@@ -1,0 +1,1002 @@
+{
+  "schema": "melee-web-h1-first-use-checkpoint-v1",
+  "evidence_label": "Browser exercised / private diagnostic prefix; rendering attribution unresolved",
+  "source_head": "6ee4a07a95b0cf760b9e7796d780b21c33b93812",
+  "private_inventory": "match-rollback-feasibility-20261012-203633-e8f0c964",
+  "runtime_build": {
+    "artifact": "h1-provenance-build-identity-v1.json",
+    "bytes": 2151,
+    "sha256": "1fa5f4ec1cdd436bcde6a0d919a7dd9bffc74af774911f3bc1d6445497d822c4"
+  },
+  "served_manifest": {
+    "artifact": "h1-served-runtime-manifest-v1.json",
+    "bytes": 1539786,
+    "sha256": "1e5dd9fb47701a98b705b9d7eab712091fcd2726d5572a1ff2376b88b4bb2e3d"
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "report": {
+        "artifact": "h1-first-use-browser-v1/browser/report.json",
+        "bytes": 135763,
+        "sha256": "5207fe69fde3a36e025e97389c5d0d2fb96d0615975bde90f763c24523fbc94c"
+      },
+      "owner": {
+        "artifact": "h1-first-use-browser-v1/owner.json",
+        "bytes": 90198,
+        "sha256": "3598c3cada7ec9052bf5f0977639d6343a2748904605e919778b16e6e703e9b3"
+      },
+      "first_failure": {
+        "artifact": "h1-first-use-browser-v1/first-failure-receipt.json",
+        "bytes": 2190,
+        "sha256": "df8ca18329adea817745c13d4b06f44347087888c62cf35fe7cc286f4cd5d192"
+      },
+      "outcome": "INCOMPLETE_OR_FAILED",
+      "first_error": "Error: alpha H1 first collector failure: record-context-binding-identity-mismatch",
+      "source": "6ee4a07a95b0cf760b9e7796d780b21c33b93812",
+      "scope": "No rendering target; failed diagnostic only"
+    },
+    {
+      "attempt": 2,
+      "report": {
+        "artifact": "h1-first-use-browser-v2/browser/report.json",
+        "bytes": 8994644,
+        "sha256": "7470d484350a97fa8b378a397b916363b1eb2b39804eda08a1aca24b467706ca"
+      },
+      "owner": {
+        "artifact": "h1-first-use-browser-v2/owner.json",
+        "bytes": 210559,
+        "sha256": "9c74c7910a3e09555f4c42497daf5e1323608dc66454760122dacb6fe0f48e50"
+      },
+      "first_failure": {
+        "artifact": "h1-first-use-browser-v2/first-failure-receipt.json",
+        "bytes": 14559,
+        "sha256": "cb8368f071506f61e6a4028d64ccf6ebb4561122167b78eb55b2faf6413c8063"
+      },
+      "outcome": "INCOMPLETE_OR_FAILED",
+      "first_error": "AssertionError [ERR_ASSERTION]: P2 combat approach tap did not resolve to exactly one captured active source row",
+      "source": "6ee4a07a95b0cf760b9e7796d780b21c33b93812",
+      "scope": "No rendering target; failed diagnostic only"
+    },
+    {
+      "attempt": 3,
+      "report": {
+        "artifact": "h1-first-use-browser-v3/browser/report.json",
+        "bytes": 9520566,
+        "sha256": "89e7372f0c9997935052c95bf180fa322d55ef59758b13d182403319228e9bf2"
+      },
+      "owner": {
+        "artifact": "h1-first-use-browser-v3/owner.json",
+        "bytes": 176586,
+        "sha256": "0d95115fcc869890fb0ca108840d969795bac0ff39a9c44f1a5096e2e018e954"
+      },
+      "first_failure": {
+        "artifact": "h1-first-use-browser-v3/first-failure-receipt.json",
+        "bytes": 7349,
+        "sha256": "5dd416843d4a856a04c2ced89d048562b2e5371e6047ae0a013d8a3a6a5760f9"
+      },
+      "outcome": "INCOMPLETE_OR_FAILED",
+      "first_error": "AssertionError [ERR_ASSERTION]: P2 combat approach tap did not resolve to exactly one captured active source row",
+      "source": "6ee4a07a95b0cf760b9e7796d780b21c33b93812",
+      "scope": "No rendering target; failed diagnostic only",
+      "input_failure": {
+        "tap": 4,
+        "active_rows": [
+          569,
+          570
+        ],
+        "active_poll_serials": [
+          1186,
+          1187
+        ],
+        "neutral_row": 571,
+        "earlier_validated_taps": [
+          1,
+          2,
+          3
+        ]
+      },
+      "native_final_status": {
+        "alpha": {
+          "capture_active": false,
+          "valid": true,
+          "final": true,
+          "invalid_reason": 0,
+          "invalid_reason_name": "none",
+          "capture_generation": 1,
+          "renderer_generation": 1,
+          "device_generation": 1,
+          "next_sequence": 655703,
+          "errors": 0,
+          "dropped": 0,
+          "open_scopes": 0,
+          "total_records": 655702,
+          "drained_records": 655702,
+          "pending_records": 0,
+          "descriptor_count": 890
+        },
+        "beta": {
+          "capture_active": false,
+          "valid": true,
+          "final": true,
+          "invalid_reason": 0,
+          "invalid_reason_name": "none",
+          "capture_generation": 1,
+          "renderer_generation": 1,
+          "device_generation": 1,
+          "next_sequence": 657771,
+          "errors": 0,
+          "dropped": 0,
+          "open_scopes": 0,
+          "total_records": 657770,
+          "drained_records": 657770,
+          "pending_records": 0,
+          "descriptor_count": 890
+        }
+      },
+      "raw_streams": {
+        "alpha": {
+          "file": "h1-pipeline-provenance/alpha.provenance.bin",
+          "bytes": 286287253,
+          "sha256": "9fe014fdf54949dbc1c088d2fcec056fb8cee644cffd12964f23c7922185b8b4"
+        },
+        "beta": {
+          "file": "h1-pipeline-provenance/beta.provenance.bin",
+          "bytes": 286155348,
+          "sha256": "0ae2550eaf4d7629d6dae26368f3ef2674bc11563b238e0c3682e29359080625"
+        }
+      },
+      "historical_pad_first_mismatch": {
+        "alpha": 130,
+        "beta": 153
+      },
+      "owned_process_absence": 21
+    }
+  ],
+  "current_decision": "Retain the first source-bound respawn preparation event and reduce its created descriptors offline. Full diagnostic remains incomplete because beta has a canceled input publication attempt. No new capture or pipeline preparation change released.",
+  "candidate_and_review": [
+    {
+      "artifact": "h1-first-use-candidate-v9/freeze-manifest.json",
+      "bytes": 3983,
+      "sha256": "389b527b78bdc822202d97f48f61bd9547c72209261565284236e922757c0acf"
+    },
+    {
+      "artifact": "h1-first-use-candidate-v9-independent-review-v1.json",
+      "bytes": 9722,
+      "sha256": "12a89a3920cb849e7564898e941e222a776c1d68d3c3393a1bd932c5733b5eda"
+    },
+    {
+      "artifact": "h1-first-use-browser-v3-independent-first-failure-review-v1.json",
+      "bytes": 35050,
+      "sha256": "4bb2c8383bc8fce16a2fc2dd1045a6e2e44e057d64cb178234e9e6521e7b7b2e"
+    },
+    {
+      "artifact": "h1-self-ko-respawn-prefix-source-plan-v1.json",
+      "bytes": 10285,
+      "sha256": "d5e1b93abd2824746973225ba198825d0cbe53fbf75c1ca63d5705061e1d9a85"
+    }
+  ],
+  "exclusions": [
+    "No same-input/seed/history equivalence to retained combat failure; recipe hashes are not complete consumed input transcript hashes.",
+    "No changed native arithmetic/RNG/source input/draw order/timing guard/deadline.",
+    "No full route, performance, rollback or acceptance claim.",
+    "Native recorder closure is valid in attempt3; H1 timing getters continued twice per peer after finish, so stronger no-native-command quiescence is incomplete.",
+    "Self-KO attempt identifies a generic respawn preparation event and six same-frame create records; exact descriptor-byte availability and causal preparation policy remain under review."
+  ],
+  "self_ko_diagnostic": {
+    "result": "INCOMPLETE_OR_FAILED_WITH_SOURCE_BOUND_RESPAWN_PREPARATION",
+    "runtime_producer": "6ee4a07a95b0cf760b9e7796d780b21c33b93812",
+    "clean_documentation_head": "c6b237659f8b90d35d2a89a5fbc1c1049292f522",
+    "input_recipe_sha256": "7582f368ba9372025b7ef229ec928fff7f50d33d0052c8f05dd2220a0e4cce44",
+    "first_error": "Error: H1 first source-backed preparation target reached for alpha",
+    "joined_target": {
+      "kind": "generic-live-preparation-exact-frame-join",
+      "preparation_host_sequence": 3039,
+      "timing_host_sequence": 3040,
+      "callback_interval": 1745,
+      "frame_id": 1279,
+      "world_generation": 3,
+      "source_tick": 317,
+      "native_menu_phase": 7,
+      "native_menu_running": 0,
+      "attribution": "same returned original draw/callback; descriptor ownership and queued-work cause are not inferred"
+    },
+    "joined_coordinates": {
+      "native_provenance_source_tick": 317,
+      "runtime_source_cursor": 641,
+      "native_match_frame": 193,
+      "timing_callback_frame": 1131,
+      "renderer_frame_id": 1279,
+      "native_provenance_scene": 4,
+      "native_provenance_phase": 6,
+      "p1_motion_id": 12,
+      "stocks": [
+        3,
+        4
+      ],
+      "peer_renderer_frame_ids": {
+        "alpha": 1279,
+        "beta": 821
+      }
+    },
+    "frame_membership": {
+      "demand_records": 1265,
+      "unique_descriptor_hashes": 41,
+      "created_records": 6,
+      "created_descriptor_rows": [
+        {
+          "record": {
+            "sequence": 730473,
+            "kind": "create",
+            "scope_id": 106189,
+            "thread_id": 1,
+            "context_index": 93,
+            "renderer_generation": 1,
+            "device_generation": 1,
+            "frame_id": 1279,
+            "packet_id": 0,
+            "type": 1,
+            "pipeline_ref": "0x00000000a954ef12",
+            "config_version": 65549,
+            "descriptor_sha256": "7210814ff506356b71b0e8dfc4675d9ead99887b7f8503e1233be6dd68d59445",
+            "outcome": "created"
+          },
+          "context": {
+            "scene": 4,
+            "phase": 6,
+            "world_generation": 3,
+            "route_epoch": 7,
+            "source_tick": 317,
+            "coverage_case_id": 1,
+            "input_binding_sha256": "7582f368ba9372025b7ef229ec928fff7f50d33d0052c8f05dd2220a0e4cce44",
+            "stage": 32,
+            "ground": 37,
+            "hud_layout": 4,
+            "gobj_classifier": 4,
+            "gx_link": 5,
+            "render_pass": 0,
+            "active_player_count": 2,
+            "players": [
+              {
+                "character": 8,
+                "fighter_kind": 0,
+                "costume": 1,
+                "subcolor": 0,
+                "effect_bank": 1,
+                "motion_id": 12,
+                "stocks": 3
+              },
+              {
+                "character": 8,
+                "fighter_kind": 0,
+                "costume": 0,
+                "subcolor": 0,
+                "effect_bank": 1,
+                "motion_id": 14,
+                "stocks": 4
+              },
+              {
+                "character": 0,
+                "fighter_kind": 0,
+                "costume": 0,
+                "subcolor": 0,
+                "effect_bank": 0,
+                "motion_id": -1,
+                "stocks": -1
+              },
+              {
+                "character": 0,
+                "fighter_kind": 0,
+                "costume": 0,
+                "subcolor": 0,
+                "effect_bank": 0,
+                "motion_id": -1,
+                "stocks": -1
+              }
+            ],
+            "owner_kind": 3,
+            "owner_id": 4,
+            "owner_effect_bank": 4294967295,
+            "owner_explicit_unknown": true
+          }
+        },
+        {
+          "record": {
+            "sequence": 730476,
+            "kind": "create",
+            "scope_id": 106189,
+            "thread_id": 1,
+            "context_index": 93,
+            "renderer_generation": 1,
+            "device_generation": 1,
+            "frame_id": 1279,
+            "packet_id": 0,
+            "type": 1,
+            "pipeline_ref": "0x0000000088a55434",
+            "config_version": 65549,
+            "descriptor_sha256": "47fbb55564245fac62540a09d2a3baf7a782292af212241948ba3017909302a4",
+            "outcome": "created"
+          },
+          "context": {
+            "scene": 4,
+            "phase": 6,
+            "world_generation": 3,
+            "route_epoch": 7,
+            "source_tick": 317,
+            "coverage_case_id": 1,
+            "input_binding_sha256": "7582f368ba9372025b7ef229ec928fff7f50d33d0052c8f05dd2220a0e4cce44",
+            "stage": 32,
+            "ground": 37,
+            "hud_layout": 4,
+            "gobj_classifier": 4,
+            "gx_link": 5,
+            "render_pass": 0,
+            "active_player_count": 2,
+            "players": [
+              {
+                "character": 8,
+                "fighter_kind": 0,
+                "costume": 1,
+                "subcolor": 0,
+                "effect_bank": 1,
+                "motion_id": 12,
+                "stocks": 3
+              },
+              {
+                "character": 8,
+                "fighter_kind": 0,
+                "costume": 0,
+                "subcolor": 0,
+                "effect_bank": 1,
+                "motion_id": 14,
+                "stocks": 4
+              },
+              {
+                "character": 0,
+                "fighter_kind": 0,
+                "costume": 0,
+                "subcolor": 0,
+                "effect_bank": 0,
+                "motion_id": -1,
+                "stocks": -1
+              },
+              {
+                "character": 0,
+                "fighter_kind": 0,
+                "costume": 0,
+                "subcolor": 0,
+                "effect_bank": 0,
+                "motion_id": -1,
+                "stocks": -1
+              }
+            ],
+            "owner_kind": 3,
+            "owner_id": 4,
+            "owner_effect_bank": 4294967295,
+            "owner_explicit_unknown": true
+          }
+        },
+        {
+          "record": {
+            "sequence": 730481,
+            "kind": "create",
+            "scope_id": 106189,
+            "thread_id": 1,
+            "context_index": 93,
+            "renderer_generation": 1,
+            "device_generation": 1,
+            "frame_id": 1279,
+            "packet_id": 0,
+            "type": 1,
+            "pipeline_ref": "0x00000000e456dc79",
+            "config_version": 65549,
+            "descriptor_sha256": "53502fad1fd52f172d9ea116a28820ea9cdfad0ec3f0a55af48e3d16ea4452d1",
+            "outcome": "created"
+          },
+          "context": {
+            "scene": 4,
+            "phase": 6,
+            "world_generation": 3,
+            "route_epoch": 7,
+            "source_tick": 317,
+            "coverage_case_id": 1,
+            "input_binding_sha256": "7582f368ba9372025b7ef229ec928fff7f50d33d0052c8f05dd2220a0e4cce44",
+            "stage": 32,
+            "ground": 37,
+            "hud_layout": 4,
+            "gobj_classifier": 4,
+            "gx_link": 5,
+            "render_pass": 0,
+            "active_player_count": 2,
+            "players": [
+              {
+                "character": 8,
+                "fighter_kind": 0,
+                "costume": 1,
+                "subcolor": 0,
+                "effect_bank": 1,
+                "motion_id": 12,
+                "stocks": 3
+              },
+              {
+                "character": 8,
+                "fighter_kind": 0,
+                "costume": 0,
+                "subcolor": 0,
+                "effect_bank": 1,
+                "motion_id": 14,
+                "stocks": 4
+              },
+              {
+                "character": 0,
+                "fighter_kind": 0,
+                "costume": 0,
+                "subcolor": 0,
+                "effect_bank": 0,
+                "motion_id": -1,
+                "stocks": -1
+              },
+              {
+                "character": 0,
+                "fighter_kind": 0,
+                "costume": 0,
+                "subcolor": 0,
+                "effect_bank": 0,
+                "motion_id": -1,
+                "stocks": -1
+              }
+            ],
+            "owner_kind": 3,
+            "owner_id": 4,
+            "owner_effect_bank": 4294967295,
+            "owner_explicit_unknown": true
+          }
+        },
+        {
+          "record": {
+            "sequence": 730483,
+            "kind": "create",
+            "scope_id": 106189,
+            "thread_id": 1,
+            "context_index": 93,
+            "renderer_generation": 1,
+            "device_generation": 1,
+            "frame_id": 1279,
+            "packet_id": 0,
+            "type": 1,
+            "pipeline_ref": "0x0000000060365c92",
+            "config_version": 65549,
+            "descriptor_sha256": "c57b5f4bc8497f206c4675d12cbbfc03f502dabd67690b9e0fbe04237251c772",
+            "outcome": "created"
+          },
+          "context": {
+            "scene": 4,
+            "phase": 6,
+            "world_generation": 3,
+            "route_epoch": 7,
+            "source_tick": 317,
+            "coverage_case_id": 1,
+            "input_binding_sha256": "7582f368ba9372025b7ef229ec928fff7f50d33d0052c8f05dd2220a0e4cce44",
+            "stage": 32,
+            "ground": 37,
+            "hud_layout": 4,
+            "gobj_classifier": 4,
+            "gx_link": 5,
+            "render_pass": 0,
+            "active_player_count": 2,
+            "players": [
+              {
+                "character": 8,
+                "fighter_kind": 0,
+                "costume": 1,
+                "subcolor": 0,
+                "effect_bank": 1,
+                "motion_id": 12,
+                "stocks": 3
+              },
+              {
+                "character": 8,
+                "fighter_kind": 0,
+                "costume": 0,
+                "subcolor": 0,
+                "effect_bank": 1,
+                "motion_id": 14,
+                "stocks": 4
+              },
+              {
+                "character": 0,
+                "fighter_kind": 0,
+                "costume": 0,
+                "subcolor": 0,
+                "effect_bank": 0,
+                "motion_id": -1,
+                "stocks": -1
+              },
+              {
+                "character": 0,
+                "fighter_kind": 0,
+                "costume": 0,
+                "subcolor": 0,
+                "effect_bank": 0,
+                "motion_id": -1,
+                "stocks": -1
+              }
+            ],
+            "owner_kind": 3,
+            "owner_id": 4,
+            "owner_effect_bank": 4294967295,
+            "owner_explicit_unknown": true
+          }
+        },
+        {
+          "record": {
+            "sequence": 730887,
+            "kind": "create",
+            "scope_id": 106208,
+            "thread_id": 1,
+            "context_index": 112,
+            "renderer_generation": 1,
+            "device_generation": 1,
+            "frame_id": 1279,
+            "packet_id": 0,
+            "type": 1,
+            "pipeline_ref": "0x000000000da142cc",
+            "config_version": 65549,
+            "descriptor_sha256": "11162b0ef548ca81311c56c60648ad88b4cec6d6a43c2081cae8006a1e25f018",
+            "outcome": "created"
+          },
+          "context": {
+            "scene": 4,
+            "phase": 6,
+            "world_generation": 3,
+            "route_epoch": 7,
+            "source_tick": 317,
+            "coverage_case_id": 1,
+            "input_binding_sha256": "7582f368ba9372025b7ef229ec928fff7f50d33d0052c8f05dd2220a0e4cce44",
+            "stage": 32,
+            "ground": 37,
+            "hud_layout": 4,
+            "gobj_classifier": 4,
+            "gx_link": 5,
+            "render_pass": 2,
+            "active_player_count": 2,
+            "players": [
+              {
+                "character": 8,
+                "fighter_kind": 0,
+                "costume": 1,
+                "subcolor": 0,
+                "effect_bank": 1,
+                "motion_id": 12,
+                "stocks": 3
+              },
+              {
+                "character": 8,
+                "fighter_kind": 0,
+                "costume": 0,
+                "subcolor": 0,
+                "effect_bank": 1,
+                "motion_id": 14,
+                "stocks": 4
+              },
+              {
+                "character": 0,
+                "fighter_kind": 0,
+                "costume": 0,
+                "subcolor": 0,
+                "effect_bank": 0,
+                "motion_id": -1,
+                "stocks": -1
+              },
+              {
+                "character": 0,
+                "fighter_kind": 0,
+                "costume": 0,
+                "subcolor": 0,
+                "effect_bank": 0,
+                "motion_id": -1,
+                "stocks": -1
+              }
+            ],
+            "owner_kind": 3,
+            "owner_id": 4,
+            "owner_effect_bank": 4294967295,
+            "owner_explicit_unknown": true
+          }
+        },
+        {
+          "record": {
+            "sequence": 730889,
+            "kind": "create",
+            "scope_id": 106208,
+            "thread_id": 1,
+            "context_index": 112,
+            "renderer_generation": 1,
+            "device_generation": 1,
+            "frame_id": 1279,
+            "packet_id": 0,
+            "type": 1,
+            "pipeline_ref": "0x0000000029ba895b",
+            "config_version": 65549,
+            "descriptor_sha256": "af384190d7190036573cfa07ff20e9432b854ea869967d3aa0888e42449dd588",
+            "outcome": "created"
+          },
+          "context": {
+            "scene": 4,
+            "phase": 6,
+            "world_generation": 3,
+            "route_epoch": 7,
+            "source_tick": 317,
+            "coverage_case_id": 1,
+            "input_binding_sha256": "7582f368ba9372025b7ef229ec928fff7f50d33d0052c8f05dd2220a0e4cce44",
+            "stage": 32,
+            "ground": 37,
+            "hud_layout": 4,
+            "gobj_classifier": 4,
+            "gx_link": 5,
+            "render_pass": 2,
+            "active_player_count": 2,
+            "players": [
+              {
+                "character": 8,
+                "fighter_kind": 0,
+                "costume": 1,
+                "subcolor": 0,
+                "effect_bank": 1,
+                "motion_id": 12,
+                "stocks": 3
+              },
+              {
+                "character": 8,
+                "fighter_kind": 0,
+                "costume": 0,
+                "subcolor": 0,
+                "effect_bank": 1,
+                "motion_id": 14,
+                "stocks": 4
+              },
+              {
+                "character": 0,
+                "fighter_kind": 0,
+                "costume": 0,
+                "subcolor": 0,
+                "effect_bank": 0,
+                "motion_id": -1,
+                "stocks": -1
+              },
+              {
+                "character": 0,
+                "fighter_kind": 0,
+                "costume": 0,
+                "subcolor": 0,
+                "effect_bank": 0,
+                "motion_id": -1,
+                "stocks": -1
+              }
+            ],
+            "owner_kind": 3,
+            "owner_id": 4,
+            "owner_effect_bank": 4294967295,
+            "owner_explicit_unknown": true
+          }
+        }
+      ],
+      "scope": "These are same-frame records, not proof of one causal descriptor, full resource ownership, or duration.",
+      "first_create_scope": "All six hashes have their first retained create/created records in this target frame on each peer; this is not a per-descriptor GPU cause/duration join.",
+      "ownership": "FIGHTER bucket, owner_id/gobj_classifier4, gx_link5, render_pass0 for four records and render_pass2 for two, owner_effect_bank4294967295, owner_explicit_unknown=true; instance/platform/effect unidentified.",
+      "descriptor_bytes": "Native JSON retains SHA/type/config version/byte count only; no canonical config bytes in this stream."
+    },
+    "timing_observation": {
+      "valid": true,
+      "source_steps": 1,
+      "source_draws": 1,
+      "queued_delta": 0,
+      "created_delta": 6,
+      "scope": "Private recorder overhead; no performance claim."
+    },
+    "stock_loss_observations": [
+      {
+        "remaining_p1_stocks": 3,
+        "before_frame": 122,
+        "first_observed_frame": 134,
+        "first_observed_source_tick": 582,
+        "before_source_tick": 570,
+        "observed_after_action_label": "P1 outward A walk-off attempt from 4 stocks",
+        "attribution": "observation window only; no causal claim about the keyboard pulse",
+        "observed_by_peer": [
+          {
+            "peer": "alpha",
+            "source_frame": 134,
+            "stocks": [
+              3,
+              4
+            ],
+            "position": -162.218796,
+            "motion": 0,
+            "groundAir": 1
+          },
+          {
+            "peer": "beta",
+            "source_frame": 134,
+            "stocks": [
+              3,
+              4
+            ],
+            "position": -162.218796,
+            "motion": 0,
+            "groundAir": 1
+          }
+        ]
+      }
+    ],
+    "completed_grounded_respawns": 0,
+    "profiles": {
+      "alpha": {
+        "collector": {
+          "native_records": 731259,
+          "background_import_records": 884,
+          "chunks": 1292,
+          "raw_file_bytes": 321865977,
+          "host_sequence": 3082,
+          "native_sequence_end": 731259,
+          "failure": null,
+          "match_start_ready_admitted": true,
+          "final_status": {
+            "capture_active": false,
+            "valid": true,
+            "final": true,
+            "invalid_reason": 0,
+            "invalid_reason_name": "none",
+            "capture_generation": 1,
+            "renderer_generation": 1,
+            "device_generation": 1,
+            "next_sequence": 731260,
+            "errors": 0,
+            "dropped": 0,
+            "open_scopes": 0,
+            "total_records": 731259,
+            "drained_records": 731259,
+            "pending_records": 0,
+            "descriptor_count": 896
+          }
+        },
+        "observation_retirement": {
+          "observations_retired": true,
+          "original_callbacks_preserved": true,
+          "scope": "H1 timing/preparation getter collection only; final chunks and other owners remain active"
+        },
+        "final_chunk_byte_length": 483,
+        "final_chunk_delivered": true,
+        "ordinary_leave": {
+          "attempted": true,
+          "status": "Disconnected by your choice. Route outcome is not assessed.",
+          "close_mode": "normal",
+          "endpoint_closed": true,
+          "transport_cleanup": {
+            "closed": true,
+            "type": "room-websocket"
+          }
+        },
+        "native_unload": {
+          "attempted": true,
+          "phase": 0,
+          "running": 0
+        },
+        "local_pad": {
+          "validated": true,
+          "count_in_retained_cleanup_report": 641,
+          "cancelled_publications": []
+        }
+      },
+      "beta": {
+        "collector": {
+          "native_records": 732084,
+          "background_import_records": 884,
+          "chunks": 835,
+          "raw_file_bytes": 321466627,
+          "host_sequence": 2190,
+          "native_sequence_end": 732084,
+          "failure": null,
+          "match_start_ready_admitted": true,
+          "final_status": {
+            "capture_active": false,
+            "valid": true,
+            "final": true,
+            "invalid_reason": 0,
+            "invalid_reason_name": "none",
+            "capture_generation": 1,
+            "renderer_generation": 1,
+            "device_generation": 1,
+            "next_sequence": 732085,
+            "errors": 0,
+            "dropped": 0,
+            "open_scopes": 0,
+            "total_records": 732084,
+            "drained_records": 732084,
+            "pending_records": 0,
+            "descriptor_count": 896
+          }
+        },
+        "observation_retirement": {
+          "observations_retired": true,
+          "original_callbacks_preserved": true,
+          "scope": "H1 timing/preparation getter collection only; final chunks and other owners remain active"
+        },
+        "final_chunk_byte_length": 483,
+        "final_chunk_delivered": true,
+        "ordinary_leave": {
+          "attempted": true,
+          "status": "Disconnected by your choice. Route outcome is not assessed.",
+          "close_mode": "normal",
+          "endpoint_closed": true,
+          "transport_cleanup": {
+            "closed": true,
+            "type": "room-websocket"
+          }
+        },
+        "native_unload": {
+          "attempted": true,
+          "phase": 0,
+          "running": 0
+        },
+        "local_pad": {
+          "validated": false,
+          "count_in_retained_cleanup_report": 642,
+          "cancelled_publications": [
+            {
+              "source_cursor": 641,
+              "input_tick": 641,
+              "local_port": 1,
+              "poll_serial": 1295,
+              "bytes": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "disposition": "cancelled_unpublished",
+              "reason": "closed_transport_send",
+              "packet_sequence": 3840,
+              "publication_scope": "this_state_packet_attempt_only",
+              "packet_input_ticks": [
+                641
+              ]
+            }
+          ],
+          "error": "Error: beta: live local PAD capture is missing, canceled, or inconsistent"
+        }
+      }
+    },
+    "cleanup": {
+      "owner_pass": true,
+      "process_observation_passed": true,
+      "independently_checked_browser_pids": [
+        77456,
+        77475,
+        77479,
+        77480,
+        77481,
+        77482,
+        77491,
+        77492,
+        77493,
+        77497,
+        77543,
+        77547,
+        77548,
+        77549,
+        77550,
+        77552,
+        77553,
+        77555,
+        77577,
+        77607,
+        77610
+      ],
+      "live_pids": [],
+      "capture_group_absent": true,
+      "server_group_absent": true
+    },
+    "artifacts": [
+      {
+        "artifact": "h1-self-ko-prefix-browser-v1/release.json",
+        "bytes": 6204,
+        "sha256": "c25022673567404f5dfe36ee38c2afe172fd366ebb8499225162490fae97174d"
+      },
+      {
+        "artifact": "h1-self-ko-prefix-browser-v1/launcher-result.json",
+        "bytes": 202209,
+        "sha256": "8cf9e382446ae8c20a747cf86233a291dfa70fc65cfe5abadcd6ee0a5a95203a"
+      },
+      {
+        "artifact": "h1-self-ko-prefix-browser-v1/owner.json",
+        "bytes": 199169,
+        "sha256": "a54bff388f04de53d85f2d1488446d08435f54bc62882c952de0d49e836a582c"
+      },
+      {
+        "artifact": "h1-self-ko-prefix-browser-v1/browser/report.json",
+        "bytes": 10050450,
+        "sha256": "6c0a8189b431de652e63b18f3d1f0a5697b3216ff8eadeb9570554dd2e7d2a7e"
+      },
+      {
+        "artifact": "h1-self-ko-prefix-browser-v1/browser/h1-pipeline-provenance/alpha.provenance.bin",
+        "bytes": 321865977,
+        "sha256": "4d8b57984f6b7cfaad7dfc9e12e5c29f35ac57aff328be9bc3ec1dd22bd7362c"
+      },
+      {
+        "artifact": "h1-self-ko-prefix-browser-v1/browser/h1-pipeline-provenance/beta.provenance.bin",
+        "bytes": 321466627,
+        "sha256": "3c8b3a3ac87b44b4135f3a44f4f9ff5944bf7dc3a6649eda5c0045acf0aed3d8"
+      },
+      {
+        "artifact": "h1-self-ko-prefix-browser-v1/browser/h1-pipeline-provenance/alpha.receipts.jsonl",
+        "bytes": 1727438,
+        "sha256": "e57acddb6f6617e8ce7538cbcea0d6ebf7d380f707c37b598e162949a0b564f7"
+      },
+      {
+        "artifact": "h1-self-ko-prefix-browser-v1/browser/h1-pipeline-provenance/beta.receipts.jsonl",
+        "bytes": 1200060,
+        "sha256": "c61e2d349d49dc27e3ada86d26cf1a19f9d5a4d60ccef5a71d3e964beb955f28"
+      },
+      {
+        "artifact": "h1-self-ko-prefix-browser-v1/browser/h1-pipeline-provenance/alpha.timing.jsonl",
+        "bytes": 3307502,
+        "sha256": "8b387c49a9e4845412413fa48cba99caa4c66a16c8ad6d649e8c0d4a6663c996"
+      },
+      {
+        "artifact": "h1-self-ko-prefix-browser-v1/browser/h1-pipeline-provenance/beta.timing.jsonl",
+        "bytes": 2485922,
+        "sha256": "372d80f61cae307bb17a15ab2f8f503731d6a0b438d670b56d889ab72653b144"
+      },
+      {
+        "artifact": "h1-self-ko-prefix-browser-v1/browser/h1-local-pad/alpha.actual-local-pad.json",
+        "bytes": 168543,
+        "sha256": "35274612ca8f20067193715ae42d403a9c01bfa53000b299714bf8cdbda78b46"
+      },
+      {
+        "artifact": "h1-self-ko-prefix-browser-v1/alpha-target-frame-created-rows.json",
+        "bytes": 13057,
+        "sha256": "592e68698418d8d493247830c4966150febaf6e467995741ca7ab487da24e7ee"
+      },
+      {
+        "artifact": "h1-self-ko-prefix-browser-v1/root-result-receipt-v1.json",
+        "bytes": 33037,
+        "sha256": "58cd6539cddfbdf00f70cca4874db3ae5a5d02ef7be314a9f8ec4c839bc57182"
+      },
+      {
+        "artifact": "h1-self-ko-prefix-candidate-v2/freeze-manifest.json",
+        "bytes": 4548,
+        "sha256": "a551285c4b4d00dcc9f5921d168c360fbe0ca31b6385894ecee4d0e8829ba9bd"
+      },
+      {
+        "artifact": "h1-self-ko-prefix-candidate-v2-independent-review-v1.json",
+        "bytes": 3725,
+        "sha256": "dbeffeb7f02353e397f05dd7c8c5adbb623dfbdd3f91cc0d13d87087bba10aba"
+      }
+    ],
+    "independent_result_review": {
+      "artifact": "h1-self-ko-prefix-browser-v1/independent-result-review-v1.json",
+      "bytes": 49101,
+      "sha256": "9bfabb25be78a92329ff6288021db29a7eb5932c2fe88bb12a9b454132f619ee",
+      "erratum": {
+        "artifact": "h1-self-ko-prefix-browser-v1/independent-result-review-v1-render-pass-erratum.json",
+        "bytes": 4239,
+        "sha256": "08a89ded40b37e1f318f939505afde2c5368513e205d98f6fe50434738bf6c2d"
+      }
+    },
+    "scope": "Different actual keyboard recipe; no historical combat equivalence, complete diagnostic input witness, completed respawn, H1 fix or acceptance. No replay/Resume/prewarm/timing changes.",
+    "post_target_scope": "Stop is at the next existing harness boundary, not a synchronous source freeze. Beta has one later source step/draw before cleanup (native match frame194/runtime cursor642 versus target193/641).",
+    "input_refusal_scope": "Beta canceled publication is scoped to one state-packet attempt. It is not proof that the input row was never published in another packet or consumed. The unchanged full witness validator refuses this capture."
+  },
+  "prior_portable_checkpoint": {
+    "artifact": "h1-first-use-portable-checkpoint-v1.json",
+    "sha256": "25008efd63cf05b54cb94745c19888a19e4b979838e8921c7a509e693b025d37"
+  }
+}

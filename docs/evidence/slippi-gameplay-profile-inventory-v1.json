@@ -199,7 +199,7 @@
     "ishiiruka_readme_notice": "Pinned Ishiiruka Readme.md: GPL version 2 or later (GPLv2+).",
     "ishiiruka_exi_source_header": "Pinned EXI_DeviceSlippi.cpp header: GPLv2+.",
     "ishiiruka_license_text": "Pinned root license.txt is GNU GPL version 2 text.",
-    "m_ex_binary": "The generated m-ex.bin payload is referenced from a separate source project; its exact binary provenance/license was not audited.",
+    "m_ex_binary": "The v4 source-provenance follow-up matched the selected ASM Binary/m-ex.bin Git blob to JLaferri/m-ex asm/m-ex.bin at the identified artifact-changing commit. Exact source/toolchain generation and complete contributor/reuse rights remain unresolved; no legal clearance is inferred.",
     "conclusion": "These source/repository notices are distinct across repositories. Do not infer a combined binary redistribution permission. This is not legal advice, a complete contributor-provenance analysis, or permission to reuse. Review exact files, artifacts, contributors and distribution plan before reuse."
   },
   "configured_code_categories": [
@@ -1258,7 +1258,7 @@
     "caveat": "PinnedsourceJSONbehavior verified; historical executable producing checked-in generatedoutput remainsunknown. No inferred historicalproduceridentity."
   },
   "gameplay_effect_inventory": {
-    "coverage": "Source-only partial checkpoint: 183 unique annotated active ASM hook paths among 288 generated default records; 27 ASM hooks are tagged affects-gameplay. Of 156 untagged ASM hooks, 24 unique paths have bounded source checks: six from the original v4 inventory, six in the corrected prior packet (v1 and v2 are versions of that same six-hook set), and twelve in the corrected v4 packet. The sets are disjoint; 132 lack a bounded check. Root applied the corrected packet after independent source review; the portable summary separately corrects ledge-grab count units and ClientPause callback ownership. Neither tagging nor bounded checks complete semantic coverage, and no client binary/profile runtime activation or acceptance is validated.",
+    "coverage": "Source-only partial checkpoint: 183 unique annotated active ASM hook paths among 288 generated default records; 27 ASM hooks are tagged affects-gameplay. Of 156 untagged ASM hooks, 30 unique paths have bounded source checks: six from the original v4 inventory, six in the corrected prior packet (v1 and v2 are versions of that same six-hook set), twelve in the corrected v4 packet, and six in the v5 packet. The sets are disjoint; 126 lack a bounded check. Tagging and bounded checks do not complete semantic coverage, and neither establishes runtime activation, executable identity, or profile acceptance.",
     "active_tagged_gameplay_hook_count": 27,
     "active_tagged_hooks": [
       {
@@ -1795,7 +1795,7 @@
         "review_packet": "slippi-untagged-gameplay-review-v2"
       }
     ],
-    "untagged_active_hook_semantics_unreviewed_count": 132,
+    "untagged_active_hook_semantics_unreviewed_count": 126,
     "active_source_file_notes": {
       "selected_roots_total_files": 198,
       "asm_hook_sources": 183,
@@ -1838,7 +1838,7 @@
       }
     ],
     "untagged_active_hook_total_count": 156,
-    "untagged_active_hook_bounded_review_count": 24,
+    "untagged_active_hook_bounded_review_count": 30,
     "additional_support_source_bounded_review_count": 1,
     "untagged_gameplay_hook_review_v2": {
       "packet": "slippi-untagged-gameplay-review-v2",
@@ -2354,11 +2354,320 @@
         "sha256": "826eaf222975fb7ca1800aa80ed747fb8c5c977dfcd3d87727c5ed61bbdef999",
         "scope": "Reviewed six-file pre-promotion bytes and permitted only this review-label promotion; source/reference/semantic gaps remain open."
       }
+    },
+    "untagged_gameplay_hook_review_v5": {
+      "packet": "slippi-untagged-gameplay-review-v5",
+      "run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+      "source_repository": "project-slippi/slippi-ssbm-asm",
+      "source_commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+      "status": "Bounded source/config review; static selection only; no runtime activation or executable/profile acceptance.",
+      "packet_manifest_sha256": "ace88153a5b652972f61ac6728043f0ba1aef6104df0631f774e1c1e2c754624",
+      "freeze_manifest_sha256": "9b187a5552697137fc76fd66f8b59f739a9550ff4b0ce792b19ec4f869d4d5fd",
+      "report_sha256": "47a2b51cdd11a0e0b13c0020cd938987574df0010af5a8903db6c9c6a9bb0858",
+      "review_json_sha256": "2e4af5a8747d8087e205e9bfa91517140fb538276b4cd408583102b04fcfc9bb",
+      "remaining_unreviewed_sha256": "3ea13df8dd148d7f0b50e26b85de6eee082bc4bc1b80d88dfddbb57da0b243b1",
+      "configuration_selection": {
+        "configuration": "Required: Slippi Online, selected-by-default in captured GALE01r2 profile; Online/Menus recursive root; generated active records carry empty Tags.",
+        "exclusions": [
+          "No tagged hook semantics counted or re-audited.",
+          "No prior 24 unique untagged checks counted twice.",
+          "No executable, binary, runtime, or source-port claim."
+        ],
+        "group": "online SSS frozen Stadium stage-choice presentation and handoff",
+        "rationale": "This is the next cohesive unreviewed online stage-selection cluster whose chosen Stadium alternate-mode identity can affect which game setup is requested. It is scoped to six active untagged injection paths, not the tagged in-game transformation routine."
+      },
+      "coverage": {
+        "accounting": "6 original v4 inventory checks + 6 unique corrected prior checks + 12 corrected v4 batch checks + 6 new checks = 30 unique; 156 - 30 = 126 remaining.",
+        "bounded_checks_after_this_packet": 30,
+        "corrected_prior_packet_bounded_checks": 6,
+        "original_v4_inventory_bounded_checks": 6,
+        "path_sets": {
+          "corrected_prior_packet_v1_v2_same_paths": [
+            "Online/Core/ForceEngineOnRollback.asm",
+            "Online/Core/ForceInputRefetchOnAdvance.asm",
+            "Online/Core/LoopEngineForRollback.asm",
+            "Online/Core/SkipNewInputFetchOnRollback.asm",
+            "Online/Core/TriggerSendInput.asm",
+            "Online/Core/InitOnlinePlay.asm"
+          ],
+          "original_v4_inventory": [
+            "External/Disable FoD During Doubles/Disable FoD During Doubles.asm",
+            "External/DPad Down at CSS for Random Stage/DPad Down at CSS for Random Stage.asm",
+            "Online/Menus/SSS/FrozenStadiumToggle/CursorOnHoverStadium.asm",
+            "Online/Menus/SSS/FrozenStadiumToggle/CheckForFrozenOnStageName.asm",
+            "Common/UseInGameDelay/ApplyInGameDelay.asm",
+            "Common/UseInGameDelay/InitializeInGameDelay.asm"
+          ],
+          "prior_twelve_corrected_review_v4": [
+            "Common/FastForward/DynamicsFix.asm",
+            "Online/Core/InitPause.asm",
+            "Online/Core/LGLExceededGameEnd.asm",
+            "Online/Core/PauseCounter.asm",
+            "Online/Core/PreventPauseStranding.asm",
+            "Online/Core/ReportNoContestLRAS.asm",
+            "Online/Core/StartEngineLoop.asm",
+            "Online/Core/Teams/PreventDeadStranding.asm",
+            "Online/Slippi Online Scene/main.asm",
+            "Online/Static/LoadMatchState.asm",
+            "Online/Static/LoadState.asm",
+            "Online/Static/SaveState.asm"
+          ],
+          "this_packet": [
+            "Online/Menus/SSS/FrozenStadiumToggle/CheckForToggledOnStageName.asm",
+            "Online/Menus/SSS/FrozenStadiumToggle/IncMaxNames.asm",
+            "Online/Menus/SSS/FrozenStadiumToggle/StageSelectTextProc.asm",
+            "Online/Menus/SSS/FrozenStadiumToggle/StoreNameId.asm",
+            "Online/Menus/SSS/ExitSSSUponStageSelect.asm",
+            "Online/Menus/SSS/DisableLRSTART.asm"
+          ]
+        },
+        "prior_corrected_v4_reviewed_paths": 12,
+        "prior_v1_v2_are_same_six_paths": true,
+        "remaining_after_this_packet": 126,
+        "remaining_before_this_packet": 132,
+        "remaining_set_exact": true,
+        "reviewed_intersections_empty": true,
+        "reviewed_union_count": 30,
+        "this_packet_checked": 6,
+        "v4_active_annotated_hook_paths": 183,
+        "v4_tagged_gameplay_hooks": 27,
+        "v4_untagged_hooks": 156
+      },
+      "checked_hooks": [
+        {
+          "address": "80259E34",
+          "category": "Required: Slippi Online",
+          "configuration_selection": {
+            "category": "Required: Slippi Online",
+            "config_source": "v4 raw/netplay.json lines 296-300; generated GALE01r2.ini lines 10-16; generated hook record in selected-active-sources.json",
+            "generated_record": {
+              "Annotation": "Online/Menus/SSS/FrozenStadiumToggle/CheckForToggledOnStageName.asm",
+              "Codetype": "Auto",
+              "InjectionAddress": "80259E34",
+              "Name": "Required: Slippi Online",
+              "Tags": ""
+            },
+            "record_tags": "",
+            "recursive": true,
+            "runtime_activation_claimed": false,
+            "selected_root": "Online/Menus",
+            "status": "selected-by-default in the captured v4 GALE01r2 netplay profile"
+          },
+          "gameplay_relevance": "Stage-choice display reflects a Stadium alternate-mode byte that is consumed by other selected code; this hook itself updates display state and does not write the match-state buffer.",
+          "git_blob_sha": "1d13db33d29569a6b86a65924462ee7a88c709e9",
+          "mode_gate_observed_in_source": "No explicit scene comparison in this source body; source is injected at the stage-name update hook under recursively selected Online/Menus.",
+          "observed_source_behavior": "Reads the current hovered icon and the shared freeze byte at INJ_FREEZE_STADIUM+8. If the icon is Stadium (ID_GRPS=18) and the byte differs from this hook\u2019s local one-byte IS_CHANGED value, it updates IS_CHANGED and selects display ID 31 when set or ID 18 when clear, then animates and recreates the stage-name text. Other icons follow the original path.",
+          "path": "Online/Menus/SSS/FrozenStadiumToggle/CheckForToggledOnStageName.asm",
+          "source_lines": "22-59; 80-101",
+          "source_sha256": "ed4dafdd89652e93ba590dff20e839cf3691e3d5feb52713fdda0ceb1822bd57",
+          "source_url": "https://raw.githubusercontent.com/project-slippi/slippi-ssbm-asm/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Menus/SSS/FrozenStadiumToggle/CheckForToggledOnStageName.asm",
+          "unresolved_semantic_dependency": "Whether and when this display-only hook observes a synchronized selected mode depends on the separate toggle/input and match-state producer/consumer paths."
+        },
+        {
+          "address": "80259FB4",
+          "category": "Required: Slippi Online",
+          "configuration_selection": {
+            "category": "Required: Slippi Online",
+            "config_source": "v4 raw/netplay.json lines 296-300; generated GALE01r2.ini lines 10-16; generated hook record in selected-active-sources.json",
+            "generated_record": {
+              "Annotation": "Online/Menus/SSS/FrozenStadiumToggle/IncMaxNames.asm",
+              "Codetype": "Auto",
+              "InjectionAddress": "80259FB4",
+              "Name": "Required: Slippi Online",
+              "Tags": ""
+            },
+            "record_tags": "",
+            "recursive": true,
+            "runtime_activation_claimed": false,
+            "selected_root": "Online/Menus",
+            "status": "selected-by-default in the captured v4 GALE01r2 netplay profile"
+          },
+          "gameplay_relevance": "Likely extends the stage-name animation/list bound so the additional Stadium display entry can be represented; the exact downstream list effect is not established by this hook alone.",
+          "git_blob_sha": "36d7b98b2c7d95dc7e8df1e2b91eed335552665d",
+          "mode_gate_observed_in_source": "No explicit scene comparison in the six-line hook.",
+          "observed_source_behavior": "Its comment says the original maximum is 30; the replacement compares r30 against 32. The excerpt does not include the following caller branch or list construction.",
+          "path": "Online/Menus/SSS/FrozenStadiumToggle/IncMaxNames.asm",
+          "source_lines": "1-6",
+          "source_sha256": "474b4842d3e9d22be2afbaa3bb058238fb5500574baf78f606d4dbec80aa5fff",
+          "source_url": "https://raw.githubusercontent.com/project-slippi/slippi-ssbm-asm/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Menus/SSS/FrozenStadiumToggle/IncMaxNames.asm",
+          "unresolved_semantic_dependency": "Caller continuation and authored stage-name table bounds are not established here; do not infer that the stage-selection table or runtime stage set has 32 valid entries."
+        },
+        {
+          "address": "8025AC6C",
+          "category": "Required: Slippi Online",
+          "configuration_selection": {
+            "category": "Required: Slippi Online",
+            "config_source": "v4 raw/netplay.json lines 296-300; generated GALE01r2.ini lines 10-16; generated hook record in selected-active-sources.json",
+            "generated_record": {
+              "Annotation": "Online/Menus/SSS/FrozenStadiumToggle/StageSelectTextProc.asm",
+              "Codetype": "Auto",
+              "InjectionAddress": "8025AC6C",
+              "Name": "Required: Slippi Online",
+              "Tags": ""
+            },
+            "record_tags": "",
+            "recursive": true,
+            "runtime_activation_claimed": false,
+            "selected_root": "Online/Menus",
+            "status": "selected-by-default in the captured v4 GALE01r2 netplay profile"
+          },
+          "gameplay_relevance": "Presentation-only stage choice indicator in the observed code; no battle-state write is visible.",
+          "git_blob_sha": "a0b7e2642c9ee6912b7dcbd2e5661223fcbcd458",
+          "mode_gate_observed_in_source": "No explicit scene comparison in this source body; injected under recursively selected Online/Menus.",
+          "observed_source_behavior": "Allocates and zeroes 12 bytes of per-GObj user data, attaches it with HSD_Free, and registers a process. The process compares SSS_HoveredIcon to ID_GRPS=18, stores a 0/1 animation state, and advances or reverses the stage-select/alternate-stage text animations.",
+          "path": "Online/Menus/SSS/FrozenStadiumToggle/StageSelectTextProc.asm",
+          "source_lines": "18-45; 64-169",
+          "source_sha256": "72545814d395e71633334d5537d537d3860a6a85deae4cb36afdd66d8c48a9b8",
+          "source_url": "https://raw.githubusercontent.com/project-slippi/slippi-ssbm-asm/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Menus/SSS/FrozenStadiumToggle/StageSelectTextProc.asm",
+          "unresolved_semantic_dependency": "Runtime GObj lifetime/order and whether this hook is invoked only while the intended selector object is live are not validated."
+        },
+        {
+          "address": "80259FAC",
+          "category": "Required: Slippi Online",
+          "configuration_selection": {
+            "category": "Required: Slippi Online",
+            "config_source": "v4 raw/netplay.json lines 296-300; generated GALE01r2.ini lines 10-16; generated hook record in selected-active-sources.json",
+            "generated_record": {
+              "Annotation": "Online/Menus/SSS/FrozenStadiumToggle/StoreNameId.asm",
+              "Codetype": "Auto",
+              "InjectionAddress": "80259FAC",
+              "Name": "Required: Slippi Online",
+              "Tags": ""
+            },
+            "record_tags": "",
+            "recursive": true,
+            "runtime_activation_claimed": false,
+            "selected_root": "Online/Menus",
+            "status": "selected-by-default in the captured v4 GALE01r2 netplay profile"
+          },
+          "gameplay_relevance": "Preserves the canonical Stadium ID in the stage-name GObj while a separate display entry 31 represents the alternate appearance.",
+          "git_blob_sha": "fb89bc7ce7d001c7debb89178617d28eb8ee2634",
+          "mode_gate_observed_in_source": "No explicit scene comparison in this source body; injected under recursively selected Online/Menus.",
+          "observed_source_behavior": "At the stage-name text data write site, maps input ID 31 to ID_GRPS=18 before storing halfword r30 at address r28; other IDs are stored unchanged. The included SSSToggles.s defines ID_GRPS as 18 and names the called text constructor.",
+          "path": "Online/Menus/SSS/FrozenStadiumToggle/StoreNameId.asm",
+          "source_lines": "10-22",
+          "source_sha256": "2e794eb236020657d8eedef2c9224ee6fc19906534b23fb63846b60b2f53fc4e",
+          "source_url": "https://raw.githubusercontent.com/project-slippi/slippi-ssbm-asm/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Menus/SSS/FrozenStadiumToggle/StoreNameId.asm",
+          "unresolved_semantic_dependency": "The hook\u2019s GObj field is UI state; this source does not prove which later selected-stage or transmitted-match field consumes it."
+        },
+        {
+          "address": "80259CC8",
+          "category": "Required: Slippi Online",
+          "configuration_selection": {
+            "category": "Required: Slippi Online",
+            "config_source": "v4 raw/netplay.json lines 296-300; generated GALE01r2.ini lines 10-16; generated hook record in selected-active-sources.json",
+            "generated_record": {
+              "Annotation": "Online/Menus/SSS/ExitSSSUponStageSelect.asm",
+              "Codetype": "Auto",
+              "InjectionAddress": "80259CC8",
+              "Name": "Required: Slippi Online",
+              "Tags": ""
+            },
+            "record_tags": "",
+            "recursive": true,
+            "runtime_activation_claimed": false,
+            "selected_root": "Online/Menus",
+            "status": "selected-by-default in the captured v4 GALE01r2 netplay profile"
+          },
+          "gameplay_relevance": "Controls the stage-selection handoff that precedes online match setup.",
+          "git_blob_sha": "0e2d8c13d3a5378cd78c8fbabae857f7fc2da8ad",
+          "mode_gate_observed_in_source": "Explicitly requires getMinorMajor == SCENE_ONLINE_SSS (0x0108), via the pinned Common/Common.s macro and Online/Online.s constant.",
+          "observed_source_behavior": "On the online SSS path, plays a menu sound, reads the hovered stage external ID from r13-0x49F2, calls 0x8025bc08 with that ID, sets the minor-scene byte at r13-0x49F1 to 2, then branches out. A ready-state comparison and FN_LoadMatchState block are comments and are inactive.",
+          "path": "Online/Menus/SSS/ExitSSSUponStageSelect.asm",
+          "source_lines": "8-44",
+          "source_sha256": "21fa92719e2d2ba5faca9882efc1fbd3cc85637c9950f6e7bf98054fe3756004",
+          "source_url": "https://raw.githubusercontent.com/project-slippi/slippi-ssbm-asm/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Menus/SSS/ExitSSSUponStageSelect.asm",
+          "unresolved_semantic_dependency": "The callee at 0x8025bc08 is unnamed in the retained source; the active hook does not visibly serialize the freeze byte or verify remote-ready agreement."
+        },
+        {
+          "address": "8025B8A4",
+          "category": "Required: Slippi Online",
+          "configuration_selection": {
+            "category": "Required: Slippi Online",
+            "config_source": "v4 raw/netplay.json lines 296-300; generated GALE01r2.ini lines 10-16; generated hook record in selected-active-sources.json",
+            "generated_record": {
+              "Annotation": "Online/Menus/SSS/DisableLRSTART.asm",
+              "Codetype": "Auto",
+              "InjectionAddress": "8025B8A4",
+              "Name": "Required: Slippi Online",
+              "Tags": ""
+            },
+            "record_tags": "",
+            "recursive": true,
+            "runtime_activation_claimed": false,
+            "selected_root": "Online/Menus",
+            "status": "selected-by-default in the captured v4 GALE01r2 netplay profile"
+          },
+          "gameplay_relevance": "Changes exit/input progression while choosing an online stage; it is not a match simulation hook.",
+          "git_blob_sha": "7c95e4c37559c0aaa713da35a7d6f393549ba7ab",
+          "mode_gate_observed_in_source": "Explicitly requires getMinorMajor == SCENE_ONLINE_SSS (0x0108), via the pinned Common/Common.s macro and Online/Online.s constant.",
+          "observed_source_behavior": "On online SSS, branches to 0x8025b8cc to skip the original LRA sequence. Outside that scene, falls through to the replaced `li r3,0` instruction.",
+          "path": "Online/Menus/SSS/DisableLRSTART.asm",
+          "source_lines": "8-16",
+          "source_sha256": "99483e10d52438f1b723ea6c7011e6e843e674b07a212584d0f04c0181af191b",
+          "source_url": "https://raw.githubusercontent.com/project-slippi/slippi-ssbm-asm/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Menus/SSS/DisableLRSTART.asm",
+          "unresolved_semantic_dependency": "The exact skipped original instructions and their callers are outside this hook excerpt; no broader claim about all LRAS behavior is made."
+        }
+      ],
+      "support_includes": [
+        {
+          "cached_source_reference": "../slippi-gameplay-mode-inventory-v4/raw/selected-active-sources/Common/Common.s",
+          "git_blob_sha": "71d9cfa792e750391a822d43fbbcaeeb5365e6bf",
+          "path": "Common/Common.s",
+          "relevant_lines": "304-307 getMinorMajor",
+          "source_sha256": "88938bddf09d25521fbcb4b12fa7321eaf3075ac02269acbefb6aef7d48a2b63"
+        },
+        {
+          "cached_source_reference": "../slippi-gameplay-mode-inventory-v4/raw/active-include-dependencies/Online/Online.s",
+          "git_blob_sha": "5b34ad34960aac710b564f409670bfd53fae49a9",
+          "path": "Online/Online.s",
+          "relevant_lines": "90-93 online scene IDs",
+          "source_sha256": "1b5536a902b22c2608e014854945a462dd853a67a7d6810762cf1fceaf648c2a"
+        },
+        {
+          "cached_source_reference": "../slippi-gameplay-mode-inventory-v4/raw/selected-recursive-files/Online/Menus/SSS/FrozenStadiumToggle/SSSToggles.s",
+          "git_blob_sha": "086ceac04ba1089d24958203f2279ccdcc4e3a88",
+          "path": "Online/Menus/SSS/FrozenStadiumToggle/SSSToggles.s",
+          "relevant_lines": "5,15-23 text constructor and stage ID constants",
+          "source_sha256": "cc5e820622e22d219113b9c2a551faafb6975c2ff7598f0cfdc5905d915f54cd"
+        }
+      ],
+      "first_uncertainty": {
+        "effect": "The callee is unnamed in the retained source and this hook shows only a scene-transition flag write; the path that serializes the selected frozen mode for every online participant remains a separate source boundary. Prior InitOnlinePlay review observes MSRB_ALT_STAGE_MODE copied to the shared frozen-mode byte, but this batch does not establish that this stage-choice callback populates that field or validates peer agreement.",
+        "excerpt": "reads the highlighted stage external ID and calls 0x8025bc08",
+        "line": 18,
+        "path": "Online/Menus/SSS/ExitSSSUponStageSelect.asm"
+      },
+      "nonclaims": [
+        "Static source/config selection is not runtime activation or executable-address acceptance.",
+        "This packet does not certify that all online participants select the same Stadium mode.",
+        "No v3.6.4 release binary or archive was inspected or paired.",
+        "m-ex.bin generation and contributor/reuse rights remain unresolved; repository notices do not constitute legal clearance.",
+        "No legal clearance, portability, source-port readiness, gameplay acceptance, or tournament-rules conclusion is made.",
+        "Untouched untagged hooks are not classified as non-gameplay."
+      ],
+      "source_lineage": {
+        "source_bytes_reused_from_v4_cache": true,
+        "v4_freeze_manifest_sha256": "cd170870e70ce9f72299060928f6d9208617c6750f33e38fe45736cc9fe22db3",
+        "v4_inventory_sha256": "0a2edc85cff4843065f3c5449136ebef1734fedd90f65916f2ef41ed53e65526",
+        "new_source_network_fetches": 0,
+        "release_configuration_license_and_m_ex_scope": "Unchanged from v4; no new release or license research in v5.",
+        "release_binary_pairing": "Unresolved; no release archive or executable inspected.",
+        "m_ex_generation_and_reuse_rights": "Unresolved; repository notices do not constitute legal clearance."
+      },
+      "independent_review": {
+        "artifact": "slippi-untagged-gameplay-review-v5-independent-review-v1.json",
+        "sha256": "a916ea3c39cf69e53544003221d1bd578c3a6aa6a700328b1735ca5572c06143",
+        "result": "PASS_WITH_RECEIPT_SYNC_NOTE",
+        "scope": "Independent bounded source/identity/accounting/receipt review of the six v5 hooks only; no review of the other 126 hooks.",
+        "receipt_sync_note": "The review found the then-current portable receipt and summary still at 24 checks / 132 remaining; this candidate syncs them to the reviewed v5 packet. Independent portable-document review is pending."
+      },
+      "cached_source_reference_base": "References in support_includes are relative to the retained external packet slippi-untagged-gameplay-review-v5, not this repository document."
     }
   },
   "schema": "slippi-gameplay-profile-inventory-v1",
   "evidence_label": "Source identified / Partial semantic inventory / No port or runtime comparison",
-  "snapshot_date": "2026-10-12",
+  "snapshot_date": "2026-10-13",
   "external_packet": {
     "run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
     "directory": "slippi-gameplay-mode-inventory-v4",
@@ -2392,6 +2701,22 @@
         "sha256": "826eaf222975fb7ca1800aa80ed747fb8c5c977dfcd3d87727c5ed61bbdef999",
         "scope": "Reviewed six-file pre-promotion bytes and permitted only this review-label promotion; source/reference/semantic gaps remain open."
       }
+    },
+    "untagged_gameplay_review_v5": {
+      "run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+      "directory": "slippi-untagged-gameplay-review-v5",
+      "packet_manifest_sha256": "ace88153a5b652972f61ac6728043f0ba1aef6104df0631f774e1c1e2c754624",
+      "freeze_manifest_sha256": "9b187a5552697137fc76fd66f8b59f739a9550ff4b0ce792b19ec4f869d4d5fd",
+      "review_json_sha256": "2e4af5a8747d8087e205e9bfa91517140fb538276b4cd408583102b04fcfc9bb",
+      "remaining_unreviewed_sha256": "3ea13df8dd148d7f0b50e26b85de6eee082bc4bc1b80d88dfddbb57da0b243b1",
+      "report_sha256": "47a2b51cdd11a0e0b13c0020cd938987574df0010af5a8903db6c9c6a9bb0858",
+      "independent_review_artifact": "slippi-untagged-gameplay-review-v5-independent-review-v1.json",
+      "independent_review_sha256": "a916ea3c39cf69e53544003221d1bd578c3a6aa6a700328b1735ca5572c06143",
+      "independent_review_result": "PASS_WITH_RECEIPT_SYNC_NOTE",
+      "checked_hook_count": 6,
+      "total_bounded_untagged_hook_count": 30,
+      "untagged_hooks_still_without_bounded_check": 126,
+      "scope": "The six reviewed paths are statically selected under the recursive Online/Menus root. No runtime activation, release executable correspondence, peer agreement, or profile acceptance is established."
     }
   },
   "active_source_inventory": {
@@ -4944,5 +5269,133 @@
     ],
     "portable_projection_review_sha256": "4d3975d8d819b9eb8a23e94f4bbdd22817100e381556a11d1f9eba374384c9e5"
   },
-  "prior_snapshot_scope": "Release, license, mode, and source-provenance findings retain their original v4 scope and identities. The gameplay_effect_inventory adds six bounded hook checks from slippi-untagged-gameplay-review-v2 and updates the untagged-check counts; external_packet records that packet and its independent-review identity. The source_provenance_followup continues to add released-source/config pairing and narrow m-ex artifact association without resolving exact binary generation, contributor/reuse rights, executable validation, or full semantics."
+  "prior_snapshot_scope": "The pinned source/release and license findings retain their v4 scope and identities; v5 did not repeat that investigation. The gameplay_effect_inventory adds six bounded hook checks from slippi-untagged-gameplay-review-v5 to the prior 24 and updates the untagged-check counts. external_packet records the v5 packet and its independent-review identity. Release-binary correspondence, m-ex generation, contributor/reuse rights, executable validation, runtime activation and complete semantics remain unresolved.",
+  "ucf_payload_identity_v6": {
+    "review_receipt": {
+      "path": "slippi-gameplay-profile-ucf-v6-independent-review-v1/review.json",
+      "sha256": "7f0492a6175fafd1e4a60656f18df1ab242a8c163536269d45eddf2816712754",
+      "result": "PASS_PINNED_PAYLOAD_IDENTITY_ONLY_HOLD_NOVEL_AUTHOR_SOURCE_CLAIMS"
+    },
+    "scope": "Identity comparison of eight selected tagged UCF ASM payloads with generated INI blocks; no disassembly, semantic coverage, activation, or source-to-built-output pairing.",
+    "generated_ini_selection": "Pinned netplay.json recursively selects External/UCF0.84/UCF under Required: General Codes; generated INI and selected-active-sources identities match the v4 review inputs.",
+    "coverage": {
+      "tagged_gameplay_paths_total": 27,
+      "payloads_identity_checked": 8,
+      "other_tagged_summaries_reaudited": 0,
+      "untagged_paths_checked": 30,
+      "untagged_paths_total": 156,
+      "untagged_paths_without_bounded_check": 126,
+      "count_effect": "No untagged count change; these eight belong to the distinct tagged set."
+    },
+    "cached_reference_correction": "Pad Buffer + 1.0 Cardinals uses a literal plus sign in the verified cached path; the former %2B reference did not resolve.",
+    "payloads": [
+      {
+        "path": "External/UCF 0.84/UCF/UCF DBOOC SquatRv Fix.asm",
+        "cached_source_reference": "slippi-gameplay-mode-inventory-v4/raw/selected-active-sources/External/UCF 0.84/UCF/UCF DBOOC SquatRv Fix.asm",
+        "sha256": "39a50bcab5c454d9fbf5865ca2ebdb947031959d0c4c8b188abf4d337da29c80",
+        "git_blob_sha": "2b04b682a9653dfd446f51818cc4345a92eafac5",
+        "literal_words": 30,
+        "generated_words": 32,
+        "padding": [
+          "60000000",
+          "00000000"
+        ],
+        "ini_prefix_equal": true
+      },
+      {
+        "path": "External/UCF 0.84/UCF/UCF Dashback.asm",
+        "cached_source_reference": "slippi-gameplay-mode-inventory-v4/raw/selected-active-sources/External/UCF 0.84/UCF/UCF Dashback.asm",
+        "sha256": "a791aff823b54980edac685acdb2c15bba31d5239b34662ab4c831e3526f9037",
+        "git_blob_sha": "dc89a608d191040902fea4adc8ff3defa37535eb",
+        "literal_words": 63,
+        "generated_words": 64,
+        "padding": [
+          "00000000"
+        ],
+        "ini_prefix_equal": true
+      },
+      {
+        "path": "External/UCF 0.84/UCF/UCF Pad Buffer + 1.0 Cardinals.asm",
+        "cached_source_reference": "slippi-gameplay-mode-inventory-v4/raw/selected-active-sources/External/UCF 0.84/UCF/UCF Pad Buffer + 1.0 Cardinals.asm",
+        "sha256": "fc1051043a4782a6d52c7599ef07792a83e8098cfe16495458ce0c915fed2174",
+        "git_blob_sha": "98fa94df98acafb9fa0c8fd29ec4610736095ceb",
+        "literal_words": 166,
+        "generated_words": 168,
+        "padding": [
+          "60000000",
+          "00000000"
+        ],
+        "ini_prefix_equal": true
+      },
+      {
+        "path": "External/UCF 0.84/UCF/UCF SDI.asm",
+        "cached_source_reference": "slippi-gameplay-mode-inventory-v4/raw/selected-active-sources/External/UCF 0.84/UCF/UCF SDI.asm",
+        "sha256": "bef78a08cb1604a3fd9edaaecc030d919ab983a9e4a58b55237a91814d67dd66",
+        "git_blob_sha": "7b9426a6882f805bca83bb9cb14868a89f7e160f",
+        "literal_words": 56,
+        "generated_words": 58,
+        "padding": [
+          "60000000",
+          "00000000"
+        ],
+        "ini_prefix_equal": true
+      },
+      {
+        "path": "External/UCF 0.84/UCF/UCF Shield Drop Extended.asm",
+        "cached_source_reference": "slippi-gameplay-mode-inventory-v4/raw/selected-active-sources/External/UCF 0.84/UCF/UCF Shield Drop Extended.asm",
+        "sha256": "1513c495eabaed680c4161df836d075177a5b484635c39576e008ae69ca834d4",
+        "git_blob_sha": "39d01b1ed9b5fe6f14fc7fbe770e39cc6d901814",
+        "literal_words": 18,
+        "generated_words": 20,
+        "padding": [
+          "60000000",
+          "00000000"
+        ],
+        "ini_prefix_equal": true
+      },
+      {
+        "path": "External/UCF 0.84/UCF/UCF Shield Drop.asm",
+        "cached_source_reference": "slippi-gameplay-mode-inventory-v4/raw/selected-active-sources/External/UCF 0.84/UCF/UCF Shield Drop.asm",
+        "sha256": "5b95d5ae91523453fa8b8cb71349e3d01b2cbb3d4265ebf008351cef9b77b8dd",
+        "git_blob_sha": "9f4f7d591fec8d01c39415aa23f5dfea15f1ef0d",
+        "literal_words": 49,
+        "generated_words": 50,
+        "padding": [
+          "00000000"
+        ],
+        "ini_prefix_equal": true
+      },
+      {
+        "path": "External/UCF 0.84/UCF/UCF Shield SDI.asm",
+        "cached_source_reference": "slippi-gameplay-mode-inventory-v4/raw/selected-active-sources/External/UCF 0.84/UCF/UCF Shield SDI.asm",
+        "sha256": "89caa0c3ba47ff41a61ab9ad521d1d30edc396c992c1c67c5ee9869a703ff1a1",
+        "git_blob_sha": "b1e15d4e5e30f8c1fa81300e054d7d924e43fc52",
+        "literal_words": 38,
+        "generated_words": 40,
+        "padding": [
+          "60000000",
+          "00000000"
+        ],
+        "ini_prefix_equal": true
+      },
+      {
+        "path": "External/UCF 0.84/UCF/UCF Tumble.asm",
+        "cached_source_reference": "slippi-gameplay-mode-inventory-v4/raw/selected-active-sources/External/UCF 0.84/UCF/UCF Tumble.asm",
+        "sha256": "1a829856a3427dadbc79ab9e3828a0f7922988e5b58fcc86dc6a417b721eae5c",
+        "git_blob_sha": "6b8a154af0b065f9c45caac384ec98a5569678af",
+        "literal_words": 36,
+        "generated_words": 38,
+        "padding": [
+          "60000000",
+          "00000000"
+        ],
+        "ini_prefix_equal": true
+      }
+    ],
+    "limitations": [
+      "Exact payload mechanics remain opaque.",
+      "Static selection does not establish activation or per-player/per-mode values.",
+      "No source-to-built-output pairing, executable/profile acceptance, or license conclusion follows."
+    ]
+  }
 }
