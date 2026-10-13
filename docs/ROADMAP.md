@@ -112,9 +112,9 @@ under #308 remains open, without an unchanged retry or weaker assertion.
 
 Pokémon Stadium C3 [#251](https://github.com/ericvanlare/melee-web/issues/251) /
 [draft #301](https://github.com/ericvanlare/melee-web/pull/301) remains the next
-Track B milestone. Reuse the retained PadPoll/draw-order reduction and original
-owner evidence; no duplicate capture. Track A has first claim on the shared
-capture lane. Physical controllers, foreground timing, audible output and a
+Track B milestone. Reuse the reviewed PadPoll/draw-order repair and fresh original
+idle reference for the browser lifetime comparison; no duplicate capture. Track A
+has first claim on the shared capture lane. Physical controllers, foreground timing, audible output and a
 two-machine human session remain separate unrun gates.
 
 ### Track B: competitive-rules Melee before the whole game
@@ -166,14 +166,14 @@ retain a reduced reproducer and move to the next fighter. Bowser's
 [#274 checkpoint](https://github.com/ericvanlare/melee-web/issues/274) remains
 unresolved and parked after the reconstructed-prefix attempt budget.
 
-**Current #304 boundary.** The bounded original Zelda-to-Sheik owner-prefix milestone is complete for [issue #304](https://github.com/ericvanlare/melee-web/issues/304), with evidence in the [scoped lineup status](status/2026-10-09-weaker-fighter-comparison-lineup.md); strict two-human browser comparison remains separate. Stadium C3 under [#251](https://github.com/ericvanlare/melee-web/issues/251) remains checkpointed while H1 first-use attribution has first claim on the capture lane. Its matched C/F prerequisite, constructor observations and failed longer original reference are retained in the [existing Stadium boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md). Public #288 now uses the owner-cleared isolated staging relay.
+**Current #304 boundary.** The bounded original Zelda-to-Sheik owner-prefix milestone is complete for [issue #304](https://github.com/ericvanlare/melee-web/issues/304), with evidence in the [scoped lineup status](status/2026-10-09-weaker-fighter-comparison-lineup.md); strict two-human browser comparison remains separate. Stadium C3 under [#251](https://github.com/ericvanlare/melee-web/issues/251) remains checkpointed while H1 first-use attribution has first claim on the capture lane. Its matched C/F prerequisite, constructor observations, failed first recording and fresh original idle reference are retained in the [existing Stadium boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md). Public #288 now uses the owner-cleared isolated staging relay.
 
 The next Stadium milestone is [C3 idle in-match lifetime #251](https://github.com/ericvanlare/melee-web/issues/251),
 with its remaining prerequisites counted and tracked inside that issue and PR.
-First reduce the retained PadPoll-inside-draw mismatch against original source
-ordering. Complete the actual original input/draw/state/RNG reference through
-3,500 post-GO ticks, counted from the observed GO event, then compare runtime
-lifetime A, checked retirement/recreation and lifetime B with per-owner RNG.
+The reviewed reader repair admits only typed same-draw PadPoll observations.
+Use the fresh original idle reference recorded from the observed GO event,
+extract its own Setup-to-GO schedule, then compare browser lifetime A, checked
+retirement/recreation and lifetime B with per-owner RNG.
 Historical no-draw lifetimes remain separate; do not invent neutral rows or
 hardcode the historical GO tick. Prerequisite fixes are commits within C3,
 not isolated ownership PRs. Transformations, broader rendering, browser

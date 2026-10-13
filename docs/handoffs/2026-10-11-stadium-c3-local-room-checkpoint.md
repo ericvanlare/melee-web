@@ -2,13 +2,12 @@
 
 Continue `codex/stadium-c3-lifetime` and draft PR #301. The branch base before
 current-main integration is `5f274ed3fc6743937c8ec2ae66e23c1db4094c4e`.
-Main `b6db0aa6` is integrated in the current source. The shared original
-collector preserves the retained Stadium menu recipe and separate Sheik Items
-and Stadium replay paths. Focused controls, retained raw replays and actual
-native translation-unit syntax pass. The earlier current-main regression and browser Release builds remain historical
-results linked below; the new executable head still requires full regression and
-exact-head CI before merge.
-Native-observer syntax is not a Dolphin producer build. Prior capture producers are unchanged.
+Main `6ee4a07a` is integrated via `ec97b845`. The reviewed same-draw PadPoll
+reader repair and reduced startup-fixture dependency repair are in `9e721b13`.
+Current regression and both affected Release builds pass; exact-head CI is pending.
+The shared original collector preserves the retained Stadium menu recipe and
+separate Sheik Items and Stadium replay paths. Native-observer syntax is not a
+Dolphin producer build. Prior capture producers are unchanged.
 
 The matched-Setup C/F run passed its declared state/seed comparison and checked
 retirement. Capture checkpoint `e0c072cc` (tree `3a68e30e`), tested harness
@@ -28,12 +27,17 @@ partial ordinal, producer, initial review and completed independent review.
 The latter confirms the reader/producer schedule-contract mismatch; broader
 original callback/interrupt and lifecycle semantics remain unproved.
 
-C3 remains open. Next reduce that exact retained interleave against original
-callback/interrupt authority before any repair or new long run. The original
-3,500-post-GO reference is still missing. Once it exists, compare one native
-lifetime, prove checked retirement/recreation, and compare a second lifetime,
-with per-owner RNG evidence throughout. Extract the fresh Setup-to-GO prefix
-from the same new recording; do not splice the historical short schedule.
+The same-draw PadPoll boundary has now been reduced, reviewed and repaired.
+A separate fresh recording using the unchanged original observer and current
+host reader completes the original idle reference; independent raw decoding
+and input-stream validation reproduce its scoped result. The status boundary and receipt above retain its exact
+counts, producer identities, completion and cleanup, alongside the failed run.
+
+C3 remains open. Extract the fresh Setup-to-GO input/draw schedule from this new
+recording; do not splice the historical short schedule. Then compare browser
+lifetime A, prove checked retirement/recreation, and compare lifetime B with
+per-owner RNG evidence. No existing scoped original result establishes those
+browser or lifetime gates.
 
 No further capture is authorized by this checkpoint. Timer/title and other
 unpaired fields remain explicit in the receipt. The C/F result does not establish

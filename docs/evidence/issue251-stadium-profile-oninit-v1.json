@@ -9397,7 +9397,7 @@
       "current_head_full_regression": "PENDING",
       "current_head_ci": "PENDING"
     },
-    "next": "Finish portable regression coverage and current-head validation for the reviewed same-draw PadPoll reader repair. Only then separately release one fresh original reference under unchanged caps and source/input/draw/GO-counting contracts. Complete 3500-post-GO reference, lifetime A, checked retirement/recreation, lifetime B and per-owner RNG remain outstanding.",
+    "next": "The reviewed same-draw PadPoll reduction and fresh run2 below supersede the next experiment; this historical capture remains interrupted and incomplete.",
     "reader_reduction_2026_10_13": {
       "result": "REVIEWED_OFFLINE_READER_REPAIR; ORIGINAL_REFERENCE_STILL_INCOMPLETE",
       "historical_executable_source": "3d4ee3d388877249b994543d93db788ed542e2a0",
@@ -9471,9 +9471,185 @@
           "artifact": "stadium-reader-focused-v1.json",
           "bytes": 733,
           "sha256": "df292af1f84005896ccf7d415aac539e444bdcfa4ce7f29686741d3f79755c17"
+        },
+        "full_regression_failure": {
+          "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+          "artifact": "stadium-reader-full-regression-v1.json",
+          "bytes": 634,
+          "sha256": "ac5ac106911f11603d3b6a363520d4651ccf927ad6d53eea286c18daa625b57a"
+        },
+        "dependency_refresh": {
+          "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+          "artifact": "stadium-aurora-refresh-v1.json",
+          "bytes": 623,
+          "sha256": "20da783f5a979d231673c2bc175e5a991b109080a4c3b958563b1aaeaea9cb4c"
+        },
+        "fixture_review": {
+          "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+          "artifact": "entity-profile-startup-test-candidate-v2-independent-review-v1.json",
+          "bytes": 3325,
+          "sha256": "7613d67690ff9cebe35ae3444ca4179a2de2d57a499e3f5f9f2971aaf9ba751b"
+        },
+        "full_regression": {
+          "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+          "artifact": "stadium-reader-full-regression-v2.json",
+          "bytes": 842,
+          "sha256": "f6370684352e82a76f9161620a3d2bff1f9df61cd8079557a26ade9e68be2dde"
+        },
+        "diagnostic_release": {
+          "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+          "artifact": "stadium-current-diagnostic-release-v1.json",
+          "bytes": 503,
+          "sha256": "7195ae1c758072aae9574a83f4e88f206a834c2f3faeed9955f02800d43b7ba4"
+        },
+        "ordinary_release": {
+          "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+          "artifact": "stadium-current-ordinary-release-v1.json",
+          "bytes": 470,
+          "sha256": "141da473427f5ed7d7a75a041a91e12f1c15422b27be77154e7c11f803200ab9"
+        },
+        "release_artifact_identities": {
+          "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+          "artifact": "stadium-current-release-artifacts-v1.json",
+          "bytes": 1199,
+          "sha256": "3d2a8d738b4141fa132932e176ea1549be170849e0be3d90c1ea7d3162a86cc1"
         }
       },
-      "validation": "Nine focused tests PASS on ec97b845 plus exact reviewed reader/test changes; full regression and exact-head CI pending. No new original or browser capture. Prior control-harness failures remain retained."
+      "validation": "Nine focused controls pass; full regression on9e721b13 passes2593tests/180skips after reviewed dependency/fixture repairs. Diagnostic and ordinary Release builds pass. Exact-head CI pending. Fresh original run2 is a separate result below; original run1 remains failed."
     }
+  },
+  "original_idle3500_fresh_recording_run2_2026_10_13": {
+    "result": "INDEPENDENTLY_REVIEWED_PASS_ORIGINAL_3500_IDLE_REFERENCE_ONLY",
+    "native_producer_source": "3d4ee3d388877249b994543d93db788ed542e2a0",
+    "native_binary_sha256": "c0c51f4f4cd9b2e26bde1c759e0de809a5fb26a42bf146a9652f652861c9f488",
+    "capture_reader_source": "9e721b130168f863edb0e0839da72f14b49076c0",
+    "reader_sha256": "c8f4c9685936208fb06ee7d11884fef32f4eb851c5b2b5c18f611ebeda4cbe88",
+    "scope": "Fresh original record only, no replay, synthetic neutral inputs or historical pre-GO schedule splice. This does not compare a browser lifetime.",
+    "observations": {
+      "go_source_tick_C": 84,
+      "first_full_post_go_source_tick_F": 85,
+      "comparison_end_source_tick": 3584,
+      "post_go_ticks": 3500,
+      "observed_ticks_including_C": 3501,
+      "natural_tail_ticks": 0,
+      "actual_four_port_bundles": 3501,
+      "ordered_tick_draw_events": 10497,
+      "constructor_countdown": 3629,
+      "C_countdown": 3628,
+      "end_countdown": 128,
+      "observer_records": 20482,
+      "observer_bytes": 58562839,
+      "observer_sha256": "45de31f20751b87414fe5ca5d3569940ce706bb029e30beb142f33fac546ff3a",
+      "state_observations_sha256": "e610a6e97e6d283147602fc26917096e252d758b66fbff0b79eea81675f1fb41",
+      "input_events": 18836,
+      "observer_complete": true,
+      "input_complete": true,
+      "invalid": false,
+      "host_input_channels": [
+        0,
+        1
+      ],
+      "host_input_events_per_channel": 9418,
+      "host_input_scope": "MWRI host requests are separately CRC/sequence/footer checked; not mapped one-to-one to source ticks.",
+      "source_consumed_input_scope": "MWRO four-port PadConsume rows paired to source tick and draw ordinal; active0/1neutral,2/3disconnected; no invented samples."
+    },
+    "ownership": {
+      "native_pid_absent": true,
+      "collector_group_absent": true,
+      "logger_drained": true,
+      "frozen_inputs_unchanged": true
+    },
+    "artifacts": {
+      "report.json": {
+        "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+        "artifact": "original-stadium-idle3500-reference-run2/report.json",
+        "bytes": 1379922,
+        "sha256": "be8dba769e0436e91435bc96014594015efe7646ddbf53a99da79c996cd53e22"
+      },
+      "idle3500-reference.json": {
+        "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+        "artifact": "original-stadium-idle3500-reference-run2/idle3500-reference.json",
+        "bytes": 2033197,
+        "sha256": "562969a7e6a6e7fd43457821f84464852a38da2a83c9dc20672ad713cd6010bc"
+      },
+      "observer.bin": {
+        "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+        "artifact": "original-stadium-idle3500-reference-run2/observer.bin",
+        "bytes": 58562839,
+        "sha256": "45de31f20751b87414fe5ca5d3569940ce706bb029e30beb142f33fac546ff3a"
+      },
+      "observer-status.json": {
+        "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+        "artifact": "original-stadium-idle3500-reference-run2/observer-status.json",
+        "bytes": 521,
+        "sha256": "0a0f4cb3f1c5cc678f6fffda55396f96413406436686addec537d73576dd1f4e"
+      },
+      "inputs.mwri": {
+        "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+        "artifact": "original-stadium-idle3500-reference-run2/inputs.mwri",
+        "bytes": 753496,
+        "sha256": "75e28ea0eba9f31e3e772e981b19eb27f3601ffc26580c5eed107c6ab1460690"
+      },
+      "input-status.json": {
+        "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+        "artifact": "original-stadium-idle3500-reference-run2/input-status.json",
+        "bytes": 90,
+        "sha256": "e907af749995e2ff7b54c84d8e9e4932876b56ee0cb652d137faf4351c1f43e4"
+      },
+      "input-intentions.jsonl": {
+        "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+        "artifact": "original-stadium-idle3500-reference-run2/input-intentions.jsonl",
+        "bytes": 50530,
+        "sha256": "6e0f09c0ed54125e36920099aa225a22a71797f6d2c85e598e91881315547cbb"
+      },
+      "launch.json": {
+        "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+        "artifact": "original-stadium-idle3500-reference-run2/launch.json",
+        "bytes": 2542,
+        "sha256": "ef6d99b6d62583cf7e3f3542780218e348bb2fa8bd9be956bebaaa3f4f32efb4"
+      },
+      "cleanup.json": {
+        "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+        "artifact": "original-stadium-idle3500-reference-run2/cleanup.json",
+        "bytes": 137,
+        "sha256": "31ed9458f58a9a5e192b1615f0207c843e44a8a914632129ac6c1c86f75960a3"
+      },
+      "owned-log-cleanup.json": {
+        "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+        "artifact": "original-stadium-idle3500-reference-run2/owned-log-cleanup.json",
+        "bytes": 123,
+        "sha256": "fa8862e277a1c1c397d11840fa002c857a12dd4e7266d644a77290c64b2fd5a2"
+      },
+      "owner": {
+        "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+        "artifact": "stadium-fresh-original-run2-owner/launch-result.json",
+        "bytes": 1898,
+        "sha256": "ffcfe8cba47669f2eb385a5e4302ff375d328df2f1239ea4f350bea8663bce09"
+      },
+      "release": {
+        "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+        "artifact": "stadium-fresh-original-run2-owner/root-one-launch-release.json",
+        "bytes": 650,
+        "sha256": "ef3a5467eff36844d297061b393260e8b9b0485e3a5bd064f62dead1bec661b2"
+      },
+      "independent_review": {
+        "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+        "artifact": "stadium-fresh-original-run2-independent-review-v1/review.json",
+        "bytes": 19374,
+        "sha256": "7035fe7626c378c9f106d14aabc6032cd69b4bafa1f48d9bd0eec390f01f2f49"
+      }
+    },
+    "limits": {
+      "browser_comparison": false,
+      "C3_acceptance": false,
+      "registration_generation_retirement": false,
+      "cross_owner_rng_ledger_complete": false,
+      "fresh_setup_to_go_extraction_remaining": true,
+      "stage_transformations": false,
+      "setup_profile_verified_by_observer": false,
+      "profile_setup_equivalence": false,
+      "whole_session_equivalent": false
+    },
+    "next": "Extract this fresh recording\u2019s Setup-to-GO input/draw schedule and bounded comparison fields; compare browser lifetime A, then checked retirement/recreation and lifetime B with per-owner RNG. Keep historical C/F and no-draw results separate."
   }
 }
