@@ -123,6 +123,7 @@ int melee_web_io_pump(MeleeWebIo* io,uint32_t limit,uint32_t* completed,char* er
     io->pumping=false;return ok(error,size);
 }
 size_t melee_web_io_pending(const MeleeWebIo* io){return io?io->requests.size():0;}
+int melee_web_io_quiescent(const MeleeWebIo* io){return io&&!io->pumping&&io->requests.empty();}
 int melee_web_io_destroy(MeleeWebIo* io,char* error,size_t size){
     if(!io)return ok(error,size);
     if(io->pumping||!io->requests.empty())return fail(error,size,"I/O context still has active or queued transfers");

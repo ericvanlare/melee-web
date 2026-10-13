@@ -52,6 +52,24 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
+### 2026-10-13 — Owner: rollback checkpoint and Stadium sprint
+
+**Ask:** Proceed with the next sprint: one same-instance Mario/FD checkpoint,
+original tick and draw, restore and repeat; in parallel, complete the Stadium C3
+idle lifetime comparison and checked recreation.
+
+**Status:** Accepted. Close the reachable renderer, audio and file owners before
+restoring browser memory. Freeze actual input and clock decisions at a returned
+native-call boundary; do not rewind an active native continuation. Keep the
+terminal draw-discard diagnostic one-shot. A new normal-frame renderer receipt
+is a prerequisite observation, not a restore result. Stadium may optimize its
+diagnostic replay driver while preserving every source action, comparison and
+approval; production timing guards and capture deadlines stay unchanged.
+
+**Links:** [Sprint queue #158](https://github.com/ericvanlare/melee-web/issues/158),
+[rollback #318](https://github.com/ericvanlare/melee-web/issues/318),
+[Stadium #251](https://github.com/ericvanlare/melee-web/issues/251).
+
 ### 2026-10-13 — Owner: related-project research and exact arithmetic
 
 **Ask:** Checkpoint the in-flight Stadium step, then test the fused-operation

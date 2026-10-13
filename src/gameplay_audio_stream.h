@@ -26,6 +26,9 @@ int melee_web_audio_stream_end(MeleeWebAudioStream*,char*,size_t);
 int melee_web_audio_stream_pump_for(MeleeWebAudio*,char*,size_t);
 int melee_web_audio_stream_resolve(MeleeWebAudio*,uint32_t address,const MeleeWebAudioChannel**,uint32_t* base);
 int melee_web_audio_stream_owned(MeleeWebAudio*);
+/* Requires the matching live HPS owner and idle outer/inner transfer pumps.
+ * It does not admit browser output, source synthesis or heap restoration. */
+int melee_web_audio_stream_quiescent_for(MeleeWebAudio*);
 int melee_web_audio_stream_progress(MeleeWebAudio*,uint32_t* completed_payloads,uint32_t* revisited_blocks);
 /* Read-only semantic identity for diagnostics and retail-comparison traces.
  * The returned path is borrowed from the validated stream input. */

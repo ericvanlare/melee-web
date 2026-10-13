@@ -204,6 +204,10 @@ int melee_web_audio_stream_resolve(MeleeWebAudio* audio,uint32_t address,const M
 int melee_web_audio_stream_progress(MeleeWebAudio* a,uint32_t* completed,uint32_t* revisited){if(!active||active->audio!=a||!completed||!revisited)return 0;*completed=active->completed;*revisited=active->revisited;return 1;}
 const char* melee_web_audio_stream_path(MeleeWebAudio* a){if(!active||active->audio!=a||!active->selected_file)return NULL;return active->files[active->selected_file-1].input->path;}
 int melee_web_audio_stream_owned(MeleeWebAudio* a){return active&&active->audio==a;}
+int melee_web_audio_stream_quiescent_for(MeleeWebAudio* a){
+ return a&&active&&active->audio==a&&!active->requests&&!active->pumping&&
+        melee_web_io_quiescent(active->io);
+}
 int melee_web_audio_stream_end(MeleeWebAudioStream* s,char* e,size_t n){
  if(!s||active!=s||s->pumping)return fail(e,n,"HPS scope is not active or is pumping");
  if(!melee_web_audio_stream_pump_for(s->audio,e,n))return 0;

@@ -126,6 +126,18 @@ records the parallel Slippi behavior mapping, pending owner licensing decision,
 and deferred A5 gateway/cadence research. Copy no related-project code, and send
 no automated traffic to Slippi production services or real accounts.
 
+The owner-approved October 13 sprint targets one same-instance Mario/FD
+checkpoint → original tick/full draw → restore → repeat comparison under
+[#318](https://github.com/ericvanlare/melee-web/issues/318). First close the
+reachable renderer content/handle, native audio/output and file-completion
+owners. Freeze actual clock and input decisions, then return from native code
+before copying memory. A normal-frame renderer observation and native idle-owner
+controls are prerequisites, not browser restore evidence. Only a reviewed
+one-tick pass can open a longer correction measurement; no combined budget
+claim follows from separate timings. The existing terminal diagnostic remains
+one-shot. The [sprint queue](https://github.com/ericvanlare/melee-web/issues/158)
+owns work-item ordering and stopping rules.
+
 Pokémon Stadium C3 [#251](https://github.com/ericvanlare/melee-web/issues/251) /
 [draft #301](https://github.com/ericvanlare/melee-web/pull/301) remains the next
 Track B milestone. Reuse the retained PadPoll/draw-order reduction and original

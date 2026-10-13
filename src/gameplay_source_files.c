@@ -355,6 +355,12 @@ int melee_web_source_file_drive_busy(void)
     return active_scope && active_scope->request_count != 0;
 }
 
+int melee_web_source_files_quiescent(void)
+{
+    return active_scope && !active_scope->pumping &&
+           !active_scope->request_count && !active_scope->requests;
+}
+
 int melee_web_source_files_external_set(const char* name, size_t size,
                                         char* error, size_t error_size)
 {
@@ -574,10 +580,10 @@ int melee_web_source_files_pump(char* error, size_t error_size)
     scope->pumping = 1;
     while (available && budget-- && scope->requests) {
         SourceFileRequest* request = scope->requests;
-        uint32_t staging = 0;
         if (!request->cancelled && request->file->external &&
             !request->stream_ready) {
 #if defined(__EMSCRIPTEN__)
+            uint32_t staging = 0;
             if (!request->stream_dispatched) {
                 if (request->offset > UINT32_MAX || request->size > UINT32_MAX ||
                     !source_stream_start(request->id, request->file->name,
