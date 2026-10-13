@@ -12,7 +12,7 @@ import sqlite3
 
 from bootstrap import read_lock, verify_sources
 from gameplay_sources import prepare_sources
-from workspace_resources import operation, record_build
+from workspace_resources import atomic_json, operation, record_build
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -25,6 +25,47 @@ AUDIO_PREVIEW_RUNTIME_BUILD_DIR = "build/browser-audio-preview-release"
 AUDIO_PREVIEW_RUNTIME_EXECUTABLE = "gameplay_audio_preview"
 AURORA_QUIESCENCE_DIAGNOSTIC_TARGET = "aurora-browser-quiescence"
 MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET = "runtime-match-draw-discard"
+FMA_DIAGNOSTIC_TARGET = "runtime-fma-diagnostic"
+FMA_COLLISION_OPERATION_INVENTORY = (
+    ("80006e80", "broadphase_radius"),
+    ("80007130", "segment_dot_xy"),
+    ("80007140", "segment_dot_z"),
+    ("80007134", "hurt_length_xy"),
+    ("80007144", "hurt_length_z"),
+    ("80007160", "hit_start_dot_xy"),
+    ("8000716c", "hit_start_dot_z"),
+    ("80007164", "hurt_start_dot_xy"),
+    ("80007170", "hurt_start_dot_z"),
+    ("80007174", "closest_denominator"),
+    ("80007280", "parallel_start_distance_x"),
+    ("8000728c", "parallel_start_distance_z"),
+    ("80007288", "parallel_end_distance_x"),
+    ("80007290", "parallel_end_distance_z"),
+    ("800072ec", "endpoint_start_denominator_x"),
+    ("80007300", "endpoint_start_denominator_z"),
+    ("80007320", "endpoint_start_dot_x"),
+    ("80007324", "endpoint_start_dot_z"),
+    ("800073a8", "endpoint_end_denominator_x"),
+    ("800073bc", "endpoint_end_denominator_z"),
+    ("800073dc", "endpoint_end_dot_x"),
+    ("800073e0", "endpoint_end_dot_z"),
+    ("80007420", "hit_param_numerator"),
+    ("80007424", "hurt_param_numerator"),
+    ("80007500", "hurt_closest_y"),
+    ("80007508", "hurt_closest_z"),
+    ("80007538", "hurt_closest_x"),
+    ("8000750c", "hit_closest_x"),
+    ("8000751c", "hit_closest_y"),
+    ("8000752c", "hit_closest_z"),
+    ("80007574", "closest_distance_x"),
+    ("80007578", "closest_distance_z"),
+    ("8000768c", "local_distance_x"),
+    ("80007690", "local_distance_z"),
+    ("8000771c", "contact_x"),
+    ("80007730", "contact_y"),
+    ("80007744", "contact_z"),
+)
+FMA_VELOCITY_Y_OPERATION = ("8006bc90", "common_velocity_y_interpolation")
 
 # These are the only lifecycle executables that the content-check workflow may
 # select directly.  Keep this list deliberately small and explicit: adding a
@@ -55,6 +96,7 @@ BUILD_TARGETS = {
     # submission-owner/quiescence instrumentation.
     AURORA_QUIESCENCE_DIAGNOSTIC_TARGET: ("gx_probe",),
     MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET: ("gameplay_menu_browser",),
+    FMA_DIAGNOSTIC_TARGET: ("gameplay_menu_browser",),
     "gameplay": ("gameplay_checks",),
     "runtime": ("gameplay_menu_browser",),
     PUBLIC_RUNTIME_TARGET: (PUBLIC_RUNTIME_TARGET,),
@@ -75,7 +117,9 @@ BUILD_TARGETS = {
 
 def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
                     pipeline_provenance=False, selective_pipelines=False,
-                    stadium_c1a_diagnostic=False):
+                    stadium_c1a_diagnostic=False,
+                    fma_collision_diagnostic=False,
+                    fma_velocity_y_diagnostic=False):
     """Return the build directory selected by the normal build contract.
 
     Trace targets use the private development build directory and intentionally
@@ -86,6 +130,19 @@ def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
     root = Path(root)
     if target not in BUILD_TARGETS and target not in TRACE_TARGETS:
         raise ValueError(f"Unsupported build target: {target}")
+    fma_requested = fma_collision_diagnostic or fma_velocity_y_diagnostic
+    if target == FMA_DIAGNOSTIC_TARGET:
+        if not fma_requested:
+            raise ValueError("runtime-fma-diagnostic requires at least one explicit FMA diagnostic switch")
+        if pipeline_provenance or selective_pipelines or stadium_c1a_diagnostic:
+            raise ValueError("runtime-fma-diagnostic cannot be combined with another private build profile")
+        profile = "collision" if fma_collision_diagnostic else ""
+        if fma_velocity_y_diagnostic:
+            profile += "-velocity-y" if profile else "velocity-y"
+        suffix = "-release" if configuration == "Release" else ""
+        return root / f"build/browser-fma-{profile}{suffix}"
+    if fma_requested:
+        raise ValueError("FMA diagnostic switches require --target runtime-fma-diagnostic")
     if target in TRACE_TARGETS and (pipeline_provenance or selective_pipelines):
         raise ValueError("trace targets require the private development build")
     if stadium_c1a_diagnostic:
@@ -818,10 +875,82 @@ def _write_audio_preview_identity(root, build_dir, version, cmake, ninja,
     return identity_path
 
 
+def _write_fma_diagnostic_identity(root, build_dir, collision_enabled,
+                                  velocity_y_enabled, gameplay_source):
+    """Bind private FMA switches, mapped source sites and runtime artifacts."""
+    artifact_names = (
+        "gameplay_menu_browser.js",
+        "gameplay_menu_browser.wasm",
+        "gameplay_menu_browser.data",
+    )
+    artifacts = []
+    for name in artifact_names:
+        path = build_dir / name
+        if path.is_symlink() or not path.is_file():
+            raise ValueError(f"{path}: FMA diagnostic runtime artifact is missing or a symlink")
+        artifacts.append(_file_record(path, root))
+    generated = Path(gameplay_source)
+    source_paths = (
+        root / "CMakeLists.txt",
+        root / "cmake/FighterRuntime.cmake",
+        root / "patches/melee-gameplay.patch",
+        root / "scripts/build.py",
+        root / "src/gameplay_fma_diagnostic.c",
+        root / "src/gameplay_fma_diagnostic.h",
+        root / "src/gameplay_hit_transition_probe.c",
+        generated / "melee/lb/lbcollision.c",
+        generated / "melee/ft/fighter.c",
+    )
+    sources = {}
+    for path in source_paths:
+        if path.is_symlink() or not path.is_file():
+            raise ValueError(f"{path}: FMA diagnostic source identity input is missing or a symlink")
+        sources[path.relative_to(root).as_posix()] = _sha256(path)
+    identity = {
+        "schema": "melee-web-private-fma-diagnostic-v1",
+        "target": FMA_DIAGNOSTIC_TARGET,
+        "configuration": "Release",
+        "profile": "private-development",
+        "artifact_root": build_dir.relative_to(root).as_posix(),
+        "artifacts": artifacts,
+        "source_commit": subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=root, text=True).strip(),
+        "source_inputs_sha256": dict(sorted(sources.items())),
+        "compile_policy": {"ffp_contract": "off"},
+        "diagnostics": {
+            "collision": {
+                "enabled": bool(collision_enabled),
+                "routine": "lbColl_80006E58",
+                "sites": [
+                    {"pc": pc, "name": name}
+                    for pc, name in FMA_COLLISION_OPERATION_INVENTORY
+                ],
+            },
+            "velocity_y": {
+                "enabled": bool(velocity_y_enabled),
+                "site": {"pc": FMA_VELOCITY_Y_OPERATION[0],
+                         "name": FMA_VELOCITY_Y_OPERATION[1]},
+                "scope": "common fighter velocity-Y interpolation",
+            },
+        },
+        "numerical_domain": {
+            "inputs": "finite normal binary32 or signed zero",
+            "unsupported": "NaN, infinity, subnormal, NI underflow; abort explicitly",
+            "fused_result": "C fmaf; never double fma",
+        },
+    }
+    identity_path = build_dir / "fma-diagnostic-identity.json"
+    if identity_path.is_symlink():
+        raise ValueError(f"{identity_path}: FMA diagnostic identity must not be a symlink")
+    atomic_json(identity_path, identity)
+    return identity_path
+
+
 def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
           pipeline_provenance=False, selective_pipelines=False, configure_only=False,
           trace_targets=None, gameplay_bootstrap_state=False,
-          stadium_c1a_diagnostic=False):
+          stadium_c1a_diagnostic=False, fma_collision_diagnostic=False,
+          fma_velocity_y_diagnostic=False):
     trace_targets = tuple(trace_targets or ())
     if gameplay_bootstrap_state and (
         tuple(trace_targets or ()) != ("gameplay_snapshot_probe",)):
@@ -834,11 +963,20 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
             raise ValueError(f"Unsupported trace target: {unknown[0]}")
         if pipeline_provenance or selective_pipelines:
             raise ValueError("trace targets require the private development build")
-    if configure_only and target in {PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET}:
+    if configure_only and target in {PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET, FMA_DIAGNOSTIC_TARGET}:
         # Release profiles write an identity sidecar only after a complete
         # build. A configure-only invocation must not leave an apparently
         # usable identity next to stale artifacts.
         raise ValueError(f"--configure-only cannot be used with {target}")
+    if target == FMA_DIAGNOSTIC_TARGET:
+        if not (fma_collision_diagnostic or fma_velocity_y_diagnostic):
+            raise ValueError("runtime-fma-diagnostic requires at least one explicit FMA diagnostic switch")
+        if configuration != "Release":
+            raise ValueError("runtime-fma-diagnostic is Release-only; pass --configuration Release")
+        if pipeline_provenance or selective_pipelines or stadium_c1a_diagnostic or trace_targets:
+            raise ValueError("runtime-fma-diagnostic cannot be combined with another private build profile")
+    elif fma_collision_diagnostic or fma_velocity_y_diagnostic:
+        raise ValueError("FMA diagnostic switches require --target runtime-fma-diagnostic")
     if selective_pipelines and (target not in {"runtime", PUBLIC_RUNTIME_TARGET} or pipeline_provenance):
         raise ValueError("--selective-pipelines requires runtime/runtime-public without --pipeline-provenance")
     if pipeline_provenance and target != "runtime":
@@ -887,7 +1025,9 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         build_dir = build_directory(root, target=build_target, configuration=configuration,
                                     pipeline_provenance=pipeline_provenance,
                                     selective_pipelines=selective_pipelines,
-                                    stadium_c1a_diagnostic=stadium_c1a_diagnostic)
+                                    stadium_c1a_diagnostic=stadium_c1a_diagnostic,
+                                    fma_collision_diagnostic=fma_collision_diagnostic,
+                                    fma_velocity_y_diagnostic=fma_velocity_y_diagnostic)
         if (root / "build").is_symlink() or build_dir.is_symlink():
             raise ValueError("Build output must be a local directory, not a symlink")
         source_inputs_before = (
@@ -922,6 +1062,12 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
             f"-DMELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC={'ON' if target == MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET else 'OFF'}"
         )
         configure.append(
+            f"-DMELEE_WEB_FMA_COLLISION_DIAGNOSTIC={'ON' if fma_collision_diagnostic else 'OFF'}"
+        )
+        configure.append(
+            f"-DMELEE_WEB_FMA_VELOCITY_Y_DIAGNOSTIC={'ON' if fma_velocity_y_diagnostic else 'OFF'}"
+        )
+        configure.append(
             f"-DMELEE_WEB_SLIPPI_PROFILE_BROWSER={'ON' if 'gameplay_snapshot_probe_browser' in trace_targets else 'OFF'}"
         )
         record_build(root, build_dir, False)
@@ -946,6 +1092,13 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
                 )
             print(f"Wrote {identity_path.relative_to(root)}")
 
+        if target == FMA_DIAGNOSTIC_TARGET:
+            identity_path = _write_fma_diagnostic_identity(
+                root, build_dir, fma_collision_diagnostic,
+                fma_velocity_y_diagnostic, gameplay_source,
+            )
+            print(f"Wrote {identity_path.relative_to(root)}")
+
         record_build(root, build_dir, True)
 
 
@@ -954,6 +1107,7 @@ def main():
     parser.add_argument("--jobs", type=int, default=min(os.cpu_count() or 2, 6))
     parser.add_argument("--target", choices=("graphics", AURORA_QUIESCENCE_DIAGNOSTIC_TARGET,
                                               MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET,
+                                              FMA_DIAGNOSTIC_TARGET,
                                               "gameplay", "fighter", "runtime",
                                               PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET, "all"))
     parser.add_argument("--trace-target", dest="trace_targets", choices=TRACE_TARGETS,
@@ -966,6 +1120,10 @@ def main():
                         help="Prepare certified upcoming pipeline unions in a separate runtime build")
     parser.add_argument("--configure-only", action="store_true",
                         help="Configure the selected build directory without compiling targets")
+    parser.add_argument("--fma-collision-diagnostic", action="store_true",
+                        help="Enable the private 37-site lbColl_80006E58 FMA diagnostic")
+    parser.add_argument("--fma-velocity-y-diagnostic", action="store_true",
+                        help="Enable the independent common velocity-Y interpolation FMA diagnostic")
     parser.add_argument("--gameplay-bootstrap-state", action="store_true",
                         help="Enable the typed bootstrap-state diagnostic on gameplay_snapshot_probe")
     parser.add_argument("--stadium-c1a-diagnostic", action="store_true",
@@ -980,7 +1138,9 @@ def main():
               pipeline_provenance=args.pipeline_provenance, selective_pipelines=args.selective_pipelines,
               configure_only=args.configure_only, trace_targets=args.trace_targets,
               gameplay_bootstrap_state=args.gameplay_bootstrap_state,
-              stadium_c1a_diagnostic=args.stadium_c1a_diagnostic)
+              stadium_c1a_diagnostic=args.stadium_c1a_diagnostic,
+              fma_collision_diagnostic=args.fma_collision_diagnostic,
+              fma_velocity_y_diagnostic=args.fma_velocity_y_diagnostic)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         raise SystemExit(f"build: {error}") from error
 

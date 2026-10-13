@@ -69,6 +69,14 @@ if(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
   target_compile_definitions(fighter_source_runtime PRIVATE
     MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1)
 endif()
+if(MELEE_WEB_FMA_COLLISION_DIAGNOSTIC OR MELEE_WEB_FMA_VELOCITY_Y_DIAGNOSTIC)
+  target_compile_definitions(fighter_source_runtime PRIVATE
+    MELEE_WEB_FMA_DIAGNOSTIC=1)
+  if(MELEE_WEB_FMA_COLLISION_DIAGNOSTIC)
+    target_compile_definitions(fighter_source_runtime PRIVATE
+      MELEE_WEB_FMA_COLLISION_DIAGNOSTIC=1)
+  endif()
+endif()
 if(NOT MELEE_WEB_PUBLIC_RUNTIME AND NOT MELEE_WEB_AUDIO_PREVIEW_RUNTIME)
   target_compile_definitions(fighter_source_runtime PRIVATE MELEE_WEB_RNG_DRAW_OBSERVER=1)
 endif()

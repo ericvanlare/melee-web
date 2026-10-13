@@ -352,8 +352,8 @@ const persistReport = async () => {
   try {
     serialized = measure
       ? timedActionSync(sample, 'report_serialize', null,
-        () => JSON.stringify(report, null, 2) + '\n', event => { serializeMs = event.elapsed_ms; })
-      : JSON.stringify(report, null, 2) + '\n';
+        () => JSON.stringify(report) + '\n', event => { serializeMs = event.elapsed_ms; })
+      : JSON.stringify(report) + '\n';
     if (measure) {
       await timedActionAsync(sample, 'report_write', null,
         () => fs.writeFile(temporary, serialized), event => { writeMs = event.elapsed_ms; });

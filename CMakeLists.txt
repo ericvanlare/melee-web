@@ -21,6 +21,18 @@ option(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC
   "Enable the development-only Pokémon Stadium selection/preparation checkpoint" OFF)
 option(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC
   "Build the private one-shot terminal match draw/discard diagnostic" OFF)
+option(MELEE_WEB_FMA_COLLISION_DIAGNOSTIC
+  "Enable the private PC-mapped scalar collision FMA diagnostic" OFF)
+option(MELEE_WEB_FMA_VELOCITY_Y_DIAGNOSTIC
+  "Enable the private common fighter velocity-Y interpolation FMA diagnostic" OFF)
+if((MELEE_WEB_FMA_COLLISION_DIAGNOSTIC OR MELEE_WEB_FMA_VELOCITY_Y_DIAGNOSTIC) AND
+   (MELEE_WEB_PUBLIC_RUNTIME OR MELEE_WEB_AUDIO_PREVIEW_RUNTIME))
+  message(FATAL_ERROR "FMA diagnostics are private and unavailable in public runtimes")
+endif()
+if((MELEE_WEB_FMA_COLLISION_DIAGNOSTIC OR MELEE_WEB_FMA_VELOCITY_Y_DIAGNOSTIC) AND
+   NOT EMSCRIPTEN)
+  message(FATAL_ERROR "FMA diagnostics require the Emscripten gameplay runtime")
+endif()
 if(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC AND
    (MELEE_WEB_PUBLIC_RUNTIME OR MELEE_WEB_AUDIO_PREVIEW_RUNTIME))
   message(FATAL_ERROR "Match draw/discard diagnostic is private and unavailable in public runtimes")
@@ -124,6 +136,18 @@ if(EMSCRIPTEN)
   endforeach()
   target_include_directories(gameplay_runtime PUBLIC src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}")
   target_compile_definitions(gameplay_runtime PUBLIC TARGET_PC)
+  if(MELEE_WEB_FMA_COLLISION_DIAGNOSTIC OR MELEE_WEB_FMA_VELOCITY_Y_DIAGNOSTIC)
+    target_sources(gameplay_runtime PRIVATE src/gameplay_fma_diagnostic.c)
+    target_compile_definitions(gameplay_runtime PRIVATE MELEE_WEB_FMA_DIAGNOSTIC=1)
+    if(MELEE_WEB_FMA_COLLISION_DIAGNOSTIC)
+      target_compile_definitions(gameplay_runtime PRIVATE
+        MELEE_WEB_FMA_COLLISION_DIAGNOSTIC=1)
+    endif()
+    if(MELEE_WEB_FMA_VELOCITY_Y_DIAGNOSTIC)
+      target_compile_definitions(gameplay_runtime PRIVATE
+        MELEE_WEB_FMA_VELOCITY_Y_DIAGNOSTIC=1)
+    endif()
+  endif()
   target_compile_options(gameplay_runtime PRIVATE -ffunction-sections -fdata-sections -ffp-contract=off
     "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
   target_link_libraries(gameplay_runtime PUBLIC aurora::os aurora::mtx PRIVATE fmt::fmt)

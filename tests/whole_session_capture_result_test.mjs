@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import fs from 'node:fs/promises';
 import vm from 'node:vm';
 import {finalizeSessionCapture, REQUIRED_SESSION_DOWNLOADS,
@@ -6,6 +7,7 @@ import {finalizeSessionCapture, REQUIRED_SESSION_DOWNLOADS,
   FIRST_REPLAY_BOUNDARY_MARKER_PREFIX, FIRST_REPLAY_BOUNDARY_MARKER_NAMES,
   parseFirstReplayBoundaryMarker, inspectFirstReplayBoundaryMarkers,
   readRequestedEntityPrefix, sessionReplayReportCompleted} from '../scripts/whole_session_capture_result.mjs';
+import {summarizeRuntimeIncidents} from '../scripts/a3_runtime_incidents.mjs';
 
 const clean = () => ({
   result: 'fail', first_error: null, browser_errors: [], unexpected_requests: [],
@@ -184,9 +186,13 @@ function extractBetween(start, end) {
 const closeSource = extractBetween('async function closeOwnedCaptureBrowser() {', 'const boundaryMarkers = [];');
 const observeSource = extractBetween('async function observePageOperation(label, operation) {', 'async function pauseTraceStatus');
 const collectSource = extractBetween('  try {\n  if (diagnostic) {\n    if (pageObservationTimedOut)', '  for (const candidate of runtimeDataAbortCandidates)');
-async function actualCollection(failure) {
-  const calls = [], primary = {kind: 'existing primary', message: 'keep first failure'};
-  const report = {first_error: primary};
+async function actualCollection(failure, runtimeIncidentRecording = false) {
+  const calls = [], primary = ['runtime incidents success', 'runtime incidents h1',
+    'runtime incidents null without primary'].includes(failure) ? null :
+    {kind: 'existing primary', message: 'keep first failure'};
+  const report = {first_error: primary,
+    ...(runtimeIncidentRecording ? {runtime_incident_recording: {missing_evidence: []}} : {})};
+  const written = {};
   const pending = () => new Promise(() => {});
   const page = {
     isClosed: () => false,
@@ -196,6 +202,16 @@ async function actualCollection(failure) {
     }),
     evaluate: fn => {
       const text = String(fn);
+      if (text.includes('meleeNetRuntimeDiagnosticExport')) {
+        calls.push('incident export');
+        if (failure.startsWith('runtime incidents null')) return Promise.resolve(null);
+        if (failure === 'runtime incidents stall') return pending();
+        return Promise.resolve({current: {schema: 'melee-web-runtime-diagnostics',
+          session_id: 'test-session', incidents: failure === 'runtime incidents h1' ? [{
+            id: 'timing-1', reason: 'simulation_debt', source_frame: 8, value: 72,
+            threshold: 60, staging: {peak_occupied_slots: 2},
+          }] : []}, retained: {records: []}});
+      }
       if (text.includes('__cpuPrefixRows')) {calls.push('cpu prefix'); return failure === 'CPU prefix stall' ? pending() : Promise.resolve([]);}
       if (text.includes('TraceTotal')) {calls.push('allocation total'); return Promise.resolve(0);}
       calls.push('other evaluate'); return Promise.resolve([]);
@@ -204,9 +220,11 @@ async function actualCollection(failure) {
   };
   const scope = vm.createContext({report, page, diagnostic: false, pageObservationTimedOut: false,
     observationTimeoutMs: 5, currentPhase: 'finally', boundedCaptureOperation,
+    runtimeIncidentRecording, summarizeRuntimeIncidents,
     firstError: (kind, message) => {report.first_error ||= {kind, message};},
-    snapshot: async () => ({}), rngDrawProbe: null, hitTransitionProbe: null,
-    write: async () => {calls.push('write'); if (failure === 'write failure') throw Error('owned write failed');},
+    snapshot: async () => ({running: 0, status: failure === 'runtime incidents h1'
+      ? 'Paused after a timing disruption. Resume to continue.' : 'Original Results'}), rngDrawProbe: null, hitTransitionProbe: null,
+    write: async (name, value) => {calls.push('write'); written[name] = value; if (failure === 'write failure') throw Error('owned write failed');},
     Buffer, createHash: (await import('node:crypto')).createHash, path: (await import('node:path')).default,
     output: 'unused', driver: {dispose: () => calls.push('dispose')},
     browser: {close: async () => {calls.push('close'); if (failure === 'close failure') throw Error('owned close failed');}},
@@ -214,7 +232,9 @@ async function actualCollection(failure) {
   });
   vm.runInContext(observeSource + closeSource, scope);
   await vm.runInContext(`(async () => {${collectSource}})()`, scope);
-  assert.equal(report.first_error, primary, 'later failures must preserve primary');
+  if (primary) assert.equal(report.first_error, primary, 'later failures must preserve primary');
+  else if (failure === 'runtime incidents success')
+    assert.equal(report.first_error, null, 'successful runtime incident retention must not create an error');
   assert.equal(calls.at(-1), 'close', 'actual final collection must close its browser last');
   if (failure === 'artifacts stall') {
     assert.deepEqual(calls, ['artifacts', 'dispose', 'close']);
@@ -227,8 +247,45 @@ async function actualCollection(failure) {
   if (failure === 'write failure') assert.match(report.download_error, /owned write failed/);
   if (failure === 'close failure') assert.match(report.close_error, /owned close failed/);
   checks++;
+  return {calls, report, written, scope};
 }
 for (const failure of ['artifacts stall', 'CPU prefix stall', 'write failure', 'close failure']) await actualCollection(failure);
+const incidentSuccess = await actualCollection('runtime incidents success', true);
+const incidentCalls = incidentSuccess.calls;
+assert(incidentCalls.indexOf('incident export') < incidentCalls.indexOf('artifacts'),
+  'runtime incident export must precede larger download collection');
+assert.equal(incidentCalls.at(-1), 'close');
+assert.equal(incidentSuccess.report.first_error, null);
+assert.equal(incidentSuccess.report.runtime_incident_recording.before_leave.native_running, 0);
+assert.equal(incidentSuccess.report.runtime_incident_recording.before_leave.native_message, 'Original Results');
+assert.equal(incidentSuccess.report.runtime_incident_recording.summary.h1_timing_pause_observed, false);
+assert.equal(incidentSuccess.report.runtime_incident_recording.summary.stopped_timing_message, false);
+assert.equal(incidentSuccess.report.runtime_incident_recording.artifact.name, 'rawruntime-incidents.json');
+assert.equal(incidentSuccess.report.runtime_incident_recording.artifact.bytes,
+  Buffer.byteLength(incidentSuccess.written['rawruntime-incidents.json']));
+assert.equal(incidentSuccess.report.runtime_incident_recording.artifact.sha256,
+  createHash('sha256').update(incidentSuccess.written['rawruntime-incidents.json']).digest('hex'));
+assert(!incidentSuccess.report.saved_downloads?.some(row => row.name === 'rawruntime-incidents.json'));
+const missingIncident = await actualCollection('runtime incidents null', true);
+assert.equal(missingIncident.report.first_error?.kind, 'existing primary');
+assert(missingIncident.report.runtime_incident_recording.missing_evidence.some(reason => reason.includes('no active-session')));
+assert.equal(missingIncident.calls.filter(name => name === 'incident export').length, 1,
+  'a null runtime export must not be retried');
+const missingIncidentWithoutPriorError = await actualCollection('runtime incidents null without primary', true);
+assert.equal(missingIncidentWithoutPriorError.report.first_error?.kind, 'runtime_incident_recording');
+assert(missingIncidentWithoutPriorError.report.runtime_incident_recording.missing_evidence.length > 0);
+const timedOutIncident = await actualCollection('runtime incidents stall', true);
+assert.equal(timedOutIncident.scope.pageObservationTimedOut, true);
+assert.equal(timedOutIncident.calls.filter(name => name === 'incident export').length, 1,
+  'a timed-out runtime export must not be retried');
+assert(timedOutIncident.report.runtime_incident_recording.missing_evidence.length > 0);
+const h1Incident = await actualCollection('runtime incidents h1', true);
+assert.equal(h1Incident.report.runtime_incident_recording.summary.h1_timing_pause_observed, true);
+assert.match(h1Incident.report.runtime_incident_recording.failure, /H1 timing pause/);
+assert.equal(h1Incident.report.first_error?.kind, 'runtime_incident_recording');
+assert.equal(h1Incident.report.runtime_incident_recording.artifact.name, 'rawruntime-incidents.json',
+  'a positive H1 finding retains its raw export');
+checks += 5;
 console.log(`Owned capture final collection controls passed: ${checks} total report/ownership controls.`);
 
 // Synthetic transport metadata exercises the production requested-mode parser;

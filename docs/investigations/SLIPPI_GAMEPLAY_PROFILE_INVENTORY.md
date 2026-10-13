@@ -9,6 +9,8 @@ contains pinned sources, every configured entry, selected file/hash closure,
 bounded hook summaries and explicit unknowns. It contains no upstream code or binary payload.
 The [milestone status](../status/2026-10-12-match-only-rollback-feasibility.md)
 is the changing evidence boundary. No Slippi code has been ported.
+The incremental coverage counts below describe retained historical checkpoints;
+use that status boundary and its receipt for current hook-body accounting.
 
 ## Modes and Stadium
 
@@ -33,8 +35,9 @@ Selected static defaults include four stocks, eight minutes, Stock mode, no item
 and Singles stages; live setup can override these, including Party's rules.
 
 - **UCF 0.84** is selected. Named hooks cover dashback, squat reverse, pad-buffer/cardinals,
-  SDI, shield drop/shield SDI, tumble and its indicator. Individual payload mechanics
-  and live per-player/per-mode toggle values remain unresolved. Replay `prepareGameInfo`
+  SDI, shield drop/shield SDI, tumble and its indicator. The receipt now includes
+  static payload decodes; complete predicates, history ownership and live
+  per-player/per-mode toggle values remain unresolved. Replay `prepareGameInfo`
   serialization is not evidence of live online toggle transport.
 - **Neutral spawns** compute Singles/Teams assignments. The fallback uses original
   authored spawn coordinates with computed IDs and recomputed facing; vanilla-order
@@ -48,17 +51,15 @@ and Singles stages; live setup can override these, including Party's rules.
   predicate and camera-KO velocity/model handling. The receipt enumerates exact paths,
   addresses and narrowed source summaries; hook names alone are not behavioral proof.
 
-All 59 configured entries are mapped (52 default-selected). Selected folders resolve
+Historical v5 accounting mapped all 59 configured entries (52 default-selected). Selected folders resolve
 to 198 files and 183 annotated ASM hooks; the parsed textual include closure contains
 196 files, and 21 selected binary payloads are hashed. Of 183 hooks, 27 carry an
 `affects-gameplay` tag and 156 do not. Across the original v4 inventory checks, the corrected prior six-hook set (v1 and v2
-are versions of the same paths), the corrected v4 packet, the v5 packet, and the
-v6 packet, 36 unique untagged hooks have bounded source checks; **120 lack such
-checks**. The latest v6 packet records six exact source identities, selected-root
-membership, observed behavior and unresolved dependencies. The v5 six-hook packet
-remains a historical 30/156 checkpoint; its paths are counted once in the current
-disjoint total. This remains source-only evidence: no client binary/profile was
-inspected or accepted. Tag absence does not establish non-gameplay behavior.
+are versions of the same paths), the corrected v4 packet, and the v5 packet, 30 unique
+untagged hooks had bounded source checks; **126 lacked such checks at that boundary**. That packet
+records six exact source identities, selected-root membership, observed behavior and
+unresolved dependencies. This remains source-only evidence: no client binary/profile
+was inspected or accepted. Tag absence does not establish non-gameplay behavior.
 
 The complete file inventory therefore does **not** establish a complete semantic inventory.
 
@@ -180,49 +181,13 @@ The independent source/accounting review is
 `slippi-untagged-gameplay-review-v5-independent-review-v1.json`, SHA-256
 `a916ea3c39cf69e53544003221d1bd578c3a6aa6a700328b1735ca5572c06143`; it passed
 with a receipt-sync note because the portable files still reported the prior count.
-The v5 packet remains the historical checkpoint at 30 checked of 156. Its source
-bytes and source/release/license findings are reused from the frozen v4 packet.
-Release-binary validation remains unperformed. The current v6 source packet and
-its bounded independent review are summarized below; portable-doc review of this
-candidate remains pending. The
+This candidate syncs those files; independent review of the portable documentation
+remains pending. The v5 source bytes and source/release/license findings are reused
+from the frozen v4 packet. Release-binary validation remains unperformed. The
 selected m-ex artifact's checked-in byte association is identified separately from
 its unresolved exact generation, contributor/reuse rights and license status;
 repository notices do not provide legal clearance. No profile has been ported or
 accepted.
-
-
-## Bounded follow-up: online route and match setup
-
-A v6 source checkpoint adds six paths selected from the exact frozen v5 remaining
-set. The pinned profile places them under recursively selected `Required: Slippi
-Online` roots. This is static selection evidence only; it does not establish that
-these hooks activate in a released client or online match.
-
-| Hook path | Address | Source-only observation |
-| --- | --- | --- |
-| `Online/Slippi Online Scene/boot.asm` | `801BFA20` | Sets the first title-menu destination to online submenu 8 and selects the first unlocked item. The later online match/network activation is not established. Though a comment says Stadium transformations are preloaded, the observed loop calls `File_GetLength` on four paths; actual loading/caching is unproven. |
-| `Online/Menus/InGame/InitInGame.asm` | `802F6694` | Gated to `SCENE_ONLINE_IN_GAME`; builds HUD/name/delay presentation and calls `FN_LoadMatchState` for displayed names. No gameplay simulation write is visible in the reviewed body. |
-| `Online/Menus/CSS/FetchMatchInfo.asm` | `80260310` | Gated to `SCENE_ONLINE_CSS`; passes the CSS data table's MSRB buffer to `FN_LoadMatchState`, which sends `GetMatchState` through EXI and reads the response. This hook is a data-fetch path, not itself a simulation update. |
-| `Online/Menus/CSS/SceneLoadCSS.asm` | `8026699C` | Allocates and zeroes CSSDT; allocates/stores an MSRB pointer with no MSRB zeroing call shown. In Teams mode it saves the prior team-toggle index; it also loads `slpCSS.dat`. This is menu/setup state and a file-backed chat resource. |
-| `Online/Static/AdjustNullCharID.asm` | `80005694` | The helper body is only `blr` and does not write the buffer. Its caller copies match info to `VS_SSS_DATA` before calling it; a caller comment says later In-Game prep will copy that block, but this packet does not establish that later copy. Downstream buffer/sentinel use remains untraced, so the no-op is not classified as safely irrelevant. |
-| `Online/Static/GetTeamCostumeIndex.asm` | `800056B0` | Maps team 3→green, 2→blue, 1→red, other values→blue. The Teams-gated online scene writes the result into VS splash setup; no simulation-rule change is established. |
-
-The v6 packet is `slippi-remaining-source-inventory-v6-corrected-v1` in run
-`match-rollback-feasibility-20261012-203633-e8f0c964`. Its actual inventory file is
-`inventory-v6-corrected.json` (SHA-256
-`3605b52de2ec868d4a9aa4eca588a9d7a2dc3de79504c7257fbfde78ab60486e`); the freeze
-manifest SHA-256 is `da5105fbfcdf294e59a8bd608ad5d5d361aab2f310a7bd85b9af750d0e23b7f6`
-and the corrected report SHA-256 is
-`5290eab1b26b8140078d1efa0b89e26ffcb3d777df5d40ff26a08a395be56f35`. The
-independent review `slippi-remaining-source-inventory-v6-corrected-independent-review-v1.json`
-(SHA-256 `d32af9bd75b11198cc3d918c0a8b93a3cbf11beec52520eef15f2a431d4cd101`)
-passed for bounded source-check publication only and verified 36/156 checks with
-120 remaining. It also required the corrected inventory locator used above because
-the frozen report names a stale filename. The source repository and GPL-3.0 root
-notice are inherited from the pinned inventory; this is not legal clearance.
-Runtime activation, release executable compatibility, peer agreement, full
-semantics, and profile acceptance remain unresolved. No code or profile was
-ported.
 
 ## Pins and license findings
 
@@ -283,10 +248,9 @@ per-player values, runtime behavior, or source-to-built-output pairing.
 
 The eight files are in the recursively selected External/UCF 0.84/UCF subtree
 under Required: General Codes. They are already among the 27 tagged gameplay
-paths. This identity check adds no untagged semantic checks. Its recorded 30/156
-baseline predates the separate v6 source packet; the current source-check count is
-36 checked of 156, with 120 remaining. The other 19 tagged summaries were not
-re-audited. The independent review corrected
+paths. At that v6 boundary, this identity check added no untagged semantic checks:
+the separate count remained 30 checked of 156 untagged hooks, with 126 lacking
+bounded checks. The other 19 tagged summaries were not re-audited then. The independent review corrected
 the Pad Buffer + 1.0 Cardinals cached reference: its actual path contains a
 literal plus sign; the earlier %2B spelling did not resolve.
 

@@ -205,12 +205,36 @@ def _replace_source_once(source, old, new, label):
     if count!=1:raise RuntimeError(f'{label}: expected one source anchor, found {count}')
     return source.replace(old,new,1)
 
+def _select_source_anchor(source, candidates, label):
+    matches=[anchor for anchor in candidates if source.count(anchor)==1]
+    if len(matches)!=1:
+        raise RuntimeError(f'{label}: expected one supported source anchor, found {len(matches)}')
+    return matches[0]
+
 def _instrument_inner_geometry(inner):
     """Add read-only snapshots after existing calculations and branches."""
     source=inner
+    broadphase_anchor=_select_source_anchor(source, (
+        'broadphase_radius = (hurt_radius * broadphase_scale) + hit_radius;',
+        'broadphase_radius = MELEE_WEB_FMA_COLLISION_ADD(MELEE_WEB_FMA_RADIUS, hurt_radius, broadphase_scale, hit_radius);'),
+        'broadphase radius')
+    closest_anchor=_select_source_anchor(source, (
+        'closest_denom = (hit_len_sq * hurt_len_sq) - (segment_dot * segment_dot);',
+        'closest_denom = MELEE_WEB_FMA_COLLISION_SUB(MELEE_WEB_FMA_CLOSEST_DENOMINATOR,\n'
+        '        hit_len_sq, hurt_len_sq, segment_dot * segment_dot);'),
+        'closest denominator')
+    solver_anchor=_select_source_anchor(source, (
+        '        } else {\n            hit_param = ((segment_dot * hurt_start_dot) -',
+        '        } else {\n            hit_param = MELEE_WEB_FMA_COLLISION_SUB(MELEE_WEB_FMA_HIT_PARAM_NUMERATOR,'),
+        'nonparallel solver')
+    hit_closest_anchor=_select_source_anchor(source, (
+        '    hit_closest->x = (hit_delta.x * hit_param) + hit_start_copy.x;',
+        '    hit_closest->x = MELEE_WEB_FMA_COLLISION_ADD(MELEE_WEB_FMA_HIT_CLOSEST_X,\n'
+        '        hit_delta.x, hit_param, hit_start_copy.x);'),
+        'hit closest X')
     anchors=[
-        ('broadphase_radius = (hurt_radius * broadphase_scale) + hit_radius;',
-         'broadphase_radius = (hurt_radius * broadphase_scale) + hit_radius;\n    MELEE_TRACE_VALUE("broadphase_radius", broadphase_radius);'),
+        (broadphase_anchor,
+         broadphase_anchor+'\n    MELEE_TRACE_VALUE("broadphase_radius", broadphase_radius);'),
         ('float bound = hit_start_copy.x + broadphase_radius;',
          'float bound = hit_start_copy.x + broadphase_radius;\n        MELEE_TRACE_VALUE("x_upper_from_start", bound);'),
         ('bound = hit_end_x - broadphase_radius;',
@@ -235,8 +259,8 @@ def _instrument_inner_geometry(inner):
          'float bound = hit_start_z - broadphase_radius;\n        MELEE_TRACE_VALUE("z_lower_from_start", bound);'),
         ('bound += broadphase_radius;',
          'bound += broadphase_radius;\n        MELEE_TRACE_VALUE("z_upper_from_end", bound);'),
-        ('closest_denom = (hit_len_sq * hurt_len_sq) - (segment_dot * segment_dot);',
-         'closest_denom = (hit_len_sq * hurt_len_sq) - (segment_dot * segment_dot);\n'
+        (closest_anchor,
+         closest_anchor+'\n'
          '    MELEE_TRACE_VALUE("hit_len_sq", hit_len_sq);\n'
          '    MELEE_TRACE_VALUE("hurt_len_sq", hurt_len_sq);\n'
          '    MELEE_TRACE_VALUE("segment_dot", segment_dot);\n'
@@ -250,13 +274,12 @@ def _instrument_inner_geometry(inner):
          '    } else {\n        MELEE_TRACE_EVENT("solver_nonzero_hurt_length");\n'
          '        if (approximatelyZero(closest_denom)) {\n'
          '            MELEE_TRACE_EVENT("solver_parallel_axes");'),
-        ('        } else {\n            hit_param = ((segment_dot * hurt_start_dot) -',
-         '        } else {\n            MELEE_TRACE_EVENT("solver_nonparallel_axes");\n'
-         '            hit_param = ((segment_dot * hurt_start_dot) -'),
-        ('    hit_closest->x = (hit_delta.x * hit_param) + hit_start_copy.x;',
+        (solver_anchor,
+         solver_anchor.replace('\n            hit_param',
+             '\n            MELEE_TRACE_EVENT("solver_nonparallel_axes");\n            hit_param', 1)),
+        (hit_closest_anchor,
          '    MELEE_TRACE_VALUE("hit_param", hit_param);\n'
-         '    MELEE_TRACE_VALUE("hurt_param", hurt_param);\n'
-         '    hit_closest->x = (hit_delta.x * hit_param) + hit_start_copy.x;'),
+         '    MELEE_TRACE_VALUE("hurt_param", hurt_param);\n'+hit_closest_anchor),
         ('    axis.x = sqrtf(closest_dist_sq);',
          '    axis.x = sqrtf(closest_dist_sq);\n'
          '    MELEE_TRACE_VALUE("closest_dist_sq", closest_dist_sq);\n'

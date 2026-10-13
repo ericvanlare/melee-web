@@ -206,19 +206,37 @@ and its strict original assertions remain unchanged.
 
 The [profile inventory](../investigations/SLIPPI_GAMEPLAY_PROFILE_INVENTORY.md)
 and [source receipt](../evidence/slippi-gameplay-profile-inventory-v1.json) map
-selected configuration, mode behavior, bounded source checks, and observed
-repository notices. Ranked and Unranked Stadium are unfrozen; Direct and Teams
-offer a selection. UCF 0.84 is selected in the shared configuration, while live
-toggle semantics remain unresolved. The independently reviewed v6 source packet
-adds six disjoint bounded checks: 36 of 156 untagged ASM hooks now have bounded
-source checks, with 120 remaining. It covers online route entry and CSS/In-Game
-setup; its observations remain source/config-only and do not establish online
-match activation, peer agreement, release executable correspondence, or profile
-acceptance. A separate v6 identity check confirms that eight selected tagged UCF
-payloads match their generated INI word prefixes, lengths, and padding. Their
-exact mechanics remain opaque, and this does not establish runtime activation or
-source-to-built-output pairing; that tagged-payload check predates the v6
-untagged source-check update. No release archive or executable was inspected;
-exact m-ex generation and contributor/reuse rights remain unresolved. Repository
-notices are factual observations, not legal clearance. No Slippi code or profile
-was ported, and the source inventory remains open.
+the selected configuration, mode behavior, source descriptions and repository
+notices. All 156 unique untagged active ASM hook bodies now have bounded content
+review: the 36-path reviewed baseline, 52 disjoint bodies in the semantic-
+escalation packet, and the exact remaining 68 bodies. This closes hook-body
+accounting only; original branch/continuation behavior, deeper callees, opaque
+binaries and runtime/profile closure remain open. The separate 27 tagged paths
+are not included in that count, and the current tagged behavior candidate has
+own descriptions for 25 of them.
+
+The reviewed sources distinguish Stadium transformation loading through the
+synchronous EXI `File_Read` path from the separate frozen-stage toggle predicate.
+`DynamicsFix` updates dynamic transforms that rendering normally refreshes when
+fast-forward skips drawing. The Final Destination background hook saves and
+restores RNG around the original thinker. Eight UCF 0.84 payloads have pinned,
+static big-endian PPC decodes; none was executed and per-player activation is
+unproven. Recording `SendGameInfo` allocates two GObjs/processes at priorities 0
+and 15; its character/costume corrections apply to copied replay metadata, and
+its hardcoded UCF=1 bytes do not prove live activation. Recording `SendGameEnd`
+calls the original result builder midmatch. Its extra `ODB_IS_GAME_OVER` guard
+applies only to online in-game end ID 2 (GAME); other nonzero ending IDs bypass
+that guard. The builder's match-kind-3 score path calls `pl_80039450`, which
+clears and writes live bonus-table data. Standard stock scoring avoids that
+branch; the seven deeper bonus routines remain open.
+
+Cross-play, gateway/services and frame-cadence acceptance are deferred; no real
+Slippi services or accounts were used. The pinned Slippi ASM source carries a
+GPL-3.0 notice, and Dolphin/EXI licensing is separate. The owner's GPL
+distribution question remains pending; repository notices are not clearance.
+Other open boundaries include original hook branches/continuations, UCF
+predicates and private-history lifetime, opaque `Binary/m-ex.bin` provenance,
+`FreezeGlitchFix`, recommended FoD/XFB behavior, source-to-generated bundle
+pairing and backend activation. No code or profile was ported, and this
+source-only checkpoint does not establish online match activation, release
+executable correspondence, peer agreement or profile acceptance.
