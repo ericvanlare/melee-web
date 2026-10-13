@@ -84,12 +84,12 @@ class PipelineCacheSeedTests(unittest.TestCase):
             output = Path(directory) / "initial_pipeline_cache.db"
             materialize(SEED, output)
 
-            self.assertEqual(3674112, output.stat().st_size)
+            self.assertEqual(3702784, output.stat().st_size)
             self.assertEqual(EXPECTED_SHA256, hashlib.sha256(output.read_bytes()).hexdigest())
             with sqlite3.connect(output) as database:
                 self.assertEqual([(1,)], database.execute("SELECT value FROM aurora_schema").fetchall())
                 self.assertEqual(
-                    [(0, 1, 64), (1, 883, 2447676)],
+                    [(0, 1, 64), (1, 889, 2464308)],
                     database.execute(
                         "SELECT type, COUNT(*), SUM(length(config)) FROM pipeline_cache GROUP BY type"
                     ).fetchall(),
@@ -126,6 +126,31 @@ class PipelineCacheSeedTests(unittest.TestCase):
                         "WHERE type=1 AND hash=?", (min(expected),)
                     ).fetchone(),
                 )
+
+
+    def test_h1_first_respawn_descriptors_are_admitted_with_observed_alpha_metadata(self):
+        # These exact six type-1 configs were recovered from the fresh-origin H1 self-KO run.
+        expected = {
+            2840915730: "7210814ff506356b71b0e8dfc4675d9ead99887b7f8503e1233be6dd68d59445",
+            2292536372: "47fbb55564245fac62540a09d2a3baf7a782292af212241948ba3017909302a4",
+            3830897785: "53502fad1fd52f172d9ea116a28820ea9cdfad0ec3f0a55af48e3d16ea4452d1",
+            1614175378: "c57b5f4bc8497f206c4675d12cbbfc03f502dabd67690b9e0fbe04237251c772",
+            228672204: "11162b0ef548ca81311c56c60648ad88b4cec6d6a43c2081cae8006a1e25f018",
+            700090715: "af384190d7190036573cfa07ff20e9432b854ea869967d3aa0888e42449dd588",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "seed.db"
+            materialize(SEED, output)
+            with sqlite3.connect(output) as database:
+                for key, digest in expected.items():
+                    with self.subTest(pipeline=f"{key:08x}"):
+                        row = database.execute(
+                            "SELECT config_version, config_size, config, first_frame_used FROM pipeline_cache "
+                            "WHERE type=1 AND hash=?", (key,)
+                        ).fetchone()
+                        self.assertIsNotNone(row, "Reviewed H1 descriptor must be in the seed")
+                        self.assertEqual((65549, 2772, 1278), (row[0], row[1], row[3]))
+                        self.assertEqual(digest, hashlib.sha256(row[2]).hexdigest())
 
 
 if __name__ == "__main__":

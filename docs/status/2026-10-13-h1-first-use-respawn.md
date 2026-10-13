@@ -1,10 +1,11 @@
 # H1 first-use respawn boundary
 
-**Browser exercised / source-bound respawn preparation observed; complete diagnostic and rendering fix remain open.**
+**Component passed / six observed respawn descriptors prepared before live use. Broader H1 and acceptance remain open.**
 The [portable receipt](../evidence/h1-first-use-respawn-v1.json) retains the
 original three failed combat-based diagnostic attempts and a separately named
 self-KO prefix under run match-rollback-feasibility-20261012-203633-e8f0c964.
-The runtime producer remains 6ee4a07a; later documentation heads do not rebuild it.
+The original diagnostic producer remains 6ee4a07a. The changed-seed validation
+uses producer 8eb3cb9d; later documentation heads do not rebuild either runtime.
 
 The work follows the retained preparation stall in the
 [#316 combat receipt](2026-10-12-simulated-network-combat.md). The first diagnostic
@@ -38,7 +39,36 @@ input row was never published or consumed. Raw cleanup observations and the
 refusal remain retained. Renderer-source coordinates, lockstep cursor, native
 match frame and callback frame are recorded separately in the receipt.
 
-Next, reduce the observed creation records against the existing preparation
-cache and exact descriptor identities. No new capture, descriptor prewarming,
-timing-guard change, performance result, rollback admission or route acceptance
-follows from this checkpoint.
+The copied-profile cache recovery now contains exact configuration bytes for all
+six observed descriptors, cross-checked between peers. A review error opened the
+exported SQLite databases directly and changed their shared-memory sidecars.
+Independent audit confirms the database/WAL files, saved descriptor bytes and
+original/full-copy profiles unchanged. The altered sidecars and stopped seed
+attempt remain retained. A guarded private DB+WAL recovery passed, including
+verification that its backup can be read without sidecars.
+
+The independently reviewed change adds only those six descriptors to the
+existing startup cache and preserves every prior row and its stored order.
+Focused checks, both affected Release builds and the full regression pass;
+the exact counts, identities and retained failures are in the portable receipt.
+
+A fresh run of the unchanged self-KO recipe now passes the **six-descriptor
+preparation and first-respawn reuse component**. Both peers import the six
+exact descriptors, drain the startup queue before live demand, then positively
+record READY and actual use during respawn without live pending/construction
+for those descriptors. Both reach the existing grounded first-respawn endpoint,
+with valid complete streams, uncanceled actual local input rows and ordinary
+Leave/unload. Recorded owned processes are absent.
+
+The raw diagnostic still exits with its intentional “ended without an H1 target”
+error; that result is retained. A separate independent review establishes the
+component result from positive evidence. The acknowledged common checksum
+prefix has explicit unpaired tails, including the endpoint cursor; no paired
+endpoint-tail or whole-session acceptance is claimed. The original incomplete
+capture remains incomplete, and actual inputs are not historically identical.
+
+This reuses existing background preparation without hidden game ticks/draws or
+changes to input, RNG, source order, timing guards or deadlines. It does not
+identify a single causal descriptor, establish GPU completion duration, or close
+broader H1, performance, rollback or route acceptance. Continue those gates
+under H1/#116; Stadium C3 remains the next competitive-stage milestone.
