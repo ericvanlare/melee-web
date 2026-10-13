@@ -9651,5 +9651,191 @@
       "whole_session_equivalent": false
     },
     "next": "Extract this fresh recording\u2019s Setup-to-GO input/draw schedule and bounded comparison fields; compare browser lifetime A, then checked retirement/recreation and lifetime B with per-owner RNG. Keep historical C/F and no-draw results separate."
+  },
+  "browser_prefix_source056_2026_10_13": {
+    "result": "PASS_SCOPED_174_ACTION_SOURCE_PREFIX_ONLY",
+    "scope": "One reviewed headless browser prefix: original CSS/SSS/VS Entry/Setup route followed by 174 source-ordered actions (87 ticks and 87 draws), ending after draw ordinal 86. This is not a full-match or C3 result.",
+    "current_checkout": {
+      "branch": "codex/stadium-c3-lifetime",
+      "main_commit_integrated": "7e430889",
+      "merge_head_at_documentation_update": "0a8f176b6921b8f79e0f6fac5a43e9468c10e2b7"
+    },
+    "source_and_build_identity": {
+      "runtime_producer_commit": "056c2708b4425449b9428f0380fac818e33c06aa",
+      "runtime_producer_tree": "64d2331c8b99abbfdc8ad01962309e97d7ead3fc",
+      "capture_harness_commit": "c3cd27e5c9a455443d19d38646a169f43df00f41",
+      "capture_harness_tree": "c270e5d75652fa417075b1e751c714a533a09266",
+      "full_regression_source": "c3cd27e5c9a455443d19d38646a169f43df00f41",
+      "runtime_producer_is_distinct_from_capture_harness": true,
+      "browser_artifact_count": 41,
+      "diagnostic_release_profile": "Release; MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=ON",
+      "diagnostic_js_sha256": "19e90588863aa3359614c7c3ec0d96c8efc25f49be11e4b9ec38a5266aaa6df1",
+      "diagnostic_wasm_sha256": "0dc6bfc02117b3853a1aa6c4cbd7b160fa4dab435877921cb453e36c26ce7cbe",
+      "ordinary_release_profile": "Release; MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=OFF",
+      "ordinary_js_sha256": "431282364d0ad931c185db90856da830cce673a19e4a00923c63c638b6a455bd",
+      "ordinary_wasm_sha256": "5aa6cf09a30d31fe5b81480fae9c0b11a875f82e79dc3cbf978c05251a055283",
+      "build_identity_artifact": {
+        "path": "stadium-run2-prefix-source056-capture-v2/build-identity.json",
+        "sha256": "2776a0fb7dd32189e9a9bd6bce46a444b73e3ed246002f72f978174426671546"
+      }
+    },
+    "prelaunch_contract_history": {
+      "initial_v1_decision": "REFUSED_STALE_CURRENT_SOURCE_IDENTITY",
+      "initial_v1_browser_launched": false,
+      "initial_v1_failure": "Independent root review refused the frozen v1 packet before browser launch: 11 current-checkout source hashes were stale, and historical af0/caab artifacts were incorrectly described as current. The v2 packet separately binds runtime producer 056c and capture harness c3cd.",
+      "identity_repair_v2_decision": "SOURCE_IDENTITY_REPAIRED_PENDING_INDEPENDENT_REVIEW_NO_LAUNCH",
+      "identity_repair_corrected_records": 11,
+      "v2_independent_release": "PASS_EXTERNAL_CONTRACT_REPAIR_AND_ONE_PREFIX_ADMISSION",
+      "no_failed_game_capture_at_this_boundary": true,
+      "artifacts": {
+        "refused_v1_review": {
+          "path": "stadium-run2-prefix-source056-capture-v2/root-review-refusal-v1.json",
+          "sha256": "b8ffcb3aef3208594f2cc9f2fd9fa8dd87d4f7dcae301d537e7c363ff3eab4d1"
+        },
+        "identity_repair": {
+          "path": "stadium-run2-prefix-source056-capture-v2/identity-repair-report-v2.json",
+          "sha256": "f5c963c3cc8e5cc47581f79a0358fa960b5b716b7c3ab42500c7ef5a4afaffae"
+        },
+        "released_v2_preflight": {
+          "path": "stadium-run2-prefix-source056-capture-v2/preflight.json",
+          "sha256": "daf38f0cbbe917010a0afaaac6b6d52d76e307b6eaa9a614aea6c8ef32bc2f6c"
+        }
+      }
+    },
+    "validation": {
+      "release_decision": "PASS_EXTERNAL_CONTRACT_REPAIR_AND_ONE_PREFIX_ADMISSION",
+      "release_receipt": {
+        "path": "stadium-run2-prefix-source056-capture-v2/root-review-and-release-v2.json",
+        "sha256": "fb61ff7ec12940e1f07751e142a8ffe1de74c97e736626c035b7034757f822d0"
+      },
+      "frozen_manifest_sha256": "1ab41dfa40b7d03a37c77586c65f97660d801af1e1e5366912e7b4381f920c15",
+      "both_release_builds_passed": true,
+      "full_regression": {
+        "source": "c3cd27e5c9a455443d19d38646a169f43df00f41",
+        "tests": 2603,
+        "skips": 180,
+        "log_sha256": "2a7916cda89e5e2adde7d9c90e4b0375fb55eee2bf829545e08fad613000465b"
+      },
+      "original_fixtures_unchanged": true
+    },
+    "capture": {
+      "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+      "capture_directory": "stadium-run2-prefix-source056-capture-v2",
+      "result": "pass",
+      "report": {
+        "path": "stadium-run2-prefix-source056-capture-v2/browser-run/report.json",
+        "sha256": "4152bba21909e15969c5ea2be87fdf1be5033439bd65307c17751e3cd2f65c0e"
+      },
+      "owner_report": {
+        "path": "stadium-run2-prefix-source056-capture-v2/owner.json",
+        "sha256": "e83fff21a781b62dbde6c80a3459436e66682e4ae4bbb8999472cddba07d7e47"
+      },
+      "independent_review": {
+        "path": "stadium-run2-prefix-source056-independent-review-v1.json",
+        "sha256": "494c4dbc9116df6e24dfc8f417194569c572608521752465ee1c780ca7fda757",
+        "decision": "PASS_SCOPED_174_ACTION_SOURCE_PREFIX_ONLY"
+      }
+    },
+    "observations": {
+      "same_run_setup_comparison_passed": true,
+      "actions": 174,
+      "source_ticks": 87,
+      "source_draws": 87,
+      "terminal_action": {
+        "action": "draw",
+        "ordinal": 86,
+        "schedule_index": 173
+      },
+      "copied_match_input": {
+        "source_bundles": 87,
+        "four_port_states": 348,
+        "all_four_port_bytes_match_packet": true,
+        "source_order_transcript_sha256": "55d3530b0292f97b543f8dce513eb2d337340509abd30aaea0ee1a13bf98206b",
+        "interpretation": "The compared values are the copied match input returned by the runtime, not an independent downstream PAD-poll observation."
+      },
+      "C_F_declared_host_fields": [
+        {
+          "boundary": "C",
+          "source_tick": 84,
+          "draw_ordinal": 84,
+          "compared_fields": 16,
+          "exact_match": true,
+          "seed_hex": "868d77be",
+          "map2_countdown": 3628
+        },
+        {
+          "boundary": "F",
+          "source_tick": 85,
+          "draw_ordinal": 85,
+          "compared_fields": 16,
+          "exact_match": true,
+          "seed_hex": "b50f624b",
+          "map2_countdown": 3627
+        }
+      ],
+      "headless_webgpu_api_and_adapter_available": true,
+      "page_console_and_per_action_runtime_errors": {
+        "page_errors": 0,
+        "console_errors": 0,
+        "console_warnings": 0,
+        "per_action_runtime_errors": 0
+      },
+      "hud_clock": {
+        "diagnostic_text": "Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 0 \u00b7 revisits: 0",
+        "source_traversal_ticks": 87,
+        "interpretation": "The menu HUD clock and source traversal counter are distinct."
+      },
+      "unload": {
+        "completed": true,
+        "observation_cleared": true,
+        "native_phase_after_unload": 0,
+        "native_running_after_unload": 0
+      }
+    },
+    "root_process_cleanup": {
+      "receipt": {
+        "path": "stadium-run2-prefix-source056-capture-v2/root-result-and-cleanup-v1.json",
+        "sha256": "ef9c3c59d8e5b316ee369e978b97b93fbdcdceecb3a90882e63f9ab10525d839"
+      },
+      "decision": "PASS_SCOPED_PREFIX_AND_ROOT_PROCESS_ABSENCE",
+      "owner_cleanup_passed": true,
+      "unique_owned_pid_count": 11,
+      "unique_owned_pids": [
+        15467,
+        15494,
+        15499,
+        15509,
+        15510,
+        15511,
+        15512,
+        15518,
+        15524,
+        15531,
+        15835
+      ],
+      "owned_process_groups": [
+        15467,
+        15494,
+        15499
+      ],
+      "all_owned_pids_and_groups_absent": true,
+      "native_unload_phase_running": [
+        0,
+        0
+      ]
+    },
+    "reference_and_full_schedule": {
+      "original_reference_post_go_ticks": 3500,
+      "full_setup_to_terminal_schedule_actions": 7167,
+      "current_browser_prefix_actions": 174,
+      "source": "Same-run offline extraction receipt issue251-stadium-idle-schedule-extraction-v1.json; historical original capture/producer identities remain unchanged."
+    },
+    "limits_and_nonclaims": [
+      "Not a complete 3500-post-GO-tick browser run, not execution of the full 7167-action Setup-to-terminal schedule, and not C3 or lifetime parity.",
+      "No independent downstream PAD-poll observation, pixel/PCM acceptance, or performance result.",
+      "No per-action timestamps or durations; no FPS inference.",
+      "No HUD clock advancement claim; HUD text remains ticks: 0 while source traversal reports 87 ticks.",
+      "Historical e0c072cc/af0e44fe/caabbb19 browser evidence and original 3d4ee3d3/9e721b13 evidence remain unchanged."
+    ]
   }
 }
