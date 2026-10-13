@@ -435,6 +435,141 @@ async function actualRunnerArmControl(transport) {
   return {context, dispatches};
 }
 
+
+async function actualFirstCssCleanupControl({explicit = true, idle = true, evaluateFailure = null} = {}) {
+  const source = await fs.readFile(RUNNER, 'utf8');
+  const helperStart = source.indexOf('async function retireMatchedSetupCfExplicitNative(');
+  const helperEnd = source.indexOf('\nasync function enableFirstSssTextTailProbe(', helperStart);
+  const routeStart = source.indexOf('async function runFirstCssBrowserDraw(');
+  const routeEnd = source.indexOf('\nasync function runCssSssTransition(', routeStart);
+  assert(helperStart >= 0 && helperEnd > helperStart);
+  assert(routeStart >= 0 && routeEnd > routeStart);
+  const route = source.slice(routeStart, routeEnd);
+  assert.match(route, /await unloadFirstCssDiagnosticOwner\(\);/,
+    'the actual First-CSS success route must call the owner-aware unload helper');
+  assert.match(route, /await readFirstCssDiagnosticPostUnloadSnapshot\(\)/,
+    'the actual route must use the guarded post-unload snapshot');
+  assert.match(route, /assertFirstCssDiagnosticMatchedSetupCfPostUnload\(afterUnload\)/,
+    'the actual route must execute the extracted retirement assertion seam');
+  const calls = [], nativeGetters = [];
+  const context = vm.createContext({
+    assert,
+    report: {cleanup: {}, scenario: {matched_setup_cf: {schedule_actions: 174}}},
+    firstSssVsSetupCf: true,
+    evaluateFailure,
+    matchedSetupCfExplicitArmed: explicit,
+    matchedSetupCfExplicitRetirementAttempted: false,
+    matchedSetupCfExplicitNativeAccessClosed: false,
+    matchedSetupCfExplicitAsyncifyUnsafe: false,
+    unloadAttempted: false,
+    LIMITS: {unloadMs: 1000, cleanupMs: 1000},
+    remaining: () => 1000,
+    cleanupRemaining: () => 1000,
+    timeout: async (promise, _ms, label) => {
+      if (label === 'First-CSS post-unload snapshot' && evaluateFailure === 'timeout') {
+        promise.catch(() => {});
+        throw Error('controlled page-evaluate timeout');
+      }
+      return await promise;
+    },
+    page: {
+      waitForTimeout: async () => { calls.push('wait'); },
+      evaluate: async (fn, argument) => {
+        calls.push('post-unload-evaluate');
+        if (evaluateFailure === 'reject') throw Error('controlled page-evaluate rejection');
+        if (evaluateFailure === 'timeout') return new Promise(() => {});
+        return fn(argument);
+      },
+    },
+    driver: {unload: async () => { calls.push('ordinary-runtime-unload'); return true; }},
+    assertMatchedSetupCfAsyncifyIdle: async () => { calls.push('ordinary-idle-check'); return true; },
+    executeMatchedSetupCfNativeCommand: async ({kind}) => {
+      calls.push(kind);
+      if (kind === 'retire-ready') return {ready: 1, asyncify_idle: true};
+      if (kind === 'retire-explicit') return {result: 1, asyncify_idle: true,
+        phase: 0, running: 0, retirement: {native_retired: true, terminal: true,
+          error: null, phase_after_close: 0, running_after_close: 0,
+          pipeline_cache_status_before_shutdown: 0, pipeline_cache_status_after_shutdown: 0,
+          matched_setup_cf: {complete: true, failed: false, cursor: 174}}};
+      throw Error(`Unexpected native command ${kind}`);
+    },
+    persistReport: async () => { calls.push('persist-retirement'); },
+  });
+  Object.assign(context, {
+    Module: {
+      stadiumMatchedSetupNativeIdle: () => { calls.push('asyncify-idle-predicate'); return idle; },
+      _melee_web_native_menu_stadium_first_css_draw_observe: () => {
+        nativeGetters.push('observer'); return 0;
+      },
+      _melee_web_native_menu_phase: () => { nativeGetters.push('phase'); return 0; },
+      _melee_web_native_menu_running: () => { nativeGetters.push('running'); return 0; },
+      UTF8ToString: () => { nativeGetters.push('utf8'); return null; },
+    },
+    document: {querySelector: selector => selector === '#status'
+      ? {dataset: {runtimeError: null}} : {disabled: false}},
+  });
+  vm.runInContext(source.slice(helperStart, helperEnd), context);
+  return {context, calls, nativeGetters};
+}
+
+test('actual First-CSS explicit success path retires and retains the archived receipt separately', async () => {
+  const {context, calls, nativeGetters} = await actualFirstCssCleanupControl({explicit: true, idle: true});
+  await context.unloadFirstCssDiagnosticOwner();
+  const afterUnload = await context.readFirstCssDiagnosticPostUnloadSnapshot();
+  context.assertFirstCssDiagnosticMatchedSetupCfPostUnload(afterUnload);
+  assert.equal(calls.includes('ordinary-runtime-unload'), false,
+    'explicit stopped-loop ownership must bypass queued runtime unload');
+  assert.deepEqual(calls.filter(call => call.startsWith('retire-')), ['retire-ready', 'retire-explicit']);
+  assert.equal(context.report.cleanup.unload_method, 'one-shot-native-retirement');
+  assert.equal(context.report.cleanup.unload_completed, true);
+  assert.equal(afterUnload.observation, null);
+  assert.equal(afterUnload.matched_setup_cf_retirement_receipt.complete, true);
+  assert.equal(afterUnload.matched_setup_cf_retirement_receipt.cursor, 174);
+  assert(nativeGetters.includes('phase') && nativeGetters.includes('running'));
+});
+
+test('actual First-CSS retirement assertion rejects missing schedule or mismatched archived cursor', async () => {
+  const {context} = await actualFirstCssCleanupControl({explicit: true, idle: true});
+  context.report.scenario.matched_setup_cf.schedule_actions = undefined;
+  assert.throws(() => context.assertFirstCssDiagnosticMatchedSetupCfPostUnload({
+    matched_setup_cf: null, matched_setup_cf_retirement_receipt: {complete: true, cursor: 174},
+  }), /checked matched Setup C\/F schedule length/);
+  context.report.scenario.matched_setup_cf.schedule_actions = 174;
+  assert.throws(() => context.assertFirstCssDiagnosticMatchedSetupCfPostUnload({
+    matched_setup_cf: null, matched_setup_cf_retirement_receipt: {complete: true, cursor: 173},
+  }), /cursor differs/);
+});
+
+for (const evaluateFailure of ['reject', 'timeout']) {
+  test(`actual First-CSS post-unload ${evaluateFailure} closes explicit native access`, async () => {
+    const {context, nativeGetters} = await actualFirstCssCleanupControl({
+      explicit: true, idle: true, evaluateFailure,
+    });
+    const pattern = evaluateFailure === 'reject'
+      ? /controlled page-evaluate rejection/ : /controlled page-evaluate timeout/;
+    await assert.rejects(context.readFirstCssDiagnosticPostUnloadSnapshot(), pattern);
+    assert.equal(context.matchedSetupCfExplicitAsyncifyUnsafe, true);
+    assert.equal(context.matchedSetupCfExplicitNativeAccessClosed, true);
+    assert.deepEqual(nativeGetters, []);
+  });
+}
+
+test('actual First-CSS ordinary success path keeps the guarded runtime unload', async () => {
+  const {context, calls} = await actualFirstCssCleanupControl({explicit: false, idle: true});
+  await context.unloadFirstCssDiagnosticOwner();
+  assert.deepEqual(calls, ['ordinary-idle-check', 'ordinary-runtime-unload']);
+  assert.equal(context.report.cleanup.unload_completed, true);
+  assert.equal(context.report.cleanup.matched_setup_cf_retirement, undefined);
+});
+
+test('actual First-CSS post-unload snapshot suppresses native getters when Asyncify is unsafe', async () => {
+  const {context, calls, nativeGetters} = await actualFirstCssCleanupControl({explicit: true, idle: false});
+  await assert.rejects(context.readFirstCssDiagnosticPostUnloadSnapshot(), /snapshot was suppressed/);
+  assert.deepEqual(nativeGetters, []);
+  assert.equal(context.matchedSetupCfExplicitAsyncifyUnsafe, true);
+  assert(calls.includes('asyncify-idle-predicate'));
+});
+
 for (const mode of ['lost-response', 'never-settling', 'returned-native-refusal']) {
   test(`actual runner explicit arm ${mode} suppresses all ordinary cleanup`, async () => {
     let nativeArmApplied = 0;

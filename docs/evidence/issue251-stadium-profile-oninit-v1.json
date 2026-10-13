@@ -10183,6 +10183,78 @@
         "path": "stadium-projection-result-independent-review-v1.json",
         "sha256": "a302331282138c0c9d284580c65cee9d66386ef462497c9bc0ad200c5746308e"
       }
+    },
+    "explicit_action_driver": {
+      "result": "FAIL_NATIVE_RETIREMENT_AFTER_EXACT_COMPONENT_AGREEMENT",
+      "external_run_id": "rollback-stadium-sprint-20261013-111001-9f8df4a4",
+      "runtime_producer": {
+        "base": "50c1fc958353e1e39680fa073b594480c979543a",
+        "reviewed_patch_sha256": "1516c8a51c54b918c063977034f89de9900a75ddd38761f8a6218916104c1f41",
+        "scope": "Actual v6 Release builds precede current harness/test commit; older 50c1-only build receipt labels corrected additively."
+      },
+      "capture_and_regression_head": "3e71329e7f3fe03077e6f453897edb5f60929b95",
+      "component": {
+        "actions": 174,
+        "source_ticks": 87,
+        "source_draws": 87,
+        "declared_fields_each_C_F": 16,
+        "copied_four_port_bundles": 87,
+        "downstream_PAD_poll_observed": false,
+        "action_loop_ms": 5233.778,
+        "receipt_reads": 174,
+        "poll_waits": 0,
+        "prior_projection_loop_ms": 16929.459,
+        "report_persistence_ms": 2593.603,
+        "report_serialized_bytes": 1099781306,
+        "timing_scope": "Nested inclusive host intervals; no native/GPU isolation or full-lifetime budget claim."
+      },
+      "failure": {
+        "message": "First-CSS diagnostic native menu unload exceeded 15000 ms",
+        "cause": "Early successful First-CSS route still calls queued ordinary unload after explicit arm canceled the main loop. It sets unloadAttempted before timeout, preventing finally from invoking checked explicit retirement.",
+        "native_retirement_completed": false,
+        "observation_cleared": false,
+        "owned_browser_server_and_outer_group_absent": true,
+        "source_runtime_unchanged": true
+      },
+      "validation": {
+        "full_suite_tests": 2609,
+        "skips": 180,
+        "passed": true,
+        "source_unchanged": true,
+        "both_release_builds_passed": true,
+        "exact_head_CI": "Pending; no integration claim."
+      },
+      "artifacts": {
+        "stadium-run2-explicit-step-capture-v1/browser-run/report.json": {
+          "path": "stadium-run2-explicit-step-capture-v1/browser-run/report.json",
+          "sha256": "704ed3bd5a10bc5f277e3506c8139724b5880f50bca8b2e9b402aab9789ac16d"
+        },
+        "stadium-run2-explicit-step-capture-v1/owner.json": {
+          "path": "stadium-run2-explicit-step-capture-v1/owner.json",
+          "sha256": "c05fdb2bcb79b43cc45b7aa4cf526a1eea7a681f6822104f5fdc893204ed6bf7"
+        },
+        "stadium-run2-explicit-step-capture-v1/completion.json": {
+          "path": "stadium-run2-explicit-step-capture-v1/completion.json",
+          "sha256": "939f971eae8d8ab90a839de8a0a63f46824c837d48e1620ee27e359384730d46"
+        },
+        "stadium-run2-explicit-step-capture-v1/first-failure.json": {
+          "path": "stadium-run2-explicit-step-capture-v1/first-failure.json",
+          "sha256": "800880efc39233cb90df80a89317e24897daebb9519ae7ba46d14e08ef767041"
+        },
+        "stadium-run2-explicit-step-capture-v1/runtime-build-receipt-correction-v1.json": {
+          "path": "stadium-run2-explicit-step-capture-v1/runtime-build-receipt-correction-v1.json",
+          "sha256": "8d84d802aa382a1b917b9e81bcf2c081da48c509fab702607e974833d4c6982d"
+        },
+        "stadium-run2-explicit-step-capture-v1/full-regression-retirement-v1.json": {
+          "path": "stadium-run2-explicit-step-capture-v1/full-regression-retirement-v1.json",
+          "sha256": "f1933fe3bc8c9aca258ee730417538603b076dcc142054a2614d76f65fd48f51"
+        },
+        "stadium-explicit-step-prefix-first-failure-review-v1.json": {
+          "path": "stadium-explicit-step-prefix-first-failure-review-v1.json",
+          "sha256": "1ae35fe5e27227d1b111cd1987fba6784f69edd0acaef63bb8b2bcf97b2250df"
+        }
+      },
+      "next": "Reduce and repair early success-route cleanup using existing checked explicit retirement. Then reduce remaining persistence cost before any full7167-action release; unchanged deadlines and comparison rules."
     }
   }
 }

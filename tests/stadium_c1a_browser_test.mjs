@@ -24,6 +24,7 @@ import {validateMatchedSetupCfRequest, validateMatchedSetupCfPreflight,
 import {elapsedMs, measureAsync, measureSync, monotonicNowNs, roundMs,
   summarizeFailedActionSamples, summarizeStageEvents, summarizeTimingValues}
   from './stadium_c3_timing.mjs';
+import {createStadiumC3ReportCheckpoint} from './stadium_c3_report_checkpoint.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const {values} = parseArgs({options: Object.fromEntries(
@@ -350,18 +351,24 @@ const report = {
   error: null,
 };
 
+const stadiumC3ReportCheckpoint = createStadiumC3ReportCheckpoint({reportPath: inventoryOutput});
 const persistReport = async () => {
-  const temporary = `${inventoryOutput}.tmp`;
   const sample = matchedSetupCfTiming?.currentActionSample ?? null;
   const measure = matchedSetupCfTiming?.actionLoopActive === true && sample !== null;
   const totalStarted = measure ? monotonicNowNs() : null;
   let serialized = null, serializeMs = null, writeMs = null, renameMs = null;
   let completed = false;
   try {
+    const checkpointReport = await stadiumC3ReportCheckpoint.prepare(report, {
+      terminal: report.execution_state === 'completed'});
+    const checkpointed = stadiumC3ReportCheckpoint.shouldUse(report);
+    const temporary = checkpointed
+      ? stadiumC3ReportCheckpoint.nextReportTemporaryPath()
+      : `${inventoryOutput}.tmp`;
     serialized = measure
       ? timedActionSync(sample, 'report_serialize', null,
-        () => JSON.stringify(report) + '\n', event => { serializeMs = event.elapsed_ms; })
-      : JSON.stringify(report) + '\n';
+        () => JSON.stringify(checkpointReport) + '\n', event => { serializeMs = event.elapsed_ms; })
+      : JSON.stringify(checkpointReport) + '\n';
     if (measure) {
       await timedActionAsync(sample, 'report_write', null,
         () => fs.writeFile(temporary, serialized), event => { writeMs = event.elapsed_ms; });
@@ -2188,6 +2195,84 @@ async function retireMatchedSetupCfExplicitNative({cleanupPath = false} = {}) {
   return response.retirement;
 }
 
+async function unloadFirstCssDiagnosticOwner() {
+  report.cleanup.unload_attempted = true;
+  unloadAttempted = true;
+  if (matchedSetupCfExplicitArmed) {
+    await retireMatchedSetupCfExplicitNative();
+    return;
+  }
+  await assertMatchedSetupCfAsyncifyIdle(
+    'Check Asyncify before First-CSS diagnostic native menu unload');
+  await timeout(driver.unload(), LIMITS.unloadMs,
+    'First-CSS diagnostic native menu unload');
+  report.cleanup.unload_completed = true;
+}
+
+async function readFirstCssDiagnosticPostUnloadSnapshot() {
+  let afterUnload;
+  try {
+    afterUnload = await timeout(page.evaluate(requireAsyncifyIdle => {
+      const module = globalThis.Module;
+      if (requireAsyncifyIdle &&
+          (typeof module?.stadiumMatchedSetupNativeIdle !== 'function' ||
+           module.stadiumMatchedSetupNativeIdle() !== true))
+        return {__native_asyncify_idle: false};
+      const pointer = module._melee_web_native_menu_stadium_first_css_draw_observe?.();
+      const observationText = pointer ? module.UTF8ToString(pointer) : null;
+      const observation = observationText ? JSON.parse(observationText) : null;
+      const retainedTextTail = observation?.schema ===
+        'melee-web-stadium-first-sss-text-tail-retained-v1';
+      return {phase: module._melee_web_native_menu_phase(), running: module._melee_web_native_menu_running(),
+        observation: retainedTextTail ? null : observationText,
+        retained_text_tail_wrapper: retainedTextTail,
+        first_sss_constructor_pair: observation?.first_sss_constructor_pair ?? null,
+        first_sss_consumed_tick: observation?.first_sss_consumed_tick ?? null,
+        first_sss_draw: observation?.first_sss_draw ?? null,
+        first_sss_prefix: observation?.first_sss_prefix ?? null,
+        first_sss_vs_entry: observation?.first_sss_vs_entry ?? null,
+        first_sss_vs_setup: observation?.first_sss_vs_setup ?? null,
+        matched_setup_cf: observation?.first_sss_vs_setup?.matched_setup_cf ?? null,
+        error: document.querySelector('#status')?.dataset.runtimeError || null,
+        import_enabled: !!document.querySelector('#disc') && !document.querySelector('#disc').disabled};
+    }, matchedSetupCfExplicitArmed), Math.min(5000, remaining()),
+    'First-CSS post-unload snapshot');
+  } catch (error) {
+    if (matchedSetupCfExplicitArmed) {
+      matchedSetupCfExplicitAsyncifyUnsafe = true;
+      matchedSetupCfExplicitNativeAccessClosed = true;
+    }
+    throw error;
+  }
+  if (afterUnload?.__native_asyncify_idle === false) {
+    matchedSetupCfExplicitAsyncifyUnsafe = true;
+    matchedSetupCfExplicitNativeAccessClosed = true;
+    throw Error('Asyncify is not idle; first-CSS post-unload native snapshot was suppressed');
+  }
+  if (matchedSetupCfExplicitArmed) {
+    const archived = report.cleanup.matched_setup_cf_retirement?.retirement?.matched_setup_cf;
+    const expectedCursor = report.scenario.matched_setup_cf?.schedule_actions;
+    if (!archived || archived.complete !== true || archived.cursor !== expectedCursor)
+      throw Error('Explicit retirement did not retain the complete terminal C/F receipt separately');
+    afterUnload.matched_setup_cf_retirement_receipt = archived;
+  }
+  return afterUnload;
+}
+
+function assertFirstCssDiagnosticMatchedSetupCfPostUnload(afterUnload) {
+  if (!firstSssVsSetupCf) return;
+  assert.equal(afterUnload.matched_setup_cf, null,
+    'Live matched Setup C/F observer survived native owner close');
+  if (!matchedSetupCfExplicitArmed) return;
+  const expectedCursor = report.scenario.matched_setup_cf?.schedule_actions;
+  assert.ok(Number.isSafeInteger(expectedCursor) && expectedCursor > 0,
+    'The report omitted the checked matched Setup C/F schedule length');
+  assert.equal(afterUnload.matched_setup_cf_retirement_receipt?.complete, true,
+    'Archived terminal C/F receipt was not retained separately from the cleared live observer');
+  assert.equal(afterUnload.matched_setup_cf_retirement_receipt?.cursor, expectedCursor,
+    'Archived terminal C/F cursor differs from the checked schedule length');
+}
+
 async function enableFirstSssTextTailProbe() {
   return page.evaluate(() => {
     const probe = globalThis.__meleeWebStadiumTextTailProbe;
@@ -3184,30 +3269,8 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
   assert.deepEqual(pageErrors, []);
   assert.deepEqual(externalRequests, []);
 
-  report.cleanup.unload_attempted = true;
-  unloadAttempted = true;
-  await timeout(driver.unload(), LIMITS.unloadMs, 'First-CSS diagnostic native menu unload');
-  report.cleanup.unload_completed = true;
-  const afterUnload = await timeout(page.evaluate(() => {
-    const module = globalThis.Module;
-    const pointer = module._melee_web_native_menu_stadium_first_css_draw_observe?.();
-    const observationText = pointer ? module.UTF8ToString(pointer) : null;
-    const observation = observationText ? JSON.parse(observationText) : null;
-    const retainedTextTail = observation?.schema ===
-      'melee-web-stadium-first-sss-text-tail-retained-v1';
-    return {phase: module._melee_web_native_menu_phase(), running: module._melee_web_native_menu_running(),
-      observation: retainedTextTail ? null : observationText,
-      retained_text_tail_wrapper: retainedTextTail,
-      first_sss_constructor_pair: observation?.first_sss_constructor_pair ?? null,
-      first_sss_consumed_tick: observation?.first_sss_consumed_tick ?? null,
-      first_sss_draw: observation?.first_sss_draw ?? null,
-      first_sss_prefix: observation?.first_sss_prefix ?? null,
-      first_sss_vs_entry: observation?.first_sss_vs_entry ?? null,
-      first_sss_vs_setup: observation?.first_sss_vs_setup ?? null,
-      matched_setup_cf: observation?.first_sss_vs_setup?.matched_setup_cf ?? null,
-      error: document.querySelector('#status')?.dataset.runtimeError || null,
-      import_enabled: !!document.querySelector('#disc') && !document.querySelector('#disc').disabled};
-  }), Math.min(5000, remaining()), 'First-CSS post-unload snapshot');
+  await unloadFirstCssDiagnosticOwner();
+  const afterUnload = await readFirstCssDiagnosticPostUnloadSnapshot();
   assert.equal(afterUnload.phase, 0);
   assert.equal(afterUnload.running, 0);
   assert.equal(afterUnload.observation, null);
@@ -3226,8 +3289,7 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
     assert.equal(afterUnload.first_sss_prefix, null,
       'SSS prefix diagnostic ownership survived teardown');
   if (firstSssVsSetup) assert.equal(afterUnload.first_sss_vs_setup, null);
-  if (firstSssVsSetupCf) assert.equal(afterUnload.matched_setup_cf, null,
-    'Matched Setup C/F diagnostic ownership survived checked unload');
+  assertFirstCssDiagnosticMatchedSetupCfPostUnload(afterUnload);
   if (firstSssVsSetupTextTail) {
     assert.equal(afterUnload.retained_text_tail_wrapper, true,
       'Native unload did not retain the scalar text-tail outcome');
