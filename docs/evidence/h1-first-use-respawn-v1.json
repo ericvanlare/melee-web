@@ -1000,7 +1000,7 @@
     "sha256": "25008efd63cf05b54cb94745c19888a19e4b979838e8921c7a509e693b025d37"
   },
   "exact_six_cache_preparation_candidate": {
-    "status": "INDEPENDENTLY_REVIEWED_EXACT_SIX_ADDITION_RUNTIME_VALIDATION_PENDING",
+    "status": "PASS_SIX_DESCRIPTOR_PREPARATION_AND_FIRST_RESPAWN_REUSE_COMPONENT_ONLY",
     "source_runtime": "6ee4a07a95b0cf760b9e7796d780b21c33b93812",
     "source_capture": {
       "external_run_relative_path": "h1-self-ko-prefix-browser-v1/browser/report.json",
@@ -1131,16 +1131,16 @@
     },
     "fresh_origin_basis": "The original self-KO harness created a new exclusive output directory and fresh alpha/beta user-data roots; no explicit site-data-clear API call is claimed. Recovery used copied origin IndexedDB directories.",
     "reuse": "Existing append-only reviewer/materializer and startup background pipeline preparation, provenance ON and selective pipelines OFF. No hidden game ticks/draws, timing-guard change, altered PAD/RNG or source-order change.",
-    "proposed_test_repair": "Root review caught the generator leaving the old883-row test expectation because its text replacement did not match. Preserve the generated proposal; correct expected889 rows before source validation. Seed bytes are unaffected.",
+    "proposed_test_repair": "The generated proposal retained an old883-row expected count because its text replacement did not match. That failed proposal remains retained; the independently reviewed889-row correction was applied before validation. Seed bytes were unaffected.",
     "verification_plan": {
       "external_run_relative_path": "h1-self-ko-changed-seed-verification-plan-v1.json",
       "sha256": "75e40e81d61d7f9aa1b89ccc49759e42b5b8f0f386a24bfc8b96d724e26e9779"
     },
     "remaining": [
-      "Validate the reviewed changed seed in the affected builds and full regression.",
-      "One bounded same-recipe respawn experiment must prove import, queue drain, positive READY reuse and actual use before claiming preparation.",
-      "The original canceled beta publication attempt remains explicit. Any recurrence still refuses the complete witness.",
-      "Cache admission does not prove GPU completion, causal attribution, stall removal, whole-session performance or H1 acceptance."
+      "Broader H1 covers additional fighters/effects and sustained live-play headroom; this six-descriptor first-respawn component does not close H1/#116.",
+      "The common checksum prefix ends at1018; endpointcursor1021 and tails remain outside it. No paired endpoint-tail or whole-session acceptance.",
+      "No GPU completion duration, causal descriptor/stall proof, historical input equality, physical/foreground/audio acceptance or rollback admission follows.",
+      "PR integration still requires the final current-head CI and reviewed documentation; executable producer remains8eb3cb9d."
     ],
     "independent_review": {
       "external_run_relative_path": "h1-six-row-seed-independent-review-v1/review.json",
@@ -1177,7 +1177,406 @@
       "staged_snapshot_check": {
         "entries": 2192,
         "findings": 0
+      },
+      "independent_committed_review": {
+        "external_run_relative_path": "h1-content-policy-independent-review-v2.json",
+        "sha256": "6e07ebbfbccc8c6c593049722dfbc8386aeeba9fb1b417562f4817afdf739631"
+      },
+      "superseded_review_bindings": "The two v1 review receipts sampled an index/HEAD commit race and bound an empty diff. They remain retained and invalid for change identity. The v2 review and root check bind explicit7e430889..8eb3cb9d and all six committed file hashes."
+    },
+    "runtime_validation": {
+      "producer": "8eb3cb9db216d63f0f579d9cd2805da9e31aa551",
+      "tree": "814100425765026e9d5538a7a34dfb72fd6d4290",
+      "build_identity": {
+        "external_run_relative_path": "h1-exact-six-build-identity-v1.json",
+        "sha256": "6ad778ef7ac6911440f4659a16a9109197acebeba7bf16f71adbf7ad5f5a11e5"
+      },
+      "validation_completion": {
+        "external_run_relative_path": "h1-exact-six-validation-v1/root-completion.json",
+        "sha256": "b99d787ff347a35d230a096349fae1de5f3244657bd640efd4d87642ebec3c88"
+      },
+      "provenance_release": "PASS; provenance ON, selective pipelines OFF, draw discard OFF",
+      "ordinary_release": "PASS",
+      "full_regression": {
+        "tests": 2389,
+        "skips": 165,
+        "seconds": 522.832,
+        "log_sha256": "3981d224b3de8204c8c69d6fce2259b2296a3520afa3c9c365465a3b52cb9539"
+      },
+      "historical_runtime_retained": {
+        "external_run_relative_path": "h1-original-provenance-runtime-6ee4a07a-retained-v1/retention.json",
+        "sha256": "9b514ed6ee2dee39ba003945bd9479a37bec89753b611a4e66bc34ffa904e314"
       }
+    },
+    "changed_seed_first_respawn": {
+      "decision": "PASS_SIX_SEED_DESCRIPTOR_PREPARATION_AND_FIRST_RESPAWN_REUSE_COMPONENT_ONLY",
+      "runtime_producer": "8eb3cb9db216d63f0f579d9cd2805da9e31aa551",
+      "unchanged_recipe_sha256": "7582f368ba9372025b7ef229ec928fff7f50d33d0052c8f05dd2220a0e4cce44",
+      "unchanged_runner_sha256": "bdb51984f5ea08a4470c368a7a8a2f6768f6dc61f0ac5d68ab76cb78a7465a18",
+      "capture_report": {
+        "external_run_relative_path": "h1-self-ko-changed-seed-capture-actual-v1/browser/report.json",
+        "sha256": "f268954fb3340ae111f2d8d1b64053b15d1808d3f889cb3503c1b2bd36e3594c"
+      },
+      "release": {
+        "external_run_relative_path": "h1-self-ko-changed-seed-capture-actual-v1/release.json",
+        "sha256": "962218b496d8ee3b416c3bd2716011715f7c11a97436a1d503250d3ee5724c1a"
+      },
+      "owner": {
+        "external_run_relative_path": "h1-self-ko-changed-seed-capture-actual-v1/owner.json",
+        "sha256": "37dc02678b72f0703739a11fa09d189d1bed6109263150f78db044b9f9fdb0d0"
+      },
+      "root_route_cleanup_review": {
+        "external_run_relative_path": "h1-self-ko-changed-seed-capture-actual-v1/root-route-and-cleanup-review-v1.json",
+        "sha256": "025ec757c009cee4e3fb70a6b153ab3d85a310ace458539636b39e795ba68670"
+      },
+      "independent_result_review": {
+        "external_run_relative_path": "h1-self-ko-changed-seed-capture-actual-v1/independent-result-review-v1.json",
+        "sha256": "9a0fdff4afab5c7e5d7ee381f7f41c18b4b616bb4274196bf769e608302f6639"
+      },
+      "independent_witnesses": {
+        "external_run_relative_path": "h1-self-ko-changed-seed-capture-actual-v1/independent-six-witnesses-v2.json",
+        "sha256": "d6ee1673d1dfa032fc0a8f7298cd6bd7621db626d9e82686f00e6a5399b923cd"
+      },
+      "raw_result": {
+        "decision": "FAIL",
+        "exit_code": 1,
+        "first_error": "Bounded self-KO first-respawn prefix ended without an H1 target",
+        "h1_outcome": "NO_TARGET_FIRST_RESPAWN_PREFIX_RETAINED",
+        "interpretation": "The unchanged diagnostic expects a preparation target. Its intentional no-target exit remains raw FAIL; this separately reviewed component result requires positive prepared/reuse witnesses and all unchanged scoped route/input/closure guards."
+      },
+      "peers": {
+        "alpha": {
+          "case_id": 1,
+          "native_records": 1394542,
+          "raw_bytes": 612585501,
+          "raw_sha256": "2f6b2bda78c3f5f08ba20bcdc901ac49e94a10e8ca1d8bd002fa0e7a8e533dde",
+          "chunks": 1564,
+          "ordered_startup_queue_zero": {
+            "host_sequence": 307,
+            "completed_renderer_frame": 153,
+            "native_menu_phase": 0,
+            "source_steps": 0,
+            "queued_total": 0
+          },
+          "first_live_demand": {
+            "host_sequence": 2317,
+            "sequence": 430567,
+            "frame_id": 978,
+            "world_generation": 3
+          },
+          "six_descriptors": [
+            {
+              "config_sha256": "11162b0ef548ca81311c56c60648ad88b4cec6d6a43c2081cae8006a1e25f018",
+              "import_sequence": 384,
+              "first_live_ready_sequence": 753538,
+              "phase6_use_sequence": 753539,
+              "phase6_renderer_frame": 1182,
+              "phase6_provenance_source_tick": 328,
+              "world_generation": 3,
+              "stocks": [
+                3,
+                4
+              ],
+              "live_pending_or_create_count": 0
+            },
+            {
+              "config_sha256": "af384190d7190036573cfa07ff20e9432b854ea869967d3aa0888e42449dd588",
+              "import_sequence": 385,
+              "first_live_ready_sequence": 753540,
+              "phase6_use_sequence": 753541,
+              "phase6_renderer_frame": 1182,
+              "phase6_provenance_source_tick": 328,
+              "world_generation": 3,
+              "stocks": [
+                3,
+                4
+              ],
+              "live_pending_or_create_count": 0
+            },
+            {
+              "config_sha256": "c57b5f4bc8497f206c4675d12cbbfc03f502dabd67690b9e0fbe04237251c772",
+              "import_sequence": 386,
+              "first_live_ready_sequence": 753134,
+              "phase6_use_sequence": 753135,
+              "phase6_renderer_frame": 1182,
+              "phase6_provenance_source_tick": 328,
+              "world_generation": 3,
+              "stocks": [
+                3,
+                4
+              ],
+              "live_pending_or_create_count": 0
+            },
+            {
+              "config_sha256": "47fbb55564245fac62540a09d2a3baf7a782292af212241948ba3017909302a4",
+              "import_sequence": 387,
+              "first_live_ready_sequence": 753127,
+              "phase6_use_sequence": 753128,
+              "phase6_renderer_frame": 1182,
+              "phase6_provenance_source_tick": 328,
+              "world_generation": 3,
+              "stocks": [
+                3,
+                4
+              ],
+              "live_pending_or_create_count": 0
+            },
+            {
+              "config_sha256": "7210814ff506356b71b0e8dfc4675d9ead99887b7f8503e1233be6dd68d59445",
+              "import_sequence": 388,
+              "first_live_ready_sequence": 753124,
+              "phase6_use_sequence": 753125,
+              "phase6_renderer_frame": 1182,
+              "phase6_provenance_source_tick": 328,
+              "world_generation": 3,
+              "stocks": [
+                3,
+                4
+              ],
+              "live_pending_or_create_count": 0
+            },
+            {
+              "config_sha256": "53502fad1fd52f172d9ea116a28820ea9cdfad0ec3f0a55af48e3d16ea4452d1",
+              "import_sequence": 389,
+              "first_live_ready_sequence": 753132,
+              "phase6_use_sequence": 753133,
+              "phase6_renderer_frame": 1182,
+              "phase6_provenance_source_tick": 328,
+              "world_generation": 3,
+              "stocks": [
+                3,
+                4
+              ],
+              "live_pending_or_create_count": 0
+            }
+          ],
+          "actual_local_PAD": {
+            "actual_rows": 1023,
+            "cancelled_publications": 0,
+            "historical_match": false,
+            "first_historical_mismatch_index": 132,
+            "scope": "actual per-peer local PAD rows only; not a complete four-port source-tick consumed bank"
+          },
+          "final_status": {
+            "capture_active": false,
+            "valid": true,
+            "final": true,
+            "invalid_reason": 0,
+            "invalid_reason_name": "none",
+            "capture_generation": 1,
+            "renderer_generation": 1,
+            "device_generation": 1,
+            "next_sequence": 1394543,
+            "errors": 0,
+            "dropped": 0,
+            "open_scopes": 0,
+            "total_records": 1394542,
+            "drained_records": 1394542,
+            "pending_records": 0,
+            "descriptor_count": 896
+          }
+        },
+        "beta": {
+          "case_id": 2,
+          "native_records": 1398963,
+          "raw_bytes": 613805338,
+          "raw_sha256": "82c8f7fd2851a1384b31c909900e6078b95688f64cf16437034b38fe2953cbda",
+          "chunks": 1221,
+          "ordered_startup_queue_zero": {
+            "host_sequence": 307,
+            "completed_renderer_frame": 153,
+            "native_menu_phase": 0,
+            "source_steps": 0,
+            "queued_total": 0
+          },
+          "first_live_demand": {
+            "host_sequence": 1631,
+            "sequence": 429877,
+            "frame_id": 633,
+            "world_generation": 3
+          },
+          "six_descriptors": [
+            {
+              "config_sha256": "11162b0ef548ca81311c56c60648ad88b4cec6d6a43c2081cae8006a1e25f018",
+              "import_sequence": 384,
+              "first_live_ready_sequence": 752848,
+              "phase6_use_sequence": 752849,
+              "phase6_renderer_frame": 837,
+              "phase6_provenance_source_tick": 328,
+              "world_generation": 3,
+              "stocks": [
+                3,
+                4
+              ],
+              "live_pending_or_create_count": 0
+            },
+            {
+              "config_sha256": "af384190d7190036573cfa07ff20e9432b854ea869967d3aa0888e42449dd588",
+              "import_sequence": 385,
+              "first_live_ready_sequence": 752850,
+              "phase6_use_sequence": 752851,
+              "phase6_renderer_frame": 837,
+              "phase6_provenance_source_tick": 328,
+              "world_generation": 3,
+              "stocks": [
+                3,
+                4
+              ],
+              "live_pending_or_create_count": 0
+            },
+            {
+              "config_sha256": "c57b5f4bc8497f206c4675d12cbbfc03f502dabd67690b9e0fbe04237251c772",
+              "import_sequence": 386,
+              "first_live_ready_sequence": 752444,
+              "phase6_use_sequence": 752445,
+              "phase6_renderer_frame": 837,
+              "phase6_provenance_source_tick": 328,
+              "world_generation": 3,
+              "stocks": [
+                3,
+                4
+              ],
+              "live_pending_or_create_count": 0
+            },
+            {
+              "config_sha256": "47fbb55564245fac62540a09d2a3baf7a782292af212241948ba3017909302a4",
+              "import_sequence": 387,
+              "first_live_ready_sequence": 752437,
+              "phase6_use_sequence": 752438,
+              "phase6_renderer_frame": 837,
+              "phase6_provenance_source_tick": 328,
+              "world_generation": 3,
+              "stocks": [
+                3,
+                4
+              ],
+              "live_pending_or_create_count": 0
+            },
+            {
+              "config_sha256": "7210814ff506356b71b0e8dfc4675d9ead99887b7f8503e1233be6dd68d59445",
+              "import_sequence": 388,
+              "first_live_ready_sequence": 752434,
+              "phase6_use_sequence": 752435,
+              "phase6_renderer_frame": 837,
+              "phase6_provenance_source_tick": 328,
+              "world_generation": 3,
+              "stocks": [
+                3,
+                4
+              ],
+              "live_pending_or_create_count": 0
+            },
+            {
+              "config_sha256": "53502fad1fd52f172d9ea116a28820ea9cdfad0ec3f0a55af48e3d16ea4452d1",
+              "import_sequence": 389,
+              "first_live_ready_sequence": 752442,
+              "phase6_use_sequence": 752443,
+              "phase6_renderer_frame": 837,
+              "phase6_provenance_source_tick": 328,
+              "world_generation": 3,
+              "stocks": [
+                3,
+                4
+              ],
+              "live_pending_or_create_count": 0
+            }
+          ],
+          "actual_local_PAD": {
+            "actual_rows": 1026,
+            "cancelled_publications": 0,
+            "historical_match": false,
+            "first_historical_mismatch_index": 153,
+            "scope": "actual per-peer local PAD rows only; not a complete four-port source-tick consumed bank"
+          },
+          "final_status": {
+            "capture_active": false,
+            "valid": true,
+            "final": true,
+            "invalid_reason": 0,
+            "invalid_reason_name": "none",
+            "capture_generation": 1,
+            "renderer_generation": 1,
+            "device_generation": 1,
+            "next_sequence": 1398964,
+            "errors": 0,
+            "dropped": 0,
+            "open_scopes": 0,
+            "total_records": 1398963,
+            "drained_records": 1398963,
+            "pending_records": 0,
+            "descriptor_count": 896
+          }
+        }
+      },
+      "endpoint": {
+        "stocks": [
+          3,
+          4
+        ],
+        "native_match_frame": 571,
+        "source_cursor": 1021,
+        "motion": 14,
+        "ground_air": 0,
+        "scope": "Paired observed first grounded respawn after one P1 stock loss; no second stock or Results."
+      },
+      "checksum_comparison": {
+        "common_records": 1019,
+        "source_cursor_range": [
+          0,
+          1018
+        ],
+        "required_route_boundary": 586,
+        "retained_counts": {
+          "alpha": 1022,
+          "beta": 1025
+        },
+        "unpaired_tail_counts": {
+          "alpha": 3,
+          "beta": 6
+        },
+        "unpaired_tail_ranges": {
+          "alpha": [
+            1019,
+            1021
+          ],
+          "beta": [
+            1019,
+            1024
+          ]
+        },
+        "limitation": "Common comparator prefix ends1018; endpoint source cursor1021 is retained outside that common acknowledged prefix. No common-prefix proof for endpoint/tails or whole-session acceptance."
+      },
+      "checksum_audit": {
+        "external_run_relative_path": "h1-self-ko-changed-seed-capture-actual-v1/retained-common-checksum-audit-v1.json",
+        "sha256": "f1bd932b14e77f284cfe5bce4a36c7292654df497cec5040f97e11b8b5bac983"
+      },
+      "cleanup": {
+        "ordinary_leave_unload": "PASS; phase0/running0 both peers",
+        "owned_pids_absent": 23,
+        "owned_groups_absent": 4,
+        "getter_retirement": "Observed timing/preparation getter retirement before native finish; whole-host quiescence unclaimed"
+      },
+      "timing_incidents": {
+        "alpha": 0,
+        "beta": 0,
+        "scope": "Existing recorder; no performance/timing acceptance from private provenance run"
+      },
+      "first_offline_refusal": {
+        "artifact": {
+          "external_run_relative_path": "h1-self-ko-changed-seed-capture-actual-v1/independent-six-witnesses-v1.json",
+          "sha256": "ad06151e3779c2069f1168505a46765584f3c6b97ca877589a1377aaddf843e1"
+        },
+        "cause": "Root supplied beta case2 for both peers; actual alpha1/beta2. Same audit function rerun with explicit per-peer identity, no guard change."
+      },
+      "auditor": {
+        "freeze": {
+          "external_run_relative_path": "h1-changed-seed-stream-auditor-v1/freeze-manifest.json",
+          "sha256": "3560ff489ca413ad2a3ab0ba16543a2280da53a2b3d0f4044adfa1ba623d4dc7"
+        },
+        "focused_synthetic_controls_passed": 9
+      },
+      "limits": "Existing owner300000/cleanup30000 and child260000/operation230000/cleanup30000 ms; 4M records/1GiB host bytes/4MiB chunks/8192 chunks per peer unchanged. Actual owner elapsed45487ms.",
+      "retention": "Original incomplete captures, SHM incident, refused seed/test/review/audit evidence and both current raw streams/profiles are retained."
     }
   }
 }
