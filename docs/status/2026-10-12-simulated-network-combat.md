@@ -2,6 +2,14 @@
 
 **Browser exercised / Same-machine simulated-network functional / One prepared platform-exit combat route independently reviewed through Results and returned CSS; 2,381-test regression passes; final CI and integration are recorded on PR #316; audio acceptance remains open (86/22 retained underruns)**
 
+**Integration:** #316 merged as `d6d6dfe8802b986743dc1f4efb74cc5cf6a5126d`,
+with reviewed tree `ce0b399e9297f987845119257bd75b93e162e128`. All 14
+final-head checks completed (12 successes, two expected skips), in addition to
+the validation recorded below. The owner's subsequent match-only rollback
+decision supersedes the unstarted #314 extension; [#318](https://github.com/ericvanlare/melee-web/issues/318)
+is next. Earlier next-step descriptions below are historical checkpoints.
+
+
 The preceding #316 experiment used harness and Release runtime `acd616ad`. Seven
 actual preparation jabs reached 18.1200008% within 235 of the fixed 480 source
 cursors. The reviewed approach repair retained both players' movement and

@@ -27,7 +27,14 @@ const SOURCE_FILES = [
 ];
 const MAX_SNAPSHOT_BYTES = 512 * 1024 * 1024;
 const MAX_RING_STATES = 8;
-const OBSERVATION_BYTES = 1216;
+const SUPPORTED_CHECKPOINTS = [300, 318, 420, 438, 500, 540, 558];
+const SUPPORTED_DEPTHS = [1, 2, 4, 7];
+const OBSERVATION_ABI = Object.freeze({
+  version: 'melee-web-source-snapshot-observation-v2',
+  bytes: 1280, playersOffset: 72, playerStride: 192,
+  motionOffset: 20, groundOrAirOffset: 24, motionArrayOffset: 48,
+});
+const OBSERVATION_BYTES = OBSERVATION_ABI.bytes;
 const PCM_BYTES = 1068 * 4;
 const BUFFER_IDENTITIES = new WeakMap();
 let nextBufferIdentity = 1;
@@ -42,19 +49,38 @@ function bufferIdentity(buffer) {
 }
 
 function parseArgs(argv) {
-  const options = {};
+  const raw = {};
   for (let index = 0; index < argv.length; index += 2) {
     const key = argv[index];
     const value = argv[index + 1];
-    if (!['--runtime', '--assets', '--out'].includes(key) || !value || options[key]) {
-      throw new Error('Usage: check_shared_page_snapshot.mjs --runtime FILE --assets DIR --out NEW_DIR');
+    if (!['--runtime', '--assets', '--out', '--checkpoint', '--depth'].includes(key) || !value) {
+      throw new Error('Usage: check_shared_page_snapshot.mjs --runtime FILE --assets DIR --out NEW_DIR [--checkpoint N --depth N]');
     }
-    options[key] = path.resolve(value);
+    if (raw[key] !== undefined) throw new Error(`Duplicate option ${key}`);
+    raw[key] = ['--checkpoint', '--depth'].includes(key) ? Number(value) : path.resolve(value);
   }
-  for (const key of ['--runtime', '--assets', '--out']) if (!options[key]) throw new Error(`Missing ${key}`);
-  if (fs.existsSync(options['--out'])) throw new Error(`Output directory already exists: ${options['--out']}`);
-  if (!fs.existsSync(path.dirname(options['--out']))) throw new Error('Output parent must already exist');
-  return options;
+  for (const key of ['--runtime', '--assets', '--out']) if (!raw[key]) throw new Error(`Missing ${key}`);
+  const selectedCheckpoint = raw['--checkpoint'];
+  const selectedDepth = raw['--depth'];
+  if ((selectedCheckpoint === undefined) !== (selectedDepth === undefined)) {
+    throw new Error('--checkpoint and --depth must be selected together');
+  }
+  if (selectedCheckpoint !== undefined && !SUPPORTED_CHECKPOINTS.includes(selectedCheckpoint)) {
+    throw new Error(`Unsupported checkpoint ${selectedCheckpoint}; choose one of ${SUPPORTED_CHECKPOINTS.join(', ')}`);
+  }
+  if (selectedDepth !== undefined && !SUPPORTED_DEPTHS.includes(selectedDepth)) {
+    throw new Error(`Unsupported depth ${selectedDepth}; choose one of ${SUPPORTED_DEPTHS.join(', ')}`);
+  }
+  if (fs.existsSync(raw['--out'])) throw new Error(`Output directory already exists: ${raw['--out']}`);
+  if (!fs.existsSync(path.dirname(raw['--out']))) throw new Error('Output parent must already exist');
+  return {
+    ...raw,
+    selectedCheckpoint,
+    selectedDepth,
+    selected: selectedCheckpoint !== undefined,
+    checkpoints: selectedCheckpoint === undefined ? SUPPORTED_CHECKPOINTS : [selectedCheckpoint],
+    depths: selectedDepth === undefined ? SUPPORTED_DEPTHS : [selectedDepth],
+  };
 }
 
 function sourceHashes() {
@@ -83,6 +109,15 @@ function firstDifference(expected, actual) {
 }
 
 function observationRecord(bytes) {
+  const players = [0, 1].map(slot => {
+    const offset = OBSERVATION_ABI.playersOffset + slot * OBSERVATION_ABI.playerStride;
+    const motion = bytes.readInt32LE(offset + OBSERVATION_ABI.motionOffset);
+    if (motion !== bytes.readInt32LE(OBSERVATION_ABI.motionArrayOffset + slot * 4)) {
+      throw new Error(`Observation player ${slot} layout does not match its motion field`);
+    }
+    return { motion, groundOrAir: bytes.readInt32LE(offset + OBSERVATION_ABI.groundOrAirOffset) };
+  });
+  const groundOrAir = players.map(player => player.groundOrAir);
   return {
     frame: bytes.readUInt32LE(0),
     rng: bytes.readUInt32LE(4),
@@ -96,6 +131,8 @@ function observationRecord(bytes) {
     audioPhase: bytes.readUInt32LE(36),
     stocks: [bytes.readInt32LE(40), bytes.readInt32LE(44)],
     motions: [bytes.readInt32LE(48), bytes.readInt32LE(52)],
+    groundOrAir,
+    grounded: groundOrAir.every(value => value === 0),
     fireballs: bytes.readInt32LE(56),
     objects: bytes.readUInt32LE(60),
     processes: bytes.readUInt32LE(64),
@@ -128,7 +165,7 @@ async function main() {
   const hostLog = [];
   const runtimeWasm = options['--runtime'].replace(/\.js$/, '.wasm');
   const report = {
-    schema: 'melee-web-shared-page-snapshot-experiment-v1',
+    schema: 'melee-web-shared-page-snapshot-experiment-v2',
     result: 'incomplete',
     boundary: 'synchronous source-only exported-call return; shared-page owner binds after init and native quiescence',
     scenario: 'two human Mario players / Final Destination / four stocks',
@@ -145,6 +182,18 @@ async function main() {
     ownerHeap: null,
     entrySamples: null,
     ownerBinding: null,
+    selection: {
+      checkpoints: options.checkpoints,
+      depths: options.depths,
+      requiresGroundedPlayers: options.selected,
+      requiresFullScenarioCoverage: !options.selected,
+      ringStates: MAX_RING_STATES,
+      ringRunsAfterSelectedCycles: true,
+      depthSampleSemantics: 'Depths under a checkpoint label execute sequentially; sample advances by each completed depth.',
+    },
+    readyBoundary: null,
+    selectedBoundary: null,
+    nativeObservation: null,
     cycles: [],
     sharedRing: null,
     coverage: null,
@@ -247,15 +296,18 @@ async function main() {
     const stateSize = module._melee_web_snapshot_observation_size();
     const pcmPointer = module._melee_web_snapshot_pcm();
     const pcmSize = module._melee_web_snapshot_pcm_size();
-    if (stateSize !== OBSERVATION_BYTES) throw new Error(`Runtime observation size ${stateSize} != ${OBSERVATION_BYTES}`);
-    if (pcmSize !== PCM_BYTES) throw new Error(`Runtime PCM size ${pcmSize} != ${PCM_BYTES}`);
-    const inputPointer = module._melee_web_snapshot_input();
     report.nativeObservation = {
+      abiVersion: OBSERVATION_ABI.version,
+      expectedBytes: OBSERVATION_BYTES,
       bytes: stateSize,
+      abiAccepted: stateSize === OBSERVATION_BYTES,
       pcmBytes: pcmSize,
       inputBytes: 44,
-      fields: 'source frame/RNG/ready/ending/complete/pause/outcome/winner; stocks/motions/Fireball/object/process counts; PCM; raw PAD sample bytes',
+      fields: 'source frame/RNG/ready/ending/complete/pause/outcome/winner; stocks/motions/Fireball/object/process counts; both full MeleeWebMatchStats including grounded state; PCM; raw PAD sample bytes',
     };
+    if (stateSize !== OBSERVATION_BYTES) throw new Error(`Runtime observation ABI ${OBSERVATION_ABI.version} requires exactly ${OBSERVATION_BYTES} bytes; runtime reports ${stateSize}`);
+    if (pcmSize !== PCM_BYTES) throw new Error(`Runtime PCM size ${pcmSize} != ${PCM_BYTES}`);
+    const inputPointer = module._melee_web_snapshot_input();
     const viewHeap = () => Buffer.from(module.HEAPU8.buffer, module.HEAPU8.byteOffset, module.HEAPU8.byteLength);
     const observe = ({ pcm = false, input = false, heapSha = false } = {}) => {
       const bytes = copyRange(module, statePointer, stateSize);
@@ -306,15 +358,40 @@ async function main() {
     }
     if (!entry.semantic.ready) throw new Error('Original Ready did not finish within 600 samples');
     report.entrySamples = sample;
-    for (const checkpoint of [300, 318, 420, 438, 500, 540, 558]) {
+    report.readyBoundary = { nextInputSample: sample, sourceFrame: entry.semantic.frame,
+      ready: Boolean(entry.semantic.ready), ground_or_air: entry.semantic.groundOrAir,
+      bothGrounded: entry.semantic.grounded };
+    if (options.selected && sample > options.selectedCheckpoint) {
+      report.selectedBoundary = { checkpoint: options.selectedCheckpoint,
+        nextInputSample: sample, sourceFrame: entry.semantic.frame,
+        ready: Boolean(entry.semantic.ready), ground_or_air: entry.semantic.groundOrAir,
+        bothGrounded: entry.semantic.grounded };
+      writeReport();
+      throw new Error(`Selected checkpoint ${options.selectedCheckpoint} precedes Ready completion at input sample ${sample}`);
+    }
+    for (const checkpoint of options.checkpoints) {
       while (sample < checkpoint) {
         nativeStep(sample);
         const observed = observe({ pcm: true, input: true });
         recordForward(sample, observed, forwardStates);
         sample++;
       }
-      for (const depth of [1, 2, 4, 7]) {
+      for (const depth of options.depths) {
         const initialObserved = observe();
+        const boundaryReport = { nextInputSample: sample, sourceFrame: initialObserved.semantic.frame,
+          ready: Boolean(initialObserved.semantic.ready), ending: Boolean(initialObserved.semantic.ending),
+          complete: Boolean(initialObserved.semantic.complete), ground_or_air: initialObserved.semantic.groundOrAir,
+          bothGrounded: initialObserved.semantic.grounded };
+        if (options.selected) {
+          report.selectedBoundary = { checkpoint, ...boundaryReport };
+          writeReport();
+          if (!boundaryReport.ready || boundaryReport.ending || boundaryReport.complete) {
+            throw new Error('Selected checkpoint is outside the active Ready match');
+          }
+          if (!boundaryReport.bothGrounded) {
+            throw new Error('Selected checkpoint does not have both players grounded');
+          }
+        }
         const cycle = {
           checkpoint,
           sample,
@@ -322,6 +399,7 @@ async function main() {
           repeats: 3,
           result: 'incomplete',
           initial: { frame: initialObserved.semantic.frame, rng: initialObserved.semantic.rng },
+          boundary: boundaryReport,
           captureMs: null,
           baselineMs: null,
           restoreMs: [],
@@ -518,9 +596,11 @@ async function main() {
       processCounts: [...new Set(semanticStates.map(row => row.processes))].sort((a, b) => a - b),
       samples: semanticStates.length,
     };
-    if (report.coverage.peakFireballs < 1) throw new Error('Snapshot scenario did not exercise a Mario fireball');
-    if (report.coverage.minStocks.some(stocks => stocks >= 4)) {
-      throw new Error('Snapshot scenario did not exercise both stock losses');
+    if (!options.selected) {
+      if (report.coverage.peakFireballs < 1) throw new Error('Snapshot scenario did not exercise a Mario fireball');
+      if (report.coverage.minStocks.some(stocks => stocks >= 4)) {
+        throw new Error('Snapshot scenario did not exercise both stock losses');
+      }
     }
     // Verify owner.close invalidates a still-retained snapshot and drains its
     // references. Native close occurs first, while the owner is still usable.

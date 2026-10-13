@@ -2,6 +2,14 @@
 // clock, Web Audio sink or card commit is reachable in this diagnostic target.
 // The host calls one synchronous function at a time and snapshots only after
 // it returns; a snapshot is never taken inside the original scheduler.
+#include "hsd_probe_compat.h"
+// These pinned declarations must be seen with C linkage before the C++ project
+// headers transitively include gobj.h and lock in its include guard.
+extern "C" {
+#include <sysdolphin/baselib/gobj.h>
+#include <sysdolphin/baselib/gobjproc.h>
+#include <sysdolphin/baselib/gobjplink.h>
+}
 #include "gameplay_match_session.hpp"
 #include "gameplay_menu.h"
 #include "gameplay_pad_state.h"
@@ -13,15 +21,13 @@
 #include "runtime_archive_cache.hpp"
 extern "C" {
 #include <melee/gm/gm_1A45.h>
-#include <sysdolphin/baselib/gobj.h>
-#include <sysdolphin/baselib/gobjproc.h>
-#include <sysdolphin/baselib/gobjplink.h>
 }
 #include <emscripten.h>
 #include <filesystem>
 #include <fstream>
 #include <memory>
 #include <array>
+#include <cstddef>
 #include <cstdio>
 #include <cstring>
 #include <cstdint>
@@ -79,8 +85,27 @@ struct Observation {
     MeleeWebMatchStats players[2];
     uint8_t pad_history[MELEE_WEB_PAD_STATE_BYTES];
 } observation{};
-/* Fixture-only transfer ownership sample.  This is deliberately separate
- * from Observation: the legacy 1216-byte observation ABI stays unchanged. */
+// The JavaScript feasibility checker decodes this private observation ABI.
+// Keep that fixed diagnostic contract tied to the actual source structs rather
+// than silently following a changed compiler layout.
+static_assert(sizeof(MeleeWebMatchStats)==192,"Snapshot ABI v2 match stats size");
+static_assert(GA_Ground==0,"Snapshot grounded observation uses the source GA_Ground value");
+static_assert(offsetof(MeleeWebMatchStats,motion_id)==20,"Snapshot ABI v2 motion offset");
+static_assert(offsetof(MeleeWebMatchStats,ground_or_air)==24,"Snapshot ABI v2 ground/air offset");
+static_assert(offsetof(Observation,frame)==0 && offsetof(Observation,rng)==4 &&
+              offsetof(Observation,ready)==8 && offsetof(Observation,ending)==12 &&
+              offsetof(Observation,complete)==16 && offsetof(Observation,paused)==20 &&
+              offsetof(Observation,outcome)==24 && offsetof(Observation,winner)==28 &&
+              offsetof(Observation,pcm_frames)==32 && offsetof(Observation,audio_phase)==36 &&
+              offsetof(Observation,stocks)==40 && offsetof(Observation,motion)==48 &&
+              offsetof(Observation,fireballs)==56 && offsetof(Observation,objects)==60 &&
+              offsetof(Observation,processes)==64 && offsetof(Observation,players)==72,
+              "Snapshot ABI v2 observation field offsets");
+static_assert(offsetof(Observation,pad_history)==456 &&
+              MELEE_WEB_PAD_STATE_BYTES==822 && sizeof(Observation)==1280,
+              "Snapshot ABI v2 observation size");
+/* Fixture-only transfer ownership sample. This remains separate from the
+ * fixed v2 observation ABI above. */
 struct TransferDiagnostic {
     uint32_t sample;
     int32_t before_tick_drive, before_tick_source, before_tick_bank;
