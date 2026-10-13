@@ -52,6 +52,32 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
+### 2026-10-12 — Owner: match-only rollback and explicit Slippi rules
+
+**Ask:** Finish/checkpoint #316, retain the deployed-relay match as transport
+validation, and stop extending menu/Results/rematch lockstep. Original menus run
+locally; selections and start context are messages, rollback owns only the
+match, and confirmed outcome drives local Results/rematch. Add Vanilla
+(offline-only reference) and Slippi rules (offline/online) profiles under #9,
+using an unmodified1.02 disc and a pinned Slippi Dolphin profile reference.
+
+**Status:** Agreed; no disagreement. #316 is merged and #317 already supplies
+the requested public transport experiment. The unstarted #314 expansion is
+superseded. #318 is the next bounded milestone: state size/copy/restore,
+source-draw-preserving re-simulation costs through seven corrective ticks, and
+GPU/audio/file ownership with a go/no-go recommendation. A parallel source-only
+inventory covers Slippi gameplay changes, mode activation and licenses before
+porting. H1 first-use respawn/common-effect preparation follows this measurement;
+no timing guards change. Stadium C3 remains next Track B with shared capture
+ownership. The settings toggle and rollback runtime remain implementation goals.
+
+**Links:** [Feasibility #318](https://github.com/ericvanlare/melee-web/issues/318),
+[state ownership #115](https://github.com/ericvanlare/melee-web/issues/115),
+[mode identity #9](https://github.com/ericvanlare/melee-web/issues/9),
+[decision 017](ARCHITECTURE.md#017--online-rollback-is-match-scoped-with-explicit-rules-profiles),
+[execution response](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6137878567).
+
+
 ### 2026-10-12 — Owner: public staging, cleanup and Stadium after combat
 
 **Ask:** Adopt the concrete staging prerequisites, recorded-process-only cleanup,
@@ -71,6 +97,10 @@ Stadium #301/#251 follows combat #313/#314.
 [public slice #288](https://github.com/ericvanlare/melee-web/issues/288),
 [combat checkpoint #316](https://github.com/ericvanlare/melee-web/pull/316),
 [Stadium C3 #301](https://github.com/ericvanlare/melee-web/pull/301).
+
+- 2026-10-12, Codex: the later owner decision above supersedes #314 and
+  the online sequencing here. The public experiment is transport validation;
+  match-only rollback feasibility is next. Stadium remains the next Track B item.
 
 ### 2026-10-12 — Owner: verified combat through the simulated network
 

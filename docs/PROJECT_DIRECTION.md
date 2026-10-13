@@ -1,6 +1,6 @@
 # Project direction: accurate Melee in the browser, then compatible online play
 
-Current thinking as of 2026-09-26. This document connects the overall product
+Current direction includes the owner’s 2026-10-12 match-only rollback decision. This document connects the overall product
 goal with the accuracy, compatibility, rollback and infrastructure projects
 needed to reach it. It records direction and hypotheses; it does not admit a
 feature or replace the execution order in the [roadmap](ROADMAP.md).
@@ -72,12 +72,22 @@ the latter against the selected Slippi executable as well as retaining the
 vanilla baseline. A replay parser or a successful server connection does not
 establish this profile's gameplay compatibility.
 
-The intended sequence is vanilla accuracy followed by Slippi compatibility.
+Vanilla remains the offline accuracy reference. The owner requires the Slippi
+rules profile for online play, also selectable offline; profile admission and
+rollback feasibility now precede further online delivery.
 Small service or transport experiments can reduce uncertainty earlier because
 they can use existing desktop clients or synthetic packet workloads. They do
 not promote the port's accuracy or supersede the current local milestone.
 
 ## Rollback is a separate runtime capability
+
+Rollback is match-scoped only. Original menus and scene transitions run locally;
+peers exchange selections and a complete versioned start context. Results and
+rematch follow the confirmed outcome locally and are never lockstepped or
+restored. Preserve the existing full-route lockstep path as an interim baseline,
+without extending it. The planned Vanilla/Slippi rules settings toggle keeps
+retail evidence separate from the selected Slippi Dolphin release reference;
+both profiles use the player's unmodified USA1.02 disc.
 
 Matching a forward simulation does not automatically provide a correct rewind.
 The port needs a defined state boundary covering all simulation-relevant mutable
@@ -136,21 +146,25 @@ cannot compensate for an incorrect input or acknowledgement protocol.
 
 ## Sequencing and decision gates
 
-The [roadmap](ROADMAP.md#current-priorities) orders delivery. Since 2026-10-05,
-the order has been:
+The [roadmap](ROADMAP.md#current-priorities) orders delivery. The owner’s
+October 12 update makes the sequence:
 
-1. Gameplay headroom.
-2. In parallel: browser-to-browser online play (delay-based lockstep first, then
-   rollback) and competitive-rules scope.
-3. Whole-game breadth.
-4. The Slippi compatibility profile and desktop cross-play.
+1. Preserve offline vanilla accuracy and sustained gameplay headroom.
+2. Measure match-only rollback feasibility and inventory Slippi gameplay changes
+   and patch licenses; keep competitive-rules source work in parallel.
+3. Deliver the versioned Slippi rules profile and match-scoped browser rollback
+   with local original menus, confirmed outcomes and explicit mode identity.
+4. Broaden competitive coverage and later whole-game scope; pursue pinned Slippi
+   desktop cross-play after browser rollback and profile correctness.
 
-Browser-to-browser play between two copies of this port does not need the Slippi
-profile. Gates 4 and 5 below apply to it directly, and gate 3 applies only to
-cross-play. These are the decision gates:
+Browser-to-browser online play requires the Slippi rules profile by product
+decision, even when desktop interoperability is not involved. The settings
+choice is Vanilla (offline only) or Slippi rules (offline and online). The
+existing deployed relay experiment is transport validation, not a compatibility
+or acceptance claim. These are the decision gates:
 
 1. **Local acceptance.** Complete the original CSS → SSS → four-stock Mario/Final
-   Destination → CSS boundary and the roadmap's required repeated-session,
+   Destination → Results → CSS boundary and the roadmap's required repeated-session,
    controller, audio and timing work. Keep current implementation and acceptance
    distinct; use the authoritative documents for the exact active scope.
 2. **Vanilla breadth and equivalence.** Expand the full-game inventory through
@@ -204,8 +218,9 @@ rollback correctness. A separate [headless browser-to-desktop transport
 probe](evidence/slippi-browser-desktop-transport-v1.json) now verifies
 24 tagged PAD records in each direction through a loopback relay and checks the
 desktop game's existing remote-PAD consumer. It does not run Melee in the
-browser or test network impairment. The next experiments should cover delay,
-loss, reordering, disconnects and distinct networks, then force prediction
+browser or test network impairment. Later desktop cross-play experiments should
+cover delay, loss, reordering, disconnects and distinct networks after the
+immediate #318 match-only feasibility milestone, then force in-match prediction
 corrections and compare finalized inputs and declared state against a controlled
 baseline. Integrate the port only with its accuracy and rollback prerequisites
 established, and claim cross-play after full reference matches with forced
