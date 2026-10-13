@@ -19,6 +19,9 @@ import {createCssSssTransitionCapture, CSS_SSS_TRANSITION_LIMITS,
 import {validateMatchedSetupCfRequest, validateMatchedSetupCfPreflight,
   validateMatchedSetupCfIdentities, matchedSetupCfRuntimeFailure, PREFIX_V2_SCOPE}
   from './stadium_matched_setup_cf_runner_gate.mjs';
+import {elapsedMs, measureAsync, measureSync, monotonicNowNs, roundMs,
+  summarizeFailedActionSamples, summarizeStageEvents, summarizeTimingValues}
+  from './stadium_c3_timing.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const {values} = parseArgs({options: Object.fromEntries(
@@ -119,6 +122,111 @@ const matchedSetupCfPreflight = validateMatchedSetupCfPreflight(preflight, {
 });
 const firstSssVsSetupCfV2 = firstSssVsSetupCf &&
   matchedSetupCfPreflight.scope === PREFIX_V2_SCOPE;
+const matchedSetupCfTiming = firstSssVsSetupCfV2 ? {
+  actionSamples: [], scheduledActions: null, actionLoopActive: false, actionLoopStartedNs: null,
+  actionLoopMs: null, globalCaptureDeadlineRemainingAtActionLoopStartMs: null,
+  queueRpcMsByIndex: new Map(), approvalRpcMsByIndex: new Map(),
+  persistence: [], currentActionSample: null,
+} : null;
+const finishMatchedSetupCfActionLoop = () => {
+  if (!matchedSetupCfTiming?.actionLoopActive) return;
+  matchedSetupCfTiming.actionLoopMs = elapsedMs(matchedSetupCfTiming.actionLoopStartedNs);
+  matchedSetupCfTiming.actionLoopActive = false;
+};
+const timedActionAsync = async (sample, stage, field, operation, after = null) => {
+  try {
+    return await measureAsync(sample.stage_events, stage, operation);
+  } finally {
+    const event = sample.stage_events.at(-1);
+    if (event?.stage === stage) {
+      if (field) sample[field] = event.elapsed_ms;
+      if (after) after(event);
+    }
+  }
+};
+const timedActionSync = (sample, stage, field, operation, after = null) => {
+  try {
+    return measureSync(sample.stage_events, stage, operation);
+  } finally {
+    const event = sample.stage_events.at(-1);
+    if (event?.stage === stage) {
+      if (field) sample[field] = event.elapsed_ms;
+      if (after) after(event);
+    }
+  }
+};
+const summarizeMatchedSetupCfTiming = timing => {
+  const fields = ['action_wall_ms', 'queue_ms', 'queue_rpc_ms', 'post_submit_receipt_ms',
+    'receipt_read_ms', 'first_read_ms', 'poll_wait_ms', 'before_diagnostics_ms',
+    'before_snapshot_ms', 'compare_ms', 'accept_ms', 'approval_rpc_ms',
+    'after_diagnostics_ms', 'after_snapshot_ms'];
+  const summarizeRows = rows => ({
+    count: rows.length,
+    completed_count: rows.filter(row => row.completed).length,
+    failed_count: rows.filter(row => !row.completed).length,
+    first_read_complete_count: rows.filter(row => row.first_read_complete === true).length,
+    first_read_incomplete_count: rows.filter(row => row.first_read_complete === false).length,
+    receipt_read_count: rows.reduce((sum, row) => sum + row.receipt_reads, 0),
+    poll_wait_count: rows.reduce((sum, row) => sum + row.poll_waits, 0),
+    timings_ms: Object.fromEntries(fields.map(field => [field,
+      summarizeTimingValues(rows.map(row => row[field]))])),
+  });
+  const samples = timing.actionSamples;
+  const phaseActionKeys = [...new Set(samples.map(row => `${row.phase}_${row.action}`))];
+  const persistence = timing.persistence;
+  const byteValues = persistence.map(row => row.serialized_bytes).filter(Number.isFinite);
+  return {
+    schema: 'melee-web-stadium-c3-host-timing-v2',
+    scope: 'Host-observed timing for the selected run2 prefix; no native or GPU timers.',
+    clock: 'process.hrtime.bigint',
+    action_schedule_limit_ms: LIMITS.captureWorkMs,
+    global_capture_deadline_remaining_at_action_loop_start_ms:
+      timing.globalCaptureDeadlineRemainingAtActionLoopStartMs === null ? null
+        : roundMs(timing.globalCaptureDeadlineRemainingAtActionLoopStartMs),
+    effective_action_time_ceiling_ms: timing.globalCaptureDeadlineRemainingAtActionLoopStartMs === null
+      ? null : roundMs(Math.max(0, Math.min(LIMITS.captureWorkMs,
+        timing.globalCaptureDeadlineRemainingAtActionLoopStartMs))),
+    scheduled_actions: timing.scheduledActions,
+    action_loop_ms: timing.actionLoopMs === null ? null : roundMs(timing.actionLoopMs),
+    actions: {
+      all: summarizeRows(samples),
+      by_kind: Object.fromEntries(['tick', 'draw'].map(kind => [kind,
+        summarizeRows(samples.filter(row => row.action === kind))])),
+      by_phase_action: Object.fromEntries(phaseActionKeys.map(key => [key,
+        summarizeRows(samples.filter(row => `${row.phase}_${row.action}` === key))])),
+      stage_timings: summarizeStageEvents(samples),
+      failed_samples: summarizeFailedActionSamples(samples),
+    },
+    report_persistence: {
+      attempted_count: persistence.length,
+      completed_count: persistence.filter(row => row.completed).length,
+      failed_count: persistence.filter(row => !row.completed).length,
+      serialized_bytes: byteValues.length
+        ? byteValues.reduce((sum, value) => sum + value, 0) : null,
+      timings_ms: {
+        serialize: summarizeTimingValues(persistence.map(row => row.serialize_ms)),
+        file_write: summarizeTimingValues(persistence.map(row => row.write_ms)),
+        rename: summarizeTimingValues(persistence.map(row => row.rename_ms)),
+        total: summarizeTimingValues(persistence.map(row => row.total_ms)),
+      },
+    },
+    interval_semantics: {
+      interpretation: 'Measurements are inclusive and nested. Do not add category totals or infer native/source time from these host intervals.',
+      nesting: {
+        queue_rpc_ms: 'subset of queue_ms; queue_ms measures driver.submit from call through resolution/rejection.',
+        post_submit_receipt_ms: 'starts only after driver.submit resolves and ends at the matching receipt or a failed read/wait/check; it excludes queue_ms and includes receipt reads and conditional waits.',
+        receipt_read_ms: 'sum of attempted readFirstSssVsEntryObservation waits, including a rejected read; reads are inside post_submit_receipt_ms when that interval has started.',
+        poll_wait_ms: 'sum of attempted existing 50 ms waits, including a rejected wait; waits are inside post_submit_receipt_ms.',
+        approval_rpc_ms: 'subset of accept_ms; accept_ms measures driver.accept through resolution/rejection.',
+        before_snapshot_ms: 'subset of before_diagnostics_ms; diagnostic time also includes the existing report persistence and checks.',
+        after_snapshot_ms: 'subset of after_diagnostics_ms; diagnostic time also includes the existing report persistence and checks.',
+        report_persistence: 'serialization, write, rename, and total are nested within each persistence call; action-time persistence calls are inside action_wall_ms, and calls made by diagnostics are also inside their diagnostic interval.',
+        action_wall_ms: 'encloses the complete scheduled action, including nested intervals and local comparisons/checks.',
+      },
+      host_timing_limit: 'The clock measures Node host elapsed time around existing calls. It does not isolate source scheduling, native execution, browser scheduling, or GPU work.',
+    },
+  };
+};
 const output = path.resolve(values.out);
 try { await fs.access(output); throw Error(`Refusing to overwrite existing output directory: ${output}`); }
 catch (error) { if (error.code !== 'ENOENT') throw error; }
@@ -236,8 +344,33 @@ const report = {
 
 const persistReport = async () => {
   const temporary = `${inventoryOutput}.tmp`;
-  await fs.writeFile(temporary, JSON.stringify(report, null, 2) + '\n');
-  await fs.rename(temporary, inventoryOutput);
+  const sample = matchedSetupCfTiming?.currentActionSample ?? null;
+  const measure = matchedSetupCfTiming?.actionLoopActive === true && sample !== null;
+  const totalStarted = measure ? monotonicNowNs() : null;
+  let serialized = null, serializeMs = null, writeMs = null, renameMs = null;
+  let completed = false;
+  try {
+    serialized = measure
+      ? timedActionSync(sample, 'report_serialize', null,
+        () => JSON.stringify(report, null, 2) + '\n', event => { serializeMs = event.elapsed_ms; })
+      : JSON.stringify(report, null, 2) + '\n';
+    if (measure) {
+      await timedActionAsync(sample, 'report_write', null,
+        () => fs.writeFile(temporary, serialized), event => { writeMs = event.elapsed_ms; });
+      await timedActionAsync(sample, 'report_rename', null,
+        () => fs.rename(temporary, inventoryOutput), event => { renameMs = event.elapsed_ms; });
+    } else {
+      await fs.writeFile(temporary, serialized);
+      await fs.rename(temporary, inventoryOutput);
+    }
+    completed = true;
+  } finally {
+    if (measure) matchedSetupCfTiming.persistence.push({
+      serialized_bytes: serialized === null ? null : Buffer.byteLength(serialized),
+      serialize_ms: serializeMs, write_ms: writeMs, rename_ms: renameMs,
+      total_ms: elapsedMs(totalStarted), completed,
+    });
+  }
 };
 
 let failure = null;
@@ -2264,16 +2397,39 @@ function matchedSetupCfNativeAdapter({mode, manifestBytes}) {
       ? execute({kind: 'arm-v2', manifestBytes: Array.from(suppliedManifest)},
         'Arm the one-use run2 proper-prefix continuation')
       : execute({kind: 'arm'}, 'Arm the one-use matched Setup C/F continuation'),
-    queue: async (scheduleIndex, action, bytes) => mode === 'run2-proper-prefix-v2'
-      ? execute({kind: 'queue-v2', scheduleIndex, action: action.action,
-        ordinal: action.action === 'tick' ? action.bundle : action.draw,
-        bundle: action.bundle ?? -1}, `Queue run2 source action ${scheduleIndex}`)
-      : execute({kind: 'queue', scheduleIndex,
-        action: action.action, ordinal: action.ordinal, bundle: action.bundle ?? -1,
-        bytes: Array.from(bytes)}, `Queue matched Setup C/F action ${scheduleIndex}`),
-    approve: async (scheduleIndex, accepted) =>
-      execute({kind: 'approve', scheduleIndex, accepted},
-        `Acknowledge matched Setup C/F action ${scheduleIndex}`),
+    queue: async (scheduleIndex, action, bytes) => {
+      const actionSample = matchedSetupCfTiming?.currentActionSample ?? null;
+      const queueOperation = () => mode === 'run2-proper-prefix-v2'
+        ? execute({kind: 'queue-v2', scheduleIndex, action: action.action,
+          ordinal: action.action === 'tick' ? action.bundle : action.draw,
+          bundle: action.bundle ?? -1}, `Queue run2 source action ${scheduleIndex}`)
+        : execute({kind: 'queue', scheduleIndex,
+          action: action.action, ordinal: action.ordinal, bundle: action.bundle ?? -1,
+          bytes: Array.from(bytes)}, `Queue matched Setup C/F action ${scheduleIndex}`);
+      try {
+        return actionSample
+          ? await measureAsync(actionSample.stage_events, 'queue_rpc', queueOperation)
+          : await queueOperation();
+      } finally {
+        if (actionSample) matchedSetupCfTiming.queueRpcMsByIndex.set(scheduleIndex,
+          actionSample.stage_events.at(-1)?.stage === 'queue_rpc'
+            ? actionSample.stage_events.at(-1).elapsed_ms : null);
+      }
+    },
+    approve: async (scheduleIndex, accepted) => {
+      const actionSample = matchedSetupCfTiming?.currentActionSample ?? null;
+      const approvalOperation = () => execute({kind: 'approve', scheduleIndex, accepted},
+        `Acknowledge matched Setup C/F action ${scheduleIndex}`);
+      try {
+        return actionSample
+          ? await measureAsync(actionSample.stage_events, 'approval_rpc', approvalOperation)
+          : await approvalOperation();
+      } finally {
+        if (actionSample) matchedSetupCfTiming.approvalRpcMsByIndex.set(scheduleIndex,
+          actionSample.stage_events.at(-1)?.stage === 'approval_rpc'
+            ? actionSample.stage_events.at(-1).elapsed_ms : null);
+      }
+    },
   };
 }
 
@@ -2315,8 +2471,16 @@ async function runMatchedSetupCfContinuation(setupNative) {
   let observedPageErrors = 0, observedConsoleErrors = 0, observedConsoleWarnings = 0,
     observedConsoleMessages = 0;
   const checkRuntimeDiagnostics = async (scheduleIndex, action, nativeObservation) => {
-    const runtime = await sourceSnapshot(
+    const activeSample = matchedSetupCfTiming?.currentActionSample ?? null;
+    const snapshotStage = action.endsWith('-before-ack') ? 'before_snapshot'
+      : action.endsWith('-after-ack') ? 'after_snapshot' : null;
+    const snapshotField = snapshotStage === 'before_snapshot' ? 'before_snapshot_ms'
+      : snapshotStage === 'after_snapshot' ? 'after_snapshot_ms' : null;
+    const snapshotOperation = () => sourceSnapshot(
       `Matched Setup C/F runtime diagnostics after action ${scheduleIndex}`);
+    const runtime = activeSample && snapshotStage
+      ? await timedActionAsync(activeSample, snapshotStage, snapshotField, snapshotOperation)
+      : await snapshotOperation();
     const sample = {schedule_index: scheduleIndex, action, message: runtime.message,
       diagnostics: runtime.diagnostics, runtime_error: runtime.error,
       page_errors: pageErrors.slice(observedPageErrors),
@@ -2371,54 +2535,186 @@ async function runMatchedSetupCfContinuation(setupNative) {
     await persistReport();
 
     const actionStarted = Date.now();
+    if (matchedSetupCfTiming) {
+      matchedSetupCfTiming.scheduledActions = hostEvidence.runtimePayload.schedule.length;
+      matchedSetupCfTiming.actionLoopActive = true;
+      matchedSetupCfTiming.actionLoopStartedNs = monotonicNowNs();
+      matchedSetupCfTiming.globalCaptureDeadlineRemainingAtActionLoopStartMs =
+        Math.max(0, deadline - actionStarted);
+    }
     for (let scheduleIndex = 0; scheduleIndex < hostEvidence.runtimePayload.schedule.length;
       ++scheduleIndex) {
-      assert.ok(Date.now() - actionStarted < LIMITS.captureWorkMs,
-        'Matched Setup C/F action schedule exceeded its bounded continuation deadline');
       const action = hostEvidence.runtimePayload.schedule[scheduleIndex];
-      assert.equal(await driver.submit(action), true,
-        `Matched Setup C/F host action driver refused ${scheduleIndex}: ${driver.status().first_error}`);
-
-      const receiptStarted = Date.now();
-      let cfState = null;
-      for (;;) {
-        currentNative = await timeout(readFirstSssVsEntryObservation(),
-          Math.min(3000, remaining()), `Read matched Setup C/F action ${scheduleIndex}`);
-        cfState = currentNative?.first_sss_vs_setup?.matched_setup_cf ?? null;
-        if (cfState?.failed)
-          throw Error(cfState.error || `Native matched Setup C/F stopped at action ${scheduleIndex}`);
-        if (cfState?.last_action?.complete === true &&
-            cfState.last_action.schedule_index === scheduleIndex) break;
-        assert.ok(Date.now() - receiptStarted < remaining(),
-          `Native matched Setup C/F action ${scheduleIndex} did not complete before deadline`);
-        await timeout(page.waitForTimeout(50), Math.min(1000, remaining()),
-          `Wait for matched Setup C/F action ${scheduleIndex}`);
-      }
-      const actionReceipt = structuredClone(cfState.last_action);
       const cIndex = isV2 ? hostEvidence.checkpoints.c_action_index : 168;
       const fIndex = isV2 ? hostEvidence.checkpoints.f_action_index : 170;
-      const boundary = action.action === 'tick' &&
-        (scheduleIndex === cIndex || scheduleIndex === fIndex);
-      let comparison = null;
-      if (boundary) {
-        const label = scheduleIndex === cIndex ? 'C' : 'F';
-        const accepted = hostCallbacks.compare(label, JSON.stringify(actionReceipt.observation));
-        comparison = hostCallbacks.receipts().at(-1) ?? null;
-        cf.host_comparisons.push(comparison);
-        assert.equal(accepted, comparison?.decision === 'PASS_EXACT_DECLARED_C_F_FIELDS',
-          `${label} callback acceptance differs from its strict host receipt`);
+      const timingSample = matchedSetupCfTiming ? {
+        schedule_index: scheduleIndex, action: action.action,
+        phase: scheduleIndex < cIndex ? 'before_c' : scheduleIndex <= fIndex ? 'c_through_f' : 'after_f',
+        completed: false, stage_events: [], queue_ms: null, queue_rpc_ms: null,
+        post_submit_receipt_ms: null, receipt_reads: 0, first_read_ms: null,
+        first_read_complete: null, receipt_read_ms: null, poll_waits: 0,
+        poll_wait_ms: null, before_diagnostics_ms: null, before_snapshot_ms: null,
+        compare_ms: null, accept_ms: null, approval_rpc_ms: null,
+        after_diagnostics_ms: null, after_snapshot_ms: null, action_wall_ms: null,
+      } : null;
+      const actionStartedNs = timingSample ? monotonicNowNs() : null;
+      let postSubmitReceiptStartedNs = null;
+      if (timingSample) matchedSetupCfTiming.currentActionSample = timingSample;
+      try {
+        if (timingSample) {
+          timedActionSync(timingSample, 'action_deadline_check', null, () =>
+            assert.ok(Date.now() - actionStarted < LIMITS.captureWorkMs,
+              'Matched Setup C/F action schedule exceeded its bounded continuation deadline'));
+          await timedActionAsync(timingSample, 'driver_submit', 'queue_ms', async () => {
+            assert.equal(await driver.submit(action), true,
+              `Matched Setup C/F host action driver refused ${scheduleIndex}: ${driver.status().first_error}`);
+          });
+          timingSample.queue_rpc_ms = matchedSetupCfTiming.queueRpcMsByIndex.get(scheduleIndex) ?? null;
+          postSubmitReceiptStartedNs = monotonicNowNs();
+        } else {
+          assert.ok(Date.now() - actionStarted < LIMITS.captureWorkMs,
+            'Matched Setup C/F action schedule exceeded its bounded continuation deadline');
+          assert.equal(await driver.submit(action), true,
+            `Matched Setup C/F host action driver refused ${scheduleIndex}: ${driver.status().first_error}`);
+        }
+
+        const receiptStarted = Date.now();
+        let cfState = null;
+        for (;;) {
+          const readOrdinal = timingSample?.receipt_reads ?? 0;
+          const readOperation = () => timeout(readFirstSssVsEntryObservation(),
+            Math.min(3000, remaining()), `Read matched Setup C/F action ${scheduleIndex}`);
+          if (timingSample) {
+            currentNative = await timedActionAsync(timingSample, 'receipt_read', null,
+              readOperation, event => {
+                ++timingSample.receipt_reads;
+                timingSample.receipt_read_ms = (timingSample.receipt_read_ms ?? 0) + event.elapsed_ms;
+                if (readOrdinal === 0) timingSample.first_read_ms = event.elapsed_ms;
+              });
+          } else {
+            currentNative = await readOperation();
+          }
+          cfState = currentNative?.first_sss_vs_setup?.matched_setup_cf ?? null;
+          const receiptComplete = timingSample
+            ? timedActionSync(timingSample, 'receipt_check', null, () => {
+              if (cfState?.failed)
+                throw Error(cfState.error || `Native matched Setup C/F stopped at action ${scheduleIndex}`);
+              return cfState?.last_action?.complete === true &&
+                cfState.last_action.schedule_index === scheduleIndex;
+            })
+            : (() => {
+              if (cfState?.failed)
+                throw Error(cfState.error || `Native matched Setup C/F stopped at action ${scheduleIndex}`);
+              return cfState?.last_action?.complete === true &&
+                cfState.last_action.schedule_index === scheduleIndex;
+            })();
+          if (timingSample && readOrdinal === 0) timingSample.first_read_complete = receiptComplete;
+          if (receiptComplete) {
+            if (timingSample)
+              timingSample.post_submit_receipt_ms = elapsedMs(postSubmitReceiptStartedNs);
+            break;
+          }
+          if (timingSample) {
+            timedActionSync(timingSample, 'receipt_deadline_check', null, () =>
+              assert.ok(Date.now() - receiptStarted < remaining(),
+                `Native matched Setup C/F action ${scheduleIndex} did not complete before deadline`));
+            await timedActionAsync(timingSample, 'poll_wait', null,
+              () => timeout(page.waitForTimeout(50), Math.min(1000, remaining()),
+                `Wait for matched Setup C/F action ${scheduleIndex}`), event => {
+                ++timingSample.poll_waits;
+                timingSample.poll_wait_ms = (timingSample.poll_wait_ms ?? 0) + event.elapsed_ms;
+              });
+          } else {
+            assert.ok(Date.now() - receiptStarted < remaining(),
+              `Native matched Setup C/F action ${scheduleIndex} did not complete before deadline`);
+            await timeout(page.waitForTimeout(50), Math.min(1000, remaining()),
+              `Wait for matched Setup C/F action ${scheduleIndex}`);
+          }
+        }
+        const actionReceipt = timingSample
+          ? timedActionSync(timingSample, 'receipt_clone', null,
+            () => structuredClone(cfState.last_action))
+          : structuredClone(cfState.last_action);
+        const boundary = action.action === 'tick' &&
+          (scheduleIndex === cIndex || scheduleIndex === fIndex);
+        let comparison = null;
+        if (boundary) {
+          const label = scheduleIndex === cIndex ? 'C' : 'F';
+          const compareOperation = () => {
+            const accepted = hostCallbacks.compare(label, JSON.stringify(actionReceipt.observation));
+            comparison = hostCallbacks.receipts().at(-1) ?? null;
+            cf.host_comparisons.push(comparison);
+            assert.equal(accepted, comparison?.decision === 'PASS_EXACT_DECLARED_C_F_FIELDS',
+              `${label} callback acceptance differs from its strict host receipt`);
+          };
+          if (timingSample)
+            timedActionSync(timingSample, 'comparison', 'compare_ms', compareOperation);
+          else compareOperation();
+        }
+        if (timingSample) {
+          await timedActionAsync(timingSample, 'before_diagnostics', 'before_diagnostics_ms',
+            () => checkRuntimeDiagnostics(scheduleIndex, `${action.action}-before-ack`, cfState));
+        } else {
+          await checkRuntimeDiagnostics(scheduleIndex, `${action.action}-before-ack`, cfState);
+        }
+        let accepted;
+        if (timingSample) {
+          accepted = await timedActionAsync(timingSample, 'driver_accept', 'accept_ms',
+            () => driver.accept(cfState, comparison), () => {
+              timingSample.approval_rpc_ms =
+                matchedSetupCfTiming.approvalRpcMsByIndex.get(scheduleIndex) ?? null;
+            });
+        } else {
+          accepted = await driver.accept(cfState, comparison);
+        }
+        const recordAction = () => {
+          cf.actions.push({schedule_index: scheduleIndex, action: action.action,
+            ordinal: action.ordinal ?? (action.action === 'tick' ? action.bundle : action.draw),
+            bundle: action.bundle ?? null,
+            native: actionReceipt, host_comparison: comparison});
+          cf.last_native_state = structuredClone(cfState);
+        };
+        if (timingSample)
+          timedActionSync(timingSample, 'action_record', null, recordAction);
+        else recordAction();
+        if (timingSample) {
+          await timedActionAsync(timingSample, 'after_diagnostics', 'after_diagnostics_ms',
+            () => checkRuntimeDiagnostics(scheduleIndex, `${action.action}-after-ack`, cfState));
+        } else {
+          await checkRuntimeDiagnostics(scheduleIndex, `${action.action}-after-ack`, cfState);
+        }
+        if (scheduleIndex % 16 === 15 || boundary || !accepted) await persistReport();
+        if (timingSample) {
+          timedActionSync(timingSample, 'accept_validation', null, () =>
+            assert.equal(accepted, true,
+              `Matched Setup C/F stopped at action ${scheduleIndex}: ${driver.status().first_error}`));
+          timingSample.completed = true;
+        } else {
+          assert.equal(accepted, true,
+            `Matched Setup C/F stopped at action ${scheduleIndex}: ${driver.status().first_error}`);
+        }
+      } finally {
+        if (timingSample) {
+          if (postSubmitReceiptStartedNs !== null && timingSample.post_submit_receipt_ms === null)
+            timingSample.post_submit_receipt_ms = elapsedMs(postSubmitReceiptStartedNs);
+          timingSample.queue_rpc_ms ??=
+            matchedSetupCfTiming.queueRpcMsByIndex.get(scheduleIndex) ?? null;
+          timingSample.approval_rpc_ms ??=
+            matchedSetupCfTiming.approvalRpcMsByIndex.get(scheduleIndex) ?? null;
+          timingSample.action_wall_ms = elapsedMs(actionStartedNs);
+          matchedSetupCfTiming.actionSamples.push(timingSample);
+          matchedSetupCfTiming.currentActionSample = null;
+        }
       }
-      await checkRuntimeDiagnostics(scheduleIndex, `${action.action}-before-ack`, cfState);
-      const accepted = await driver.accept(cfState, comparison);
-      cf.actions.push({schedule_index: scheduleIndex, action: action.action,
-        ordinal: action.ordinal ?? (action.action === 'tick' ? action.bundle : action.draw),
-        bundle: action.bundle ?? null,
-        native: actionReceipt, host_comparison: comparison});
-      cf.last_native_state = structuredClone(cfState);
-      await checkRuntimeDiagnostics(scheduleIndex, `${action.action}-after-ack`, cfState);
-      if (scheduleIndex % 16 === 15 || boundary || !accepted) await persistReport();
-      assert.equal(accepted, true,
-        `Matched Setup C/F stopped at action ${scheduleIndex}: ${driver.status().first_error}`);
+    }
+    finishMatchedSetupCfActionLoop();
+    if (matchedSetupCfTiming) {
+      assert.equal(matchedSetupCfTiming.actionSamples.length,
+        hostEvidence.runtimePayload.schedule.length,
+        'Matched Setup C/F timing did not retain one host sample per scheduled action');
+      assert.ok(matchedSetupCfTiming.actionSamples.every(sample =>
+        sample.stage_events.length > 0 && Number.isFinite(sample.action_wall_ms)),
+      'Matched Setup C/F timing sample is missing an attempted stage or action duration');
     }
     assert.equal(driver.status().complete, true);
     currentNative = await readFirstSssVsEntryObservation();
@@ -2438,6 +2734,7 @@ async function runMatchedSetupCfContinuation(setupNative) {
     await persistReport();
     return currentNative;
   } finally {
+    finishMatchedSetupCfActionLoop();
     setupApproved = false;
     await page.evaluate(() => { delete globalThis.__meleeWebStadiumFirstSssVsSetupCfApproved; });
   }
@@ -3533,6 +3830,8 @@ try {
   if (error.diagnostics) report.driverFailure = {step:error.step, ...error.diagnostics};
 } finally {
   await cleanupOwnedProcesses();
+  if (matchedSetupCfTiming)
+    report.scenario.matched_setup_cf_timing = summarizeMatchedSetupCfTiming(matchedSetupCfTiming);
   report.scenario.page_errors = pageErrors;
   report.scenario.console_errors = consoleErrors;
   report.scenario.console_warnings = consoleWarnings;
