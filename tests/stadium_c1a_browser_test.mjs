@@ -2185,7 +2185,9 @@ async function runFirstSssVsSetup(entryNative) {
   }
   if (firstSssVsSetupCf) native = await runMatchedSetupCfContinuation(native);
   report.scenario.first_sss_vs_setup.claim = firstSssVsSetupCf
-    ? 'Strict same-run Setup2503 Start/player0-3/seed endpoint plus the bounded exact matched original C/F prefix; no later match route, source draw85, or whole-session acceptance.'
+    ? (report.scenario.matched_setup_cf?.mode === 'run2-proper-prefix-v2'
+      ? 'Strict same-run Setup2503 endpoint plus the extracted run2 prefix through draw86 after dynamic C/F; no later lifetime or whole-session acceptance.'
+      : 'Strict same-run Setup2503 Start/player0-3/seed endpoint plus the bounded exact matched original C/F prefix; no later match route, source draw85, or whole-session acceptance.')
     : 'Declared Setup2503 Start/player0-3/seed endpoint only; zero gameplay ticks/draws and stop before Ready/GO. Other setup fields and per-owner RNG remain unpaired.';
   await persistReport();
   return native;
