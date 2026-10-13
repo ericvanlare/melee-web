@@ -52,6 +52,32 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
+### 2026-10-13 — Owner: related-project research and exact arithmetic
+
+**Ask:** Checkpoint the in-flight Stadium step, then test the fused-operation
+hypothesis at the retained Bowser and Falcon first divergences using original
+DOL instructions. In parallel, map Slippi simulation changes from its official
+code lists, verify Stadium load/freeze behavior, DynamicsFix and background RNG,
+and resolve the profile's licensing policy before behavior implementation.
+Add a match-only restore/repeat/checksum synctest to rollback feasibility.
+
+**Status:** Accepted. The Stadium observation projection is checkpointed in the
+[existing boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md).
+The next arithmetic investigation is source-only; instruction presence alone
+is not divergence causation. No blanket contraction, fast-math or tolerance
+change is authorized. An adopted arithmetic change requires exact-receipt
+revalidation. Related projects are ideas/specifications only, with no copied
+code; pinned license findings remain repository-specific. The owner licensing
+question is posted before any Slippi behavior implementation. Synctest must
+respect GPU/audio/file ownership and its observed coverage limits. A5 gateway
+and cadence research stay deferred; no Slippi production-service or real-account
+test traffic, and no unverified frame-dropping adjustment.
+
+**Links:** [Research response and licensing question](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6147291073),
+[B4 #274](https://github.com/ericvanlare/melee-web/issues/274),
+[profile #9](https://github.com/ericvanlare/melee-web/issues/9),
+[feasibility #318](https://github.com/ericvanlare/melee-web/issues/318).
+
 ### 2026-10-12 — Owner: match-only rollback and explicit Slippi rules
 
 **Ask:** Finish/checkpoint #316, retain the deployed-relay match as transport
