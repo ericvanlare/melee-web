@@ -1,6 +1,9 @@
 /* Private opt-in observations only. This storage never feeds source state. */
 #include "gameplay_hit_transition_probe.h"
 #include "gameplay_retail_state.h"
+#ifdef MELEE_WEB_FMA_DIAGNOSTIC
+#include "gameplay_fma_diagnostic.h"
+#endif
 #include <melee/ft/types.h>
 #include <melee/pl/player.h>
 #include <melee/gm/forward.h>
@@ -20,7 +23,11 @@
 #define HIT_PROBE_INVOCATIONS 64
 #define HIT_PROBE_ROW_BYTES 2048
 static char rows[HIT_PROBE_ROWS][HIT_PROBE_ROW_BYTES];
+#ifdef MELEE_WEB_FMA_DIAGNOSTIC
+static char line[HIT_PROBE_ROWS * HIT_PROBE_ROW_BYTES + 8192];
+#else
 static char line[HIT_PROBE_ROWS * HIT_PROBE_ROW_BYTES + 512];
+#endif
 static size_t cursor, count;
 static unsigned invocations, calls[3];
 static unsigned open_invocations[HIT_PROBE_INVOCATIONS], invocation_kind[HIT_PROBE_INVOCATIONS];
@@ -121,7 +128,12 @@ static void retain_overflow(void)
         "\"overflowed\":true,\"hook_counts\":[%u,%u,%u],\"events\":[",
         cursor,calls[0],calls[1],calls[2]);
     for(size_t i=0;i<count;++i)put(line,sizeof(line),&used,"%s%s",i?",":"",rows[i]);
-    put(line,sizeof(line),&used,"]}");
+    put(line,sizeof(line),&used,"]");
+#ifdef MELEE_WEB_FMA_DIAGNOSTIC
+    melee_web_fma_diagnostic_append_json(line,sizeof(line),&used);
+    melee_web_fma_diagnostic_finish_cursor();
+#endif
+    put(line,sizeof(line),&used,"}");
     emit_line();
 }
 static size_t row_capacity(void)
@@ -181,6 +193,9 @@ void melee_web_hit_probe_cursor(size_t index)
 #endif
     if(!active) return;
     if(index!=5238 && index!=5239 && index!=5240) abort();
+#ifdef MELEE_WEB_FMA_DIAGNOSTIC
+    melee_web_fma_diagnostic_cursor((uint32_t) index);
+#endif
     victim=NULL;count=0;invocations=0;depth=0;
     passes=pairs=geometries=producers=0;
     pass_open=pair_open=geometry_open=producer_open=0;
@@ -468,6 +483,10 @@ void melee_web_hit_probe_scheduler_return(void)
     for(size_t i=0;i<count;++i)put(line,sizeof(line),&used,"%s%s",i?",":"",rows[i]);
     put(line,sizeof(line),&used,"]");
     if(cursor==5239)put(line,sizeof(line),&used,",\"candidate_enabled\":true,\"candidate_passes\":%u,\"candidate_pairs\":%u",passes,pairs);
+#ifdef MELEE_WEB_FMA_DIAGNOSTIC
+    melee_web_fma_diagnostic_append_json(line,sizeof(line),&used);
+    melee_web_fma_diagnostic_finish_cursor();
+#endif
     put(line,sizeof(line),&used,"}");
     emit_line();
     active=0;

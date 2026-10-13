@@ -9,6 +9,8 @@ contains pinned sources, every configured entry, selected file/hash closure,
 bounded hook summaries and explicit unknowns. It contains no upstream code or binary payload.
 The [milestone status](../status/2026-10-12-match-only-rollback-feasibility.md)
 is the changing evidence boundary. No Slippi code has been ported.
+The incremental coverage counts below describe retained historical checkpoints;
+use that status boundary and its receipt for current hook-body accounting.
 
 ## Modes and Stadium
 
@@ -33,8 +35,9 @@ Selected static defaults include four stocks, eight minutes, Stock mode, no item
 and Singles stages; live setup can override these, including Party's rules.
 
 - **UCF 0.84** is selected. Named hooks cover dashback, squat reverse, pad-buffer/cardinals,
-  SDI, shield drop/shield SDI, tumble and its indicator. Individual payload mechanics
-  and live per-player/per-mode toggle values remain unresolved. Replay `prepareGameInfo`
+  SDI, shield drop/shield SDI, tumble and its indicator. The receipt now includes
+  static payload decodes; complete predicates, history ownership and live
+  per-player/per-mode toggle values remain unresolved. Replay `prepareGameInfo`
   serialization is not evidence of live online toggle transport.
 - **Neutral spawns** compute Singles/Teams assignments. The fallback uses original
   authored spawn coordinates with computed IDs and recomputed facing; vanilla-order
@@ -48,12 +51,12 @@ and Singles stages; live setup can override these, including Party's rules.
   predicate and camera-KO velocity/model handling. The receipt enumerates exact paths,
   addresses and narrowed source summaries; hook names alone are not behavioral proof.
 
-All 59 configured entries are mapped (52 default-selected). Selected folders resolve
+Historical v5 accounting mapped all 59 configured entries (52 default-selected). Selected folders resolve
 to 198 files and 183 annotated ASM hooks; the parsed textual include closure contains
 196 files, and 21 selected binary payloads are hashed. Of 183 hooks, 27 carry an
 `affects-gameplay` tag and 156 do not. Across the original v4 inventory checks, the corrected prior six-hook set (v1 and v2
 are versions of the same paths), the corrected v4 packet, and the v5 packet, 30 unique
-untagged hooks have bounded source checks; **126 lack such checks**. The latest packet
+untagged hooks had bounded source checks; **126 lacked such checks at that boundary**. That packet
 records six exact source identities, selected-root membership, observed behavior and
 unresolved dependencies. This remains source-only evidence: no client binary/profile
 was inspected or accepted. Tag absence does not establish non-gameplay behavior.
@@ -245,9 +248,9 @@ per-player values, runtime behavior, or source-to-built-output pairing.
 
 The eight files are in the recursively selected External/UCF 0.84/UCF subtree
 under Required: General Codes. They are already among the 27 tagged gameplay
-paths. This identity check adds no untagged semantic checks: the separate count
-remains 30 checked of 156 untagged hooks, with 126 lacking bounded checks. The
-other 19 tagged summaries were not re-audited. The independent review corrected
+paths. At that v6 boundary, this identity check added no untagged semantic checks:
+the separate count remained 30 checked of 156 untagged hooks, with 126 lacking
+bounded checks. The other 19 tagged summaries were not re-audited then. The independent review corrected
 the Pad Buffer + 1.0 Cardinals cached reference: its actual path contains a
 literal plus sign; the earlier %2B spelling did not resolve.
 

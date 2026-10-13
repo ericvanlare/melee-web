@@ -1,5 +1,6 @@
 /* The offline reducer shares this file but has a separate ABI and no game
  * services. Its included bodies come from the checked source extraction. */
+#include "gameplay_fma_diagnostic.h"
 #ifdef MELEE_WEB_HIT_PROBE_OFFLINE_REDUCER
 #include <math.h>
 #include <stdbool.h>
