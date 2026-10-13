@@ -52,22 +52,25 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
-### 2026-10-12 — Owner: public staging and combat checkpoint
+### 2026-10-12 — Owner: public staging, cleanup and Stadium after combat
 
-**Ask:** Adopt the architect check-in on concrete staging prerequisites,
-recorded-process-only cleanup, H1 recording and Stadium C3 after combat.
-Then checkpoint #316 and deploy the isolated staging Worker using the restored
-Cloudflare authorization, Workers Free and a $0 spend limit.
+**Ask:** Adopt the concrete staging prerequisites, recorded-process-only cleanup,
+H1 recording and Stadium C3 after combat. Checkpoint #316 and deploy the
+isolated staging Worker using the restored Cloudflare authorization, Workers Free
+and a $0 spend limit.
 
 **Status:** Agreed. Reuse the existing relay and headless full-route harness;
-no plan upgrade, paid service, account/security, DNS or production change.
-Report the deployed identity, origin policy, route result and Worker retirement
-policy on #158. Keep public functional evidence separate from acceptance;
-continue combat #313/#314 and then Stadium #301/#251 with existing owners.
+no plan upgrade, paid service, account/security, DNS or production change. The
+deployed identity, origin policy and same-host route result are recorded in the
+[existing readiness receipt](status/2026-10-11-local-room-ui-readiness.md).
+Keep that public functional evidence separate from acceptance. The combat step
+is checkpointed, recorded-process cleanup and H1 controls remain required, and
+Stadium #301/#251 follows combat #313/#314.
 
 **Links:** [Architect response](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6131503382),
 [public slice #288](https://github.com/ericvanlare/melee-web/issues/288),
-[combat checkpoint #316](https://github.com/ericvanlare/melee-web/pull/316).
+[combat checkpoint #316](https://github.com/ericvanlare/melee-web/pull/316),
+[Stadium C3 #301](https://github.com/ericvanlare/melee-web/pull/301).
 
 ### 2026-10-12 — Owner: verified combat through the simulated network
 

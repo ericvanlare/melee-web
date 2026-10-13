@@ -1169,8 +1169,22 @@
     "integration": {
       "local_regression": "PASS2363tests165skips",
       "release_runtime_build": "PASS",
-      "exact_head_ci": "pending",
-      "merge": "pending"
+      "exact_head_ci": {
+        "path": "m1-exact-head-ci.json",
+        "sha256": "f2de02268f2844ae84c59437f034ef57bd8e8e52cc244cbc8ccdd93e0ace4444"
+      },
+      "merge": {
+        "path": "m1-merge-receipt.json",
+        "sha256": "542fb9d9e65cfa5d4ed62ce940b20a8d4bc2eb8610acfe32da6f691544431aef"
+      },
+      "pr": 315,
+      "reviewed_head": "57701e6c6232931ebebe63922b670fb8b5d0f3e3",
+      "commit": "9e3ec835ab905f36ed1753dca3c9f0ecac3889de",
+      "tree": "6e50d5fb5e0612c757530de09f455c5c430de059",
+      "reviewed_and_merged_trees_match": true,
+      "completed_checks": 14,
+      "successes": 12,
+      "expected_skips": 2
     },
     "evidence_location_policy": "Logical evidence and input identifiers only; concrete retained locations remain in the external capture and review receipts."
   }

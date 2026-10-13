@@ -102,12 +102,18 @@ under moderate and asymmetric simulated conditions. Each milestone owns four
 timeboxed work items, one PR and one scoped status boundary. Grounded combat
 can proceed independently if the landing investigation remains inconclusive.
 Reuse existing original comparisons and preserve their setup/field exclusions;
-paired browser agreement alone is not original equivalence. Under the owner-adopted October 12 architect check-in, checkpoint the current
-[#316](https://github.com/ericvanlare/melee-web/pull/316) combat step before
-running the owner-cleared public staging slice. Keep the existing incident
-recorder enabled and retain forced timing pauses as H1 evidence. After combat
-#313/#314, Pokémon Stadium C3 #301/#251 is the next Track B milestone.
-Public functional results leave the separate acceptance gates open.
+paired browser agreement alone is not original equivalence. The combat sprint
+now owns the shared capture lane, with Stadium and unchanged provider queries
+still checkpointed. Under the owner-adopted October 12 architect check-in,
+finish or checkpoint the in-flight #316 combat step, verify recorded-process
+cleanup ownership before another capture, and keep the existing staging incident
+recorder enabled for combat and simulated-network runs. Retain forced timing
+pauses as H1 observations without inferring a combat failure or resuming to pass.
+After #313/#314, Pokémon Stadium C3 in [#301](https://github.com/ericvanlare/melee-web/pull/301)
+and [#251](https://github.com/ericvanlare/melee-web/issues/251) is the next Track B
+milestone. The same-host public-staging route is recorded in the existing
+[readiness receipt](status/2026-10-11-local-room-ui-readiness.md) as functional
+evidence; two-machine and broader acceptance gates remain open.
 
 **Owner-requested readiness checkpoint (October 11; updated October 12):** the
 existing local Worker and Host/Join UI have a [scoped browser result](status/2026-10-11-local-room-ui-readiness.md)

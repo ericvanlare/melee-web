@@ -21,8 +21,11 @@ import {resolvePostCssStallProbe, runPostCssStallProbe} from './a3_network_stall
 import {LOCKSTEP_DELAY, LOCKSTEP_MAX_SOURCE_TICKS, parseNetChecksum} from './net_lockstep_core.mjs';
 import {checksumCompareReached, checksumWaitDiagnostic} from './a3_checksum_wait_diagnostics.mjs';
 import {runA3LocalFullRoute} from './a3_local_room_full_route.mjs';
+import {retainCombatChecksumCursorPoll} from './a3_local_room_combat_probe.mjs';
+import {incidentRecordingUrl, readIncidentRecorderReadiness, requireIncidentRecorderReadiness,
+  summarizeRuntimeIncidents} from './a3_runtime_incidents.mjs';
 
-const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--network-profile control|moderate|asymmetric|constrained] [--post-css-stall-probe] [--relay-url wss://STAGING-WORKER] [--relay-preflight READ_ONLY_PREFLIGHT.json] [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route] [--controlled-cut-after-css] [--gameplay-action-probe] [--repeat-full-route]';
+const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--network-profile control|moderate|asymmetric|constrained] [--post-css-stall-probe] [--relay-url wss://STAGING-WORKER] [--relay-preflight READ_ONLY_PREFLIGHT.json] [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route] [--controlled-cut-after-css] [--gameplay-action-probe] [--gameplay-combat-probe] [--gameplay-combat-exchange] [--gameplay-combat-ko] [--gameplay-combat-ko-charged] [--gameplay-combat-ko-prepared] [--gameplay-combat-ko-prepared-platform-exit] [--repeat-full-route]';
 const {values} = parseArgs({options: {
   url: {type: 'string'}, disc: {type: 'string'}, out: {type: 'string'},
   'relay-url': {type: 'string'}, 'relay-preflight': {type: 'string'},
@@ -32,6 +35,12 @@ const {values} = parseArgs({options: {
   playwright: {type: 'string'}, 'min-checksums': {type: 'string', default: '120'},
   'timeout-ms': {type: 'string', default: '300000'}, 'full-route': {type: 'boolean', default: false},
   'gameplay-action-probe': {type: 'boolean', default: false},
+  'gameplay-combat-probe': {type: 'boolean', default: false},
+  'gameplay-combat-exchange': {type: 'boolean', default: false},
+  'gameplay-combat-ko': {type: 'boolean', default: false},
+  'gameplay-combat-ko-charged': {type: 'boolean', default: false},
+  'gameplay-combat-ko-prepared': {type: 'boolean', default: false},
+  'gameplay-combat-ko-prepared-platform-exit': {type: 'boolean', default: false},
   'repeat-full-route': {type: 'boolean', default: false},
   help: {type: 'boolean', default: false},
 }, allowPositionals: false});
@@ -74,14 +83,37 @@ if (!values.url || !values.disc || !values.out)
   throw Error('Required: ' + USAGE);
 requireCondition(!values['gameplay-action-probe'] || values['full-route'],
   '--gameplay-action-probe requires --full-route');
+requireCondition(!values['gameplay-combat-probe'] || values['full-route'],
+  '--gameplay-combat-probe requires --full-route');
+requireCondition(!values['gameplay-combat-exchange'] ||
+  (values['full-route'] && values['gameplay-combat-probe']),
+  '--gameplay-combat-exchange requires --full-route and --gameplay-combat-probe');
+requireCondition(!(values['gameplay-combat-probe'] && values['gameplay-action-probe']),
+  '--gameplay-combat-probe cannot be combined with --gameplay-action-probe');
 requireCondition(!values['repeat-full-route'] || values['full-route'],
   '--repeat-full-route requires --full-route');
 requireCondition(!(values['repeat-full-route'] && values['gameplay-action-probe']),
   '--repeat-full-route cannot be combined with --gameplay-action-probe');
+requireCondition(!(values['repeat-full-route'] && values['gameplay-combat-probe']),
+  '--repeat-full-route cannot be combined with --gameplay-combat-probe');
+requireCondition(!(values['repeat-full-route'] && values['gameplay-combat-exchange']),
+  '--repeat-full-route cannot be combined with --gameplay-combat-exchange');
 requireCondition(!(values['repeat-full-route'] &&
     (values['post-css-stall-probe'] || values['controlled-cut-after-css'])),
   '--repeat-full-route cannot be combined with a stall probe or controlled cut');
-const runtimeUrl = new URL(values.url);
+requireCondition(!values['gameplay-combat-ko'] || values['gameplay-combat-exchange'],
+  '--gameplay-combat-ko requires --gameplay-combat-exchange');
+requireCondition(!values['gameplay-combat-ko-charged'] || values['gameplay-combat-exchange'],
+  '--gameplay-combat-ko-charged requires --gameplay-combat-exchange');
+requireCondition(!values['gameplay-combat-ko-prepared'] || values['gameplay-combat-exchange'],
+  '--gameplay-combat-ko-prepared requires --gameplay-combat-exchange');
+requireCondition(!values['gameplay-combat-ko-prepared-platform-exit'] ||
+  values['gameplay-combat-ko-prepared'],
+  '--gameplay-combat-ko-prepared-platform-exit requires --gameplay-combat-ko-prepared');
+requireCondition([values['gameplay-combat-ko'], values['gameplay-combat-ko-charged'],
+  values['gameplay-combat-ko-prepared']].filter(Boolean).length <= 1,
+  'C-stick, charged, and prepared combat KO modes are separate scenarios');
+const runtimeUrl = incidentRecordingUrl(values.url);
 requireCondition(runtimeUrl.protocol === 'http:' && runtimeUrl.hostname === '127.0.0.1' &&
   runtimeUrl.port === '8787' && runtimeUrl.pathname === '/runtime.html',
   'This harness requires the already-supported client page http://127.0.0.1:8787/runtime.html');
@@ -107,6 +139,19 @@ const postCssStallProbe = resolvePostCssStallProbe({
 if (values['controlled-cut-after-css'] && (simulationConfiguration?.profile_name !== 'moderate' ||
     values['full-route'] || values['relay-url'] || values['relay-preflight'] || postCssStallProbe))
   throw Error('--controlled-cut-after-css requires simulated moderate CSS, without stall or public relay');
+if (values['gameplay-combat-probe'] &&
+    (simulationConfiguration?.mode !== 'simulated-network' ||
+     simulationConfiguration?.profile_name !== 'moderate' ||
+     values['relay-url'] || values['relay-preflight'] ||
+     values['post-css-stall-probe'] || values['controlled-cut-after-css']))
+  throw Error('--gameplay-combat-probe requires only the simulated moderate full-route scenario');
+if (values['gameplay-combat-exchange'])
+  requireCondition(simulationConfiguration?.mode === 'simulated-network' &&
+    simulationConfiguration?.profile_name === 'moderate' && !values['relay-url'] &&
+    !values['relay-preflight'] && !values['post-css-stall-probe'] &&
+    !values['controlled-cut-after-css'] && !values['gameplay-action-probe'] &&
+    !values['repeat-full-route'],
+  '--gameplay-combat-exchange requires only its simulated moderate combat-probe scenario');
 const discPath = path.resolve(values.disc);
 const discInfo = await fs.stat(discPath);
 requireCondition(discInfo.isFile() && discInfo.size > 0, '--disc must name a nonempty local file');
@@ -140,6 +185,8 @@ const report = {
   evidence_scope: simulationConfiguration
     ? 'same-machine simulated-network functional browser ' + (values['full-route'] ? 'full-route attempt' : 'CSS check') +
       (postCssStallProbe ? ' with an opt-in bounded post-CSS controlled-stall probe' : '') +
+      (values['gameplay-combat-probe'] ? ' with a bounded P2 inward approach and jab probe' : '') +
+      (values['gameplay-combat-exchange'] ? ' plus one reverse jab and bounded shield exchange' : '') +
       ' using actual Host/Join and keyboard input, real TCP proxy sockets and an owned local Worker; public routing, deployed staging, physical input, two-machine, timing, pixel/PCM equivalence and whole-session acceptance remain pending'
     : relayMode.mode === 'external'
     ? (values['full-route']
@@ -173,7 +220,15 @@ const report = {
   checksum_wait_failure: null,
   full_route: null,
   gameplay_action_probe: values['gameplay-action-probe'],
+  gameplay_combat_probe: values['gameplay-combat-probe'],
+  gameplay_combat_exchange: values['gameplay-combat-exchange'],
+  gameplay_combat_ko: values['gameplay-combat-ko'],
+  gameplay_combat_ko_charged: values['gameplay-combat-ko-charged'],
+  gameplay_combat_ko_prepared: values['gameplay-combat-ko-prepared'],
+  gameplay_combat_ko_prepared_platform_exit: values['gameplay-combat-ko-prepared-platform-exit'],
   leave_and_cleanup: {},
+  runtime_incident_recording: {requested: true, url: runtimeUrl.href, profiles: {},
+    policy: 'Existing bounded recorder; staging occupancy and queue-completion callback latency. Forced timing pauses are H1 evidence; no automatic resume added.'},
   exclusions: ['no direct PAD or Gamepad injection', 'no harness-owned peer or checksum pump',
     'no runtime source-tick/checksum-bound changes',
     ...(relayMode.mode === 'external'
@@ -194,14 +249,20 @@ let repeatedPrefixDigest = null;
 async function sourceIdentity() {
   const status = gitValue(['status', '--porcelain', '--untracked-files=all']);
   const allowedHarnessFiles = ['scripts/a3_local_room_keyboard_browser.mjs',
+    'scripts/a3_runtime_incidents.mjs', 'tests/a3_runtime_incidents.test.mjs',
+    'tests/test_a3_runtime_incidents.py',
     'scripts/net_session_instance.mjs', 'scripts/a3_data_package_diagnostics.mjs', 'tests/a3_data_package_diagnostics.test.mjs',
     'scripts/a3_expected_fault_auditor.py', 'scripts/a3_public_relay_preflight.mjs',
     'tests/test_a3_expected_fault_auditor.py', 'tests/test_a3_public_relay_preflight.py',
-    'scripts/a3_local_room_full_route.mjs', 'scripts/a3_checksum_wait_diagnostics.mjs',
+    'scripts/a3_local_room_full_route.mjs', 'scripts/a3_local_room_combat_probe.mjs',
+    'scripts/a3_local_room_combat_ko.mjs',
+    'tests/a3_local_room_full_route_combat.test.mjs',
+    'tests/test_a3_local_room_full_route_combat.py', 'scripts/a3_checksum_wait_diagnostics.mjs',
     'scripts/a3_source_cursor_join.mjs', 'scripts/run_network_simulation.py',
     'tests/test_run_network_simulation.py', 'tests/test_a3_local_room_full_route_wait.py',
     'scripts/a3_network_simulation.mjs', 'scripts/a3_network_stall_probe.mjs',
     'tests/a3_network_stall_probe.test.mjs', 'tests/test_a3_network_stall_probe.py',
+    'tests/a3_local_room_full_route_combat.test.mjs',
     'tests/net_test_tcp_proxy_stall_queue.test.mjs',
     'tests/net_test_tcp_proxy_controlled_faults.test.mjs',
     'scripts/net_test_tcp_proxy.mjs', 'tests/test_a3_network_simulation.py',
@@ -210,7 +271,9 @@ async function sourceIdentity() {
     !allowedHarnessFiles.includes(row.slice(3)));
   requireCondition(unexpected.length === 0,
     'Checkout contains changes outside this harness: ' + JSON.stringify(unexpected));
-  const sourceFiles = allowedHarnessFiles.filter(filename => filename.startsWith('scripts/'));
+  const sourceFiles = allowedHarnessFiles.filter(filename => filename.startsWith('scripts/') ||
+    filename === 'tests/a3_local_room_full_route_combat.test.mjs' ||
+    filename === 'tests/test_run_network_simulation.py');
   const filesSha256 = Object.fromEntries(await Promise.all(sourceFiles.map(async filename =>
     [filename, sha256(await fs.readFile(filename))])));
   return {head: gitValue(['rev-parse', 'HEAD']), tree: gitValue(['rev-parse', 'HEAD^{tree}']),
@@ -477,7 +540,12 @@ async function waitForBothCssAndProgress(minimum) {
   throw Error('Both runtime-owned peers did not reach the bounded common CSS checksum prefix');
 }
 
-async function waitForBothChecksumCompare(target, phase = 1, boundedDeadline = operationDeadline) {
+async function waitForBothChecksumCompare(target, phase = 1, boundedDeadline = operationDeadline,
+  sourceCursorPolicy = null) {
+  if (sourceCursorPolicy !== null)
+    requireCondition(Number.isSafeInteger(sourceCursorPolicy.sourceCursorLimit) &&
+      sourceCursorPolicy.evidenceSink && typeof sourceCursorPolicy.evidenceSink === 'object',
+    'Source-cursor checksum policy is malformed');
   const recent = [];
   let lastRows = null;
   let lastObservedAt = null;
@@ -523,6 +591,15 @@ async function waitForBothChecksumCompare(target, phase = 1, boundedDeadline = o
   while (Date.now() < boundedDeadline) {
     const states = await Promise.all([readRoomState(instances.alpha), readRoomState(instances.beta)]);
     retainRows(states);
+    if (sourceCursorPolicy !== null) {
+      try {
+        retainCombatChecksumCursorPoll({evidenceSink: sourceCursorPolicy.evidenceSink,
+          states, sourceCursorLimit: sourceCursorPolicy.sourceCursorLimit});
+      } catch (error) {
+        const message = errorText(error);
+        throw await failWithObservation(message, message, 'after-source-cursor-budget');
+      }
+    }
     for (const [index, role] of ['alpha', 'beta'].entries()) {
       const failure = protocolFailure(states[index], role);
       if (failure) throw await failWithObservation(failure, failure, 'after-protocol-failure');
@@ -835,6 +912,11 @@ try {
   });
   instances.alpha = await openRole('alpha');
   instances.beta = await openRole('beta');
+  for (const role of ['alpha', 'beta']) {
+    const readiness = await readIncidentRecorderReadiness(instances[role].page);
+    report.runtime_incident_recording.profiles[role] = {readiness};
+    requireIncidentRecorderReadiness(readiness);
+  }
   if (networkSimulation)
     browserNetworkPaths = observeBrowserNetworkPaths(instances, networkSimulation.relayUrl);
   report.browser = {...report.browser, executable: tools.browserPath,
@@ -993,6 +1075,12 @@ try {
     report.full_route = await runA3LocalFullRoute({
       alpha: instances.alpha, beta: instances.beta, report, inputDelay: invite.inputDelay,
       gameplayActionProbe: values['gameplay-action-probe'],
+      gameplayCombatProbe: values['gameplay-combat-probe'],
+      gameplayCombatExchange: values['gameplay-combat-exchange'],
+      gameplayCombatKo: values['gameplay-combat-ko'],
+      gameplayCombatKoCharged: values['gameplay-combat-ko-charged'],
+      gameplayCombatKoPrepared: values['gameplay-combat-ko-prepared'],
+      gameplayCombatKoPreparedPlatformExit: values['gameplay-combat-ko-prepared-platform-exit'],
       remaining, readRoomState, readPeerSnapshot, readPeerInputSuffix, readInputDiagnostics,
       waitForBothChecksumCompare, captureScreenshot,
       assertHealthy: (state, role) => {
@@ -1005,6 +1093,7 @@ try {
     const repeat = {
       result: 'running', scope: 'two original full routes in one continuously owned room',
       repeat_mode: 'same-room-two-match', gameplay_action_probe: false,
+      gameplay_combat_probe: false,
       required_checksum_boundary: 0, active_match_number: null, repeated_matches: [],
       checkpoint_observations: [],
       admission: null, final_prefix: null,
@@ -1362,8 +1451,27 @@ try {
 } catch (error) {
   if (report.full_route && ['running', 'awaiting_final_checksum_validation'].includes(report.full_route.result))
     report.full_route.result = 'failed';
+  const combatProbe = report.full_route?.combat_probe;
+  if (combatProbe?.result === 'running') {
+    combatProbe.result = 'failed';
+    combatProbe.failure = errorText(error);
+  }
   firstError(errorText(error));
 } finally {
+  // Read the actual stop before Leave/unload changes it. No live polling, pause,
+  // resume or new recorder is introduced by this evidence boundary.
+  for (const role of ['alpha', 'beta']) {
+    const instance = instances[role];
+    if (!instance) continue;
+    const evidence = report.runtime_incident_recording.profiles[role] ||= {};
+    try {
+      evidence.before_leave = await cleanupBounded(instance.page.evaluate(() =>
+        window.meleeNetTimingPauseEligibilitySnapshot?.() ?? null), role + ' incident stop state');
+    } catch (error) {
+      evidence.before_leave_error = errorText(error);
+      firstError(role + ' incident stop state unavailable: ' + errorText(error));
+    }
+  }
   const processInfo = {};
   for (const role of ['alpha', 'beta']) {
     const instance = instances[role];
@@ -1402,6 +1510,23 @@ try {
     }
     if (report.leave_and_cleanup[role + '_unload'].error)
       firstError(role + ' runtime unload failed: ' + report.leave_and_cleanup[role + '_unload'].error);
+    const evidence = report.runtime_incident_recording.profiles[role] ||= {};
+    try {
+      // The existing export refuses serialization during active gameplay.
+      evidence.export = await cleanupBounded(instance.page.evaluate(async () =>
+        await window.meleeNetRuntimeDiagnosticExport?.() ?? null), role + ' runtime incident export');
+      evidence.summary = summarizeRuntimeIncidents(evidence.export, evidence.before_leave);
+      if (evidence.summary.missing_timing_staging_count > 0)
+        firstError(role + ' H1 incident is missing the requested staging observation');
+      if (evidence.summary.h1_timing_pause_observed) {
+        report.runtime_incident_recording.h1_timing_pause_observed = true;
+        if (!values['post-css-stall-probe'])
+          firstError(role + ' forced timing pause retained as H1 evidence; route incomplete');
+      }
+    } catch (error) {
+      evidence.export_error = errorText(error);
+      firstError(role + ' runtime incident evidence unavailable: ' + errorText(error));
+    }
     try {
       const fatal = firstFatalBrowserError(instance.errors);
       if (fatal) firstError(role + ' browser error: ' + JSON.stringify(fatal));
@@ -1463,6 +1588,11 @@ try {
     report.leave_and_cleanup.worker = {attempted: false,
       reason: 'external Worker is not owned by the browser harness'};
   }
+  if (report.first_error && report.runtime_incident_recording.h1_timing_pause_observed)
+    report.failure_classification = {domain: 'H1', outcome: 'timing_pause_observed',
+      route_accepted: false, combat_failure_inferred: false,
+      first_error_cause: 'not_inferred_from_co_occurring_timing_pause',
+      original_first_error_retained: true};
   if (!report.first_error && workerPassed) {
     for (const role of ['alpha', 'beta']) {
       const profile = path.join(output, 'profiles', role);

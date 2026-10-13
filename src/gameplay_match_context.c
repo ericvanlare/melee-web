@@ -13,6 +13,7 @@
 #include <sysdolphin/baselib/mobj.h>
 #include <sysdolphin/baselib/aobj.h>
 #include <melee/pl/player.h>
+#include <melee/gm/forward.h>
 #include <melee/it/item.h>
 #include <melee/mp/mpcoll.h>
 #include <melee/pl/plattack.h>
@@ -514,9 +515,28 @@ int melee_web_match_stats(MeleeWebMatchContext* h,MeleeWebMatchStats* out,char* 
 int melee_web_match_player_stats(MeleeWebMatchContext* h,uint32_t index,MeleeWebMatchStats* out,char* e,size_t n)
 {
     if(!live(h,e,n))return 0;
-    if(!out||index>=h->player_count)return fail(e,n,"Match stats output and owned player index are required");
+    _Static_assert(MELEE_WEB_MATCH_KO_SLOTS == Gm_Player_NumMax,
+                   "Match KO observation must match the authored Player table");
+    if(!out||!h->player_count||h->player_count>MELEE_WEB_MATCH_MAX_PLAYERS||index>=h->player_count)
+        return fail(e,n,"Match stats output and bounded owned player index are required");
+    for(uint32_t i=0;i<h->player_count;i++)
+        if(h->slots[i]>=4||h->slots[i]>=Gm_Player_NumMax||h->controllers[i]>=4)
+            return fail(e,n,"Match stats slot/controller exceeds the owned source input range");
     memset(out,0,sizeof(*out));out->ticks=h->ticks;out->random_seed=h->seed;
     StaticPlayer* p=Player_GetPtrForSlot(h->slots[index]);
+    if(p->transformed[0]>=2)
+        return fail(e,n,"Match stats primary transformed index exceeds source entity storage");
+    /* Player counters survive a missing/recreated primary fighter. They are
+     * indexed by original player slot, never controller or compact index. */
+    out->primary_falls=Player_GetFallsByIndex(h->slots[index],0);
+    out->suicides=Player_GetSuicideCount(h->slots[index]);
+    if(out->primary_falls<0)
+        return fail(e,n,"Match stats primary fall counter is negative");
+    for(uint32_t victim=0;victim<Gm_Player_NumMax;victim++){
+        int32_t kos=Player_GetKOsByPlayerIndex(h->slots[index],victim);
+        if(kos<0)return fail(e,n,"Match stats KO counter exceeds signed getter range");
+        out->kos_by_player_slot[victim]=(uint32_t)kos;
+    }
     out->live_fighters=(p->player_entity[0]!=NULL)+(p->player_entity[1]!=NULL);
     out->motion_id=-1;out->ground_or_air=-1;out->fighter_kind=-1;out->player_slot=h->slots[index];
     out->stocks=Player_GetStocks(h->slots[index]);

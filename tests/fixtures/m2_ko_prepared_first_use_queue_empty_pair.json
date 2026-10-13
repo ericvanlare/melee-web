@@ -1,0 +1,469 @@
+{
+  "source_tick": 1147,
+  "peers": [
+    {
+      "phase": 7,
+      "running": 0,
+      "message": "Preparing first-use rendering...",
+      "error": null,
+      "source_tick": 1147,
+      "native_status": {
+        "active": 1,
+        "context_applied": 1,
+        "seed": 696906724,
+        "max_frames": 216000,
+        "pushed": 1147,
+        "cursor": 1147,
+        "blocker": "network_wait",
+        "start_barrier_callbacks": 2,
+        "wait_callbacks": 214,
+        "wait_episodes": 190,
+        "wait_start_tick": 1141,
+        "wait_last_tick": 1141,
+        "wait_resume_count": 190,
+        "backpressure_callbacks": 0,
+        "ring_pending": 0,
+        "arena_fill": -1,
+        "indexed": {
+          "duplicates": 0,
+          "conflicts": 0,
+          "gaps": 0,
+          "invalid": 0
+        },
+        "terminal": {
+          "kind": 0,
+          "tick": 0,
+          "channel": 0
+        },
+        "local_capture_failure": null,
+        "network_wait": {
+          "active": 0,
+          "callbacks": 214,
+          "episodes": 190,
+          "start_tick": 1141,
+          "last_tick": 1141,
+          "resume_count": 190
+        },
+        "start": {
+          "required": 1,
+          "recorded": 1,
+          "scene": 1,
+          "seed": 696906724,
+          "frame": 0,
+          "confirmed": 1,
+          "capture_failed": 0,
+          "card": "f2880a9d13154a36",
+          "pad_history": "af900bb4021c8716",
+          "native_context": "16f0b121dcff293b",
+          "total": "cda1609893b706cf",
+          "pad": "419eb4f4f4bbee75",
+          "scene_state": "3391b05bd2e60036",
+          "object_state": "d0e868a4883380b5",
+          "objects": 33,
+          "flags": 10
+        },
+        "arena_overflow": 0,
+        "arena": [
+          {
+            "tick": 0,
+            "scene": 1,
+            "base": 57242752,
+            "bytes": 33554432,
+            "hash": "88efc0191abc98bb"
+          },
+          {
+            "tick": 182,
+            "scene": 2,
+            "base": 57242752,
+            "bytes": 33554432,
+            "hash": "4c3aa04f6a578cad"
+          },
+          {
+            "tick": 319,
+            "scene": 3,
+            "base": 57242752,
+            "bytes": 33554432,
+            "hash": "d350b9fd4e6729d0"
+          }
+        ]
+      },
+      "css": null,
+      "stage": null,
+      "match": {
+        "leg": "vs",
+        "prior_vs_source_frames": 0,
+        "observed_player_source_slots": [
+          0,
+          1
+        ],
+        "source_pad_errors": [
+          0,
+          0,
+          -1,
+          -1
+        ],
+        "ready": true,
+        "paused": false,
+        "ending": false,
+        "complete": false,
+        "frame": 704,
+        "rng": 3037184050,
+        "outcome": 0,
+        "winner": -1,
+        "rules": {
+          "match_kind": 1,
+          "stage": 32,
+          "timer_enabled": 0,
+          "time_limit": 0,
+          "disable_pausing": 0,
+          "damage_ratio_bits": "3f800000",
+          "is_stock": 1,
+          "is_vs": 1,
+          "source_sudden_death_flag": 0,
+          "item_frequency": -1,
+          "item_mask_hex": "ffffffffffffffff",
+          "is_teams": 0,
+          "player_teams": [
+            0,
+            0
+          ],
+          "player_stocks": [
+            4,
+            4
+          ],
+          "door_teams": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "friendly_fire": 0,
+          "player_source_slots": [
+            0,
+            0
+          ],
+          "resolved_controller_ports": [
+            0,
+            1
+          ],
+          "player_slot_types": [
+            0,
+            0
+          ],
+          "player_source_stocks": [
+            4,
+            4
+          ],
+          "player_source_characters": [
+            8,
+            8
+          ],
+          "player_attack_ratio_bits": [
+            "3f800000",
+            "3f800000"
+          ],
+          "player_defense_ratio_bits": [
+            "3f800000",
+            "3f800000"
+          ]
+        },
+        "players": [
+          {
+            "fighter": 0,
+            "human": true,
+            "damage_percent": 0,
+            "source_player_index": 0,
+            "source_slot": 0,
+            "source_port": 0,
+            "source_character": 8,
+            "source_color": 1,
+            "source_initial_damage": 0,
+            "slot_type": 0,
+            "source_stocks": 4,
+            "stocks": 3,
+            "motion": 12,
+            "groundAir": 1,
+            "animation_frame": 13,
+            "shield_health": 60,
+            "facing_direction": -1,
+            "primary_falls": 1,
+            "suicides": 0,
+            "kos_by_player_slot": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "x": 16,
+            "y": 97.8999939
+          },
+          {
+            "fighter": 0,
+            "human": true,
+            "damage_percent": 3,
+            "source_player_index": 1,
+            "source_slot": 0,
+            "source_port": 1,
+            "source_character": 8,
+            "source_color": 0,
+            "source_initial_damage": 0,
+            "slot_type": 0,
+            "source_stocks": 4,
+            "stocks": 4,
+            "motion": 14,
+            "groundAir": 0,
+            "animation_frame": 13,
+            "shield_health": 60,
+            "facing_direction": -1,
+            "primary_falls": 0,
+            "suicides": 0,
+            "kos_by_player_slot": [
+              1,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "x": -62.2515373,
+            "y": 9.99999975e-05
+          }
+        ]
+      }
+    },
+    {
+      "phase": 7,
+      "running": 0,
+      "message": "Preparing first-use rendering...",
+      "error": null,
+      "source_tick": 1147,
+      "native_status": {
+        "active": 1,
+        "context_applied": 1,
+        "seed": 696906724,
+        "max_frames": 216000,
+        "pushed": 1149,
+        "cursor": 1147,
+        "blocker": "none",
+        "start_barrier_callbacks": 2,
+        "wait_callbacks": 217,
+        "wait_episodes": 193,
+        "wait_start_tick": 1144,
+        "wait_last_tick": 1144,
+        "wait_resume_count": 193,
+        "backpressure_callbacks": 0,
+        "ring_pending": 0,
+        "arena_fill": -1,
+        "indexed": {
+          "duplicates": 0,
+          "conflicts": 0,
+          "gaps": 0,
+          "invalid": 0
+        },
+        "terminal": {
+          "kind": 0,
+          "tick": 0,
+          "channel": 0
+        },
+        "local_capture_failure": null,
+        "network_wait": {
+          "active": 0,
+          "callbacks": 217,
+          "episodes": 193,
+          "start_tick": 1144,
+          "last_tick": 1144,
+          "resume_count": 193
+        },
+        "start": {
+          "required": 1,
+          "recorded": 1,
+          "scene": 1,
+          "seed": 696906724,
+          "frame": 0,
+          "confirmed": 1,
+          "capture_failed": 0,
+          "card": "f2880a9d13154a36",
+          "pad_history": "af900bb4021c8716",
+          "native_context": "16f0b121dcff293b",
+          "total": "cda1609893b706cf",
+          "pad": "419eb4f4f4bbee75",
+          "scene_state": "3391b05bd2e60036",
+          "object_state": "d0e868a4883380b5",
+          "objects": 33,
+          "flags": 10
+        },
+        "arena_overflow": 0,
+        "arena": [
+          {
+            "tick": 0,
+            "scene": 1,
+            "base": 57242752,
+            "bytes": 33554432,
+            "hash": "ac0b1704409d5b3b"
+          },
+          {
+            "tick": 182,
+            "scene": 2,
+            "base": 57242752,
+            "bytes": 33554432,
+            "hash": "b8d3f13e32e34c35"
+          },
+          {
+            "tick": 319,
+            "scene": 3,
+            "base": 57242752,
+            "bytes": 33554432,
+            "hash": "2ac3e2b12a63a908"
+          }
+        ]
+      },
+      "css": null,
+      "stage": null,
+      "match": {
+        "leg": "vs",
+        "prior_vs_source_frames": 0,
+        "observed_player_source_slots": [
+          0,
+          1
+        ],
+        "source_pad_errors": [
+          0,
+          0,
+          -1,
+          -1
+        ],
+        "ready": true,
+        "paused": false,
+        "ending": false,
+        "complete": false,
+        "frame": 704,
+        "rng": 3037184050,
+        "outcome": 0,
+        "winner": -1,
+        "rules": {
+          "match_kind": 1,
+          "stage": 32,
+          "timer_enabled": 0,
+          "time_limit": 0,
+          "disable_pausing": 0,
+          "damage_ratio_bits": "3f800000",
+          "is_stock": 1,
+          "is_vs": 1,
+          "source_sudden_death_flag": 0,
+          "item_frequency": -1,
+          "item_mask_hex": "ffffffffffffffff",
+          "is_teams": 0,
+          "player_teams": [
+            0,
+            0
+          ],
+          "player_stocks": [
+            4,
+            4
+          ],
+          "door_teams": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "friendly_fire": 0,
+          "player_source_slots": [
+            0,
+            0
+          ],
+          "resolved_controller_ports": [
+            0,
+            1
+          ],
+          "player_slot_types": [
+            0,
+            0
+          ],
+          "player_source_stocks": [
+            4,
+            4
+          ],
+          "player_source_characters": [
+            8,
+            8
+          ],
+          "player_attack_ratio_bits": [
+            "3f800000",
+            "3f800000"
+          ],
+          "player_defense_ratio_bits": [
+            "3f800000",
+            "3f800000"
+          ]
+        },
+        "players": [
+          {
+            "fighter": 0,
+            "human": true,
+            "damage_percent": 0,
+            "source_player_index": 0,
+            "source_slot": 0,
+            "source_port": 0,
+            "source_character": 8,
+            "source_color": 1,
+            "source_initial_damage": 0,
+            "slot_type": 0,
+            "source_stocks": 4,
+            "stocks": 3,
+            "motion": 12,
+            "groundAir": 1,
+            "animation_frame": 13,
+            "shield_health": 60,
+            "facing_direction": -1,
+            "primary_falls": 1,
+            "suicides": 0,
+            "kos_by_player_slot": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "x": 16,
+            "y": 97.8999939
+          },
+          {
+            "fighter": 0,
+            "human": true,
+            "damage_percent": 3,
+            "source_player_index": 1,
+            "source_slot": 0,
+            "source_port": 1,
+            "source_character": 8,
+            "source_color": 0,
+            "source_initial_damage": 0,
+            "slot_type": 0,
+            "source_stocks": 4,
+            "stocks": 4,
+            "motion": 14,
+            "groundAir": 0,
+            "animation_frame": 13,
+            "shield_health": 60,
+            "facing_direction": -1,
+            "primary_falls": 0,
+            "suicides": 0,
+            "kos_by_player_slot": [
+              1,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "x": -62.2515373,
+            "y": 9.99999975e-05
+          }
+        ]
+      }
+    }
+  ]
+}
