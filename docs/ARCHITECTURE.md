@@ -247,6 +247,10 @@ full-track decoding out of scene entry while preserving exact PCM evidence.
 
 ## 016 — Online play starts as lockstep from a shared CSS context
 
+**Historical interim decision.** Superseded for future online work by
+[decision 017](#017--online-rollback-is-match-scoped-with-explicit-rules-profiles).
+The existing implementation and scoped evidence remain regression tools.
+
 Online play is staged as delay-based lockstep, then rollback, then Slippi
 cross-play ([roadmap](ROADMAP.md#current-priorities), Track A). Lockstep needs no
 snapshot or restore. Each peer runs the same Wasm and consumes the same agreed
@@ -312,3 +316,35 @@ export-overflow failures propagate through settled page shutdown. The default
 Node-owned harness remains the regression mode. See the scoped
 [browser-native route evidence](status/2026-10-07-a3-browser-native-full-route.md);
 Internet and live-input acceptance remain separate gates.
+
+## 017 — Online rollback is match-scoped with explicit rules profiles
+
+The owner’s October 12 decision confines online rollback to the match. Original
+CSS/SSS, transitions, Results and rematch execute locally and are never rolled
+back or run in lockstep. Peers exchange canonical selections and an explicit
+versioned start context (seed, characters/costumes, stage, rules, ports, content
+and profile hashes), agree before construction/play, and verify the actual
+initial match state. Seed agreement alone does not prove hidden-state agreement.
+A confirmed outcome ends rollback ownership and drives local Results. Rematch
+negotiates a new match context; it does not rewind scenes or replay their input.
+
+Vanilla is offline-only and remains the retail accuracy reference. The planned
+settings toggle also offers Slippi rules offline and online. Players supply the
+same unmodified USA1.02 disc; applicable gameplay changes are implemented in
+source behind the versioned #9 mode boundary, after source/license inventory,
+and compared against a pinned Slippi Dolphin release bundle. A loose collection
+of repository heads, UCF alone or a successful connection is not that profile.
+
+Reuse existing protocol/checksums, relay, room UI, deterministic PAD consumption
+and runtime session interfaces. Preserve the current full-route lockstep path
+as interim evidence; add no further menu/Results/rematch lockstep behavior.
+Before production rollback, #318/#115 must measure complete state ownership,
+capture/restore and up to seven corrective tick costs. Original game draw
+callbacks execute during re-simulation; GPU submission may be withheld only
+through a checked lifetime boundary. GPU readbacks/uploads, audio output,
+asynchronous file work and persistence need explicit deterministic ownership or
+commit semantics. Do not restore a browser heap over unowned external handles.
+
+See the [roadmap](ROADMAP.md#current-priorities), [project direction](PROJECT_DIRECTION.md)
+and [owner decision](ARCHITECTS.md). This decision sets the target; it does not
+claim snapshot safety, Slippi compatibility, budget feasibility or online acceptance.

@@ -36,6 +36,14 @@ extern "C" int melee_web_net_publish_local_input(
 extern "C" void melee_web_native_menu_pause(int paused);
 #endif
 namespace melee_web_menu_browser {
+#if defined(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC)
+// The module never resumes its normal loop after arming, including on failure.
+bool match_draw_discard_terminal=false;
+// Set only after successful original close/input/Aurora/cancel-loop retirement.
+bool match_draw_discard_native_retired=false;
+unsigned match_draw_discard_frame=0;
+std::string match_draw_discard_receipt;
+#endif
 melee_web::RuntimeFiles files;
 melee_web::RuntimeAssetScope asset_scope(files);
 AssetDestination asset_destination=AssetDestination::None;
@@ -2967,6 +2975,9 @@ bool first_sss_vs_setup_service(){
 #endif
 
 void tick(){
+#if defined(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC)
+ if(match_draw_discard_terminal)return;
+#endif
  // Consume owner failure and lifecycle suspension before source or clock work.
  // A hidden/frozen interval may contain no callback at all; its handoff leaves
  // running/manual pause intent unchanged and excludes only inactive wall time.
@@ -4241,6 +4252,106 @@ void tick(){
 }
 using namespace melee_web_menu_browser;
 extern "C" {
+
+#if defined(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC)
+static bool match_draw_discard_ready(){
+ if(!match||faulted||pending||preparation.busy()||replay||melee_web_net_active()||
+    results||prize||stock_check==-1||diagnostic_start_ticks||diagnostic_pad_remaining||
+    !match->ready()||match->paused()||match->ending()||match->complete()||
+    match->opening_demo()||match->sudden_death()||melee_web_source_file_drive_busy())return false;
+ const auto* stats=aurora_get_stats();if(!stats||stats->queuedPipelines)return false;
+ const auto& start=match->start_data();
+ if(start.rules.stkind!=St_Kind_Last)return false;
+ for(unsigned i=0;i<2;++i)
+  if(start.players[i].ckind!=CKIND_MARIO||match->player_stats(i).stocks!=4)return false;
+ for(unsigned i=2;i<6;++i)if(start.players[i].slot_type!=Gm_PKind_NA)return false;
+ return true;
+}
+int melee_web_native_menu_match_draw_discard_arm(unsigned expected_frame){try{
+ check(!match_draw_discard_terminal&&running&&match_draw_discard_ready(),
+       "Draw/discard arm requires a local active Ready four-stock Mario/FD match");
+ check(match->source_frames()==expected_frame,"Draw/discard source frame changed before arm");
+ check(EM_ASM_INT({return globalThis.__matchDrawDiscard?.arm()===true?1:0;}),
+       "Draw/discard observer absent, incomplete or already used");
+ match_draw_discard_terminal=true;match_draw_discard_frame=expected_frame;
+ running=false;emscripten_cancel_main_loop();
+ return 1;
+}catch(const std::exception& e){message=e.what();return 0;}}
+int melee_web_native_menu_match_draw_discard_run(){
+ bool began=false,ended=false;unsigned ticks=0,draws=0;
+ AuroraBrowserMatchDrawDiscardSnapshot renderer{};
+ PADStatus raw[4]{};
+ const double started=emscripten_get_now();
+ double tick_ms=0,begin_ms=0,draw_ms=0,end_ms=0;
+ std::string error;
+ try{
+  check(match_draw_discard_terminal&&match_draw_discard_ready()&&
+        match->source_frames()==match_draw_discard_frame,"Draw/discard owner changed after arm");
+  check(EM_ASM_INT({return globalThis.__matchDrawDiscard?.phase==='ready'?1:0;}),
+        "Draw/discard needs a completed real prior queue fence and no pending maps/async creates");
+  check(aurora_browser_match_draw_discard_begin(),"Draw/discard renderer is busy, used or profiling-enabled");
+  EM_ASM({globalThis.__matchDrawDiscard.begin();});
+  const auto* input=melee_web_input_poll();
+  std::copy_n(input->raw,4,raw);
+  auto t=emscripten_get_now();match->tick(raw);tick_ms=emscripten_get_now()-t;++ticks;
+  t=emscripten_get_now();began=aurora_begin_frame();begin_ms=emscripten_get_now()-t;
+  check(began,"Draw/discard BeginFrame failed");
+  GXSetCopyClear(GXColor{0,0,0,255},GX_MAX_Z24);
+  t=emscripten_get_now();match->draw();draw_ms=emscripten_get_now()-t;++draws;
+  t=emscripten_get_now();
+  ended=aurora_browser_match_draw_discard_end_frame(&renderer)!=0;
+  end_ms=emscripten_get_now()-t;check(ended,"Draw/discard finalization failed");
+  check(match->source_frames()==match_draw_discard_frame+1,"Draw/discard source cursor did not advance exactly one");
+ }catch(const std::exception& e){error=e.what();
+  // Retire CPU recording even after a real source error; never report a success.
+  if(began&&!ended)ended=aurora_browser_match_draw_discard_end_frame(&renderer)!=0;
+ }
+ const double finished=emscripten_get_now();
+ EM_ASM({if(globalThis.__matchDrawDiscard.phase==='measuring')globalThis.__matchDrawDiscard.finish();});
+ char numbers[1600];
+ std::snprintf(numbers,sizeof(numbers),
+  "{\"source_frame_before\":%u,\"source_frame_after\":%u,\"tick_calls_returned\":%u,\"draw_and_flow_present_calls_returned\":%u,"
+  "\"tick_ms\":%.9g,\"begin_ms\":%.9g,\"draw_ms\":%.9g,\"end_ms\":%.9g,\"total_native_ms\":%.9g,"
+  "\"ended\":%u,\"uncommitted_after_submit_callbacks\":%u,\"uncommitted_depth_copies\":%u,\"pending_depth_maps\":%u,"
+  "\"depth_latest_reads\":%u,\"depth_requests\":%u,\"depth_identity_before\":\"%llu\",\"depth_identity_after\":\"%llu\","
+  "\"raw_pad_bytes\":[",
+  match_draw_discard_frame,match?match->source_frames():0,ticks,draws,tick_ms,begin_ms,draw_ms,end_ms,finished-started,
+  renderer.ended,renderer.uncommittedAfterSubmitCallbacks,renderer.uncommittedDepthCopies,renderer.pendingDepthMaps,
+  renderer.depthLatestReads,renderer.depthSnapshotRequests,
+  static_cast<unsigned long long>(renderer.latestDepthIdentityBefore),
+  static_cast<unsigned long long>(renderer.latestDepthIdentityAfter));
+ match_draw_discard_receipt=numbers;
+ const auto* bytes=reinterpret_cast<const unsigned char*>(raw);
+ for(size_t i=0;i<sizeof(raw);++i){if(i)match_draw_discard_receipt+=',';match_draw_discard_receipt+=std::to_string(bytes[i]);}
+ match_draw_discard_receipt+="],\"source_failed\":"+std::string(error.empty()?"false":"true")+
+  ",\"browser_pcm_evolution\":\"UNMEASURED\",\"resumable\":false}";
+ if(!error.empty())message=error;
+ return error.empty()&&ticks==1&&draws==1&&ended?1:0;
+}
+const char* melee_web_native_menu_match_draw_discard_status(){
+ static std::string status;
+ status=match_draw_discard_receipt.empty()?"{}":match_draw_discard_receipt;
+ status.pop_back();
+ if(status.size()>1)status+=',';
+ status+="\"native_retired\":"+std::string(match_draw_discard_native_retired?"true":"false")+"}";
+ return status.c_str();
+}
+int melee_web_native_menu_match_draw_discard_retire(){try{
+ check(!match_draw_discard_native_retired,"Draw/discard native owner already retired; close must not run twice");
+ check(EM_ASM_INT({return typeof window.menuMatchDrawDiscardRetired==='function'?1:0;}),
+       "Draw/discard runtime owner completion callback is unavailable");
+ check(match_draw_discard_terminal&&EM_ASM_INT({return globalThis.__matchDrawDiscard?.phase==='fenced'?1:0;}),
+       "Draw/discard retirement requires the real observed queue cleanup fence");
+ check(!melee_web_source_file_drive_busy(),
+       "Draw/discard retirement refuses source file requests created by the measured tick/draw");
+ close();melee_web_input_shutdown();aurora_shutdown();emscripten_cancel_main_loop();
+ match_draw_discard_native_retired=true;
+ EM_ASM({globalThis.__matchDrawDiscard.retired();});
+ check(EM_ASM_INT({return window.menuMatchDrawDiscardRetired()===true?1:0;}),
+       "Draw/discard native retirement completed but runtime owner notification was refused");
+ return 1;
+}catch(const std::exception& e){message=e.what();return 0;}}
+#endif
 int melee_web_native_menu_unload(){try{close();message="Native menus unloaded.";return 1;}catch(const std::exception& e){
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  first_sss_text_tail_unload_refused(e.what());first_css_browser_draw_refresh_observation();

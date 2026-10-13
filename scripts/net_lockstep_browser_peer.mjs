@@ -2,7 +2,7 @@
  * Node may publish recipe inputs and export evidence, but never handles packets
  * or submits native checksums to the protocol in this mode. */
 import {LockstepPeer, LOCKSTEP_DELAY, NET_RECORD_BYTES, PAD_BYTES, TERMINAL, readOnlySuffix} from './net_lockstep_core.mjs';
-import {createRoomRelayPeerEndpoint} from './net_lockstep_websocket_relay.mjs';
+import {createRoomRelayPeerEndpoint, RoomRelayClosedSendError} from './net_lockstep_websocket_relay.mjs';
 
 export const BROWSER_CHECKSUM_EXPORT_LIMIT = 512;
 
@@ -90,7 +90,8 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
   let nativeRecordsDrained = 0, consumerAcceptedRecords = 0, pendingConsumerBatch = null;
   let nextConsumerBatchId = 1;
   const exports = [], pending = new Set(), capturedLocalInputs = [];
-  let localInputQueue = Promise.resolve(), lastCapturePollSerial = null, peer = null;
+  const cancelledLocalInputs = [], cancelledOutboundSends = [];
+  let localInputQueue = Promise.resolve(), lastCapturePollSerial = null, peer = null, endpoint = null;
   let inputCaptureRegistered = false;
   const asError = error => error instanceof Error ? error : Error(String(error));
   function invalidateConsumerBatch(batch, reason) {
@@ -111,6 +112,56 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     settleReady(failure);
     return error;
   };
+  const isProvenClosedSendCancellation = error => inputCaptureMode === 'live' &&
+    error instanceof RoomRelayClosedSendError && endpoint?.closed === true &&
+    endpoint.errors.length === 0 && !failure && peer?.ready === true &&
+    (!peer.terminal || peer.terminal.kind === 'disconnect');
+  const isProvenDisconnectFence = () => inputCaptureMode === 'live' &&
+    endpoint?.closed === true && endpoint.errors.length === 0 && !failure &&
+    peer?.ready === true && (!peer.terminal || peer.terminal.kind === 'disconnect');
+  const isProvenCommittedDisconnect = () => inputCaptureMode === 'live' &&
+    endpoint?.closed === true && endpoint.errors.length === 0 && !failure &&
+    peer?.ready === true && peer.terminal?.kind === 'disconnect';
+  // Only onTerminal can mint this batch-local ownership token. Matching text is
+  // never authority to suppress a consumer error or to accept retained records.
+  const isNeverStartedDisconnectBatch = batch => {
+    const cancellation = batch?.disconnectCancellation;
+    return pendingConsumerBatch === batch && Boolean(cancellation) &&
+      cancellation.terminal === peer.terminal && cancellation.error === batch.cancelReason &&
+      batch.invalidated && !batch.callbackStarted && !batch.callbackSettled &&
+      batch.settlementState === 'not-started' && batch.settlementError === null &&
+      !batch.accepted && !batch.unjoined && closeMode !== 'fatal' &&
+      isProvenCommittedDisconnect() &&
+      exports.length >= batch.exportStart + batch.records.length &&
+      batch.records.every((row, index) => exports[batch.exportStart + index] === row);
+  };
+  const retainNeverStartedDisconnectBatch = batch => {
+    batch.disposition = 'cancelled_before_checksum_consumer_callback_by_disconnect';
+    batch.joined = true;
+    // Keep exact records in exports/pending batch, with accepted=false. They may
+    // already have been published to the protocol; no global delivery claim.
+  };
+  const recordCancelledLocalInput = (row, disposition, details = {}) => {
+    const cancellation = Object.freeze({...row, disposition, ...details});
+    cancelledLocalInputs.push(cancellation);
+    return cancellation;
+  };
+  const recordCancelledOutboundSend = outcome => {
+    const retained = Object.freeze({...outcome});
+    cancelledOutboundSends.push(retained);
+    if (outcome.context === 'local_input') {
+      for (const tick of outcome.input_ticks) {
+        const row = capturedLocalInputs[tick];
+        if (row && row.input_tick === tick)
+          recordCancelledLocalInput(row,
+            outcome.reason === 'peer_disconnected_before_state_send'
+              ? 'cancelled_before_publication' : 'cancelled_unpublished', {
+            reason: outcome.reason ?? 'closed_transport_send', packet_sequence: outcome.sequence,
+            publication_scope: outcome.publication_scope,
+            packet_input_ticks: outcome.packet_input_ticks});
+      }
+    }
+  };
   const check = () => { if (failure) throw failure; };
   const readonlyRecords = rows => Object.freeze(rows.map(row => Object.freeze(Array.from(row))));
   const recordTick = record => new DataView(Uint8Array.from(record).buffer).getUint32(0, true);
@@ -127,6 +178,7 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
       phase: 'submitting', invalidated: false, callbackStarted: false, callbackSettled: false,
       joined: false, unjoined: false, settlement: Promise.resolve({state: 'not-started'}),
       settlementState: 'not-started', settlementError: null, accepted: false,
+      disconnectCancellation: null, disposition: null,
     };
     exports.push(...rows);
     pendingConsumerBatch = batch;
@@ -139,8 +191,13 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
   async function consumeBatch(batch) {
     if (!batch) return;
     if (!checksumConsumer) throw Error('Browser checksum consumer is not configured');
-    if (!consumerBatchIsCurrent(batch))
+    if (!consumerBatchIsCurrent(batch)) {
+      if (isNeverStartedDisconnectBatch(batch)) {
+        retainNeverStartedDisconnectBatch(batch);
+        return;
+      }
       throw batch.cancelReason ?? Error('Browser checksum consumer batch is no longer current');
+    }
     batch.phase = 'accepting';
     batch.callbackStarted = true;
     batch.callbackSettled = false;
@@ -217,6 +274,9 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     return result;
   };
   peer = new LockstepPeer({role, sourceTicks, inputTicks,
+    isClosedSendCancellation: isProvenClosedSendCancellation,
+    isClosedDisconnect: isProvenCommittedDisconnect,
+    onSendCancellation: recordCancelledOutboundSend,
     pushFrame: async (tick, bytes) => {
       if (!await callNative('pushIndexed', tick, bytes)) throw Error('Native indexed input queue rejected agreed frames');
     },
@@ -226,14 +286,19 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     },
     onTerminal: terminal => {
       settleReady(failure ?? Error(terminal.reason ?? `Browser peer identity agreement ended with ${terminal.kind}`));
-      invalidatePendingConsumer(Error(`Browser checksum consumer batch cancelled by ${terminal.kind} terminal`));
+      const cancellation = Error(`Browser checksum consumer batch cancelled by ${terminal.kind} terminal`);
+      const batch = pendingConsumerBatch;
+      if (terminal.kind === 'disconnect' && batch && !batch.invalidated &&
+          !batch.callbackStarted && !batch.callbackSettled && batch.settlementState === 'not-started')
+        batch.disconnectCancellation = {terminal, error: cancellation};
+      invalidatePendingConsumer(cancellation);
       if (closeMode === 'fatal') return;
       return callNative('terminate', TERMINAL[terminal.kind] ?? TERMINAL.protocol,
         Number.isInteger(terminal.tick) ? terminal.tick : 0,
         Number.isInteger(terminal.channel) ? terminal.channel : 0);
     },
   });
-  const endpoint = createEndpoint({url: relayUrl, roomId, role, timeoutMs,
+  endpoint = createEndpoint({url: relayUrl, roomId, role, timeoutMs,
     onMessage: text => track(() => closing || closed ? undefined : peer.receive(text)),
     onDisconnect: (_role, reason) => intentionalClose || closed || closeMode === 'fatal'
       ? Promise.resolve() : track(() => closed || closeMode === 'fatal' ? undefined : peer.disconnect(reason)),
@@ -279,20 +344,27 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     capturedLocalInputs.push(row);
     lastCapturePollSerial = pollSerial;
     const deferSend = deferredTicks.has(tick);
-    const operation = localInputQueue.then(() => {
-      if (!inputCaptureRegistered || failure || closing || closed || peer.terminal)
+    const operation = localInputQueue.then(async () => {
+      if (!inputCaptureRegistered || failure || closing || closed || peer.terminal) {
+        if (isProvenDisconnectFence())
+          return recordCancelledLocalInput(row, 'cancelled_before_publication', {
+            reason: 'remote_disconnect_before_queue_execution',
+            publication_scope: 'no_state_packet_attempt'});
         throw Error('Native local input capture stopped before queued publication');
+      }
       return peer.addLocalInput(tick, immutableBytes, {deferSend});
     });
-    localInputQueue = operation.catch(async error => {
+    const handledOperation = operation.catch(async error => {
       const shouldFailPeer = !failure && !peer.terminal && !closing && !closed;
       const cause = remember(Error(`Asynchronous browser-local input ${tick} failed: ${String(error?.message || error)}`));
       if (shouldFailPeer) {
         try { await peer.fail('protocol', {reason: cause.message, tick}); }
         catch (terminalError) { remember(terminalError); }
       }
+      return {status: 'failed', input_tick: tick};
     });
-    void track(() => operation).catch(() => {});
+    localInputQueue = handledOperation;
+    void track(() => handledOperation).catch(() => {});
     if (inputCaptureMode === 'diagnostic' && inputCapture.pattern[tick + 1] !== undefined) {
       try { globalThis.__meleeSyntheticPadTransition(inputCapture.pattern[tick + 1]); }
       catch (error) {
@@ -351,7 +423,9 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
       const status = await callNative('status');
       const flushFinal = autonomousPump && status.active === 1 && status.blocker === 'complete' &&
         status.cursor === sourceTicks && status.terminal?.kind === 0;
-      await peer.setNativeProgress(status.cursor, {flushFinal});
+      // The endpoint can commit a terminal while native.status is awaited.
+      // Preserve that status observation, but never publish after the terminal.
+      if (!peer.terminal) await peer.setNativeProgress(status.cursor, {flushFinal});
     }
     // Closing still joins all work and reports sticky errors in finishClose;
     // a rejected startup must not prevent observation of the final native boundary.
@@ -367,6 +441,7 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
       exportRecords: exports.length,
       localInputCapture: inputCapture ? Object.freeze({enabled: true, mode: inputCaptureMode,
         input_ticks: inputTicks, captured_count: capturedLocalInputs.length,
+        cancelled_publication_count: cancelledLocalInputs.length,
         ...(inputFrom === undefined || inputFrom === null ? {} :
           {captures_since: readOnlySuffix(capturedLocalInputs, inputFrom, 'Browser local input capture')})}) :
         Object.freeze({enabled: false, mode: null, input_ticks: 0, captured_count: 0}),
@@ -380,12 +455,15 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
       nativePump: Object.freeze({enabled: autonomousPump, closing, close_mode: closeMode,
         native_quiescence: nativeQuiescence, wake_requested: wakeRequested,
         wake_queued: wakeQueued, completed_wakeups: wakeRuns, rpc_calls: rpcCalls, drain_failure: drainFailure}),
+      cancelledOutboundSends: cancelledOutboundSends.length,
       failure: failure ? String(failure?.stack || failure) : null});
   };
   const snapshot = () => ({protocol: peer.summary(), endpointErrors: endpoint.errors,
     endpointClosed: endpoint.closed, closed, exportRecords: exports.length,
     localInputCapture: inputCapture ? {enabled: true, mode: inputCaptureMode, input_ticks: inputTicks,
-      captures: capturedLocalInputs.slice(0, inputTicks)} : {enabled: false, mode: null},
+      captures: capturedLocalInputs.slice(0, inputTicks),
+      cancelled_publications: cancelledLocalInputs.slice(0, inputTicks)} : {enabled: false, mode: null},
+    cancelledOutboundSends: cancelledOutboundSends.slice(),
     checksumOwnership: {owner: 'browser-page', export_limit_records: BROWSER_CHECKSUM_EXPORT_LIMIT,
       native_records_drained: nativeRecordsDrained,
       active_native_records_submitted_before_export: activeNativeRecords,
@@ -397,6 +475,7 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
         id: pendingConsumerBatch.id, first_tick: pendingConsumerBatch.firstTick,
         last_tick: pendingConsumerBatch.lastTick, count: pendingConsumerBatch.records.length,
         phase: pendingConsumerBatch.phase, aborted: pendingConsumerBatch.invalidated,
+        disposition: pendingConsumerBatch.disposition,
         abort_reason: pendingConsumerBatch.cancelReason ? String(pendingConsumerBatch.cancelReason) : null,
         callback_started: pendingConsumerBatch.callbackStarted,
         callback_settled: pendingConsumerBatch.callbackSettled,
@@ -525,9 +604,13 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     const recordFailure = error => { failures.push(remember(error)); };
     const consumerAtClose = pendingConsumerBatch;
     if (checksumConsumer && consumerAtClose) {
-      const error = Error('Browser checksum consumer batch cancelled during close');
-      invalidateConsumerBatch(consumerAtClose, error);
-      failures.push(remember(error));
+      if (isNeverStartedDisconnectBatch(consumerAtClose)) {
+        retainNeverStartedDisconnectBatch(consumerAtClose);
+      } else {
+        const error = Error('Browser checksum consumer batch cancelled during close');
+        invalidateConsumerBatch(consumerAtClose, error);
+        failures.push(remember(error));
+      }
       if (!await joinConsumerBatch(consumerAtClose)) {
         consumerAtClose.unjoined = true;
         failures.push(remember(Error(`Browser checksum consumer was not joined within ${timeoutMs}ms`)));

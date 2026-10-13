@@ -10,14 +10,35 @@ import { QuiescentWasmSnapshot } from '../tests/quiescent_wasm_snapshot.mjs';
 
 const args = process.argv.slice(2);
 const options = {};
+const supportedCheckpoints = [300, 318, 420, 438, 500, 540, 558];
+const supportedDepths = [1, 2, 4, 7];
+const observationAbi = Object.freeze({
+  version: 'melee-web-source-snapshot-observation-v2',
+  bytes: 1280, playersOffset: 72, playerStride: 192,
+  motionOffset: 20, groundOrAirOffset: 24, motionArrayOffset: 48,
+});
 for (let i = 0; i < args.length; i += 2) {
-  if (!['--runtime', '--assets', '--out'].includes(args[i]) || !args[i + 1]) {
-    throw new Error('Usage: check_source_snapshot.mjs --runtime FILE --assets DIR --out NEW_DIR');
+  const option = args[i], value = args[i + 1];
+  if (!['--runtime', '--assets', '--out', '--checkpoint', '--depth'].includes(option) || !value) {
+    throw new Error('Usage: check_source_snapshot.mjs --runtime FILE --assets DIR --out NEW_DIR [--checkpoint N --depth N]');
   }
-  if (options[args[i]]) throw new Error(`Duplicate option ${args[i]}`);
-  options[args[i]] = path.resolve(args[i + 1]);
+  if (options[option] !== undefined) throw new Error(`Duplicate option ${option}`);
+  options[option] = ['--checkpoint', '--depth'].includes(option) ? Number(value) : path.resolve(value);
 }
 for (const key of ['--runtime', '--assets', '--out']) if (!options[key]) throw new Error(`Missing ${key}`);
+const selectedCheckpoint = options['--checkpoint'];
+const selectedDepth = options['--depth'];
+if ((selectedCheckpoint === undefined) !== (selectedDepth === undefined)) {
+  throw new Error('--checkpoint and --depth must be selected together');
+}
+if (selectedCheckpoint !== undefined && !supportedCheckpoints.includes(selectedCheckpoint)) {
+  throw new Error(`Unsupported checkpoint ${selectedCheckpoint}; choose one of ${supportedCheckpoints.join(', ')}`);
+}
+if (selectedDepth !== undefined && !supportedDepths.includes(selectedDepth)) {
+  throw new Error(`Unsupported depth ${selectedDepth}; choose one of ${supportedDepths.join(', ')}`);
+}
+const checkpoints = selectedCheckpoint === undefined ? supportedCheckpoints : [selectedCheckpoint];
+const depths = selectedDepth === undefined ? supportedDepths : [selectedDepth];
 const output = options['--out'];
 fs.mkdirSync(path.dirname(output), { recursive: true });
 fs.mkdirSync(output); // Never overwrite a previous run or failed reproducer.
@@ -28,9 +49,10 @@ const report = {
   boundary: 'synchronous-source-only-exported-call-return',
   scenario: 'two human Mario players / Final Destination / four stocks',
   sourceDrawing: false, browserGameplay: false, rollbackAdmission: false,
+  selection: { checkpoints, depths, requiresGroundedPlayers: selectedCheckpoint !== undefined },
   machine: { cpu: os.cpus()[0].model, arch: os.arch(), os: os.type(), release: os.release(), node: process.version },
   runtime: null, sourceSha256: null, assets: null,
-  cycles: [], negativeControl: null, cleanup: null,
+  readyBoundary: null, selectedBoundary: null, cycles: [], negativeControl: null, cleanup: null,
   exclusions: ['source draw traversal and hidden draw-dependent simulation', 'GPU and JS renderer ownership',
     'browser input/clock/queue state', 'Web Audio and externally committed sound', 'persistent saves',
     'memory growth after snapshot', 'asynchronous calls, workers and mutable function tables',
@@ -47,7 +69,8 @@ try {
   report.runtime = { jsSha256: digest(fs.readFileSync(options['--runtime'])),
     wasmSha256: digest(fs.readFileSync(options['--runtime'].replace(/\.js$/, '.wasm'))) };
   report.sourceSha256 = Object.fromEntries(['tests/gameplay_snapshot_probe.cpp', 'tests/quiescent_wasm_snapshot.mjs',
-    'scripts/check_source_snapshot.mjs', 'scripts/build.py', 'cmake/FighterRuntime.cmake', 'dependencies.lock.json']
+    'scripts/check_source_snapshot.mjs', 'scripts/build.py', 'cmake/FighterRuntime.cmake', 'dependencies.lock.json',
+    'src/gameplay_match_context.h', 'src/gameplay_pad_state.h']
     .map(name => [name, digest(fs.readFileSync(path.join(sourceRoot, name)))]));
   report.assets = Object.fromEntries(fs.readdirSync(options['--assets']).filter(name =>
     fs.statSync(path.join(options['--assets'], name)).isFile()).sort()
@@ -76,18 +99,35 @@ try {
   const pcmPointer = module._melee_web_snapshot_pcm();
   const pcmSize = module._melee_web_snapshot_pcm_size();
   const inputPointer = module._melee_web_snapshot_input();
-  report.nativeObservation = { bytes: stateSize, pcmBytes: pcmSize,
+  report.nativeObservation = { abiVersion: observationAbi.version,
+    expectedBytes: observationAbi.bytes, bytes: stateSize,
+    abiAccepted: stateSize === observationAbi.bytes, pcmBytes: pcmSize,
     fields: 'source frame/RNG/ready/ending/complete/pause/outcome/winner; stocks/motions/Fireball count/object/process counts; both full MeleeWebMatchStats; all semantic PAD history; PCM' };
+  if (stateSize !== observationAbi.bytes) {
+    throw new Error(`Snapshot observation ABI ${observationAbi.version} requires exactly ${observationAbi.bytes} bytes; runtime reports ${stateSize}`);
+  }
   const copyRange = (pointer, size) => Buffer.from(module.HEAPU8.slice(pointer, pointer + size));
   const viewHeap = () => Buffer.from(module.HEAPU8.buffer, module.HEAPU8.byteOffset, module.HEAPU8.byteLength);
   const state = () => {
     const bytes = copyRange(statePointer, stateSize);
+    // ABI v2 is guarded by static_asserts in the source fixture. Cross-check
+    // the independently reported motion fields before trusting ground_or_air.
+    const players = [0, 1].map(slot => {
+      const offset = observationAbi.playersOffset + slot * observationAbi.playerStride;
+      const motion = bytes.readInt32LE(offset + observationAbi.motionOffset);
+      if (motion !== bytes.readInt32LE(observationAbi.motionArrayOffset + slot * 4)) {
+        throw new Error(`Observation player ${slot} layout does not match its motion field`);
+      }
+      return { motion, ground_or_air: bytes.readInt32LE(offset + observationAbi.groundOrAirOffset) };
+    });
     return { frame: bytes.readUInt32LE(0), rng: bytes.readUInt32LE(4), ready: bytes.readUInt32LE(8),
       ending: bytes.readUInt32LE(12), complete: bytes.readUInt32LE(16),
       paused: bytes.readUInt32LE(20), pcmFrames: bytes.readUInt32LE(32), audioPhase: bytes.readUInt32LE(36),
       outcome: bytes.readUInt32LE(24), winner: bytes.readInt32LE(28),
       stocks: [bytes.readInt32LE(40), bytes.readInt32LE(44)],
       motions: [bytes.readInt32LE(48), bytes.readInt32LE(52)],
+      groundOrAir: players.map(player => player.ground_or_air),
+      grounded: players.every(player => player.ground_or_air === 0),
       fireballs: bytes.readInt32LE(56), objects: bytes.readUInt32LE(60), processes: bytes.readUInt32LE(64), bytes };
   };
   const firstDifference = (expected, actual) => {
@@ -114,12 +154,40 @@ try {
   while (!state().ready && sample < 600) step(sample++, true);
   if (!state().ready) throw new Error('Original Ready did not finish within 600 samples');
   report.entrySamples = sample;
+  const readyState = state();
+  report.readyBoundary = { nextInputSample: sample, sourceFrame: readyState.frame,
+    ready: Boolean(readyState.ready), ground_or_air: readyState.groundOrAir,
+    bothGrounded: readyState.grounded };
+  if (selectedCheckpoint !== undefined && sample > selectedCheckpoint) {
+    report.selectedBoundary = { checkpoint: selectedCheckpoint,
+      nextInputSample: sample, sourceFrame: readyState.frame,
+      ready: Boolean(readyState.ready), ground_or_air: readyState.groundOrAir,
+      bothGrounded: readyState.grounded };
+    writeReport();
+    throw new Error(`Selected checkpoint ${selectedCheckpoint} precedes Ready completion at input sample ${sample}`);
+  }
   // Different checkpoints exercise movement, combat, jump, guard and Articles.
-  for (const checkpoint of [300, 318, 420, 438, 500, 540, 558]) {
+  for (const checkpoint of checkpoints) {
     while (sample < checkpoint) step(sample++, true);
-    for (const depth of [1, 2, 4, 7]) {
+    for (const depth of depths) {
+      const boundary = state();
+      const boundaryReport = { nextInputSample: sample, sourceFrame: boundary.frame,
+        ready: Boolean(boundary.ready), ending: Boolean(boundary.ending),
+        complete: Boolean(boundary.complete), ground_or_air: boundary.groundOrAir,
+        bothGrounded: boundary.grounded };
+      if (selectedCheckpoint !== undefined) {
+        report.selectedBoundary = { checkpoint, ...boundaryReport };
+        writeReport();
+        if (!boundary.ready || boundary.ending || boundary.complete) {
+          throw new Error('Selected checkpoint is outside the active Ready match');
+        }
+        if (!boundary.grounded) {
+          throw new Error('Selected checkpoint does not have both players grounded');
+        }
+      }
       const cycle = { checkpoint, sample, depth, repeats: 3, result: 'incomplete',
-        initial: { frame: state().frame, rng: state().rng }, restoreMs: [], replayMs: [],
+        initial: { frame: boundary.frame, rng: boundary.rng }, boundary: boundaryReport,
+        restoreMs: [], replayMs: [],
         firstDivergence: null };
       report.cycles.push(cycle);
       const begin = performance.now();
@@ -188,8 +256,10 @@ try {
     motions: [0, 1].map(slot => [...new Set(forwardStates.map(row => row.motions[slot]))].sort((a, b) => a - b)),
     objectCounts: [...new Set(forwardStates.map(row => row.objects))].sort((a, b) => a - b),
     processCounts: [...new Set(forwardStates.map(row => row.processes))].sort((a, b) => a - b) };
-  if (report.coverage.peakFireballs < 1) throw new Error('Snapshot scenario did not exercise a Mario fireball');
-  if (report.coverage.minStocks.some(stocks => stocks >= 4)) throw new Error('Snapshot scenario did not exercise both stock losses');
+  if (selectedCheckpoint === undefined) {
+    if (report.coverage.peakFireballs < 1) throw new Error('Snapshot scenario did not exercise a Mario fireball');
+    if (report.coverage.minStocks.some(stocks => stocks >= 4)) throw new Error('Snapshot scenario did not exercise both stock losses');
+  }
   checked(() => module._melee_web_snapshot_close());initialized = false;
   snapshots.close();
   if (module.ccall('melee_web_snapshot_init', 'number', ['string'], [options['--assets']]) !== 0 ||

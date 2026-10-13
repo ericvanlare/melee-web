@@ -4,6 +4,7 @@
 #include "gameplay_menu_browser_state.hpp"
 #include "fixed_format_writer.hpp"
 #include <bit>
+#include <cmath>
 using namespace melee_web_menu_browser;
 extern "C" unsigned char mnItemSw_803ED438[32];
 namespace {
@@ -336,6 +337,9 @@ const char* melee_web_native_menu_match_observe(){
  try{
  match_observer_error.clear();
  const auto p0=match->player_stats(0),p1=match->player_stats(1);
+ if(!std::isfinite(p0.shield_health)||!std::isfinite(p1.shield_health)||
+    !std::isfinite(p0.facing_direction)||!std::isfinite(p1.facing_direction))
+  throw std::runtime_error("Match shield/facing observation is not finite");
  // The context's indices are compact; its stats preserve original source slots.
  const unsigned slots[2]{p0.player_slot,p1.player_slot};
  const StartMeleeData& start=match->start_data();
@@ -418,6 +422,17 @@ const char* melee_web_native_menu_match_observe(){
  out.add(",\"stocks\":%d",p0.stocks);
  out.add(",\"motion\":%d",p0.motion_id);
  out.add(",\"groundAir\":%d",p0.ground_or_air);
+ out.add(",\"animation_frame\":%.9g",p0.animation_frame);
+ out.add(",\"shield_health\":%.9g",p0.shield_health);
+ out.add(",\"facing_direction\":%.9g",p0.facing_direction);
+ out.add(",\"primary_falls\":%d",p0.primary_falls);
+ out.add(",\"suicides\":%u",p0.suicides);
+ out.add(",\"kos_by_player_slot\":[");
+ for(unsigned victim=0;victim<MELEE_WEB_MATCH_KO_SLOTS;victim++){
+  if(victim)out.add(",");
+  out.add("%u",p0.kos_by_player_slot[victim]);
+ }
+ out.add("]");
  out.add(",\"x\":%.9g",p0.position[0]);
  out.add(",\"y\":%.9g",p0.position[1]);
  out.add("}");
@@ -437,6 +452,17 @@ const char* melee_web_native_menu_match_observe(){
  out.add(",\"stocks\":%d",p1.stocks);
  out.add(",\"motion\":%d",p1.motion_id);
  out.add(",\"groundAir\":%d",p1.ground_or_air);
+ out.add(",\"animation_frame\":%.9g",p1.animation_frame);
+ out.add(",\"shield_health\":%.9g",p1.shield_health);
+ out.add(",\"facing_direction\":%.9g",p1.facing_direction);
+ out.add(",\"primary_falls\":%d",p1.primary_falls);
+ out.add(",\"suicides\":%u",p1.suicides);
+ out.add(",\"kos_by_player_slot\":[");
+ for(unsigned victim=0;victim<MELEE_WEB_MATCH_KO_SLOTS;victim++){
+  if(victim)out.add(",");
+  out.add("%u",p1.kos_by_player_slot[victim]);
+ }
+ out.add("]");
  out.add(",\"x\":%.9g",p1.position[0]);
  out.add(",\"y\":%.9g",p1.position[1]);
  out.add("}");

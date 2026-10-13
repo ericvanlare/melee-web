@@ -21,6 +21,8 @@ typedef struct MeleeWebMatchSettings {
     uint32_t random_seed;
 } MeleeWebMatchSettings;
 #define MELEE_WEB_MATCH_MAX_PLAYERS 4u
+/* Authored Player KO table size; production asserts Gm_Player_NumMax agrees. */
+#define MELEE_WEB_MATCH_KO_SLOTS 6u
 typedef struct MeleeWebControllerSample {
     uint32_t buttons;
     float stick_x, stick_y, cstick_x, cstick_y, trigger_l, trigger_r;
@@ -47,6 +49,8 @@ typedef struct MeleeWebMatchStats {
     float damage_percent, shield_health;
     int32_t stocks;
     int32_t fighter_kind; /* Current transformed source entity, not CSS identity. */
+    int32_t primary_falls;
+    uint32_t suicides, kos_by_player_slot[MELEE_WEB_MATCH_KO_SLOTS];
 } MeleeWebMatchStats;
 /* Requires the live bootstrap, native object destructors, initialized common,
  * published fighter/effect/stage assets and collision to remain owned through

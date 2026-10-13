@@ -1,0 +1,1020 @@
+{
+  "schema": "melee-web-network-resilience-m3-v1",
+  "issue": 309,
+  "checkpoint_date": "2026-10-12",
+  "scope": "same-machine simulated-network functional; no public Internet or acceptance claim",
+  "evidence_root": "RUN-relative portable retained artifact paths",
+  "decision": "STALL_CUT_FRESH_AND_TWO_MATCH_FUNCTIONAL_PASS_MERGED",
+  "source_inventory": {
+    "latest_harness": {
+      "head": "f89880bbcd774dc3d0efe94d2a91973275182288",
+      "tree": "fae568ccb937e75dcd7bc069c5d37d325409899c",
+      "status_porcelain": "",
+      "allowed_harness_only_change": false,
+      "files_sha256": {
+        "scripts/a3_local_room_keyboard_browser.mjs": "279eec1318a0610f82d7e377ccd17dde3659038bfc46d9c4afe9fce8bf99def7",
+        "scripts/net_session_instance.mjs": "019bb5b79322e5f1aff85aa6df9caffc384c35b3d7dbfbe1ecb7d103dde21a30",
+        "scripts/a3_data_package_diagnostics.mjs": "76cf448ef3c7a17137bea7078a03fb67baf5cd4a0990a2e08aab76b370d7aadb",
+        "scripts/a3_expected_fault_auditor.py": "0d7a9d94f348c970671ceb2b55e937ed651fd198e1cf682100b4f43deca48f07",
+        "scripts/a3_public_relay_preflight.mjs": "51e568899f9ee32626eb63734610cddb9526659fe3df54eedc690209db490d53",
+        "scripts/a3_local_room_full_route.mjs": "0bcaa72130139832fb219b78a60f5c7dfe4d3e95358b97e4a302971e3779d92f",
+        "scripts/a3_checksum_wait_diagnostics.mjs": "ac7c048b1baad22ea0985f17a6c9fe79c590e9106d1c9f9a055175db81673dd5",
+        "scripts/a3_source_cursor_join.mjs": "ffaf9978dd9c32f2917283726305693817a649319c0846dbe166470b273ccb07",
+        "scripts/run_network_simulation.py": "6e79c81f391072f0cf5f7c8583758e06c3bba1dbf0a5da77f0394355389a780d",
+        "scripts/a3_network_simulation.mjs": "43adc38e8cab7beb46c3a2c37c9dfc58c4b4da22340b745db637955ae86dbcef",
+        "scripts/a3_network_stall_probe.mjs": "79222b3a7f4d0ee2967c248ca960d80169f93fd86c26425e9b4388a810f543da",
+        "scripts/net_test_tcp_proxy.mjs": "eb2da6077accc9716baf465c8e5a6d5334cd9f5a75b971c483852c5f2938f512"
+      }
+    },
+    "latest_runtime_producer": "1dc301fbbafda8c1846e1157b78d7089350affab",
+    "latest_runtime_receipt": {
+      "path": "m3-runtime-producer.json",
+      "sha256": "38cd425abe4eec31f95e7c58de71b2487c5863037d25fcb412af1db294b141a5"
+    },
+    "historical_stall": {
+      "head": "a636edecead77da0eeb6a824a79e3b3e2e94f501",
+      "producer_files_sha256": {
+        "scripts/a3_expected_fault_auditor.py": "25ba1bf122067488c91faf998bbdf5688cba0e997075c69f0f1c02a11d832223",
+        "scripts/a3_local_room_keyboard_browser.mjs": "ad0a1e2a76f7f3d4654bc5533eb5967db34dac727077f0aad05909677bd4c077",
+        "scripts/a3_network_simulation.mjs": "43adc38e8cab7beb46c3a2c37c9dfc58c4b4da22340b745db637955ae86dbcef",
+        "scripts/a3_network_stall_probe.mjs": "79222b3a7f4d0ee2967c248ca960d80169f93fd86c26425e9b4388a810f543da",
+        "scripts/net_test_tcp_proxy.mjs": "eb2da6077accc9716baf465c8e5a6d5334cd9f5a75b971c483852c5f2938f512",
+        "scripts/run_network_simulation.py": "69724d0228bb02f9092a4d84afabc75d08b99e914a865f353ed1124280ea71d9"
+      },
+      "runtime_wasm_sha256": "ee9eefd71e96ec26c0a456e9993d764dc47ca4df719911e88803b221cb191e23",
+      "tree": "9fd3b885f5339a8f0dd2636af5d8e87ae9da5af3"
+    }
+  },
+  "current_results": {
+    "task12_constrained_css_stall": {
+      "checksum_prefix": {
+        "bytes_per_record": 64,
+        "literal_bytes_equal": true,
+        "records_per_peer": 179,
+        "required_boundary": 177,
+        "source_tick_range_inclusive": [
+          0,
+          178
+        ],
+        "unpaired_tail_records_per_peer": 4
+      },
+      "cleanup": {
+        "native_quiescence_both": "verified",
+        "normal_ui_leave_both": true,
+        "owned_processes_absent": true,
+        "owned_processes_checked": 23,
+        "unload_both": "phase0/running0",
+        "worker_disposed": true
+      },
+      "decision": "PASS_SCOPED_SIMULATED_CSS_STALL",
+      "evidence": [
+        {
+          "path": "css-constrained-stall-2-suite/css-constrained-stall/browser/report.json",
+          "role": "browser report",
+          "sha256": "8e9e4a4f3de2254d30a4f667265669c45734fe7501163ed6a047589278e5fc91"
+        },
+        {
+          "path": "css-constrained-stall-2-suite/css-constrained-stall/owner.json",
+          "role": "owner receipt",
+          "sha256": "23f9f7242477009bf4510f6e16b8ec18a208911554cab991d3453092e67338e1"
+        },
+        {
+          "path": "css-constrained-stall-2-suite/suite.json",
+          "role": "suite receipt",
+          "sha256": "f8e3b14ed380f54835c8429383bc057714a97ff283cb5f68074f1d2d73d7a72b"
+        },
+        {
+          "path": "sol-css-constrained-stall-2-review.json",
+          "role": "independent review",
+          "sha256": "9958b475a3cf57cc6e5d28247a996f3cc80b1204d1b7e6fe3a675b1cfab311b7"
+        }
+      ],
+      "limits": [
+        "local same-machine simulated conditions only",
+        "configured leg delay is not peer RTT or input latency",
+        "full match and public/provider behavior not tested"
+      ],
+      "profile": {
+        "clientToWorker": {
+          "bytesPerSecond": 65536,
+          "delayMs": 10,
+          "jitterMs": 5,
+          "seed": 505
+        },
+        "profile_sha256": "350e961e60755bf98ddccb53074a6d3257c224765430e4abf0b2808bc16914bf",
+        "workerToClient": {
+          "bytesPerSecond": 65536,
+          "delayMs": 10,
+          "jitterMs": 5,
+          "seed": 606
+        }
+      },
+      "proxy": {
+        "all_resources_retired": true,
+        "connections": 5,
+        "drops": 0,
+        "errors": 0,
+        "released_bytes": {
+          "clientToWorker": 79409,
+          "workerToClient": 69909
+        }
+      },
+      "scenario": "css-constrained-stall",
+      "stall": {
+        "connection_id": 4,
+        "direction": "clientToWorker",
+        "duration_ms": 600,
+        "held_source_cursors": {
+          "alpha": 175,
+          "beta": 172
+        },
+        "player_role_attributed": false,
+        "queued_bytes_at_activation": 165,
+        "queued_bytes_peak": 888,
+        "resumed_source_cursors": {
+          "alpha": 176,
+          "beta": 177
+        },
+        "stable_observation_span_ms": 141.031584,
+        "terminal_or_proxy_error_during_probe": false
+      }
+    },
+    "task13_cut_and_fresh_css": {
+      "decision": "PASS_SCOPED_EXPECTED_CUT_AND_FRESH_CSS_INDEPENDENTLY_REVIEWED",
+      "source": "1dc301fbbafda8c1846e1157b78d7089350affab",
+      "source_tree": "1487a2f0d14859515eda707dc04a18528ed72821",
+      "runtime_producer": "1dc301fbbafda8c1846e1157b78d7089350affab",
+      "runtime_wasm_sha256": "b51519b5b8832a63bd2a990318455e080a3c08bb4ddaa0e4533ce98a50d222d3",
+      "result_receipt": {
+        "path": "task13-cut-fresh-third-result.json",
+        "sha256": "cfbc29419b1de1a92dd919faa4da5af74f0cd81e1c9a197045281558b9477ffa"
+      },
+      "cut": {
+        "decision": "EXPECTED_TRANSPORT_CUT_CONFIRMED",
+        "raw_route_decision": "FAIL",
+        "selected_connection_id": 4,
+        "attribution": "opaque room-path TCP connection; no alpha/beta attribution by accept order",
+        "matched_records_before_fault": 170,
+        "cleanup_verified": true,
+        "owner_process_observation_passed": true,
+        "owned_processes_absent": 21,
+        "evidence": [
+          {
+            "path": "css-cut-fresh-3-suite/css-moderate-cut/browser/report.json",
+            "sha256": "ea335ec761c75e9e6cbc9a22146140fb3cbd49638ef97137b2da4d30f60fc4a5"
+          },
+          {
+            "path": "css-cut-fresh-3-suite/css-moderate-cut/owner.json",
+            "sha256": "5f0d528fcf342a3823d0309ee66457e27674bc374704e9446d1c2656b3aebff6"
+          },
+          {
+            "path": "css-cut-fresh-3-suite/css-moderate-cut/expected-fault-audit.json",
+            "sha256": "bdfee92da1111f9787bbc87e7fc145f2ab8702dc67ab3795ebed9f5f602a2fc8"
+          },
+          {
+            "path": "css-cut-fresh-3-suite/suite.json",
+            "sha256": "57be0a6560a2dd91177e9dd45956c363ed1f5967adf01909c7a7c297bb74a704"
+          }
+        ],
+        "owned_process_count_includes_worker_owner": true
+      },
+      "fresh_session": {
+        "decision": "FRESH_SESSION_CSS_PASS",
+        "raw_route_decision": "PASS",
+        "matched_records": 168,
+        "separate_capture_owner_invocation": true,
+        "same_page_reconnect": false,
+        "old_room_id": "x5LyGM9goMPx4MMMPlRQShlMT3x1s6uj",
+        "new_room_id": "KUhEXy-FM3aNUaQzC-8esp5aTdK9c7Vy",
+        "old_invite_sha256": "b081d01c10ba347c3af591dbd99a7607812e7dc18fff878d049e8d1b416cbfaa",
+        "new_invite_sha256": "b6b13246bde902ecca86fbc3dec82394c3024390ed555e665a880287a68f71aa",
+        "old_chrome_process_identities": 18,
+        "new_chrome_process_identities": 19,
+        "normal_leave_unload_quiescence_and_cleanup_passed": true,
+        "owned_processes_absent": 22,
+        "evidence": [
+          {
+            "path": "css-cut-fresh-3-suite/css-moderate-fresh/browser/report.json",
+            "sha256": "26b47d2f7feac4c6e38e5556884f67338960e510f8aac8009a07bb32fc2e8239"
+          },
+          {
+            "path": "css-cut-fresh-3-suite/css-moderate-fresh/owner.json",
+            "sha256": "558b30617d07a5fd3f92bc49368b6633b54325abb24e9b9f15453a72bb283a0c"
+          },
+          {
+            "path": "css-cut-fresh-3-suite/suite.json",
+            "sha256": "57be0a6560a2dd91177e9dd45956c363ed1f5967adf01909c7a7c297bb74a704"
+          }
+        ],
+        "owned_process_count_includes_worker_owner": true
+      },
+      "independent_review": {
+        "path": "sol-css-cut-fresh-3-review.json",
+        "sha256": "0552da945303808c9f1ba65a456b6f588a1e3215b7436554bddb1707d3ae0f8b"
+      },
+      "limits": [
+        "same-machine simulated moderate profile only",
+        "fresh CSS lifecycle result, not a full match",
+        "faulted route remains raw FAIL",
+        "no same-page reconnect, public network, or two-machine claim"
+      ],
+      "owned_process_counts_including_worker_owner": {
+        "cut": 21,
+        "fresh": 22
+      },
+      "retained_browser_request_diagnostics": "Both cut and fresh profiles retain GET gameplay_menu_browser.data ERR_ABORTED; cut pre-existing classification applies only to cut. Fresh normal-route policy retains request failures. No error-free request claim.",
+      "actual_repair_case": {
+        "batch_tick": 173,
+        "accepted_records": 173,
+        "retained_ticks": [
+          173,
+          174
+        ],
+        "joined": true,
+        "callback_started": false,
+        "accepted": false,
+        "exact_batch_membership_preserved": true,
+        "postterminal_tail_separately_retained": true
+      },
+      "current_scope": "Expected cut plus distinct new-room CSS pass, independently raw reviewed; not same-page reconnect."
+    },
+    "task14_same_room_two_complete_matches": {
+      "decision": "PASS",
+      "source": "f89880bbcd774dc3d0efe94d2a91973275182288",
+      "runtime_producer": "1dc301fbbafda8c1846e1157b78d7089350affab",
+      "wasm_sha256": "b51519b5b8832a63bd2a990318455e080a3c08bb4ddaa0e4533ce98a50d222d3",
+      "result_receipt": {
+        "path": "task14-repeat-third-result.json",
+        "sha256": "968556a7c82d29a524f2f6701d1a1ac178d0e94b1ee6e2ebccabcb7896f3b0e9"
+      },
+      "suite": {
+        "path": "full-moderate-repeat-3-suite/suite.json",
+        "sha256": "a23c24940848d7e544fc74cfe61dba6412e3bd4fffc9b957e5d86ae9a9a101fc"
+      },
+      "raw_browser_report": {
+        "path": "full-moderate-repeat-3-suite/full-moderate-repeat/browser/report.json",
+        "sha256": "e59c276fcaaa8722b372ad30d3c91ca9d0c23baa3fe8a84225aa8d1505375e69"
+      },
+      "owner": {
+        "path": "full-moderate-repeat-3-suite/full-moderate-repeat/owner.json",
+        "sha256": "61963c4931d2fd7e4768968bd04ad635391c87b0017f5e79e4378c9e3dfce388"
+      },
+      "matches": [
+        {
+          "match_number": 1,
+          "result": "pass",
+          "duration_ms": 68834,
+          "phases": [
+            {
+              "phase": 1,
+              "label": "connected original CSS with two Human Mario doors"
+            },
+            {
+              "phase": 3,
+              "label": "original SSS"
+            },
+            {
+              "phase": 7,
+              "label": "active two-Human Mario/Final Destination match"
+            },
+            {
+              "phase": 8,
+              "label": "original Results after P1 elimination"
+            },
+            {
+              "phase": 1,
+              "label": "original CSS after Results confirmation"
+            }
+          ],
+          "report_artifact": {
+            "file": "full-moderate-repeat-3-suite/full-moderate-repeat/browser/match-1/report.json",
+            "bytes": 918405,
+            "sha256": "6c12ac3b8eb863c1c25dc1d5d233b9edc281732d155e5eb6f2e225bdefb3610a"
+          }
+        },
+        {
+          "match_number": 2,
+          "result": "pass",
+          "duration_ms": 67279,
+          "phases": [
+            {
+              "phase": 1,
+              "label": "connected original CSS with two Human Mario doors"
+            },
+            {
+              "phase": 3,
+              "label": "original SSS"
+            },
+            {
+              "phase": 7,
+              "label": "active two-Human Mario/Final Destination match"
+            },
+            {
+              "phase": 8,
+              "label": "original Results after P1 elimination"
+            },
+            {
+              "phase": 1,
+              "label": "original CSS after Results confirmation"
+            }
+          ],
+          "report_artifact": {
+            "file": "full-moderate-repeat-3-suite/full-moderate-repeat/browser/match-2/report.json",
+            "bytes": 913202,
+            "sha256": "5d57f239341d657290c3361bf69ec00adaa88145a63f205d5c1cd4b4c1ec746c"
+          }
+        }
+      ],
+      "admission": {
+        "first_route_duration_ms": 68834,
+        "remaining_before_second_ms": 145202,
+        "required_remaining_ms": 98834,
+        "second_route_subdeadline_ms": 78834,
+        "second_route_elapsed_ms": 67279,
+        "final_reserve_ms_at_second_return": 76556
+      },
+      "final_prefix": {
+        "result": "pass",
+        "first_boundary": 2796,
+        "first_prefix_sha256": "4dcc6b0a21a5ac795516ec3855dc9fbb60c74e71ae8d3fdf6fa70192a8e55bd4",
+        "second_boundary": 5380,
+        "second_prefix_sha256": "5889888ba7df9d84cbdcf4930e920e0ddfb8667dec44b734bba261b817e3d683",
+        "compared_source_ticks": 5380,
+        "raw_records_present_in_final_checksum_comparison": true
+      },
+      "unpaired_tail": {
+        "alpha": {
+          "count": 3,
+          "records": [
+            {
+              "source_tick": 5380,
+              "raw_hex": "0415000001000000dc10fb13000000000a0000002100000013122a15779d8c90f76a615e3a65897f6fc1d86ce8d8ce6345c929912e0383baaed78ce86a06d742"
+            },
+            {
+              "source_tick": 5381,
+              "raw_hex": "0515000001000000ac8c44ef000000000a0000002100000013122a15779d8c906b1de1d23c0e03bf47f01753ed5e836c45c929912e0383bab67f1d4a276c8603"
+            },
+            {
+              "source_tick": 5382,
+              "raw_hex": "06150000010000007c3c19d1000000000a0000002100000013122a15779d8c9023bf7e9d5a4864153b0aa0b3ecb5bfee45c929912e0383ba58b6371fd88a3478"
+            }
+          ]
+        },
+        "beta": {
+          "count": 4,
+          "records": [
+            {
+              "source_tick": 5380,
+              "raw_hex": "0415000001000000dc10fb13000000000a0000002100000013122a15779d8c90f76a615e3a65897f6fc1d86ce8d8ce6345c929912e0383baaed78ce86a06d742"
+            },
+            {
+              "source_tick": 5381,
+              "raw_hex": "0515000001000000ac8c44ef000000000a0000002100000013122a15779d8c906b1de1d23c0e03bf47f01753ed5e836c45c929912e0383bab67f1d4a276c8603"
+            },
+            {
+              "source_tick": 5382,
+              "raw_hex": "06150000010000007c3c19d1000000000a0000002100000013122a15779d8c9023bf7e9d5a4864153b0aa0b3ecb5bfee45c929912e0383ba58b6371fd88a3478"
+            },
+            {
+              "source_tick": 5383,
+              "raw_hex": "07150000010000004c2056dc000000000a0000002100000013122a15779d8c900f3ec24e99c31e08cb593f183dc7532f45c929912e0383ba7775330fcc919aec"
+            }
+          ]
+        }
+      },
+      "browser_errors": {
+        "alpha": [],
+        "beta": [
+          {
+            "kind": "requestfailed",
+            "method": "GET",
+            "url": "http://127.0.0.1:8787/gameplay_menu_browser.data",
+            "failure": "net::ERR_ABORTED"
+          }
+        ]
+      },
+      "known_owned_processes_absent": 21,
+      "independent_raw_review": {
+        "path": "sol-full-moderate-repeat-3-review.json",
+        "sha256": "638f387a9891eb0b2d6213c34046e20475004c862997f3a099ce270009f44a4d"
+      },
+      "scope": "same pages/room/Worker/runtime owner; two original CSS-SSS-four-stock Mario/FD-Results-CSS routes; no reset, reconnect or reseed; no controlled timing comparison with prior failed run"
+    }
+  },
+  "source_repairs_and_controls": {
+    "disconnect_lifecycle": {
+      "decision": "PASS_REVIEW_AND_61_FOCUSED_CONTROLS; RELEASE_BUILD_PASS; browser close/unload and separate fresh CSS exercised; full-match/repeat acceptance remains open",
+      "source": "1dc301fbbafda8c1846e1157b78d7089350affab",
+      "source_tree": "1487a2f0d14859515eda707dc04a18528ed72821",
+      "source_review": {
+        "root": {
+          "path": "fresh-disconnect-root-source-review.json",
+          "sha256": "57d33cae068afecc2dcca9d3eb6ebbdd859abb67b8e4a3d2e600c3902103cc83"
+        },
+        "independent": {
+          "path": "fresh-disconnect-repair-v1/luna-independent-source-review-v2.json",
+          "sha256": "02c4b664a3166878b084f55e7fa3cf0bc3add20f9b1441e92a021f6424d3935a",
+          "decision": "PASS_SOURCE_REVIEW_FOR_FOCUSED_CONTROLS"
+        }
+      },
+      "controls": {
+        "decision": "PASS",
+        "tests": 61,
+        "failures": 0,
+        "skips": 0,
+        "receipt": {
+          "path": "fresh-disconnect-integration-controls.json",
+          "sha256": "36a1f08cc7aaf51f4b6ae48d1a70821ec63ab87412ddd26b248d9a97fbf39a5e"
+        },
+        "log": {
+          "path": "fresh-disconnect-focused-controls.log",
+          "sha256": "b7ddf8d52e47e393c04e33a758ad9786204399b3ca1a22c272b7ff2442287b21"
+        }
+      },
+      "red_reducers": {
+        "adjacent_post_status_publication": {
+          "source_at_execution": "7697712d2f426ee2ec641ba269e91e73d8d41c48",
+          "result": "Lockstep peer alpha is not active while publishing native progress after awaited status; this stopped before the historical consumer-cancellation guard",
+          "log": {
+            "path": "fresh-disconnect-repair-v1/red-reducer.log",
+            "sha256": "8b21ea6d6e4d3239cd05f5b3e6f4d250403bb62a8207253bb9ae5b2bceb9756c"
+          },
+          "result_receipt": {
+            "path": "fresh-disconnect-repair-v1/red-reducer-result.json",
+            "sha256": "784e791cfd9d35dfd08e5f686342c2122704774dfb6c7c021a476f2419dc44be"
+          }
+        },
+        "historical_never_started_consumer_cancellation": {
+          "source_at_execution": "7697712d2f426ee2ec641ba269e91e73d8d41c48",
+          "result": "Browser checksum consumer batch cancelled by disconnect terminal after real WebSocket 4001+FIN and held pre-consumer settlement; callback had not started and the pending batch remained unaccepted",
+          "log": {
+            "path": "fresh-disconnect-repair-v1/historical-red-reducer.log",
+            "sha256": "78d6657567952a74a78e161780ee0d8c348e077c754789e8540c4cc56743c415"
+          },
+          "result_receipt": {
+            "path": "fresh-disconnect-repair-v1/historical-red-reducer-result.json",
+            "sha256": "8f4713cee5347ea2afdf106adab6747c2a04d6b6262d4e99730e46c18eb922f5"
+          }
+        }
+      },
+      "release_build": {
+        "decision": "RELEASE_BUILD_PASS; later browser evidence bound separately, historical producer receipt unchanged",
+        "configuration": "Release",
+        "source": "1dc301fbbafda8c1846e1157b78d7089350affab",
+        "tree": "1487a2f0d14859515eda707dc04a18528ed72821",
+        "receipt": {
+          "path": "m3-runtime-producer.json",
+          "sha256": "38cd425abe4eec31f95e7c58de71b2487c5863037d25fcb412af1db294b141a5"
+        },
+        "build_log": {
+          "path": "m3-runtime-build.log",
+          "sha256": "d25c0c6880a5e7b944495f1f3497fdb9671552a0fa3d8837cec580ae563ba369"
+        },
+        "artifacts": {
+          "runtime.html": "70ec53d8af576bae9eaacfc42f172b0d6e8d631a92c75d824601849c8577e1a6",
+          "gameplay_menu_browser.js": "170c03c7ba2a92f6e961e233b0f783099073177de85c44ded16c2a687fefefa5",
+          "gameplay_menu_browser.wasm": "b51519b5b8832a63bd2a990318455e080a3c08bb4ddaa0e4533ce98a50d222d3",
+          "gameplay_menu_browser.data": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+          "net_lockstep_browser_peer.mjs": "5e5dbf09646c441fbc97c5f46cf7a3c0e4359fc14697adf8a27ab0ab8b6198f6",
+          "net_lockstep_core.mjs": "624dc31caa8f9c4910b39ec15fcfd31b6728b356c5cf4857a8a8105170d4910f",
+          "net_lockstep_websocket_relay.mjs": "9d0592060a3e385fe6d895bd73c8ec019346a95ce2fb0efa21b6da9be865865f"
+        },
+        "browser_capture_after_build": "exercised by full-moderate-repeat-2 and css-cut-fresh-3 at the same source/WASM; see task14_repeat_second_attempt and task13_cut_fresh_third_attempt; not a full-match or repeat PASS"
+      },
+      "limits": [
+        "Focused controls use controlled reducers and tests; they do not prove a browser full route or resolve the prior fresh CSS failure.",
+        "The disconnect disposition is limited to the checksum-consumer callback boundary; it does not claim protocol non-delivery of retained checksums.",
+        "Native gameplay/input arithmetic was not changed by the disconnect repair."
+      ]
+    },
+    "input_schema": {
+      "decision": "INDEPENDENT_SOURCE_REVIEW_AND_21_FOCUSED_CONTROLS_PASS",
+      "source": "7697712d2f426ee2ec641ba269e91e73d8d41c48",
+      "tests": {
+        "runner_policy": 7,
+        "actual_input_producer": 14
+      },
+      "independent_review": {
+        "path": "RUN/luna-task14-input-checkpoint-repair-review-v1/review.json",
+        "sha256": "890fa061ec17fb1d91571efb43388cb1a15ea493e9ab896b80da19f4f07db5ee",
+        "decision": "PASS_SOURCE_REVIEW_FOR_FOCUSED_CONTROLS_WITH_TASK13_FORWARDING_REQUIRED"
+      },
+      "integration_receipt": {
+        "path": "task14-input-repair-integration.json",
+        "sha256": "40d4d6fe95c5be847a7d422926c50847e61c01d30bcfc751a83e82eb6614f9aa"
+      },
+      "control_logs": [
+        {
+          "path": "task14-input-policy-controls.log",
+          "sha256": "901b89950013b0943a90ad7e12e4a5058c40ed6436e7e130f3704af44116fd27"
+        },
+        {
+          "path": "task14-input-producer-controls.log",
+          "sha256": "df99fb1a59afb7273e4a79b28bb145210fe2283f0c5a23ef8c5963745efb804c"
+        }
+      ],
+      "capture_after_repair": "a second same-room attempt was run after the schema repair; its result is separately bound in task14_repeat_second_attempt. This first capture remains failed before match-2 admission."
+    },
+    "package_fault_classifier": {
+      "decision": "REVIEWED_FOCUSED_CONTROLS_PASS",
+      "source": "bb10558ba9b071af2b01c8c397d165181237cc0d",
+      "candidate_freeze": "task13-preexisting-package-policy-v1/freeze.json",
+      "candidate_freeze_sha256": "bbb79e8f6ad9160b29b699bdc8bbafcbff0b20cf14dbbf4d838b8403af446f64",
+      "independent_review": {
+        "path": "luna-task13-preexisting-package-review-v1/review.json",
+        "sha256": "b69e5f39917969e3f75c9e8db2c3ce90522bab338ba163a274f252438dd74387",
+        "decision": "PASS_STATIC_REVIEW_FOR_FOCUSED_CONTROLS"
+      },
+      "integration_receipt": {
+        "path": "task13-preexisting-package-integration.json",
+        "sha256": "40e53d5b59f95bcf4495476ff2f3b22950b834b3d3eae5e97f19cd08db016e2c"
+      },
+      "focused_tests": 12,
+      "focused_log": {
+        "path": "task13-preexisting-package-controls.log",
+        "sha256": "796afe433e1648474b3541cbc94c92ff31bfa675968a150297ecb6086a253e60"
+      },
+      "policy_scope": [
+        "Requires trusted runtime package/loader identity, exact pre-cut and retired request inventories, and ready FS bytes.",
+        "Only the exact observed request diagnostic may be classified; unknown, duplicate, changed, or later errors still refuse.",
+        "Does not accept the raw route as clean, and does not claim the Chrome abort is benign or solved."
+      ]
+    },
+    "input_suffix_reader": {
+      "source": "f89880bbcd774dc3d0efe94d2a91973275182288",
+      "freeze": {
+        "path": "RUN/task14-input-read-cost-v1/freeze.json",
+        "sha256": "473e36f7c5129d6bb0341fad21f89a09b8ec7a02cf9497a7eedb21ab5252f5b7"
+      },
+      "review": {
+        "path": "sol-task14-input-read-cost-review-v2.json",
+        "sha256": "ede8f82631bc4ac5bd34bf9aab37c17ae42fa796f2b39198f0bc69f880aa76bc"
+      },
+      "root_integration": {
+        "path": "task14-suffix-root-integration.json",
+        "sha256": "cbaa1b530f09b956b32e7c0f88ed5f1371fa0810ade654101616f5b9e2555b59"
+      },
+      "scope": "Seven input-only harness read calls use existing compact Health API; full final/fault/checkpoint snapshots, original input/runtime and all guards unchanged."
+    }
+  },
+  "historical_retained_failures": {
+    "first_cut": {
+      "browser_request_failures": [
+        {
+          "error": "net::ERR_ABORTED",
+          "kind": "requestfailed",
+          "method": "GET",
+          "path": "/gameplay_menu_browser.data",
+          "peer": "alpha"
+        },
+        {
+          "error": "net::ERR_ABORTED",
+          "kind": "requestfailed",
+          "method": "GET",
+          "path": "/gameplay_menu_browser.data",
+          "peer": "beta"
+        }
+      ],
+      "cleanup": {
+        "expected_fault_audit_passed": false,
+        "native_quiescence_both": "verified",
+        "normal_ui_leave_both": true,
+        "owned_process_observation_passed": true,
+        "proxy_recorded_one_selected_cut": true,
+        "unload_both": "phase0/running0",
+        "worker_disposed": true
+      },
+      "decision": "FAIL_EXPECTED_FAULT_CLASSIFICATION",
+      "evidence": [
+        {
+          "path": "css-cut-fresh-1-suite/css-moderate-cut/browser/report.json",
+          "role": "browser report",
+          "sha256": "7f9244871d41617f7d04d52b15be49ae9e3c1c726d6bd0bb6654840c56fd951a"
+        },
+        {
+          "path": "css-cut-fresh-1-suite/css-moderate-cut/owner.json",
+          "role": "owner receipt",
+          "sha256": "94ebbbd166e4aeed74f91717f7105e866ecdc7fe6ce7920dfa6a295a23336797"
+        },
+        {
+          "path": "css-cut-fresh-1-suite/suite.json",
+          "role": "suite receipt",
+          "sha256": "fa3cdc0253970af5e5fe7675253f3640e42f85905a47070441b5d544536197cf"
+        },
+        {
+          "path": "sol-task13-data-abort-source-reduction.json",
+          "role": "source reduction",
+          "sha256": "9e7d665294125511382b2948a04f1e3e5dc8ae07c81fe6208a2fe24361eda9f8"
+        },
+        {
+          "path": "sol-task13-cut-source-review-v3.json",
+          "role": "source review",
+          "sha256": "b3f42569acecab9010caf441ceca006281dbb207bf770574fe78f81e45a0f9f7"
+        }
+      ],
+      "expected_fault_auditor": "REFUSE_UNPROVED_DATA_ABORT_EXCEPTION",
+      "first_refusal": "alpha recorded an unrelated fatal browser error during the cut route",
+      "fresh_session": "not started",
+      "limits": [
+        "faulted report remains FAIL",
+        "no clean-run exception for browser request failure",
+        "no fresh-session recovery claim"
+      ],
+      "matched_checksum_prefix": {
+        "bytes_per_record": 64,
+        "records_per_peer": 169,
+        "source_tick_range_inclusive": [
+          0,
+          168
+        ]
+      },
+      "package_observation": {
+        "benign_or_redundant_cancellation_proven": false,
+        "bytes": 3674112,
+        "contains": "/initial_pipeline_cache.db",
+        "generated_loader_sha256": "170c03c7ba2a92f6e961e233b0f783099073177de85c44ded16c2a687fefefa5",
+        "name": "gameplay_menu_browser.data",
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      "route_result": "FAIL",
+      "scenario": "css-moderate-cut",
+      "selected_cut": {
+        "connection_id": 4,
+        "kind": "cut",
+        "player_role_attributed": false
+      }
+    },
+    "second_cut_then_failed_fresh_css": {
+      "scenario": "css-cut-fresh-2-suite",
+      "decision": "FAIL_FRESH_CSS_LEAVE_AND_NATIVE_UNLOAD",
+      "source": "bb10558ba9b071af2b01c8c397d165181237cc0d",
+      "runtime_producer": "f5ecc9346ca43e25cf12e593f3d5ce50393b03b8",
+      "wasm_sha256": "624d3a70c5c413d235fdda0887da242e860d75887c1fe5a2091da2162abc3ada",
+      "expected_cut_audit": {
+        "decision": "EXPECTED_TRANSPORT_CUT_CONFIRMED",
+        "matched_raw_checksum_records": 166,
+        "alpha_preexisting_package_classification": true,
+        "evidence": [
+          {
+            "path": "css-cut-fresh-2-suite/css-moderate-cut/expected-fault-audit.json",
+            "sha256": "df7c4957a54ca8695cbf4e684e94d910e7049e47e63db8dfb62bde05b27d013a"
+          },
+          {
+            "path": "css-cut-fresh-2-suite/css-moderate-cut/browser/report.json",
+            "sha256": "f0a8282b1364f0b7f2f4a3e4e994438bbbcbde600e5a1a1cccfc949b84103065"
+          },
+          {
+            "path": "css-cut-fresh-2-suite/css-moderate-cut/owner.json",
+            "sha256": "0a7a60aaa65be6c1cd02deaf1e7e88d6734f9790816f93f7762f72a4b1e89ca1"
+          }
+        ],
+        "scope": "Expected-cut audit evidence only; the raw cut report intentionally remains FAIL and this does not validate fresh-session recovery."
+      },
+      "fresh_css": {
+        "decision": "FAIL",
+        "matched_raw_checksum_records": 168,
+        "first_failure": "Beta UI Stop/Leave timed out after 15 seconds.",
+        "native_quiescence": "verified",
+        "native_unload_and_context": "failed",
+        "aggregate_error": "Beta peer.failure: Browser checksum consumer batch cancelled by disconnect terminal (browser_peer264 before disconnect callback274).",
+        "evidence": [
+          {
+            "path": "css-cut-fresh-2-suite/css-moderate-fresh/browser/report.json",
+            "sha256": "04b671c6519862a181100716710cddbe730c719edc49521d6b9c4d108f0e51a8"
+          },
+          {
+            "path": "css-cut-fresh-2-suite/css-moderate-fresh/owner.json",
+            "sha256": "1aa01f88e8282fd72c722fb4cc6155895d9d922fe3254d6053a49facebcde1fd"
+          }
+        ]
+      },
+      "suite": {
+        "decision": "FAIL",
+        "path": "css-cut-fresh-2-suite/suite.json",
+        "sha256": "c9e6eda5d5e8234197e56144e0d83827f65a74cefb5cd0f4f6a175f7786b1879"
+      },
+      "acceptance": "No fresh CSS recovery pass. Do not ignore the beta cancellation AggregateError or weaken normal cleanup/unload/context gates."
+    },
+    "first_repeat_checkpoint_schema": {
+      "decision": "FAIL_HARNESS_DIAGNOSTIC_SCHEMA_BEFORE_SECOND_MATCH",
+      "source": "20a579520fe2af2498ed0f0e7b7812f89c006e95",
+      "runtime_producer": "f5ecc9346ca43e25cf12e593f3d5ce50393b03b8",
+      "first_error": "The repeat checkpoint expected input.port/input.sample, while the actual _melee_web_input_message producer exports pads/layout/mask. It stopped before second-match admission.",
+      "route_observation": "Browser reached the match-1 returned-to-CSS checkpoint, but repeat prefix comparison and second-match admission did not pass. Do not claim a repeat or first-route comparison pass.",
+      "second_match_attempted": false,
+      "cleanup_passed": true,
+      "owned_process_observation_passed": true,
+      "browser_errors": {
+        "alpha": [],
+        "beta": []
+      },
+      "candidate_controls": {
+        "decision": "INDEPENDENT_SOURCE_REVIEW_AND_21_FOCUSED_CONTROLS_PASS",
+        "source": "7697712d2f426ee2ec641ba269e91e73d8d41c48",
+        "tests": {
+          "runner_policy": 7,
+          "actual_input_producer": 14
+        },
+        "independent_review": {
+          "path": "RUN/luna-task14-input-checkpoint-repair-review-v1/review.json",
+          "sha256": "890fa061ec17fb1d91571efb43388cb1a15ea493e9ab896b80da19f4f07db5ee",
+          "decision": "PASS_SOURCE_REVIEW_FOR_FOCUSED_CONTROLS_WITH_TASK13_FORWARDING_REQUIRED"
+        },
+        "integration_receipt": {
+          "path": "task14-input-repair-integration.json",
+          "sha256": "40d4d6fe95c5be847a7d422926c50847e61c01d30bcfc751a83e82eb6614f9aa"
+        },
+        "control_logs": [
+          {
+            "path": "task14-input-policy-controls.log",
+            "sha256": "901b89950013b0943a90ad7e12e4a5058c40ed6436e7e130f3704af44116fd27"
+          },
+          {
+            "path": "task14-input-producer-controls.log",
+            "sha256": "df99fb1a59afb7273e4a79b28bb145210fe2283f0c5a23ef8c5963745efb804c"
+          }
+        ],
+        "capture_after_repair": "a second same-room attempt was run after the schema repair; its result is separately bound in task14_repeat_second_attempt. This first capture remains failed before match-2 admission."
+      },
+      "evidence": [
+        {
+          "path": "full-moderate-repeat-1-suite/suite.json",
+          "sha256": "7b00ebe2e0c7aa9cb4a1e12108fa4c4dd8280cd0c892ffe13c62dac1e4619e73"
+        },
+        {
+          "path": "full-moderate-repeat-1-suite/full-moderate-repeat/browser/report.json",
+          "sha256": "17605be3f35b56d2c0767fe6d8ac16322511375abb9296295ad4143188ee3c56"
+        },
+        {
+          "path": "full-moderate-repeat-1-suite/full-moderate-repeat/browser/match-1/report.json",
+          "sha256": "6736ab31af0323c06c0cf2917ec4a35d554772add36d4e0313881b8074320911"
+        },
+        {
+          "path": "full-moderate-repeat-1-suite/full-moderate-repeat/owner.json",
+          "sha256": "86e14ce5fb1012531f7ca34288cbe27e2e787ab1337dc52c098d9210ac4fdbb6"
+        },
+        {
+          "path": "task14-repeat-first-failure.json",
+          "sha256": "a07b7747e018e81b2fafc139b619df892c799578b6f865bcac7f89cc6f26ee1a"
+        }
+      ],
+      "next": "The first failure remains preserved. The post-repair attempt is recorded separately below; no further repeat is authorized."
+    },
+    "second_repeat_fixed_deadline": {
+      "schema": "melee-web-task14-same-room-repeat-capture-v1",
+      "decision": "FAIL_SECOND_MATCH_RESULTS_PHASE2_TIMEOUT_BEFORE_RETURN_CSS",
+      "source": "1dc301fbbafda8c1846e1157b78d7089350affab",
+      "source_tree": "1487a2f0d14859515eda707dc04a18528ed72821",
+      "runtime": {
+        "producer_source": "1dc301fbbafda8c1846e1157b78d7089350affab",
+        "wasm_sha256": "b51519b5b8832a63bd2a990318455e080a3c08bb4ddaa0e4533ce98a50d222d3"
+      },
+      "scenario": "full-moderate-repeat; same room, same persistent browser pages and owner across two full-route invocations",
+      "first_match": {
+        "decision": "PASS",
+        "route_elapsed_ms": 76635,
+        "phases": [
+          1,
+          3,
+          7,
+          8,
+          1
+        ],
+        "returned_to_css": true,
+        "returned_css_checkpoint": "PASS",
+        "common_raw_prefix": {
+          "decision": "PASS",
+          "record_count": 2801,
+          "bytes_per_record": 64,
+          "source_tick_range_inclusive": [
+            0,
+            2800
+          ],
+          "alpha_equals_beta": true,
+          "sha256_concatenated_records": "2265cef9a1a78f52a294e2a55b77d49f26d2eac31f46b48ed94b0374b08c19f4"
+        }
+      },
+      "match_two_entry_checkpoint": {
+        "decision": "PASS",
+        "room_id_unchanged": true,
+        "same_capture_owner": true,
+        "same_persistent_browser_pages": true
+      },
+      "second_match": {
+        "decision": "FAIL",
+        "route_elapsed_ms": 86636,
+        "fixed_subdeadline_ms": 86635,
+        "phases_observed": [
+          1,
+          3,
+          7,
+          8
+        ],
+        "p1_stock_losses": 4,
+        "results_phase2_presentation_reached": false,
+        "last_results_source_frame": 95,
+        "returned_to_css": false,
+        "final_prefix": null
+      },
+      "first_error": "Original Results phase-2 presentation gate timed out before the source Results condition; last observed Results source frame was 95.",
+      "suite_decision": "FAIL",
+      "browser_diagnostics": {
+        "alpha": [],
+        "beta": [
+          {
+            "kind": "requestfailed",
+            "method": "GET",
+            "path": "/gameplay_menu_browser.data",
+            "failure": "net::ERR_ABORTED"
+          }
+        ],
+        "classification": "retained diagnostic; no cause attributed in this receipt"
+      },
+      "cleanup": {
+        "alpha_and_beta_normal_leave": true,
+        "both_endpoints_closed": true,
+        "both_native_quiescence_verified": true,
+        "both_unloaded_phase_zero_running_zero": true,
+        "worker_disposed_and_owned_temps_clean": true,
+        "proxy_listener_and_sockets_clean": true,
+        "proxy_connections": {
+          "accepted": 5,
+          "closed": 5,
+          "clean": 5,
+          "failed": 0,
+          "cut": 0,
+          "active_connections": 0,
+          "active_timers": 0,
+          "clean_shutdown": true,
+          "data_path_pass": true
+        },
+        "owner_process_observation_passed": true,
+        "capture_and_server_process_groups_absent": true,
+        "owner_elapsed_ms": 187525
+      },
+      "evidence": [
+        {
+          "path": "full-moderate-repeat-2-suite/suite.json",
+          "bytes": 1551466,
+          "sha256": "582b7bc6af0ff9651280ccdf451e301ef22abddd27dea052ff0a69e6e1c1fbad"
+        },
+        {
+          "path": "full-moderate-repeat-2-suite/full-moderate-repeat/browser/report.json",
+          "bytes": 42394962,
+          "sha256": "127793d206ade8de20c75f3bcd77c8426bf3f6cfb49d01ba907c7debcd91ee22"
+        },
+        {
+          "path": "full-moderate-repeat-2-suite/full-moderate-repeat/owner.json",
+          "bytes": 198148,
+          "sha256": "1ab9a91713f82bc23367eae78734b466bde9f71cc94acc267d46f6cfb3e46614"
+        },
+        {
+          "path": "full-moderate-repeat-2-suite/full-moderate-repeat/capture.log",
+          "bytes": 1588,
+          "sha256": "88edd86a3ddafaf7c19cd649ac2388116cbf246e15bf82cba92793f78e6e85c2"
+        },
+        {
+          "path": "full-moderate-repeat-2-suite/full-moderate-repeat/browser/match-1/report.json",
+          "bytes": 913149,
+          "sha256": "550c44825bd2ed54d68d87f5f547751cd9a7c20cc8b9e2284d2a0b2546449146"
+        },
+        {
+          "path": "full-moderate-repeat-2-suite/full-moderate-repeat/browser/match-2/report.json",
+          "bytes": 174223,
+          "sha256": "874dd8fd8cbed7274bc74c441ca5da64c9f6a380fa7776734756c2095730815b"
+        }
+      ],
+      "limits": [
+        "same-machine moderate profile",
+        "no full two-route completion",
+        "no final prefix through match 2",
+        "no result-phase timeout/deadline extension",
+        "no repeated-match pass"
+      ],
+      "independent_review": {
+        "path": "sol-full-moderate-repeat-2-review.json",
+        "sha256": "5d91154a54b258aad4d474cbe601b25949dd094159653a79a94685b1c1a5e753"
+      },
+      "result_receipt": {
+        "path": "task14-repeat-second-result.json",
+        "sha256": "57ba40a04411b2bcc6068c81409c4f5ac0c480c1a1a3850d7ed9d0f09281b437"
+      },
+      "owned_process_count_including_worker_owner": 23,
+      "supplemental_cleanup_raw_common_prefix": {
+        "records": 5300,
+        "tails": {
+          "alpha": 0,
+          "beta": 3
+        },
+        "scope": "raw equality only; second Results confirmation and return CSS unobserved"
+      },
+      "historical_superseded_attempt": true,
+      "no_retry_authorized_at_failure_checkpoint": true
+    },
+    "precut_package_diagnostic_reducer": {
+      "decision": "PASS_OBSERVED_PRE_IMPORT_ABORT_WITH_EXACT_READY_PACKAGE",
+      "source": "4529d713cd89bec1511caa34e122be38e3e71969",
+      "runtime_producer": "f5ecc9346ca43e25cf12e593f3d5ce50393b03b8",
+      "wasm_sha256": "624d3a70c5c413d235fdda0887da242e860d75887c1fe5a2091da2162abc3ada",
+      "raw_evidence": [
+        {
+          "path": "data-package-disc-import-1/browser/report.json",
+          "sha256": "e5a2861e83b0ecc6e54d3ef4a0d49c2573ed2eaf4f32a059cb209a3c9983d7e2"
+        },
+        {
+          "path": "data-package-disc-import-1/owner.json",
+          "sha256": "8119647e9723c9d513792634d172e89bd254ff3e1326719996e34fc2ea753797"
+        },
+        {
+          "path": "sol-task13-import-result-review-v1/review.json",
+          "sha256": "89b9eb4ab653f322004ae3f8618aaf8fff2c9be1d6d60d0dea7befc5ede9fd06"
+        }
+      ],
+      "observed_request": {
+        "url": "http://127.0.0.1:8787/gameplay_menu_browser.data",
+        "method": "GET",
+        "resource_type": "fetch",
+        "status": 200,
+        "failure": "net::ERR_ABORTED",
+        "request_finished": false,
+        "response_body": "unavailable in CDP; retained NoData diagnostic",
+        "requested_at_monotonic_ms": 607.159416,
+        "response_at_monotonic_ms": 611.381791,
+        "failed_at_monotonic_ms": 616.523833
+      },
+      "ready_package": {
+        "path": "/initial_pipeline_cache.db",
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+        "loaded_bytes": 3674112,
+        "expected_bytes": 3674112,
+        "runtime_error": null
+      },
+      "scope": "Observed before disc import, room creation, proxy, or cut. Readiness is supported by exact package/FS identity and counters; this does not establish requestfinished, benign transport, redundant fetch, fallback, or abort cause, and does not retrofit the old cut capture."
+    },
+    "suffix_control_fixture_failures": {
+      "freeze": {
+        "path": "RUN/task14-input-read-cost-v1/freeze.json",
+        "sha256": "473e36f7c5129d6bb0341fad21f89a09b8ec7a02cf9497a7eedb21ab5252f5b7"
+      },
+      "scope": "External VM globals and cross-realm fixture comparisons repaired; no runtime claim."
+    }
+  },
+  "validation": {
+    "affected_release_build": {
+      "path": "m3-runtime-producer.json",
+      "sha256": "38cd425abe4eec31f95e7c58de71b2487c5863037d25fcb412af1db294b141a5"
+    },
+    "first_full_regression": {
+      "path": "m3-full-regression-1dc301fb.json",
+      "sha256": "a5e8fa4352353243d912c71fbb9cfc9fdf563b1fc42c3b8234a8063f7c0ba6a5"
+    },
+    "final_full_regression": {
+      "path": "m3-final-full-regression-f89880bb.json",
+      "sha256": "20aed90a787d16d6eb3d2d8fa56139d10a92fc0d96de3fab1b6cfd84d9cb53e2"
+    },
+    "source_integration_review": {
+      "path": "RUN/m3-final-integration-review-luna-v1.json",
+      "sha256": "88e39da49035e6d13682561f1b663d46f0bbbb596322a88be6050f996fa98a06"
+    },
+    "exact_head_ci": {
+      "path": "m3-exact-head-ci.json",
+      "sha256": "9523d169e02f55317ad11e06d29b05c19698bc7ebd7587bbb2e58154437d6a87"
+    },
+    "merge": {
+      "path": "m3-merge-receipt.json",
+      "sha256": "17f5ab5e61452847005adbece8b257e6101543d8d3ba2bde7917f3f757e10d7a"
+    },
+    "integration": {
+      "pr": 312,
+      "head": "c68f2226d4fee2c49281ab116892fed958d498d3",
+      "commit": "759ede7b4554477cd404b9176c5ae7c8d93c7b7f",
+      "tree": "906b0dcc784046aafd1d94e212b57852a088b755",
+      "reviewed_and_merged_trees_match": true,
+      "ci_run": 38225509373,
+      "completed_checks": 14,
+      "successful_checks": 12,
+      "expected_skips": 2
+    }
+  },
+  "open_boundaries": [
+    "Task9 strict optional jab/jump return-to-Wait probe remains failed/timeboxed under#308; baseline and repeated routes do not satisfy it.",
+    "Public staging endpoint, public Internet routing/TLS/NAT and two-machine play remain unrun.",
+    "Original-game equivalence, physical input, foreground timing, audio/PCM/pixel fidelity and sustained performance remain separate gates."
+  ],
+  "m2_integration": {
+    "source": "2078652eb8e0201d48011a5b67441b6f101f2572",
+    "tree": "c4cada0b9efccb8e2fee5039773996d94da3512f",
+    "reviewed_combined_parent": "e3b9a7341ec61cd6afe4bc3ae0ec2a10b3d79805",
+    "m2_merge_commit": "707c44899298cf8b1234a9b6d5a4d781beacf3ef",
+    "receipt": {
+      "path": "m3-m2-squash-integration.json",
+      "sha256": "fe2e9952e8f980b6590a6330ac83a4711f0a45db55698f1427a851811777af0f"
+    },
+    "review": {
+      "path": "sprint/m3-m2-integration-review.json",
+      "sha256": "1188e60ba088a16cb2986a0508952ade06876eebca3484677c49172a139b3b87"
+    },
+    "decision": "IDENTICAL_REVIEWED_COMBINED_TREE; ancestry-only integration preserved reviewed M2 and M3 file contents"
+  }
+}

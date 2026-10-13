@@ -114,7 +114,9 @@ function mismatchChannel(a, b) {
 /** One side of the bounded A2 peer protocol. The transport is an opaque
  * send(string) callback; it never assembles PAD frames or edits checksums. */
 export class LockstepPeer {
-  constructor({role, sourceTicks, inputTicks, pushFrame, onTerminal = () => {}, onReady = () => {}}) {
+  constructor({role, sourceTicks, inputTicks, pushFrame, onTerminal = () => {}, onReady = () => {},
+    isClosedSendCancellation = () => false, isClosedDisconnect = () => false,
+    onSendCancellation = () => {}}) {
     if (!(role in opposite)) throw Error('Lockstep role must be alpha or beta');
     this.role = role;
     this.remoteRole = opposite[role];
@@ -127,6 +129,12 @@ export class LockstepPeer {
     this.pushFrame = pushFrame;
     this.onTerminal = onTerminal;
     this.onReady = onReady;
+    if (typeof isClosedSendCancellation !== 'function' || typeof isClosedDisconnect !== 'function' ||
+        typeof onSendCancellation !== 'function')
+      throw Error('Lockstep closed-send cancellation hooks must be functions');
+    this.isClosedSendCancellation = isClosedSendCancellation;
+    this.isClosedDisconnect = isClosedDisconnect;
+    this.onSendCancellation = onSendCancellation;
     this.sendRaw = null;
     this.localHello = null;
     this.startAttempted = false;
@@ -319,8 +327,11 @@ export class LockstepPeer {
     }
     while (this.local.has(this.localContiguousInput + 1)) ++this.localContiguousInput;
     await this.#pumpFrames();
-    if (!deferSend) await this.#sendState();
-    if (repeat) await this.#sendState();
+    if (!deferSend) {
+      const outcome = await this.#sendState({context: 'local_input', input_ticks: entries.map(([tick]) => tick)});
+      if (outcome?.status === 'cancelled_unpublished') return outcome;
+    }
+    if (repeat) return this.#sendState({context: 'local_input', input_ticks: entries.map(([tick]) => tick)});
   }
 
   async addChecksum(record) {
@@ -341,7 +352,7 @@ export class LockstepPeer {
     const through = flushFinal ? this.sourceTicks - 1 : cursor - LOCKSTEP_DELAY - 1;
     if (through > this.delayedChecksumThrough) {
       this.delayedChecksumThrough = through;
-      await this.#sendState();
+      return this.#sendState({context: 'native_progress', source_cursor: cursor, flush_final: flushFinal});
     }
   }
 
@@ -349,8 +360,23 @@ export class LockstepPeer {
     if (!this.ready || this.terminal) throw Error(`Lockstep peer ${this.role} is not active`);
   }
 
-  async #sendState() {
-    if (!this.ready || this.terminal) return;
+  async #sendState(context = {}) {
+    if (!this.ready) return;
+    if (this.terminal) {
+      if (this.terminal.kind === 'disconnect' && context.context === 'local_input' &&
+          this.isClosedDisconnect()) {
+        // The accepted local map row remains; no state packet for this call was built.
+        const outcome = Object.freeze({status: 'cancelled_unpublished',
+          reason: 'peer_disconnected_before_state_send', context: context.context,
+          packet_type: 'state', publication_scope: 'no_state_packet_attempt', sequence: null,
+          input_ticks: Object.freeze(context.input_ticks ? [...context.input_ticks] : []),
+          packet_input_ticks: Object.freeze([]), checksum_ticks: Object.freeze([]),
+          ack_sequence: null, ack_input: null, ack_checksum: null});
+        this.onSendCancellation(outcome);
+        return outcome;
+      }
+      return;
+    }
     const unacknowledged = [...this.local.entries()]
       .filter(([tick]) => tick > this.remoteAckInput && !this.deferredInputs.has(tick))
       .slice(0, LOCKSTEP_MAX_BATCH)
@@ -359,14 +385,35 @@ export class LockstepPeer {
       .filter(([tick]) => tick > this.remoteAckChecksum && tick <= this.delayedChecksumThrough)
       .slice(0, LOCKSTEP_MAX_BATCH)
       .map(([tick, record]) => ({tick, record: encodeBase64(record)}));
-    await this.sendObject({
+    const packet = {
       type: 'state', version: LOCKSTEP_VERSION, role: this.role,
       sequence: this.nextSequence++,
       ack_sequence: this.expectedSequence ? this.expectedSequence - 1 : null,
       ack_input: this.remoteContiguousInput >= 0 ? this.remoteContiguousInput : null,
       ack_checksum: this.remoteContiguousChecksum >= 0 ? this.remoteContiguousChecksum : null,
       unacknowledged, delayed_checksums: checksums,
-    });
+    };
+    try { await this.sendObject(packet); }
+    catch (error) {
+      if (this.ready && (!this.terminal || this.terminal.kind === 'disconnect') &&
+          this.isClosedSendCancellation(error)) {
+        // This identifies one failed packet attempt, not whether another packet
+        // already carried any of its unacknowledged inputs or checksums.
+        const outcome = Object.freeze({status: 'cancelled_unpublished', context: context.context ?? 'state',
+          reason: 'closed_transport_send', packet_type: packet.type,
+          publication_scope: 'this_state_packet_attempt_only', sequence: packet.sequence,
+          input_ticks: Object.freeze(context.input_ticks ? [...context.input_ticks] : []),
+          packet_input_ticks: Object.freeze(unacknowledged.map(entry => entry.tick)),
+          checksum_ticks: Object.freeze(checksums.map(entry => entry.tick)),
+          ack_sequence: packet.ack_sequence, ack_input: packet.ack_input,
+          ack_checksum: packet.ack_checksum,
+          ...(context.source_cursor === undefined ? {} : {source_cursor: context.source_cursor}),
+          ...(context.flush_final === undefined ? {} : {flush_final: context.flush_final})});
+        this.onSendCancellation(outcome);
+        return outcome;
+      }
+      throw error;
+    }
   }
 
   async #receiveState(packet, raw) {
@@ -393,7 +440,7 @@ export class LockstepPeer {
       changed = (await this.#applyState(next.packet)) || changed;
     }
     await this.#pumpFrames();
-    if (changed) await this.#sendState();
+    if (changed) return this.#sendState({context: 'inbound_state_ack'});
   }
 
   async #applyState(packet) {

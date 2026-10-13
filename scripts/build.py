@@ -24,6 +24,7 @@ AUDIO_PREVIEW_RUNTIME_CONFIGURATION = "Release"
 AUDIO_PREVIEW_RUNTIME_BUILD_DIR = "build/browser-audio-preview-release"
 AUDIO_PREVIEW_RUNTIME_EXECUTABLE = "gameplay_audio_preview"
 AURORA_QUIESCENCE_DIAGNOSTIC_TARGET = "aurora-browser-quiescence"
+MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET = "runtime-match-draw-discard"
 
 # These are the only lifecycle executables that the content-check workflow may
 # select directly.  Keep this list deliberately small and explicit: adding a
@@ -53,6 +54,7 @@ BUILD_TARGETS = {
     # the only normal build entry point that enables Aurora's opt-in browser
     # submission-owner/quiescence instrumentation.
     AURORA_QUIESCENCE_DIAGNOSTIC_TARGET: ("gx_probe",),
+    MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET: ("gameplay_menu_browser",),
     "gameplay": ("gameplay_checks",),
     "runtime": ("gameplay_menu_browser",),
     PUBLIC_RUNTIME_TARGET: (PUBLIC_RUNTIME_TARGET,),
@@ -103,6 +105,9 @@ def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
     if target == AURORA_QUIESCENCE_DIAGNOSTIC_TARGET:
         suffix = "-release" if configuration == "Release" else ""
         return root / f"build/browser-quiescence{suffix}"
+    if target == MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET:
+        suffix = "-release" if configuration == "Release" else ""
+        return root / f"build/browser-match-draw-discard{suffix}"
     return root / (PUBLIC_RUNTIME_BUILD_DIR if target == PUBLIC_RUNTIME_TARGET else
                    ("build/browser-release" if configuration == "Release" else "build/browser"))
 
@@ -914,6 +919,9 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
             f"-DMELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC={'ON' if target == AURORA_QUIESCENCE_DIAGNOSTIC_TARGET else 'OFF'}"
         )
         configure.append(
+            f"-DMELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC={'ON' if target == MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET else 'OFF'}"
+        )
+        configure.append(
             f"-DMELEE_WEB_SLIPPI_PROFILE_BROWSER={'ON' if 'gameplay_snapshot_probe_browser' in trace_targets else 'OFF'}"
         )
         record_build(root, build_dir, False)
@@ -945,6 +953,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--jobs", type=int, default=min(os.cpu_count() or 2, 6))
     parser.add_argument("--target", choices=("graphics", AURORA_QUIESCENCE_DIAGNOSTIC_TARGET,
+                                              MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET,
                                               "gameplay", "fighter", "runtime",
                                               PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET, "all"))
     parser.add_argument("--trace-target", dest="trace_targets", choices=TRACE_TARGETS,

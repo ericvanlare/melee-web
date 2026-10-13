@@ -52,6 +52,117 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
+### 2026-10-12 — Owner: match-only rollback and explicit Slippi rules
+
+**Ask:** Finish/checkpoint #316, retain the deployed-relay match as transport
+validation, and stop extending menu/Results/rematch lockstep. Original menus run
+locally; selections and start context are messages, rollback owns only the
+match, and confirmed outcome drives local Results/rematch. Add Vanilla
+(offline-only reference) and Slippi rules (offline/online) profiles under #9,
+using an unmodified1.02 disc and a pinned Slippi Dolphin profile reference.
+
+**Status:** Agreed; no disagreement. #316 is merged and #317 already supplies
+the requested public transport experiment. The unstarted #314 expansion is
+superseded. #318 is the next bounded milestone: state size/copy/restore,
+source-draw-preserving re-simulation costs through seven corrective ticks, and
+GPU/audio/file ownership with a go/no-go recommendation. A parallel source-only
+inventory covers Slippi gameplay changes, mode activation and licenses before
+porting. H1 first-use respawn/common-effect preparation follows this measurement;
+no timing guards change. Stadium C3 remains next Track B with shared capture
+ownership. The settings toggle and rollback runtime remain implementation goals.
+
+**Links:** [Feasibility #318](https://github.com/ericvanlare/melee-web/issues/318),
+[state ownership #115](https://github.com/ericvanlare/melee-web/issues/115),
+[mode identity #9](https://github.com/ericvanlare/melee-web/issues/9),
+[decision 017](ARCHITECTURE.md#017--online-rollback-is-match-scoped-with-explicit-rules-profiles),
+[execution response](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6137878567).
+
+- 2026-10-12, Codex: posted the [profile inventory response](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6138210180).
+  Source/configuration pairing and license findings are recorded in the same
+  [feasibility boundary](status/2026-10-12-match-only-rollback-feasibility.md);
+  semantic and executable-reference gaps remain open before porting.
+
+- 2026-10-12, Codex: the [same feasibility boundary](status/2026-10-12-match-only-rollback-feasibility.md)
+  now records measured source-only snapshot/replay and one terminal full-source-draw
+  browser sample. The [posted recommendation](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6139680477)
+  is no-go for naive heap rewind and a current seven-tick budget claim, with
+  state/host ownership continuing under #115. The
+  next renderer experiment stopped before implementation because cache/target
+  contents are not covered by CPU packet reset. This does not reject match-only
+  rollback or demonstrate a performance failure. H1 preparation investigation is
+  the next independent engineering step; exhaustive profile semantics remain open.
+
+### 2026-10-12 — Owner: public staging, cleanup and Stadium after combat
+
+**Ask:** Adopt the concrete staging prerequisites, recorded-process-only cleanup,
+H1 recording and Stadium C3 after combat. Checkpoint #316 and deploy the
+isolated staging Worker using the restored Cloudflare authorization, Workers Free
+and a $0 spend limit.
+
+**Status:** Agreed. Reuse the existing relay and headless full-route harness;
+no plan upgrade, paid service, account/security, DNS or production change. The
+deployed identity, origin policy and same-host route result are recorded in the
+[existing readiness receipt](status/2026-10-11-local-room-ui-readiness.md).
+Keep that public functional evidence separate from acceptance. The combat step
+is checkpointed, recorded-process cleanup and H1 controls remain required, and
+Stadium #301/#251 follows combat #313/#314.
+
+**Links:** [Architect response](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6131503382),
+[public slice #288](https://github.com/ericvanlare/melee-web/issues/288),
+[combat checkpoint #316](https://github.com/ericvanlare/melee-web/pull/316),
+[Stadium C3 #301](https://github.com/ericvanlare/melee-web/pull/301).
+
+- 2026-10-12, Codex: the later owner decision above supersedes #314 and
+  the online sequencing here. The public experiment is transport validation;
+  match-only rollback feasibility is next. Stadium remains the next Track B item.
+
+### 2026-10-12 — Owner: verified combat through the simulated network
+
+**Ask:** After the network simulation sprint, the owner approved the proposed
+twelve-item combat follow-up and autonomous execution.
+
+**Status:** Proceed in three milestone batches: diagnose the retained action
+observation gap, verify input-only attacks/defense and a combat stock loss,
+then carry that combat through complete original routes and rematches. Reuse
+the existing headless lane and source observers. Close-range component fixtures
+may inform assertions but must not supply manually positioned live fighters.
+Grounded combat may continue independently of the timeboxed landing diagnosis.
+Keep original comparison, public Internet and acceptance claims separate.
+
+**Links:** [Action checkpoint #308](https://github.com/ericvanlare/melee-web/issues/308),
+[Combat #313](https://github.com/ericvanlare/melee-web/issues/313),
+[Complete sessions #314](https://github.com/ericvanlare/melee-web/issues/314),
+[priorities #158](https://github.com/ericvanlare/melee-web/issues/158).
+
+### 2026-10-11 night — Owner: simulate network play and complete a bounded sprint
+
+**Ask:** The owner explicitly permits a realistic same-computer network
+simulation, wants two automated browsers to exchange traffic through it, and
+requests 10–20 work items of 5 minutes to 5 hours each with autonomous oversight
+while they sleep.
+
+**Decision:** Use the existing actual Host/Join and keyboard browser route,
+pinned relay and runtime-owned lockstep behind a separate byte-transparent TCP
+proxy. Keep the traffic real and the simulated conditions explicit. Preserve
+byte order and source checks; model loss effects as bounded stalls and cuts,
+with expected failures assessed separately from successful matches. Keep public
+staging, physical input, real two-machine behavior and broader acceptance open.
+
+**Plan:** Sixteen timeboxed items form three coherent milestones: reusable
+network lane, full original match under delay/jitter, and resilience/repeated
+sessions with a one-command suite. The lane owns shared captures; Stadium and
+unchanged provider polling are parked. Stop each failing experiment, retain its
+evidence and reduce after two attempts. Required validation and independent
+review precede integration under the owner's standing merge approval. The old
+recurring investigation automation remains deleted; this active sprint has its
+own checkpoint and scope.
+
+**Links:** [Lane #307](https://github.com/ericvanlare/melee-web/issues/307),
+[Full match #308](https://github.com/ericvanlare/melee-web/issues/308),
+[Reliability #309](https://github.com/ericvanlare/melee-web/issues/309),
+[priorities #158](https://github.com/ericvanlare/melee-web/issues/158).
+
+
 ### 2026-10-11 — Owner and Codex: local room readiness before further Stadium work
 
 **Ask:** The owner requested a smaller near-term deliverable and fully autonomous

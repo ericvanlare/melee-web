@@ -19,6 +19,16 @@ option(MELEE_WEB_PIPELINE_PROVENANCE "Private pipeline-use coverage recorder" OF
 option(MELEE_WEB_SELECTIVE_PIPELINES "Prepare certified descriptor unions before source interaction" OFF)
 option(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC
   "Enable the development-only Pokémon Stadium selection/preparation checkpoint" OFF)
+option(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC
+  "Build the private one-shot terminal match draw/discard diagnostic" OFF)
+if(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC AND
+   (MELEE_WEB_PUBLIC_RUNTIME OR MELEE_WEB_AUDIO_PREVIEW_RUNTIME))
+  message(FATAL_ERROR "Match draw/discard diagnostic is private and unavailable in public runtimes")
+endif()
+if(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC)
+  add_compile_definitions(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC=1
+    AURORA_MATCH_DRAW_DISCARD_DIAGNOSTIC=1)
+endif()
 if(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC AND
    (MELEE_WEB_PUBLIC_RUNTIME OR MELEE_WEB_AUDIO_PREVIEW_RUNTIME))
   message(FATAL_ERROR "Pokémon Stadium C1a is unavailable in public and audio-preview runtimes")

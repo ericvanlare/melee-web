@@ -19,7 +19,9 @@ a complete acceptance result.
 Set by the owner on 2026-10-05, with the owner-adopted
 [2026-10-08 architect check-in](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6069469010)
 and [execution response](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6069737799)
-setting the immediate milestone queue. Two tracks run in parallel. When they compete
+setting the milestone process. The owner’s October 12 match-only rollback
+decision supersedes the earlier online sequence (see the [architects’ log](ARCHITECTS.md)).
+Two tracks run in parallel. When they compete
 for the same scarce resource, such as the single browser-timing lane on the test
 machine or a reviewer's attention, take the lowest-numbered unblocked item and
 prefer Track A.
@@ -30,74 +32,90 @@ prefer Track A.
 profile, a natural four-stock match through the original menus completes without
 a timing-guard pause. Both tracks depend on this. Lockstep stalls both players
 on any host stall, rollback must re-simulate several ticks inside one tick's
-budget, and competitive play cannot tolerate pauses. H1 gates A3 and B5. The
-functional steps A1 and A2 can proceed without it. Work starts from the open
+budget, and competitive play cannot tolerate pauses. H1 gates live-play admission in A4 and B5. The
+bounded functional and feasibility steps A1–A3 can proceed without it. Work starts from the open
 pause classification in [#116](https://github.com/ericvanlare/melee-web/issues/116).
 The fix must come from the runtime, never from a threshold, frame-rate,
 skipped-tick or auto-Resume change.
 
-### Track A: online multiplayer, beelined
+### Track A: match-only rollback online
 
-**Target.** Two people on different machines play vanilla Melee against each
-other in the browser under competitive rules, through the original menus.
+**Target.** Two people on different machines play the **Slippi rules** profile
+in the browser with rollback confined to the match. **Vanilla is offline-only**
+and remains the accuracy reference. Both profiles use the player's unmodified
+USA revision 1.02 disc. A settings toggle selects Vanilla or Slippi rules; that
+profile implementation is planned, not already available.
 
-The path reuses what the project already proved. The browser runtime replays
-recorded per-tick controller input to exact recorded-session agreement with the
-original game. Two runtimes that start from the same CSS context and receive the
-same inputs should therefore stay in step without any snapshot or restore. That
-makes delay-based lockstep the shortest route to real play. Rollback, and then
-Slippi desktop cross-play, build on it later. The design, including the host
-channels that A1 must rule out, is [architecture decision 016](ARCHITECTURE.md#016--online-play-starts-as-lockstep-from-a-shared-css-context).
+Original CSS and SSS run locally. Peers exchange selections and a versioned
+match-start context: seed, characters/costumes, stage, rules, ports, content and
+profile identities. Both must agree on the context and the actual constructed
+match state before play. Rollback runs only inside the match. Scene transitions,
+Results and rematch remain local, driven by a confirmed outcome and a new
+agreement for the next match. Never roll back or lockstep those scenes.
+
+Reuse the existing determinism work, input protocol, checksums, relay, room UI
+and runtime-owned session. Keep the current full-route lockstep path as an
+interim implementation and regression tool; stop extending it. [Decision 017](ARCHITECTURE.md#017--online-rollback-is-match-scoped-with-explicit-rules-profiles)
+supersedes decision 016 for future online work.
 
 | Step | Outcome |
 | --- | --- |
-| **A1. Determinism** | Two fresh browser instances given the same build, disc, CSS start context and per-tick input produce identical per-tick state checksums from CSS through Results and back to CSS. Their pacing, caches and memory initialization deliberately differ. First run in Chrome, then across Chrome and WebKit, and across x86 and arm64. |
-| **A2. Local lockstep** | Two tabs on one machine play through original CSS → SSS → match → Results → CSS with a fixed input delay over loopback, with matching checksums on every tick. |
-| **A3. Internet lockstep** | Two machines connect through a small signaling service and a WebRTC data channel (with relay fallback). They play a complete set with desync detection and a clean disconnect. |
-| **A4. Rollback** | Snapshot, restore and re-simulate replace the fixed delay with prediction. This continues the state-ownership work in [#115](https://github.com/ericvanlare/melee-web/issues/115). |
-| **A5. Slippi desktop cross-play** | A pinned Slippi compatibility profile and a transport bridge let a browser player face a desktop Slippi player ([project direction](PROJECT_DIRECTION.md), [#9](https://github.com/ericvanlare/melee-web/issues/9)). |
+| **A1. Determinism** | Preserve scoped shared-input/checksum evidence; extend browser/architecture coverage only through bounded experiments. It does not establish complete state ownership. |
+| **A2. Interim local lockstep** | Retain the original CSS → SSS → match → Results → CSS functional baseline. No new menu/Results/rematch lockstep campaign. |
+| **A3. Rollback feasibility and rules inventory** | [#318](https://github.com/ericvanlare/melee-web/issues/318), continuing [#115](https://github.com/ericvanlare/melee-web/issues/115): measure match-state size and snapshot/restore cost, full source tick/draw with GPU submission suppressed, and host-side effects. Report whether up to seven corrective ticks fit the declared budget. In parallel inventory Slippi gameplay changes and patch licenses. |
+| **A4. Match-scoped online play** | After the feasibility decision, implement restore/prediction and an agreed match-start barrier. Deliver the Vanilla/Slippi rules settings toggle and versioned Slippi rules profile under [#9](https://github.com/ericvanlare/melee-web/issues/9), checked against a pinned Slippi Dolphin release bundle. Complete matches with controlled corrections, confirmed outcomes, local Results/rematch, exact state checks and clean disconnect. |
+| **A5. Slippi desktop cross-play** | Extend the pinned profile and transport only after browser rollback correctness; demonstrate actual desktop interoperability. Browser networking or a profile name alone cannot establish cross-play. |
 
-Every online mode carries an explicit mode identity under #9, so a networked
-session is never reported as retail-equivalent evidence.
+Every online session carries an explicit mode identity under #9. Slippi rules
+may also be selected offline, with its own evidence. Source gameplay changes
+must be enumerated, licensed and compared against the selected Slippi build;
+never infer the complete profile from UCF alone or leak modifications into
+vanilla. The chosen release bundle and per-mode stage rules need explicit pins.
 
-**Immediate A3 milestone:** [#288](https://github.com/ericvanlare/melee-web/issues/288)
-delivers Host/Join by room code through the deployed staging Worker at its
-public URL. First verify the deployed Worker identity, endpoint and allowed
-client origin, then exercise a short live-input CSS interval with two separate
-headless profiles. Only then extend live input on both sides through original
-CSS → SSS → one four-stock Mario/Final Destination
-match → Results → CSS, with per-tick checksum desync detection and clean
-disconnect. Record RTT, chosen input delay and `network_wait` totals/durations,
-and retain incident recording on long runs. Label this functional networked
-mode, not acceptance. A human two-machine session follows by arrangement with
-the owner; same-machine profiles do not establish that gate. Loopback is not a
-substitute for the public relay experiment. Reuse existing relay, protocol and
-runtime owners; do only the ownership work this slice needs. WebRTC, complete
-sets, rollback and cross-play follow it. Current prerequisite failures and
-producer identities stay in the issue and scoped receipts.
+**Completed prerequisites:** [#316](https://github.com/ericvanlare/melee-web/pull/316)
+records the bounded keyboard-combat milestone, including a credited stock loss
+and complete route, in the [combat receipt](status/2026-10-12-simulated-network-combat.md).
+The complete two-browser route through the deployed staging Worker is recorded
+in [#317](https://github.com/ericvanlare/melee-web/pull/317) and the
+[readiness receipt](status/2026-10-11-local-room-ui-readiness.md).
+Treat the public route as functional **transport validation**, not acceptance
+or a reason to extend menu lockstep. RTT, fixed input delay, network-wait
+counters, exact producer identities, failures and unmeasured wait durations
+belong in that receipt. The isolated workers.dev Worker remains deployed idle
+under the owner's Workers Free/$0 limit; no paid, billing, account/security,
+DNS or production changes are authorized. Do not repeat successful captures
+without a new hypothesis.
 
-**Owner-requested readiness checkpoint (October 11; updated October 12):** the
-existing local Worker and Host/Join UI have a [scoped browser result](status/2026-10-11-local-room-ui-readiness.md)
-for actual keyboard control through original CSS → SSS → four-stock Mario/FD
-→ Results → CSS, matching runtime checksums and clean intentional disconnect.
-The local #288 driver also includes a separately scoped P2 gameplay-input
-interval and the optional supplied-preflight interface. Its reviewed local
-evidence does not replace the public endpoint milestone above. The supplied
-preflight code only checks the receipt structure and does not verify a live Worker. No deployed
-endpoint, remote browser run or RTT result is available, so public #288 remains
-blocked on those service facts. Do not repeat local captures without a new
-hypothesis.
+**Feasibility checkpoint:** #318 retains source-only snapshot/replay measurements
+and one terminal browser tick with full source draw and no GPU submission in its
+[single receipt](status/2026-10-12-match-only-rollback-feasibility.md). The current
+recommendation is no-go for naive browser-heap rewind or a combined seven-tick
+budget claim: renderer content/cache ownership, audio clocks and asynchronous
+file destinations are not closed. This is not a rejection of rollback or proof
+that it is too slow. The next ownership design belongs under #115; A4 needs an
+explicit go decision after those gates. A later multi-frame diagnostic must first
+prove useful safe renderer reuse, preserving original draw callbacks. The
+Slippi semantic/license/reference inventory continues under #9; no profile is
+ready to port. Keep component measurements separate from browser acceptance.
 
-The bounded original Zelda-to-Sheik owner-prefix milestone for [#304](https://github.com/ericvanlare/melee-web/issues/304)
-is now recorded in the [existing weaker-fighter status](status/2026-10-09-weaker-fighter-comparison-lineup.md);
-the strict two-human browser comparison remains separate. Stadium C3 is now
-checkpointed under [#251](https://github.com/ericvanlare/melee-web/issues/251),
-with its constructor observation and failed longer reference in the
-[existing Stadium boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md).
-Next reduce the retained controller-poll/draw interleave against original source
-authority before repairing the reader or scheduling another capture.
-Public #288 work resumes when the deployed service facts change. See the
-[execution update](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6112686789).
+After this bounded measurement checkpoint, investigate first-use respawn-platform
+and common-effect pipeline preparation under H1/#116. Preparation must not consume
+hidden gameplay ticks/RNG, change draw order or relax timing guards. Keep H1
+incident recording on for combat and simulated-network runs; a forced pause is
+retained H1 evidence. The owner identifies the #316 respawn preparation stall as
+the second mid-play first-use incident; its failure stays retained.
+
+The simulated-network milestones #307–#309 and combat #313 retain their scoped
+results and failures. The unstarted #314 full-route/rematch expansion is
+superseded by the match-only direction. The strict jump/landing observation gap
+under #308 remains open, without an unchanged retry or weaker assertion.
+
+Pokémon Stadium C3 [#251](https://github.com/ericvanlare/melee-web/issues/251) /
+[draft #301](https://github.com/ericvanlare/melee-web/pull/301) remains the next
+Track B milestone. Reuse the retained PadPoll/draw-order reduction and original
+owner evidence; no duplicate capture. Track A has first claim on the shared
+capture lane. Physical controllers, foreground timing, audible output and a
+two-machine human session remain separate unrun gates.
 
 ### Track B: competitive-rules Melee before the whole game
 
@@ -148,30 +166,18 @@ retain a reduced reproducer and move to the next fighter. Bowser's
 [#274 checkpoint](https://github.com/ericvanlare/melee-web/issues/274) remains
 unresolved and parked after the reconstructed-prefix attempt budget.
 
-**Current #304 boundary.** The original Zelda-to-Sheik owner prefix is observed
-and integrated for [issue #304](https://github.com/ericvanlare/melee-web/issues/304);
-the strict two-human browser comparison remains separate
-([scoped lineup status](status/2026-10-09-weaker-fighter-comparison-lineup.md)).
-Stadium's matched-Setup C/F prerequisite also has a
-[scoped result](status/2026-10-07-pokemon-stadium-profile-oninit.md). Its longer
-original recording stopped at a reader ordering check. First reduce that
-retained failure, preserving actual consumed inputs and source tick/draw order;
-the original idle reference remains a prerequisite. Public #288 work resumes
-when the deployed service facts change.
+**Current #304 boundary.** The bounded original Zelda-to-Sheik owner-prefix milestone is complete for [issue #304](https://github.com/ericvanlare/melee-web/issues/304), with evidence in the [scoped lineup status](status/2026-10-09-weaker-fighter-comparison-lineup.md); strict two-human browser comparison remains separate. Stadium C3 under [#251](https://github.com/ericvanlare/melee-web/issues/251) remains checkpointed while H1 first-use attribution has first claim on the capture lane. Its matched C/F prerequisite, constructor observations and failed longer original reference are retained in the [existing Stadium boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md). Public #288 now uses the owner-cleared isolated staging relay.
 
 The next Stadium milestone is [C3 idle in-match lifetime #251](https://github.com/ericvanlare/melee-web/issues/251),
 with its remaining prerequisites counted and tracked inside that issue and PR.
-Keep the existing two sequential native no-draw functional lifetimes as their
-own evidence. For original agreement, first retain the actual original input
-and tick/draw schedule through the declared idle interval. Then use the existing
-source-ordered harness for matched lifetime A, complete retirement/recreation,
-and separately identified matched lifetime B, each with at least 3,500 post-GO
-ticks before the first transformation. Require checked state/RNG ownership and
-per-tick per-owner RNG ledger comparison with the verified original; do not
-extrapolate the short C/F prefix into a fabricated neutral schedule.
-Prerequisite fixes are commits within C3, not isolated
-ownership PRs. Transformation, rendering, browser admission and broader
-original-stage comparison gates remain separate. Source-only
+First reduce the retained PadPoll-inside-draw mismatch against original source
+ordering. Complete the actual original input/draw/state/RNG reference through
+3,500 post-GO ticks, counted from the observed GO event, then compare runtime
+lifetime A, checked retirement/recreation and lifetime B with per-owner RNG.
+Historical no-draw lifetimes remain separate; do not invent neutral rows or
+hardcode the historical GO tick. Prerequisite fixes are commits within C3,
+not isolated ownership PRs. Transformations, broader rendering, browser
+admission and whole-stage acceptance remain separate. Source-only
 and documentation work may overlap when ownership permits; Track A retains
 priority for shared capture resources.
 

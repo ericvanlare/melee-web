@@ -96,6 +96,154 @@ Use the supervised five-minute owner budget with cleanup reserve described in
 that receipt. Do not interpret a driver timeout as a desync or extend its budget
 without reducing the observed boundary first.
 
+For owner-authorized same-machine network experiments, add
+`--network-profile moderate` to that same command. The harness starts an owned
+TCP proxy between both browser WebSockets and the local Worker. Named profiles
+are `control`, `moderate`, `asymmetric` and `constrained`; their exact directional
+settings and hashes are recorded in the report. This option cannot be combined
+with public-relay flags. HTTP calibration, actual browser endpoint observations,
+byte-integrity checks and final socket/listener cleanup are required. The
+configured delay is per client/Worker leg; measured HTTP round trips are not
+peer RTT or input latency. These experiments establish simulated-network
+functional evidence only, leaving public staging and two-machine gates open.
+Keep the same supervised owner budget and shared capture-lane policy.
+
+The room harness opts into the existing bounded staging incident recorder on
+both profiles, verifies the runtime accepted that option, and retains its
+current-session and persisted exports before context close. Staging occupancy
+and queue-completion callback latency accompany a forced timing pause as H1
+evidence. Callback latency includes browser delivery and is not hardware GPU
+duration. Missing evidence fails validation; a timing pause does not become a
+combat failure or a successful route. The explicitly selected controlled-stall
+scenario keeps its separate fault policy. No new automatic recovery is added.
+
+The serial suite packages that owner and its cleanup checks:
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 scripts/run_network_simulation.py \
+  --disc "$MELEE_DISC" --playwright "$PLAYWRIGHT_DIR" --out "$NEW_EVIDENCE_DIR" \
+  --scenarios css-moderate full-moderate full-asymmetric css-constrained
+```
+
+Choose a new evidence directory on the verified external volume. The suite
+requires an existing Release runtime, records every served file's identity,
+and stops on the first failed scenario. It retains failed evidence and never
+retries automatically. Use `--plan-only` to inspect commands without launching
+anything, or select a single scenario for a reviewed changed hypothesis.
+Scenario availability is tooling, not a claim that its browser gate has passed.
+
+`full-moderate` and `full-asymmetric` use the complete-match baseline, including
+P2's short actual gameplay axis pulse. The separate, non-default
+`full-moderate-action-probe` adds the strict jab/jump observation window. Its
+underlying `--gameplay-action-probe` flag requires `--full-route`; reports and
+suite validation bind the requested mode. A passing baseline cannot satisfy a
+failed action probe. See the [M2 receipt](status/2026-10-11-simulated-network-full-route-m2.md)
+for the current coverage and retained failures.
+
+The separate `full-moderate-combat-probe` scenario adds a bounded actual-keyboard
+P2 approach and jab, requiring paired source observations of the attack and
+P1 damage reaction before continuing the original route. Its
+`--gameplay-combat-probe` flag is exclusive with the action, stall, cut and
+repeat probes. The approach permits at most 16 observed-release taps and 480
+source cursors; its positive-distance target is an unproved reach hypothesis.
+The existing action and owner deadlines remain fixed. Scenario availability
+does not establish a hit, complete combat coverage or original equivalence.
+
+The separately selected `full-moderate-combat-exchange` scenario keeps that
+prefix, then adds one P1 jab and one P1 jab against P2's actual held shield.
+It requires paired Guard entry before the attack, paired GuardSetOff, unchanged
+defender damage through recovery, and exact A/R input and release windows.
+The R hold is bounded to 30 source input ticks and the existing 500 ms observed
+keyboard callback; each attack retains its 60-source-tick observation limit.
+Use `--gameplay-combat-exchange` together with `--gameplay-combat-probe` only in
+the moderate full-route scenario. This mode does not attribute a stock loss to
+combat; its scoped result belongs in the combat evidence entry.
+
+The separate full-moderate-combat-ko scenario extends the verified exchange with one actual P2 left C-stick forward smash. Its optional gameplay-combat-ko mode requires the exchange prefix, a fresh four-stock baseline, observed hit/air/death, original source-slot KO credit and natural three-stock respawn within 480 source cursors. Literal inputs must show neutral P1 and one P2 C-stick episode through respawn. Only that validated handoff permits the existing route to continue from three stocks. A ledge grab or safe landing stops the hypothesis. Normal validation reads and checksum waits are source-bounded; diagnostic readbacks after a failure remain unaccepted evidence. Scenario availability is not a KO result.
+
+The mutually exclusive `full-moderate-combat-ko-charged` scenario selects
+`--gameplay-combat-ko-charged` for one held A+left input hypothesis instead.
+The driver requests release at the first observed source cursor reaching the
+24-cursor target, within the existing 500 ms callback and at most 30 literal
+held input records. It separately validates the actual neutral release, sampled
+ordered animation plateau and later advance; missing sampled frames remain
+explicit and no hidden charge amount is inferred. All KO-credit, neutral-victim,
+respawn and owner limits above still apply. It is an experiment, not a KO claim.
+
+The separate `full-moderate-combat-ko-prepared` scenario selects
+`--gameplay-combat-ko-prepared` after the same verified exchange. It permits
+at most eight actual P2 jabs toward observed 18% damage, with a shared
+480-source-cursor preparation limit and bounded P2 approach taps. Each jab
+requires a paired damage response, grounded recovery, unchanged stocks and
+scorer counters, and literal neutral P1 input. The final grounded-neutral pair
+becomes the baseline for the unchanged uncharged KO proof. Failure stops the
+run; the damage target is a hypothesis, not a guaranteed KO. Existing owner,
+input and action deadlines remain unchanged.
+
+The separate `full-moderate-combat-ko-prepared-platform-exit` scenario opts
+into the reviewed post-credit platform-exit policy with
+`--gameplay-combat-ko-prepared-platform-exit`. The legacy
+`full-moderate-combat-ko-prepared` scenario remains fully neutral for P1 through
+the KO/respawn proof; its receipts cannot be relabeled as platform-exit evidence.
+The new mode requires the verified exchange and prepared uncharged KO, a branded
+source-credited loss, the paired active airborne RebirthWait/facing gate, and a
+validated fully neutral pre-keydown PAD prefix. Only then does it allow one actual
+P1 horizontal-only input episode of 1–30 literal PAD rows through the existing
+500 ms keyboard callback (`holdMs: 0`, observed press), followed by a literal
+neutral release and tail. Actual paired Fall29 and grounded Wait14 must bind to the
+source-consumed action and complete PAD endpoint. Existing limits remain: at most
+eight observed-damage jabs, 18% actual damage within 480 preparation cursors, at
+most 16 approach taps, and a fresh 480-cursor KO budget; no cap/deadline reset.
+The gate's conservative position range is a scenario-admission policy, not
+authored Final Destination geometry or proof of landing. The observed result
+credited the first stock loss to combat, then used the existing walk-off route for
+the remaining stocks before Results and CSS. Scenario availability is not a
+gameplay acceptance claim.
+
+Example, after reviewing the current evidence and obtaining a separate capture
+release; use a fresh output directory:
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 scripts/run_network_simulation.py \
+  --disc "$MELEE_DISC" --playwright "$PLAYWRIGHT_DIR" --out "$NEW_EVIDENCE_DIR" \
+  --scenarios full-moderate-combat-ko-prepared-platform-exit
+```
+
+The reliability scenarios use separate result policies. Select one command below
+with a new evidence directory for each invocation:
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 scripts/run_network_simulation.py \
+  --disc "$MELEE_DISC" --playwright "$PLAYWRIGHT_DIR" --out "$NEW_EVIDENCE_DIR" \
+  --scenarios css-constrained-stall
+```
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 scripts/run_network_simulation.py \
+  --disc "$MELEE_DISC" --playwright "$PLAYWRIGHT_DIR" --out "$NEW_EVIDENCE_DIR" \
+  --scenarios css-moderate-cut css-moderate-fresh
+```
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 scripts/run_network_simulation.py \
+  --disc "$MELEE_DISC" --playwright "$PLAYWRIGHT_DIR" --out "$NEW_EVIDENCE_DIR" \
+  --scenarios full-moderate-repeat
+```
+
+The controlled-cut browser route remains a failure. A separate expected-fault
+auditor checks the declared cut and normal resource retirement before the fresh
+CSS scenario may start with a distinct room and process owner. The repeat
+scenario runs two complete original routes in one continuously owned room,
+retaining separate match artifacts and requiring the final raw checksum prefix
+to contain the unchanged first-return prefix. It keeps a fixed admission rule,
+second-route cap and cleanup reserve; an incomplete route or insufficient budget
+fails. Full snapshots remain at validation boundaries; input-only reads use the
+existing compact health suffix. Mode combinations that confuse these policies
+are rejected. See the [scoped resilience receipt](status/2026-10-12-simulated-network-resilience.md)
+for observed coverage and retained failures. Scenario availability does not
+establish a passing gate; do not repeat a failed capture without a changed,
+reviewed hypothesis.
+
 ## Choose by change boundary
 
 | Change | Start here | Focused command or procedure | Evidence boundary |

@@ -1,0 +1,1191 @@
+{
+  "schema": "melee-web-simulated-network-full-route-m2-v1",
+  "milestone": "M2",
+  "issue": 308,
+  "decision": "PASS_REVIEWED_FULL_ROUTES_AND_REQUIRED_LOCAL_VALIDATION",
+  "evidence_label": "Browser exercised / Same-machine simulated-network full-route",
+  "capture": {
+    "run_id": "network-simulation-sprint-20261011-210744-b1be023a",
+    "scenario": "full-moderate",
+    "scenario_type": "baseline full route; gameplay_action_probe=false",
+    "profile": {
+      "name": "moderate",
+      "client_to_worker": {
+        "delay_ms": 10,
+        "jitter_ms": 5,
+        "seed": 101
+      },
+      "worker_to_client": {
+        "delay_ms": 10,
+        "jitter_ms": 5,
+        "seed": 202
+      },
+      "scope": "per browser/Worker TCP leg; not peer RTT"
+    },
+    "source_capture": {
+      "commit": "44ef35c4865e557dd593cb4dcb9a4fb92824199d",
+      "tree": "2d5cc74cd12cf3d4db2f9b3cbed5cd0cc3328974",
+      "harness_file_sha256": {
+        "scripts/a3_checksum_wait_diagnostics.mjs": "ac7c048b1baad22ea0985f17a6c9fe79c590e9106d1c9f9a055175db81673dd5",
+        "scripts/a3_local_room_full_route.mjs": "0acb07557018e34849d7c99d41b09726ed63fc6da8ddf260f03d631d6bb39eff",
+        "scripts/a3_local_room_keyboard_browser.mjs": "1f34bb56ca0f8fadf9dd0c857b86acf74952d6cb3d186efda40fbdc309606e43",
+        "scripts/a3_network_simulation.mjs": "43adc38e8cab7beb46c3a2c37c9dfc58c4b4da22340b745db637955ae86dbcef",
+        "scripts/a3_public_relay_preflight.mjs": "51e568899f9ee32626eb63734610cddb9526659fe3df54eedc690209db490d53",
+        "scripts/a3_source_cursor_join.mjs": "ffaf9978dd9c32f2917283726305693817a649319c0846dbe166470b273ccb07",
+        "scripts/net_test_tcp_proxy.mjs": "7025b26d9242f6391a4144efc89e694d73f15813d8529edfa8a5941cabfe91ed",
+        "scripts/run_network_simulation.py": "24d13e48440905e0a14febf14e21978464cd2cfcbc8971017cb84f337fe960c6"
+      }
+    },
+    "runtime": {
+      "producer_commit": "b92a36033692dbef756b067175b39cac2d23925e",
+      "directory": "build/browser-release",
+      "identity_source": "full-moderate-baseline-1-suite/suite.json runtime_files map",
+      "key_files": {
+        "runtime.html": {
+          "bytes": 6237,
+          "sha256": "70ec53d8af576bae9eaacfc42f172b0d6e8d631a92c75d824601849c8577e1a6"
+        },
+        "gameplay_menu_browser.wasm": {
+          "bytes": 15819523,
+          "sha256": "ee9eefd71e96ec26c0a456e9993d764dc47ca4df719911e88803b221cb191e23"
+        }
+      },
+      "producer_evidence": {
+        "build_source": "b92a36033692dbef756b067175b39cac2d23925e",
+        "build_tree": "29938ac85204af43a26240305322b71d3dcd466f",
+        "release_build_receipt": {
+          "file": "m1-closing-validation.json",
+          "sha256": "278574b4f79a3ea5344cb450ade9ef82bb9c2e2f11ae06d6b483cebdcfce60ee",
+          "decision": "PASS"
+        },
+        "runtime_output_manifest": {
+          "file": "runtime-closing-producer.json",
+          "sha256": "f43096b409619c23565df4a310898500af9670aefb696b79e22fa33812e8ea06",
+          "runtime_file_count": 8617
+        },
+        "cross_check": "The produced gameplay_menu_browser.wasm bytes/hash match the served suite manifest. The complete served file identity remains the suite.json runtime_files map; equality of the two full file maps is not asserted."
+      }
+    },
+    "raw_reports": {
+      "suite": {
+        "file": "full-moderate-baseline-1-suite/suite.json",
+        "bytes": 1551193,
+        "sha256": "eb74f2820d88ed72da300424d9938dd15d5eae3bb777e314026c26f0851f9db5",
+        "decision": "PASS"
+      },
+      "browser": {
+        "file": "full-moderate-baseline-1-suite/full-moderate/browser/report.json",
+        "bytes": 29442793,
+        "sha256": "782177ff19be104261dc183f8801ef58ec7b90d7dca900b15475069075577098",
+        "decision": "PASS",
+        "raw_streams": "Contains literal PAD windows, route observations, and per-tick 64-byte checksum records"
+      },
+      "owner": {
+        "file": "full-moderate-baseline-1-suite/full-moderate/owner.json",
+        "bytes": 189246,
+        "sha256": "28fcfbf409946c0359e0584a2b112acca55e5a5be47df268292158e32094ec1b",
+        "decision": "PASS"
+      },
+      "runtime_build_receipt": {
+        "file": "m1-closing-validation.json",
+        "sha256": "278574b4f79a3ea5344cb450ade9ef82bb9c2e2f11ae06d6b483cebdcfce60ee",
+        "source": "b92a36033692dbef756b067175b39cac2d23925e",
+        "decision": "PASS"
+      }
+    },
+    "observed": {
+      "full_route_phases": [
+        1,
+        3,
+        7,
+        8,
+        1
+      ],
+      "first_error": null,
+      "checksums": {
+        "compared_source_ticks": 2783,
+        "source_tick_range": [
+          0,
+          2782
+        ],
+        "exact_record_count_each": 2783,
+        "required_final_boundary": 2781,
+        "freeze_before_leave": true,
+        "unpaired_tail_counts": {
+          "alpha": 4,
+          "beta": 3
+        }
+      },
+      "p2_axis_witness": {
+        "local_port": 1,
+        "key": "ArrowLeft",
+        "direction_x": -1,
+        "movement_tick": 449,
+        "movement_bytes": [
+          0,
+          0,
+          129,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "neutral_release_tick": 450,
+        "neutral_bytes": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "checksum_boundary_required": 453,
+        "checksum_boundary_reached": true,
+        "paired_observation_tick": 458,
+        "position_before_x": 60,
+        "position_after_x": 52.2600021,
+        "peer_deltas_x": [
+          -7.739997899999999,
+          -7.739997899999999
+        ],
+        "stocks_each": [
+          4,
+          4
+        ],
+        "input_window": {
+          "source_tick_range": [
+            449,
+            450
+          ],
+          "movement": {
+            "input_tick": 449,
+            "local_port": 1,
+            "bytes": [
+              0,
+              0,
+              129,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "neutral_release": {
+            "input_tick": 450,
+            "local_port": 1,
+            "bytes": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "p2_literal_row_count": 2,
+          "p1_neutral_rows": [
+            {
+              "input_tick": 449,
+              "local_port": 0,
+              "bytes": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "input_tick": 450,
+              "local_port": 0,
+              "bytes": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "observed_capture_end_tick": 454
+        }
+      },
+      "natural_stock_sequence": [
+        3,
+        2,
+        1,
+        0
+      ],
+      "results_and_css": {
+        "original_results_confirmed": true,
+        "returned_to_original_css": true
+      },
+      "cleanup": {
+        "owner_cleanup_passed": true,
+        "process_observation_passed": true,
+        "capture_process_group_absent": true,
+        "server_process_group_absent": true,
+        "both_ui_leave_normal": true,
+        "both_unloaded_phase_zero": true,
+        "proxy_path_verified": true,
+        "proxy_final_cleanup_verified": true
+      }
+    },
+    "independent_review": {
+      "status": "PASS_SCOPED_SIMULATED_NETWORK_BASELINE",
+      "file": "sol-full-moderate-baseline-1-review.json",
+      "sha256": "6998f2209fc22ee3ba560e4d1febe4f77d3e5ddcf431ab956fc8b3782067f306",
+      "owned_pids_absent": 23
+    }
+  },
+  "prior_failures": [
+    {
+      "name": "full-moderate-1",
+      "source_head": "ef4c88d2f796db738ab4e901e3441b49791d4fcc",
+      "browser_report_sha256": "85c3706d8fdf5c7c4a68efda4255fe60fc0cf6a3b064734b5e6ffcd4fd7bcf01",
+      "owner_report_sha256": "091dd8c88c2de71891164c630b31c39560385a42d9efa7314252bb00cce6214c",
+      "suite_report_sha256": "3f200692ebbe126b70ab054fc3a5321b49868841b25fe8514cc3cab8204dc0cb",
+      "first_failure": "P1 SSS Final Destination cursor step 1: real keyboard chord did not appear in a source-aligned 11-byte PAD capture."
+    },
+    {
+      "name": "full-moderate-2",
+      "source_head": "b2efb6eb33057c80751fef6fd456c9137578a213",
+      "browser_report_sha256": "783fe3722823aee5777d06f86dce756f3c9cc4b5941bcc51d87e8326d7ce2a5b",
+      "owner_report_sha256": "d64b64bcfc6bbd7093ccb4997bdcaef797e9029af6c14429ed1ddc28614ba18d",
+      "suite_report_sha256": "621f42a3ccdd61c796acbd9909df34bb8bd93b24b1807656592f1e611f4371ef",
+      "first_failure": "P2 keyboard jump: both players did not return to grounded Wait within 60 source ticks.",
+      "details": {
+        "p1_jab_grounded_return_tick": 494,
+        "p2_jump_action_start_tick": 501,
+        "p2_jump_grounded_return": null
+      }
+    },
+    {
+      "name": "full-moderate-3",
+      "source_head": "5057589a3615b7c6c653cadca6b6dcbae0ca8166",
+      "browser_report_sha256": "a117b75769eb9a866aa864355861bc02dd9d4d71a7beea8d14386d42774fdbd4",
+      "owner_report_sha256": "b8186a7afd3b6c1949821b49768c982ff6f7d54b4d9355b198fa4ddf32dbcbf7",
+      "suite_report_sha256": "cf938ded60550dc098123ff781120f9584378c0820494156b055f88a57ef6ae2",
+      "first_failure": "P2 keyboard jump: both players did not return to grounded Wait within 60 source ticks.",
+      "details": {
+        "p1_jab_grounded_return_tick": 501,
+        "p2_jump_action_start_tick": 508,
+        "landing_motion_observed": {
+          "motion": 42,
+          "groundAir": 0,
+          "source_cursor_first": 544,
+          "source_frame_first": 97,
+          "source_cursor_last": 567,
+          "source_frame_last": 120,
+          "observed_ticks": 24
+        }
+      }
+    }
+  ],
+  "optional_action_scenario": {
+    "name": "full-moderate-action-probe",
+    "flag": "--gameplay-action-probe",
+    "default_suite_member": false,
+    "current_baseline_enabled": false,
+    "status": "NOT RUN after the baseline/action split",
+    "strict_checks": {
+      "p1_key": "j",
+      "p1_button": "0x0100",
+      "p1_motion": 44,
+      "p2_key": "Delete",
+      "p2_button": "0x0400",
+      "p2_jump_motions": [
+        25,
+        26
+      ],
+      "grounded_wait_motion": 14,
+      "source_tick_limit_per_action": 60,
+      "stocks": [
+        4,
+        4
+      ]
+    },
+    "prior_jump_failures": [
+      "full-moderate-2",
+      "full-moderate-3"
+    ],
+    "assertion_policy": "Failure remains strict; the current baseline pass does not pass or waive this separate probe."
+  },
+  "scope_exclusions": [
+    "No public routing, TLS/NAT or two-machine evidence",
+    "No peer RTT or input-latency claim",
+    "No physical-input, foreground-timing, audible-output or retail/original comparison acceptance",
+    "No action-probe pass",
+    "Optional action probe remains open; current full-route evidence is not combat or whole-session acceptance"
+  ],
+  "asymmetric_capture": {
+    "decision": "PASS_SCOPED_SIMULATED_NETWORK_BASELINE",
+    "source_capture": {
+      "head": "44ef35c4865e557dd593cb4dcb9a4fb92824199d",
+      "tree": "2d5cc74cd12cf3d4db2f9b3cbed5cd0cc3328974",
+      "status_porcelain": "",
+      "allowed_harness_only_change": false,
+      "files_sha256": {
+        "scripts/a3_local_room_keyboard_browser.mjs": "1f34bb56ca0f8fadf9dd0c857b86acf74952d6cb3d186efda40fbdc309606e43",
+        "scripts/a3_public_relay_preflight.mjs": "51e568899f9ee32626eb63734610cddb9526659fe3df54eedc690209db490d53",
+        "scripts/a3_local_room_full_route.mjs": "0acb07557018e34849d7c99d41b09726ed63fc6da8ddf260f03d631d6bb39eff",
+        "scripts/a3_checksum_wait_diagnostics.mjs": "ac7c048b1baad22ea0985f17a6c9fe79c590e9106d1c9f9a055175db81673dd5",
+        "scripts/a3_source_cursor_join.mjs": "ffaf9978dd9c32f2917283726305693817a649319c0846dbe166470b273ccb07",
+        "scripts/a3_network_simulation.mjs": "43adc38e8cab7beb46c3a2c37c9dfc58c4b4da22340b745db637955ae86dbcef",
+        "scripts/net_test_tcp_proxy.mjs": "7025b26d9242f6391a4144efc89e694d73f15813d8529edfa8a5941cabfe91ed"
+      }
+    },
+    "runtime_producer": "b92a36033692dbef756b067175b39cac2d23925e",
+    "configuration": {
+      "mode": "simulated-network",
+      "profile_name": "asymmetric",
+      "profile": {
+        "clientToWorker": {
+          "seed": 303,
+          "delayMs": 5,
+          "jitterMs": 15
+        },
+        "workerToClient": {
+          "seed": 404,
+          "delayMs": 25,
+          "jitterMs": 10
+        }
+      },
+      "profile_sha256": "28f253679a039fa2d9535bba7ee8ffbafd0ed4af58cf51ee4f110eb337d8a70b",
+      "scope": "same-machine real TCP sockets through an owned proxy and local Worker; simulated network conditions",
+      "directions": "client-to-Worker and Worker-to-client per connection; each peer-to-peer message traverses two shaped legs",
+      "limits": [
+        "no public routing, NAT, TLS or geographic network evidence",
+        "configured leg delay is not measured peer RTT or input latency",
+        "seeded jitter repeats only for an identical TCP chunk sequence; OS segmentation can vary",
+        "bandwidth shaping and stalls do not implement a physical IP packet-loss model"
+      ]
+    },
+    "reports": {
+      "full-asymmetric-baseline-1-suite/suite.json": {
+        "bytes": 1551231,
+        "sha256": "9eb87f5259d9c386391002b4213c50f03b8541062c940cca2577dd75db3cd086"
+      },
+      "full-asymmetric-baseline-1-suite/full-asymmetric/browser/report.json": {
+        "bytes": 29452989,
+        "sha256": "935de9b78bc904620c7f1d6723af9d802a5efa558ce967ecd8e6a747ff7fa641"
+      },
+      "full-asymmetric-baseline-1-suite/full-asymmetric/owner.json": {
+        "bytes": 170429,
+        "sha256": "b7e9d3dc9205a7e031d051fbd5301f19fdf5c44d659bdb9efb062af9e9a12bfd"
+      }
+    },
+    "records": 2784,
+    "range": [
+      0,
+      2783
+    ],
+    "required_final_boundary": 2783,
+    "unpaired_tail_counts": {
+      "alpha": 4,
+      "beta": 5
+    },
+    "phases": [
+      1,
+      3,
+      7,
+      8,
+      1
+    ],
+    "natural_stock_sequence": [
+      3,
+      2,
+      1,
+      0
+    ],
+    "p2_axis_witness": {
+      "source_port": 1,
+      "key": "ArrowLeft",
+      "direction_x": -1,
+      "direction_policy": "one short inward step based on the fresh source-aligned P2 position",
+      "before": {
+        "source_tick": 435,
+        "peers": [
+          {
+            "p1_x": -60,
+            "p2_x": 60
+          },
+          {
+            "p1_x": -60,
+            "p2_x": 60
+          }
+        ],
+        "stocks": [
+          [
+            4,
+            4
+          ],
+          [
+            4,
+            4
+          ]
+        ]
+      },
+      "input_window": {
+        "movement": {
+          "source_cursor": 435,
+          "input_tick": 435,
+          "local_port": 1,
+          "poll_serial": 1054,
+          "bytes": [
+            0,
+            0,
+            129,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "neutral_release": {
+          "source_cursor": 436,
+          "input_tick": 436,
+          "local_port": 1,
+          "poll_serial": 1055,
+          "bytes": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "source_tick_range": [
+          435,
+          436
+        ],
+        "p2_literal_rows": [
+          {
+            "source_cursor": 435,
+            "input_tick": 435,
+            "local_port": 1,
+            "poll_serial": 1054,
+            "bytes": [
+              0,
+              0,
+              129,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "source_cursor": 436,
+            "input_tick": 436,
+            "local_port": 1,
+            "poll_serial": 1055,
+            "bytes": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "p1_literal_rows": [
+          {
+            "source_cursor": 435,
+            "input_tick": 435,
+            "local_port": 0,
+            "poll_serial": 1241,
+            "bytes": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "source_cursor": 436,
+            "input_tick": 436,
+            "local_port": 0,
+            "poll_serial": 1248,
+            "bytes": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "observed_capture_end_tick": 444,
+        "p2_literal_capture_count": 2,
+        "p1_neutral_capture_count": 2,
+        "p1_neutral_source_tick_range": [
+          435,
+          436
+        ]
+      },
+      "after": {
+        "source_tick": 447,
+        "checksum_boundary_required": 439,
+        "checksum_boundary_reached": true,
+        "peers": [
+          {
+            "p1_x": -60,
+            "p2_x": 49.2000008,
+            "stocks": [
+              4,
+              4
+            ]
+          },
+          {
+            "p1_x": -60,
+            "p2_x": 49.2000008,
+            "stocks": [
+              4,
+              4
+            ]
+          }
+        ],
+        "p2_position_delta_by_peer": [
+          {
+            "peer": "alpha",
+            "before_x": 60,
+            "after_x": 49.2000008,
+            "delta_x": -10.799999200000002
+          },
+          {
+            "peer": "beta",
+            "before_x": 60,
+            "after_x": 49.2000008,
+            "delta_x": -10.799999200000002
+          }
+        ]
+      },
+      "scope": "one short actual P2 keyboard axis pulse toward center plus literal neutral release; no combat-coverage claim"
+    },
+    "cleanup_passed": true,
+    "process_observation_passed": true,
+    "elapsed_ms": 110488,
+    "action_probe": false,
+    "independent_review": {
+      "file": "sol-full-asymmetric-baseline-1-review.json",
+      "sha256": "5fab311666d71dd6a2add0aaf8e4562c74abc678a4d5b1faa05b9decf8a4e48c",
+      "owned_pids_absent": 22
+    },
+    "request_diagnostic_gap": {
+      "observation": "beta GET gameplay_menu_browser.data net::ERR_ABORTED; alpha none. Existing clean-route policy permits requestfailed; strict cut policy does not. Raw game/checksum/cleanup outcome unchanged; no error-free request claim.",
+      "cause": "UNCLASSIFIED; no request IDs/timing in this capture",
+      "review_addendum": {
+        "file": "sol-full-asymmetric-baseline-1-review-addendum-v1.json",
+        "sha256": "e1cdd25fff96d0dfed85ac1cfaf41cb1f13689c7b25da107bcad2190b31fa7c0"
+      }
+    }
+  },
+  "source_reviews": {
+    "m2-baseline-split-review.json": "2110b66e6a1e403e168ee2c4da17c2ccd621d948559022d030b7e017e96d41a3",
+    "sol-m2-integration-source-review-v1.json": "c2a88b5eff0bf1b4c30fc86955f84bb787071827554b6c75d086c517c7f85dfa",
+    "sol-m2-docs-review-v1.json": "eda11b62ce0a9032f174ebdd4e78318273e4a3377ac8730c8968fd4122e90539"
+  },
+  "integration_validation": {
+    "schema": "melee-web-m2-required-validation-v1",
+    "source": "f5ecc9346ca43e25cf12e593f3d5ce50393b03b8",
+    "tree": "03e91745e5b4efda8c9543c7bd0a46ba1158f6ee",
+    "decision": "PASS",
+    "full_regression": {
+      "exit_code": 0,
+      "tests": 2344,
+      "skips": 165,
+      "seconds": 495.381,
+      "file": "m2-full-regression.log",
+      "sha256": "545a86658db99d42c6b4c1f6d9ed8b375d5a024b4474d61b8f3428386c26a1db"
+    },
+    "affected_runtime_build": {
+      "exit_code": 0,
+      "target": "runtime",
+      "configuration": "Release",
+      "file": "m2-runtime-build.log",
+      "sha256": "77835b18a10f0c63108f868bb846fdcc1ea9daeaca724d0a28eacafcdaf0cc0f"
+    },
+    "after_build_key_files": {
+      "runtime.html": {
+        "bytes": 6237,
+        "sha256": "70ec53d8af576bae9eaacfc42f172b0d6e8d631a92c75d824601849c8577e1a6"
+      },
+      "gameplay_menu_browser.js": {
+        "bytes": 300688,
+        "sha256": "170c03c7ba2a92f6e961e233b0f783099073177de85c44ded16c2a687fefefa5"
+      },
+      "gameplay_menu_browser.wasm": {
+        "bytes": 15819523,
+        "sha256": "624d3a70c5c413d235fdda0887da242e860d75887c1fe5a2091da2162abc3ada"
+      },
+      "gameplay_menu_browser.data": {
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      "net_lockstep_browser_peer.mjs": {
+        "bytes": 37016,
+        "sha256": "a1f1e899037cf6e6641f91fb2f4577980c355c589ca0d64bedb9131bc07a8b83"
+      },
+      "net_lockstep_core.mjs": {
+        "bytes": 30649,
+        "sha256": "624dc31caa8f9c4910b39ec15fcfd31b6728b356c5cf4857a8a8105170d4910f"
+      },
+      "net_lockstep_websocket_relay.mjs": {
+        "bytes": 20621,
+        "sha256": "9d0592060a3e385fe6d895bd73c8ec019346a95ce2fb0efa21b6da9be865865f"
+      }
+    },
+    "capture_key_files_unchanged": {
+      "runtime.html": true,
+      "gameplay_menu_browser.js": true,
+      "gameplay_menu_browser.wasm": false,
+      "gameplay_menu_browser.data": true,
+      "net_lockstep_browser_peer.mjs": true,
+      "net_lockstep_core.mjs": true,
+      "net_lockstep_websocket_relay.mjs": true
+    },
+    "capture_source": "44ef35c4865e557dd593cb4dcb9a4fb92824199d",
+    "historical_capture_runtime_producer": "b92a36033692dbef756b067175b39cac2d23925e",
+    "finished_at": "2026-10-12T07:07:21.200239+00:00",
+    "exact_head_ci": {
+      "decision": "ALL_14_COMPLETED",
+      "head": "a4daed0f431e97ecdc2ddb24d869dfeefdae8755",
+      "run_id": 38216775643,
+      "successes": 12,
+      "expected_skips": 2,
+      "receipt": {
+        "path": "m2-exact-head-ci.json",
+        "sha256": "1026f09dd64bb453f984b6f772c19461433166377076b7af15100b3ddddacda9"
+      }
+    },
+    "artifact_identity_review": {
+      "file": "sol-m2-runtime-byte-identity-review-v1/review.json",
+      "sha256": "36580395434b1d5f0be8058491934fb476daf79da3bbba7d368ef02f4c9176f2",
+      "result": "BYTE_EQUALITY_NOT_ESTABLISHED_NEW_BUILD_NEEDS_SCOPED_CAPTURE"
+    }
+  },
+  "post_build_capture": {
+    "decision": "PASS_SCOPED_SIMULATED_NETWORK_BASELINE",
+    "source_capture": {
+      "head": "df076457a4758fab3aa24cf80efb197ea5107ff5",
+      "tree": "c1d8a8ea175634ba3b758ee5079f925c85dc9d1c",
+      "status_porcelain": "",
+      "allowed_harness_only_change": false,
+      "files_sha256": {
+        "scripts/a3_local_room_keyboard_browser.mjs": "1f34bb56ca0f8fadf9dd0c857b86acf74952d6cb3d186efda40fbdc309606e43",
+        "scripts/a3_public_relay_preflight.mjs": "51e568899f9ee32626eb63734610cddb9526659fe3df54eedc690209db490d53",
+        "scripts/a3_local_room_full_route.mjs": "0acb07557018e34849d7c99d41b09726ed63fc6da8ddf260f03d631d6bb39eff",
+        "scripts/a3_checksum_wait_diagnostics.mjs": "ac7c048b1baad22ea0985f17a6c9fe79c590e9106d1c9f9a055175db81673dd5",
+        "scripts/a3_source_cursor_join.mjs": "ffaf9978dd9c32f2917283726305693817a649319c0846dbe166470b273ccb07",
+        "scripts/a3_network_simulation.mjs": "43adc38e8cab7beb46c3a2c37c9dfc58c4b4da22340b745db637955ae86dbcef",
+        "scripts/net_test_tcp_proxy.mjs": "7025b26d9242f6391a4144efc89e694d73f15813d8529edfa8a5941cabfe91ed"
+      }
+    },
+    "runtime_producer": "f5ecc9346ca43e25cf12e593f3d5ce50393b03b8",
+    "runtime_wasm_sha256": "624d3a70c5c413d235fdda0887da242e860d75887c1fe5a2091da2162abc3ada",
+    "reports": {
+      "full-moderate-current-build-1-suite/suite.json": {
+        "bytes": 1551233,
+        "sha256": "0c11b45f0373d3bca8e4233a64ebf949142a2ec326e34df07aa8afaa3ff320cb"
+      },
+      "full-moderate-current-build-1-suite/full-moderate/browser/report.json": {
+        "bytes": 29480710,
+        "sha256": "3bf46c6396db0be23a29803f6df2b60893d63f2cb1813967d5901def40cf1bc8"
+      },
+      "full-moderate-current-build-1-suite/full-moderate/owner.json": {
+        "bytes": 182971,
+        "sha256": "94c339cfc2e14cebdaa29b3b86b6e0a41163c02aba375b879227e1cd68267b7e"
+      }
+    },
+    "records": 2788,
+    "range": [
+      0,
+      2787
+    ],
+    "required_final_boundary": 2785,
+    "unpaired_tail_counts": {
+      "alpha": 4,
+      "beta": 3
+    },
+    "phases": [
+      1,
+      3,
+      7,
+      8,
+      1
+    ],
+    "natural_stock_sequence": [
+      3,
+      2,
+      1,
+      0
+    ],
+    "p2_axis_witness": {
+      "source_port": 1,
+      "key": "ArrowLeft",
+      "direction_x": -1,
+      "direction_policy": "one short inward step based on the fresh source-aligned P2 position",
+      "before": {
+        "source_tick": 446,
+        "peers": [
+          {
+            "p1_x": -60,
+            "p2_x": 60
+          },
+          {
+            "p1_x": -60,
+            "p2_x": 60
+          }
+        ],
+        "stocks": [
+          [
+            4,
+            4
+          ],
+          [
+            4,
+            4
+          ]
+        ]
+      },
+      "input_window": {
+        "movement": {
+          "source_cursor": 446,
+          "input_tick": 446,
+          "local_port": 1,
+          "poll_serial": 940,
+          "bytes": [
+            0,
+            0,
+            129,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "neutral_release": {
+          "source_cursor": 447,
+          "input_tick": 447,
+          "local_port": 1,
+          "poll_serial": 941,
+          "bytes": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "source_tick_range": [
+          446,
+          447
+        ],
+        "p2_literal_rows": [
+          {
+            "source_cursor": 446,
+            "input_tick": 446,
+            "local_port": 1,
+            "poll_serial": 940,
+            "bytes": [
+              0,
+              0,
+              129,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "source_cursor": 447,
+            "input_tick": 447,
+            "local_port": 1,
+            "poll_serial": 941,
+            "bytes": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "p1_literal_rows": [
+          {
+            "source_cursor": 446,
+            "input_tick": 446,
+            "local_port": 0,
+            "poll_serial": 1133,
+            "bytes": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "source_cursor": 447,
+            "input_tick": 447,
+            "local_port": 0,
+            "poll_serial": 1134,
+            "bytes": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "observed_capture_end_tick": 451,
+        "p2_literal_capture_count": 2,
+        "p1_neutral_capture_count": 2,
+        "p1_neutral_source_tick_range": [
+          446,
+          447
+        ]
+      },
+      "after": {
+        "source_tick": 455,
+        "checksum_boundary_required": 450,
+        "checksum_boundary_reached": true,
+        "peers": [
+          {
+            "p1_x": -60,
+            "p2_x": 52.2600021,
+            "stocks": [
+              4,
+              4
+            ]
+          },
+          {
+            "p1_x": -60,
+            "p2_x": 52.2600021,
+            "stocks": [
+              4,
+              4
+            ]
+          }
+        ],
+        "p2_position_delta_by_peer": [
+          {
+            "peer": "alpha",
+            "before_x": 60,
+            "after_x": 52.2600021,
+            "delta_x": -7.739997899999999
+          },
+          {
+            "peer": "beta",
+            "before_x": 60,
+            "after_x": 52.2600021,
+            "delta_x": -7.739997899999999
+          }
+        ]
+      },
+      "scope": "one short actual P2 keyboard axis pulse toward center plus literal neutral release; no combat-coverage claim"
+    },
+    "owner_cleanup_passed": true,
+    "process_observation_passed": true,
+    "request_failures": {
+      "alpha_browser_errors": [],
+      "beta_browser_errors": [
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "url": "http://127.0.0.1:8787/gameplay_menu_browser.data",
+          "failure": "net::ERR_ABORTED"
+        }
+      ]
+    },
+    "request_failure_scope": "Existing clean-route policy; package abort cause remains unclassified and is not admitted by strict cut auditor",
+    "independent_review": {
+      "file": "sol-full-moderate-current-build-1-review.json",
+      "sha256": "4a0de86fc0af1173eabe04ba5d35f53587f126bf7ec77bb078c212145dca80c8",
+      "owned_pids_absent": 22
+    }
+  },
+  "merged_boundary": {
+    "pull_request": 311,
+    "merge": "707c44899298cf8b1234a9b6d5a4d781beacf3ef",
+    "reviewed_head": "a4daed0f431e97ecdc2ddb24d869dfeefdae8755",
+    "reviewed_and_merged_tree": "e50142ad5d3231c697b18287fdfab5846f98327b",
+    "receipt": {
+      "path": "m2-merge-receipt.json",
+      "sha256": "74a5cc625a453d9c547fea58727f35ae5e1a1c0567def31d2938a7269917a93e"
+    }
+  },
+  "action_observation_followup": {
+    "date": "2026-10-12",
+    "decision": "STRICT_ACTION_PROBE_FAIL_WITH_PAIRED_ANIMATION_PROGRESS",
+    "evidence_root": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1",
+    "source_and_runtime": "5f895d3b5ea70811bccc8b9967fde788f6dd8cef",
+    "source_change": "Add existing source-owned animation_frame to both player JSON objects and three action evidence projections; original gameplay, inputs, arithmetic, motion/groundedWait predicates,60tick and wall caps unchanged.",
+    "artifacts": {
+      "candidate": {
+        "path": "action-observation-candidate-v1/candidate-freeze.json",
+        "bytes": 7732,
+        "sha256": "9d469a250af727f008e0636f7a07a1a6ea4f0dba0f552a9ce0c48a58962c9922"
+      },
+      "source_review": {
+        "path": "action-observation-integration-review-v1.json",
+        "bytes": 2187,
+        "sha256": "c2f66bf8e8482600864494d986300aa2cff28cecddfb06e1f0e37e47b8953592"
+      },
+      "runtime": {
+        "path": "m1-runtime-producer.json",
+        "bytes": 1419,
+        "sha256": "e36c7b3a804b95690c0f1314864d30a27f47a02bc511c99cb4bd03caf4aa4e4d"
+      },
+      "capture_release": {
+        "path": "m1-capture-release.json",
+        "bytes": 897,
+        "sha256": "97649ecc9b03323120a3729cac4c5ea1408d2b9729f49af34e7602f4e2b32e42"
+      },
+      "result_review": {
+        "path": "m1-action-result-review-v1.json",
+        "bytes": 10008,
+        "sha256": "d2649fc1859e8e08cf34bf96210f60d45d04947644c9da110d30ff37f672127c"
+      },
+      "root_analysis": {
+        "path": "m1-action-analysis.json",
+        "bytes": 6105,
+        "sha256": "555165d473385a43b0be67fdcc82e45471f504aae904b1693e01347b5e167b52"
+      },
+      "full_regression": {
+        "path": "m1-full-regression-5f895d3b.json",
+        "bytes": 606,
+        "sha256": "e2a4642a3cd175d04340db20f0f5a36871b2e69ecc810ccd050b3f62599593a7"
+      },
+      "original_reference_availability": {
+        "path": "original-reference-availability-v1.json",
+        "bytes": 7621,
+        "sha256": "0b75a6fe348052e53614e52bf0e648b506a1ef22b29229f7aae170150b2391ac"
+      }
+    },
+    "observed": {
+      "jab": {
+        "literal_A_input_ticks": [
+          473,
+          479
+        ],
+        "neutral_input_tick": 480,
+        "paired_samples": 9,
+        "target_tick": 483,
+        "grounded_wait_tick": 491
+      },
+      "jump": {
+        "literal_X_input_tick": 491,
+        "neutral_input_tick": 492,
+        "declared_window": [
+          494,
+          553
+        ],
+        "paired_samples": 48,
+        "jump_target_tick": 500,
+        "landing_first_sample": {
+          "source_tick": 530,
+          "animation_frame": 0
+        },
+        "landing_last_sample": {
+          "source_tick": 552,
+          "animation_frame": 22
+        },
+        "grounded_wait_observed": false
+      },
+      "all_retained_paired_player_fields_agree": true,
+      "sample_gaps_remain": true,
+      "cleanup_checksum_common_records": 556,
+      "cleanup_checksum_tails_by_peer": [
+        0,
+        1
+      ],
+      "final_full_route_checksum_comparison": false,
+      "owned_inventory_processes_absent": 24,
+      "browser_processes_in_cleanup_absent": 21
+    },
+    "authored_asset_inspection": {
+      "scope": "Read-only structural byte inspection following existing DatArchive/DatFighterRuntime/DatAnimation field layouts, not execution of full checked parser or active capture joint oracle.",
+      "asset_files": [
+        {
+          "path": "local-input/snapshot-mario/PlMr.dat",
+          "bytes": 194992,
+          "sha256": "929cdf08c31bc75156ccef05238f2b16dc4d0b187ed1bb4f0a628a2466fb7f7a"
+        },
+        {
+          "path": "local-input/snapshot-mario/PlMrAJ.dat",
+          "bytes": 1259328,
+          "sha256": "4bd9593e6f0d980b4441891b62ea84a08c099471d695a614974c67223ab5872f"
+        }
+      ],
+      "source_motion": "MS_Landing42 selects SM_Landing35",
+      "fighter_public_root": 36324,
+      "action_row_absolute_offset": 29320,
+      "animation_container_offset": 117216,
+      "archive_bytes": 6177,
+      "public_symbol": "PlyMario5K_Share_ACTION_Landing_figatree",
+      "figatree_root_data_offset": 5548,
+      "end_frame_bits": "41e80000",
+      "end_frame": 29.0,
+      "source_rule": "Landing_Anim calls ftAnim_IsFramesRemaining over active part joint/blended joint status; basic Landing starts animation0 speed1. Landing IASA normal_landing_lag permits input checks, not automatic neutral Wait.",
+      "limitations": [
+        "Retained snapshot assets not independently bound to this capture active fighter archive in this task.",
+        "Authored29 endpoint does not prove exact active joint status or original/live duration.",
+        "No captured original matching input interval or joint-end observation; source snapshots are sampled with gaps.",
+        "Observed animation0to22 progressing does not establish runtime defect, frozen animation or future transition time."
+      ],
+      "source_hashes": [
+        {
+          "path": "build/gameplay-source/src/melee/ft/ftmotionstates.c",
+          "sha256": "8785cfcb7091ce29268a8c2172aecd97a60bc6352c545a472aa77e4cbd66141a"
+        },
+        {
+          "path": "build/gameplay-source/src/melee/ft/kinds/ftCommon/forward.h",
+          "sha256": "514cd2e4a2ebf3729255efce6b88bb6b91acd685a519e2b4bb01bcb09f7492ca"
+        },
+        {
+          "path": "build/gameplay-source/src/melee/ft/kinds/ftCommon/ftCo_Landing.c",
+          "sha256": "601e45b75a559ce7937f1547151fbd1987994652e34635abe6b60c76ce631d17"
+        },
+        {
+          "path": "build/gameplay-source/src/melee/ft/ftanim.c",
+          "sha256": "575ad38351d426707246600cd1f4367d45523b7e139382c5cf3c222150d0a25e"
+        },
+        {
+          "path": "src/dat_fighter_runtime.cpp",
+          "sha256": "5f32405154a1a240167854b864a84720d51b42c4e8a9892b9ec069e60c783614"
+        },
+        {
+          "path": "src/dat_animation.cpp",
+          "sha256": "76e1d3e1a988c20a67ec92d9fee41a4c44604bb1ad7a834a98854195c9c52fc9"
+        }
+      ]
+    },
+    "limitations": [
+      "Failed action scenario has no completed match,Results or CSS return.",
+      "Supplemental cleanup checksum prefix is not a final full-route pass.",
+      "Advancing cur_anim_frame does not establish actual joint animation completion or original equivalence.",
+      "Retained Landing asset endpoint29 is not bound to active capture archive or runtime joints.",
+      "Historical stock/jab raw reference and provenance were not located; fresh selected original comparison remains unrun."
+    ],
+    "next": "Keep strict action gate open; no runtime repair demonstrated. Proceed with separately reviewed grounded combat milestone313.",
+    "integration": {
+      "local_regression": "PASS2363tests165skips",
+      "release_runtime_build": "PASS",
+      "exact_head_ci": {
+        "path": "m1-exact-head-ci.json",
+        "sha256": "f2de02268f2844ae84c59437f034ef57bd8e8e52cc244cbc8ccdd93e0ace4444"
+      },
+      "merge": {
+        "path": "m1-merge-receipt.json",
+        "sha256": "542fb9d9e65cfa5d4ed62ce940b20a8d4bc2eb8610acfe32da6f691544431aef"
+      },
+      "pr": 315,
+      "reviewed_head": "57701e6c6232931ebebe63922b670fb8b5d0f3e3",
+      "commit": "9e3ec835ab905f36ed1753dca3c9f0ecac3889de",
+      "tree": "6e50d5fb5e0612c757530de09f455c5c430de059",
+      "reviewed_and_merged_trees_match": true,
+      "completed_checks": 14,
+      "successes": 12,
+      "expected_skips": 2
+    },
+    "evidence_location_policy": "Logical evidence and input identifiers only; concrete retained locations remain in the external capture and review receipts."
+  }
+}
