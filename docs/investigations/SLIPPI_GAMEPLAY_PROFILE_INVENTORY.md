@@ -51,9 +51,63 @@ and Singles stages; live setup can override these, including Party's rules.
 All 59 configured entries are mapped (52 default-selected). Selected folders resolve
 to 198 files and 183 annotated ASM hooks; the parsed textual include closure contains
 196 files, and 21 selected binary payloads are hashed. Of 183 hooks, 27 carry an
-`affects-gameplay` tag and 156 do not. Six untagged ASM hooks received additional bounded
-checks; **150 lack such checks**. Tag absence does not establish non-gameplay behavior.
+`affects-gameplay` tag and 156 do not. Twelve untagged ASM hooks now have additional
+bounded source checks, including six on the online rollback controller/input/engine
+path; **144 lack such checks**. The new packet records exact source identities,
+static `Online/Core` selection, observed behavior and unresolved dependencies. Its
+independent review verified source/config selection and the 150-to-144 accounting,
+then requested three wording corrections for online initialization; corrected packet
+v2 applies those corrections. This is source-only evidence: no client binary/profile
+was inspected or accepted. Tag absence does not establish non-gameplay behavior.
+
 The complete file inventory therefore does **not** establish a complete semantic inventory.
+
+
+## Bounded rollback-core hook review
+
+A second bounded source checkpoint covers six previously unchecked hooks under
+the recursively selected `Required: Slippi Online` → `Online/Core` root. The
+v4 source/config inventory records this root as selected by default and recursive;
+all six paths have active generated-hook records without gameplay tags. This is
+static selection evidence, not proof that the hooks execute in a particular
+client binary.
+
+| Hook path | Injection address | Source-only observation |
+| --- | --- | --- |
+| `Online/Core/ForceEngineOnRollback.asm` | `801A4DB4` | Uses rollback state to permit engine-loop work and copies changing rollback fields to stable storage. |
+| `Online/Core/ForceInputRefetchOnAdvance.asm` | `80019614` | Calls the input-renew routine when the online frame-advance flag is set. |
+| `Online/Core/LoopEngineForRollback.asm` | `801A5014` | Re-executes engine frames through the stored rollback end and reconciles sound logs. |
+| `Online/Core/SkipNewInputFetchOnRollback.asm` | `80376A20` | Skips a fresh PAD read during rollback except while a state load is pending. |
+| `Online/Core/TriggerSendInput.asm` | `80376A28` | Routes delayed local and received/predicted remote reports, exchanges frame data, and sets rollback state when comparisons differ. |
+| `Online/Core/InitOnlinePlay.asm` | `8016E748` | Initializes online match state, input indices and RNG; copies the received Stadium-mode byte into the Freeze Stadium injection parameter. |
+
+The exact per-hook source SHA-256/Git blob identities, source lines, summaries
+and unresolved dependencies are in the machine receipt. The initialization
+summary is intentionally narrow: ODB/RXB/SSCB receive explicit zero calls in
+this routine; TXB/SSRB do not. Despite a “Clear A inputs” source comment, the
+hook stores zero as a full 32-bit word at offset zero of each 68-byte-stride pad
+entry for four ports; this source check does not establish an A-only mask or the
+parent field semantics. The mode byte is passed to the Freeze Stadium injection;
+this does not establish a fixed frozen-stage policy.
+
+The bounded checkpoint reduces untagged hooks without a source check from 150
+to 144: 183 active annotated hook paths comprise 27 tagged and 156 untagged;
+12 untagged paths now have bounded checks (six prior and six new), while 144
+remain without one. These checks do not complete semantic coverage. The independent
+review receipt validated source/config selection, hashes and this accounting for
+its v1 packet, and identified three initialization wording corrections now applied
+in v2; it did not validate a binary or runtime behavior.
+
+The corrected external packet is `slippi-untagged-gameplay-review-v2` under run
+`match-rollback-feasibility-20261012-203633-e8f0c964`; its manifest SHA-256 is
+`1a3c5e698c5cd46147703a8dfaf4ab65d55bf315ba7830167eff198bbeb67847`. The independent
+review receipt is `slippi-untagged-gameplay-review-v1-independent-review.json` with
+SHA-256 `fbd0480e519708211336d0657a3467ff3412e5c588009a6311c58c46f3d66e25`. This update
+does not alter the earlier release/configuration pairing, v4 branch-scoped mode
+findings, or the separate m-ex generation and contributor-rights unknowns. No
+Slippi code or profile has been ported, and no binary/reference validation is
+claimed. Offline Vanilla remains a separate profile decision from Slippi rules;
+this online-only source review does not alter it.
 
 ## Pins and license findings
 

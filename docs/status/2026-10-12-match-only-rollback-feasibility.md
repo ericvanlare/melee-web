@@ -1,6 +1,6 @@
 # Match-only rollback feasibility
 
-**Compiled / Source-only snapshot diagnostic / Browser rollback and frame-budget feasibility unproven**
+**Compiled / Source-only snapshot diagnostic / Terminal browser tick-and-draw diagnostic / Browser rollback and frame-budget feasibility unproven**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
 [draft #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
@@ -85,16 +85,66 @@ source-inventory caveat. Sample 300 observation/PCM matches the first experiment
 its one-tick and this seven-tick memory endpoints are different states and are
 not compared with each other. No successful capture was repeated.
 
+## First terminal browser tick and source draw
+
+A private, default-off Release diagnostic reached the original two-human Mario/FD
+match through CSS, Rules/Items/Rules Plus and SSS. At frame 188, both keyboard
+ports were observed neutral and both fighters grounded with four stocks. The
+next ordinary callback returned exactly one original tick and draw at frame 189,
+with the observed GPU-submit counter increasing from 3231 to 3232. The terminal
+measurement then polled the actual four-port PAD bank, advanced one original tick
+to frame 190, ran the complete source draw and CPU finalization, and closed the
+owner after real prior-work and cleanup fences. It never restored or resumed the
+browser instance. The four-port raw bytes include disconnected-port errors;
+unused rows were not replaced with invented neutral input.
+
+| One instrumented sample | Observed value |
+| --- | --- |
+| Original tick | 0.215 ms |
+| Begin frame | 0.130 ms |
+| Source draw | 1.900 ms |
+| CPU finalization | 1.590 ms |
+| Native elapsed total | 3.935 ms |
+| Nested WebGPU observer interval | 3.875 ms |
+| GPU submits / encoder finishes / maps | 0 / 0 / 0 |
+| GPU object creation | One command encoder, two bind groups |
+| Queue writes | Four buffer writes, 1,220,880 bytes |
+| Prior-work / cleanup fence | 0.320 / 0.285 ms, both resolved |
+
+The intervals differ and include instrumentation; this is not uninstrumented
+CPU cost. GPU writes and object creation still happen without a submission, so
+omitting Submit does not make heap rewind safe. Native PCM evolution, audio/file
+operation counts, same-instance restore, seven corrective ticks plus current,
+and combined frame-budget cost remain unmeasured. Empty source-menu observations
+are recorded as unknown; the actual match observations are retained separately.
+The browser's reserved heap is 278,396,928 bytes at this boundary; that is neither
+a copied snapshot nor the minimum simulation-state size.
+
+The current H1 export contains no timing incidents and no observed audio
+underruns/overflows; history eviction and missing embedded build identity remain
+explicit. Independently verified served hashes bind the producer. Native
+close/input/Aurora retirement and zero source-owner/cache checks passed; all 12
+recorded PIDs and three process groups are independently absent. The retained
+pre-diagnostic screenshot shows visible FD magenta/texture artifacts and does
+not establish pixel accuracy. Independent source and raw-result reviews pass.
+
+Producer `e8ba53f4` plus patch `128f2918` is distinct from its eventual commit.
+The private Wasm is `ca043e5a`; the default-off runtime omits all four probe
+exports. Both affected Release builds pass. The unchanged assembled executable
+source passes 2,388 tests with 165 skips, including actual retirement-callback
+and extracted-native failure/ordering controls. New exact-head CI is pending.
+The structured receipt retains complete hashes, raw PAD, effects and cleanup.
+
 ## Remaining measurement boundaries
 
 1. **State size/copy/restore:** whole-heap and shared-page measurements are
    observed. Complete mutable owner ranges and external host-state bytes remain
    unknown; retained page payload is not the minimum simulation-state size.
-2. **Source draw and seven corrective ticks:** unmeasured. Existing
-   `suppress_draw` skips required game callbacks and cannot answer this gate.
-   A terminal diagnostic is being prepared to run the full tick/draw path with
-   zero GPU submission, while counting actual resource creation and queue
-   writes. No browser restore or resumed frame is authorized by that diagnostic.
+2. **Source draw and seven corrective ticks:** one terminal tick/draw is now
+   measured above. Existing `suppress_draw` skips required game callbacks and
+   cannot answer this gate. Actual object creation and queue writes remain
+   despite zero GPU submission. Browser restore and a resumed frame remain
+   unproved; the terminal diagnostic grants no admission for either.
    Measure seven corrective ticks plus current separately from seven total,
    including combined capture/restore and final presentation before a budget claim.
 3. **Host effects:** source inspection identifies GPU resources/caches/staging,
@@ -111,6 +161,8 @@ completion. HPS decoded slots and SSM bank mappings have distinct owners.
 The receipt proposes restore, journal or commit-once policies for each owner;
 these are design options, not implemented rollback safety.
 
+
+Lineage-aware follow-up: the retained 11-source v2 inventory and hashes remain a historical snapshot. The later read-only host-state disposition review (SHA-256 ea9f79fad1c6c7dff5457ca5f7c2fda742eb226d99689e415793bd0ab0ee0b5e) records that the current private draw/discard probe checks `source_file_drive_busy` (`request_count`) before close, but does not establish pumping/region, JavaScript Promise/result-map, native audio/HPS/SSM, or GPU-completion closure. It adds no operation counts or rollback-safety evidence. That review proposes owner journals and a later nonterminal replay as design options. The current feasibility queue first chooses the smallest draw-inclusive seven-tick cost experiment alongside the audio/file source inventory and safety policies; the broader instrumentation proposal is not a required implementation step. Nonterminal restore over unknown owners remains inadmissible.
 
 The recommendation remains pending these answers; this fixture is no evidence
 of browser rollback safety or a seven-tick budget pass. Source draw, GPU/JS
@@ -137,8 +189,8 @@ and [source receipt](../evidence/slippi-gameplay-profile-inventory-v1.json) map
 the selected patch configuration, mode behavior and license notices. Ranked and
 Unranked Stadium are unfrozen; Direct/Teams offer a selection. UCF 0.84 is selected
 in the shared configuration, while live toggle semantics remain unresolved.
-File/hash closure is reviewed, but 150 untagged ASM hooks lack bounded semantic
-checks. A source/configuration pairing is now identified for release v3.6.4, and the
+File/hash closure is reviewed, but 144 untagged ASM hooks still lack bounded semantic
+checks after a further six online rollback/input hooks were reviewed. A source/configuration pairing is now identified for release v3.6.4, and the
 selected m-ex artifact is traced to matching checked-in bytes. Executable reference
 validation, reproducible m-ex generation and reuse rights remain open. No profile
 code was ported, and the source inventory task remains open.

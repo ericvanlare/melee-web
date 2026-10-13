@@ -1258,7 +1258,7 @@
     "caveat": "PinnedsourceJSONbehavior verified; historical executable producing checked-in generatedoutput remainsunknown. No inferred historicalproduceridentity."
   },
   "gameplay_effect_inventory": {
-    "coverage": "Source-only partial checkpoint:183uniqueannotated activeASMhookpaths among288generateddefaultrecords;27ASMhooks taggedaffects-gameplay. Of156untaggedASMhooks,6have additionalbounded sourcechecks and150lacksuchcheck;1furtherreview is .sdependency. Neither tagging nor these boundedchecks completes semanticcoverage.",
+    "coverage": "Source-only partial checkpoint: 183 unique annotated active ASM hook paths among 288 generated default records; 27 ASM hooks are tagged affects-gameplay. Of 156 untagged ASM hooks, 12 have additional bounded source checks and 144 lack such a check; one further review is a .s dependency. Neither tagging nor bounded checks complete semantic coverage.",
     "active_tagged_gameplay_hook_count": 27,
     "active_tagged_hooks": [
       {
@@ -1703,9 +1703,99 @@
         "summary": "Defines four 12-byte PAD reports and a maximum offline delay of 15 frames.",
         "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Common/UseInGameDelay/InGameDelay.s#L11",
         "status": "additional bounded source review; not a complete recursive semantic audit"
+      },
+      {
+        "path": "Online/Core/ForceEngineOnRollback.asm",
+        "source_lines": "11-76",
+        "source_sha256": "06d871048a0092516a4de3896d6d454250f5438912e97809862a394183d47830",
+        "git_blob_sha": "4a782535db287beb65be813d3c3daaf3a26cc82f",
+        "injection_address": "801A4DB4",
+        "category": "Required: Slippi Online",
+        "tag": "",
+        "summary": "For the online in-game scene and a zero-valued field read through 0x80479d64, disables interrupts and checks the ODB. If the parent reports input work, it proceeds to prepare engine loops; with no parent input but rollback active it sets r27 to one so a rollback iteration can run. It copies rollback-active, rollback-end, should-load-state, and savestate-frame values into stable ODB fields before the engine-loop code. With no input and no rollback, it may clear the force-pad-renew flag and call RenewInputs_Prefunction. It then follows the replaced parent branch/wait flow.",
+        "gameplay_relevance": "Controls whether and how the online game engine advances during rollback; direct simulation-step timing/control.",
+        "unresolved_dependency": "The source calls 0x80479d64 \u201cBelieved to be some loading state\u201d; parent routine register and branch meanings, interrupt safety, RenewInputs_Prefunction behavior, relationship to input hook mutation, and executable-address correspondence are not validated.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/ForceEngineOnRollback.asm#L11",
+        "status": "additional bounded source review; not a complete recursive semantic audit; no runtime validation",
+        "review_packet": "slippi-untagged-gameplay-review-v2"
+      },
+      {
+        "path": "Online/Core/ForceInputRefetchOnAdvance.asm",
+        "source_lines": "8-30",
+        "source_sha256": "503f9bd0e287c3d437adeecf9981a0c40b41e4fb750ea905389bd64291ed74c2",
+        "git_blob_sha": "a3cd315693adaa9516075b4c78f3e09a4b1fc2f7",
+        "injection_address": "80019614",
+        "category": "Required: Slippi Online",
+        "tag": "",
+        "summary": "Executes the replaced call at 0x8001d2bc first. On the online in-game path gated by the same 0x80479d64 zero check, reads ODB_IS_FRAME_ADVANCE and calls RenewInputs_Prefunction when it is nonzero.",
+        "gameplay_relevance": "Changes controller-input renewal/engine-loop work after an advance response, affecting which input sample is associated with subsequent simulation.",
+        "unresolved_dependency": "The exact engine caller contract and the effect/count of RenewInputs_Prefunction are not derived here; the loading-state field meaning is explicitly uncertain in source comments; no runtime trace.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/ForceInputRefetchOnAdvance.asm#L8",
+        "status": "additional bounded source review; not a complete recursive semantic audit; no runtime validation",
+        "review_packet": "slippi-untagged-gameplay-review-v2"
+      },
+      {
+        "path": "Online/Core/LoopEngineForRollback.asm",
+        "source_lines": "9-204",
+        "source_sha256": "3b73ee2323b86160eb9a70a23cf471f51e099ab64b1a7152534cae85a0f94e63",
+        "git_blob_sha": "33bbc7cc23c08df301c5a3213817712be49bf2ee",
+        "injection_address": "801A5014",
+        "category": "Required: Slippi Online",
+        "tag": "",
+        "summary": "Preserves the original conditional branch for its non-online/loading path. In the online path it tracks per-frame pending/stable sound logs, stops sound instances present in the previous stable log but absent from the re-executed pending log, copies pending log to stable, and advances the sound/frame ring on a new frame. If stable rollback remains active and current frame is before the recorded end, it invokes the camera-task helper and branches to the engine-loop start; at/after the end it clears rollback-active flags and exits the input loop.",
+        "gameplay_relevance": "Directly re-runs engine frames during rollback and adjusts accompanying sound side effects; this is a simulation and user-visible audio timing boundary.",
+        "unresolved_dependency": "The source itself marks r26 increments as uncertain (\u201cProbably not necessary\u201d and \u201cNot 100% sure about whether this is safe\u201d); correctness depends on exact original loop state, camera-task helper, paired input/savestate hooks, interrupt behavior and target executable.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/LoopEngineForRollback.asm#L9",
+        "status": "additional bounded source review; not a complete recursive semantic audit; no runtime validation",
+        "review_packet": "slippi-untagged-gameplay-review-v2"
+      },
+      {
+        "path": "Online/Core/SkipNewInputFetchOnRollback.asm",
+        "source_lines": "12-43",
+        "source_sha256": "788b23a10084d54e2bfcb23822dbf6ea57dc95a6e892570699896b8407b44379",
+        "git_blob_sha": "01b10f9fbebacc869951fec3d06e81de0405fbbf",
+        "injection_address": "80376A20",
+        "category": "Required: Slippi Online",
+        "tag": "",
+        "summary": "On the online in-game path with the loading gate clear, if rollback is active and the should-load-state flag is zero, branches past the PADRead path into TriggerSendInput. If rollback is inactive or state should be loaded, falls through to the replaced addi instruction and PADRead.",
+        "gameplay_relevance": "Selects whether a new physical/controller sample is acquired during rollback, so it changes the input stream used by the engine.",
+        "unresolved_dependency": "Depends on parent PAD-read control flow and precise flag update/load order; source comment specifically mentions frame advance can request another input before savestate processing. No executable control-flow check or runtime sample.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/SkipNewInputFetchOnRollback.asm#L12",
+        "status": "additional bounded source review; not a complete recursive semantic audit; no runtime validation",
+        "review_packet": "slippi-untagged-gameplay-review-v2"
+      },
+      {
+        "path": "Online/Core/TriggerSendInput.asm",
+        "source_lines": "30-38;64-76;82-169;172-280;282-381;383-727;729-900;908-978",
+        "source_sha256": "f851335ec34afcbe8f0c193b5f455db7c467b4cac43f8fdce933565a0dd29b4f",
+        "git_blob_sha": "52847705f5c7fa3454e6843cc9fbe7efaf6c5ddb",
+        "injection_address": "80376A28",
+        "category": "Required: Slippi Online",
+        "tag": "",
+        "summary": "Runs only for the online in-game scene when the field at 0x80479d64 is zero. When not in the rollback handler it can zero all four reports during the configured freeze window; clamps both local stick axes to zero when each coordinate is within \u00b12; replaces a local report whose status byte is -3 with the prior local input (the comment says the game likely does this but is unsure); saves the last input; sends frame index, stable finalized frame/checksum, delay and local report via EXI, then reads a response. RESP_SKIP can branch to the parent restore path without handling input unless game-over is set; RESP_DISCONNECTED and RESP_ADVANCE set flags. It rotates delayed local reports, stores rollback-local history, compares actual remote reports against predicted reports (buttons, raw stick bytes, and triggers with values <=42 treated as deadzone), advances matching predictions/finalized state, and sets rollback/savestate flags and end frame when a mismatch requires rollback. Missing remote inputs use the most recent received report and save prediction/input indices; the rollback handler replays local history and reuses opponent input loading. The hook increments ODB_FRAME on its normal exit.",
+        "gameplay_relevance": "Central online controller sampling, delayed/local and remote input routing, prediction, rollback trigger, and game-frame counter behavior.",
+        "unresolved_dependency": "The parent stack layout/PAD report semantics and status -3 meaning are not independently established; EXI packet/response semantics and target-side RX/TX generation are outside this ASM-only check; exact savestate timing/address bridge and controller transformations need runtime/reference checks; source comments identify uncertainty on freeze frame timing. Behavior here is online-client-specific and does not imply offline vanilla mode behavior.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/TriggerSendInput.asm#L30",
+        "status": "additional bounded source review; not a complete recursive semantic audit; no runtime validation",
+        "review_packet": "slippi-untagged-gameplay-review-v2"
+      },
+      {
+        "path": "Online/Core/InitOnlinePlay.asm",
+        "source_lines": "16-60;62-106;108-260;262-301;304-458",
+        "source_sha256": "d0a5df91c9b535b3c711880a4156769c2b3e799e7e72bc9d071be9fd90394067",
+        "git_blob_sha": "c8e75c90be4c0656454e074d7e6c44d6aa46b14a",
+        "injection_address": "8016E748",
+        "category": "Required: Slippi Online",
+        "tag": "",
+        "summary": "Calls the replaced StartMelee routine first, then limits added setup to the online in-game scene. Allocates ODB, TXB, RXB, SSRB and SSCB buffers. In this routine it explicitly calls Zero_AreaLength for ODB, RXB and SSCB; no corresponding zero call follows the TXB or SSRB allocations. It records the ODB/RX/control-buffer addresses and sizes for preservation across savestates; initializes game frame to 1 and the completion handler. Loads match-state data, writes local/input/remote indices and RNG offset into ODB, writes that offset into the global seed, and copies the match info block. It loads the MSRB_ALT_STAGE_MODE byte and stores that byte at offset +8 from the computed INJ_FREEZE_STADIUM branch target, as a parameter in gecko code space; this source does not establish a fixed frozen-stage policy. Ranked tiebreak path can overwrite timer to 180 and all four stock bytes to 1 (unless the last end-mode byte is 7); Ranked non-tiebreak sends match-start EXI data. Teams path derives and writes four costume indices. Delay is clamped to 1..15. Despite the \u201cClear A inputs\u201d comment, the loop stores zero as a full 32-bit word at offset 0 of each 68-byte-stride pad entry based at 0x804c20bc, for all four ports; no A-only mask is applied in this hook. It creates an RNG GObj, and its procedure writes global seed from rotated global frame plus ODB RNG offset. The completion handler builds a result report including result/game/player/game-info fields and sends it over EXI.",
+        "gameplay_relevance": "Online match initialization sets game frame, controller-port mapping, RNG values and delay; also carries mode-dependent match setup and a raw full-word pad write before simulation. Completion reporting is adjacent but not itself a game-state claim.",
+        "unresolved_dependency": "Match-state struct layout, hard-coded game addresses, seed timing and game RNG call behavior, EXI server/response contract, source game revision, and tiebreak/Teams behavior are not validated against an executable/reference run. For the pad write, this hook shows a full 32-bit store but does not independently establish the word\u2019s field semantics or downstream effects. The Freeze Stadium parameter\u2019s runtime interpretation is not derived here; copying MSRB_ALT_STAGE_MODE does not prove any fixed frozen-stage policy.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/InitOnlinePlay.asm#L16",
+        "status": "additional bounded source review; not a complete recursive semantic audit; no runtime validation",
+        "review_packet": "slippi-untagged-gameplay-review-v2"
       }
     ],
-    "untagged_active_hook_semantics_unreviewed_count": 150,
+    "untagged_active_hook_semantics_unreviewed_count": 144,
     "active_source_file_notes": {
       "selected_roots_total_files": 198,
       "asm_hook_sources": 183,
@@ -1748,8 +1838,54 @@
       }
     ],
     "untagged_active_hook_total_count": 156,
-    "untagged_active_hook_bounded_review_count": 6,
-    "additional_support_source_bounded_review_count": 1
+    "untagged_active_hook_bounded_review_count": 12,
+    "additional_support_source_bounded_review_count": 1,
+    "untagged_gameplay_hook_review_v2": {
+      "packet": "slippi-untagged-gameplay-review-v2",
+      "run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+      "source_repository": "project-slippi/slippi-ssbm-asm",
+      "source_commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+      "packet_manifest_sha256": "1a3c5e698c5cd46147703a8dfaf4ab65d55bf315ba7830167eff198bbeb67847",
+      "report_sha256": "37186c0c11f03fbe8de613099e5a3e762818ba3dc0dde1b49d0ada5f31f0bc42",
+      "review_json_sha256": "7649175682ec95d8a31a2819b42df70b6523014d7617c6abc10b1edb867f7de3",
+      "remaining_unreviewed_sha256": "d4c97019b844348625018e72c7ce978b682136222caea01b70c0bc31bd76b569",
+      "checked_hook_count": 6,
+      "previous_bounded_untagged_hook_count": 6,
+      "total_bounded_untagged_hook_count": 12,
+      "untagged_hooks_still_without_bounded_check": 144,
+      "accounting": [
+        "183 - 27 = 156",
+        "156 - 6 prior - 6 new = 144"
+      ],
+      "configuration_selection": {
+        "category": "Required: Slippi Online",
+        "selected_by_default": true,
+        "root": "Online/Core",
+        "recursive": true,
+        "netplay_json_line": 291,
+        "evidence_scope": "Pinned static config/generated source selection only; does not establish runtime activation or accepted client identity."
+      },
+      "reviewed_scope": "Online rollback engine/input path: online match setup, controller input routing, prediction and rollback re-execution.",
+      "independent_review": {
+        "artifact": "slippi-untagged-gameplay-review-v1-independent-review.json",
+        "sha256": "fbd0480e519708211336d0657a3467ff3412e5c588009a6311c58c46f3d66e25",
+        "reviewed_packet": "slippi-untagged-gameplay-review-v1",
+        "decision": "PASS_STATIC_SELECTION_IDENTITY_AND_150_TO_144_ACCOUNTING; CORRECT_INIT_SUMMARY_WORDING_BEFORE_PUBLICATION",
+        "finding": "Validated selection, source/blob identities and 150-to-144 accounting; requested three precise InitOnlinePlay wording corrections, now applied in v2.",
+        "v2_independently_reviewed": false
+      },
+      "limits": [
+        "Source-only, bounded review.",
+        "No executable/binary/profile activation, runtime trace, acceptance test, or full semantic audit.",
+        "Six new checks do not establish gameplay completeness; tag absence does not imply non-gameplay.",
+        "Prior source/release and license boundaries remain unchanged."
+      ],
+      "root_correction_review": {
+        "artifact": "root-slippi-six-hook-review-v2.json",
+        "sha256": "e1b95efa41b0e470b9907c8437fabcc54c2bcdc0978c92ec9250ab88d9f5d928",
+        "scope": "Verified frozen v2 hashes, unchanged reviewed raw bytes and precise initialization corrections; no runtime or full semantic claim."
+      }
+    }
   },
   "schema": "slippi-gameplay-profile-inventory-v1",
   "evidence_label": "Source identified / Partial semantic inventory / No port or runtime comparison",
@@ -1760,7 +1896,18 @@
     "inventory_sha256": "0a2edc85cff4843065f3c5449136ebef1734fedd90f65916f2ef41ed53e65526",
     "report_sha256": "b72f56c0ac28744f957569436e1b157bb01ffb094b84d71fb95ebf272a654dab",
     "freeze_sha256": "cd170870e70ce9f72299060928f6d9208617c6750f33e38fe45736cc9fe22db3",
-    "root_review_sha256": "e615cb51a81515b2376b508f54abbac8005505fe6d2bc4d62bb9af80f5eb2296"
+    "root_review_sha256": "e615cb51a81515b2376b508f54abbac8005505fe6d2bc4d62bb9af80f5eb2296",
+    "untagged_gameplay_review_v2": {
+      "run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+      "directory": "slippi-untagged-gameplay-review-v2",
+      "packet_manifest_sha256": "1a3c5e698c5cd46147703a8dfaf4ab65d55bf315ba7830167eff198bbeb67847",
+      "report_sha256": "37186c0c11f03fbe8de613099e5a3e762818ba3dc0dde1b49d0ada5f31f0bc42",
+      "review_sha256": "7649175682ec95d8a31a2819b42df70b6523014d7617c6abc10b1edb867f7de3",
+      "remaining_unreviewed_sha256": "d4c97019b844348625018e72c7ce978b682136222caea01b70c0bc31bd76b569",
+      "independent_review_artifact": "slippi-untagged-gameplay-review-v1-independent-review.json",
+      "independent_review_sha256": "fbd0480e519708211336d0657a3467ff3412e5c588009a6311c58c46f3d66e25",
+      "independent_review_scope": "The independent review inspected v1 and validated static selection/source identities/accounting; it raised three InitOnlinePlay wording corrections. The corrected v2 applies them; this field does not claim an independent re-review of v2."
+    }
   },
   "active_source_inventory": {
     "selected_categories": [
@@ -4312,5 +4459,5 @@
     ],
     "portable_projection_review_sha256": "4d3975d8d819b9eb8a23e94f4bbdd22817100e381556a11d1f9eba374384c9e5"
   },
-  "prior_snapshot_scope": "Fields outside source_provenance_followup retain the original v4 source snapshot. The follow-up supersedes its unknown checked-in m-ex artifact association and adds released-source/config pairing, without resolving actual binary generation, rights, executable validation or full semantics."
+  "prior_snapshot_scope": "Release, license, mode, and source-provenance findings retain their original v4 scope and identities. The gameplay_effect_inventory adds six bounded hook checks from slippi-untagged-gameplay-review-v2 and updates the untagged-check counts; external_packet records that packet and its independent-review identity. The source_provenance_followup continues to add released-source/config pairing and narrow m-ex artifact association without resolving exact binary generation, contributor/reuse rights, executable validation, or full semantics."
 }

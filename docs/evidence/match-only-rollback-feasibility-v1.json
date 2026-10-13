@@ -235,9 +235,10 @@
     "layout_scope": "Intermediate ssize_t and duplicate compatibility typedef failures retained. Final actual Wasm layout compiles with Stats192/Observation1280 assertions."
   },
   "draw_measurement": {
-    "state": "unmeasured",
-    "scope_addendum_sha256": "e11b2302bface89cef34be1b552ee4c8b0acf481b29a5a46ca92d75fdd70d0fd",
-    "required": "Full source tick/draw/flow-present, real zero Queue.Submit, balanced terminal cleanup; count actual Create/WriteBuffer. No browser restore or instance reuse."
+    "state": "one_terminal_original_tick_draw_zero_submit_component_pass",
+    "receipt": "terminal_draw_diagnostic",
+    "seven_corrective_ticks_and_combined_budget": "UNMEASURED",
+    "browser_restore": "NOT_ADMITTED"
   },
   "host_state": {
     "state": "source_inventory_not_measured_rollback_safety",
@@ -333,7 +334,19 @@
       "correction": "Clarify decoded slots belong to HPS, not SSM; all policies remain proposals."
     },
     "inventory_sha256": "5cc08779ba15844401a410279ff6e2b634e7423cb8baf4084487c551003782f2",
-    "inventory_result_review_sha256": "fa3adbc66e012ad030743308a93e598576cc91058faecf110318ba1f18c7dea7"
+    "inventory_result_review_sha256": "fa3adbc66e012ad030743308a93e598576cc91058faecf110318ba1f18c7dea7",
+    "lineage_aware_followup": {
+      "state": "lineage_aware_read_only_source_review_no_new_measurements",
+      "review_artifact": "rollback-host-state-disposition-v1.md",
+      "review_artifact_sha256": "ea9f79fad1c6c7dff5457ca5f7c2fda742eb226d99689e415793bd0ab0ee0b5e",
+      "scope": "Read-only source follow-up reuses the 11-source owner inventory as historical lineage; its source hashes are unchanged. No new host-operation counts, runtime measurements, or rollback-safety result were added.",
+      "current_private_probe_guard": "Adds a pre-close source_file_drive_busy request_count check. It does not establish source pumping or writable-region closure, JavaScript Promise/result-map closure, native audio/HPS/SSM closure, or GPU completion closure.",
+      "retained_source_review_options_not_execution_queue": [
+        "Record operation/generation receipts for source-file requests and asynchronous JS completions, native audio/HPS/SSM, AudioWorklet output, and GPU callbacks across one full tick/draw; retain unknowns where unobserved.",
+        "After owner boundaries are measured or fail closed, run one nonterminal same-instance seven-tick replay with exact raw input and original source order, stale-completion rejection, and once-only external audio/presentation; evaluate combined cost only against an explicit end-to-end budget."
+      ],
+      "current_feasibility_next_boundary": "Choose the smallest draw-inclusive seven-tick cost experiment alongside the source-owned audio/file inventory and proposed safety policies. The retained broad journal/replay proposal is not the committed execution queue; no nonterminal restore over unknown owners."
+    }
   },
   "seven_tick_budget": {
     "state": "unmeasured_with_source_draw",
@@ -864,5 +877,472 @@
     "scope": "Snapshot-runner checkpoint. Subsequent executable changes need affected validation; no complete rollback milestone or merge.",
     "unittest_elapsed_seconds": 519.934,
     "process_elapsed_seconds": 520.2733840411529
+  },
+  "terminal_draw_diagnostic": {
+    "state": "independently_reviewed_terminal_component_pass",
+    "rollback_admission": false,
+    "scope": "One original tick and complete source draw followed by CPU finalization, with GPU command submission suppressed. Terminal owner is closed; no restore, resumed frame, Results, source equivalence, pixels/PCM agreement or seven-tick budget result.",
+    "raw_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964/terminal-draw-browser-v1",
+    "producer": {
+      "head": "e8ba53f496149626e33244334bd5c80cdd688f0d",
+      "uncommitted_source_patch_sha256": "128f29185873dbe8b42cde67943c2ae6f05f93ad413ffedb1a79d5bf5ee9fb02",
+      "source_files": {
+        "CMakeLists.txt": "5e2a1cf37271c5466b68f54b7c4c369ba8072781d08cac968c1a5b8f1987e84f",
+        "cmake/FighterRuntime.cmake": "2c9fae26dd36228b64e66b76e164fe59bf4101e654a1bd342812862d0f748b05",
+        "patches/aurora-browser.patch": "014dc6ff999e67103f895f7d063bb153c54ab02d46cc8e855347d8f1cb104287",
+        "scripts/build.py": "fd6561613fed88420dd18289686d9697c1a61a53305a4de8823125c01b38a37d",
+        "src/gameplay_menu_browser.cpp": "1ac2b768dd608d2b5da5977dba39f8653b519116996c807dabf26477774b8f5c",
+        "tests/match_draw_discard_retirement.test.mjs": "bc4452208fc330214cb16dbbf9b587b2ab2323015a33a8cd90f13d3ca202c0d5",
+        "tests/test_match_draw_discard_build.py": "f503b051e0e18fe4697bac4d6c8accc49dfd880f7df2177502288dc9e4cbbf75",
+        "tests/test_match_draw_discard_retirement.py": "a5fd2c70313e3faf9b4e7ddaf768027c5310fd867f1e93a11c3275f415831063",
+        "web/melee-runtime.mjs": "d898c09b08ccef1e62155d33c0cd582df2cd63ef6eb49cfd35efc192a3d048cf"
+      },
+      "private_release_artifacts": {
+        "gameplay_menu_browser.js": {
+          "sha256": "0d17ccbd01b3dad1bcfd9ca7d0e02200842e1468402bd162c75dfbeb80f71d62",
+          "bytes": 303123
+        },
+        "gameplay_menu_browser.wasm": {
+          "sha256": "ca043e5a6d9a05bae2cdc8f02bd43142c38e8fce7ea16c9cd2ba3e49d2dbceb6",
+          "bytes": 15842654
+        },
+        "gameplay_menu_browser.data": {
+          "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+          "bytes": 3674112
+        },
+        "melee-runtime.mjs": {
+          "sha256": "d898c09b08ccef1e62155d33c0cd582df2cd63ef6eb49cfd35efc192a3d048cf",
+          "bytes": 55405
+        }
+      },
+      "ordinary_release_native_bytes_unchanged_from_prior_v2": true,
+      "ordinary_profile_probe_exports_present": false
+    },
+    "harness": {
+      "manifest_sha256": "96cf454c6e75bc7089a71f3c5f2b6e604ce74c848060771f2be4d5f41e32adf0",
+      "files": {
+        "CONTRACT.md": "b51958bd40234d49dedd11b318592a85d89597f426f0cd7386d49818184727a1",
+        "normal-frame-control.js": "e2f3aa1f3fa32f8bc61fa33285cab9561c6839317571318c78cf1146f62d4555",
+        "normal-frame-control.test.mjs": "3de1060aeaba8f13b0c882f68a959d70073423eb0d5337b578a1a783c551deaf",
+        "runner-failure-controls.test.mjs": "d5725e283500480f8d369dd92b9aeadad7187a94e77d7e671b3dc7b131a46c0a",
+        "terminal-probe.js": "0a7ae65a8795acdafeeda22b0a3f9febd2d258f72dd9e8f981e2899a53e77993",
+        "v3-v4-producer-identity.diff": "178e2a9582f4174d6dc107d24310e98da447d7ec3e5c0529d576aaafa1ec3ebe",
+        "vs_rules_item_menu_draw_discard_candidate.mjs": "443dc7db80152798ef940ec95906bbdc614830c3369d5b253c6b0c36f20c8b31",
+        "webgpu-observer.js": "834f237801671d44c7b6ef260b652972042f1578ff53e60ea76e4d2b5846234c"
+      },
+      "selection": "competitive-match-start-only + draw-discard-diagnostic",
+      "browser_version": "155.0.8059.40",
+      "headless": true,
+      "speakers_muted_audio_processing_enabled": true
+    },
+    "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "normal_positive_control": {
+      "source_frame_before": 188,
+      "source_frame_after": 189,
+      "source_steps_returned": 1,
+      "normal_draw_calls_returned": 1,
+      "phase_at_publication": 7,
+      "running_at_publication": true,
+      "submit_count_before": 3231,
+      "submit_count_after": 3232,
+      "source_draw_semantics": "SourceFrameSequence counts a draw only when present_source returns true; match->draw returned after a real BeginFrame"
+    },
+    "native_measurement_before_retirement": {
+      "source_frame_before": 189,
+      "source_frame_after": 190,
+      "tick_calls_returned": 1,
+      "draw_and_flow_present_calls_returned": 1,
+      "tick_ms": 0.214999914,
+      "begin_ms": 0.130000114,
+      "draw_ms": 1.89999986,
+      "end_ms": 1.59000015,
+      "total_native_ms": 3.93500018,
+      "ended": 1,
+      "uncommitted_after_submit_callbacks": 0,
+      "uncommitted_depth_copies": 0,
+      "pending_depth_maps": 0,
+      "depth_latest_reads": 0,
+      "depth_requests": 0,
+      "depth_identity_before": "14695981039346656037",
+      "depth_identity_after": "14695981039346656037",
+      "raw_pad_bytes": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "source_failed": false,
+      "browser_pcm_evolution": "UNMEASURED",
+      "resumable": false,
+      "native_retired": false
+    },
+    "native_retired_field_scope": "The native measurement was serialized before retirement and correctly reports native_retired:false. Later retire_return=1, actual completion callback and read-only zero-owner checks establish retirement separately.",
+    "gpu_effects": {
+      "schema": "terminal-draw-discard-webgpu-effects-v2",
+      "phase": "retired",
+      "covered": [
+        "GPUQueue.submit",
+        "GPUQueue.writeBuffer",
+        "GPUQueue.writeTexture",
+        "GPUQueue.onSubmittedWorkDone",
+        "GPUDevice.createBuffer",
+        "GPUDevice.createTexture",
+        "GPUDevice.createCommandEncoder",
+        "GPUDevice.createBindGroup",
+        "GPUDevice.createBindGroupLayout",
+        "GPUDevice.createPipelineLayout",
+        "GPUDevice.createShaderModule",
+        "GPUDevice.createSampler",
+        "GPUDevice.createRenderPipeline",
+        "GPUDevice.createComputePipeline",
+        "GPUBuffer.mapAsync",
+        "GPUDevice.createComputePipelineAsync",
+        "GPUDevice.createQuerySet",
+        "GPUDevice.createRenderBundleEncoder",
+        "GPUDevice.createRenderPipelineAsync",
+        "GPUTexture.createView",
+        "GPUCommandEncoder.finish"
+      ],
+      "failures": [],
+      "prior_fence": {
+        "label": "prior-work",
+        "queues": [
+          1
+        ],
+        "elapsed_ms": 0.31999993324279785,
+        "actual_onSubmittedWorkDone": true,
+        "queue_work_serial": 18896,
+        "status": "resolved"
+      },
+      "cleanup_fence": {
+        "label": "observed-writes-cleanup",
+        "queues": [
+          1
+        ],
+        "elapsed_ms": 0.2850000858306885,
+        "actual_onSubmittedWorkDone": true,
+        "queue_work_serial": 18900,
+        "status": "resolved"
+      },
+      "measured_ms": 3.875,
+      "preparation_submit_positive_control_calls": 3232,
+      "attempted_submit_calls": 0,
+      "write_buffer_calls": 4,
+      "write_buffer_bytes": 1220880,
+      "write_texture_calls": 0,
+      "write_texture_provided_data_bytes": 0,
+      "create_calls": 3,
+      "pending_host_gpu_operations": 0,
+      "events": [
+        {
+          "method": "GPUDevice.createCommandEncoder",
+          "receiver": 2,
+          "returned": true,
+          "result": 3
+        },
+        {
+          "method": "GPUDevice.createBindGroup",
+          "receiver": 2,
+          "returned": true,
+          "result": 4
+        },
+        {
+          "method": "GPUDevice.createBindGroup",
+          "receiver": 2,
+          "returned": true,
+          "result": 5
+        },
+        {
+          "method": "GPUQueue.writeBuffer",
+          "receiver": 1,
+          "returned": true,
+          "dataOffsetBytes": 0,
+          "bytes": 135160,
+          "destination": 6,
+          "bufferOffset": 0
+        },
+        {
+          "method": "GPUQueue.writeBuffer",
+          "receiver": 1,
+          "returned": true,
+          "dataOffsetBytes": 0,
+          "bytes": 737600,
+          "destination": 6,
+          "bufferOffset": 5242880
+        },
+        {
+          "method": "GPUQueue.writeBuffer",
+          "receiver": 1,
+          "returned": true,
+          "dataOffsetBytes": 0,
+          "bytes": 121296,
+          "destination": 6,
+          "bufferOffset": 30408704
+        },
+        {
+          "method": "GPUQueue.writeBuffer",
+          "receiver": 1,
+          "returned": true,
+          "dataOffsetBytes": 0,
+          "bytes": 226824,
+          "destination": 6,
+          "bufferOffset": 32505856
+        }
+      ],
+      "limits": [
+        "same-realm single-thread WebGPU only",
+        "provided writeTexture bytes are not logical GPU transfer bytes",
+        "browser PCM evolution and asynchronous file/audio host scheduling are unmeasured",
+        "timing includes observer dispatch/event-recording overhead; no uninstrumented cost claim",
+        "actual browser realm attachment requires observed submitted preparation/control frame",
+        "no pixels, state equivalence, source accuracy, performance acceptance or resumability claim"
+      ]
+    },
+    "timing_scope": "One instrumented sample. Native tick/begin/draw/end elapsed totals3.93500018ms; the nested observer measurement is3.875ms. Distinct intervals must not be subtracted or called uninstrumented CPU cost. Real prior/cleanup fences are separate. No combined snapshot/restore/seven-corrective-plus-current/final-presentation measurement.",
+    "source_before": {
+      "status": "unknown-empty-or-non-record-json",
+      "raw": "{}"
+    },
+    "source_after": {
+      "status": "unknown-empty-or-non-record-json",
+      "raw": "{}"
+    },
+    "native_audio_pcm_and_file_operation_counts": "UNMEASURED; terminal direct tick/draw excludes separate native audio_clock loop. Cache occupancy is not voice/request/operation totals.",
+    "memory_occupancy": {
+      "before_control": {
+        "wasm_heap_bytes": 278396928,
+        "allocator_live_bytes": 132269128,
+        "source_allocation_identity": 57242752,
+        "source_allocation_generation": 1,
+        "source_allocation_bytes": 33554432,
+        "source_session_owned": true,
+        "source_world_generation": 5,
+        "source_objects": 62,
+        "source_processes": 90,
+        "source_heap_free_bytes": 32067040,
+        "cached_archives": 18,
+        "cached_audio_banks": 7,
+        "asset_files": 31,
+        "asset_bytes": 19116454,
+        "asset_source_bytes": 18965414,
+        "staged_asset_files": 0,
+        "staged_asset_bytes": 0,
+        "asset_generation": 0
+      },
+      "before_terminal": {
+        "wasm_heap_bytes": 278396928,
+        "allocator_live_bytes": 132269192,
+        "source_allocation_identity": 57242752,
+        "source_allocation_generation": 1,
+        "source_allocation_bytes": 33554432,
+        "source_session_owned": true,
+        "source_world_generation": 5,
+        "source_objects": 62,
+        "source_processes": 90,
+        "source_heap_free_bytes": 32067040,
+        "cached_archives": 18,
+        "cached_audio_banks": 7,
+        "asset_files": 31,
+        "asset_bytes": 19116454,
+        "asset_source_bytes": 18965414,
+        "staged_asset_files": 0,
+        "staged_asset_bytes": 0,
+        "asset_generation": 0
+      },
+      "after_retirement": {
+        "wasm_heap_bytes": 278396928,
+        "allocator_live_bytes": 793160,
+        "source_allocation_identity": 0,
+        "source_allocation_generation": 0,
+        "source_allocation_bytes": 0,
+        "source_session_owned": false,
+        "source_world_generation": 0,
+        "source_objects": 0,
+        "source_processes": 0,
+        "source_heap_free_bytes": 0,
+        "cached_archives": 0,
+        "cached_audio_banks": 0,
+        "asset_files": 0,
+        "asset_bytes": 0,
+        "asset_source_bytes": 0,
+        "staged_asset_files": 0,
+        "staged_asset_bytes": 0,
+        "asset_generation": 0
+      },
+      "scope": "Observed live occupancy and reserved heap length, not minimal simulation size or cumulative allocation counts; no browser heap copy/restore measured."
+    },
+    "h1": {
+      "summary": {
+        "session_id": "session-83fce205e808cae93c0bfa0a7a49c837",
+        "h1_timing_pause_observed": false,
+        "timing_incident_count": 0,
+        "stopped_timing_message": false,
+        "staging_incident_summaries": [],
+        "missing_timing_staging_count": 0,
+        "scope": "H1 observation only; callback latency includes GPU queue and browser delivery, not hardware GPU duration"
+      },
+      "readiness": {
+        "requested": true,
+        "export_available": true,
+        "ring_status": {
+          "frame_slots": 2,
+          "staging_buffers": 2,
+          "reserved_gpu_buffer_bytes": 132120576,
+          "selection": {
+            "requested_frame_slots": null,
+            "selected_frame_slots": 2,
+            "reason": "default_two",
+            "selector_scope": "loopback desktop browser experiment",
+            "byte_hash_requested": false,
+            "byte_hash_enabled": false,
+            "byte_hash_reason": "not_requested",
+            "staging_diagnostics_requested": true,
+            "staging_diagnostics_enabled": true,
+            "staging_diagnostics_reason": "explicit_loopback_opt_in"
+          }
+        }
+      },
+      "audio": {
+        "callback_count": 130,
+        "first_timestamp": 30357.575000047684,
+        "last_timestamp": 84220.99000000954,
+        "max_callback_ms": null,
+        "max_interval_ms": null,
+        "max_queue_depth": 1877,
+        "underruns": 0,
+        "overflows": 0,
+        "clock_seconds": 53.76,
+        "context_state": "running",
+        "enabled": true,
+        "malformed_count": 0
+      },
+      "identity_limitation": "H1 embedded source_commit/runtime_hash are null; exact producer binding comes from independent served-artifact verification and raw capture receipt. History evictions retained; no whole-session H1 acceptance."
+    },
+    "retirement": {
+      "native_return": 1,
+      "cleanup_fence": "REAL_FENCE_RESOLVED",
+      "observer_phase": "retired",
+      "native_owner_check": {
+        "status": "original-retire-and-read-only-owner-check-passed",
+        "note": "The terminal probe invoked original close/input/Aurora shutdown and cancel-loop; no ordinary Eject was issued."
+      },
+      "lifecycle": [
+        {
+          "label": "Original native close/input/Aurora retirement after terminal diagnostic",
+          "wasm_heap_bytes": 278396928,
+          "allocator_live_bytes": 793160,
+          "source_allocation_identity": 0,
+          "source_allocation_generation": 0,
+          "source_allocation_bytes": 0,
+          "source_session_owned": false,
+          "source_world_generation": 0,
+          "source_objects": 0,
+          "source_processes": 0,
+          "source_heap_free_bytes": 0,
+          "cached_archives": 0,
+          "cached_audio_banks": 0,
+          "match_present": false,
+          "menu_present": false,
+          "results_present": false,
+          "prize_present": false,
+          "menu_phase": 0,
+          "scoped_assets": false,
+          "asset_files": 0,
+          "asset_bytes": 0,
+          "asset_source_bytes": 0,
+          "staged_asset_files": 0,
+          "staged_asset_bytes": 0,
+          "asset_generation": 0
+        }
+      ],
+      "owned_pids_absent": 12,
+      "owned_groups_absent": 3
+    },
+    "screenshot_limit": "Pre-diagnostic Ready screenshot retains visible magenta/texture artifacts on FD. This is not pixel-equivalence evidence.",
+    "retained_files": {
+      "browser/report.json": "f17815f421e2b203715da4f1837d56581ef5f8c4fec6153f0809fc71f2b80c37",
+      "owner.json": "8fb5053058f91495b364aff51c0c2f9e8e47518085798c6b817c40203e7537e9",
+      "processes.jsonl": "242665e0576e0c7a5f91badd4f55c0437d35a3b9bfb64657f880d18a763c898a",
+      "release.json": "0c73c76d325e4ec1911730201d3ed39da1f80e3d3dc901e4174d79497213d70d",
+      "root-cleanup-and-artifact-review-v1.json": "cc7773cf2d7e7fc605c44e2cb082155585200c9197e73ae845ad5e60c69d27ec",
+      "browser/10-ready-match-before-terminal-control.png": "86e56f120c4681bdd5a8c4574a3b2ab34989c11d32e0eb8c0cc0b20d515c4cd1"
+    },
+    "build_and_validation": {
+      "regression_tests": 2388,
+      "regression_skips": 165,
+      "regression_receipt_sha256": "c075ac4e821e00c073891feaebf34ee687c6eb156ebc4531aade1b4a5a80734f",
+      "regression_log_sha256": "ddd0cf1892764cfba8cdac3b21564c31ea17a54f14e66161e97fecea8b08f122",
+      "source_unchanged": true,
+      "private_release_receipt_sha256": "d51e05079c1396cf61cd700132ab92f86f3706eabae3cd9c648e36ac68099436",
+      "ordinary_release_receipt_sha256": "9fe3b28396c6c1ca5ef05525657e2d82d9632e33bb5e099248c9f17e1254fe3c",
+      "exact_head_ci": "Pending new commit; historical e8/92c checks do not cover these executable changes."
+    },
+    "next": "Review the smallest bounded follow-up that can answer seven-tick cost without implementing full rollback; audio/file source inventory and safety policies remain explicit. No nonterminal restore over unowned host handles.",
+    "reviews": {
+      "assembled-source-review-v1.json": "691fc9b92c5a5423ffb0c71d31831f92bd5e9bc421dd87815eabac84c13337fb",
+      "terminal-draw-browser-v1/independent-result-review-v1.json": "d34480c812674137f8d6ec13d90dacbd5c2eb47ef9ae083ec58fba05941c97cc",
+      "root-terminal-completion-notification-review-v1.json": "4652460d04181dcf37307dc1d090303994018ea487bb6dcb4839463d9464bd33",
+      "root-draw-adapter-v3-review.json": "ef76a90ccfb7eb359705be5a13ff0c949a01191db64fd399103f6175d1616180"
+    }
   }
 }
