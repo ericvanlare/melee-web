@@ -38,7 +38,25 @@ input row was never published or consumed. Raw cleanup observations and the
 refusal remain retained. Renderer-source coordinates, lockstep cursor, native
 match frame and callback frame are recorded separately in the receipt.
 
-Next, reduce the observed creation records against the existing preparation
-cache and exact descriptor identities. No new capture, descriptor prewarming,
-timing-guard change, performance result, rollback admission or route acceptance
-follows from this checkpoint.
+The copied-profile cache recovery now contains exact configuration bytes for all
+six observed descriptors, cross-checked between peers. A review error opened the
+exported SQLite databases directly and changed their shared-memory sidecars.
+Independent audit confirms the database/WAL files, saved descriptor bytes and
+original/full-copy profiles unchanged. The altered sidecars and stopped seed
+attempt remain retained. A guarded private DB+WAL recovery passed, including
+verification that its backup can be read without sidecars.
+
+The independently reviewed change adds only those six descriptors to the
+existing startup cache and preserves every prior row and its stored order. Its
+exact identities, recovery incident, provenance and review state are in the same
+portable receipt. Focused seed and append-only reviewer tests pass; full
+regression, affected builds and browser verification remain pending. The proposed change reuses existing
+background preparation without hidden game ticks/draws or changes to input,
+RNG, source order or timing guards.
+
+Next, verify the changed seed through the same bounded respawn recipe. Require
+import and queue-drain evidence before live demand, then positive READY/use
+evidence at respawn, the existing grounded endpoint, strict input/checksum and
+cleanup checks. A cache row or absence of a CREATE event alone does not prove preparation. Retain any
+canceled-input refusal or early preparation stop; no stall fix, performance,
+rollback admission or route acceptance is yet claimed.

@@ -998,5 +998,186 @@
   "prior_portable_checkpoint": {
     "artifact": "h1-first-use-portable-checkpoint-v1.json",
     "sha256": "25008efd63cf05b54cb94745c19888a19e4b979838e8921c7a509e693b025d37"
+  },
+  "exact_six_cache_preparation_candidate": {
+    "status": "INDEPENDENTLY_REVIEWED_EXACT_SIX_ADDITION_RUNTIME_VALIDATION_PENDING",
+    "source_runtime": "6ee4a07a95b0cf760b9e7796d780b21c33b93812",
+    "source_capture": {
+      "external_run_relative_path": "h1-self-ko-prefix-browser-v1/browser/report.json",
+      "sha256": "6c0a8189b431de652e63b18f3d1f0a5697b3216ff8eadeb9570554dd2e7d2a7e"
+    },
+    "recovery": {
+      "storage_scope": "Only copied-profile pipeline cache DB/WAL/SHM exported. Dawn file names and lengths observed as metadata only; no Dawn payload admitted.",
+      "v4_storage_pass": true,
+      "original_profiles_unchanged": true,
+      "six_blobs_match_both_profiles": true,
+      "shm_incident": "An independent reviewer opened both raw exported databases in SQLite mode=ro, which changed their SHM sidecars. Both DB and WAL files, all saved target BLOBs and canonical/full-copy profiles stayed byte-identical. The raw three-file export is not claimed immutable. Altered SHM remains retained evidence.",
+      "independent_contract": {
+        "external_run_relative_path": "h1-export-shm-discrepancy-root-audit-v1/independent-recovery-contract-v1.json",
+        "sha256": "646dcae8d5e63c24d0c4896f5e01f9f4a4201a9b28bfcd0dbaf1e10685eeb9e8"
+      },
+      "private_recovery": {
+        "external_run_relative_path": "h1-private-dbw-recovery-actual-v1/report.json",
+        "sha256": "52f08b65b347ed6dc1cffc806b5f637a49b893640c5aec4f9f96a203848e84fa"
+      },
+      "root_result_review": {
+        "external_run_relative_path": "h1-private-dbw-recovery-actual-v1/root-result-review-v1.json",
+        "sha256": "a325c877ec4395c987b5decebf2ec0716ef176122fd92fde6b532edddb7543c1"
+      },
+      "method": "Copy unchanged DB+WAL into a private workspace, regenerate private SHM, SQLite backup to a standalone DB, verify via clean DB-only copy. Before/after source guards pass; no raw SHM used.",
+      "historical_refused_seed_attempt": {
+        "external_run_relative_path": "h1-root-preparation-seed-candidate-v1/first-failure-receipt.json",
+        "sha256": "e99265cb6def06fb710670f1b6bf938e757dbe80fb611ce6b32c5dc9d33f6211"
+      }
+    },
+    "base": {
+      "decoded_sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+      "rows": 884,
+      "type1_rows": 883,
+      "row_order_preserved": true
+    },
+    "candidate": {
+      "decoded_sha256": "1eb094d18d16f0894840e297d975f52bb97ead994e723fa13887b6ecda0a17a6",
+      "encoded_sha256": "9e5e539b52114569fe8e12debb2d728dc084480806c50e810721960ff0ded446",
+      "decoded_bytes": 3702784,
+      "rows": 890,
+      "type1_rows": 889,
+      "all_884_base_rows_preserved_field_for_field": true,
+      "selected_rows": [
+        {
+          "beta_crosscheck_first_frame_used": 820,
+          "beta_is_crosscheck_only": true,
+          "config_bytes": 2772,
+          "config_sha256": "11162b0ef548ca81311c56c60648ad88b4cec6d6a43c2081cae8006a1e25f018",
+          "config_size": 2772,
+          "config_version": 65549,
+          "hash": 228672204,
+          "pipeline_ref": "0x0da142cc",
+          "selected_first_frame_used": 1278,
+          "type": 1
+        },
+        {
+          "beta_crosscheck_first_frame_used": 820,
+          "beta_is_crosscheck_only": true,
+          "config_bytes": 2772,
+          "config_sha256": "af384190d7190036573cfa07ff20e9432b854ea869967d3aa0888e42449dd588",
+          "config_size": 2772,
+          "config_version": 65549,
+          "hash": 700090715,
+          "pipeline_ref": "0x29ba895b",
+          "selected_first_frame_used": 1278,
+          "type": 1
+        },
+        {
+          "beta_crosscheck_first_frame_used": 820,
+          "beta_is_crosscheck_only": true,
+          "config_bytes": 2772,
+          "config_sha256": "c57b5f4bc8497f206c4675d12cbbfc03f502dabd67690b9e0fbe04237251c772",
+          "config_size": 2772,
+          "config_version": 65549,
+          "hash": 1614175378,
+          "pipeline_ref": "0x60365c92",
+          "selected_first_frame_used": 1278,
+          "type": 1
+        },
+        {
+          "beta_crosscheck_first_frame_used": 820,
+          "beta_is_crosscheck_only": true,
+          "config_bytes": 2772,
+          "config_sha256": "47fbb55564245fac62540a09d2a3baf7a782292af212241948ba3017909302a4",
+          "config_size": 2772,
+          "config_version": 65549,
+          "hash": 2292536372,
+          "pipeline_ref": "0x88a55434",
+          "selected_first_frame_used": 1278,
+          "type": 1
+        },
+        {
+          "beta_crosscheck_first_frame_used": 820,
+          "beta_is_crosscheck_only": true,
+          "config_bytes": 2772,
+          "config_sha256": "7210814ff506356b71b0e8dfc4675d9ead99887b7f8503e1233be6dd68d59445",
+          "config_size": 2772,
+          "config_version": 65549,
+          "hash": 2840915730,
+          "pipeline_ref": "0xa954ef12",
+          "selected_first_frame_used": 1278,
+          "type": 1
+        },
+        {
+          "beta_crosscheck_first_frame_used": 820,
+          "beta_is_crosscheck_only": true,
+          "config_bytes": 2772,
+          "config_sha256": "53502fad1fd52f172d9ea116a28820ea9cdfad0ec3f0a55af48e3d16ea4452d1",
+          "config_size": 2772,
+          "config_version": 65549,
+          "hash": 3830897785,
+          "pipeline_ref": "0xe456dc79",
+          "selected_first_frame_used": 1278,
+          "type": 1
+        }
+      ],
+      "beta_is_blob_crosscheck_only": true,
+      "alpha_first_frame_used": 1278,
+      "beta_first_frame_used": 820,
+      "candidate_report": {
+        "external_run_relative_path": "h1-root-preparation-seed-candidate-v2-output-fix/candidate-report.json",
+        "sha256": "5eb557400dab4027adf04bd5be6a343a9823af8e3183fc638f670291ec57457b"
+      },
+      "result_manifest": {
+        "external_run_relative_path": "h1-root-preparation-seed-candidate-v2-output-fix/result-manifest.json",
+        "sha256": "18e0bbf4127fd41db50a1f027bd105b65e7c5e8aa808bf45087d096142c340e4"
+      }
+    },
+    "fresh_origin_basis": "The original self-KO harness created a new exclusive output directory and fresh alpha/beta user-data roots; no explicit site-data-clear API call is claimed. Recovery used copied origin IndexedDB directories.",
+    "reuse": "Existing append-only reviewer/materializer and startup background pipeline preparation, provenance ON and selective pipelines OFF. No hidden game ticks/draws, timing-guard change, altered PAD/RNG or source-order change.",
+    "proposed_test_repair": "Root review caught the generator leaving the old883-row test expectation because its text replacement did not match. Preserve the generated proposal; correct expected889 rows before source validation. Seed bytes are unaffected.",
+    "verification_plan": {
+      "external_run_relative_path": "h1-self-ko-changed-seed-verification-plan-v1.json",
+      "sha256": "75e40e81d61d7f9aa1b89ccc49759e42b5b8f0f386a24bfc8b96d724e26e9779"
+    },
+    "remaining": [
+      "Validate the reviewed changed seed in the affected builds and full regression.",
+      "One bounded same-recipe respawn experiment must prove import, queue drain, positive READY reuse and actual use before claiming preparation.",
+      "The original canceled beta publication attempt remains explicit. Any recurrence still refuses the complete witness.",
+      "Cache admission does not prove GPU completion, causal attribution, stall removal, whole-session performance or H1 acceptance."
+    ],
+    "independent_review": {
+      "external_run_relative_path": "h1-six-row-seed-independent-review-v1/review.json",
+      "sha256": "0d7c9c6d6436793ab9af99722d96855114f69a5d913d45e74d4f4fc3de329272"
+    },
+    "test_correction_applied": {
+      "expected_type1_rows": 889,
+      "expected_type1_config_bytes": 2464308,
+      "corrected_test_sha256": "6bac3472ec90dac2305f041b5b803b595b5137b892382e7a8a6b00536e741c61",
+      "external_preview_focused_seed_tests_passed": 6
+    },
+    "focused_validation": {
+      "source_state": "reviewed six-row seed and corrected test applied over main 7e430889; before commit",
+      "seed_tests": {
+        "command": "python3 -m unittest discover -s tests -p test_pipeline_cache_seed.py -v",
+        "passed": 6
+      },
+      "append_only_reviewer_tests": {
+        "command": "python3 -m unittest discover -s tests -p test_review_pipeline_cache.py -v",
+        "passed": 7
+      },
+      "repository_content_tests": {
+        "command": "python3 -m unittest discover -s tests -p test_repository_content.py -v",
+        "passed": 20,
+        "duration_seconds": 3.992
+      }
+    },
+    "content_policy": {
+      "path": ".github/repository-content-policy.json",
+      "rule": "encoded_payload",
+      "exact_encoded_sha256": "9e5e539b52114569fe8e12debb2d728dc084480806c50e810721960ff0ded446",
+      "scope": "Reviewed exact seed only; guard implementation and other checks unchanged. Licensing uncertainty remains separate.",
+      "first_refusal_retained": "h1-exact-six-content-guard-first-refusal-v1.json",
+      "staged_snapshot_check": {
+        "entries": 2192,
+        "findings": 0
+      }
+    }
   }
 }

@@ -22,8 +22,8 @@
     {
       "path": "web/initial_pipeline_cache.db.gz.b64",
       "rule": "encoded_payload",
-      "sha256": "8aa03d3eca17d71b9eab9cf0b9ad60e45dd45ab5789441e48824da3ed5c7e839",
-      "reason": "Reviewed PR56 Results/Prize renderer metadata: 884 records including 883 pipeline descriptors. See docs/evidence/results-prize-pipeline-seed-v1.json for bounded decode, identity and content review. This exception is not licensing clearance; documented provenance uncertainty remains."
+      "sha256": "9e5e539b52114569fe8e12debb2d728dc084480806c50e810721960ff0ded446",
+      "reason": "Reviewed H1 respawn renderer metadata: exactly six source-observed type-1 descriptors appended to the unchanged 884-row Results/Prize seed (890 total records). See docs/evidence/h1-first-use-respawn-v1.json for byte identities, recovery incident and independent content review. No Dawn driver cache is included. This exception is not licensing clearance; documented provenance uncertainty remains."
     }
   ],
   "synthetic_secrets": [
