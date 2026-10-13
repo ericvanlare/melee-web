@@ -1258,7 +1258,7 @@
     "caveat": "PinnedsourceJSONbehavior verified; historical executable producing checked-in generatedoutput remainsunknown. No inferred historicalproduceridentity."
   },
   "gameplay_effect_inventory": {
-    "coverage": "Source-only partial checkpoint: 183 unique annotated active ASM hook paths among 288 generated default records; 27 ASM hooks are tagged affects-gameplay. Of 156 untagged ASM hooks, 12 have additional bounded source checks and 144 lack such a check; one further review is a .s dependency. Neither tagging nor bounded checks complete semantic coverage.",
+    "coverage": "Source-only partial checkpoint: 183 unique annotated active ASM hook paths among 288 generated default records; 27 ASM hooks are tagged affects-gameplay. Of 156 untagged ASM hooks, 24 unique paths have bounded source checks: six from the original v4 inventory, six in the corrected prior packet (v1 and v2 are versions of that same six-hook set), and twelve in the corrected v4 packet. The sets are disjoint; 132 lack a bounded check. Root applied the corrected packet after independent source review; the portable summary separately corrects ledge-grab count units and ClientPause callback ownership. Neither tagging nor bounded checks complete semantic coverage, and no client binary/profile runtime activation or acceptance is validated.",
     "active_tagged_gameplay_hook_count": 27,
     "active_tagged_hooks": [
       {
@@ -1795,7 +1795,7 @@
         "review_packet": "slippi-untagged-gameplay-review-v2"
       }
     ],
-    "untagged_active_hook_semantics_unreviewed_count": 144,
+    "untagged_active_hook_semantics_unreviewed_count": 132,
     "active_source_file_notes": {
       "selected_roots_total_files": 198,
       "asm_hook_sources": 183,
@@ -1838,7 +1838,7 @@
       }
     ],
     "untagged_active_hook_total_count": 156,
-    "untagged_active_hook_bounded_review_count": 12,
+    "untagged_active_hook_bounded_review_count": 24,
     "additional_support_source_bounded_review_count": 1,
     "untagged_gameplay_hook_review_v2": {
       "packet": "slippi-untagged-gameplay-review-v2",
@@ -1885,6 +1885,475 @@
         "sha256": "e1b95efa41b0e470b9907c8437fabcc54c2bcdc0978c92ec9250ab88d9f5d928",
         "scope": "Verified frozen v2 hashes, unchanged reviewed raw bytes and precise initialization corrections; no runtime or full semantic claim."
       }
+    },
+    "untagged_gameplay_hook_review_v4": {
+      "packet": "slippi-untagged-gameplay-review-v4",
+      "run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+      "source_repository": "project-slippi/slippi-ssbm-asm",
+      "source_commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+      "review_status": "PASS scoped source/portable documentation review; no runtime activation or complete profile semantics claim.",
+      "packet_manifest_sha256": "6d72f7b52bf11766a4e2f6e9d0a17fab70c50f6d3ea20677cd65176dfc790025",
+      "review_json_sha256": "dd42ced93e1985d44ed581130f852a7bd98e16aa745d22097b1f3a1b33b14a05",
+      "remaining_unreviewed_sha256": "baab798f42269356aa6402fc9c46750857fa3d5b2da807171a2de4129adb8e27",
+      "report_sha256": "96c0a7cf9cfc7bd6df88f611dd43828b8f8224486bdcf70477bd6dcb8980a8ea",
+      "sources_manifest_sha256": "0e362ae5dba8427e9ff7be458411c5795c2dbd971e8548811bb1c420ed10677f",
+      "correction_review_receipt": {
+        "artifact": "slippi-untagged-gameplay-v3-independent-review-v2.json",
+        "sha256": "4c8acbc4e8d33d2e9b67f5f91f82c9bf1832fb7586b0f1f04aeb47fe36c70547",
+        "reviewed_packet": "slippi-untagged-gameplay-review-v3",
+        "applied_findings": [
+          "ranked SinglesDetermineWinner call scope",
+          "disjoint path accounting",
+          "StartEngineLoop SFX/HUD/FN_END_GAME source call sites"
+        ],
+        "scope": "Source/hash review of frozen v3; its required corrections are applied in v4. Portable publication review is separate."
+      },
+      "configuration_selection": {
+        "evidence_scope": "Pinned generated records and recursively selected roots only; does not establish runtime activation, release executable correspondence, or profile acceptance.",
+        "selected_by_default": true,
+        "roots": [
+          {
+            "root": "Common/FastForward",
+            "category": "Required: Slippi Online",
+            "manifest_line": 326,
+            "recursive": true
+          },
+          {
+            "root": "Online/Core",
+            "category": "Required: Slippi Online",
+            "manifest_line": 291,
+            "recursive": true
+          },
+          {
+            "root": "Online/Slippi Online Scene",
+            "category": "Required: Slippi Online",
+            "manifest_line": 303,
+            "recursive": true
+          },
+          {
+            "root": "Online/Static",
+            "category": "Required: Slippi Online",
+            "manifest_line": 309,
+            "recursive": true
+          }
+        ]
+      },
+      "coverage": {
+        "active_untagged_path_count": 156,
+        "original_v4_inventory_bounded_checks": 6,
+        "corrected_prior_packet_bounded_checks": 6,
+        "prior_v1_and_v2_are_same_six_paths": true,
+        "this_packet_checked": 12,
+        "unique_bounded_path_count": 24,
+        "remaining_without_bounded_check": 132,
+        "accounting": "6 original v4 inventory + 6 unique corrected prior + 12 new = 24; 156 - 24 = 132",
+        "reviewed_path_sets": {
+          "original_v4_inventory": [
+            "Common/UseInGameDelay/ApplyInGameDelay.asm",
+            "Common/UseInGameDelay/InitializeInGameDelay.asm",
+            "External/DPad Down at CSS for Random Stage/DPad Down at CSS for Random Stage.asm",
+            "External/Disable FoD During Doubles/Disable FoD During Doubles.asm",
+            "Online/Menus/SSS/FrozenStadiumToggle/CheckForFrozenOnStageName.asm",
+            "Online/Menus/SSS/FrozenStadiumToggle/CursorOnHoverStadium.asm"
+          ],
+          "corrected_prior_packet_v1_v2_same_paths": [
+            "Online/Core/ForceEngineOnRollback.asm",
+            "Online/Core/ForceInputRefetchOnAdvance.asm",
+            "Online/Core/InitOnlinePlay.asm",
+            "Online/Core/LoopEngineForRollback.asm",
+            "Online/Core/SkipNewInputFetchOnRollback.asm",
+            "Online/Core/TriggerSendInput.asm"
+          ],
+          "this_packet": [
+            "Common/FastForward/DynamicsFix.asm",
+            "Online/Core/InitPause.asm",
+            "Online/Core/LGLExceededGameEnd.asm",
+            "Online/Core/PauseCounter.asm",
+            "Online/Core/PreventPauseStranding.asm",
+            "Online/Core/ReportNoContestLRAS.asm",
+            "Online/Core/StartEngineLoop.asm",
+            "Online/Core/Teams/PreventDeadStranding.asm",
+            "Online/Slippi Online Scene/main.asm",
+            "Online/Static/LoadMatchState.asm",
+            "Online/Static/LoadState.asm",
+            "Online/Static/SaveState.asm"
+          ]
+        },
+        "intersections_empty": true,
+        "remaining_set_exact": true
+      },
+      "lineage": {
+        "v1_v2_packet_versions_same_six_paths": true,
+        "corrected_prior_packet": "slippi-untagged-gameplay-review-v2",
+        "corrected_prior_packet_manifest_sha256": "1a3c5e698c5cd46147703a8dfaf4ab65d55bf315ba7830167eff198bbeb67847",
+        "source_inventory_packet": "slippi-gameplay-mode-inventory-v4",
+        "source_inventory_freeze_sha256": "cd170870e70ce9f72299060928f6d9208617c6750f33e38fe45736cc9fe22db3",
+        "source_inventory_sha256": "0a2edc85cff4843065f3c5449136ebef1734fedd90f65916f2ef41ed53e65526",
+        "raw_source_bytes_unchanged_from_v3": true,
+        "release_configuration_license_and_m_ex_findings_changed": false
+      },
+      "checked_hooks": [
+        {
+          "path": "Common/FastForward/DynamicsFix.asm",
+          "address": "8009E090",
+          "category": "Required: Slippi Online",
+          "tag": "",
+          "source_sha256": "13002603c6f4e89ba546e95798ed33861eefb2abdea777d2c8345d2a00389e55",
+          "git_blob_sha": "18e9bff1cf8e56c10a633259228d8df52378c0db",
+          "source_url": "https://raw.githubusercontent.com/project-slippi/slippi-ssbm-asm/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Common/FastForward/DynamicsFix.asm",
+          "source_lines_reviewed": "1-71",
+          "configuration_selection": {
+            "configured_root": "Common/FastForward",
+            "category_default_enabled": true,
+            "root_recursive": true,
+            "manifest_line": 326,
+            "generated_record": {
+              "Annotation": "Common/FastForward/DynamicsFix.asm",
+              "Codetype": "Auto",
+              "InjectionAddress": "8009E090",
+              "Name": "Required: Slippi Online",
+              "Tags": ""
+            },
+            "limitation": "Selection and generated record do not establish runtime execution, release executable correspondence or profile acceptance."
+          },
+          "mode_gate_observed_in_source": "No online-scene/mode predicate in this hook body; static selected category/root only.",
+          "observed_source_behavior": "After dynamics it follows r30 to a fighter JOBJ and calls JOBJ_SetupMatrixSubAll. The helper tests node flags, calls matrix setup for qualifying nodes, then recurses through child/sibling JOBJ links. Source comments say this repairs fighter-bone matrices after fast-forward skips shadow rendering.",
+          "gameplay_relevance": "Potential fighter pose/bone state during fast-forward; whether matrices feed collision/hitbox state or only rendering is unresolved.",
+          "unresolved_semantic_dependency": "JOBJ flag meanings, helper ABI/parent routine, caller, and collision/hitbox use are not established.",
+          "status": "bounded source observation; no binary/runtime validation"
+        },
+        {
+          "path": "Online/Core/InitPause.asm",
+          "address": "8016E904",
+          "category": "Required: Slippi Online",
+          "tag": "",
+          "source_sha256": "fdee35e943a759349cdb4f23eaaf6f0d8cb668abe6e539fb93dfbbba89e1a33f",
+          "git_blob_sha": "d185591c40e465caefb15aa4ccd00e2726d33742",
+          "source_url": "https://raw.githubusercontent.com/project-slippi/slippi-ssbm-asm/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/InitPause.asm",
+          "source_lines_reviewed": "1-235",
+          "configuration_selection": {
+            "configured_root": "Online/Core",
+            "category_default_enabled": true,
+            "root_recursive": true,
+            "manifest_line": 291,
+            "generated_record": {
+              "Annotation": "Online/Core/InitPause.asm",
+              "Codetype": "Auto",
+              "InjectionAddress": "8016E904",
+              "Name": "Required: Slippi Online",
+              "Tags": ""
+            },
+            "limitation": "Selection and generated record do not establish runtime execution, release executable correspondence or profile acceptance."
+          },
+          "mode_gate_observed_in_source": "Checks SCENE_ONLINE_IN_GAME; skips Ranked and Party; setting-bit gates ClientPause callback install.",
+          "observed_source_behavior": "Installs a client-side pause callback in online non-ranked/non-party play. It checks human ports, stocks, disconnect/LRA+Start inputs, and local Start; toggles its local pause flag/HUD/UI or writes exit/pauser fields for disconnect. Returns -1 to avoid normal game pause.",
+          "gameplay_relevance": "Changes whether/how clients pause or exit an online game.",
+          "unresolved_semantic_dependency": "Pause-bit meaning, callback contract, simulation/audio/input ownership during local pause, and disconnect synchronization are unverified.",
+          "status": "bounded source observation; no binary/runtime validation"
+        },
+        {
+          "path": "Online/Core/LGLExceededGameEnd.asm",
+          "address": "802F70C4",
+          "category": "Required: Slippi Online",
+          "tag": "",
+          "source_sha256": "88bf629460c3aecd4403cc9f79f39ecf14a719f5662dcd047ab8ea6e9269d9dd",
+          "git_blob_sha": "009b95cc1531d0ad31de80ee33c7877a71ce7e4f",
+          "source_url": "https://raw.githubusercontent.com/project-slippi/slippi-ssbm-asm/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/LGLExceededGameEnd.asm",
+          "source_lines_reviewed": "1-141",
+          "configuration_selection": {
+            "configured_root": "Online/Core",
+            "category_default_enabled": true,
+            "root_recursive": true,
+            "manifest_line": 291,
+            "generated_record": {
+              "Annotation": "Online/Core/LGLExceededGameEnd.asm",
+              "Codetype": "Auto",
+              "InjectionAddress": "802F70C4",
+              "Name": "Required: Slippi Online",
+              "Tags": ""
+            },
+            "limitation": "Selection and generated record do not establish runtime execution, release executable correspondence or profile acceptance."
+          },
+          "mode_gate_observed_in_source": "Checks SCENE_ONLINE_IN_GAME; exits for Teams and Party.",
+          "observed_source_behavior": "Reads both cliffhanger counts; with exactly one side above LGL_LIMIT (45 in included Online.s), selects Success/Failure text by local player, extends GAME! transition timer, and creates HUD subtext. It does not itself write the match winner.",
+          "gameplay_relevance": "Competitive timeout-rule presentation and transition.",
+          "unresolved_semantic_dependency": "Actual target caller/result semantics and relationship between displayed text and winner selection are unverified.",
+          "status": "bounded source observation; no binary/runtime validation"
+        },
+        {
+          "path": "Online/Core/PauseCounter.asm",
+          "address": "8016D26C",
+          "category": "Required: Slippi Online",
+          "tag": "",
+          "source_sha256": "e7b77aaf32fc27a8c6ebb1ea3eb59d4dd100bfaeec2c51b1b08b4fe43f89ddfd",
+          "git_blob_sha": "ab3f438d5b6c1c8e243c74b7694247223b041d70",
+          "source_url": "https://raw.githubusercontent.com/project-slippi/slippi-ssbm-asm/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/PauseCounter.asm",
+          "source_lines_reviewed": "1-13",
+          "configuration_selection": {
+            "configured_root": "Online/Core",
+            "category_default_enabled": true,
+            "root_recursive": true,
+            "manifest_line": 291,
+            "generated_record": {
+              "Annotation": "Online/Core/PauseCounter.asm",
+              "Codetype": "Auto",
+              "InjectionAddress": "8016D26C",
+              "Name": "Required: Slippi Online",
+              "Tags": ""
+            },
+            "limitation": "Selection and generated record do not establish runtime execution, release executable correspondence or profile acceptance."
+          },
+          "mode_gate_observed_in_source": "No mode predicate in this body; source comment places it at paused VSModeThink.",
+          "observed_source_behavior": "Increments ODB_PAUSE_COUNTER and executes the replaced addi r3,r31,0.",
+          "gameplay_relevance": "Adds pause-tick state to ODB.",
+          "unresolved_semantic_dependency": "The consumer, initialization/wrap behavior, and effect on game/network rules are unknown.",
+          "status": "bounded source observation; no binary/runtime validation"
+        },
+        {
+          "path": "Online/Core/PreventPauseStranding.asm",
+          "address": "8016CD08",
+          "category": "Required: Slippi Online",
+          "tag": "",
+          "source_sha256": "fe45e0f9cfdfd40f15676c948f50df77ccea0a6e94768eef29b1b0ec76d5b27d",
+          "git_blob_sha": "2297e1015c19c8dd4cfb7a81a55d7611af021e21",
+          "source_url": "https://raw.githubusercontent.com/project-slippi/slippi-ssbm-asm/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/PreventPauseStranding.asm",
+          "source_lines_reviewed": "1-32",
+          "configuration_selection": {
+            "configured_root": "Online/Core",
+            "category_default_enabled": true,
+            "root_recursive": true,
+            "manifest_line": 291,
+            "generated_record": {
+              "Annotation": "Online/Core/PreventPauseStranding.asm",
+              "Codetype": "Auto",
+              "InjectionAddress": "8016CD08",
+              "Name": "Required: Slippi Online",
+              "Tags": ""
+            },
+            "limitation": "Selection and generated record do not establish runtime execution, release executable correspondence or profile acceptance."
+          },
+          "mode_gate_observed_in_source": "Checks online scene; disconnected state and pauser identity gate the forced-unpause branch.",
+          "observed_source_behavior": "After no unpause button was detected, if disconnected and recorded pauser is not local, branches to original unpause code; otherwise executes replaced li r4,-1.",
+          "gameplay_relevance": "Changes online pause recovery after disconnection.",
+          "unresolved_semantic_dependency": "Original branch target, pauser index meaning, and cross-client convergence are not runtime-validated.",
+          "status": "bounded source observation; no binary/runtime validation"
+        },
+        {
+          "path": "Online/Core/ReportNoContestLRAS.asm",
+          "address": "8016E9E8",
+          "category": "Required: Slippi Online",
+          "tag": "",
+          "source_sha256": "86885fa2b06c06f13de7753349de50c653ecad92f794629981697b5144a4c5f5",
+          "git_blob_sha": "16fe75466c830c607f361865a770db4dec4db722",
+          "source_url": "https://raw.githubusercontent.com/project-slippi/slippi-ssbm-asm/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/ReportNoContestLRAS.asm",
+          "source_lines_reviewed": "1-33",
+          "configuration_selection": {
+            "configured_root": "Online/Core",
+            "category_default_enabled": true,
+            "root_recursive": true,
+            "manifest_line": 291,
+            "generated_record": {
+              "Annotation": "Online/Core/ReportNoContestLRAS.asm",
+              "Codetype": "Auto",
+              "InjectionAddress": "8016E9E8",
+              "Name": "Required: Slippi Online",
+              "Tags": ""
+            },
+            "limitation": "Selection and generated record do not establish runtime execution, release executable correspondence or profile acceptance."
+          },
+          "mode_gate_observed_in_source": "Checks online scene; ODB_IS_GAME_OVER prevents a duplicate handler call.",
+          "observed_source_behavior": "If game-over is false, sets it and calls the ODB game-over handler, then executes replaced byte load. Source comment says this covers direct-mode LRAS reporting missed by StartEngineLoop.",
+          "gameplay_relevance": "Changes online match-end/report lifecycle on LRAS.",
+          "unresolved_semantic_dependency": "Handler side effects and exact LRAS paths reaching this injection are unresolved.",
+          "status": "bounded source observation; no binary/runtime validation"
+        },
+        {
+          "path": "Online/Core/StartEngineLoop.asm",
+          "address": "801A4DE4",
+          "category": "Required: Slippi Online",
+          "tag": "",
+          "source_sha256": "61d0c87a31c98efa40a86ceefd916d43dfd95cd166a4a8a8aea5d16dbe7fe50f",
+          "git_blob_sha": "5ef180e443169a884656af4bad70c9b92efbba84",
+          "source_url": "https://raw.githubusercontent.com/project-slippi/slippi-ssbm-asm/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/StartEngineLoop.asm",
+          "source_lines_reviewed": "1-748",
+          "configuration_selection": {
+            "configured_root": "Online/Core",
+            "category_default_enabled": true,
+            "root_recursive": true,
+            "manifest_line": 291,
+            "generated_record": {
+              "Annotation": "Online/Core/StartEngineLoop.asm",
+              "Codetype": "Auto",
+              "InjectionAddress": "801A4DE4",
+              "Name": "Required: Slippi Online",
+              "Tags": ""
+            },
+            "limitation": "Selection and generated record do not establish runtime execution, release executable correspondence or profile acceptance."
+          },
+          "mode_gate_observed_in_source": "Checks online scene and field at 0x80479d64; source calls the field \u201cBelieved to be some loading state.\u201d",
+          "observed_source_behavior": "Masks interrupts while processing ODB/RXB. During active rollback, loads state only when current frame is later than requested frame; equal skips load, earlier current frame exits this rollback block. A load rewinds raw pad-ring bookkeeping, clears rollback-load flags, reloads global frame and calls RenewInputs_Prefunction. It updates stable finalized frame/checksum/player status; captures state when prediction is pending and current frame is past finalized. It processes RXB remote-fighter despawn flags and defers game-over handling until the end state exceeds the 7-frame rollback window. Active disconnect and hard-desync branches call SFX_Menu_CommonSound, create HUD subtext, set display state and call FN_END_GAME; the soft-desync-risk branch also creates HUD subtext. FN_END_GAME writes match exit/pauser/transition fields. These are source call/write sites; resulting audio/HUD/host effects are not established.",
+          "gameplay_relevance": "Direct rollback, pad-ring, savestate, remote-player despawn and game-end control. The source also contains disconnect and desync UI/end-game handling.",
+          "unresolved_semantic_dependency": "Caller/ABI, loading field meaning, ODB persistence across restore, external savestate completeness, input queue ownership, and sound/host side effects are not validated. Source also flags comparison/field uncertainties. Downstream SFX/HUD/host effects and runtime reachability of these branches are unvalidated.",
+          "status": "bounded source observation; no binary/runtime validation"
+        },
+        {
+          "path": "Online/Core/Teams/PreventDeadStranding.asm",
+          "address": "8016BE28",
+          "category": "Required: Slippi Online",
+          "tag": "",
+          "source_sha256": "c420dc7eb24afcaaf955cc1270a76ab500f9b321f803d544f5a5dfeb64a9a18b",
+          "git_blob_sha": "4eb98223f7eb49f82a9967168e0320cd8eb62d2c",
+          "source_url": "https://raw.githubusercontent.com/project-slippi/slippi-ssbm-asm/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/Teams/PreventDeadStranding.asm",
+          "source_lines_reviewed": "1-36",
+          "configuration_selection": {
+            "configured_root": "Online/Core",
+            "category_default_enabled": true,
+            "root_recursive": true,
+            "manifest_line": 291,
+            "generated_record": {
+              "Annotation": "Online/Core/Teams/PreventDeadStranding.asm",
+              "Codetype": "Auto",
+              "InjectionAddress": "8016BE28",
+              "Name": "Required: Slippi Online",
+              "Tags": ""
+            },
+            "limitation": "Selection and generated record do not establish runtime execution, release executable correspondence or profile acceptance."
+          },
+          "mode_gate_observed_in_source": "Requires asleep/dead predicate, online scene, Teams mode, and disconnected flag before changing r3.",
+          "observed_source_behavior": "At pause eligibility check, leaves r3 unchanged except for disconnected online Teams while the predicate is true, where it sets r3=0 before the original compare.",
+          "gameplay_relevance": "Changes a dead/asleep pause predicate in disconnected online Teams.",
+          "unresolved_semantic_dependency": "Predicate meaning and downstream effect on respawn/team-life behavior are unverified.",
+          "status": "bounded source observation; no binary/runtime validation"
+        },
+        {
+          "path": "Online/Slippi Online Scene/main.asm",
+          "address": "801A45B8",
+          "category": "Required: Slippi Online",
+          "tag": "",
+          "source_sha256": "e27aa60410427bd4a2b8e4b7ab64052eaec77eb93cef111ab4511018f499ca31",
+          "git_blob_sha": "55fa09785e80b21389c520dee5c60b011ea415b3",
+          "source_url": "https://raw.githubusercontent.com/project-slippi/slippi-ssbm-asm/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Slippi%20Online%20Scene/main.asm",
+          "source_lines_reviewed": "520-560; 585-745; 1180-1268; 1381-1435",
+          "configuration_selection": {
+            "configured_root": "Online/Slippi Online Scene",
+            "category_default_enabled": true,
+            "root_recursive": true,
+            "manifest_line": 303,
+            "generated_record": {
+              "Annotation": "Online/Slippi Online Scene/main.asm",
+              "Codetype": "Auto",
+              "InjectionAddress": "801A45B8",
+              "Name": "Required: Slippi Online",
+              "Tags": ""
+            },
+            "limitation": "Selection and generated record do not establish runtime execution, release executable correspondence or profile acceptance."
+          },
+          "mode_gate_observed_in_source": "The call at source line 652 is inside the ranked VSSceneDecide_ConnectionActive path. The file has separate ranked/party/direct branches, but this observation does not establish non-ranked winner semantics.",
+          "observed_source_behavior": "Reviewed SSS path loads MSRB and compares ready bytes before splash or CSS. VSSceneDecide routes ranked/party/direct; the call at line 652 to SinglesDetermineWinner occurs inside the ranked VSSceneDecide_ConnectionActive path and feeds ranked tie/winner/set bookkeeping. The helper code in the reviewed range checks timeout/LGL, stocks and percent; source says LRAS is not handled by this helper. This does not establish non-ranked winner semantics. GamePrep rereads MSRB and redirects on disconnect/tie-break. Calls FN_LoadMatchState at lines 534, 600, 896, 1143 and 1391.",
+          "gameplay_relevance": "Online scene progression and ranked tie/winner bookkeeping in the reviewed call path; non-ranked winner semantics remain unknown.",
+          "unresolved_semantic_dependency": "Source itself marks ODB access in VSSceneDecide as belief; match fields/callbacks/ranked policy and runtime reachability need validation. The reviewed SinglesDetermineWinner call is in ranked handling; non-ranked winner paths are not established. This is a focused section review of a 1,441-line file.",
+          "status": "bounded source observation; no binary/runtime validation"
+        },
+        {
+          "path": "Online/Static/LoadMatchState.asm",
+          "address": "80005610",
+          "category": "Required: Slippi Online",
+          "tag": "",
+          "source_sha256": "0c3db3325f31e384d0dd9c0d1557a420ecc7e6100038b14ac5c4998cfc2370b1",
+          "git_blob_sha": "f677070eee5d17b224f8bd6de992d7e44cec61fc",
+          "source_url": "https://raw.githubusercontent.com/project-slippi/slippi-ssbm-asm/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Static/LoadMatchState.asm",
+          "source_lines_reviewed": "1-44",
+          "configuration_selection": {
+            "configured_root": "Online/Static",
+            "category_default_enabled": true,
+            "root_recursive": true,
+            "manifest_line": 309,
+            "generated_record": {
+              "Annotation": "Online/Static/LoadMatchState.asm",
+              "Codetype": "Auto",
+              "InjectionAddress": "80005610",
+              "Name": "Required: Slippi Online",
+              "Tags": ""
+            },
+            "limitation": "Selection and generated record do not establish runtime execution, release executable correspondence or profile acceptance."
+          },
+          "mode_gate_observed_in_source": "No helper-local mode predicate; selected under Online/Static and called from online scene source.",
+          "observed_source_behavior": "Uses supplied MSRB buffer or allocates MSRB_SIZE, writes GetMatchState command, performs EXI write of one byte and EXI read of MSRB_SIZE, then returns buffer pointer. No visible transfer-result validation.",
+          "gameplay_relevance": "Feeds match settings into online scene decisions.",
+          "unresolved_semantic_dependency": "EXI success/failure, buffer validity, MSRB field meaning and synchronization are unchecked.",
+          "status": "bounded source observation; no binary/runtime validation"
+        },
+        {
+          "path": "Online/Static/LoadState.asm",
+          "address": "8000560C",
+          "category": "Required: Slippi Online",
+          "tag": "",
+          "source_sha256": "5a8c6fc93f6574b60ef72e15769a66968f182259129069a651cdb7bf7da725bc",
+          "git_blob_sha": "f3d53b580e6c91c35f390e5482818fab5f46aca2",
+          "source_url": "https://raw.githubusercontent.com/project-slippi/slippi-ssbm-asm/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Static/LoadState.asm",
+          "source_lines_reviewed": "1-190",
+          "configuration_selection": {
+            "configured_root": "Online/Static",
+            "category_default_enabled": true,
+            "root_recursive": true,
+            "manifest_line": 309,
+            "generated_record": {
+              "Annotation": "Online/Static/LoadState.asm",
+              "Codetype": "Auto",
+              "InjectionAddress": "8000560C",
+              "Name": "Required: Slippi Online",
+              "Tags": ""
+            },
+            "limitation": "Selection and generated record do not establish runtime execution, release executable correspondence or profile acceptance."
+          },
+          "mode_gate_observed_in_source": "No helper-local mode predicate; selected under Online/Static and called at StartEngineLoop.asm:354.",
+          "observed_source_behavior": "Searches seven-entry metadata ring backward for requested frame; missing frame logs then branches to address zero. On match disables interrupts and sends LoadSavestate command/frame over EXI, then restores interrupts. Sound backup/restore blocks are comments, not active code.",
+          "gameplay_relevance": "Requests external emulator savestate load used by rollback.",
+          "unresolved_semantic_dependency": "Dolphin command/result, restored-owner completeness, interrupt safety and address-zero assertion handling are unvalidated.",
+          "status": "bounded source observation; no binary/runtime validation"
+        },
+        {
+          "path": "Online/Static/SaveState.asm",
+          "address": "80005608",
+          "category": "Required: Slippi Online",
+          "tag": "",
+          "source_sha256": "541dc14b20c5acdb97c6f744d70bce3b440c8ba656afcf311fba57b03e1db4d8",
+          "git_blob_sha": "9e080e11c1250f921d5559f339e962d9bdba6850",
+          "source_url": "https://raw.githubusercontent.com/project-slippi/slippi-ssbm-asm/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Static/SaveState.asm",
+          "source_lines_reviewed": "1-72",
+          "configuration_selection": {
+            "configured_root": "Online/Static",
+            "category_default_enabled": true,
+            "root_recursive": true,
+            "manifest_line": 309,
+            "generated_record": {
+              "Annotation": "Online/Static/SaveState.asm",
+              "Codetype": "Auto",
+              "InjectionAddress": "80005608",
+              "Name": "Required: Slippi Online",
+              "Tags": ""
+            },
+            "limitation": "Selection and generated record do not establish runtime execution, release executable correspondence or profile acceptance."
+          },
+          "mode_gate_observed_in_source": "No helper-local mode predicate; selected under Online/Static and called at StartEngineLoop.asm:654.",
+          "observed_source_behavior": "Advances seven-entry write index, writes frame number to local SSDB metadata, disables interrupts, writes CaptureSavestate/frame into SSRB and transfers SSRB_SIZE over EXI, then restores interrupts.",
+          "gameplay_relevance": "Requests external emulator savestate capture and tags it with rollback frame.",
+          "unresolved_semantic_dependency": "Capture contents/completion and consistency of local metadata with external state are unverified.",
+          "status": "bounded source observation; no binary/runtime validation"
+        }
+      ],
+      "limits": [
+        "Bounded source observations are not a complete semantic audit.",
+        "Empty tags do not establish that a hook is non-gameplay.",
+        "The selected roots/generated records do not prove runtime activation, released-client identity, or profile acceptance.",
+        "No executable, binary, runtime trace, or reference match was inspected.",
+        "The source/config pairing and repository license notices remain distinct from unresolved compiled m-ex generation and contributor/reuse rights."
+      ],
+      "portable_review": {
+        "artifact": "six-doc-feasibility-profile-final-independent-review-v1.json",
+        "sha256": "826eaf222975fb7ca1800aa80ed747fb8c5c977dfcd3d87727c5ed61bbdef999",
+        "scope": "Reviewed six-file pre-promotion bytes and permitted only this review-label promotion; source/reference/semantic gaps remain open."
+      }
     }
   },
   "schema": "slippi-gameplay-profile-inventory-v1",
@@ -1907,6 +2376,22 @@
       "independent_review_artifact": "slippi-untagged-gameplay-review-v1-independent-review.json",
       "independent_review_sha256": "fbd0480e519708211336d0657a3467ff3412e5c588009a6311c58c46f3d66e25",
       "independent_review_scope": "The independent review inspected v1 and validated static selection/source identities/accounting; it raised three InitOnlinePlay wording corrections. The corrected v2 applies them; this field does not claim an independent re-review of v2."
+    },
+    "untagged_gameplay_review_v4": {
+      "directory": "slippi-untagged-gameplay-review-v4",
+      "packet_manifest_sha256": "6d72f7b52bf11766a4e2f6e9d0a17fab70c50f6d3ea20677cd65176dfc790025",
+      "review_json_sha256": "dd42ced93e1985d44ed581130f852a7bd98e16aa745d22097b1f3a1b33b14a05",
+      "remaining_unreviewed_sha256": "baab798f42269356aa6402fc9c46750857fa3d5b2da807171a2de4129adb8e27",
+      "report_sha256": "96c0a7cf9cfc7bd6df88f611dd43828b8f8224486bdcf70477bd6dcb8980a8ea",
+      "review_status": "PASS scoped source/portable documentation review; no runtime activation or complete profile semantics claim.",
+      "checked_hook_count": 12,
+      "total_bounded_untagged_hook_count": 24,
+      "untagged_hooks_still_without_bounded_check": 132,
+      "portable_review": {
+        "artifact": "six-doc-feasibility-profile-final-independent-review-v1.json",
+        "sha256": "826eaf222975fb7ca1800aa80ed747fb8c5c977dfcd3d87727c5ed61bbdef999",
+        "scope": "Reviewed six-file pre-promotion bytes and permitted only this review-label promotion; source/reference/semantic gaps remain open."
+      }
     }
   },
   "active_source_inventory": {

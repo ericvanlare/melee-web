@@ -82,6 +82,16 @@ ownership. The settings toggle and rollback runtime remain implementation goals.
   [feasibility boundary](status/2026-10-12-match-only-rollback-feasibility.md);
   semantic and executable-reference gaps remain open before porting.
 
+- 2026-10-12, Codex: the [same feasibility boundary](status/2026-10-12-match-only-rollback-feasibility.md)
+  now records measured source-only snapshot/replay and one terminal full-source-draw
+  browser sample. The [posted recommendation](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6139680477)
+  is no-go for naive heap rewind and a current seven-tick budget claim, with
+  state/host ownership continuing under #115. The
+  next renderer experiment stopped before implementation because cache/target
+  contents are not covered by CPU packet reset. This does not reject match-only
+  rollback or demonstrate a performance failure. H1 preparation investigation is
+  the next independent engineering step; exhaustive profile semantics remain open.
+
 ### 2026-10-12 — Owner: public staging, cleanup and Stadium after combat
 
 **Ask:** Adopt the concrete staging prerequisites, recorded-process-only cleanup,

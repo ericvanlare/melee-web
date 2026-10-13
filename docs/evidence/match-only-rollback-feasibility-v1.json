@@ -2,7 +2,7 @@
   "schema": "match-only-rollback-feasibility-v1",
   "issue": 318,
   "pr": 319,
-  "status": "in_progress_not_a_feasibility_go",
+  "status": "bounded_measurement_checkpoint_no_go_naive_browser_heap_rewind",
   "source_only_baseline": {
     "boundary": "synchronous-source-only-exported-call-return",
     "sourceDrawing": false,
@@ -345,7 +345,41 @@
         "Record operation/generation receipts for source-file requests and asynchronous JS completions, native audio/HPS/SSM, AudioWorklet output, and GPU callbacks across one full tick/draw; retain unknowns where unobserved.",
         "After owner boundaries are measured or fail closed, run one nonterminal same-instance seven-tick replay with exact raw input and original source order, stale-completion rejection, and once-only external audio/presentation; evaluate combined cost only against an explicit end-to-end budget."
       ],
-      "current_feasibility_next_boundary": "Choose the smallest draw-inclusive seven-tick cost experiment alongside the source-owned audio/file inventory and proposed safety policies. The retained broad journal/replay proposal is not the committed execution queue; no nonterminal restore over unknown owners."
+      "current_feasibility_next_boundary": "Renderer reuse gate stopped before implementation after independent RenderPass content review. Retain source-only host policies; no multi-frame measurement or broad transaction engine authorized by this checkpoint."
+    },
+    "sfx_source_followup": {
+      "artifact": "sfx-call-path-review-v1.json",
+      "sha256": "f373ea698b90d57b2003381dcf940a0550e61841a4b0dee11095921aab1a2e7a",
+      "scope": "Read-only source and configured compile-database review of original gameplay SFX versus HPS/music host paths. No build, test, capture, runtime call counts, or playback claim.",
+      "source_identity": {
+        "pinned_melee_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+        "prepared_source_is_patch_applied": true,
+        "source_sha256": {
+          "dependencies.lock.json": "b51fcde84db09641e4936339af970d74e97c71043ce6f6efee0c70e09211b385",
+          "patches/melee-gameplay.patch": "b2e5cb2bebf1ac87e5a4f7d765180db34cfd90bd6029103d79169d819064564c",
+          "cmake/FighterRuntime.cmake": "2c9fae26dd36228b64e66b76e164fe59bf4101e654a1bd342812862d0f748b05",
+          ".deps/melee/src/melee/ft/ft_0877.c": "5e78054d1e032264a65605ea45b638951af8f80811daff50e7f14de5afcb0504",
+          ".deps/melee/src/melee/lb/lbaudio_ax.c": "11e237a0af742dee1502cdab1454191301179af2f9030958324dec0886ccf5dc",
+          ".deps/melee/src/sysdolphin/baselib/axdriver.c": "c818fc3131c92ce7a3734cbac8d6ddc4074ba5a01fcf2ec3c1937ffc26c1ff3f",
+          ".deps/melee/src/sysdolphin/baselib/synth.c": "a8a45a3b66ea559ad945979ccfeb1eeb873d11210bd241ad0dfffaa14beefca6",
+          "build/gameplay-source/src/melee/ft/ft_0877.c": "eb5f8dc9e605f0f39ae2dc5285f545095b5ad3c247cd09e28cef85acdd1bd5a2",
+          "build/gameplay-source/src/melee/lb/lbaudio_ax.c": "2c32c2d2fa8315f524b4b77db105f943307b3fc70885ef9f40747af9b72c2743",
+          "build/gameplay-source/src/melee/gr/stage.c": "9722a206f516e7903eaa4ea95d89a9a1ebba7e1f3ae3d33bd034e04033c0e39c",
+          "build/gameplay-source/src/sysdolphin/baselib/axdriver.c": "ad5a170d9d85f6afd641f8a81f4ab0b00dfa37e3ebbdf86a22cbe87dd7afbaa4",
+          "build/gameplay-source/src/sysdolphin/baselib/synth.c": "274c9222aed7c5de13a356a3cb1e8bab312e4fec50b442b6fb18cc0dd5f6ec87",
+          "src/gameplay_audio.c": "29cbc36f9af3f256662bc5aa0142bdc771778b9d6790fb4aa2b4eb7ef979e9af",
+          "src/gameplay_audio.h": "4719666032435333301a870148b55684d442c1124a738b809cdd1cece650ddb6",
+          "src/gameplay_audio_stream.c": "87d1b6be3b6843bf8112cb7c6e2ea5a87e0d8a840817725d84bf4d278ca5de49",
+          "src/gameplay_audio_bank_transport.c": "a78d2d3e6edee790e71b6474ebcab5a4260c5d47a13f42bbd397af0d898da816",
+          "src/gameplay_match_session.cpp": "a4a6302f69863eb1b2bca39507b0170ef7cba168f0b1599537a5e7f26825bc28",
+          "src/gameplay_menu_browser.cpp": "1ac2b768dd608d2b5da5977dba39f8653b519116996c807dabf26477774b8f5c",
+          "web/runtime-audio.mjs": "93fbc8e78dd364abdebdc8eba0430d7e295d4e8dc9333a22e24574b15ba085cc",
+          "web/audio-worklet.js": "f879fb58401d3edf7cc71345b95a876327795f0b9082f62e3480cd5383fea6ea"
+        }
+      },
+      "path": "ft_PlaySFX -> lbAudioAx_800237A8 -> fn_80023750 -> AXDriver_8038CFF4 queued original command -> later HSD_SynthSFXPlayWithGroup",
+      "host_cadence": "melee_web_audio_render invokes HSD_SynthCallback at 160-sample boundaries, separately from match tick; HPS/SSM and source files have distinct request owners.",
+      "excluded": "No runtime SFX/voice/PCM counts; compile database selection is not final-link/live dispatch proof; melee_web_audio_play has no in-tree caller and is not original SFX ingress."
     }
   },
   "seven_tick_budget": {
@@ -1335,7 +1369,14 @@
       "source_unchanged": true,
       "private_release_receipt_sha256": "d51e05079c1396cf61cd700132ab92f86f3706eabae3cd9c648e36ac68099436",
       "ordinary_release_receipt_sha256": "9fe3b28396c6c1ca5ef05525657e2d82d9632e33bb5e099248c9f17e1254fe3c",
-      "exact_head_ci": "Pending new commit; historical e8/92c checks do not cover these executable changes."
+      "exact_head_ci": {
+        "source": "ee3d724ac913d6382f0375df98caf3c7cad2f4c2",
+        "checks": 14,
+        "successes": 12,
+        "expected_skips": 2,
+        "receipt_sha256": "9bd85440da293e369c7fd7fefd019c893d78f4eab87044fad5bf475916896dee",
+        "scope": "Executable checkpoint. Any later documentation head requires separate exact-head checks."
+      }
     },
     "next": "Review the smallest bounded follow-up that can answer seven-tick cost without implementing full rollback; audio/file source inventory and safety policies remain explicit. No nonterminal restore over unowned host handles.",
     "reviews": {
@@ -1344,5 +1385,85 @@
       "root-terminal-completion-notification-review-v1.json": "4652460d04181dcf37307dc1d090303994018ea487bb6dcb4839463d9464bd33",
       "root-draw-adapter-v3-review.json": "ef76a90ccfb7eb359705be5a13ff0c949a01191db64fd399103f6175d1616180"
     }
+  },
+  "renderer_reuse_stop": {
+    "state": "STOPPED_BEFORE_IMPLEMENTATION",
+    "source": "ee3d724ac913d6382f0375df98caf3c7cad2f4c2",
+    "source_sha256": {
+      ".deps/aurora/lib/gfx/encoding.cpp": "894812251e2f86942903bca617898e916f363630ba996ffed86cb4b7791bd727",
+      ".deps/aurora/lib/gfx/frame_packet.hpp": "f9f6fafad2b63d8e20771099a6fcc425a22d452cae96283d9a7239b1d4a95739",
+      ".deps/aurora/lib/gfx/recording.cpp": "d09a3b23700d0c753d2a6ed1e28d54aa9f2492a518a74b00bce8c43068042ff4",
+      ".deps/aurora/lib/gfx/recording.hpp": "a038d9525acb6ced2aca0b7b64bc503df494fd21338ccb8929044a4fc859bcf3",
+      ".deps/aurora/lib/gfx/frame.cpp": "b1a6ff283b59df1105f6be25d23c833af1641587c728b7c08ba8963b186d34b1",
+      ".deps/aurora/lib/gfx/frame.hpp": "f8b01177705017c02f4383f8d0c453ae0d57ff8a06cfe9d1e3f67880f48a0cd2",
+      ".deps/aurora/lib/aurora.cpp": "658c097594e67a5d66ca41237748d8984c4b89e40d259a83ffe5314e92458c68",
+      ".deps/aurora/include/aurora/aurora.h": "954cdd4387d3ffa71a2a0c59af0c2f35a4ffefbce24bab2cd9b284a264c9f5b9"
+    },
+    "finding": "Top-level FramePacket upload/copy/task/custom-callback counts do not cover content effects encoded inside RenderPass. The existing source proves these paths exist, but does not prove that every ordinary gameplay frame necessarily depends on them.",
+    "reason": "A fail-closed second-frame gate needs to classify persistent RenderPass targets and callbacks, including cached/offscreen and resolved textures. A gate that merely rejects every RenderPass would be vacuous for the drawn component; allowing ordinary EFB output based only on queue-write completion or the packet reset would guess that no next-tick consumer exists. Establishing reusable target/resource lineage would exceed the bounded smallest_B_contract. Per root instruction, stopped before creating a vacuous gate or broad redesign.",
+    "source_paths": [
+      {
+        "source": ".deps/aurora/lib/gfx/encoding.cpp:191-204",
+        "fact": "paletteConvs encode before the discardable-pass early return, so a discardable RenderPass is not evidence of no GPU content effect."
+      },
+      {
+        "source": ".deps/aurora/lib/gfx/encoding.cpp:206-253",
+        "fact": "RenderPass color/depth attachment load/clear/store behavior and resolve views are encoded. Load may consume prior target content."
+      },
+      {
+        "source": ".deps/aurora/lib/gfx/encoding.cpp:255-320",
+        "fact": "The encoder can add a depth snapshot, resolveTarget conversion/blit/copy, and color/depth snapshot copies outside the top-level FrameOp TextureCopy list."
+      },
+      {
+        "source": ".deps/aurora/lib/gfx/recording.cpp:430-517",
+        "fact": "EFB can be suspended while cached offscreen textures are acquired and rendered; restore resumes the EFB, and frame-local pass metadata alone does not prove whether a cached output is consumed next tick."
+      },
+      {
+        "source": ".deps/aurora/lib/gfx/recording.cpp:833-881,1012-1049",
+        "fact": "resolve_pass_into records a resolveTarget and resumes EFB; resolve_pass may create cached color/depth snapshot destinations and resumes EFB with load semantics."
+      },
+      {
+        "source": ".deps/aurora/lib/gfx/frame.cpp:1343-1394",
+        "fact": "Discard finalization writes browser staging prefixes, moves callbacks, resets the CPU FramePacket, and does not finish or submit the encoder. Resetting the packet is not GPU-target/cache rollback."
+      },
+      {
+        "source": ".deps/aurora/lib/aurora.cpp:580-636",
+        "fact": "The private match-draw discard lifecycle remains deliberately one-shot; relaxing it is not part of this candidate."
+      }
+    ],
+    "scope": {
+      "implemented": false,
+      "source_copies_or_patch": false,
+      "tests_build_or_capture": false,
+      "measured_claims": false,
+      "conclusion": "No second-frame renderer admission is established by existing reset semantics or current terminal evidence. This is an unclassified ownership blocker, not proof that a second frame is impossible or too slow. Seven-tick component execution remains unrun."
+    },
+    "next_gate": "Before any capped multi-frame diagnostic, classify the actual RenderPass output owners used by the existing Ready match path: distinguish freshly cleared EFB-only output from pass-load dependencies, resolve/snapshot/palette destinations, offscreen-cache outputs, and any encoding callback side effects. Then design one compact fail-closed receipt and a real end-to-begin runtime control that exceeds active frame-slot count, verifies packet/high-water reset and exactly-once lease return, and injects one known unsafe content operation. Preserve one-shot behavior.",
+    "review_artifacts": {
+      "feasibility-next-boundary-review-v1.json": "d7136316e8880887a57e9cb8759eb7bef3eed4d0546955a3fcdcca5efe5a8738",
+      "renderer-discard-validity-candidate-v1/blocker-review.json": "71489ea7d072295a55c8064e157c453862a7c22a65858b99c27836a08268562b",
+      "feasibility-next-boundary-stopping-addendum-v1.json": "fabf92b89af05d12703b1d526e31fa876694f6feac98ac702578c68c0a7ab5bd"
+    }
+  },
+  "recommendation": {
+    "decision": "NO_GO_NAIVE_BROWSER_HEAP_REWIND_COMBINED_BUDGET_UNESTABLISHED",
+    "scope": "Reject current unowned rewind strategy and seven-corrective-tick frame-budget claim, not match-only rollback or its eventual performance.",
+    "answers": {
+      "state": "Observed whole-heap and shared-page fixture costs; minimum complete mutable state and host bytes remain unknown. See source_only_baseline/shared_page_baseline.",
+      "tick_draw": "One terminal original browser tick/full source draw with zero submits measured; creates/writes still observed. Seven drawn corrective ticks and combined budget unmeasured. See terminal_draw_diagnostic.",
+      "host": "GPU/cache/staging/readback, original audio/native voices/independent output, file/bank/stream/Promise and persistence owners inventoried with proposed policies; no implemented safety claim. See host_state and renderer_reuse_stop."
+    },
+    "next": [
+      "Continue explicit simulation/renderer/audio/file owner design under #115 before browser restore or A4 admission.",
+      "Keep the diagnostic terminal; before multi-frame timing classify actual content owners and prove safe end-to-begin transition.",
+      "Proceed to owner-requested H1 first-use preparation investigation without hidden ticks/RNG/order changes or timing-guard relaxation.",
+      "Keep Slippi exact semantic/license/release-reference gaps open under #9; Stadium C3 remains next Track B."
+    ],
+    "not_authorized_by_evidence": [
+      "browser restore/resume",
+      "seven-tick drawn budget claim",
+      "profile port or equivalent reference",
+      "retail/Slippi or physical/foreground/audible/two-machine acceptance"
+    ]
   }
 }

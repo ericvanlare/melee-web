@@ -86,20 +86,20 @@ under the owner's Workers Free/$0 limit; no paid, billing, account/security,
 DNS or production changes are authorized. Do not repeat successful captures
 without a new hypothesis.
 
-**Immediate milestone:** #318 is about one week of bounded feasibility work,
-with one issue, one PR and one in-place status boundary. First inventory and
-reuse the existing #115 source snapshot fixture; then measure fresh source-only
-copy/restore costs. Separately review a diagnostic boundary that executes the
-original game draw callbacks while suppressing GPU submission. Existing
-`suppress_draw`-style shortcuts that omit those callbacks cannot answer the
-question. Inventory GPU objects/uploads/readbacks, audio voices/PCM and file
-loads/completions before attempting browser restore. Unknown host owners block
-restore admission. Measure combined capture/restore/re-simulation and final
-presentation cost, with instrumentation and timing tails explicit; historical
-no-draw averages do not establish a browser frame budget.
+**Feasibility checkpoint:** #318 retains source-only snapshot/replay measurements
+and one terminal browser tick with full source draw and no GPU submission in its
+[single receipt](status/2026-10-12-match-only-rollback-feasibility.md). The current
+recommendation is no-go for naive browser-heap rewind or a combined seven-tick
+budget claim: renderer content/cache ownership, audio clocks and asynchronous
+file destinations are not closed. This is not a rejection of rollback or proof
+that it is too slow. The next ownership design belongs under #115; A4 needs an
+explicit go decision after those gates. A later multi-frame diagnostic must first
+prove useful safe renderer reuse, preserving original draw callbacks. The
+Slippi semantic/license/reference inventory continues under #9; no profile is
+ready to port. Keep component measurements separate from browser acceptance.
 
-After the measurement milestone, investigate first-use respawn-platform and
-common-effect pipeline preparation under H1/#116. Preparation must not consume
+After this bounded measurement checkpoint, investigate first-use respawn-platform
+and common-effect pipeline preparation under H1/#116. Preparation must not consume
 hidden gameplay ticks/RNG, change draw order or relax timing guards. Keep H1
 incident recording on for combat and simulated-network runs; a forced pause is
 retained H1 evidence. The owner identifies the #316 respawn preparation stall as

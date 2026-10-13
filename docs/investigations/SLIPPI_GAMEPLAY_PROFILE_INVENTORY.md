@@ -51,14 +51,13 @@ and Singles stages; live setup can override these, including Party's rules.
 All 59 configured entries are mapped (52 default-selected). Selected folders resolve
 to 198 files and 183 annotated ASM hooks; the parsed textual include closure contains
 196 files, and 21 selected binary payloads are hashed. Of 183 hooks, 27 carry an
-`affects-gameplay` tag and 156 do not. Twelve untagged ASM hooks now have additional
-bounded source checks, including six on the online rollback controller/input/engine
-path; **144 lack such checks**. The new packet records exact source identities,
-static `Online/Core` selection, observed behavior and unresolved dependencies. Its
-independent review verified source/config selection and the 150-to-144 accounting,
-then requested three wording corrections for online initialization; corrected packet
-v2 applies those corrections. This is source-only evidence: no client binary/profile
-was inspected or accepted. Tag absence does not establish non-gameplay behavior.
+`affects-gameplay` tag and 156 do not. Across the original v4 inventory checks, the
+corrected prior six-hook set (v1 and v2 are versions of the same paths), and the
+corrected v4 packet, 24 unique untagged hooks have bounded source checks;
+**132 lack such checks**. The new packet records 12 more exact source identities,
+selected-root membership, observed behavior and unresolved dependencies. This remains
+source-only evidence: no client binary/profile was inspected or accepted. Tag absence
+does not establish non-gameplay behavior.
 
 The complete file inventory therefore does **not** establish a complete semantic inventory.
 
@@ -108,6 +107,44 @@ findings, or the separate m-ex generation and contributor-rights unknowns. No
 Slippi code or profile has been ported, and no binary/reference validation is
 claimed. Offline Vanilla remains a separate profile decision from Slippi rules;
 this online-only source review does not alter it.
+
+
+## Bounded follow-up: online recovery and match flow
+
+A corrected candidate adds 12 active untagged hooks from the pinned ASM commit
+`fcf47f10dc244152c2ebaa3a9dec142ea42243b7`. Their generated records are under
+default-selected recursive roots: `Common/FastForward`, `Online/Core`,
+`Online/Slippi Online Scene`, and `Online/Static`. This establishes static source/config
+selection only.
+
+| Hook path | Address | Observed source behavior; remaining dependency |
+| --- | --- | --- |
+| `Common/FastForward/DynamicsFix.asm` | `8009E090` | After dynamics, recursively sets up matrices for qualifying fighter JOBJ nodes; source comments connect this to fast-forward skipping shadow rendering. JOBJ flags, caller/ABI, and any collision or hitbox use remain unknown. |
+| `Online/Core/InitPause.asm` | `8016E904` | Installs client pause handling for online non-ranked/non-party play, including local pause and disconnect/LRA+Start fields; its ClientPause callback returns -1. Callback ownership, pause state effects, and disconnect convergence are unverified. |
+| `Online/Core/LGLExceededGameEnd.asm` | `802F70C4` | Outside Teams/Party, if exactly one side exceeds the threshold of 45 ledge grabs, selects success/failure HUD text and extends the transition. This hook does not itself choose the winner; caller/result behavior is unverified. |
+| `Online/Core/PauseCounter.asm` | `8016D26C` | Increments `ODB_PAUSE_COUNTER` and executes the replaced instruction. Its consumer and gameplay/network effect are unknown. |
+| `Online/Core/PreventPauseStranding.asm` | `8016CD08` | After no unpause button, if disconnected and recorded pauser is remote, branches to original unpause code; otherwise uses the replaced `li r4,-1`. Branch target, pauser field, and cross-client behavior are unverified. |
+| `Online/Core/ReportNoContestLRAS.asm` | `8016E9E8` | If not already game-over, sets the flag and calls the ODB handler on the LRAS path. Handler side effects and reachable cases remain unknown. |
+| `Online/Core/StartEngineLoop.asm` | `801A4DE4` | During active rollback, loads external state only when current frame is later than requested; equal skips the external load but still reaches pad-ring rewind/flag-clear bookkeeping, while an earlier frame skips the rollback block. A load rewinds raw pad-ring bookkeeping, clears flags, reloads the global frame and renews inputs; it also updates finalized/checksum/player status, captures pending prediction state, processes remote despawn, and delays game-over across the seven-frame window. Disconnect and hard-desync branches call `SFX_Menu_CommonSound`, create HUD subtext and call `FN_END_GAME`; the soft-desync-risk branch creates HUD subtext. The helper writes exit/pauser/transition fields. Downstream audio/HUD/host effects remain unknown. |
+| `Online/Core/Teams/PreventDeadStranding.asm` | `8016BE28` | In the asleep/dead predicate for disconnected online Teams, sets the input to the original compare to zero. Predicate and downstream life/respawn effect are unknown. |
+| `Online/Slippi Online Scene/main.asm` | `801A45B8` | The call at line 652 to `SinglesDetermineWinner` is inside ranked `VSSceneDecide_ConnectionActive` and feeds ranked tie/winner/set bookkeeping. Reviewed helper code checks timeout/LGL, stocks and percent; source says LRAS is not handled. This does not establish non-ranked winner semantics. Reviewed sections also cover readiness, mode routing, ranked set/tiebreak and match-state loads. |
+| `Online/Static/LoadMatchState.asm` | `80005610` | Writes the match-state EXI command and reads an MSRB buffer, without visible transfer-result validation. Buffer/field semantics and synchronization are unknown. |
+| `Online/Static/LoadState.asm` | `8000560C` | Searches a seven-entry frame metadata ring, then requests external savestate load over EXI; missing frame logs and branches to address zero. Completion, restored-owner coverage and assertion behavior are unverified. |
+| `Online/Static/SaveState.asm` | `80005608` | Writes frame metadata and requests external savestate capture over EXI with interrupts disabled. Captured state, completion and metadata consistency are unverified. |
+
+The coverage count uses disjoint path sets: six hook checks from the original v4 inventory,
+six unique checks in the corrected prior packet (v1 and v2 are versions of the same six),
+and these twelve new checks. That is 24 of 156 untagged active hooks, leaving 132
+without a bounded check. The Sol correction receipt
+`slippi-untagged-gameplay-v3-independent-review-v2.json`
+(SHA-256 `4c8acbc4e8d33d2e9b67f5f91f82c9bf1832fb7586b0f1f04aeb47fe36c70547`) records the
+ranked call-scope and StartEngineLoop call-site corrections and verifies the disjoint
+path union and exact remaining set. Root applied the corrected v4 packet after independent review and corrected the
+portable summary to name ledge-grab counts and the ClientPause callback explicitly.
+It is source-only and does not establish runtime activation, executable identity,
+or profile acceptance. The corrected packet is `slippi-untagged-gameplay-review-v4` under run `match-rollback-feasibility-20261012-203633-e8f0c964`; its manifest SHA-256 is `6d72f7b52bf11766a4e2f6e9d0a17fab70c50f6d3ea20677cd65176dfc790025`, review JSON SHA-256 is `dd42ced93e1985d44ed581130f852a7bd98e16aa745d22097b1f3a1b33b14a05`, remaining-list SHA-256 is `baab798f42269356aa6402fc9c46750857fa3d5b2da807171a2de4129adb8e27`, and report SHA-256 is `96c0a7cf9cfc7bd6df88f611dd43828b8f8224486bdcf70477bd6dcb8980a8ea`. Exact hook/source identities are in that machine receipt. It does
+not alter the v3.6.4 source/config pairing, branch-scoped mode findings, repository
+license notices, or separate m-ex generation and contributor/reuse-rights unknowns.
 
 ## Pins and license findings
 

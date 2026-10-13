@@ -132,43 +132,63 @@ Producer `e8ba53f4` plus patch `128f2918` is distinct from its eventual commit.
 The private Wasm is `ca043e5a`; the default-off runtime omits all four probe
 exports. Both affected Release builds pass. The unchanged assembled executable
 source passes 2,388 tests with 165 skips, including actual retirement-callback
-and extracted-native failure/ordering controls. New exact-head CI is pending.
+and extracted-native failure/ordering controls. Executable checkpoint `ee3d724a` passes all 14 exact-head CI checks (12 successes,
+two expected skips). Later documentation heads still require their own checks.
 The structured receipt retains complete hashes, raw PAD, effects and cleanup.
 
-## Remaining measurement boundaries
+## Feasibility recommendation and stopping point
 
-1. **State size/copy/restore:** whole-heap and shared-page measurements are
-   observed. Complete mutable owner ranges and external host-state bytes remain
-   unknown; retained page payload is not the minimum simulation-state size.
-2. **Source draw and seven corrective ticks:** one terminal tick/draw is now
-   measured above. Existing `suppress_draw` skips required game callbacks and
-   cannot answer this gate. Actual object creation and queue writes remain
-   despite zero GPU submission. Browser restore and a resumed frame remain
-   unproved; the terminal diagnostic grants no admission for either.
-   Measure seven corrective ticks plus current separately from seven total,
-   including combined capture/restore and final presentation before a budget claim.
-3. **Host effects:** source inspection identifies GPU resources/caches/staging,
-   depth/profiler callbacks, native and browser audio state, file/stream requests
-   and persistent profile/card state. Actual effect counts and rollback-safe
-   ownership/commit behavior remain open. Omitting Submit alone does not undo
-   earlier queue writes, complete callbacks, or make heap restoration safe.
+**No-go for naive live-browser heap rewind or a current seven-corrective-tick
+budget claim. Continue the match-only direction with explicit state and host
+ownership under #115.** This is not evidence that rollback is impossible or too
+slow. The measurements above answer the admitted component questions; minimum
+complete mutable state size, browser restore and the combined frame budget are
+still unknown.
 
-The reviewed source owner inventory is retained in the structured receipt. Native
-audio uses a separate host-time accumulator; the AudioWorklet output clock is
-independent again. Transferred PCM already consumed by output cannot be rewound.
-File requests also cross into JavaScript promise/result maps and asynchronous
-completion. HPS decoded slots and SSM bank mappings have distinct owners.
-The receipt proposes restore, journal or commit-once policies for each owner;
-these are design options, not implemented rollback safety.
+The proposed next renderer gate stopped before implementation or another capture.
+Source inspection found content effects inside `RenderPass`, beyond top-level
+packet upload/copy counts: palette conversions, attachment loads, resolves,
+color/depth snapshots and cached offscreen outputs. CPU packet reset does not
+restore those GPU contents. A later frame could consume a cache handle whose
+producing commands were discarded. This establishes possible source paths, not
+that the observed Mario/FD sample exercised every one. Rejecting every drawn pass
+would make the proposed test useless; admitting a useful path requires content
+and owner classification beyond this bounded repair. No seven-frame run occurred.
 
+Before another drawn multi-frame measurement, classify the actual match output
+owners and prove a safe end-to-begin transition, including load dependencies,
+cache content, callbacks and exactly-once lease return. Keep the private terminal
+diagnostic one-shot. Do not expand this feasibility checkpoint into a broad
+renderer transaction engine simply to obtain a timing number.
 
-Lineage-aware follow-up: the retained 11-source v2 inventory and hashes remain a historical snapshot. The later read-only host-state disposition review (SHA-256 ea9f79fad1c6c7dff5457ca5f7c2fda742eb226d99689e415793bd0ab0ee0b5e) records that the current private draw/discard probe checks `source_file_drive_busy` (`request_count`) before close, but does not establish pumping/region, JavaScript Promise/result-map, native audio/HPS/SSM, or GPU-completion closure. It adds no operation counts or rollback-safety evidence. That review proposes owner journals and a later nonterminal replay as design options. The current feasibility queue first chooses the smallest draw-inclusive seven-tick cost experiment alongside the audio/file source inventory and safety policies; the broader instrumentation proposal is not a required implementation step. Nonterminal restore over unknown owners remains inadmissible.
+| Host owner | Source finding and proposed policy | Remaining evidence |
+| --- | --- | --- |
+| Simulation / allocation | Restore complete original mutable state, PAD history, RNG, draw-dependent state and allocator ownership at a quiescent boundary; retain exact immutable asset identities. | Complete mutable ranges, nonmemory globals/tables and browser-safe closure are unknown. |
+| GPU / renderer | Preserve full source draw; distinguish immutable resources from speculative target/cache contents, writes, staging and completion ownership. Version or discard speculative effects and commit intended presentation once. | One terminal sample measured creates/writes; reusable content rollback and readback semantics are unproved. |
+| Native audio / browser output | Original SFX commands precede later voice and PCM advancement. Native audio and the AudioWorklet have separate clocks. Preserve source progression and define confirmed/predicted output policy; consumed sound cannot be undone. | No per-tick SFX/voice/PCM count or browser audio rollback validation. |
+| Files / banks / streams | Native requests cross into JavaScript Promise/result maps. HPS decoded slots and SSM bank mappings have separate owners. Retain immutable bytes and explicit timeline/request/completion identities before restoring destinations. | Stale callback rejection, asynchronous closure and source latency/order remain unproved. |
+| Input / outcome / persistence | Keep transport, live devices and wall clocks outside rewind; replay exact logged inputs. Commit confirmed outcome and persistent writes once outside speculative work. | Match start agreement and actual reachable persistent effects still need validation. |
 
-The recommendation remains pending these answers; this fixture is no evidence
-of browser rollback safety or a seven-tick budget pass. Source draw, GPU/JS
-ownership, browser input/clocks, externally committed audio, persistent saves,
-async/growing memory, Slippi/retail equivalence and human acceptance gates are
-excluded. Original arithmetic, PAD, RNG and source ordering remain unchanged.
+These are source-backed policies, not implemented rollback safety. The retained
+11-source inventory is historical; its hashes were not rewritten. A later
+lineage-aware review identifies the existing pre-close `source_file_drive_busy`
+request-count guard, which does not prove pumping/region, JS Promise, native
+HPS/SSM/audio or GPU closure. A separate source/compile-database review follows
+original `ft_PlaySFX` through `lbAudioAx_800237A8` and `AXDriver_8038CFF4` to the
+later synth callback; the unused `melee_web_audio_play` helper is not a gameplay
+SFX observation seam. Browser audio rendering invokes the synth callback on its
+own sample cadence, separately from match ticks. This is configured-source
+inspection, not final-link retention or a runtime call count. Exact review and
+source identities are in the structured receipt.
+
+The recommendation is to retain these controls, keep A4 blocked on a concrete
+state/host-ownership design and the Slippi profile gates, and move independent
+engineering to the requested H1 first-use respawn/common-effect preparation
+investigation. H1 keeps every timing guard and source tick/RNG/order invariant.
+Stadium C3 remains next Track B. Source-only Slippi semantic/license/reference
+work continues under #9; the profile is not ready to port. Original comparison,
+physical input, foreground timing, audible output and two-machine acceptance
+remain separate unrun gates.
 
 ## Retained preparation failures
 
@@ -189,8 +209,10 @@ and [source receipt](../evidence/slippi-gameplay-profile-inventory-v1.json) map
 the selected patch configuration, mode behavior and license notices. Ranked and
 Unranked Stadium are unfrozen; Direct/Teams offer a selection. UCF 0.84 is selected
 in the shared configuration, while live toggle semantics remain unresolved.
-File/hash closure is reviewed, but 144 untagged ASM hooks still lack bounded semantic
-checks after a further six online rollback/input hooks were reviewed. A source/configuration pairing is now identified for release v3.6.4, and the
+File/hash closure is reviewed, but 132 untagged ASM hooks still lack bounded semantic
+checks after 24 unique checks across the original inventory and two later batches.
+The latest twelve-hook source review retains corrections to ranked winner-helper
+scope and version-versus-path accounting; it does not complete profile semantics. A source/configuration pairing is now identified for release v3.6.4, and the
 selected m-ex artifact is traced to matching checked-in bytes. Executable reference
 validation, reproducible m-ex generation and reuse rights remain open. No profile
 code was ported, and the source inventory task remains open.
