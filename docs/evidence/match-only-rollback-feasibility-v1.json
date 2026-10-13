@@ -1465,5 +1465,333 @@
       "profile port or equivalent reference",
       "retail/Slippi or physical/foreground/audible/two-machine acceptance"
     ]
+  },
+  "drawn_synctest_sprint": {
+    "status": "one normal submitted callback observed and retired; renderer LOAD_ATTACHMENT ownership remains open; no restore",
+    "artifact_run": "rollback-stadium-sprint-20261013-111001-9f8df4a4",
+    "source": "a34d5acfa540af173d97679f7c54650ac577930a",
+    "private_build_source_patch_sha256": "e932d6e21be0960b16160b0f77b81aa874b30976e899ce09848c406493a9bf61",
+    "runtime": {
+      "artifact": "normal-frame-served-runtime-v2.json",
+      "bytes": 7416,
+      "sha256": "efa770fdd90c708306a09fb7f0eacc91e7b89ba5b52ed025cda4dc5d11c07dec"
+    },
+    "private_release": {
+      "artifact": "normal-frame-build-v3/private-release.json",
+      "bytes": 703,
+      "sha256": "91c6e5c8ab54df0f1d1f73b188d544c7657c18a7a07e4cb92764c6573d0ae5e6"
+    },
+    "ordinary_release": {
+      "artifact": "normal-frame-build-v3/ordinary-release.json",
+      "bytes": 682,
+      "sha256": "e7146156a4b2aacfc9176ae9e4871a552ef9c6c82115e498a0b33cb1209904d6"
+    },
+    "validation": {
+      "receipt": {
+        "artifact": "normal-frame-regression-v3/full-regression.json",
+        "bytes": 797,
+        "sha256": "9b37a9205b4af24767bf5d9f9cb82b68f5713de7ae75d100e69c4adb978ff1fa"
+      },
+      "tests": 2400,
+      "skips": 164,
+      "result": "pass",
+      "source_patch_sha256": "e388731246285d12b400131f55214ca1dbb6057bb19f15a306dabb16ebd2c6e9"
+    },
+    "retained_regression_failures": [
+      {
+        "artifact": "normal-frame-regression-v1/full-regression.json",
+        "bytes": 796,
+        "sha256": "0b976dfccea2a061edc8e675cb4d47e326cb6edc611dc78f7a418a836d130458"
+      },
+      {
+        "artifact": "normal-frame-regression-v2/full-regression.json",
+        "bytes": 795,
+        "sha256": "a1ef4d2714e4cd58cc5fda6acb3656467342c443d45d165a0fdb54effd5fd165"
+      }
+    ],
+    "first_capture": {
+      "report": {
+        "artifact": "normal-frame-capture-v1/browser/report.json",
+        "bytes": 389493,
+        "sha256": "d10bf1b1ca381f2ab67a0523809718730ec0a3d097109010a885f534d7fa7814"
+      },
+      "owner": {
+        "artifact": "normal-frame-capture-v1/owner-report.json",
+        "bytes": 93358,
+        "sha256": "c00fb279c19224458b3bc1fd07a137664de67a673eedd304507114aa3378f651"
+      },
+      "completion": {
+        "artifact": "normal-frame-capture-v1/completion.json",
+        "bytes": 171855,
+        "sha256": "d6e6ea8e2707075c5d8165c263e11156c0343dae62ef977fbaae82436fb75b1e"
+      },
+      "reduction": {
+        "artifact": "normal-frame-capture-v1/first-failure.json",
+        "bytes": 188457,
+        "sha256": "0869b38bd8cb3fe11ea84e3160502f8290bfc37c0c5afe0dbccc20078ccbf059"
+      },
+      "result": "fail-before-observer-arm",
+      "boundary": "Original CSS to SSS after CPU-to-empty-to-Human P2 transition",
+      "match_observations": 0,
+      "observer_armed": false,
+      "native_cleanup": "pass: source/menu owners and cached assets released",
+      "owned_browser_and_server_absent": true,
+      "source_and_runtime_unchanged": true,
+      "h1": "No forced timing pause reported; recorder retained seven reason-code7 incidents, no dropped incidents, 7998 evicted samples, and zero match source steps. Not a match timing result."
+    },
+    "next": "Classify actual attachment-load, resolve and snapshot content owners, then independently review the smallest safe same-instance checkpoint/restore contract; no repeated successful capture.",
+    "scope": "Observer and idle predicates are prerequisites only. No same-instance drawn restore, minimum complete state size or combined seven-tick budget result.",
+    "hps_quiescence_controls": {
+      "result": "pass-focused-component-only",
+      "source": "a34d5acfa540af173d97679f7c54650ac577930a",
+      "candidate": {
+        "artifact": "hps-native-quiescence-controls-v6/manifest-v6.json",
+        "bytes": 7653,
+        "sha256": "a7b99f17692935c9371e06edb8e82993eeccb8c4f37557bd3845f57b1f928999"
+      },
+      "attempt": {
+        "artifact": "hps-native-quiescence-controls-v6/attempt-v1/attempt.json",
+        "bytes": 3023,
+        "sha256": "34564339b5d5484824b02e9ddf03737b24f231692390e150d141b56bc8fbfe3a"
+      },
+      "review": {
+        "artifact": "hps-native-quiescence-root-result-review-v6.json",
+        "bytes": 1353,
+        "sha256": "c0a5ddf4ce9a6e02ae4b362595eb1ac141aad3a94ca58d7e8e3efd0614d163aa"
+      },
+      "controls": "Actual HPS stream and inner IO code reject wrong owner, queued request and callback-time pumping; same idle owner is admitted. Always-on CHECK negative reaches C via argv and fails as expected under Release flags.",
+      "scope": "Audio identity/source lifecycle collaborators are fixture-only. No decoded HPS, full DSP, host Promise/destination ownership, browser checkpoint or restore claim.",
+      "retained_failures": [
+        "v1 host-ABI compile",
+        "v3 actual TARGET_PC callback signature compile",
+        "v5 environment-driven negative did not reach C getenv; overall attempt failed"
+      ]
+    },
+    "second_capture": {
+      "receipt": "rollback-stadium-sprint-20261013-111001-9f8df4a4/normal-frame-capture-v2/first-failure.json",
+      "sha256": "393ff0bb2ecabc2208923936bbb8dc6a1f77da396169762e7f2b94dbe1d71d81",
+      "state": "FAIL",
+      "harness_patch_sha256": "0730cef984dc68c60180da8e7a23b837c6377577b188074ca37090ca5b00fb29",
+      "runtime": "Unchanged frozen runtime-v2; source a34d5acf plus e932d6e2",
+      "css_readiness": "PASS; actual two-keyboard/source readiness, one Start edge, original SSS",
+      "normalized_source_frame": 180,
+      "failure": "Observer selected valid zero-source callback before a due tick; zero tick/draw, one audio render of533 PCM frames",
+      "native_retirement": true,
+      "owned_browser_server_absent": true,
+      "h1_validation_failures": [],
+      "not_claimed": [
+        "Actual consumed PAD receipt",
+        "Renderer event inventory",
+        "Browser restore",
+        "Acceptance"
+      ],
+      "next": "Reduced actual-native zero-step->due-step control and independent review before a new runtime build/capture"
+    },
+    "third_capture": {
+      "result": "pass-observation-only",
+      "report": {
+        "artifact": "normal-frame-capture-v3/browser/report.json",
+        "bytes": 634550,
+        "sha256": "5ab01c209e832e9b4b681783cd5cdce53f715b2321770d92a3e94a11929bdd5f"
+      },
+      "owner": {
+        "artifact": "normal-frame-capture-v3/owner-report.json",
+        "bytes": 71819,
+        "sha256": "8e6118296b42c284f0ab5c4d505e8613ff827238f52a445ac0de89ad67e2df1c"
+      },
+      "completion": {
+        "artifact": "normal-frame-capture-v3/completion.json",
+        "bytes": 168116,
+        "sha256": "dc07c0c63661ff9c937a3b9a66296915180007076d2427f8121791ef20d6f0b8"
+      },
+      "independent_review": {
+        "artifact": "normal-frame-capture-v3-independent-review-v1.json",
+        "bytes": 6057,
+        "sha256": "27f10fa689aeb507365c4cbd6f6ffba676cb750129cea7ecb974a5f25667ba0f"
+      },
+      "source": "a34d5acfa540af173d97679f7c54650ac577930a",
+      "source_patch_sha256": "c50aa00bd6c3ef86e7ab6774eaa5c8b537c254ce13a21fba44ad7a35377195e8",
+      "runtime": {
+        "artifact": "normal-frame-served-runtime-v3.json",
+        "bytes": 7557,
+        "sha256": "38ab7a0731090b78306e0b2067108be87e705739315794e0535b1c7a93c3f178"
+      },
+      "private_release": {
+        "artifact": "normal-frame-build-v4/private-release.json",
+        "bytes": 703,
+        "sha256": "92b3b438834a710eb0280d8415f2462a7edb88a33b28cc2b47b7bd23f6f0cc59"
+      },
+      "ordinary_release": {
+        "artifact": "normal-frame-build-v4/ordinary-release.json",
+        "bytes": 682,
+        "sha256": "fff2b531be23a9aa01e562f5f4d70b6a02f09d28a83b7cb61765329171471683"
+      },
+      "validation": {
+        "receipt": {
+          "artifact": "normal-frame-regression-v4/full-regression.json",
+          "bytes": 796,
+          "sha256": "41aff8f587c160d79867c1e7d6d6bdb7241ab3f283d1d18c36ffda335c1916b1"
+        },
+        "tests": 2402,
+        "skips": 164,
+        "source_unchanged": true
+      },
+      "due_tick_repair": {
+        "activation": "first original begin_tick selected by unchanged clock; source-free callbacks retain original audio work and first-due failure is terminal",
+        "review": {
+          "artifact": "normal-frame-due-tick-final-component-review-v3.json",
+          "bytes": 5003,
+          "sha256": "15bd856af3aee378cd6a91358c59c9850136cde6643b69245c415dd81e8060f5"
+        },
+        "actual_source_wasm32_controls": {
+          "artifact": "normal-frame-due-tick-controls-v3/receipt.json",
+          "bytes": 19632,
+          "sha256": "c63c9a395ae6e618acac7c700de6e98af8fef2cce3aa943845a4e3f51524e9b0"
+        },
+        "integrated_controls": {
+          "artifact": "normal-frame-due-tick-integrated-controls-v3.json",
+          "bytes": 528,
+          "sha256": "78f3c565f70481c80c4062db2dffeccb6b58035468befa7d4f1746a23d91e8fb"
+        }
+      },
+      "callback": {
+        "requested_source_frame": 180,
+        "source_frame_before": 180,
+        "source_frame_after": 181,
+        "tick_returns": 1,
+        "draw_returns": 1,
+        "audio_returns": 1,
+        "pcm_frames": 533,
+        "audio_phase_before": 20,
+        "audio_phase_after": 40,
+        "pre_tick_callbacks": 0,
+        "pre_tick_audio_returns": 0,
+        "pre_tick_pcm_frames": 0,
+        "raw_pad_bytes": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          255,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          255,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "renderer": {
+        "schema_version": 1,
+        "state": 4,
+        "first_blocker": 7,
+        "target_frame_index": 3238,
+        "frame_index": 3238,
+        "frame_id": "3239",
+        "event_count": 280,
+        "handle_count": 10,
+        "op_count": 3,
+        "render_pass_count": 3,
+        "draw_command_count": 246,
+        "custom_draw_count": 0,
+        "encoder_task_count": 0,
+        "texture_copy_count": 0,
+        "texture_upload_count": 0,
+        "palette_conversion_count": 0,
+        "resolve_count": 2,
+        "snapshot_count": 1,
+        "staging_copy_count": 12,
+        "queue_write_count": 4,
+        "queue_write_bytes": "1231440",
+        "after_submit_callback_count": 0,
+        "submit_count": 1,
+        "fence_count": 1,
+        "fence_success": 1
+      },
+      "renderer_first_blocker_name": "LOAD_ATTACHMENT",
+      "renderer_handle_scope": "Capture-local IDs identify observed handles, not full owner/content/retirement coverage",
+      "h1": {
+        "timing_pauses": 0,
+        "dropped_samples": 3029,
+        "dropped_incidents": 0,
+        "reason_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          8,
+          0,
+          0
+        ],
+        "scope": "Lossy route callback recorder includes setup and match; no acceptance or no-stall claim beyond observed boundary"
+      },
+      "native_retirement": true,
+      "owned_browser_server_absent": true,
+      "source_runtime_unchanged": true,
+      "not_claimed": [
+        "Browser-observed zero-source callback skip (pre_tick counts are zero here; actual-source fixture covers it)",
+        "Renderer content/handle ownership closure",
+        "Actual file-operation inventory or decoded/native PCM equality",
+        "Snapshot/restore/replay",
+        "Seven corrective ticks or combined frame budget",
+        "Acceptance"
+      ]
+    }
   }
 }

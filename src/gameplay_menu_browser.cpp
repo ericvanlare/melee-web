@@ -1,4 +1,7 @@
 #include "gameplay_menu_browser_state.hpp"
+#if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
+#include "gameplay_menu_frame_effect.hpp"
+#endif
 extern "C" uint32_t gm_801A4BA8(void);
 #if defined(MELEE_WEB_NET_SESSION)
 extern "C" int melee_web_net_publish_local_input(
@@ -1248,6 +1251,9 @@ void log_message(AuroraLogLevel level,const char* module,const char* text,unsign
 void render_audio_tick(MeleeWebAudio* audio,char* error,size_t error_size){
  audio_phase+=32000;const unsigned count=audio_phase/60;audio_phase%=60;
  check(melee_web_audio_render(audio,pcm.data(),count,error,error_size),error);
+#if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
+ frame_effect_audio_returned(count);
+#endif
 #if !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
  EM_ASM({window.menuAudio?.(HEAPF32.slice($0>>2,($0>>2)+$1*2));},pcm.data(),count);
 #endif
@@ -1312,6 +1318,10 @@ void service_render_cache_writes(){
         ok,flushed,duration);
 }
 void tick(){
+#if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
+ if(frame_effect_terminal())return;
+ frame_effect_callback_started();
+#endif
 #if defined(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC)
  if(match_draw_discard_terminal)return;
 #endif
@@ -1326,6 +1336,9 @@ void tick(){
   running=false;faulted=true;
   menu_clock.reset();audio_clock.reset();
   emscripten_cancel_main_loop();
+#if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
+  frame_effect_callback_aborted("runtime_owner_stopped");
+#endif
   return;
  }
  if(owner_action==1){
@@ -1372,7 +1385,13 @@ void tick(){
   (void)prepare_deferred_pipelines();
 #endif
   for(const AuroraEvent* event=aurora_update();event&&event->type!=AURORA_NONE;++event){
-   if(event->type==AURORA_EXIT){close();melee_web_input_shutdown();aurora_shutdown();emscripten_cancel_main_loop();return;}
+   if(event->type==AURORA_EXIT){
+    close();melee_web_input_shutdown();aurora_shutdown();emscripten_cancel_main_loop();
+#if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
+    frame_effect_callback_aborted("aurora_exit");
+#endif
+    return;
+   }
   }
   const auto* input=melee_web_input_poll();
   input_done=emscripten_get_now();
@@ -1398,11 +1417,17 @@ void tick(){
 #endif
   if(frame_began){
    began=1;began_this_frame=true;begin_done=emscripten_get_now();
+#if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
+   frame_effect_begin_draw();
+#endif
    GXSetCopyClear(GXColor{0,0,0,255},GX_MAX_Z24);
    if(!suppress_draw){
     if(!faulted){
      if(match){
       match->draw();actual_source_draw=true;drew_source=true;
+#if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
+      frame_effect_draw_returned();
+#endif
       if(replay&&replay_trace&&!replay_final_draw){
        if(source_frames.pending())melee_web::retail_replay_draw(*replay,replay_cursor-1);
        else melee_web::retail_replay_preparation_draw(*replay);
@@ -1739,7 +1764,14 @@ void tick(){
     // gm_801A4BA8 is the original scene traversal cursor (MWRO80479d58),
     // not the gameplay timer returned by source_frames()/gm_GetFrameCount.
     const auto prefix_tick_before=replay&&replay->diagnostic_entity_prefix?gm_801A4BA8():0;
+#if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
+    frame_effect_begin_tick(sample,source_frames.steps(),elapsed.steps,audio_elapsed.steps,
+                            audio_before_construction,elapsed.stalled||audio_elapsed.stalled);
+#endif
     match->tick(sample);
+#if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
+    frame_effect_tick_returned();
+#endif
     if(replay&&replay->diagnostic_entity_prefix)
      check(replay_prefix_progress.observe(prefix_tick_before,gm_801A4BA8(),replay->diagnostic_active_entity_prefix) &&
            !match->paused()&&!match->complete()&&!match->ending(),
@@ -2041,6 +2073,9 @@ void tick(){
                        static_cast<int>(source_frames.draws()),running?1:0);
  }
 #endif
+#if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
+ frame_effect_callback_finished(source_frames.steps(),source_frames.draws());
+#endif
 }
 }
 using namespace melee_web_menu_browser;
@@ -2223,5 +2258,8 @@ int main(int argc,char** argv){
  GXInit(fifo,sizeof(fifo));
 #endif
  if(!melee_web_input_startup())return 1;
+#if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
+ EM_ASM({Module.matchFrameEffectNativeIdle=()=>!ABORT&&Asyncify.state===Asyncify.State.Normal&&Asyncify.currData===null;});
+#endif
  emscripten_set_main_loop(tick,0,1);return 0;
 }

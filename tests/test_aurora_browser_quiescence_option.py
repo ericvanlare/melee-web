@@ -148,11 +148,46 @@ class AuroraBrowserQuiescenceOptionTests(OwnedWorkspaceTests):
         end = source.index("    stats.lastEndFrameCallbackResidualMs =", position)
         block = source[start:end]
         conditional = block[block.index(diagnostic) + len(diagnostic):]
-        on, off = conditional.split("#else\n", 1)
-        off = off.split("#endif", 1)[0]
+        on, off = AuroraBrowserQuiescenceOptionTests._split_outer_branches(conditional)
         return source, function, on.rstrip() + "\n", off.rstrip() + "\n"
 
-    def _preprocess(self, source, *, diagnostic, include_dirs=(), label="projection"):
+    @staticmethod
+    def _split_outer_branches(conditional):
+        # The opening outer #if has already been removed. Nested directives
+        # belong to their branch; only depth-zero #else/#endif delimit it.
+        depth = 0
+        offset = 0
+        otherwise = None
+        off_start = None
+        for line in conditional.splitlines(keepends=True):
+            words = line.lstrip().split(None, 1)
+            directive = words[0] if words else ""
+            if directive in ("#if", "#ifdef", "#ifndef"):
+                depth += 1
+            elif directive == "#endif":
+                if depth:
+                    depth -= 1
+                else:
+                    if otherwise is None:
+                        raise ValueError("outer conditional has no #else")
+                    return conditional[:otherwise], conditional[off_start:offset]
+            elif directive in ("#else", "#elif") and depth == 0:
+                if directive != "#else" or otherwise is not None:
+                    raise ValueError("unexpected outer alternative")
+                otherwise = offset
+                off_start = offset + len(line)
+            offset += len(line)
+        raise ValueError("unterminated outer conditional")
+
+    def test_outer_branch_split_preserves_nested_alternatives(self):
+        on = "on\n#if INNER\ninner_on\n#else\ninner_off\n#endif\n"
+        off = "off\n#ifdef OTHER\nother\n#endif\n"
+        self.assertEqual(self._split_outer_branches(on + "#else\n" + off + "#endif\n"), (on, off))
+        for malformed in ("on\n#endif\n", "on\n#else\noff\n", "on\n#elif X\nx\n#endif\n"):
+            with self.subTest(malformed=malformed), self.assertRaises(ValueError):
+                self._split_outer_branches(malformed)
+
+    def _preprocess(self, source, *, diagnostic, frame_observer=False, include_dirs=(), label="projection"):
         compiler = shutil.which("clang++") or shutil.which("g++")
         if compiler is None:
             raise unittest.SkipTest("a C++ preprocessor is unavailable")
@@ -164,6 +199,8 @@ class AuroraBrowserQuiescenceOptionTests(OwnedWorkspaceTests):
         command = [compiler, "-E", "-P", "-std=c++20", "-D__EMSCRIPTEN__"]
         if diagnostic:
             command.append("-DAURORA_BROWSER_QUIESCENCE_DIAGNOSTIC=1")
+        if frame_observer:
+            command.append("-DAURORA_BROWSER_FRAME_EFFECT_OBSERVER=1")
         for include_dir in include_dirs:
             command.extend(("-I", str(include_dir)))
         command.append(str(fixture))
@@ -224,13 +261,20 @@ class AuroraBrowserQuiescenceOptionTests(OwnedWorkspaceTests):
                 "      }\n"
             )
             capture = "[stagingSlot, generation, completionRegistrationMs,\n           diagnosticSourceFrame]"
+            observer_capture = capture.replace("diagnosticSourceFrame]", "diagnosticSourceFrame, frameId]")
             completion = "            observe_browser_queue_completion(completionRegistrationMs, diagnosticSourceFrame);\n"
-            for addition in (registration, capture, completion):
+            for addition in (registration, capture, observer_capture, completion):
                 self.assertEqual(off.count(addition), 1)
             projected = off.replace(registration, "").replace(
                 capture, "[stagingSlot, generation]"
-            ).replace(completion, "")
-            self.assertEqual(projected.strip(), BASELINE.read_text(encoding="utf-8").split("\n", 2)[2].strip())
+            ).replace(observer_capture, "[stagingSlot, generation, frameId]").replace(completion, "")
+            # Real preprocessing selects the private observer guard. Never strip
+            # its capture: an ordinary-path frameId delta must fail this check.
+            baseline = BASELINE.read_text(encoding="utf-8").split("\n", 2)[2]
+            self.assertEqual(
+                self._preprocess(projected, diagnostic=False),
+                self._preprocess(baseline, diagnostic=False),
+            )
             guard = "if (!g_browserStagingDiagnosticsEnabled) {\n    return;\n  }"
             observer_start = source.index("void observe_browser_queue_completion(")
             observer_end = source.index("\n}\n", observer_start)
@@ -251,6 +295,15 @@ class AuroraBrowserQuiescenceOptionTests(OwnedWorkspaceTests):
 
             off_preprocessed = self._preprocess(function, diagnostic=False)
             on_preprocessed = self._preprocess(function, diagnostic=True)
+            for diagnostic in (False, True):
+                with self.subTest(quiescence=diagnostic):
+                    observer_on = self._preprocess(function, diagnostic=diagnostic, frame_observer=True)
+                    observer_off = self._preprocess(function, diagnostic=diagnostic)
+                    capture_suffix = "diagnosticSourceFrame, frameId]"
+                    self.assertIn(capture_suffix, observer_on)
+                    self.assertRegex(observer_on, r"observe_fence\(\s*frameId,")
+                    self.assertNotIn(capture_suffix, observer_off)
+                    self.assertNotIn("observe_fence(", observer_off)
 
             # The ordinary browser path retains its queue observer, generation
             # guard and release, while the opt-in owner book/counters/fatal path

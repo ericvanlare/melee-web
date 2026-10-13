@@ -166,6 +166,7 @@ test('actual harness finally preserves primary failure and closes after capture/
   const body=source.slice(start,source.indexOf('\n}\nconsole.log',start));
   for(const primary of [null,Error('original route failure')]){
     const calls=[];const scope={failure:primary,nativeSessionActive:false,suddenDeathRoute:true,sparseMarioPrefix:false,competitiveTimeoutRoute:false,
+      frameEffectObservationOnly:false,frameEffectNativeCallsForbidden:false,
       report:{result:primary?'fail':'pass'},page:{},redactDiscPath:String,reportWriteError:null,
       driver:{diagnostics:async()=>{throw Error('diagnostic failure');}},
       readRuntimeDiagnosticsCapture:async()=>{throw Error('capture unavailable');},validateFinalSdCapture,
@@ -200,6 +201,7 @@ test('actual finally retains late failing capture and still closes without repla
     const capture=structuredClone(counter);for(const phase of [7,14,8])capture.phase_source_steps[phase]=1;
     capture.reason_counts[3]=1;let closed=0;
     const scope={failure:primary,nativeSessionActive:false,suddenDeathRoute:true,sparseMarioPrefix:false,competitiveTimeoutRoute:false,
+      frameEffectObservationOnly:false,frameEffectNativeCallsForbidden:false,
       report:{result:'pass'},page:{},redactDiscPath:String,reportWriteError:null,
       driver:{diagnostics:async()=>({})},validateFinalSdCapture,
       readRuntimeDiagnosticsCapture:async()=>capture,persistReport:async()=>{},

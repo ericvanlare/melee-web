@@ -20,7 +20,7 @@ class MatchDrawDiscardRetirementTests(unittest.TestCase):
              str(ROOT / "tests/match_draw_discard_retirement.test.mjs")],
             cwd=ROOT, capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("tests 9", result.stdout)
+        self.assertIn("tests 19", result.stdout)
         self.assertIn("fail 0", result.stdout)
 
     def test_extracted_native_status_and_retirement_controls(self):

@@ -96,6 +96,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   let keyboard = [true, true], layout = 'two';
   const commands = [], listeners = [];
   let terminalDrawDiscardRetirementConsumed = false;
+  let terminalFrameEffectRetirementConsumed = false;
   let diagnostics = null, diagnosticActive = true, longtaskObserver = null, diagnosticPreparationAt = null;
   let diagnosticDelivery = null, diagnosticDeliveryTimer = null, diagnosticRetainedLoaded = false;
   let diagnosticMatureDeliveryPromise = null;
@@ -633,6 +634,19 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       terminalDrawDiscardRetirementConsumed = true;
       diagnosticLifecycle('scene_exit');
       publish(); // Derive diagnostic activity from the actual inactive owner.
+      return diagnosticActive === false;
+    },
+    menuMatchFrameEffectRetired() {
+      if (!ready || fatal || destroyed || terminalFrameEffectRetirementConsumed ||
+          typeof Module._melee_web_native_menu_frame_effect_status !== 'function') return false;
+      let terminal;
+      try { terminal = JSON.parse(Module.UTF8ToString(Module._melee_web_native_menu_frame_effect_status())); }
+      catch { return false; }
+      if (terminal?.native_retired !== true || terminal?.terminal !== true ||
+          Module._melee_web_native_menu_phase() !== 0 || Module._melee_web_native_menu_running() !== 0) return false;
+      terminalFrameEffectRetirementConsumed = true;
+      diagnosticLifecycle('scene_exit');
+      publish();
       return diagnosticActive === false;
     },
     menuFrame(wasRunning) {

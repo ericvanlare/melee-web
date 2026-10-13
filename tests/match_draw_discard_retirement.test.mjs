@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, {describe} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -42,12 +42,16 @@ function actualFunction(signature, name) {
   assert.fail(`could not find the end of ${signature}`);
 }
 
+for (const [label, signature, privateExportName, consumedKey] of [
+  ['draw/discard', 'menuMatchDrawDiscardRetired()', '_melee_web_native_menu_match_draw_discard_status', 'terminalDrawDiscardRetirementConsumed'],
+  ['normal frame effects', 'menuMatchFrameEffectRetired()', '_melee_web_native_menu_frame_effect_status', 'terminalFrameEffectRetirementConsumed'],
+]) describe(label, () => {
 const publish = actualFunction('function publish()', 'publish');
-const completion = actualFunction('menuMatchDrawDiscardRetired()', 'completion');
+const completion = actualFunction(signature, 'completion');
 const exportDiagnostics = actualFunction('async exportDiagnostics()', 'exportDiagnostics')
   .replace(/^function /, 'async function ');
 
-function harness({retired = false, privateExport = true, phase = 0, running = 0,
+function harness({retired = false, terminal = true, privateExport = true, phase = 0, running = 0,
   busy = false, fatal = false, destroyed = false, malformed = false} = {}) {
   const counts = {status: 0, phase: 0, running: 0, snapshots: 0,
     published: 0, sceneExit: 0, persist: 0};
@@ -56,7 +60,7 @@ function harness({retired = false, privateExport = true, phase = 0, running = 0,
     ready: true,
     fatal,
     destroyed,
-    terminalDrawDiscardRetirementConsumed: false,
+    [consumedKey]: false,
     diagnosticActive: true,
     lastState: '',
     preparationLabel: '',
@@ -80,9 +84,9 @@ function harness({retired = false, privateExport = true, phase = 0, running = 0,
     },
   };
   if (privateExport) {
-    context.Module._melee_web_native_menu_match_draw_discard_status = () => {
+    context.Module[privateExportName] = () => {
       counts.status++;
-      return malformed ? 'not-json' : JSON.stringify({native_retired: retired});
+      return malformed ? 'not-json' : JSON.stringify({native_retired: retired, terminal});
     };
   }
   vm.createContext(context);
@@ -94,7 +98,7 @@ function harness({retired = false, privateExport = true, phase = 0, running = 0,
 test('a retired private owner publishes inactivity once and permits the existing export', async () => {
   const {context, counts} = harness({retired: true});
   assert.equal(context.complete(), true);
-  assert.equal(context.terminalDrawDiscardRetirementConsumed, true);
+  assert.equal(context[consumedKey], true);
   assert.equal(context.diagnosticActive, false);
   assert.deepEqual([counts.status, counts.phase, counts.running, counts.snapshots,
     counts.published, counts.sceneExit], [1, 1, 1, 1, 1, 1]);
@@ -114,7 +118,7 @@ test('ordinary builds without the private status export cannot publish retiremen
   const {context, counts} = harness({privateExport: false});
   assert.equal(context.complete(), false);
   assert.equal(await context.exported(), null);
-  assert.equal(context.terminalDrawDiscardRetirementConsumed, false);
+  assert.equal(context[consumedKey], false);
   assert.deepEqual([counts.phase, counts.running, counts.published, counts.persist], [0, 0, 0, 0]);
 });
 
@@ -122,7 +126,7 @@ test('a private status that is not retired refuses before reading the native own
   const {context, counts} = harness();
   assert.equal(context.complete(), false);
   assert.equal(await context.exported(), null);
-  assert.equal(context.terminalDrawDiscardRetirementConsumed, false);
+  assert.equal(context[consumedKey], false);
   assert.deepEqual([counts.status, counts.phase, counts.running, counts.published, counts.persist],
     [1, 0, 0, 0, 0]);
 });
@@ -138,7 +142,7 @@ for (const options of [
     const {context, counts} = harness({retired: true, ...options});
     assert.equal(context.complete(), false);
     assert.equal(await context.exported(), null);
-    assert.equal(context.terminalDrawDiscardRetirementConsumed, false);
+    assert.equal(context[consumedKey], false);
     assert.equal(counts.published, 0);
     assert.equal(counts.sceneExit, 0);
     assert.equal(counts.persist, 0);
@@ -148,9 +152,17 @@ for (const options of [
 test('other busy work keeps the existing diagnostics export guard active after publication', async () => {
   const {context, counts} = harness({retired: true, busy: true});
   assert.equal(context.complete(), false);
-  assert.equal(context.terminalDrawDiscardRetirementConsumed, true);
+  assert.equal(context[consumedKey], true);
   assert.equal(context.diagnosticActive, true);
   assert.equal(counts.sceneExit, 1);
   assert.equal(await context.exported(), null);
   assert.equal(counts.persist, 0);
+});
+
+if (label === 'normal frame effects') test('native retirement cannot invent a terminal callback', () => {
+  const {context, counts} = harness({retired: true, terminal: false});
+  assert.equal(context.complete(), false);
+  assert.deepEqual([counts.phase, counts.running, counts.published, counts.sceneExit], [0, 0, 0, 0]);
+  assert.equal(context[consumedKey], false);
+});
 });

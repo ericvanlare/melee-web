@@ -21,6 +21,20 @@ option(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC
   "Enable the development-only Pokémon Stadium selection/preparation checkpoint" OFF)
 option(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC
   "Build the private one-shot terminal match draw/discard diagnostic" OFF)
+option(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC
+  "Observe one normal submitted match frame without restoring state" OFF)
+if(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC AND
+   (MELEE_WEB_PUBLIC_RUNTIME OR MELEE_WEB_AUDIO_PREVIEW_RUNTIME OR
+    MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC OR MELEE_WEB_STADIUM_C1A_DIAGNOSTIC OR
+    MELEE_WEB_PIPELINE_PROVENANCE OR MELEE_WEB_SELECTIVE_PIPELINES OR
+    MELEE_WEB_FMA_COLLISION_DIAGNOSTIC OR MELEE_WEB_FMA_VELOCITY_Y_DIAGNOSTIC))
+  message(FATAL_ERROR "Match frame-effect observation requires its isolated private runtime")
+endif()
+if(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC AND NOT EMSCRIPTEN)
+  message(FATAL_ERROR "Match frame-effect observation requires Emscripten")
+endif()
+set(AURORA_BROWSER_FRAME_EFFECT_OBSERVER ${MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC}
+  CACHE BOOL "Private normal-frame effect observer" FORCE)
 option(MELEE_WEB_FMA_COLLISION_DIAGNOSTIC
   "Enable the private PC-mapped scalar collision FMA diagnostic" OFF)
 option(MELEE_WEB_FMA_VELOCITY_Y_DIAGNOSTIC

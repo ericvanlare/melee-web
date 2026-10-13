@@ -25,6 +25,7 @@ AUDIO_PREVIEW_RUNTIME_BUILD_DIR = "build/browser-audio-preview-release"
 AUDIO_PREVIEW_RUNTIME_EXECUTABLE = "gameplay_audio_preview"
 AURORA_QUIESCENCE_DIAGNOSTIC_TARGET = "aurora-browser-quiescence"
 MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET = "runtime-match-draw-discard"
+MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET = "runtime-match-frame-effect"
 FMA_DIAGNOSTIC_TARGET = "runtime-fma-diagnostic"
 FMA_COLLISION_OPERATION_INVENTORY = (
     ("80006e80", "broadphase_radius"),
@@ -96,6 +97,7 @@ BUILD_TARGETS = {
     # submission-owner/quiescence instrumentation.
     AURORA_QUIESCENCE_DIAGNOSTIC_TARGET: ("gx_probe",),
     MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET: ("gameplay_menu_browser",),
+    MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET: ("gameplay_menu_browser",),
     FMA_DIAGNOSTIC_TARGET: ("gameplay_menu_browser",),
     "gameplay": ("gameplay_checks",),
     "runtime": ("gameplay_menu_browser",),
@@ -130,6 +132,13 @@ def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
     root = Path(root)
     if target not in BUILD_TARGETS and target not in TRACE_TARGETS:
         raise ValueError(f"Unsupported build target: {target}")
+    if target == MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET:
+        if configuration != "Release":
+            raise ValueError("runtime-match-frame-effect is Release-only")
+        if (pipeline_provenance or selective_pipelines or stadium_c1a_diagnostic or
+                fma_collision_diagnostic or fma_velocity_y_diagnostic):
+            raise ValueError("runtime-match-frame-effect requires its isolated private build profile")
+        return root / "build/browser-match-frame-effect-release"
     fma_requested = fma_collision_diagnostic or fma_velocity_y_diagnostic
     if target == FMA_DIAGNOSTIC_TARGET:
         if not fma_requested:
@@ -977,6 +986,12 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
             raise ValueError("runtime-fma-diagnostic cannot be combined with another private build profile")
     elif fma_collision_diagnostic or fma_velocity_y_diagnostic:
         raise ValueError("FMA diagnostic switches require --target runtime-fma-diagnostic")
+    if target == MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET:
+        # Validate the isolated profile before source preparation or tool use.
+        build_directory(root, target=target, configuration=configuration,
+                        pipeline_provenance=pipeline_provenance,
+                        selective_pipelines=selective_pipelines,
+                        stadium_c1a_diagnostic=stadium_c1a_diagnostic)
     if selective_pipelines and (target not in {"runtime", PUBLIC_RUNTIME_TARGET} or pipeline_provenance):
         raise ValueError("--selective-pipelines requires runtime/runtime-public without --pipeline-provenance")
     if pipeline_provenance and target != "runtime":
@@ -1062,6 +1077,9 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
             f"-DMELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC={'ON' if target == MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET else 'OFF'}"
         )
         configure.append(
+            f"-DMELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC={'ON' if target == MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET else 'OFF'}"
+        )
+        configure.append(
             f"-DMELEE_WEB_FMA_COLLISION_DIAGNOSTIC={'ON' if fma_collision_diagnostic else 'OFF'}"
         )
         configure.append(
@@ -1107,6 +1125,7 @@ def main():
     parser.add_argument("--jobs", type=int, default=min(os.cpu_count() or 2, 6))
     parser.add_argument("--target", choices=("graphics", AURORA_QUIESCENCE_DIAGNOSTIC_TARGET,
                                               MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET,
+                                              MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET,
                                               FMA_DIAGNOSTIC_TARGET,
                                               "gameplay", "fighter", "runtime",
                                               PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET, "all"))

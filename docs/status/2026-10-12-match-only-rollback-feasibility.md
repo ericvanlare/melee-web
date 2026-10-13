@@ -181,12 +181,13 @@ own sample cadence, separately from match ticks. This is configured-source
 inspection, not final-link retention or a runtime call count. Exact review and
 source identities are in the structured receipt.
 
-The recommendation is to retain these controls, keep A4 blocked on a concrete
-state/host-ownership design and the Slippi profile gates, and move independent
-engineering to the requested H1 first-use respawn/common-effect preparation
-investigation. H1 keeps every timing guard and source tick/RNG/order invariant.
-Stadium C3 remains next Track B. Source-only Slippi semantic/license/reference
-work continues under #9; the profile is not ready to port. Original comparison,
+The recommendation is to retain these controls and keep A4 blocked on a concrete
+state/host-ownership design and the Slippi profile gates. The owner-approved
+October 13 sprint continues the smallest drawn-browser checkpoint/restore/repeat
+boundary under #115/#318. The H1 first-use respawn preparation component merged
+in #322; broader H1 keeps every timing guard and source tick/RNG/order invariant.
+Stadium C3 proceeds in parallel as the next Track B milestone. Source-only Slippi
+semantic/license/reference work continues under #9; the profile is not ready to port. Original comparison,
 physical input, foreground timing, audible output and two-machine acceptance
 remain separate unrun gates.
 
@@ -201,6 +202,70 @@ layout is now compile-checked: match stats 192 bytes, observation 1280 bytes, wi
 explicit field/PAD offsets. The checker refuses an incompatible layout and
 invalid or partial checkpoint/depth selection. The default full-fixture matrix
 and its strict original assertions remain unchanged.
+
+## Drawn synctest sprint checkpoint
+
+The October 13 sprint now has one successful normal submitted Mario/FD callback
+observation. The private observer and ordinary Release builds pass, as does the
+exact-source 2,402-test regression (164 skips). Producer and tested source are
+`a34d5acf` plus patch `c50aa00b`; the structured receipt binds the new artifacts
+and independent raw-result review. The earlier runtime patch `e932d6e2` and
+harness/regression patch `e3887312` remain historical identities with their
+retained failures.
+
+The first capture failed before the observer was armed: after original CSS
+changed P2 from CPU through empty to Human, one Start press did not enter SSS.
+There were zero match observations. The pre-Start screenshot still has P2 faded;
+the later failure screenshot shows READY TO FIGHT. Source inspection identifies
+a readiness/cooldown gate, so an early Start is the current hypothesis, not a
+confirmed input-delivery diagnosis. The next harness change reuses the existing
+full CSS observer and waits for original readiness before one Start edge; it
+changes no game state, timing threshold or deadline. No unchanged retry is
+admitted. Native cleanup passed, all recorded Chrome/server processes are absent,
+and served runtime/source identities are unchanged. The H1 recorder and failed
+packet remain retained; no match timing or renderer-effect result follows.
+
+The changed-hypothesis second capture passed that readiness gate with one Start
+edge and reached the normalized Mario/FD match at source frame 180. It then
+exposed a private-observer scheduling error: the next browser callback had zero
+source ticks/draws while audio rendered normally. The observer had activated
+before the source clock decided whether a tick was due, so its strict one-tick
+check failed. No renderer events or consumed PAD records were collected; the
+zero-filled diagnostic PAD buffer is not input evidence. The callback recorder
+passed its checks with no timing pause, checked native retirement passed, and
+all owned browser/server processes exited. That retained failure drove an
+actual-source zero-step-then-due-step fixture and a reviewed repair that activates
+the observer at the first tick selected by the unchanged game clock. Pending
+owner/readiness changes and a stalled or multi-step first due callback still
+fail terminally; original source-free audio callbacks remain unchanged.
+
+The third capture passed: source frame 180 advanced to 181 with one original
+tick, one complete draw and one audio return of 533 PCM frames. Its actual
+four-port PAD bytes retain disconnected-port errors. The renderer recorded
+three operations/render passes, 246 draw commands, two resolves, one snapshot,
+12 staging copies and four queue writes totaling 1,231,440 bytes. One normal
+submission and its fence completed; checked native retirement and owned browser/
+server absence passed. The observation kept **LOAD_ATTACHMENT (blocker 7)**,
+so these events do not establish safe GPU-content or handle restoration.
+The successful browser run had zero pre-tick callbacks; zero-source callback
+skipping is covered by the actual-source fixture, not this browser sample.
+
+There were no forced timing pauses in this route. The H1 recorder retained eight
+reason-code-7 preparation incidents, zero dropped incidents and 3,029 evicted
+samples; it is a lossy setup-and-match record. Audio-frame counting does not
+establish PCM equality or a file-operation inventory. Snapshot/restore, renderer
+ownership closure and the combined corrective-tick budget remain unproven.
+
+A separate actual-source HPS/inner-I/O control now passes the idle-owner,
+wrong-owner, queued-request and active-callback checks under the configured
+Emscripten Release ABI. Its deliberate CHECK failure also reaches C and fails as
+expected. Earlier host-ABI, callback-signature and environment-sentinel test
+failures are retained. Fixture collaborators isolate audio identity and source
+lifecycle; this does not establish decoded audio, browser file closure or restore.
+
+This continues the approved same-instance draw/restore/repeat ownership work.
+No browser restore, complete state-size result or combined correction budget is
+claimed. Stadium C3 remains a separate parallel milestone.
 
 ## Slippi profile source checkpoint
 
