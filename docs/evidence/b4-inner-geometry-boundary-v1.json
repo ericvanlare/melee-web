@@ -136,5 +136,85 @@
     "The capped browser capture failed and remains incomplete.",
     "The offline reducer does not prove original-game arithmetic or explain the first divergence.",
     "Issue 274, Results, and whole-session acceptance remain open."
-  ]
+  ],
+  "fma_diagnostic_2026_10_13": {
+    "frozen_candidate": {
+      "commit": "8d1528043dab9e46cf9a76f0f41e00f92d43b63d",
+      "branch": "codex/fma-dol-diagnostic-274",
+      "manifest": "fma-diagnostic-candidate-v1/frozen-candidate-manifest-v2.json",
+      "manifest_sha256": "742d253c130ca371578f5b9d0e7a79dc97e059374c8923d961fe211aa1d87382",
+      "canonical_patch_sha256": "f18e8a34aba1e55a5883c0eec42144e712eb2099ecf903623b82221b08fcaf02",
+      "canonical_changed_source_files": [
+        "src/melee/ft/fighter.c",
+        "src/melee/lb/lbcollision.c"
+      ],
+      "rejected_composed_patch": {
+        "artifact": "fma-diagnostic-candidate-v1/gameplay-candidate-composed-patch-v1.patch",
+        "sha256": "b9c6a676e9d2cc839a5d0ed811e2299561f3c9a8f887a5e5dec5503a756b3030",
+        "reason": "Generated-only gameplay_bool overlay was included; it remains retained as rejected evidence and is not the canonical candidate."
+      }
+    },
+    "review": {
+      "artifact": "fma-diagnostic-independent-review-v1/candidate-review-v3.md",
+      "sha256": "dcd1e63de910476aa8d34fe95a34d7bfeb73aa58caed7216a5e3df20e117b565",
+      "decision_scope": "Candidate released for root-owned required unit suite and affected private runtime build. One collision-only B4 prefix experiment is conditional on a passing default-off current-main baseline and separate adapter release. This is not correctness, whole-session acceptance or capture approval."
+    },
+    "evidence_artifacts": {
+      "native_wasm_controls": {
+        "artifact": "fma-diagnostic-candidate-v1/focused-helper-controls-v2.json",
+        "sha256": "64cc3bbc1da9150868e8ece2cbfd10fe6b1e016d2dbb38049bcd552cc217780b"
+      },
+      "retained_geometry_reduction": {
+        "artifact": "fma-diagnostic-candidate-v1/retained-geometry-reduction-v1.json",
+        "sha256": "23dc180559c4381e3c569d935e40701a7b59ec62315c1746a8cd5825688930d7",
+        "erratum": "fma-diagnostic-candidate-v1/retained-geometry-summary-erratum-v1.json",
+        "erratum_sha256": "7b94be0f8a97063a8bf84e7c206b4553b4b01a92e3320fd4ff5c126dfac809e1"
+      },
+      "exact_candidate_validation": {
+        "test_count_erratum": "fma-diagnostic-candidate-v1/frozen-candidate-test-count-erratum-v1.json",
+        "test_count_erratum_sha256": "81fe5e5156c80b12914b74cf484dd8cfcb30fc7ffc67674af4a52d75be535d4c",
+        "hit_transition_output": "fma-diagnostic-candidate-v1/hit-transition-probe-focused-v2.log",
+        "hit_transition_output_sha256": "2cfcdc30eaf19d0276903ba19298544a2a5476c033b13831f8d1c4abeaf21142"
+      }
+    },
+    "evidence_run": "match-rollback-feasibility-20261012-203633-e8f0c964",
+    "source_mapping": {
+      "collision_scalar_sites": 37,
+      "velocity_y_site": "8006bc90",
+      "velocity_y_activation_on_falcon_failure": "unobserved",
+      "static_site_presence_is_causation": false
+    },
+    "retained_geometry_reduction": {
+      "rows": 60,
+      "split_false": 60,
+      "fused_false": 60,
+      "changed_output_rows": 5,
+      "changed_contact_rows": 4,
+      "changed_overlap_rows": 1,
+      "active_mapped_sites": 31,
+      "original_dynamic_operand_comparison": false
+    },
+    "runtime_validation": {
+      "producer": "8d1528043dab9e46cf9a76f0f41e00f92d43b63d",
+      "ordinary_release": "PASS",
+      "collision_only_release": "PASS",
+      "full_regression_first_run": {
+        "discovered": 2392,
+        "skipped": 165,
+        "failures": 1,
+        "failure": "Broken relative documentation link into unmerged Stadium branch; corrected to pinned GitHub blob and focused link test passes.",
+        "log_sha256": "347b749c0c699a71ad32b1ac616508fc24102ee6c9a9cca7f7c3a5c11a0306f7"
+      },
+      "final_regression": "pending"
+    },
+    "current_prefix_comparison": {
+      "state": "pending",
+      "requested_cursor": 5241,
+      "max_exported_cursor": 5273,
+      "velocity_y_enabled": false,
+      "whole_session_accepted": false
+    },
+    "arithmetic_adopted": false,
+    "issue_resolved": false
+  }
 }

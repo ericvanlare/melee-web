@@ -30,6 +30,8 @@ import {installPauseTraceCapture, readPauseTraceCapture, readPauseTraceStatus,
   readRetainedPauseDiagnostics} from '../tests/pause_trace_capture.mjs';
 import {traceSettings, finalizeTrace} from './run_hitch_matrix.mjs';
 import {browserArtifactInventory as readSharedArtifactInventory} from './browser_artifact_inventory.mjs';
+import {incidentRecordingUrl, readIncidentRecorderReadiness, requireIncidentRecorderReadiness,
+  summarizeRuntimeIncidents} from './a3_runtime_incidents.mjs';
 
 const {values, tokens} = parseArgs({tokens: true, options: {
   url: {type: 'string'},
@@ -55,6 +57,7 @@ const {values, tokens} = parseArgs({tokens: true, options: {
   'rng-draw-probe-cursors': {type: 'string'},
   'hit-transition-probe-cursors': {type: 'string'},
   'first-replay-callback-probe': {type: 'boolean', default: false},
+  'runtime-incidents': {type: 'boolean', default: false},
   'expected-frame0': {type: 'string'},
   'artifact-root': {type: 'string'},
 }});
@@ -68,11 +71,16 @@ function integer(name, minimum, maximum) {
 
 if (!values.url || !values.disc || !values.recipe || !values.out)
   throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc PATH --recipe PATH --out NEW_DIRECTORY [--manifest PATH]');
-const url = new URL(values.url);
-if (!['http:', 'https:'].includes(url.protocol) || !url.pathname.endsWith('/runtime.html'))
+const requestedUrl = new URL(values.url);
+if (!['http:', 'https:'].includes(requestedUrl.protocol) || !requestedUrl.pathname.endsWith('/runtime.html'))
   throw Error('A real HTTP development runtime.html URL is required');
 const captureMode = resolveCaptureMode(values.mode, values['diagnostic-manifest']);
 const diagnostic = captureMode.diagnostic;
+const runtimeIncidentRecording = values['runtime-incidents'];
+if (runtimeIncidentRecording && (diagnostic || captureMode.mode !== 'state' ||
+    values['first-replay-callback-probe']))
+  throw Error('--runtime-incidents requires state-only capture and cannot overlap performance or first-replay-callback capture');
+const url = runtimeIncidentRecording ? incidentRecordingUrl(requestedUrl.href) : requestedUrl;
 const stoppedScenePair = values['stopped-scene-pair'];
 if (stoppedScenePair && !diagnostic)
   throw Error('--stopped-scene-pair requires performance mode and a diagnostic manifest');
@@ -164,6 +172,10 @@ const report = {
   result: 'fail',
   url: values.url,
   mode: captureMode.mode,
+  ...(runtimeIncidentRecording ? {runtime_incident_recording: {
+    enabled: true, effective_url: url.href, readiness: null, before_leave: null,
+    artifact: null, summary: null, missing_evidence: [],
+  }} : {}),
   ...(diagnostic ? {diagnostic_manifest: {path: diagnosticManifestPath, sha256: diagnosticManifestSha256}} : {}),
   ...(diagnostic ? {diagnostic_protocol: diagnosticProtocol,
     diagnostic_kind: stoppedScenePair ? 'paired_stopped_scene_screenshots' : 'natural_pause'} : {}),
@@ -989,6 +1001,16 @@ try {
     if (!report.ring_status_validation.valid)
       throw Error(`Default two-slot staging identity rejected: ${report.ring_status_validation.problems.join(', ')}`);
   }
+  if (runtimeIncidentRecording) {
+    report.runtime_incident_recording.readiness = await observePageOperation(
+      'runtime incident recorder readiness', () => readIncidentRecorderReadiness(page));
+    try { requireIncidentRecorderReadiness(report.runtime_incident_recording.readiness); }
+    catch (error) {
+      report.runtime_incident_recording.missing_evidence.push(
+        'Runtime incident recorder readiness was not verified.');
+      throw error;
+    }
+  }
   // The development UI import is deliberately separate from the disc import.
   // It is the only replay input supplied after the fresh runtime is prepared.
   const uiTimeout = Math.min(phaseTimeoutMs, 10000);
@@ -1372,6 +1394,51 @@ try {
   } else if (page && !page.isClosed() && !pageObservationTimedOut) {
     const final = await snapshot('finally');
     report.final_snapshot = final;
+    if (runtimeIncidentRecording) {
+      const evidence = report.runtime_incident_recording;
+      const missing = reason => {
+        evidence.missing_evidence.push(reason);
+        firstError('runtime_incident_recording', reason, final ?? null);
+      };
+      if (pageObservationTimedOut || final?.snapshot_error) {
+        missing('Final page snapshot was unavailable; runtime incident export was skipped.');
+      } else if (final?.running !== 0) {
+        missing('Runtime incident export requires the final native running state to be zero.');
+      } else {
+        try {
+          evidence.before_leave = {
+            native_running: final.running ?? null,
+            native_message: final.status ?? null,
+          };
+          if (evidence.before_leave?.native_running !== 0 ||
+              typeof evidence.before_leave?.native_message !== 'string')
+            missing('The stopped timing snapshot did not provide native_running and native_message.');
+          if (!pageObservationTimedOut && page && !page.isClosed()) {
+            const exported = await observePageOperation('runtime diagnostic export', () =>
+              page.evaluate(async () => await window.meleeNetRuntimeDiagnosticExport?.() ?? null));
+            if (exported == null) {
+              missing('Runtime diagnostic export returned no active-session evidence.');
+            } else {
+              const text = JSON.stringify(exported, null, 2) + '\n';
+              const name = 'rawruntime-incidents.json';
+              await write(name, text);
+              evidence.artifact = {name, path: path.join(output, name),
+                bytes: Buffer.byteLength(text), sha256: createHash('sha256').update(text).digest('hex')};
+              evidence.summary = summarizeRuntimeIncidents(exported, evidence.before_leave);
+              if (evidence.summary.h1_timing_pause_observed) {
+                evidence.failure = 'An H1 timing pause was observed in the retained runtime session.';
+                firstError('runtime_incident_recording', evidence.failure, evidence.summary);
+              }
+            }
+          } else {
+            missing('Runtime diagnostic export was skipped after the page became unavailable.');
+          }
+        } catch (error) {
+          evidence.export_error = String(error?.message || error);
+          missing('Runtime incident evidence could not be retained: ' + (error?.message || error));
+        }
+      }
+    }
     if (pageObservationTimedOut) {
       report.page_exports_skipped = 'Renderer observation timed out; last successful snapshot retained and page exports were skipped.';
     } else {
@@ -1443,6 +1510,12 @@ try {
     try { await write('page.txt', await observePageOperation('final page text', () => page.locator('body').innerText())); } catch (error) { report.page_dump_error = String(error); }
     try { await observePageOperation('final screenshot', () => page.screenshot({path: path.join(output, 'final.png'), fullPage: false})); } catch (error) { report.screenshot_error = String(error); }
     }
+  } else if (runtimeIncidentRecording) {
+    const reason = pageObservationTimedOut
+      ? 'Renderer observation timed out before runtime incident export.'
+      : 'Owned browser page was unavailable before runtime incident export.';
+    report.runtime_incident_recording.missing_evidence.push(reason);
+    firstError('runtime_incident_recording', reason, report.last_successful_snapshot ?? null);
   }
   } finally {
     await closeOwnedCaptureBrowser();

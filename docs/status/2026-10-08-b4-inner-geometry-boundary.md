@@ -7,6 +7,39 @@ The [portable receipt](../evidence/b4-inner-geometry-boundary-v1.json) separates
 the Release observer capture, its incomplete whole-session outcome, the offline
 reducer and the full-suite validation.
 
+## October 13: original-site fused arithmetic diagnostic
+
+The owner-directed FMA hypothesis has a private, default-off diagnostic at
+source `8d1528043dab9e46cf9a76f0f41e00f92d43b63d`. It maps 37 scalar
+operations in `lbColl_80006E58` to original DOL instructions and keeps a separate
+common velocity-Y option. The Y site's execution at the retained Falcon
+mismatch remains unobserved. Static instruction presence is not causation.
+
+Native and pinned Emscripten/Wasm controls pass for fused/split values, a
+rounding tie, signed zero and explicit unsupported-domain refusals. Both signs
+of the ambiguous `FLT_MIN` boundary are rejected; this is a conservative
+diagnostic limit, not a finding about original PowerPC flushing. The ordinary
+and collision-only Release builds pass with contraction disabled. The first
+full regression found one broken documentation link among 2,392 tests with
+165 skips; the corrected link passes its focused check. Final regression and
+current-prefix captures remain pending in this checkpoint.
+
+The reduced cursor-5239 experiment reuses all 60 retained browser geometry
+inputs. All split and fused collision results remain false. Four contact rows
+and one overlap row change bits; 31 mapped sites execute. This does not explain
+the original hit. The receipt separates the full capture hash from the selected
+line hash and preserves the earlier report's correction.
+
+Independent review permits one collision-only prefix experiment after an
+ordinary-build baseline reproduces the first mismatch. Stop cursor 5241 and the
+export ceiling 5273 are fixed before capture; all exported rows are validated,
+but only indices 0–5240 have a copied-original comparison. Velocity-Y stays off.
+An unchanged/earlier divergence or domain refusal returns to reduction/review.
+A later/removed divergence requires the existing exact recorded-session
+regressions before any arithmetic adoption. No arithmetic has been adopted.
+
+## Retained October 8 inner-geometry boundary
+
 The Release observer was built from native producer
 `aea0d318a2734709b99d6be4901463c0f8bfbad1`; patch metadata canonicalization in
 `afec01d` did not change the applied observer source tree. The browser harness

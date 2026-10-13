@@ -62,7 +62,7 @@ and resolve the profile's licensing policy before behavior implementation.
 Add a match-only restore/repeat/checksum synctest to rollback feasibility.
 
 **Status:** Accepted. The Stadium observation projection is checkpointed in the
-[existing boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md).
+[draft Stadium boundary](https://github.com/ericvanlare/melee-web/blob/d977f777156148d97f07bf03366efd3b2909cfa2/docs/status/2026-10-07-pokemon-stadium-profile-oninit.md).
 The next arithmetic investigation is source-only; instruction presence alone
 is not divergence causation. No blanket contraction, fast-math or tolerance
 change is authorized. An adopted arithmetic change requires exact-receipt
