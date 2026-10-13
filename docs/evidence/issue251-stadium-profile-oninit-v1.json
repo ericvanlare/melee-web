@@ -10013,7 +10013,7 @@
       "empty_tmp_removed": true,
       "incrementals": "Retained for active C3 milestone"
     },
-    "next": "Review actual-source native-only observation transport reduction, preserving getter/callback behavior and all assertions. One changed-hypothesis prefix only after review and validation; no full schedule or cap extension.",
+    "next": "Source-only reduction of remaining per-action polling and persistence costs, retaining exact source/PAD/draw order, all comparisons and guards; review before any full-schedule protocol or changed capture. C3 remains open.",
     "independent_result_review": {
       "path": "stadium-timing-v3-result-independent-review-v1.json",
       "sha256": "142a1f9834ff1b8d3cbccb99e681e981b1bfc5bce0509ceb37261d5ea933174b",
@@ -10024,6 +10024,165 @@
       "path": "stadium-timing-v3-result-independent-cleanup-addendum-v1.json",
       "sha256": "920361806886ebf9e10df31fc0eeaed8d7cfae555d62b077a6295efd5f63ad7d",
       "scope": "14recordedownedPIDs and3groups independently absent, including launcher and workspace wrapper."
+    },
+    "native_only_projection": {
+      "result": "USEFUL_HARNESS_OVERHEAD_REDUCTION",
+      "runtime_producer": "172556834809294dcf4e423312f0b39309523767",
+      "implementation_commit": "1ed2b29c7096b475f8bbb526c4584e710ac1e5f3",
+      "fixture_repair_capture_and_regression_source": "09acb92b422f03a704f6010f1a15113fcdc1bcea",
+      "change": "Return full native observation only from the existing single page.evaluate; preserve native getter/UTF8 parse/phase/running/host callback invocation and ordering. Full-prefix evidence reader unchanged.",
+      "metrics": {
+        "baseline": {
+          "first_read_p50_ms": 90.455,
+          "receipt_ms_per_read": 92.37091666666667,
+          "read_count": 336,
+          "poll_wait_count": 162,
+          "action_loop_ms": 44523.028
+        },
+        "current": {
+          "first_read_p50_ms": 7.784,
+          "receipt_ms_per_read": 8.64703488372093,
+          "read_count": 344,
+          "poll_wait_count": 170,
+          "action_loop_ms": 16929.459
+        },
+        "fraction_reduction": {
+          "first_read_p50_ms": 0.9139461610745675,
+          "receipt_ms_per_read": 0.9063879065428683
+        },
+        "threshold": "At least20percent improvement on both readmetrics predeclared; no unchanged repeat."
+      },
+      "route": {
+        "actions": 174,
+        "ticks": 87,
+        "draws": 87,
+        "declared_C_F_fields_each": 16,
+        "copied_four_port_inputs": 87,
+        "pad_scope": "Copied original bundles matched; not an independent native consumed-PAD observation.",
+        "http_artifacts_before_after": 41,
+        "diagnostic_samples": 349,
+        "ordinary_unload_cleared": true
+      },
+      "owned_cleanup": {
+        "pids": [
+          61612,
+          61624,
+          61626,
+          61668,
+          61678,
+          61687,
+          61688,
+          61690,
+          61691,
+          61706,
+          61709,
+          61712,
+          61724,
+          61923
+        ],
+        "groups": [
+          61624,
+          61626,
+          61678
+        ],
+        "live_members": [],
+        "empty_owned_tmp_removed": true,
+        "incrementals": "Retained for active C3."
+      },
+      "artifacts": {
+        "browser-run/report.json": {
+          "path": "stadium-run2-projection-capture-v1/browser-run/report.json",
+          "sha256": "3c4e6ad9c04361901d2bd94d5717c626c9e0c5b7f5db5f2f09fb7c2f6196da49"
+        },
+        "owner.json": {
+          "path": "stadium-run2-projection-capture-v1/owner.json",
+          "sha256": "ac82d748b82135182909e0b0cf5ee533b0f1733a4330cedc97718286df17566f"
+        },
+        "root-result-and-cleanup-v1.json": {
+          "path": "stadium-run2-projection-capture-v1/root-result-and-cleanup-v1.json",
+          "sha256": "20965355b11d2b1b8de395382346c9827ab1e7562b56dfecb5a81ae735108169"
+        },
+        "preflight.json": {
+          "path": "stadium-run2-projection-capture-v1/preflight.json",
+          "sha256": "844a480c5c6a4c229ae0a539b9d7285dd4d97ad61d5a046b43d764a86ed83909"
+        },
+        "command.json": {
+          "path": "stadium-run2-projection-capture-v1/command.json",
+          "sha256": "34faccb227156a70f1ea4bc94f94f9eae6661389eef3d2b7b314829bfa7d7b96"
+        },
+        "manifest.json": {
+          "path": "stadium-run2-projection-capture-v1/manifest.json",
+          "sha256": "624676a7cc0c3cde2a499cefca40ca02fb4e5f711ed616e21de77b236390911f"
+        },
+        "root-completion-and-effective-locators-v1.json": {
+          "path": "stadium-run2-projection-capture-v1/root-completion-and-effective-locators-v1.json",
+          "sha256": "923708791925db169866498c2b4ff29fe515f26569c774ae5447d3a64c703b14"
+        },
+        "root-prelaunch-count-reducer-v1.json": {
+          "path": "stadium-run2-projection-capture-v1/root-prelaunch-count-reducer-v1.json",
+          "sha256": "3125d5a8a804f270b344c843ae97cc61d6ad8779d7f9f51e1e2b5e4fd25d3176"
+        },
+        "root-one-capture-release.json": {
+          "path": "stadium-run2-projection-capture-v1/root-one-capture-release.json",
+          "sha256": "f0df0512681e9e2b34e179ddfa6e144da11d79961d57301cd1decfd712cd859c"
+        },
+        "launch-static-bindings.json": {
+          "path": "stadium-run2-projection-capture-v1/launch-static-bindings.json",
+          "sha256": "a67d689ce7fef50e71c223f96371f8b1a49ec44915dcb104780d05ba5119b355"
+        }
+      },
+      "reviews": {
+        "stadium-native-projection-candidate-independent-review-v1.json": {
+          "path": "stadium-native-projection-candidate-independent-review-v1.json",
+          "sha256": "deecf3863255c368099a39f2e8faeae7414624a75c3ac0b4ec0c0c65eed17062"
+        },
+        "stadium-native-projection-runner-fixture-independent-review-v1.json": {
+          "path": "stadium-native-projection-runner-fixture-independent-review-v1.json",
+          "sha256": "0d33545f989a8e09435fb0c259d87c5916b82053aa9b135032a94f76bddd5ede"
+        },
+        "stadium-projection-capture-packet-independent-review-v1.json": {
+          "path": "stadium-projection-capture-packet-independent-review-v1.json",
+          "sha256": "6ab2b1a7d458237d75565ae5396dd7a8e5477453dbcb544544f53710c6859728"
+        },
+        "stadium-projection-completion-locator-supplement-independent-review-v1.json": {
+          "path": "stadium-projection-completion-locator-supplement-independent-review-v1.json",
+          "sha256": "2965bf9c9af5978227d075291c3366b38ca8b7535907701186618d552b68346e"
+        },
+        "stadium-projection-launcher-v2-independent-delta-review-v1.json": {
+          "path": "stadium-projection-launcher-v2-independent-delta-review-v1.json",
+          "sha256": "b26c3e8210d229cec8142d03e6d0ed0827b49d09925fed0bfb283a9c19219b29"
+        }
+      },
+      "regression": {
+        "passed": true,
+        "tests": 2605,
+        "skips": 180,
+        "completion": {
+          "path": "stadium-projection-regression-09acb92b-v1/root-completion.json",
+          "sha256": "07f32c07fa6330c504911a4b30414e026a8d5666633b17040c48758f1e68990e"
+        }
+      },
+      "retained_failure_history": {
+        "fixture": "Full regression on1ed2 stopped at first failure: stale actual-Setup runner fixture lacked page. Focused reduction reproduced it; fixture-only09ac preserves native equality/call-order assertions.",
+        "stopped_regression": {
+          "path": "stadium-projection-regression-1ed2b29c-v1/full-regression.json",
+          "sha256": "70cade0d5eb7a9922c41d0ee7b03289ab8153b13150f9ecb06a71337b56b65a4"
+        },
+        "failure_log": {
+          "path": "stadium-projection-regression-1ed2b29c-v1/full-regression.log",
+          "sha256": "e88b44ebfe5d4bf95bb5c501a393804102846c9c242abf137577849dd6ef4b6f"
+        },
+        "frozen_plan_recovery": {
+          "path": "stadium-timing-overhead-plan-v1/erratum-v1-recovery.json",
+          "sha256": "a4dacca1f3388972012cab08f6115fd7f384c80cfcc8acf4a90918965895f7e4"
+        },
+        "prelaunch": "Frozen preflight retained two stale server log locators, corrected by immutable effective-path supplement. Root launcher initially supplied two of four audit inputs; reduced audit grouping mistakes retained in3125 receipt. No browser started until whole four-input audit matched frozen262bindings/190paths."
+      },
+      "limits": "One changed-hypothesis host-overhead experiment. Nested intervals, no source/native/GPU attribution; no individual timing samples for recomputed quantiles. No full3500/C3/lifetime/acceptance claim.",
+      "independent_result_review": {
+        "path": "stadium-projection-result-independent-review-v1.json",
+        "sha256": "a302331282138c0c9d284580c65cee9d66386ef462497c9bc0ad200c5746308e"
+      }
     }
   }
 }

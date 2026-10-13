@@ -63,7 +63,7 @@ supersedes decision 016 for future online work.
 | --- | --- |
 | **A1. Determinism** | Preserve scoped shared-input/checksum evidence; extend browser/architecture coverage only through bounded experiments. It does not establish complete state ownership. |
 | **A2. Interim local lockstep** | Retain the original CSS → SSS → match → Results → CSS functional baseline. No new menu/Results/rematch lockstep campaign. |
-| **A3. Rollback feasibility and rules inventory** | [#318](https://github.com/ericvanlare/melee-web/issues/318), continuing [#115](https://github.com/ericvanlare/melee-web/issues/115): measure match-state size and snapshot/restore cost, full source tick/draw with GPU submission suppressed, and host-side effects. Report whether up to seven corrective ticks fit the declared budget. In parallel inventory Slippi gameplay changes and patch licenses. |
+| **A3. Rollback feasibility and rules inventory** | [#318](https://github.com/ericvanlare/melee-web/issues/318), continuing [#115](https://github.com/ericvanlare/melee-web/issues/115): measure match-state size and snapshot/restore cost, full source tick/draw with GPU submission suppressed, and host-side effects. Add a match-only restored-snapshot repeat-tick checksum test after safe host ownership; report its exercised coverage alongside whether up to seven corrective ticks fit the declared budget. In parallel inventory Slippi gameplay changes and patch licenses. |
 | **A4. Match-scoped online play** | After the feasibility decision, implement restore/prediction and an agreed match-start barrier. Deliver the Vanilla/Slippi rules settings toggle and versioned Slippi rules profile under [#9](https://github.com/ericvanlare/melee-web/issues/9), checked against a pinned Slippi Dolphin release bundle. Complete matches with controlled corrections, confirmed outcomes, local Results/rematch, exact state checks and clean disconnect. |
 | **A5. Slippi desktop cross-play** | Extend the pinned profile and transport only after browser rollback correctness; demonstrate actual desktop interoperability. Browser networking or a profile name alone cannot establish cross-play. |
 
@@ -111,6 +111,19 @@ The simulated-network milestones #307–#309 and combat #313 retain their scoped
 results and failures. The unstarted #314 full-route/rematch expansion is
 superseded by the match-only direction. The strict jump/landing observation gap
 under #308 remains open, without an unchanged retry or weaker assertion.
+
+The owner's October 13 research input makes a source-only fused-operation
+investigation the next bounded priority after the current Stadium checkpoint.
+Use the retained first Bowser and Falcon divergences and actual original DOL
+instructions under [#274](https://github.com/ericvanlare/melee-web/issues/274);
+prove a candidate site before proposing an opt-in diagnostic. Preserve exact
+bits and original arithmetic: no blanket contraction, fast-math, widened
+comparisons or deadline changes. Two experiments require a reduction or review;
+an adopted arithmetic change reopens exact-receipt validation. The
+[architect response](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6147291073)
+records the parallel Slippi behavior mapping, pending owner licensing decision,
+and deferred A5 gateway/cadence research. Copy no related-project code, and send
+no automated traffic to Slippi production services or real accounts.
 
 Pokémon Stadium C3 [#251](https://github.com/ericvanlare/melee-web/issues/251) /
 [draft #301](https://github.com/ericvanlare/melee-web/pull/301) remains the next
