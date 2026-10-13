@@ -1,34 +1,44 @@
 # H1 first-use respawn boundary
 
-**Browser exercised / private diagnostic prefix; rendering attribution unresolved.**
-The portable checkpoint
-[receipt](../evidence/h1-first-use-respawn-v1.json) is derived from the frozen
-checkpoint at SHA-256
-25008efd63cf05b54cb94745c19888a19e4b979838e8921c7a509e693b025d37 for source
-head 6ee4a07a95b0cf760b9e7796d780b21c33b93812. It records the three retained
-failed attempts and their artifact identities under run
-match-rollback-feasibility-20261012-203633-e8f0c964.
+**Browser exercised / source-bound respawn preparation observed; complete diagnostic and rendering fix remain open.**
+The [portable receipt](../evidence/h1-first-use-respawn-v1.json) retains the
+original three failed combat-based diagnostic attempts and a separately named
+self-KO prefix under run match-rollback-feasibility-20261012-203633-e8f0c964.
+The runtime producer remains 6ee4a07a; later documentation heads do not rebuild it.
 
-This work follows the retained first-use respawn/preparation stall recorded in
-the [#316 combat receipt](2026-10-12-simulated-network-combat.md). That incident
-motivates attribution work but does not identify a rendering descriptor.
+The work follows the retained preparation stall in the
+[#316 combat receipt](2026-10-12-simulated-network-combat.md). The first diagnostic
+stopped on a record-context identity mismatch. The next two stopped at the
+unchanged exact-one P2 approach-input guard, before a rendering target. Their
+failures and producer identities remain retained. The third native recorder
+closed validly, but H1 timing getters still ran after finish.
 
-The first attempt stopped on a record-context-binding identity mismatch. The
-second and third stopped because the P2 combat-approach tap did not resolve to
-exactly one active source row. In the third attempt, tap 4 produced active rows
-at 569 and 570, followed by a neutral row at 571; taps 1–3 had passed the exact
-one-row check. The third collector export was complete and valid, but no
-rendering target was identified. It does not establish a causal pipeline
-descriptor, a first-use rendering fix, or H1 success.
+The smaller self-KO recipe uses the existing original menus and actual keyboard
+walk-off path. It observed the first P1 stock loss with P2 still at four, then
+stopped on a source-bound preparation event while waiting for respawn. The
+joined original draw has Respawn context, P1 motion 12, and the first retained creations of six descriptors on each peer. The recorder
+identifies only a fighter ownership bucket, with the individual owner explicitly
+unknown. These records do not identify one causal descriptor or a measured
+stall duration. The native stream contains descriptor hashes and sizes, without
+the canonical configuration bytes. This recipe is distinct from the historical combat
+inputs, seed and rendering history. No completed grounded-respawn endpoint was
+reached.
 
-The native recorder in that third attempt finalized validly with no recorded
-errors or pending records. H1 timing getters were observed twice per peer after
-recorder finish. The stronger requirement to stop those getter calls before
-finish was not satisfied. The existing evidence does not justify descriptor
-prewarming.
+Both provenance streams finalized with valid status and no missing records;
+H1 timing/preparation observation getters were retired before finish. Original
+callbacks and final-chunk metadata reads remained active. Ordinary Leave/unload
+and owned-process cleanup passed. The stop occurred at the next harness
+boundary: beta advanced one later source step/draw before cleanup, so this is
+not an exact freeze at the target.
 
-A separately named self-KO respawn prefix has source-backed feasibility and
-implementation work in progress only. It has no capture or result and does not
-replace or resolve the retained combat-route failures. No live rendering
-attribution, route acceptance, performance result, or timing-guard change is
-claimed.
+The full diagnostic remains **incomplete**: beta's retained input history
+contains a canceled publication attempt, and the unchanged PAD witness validator
+refused it. That cancellation describes one packet attempt, not proof that the
+input row was never published or consumed. Raw cleanup observations and the
+refusal remain retained. Renderer-source coordinates, lockstep cursor, native
+match frame and callback frame are recorded separately in the receipt.
+
+Next, reduce the observed creation records against the existing preparation
+cache and exact descriptor identities. No new capture, descriptor prewarming,
+timing-guard change, performance result, rollback admission or route acceptance
+follows from this checkpoint.
