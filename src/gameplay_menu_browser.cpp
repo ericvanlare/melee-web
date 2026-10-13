@@ -323,8 +323,19 @@ FirstSssVsSetupState first_sss_vs_setup;
 struct MatchedSetupCfState {
  bool opted_in=false,armed=false,queued=false,awaiting_approval=false;
  bool failed=false,complete=false,last_action_complete=false;
+ bool version2=false;
  uint32_t cursor=0,last_schedule_index=0,last_ordinal=0,last_bundle=UINT32_MAX;
+ uint32_t action_count=171,c_action_index=168,f_action_index=170,c_source_tick=84,f_source_tick=85;
+ uint32_t source_ticks=0,source_draws=0,last_ticks_after=0,last_draws_after=0;
+ uint32_t queued_ticks_before=0,queued_draws_before=0;
+ uint64_t queued_source_frame_before=0,last_source_frame_after=0;
  int last_action_kind=0;
+ struct ManifestAction {
+  uint8_t kind=0;
+  uint32_t ordinal=0,bundle=UINT32_MAX,draws_before=0;
+  std::array<uint8_t,44> pad{};
+ };
+ std::vector<ManifestAction> version2_actions;
  std::array<uint8_t,44> queued_statuses{};
  const melee_web::GameplayMatchSession* owner=nullptr;
  const melee_web::RuntimeArchiveCache* cache_owner=nullptr;
@@ -2705,7 +2716,14 @@ void matched_setup_cf_fail(const char* error){
  running=false;pending=false;first_use_draw_pending=false;menu_clock.reset();audio_clock.reset();
  message=state.error;first_css_browser_draw_refresh_observation();
 }
-void matched_setup_cf_check_owner(unsigned expected_ticks){
+// gm_16AE fn_8016CD98 gates the match clock on HUD/pause state. A source
+// traversal therefore advances it zero or one times; a draw never advances it.
+// Keep this clock separate from the world's traversal counter through Ready.
+bool matched_setup_cf_clock_transition(bool tick_action,uint64_t before,uint64_t after){
+ return before<=UINT32_MAX&&after<=UINT32_MAX&&after>=before&&
+        (tick_action?after-before<=1:after==before);
+}
+void matched_setup_cf_check_owner(unsigned expected_ticks,unsigned expected_draws=~0U){
  const auto& state=matched_setup_cf;
  check(state.armed&&!state.failed&&!state.complete&&first_sss_vs_setup.complete&&
        !first_sss_vs_setup.failed&&match&&match.get()==state.owner&&
@@ -2716,6 +2734,22 @@ void matched_setup_cf_check_owner(unsigned expected_ticks){
        melee_web_gameplay_generation()==state.world_generation&&
        match->construction_complete()&&melee_web_gameplay_stats().ticks==expected_ticks,
        "Matched Setup C/F action lost its bound stopped source owner or tick position");
+ if(state.version2&&expected_draws!=~0U)
+  check(state.source_draws==expected_draws,
+        "Matched Setup C/F v2 independent source draw counter changed");
+ if(state.version2)
+  check(match->source_frames()==state.last_source_frame_after,
+        "Matched Setup C/F v2 match clock changed outside its acknowledged action");
+ if(state.version2&&state.queued&&!state.awaiting_approval)
+  check(state.source_ticks==state.queued_ticks_before&&
+        state.source_draws==state.queued_draws_before&&
+        match->source_frames()==state.queued_source_frame_before,
+        "Matched Setup C/F v2 source frame/tick/draw advanced while an action awaited service");
+ if(state.version2&&state.awaiting_approval)
+  check(state.source_ticks==state.last_ticks_after&&
+        state.source_draws==state.last_draws_after&&
+        match->source_frames()==state.last_source_frame_after,
+        "Matched Setup C/F v2 source frame/tick/draw advanced while awaiting host approval");
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
  MeleeWebPipelineStatus provenance_status{};char provenance_error[256]{};
  check(melee_web_pipeline_status(melee_web_provenance_recorder(),&provenance_status,
@@ -2738,7 +2772,8 @@ void matched_setup_cf_check_owner(unsigned expected_ticks){
         diagnostic_audio_render_calls==state.audio_calls_after&&
         diagnostic_audio_render_frames==state.audio_frames_after&&audio_phase==state.audio_phase_after,
         "Matched Setup C/F source RNG/audio changed while awaiting host approval");
- if(state.awaiting_approval&&state.last_action_kind==1&&state.last_ordinal>=84){
+ if(state.awaiting_approval&&((state.version2&&state.last_ticks_after>state.c_source_tick)||
+                              (!state.version2&&state.last_action_kind==1&&state.last_ordinal>=84))){
   MeleeWebStadiumIdleSnapshot idle{};
   check(match->diagnostic_stadium_idle_snapshot(&idle,error,sizeof(error)),
         error[0]?error:"Matched Setup C/F idle owner snapshot refused during host approval");
@@ -2751,8 +2786,9 @@ bool matched_setup_cf_service(){
  if(!state.armed||state.failed||state.complete)return true;
  bool frame_began=false;
  try{
-  unsigned expected_ticks=0;
-  if(state.awaiting_approval)expected_ticks=state.last_ordinal+1;
+  unsigned expected_ticks=0,expected_draws=~0U;
+  if(state.version2){expected_ticks=state.source_ticks;expected_draws=state.source_draws;}
+  else if(state.awaiting_approval)expected_ticks=state.last_ordinal+1;
   else if(state.queued)expected_ticks=state.last_ordinal+(state.last_action_kind==2?1U:0U);
   else if(state.cursor<171){
    const unsigned ordinal=state.cursor<168?state.cursor/2:
@@ -2761,7 +2797,7 @@ bool matched_setup_cf_service(){
        (state.cursor<168&&(state.cursor%2)==0);
    expected_ticks=ordinal+(tick_action?0U:1U);
   }else throw std::runtime_error("Matched Setup C/F action cursor exceeded its fixed schedule");
-  matched_setup_cf_check_owner(expected_ticks);
+  matched_setup_cf_check_owner(expected_ticks,expected_draws);
   if(!state.queued||state.awaiting_approval){
    first_css_browser_draw_refresh_observation();return true;
   }
@@ -2784,6 +2820,7 @@ bool matched_setup_cf_service(){
    match->tick(raw);
    check(melee_web_gameplay_stats().ticks==ordinal+1&&!match->paused()&&!match->ending()&&
          !match->complete(),"Matched Setup C/F source tick left its exact live sequence");
+   if(state.version2)state.source_ticks=melee_web_gameplay_stats().ticks;
    render_audio_tick(match->audio(),error,sizeof(error));
    check(diagnostic_audio_render_calls==calls_before+1,
          "Matched Setup C/F tick did not render exactly one original audio block");
@@ -2795,6 +2832,7 @@ bool matched_setup_cf_service(){
    check(frame_began,"Matched Setup C/F AuroraBegin refused");
    GXSetCopyClear(GXColor{0,0,0,255},GX_MAX_Z24);
    match->draw();
+   if(state.version2)++state.source_draws;
    aurora_end_frame();++state.aurora_end_calls;frame_began=false;
   }
   } // Close source provenance before exporting its ordered records.
@@ -2802,7 +2840,18 @@ bool matched_setup_cf_service(){
   melee_web_provenance_frame(0);
 #endif
   state.queued=false;
-  matched_setup_cf_check_owner(ordinal+1);
+  if(state.version2){
+   check(state.source_ticks==state.queued_ticks_before+(tick_action?1U:0U)&&
+         state.source_draws==state.queued_draws_before+(tick_action?0U:1U),
+         "Matched Setup C/F v2 action changed independent tick/draw counters unexpectedly");
+   const uint64_t source_frame_after=match->source_frames();
+   check(matched_setup_cf_clock_transition(tick_action,state.queued_source_frame_before,
+                                           source_frame_after),
+         "Matched Setup C/F v2 match clock violates its source tick/draw transition");
+   state.last_ticks_after=state.source_ticks;state.last_draws_after=state.source_draws;
+   state.last_source_frame_after=source_frame_after;
+   matched_setup_cf_check_owner(state.last_ticks_after,state.last_draws_after);
+  }else matched_setup_cf_check_owner(ordinal+1);
   state.seed_after_action=match->random_seed();
   state.last_action_complete=true;
   state.audio_calls_before=calls_before;state.audio_frames_before=audio_frames_before;
@@ -2810,8 +2859,10 @@ bool matched_setup_cf_service(){
   state.audio_frames_after=diagnostic_audio_render_frames;
   state.audio_phase_before=phase_before;state.audio_phase_after=audio_phase;
   std::ostringstream actual;
-  if(tick_action&&(ordinal==84||ordinal==85)){
-   const char* label=ordinal==84?"C":"F";
+  const unsigned c_tick=state.version2?state.c_source_tick:84U;
+  const unsigned f_tick=state.version2?state.f_source_tick:85U;
+  if(tick_action&&(ordinal==c_tick||ordinal==f_tick)){
+   const char* label=ordinal==c_tick?"C":"F";
    check(state.expected_branch==0,"Matched Setup C/F supports only the approved branch-0 Setup");
    char owner_error[256]{};
    check(match->diagnostic_stadium_idle_snapshot(&state.idle,owner_error,sizeof(owner_error)),
@@ -2823,26 +2874,52 @@ bool matched_setup_cf_service(){
          state.go.armed_source_frame==0&&state.go.next_sequence==3&&
          state.go.stage_before.sequence==1&&state.go.stage_after.sequence==2&&
          state.go.go_after.sequence==3&&state.go.hud_after.sequence==0&&
-         state.go.stage_before.world_ticks==84&&state.go.stage_after.world_ticks==84&&
-         state.go.go_after.world_ticks==84&&state.go.go_after.source_branch==0&&
+         state.go.stage_before.world_ticks==c_tick&&state.go.stage_after.world_ticks==c_tick&&
+         state.go.go_after.world_ticks==c_tick&&state.go.go_after.source_branch==0&&
          state.go.stage_before.generation==state.world_generation&&
          state.go.stage_after.generation==state.world_generation&&
          state.go.go_after.generation==state.world_generation&&
          state.idle.world_generation==state.world_generation&&
          state.idle.world_ticks==ordinal+1,
-         "Matched Setup C/F branch-0 GO events do not match the source tick-84 boundary");
+         "Matched Setup C/F branch-0 GO events do not match the dynamic C boundary");
+   if(state.version2)
+    check(state.idle.source_frame==state.last_source_frame_after,
+          "Matched Setup C/F v2 snapshot match clock differs from its action receipt");
    actual<<"{\"label\":\""<<label<<"\",\"ordinal\":"<<ordinal
          <<",\"seed_hex\":\""<<melee_web::stadium_first_css_diagnostic::hex32(state.seed_after_action)
          <<"\",\"expected_branch\":"<<state.expected_branch
          <<",\"idle_snapshot\":"<<matched_setup_cf_idle_json(state.idle)
          <<",\"go_trace\":"<<matched_setup_cf_go_json(state.go)<<'}';
   }else actual<<"null";
+  if(state.version2&&state.source_ticks>c_tick&&
+     !(tick_action&&(ordinal==c_tick||ordinal==f_tick))){
+   char owner_error[256]{};
+   check(match->diagnostic_stadium_idle_snapshot(&state.idle,owner_error,sizeof(owner_error)),
+         owner_error[0]?owner_error:"Matched Setup C/F v2 idle snapshot refused");
+   check(match->diagnostic_stadium_go_alignment_snapshot(&state.go,owner_error,sizeof(owner_error)),
+         owner_error[0]?owner_error:"Matched Setup C/F v2 GO snapshot refused");
+  }
+  std::ostringstream input_hex;
+  if(state.version2&&tick_action)for(uint8_t byte:state.queued_statuses)
+   input_hex<<"0123456789abcdef"[byte>>4]<<"0123456789abcdef"[byte&15];
+  std::string v2_counter_json;
+  if(state.version2){
+   v2_counter_json=",\"source_ticks_before\":"+std::to_string(state.queued_ticks_before)+
+      ",\"source_ticks_after\":"+std::to_string(state.last_ticks_after)+
+      ",\"source_draws_before\":"+std::to_string(state.queued_draws_before)+
+      ",\"source_draws_after\":"+std::to_string(state.last_draws_after)+
+      ",\"source_frames_before\":"+std::to_string(state.queued_source_frame_before)+
+      ",\"source_frames_after\":"+std::to_string(state.last_source_frame_after)+
+      ",\"source_tick_input_pad_hex\":"+(tick_action?
+          first_css_browser_draw_json_quote(input_hex.str()):"null");
+  }
   state.last_action_json="{\"schedule_index\":"+std::to_string(index)+
       ",\"action\":"+first_css_browser_draw_json_quote(tick_action?"tick":"draw")+
       ",\"ordinal\":"+std::to_string(ordinal)+",\"bundle\":"+
       (tick_action?std::to_string(state.last_bundle):"null")+
       ",\"complete\":true,\"source_frames\":"+std::to_string(match->source_frames())
       +",\"world_ticks\":"+std::to_string(melee_web_gameplay_stats().ticks)
+      +v2_counter_json
       +",\"audio_render_calls_before\":"+std::to_string(state.audio_calls_before)
       +",\"audio_render_calls_after\":"+std::to_string(state.audio_calls_after)
       +",\"audio_render_frames_before\":"+std::to_string(state.audio_frames_before)
@@ -2861,7 +2938,8 @@ bool matched_setup_cf_service(){
         provenance_status.errors==0&&provenance_status.dropped==0,
         error[0]?error:"Matched Setup C/F source provenance became invalid");
 #endif
-  matched_setup_cf_check_owner(ordinal+1);
+  matched_setup_cf_check_owner(state.version2?state.last_ticks_after:ordinal+1,
+                               state.version2?state.last_draws_after:~0U);
   first_css_browser_draw_refresh_observation();return true;
  }catch(const std::exception& error){
   if(frame_began){try{aurora_end_frame();++state.aurora_end_calls;}catch(...){} }
@@ -2878,8 +2956,11 @@ std::string matched_setup_cf_json(){
      state.awaiting_approval?"awaiting-approval":state.queued?"queued":
      state.armed?"armed":"idle";
  std::ostringstream out;
- out<<"{\"schema\":\"melee-web-stadium-matched-setup-cf-native-v1\",\"state\":\""
-    <<phase<<"\",\"opted_in\":"<<(state.opted_in?"true":"false")
+ if(state.version2)out<<"{\"schema\":\"melee-web-stadium-source-action-native-v2\",\"scope\":\"proper-prefix-next-draw-tick-draw\",\"action_count\":"
+    <<state.action_count<<",\"source_ticks\":"<<state.source_ticks
+    <<",\"source_draws\":"<<state.source_draws<<",\"state\":\"";
+ else out<<"{\"schema\":\"melee-web-stadium-matched-setup-cf-native-v1\",\"state\":\"";
+ out<<phase<<"\",\"opted_in\":"<<(state.opted_in?"true":"false")
     <<",\"armed\":"<<(state.armed?"true":"false")
     <<",\"cursor\":"<<state.cursor<<",\"queued\":"<<(state.queued?"true":"false")
     <<",\"awaiting_approval\":"<<(state.awaiting_approval?"true":"false")
@@ -4614,11 +4695,25 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_begin(int text_tail_probe){
  first_css_browser_draw_refresh_observation();return 1;
 }catch(const std::exception& error){first_sss_vs_setup_fail(error.what());return 0;}}
 
-int melee_web_native_menu_stadium_first_sss_vs_setup_cf_arm(){try{
+int matched_setup_cf_arm_internal(bool version2,unsigned action_count,
+    unsigned c_action_index,unsigned f_action_index,unsigned c_source_tick,
+    unsigned f_source_tick){try{
  auto& state=matched_setup_cf;auto& setup=first_sss_vs_setup;
  check(!state.opted_in&&!state.armed&&!state.failed&&!state.complete,
        "Matched Setup C/F continuation is one-use");
  state.opted_in=true;
+ state.version2=version2;
+ state.action_count=version2?action_count:171U;
+ state.c_action_index=version2?c_action_index:168U;
+ state.f_action_index=version2?f_action_index:170U;
+ state.c_source_tick=version2?c_source_tick:84U;
+ state.f_source_tick=version2?f_source_tick:85U;
+ state.source_ticks=state.source_draws=0;
+ state.queued_source_frame_before=state.last_source_frame_after=0;
+ check(!version2||(action_count==state.version2_actions.size()&&action_count>=5&&
+       action_count<=7167&&c_action_index<f_action_index&&f_action_index+3==action_count-1&&
+       c_source_tick+1==f_source_tick),
+       "Matched Setup C/F v2 immutable prefix dimensions are invalid");
  check(setup.attempted&&setup.complete&&!setup.failed&&setup.construction_complete&&
        setup.source_frames==0&&!running&&!pending&&!faulted&&!host_entered&&
        host&&match&&archive_cache&&match->construction_complete()&&
@@ -4664,8 +4759,70 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_cf_arm(){try{
  state.audio_frames_before=state.audio_frames_after=diagnostic_audio_render_frames;
  state.audio_phase_before=state.audio_phase_after=audio_phase;
  state.armed=true;
- matched_setup_cf_check_owner(0);
+ matched_setup_cf_check_owner(0,version2?0U:~0U);
  first_css_browser_draw_refresh_observation();return 1;
+}catch(const std::exception& error){
+ matched_setup_cf_fail(error.what());return 0;
+}}
+
+int melee_web_native_menu_stadium_first_sss_vs_setup_cf_arm(){
+ return matched_setup_cf_arm_internal(false,171U,168U,170U,84U,85U);
+}
+
+int melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_arm(
+    const uint8_t* manifest,size_t manifest_bytes){try{
+ auto& state=matched_setup_cf;
+ check(manifest&&manifest_bytes>=24,"Matched Setup C/F v2 manifest header is absent");
+ check(manifest[0]=='M'&&manifest[1]=='W'&&manifest[2]=='P'&&manifest[3]=='2',
+       "Matched Setup C/F v2 manifest magic differs");
+ const auto read32=[&](size_t offset){
+  check(offset+4<=manifest_bytes,"Matched Setup C/F v2 manifest integer is truncated");
+  return static_cast<uint32_t>(manifest[offset])|
+      (static_cast<uint32_t>(manifest[offset+1])<<8)|
+      (static_cast<uint32_t>(manifest[offset+2])<<16)|
+      (static_cast<uint32_t>(manifest[offset+3])<<24);
+ };
+ const unsigned action_count=read32(4),c_index=read32(8),f_index=read32(12),
+                c_tick=read32(16),f_tick=read32(20);
+ constexpr size_t header_bytes=24,action_bytes=57;
+ check(action_count>=5&&action_count<=7167&&
+       manifest_bytes==header_bytes+static_cast<size_t>(action_count)*action_bytes,
+       "Matched Setup C/F v2 manifest count or length is invalid");
+ check(c_index<f_index&&f_index+3==action_count-1&&c_tick+1==f_tick,
+       "Matched Setup C/F v2 C/F/terminal coordinates are inconsistent");
+ std::vector<MatchedSetupCfState::ManifestAction> actions;actions.reserve(action_count);
+ unsigned ticks=0,draws=0;
+ for(unsigned index=0;index<action_count;++index){
+  const size_t offset=header_bytes+static_cast<size_t>(index)*action_bytes;
+  MatchedSetupCfState::ManifestAction action{};
+  action.kind=manifest[offset];action.ordinal=read32(offset+1);
+  action.bundle=read32(offset+5);action.draws_before=read32(offset+9);
+  std::copy(manifest+offset+13,manifest+offset+action_bytes,action.pad.begin());
+  if(action.kind==1){
+   check(action.ordinal==ticks&&action.bundle==ticks&&action.draws_before==draws,
+         "Matched Setup C/F v2 tick descriptor is discontinuous");
+   ++ticks;
+  }else if(action.kind==2){
+   check(action.ordinal==draws&&action.bundle==UINT32_MAX&&action.draws_before==draws&&
+         std::all_of(action.pad.begin(),action.pad.end(),[](uint8_t byte){return byte==0;}),
+         "Matched Setup C/F v2 draw descriptor is malformed");
+   ++draws;
+  }else throw std::runtime_error("Matched Setup C/F v2 action kind is unknown");
+  actions.push_back(action);
+ }
+ check(actions[c_index].kind==1&&actions[c_index].ordinal==c_tick&&
+       actions[f_index].kind==1&&actions[f_index].ordinal==f_tick,
+       "Matched Setup C/F v2 C/F descriptors do not match their declared source ticks");
+ check(std::none_of(actions.begin()+c_index+1,actions.begin()+f_index,
+       [](const auto& action){return action.kind==1;}),
+       "Matched Setup C/F v2 inserted another tick between C and F");
+ check(actions[f_index+1].kind==2&&actions[f_index+2].kind==1&&
+       actions[f_index+3].kind==2,
+       "Matched Setup C/F v2 terminal is not the required next draw/tick/draw");
+ check(!state.opted_in&&!state.armed&&!state.failed&&!state.complete,
+       "Matched Setup C/F v2 continuation is one-use");
+ state.version2_actions=std::move(actions);
+ return matched_setup_cf_arm_internal(true,action_count,c_index,f_index,c_tick,f_tick);
 }catch(const std::exception& error){
  matched_setup_cf_fail(error.what());return 0;
 }}
@@ -4674,7 +4831,7 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_cf_queue(
     unsigned schedule_index,int action_kind,unsigned ordinal,int bundle,
     const uint8_t* bytes,size_t byte_count){try{
  auto& state=matched_setup_cf;
- check(state.armed&&!state.failed&&!state.complete&&!state.queued&&
+ check(!state.version2&&state.armed&&!state.failed&&!state.complete&&!state.queued&&
        !state.awaiting_approval&&schedule_index==state.cursor&&schedule_index<171,
        "Matched Setup C/F action queue is not at its one-use cursor");
  const bool tick_action=schedule_index==168||schedule_index==170||
@@ -4698,6 +4855,33 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_cf_queue(
  matched_setup_cf_fail(error.what());return 0;
 }}
 
+int melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_queue(
+    unsigned schedule_index,int action_kind,unsigned ordinal,int bundle){try{
+ auto& state=matched_setup_cf;
+ check(state.version2&&state.armed&&!state.failed&&!state.complete&&!state.queued&&
+       !state.awaiting_approval&&schedule_index==state.cursor&&
+       schedule_index<state.version2_actions.size(),
+       "Matched Setup C/F v2 action queue is not at its one-use cursor");
+ const auto& action=state.version2_actions[schedule_index];
+ check(action_kind==action.kind&&ordinal==action.ordinal&&
+       bundle==(action.kind==1?static_cast<int>(action.bundle):-1)&&
+       action.draws_before==state.source_draws&&action.ordinal==
+         (action.kind==1?state.source_ticks:state.source_draws),
+       "Matched Setup C/F v2 queued action differs from its immutable manifest row");
+ matched_setup_cf_check_owner(state.source_ticks,state.source_draws);
+ state.seed_at_queue=match->random_seed();
+ state.last_schedule_index=schedule_index;state.last_action_kind=action.kind;
+ state.last_ordinal=action.ordinal;state.last_bundle=action.kind==1?action.bundle:UINT32_MAX;
+ state.last_action_complete=false;state.last_action_json.clear();
+ state.queued_statuses=action.pad;
+ state.queued_ticks_before=state.source_ticks;
+ state.queued_draws_before=state.source_draws;
+ state.queued_source_frame_before=match->source_frames();
+ state.queued=true;first_css_browser_draw_refresh_observation();return 1;
+}catch(const std::exception& error){
+ matched_setup_cf_fail(error.what());return 0;
+}}
+
 int melee_web_native_menu_stadium_first_sss_vs_setup_cf_approve(
     unsigned schedule_index,int accepted){try{
  auto& state=matched_setup_cf;
@@ -4705,10 +4889,11 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_cf_approve(
        state.awaiting_approval&&state.last_action_complete&&
        schedule_index==state.cursor&&schedule_index==state.last_schedule_index,
        "Matched Setup C/F approval is duplicate, stale, or out of order");
- matched_setup_cf_check_owner(state.last_ordinal+1);
+ if(state.version2)matched_setup_cf_check_owner(state.last_ticks_after,state.last_draws_after);
+ else matched_setup_cf_check_owner(state.last_ordinal+1);
  if(!accepted){matched_setup_cf_fail("Host refused the pending matched Setup C/F boundary");return 1;}
  state.awaiting_approval=false;state.last_action_complete=false;++state.cursor;
- if(state.cursor==171)state.complete=true;
+ if(state.cursor==state.action_count)state.complete=true;
  first_css_browser_draw_refresh_observation();return 1;
 }catch(const std::exception& error){
  matched_setup_cf_fail(error.what());return 0;

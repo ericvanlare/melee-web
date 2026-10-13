@@ -17,7 +17,7 @@ import {firstSssAudioAccounting} from './stadium_first_css_stream_compare.mjs';
 import {createCssSssTransitionCapture, CSS_SSS_TRANSITION_LIMITS,
   cssReadinessEvidence, cssSssOutcome, hasCssMenuReadiness} from './stadium_c1a_css_sss_reducer.mjs';
 import {validateMatchedSetupCfRequest, validateMatchedSetupCfPreflight,
-  validateMatchedSetupCfIdentities, matchedSetupCfRuntimeFailure}
+  validateMatchedSetupCfIdentities, matchedSetupCfRuntimeFailure, PREFIX_V2_SCOPE}
   from './stadium_matched_setup_cf_runner_gate.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -117,6 +117,8 @@ const matchedSetupCfPreflight = validateMatchedSetupCfPreflight(preflight, {
     ? path.resolve(values['first-sss-vs-setup-cf-assembly']) : null,
   helperPath: path.join(ROOT, 'tests/stadium_matched_setup_cf_consumer.mjs'),
 });
+const firstSssVsSetupCfV2 = firstSssVsSetupCf &&
+  matchedSetupCfPreflight.scope === PREFIX_V2_SCOPE;
 const output = path.resolve(values.out);
 try { await fs.access(output); throw Error(`Refusing to overwrite existing output directory: ${output}`); }
 catch (error) { if (error.code !== 'ENOENT') throw error; }
@@ -211,7 +213,9 @@ const report = {
     browser_process_pid: null, server_process_terminated: false, server_process_pid: null,
     server_process_exit: null, failures: []},
   source_request_scope: firstSssVsSetupCf
-    ? 'Strict same-run Entry and completed Setup comparison, then the exact original 86-tick/85-draw schedule; compare C after tick84 before draw84 and F after tick85 before draw85, then stop.'
+    ? firstSssVsSetupCfV2
+      ? 'Strict same-run Entry and completed Setup comparison, then the extracted run2 proper prefix from action0 through the next draw/tick/draw after dynamically mapped C/F; compare C/F before their following draws, then stop.'
+      : 'Strict same-run Entry and completed Setup comparison, then the exact original 86-tick/85-draw schedule; compare C after tick84 before draw84 and F after tick85 before draw85, then stop.'
     : firstSssVsSetup
     ? `Strict Entry then checked async exact Stadium asset handoff and existing deferred Session Setup endpoint; stop before gameplay tick/draw/GO${firstSssVsSetupTextTail?'; opt-in bounded SIS text-tail diagnostics only':''}`
     : firstSssVsEntry
@@ -640,11 +644,25 @@ async function loadMatchedSetupCfInputs() {
   catch (error) { throw Error(`Matched Setup C/F packet is malformed: ${errorText(error)}`); }
   try { assembly = JSON.parse(assemblyIdentity.content.toString('utf8')); }
   catch (error) { throw Error(`Matched Setup C/F evidence assembly is malformed: ${errorText(error)}`); }
-  assert.equal(assembly.schema, 'melee-web-stadium-setup-cf-external-evidence-assembly-v1');
-  assert.equal(assembly.scope,
-    'Historical retained evidence basis only; does not admit a future source, producer, fresh Setup or runtime continuation. Never forward into runtime.');
   const helper = await import(pathToFileURL(helperPath).href);
   const hostEvidence = helper.hostEvidenceFromPacket(packet);
+  assert.equal(hostEvidence.mode === 'run2-proper-prefix-v2', firstSssVsSetupCfV2,
+    'packet schema differs from the preflight-bound continuation version');
+  if (hostEvidence.mode === 'run2-proper-prefix-v2') {
+    assert.deepEqual(Object.keys(assembly).sort(),
+      ['host_only_expectations_sha256', 'runtime_payload_sha256', 'schema', 'scope'].sort());
+    assert.equal(assembly.schema, 'melee-web-stadium-run2-source-action-assembly-v1');
+    assert.equal(assembly.scope,
+      'Source-only run2 action payload and host-only expectation identity; no runtime or profile acceptance.');
+    assert.equal(assembly.runtime_payload_sha256, digest(Buffer.from(
+      JSON.stringify(sortedJsonValue(packet.runtime_payload), null, 2) + '\n')));
+    assert.equal(assembly.host_only_expectations_sha256, digest(Buffer.from(
+      JSON.stringify(sortedJsonValue(packet.host_only), null, 2) + '\n')));
+  } else {
+    assert.equal(assembly.schema, 'melee-web-stadium-setup-cf-external-evidence-assembly-v1');
+    assert.equal(assembly.scope,
+      'Historical retained evidence basis only; does not admit a future source, producer, fresh Setup or runtime continuation. Never forward into runtime.');
+  }
   return {helper, hostEvidence, packetIdentity: Object.fromEntries(
     Object.entries(packetIdentity).filter(([key]) => key !== 'content')),
     assemblyIdentity: Object.fromEntries(
@@ -2174,7 +2192,8 @@ async function runFirstSssVsSetup(entryNative) {
 }
 
 async function executeMatchedSetupCfNativeCommand(command) {
-  const response = await page.evaluate(({kind, scheduleIndex, action, ordinal, bundle, bytes, accepted}) => {
+  const response = await page.evaluate(({kind, scheduleIndex, action, ordinal, bundle, bytes,
+    manifestBytes, accepted}) => {
     const module = globalThis.Module;
     const readMessage = () => {
       const pointer = module?._melee_web_native_menu_message?.();
@@ -2186,6 +2205,17 @@ async function executeMatchedSetupCfNativeCommand(command) {
       if (typeof fn !== 'function') return {result: 0, message: 'Matched Setup C/F arm export is absent'};
       const result = fn();
       return {result, message: result === 1 ? null : readMessage()};
+    }
+    if (kind === 'arm-v2') {
+      const fn = module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_arm;
+      if (typeof fn !== 'function') return {result: 0, message: 'Matched Setup C/F v2 arm export is absent'};
+      const pointer = module._malloc(manifestBytes.length);
+      if (!pointer) return {result: 0, message: 'Matched Setup C/F v2 manifest allocation failed'};
+      try {
+        module.HEAPU8.set(manifestBytes, pointer);
+        const result = fn(pointer, manifestBytes.length);
+        return {result, message: result === 1 ? null : readMessage()};
+      } finally { module._free(pointer); }
     }
     if (kind === 'queue') {
       const fn = module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_queue;
@@ -2201,6 +2231,13 @@ async function executeMatchedSetupCfNativeCommand(command) {
         if (pointer) module._free(pointer);
       }
     }
+    if (kind === 'queue-v2') {
+      const fn = module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_queue;
+      if (typeof fn !== 'function') return {result: 0, message: 'Matched Setup C/F v2 queue export is absent'};
+      const result = fn(scheduleIndex, action === 'tick' ? 1 : 2,
+        ordinal, action === 'tick' ? bundle : -1);
+      return {result, message: result === 1 ? null : readMessage()};
+    }
     if (kind === 'approve') {
       const fn = module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_approve;
       if (typeof fn !== 'function') return {result: 0, message: 'Matched Setup C/F approval export is absent'};
@@ -2212,7 +2249,7 @@ async function executeMatchedSetupCfNativeCommand(command) {
   return response;
 }
 
-function matchedSetupCfNativeAdapter() {
+function matchedSetupCfNativeAdapter({mode, manifestBytes}) {
   const execute = async (command, label) => {
     const response = await timeout(executeMatchedSetupCfNativeCommand(command),
       Math.min(5000, remaining()), label);
@@ -2221,9 +2258,15 @@ function matchedSetupCfNativeAdapter() {
     return response.result;
   };
   return {
-    arm: async () => execute({kind: 'arm'}, 'Arm the one-use matched Setup C/F continuation'),
-    queue: async (scheduleIndex, action, bytes) =>
-      execute({kind: 'queue', scheduleIndex,
+    arm: async suppliedManifest => mode === 'run2-proper-prefix-v2'
+      ? execute({kind: 'arm-v2', manifestBytes: Array.from(suppliedManifest)},
+        'Arm the one-use run2 proper-prefix continuation')
+      : execute({kind: 'arm'}, 'Arm the one-use matched Setup C/F continuation'),
+    queue: async (scheduleIndex, action, bytes) => mode === 'run2-proper-prefix-v2'
+      ? execute({kind: 'queue-v2', scheduleIndex, action: action.action,
+        ordinal: action.action === 'tick' ? action.bundle : action.draw,
+        bundle: action.bundle ?? -1}, `Queue run2 source action ${scheduleIndex}`)
+      : execute({kind: 'queue', scheduleIndex,
         action: action.action, ordinal: action.ordinal, bundle: action.bundle ?? -1,
         bytes: Array.from(bytes)}, `Queue matched Setup C/F action ${scheduleIndex}`),
     approve: async (scheduleIndex, accepted) =>
@@ -2235,6 +2278,8 @@ function matchedSetupCfNativeAdapter() {
 async function runMatchedSetupCfContinuation(setupNative) {
   const inputs = matchedSetupCfInputs;
   const {helper, hostEvidence} = inputs;
+  const mode = hostEvidence.mode ?? 'legacy-v1';
+  const isV2 = mode === 'run2-proper-prefix-v2';
   const actualSetup = setupNative?.first_sss_vs_setup?.actual;
   assert.equal(actualSetup?.phase, 'vs_setup');
   assert.equal(actualSetup?.start?.rules?.x1_3, 0,
@@ -2245,7 +2290,8 @@ async function runMatchedSetupCfContinuation(setupNative) {
   assertFirstSssVsSetupOwners(setupNative.first_sss_vs_setup);
 
   const cf = report.scenario.matched_setup_cf = {
-    decision: 'RUNNING_BOUNDED_MATCHED_SETUP_CF',
+    decision: isV2 ? 'RUNNING_RUN2_PROPER_PREFIX_V2' : 'RUNNING_BOUNDED_MATCHED_SETUP_CF',
+    mode,
     packet: inputs.packetIdentity, assembly_manifest: inputs.assemblyIdentity,
     host_helper: inputs.helperIdentity, assembly_schema: inputs.assemblySchema,
     runtime_payload_sha256: inputs.runtimePayloadSha256,
@@ -2257,7 +2303,9 @@ async function runMatchedSetupCfContinuation(setupNative) {
       original_SIS_title_bytes: 'unobserved', original_map_root_allocation_lifetime: 'unproved',
       original_object_type: 'unobserved', native_flow_clock: 'reported separately',
       nested_display_list_provenance: 'not instrumented in the admitted profile; the nested GX_CMD_CALL_DL warning is a stop condition'},
-    claim: 'One matched original input prefix after the fresh strict Setup comparison; state-only C/F checks, no whole-session acceptance.',
+    claim: isV2
+      ? 'Fresh strict Setup followed by the extracted run2 action0 prefix through the next draw/tick/draw beyond dynamically mapped C/F; exact declared C/F state and seed comparisons; proper-prefix completion only, no whole-session acceptance.'
+      : 'One matched original input prefix after the fresh strict Setup comparison; state-only C/F checks, no whole-session acceptance.',
   };
   await persistReport();
 
@@ -2299,8 +2347,10 @@ async function runMatchedSetupCfContinuation(setupNative) {
     setupApproved: () => setupApproved,
     originalSnapshots: hostEvidence.originalSnapshots,
     originalSeeds: hostEvidence.originalSeeds,
+    coordinates: hostEvidence.coordinates ?? null,
   });
-  const nativeAdapter = matchedSetupCfNativeAdapter();
+  const nativeAdapter = matchedSetupCfNativeAdapter({mode,
+    manifestBytes: isV2 ? helper.encodeRun2NativeManifest(hostEvidence.runtimePayload) : null});
   const driver = new helper.StadiumSetupCfActionDriver({
     runtimePayload: hostEvidence.runtimePayload, native: nativeAdapter});
   await page.evaluate(() => {
@@ -2343,10 +2393,13 @@ async function runMatchedSetupCfContinuation(setupNative) {
           `Wait for matched Setup C/F action ${scheduleIndex}`);
       }
       const actionReceipt = structuredClone(cfState.last_action);
-      const boundary = action.action === 'tick' && (action.ordinal === 84 || action.ordinal === 85);
+      const cIndex = isV2 ? hostEvidence.checkpoints.c_action_index : 168;
+      const fIndex = isV2 ? hostEvidence.checkpoints.f_action_index : 170;
+      const boundary = action.action === 'tick' &&
+        (scheduleIndex === cIndex || scheduleIndex === fIndex);
       let comparison = null;
       if (boundary) {
-        const label = action.ordinal === 84 ? 'C' : 'F';
+        const label = scheduleIndex === cIndex ? 'C' : 'F';
         const accepted = hostCallbacks.compare(label, JSON.stringify(actionReceipt.observation));
         comparison = hostCallbacks.receipts().at(-1) ?? null;
         cf.host_comparisons.push(comparison);
@@ -2356,7 +2409,8 @@ async function runMatchedSetupCfContinuation(setupNative) {
       await checkRuntimeDiagnostics(scheduleIndex, `${action.action}-before-ack`, cfState);
       const accepted = await driver.accept(cfState, comparison);
       cf.actions.push({schedule_index: scheduleIndex, action: action.action,
-        ordinal: action.ordinal, bundle: action.bundle ?? null,
+        ordinal: action.ordinal ?? (action.action === 'tick' ? action.bundle : action.draw),
+        bundle: action.bundle ?? null,
         native: actionReceipt, host_comparison: comparison});
       cf.last_native_state = structuredClone(cfState);
       await checkRuntimeDiagnostics(scheduleIndex, `${action.action}-after-ack`, cfState);
@@ -2369,12 +2423,15 @@ async function runMatchedSetupCfContinuation(setupNative) {
     const finalState = currentNative?.first_sss_vs_setup?.matched_setup_cf;
     assert.equal(finalState?.complete, true, finalState?.error || 'Native matched Setup C/F did not complete');
     assert.equal(finalState?.failed, false);
-    assert.equal(finalState?.cursor, 171);
-    assert.equal(finalState?.last_action?.schedule_index, 170);
-    assert.equal(finalState?.last_action?.action, 'tick');
-    assert.equal(finalState?.last_action?.ordinal, 85);
+    assert.equal(finalState?.cursor, hostEvidence.runtimePayload.schedule.length);
+    assert.equal(finalState?.last_action?.schedule_index,
+      hostEvidence.runtimePayload.schedule.length - 1);
+    assert.equal(finalState?.last_action?.action, isV2 ? 'draw' : 'tick');
+    assert.equal(finalState?.last_action?.ordinal, isV2
+      ? hostEvidence.checkpoints.terminal_draw_ordinal : 85);
     cf.last_native_state = structuredClone(finalState);
-    cf.decision = 'PASS_MATCHED_SETUP_CF_C_AND_F_STATE_ONLY';
+    cf.decision = isV2 ? 'PASS_RUN2_PROPER_PREFIX_C_F_STATE_ONLY'
+      : 'PASS_MATCHED_SETUP_CF_C_AND_F_STATE_ONLY';
     cf.actions_completed = cf.actions.length;
     await persistReport();
     return currentNative;

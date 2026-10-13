@@ -648,6 +648,58 @@ def _source_expectations(rows: Sequence[Mapping[str, Any]], route: Mapping[str, 
     }
 
 
+def _boundary_rng_observations(idle: Mapping[str, Any],
+                               expected_state: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Bind fresh original C/F seed words to their typed raw source rows.
+
+    The existing idle-reference validator emits one seed observation per
+    post-GO source tick. Keep pointer values as source provenance only; callers
+    must not compare guest pointer numbers with browser-native addresses.
+    """
+    c_state, f_state = expected_state.get("C"), expected_state.get("F")
+    _require(isinstance(c_state, Mapping) and isinstance(f_state, Mapping),
+             "typed C/F state rows are required for boundary RNG extraction")
+    c_raw, f_raw = c_state.get("raw_identity"), f_state.get("raw_identity")
+    _require(isinstance(c_raw, Mapping) and isinstance(f_raw, Mapping),
+             "typed C/F raw source identities are required for boundary RNG extraction")
+    c_tick, f_tick = c_raw.get("source_tick"), f_raw.get("source_tick")
+    c_draw, f_draw = c_raw.get("draw_ordinal"), f_raw.get("draw_ordinal")
+    _require(type(c_tick) is int and type(f_tick) is int and f_tick == c_tick + 1 and
+             type(c_draw) is int and type(f_draw) is int and c_draw >= 0 and f_draw >= 0,
+             "C/F source tick and draw coordinates are malformed")
+    observations = idle.get("seed_observations")
+    _require(isinstance(observations, list) and len(observations) == 3_501,
+             "same-run idle reference does not contain every post-GO seed observation")
+    by_sequence: dict[int, Mapping[str, Any]] = {}
+    for row in observations:
+        sequence = row.get("sequence") if isinstance(row, Mapping) else None
+        _require(type(sequence) is int and sequence not in by_sequence,
+                 "same-run seed observations have a missing or duplicate source sequence")
+        by_sequence[sequence] = row
+
+    result = []
+    for label, raw, tick, draw in (("C", c_raw, c_tick, c_draw),
+                                   ("F", f_raw, f_tick, f_draw)):
+        sequence = raw.get("sequence")
+        _require(type(sequence) is int and raw.get("event") == "boundary" and
+                 raw.get("boundary") == "source_tick" and
+                 raw.get("draw_ordinal") == draw,
+                 f"same-run {label} raw identity is not a source-tick boundary")
+        row = by_sequence.get(sequence)
+        _require(row is not None and row.get("ordinal") == tick - c_tick and
+                 isinstance(row.get("pointer_hex"), str) and
+                 re.fullmatch(r"[0-9a-fA-F]{8}", row["pointer_hex"]) is not None and
+                 isinstance(row.get("seed_hex"), str) and
+                 re.fullmatch(r"[0-9a-fA-F]{8}", row["seed_hex"]) is not None,
+                 f"same-run {label} seed word does not match its raw source row")
+        result.append({"label": label, "sequence": sequence,
+                       "source_tick": tick, "draw_ordinal": draw,
+                       "post_go_ordinal": row["ordinal"],
+                       "pointer_hex": row["pointer_hex"].lower(),
+                       "seed_hex": row["seed_hex"].lower()})
+    return result
+
+
 def _validate_retained_summaries(report: Mapping[str, Any],
                                  retained_idle: Mapping[str, Any],
                                  route: Mapping[str, Any],
@@ -826,6 +878,7 @@ def extract_same_run_schedule(repo_root: str | Path, run_root: str | Path) -> di
             "bundle_provenance": schedule["bundle_provenance"],
             "action_provenance": schedule["action_provenance"],
             "expected_state": expectations,
+            "boundary_rng_observations": _boundary_rng_observations(idle, expectations),
             "recorded_mwri_and_intentions_are_separate_from_source_consumed_pad": True,
         },
         "summary": summary,

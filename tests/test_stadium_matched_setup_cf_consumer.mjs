@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
+import {readFileSync} from 'node:fs';
 import {
   compareOriginalIdleSnapshot,
   createHostCallbacks,
   hostEvidenceFromPacket,
+  deriveRun2ProperPrefix,
+  encodeRun2NativeManifest,
   StadiumSetupCfActionDriver,
   validateRuntimePayload,
 } from './stadium_matched_setup_cf_consumer.mjs';
@@ -18,6 +21,47 @@ function runtimePayload() {
   schedule.push({action: 'tick', ordinal: 84, bundle: 84},
     {action: 'draw', ordinal: 84}, {action: 'tick', ordinal: 85, bundle: 85});
   return {schema: 'melee-web-stadium-typed-pad-action-plan', version: 1, bundles, schedule};
+}
+
+function run2Packet() {
+  const bundles = Array.from({length: 4}, (_, bundle) => ({bundle,
+    ports: Array.from({length: 4}, (_, port) => ({port,
+      status_hex: `${bundle.toString(16).padStart(2, '0')}${'00'.repeat(10)}`}))}));
+  const schedule = [
+    {action: 'tick', action_index: 0, bundle: 0},
+    {action: 'draw', action_index: 1, draw: 0},
+    {action: 'tick', action_index: 2, bundle: 1},
+    {action: 'draw', action_index: 3, draw: 1},
+    {action: 'tick', action_index: 4, bundle: 2},
+    {action: 'draw', action_index: 5, draw: 2},
+    {action: 'tick', action_index: 6, bundle: 3},
+    {action: 'draw', action_index: 7, draw: 3},
+  ];
+  const typed = (label, tick, draw, sequence) => ({boundary_role: label,
+    raw_identity: {sequence, event: 'boundary', boundary: 'source_tick',
+      source_tick: tick, draw_ordinal: draw},
+    typed_fields: {...expected(label), sequence, source_tick: tick, draw_ordinal: draw}});
+  const host_only = {schema: 'melee-web-stadium-source-host-expectations', version: 1,
+    source_identity: {strict_route: {source: {
+      dol_sha256: 'dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646',
+      dol_sha1: '08e0bf20134dfcb260699671004527b2d6bb1a45'}}},
+    expected_state: {
+      comparison_scope: {setup_profile_verified_by_observer: false,
+        profile_equivalence: 'pending; browser Setup receipt must be separately matched'},
+      GO: {raw_identity: {sequence: 100, event: 'progress', phase: 'go_after',
+        source_tick: 1, draw_ordinal: 1}, typed_fields: {label: 'GO', sequence: 100,
+        source_tick: 1, draw_ordinal: 1}},
+      C: typed('C', 1, 1, 105), F: typed('F', 2, 2, 110),
+    },
+    boundary_rng_observations: [
+      {label: 'C', sequence: 105, source_tick: 1, draw_ordinal: 1,
+        post_go_ordinal: 0, pointer_hex: '804d5f90', seed_hex: '01234567'},
+      {label: 'F', sequence: 110, source_tick: 2, draw_ordinal: 2,
+        post_go_ordinal: 1, pointer_hex: '804d5f90', seed_hex: '89abcdef'},
+    ]};
+  return {schema: 'melee-web-stadium-source-action-replay-packet', version: 2,
+    runtime_payload: {schema: 'melee-web-stadium-pad-action-plan', version: 1,
+      bundles, schedule}, host_only};
 }
 
 function expected(label) {
@@ -62,6 +106,123 @@ test('accepts the exact 86-bundle/171-action plan and rejects host-only leakage'
   const bad = runtimePayload();
   bad.schedule[169] = {action: 'draw', ordinal: 85};
   assert.throws(() => validateRuntimePayload(bad), /fixed tick\/draw/);
+});
+
+test('derives a proper run2 prefix and dynamic C/F seed identities from host-only rows', async () => {
+  const packet = run2Packet();
+  const evidence = hostEvidenceFromPacket(packet);
+  assert.equal(evidence.mode, 'run2-proper-prefix-v2');
+  assert.equal(evidence.runtimePayload.schedule.length, 8);
+  assert.deepEqual(evidence.checkpoints, {c_action_index: 2, f_action_index: 4,
+    c_source_tick: 1, f_source_tick: 2, terminal_action_index: 7, terminal_draw_ordinal: 3});
+  assert.deepEqual(evidence.originalSeeds, {C: '01234567', F: '89abcdef'});
+  assert.deepEqual(evidence.coordinates, {cTick: 1, fTick: 2, goSequence: 100,
+    cSequence: 105, fSequence: 110, goDraw: 1, cDraw: 1, fDraw: 2});
+
+  const cActual = actual('C');
+  cActual.ordinal = 1;
+  cActual.idle_snapshot.world_ticks = 2;
+  cActual.idle_snapshot.source_frame = 2;
+  cActual.go_trace.armed_world_ticks = 0;
+  cActual.go_trace.armed_source_frame = 0;
+  for (const event of [cActual.go_trace.stage_before, cActual.go_trace.stage_after,
+    cActual.go_trace.go_after]) event.world_ticks = 1;
+  cActual.seed_hex = '01234567';
+  const result = compareOriginalIdleSnapshot({label: 'C', expected: evidence.originalSnapshots[1],
+    expectedGo: evidence.originalSnapshots[0], expectedSeedHex: evidence.originalSeeds.C,
+    actual: cActual, coordinates: evidence.coordinates});
+  assert.equal(result.decision, 'PASS_EXACT_DECLARED_C_F_FIELDS');
+
+  const altered = structuredClone(packet);
+  altered.host_only.boundary_rng_observations[0].sequence = 104;
+  assert.throws(() => hostEvidenceFromPacket(altered), /seed row differs/);
+  const wrongGoOrdinal = structuredClone(packet);
+  wrongGoOrdinal.host_only.boundary_rng_observations[1].post_go_ordinal = 2;
+  assert.throws(() => hostEvidenceFromPacket(wrongGoOrdinal), /seed row differs/);
+  const wrongSequence = structuredClone(packet);
+  wrongSequence.runtime_payload.schedule[4].bundle = 1;
+  assert.throws(() => deriveRun2ProperPrefix(wrongSequence.runtime_payload,
+    wrongSequence.host_only), /discontinuous/);
+});
+
+test('encodes and gates each v2 manifest action with independent counters and C/F approval', async () => {
+  const evidence = hostEvidenceFromPacket(run2Packet());
+  const payload = evidence.runtimePayload;
+  const manifest = encodeRun2NativeManifest(payload);
+  const read32 = offset => manifest[offset] | (manifest[offset + 1] << 8) |
+    (manifest[offset + 2] << 16) | (manifest[offset + 3] << 24);
+  assert.equal(Buffer.from(manifest.subarray(0, 4)).toString('ascii'), 'MWP2');
+  assert.deepEqual([read32(4), read32(8), read32(12), read32(16), read32(20)],
+    [8, 2, 4, 1, 2]);
+  assert.equal(manifest.byteLength, 24 + payload.schedule.length * 57);
+  assert.deepEqual([...manifest.subarray(24, 37)], [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  assert.equal(Buffer.from(manifest.subarray(37, 81)).toString('hex'),
+    payload.bundles[0].ports.map(port => port.status_hex).join(''));
+  assert.deepEqual([...manifest.subarray(24 + 57, 24 + 57 + 57)],
+    [2, 0, 0, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, ...new Array(44).fill(0)]);
+  const malformed = structuredClone(payload);
+  malformed.checkpoints.f_action_index = 5;
+  assert.throws(() => encodeRun2NativeManifest(malformed), /dimensions differ/);
+
+  let pending = null;
+  const approvals = [];
+  const native = {
+    arm: bytes => bytes instanceof Uint8Array && bytes.length === manifest.length ? 1 : 0,
+    queue: (index, action, bytes) => {
+      pending = {index, action, bytes};
+      return 1;
+    },
+    approve: (index, accepted) => {
+      assert.equal(index, pending.index);
+      approvals.push(accepted);
+      pending = null;
+      return 1;
+    },
+  };
+  const driver = new StadiumSetupCfActionDriver({runtimePayload: payload, native});
+  assert.equal(await driver.arm(true), true);
+  let ticks = 0, draws = 0;
+  for (let index = 0; index < payload.schedule.length; ++index) {
+    const action = payload.schedule[index];
+    const ticksBefore = ticks, drawsBefore = draws;
+    if (action.action === 'tick') ++ticks;
+    else ++draws;
+    assert.equal(await driver.submit(action), true);
+    assert.deepEqual(pending.bytes, action.action === 'tick'
+      ? Uint8Array.from(payload.bundles[action.bundle].ports.flatMap(port =>
+        port.status_hex.match(/../g).map(byte => Number.parseInt(byte, 16))))
+      : new Uint8Array());
+    const observation = {last_action: {complete: true, schedule_index: index,
+      action: action.action, ordinal: action.action === 'tick' ? action.bundle : action.draw,
+      ...(action.action === 'tick' ? {bundle: action.bundle} : {}),
+      source_ticks_before: ticksBefore, source_ticks_after: ticks,
+      source_draws_before: drawsBefore, source_draws_after: draws,
+      source_frames_before: 0, source_frames_after: 0,
+      source_frames: 0, world_ticks: ticks,
+      observation: {idle_snapshot: {source_frame: 0}},
+      source_tick_input_pad_hex: action.action === 'tick'
+        ? payload.bundles[action.bundle].ports.map(port => port.status_hex).join('') : null}};
+    const comparison = index === evidence.checkpoints.c_action_index
+      ? {phase: 'C', decision: 'PASS_EXACT_DECLARED_C_F_FIELDS'}
+      : index === evidence.checkpoints.f_action_index
+        ? {phase: 'F', decision: 'PASS_EXACT_DECLARED_C_F_FIELDS'} : null;
+    assert.equal(await driver.accept(observation, comparison), true,
+      driver.status().first_error || `v2 action ${index} was refused`);
+  }
+  assert.equal(driver.status().complete, true);
+  assert.deepEqual(approvals, new Array(payload.schedule.length).fill(true));
+
+  const rejected = new StadiumSetupCfActionDriver({runtimePayload: payload,
+    native: {arm: () => 1, queue: () => 1, approve: () => assert.fail('bad receipt was acknowledged')}});
+  assert.equal(await rejected.arm(true), true);
+  assert.equal(await rejected.submit(payload.schedule[0]), true);
+  const badReceipt = {last_action: {complete: true, schedule_index: 0, action: 'tick',
+    ordinal: 0, bundle: 0, source_ticks_before: 0, source_ticks_after: 1,
+    source_draws_before: 0, source_draws_after: 0, source_frames_before: 0,
+    source_frames_after: 1, source_frames: 1, world_ticks: 1,
+    source_tick_input_pad_hex: 'ff'.repeat(44)}};
+  assert.equal(await rejected.accept(badReceipt), false);
+  assert.match(rejected.status().first_error, /receipt counters or literal consumed PAD/);
 });
 
 test('compares only the declared C/F scalars, named PPC flag masks, and owned source RNG', async () => {
@@ -405,4 +566,109 @@ test('async refusal and rejection at each native call remain sticky without adva
     assert.equal(await driver.submit(payload.schedule[0]), false);
     assert.equal(driver.status().first_error, first); assert.equal(calls, 1);
   }
+});
+
+
+// These are mocked owner-seam controls, not game execution or clock prediction.
+function clockReceipt(payload, index, before, after) {
+  const action = payload.schedule[index];
+  const ticks = payload.schedule.slice(0, index).filter(row => row.action === 'tick').length;
+  const draws = index - ticks;
+  return {last_action: {complete: true, schedule_index: index, action: action.action,
+    ordinal: action.action === 'tick' ? action.bundle : action.draw,
+    ...(action.action === 'tick' ? {bundle: action.bundle} : {}),
+    source_ticks_before: ticks, source_ticks_after: ticks + (action.action === 'tick' ? 1 : 0),
+    source_draws_before: draws, source_draws_after: draws + (action.action === 'draw' ? 1 : 0),
+    source_frames_before: before, source_frames_after: after, source_frames: after,
+    world_ticks: ticks + (action.action === 'tick' ? 1 : 0),
+    source_tick_input_pad_hex: action.action === 'tick'
+      ? payload.bundles[action.bundle].ports.map(port => port.status_hex).join('') : null,
+    observation: {idle_snapshot: {source_frame: after}}}};
+}
+
+function clockDriver() {
+  const payload = hostEvidenceFromPacket(run2Packet()).runtimePayload;
+  const approvals = [];
+  const driver = new StadiumSetupCfActionDriver({runtimePayload: payload,
+    native: {arm: () => 1, queue: () => 1,
+      approve: (index, accepted) => {approvals.push({index, accepted}); return 1;}}});
+  return {payload, driver, approvals};
+}
+
+test('v2 keeps the HUD-gated match clock separate from traversal ticks and acknowledges once', async () => {
+  const {payload, driver} = clockDriver();
+  assert.equal(await driver.arm(true), true);
+  // HUD0 Ready: traversal tick advances while match clock stays at zero.
+  assert.equal(await driver.submit(payload.schedule[0]), true);
+  assert.equal(await driver.accept(clockReceipt(payload, 0, 0, 0)), true);
+  assert.equal(await driver.submit(payload.schedule[1]), true);
+  assert.equal(await driver.accept(clockReceipt(payload, 1, 0, 0)), true);
+  // A source-eligible tick may instead advance the separate clock once.
+  assert.equal(await driver.submit(payload.schedule[2]), true);
+  assert.equal(await driver.accept(clockReceipt(payload, 2, 0, 1),
+    {phase: 'C', decision: 'PASS_EXACT_DECLARED_C_F_FIELDS'}), true);
+  assert.equal(await driver.submit(payload.schedule[3]), true);
+  assert.equal(await driver.accept(clockReceipt(payload, 3, 1, 1)), true);
+  assert.equal(await driver.accept(clockReceipt(payload, 3, 1, 1)), false);
+});
+
+test('v2 refuses clock mutation, discontinuity, malformed values and C/F receipt mismatch', async () => {
+  for (const [label, index, before, after] of [
+    ['clock before first tick changed while idle/queued', 0, 1, 1],
+    ['tick jumps twice', 0, 0, 2],
+    ['tick goes backward', 0, 0, -1],
+    ['tick clock malformed', 0, 0, 0.5],
+    ['tick clock overflow', 0, 0, 0x100000000],
+    ['draw changes clock', 1, 0, 1],
+    ['clock changes between acknowledgement and next action', 1, 1, 1],
+  ]) {
+    const {payload, driver, approvals} = clockDriver();
+    assert.equal(await driver.arm(true), true);
+    if (index === 1) {
+      assert.equal(await driver.submit(payload.schedule[0]), true);
+      assert.equal(await driver.accept(clockReceipt(payload, 0, 0, 0)), true);
+    }
+    assert.equal(await driver.submit(payload.schedule[index]), true);
+    assert.equal(await driver.accept(clockReceipt(payload, index, before, after)), false, label);
+    assert.match(driver.status().first_error, /match clock transition or continuity/, label);
+    assert.equal(approvals.length, index, label);
+  }
+  for (const [boundaryIndex, label] of [[2, 'C'], [4, 'F']]) {
+    const {payload, driver, approvals} = clockDriver();
+    assert.equal(await driver.arm(true), true);
+    for (let index = 0; index < boundaryIndex; ++index) {
+      assert.equal(await driver.submit(payload.schedule[index]), true);
+      const comparison = index === 2
+        ? {phase: 'C', decision: 'PASS_EXACT_DECLARED_C_F_FIELDS'} : null;
+      assert.equal(await driver.accept(clockReceipt(payload, index, 0, 0), comparison), true);
+    }
+    assert.equal(await driver.submit(payload.schedule[boundaryIndex]), true);
+    const mismatch = clockReceipt(payload, boundaryIndex, 0, 0);
+    mismatch.last_action.observation.idle_snapshot.source_frame = 1;
+    assert.equal(await driver.accept(mismatch,
+      {phase: label, decision: 'PASS_EXACT_DECLARED_C_F_FIELDS'}), false);
+    assert.match(driver.status().first_error, /snapshot match clock differs/);
+    assert.deepEqual(approvals.at(-1), {index: boundaryIndex, accepted: false});
+  }
+});
+
+test('native source clock predicate and owner wiring preserve separate wait/action ledgers', () => {
+  const source = readFileSync(new URL('../src/gameplay_menu_browser.cpp', import.meta.url), 'utf8');
+  const body = source.match(/bool matched_setup_cf_clock_transition\([^)]*\)\{([\s\S]*?)\n\}/)?.[1];
+  assert.ok(body, 'actual native transition predicate is present');
+  // Evaluate the unchanged boolean expression over bounded exact integers. This
+  // is source-predicate coverage only, not a native compilation/runtime claim.
+  const transition = new Function('tick_action', 'before', 'after', 'UINT32_MAX', body);
+  for (const [tick, before, after, expected] of [
+    [true, 0, 0, true], [true, 0, 1, true], [false, 0, 0, true],
+    [true, 0, 2, false], [true, 1, 0, false], [false, 0, 1, false],
+    [true, 0xffffffff, 0x100000000, false],
+  ]) assert.equal(transition(tick, before, after, 0xffffffff), expected);
+  const ownerStart = source.indexOf('void matched_setup_cf_check_owner(');
+  const owner = source.slice(ownerStart, source.indexOf('bool matched_setup_cf_service()', ownerStart));
+  assert.match(owner, /match->source_frames\(\)==state.last_source_frame_after/);
+  assert.match(owner, /match->source_frames\(\)==state.queued_source_frame_before/);
+  assert.doesNotMatch(owner, /match->source_frames\(\)==expected_ticks/);
+  assert.match(source, /matched_setup_cf_clock_transition\(tick_action,state.queued_source_frame_before,/);
+  assert.match(source, /state.idle.source_frame==state.last_source_frame_after/);
 });

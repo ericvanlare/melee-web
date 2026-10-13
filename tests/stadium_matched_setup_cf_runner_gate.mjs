@@ -4,6 +4,12 @@ const EXPORTS = Object.freeze({
   queue: '_melee_web_native_menu_stadium_first_sss_vs_setup_cf_queue',
   approve: '_melee_web_native_menu_stadium_first_sss_vs_setup_cf_approve',
 });
+export const PREFIX_V2_SCOPE = 'same-run completed Setup, then extracted run2 prefix from action0 through the next draw/tick/draw after dynamic C/F; terminal remains a proper prefix';
+const PREFIX_V2_EXPORTS = Object.freeze({
+  arm: '_melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_arm',
+  queue: '_melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_queue',
+  approve: '_melee_web_native_menu_stadium_first_sss_vs_setup_cf_approve',
+});
 function exactKeys(value, keys, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value) ||
       Object.keys(value).sort().join(',') !== [...keys].sort().join(','))
@@ -41,7 +47,8 @@ export function validateMatchedSetupCfPreflight(preflight, {enabled, packetPath,
   const frozen = preflight.matched_setup_cf;
   exactKeys(frozen, ['scope', 'packet', 'assembly_manifest', 'helper', 'diagnostic_exports'],
     'Matched Setup C/F preflight binding');
-  if (frozen.scope !== 'same-run completed Setup, then exact original 86-tick/85-draw prefix; compare C before draw84 and F before draw85')
+  if (frozen.scope !== 'same-run completed Setup, then exact original 86-tick/85-draw prefix; compare C before draw84 and F before draw85' &&
+      frozen.scope !== PREFIX_V2_SCOPE)
     throw new TypeError('Matched Setup C/F preflight scope differs');
   const expectedPaths = [
     ['packet', packetPath], ['assembly_manifest', assemblyPath], ['helper', helperPath],
@@ -57,7 +64,8 @@ export function validateMatchedSetupCfPreflight(preflight, {enabled, packetPath,
   }
   exactKeys(frozen.diagnostic_exports, ['arm', 'queue', 'approve'],
     'Matched Setup C/F diagnostic exports');
-  if (JSON.stringify(frozen.diagnostic_exports) !== JSON.stringify(EXPORTS))
+  const expectedExports = frozen.scope === PREFIX_V2_SCOPE ? PREFIX_V2_EXPORTS : EXPORTS;
+  if (JSON.stringify(frozen.diagnostic_exports) !== JSON.stringify(expectedExports))
     throw new TypeError('Matched Setup C/F native exports differ from the reviewed contract');
   return frozen;
 }

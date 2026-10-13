@@ -11,7 +11,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from stadium_idle_browser_schedule import (
-    EXPECTED_PACKET_SHA256, StadiumIdleScheduleError, _build_schedule,
+    EXPECTED_PACKET_SHA256, StadiumIdleScheduleError, _boundary_rng_observations, _build_schedule,
     _identity, _load_and_validate_api, _profile_provenance, _validate_source_manifest,
     _validate_retained_summaries,
 )
@@ -150,6 +150,38 @@ class StadiumIdleBrowserIdentityTests(unittest.TestCase):
 
 
 class StadiumIdleBrowserScheduleTests(unittest.TestCase):
+    def test_fresh_c_f_seed_words_bind_by_raw_sequence_and_dynamic_coordinates(self):
+        expected = {
+            "C": {"raw_identity": {"sequence": 9001, "event": "boundary",
+                "boundary": "source_tick", "source_tick": 42, "draw_ordinal": 40}},
+            "F": {"raw_identity": {"sequence": 9007, "event": "boundary",
+                "boundary": "source_tick", "source_tick": 43, "draw_ordinal": 41}},
+        }
+        rows = [{"ordinal": i, "sequence": 9001 if i == 0 else 9007 if i == 1 else 10_000 + i,
+                 "pointer_hex": "804d5f90",
+                 "seed_hex": f"{i + 1:08x}"} for i in range(3501)]
+        found = _boundary_rng_observations({"seed_observations": rows}, expected)
+        self.assertEqual(found, [
+            {"label": "C", "sequence": 9001, "source_tick": 42,
+             "draw_ordinal": 40, "post_go_ordinal": 0,
+             "pointer_hex": "804d5f90", "seed_hex": "00000001"},
+            {"label": "F", "sequence": 9007, "source_tick": 43,
+             "draw_ordinal": 41, "post_go_ordinal": 1,
+             "pointer_hex": "804d5f90", "seed_hex": "00000002"},
+        ])
+        swapped = copy.deepcopy(rows)
+        swapped[1]["sequence"] = 9001
+        with self.assertRaisesRegex(StadiumIdleScheduleError, "duplicate source sequence"):
+            _boundary_rng_observations({"seed_observations": swapped}, expected)
+        missing = copy.deepcopy(rows)
+        missing[1]["sequence"] = 9006
+        with self.assertRaisesRegex(StadiumIdleScheduleError, "does not match its raw source row"):
+            _boundary_rng_observations({"seed_observations": missing}, expected)
+        wrong_coord = copy.deepcopy(expected)
+        wrong_coord["F"]["raw_identity"]["sequence"] = 9002
+        with self.assertRaisesRegex(StadiumIdleScheduleError, "does not match its raw source row"):
+            _boundary_rng_observations({"seed_observations": rows}, wrong_coord)
+
     def test_dynamic_go_literal_ports_and_consecutive_ticks(self):
         for c_tick in (1, 2):
             with self.subTest(c_tick=c_tick):

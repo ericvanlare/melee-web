@@ -6,7 +6,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import test from 'node:test';
 import {validateMatchedSetupCfRequest, validateMatchedSetupCfPreflight,
-  validateMatchedSetupCfIdentities, matchedSetupCfRuntimeFailure}
+  validateMatchedSetupCfIdentities, matchedSetupCfRuntimeFailure, PREFIX_V2_SCOPE}
   from './stadium_matched_setup_cf_runner_gate.mjs';
 
 const CANDIDATE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -17,6 +17,11 @@ const SCOPE = 'same-run completed Setup, then exact original 86-tick/85-draw pre
 const EXPORTS = {
   arm: '_melee_web_native_menu_stadium_first_sss_vs_setup_cf_arm',
   queue: '_melee_web_native_menu_stadium_first_sss_vs_setup_cf_queue',
+  approve: '_melee_web_native_menu_stadium_first_sss_vs_setup_cf_approve',
+};
+const PREFIX_V2_EXPORTS = {
+  arm: '_melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_arm',
+  queue: '_melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_queue',
   approve: '_melee_web_native_menu_stadium_first_sss_vs_setup_cf_approve',
 };
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -31,8 +36,11 @@ test('the matched Setup C/F opt-in and preflight gate fail before server/browser
     /\['first-sss-vs-setup-cf', \{type: 'boolean', default: false\}\]/,
     'the continuation must remain opt-in by default');
   assert.match(runnerSource,
-    /source_request_scope: firstSssVsSetupCf\s*\? 'Strict same-run Entry and completed Setup comparison, then the exact original 86-tick\/85-draw schedule; compare C after tick84 before draw84 and F after tick85 before draw85, then stop\.'\s*:\s*firstSssVsSetup\s*\? `Strict Entry then checked async exact Stadium asset handoff and existing deferred Session Setup endpoint; stop before gameplay tick\/draw\/GO/,
-    'opt-in C/F scope must describe its schedule while default Setup scope remains stopped at Setup');
+    /source_request_scope: firstSssVsSetupCf\s*\? firstSssVsSetupCfV2\s*\?/,
+    'the v2 proper-prefix scope must be separately labeled');
+  assert.match(runnerSource,
+    /exact original 86-tick\/85-draw schedule; compare C after tick84 before draw84 and F after tick85 before draw85/,
+    'legacy v1 scope must retain its fixed schedule wording');
   assert.match(runnerSource, /await driver\.arm\(/,
     'arm must await the actual native export result');
   assert.match(runnerSource, /await driver\.submit\(/,
@@ -41,7 +49,7 @@ test('the matched Setup C/F opt-in and preflight gate fail before server/browser
     'cursor advancement must await native approval');
   assert.doesNotMatch(runnerSource, /adapter\.flush\(/,
     'native actions cannot be staged and acknowledged later');
-  const adapterStart = runnerSource.indexOf('function matchedSetupCfNativeAdapter()');
+  const adapterStart = runnerSource.indexOf('function matchedSetupCfNativeAdapter(');
   const adapterEnd = runnerSource.indexOf('async function runMatchedSetupCfContinuation', adapterStart);
   const adapterSource = runnerSource.slice(adapterStart, adapterEnd);
   assert.match(adapterSource, /executeMatchedSetupCfNativeCommand\(command\)/,
@@ -80,6 +88,10 @@ test('the matched Setup C/F opt-in and preflight gate fail before server/browser
   const preflight = {route_mode: 'first-sss-vs-setup', matched_setup_cf: frozen};
   assert.equal(validateMatchedSetupCfPreflight(preflight, {enabled: true,
     packetPath: packet, assemblyPath: assembly, helperPath: HELPER}), frozen);
+  const v2Frozen = {...frozen, scope: PREFIX_V2_SCOPE, diagnostic_exports: PREFIX_V2_EXPORTS};
+  assert.equal(validateMatchedSetupCfPreflight({route_mode: 'first-sss-vs-setup',
+    matched_setup_cf: v2Frozen}, {enabled: true, packetPath: packet,
+    assemblyPath: assembly, helperPath: HELPER}), v2Frozen);
   assert.throws(() => validateMatchedSetupCfPreflight({...preflight,
     matched_setup_cf: {...frozen, packet: {...packetId, path: `${packet}.other`}}},
   {enabled: true, packetPath: packet, assemblyPath: assembly, helperPath: HELPER}), /packet path/);
