@@ -323,6 +323,7 @@ FirstSssVsSetupState first_sss_vs_setup;
 struct MatchedSetupCfState {
  bool opted_in=false,armed=false,queued=false,awaiting_approval=false;
  bool failed=false,complete=false,last_action_complete=false;
+ bool explicit_step_mode=false,explicit_step_inflight=false;
  bool version2=false;
  uint32_t cursor=0,last_schedule_index=0,last_ordinal=0,last_bundle=UINT32_MAX;
  uint32_t action_count=171,c_action_index=168,f_action_index=170,c_source_tick=84,f_source_tick=85;
@@ -352,6 +353,13 @@ struct MatchedSetupCfState {
  std::string error,last_action_json;
 };
 MatchedSetupCfState matched_setup_cf;
+struct MatchedSetupCfRetirement {
+ bool native_retired=false,terminal=false;
+ int phase_after_close=-1,running_after_close=-1;
+ int pipeline_cache_before=-1,pipeline_cache_after=-1;
+ std::string receipt,error;
+};
+MatchedSetupCfRetirement matched_setup_cf_retirement;
 std::string matched_setup_cf_json();
 bool matched_setup_cf_service();
 struct FirstSssTextTailProbeState {
@@ -2970,6 +2978,21 @@ std::string matched_setup_cf_json(){
     <<",\"last_action\":"<<(state.last_action_json.empty()?"null":state.last_action_json)<<'}';
  return out.str();
 }
+std::string matched_setup_cf_retirement_json(){
+ std::ostringstream out;
+ out<<"{\"schema\":\"melee-web-stadium-matched-setup-cf-retirement-v1\""
+    <<",\"native_retired\":"<<(matched_setup_cf_retirement.native_retired?"true":"false")
+    <<",\"terminal\":"<<(matched_setup_cf_retirement.terminal?"true":"false")
+    <<",\"phase_after_close\":"<<matched_setup_cf_retirement.phase_after_close
+    <<",\"running_after_close\":"<<matched_setup_cf_retirement.running_after_close
+    <<",\"pipeline_cache_status_before_shutdown\":"<<matched_setup_cf_retirement.pipeline_cache_before
+    <<",\"pipeline_cache_status_after_shutdown\":"<<matched_setup_cf_retirement.pipeline_cache_after
+    <<",\"error\":"<<(matched_setup_cf_retirement.error.empty()?"null":
+        first_css_browser_draw_json_quote(matched_setup_cf_retirement.error))
+    <<",\"matched_setup_cf\":"<<(matched_setup_cf_retirement.receipt.empty()?"null":
+        matched_setup_cf_retirement.receipt)<<'}';
+ return out.str();
+}
 #endif
 
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
@@ -3058,6 +3081,11 @@ bool first_sss_vs_setup_service(){
 void tick(){
 #if defined(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC)
  if(match_draw_discard_terminal)return;
+#endif
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ // The opt-in source-action driver owns these stopped diagnostic callbacks.
+ // Its async export is the only path allowed to consume a queued action.
+ if(matched_setup_cf.explicit_step_mode)return;
 #endif
  // Consume owner failure and lifecycle suspension before source or clock work.
  // A hidden/frozen interval may contain no callback at all; its handoff leaves
@@ -4827,6 +4855,124 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_arm(
  matched_setup_cf_fail(error.what());return 0;
 }}
 
+int melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_explicit_arm(
+    const uint8_t* manifest,size_t manifest_bytes){try{
+ auto& state=matched_setup_cf;
+ check(!state.explicit_step_mode&&!state.explicit_step_inflight&&
+       !matched_setup_cf_retirement.native_retired&&
+       matched_setup_cf_retirement.receipt.empty(),
+       "Matched Setup C/F explicit-step owner is one-use");
+ matched_setup_cf_retirement=MatchedSetupCfRetirement{};
+ check(melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_arm(
+       manifest,manifest_bytes)==1,
+       "Matched Setup C/F v2 arm refused the explicit-step manifest");
+ check(state.version2&&state.armed&&!state.failed&&!state.complete&&
+       !state.queued&&!state.awaiting_approval,
+       "Matched Setup C/F explicit-step arm did not retain a fresh v2 owner");
+ state.explicit_step_mode=true;
+ // Pause and clear MainLoop.func. Asyncify resumes an exported call through
+ // MainLoop.resume when a function remains installed, which would re-enable
+ // RAF admission alongside the explicit host-owned step sequence.
+ emscripten_cancel_main_loop();
+ first_css_browser_draw_refresh_observation();return 1;
+}catch(const std::exception& error){
+ matched_setup_cf_fail(error.what());return 0;
+}}
+
+int melee_web_native_menu_stadium_first_sss_vs_setup_cf_step_once(){try{
+ auto& state=matched_setup_cf;
+ check(state.explicit_step_mode&&state.version2&&state.armed&&!state.failed&&
+       !state.complete&&!state.explicit_step_inflight&&state.queued&&
+       !state.awaiting_approval&&state.cursor==state.last_schedule_index,
+       "Matched Setup C/F explicit step is outside its one-use queued cursor");
+ state.explicit_step_inflight=true;
+ // Match tick()'s owner/lifecycle handoff before allowing any source work.
+ const int owner_action=EM_ASM_INT({return window.menuServiceCommands?.() || 0;});
+ if(owner_action<0){
+  matched_setup_cf_fail("Matched Setup C/F owner stopped before its explicit action");
+  running=false;faulted=true;menu_clock.reset();audio_clock.reset();
+  emscripten_cancel_main_loop();state.explicit_step_inflight=false;return 0;
+ }
+ if(owner_action==1){menu_clock.reset();audio_clock.reset();}
+ // This is the existing single-row service. It owns the original PAD/tick or
+ // Aurora draw path, source checks, and complete receipt; no tick is batched.
+ (void)matched_setup_cf_service();
+ state.explicit_step_inflight=false;
+ check(!state.failed&&!state.queued&&state.awaiting_approval&&
+       state.last_action_complete&&state.cursor==state.last_schedule_index,
+       "Matched Setup C/F explicit service returned without one completed pending receipt");
+ return 1;
+}catch(const std::exception& error){
+ matched_setup_cf.explicit_step_inflight=false;
+ matched_setup_cf_fail(error.what());return 0;
+}}
+
+int melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire_ready(){
+ auto& state=matched_setup_cf;
+ if(EM_ASM_INT({return !ABORT&&typeof Module.stadiumMatchedSetupNativeIdle==='function'&&
+                        Module.stadiumMatchedSetupNativeIdle()===true?1:0;})!=1) return -1;
+ const bool terminal=state.complete||state.failed||
+                     (state.awaiting_approval&&state.last_action_complete);
+ if(!state.explicit_step_mode||!state.version2||!state.armed||state.explicit_step_inflight||
+    !terminal||state.queued||!match||match.get()!=state.owner||!archive_cache||
+    archive_cache.get()!=state.cache_owner||!host||host!=state.host_owner||host_entered||
+    running||pending||(faulted&&!state.failed)||first_use_draw_pending||preparation.busy()||
+    preparation.phase()!=melee_web::MenuPreparationState::Phase::Idle||
+    asset_destination!=AssetDestination::None||menu_scene_rebuild_pending||replay||
+    melee_web_net_active()||melee_web_source_file_drive_busy()||
+    !melee_web_gameplay_world_exists()||melee_web_gameplay_generation()!=state.world_generation||
+    asset_generation!=state.asset_generation||!match->construction_complete()||
+    match->source_frames()!=state.last_source_frame_after) return -1;
+ const auto submission=aurora_browser_submission_status();
+ const auto* stats=aurora_get_stats();
+ if(!stats)return -1;
+ return stats->queuedPipelines==0&&submission.pendingFramePackets==0&&
+        submission.pendingStagingBuffers==0&&submission.workerBusy==0?1:0;
+}
+const char* melee_web_native_menu_stadium_first_sss_vs_setup_cf_retirement_status(){
+ static std::string status;status=matched_setup_cf_retirement_json();return status.c_str();
+}
+int melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire(){try{
+ check(!matched_setup_cf_retirement.native_retired&&
+       matched_setup_cf_retirement.receipt.empty(),
+       "Matched Setup C/F retirement is one-use");
+ check(melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire_ready()==1,
+       "Matched Setup C/F retirement requires a terminal owner and settled renderer");
+ check(EM_ASM_INT({return typeof window.menuMatchedSetupCfRetired==='function'?1:0;}),
+       "Matched Setup C/F runtime retirement callback is unavailable");
+ auto& state=matched_setup_cf;
+ matched_setup_cf_retirement.terminal=state.complete||state.failed||
+     (state.awaiting_approval&&state.last_action_complete);
+ matched_setup_cf_retirement.receipt=matched_setup_cf_json();
+ matched_setup_cf_retirement.pipeline_cache_before=
+     static_cast<int>(aurora_pipeline_cache_status());
+ // This diagnostic never resumes the regular loop or calls another source step.
+ // The exact terminal receipt above survives close(), which resets the live C/F owner.
+ emscripten_cancel_main_loop();
+ close();
+ matched_setup_cf_retirement.phase_after_close=melee_web_native_menu_phase();
+ matched_setup_cf_retirement.running_after_close=melee_web_native_menu_running();
+ check(!match&&!world&&!results&&!prize&&!host&&
+       matched_setup_cf_retirement.phase_after_close==0&&
+       matched_setup_cf_retirement.running_after_close==0,
+       "Matched Setup C/F native close left a live owner");
+ melee_web_input_shutdown();
+ // Aurora shutdown retains its existing opportunistic writer behavior. JS IDBFS
+ // persistence and the top-level render-cache flush boundary remain unrun here.
+ aurora_shutdown();
+ matched_setup_cf_retirement.pipeline_cache_after=
+     static_cast<int>(aurora_pipeline_cache_status());
+ matched_setup_cf_retirement.native_retired=true;
+ matched_setup_cf_retirement.error.clear();
+ const std::string status=matched_setup_cf_retirement_json();
+ check(EM_ASM_INT({return window.menuMatchedSetupCfRetired(
+       JSON.parse(UTF8ToString($0)))===true?1:0;},status.c_str()),
+       "Matched Setup C/F native retirement completed but runtime notification was refused");
+ return 1;
+}catch(const std::exception& error){
+ if(matched_setup_cf_retirement.error.empty())matched_setup_cf_retirement.error=error.what();
+ message=error.what();return 0;
+}}
 int melee_web_native_menu_stadium_first_sss_vs_setup_cf_queue(
     unsigned schedule_index,int action_kind,unsigned ordinal,int bundle,
     const uint8_t* bytes,size_t byte_count){try{
@@ -5116,5 +5262,16 @@ int main(int argc,char** argv){
  GXInit(fifo,sizeof(fifo));
 #endif
  if(!melee_web_input_startup())return 1;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ // The private host runner checks this closure before every matched Setup
+ // native getter/export. It must remain false while Asyncify is unwinding,
+ // rewinding, retaining currData, or after a runtime abort.
+ if(!EM_ASM_INT({
+   if(typeof Module!=='object'||typeof Asyncify!=='object')return 0;
+   Module.stadiumMatchedSetupNativeIdle=()=>
+     !ABORT&&Asyncify.state===Asyncify.State.Normal&&Asyncify.currData===null;
+   return 1;
+ }))return 1;
+#endif
  emscripten_set_main_loop(tick,0,1);return 0;
 }

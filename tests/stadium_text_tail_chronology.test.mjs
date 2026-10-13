@@ -2,9 +2,13 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import vm from 'node:vm';
+import {guardMatchedSetupCfNativeCleanup,
+  matchedSetupCfNativeAccessAllowed} from './stadium_matched_setup_cf_runner_gate.mjs';
 
 const runnerPath = new URL('./stadium_c1a_browser_test.mjs', import.meta.url);
 const runnerSource = await fs.readFile(runnerPath, 'utf8');
+const idleMatch = runnerSource.match(/async function assertMatchedSetupCfAsyncifyIdle\(label\) \{[\s\S]*?\n\}/);
+assert.ok(idleMatch, 'Actual default-off Asyncify idle helper is present');
 const cleanupMatch = runnerSource.match(/async function cleanupOwnedProcesses\(\) \{[\s\S]*?\n\}/);
 assert.ok(cleanupMatch, 'Actual cleanupOwnedProcesses function is present');
 
@@ -32,6 +36,14 @@ async function exerciseCleanup({unloadAttemptedInitially, unloadCompletedInitial
     }}},
   };
   const sandbox = {
+    // Cleanup chronology here covers the ordinary default-off route.
+    guardMatchedSetupCfNativeCleanup,
+    matchedSetupCfNativeAccessAllowed,
+    firstSssVsSetupCfExplicitStep: false,
+    pendingMatchedSetupCfExplicitStep: null,
+    matchedSetupCfExplicitAsyncifyUnsafe: false,
+    matchedSetupCfExplicitNativeAccessClosed: false,
+    matchedSetupCfExplicitArmed: false,
     LIMITS: {cleanupTotalMs: 10000, cleanupMs: 5000},
     cleanupDeadline: 0,
     cleanupRemaining: () => 5000,
@@ -85,7 +97,7 @@ async function exerciseCleanup({unloadAttemptedInitially, unloadCompletedInitial
     cleanupServer: async () => {},
   };
   const context = vm.createContext(sandbox);
-  new vm.Script(cleanupMatch[0] + '\nglobalThis.runActualCleanup = cleanupOwnedProcesses;')
+  new vm.Script(idleMatch[0] + '\n' + cleanupMatch[0] + '\nglobalThis.runActualCleanup = cleanupOwnedProcesses;')
     .runInContext(context);
   await context.runActualCleanup();
   return {report, events, genuinePreUnloadLog, genuinePreUnloadValidation,

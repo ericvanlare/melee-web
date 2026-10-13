@@ -96,6 +96,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   let keyboard = [true, true], layout = 'two';
   const commands = [], listeners = [];
   let terminalDrawDiscardRetirementConsumed = false;
+  let terminalMatchedSetupCfRetirementConsumed = false;
   let diagnostics = null, diagnosticActive = true, longtaskObserver = null, diagnosticPreparationAt = null;
   let diagnosticDelivery = null, diagnosticDeliveryTimer = null, diagnosticRetainedLoaded = false;
   let diagnosticMatureDeliveryPromise = null;
@@ -307,7 +308,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       ready = true; publish(); resolveStartup();
     },
   };
-  const status = () => ready ? Module.UTF8ToString(Module._melee_web_native_menu_message()) : 'Starting WebGPU…';
+  const status = () => terminalMatchedSetupCfRetirementConsumed ? 'Native diagnostic owner retired.' : ready ? Module.UTF8ToString(Module._melee_web_native_menu_message()) : 'Starting WebGPU…';
   const check = result => { if (!result) throw Error(status()); return result; };
   const numericProgress = (value, fallback = 0) => Number.isFinite(Number(value)) ? Math.max(0, Math.floor(Number(value))) : fallback;
   function readNativeCacheIdle() {
@@ -379,8 +380,10 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   }
   function snapshot() {
     refreshCatalogLoading();
-    const phase = ready && !fatal && !destroyed ? Module._melee_web_native_menu_phase() : 0;
-    const running = ready && !fatal && !destroyed && !!Module._melee_web_native_menu_running();
+    const phase = ready && !fatal && !destroyed && !terminalMatchedSetupCfRetirementConsumed
+      ? Module._melee_web_native_menu_phase() : 0;
+    const running = ready && !fatal && !destroyed && !terminalMatchedSetupCfRetirementConsumed &&
+      !!Module._melee_web_native_menu_running();
     const scene = SCENES[phase] || 'idle';
     const active = ['css', 'sss', 'title', 'main', 'opening', 'opening-vs',
       'match', 'results', 'prize'].includes(scene);
@@ -633,6 +636,26 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       terminalDrawDiscardRetirementConsumed = true;
       diagnosticLifecycle('scene_exit');
       publish(); // Derive diagnostic activity from the actual inactive owner.
+      return diagnosticActive === false;
+    },
+    // The explicit-step Stadium path supplies its immutable C/F receipt from
+    // native retirement. This callback deliberately reads no native exports:
+    // the awaited ccall owns teardown and the host checks Asyncify idle after it settles.
+    menuMatchedSetupCfRetired(receipt) {
+      if (!ready || fatal || destroyed || terminalMatchedSetupCfRetirementConsumed ||
+          receipt?.schema !== 'melee-web-stadium-matched-setup-cf-retirement-v1' ||
+          receipt.native_retired !== true || receipt.terminal !== true || receipt.error !== null ||
+          receipt.phase_after_close !== 0 || receipt.running_after_close !== 0) return false;
+      const state = receipt.matched_setup_cf;
+      if (!state || state.queued === true ||
+          (state.complete === true && state.error !== null) ||
+          (state.failed === true && typeof state.error !== 'string') ||
+          !(state.complete === true || state.failed === true ||
+            (state.awaiting_approval === true && state.last_action?.complete === true)) ||
+          !['complete', 'failed', 'awaiting-approval'].includes(state.state)) return false;
+      terminalMatchedSetupCfRetirementConsumed = true;
+      diagnosticLifecycle('scene_exit');
+      publish();
       return diagnosticActive === false;
     },
     menuFrame(wasRunning) {

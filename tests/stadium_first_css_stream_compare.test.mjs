@@ -1265,7 +1265,10 @@ test('VS Entry uses the actual prefix reader live phase/running shape before inv
     UTF8ToString: () => JSON.stringify(raw), _melee_web_native_menu_phase: () => 5,
     _melee_web_native_menu_running: () => 0};
   try {
-    const {prefix, entry, check} = new Function('assert', 'page', `${definitions}; return {
+    const {prefix, entry, check} = new Function('assert', 'page',
+      `const firstSssVsSetupCfExplicitStep = false;
+       let matchedSetupCfExplicitAsyncifyUnsafe = false;
+       ${definitions}; return {
       prefix:readFirstSssPrefixObservation,entry:readFirstSssVsEntryObservation,
       check:assertFirstSssVsEntryUnchanged};`)(assert, {evaluate: async fn => fn()});
     const before = (await prefix()).native;

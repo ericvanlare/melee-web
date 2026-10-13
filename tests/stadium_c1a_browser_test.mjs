@@ -17,7 +17,9 @@ import {firstSssAudioAccounting} from './stadium_first_css_stream_compare.mjs';
 import {createCssSssTransitionCapture, CSS_SSS_TRANSITION_LIMITS,
   cssReadinessEvidence, cssSssOutcome, hasCssMenuReadiness} from './stadium_c1a_css_sss_reducer.mjs';
 import {validateMatchedSetupCfRequest, validateMatchedSetupCfPreflight,
-  validateMatchedSetupCfIdentities, matchedSetupCfRuntimeFailure, PREFIX_V2_SCOPE}
+  validateMatchedSetupCfIdentities, matchedSetupCfRuntimeFailure, PREFIX_V2_SCOPE,
+  trackMatchedSetupCfExplicitStep, matchedSetupCfNativeAccessAllowed,
+  dispatchMatchedSetupCfNativeEvaluation, guardMatchedSetupCfNativeCleanup}
   from './stadium_matched_setup_cf_runner_gate.mjs';
 import {elapsedMs, measureAsync, measureSync, monotonicNowNs, roundMs,
   summarizeFailedActionSamples, summarizeStageEvents, summarizeTimingValues}
@@ -45,13 +47,16 @@ const {values} = parseArgs({options: Object.fromEntries(
       ['first-sss-vs-entry', {type: 'boolean', default: false}],
       ['first-sss-vs-setup', {type: 'boolean', default: false}],
       ['first-sss-vs-setup-cf', {type: 'boolean', default: false}],
+      ['first-sss-vs-setup-cf-explicit-step', {type: 'boolean', default: false}],
       ['first-sss-vs-setup-text-tail', {type: 'boolean', default: false}],
     ])), strict: true});
 const cssSssReducer = values['css-sss-reducer'];
 const firstSssVsSetup = values['first-sss-vs-setup'];
 const firstSssVsSetupTextTail = values['first-sss-vs-setup-text-tail'];
+const firstSssVsSetupCfExplicitStep = values['first-sss-vs-setup-cf-explicit-step'];
 const firstSssVsSetupCf = validateMatchedSetupCfRequest({
-  enabled: values['first-sss-vs-setup-cf'], setup: firstSssVsSetup,
+  enabled: values['first-sss-vs-setup-cf'], explicitStep: firstSssVsSetupCfExplicitStep,
+  setup: firstSssVsSetup,
   textTail: firstSssVsSetupTextTail,
   packetPath: values['first-sss-vs-setup-cf-packet'] || null,
   assemblyPath: values['first-sss-vs-setup-cf-assembly'] || null,
@@ -114,6 +119,7 @@ const preflightBytes = await fs.readFile(preflightPath);
 const preflight = JSON.parse(preflightBytes.toString('utf8'));
 const matchedSetupCfPreflight = validateMatchedSetupCfPreflight(preflight, {
   enabled: firstSssVsSetupCf,
+  explicitStep: firstSssVsSetupCfExplicitStep,
   packetPath: values['first-sss-vs-setup-cf-packet']
     ? path.resolve(values['first-sss-vs-setup-cf-packet']) : null,
   assemblyPath: values['first-sss-vs-setup-cf-assembly']
@@ -127,6 +133,7 @@ const matchedSetupCfTiming = firstSssVsSetupCfV2 ? {
   actionLoopMs: null, globalCaptureDeadlineRemainingAtActionLoopStartMs: null,
   queueRpcMsByIndex: new Map(), approvalRpcMsByIndex: new Map(),
   persistence: [], currentActionSample: null,
+  explicitStep: firstSssVsSetupCfExplicitStep,
 } : null;
 const finishMatchedSetupCfActionLoop = () => {
   if (!matchedSetupCfTiming?.actionLoopActive) return;
@@ -157,8 +164,8 @@ const timedActionSync = (sample, stage, field, operation, after = null) => {
 };
 const summarizeMatchedSetupCfTiming = timing => {
   const fields = ['action_wall_ms', 'queue_ms', 'queue_rpc_ms', 'post_submit_receipt_ms',
-    'receipt_read_ms', 'first_read_ms', 'poll_wait_ms', 'before_diagnostics_ms',
-    'before_snapshot_ms', 'compare_ms', 'accept_ms', 'approval_rpc_ms',
+    'receipt_read_ms', 'first_read_ms', 'poll_wait_ms', 'explicit_step_ms',
+    'before_diagnostics_ms', 'before_snapshot_ms', 'compare_ms', 'accept_ms', 'approval_rpc_ms',
     'after_diagnostics_ms', 'after_snapshot_ms'];
   const summarizeRows = rows => ({
     count: rows.length,
@@ -214,7 +221,8 @@ const summarizeMatchedSetupCfTiming = timing => {
       interpretation: 'Measurements are inclusive and nested. Do not add category totals or infer native/source time from these host intervals.',
       nesting: {
         queue_rpc_ms: 'subset of queue_ms; queue_ms measures driver.submit from call through resolution/rejection.',
-        post_submit_receipt_ms: 'starts only after driver.submit resolves and ends at the matching receipt or a failed read/wait/check; it excludes queue_ms and includes receipt reads and conditional waits.',
+        post_submit_receipt_ms: 'starts only after driver.submit resolves and ends at the matching receipt or a failed read/wait/check; it excludes queue_ms and includes the explicit native service call when enabled, receipt reads, and any legacy conditional waits.',
+        explicit_step_ms: 'the explicit async Module.ccall service call, nested in post_submit_receipt_ms and action_wall_ms; it measures host-observed call completion, not a GPU queue fence.',
         receipt_read_ms: 'sum of attempted readFirstSssVsEntryObservation waits, including a rejected read; reads are inside post_submit_receipt_ms when that interval has started.',
         poll_wait_ms: 'sum of attempted existing 50 ms waits, including a rejected wait; waits are inside post_submit_receipt_ms.',
         approval_rpc_ms: 'subset of accept_ms; accept_ms measures driver.accept through resolution/rejection.',
@@ -388,6 +396,11 @@ let context = null;
 let page = null;
 let driver = null;
 let nativeObservation = null;
+let pendingMatchedSetupCfExplicitStep = null;
+let matchedSetupCfExplicitAsyncifyUnsafe = false;
+let matchedSetupCfExplicitArmed = false;
+let matchedSetupCfExplicitRetirementAttempted = false;
+let matchedSetupCfExplicitNativeAccessClosed = false;
 let unloadAttempted = false;
 let requestRows = [];
 let responseRows = [];
@@ -864,9 +877,13 @@ async function saveScreenshot(name) {
   return item;
 }
 
-function nativeSnapshot() {
-  return page.evaluate(() => {
+async function nativeSnapshot() {
+  const snapshot = await page.evaluate(requireAsyncifyIdle => {
     const module = globalThis.Module;
+    if (requireAsyncifyIdle &&
+        (typeof module?.stadiumMatchedSetupNativeIdle !== 'function' ||
+         module.stadiumMatchedSetupNativeIdle() !== true))
+      return {__native_asyncify_idle: false};
     const pointer = module?._melee_web_native_menu_message?.();
     const detail = module?._melee_web_native_menu_diagnostics?.();
     return {
@@ -876,7 +893,12 @@ function nativeSnapshot() {
       diagnostics: detail ? module.UTF8ToString(detail) : null,
       error: document.querySelector('#status')?.dataset.runtimeError || null,
     };
-  });
+  }, firstSssVsSetupCfExplicitStep);
+  if (snapshot?.__native_asyncify_idle === false) {
+    matchedSetupCfExplicitAsyncifyUnsafe = true;
+    throw Error('Asyncify is not idle; native snapshot was suppressed');
+  }
+  return snapshot;
 }
 
 async function sourceSnapshot(label) {
@@ -2068,8 +2090,12 @@ async function runFirstSssPrefix(constructorNative, firstDrawNative) {
 }
 
 async function readFirstSssVsEntryObservation() {
-  return page.evaluate(() => {
+  const native = await page.evaluate(requireAsyncifyIdle => {
     const module = globalThis.Module;
+    if (requireAsyncifyIdle &&
+        (typeof module?.stadiumMatchedSetupNativeIdle !== 'function' ||
+         module.stadiumMatchedSetupNativeIdle() !== true))
+      return {__native_asyncify_idle: false};
     const pointer = module?._melee_web_native_menu_stadium_first_css_draw_observe?.();
     const observation = pointer ? JSON.parse(module.UTF8ToString(pointer)) : null;
     const native = observation ? {...observation,
@@ -2078,7 +2104,88 @@ async function readFirstSssVsEntryObservation() {
     // Preserve callback ordering and thrown errors, but keep its unused rows in-page.
     globalThis.__meleeWebStadiumFirstSssPrefixRead?.() ?? null;
     return native;
-  });
+  }, firstSssVsSetupCfExplicitStep);
+  if (native?.__native_asyncify_idle === false) {
+    matchedSetupCfExplicitAsyncifyUnsafe = true;
+    throw Error('Asyncify is not idle; VS Entry native observation was suppressed');
+  }
+  return native;
+}
+
+async function assertMatchedSetupCfAsyncifyIdle(label) {
+  if (!firstSssVsSetupCfExplicitStep) return true;
+  const idle = await timeout(page.evaluate(() => {
+    const predicate = globalThis.Module?.stadiumMatchedSetupNativeIdle;
+    return typeof predicate === 'function' && predicate() === true;
+  }), Math.min(2000, remaining()), label);
+  if (idle !== true) {
+    matchedSetupCfExplicitAsyncifyUnsafe = true;
+    throw Error('Asyncify is not idle; native operation was suppressed');
+  }
+  return true;
+}
+async function retireMatchedSetupCfExplicitNative({cleanupPath = false} = {}) {
+  if (!matchedSetupCfExplicitArmed)
+    throw Error('Explicit C/F retirement requested before the native owner was armed');
+  if (matchedSetupCfExplicitRetirementAttempted)
+    throw Error('Explicit C/F retirement is one-use and was already attempted');
+  matchedSetupCfExplicitRetirementAttempted = true;
+  matchedSetupCfExplicitNativeAccessClosed = true;
+  unloadAttempted = true;
+  report.cleanup.unload_attempted = true;
+  report.cleanup.unload_method = 'one-shot-native-retirement';
+  report.cleanup.matched_setup_cf_retirement ??= {
+    attempts: 0, readiness_observations: 0,
+    javascript_idbfs_persistence: 'not_run',
+    ordinary_unload_cache_parity: 'not_claimed',
+  };
+  const evidence = report.cleanup.matched_setup_cf_retirement;
+  evidence.attempts += 1;
+  const budget = () => cleanupPath
+    ? cleanupRemaining(LIMITS.cleanupMs) : remaining(LIMITS.unloadMs);
+  let ready;
+  for (;;) {
+    const response = await timeout(executeMatchedSetupCfNativeCommand({
+      kind: 'retire-ready', requireAsyncifyIdle: true}),
+    Math.min(1000, budget()), 'Check explicit C/F retirement readiness');
+    ++evidence.readiness_observations;
+    if (response?.asyncify_idle !== true) {
+      matchedSetupCfExplicitAsyncifyUnsafe = true;
+      throw Error('Asyncify idle proof failed before native retirement');
+    }
+    ready = response.ready;
+    if (ready === 1) break;
+    if (ready !== 0)
+      throw Error(response?.message || 'Native owner refused explicit C/F retirement readiness');
+    await page.waitForTimeout(Math.min(20, budget()));
+  }
+  evidence.readiness = 'ready';
+  const response = await timeout(executeMatchedSetupCfNativeCommand({
+    kind: 'retire-explicit', requireAsyncifyIdle: true}),
+  Math.min(LIMITS.unloadMs, budget()), 'Await explicit C/F native retirement');
+  if (response?.asyncify_idle !== true) {
+    matchedSetupCfExplicitAsyncifyUnsafe = true;
+    throw Error('Asyncify did not return to a safe idle state after native retirement');
+  }
+  evidence.result = response.result;
+  evidence.retirement = response.retirement;
+  evidence.post_retirement_native = {phase: response.phase, running: response.running};
+  evidence.pipeline_cache_status_before_shutdown =
+    response.retirement?.pipeline_cache_status_before_shutdown ?? null;
+  evidence.pipeline_cache_status_after_shutdown =
+    response.retirement?.pipeline_cache_status_after_shutdown ?? null;
+  evidence.javascript_idbfs_persistence = 'not_run';
+  evidence.ordinary_unload_cache_parity = 'not_claimed';
+  await persistReport();
+  if (response.result !== 1 || response.retirement?.native_retired !== true ||
+      response.retirement?.terminal !== true || response.retirement?.error !== null ||
+      response.phase !== 0 || response.running !== 0)
+    throw Error(response.message || response.retirement?.error ||
+      'Explicit C/F native retirement did not prove a stopped, retired owner');
+  report.cleanup.unload_completed = true;
+  report.cleanup.native_retired = true;
+  matchedSetupCfExplicitNativeAccessClosed = false;
+  return response.retirement;
 }
 
 async function enableFirstSssTextTailProbe() {
@@ -2337,9 +2444,16 @@ async function runFirstSssVsSetup(entryNative) {
 }
 
 async function executeMatchedSetupCfNativeCommand(command) {
-  const response = await page.evaluate(({kind, scheduleIndex, action, ordinal, bundle, bytes,
-    manifestBytes, accepted}) => {
+  const evaluatePromise = dispatchMatchedSetupCfNativeEvaluation({
+    command, pendingStep: pendingMatchedSetupCfExplicitStep,
+    dispatch: () => page.evaluate(({kind, scheduleIndex, action, ordinal, bundle, bytes,
+    manifestBytes, accepted, requireAsyncifyIdle}) => {
     const module = globalThis.Module;
+    const asyncifyIdle = () => typeof module?.stadiumMatchedSetupNativeIdle === 'function' &&
+      module.stadiumMatchedSetupNativeIdle() === true;
+    if (requireAsyncifyIdle && !asyncifyIdle())
+      return {result: 0, message: 'Asyncify is not idle; native command was suppressed',
+        asyncify_idle: false};
     const readMessage = () => {
       const pointer = module?._melee_web_native_menu_message?.();
       return pointer ? module.UTF8ToString(pointer) : null;
@@ -2350,6 +2464,17 @@ async function executeMatchedSetupCfNativeCommand(command) {
       if (typeof fn !== 'function') return {result: 0, message: 'Matched Setup C/F arm export is absent'};
       const result = fn();
       return {result, message: result === 1 ? null : readMessage()};
+    }
+    if (kind === 'arm-explicit-v2') {
+      const fn = module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_explicit_arm;
+      if (typeof fn !== 'function') return {result: 0, message: 'Matched Setup C/F explicit arm export is absent'};
+      const pointer = module._malloc(manifestBytes.length);
+      if (!pointer) return {result: 0, message: 'Matched Setup C/F explicit manifest allocation failed'};
+      try {
+        module.HEAPU8.set(manifestBytes, pointer);
+        const result = fn(pointer, manifestBytes.length);
+        return {result, message: result === 1 ? null : readMessage()};
+      } finally { module._free(pointer); }
     }
     if (kind === 'arm-v2') {
       const fn = module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_arm;
@@ -2376,6 +2501,67 @@ async function executeMatchedSetupCfNativeCommand(command) {
         if (pointer) module._free(pointer);
       }
     }
+    if (kind === 'step-explicit') {
+      if (typeof module.ccall !== 'function')
+        throw Error('Matched Setup C/F explicit step requires generated runtime ccall');
+      const call = module.ccall(
+        'melee_web_native_menu_stadium_first_sss_vs_setup_cf_step_once',
+        'number', [], [], {async: true});
+      if (!call || typeof call.then !== 'function')
+        throw Error('Generated explicit native step did not return its Asyncify promise');
+      return Promise.resolve(call).then(result => {
+        const idle = asyncifyIdle();
+        return {result, message: idle ? result === 1 ? null : readMessage() : null,
+          asyncify_idle: idle};
+      }, error => {
+        const idle = asyncifyIdle();
+        const rejection = String(error?.message || error);
+        const nativeMessage = idle ? readMessage() : null;
+        return {result: 0,
+          message: idle ? `${nativeMessage || 'Asyncify native step rejected'}: ${rejection}`
+            : `Asyncify became unsafe after native step rejection: ${rejection}`,
+          asyncify_idle: idle};
+      });
+    }
+    if (kind === 'retire-ready') {
+      if (!asyncifyIdle()) return {ready: -1, asyncify_idle: false};
+      const fn = module?._melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire_ready;
+      if (typeof fn !== 'function')
+        return {ready: -1, asyncify_idle: true, message: 'Matched Setup C/F retire-ready export is absent'};
+      return {ready: fn(), asyncify_idle: true};
+    }
+    if (kind === 'retire-explicit') {
+      if (!asyncifyIdle()) return {result: 0, asyncify_idle: false};
+      if (typeof module.ccall !== 'function')
+        throw Error('Matched Setup C/F retirement requires generated runtime ccall');
+      const call = module.ccall(
+        'melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire',
+        'number', [], [], {async: true});
+      if (!call || typeof call.then !== 'function')
+        throw Error('Generated native retirement did not return its Asyncify promise');
+      const settled = result => {
+        const idle = asyncifyIdle();
+        if (!idle) return {result, asyncify_idle: false};
+        const statusFn = module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_retirement_status;
+        let retirement = null;
+        if (typeof statusFn === 'function') {
+          const pointer = statusFn();
+          retirement = pointer ? JSON.parse(module.UTF8ToString(pointer)) : null;
+        }
+        return {result, asyncify_idle: true, retirement,
+          phase: module._melee_web_native_menu_phase(),
+          running: module._melee_web_native_menu_running(),
+          message: result === 1 ? null : readMessage()};
+      };
+      return Promise.resolve(call).then(settled, error => {
+        const idle = asyncifyIdle();
+        if (!idle) return {result: 0, asyncify_idle: false,
+          rejection: String(error?.message || error)};
+        const response = settled(0);
+        response.rejection = String(error?.message || error);
+        return response;
+      });
+    }
     if (kind === 'queue-v2') {
       const fn = module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_queue;
       if (typeof fn !== 'function') return {result: 0, message: 'Matched Setup C/F v2 queue export is absent'};
@@ -2390,23 +2576,76 @@ async function executeMatchedSetupCfNativeCommand(command) {
       return {result, message: result === 1 ? null : readMessage()};
     }
     return {result: 0, message: `Unknown matched Setup C/F native command ${kind}`};
-  }, command);
-  return response;
+  }, command)});
+  if (command.kind === 'step-explicit' || command.kind === 'retire-explicit') {
+    const tracked = trackMatchedSetupCfExplicitStep(evaluatePromise, state => {
+      state.asyncifyIdle = state.value?.asyncify_idle === true;
+    });
+    tracked.requiresAsyncifyIdle = true;
+    tracked.scheduleIndex = command.scheduleIndex ?? null;
+    tracked.commandKind = command.kind;
+    tracked.outcome = 'pending';
+    tracked.promise = tracked.promise.then(value => {
+      tracked.outcome = 'resolved';
+      return value;
+    }, error => {
+      tracked.outcome = 'rejected';
+      tracked.error = errorText(error);
+      throw error;
+    });
+    pendingMatchedSetupCfExplicitStep = tracked;
+    return tracked.promise;
+  }
+  return evaluatePromise;
 }
 
-function matchedSetupCfNativeAdapter({mode, manifestBytes}) {
+function matchedSetupCfNativeAdapter({mode, manifestBytes, explicitStep = false}) {
   const execute = async (command, label) => {
-    const response = await timeout(executeMatchedSetupCfNativeCommand(command),
-      Math.min(5000, remaining()), label);
+    const explicitArm = command.kind === 'arm-explicit-v2';
+    if (explicitArm) {
+      // The native arm may cancel RAF before its page response reaches the host.
+      // Until confirmed success, neither a lost response nor native result 0
+      // proves that the ordinary command loop is still available for cleanup.
+      matchedSetupCfExplicitNativeAccessClosed = true;
+      report.cleanup.matched_setup_cf_arm_outcome = 'dispatched-uncertain';
+    }
+    let response;
+    try {
+      response = await timeout(executeMatchedSetupCfNativeCommand({
+        ...command, requireAsyncifyIdle: explicitStep}),
+        Math.min(5000, remaining()), label);
+    } catch (error) {
+      if (explicitStep) {
+        // Host timeout/rejection does not cancel a possibly applied command or
+        // yielded step. Even late settlement cannot reopen native cleanup.
+        matchedSetupCfExplicitNativeAccessClosed = true;
+        matchedSetupCfExplicitAsyncifyUnsafe = true;
+        if (explicitArm)
+          report.cleanup.matched_setup_cf_arm_outcome = 'response-uncertain';
+      }
+      throw error;
+    }
+    if (explicitStep && response?.asyncify_idle === false)
+      matchedSetupCfExplicitAsyncifyUnsafe = true;
+    if (command.kind === 'step-explicit' && response?.asyncify_idle !== true)
+      throw Error('Explicit Asyncify step settled without a safe native-idle state');
     if (response?.result !== 1)
       throw Error(response?.message || `${label} was refused by the native owner`);
+    if (explicitArm) {
+      matchedSetupCfExplicitArmed = true;
+      matchedSetupCfExplicitNativeAccessClosed = false;
+      report.cleanup.matched_setup_cf_arm_outcome = 'confirmed-armed';
+    }
     return response.result;
   };
   return {
     arm: async suppliedManifest => mode === 'run2-proper-prefix-v2'
-      ? execute({kind: 'arm-v2', manifestBytes: Array.from(suppliedManifest)},
+      ? execute({kind: explicitStep ? 'arm-explicit-v2' : 'arm-v2',
+        manifestBytes: Array.from(suppliedManifest)},
         'Arm the one-use run2 proper-prefix continuation')
       : execute({kind: 'arm'}, 'Arm the one-use matched Setup C/F continuation'),
+    step: async scheduleIndex => execute({kind: 'step-explicit', scheduleIndex},
+      `Service explicit run2 source action ${scheduleIndex}`),
     queue: async (scheduleIndex, action, bytes) => {
       const actionSample = matchedSetupCfTiming?.currentActionSample ?? null;
       const queueOperation = () => mode === 'run2-proper-prefix-v2'
@@ -2464,6 +2703,9 @@ async function runMatchedSetupCfContinuation(setupNative) {
     host_helper: inputs.helperIdentity, assembly_schema: inputs.assemblySchema,
     runtime_payload_sha256: inputs.runtimePayloadSha256,
     schedule_actions: hostEvidence.runtimePayload.schedule.length,
+    explicit_step_mode: firstSssVsSetupCfExplicitStep,
+    asyncify_idle_predicate: firstSssVsSetupCfExplicitStep
+      ? 'Module.stadiumMatchedSetupNativeIdle' : null,
     input_bundles: hostEvidence.runtimePayload.bundles.length,
     setup_comparison: structuredClone(setupStatus), branch: 0,
     actions: [], host_comparisons: [], runtime_diagnostics: [], last_native_state: null,
@@ -2526,6 +2768,7 @@ async function runMatchedSetupCfContinuation(setupNative) {
     coordinates: hostEvidence.coordinates ?? null,
   });
   const nativeAdapter = matchedSetupCfNativeAdapter({mode,
+    explicitStep: firstSssVsSetupCfExplicitStep,
     manifestBytes: isV2 ? helper.encodeRun2NativeManifest(hostEvidence.runtimePayload) : null});
   const driver = new helper.StadiumSetupCfActionDriver({
     runtimePayload: hostEvidence.runtimePayload, native: nativeAdapter});
@@ -2561,7 +2804,8 @@ async function runMatchedSetupCfContinuation(setupNative) {
         schedule_index: scheduleIndex, action: action.action,
         phase: scheduleIndex < cIndex ? 'before_c' : scheduleIndex <= fIndex ? 'c_through_f' : 'after_f',
         completed: false, stage_events: [], queue_ms: null, queue_rpc_ms: null,
-        post_submit_receipt_ms: null, receipt_reads: 0, first_read_ms: null,
+        post_submit_receipt_ms: null, explicit_step_ms: null,
+        receipt_reads: 0, first_read_ms: null,
         first_read_complete: null, receipt_read_ms: null, poll_waits: 0,
         poll_wait_ms: null, before_diagnostics_ms: null, before_snapshot_ms: null,
         compare_ms: null, accept_ms: null, approval_rpc_ms: null,
@@ -2586,6 +2830,13 @@ async function runMatchedSetupCfContinuation(setupNative) {
             'Matched Setup C/F action schedule exceeded its bounded continuation deadline');
           assert.equal(await driver.submit(action), true,
             `Matched Setup C/F host action driver refused ${scheduleIndex}: ${driver.status().first_error}`);
+        }
+
+        if (firstSssVsSetupCfExplicitStep) {
+          const stepOperation = () => nativeAdapter.step(scheduleIndex);
+          if (timingSample)
+            await timedActionAsync(timingSample, 'explicit_step', 'explicit_step_ms', stepOperation);
+          else await stepOperation();
         }
 
         const receiptStarted = Date.now();
@@ -2624,6 +2875,8 @@ async function runMatchedSetupCfContinuation(setupNative) {
               timingSample.post_submit_receipt_ms = elapsedMs(postSubmitReceiptStartedNs);
             break;
           }
+          if (firstSssVsSetupCfExplicitStep)
+            throw Error(`Explicit native service resolved without the complete receipt for action ${scheduleIndex}`);
           if (timingSample) {
             timedActionSync(timingSample, 'receipt_deadline_check', null, () =>
               assert.ok(Date.now() - receiptStarted < remaining(),
@@ -3605,16 +3858,29 @@ async function main() {
 
   report.cleanup.unload_attempted = true;
   unloadAttempted = true;
-  await timeout(driver.unload(), LIMITS.unloadMs, 'Recoverable native menu unload');
-  report.cleanup.unload_completed = true;
-  const afterUnload = await timeout(page.evaluate(() => {
+  if (matchedSetupCfExplicitArmed) {
+    await retireMatchedSetupCfExplicitNative();
+  } else {
+    await assertMatchedSetupCfAsyncifyIdle('Check Asyncify before recoverable native menu unload');
+    await timeout(driver.unload(), LIMITS.unloadMs, 'Recoverable native menu unload');
+    report.cleanup.unload_completed = true;
+  }
+  const afterUnload = await timeout(page.evaluate(requireAsyncifyIdle => {
     const module = globalThis.Module;
+    if (requireAsyncifyIdle &&
+        (typeof module?.stadiumMatchedSetupNativeIdle !== 'function' ||
+         module.stadiumMatchedSetupNativeIdle() !== true))
+      return {__native_asyncify_idle: false};
     const pointer = module._melee_web_native_menu_stadium_c1a_observe?.();
     return {phase: module._melee_web_native_menu_phase(), running: module._melee_web_native_menu_running(),
       observation: pointer ? module.UTF8ToString(pointer) : null,
       error: document.querySelector('#status')?.dataset.runtimeError || null,
       import_enabled: !!document.querySelector('#disc') && !document.querySelector('#disc').disabled};
-  }), Math.min(5000, remaining()), 'Post-unload native snapshot');
+  }, firstSssVsSetupCfExplicitStep), Math.min(5000, remaining()), 'Post-unload native snapshot');
+  if (afterUnload?.__native_asyncify_idle === false) {
+    matchedSetupCfExplicitAsyncifyUnsafe = true;
+    throw Error('Asyncify is not idle; post-unload native snapshot was suppressed');
+  }
   assert.equal(afterUnload.phase, 0, 'Unload did not restore the native menu host to closed phase');
   assert.equal(afterUnload.running, 0);
   assert.equal(afterUnload.observation, null, 'C1a permission/observation survived teardown');
@@ -3641,7 +3907,63 @@ async function main() {
 async function cleanupOwnedProcesses() {
   cleanupDeadline = Date.now() + LIMITS.cleanupTotalMs;
   const cleanupFailures = report.cleanup.failures;
-  if (report.result !== 'pass' && page && !page.isClosed()) {
+  const cleanupGate = await guardMatchedSetupCfNativeCleanup({
+    explicitStep: firstSssVsSetupCfExplicitStep,
+    pendingStep: pendingMatchedSetupCfExplicitStep,
+    forcedUnsafe: matchedSetupCfExplicitAsyncifyUnsafe ||
+      matchedSetupCfExplicitNativeAccessClosed,
+    checkNativeIdle: async () => {
+      if (!page || page.isClosed()) return false;
+      return await timeout(page.evaluate(() => {
+        const predicate = globalThis.Module?.stadiumMatchedSetupNativeIdle;
+        return typeof predicate === 'function' && predicate() === true;
+      }), Math.min(1000, cleanupRemaining()),
+      'JS-only Asyncify native-idle check at cleanup entry') === true;
+    },
+    onNativeAccessAllowed: async status => {
+      report.cleanup.asyncify_cleanup_entry_check = status.idle_check;
+      report.cleanup.asyncify_cleanup_entry_pending_safe = status.pending_safe;
+    },
+    onNativeAccessBlocked: async status => {
+      report.cleanup.native_cleanup_suppressed_asyncify = true;
+      report.cleanup.asyncify_cleanup_entry_check = status.idle_check;
+      report.cleanup.asyncify_cleanup_entry_pending_safe = status.pending_safe;
+      if (status.error) report.cleanup.asyncify_cleanup_entry_error = status.error;
+      if (report.result === 'pass') {
+        report.result = 'fail';
+        if (!failure) {
+          failure = 'Asyncify native-idle state could not be proven at cleanup entry';
+          report.error ??= failure;
+        }
+      }
+      if (page && !page.isClosed()) {
+        try {
+          await timeout(page.close(), Math.min(1000, cleanupRemaining()),
+            'Close page after unsafe Asyncify cleanup-entry check');
+          report.cleanup.page_closed_asyncify_unsafe = true;
+        } catch (error) {
+          cleanupFailures.push({step: 'unsafe-asyncify-page-close', error: errorText(error)});
+        }
+      }
+    },
+  });
+  const explicitStepStillPending = matchedSetupCfExplicitAsyncifyUnsafe ||
+    (pendingMatchedSetupCfExplicitStep &&
+     !matchedSetupCfNativeAccessAllowed(pendingMatchedSetupCfExplicitStep));
+  let nativeCleanupSuppressed = cleanupGate.allowed !== true;
+  if (nativeCleanupSuppressed && !report.cleanup.native_cleanup_suppressed_asyncify)
+    report.cleanup.native_cleanup_suppressed_asyncify = true;
+  if (matchedSetupCfExplicitNativeAccessClosed)
+    report.cleanup.native_cleanup_suppressed_retirement = true;
+  if (explicitStepStillPending) {
+    report.cleanup.native_cleanup_suppressed_pending_async_step = true;
+    report.cleanup.pending_async_step_schedule_index =
+      pendingMatchedSetupCfExplicitStep?.scheduleIndex ?? null;
+    report.cleanup.pending_async_step_state =
+      matchedSetupCfExplicitAsyncifyUnsafe ? 'asyncify-not-idle-at-cleanup-entry'
+        : 'unsettled-at-cleanup-entry';
+  }
+  if (report.result !== 'pass' && page && !page.isClosed() && !nativeCleanupSuppressed) {
     if (firstCssBrowserFinalDraw) {
       try { report.scenario.first_css_final_draw_failure = await timeout(
         readFirstCssBrowserFinalDrawObservation(), Math.min(2000, cleanupRemaining()),
@@ -3743,15 +4065,26 @@ async function cleanupOwnedProcesses() {
     try { await timeout(saveScreenshot('failure-state'), Math.min(5000, cleanupRemaining()), 'Failure screenshot'); }
     catch (error) { cleanupFailures.push({step: 'failure-screenshot', error: errorText(error)}); }
   }
-  if (driver && !unloadAttempted && page && !page.isClosed()) {
-    report.cleanup.unload_attempted = true;
-    unloadAttempted = true;
-    try {
-      await timeout(driver.unload(), Math.min(LIMITS.cleanupMs, cleanupRemaining()), 'Failure-path unload');
-      report.cleanup.unload_completed = true;
-    } catch (error) { cleanupFailures.push({step: 'unload', error: errorText(error)}); }
+  if (driver && !unloadAttempted && page && !page.isClosed() && !nativeCleanupSuppressed) {
+    if (matchedSetupCfExplicitArmed) {
+      try {
+        await retireMatchedSetupCfExplicitNative({cleanupPath: true});
+      } catch (error) {
+        nativeCleanupSuppressed = true;
+        report.cleanup.native_cleanup_suppressed_retirement = true;
+        cleanupFailures.push({step: 'explicit-native-retirement', error: errorText(error)});
+      }
+    } else {
+      report.cleanup.unload_attempted = true;
+      unloadAttempted = true;
+      try {
+        await assertMatchedSetupCfAsyncifyIdle('Check Asyncify before failure-path unload');
+        await timeout(driver.unload(), Math.min(LIMITS.cleanupMs, cleanupRemaining()), 'Failure-path unload');
+        report.cleanup.unload_completed = true;
+      } catch (error) { cleanupFailures.push({step: 'unload', error: errorText(error)}); }
+    }
   }
-  if (firstSssVsSetupTextTail && unloadAttempted && page && !page.isClosed() &&
+  if (!nativeCleanupSuppressed && firstSssVsSetupTextTail && unloadAttempted && page && !page.isClosed() &&
       report.scenario.first_sss_vs_setup?.text_tail_probe &&
       !report.scenario.first_sss_vs_setup.text_tail_probe.after_unload) {
     try {
@@ -3778,7 +4111,7 @@ async function cleanupOwnedProcesses() {
       cleanupFailures.push({step: 'text-tail-post-unload-harvest', error: errorText(error)});
     }
   }
-  if (firstSssConstructorPair && report.cleanup.unload_completed &&
+  if (!nativeCleanupSuppressed && firstSssConstructorPair && report.cleanup.unload_completed &&
       !report.cleanup.native_after_unload && page && !page.isClosed()) {
     try {
       const afterUnload = await timeout(readFirstSssPairPostUnloadState(),
@@ -3804,9 +4137,21 @@ async function cleanupOwnedProcesses() {
       cleanupFailures.push({step: 'sss-pair-post-unload-check', error: errorText(error)});
     }
   }
+  if (driver && !unloadAttempted && nativeCleanupSuppressed) {
+    if (explicitStepStillPending) report.cleanup.unload_suppressed_pending_async_step = true;
+    else report.cleanup.unload_suppressed_asyncify_idle = true;
+  }
   if (context) {
     try { await timeout(context.close(), cleanupRemaining(), 'Browser context close'); report.cleanup.context_closed = true; }
     catch (error) { cleanupFailures.push({step: 'context-close', error: errorText(error)}); }
+  }
+  if (explicitStepStillPending) {
+    report.cleanup.pending_async_step_state = matchedSetupCfNativeAccessAllowed(
+      pendingMatchedSetupCfExplicitStep) ? 'settled-after-context-close' : 'unsettled-after-context-close';
+    report.cleanup.pending_async_step_outcome =
+      pendingMatchedSetupCfExplicitStep?.outcome ?? 'pending';
+    if (pendingMatchedSetupCfExplicitStep?.error)
+      report.cleanup.pending_async_step_error = pendingMatchedSetupCfExplicitStep.error;
   }
   if (driver) { try { driver.dispose(); } catch {} }
   if (browserCdp) {

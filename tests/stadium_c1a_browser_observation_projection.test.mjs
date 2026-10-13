@@ -86,6 +86,9 @@ function makeContext({prefixSource, readerSource, mode, spec = {}}) {
     };
   }
   const sandbox = {
+    // This VM covers the default-off reader route; explicit Asyncify controls have separate tests.
+    firstSssVsSetupCfExplicitStep: false,
+    matchedSetupCfExplicitAsyncifyUnsafe: false,
     Module: module,
     JSON: {parse(text) { events.push('json_parse'); return JSON.parse(text); }},
     page: {

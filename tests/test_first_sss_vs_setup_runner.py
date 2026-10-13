@@ -19,6 +19,8 @@ class FirstSssVsSetupRunnerTests(OwnedWorkspaceTests):
   runtime=(ROOT/'web/runtime-development.mjs').read_text()
   sink=runtime[runtime.index('const STADIUM_TEXT_TAIL_MAX_RECORDS='):runtime.index("if(typeof PerformanceObserver",runtime.index('const STADIUM_TEXT_TAIL_MAX_RECORDS='))]
   js+='const actualSinkSource='+repr(sink)+';\n'
+  # This extracted reader is exercised on the default-off, non-explicit route.
+  js+='const firstSssVsSetupCfExplicitStep=false; let matchedSetupCfExplicitAsyncifyUnsafe=false;\n'
 
   js+=_function(source,'function assertFirstSssVsSetupHistory(native, before)')
   js+=_function(source,'function assertFirstSssVsSetupOwners(setup)')
