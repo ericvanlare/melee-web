@@ -2871,7 +2871,7 @@ async function runCssSssReducer({startKey, baseUrl, artifacts, before}) {
   report.local_http_artifacts.after = after;
   report.local_http_artifacts.unchanged = JSON.stringify(before) === JSON.stringify(after);
   assert.equal(report.local_http_artifacts.unchanged, true,
-    'One or more of the 40 served artifacts changed during the CSS-to-SSS reducer');
+    'One or more of the 41 served artifacts changed during the CSS-to-SSS reducer');
   report.scenario.http_requests = [...requestRows, ...responseRows];
   report.scenario.external_http_requests = externalRequests;
   report.result = 'pass';
@@ -3019,7 +3019,7 @@ async function main() {
       `Ordinary default runtime unexpectedly exports matched Setup C/F ${name}`);
 
   const artifacts = JSON.parse(await fs.readFile(path.join(ROOT, 'tools/browser_build_artifacts.json'), 'utf8'));
-  assert.equal(artifacts.length, 40, 'The checked-in browser artifact inventory changed; review the preflight');
+  assert.equal(artifacts.length, 41, 'The checked-in browser artifact inventory changed; review the preflight');
   assert.equal(new Set(artifacts).size, artifacts.length, 'Browser artifact inventory contains duplicates');
   assert.ok(artifacts.every(name => typeof name === 'string' && name === path.basename(name)),
     'Browser artifact inventory must contain plain build filenames');
@@ -3323,7 +3323,7 @@ async function main() {
   report.local_http_artifacts.after = after;
   report.local_http_artifacts.unchanged = JSON.stringify(before) === JSON.stringify(after);
   assert.equal(report.local_http_artifacts.unchanged, true,
-    'One or more of the 40 served build artifacts changed during the browser attempt');
+    'One or more of the 41 served build artifacts changed during the browser attempt');
   report.scenario.http_requests = [...requestRows, ...responseRows];
   report.scenario.external_http_requests = externalRequests;
   assert.deepEqual(pageErrors, []);
