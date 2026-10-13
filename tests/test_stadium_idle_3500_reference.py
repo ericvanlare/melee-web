@@ -56,7 +56,26 @@ def match_slices(tick):
             state._slice(11,0,0x81008000,bytes(81))]
 
 
-def fixture(*, tail=0, end_ordinal=3500, mutate=None):
+def pad_poll_slices():
+    queue=bytearray(12);queue[0]=5;queue[8:]=struct.pack('>I',0x81006000)
+    return [state._slice(1,0,0x81009000,bytes(48)),
+            state._slice(27,0,0x8100a054,bytes.fromhex('80376a28')),
+            state._slice(2,0,0x804c1f78,bytes(queue)),
+            state._slice(21,0,0x804c1f84,bytes(856)),
+            state._slice(22,0,0x804d7420,bytes(4)),
+            state._slice(23,0,0x804a7f98,bytes(4)),
+            state._slice(17,0,0x80479d30,bytes(6))]
+
+def pad_poll(tick):
+    raw=frame(1,tick,pad_poll_slices())
+    h,b=literal_frames(raw)[0]
+    b=bytearray(b)
+    struct.pack_into('<I',b,20+31*4,0x81009030)
+    struct.pack_into('<I',b,20+4,0x8100a000)
+    return stored_frame(h,bytes(b),replacement_payload=bytes(b))
+
+
+def fixture(*, tail=0, end_ordinal=3500, mutate=None, pad_poll_after_draw_enter=False):
     raw,status=route._fixture()
     raw,status=with_constructor(raw,status)
     out=[];go=False;end=None
@@ -85,7 +104,12 @@ def fixture(*, tail=0, end_ordinal=3500, mutate=None):
         if mutate:record=mutate(ordinal,record)
         out.append(record)
         if ordinal<end_ordinal and ordinal%5==4:
-            out += [frame(7,tick,[route._slice(2,12)]+match_slices(tick)),frame(8,tick,[route._slice(2,12)]+match_slices(tick))]
+            enter=frame(7,tick,[route._slice(2,12)]+match_slices(tick))
+            leave=frame(8,tick,[route._slice(2,12)]+match_slices(tick))
+            if pad_poll_after_draw_enter and ordinal==4:
+                out += [enter,pad_poll(tick),leave]
+            else:
+                out += [enter,leave]
     out += [frame(7,125+end_ordinal+tail,[route._slice(2,12)]+match_slices(125+end_ordinal+tail)),
             frame(8,125+end_ordinal+tail,[route._slice(2,12)]+match_slices(125+end_ordinal+tail))]
     end.update(original_idle_post_go_ticks=3500,comparison_end_tick=3625,tail_ticks_before_draw_return=tail,
@@ -155,6 +179,71 @@ class StadiumIdle3500ReferenceTests(unittest.TestCase):
             decoder=StadiumIdle3500Observations()
             with self.subTest(mutation=mutation),self.assertRaises(StadiumGoPrefixError):
                 for row in prefix:decoder.accept(row)
+
+    def test_open_draw_pad_poll_same_ordinal_tick_and_return_contract(self):
+        from stadium_go_prefix import StadiumIdle3500Observations
+        raw,_=fixture(pad_poll_after_draw_enter=True)
+        rows=[wire._decode_record(h,b,'same-draw synthetic PadPoll') for h,b in literal_frames(raw)]
+        enter_index=next(i for i,r in enumerate(rows) if r['event']=='boundary' and
+                         r['payload']['boundary']=='draw_enter' and r['source_tick']==129)
+        enter=rows[enter_index]
+        poll=rows[enter_index+1]
+        leave=rows[enter_index+2]
+        self.assertEqual([r['payload'].get('boundary') for r in rows[enter_index:enter_index+3]],
+                         ['draw_enter','pad_poll','draw_return'])
+        self.assertEqual({r['source_tick'] for r in rows[enter_index:enter_index+3]},{129})
+        self.assertEqual({r['draw_ordinal'] for r in rows[enter_index:enter_index+3]},
+                         {enter['draw_ordinal']})
+
+        def before_boundary():
+            decoder=StadiumIdle3500Observations()
+            for row in rows[:enter_index+1]:decoder.accept(row)
+            return decoder
+
+        def schedule(decoder):
+            return (decoder.last_ordinal,decoder.pending is None,len(decoder.tick_sequences),
+                    len(decoder.bundles),len(decoder.seed_observations),
+                    decoder.state_digest.hexdigest(),len(decoder.actions),decoder.owner,
+                    decoder.c_countdown,getattr(decoder,'map2_history',None))
+
+        decoder=before_boundary()
+        before=schedule(decoder)
+        open_ordinal=decoder.draw_open
+        self.assertEqual(open_ordinal,decoder.expected_draw)
+        self.assertEqual(decoder.draw_open_tick,129)
+        decoder.accept(poll)
+        self.assertEqual(schedule(decoder),before)
+        self.assertEqual(decoder.draw_open,open_ordinal)
+        self.assertEqual(decoder.expected_draw,open_ordinal)
+        self.assertEqual(decoder.draw_open_tick,129)
+
+        wrong_tick=copy.deepcopy(poll)
+        wrong_tick['source_tick']+=1
+        wrong_tick['payload']['source_tick']+=1
+        rejected=before_boundary()
+        rejected_state=schedule(rejected)
+        with self.assertRaisesRegex(StadiumGoPrefixError,'open-draw source tick differs'):
+            rejected.accept(wrong_tick)
+        self.assertEqual(schedule(rejected),rejected_state)
+
+        # A valid synthetic SourceTick placed inside the open draw remains forbidden.
+        source_tick=copy.deepcopy(next(r for r in rows if r['event']=='boundary' and
+                                       r['payload'].get('boundary')=='source_tick' and
+                                       r['source_tick']==129))
+        source_tick['draw_ordinal']=open_ordinal
+        source_tick['payload']['draw_ordinal']=open_ordinal
+        forbidden=before_boundary()
+        with self.assertRaisesRegex(StadiumGoPrefixError,'boundary not allowed inside source draw'):
+            forbidden.accept(source_tick)
+
+        decoder.accept(leave)
+        self.assertIsNone(decoder.draw_open)
+        self.assertIsNone(decoder.draw_open_tick)
+        self.assertEqual(decoder.expected_draw,open_ordinal+1)
+        self.assertEqual(schedule(decoder)[:-1],(before[0],before[1],before[2],before[3],
+                         before[4],before[5],before[6]+1,before[7],before[8]))
+        with self.assertRaisesRegex(StadiumGoPrefixError,'interval/terminal consume accounting incomplete'):
+            decoder.finish({'tail_ticks_after_comparison_end':0})
 
     def test_binary_minima_and_cap_derivation(self):
         poll=[route._slice(t,n) for t,n in [(1,48),(27,4),(2,12),(21,856),(22,4),(23,4),(17,6)]]

@@ -9397,6 +9397,83 @@
       "current_head_full_regression": "PENDING",
       "current_head_ci": "PENDING"
     },
-    "next": "Reduce exact retained PadPoll13356/source2155/draw2154 afterDrawEnter13355 against original callback/interrupt source authority. Preserve exact draw ordinals, consume/tick pairing and state checks. No new long run, repair or retry authorized by this checkpoint."
+    "next": "Finish portable regression coverage and current-head validation for the reviewed same-draw PadPoll reader repair. Only then separately release one fresh original reference under unchanged caps and source/input/draw/GO-counting contracts. Complete 3500-post-GO reference, lifetime A, checked retirement/recreation, lifetime B and per-owner RNG remain outstanding.",
+    "reader_reduction_2026_10_13": {
+      "result": "REVIEWED_OFFLINE_READER_REPAIR; ORIGINAL_REFERENCE_STILL_INCOMPLETE",
+      "historical_executable_source": "3d4ee3d388877249b994543d93db788ed542e2a0",
+      "historical_failure_document_revision": "660d98564beb084bdb634723389317316182a944",
+      "current_main_refresh": "ec97b845540102ea631f4e4513d306392fd85ad8",
+      "reader_source_sha256": "c8f4c9685936208fb06ee7d11884fef32f4eb851c5b2b5c18f611ebeda4cbe88",
+      "source_contract": "Only typed PadPoll within the same open/expected draw ordinal and unchanged DrawEnter source_tick is newly admitted. Existing PC/GPR/caller/PAD checks remain. Only DrawReturn closes the draw and advances expected_draw. SourceTick, PadConsume, nested DrawEnter and completion inside a draw still fail.",
+      "source_limit": "The captured PADRead PC and HSD raw-renew caller are supported. The outer periodic-alarm/interrupt caller remains unobserved; this is not an interrupt ABI claim.",
+      "offline_result": {
+        "fragment_sequences": [
+          13355,
+          13356,
+          13357
+        ],
+        "source_tick": 2155,
+        "draw_ordinal": 2154,
+        "pad_poll_does_not_change_tick_bundle_or_draw_schedule": true,
+        "negative_controls": 38,
+        "retained_rows_accepted": 13404,
+        "terminal_sequence": 13403,
+        "terminal_status": "interrupted",
+        "last_relative_tick": 2079,
+        "original3500_complete": false,
+        "finish_refusal": "idle3500 interval/terminal consume accounting incomplete"
+      },
+      "artifacts": {
+        "source_review": {
+          "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+          "artifact": "stadium-draw-pad-independent-source-review-v1.json",
+          "bytes": 5147,
+          "sha256": "62746e272e13664aba1ab6d9e3f135adba58e4b52d21549b1f72b0cef6804c47"
+        },
+        "reader_patch": {
+          "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+          "artifact": "stadium-draw-pad-reduction-v2/candidate/reader-contract.patch",
+          "bytes": 3413,
+          "sha256": "284d34c41c95e604827d22d2dbbf8cf43abdde0f6ef8fd1d16abcc768b996609"
+        },
+        "controls": {
+          "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+          "artifact": "stadium-draw-pad-reduction-v2/controls/reader-contract-controls.json",
+          "bytes": 11050,
+          "sha256": "bcc0ef54810561b282f6b645d91292536e8b6ac98c172247891bd59d1429d7b4"
+        },
+        "implementation_review": {
+          "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+          "artifact": "stadium-draw-pad-reduction-v2/reader-contract-independent-review-v1.json",
+          "bytes": 9405,
+          "sha256": "769f4e748634e1de4b808fc626dcd44b9e6e7e3c784bf4204eeb4b337be06d4d"
+        },
+        "raw_fragment": {
+          "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+          "artifact": "stadium-draw-pad-reduction-v2/fixtures/raw-window-13355-13357.mwro-fragment",
+          "bytes": 10001,
+          "sha256": "0d697e5359fec49c35ca49ffb774f1c594b5bb2511e67052fd48c59f13e74ca5"
+        },
+        "portable_test_patch": {
+          "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+          "artifact": "stadium-draw-pad-test-candidate-v1/candidate/portable-pad-poll-tests.patch",
+          "bytes": 6107,
+          "sha256": "736e5ef54da2726c4faf4515620f0fdacd97b3ab282c26cb964df1fbde322957"
+        },
+        "docs_and_portable_test_review": {
+          "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+          "artifact": "stadium-reader-doc-test-independent-review-v1.json",
+          "bytes": 6477,
+          "sha256": "fbb22bc0eba8abf44b01d74389193c418ff00a51336efd60e63658464a7d2fd1"
+        },
+        "focused_validation": {
+          "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+          "artifact": "stadium-reader-focused-v1.json",
+          "bytes": 733,
+          "sha256": "df292af1f84005896ccf7d415aac539e444bdcfa4ce7f29686741d3f79755c17"
+        }
+      },
+      "validation": "Nine focused tests PASS on ec97b845 plus exact reviewed reader/test changes; full regression and exact-head CI pending. No new original or browser capture. Prior control-harness failures remain retained."
+    }
   }
 }

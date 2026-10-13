@@ -3854,6 +3854,7 @@ class StadiumIdle3500Observations:
         self.bundles = []
         self.actions = []
         self.draw_open = None
+        self.draw_open_tick = None
         self.expected_draw = None
         self.state_digest = hashlib.sha256()
         self.seed_observations = []
@@ -3864,6 +3865,8 @@ class StadiumIdle3500Observations:
         event, kind = row.get("event"), p.get("boundary")
         if self.go is not None:
             _require(event in ('boundary','end'), 'idle3500 unexpected post-GO record class')
+            if event == 'end' and self.draw_open is not None:
+                _require(False, 'idle3500 completion inside source draw')
         if event == "progress" and p.get("phase") == "constructor_commit":
             self.constructor = p
         if event == "progress" and p.get("phase") == "go_after":
@@ -3879,8 +3882,13 @@ class StadiumIdle3500Observations:
             _require(type(row.get("draw_ordinal")) is int and
                      row["draw_ordinal"] == self.expected_draw,
                      "idle3500 source draw ordinal is missing, duplicated or reordered")
-            _require(self.draw_open is None or kind == "draw_return",
-                     "idle3500 boundary nested in source draw")
+            if self.draw_open is not None:
+                _require(kind in ("pad_poll", "draw_return"),
+                         "idle3500 boundary not allowed inside source draw")
+                _require(row["draw_ordinal"] == self.draw_open == self.expected_draw,
+                         "idle3500 open-draw ordinal differs")
+                _require(row["source_tick"] == self.draw_open_tick,
+                         "idle3500 open-draw source tick differs")
         if kind == "setup":
             self.setup = True
         if not self.setup:
@@ -3950,18 +3958,26 @@ class StadiumIdle3500Observations:
             if kind == 'draw_enter':
                 _require(self.draw_open is None, 'idle3500 duplicate DrawEnter')
                 self.draw_open = row['draw_ordinal']
+                self.draw_open_tick = row['source_tick']
             else:
                 _require(self.draw_open is not None and self.draw_open == row['draw_ordinal'],
                          'idle3500 DrawReturn lacks its same-ordinal DrawEnter')
+                self._require_draw_tick(row)
                 self.draw_open = None
+                self.draw_open_tick = None
                 self.expected_draw += 1
             self.actions.append({'action':kind,'ordinal':self.last_ordinal,
                                  'sequence':row['seq'],'draw_ordinal':row['draw_ordinal']})
         elif self.go is not None:
             _require(kind in ('pad_poll','pad_consume'), 'idle3500 unexpected post-GO boundary')
 
+    def _require_draw_tick(self, row):
+        _require(self.draw_open_tick is not None and row["source_tick"] == self.draw_open_tick,
+                 "idle3500 DrawReturn source tick differs from its DrawEnter")
+
     def finish(self, baseline):
-        _require(self.pending is None and self.draw_open is None and self.last_ordinal ==
+        _require(self.pending is None and self.draw_open is None and
+                 self.draw_open_tick is None and self.last_ordinal ==
                  3500 + baseline['tail_ticks_after_comparison_end'] and
                  len(self.bundles) == self.last_ordinal + 1,
                  'idle3500 interval/terminal consume accounting incomplete')
