@@ -72,6 +72,12 @@ class ReferenceEntityProfileTests(unittest.TestCase):
         if compiler is None:
             self.skipTest('Native C++ compiler unavailable')
         source = SOURCE.read_text()
+        input_source = (ROOT / 'reference-capture/dolphin/source/Core/PowerPC/ReferenceInputStream.cpp').read_text()
+        input_start = input_source.index('bool InputStream::IsReplaying()')
+        input_methods = input_source[input_start:input_source.index('void InputStream::Record', input_start)]
+        stadium_owner_fields = '\n'.join(
+            source[source.index(marker):source.index(';', source.index(marker)) + 1]
+            for marker in ('  bool stadium_idle_3500 = false;', '  bool stadium_constructor_enabled = false;'))
         gate = source[source.index('    whole_session_matches = WholeSessionMatchCount();'):
                       source.index('    capture_id = Env("MWRC_CAPTURE_ID");')]
         stadium_receipt_start = source.index('constexpr char STADIUM_SETUP_RECEIPT_SHA256[]')
@@ -88,6 +94,15 @@ class ReferenceEntityProfileTests(unittest.TestCase):
 #include <cstdint>
 #include <map>
 #include <string>
+namespace ReferenceCapture {
+struct TestInputState { int mode = 0; };
+TestInputState& State() { static TestInputState state; return state; }
+class Observer { public: static bool enabled; static bool IsEnabled() { return enabled; } };
+bool Observer::enabled = false;
+class InputStream { public: static bool IsReplaying(); static bool IsRecording(); };
+'''+input_methods+r'''
+}
+using namespace ReferenceCapture;
 std::map<std::string,std::string> environment;
 std::string Env(const char* name){return environment[name];}
 using u8=std::uint8_t;
@@ -97,7 +112,7 @@ constexpr unsigned WHOLE_SESSION_MIN_MATCHES=3,WHOLE_SESSION_MAX_MATCHES=64;
 bool SdInitRequested(){return !Env("MWRC_SD_INIT").empty();}
 struct Reader {
  unsigned whole_session_matches=0;bool checked_entity_profile=false,active_entity_profile=false;std::string error;
-''' + stadium_state + r'''
+''' + stadium_owner_fields + '\n' + stadium_state + r'''
  bool SetInvalid(const char* s){error=s;return false;}
  bool configure(){
 ''' + gate + r'''
