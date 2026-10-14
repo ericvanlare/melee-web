@@ -1,6 +1,6 @@
 # Public staging graphics startup profiling
 
-**Browser observed / Source identified — startup attribution in progress**
+**Browser exercised / Source identified — scoped startup improvement deployed**
 
 Issue [#326](https://github.com/ericvanlare/melee-web/issues/326) follows the
 owner’s reported 10–15 second “Preparing graphics…” wait on the public Pages
@@ -35,15 +35,16 @@ The original gzip trace is unchanged. Its scoped derived summary is
 No source ticks or disc import were requested. The Chrome profile, docked
 DevTools and instrumented capture are not a quiet-machine performance gate.
 
-The bounded startup report is deployed on the ordinary audio-player at immutable
-[e3dc446a](https://e3dc446a.webmelee-staging.pages.dev/) and the public staging
-alias. Source `dcf6b06e794597b01bcc5d07c4dfb46f0e843018`, runtime
+The profiling-only baseline was deployed on the ordinary audio-player at
+immutable [e3dc446a](https://e3dc446a.webmelee-staging.pages.dev/). The public
+staging alias now runs the guarded candidate below. Source `dcf6b06e794597b01bcc5d07c4dfb46f0e843018`, runtime
 `2f3efb6678651310`, and producer/package identities remain in the scoped receipt.
 The UI works before native startup and after an error, exports locally, and
 records User Timing marks. The Release build, package audit, immutable HTTP
 verification and two headless report/export checks pass. The first 2,400-test
 regression retained one reduced-fixture failure (166 skips); its reviewed repair
-passes focused controls. A corrected full regression is still pending.
+passes focused controls. The corrected full regression on the guarded producer
+is recorded below.
 
 Two native Chrome UI reloads on that deployed candidate took 6,597.915 ms and
 4,627.905 ms from mount. Their native startup intervals were 5,697.145 ms and
@@ -64,11 +65,37 @@ failure cannot yet be assigned to a specific stack.
 
 The bounded failure review identified a possible asynchronous native reentry:
 an independent timer may enter Wasm while the ordinary render callback has a
-live Asyncify continuation. The next step is a generated, reduced Asyncify
-fixture and a guard before native entry, before another startup experiment.
-That generated fixture now passes independent review: five timer attempts with
+live Asyncify continuation. This led to a generated, reduced Asyncify
+fixture and a guard before native entry. The fixture passes independent review: five timer attempts with
 a live continuation were withheld, followed by one native entry after idle;
 stop/change/abort controls prevented entry. This is a component result, not
 proof of the original memory-error stack or game safety.
-The safe profiling-only build remains live. No speedup is claimed yet; game
-arithmetic, input, source order, readiness guards and deadlines are unchanged.
+The guarded candidate is now deployed at immutable
+[526e0535](https://526e0535.webmelee-staging.pages.dev/) and the real public
+staging alias. Source `0258f2fc73613fbfd2d07fe67277bf4f97890c9b`, runtime
+`5e6240776085dbf6`. It retains one 8 ms timer, the existing five-entry batch cap,
+queue order and native ownership checks; its JavaScript gate refuses native
+entry while Asyncify has a live continuation, or after owner stop/abort.
+
+The first new-artifact visit in the existing Chrome profile took 3,556.650 ms;
+the ordinary warm reload took 2,621.200 ms, versus the profiling baseline’s
+6,597.915 / 4,627.905 ms. The observed warm reduction is about 43%. Both retained
+890 created entries, queue zero and cache-idle `1`. The warm candidate recorded
+no long tasks. These are scoped same-profile observations, with uncontrolled
+OS/driver caches, not a promise about every visit or the owner’s original run.
+
+The matched headless deep probe preserves 916 pipeline and 917 shader API calls
+in each run. API wall time stays around 22 ms while time between batches falls
+substantially. One candidate run’s p95 animation gap is slightly higher than
+its baseline; the maximum gaps and the other run’s p95 are lower. The receipt
+retains all values: no blanket responsiveness or GPU-completion claim is made.
+
+Release build, source-bound package audit, immutable HTTP verification, local
+report/export checks and all 13 real-disc audio/menu/gameplay smoke checks pass.
+The smoke covers a No Contest return and second entry, not a complete stock
+match or acceptance. Owned process cleanup is verified. The corrected full
+regression passes 2,402 tests with 166 skips in 544.327 s on producer `0258f2fc`.
+Final integration requires independent review and complete current-head CI;
+that integration state is tracked in [PR #327](https://github.com/ericvanlare/melee-web/pull/327).
+Original failed timer evidence is preserved. Game arithmetic, input, source order, readiness
+guards and deadlines are unchanged.

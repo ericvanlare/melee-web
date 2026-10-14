@@ -163,7 +163,7 @@
     }
   },
   "candidate": {
-    "state": "profiling_deployed_timer_candidate_held",
+    "state": "historical_profiling_only_deployment",
     "base_commit": "e19cecfe7764bcd97802bea1933500e37a872af5",
     "independent_js_review_sha256": "7e345137e1770781b25348f5d24023b4aa418b5baa863503d8e988076fb4ba3d",
     "speedup_claim": false,
@@ -383,6 +383,422 @@
       "console_observation": "One favicon404 retained; no page errors.",
       "independent_review": "asyncify-reducer-v1/independent-result-review.json",
       "independent_review_sha256": "f3ef2fb1128de7dd8e93f2042a72d4bb67c13785d1ffa72c97bc7ca64474d301"
+    }
+  },
+  "guarded_scheduler": {
+    "state": "deployed_scoped_startup_improvement",
+    "source_commit": "0258f2fc73613fbfd2d07fe67277bf4f97890c9b",
+    "runtime_hash": "5e6240776085dbf6",
+    "deployment": {
+      "source_sha": "0258f2fc73613fbfd2d07fe67277bf4f97890c9b",
+      "candidate_head": "0258f2fc73613fbfd2d07fe67277bf4f97890c9b",
+      "runtime_hash": "5e6240776085dbf6",
+      "profile": "audio-player",
+      "manifest_sha256": "529d6ca0cf62196bd411e117437fb3bea3348d2be74d3c12cdca71be0ca56ac8",
+      "previous_deployment_id": "e3dc446a-6226-4398-a4c9-34a5d15741f5",
+      "production_changed": false,
+      "review": "Reviewed Asyncify-guarded startup scheduler candidate PR327. Local startup and audio checks required before deployment; hosted comparison and corrected full regression remain separately recorded.",
+      "deployment_id": "526e0535-279b-4174-b53b-563b60fac501",
+      "immutable_url": "https://526e0535.webmelee-staging.pages.dev",
+      "project": "webmelee-staging",
+      "branch": "staging",
+      "environment": "staging",
+      "pages_environment": "production",
+      "stable_url": "https://webmelee-staging.pages.dev"
+    },
+    "review": {
+      "path": "timer-v1/asyncify-guarded-candidate-source-review.json",
+      "sha256": "ac8737baaced7501a12f146d54e510b6c4d969ea1a7889a7ffa30e995de6eae1"
+    },
+    "validation_review": {
+      "path": "guard-v1/local-ui-and-deploy-independent-review.json",
+      "sha256": "ffc330de8f0b28facb1fac8d67ff467b296d9bd04d8c3777eececae406ee9f18"
+    },
+    "release_build": "audio-guard-build-v1.log",
+    "package_audit": "guard-package-v1.log",
+    "immutable_http": {
+      "path": "guard-v1/immutable-http.json",
+      "sha256": "0cc0451fb8c269a98ad695ee22dc5547ab6681b13a23cd961e1adb17c8fcc779"
+    },
+    "local_ui": {
+      "path": "guard-v1/local-ui/browser/report.json",
+      "sha256": "2c2df4a909314d2514ce78dd567a2df3fcdcccecc8cb0c5a1021021d8d7224f7"
+    },
+    "local_ui_cleanup": {
+      "path": "guard-v1/local-ui/owner.json",
+      "sha256": "4a119121e8ff07e3012baa0c610b97e47761cedf91a68424ad8cc74496743c9e"
+    },
+    "local_audio": {
+      "path": "guard-v1/local-audio/browser/report.json",
+      "sha256": "b76d032b91334f68dd22618db327fd60f84d7c409a19d5bd5e2f3965d112403f"
+    },
+    "local_audio_cleanup": {
+      "path": "guard-v1/local-audio/owner.json",
+      "sha256": "790c08a8fc94a7b7faf4b4f0be1dd61c758d97db579a8ff010a42fa6e96a920c"
+    },
+    "local_audio_scope": "13 functional checks: owned disc, original CSS/SSS, Mario/FD, No Contest return, second entry, Title/Opening, Eject and audio processing. Not full-match acceptance or pixels/PCM comparison.",
+    "foreground_runs": [
+      {
+        "path": "guard-v1/foreground-startup-1.json",
+        "sha256": "0538e708d16adb8412dc88ddb0db22e5f44bfbb91c4c345db74727ca8c8b54fc",
+        "condition": "First new-artifact navigation in existing profile",
+        "elapsed_ms": 3556.65,
+        "navigation_elapsed_ms": 3967.235,
+        "graphics_startup": {
+          "renderer_init_ms": 64.67499995231628,
+          "queued_pipelines": 0,
+          "created_pipelines": 890,
+          "cache_idle": 1,
+          "first_native_callback_ms": 66.89000010490417,
+          "elapsed_ms": 2940.765000104904,
+          "terminal": true
+        },
+        "graphics_samples": [
+          {
+            "at_ms": 704.44,
+            "elapsed_ms": 88.84500002861023,
+            "queued_pipelines": 880,
+            "created_pipelines": 10,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 1710.345,
+            "elapsed_ms": 1095.0599999427795,
+            "queued_pipelines": 590,
+            "created_pipelines": 300,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 2716.075,
+            "elapsed_ms": 2100.7999999523163,
+            "queued_pipelines": 265,
+            "created_pipelines": 625,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 3556.625,
+            "elapsed_ms": 2940.765000104904,
+            "queued_pipelines": 0,
+            "created_pipelines": 890,
+            "cache_idle": 1,
+            "terminal": true
+          }
+        ],
+        "longtasks": {
+          "status": "available",
+          "count": 1,
+          "total_ms": 56,
+          "max_ms": 56,
+          "before_profile_count": 0,
+          "before_profile_total_ms": 0,
+          "dropped_rows": 0,
+          "rows": [
+            {
+              "start_ms": 1034.76,
+              "duration_ms": 56,
+              "before_profile": false
+            }
+          ]
+        }
+      },
+      {
+        "path": "guard-v1/foreground-startup-2-warm.json",
+        "sha256": "63b978d83d58d887833fd03e3bcc33a603fe2d3c7dbceacd08d84cfd14e43ad6",
+        "condition": "Ordinary same-profile warm reload",
+        "elapsed_ms": 2621.2,
+        "navigation_elapsed_ms": 2701.755,
+        "graphics_startup": {
+          "renderer_init_ms": 19.09499979019165,
+          "queued_pipelines": 0,
+          "created_pipelines": 890,
+          "cache_idle": 1,
+          "first_native_callback_ms": 19.479999780654907,
+          "elapsed_ms": 2550.7599999904633,
+          "terminal": true
+        },
+        "graphics_samples": [
+          {
+            "at_ms": 93.415,
+            "elapsed_ms": 23.18999981880188,
+            "queued_pipelines": 880,
+            "created_pipelines": 10,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 1099.415,
+            "elapsed_ms": 1029.4849998950958,
+            "queued_pipelines": 520,
+            "created_pipelines": 370,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 2123.39,
+            "elapsed_ms": 2053.4649999141693,
+            "queued_pipelines": 185,
+            "created_pipelines": 705,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 2621.195,
+            "elapsed_ms": 2550.7599999904633,
+            "queued_pipelines": 0,
+            "created_pipelines": 890,
+            "cache_idle": 1,
+            "terminal": true
+          }
+        ],
+        "longtasks": {
+          "status": "available",
+          "count": 0,
+          "total_ms": 0,
+          "max_ms": null,
+          "before_profile_count": 0,
+          "before_profile_total_ms": 0,
+          "dropped_rows": 0,
+          "rows": []
+        }
+      }
+    ],
+    "deep_comparison": [
+      {
+        "condition": "profile-v1",
+        "path": "profile-v1/headless-probe-warm/report.json",
+        "sha256": "51df0c551c036b022b1cc0fe4cc74da6fb54841d0783b1347f58b1d295bd3a8c",
+        "attempts": [
+          {
+            "time_to_graphics_ready_ms": 9679.805000066757,
+            "preparation": {
+              "pipelineCount": 916,
+              "shaderModuleCount": 917,
+              "asyncPipelineCount": 0,
+              "activeCreateRenderPipelineMs": 6.019997835159302,
+              "activeCreateShaderModuleMs": 16.835002899169922,
+              "activePipelineApiWallMs": 22.855000734329224,
+              "apiWrapperOverheadMs": 0.8399968147277832,
+              "firstApiAtMs": 218.84999990463257,
+              "lastApiAtMs": 9677.27999997139,
+              "pipelineCreateSpanMs": 9458.430000066757,
+              "waitBetweenNonemptyBatchesMs": 9266.440001010895,
+              "batchCount": 177,
+              "nativePreparationCallbacks": 153,
+              "renderedBatchCount": 153,
+              "timerBatchCount": 24,
+              "batchScheduleToGraphicsReadyRemainderMs": 2.5250000953674316
+            },
+            "responsiveness": {
+              "animationCallbackGapMs": {
+                "count": 405,
+                "min": 0.13000011444091797,
+                "median": 16.669999837875366,
+                "p95": 78.90000009536743,
+                "max": 228.44000005722046
+              },
+              "gapsOver16_67ms": 204,
+              "gapsOver35ms": 41,
+              "longTaskMs": {
+                "count": 1,
+                "min": 55,
+                "median": 55,
+                "p95": 55,
+                "max": 55
+              },
+              "longTasksDuringGraphics": [
+                {
+                  "start": 218.5,
+                  "duration": 55
+                }
+              ],
+              "longTasksAfterGraphics": []
+            },
+            "errors": []
+          },
+          {
+            "time_to_graphics_ready_ms": 6927.380000114441,
+            "preparation": {
+              "pipelineCount": 916,
+              "shaderModuleCount": 917,
+              "asyncPipelineCount": 0,
+              "activeCreateRenderPipelineMs": 5.61499285697937,
+              "activeCreateShaderModuleMs": 16.574994802474976,
+              "activePipelineApiWallMs": 22.189987659454346,
+              "apiWrapperOverheadMs": 0.830000638961792,
+              "firstApiAtMs": 145.20000004768372,
+              "lastApiAtMs": 6882.305000066757,
+              "pipelineCreateSpanMs": 6737.1050000190735,
+              "waitBetweenNonemptyBatchesMs": 6549.2800006866455,
+              "batchCount": 177,
+              "nativePreparationCallbacks": 153,
+              "renderedBatchCount": 152,
+              "timerBatchCount": 25,
+              "batchScheduleToGraphicsReadyRemainderMs": 45.075000047683716
+            },
+            "responsiveness": {
+              "animationCallbackGapMs": {
+                "count": 320,
+                "min": 1.4399998188018799,
+                "median": 16.664999961853027,
+                "p95": 57.625,
+                "max": 177.3400001525879
+              },
+              "gapsOver16_67ms": 160,
+              "gapsOver35ms": 24,
+              "longTaskMs": {
+                "count": 1,
+                "min": 55,
+                "median": 55,
+                "p95": 55,
+                "max": 55
+              },
+              "longTasksDuringGraphics": [
+                {
+                  "start": 144.83500003814697,
+                  "duration": 55
+                }
+              ],
+              "longTasksAfterGraphics": []
+            },
+            "errors": []
+          }
+        ]
+      },
+      {
+        "condition": "guard-v1",
+        "path": "guard-v1/headless-probe-warm/report.json",
+        "sha256": "e29932584ca12db9b27a09a61b4af9f73ac4ad49874065101a3fcda912a639f2",
+        "attempts": [
+          {
+            "time_to_graphics_ready_ms": 3978.4649999141693,
+            "preparation": {
+              "pipelineCount": 916,
+              "shaderModuleCount": 917,
+              "asyncPipelineCount": 0,
+              "activeCreateRenderPipelineMs": 5.50999903678894,
+              "activeCreateShaderModuleMs": 16.884999752044678,
+              "activePipelineApiWallMs": 22.394998788833618,
+              "apiWrapperOverheadMs": 0.8799972534179688,
+              "firstApiAtMs": 120.27999997138977,
+              "lastApiAtMs": 3972.789999961853,
+              "pipelineCreateSpanMs": 3852.5099999904633,
+              "waitBetweenNonemptyBatchesMs": 3663.935001850128,
+              "batchCount": 177,
+              "nativePreparationCallbacks": 79,
+              "renderedBatchCount": 78,
+              "timerBatchCount": 99,
+              "batchScheduleToGraphicsReadyRemainderMs": 5.674999952316284
+            },
+            "responsiveness": {
+              "animationCallbackGapMs": {
+                "count": 168,
+                "min": 0.10500001907348633,
+                "median": 16.669999837875366,
+                "p95": 81.75,
+                "max": 188.7350001335144
+              },
+              "gapsOver16_67ms": 85,
+              "gapsOver35ms": 17,
+              "longTaskMs": {
+                "count": 1,
+                "min": 55,
+                "median": 55,
+                "p95": 55,
+                "max": 55
+              },
+              "longTasksDuringGraphics": [
+                {
+                  "start": 119.93499994277954,
+                  "duration": 55
+                }
+              ],
+              "longTasksAfterGraphics": []
+            },
+            "errors": []
+          },
+          {
+            "time_to_graphics_ready_ms": 3679.954999923706,
+            "preparation": {
+              "pipelineCount": 916,
+              "shaderModuleCount": 917,
+              "asyncPipelineCount": 0,
+              "activeCreateRenderPipelineMs": 5.119996547698975,
+              "activeCreateShaderModuleMs": 17.00999903678894,
+              "activePipelineApiWallMs": 22.129995584487915,
+              "apiWrapperOverheadMs": 0.6899988651275635,
+              "firstApiAtMs": 129.38499999046326,
+              "lastApiAtMs": 3677.2249999046326,
+              "pipelineCreateSpanMs": 3547.8399999141693,
+              "waitBetweenNonemptyBatchesMs": 3359.7550027370453,
+              "batchCount": 177,
+              "nativePreparationCallbacks": 80,
+              "renderedBatchCount": 80,
+              "timerBatchCount": 97,
+              "batchScheduleToGraphicsReadyRemainderMs": 2.7300000190734863
+            },
+            "responsiveness": {
+              "animationCallbackGapMs": {
+                "count": 176,
+                "min": 0.5349998474121094,
+                "median": 16.670000076293945,
+                "p95": 48.47000002861023,
+                "max": 158.72499990463257
+              },
+              "gapsOver16_67ms": 90,
+              "gapsOver35ms": 14,
+              "longTaskMs": {
+                "count": 1,
+                "min": 54,
+                "median": 54,
+                "p95": 54,
+                "max": 54
+              },
+              "longTasksDuringGraphics": [
+                {
+                  "start": 129.0149998664856,
+                  "duration": 54
+                }
+              ],
+              "longTasksAfterGraphics": []
+            },
+            "errors": []
+          }
+        ]
+      }
+    ],
+    "limits": [
+      "The original reported10\u201315second attempt was not reproduced exactly.",
+      "Existing Chrome profile, driver and OS caches were not cleared or controlled; separate visits are scoped measurements, not a statistical guarantee.",
+      "API create/queue-retirement counts do not measure backend GPU compilation completion.",
+      "Deep probe overhead and its warmup are separate from ordinary-profile UI timings. Boundary-only runs select no disc; the historical harness cache-description wording about a real-disc warmup does not apply.",
+      "First deep-probe p95 animation gap increased from78.9 to81.75ms while its maximum gap fell; responsiveness is not uniformly improved or accepted."
+    ],
+    "warm_observed_reduction_percent": 43.361,
+    "deep_cleanup": {
+      "path": "guard-v1/deep-owner.json",
+      "sha256": "4c66817a036e6cf6ec9243a7a563656548087623ae4ffb4bfa93f822a8009080"
+    },
+    "final_scoped_result_review": {
+      "path": "guard-v1/final-scoped-result-review.json",
+      "sha256": "f82a8ee1f6813c0275486389aa8d1b1bee28e23cdbe400eb02016d748e487c27"
+    },
+    "full_regression": {
+      "result": "pass",
+      "source_commit": "0258f2fc73613fbfd2d07fe67277bf4f97890c9b",
+      "tests": 2402,
+      "skipped": 166,
+      "seconds": 544.327,
+      "exit_code": 0,
+      "log_sha256": "e25ed786c3014a3b84b84acb38245dbb54b0c75051f6924711ffa727d6312059",
+      "receipt": "guard-v1/full-regression-receipt.json",
+      "receipt_sha256": "39f183ad08bc1ad0316168837aed798f62d40788a9a5ad3e8383f8c504b6abe9"
+    },
+    "integration": {
+      "pull_request": "https://github.com/ericvanlare/melee-web/pull/327",
+      "policy": "Only merge after independent review and complete final-head CI on current main; deployed producer remains distinct from documentation/integration commits."
     }
   }
 }
