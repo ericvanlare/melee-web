@@ -54,19 +54,24 @@ test('native and host recorder gates require opt-in on an allowed origin', () =>
   const host = readFileSync(new URL('../web/melee-runtime.mjs', import.meta.url), 'utf8');
   const start = host.indexOf('  let stagingDiagnosticsEnabled = false;');
   const body = host.slice(start, host.indexOf('  function diagnosticDeliveryBlocked()', start));
-  const runHost = new Function('globalThis', 'recordDiagnostics', body + '\nreturn stagingDiagnosticsEnabled;');
+  const runHost = new Function('globalThis', 'recordDiagnostics', 'stagingDiagnosticsOrigin', body + '\nreturn stagingDiagnosticsEnabled;');
   const staging = 'https://melee-web-room-relay-staging-288.mywebcomic.workers.dev';
   for (const origin of ['http://127.0.0.1:8787', staging, 'https://example.com', staging + ':444']) {
     for (const requested of [false, true]) for (const recorder of [false, true]) {
       const url = new URL(origin + '/' + (requested ? '?melee-web-staging-diagnostics=1' : ''));
       const expected = requested && recorder && ['http://127.0.0.1:8787', staging].includes(origin);
-      const window = {location: url, __meleeWebStagingRingSelection: {}, menuStagingDiagnosticsEnabled: () => recorder};
+      const hostEnabled = runHost({location: url}, recorder, staging);
+      const window = {location: url, __meleeWebStagingRingSelection: {}, menuStagingDiagnosticsEnabled: () => hostEnabled};
       assert.equal(runNative(window), expected ? 1 : 0);
-      assert.equal(runHost({location: url}, recorder), expected);
+      assert.equal(hostEnabled, expected);
       if (expected) assert.equal(window.__meleeWebStagingRingSelection.staging_diagnostics_reason,
         origin === staging ? 'explicit_hosted_staging_opt_in' : 'explicit_loopback_opt_in');
     }
   }
+  const hostedUrl = new URL(staging + '/?melee-web-staging-diagnostics=1');
+  assert.equal(runHost({location: hostedUrl}, true, null), false,
+    'Public/audio callers do not enable hosted telemetry without an explicit staging origin');
+  assert.equal(runNative({location: hostedUrl, __meleeWebStagingRingSelection: {}}), 0);
 });
 
 test('current timing incidents retain staging evidence and classify H1 without inferring combat failure', () => {

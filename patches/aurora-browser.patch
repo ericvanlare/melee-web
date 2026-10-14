@@ -1697,7 +1697,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..9fe8bd7426cee8680344ad5c719debc4
    switch (op.type) {
    case FrameOpType::RenderPass:
 diff --git a/lib/gfx/frame.cpp b/lib/gfx/frame.cpp
-index 9fd83efc28ad8a19c3e902a6efc1096126982583..4fc2f75cd6a088d7f90986fda4e7e3800a938d96 100644
+index 9fd83efc28ad8a19c3e902a6efc1096126982583..a24ad42fe59dbf005c88f7d8e5303cec08b855c1 100644
 --- a/lib/gfx/frame.cpp
 +++ b/lib/gfx/frame.cpp
 @@ -1,7 +1,16 @@
@@ -1876,14 +1876,14 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4fc2f75cd6a088d7f90986fda4e7e380
 +      const requested = new URLSearchParams(window.location.search)
 +        .get('melee-web-staging-diagnostics') === '1';
 +      const recorderEnabled = window.menuStagingDiagnosticsEnabled?.() === true;
-+      const hostedStaging = window.location.origin === 'https://melee-web-room-relay-staging-288.mywebcomic.workers.dev';
-+      const enabled = (localHost || hostedStaging) && requested && recorderEnabled;
++      // The shared runtime owner validates the caller's optional staging origin.
++      const enabled = requested && recorderEnabled;
 +      if (selection) {
 +        selection.staging_diagnostics_requested = requested;
 +        selection.staging_diagnostics_enabled = enabled;
 +        selection.staging_diagnostics_reason = !requested ? 'not_requested' :
 +          enabled ? (localHost ? 'explicit_loopback_opt_in' : 'explicit_hosted_staging_opt_in') :
-+          (localHost || hostedStaging) ? 'recorder_unavailable' : 'unsupported_environment';
++          localHost ? 'recorder_unavailable' : 'unsupported_environment';
 +      }
 +      return enabled ? 1 : 0;
 +    } catch (_) {

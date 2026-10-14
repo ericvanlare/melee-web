@@ -9,7 +9,7 @@ import {createDevelopmentLockstepOwner} from './net_lockstep_development_owner.m
 import {createRoomInvite, parseRoomInvite} from './net_lockstep_room_invite.mjs';
 import {LOCKSTEP_DELAY, LOCKSTEP_MAX_SOURCE_TICKS} from './net_lockstep_core.mjs';
 import {isStagingRoomSurface, parseStagingRoomInvite, stagingRoomInviteFromHash,
-  stagingRoomInviteLink, STAGING_RELAY_URL} from './staging-room.mjs';
+  stagingRoomInviteLink, STAGING_HOST, STAGING_RELAY_URL} from './staging-room.mjs';
 const stagingRoomEnabled=isStagingRoomSurface(window.location);
 window.meleeStagingRoom=Object.freeze({enabled:stagingRoomEnabled,relayUrl:STAGING_RELAY_URL,
   parseInvite:text=>parseStagingRoomInvite(text,parseRoomInvite),
@@ -580,6 +580,7 @@ controllerSettings = mountControllerSettings({
 });
 try {
   await mountMeleeRuntime({canvas:$('canvas'),createAudio:createRuntimeAudio,readDisc:loadNativeGameDisc,openDisc:openNativeGameSession,loaderUrl:new URL('./gameplay_menu_browser.js',import.meta.url),
+    stagingDiagnosticsOrigin:`https://${STAGING_HOST}`,
     onOwner(context){owner=context;({Module,boundary,status,check,put,prepareAudio,pauseAudioForPreparation,
       syncAudio,unloadAndSave,prepareNativeResources,waitForAudioAck,waitForAudioRender}=context);},
     configureModule(module){
