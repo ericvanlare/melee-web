@@ -2156,6 +2156,24 @@
           "finding": "event8 static slot0 bindgroup capture_id8 lacks its real pre-arm initialization descriptor; no swapchain identity claim",
           "state": "source/raw-result reduction only; repair pending"
         }
+      },
+      "ci_content_repair": {
+        "failed_head": "c809535175167cf51c0989a5a2d991b85aee58bd",
+        "failed_run": 38616421982,
+        "failure": "sensitive_assignment at private local apiKey name holding fixed Module property",
+        "repair": "Three lexical identifier references renamed accessorPropertyName; property literal and scanner unchanged",
+        "review_manifest_sha256": "1a7849b4e49c8d28cc830ffbb670df120f66bbd4c63c089561c073c62d00760f",
+        "focused_tests": {
+          "run": 2,
+          "passed": 2,
+          "log_sha256": "131bacc7cbaad1e66b36ec317cccedf9ac5c4d55e5c02ea04b92660fdc8e3371"
+        },
+        "tracked_content": {
+          "entries": 2245,
+          "findings": 0,
+          "log_sha256": "81bdbb761689ad713e52bf8f471fbaba4e76ab98fb579b3521da66881e1573fb"
+        },
+        "runtime_capture_producer": "fa58cb7b305ec6cd44e87f064311e39a98487f9f"
       }
     }
   }

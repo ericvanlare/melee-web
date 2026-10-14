@@ -6,7 +6,7 @@ addToLibrary({
   $MeleeWebWasmOwnershipPrivateV1: {},
   $MeleeWebWasmOwnershipPrivateV1__postset: `
     MeleeWebWasmOwnershipPrivateV1 = (() => {
-      const apiKey = "__meleeWebWasmOwnershipPrivateV1";
+      const accessorPropertyName = "__meleeWebWasmOwnershipPrivateV1";
       const installerKey = "__meleeWebWasmOwnershipInstallV1";
       const schema = "melee-web-private-wasm-instance-v1";
       let state = "waiting_for_prerun";
@@ -126,10 +126,10 @@ addToLibrary({
           return bindings;
         },
       });
-      if (Object.prototype.hasOwnProperty.call(Module, apiKey)) {
+      if (Object.prototype.hasOwnProperty.call(Module, accessorPropertyName)) {
         refuse("private Module accessor property already exists");
       }
-      Object.defineProperty(Module, apiKey, {
+      Object.defineProperty(Module, accessorPropertyName, {
         value: api, enumerable: false, writable: false, configurable: false,
       });
       requirePreRunInstaller();

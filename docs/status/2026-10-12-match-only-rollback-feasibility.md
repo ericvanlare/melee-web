@@ -348,6 +348,13 @@ equality, seven-tick corrective budget or two-computer acceptance is claimed.
 The same evidence entry retains the full build, browser, cleanup and reduction
 receipt hashes. Draft #324 remains open for the drawn restore/repeat milestone.
 
+The first documentation head `c8095351` failed repository-content CI because a
+private helper variable named `apiKey` held a public Module property name. The
+reviewed repair renames only its three local references to `accessorPropertyName`;
+the fixed property string and all scanner rules remain unchanged. The complete
+tracked-content check and both existing Wasm ownership controls pass after the
+repair. This does not relabel the `fa58cb7b` build or browser evidence.
+
 ## Slippi profile source checkpoint
 
 The [profile inventory](../investigations/SLIPPI_GAMEPLAY_PROFILE_INVENTORY.md)
