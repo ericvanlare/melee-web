@@ -19,8 +19,10 @@ from package_staging_room import PackageError, prepare_package  # noqa: E402
 
 
 WORKER = "melee-web-room-relay-staging-288"
-VERSION = "version-8fb9"
-DEPLOYMENT = "deployment-824f"
+OLD_VERSION = "version-8fb9"
+OLD_DEPLOYMENT = "deployment-824f"
+VERSION = "version-2667"
+DEPLOYMENT = "deployment-a61f"
 NAMESPACE = "6644841b09974b46822753ce5cc49965"
 ORIGIN = f"https://{WORKER}.mywebcomic.workers.dev"
 WSS = f"wss://{WORKER}.mywebcomic.workers.dev"
@@ -128,9 +130,16 @@ class StagingRoomPackageTests(unittest.TestCase):
         }
         self.version_path = self.base / "live-version.json"
         _write_json(self.version_path, self.version)
-        self.deployments = [{"id": DEPLOYMENT, "versions": [
-            {"version_id": VERSION, "percentage": 100}
-        ]}]
+        self.deployments = [
+            {"id": OLD_DEPLOYMENT, "created_on": "2026-10-12T20:09:55.597522Z",
+             "strategy": "percentage", "versions": [
+                 {"version_id": OLD_VERSION, "percentage": 100}
+             ]},
+            {"id": DEPLOYMENT, "created_on": "2026-10-14T01:57:35.260554Z",
+             "strategy": "percentage", "versions": [
+                 {"version_id": VERSION, "percentage": 100}
+             ]},
+        ]
         self.deployments_path = self.base / "live-deployments.json"
         _write_json(self.deployments_path, self.deployments)
         source_inputs = {"files_sha256": {
@@ -189,12 +198,36 @@ class StagingRoomPackageTests(unittest.TestCase):
         self.assertNotIn("connect-src *", headers)
         self.assertEqual(manifest["staging_worker"]["room_namespace_id"], NAMESPACE)
         self.assertEqual(manifest["staging_worker"]["allowed_origins_after"][-1], ORIGIN)
+        history = manifest["staging_worker"]["deployment_history"]
+        self.assertEqual([row["id"] for row in history], [OLD_DEPLOYMENT, DEPLOYMENT])
+        self.assertEqual([row["selected"] for row in history], [False, True])
         self.assertEqual(manifest["package"]["file_count_excluding_manifest"], 12)
 
     def test_rejects_non_100_percent_or_wrong_live_version(self) -> None:
-        self.deployments[0]["versions"][0]["percentage"] = 50
+        self.deployments[1]["versions"][0]["percentage"] = 50
         _write_json(self.deployments_path, self.deployments)
         with self.assertRaisesRegex(PackageError, "100%"):
+            self._prepare()
+
+    def test_does_not_fall_back_to_historical_matching_deployment(self) -> None:
+        self.deployments[1]["id"] = "newer-deployment-with-unbound-version"
+        self.deployments[1]["versions"][0]["version_id"] = "newer-unbound-version"
+        _write_json(self.deployments_path, self.deployments)
+        with self.assertRaisesRegex(PackageError, "latest deployment id.*stale"):
+            self._prepare()
+
+    def test_rejects_ambiguous_or_malformed_latest_history(self) -> None:
+        duplicate_latest = dict(self.deployments[1])
+        duplicate_latest["id"] = "duplicate-latest-deployment"
+        self.deployments.append(duplicate_latest)
+        _write_json(self.deployments_path, self.deployments)
+        with self.assertRaisesRegex(PackageError, "ambiguous newest"):
+            self._prepare()
+
+        self.deployments.pop()
+        self.deployments[1]["created_on"] = "not-a-timestamp"
+        _write_json(self.deployments_path, self.deployments)
+        with self.assertRaisesRegex(PackageError, "malformed created_on"):
             self._prepare()
 
     def test_rejects_namespace_replacement(self) -> None:

@@ -110,7 +110,7 @@ body[data-surface="staging"] #developer-diagnostics { display: none !important; 
 
 body[data-surface="staging"] #game-host {
   grid-area: game;
-  align-self: stretch;
+  align-self: start;
   width: 100%;
   min-height: 280px;
   overflow: hidden;

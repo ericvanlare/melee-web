@@ -100,6 +100,14 @@ class CaptureOwnerOutputTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stdout)
 
+    def test_hosted_room_leave_cleanup_controls_are_in_python_suite(self):
+        result = subprocess.run(
+            [str(node_runtime(ROOT)), "--test", str(ROOT / "tests/a3_local_room_cleanup.test.mjs")],
+            cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
+            timeout=30,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+
     def test_browser_report_parent_is_created_by_capture_runner(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

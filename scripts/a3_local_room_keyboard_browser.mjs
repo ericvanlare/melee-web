@@ -699,16 +699,19 @@ async function leaveThroughUi(instance, role) {
   const enabled = await leave.isEnabled().catch(() => false);
   if (!enabled) return {attempted: false, reason: 'Stop / leave control was not enabled'};
   await leave.click({timeout: Math.max(1, Math.min(cleanupRemaining(), 10000))});
-  await page.waitForFunction(() =>
+  const expectedStatus = hostedStaging
+    ? 'You left the room. Reload and import your disc to try again.'
+    : 'Disconnected by your choice. Route outcome is not assessed.';
+  await page.waitForFunction(status =>
     document.querySelector('#lockstep-status')?.textContent?.trim() ===
-      'Disconnected by your choice. Route outcome is not assessed.',
-  null, {timeout: Math.max(1, Math.min(cleanupRemaining(), 15000))});
+      status,
+  expectedStatus, {timeout: Math.max(1, Math.min(cleanupRemaining(), 15000))});
   const state = await readPeerSnapshot(instance);
   requireCondition(state.snapshot?.close_mode === 'normal' &&
     state.snapshot?.peer?.endpointClosed === true &&
     state.snapshot?.transport_cleanup?.closed === true,
     role + ' runtime owner did not confirm normal relay teardown');
-  return {attempted: true, status: 'Disconnected by your choice. Route outcome is not assessed.',
+  return {attempted: true, status: expectedStatus,
     close_mode: state.snapshot.close_mode,
     endpoint_closed: state.snapshot.peer.endpointClosed,
     transport_cleanup: state.snapshot.transport_cleanup};
@@ -947,6 +950,36 @@ try {
     requireCondition(graphics?.cross_origin_isolated === true &&
       graphics.canvas?.width === 640 && graphics.canvas?.height === 480,
       role + ' browser did not retain the isolated 640x480 runtime canvas');
+  }
+  if (hostedStaging) {
+    for (const role of ['alpha', 'beta']) {
+      const layout = await instances[role].page.evaluate(() => {
+        const readRect = selector => {
+          const element = document.querySelector(selector);
+          if (!element) return null;
+          const rect = element.getBoundingClientRect();
+          return {x: rect.x, y: rect.y, top: rect.top, right: rect.right,
+            bottom: rect.bottom, left: rect.left, width: rect.width, height: rect.height};
+        };
+        return {viewport: {width: innerWidth, height: innerHeight, device_pixel_ratio: devicePixelRatio},
+          game_host: readRect('#game-host'), canvas: readRect('#canvas')};
+      });
+      const errorFor = rect => rect && Number.isFinite(rect.width) && rect.width > 0 &&
+        Number.isFinite(rect.height) && rect.height > 0
+        ? Math.abs(rect.width - rect.height * 4 / 3) : null;
+      layout.game_host_aspect_error_css_px = errorFor(layout.game_host);
+      layout.canvas_aspect_error_css_px = errorFor(layout.canvas);
+      layout.aspect_tolerance_css_px = 1;
+      layout.sample_phase = 'both profiles prepared before Host';
+      report.profiles[role].hosted_layout = layout;
+      requireCondition(layout.viewport?.width === 900 && layout.viewport?.height === 700 &&
+        Number.isFinite(layout.game_host_aspect_error_css_px) &&
+        layout.game_host_aspect_error_css_px <= layout.aspect_tolerance_css_px &&
+        Number.isFinite(layout.canvas_aspect_error_css_px) &&
+        layout.canvas_aspect_error_css_px <= layout.aspect_tolerance_css_px,
+        role + ' hosted game host/canvas is not 4:3 within 1 CSS pixel at 900x700: ' +
+          JSON.stringify(layout));
+    }
   }
 
   const relayUrl = networkSimulation?.relayUrl ?? (relayMode.mode === 'external' ? relayMode.endpoint.url :

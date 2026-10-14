@@ -117,7 +117,7 @@ function observeLockstepRoom(){
  if(Number(protocol?.local_checksum_ticks)>=LOCKSTEP_MAX_SOURCE_TICKS){
   finishLockstepRoomStatus('Session limit reached. Route completion is unverified.',health);return;
  }
- if(protocol?.ready===true){lockstepRoomStatus(lockstepStagingMode?'Connected. Continue through the original character and stage screens. Match results are not assessed here.':'Connected. Match results are not assessed here.');return;}
+ if(protocol?.ready===true){lockstepRoomStatus(lockstepStagingMode?'Connected. Choose your characters and stage to start the match.':'Connected. Match results are not assessed here.');return;}
  lockstepRoomStatus(health.armed===true?waitingLockstepRoomStatus():
   `Preparing ${lockstepRoomRole==='alpha'?'Host':'Join'} session.`);
 }

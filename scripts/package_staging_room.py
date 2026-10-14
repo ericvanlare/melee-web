@@ -10,6 +10,7 @@ deployment directory.  It never deploys anything.
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -186,6 +187,51 @@ def _origin(value: object, label: str, scheme: str | None = None) -> str:
     return value
 
 
+def _deployment_history_rows(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list) or not value:
+        raise PackageError("live deployment history must be a nonempty list")
+    rows: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise PackageError(f"deployment history row {index} is not an object")
+        deployment_id = item.get("id")
+        created_on = item.get("created_on")
+        versions = item.get("versions")
+        if not isinstance(deployment_id, str) or not deployment_id or deployment_id in seen_ids:
+            raise PackageError(f"deployment history row {index} has a missing or duplicate id")
+        seen_ids.add(deployment_id)
+        if not isinstance(created_on, str) or not created_on:
+            raise PackageError(f"deployment history row {deployment_id} has no created_on timestamp")
+        try:
+            timestamp = datetime.fromisoformat(created_on.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise PackageError(f"deployment history row {deployment_id} has malformed created_on") from exc
+        if timestamp.tzinfo is None or timestamp.utcoffset() is None:
+            raise PackageError(f"deployment history row {deployment_id} has a timezone-free created_on")
+        if not isinstance(versions, list) or not versions:
+            raise PackageError(f"deployment history row {deployment_id} has no version allocation")
+        normalized_versions: list[dict[str, Any]] = []
+        seen_versions: set[str] = set()
+        for allocation in versions:
+            if not isinstance(allocation, dict):
+                raise PackageError(f"deployment history row {deployment_id} has a malformed allocation")
+            version_id, percentage = allocation.get("version_id"), allocation.get("percentage")
+            if (not isinstance(version_id, str) or not version_id or version_id in seen_versions or
+                    type(percentage) not in (int, float) or not 0 <= percentage <= 100):
+                raise PackageError(f"deployment history row {deployment_id} has an invalid allocation")
+            seen_versions.add(version_id)
+            normalized_versions.append({"version_id": version_id, "percentage": percentage})
+        rows.append({
+            "id": deployment_id,
+            "created_on": created_on,
+            "timestamp": timestamp.astimezone(timezone.utc),
+            "strategy": item.get("strategy"),
+            "versions": normalized_versions,
+        })
+    return rows
+
+
 def _validate_provider_inputs(binding: dict[str, Any], version: dict[str, Any],
                               deployments: object, config: dict[str, Any],
                               worker_sha: str, config_raw: bytes,
@@ -262,17 +308,19 @@ def _validate_provider_inputs(binding: dict[str, Any], version: dict[str, Any],
         raise PackageError("live version differs from the endpoint version in the baseline binding")
     if version.get("id") == "":
         raise PackageError("deployed-version receipt has an empty version id")
-    if not isinstance(deployments, list) or len(deployments) != 1:
-        raise PackageError("live deployment query must contain exactly the staging Worker")
-    deployment = deployments[0]
-    if not isinstance(deployment, dict) or deployment.get("id") != binding["deployment_id"]:
-        raise PackageError("live deployment differs from the retained staging deployment")
-    active_versions = deployment.get("versions")
+    history = _deployment_history_rows(deployments)
+    newest_timestamp = max(row["timestamp"] for row in history)
+    newest_rows = [row for row in history if row["timestamp"] == newest_timestamp]
+    if len(newest_rows) != 1:
+        raise PackageError("deployment history has an ambiguous newest created_on timestamp")
+    deployment = newest_rows[0]
+    if deployment["id"] != binding["deployment_id"]:
+        raise PackageError("latest deployment id differs from the retained binding; binding is stale")
+    active_versions = deployment["versions"]
     if (not isinstance(active_versions, list) or len(active_versions) != 1 or
-            not isinstance(active_versions[0], dict) or
             active_versions[0].get("version_id") != version.get("id") or
             active_versions[0].get("percentage") != 100):
-        raise PackageError("staging deployment is not 100% on the supplied live version")
+        raise PackageError("latest staging deployment is not 100% on the supplied live version")
     resources = version.get("resources")
     if not isinstance(resources, dict):
         raise PackageError("deployed-version receipt has no resources")
@@ -308,6 +356,12 @@ def _validate_provider_inputs(binding: dict[str, Any], version: dict[str, Any],
         "namespace_id": namespace,
         "deployment_id": binding["deployment_id"],
         "version_id": binding["version_id"],
+        "deployment_history": [
+            {"id": row["id"], "created_on": row["created_on"],
+             "strategy": row["strategy"], "versions": row["versions"],
+             "selected": row["id"] == deployment["id"]}
+            for row in history
+        ],
         "compatibility_date": config["compatibility_date"],
         "usage_model": runtime.get("usage_model"),
         "owner_plan": binding["owner_plan"],
@@ -517,6 +571,7 @@ def prepare_package(source_root: Path, build_receipt_path: Path,
                 "owner_plan": provider["owner_plan"], "spend_limit_usd": provider["spend_limit_usd"],
                 "workers_dev": True, "preview_urls": False, "routes": [],
                 "deployment_id": provider["deployment_id"], "prior_version_id": provider["version_id"],
+                "deployment_history": provider["deployment_history"],
                 "room_class": ROOM_CLASS, "room_binding": ROOM_BINDING,
                 "room_namespace_id": provider["namespace_id"], "usage_model": provider["usage_model"],
                 "compatibility_date": provider["compatibility_date"],
