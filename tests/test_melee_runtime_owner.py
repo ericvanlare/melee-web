@@ -94,7 +94,8 @@ class SharedRuntimeOwnerTests(unittest.TestCase):
         startup_end = source.index("void schedule_startup_pipeline_service(){", startup_begin)
         startup_callback = source[startup_begin:startup_end]
         terminal_query = "EM_ASM_INT({return window.menuOwnerStopped?.()?1:0;})"
-        self.assertEqual(startup_callback.count(terminal_query), 1)
+        self.assertEqual(startup_callback.count(terminal_query), 2,
+                         "the owner-stop state is checked before and after startup service")
         startup_callback = startup_callback.replace(terminal_query, "owner_stopped")
 
         compiler_name = os.environ.get("CXX", "clang++")
@@ -143,7 +144,9 @@ const AuroraStats* aurora_get_stats() {{ static AuroraStats stats{{1}}; return &
 bool startup_pipeline_service_allowed() {{ return !faulted; }}
 bool aurora_pipeline_service_preparation() {{ ++startup_batches; return true; }}
 
+void schedule_startup_pipeline_service();
 {startup_callback}
+void schedule_startup_pipeline_service() {{}}
 
 {prefix}
 }}
@@ -269,6 +272,189 @@ int main() {{
             self.assertEqual(executed.returncode, 0,
                              executed.stdout + executed.stderr)
             self.assertIn("native lifecycle handoff fixture passed", executed.stdout)
+
+    def test_startup_pipeline_service_chains_bounded_timer_batches(self):
+        source = menu_browser_source()
+        allowed_begin = source.index("bool startup_pipeline_service_allowed(){")
+        forward = source.index("void schedule_startup_pipeline_service();", allowed_begin)
+        allowed = source[allowed_begin:forward]
+        service_begin = forward
+        service_end = source.index("void service_render_cache_writes(){", service_begin)
+        service = source[service_begin:service_end]
+        stop_query = "EM_ASM_INT({return window.menuOwnerStopped?.()?1:0;})"
+        self.assertEqual(service.count(stop_query), 2,
+                         "the timer callback checks stop state before and after one service batch")
+        service = service.replace(stop_query, "owner_stopped")
+        for forbidden in ("tick(", "render_audio_tick(", "present_source(",
+                          "service_render_cache_writes(", "menu_clock.", "audio_clock."):
+            self.assertNotIn(forbidden, service,
+                             "the independent timer cannot perform gameplay, draw, clock, or cache work")
+        delay_line = next(line for line in source.splitlines()
+                          if "constexpr int kStartupPipelineServiceDelayMs=" in line)
+
+        compiler_name = os.environ.get("CXX", "clang++")
+        compiler_words = shlex.split(compiler_name)
+        compiler = shutil.which(compiler_words[0]) if compiler_words else None
+        if compiler is None:
+            compiler = shutil.which("clang++") or shutil.which("g++")
+        if compiler is None:
+            self.skipTest("no C++ compiler is available for the native timer fixture")
+        fixture = r'''#include <algorithm>
+#include <iostream>
+#include <vector>
+
+bool world=false,match=false,results=false,prize=false,host=false;
+bool running=false,pending=false,scoped_assets=false,faulted=false;
+bool preparation_busy=false,owner_stopped=false;
+struct Preparation { bool busy() const { return preparation_busy; } } preparation;
+struct AuroraStats { unsigned queuedPipelines=0; } stats;
+bool stats_available=true;
+const AuroraStats* aurora_get_stats() { return stats_available?&stats:nullptr; }
+bool startup_pipeline_service_scheduled=false;
+bool startup_pipeline_service_failed=false;
+unsigned service_calls=0;
+bool service_ok=true,service_reenter=false,stop_after_service=false;
+void schedule_startup_pipeline_service();
+struct Timer { void (*callback)(void*); void* argument; int delay_ms; };
+std::vector<Timer> timers;
+void emscripten_async_call(void (*callback)(void*),void* argument,int delay_ms) {
+ timers.push_back({callback,argument,delay_ms});
+}
+bool aurora_pipeline_service_preparation() {
+ ++service_calls;
+ if(service_reenter)schedule_startup_pipeline_service();
+ if(!service_ok)return false;
+ stats.queuedPipelines-=std::min(stats.queuedPipelines,5u);
+ if(stop_after_service)owner_stopped=true;
+ return true;
+}
+@DELAY_LINE@
+@ALLOWED@
+@SERVICE@
+bool run_timer() {
+ if(timers.size()!=1)return false;
+ const Timer task=timers.front();timers.erase(timers.begin());
+ task.callback(task.argument);return true;
+}
+bool require(bool value,const char* label) {
+ if(value)return true;
+ std::cerr<<"failed control: "<<label<<"\n";return false;
+}
+#define REQUIRE(value,label) do { if(!require((value),(label)))return 1; } while(false)
+int main() {
+ stats.queuedPipelines=0;
+ schedule_startup_pipeline_service();
+ REQUIRE(timers.empty()&&!startup_pipeline_service_scheduled,"empty queue does not arm timer");
+ stats_available=false;stats.queuedPipelines=2;
+ schedule_startup_pipeline_service();
+ REQUIRE(timers.empty()&&!startup_pipeline_service_scheduled,"missing stats do not arm timer");
+ stats_available=true;
+
+ bool* excluded[]={&world,&match,&results,&prize,&host,&running,&pending,
+                   &scoped_assets,&preparation_busy,&faulted};
+ const char* exclusion_names[]={"world","match","results","prize","host",
+   "running","pending","scoped assets","preparation","fault"};
+ for(unsigned i=0;i<sizeof(excluded)/sizeof(excluded[0]);++i) {
+  *excluded[i]=true;
+  schedule_startup_pipeline_service();
+  REQUIRE(timers.empty()&&!startup_pipeline_service_scheduled,exclusion_names[i]);
+  *excluded[i]=false;
+ }
+
+ // A single timer dispatch owns one Aurora service call. The test double
+ // leaves at most five queue entries per service to model the existing
+ // bounded Aurora pass; the native scheduler only chooses when to request it.
+ stats.queuedPipelines=11;service_reenter=true;
+ schedule_startup_pipeline_service();
+ REQUIRE(timers.size()==1&&timers[0].delay_ms==kStartupPipelineServiceDelayMs,
+         "first eligible source callback schedules one exact-delay timer");
+ schedule_startup_pipeline_service();
+ REQUIRE(timers.size()==1,"duplicate scheduling keeps one pending timer");
+ REQUIRE(service_calls==0,"scheduling does no synchronous preparation");
+ REQUIRE(run_timer(),"first timer dispatches");
+ REQUIRE(service_calls==1&&stats.queuedPipelines==6,"first timer runs one bounded batch");
+ REQUIRE(timers.size()==1&&timers[0].delay_ms==kStartupPipelineServiceDelayMs,
+         "remaining work gets one fresh timer after the batch");
+ REQUIRE(run_timer(),"second timer dispatches");
+ REQUIRE(service_calls==2&&stats.queuedPipelines==1,"second timer runs one bounded batch");
+ REQUIRE(timers.size()==1&&timers[0].delay_ms==kStartupPipelineServiceDelayMs,
+         "tail work gets one fresh timer after the batch");
+ REQUIRE(run_timer(),"third timer dispatches");
+ REQUIRE(service_calls==3&&stats.queuedPipelines==0,"third timer drains only its one bounded batch");
+ REQUIRE(timers.empty()&&!startup_pipeline_service_scheduled,"empty tail stops timer chain");
+
+ stats.queuedPipelines=1;schedule_startup_pipeline_service();
+ REQUIRE(timers.size()==1,"empty-before-callback control arms one timer");
+ stats.queuedPipelines=0;
+ unsigned before_empty_callback=service_calls;
+ REQUIRE(run_timer(),"empty-before-callback timer dispatches");
+ REQUIRE(service_calls==before_empty_callback&&timers.empty()&&
+         !startup_pipeline_service_scheduled,"empty queue at callback refuses service");
+ stats.queuedPipelines=1;schedule_startup_pipeline_service();
+ REQUIRE(timers.size()==1,"missing-stats callback control arms one timer");
+ stats_available=false;before_empty_callback=service_calls;
+ REQUIRE(run_timer(),"missing-stats timer dispatches");
+ REQUIRE(service_calls==before_empty_callback&&timers.empty()&&
+         !startup_pipeline_service_scheduled,"missing stats at callback refuses service");
+ stats_available=true;
+
+ // Native or JS ownership may change after scheduling or while the service
+ // call yields. In either case the pending timer is consumed without chaining.
+ bool* callback_exclusions[]={&world,&match,&results,&prize,&host,&running,&pending,
+   &scoped_assets,&preparation_busy,&faulted};
+ for(unsigned i=0;i<sizeof(callback_exclusions)/sizeof(callback_exclusions[0]);++i) {
+  *callback_exclusions[i]=false;stats.queuedPipelines=1;
+  schedule_startup_pipeline_service();
+  REQUIRE(timers.size()==1,"owner-change control arms one timer");
+  *callback_exclusions[i]=true;
+  const unsigned before=service_calls;
+  REQUIRE(run_timer(),"owner-change timer dispatches");
+  REQUIRE(service_calls==before&&timers.empty()&&!startup_pipeline_service_scheduled,
+          "owner change before callback refuses service and chaining");
+  *callback_exclusions[i]=false;
+ }
+ stats.queuedPipelines=1;owner_stopped=false;stop_after_service=true;
+ schedule_startup_pipeline_service();
+ const unsigned before_stop=service_calls;
+ REQUIRE(run_timer(),"post-service stop timer dispatches");
+ REQUIRE(service_calls==before_stop+1&&timers.empty()&&!startup_pipeline_service_scheduled,
+         "JS owner stop during service prevents a chained timer");
+ stop_after_service=false;owner_stopped=true;stats.queuedPipelines=1;
+ schedule_startup_pipeline_service();
+ REQUIRE(timers.size()==1,"stopped-owner callback control arms before stop");
+ const unsigned before_js_stop=service_calls;
+ REQUIRE(run_timer(),"stopped-owner timer dispatches");
+ REQUIRE(service_calls==before_js_stop&&timers.empty()&&!startup_pipeline_service_scheduled,
+         "stopped JS owner consumes timer without service");
+ owner_stopped=false;
+
+ stats.queuedPipelines=1;service_ok=false;
+ schedule_startup_pipeline_service();
+ const unsigned before_failure=service_calls;
+ REQUIRE(run_timer(),"failed service timer dispatches");
+ REQUIRE(service_calls==before_failure+1&&startup_pipeline_service_failed&&
+         timers.empty()&&!startup_pipeline_service_scheduled,"service failure remains terminal");
+ schedule_startup_pipeline_service();
+ REQUIRE(timers.empty(),"failed service cannot restart timer chain");
+ std::cout<<"startup timer chain controls passed\n";
+}
+'''
+        fixture = (fixture.replace("@DELAY_LINE@", delay_line)
+                          .replace("@ALLOWED@", allowed)
+                          .replace("@SERVICE@", service))
+        with tempfile.TemporaryDirectory(prefix="melee-startup-pipeline-timer-") as directory:
+            directory = Path(directory)
+            fixture_path = directory / "startup_pipeline_timer_fixture.cpp"
+            binary_path = directory / "startup_pipeline_timer_fixture"
+            fixture_path.write_text(fixture)
+            command = [compiler, *compiler_words[1:], "-std=c++17", "-Wall", "-Wextra",
+                       "-Werror", str(fixture_path), "-o", str(binary_path)]
+            compiled = subprocess.run(command, capture_output=True, text=True, timeout=30)
+            self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+            executed = subprocess.run([str(binary_path)], capture_output=True, text=True,
+                                      timeout=10)
+            self.assertEqual(executed.returncode, 0, executed.stdout + executed.stderr)
+            self.assertIn("startup timer chain controls passed", executed.stdout)
 
     def test_explicit_silent_owner_never_opens_audio(self):
         self.run_owner(['--silent'])

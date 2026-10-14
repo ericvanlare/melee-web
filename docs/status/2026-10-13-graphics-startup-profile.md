@@ -35,8 +35,27 @@ The original gzip trace is unchanged. Its scoped derived summary is
 No source ticks or disc import were requested. The Chrome profile, docked
 DevTools and instrumented capture are not a quiet-machine performance gate.
 
-The next boundary is a source-bound startup report on the ordinary audio-player:
-phase timings, cache-idle state and a bounded pipeline-queue history, available
-from the UI while loading. The candidate changes no game arithmetic, inputs,
-source order, readiness guards or timing deadlines. No speedup or completed
-staging rollout is claimed by this baseline entry.
+The bounded startup report is deployed on the ordinary audio-player at immutable
+[e3dc446a](https://e3dc446a.webmelee-staging.pages.dev/) and the public staging
+alias. Source `dcf6b06e794597b01bcc5d07c4dfb46f0e843018`, runtime
+`2f3efb6678651310`, and producer/package identities remain in the scoped receipt.
+The UI works before native startup and after an error, exports locally, and
+records User Timing marks. The Release build, package audit, immutable HTTP
+verification and two headless report/export checks pass. The first 2,400-test
+regression retained one reduced-fixture failure (166 skips); its reviewed repair
+passes focused controls. A corrected full regression is still pending.
+
+Two native Chrome UI reloads on that deployed candidate took 6,597.915 ms and
+4,627.905 ms from mount. Their native startup intervals were 5,697.145 ms and
+4,539.575 ms; renderer initialization was 79.755 ms and 29.350 ms. Each retired
+all 890 declared pipeline entries with queue zero and the original cache-idle
+state `1`. The second reload recorded no long tasks. Exact exported reports,
+cache conditions and observation limits are in the receipt. These observations
+identify the pipeline queue as the gate holding readiness; they do not measure
+backend GPU compilation completion or reproduce the owner's exact 10–15 s run.
+
+The next bounded experiment decouples the same five-entry startup batches from
+the sixth-render-callback cadence with one yielding 8 ms timer. Its ownership,
+queue ordering and stop controls must pass independent review before a matched
+capture. No speedup is claimed yet. The report and candidate preserve game
+arithmetic, input, source order, readiness guards and timing deadlines.

@@ -229,7 +229,6 @@ std::string match_message="Original source match";
 bool running=false,pending=false,host_entered=false,world_exposed=false,faulted=false;
 bool startup_pipeline_service_scheduled=false;
 bool startup_pipeline_service_failed=false;
-unsigned startup_pipeline_service_skip_frames=0;
 constexpr int kStartupPipelineServiceDelayMs=8;
 melee_web::MenuPreparationState preparation;
 unsigned audio_phase=0,diagnostic_start_ticks=0;
@@ -1291,30 +1290,40 @@ bool startup_pipeline_service_allowed(){
 }
 void schedule_startup_pipeline_service();
 void startup_pipeline_service_callback(void*){
- startup_pipeline_service_scheduled=false;
+ // Keep the single-owner flag set while the service call is active. If that
+ // call yields, another main-loop callback must not queue a duplicate timer.
+ if(!startup_pipeline_service_scheduled)return;
  // This independent timer can run before tick consumes the terminal signal.
  // Query owner state without draining commands or changing lifecycle intent.
- if(EM_ASM_INT({return window.menuOwnerStopped?.()?1:0;}))return;
- if(!startup_pipeline_service_allowed())return;
+ if(EM_ASM_INT({return window.menuOwnerStopped?.()?1:0;})||
+    !startup_pipeline_service_allowed()){
+  startup_pipeline_service_scheduled=false;
+  return;
+ }
  const AuroraStats* stats=aurora_get_stats();
- if(!stats||stats->queuedPipelines==0)return;
- // Emscripten invokes async_call through a delayed timer task. Schedule one
- // bounded Aurora batch between every sixth eligible rendered callback
- // instead of chaining timer tasks or adding work to every display interval.
+ if(!stats||stats->queuedPipelines==0){
+  startup_pipeline_service_scheduled=false;
+  return;
+ }
+ // One delayed timer owns one bounded Aurora service batch. The flag remains
+ // set across the call so a yielded/reentrant main loop cannot queue a peer.
  if(!aurora_pipeline_service_preparation()){
   startup_pipeline_service_failed=true;
+  startup_pipeline_service_scheduled=false;
+  return;
  }
+ startup_pipeline_service_scheduled=false;
+ // A successful batch may leave startup work queued. Recheck the JS owner
+ // after the service and let the ordinary scheduling guards recheck native
+ // ownership and queue state before chaining another independent timer.
+ if(EM_ASM_INT({return window.menuOwnerStopped?.()?1:0;}))return;
+ schedule_startup_pipeline_service();
 }
 void schedule_startup_pipeline_service(){
  if(startup_pipeline_service_scheduled||startup_pipeline_service_failed||
     !startup_pipeline_service_allowed())return;
  const AuroraStats* stats=aurora_get_stats();
  if(!stats||stats->queuedPipelines==0)return;
- if(startup_pipeline_service_skip_frames<5){
-  ++startup_pipeline_service_skip_frames;
-  return;
- }
- startup_pipeline_service_skip_frames=0;
  startup_pipeline_service_scheduled=true;
  emscripten_async_call(startup_pipeline_service_callback,nullptr,
                        kStartupPipelineServiceDelayMs);

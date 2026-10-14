@@ -163,10 +163,203 @@
     }
   },
   "candidate": {
-    "state": "source_reviewed_validation_pending",
+    "state": "profiling_deployed_scheduler_experiment_pending",
     "base_commit": "e19cecfe7764bcd97802bea1933500e37a872af5",
     "independent_js_review_sha256": "7e345137e1770781b25348f5d24023b4aa418b5baa863503d8e988076fb4ba3d",
     "speedup_claim": false,
-    "deployed": false
+    "deployed": true,
+    "source_commit": "dcf6b06e794597b01bcc5d07c4dfb46f0e843018",
+    "runtime_hash": "2f3efb6678651310",
+    "producer_identity_sha256": "cd6931a26138043dedd5a2e86351cfc8421b6c69cee6d4dddbaa0f665ef6aa76",
+    "manifest_sha256": "c51dc784d8beecedd85c1a8f52007cd9cb6500f57f3023b58540c0ecc4bc6b98",
+    "deployment_id": "e3dc446a-6226-4398-a4c9-34a5d15741f5",
+    "immutable_url": "https://e3dc446a.webmelee-staging.pages.dev",
+    "validation": {
+      "release_audio_build": "pass",
+      "package_source_inventory_audit": "pass",
+      "immutable_http": "pass",
+      "local_startup_ui_export_runs": 2,
+      "first_full_regression": {
+        "tests": 2400,
+        "skipped": 166,
+        "failed": 1,
+        "failure": "Reduced teardown fixture omitted startupProfilingPending; retained full-regression-v1.log. Repaired by explicit completed startup state; focused fixture passes."
+      },
+      "corrected_full_regression": "pending"
+    }
+  },
+  "instrumented_foreground_baseline": {
+    "source_commit": "dcf6b06e794597b01bcc5d07c4dfb46f0e843018",
+    "runtime_hash": "2f3efb6678651310",
+    "method": "Native Chrome UI reload, Startup details, local JSON export; no console injection, DevTools closed, no disc selected. No builds, tests or other owned captures during reloads. Shared user profile and OS/GPU caches uncontrolled.",
+    "samples": [
+      {
+        "file": "foreground-startup-1.json",
+        "sha256": "815f02a86a506a14ec05720029f9f0ae6d020d91ab3b17baa8f70b62fbc912e0",
+        "condition": "Existing foreground Chrome profile, first navigation to new artifact, downloaded new runtime files",
+        "elapsed_ms": 6597.915,
+        "navigation_elapsed_ms": 7088.445,
+        "graphics_startup": {
+          "renderer_init_ms": 79.75500011444092,
+          "queued_pipelines": 0,
+          "created_pipelines": 890,
+          "cache_idle": 1,
+          "first_native_callback_ms": 82.53999996185303,
+          "elapsed_ms": 5697.1449999809265,
+          "terminal": true
+        },
+        "graphics_samples": [
+          {
+            "at_ms": 1008.355,
+            "elapsed_ms": 107.9850001335144,
+            "queued_pipelines": 880,
+            "created_pipelines": 10,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 2137.005,
+            "elapsed_ms": 1236.9700000286102,
+            "queued_pipelines": 795,
+            "created_pipelines": 95,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 3223.96,
+            "elapsed_ms": 2323.914999961853,
+            "queued_pipelines": 590,
+            "created_pipelines": 300,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 4250.925,
+            "elapsed_ms": 3350.880000114441,
+            "queued_pipelines": 485,
+            "created_pipelines": 405,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 5312.26,
+            "elapsed_ms": 4412.215000152588,
+            "queued_pipelines": 305,
+            "created_pipelines": 585,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 6315.25,
+            "elapsed_ms": 5415.210000038147,
+            "queued_pipelines": 85,
+            "created_pipelines": 805,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 6597.895,
+            "elapsed_ms": 5697.1449999809265,
+            "queued_pipelines": 0,
+            "created_pipelines": 890,
+            "cache_idle": 1,
+            "terminal": true
+          }
+        ],
+        "longtasks": {
+          "status": "available",
+          "count": 1,
+          "total_ms": 62,
+          "max_ms": 62,
+          "before_profile_count": 0,
+          "before_profile_total_ms": 0,
+          "dropped_rows": 0,
+          "rows": [
+            {
+              "start_ms": 1409.46,
+              "duration_ms": 62,
+              "before_profile": false
+            }
+          ]
+        }
+      },
+      {
+        "file": "foreground-startup-2-warm.json",
+        "sha256": "be3833099d93bb4066c9f9c26f95564a44892df0fb61ae25af7f2035c665c8cd",
+        "condition": "Same foreground Chrome profile, ordinary cached reload; no cache clearing or throttling",
+        "elapsed_ms": 4627.905,
+        "navigation_elapsed_ms": 4855.03,
+        "graphics_startup": {
+          "renderer_init_ms": 29.350000143051147,
+          "queued_pipelines": 0,
+          "created_pipelines": 890,
+          "cache_idle": 1,
+          "first_native_callback_ms": 29.65000009536743,
+          "elapsed_ms": 4539.575000047684,
+          "terminal": true
+        },
+        "graphics_samples": [
+          {
+            "at_ms": 124.05,
+            "elapsed_ms": 35.75999999046326,
+            "queued_pipelines": 880,
+            "created_pipelines": 10,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 1180.455,
+            "elapsed_ms": 1092.710000038147,
+            "queued_pipelines": 725,
+            "created_pipelines": 165,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 2254.305,
+            "elapsed_ms": 2166.560000181198,
+            "queued_pipelines": 500,
+            "created_pipelines": 390,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 3357.525,
+            "elapsed_ms": 3269.7750000953674,
+            "queued_pipelines": 325,
+            "created_pipelines": 565,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 4360.52,
+            "elapsed_ms": 4272.775000095367,
+            "queued_pipelines": 65,
+            "created_pipelines": 825,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 4627.9,
+            "elapsed_ms": 4539.575000047684,
+            "queued_pipelines": 0,
+            "created_pipelines": 890,
+            "cache_idle": 1,
+            "terminal": true
+          }
+        ],
+        "longtasks": {
+          "status": "available",
+          "count": 0,
+          "total_ms": 0,
+          "max_ms": null,
+          "before_profile_count": 0,
+          "before_profile_total_ms": 0,
+          "dropped_rows": 0,
+          "rows": []
+        }
+      }
+    ],
+    "interpretation": "The existing native cache-idle readiness gate stayed pending while 890 startup pipeline entries drained. Renderer initialization is a small part of the observed wait. This establishes the active gate; queue retirement is not backend GPU completion. A scheduler change is still an experiment, not a claimed speedup."
   }
 }
