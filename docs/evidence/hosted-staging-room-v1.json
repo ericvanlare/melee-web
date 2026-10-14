@@ -1,0 +1,379 @@
+{
+  "schema": "melee-web-hosted-staging-room-v1",
+  "state": "FINAL_CANDIDATE_VALIDATION_PASS_R2_DEPLOYMENT_HTTP_AND_SHORT_CSS_CHECK_PASS_R1_RTT_PASS_R1_FULL_ROUTE_FAIL",
+  "review": {
+    "deployment_http_rtt": {
+      "path": "deployment-http-rtt-result-review.json",
+      "sha256": "c995ab45418df1cb3233bc05c128ee4ed72018771cf014cd05d294cf4ebe44c2",
+      "state": "PASS",
+      "scope": "deployed identity, static HTTP checks, and dedicated same-host two-profile RTT"
+    },
+    "full_route": {
+      "path": "hosted-full-first-failure-review.json",
+      "sha256": "f94f71e1c10012287810616e7435140375162be6097678a40018de3576c35f76",
+      "state": "FAIL",
+      "scope": "one same-host full-route attempt; no completed route acceptance"
+    },
+    "revision_2_short_hosted_check": {
+      "path": "revision-2/result-review.json",
+      "sha256": "f5522c2f29614a771023bbfd496ace743ac05a4095105fb0e86a6e1e4f97631f",
+      "state": "PASS",
+      "scope": "bounded two-profile same-host CSS keyboard Host/Join/Leave check; no full match or two-machine evidence"
+    }
+  },
+  "producer": {
+    "commit": "0a74399026234a8bf688d782c4329d23026703b9",
+    "tree": "8bdd01f4a7db2c566678e8d954ae8952d7faad61",
+    "runtime_wasm_sha256": "5e815931c8fa0c7be49c977c9717b46f0f911fe080cf2ba91b28b023673e690f",
+    "ordinary_release_build_receipt_sha256": "e60a4e845e6b7d4217108a65dac46f3e6d2ae0911b8ed2898c07a61d9530a6ea",
+    "package_manifest_sha256": "e034c08fa08c1d098c4b28fb40e3ef5c46298fbf2148a508bc7811d73518fdf1"
+  },
+  "staging_worker": {
+    "name": "melee-web-room-relay-staging-288",
+    "origin": "https://melee-web-room-relay-staging-288.mywebcomic.workers.dev/",
+    "deployment_id": "a61fb916-e38f-4cc8-9002-7b64678d6fa1",
+    "version_id": "2667dd0e-eaba-4ded-87bd-ab4988d9271e",
+    "percentage": 100,
+    "durable_object_class": "RoomRelay",
+    "storage": "sqlite",
+    "namespace_id": "6644841b09974b46822753ce5cc49965",
+    "workers_dev": true,
+    "routes": [],
+    "preview_urls": false,
+    "plan": "Workers Free",
+    "spend_limit_usd": 0,
+    "account_or_billing_reverified": false,
+    "source_and_provider_receipts": {
+      "deployment_binding": {
+        "path": "deployment-binding.json",
+        "sha256": "4cedd7f81a49bf9152d1cf3b2802a83c30ac35fbcc2c7a8f37831241305b2473"
+      },
+      "deployed_version": {
+        "path": "deployed-version.json",
+        "sha256": "c6fa6a884cc968da5ce1ab12e8c945ee59222f8226a5361c356d0d081fc6819e"
+      },
+      "deployment_list": {
+        "path": "deployment-list.json",
+        "sha256": "bcb606adc1a8b4e65d86bf3b782ea33db71059c6f38e451ee9eec6ab82e260af"
+      }
+    }
+  },
+  "static_http": {
+    "state": "PASS",
+    "served_runtime_file_count": 43,
+    "headers_csp_coop_coep": true,
+    "wasm_mime": true,
+    "hosted_origin_101": true,
+    "forbidden_origin_status": 403,
+    "owned_socket_context_profile_cleanup": true,
+    "outer_process_absence": true,
+    "verification_receipt": {
+      "path": "hosted-http-verification.json",
+      "sha256": "83a28dad6893836804752fda2e76b1f07dbcf6f3ec448f1679d0d612ef68a74c"
+    }
+  },
+  "same_host_relay_rtt": {
+    "state": "PASS",
+    "profiles": 2,
+    "same_host": true,
+    "warmup_echoes": 10,
+    "measured_echoes": 40,
+    "exact_payload_echoes": 50,
+    "alpha_to_beta_to_alpha_ms": {
+      "count": 20,
+      "p50": 93.75499999523163,
+      "p95_nearest_rank": 163.00999999046326,
+      "max": 180.07000017166138
+    },
+    "beta_to_alpha_to_beta_ms": {
+      "count": 20,
+      "p50": 80.60249996185303,
+      "p95_nearest_rank": 151.05499982833862,
+      "max": 152.30999994277954
+    },
+    "limits": [
+      "Includes browser dispatch and relay time; it is not two-machine latency, network-only RTT, input-to-photon latency, or performance acceptance.",
+      "The remote Worker bundle was not downloaded; uploaded source identity is bound through deployment receipts."
+    ],
+    "report": {
+      "path": "hosted-rtt-result/report.json",
+      "sha256": "98aabb1a6a6b0e866a50e887f893e2e504b59e68dfc4a1fb5904cad9b0abc03e"
+    },
+    "producer_commit": "0a74399026234a8bf688d782c4329d23026703b9",
+    "deployment_version_id": "2667dd0e-eaba-4ded-87bd-ab4988d9271e"
+  },
+  "full_route_attempt": {
+    "state": "FAIL",
+    "reason": "operation budget exhausted while progressing Results presentation",
+    "outer_elapsed_ms": 260397,
+    "operation_budget_ms": 230000,
+    "cleanup_reserve_ms": 30000,
+    "outer_total_ms": 300000,
+    "match_source_frames": 1975,
+    "stock_losses": 4,
+    "respawns": 3,
+    "final_stocks": [
+      0,
+      4
+    ],
+    "results_trace_rows": 214,
+    "results_entry_source_cursor": 2507,
+    "final_route_complete": false,
+    "final_raw_checksum_comparison": "unavailable; null final freeze",
+    "latest_protocol_witness": {
+      "local_checksum_ticks": 2709,
+      "remote_checksum_ticks": 2706,
+      "checksum_mismatch_count": 0,
+      "native_local_divergences": 0
+    },
+    "h1_and_native_lifecycle": {
+      "readiness_enabled": true,
+      "final_incident_export": "failed at cleanup deadline",
+      "before_leave_phase": "OriginalResults",
+      "before_leave_running": 1,
+      "zero_incidents_claimed": false,
+      "native_unload": "unverified"
+    },
+    "harness_cleanup": {
+      "hosted_leave_status_mismatch": true,
+      "bounded_status_waits_ms": [
+        15000,
+        15000
+      ],
+      "cleanup_reserve_consumed": true,
+      "exact_owned_outer_process_cleanup": "PASS"
+    },
+    "reviewed_report": {
+      "path": "hosted-full/report.json",
+      "sha256": "9d6a38344a3242c958b6850f5194cc1b28f38e1d32ac0bf2bfa9817b9a146574"
+    },
+    "first_failure_review": {
+      "path": "hosted-full-first-failure-review.json",
+      "sha256": "f94f71e1c10012287810616e7435140375162be6097678a40018de3576c35f76"
+    },
+    "producer_commit": "0a74399026234a8bf688d782c4329d23026703b9",
+    "deployment_version_id": "2667dd0e-eaba-4ded-87bd-ab4988d9271e"
+  },
+  "next_candidate": {
+    "commit": "4181cd25a0060520999e05d4e33720b56b5ce73b",
+    "full_regression": "PASS; 2398 run, 166 skipped",
+    "ordinary_release_build": "PASS",
+    "second_asset_deployment": "PASS; revision 2 identity and static HTTP bytes/headers verified",
+    "short_css_host_join_leave_geometry_check": "PASS; reviewed bounded two-profile same-host check",
+    "manual_two_mac_trial": "NOT_RUN",
+    "full_match": "NOT_RUN"
+  },
+  "scope": {
+    "runtime_mode": "existing interim lockstep",
+    "match_only_rollback_target_changed": false,
+    "two_machine_play_observed": false,
+    "complete_full_route_observed": false,
+    "internet_reliability_established": false,
+    "visual_or_audio_equivalence_established": false
+  },
+  "evidence_locator": "Hosted staging run directory hosted-staging-room-20261013-181206-4a803eb1; artifact paths above are relative to that private run.",
+  "final_candidate": {
+    "commit": "4181cd25a0060520999e05d4e33720b56b5ce73b",
+    "tree": "6e5256750ae126c5f8fa997a36cddbe690625790",
+    "validation": {
+      "state": "PASS",
+      "full_regression": {
+        "tests_run": 2398,
+        "skipped": 166,
+        "tests_passed": 2232,
+        "elapsed_seconds": 546.0010197500233,
+        "source_unchanged": true,
+        "receipt_path": "validation-v3/full-regression.json",
+        "receipt_sha256": "aa33378b986b51bbe1b66810d97090277bf9f1e2f1a04f970e30c2a77c15cf1e",
+        "log_path": "validation-v3/full-regression.log",
+        "log_sha256": "3239343551ca0841b0f6f24785eeee77ee68e3e91e15314becb6006c32c49a48"
+      },
+      "ordinary_release_build": {
+        "state": "PASS",
+        "target": "runtime",
+        "configuration": "Release",
+        "public_runtime": false,
+        "artifact_count": 43,
+        "artifact_bytes": 20531046,
+        "receipt_path": "validation-v3/ordinary-release-build.json",
+        "receipt_sha256": "ed6a9c2e2264d2caf03834f3f094d2f82a272823ac3a4143eee1fcc8c667d0d1"
+      }
+    },
+    "runtime_artifacts": {
+      "count": 43,
+      "wasm_sha256": "d4a09f957c6eb2abfed2163471a7b942d666488470c9840e681fe83596790c5a"
+    },
+    "hosted_package": {
+      "manifest_path": "revision-2/package-v1/package-manifest.json",
+      "manifest_sha256": "70e84e505138bdb24974b1c85cfee1366b9e00cd67fb83f7553c4a1c3989bce4",
+      "source_inputs_count": 2202,
+      "package_file_count_excluding_manifest": 51,
+      "package_total_bytes_excluding_manifest": 20712590,
+      "worker_source_sha256": "850b0f1dbb5f8c48c997a9d46405644ef2a36b6795e6b7fac5bbacd2005cb709"
+    }
+  },
+  "revision_2": {
+    "worker_name": "melee-web-room-relay-staging-288",
+    "origin": "https://melee-web-room-relay-staging-288.mywebcomic.workers.dev/",
+    "deployment_id": "cd11afc0-e420-4d42-bac3-bd5ffdde9e29",
+    "version_id": "5d607d92-458a-4b5c-9751-7c130e3cb062",
+    "percentage": 100,
+    "durable_object_class": "RoomRelay",
+    "storage": "sqlite",
+    "namespace_id": "6644841b09974b46822753ce5cc49965",
+    "workers_dev": true,
+    "routes": [],
+    "preview_urls": false,
+    "deployment_binding": {
+      "path": "revision-2/deployment-binding.json",
+      "sha256": "2a4e05cebf0ad367b0118409cf5899b80064d1f7b9e2b98298010c4afe460d98"
+    },
+    "deployed_version": {
+      "path": "revision-2/deployed-version.json",
+      "sha256": "4b5914d9bfd111b049c3f54c726fcde71f99e1d4f58a072927fd9d8e284f0dbe"
+    },
+    "static_http": {
+      "state": "PASS",
+      "scope": "static HTTP bytes and response headers only; no browser/gameplay result",
+      "served_runtime_file_count": 43,
+      "all_local_served_bytes_equal": true,
+      "headers_csp_coop_coep": true,
+      "wasm_mime": true,
+      "verification_receipt": {
+        "path": "revision-2/hosted-http-verification.json",
+        "sha256": "ea89e7be7b97ed40851f9f1f49f9a646a49e7674043b6b095aacced1a27a0bff"
+      }
+    },
+    "hosted_css_capture": {
+      "state": "PASS",
+      "report_path": "revision-2/hosted-css/report.json",
+      "report_sha256": "5038c3fe7586bd0e9f6b038b415558bc2869cb6592aee36b6887612478079c44",
+      "review_path": "revision-2/result-review.json",
+      "review_sha256": "f5522c2f29614a771023bbfd496ace743ac05a4095105fb0e86a6e1e4f97631f",
+      "duration_ms": 38548,
+      "browser_profiles": 2,
+      "same_host": true,
+      "checksum_comparison": {
+        "paired_records_each": 152,
+        "source_tick_first": 0,
+        "source_tick_last": 151,
+        "exact_match": true,
+        "source_tick_range_inclusive": [
+          0,
+          151
+        ]
+      },
+      "css_keyboard": {
+        "input_delay": 2,
+        "alpha": {
+          "input": "P1 D / right",
+          "local_port": 0,
+          "moved_sample_input_tick": 130,
+          "delta_x_both_peers": 6.19999885559082
+        },
+        "beta": {
+          "input": "P2 right arrow",
+          "local_port": 1,
+          "moved_sample_input_tick": 145,
+          "delta_x_both_peers": 6.19999885559082
+        }
+      },
+      "canvas_geometry": {
+        "viewport_css_px": [
+          900,
+          700
+        ],
+        "canvas_css_px": [
+          414,
+          310.5
+        ],
+        "aspect_ratio": "4:3 exact",
+        "beta_sampled_rect_visible": false,
+        "beta_visibility_context": "Controls scroll; dimensions/aspect ratio only",
+        "beta_rect_visible_at_sample": false
+      },
+      "native_wait_before_leave": {
+        "alpha": {
+          "callbacks": 88,
+          "episodes": 57,
+          "resume_count": 56,
+          "cursor": 156
+        },
+        "beta": {
+          "callbacks": 88,
+          "episodes": 52,
+          "resume_count": 51,
+          "cursor": 159
+        }
+      },
+      "leave_and_cleanup": {
+        "both_leave_normal": true,
+        "post_unload_phase_running": {
+          "alpha": [
+            0,
+            0
+          ],
+          "beta": [
+            0,
+            0
+          ]
+        },
+        "browser_errors": [],
+        "both_contexts_closed": true,
+        "both_profiles_removed": true,
+        "profile_root_removed": true,
+        "test_room_sockets_closed": true,
+        "outer_owned_process_absence": true,
+        "staging_worker": "remains deployed and idle; worker is external and not owned by harness",
+        "native_unload": "verified to phase 0 with running 0 for both peers"
+      },
+      "h1_observation": {
+        "alpha": {
+          "current_incident_count": 0,
+          "retained_incident_count": 0,
+          "timing_pause_observed": false,
+          "history_evicted_count": 169,
+          "missing_timing_staging_count": 0
+        },
+        "beta": {
+          "current_incident_count": 0,
+          "retained_incident_count": 0,
+          "timing_pause_observed": false,
+          "history_evicted_count": 51,
+          "missing_timing_staging_count": 0
+        },
+        "scope": "bounded CSS check only; histories evicted, no whole-match or complete-session H1 claim"
+      },
+      "exclusions": [
+        "No actual two-machine/human-controller validation, fullroutePASS on finalpackage, completePCM/pixel equivalence, uninterruptedforeground/audio timing, rollback or performance acceptance."
+      ],
+      "review_notes": [
+        "Beta preHost geometry is offscreen due Controls scroll; positive4:3dimensions proven, no preHostvisibility claim. Viewed retained CSS screenshot shows correct unstretched4:3render.",
+        "RTT prior deployment/producer reviewed separately in parent deployment-http-rtt-result-review.json; not rerun or relabeled finalproducerRTT.",
+        "Earlier fullroute failed at230s operation budget while Results progressed; final checksum/H1/nativecleanup unavailable there. Short PASS does not supersede that failure.",
+        "Worker remote bundle not downloaded; unchanged local upload hash linked to recorded successful deployment/version. WorkersFree/$0 retained owner authority, no new billingquery."
+      ],
+      "source_input": {
+        "alpha": {
+          "key": "P1 D / right",
+          "port": 0,
+          "input_delay": 2,
+          "moved_sample_input_tick": 130
+        },
+        "beta": {
+          "key": "P2 right arrow",
+          "port": 1,
+          "input_delay": 2,
+          "moved_sample_input_tick": 145
+        },
+        "observed_geometry_delta_x_both_peers": 6.19999885559082
+      },
+      "review_state": "PASS",
+      "report_decision": "PASS",
+      "review_findings": [],
+      "review_exclusions": [
+        "No actual two-machine/human-controller validation, fullroutePASS on finalpackage, completePCM/pixel equivalence, uninterruptedforeground/audio timing, rollback or performance acceptance."
+      ]
+    }
+  }
+}
