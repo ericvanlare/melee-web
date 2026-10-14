@@ -5,6 +5,7 @@ const EXPORTS = Object.freeze({
   approve: '_melee_web_native_menu_stadium_first_sss_vs_setup_cf_approve',
 });
 export const PREFIX_V2_SCOPE = 'same-run completed Setup, then extracted run2 prefix from action0 through the next draw/tick/draw after dynamic C/F; terminal remains a proper prefix';
+export const FULL_V3_SCOPE = 'same-run completed Setup, then exact original7167-action run2 schedule; functional lifetime A and declared C/F only';
 const PREFIX_V2_EXPORTS = Object.freeze({
   arm: '_melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_arm',
   queue: '_melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_queue',
@@ -20,6 +21,8 @@ const PREFIX_V2_EXPLICIT_STEP_EXPORTS = Object.freeze({
   retirement_status: '_melee_web_native_menu_stadium_first_sss_vs_setup_cf_retirement_status',
   approve: '_melee_web_native_menu_stadium_first_sss_vs_setup_cf_approve',
 });
+const FULL_V3_EXPLICIT_STEP_EXPORTS = Object.freeze({...PREFIX_V2_EXPLICIT_STEP_EXPORTS,
+  arm: '_melee_web_native_menu_stadium_first_sss_vs_setup_cf_full_explicit_arm'});
 function exactKeys(value, keys, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value) ||
       Object.keys(value).sort().join(',') !== [...keys].sort().join(','))
@@ -37,9 +40,11 @@ function assertIdentity(binding, actual, label) {
     throw new TypeError(`${label} differs from the frozen preflight identity`);
 }
 
-export function validateMatchedSetupCfRequest({enabled, explicitStep = false, setup, textTail,
+export function validateMatchedSetupCfRequest({enabled, explicitStep = false, fullSchedule = false, setup, textTail,
   packetPath, assemblyPath}) {
   const active = enabled === true;
+  if (typeof fullSchedule !== 'boolean' || (fullSchedule && (!active || explicitStep !== true)))
+    throw new TypeError('Full schedule requires explicit one-action service and continuation opt-in');
   if (explicitStep === true && !active)
     throw new TypeError('Matched Setup C/F explicit stepping requires the continuation opt-in');
   const hasPacket = typeof packetPath === 'string' && packetPath.length > 0;
@@ -51,8 +56,10 @@ export function validateMatchedSetupCfRequest({enabled, explicitStep = false, se
   return active;
 }
 
-export function validateMatchedSetupCfPreflight(preflight, {enabled, explicitStep = false,
+export function validateMatchedSetupCfPreflight(preflight, {enabled, explicitStep = false, fullSchedule = false,
   packetPath, assemblyPath, helperPath}) {
+  if (typeof fullSchedule !== 'boolean' || (fullSchedule && (enabled !== true || explicitStep !== true)))
+    throw new TypeError('Full schedule preflight requires explicit service opt-in');
   if (enabled !== true) return null;
   if (preflight?.route_mode !== 'first-sss-vs-setup')
     throw new TypeError('Matched Setup C/F requires the frozen first-sss-vs-setup preflight route');
@@ -65,7 +72,7 @@ export function validateMatchedSetupCfPreflight(preflight, {enabled, explicitSte
   if (explicitStep === true && frozen.asyncify_idle_predicate !== ASYNCIFY_IDLE_PREDICATE)
     throw new TypeError('Matched Setup C/F Asyncify idle predicate differs from its private binding');
   if (frozen.scope !== 'same-run completed Setup, then exact original 86-tick/85-draw prefix; compare C before draw84 and F before draw85' &&
-      frozen.scope !== PREFIX_V2_SCOPE)
+      frozen.scope !== PREFIX_V2_SCOPE && frozen.scope !== FULL_V3_SCOPE)
     throw new TypeError('Matched Setup C/F preflight scope differs');
   const expectedPaths = [
     ['packet', packetPath], ['assembly_manifest', assemblyPath], ['helper', helperPath],
@@ -79,13 +86,15 @@ export function validateMatchedSetupCfPreflight(preflight, {enabled, explicitSte
         !/^[0-9a-f]{64}$/.test(binding.sha256))
       throw new TypeError(`Matched Setup C/F ${name} identity is malformed`);
   }
-  if (explicitStep === true && frozen.scope !== PREFIX_V2_SCOPE)
+  if ((frozen.scope === FULL_V3_SCOPE) !== fullSchedule)
+    throw new TypeError('Full schedule request differs from exact preflight scope');
+  if (explicitStep === true && frozen.scope !== (fullSchedule ? FULL_V3_SCOPE : PREFIX_V2_SCOPE))
     throw new TypeError('Matched Setup C/F explicit stepping requires the reviewed v2 proper-prefix scope');
   exactKeys(frozen.diagnostic_exports, explicitStep === true
     ? ['arm', 'queue', 'step', 'retire_ready', 'retire', 'retirement_status', 'approve']
     : ['arm', 'queue', 'approve'],
     'Matched Setup C/F diagnostic exports');
-  const expectedExports = explicitStep === true ? PREFIX_V2_EXPLICIT_STEP_EXPORTS
+  const expectedExports = explicitStep === true ? (fullSchedule ? FULL_V3_EXPLICIT_STEP_EXPORTS : PREFIX_V2_EXPLICIT_STEP_EXPORTS)
     : frozen.scope === PREFIX_V2_SCOPE ? PREFIX_V2_EXPORTS : EXPORTS;
   if (JSON.stringify(frozen.diagnostic_exports) !== JSON.stringify(expectedExports))
     throw new TypeError('Matched Setup C/F native exports differ from the reviewed contract');

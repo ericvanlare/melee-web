@@ -43,7 +43,8 @@ const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 
 export function isStadiumC3ReportCheckpointEligible(report) {
   const matched = report?.scenario?.matched_setup_cf;
-  return matched?.mode === 'run2-proper-prefix-v2' &&
+  return (matched?.mode === 'run2-proper-prefix-v2' ||
+    (matched?.mode === 'run2-full-schedule-v3' && matched.schedule_actions === 7167)) &&
     matched.explicit_step_mode === true;
 }
 
@@ -303,6 +304,7 @@ export function createStadiumC3ReportCheckpoint({reportPath, fileSystem = fs}) {
     frozenState = {
       payload: sidecarPayload,
       scenario,
+      matchedMode: matched.mode,
       frozenRoots: Object.fromEntries(STADIUM_C3_FROZEN_SCENARIO_FIELDS.map(
         key => [key, scenario[key]])),
       sidecar: {
@@ -328,7 +330,8 @@ export function createStadiumC3ReportCheckpoint({reportPath, fileSystem = fs}) {
         throw new Error(`Stadium C3 frozen pre-action field changed: ${key}`);
     }
     const matched = scenario.matched_setup_cf;
-    if (matched?.mode !== 'run2-proper-prefix-v2' || matched.explicit_step_mode !== true)
+    if (matched?.mode !== frozenState.matchedMode ||
+        !isStadiumC3ReportCheckpointEligible(report))
       throw new Error('Stadium C3 explicit run2 checkpoint identity changed after freeze');
   }
 

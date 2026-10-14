@@ -350,7 +350,7 @@ struct MatchedSetupCfState {
  bool opted_in=false,armed=false,queued=false,awaiting_approval=false;
  bool failed=false,complete=false,last_action_complete=false;
  bool explicit_step_mode=false,explicit_step_inflight=false;
- bool version2=false;
+ bool version2=false,full_schedule=false;
  uint32_t cursor=0,last_schedule_index=0,last_ordinal=0,last_bundle=UINT32_MAX;
  uint32_t action_count=171,c_action_index=168,f_action_index=170,c_source_tick=84,f_source_tick=85;
  uint32_t source_ticks=0,source_draws=0,last_ticks_after=0,last_draws_after=0;
@@ -3017,7 +3017,10 @@ std::string matched_setup_cf_json(){
      state.awaiting_approval?"awaiting-approval":state.queued?"queued":
      state.armed?"armed":"idle";
  std::ostringstream out;
- if(state.version2)out<<"{\"schema\":\"melee-web-stadium-source-action-native-v2\",\"scope\":\"proper-prefix-next-draw-tick-draw\",\"action_count\":"
+ if(state.full_schedule)out<<"{\"schema\":\"melee-web-stadium-source-action-native-v3\",\"scope\":\"original-full7167-schedule-observation-only\",\"action_count\":"
+    <<state.action_count<<",\"source_ticks\":"<<state.source_ticks
+    <<",\"source_draws\":"<<state.source_draws<<",\"state\":\"";
+ else if(state.version2)out<<"{\"schema\":\"melee-web-stadium-source-action-native-v2\",\"scope\":\"proper-prefix-next-draw-tick-draw\",\"action_count\":"
     <<state.action_count<<",\"source_ticks\":"<<state.source_ticks
     <<",\"source_draws\":"<<state.source_draws<<",\"state\":\"";
  else out<<"{\"schema\":\"melee-web-stadium-matched-setup-cf-native-v1\",\"state\":\"";
@@ -4782,12 +4785,13 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_begin(int text_tail_probe){
 
 int matched_setup_cf_arm_internal(bool version2,unsigned action_count,
     unsigned c_action_index,unsigned f_action_index,unsigned c_source_tick,
-    unsigned f_source_tick){try{
+    unsigned f_source_tick,bool full_schedule=false){try{
  auto& state=matched_setup_cf;auto& setup=first_sss_vs_setup;
  check(!state.opted_in&&!state.armed&&!state.failed&&!state.complete,
        "Matched Setup C/F continuation is one-use");
  state.opted_in=true;
  state.version2=version2;
+ state.full_schedule=full_schedule;
  state.action_count=version2?action_count:171U;
  state.c_action_index=version2?c_action_index:168U;
  state.f_action_index=version2?f_action_index:170U;
@@ -4796,7 +4800,9 @@ int matched_setup_cf_arm_internal(bool version2,unsigned action_count,
  state.source_ticks=state.source_draws=0;
  state.queued_source_frame_before=state.last_source_frame_after=0;
  check(!version2||(action_count==state.version2_actions.size()&&action_count>=5&&
-       action_count<=7167&&c_action_index<f_action_index&&f_action_index+3==action_count-1&&
+       action_count<=7167&&c_action_index<f_action_index&&
+       (full_schedule?(action_count==7167&&c_action_index==168&&f_action_index==170&&
+         c_source_tick==84&&f_source_tick==85):f_action_index+3==action_count-1)&&
        c_source_tick+1==f_source_tick),
        "Matched Setup C/F v2 immutable prefix dimensions are invalid");
  check(setup.attempted&&setup.complete&&!setup.failed&&setup.construction_complete&&
@@ -4912,6 +4918,67 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_arm(
  matched_setup_cf_fail(error.what());return 0;
 }}
 
+// Explicit full run2 scope; the existing v2 prefix decoder above is unchanged.
+int matched_setup_cf_full_manifest_arm(
+    const uint8_t* manifest,size_t manifest_bytes){try{
+ auto& state=matched_setup_cf;
+ check(manifest&&manifest_bytes>=24,"Matched Setup full schedule manifest header is absent");
+ check(manifest[0]=='M'&&manifest[1]=='W'&&manifest[2]=='F'&&manifest[3]=='3',
+       "Matched Setup full schedule manifest magic differs");
+ const auto read32=[&](size_t offset){
+  check(offset+4<=manifest_bytes,"Matched Setup full schedule manifest integer is truncated");
+  return static_cast<uint32_t>(manifest[offset])|
+      (static_cast<uint32_t>(manifest[offset+1])<<8)|
+      (static_cast<uint32_t>(manifest[offset+2])<<16)|
+      (static_cast<uint32_t>(manifest[offset+3])<<24);
+ };
+ const unsigned action_count=read32(4),c_index=read32(8),f_index=read32(12),
+                c_tick=read32(16),f_tick=read32(20);
+ constexpr size_t header_bytes=24,action_bytes=57;
+ check(action_count==7167&&
+       manifest_bytes==header_bytes+static_cast<size_t>(action_count)*action_bytes,
+       "Matched Setup full schedule manifest count or length is invalid");
+ check(c_index==168&&f_index==170&&c_tick==84&&f_tick==85,
+       "Matched Setup full schedule C/F/terminal coordinates are inconsistent");
+ std::vector<MatchedSetupCfState::ManifestAction> actions;actions.reserve(action_count);
+ unsigned ticks=0,draws=0;
+ for(unsigned index=0;index<action_count;++index){
+  const size_t offset=header_bytes+static_cast<size_t>(index)*action_bytes;
+  MatchedSetupCfState::ManifestAction action{};
+  action.kind=manifest[offset];action.ordinal=read32(offset+1);
+  action.bundle=read32(offset+5);action.draws_before=read32(offset+9);
+  std::copy(manifest+offset+13,manifest+offset+action_bytes,action.pad.begin());
+  if(action.kind==1){
+   check(action.ordinal==ticks&&action.bundle==ticks&&action.draws_before==draws,
+         "Matched Setup full schedule tick descriptor is discontinuous");
+   ++ticks;
+  }else if(action.kind==2){
+   check(action.ordinal==draws&&action.bundle==UINT32_MAX&&action.draws_before==draws&&
+         std::all_of(action.pad.begin(),action.pad.end(),[](uint8_t byte){return byte==0;}),
+         "Matched Setup full schedule draw descriptor is malformed");
+   ++draws;
+  }else throw std::runtime_error("Matched Setup full schedule action kind is unknown");
+  actions.push_back(action);
+ }
+ check(ticks==3585&&draws==3582&&actions.back().kind==2&&actions.back().ordinal==3581,
+       "Full schedule tick/draw terminal dimensions differ");
+ check(actions[c_index].kind==1&&actions[c_index].ordinal==c_tick&&
+       actions[f_index].kind==1&&actions[f_index].ordinal==f_tick,
+       "Matched Setup full schedule C/F descriptors do not match their declared source ticks");
+ check(std::none_of(actions.begin()+c_index+1,actions.begin()+f_index,
+       [](const auto& action){return action.kind==1;}),
+       "Matched Setup full schedule inserted another tick between C and F");
+ check(actions[f_index+1].kind==2&&actions[f_index+2].kind==1&&
+       actions[f_index+3].kind==2,
+       "Matched Setup full schedule terminal is not the required next draw/tick/draw");
+ check(!state.opted_in&&!state.armed&&!state.failed&&!state.complete,
+       "Matched Setup full schedule continuation is one-use");
+ state.version2_actions=std::move(actions);
+ return matched_setup_cf_arm_internal(true,action_count,c_index,f_index,c_tick,f_tick,true);
+}catch(const std::exception& error){
+ matched_setup_cf_fail(error.what());return 0;
+}}
+
 int melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_explicit_arm(
     const uint8_t* manifest,size_t manifest_bytes){try{
  auto& state=matched_setup_cf;
@@ -4924,6 +4991,30 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_explicit_arm(
        manifest,manifest_bytes)==1,
        "Matched Setup C/F v2 arm refused the explicit-step manifest");
  check(state.version2&&state.armed&&!state.failed&&!state.complete&&
+       !state.queued&&!state.awaiting_approval,
+       "Matched Setup C/F explicit-step arm did not retain a fresh v2 owner");
+ state.explicit_step_mode=true;
+ // Pause and clear MainLoop.func. Asyncify resumes an exported call through
+ // MainLoop.resume when a function remains installed, which would re-enable
+ // RAF admission alongside the explicit host-owned step sequence.
+ emscripten_cancel_main_loop();
+ first_css_browser_draw_refresh_observation();return 1;
+}catch(const std::exception& error){
+ matched_setup_cf_fail(error.what());return 0;
+}}
+
+int melee_web_native_menu_stadium_first_sss_vs_setup_cf_full_explicit_arm(
+    const uint8_t* manifest,size_t manifest_bytes){try{
+ auto& state=matched_setup_cf;
+ check(!state.explicit_step_mode&&!state.explicit_step_inflight&&
+       !matched_setup_cf_retirement.native_retired&&
+       matched_setup_cf_retirement.receipt.empty(),
+       "Matched Setup C/F explicit-step owner is one-use");
+ matched_setup_cf_retirement=MatchedSetupCfRetirement{};
+ check(matched_setup_cf_full_manifest_arm(
+       manifest,manifest_bytes)==1,
+       "Matched Setup C/F v2 arm refused the explicit-step manifest");
+ check(state.version2&&state.full_schedule&&state.armed&&!state.failed&&!state.complete&&
        !state.queued&&!state.awaiting_approval,
        "Matched Setup C/F explicit-step arm did not retain a fresh v2 owner");
  state.explicit_step_mode=true;

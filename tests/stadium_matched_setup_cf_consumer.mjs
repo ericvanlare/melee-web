@@ -143,6 +143,42 @@ export function deriveRun2ProperPrefix(runtimePayload, hostOnly) {
     expectedSeeds: {C: seedRows[0].seed_hex, F: seedRows[1].seed_hex}};
 }
 
+export function deriveRun2FullSchedule(runtimePayload, hostOnly) {
+  const derived = deriveRun2ProperPrefix(runtimePayload, hostOnly);
+  const payload = validateRun2RuntimePayload(runtimePayload);
+  if (payload.schedule.length !== 7167 || payload.bundles.length !== 3585 ||
+      payload.schedule.filter(row => row.action === 'draw').length !== 3582 ||
+      derived.prefix.checkpoints.c_action_index !== 168 || derived.prefix.checkpoints.f_action_index !== 170 ||
+      derived.c.source_tick !== 84 || derived.f.source_tick !== 85 ||
+      payload.schedule.at(-1)?.action !== 'draw' || payload.schedule.at(-1)?.draw !== 3581)
+    throw new TypeError('original full7167 schedule dimensions or C/F coordinates differ');
+  return {...derived, prefix: {schema: 'melee-web-stadium-run2-full-schedule-v3', version: 3,
+    bundles: payload.bundles, schedule: payload.schedule,
+    checkpoints: {...derived.prefix.checkpoints, terminal_action_index: 7166,
+      terminal_draw_ordinal: 3581}}};
+}
+
+export function encodeRun2FullNativeManifest(full) {
+  exactKeys(full, ['bundles', 'checkpoints', 'schedule', 'schema', 'version'], 'full schedule manifest');
+  exactKeys(full.checkpoints, ['c_action_index', 'c_source_tick', 'f_action_index',
+    'f_source_tick', 'terminal_action_index', 'terminal_draw_ordinal'], 'full schedule checkpoints');
+  validateRun2RuntimePayload({schema: 'melee-web-stadium-pad-action-plan', version: 1,
+    bundles: full.bundles, schedule: full.schedule});
+  const c = full.checkpoints;
+  if (full.schema !== 'melee-web-stadium-run2-full-schedule-v3' || full.version !== 3 ||
+      full.schedule.length !== 7167 || full.bundles.length !== 3585 ||
+      full.schedule.filter(row => row.action === 'draw').length !== 3582 ||
+      c.c_action_index !== 168 || c.f_action_index !== 170 || c.c_source_tick !== 84 ||
+      c.f_source_tick !== 85 || c.terminal_action_index !== 7166 || c.terminal_draw_ordinal !== 3581 ||
+      full.schedule[168]?.action !== 'tick' || full.schedule[168]?.bundle !== 84 ||
+      full.schedule[170]?.action !== 'tick' || full.schedule[170]?.bundle !== 85 ||
+      full.schedule[171]?.action !== 'draw' || full.schedule[172]?.action !== 'tick' ||
+      full.schedule[173]?.action !== 'draw' || full.schedule.at(-1)?.action !== 'draw' ||
+      full.schedule.at(-1)?.draw !== 3581)
+    throw new TypeError('original full7167 manifest dimensions or terminal differ');
+  return encodeNativeManifestRows(full, [0x4d, 0x57, 0x46, 0x33]);
+}
+
 export function encodeRun2NativeManifest(prefix) {
   exactKeys(prefix, ['bundles', 'checkpoints', 'schedule', 'schema', 'version'],
     'run2 native prefix manifest');
@@ -167,8 +203,12 @@ export function encodeRun2NativeManifest(prefix) {
       prefix.schedule.at(-1)?.action !== 'draw' ||
       prefix.schedule.at(-1)?.draw !== prefix.checkpoints.terminal_draw_ordinal)
     throw new TypeError('run2 native prefix C/F and terminal actions differ');
+  return encodeNativeManifestRows(prefix, [0x4d, 0x57, 0x50, 0x32]);
+}
+
+function encodeNativeManifestRows(prefix, magic) {
   const bytes = new Uint8Array(24 + prefix.schedule.length * 57);
-  bytes.set([0x4d, 0x57, 0x50, 0x32]);
+  bytes.set(magic);
   const write32 = (offset, value) => {
     if (!Number.isSafeInteger(value) || value < 0 || value > 0xffffffff)
       throw new TypeError('run2 native manifest integer is outside uint32');
@@ -374,9 +414,11 @@ export function createHostCallbacks({setupApproved, originalSnapshots, originalS
   };
 }
 
-export function hostEvidenceFromPacket(packet) {
+export function hostEvidenceFromPacket(packet, {fullSchedule = false} = {}) {
+  if (typeof fullSchedule !== 'boolean') throw new TypeError('fullSchedule must be boolean');
   if (packet?.schema === 'melee-web-stadium-source-action-replay-packet' && packet.version === 2)
-    return hostEvidenceFromRun2Packet(packet);
+    return hostEvidenceFromRun2Packet(packet, {fullSchedule});
+  if (fullSchedule) throw new TypeError('Full schedule requires original run2 packet');
   exactKeys(packet, ['schema', 'version', 'host_only', 'runtime_payload'], 'matched Setup packet');
   if (packet.schema !== 'melee-web-stadium-setup-cf-input-schedule' ||
       packet.version !== 1 || !packet.host_only || typeof packet.host_only !== 'object')
@@ -416,7 +458,8 @@ export function hostEvidenceFromPacket(packet) {
     originalSeeds: seeds};
 }
 
-export function hostEvidenceFromRun2Packet(packet) {
+export function hostEvidenceFromRun2Packet(packet, {fullSchedule = false} = {}) {
+  if (typeof fullSchedule !== 'boolean') throw new TypeError('fullSchedule must be boolean');
   exactKeys(packet, ['host_only', 'runtime_payload', 'schema', 'version'], 'run2 action packet');
   if (packet.schema !== 'melee-web-stadium-source-action-replay-packet' || packet.version !== 2)
     throw new TypeError('run2 action packet identity differs');
@@ -429,7 +472,8 @@ export function hostEvidenceFromRun2Packet(packet) {
       hostOnly.expected_state?.comparison_scope?.setup_profile_verified_by_observer !== false ||
       hostOnly.expected_state?.comparison_scope?.profile_equivalence?.startsWith('pending') !== true)
     throw new TypeError('run2 host-only source identity or evidence scope differs');
-  const derived = deriveRun2ProperPrefix(packet.runtime_payload, hostOnly);
+  const derived = fullSchedule ? deriveRun2FullSchedule(packet.runtime_payload, hostOnly)
+    : deriveRun2ProperPrefix(packet.runtime_payload, hostOnly);
   const normalize = label => {
     const row = derived.expectedState[label];
     const raw = row?.raw_identity;
@@ -461,7 +505,7 @@ export function hostEvidenceFromRun2Packet(packet) {
     goDraw: go.draw_ordinal, cDraw: derived.c.draw_ordinal, fDraw: derived.f.draw_ordinal};
   return {runtimePayload: derived.prefix, sourceRuntimePayload: packet.runtime_payload,
     originalSnapshots: snapshots, originalSeeds: derived.expectedSeeds, coordinates,
-    checkpoints: derived.prefix.checkpoints, mode: 'run2-proper-prefix-v2'};
+    checkpoints: derived.prefix.checkpoints, mode: fullSchedule ? 'run2-full-schedule-v3' : 'run2-proper-prefix-v2'};
 }
 
 function bundleBytes(bundle) {
@@ -471,19 +515,21 @@ function bundleBytes(bundle) {
 
 export class StadiumSetupCfActionDriver {
   constructor({runtimePayload, native}) {
-    this.mode = runtimePayload?.schema === 'melee-web-stadium-run2-proper-prefix-v2'
+    this.mode = runtimePayload?.schema === 'melee-web-stadium-run2-full-schedule-v3'
+      ? 'run2-full-schedule-v3' : runtimePayload?.schema === 'melee-web-stadium-run2-proper-prefix-v2'
       ? 'run2-proper-prefix-v2' : 'legacy-v1';
     if (this.mode === 'legacy-v1') this.payload = validateRuntimePayload(runtimePayload);
     else {
       exactKeys(runtimePayload, ['bundles', 'checkpoints', 'schedule', 'schema', 'version'],
         'run2 proper-prefix manifest');
-      if (runtimePayload.version !== 2 || !Array.isArray(runtimePayload.bundles) ||
+      if (runtimePayload.version !== (this.mode === 'run2-full-schedule-v3' ? 3 : 2) || !Array.isArray(runtimePayload.bundles) ||
           !Array.isArray(runtimePayload.schedule) || !runtimePayload.schedule.length ||
           runtimePayload.schedule.length !== runtimePayload.checkpoints.terminal_action_index + 1 ||
           runtimePayload.schedule.at(-1)?.action !== 'draw')
         throw new TypeError('run2 proper-prefix manifest is malformed');
       this.payload = runtimePayload;
-      this.nativeManifest = encodeRun2NativeManifest(runtimePayload);
+      this.nativeManifest = this.mode === 'run2-full-schedule-v3'
+        ? encodeRun2FullNativeManifest(runtimePayload) : encodeRun2NativeManifest(runtimePayload);
     }
     if (!native || typeof native.arm !== 'function' || typeof native.queue !== 'function' ||
         typeof native.approve !== 'function')
@@ -542,6 +588,9 @@ export class StadiumSetupCfActionDriver {
     if (this.inFlight || !this.pending || this.failed || this.complete)
       return this._fail('unexpected or repeated native action receipt');
     const action = this.payload.schedule[this.cursor];
+    if (this.mode === 'run2-full-schedule-v3' && (observation?.schema !== 'melee-web-stadium-source-action-native-v3' ||
+        observation?.scope !== 'original-full7167-schedule-observation-only' || observation?.action_count !== 7167))
+      return this._fail('Full schedule native observation scope differs');
     const result = observation?.last_action;
     const ordinal = this.mode === 'legacy-v1' ? action?.ordinal :
       action?.action === 'tick' ? action.bundle : action?.draw;

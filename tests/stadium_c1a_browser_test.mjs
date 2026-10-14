@@ -18,7 +18,7 @@ import {firstSssAudioAccounting} from './stadium_first_css_stream_compare.mjs';
 import {createCssSssTransitionCapture, CSS_SSS_TRANSITION_LIMITS,
   cssReadinessEvidence, cssSssOutcome, hasCssMenuReadiness} from './stadium_c1a_css_sss_reducer.mjs';
 import {validateMatchedSetupCfRequest, validateMatchedSetupCfPreflight,
-  validateMatchedSetupCfIdentities, matchedSetupCfRuntimeFailure, PREFIX_V2_SCOPE,
+  validateMatchedSetupCfIdentities, matchedSetupCfRuntimeFailure, PREFIX_V2_SCOPE, FULL_V3_SCOPE,
   trackMatchedSetupCfExplicitStep, matchedSetupCfNativeAccessAllowed,
   dispatchMatchedSetupCfNativeEvaluation, guardMatchedSetupCfNativeCleanup}
   from './stadium_matched_setup_cf_runner_gate.mjs';
@@ -50,14 +50,17 @@ const {values} = parseArgs({options: Object.fromEntries(
       ['first-sss-vs-setup', {type: 'boolean', default: false}],
       ['first-sss-vs-setup-cf', {type: 'boolean', default: false}],
       ['first-sss-vs-setup-cf-explicit-step', {type: 'boolean', default: false}],
+      ['first-sss-vs-setup-cf-full-schedule', {type: 'boolean', default: false}],
       ['first-sss-vs-setup-text-tail', {type: 'boolean', default: false}],
     ])), strict: true});
 const cssSssReducer = values['css-sss-reducer'];
 const firstSssVsSetup = values['first-sss-vs-setup'];
 const firstSssVsSetupTextTail = values['first-sss-vs-setup-text-tail'];
 const firstSssVsSetupCfExplicitStep = values['first-sss-vs-setup-cf-explicit-step'];
+const firstSssVsSetupCfFullSchedule = values['first-sss-vs-setup-cf-full-schedule'];
 const firstSssVsSetupCf = validateMatchedSetupCfRequest({
   enabled: values['first-sss-vs-setup-cf'], explicitStep: firstSssVsSetupCfExplicitStep,
+  fullSchedule: firstSssVsSetupCfFullSchedule,
   setup: firstSssVsSetup,
   textTail: firstSssVsSetupTextTail,
   packetPath: values['first-sss-vs-setup-cf-packet'] || null,
@@ -122,6 +125,7 @@ const preflight = JSON.parse(preflightBytes.toString('utf8'));
 const matchedSetupCfPreflight = validateMatchedSetupCfPreflight(preflight, {
   enabled: firstSssVsSetupCf,
   explicitStep: firstSssVsSetupCfExplicitStep,
+  fullSchedule: firstSssVsSetupCfFullSchedule,
   packetPath: values['first-sss-vs-setup-cf-packet']
     ? path.resolve(values['first-sss-vs-setup-cf-packet']) : null,
   assemblyPath: values['first-sss-vs-setup-cf-assembly']
@@ -129,7 +133,7 @@ const matchedSetupCfPreflight = validateMatchedSetupCfPreflight(preflight, {
   helperPath: path.join(ROOT, 'tests/stadium_matched_setup_cf_consumer.mjs'),
 });
 const firstSssVsSetupCfV2 = firstSssVsSetupCf &&
-  matchedSetupCfPreflight.scope === PREFIX_V2_SCOPE;
+  (matchedSetupCfPreflight.scope === PREFIX_V2_SCOPE || matchedSetupCfPreflight.scope === FULL_V3_SCOPE);
 const matchedSetupCfTiming = firstSssVsSetupCfV2 ? {
   actionSamples: [], scheduledActions: null, actionLoopActive: false, actionLoopStartedNs: null,
   actionLoopMs: null, globalCaptureDeadlineRemainingAtActionLoopStartMs: null,
@@ -332,7 +336,9 @@ const report = {
     server_process_exit: null, failures: []},
   source_request_scope: firstSssVsSetupCf
     ? firstSssVsSetupCfV2
-      ? 'Strict same-run Entry and completed Setup comparison, then the extracted run2 proper prefix from action0 through the next draw/tick/draw after dynamically mapped C/F; compare C/F before their following draws, then stop.'
+      ? firstSssVsSetupCfFullSchedule
+        ? 'Strict same-run original Setup then all7167 source-ordered actions, exact consumed PAD and C/F fields; measured functionalA probe, no C3 acceptance.'
+        : 'Strict same-run Entry and completed Setup comparison, then the extracted run2 proper prefix from action0 through the next draw/tick/draw after dynamically mapped C/F; compare C/F before their following draws, then stop.'
       : 'Strict same-run Entry and completed Setup comparison, then the exact original 86-tick/85-draw schedule; compare C after tick84 before draw84 and F after tick85 before draw85, then stop.'
     : firstSssVsSetup
     ? `Strict Entry then checked async exact Stadium asset handoff and existing deferred Session Setup endpoint; stop before gameplay tick/draw/GO${firstSssVsSetupTextTail?'; opt-in bounded SIS text-tail diagnostics only':''}`
@@ -801,10 +807,10 @@ async function loadMatchedSetupCfInputs() {
   try { assembly = JSON.parse(assemblyIdentity.content.toString('utf8')); }
   catch (error) { throw Error(`Matched Setup C/F evidence assembly is malformed: ${errorText(error)}`); }
   const helper = await import(pathToFileURL(helperPath).href);
-  const hostEvidence = helper.hostEvidenceFromPacket(packet);
-  assert.equal(hostEvidence.mode === 'run2-proper-prefix-v2', firstSssVsSetupCfV2,
+  const hostEvidence = helper.hostEvidenceFromPacket(packet, {fullSchedule: firstSssVsSetupCfFullSchedule});
+  assert.equal(['run2-proper-prefix-v2', 'run2-full-schedule-v3'].includes(hostEvidence.mode), firstSssVsSetupCfV2,
     'packet schema differs from the preflight-bound continuation version');
-  if (hostEvidence.mode === 'run2-proper-prefix-v2') {
+  if (['run2-proper-prefix-v2', 'run2-full-schedule-v3'].includes(hostEvidence.mode)) {
     assert.deepEqual(Object.keys(assembly).sort(),
       ['host_only_expectations_sha256', 'runtime_payload_sha256', 'schema', 'scope'].sort());
     assert.equal(assembly.schema, 'melee-web-stadium-run2-source-action-assembly-v1');
@@ -2528,7 +2534,9 @@ async function runFirstSssVsSetup(entryNative) {
     await persistReport();
   }
   if (firstSssVsSetupCf) native = await runMatchedSetupCfContinuation(native);
-  report.scenario.first_sss_vs_setup.claim = firstSssVsSetupCf
+  report.scenario.first_sss_vs_setup.claim = firstSssVsSetupCfFullSchedule
+    ? 'Strict same-run Setup plus original7167-action functionalA and declaredC/F only; no recreatedB, per-ownerRNG or C3 acceptance.'
+    : firstSssVsSetupCf
     ? (report.scenario.matched_setup_cf?.mode === 'run2-proper-prefix-v2'
       ? 'Strict same-run Setup2503 endpoint plus the extracted run2 prefix through draw86 after dynamic C/F; no later lifetime or whole-session acceptance.'
       : 'Strict same-run Setup2503 Start/player0-3/seed endpoint plus the bounded exact matched original C/F prefix; no later match route, source draw85, or whole-session acceptance.')
@@ -2559,8 +2567,10 @@ async function executeMatchedSetupCfNativeCommand(command) {
       const result = fn();
       return {result, message: result === 1 ? null : readMessage()};
     }
-    if (kind === 'arm-explicit-v2') {
-      const fn = module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_explicit_arm;
+    if (kind === 'arm-explicit-v2' || kind === 'arm-explicit-full') {
+      const fn = kind === 'arm-explicit-full'
+        ? module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_full_explicit_arm
+        : module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_explicit_arm;
       if (typeof fn !== 'function') return {result: 0, message: 'Matched Setup C/F explicit arm export is absent'};
       const pointer = module._malloc(manifestBytes.length);
       if (!pointer) return {result: 0, message: 'Matched Setup C/F explicit manifest allocation failed'};
@@ -2693,9 +2703,9 @@ async function executeMatchedSetupCfNativeCommand(command) {
   return evaluatePromise;
 }
 
-function matchedSetupCfNativeAdapter({mode, manifestBytes, explicitStep = false}) {
+function matchedSetupCfNativeAdapter({mode, explicitStep = false}) {
   const execute = async (command, label) => {
-    const explicitArm = command.kind === 'arm-explicit-v2';
+    const explicitArm = command.kind === 'arm-explicit-v2' || command.kind === 'arm-explicit-full';
     if (explicitArm) {
       // The native arm may cancel RAF before its page response reaches the host.
       // Until confirmed success, neither a lost response nor native result 0
@@ -2733,8 +2743,9 @@ function matchedSetupCfNativeAdapter({mode, manifestBytes, explicitStep = false}
     return response.result;
   };
   return {
-    arm: async suppliedManifest => mode === 'run2-proper-prefix-v2'
-      ? execute({kind: explicitStep ? 'arm-explicit-v2' : 'arm-v2',
+    arm: async suppliedManifest => ['run2-proper-prefix-v2', 'run2-full-schedule-v3'].includes(mode)
+      ? execute({kind: mode === 'run2-full-schedule-v3' ? 'arm-explicit-full'
+          : explicitStep ? 'arm-explicit-v2' : 'arm-v2',
         manifestBytes: Array.from(suppliedManifest)},
         'Arm the one-use run2 proper-prefix continuation')
       : execute({kind: 'arm'}, 'Arm the one-use matched Setup C/F continuation'),
@@ -2742,7 +2753,7 @@ function matchedSetupCfNativeAdapter({mode, manifestBytes, explicitStep = false}
       `Service explicit run2 source action ${scheduleIndex}`),
     queue: async (scheduleIndex, action, bytes) => {
       const actionSample = matchedSetupCfTiming?.currentActionSample ?? null;
-      const queueOperation = () => mode === 'run2-proper-prefix-v2'
+      const queueOperation = () => ['run2-proper-prefix-v2', 'run2-full-schedule-v3'].includes(mode)
         ? execute({kind: 'queue-v2', scheduleIndex, action: action.action,
           ordinal: action.action === 'tick' ? action.bundle : action.draw,
           bundle: action.bundle ?? -1}, `Queue run2 source action ${scheduleIndex}`)
@@ -2780,7 +2791,7 @@ async function runMatchedSetupCfContinuation(setupNative) {
   const inputs = matchedSetupCfInputs;
   const {helper, hostEvidence} = inputs;
   const mode = hostEvidence.mode ?? 'legacy-v1';
-  const isV2 = mode === 'run2-proper-prefix-v2';
+  const isV2 = ['run2-proper-prefix-v2', 'run2-full-schedule-v3'].includes(mode);
   const actualSetup = setupNative?.first_sss_vs_setup?.actual;
   assert.equal(actualSetup?.phase, 'vs_setup');
   assert.equal(actualSetup?.start?.rules?.x1_3, 0,
@@ -2791,7 +2802,8 @@ async function runMatchedSetupCfContinuation(setupNative) {
   assertFirstSssVsSetupOwners(setupNative.first_sss_vs_setup);
 
   const cf = report.scenario.matched_setup_cf = {
-    decision: isV2 ? 'RUNNING_RUN2_PROPER_PREFIX_V2' : 'RUNNING_BOUNDED_MATCHED_SETUP_CF',
+    decision: mode === 'run2-full-schedule-v3' ? 'RUNNING_ORIGINAL_FULL7167_SCHEDULE'
+      : isV2 ? 'RUNNING_RUN2_PROPER_PREFIX_V2' : 'RUNNING_BOUNDED_MATCHED_SETUP_CF',
     mode,
     packet: inputs.packetIdentity, assembly_manifest: inputs.assemblyIdentity,
     host_helper: inputs.helperIdentity, assembly_schema: inputs.assemblySchema,
@@ -2807,7 +2819,9 @@ async function runMatchedSetupCfContinuation(setupNative) {
       original_SIS_title_bytes: 'unobserved', original_map_root_allocation_lifetime: 'unproved',
       original_object_type: 'unobserved', native_flow_clock: 'reported separately',
       nested_display_list_provenance: 'not instrumented in the admitted profile; the nested GX_CMD_CALL_DL warning is a stop condition'},
-    claim: isV2
+    claim: mode === 'run2-full-schedule-v3'
+      ? 'One original7167-action schedule probe; functional lifetime A with declared C/F only, no complete original comparison, per-owner RNG, recreated B or C3 acceptance.'
+      : isV2
       ? 'Fresh strict Setup followed by the extracted run2 action0 prefix through the next draw/tick/draw beyond dynamically mapped C/F; exact declared C/F state and seed comparisons; proper-prefix completion only, no whole-session acceptance.'
       : 'One matched original input prefix after the fresh strict Setup comparison; state-only C/F checks, no whole-session acceptance.',
   };
@@ -2862,8 +2876,7 @@ async function runMatchedSetupCfContinuation(setupNative) {
     coordinates: hostEvidence.coordinates ?? null,
   });
   const nativeAdapter = matchedSetupCfNativeAdapter({mode,
-    explicitStep: firstSssVsSetupCfExplicitStep,
-    manifestBytes: isV2 ? helper.encodeRun2NativeManifest(hostEvidence.runtimePayload) : null});
+    explicitStep: firstSssVsSetupCfExplicitStep});
   const driver = new helper.StadiumSetupCfActionDriver({
     runtimePayload: hostEvidence.runtimePayload, native: nativeAdapter});
   await page.evaluate(() => {
@@ -3008,6 +3021,18 @@ async function runMatchedSetupCfContinuation(setupNative) {
             timedActionSync(timingSample, 'comparison', 'compare_ms', compareOperation);
           else compareOperation();
         }
+        // This immutable row records observation, never host/native approval.
+        const recordAction = () => {
+          cf.actions.push({evidence_scope: 'completed_native_receipt_before_host_approval',
+            schedule_index: scheduleIndex, action: action.action,
+            ordinal: action.ordinal ?? (action.action === 'tick' ? action.bundle : action.draw),
+            bundle: action.bundle ?? null,
+            native: actionReceipt, host_comparison: comparison});
+          cf.last_native_state = structuredClone(cfState);
+        };
+        if (timingSample)
+          timedActionSync(timingSample, 'action_record', null, recordAction);
+        else recordAction();
         if (timingSample) {
           await timedActionAsync(timingSample, 'before_diagnostics', 'before_diagnostics_ms',
             () => checkRuntimeDiagnostics(scheduleIndex, `${action.action}-before-ack`, cfState));
@@ -3024,16 +3049,6 @@ async function runMatchedSetupCfContinuation(setupNative) {
         } else {
           accepted = await driver.accept(cfState, comparison);
         }
-        const recordAction = () => {
-          cf.actions.push({schedule_index: scheduleIndex, action: action.action,
-            ordinal: action.ordinal ?? (action.action === 'tick' ? action.bundle : action.draw),
-            bundle: action.bundle ?? null,
-            native: actionReceipt, host_comparison: comparison});
-          cf.last_native_state = structuredClone(cfState);
-        };
-        if (timingSample)
-          timedActionSync(timingSample, 'action_record', null, recordAction);
-        else recordAction();
         if (timingSample) {
           await timedActionAsync(timingSample, 'after_diagnostics', 'after_diagnostics_ms',
             () => checkRuntimeDiagnostics(scheduleIndex, `${action.action}-after-ack`, cfState));
@@ -3085,7 +3100,8 @@ async function runMatchedSetupCfContinuation(setupNative) {
     assert.equal(finalState?.last_action?.ordinal, isV2
       ? hostEvidence.checkpoints.terminal_draw_ordinal : 85);
     cf.last_native_state = structuredClone(finalState);
-    cf.decision = isV2 ? 'PASS_RUN2_PROPER_PREFIX_C_F_STATE_ONLY'
+    cf.decision = mode === 'run2-full-schedule-v3' ? 'PASS_ORIGINAL_FULL7167_FUNCTIONAL_A_C_F_ONLY'
+      : isV2 ? 'PASS_RUN2_PROPER_PREFIX_C_F_STATE_ONLY'
       : 'PASS_MATCHED_SETUP_CF_C_AND_F_STATE_ONLY';
     cf.actions_completed = cf.actions.length;
     await persistReport();
