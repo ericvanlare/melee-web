@@ -54,8 +54,11 @@ const {values} = parseArgs({options: Object.fromEntries(
       ['first-sss-vs-setup-cf-full-schedule', {type: 'boolean', default: false}],
       ['first-sss-vs-setup-cf-common-fields', {type: 'boolean', default: false}],
       ['first-sss-vs-setup-text-tail', {type: 'boolean', default: false}],
+      ['recreation-canary', {type: 'boolean', default: false}],
     ])), strict: true});
 const cssSssReducer = values['css-sss-reducer'];
+const recreationCanary = values['recreation-canary'];
+let recreationLifetime = null;
 const firstSssVsSetup = values['first-sss-vs-setup'];
 const firstSssVsSetupTextTail = values['first-sss-vs-setup-text-tail'];
 const firstSssVsSetupCfExplicitStep = values['first-sss-vs-setup-cf-explicit-step'];
@@ -77,6 +80,10 @@ const firstSssConstructorPair = values['first-sss-constructor-pair'] || firstSss
 const firstCssBrowserFinalDraw = values['first-css-browser-final-draw'] || firstSssConstructorPair;
 const firstCssBrowserStream = values['first-css-browser-stream'] || firstCssBrowserFinalDraw;
 const firstCssBrowserDraw = values['first-css-browser-draw'] || firstCssBrowserStream;
+if (recreationCanary && (!firstSssVsSetup || !values['first-sss-vs-setup-cf'] ||
+    !firstSssVsSetupCfExplicitStep || firstSssVsSetupCfFullSchedule ||
+    firstSssVsSetupCfCommonFields || firstSssVsSetupTextTail))
+  throw Error('Stadium recreation canary requires only the explicit 174-action proper-prefix route');
 if ((firstSssVsSetup && values['first-sss-vs-entry']) ||
     (firstSssVsSetupTextTail && !firstSssVsSetup) ||
     (firstSssVsSetup && !values['first-sss-vs-setup-expected']) ||
@@ -136,10 +143,12 @@ const matchedSetupCfPreflight = validateMatchedSetupCfPreflight(preflight, {
     ? path.resolve(values['first-sss-vs-setup-cf-assembly']) : null,
   helperPath: path.join(ROOT, 'tests/stadium_matched_setup_cf_consumer.mjs'),
 });
+const recreationIdentityLibraryPath = path.join(ROOT, 'src/stadium_recreation_identity_library.js');
+const recreationContextHelperPath = path.join(ROOT, 'tests/stadium_recreation_canary_context.mjs');
 const firstSssVsSetupCfV2 = firstSssVsSetupCf &&
   (matchedSetupCfPreflight.scope === PREFIX_V2_SCOPE || matchedSetupCfPreflight.scope === FULL_V3_SCOPE ||
    matchedSetupCfPreflight.scope === FULL_COMMON_FIELDS_SEED_V1_SCOPE);
-const matchedSetupCfTiming = firstSssVsSetupCfV2 ? {
+let matchedSetupCfTiming = firstSssVsSetupCfV2 ? {
   actionSamples: [], scheduledActions: null, actionLoopActive: false, actionLoopStartedNs: null,
   actionLoopMs: null, globalCaptureDeadlineRemainingAtActionLoopStartMs: null,
   queueRpcMsByIndex: new Map(), approvalRpcMsByIndex: new Map(),
@@ -278,9 +287,9 @@ const remaining = (cap = LIMITS.captureWorkMs) => {
   return ms;
 };
 const hashFile = async file => digest(await fs.readFile(file));
-const inventoryOutput = path.join(output, 'report.json');
+let inventoryOutput = path.join(output, recreationCanary ? 'report-A.json' : 'report.json');
 
-const report = {
+let report = {
   schema: 'melee-web-stadium-c1a-browser-v1',
   result: 'fail',
   execution_state: 'running',
@@ -295,7 +304,7 @@ const report = {
   browser: null,
   local_http_artifacts: {count: 0, before: null, after: null, unchanged: false},
   scenario: {
-    route_mode: firstSssVsSetup ? 'first-sss-vs-setup' : firstSssVsEntry ? 'first-sss-vs-entry' : firstSssPrefix ? 'first-sss-prefix' : firstSssDraw ? 'first-sss-draw' :
+    route_mode: recreationCanary ? 'same-instance-recreation-canary-174' : firstSssVsSetup ? 'first-sss-vs-setup' : firstSssVsEntry ? 'first-sss-vs-entry' : firstSssPrefix ? 'first-sss-prefix' : firstSssDraw ? 'first-sss-draw' :
       firstSssConsumedPadTick ? 'first-sss-consumed-pad-tick' :
       firstSssConstructorPair ? 'first-sss-constructor-pair' :
       firstCssBrowserFinalDraw ? 'first-css-browser-final-pending-draw' :
@@ -319,6 +328,7 @@ const report = {
     first_sss_vs_entry: null,
     first_sss_vs_setup: null,
     matched_setup_cf: null,
+    recreation_canary: null,
     requested_committed_manifest: null,
     native_observation: null,
     final_phase: null,
@@ -339,7 +349,9 @@ const report = {
     context_closed: false, browser_connection_closed: false, browser_process_terminated: false,
     browser_process_pid: null, server_process_terminated: false, server_process_pid: null,
     server_process_exit: null, failures: []},
-  source_request_scope: firstSssVsSetupCf
+  source_request_scope: recreationCanary
+    ? 'Two separately reported same-instance original-route 174-action lifetimes with checked A close/restart; no whole-session or recreation acceptance.'
+    : firstSssVsSetupCf
     ? firstSssVsSetupCfV2
       ? firstSssVsSetupCfCommonFields
         ? 'Strict same-run original Setup then all7167 source-ordered actions, exact consumed PAD and C/F/GO checks plus 3501 declared post-tick common-field comparisons; no full-state or C3 acceptance.'
@@ -365,7 +377,7 @@ const report = {
   error: null,
 };
 
-const stadiumC3ReportCheckpoint = createStadiumC3ReportCheckpoint({reportPath: inventoryOutput});
+let stadiumC3ReportCheckpoint = createStadiumC3ReportCheckpoint({reportPath: inventoryOutput});
 const persistReport = async () => {
   const sample = matchedSetupCfTiming?.currentActionSample ?? null;
   const measure = matchedSetupCfTiming?.actionLoopActive === true && sample !== null;
@@ -394,6 +406,9 @@ const persistReport = async () => {
     }
     if (checkpointed && !terminal)
       stadiumC3ReportCheckpoint.commitPrepared(checkpointReport);
+    // Keep the unchanged supervisor's standard full-report/CDP/cleanup shape at
+    // its fixed report.json path in every canary phase. The summary is separate.
+    if (recreationCanary) await publishRecreationSupervisorReport();
     completed = true;
   } finally {
     if (measure) matchedSetupCfTiming.persistence.push({
@@ -946,6 +961,8 @@ function assertProducerArtifacts(inventory, names, phase) {
 
 async function saveScreenshot(name) {
   if (!page || page.isClosed()) return null;
+  if (recreationCanary && recreationLifetime)
+    name = `${recreationLifetime}-${name}`;
   const file = path.join(output, `${name}.png`);
   await timeout(page.screenshot({path: file, fullPage: true, animations: 'disabled'}),
     10000, `Screenshot ${name}`);
@@ -1231,6 +1248,7 @@ async function runFirstCssBrowserPostdrawStream(baseline) {
     let hookError = null;
     globalThis.__meleeWebStadiumFirstCssStreamRead = () => ({
       status: comparator.status(), rows, hook_error: hookError});
+    globalThis.__meleeWebStadiumRecreationCallbackScopeV1?.claimInstalled('__meleeWebStadiumFirstCssStreamRead', globalThis.__meleeWebStadiumFirstCssStreamRead);
     globalThis.__meleeWebStadiumFirstCssStreamCompare = (phase, actualJson) => {
       if (rows.length >= 297) {
         hookError = 'CSS stream callback count exceeded the bound';
@@ -1244,6 +1262,7 @@ async function runFirstCssBrowserPostdrawStream(baseline) {
       rows.push({phase, actual, approved});
       return approved === true;
     };
+    globalThis.__meleeWebStadiumRecreationCallbackScopeV1?.claimInstalled('__meleeWebStadiumFirstCssStreamCompare', globalThis.__meleeWebStadiumFirstCssStreamCompare);
   }, {moduleUrl: 'data:text/javascript;base64,' +
         Buffer.from(firstCssBrowserStreamInputs.helperSource).toString('base64'),
       expectedPairs: firstCssBrowserStreamInputs.expected.expected_pairs}),
@@ -1449,6 +1468,7 @@ async function runFirstCssBrowserFinalPendingDraw() {
     let hookError = null;
     globalThis.__meleeWebStadiumFirstCssFinalDrawRead = () => ({
       status: comparator.status(), rows, hook_error: hookError});
+    globalThis.__meleeWebStadiumRecreationCallbackScopeV1?.claimInstalled('__meleeWebStadiumFirstCssFinalDrawRead', globalThis.__meleeWebStadiumFirstCssFinalDrawRead);
     globalThis.__meleeWebStadiumFirstCssFinalDrawCompare = (phase, actualJson) => {
       if (rows.length >= 1) { hookError = 'Final CSS draw callback repeated'; return false; }
       let actual;
@@ -1458,6 +1478,7 @@ async function runFirstCssBrowserFinalPendingDraw() {
       rows.push({phase, actual, approved});
       return approved === true;
     };
+    globalThis.__meleeWebStadiumRecreationCallbackScopeV1?.claimInstalled('__meleeWebStadiumFirstCssFinalDrawCompare', globalThis.__meleeWebStadiumFirstCssFinalDrawCompare);
   }, {moduleUrl: 'data:text/javascript;base64,' +
       Buffer.from(firstCssBrowserStreamInputs.helperSource).toString('base64'),
     expectedPair: firstCssBrowserStreamInputs.expected.expected_pairs[147],
@@ -1566,6 +1587,7 @@ async function runFirstSssConstructorPair() {
     let hookError = null;
     globalThis.__meleeWebStadiumFirstSssPairRead = () => ({
       status: comparator.status(), rows, hook_error: hookError});
+    globalThis.__meleeWebStadiumRecreationCallbackScopeV1?.claimInstalled('__meleeWebStadiumFirstSssPairRead', globalThis.__meleeWebStadiumFirstSssPairRead);
     globalThis.__meleeWebStadiumFirstSssPairCompare = (phase, actualJson) => {
       if (rows.length >= 1) {
         hookError = 'SSS pair comparison callback repeated';
@@ -1581,6 +1603,7 @@ async function runFirstSssConstructorPair() {
       row.approved = approved === true;
       return approved === true;
     };
+    globalThis.__meleeWebStadiumRecreationCallbackScopeV1?.claimInstalled('__meleeWebStadiumFirstSssPairCompare', globalThis.__meleeWebStadiumFirstSssPairCompare);
   }, {moduleUrl: 'data:text/javascript;base64,' +
       Buffer.from(firstCssBrowserStreamInputs.helperSource).toString('base64'),
     expectedPair: firstSssConstructorPairInputs.expected}),
@@ -1789,6 +1812,7 @@ async function runFirstSssConsumedPadTick(constructorNative) {
     let hookError = null;
     globalThis.__meleeWebStadiumFirstSssTickRead = () => ({
       status: comparator.status(), rows, hook_error: hookError});
+    globalThis.__meleeWebStadiumRecreationCallbackScopeV1?.claimInstalled('__meleeWebStadiumFirstSssTickRead', globalThis.__meleeWebStadiumFirstSssTickRead);
     globalThis.__meleeWebStadiumFirstSssTickCompare = (phase, actualJson) => {
       if (rows.length >= 1) {
         hookError = 'SSS consumed-tick comparison callback repeated';
@@ -1803,6 +1827,7 @@ async function runFirstSssConsumedPadTick(constructorNative) {
       row.approved = approved === true;
       return approved === true;
     };
+    globalThis.__meleeWebStadiumRecreationCallbackScopeV1?.claimInstalled('__meleeWebStadiumFirstSssTickCompare', globalThis.__meleeWebStadiumFirstSssTickCompare);
   }, {moduleUrl: 'data:text/javascript;base64,' +
       Buffer.from(firstCssBrowserStreamInputs.helperSource).toString('base64'),
     expectedTick: firstSssConsumedPadTickInputs.expected, pair: constructorPair}),
@@ -1911,6 +1936,7 @@ async function runFirstSssDraw(constructorNative) {
     let hookError = null;
     globalThis.__meleeWebStadiumFirstSssDrawRead = () => ({
       status: comparator.status(), rows, hook_error: hookError});
+    globalThis.__meleeWebStadiumRecreationCallbackScopeV1?.claimInstalled('__meleeWebStadiumFirstSssDrawRead', globalThis.__meleeWebStadiumFirstSssDrawRead);
     globalThis.__meleeWebStadiumFirstSssDrawCompare = (phase, actualJson) => {
       let actual;
       try { actual = JSON.parse(actualJson); }
@@ -1922,6 +1948,7 @@ async function runFirstSssDraw(constructorNative) {
       row.approved = approved === true;
       return approved === true;
     };
+    globalThis.__meleeWebStadiumRecreationCallbackScopeV1?.claimInstalled('__meleeWebStadiumFirstSssDrawCompare', globalThis.__meleeWebStadiumFirstSssDrawCompare);
   }, {moduleUrl: 'data:text/javascript;base64,' + Buffer.from(helperSource).toString('base64'),
     expectedDraw: expected, pair, tick: consumedTick}), Math.min(5000, remaining()),
   'Register exact original SSS first-draw comparison');
@@ -2033,6 +2060,7 @@ async function runFirstSssPrefix(constructorNative, firstDrawNative) {
     let hookError = null;
     globalThis.__meleeWebStadiumFirstSssPrefixRead = () => ({
       status: comparator.status(), rows, hook_error: hookError});
+    globalThis.__meleeWebStadiumRecreationCallbackScopeV1?.claimInstalled('__meleeWebStadiumFirstSssPrefixRead', globalThis.__meleeWebStadiumFirstSssPrefixRead);
     globalThis.__meleeWebStadiumFirstSssPrefixCompare = (phase, actualJson) => {
       let actual;
       try { actual = JSON.parse(actualJson); }
@@ -2044,6 +2072,7 @@ async function runFirstSssPrefix(constructorNative, firstDrawNative) {
       row.approved = approved === true;
       return approved === true;
     };
+    globalThis.__meleeWebStadiumRecreationCallbackScopeV1?.claimInstalled('__meleeWebStadiumFirstSssPrefixCompare', globalThis.__meleeWebStadiumFirstSssPrefixCompare);
   }, {moduleUrl: 'data:text/javascript;base64,' + Buffer.from(firstCssBrowserStreamInputs.helperSource).toString('base64'),
     expectedPrefix: expected, inputRows: firstSssPrefixInputs.inputRows,
     pair, tick: consumedTick, draw: firstDraw}), Math.min(5000, remaining()),
@@ -2467,6 +2496,7 @@ async function runFirstSssVsEntry(prefixNative) {
         result?.status?.first_mismatch === null && result?.rows?.length === 374 &&
         result.rows.every(row => row.approved === true);
     };
+    globalThis.__meleeWebStadiumRecreationCallbackScopeV1?.claimInstalled('__meleeWebStadiumFirstSssPrefixApproved', globalThis.__meleeWebStadiumFirstSssPrefixApproved);
   }), Math.min(5000, remaining()), 'Approve only the already compared stopped SSS prefix');
   const result = await timeout(page.evaluate(() => {
     const module = globalThis.Module;
@@ -2544,6 +2574,7 @@ async function runFirstSssVsSetup(entryNative) {
       throw Error('Setup Entry approval already installed');
     // Installed only after Node has completed unchanged strict Entry assertions.
     globalThis.__meleeWebStadiumFirstSssVsEntryApproved = () => true;
+    globalThis.__meleeWebStadiumRecreationCallbackScopeV1?.claimInstalled('__meleeWebStadiumFirstSssVsEntryApproved', globalThis.__meleeWebStadiumFirstSssVsEntryApproved);
   });
   if (firstSssVsSetupTextTail)
     assert.equal(await enableFirstSssTextTailProbe(), true,
@@ -2578,6 +2609,28 @@ async function runFirstSssVsSetup(entryNative) {
   await persistReport();
   assert.equal(approved, true, JSON.stringify(comparator.status().first_mismatch));
   assertFirstSssVsSetupOwners(native.first_sss_vs_setup);
+  if (recreationCanary && recreationLifetime === 'B') {
+    const generation = native.first_sss_vs_setup.match_world_generation;
+    assert.ok(Number.isSafeInteger(generation) && generation > recreationCloseReceipt.prior_world_generation,
+      'Recreated B Setup generation must be newer than retired A');
+    const admitted = await timeout(page.evaluate(() => {
+      const m = globalThis.Module;
+      if (m?.stadiumMatchedSetupNativeIdle?.() !== true || globalThis.menuOwnerStopped?.() !== false)
+        throw Error('B admission requires a returned non-stopped native boundary');
+      const admit = m._melee_web_native_menu_stadium_recreation_admit_b;
+      const getter = m._melee_web_native_menu_stadium_recreation_status;
+      if (typeof admit !== 'function' || typeof getter !== 'function') throw Error('Private B admission exports are absent');
+      const result = admit();
+      const pointer = getter();if (!pointer) throw Error('B admission status is absent');
+      return {result, receipt: JSON.parse(m.UTF8ToString(pointer))};
+    }), Math.min(3000, remaining()), 'Admit actual fresh B owner and RNG chain');
+    assert.equal(admitted.result, 1, admitted.receipt?.error || 'Native B admission refused');
+    assert.equal(admitted.receipt?.lifetime_b?.admitted, true);
+    assert.equal(admitted.receipt.lifetime_b.world_generation, generation);
+    assert.equal(admitted.receipt.lifetime_b.prior_world_generation, recreationCloseReceipt.prior_world_generation);
+    report.scenario.recreation_canary.native_B_admission = admitted.receipt.lifetime_b;
+    await persistReport();
+  }
   if (firstSssVsSetupTextTail) {
     const nativeTextTail = native.first_sss_vs_setup.text_tail_probe;
     assert.equal(nativeTextTail?.opted_in, true);
@@ -2968,6 +3021,7 @@ async function runMatchedSetupCfContinuation(setupNative) {
     if (globalThis.__meleeWebStadiumFirstSssVsSetupCfApproved)
       throw Error('Matched Setup C/F approval callback already exists');
     globalThis.__meleeWebStadiumFirstSssVsSetupCfApproved = () => true;
+    globalThis.__meleeWebStadiumRecreationCallbackScopeV1?.claimInstalled('__meleeWebStadiumFirstSssVsSetupCfApproved', globalThis.__meleeWebStadiumFirstSssVsSetupCfApproved);
   });
   try {
     assert.equal(await driver.arm(hostCallbacks.setupApproved()), true,
@@ -3230,8 +3284,593 @@ async function runMatchedSetupCfContinuation(setupNative) {
   } finally {
     finishMatchedSetupCfActionLoop();
     setupApproved = false;
-    await page.evaluate(() => { delete globalThis.__meleeWebStadiumFirstSssVsSetupCfApproved; });
+    await page.evaluate(() => {
+      const name = '__meleeWebStadiumFirstSssVsSetupCfApproved';
+      const scope = globalThis.__meleeWebStadiumRecreationCallbackScopeV1;
+      if (scope) scope.disposeOne(name, globalThis[name]);
+      else delete globalThis[name];
+    });
   }
+}
+
+const recreationCallbackNames = Object.freeze([
+  '__meleeWebStadiumFirstCssStreamRead', '__meleeWebStadiumFirstCssStreamCompare',
+  '__meleeWebStadiumFirstCssFinalDrawRead', '__meleeWebStadiumFirstCssFinalDrawCompare',
+  '__meleeWebStadiumFirstSssPairRead', '__meleeWebStadiumFirstSssPairCompare',
+  '__meleeWebStadiumFirstSssTickRead', '__meleeWebStadiumFirstSssTickCompare',
+  '__meleeWebStadiumFirstSssDrawRead', '__meleeWebStadiumFirstSssDrawCompare',
+  '__meleeWebStadiumFirstSssPrefixRead', '__meleeWebStadiumFirstSssPrefixCompare',
+  '__meleeWebStadiumFirstSssPrefixApproved', '__meleeWebStadiumFirstSssVsEntryApproved',
+  '__meleeWebStadiumFirstSssVsSetupCfApproved', '__meleeWebStadiumTextTailProbe',
+  'menuStadiumC1aPrepared', '__meleeStadiumC1aPayload',
+]);
+const recreationHelperKey = '__meleeWebStadiumRecreationCanary';
+const recreationCallbackScopeKey = '__meleeWebStadiumRecreationCallbackScopeV1';
+let recreationSummary = null;
+let recreationBaseReport = null;
+let recreationReportAObject = null;
+let recreationCheckpointAObject = null;
+let recreationCheckpointControlObject = null;
+let recreationCheckpointBObject = null;
+let recreationCheckpointAFiles = null;
+let recreationCheckpointBFiles = null;
+let recreationReportABytes = null;
+let recreationReportAFile = null;
+let recreationReportAFileSha256 = null;
+let recreationArchivedProjection = null;
+let recreationCloseReceipt = null;
+let recreationCloseFileSha256 = null;
+let recreationCloseFilePath = null;
+let recreationCloseIdentity = null;
+let recreationRestartIdentity = null;
+let recreationEventStart = {requests: 0, responses: 0, external: 0,
+  pageErrors: 0, consoleErrors: 0, consoleWarnings: 0, consoleMessages: 0,
+  consoleDropped: 0};
+
+function recreationEventSnapshot() {
+  const start = recreationEventStart;
+  return {
+    page_errors: pageErrors.slice(start.pageErrors),
+    console_errors: consoleErrors.slice(start.consoleErrors),
+    console_warnings: consoleWarnings.slice(start.consoleWarnings),
+    console_messages: consoleMessages.slice(start.consoleMessages),
+    console_message_capture_overflow: consoleMessageDropped > start.consoleDropped,
+    console_message_dropped_count: consoleMessageDropped - start.consoleDropped,
+    http_requests: [...requestRows.slice(start.requests), ...responseRows.slice(start.responses)],
+    external_http_requests: externalRequests.slice(start.external),
+  };
+}
+
+async function snapshotRecreationCheckpointFiles(checkpoint) {
+  const paths = [checkpoint?.sidecarPath, checkpoint?.dynamicRecordPath].filter(Boolean);
+  const records = [];
+  for (const file of paths) {
+    const absolute = path.resolve(file);
+    assert.equal(path.dirname(absolute), path.resolve(output),
+      'A checkpoint artifact escaped the owned capture directory');
+    const stat = await fs.stat(absolute);
+    assert.ok(stat.isFile());
+    records.push({basename: path.basename(absolute), bytes: stat.size,
+      sha256: await hashFile(absolute)});
+  }
+  assert.ok(records.length > 0, 'Lifetime A did not expose its owned checkpoint artifacts');
+  return records;
+}
+
+async function assertRecreationCheckpointFilesUnchanged(expected) {
+  assert.ok(recreationCheckpointAObject && Object.isFrozen(recreationCheckpointAObject),
+    'Lifetime A checkpoint owner is absent or was not frozen');
+  if (recreationCheckpointBObject) {
+    assert.equal(stadiumC3ReportCheckpoint, recreationCheckpointBObject,
+      'Current checkpoint owner changed after lifetime B started');
+    assert.notEqual(recreationCheckpointBObject, recreationCheckpointAObject,
+      'Lifetime B reused the frozen A checkpoint owner');
+  } else if (recreationCheckpointControlObject) {
+    assert.equal(stadiumC3ReportCheckpoint, recreationCheckpointControlObject,
+      'A-close control checkpoint owner changed before B started');
+    assert.notEqual(recreationCheckpointControlObject, recreationCheckpointAObject,
+      'A-close control reused the frozen A checkpoint owner');
+  }
+  assert.deepEqual(await snapshotRecreationCheckpointFiles(recreationCheckpointAObject), expected,
+    'Lifetime A checkpoint sidecar bytes changed while B ran');
+}
+
+async function verifyRecreationArchiveAfterFinalCleanup() {
+  if (!recreationCanary || !recreationReportAObject || !recreationCheckpointAFiles) return;
+  try {
+    assert.equal(JSON.stringify(recreationReportAObject), recreationReportABytes,
+      'Archived A report bytes changed before final teardown result');
+    await assertRecreationCheckpointFilesUnchanged(recreationCheckpointAFiles);
+    assert.equal(await hashFile(recreationReportAFile), recreationReportAFileSha256,
+      'A report file changed before final teardown result');
+    if (recreationSummary?.close_receipt) {
+      assert.ok(recreationCloseFilePath && recreationCloseFileSha256,
+        'Persisted A close receipt is missing its owned file identity');
+      assert.equal(await hashFile(recreationCloseFilePath), recreationCloseFileSha256,
+        'A close receipt changed before final teardown result');
+    }
+    recreationSummary ??= {};
+    recreationSummary.final_archive_integrity = {result: 'pass', checked_after_owned_cleanup: true};
+    if (recreationSummary.lifetime_b?.completed_actions === 174)
+      recreationSummary.A_archived_bytes_unchanged_after_B = true;
+  } catch (error) {
+    const message = errorText(error);
+    recreationSummary ??= {};
+    recreationSummary.final_archive_integrity = {
+      result: 'fail', checked_after_owned_cleanup: true, error: message,
+    };
+    recreationSummary.A_archived_bytes_unchanged_after_B = false;
+    recreationSummary.decision = 'OPEN_FAILURE';
+    recreationSummary.result = 'fail';
+    failure ??= `Final A archive integrity check failed: ${message}`;
+    report.error = failure;
+    report.result = 'fail';
+  }
+}
+
+async function publishRecreationSupervisorReport() {
+  const target = path.join(output, 'report.json');
+  assert.notEqual(path.resolve(inventoryOutput), path.resolve(target),
+    'Canary phase report must have its own immutable/report owner path');
+  const temporary = `${target}.tmp`;
+  await fs.copyFile(inventoryOutput, temporary);
+  await fs.rename(temporary, target);
+}
+
+async function persistRecreationSummary() {
+  if (!recreationCanary) return;
+  const summary = recreationSummary ?? {
+    schema: 'melee-web-stadium-recreation-canary-summary-v1',
+    result: 'fail', decision: 'OPEN_FAILURE', acceptance: 'not_claimed',
+    lifetime_a: null, close_receipt: null, lifetime_b: null,
+    identity_samples: [], A_archived_bytes_unchanged_after_B: false,
+  };
+  const cleanupFailed = report.cleanup.failures.length > 0 ||
+    !report.cleanup.browser_process_terminated || !report.cleanup.server_process_terminated;
+  const passed = !failure && !cleanupFailed && report.result === 'pass' &&
+    summary.final_archive_integrity?.result === 'pass' &&
+    summary.decision === 'PASS_SAME_INSTANCE_174_ACTION_RECREATION_COMPONENT_ONLY';
+  summary.result = passed ? 'pass' : 'fail';
+  if (!passed) summary.decision = 'OPEN_FAILURE';
+  summary.acceptance = 'not_claimed';
+  summary.restore_admission = 'not_claimed';
+  summary.final_report = {path: path.basename(inventoryOutput), sha256: await hashFile(inventoryOutput)};
+  summary.cleanup = {browser_process_terminated: report.cleanup.browser_process_terminated,
+    server_process_terminated: report.cleanup.server_process_terminated,
+    failures: report.cleanup.failures};
+  if (failure) summary.failure = failure;
+  if (cleanupFailed && !failure) summary.failure = 'Owned browser/server cleanup did not pass';
+  const target = path.join(output, 'recreation-summary.json');
+  const temporary = `${target}.tmp`;
+  await fs.writeFile(temporary, `${JSON.stringify(summary)}\n`);
+  await fs.rename(temporary, target);
+}
+
+async function beginRecreationCallbackScope(label) {
+  return timeout(page.evaluate(({label, names, helperKey, scopeKey}) => {
+    if (!globalThis[scopeKey]) {
+      let active = false, baseline = null, activeLabel = null, claimed = null;
+      const sameDescriptor = (left, right) => left === null || right === null
+        ? left === right
+        : left.value === right.value && left.get === right.get && left.set === right.set &&
+          left.configurable === right.configurable && left.enumerable === right.enumerable &&
+          left.writable === right.writable;
+      const scope = Object.freeze({
+        begin(nextLabel) {
+          if (active) throw Error('Stadium callback ownership scope is already active');
+          baseline = new Map(names.map(name => [name,
+            Object.getOwnPropertyDescriptor(globalThis, name) ?? null]));
+          activeLabel = nextLabel;claimed = new Map();
+          active = true;
+          return {active: true, label: activeLabel, tracked_names: names.length};
+        },
+        claimInstalled(name, expectedValue) {
+          if (!active || !baseline.has(name)) throw Error('Callback installation is outside its owned scope');
+          const current = Object.getOwnPropertyDescriptor(globalThis, name) ?? null;
+          if (!current || !Object.hasOwn(current, 'value') || current.value !== expectedValue)
+            throw Error('Callback installation descriptor does not match its exact installed value');
+          const prior = claimed.get(name);
+          if (prior && !sameDescriptor(prior, current)) throw Error('Owned callback was replaced before installation claim');
+          if (!sameDescriptor(baseline.get(name), current)) claimed.set(name, current);
+        },
+        disposeOne(name, expectedValue) {
+          if (!active || !claimed.has(name)) throw Error('Callback disposal lacks an exact installation claim');
+          const current = Object.getOwnPropertyDescriptor(globalThis, name) ?? null;
+          if (!sameDescriptor(current, claimed.get(name)) || current?.value !== expectedValue)
+            throw Error('Foreign callback replacement refuses owned disposal');
+          const before = baseline.get(name);
+          if (before === null) { if (!delete globalThis[name]) throw Error('Could not remove owned callback: ' + name); }
+          else Object.defineProperty(globalThis, name, before);
+          claimed.delete(name);
+        },
+        dispose(expectedLabel) {
+          if (!active || activeLabel !== expectedLabel)
+            throw Error('Stadium callback disposal does not match its active lifetime');
+          // Validate every descriptor before touching any property. A foreign
+          // replacement is retained and refuses the whole disposal operation.
+          for (const name of names) {
+            const expected = claimed.get(name) ?? baseline.get(name);
+            if (!sameDescriptor(Object.getOwnPropertyDescriptor(globalThis, name) ?? null, expected))
+              throw Error('Foreign callback descriptor changed before scope disposal: ' + name);
+          }
+          const changed = [...claimed.keys()];
+          for (const name of changed) scope.disposeOne(name, claimed.get(name).value);
+          active = false;
+          const disposed = {active: false, label: activeLabel, changed};
+          baseline = null; claimed = null; activeLabel = null;
+          return disposed;
+        },
+        retire(expectedHelper) {
+          if (active) throw Error('Cannot retire callback scope while a lifetime is active');
+          if (globalThis[helperKey] !== expectedHelper)
+            throw Error('Canary context changed before callback-scope retirement');
+          delete globalThis[helperKey];
+          if (globalThis[scopeKey] !== scope)
+            throw Error('Callback scope identity changed before retirement');
+          delete globalThis[scopeKey];
+          return true;
+        },
+      });
+      Object.defineProperty(globalThis, scopeKey, {
+        value: scope, enumerable: false, writable: false, configurable: true,
+      });
+    }
+    return globalThis[scopeKey].begin(label);
+  }, {label, names: recreationCallbackNames, helperKey: recreationHelperKey,
+    scopeKey: recreationCallbackScopeKey}), Math.min(3000, remaining()),
+    `Begin lifetime ${label} callback ownership scope`);
+}
+
+async function disposeRecreationCallbackScope(label) {
+  return timeout(page.evaluate(({label, scopeKey}) => {
+    const scope = globalThis[scopeKey];
+    if (!scope) throw Error('Stadium callback ownership scope is absent');
+    return scope.dispose(label);
+  }, {label, scopeKey: recreationCallbackScopeKey}), Math.min(3000, remaining()),
+  `Dispose only lifetime ${label} callbacks`);
+}
+
+function recreationApprovalProjection(value) {
+  return {
+    scenario: {
+      matched_setup_cf: value.scenario.matched_setup_cf,
+      first_sss_vs_setup: {
+        observation: value.scenario.first_sss_vs_setup?.observation ?? null,
+      },
+    },
+  };
+}
+
+async function installRecreationCanaryContext(reportA, checkpointFiles) {
+  const checkpointA = Object.freeze({owner: 'A', report_path: 'report-A.json',
+    artifacts: Object.freeze(checkpointFiles.map(file => Object.freeze({...file})))});
+  const helperSource = await fs.readFile(recreationContextHelperPath, 'utf8');
+  const moduleUrl = `data:text/javascript;base64,${Buffer.from(helperSource).toString('base64')}`;
+  return timeout(page.evaluate(async ({moduleUrl, reportA, checkpointA, helperKey}) => {
+    if (Object.prototype.hasOwnProperty.call(globalThis, helperKey))
+      throw Error('Stadium recreation context was already installed');
+    const {createStadiumRecreationCanaryContext} = await import(moduleUrl);
+    const context = createStadiumRecreationCanaryContext({reportA, checkpointA});
+    Object.defineProperty(globalThis, helperKey, {
+      value: context, enumerable: false, writable: false, configurable: true,
+    });
+    return {schema: 'melee-web-stadium-recreation-context-v1', installed: true};
+  }, {moduleUrl, reportA: recreationApprovalProjection(reportA), checkpointA,
+    helperKey: recreationHelperKey}),
+  Math.min(5000, remaining()), 'Install immutable same-page A/B canary context');
+}
+
+async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
+  recreationReportAObject = report;
+  recreationCheckpointAObject = stadiumC3ReportCheckpoint;
+  assert.ok(Object.isFrozen(recreationCheckpointAObject),
+    'Lifetime A report checkpoint API must be immutable before A starts');
+  recreationBaseReport = structuredClone(report);
+  report.scenario.recreation_canary = {...report.scenario.recreation_canary,
+    lifetime: 'A', role: 'source-lifetime-A',
+    status: 'awaiting-174-action-comparison'};
+  await page.exposeFunction('__persistStadiumRecreationCanaryA', async projection => {
+    if (JSON.stringify(projection) !== JSON.stringify(recreationApprovalProjection(recreationReportAObject)) ||
+        report !== recreationReportAObject || stadiumC3ReportCheckpoint !== recreationCheckpointAObject)
+      throw Error('Lifetime A report/checkpoint changed before the awaited A persistence');
+    await persistReport();
+    if (JSON.stringify(recreationReportAObject) !== JSON.stringify(report))
+      throw Error('Lifetime A report changed during its persistence callback');
+    return true;
+  });
+  await page.exposeFunction('__persistStadiumRecreationCanaryClose', async receipt => {
+    if (!recreationCloseReceipt || JSON.stringify(receipt) !== JSON.stringify(recreationCloseReceipt) ||
+        JSON.stringify(recreationReportAObject) !== recreationReportABytes)
+      throw Error('A close persistence received a different receipt or changed A report');
+    const target = path.join(output, 'recreation-close-A.json');
+    const temporary = `${target}.tmp`;
+    const bytes = `${JSON.stringify(receipt)}\n`;
+    await fs.writeFile(temporary, bytes);
+    await fs.rename(temporary, target);
+    recreationCloseFileSha256 = digest(Buffer.from(bytes));
+    recreationCloseFilePath = target;
+    return true;
+  });
+
+  recreationLifetime = 'A';
+  const aRouteStartedNs = monotonicNowNs();
+  await runFirstCssBrowserDraw({baseUrl, artifacts, before});
+  const aRouteMs = elapsedMs(aRouteStartedNs);
+  assert.equal(report.result, 'pass', 'Lifetime A did not finish the exact retained 174-action route');
+  assert.equal(report.scenario.matched_setup_cf?.decision, 'PASS_RUN2_PROPER_PREFIX_C_F_STATE_ONLY');
+  assert.equal(report.scenario.matched_setup_cf?.actions_completed, 174);
+  report.scenario.recreation_canary.status = 'complete-awaiting-checked-close';
+  report.execution_state = 'completed';
+  report.completed_at = new Date().toISOString();
+  report.scenario.matched_setup_cf_timing = summarizeMatchedSetupCfTiming(matchedSetupCfTiming);
+  await persistReport();
+  report.scenario.recreation_canary.route_elapsed_ms = aRouteMs;
+  report.scenario.recreation_canary.elapsed_scope =
+    'Host monotonic wall duration for the bounded first-draw plus exact 174-action route; diagnostic timing only.';
+  await persistReport();
+  recreationReportABytes = JSON.stringify(report);
+  const aFile = path.join(output, 'report-A.json');
+  const aFileBeforeArchiveSha256 = await hashFile(aFile);
+  recreationReportAFile = aFile;
+  recreationReportAFileSha256 = aFileBeforeArchiveSha256;
+  recreationCheckpointAFiles = Object.freeze(
+    (await snapshotRecreationCheckpointFiles(recreationCheckpointAObject))
+      .map(file => Object.freeze({...file})));
+  await installRecreationCanaryContext(report, recreationCheckpointAFiles);
+  const aProjection = recreationApprovalProjection(report);
+  const archivedProjectionBytes = JSON.stringify(aProjection);
+  const archive = await timeout(page.evaluate(async ({helperKey}) => {
+    const helper = globalThis[helperKey];
+    if (!helper) throw Error('Stadium recreation context disappeared before A archive');
+    await helper.archiveA(async snapshot => {
+      const persisted = await globalThis.__persistStadiumRecreationCanaryA(snapshot);
+      if (persisted !== true) throw Error('Node did not acknowledge complete A report persistence');
+    });
+    return helper.status();
+  }, {helperKey: recreationHelperKey}), Math.min(10000, remaining()),
+  'Persist and archive complete lifetime A before native close');
+  assert.equal(archive.phase, 'A-persisted');
+  recreationArchivedProjection = archive.archivedA;
+  assert.equal(recreationArchivedProjection, archivedProjectionBytes);
+  // From this point on A is immutable. A distinct control report receives any
+  // close/restart failure details until the fresh B report is constructed.
+  report = structuredClone(recreationBaseReport);
+  report.result = 'fail';
+  report.execution_state = 'running';
+  report.error = null;
+  report.scenario.recreation_canary = {lifetime: 'A-close-control',
+    archived_report_sha256: aFileBeforeArchiveSha256, status: 'awaiting-close-restart',
+    result_scope: 'component-only'};
+  inventoryOutput = path.join(output, 'recreation-control.json');
+  stadiumC3ReportCheckpoint = createStadiumC3ReportCheckpoint({reportPath: inventoryOutput});
+  recreationCheckpointControlObject = stadiumC3ReportCheckpoint;
+  const aFileSha256 = await hashFile(aFile);
+  assert.equal(aFileSha256, aFileBeforeArchiveSha256,
+    'A persistence changed the completed report bytes while archiving');
+  recreationSummary = {schema: 'melee-web-stadium-recreation-canary-summary-v1',
+    result: 'running', decision: null, acceptance: 'not_claimed',
+    lifetime_a: {path: path.basename(aFile), sha256: aFileSha256,
+      completed_actions: 174, route_elapsed_ms: aRouteMs,
+      checkpoint_files: recreationCheckpointAFiles},
+    close_receipt: null, lifetime_b: null, identity_samples: [],
+    A_archived_bytes_unchanged_after_B: false,
+    callback_scope: {owned_names: recreationCallbackNames,
+      shared_listener_scope: 'one page-wide request/response/console/pageerror listener set; per-lifetime report rows are sliced, not re-registered'}};
+
+  const closeRestartStartedNs = monotonicNowNs();
+  const closeStartedNs = monotonicNowNs();
+  matchedSetupCfExplicitNativeAccessClosed = true;
+  const close = await timeout(page.evaluate(async () => {
+    const module = globalThis.Module;
+    if (!module || module.ABORT === true ||
+        module.stadiumMatchedSetupNativeIdle?.() !== true ||
+        globalThis.menuOwnerStopped?.() !== false ||
+        globalThis.__meleeWebStadiumRecreationCanary?.beforeClose?.() !== true)
+      throw Error('A close requires a returned, non-aborted idle boundary and persisted A approval');
+    const closeFunction = module._melee_web_native_menu_stadium_recreation_close;
+    if (typeof closeFunction !== 'function') throw Error('Private recreation close export is absent');
+    if (typeof module.ccall !== 'function') throw Error('Generated asynchronous ccall is absent');
+    const pending = module.ccall('melee_web_native_menu_stadium_recreation_close', 'number', [], [], {async: true});
+    if (!pending || typeof pending.then !== 'function') throw Error('Native canary call did not return its owned promise');
+    const result = await pending;
+    if (module.stadiumMatchedSetupNativeIdle?.() !== true)
+      throw Error('Canary call returned without Asyncify idle; refusing native status read');
+    const getter = module._melee_web_native_menu_stadium_recreation_status;
+    if (typeof getter !== 'function') throw Error('Private recreation status export is absent');
+    const pointer = getter();
+    if (!pointer) throw Error('Private recreation status returned no receipt');
+    return {result, receipt: JSON.parse(module.UTF8ToString(pointer)),
+      identity: module.__meleeWebStadiumRecreationIdentityV1?.compare?.() ?? null};
+  }), Math.min(LIMITS.unloadMs, remaining()), 'Checked native close of lifetime A');
+  recreationCloseReceipt = close.receipt;
+  assert.equal(close.result, 1, close.receipt?.error || 'Native A close was refused');
+  assert.equal(close.receipt?.closed, true);
+  assert.equal(close.receipt?.restarted, false);
+  assert.equal(close.identity?.same_instance, true,
+    'Actual Module/Wasm exports/Memory identity changed across A close');
+  recreationCloseIdentity = close.identity;
+  const closeNativeMs = elapsedMs(closeStartedNs);
+  const closeArchive = await timeout(page.evaluate(async ({helperKey, receipt}) => {
+    const helper = globalThis[helperKey];
+    await helper.archiveClose(receipt, async archived => {
+      const persisted = await globalThis.__persistStadiumRecreationCanaryClose(archived);
+      if (persisted !== true) throw Error('Node did not acknowledge A close receipt persistence');
+    });
+    return helper.status();
+  }, {helperKey: recreationHelperKey, receipt: close.receipt}), Math.min(10000, remaining()),
+  'Persist exact returned A close receipt');
+  assert.equal(closeArchive.phase, 'A-closed-persisted');
+  assert.equal(closeArchive.archivedA, recreationArchivedProjection);
+  const callbackCleanupA = await disposeRecreationCallbackScope('A');
+  recreationSummary.lifetime_a.callbacks_disposed = callbackCleanupA.changed;
+  recreationSummary.close_receipt = {path: 'recreation-close-A.json',
+    sha256: recreationCloseFileSha256, identity: recreationCloseIdentity};
+
+  const restartStartedNs = monotonicNowNs();
+  const restart = await timeout(page.evaluate(async () => {
+    const module = globalThis.Module;
+    if (!module || module.ABORT === true ||
+        module.stadiumMatchedSetupNativeIdle?.() !== true ||
+        globalThis.menuOwnerStopped?.() !== false ||
+        globalThis.__meleeWebStadiumRecreationCanary?.afterClose?.() !== true)
+      throw Error('Restart requires the returned idle boundary and persisted close receipt');
+    const restartFunction = module._melee_web_native_menu_stadium_recreation_restart;
+    if (typeof restartFunction !== 'function') throw Error('Private recreation restart export is absent');
+    if (typeof module.ccall !== 'function') throw Error('Generated asynchronous ccall is absent');
+    const pending = module.ccall('melee_web_native_menu_stadium_recreation_restart', 'number', [], [], {async: true});
+    if (!pending || typeof pending.then !== 'function') throw Error('Native canary call did not return its owned promise');
+    const result = await pending;
+    if (module.stadiumMatchedSetupNativeIdle?.() !== true)
+      throw Error('Canary call returned without Asyncify idle; refusing native status read');
+    const getter = module._melee_web_native_menu_stadium_recreation_status;
+    if (typeof getter !== 'function') throw Error('Private recreation status export is absent');
+    const pointer = getter();
+    if (!pointer) throw Error('Private recreation status returned no receipt');
+    return {result, receipt: JSON.parse(module.UTF8ToString(pointer)),
+      identity: module.__meleeWebStadiumRecreationIdentityV1?.compare?.() ?? null};
+  }), Math.min(5000, remaining()), 'Restart ordinary ownerless loop on the retained instance');
+  assert.equal(restart.result, 1, restart.receipt?.error || 'Native recreation restart was refused');
+  assert.equal(restart.receipt?.restarted, true);
+  assert.equal(restart.identity?.same_instance, true,
+    'Actual Module/Wasm exports/Memory identity changed across restart');
+  recreationRestartIdentity = restart.identity;
+  const restartNativeMs = elapsedMs(restartStartedNs);
+  const closeRestartMs = elapsedMs(closeRestartStartedNs);
+  await page.evaluate(({helperKey, receipt}) => {
+    globalThis[helperKey].acceptRestart(receipt);
+  }, {helperKey: recreationHelperKey, receipt: restart.receipt});
+  const archiveAfterRestart = await page.evaluate(helperKey => globalThis[helperKey].status(),
+    recreationHelperKey);
+  assert.equal(archiveAfterRestart.phase, 'restarted');
+  assert.equal(archiveAfterRestart.archivedA, recreationArchivedProjection);
+
+  // The terminal callback state is never reset. Only runner-owned C/F bookkeeping
+  // for the closed A owner is retired before the fresh original B import.
+  matchedSetupCfExplicitArmed = false;
+  matchedSetupCfExplicitRetirementAttempted = false;
+  matchedSetupCfExplicitNativeAccessClosed = false;
+  matchedSetupCfExplicitAsyncifyUnsafe = false;
+  pendingMatchedSetupCfExplicitStep = null;
+  const nextReport = structuredClone(recreationBaseReport);
+  nextReport.result = 'fail';
+  nextReport.execution_state = 'running';
+  delete nextReport.completed_at;
+  nextReport.error = null;
+  nextReport.scenario.recreation_canary = {lifetime: 'B', role: 'source-lifetime-B',
+    prior_world_generation: close.receipt.prior_world_generation,
+    identity_capture: recreationBaseReport.scenario.recreation_canary.identity_capture,
+    instance_identity_samples: [], result_scope: 'component-only'};
+  report = nextReport;
+  inventoryOutput = path.join(output, 'report-B.json');
+  stadiumC3ReportCheckpoint = createStadiumC3ReportCheckpoint({reportPath: inventoryOutput});
+  recreationCheckpointBObject = stadiumC3ReportCheckpoint;
+  matchedSetupCfTiming = firstSssVsSetupCfV2 ? {
+    actionSamples: [], scheduledActions: null, actionLoopActive: false, actionLoopStartedNs: null,
+    actionLoopMs: null, globalCaptureDeadlineRemainingAtActionLoopStartMs: null,
+    queueRpcMsByIndex: new Map(), approvalRpcMsByIndex: new Map(),
+    persistence: [], currentActionSample: null, explicitStep: firstSssVsSetupCfExplicitStep,
+  } : null;
+  recreationLifetime = 'B';
+  assert.notEqual(stadiumC3ReportCheckpoint, recreationCheckpointAObject);
+  recreationEventStart = {requests: requestRows.length, responses: responseRows.length,
+    external: externalRequests.length, pageErrors: pageErrors.length,
+    consoleErrors: consoleErrors.length, consoleWarnings: consoleWarnings.length,
+    consoleMessages: consoleMessages.length, consoleDropped: consoleMessageDropped};
+  await page.evaluate(({helperKey, reportB}) => {
+    globalThis[helperKey].beginB(reportB, Object.freeze({owner: 'B', report_path: 'report-B.json'}));
+  }, {helperKey: recreationHelperKey, reportB: recreationApprovalProjection(report)});
+  await beginRecreationCallbackScope('B');
+  const identityBeforeB = await page.evaluate(() =>
+    globalThis.Module.__meleeWebStadiumRecreationIdentityV1.compare());
+  assert.equal(identityBeforeB.same_instance, true,
+    'Actual instance identity changed before the fresh B import');
+  report.scenario.recreation_canary.instance_identity_samples.push({boundary: 'after-A-restart-before-B',
+    ...identityBeforeB});
+  await persistReport();
+  const bImportStartedNs = monotonicNowNs();
+  await timeout(driver.selectDisc(values.disc), Math.min(LIMITS.discImportMs, remaining()),
+    'Fresh B disc import after checked same-instance restart');
+  await timeout(driver.waitForStart(), Math.min(LIMITS.discImportMs, remaining()),
+    'Fresh B native menu preparation');
+  const bImportMs = elapsedMs(bImportStartedNs);
+  const bRouteStartedNs = monotonicNowNs();
+  await runFirstCssBrowserDraw({baseUrl, artifacts, before});
+  const bRouteMs = elapsedMs(bRouteStartedNs);
+  assert.equal(report.result, 'pass', 'Lifetime B did not finish the exact retained 174-action route');
+  assert.equal(report.scenario.matched_setup_cf?.decision, 'PASS_RUN2_PROPER_PREFIX_C_F_STATE_ONLY');
+  assert.equal(report.scenario.matched_setup_cf?.actions_completed, 174);
+  const bSetupGeneration = report.scenario.first_sss_vs_setup.observation.first_sss_vs_setup.match_world_generation;
+  assert.ok(bSetupGeneration > close.receipt.prior_world_generation, 'B generation did not advance after A retirement');
+  const bRng = report.cleanup.matched_setup_cf_retirement?.retirement?.recreation_b_rng;
+  assert.equal(bRng?.schema, 'melee-web-stadium-recreation-b-rng-v1');
+  assert.equal(bRng.admitted, true);assert.equal(bRng.world_generation, bSetupGeneration);
+  assert.equal(bRng.prior_world_generation, close.receipt.prior_world_generation);
+  assert.equal(bRng.match_to_host_restored, true);assert.equal(bRng.host_to_parent_restored, true);
+  assert.equal(bRng.terminal_checked, true);
+  assert.equal(bRng.parent_seed, close.receipt.parent_seed);
+  report.scenario.recreation_canary.terminal_B_rng = structuredClone(bRng);
+  recreationCheckpointBFiles = Object.freeze(
+    (await snapshotRecreationCheckpointFiles(recreationCheckpointBObject))
+      .map(file => Object.freeze({...file})));
+  const identityAfterB = await page.evaluate(() =>
+    globalThis.Module.__meleeWebStadiumRecreationIdentityV1.compare());
+  assert.equal(identityAfterB.same_instance, true,
+    'Actual Module/Wasm exports/Memory identity changed during fresh B route');
+  report.scenario.recreation_canary.instance_identity_samples.push({boundary: 'after-B-complete',
+    ...identityAfterB});
+  const callbackCleanupB = await disposeRecreationCallbackScope('B');
+
+  const helperFinal = await page.evaluate(helperKey => globalThis[helperKey].status(),
+    recreationHelperKey);
+  assert.equal(helperFinal.phase, 'B');
+  assert.equal(helperFinal.archivedA, recreationArchivedProjection,
+    'A archived approval bytes changed while B ran');
+  assert.notEqual(stadiumC3ReportCheckpoint, recreationCheckpointAObject,
+    'B reused A checkpoint owner');
+  const helperRemoved = await page.evaluate(helperKey => {
+    const value = globalThis[helperKey];
+    if (!value || value.status().phase !== 'B') throw Error('Canary helper changed before final removal');
+    const scope = globalThis.__meleeWebStadiumRecreationCallbackScopeV1;
+    if (!scope || scope.retire(value) !== true)
+      throw Error('Canary callback-scope owner did not retire exact helper references');
+    return !Object.prototype.hasOwnProperty.call(globalThis, helperKey) &&
+      !Object.prototype.hasOwnProperty.call(globalThis,
+        '__meleeWebStadiumRecreationCallbackScopeV1');
+  }, recreationHelperKey);
+  assert.equal(helperRemoved, true);
+
+  // Recheck A's in-memory archive, exact on-disk report/receipt and checkpoint
+  // sidecars after all B work and callback disposal, immediately before return.
+  assert.equal(JSON.stringify(recreationReportAObject), recreationReportABytes,
+    'Archived A report bytes changed while B ran');
+  await assertRecreationCheckpointFilesUnchanged(recreationCheckpointAFiles);
+  assert.equal(await hashFile(aFile), aFileSha256, 'A report file changed while B ran');
+  assert.equal(await hashFile(path.join(output, 'recreation-close-A.json')),
+    recreationCloseFileSha256, 'Persisted A close receipt changed while B ran');
+  report.scenario.recreation_canary.completed_actions = 174;
+  report.scenario.recreation_canary.report_path = path.basename(inventoryOutput);
+  report.scenario.recreation_canary.close_receipt_path = 'recreation-close-A.json';
+  report.scenario.recreation_canary.close_receipt_sha256 = recreationCloseFileSha256;
+  report.scenario.recreation_canary.close_identity = recreationCloseIdentity;
+  report.scenario.recreation_canary.callbacks_disposed = callbackCleanupB.changed;
+  report.scenario.recreation_canary.archived_A_unchanged_after_B = true;
+  report.scenario.recreation_canary.instance_identity_claim =
+    'Actual Module, wasmExports and WebAssembly.Memory references plus exported wrappers remained identical; HEAP/memory buffer replacement is recorded separately and does not infer a new instance.';
+  recreationSummary.result = 'pass';
+  recreationSummary.decision = 'PASS_SAME_INSTANCE_174_ACTION_RECREATION_COMPONENT_ONLY';
+  recreationSummary.close_restart_elapsed_ms = closeRestartMs;
+  recreationSummary.close_native_elapsed_ms = closeNativeMs;
+  recreationSummary.restart_native_elapsed_ms = restartNativeMs;
+  recreationSummary.lifetime_b = {path: 'report-B.json', completed_actions: 174,
+    import_prepare_elapsed_ms: bImportMs, route_elapsed_ms: bRouteMs,
+    checkpoint_files: recreationCheckpointBFiles};
+  recreationSummary.identity_samples = [
+    {boundary: 'before-A', ...recreationBaseReport.scenario.recreation_canary.identity_capture},
+    {boundary: 'after-A-close', ...recreationCloseIdentity},
+    {boundary: 'after-A-restart', ...recreationRestartIdentity},
+    ...report.scenario.recreation_canary.instance_identity_samples,
+  ];
+  recreationSummary.A_archived_bytes_unchanged_after_B = true;
 }
 
 async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
@@ -3406,14 +4045,29 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
     firstSssConstructorPair ? 'stadium-first-sss-constructor-pair-final' :
     firstCssBrowserFinalDraw ? 'stadium-first-css-browser-final-pending-draw' :
     firstCssBrowserStream ? 'stadium-first-css-browser-postdraw-stream' : 'stadium-first-css-browser-draw');
-  report.scenario.page_errors = pageErrors;
-  report.scenario.console_errors = consoleErrors;
-  report.scenario.console_warnings = consoleWarnings;
-  report.scenario.console_messages = consoleMessages;
-  report.scenario.console_message_capture_overflow = consoleMessageCaptureOverflow;
-  report.scenario.console_message_dropped_count = consoleMessageDropped;
+  Object.assign(report.scenario, recreationCanary ? recreationEventSnapshot() : {
+    page_errors: pageErrors, console_errors: consoleErrors, console_warnings: consoleWarnings,
+    console_messages: consoleMessages, console_message_capture_overflow: consoleMessageCaptureOverflow,
+    console_message_dropped_count: consoleMessageDropped,
+  });
   assert.deepEqual(pageErrors, []);
   assert.deepEqual(externalRequests, []);
+
+  if (recreationCanary && recreationLifetime === 'A') {
+    // A must remain live until the explicitly checked native close. It is not
+    // terminally unloaded between the two same-instance lifetimes.
+    report.profile.after = summarizeStorage(await timeout(context.storageState(),
+      Math.min(5000, remaining()), 'Lifetime A browser profile snapshot'));
+    const after = await buildArtifactInventory(baseUrl, artifacts);
+    assertProducerArtifacts(after, artifacts, 'After lifetime A route');
+    report.local_http_artifacts.after = after;
+    report.local_http_artifacts.unchanged = JSON.stringify(before) === JSON.stringify(after);
+    assert.equal(report.local_http_artifacts.unchanged, true);
+    report.scenario.http_requests = recreationEventSnapshot().http_requests;
+    report.scenario.external_http_requests = recreationEventSnapshot().external_http_requests;
+    report.result = 'pass';
+    return;
+  }
 
   await unloadFirstCssDiagnosticOwner();
   const afterUnload = await readFirstCssDiagnosticPostUnloadSnapshot();
@@ -3471,8 +4125,10 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
   report.local_http_artifacts.after = after;
   report.local_http_artifacts.unchanged = JSON.stringify(before) === JSON.stringify(after);
   assert.equal(report.local_http_artifacts.unchanged, true);
-  report.scenario.http_requests = [...requestRows, ...responseRows];
-  report.scenario.external_http_requests = externalRequests;
+  report.scenario.http_requests = recreationCanary
+    ? recreationEventSnapshot().http_requests : [...requestRows, ...responseRows];
+  report.scenario.external_http_requests = recreationCanary
+    ? recreationEventSnapshot().external_http_requests : externalRequests;
   assert.deepEqual(consoleErrors, []);
   report.result = 'pass';
 }
@@ -3764,7 +4420,31 @@ async function main() {
   assert.match(diagCache, /^MELEE_WEB_STADIUM_C1A_DIAGNOSTIC:BOOL=ON$/m);
   const defaultCache = await fs.readFile(path.join(defaultBuild, 'CMakeCache.txt'), 'utf8');
   assert.match(defaultCache, /^MELEE_WEB_STADIUM_C1A_DIAGNOSTIC:BOOL=OFF$/m);
+  const privateJs = await fs.readFile(path.join(build, 'gameplay_menu_browser.js'), 'utf8');
   const defaultJs = await fs.readFile(path.join(defaultBuild, 'gameplay_menu_browser.js'), 'utf8');
+  if (recreationCanary) {
+    assert.equal(matchedSetupCfPreflight.scope, PREFIX_V2_SCOPE,
+      'Recreation canary only accepts the explicit proper-prefix V2 route');
+    const bound = preflight.recreation_canary;
+    assert.equal(bound?.schema, 'melee-web-stadium-recreation-canary-preflight-v1');
+    assert.equal(path.resolve(bound.identity_library?.path || ''), recreationIdentityLibraryPath);
+    assert.equal(bound.identity_library.sha256, await hashFile(recreationIdentityLibraryPath),
+      'Private same-instance accessor differs from the frozen canary preflight');
+    assert.equal(path.resolve(bound.context_helper?.path || ''), recreationContextHelperPath);
+    assert.equal(bound.context_helper.sha256, await hashFile(recreationContextHelperPath),
+      'Immutable A/B context helper differs from the frozen canary preflight');
+    for (const name of ['_melee_web_native_menu_stadium_recreation_status',
+      '_melee_web_native_menu_stadium_recreation_close',
+      '_melee_web_native_menu_stadium_recreation_restart',
+      '_melee_web_native_menu_stadium_recreation_admit_b'])
+      assert.ok(privateJs.includes(name), `Private recreation export is absent: ${name}`);
+    assert.ok(privateJs.includes('__meleeWebStadiumRecreationIdentityV1'),
+      'Private generated glue omitted the same-instance identity accessor');
+  }
+  assert.equal(defaultJs.includes('_melee_web_native_menu_stadium_recreation_status'), false,
+    'Ordinary default runtime unexpectedly exports private recreation controls');
+  assert.equal(defaultJs.includes('__meleeWebStadiumRecreationIdentityV1'), false,
+    'Ordinary default runtime unexpectedly links the private identity accessor');
   assert.equal(defaultJs.includes('_melee_web_native_menu_stadium_c1a_arm'), false,
     'Ordinary default runtime unexpectedly exports the private C1a arm gate');
   assert.equal(defaultJs.includes('_melee_web_native_menu_stadium_first_css_draw_arm'), false,
@@ -3887,6 +4567,18 @@ async function main() {
   await timeout(page.goto(`${baseUrl}/runtime.html`, {waitUntil: 'commit', timeout: remaining(30000)}),
     remaining(30000), 'Runtime page navigation');
   await driver.waitForImport();
+  if (recreationCanary) {
+    const identity = await timeout(page.evaluate(() => {
+      const accessor = globalThis.Module?.__meleeWebStadiumRecreationIdentityV1;
+      if (!accessor || accessor.schema !== 'melee-web-stadium-instance-identity-v1')
+        throw Error('Private same-instance identity accessor is absent or has an unknown schema');
+      return accessor.capture();
+    }), Math.min(5000, remaining()), 'Capture actual private Emscripten instance identities');
+    assert.equal(identity.captured, true);
+    report.scenario.recreation_canary = {identity_capture: identity,
+      instance_identity_samples: [], lifetimes: [], close: null, result_scope: 'component-only'};
+    await beginRecreationCallbackScope('A');
+  }
   const readControls = () => timeout(page.evaluate(() => ({
     layout: document.querySelector('#keyboard-layout')?.value ?? null,
     sources: ['#player-one-source', '#player-two-source'].map(selector =>
@@ -3916,7 +4608,10 @@ async function main() {
   await driver.selectDisc(values.disc);
   await timeout(driver.waitForStart(), Math.min(LIMITS.discImportMs, remaining()), 'Disc import and native prep');
   if (firstCssBrowserDraw) {
-    await runFirstCssBrowserDraw({baseUrl, artifacts, before});
+    if (recreationCanary)
+      await runStadiumRecreationCanary({baseUrl, artifacts, before});
+    else
+      await runFirstCssBrowserDraw({baseUrl, artifacts, before});
     return;
   }
 
@@ -4396,14 +5091,20 @@ try {
   report.scenario.console_errors = consoleErrors;
   report.scenario.console_warnings = consoleWarnings;
   report.scenario.console_messages = consoleMessages;
-  report.scenario.console_message_capture_overflow = consoleMessageCaptureOverflow;
-  report.scenario.console_message_dropped_count = consoleMessageDropped;
-  report.scenario.http_requests = [...requestRows, ...responseRows];
-  report.scenario.external_http_requests = externalRequests;
+  if (recreationCanary) Object.assign(report.scenario, recreationEventSnapshot());
+  else {
+    report.scenario.console_message_capture_overflow = consoleMessageCaptureOverflow;
+    report.scenario.console_message_dropped_count = consoleMessageDropped;
+    report.scenario.http_requests = [...requestRows, ...responseRows];
+    report.scenario.external_http_requests = externalRequests;
+  }
+  if (recreationCanary) await verifyRecreationArchiveAfterFinalCleanup();
   if (report.result !== 'pass') report.result = 'fail';
+  if (recreationCanary && (failure || report.cleanup.failures.length > 0)) report.result = 'fail';
   report.execution_state = 'completed';
   report.completed_at = new Date().toISOString();
   await persistReport();
+  if (recreationCanary) await persistRecreationSummary();
 }
 
 if (failure || report.cleanup.failures.length || !report.cleanup.browser_process_terminated ||

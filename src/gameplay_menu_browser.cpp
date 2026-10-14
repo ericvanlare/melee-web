@@ -2,6 +2,11 @@
 #include <emscripten/em_macros.h>
 extern "C" uint32_t gm_801A4BA8(void);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+// Retain the private postset that captures actual Emscripten instance object
+// identities for the short recreation canary. Ordinary/public profiles omit it.
+EM_JS_DEPS(stadium_recreation_identity_v1, "$MeleeWebStadiumRecreationIdentityV1");
+#endif
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 extern "C" int gm_GetCurrentGameMode(void);
 extern "C" int gm_GetPreviousGameMode(void);
 extern "C" int gm_GetCurrentSceneIndex(void);
@@ -387,6 +392,9 @@ struct MatchedSetupCfRetirement {
 };
 MatchedSetupCfRetirement matched_setup_cf_retirement;
 std::string matched_setup_cf_json();
+std::string stadium_recreation_b_json();
+void stadium_recreation_b_before_retire();
+void stadium_recreation_b_after_close();
 bool matched_setup_cf_service();
 struct FirstSssTextTailProbeState {
  bool opted_in=false,probe_enabled=false;
@@ -1583,6 +1591,9 @@ std::string selected_match_message(const MeleeWebMenuMatchSelection& selection){
  result+=" match on ";result+=stage?stage->name:"source stage";
  return result;
 }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+void stadium_recreation_match_retired();
+#endif
 void close(){
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  FirstSssTextTailCloseGuard text_tail_close{first_sss_text_tail_probe.opted_in};
@@ -1600,6 +1611,9 @@ void close(){
  if(match){
   const bool opening_demo=match->opening_demo();
   match->close();match.reset();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  stadium_recreation_match_retired();
+#endif
   if(opening_demo&&host){
    check(melee_web_menu_host_opening_match_abort(host,error,sizeof(error)),error);
    pending_opening_state=-1;
@@ -3094,7 +3108,10 @@ std::string matched_setup_cf_retirement_json(){
     <<",\"error\":"<<(matched_setup_cf_retirement.error.empty()?"null":
         first_css_browser_draw_json_quote(matched_setup_cf_retirement.error))
     <<",\"matched_setup_cf\":"<<(matched_setup_cf_retirement.receipt.empty()?"null":
-        matched_setup_cf_retirement.receipt)<<'}';
+        matched_setup_cf_retirement.receipt);
+ const auto recreation_b=stadium_recreation_b_json();
+ if(!recreation_b.empty())out<<",\"recreation_b_rng\":"<<recreation_b;
+ out<<'}';
  return out.str();
 }
 #endif
@@ -5147,6 +5164,7 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire(){try{
  matched_setup_cf_retirement.terminal=state.complete||state.failed||
      (state.awaiting_approval&&state.last_action_complete);
  matched_setup_cf_retirement.receipt=matched_setup_cf_json();
+ stadium_recreation_b_before_retire();
  matched_setup_cf_retirement.pipeline_cache_before=
      static_cast<int>(aurora_pipeline_cache_status());
  // This diagnostic never resumes the regular loop or calls another source step.
@@ -5159,6 +5177,7 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire(){try{
        matched_setup_cf_retirement.phase_after_close==0&&
        matched_setup_cf_retirement.running_after_close==0,
        "Matched Setup C/F native close left a live owner");
+ stadium_recreation_b_after_close();
  melee_web_input_shutdown();
  // Aurora shutdown retains its existing opportunistic writer behavior. JS IDBFS
  // persistence and the top-level render-cache flush boundary remain unrun here.
@@ -5176,6 +5195,203 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire(){try{
  if(matched_setup_cf_retirement.error.empty())matched_setup_cf_retirement.error=error.what();
  message=error.what();return 0;
 }}
+} // extern "C"
+namespace melee_web_menu_browser {
+// Private recreation prerequisite. This is separate from terminal retirement:
+// its receipt survives close(), and only an acknowledged returned boundary can
+// restart the ordinary ownerless callback needed by the existing import route.
+struct StadiumRecreationCanary {
+ bool attempted=false,closed=false,restarted=false;
+ const uint32_t* expected_host_owner=nullptr;
+ const uint32_t* expected_parent_owner=nullptr;
+ uint64_t prior_generation=0;
+ uint32_t match_seed=0,host_seed=0,parent_seed=0;
+ bool match_to_host_restored=false,host_to_parent_restored=false;
+ bool b_admitted=false,b_retiring=false,b_match_restored=false,b_parent_restored=false,b_terminal_checked=false;
+ uint64_t b_generation=0;
+ uint32_t b_asset_generation=0,b_match_seed_before=0,b_match_seed_at_retirement=0,b_host_seed=0,b_parent_seed=0;
+ const melee_web::GameplayMatchSession* b_match_owner=nullptr;
+ const melee_web::RuntimeArchiveCache* b_cache_owner=nullptr;
+ const MeleeWebMenuHost* b_host_owner=nullptr;
+ const uint32_t* b_expected_host_owner=nullptr;
+ const uint32_t* b_expected_parent_owner=nullptr;
+ std::string action_receipt,error;
+};
+StadiumRecreationCanary stadium_recreation_canary;
+void stadium_recreation_match_retired(){
+ auto& s=stadium_recreation_canary;
+ if(s.b_admitted){
+  check(s.b_retiring&&!s.b_terminal_checked,"Stadium B match close is outside checked terminal retirement");
+  s.b_match_restored=seed_ptr==s.b_expected_host_owner&&*seed_ptr==s.b_host_seed;
+  check(s.b_match_restored,"Stadium B match retirement changed parent RNG owner/value");
+  return;
+ }
+ if(!s.attempted||s.closed||s.restarted||!s.error.empty())return;
+ s.match_to_host_restored=seed_ptr==s.expected_host_owner&&*seed_ptr==s.host_seed;
+ check(s.match_to_host_restored,"Stadium recreation match retirement changed its parent RNG owner/value");
+}
+std::string stadium_recreation_canary_json(){
+ const auto& s=stadium_recreation_canary;std::ostringstream out;
+ out<<"{\"schema\":\"melee-web-stadium-recreation-boundary-v1\",\"attempted\":"
+    <<(s.attempted?"true":"false")<<",\"closed\":"<<(s.closed?"true":"false")
+    <<",\"restarted\":"<<(s.restarted?"true":"false")
+    <<",\"prior_world_generation\":"<<s.prior_generation
+    <<",\"match_seed\":"<<s.match_seed<<",\"host_seed\":"<<s.host_seed
+    <<",\"parent_seed\":"<<s.parent_seed
+    <<",\"match_to_host_restored\":"<<(s.match_to_host_restored?"true":"false")
+    <<",\"host_to_parent_restored\":"<<(s.host_to_parent_restored?"true":"false")
+    <<",\"matched_setup_cf\":"<<(s.action_receipt.empty()?"null":s.action_receipt)
+    <<",\"error\":";
+ out<<(s.error.empty()?"null":first_css_browser_draw_json_quote(s.error));
+ const auto b=stadium_recreation_b_json();if(!b.empty())out<<",\"lifetime_b\":"<<b;
+ out<<'}';return out.str();
+}
+std::string stadium_recreation_b_json(){
+ const auto& s=stadium_recreation_canary;if(!s.b_admitted)return {};
+ std::ostringstream out;out<<"{\"schema\":\"melee-web-stadium-recreation-b-rng-v1\",\"admitted\":true"
+   <<",\"world_generation\":"<<s.b_generation<<",\"prior_world_generation\":"<<s.prior_generation
+   <<",\"match_seed_before\":"<<s.b_match_seed_before<<",\"match_seed_at_retirement\":"<<s.b_match_seed_at_retirement
+   <<",\"host_seed\":"<<s.b_host_seed<<",\"parent_seed\":"<<s.b_parent_seed
+   <<",\"match_to_host_restored\":"<<(s.b_match_restored?"true":"false")
+   <<",\"host_to_parent_restored\":"<<(s.b_parent_restored?"true":"false")
+   <<",\"terminal_checked\":"<<(s.b_terminal_checked?"true":"false")<<'}';return out.str();
+}
+} // namespace melee_web_menu_browser
+extern "C" {
+int melee_web_native_menu_stadium_recreation_admit_b(){try{
+ auto& s=stadium_recreation_canary;const auto& setup=first_sss_vs_setup;
+ check(s.closed&&s.restarted&&s.error.empty()&&!s.b_admitted&&!s.b_terminal_checked&&
+       setup.complete&&!setup.failed&&match&&host&&!host_entered&&archive_cache&&
+       !running&&!pending&&!faulted&&!preparation.busy()&&!menu_scene_rebuild_pending&&
+       !melee_web_source_file_drive_busy()&&match->construction_complete()&&match->source_frames()==0&&
+       !matched_setup_cf.opted_in&&!matched_setup_cf.armed&&
+       setup.match_world_generation>s.prior_generation&&
+       melee_web_gameplay_generation()==setup.match_world_generation&&
+       asset_generation==setup.committed_generation,
+       "Stadium B admission requires the fresh compared Setup owner/generation");
+ MeleeWebMenuHostRngBoundary rng{};uint32_t seed=0;
+ check(melee_web_menu_host_rng_boundary(host,&rng)==1&&rng.host_owner==setup.parent_seed_owner&&
+       rng.host_value==setup.parent_seed&&rng.parent_owner==s.expected_parent_owner&&
+       rng.parent_value==s.parent_seed&&melee_web_match_rng_seed_owner_read(&seed)==1,
+       "Stadium B admission lost match/host/outer-parent RNG identity or value");
+ s.b_generation=setup.match_world_generation;s.b_asset_generation=asset_generation;
+ s.b_match_owner=match.get();s.b_cache_owner=archive_cache.get();s.b_host_owner=host;
+ s.b_expected_host_owner=rng.host_owner;s.b_expected_parent_owner=rng.parent_owner;
+ s.b_host_seed=rng.host_value;s.b_parent_seed=rng.parent_value;s.b_match_seed_before=seed;s.b_admitted=true;
+ return 1;
+}catch(const std::exception& error){
+ if(stadium_recreation_canary.error.empty())stadium_recreation_canary.error=error.what();message=error.what();return 0;
+}}
+} // extern "C"
+namespace melee_web_menu_browser {
+void stadium_recreation_b_before_retire(){
+ auto& s=stadium_recreation_canary;if(!s.b_admitted)return;
+ const auto& cf=matched_setup_cf;MeleeWebMenuHostRngBoundary rng{};
+ check(s.closed&&s.restarted&&s.error.empty()&&!s.b_retiring&&!s.b_terminal_checked&&
+       cf.complete&&!cf.failed&&!cf.awaiting_approval&&cf.cursor==174&&cf.action_count==174&&!cf.full_schedule&&
+       match.get()==s.b_match_owner&&archive_cache.get()==s.b_cache_owner&&host==s.b_host_owner&&
+       cf.world_generation==s.b_generation&&melee_web_gameplay_generation()==s.b_generation&&
+       cf.asset_generation==s.b_asset_generation&&asset_generation==s.b_asset_generation&&
+       melee_web_menu_host_rng_boundary(host,&rng)==1&&rng.host_owner==s.b_expected_host_owner&&
+       rng.host_value==s.b_host_seed&&rng.parent_owner==s.b_expected_parent_owner&&rng.parent_value==s.b_parent_seed&&
+       melee_web_match_rng_seed_owner_read(&s.b_match_seed_at_retirement)==1,
+       "Stadium B terminal retirement lost its admitted owner or RNG boundary");
+ s.b_retiring=true;
+}
+void stadium_recreation_b_after_close(){
+ auto& s=stadium_recreation_canary;if(!s.b_admitted)return;
+ check(s.b_retiring&&s.b_match_restored&&!s.b_terminal_checked&&
+       seed_ptr==s.b_expected_parent_owner&&*seed_ptr==s.b_parent_seed,
+       "Stadium B terminal close changed outer-parent RNG owner/value");
+ s.b_parent_restored=true;s.b_terminal_checked=true;
+}
+} // namespace melee_web_menu_browser
+extern "C" {
+const char* melee_web_native_menu_stadium_recreation_status(){
+ static std::string json;json=stadium_recreation_canary_json();return json.c_str();
+}
+int melee_web_native_menu_stadium_recreation_close(){try{
+ auto& s=stadium_recreation_canary;auto& cf=matched_setup_cf;
+ check(!s.attempted&&!s.closed&&!s.restarted&&s.error.empty(),"Stadium recreation canary is one-use");
+ check(melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire_ready()==1&&
+       cf.complete&&!cf.failed&&!cf.awaiting_approval&&cf.cursor==cf.action_count&&
+       cf.version2&&!cf.full_schedule&&cf.action_count==174&&
+       !matched_setup_cf_retirement.native_retired&&matched_setup_cf_retirement.receipt.empty(),
+       "Stadium recreation requires an approved complete174-action original prefix");
+ const auto* expected_match=match.get();const auto* expected_host=host;
+ const auto* expected_cache=archive_cache.get();
+ const auto expected_world_generation=cf.world_generation;
+ const auto expected_asset_generation=cf.asset_generation;
+ const auto expected_source_frame=cf.last_source_frame_after;
+ check(EM_ASM_INT({try{return globalThis.__meleeWebStadiumRecreationCanary?.beforeClose()===true?1:0;}catch(_){return 0;}})==1,
+       "Stadium recreation requires persisted immutable lifetime A approval");
+ // Host callback must not advance or replace any native owner.
+ check(melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire_ready()==1&&
+       match.get()==expected_match&&host==expected_host&&archive_cache.get()==expected_cache&&
+       cf.world_generation==expected_world_generation&&melee_web_gameplay_generation()==expected_world_generation&&
+       cf.asset_generation==expected_asset_generation&&asset_generation==expected_asset_generation&&
+       cf.last_source_frame_after==expected_source_frame&&
+       cf.complete&&!cf.failed&&!cf.awaiting_approval&&cf.cursor==cf.action_count,
+       "Stadium recreation owner changed during host approval");
+ MeleeWebMenuHostRngBoundary rng{};
+ check(melee_web_menu_host_rng_boundary(host,&rng)==1&&
+       rng.host_owner==first_sss_vs_setup.parent_seed_owner&&
+       rng.host_value==first_sss_vs_setup.parent_seed&&
+       melee_web_match_rng_seed_owner_read(&s.match_seed)==1,
+       "Stadium recreation lost the match/host/parent RNG ownership chain");
+ const void* arena=nullptr;size_t arena_bytes=0;
+ check(melee_web_gameplay_session_arena(&arena,&arena_bytes)==1,
+       "Stadium recreation requires its live source session arena");
+ const auto parent=reinterpret_cast<uintptr_t>(rng.parent_owner),base=reinterpret_cast<uintptr_t>(arena);
+ check(parent<base||parent-base>=arena_bytes,
+       "Stadium recreation parent RNG owner is inside the retiring session arena");
+ s.attempted=true;s.prior_generation=cf.world_generation;s.host_seed=rng.host_value;
+ s.parent_seed=rng.parent_value;s.expected_host_owner=rng.host_owner;
+ s.expected_parent_owner=rng.parent_owner;
+ s.action_receipt=matched_setup_cf_json();
+ // Preserve close's original report/match/host/session ordering. The private
+ // hook checks the restored host immediately after its existing match close.
+ close();
+ s.host_to_parent_restored=seed_ptr==rng.parent_owner&&*seed_ptr==s.parent_seed;
+ check(s.host_to_parent_restored&&!match&&!world&&!host&&!results&&!prize&&
+       !source_session_owned&&!archive_cache&&!scoped_assets&&
+       !melee_web_gameplay_world_exists()&&melee_web_native_menu_phase()==0&&
+       melee_web_native_menu_running()==0,
+       "Stadium recreation close left live owners or changed parent RNG");
+ s.closed=true;return 1;
+}catch(const std::exception& error){
+ if(stadium_recreation_canary.error.empty())stadium_recreation_canary.error=error.what();
+ message=error.what();return 0;
+}}
+int melee_web_native_menu_stadium_recreation_restart(){try{
+ auto& s=stadium_recreation_canary;
+ check(s.attempted&&s.closed&&!s.restarted&&s.error.empty()&&
+       !match&&!world&&!host&&!results&&!prize&&!source_session_owned&&
+       !archive_cache&&!scoped_assets&&!running&&!pending&&!faulted&&
+       !melee_web_source_file_drive_busy()&&s.expected_parent_owner&&
+       seed_ptr==s.expected_parent_owner&&*seed_ptr==s.parent_seed,
+       "Stadium recreation restart requires its unchanged closed owner and parent RNG boundary");
+ check(EM_ASM_INT({try{return !ABORT&&Module.stadiumMatchedSetupNativeIdle?.()===true&&
+       window.menuOwnerStopped?.()===false&&
+       globalThis.__meleeWebStadiumRecreationCanary?.afterClose()===true?1:0;}catch(_){return 0;}})==1,
+       "Stadium recreation restart requires returned idle and persisted close approval");
+ check(!match&&!world&&!host&&!results&&!prize&&!source_session_owned&&
+       !archive_cache&&!scoped_assets&&!running&&!pending&&!faulted&&
+       !melee_web_source_file_drive_busy()&&seed_ptr==s.expected_parent_owner&&
+       *seed_ptr==s.parent_seed,
+       "Stadium recreation closed owner or parent RNG changed during host approval");
+ const auto submission=aurora_browser_submission_status();const auto* stats=aurora_get_stats();
+ check(stats&&stats->queuedPipelines==0&&submission.pendingFramePackets==0&&
+       submission.pendingStagingBuffers==0&&submission.workerBusy==0,
+       "Stadium recreation restart requires settled retained renderer");
+ // No native source owner exists. This restores ordinary command/import service;
+ // B still must pass the existing fresh import and original CSS/SSS/Setup route.
+ s.restarted=true;emscripten_set_main_loop(tick,0,0);return 1;
+}catch(const std::exception& error){
+ if(stadium_recreation_canary.error.empty())stadium_recreation_canary.error=error.what();
+ message=error.what();return 0;
+}}
+
 int melee_web_native_menu_stadium_first_sss_vs_setup_cf_queue(
     unsigned schedule_index,int action_kind,unsigned ordinal,int bundle,
     const uint8_t* bytes,size_t byte_count){try{

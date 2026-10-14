@@ -3835,6 +3835,20 @@ int melee_web_menu_host_prize_end(MeleeWebMenuHost* h,uint32_t seed,
     restore_results_route(h);
     return melee_web_menu_host_match_finished(h,seed,input,e,n);
 }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+int melee_web_menu_host_rng_boundary(const MeleeWebMenuHost* h,
+                                    MeleeWebMenuHostRngBoundary* out)
+{
+    if (!h || h != owner || !out || !h->saved_seed || h->entered || h->audio)
+        return 0;
+    out->host_owner = &h->seed;
+    out->parent_owner = h->saved_seed;
+    out->host_value = h->seed;
+    out->parent_value = *h->saved_seed;
+    return 1;
+}
+#endif
+
 int melee_web_menu_host_destroy(MeleeWebMenuHost* h,char* e,size_t n){
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     if(h && h==owner && h->first_sss_sequence_operation){

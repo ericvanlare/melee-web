@@ -12,6 +12,16 @@
 extern "C" {
 #endif
 typedef struct MeleeWebMenuHost MeleeWebMenuHost;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+/* Local owner identity only; never serialized or compared with guest pointers. */
+typedef struct MeleeWebMenuHostRngBoundary {
+    const uint32_t* host_owner;
+    const uint32_t* parent_owner;
+    uint32_t host_value, parent_value;
+} MeleeWebMenuHostRngBoundary;
+int melee_web_menu_host_rng_boundary(const MeleeWebMenuHost*,
+                                    MeleeWebMenuHostRngBoundary*);
+#endif
 enum {
     MELEE_WEB_SAVE_MODE_EVERYTHING = 0,
     MELEE_WEB_SAVE_MODE_PERSONAL = 1,
