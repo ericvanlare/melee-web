@@ -7,8 +7,8 @@ import test from 'node:test';
 import vm from 'node:vm';
 import {fileURLToPath} from 'node:url';
 import {createStadiumC3ReportCheckpoint, isStadiumC3ReportCheckpointEligible,
-  materializeStadiumC3ReportCheckpoint, STADIUM_C3_FROZEN_SCENARIO_FIELDS,
-  STADIUM_C3_REPORT_CHECKPOINT_SCHEMA} from './stadium_c3_report_checkpoint.mjs';
+  materializeStadiumC3ReportCheckpoint, recoverStadiumC3ReportCheckpoint,
+  STADIUM_C3_FROZEN_SCENARIO_FIELDS, STADIUM_C3_REPORT_CHECKPOINT_SCHEMA} from './stadium_c3_report_checkpoint.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const RUNNER = path.join(HERE, 'stadium_c1a_browser_test.mjs');
@@ -27,7 +27,9 @@ function representativeReport() {
     first_sss_prefix: {samples: Array.from({length: 3}, (_, i) => ({i, value: `s${i}`}))},
     first_sss_vs_entry: {phase: 'entry', owner: 'source'},
     matched_setup_cf: {mode: 'run2-proper-prefix-v2', explicit_step_mode: true,
-      actions: [{schedule_index: 0, accepted: true}]},
+      actions: [{schedule_index: 0, accepted: true, detail: {owner: {source_index: 0}}}],
+      runtime_diagnostics: [{schedule_index: 0, message: 'initial'}],
+      host_comparisons: []},
     mutable_failure_snapshot: null,
   };
   return {
@@ -49,11 +51,23 @@ function extractPersistReport(source) {
   return `${source.slice(begin, end + 3)}\nglobalThis.__persistReport = persistReport;`;
 }
 
-async function actualPersistReport({report, reportPath, checkpoint, reportFs}) {
+async function actualPersistReport({report, reportPath, checkpoint, reportFs, events = []}) {
   const source = await fs.readFile(RUNNER, 'utf8');
+  const checkpointApi = {
+    shouldUse: value => checkpoint.shouldUse(value),
+    prepare: async (...args) => checkpoint.prepare(...args),
+    nextReportTemporaryPath: () => checkpoint.nextReportTemporaryPath(),
+    commitPrepared: value => { events.push('checkpoint-commit'); return checkpoint.commitPrepared(value); },
+  };
+  const observedFs = {...reportFs,
+    rename: async (from, to) => {
+      const result = await reportFs.rename(from, to);
+      if (to === reportPath) events.push('report-rename-complete');
+      return result;
+    }};
   const context = {
-    report, inventoryOutput: reportPath, stadiumC3ReportCheckpoint: checkpoint,
-    matchedSetupCfTiming: null, fs: reportFs, Buffer, JSON, Error,
+    report, inventoryOutput: reportPath, stadiumC3ReportCheckpoint: checkpointApi,
+    matchedSetupCfTiming: null, fs: observedFs, Buffer, JSON, Error,
     monotonicNowNs: () => 0n, elapsedMs: () => 0,
     timedActionSync: (_sample, _stage, _field, operation) => operation(),
     timedActionAsync: async (_sample, _stage, _field, operation) => operation(),
@@ -66,6 +80,13 @@ function makeFileSystemFailure(realFs, failingOperation, error) {
   return {
     access: (...args) => realFs.access(...args),
     readFile: (...args) => realFs.readFile(...args),
+    appendFile: async (file, data, ...args) => {
+      if (failingOperation === 'appendFile') {
+        await realFs.appendFile(file, Buffer.from('partial-retained-journal-bytes\n'));
+        throw error;
+      }
+      return realFs.appendFile(file, data, ...args);
+    },
     writeFile: async (file, data, ...args) => {
       if (failingOperation === 'writeFile') {
         await realFs.writeFile(file, Buffer.from('partial-retained-temp-bytes'));
@@ -86,6 +107,13 @@ function makeControllableFileSystem(realFs) {
     setFailure(operation, error) { failure = {operation, error}; },
     access: (...args) => realFs.access(...args),
     readFile: (...args) => realFs.readFile(...args),
+    appendFile: async (file, data, ...args) => {
+      if (failure?.operation === 'appendFile') {
+        await realFs.appendFile(file, Buffer.from('partial-retained-journal-bytes\n'));
+        throw failure.error;
+      }
+      return realFs.appendFile(file, data, ...args);
+    },
     writeFile: async (file, data, ...args) => {
       if (failure?.operation === 'writeFile') {
         await realFs.writeFile(file, Buffer.from('partial-retained-temp-bytes'));
@@ -132,19 +160,21 @@ test('intermediate checkpoint keeps owner fields and materializes exact key orde
     assert.equal(sidecarBytes.byteLength, checkpoint.stadium_c3_persistence_checkpoint.sidecar.byte_length);
     assert.equal(crypto.createHash('sha256').update(sidecarBytes).digest('hex'),
       checkpoint.stadium_c3_persistence_checkpoint.sidecar.sha256);
+    const dynamicBytes = await fs.readFile(checkpointWriter.dynamicRecordPath);
     const persistedCheckpoint = JSON.parse(`${JSON.stringify(checkpoint)}\n`);
-    const recovered = materializeStadiumC3ReportCheckpoint(persistedCheckpoint, sidecarBytes);
+    const recovered = materializeStadiumC3ReportCheckpoint(persistedCheckpoint, sidecarBytes, dynamicBytes);
+    checkpointWriter.commitPrepared(checkpoint);
     assert.equal(JSON.stringify(recovered) + '\n', JSON.stringify(report) + '\n',
       'a parsed last-good checkpoint reconstructs the exact in-memory report without advancing it');
     assert.equal(recovered.scenario.matched_setup_cf.actions.length,
       report.scenario.matched_setup_cf.actions.length,
       'checkpoint recovery preserves action/approval state as recorded');
-    assert.throws(() => materializeStadiumC3ReportCheckpoint(persistedCheckpoint),
-      /sidecar bytes are missing or invalid/,
-      'recovery rejects a missing original sidecar byte payload');
-    assert.throws(() => materializeStadiumC3ReportCheckpoint(persistedCheckpoint, Buffer.alloc(0)),
-      /sidecar byte identity mismatch/,
-      'recovery rejects sidecar bytes with the wrong byte length');
+    assert.throws(() => materializeStadiumC3ReportCheckpoint(persistedCheckpoint, sidecarBytes),
+      /dynamic-record sidecar bytes are missing or invalid/,
+      'recovery rejects a missing original dynamic-record payload');
+    assert.throws(() => materializeStadiumC3ReportCheckpoint(persistedCheckpoint, sidecarBytes,
+      Buffer.alloc(0)), /dynamic-record sidecar is truncated/,
+      'recovery rejects dynamic-record bytes with the wrong byte length');
     const wrongPayload = JSON.parse(sidecarBytes.toString('utf8'));
     wrongPayload.scenario_fields.first_css_browser_stream.samples[0].state = 'CSS';
     const sameLengthWrongBytes = Buffer.from(`${JSON.stringify(wrongPayload)}\n`);
@@ -153,9 +183,9 @@ test('intermediate checkpoint keeps owner fields and materializes exact key orde
     assert.deepEqual(Object.keys(wrongPayload.scenario_fields), Object.keys(
       JSON.parse(sidecarBytes.toString('utf8')).scenario_fields),
       'wrong-payload control keeps the exact sidecar field shape');
-    assert.throws(() => materializeStadiumC3ReportCheckpoint(persistedCheckpoint, sameLengthWrongBytes),
-      /sidecar byte identity mismatch/,
-      'recovery rejects same-shaped, same-length sidecar bytes with a different value');
+    assert.throws(() => materializeStadiumC3ReportCheckpoint(persistedCheckpoint,
+      sameLengthWrongBytes, dynamicBytes), /sidecar byte identity mismatch/,
+      'recovery rejects same-shaped, same-length frozen sidecar bytes with a different value');
     const finalReport = await checkpointWriter.prepare({...report, execution_state: 'completed'},
       {terminal: true});
     assert.deepEqual(Object.keys(finalReport), Object.keys(report));
@@ -166,24 +196,156 @@ test('intermediate checkpoint keeps owner fields and materializes exact key orde
   } finally { await removeTemp(dir); }
 });
 
+test('append-only record segments reconstruct in order and reject missing, truncated, reordered, or altered bytes', async () => {
+  const report = representativeReport();
+  const dir = await makeTemp('stadium-c3-dynamic-records-');
+  const reportPath = path.join(dir, 'report.json');
+  try {
+    const writer = createStadiumC3ReportCheckpoint({reportPath});
+    const first = await writer.prepare(report);
+    writer.commitPrepared(first);
+    const actions = report.scenario.matched_setup_cf.actions;
+    assert.equal(Reflect.set(actions[0], 'accepted', false), false,
+      'a committed history row cannot be mutated in place');
+    assert.equal(Reflect.set(actions[0].detail.owner, 'source_index', 99), false,
+      'a committed history row is recursively frozen');
+    assert.equal(Reflect.set(actions, '0', {schedule_index: -1}), false,
+      'a committed history index cannot be replaced');
+    assert.equal(Reflect.set(actions, 'length', 0), false,
+      'a committed history prefix cannot be shrunk');
+    report.scenario.matched_setup_cf.actions.push({schedule_index: 1, accepted: true});
+    report.scenario.matched_setup_cf.runtime_diagnostics.push({schedule_index: 1, message: 'second'});
+    report.scenario.matched_setup_cf.host_comparisons.push({label: 'C', decision: 'PASS_EXACT'});
+    const second = await writer.prepare(report);
+    writer.commitPrepared(second);
+    const parsed = JSON.parse(`${JSON.stringify(second)}\n`);
+    const frozenBytes = await fs.readFile(writer.sidecarPath);
+    const dynamicBytes = await fs.readFile(writer.dynamicRecordPath);
+    assert.equal(parsed.stadium_c3_persistence_checkpoint.dynamic_records.segment_count, 2);
+    assert.equal(JSON.stringify(materializeStadiumC3ReportCheckpoint(parsed, frozenBytes, dynamicBytes)),
+      JSON.stringify(report), 'ordered deltas reconstruct the exact final object and array order');
+    assert.throws(() => materializeStadiumC3ReportCheckpoint(parsed, frozenBytes),
+      /dynamic-record sidecar bytes are missing or invalid/);
+    assert.throws(() => materializeStadiumC3ReportCheckpoint(parsed, frozenBytes,
+      dynamicBytes.subarray(0, dynamicBytes.byteLength - 1)), /truncated/);
+    const lines = dynamicBytes.toString('utf8').trimEnd().split('\n');
+    const reordered = Buffer.from(`${lines.reverse().join('\n')}\n`);
+    assert.throws(() => materializeStadiumC3ReportCheckpoint(parsed, frozenBytes, reordered),
+      /segment order or shape is invalid/);
+    const altered = Buffer.from(dynamicBytes.toString('utf8').replace('initial', 'Initial'));
+    assert.equal(altered.byteLength, dynamicBytes.byteLength);
+    assert.notDeepEqual(altered, dynamicBytes);
+    assert.throws(() => materializeStadiumC3ReportCheckpoint(parsed, frozenBytes, altered),
+      /segment order or shape is invalid/,
+      'changing the first payload invalidates the next segment previous hash');
+    const alteredLast = Buffer.from(dynamicBytes.toString('utf8').replace('second', 'Second'));
+    assert.equal(alteredLast.byteLength, dynamicBytes.byteLength);
+    assert.notDeepEqual(alteredLast, dynamicBytes);
+    assert.throws(() => materializeStadiumC3ReportCheckpoint(parsed, frozenBytes, alteredLast),
+      /count or hash-chain identity mismatch/,
+      'changing the terminal payload invalidates the descriptor chain hash');
+    const badCounts = JSON.parse(JSON.stringify(parsed));
+    badCounts.stadium_c3_persistence_checkpoint.dynamic_records.record_counts.actions += 1;
+    assert.throws(() => materializeStadiumC3ReportCheckpoint(badCounts, frozenBytes, dynamicBytes),
+      /count or hash-chain identity mismatch/);
+    const badHash = JSON.parse(JSON.stringify(parsed));
+    badHash.stadium_c3_persistence_checkpoint.dynamic_records.chain_sha256 = '0'.repeat(64);
+    assert.throws(() => materializeStadiumC3ReportCheckpoint(badHash, frozenBytes, dynamicBytes),
+      /count or hash-chain identity mismatch/);
+    const unknownMarker = JSON.parse(JSON.stringify(parsed));
+    unknownMarker.stadium_c3_persistence_checkpoint.unrecognized = true;
+    assert.throws(() => recoverStadiumC3ReportCheckpoint(unknownMarker, frozenBytes, dynamicBytes),
+      /checkpoint descriptor is missing or malformed/,
+    'recovery rejects unknown descriptor fields rather than rebuilding a reduced marker');
+    const missingDynamicMarker = JSON.parse(JSON.stringify(parsed));
+    delete missingDynamicMarker.stadium_c3_persistence_checkpoint.dynamic_records;
+    assert.throws(() => materializeStadiumC3ReportCheckpoint(
+      missingDynamicMarker, frozenBytes, dynamicBytes),
+    /dynamic-record descriptor is missing/,
+    'a compact checkpoint cannot fall back to the fixed-only schema after losing its stream descriptor');
+    assert.throws(() => recoverStadiumC3ReportCheckpoint(
+      missingDynamicMarker, frozenBytes, dynamicBytes),
+    /dynamic-record descriptor is missing/,
+    'recovery applies the same missing-stream guard as direct materialization');
+    await assert.rejects(fs.readFile(`${writer.dynamicRecordPath}.missing`), {code: 'ENOENT'});
+  } finally { await removeTemp(dir); }
+});
+
+test('actual persistReport accepts append-only matched metadata additions and terminally restores inline history', async () => {
+  const dir = await makeTemp('stadium-c3-matched-metadata-');
+  try {
+    const successDir = path.join(dir, 'success');
+    await fs.mkdir(successDir);
+    const successReportPath = path.join(successDir, 'report.json');
+    const successReport = representativeReport();
+    const successWriter = createStadiumC3ReportCheckpoint({reportPath: successReportPath});
+    const successPersist = await actualPersistReport({report: successReport,
+      reportPath: successReportPath, checkpoint: successWriter, reportFs: fs});
+    await successPersist();
+    successReport.scenario.matched_setup_cf.actions_completed = 1;
+    await successPersist();
+    const successCheckpoint = JSON.parse((await fs.readFile(successReportPath)).toString('utf8'));
+    const successSidecar = await fs.readFile(successWriter.sidecarPath);
+    const successRecords = await fs.readFile(successWriter.dynamicRecordPath);
+    assert.deepEqual(materializeStadiumC3ReportCheckpoint(successCheckpoint,
+      successSidecar, successRecords), successReport,
+    'the successful actions_completed metadata addition remains in the committed checkpoint');
+    successReport.execution_state = 'completed';
+    await successPersist();
+    const completed = JSON.parse((await fs.readFile(successReportPath)).toString('utf8'));
+    assert.equal(Object.hasOwn(completed, 'stadium_c3_persistence_checkpoint'), false);
+    assert.equal(completed.scenario.matched_setup_cf.actions_completed, 1);
+    assert.deepEqual(completed.scenario.matched_setup_cf.actions,
+      successReport.scenario.matched_setup_cf.actions);
+
+    const failureDir = path.join(dir, 'failure');
+    await fs.mkdir(failureDir);
+    const failureReportPath = path.join(failureDir, 'report.json');
+    const failureReport = representativeReport();
+    const failureWriter = createStadiumC3ReportCheckpoint({reportPath: failureReportPath});
+    const failurePersist = await actualPersistReport({report: failureReport,
+      reportPath: failureReportPath, checkpoint: failureWriter, reportFs: fs});
+    await failurePersist();
+    failureReport.scenario.matched_setup_cf.stop_reason = 'bounded-first-failure';
+    await failurePersist();
+    const failedCheckpoint = JSON.parse((await fs.readFile(failureReportPath)).toString('utf8'));
+    const failureSidecar = await fs.readFile(failureWriter.sidecarPath);
+    const failureRecords = await fs.readFile(failureWriter.dynamicRecordPath);
+    assert.deepEqual(materializeStadiumC3ReportCheckpoint(failedCheckpoint,
+      failureSidecar, failureRecords), failureReport,
+    'a failure stop_reason appended after startup remains in the checkpoint with exact key order');
+    failureReport.execution_state = 'completed';
+    failureReport.result = 'fail';
+    await failurePersist();
+    const finalFailure = JSON.parse((await fs.readFile(failureReportPath)).toString('utf8'));
+    assert.equal(Object.hasOwn(finalFailure, 'stadium_c3_persistence_checkpoint'), false);
+    assert.equal(finalFailure.scenario.matched_setup_cf.stop_reason, 'bounded-first-failure');
+    assert.deepEqual(finalFailure.scenario.matched_setup_cf.actions,
+      failureReport.scenario.matched_setup_cf.actions);
+  } finally { await removeTemp(dir); }
+});
+
 test('frozen mutation, missing sidecar, and corrupt sidecar fail closed', async () => {
   const dir = await makeTemp('stadium-c3-invalid-sidecar-');
   try {
     const reportPath = path.join(dir, 'report.json');
     const writer = createStadiumC3ReportCheckpoint({reportPath});
     const report = representativeReport();
-    await writer.prepare(report);
+    const initialCheckpoint = await writer.prepare(report);
+    writer.commitPrepared(initialCheckpoint);
     assert.equal(Reflect.set(report.scenario, 'first_sss_prefix', {}), false,
       'the selected pre-action root field is immutable after sidecar creation');
     assert.equal(Reflect.set(report.scenario.first_sss_prefix.samples[0], 'value', 'changed'), false,
       'nested selected evidence is immutable after sidecar creation');
-    await writer.prepare(report);
+    const unchangedCheckpoint = await writer.prepare(report);
+    writer.commitPrepared(unchangedCheckpoint);
 
     const replacedDir = path.join(dir, 'replaced');
     await fs.mkdir(replacedDir);
     const replacedWriter = createStadiumC3ReportCheckpoint({reportPath: path.join(replacedDir, 'report.json')});
     const replacedReport = representativeReport();
-    await replacedWriter.prepare(replacedReport);
+    const replacedCheckpoint = await replacedWriter.prepare(replacedReport);
+    replacedWriter.commitPrepared(replacedCheckpoint);
     const replacementScenario = JSON.parse(JSON.stringify(replacedReport.scenario));
     replacementScenario.first_sss_prefix.samples[0].value = 'altered';
     replacedReport.scenario = replacementScenario;
@@ -224,28 +386,93 @@ test('actual persistReport preserves last-good checkpoint and blocks acceptance 
       await fs.mkdir(caseDir);
       const reportPath = path.join(caseDir, 'report.json');
       const reportFs = makeControllableFileSystem(fs);
-      const checkpoint = createStadiumC3ReportCheckpoint({reportPath});
+      const checkpointFs = makeControllableFileSystem(fs);
+      const checkpoint = createStadiumC3ReportCheckpoint({reportPath, fileSystem: checkpointFs});
       const report = representativeReport();
-      const persist = await actualPersistReport({report, reportPath, checkpoint, reportFs});
+      const events = [];
+      const persist = await actualPersistReport({report, reportPath, checkpoint, reportFs, events});
       let accepted = 0;
       await persist();
       accepted += 1;
+      assert.deepEqual(events.slice(-2), ['report-rename-complete', 'checkpoint-commit'],
+        'the append-only descriptor advances only after the atomic report rename succeeds');
       const previousCheckpointBytes = await fs.readFile(reportPath);
       const previousCheckpoint = JSON.parse(previousCheckpointBytes.toString('utf8'));
       const sidecarBytes = await fs.readFile(checkpoint.sidecarPath);
-      const lastGood = materializeStadiumC3ReportCheckpoint(previousCheckpoint, sidecarBytes);
+      const dynamicBytes = await fs.readFile(checkpoint.dynamicRecordPath);
+      const lastGood = materializeStadiumC3ReportCheckpoint(previousCheckpoint, sidecarBytes, dynamicBytes);
       const expectedLastGood = JSON.parse(JSON.stringify(report));
+      assert.equal(JSON.stringify(lastGood), JSON.stringify(expectedLastGood),
+        'the committed checkpoint reconstructs its exact pre-failure report');
       report.scenario.mutable_failure_snapshot = {attempt: 2, action_order: 'unchanged'};
+      report.scenario.matched_setup_cf.actions.push({schedule_index: 1, accepted: true});
+      report.scenario.matched_setup_cf.runtime_diagnostics.push({schedule_index: 1, message: 'next'});
+      report.scenario.matched_setup_cf.host_comparisons.push({label: 'F', decision: 'PASS_EXACT'});
+      const eventCountBeforeFailure = events.length;
       const marker = new Error(`injected report ${operation} failure`);
       reportFs.setFailure(operation, marker);
       await assert.rejects((async () => { await persist(); accepted += 1; })(), error => error === marker);
       assert.equal(accepted, 1, 'failed persist must not reach the following acceptance');
+      assert.equal(events.length, eventCountBeforeFailure,
+        'a failed report replacement does not advance the descriptor commit callback');
       assert.deepEqual(await fs.readFile(reportPath), previousCheckpointBytes,
         'the last complete checkpoint remains byte-identical after failed replacement');
       const failedTemp = `${reportPath}.stadium-c3-checkpoint-000002.tmp`;
       assert.ok((await fs.stat(failedTemp)).size > 0, 'failed checkpoint temporary bytes remain available');
-      assert.equal(JSON.stringify(lastGood), JSON.stringify(expectedLastGood),
-        'the previous checkpoint plus immutable sidecar still reconstructs its last-good state');
+      const journalAfterFailure = await fs.readFile(checkpoint.dynamicRecordPath);
+      assert.throws(() => materializeStadiumC3ReportCheckpoint(
+        previousCheckpoint, sidecarBytes, journalAfterFailure), /uncommitted tail/,
+      'strict checkpoint admission refuses bytes beyond its committed descriptor');
+      const recovery = recoverStadiumC3ReportCheckpoint(previousCheckpoint, sidecarBytes, journalAfterFailure);
+      assert.equal(JSON.stringify(recovery.report), JSON.stringify(expectedLastGood),
+        'the previous checkpoint plus its committed journal prefix reconstructs the last-good report');
+      assert.ok(recovery.uncommittedDynamicTail?.byte_length > 0,
+        'the append preceding a failed report replacement is explicitly reported as an uncommitted tail');
+      assert.equal(recovery.uncommittedDynamicTail.sha256,
+        crypto.createHash('sha256').update(journalAfterFailure.subarray(
+          previousCheckpoint.stadium_c3_persistence_checkpoint.dynamic_records.byte_length)).digest('hex'));
+      assert.equal(recovery.uncommittedDynamicTail.basename,
+        previousCheckpoint.stadium_c3_persistence_checkpoint.dynamic_records.basename);
+      assert.throws(() => materializeStadiumC3ReportCheckpoint(
+        previousCheckpoint, sidecarBytes, journalAfterFailure), /uncommitted tail/,
+      'strict materialization refuses the tail rather than silently discarding it');
+      assert.ok(lastGood, 'strict materialization succeeded before the journal tail was appended');
+    }
+
+    {
+      const caseDir = path.join(dir, 'appendFile');
+      await fs.mkdir(caseDir);
+      const reportPath = path.join(caseDir, 'report.json');
+      const reportFs = makeControllableFileSystem(fs);
+      const checkpointFs = makeControllableFileSystem(fs);
+      const checkpoint = createStadiumC3ReportCheckpoint({reportPath, fileSystem: checkpointFs});
+      const report = representativeReport();
+      const persist = await actualPersistReport({report, reportPath, checkpoint, reportFs});
+      await persist();
+      const previousBytes = await fs.readFile(reportPath);
+      const previous = JSON.parse(previousBytes.toString('utf8'));
+      const frozenBytes = await fs.readFile(checkpoint.sidecarPath);
+      const previousDynamicBytes = await fs.readFile(checkpoint.dynamicRecordPath);
+      const expected = materializeStadiumC3ReportCheckpoint(previous, frozenBytes, previousDynamicBytes);
+      report.scenario.matched_setup_cf.actions.push({schedule_index: 1, accepted: true});
+      const marker = new Error('injected dynamic append failure');
+      checkpointFs.setFailure('appendFile', marker);
+      let approvals = 0;
+      const events = [];
+      const persistWithEvents = await actualPersistReport({report, reportPath, checkpoint, reportFs, events});
+      // The first persisted checkpoint has already committed; the next attempt fails in prepare.
+      await assert.rejects((async () => { await persistWithEvents(); approvals += 1; })(), error => error === marker);
+      assert.equal(approvals, 0, 'a failed journal append must stop before any following approval');
+      assert.equal(events.length, 0, 'an append failure cannot rename or commit a new report checkpoint');
+      assert.deepEqual(await fs.readFile(reportPath), previousBytes,
+        'append failure leaves the prior atomic report target unchanged');
+      const journalWithPartialTail = await fs.readFile(checkpoint.dynamicRecordPath);
+      const recovery = recoverStadiumC3ReportCheckpoint(previous, frozenBytes, journalWithPartialTail);
+      assert.deepEqual(recovery.report, expected, 'the prior committed checkpoint remains recoverable');
+      assert.ok(recovery.uncommittedDynamicTail?.byte_length > 0,
+        'partial append bytes remain present and are explicitly surfaced as an uncommitted tail');
+      assert.ok(journalWithPartialTail.byteLength > previousDynamicBytes.byteLength,
+        'failed append does not truncate or delete the retained journal tail');
     }
 
     for (const operation of ['writeFile', 'rename']) {

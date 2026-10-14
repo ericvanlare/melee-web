@@ -360,8 +360,8 @@ const persistReport = async () => {
   let serialized = null, serializeMs = null, writeMs = null, renameMs = null;
   let completed = false;
   try {
-    const checkpointReport = await stadiumC3ReportCheckpoint.prepare(report, {
-      terminal: report.execution_state === 'completed'});
+    const terminal = report.execution_state === 'completed';
+    const checkpointReport = await stadiumC3ReportCheckpoint.prepare(report, {terminal});
     const checkpointed = stadiumC3ReportCheckpoint.shouldUse(report);
     const temporary = checkpointed
       ? stadiumC3ReportCheckpoint.nextReportTemporaryPath()
@@ -379,6 +379,8 @@ const persistReport = async () => {
       await fs.writeFile(temporary, serialized);
       await fs.rename(temporary, inventoryOutput);
     }
+    if (checkpointed && !terminal)
+      stadiumC3ReportCheckpoint.commitPrepared(checkpointReport);
     completed = true;
   } finally {
     if (measure) matchedSetupCfTiming.persistence.push({
