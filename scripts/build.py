@@ -333,6 +333,26 @@ def _file_record(path, root):
     }
 
 
+FIRST_PAIR_PRIVATE_TEST_ASSETS = (
+    ("wasm_ownership_accessor_v1.test.mjs", "tests/wasm_ownership_accessor_v1.mjs"),
+)
+
+
+def _verify_first_pair_private_test_assets(root, build_dir):
+    """Require private test-only assets to be exact copies of their sources."""
+    verified = []
+    for artifact_name, source_name in FIRST_PAIR_PRIVATE_TEST_ASSETS:
+        source = root / source_name
+        artifact = build_dir / artifact_name
+        source_record = _file_record(source, root)
+        artifact_record = _file_record(artifact, root)
+        if source_record["bytes"] != artifact_record["bytes"] or source_record["sha256"] != artifact_record["sha256"]:
+            raise ValueError(f"private test asset differs from its reviewed source: {artifact_name}")
+        verified.append({"path": artifact_name, "bytes": artifact_record["bytes"],
+                         "sha256": artifact_record["sha256"]})
+    return tuple(verified)
+
+
 def _tree_record(path, root):
     """Hash a deterministic path-and-bytes inventory for a source subtree."""
     if path.is_symlink() or not path.is_dir():
@@ -1138,6 +1158,9 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
                 fma_velocity_y_diagnostic, gameplay_source,
             )
             print(f"Wrote {identity_path.relative_to(root)}")
+        if target == MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET and first_pair_audio_file_diagnostic:
+            for asset in _verify_first_pair_private_test_assets(root, build_dir):
+                print(f"Verified private test asset {asset['path']} sha256={asset['sha256']}")
 
         record_build(root, build_dir, True)
 

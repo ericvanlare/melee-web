@@ -73,6 +73,32 @@ class MatchFrameEffectBuildTests(unittest.TestCase):
         self.assertIn("-DMELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC=OFF", frame_effect)
         self.assertIn("-DMELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC=OFF", ordinary)
 
+    def test_private_accessor_test_asset_is_exact_source_copy(self):
+        build = fixture.BUILD
+        with tempfile.TemporaryDirectory(prefix="wasm-owner-private-asset-") as directory:
+            root = Path(directory)
+            source = root / "tests/wasm_ownership_accessor_v1.mjs"
+            asset = root / "build/browser-first-pair-audio-file-release/wasm_ownership_accessor_v1.test.mjs"
+            source.parent.mkdir(parents=True)
+            asset.parent.mkdir(parents=True)
+            source.write_bytes(b"export function installAsyncifyWriterCounterV1() {}\n")
+            asset.write_bytes(source.read_bytes())
+            verified = build._verify_first_pair_private_test_assets(root, asset.parent)
+            self.assertEqual(verified, ({"path": "wasm_ownership_accessor_v1.test.mjs",
+                                         "bytes": len(source.read_bytes()),
+                                         "sha256": build._sha256(source)},))
+            asset.write_bytes(b"changed\n")
+            with self.assertRaisesRegex(ValueError, "differs from its reviewed source"):
+                build._verify_first_pair_private_test_assets(root, asset.parent)
+
+    def test_accessor_test_asset_is_staged_only_under_first_pair_guard(self):
+        cmake = (fixture.ROOT / "cmake/FighterRuntime.cmake").read_text(encoding="utf-8")
+        start = cmake.index("if(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)\n  configure_file(web/first-pair-audio-file-guard.mjs")
+        end = cmake.index("\nendif()", start)
+        block = cmake[start:end]
+        self.assertIn("configure_file(tests/wasm_ownership_accessor_v1.mjs", block)
+        self.assertIn("wasm_ownership_accessor_v1.test.mjs COPYONLY", block)
+
     def test_first_pair_profile_refuses_escape_before_source_preparation(self):
         build = fixture.BUILD
         cases = (

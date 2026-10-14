@@ -232,6 +232,8 @@ foreach(module disc-image disc-session dsp-coefficients runtime-assets runtime-a
 endforeach()
 if(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
   configure_file(web/first-pair-audio-file-guard.mjs first-pair-audio-file-guard.mjs COPYONLY)
+  # Test-only bridge for the opt-in private Wasm ownership boot check.
+  configure_file(tests/wasm_ownership_accessor_v1.mjs wasm_ownership_accessor_v1.test.mjs COPYONLY)
 endif()
 configure_file(web/controller-settings.css controller-settings.css COPYONLY)
 configure_file(web/touch-controls.css touch-controls.css COPYONLY)
