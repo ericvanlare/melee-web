@@ -120,3 +120,62 @@ test('renderer4/normal4/first5 exact attachment slots while historical renderer3
     assert.ok(rendererOwnerObservationFailures(r).includes('provenance_count'));
   }
 });
+
+function textureFixture(firstDraw=false,role=17,slot=0) {
+  const r=attachmentFixture(firstDraw);r.schema_version=firstDraw?6:5;r.renderer.schema_version=5;
+  r.provenance.at(-2).role=role;r.provenance.at(-1).role=role+1;
+  r.provenance.at(-2).slot=r.provenance.at(-1).slot=slot;
+  r.attachment_facts=[];r.renderer.attachment_fact_count=0;
+  return r;
+}
+test('renderer5 dynamic owner roles use authentic serial uniqueness and exact authored slots',()=>{
+  for(const first of [false,true])for(const role of [17,19,21,23,25]) {
+    const slot=role===19||role===21?3:0;
+    const r=textureFixture(first,role,slot);const validate=first?firstDrawObservationFailures:frameEffectObservationFailures;
+    assert.deepEqual(validate(r),[]);
+    const t=structuredClone(r.resources.at(-2)),v=structuredClone(r.resources.at(-1));t.capture_id='8';v.capture_id='9';v.owner_id='8';v.words[0]=8;
+    r.resources.push(t,v);r.renderer.resource_count+=2;r.handles.push({capture_id:'8',kind:2,reserved:0},{capture_id:'9',kind:1,reserved:0});r.renderer.handle_count+=2;
+    const tp=structuredClone(r.provenance.at(-2)),vp=structuredClone(r.provenance.at(-1));tp.capture_id='8';vp.capture_id='9';tp.creation_serial='9007199254740998';vp.creation_serial='9007199254740999';
+    r.provenance.push(tp,vp);r.renderer.provenance_count+=2;assert.deepEqual(validate(r),[]);
+    for(const mutate of [x=>{x.schema_version=first?5:4;x.renderer.schema_version=4;delete x.attachment_facts;delete x.renderer.attachment_fact_count;},
+      x=>{x.provenance.at(-1).creation_serial=x.provenance.at(-2).creation_serial;},x=>{x.provenance.at(-1).role=role===25?24:role+3;},
+      x=>{x.provenance.at(-1).slot=slot===3?4:1;},x=>{x.provenance.at(-2).slot=slot===3?4:1;}]){
+      const bad=structuredClone(r);mutate(bad);assert.ok(validate(bad).length);
+    }
+  }
+  const r=textureFixture();r.provenance=Array(6145).fill(null);r.renderer.provenance_count=6145;
+  assert.ok(rendererOwnerObservationFailures(r).includes('provenance_count'));
+});
+function clearFixture(first=false) {
+  const r=textureFixture(first);const event=(kind,flags,handle_a='0')=>({kind,frame_index:r.renderer.frame_index,op_index:77,item_index:0,flags,value0:0,value1:0,value2:0,value3:0,handle_a,handle_b:'0'});
+  const index=r.events.length;r.events.push(event(2,6),event(3,0,'7'),event(4,0,'7'));r.renderer.event_count+=3;
+  r.attachment_facts=[{event_index:index+1,kind:1,aspects:1,reserved:0,view_id:'7',resolve_view_id:'0',color_clear_bits:['9223372036854775808','9221120237041090561','0','4607182418800017408'],depth_clear_bits:0,stencil_clear_value:0},
+    {event_index:index+2,kind:2,aspects:6,reserved:0,view_id:'7',resolve_view_id:'0',color_clear_bits:['0','0','0','0'],depth_clear_bits:2147483648,stencil_clear_value:4294967295}];
+  r.renderer.attachment_fact_count=2;return r;
+}
+test('actual API clear facts retain exact words and ordered pass/aspect association in both outer schemas',()=>{
+  for(const first of [false,true]){
+    const r=clearFixture(first);const validate=first?firstDrawObservationFailures:frameEffectObservationFailures;
+    const compare=first?compareFirstDrawObservations:compareFrameEffectObservations;
+    assert.deepEqual(validate(r),[]);assert.deepEqual(compare(r,structuredClone(r)),[]);
+    for(const mutate of [x=>{x.attachment_facts[0].color_clear_bits[1]='9221120237041090562';},
+      x=>{x.attachment_facts[1].depth_clear_bits++;},x=>{x.attachment_facts[1].stencil_clear_value--;}]) {
+      const different=structuredClone(r);mutate(different);assert.deepEqual(validate(different),[]);assert.ok(compare(r,different).length);
+    }
+    for(const mutate of [x=>{x.attachment_facts[0].event_index--;},x=>{x.attachment_facts.reverse();},x=>{x.attachment_facts[0].kind=2;},
+      x=>{x.attachment_facts[1].aspects=2;},x=>{x.attachment_facts[1].view_id='6';},x=>{x.attachment_facts[0].resolve_view_id='7';},
+      x=>{x.attachment_facts[0].color_clear_bits[0]=9223372036854775808;},x=>{x.attachment_facts[0].depth_clear_bits=1;},
+      x=>{x.attachment_facts[1].color_clear_bits[0]='1';},x=>{x.attachment_facts.pop();x.renderer.attachment_fact_count--;},
+      x=>{x.attachment_facts[0].extra=true;},x=>{delete x.renderer.attachment_fact_count;},x=>{delete x.attachment_facts;},
+      x=>{x.schema_version=first?5:4;x.renderer.schema_version=4;},x=>{x.renderer.attachment_fact_count=8193;}]) {
+      const bad=structuredClone(r);mutate(bad);assert.doesNotThrow(()=>assert.ok(validate(bad).length));
+    }
+  }
+});
+test('malformed clear fact rows return refusals without throwing',()=>{
+  for(const first of [false,true])for(const row of [null,undefined,17,'fact',[],{}, {...clearFixture().attachment_facts[0],color_clear_bits:null}]){
+    const r=clearFixture(first);r.attachment_facts[0]=row;const validate=first?firstDrawObservationFailures:frameEffectObservationFailures;
+    assert.doesNotThrow(()=>assert.ok(rendererOwnerObservationFailures(r).length));
+    assert.doesNotThrow(()=>assert.ok(validate(r).length));
+  }
+});

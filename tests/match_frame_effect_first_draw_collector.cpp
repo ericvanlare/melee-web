@@ -8,6 +8,7 @@
 #include <memory>
 #include <new>
 #include "lib/gfx/frame_effect_observer.hpp"
+// ACTUAL_TEXTURE_OWNER_BRIDGES
 #define REQUIRE(x) do { if (!(x)) { std::fprintf(stderr,"first-draw collector failure line %d: %s\n",__LINE__,#x);return 1; } } while(false)
 namespace aurora::gfx::detail {
 struct BrowserFrameEffectObserverControls {
@@ -26,8 +27,15 @@ struct BrowserFrameEffectObserverControls {
     }
     return result;
   }
+  static TextureOwnerPair corrupt_texture_owner(const TextureOwnerPair& source,unsigned corruption) {
+    auto result=source;switch(corruption){
+      case 0:++result.texture.raw;break;case 1:++result.texture.device;break;case 2:++result.texture.serial;break;
+      case 3:++result.view.parentSerial;break;case 4:result.texture.words[0]^=1;break;case 5:result.view.words[2]^=1;break;
+      case 6:++result.texture.deviceEpoch;break;case 7:++result.texture.domainEpoch;break;case 8:++result.textureRefOwner;break;
+    }return result;
+  }
   static void exhaust_layout_rows(BrowserFrameEffectObserver& observer) { observer.layoutEntryCount_=observer.LayoutEntryCapacity; }
-  static void exhaust_provenance_rows(BrowserFrameEffectObserver& observer) { observer.provenanceCount_=observer.WarmOwnerCapacity; }
+  static void exhaust_provenance_rows(BrowserFrameEffectObserver& observer) { observer.provenanceCount_=observer.ResourceCapacity; }
 };
 }
 
@@ -596,14 +604,17 @@ void observe_attachment_load_pass(AttachmentFixture& f) {
     const aurora::gfx::detail::Command::Data data{.debugMarkerIndex=i};
     pass.commands.push_back({.type=aurora::gfx::detail::CommandType::DebugMarker,.data=data});
   }
+  pass.hasDepth=true;pass.hasStencil=true;
   pass.colorAttachments[0].size={640,480,1};pass.colorAttachments[0].clear=false;
   pass.colorAttachments[0].view=wgpu::TextureView::Acquire(reinterpret_cast<WGPUTextureView>(address(&f.views[0])));
   pass.colorAttachments[0].resolveView=wgpu::TextureView::Acquire(reinterpret_cast<WGPUTextureView>(address(&f.views[1])));
   std::array<wgpu::RenderPassColorAttachment,aurora::gfx::MaxColorAttachments> colors{};
   colors[0].loadOp=wgpu::LoadOp::Load;colors[0].storeOp=wgpu::StoreOp::Store;
+  colors[0].clearValue={std::bit_cast<double>(uint64_t{0x8000000000000000}),std::bit_cast<double>(uint64_t{0x7ff8000000000001}),0.0,1.0};
   colors[0].view=wgpu::TextureView::Acquire(reinterpret_cast<WGPUTextureView>(address(&f.views[0])));
   colors[0].resolveTarget=wgpu::TextureView::Acquire(reinterpret_cast<WGPUTextureView>(address(&f.views[1])));
   wgpu::RenderPassDepthStencilAttachment depth{};depth.depthLoadOp=wgpu::LoadOp::Load;depth.depthStoreOp=wgpu::StoreOp::Store;
+  depth.depthClearValue=std::bit_cast<float>(uint32_t{0x80000000});depth.stencilClearValue=UINT32_MAX;
   depth.view=wgpu::TextureView::Acquire(reinterpret_cast<WGPUTextureView>(address(&f.views[2])));
   f.base.observer->observe_render_pass(frame,0,pass,colors,&depth);
   (void)pass.colorAttachments[0].view.MoveToCHandle();(void)pass.colorAttachments[0].resolveView.MoveToCHandle();
@@ -618,7 +629,12 @@ bool persistent_attachment_controls() {
     STATIC_GROUP_CONTROL_CHECK(f.base.begin());
     for(size_t slot=0;slot<3;++slot)STATIC_GROUP_CONTROL_CHECK(created[slot*2]==Access::attachment_serial(o,O::PersistentAttachmentTextureRole,slot));
     STATIC_GROUP_CONTROL_CHECK(f.base.arm_and_begin_frame());observe_attachment_load_pass(f);
-    const auto observed=o.snapshot();STATIC_GROUP_CONTROL_CHECK(observed.schemaVersion==4&&observed.firstBlocker==AURORA_BROWSER_FRAME_EFFECT_LOAD_ATTACHMENT);
+    const auto observed=o.snapshot();STATIC_GROUP_CONTROL_CHECK(observed.schemaVersion==5&&observed.firstBlocker==AURORA_BROWSER_FRAME_EFFECT_LOAD_ATTACHMENT);
+    AuroraBrowserFrameEffectAttachmentFact color{},depth{};
+    STATIC_GROUP_CONTROL_CHECK(observed.attachmentFactCount==2&&o.attachment_fact(0,&color)&&o.attachment_fact(1,&depth)&&!o.attachment_fact(2,&depth)&&!o.attachment_fact(0,nullptr));
+    STATIC_GROUP_CONTROL_CHECK(color.kind==1&&color.aspects==1&&color.colorClearBits[0]==0x8000000000000000ULL&&color.colorClearBits[1]==0x7ff8000000000001ULL&&color.colorClearBits[3]==0x3ff0000000000000ULL);
+    STATIC_GROUP_CONTROL_CHECK(depth.kind==2&&depth.aspects==6&&depth.depthClearBits==0x80000000u&&depth.stencilClearValue==UINT32_MAX);
+    AuroraBrowserFrameEffectEvent ce{},de{};STATIC_GROUP_CONTROL_CHECK(o.event(color.eventIndex,&ce)&&o.event(depth.eventIndex,&de)&&ce.kind==3&&de.kind==4&&ce.handleA==color.viewId&&de.handleA==depth.viewId);
     STATIC_GROUP_CONTROL_CHECK(observed.resourceCount==6&&observed.provenanceCount==6&&observed.layoutEntryCount==0&&observed.bindingEntryCount==0);
     for(uint32_t i=0;i<6;i+=2){AuroraBrowserFrameEffectResource texture{},view{};AuroraBrowserFrameEffectProvenance tp{},vp{};
       STATIC_GROUP_CONTROL_CHECK(o.resource(i,&texture)&&o.resource(i+1,&view)&&o.provenance(i,&tp)&&o.provenance(i+1,&vp));
@@ -688,7 +704,110 @@ bool persistent_attachment_controls() {
 }
 }
 
+namespace {
+using TextureOwnerPair=aurora::gfx::detail::TextureOwnerPair;
+using TextureCreation=aurora::gfx::detail::TextureCreation;
+struct TextureOwnerFixture {
+  Fixture base;
+  std::array<int,8> textures{},views{},owners{};
+  wgpu::TextureDescriptor descriptor{.usage=wgpu::TextureUsage::TextureBinding|wgpu::TextureUsage::RenderAttachment,
+      .dimension=wgpu::TextureDimension::e2D,.size={640,480,1},.format=wgpu::TextureFormat::RGBA8Unorm,.mipLevelCount=1,.sampleCount=1};
+  wgpu::TextureViewDescriptor viewDescriptor{.dimension=wgpu::TextureViewDimension::e2D};
+  bool start(){if(!base.observer)return false;base.observer->begin_persistent_attachment_lifetime(base.ids.device);return true;}
+  TextureOwnerPair create(size_t index,uint32_t role=17,uint32_t slot=0) {
+    auto& o=*base.observer;
+    const auto texture=o.observe_owned_texture_creation(role,slot,address(&textures[index]),base.ids.device,descriptor);
+    auto pair=o.observe_owned_texture_view_creation(texture,address(&views[index]),address(&textures[index]),base.ids.device,&viewDescriptor);
+    if(role==17)o.bind_owned_texture_ref(address(&owners[index]),pair,address(&textures[index]),address(&views[index]),address(&views[index]));
+    return pair;
+  }
+  bool promote(const TextureOwnerPair& pair,size_t index,uint32_t role=17,uint32_t frameIndex=3158,uint64_t frameId=3159) {
+    return base.observer->promote_owned_texture_pair(pair,role==17?address(&owners[index]):0,address(&textures[index]),address(&views[index]),frameIndex,frameId);
+  }
+};
+bool copied_texture_owner_controls(){
+  using Access=aurora::gfx::detail::BrowserFrameEffectObserverControls;
+  // Actual constructor/destructor and exact extracted production bridge. Opaque
+  // wrappers are relinquished before final destruction; no WebGPU calls occur.
+  {
+    int textureRaw,viewRaw,ownerRaw,deviceRaw;
+    auto& o=aurora::gfx::detail::browser_frame_effect_observer();
+    const auto device=address(&deviceRaw);
+    o.begin_persistent_attachment_lifetime(device);
+    const wgpu::TextureDescriptor d{.usage=wgpu::TextureUsage::TextureBinding,.dimension=wgpu::TextureDimension::e2D,
+      .size={8,8,1},.format=wgpu::TextureFormat::RGBA8Unorm,.mipLevelCount=1,.sampleCount=1};
+    const auto t=o.observe_owned_texture_creation(17,0,address(&textureRaw),device,d);
+    const auto pair=o.observe_owned_texture_view_creation(t,address(&viewRaw),address(&textureRaw),device,nullptr);
+    auto ref=std::make_shared<aurora::gfx::TextureRef>(
+      wgpu::Texture::Acquire(reinterpret_cast<WGPUTexture>(address(&textureRaw))),
+      wgpu::TextureView::Acquire(reinterpret_cast<WGPUTextureView>(address(&viewRaw))),
+      wgpu::TextureView::Acquire(reinterpret_cast<WGPUTextureView>(address(&viewRaw))),d.size,d.format,1,0,pair);
+    auto alias=ref;const auto actualOwner=address(ref.get());
+    o.begin_static_resource_lifetime(address(&ownerRaw),device);
+    STATIC_GROUP_CONTROL_CHECK(o.arm_first_draw(3158,3159));
+    STATIC_GROUP_CONTROL_CHECK(o.promote_owned_texture_pair(ref->frameEffectOwnerFacts,actualOwner,address(&textureRaw),address(&viewRaw),3158,3159));
+    ref.reset();STATIC_GROUP_CONTROL_CHECK(o.snapshot().firstBlocker==0);
+    (void)alias->texture.MoveToCHandle();(void)alias->sampleTextureView.MoveToCHandle();(void)alias->attachmentTextureView.MoveToCHandle();
+    alias.reset();STATIC_GROUP_CONTROL_CHECK(o.snapshot().firstBlocker==AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
+  }
+  for(uint32_t role:{17u,19u,21u,23u,25u})for(bool armed:{false,true}) {
+    TextureOwnerFixture f;STATIC_GROUP_CONTROL_CHECK(f.start());const uint32_t slot=role==19||role==21?3:0;
+    const auto pair=f.create(0,role,slot);const auto other=f.create(1,role,slot);
+    STATIC_GROUP_CONTROL_CHECK(f.base.begin());
+    if(armed)STATIC_GROUP_CONTROL_CHECK(f.base.observer->arm_first_draw(3158,3159));
+    else STATIC_GROUP_CONTROL_CHECK(f.base.arm_and_begin_frame());
+    STATIC_GROUP_CONTROL_CHECK(f.promote(pair,0,role)&&f.promote(other,1,role)&&f.promote(pair,0,role));
+    auto& o=*f.base.observer;STATIC_GROUP_CONTROL_CHECK(o.snapshot().resourceCount==4&&o.snapshot().provenanceCount==4);
+    AuroraBrowserFrameEffectResource t{},v{};AuroraBrowserFrameEffectProvenance tp{},vp{},op{};
+    STATIC_GROUP_CONTROL_CHECK(o.resource(0,&t)&&o.resource(1,&v)&&o.provenance(0,&tp)&&o.provenance(1,&vp)&&o.provenance(2,&op));
+    STATIC_GROUP_CONTROL_CHECK(tp.role==role&&vp.role==role+1&&tp.slot==slot&&vp.slot==slot&&tp.creationSerial!=op.creationSerial&&vp.creationSerial!=tp.creationSerial);
+    STATIC_GROUP_CONTROL_CHECK(v.ownerId==t.captureId&&v.words[0]==t.captureId&&tp.deviceId==vp.deviceId&&tp.rendererEpoch==vp.rendererEpoch);
+    if(armed){o.observe_command(3158,3159,0,0,0,false);STATIC_GROUP_CONTROL_CHECK(o.snapshot().resourceCount==4&&o.snapshot().state==AURORA_BROWSER_FRAME_EFFECT_COLLECTING);}
+  }
+  // Exact token mutations are refusals, never a descriptor-to-provenance upgrade.
+  for(unsigned mutation=0;mutation<9;++mutation){
+    TextureOwnerFixture f;STATIC_GROUP_CONTROL_CHECK(f.start());auto pair=f.create(0);
+    pair=Access::corrupt_texture_owner(pair,mutation);STATIC_GROUP_CONTROL_CHECK(f.base.begin()&&f.base.arm_and_begin_frame());
+    STATIC_GROUP_CONTROL_CHECK(!f.promote(pair,0));const auto s=f.base.observer->snapshot();
+    STATIC_GROUP_CONTROL_CHECK(s.firstBlocker==AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE&&s.resourceCount==0&&s.provenanceCount==0&&s.bindingEntryCount==0&&s.layoutEntryCount==0);
+  }
+  for(unsigned mode=0;mode<10;++mode){
+    TextureOwnerFixture f;STATIC_GROUP_CONTROL_CHECK(f.start());const auto pair=f.create(0,mode==2||mode==3?19:17);
+    auto& o=*f.base.observer;
+    if(mode==0){o.end_persistent_attachment_lifetime(f.base.ids.device);o.begin_persistent_attachment_lifetime(f.base.ids.device);}
+    if(mode==2)o.invalidate_texture_owner_domain(1);
+    STATIC_GROUP_CONTROL_CHECK(f.base.begin()&&f.base.arm_and_begin_frame());const auto before=o.snapshot();
+    if(mode==1)o.detach_owned_texture_ref(address(&f.owners[0]),pair);
+    if(mode==3)o.invalidate_texture_owner_domain(1);
+    if(mode==4)o.detach_owned_texture_ref(address(&wrongOwnerToken),pair);
+    if(mode==5)Access::exhaust_provenance_rows(o);
+    if(mode==6)o.observe_texture_descriptor(address(&f.textures[0]),f.base.ids.device,f.descriptor);
+    bool accepted=false;
+    if(mode==7)accepted=o.promote_owned_texture_pair(pair,address(&f.owners[0]),address(&wrongVertexToken),address(&f.views[0]),3158,3159);
+    else if(mode==8)accepted=f.promote(pair,0,17,3157,3159);
+    else if(mode==9)accepted=f.promote(pair,0,17,3158,3160);
+    else accepted=f.promote(pair,0,mode==2||mode==3?19:17);
+    STATIC_GROUP_CONTROL_CHECK(!accepted);
+    const auto after=o.snapshot();const auto expected=mode==5?AURORA_BROWSER_FRAME_EFFECT_DESCRIPTOR_OVERFLOW:mode>=8?AURORA_BROWSER_FRAME_EFFECT_FRAME_ID_MISMATCH:AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE;
+    STATIC_GROUP_CONTROL_CHECK(after.firstBlocker==expected&&after.resourceCount==(mode==6?1:before.resourceCount)&&after.provenanceCount==(mode==5?BrowserFrameEffectObserver::ResourceCapacity:before.provenanceCount)&&after.bindingEntryCount==0&&after.layoutEntryCount==0);
+  }
+  {TextureOwnerFixture f;STATIC_GROUP_CONTROL_CHECK(f.start());const auto pair=f.create(0);STATIC_GROUP_CONTROL_CHECK(f.base.begin()&&f.base.arm_and_begin_frame()&&f.promote(pair,0));
+    const auto replacement=f.create(0);const auto before=f.base.observer->snapshot();STATIC_GROUP_CONTROL_CHECK(!f.promote(replacement,0));
+    const auto after=f.base.observer->snapshot();STATIC_GROUP_CONTROL_CHECK(after.firstBlocker==AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE&&after.resourceCount==before.resourceCount&&after.provenanceCount==before.provenanceCount);}
+  {TextureOwnerFixture f;STATIC_GROUP_CONTROL_CHECK(f.start());auto t=f.base.observer->observe_owned_texture_creation(19,4,address(&f.textures[0]),f.base.ids.device,f.descriptor);
+    auto bad=f.base.observer->observe_owned_texture_view_creation(t,address(&f.views[0]),address(&f.textures[0]),f.base.ids.device,&f.viewDescriptor);
+    STATIC_GROUP_CONTROL_CHECK(f.base.begin()&&f.base.arm_and_begin_frame()&&!f.promote(bad,0,19)&&f.base.observer->snapshot().firstBlocker==AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE);}
+  {TextureOwnerFixture f;STATIC_GROUP_CONTROL_CHECK(f.start());const auto t=f.base.observer->observe_owned_texture_creation(17,0,address(&f.textures[0]),f.base.ids.device,f.descriptor);
+    const auto bad=f.base.observer->observe_owned_texture_view_creation(t,address(&f.views[0]),address(&wrongVertexToken),f.base.ids.device,&f.viewDescriptor);
+    STATIC_GROUP_CONTROL_CHECK(f.base.begin()&&f.base.arm_and_begin_frame()&&!f.promote(bad,0)&&f.base.observer->snapshot().firstBlocker==AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE);}
+  {TextureOwnerFixture f;STATIC_GROUP_CONTROL_CHECK(f.start());Access::exhaust_serials(*f.base.observer);const auto bad=f.create(0);
+    STATIC_GROUP_CONTROL_CHECK(f.base.begin()&&f.base.arm_and_begin_frame()&&!f.promote(bad,0)&&f.base.observer->snapshot().firstBlocker==AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);}
+  std::puts("actual TextureRef final-owner detach, live copied/pool token ARMED/COLLECTING provenance and exact identity/domain/budget refusals passed");
+  return true;
+}
+}
+
 int main(){
- if(!persistent_attachment_controls() || !renderer_owner_sampler_order_controls() || !renderer_owner_layout_and_budget_refusals() || !renderer_owner_graph_positive() || !renderer_owner_release_and_malformed_controls() || static_group_descriptor_controls() || selected_completion(false)||selected_completion(true)||unknown_identity())return 1;
+ if(!copied_texture_owner_controls() || !persistent_attachment_controls() || !renderer_owner_sampler_order_controls() || !renderer_owner_layout_and_budget_refusals() || !renderer_owner_graph_positive() || !renderer_owner_release_and_malformed_controls() || static_group_descriptor_controls() || selected_completion(false)||selected_completion(true)||unknown_identity())return 1;
  std::puts("first-draw actual collector issuing identity and selected map-owner controls passed");
 }

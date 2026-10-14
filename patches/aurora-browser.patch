@@ -328,7 +328,7 @@ index 0000000000000000000000000000000000000000..2ecd22a6c10e9caf99ce33d9c0a465a0
 +              "future owner row identity offset changed");
 +#endif
 diff --git a/include/aurora/gfx.h b/include/aurora/gfx.h
-index 94504b177d6733244a9de40a8dfb49f5964363ae..b1f6b74824c73efe0ba3b2910c15b655a03f84f3 100644
+index 94504b177d6733244a9de40a8dfb49f5964363ae..afb2d69f6187093b5f82c9238e2bcf598e20b936 100644
 --- a/include/aurora/gfx.h
 +++ b/include/aurora/gfx.h
 @@ -3,10 +3,12 @@
@@ -344,7 +344,7 @@ index 94504b177d6733244a9de40a8dfb49f5964363ae..b1f6b74824c73efe0ba3b2910c15b655
  #endif
  
  #if !defined(NDEBUG) && !defined(AURORA_GFX_DEBUG_GROUPS)
-@@ -26,8 +28,323 @@ typedef struct {
+@@ -26,8 +28,330 @@ typedef struct {
    uint32_t lastIndexSize;
    uint32_t lastStorageSize;
    uint32_t lastTextureUploadSize;
@@ -519,7 +519,7 @@ index 94504b177d6733244a9de40a8dfb49f5964363ae..b1f6b74824c73efe0ba3b2910c15b655
 +
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && !defined(__EMSCRIPTEN_PTHREADS__)
 +enum {
-+  AURORA_BROWSER_FRAME_EFFECT_SCHEMA_VERSION = 4,
++  AURORA_BROWSER_FRAME_EFFECT_SCHEMA_VERSION = 5,
 +  AURORA_BROWSER_FRAME_EFFECT_EVENT_FRAME_OP = 1,
 +  AURORA_BROWSER_FRAME_EFFECT_EVENT_RENDER_PASS = 2,
 +  AURORA_BROWSER_FRAME_EFFECT_EVENT_COLOR_ATTACHMENT = 3,
@@ -620,6 +620,12 @@ index 94504b177d6733244a9de40a8dfb49f5964363ae..b1f6b74824c73efe0ba3b2910c15b655
 +typedef struct { uint64_t layoutId; uint32_t entryIndex; uint32_t words[15]; } AuroraBrowserFrameEffectLayoutEntry;
 +typedef struct { uint64_t captureId, deviceId, creationSerial, rendererEpoch; uint32_t role, slot; } AuroraBrowserFrameEffectProvenance;
 +typedef struct {
++  uint32_t eventIndex,kind,aspects,reserved; /* kind1 color/aspect1, kind2 depth/aspects2|4 */
++  uint64_t viewId,resolveViewId;
++  uint64_t colorClearBits[4];
++  uint32_t depthClearBits,stencilClearValue;
++} AuroraBrowserFrameEffectAttachmentFact;
++typedef struct {
 +  uint32_t frameIndex, opIndex, commandIndex, rendererKind;
 +  uint64_t pipelineKey, pipelineId;
 +  uint64_t bindGroupIds[4];
@@ -644,7 +650,7 @@ index 94504b177d6733244a9de40a8dfb49f5964363ae..b1f6b74824c73efe0ba3b2910c15b655
 +  uint64_t queueWriteBytes, findingMask;
 +  uint32_t commandRecordCount, actualDrawCount, resourceCount, bindingEntryCount;
 +  uint32_t depthTraceCount, depthRequestCount;
-+  uint32_t layoutEntryCount, provenanceCount;
++  uint32_t layoutEntryCount, provenanceCount, attachmentFactCount;
 +} AuroraBrowserFrameEffectSnapshot;
 +typedef struct {
 +  uint32_t registeredCount, completedCount, pendingCount, ignoredOtherIssuerCount, finalized;
@@ -660,6 +666,7 @@ index 94504b177d6733244a9de40a8dfb49f5964363ae..b1f6b74824c73efe0ba3b2910c15b655
 +int aurora_browser_frame_effect_observer_binding_entry(uint32_t index, AuroraBrowserFrameEffectBindingEntry* out);
 +int aurora_browser_frame_effect_observer_layout_entry(uint32_t index, AuroraBrowserFrameEffectLayoutEntry* out);
 +int aurora_browser_frame_effect_observer_provenance(uint32_t index, AuroraBrowserFrameEffectProvenance* out);
++int aurora_browser_frame_effect_observer_attachment_fact(uint32_t index, AuroraBrowserFrameEffectAttachmentFact* out);
 +int aurora_browser_frame_effect_observer_draw(uint32_t index, AuroraBrowserFrameEffectDraw* out);
 +#endif
 +
@@ -791,7 +798,7 @@ index 252fca7d9a4056d9e19f31d0777ba153a30fcc65..3e36937e92a0c391d80194b7527fa4f8
  void PADSetVirtualStatus(u32 port, const PADStatus* status);
  void PADClearVirtualStatus(u32 port);
 diff --git a/lib/aurora.cpp b/lib/aurora.cpp
-index 9430842976e01edc8d43d2182e56a61f7def6ec8..05d995fdfac9bf4a995673bd30da0bffdb9516c1 100644
+index 9430842976e01edc8d43d2182e56a61f7def6ec8..75938b2dfac3031d6c1ce20f2ae58403b4c1b5e6 100644
 --- a/lib/aurora.cpp
 +++ b/lib/aurora.cpp
 @@ -1,10 +1,21 @@
@@ -1094,8 +1101,8 @@ index 9430842976e01edc8d43d2182e56a61f7def6ec8..05d995fdfac9bf4a995673bd30da0bff
 +  g_matchDrawDiscardSnapshot.latestDepthIdentityBefore = depth.latestIdentity;
 +  gfx::depth_peek::begin_match_draw_discard();
 +  return 1;
-+#endif
-+}
+ #endif
+ }
 +int match_draw_discard_end_frame(AuroraBrowserMatchDrawDiscardSnapshot* out) {
 +  if (!out || !g_matchDrawDiscardUsed || !g_matchDrawDiscardBeganFrame || g_matchDrawDiscardEnded) return 0;
 +  // Same original CPU finalization prefix; skip only the outer presentation and
@@ -1134,8 +1141,8 @@ index 9430842976e01edc8d43d2182e56a61f7def6ec8..05d995fdfac9bf4a995673bd30da0bff
 +  return gfx::detail::browser_frame_effect_observer().arm(gfx::current_frame()) ? 1 : 0;
 +#else
 +  return 0;
- #endif
- }
++#endif
++}
 +#endif
 +
  } // namespace
@@ -1175,7 +1182,7 @@ index 9430842976e01edc8d43d2182e56a61f7def6ec8..05d995fdfac9bf4a995673bd30da0bff
  AuroraBackend aurora_get_backend() { return aurora::g_config.desiredBackend; }
  const AuroraBackend* aurora_get_available_backends(size_t* count) {
    if (count != nullptr) {
-@@ -476,3 +701,60 @@ void aurora_set_resampler(AuroraSampler sampler) {
+@@ -476,3 +701,63 @@ void aurora_set_resampler(AuroraSampler sampler) {
  }
  void aurora_set_timescale(float scale) { aurora::time::set_scale(scale); }
  float aurora_get_timescale() { return aurora::time::scale(); }
@@ -1231,6 +1238,9 @@ index 9430842976e01edc8d43d2182e56a61f7def6ec8..05d995fdfac9bf4a995673bd30da0bff
 +}
 +int aurora_browser_frame_effect_observer_provenance(uint32_t index, AuroraBrowserFrameEffectProvenance* out) {
 +  return aurora::gfx::detail::browser_frame_effect_observer().provenance(index, out);
++}
++int aurora_browser_frame_effect_observer_attachment_fact(uint32_t index, AuroraBrowserFrameEffectAttachmentFact* out) {
++  return aurora::gfx::detail::browser_frame_effect_observer().attachment_fact(index,out);
 +}
 +int aurora_browser_frame_effect_observer_draw(uint32_t index, AuroraBrowserFrameEffectDraw* out) {
 +  return aurora::gfx::detail::browser_frame_effect_observer().draw(index, out);
@@ -4247,10 +4257,10 @@ index 0b86ffead6e8f6153d2acf52cf9daecf4f07ccfa..a5ad738b32d623acc50eb06d39589ff0
  void gpu_synchronize();
 diff --git a/lib/gfx/frame_effect_observer.hpp b/lib/gfx/frame_effect_observer.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..54d5cef987a9c8574d38577ea50404a90de69d75
+index 0000000000000000000000000000000000000000..37089bb225eeb507ac168e115bfb30dda023aebb
 --- /dev/null
 +++ b/lib/gfx/frame_effect_observer.hpp
-@@ -0,0 +1,1567 @@
+@@ -0,0 +1,1729 @@
 +#pragma once
 +
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
@@ -4258,6 +4268,7 @@ index 0000000000000000000000000000000000000000..54d5cef987a9c8574d38577ea50404a9
 +#include <aurora/gfx.h>
 +#include "frame_packet.hpp"
 +#include "frame.hpp"
++#include "frame_effect_texture_owner.hpp"
 +#include <dolphin/gx/GXEnum.h>
 +#include <algorithm>
 +
@@ -4277,6 +4288,11 @@ index 0000000000000000000000000000000000000000..54d5cef987a9c8574d38577ea50404a9
 +  static constexpr uint32_t StaticLayoutRole = 6, UniformLayoutRole = 7, EmptyLayoutRole = 8;
 +  static constexpr uint32_t StaticGroupRole = 9, UniformGroupRole = 10, EmptyGroupRole = 11;
 +  static constexpr uint32_t EmptyTextureRole = 12, EmptyViewRole = 13, EmptySamplerRole = 14;
++  static constexpr uint32_t TextureRefTextureRole=17,TextureRefViewRole=18;
++  static constexpr uint32_t SnapshotColorTextureRole=19,SnapshotColorViewRole=20,SnapshotDepthTextureRole=21,SnapshotDepthViewRole=22;
++  static constexpr uint32_t OffscreenColorTextureRole=23,OffscreenColorViewRole=24,OffscreenDepthTextureRole=25,OffscreenDepthViewRole=26;
++  // Existing capture resource budget; never a bound on native cache size.
++  static constexpr uint32_t ResourceCapacity=6144;
 +  static constexpr size_t TextureEntryCount = 2 * GX_MAX_TEXMAP;
 +  // Exactly the three persistent EFB globals: color, resolved color, depth.
 +  static constexpr uint32_t PersistentAttachmentTextureRole = 15, PersistentAttachmentViewRole = 16;
@@ -4301,6 +4317,9 @@ index 0000000000000000000000000000000000000000..54d5cef987a9c8574d38577ea50404a9
 +    if (state_.load(std::memory_order_acquire) != AURORA_BROWSER_FRAME_EFFECT_UNUSED || attachmentActive_ || !device) {
 +      attachment_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE); return;
 +    }
++    if(deviceEpoch_==UINT64_MAX){attachment_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);return;}
++    ++deviceEpoch_;textureOwnerFailure_=0;
++    for(auto& epoch:textureOwnerDomainEpochs_){if(epoch==UINT64_MAX){attachment_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);return;}++epoch;}
 +    attachmentDevice_ = device; attachmentActive_ = true; attachmentError_ = 0; attachmentOwners_ = {};
 +    for (size_t i=SharedWarmOwnerCapacity;i<WarmOwnerCapacity;++i) warm_[i] = {};
 +  }
@@ -4365,6 +4384,113 @@ index 0000000000000000000000000000000000000000..54d5cef987a9c8574d38577ea50404a9
 +      }
 +    // Other attachment owners remain explicitly unknown; no descriptor guesses.
 +    fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE);return false;
++  }
++
++  TextureCreation observe_owned_texture_creation(uint32_t role,uint32_t slot,uintptr_t raw,uintptr_t device,
++                                                     const wgpu::TextureDescriptor& d) noexcept {
++    TextureCreation result{};result.error=AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE;
++    const auto domain=texture_owner_domain(role);
++    if(domain>=textureOwnerDomainEpochs_.size() || role%2==0 || !texture_owner_slot(role,slot) || !raw ||
++       !attachmentActive_ || device!=attachmentDevice_ || !deviceEpoch_ || d.nextInChain || d.viewFormatCount>6 ||
++       (d.viewFormatCount && !d.viewFormats)) {if(capture_window_live())texture_owner_fail(result.error);return result;}
++    if(nextCreateSerial_==UINT64_MAX){result.error=AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE;if(capture_window_live())texture_owner_fail(result.error);return result;}
++    result.raw=raw;result.device=device;result.serial=++nextCreateSerial_;result.deviceEpoch=deviceEpoch_;
++    result.domainEpoch=textureOwnerDomainEpochs_[domain];result.role=role;result.slot=slot;result.wordCount=uint32_t(10+d.viewFormatCount);
++    const uint64_t usage=static_cast<uint64_t>(d.usage);
++    result.words={d.size.width,d.size.height,d.size.depthOrArrayLayers,uint32_t(d.format),uint32_t(d.dimension),d.mipLevelCount,d.sampleCount,uint32_t(usage),uint32_t(usage>>32),uint32_t(d.viewFormatCount)};
++    for(size_t i=0;i<d.viewFormatCount;++i)result.words[10+i]=uint32_t(d.viewFormats[i]);
++    result.error=0;result.valid=true;result.seal=texture_creation_seal(result);return result;
++  }
++  TextureOwnerPair observe_owned_texture_view_creation(const TextureCreation& texture,uintptr_t raw,uintptr_t parent,uintptr_t device,
++                                                         const wgpu::TextureViewDescriptor* descriptor) noexcept {
++    TextureOwnerPair pair{};pair.texture=texture;pair.view.error=texture.error?texture.error:AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE;
++    const wgpu::TextureViewDescriptor defaults{};const auto& d=descriptor?*descriptor:defaults;
++    if(!valid_texture_creation(texture) || texture.role%2!=1 || !raw || parent!=texture.raw || device!=texture.device || d.nextInChain ||
++       (static_cast<uint64_t>(d.usage)>>32)!=0){if(capture_window_live())texture_owner_fail(pair.view.error);return pair;}
++    if(nextCreateSerial_==UINT64_MAX){pair.view.error=AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE;if(capture_window_live())texture_owner_fail(pair.view.error);return pair;}
++    auto& view=pair.view;view.raw=raw;view.device=device;view.serial=++nextCreateSerial_;view.deviceEpoch=deviceEpoch_;
++    view.parentSerial=texture.serial;view.domainEpoch=texture.domainEpoch;view.role=texture.role+1;view.slot=texture.slot;view.wordCount=10;
++    view.words={0,0,uint32_t(d.format),uint32_t(d.dimension),d.baseMipLevel,d.mipLevelCount,d.baseArrayLayer,d.arrayLayerCount,uint32_t(d.aspect),uint32_t(d.usage)};
++    view.error=0;view.valid=true;view.seal=texture_creation_seal(view);return pair;
++  }
++  void bind_owned_texture_ref(uintptr_t owner,TextureOwnerPair& pair,uintptr_t texture,uintptr_t sampleView,uintptr_t attachmentView) noexcept {
++    if(!pair.texture.valid || !pair.view.valid)return;
++    if(!owner || pair.textureRefOwner || pair.texture.role!=TextureRefTextureRole || pair.texture.raw!=texture ||
++       pair.view.raw!=sampleView || (attachmentView && attachmentView!=sampleView)){
++      pair.view.valid=false;pair.view.error=AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE;
++      if(capture_window_live())texture_owner_fail(pair.view.error);return;
++    }
++    pair.textureRefOwner=owner;
++  }
++  void detach_owned_texture_ref(uintptr_t owner,const TextureOwnerPair& pair) noexcept {
++    if(!pair.texture.valid || !pair.view.valid)return;
++    if(pair.textureRefOwner!=owner){if(capture_window_live())texture_owner_fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);return;}
++    if(pair.texture.deviceEpoch==deviceEpoch_ && capture_window_live())texture_owner_fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
++    // Final TextureRef detach is not native GPU final destruction: pass/bind refs can survive.
++  }
++  void detach_pool_texture_owner(const TextureOwnerPair& pair) noexcept {
++    if(pair.texture.valid && pair.texture.deviceEpoch==deviceEpoch_ && capture_window_live())texture_owner_fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
++  }
++  void invalidate_texture_owner_domain(uint32_t domain) noexcept {
++    if(domain==0 || domain>=textureOwnerDomainEpochs_.size()){if(capture_window_live())texture_owner_fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE);return;}
++    if(capture_window_live())texture_owner_fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
++    if(textureOwnerDomainEpochs_[domain]==UINT64_MAX){attachment_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);return;}
++    ++textureOwnerDomainEpochs_[domain];
++  }
++  bool promote_owned_texture_pair(const TextureOwnerPair& pair,uintptr_t owner,uintptr_t texture,uintptr_t view,
++                                    uint32_t frameIndex,uint64_t frameId) noexcept {
++    if(!recording())return false;
++    if(textureOwnerFailure_){fail(textureOwnerFailure_);return false;}
++    if(frameIndex!=targetFrameIndex_ || !frameId || (firstDrawMode_?frameId!=issuingFrameId_:collecting()&&frameId!=frameId_)){
++      texture_owner_fail(AURORA_BROWSER_FRAME_EFFECT_FRAME_ID_MISMATCH);return false;
++    }
++    const auto& t=pair.texture;const auto& v=pair.view;
++    if(!warmActive_ || !warmEpoch_){texture_owner_fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE);return false;}
++    if(!t.valid || !v.valid){texture_owner_fail(t.error?t.error:v.error?v.error:AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE);return false;}
++    if(warmDevice_!=t.device || !valid_texture_creation(t) || !valid_texture_creation(v) || t.role%2!=1 || v.wordCount!=10 || t.raw!=texture || v.raw!=view ||
++       v.role!=t.role+1 || v.slot!=t.slot || v.parentSerial!=t.serial || v.device!=t.device || v.deviceEpoch!=t.deviceEpoch ||
++       v.domainEpoch!=t.domainEpoch || t.serial==v.serial || (t.role==TextureRefTextureRole?(owner==0 || pair.textureRefOwner!=owner):(owner!=0 || pair.textureRefOwner!=0))){
++      texture_owner_fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);return false;
++    }
++    const auto existingId=[&](uint32_t kind,uintptr_t raw)->uint64_t{
++      for(uint32_t i=0;i<handleCount_.load(std::memory_order_relaxed);++i)if(handles_[i].kind==kind&&handles_[i].address==raw)return uint64_t(i)+1;
++      return 0;
++    };
++    const uint32_t kinds[2]={AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE,AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE_VIEW};
++    const TextureCreation* tokens[2]={&t,&v};uint32_t newHandles=existingId(AURORA_BROWSER_FRAME_EFFECT_HANDLE_DEVICE,t.device)?0:1,newResources=0,newProvenance=0;
++    for(size_t i=0;i<2;++i){const auto id=existingId(kinds[i],tokens[i]->raw);if(!id)++newHandles;
++      bool resource=false,provenance=false;
++      for(uint32_t j=0;j<resourceCount_;++j)resource|=id && resources_[j].captureId==id;
++      for(uint32_t j=0;j<provenanceCount_;++j)provenance|=id && provenance_[j].captureId==id;
++      if(!resource)++newResources;if(!provenance)++newProvenance;
++    }
++    if(newHandles>HandleCapacity-handleCount_.load(std::memory_order_relaxed) || newResources>ResourceCapacity-resourceCount_ ||
++       newProvenance>ResourceCapacity-provenanceCount_){texture_owner_fail(AURORA_BROWSER_FRAME_EFFECT_DESCRIPTOR_OVERFLOW);return false;}
++    const auto deviceId=handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_DEVICE,t.device);
++    const uint64_t ids[2]={handle(kinds[0],t.raw),handle(kinds[1],v.raw)};
++    std::array<AuroraBrowserFrameEffectResource,2> prepared{};bool published[2]={};
++    for(size_t i=0;i<2;++i){auto& row=prepared[i];const auto& token=*tokens[i];row.captureId=ids[i];row.kind=kinds[i];row.ownerId=i?ids[0]:deviceId;
++      row.wordCount=token.wordCount;std::copy(token.words.begin(),token.words.end(),row.words);
++      if(i){row.words[0]=uint32_t(ids[0]);row.words[1]=uint32_t(ids[0]>>32);}
++      for(uint32_t j=0;j<provenanceCount_;++j){const auto& p=provenance_[j];
++        if(p.creationSerial==token.serial && p.captureId!=ids[i]){texture_owner_fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);return false;}
++        if(p.captureId==ids[i]){if(p.creationSerial!=token.serial || p.rendererEpoch!=warmEpoch_ || p.deviceId!=deviceId || p.role!=token.role || p.slot!=token.slot){texture_owner_fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);return false;}published[i]=true;}
++      }
++      bool resourcePresent=false;
++      for(uint32_t j=0;j<resourceCount_;++j)if(resources_[j].captureId==ids[i]){
++        resourcePresent=true;
++        const auto& prior=resources_[j];bool same=published[i]&&prior.kind==row.kind&&prior.ownerId==row.ownerId&&prior.wordCount==row.wordCount;
++        for(size_t k=0;same&&k<16;++k)same=prior.words[k]==row.words[k];
++        if(!same){texture_owner_fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);return false;}
++      }
++      if(published[i]!=resourcePresent){texture_owner_fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);return false;}
++    }
++    // Both exact parent/child graphs pass before any resource/provenance publication.
++    for(size_t i=0;i<2;++i)if(!published[i]){const auto& token=*tokens[i];const auto& row=prepared[i];
++      register_resource(row.kind,token.raw,row.ownerId,row.words,row.wordCount);
++      provenance_[provenanceCount_++]={row.captureId,deviceId,token.serial,warmEpoch_,token.role,token.slot};
++    }
++    return true;
 +  }
 +
 +  void begin_static_resource_lifetime(uintptr_t owner, uintptr_t device,
@@ -4600,6 +4726,9 @@ index 0000000000000000000000000000000000000000..54d5cef987a9c8574d38577ea50404a9
 +    if (!out || index >= provenanceCount_) return 0; *out = provenance_[index]; return 1;
 +  }
 +
++  int attachment_fact(uint32_t index,AuroraBrowserFrameEffectAttachmentFact* out) const noexcept {
++    if(!out || index>=attachmentFactCount_)return 0;*out=attachmentFacts_[index];return 1;
++  }
 +  bool arm(uint32_t frameIndex) noexcept {
 +    if (state_.load(std::memory_order_acquire) != AURORA_BROWSER_FRAME_EFFECT_UNUSED) return false;
 +    targetFrameIndex_ = frameIndex;
@@ -5155,7 +5284,15 @@ index 0000000000000000000000000000000000000000..54d5cef987a9c8574d38577ea50404a9
 +      row.value3 = source.size.height;
 +      row.handleA = handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE_VIEW, source.view.Get());
 +      row.handleB = handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE_VIEW, source.resolveView.Get());
++      const auto factEventIndex=eventCount_.load(std::memory_order_relaxed);
 +      append(row);
++      if(eventCount_.load(std::memory_order_relaxed)==factEventIndex+1){
++        AuroraBrowserFrameEffectAttachmentFact fact{};fact.eventIndex=factEventIndex;fact.kind=1;fact.aspects=1;
++        fact.viewId=row.handleA;fact.resolveViewId=row.handleB;
++        fact.colorClearBits[0]=std::bit_cast<uint64_t>(actual.clearValue.r);fact.colorClearBits[1]=std::bit_cast<uint64_t>(actual.clearValue.g);
++        fact.colorClearBits[2]=std::bit_cast<uint64_t>(actual.clearValue.b);fact.colorClearBits[3]=std::bit_cast<uint64_t>(actual.clearValue.a);
++        append_attachment_fact(fact);
++      }
 +      if (actual.loadOp == wgpu::LoadOp::Load) set_blocker(AURORA_BROWSER_FRAME_EFFECT_LOAD_ATTACHMENT);
 +      promote_persistent_attachment_view(reinterpret_cast<uintptr_t>(source.view.Get()));
 +      promote_persistent_attachment_view(reinterpret_cast<uintptr_t>(source.resolveView.Get()));
@@ -5168,7 +5305,14 @@ index 0000000000000000000000000000000000000000..54d5cef987a9c8574d38577ea50404a9
 +      row.value2 = static_cast<uint32_t>(depth->stencilLoadOp);
 +      row.value3 = static_cast<uint32_t>(depth->stencilStoreOp);
 +      row.handleA = handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE_VIEW, depth->view.Get());
++      const auto factEventIndex=eventCount_.load(std::memory_order_relaxed);
 +      append(row);
++      if(eventCount_.load(std::memory_order_relaxed)==factEventIndex+1){
++        AuroraBrowserFrameEffectAttachmentFact fact{};fact.eventIndex=factEventIndex;fact.kind=2;
++        fact.aspects=(pass.hasDepth?2u:0u)|(pass.hasStencil?4u:0u);fact.viewId=row.handleA;
++        fact.depthClearBits=std::bit_cast<uint32_t>(depth->depthClearValue);fact.stencilClearValue=depth->stencilClearValue;
++        append_attachment_fact(fact);
++      }
 +      if (depth->depthLoadOp == wgpu::LoadOp::Load || depth->stencilLoadOp == wgpu::LoadOp::Load)
 +        set_blocker(AURORA_BROWSER_FRAME_EFFECT_LOAD_ATTACHMENT);
 +      promote_persistent_attachment_view(reinterpret_cast<uintptr_t>(depth->view.Get()));
@@ -5250,6 +5394,8 @@ index 0000000000000000000000000000000000000000..54d5cef987a9c8574d38577ea50404a9
 +  void observe_resolve(const FramePacket& frame, uint32_t opIndex, uint32_t flags, uint32_t width,
 +                       uint32_t height, const wgpu::Texture& source, const TextureHandle& target) noexcept {
 +    if (!begin_or_match(frame.frameIndex, frame.frameId)) return;
++    if(target)promote_owned_texture_pair(target->frameEffectOwnerFacts,reinterpret_cast<uintptr_t>(target.get()),
++        reinterpret_cast<uintptr_t>(target->texture.Get()),reinterpret_cast<uintptr_t>(target->sampleTextureView.Get()),frame.frameIndex,frame.frameId);
 +    ++counts_.resolveCount;
 +    auto row = make_event(AURORA_BROWSER_FRAME_EFFECT_EVENT_RESOLVE, opIndex);
 +    row.flags = flags;
@@ -5393,7 +5539,7 @@ index 0000000000000000000000000000000000000000..54d5cef987a9c8574d38577ea50404a9
 +    out.actualDrawCount = actualDrawCount_;
 +    out.resourceCount = resourceCount_;
 +    out.bindingEntryCount = bindingEntryCount_;
-+    out.layoutEntryCount = layoutEntryCount_; out.provenanceCount = provenanceCount_;
++    out.layoutEntryCount = layoutEntryCount_; out.provenanceCount = provenanceCount_;out.attachmentFactCount=attachmentFactCount_;
 +    out.depthTraceCount = depthTraceCount_;
 +    out.depthRequestCount = depthRequestCount_;
 +    out.opCount = counts_.opCount;
@@ -5435,6 +5581,26 @@ index 0000000000000000000000000000000000000000..54d5cef987a9c8574d38577ea50404a9
 +  friend struct BrowserFrameEffectObserverControls;
 +  struct HandleEntry { uintptr_t address = 0; uint32_t kind = 0; };
 +  struct BindGroupRefEntry { uint64_t refKey = 0, captureId = 0; };
++  uint32_t textureOwnerFailure_=0;
++  void texture_owner_fail(uint32_t blocker) noexcept {if(!textureOwnerFailure_)textureOwnerFailure_=blocker;fail(blocker);}
++  static uint32_t texture_owner_domain(uint32_t role) noexcept {return role>=17&&role<=18?0:role>=19&&role<=22?1:role>=23&&role<=26?2:3;}
++  static bool texture_owner_slot(uint32_t role,uint32_t slot) noexcept {return role>=19&&role<=22?slot<FrameSlotCount:slot==0;}
++  static uint64_t texture_creation_seal(const TextureCreation& token) noexcept {
++    // Internal copy-integrity check, not an adversarial or cryptographic seal.
++    uint64_t hash=14695981039346656037ULL;
++    const auto mix=[&](uint64_t value){for(unsigned shift=0;shift<64;shift+=8){hash^=(value>>shift)&255u;hash*=1099511628211ULL;}};
++    mix(token.raw);mix(token.device);mix(token.serial);mix(token.deviceEpoch);mix(token.parentSerial);mix(token.domainEpoch);
++    mix(token.role);mix(token.slot);mix(token.wordCount);for(auto word:token.words)mix(word);
++    return hash;
++  }
++  bool valid_texture_creation(const TextureCreation& token) const noexcept {
++    const auto domain=texture_owner_domain(token.role);
++    return token.valid && token.error==0 && token.seal==texture_creation_seal(token) && token.raw && token.serial && token.serial<=nextCreateSerial_ && attachmentActive_ && token.device==attachmentDevice_ &&
++      token.deviceEpoch==deviceEpoch_ && deviceEpoch_ && domain<textureOwnerDomainEpochs_.size() && token.domainEpoch==textureOwnerDomainEpochs_[domain] &&
++      texture_owner_slot(token.role,token.slot) && token.wordCount>=10 && token.wordCount<=16 && warmEpoch_!=UINT64_MAX;
++  }
++  uint64_t deviceEpoch_=0;
++  std::array<uint64_t,3> textureOwnerDomainEpochs_{};
 +  struct WarmWitness {
 +    uintptr_t raw = 0, owner = 0, device = 0;
 +    uint64_t serial = 0, epoch = 0, parentSerial = 0, cachedSamplerSerial = 0;
@@ -5554,7 +5720,7 @@ index 0000000000000000000000000000000000000000..54d5cef987a9c8574d38577ea50404a9
 +    }
 +    if(newHandles>HandleCapacity-handleCount_.load(std::memory_order_relaxed)||newResources>ResourceCapacity-resourceCount_||
 +       newBindings>BindingEntryCapacity-bindingEntryCount_||newLayouts>LayoutEntryCapacity-layoutEntryCount_||
-+       newProvenance>WarmOwnerCapacity-provenanceCount_){fail(AURORA_BROWSER_FRAME_EFFECT_DESCRIPTOR_OVERFLOW);return false;}
++       newProvenance>ResourceCapacity-provenanceCount_){fail(AURORA_BROWSER_FRAME_EFFECT_DESCRIPTOR_OVERFLOW);return false;}
 +    const auto deviceId=handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_DEVICE,warmDevice_);
 +    std::array<AuroraBrowserFrameEffectResource,WarmOwnerCapacity> prepared{};
 +    std::array<uint64_t,WarmOwnerCapacity> ids{};
@@ -5599,7 +5765,7 @@ index 0000000000000000000000000000000000000000..54d5cef987a9c8574d38577ea50404a9
 +  bool warmActive_=false;uint32_t warmError_=0;size_t activeStaging_=0;
 +  std::array<WarmWitness,WarmOwnerCapacity> warm_{};
 +  std::array<AuroraBrowserFrameEffectLayoutEntry,LayoutEntryCapacity> layoutEntries_{};
-+  std::array<AuroraBrowserFrameEffectProvenance,WarmOwnerCapacity> provenance_{};
++  std::array<AuroraBrowserFrameEffectProvenance,ResourceCapacity> provenance_{};
 +  uint32_t layoutEntryCount_=0,provenanceCount_=0;
 +
 +  struct Counts {
@@ -5611,7 +5777,6 @@ index 0000000000000000000000000000000000000000..54d5cef987a9c8574d38577ea50404a9
 +  };
 +  static constexpr uint32_t EventCapacity = 8192;
 +  static constexpr uint32_t HandleCapacity = 6144;
-+  static constexpr uint32_t ResourceCapacity = 6144;
 +  static constexpr uint32_t BindingEntryCapacity = 3955;
 +  static constexpr uint32_t DrawCapacity = 246;
 +  static constexpr uint32_t BindGroupRefCapacity = 512;
@@ -5625,6 +5790,9 @@ index 0000000000000000000000000000000000000000..54d5cef987a9c8574d38577ea50404a9
 +  uint32_t firstBlocker_ = AURORA_BROWSER_FRAME_EFFECT_BLOCKER_NONE;
 +  Counts counts_{};
 +  std::array<AuroraBrowserFrameEffectEvent, EventCapacity> events_{};
++  // Each fact corresponds to one existing attachment event; same authored cap.
++  std::array<AuroraBrowserFrameEffectAttachmentFact,EventCapacity> attachmentFacts_{};
++  uint32_t attachmentFactCount_=0;
 +  std::array<HandleEntry, HandleCapacity> handles_{};
 +  std::array<AuroraBrowserFrameEffectResource, ResourceCapacity> resources_{};
 +  std::array<AuroraBrowserFrameEffectBindingEntry, BindingEntryCapacity> bindingEntries_{};
@@ -5758,6 +5926,10 @@ index 0000000000000000000000000000000000000000..54d5cef987a9c8574d38577ea50404a9
 +    pendingDepthEvents_[pendingDepthEventCount_++] = row;
 +  }
 +
++  void append_attachment_fact(const AuroraBrowserFrameEffectAttachmentFact& fact) noexcept {
++    if(attachmentFactCount_>=EventCapacity){fail(AURORA_BROWSER_FRAME_EFFECT_DESCRIPTOR_OVERFLOW);return;}
++    attachmentFacts_[attachmentFactCount_++]=fact;
++  }
 +  void append(const AuroraBrowserFrameEffectEvent& event) noexcept {
 +    const uint32_t index = eventCount_.load(std::memory_order_relaxed);
 +    if (index >= EventCapacity) {
@@ -5817,6 +5989,45 @@ index 0000000000000000000000000000000000000000..54d5cef987a9c8574d38577ea50404a9
 +
 +} // namespace aurora::gfx::detail
 +
++#endif
+diff --git a/lib/gfx/frame_effect_texture_owner.hpp b/lib/gfx/frame_effect_texture_owner.hpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..afb2febe8508aa9a6e44c51756c01979d262ac35
+--- /dev/null
++++ b/lib/gfx/frame_effect_texture_owner.hpp
+@@ -0,0 +1,33 @@
++#pragma once
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++#include <array>
++#include <cstdint>
++namespace aurora::gfx::detail {
++class BrowserFrameEffectObserver;
++struct BrowserFrameEffectObserverControls;
++// Copied facts only. These tokens never own a native object or a cache entry.
++class TextureCreation {
++public:
++  TextureCreation() = default;
++private:
++  friend class BrowserFrameEffectObserver;
++  friend struct BrowserFrameEffectObserverControls;
++  uintptr_t raw=0,device=0;
++  uint64_t serial=0,deviceEpoch=0,parentSerial=0,domainEpoch=0,seal=0;
++  uint32_t role=0,slot=0,wordCount=0,error=0;
++  std::array<uint32_t,16> words{};
++  bool valid=false;
++};
++class TextureOwnerPair {
++public:
++  TextureOwnerPair() = default;
++private:
++  friend class BrowserFrameEffectObserver;
++  friend struct BrowserFrameEffectObserverControls;
++  TextureCreation texture,view;
++  uintptr_t textureRefOwner=0;
++};
++void bind_texture_ref_owner(uintptr_t owner,TextureOwnerPair& facts,uintptr_t texture,uintptr_t sampleView,uintptr_t attachmentView) noexcept;
++void detach_texture_ref_owner(uintptr_t owner,const TextureOwnerPair& facts) noexcept;
++} // namespace aurora::gfx::detail
 +#endif
 diff --git a/lib/gfx/frame_packet.hpp b/lib/gfx/frame_packet.hpp
 index d50ce6a43a8af6071dc9e810e96e63eccc5c7640..8f7ded5ccb5c5b9d8b845c0b7780b5997e4d67e6 100644
@@ -7606,7 +7817,7 @@ index 0000000000000000000000000000000000000000..73b22bcdf71b1dd107ef0e26990fa4cf
 +
 +} // namespace aurora::gfx::selective
 diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
-index d04db0f34210fb56995de0793200c457aaf61233..0ac35c911ecbf55d22f04c6f6bd2094e92c531eb 100644
+index d04db0f34210fb56995de0793200c457aaf61233..5dd6fe60b4ccef68190c1c08c97e82ecbacceb9f 100644
 --- a/lib/gfx/recording.cpp
 +++ b/lib/gfx/recording.cpp
 @@ -2,6 +2,9 @@
@@ -7635,39 +7846,102 @@ index d04db0f34210fb56995de0793200c457aaf61233..0ac35c911ecbf55d22f04c6f6bd2094e
  using namespace detail;
  
  namespace {
-@@ -166,7 +171,15 @@ PassSnapshotEntry& acquire_pass_snapshot(uint32_t width, uint32_t height, bool w
+@@ -69,6 +74,15 @@ struct FrameRecorder {
+ 
+ FrameRecorder g_recorder;
+ 
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++void promote_recorded_pool_owner(const TextureOwnerPair& facts,const webgpu::TextureWithSampler& native) {
++  if(!g_recorder.active())return;
++  const auto& frame=g_recorder.frame();
++  browser_frame_effect_observer().promote_owned_texture_pair(facts,0,
++      reinterpret_cast<uintptr_t>(native.texture.Get()),reinterpret_cast<uintptr_t>(native.view.Get()),frame.frameIndex,frame.frameId);
++}
++#endif
++
+ std::string pass_label(std::string_view kind) {
+ #ifdef AURORA_GFX_DEBUG_GROUPS
+   if (!g_recorder.debugGroupStack.empty()) {
+@@ -129,6 +143,9 @@ struct OffscreenCacheKey {
+ struct OffscreenCacheEntry {
+   webgpu::TextureWithSampler color;
+   webgpu::TextureWithSampler depth;
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  TextureOwnerPair colorFacts,depthFacts;
++#endif
+ };
+ absl::flat_hash_map<OffscreenCacheKey, OffscreenCacheEntry> g_offscreenCache;
+ 
+@@ -139,6 +156,9 @@ absl::flat_hash_map<OffscreenCacheKey, OffscreenCacheEntry> g_offscreenCache;
+ struct PassSnapshotEntry {
+   webgpu::TextureWithSampler color;
+   webgpu::TextureWithSampler depth; // R32Float raw depth
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  TextureOwnerPair colorFacts,depthFacts;
++#endif
+ };
+ struct PassSnapshotPool {
+   std::vector<PassSnapshotEntry> entries;
+@@ -166,13 +186,26 @@ PassSnapshotEntry& acquire_pass_snapshot(uint32_t width, uint32_t height, bool w
          .sampleCount = 1,
      };
      auto texture = webgpu::g_device.CreateTexture(&desc);
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+    browser_frame_effect_observer().observe_texture_descriptor(reinterpret_cast<uintptr_t>(texture.Get()),
-+        reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), desc);
++    const auto textureCreation=browser_frame_effect_observer().observe_owned_texture_creation(
++        BrowserFrameEffectObserver::SnapshotColorTextureRole,uint32_t(g_recorder.frameSlot),reinterpret_cast<uintptr_t>(texture.Get()),
++        reinterpret_cast<uintptr_t>(webgpu::g_device.Get()),desc);
 +#endif
      auto view = texture.CreateView();
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+    browser_frame_effect_observer().observe_texture_view_descriptor(reinterpret_cast<uintptr_t>(view.Get()),
-+        reinterpret_cast<uintptr_t>(texture.Get()), reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), nullptr);
++    const auto ownerFacts=browser_frame_effect_observer().observe_owned_texture_view_creation(textureCreation,
++        reinterpret_cast<uintptr_t>(view.Get()),reinterpret_cast<uintptr_t>(texture.Get()),reinterpret_cast<uintptr_t>(webgpu::g_device.Get()),nullptr);
++    if(entry.color.texture)browser_frame_effect_observer().detach_pool_texture_owner(entry.colorFacts);
 +#endif
      entry.color = webgpu::TextureWithSampler{
          .texture = std::move(texture),
          .view = std::move(view),
-@@ -185,7 +198,15 @@ PassSnapshotEntry& acquire_pass_snapshot(uint32_t width, uint32_t height, bool w
+         .size = size,
+         .format = format,
+     };
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    entry.colorFacts=ownerFacts;
++#endif
+   }
+   if (wantDepth && (!entry.depth.texture || entry.depth.size.width != width || entry.depth.size.height != height)) {
+     const wgpu::TextureDescriptor desc{
+@@ -185,14 +218,31 @@ PassSnapshotEntry& acquire_pass_snapshot(uint32_t width, uint32_t height, bool w
          .sampleCount = 1,
      };
      auto texture = webgpu::g_device.CreateTexture(&desc);
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+    browser_frame_effect_observer().observe_texture_descriptor(reinterpret_cast<uintptr_t>(texture.Get()),
-+        reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), desc);
++    const auto textureCreation=browser_frame_effect_observer().observe_owned_texture_creation(
++        BrowserFrameEffectObserver::SnapshotDepthTextureRole,uint32_t(g_recorder.frameSlot),reinterpret_cast<uintptr_t>(texture.Get()),
++        reinterpret_cast<uintptr_t>(webgpu::g_device.Get()),desc);
 +#endif
      auto view = texture.CreateView();
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+    browser_frame_effect_observer().observe_texture_view_descriptor(reinterpret_cast<uintptr_t>(view.Get()),
-+        reinterpret_cast<uintptr_t>(texture.Get()), reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), nullptr);
++    const auto ownerFacts=browser_frame_effect_observer().observe_owned_texture_view_creation(textureCreation,
++        reinterpret_cast<uintptr_t>(view.Get()),reinterpret_cast<uintptr_t>(texture.Get()),reinterpret_cast<uintptr_t>(webgpu::g_device.Get()),nullptr);
++    if(entry.depth.texture)browser_frame_effect_observer().detach_pool_texture_owner(entry.depthFacts);
 +#endif
      entry.depth = webgpu::TextureWithSampler{
          .texture = std::move(texture),
          .view = std::move(view),
-@@ -213,6 +234,9 @@ StagingHighWater current_high_water(const FramePacket& frame) noexcept {
+         .size = size,
+         .format = wgpu::TextureFormat::R32Float,
+     };
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    entry.depthFacts=ownerFacts;
++#endif
+   }
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  if(wantColor)promote_recorded_pool_owner(entry.colorFacts,entry.color);
++  if(wantDepth)promote_recorded_pool_owner(entry.depthFacts,entry.depth);
++#endif
+   return entry;
+ }
+ 
+@@ -213,6 +263,9 @@ StagingHighWater current_high_water(const FramePacket& frame) noexcept {
  
  FrameOp capture_frame_op(FramePacket& frame, FrameOpType type, uint32_t index) {
    FrameOp op{
@@ -7677,7 +7951,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..0ac35c911ecbf55d22f04c6f6bd2094e
        .type = type,
        .index = index,
        .renderPass =
-@@ -327,9 +351,13 @@ void encode_draw(void* payload, const wgpu::RenderPassEncoder& pass, const Rende
+@@ -327,9 +380,13 @@ void encode_draw(void* payload, const wgpu::RenderPassEncoder& pass, const Rende
  
  template <auto Renderer, InlinePayload T>
  DrawCommand make_draw_command(const T& data) {
@@ -7693,39 +7967,66 @@ index d04db0f34210fb56995de0793200c457aaf61233..0ac35c911ecbf55d22f04c6f6bd2094e
    std::memcpy(command.payload.data(), &data, sizeof(data));
    return command;
  }
-@@ -357,7 +385,15 @@ OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
+@@ -342,6 +399,10 @@ void push_draw_command(DrawCommand data) {
+ OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
+   OffscreenCacheKey key{width, height};
+   if (const auto it = g_offscreenCache.find(key); it != g_offscreenCache.end()) {
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    promote_recorded_pool_owner(it->second.colorFacts,it->second.color);
++    promote_recorded_pool_owner(it->second.depthFacts,it->second.depth);
++#endif
+     return it->second;
+   }
+   const auto colorFormat = webgpu::g_graphicsConfig.surfaceConfiguration.format;
+@@ -357,7 +418,15 @@ OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
        .sampleCount = 1,
    };
    auto colorTexture = webgpu::g_device.CreateTexture(&colorDesc);
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+  browser_frame_effect_observer().observe_texture_descriptor(reinterpret_cast<uintptr_t>(colorTexture.Get()),
-+      reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), colorDesc);
++  const auto colorCreation=browser_frame_effect_observer().observe_owned_texture_creation(
++      BrowserFrameEffectObserver::OffscreenColorTextureRole,0,reinterpret_cast<uintptr_t>(colorTexture.Get()),reinterpret_cast<uintptr_t>(webgpu::g_device.Get()),colorDesc);
 +#endif
    auto colorView = colorTexture.CreateView();
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+  browser_frame_effect_observer().observe_texture_view_descriptor(reinterpret_cast<uintptr_t>(colorView.Get()),
-+      reinterpret_cast<uintptr_t>(colorTexture.Get()), reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), nullptr);
++  const auto colorFacts=browser_frame_effect_observer().observe_owned_texture_view_creation(colorCreation,
++      reinterpret_cast<uintptr_t>(colorView.Get()),reinterpret_cast<uintptr_t>(colorTexture.Get()),reinterpret_cast<uintptr_t>(webgpu::g_device.Get()),nullptr);
 +#endif
    webgpu::TextureWithSampler color{
        .texture = std::move(colorTexture),
        .view = std::move(colorView),
-@@ -375,7 +411,15 @@ OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
+@@ -375,7 +444,15 @@ OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
        .sampleCount = 1,
    };
    auto depthTexture = webgpu::g_device.CreateTexture(&depthDesc);
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+  browser_frame_effect_observer().observe_texture_descriptor(reinterpret_cast<uintptr_t>(depthTexture.Get()),
-+      reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), depthDesc);
++  const auto depthCreation=browser_frame_effect_observer().observe_owned_texture_creation(
++      BrowserFrameEffectObserver::OffscreenDepthTextureRole,0,reinterpret_cast<uintptr_t>(depthTexture.Get()),reinterpret_cast<uintptr_t>(webgpu::g_device.Get()),depthDesc);
 +#endif
    auto depthView = depthTexture.CreateView();
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+  browser_frame_effect_observer().observe_texture_view_descriptor(reinterpret_cast<uintptr_t>(depthView.Get()),
-+      reinterpret_cast<uintptr_t>(depthTexture.Get()), reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), nullptr);
++  const auto depthFacts=browser_frame_effect_observer().observe_owned_texture_view_creation(depthCreation,
++      reinterpret_cast<uintptr_t>(depthView.Get()),reinterpret_cast<uintptr_t>(depthTexture.Get()),reinterpret_cast<uintptr_t>(webgpu::g_device.Get()),nullptr);
 +#endif
    webgpu::TextureWithSampler depth{
        .texture = std::move(depthTexture),
        .view = std::move(depthView),
-@@ -530,6 +574,15 @@ void enqueue_pass(FramePacket& frame, uint32_t passIndex) {
+@@ -385,8 +462,15 @@ OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
+   OffscreenCacheEntry entry{
+       .color = std::move(color),
+       .depth = std::move(depth),
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++      .colorFacts=colorFacts,.depthFacts=depthFacts,
++#endif
+   };
+   auto [insertIt, _] = g_offscreenCache.emplace(key, std::move(entry));
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  promote_recorded_pool_owner(insertIt->second.colorFacts,insertIt->second.color);
++  promote_recorded_pool_owner(insertIt->second.depthFacts,insertIt->second.depth);
++#endif
+   return insertIt->second;
+ }
+ 
+@@ -530,6 +614,15 @@ void enqueue_pass(FramePacket& frame, uint32_t passIndex) {
  
  namespace detail {
  
@@ -7741,7 +8042,18 @@ index d04db0f34210fb56995de0793200c457aaf61233..0ac35c911ecbf55d22f04c6f6bd2094e
  void begin_recording(FramePacket& packet, size_t frameSlot) {
    CHECK(!g_recorder.active(), "A recording session is already active");
    g_recorder.packet = &packet;
-@@ -634,7 +687,8 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
+@@ -584,6 +677,10 @@ RecordedFrame end_recording() {
+ }
+ 
+ void shutdown_recording() {
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  browser_frame_effect_observer().invalidate_texture_owner_domain(1);
++  browser_frame_effect_observer().invalidate_texture_owner_domain(2);
++#endif
+   for (auto& pool : g_passSnapshotPools) {
+     pool = {};
+   }
+@@ -634,7 +731,8 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
                                 wgpu::TexelCopyTextureInfo tex, wgpu::Extent3D size) {
    const auto copyBytesPerRow = AURORA_ALIGN(bytesPerRow, 256);
    auto& frame = current_frame_packet();
@@ -7751,7 +8063,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..0ac35c911ecbf55d22f04c6f6bd2094e
      const auto range = push_texture_data(data, bytesPerRow, rowsPerImage);
      const wgpu::TexelCopyBufferLayout layout{
          .offset = range.offset,
-@@ -645,14 +699,52 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
+@@ -645,14 +743,52 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
      return;
    }
  
@@ -7805,7 +8117,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..0ac35c911ecbf55d22f04c6f6bd2094e
    auto* dst = static_cast<uint8_t*>(buffer.GetMappedRange(0, uploadSize));
    for (uint32_t row = 0; row < rowsPerImage; ++row) {
      memcpy(dst, data, bytesPerRow);
-@@ -660,6 +752,7 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
+@@ -660,6 +796,7 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
      dst += copyBytesPerRow;
    }
    buffer.Unmap();
@@ -7813,6 +8125,16 @@ index d04db0f34210fb56995de0793200c457aaf61233..0ac35c911ecbf55d22f04c6f6bd2094e
  
    const wgpu::TexelCopyBufferLayout layout{
        .offset = 0,
+@@ -877,6 +1014,9 @@ RenderTargetLayout get_render_target_layout() noexcept {
+ }
+ 
+ void clear_caches() noexcept {
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  browser_frame_effect_observer().invalidate_texture_owner_domain(2);
++#endif
+   g_offscreenCache.clear();
+   clear_bind_group_cache();
+ }
 diff --git a/lib/gfx/recording.hpp b/lib/gfx/recording.hpp
 index cd2b794159d0daeca9dc0092300e0e808d2f5de4..e1b85f5fa8817ce669d5c4e0c24ca5cc91e67086 100644
 --- a/lib/gfx/recording.hpp
@@ -8135,7 +8457,7 @@ index 0000000000000000000000000000000000000000..8a76bfe19513fe6bf000224d301dbeb8
 +
 +} // namespace aurora::gfx::selective
 diff --git a/lib/gfx/texture.cpp b/lib/gfx/texture.cpp
-index 029a3d047c357a5e1aed999af63a3dee8ea09f03..a1eb23850f3ea5757c404ec92d4abb5141801e84 100644
+index 029a3d047c357a5e1aed999af63a3dee8ea09f03..b754d6117649d5f1744d077ebc361e91340b8d07 100644
 --- a/lib/gfx/texture.cpp
 +++ b/lib/gfx/texture.cpp
 @@ -5,6 +5,9 @@
@@ -8165,19 +8487,38 @@ index 029a3d047c357a5e1aed999af63a3dee8ea09f03..a1eb23850f3ea5757c404ec92d4abb51
  wgpu::AddressMode wgpu_address_mode(GXTexWrapMode mode) {
    switch (mode) {
      DEFAULT_FATAL("invalid wrap mode {}", underlying(mode));
-@@ -174,6 +180,11 @@ TextureHandle new_dynamic_texture_2d(uint32_t width, uint32_t height, uint32_t m
+@@ -97,6 +103,17 @@ u16 wgpu_aniso(GXAnisotropy aniso) {
+ }
+ } // namespace
+ 
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++namespace detail {
++void bind_texture_ref_owner(uintptr_t owner,TextureOwnerPair& facts,uintptr_t texture,uintptr_t sampleView,uintptr_t attachmentView) noexcept {
++  browser_frame_effect_observer().bind_owned_texture_ref(owner,facts,texture,sampleView,attachmentView);
++}
++void detach_texture_ref_owner(uintptr_t owner,const TextureOwnerPair& facts) noexcept {
++  browser_frame_effect_observer().detach_owned_texture_ref(owner,facts);
++}
++}
++#endif
++
+ TextureHandle new_static_texture_2d(uint32_t width, uint32_t height, uint32_t mips, u32 format, ArrayRef<uint8_t> data,
+                                     bool tlut, const char* label) noexcept {
+   ZoneScoped;
+@@ -174,6 +191,12 @@ TextureHandle new_dynamic_texture_2d(uint32_t width, uint32_t height, uint32_t m
        .sampleCount = 1,
    };
    auto texture = g_device.CreateTexture(&textureDescriptor);
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
 +  auto& effectObserver = detail::browser_frame_effect_observer();
-+  effectObserver.observe_texture_descriptor(reinterpret_cast<uintptr_t>(texture.Get()),
-+                                             reinterpret_cast<uintptr_t>(g_device.Get()), textureDescriptor);
++  const auto textureCreation=effectObserver.observe_owned_texture_creation(
++      detail::BrowserFrameEffectObserver::TextureRefTextureRole,0,reinterpret_cast<uintptr_t>(texture.Get()),
++      reinterpret_cast<uintptr_t>(g_device.Get()),textureDescriptor);
 +#endif
    const auto viewLabel = fmt::format("{} view", label);
    wgpu::TextureViewDescriptor textureViewDescriptor{
        .label = viewLabel.c_str(),
-@@ -181,11 +192,18 @@ TextureHandle new_dynamic_texture_2d(uint32_t width, uint32_t height, uint32_t m
+@@ -181,13 +204,24 @@ TextureHandle new_dynamic_texture_2d(uint32_t width, uint32_t height, uint32_t m
        .dimension = wgpu::TextureViewDimension::e2D,
        .mipLevelCount = mips,
    };
@@ -8189,63 +8530,141 @@ index 029a3d047c357a5e1aed999af63a3dee8ea09f03..a1eb23850f3ea5757c404ec92d4abb51
 +#endif
    auto textureView = texture.CreateView(&textureViewDescriptor);
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+  effectObserver.observe_texture_view_descriptor(reinterpret_cast<uintptr_t>(textureView.Get()),
-+                                                  reinterpret_cast<uintptr_t>(texture.Get()),
-+                                                  reinterpret_cast<uintptr_t>(g_device.Get()), &textureViewDescriptor);
++  const auto ownerFacts=effectObserver.observe_owned_texture_view_creation(textureCreation,
++      reinterpret_cast<uintptr_t>(textureView.Get()),reinterpret_cast<uintptr_t>(texture.Get()),
++      reinterpret_cast<uintptr_t>(g_device.Get()),&textureViewDescriptor);
 +#endif
    return std::make_shared<TextureRef>(std::move(texture), std::move(textureView), wgpu::TextureView{}, size, wgpuFormat,
-                                       mips, gxFormat);
+-                                      mips, gxFormat);
++                                      mips, gxFormat
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++                                      , ownerFacts
++#endif
++                                      );
  }
-@@ -209,6 +227,11 @@ TextureHandle new_render_texture(uint32_t width, uint32_t height, u32 gxFormat,
+ 
+ TextureHandle new_render_texture(uint32_t width, uint32_t height, u32 gxFormat, const char* label) noexcept {
+@@ -209,6 +243,12 @@ TextureHandle new_render_texture(uint32_t width, uint32_t height, u32 gxFormat,
        .sampleCount = 1,
    };
    auto texture = g_device.CreateTexture(&textureDescriptor);
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
 +  auto& effectObserver = detail::browser_frame_effect_observer();
-+  effectObserver.observe_texture_descriptor(reinterpret_cast<uintptr_t>(texture.Get()),
-+                                             reinterpret_cast<uintptr_t>(g_device.Get()), textureDescriptor);
++  const auto textureCreation=effectObserver.observe_owned_texture_creation(
++      detail::BrowserFrameEffectObserver::TextureRefTextureRole,0,reinterpret_cast<uintptr_t>(texture.Get()),
++      reinterpret_cast<uintptr_t>(g_device.Get()),textureDescriptor);
 +#endif
  
    // Create texture view for color attachments
    const auto viewLabel = fmt::format("{} view", label);
-@@ -218,6 +241,11 @@ TextureHandle new_render_texture(uint32_t width, uint32_t height, u32 gxFormat,
+@@ -218,9 +258,18 @@ TextureHandle new_render_texture(uint32_t width, uint32_t height, u32 gxFormat,
        .dimension = wgpu::TextureViewDimension::e2D,
    };
    auto attachmentTextureView = texture.CreateView(&textureViewDescriptor);
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+  effectObserver.observe_texture_view_descriptor(reinterpret_cast<uintptr_t>(attachmentTextureView.Get()),
-+                                                  reinterpret_cast<uintptr_t>(texture.Get()),
-+                                                  reinterpret_cast<uintptr_t>(g_device.Get()), &textureViewDescriptor);
++  const auto ownerFacts=effectObserver.observe_owned_texture_view_creation(textureCreation,
++      reinterpret_cast<uintptr_t>(attachmentTextureView.Get()),reinterpret_cast<uintptr_t>(texture.Get()),
++      reinterpret_cast<uintptr_t>(g_device.Get()),&textureViewDescriptor);
 +#endif
    wgpu::TextureView sampleTextureView = attachmentTextureView;
    return std::make_shared<TextureRef>(std::move(texture), std::move(sampleTextureView),
-                                       std::move(attachmentTextureView), size, wgpuFormat, 1, gxFormat);
-@@ -242,6 +270,11 @@ TextureHandle new_conv_texture(uint32_t width, uint32_t height, u32 gxFormat, co
+-                                      std::move(attachmentTextureView), size, wgpuFormat, 1, gxFormat);
++                                      std::move(attachmentTextureView), size, wgpuFormat, 1, gxFormat
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++                                      , ownerFacts
++#endif
++                                      );
+ }
+ 
+ TextureHandle new_conv_texture(uint32_t width, uint32_t height, u32 gxFormat, const char* label) noexcept {
+@@ -242,6 +291,12 @@ TextureHandle new_conv_texture(uint32_t width, uint32_t height, u32 gxFormat, co
        .sampleCount = 1,
    };
    auto texture = g_device.CreateTexture(&textureDescriptor);
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
 +  auto& effectObserver = detail::browser_frame_effect_observer();
-+  effectObserver.observe_texture_descriptor(reinterpret_cast<uintptr_t>(texture.Get()),
-+                                             reinterpret_cast<uintptr_t>(g_device.Get()), textureDescriptor);
++  const auto textureCreation=effectObserver.observe_owned_texture_creation(
++      detail::BrowserFrameEffectObserver::TextureRefTextureRole,0,reinterpret_cast<uintptr_t>(texture.Get()),
++      reinterpret_cast<uintptr_t>(g_device.Get()),textureDescriptor);
 +#endif
  
    // Create texture view for color attachments
    const auto viewLabel = fmt::format("{} view", label);
-@@ -251,6 +284,11 @@ TextureHandle new_conv_texture(uint32_t width, uint32_t height, u32 gxFormat, co
+@@ -251,9 +306,18 @@ TextureHandle new_conv_texture(uint32_t width, uint32_t height, u32 gxFormat, co
        .dimension = wgpu::TextureViewDimension::e2D,
    };
    auto attachmentTextureView = texture.CreateView(&textureViewDescriptor);
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+  effectObserver.observe_texture_view_descriptor(reinterpret_cast<uintptr_t>(attachmentTextureView.Get()),
-+                                                  reinterpret_cast<uintptr_t>(texture.Get()),
-+                                                  reinterpret_cast<uintptr_t>(g_device.Get()), &textureViewDescriptor);
++  const auto ownerFacts=effectObserver.observe_owned_texture_view_creation(textureCreation,
++      reinterpret_cast<uintptr_t>(attachmentTextureView.Get()),reinterpret_cast<uintptr_t>(texture.Get()),
++      reinterpret_cast<uintptr_t>(g_device.Get()),&textureViewDescriptor);
 +#endif
    wgpu::TextureView sampleTextureView = attachmentTextureView;
    return std::make_shared<TextureRef>(std::move(texture), std::move(sampleTextureView),
-                                       std::move(attachmentTextureView), size, wgpuFormat, 1, gxFormat);
+-                                      std::move(attachmentTextureView), size, wgpuFormat, 1, gxFormat);
++                                      std::move(attachmentTextureView), size, wgpuFormat, 1, gxFormat
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++                                      , ownerFacts
++#endif
++                                      );
+ }
+ 
+ void write_texture(TextureRef& ref, ArrayRef<uint8_t> data) noexcept {
+diff --git a/lib/gfx/texture.hpp b/lib/gfx/texture.hpp
+index 0a5ca8343b0e4349cd5b2e3ddd0db7f34b8fa1c5..056514e3a72eb732296481a103767690b3c0a6f1 100644
+--- a/lib/gfx/texture.hpp
++++ b/lib/gfx/texture.hpp
+@@ -4,6 +4,9 @@
+ #include <utility>
+ 
+ #include "types.hpp"
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++#include "frame_effect_texture_owner.hpp"
++#endif
+ 
+ namespace aurora::gfx {
+ struct TextureUpload {
+@@ -44,15 +47,36 @@ struct TextureRef {
+   bool hasArbitraryMips = false;
+   bool isReplacement = false;
+ 
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  detail::TextureOwnerPair frameEffectOwnerFacts;
++#endif
++
+   TextureRef(wgpu::Texture texture, wgpu::TextureView sampleTextureView, wgpu::TextureView attachmentTextureView,
+-             wgpu::Extent3D size, wgpu::TextureFormat format, uint32_t mipCount, u32 gxFormat)
++             wgpu::Extent3D size, wgpu::TextureFormat format, uint32_t mipCount, u32 gxFormat
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++             , const detail::TextureOwnerPair& ownerFacts = {}
++#endif
++             )
+   : texture(std::move(texture))
+   , sampleTextureView(std::move(sampleTextureView))
+   , attachmentTextureView(std::move(attachmentTextureView))
+   , size(size)
+   , format(format)
+   , mipCount(mipCount)
+-  , gxFormat(gxFormat) {}
++  , gxFormat(gxFormat)
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  , frameEffectOwnerFacts(ownerFacts)
++#endif
++  {
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    detail::bind_texture_ref_owner(reinterpret_cast<uintptr_t>(this),frameEffectOwnerFacts,
++        reinterpret_cast<uintptr_t>(this->texture.Get()),reinterpret_cast<uintptr_t>(this->sampleTextureView.Get()),
++        reinterpret_cast<uintptr_t>(this->attachmentTextureView.Get()));
++#endif
++  }
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  ~TextureRef() { detail::detach_texture_ref_owner(reinterpret_cast<uintptr_t>(this),frameEffectOwnerFacts); }
++#endif
+ };
+ 
+ TextureHandle new_static_texture_2d(uint32_t width, uint32_t height, uint32_t mips, u32 gxFormat,
 diff --git a/lib/gfx/texture_replacement.cpp b/lib/gfx/texture_replacement.cpp
-index 03dda4678ec0b5c9e6ca6d124d8519c90d093700..52668300558ff401c38c1691b7bc2d588f479933 100644
+index 03dda4678ec0b5c9e6ca6d124d8519c90d093700..0e9f9292d72f8c189b9db954671a188b68f83abc 100644
 --- a/lib/gfx/texture_replacement.cpp
 +++ b/lib/gfx/texture_replacement.cpp
 @@ -1,4 +1,7 @@
@@ -8280,30 +8699,38 @@ index 03dda4678ec0b5c9e6ca6d124d8519c90d093700..52668300558ff401c38c1691b7bc2d58
    uint8_t* const dst = blob.data();
    uint64_t o = 0;
    const auto append = [&](const ByteBuffer& d) noexcept -> bool {
-@@ -976,6 +980,11 @@ gfx::TextureHandle create_converted_texture_handle(const EntryLoadSnapshot& entr
+@@ -976,6 +980,12 @@ gfx::TextureHandle create_converted_texture_handle(const EntryLoadSnapshot& entr
        .sampleCount = 1,
    };
    auto texture = webgpu::g_device.CreateTexture(&textureDescriptor);
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
 +  auto& effectObserver = gfx::detail::browser_frame_effect_observer();
-+  effectObserver.observe_texture_descriptor(reinterpret_cast<uintptr_t>(texture.Get()),
-+                                             reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), textureDescriptor);
++  const auto textureCreation=effectObserver.observe_owned_texture_creation(
++      gfx::detail::BrowserFrameEffectObserver::TextureRefTextureRole,0,reinterpret_cast<uintptr_t>(texture.Get()),
++      reinterpret_cast<uintptr_t>(webgpu::g_device.Get()),textureDescriptor);
 +#endif
    const auto viewLabel = fmt::format("{} view", label);
    const wgpu::TextureViewDescriptor textureViewDescriptor{
        .label = viewLabel.c_str(),
-@@ -984,6 +993,11 @@ gfx::TextureHandle create_converted_texture_handle(const EntryLoadSnapshot& entr
+@@ -984,8 +994,17 @@ gfx::TextureHandle create_converted_texture_handle(const EntryLoadSnapshot& entr
        .mipLevelCount = replacement.mips,
    };
    auto textureView = texture.CreateView(&textureViewDescriptor);
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+  effectObserver.observe_texture_view_descriptor(reinterpret_cast<uintptr_t>(textureView.Get()),
-+                                                  reinterpret_cast<uintptr_t>(texture.Get()),
-+                                                  reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), &textureViewDescriptor);
++  const auto ownerFacts=effectObserver.observe_owned_texture_view_creation(textureCreation,
++      reinterpret_cast<uintptr_t>(textureView.Get()),reinterpret_cast<uintptr_t>(texture.Get()),
++      reinterpret_cast<uintptr_t>(webgpu::g_device.Get()),&textureViewDescriptor);
 +#endif
    auto handle = std::make_shared<gfx::TextureRef>(std::move(texture), std::move(textureView), wgpu::TextureView{}, size,
-                                                   replacement.format, replacement.mips, gfx::InvalidTextureFormat);
+-                                                  replacement.format, replacement.mips, gfx::InvalidTextureFormat);
++                                                  replacement.format, replacement.mips, gfx::InvalidTextureFormat
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++                                                  , ownerFacts
++#endif
++                                                  );
    handle->isReplacement = true;
+   aurora::gfx::write_texture(*handle, replacement.data);
+   return handle;
 diff --git a/lib/gfx/types.hpp b/lib/gfx/types.hpp
 index 940d599b8bf31ff792c991f5b0319e25848fa217..4b3001346b8790d6c36ab004544bb49f004136b9 100644
 --- a/lib/gfx/types.hpp
@@ -8589,7 +9016,7 @@ index 0d6a5d8ab36c7992ab98418458bb21beb178faaf..510e6e7c675bad50276fb46ced412a45
      LIKELY {
        if (detail::sBufferSize < detail::sBufferCapacity)
 diff --git a/lib/gx/gx.cpp b/lib/gx/gx.cpp
-index b12b327fe4d3276c13b23e93baca64824ed50806..04d23c4fc0e9b7b3a8bea6753a39d725e48f7de0 100644
+index b12b327fe4d3276c13b23e93baca64824ed50806..f94a25d964b5c7aea9f67af9a0c00028f5686edc 100644
 --- a/lib/gx/gx.cpp
 +++ b/lib/gx/gx.cpp
 @@ -1,4 +1,7 @@
@@ -8600,7 +9027,21 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..04d23c4fc0e9b7b3a8bea6753a39d725
  
  #include "pipeline.hpp"
  #include "texture.hpp"
-@@ -502,6 +505,12 @@ GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept {
+@@ -484,6 +487,13 @@ GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept {
+     textureEntry.binding = i * 2;
+     samplerEntry.binding = i * 2 + 1;
+     if (tex && (info.sampledTextures[i] || info.sampledIndTextures[i])) {
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++      uint32_t effectFrameIndex=0;uint64_t effectFrameId=0;
++      if(gfx::detail::frame_effect_recording_identity(effectFrameIndex,effectFrameId))
++        gfx::detail::browser_frame_effect_observer().promote_owned_texture_pair(tex.ref->frameEffectOwnerFacts,
++            reinterpret_cast<uintptr_t>(tex.ref.get()),reinterpret_cast<uintptr_t>(tex.ref->texture.Get()),
++            reinterpret_cast<uintptr_t>(tex.ref->sampleTextureView.Get()),effectFrameIndex,effectFrameId);
++#endif
+       textureEntry.textureView = tex.ref->sampleTextureView.Get();
+       samplerEntry.sampler = gfx::sampler_ref(tex.get_descriptor()).Get();
+     } else {
+@@ -502,6 +512,12 @@ GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept {
    };
  }
  
@@ -8613,7 +9054,7 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..04d23c4fc0e9b7b3a8bea6753a39d725
  void initialize() noexcept {
    {
      std::array<wgpu::BindGroupLayoutEntry, MaxTextures * 2> textureEntries;
-@@ -527,10 +536,22 @@ void initialize() noexcept {
+@@ -527,10 +543,22 @@ void initialize() noexcept {
          .entries = textureEntries.data(),
      };
      sTextureBindGroupLayout = g_device.CreateBindGroupLayout(&descriptor);
@@ -8636,7 +9077,7 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..04d23c4fc0e9b7b3a8bea6753a39d725
    }
    {
      constexpr wgpu::TextureDescriptor descriptor{
-@@ -540,7 +561,17 @@ void initialize() noexcept {
+@@ -540,7 +568,17 @@ void initialize() noexcept {
          .format = wgpu::TextureFormat::RGBA8Unorm,
      };
      sEmptyTexture = g_device.CreateTexture(&descriptor);
@@ -8654,7 +9095,7 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..04d23c4fc0e9b7b3a8bea6753a39d725
    }
    {
      std::array<wgpu::BindGroupEntry, MaxTextures * 2> entries;
-@@ -561,24 +592,40 @@ void initialize() noexcept {
+@@ -561,24 +599,40 @@ void initialize() noexcept {
          .entries = entries.data(),
      };
      g_emptyTextureBindGroup = g_device.CreateBindGroup(&desc);

@@ -57,6 +57,8 @@ std::vector<AuroraBrowserFrameEffectBindingEntry> binding_rows;
 std::vector<AuroraBrowserFrameEffectDraw> draw_rows;
 std::vector<AuroraBrowserFrameEffectLayoutEntry> layout_rows;
 std::vector<AuroraBrowserFrameEffectProvenance> provenance_rows;
+std::vector<AuroraBrowserFrameEffectAttachmentFact> attachment_fact_rows;
+int aurora_browser_frame_effect_observer_attachment_fact(uint32_t,AuroraBrowserFrameEffectAttachmentFact*);
 unsigned refused_category=0;
 template<typename T> int fixture_row(unsigned category,uint32_t index,T* out,const std::vector<T>& rows){
  if(refused_category==category||index>=rows.size())return 0;*out=rows[index];return 1;
@@ -67,6 +69,7 @@ int aurora_browser_frame_effect_observer_resource(uint32_t i,AuroraBrowserFrameE
 int aurora_browser_frame_effect_observer_binding_entry(uint32_t i,AuroraBrowserFrameEffectBindingEntry* out){return fixture_row(4,i,out,binding_rows);}
 int aurora_browser_frame_effect_observer_layout_entry(uint32_t i,AuroraBrowserFrameEffectLayoutEntry* out){return fixture_row(6,i,out,layout_rows);}
 int aurora_browser_frame_effect_observer_provenance(uint32_t i,AuroraBrowserFrameEffectProvenance* out){return fixture_row(7,i,out,provenance_rows);}
+int aurora_browser_frame_effect_observer_attachment_fact(uint32_t i,AuroraBrowserFrameEffectAttachmentFact* out){return fixture_row(8,i,out,attachment_fact_rows);}
 int aurora_browser_frame_effect_observer_draw(uint32_t i,AuroraBrowserFrameEffectDraw* out){return fixture_row(5,i,out,draw_rows);}
 void emscripten_cancel_main_loop(){++cancel_calls;}
 void close(){retired_calls.push_back("close");if(throw_close)throw std::runtime_error("close failed");melee_web_menu_browser::match.reset();}
@@ -84,7 +87,7 @@ void reset(){
  stock_check=0;diagnostic_start_ticks=diagnostic_pad_remaining=audio_phase=0;asset_generation=1;
  depth_owners={};net=source_busy=throw_close=false;arm_allowed=em_answer=true;stats={};submission={};gpu={};
  gpu_arms=cancel_calls=returned_tasks=0;retired_calls.clear();message.clear();
- event_rows.clear();handle_rows.clear();resource_rows.clear();binding_rows.clear();draw_rows.clear();layout_rows.clear();provenance_rows.clear();refused_category=0;
+ event_rows.clear();handle_rows.clear();resource_rows.clear();binding_rows.clear();draw_rows.clear();layout_rows.clear();provenance_rows.clear();attachment_fact_rows.clear();refused_category=0;
 }
 void request(){assert(melee_web_native_menu_frame_effect_arm(200)==1);frame_effect_callback_started();}
 void begin(unsigned planned_steps=1,bool clock_stalled=false){PADStatus pads[4]{};pads[1].button=0x100;pads[1].extButton=0x12345678;
@@ -97,7 +100,7 @@ void tick_and_draw(){++match->frame;frame_effect_tick_returned();frame_effect_au
 
 void schema2_serialization_control(){
  reset();request();begin();tick_and_draw();
- gpu.schemaVersion=4;gpu.state=4;gpu.targetFrameIndex=gpu.frameIndex=3;gpu.frameId=9007199254740993ULL;
+ gpu.schemaVersion=5;gpu.state=4;gpu.targetFrameIndex=gpu.frameIndex=3;gpu.frameId=9007199254740993ULL;
  gpu.submitCount=gpu.fenceCount=gpu.fenceSuccess=1;gpu.firstBlocker=7;gpu.findingMask=128|(uint64_t{1}<<27);
  gpu.commandRecordCount=gpu.actualDrawCount=1;gpu.opCount=gpu.renderPassCount=gpu.drawCommandCount=1;
  gpu.resourceCount=4;gpu.bindingEntryCount=1;gpu.handleCount=5;gpu.eventCount=8;gpu.layoutEntryCount=2;gpu.provenanceCount=2;
@@ -130,15 +133,25 @@ void schema2_serialization_control(){
  resource_rows.push_back(attachmentTexture);resource_rows.push_back(attachmentView);handle_rows.push_back({6,2,0});handle_rows.push_back({7,1,0});
  provenance_rows.push_back({6,1,9007199254740995ULL,UINT64_MAX,15,2});provenance_rows.push_back({7,1,9007199254740996ULL,UINT64_MAX,16,2});
  gpu.resourceCount+=2;gpu.handleCount+=2;gpu.provenanceCount+=2;
+ // Protocol fixture: associated actual-API payload words, independent of content safety.
+ AuroraBrowserFrameEffectEvent pass{};pass.kind=2;pass.frameIndex=3;pass.opIndex=8;pass.flags=6;
+ AuroraBrowserFrameEffectEvent color{};color.kind=3;color.frameIndex=3;color.opIndex=8;color.handleA=7;
+ AuroraBrowserFrameEffectEvent depth{};depth.kind=4;depth.frameIndex=3;depth.opIndex=8;depth.handleA=7;
+ event_rows.push_back(pass);event_rows.push_back(color);event_rows.push_back(depth);gpu.eventCount+=3;
+ attachment_fact_rows={{9,1,1,0,7,0,{0x8000000000000000ULL,0x7ff8000000000001ULL,0,0x3ff0000000000000ULL},0,0},
+                       {10,2,6,0,7,0,{0,0,0,0},0x80000000u,UINT32_MAX}};
+ gpu.attachmentFactCount=2;
  const std::string complete=melee_web_native_menu_frame_effect_status();
- assert(complete.find("\"schema_version\":4")!=std::string::npos);
+ assert(complete.find("\"schema_version\":5")!=std::string::npos);
  assert(complete.find("\"rows_complete\":true")!=std::string::npos);
  assert(complete.find("\"viewport_bits\":[2147483648,2143289345,1065353216,1065353216,0,1065353216]")!=std::string::npos);
  assert(complete.find("\"clear_color_bits\":[\"9223372036854775808\",\"9221120237041090561\",\"0\",\"4607182418800017408\"]")!=std::string::npos);
+ assert(complete.find("\"attachment_facts\":[{\"event_index\":9")!=std::string::npos);
+ assert(complete.find("\"depth_clear_bits\":2147483648,\"stencil_clear_value\":4294967295")!=std::string::npos);
  assert(complete.find("\"layout_entries\":[{\"layout_id\":\"5\"")!=std::string::npos);
  assert(complete.find("\"creation_serial\":\"9007199254740993\"")!=std::string::npos);
  std::printf("SCHEMA2_STATUS %s\n",complete.c_str());
- for(unsigned category=1;category<=7;++category){
+ for(unsigned category=1;category<=8;++category){
   refused_category=category;const std::string failed=melee_web_native_menu_frame_effect_status();
   assert(failed.find("\"rows_complete\":false")!=std::string::npos);
  }
@@ -208,7 +221,7 @@ void first_draw_serialization_control(){
  observation.callback_draws=2;observation.tick_returns=2;observation.draw_returns=2;
  observation.source_after=202;
  const std::string raw=melee_web_native_menu_frame_effect_status();
- assert(raw.find("\"schema_version\":5")!=std::string::npos);
+ assert(raw.find("\"schema_version\":6")!=std::string::npos);
  assert(raw.find("\"selected_source_frame\":201,\"unobserved_draws\":1")!=std::string::npos);
  std::printf("SCHEMA3_STATUS %s\n",raw.c_str());
 }

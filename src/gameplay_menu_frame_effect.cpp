@@ -166,8 +166,8 @@ const char* melee_web_native_menu_frame_effect_status(){
  const auto renderer=aurora_browser_frame_effect_observer_snapshot();
  bool rows_complete=true;
  out=observation.first_draw?
-     "{\"schema_version\":5,\"scope\":\"first_draw_in_normal_callback_observation_only\"":
-     "{\"schema_version\":4,\"scope\":\"one_normal_callback_observation_only\"";
+     "{\"schema_version\":6,\"scope\":\"first_draw_in_normal_callback_observation_only\"":
+     "{\"schema_version\":5,\"scope\":\"one_normal_callback_observation_only\"";
  const auto number=[&](const char* name,auto value){out+=",\"";out+=name;out+="\":";out+=std::to_string(value);};
  const auto boolean=[&](const char* name,bool value){out+=",\"";out+=name;out+=value?"\":true":"\":false";};
  boolean("requested",observation.requested);boolean("terminal",observation.terminal);
@@ -216,6 +216,7 @@ const char* melee_web_native_menu_frame_effect_status(){
  number("command_record_count",renderer.commandRecordCount);number("actual_draw_count",renderer.actualDrawCount);
  number("resource_count",renderer.resourceCount);number("binding_entry_count",renderer.bindingEntryCount);
  number("layout_entry_count",renderer.layoutEntryCount);number("provenance_count",renderer.provenanceCount);
+ number("attachment_fact_count",renderer.attachmentFactCount);
  number("depth_trace_count",renderer.depthTraceCount);number("depth_request_count",renderer.depthRequestCount);
  out+="},\"events\":[";
  for(uint32_t i=0;i<renderer.eventCount;++i){
@@ -267,6 +268,16 @@ const char* melee_web_native_menu_frame_effect_status(){
   out+="{\"capture_id\":\""+std::to_string(row.captureId)+"\",\"device_id\":\""+std::to_string(row.deviceId);
   out+="\",\"creation_serial\":\""+std::to_string(row.creationSerial)+"\",\"renderer_epoch\":\""+std::to_string(row.rendererEpoch)+"\"";
   number("role",row.role);number("slot",row.slot);out+='}';
+ }
+ out+="],\"attachment_facts\":[";
+ for(uint32_t i=0;i<renderer.attachmentFactCount;++i){
+  AuroraBrowserFrameEffectAttachmentFact row{};
+  if(!aurora_browser_frame_effect_observer_attachment_fact(i,&row)){rows_complete=false;break;}
+  if(i)out+=',';out+="{\"event_index\":"+std::to_string(row.eventIndex);
+  number("kind",row.kind);number("aspects",row.aspects);number("reserved",row.reserved);
+  out+=",\"view_id\":\""+std::to_string(row.viewId)+"\",\"resolve_view_id\":\""+std::to_string(row.resolveViewId)+"\",\"color_clear_bits\":[";
+  for(unsigned j=0;j<4;++j){if(j)out+=',';out+='\"';out+=std::to_string(row.colorClearBits[j]);out+='\"';}out+=']';
+  number("depth_clear_bits",row.depthClearBits);number("stencil_clear_value",row.stencilClearValue);out+='}';
  }
  out+="],\"draws\":[";
  for(uint32_t i=0;i<renderer.actualDrawCount;++i){

@@ -116,7 +116,8 @@ export function frameEffectSchema1ObservationFailures(receipt) {
 }
 
 export function frameEffectObservationFailures(receipt) {
-  const attachmentOwners = receipt?.schema_version === 4;
+  const textureOwners = receipt?.schema_version === 5;
+  const attachmentOwners = receipt?.schema_version === 4 || textureOwners;
   const currentOwners = receipt?.schema_version === 3 || attachmentOwners;
   const failures = [];
   const uint32 = value => Number.isInteger(value) && value >= 0 && value <= 0xffffffff;
@@ -148,7 +149,7 @@ export function frameEffectObservationFailures(receipt) {
       !receipt.raw_pad_bytes.every(value => Number.isInteger(value) && value >= 0 && value <= 255))
     failures.push('native_pad_records');
   const renderer = receipt.renderer;
-  if (renderer?.schema_version !== (attachmentOwners ? 4 : currentOwners ? 3 : 2) || renderer?.state !== 4 ||
+  if (renderer?.schema_version !== (textureOwners ? 5 : attachmentOwners ? 4 : currentOwners ? 3 : 2) || renderer?.state !== 4 ||
       renderer.submit_count !== 1 || renderer.fence_count !== 1 || renderer.fence_success !== 1)
     failures.push('normal_submit_and_fence');
   if (!Array.isArray(receipt.events) || !Array.isArray(receipt.handles) ||
@@ -190,12 +191,14 @@ export function frameEffectObservationFailures(receipt) {
   const vector = (row, size, predicate) => Array.isArray(row) && row.length === size && row.every(predicate);
   const rootFields = 'schema_version scope requested terminal native_retired admitted renderer_armed resumable requested_source_frame owner_generation source_frame_before source_frame_after tick_returns draw_returns audio_returns pcm_frames pre_tick_callbacks pre_tick_audio_returns pre_tick_pcm_frames planned_steps planned_audio_steps callback_steps callback_draws audio_phase_before audio_phase_after error raw_pad_bytes renderer events handles resources binding_entries draws rows_complete'.split(' ');
   if (currentOwners) rootFields.push('layout_entries', 'provenance');
+  if (textureOwners) rootFields.push('attachment_facts');
   if (!exact(receipt, rootFields) || typeof receipt.native_retired !== 'boolean' || receipt.rows_complete !== true)
     failures.push('incomplete_schema2_serialization');
   for (const key of ['pre_tick_callbacks', 'pre_tick_audio_returns', 'pre_tick_pcm_frames'])
     if (!uint32(receipt[key])) failures.push(key);
   const counterFields = 'state first_blocker target_frame_index frame_index event_count handle_count op_count render_pass_count draw_command_count custom_draw_count encoder_task_count texture_copy_count texture_upload_count palette_conversion_count resolve_count snapshot_count staging_copy_count queue_write_count after_submit_callback_count submit_count fence_count fence_success command_record_count actual_draw_count resource_count binding_entry_count depth_trace_count depth_request_count'.split(' ');
   if (currentOwners) counterFields.push('layout_entry_count', 'provenance_count');
+  if (textureOwners) counterFields.push('attachment_fact_count');
   const rendererFields = ['schema_version', 'frame_id', 'queue_write_bytes', 'finding_mask', ...counterFields];
   if (!exact(renderer, rendererFields) || !counterFields.every(key => uint32(renderer?.[key])) ||
       !uint64(renderer?.queue_write_bytes) || !uint64(renderer?.finding_mask)) failures.push('renderer_schema2_fields');
