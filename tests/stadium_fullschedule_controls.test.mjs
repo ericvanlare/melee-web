@@ -112,7 +112,8 @@ test('actual full-route construction has one encoder owner and dispatches full m
   const constructionEnd = source.indexOf('  await page.evaluate(', constructionStart);
   assert.ok(adapterStart >= 0 && adapterEnd > adapterStart && constructionStart > adapterEnd && constructionEnd > constructionStart);
   const calls = [];
-  const context = {helper, mode: 'run2-full-schedule-v3', firstSssVsSetupCfExplicitStep: true,
+  const context = {helper, mode: 'run2-full-schedule-v3', commonFieldsMode: false,
+    firstSssVsSetupCfExplicitStep: true,
     hostEvidence: {runtimePayload: fullManifest()}, report: {cleanup: {}},
     remaining: () => 5000, timeout: promise => promise,
     matchedSetupCfExplicitNativeAccessClosed: false, matchedSetupCfExplicitArmed: false,
@@ -145,7 +146,8 @@ test('actual receipt/diagnostic/persist/accept tail saves raw evidence before AC
       world_ticks: 1, source_tick_input_pad_hex: '00'.repeat(44),
       source_frames_before: 0, source_frames_after: 1, source_frames: 1};
     const cf = {actions: [], host_comparisons: [], runtime_diagnostics: [], last_native_state: null};
-    const context = {assert, structuredClone, driver, cf, timingSample: null, matchedSetupCfTiming: null,
+    const context = {assert, structuredClone, driver, cf, commonFieldsMode: false,
+      timingSample: null, matchedSetupCfTiming: null,
       cfState: {schema: 'melee-web-stadium-source-action-native-v3',
         scope: 'original-full7167-schedule-observation-only', action_count: 7167, last_action: receipt},
       action: full.schedule[0], scheduleIndex: 0, cIndex: 168, fIndex: 170,
