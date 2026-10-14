@@ -246,6 +246,11 @@ bool startup_pipeline_service_failed=false;
 constexpr int kStartupPipelineServiceDelayMs=8;
 EM_JS_DEPS(startup_pipeline_service_asyncify_deps,
            "$safeSetTimeout,$dynCall,$Asyncify");
+#if defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
+// Retain the private JS-library postset only in the combined first-pair profile.
+EM_JS_DEPS(melee_web_wasm_ownership_private_v1,
+           "$MeleeWebWasmOwnershipPrivateV1");
+#endif
 EM_JS(void, dispatch_startup_pipeline_service_at_asyncify_idle,
       (uintptr_t callback,int delay_ms), {
  const schedule=()=>{

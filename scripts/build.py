@@ -251,6 +251,7 @@ PUBLIC_RUNTIME_SOURCE_FILES = (
     "cmake/FighterRuntime.cmake",
     "patches/melee-gameplay.patch",
     "src/gameplay_menu_browser.cpp",
+    "src/melee_web_wasm_ownership_library.js",
     "src/gameplay_menu_browser_state.hpp",
     "src/gameplay_menu_browser_menu.cpp",
     "src/gameplay_menu_browser_match.cpp",

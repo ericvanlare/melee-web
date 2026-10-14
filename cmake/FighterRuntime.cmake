@@ -729,6 +729,13 @@ if(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
   target_compile_definitions(fighter_source_runtime PRIVATE MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC=1)
   target_compile_definitions(gameplay_runtime PRIVATE MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC=1)
   string(APPEND gameplay_menu_browser_exports ",_melee_web_first_pair_file_guard_arm,_melee_web_native_menu_first_pair_file_owners_quiescent,_melee_web_native_menu_first_pair_plan_capture")
+  string(APPEND gameplay_menu_browser_runtime_methods ",stackSave,stackRestore,getTempRet0,setTempRet0")
+  set(MELEE_WEB_WASM_OWNERSHIP_JS_LIBRARY
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/melee_web_wasm_ownership_library.js")
+  target_link_options(gameplay_menu_browser PRIVATE
+    "SHELL:--js-library=${MELEE_WEB_WASM_OWNERSHIP_JS_LIBRARY}")
+  set_property(TARGET gameplay_menu_browser APPEND PROPERTY LINK_DEPENDS
+    "${MELEE_WEB_WASM_OWNERSHIP_JS_LIBRARY}")
 endif()
 if(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC)
   target_compile_definitions(gameplay_menu_browser PRIVATE MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC=1)
