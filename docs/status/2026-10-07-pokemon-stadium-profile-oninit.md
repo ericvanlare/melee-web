@@ -73,14 +73,42 @@ synthetic calibration used 1.26384 times the actual prefix byte volume and
 not a lower bound, actual full-session cost or proof that the browser fits.
 No game action or comparison was executed.
 
-**Next C3 boundary:** Remove repeated serialization of completed append-only
-report histories while preserving every evidence checkpoint before approval,
-exact field/order reconstruction and failure evidence. Cost-only synthetic rows
-remain separate from actual input and comparison evidence.
-The full-schedule consumer protocol and lifetime A/B still require review; no
-longer capture or deadline increase is admitted. C3 requires lifetime A, checked
-retirement/recreation, then lifetime B with per-owner RNG comparison. Stop at the
-first missing pairing, mismatch, unsupported service or incomplete teardown.
+**Incremental report checkpoint (October 14):** Source `cc882c36` saves each
+completed action, diagnostic and comparison row once in an ordered hash-linked
+journal. Every compact report still commits before approval; strict recovery
+reconstructs its exact committed prefix, and terminal output retains the full
+inline report. Failed or uncommitted tails remain inspectable. Eight Node
+controls and six Python wrapper checks pass; the full regression passes 2,631
+tests with 180 skips. The retained runtime remains `8ca65a6f`; these harness-only
+changes do not create a new browser or native-build result.
+
+The changed synthetic workload keeps all 7,167 actions and 14,783 action-loop
+checkpoints. In memory, compact serialization takes 3,780.556 ms and the loop
+4,752.443 ms. A separate run through real filesystem append/write/rename calls
+completes the logging pipeline in 8,270.956 ms and the loop in 8,441.627 ms.
+Both write 3,721,762,549 cumulative compact-report bytes plus 14,854,925 journal
+bytes; fixed history and terminal output are counted separately. Both recover
+exactly 7,167 action rows, 14,335 diagnostic rows and two comparison rows, with
+the same journal hash and no uncommitted tail. Real terminal readback matches
+its 14,595,023 bytes. Owned processes are absent and successful scratch is removed.
+These are synthetic persistence measurements, not gameplay, crash durability,
+future payload bounds or proof that a full browser lifetime fits the budget.
+
+The earlier corruption-control mismatch and corrected test-only expectation,
+external candidate freeze violations/errata, and all failed preparation attempts
+remain retained. Exact source, control, regression and cost identities are in
+the existing evidence receipt.
+
+**Next C3 boundary:** Add a separate, explicit full-schedule diagnostic mode.
+The current consumer and native manifest intentionally admit only the proper
+prefix ending three actions after F; the original full packet alone cannot
+extend that route. Preserve those default guards. A reviewed new mode and
+runtime must keep the exact original 7,167-action schedule, consumed four-port
+PAD bytes, C/F coordinates and fixed work/cleanup budgets. No longer capture is
+yet admitted. Completing the schedule would establish scoped functional
+lifetime A, not all 3,501 original typed-state comparisons or per-owner RNG.
+Those comparisons, checked recreation and lifetime B remain C3 gates. Stop on
+the first missing pairing, mismatch, unsupported service or incomplete teardown.
 Keep [PR #301](https://github.com/ericvanlare/melee-web/pull/301) draft.
 
 **Previous zero-tick Setup constructor checkpoint:** The separate `b71da6f0` run compared the declared Setup fields and recorded a native-only constructor receipt: countdown 3,629, authored x0/x4 3,600/3,800, one constructor RNG call with bound 200 and result 29, and seed `3bb84c53 → 263cc5ca`; the completed Setup seed was `35a455b9`. Construction took six steps with zero match ticks, source frames or draws. At that checkpoint those constructor values were not observed in the original. The newer original constructor receipt is separate; matching numbers alone do not establish parity. The newer C/F pass is a separate bounded field comparison, not constructor, GO-state or lifetime parity.

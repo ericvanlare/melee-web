@@ -10013,7 +10013,7 @@
       "empty_tmp_removed": true,
       "incrementals": "Retained for active C3 milestone"
     },
-    "next": "Validate the integrated terminal-owner reducer and per-action transfer projection, then review one unchanged 174-action capture. Full 7,167-action protocol and C3 lifetimes remain unimplemented/unadmitted.",
+    "next": "Distinct full-schedule private mode preserving proper-prefix default; no full lifetime capture until new source review/validation. Typed-state and per-owner RNG comparison/recreation remain open.",
     "independent_result_review": {
       "path": "stadium-timing-v3-result-independent-review-v1.json",
       "sha256": "142a1f9834ff1b8d3cbccb99e681e981b1bfc5bce0509ceb37261d5ea933174b",
@@ -10573,6 +10573,107 @@
           }
         ]
       }
+    },
+    "incremental_persistence_2026_10_14": {
+      "state": "REVIEWED_SOURCE_FULL_REGRESSION_AND_SYNTHETIC_REAL_FILESYSTEM_COST_PASS",
+      "source": "cc882c362a45ed63d033fdf344f0124940703698",
+      "tree": "40ed56c1a3f05b13b217550b414382ee2b239b5b",
+      "retained_runtime": "8ca65a6f2f67b20bbe7fbfd448a1f789c463be60",
+      "run_id": "rollback-sprint-resume-20261014-085704-6fe33b74",
+      "validation": {
+        "focused_node": 8,
+        "focused_python": 6,
+        "separate_reduced_node": 1,
+        "full_tests": 2631,
+        "skips": 180,
+        "failures": 0,
+        "elapsed_seconds": 563.32
+      },
+      "memory_cost": {
+        "actions": 7167,
+        "loop_checkpoints": 14783,
+        "serialize_ms": 3780.556,
+        "loop_wall_ms": 4752.443
+      },
+      "actual_filesystem_cost": {
+        "actions": 7167,
+        "loop_checkpoints": 14783,
+        "loop_pipeline_ms": 8270.956,
+        "loop_wall_ms": 8441.627,
+        "compact_bytes": 3721762549,
+        "journal_bytes": 14854925,
+        "recovered_rows": {
+          "actions": 7167,
+          "diagnostics": 14335,
+          "comparisons": 2
+        },
+        "recovered_journal_sha256": "8fd7370efcdf41206bd448c1b8fc85259e62aec246de67808df3f25b043d01a4",
+        "terminal_bytes": 14595023,
+        "terminal_sha256": "0689c595de3caadfe31e272000f7bc98aa88345c9cead0c4b1b73ed25d4729b2",
+        "owned_scratch_removed": true,
+        "owned_group_absent": true
+      },
+      "limitations": [
+        "Synthetic row shapes, not game actions or original comparisons",
+        "No future-payload conservative bound or full-browser fit claim",
+        "No fsync/crash durability or concurrent browser I/O claim",
+        "Current host and native enforce F+3 prefix; full mode requires new reviewed runtime",
+        "Full typed-state/per-owner RNG and same-process recreation B remain open"
+      ],
+      "artifacts": [
+        {
+          "file": "stadium-persistence-delta-v3-focused-validation-v1/focused-controls-result.json",
+          "sha256": "49d5fc93fc422a94a26e9d89fc681acce05fdb92f947cddca6bbd9be3f39841b"
+        },
+        {
+          "file": "stadium-persistence-delta-v3-focused-validation-v1/root-commit-review.json",
+          "sha256": "9e742c5404ffbc4376f7e19603f7738344e4a096dddbe5c69ad760b106053c6b"
+        },
+        {
+          "file": "stadium-corruption-control-repair-v1/manifest.json",
+          "sha256": "e81f6d373780a45456b21e5d4bc0fb7b8c2565b1a5162e72d14a7f334d699274"
+        },
+        {
+          "file": "stadium-persistence-full-regression-cc882-v1/evidence/root-result-review.json",
+          "sha256": "ac359664e7f5aa2a92ac8753dc8cca9c28d6fde875be70a97641be0aada197b0"
+        },
+        {
+          "file": "stadium-persistence-full-regression-cc882-v1/evidence/full-unittest-suite.log",
+          "sha256": "85d865f355b89b76dc4eab124a6598e1c26748c1681bc7a41f9a7f590fe6dc81"
+        },
+        {
+          "file": "stadium-persistence-cost-workload-v3/manifest-v3.json",
+          "sha256": "c0bce0f78affe594d8572166decf63ac51b239c8f5e2091d853861ffd722d0c0"
+        },
+        {
+          "file": "stadium-persistence-cost-workload-v3/v2-mutation-erratum.json",
+          "sha256": "67fa9fecba500d01b3a9ffc16cd1b39012f9f0c2aec620db2d2d0901751545e6"
+        },
+        {
+          "file": "stadium-persistence-cost-workload-v3/execution-v3/serialization-cost-only-result-v3.json",
+          "sha256": "a4def8d8e794ed776bc8cda8945f8acf03aaf6b310c5de5f37c23cc62d5943b8"
+        },
+        {
+          "file": "stadium-persistence-cost-workload-v3/execution-v3/root-result-review.json",
+          "sha256": "0410be6fc16ea991e359fc201ee25d085f3b215e778940632a901e7b43577444"
+        },
+        {
+          "file": "stadium-persistence-cost-workload-v4/manifest-v4.json",
+          "sha256": "0920ded87badc51ea2ed94e9910a28f76982889d2f6d52db7c62bccd9686a89e"
+        },
+        {
+          "file": "stadium-persistence-cost-workload-v4/execution-v4/serialization-cost-only-result-v4.json",
+          "sha256": "1ae6c1059b39058afb00545b47fe9b2ea0f152766a43837af1a3fe8e8a29579e"
+        },
+        {
+          "file": "stadium-persistence-cost-workload-v4/execution-v4/root-result-review.json",
+          "sha256": "127317f75b31255be5937ff8f49346a7e2dfa37179d824a75cce40bed11b4707"
+        },
+        {
+          "file": "stadium-full7167-measured-probe-protocol-v1/protocol.json",
+          "sha256": "b0ac682dda08d344d483e35c3f734cec9f33e38e530d8d56cf3d9fa2402387ed"
+        }
+      ]
     }
   }
 }
