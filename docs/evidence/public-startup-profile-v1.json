@@ -1,0 +1,172 @@
+{
+  "schema": "melee-web-public-startup-profile-evidence-v1",
+  "scope": "Pre-disc startup attribution; no gameplay or performance acceptance claim",
+  "retained_run": "public-startup-profile-20261013-211719-304e5e58",
+  "historical_foreground_baseline": {
+    "schema": "melee-web-public-startup-trace-summary-v1",
+    "input": {
+      "file": "foreground-existing-profile-startup-1.json.gz",
+      "sha256": "cfa7429d34d28490b7ab4d295d65e6b056f6280bb24600118954805180cddc35",
+      "compressed_bytes": 3811596,
+      "decompressed_bytes": 52768299,
+      "trace_events": 196658
+    },
+    "deployment": {
+      "host": "webmelee-staging.pages.dev",
+      "pages_deployment_id": "19a6ec7e-b035-4361-ad6e-43f275e4d3f5",
+      "source_commit": "07bcfdfa6f4531ac464eab44ebecb206daa1f0da",
+      "runtime": "audio-player",
+      "runtime_identity": "9c81b55e5bc2366d",
+      "runtime_manifest_sha256": "edb5722a41fa895ddabb69f814f09e183e70e5e3ad8551a26eec235118a5d30e"
+    },
+    "method": {
+      "profile": "Existing foreground Chrome profile; manual Record then Reload.",
+      "cache": "Not cleared; cache disabling was off.",
+      "throttling": "CPU and network throttling were off.",
+      "screenshots": "450 trace screenshots; OCR was sampled on every fifth screenshot (91 samples, about 134 ms apart). Screenshot pixels were inspected transiently and not retained.",
+      "scope": "Only the staging navigation/runtime origin was summarized; unrelated tabs and profile fields are excluded."
+    },
+    "navigation_ms_from_navigation_start": {
+      "first_paint": 404.769,
+      "first_contentful_paint": 404.769,
+      "dom_content_loaded_end": 421.526,
+      "load_event_end": 455.834,
+      "trace_first_event": 0,
+      "trace_last_event": 14572.74
+    },
+    "preparing_graphics_label": {
+      "first_sampled_positive_ms": 813.9,
+      "last_sampled_positive_ms": 6939.4,
+      "first_later_sampled_nonmatch_ms": 7017.0,
+      "interpretation": "Sampled visibility bracket only, not exact label start/end or readiness time. The 14.57 s trace tail is not startup duration."
+    },
+    "resources": {
+      "target_origin_requests": 28,
+      "responses_and_finishes": 28,
+      "http_statuses": {
+        "200": 28
+      },
+      "from_cache": 27,
+      "from_service_worker": 0,
+      "request_to_headers_ms": {
+        "median": 8.89,
+        "max": 123.5
+      },
+      "request_to_finish_ms": {
+        "median": 9.25,
+        "max": 123.5
+      },
+      "large_runtime_assets": [
+        {
+          "path": "gameplay_audio_preview.js",
+          "request_ms": 424.06,
+          "from_cache": true,
+          "decoded_bytes": 289745
+        },
+        {
+          "path": "runtime data asset (.data)",
+          "request_ms": 447.19,
+          "from_cache": true,
+          "decoded_bytes": 3674112
+        },
+        {
+          "path": "runtime WebAssembly (.wasm)",
+          "request_ms": 449.08,
+          "from_cache": true,
+          "decoded_bytes": 14707263
+        }
+      ]
+    },
+    "wasm": {
+      "stream_from_response_ms": 453.3,
+      "module_cache_hit_ms": 455.3,
+      "compile_consume_done_ms": 549.51,
+      "compile_consume_done_slice_ms": 12.084,
+      "compile_consume_slice_count": 161,
+      "compile_consume_summed_slice_ms": 18.431,
+      "compile_consume_span_ms": 108.303,
+      "interpretation": "Slices may be nested or overlap; summed duration is not an independent CPU attribution. Trace records a Wasm module-cache hit."
+    },
+    "main_renderer_thread": {
+      "navigation_to_first_sampled_nonmatch": {
+        "run_task_count": 4610,
+        "busy_ms": 930.13,
+        "busy_fraction_percent": 13.3,
+        "max_task_ms": 93.03,
+        "tasks_over_50ms": 3,
+        "tasks_over_100ms": 0
+      },
+      "sampled_positive_label_interval": {
+        "run_task_count": 3588,
+        "busy_ms": 542.1,
+        "busy_fraction_percent": 8.7,
+        "max_task_ms": 93.03,
+        "tasks_over_50ms": 1,
+        "tasks_over_100ms": 0,
+        "longest_task_start_ms": 1272.1,
+        "largest_task_attribution": "The 93.025 ms RunTask at +1272.108 ms has no nested source/function event in this trace, so it cannot be assigned to a runtime or native function."
+      },
+      "interpretation": "Main-thread task time does not show continuous CPU saturation during sampled label visibility. The 93 ms task is not attributed to a specific native/JS operation."
+    },
+    "attribution": {
+      "supported": [
+        "This is a warm, mostly cached load.",
+        "The observed label window is not explained by sustained main-renderer CPU occupancy in this trace.",
+        "Ordinary request timing and recorded Wasm compilation slices end early relative to the sampled label interval."
+      ],
+      "unresolved": [
+        "The trace does not identify whether startupCacheReady or Module.pipelinePreparation.ready held the label; runtime refreshCatalogLoading uses either condition.",
+        "No direct WebGPU shader/pipeline creation event was identified, so the trace does not attribute the remaining wait to pipeline compilation, native initialization, or GPU queue readiness.",
+        "A single warm reload does not characterize cold-cache behavior or reproduce the user's full 10\u201315 s report."
+      ]
+    },
+    "limits": [
+      "No cache-cleared, throttled, or repeated comparison was performed.",
+      "Chrome PipelineReporter markers are not evidence of WebGPU pipeline compilation.",
+      "Do not infer startup duration from the trace recording tail."
+    ],
+    "animation_callbacks": {
+      "interval_ms_from_navigation_start": [
+        813.9,
+        7017.0
+      ],
+      "target_renderer_frame": {
+        "process_id": 31500,
+        "thread_id": 72400659
+      },
+      "fire_animation_frame": {
+        "callback_count": 1466,
+        "interarrival_ms": {
+          "min": 0.003,
+          "p50": 0.005,
+          "p90": 16.567,
+          "p95": 17.214,
+          "max": 187.826
+        },
+        "interpretation": "Dispatch timestamps include short callback bursts; raw interarrival p50 is not the frame cadence."
+      },
+      "frame_lifecycle": {
+        "animation_frame_begin_count": 245,
+        "page_animator_service_count": 244,
+        "animation_frame_begin_interarrival_ms": {
+          "p50": 16.607,
+          "p90": 53.689,
+          "max": 188.208
+        },
+        "page_animator_interarrival_ms": {
+          "p50": 16.683,
+          "p90": 51.911,
+          "max": 187.826
+        },
+        "interpretation": "The sampled interval contains regular frame callbacks plus intermittent longer gaps; this is a trace observation, not proof that frame pacing caused the graphics label."
+      }
+    }
+  },
+  "candidate": {
+    "state": "source_reviewed_validation_pending",
+    "base_commit": "e19cecfe7764bcd97802bea1933500e37a872af5",
+    "independent_js_review_sha256": "7e345137e1770781b25348f5d24023b4aa418b5baa863503d8e988076fb4ba3d",
+    "speedup_claim": false,
+    "deployed": false
+  }
+}

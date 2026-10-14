@@ -14,6 +14,16 @@ from check_gameplay import node_runtime
 from menu_browser_source import menu_browser_source
 
 class SharedRuntimeOwnerTests(unittest.TestCase):
+    def test_startup_profile_is_bounded_and_freezes_at_terminal(self):
+        result = subprocess.run([str(node_runtime()), str(ROOT / 'tests/startup_profile_test.mjs')],
+                                capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Startup profile schema', result.stdout)
+
+    def test_startup_profile_callback_cannot_reenter_mount(self):
+        self.run_owner(['--startup-profile-reentrant'],
+                       'startup profile callbacks cannot reenter document ownership')
+
     def test_fatal_failure_delivers_sanitized_diagnostics(self):
         self.run_owner(['--diagnostics-known-host', '--diagnostics-fatal'],
                        'fatal failure delivers sanitized diagnostics while stopped')
@@ -112,6 +122,10 @@ int pending_handoff = 0;
 unsigned source_frames = 0;
 unsigned audio_ticks = 0;
 unsigned cache_services = 0;
+double graphics_startup_started_ms = 100;
+double graphics_startup_first_callback_ms = -1;
+unsigned startup_time_reads = 0;
+double emscripten_get_now() {{ ++startup_time_reads; return 123; }}
 
 int simulated_consumable_handoff() noexcept {{
     const int result = pending_handoff;
@@ -163,6 +177,7 @@ int main() {{
     visible = false;
     tick();
     assert(pending_handoff == 0 && cache_services == 1);
+    assert(graphics_startup_first_callback_ms == 23 && startup_time_reads == 1);
     visible = true;
     const Pair reactivated = advance(366.6666667);
     assert(reactivated.menu.steps == 0 && reactivated.audio.steps == 0);
@@ -234,6 +249,7 @@ int main() {{
     const Pair after_fault = advance(2000.0);
     assert(after_fault.menu.steps == 0 && after_fault.audio.steps == 0);
     assert(source_frames == source_before_fault && audio_ticks == audio_before_fault);
+    assert(graphics_startup_first_callback_ms == 23 && startup_time_reads == 1);
     std::cout << "native lifecycle handoff fixture passed\\n";
 }}
 '''

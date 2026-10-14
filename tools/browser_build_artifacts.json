@@ -8,6 +8,7 @@
   "staging-room.css",
   "net-timing-pause.mjs",
   "melee-runtime.mjs",
+  "startup-profile.mjs",
   "runtime-diagnostics.mjs",
   "runtime-diagnostics-delivery.mjs",
   "diagnostics-settings.mjs",

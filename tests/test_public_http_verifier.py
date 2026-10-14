@@ -161,6 +161,7 @@ def _player_fixture() -> tuple[dict[str, bytes], dict[str, object]]:
     runtime_root = "/runtime/0123456789abcdef"
     runtime_files = {
         "melee-runtime.mjs": b"export {};",
+        "startup-profile.mjs": b"export {};",
         "save-profile-settings.mjs": b"export {};",
         "save-profile-store.mjs": b"export {};",
         "gamecube-save.mjs": b"export {};",

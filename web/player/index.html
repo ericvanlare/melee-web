@@ -34,6 +34,7 @@
           <button id="pause-game" type="button" disabled>Pause</button>
           <button id="fullscreen" type="button" hidden>Fullscreen</button>
           <button id="end-session" type="button" disabled>Eject</button>
+          <button id="startup-open" type="button">Startup details</button>
           <button id="status" type="button" disabled aria-live="polite">Loading…</button>
           <progress id="progress" aria-label="Preparing local data" hidden></progress>
         </div>
@@ -41,6 +42,14 @@
       <div id="toolbar-meta"><span id="audio-note">no audio <button id="audio-info" type="button" aria-label="Why there is no audio" aria-expanded="false" aria-controls="audio-details">ⓘ</button><span id="audio-details" role="tooltip" aria-hidden="true">licensing issue, need to remove about 50 lines of Dolphin audio code still</span></span><span id="disc-selection-status" role="status" aria-live="polite" hidden></span><a href="/notices">About / legal</a></div>
     </div>
   </main>
+  <dialog id="startup-dialog" aria-labelledby="startup-title">
+    <h2 id="startup-title">Startup details</h2>
+    <p id="startup-summary" role="status">Waiting for the player module…</p>
+    <p class="settings-description">Timing for this visit stays on this device. It covers startup before game loading; it does not measure gameplay.</p>
+    <pre id="startup-report" tabindex="0" aria-label="Startup timing report">No startup observations yet.</pre>
+    <div class="dialog-actions"><button id="startup-export" type="button" disabled>Export startup report</button><button id="startup-close" type="button">Close</button></div>
+    <p id="startup-export-status" role="status"></p>
+  </dialog>
   <dialog id="disc-dialog" aria-label="Select your game copy">
     <p>Some CPU actions can stop the player (opcode 63); restart may be required.</p>
     <p>Choose a copy you are legally authorized to use. Select an unmodified USA 1.02 ISO, GCM or CISO. RVZ is not supported.</p>
