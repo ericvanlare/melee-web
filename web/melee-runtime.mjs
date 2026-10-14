@@ -24,7 +24,7 @@ const DIAGNOSTIC_DESTROY_PERSIST_TIMEOUT_MS = 250;
 export async function mountMeleeRuntime({canvas, onState = () => {}, onError = () => {},
   onEvent = () => {}, onLog = () => {}, onOwner, configureModule,
   readDisc = loadNativeGameDisc, openDisc = openNativeGameDiscSession, createAudio,
-  diagnosticIdentity = null, recordDiagnostics = true,
+  diagnosticIdentity = null, recordDiagnostics = true, stagingDiagnosticsOrigin = null,
   loaderUrl = new URL('./gameplay_public.js', import.meta.url), startupTimeout = 60000} = {}) {
   if (!canvas || canvas.id !== 'canvas') throw Error('The player requires its own #canvas.');
   if (documentOwner) throw Error('Reload the page to start a fresh player.');
@@ -108,7 +108,9 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   try {
     const url = new URL(globalThis.location.href);
     const localHost = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(url.hostname);
-    stagingDiagnosticsEnabled = recordDiagnostics && localHost &&
+    const hostedStaging = typeof stagingDiagnosticsOrigin === 'string' &&
+      url.protocol === 'https:' && url.origin === stagingDiagnosticsOrigin;
+    stagingDiagnosticsEnabled = recordDiagnostics && (localHost || hostedStaging) &&
       url.searchParams.get('melee-web-staging-diagnostics') === '1';
   } catch { /* Staging diagnostics remain disabled unless explicitly selected. */ }
   function diagnosticDeliveryBlocked() {
