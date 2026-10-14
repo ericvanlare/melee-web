@@ -54,8 +54,21 @@ cache conditions and observation limits are in the receipt. These observations
 identify the pipeline queue as the gate holding readiness; they do not measure
 backend GPU compilation completion or reproduce the owner's exact 10–15 s run.
 
-The next bounded experiment decouples the same five-entry startup batches from
-the sixth-render-callback cadence with one yielding 8 ms timer. Its ownership,
-queue ordering and stop controls must pass independent review before a matched
-capture. No speedup is claimed yet. The report and candidate preserve game
-arithmetic, input, source order, readiness guards and timing deadlines.
+The first timer experiment at source `edece6ceffa8405afdf1350b219d51397049a681`
+kept five-entry batches and the 8 ms yield but chained them independently of
+rendered callbacks. Focused native controls, independent source review and the
+Release build passed; the first local browser startup failed with three
+“memory access out of bounds” errors. That candidate is **not deployed**.
+The initial helper omitted the error stacks and raw failed profile, so the
+failure cannot yet be assigned to a specific stack.
+
+The bounded failure review identified a possible asynchronous native reentry:
+an independent timer may enter Wasm while the ordinary render callback has a
+live Asyncify continuation. The next step is a generated, reduced Asyncify
+fixture and a guard before native entry, before another startup experiment.
+That generated fixture now passes independent review: five timer attempts with
+a live continuation were withheld, followed by one native entry after idle;
+stop/change/abort controls prevented entry. This is a component result, not
+proof of the original memory-error stack or game safety.
+The safe profiling-only build remains live. No speedup is claimed yet; game
+arithmetic, input, source order, readiness guards and deadlines are unchanged.

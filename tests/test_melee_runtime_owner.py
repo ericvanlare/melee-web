@@ -1,6 +1,7 @@
 """Exercise shared player lifecycle without claiming native gameplay evidence."""
 from pathlib import Path
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -281,6 +282,16 @@ int main() {{
         service_begin = forward
         service_end = source.index("void service_render_cache_writes(){", service_begin)
         service = source[service_begin:service_end]
+        dispatch_call, dispatch_replacements = re.subn(
+            r"dispatch_startup_pipeline_service_at_asyncify_idle\(\s*"
+            r"reinterpret_cast<uintptr_t>\(startup_pipeline_service_callback\),\s*"
+            r"kStartupPipelineServiceDelayMs\);",
+            "emscripten_async_call(startup_pipeline_service_callback,nullptr,"
+            "kStartupPipelineServiceDelayMs);",
+            service)
+        self.assertEqual(dispatch_replacements, 1,
+                         "the native fixture substitutes only the real JS timer boundary")
+        service = dispatch_call
         stop_query = "EM_ASM_INT({return window.menuOwnerStopped?.()?1:0;})"
         self.assertEqual(service.count(stop_query), 2,
                          "the timer callback checks stop state before and after one service batch")
@@ -455,6 +466,79 @@ int main() {
                                       timeout=10)
             self.assertEqual(executed.returncode, 0, executed.stdout + executed.stderr)
             self.assertIn("startup timer chain controls passed", executed.stdout)
+
+    def test_startup_pipeline_timer_gate_waits_for_asyncify_idle_before_dyn_call(self):
+        source = menu_browser_source()
+        deps = 'EM_JS_DEPS(startup_pipeline_service_asyncify_deps,\n           "$safeSetTimeout,$dynCall,$Asyncify");'
+        self.assertIn(deps, source,
+                      "the generated runtime must retain the exact JS gate dependencies")
+        marker = "EM_JS(void, dispatch_startup_pipeline_service_at_asyncify_idle,"
+        begin = source.index(marker)
+        body_begin = source.index("{", begin) + 1
+        body_end = source.index("\n});", body_begin)
+        body = source[body_begin:body_end]
+        fixture = f'''import assert from 'node:assert/strict';
+let ABORT=false;
+let owner_stopped=false;
+const window={{menuOwnerStopped:()=>owner_stopped}};
+const Asyncify={{State:{{Normal:0,Unwinding:1,Rewinding:2}},state:0,currData:17}};
+const timers=[];
+const calls=[];
+let max_pending=0;
+function safeSetTimeout(callback,delay){{
+ timers.push({{callback,delay}});max_pending=Math.max(max_pending,timers.length);
+}}
+function dynCall(signature,callback,args){{calls.push({{signature,callback,args}});}}
+function dispatch(callback,delay_ms){{{body}\n}}
+function fireOne(){{const timer=timers.shift();assert.ok(timer);assert.equal(timer.delay,8);timer.callback();}}
+dispatch(37,8);
+fireOne();
+assert.equal(calls.length,0,'Normal with live currData must not enter native');
+assert.equal(timers.length,1,'one retry remains owned');
+Asyncify.state=Asyncify.State.Unwinding;
+fireOne();
+assert.equal(calls.length,0,'Unwinding must not enter native');
+assert.equal(timers.length,1,'Unwinding schedules only one retry');
+Asyncify.state=Asyncify.State.Rewinding;
+fireOne();
+assert.equal(calls.length,0,'Rewinding must not enter native');
+assert.equal(timers.length,1,'Rewinding schedules only one retry');
+Asyncify.state=Asyncify.State.Normal;Asyncify.currData=null;
+fireOne();
+assert.deepEqual(calls,[{{signature:'vp',callback:37,args:[0]}}]);
+assert.equal(timers.length,0);
+assert.equal(max_pending,1,'the chain never owns overlapping timers');
+
+// Owner stop must prevent both a retry while Asyncify is live and a dispatch
+// when Asyncify is already idle.
+owner_stopped=false;Asyncify.currData=17;
+dispatch(41,8);assert.equal(timers.length,1);
+owner_stopped=true;fireOne();
+assert.equal(calls.length,1,'a stopped owner with live currData must not enter native');
+assert.equal(timers.length,0,'a stopped owner with live currData must not retry');
+owner_stopped=false;Asyncify.currData=null;
+dispatch(43,8);assert.equal(timers.length,1);
+owner_stopped=true;fireOne();
+assert.equal(calls.length,1,'a stopped idle owner must not enter native');
+assert.equal(timers.length,0,'a stopped idle owner must not retry');
+
+// The reducer also checks the real Emscripten safeSetTimeout wrapper, which
+// suppresses callbacks after ABORT. Invoke this extracted body directly once
+// to verify its own pre-dynCall abort guard.
+ABORT=false;Asyncify.state=Asyncify.State.Normal;Asyncify.currData=null;
+owner_stopped=false;dispatch(47,8);assert.equal(timers.length,1);
+ABORT=true;fireOne();
+assert.equal(calls.length,1,'ABORT must refuse a second native entry');
+assert.equal(timers.length,0,'ABORT must stop retries');
+console.log('startup Asyncify dispatch gate controls passed');
+'''
+        with tempfile.TemporaryDirectory(prefix="melee-startup-asyncify-gate-") as directory:
+            fixture_path = Path(directory) / "startup_asyncify_gate_fixture.mjs"
+            fixture_path.write_text(fixture)
+            executed = subprocess.run([str(node_runtime()), str(fixture_path)],
+                                      capture_output=True, text=True, timeout=10)
+            self.assertEqual(executed.returncode, 0, executed.stdout + executed.stderr)
+            self.assertIn("startup Asyncify dispatch gate controls passed", executed.stdout)
 
     def test_explicit_silent_owner_never_opens_audio(self):
         self.run_owner(['--silent'])

@@ -1,4 +1,5 @@
 #include "gameplay_menu_browser_state.hpp"
+#include <emscripten/em_macros.h>
 extern "C" uint32_t gm_801A4BA8(void);
 #if defined(MELEE_WEB_NET_SESSION)
 extern "C" int melee_web_net_publish_local_input(
@@ -230,6 +231,23 @@ bool running=false,pending=false,host_entered=false,world_exposed=false,faulted=
 bool startup_pipeline_service_scheduled=false;
 bool startup_pipeline_service_failed=false;
 constexpr int kStartupPipelineServiceDelayMs=8;
+EM_JS_DEPS(startup_pipeline_service_asyncify_deps,
+           "$safeSetTimeout,$dynCall,$Asyncify");
+EM_JS(void, dispatch_startup_pipeline_service_at_asyncify_idle,
+      (uintptr_t callback,int delay_ms), {
+ const schedule=()=>{
+  if(ABORT||window.menuOwnerStopped?.())return;
+  safeSetTimeout(()=>{
+   if(ABORT||window.menuOwnerStopped?.())return;
+   if(Asyncify.state!==Asyncify.State.Normal||Asyncify.currData!==null){
+    schedule();
+    return;
+   }
+   dynCall('vp',callback,[0]);
+  },delay_ms);
+ };
+ schedule();
+});
 melee_web::MenuPreparationState preparation;
 unsigned audio_phase=0,diagnostic_start_ticks=0;
 int stock_check=0,stock_count=4,stock_respawns=0;
@@ -1325,8 +1343,9 @@ void schedule_startup_pipeline_service(){
  const AuroraStats* stats=aurora_get_stats();
  if(!stats||stats->queuedPipelines==0)return;
  startup_pipeline_service_scheduled=true;
- emscripten_async_call(startup_pipeline_service_callback,nullptr,
-                       kStartupPipelineServiceDelayMs);
+ dispatch_startup_pipeline_service_at_asyncify_idle(
+     reinterpret_cast<uintptr_t>(startup_pipeline_service_callback),
+     kStartupPipelineServiceDelayMs);
 }
 void service_render_cache_writes(){
  // SQLite fsync may Asyncify-yield. Run at the top-level main-loop boundary,

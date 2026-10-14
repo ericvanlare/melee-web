@@ -163,7 +163,7 @@
     }
   },
   "candidate": {
-    "state": "profiling_deployed_scheduler_experiment_pending",
+    "state": "profiling_deployed_timer_candidate_held",
     "base_commit": "e19cecfe7764bcd97802bea1933500e37a872af5",
     "independent_js_review_sha256": "7e345137e1770781b25348f5d24023b4aa418b5baa863503d8e988076fb4ba3d",
     "speedup_claim": false,
@@ -361,5 +361,28 @@
       }
     ],
     "interpretation": "The existing native cache-idle readiness gate stayed pending while 890 startup pipeline entries drained. Renderer initialization is a small part of the observed wait. This establishes the active gate; queue retirement is not backend GPU completion. A scheduler change is still an experiment, not a claimed speedup."
+  },
+  "timer_experiment": {
+    "source_commit": "edece6ceffa8405afdf1350b219d51397049a681",
+    "runtime_hash": "1ce59e2440003517",
+    "deployed": false,
+    "outcome": "First local startup failed before readiness; three memory access out of bounds errors. No speedup claim.",
+    "report": "timer-v1/local-ui/report.json",
+    "report_sha256": "6e3d903ea8090981e4f2e7abad470245c8de3acd1f664d703db9927a7003d38e",
+    "limitations": "Initial helper retained neither error stacks nor raw failed profile; source causation is unproved.",
+    "review": "timer-v1/first-failure-source-review.json",
+    "review_sha256": "5ca2c99d5cbff91232dcf7fe23752e63c48f4c37e92ddad2549d7f7ceb698051",
+    "next": "Generated Asyncify reducer before another startup. Guard must run in JS before native entry while the normal frame has a live continuation.",
+    "validation_scope": "Focused native scheduler controls and Release compilation passed but did not establish browser safety.",
+    "reducer": {
+      "report": "asyncify-reducer-v1/result.json",
+      "report_sha256": "bfb5f25a9293c82112daabdf3f50335b6479d3f4323782c613296d18b519ca73",
+      "result": "Five timer attempts with Normal state and live continuation were withheld; one native callback ran after idle. Stop/change/abort controls made zero service entries.",
+      "scope": "Generated pinned Emscripten fixture; no GPU/game and no proof of original memory-error causation.",
+      "retained_setup_failures": true,
+      "console_observation": "One favicon404 retained; no page errors.",
+      "independent_review": "asyncify-reducer-v1/independent-result-review.json",
+      "independent_review_sha256": "f3ef2fb1128de7dd8e93f2042a72d4bb67c13785d1ffa72c97bc7ca64474d301"
+    }
   }
 }
