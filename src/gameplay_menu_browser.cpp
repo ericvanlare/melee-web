@@ -2,6 +2,7 @@
 #if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
 #include "gameplay_menu_frame_effect.hpp"
 #endif
+#include <emscripten/em_macros.h>
 extern "C" uint32_t gm_801A4BA8(void);
 #if defined(MELEE_WEB_NET_SESSION)
 extern "C" int melee_web_net_publish_local_input(
@@ -23,6 +24,31 @@ extern "C" int melee_web_net_publish_local_input(
 extern "C" void melee_web_native_menu_pause(int paused);
 #endif
 namespace melee_web_menu_browser {
+// Startup observations only. These do not service the renderer or change its
+// cache gate; samples stop at the existing getter's first terminal idle state.
+double graphics_startup_started_ms=-1;
+double graphics_startup_renderer_init_ms=-1;
+double graphics_startup_first_callback_ms=-1;
+bool graphics_startup_terminal=false;
+void publish_graphics_startup(int cache_idle,bool read_stats) noexcept {
+ if(graphics_startup_started_ms<0||graphics_startup_terminal)return;
+ const AuroraStats* stats=read_stats?aurora_get_stats():nullptr;
+ const uint32_t queued=stats?stats->queuedPipelines:0;
+ // Aurora increments this on valid pipeline readiness and resets at shutdown,
+ // rather than at begin_pipeline_frame. It is not a GPU-completion count.
+ const uint32_t created=stats?stats->createdPipelines:0;
+ const double elapsed=emscripten_get_now()-graphics_startup_started_ms;
+ graphics_startup_terminal=cache_idle==1||cache_idle==-1;
+ EM_ASM({
+  try {
+   const finite=value=>Number.isFinite(value)&&value>=0?value:null;
+   Module.graphicsStartup=({version:1,renderer_init_ms:finite($0),
+    queued_pipelines:$1?($2>>>0):null,created_pipelines:$1?($3>>>0):null,
+    cache_idle:$4,first_native_callback_ms:finite($5),elapsed_ms:finite($6),terminal:!!$7});
+  } catch (_) { /* Optional observation must not interrupt native startup. */ }
+ },graphics_startup_renderer_init_ms,stats?1:0,queued,created,cache_idle,
+   graphics_startup_first_callback_ms,elapsed,graphics_startup_terminal?1:0);
+}
 #if defined(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC)
 // The module never resumes its normal loop after arming, including on failure.
 bool match_draw_discard_terminal=false;
@@ -207,8 +233,24 @@ std::string match_message="Original source match";
 bool running=false,pending=false,host_entered=false,world_exposed=false,faulted=false;
 bool startup_pipeline_service_scheduled=false;
 bool startup_pipeline_service_failed=false;
-unsigned startup_pipeline_service_skip_frames=0;
 constexpr int kStartupPipelineServiceDelayMs=8;
+EM_JS_DEPS(startup_pipeline_service_asyncify_deps,
+           "$safeSetTimeout,$dynCall,$Asyncify");
+EM_JS(void, dispatch_startup_pipeline_service_at_asyncify_idle,
+      (uintptr_t callback,int delay_ms), {
+ const schedule=()=>{
+  if(ABORT||window.menuOwnerStopped?.())return;
+  safeSetTimeout(()=>{
+   if(ABORT||window.menuOwnerStopped?.())return;
+   if(Asyncify.state!==Asyncify.State.Normal||Asyncify.currData!==null){
+    schedule();
+    return;
+   }
+   dynCall('vp',callback,[0]);
+  },delay_ms);
+ };
+ schedule();
+});
 melee_web::MenuPreparationState preparation;
 unsigned audio_phase=0,diagnostic_start_ticks=0;
 int stock_check=0,stock_count=4,stock_respawns=0;
@@ -1272,33 +1314,44 @@ bool startup_pipeline_service_allowed(){
 }
 void schedule_startup_pipeline_service();
 void startup_pipeline_service_callback(void*){
- startup_pipeline_service_scheduled=false;
+ // Keep the single-owner flag set while the service call is active. If that
+ // call yields, another main-loop callback must not queue a duplicate timer.
+ if(!startup_pipeline_service_scheduled)return;
  // This independent timer can run before tick consumes the terminal signal.
  // Query owner state without draining commands or changing lifecycle intent.
- if(EM_ASM_INT({return window.menuOwnerStopped?.()?1:0;}))return;
- if(!startup_pipeline_service_allowed())return;
+ if(EM_ASM_INT({return window.menuOwnerStopped?.()?1:0;})||
+    !startup_pipeline_service_allowed()){
+  startup_pipeline_service_scheduled=false;
+  return;
+ }
  const AuroraStats* stats=aurora_get_stats();
- if(!stats||stats->queuedPipelines==0)return;
- // Emscripten invokes async_call through a delayed timer task. Schedule one
- // bounded Aurora batch between every sixth eligible rendered callback
- // instead of chaining timer tasks or adding work to every display interval.
+ if(!stats||stats->queuedPipelines==0){
+  startup_pipeline_service_scheduled=false;
+  return;
+ }
+ // One delayed timer owns one bounded Aurora service batch. The flag remains
+ // set across the call so a yielded/reentrant main loop cannot queue a peer.
  if(!aurora_pipeline_service_preparation()){
   startup_pipeline_service_failed=true;
+  startup_pipeline_service_scheduled=false;
+  return;
  }
+ startup_pipeline_service_scheduled=false;
+ // A successful batch may leave startup work queued. Recheck the JS owner
+ // after the service and let the ordinary scheduling guards recheck native
+ // ownership and queue state before chaining another independent timer.
+ if(EM_ASM_INT({return window.menuOwnerStopped?.()?1:0;}))return;
+ schedule_startup_pipeline_service();
 }
 void schedule_startup_pipeline_service(){
  if(startup_pipeline_service_scheduled||startup_pipeline_service_failed||
     !startup_pipeline_service_allowed())return;
  const AuroraStats* stats=aurora_get_stats();
  if(!stats||stats->queuedPipelines==0)return;
- if(startup_pipeline_service_skip_frames<5){
-  ++startup_pipeline_service_skip_frames;
-  return;
- }
- startup_pipeline_service_skip_frames=0;
  startup_pipeline_service_scheduled=true;
- emscripten_async_call(startup_pipeline_service_callback,nullptr,
-                       kStartupPipelineServiceDelayMs);
+ dispatch_startup_pipeline_service_at_asyncify_idle(
+     reinterpret_cast<uintptr_t>(startup_pipeline_service_callback),
+     kStartupPipelineServiceDelayMs);
 }
 void service_render_cache_writes(){
  // SQLite fsync may Asyncify-yield. Run at the top-level main-loop boundary,
@@ -1325,6 +1378,8 @@ void tick(){
 #if defined(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC)
  if(match_draw_discard_terminal)return;
 #endif
+ if(graphics_startup_started_ms>=0&&graphics_startup_first_callback_ms<0)
+  graphics_startup_first_callback_ms=emscripten_get_now()-graphics_startup_started_ms;
  // Consume owner failure and lifecycle suspension before source or clock work.
  // A hidden/frozen interval may contain no callback at all; its handoff leaves
  // running/manual pause intent unchanged and excludes only inactive wall time.
@@ -2190,9 +2245,11 @@ void melee_web_native_menu_pause(int paused){
 const char* melee_web_native_menu_message(){return message.c_str();}
 int melee_web_native_menu_running(){return running;}
 int melee_web_native_menu_cache_idle(){
- if(!render_cache_can_flush())return 0;
+ if(!render_cache_can_flush()){publish_graphics_startup(0,true);return 0;}
  const auto state=aurora_pipeline_cache_status();
- return state==AURORA_PIPELINE_CACHE_READY?1:state==AURORA_PIPELINE_CACHE_ERROR?-1:0;
+ const int idle=state==AURORA_PIPELINE_CACHE_READY?1:state==AURORA_PIPELINE_CACHE_ERROR?-1:0;
+ publish_graphics_startup(idle,true);
+ return idle;
 }
 int melee_web_native_menu_phase(){
  if(match)return match->sudden_death()?14:7;
@@ -2237,7 +2294,11 @@ int main(int argc,char** argv){
  if(!aurora_pipeline_prepare_enable())return 1;
  pipeline_bootstrap_started=emscripten_get_now();
 #endif
+ graphics_startup_started_ms=emscripten_get_now();
+ publish_graphics_startup(0,false);
  aurora_initialize(argc,argv,&config);
+ graphics_startup_renderer_init_ms=emscripten_get_now()-graphics_startup_started_ms;
+ publish_graphics_startup(0,true);
 #if !defined(MELEE_WEB_SELECTIVE_PIPELINES)
  // Development replay must draw every requested primitive. Its first-use
  // compilation remains measured; it must not silently skip geometry and then

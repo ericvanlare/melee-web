@@ -19,7 +19,13 @@ from workspace_resources import operation
 # Future/object bootstrap path. Both are exact isolated-index trees, never an
 # arbitrary locally modified checkout.
 AURORA_PREVIOUS_PATCH_TREES = (
-    # Exact pre-frame-observer canonical tree; unrelated dependency edits refuse.
+    # Exact reviewed observer and hosted-staging predecessor trees.
+    "a28936a4148fc2d62f7a51a1b47767adb512f86e",
+    "55f61288df8e2bdeec93f14c3be2e83111fb91ab",
+    # Exact reviewed hosted-telemetry candidate before caller-owned admission.
+    "fa255c8adc3bab486929b388b89ef922455e00c6",
+    # Exact main predecessor before allowing opt-in telemetry on the isolated
+    # hosted room staging origin; arbitrary dependency edits still refuse.
     "f01edd86feeae18cc13910afcf095c6301bee054",
     "980aec703ceb03604f7692cb4efd91779f920078",
     "ba1bbed8acbd886ed263468e3d9148163e4afc68",

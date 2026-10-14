@@ -38,4 +38,16 @@ const expiredDriver=createBrowserDriver(expired,{deadline:Date.now()-1});
 await assert.rejects(expiredDriver.pressChord(['A']),/wall-time bound/);
 assert.deepEqual(expired.events,[]);expiredDriver.dispose();
 assert.throws(()=>createBrowserDriver(new Page(),{surface:'typo'}),/Unknown/);
+const staging = new Page();
+staging.waitForFunction = async (_fn, {selector}) => {
+  staging.events.push('ready:' + selector);
+  return {jsonValue: async () => ({ready: true}), dispose: async () => {}};
+};
+staging.locator = selector => ({setInputFiles: async file => staging.events.push('disc:' + selector + ':' + file)});
+const stagingDriver = createBrowserDriver(staging, {surface: 'staging-room'});
+await stagingDriver.selectDisc('owned.ciso');
+await stagingDriver.waitForStart();
+assert.deepEqual(staging.events, ['ready:#disc', 'disc:#disc:owned.ciso', 'ready:#lockstep-host']);
+await assert.rejects(stagingDriver.launch(), /auto-launch|development/);
+stagingDriver.dispose();
 console.log('Browser driver input ordering, cleanup and deadline checks passed');

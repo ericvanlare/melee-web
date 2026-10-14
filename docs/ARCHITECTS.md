@@ -52,6 +52,43 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
+### 2026-10-13 — Owner: hosted room UI for a manual two-computer trial
+
+**Ask:** Replace the proposed local portable delivery with a live staging page
+that lets two people connect for a manual PvP trial. Keep the rollback and
+Stadium work checkpointed and preserve the existing relay.
+
+**Decision:** Accepted. Serve the ordinary development runtime as static assets
+from the existing isolated `melee-web-room-relay-staging-288` Workers Free
+Worker. Keep the existing `RoomRelay` SQLite Durable Object and Worker source;
+send only `/v1/rooms/*` through the Worker. Add the hosted UI origin to the
+existing relay allowlist. Keep workers.dev-only routing, no preview URL, no
+DNS, plan, billing, account/security, production or paid-service changes. The
+local-package attempt remains historical preparation and is not the selected
+user setup.
+
+The manual trial is two separate Macs, using each player's own local disc. The
+host assigns Player 1 to Keyboard through the existing Controls panel. The
+joiner assigns an attached controller to Player 2 / Port 2 and selects
+**Controller only** through the existing input and remapping controls. Do not
+require a controller model. Record the live build/provider/browser identities,
+connection, intended inputs, timing incidents, any completed match and clean
+stop/unload. The trial exercises the existing interim lockstep route; it does
+not change the match-only rollback target or by itself establish acceptance.
+
+**Status:** The final candidate passed full regression and ordinary Release
+build validation. Its second deployment passed static HTTP verification, and
+the bounded CSS/Host/Join/Leave check passed with exact paired records and
+verified normal native unload. The first candidate's full-route attempt still
+stands as a separate failure while progressing through Results; it was not
+completed by the short check. The two-Mac trial has not run. See the
+[hosted-room boundary](status/2026-10-13-hosted-staging-room.md).
+
+**Links:** [Issue #288](https://github.com/ericvanlare/melee-web/issues/288),
+[current local readiness boundary](status/2026-10-11-local-room-ui-readiness.md),
+[historical local-package preparation](status/2026-10-13-manual-two-computer-alpha.md),
+[A4 match-only rollback target](ROADMAP.md#track-a-match-only-rollback-online).
+
 ### 2026-10-13 — Owner: rollback checkpoint and Stadium sprint
 
 **Ask:** Proceed with the next sprint: one same-instance Mario/FD checkpoint,

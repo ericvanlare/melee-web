@@ -17,6 +17,7 @@ const adapterRace = process.argv.includes('--adapter-race');
 const adapterRetry = process.argv.includes('--adapter-retry');
 const adapterTimeoutLate = process.argv.includes('--adapter-timeout-late');
 const adapterDeadlineSpan = process.argv.includes('--adapter-deadline-span');
+const startupProfileReentrant = process.argv.includes('--startup-profile-reentrant');
 const lifecycleHandoff = process.argv.includes('--lifecycle-handoff');
 const diagnosticsRetentionCheckpoint = process.argv.includes('--diagnostics-retention-checkpoint');
 const diagnosticsRetentionDestroy = process.argv.includes('--diagnostics-retention-destroy');
@@ -117,7 +118,7 @@ if (diagnosticsRetentionMode && !diagnosticsRetentionDenied) {
 }
 let phase = 0, running = false, nextPointer = 16,
   cacheWaits = startupCacheDelay ? 2 : startupCacheTimeout ? Number.MAX_SAFE_INTEGER : 0, audioClosed = false;
-let rendererStarted = false, cacheIdleCalls = 0;
+let rendererStarted = false, cacheIdleCalls = 0, graphicsStartupReads = 0;
 let failedFile = null, serviceBatch = 0;
 const calls = [], states = [], ownerErrors = [], listeners = new Map();
 let controlledDiscSession = null, releaseDiscScope = null, reportDiscProgress = null;
@@ -211,13 +212,13 @@ globalThis.testOpenNativeGameDiscSession = async file => {
 const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'melee-runtime-owner-'));
 const sourcePath = path.join(temporary, 'runtime.mjs');
 await fs.copyFile(new URL('../web/controller-input.mjs', import.meta.url), path.join(temporary, 'controller-input.mjs'));
-for (const module of ['runtime-diagnostics.mjs', 'runtime-diagnostics-delivery.mjs', 'diagnostics-settings.mjs', 'diagnostics-schema.mjs']) {
+for (const module of ['runtime-diagnostics.mjs', 'runtime-diagnostics-delivery.mjs', 'diagnostics-settings.mjs', 'diagnostics-schema.mjs', 'startup-profile.mjs']) {
   await fs.copyFile(new URL(`../web/${module}`, import.meta.url), path.join(temporary, module));
 }
 await fs.writeFile(sourcePath, source);
 const {mountMeleeRuntime} = await import(pathToFileURL(sourcePath));
 await fs.rm(temporary, {recursive: true});
-if (adapterRace || adapterRetry || adapterTimeoutLate || adapterDeadlineSpan) {
+if (adapterRace || adapterRetry || adapterTimeoutLate || adapterDeadlineSpan || startupProfileReentrant) {
   let createdAudio = 0, owners = 0, configurations = 0, assignedModule = null, moduleAssignments = 0;
   Object.defineProperty(globalThis, 'Module', {configurable: true,
     get: () => assignedModule,
@@ -254,6 +255,32 @@ if (adapterRace || adapterRetry || adapterTimeoutLate || adapterDeadlineSpan) {
     readyModule();
     assert.equal((await first).getState().ready, true);
     console.log('Shared runtime owner: deferred concurrent adapter requests reserve one document owner before audio, Module, or loader setup.');
+    process.exit(0);
+  }
+
+  if (startupProfileReentrant) {
+    adapterImplementation = () => deferredAdapter;
+    let reentrantAttempt = null, reentrantStarted = false, profileUpdates = 0;
+    const firstOptions = options();
+    firstOptions.onStartupProfile = profile => {
+      profileUpdates++;
+      if (profile.status === 'pending' && !reentrantStarted) {
+        reentrantStarted = true;
+        reentrantAttempt = mountMeleeRuntime(options());
+      }
+    };
+    const first = mountMeleeRuntime(firstOptions);
+    assert.ok(reentrantAttempt, 'The first profile callback runs only after the first owner reserves the document');
+    await assert.rejects(reentrantAttempt, /Reload the page/,
+      'A profile callback cannot reenter mount before document reservation');
+    assertEffects({audio: 0, owners: 0, configurations: 0, modules: 0, loaders: 0});
+    resolveDeferredAdapter({limits: {}});
+    await new Promise(resolve => setImmediate(resolve));
+    assertEffects({audio: 1, owners: 1, configurations: 1, modules: 1, loaders: 1});
+    readyModule();
+    assert.equal((await first).getState().ready, true);
+    assert.ok(profileUpdates >= 2, 'The accepted owner reports bounded startup milestones');
+    console.log('Shared runtime owner: startup profile callbacks cannot reenter document ownership.');
     process.exit(0);
   }
 
@@ -424,6 +451,8 @@ if (fatalAudioDiscOperation || networkOwnerLifecycle) Object.assign(Module, {
 if (missingCacheService) delete Module._melee_web_native_menu_cache_idle;
 if (startupCacheDelay) assert.equal(Module._melee_web_native_menu_cache_idle(), 1,
   'The pre-main cache status is not used as startup readiness');
+Object.defineProperty(Module, 'graphicsStartup', {configurable: true,
+  get() { graphicsStartupReads++; return undefined; }});
 Module.onRuntimeInitialized();
 let player = await mounted;
 assert.equal(player.getState().ready, true);
@@ -1078,6 +1107,11 @@ Module.pipelinePreparation.ready = true;
 window.menuFrame(false);
 assert.equal(player.getState().loading, null, 'Ready catalog clears startup loading');
 assert.equal(player.getState().graphicsReady, true);
+assert.equal(player.getStartupProfile().terminal, true, 'The startup snapshot remains available after readiness');
+const startupGraphicsReads = graphicsStartupReads;
+window.menuFrame(false);
+assert.equal(graphicsStartupReads, startupGraphicsReads,
+  'Terminal startup profiling stops reading Module.graphicsStartup on later frames');
 assert.equal(player.Module, undefined, 'Native module is not on the public handle');
 await assert.rejects(mountMeleeRuntime({canvas}), /Reload the page/);
 async function pump(promise) {

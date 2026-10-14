@@ -1,0 +1,134 @@
+body[data-surface="staging"] {
+  width: auto;
+  max-width: none;
+  min-height: 100%;
+  margin: 0;
+  padding: clamp(16px, 3vw, 36px);
+  background: radial-gradient(ellipse at 84% 10%, #263754 0, #151d2c 38%, #0b1019 100%);
+  color: #edf2fb;
+}
+
+body[data-surface="staging"] #runtime-page {
+  display: grid;
+  grid-template-columns: minmax(290px, 410px) minmax(0, 1fr);
+  grid-template-areas:
+    "header header"
+    "disc game"
+    "room game"
+    "actions help"
+    "status help";
+  align-items: start;
+  gap: 14px 22px;
+  width: min(1240px, 100%);
+  margin: 0 auto;
+}
+
+body[data-surface="staging"] #runtime-header { grid-area: header; margin-bottom: 8px; }
+body[data-surface="staging"] .runtime-kicker {
+  margin: 0 0 8px;
+  color: #a9c8e8;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+body[data-surface="staging"] #page-heading { margin: 0; font-size: clamp(28px, 4vw, 42px); line-height: 1.1; }
+body[data-surface="staging"] #staging-intro { max-width: 58ch; margin: 10px 0 0; color: #bbc8d9; line-height: 1.5; }
+
+body[data-surface="staging"] #disc-label,
+body[data-surface="staging"] #lockstep-room,
+body[data-surface="staging"] #runtime-actions,
+body[data-surface="staging"] #status {
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid #34445d;
+  border-radius: 12px;
+  background: #121a27eF;
+  box-shadow: 0 12px 32px #0003;
+}
+body[data-surface="staging"] #disc-label { grid-area: disc; display: grid; gap: 10px; font-weight: 650; }
+body[data-surface="staging"] #disc { width: 100%; min-width: 0; }
+body[data-surface="staging"] #lockstep-room { grid-area: room; }
+body[data-surface="staging"] #lockstep-room legend { padding: 0 6px; color: #dceaff; font-size: 17px; font-weight: 700; }
+body[data-surface="staging"] #room-help { margin: 2px 0 12px; color: #bdc8d7; font-size: 13px; line-height: 1.5; }
+body[data-surface="staging"] #role-controls-help { display: grid; gap: 9px; margin: 10px 0 14px; }
+body[data-surface="staging"] #role-controls-help section { padding: 10px 11px; border: 1px solid #34445d; border-radius: 8px; background: #0c1320; }
+body[data-surface="staging"] #role-controls-help h2 { margin: 0 0 5px; color: #e4efff; font-size: 13px; }
+body[data-surface="staging"] #role-controls-help p { margin: 4px 0; color: #b6c4d5; font-size: 12px; line-height: 1.45; }
+body[data-surface="staging"] #role-controls-help .role-controls-note { padding-top: 3px; color: #d4e4f8; }
+body[data-surface="staging"] #lockstep-relay-setting { display: none !important; }
+body[data-surface="staging"] #lockstep-room label { display: block; margin: 12px 0 6px; color: #dce5f1; font-size: 12px; font-weight: 650; }
+body[data-surface="staging"] #lockstep-room textarea,
+body[data-surface="staging"] #lockstep-room input[type="url"] {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 9px 10px;
+  border: 1px solid #465873;
+  border-radius: 7px;
+  background: #0a1019;
+  color: #e8eff9;
+  font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+body[data-surface="staging"] #lockstep-room textarea { min-height: 54px; resize: vertical; }
+body[data-surface="staging"] .room-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+body[data-surface="staging"] button {
+  margin: 4px 4px 4px 0;
+  padding: 10px 14px;
+  border: 1px solid #6687ad;
+  border-radius: 8px;
+  background: #dcecff;
+  color: #132237;
+  font-weight: 700;
+  cursor: pointer;
+}
+body[data-surface="staging"] button:hover:not(:disabled) { background: #fff; }
+body[data-surface="staging"] button:disabled { border-color: #39485d; background: #263245; color: #8492a7; cursor: not-allowed; }
+body[data-surface="staging"] button:focus-visible,
+body[data-surface="staging"] input:focus-visible,
+body[data-surface="staging"] textarea:focus-visible,
+body[data-surface="staging"] canvas:focus-visible { outline: 3px solid #8bc8ff; outline-offset: 2px; }
+body[data-surface="staging"] #lockstep-copy,
+body[data-surface="staging"] #lockstep-copy-link,
+body[data-surface="staging"] #lockstep-leave,
+body[data-surface="staging"] #lockstep-retry { background: #26364b; color: #e3efff; }
+body[data-surface="staging"] #lockstep-status { display: block; min-height: 42px; margin: 10px 0 0; color: #d2e6fb; font-size: 13px; line-height: 1.5; }
+body[data-surface="staging"] #lockstep-copy-status { display: inline-block; color: #b9e0c1; font-size: 12px; }
+
+body[data-surface="staging"] #runtime-actions { grid-area: actions; }
+body[data-surface="staging"] #runtime-actions #launch,
+body[data-surface="staging"] #runtime-actions #pause { display: none !important; }
+body[data-surface="staging"] #runtime-actions #unload { background: #26364b; color: #e3efff; }
+body[data-surface="staging"] #status { grid-area: status; color: #aebed2; font-size: 12px; line-height: 1.45; }
+body[data-surface="staging"] #cache-status,
+body[data-surface="staging"] #perf-metrics,
+body[data-surface="staging"] #render-metrics,
+body[data-surface="staging"] #construction-metrics,
+body[data-surface="staging"] #audio-metrics,
+body[data-surface="staging"] #developer-diagnostics { display: none !important; }
+
+body[data-surface="staging"] #game-host {
+  grid-area: game;
+  align-self: start;
+  width: 100%;
+  min-height: 280px;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  border: 1px solid #44536a;
+  border-radius: 12px;
+  background: #000;
+  box-shadow: 0 18px 48px #0006;
+}
+body[data-surface="staging"] #game-host canvas { border-radius: inherit; }
+body[data-surface="staging"] #input-guidance { grid-area: help; align-self: start; margin: 0; color: #adbdd0; font-size: 12px; line-height: 1.5; }
+body[data-surface="staging"] #controls-dialog { color: #111; }
+
+@media (max-width: 760px) {
+  body[data-surface="staging"] #runtime-page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "header" "disc" "room" "actions" "status" "game" "help";
+    gap: 12px;
+  }
+  body[data-surface="staging"] #game-host { min-height: 0; }
+}

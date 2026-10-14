@@ -231,3 +231,36 @@ orderly teardown followed by an actual same-origin reload. It verifies the
 incident identity survives in IndexedDB; it does not simulate a process kill.
 Use [hitch capture](HITCH_CAPTURE.md) to reduce a natural failure and
 [the accuracy contract](ACCURACY_CONTRACT.md) for separate acceptance gates.
+
+
+## Startup timing in the player
+
+The public player’s **Startup details** button is available before native startup
+and after a startup error. It shows a bounded local report and can export
+`webmelee-startup.json`. The report is separate from incident reporting: it is
+not uploaded or saved to browser storage. Its observer and elapsed timer stop
+when graphics readiness, startup failure or destruction is observed.
+
+The report distinguishes the adapter request, compiled loader, runtime
+initialization, first native callback, existing cache-idle gate and graphics
+readiness. Ordinary builds expose read-only renderer initialization time and
+queued/created pipeline counters through the existing cache-idle observation.
+A bounded queue history helps distinguish slow work from time between callbacks.
+The optional selective-pipeline build’s catalog timings remain separately
+labelled when available. Matching `webmelee-startup:` User Timing events can be
+seen in Chrome’s Performance panel.
+
+Identity comes from the packaged source commit, runtime graph and build profile.
+Known loader/Wasm/data resource entries contain timing and byte counts, with
+asset basenames only. Zero transferred bytes do not establish a particular
+cache hit. Native cache-idle `-1` remains an optional-cache failure, even when
+the player can continue. Pipeline creation counters do not establish GPU
+completion; overlapping native duration fields must not be added together.
+Missing browser or native observations are explicit.
+
+Start a Performance recording before reloading when investigating a real
+browser profile. Retain cache/throttling settings and build identity with the
+report. A warm reload, fresh browser context and cold graphics-driver cache
+are different conditions. The startup report measures admission to graphics
+readiness, not scene preparation, game simulation, pixels, PCM or performance
+acceptance. See the [startup evidence boundary](status/2026-10-13-graphics-startup-profile.md).

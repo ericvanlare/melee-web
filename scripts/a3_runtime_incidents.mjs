@@ -1,9 +1,11 @@
 /** Retain the existing runtime recorder without adding a live gameplay observer. */
 export function incidentRecordingUrl(value) {
   const url = new URL(value);
-  if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' ||
-      url.port !== '8787' || url.pathname !== '/runtime.html')
-    throw Error('Incident recording requires the supported loopback runtime page');
+  const loopback = url.origin === 'http://127.0.0.1:8787' && url.pathname === '/runtime.html';
+  const hosted = url.origin === 'https://melee-web-room-relay-staging-288.mywebcomic.workers.dev' &&
+    ['/', '/runtime.html'].includes(url.pathname);
+  if ((!loopback && !hosted) || url.username || url.password || url.hash)
+    throw Error('Incident recording requires the supported loopback or isolated staging runtime page');
   const requested = url.searchParams.getAll('melee-web-staging-diagnostics');
   if (requested.some(value => value !== '1'))
     throw Error('Room captures require staging incident diagnostics enabled');
@@ -24,7 +26,8 @@ export function requireIncidentRecorderReadiness(value) {
   if (value?.requested !== true || value?.export_available !== true ||
       selection?.staging_diagnostics_requested !== true ||
       selection?.staging_diagnostics_enabled !== true ||
-      selection?.staging_diagnostics_reason !== 'explicit_loopback_opt_in')
+      !['explicit_loopback_opt_in', 'explicit_hosted_staging_opt_in'].includes(
+        selection?.staging_diagnostics_reason))
     throw Error('Runtime staging incident recorder readiness was not verified');
   return value;
 }

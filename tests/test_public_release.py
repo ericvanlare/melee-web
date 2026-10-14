@@ -153,6 +153,7 @@ class PublicReleaseTests(unittest.TestCase):
         runtime.mkdir(parents=True)
         source_map = {
             "melee-runtime.mjs": fixture_root / "web" / "melee-runtime.mjs",
+            "startup-profile.mjs": fixture_root / "web" / "startup-profile.mjs",
             "save-profile-settings.mjs": fixture_root / "web" / "save-profile-settings.mjs",
             "save-profile-store.mjs": fixture_root / "web" / "save-profile-store.mjs",
             "gamecube-save.mjs": fixture_root / "web" / "gamecube-save.mjs",

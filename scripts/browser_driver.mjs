@@ -4,6 +4,7 @@
  */
 const SURFACES = Object.freeze({
   development: {import:'#disc', start:'#launch', pause:'#pause', unload:'#unload'},
+  'staging-room': {import:'#disc', start:'#lockstep-host', pause:'#pause', unload:'#unload'},
   public: {import:'#choose-disc', start:'#start-game', pause:'#pause-game', unload:'#end-session'},
 });
 
@@ -80,7 +81,7 @@ export function createBrowserDriver(page, {surface='development', timeoutMs=6000
   }
   const waitForImport=()=>step('wait-for-import',()=>enabled(controls.import));
   const waitForStart=()=>step('wait-for-start',async()=>{
-    if(surface!=='development')throw Error('Public players auto-launch; use waitForPublicCss()');
+    if(surface!=='development'&&surface!=='staging-room')throw Error('Public players auto-launch; use waitForPublicCss()');
     await enabled(controls.start);
   });
   const waitForPublicCss=()=>step('wait-for-public-css',async()=>{
@@ -143,7 +144,7 @@ export function createBrowserDriver(page, {surface='development', timeoutMs=6000
   async function selectDisc(file) {
     return step('select-disc',async()=>{
       await enabled(controls.import,{allowRecovery:true});
-      if(surface==='development') {
+      if(surface==='development'||surface==='staging-room') {
         await page.locator(controls.import).setInputFiles(file,{timeout:remaining()});
       } else {
         await page.locator(controls.import).click({timeout:remaining()});
@@ -214,7 +215,7 @@ export function createBrowserDriver(page, {surface='development', timeoutMs=6000
     ]);
     else await page.locator(controls.unload).click({timeout:remaining()});
     await enabled(controls.import);
-    if(surface==='development') {
+    if(surface==='development'||surface==='staging-room') {
       const result=await page.waitForFunction(()=>{
         const error=document.querySelector('#status')?.dataset.runtimeError;
         if(error)return {error};

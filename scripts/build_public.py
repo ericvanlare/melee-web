@@ -43,6 +43,7 @@ SOURCE_ALLOWLIST = (
 PLAYER_SOURCE_ALLOWLIST = ("index.html", "player.css", "player-shell.mjs")
 PLAYER_RUNTIME_FILES = (
     "melee-runtime.mjs",
+    "startup-profile.mjs",
     "save-profile-settings.mjs",
     "save-profile-store.mjs",
     "gamecube-save.mjs",
@@ -67,6 +68,7 @@ PLAYER_RUNTIME_FILES = (
 PLAYER_ALLOWED_ARTIFACTS = frozenset(PLAYER_RUNTIME_FILES) | {"gameplay_public.data"}
 PLAYER_SOURCE_RUNTIME_FILES = (
     "melee-runtime.mjs",
+    "startup-profile.mjs",
     "save-profile-settings.mjs",
     "save-profile-store.mjs",
     "gamecube-save.mjs",
@@ -129,6 +131,7 @@ RUNTIME_SOURCE_FILES = (
     "web/initial_pipeline_cache.db.gz.b64",
     "web/disc-session.mjs",
     "web/melee-runtime.mjs",
+    "web/startup-profile.mjs",
     "web/runtime-assets.mjs",
     "web/runtime-audio-assets.mjs",
     "web/runtime-diagnostics-delivery.mjs",
@@ -1187,7 +1190,7 @@ def _validate_runtime_graph(files: dict[str, bytes], *, audio: bool = False) -> 
             if not audio and re.search(r"(?:dsp-coefficients|audio-worklet|audio-ring|runtime-audio)", text, re.I):
                 raise BuildError(f"development audio module reference rejected in runtime JavaScript: {rel}")
     required_imports = {
-        "melee-runtime.mjs": ("./runtime-assets.mjs", "./gameplay_public.js", "./controller-input.mjs"),
+        "melee-runtime.mjs": ("./runtime-assets.mjs", "./gameplay_public.js", "./controller-input.mjs", "./startup-profile.mjs"),
         "save-profile-settings.mjs": ("./gamecube-save.mjs", "./save-profile-store.mjs"),
         "runtime-assets.mjs": ("./disc-image.mjs", "./disc-session.mjs"),
         "disc-session.mjs": ("./disc-image.mjs",),
@@ -1581,6 +1584,7 @@ def build(
         runtime_files = dict(native_files)
         source_runtime = {
             "melee-runtime.mjs": ROOT / "web" / "melee-runtime.mjs",
+            "startup-profile.mjs": ROOT / "web" / "startup-profile.mjs",
             "save-profile-settings.mjs": ROOT / "web" / "save-profile-settings.mjs",
             "save-profile-store.mjs": ROOT / "web" / "save-profile-store.mjs",
             "gamecube-save.mjs": ROOT / "web" / "gamecube-save.mjs",
