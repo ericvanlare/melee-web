@@ -42,7 +42,46 @@ The new run **fails when the runtime refuses the native-retirement notification*
 
 **Reviewed cleanup and transfer repair:** The actual runtime-owner reducer passes 51 discovered owner tests and three runner-gate tests. It separates observed native closure from accepted host retirement, settles only stale native preparation through the existing cancellation callback, and preserves active transfer, queued-command, disc/handoff and fatal-owner refusal. The failed browser run did not record the host flags; this establishes a reproduced cause class, not its exact sampled flag. The independently reviewed per-action projection also passes its 21 controls and three affected discovery methods; it preserves the complete C/F record, native getter/callback order and full setup/final/failure reads while reducing only data transferred back to the host. Neither component result establishes browser cleanup or measured speed. Exact candidate, review and focused-result identities are under `terminal_owner_reducer` and `matched_action_projection` in the existing receipt.
 
-**Next C3 boundary:** Run fresh affected builds and full regression for the integrated repairs, then review one unchanged 174-action capture before attempting it. The reference contains **3,500 post-GO ticks / 7,167 actions**, while the browser still covers only 174 actions. Constant-mean extrapolation of this prefix would exceed the 89.181 seconds remaining when its action loop began; this is a planning estimate, not a measured long run. No longer run is released and no deadline is extended. The full-schedule consumer protocol remains unimplemented and unreviewed. C3 still requires lifetime A, checked retirement/recreation, then lifetime B with per-owner RNG comparison. Stop at the first missing pairing, mismatch, unsupported service or incomplete teardown. Keep [PR #301](https://github.com/ericvanlare/melee-web/pull/301) draft.
+**Current terminal-owner checkpoint (October 14):** Runtime and harness `8ca65a6f`
+pass both affected Release builds and the full 2,631-test regression (180 skips).
+A single changed-hypothesis headless replay completes the same 174 original
+schedule actions, with all 87 copied four-port PAD records matching the packet.
+Both C/F comparisons pass all 16 declared fields. Checked native retirement and
+host notification succeed on the first attempt; all recorded browser/server
+processes and groups are absent. The action loop takes 1,618.786 ms with no polls;
+360 persistence calls serialize 111,803,666 bytes in 427.405 ms inclusive. Nested
+serialization/write/rename timings are not additive to this total. The remaining
+global budget at loop entry is 89,516 ms. These are scoped prefix measurements,
+not a full-schedule cost prediction. Native pipeline-cache retirement is
+observed; JavaScript IDBFS persistence was not run, and ordinary-unload cache
+parity is not claimed. Historical failures and producers above remain unchanged.
+
+The retained preparation failures include a missing startup-profile build copy,
+a stale fixed artifact count, and pre-browser launcher binding/variable errors.
+The repaired launcher uses the existing canonical patched-tree calculation;
+pristine upstream HEAD is not the applied dependency tree. No dependency source
+was reset. These failures, focused reductions, successful package checks and
+exact producer identities are retained in the existing evidence receipt.
+
+**Offline report-cost checkpoint:** A source-bound synthetic workload exercised
+all 14,783 checkpoint calls implied by the retained 7,167-action schedule.
+Serialization took 66,342.891 ms and processed 89,286,001,840 cumulative JSON
+bytes in memory; the overall loop took 77,154.344 ms. Only one 14,595,004-byte
+synthetic terminal file was written and verified on disk. The 174-action
+synthetic calibration used 1.26384 times the actual prefix byte volume and
+0.742247 times its serialization time. This is representative cost evidence,
+not a lower bound, actual full-session cost or proof that the browser fits.
+No game action or comparison was executed.
+
+**Next C3 boundary:** Remove repeated serialization of completed append-only
+report histories while preserving every evidence checkpoint before approval,
+exact field/order reconstruction and failure evidence. Cost-only synthetic rows
+remain separate from actual input and comparison evidence.
+The full-schedule consumer protocol and lifetime A/B still require review; no
+longer capture or deadline increase is admitted. C3 requires lifetime A, checked
+retirement/recreation, then lifetime B with per-owner RNG comparison. Stop at the
+first missing pairing, mismatch, unsupported service or incomplete teardown.
+Keep [PR #301](https://github.com/ericvanlare/melee-web/pull/301) draft.
 
 **Previous zero-tick Setup constructor checkpoint:** The separate `b71da6f0` run compared the declared Setup fields and recorded a native-only constructor receipt: countdown 3,629, authored x0/x4 3,600/3,800, one constructor RNG call with bound 200 and result 29, and seed `3bb84c53 → 263cc5ca`; the completed Setup seed was `35a455b9`. Construction took six steps with zero match ticks, source frames or draws. At that checkpoint those constructor values were not observed in the original. The newer original constructor receipt is separate; matching numbers alone do not establish parity. The newer C/F pass is a separate bounded field comparison, not constructor, GO-state or lifetime parity.
 

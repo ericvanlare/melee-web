@@ -10450,6 +10450,129 @@
         "No native getter or source-order change.",
         "Synthetic transfer-byte comparison is not measured browser speed."
       ]
+    },
+    "terminal_owner_capture_2026_10_14": {
+      "result": "PASS_SCOPED_174_ACTION_PREFIX_AND_TERMINAL_RETIREMENT",
+      "raw_run_id": "rollback-sprint-resume-20261014-085704-6fe33b74",
+      "runtime_and_harness_source": "8ca65a6f2f67b20bbe7fbfd448a1f789c463be60",
+      "source_tree": "05feda23473968e95e008759fce197275238ddd6",
+      "validation": {
+        "release_builds": 2,
+        "state": "PASS",
+        "tests_run": 2631,
+        "skips": 180,
+        "ci": "PENDING_ON_FINAL_HEAD"
+      },
+      "actions": 174,
+      "ticks": 87,
+      "draws": 87,
+      "copied_four_port_bundles": 87,
+      "c_f_declared_comparisons_each": 16,
+      "seed_c": "868d77be",
+      "seed_f": "b50f624b",
+      "action_loop_ms": 1618.786,
+      "global_remaining_at_loop_entry_ms": 89516,
+      "persistence": {
+        "calls": 360,
+        "serialized_bytes": 111803666,
+        "inclusive_ms": 427.405,
+        "serialize_ms": 169.358,
+        "write_ms": 175.26,
+        "rename_ms": 45.686,
+        "nested_not_additive": true
+      },
+      "receipt_polls": 0,
+      "retirement": {
+        "native": true,
+        "host_notification": true,
+        "ready_observations": 1,
+        "pipeline_cache_status_before": 1,
+        "pipeline_cache_status_after": 0,
+        "phase_after": 0,
+        "running_after": 0,
+        "owned_processes_absent": true,
+        "javascript_idbfs_persistence": "NOT_RUN",
+        "ordinary_unload_cache_parity": "NOT_CLAIMED"
+      },
+      "artifacts": [
+        {
+          "file": "stadium-clean-validation-8ca65a6f-v1/evidence/result.json",
+          "bytes": 12208,
+          "sha256": "570621955a4e5ed1d331ebb2a227f863fc7e3d9ad6b92880f8d0037435ee96ca"
+        },
+        {
+          "file": "stadium-clean-validation-8ca65a6f-v1/root-result-review.json",
+          "bytes": 1633,
+          "sha256": "eb6c08fb530b244e5ad2f8baedbb2a9d34bd5de99918269e41ee5975574d94a5"
+        },
+        {
+          "file": "stadium-run2-terminal-owner-capture-8ca65a6f-v1/browser-run/report.json",
+          "bytes": 3311677,
+          "sha256": "4157cbd1785e46a5b52565f8079063975fd72feb1d4d21104d43b73a3b258f33"
+        },
+        {
+          "file": "stadium-run2-terminal-owner-capture-8ca65a6f-v1/postrun-summary-v1.json",
+          "bytes": 7288,
+          "sha256": "04dad60ac3974f6acf10697271fb7c3780273c461e19baff05fd8ec44facb46c"
+        },
+        {
+          "file": "stadium-run2-terminal-owner-capture-8ca65a6f-v1/owner.json",
+          "bytes": 159121,
+          "sha256": "38d77c55424a01b796ddbaa4a882a1a7aca6dad634f1ba0c95f0e0ce64873534"
+        },
+        {
+          "file": "stadium-run2-terminal-owner-capture-8ca65a6f-v1/completion.json",
+          "bytes": 7316,
+          "sha256": "26cd67bcec1b633297567edfe0502e32a08c02045e9cf3ef28319150ffb9eff5"
+        },
+        {
+          "file": "stadium-launcher-v4-independent-review.json",
+          "bytes": 3281,
+          "sha256": "67dbd201e37856243c902134de63e750a5cd7364b468340959732be8ea91ac84"
+        }
+      ],
+      "scope": "Same retained exact prefix/input/C-F comparator; no full7167/lifetimeA/B/per-ownerRNG/wholeC3 claim. Source/runtime unchanged and all owned processes retired. Historicalfailedcaptures remain failed.",
+      "next": "Review a bounded append-only history candidate preserving every existing evidence checkpoint and exact terminal/failure reconstruction; no longcapture or capextension. C3 remains open.",
+      "cost_only_workload": {
+        "class": "synthetic-cost-only",
+        "checkpoints": 14783,
+        "cumulative_serialized_bytes": 89286001840,
+        "serialize_ms": 66342.891,
+        "harness_wall_ms": 77154.344,
+        "actual_game_actions": 0,
+        "synthetic174_byte_ratio": 1.26384,
+        "synthetic174_time_ratio": 0.742247,
+        "real_disk_writes": 1,
+        "real_disk_write_bytes": 14595004,
+        "future_runtime_fit": "UNPROVED",
+        "scope": "Row-shape workload is not a lower bound; no cumulative disk-write replay, browser actions, input or RNGcomparison.",
+        "artifacts": [
+          {
+            "file": "stadium-persistence-cost-workload-v1/execution-v1/execution-freeze.json",
+            "sha256": "b30d9fc76b609a7b7811b0c1825cf8e255120270d3c52b9eefabaa38780f8986"
+          },
+          {
+            "file": "stadium-persistence-cost-workload-v1/execution-v1/workload.mjs",
+            "sha256": "9afb7660bb7c97a7cc803b397ca22bed4e9686ff2f5fe0ec1b698fcb69eb0530"
+          },
+          {
+            "file": "stadium-persistence-cost-workload-v1/execution-v1/serialization-cost-only-result.json",
+            "sha256": "f4b6aa393d4ae82917542cde9c4cb843726a1d4751b4442424b57d52d51d0058"
+          },
+          {
+            "file": "stadium-persistence-cost-workload-v1/execution-v1/single-atomic-write-sample.json",
+            "sha256": "04dcd695c910d1850b89ac0280548285bbd3a8387c443744e791be4fe762b48a"
+          },
+          {
+            "file": "stadium-persistence-cost-workload-v1/execution-v1/supervisor.json",
+            "sha256": "101a64ad3b9e71f845b120d02df96e7305742853f0da8f4c35400cee5943c28b"
+          },
+          {
+            "file": "stadium-persistence-cost-workload-v1/execution-v1/root-result-review.json",
+            "sha256": "517abfc74838c0f846fa281cae873161e2d7640d8db891dddd7824653ce06fc5"
+          }
+        ]
+      }
     }
   }
 }
