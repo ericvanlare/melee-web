@@ -20,7 +20,8 @@ import {createCssSssTransitionCapture, CSS_SSS_TRANSITION_LIMITS,
 import {validateMatchedSetupCfRequest, validateMatchedSetupCfPreflight,
   validateMatchedSetupCfIdentities, matchedSetupCfRuntimeFailure, PREFIX_V2_SCOPE, FULL_V3_SCOPE,
   trackMatchedSetupCfExplicitStep, matchedSetupCfNativeAccessAllowed,
-  dispatchMatchedSetupCfNativeEvaluation, guardMatchedSetupCfNativeCleanup}
+  dispatchMatchedSetupCfNativeEvaluation, guardMatchedSetupCfNativeCleanup,
+  FULL_COMMON_FIELDS_SEED_V1_SCOPE}
   from './stadium_matched_setup_cf_runner_gate.mjs';
 import {elapsedMs, measureAsync, measureSync, monotonicNowNs, roundMs,
   summarizeFailedActionSamples, summarizeStageEvents, summarizeTimingValues}
@@ -51,6 +52,7 @@ const {values} = parseArgs({options: Object.fromEntries(
       ['first-sss-vs-setup-cf', {type: 'boolean', default: false}],
       ['first-sss-vs-setup-cf-explicit-step', {type: 'boolean', default: false}],
       ['first-sss-vs-setup-cf-full-schedule', {type: 'boolean', default: false}],
+      ['first-sss-vs-setup-cf-common-fields', {type: 'boolean', default: false}],
       ['first-sss-vs-setup-text-tail', {type: 'boolean', default: false}],
     ])), strict: true});
 const cssSssReducer = values['css-sss-reducer'];
@@ -58,9 +60,10 @@ const firstSssVsSetup = values['first-sss-vs-setup'];
 const firstSssVsSetupTextTail = values['first-sss-vs-setup-text-tail'];
 const firstSssVsSetupCfExplicitStep = values['first-sss-vs-setup-cf-explicit-step'];
 const firstSssVsSetupCfFullSchedule = values['first-sss-vs-setup-cf-full-schedule'];
+const firstSssVsSetupCfCommonFields = values['first-sss-vs-setup-cf-common-fields'];
 const firstSssVsSetupCf = validateMatchedSetupCfRequest({
   enabled: values['first-sss-vs-setup-cf'], explicitStep: firstSssVsSetupCfExplicitStep,
-  fullSchedule: firstSssVsSetupCfFullSchedule,
+  fullSchedule: firstSssVsSetupCfFullSchedule, commonFields: firstSssVsSetupCfCommonFields,
   setup: firstSssVsSetup,
   textTail: firstSssVsSetupTextTail,
   packetPath: values['first-sss-vs-setup-cf-packet'] || null,
@@ -126,6 +129,7 @@ const matchedSetupCfPreflight = validateMatchedSetupCfPreflight(preflight, {
   enabled: firstSssVsSetupCf,
   explicitStep: firstSssVsSetupCfExplicitStep,
   fullSchedule: firstSssVsSetupCfFullSchedule,
+  commonFields: firstSssVsSetupCfCommonFields,
   packetPath: values['first-sss-vs-setup-cf-packet']
     ? path.resolve(values['first-sss-vs-setup-cf-packet']) : null,
   assemblyPath: values['first-sss-vs-setup-cf-assembly']
@@ -133,7 +137,8 @@ const matchedSetupCfPreflight = validateMatchedSetupCfPreflight(preflight, {
   helperPath: path.join(ROOT, 'tests/stadium_matched_setup_cf_consumer.mjs'),
 });
 const firstSssVsSetupCfV2 = firstSssVsSetupCf &&
-  (matchedSetupCfPreflight.scope === PREFIX_V2_SCOPE || matchedSetupCfPreflight.scope === FULL_V3_SCOPE);
+  (matchedSetupCfPreflight.scope === PREFIX_V2_SCOPE || matchedSetupCfPreflight.scope === FULL_V3_SCOPE ||
+   matchedSetupCfPreflight.scope === FULL_COMMON_FIELDS_SEED_V1_SCOPE);
 const matchedSetupCfTiming = firstSssVsSetupCfV2 ? {
   actionSamples: [], scheduledActions: null, actionLoopActive: false, actionLoopStartedNs: null,
   actionLoopMs: null, globalCaptureDeadlineRemainingAtActionLoopStartMs: null,
@@ -336,7 +341,9 @@ const report = {
     server_process_exit: null, failures: []},
   source_request_scope: firstSssVsSetupCf
     ? firstSssVsSetupCfV2
-      ? firstSssVsSetupCfFullSchedule
+      ? firstSssVsSetupCfCommonFields
+        ? 'Strict same-run original Setup then all7167 source-ordered actions, exact consumed PAD and C/F/GO checks plus 3501 declared post-tick common-field comparisons; no full-state or C3 acceptance.'
+        : firstSssVsSetupCfFullSchedule
         ? 'Strict same-run original Setup then all7167 source-ordered actions, exact consumed PAD and C/F fields; measured functionalA probe, no C3 acceptance.'
         : 'Strict same-run Entry and completed Setup comparison, then the extracted run2 proper prefix from action0 through the next draw/tick/draw after dynamically mapped C/F; compare C/F before their following draws, then stop.'
       : 'Strict same-run Entry and completed Setup comparison, then the exact original 86-tick/85-draw schedule; compare C after tick84 before draw84 and F after tick85 before draw85, then stop.'
@@ -793,6 +800,31 @@ async function loadMatchedSetupCfInputs() {
     return {path: path.resolve(file), basename: path.basename(file),
       bytes: bytes.byteLength, sha256: digest(bytes), content: bytes};
   };
+  const readBoundedIdentity = async (file, expectedBytes) => {
+    const handle = await fs.open(file, 'r');
+    try {
+      const before = await handle.stat();
+      if (!before.isFile() || before.size !== expectedBytes)
+        throw Error(`Retained RNG sidecar size is not exactly ${expectedBytes} bytes`);
+      const content = Buffer.alloc(expectedBytes);
+      let offset = 0;
+      while (offset < content.length) {
+        const {bytesRead} = await handle.read(content, offset, content.length - offset, offset);
+        if (bytesRead <= 0) break;
+        offset += bytesRead;
+      }
+      const extra = Buffer.alloc(1);
+      const {bytesRead: extraBytes} = await handle.read(extra, 0, 1, expectedBytes);
+      const after = await handle.stat();
+      if (offset !== expectedBytes || extraBytes !== 0 || after.size !== expectedBytes ||
+          before.dev !== after.dev || before.ino !== after.ino)
+        throw Error('Retained RNG sidecar changed while being read');
+      return {path: path.resolve(file), basename: path.basename(file),
+        bytes: content.byteLength, sha256: digest(content), content};
+    } finally {
+      await handle.close();
+    }
+  };
   const [packetIdentity, assemblyIdentity, helperIdentity] = await Promise.all([
     readIdentity(packetPath), readIdentity(assemblyPath), readIdentity(helperPath),
   ]);
@@ -807,10 +839,38 @@ async function loadMatchedSetupCfInputs() {
   try { assembly = JSON.parse(assemblyIdentity.content.toString('utf8')); }
   catch (error) { throw Error(`Matched Setup C/F evidence assembly is malformed: ${errorText(error)}`); }
   const helper = await import(pathToFileURL(helperPath).href);
-  const hostEvidence = helper.hostEvidenceFromPacket(packet, {fullSchedule: firstSssVsSetupCfFullSchedule});
-  assert.equal(['run2-proper-prefix-v2', 'run2-full-schedule-v3'].includes(hostEvidence.mode), firstSssVsSetupCfV2,
+  let seedSidecar = null, seedIdentity = null, seedReferenceIdentity = null;
+  if (firstSssVsSetupCfCommonFields) {
+    const expected = helper.IDLE_SEED_REFERENCE_IDENTITY;
+    const binding = packet?.host_only?.source_identity?.source_run?.run_artifacts?.[
+      'idle3500-reference.json'];
+    if (!expected || !binding ||
+        Object.keys(binding).sort().join(',') !== 'bytes,hash_source,path,sha256' ||
+        typeof binding.path !== 'string' || !path.isAbsolute(binding.path) ||
+        path.resolve(binding.path) !== binding.path ||
+        path.basename(binding.path) !== expected.basename ||
+        binding.bytes !== expected.bytes || binding.sha256 !== expected.sha256 ||
+        binding.hash_source !== expected.hash_source)
+      throw Error('Original run2 packet does not bind the exact retained idle RNG sidecar');
+    const loadedSeedIdentity = await readBoundedIdentity(binding.path, expected.bytes);
+    if (loadedSeedIdentity.path !== binding.path ||
+        loadedSeedIdentity.basename !== expected.basename ||
+        loadedSeedIdentity.bytes !== expected.bytes || loadedSeedIdentity.sha256 !== expected.sha256)
+      throw Error('Retained idle RNG sidecar bytes differ from the packet-bound identity');
+    try { seedSidecar = JSON.parse(loadedSeedIdentity.content.toString('utf8')); }
+    catch (error) { throw Error(`Retained idle RNG sidecar is malformed: ${errorText(error)}`); }
+    seedIdentity = {path: loadedSeedIdentity.path, basename: loadedSeedIdentity.basename,
+      bytes: loadedSeedIdentity.bytes, sha256: loadedSeedIdentity.sha256};
+    seedReferenceIdentity = {...seedIdentity, hash_source: binding.hash_source};
+  }
+  const hostEvidence = helper.hostEvidenceFromPacket(packet, {
+    fullSchedule: firstSssVsSetupCfFullSchedule, commonFields: firstSssVsSetupCfCommonFields,
+    seedSidecar, seedIdentity});
+  assert.equal(['run2-proper-prefix-v2', 'run2-full-schedule-v3',
+    'run2-full-common-fields-seed-v1'].includes(hostEvidence.mode), firstSssVsSetupCfV2,
     'packet schema differs from the preflight-bound continuation version');
-  if (['run2-proper-prefix-v2', 'run2-full-schedule-v3'].includes(hostEvidence.mode)) {
+  if (['run2-proper-prefix-v2', 'run2-full-schedule-v3',
+    'run2-full-common-fields-seed-v1'].includes(hostEvidence.mode)) {
     assert.deepEqual(Object.keys(assembly).sort(),
       ['host_only_expectations_sha256', 'runtime_payload_sha256', 'schema', 'scope'].sort());
     assert.equal(assembly.schema, 'melee-web-stadium-run2-source-action-assembly-v1');
@@ -831,6 +891,7 @@ async function loadMatchedSetupCfInputs() {
       Object.entries(assemblyIdentity).filter(([key]) => key !== 'content')),
     helperIdentity: Object.fromEntries(
       Object.entries(helperIdentity).filter(([key]) => key !== 'content')),
+    seedReferenceIdentity,
     assemblySchema: assembly.schema, runtimePayloadSha256: digest(Buffer.from(
       JSON.stringify(sortedJsonValue(packet.runtime_payload), null, 2) + '\n'))};
 }
@@ -2743,8 +2804,10 @@ function matchedSetupCfNativeAdapter({mode, explicitStep = false}) {
     return response.result;
   };
   return {
-    arm: async suppliedManifest => ['run2-proper-prefix-v2', 'run2-full-schedule-v3'].includes(mode)
-      ? execute({kind: mode === 'run2-full-schedule-v3' ? 'arm-explicit-full'
+    arm: async suppliedManifest => ['run2-proper-prefix-v2', 'run2-full-schedule-v3',
+      'run2-full-common-fields-seed-v1'].includes(mode)
+      ? execute({kind: (mode === 'run2-full-schedule-v3' ||
+          mode === 'run2-full-common-fields-seed-v1') ? 'arm-explicit-full'
           : explicitStep ? 'arm-explicit-v2' : 'arm-v2',
         manifestBytes: Array.from(suppliedManifest)},
         'Arm the one-use run2 proper-prefix continuation')
@@ -2753,7 +2816,8 @@ function matchedSetupCfNativeAdapter({mode, explicitStep = false}) {
       `Service explicit run2 source action ${scheduleIndex}`),
     queue: async (scheduleIndex, action, bytes) => {
       const actionSample = matchedSetupCfTiming?.currentActionSample ?? null;
-      const queueOperation = () => ['run2-proper-prefix-v2', 'run2-full-schedule-v3'].includes(mode)
+      const queueOperation = () => ['run2-proper-prefix-v2', 'run2-full-schedule-v3',
+        'run2-full-common-fields-seed-v1'].includes(mode)
         ? execute({kind: 'queue-v2', scheduleIndex, action: action.action,
           ordinal: action.action === 'tick' ? action.bundle : action.draw,
           bundle: action.bundle ?? -1}, `Queue run2 source action ${scheduleIndex}`)
@@ -2791,7 +2855,10 @@ async function runMatchedSetupCfContinuation(setupNative) {
   const inputs = matchedSetupCfInputs;
   const {helper, hostEvidence} = inputs;
   const mode = hostEvidence.mode ?? 'legacy-v1';
-  const isV2 = ['run2-proper-prefix-v2', 'run2-full-schedule-v3'].includes(mode);
+  const isV2 = ['run2-proper-prefix-v2', 'run2-full-schedule-v3',
+    'run2-full-common-fields-seed-v1'].includes(mode);
+  const fullScheduleMode = mode === 'run2-full-schedule-v3' || mode === 'run2-full-common-fields-seed-v1';
+  const commonFieldsMode = mode === 'run2-full-common-fields-seed-v1';
   const actualSetup = setupNative?.first_sss_vs_setup?.actual;
   assert.equal(actualSetup?.phase, 'vs_setup');
   assert.equal(actualSetup?.start?.rules?.x1_3, 0,
@@ -2800,13 +2867,16 @@ async function runMatchedSetupCfContinuation(setupNative) {
   assert.equal(setupStatus?.approved, true,
     'Matched Setup C/F arm requires the completed strict Setup comparison');
   assertFirstSssVsSetupOwners(setupNative.first_sss_vs_setup);
+  const admittedWorldGeneration = setupNative.first_sss_vs_setup.match_world_generation;
 
   const cf = report.scenario.matched_setup_cf = {
-    decision: mode === 'run2-full-schedule-v3' ? 'RUNNING_ORIGINAL_FULL7167_SCHEDULE'
+    decision: commonFieldsMode ? 'RUNNING_ORIGINAL_FULL7167_COMMON_FIELDS_AND_SEED'
+      : fullScheduleMode ? 'RUNNING_ORIGINAL_FULL7167_SCHEDULE'
       : isV2 ? 'RUNNING_RUN2_PROPER_PREFIX_V2' : 'RUNNING_BOUNDED_MATCHED_SETUP_CF',
     mode,
     packet: inputs.packetIdentity, assembly_manifest: inputs.assemblyIdentity,
     host_helper: inputs.helperIdentity, assembly_schema: inputs.assemblySchema,
+    retained_seed_sidecar: inputs.seedReferenceIdentity,
     runtime_payload_sha256: inputs.runtimePayloadSha256,
     schedule_actions: hostEvidence.runtimePayload.schedule.length,
     explicit_step_mode: firstSssVsSetupCfExplicitStep,
@@ -2815,11 +2885,23 @@ async function runMatchedSetupCfContinuation(setupNative) {
     input_bundles: hostEvidence.runtimePayload.bundles.length,
     setup_comparison: structuredClone(setupStatus), branch: 0,
     actions: [], host_comparisons: [], runtime_diagnostics: [], last_native_state: null,
-    unpaired: {raw_timer_initialization: 'unobserved', original_xF0: 'unobserved',
+    common_field_comparisons_attempted: commonFieldsMode ? 0 : null,
+    common_field_comparisons_passed: commonFieldsMode ? 0 : null,
+    common_field_count: commonFieldsMode ? 15 : null,
+    seed_value_comparisons_attempted: commonFieldsMode ? 0 : null,
+    seed_value_comparisons_passed: commonFieldsMode ? 0 : null,
+    seed_value_count: commonFieldsMode ? 1 : null,
+    exact_value_comparisons_attempted: commonFieldsMode ? 0 : null,
+    exact_value_comparisons_passed: commonFieldsMode ? 0 : null,
+    unpaired: {common_field_scope: commonFieldsMode ? '15 declared integer/bit fields plus one exact 32-bit seed value on each source tick84..3584; all other typed fields stay unpaired' : null,
+      rng_scope: commonFieldsMode ? '3501 existing seed_after_action values compared to the exact packet-bound retained original sidecar; no RNG call ledger or cross-owner pointer pairing' : null,
+      raw_timer_initialization: 'unobserved', original_xF0: 'unobserved',
       original_SIS_title_bytes: 'unobserved', original_map_root_allocation_lifetime: 'unproved',
       original_object_type: 'unobserved', native_flow_clock: 'reported separately',
       nested_display_list_provenance: 'not instrumented in the admitted profile; the nested GX_CMD_CALL_DL warning is a stop condition'},
-    claim: mode === 'run2-full-schedule-v3'
+    claim: commonFieldsMode
+      ? 'One original7167-action schedule with 56016 exact values over3501 post-source-tick samples (52515 common scalar fields and3501 retained RNG seed values), plus C/F and GO checks; no RNG call ledger, cross-owner pointer pairing, complete typed state, lifetime B, restore or C3 acceptance.'
+      : fullScheduleMode
       ? 'One original7167-action schedule probe; functional lifetime A with declared C/F only, no complete original comparison, per-owner RNG, recreated B or C3 acceptance.'
       : isV2
       ? 'Fresh strict Setup followed by the extracted run2 action0 prefix through the next draw/tick/draw beyond dynamically mapped C/F; exact declared C/F state and seed comparisons; proper-prefix completion only, no whole-session acceptance.'
@@ -2878,7 +2960,10 @@ async function runMatchedSetupCfContinuation(setupNative) {
   const nativeAdapter = matchedSetupCfNativeAdapter({mode,
     explicitStep: firstSssVsSetupCfExplicitStep});
   const driver = new helper.StadiumSetupCfActionDriver({
-    runtimePayload: hostEvidence.runtimePayload, native: nativeAdapter});
+    runtimePayload: hostEvidence.runtimePayload, native: nativeAdapter,
+    commonFields: commonFieldsMode,
+    admittedWorldGeneration: commonFieldsMode ? admittedWorldGeneration : null,
+    commonRowsByAction: commonFieldsMode ? hostEvidence.commonRowsByAction : null});
   await page.evaluate(() => {
     if (globalThis.__meleeWebStadiumFirstSssVsSetupCfApproved)
       throw Error('Matched Setup C/F approval callback already exists');
@@ -3021,13 +3106,35 @@ async function runMatchedSetupCfContinuation(setupNative) {
             timedActionSync(timingSample, 'comparison', 'compare_ms', compareOperation);
           else compareOperation();
         }
-        // This immutable row records observation, never host/native approval.
+        let commonComparison = null;
+        if (commonFieldsMode && action.action === 'tick' && action.bundle >= 84 && action.bundle <= 3584) {
+          const expectedCommon = hostEvidence.commonRowsByAction.get(scheduleIndex);
+          const compareCommon = () => {
+            commonComparison = helper.compareOriginalCommonTickFields({
+              expected: expectedCommon, actual: actionReceipt.common_fields_sample,
+              actionIndex: scheduleIndex, sourceFramesAfter: actionReceipt.source_frames_after,
+              admittedWorldGeneration});
+            ++cf.common_field_comparisons_attempted;
+            cf.seed_value_comparisons_attempted += commonComparison.seed_value_count ?? 0;
+            cf.exact_value_comparisons_attempted += commonComparison.exact_value_count ?? 0;
+            if (commonComparison.decision === 'PASS_EXACT_15_COMMON_FIELDS_AND_SEED') {
+              ++cf.common_field_comparisons_passed;
+              cf.seed_value_comparisons_passed += commonComparison.seed_value_count;
+              cf.exact_value_comparisons_passed += commonComparison.exact_value_count;
+            }
+          };
+          if (timingSample)
+            timedActionSync(timingSample, 'common_field_comparison', 'compare_ms', compareCommon);
+          else compareCommon();
+        }
+        // This immutable row records observation and comparisons before native approval.
         const recordAction = () => {
           cf.actions.push({evidence_scope: 'completed_native_receipt_before_host_approval',
             schedule_index: scheduleIndex, action: action.action,
             ordinal: action.ordinal ?? (action.action === 'tick' ? action.bundle : action.draw),
             bundle: action.bundle ?? null,
-            native: actionReceipt, host_comparison: comparison});
+            native: actionReceipt, host_comparison: comparison,
+            ...(commonFieldsMode ? {common_field_comparison: commonComparison} : {})});
           cf.last_native_state = structuredClone(cfState);
         };
         if (timingSample)
@@ -3042,12 +3149,12 @@ async function runMatchedSetupCfContinuation(setupNative) {
         let accepted;
         if (timingSample) {
           accepted = await timedActionAsync(timingSample, 'driver_accept', 'accept_ms',
-            () => driver.accept(cfState, comparison), () => {
+            () => driver.accept(cfState, comparison, commonComparison), () => {
               timingSample.approval_rpc_ms =
                 matchedSetupCfTiming.approvalRpcMsByIndex.get(scheduleIndex) ?? null;
             });
         } else {
-          accepted = await driver.accept(cfState, comparison);
+          accepted = await driver.accept(cfState, comparison, commonComparison);
         }
         if (timingSample) {
           await timedActionAsync(timingSample, 'after_diagnostics', 'after_diagnostics_ms',
@@ -3100,7 +3207,21 @@ async function runMatchedSetupCfContinuation(setupNative) {
     assert.equal(finalState?.last_action?.ordinal, isV2
       ? hostEvidence.checkpoints.terminal_draw_ordinal : 85);
     cf.last_native_state = structuredClone(finalState);
-    cf.decision = mode === 'run2-full-schedule-v3' ? 'PASS_ORIGINAL_FULL7167_FUNCTIONAL_A_C_F_ONLY'
+    if (commonFieldsMode) {
+      assert.equal(cf.common_field_comparisons_attempted, 3501,
+        'Per-tick common-field scope did not compare exactly3501 selected receipts');
+      assert.equal(cf.common_field_comparisons_passed, 3501,
+        'Per-tick common-field scope did not pass all52515 declared scalar comparisons');
+      assert.equal(cf.common_field_count * cf.common_field_comparisons_passed, 52515);
+      assert.equal(cf.seed_value_comparisons_attempted, 3501,
+        'Per-tick seed scope did not compare all3501 selected receipts');
+      assert.equal(cf.seed_value_comparisons_passed, 3501,
+        'Per-tick seed scope did not pass all3501 exact seed values');
+      assert.equal(cf.exact_value_comparisons_attempted, 56016);
+      assert.equal(cf.exact_value_comparisons_passed, 56016);
+    }
+    cf.decision = commonFieldsMode ? 'PASS_ORIGINAL_FULL7167_3501_TICK_15_COMMON_FIELDS_AND_SEED_C_F_GO'
+      : fullScheduleMode ? 'PASS_ORIGINAL_FULL7167_FUNCTIONAL_A_C_F_ONLY'
       : isV2 ? 'PASS_RUN2_PROPER_PREFIX_C_F_STATE_ONLY'
       : 'PASS_MATCHED_SETUP_CF_C_AND_F_STATE_ONLY';
     cf.actions_completed = cf.actions.length;

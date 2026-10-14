@@ -12,6 +12,9 @@ class StadiumFullScheduleTests(OwnedWorkspaceTests):
  def test_full_host_dimensions_pad_and_prefix_refusals(self):
   result=subprocess.run([str(node_runtime(ROOT)),'--test',str(SOURCE_ROOT/'tests/stadium_fullschedule_controls.test.mjs')],cwd=ROOT,capture_output=True,text=True,timeout=45)
   self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+ def test_full_common_fields_and_seed_controls(self):
+  result=subprocess.run([str(node_runtime(ROOT)),'--test',str(SOURCE_ROOT/'tests/stadium_per_tick_common_fields_controls.test.mjs')],cwd=ROOT,capture_output=True,text=True,timeout=45)
+  self.assertEqual(result.returncode,0,result.stdout+result.stderr)
  def test_actual_native_full_decoder_structure_and_pad_limit(self):
   compiler=shutil.which('c++')
   if not compiler:self.skipTest('native C++ compiler unavailable')
@@ -34,12 +37,14 @@ std::string error;
 unsigned arms=0;
 void check(bool pass,const char* message){if(!pass)throw std::runtime_error(message);}
 void matched_setup_cf_fail(const char* message){matched_setup_cf.failed=true;error=message;}
-int matched_setup_cf_arm_internal(bool v2,unsigned count,unsigned c,unsigned f,unsigned ct,unsigned ft,bool full=false){assert(v2&&count==(full?7167U:174U)&&c==168&&f==170&&ct==84&&ft==85);++arms;return 1;}
+bool expected_common_fields=false;
+std::vector<bool> common_fields_flags;
+int matched_setup_cf_arm_internal(bool v2,unsigned count,unsigned c,unsigned f,unsigned ct,unsigned ft,bool full=false,bool common_fields=false){assert(v2&&count==(full?7167U:174U)&&c==168&&f==170&&ct==84&&ft==85);assert(common_fields==expected_common_fields);common_fields_flags.push_back(common_fields);++arms;return 1;}
 '''+decoder+r'''
 void put(std::vector<uint8_t>& b,size_t off,uint32_t value){for(unsigned i=0;i<4;++i)b[off+i]=static_cast<uint8_t>(value>>(8*i));}
-std::vector<uint8_t> manifest(){std::vector<uint8_t>b(24+7167*57);b[0]='M';b[1]='W';b[2]='F';b[3]='3';put(b,4,7167);put(b,8,168);put(b,12,170);put(b,16,84);put(b,20,85);unsigned index=0,draws=0;for(unsigned tick=0;tick<3585;++tick){size_t off=24+(index++)*57;b[off]=1;put(b,off+1,tick);put(b,off+5,tick);put(b,off+9,draws);if(tick!=2000&&tick!=2500&&tick!=3000){off=24+(index++)*57;b[off]=2;put(b,off+1,draws);put(b,off+5,UINT32_MAX);put(b,off+9,draws);++draws;}}assert(index==7167&&draws==3582);return b;}
-int run(std::vector<uint8_t>b){matched_setup_cf={};error.clear();return matched_setup_cf_full_manifest_arm(b.data(),b.size());}
-int main(){const auto good=manifest();matched_setup_cf={};assert(melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_arm(good.data(),good.size())==0);auto prefix=good;prefix.resize(24+174*57);prefix[2]='P';prefix[3]='2';put(prefix,4,174);matched_setup_cf={};assert(melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_arm(prefix.data(),prefix.size())==1&&arms==1);assert(run(prefix)==0);assert(run(good)==1&&arms==2);auto bad=good;bad[2]='P';bad[3]='2';assert(run(bad)==0);bad=good;bad.pop_back();assert(run(bad)==0);bad=good;bad.push_back(0);assert(run(bad)==0);bad=good;put(bad,12,172);assert(run(bad)==0);bad=good;put(bad,24+1,1);assert(run(bad)==0);bad=good;bad[24+57+13]=1;assert(run(bad)==0);bad=good;bad[24+13]=1;assert(run(bad)==1&&arms==3);std::cout<<"PASS actual native decoder: full dimensions/order/refusals; valid tick PAD mutation structurally accepted (host hash/consumed equality required)\n";}
+std::vector<uint8_t> manifest(bool common_fields=false){std::vector<uint8_t>b(24+7167*57);b[0]='M';b[1]='W';b[2]=common_fields?'C':'F';b[3]=common_fields?'5':'3';put(b,4,7167);put(b,8,168);put(b,12,170);put(b,16,84);put(b,20,85);unsigned index=0,draws=0;for(unsigned tick=0;tick<3585;++tick){size_t off=24+(index++)*57;b[off]=1;put(b,off+1,tick);put(b,off+5,tick);put(b,off+9,draws);if(tick!=2000&&tick!=2500&&tick!=3000){off=24+(index++)*57;b[off]=2;put(b,off+1,draws);put(b,off+5,UINT32_MAX);put(b,off+9,draws);++draws;}}assert(index==7167&&draws==3582);return b;}
+int run(std::vector<uint8_t>b){matched_setup_cf={};error.clear();expected_common_fields=b.size()>=4&&b[0]=='M'&&b[1]=='W'&&b[2]=='C'&&b[3]=='5';return matched_setup_cf_full_manifest_arm(b.data(),b.size());}
+int main(){const auto good=manifest();matched_setup_cf={};assert(melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_arm(good.data(),good.size())==0);auto prefix=good;prefix.resize(24+174*57);prefix[2]='P';prefix[3]='2';put(prefix,4,174);matched_setup_cf={};expected_common_fields=false;assert(melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_arm(prefix.data(),prefix.size())==1&&arms==1&&common_fields_flags.back()==false);assert(run(prefix)==0);assert(run(good)==1&&arms==2&&common_fields_flags.back()==false);const auto common=manifest(true);assert(run(common)==1&&arms==3&&common_fields_flags.back()==true);auto bad=good;bad[2]='P';bad[3]='2';assert(run(bad)==0);bad=good;bad.pop_back();assert(run(bad)==0);bad=good;bad.push_back(0);assert(run(bad)==0);bad=good;put(bad,12,172);assert(run(bad)==0);bad=good;put(bad,24+1,1);assert(run(bad)==0);bad=good;bad[24+57+13]=1;assert(run(bad)==0);bad=good;bad[24+13]=1;assert(run(bad)==1&&arms==4&&common_fields_flags.back()==false);bad=common;bad[24+13]=1;assert(run(bad)==1&&arms==5&&common_fields_flags.back()==true);std::cout<<"PASS actual native decoder: MWF3/MWC5 common-fields flag routing, full dimensions/order/refusals; valid tick PAD mutation structurally accepted (host hash/consumed equality required)\n";}
 '''
   file=scratch/'control.cpp';file.write_text(fixture);binary=scratch/'control'
   compiled=subprocess.run([compiler,'-std=c++20','-O0','-Wall','-Wextra','-Werror',str(file),'-o',str(binary)],capture_output=True,text=True,timeout=45)

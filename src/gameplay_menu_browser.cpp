@@ -350,7 +350,7 @@ struct MatchedSetupCfState {
  bool opted_in=false,armed=false,queued=false,awaiting_approval=false;
  bool failed=false,complete=false,last_action_complete=false;
  bool explicit_step_mode=false,explicit_step_inflight=false;
- bool version2=false,full_schedule=false;
+ bool version2=false,full_schedule=false,common_fields=false;
  uint32_t cursor=0,last_schedule_index=0,last_ordinal=0,last_bundle=UINT32_MAX;
  uint32_t action_count=171,c_action_index=168,f_action_index=170,c_source_tick=84,f_source_tick=85;
  uint32_t source_ticks=0,source_draws=0,last_ticks_after=0,last_draws_after=0;
@@ -2770,6 +2770,38 @@ std::string matched_setup_cf_idle_json(const MeleeWebStadiumIdleSnapshot& idle){
     <<",\"map2_buffer_origin\":"<<idle.map2_buffer_origin<<'}';
  return out.str();
 }
+// This compact row reuses the value-copy already captured for the pending
+// action. It adds no owner getter, source call, or retained native history.
+constexpr size_t MATCHED_SETUP_CF_COMMON_SAMPLE_MAX_BYTES=1508;
+std::string matched_setup_cf_common_fields_json(
+    const MeleeWebStadiumIdleSnapshot& idle,uint32_t seed,unsigned schedule_index,unsigned source_tick){
+ check(idle.map2_gate>=0&&idle.map2_gate<=1&&idle.display_flags<=7,
+       "Stadium common-field byte values are outside their declared bit ranges");
+ std::ostringstream out;
+ out<<"{\"schema\":\"melee-web-stadium-per-tick-common-fields-native-v2\",\"schedule_index\":"
+    <<schedule_index<<",\"source_tick\":"<<source_tick
+    <<",\"world_ticks\":"<<idle.world_ticks
+    <<",\"source_frame\":"<<idle.source_frame
+    <<",\"world_generation\":"<<idle.world_generation
+    <<",\"map2_countdown\":"<<idle.map2_countdown
+    <<",\"map2_phase\":"<<idle.map2_phase
+    <<",\"map2_form\":"<<idle.map2_form
+    <<",\"map2_history_e0\":"<<idle.map2_history_e0
+    <<",\"map2_history_e2\":"<<idle.map2_history_e2
+    <<",\"map2_gate\":"<<(idle.map2_gate?"true":"false")
+    <<",\"display_mode\":"<<idle.display_mode
+    <<",\"display_e6\":"<<idle.display_e6
+    <<",\"display_e8\":"<<idle.display_e8
+    <<",\"display_previous_mode\":"<<idle.display_previous_mode
+    <<",\"display_selected_player\":"<<idle.display_selected_player
+    <<",\"display_f2\":"<<idle.display_f2
+    <<",\"display_flags\":"<<unsigned(idle.display_flags)
+    <<",\"seed_hex\":\""<<melee_web::stadium_first_css_diagnostic::hex32(seed)<<"\"}";
+ const std::string sample=out.str();
+ check(sample.size()<=MATCHED_SETUP_CF_COMMON_SAMPLE_MAX_BYTES,
+       "Stadium per-tick common-field sample exceeded its reviewed byte bound");
+ return sample;
+}
 void matched_setup_cf_fail(const char* error){
  auto& state=matched_setup_cf;
  state.failed=true;state.complete=false;state.queued=false;state.awaiting_approval=false;
@@ -2960,6 +2992,18 @@ bool matched_setup_cf_service(){
    check(match->diagnostic_stadium_go_alignment_snapshot(&state.go,owner_error,sizeof(owner_error)),
          owner_error[0]?owner_error:"Matched Setup C/F v2 GO snapshot refused");
   }
+  std::string common_sample_json;
+  if(state.common_fields){
+   common_sample_json="null";
+   if(tick_action&&ordinal>=84&&ordinal<=3584){
+    check(state.idle.world_generation==state.world_generation&&
+          state.idle.world_ticks==ordinal+1&&
+          state.idle.source_frame==state.last_source_frame_after,
+          "Stadium per-tick common sample is not the completed post-tick owner snapshot");
+    common_sample_json=matched_setup_cf_common_fields_json(
+        state.idle,state.seed_after_action,index,ordinal);
+   }
+  }
   std::ostringstream input_hex;
   if(state.version2&&tick_action)for(uint8_t byte:state.queued_statuses)
    input_hex<<"0123456789abcdef"[byte>>4]<<"0123456789abcdef"[byte&15];
@@ -2989,7 +3033,8 @@ bool matched_setup_cf_service(){
       +",\"audio_phase_after\":"+std::to_string(state.audio_phase_after)
       +",\"aurora_begin_calls\":"+std::to_string(state.aurora_begin_calls)
       +",\"aurora_end_calls\":"+std::to_string(state.aurora_end_calls)
-      +",\"observation\":"+actual.str()+'}';
+      +",\"observation\":"+actual.str()+
+      (state.common_fields?",\"common_fields_sample\":"+common_sample_json:"")+"}";
   state.awaiting_approval=true;
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
   drain_pipeline_provenance();
@@ -3017,7 +3062,10 @@ std::string matched_setup_cf_json(){
      state.awaiting_approval?"awaiting-approval":state.queued?"queued":
      state.armed?"armed":"idle";
  std::ostringstream out;
- if(state.full_schedule)out<<"{\"schema\":\"melee-web-stadium-source-action-native-v3\",\"scope\":\"original-full7167-schedule-observation-only\",\"action_count\":"
+ if(state.common_fields)out<<"{\"schema\":\"melee-web-stadium-source-action-native-v5\",\"scope\":\"original-full7167-common-fields-seed-observation-only\",\"common_field_count\":15,\"seed_value_count\":1,\"action_count\":"
+    <<state.action_count<<",\"source_ticks\":"<<state.source_ticks
+    <<",\"source_draws\":"<<state.source_draws<<",\"state\":\"";
+ else if(state.full_schedule)out<<"{\"schema\":\"melee-web-stadium-source-action-native-v3\",\"scope\":\"original-full7167-schedule-observation-only\",\"action_count\":"
     <<state.action_count<<",\"source_ticks\":"<<state.source_ticks
     <<",\"source_draws\":"<<state.source_draws<<",\"state\":\"";
  else if(state.version2)out<<"{\"schema\":\"melee-web-stadium-source-action-native-v2\",\"scope\":\"proper-prefix-next-draw-tick-draw\",\"action_count\":"
@@ -4785,13 +4833,16 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_begin(int text_tail_probe){
 
 int matched_setup_cf_arm_internal(bool version2,unsigned action_count,
     unsigned c_action_index,unsigned f_action_index,unsigned c_source_tick,
-    unsigned f_source_tick,bool full_schedule=false){try{
+    unsigned f_source_tick,bool full_schedule=false,bool common_fields=false){try{
  auto& state=matched_setup_cf;auto& setup=first_sss_vs_setup;
  check(!state.opted_in&&!state.armed&&!state.failed&&!state.complete,
        "Matched Setup C/F continuation is one-use");
  state.opted_in=true;
  state.version2=version2;
  state.full_schedule=full_schedule;
+ state.common_fields=common_fields;
+ check(!common_fields||(version2&&full_schedule),
+       "Per-tick common fields require the explicit full-schedule v2 owner");
  state.action_count=version2?action_count:171U;
  state.c_action_index=version2?c_action_index:168U;
  state.f_action_index=version2?f_action_index:170U;
@@ -4923,7 +4974,10 @@ int matched_setup_cf_full_manifest_arm(
     const uint8_t* manifest,size_t manifest_bytes){try{
  auto& state=matched_setup_cf;
  check(manifest&&manifest_bytes>=24,"Matched Setup full schedule manifest header is absent");
- check(manifest[0]=='M'&&manifest[1]=='W'&&manifest[2]=='F'&&manifest[3]=='3',
+ const bool common_fields=manifest[0]=='M'&&manifest[1]=='W'&&
+       manifest[2]=='C'&&manifest[3]=='5';
+ check((manifest[0]=='M'&&manifest[1]=='W'&&manifest[2]=='F'&&manifest[3]=='3')||
+       common_fields,
        "Matched Setup full schedule manifest magic differs");
  const auto read32=[&](size_t offset){
   check(offset+4<=manifest_bytes,"Matched Setup full schedule manifest integer is truncated");
@@ -4974,7 +5028,8 @@ int matched_setup_cf_full_manifest_arm(
  check(!state.opted_in&&!state.armed&&!state.failed&&!state.complete,
        "Matched Setup full schedule continuation is one-use");
  state.version2_actions=std::move(actions);
- return matched_setup_cf_arm_internal(true,action_count,c_index,f_index,c_tick,f_tick,true);
+ return matched_setup_cf_arm_internal(true,action_count,c_index,f_index,c_tick,f_tick,true,
+                                      common_fields);
 }catch(const std::exception& error){
  matched_setup_cf_fail(error.what());return 0;
 }}

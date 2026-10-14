@@ -44,7 +44,10 @@ const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 export function isStadiumC3ReportCheckpointEligible(report) {
   const matched = report?.scenario?.matched_setup_cf;
   return (matched?.mode === 'run2-proper-prefix-v2' ||
-    (matched?.mode === 'run2-full-schedule-v3' && matched.schedule_actions === 7167)) &&
+    ((matched?.mode === 'run2-full-schedule-v3' ||
+      (matched?.mode === 'run2-full-common-fields-seed-v1' &&
+       matched.common_field_count === 15 && matched.seed_value_count === 1)) &&
+      matched.schedule_actions === 7167)) &&
     matched.explicit_step_mode === true;
 }
 

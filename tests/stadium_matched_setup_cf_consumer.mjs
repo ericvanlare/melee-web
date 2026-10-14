@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 const PLAN_SCHEMA = 'melee-web-stadium-typed-pad-action-plan';
 const PLAN_BUNDLES = 86;
 const PLAN_ACTIONS = 171;
@@ -158,6 +160,405 @@ export function deriveRun2FullSchedule(runtimePayload, hostOnly) {
       terminal_draw_ordinal: 3581}}};
 }
 
+const COMMON_FIELDS_NATIVE_SAMPLE_SCHEMA = 'melee-web-stadium-per-tick-common-fields-native-v2';
+const COMMON_FIELDS_COMPARISON_SCHEMA = 'melee-web-stadium-source-tick-common-fields-comparison-v2';
+const COMMON_FIELDS_SAMPLE_MAX_BYTES = 1508;
+const COMMON_FIELDS_COMPARISON_MAX_BYTES = 512;
+export const IDLE_SEED_REFERENCE_IDENTITY = Object.freeze({
+  basename: 'idle3500-reference.json', bytes: 2033197,
+  sha256: '562969a7e6a6e7fd43457821f84464852a38da2a83c9dc20672ad713cd6010bc',
+  hash_source: 'computed',
+});
+const COMMON_FIELDS_EXPECTED_KEYS = Object.freeze([
+  'map2_countdown', 'map2_phase', 'map2_form', 'map2_history_e0', 'map2_history_e2',
+  'map2_gate', 'display_mode', 'display_e6', 'display_e8', 'display_previous_mode',
+  'display_selected_player', 'display_f2', 'display_flags',
+]);
+const COMMON_FIELDS_ACTUAL_KEYS = Object.freeze([
+  'schema', 'schedule_index', 'source_tick', 'world_ticks', 'source_frame', 'world_generation',
+  ...COMMON_FIELDS_EXPECTED_KEYS, 'seed_hex',
+]);
+const COMMON_FIELDS_INTEGER_FIELDS = Object.freeze([
+  ['map2.countdown_s32', 'map2_countdown', 32],
+  ['map2.phase_s16', 'map2_phase', 16],
+  ['map2.form_s16', 'map2_form', 16],
+  ['map2.previous_form_s16', 'map2_history_e0', 16],
+  ['map2.prior_form_s16', 'map2_history_e2', 16],
+  ['display.mode_s16', 'display_mode', 16],
+  ['display.flags_s16', 'display_e6', 16],
+  ['display.previous_flags_s16', 'display_e8', 16],
+  ['display.previous_mode_s16', 'display_previous_mode', 16],
+  ['display.focused_player_s16', 'display_selected_player', 16],
+  ['display.selection_counter_s16', 'display_f2', 16],
+]);
+function signedRange(value, bits, label) {
+  const limit = 2 ** (bits - 1);
+  if (!Number.isInteger(value) || value < -limit || value >= limit)
+    throw new TypeError(`${label} is not an exact signed${bits} value`);
+  return value;
+}
+function commonOriginalValues(fields, sourceTick) {
+  exactKeys(fields, ['display', 'draw_ordinal', 'guest_pointer_policy', 'label', 'map2',
+    'map_root_allocation_lifetime_proved', 'map_root_object_type_observed', 'map_root_roles',
+    'sequence', 'source_tick', 'title'], `original source tick ${sourceTick} typed fields`);
+  const map = fields.map2, display = fields.display;
+  exactKeys(map, ['countdown_s32', 'form_s16', 'gate_mask_40', 'gate_mask_80', 'gate_raw_hex',
+    'map5_root_pointer_equals_fixed_map5_slot_value', 'phase_s16', 'previous_form_s16',
+    'prior_form_s16'], `original source tick ${sourceTick} map2 fields`);
+  exactKeys(display, ['flags_s16', 'focused_player_s16', 'mode_s16', 'packed_flags_raw_hex',
+    'previous_flags_s16', 'previous_mode_s16', 'selection_counter_s16', 'timer_initialization_observed',
+    'timer_raw_hex', 'timer_representation', 'xF0_observed'],
+  `original source tick ${sourceTick} display fields`);
+  const values = {
+    map2_countdown: signedRange(map.countdown_s32, 32, 'original map2.countdown_s32'),
+    map2_phase: signedRange(map.phase_s16, 16, 'original map2.phase_s16'),
+    map2_form: signedRange(map.form_s16, 16, 'original map2.form_s16'),
+    map2_history_e0: signedRange(map.previous_form_s16, 16, 'original map2.previous_form_s16'),
+    map2_history_e2: signedRange(map.prior_form_s16, 16, 'original map2.prior_form_s16'),
+    map2_gate: requiredBoolean(map.gate_mask_80, 'original map2.gate_mask_80'),
+    display_mode: signedRange(display.mode_s16, 16, 'original display.mode_s16'),
+    display_e6: signedRange(display.flags_s16, 16, 'original display.flags_s16'),
+    display_e8: signedRange(display.previous_flags_s16, 16, 'original display.previous_flags_s16'),
+    display_previous_mode: signedRange(display.previous_mode_s16, 16, 'original display.previous_mode_s16'),
+    display_selected_player: signedRange(display.focused_player_s16, 16, 'original display.focused_player_s16'),
+    display_f2: signedRange(display.selection_counter_s16, 16, 'original display.selection_counter_s16'),
+  };
+  if (typeof map.gate_mask_40 !== 'boolean' || !/^[0-9a-fA-F]{2}$/.test(map.gate_raw_hex ?? '') ||
+      ((Number.parseInt(map.gate_raw_hex, 16) & 0x80) !== 0) !== map.gate_mask_80 ||
+      typeof map.map5_root_pointer_equals_fixed_map5_slot_value !== 'boolean' ||
+      fields.map_root_allocation_lifetime_proved !== false ||
+      fields.map_root_object_type_observed !== false ||
+      !Array.isArray(fields.map_root_roles) || fields.map_root_roles.length !== 4 ||
+      fields.map_root_roles.some((role, index) => role?.fixed_slot_map_id !== [0, 1, 2, 5][index]) ||
+      !/^[0-9a-fA-F]{2}$/.test(display.packed_flags_raw_hex ?? '') ||
+      typeof display.timer_initialization_observed !== 'boolean' ||
+      typeof display.xF0_observed !== 'boolean' ||
+      !/^[0-9a-fA-F]{8}$/.test(display.timer_raw_hex ?? '') ||
+      typeof display.timer_representation !== 'string')
+    throw new TypeError(`original source tick ${sourceTick} unpaired/common evidence shape is malformed`);
+  const packed = Number.parseInt(display.packed_flags_raw_hex, 16);
+  values.display_flags = ((packed & 0x80) ? 1 : 0) |
+      ((packed & 0x40) ? 2 : 0) | ((packed & 0x20) ? 4 : 0);
+  exactKeys(values, COMMON_FIELDS_EXPECTED_KEYS, `original source tick ${sourceTick} common values`);
+  return values;
+}
+
+// One O(n) pass binds all host original action provenance to the already
+// validated native schedule, then binds the 3501 typed source rows to ticks.
+export function deriveRun2CommonTickExpectations(runtimePayload, hostOnly) {
+  const payload = validateRun2RuntimePayload(runtimePayload);
+  const route = hostOnly?.source_identity?.strict_route;
+  const source = route?.source;
+  if (source?.dol_sha256 !== 'dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646' ||
+      source?.dol_sha1 !== '08e0bf20134dfcb260699671004527b2d6bb1a45' ||
+      route?.stream_sha256 !== '45de31f20751b87414fe5ca5d3569940ce706bb029e30beb142f33fac546ff3a' ||
+      route?.stream_records !== 20482 ||
+      hostOnly?.source_identity?.source_run?.source_consumed_pad?.artifact?.sha256 !==
+        '45de31f20751b87414fe5ca5d3569940ce706bb029e30beb142f33fac546ff3a')
+    throw new TypeError('per-tick original DOL or consumed-stream identity differs');
+  const provenance = hostOnly.action_provenance;
+  if (!Array.isArray(provenance) || provenance.length !== 7167 ||
+      payload.schedule.length !== 7167 || payload.bundles.length !== 3585)
+    throw new TypeError('per-tick comparison requires all7167 original provenance/action rows');
+  const tickProvenance = new Map();
+  let tick = 0, draw = 0, previousSequence = -1;
+  for (let index = 0; index < 7167; ++index) {
+    const action = payload.schedule[index], original = provenance[index];
+    if (!original || original.action_index !== index || original.action !== action.action)
+      throw new TypeError(`original action provenance ${index} is missing, duplicate, reordered, or mismatched`);
+    let eventSequences;
+    if (action.action === 'tick') {
+      exactKeys(original, ['action', 'action_index', 'consume_sequence', 'draw_ordinal',
+        'intervening_progress_sequences', 'source_tick', 'source_tick_sequence'],
+      `original tick provenance ${index}`);
+      if (action.bundle !== tick || original.source_tick !== tick || original.draw_ordinal !== draw ||
+          !Array.isArray(original.intervening_progress_sequences))
+        throw new TypeError(`original tick provenance ${index} differs from its runtime bundle/draw cursor`);
+      const progress = original.intervening_progress_sequences;
+      if (progress.some(sequence => !Number.isSafeInteger(sequence)) ||
+          progress.some((sequence, position) => position > 0 && sequence <= progress[position - 1]))
+        throw new TypeError(`original tick provenance ${index} has malformed progress ordering`);
+      eventSequences = [original.consume_sequence, ...progress, original.source_tick_sequence];
+      if (eventSequences.some(sequence => !Number.isSafeInteger(sequence) || sequence < 0) ||
+          eventSequences.some((sequence, position) => position > 0 && sequence <= eventSequences[position - 1]))
+        throw new TypeError(`original tick provenance ${index} violates consume-before-tick sequence`);
+      tickProvenance.set(tick, original);
+      ++tick;
+    } else {
+      exactKeys(original, ['action', 'action_index', 'draw_enter_sequence', 'draw_ordinal',
+        'draw_return_sequence', 'source_tick'], `original draw provenance ${index}`);
+      if (action.draw !== draw || original.draw_ordinal !== draw || original.source_tick !== tick)
+        throw new TypeError(`original draw provenance ${index} differs from its source tick/draw cursor`);
+      eventSequences = [original.draw_enter_sequence, original.draw_return_sequence];
+      if (eventSequences.some(sequence => !Number.isSafeInteger(sequence) || sequence < 0) ||
+          eventSequences[1] <= eventSequences[0])
+        throw new TypeError(`original draw provenance ${index} violates draw enter/return ordering`);
+      ++draw;
+    }
+    if (eventSequences[0] <= previousSequence)
+      throw new TypeError(`original action provenance ${index} is not in source event order`);
+    previousSequence = eventSequences.at(-1);
+  }
+  if (tick !== 3585 || draw !== 3582 ||
+      payload.schedule[7165]?.action !== 'tick' || payload.schedule[7165]?.bundle !== 3584 ||
+      payload.schedule[7166]?.action !== 'draw' || payload.schedule[7166]?.draw !== 3581 ||
+      tickProvenance.get(84)?.action_index !== 168 ||
+      tickProvenance.get(84)?.source_tick_sequence !== 2984 ||
+      tickProvenance.get(84)?.draw_ordinal !== 84 ||
+      tickProvenance.get(85)?.action_index !== 170 ||
+      tickProvenance.get(85)?.source_tick_sequence !== 2989 ||
+      tickProvenance.get(85)?.draw_ordinal !== 85 ||
+      tickProvenance.get(3584)?.action_index !== 7165 ||
+      tickProvenance.get(3584)?.source_tick_sequence !== 20478 ||
+      tickProvenance.get(3584)?.draw_ordinal !== 3581)
+    throw new TypeError('original 7167-action source/tick/draw terminal mapping differs');
+  const sourceRows = hostOnly?.expected_state?.per_source_tick;
+  if (!Array.isArray(sourceRows) || sourceRows.length !== 3501)
+    throw new TypeError('exact3501 typed original source tick rows are required');
+  const expectedByAction = new Map();
+  for (let rowIndex = 0; rowIndex < 3501; ++rowIndex) {
+    const sourceTick = 84 + rowIndex, row = sourceRows[rowIndex];
+    if (!row || !['C', 'F', 'IDLE'].includes(row.boundary_role))
+      throw new TypeError(`typed original source row ${rowIndex} has an unknown role`);
+    exactKeys(row.raw_identity, ['boundary', 'draw_ordinal', 'event', 'sequence', 'source_tick'],
+      `typed original source row ${rowIndex} raw identity`);
+    const raw = row.raw_identity, role = sourceTick === 84 ? 'C' : sourceTick === 85 ? 'F' : 'IDLE';
+    if (row.boundary_role !== role || raw.event !== 'boundary' || raw.boundary !== 'source_tick' ||
+        raw.source_tick !== sourceTick || !Number.isSafeInteger(raw.sequence) || raw.sequence < 0 ||
+        !Number.isSafeInteger(raw.draw_ordinal) || raw.draw_ordinal < 0 ||
+        row.typed_fields?.label !== role || row.typed_fields.sequence !== raw.sequence ||
+        row.typed_fields.source_tick !== raw.source_tick || row.typed_fields.draw_ordinal !== raw.draw_ordinal)
+      throw new TypeError(`typed original source row ${rowIndex} differs from its raw source identity`);
+    const action = tickProvenance.get(sourceTick);
+    if (!action || action.source_tick !== raw.source_tick ||
+        action.source_tick_sequence !== raw.sequence || action.draw_ordinal !== raw.draw_ordinal ||
+        payload.schedule[action.action_index]?.action !== 'tick' ||
+        payload.schedule[action.action_index]?.bundle !== sourceTick ||
+        expectedByAction.has(action.action_index))
+      throw new TypeError(`typed original source row ${rowIndex} does not bijectively map to one runtime tick`);
+    const values = commonOriginalValues(row.typed_fields, sourceTick);
+    expectedByAction.set(action.action_index, {action_index: action.action_index,
+      boundary_role: role, source_tick: sourceTick, draw_ordinal: raw.draw_ordinal,
+      raw_identity: {sequence: raw.sequence, source_tick: raw.source_tick,
+        draw_ordinal: raw.draw_ordinal}, values});
+  }
+  if (expectedByAction.size !== 3501 || !expectedByAction.has(168) ||
+      !expectedByAction.has(170) || !expectedByAction.has(7165))
+    throw new TypeError('per-tick common expectation index is incomplete');
+  return expectedByAction;
+}
+
+// The RNG reference remains a separate, independently hash-bound original
+// artifact. This joins its existing tick rows; it does not infer RNG calls or
+// compare pointer values across owners.
+export function deriveRun2CommonSeedExpectations(runtimePayload, hostOnly,
+  commonRowsByAction, seedSidecar, seedIdentity) {
+  const payload = validateRun2RuntimePayload(runtimePayload);
+  const binding = hostOnly?.source_identity?.source_run?.run_artifacts?.['idle3500-reference.json'];
+  exactKeys(binding, ['bytes', 'hash_source', 'path', 'sha256'], 'original idle seed artifact binding');
+  exactKeys(seedIdentity, ['basename', 'bytes', 'path', 'sha256'], 'loaded idle seed artifact identity');
+  if (typeof binding.path !== 'string' || !path.isAbsolute(binding.path) ||
+      path.resolve(binding.path) !== binding.path ||
+      path.basename(binding.path) !== IDLE_SEED_REFERENCE_IDENTITY.basename ||
+      binding.bytes !== IDLE_SEED_REFERENCE_IDENTITY.bytes ||
+      binding.sha256 !== IDLE_SEED_REFERENCE_IDENTITY.sha256 ||
+      binding.hash_source !== IDLE_SEED_REFERENCE_IDENTITY.hash_source ||
+      seedIdentity.path !== binding.path ||
+      seedIdentity.basename !== IDLE_SEED_REFERENCE_IDENTITY.basename ||
+      seedIdentity.bytes !== binding.bytes || seedIdentity.sha256 !== binding.sha256 ||
+      !Number.isSafeInteger(seedIdentity.bytes) || !/^[0-9a-f]{64}$/.test(seedIdentity.sha256))
+    throw new TypeError('retained original idle seed sidecar is not the exact packet-bound artifact');
+  if (!seedSidecar || seedSidecar.schema !== 'melee-web-original-stadium-idle-3500' ||
+      seedSidecar.version !== 1 || seedSidecar.decision !== 'PASS_ORIGINAL_3500_IDLE_REFERENCE_ONLY' ||
+      seedSidecar.observed_tick_count !== 3501 ||
+      seedSidecar.comparison_post_go_ticks !== 3500 ||
+      seedSidecar.cross_owner_rng_ledger_complete !== false ||
+      seedSidecar.native_parity !== false || seedSidecar.lifetime_pairing_observed !== false ||
+      !Array.isArray(seedSidecar.seed_observations) || seedSidecar.seed_observations.length !== 3501 ||
+      !Array.isArray(seedSidecar.source_action_schedule) || seedSidecar.source_action_schedule.length !== 10497 ||
+      !(commonRowsByAction instanceof Map) || commonRowsByAction.size !== 3501)
+    throw new TypeError('retained original idle seed sidecar scope or dimensions differ');
+
+  const expectedBySequence = new Map();
+  for (const expected of commonRowsByAction.values()) {
+    if (!expected || expectedBySequence.has(expected.raw_identity?.sequence))
+      throw new TypeError('typed source tick seed join contains duplicate identities');
+    expectedBySequence.set(expected.raw_identity.sequence, expected);
+  }
+  const seedSequences = new Set(), seedValues = new Set();
+  const joined = new Map();
+  const provenance = hostOnly.action_provenance;
+  let scheduleCursor = 0, previousSequence = -1;
+  for (let ordinal = 0; ordinal < 3501; ++ordinal) {
+    const sourceTick = 84 + ordinal;
+    const seed = seedSidecar.seed_observations[ordinal];
+    exactKeys(seed, ['ordinal', 'pointer_hex', 'seed_hex', 'sequence'],
+      `original seed observation ${ordinal}`);
+    if (seed.ordinal !== ordinal || !Number.isSafeInteger(seed.sequence) || seed.sequence < 0 ||
+        !/^[0-9a-f]{8}$/.test(seed.pointer_hex ?? '') || seed.pointer_hex !== '804d5f90' ||
+        !/^[0-9a-f]{8}$/.test(seed.seed_hex ?? '') || seedSequences.has(seed.sequence) ||
+        seedValues.has(seed.seed_hex))
+      throw new TypeError(`original idle seed row ${ordinal} is missing, repeated, reordered, or malformed`);
+    seedSequences.add(seed.sequence); seedValues.add(seed.seed_hex);
+    const expected = expectedBySequence.get(seed.sequence);
+    if (!expected || expected.source_tick !== sourceTick ||
+        expected.raw_identity.sequence !== seed.sequence ||
+        expected.draw_ordinal !== expected.raw_identity.draw_ordinal ||
+        expected.action_index < 0 || expected.action_index >= payload.schedule.length ||
+        payload.schedule[expected.action_index]?.action !== 'tick' ||
+        payload.schedule[expected.action_index]?.bundle !== sourceTick)
+      throw new TypeError(`original seed row ${ordinal} does not join one typed row and full schedule tick`);
+    const referenceTick = seedSidecar.source_action_schedule[scheduleCursor++];
+    exactKeys(referenceTick, ['action', 'bundle', 'draw_ordinal', 'ordinal', 'sequence'],
+      `original seed action ${ordinal}`);
+    if (referenceTick.action !== 'tick' || referenceTick.ordinal !== ordinal ||
+        referenceTick.bundle !== ordinal || referenceTick.sequence !== seed.sequence ||
+        referenceTick.draw_ordinal !== expected.draw_ordinal)
+      throw new TypeError(`original seed action ${ordinal} differs from its tick/sequence join`);
+    if (seed.sequence <= previousSequence)
+      throw new TypeError(`original seed action ${ordinal} is not in event order`);
+    previousSequence = seed.sequence;
+    const actionIndex = expected.action_index;
+    const action = payload.schedule[actionIndex];
+    const draw = payload.schedule[actionIndex + 1];
+    if (draw?.action === 'draw') {
+      const drawSource = provenance[actionIndex + 1];
+      if (!drawSource || drawSource.action !== 'draw' || drawSource.action_index !== actionIndex + 1 ||
+          drawSource.draw_ordinal !== draw.draw || drawSource.source_tick !== sourceTick + 1)
+        throw new TypeError(`original seed action ${ordinal} lacks the unique following draw provenance`);
+      for (const [name, sequence] of [['draw_enter', drawSource.draw_enter_sequence],
+        ['draw_return', drawSource.draw_return_sequence]]) {
+        const sourceEvent = seedSidecar.source_action_schedule[scheduleCursor++];
+        exactKeys(sourceEvent, ['action', 'draw_ordinal', 'ordinal', 'sequence'],
+          `original seed ${name} action ${ordinal}`);
+        if (sourceEvent.action !== name || sourceEvent.ordinal !== ordinal ||
+            sourceEvent.draw_ordinal !== draw.draw || sourceEvent.sequence !== sequence ||
+            !Number.isSafeInteger(sequence) || sequence <= previousSequence)
+          throw new TypeError(`original seed ${name} action ${ordinal} differs from full draw provenance`);
+        previousSequence = sequence;
+      }
+    } else if (draw !== undefined && draw.action !== 'tick') {
+      throw new TypeError(`original seed action ${ordinal} has an unknown following full action`);
+    }
+    joined.set(actionIndex, {...expected, seed_ordinal: ordinal, seed_hex: seed.seed_hex});
+  }
+  if (scheduleCursor !== seedSidecar.source_action_schedule.length || joined.size !== 3501 ||
+      seedSequences.size !== 3501 || seedValues.size !== 3501)
+    throw new TypeError('original idle seed schedule has extra or missing tick/draw evidence');
+  const originalCFS = hostOnly.boundary_rng_observations;
+  if (!Array.isArray(originalCFS) || originalCFS.length !== 2 ||
+      originalCFS[0]?.label !== 'C' || originalCFS[1]?.label !== 'F' ||
+      joined.get(168)?.seed_hex !== originalCFS[0].seed_hex ||
+      joined.get(170)?.seed_hex !== originalCFS[1].seed_hex)
+    throw new TypeError('original seed sidecar C/F values differ from existing boundary RNG evidence');
+  if (joined.get(7165)?.seed_hex !== '312a19c4')
+    throw new TypeError('original seed sidecar terminal value differs from its reviewed endpoint');
+  return joined;
+}
+
+export function compareOriginalCommonTickFields({expected, actual, actionIndex, sourceFramesAfter,
+  admittedWorldGeneration}) {
+  const refusal = (path, want, got, count = 0) => ({
+    schema: COMMON_FIELDS_COMPARISON_SCHEMA,
+    scope: 'exact host-original typed source row and hash-bound seed versus one completed post-tick native value-copy',
+    action_index: Number.isSafeInteger(actionIndex) ? actionIndex : null,
+    source_tick: Number.isSafeInteger(expected?.source_tick) ? expected.source_tick : null,
+    original_sequence: Number.isSafeInteger(expected?.raw_identity?.sequence)
+      ? expected.raw_identity.sequence : null,
+    draw_ordinal: Number.isSafeInteger(expected?.draw_ordinal) ? expected.draw_ordinal : null,
+    compared_field_count: count, seed_value_count: count ? 1 : 0,
+    exact_value_count: count ? count + 1 : 0,
+    decision: 'REFUSE_FIRST_COMMON_FIELD_OR_SEED_MISMATCH',
+    first_mismatch: {path, expected: want ?? null, actual: got ?? null},
+  });
+  try {
+    exactKeys(expected, ['action_index', 'boundary_role', 'draw_ordinal', 'raw_identity',
+      'seed_hex', 'seed_ordinal', 'source_tick', 'values'], 'common-field expected source row');
+    exactKeys(expected.raw_identity, ['draw_ordinal', 'sequence', 'source_tick'],
+      'common-field expected raw identity');
+    exactKeys(expected.values, COMMON_FIELDS_EXPECTED_KEYS, 'common-field expected values');
+    if (!Number.isSafeInteger(actionIndex) || actionIndex !== expected.action_index ||
+        !Number.isSafeInteger(expected.source_tick) || expected.source_tick < 84 ||
+        expected.source_tick > 3584 || expected.raw_identity.source_tick !== expected.source_tick ||
+        expected.raw_identity.draw_ordinal !== expected.draw_ordinal ||
+        !Number.isSafeInteger(expected.raw_identity.sequence) || expected.raw_identity.sequence < 0 ||
+        expected.seed_ordinal !== expected.source_tick - 84 ||
+        !/^[0-9a-f]{8}$/.test(expected.seed_hex ?? '') ||
+        expected.boundary_role !== (expected.source_tick === 84 ? 'C' :
+          expected.source_tick === 85 ? 'F' : 'IDLE'))
+      return refusal('original.action_mapping', expected?.action_index, actionIndex);
+    if (!Number.isSafeInteger(admittedWorldGeneration) || admittedWorldGeneration <= 0)
+      return refusal('admitted.world_generation', 'positive safe integer from checked Setup', admittedWorldGeneration);
+    if (!actual || typeof actual !== 'object' || Array.isArray(actual))
+      return refusal('native.common_fields_sample', 'one object', actual);
+    let serialized;
+    try { serialized = JSON.stringify(actual); }
+    catch { return refusal('native.serialization', 'bounded JSON object', 'unserializable'); }
+    if (Buffer.byteLength(serialized, 'utf8') > COMMON_FIELDS_SAMPLE_MAX_BYTES)
+      return refusal('native.sample_bytes', `<=${COMMON_FIELDS_SAMPLE_MAX_BYTES}`, Buffer.byteLength(serialized, 'utf8'));
+    try { exactKeys(actual, COMMON_FIELDS_ACTUAL_KEYS, 'native per-tick common sample'); }
+    catch { return refusal('native.keys', COMMON_FIELDS_ACTUAL_KEYS, Object.keys(actual).sort()); }
+    if (actual.schema !== COMMON_FIELDS_NATIVE_SAMPLE_SCHEMA ||
+        actual.schedule_index !== actionIndex || actual.source_tick !== expected.source_tick ||
+        actual.world_ticks !== expected.source_tick + 1 ||
+        !Number.isSafeInteger(actual.world_generation) || actual.world_generation !== admittedWorldGeneration ||
+        !Number.isSafeInteger(actual.source_frame) || actual.source_frame < 0 ||
+        actual.source_frame > 0xffffffff || !Number.isSafeInteger(sourceFramesAfter) ||
+        sourceFramesAfter < 0 || sourceFramesAfter > 0xffffffff ||
+        actual.source_frame !== sourceFramesAfter)
+      return refusal('native.action_or_owner_identity',
+        {schedule_index: actionIndex, source_tick: expected.source_tick,
+          world_ticks: expected.source_tick + 1, world_generation: admittedWorldGeneration,
+          source_frame: sourceFramesAfter},
+        {schedule_index: actual.schedule_index, source_tick: actual.source_tick,
+          world_ticks: actual.world_ticks, world_generation: actual.world_generation,
+          source_frame: actual.source_frame, receipt_source_frames_after: sourceFramesAfter});
+    if (!/^[0-9a-f]{8}$/.test(actual.seed_hex ?? ''))
+      return refusal('native.seed_hex', 'exact 8-lowercase-hex value', actual.seed_hex);
+    if (typeof actual.map2_gate !== 'boolean' ||
+        !Number.isInteger(actual.display_flags) || actual.display_flags < 0 || actual.display_flags > 7)
+      return refusal('native.boolean_or_packed_flags',
+        {map2_gate: 'boolean', display_flags: '0..7'},
+        {map2_gate: actual.map2_gate, display_flags: actual.display_flags});
+    for (const [, key, bits] of COMMON_FIELDS_INTEGER_FIELDS) {
+      try { signedRange(expected.values[key], bits, `expected ${key}`); }
+      catch { return refusal(`original.${key}`, `signed${bits}`, expected.values[key]); }
+      try { signedRange(actual[key], bits, `native ${key}`); }
+      catch { return refusal(`native.${key}`, `signed${bits}`, actual[key]); }
+    }
+    if (typeof expected.values.map2_gate !== 'boolean')
+      return refusal('original.map2_gate', 'boolean', expected.values.map2_gate);
+    if (!Number.isInteger(expected.values.display_flags) ||
+        expected.values.display_flags < 0 || expected.values.display_flags > 7)
+      return refusal('original.display_flags', 'integer 0..7', expected.values.display_flags);
+    const pairs = COMMON_FIELDS_INTEGER_FIELDS.map(([path, key]) => [path, expected.values[key], actual[key]]);
+    pairs.splice(5, 0, ['map2.gate_mask_80', expected.values.map2_gate, actual.map2_gate]);
+    for (const [index, mask] of [0x80, 0x40, 0x20].entries())
+      pairs.push([`display.packed_flags_raw_hex_bit_${mask.toString(16)}`,
+        (expected.values.display_flags & (1 << index)) !== 0 ? 1 : 0,
+        (actual.display_flags & (1 << index)) !== 0 ? 1 : 0]);
+    pairs.push(['rng.seed_hex', expected.seed_hex, actual.seed_hex]);
+    let firstMismatch = null;
+    for (const [path, want, got] of pairs) {
+      const equal = Object.is(want, got);
+      if (!equal && !firstMismatch) firstMismatch = {path, expected: want, actual: got};
+    }
+    const result = {schema: COMMON_FIELDS_COMPARISON_SCHEMA,
+      scope: 'exact host-original typed source row and hash-bound seed versus one completed post-tick native value-copy',
+      action_index: actionIndex, source_tick: expected.source_tick,
+      original_sequence: expected.raw_identity.sequence, draw_ordinal: expected.draw_ordinal,
+      compared_field_count: 15, seed_value_count: 1, exact_value_count: 16,
+      decision: firstMismatch ? 'REFUSE_FIRST_COMMON_FIELD_OR_SEED_MISMATCH'
+        : 'PASS_EXACT_15_COMMON_FIELDS_AND_SEED',
+      first_mismatch: firstMismatch};
+    if (Buffer.byteLength(JSON.stringify(result), 'utf8') > COMMON_FIELDS_COMPARISON_MAX_BYTES)
+      return refusal('comparison.summary_bytes', `<=${COMMON_FIELDS_COMPARISON_MAX_BYTES}`, 'overflow', 15);
+    return result;
+  } catch (error) {
+    return refusal('common_fields.validation', 'strict typed record', String(error?.message ?? error));
+  }
+}
+
 export function encodeRun2FullNativeManifest(full) {
   exactKeys(full, ['bundles', 'checkpoints', 'schedule', 'schema', 'version'], 'full schedule manifest');
   exactKeys(full.checkpoints, ['c_action_index', 'c_source_tick', 'f_action_index',
@@ -177,6 +578,12 @@ export function encodeRun2FullNativeManifest(full) {
       full.schedule.at(-1)?.draw !== 3581)
     throw new TypeError('original full7167 manifest dimensions or terminal differ');
   return encodeNativeManifestRows(full, [0x4d, 0x57, 0x46, 0x33]);
+}
+
+export function encodeRun2FullCommonNativeManifest(full) {
+  const bytes = encodeRun2FullNativeManifest(full);
+  bytes.set([0x4d, 0x57, 0x43, 0x35]);
+  return bytes;
 }
 
 export function encodeRun2NativeManifest(prefix) {
@@ -414,11 +821,15 @@ export function createHostCallbacks({setupApproved, originalSnapshots, originalS
   };
 }
 
-export function hostEvidenceFromPacket(packet, {fullSchedule = false} = {}) {
-  if (typeof fullSchedule !== 'boolean') throw new TypeError('fullSchedule must be boolean');
+export function hostEvidenceFromPacket(packet, {fullSchedule = false, commonFields = false,
+  seedSidecar = null, seedIdentity = null} = {}) {
+  if (typeof fullSchedule !== 'boolean' || typeof commonFields !== 'boolean')
+    throw new TypeError('fullSchedule and commonFields must be boolean');
+  if (commonFields && !fullSchedule)
+    throw new TypeError('Per-tick common fields require the explicit full schedule');
   if (packet?.schema === 'melee-web-stadium-source-action-replay-packet' && packet.version === 2)
-    return hostEvidenceFromRun2Packet(packet, {fullSchedule});
-  if (fullSchedule) throw new TypeError('Full schedule requires original run2 packet');
+    return hostEvidenceFromRun2Packet(packet, {fullSchedule, commonFields, seedSidecar, seedIdentity});
+  if (fullSchedule || commonFields) throw new TypeError('Full schedule requires original run2 packet');
   exactKeys(packet, ['schema', 'version', 'host_only', 'runtime_payload'], 'matched Setup packet');
   if (packet.schema !== 'melee-web-stadium-setup-cf-input-schedule' ||
       packet.version !== 1 || !packet.host_only || typeof packet.host_only !== 'object')
@@ -458,8 +869,11 @@ export function hostEvidenceFromPacket(packet, {fullSchedule = false} = {}) {
     originalSeeds: seeds};
 }
 
-export function hostEvidenceFromRun2Packet(packet, {fullSchedule = false} = {}) {
-  if (typeof fullSchedule !== 'boolean') throw new TypeError('fullSchedule must be boolean');
+export function hostEvidenceFromRun2Packet(packet, {fullSchedule = false, commonFields = false,
+  seedSidecar = null, seedIdentity = null} = {}) {
+  if (typeof fullSchedule !== 'boolean' || typeof commonFields !== 'boolean' ||
+      (commonFields && !fullSchedule))
+    throw new TypeError('Per-tick common fields require a boolean full-schedule opt-in');
   exactKeys(packet, ['host_only', 'runtime_payload', 'schema', 'version'], 'run2 action packet');
   if (packet.schema !== 'melee-web-stadium-source-action-replay-packet' || packet.version !== 2)
     throw new TypeError('run2 action packet identity differs');
@@ -500,12 +914,20 @@ export function hostEvidenceFromRun2Packet(packet, {fullSchedule = false} = {}) 
   const go = {label: 'GO', sequence: goRaw.sequence, source_tick: goRaw.source_tick,
     draw_ordinal: goRaw.draw_ordinal};
   const snapshots = [go, normalize('C'), normalize('F')];
+  const commonFieldRowsByAction = commonFields
+    ? deriveRun2CommonTickExpectations(packet.runtime_payload, hostOnly) : null;
+  const commonRowsByAction = commonFields
+    ? deriveRun2CommonSeedExpectations(packet.runtime_payload, hostOnly,
+      commonFieldRowsByAction, seedSidecar, seedIdentity) : null;
   const coordinates = {cTick: derived.c.source_tick, fTick: derived.f.source_tick,
     goSequence: go.sequence, cSequence: derived.c.sequence, fSequence: derived.f.sequence,
     goDraw: go.draw_ordinal, cDraw: derived.c.draw_ordinal, fDraw: derived.f.draw_ordinal};
   return {runtimePayload: derived.prefix, sourceRuntimePayload: packet.runtime_payload,
     originalSnapshots: snapshots, originalSeeds: derived.expectedSeeds, coordinates,
-    checkpoints: derived.prefix.checkpoints, mode: fullSchedule ? 'run2-full-schedule-v3' : 'run2-proper-prefix-v2'};
+    checkpoints: derived.prefix.checkpoints,
+    mode: commonFields ? 'run2-full-common-fields-seed-v1' :
+      fullSchedule ? 'run2-full-schedule-v3' : 'run2-proper-prefix-v2',
+    ...(commonFields ? {commonRowsByAction} : {})};
 }
 
 function bundleBytes(bundle) {
@@ -514,22 +936,46 @@ function bundleBytes(bundle) {
 }
 
 export class StadiumSetupCfActionDriver {
-  constructor({runtimePayload, native}) {
-    this.mode = runtimePayload?.schema === 'melee-web-stadium-run2-full-schedule-v3'
+  constructor({runtimePayload, native, commonFields = false, commonRowsByAction = null,
+    admittedWorldGeneration = null}) {
+    if (typeof commonFields !== 'boolean' || (commonFields &&
+        runtimePayload?.schema !== 'melee-web-stadium-run2-full-schedule-v3'))
+      throw new TypeError('Per-tick common fields require an explicit full-schedule manifest');
+    this.mode = commonFields ? 'run2-full-common-fields-seed-v1'
+      : runtimePayload?.schema === 'melee-web-stadium-run2-full-schedule-v3'
       ? 'run2-full-schedule-v3' : runtimePayload?.schema === 'melee-web-stadium-run2-proper-prefix-v2'
       ? 'run2-proper-prefix-v2' : 'legacy-v1';
+    this.commonFields = commonFields;
+    this.commonRowsByAction = commonFields ? commonRowsByAction : null;
+    if (commonFields && (!Number.isSafeInteger(admittedWorldGeneration) || admittedWorldGeneration <= 0))
+      throw new TypeError('Per-tick common fields require the positive safe generation from checked Setup');
+    this.admittedWorldGeneration = commonFields ? admittedWorldGeneration : null;
+    if (commonFields && (!(commonRowsByAction instanceof Map) || commonRowsByAction.size !== 3501))
+      throw new TypeError('Per-tick common source expectations must contain exactly3501 mapped rows');
+    if (commonFields) {
+      for (let index = 0; index < runtimePayload.schedule.length; ++index) {
+        const action = runtimePayload.schedule[index];
+        const selected = action.action === 'tick' && action.bundle >= 84 && action.bundle <= 3584;
+        const row = commonRowsByAction.get(index);
+        if (selected ? (!row || row.action_index !== index || row.source_tick !== action.bundle)
+          : row !== undefined)
+          throw new TypeError(`Per-tick common source expectation ${index} is outside its exact action mapping`);
+      }
+    }
     if (this.mode === 'legacy-v1') this.payload = validateRuntimePayload(runtimePayload);
     else {
       exactKeys(runtimePayload, ['bundles', 'checkpoints', 'schedule', 'schema', 'version'],
         'run2 proper-prefix manifest');
-      if (runtimePayload.version !== (this.mode === 'run2-full-schedule-v3' ? 3 : 2) || !Array.isArray(runtimePayload.bundles) ||
+      if (runtimePayload.version !== (['run2-full-schedule-v3', 'run2-full-common-fields-seed-v1'].includes(this.mode) ? 3 : 2) || !Array.isArray(runtimePayload.bundles) ||
           !Array.isArray(runtimePayload.schedule) || !runtimePayload.schedule.length ||
           runtimePayload.schedule.length !== runtimePayload.checkpoints.terminal_action_index + 1 ||
           runtimePayload.schedule.at(-1)?.action !== 'draw')
         throw new TypeError('run2 proper-prefix manifest is malformed');
       this.payload = runtimePayload;
-      this.nativeManifest = this.mode === 'run2-full-schedule-v3'
-        ? encodeRun2FullNativeManifest(runtimePayload) : encodeRun2NativeManifest(runtimePayload);
+      this.nativeManifest = this.mode === 'run2-full-common-fields-seed-v1'
+        ? encodeRun2FullCommonNativeManifest(runtimePayload)
+        : this.mode === 'run2-full-schedule-v3'
+          ? encodeRun2FullNativeManifest(runtimePayload) : encodeRun2NativeManifest(runtimePayload);
     }
     if (!native || typeof native.arm !== 'function' || typeof native.queue !== 'function' ||
         typeof native.approve !== 'function')
@@ -584,13 +1030,19 @@ export class StadiumSetupCfActionDriver {
     } finally { this.inFlight = false; }
   }
 
-  async accept(observation, hostComparison = null) {
+  async accept(observation, hostComparison = null, commonComparison = null) {
     if (this.inFlight || !this.pending || this.failed || this.complete)
       return this._fail('unexpected or repeated native action receipt');
     const action = this.payload.schedule[this.cursor];
     if (this.mode === 'run2-full-schedule-v3' && (observation?.schema !== 'melee-web-stadium-source-action-native-v3' ||
         observation?.scope !== 'original-full7167-schedule-observation-only' || observation?.action_count !== 7167))
       return this._fail('Full schedule native observation scope differs');
+    if (this.mode === 'run2-full-common-fields-seed-v1' &&
+        (observation?.schema !== 'melee-web-stadium-source-action-native-v5' ||
+         observation?.scope !== 'original-full7167-common-fields-seed-observation-only' ||
+         observation?.common_field_count !== 15 || observation?.seed_value_count !== 1 ||
+         observation?.action_count !== 7167))
+      return this._fail('Per-tick common-field native observation scope differs');
     const result = observation?.last_action;
     const ordinal = this.mode === 'legacy-v1' ? action?.ordinal :
       action?.action === 'tick' ? action.bundle : action?.draw;
@@ -636,6 +1088,30 @@ export class StadiumSetupCfActionDriver {
         refusal = `${expectedLabel} host comparison failed or is absent`;
     } else if (hostComparison !== null) {
       refusal = 'host comparison was supplied outside C/F';
+    }
+    if (this.mode === 'run2-full-common-fields-seed-v1') {
+      const selectedTick = action.action === 'tick' && action.bundle >= 84 && action.bundle <= 3584;
+      const expectedCommon = this.commonRowsByAction.get(this.cursor);
+      if (selectedTick) {
+        if (!expectedCommon || expectedCommon.source_tick !== action.bundle ||
+            expectedCommon.action_index !== this.cursor ||
+            result.common_fields_sample?.schema !== COMMON_FIELDS_NATIVE_SAMPLE_SCHEMA ||
+            result.common_fields_sample?.schedule_index !== this.cursor ||
+            result.common_fields_sample?.source_tick !== action.bundle ||
+            result.common_fields_sample?.world_generation !== this.admittedWorldGeneration ||
+            commonComparison?.schema !== COMMON_FIELDS_COMPARISON_SCHEMA ||
+            commonComparison?.action_index !== this.cursor ||
+            commonComparison?.source_tick !== action.bundle ||
+            commonComparison?.original_sequence !== expectedCommon.raw_identity.sequence ||
+            commonComparison?.compared_field_count !== 15 ||
+            commonComparison?.seed_value_count !== 1 || commonComparison?.exact_value_count !== 16 ||
+            commonComparison?.decision !== 'PASS_EXACT_15_COMMON_FIELDS_AND_SEED')
+          refusal ??= 'per-tick common-field comparison failed or is absent';
+      } else if (expectedCommon || result.common_fields_sample !== null || commonComparison !== null) {
+        refusal ??= 'per-tick common-field sample/comparison was supplied outside its source-tick scope';
+      }
+    } else if (commonComparison !== null) {
+      refusal ??= 'common-field comparison was supplied without the explicit scope';
     }
     this.inFlight = true;
     if (refusal) this._fail(refusal);
