@@ -445,6 +445,7 @@ def _validate_player_runtime(output: Path, runtime: dict[str, Any], records: lis
     source_map = {
         "runtime-diagnostics.mjs": ROOT / "web" / "runtime-diagnostics.mjs",
         "melee-runtime.mjs": ROOT / "web" / "melee-runtime.mjs",
+        "startup-profile.mjs": ROOT / "web" / "startup-profile.mjs",
         "save-profile-settings.mjs": ROOT / "web" / "save-profile-settings.mjs",
         "save-profile-store.mjs": ROOT / "web" / "save-profile-store.mjs",
         "gamecube-save.mjs": ROOT / "web" / "gamecube-save.mjs",

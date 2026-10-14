@@ -273,6 +273,7 @@ PUBLIC_RUNTIME_SOURCE_FILES = (
     "web/initial_pipeline_cache.db.gz.b64",
     "web/disc-session.mjs",
     "web/melee-runtime.mjs",
+    "web/startup-profile.mjs",
     "web/runtime-assets.mjs",
     "web/runtime-audio-assets.mjs",
     "web/runtime-diagnostics-delivery.mjs",

@@ -12,6 +12,37 @@ let selectedDiscMessage = '', validatingSelection = null;
 let audioActivation = Promise.resolve(), audioActivationError = null;
 const busyStates = ['booting', 'importing', 'preparing', 'pausing', 'resuming', 'unloading', 'saving'];
 const startReadinessWaiters = new Set();
+let startupReport = null;
+function renderStartupProfile(report) {
+  startupReport = report;
+  $('startup-export').disabled = !report || state?.running === true;
+  // The bounded report stays in memory; format it only when requested.
+  if (!$('startup-dialog').open) return;
+  const phaseNames = {environment: 'Checking browser support', adapter: 'Requesting graphics adapter',
+    module_setup: 'Setting up the player', module_load: 'Loading the compiled player',
+    native_startup: 'Starting the native renderer', readiness: 'Waiting for graphics readiness',
+    cache_idle: 'Preparing renderer resources', pipeline_catalog: 'Preparing graphics pipelines',
+    graphics_ready: 'Graphics ready', failed: 'Startup failed', destroyed: 'Startup stopped'};
+  const elapsed = Number.isFinite(report?.elapsed_ms) ? `${(report.elapsed_ms / 1000).toFixed(2)} s` : 'time unavailable';
+  $('startup-summary').textContent = report ? `${phaseNames[report.phase] || 'Startup'} · ${elapsed}` : 'Waiting for the player module…';
+  $('startup-report').textContent = report ? JSON.stringify(report, null, 2) : 'No startup observations yet.';
+}
+$('startup-open').onclick = () => {
+  $('startup-dialog').showModal();
+  renderStartupProfile(startupReport);
+};
+$('startup-close').onclick = () => $('startup-dialog').close();
+$('startup-export').onclick = () => {
+  if (!startupReport || state?.running === true) return;
+  let url;
+  try {
+    url = URL.createObjectURL(new Blob([JSON.stringify(startupReport, null, 2)], {type: 'application/json'}));
+    const link = document.createElement('a');
+    link.href = url; link.download = 'webmelee-startup.json'; link.click();
+    $('startup-export-status').textContent = 'Startup report exported.';
+  } catch { $('startup-export-status').textContent = 'Startup report could not be exported.'; }
+  finally { if (url) setTimeout(() => URL.revokeObjectURL(url), 1000); }
+};
 
 function waitForStartReadiness(selection) {
   return new Promise(resolve => {
@@ -147,6 +178,8 @@ function renderStatus(next) {
   if (!next) return;
   state = next;
   if (next.running) hasStarted = true;
+  $('startup-open').disabled = next.running === true;
+  $('startup-export').disabled = !startupReport || next.running === true;
   const saveBusy = !!saveSettings?.busy;
   $('choose-disc').disabled = !next.canSelectDisc;
   $('start-game').disabled = !selectedDiscReady || !next.canStart || !saveSettingsReady ||
@@ -347,6 +380,7 @@ if (nativeFullscreenAvailable) {
 try {
   player = await mountMeleeRuntime({
     canvas: $('canvas'), onState: renderStatus, onError: error => showError(error),
+    onStartupProfile: renderStartupProfile,
     onOwner: owner => {
       player = owner.handle;
       diagnosticSettings.bindPlayer(player);

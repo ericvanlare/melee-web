@@ -1,0 +1,804 @@
+{
+  "schema": "melee-web-public-startup-profile-evidence-v1",
+  "scope": "Pre-disc startup attribution; no gameplay or performance acceptance claim",
+  "retained_run": "public-startup-profile-20261013-211719-304e5e58",
+  "historical_foreground_baseline": {
+    "schema": "melee-web-public-startup-trace-summary-v1",
+    "input": {
+      "file": "foreground-existing-profile-startup-1.json.gz",
+      "sha256": "cfa7429d34d28490b7ab4d295d65e6b056f6280bb24600118954805180cddc35",
+      "compressed_bytes": 3811596,
+      "decompressed_bytes": 52768299,
+      "trace_events": 196658
+    },
+    "deployment": {
+      "host": "webmelee-staging.pages.dev",
+      "pages_deployment_id": "19a6ec7e-b035-4361-ad6e-43f275e4d3f5",
+      "source_commit": "07bcfdfa6f4531ac464eab44ebecb206daa1f0da",
+      "runtime": "audio-player",
+      "runtime_identity": "9c81b55e5bc2366d",
+      "runtime_manifest_sha256": "edb5722a41fa895ddabb69f814f09e183e70e5e3ad8551a26eec235118a5d30e"
+    },
+    "method": {
+      "profile": "Existing foreground Chrome profile; manual Record then Reload.",
+      "cache": "Not cleared; cache disabling was off.",
+      "throttling": "CPU and network throttling were off.",
+      "screenshots": "450 trace screenshots; OCR was sampled on every fifth screenshot (91 samples, about 134 ms apart). Screenshot pixels were inspected transiently and not retained.",
+      "scope": "Only the staging navigation/runtime origin was summarized; unrelated tabs and profile fields are excluded."
+    },
+    "navigation_ms_from_navigation_start": {
+      "first_paint": 404.769,
+      "first_contentful_paint": 404.769,
+      "dom_content_loaded_end": 421.526,
+      "load_event_end": 455.834,
+      "trace_first_event": 0,
+      "trace_last_event": 14572.74
+    },
+    "preparing_graphics_label": {
+      "first_sampled_positive_ms": 813.9,
+      "last_sampled_positive_ms": 6939.4,
+      "first_later_sampled_nonmatch_ms": 7017.0,
+      "interpretation": "Sampled visibility bracket only, not exact label start/end or readiness time. The 14.57 s trace tail is not startup duration."
+    },
+    "resources": {
+      "target_origin_requests": 28,
+      "responses_and_finishes": 28,
+      "http_statuses": {
+        "200": 28
+      },
+      "from_cache": 27,
+      "from_service_worker": 0,
+      "request_to_headers_ms": {
+        "median": 8.89,
+        "max": 123.5
+      },
+      "request_to_finish_ms": {
+        "median": 9.25,
+        "max": 123.5
+      },
+      "large_runtime_assets": [
+        {
+          "path": "gameplay_audio_preview.js",
+          "request_ms": 424.06,
+          "from_cache": true,
+          "decoded_bytes": 289745
+        },
+        {
+          "path": "runtime data asset (.data)",
+          "request_ms": 447.19,
+          "from_cache": true,
+          "decoded_bytes": 3674112
+        },
+        {
+          "path": "runtime WebAssembly (.wasm)",
+          "request_ms": 449.08,
+          "from_cache": true,
+          "decoded_bytes": 14707263
+        }
+      ]
+    },
+    "wasm": {
+      "stream_from_response_ms": 453.3,
+      "module_cache_hit_ms": 455.3,
+      "compile_consume_done_ms": 549.51,
+      "compile_consume_done_slice_ms": 12.084,
+      "compile_consume_slice_count": 161,
+      "compile_consume_summed_slice_ms": 18.431,
+      "compile_consume_span_ms": 108.303,
+      "interpretation": "Slices may be nested or overlap; summed duration is not an independent CPU attribution. Trace records a Wasm module-cache hit."
+    },
+    "main_renderer_thread": {
+      "navigation_to_first_sampled_nonmatch": {
+        "run_task_count": 4610,
+        "busy_ms": 930.13,
+        "busy_fraction_percent": 13.3,
+        "max_task_ms": 93.03,
+        "tasks_over_50ms": 3,
+        "tasks_over_100ms": 0
+      },
+      "sampled_positive_label_interval": {
+        "run_task_count": 3588,
+        "busy_ms": 542.1,
+        "busy_fraction_percent": 8.7,
+        "max_task_ms": 93.03,
+        "tasks_over_50ms": 1,
+        "tasks_over_100ms": 0,
+        "longest_task_start_ms": 1272.1,
+        "largest_task_attribution": "The 93.025 ms RunTask at +1272.108 ms has no nested source/function event in this trace, so it cannot be assigned to a runtime or native function."
+      },
+      "interpretation": "Main-thread task time does not show continuous CPU saturation during sampled label visibility. The 93 ms task is not attributed to a specific native/JS operation."
+    },
+    "attribution": {
+      "supported": [
+        "This is a warm, mostly cached load.",
+        "The observed label window is not explained by sustained main-renderer CPU occupancy in this trace.",
+        "Ordinary request timing and recorded Wasm compilation slices end early relative to the sampled label interval."
+      ],
+      "unresolved": [
+        "The trace does not identify whether startupCacheReady or Module.pipelinePreparation.ready held the label; runtime refreshCatalogLoading uses either condition.",
+        "No direct WebGPU shader/pipeline creation event was identified, so the trace does not attribute the remaining wait to pipeline compilation, native initialization, or GPU queue readiness.",
+        "A single warm reload does not characterize cold-cache behavior or reproduce the user's full 10\u201315 s report."
+      ]
+    },
+    "limits": [
+      "No cache-cleared, throttled, or repeated comparison was performed.",
+      "Chrome PipelineReporter markers are not evidence of WebGPU pipeline compilation.",
+      "Do not infer startup duration from the trace recording tail."
+    ],
+    "animation_callbacks": {
+      "interval_ms_from_navigation_start": [
+        813.9,
+        7017.0
+      ],
+      "target_renderer_frame": {
+        "process_id": 31500,
+        "thread_id": 72400659
+      },
+      "fire_animation_frame": {
+        "callback_count": 1466,
+        "interarrival_ms": {
+          "min": 0.003,
+          "p50": 0.005,
+          "p90": 16.567,
+          "p95": 17.214,
+          "max": 187.826
+        },
+        "interpretation": "Dispatch timestamps include short callback bursts; raw interarrival p50 is not the frame cadence."
+      },
+      "frame_lifecycle": {
+        "animation_frame_begin_count": 245,
+        "page_animator_service_count": 244,
+        "animation_frame_begin_interarrival_ms": {
+          "p50": 16.607,
+          "p90": 53.689,
+          "max": 188.208
+        },
+        "page_animator_interarrival_ms": {
+          "p50": 16.683,
+          "p90": 51.911,
+          "max": 187.826
+        },
+        "interpretation": "The sampled interval contains regular frame callbacks plus intermittent longer gaps; this is a trace observation, not proof that frame pacing caused the graphics label."
+      }
+    }
+  },
+  "candidate": {
+    "state": "historical_profiling_only_deployment",
+    "base_commit": "e19cecfe7764bcd97802bea1933500e37a872af5",
+    "independent_js_review_sha256": "7e345137e1770781b25348f5d24023b4aa418b5baa863503d8e988076fb4ba3d",
+    "speedup_claim": false,
+    "deployed": true,
+    "source_commit": "dcf6b06e794597b01bcc5d07c4dfb46f0e843018",
+    "runtime_hash": "2f3efb6678651310",
+    "producer_identity_sha256": "cd6931a26138043dedd5a2e86351cfc8421b6c69cee6d4dddbaa0f665ef6aa76",
+    "manifest_sha256": "c51dc784d8beecedd85c1a8f52007cd9cb6500f57f3023b58540c0ecc4bc6b98",
+    "deployment_id": "e3dc446a-6226-4398-a4c9-34a5d15741f5",
+    "immutable_url": "https://e3dc446a.webmelee-staging.pages.dev",
+    "validation": {
+      "release_audio_build": "pass",
+      "package_source_inventory_audit": "pass",
+      "immutable_http": "pass",
+      "local_startup_ui_export_runs": 2,
+      "first_full_regression": {
+        "tests": 2400,
+        "skipped": 166,
+        "failed": 1,
+        "failure": "Reduced teardown fixture omitted startupProfilingPending; retained full-regression-v1.log. Repaired by explicit completed startup state; focused fixture passes."
+      },
+      "corrected_full_regression": "pending"
+    }
+  },
+  "instrumented_foreground_baseline": {
+    "source_commit": "dcf6b06e794597b01bcc5d07c4dfb46f0e843018",
+    "runtime_hash": "2f3efb6678651310",
+    "method": "Native Chrome UI reload, Startup details, local JSON export; no console injection, DevTools closed, no disc selected. No builds, tests or other owned captures during reloads. Shared user profile and OS/GPU caches uncontrolled.",
+    "samples": [
+      {
+        "file": "foreground-startup-1.json",
+        "sha256": "815f02a86a506a14ec05720029f9f0ae6d020d91ab3b17baa8f70b62fbc912e0",
+        "condition": "Existing foreground Chrome profile, first navigation to new artifact, downloaded new runtime files",
+        "elapsed_ms": 6597.915,
+        "navigation_elapsed_ms": 7088.445,
+        "graphics_startup": {
+          "renderer_init_ms": 79.75500011444092,
+          "queued_pipelines": 0,
+          "created_pipelines": 890,
+          "cache_idle": 1,
+          "first_native_callback_ms": 82.53999996185303,
+          "elapsed_ms": 5697.1449999809265,
+          "terminal": true
+        },
+        "graphics_samples": [
+          {
+            "at_ms": 1008.355,
+            "elapsed_ms": 107.9850001335144,
+            "queued_pipelines": 880,
+            "created_pipelines": 10,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 2137.005,
+            "elapsed_ms": 1236.9700000286102,
+            "queued_pipelines": 795,
+            "created_pipelines": 95,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 3223.96,
+            "elapsed_ms": 2323.914999961853,
+            "queued_pipelines": 590,
+            "created_pipelines": 300,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 4250.925,
+            "elapsed_ms": 3350.880000114441,
+            "queued_pipelines": 485,
+            "created_pipelines": 405,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 5312.26,
+            "elapsed_ms": 4412.215000152588,
+            "queued_pipelines": 305,
+            "created_pipelines": 585,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 6315.25,
+            "elapsed_ms": 5415.210000038147,
+            "queued_pipelines": 85,
+            "created_pipelines": 805,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 6597.895,
+            "elapsed_ms": 5697.1449999809265,
+            "queued_pipelines": 0,
+            "created_pipelines": 890,
+            "cache_idle": 1,
+            "terminal": true
+          }
+        ],
+        "longtasks": {
+          "status": "available",
+          "count": 1,
+          "total_ms": 62,
+          "max_ms": 62,
+          "before_profile_count": 0,
+          "before_profile_total_ms": 0,
+          "dropped_rows": 0,
+          "rows": [
+            {
+              "start_ms": 1409.46,
+              "duration_ms": 62,
+              "before_profile": false
+            }
+          ]
+        }
+      },
+      {
+        "file": "foreground-startup-2-warm.json",
+        "sha256": "be3833099d93bb4066c9f9c26f95564a44892df0fb61ae25af7f2035c665c8cd",
+        "condition": "Same foreground Chrome profile, ordinary cached reload; no cache clearing or throttling",
+        "elapsed_ms": 4627.905,
+        "navigation_elapsed_ms": 4855.03,
+        "graphics_startup": {
+          "renderer_init_ms": 29.350000143051147,
+          "queued_pipelines": 0,
+          "created_pipelines": 890,
+          "cache_idle": 1,
+          "first_native_callback_ms": 29.65000009536743,
+          "elapsed_ms": 4539.575000047684,
+          "terminal": true
+        },
+        "graphics_samples": [
+          {
+            "at_ms": 124.05,
+            "elapsed_ms": 35.75999999046326,
+            "queued_pipelines": 880,
+            "created_pipelines": 10,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 1180.455,
+            "elapsed_ms": 1092.710000038147,
+            "queued_pipelines": 725,
+            "created_pipelines": 165,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 2254.305,
+            "elapsed_ms": 2166.560000181198,
+            "queued_pipelines": 500,
+            "created_pipelines": 390,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 3357.525,
+            "elapsed_ms": 3269.7750000953674,
+            "queued_pipelines": 325,
+            "created_pipelines": 565,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 4360.52,
+            "elapsed_ms": 4272.775000095367,
+            "queued_pipelines": 65,
+            "created_pipelines": 825,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 4627.9,
+            "elapsed_ms": 4539.575000047684,
+            "queued_pipelines": 0,
+            "created_pipelines": 890,
+            "cache_idle": 1,
+            "terminal": true
+          }
+        ],
+        "longtasks": {
+          "status": "available",
+          "count": 0,
+          "total_ms": 0,
+          "max_ms": null,
+          "before_profile_count": 0,
+          "before_profile_total_ms": 0,
+          "dropped_rows": 0,
+          "rows": []
+        }
+      }
+    ],
+    "interpretation": "The existing native cache-idle readiness gate stayed pending while 890 startup pipeline entries drained. Renderer initialization is a small part of the observed wait. This establishes the active gate; queue retirement is not backend GPU completion. A scheduler change is still an experiment, not a claimed speedup."
+  },
+  "timer_experiment": {
+    "source_commit": "edece6ceffa8405afdf1350b219d51397049a681",
+    "runtime_hash": "1ce59e2440003517",
+    "deployed": false,
+    "outcome": "First local startup failed before readiness; three memory access out of bounds errors. No speedup claim.",
+    "report": "timer-v1/local-ui/report.json",
+    "report_sha256": "6e3d903ea8090981e4f2e7abad470245c8de3acd1f664d703db9927a7003d38e",
+    "limitations": "Initial helper retained neither error stacks nor raw failed profile; source causation is unproved.",
+    "review": "timer-v1/first-failure-source-review.json",
+    "review_sha256": "5ca2c99d5cbff91232dcf7fe23752e63c48f4c37e92ddad2549d7f7ceb698051",
+    "next": "Generated Asyncify reducer before another startup. Guard must run in JS before native entry while the normal frame has a live continuation.",
+    "validation_scope": "Focused native scheduler controls and Release compilation passed but did not establish browser safety.",
+    "reducer": {
+      "report": "asyncify-reducer-v1/result.json",
+      "report_sha256": "bfb5f25a9293c82112daabdf3f50335b6479d3f4323782c613296d18b519ca73",
+      "result": "Five timer attempts with Normal state and live continuation were withheld; one native callback ran after idle. Stop/change/abort controls made zero service entries.",
+      "scope": "Generated pinned Emscripten fixture; no GPU/game and no proof of original memory-error causation.",
+      "retained_setup_failures": true,
+      "console_observation": "One favicon404 retained; no page errors.",
+      "independent_review": "asyncify-reducer-v1/independent-result-review.json",
+      "independent_review_sha256": "f3ef2fb1128de7dd8e93f2042a72d4bb67c13785d1ffa72c97bc7ca64474d301"
+    }
+  },
+  "guarded_scheduler": {
+    "state": "deployed_scoped_startup_improvement",
+    "source_commit": "0258f2fc73613fbfd2d07fe67277bf4f97890c9b",
+    "runtime_hash": "5e6240776085dbf6",
+    "deployment": {
+      "source_sha": "0258f2fc73613fbfd2d07fe67277bf4f97890c9b",
+      "candidate_head": "0258f2fc73613fbfd2d07fe67277bf4f97890c9b",
+      "runtime_hash": "5e6240776085dbf6",
+      "profile": "audio-player",
+      "manifest_sha256": "529d6ca0cf62196bd411e117437fb3bea3348d2be74d3c12cdca71be0ca56ac8",
+      "previous_deployment_id": "e3dc446a-6226-4398-a4c9-34a5d15741f5",
+      "production_changed": false,
+      "review": "Reviewed Asyncify-guarded startup scheduler candidate PR327. Local startup and audio checks required before deployment; hosted comparison and corrected full regression remain separately recorded.",
+      "deployment_id": "526e0535-279b-4174-b53b-563b60fac501",
+      "immutable_url": "https://526e0535.webmelee-staging.pages.dev",
+      "project": "webmelee-staging",
+      "branch": "staging",
+      "environment": "staging",
+      "pages_environment": "production",
+      "stable_url": "https://webmelee-staging.pages.dev"
+    },
+    "review": {
+      "path": "timer-v1/asyncify-guarded-candidate-source-review.json",
+      "sha256": "ac8737baaced7501a12f146d54e510b6c4d969ea1a7889a7ffa30e995de6eae1"
+    },
+    "validation_review": {
+      "path": "guard-v1/local-ui-and-deploy-independent-review.json",
+      "sha256": "ffc330de8f0b28facb1fac8d67ff467b296d9bd04d8c3777eececae406ee9f18"
+    },
+    "release_build": "audio-guard-build-v1.log",
+    "package_audit": "guard-package-v1.log",
+    "immutable_http": {
+      "path": "guard-v1/immutable-http.json",
+      "sha256": "0cc0451fb8c269a98ad695ee22dc5547ab6681b13a23cd961e1adb17c8fcc779"
+    },
+    "local_ui": {
+      "path": "guard-v1/local-ui/browser/report.json",
+      "sha256": "2c2df4a909314d2514ce78dd567a2df3fcdcccecc8cb0c5a1021021d8d7224f7"
+    },
+    "local_ui_cleanup": {
+      "path": "guard-v1/local-ui/owner.json",
+      "sha256": "4a119121e8ff07e3012baa0c610b97e47761cedf91a68424ad8cc74496743c9e"
+    },
+    "local_audio": {
+      "path": "guard-v1/local-audio/browser/report.json",
+      "sha256": "b76d032b91334f68dd22618db327fd60f84d7c409a19d5bd5e2f3965d112403f"
+    },
+    "local_audio_cleanup": {
+      "path": "guard-v1/local-audio/owner.json",
+      "sha256": "790c08a8fc94a7b7faf4b4f0be1dd61c758d97db579a8ff010a42fa6e96a920c"
+    },
+    "local_audio_scope": "13 functional checks: owned disc, original CSS/SSS, Mario/FD, No Contest return, second entry, Title/Opening, Eject and audio processing. Not full-match acceptance or pixels/PCM comparison.",
+    "foreground_runs": [
+      {
+        "path": "guard-v1/foreground-startup-1.json",
+        "sha256": "0538e708d16adb8412dc88ddb0db22e5f44bfbb91c4c345db74727ca8c8b54fc",
+        "condition": "First new-artifact navigation in existing profile",
+        "elapsed_ms": 3556.65,
+        "navigation_elapsed_ms": 3967.235,
+        "graphics_startup": {
+          "renderer_init_ms": 64.67499995231628,
+          "queued_pipelines": 0,
+          "created_pipelines": 890,
+          "cache_idle": 1,
+          "first_native_callback_ms": 66.89000010490417,
+          "elapsed_ms": 2940.765000104904,
+          "terminal": true
+        },
+        "graphics_samples": [
+          {
+            "at_ms": 704.44,
+            "elapsed_ms": 88.84500002861023,
+            "queued_pipelines": 880,
+            "created_pipelines": 10,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 1710.345,
+            "elapsed_ms": 1095.0599999427795,
+            "queued_pipelines": 590,
+            "created_pipelines": 300,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 2716.075,
+            "elapsed_ms": 2100.7999999523163,
+            "queued_pipelines": 265,
+            "created_pipelines": 625,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 3556.625,
+            "elapsed_ms": 2940.765000104904,
+            "queued_pipelines": 0,
+            "created_pipelines": 890,
+            "cache_idle": 1,
+            "terminal": true
+          }
+        ],
+        "longtasks": {
+          "status": "available",
+          "count": 1,
+          "total_ms": 56,
+          "max_ms": 56,
+          "before_profile_count": 0,
+          "before_profile_total_ms": 0,
+          "dropped_rows": 0,
+          "rows": [
+            {
+              "start_ms": 1034.76,
+              "duration_ms": 56,
+              "before_profile": false
+            }
+          ]
+        }
+      },
+      {
+        "path": "guard-v1/foreground-startup-2-warm.json",
+        "sha256": "63b978d83d58d887833fd03e3bcc33a603fe2d3c7dbceacd08d84cfd14e43ad6",
+        "condition": "Ordinary same-profile warm reload",
+        "elapsed_ms": 2621.2,
+        "navigation_elapsed_ms": 2701.755,
+        "graphics_startup": {
+          "renderer_init_ms": 19.09499979019165,
+          "queued_pipelines": 0,
+          "created_pipelines": 890,
+          "cache_idle": 1,
+          "first_native_callback_ms": 19.479999780654907,
+          "elapsed_ms": 2550.7599999904633,
+          "terminal": true
+        },
+        "graphics_samples": [
+          {
+            "at_ms": 93.415,
+            "elapsed_ms": 23.18999981880188,
+            "queued_pipelines": 880,
+            "created_pipelines": 10,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 1099.415,
+            "elapsed_ms": 1029.4849998950958,
+            "queued_pipelines": 520,
+            "created_pipelines": 370,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 2123.39,
+            "elapsed_ms": 2053.4649999141693,
+            "queued_pipelines": 185,
+            "created_pipelines": 705,
+            "cache_idle": 0,
+            "terminal": false
+          },
+          {
+            "at_ms": 2621.195,
+            "elapsed_ms": 2550.7599999904633,
+            "queued_pipelines": 0,
+            "created_pipelines": 890,
+            "cache_idle": 1,
+            "terminal": true
+          }
+        ],
+        "longtasks": {
+          "status": "available",
+          "count": 0,
+          "total_ms": 0,
+          "max_ms": null,
+          "before_profile_count": 0,
+          "before_profile_total_ms": 0,
+          "dropped_rows": 0,
+          "rows": []
+        }
+      }
+    ],
+    "deep_comparison": [
+      {
+        "condition": "profile-v1",
+        "path": "profile-v1/headless-probe-warm/report.json",
+        "sha256": "51df0c551c036b022b1cc0fe4cc74da6fb54841d0783b1347f58b1d295bd3a8c",
+        "attempts": [
+          {
+            "time_to_graphics_ready_ms": 9679.805000066757,
+            "preparation": {
+              "pipelineCount": 916,
+              "shaderModuleCount": 917,
+              "asyncPipelineCount": 0,
+              "activeCreateRenderPipelineMs": 6.019997835159302,
+              "activeCreateShaderModuleMs": 16.835002899169922,
+              "activePipelineApiWallMs": 22.855000734329224,
+              "apiWrapperOverheadMs": 0.8399968147277832,
+              "firstApiAtMs": 218.84999990463257,
+              "lastApiAtMs": 9677.27999997139,
+              "pipelineCreateSpanMs": 9458.430000066757,
+              "waitBetweenNonemptyBatchesMs": 9266.440001010895,
+              "batchCount": 177,
+              "nativePreparationCallbacks": 153,
+              "renderedBatchCount": 153,
+              "timerBatchCount": 24,
+              "batchScheduleToGraphicsReadyRemainderMs": 2.5250000953674316
+            },
+            "responsiveness": {
+              "animationCallbackGapMs": {
+                "count": 405,
+                "min": 0.13000011444091797,
+                "median": 16.669999837875366,
+                "p95": 78.90000009536743,
+                "max": 228.44000005722046
+              },
+              "gapsOver16_67ms": 204,
+              "gapsOver35ms": 41,
+              "longTaskMs": {
+                "count": 1,
+                "min": 55,
+                "median": 55,
+                "p95": 55,
+                "max": 55
+              },
+              "longTasksDuringGraphics": [
+                {
+                  "start": 218.5,
+                  "duration": 55
+                }
+              ],
+              "longTasksAfterGraphics": []
+            },
+            "errors": []
+          },
+          {
+            "time_to_graphics_ready_ms": 6927.380000114441,
+            "preparation": {
+              "pipelineCount": 916,
+              "shaderModuleCount": 917,
+              "asyncPipelineCount": 0,
+              "activeCreateRenderPipelineMs": 5.61499285697937,
+              "activeCreateShaderModuleMs": 16.574994802474976,
+              "activePipelineApiWallMs": 22.189987659454346,
+              "apiWrapperOverheadMs": 0.830000638961792,
+              "firstApiAtMs": 145.20000004768372,
+              "lastApiAtMs": 6882.305000066757,
+              "pipelineCreateSpanMs": 6737.1050000190735,
+              "waitBetweenNonemptyBatchesMs": 6549.2800006866455,
+              "batchCount": 177,
+              "nativePreparationCallbacks": 153,
+              "renderedBatchCount": 152,
+              "timerBatchCount": 25,
+              "batchScheduleToGraphicsReadyRemainderMs": 45.075000047683716
+            },
+            "responsiveness": {
+              "animationCallbackGapMs": {
+                "count": 320,
+                "min": 1.4399998188018799,
+                "median": 16.664999961853027,
+                "p95": 57.625,
+                "max": 177.3400001525879
+              },
+              "gapsOver16_67ms": 160,
+              "gapsOver35ms": 24,
+              "longTaskMs": {
+                "count": 1,
+                "min": 55,
+                "median": 55,
+                "p95": 55,
+                "max": 55
+              },
+              "longTasksDuringGraphics": [
+                {
+                  "start": 144.83500003814697,
+                  "duration": 55
+                }
+              ],
+              "longTasksAfterGraphics": []
+            },
+            "errors": []
+          }
+        ]
+      },
+      {
+        "condition": "guard-v1",
+        "path": "guard-v1/headless-probe-warm/report.json",
+        "sha256": "e29932584ca12db9b27a09a61b4af9f73ac4ad49874065101a3fcda912a639f2",
+        "attempts": [
+          {
+            "time_to_graphics_ready_ms": 3978.4649999141693,
+            "preparation": {
+              "pipelineCount": 916,
+              "shaderModuleCount": 917,
+              "asyncPipelineCount": 0,
+              "activeCreateRenderPipelineMs": 5.50999903678894,
+              "activeCreateShaderModuleMs": 16.884999752044678,
+              "activePipelineApiWallMs": 22.394998788833618,
+              "apiWrapperOverheadMs": 0.8799972534179688,
+              "firstApiAtMs": 120.27999997138977,
+              "lastApiAtMs": 3972.789999961853,
+              "pipelineCreateSpanMs": 3852.5099999904633,
+              "waitBetweenNonemptyBatchesMs": 3663.935001850128,
+              "batchCount": 177,
+              "nativePreparationCallbacks": 79,
+              "renderedBatchCount": 78,
+              "timerBatchCount": 99,
+              "batchScheduleToGraphicsReadyRemainderMs": 5.674999952316284
+            },
+            "responsiveness": {
+              "animationCallbackGapMs": {
+                "count": 168,
+                "min": 0.10500001907348633,
+                "median": 16.669999837875366,
+                "p95": 81.75,
+                "max": 188.7350001335144
+              },
+              "gapsOver16_67ms": 85,
+              "gapsOver35ms": 17,
+              "longTaskMs": {
+                "count": 1,
+                "min": 55,
+                "median": 55,
+                "p95": 55,
+                "max": 55
+              },
+              "longTasksDuringGraphics": [
+                {
+                  "start": 119.93499994277954,
+                  "duration": 55
+                }
+              ],
+              "longTasksAfterGraphics": []
+            },
+            "errors": []
+          },
+          {
+            "time_to_graphics_ready_ms": 3679.954999923706,
+            "preparation": {
+              "pipelineCount": 916,
+              "shaderModuleCount": 917,
+              "asyncPipelineCount": 0,
+              "activeCreateRenderPipelineMs": 5.119996547698975,
+              "activeCreateShaderModuleMs": 17.00999903678894,
+              "activePipelineApiWallMs": 22.129995584487915,
+              "apiWrapperOverheadMs": 0.6899988651275635,
+              "firstApiAtMs": 129.38499999046326,
+              "lastApiAtMs": 3677.2249999046326,
+              "pipelineCreateSpanMs": 3547.8399999141693,
+              "waitBetweenNonemptyBatchesMs": 3359.7550027370453,
+              "batchCount": 177,
+              "nativePreparationCallbacks": 80,
+              "renderedBatchCount": 80,
+              "timerBatchCount": 97,
+              "batchScheduleToGraphicsReadyRemainderMs": 2.7300000190734863
+            },
+            "responsiveness": {
+              "animationCallbackGapMs": {
+                "count": 176,
+                "min": 0.5349998474121094,
+                "median": 16.670000076293945,
+                "p95": 48.47000002861023,
+                "max": 158.72499990463257
+              },
+              "gapsOver16_67ms": 90,
+              "gapsOver35ms": 14,
+              "longTaskMs": {
+                "count": 1,
+                "min": 54,
+                "median": 54,
+                "p95": 54,
+                "max": 54
+              },
+              "longTasksDuringGraphics": [
+                {
+                  "start": 129.0149998664856,
+                  "duration": 54
+                }
+              ],
+              "longTasksAfterGraphics": []
+            },
+            "errors": []
+          }
+        ]
+      }
+    ],
+    "limits": [
+      "The original reported10\u201315second attempt was not reproduced exactly.",
+      "Existing Chrome profile, driver and OS caches were not cleared or controlled; separate visits are scoped measurements, not a statistical guarantee.",
+      "API create/queue-retirement counts do not measure backend GPU compilation completion.",
+      "Deep probe overhead and its warmup are separate from ordinary-profile UI timings. Boundary-only runs select no disc; the historical harness cache-description wording about a real-disc warmup does not apply.",
+      "First deep-probe p95 animation gap increased from78.9 to81.75ms while its maximum gap fell; responsiveness is not uniformly improved or accepted."
+    ],
+    "warm_observed_reduction_percent": 43.361,
+    "deep_cleanup": {
+      "path": "guard-v1/deep-owner.json",
+      "sha256": "4c66817a036e6cf6ec9243a7a563656548087623ae4ffb4bfa93f822a8009080"
+    },
+    "final_scoped_result_review": {
+      "path": "guard-v1/final-scoped-result-review.json",
+      "sha256": "f82a8ee1f6813c0275486389aa8d1b1bee28e23cdbe400eb02016d748e487c27"
+    },
+    "full_regression": {
+      "result": "pass",
+      "source_commit": "0258f2fc73613fbfd2d07fe67277bf4f97890c9b",
+      "tests": 2402,
+      "skipped": 166,
+      "seconds": 544.327,
+      "exit_code": 0,
+      "log_sha256": "e25ed786c3014a3b84b84acb38245dbb54b0c75051f6924711ffa727d6312059",
+      "receipt": "guard-v1/full-regression-receipt.json",
+      "receipt_sha256": "39f183ad08bc1ad0316168837aed798f62d40788a9a5ad3e8383f8c504b6abe9"
+    },
+    "integration": {
+      "pull_request": "https://github.com/ericvanlare/melee-web/pull/327",
+      "policy": "Only merge after independent review and complete final-head CI on current main; deployed producer remains distinct from documentation/integration commits."
+    }
+  }
+}
