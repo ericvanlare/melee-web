@@ -26,14 +26,15 @@ export function readNativeFrameEffectFirstDraw() {
   const status = JSON.parse(module.UTF8ToString(module._melee_web_native_menu_frame_effect_status()));
   if (status.busy === true) return {settled: false};
   const renderer = status.renderer;
-  const completed = (status.schema_version === 3 || status.schema_version === 4) && status.terminal === true &&
+  const completed = (status.schema_version === 3 || status.schema_version === 4 || status.schema_version === 5) && status.terminal === true &&
     status.selected_depth_owners?.pending === 0 && (status.error !== '' ||
     renderer?.state === 5 || renderer?.fence_count === 1);
   return {settled: true, completed, status};
 }
 
 export function firstDrawObservationFailures(receipt) {
-  const currentOwners = receipt?.schema_version === 4;
+  const attachmentOwners = receipt?.schema_version === 5;
+  const currentOwners = receipt?.schema_version === 4 || attachmentOwners;
   const failures = [];
   const uint32 = value => Number.isInteger(value) && value >= 0 && value <= 0xffffffff;
   const uint64 = value => typeof value === 'string' && /^(0|[1-9][0-9]{0,19})$/.test(value) &&
@@ -77,7 +78,7 @@ export function firstDrawObservationFailures(receipt) {
       !receipt.raw_pad_bytes.every(value => Number.isInteger(value) && value >= 0 && value <= 255))
     failures.push('native_pad_records');
   const renderer = receipt.renderer;
-  if (renderer?.schema_version !== (currentOwners ? 3 : 2) || renderer?.state !== 4 ||
+  if (renderer?.schema_version !== (attachmentOwners ? 4 : currentOwners ? 3 : 2) || renderer?.state !== 4 ||
       renderer.submit_count !== 1 || renderer.fence_count !== 1 || renderer.fence_success !== 1)
     failures.push('normal_submit_and_fence');
   if (!Array.isArray(receipt.events) || !Array.isArray(receipt.handles) ||

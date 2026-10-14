@@ -97,7 +97,7 @@ void tick_and_draw(){++match->frame;frame_effect_tick_returned();frame_effect_au
 
 void schema2_serialization_control(){
  reset();request();begin();tick_and_draw();
- gpu.schemaVersion=3;gpu.state=4;gpu.targetFrameIndex=gpu.frameIndex=3;gpu.frameId=9007199254740993ULL;
+ gpu.schemaVersion=4;gpu.state=4;gpu.targetFrameIndex=gpu.frameIndex=3;gpu.frameId=9007199254740993ULL;
  gpu.submitCount=gpu.fenceCount=gpu.fenceSuccess=1;gpu.firstBlocker=7;gpu.findingMask=128|(uint64_t{1}<<27);
  gpu.commandRecordCount=gpu.actualDrawCount=1;gpu.opCount=gpu.renderPassCount=gpu.drawCommandCount=1;
  gpu.resourceCount=4;gpu.bindingEntryCount=1;gpu.handleCount=5;gpu.eventCount=8;gpu.layoutEntryCount=2;gpu.provenanceCount=2;
@@ -124,8 +124,14 @@ void schema2_serialization_control(){
  auto& detail=event_rows[1];detail.kind=20;detail.flags=2;detail.value0=3;detail.value1=6;detail.value2=1;detail.value3=255;detail.handleA=2;detail.handleB=3;
  for(unsigned i=0;i<4;++i){auto& e=event_rows[i+2];e.kind=21;e.flags=i;if(i==0){e.value0=4;e.value1=1;e.value2=2;e.value3=3;e.handleA=4;}}
  event_rows[6].kind=17;event_rows[7].kind=18;event_rows[7].flags=1;
+ AuroraBrowserFrameEffectResource attachmentTexture{};attachmentTexture.captureId=6;attachmentTexture.ownerId=1;attachmentTexture.kind=2;attachmentTexture.wordCount=10;
+ attachmentTexture.words[0]=640;attachmentTexture.words[1]=480;attachmentTexture.words[2]=1;attachmentTexture.words[3]=1;attachmentTexture.words[4]=2;attachmentTexture.words[5]=attachmentTexture.words[6]=1;
+ AuroraBrowserFrameEffectResource attachmentView{};attachmentView.captureId=7;attachmentView.ownerId=6;attachmentView.kind=1;attachmentView.wordCount=10;attachmentView.words[0]=6;
+ resource_rows.push_back(attachmentTexture);resource_rows.push_back(attachmentView);handle_rows.push_back({6,2,0});handle_rows.push_back({7,1,0});
+ provenance_rows.push_back({6,1,9007199254740995ULL,UINT64_MAX,15,2});provenance_rows.push_back({7,1,9007199254740996ULL,UINT64_MAX,16,2});
+ gpu.resourceCount+=2;gpu.handleCount+=2;gpu.provenanceCount+=2;
  const std::string complete=melee_web_native_menu_frame_effect_status();
- assert(complete.find("\"schema_version\":3")!=std::string::npos);
+ assert(complete.find("\"schema_version\":4")!=std::string::npos);
  assert(complete.find("\"rows_complete\":true")!=std::string::npos);
  assert(complete.find("\"viewport_bits\":[2147483648,2143289345,1065353216,1065353216,0,1065353216]")!=std::string::npos);
  assert(complete.find("\"clear_color_bits\":[\"9223372036854775808\",\"9221120237041090561\",\"0\",\"4607182418800017408\"]")!=std::string::npos);
@@ -202,7 +208,7 @@ void first_draw_serialization_control(){
  observation.callback_draws=2;observation.tick_returns=2;observation.draw_returns=2;
  observation.source_after=202;
  const std::string raw=melee_web_native_menu_frame_effect_status();
- assert(raw.find("\"schema_version\":4")!=std::string::npos);
+ assert(raw.find("\"schema_version\":5")!=std::string::npos);
  assert(raw.find("\"selected_source_frame\":201,\"unobserved_draws\":1")!=std::string::npos);
  std::printf("SCHEMA3_STATUS %s\n",raw.c_str());
 }

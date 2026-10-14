@@ -123,7 +123,7 @@ class MatchFrameEffectNativeTests(OwnedWorkspaceTests):
                          "const r=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));\n" +
                          "assert.deepEqual(frameEffectObservationFailures(r),[]);\n" +
                          "assert.deepEqual(compareFrameEffectObservations(r,structuredClone(r)),[]);\n" +
-                         "console.log('actual native renderer3 normal JSON decoded exactly');\n")
+                         "console.log('actual native renderer4 normal JSON decoded exactly');\n")
         decoded = subprocess.run([str(node_runtime(ROOT)), str(check), str(raw)],
                                  capture_output=True, text=True, timeout=15)
         self.assertEqual(decoded.returncode, 0, decoded.stdout + decoded.stderr)
@@ -134,7 +134,7 @@ class MatchFrameEffectNativeTests(OwnedWorkspaceTests):
         check.write_text(check.read_text().replace("match_frame_effect_driver.mjs", "match_frame_effect_first_draw_driver.mjs")
                          .replace("frameEffectObservationFailures", "firstDrawObservationFailures")
                          .replace("compareFrameEffectObservations", "compareFirstDrawObservations")
-                         .replace("actual native renderer3 normal JSON decoded exactly", "actual native renderer3 first-draw JSON decoded exactly"))
+                         .replace("actual native renderer4 normal JSON decoded exactly", "actual native renderer4 first-draw JSON decoded exactly"))
         decoded = subprocess.run([str(node_runtime(ROOT)), str(check), str(raw)],
                                  capture_output=True, text=True, timeout=15)
         self.assertEqual(decoded.returncode, 0, decoded.stdout + decoded.stderr)

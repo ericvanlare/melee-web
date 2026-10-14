@@ -93,3 +93,30 @@ test('invalid exact-shaped raw rows cannot enter owner graph lookups',()=>{
     assert.doesNotThrow(()=>{failures=validate(r);});assert.ok(failures.length);
   }
 });
+
+function attachmentFixture(firstDraw=false,slot=0) {
+  const r=currentFixture(firstDraw);r.schema_version=firstDraw?5:4;r.renderer.schema_version=4;
+  r.handles.push({capture_id:'6',kind:2,reserved:0},{capture_id:'7',kind:1,reserved:0});r.renderer.handle_count+=2;
+  r.resources.push({capture_id:'6',owner_id:'1',kind:2,word_count:10,words:[640,480,1,1,2,1,1,16,0,0,...Array(6).fill(0)]},
+    {capture_id:'7',owner_id:'6',kind:1,word_count:10,words:[6,0,0,2,0,1,0,1,0,0,...Array(6).fill(0)]});r.renderer.resource_count+=2;
+  r.provenance.push({capture_id:'6',device_id:'1',creation_serial:'9007199254740996',renderer_epoch:'18446744073709551615',role:15,slot},
+    {capture_id:'7',device_id:'1',creation_serial:'9007199254740997',renderer_epoch:'18446744073709551615',role:16,slot});r.renderer.provenance_count+=2;
+  return r;
+}
+test('renderer4/normal4/first5 exact attachment slots while historical renderer3 refuses new roles',()=>{
+  for(const firstDraw of [false,true])for(const slot of [0,1,2]){
+    const r=attachmentFixture(firstDraw,slot);const validate=firstDraw?firstDrawObservationFailures:frameEffectObservationFailures;
+    const compare=firstDraw?compareFirstDrawObservations:compareFrameEffectObservations;
+    assert.deepEqual(validate(r),[]);assert.deepEqual(compare(r,structuredClone(r)),[]);
+    for(const mutate of [x=>{x.renderer.schema_version=3;},x=>{x.schema_version=firstDraw?4:3;x.renderer.schema_version=3;},
+      x=>{x.provenance.at(-1).slot=3;},x=>{x.provenance.at(-2).slot=3;},x=>{x.provenance.at(-1).role=17;},
+      x=>{x.provenance.at(-1).slot=(slot+1)%3;},x=>{x.provenance.at(-2).role=12;},x=>{x.resources.at(-1).owner_id='3';}]){
+      const bad=structuredClone(r);mutate(bad);assert.ok(validate(bad).length);
+    }
+    const different=structuredClone(r);different.provenance.at(-1).creation_serial='9007199254740998';assert.ok(compare(r,different).length);
+  }
+  for(const [schema,bound] of [[3,17],[4,23]]){
+    const r=attachmentFixture();r.renderer.schema_version=schema;r.provenance=Array(bound+1).fill(null);r.renderer.provenance_count=bound+1;
+    assert.ok(rendererOwnerObservationFailures(r).includes('provenance_count'));
+  }
+});

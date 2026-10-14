@@ -11,6 +11,8 @@
 #define REQUIRE(x) do { if (!(x)) { std::fprintf(stderr,"first-draw collector failure line %d: %s\n",__LINE__,#x);return 1; } } while(false)
 namespace aurora::gfx::detail {
 struct BrowserFrameEffectObserverControls {
+  static uint64_t attachment_serial(BrowserFrameEffectObserver& o,uint32_t role,size_t slot) { return o.warm_[o.warm_index(role,slot)].serial; }
+  static void stale_attachment_parent(BrowserFrameEffectObserver& o,size_t slot) { ++o.warm_[o.warm_index(o.PersistentAttachmentViewRole,slot)].parentSerial; }
   static void exhaust_serials(BrowserFrameEffectObserver& observer) { observer.nextCreateSerial_=UINT64_MAX; }
   static BrowserFrameEffectObserver::SamplerCreation corrupt_sampler(
       const BrowserFrameEffectObserver::SamplerCreation& source, unsigned corruption) {
@@ -563,7 +565,130 @@ bool renderer_owner_layout_and_budget_refusals() {
 }
 }
 
+namespace {
+struct AttachmentFixture {
+  Fixture base;
+  std::array<int,3> owners{},textures{},views{};
+  wgpu::TextureDescriptor texture{.usage=wgpu::TextureUsage::RenderAttachment|wgpu::TextureUsage::TextureBinding|wgpu::TextureUsage::CopySrc|wgpu::TextureUsage::CopyDst,
+    .dimension=wgpu::TextureDimension::e2D,.size={640,480,1},.format=wgpu::TextureFormat::RGBA8Unorm,.mipLevelCount=1,.sampleCount=1};
+  wgpu::TextureViewDescriptor view{.dimension=wgpu::TextureViewDimension::e2D};
+  void create(size_t slot,uintptr_t device=0) {
+    auto& o=*base.observer;if(!device)device=base.ids.device;
+    o.remember_persistent_attachment_texture(slot,address(&owners[slot]),device,address(&textures[slot]),texture);
+    o.remember_persistent_attachment_view(slot,address(&owners[slot]),device,address(&views[slot]),address(&textures[slot]),view);
+  }
+  void release(size_t slot) {
+    base.observer->release_persistent_attachment(slot,address(&owners[slot]),address(&textures[slot]),address(&views[slot]));
+  }
+  bool start(size_t count=3) {
+    if(!base.observer)return false;
+    base.observer->begin_persistent_attachment_lifetime(base.ids.device);
+    for(size_t slot=0;slot<count;++slot)create(slot);
+    return true;
+  }
+};
+void observe_attachment_load_pass(AttachmentFixture& f) {
+  // Actual collector/API path; fake identity wrappers are detached before any
+  // destructor, so no WebGPU service/refcount calls or command encoding occur.
+  aurora::gfx::detail::FramePacket frame;frame.frameIndex=3158;frame.frameId=3159;
+  aurora::gfx::detail::RenderPass pass;pass.colorAttachmentCount=1;
+  for (size_t i=0;i<23;++i) {
+    const aurora::gfx::detail::Command::Data data{.debugMarkerIndex=i};
+    pass.commands.push_back({.type=aurora::gfx::detail::CommandType::DebugMarker,.data=data});
+  }
+  pass.colorAttachments[0].size={640,480,1};pass.colorAttachments[0].clear=false;
+  pass.colorAttachments[0].view=wgpu::TextureView::Acquire(reinterpret_cast<WGPUTextureView>(address(&f.views[0])));
+  pass.colorAttachments[0].resolveView=wgpu::TextureView::Acquire(reinterpret_cast<WGPUTextureView>(address(&f.views[1])));
+  std::array<wgpu::RenderPassColorAttachment,aurora::gfx::MaxColorAttachments> colors{};
+  colors[0].loadOp=wgpu::LoadOp::Load;colors[0].storeOp=wgpu::StoreOp::Store;
+  colors[0].view=wgpu::TextureView::Acquire(reinterpret_cast<WGPUTextureView>(address(&f.views[0])));
+  colors[0].resolveTarget=wgpu::TextureView::Acquire(reinterpret_cast<WGPUTextureView>(address(&f.views[1])));
+  wgpu::RenderPassDepthStencilAttachment depth{};depth.depthLoadOp=wgpu::LoadOp::Load;depth.depthStoreOp=wgpu::StoreOp::Store;
+  depth.view=wgpu::TextureView::Acquire(reinterpret_cast<WGPUTextureView>(address(&f.views[2])));
+  f.base.observer->observe_render_pass(frame,0,pass,colors,&depth);
+  (void)pass.colorAttachments[0].view.MoveToCHandle();(void)pass.colorAttachments[0].resolveView.MoveToCHandle();
+  (void)colors[0].view.MoveToCHandle();(void)colors[0].resolveTarget.MoveToCHandle();(void)depth.view.MoveToCHandle();
+}
+bool persistent_attachment_controls() {
+  using O=BrowserFrameEffectObserver;using Access=aurora::gfx::detail::BrowserFrameEffectObserverControls;
+  {
+    AttachmentFixture f;STATIC_GROUP_CONTROL_CHECK(f.start());auto& o=*f.base.observer;
+    std::array<uint64_t,6> created{};
+    for(size_t slot=0;slot<3;++slot){created[slot*2]=Access::attachment_serial(o,O::PersistentAttachmentTextureRole,slot);created[slot*2+1]=Access::attachment_serial(o,O::PersistentAttachmentViewRole,slot);}
+    STATIC_GROUP_CONTROL_CHECK(f.base.begin());
+    for(size_t slot=0;slot<3;++slot)STATIC_GROUP_CONTROL_CHECK(created[slot*2]==Access::attachment_serial(o,O::PersistentAttachmentTextureRole,slot));
+    STATIC_GROUP_CONTROL_CHECK(f.base.arm_and_begin_frame());observe_attachment_load_pass(f);
+    const auto observed=o.snapshot();STATIC_GROUP_CONTROL_CHECK(observed.schemaVersion==4&&observed.firstBlocker==AURORA_BROWSER_FRAME_EFFECT_LOAD_ATTACHMENT);
+    STATIC_GROUP_CONTROL_CHECK(observed.resourceCount==6&&observed.provenanceCount==6&&observed.layoutEntryCount==0&&observed.bindingEntryCount==0);
+    for(uint32_t i=0;i<6;i+=2){AuroraBrowserFrameEffectResource texture{},view{};AuroraBrowserFrameEffectProvenance tp{},vp{};
+      STATIC_GROUP_CONTROL_CHECK(o.resource(i,&texture)&&o.resource(i+1,&view)&&o.provenance(i,&tp)&&o.provenance(i+1,&vp));
+      STATIC_GROUP_CONTROL_CHECK(texture.kind==AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE&&texture.wordCount==10&&texture.words[0]==640&&texture.words[1]==480&&texture.words[2]==1);
+      STATIC_GROUP_CONTROL_CHECK(view.kind==AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE_VIEW&&view.wordCount==10&&view.ownerId==texture.captureId&&view.words[0]==texture.captureId&&view.words[1]==0);
+      STATIC_GROUP_CONTROL_CHECK(tp.role==15&&vp.role==16&&tp.slot==i/2&&vp.slot==tp.slot&&tp.rendererEpoch==vp.rendererEpoch&&tp.rendererEpoch!=0);
+      STATIC_GROUP_CONTROL_CHECK(tp.creationSerial==created[i]&&vp.creationSerial==created[i+1]&&tp.deviceId==vp.deviceId);
+    }
+    STATIC_GROUP_CONTROL_CHECK(o.promote_persistent_attachment_view(address(&f.views[0]))&&o.snapshot().resourceCount==6&&o.snapshot().provenanceCount==6);
+    STATIC_GROUP_CONTROL_CHECK((observed.findingMask&(uint64_t{1}<<AURORA_BROWSER_FRAME_EFFECT_LOAD_ATTACHMENT))!=0);
+  }
+  for(unsigned mode=0;mode<12;++mode){
+    AttachmentFixture f;STATIC_GROUP_CONTROL_CHECK(f.start(1));auto& o=*f.base.observer;
+    uint32_t expected=AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE;
+    switch(mode){
+      case 0:f.create(0);break; // duplicate actual creation, never cache observation
+      case 1:f.release(0);f.release(0);break;
+      case 2:o.release_persistent_attachment(0,address(&wrongOwnerToken),address(&f.textures[0]),address(&f.views[0]));break;
+      case 3:Access::stale_attachment_parent(o,0);expected=AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE;break;
+      case 4:o.end_persistent_attachment_lifetime(address(&wrongDeviceToken));break;
+      case 5:o.begin_persistent_attachment_lifetime(address(&wrongDeviceToken));break;
+      case 6:o.end_persistent_attachment_lifetime(f.base.ids.device);expected=AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE;break;
+      case 7:o.remember_persistent_attachment_view(1,address(&f.owners[1]),f.base.ids.device,address(&f.views[1]),address(&wrongVertexToken),f.view);expected=AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE;break;
+      case 8:o.remember_persistent_attachment_view(1,address(&f.owners[1]),address(&wrongDeviceToken),address(&f.views[1]),address(&f.textures[0]),f.view);expected=AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE;break;
+      case 9:{auto d=f.texture;d.nextInChain=reinterpret_cast<const wgpu::ChainedStruct*>(&wrongGroupToken);o.remember_persistent_attachment_texture(1,address(&f.owners[1]),f.base.ids.device,address(&f.textures[1]),d);o.remember_persistent_attachment_texture(1,address(&f.owners[1]),f.base.ids.device,address(&f.textures[1]),f.texture);expected=AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE;break;}
+      case 10:{auto d=f.view;d.nextInChain=reinterpret_cast<const wgpu::ChainedStruct*>(&wrongGroupToken);o.remember_persistent_attachment_view(1,address(&f.owners[1]),f.base.ids.device,address(&f.views[1]),address(&f.textures[1]),d);o.remember_persistent_attachment_texture(1,address(&f.owners[1]),f.base.ids.device,address(&f.textures[1]),f.texture);expected=AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE;break;}
+      case 11:o.remember_persistent_attachment_texture(3,address(&wrongOwnerToken),f.base.ids.device,address(&wrongVertexToken),f.texture);expected=AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE;break;
+    }
+    STATIC_GROUP_CONTROL_CHECK(f.base.begin()&&f.base.arm_and_begin_frame());
+    STATIC_GROUP_CONTROL_CHECK(!o.promote_persistent_attachment_view(address(&f.views[0])));
+    const auto r=o.snapshot();STATIC_GROUP_CONTROL_CHECK(r.firstBlocker==expected&&r.resourceCount==0&&r.provenanceCount==0&&r.bindingEntryCount==0&&r.layoutEntryCount==0);
+  }
+  for(unsigned mode=0;mode<4;++mode){
+    AttachmentFixture f;STATIC_GROUP_CONTROL_CHECK(f.start(1)&&f.base.begin()&&f.base.arm_and_begin_frame());auto& o=*f.base.observer;
+    if(mode==0)f.release(0);
+    else if(mode==1)f.create(0); // reused raw during active window refuses before allocating a serial
+    else if(mode==2)o.end_persistent_attachment_lifetime(f.base.ids.device);
+    else o.end_persistent_attachment_lifetime(address(&wrongDeviceToken));
+    STATIC_GROUP_CONTROL_CHECK(!o.promote_persistent_attachment_view(address(&f.views[0]))&&o.snapshot().firstBlocker==AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE&&o.snapshot().resourceCount==0&&o.snapshot().provenanceCount==0);
+  }
+  {AttachmentFixture f;STATIC_GROUP_CONTROL_CHECK(f.start(1));const auto prior=Access::attachment_serial(*f.base.observer,O::PersistentAttachmentTextureRole,0);
+    f.release(0);f.create(0);STATIC_GROUP_CONTROL_CHECK(Access::attachment_serial(*f.base.observer,O::PersistentAttachmentTextureRole,0)!=prior);
+    STATIC_GROUP_CONTROL_CHECK(f.base.begin()&&f.base.arm_and_begin_frame());STATIC_GROUP_CONTROL_CHECK(f.base.observer->promote_persistent_attachment_view(address(&f.views[0])));}
+  {AttachmentFixture f;STATIC_GROUP_CONTROL_CHECK(f.start(1)&&f.base.begin()&&f.base.arm_and_begin_frame());
+    STATIC_GROUP_CONTROL_CHECK(!f.base.observer->promote_persistent_attachment_view(address(&wrongVertexToken))&&f.base.observer->snapshot().firstBlocker==AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE&&f.base.observer->snapshot().resourceCount==0);}
+  {AttachmentFixture f;STATIC_GROUP_CONTROL_CHECK(f.start(1));f.base.ids.device=address(&wrongDeviceToken);
+    STATIC_GROUP_CONTROL_CHECK(f.base.begin()&&f.base.arm_and_begin_frame());STATIC_GROUP_CONTROL_CHECK(!f.base.observer->promote_persistent_attachment_view(address(&f.views[0]))&&f.base.observer->snapshot().firstBlocker==AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE&&f.base.observer->snapshot().resourceCount==0);}
+  {AttachmentFixture f;STATIC_GROUP_CONTROL_CHECK(f.start(1));auto& o=*f.base.observer;
+    const auto prior=Access::attachment_serial(o,O::PersistentAttachmentTextureRole,0);
+    f.release(0);o.end_persistent_attachment_lifetime(f.base.ids.device);
+    f.base.ids.device=address(&wrongDeviceToken);o.begin_persistent_attachment_lifetime(f.base.ids.device);f.create(0);
+    STATIC_GROUP_CONTROL_CHECK(prior!=Access::attachment_serial(o,O::PersistentAttachmentTextureRole,0));
+    STATIC_GROUP_CONTROL_CHECK(f.base.begin()&&f.base.arm_and_begin_frame()&&o.promote_persistent_attachment_view(address(&f.views[0])));
+    AuroraBrowserFrameEffectProvenance parent{};STATIC_GROUP_CONTROL_CHECK(o.provenance(0,&parent)&&parent.role==15&&parent.creationSerial!=prior);}
+  for(bool parentKnown:{false,true}){AttachmentFixture f;STATIC_GROUP_CONTROL_CHECK(f.base.begin()&&f.base.arm_and_begin_frame());auto& o=*f.base.observer;
+    if(parentKnown)o.observe_texture_descriptor(address(&f.textures[0]),f.base.ids.device,f.texture);
+    o.observe_texture_view_descriptor(address(&f.views[0]),address(&f.textures[0]),f.base.ids.device,&f.view);
+    const auto before=o.snapshot();STATIC_GROUP_CONTROL_CHECK(o.promote_persistent_attachment_view(address(&f.views[0]))==parentKnown);
+    STATIC_GROUP_CONTROL_CHECK(o.snapshot().resourceCount==before.resourceCount&&o.snapshot().provenanceCount==0);
+    STATIC_GROUP_CONTROL_CHECK(parentKnown?o.snapshot().firstBlocker==0:o.snapshot().firstBlocker==AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE);}
+  {AttachmentFixture f;STATIC_GROUP_CONTROL_CHECK(f.start(1)&&f.base.begin()&&f.base.arm_and_begin_frame());auto& o=*f.base.observer;
+    Access::exhaust_provenance_rows(o);const auto before=o.snapshot();
+    STATIC_GROUP_CONTROL_CHECK(!o.promote_persistent_attachment_view(address(&f.views[0]))&&o.snapshot().firstBlocker==AURORA_BROWSER_FRAME_EFFECT_DESCRIPTOR_OVERFLOW);
+    STATIC_GROUP_CONTROL_CHECK(o.snapshot().resourceCount==0&&o.snapshot().provenanceCount==before.provenanceCount&&o.snapshot().bindingEntryCount==0&&o.snapshot().layoutEntryCount==0);}
+  std::puts("actual persistent EFB attachment pre-renderer creation/LOAD parent provenance and lifecycle refusals passed");
+  return true;
+}
+}
+
 int main(){
- if(!renderer_owner_sampler_order_controls() || !renderer_owner_layout_and_budget_refusals() || !renderer_owner_graph_positive() || !renderer_owner_release_and_malformed_controls() || static_group_descriptor_controls() || selected_completion(false)||selected_completion(true)||unknown_identity())return 1;
+ if(!persistent_attachment_controls() || !renderer_owner_sampler_order_controls() || !renderer_owner_layout_and_budget_refusals() || !renderer_owner_graph_positive() || !renderer_owner_release_and_malformed_controls() || static_group_descriptor_controls() || selected_completion(false)||selected_completion(true)||unknown_identity())return 1;
  std::puts("first-draw actual collector issuing identity and selected map-owner controls passed");
 }

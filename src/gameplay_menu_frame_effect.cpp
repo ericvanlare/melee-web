@@ -166,8 +166,8 @@ const char* melee_web_native_menu_frame_effect_status(){
  const auto renderer=aurora_browser_frame_effect_observer_snapshot();
  bool rows_complete=true;
  out=observation.first_draw?
-     "{\"schema_version\":4,\"scope\":\"first_draw_in_normal_callback_observation_only\"":
-     "{\"schema_version\":3,\"scope\":\"one_normal_callback_observation_only\"";
+     "{\"schema_version\":5,\"scope\":\"first_draw_in_normal_callback_observation_only\"":
+     "{\"schema_version\":4,\"scope\":\"one_normal_callback_observation_only\"";
  const auto number=[&](const char* name,auto value){out+=",\"";out+=name;out+="\":";out+=std::to_string(value);};
  const auto boolean=[&](const char* name,bool value){out+=",\"";out+=name;out+=value?"\":true":"\":false";};
  boolean("requested",observation.requested);boolean("terminal",observation.terminal);

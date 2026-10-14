@@ -19,6 +19,8 @@ from workspace_resources import operation
 # Future/object bootstrap path. Both are exact isolated-index trees, never an
 # arbitrary locally modified checkout.
 AURORA_PREVIOUS_PATCH_TREES = (
+    # Exact typed renderer-owner predecessor before persistent EFB attachment provenance.
+    "ecd933889b07d5d91175e69200c37bdef35c00c8",
     # Exact static-descriptor observer predecessor before typed renderer-owner provenance.
     "80b7095bde6d00e8e8330e044793610e9adc2e9d",
     # Exact canonical observer predecessor before static slot-0 descriptor retention.

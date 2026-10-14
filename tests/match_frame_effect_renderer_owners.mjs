@@ -1,4 +1,4 @@
-// Renderer schema3 owner rows. Historical schema2 has a separate exact dispatch.
+// Renderer3 retains original role/bounds; renderer4 adds authored EFB texture/view pairs.
 export function rendererOwnerObservationFailures(receipt) {
   const failures = [];
   if (!receipt || typeof receipt !== 'object' || Array.isArray(receipt)) return ['owner_receipt_shape'];
@@ -7,6 +7,8 @@ export function rendererOwnerObservationFailures(receipt) {
   const exact = (row, keys) => row && typeof row === 'object' && !Array.isArray(row) &&
     Object.keys(row).length === keys.length && keys.every(k => Object.hasOwn(row,k));
   const renderer = receipt.renderer;
+  const attachmentOwners = renderer?.schema_version === 4;
+  if (renderer?.schema_version !== 3 && !attachmentOwners) failures.push('owner_schema');
   const layouts = Array.isArray(receipt.layout_entries) ? receipt.layout_entries : [];
   const ownerRows = Array.isArray(receipt.provenance) ? receipt.provenance : [];
   const resourceRows = Array.isArray(receipt.resources) ? receipt.resources : [];
@@ -27,11 +29,12 @@ export function rendererOwnerObservationFailures(receipt) {
       !Array.isArray(receipt.binding_entries) || bindings.some(e=>!validBindingRow(e)))
     failures.push('owner_raw_collection_rows');
   // Authored browser bounds: 2 static + 1 uniform + 2*GX_MAX_TEXMAP(8);
-  // 4 shared + StagingBufferCount(4) + 3 layouts + 3 groups + empty texture/view/sampler.
+  // Renderer3: 4 shared + StagingBufferCount(4) + 3 layouts + 3 groups + empty texture/view/sampler.
+  // Renderer4: add exactly3 authored EFB texture/view pairs (6rows).
   if (!Array.isArray(receipt.layout_entries) || receipt.layout_entries.length > 19 ||
       receipt.layout_entries.length !== renderer?.layout_entry_count || !u32(renderer?.layout_entry_count))
     failures.push('layout_entry_count');
-  if (!Array.isArray(receipt.provenance) || receipt.provenance.length > 17 ||
+  if (!Array.isArray(receipt.provenance) || receipt.provenance.length > (attachmentOwners ? 23 : 17) ||
       receipt.provenance.length !== renderer?.provenance_count || !u32(renderer?.provenance_count))
     failures.push('provenance_count');
   const resources = new Map(resourceRows.filter(validResourceRow).map(r => [r.capture_id,r]));
@@ -50,13 +53,13 @@ export function rendererOwnerObservationFailures(receipt) {
     failures.push('layout_descriptor_rows');
   const seen = new Set(), roles = new Set(), serials = new Set(), epochs = new Set(), devices = new Set();
   const validOwnerRows = [];
-  const kindForRole = role => role <= 5 ? 3 : role <= 8 ? 9 : role <= 11 ? 5 : role === 12 ? 2 : role === 13 ? 1 : 4;
+  const kindForRole = role => role <= 5 ? 3 : role <= 8 ? 9 : role <= 11 ? 5 : role === 12 || role === 15 ? 2 : role === 13 || role === 16 ? 1 : 4;
   for (const row of ownerRows) {
     const resource = resources.get(row?.capture_id), roleKey = `${row?.role}:${row?.slot}`;
     if (!exact(row,['capture_id','device_id','creation_serial','renderer_epoch','role','slot']) ||
         !u64(row.capture_id) || row.capture_id === '0' || !u64(row.device_id) || handles.get(row.device_id) !== 7 ||
         !u64(row.creation_serial) || row.creation_serial === '0' || !u64(row.renderer_epoch) || row.renderer_epoch === '0' ||
-        !u32(row.role) || row.role < 1 || row.role > 14 || !u32(row.slot) || (row.role === 5 ? row.slot >= 4 : row.slot !== 0) ||
+        !u32(row.role) || row.role < 1 || row.role > (attachmentOwners ? 16 : 14) || !u32(row.slot) || (row.role === 5 ? row.slot >= 4 : row.role >= 15 ? row.slot >= 3 : row.slot !== 0) ||
         !resource || resource.kind !== kindForRole(row.role) || seen.has(row.capture_id) || roles.has(roleKey) || serials.has(row.creation_serial) ||
         (resource.kind !== 1 && resource.owner_id !== row.device_id)) failures.push('owner_provenance_rows');
     else validOwnerRows.push(row);
@@ -71,6 +74,8 @@ export function rendererOwnerObservationFailures(receipt) {
     if (resource?.kind === 1 && (!provenance.has(resource.owner_id) || resources.get(resource.owner_id)?.kind !== 2 ||
         provenance.get(resource.owner_id)?.device_id !== row.device_id || provenance.get(resource.owner_id)?.renderer_epoch !== row.renderer_epoch))
       failures.push('view_parent_provenance');
+    if (row.role === 16 && (provenance.get(resource.owner_id)?.role !== 15 ||
+        provenance.get(resource.owner_id)?.slot !== row.slot)) failures.push('attachment_parent_role_or_slot');
     if (resource?.kind === 5) {
       if (!Array.isArray(resource.words) || !resource.words.every(u32) || resource.words.length !== 16) {
         failures.push('group_owner_graph');continue;

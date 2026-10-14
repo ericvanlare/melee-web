@@ -328,7 +328,7 @@ index 0000000000000000000000000000000000000000..2ecd22a6c10e9caf99ce33d9c0a465a0
 +              "future owner row identity offset changed");
 +#endif
 diff --git a/include/aurora/gfx.h b/include/aurora/gfx.h
-index 94504b177d6733244a9de40a8dfb49f5964363ae..f1db3f16026b9222bde093e5d9d246c80be744cf 100644
+index 94504b177d6733244a9de40a8dfb49f5964363ae..b1f6b74824c73efe0ba3b2910c15b655a03f84f3 100644
 --- a/include/aurora/gfx.h
 +++ b/include/aurora/gfx.h
 @@ -3,10 +3,12 @@
@@ -519,7 +519,7 @@ index 94504b177d6733244a9de40a8dfb49f5964363ae..f1db3f16026b9222bde093e5d9d246c8
 +
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && !defined(__EMSCRIPTEN_PTHREADS__)
 +enum {
-+  AURORA_BROWSER_FRAME_EFFECT_SCHEMA_VERSION = 3,
++  AURORA_BROWSER_FRAME_EFFECT_SCHEMA_VERSION = 4,
 +  AURORA_BROWSER_FRAME_EFFECT_EVENT_FRAME_OP = 1,
 +  AURORA_BROWSER_FRAME_EFFECT_EVENT_RENDER_PASS = 2,
 +  AURORA_BROWSER_FRAME_EFFECT_EVENT_COLOR_ATTACHMENT = 3,
@@ -4247,10 +4247,10 @@ index 0b86ffead6e8f6153d2acf52cf9daecf4f07ccfa..a5ad738b32d623acc50eb06d39589ff0
  void gpu_synchronize();
 diff --git a/lib/gfx/frame_effect_observer.hpp b/lib/gfx/frame_effect_observer.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..68288b3177e1753dc7e27b557292c959bd485f01
+index 0000000000000000000000000000000000000000..54d5cef987a9c8574d38577ea50404a90de69d75
 --- /dev/null
 +++ b/lib/gfx/frame_effect_observer.hpp
-@@ -0,0 +1,1460 @@
+@@ -0,0 +1,1567 @@
 +#pragma once
 +
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
@@ -4278,7 +4278,11 @@ index 0000000000000000000000000000000000000000..68288b3177e1753dc7e27b557292c959
 +  static constexpr uint32_t StaticGroupRole = 9, UniformGroupRole = 10, EmptyGroupRole = 11;
 +  static constexpr uint32_t EmptyTextureRole = 12, EmptyViewRole = 13, EmptySamplerRole = 14;
 +  static constexpr size_t TextureEntryCount = 2 * GX_MAX_TEXMAP;
-+  static constexpr size_t WarmOwnerCapacity = 4 + StagingBufferCount + 3 + 3 + 3;
++  // Exactly the three persistent EFB globals: color, resolved color, depth.
++  static constexpr uint32_t PersistentAttachmentTextureRole = 15, PersistentAttachmentViewRole = 16;
++  static constexpr size_t PersistentAttachmentSlotCount = 3;
++  static constexpr size_t SharedWarmOwnerCapacity = 4 + StagingBufferCount + 3 + 3 + 3;
++  static constexpr size_t WarmOwnerCapacity = SharedWarmOwnerCapacity + 2 * PersistentAttachmentSlotCount;
 +  static constexpr size_t LayoutEntryCapacity = 2 + 1 + TextureEntryCount;
 +  struct SamplerCreation {
 +    SamplerCreation() = default;
@@ -4291,17 +4295,95 @@ index 0000000000000000000000000000000000000000..68288b3177e1753dc7e27b557292c959
 +    bool valid = false;
 +  };
 +
++  // GPU initialization precedes renderer initialization. These authored creation
++  // rows retain their real serials; renderer begin only assigns observer epoch.
++  void begin_persistent_attachment_lifetime(uintptr_t device) noexcept {
++    if (state_.load(std::memory_order_acquire) != AURORA_BROWSER_FRAME_EFFECT_UNUSED || attachmentActive_ || !device) {
++      attachment_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE); return;
++    }
++    attachmentDevice_ = device; attachmentActive_ = true; attachmentError_ = 0; attachmentOwners_ = {};
++    for (size_t i=SharedWarmOwnerCapacity;i<WarmOwnerCapacity;++i) warm_[i] = {};
++  }
++  void end_persistent_attachment_lifetime(uintptr_t device) noexcept {
++    if (!attachmentActive_ || device != attachmentDevice_) attachment_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
++    if (capture_window_live()) attachment_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
++    attachmentActive_ = false;
++    for (size_t i=SharedWarmOwnerCapacity;i<WarmOwnerCapacity;++i) warm_[i].valid = false;
++    // This is observed owner detach, not proof of native WebGPU destruction.
++  }
++  void release_persistent_attachment(size_t slot, uintptr_t owner, uintptr_t texture, uintptr_t view) noexcept {
++    if (slot >= PersistentAttachmentSlotCount) { attachment_reject(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return; }
++    auto& parent=warm_[warm_index(PersistentAttachmentTextureRole,slot)];
++    auto& child=warm_[warm_index(PersistentAttachmentViewRole,slot)];
++    if (!attachmentActive_ || attachmentOwners_[slot]!=owner || !parent.valid || !child.valid ||
++        parent.raw!=texture || child.raw!=view || child.parentSerial!=parent.serial) {
++      attachment_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE); return;
++    }
++    if (capture_window_live()) attachment_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
++    parent.valid=false;child.valid=false;
++  }
++  void remember_persistent_attachment_texture(size_t slot, uintptr_t owner, uintptr_t device, uintptr_t raw,
++                                                const wgpu::TextureDescriptor& d) noexcept {
++    auto* w=attachment_create(PersistentAttachmentTextureRole,slot,owner,device,raw,AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE);
++    if (!w) return;
++    if (d.nextInChain || d.viewFormatCount>6 || (d.viewFormatCount && !d.viewFormats)) {
++      attachment_reject(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return;
++    }
++    const uint64_t usage=static_cast<uint64_t>(d.usage);w->wordCount=uint32_t(10+d.viewFormatCount);
++    w->words={d.size.width,d.size.height,d.size.depthOrArrayLayers,uint32_t(d.format),uint32_t(d.dimension),d.mipLevelCount,d.sampleCount,uint32_t(usage),uint32_t(usage>>32),uint32_t(d.viewFormatCount)};
++    for(size_t i=0;i<d.viewFormatCount;++i)w->words[10+i]=uint32_t(d.viewFormats[i]);
++  }
++  void remember_persistent_attachment_view(size_t slot, uintptr_t owner, uintptr_t device, uintptr_t raw,
++                                             uintptr_t texture, const wgpu::TextureViewDescriptor& d) noexcept {
++    auto* w=attachment_create(PersistentAttachmentViewRole,slot,owner,device,raw,AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE_VIEW);
++    if (!w) return;
++    const auto parent=warm_index(PersistentAttachmentTextureRole,slot);const auto& p=warm_[parent];
++    if (d.nextInChain || !p.valid || p.raw!=texture || p.owner!=owner || p.device!=device) {
++      attachment_reject(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return;
++    }
++    w->parent=parent;w->parentSerial=p.serial;w->wordCount=10;
++    w->words={0,0,uint32_t(d.format),uint32_t(d.dimension),d.baseMipLevel,d.mipLevelCount,d.baseArrayLayer,d.arrayLayerCount,uint32_t(d.aspect),uint32_t(d.usage)};
++  }
++  bool promote_persistent_attachment_view(uintptr_t raw) noexcept {
++    if (!collecting()) return false;
++    if (!raw) return true; // An absent resolve target is not an attachment.
++    if (attachmentError_) { fail(attachmentError_);return false; }
++    for(size_t slot=0;slot<PersistentAttachmentSlotCount;++slot){
++      const auto index=warm_index(PersistentAttachmentViewRole,slot);
++      if(warm_[index].raw==raw){
++        if(!warm_[index].valid){fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);return false;}
++        return promote_warm_graph(index);
++      }
++    }
++    // Existing in-window descriptor observations retain their original scope;
++    // they do not acquire persistent creation provenance merely by matching.
++    for(uint32_t i=0;i<handleCount_.load(std::memory_order_relaxed);++i)
++      if(handles_[i].kind==AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE_VIEW && handles_[i].address==raw){
++        const uint64_t viewId=uint64_t(i)+1;
++        for(uint32_t j=0;j<resourceCount_;++j)if(resources_[j].captureId==viewId && resources_[j].kind==AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE_VIEW)
++          for(uint32_t k=0;k<resourceCount_;++k)if(resources_[k].captureId==resources_[j].ownerId && resources_[k].kind==AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE)return true;
++      }
++    // Other attachment owners remain explicitly unknown; no descriptor guesses.
++    fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE);return false;
++  }
++
 +  void begin_static_resource_lifetime(uintptr_t owner, uintptr_t device,
 +                                     size_t activeStaging = StagingBufferCount) noexcept {
 +    if (state_.load(std::memory_order_acquire) != AURORA_BROWSER_FRAME_EFFECT_UNUSED) {
 +      if (capture_window_live()) fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
 +      warmActive_ = false; return;
 +    }
-+    warm_ = {}; warmOwner_ = owner; warmDevice_ = device; warmError_ = 0;
++    for(size_t i=0;i<SharedWarmOwnerCapacity;++i)warm_[i]={};
++    warmOwner_ = owner; warmDevice_ = device; warmError_ = attachmentError_;
 +    warmActive_ = owner != 0 && device != 0 && activeStaging <= StagingBufferCount;
 +    activeStaging_ = activeStaging;
 +    if (warmEpoch_ == UINT64_MAX) { warmActive_ = false; warmError_ = AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE; }
 +    else ++warmEpoch_;
++    for(size_t i=SharedWarmOwnerCapacity;i<WarmOwnerCapacity;++i)if(warm_[i].valid){
++      if(!attachmentActive_ || attachmentDevice_!=device || warm_[i].device!=device)
++        warm_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
++      else {warm_[i].epoch=warmEpoch_;warm_[i].promoted=false;}
++    }
 +  }
 +  void end_static_resource_lifetime(uintptr_t owner) noexcept {
 +    if (owner != warmOwner_ || !warmActive_) warm_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
@@ -5075,6 +5157,8 @@ index 0000000000000000000000000000000000000000..68288b3177e1753dc7e27b557292c959
 +      row.handleB = handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE_VIEW, source.resolveView.Get());
 +      append(row);
 +      if (actual.loadOp == wgpu::LoadOp::Load) set_blocker(AURORA_BROWSER_FRAME_EFFECT_LOAD_ATTACHMENT);
++      promote_persistent_attachment_view(reinterpret_cast<uintptr_t>(source.view.Get()));
++      promote_persistent_attachment_view(reinterpret_cast<uintptr_t>(source.resolveView.Get()));
 +    }
 +    if (depth != nullptr) {
 +      auto row = make_event(AURORA_BROWSER_FRAME_EFFECT_EVENT_DEPTH_ATTACHMENT, opIndex);
@@ -5087,6 +5171,7 @@ index 0000000000000000000000000000000000000000..68288b3177e1753dc7e27b557292c959
 +      append(row);
 +      if (depth->depthLoadOp == wgpu::LoadOp::Load || depth->stencilLoadOp == wgpu::LoadOp::Load)
 +        set_blocker(AURORA_BROWSER_FRAME_EFFECT_LOAD_ATTACHMENT);
++      promote_persistent_attachment_view(reinterpret_cast<uintptr_t>(depth->view.Get()));
 +    }
 +  }
 +
@@ -5366,6 +5451,8 @@ index 0000000000000000000000000000000000000000..68288b3177e1753dc7e27b557292c959
 +    if (role >= StaticVertexBufferRole && role <= IndexBufferRole && slot == 0) return role - 1;
 +    if (role == StagingBufferRole && slot < StagingBufferCount) return 4 + slot;
 +    if (role >= StaticLayoutRole && role <= EmptySamplerRole && slot == 0) return 4 + StagingBufferCount + role - StaticLayoutRole;
++    if ((role==PersistentAttachmentTextureRole || role==PersistentAttachmentViewRole) && slot<PersistentAttachmentSlotCount)
++      return SharedWarmOwnerCapacity+slot*2+(role==PersistentAttachmentViewRole?1:0);
 +    return WarmOwnerCapacity;
 +  }
 +  bool capture_window_live() const noexcept {
@@ -5375,6 +5462,21 @@ index 0000000000000000000000000000000000000000..68288b3177e1753dc7e27b557292c959
 +  void warm_reject(uint32_t blocker) noexcept {
 +    if (!warmError_) warmError_ = blocker;
 +    if (capture_window_live()) fail(blocker);
++  }
++  void attachment_reject(uint32_t blocker) noexcept {
++    if(!attachmentError_)attachmentError_=blocker;
++    warm_reject(blocker);
++  }
++  WarmWitness* attachment_create(uint32_t role,size_t slot,uintptr_t owner,uintptr_t device,uintptr_t raw,uint32_t kind) noexcept {
++    const auto index=warm_index(role,slot);
++    if(state_.load(std::memory_order_acquire)!=AURORA_BROWSER_FRAME_EFFECT_UNUSED){attachment_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);return nullptr;}
++    if(!attachmentActive_ || attachmentError_ || index>=WarmOwnerCapacity || !owner || !raw || device!=attachmentDevice_){attachment_reject(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE);return nullptr;}
++    if(warm_[index].valid || nextCreateSerial_==UINT64_MAX || (attachmentOwners_[slot] && attachmentOwners_[slot]!=owner)){
++      attachment_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);return nullptr;
++    }
++    attachmentOwners_[slot]=owner;
++    auto& w=warm_[index];w={};w.raw=raw;w.owner=owner;w.device=device;w.serial=++nextCreateSerial_;
++    w.epoch=warmActive_?warmEpoch_:0;w.role=role;w.slot=uint32_t(slot);w.kind=kind;w.valid=true;return &w;
 +  }
 +  WarmWitness* warm_create(uint32_t role, size_t slot, uintptr_t owner, uintptr_t device, uintptr_t raw,
 +                           uint32_t kind, uint64_t existingSerial = 0) noexcept {
@@ -5402,7 +5504,9 @@ index 0000000000000000000000000000000000000000..68288b3177e1753dc7e27b557292c959
 +    if (index >= WarmOwnerCapacity) return false;
 +    if (visited[index]) return true;
 +    const auto& w = warm_[index];
-+    if (!w.valid || !w.raw || !w.serial || w.epoch != warmEpoch_ || w.owner != warmOwner_ || w.device != warmDevice_) return false;
++    const uintptr_t expectedOwner=w.role>=PersistentAttachmentTextureRole && w.slot<PersistentAttachmentSlotCount ? attachmentOwners_[w.slot] : warmOwner_;
++    if (!w.valid || !w.raw || !w.serial || w.epoch != warmEpoch_ || w.owner != expectedOwner || w.device != warmDevice_) return false;
++    if(w.role>=PersistentAttachmentTextureRole && (!attachmentActive_ || attachmentDevice_!=warmDevice_))return false;
 +    if (w.parent != WarmOwnerCapacity) {
 +      if (w.parent >= WarmOwnerCapacity || warm_[w.parent].serial != w.parentSerial ||
 +          !gather_warm(w.parent,visited,order,count)) return false;
@@ -5488,6 +5592,9 @@ index 0000000000000000000000000000000000000000..68288b3177e1753dc7e27b557292c959
 +    }
 +    return true;
 +  }
++  uintptr_t attachmentDevice_=0;
++  std::array<uintptr_t,PersistentAttachmentSlotCount> attachmentOwners_{};
++  bool attachmentActive_=false;uint32_t attachmentError_=0;
 +  uintptr_t warmOwner_=0,warmDevice_=0;uint64_t warmEpoch_=0,nextCreateSerial_=0;
 +  bool warmActive_=false;uint32_t warmError_=0;size_t activeStaging_=0;
 +  std::array<WarmWitness,WarmOwnerCapacity> warm_{};
@@ -9008,7 +9115,7 @@ index 38db46bbfcfbc76c8a7fbc062e8fb1086638e738..abd3b23debd1e1a6496f28d93d51bbe0
  
    explicit operator bool() const { return m_active; }
 diff --git a/lib/webgpu/gpu.cpp b/lib/webgpu/gpu.cpp
-index 592b8ab440f52253a8e1eaa76236bfe3a7ec466a..ad068b05e86c14973fcb6e0d2173135d0ec4e568 100644
+index 592b8ab440f52253a8e1eaa76236bfe3a7ec466a..4acc71091906bd34dc852654b0793404cb8524d0 100644
 --- a/lib/webgpu/gpu.cpp
 +++ b/lib/webgpu/gpu.cpp
 @@ -1,3 +1,6 @@
@@ -9018,7 +9125,17 @@ index 592b8ab440f52253a8e1eaa76236bfe3a7ec466a..ad068b05e86c14973fcb6e0d2173135d
  #include "gpu.hpp"
  
  #include <algorithm>
-@@ -73,6 +76,7 @@ static std::atomic_bool g_vsyncEnabled = true;
+@@ -21,6 +24,9 @@
+ #include "../gfx/frame.hpp"
+ #include "../gfx/recording.hpp"
+ #include "../gfx/render_worker.hpp"
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++#include "../gfx/frame_effect_observer.hpp"
++#endif
+ #include "../internal.hpp"
+ #include "../window.hpp"
+ #include "gpu_prof.hpp"
+@@ -73,6 +79,7 @@ static std::atomic_bool g_vsyncEnabled = true;
  
  namespace {
  
@@ -9026,7 +9143,7 @@ index 592b8ab440f52253a8e1eaa76236bfe3a7ec466a..ad068b05e86c14973fcb6e0d2173135d
  AuroraLogLevel wgpu_log_level(wgpu::LoggingType type) {
    switch (type) {
    case wgpu::LoggingType::Verbose:
-@@ -92,6 +96,8 @@ void wgpu_log(wgpu::LoggingType type, wgpu::StringView message) {
+@@ -92,6 +99,8 @@ void wgpu_log(wgpu::LoggingType type, wgpu::StringView message) {
    Log.report(wgpu_log_level(type), "WebGPU message: {}", message);
  }
  
@@ -9035,7 +9152,68 @@ index 592b8ab440f52253a8e1eaa76236bfe3a7ec466a..ad068b05e86c14973fcb6e0d2173135d
  struct ResampleUniformBlock {
    uint32_t samplerMode = 0;
    float frameWidth = 0.f;
-@@ -872,7 +878,9 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+@@ -258,7 +267,11 @@ wgpu::PresentMode select_present_mode(const wgpu::SurfaceCapabilities& capabilit
+   return wgpu::PresentMode::Fifo;
+ }
+ 
+-TextureWithSampler create_render_texture(uint32_t width, uint32_t height, bool multisampled) {
++TextureWithSampler create_render_texture(uint32_t width, uint32_t height, bool multisampled
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++                                        , uint32_t attachmentSlot, uintptr_t attachmentOwner
++#endif
++) {
+   const wgpu::Extent3D size{
+       .width = width,
+       .height = height,
+@@ -284,12 +297,24 @@ TextureWithSampler create_render_texture(uint32_t width, uint32_t height, bool m
+       .sampleCount = sampleCount,
+   };
+   auto texture = g_device.CreateTexture(&textureDescriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  if (attachmentSlot != UINT32_MAX)
++    gfx::detail::browser_frame_effect_observer().remember_persistent_attachment_texture(
++        attachmentSlot, attachmentOwner, reinterpret_cast<uintptr_t>(g_device.Get()),
++        reinterpret_cast<uintptr_t>(texture.Get()), textureDescriptor);
++#endif
+ 
+   constexpr wgpu::TextureViewDescriptor viewDescriptor{
+       .label = "Render texture view",
+       .dimension = wgpu::TextureViewDimension::e2D,
+   };
+   auto view = texture.CreateView(&viewDescriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  if (attachmentSlot != UINT32_MAX)
++    gfx::detail::browser_frame_effect_observer().remember_persistent_attachment_view(
++        attachmentSlot, attachmentOwner, reinterpret_cast<uintptr_t>(g_device.Get()),
++        reinterpret_cast<uintptr_t>(view.Get()), reinterpret_cast<uintptr_t>(texture.Get()), viewDescriptor);
++#endif
+ 
+   constexpr wgpu::SamplerDescriptor samplerDescriptor{
+       .label = "Render sampler",
+@@ -377,12 +402,22 @@ static TextureWithSampler create_depth_texture(uint32_t width, uint32_t height)
+       .sampleCount = g_graphicsConfig.msaaSamples,
+   };
+   auto texture = g_device.CreateTexture(&textureDescriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  gfx::detail::browser_frame_effect_observer().remember_persistent_attachment_texture(
++      2, reinterpret_cast<uintptr_t>(&g_depthBuffer), reinterpret_cast<uintptr_t>(g_device.Get()),
++      reinterpret_cast<uintptr_t>(texture.Get()), textureDescriptor);
++#endif
+ 
+   const wgpu::TextureViewDescriptor viewDescriptor{
+       .label = "Depth texture view",
+       .dimension = wgpu::TextureViewDimension::e2D,
+   };
+   auto view = texture.CreateView(&viewDescriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  gfx::detail::browser_frame_effect_observer().remember_persistent_attachment_view(
++      2, reinterpret_cast<uintptr_t>(&g_depthBuffer), reinterpret_cast<uintptr_t>(g_device.Get()),
++      reinterpret_cast<uintptr_t>(view.Get()), reinterpret_cast<uintptr_t>(texture.Get()), viewDescriptor);
++#endif
+ 
+   const wgpu::SamplerDescriptor samplerDescriptor{
+       .label = "Depth sampler",
+@@ -872,7 +907,9 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
              supportedLimits.minUniformBufferOffsetAlignment < 64 ? 64 : supportedLimits.minUniformBufferOffsetAlignment,
          .minStorageBufferOffsetAlignment =
              supportedLimits.minStorageBufferOffsetAlignment < 16 ? 16 : supportedLimits.minStorageBufferOffsetAlignment,
@@ -9045,7 +9223,7 @@ index 592b8ab440f52253a8e1eaa76236bfe3a7ec466a..ad068b05e86c14973fcb6e0d2173135d
      };
      Log.info(
          "Using limits:"
-@@ -882,12 +890,11 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+@@ -882,12 +919,11 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
          "\n  maxTextureArrayLayers: {}"
          "\n  maxStorageBuffersPerShaderStage: {}"
          "\n  minUniformBufferOffsetAlignment: {}"
@@ -9060,7 +9238,7 @@ index 592b8ab440f52253a8e1eaa76236bfe3a7ec466a..ad068b05e86c14973fcb6e0d2173135d
      std::vector<wgpu::FeatureName> requiredFeatures;
      g_hasCoreFeatures = false;
      g_bcTexturesSupported = false;
-@@ -898,16 +905,21 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+@@ -898,16 +934,21 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
      for (size_t i = 0; i < supportedFeatures.featureCount; ++i) {
        const auto feature = supportedFeatures.features[i];
        if (feature == wgpu::FeatureName::CoreFeaturesAndLimits || feature == wgpu::FeatureName::TextureCompressionBC ||
@@ -9084,7 +9262,7 @@ index 592b8ab440f52253a8e1eaa76236bfe3a7ec466a..ad068b05e86c14973fcb6e0d2173135d
          }
          requiredFeatures.push_back(feature);
        }
-@@ -1006,9 +1018,14 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+@@ -1006,9 +1047,17 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
      if (!g_device) {
        return false;
      }
@@ -9093,13 +9271,30 @@ index 592b8ab440f52253a8e1eaa76236bfe3a7ec466a..ad068b05e86c14973fcb6e0d2173135d
 +#endif
    }
    g_queue = g_device.GetQueue();
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  gfx::detail::browser_frame_effect_observer().begin_persistent_attachment_lifetime(reinterpret_cast<uintptr_t>(g_device.Get()));
++#endif
 +#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
 +  melee_web_provenance_device_begin();
 +#endif
  
    const wgpu::Status status = g_surface.GetCapabilities(g_adapter, &g_surfaceCapabilities);
    if (status != wgpu::Status::Success) {
-@@ -1068,6 +1085,9 @@ void shutdown() {
+@@ -1062,12 +1111,23 @@ void shutdown() {
+   g_ResamplePipeline = {};
+   g_ResampleUniformBuffer = {};
+   g_resampledFrameBuffer = {};
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  // Detach the three authored owners before the original native releases.
++  auto& effectObserver=gfx::detail::browser_frame_effect_observer();
++  if(g_frameBuffer.texture)effectObserver.release_persistent_attachment(0,reinterpret_cast<uintptr_t>(&g_frameBuffer),reinterpret_cast<uintptr_t>(g_frameBuffer.texture.Get()),reinterpret_cast<uintptr_t>(g_frameBuffer.view.Get()));
++  if(g_frameBufferResolved.texture)effectObserver.release_persistent_attachment(1,reinterpret_cast<uintptr_t>(&g_frameBufferResolved),reinterpret_cast<uintptr_t>(g_frameBufferResolved.texture.Get()),reinterpret_cast<uintptr_t>(g_frameBufferResolved.view.Get()));
++  if(g_depthBuffer.texture)effectObserver.release_persistent_attachment(2,reinterpret_cast<uintptr_t>(&g_depthBuffer),reinterpret_cast<uintptr_t>(g_depthBuffer.texture.Get()),reinterpret_cast<uintptr_t>(g_depthBuffer.view.Get()));
++  effectObserver.end_persistent_attachment_lifetime(reinterpret_cast<uintptr_t>(g_device.Get()));
++#endif
+   g_frameBuffer = {};
+   g_frameBufferResolved = {};
+   g_depthBuffer = {};
    g_queue = {};
    g_surface = {};
    g_device = {};
@@ -9109,6 +9304,41 @@ index 592b8ab440f52253a8e1eaa76236bfe3a7ec466a..ad068b05e86c14973fcb6e0d2173135d
    g_adapter = {};
    g_instance = {};
    cache_shutdown();
+@@ -1104,8 +1164,17 @@ static void resize_swapchain_internal(uint32_t width, uint32_t height, uint32_t
+     window::SurfaceLock surfaceLock;
+     g_surface.Configure(&surfaceConfiguration);
+   }
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  auto& effectObserver=gfx::detail::browser_frame_effect_observer();
++  if(g_frameBuffer.texture)effectObserver.release_persistent_attachment(0,reinterpret_cast<uintptr_t>(&g_frameBuffer),reinterpret_cast<uintptr_t>(g_frameBuffer.texture.Get()),reinterpret_cast<uintptr_t>(g_frameBuffer.view.Get()));
++  g_frameBuffer = create_render_texture(width, height, true, 0, reinterpret_cast<uintptr_t>(&g_frameBuffer));
++  if(g_frameBufferResolved.texture)effectObserver.release_persistent_attachment(1,reinterpret_cast<uintptr_t>(&g_frameBufferResolved),reinterpret_cast<uintptr_t>(g_frameBufferResolved.texture.Get()),reinterpret_cast<uintptr_t>(g_frameBufferResolved.view.Get()));
++  g_frameBufferResolved = create_render_texture(width, height, false, 1, reinterpret_cast<uintptr_t>(&g_frameBufferResolved));
++  if(g_depthBuffer.texture)effectObserver.release_persistent_attachment(2,reinterpret_cast<uintptr_t>(&g_depthBuffer),reinterpret_cast<uintptr_t>(g_depthBuffer.texture.Get()),reinterpret_cast<uintptr_t>(g_depthBuffer.view.Get()));
++#else
+   g_frameBuffer = create_render_texture(width, height, true);
+   g_frameBufferResolved = create_render_texture(width, height, false);
++#endif
+   g_depthBuffer = create_depth_texture(width, height);
+   g_CopyBindGroup = create_copy_bind_group(present_source());
+ }
+diff --git a/lib/webgpu/gpu.hpp b/lib/webgpu/gpu.hpp
+index 3943da0943c3812838dd0cb92e2013af21aa0174..ae89bedc0fd28165caff498dbf49c2856cd6a6f9 100644
+--- a/lib/webgpu/gpu.hpp
++++ b/lib/webgpu/gpu.hpp
+@@ -62,7 +62,11 @@ void shutdown();
+ void release_surface() noexcept;
+ bool refresh_surface(bool recreate = true);
+ void resize_swapchain(uint32_t width, uint32_t height, uint32_t nativeWidth, uint32_t nativeHeight, bool force = false);
+-TextureWithSampler create_render_texture(uint32_t width, uint32_t height, bool multisampled);
++TextureWithSampler create_render_texture(uint32_t width, uint32_t height, bool multisampled
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++                                        , uint32_t attachmentSlot = UINT32_MAX, uintptr_t attachmentOwner = 0
++#endif
++);
+ const TextureWithSampler& present_source() noexcept;
+ wgpu::BindGroup create_copy_bind_group(const TextureWithSampler& source);
+ void set_resampler(AuroraSampler sampler) noexcept;
 diff --git a/lib/window.cpp b/lib/window.cpp
 index 2a4aadf6913443d286bc309ca6fe3e73f7630e52..58ac7417baf95ea90c3b72290d07f6882d904296 100644
 --- a/lib/window.cpp
