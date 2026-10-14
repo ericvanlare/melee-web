@@ -9,9 +9,10 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 class ScopedRuntimeOwnerTests(unittest.TestCase):
     def run_mode(self, mode, expected):
-        from check_gameplay import node_runtime
+        from first_pair_test_support import pinned_node_or_skip
+        node = pinned_node_or_skip(self, ROOT)
         result = subprocess.run(
-            [str(node_runtime()), str(ROOT / "tests/melee_runtime_scope_owner_test.mjs"), mode],
+            [str(node), str(ROOT / "tests/melee_runtime_scope_owner_test.mjs"), mode],
             cwd=ROOT, capture_output=True, text=True, timeout=30,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -52,6 +53,12 @@ class ScopedRuntimeOwnerTests(unittest.TestCase):
 
     def test_source_transition_error_is_visible_and_eject_recovers(self):
         self.run_mode("--source-transition-fail", "unsupported source transition is surfaced")
+
+    def test_ordinary_runtime_keeps_private_first_pair_callbacks_absent(self):
+        self.run_mode("--ordinary-no-first-pair", "no private callbacks, one original PCM write PASS")
+
+    def test_actual_runtime_callback_and_discarded_read_lifetimes(self):
+        self.run_mode("--first-pair-callbacks", "postcallback plan remains provenance")
 
 
 if __name__ == "__main__":

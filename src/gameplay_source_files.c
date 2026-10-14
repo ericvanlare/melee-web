@@ -1,4 +1,8 @@
 #include "gameplay_source_files.h"
+#include "gameplay_first_pair_file_guard.h"
+#if defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
+#include "gameplay_platform.h"
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,10 +25,17 @@ EM_JS(uint32_t, source_stream_take, (int request), {
     if (typeof window.menuSourceReadTake !== 'function') return 0;
     return window.menuSourceReadTake(request);
 });
+#if defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
+EM_JS(int, source_stream_discard, (int request), {
+    if (typeof window.menuSourceReadDiscard !== 'function') return 1;
+    return window.menuSourceReadDiscard(request) === false ? 0 : 1;
+});
+#else
 EM_JS(void, source_stream_discard, (int request), {
     if (typeof window.menuSourceReadDiscard === 'function')
         window.menuSourceReadDiscard(request);
 });
+#endif
 #endif
 
 typedef struct SourceFile {
@@ -150,6 +161,10 @@ MeleeWebSourceFileScope* melee_web_source_files_begin(
     const MeleeWebSourceFileInput* input, size_t count, char* error,
     size_t error_size)
 {
+    if (!melee_web_first_pair_file_operation("native.source.scope-begin")) {
+        fail(error, error_size, "First-pair file-operation guard refused source scope creation");
+        return NULL;
+    }
     if (active_scope) {
         fail(error, error_size, "A source RuntimeFiles scope is already active");
         return NULL;
@@ -252,6 +267,9 @@ MeleeWebSourceFileScope* melee_web_source_files_begin(
 int melee_web_source_files_end(MeleeWebSourceFileScope* scope, char* error,
                                size_t error_size)
 {
+    if (!melee_web_first_pair_file_operation("native.source.scope-end"))
+        return fail(error, error_size,
+                    "First-pair file-operation guard refused source scope release");
     if (!scope || active_scope != scope)
         return fail(error, error_size,
                     "Source RuntimeFiles scope is not the active owner");
@@ -299,6 +317,11 @@ int melee_web_source_file_copy(const char* name, void* destination,
     if (!file || file->external || !size || (file->size && !destination)) return 0;
     SourceFileCopy* copy = active_scope->copies;
     while (copy && copy->destination != destination) copy = copy->next;
+#if defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
+    if (!melee_web_first_pair_file_operation("native.source.copy")) {
+        melee_web_platform_unavailable("first-pair file-operation guard refused source file copy");
+    }
+#endif
     if (!copy) {
         copy = malloc(sizeof(*copy));
         if (!copy) return 0;
@@ -318,6 +341,10 @@ const char* melee_web_source_file_take_name(const void* copied_buffer)
     SourceFileCopy** link = &active_scope->copies;
     while (*link && (*link)->destination != copied_buffer) link = &(*link)->next;
     if (!*link) return NULL;
+#if defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
+    if (!melee_web_first_pair_file_operation("native.source.take-name"))
+        melee_web_platform_unavailable("first-pair file-operation guard refused source file name transfer");
+#endif
     SourceFileCopy* copy = *link;
     *link = copy->next;
     const char* name = copy->name;
@@ -361,9 +388,18 @@ int melee_web_source_files_quiescent(void)
            !active_scope->request_count && !active_scope->requests;
 }
 
+int melee_web_source_files_quiescent_for(
+    const MeleeWebSourceFileScope* owner)
+{
+    return owner && active_scope == owner && !owner->pumping &&
+           !owner->request_count && !owner->requests;
+}
+
 int melee_web_source_files_external_set(const char* name, size_t size,
                                         char* error, size_t error_size)
 {
+    if (!melee_web_first_pair_file_operation("native.source.external-set"))
+        return fail(error, error_size, "First-pair file-operation guard refused external source metadata");
     if (active_scope)
         return fail(error, error_size,
                     "Cannot change external files while a source scope is active");
@@ -394,6 +430,8 @@ int melee_web_source_files_external_set(const char* name, size_t size,
 
 int melee_web_source_files_external_clear(char* error, size_t error_size)
 {
+    if (!melee_web_first_pair_file_operation("native.source.external-clear"))
+        return fail(error, error_size, "First-pair file-operation guard refused external source metadata release");
     if (active_scope)
         return fail(error, error_size,
                     "Cannot clear external files while a source scope is active");
@@ -418,6 +456,8 @@ int melee_web_source_file_region_register(void* base, size_t size,
         return fail(error, error_size,
                     "Invalid source RuntimeFiles writable region");
     }
+    if (!melee_web_first_pair_file_operation("native.source.region-register"))
+        return fail(error, error_size, "First-pair file-operation guard refused source region registration");
     const uintptr_t begin = (uintptr_t)base;
     const uintptr_t end = begin + size;
     for (SourceFileRegion* at = active_scope->regions; at; at = at->next) {
@@ -456,6 +496,8 @@ int melee_web_source_file_region_unregister(void* base, size_t size,
         return fail(error, error_size,
                     "Source RuntimeFiles region release lost its owner");
     }
+    if (!melee_web_first_pair_file_operation("native.source.region-unregister"))
+        return fail(error, error_size, "First-pair file-operation guard refused source region release");
     const uintptr_t end = begin + size;
     for (SourceFileRequest* request = active_scope->requests; request;
          request = request->next) {
@@ -502,6 +544,8 @@ int melee_web_source_file_request(int entry, uintptr_t offset,
         return fail(error, error_size,
                     "Unsupported or unowned source DVD/DevCom request");
     }
+    if (!melee_web_first_pair_file_operation("native.source.request"))
+        return fail(error, error_size, "First-pair file-operation guard refused source request");
     if (next_source_request < 0x50000000 ||
         next_source_request > INT_MAX - 4) {
         return fail(error, error_size,
@@ -534,9 +578,17 @@ int melee_web_source_file_cancel(int request_id, uint32_t flags,
     for (SourceFileRequest* request = active_scope->requests; request;
          request = request->next) {
         if (request->id != request_id) continue;
+#if defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
+        if (!melee_web_first_pair_file_operation("native.source.cancel"))
+            melee_web_platform_unavailable("first-pair file-operation guard refused source cancellation");
+#if defined(__EMSCRIPTEN__)
+        if (request->file->external && !source_stream_discard(request_id))
+            melee_web_platform_unavailable("first-pair host guard refused source-read discard");
+#endif
+#endif
         if (flags & 1u) request->callback = callback;
         request->cancelled = 1;
-#if defined(__EMSCRIPTEN__)
+#if defined(__EMSCRIPTEN__) && !defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
         if (request->file->external) source_stream_discard(request_id);
 #endif
         return 1;
@@ -558,6 +610,8 @@ int melee_web_source_file_supply(int request_id, const void* bytes, size_t size,
         return fail(error, error_size,
                     "External source file transfer has no matching owner");
     }
+    if (!melee_web_first_pair_file_operation("native.source.supply"))
+        return fail(error, error_size, "First-pair file-operation guard refused source completion");
     memcpy((void*)request->destination, bytes, size);
     request->stream_ready = 1;
     if (error && error_size) error[0] = '\0';
@@ -575,6 +629,8 @@ int melee_web_source_files_pump(char* error, size_t error_size)
                     "Reentrant source RuntimeFiles transfer pump");
     }
     MeleeWebSourceFileScope* scope = active_scope;
+    if (scope->requests && !melee_web_first_pair_file_operation("native.source.pump"))
+        return fail(error, error_size, "First-pair file-operation guard refused source completion pump");
     size_t available = scope->request_count;
     size_t budget = 64;
     scope->pumping = 1;

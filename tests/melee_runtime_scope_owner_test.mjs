@@ -37,6 +37,9 @@ const payloadSize = mode === '--stream-byte-bound' ? 3 * 1024 * 1024 :
   mode === '--stream-bound' ? 128 * 1024 : 1;
 const pendingPayloads = new Set();
 let maxPendingPayloads = 0;
+let holdSourceRead = false;
+let sourceReadStarted = false;
+let releaseSourceRead = null;
 
 Object.defineProperty(globalThis, 'navigator', {
   value: {gpu: {requestAdapter: async () => ({limits: {}})}}, configurable: true,
@@ -83,9 +86,15 @@ async function openDisc(file) {
       assert.ok(['MvOpen.mth', 'MvHowto.mth', 'MvOmake15.mth'].includes(name));
       return {name, size: 128};
     },
-    async readFile(name, offset, size) {
-      return new Uint8Array(size).fill((name.length + offset) & 0xff);
+    readFile(name, offset, size) {
+      if (mode === '--first-pair-callbacks' && holdSourceRead) {
+        sourceReadStarted = true;
+        return new Promise(resolve => { releaseSourceRead = () =>
+          resolve(new Uint8Array(size).fill((name.length + offset) & 0xff)); });
+      }
+      return Promise.resolve(new Uint8Array(size).fill((name.length + offset) & 0xff));
     },
+    async identity() { return 'fixture-disc-identity'; },
     async *streamScope(names) {
       ++readCount;
       readStarted = true;
@@ -206,6 +215,10 @@ function installModule(Module) {
       running = !value;
     },
     _melee_web_native_menu_cache_idle: () => 1,
+    ...(mode === '--first-pair-callbacks' ? {
+      _melee_web_native_menu_first_pair_file_owners_quiescent: () => 1,
+      _melee_web_native_menu_first_pair_plan_capture(value) { calls.push(['plan-capture', value]); },
+    } : {}),
     _melee_web_input_set_keyboard: () => {},
     _melee_web_input_set_keyboard_port: () => {},
     _melee_web_input_set_activity: () => {},
@@ -222,7 +235,7 @@ function createTestAudio() {
     waitForRender: () => Promise.resolve(),
     setEnabled(value) { calls.push(['audio-enabled', !!value]); },
     fail(error) { calls.push(['audio-fail', String(error?.message || error)]); },
-    write() {},
+    write(pcm) { calls.push(['audio-write', pcm.slice()]); },
     async destroy() { calls.push(['audio-destroy']); },
   };
 }
@@ -231,7 +244,7 @@ let owner;
 const mounted = mountMeleeRuntime({
   canvas,
   openDisc,
-  createAudio: mode === '--destroy-unload-fail' ? createTestAudio : undefined,
+  createAudio: ['--destroy-unload-fail', '--first-pair-callbacks', '--ordinary-no-first-pair'].includes(mode) ? createTestAudio : undefined,
   loaderUrl: new URL('http://localhost/runtime/version/gameplay_public.js'),
   onState: state => states.push(state),
   onError: error => surfacedErrors.push(String(error?.message || error)),
@@ -467,4 +480,59 @@ else if (mode === '--late-open-stop') await lateOpen('stop');
 else if (mode === '--late-open-destroy') await lateOpen('destroy');
 else if (mode === '--destroy-unload-fail') await destroyUnloadFails();
 else if (mode === '--source-transition-fail') await sourceTransitionFailure();
+else if (mode === '--ordinary-no-first-pair') {
+  assert.equal(typeof window.menuFirstPairArm, 'undefined');
+  assert.equal(typeof window.menuFirstPairHostReadSnapshot, 'undefined');
+  const pcm = new Float32Array(4);
+  assert.equal(window.menuAudio(pcm), undefined);
+  assert.equal(calls.filter(row => row[0] === 'audio-write').length, 1);
+  await settle(player.destroy(), 'ordinary fixture destroy did not settle');
+  console.log('Ordinary actual runtime: no private callbacks, one original PCM write PASS');
+}
+else if (mode === '--first-pair-callbacks') {
+  await settle(player.importDisc({name: 'first-pair.iso'}), 'first-pair setup import did not settle');
+  assert.equal(window.menuFirstPairPlanCapture(true), true);
+  assert.equal(window.menuFirstPairNativeAudioTick(101, 0, 0, 533, 20), true);
+  assert.equal(window.menuFirstPairNativeCallbackReturning({
+    callbackId: 101, plannedSteps: 2, plannedAudioSteps: 5,
+    audioPhaseBefore: 0, audioPhaseAfter: 20, audioCallCount: 1,
+    postClockState: {sourceFrame: 0, audioPhase: 20},
+  }), true);
+  await Promise.resolve();
+  const observed = window.menuFirstPairReturnedPlan();
+  assert.equal(observed.returned, true);
+  assert.equal(observed.plannedSteps, 2);
+  assert.equal(observed.plannedAudioSteps, 5, 'source and audio scheduling remain distinct');
+  assert.equal(calls.at(-1)[0], 'plan-capture');
+  assert.equal(calls.at(-1)[1], 0, 'plan capture stops after returning provenance is frozen');
+  const refusal = window.menuFirstPairArm();
+  assert.equal(refusal.armed, false);
+  assert.match(refusal.refusal, /Coordinator pre-leg capability is not implemented/);
+  assert.equal(window.menuFirstPairBeginLeg('baseline'), false);
+  const pcm = new Float32Array([0.25, -0.5]);
+  const writesBefore = calls.filter(row => row[0] === 'audio-write').length;
+  assert.equal(window.menuAudio(pcm), true);
+  assert.equal(calls.filter(row => row[0] === 'audio-write').length, writesBefore + 1,
+    'default-off menuAudio still performs exactly one ordinary Worklet delivery');
+  holdSourceRead = true;
+  sourceReadStarted = false;
+  releaseSourceRead = null;
+  const generationBefore = BigInt(window.menuFirstPairHostReadSnapshot().generation);
+  assert.equal(window.menuStartSourceRead(88, 'MvOpen.mth', 0, 8), true);
+  await pumpUntil(() => sourceReadStarted, 'controlled source read did not start');
+  assert.equal(window.menuSourceReadDiscard(88), true);
+  const discarded = window.menuFirstPairHostReadSnapshot();
+  assert.equal(discarded.resultCount, 0);
+  assert.equal(discarded.unresolvedReads, 1, 'discard leaves its Promise owner outstanding');
+  assert.ok(BigInt(discarded.generation) > generationBefore);
+  releaseSourceRead();
+  await pumpUntil(() => window.menuFirstPairHostReadSnapshot().unresolvedReads === 0,
+    'discarded host Promise did not retire in finally');
+  const settled = window.menuFirstPairHostReadSnapshot();
+  assert.ok(BigInt(settled.generation) > BigInt(discarded.generation),
+    'late stale settlement advances host generation');
+  assert.equal(window.menuSourceReadStatus(88), -1);
+  await settle(player.destroy(), 'first-pair fixture destroy did not settle');
+  console.log('Actual runtime callback controls passed: postcallback plan remains provenance, default audio writes once, and discarded unresolved source Promise stays counted through finally.');
+}
 else throw Error(`Unknown scoped-owner mode: ${mode}`);

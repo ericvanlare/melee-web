@@ -14,6 +14,8 @@ int melee_web_audio_bank_transport_begin(MeleeWebAudio*,MeleeWebAudioResidency*,
 int melee_web_audio_bank_transport_end(char*,size_t);
 int melee_web_audio_bank_transport_active(void);
 int melee_web_audio_bank_transport_busy(void);
+/* Requires the matching nonnull audio owner and a drained SSM queue/pump. */
+int melee_web_audio_bank_transport_quiescent_for(MeleeWebAudio*);
 int melee_web_audio_bank_transport_configured(void);
 void melee_web_audio_bank_transport_configure(uint32_t bytes);
 int melee_web_audio_bank_transport_path(const char*);

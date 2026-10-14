@@ -1,4 +1,7 @@
 #include "gameplay_menu_browser_state.hpp"
+#include "gameplay_audio_bank_transport.h"
+#include "gameplay_audio_stream.h"
+#include "gameplay_source_files.h"
 #if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
 #include "gameplay_menu_frame_effect.hpp"
 #endif
@@ -49,6 +52,13 @@ void publish_graphics_startup(int cache_idle,bool read_stats) noexcept {
  },graphics_startup_renderer_init_ms,stats?1:0,queued,created,cache_idle,
    graphics_startup_first_callback_ms,elapsed,graphics_startup_terminal?1:0);
 }
+#if defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
+bool first_pair_plan_capture_enabled=false;
+uint32_t first_pair_plan_sequence=0,first_pair_active_callback_id=0;
+unsigned first_pair_audio_call_index=0,first_pair_source_planned_steps=0,first_pair_audio_planned_steps=0;
+unsigned first_pair_audio_phase_before=0;
+bool first_pair_audio_before_construction=false,first_pair_audio_stalled=false;
+#endif
 #if defined(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC)
 // The module never resumes its normal loop after arming, including on failure.
 bool match_draw_discard_terminal=false;
@@ -1291,13 +1301,43 @@ void log_message(AuroraLogLevel level,const char* module,const char* text,unsign
  if(level==LOG_FATAL)std::abort();
 }
 void render_audio_tick(MeleeWebAudio* audio,char* error,size_t error_size){
+ #if defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
+ const unsigned phase_before=audio_phase;
+ #endif
  audio_phase+=32000;const unsigned count=audio_phase/60;audio_phase%=60;
  check(melee_web_audio_render(audio,pcm.data(),count,error,error_size),error);
 #if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
  frame_effect_audio_returned(count);
 #endif
+#if defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
+ if(first_pair_plan_capture_enabled){
+  const unsigned order=first_pair_audio_call_index++;
+  EM_ASM({
+   const callback=globalThis.window?.menuFirstPairNativeAudioTick;
+   if(typeof callback==='function')callback($0,$1,$2,$3,$4);
+   else globalThis.window?.menuFirstPairNativeFileOperationFailure?.('native audio-plan callback is missing');
+  },first_pair_active_callback_id,order,phase_before,count,audio_phase);
+ }
+#endif
 #if !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+#if defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
+ const int audio_sink_ok=EM_ASM_INT({
+  const host=globalThis.window;
+  const callback=host?.menuAudio;
+  if(typeof callback!=='function'){
+   if(host?.__meleeWebFirstPairFileGuardArmed===true){
+    host.menuFirstPairNativeFileOperationFailure?.('menuAudio callback is missing');
+    return 0;
+   }
+   return 1;
+  }
+  const accepted=callback(HEAPF32.slice($0>>2,($0>>2)+$1*2));
+  return accepted===false?0:1;
+ },pcm.data(),count);
+ check(audio_sink_ok,"First-pair PCM journal refused source audio callback");
+#else
  EM_ASM({window.menuAudio?.(HEAPF32.slice($0>>2,($0>>2)+$1*2));},pcm.data(),count);
+#endif
 #endif
 }
 bool render_cache_can_flush(){
@@ -1399,6 +1439,21 @@ void tick(){
  if(owner_action==1){
   menu_clock.reset();audio_clock.reset();
  }
+#if defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
+ if(first_pair_plan_capture_enabled){
+  if(first_pair_plan_sequence==UINT32_MAX){
+   EM_ASM({globalThis.window?.menuFirstPairNativeFileOperationFailure?.('native callback-plan identity exhausted');});
+   check(0,"First-pair callback-plan identity exhausted");
+  }
+  first_pair_active_callback_id=++first_pair_plan_sequence;
+  first_pair_audio_call_index=0;
+  first_pair_audio_phase_before=audio_phase;
+  first_pair_source_planned_steps=0;
+  first_pair_audio_planned_steps=0;
+  first_pair_audio_before_construction=false;
+  first_pair_audio_stalled=false;
+ }
+#endif
  service_render_cache_writes();
  const double started=emscripten_get_now();
  const bool running_at_callback_start=running;
@@ -1636,6 +1691,13 @@ void tick(){
   const auto audio_elapsed=audio_clock.tick(
       clock_now,audio_owner&&input->visible&&(running||transition_audio_continues),
       [](const auto& event) noexcept {diagnostic_clock_stall(event,2);});
+ #if defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
+ if(first_pair_plan_capture_enabled){
+   first_pair_audio_planned_steps=audio_elapsed.steps;
+   first_pair_audio_before_construction=audio_before_construction;
+   first_pair_audio_stalled=audio_elapsed.stalled;
+  }
+#endif
   if(audio_elapsed.stalled){
    // Keep the shared timing-pause prefix understood by the development host.
    // Its state capture may resume and records every resume; performance capture
@@ -1705,6 +1767,9 @@ void tick(){
                                   observe_simulation_clock_stall):
       menu_clock.tick(simulation_clock_now,simulation_clock_running,
                       observe_simulation_clock_stall);
+ #if defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
+ if(first_pair_plan_capture_enabled)first_pair_source_planned_steps=elapsed.steps;
+#endif
   if(elapsed.stalled){running=false;message="Paused after a timing disruption. Resume to continue.";}
   if(elapsed.steps&&transition_audio_continues){
    transition_audio_continues=false;
@@ -2131,11 +2196,44 @@ void tick(){
 #if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
  frame_effect_callback_finished(source_frames.steps(),source_frames.draws());
 #endif
+#if defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
+ if(first_pair_plan_capture_enabled){
+  const int plan_recorded=EM_ASM_INT({
+   const callback=globalThis.window?.menuFirstPairNativeCallbackReturning;
+   if(typeof callback!=='function')return 0;
+   return callback({callbackId:$0,plannedSteps:$1,plannedAudioSteps:$2,
+    audioPhaseBefore:$3,audioPhaseAfter:$4,audioCallCount:$5,
+    audioBeforeConstruction:!!$6,audioStalled:!!$7,
+    postClockState:{audioPhase:$4,audioPendingTicks:$8,sourcePendingTicks:$9,
+     sourceFrame:$10,sourceSteps:$11,sourceDraws:$12,running:!!$13}})===true?1:0;
+  },first_pair_active_callback_id,first_pair_source_planned_steps,
+    first_pair_audio_planned_steps,first_pair_audio_phase_before,audio_phase,
+    first_pair_audio_call_index,first_pair_audio_before_construction?1:0,
+    first_pair_audio_stalled?1:0,audio_clock.pending_ticks(),menu_clock.pending_ticks(),
+    diagnostic_source_frame(),source_frames.steps(),source_frames.draws(),running?1:0);
+  check(plan_recorded,"First-pair returned callback plan could not be frozen");
+ }
+#endif
 }
 }
 using namespace melee_web_menu_browser;
 extern "C" {
 
+#if defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
+int melee_web_native_menu_first_pair_file_owners_quiescent(){
+ if(!match||!running||faulted||pending||preparation.busy()||replay||
+    asset_destination!=AssetDestination::None||results||prize)return 0;
+ MeleeWebAudio* const audio=match->audio();
+ const MeleeWebSourceFileScope* const source_files=match->source_file_scope();
+ return audio&&melee_web_audio_stream_quiescent_for(audio)&&
+        melee_web_audio_bank_transport_quiescent_for(audio)&&
+        source_files&&melee_web_source_files_quiescent_for(source_files);
+}
+void melee_web_native_menu_first_pair_plan_capture(int enabled){
+ first_pair_plan_capture_enabled=enabled!=0;
+}
+
+#endif
 #if defined(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC)
 static bool match_draw_discard_ready(){
  if(!match||faulted||pending||preparation.busy()||replay||melee_web_net_active()||

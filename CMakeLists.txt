@@ -21,8 +21,13 @@ option(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC
   "Enable the development-only Pokémon Stadium selection/preparation checkpoint" OFF)
 option(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC
   "Build the private one-shot terminal match draw/discard diagnostic" OFF)
+option(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC
+  "Enable private audio/file prerequisite controls; no coordinator or restore" OFF)
 option(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC
   "Observe one normal submitted match frame without restoring state" OFF)
+if(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC AND NOT MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
+  message(FATAL_ERROR "First-pair audio/file prerequisite requires isolated frame-effect profile")
+endif()
 if(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC AND
    (MELEE_WEB_PUBLIC_RUNTIME OR MELEE_WEB_AUDIO_PREVIEW_RUNTIME OR
     MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC OR MELEE_WEB_STADIUM_C1A_DIAGNOSTIC OR
@@ -123,6 +128,7 @@ if(EMSCRIPTEN)
   endif()
   add_library(gameplay_runtime STATIC src/gameplay_bootstrap.c src/gameplay_abi.c
     src/gameplay_source_context.c src/gameplay_source_files.c
+    src/gameplay_first_pair_file_guard.c
     src/gameplay_source_memory_runtime.cpp
     src/source_address_context.cpp src/source_game_heap_context.cpp
     src/gameplay_ps_math.c
@@ -285,7 +291,7 @@ if(EMSCRIPTEN)
     set_target_properties(${target} PROPERTIES SUFFIX ".js")
   endforeach()
   add_executable(gameplay_source_files_trace tests/gameplay_source_files_trace.c
-    src/gameplay_source_files.c)
+    src/gameplay_source_files.c src/gameplay_first_pair_file_guard.c)
   target_include_directories(gameplay_source_files_trace PRIVATE src)
   target_compile_options(gameplay_source_files_trace PRIVATE -UNDEBUG)
   target_link_options(gameplay_source_files_trace PRIVATE -sENVIRONMENT=node

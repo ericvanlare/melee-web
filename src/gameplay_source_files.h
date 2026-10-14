@@ -54,6 +54,9 @@ int melee_web_source_file_drive_busy(void);
 /* Requires an active scope, no queued request and no pump/callback in progress.
  * This native check does not cover browser promises or prove restore safety. */
 int melee_web_source_files_quiescent(void);
+/* Same idle predicate, bound to the exact owner scope retained by a native
+ * scene session. A missing, stale or different scope is never quiescent. */
+int melee_web_source_files_quiescent_for(const MeleeWebSourceFileScope* owner);
 
 /* Files present on the validated disc but intentionally omitted from the
  * bounded RuntimeFiles import (for example authored THP movies). The catalog

@@ -584,6 +584,9 @@ MeleeWebMatchStats GameplayMatchSession::player_stats(unsigned index)const{
     check(melee_web_match_player_stats(storage_->match,index,&stats,error,sizeof(error)),error);return stats;
 }
 MeleeWebAudio* GameplayMatchSession::audio()const{return storage_&&storage_->bank?storage_->bank->get():nullptr;}
+const MeleeWebSourceFileScope* GameplayMatchSession::source_file_scope()const noexcept{
+    return storage_&&storage_->world?storage_->world->source_file_scope():nullptr;
+}
 bool GameplayMatchSession::advance_construction(){return storage_&&storage_->advance_construction();}
 bool GameplayMatchSession::construction_complete()const{return storage_&&storage_->construction_phase==5;}
 }

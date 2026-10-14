@@ -31,7 +31,7 @@ add_library(fighter_source_runtime STATIC EXCLUDE_FROM_ALL ${fighter_paths}
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/ax/AXAux.c" src/gameplay_sdk.c src/gameplay_action_store.c src/gameplay_bonus_data.c src/gameplay_rumble.c
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/thp/THPDec.c"
   src/gameplay_render_mode.c
-  src/gameplay_player_context.c src/gameplay_fighter_assets.c src/gameplay_effect_banks.c src/gameplay_ground_data.c src/gameplay_archive_sections.c src/gameplay_source_files.c src/gameplay_source_alarm.c src/gameplay_thp_cpu.c src/gameplay_platform.c src/gameplay_match_context.c src/gameplay_pad_state.c src/gameplay_font_atlas.c src/gameplay_stage_numeric.c src/dat_item_registry.c
+  src/gameplay_player_context.c src/gameplay_fighter_assets.c src/gameplay_effect_banks.c src/gameplay_ground_data.c src/gameplay_archive_sections.c src/gameplay_source_files.c src/gameplay_first_pair_file_guard.c src/gameplay_source_alarm.c src/gameplay_thp_cpu.c src/gameplay_platform.c src/gameplay_match_context.c src/gameplay_pad_state.c src/gameplay_font_atlas.c src/gameplay_stage_numeric.c src/dat_item_registry.c
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/particle.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/generator.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/hsd_3A64.c"
@@ -230,6 +230,9 @@ configure_file(web/runtime-cache.js runtime-cache.js COPYONLY)
 foreach(module disc-image disc-session dsp-coefficients runtime-assets runtime-audio runtime-audio-assets runtime-diagnostics runtime-diagnostics-delivery diagnostics-settings diagnostics-schema match-flow match-menu action-sweep hitch-capture melee-runtime net-timing-pause runtime-development controller-input controller-panel controller-settings touch-controls prototype-keyboard-layouts staging-room)
   configure_file(web/${module}.mjs ${module}.mjs COPYONLY)
 endforeach()
+if(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
+  configure_file(web/first-pair-audio-file-guard.mjs first-pair-audio-file-guard.mjs COPYONLY)
+endif()
 configure_file(web/controller-settings.css controller-settings.css COPYONLY)
 configure_file(web/touch-controls.css touch-controls.css COPYONLY)
 configure_file(web/staging-room.css staging-room.css COPYONLY)
@@ -721,6 +724,12 @@ if(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC OR MELEE_WEB_MATCH_FRAME_EFFECT_DIAGN
   string(PREPEND gameplay_menu_browser_runtime_methods "ccall,")
 endif()
 set(gameplay_menu_browser_exports "_main,_malloc,_free,_melee_web_native_asset_begin,_melee_web_native_asset_count,_melee_web_native_asset_name,_melee_web_native_asset_file,_melee_web_native_asset_commit,_melee_web_native_asset_abort,_melee_web_native_menu_file,_melee_web_native_source_file_external_set,_melee_web_native_source_files_external_clear,_melee_web_native_menu_prepare,_melee_web_native_menu_launch,_melee_web_native_menu_replay,_melee_web_native_menu_replay_cursor,_melee_web_native_menu_replay_whole_session,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_set_save_profile,_melee_web_native_menu_snapshot_save_profile,_melee_web_native_menu_snapshot_unlocked_baseline,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_cache_idle,_melee_web_native_menu_phase,_melee_web_native_menu_confirm_check,_melee_web_native_menu_pad_sample,_melee_web_native_menu_pad_sample_full,_melee_web_native_menu_results_pad_schedule,_melee_web_native_menu_results_pause_schedule,_melee_web_native_menu_player_state,_melee_web_native_menu_drive_fighter,_melee_web_native_menu_drive_stage,_melee_web_native_menu_stock_check,_melee_web_native_menu_stock_check_ready,_melee_web_native_menu_diagnostics,_melee_web_native_menu_memory,_melee_web_native_menu_results_entry_packet,_melee_web_native_menu_results_pad_trace,_melee_web_css_observe,_melee_web_css_observe_setup,_melee_web_sss_observe,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_message,_melee_web_native_menu_match_observe,_melee_web_native_menu_source_observe,_melee_web_css_observe_port,_melee_web_native_menu_net_begin,_melee_web_native_menu_net_begin_lockstep,_melee_web_net_push,_melee_web_net_push_indexed,_melee_web_net_enable_local_input_capture,_melee_web_net_confirm_start,_melee_web_net_terminate,_melee_web_net_cursor,_melee_web_net_pushed,_melee_web_net_checksum_drain,_melee_web_net_status,_melee_web_net_arena_fill")
+if(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
+  target_compile_definitions(gameplay_menu_browser PRIVATE MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC=1)
+  target_compile_definitions(fighter_source_runtime PRIVATE MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC=1)
+  target_compile_definitions(gameplay_runtime PRIVATE MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC=1)
+  string(APPEND gameplay_menu_browser_exports ",_melee_web_first_pair_file_guard_arm,_melee_web_native_menu_first_pair_file_owners_quiescent,_melee_web_native_menu_first_pair_plan_capture")
+endif()
 if(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC)
   target_compile_definitions(gameplay_menu_browser PRIVATE MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC=1)
   string(APPEND gameplay_menu_browser_exports

@@ -121,11 +121,12 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   let lifecycleSuspended = false;
   let loading = Object.freeze({phase: 'boot', message: 'Starting player…', complete: 0, total: 0});
   let preparationLabel = '', preparationKeepsAudio = false;
-  let discSession = null, assetTransfer = null;
+  let discSession = null, firstPairDiscIdentity = null, assetTransfer = null;
   let networkSessionClose = null, networkCloseOperation = null, networkCloseMode = null;
   let discRetirementOperation = null, destroyOperation = null, unloadOperation = null;
   const networkCleanupErrors = [];
   const sourceReadResults = new Map();
+  let firstPairAudioFileGuard = null;
   const openedDiscSessions = new WeakSet();
   let keyboard = [true, true], layout = 'two';
   const commands = [], listeners = [];
@@ -496,6 +497,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     if (discRetirementOperation) return discRetirementOperation;
     const session = discSession;
     discSession = null;
+    firstPairDiscIdentity = null;
     if (!session) return Promise.resolve();
     try {
       discRetirementOperation = Promise.resolve(session.close()).catch(error => {
@@ -583,12 +585,17 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
         callbacks, peakQueueCompletionCallbackMs, lastCompletedSourceFrame, force === true || force === 1) || false;
     },
     menuAudio(pcm) {
+      const captured = firstPairAudioFileGuard?.capturePcm(pcm) ?? null;
+      if (captured === true) return true;
+      if (captured === false) return false;
       if (!audio) throw Error('Audio output is disabled in this public alpha.');
       audio.write(pcm);
+      if (firstPairAudioFileGuard) return true;
     },
     // These two callbacks MUST remain synchronous at their native boundaries.
     menuAudioReadyForPreparation() { return preparationKeepsAudio || !audio || audio.readyForPreparation(); },
     menuStartSourceRead(request, name, offset, size) {
+      if (!firstPairAudioFileGuard) {
       if (!discSession || typeof discSession.readFile !== 'function' ||
           !Number.isInteger(request) || typeof name !== 'string' || !name ||
           !Number.isSafeInteger(offset) || offset < 0 ||
@@ -613,9 +620,40 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
           message: String(error?.message || error || 'Disc range read failed.')});
       });
       return true;
+
+      }
+      if (!discSession || typeof discSession.readFile !== 'function' ||
+          !Number.isInteger(request) || typeof name !== 'string' || !name ||
+          !Number.isSafeInteger(offset) || offset < 0 ||
+          !Number.isInteger(size) || size <= 0 || size > 16 * 1024 * 1024 ||
+          sourceReadResults.has(request)) return false;
+      const session = discSession;
+      const token = firstPairAudioFileGuard?.beginSourceRead('source-read-start');
+      if (!token) return false;
+      const result = {state: 0, bytes: null};
+      sourceReadResults.set(request, result);
+      Promise.resolve().then(() => session.readFile(name, offset, size)).then(bytes => {
+        if (!firstPairAudioFileGuard.settleSourceRead(token)) return;
+        if (sourceReadResults.get(request) !== result) return;
+        if (!(bytes instanceof Uint8Array) || bytes.byteLength !== size) {
+          result.state = -1;
+          emit('sourceReadError', {request, name, message: 'Disc range returned an invalid byte count.'});
+          return;
+        }
+        result.bytes = bytes;
+        result.state = 1;
+      }).catch(error => {
+        if (!token.settled && !firstPairAudioFileGuard.settleSourceRead(token)) return;
+        if (sourceReadResults.get(request) !== result) return;
+        result.state = -1;
+        emit('sourceReadError', {request, name,
+          message: String(error?.message || error || 'Disc range read failed.')});
+      }).finally(() => firstPairAudioFileGuard.finishSourceRead(token));
+      return true;
     },
     menuSourceReadStatus(request) { return sourceReadResults.get(request)?.state ?? -1; },
     menuSourceReadTake(request) {
+      if (firstPairAudioFileGuard && !firstPairAudioFileGuard.beforeSourceReadMutation('take')) return 0;
       const result = sourceReadResults.get(request);
       if (!result || result.state !== 1 || !result.bytes?.byteLength) return 0;
       const pointer = Module._malloc(result.bytes.byteLength);
@@ -628,7 +666,12 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       sourceReadResults.delete(request);
       return pointer;
     },
-    menuSourceReadDiscard(request) { sourceReadResults.delete(request); },
+    menuSourceReadDiscard(request) {
+      if (!firstPairAudioFileGuard) { sourceReadResults.delete(request); return; }
+      if (!firstPairAudioFileGuard?.beforeSourceReadMutation('discard')) return false;
+      sourceReadResults.delete(request);
+      return true;
+    },
     menuOwnerStopped() { return fatal || destroyed; },
     menuServiceCommands() {
       // Native consumes this terminal signal before input, clocks, preparation
@@ -712,6 +755,73 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     },
   };
   for (const [name, callback] of Object.entries(callbacks)) window[name] = callback;
+  async function initializeFirstPairPrerequisite() {
+    if (typeof Module._melee_web_native_menu_first_pair_plan_capture !== 'function') return;
+    const {createFirstPairAudioFileGuard} = await import('./first-pair-audio-file-guard.mjs');
+    firstPairAudioFileGuard = createFirstPairAudioFileGuard({
+    getHostState() {
+      const discIdentity = firstPairDiscIdentity?.session === discSession
+        ? firstPairDiscIdentity.identity : null;
+      return {discSession, discIdentity, audioOwner: audio,
+        readResults: sourceReadResults.size, assetTransfer,
+        preparing: !!preparationLabel || !!busy, ready, fatal, destroyed};
+    },
+    getNativeOwnersQuiescent() {
+      return ready && !fatal && !destroyed &&
+        typeof Module._melee_web_native_menu_first_pair_file_owners_quiescent === 'function' &&
+        Module._melee_web_native_menu_first_pair_file_owners_quiescent() === 1;
+    },
+    getCallbackIdentities() {
+      const names = ['menuAudio', 'menuStartSourceRead', 'menuSourceReadTake',
+        'menuSourceReadDiscard', 'menuFirstPairNativeFileOperation',
+        'menuFirstPairNativeFileOperationFailure', 'menuFirstPairNativeAudioTick',
+        'menuFirstPairNativeCallbackReturning'];
+      return Object.fromEntries(names.map(name => [name, window[name]]));
+    },
+    onFailure: stop,
+  });
+  window.__meleeWebFirstPairFileGuardArmed = false;
+    const privateCallbacks = {
+    menuFirstPairNativeFileOperation(operation) {
+      return firstPairAudioFileGuard?.nativeFileOperation(operation) ?? true;
+    },
+    menuFirstPairNativeFileOperationFailure(detail) {
+      return firstPairAudioFileGuard?.nativeFileOperationFailure(detail) ?? false;
+    },
+    menuFirstPairNativeAudioTick(callbackId, order, phaseBefore, frames, phaseAfter) {
+      return firstPairAudioFileGuard?.nativeAudioTick(callbackId, order, phaseBefore, frames, phaseAfter) ?? false;
+    },
+    menuFirstPairNativeCallbackReturning(plan) {
+      return firstPairAudioFileGuard?.nativeCallbackReturning(plan) ?? false;
+    },
+    menuFirstPairPlanCapture(enabled) {
+      if (!ready || fatal || destroyed ||
+          typeof Module._melee_web_native_menu_first_pair_plan_capture !== 'function') return false;
+      Module._melee_web_native_menu_first_pair_plan_capture(enabled === true ? 1 : 0);
+      return true;
+    },
+    menuFirstPairReturnedPlan() {
+      const plan = firstPairAudioFileGuard?.getLastReturnedPlan() ?? null;
+      if (plan && typeof Module._melee_web_native_menu_first_pair_plan_capture === 'function')
+        Module._melee_web_native_menu_first_pair_plan_capture(0);
+      return plan;
+    },
+    menuFirstPairArm() {
+      // The returned-callback observer is provenance only. Admission requires
+      // a separately reviewed coordinator receipt at a pre-side-effect
+      // boundary; this candidate deliberately has no such capability.
+      const result = firstPairAudioFileGuard?.armPreLegPlan(null, null);
+      return result || Object.freeze({armed: false,
+        refusal: firstPairAudioFileGuard?.snapshot().preflightRefusal ||
+          'Coordinator pre-leg capability is not implemented'});
+    },
+    menuFirstPairBeginLeg() { return false; },
+    menuFirstPairEndLeg() { return false; },
+    menuFirstPairGuardSnapshot() { return firstPairAudioFileGuard?.snapshot() ?? null; },
+    menuFirstPairHostReadSnapshot() { return firstPairAudioFileGuard?.hostReadSnapshot() ?? null; },
+    };
+    for (const [name, callback] of Object.entries(privateCallbacks)) window[name] = callback;
+  }
   function listen(type, listener) { window.addEventListener(type, listener, true); listeners.push([type, listener]); }
   for (const type of ['focus', 'blur', 'visibilitychange', 'focusin', 'focusout']) listen(type, () => { inputDirty = true; emit('focus'); });
   listen('visibilitychange', () => {
@@ -956,7 +1066,38 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     activateAudio() { return prepareAudio(); },
     async openDiscSession(file) {
       if (typeof openDisc !== 'function') throw Error('This player has no local disc session loader.');
+      if (!firstPairAudioFileGuard) {
+      if (typeof openDisc !== 'function') throw Error('This player has no local disc session loader.');
       const session = await openDisc(file);
+      if (!session || typeof session !== 'object' || typeof session.close !== 'function' ||
+          typeof session.streamScope !== 'function') {
+        session?.close?.();
+        throw Error('The configured disc loader returned an invalid session.');
+      }
+      if (fatal || destroyed) {
+        session.close();
+        throw Error('The player stopped while opening the local disc.');
+      }
+      openedDiscSessions.add(session);
+      return session;
+
+      }
+      const token = firstPairAudioFileGuard.beginSourceRead('disc-open');
+      if (!token) throw Error('A first-pair diagnostic refused a new disc session read.');
+      let session;
+      try {
+        session = await Promise.resolve().then(() => openDisc(file)).then(value => {
+          if (!firstPairAudioFileGuard.settleSourceRead(token))
+            throw Error('A first-pair diagnostic refused a new disc session read.');
+          return value;
+        }, error => {
+          firstPairAudioFileGuard.settleSourceRead(token);
+          throw error;
+        }).finally(() => firstPairAudioFileGuard.finishSourceRead(token));
+      } catch (error) {
+        if (!token.finished) firstPairAudioFileGuard.finishSourceRead(token);
+        throw error;
+      }
       if (!session || typeof session !== 'object' || typeof session.close !== 'function' ||
           typeof session.streamScope !== 'function') {
         session?.close?.();
@@ -972,7 +1113,19 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     async discIdentity() {
       if (!discSession || typeof discSession.identity !== 'function')
         throw Error('A validated local disc identity is unavailable.');
-      return discSession.identity();
+      if (!firstPairAudioFileGuard) return discSession.identity();
+      const session = discSession;
+      const token = firstPairAudioFileGuard.beginSourceRead('disc-identity');
+      if (!token) throw Error('A first-pair diagnostic refused a new disc identity read.');
+      return Promise.resolve().then(() => session.identity()).then(value => {
+        if (!firstPairAudioFileGuard.settleSourceRead(token))
+          throw Error('A first-pair diagnostic refused a new disc identity read.');
+        if (discSession === session) firstPairDiscIdentity = {session, identity: value};
+        return value;
+      }, error => {
+        firstPairAudioFileGuard.settleSourceRead(token);
+        throw error;
+      }).finally(() => firstPairAudioFileGuard.finishSourceRead(token));
     },
     importDisc(file, {preopenedSession = null} = {}) {
       if (preopenedSession && (!openedDiscSessions.has(preopenedSession) ||
@@ -986,7 +1139,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
           if (!await unloadAndSave()) throw Error(status());
           if (discSession) {
             await clearSourceFileStreams();
-            discSession.close(); discSession = null;
+            discSession.close(); discSession = null; firstPairDiscIdentity = null;
           }
           setLoading('disc', 'Reading game data…', 0, 1); publish();
           if (openDisc) {
@@ -996,6 +1149,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
               throw Error('The player stopped while opening the local disc.');
             }
             discSession = opened;
+            firstPairDiscIdentity = null;
             adoptedSession = !!preopenedSession;
             await configureSourceFileStreams(discSession);
           }
@@ -1129,7 +1283,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     clearStartupTimeout();
     throw error;
   }
-  try { await startup; return handle; }
+  try { await startup; await initializeFirstPairPrerequisite(); return handle; }
   finally {
     if (startupCacheReady || fatal || destroyed) {
       clearStartupTimeout();

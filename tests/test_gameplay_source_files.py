@@ -22,8 +22,10 @@ class GameplaySourceFilesTests(OwnedWorkspaceTests):
         compiler = shutil.which("clang") or shutil.which("cc")
         self.assertIsNotNone(compiler)
         binary = self.work / "source_files_trace"
+        # Keep the ordinary default-off owner trace strict C11/O0 and link no
+        # platform or first-pair guard object into this standalone executable.
         build = subprocess.run([
-            compiler, "-std=c11", "-D_POSIX_C_SOURCE=200809L",
+            compiler, "-std=c11", "-O0", "-D_POSIX_C_SOURCE=200809L",
             "-Wall", "-Wextra", "-Werror",
             "-I", str(ROOT / "src"),
             str(ROOT / "src/gameplay_source_files.c"),
