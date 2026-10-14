@@ -1467,7 +1467,7 @@
     ]
   },
   "drawn_synctest_sprint": {
-    "status": "one normal submitted callback observed and retired; renderer LOAD_ATTACHMENT ownership remains open; no restore",
+    "status": "First-draw schema3 observation collected; UNKNOWN_RESOURCE, LOAD_ATTACHMENT and COMMAND_SHAPE_MISMATCH remain; no restore",
     "artifact_run": "rollback-stadium-sprint-20261013-111001-9f8df4a4",
     "source": "a34d5acfa540af173d97679f7c54650ac577930a",
     "private_build_source_patch_sha256": "e932d6e21be0960b16160b0f77b81aa874b30976e899ce09848c406493a9bf61",
@@ -1539,7 +1539,7 @@
       "source_and_runtime_unchanged": true,
       "h1": "No forced timing pause reported; recorder retained seven reason-code7 incidents, no dropped incidents, 7998 evicted samples, and zero match source steps. Not a match timing result."
     },
-    "next": "Classify actual attachment-load, resolve and snapshot content owners, then independently review the smallest safe same-instance checkpoint/restore contract; no repeated successful capture.",
+    "next": "Reduce the first actual static bind-group descriptor lost before observer arm; preserve original descriptors and live owner identity in a focused source control before another browser attempt.",
     "scope": "Observer and idle predicates are prerequisites only. No same-instance drawn restore, minimum complete state size or combined seven-tick budget result.",
     "hps_quiescence_controls": {
       "result": "pass-focused-component-only",
@@ -1829,7 +1829,7 @@
       "scope": "Draft checkpoint only; no restore or integration claim"
     },
     "october14_resume": {
-      "status": "OWNERSHIP_COMPONENTS_REVIEWED_NO_BROWSER_RESTORE",
+      "status": "FIRST_DRAW_OBSERVED_WITH_UNRESOLVED_RENDERER_FINDINGS",
       "raw_run_id": "rollback-sprint-resume-20261014-085704-6fe33b74",
       "runtime_producer": "a557e9ce444f7a40c80f9a55c58c8abf96719a44",
       "metadata_and_harness_head": "bf59a893b56ac1aa8b02165349ac694445ef0acd",
@@ -2015,7 +2015,7 @@
           "sha256": "c1ae2e89c8233a5f9631b8a5c21dc0011a3cd954afa6019d9f7795a82868d5de"
         }
       ],
-      "scope": "Component controls and one refused admission only; historical schema1 success retained separately. No renderer ownership closure, real pair coordinator, restore or acceptance.",
+      "scope": "Earlier schema2 refusal and all historical producers retained. New fa58 first-draw collection is not resource closure, restore, repeated-tick equivalence or acceptance.",
       "wasm_instance_component": {
         "local_commit": "2d9e2927060944c44ca1aaf4587eeafad3f5f1c2",
         "focused_tests": 46,
@@ -2032,6 +2032,130 @@
         "historical_failed_fixture": "Missing canonical wasmTable dependency; retained v2, v3 dependency repair passes",
         "private_game_artifact_scan": "PENDING",
         "game_restore": "NOT_RUN"
+      },
+      "first_draw_observation": {
+        "state": "OBSERVATION_COLLECTED_RENDERER_RESTORE_BLOCKED",
+        "producer": "fa58cb7b305ec6cd44e87f064311e39a98487f9f",
+        "report_sha256": "66434c675015454c366a1c6ac97a76df449e916556fc4e51e5a1f7dae1765e95",
+        "owner_sha256": "6106c96f3cf37ab485ac73164dfa11c76b53bd152b72f22bfe8d5cd16f7e5c39",
+        "completion_sha256": "a928775a8499d3cbe765635e3de46c2c0860dc1142fa2375c4a0d9c338351780",
+        "independent_review_sha256": "dcac640641bdb74c3946477302db6064034eca2e732525ea96839a98752feed0",
+        "source": {
+          "source_frame_before": 180,
+          "source_frame_after": 181,
+          "planned_steps": 1,
+          "planned_audio_steps": 2,
+          "tick_returns": 1,
+          "draw_returns": 1,
+          "audio_returns": 2,
+          "pcm_frames": 1067,
+          "selected_source_frame": 181,
+          "unobserved_draws": 0
+        },
+        "renderer": {
+          "schema_version": 2,
+          "state": 4,
+          "first_blocker": 18,
+          "target_frame_index": 3158,
+          "frame_index": 3158,
+          "frame_id": "3159",
+          "event_count": 1763,
+          "handle_count": 193,
+          "op_count": 3,
+          "render_pass_count": 3,
+          "draw_command_count": 243,
+          "custom_draw_count": 0,
+          "encoder_task_count": 0,
+          "texture_copy_count": 0,
+          "texture_upload_count": 0,
+          "palette_conversion_count": 0,
+          "resolve_count": 2,
+          "snapshot_count": 1,
+          "staging_copy_count": 12,
+          "queue_write_count": 4,
+          "queue_write_bytes": "1225104",
+          "after_submit_callback_count": 0,
+          "submit_count": 1,
+          "fence_count": 1,
+          "fence_success": 1,
+          "finding_mask": "134480000",
+          "command_record_count": 262,
+          "actual_draw_count": 243,
+          "resource_count": 105,
+          "binding_entry_count": 1104,
+          "depth_trace_count": 3,
+          "depth_request_count": 0
+        },
+        "array_lengths": {
+          "raw_pad_bytes": 64,
+          "events": 1763,
+          "handles": 193,
+          "resources": 105,
+          "binding_entries": 1104,
+          "draws": 243
+        },
+        "depth_after_retirement": {
+          "registered": 0,
+          "completed": 0,
+          "pending": 0,
+          "ignored_other_issuer": 0,
+          "finalized": true
+        },
+        "h1": {
+          "callback_count": 3120,
+          "dropped_samples": 3020,
+          "dropped_incidents": 0,
+          "reason_counts": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            8,
+            0,
+            0
+          ],
+          "unknown_reason_count": 0,
+          "invalid_preparation_count": 0,
+          "status": "installed"
+        },
+        "timing_pauses": 0,
+        "native_retired": true,
+        "owner_elapsed_ms": 62234,
+        "owned_browser_server_absent": true,
+        "scope": "One naturallydue1tick callback observed. Multi-tick and pending-depth-map browsercoverage absent; fixturecontrols separate. Unknownresource18,LOAD7,commandshape27 remain blockers; no restore/repeat/acceptance.",
+        "raw_run_id": "rollback-sprint-resume-20261014-085704-6fe33b74",
+        "artifact_directory": "first-draw-observation-packet-v2/capture",
+        "aurora_tree": "dce8b9ecb931375e636947ec482f881c667d0cde",
+        "validation": {
+          "release_artifact_counts": [
+            44,
+            44,
+            45
+          ],
+          "full_suite_run": 2429,
+          "full_suite_skipped": 164,
+          "full_suite_failed": 0,
+          "result_sha256": "aed4a747c6fc3937507f752d14614448451c442e4ce99ce0b8a10d4eb4bfda2d",
+          "focused_tests": 52,
+          "off_projection_translation_units": 4
+        },
+        "fresh_static_wasm_inventory": {
+          "result_sha256": "84a44b51471c8f5cc10b0067a0b17f44cd1923d4121626d38e94901b5516e839",
+          "profiles": [
+            "ordinary",
+            "frame_effect",
+            "first_pair"
+          ],
+          "scope": "Fresh bindings and full static instruction inventory only; no runtime hidden-state closure."
+        },
+        "first_blocker_reduction": {
+          "receipt_sha256": "584d94c2f7d378e9b62761310a32b6a6f144d1c9cf226ba617143834498bfeeb",
+          "finding": "event8 static slot0 bindgroup capture_id8 lacks its real pre-arm initialization descriptor; no swapchain identity claim",
+          "state": "source/raw-result reduction only; repair pending"
+        }
       }
     }
   }

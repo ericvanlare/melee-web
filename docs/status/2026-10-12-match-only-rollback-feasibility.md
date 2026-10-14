@@ -313,6 +313,41 @@ the second bounded attempt. No gameplay private-profile build or restore result
 follows from these controls; GPU, audio/file and output ownership remain open. No snapshot/restore, seven-tick
 combined budget, human-input or two-computer acceptance is claimed.
 
+### October 14 first-draw observation
+
+At runtime and harness producer `fa58cb7b`, all three Release builds pass
+(ordinary/frame-effect/combined private artifacts: 44/44/45). The full regression
+runs 2,429 tests with 164 skips and no failures. The 52 focused checks and four
+changed Aurora translation units' diagnostic-off projection also pass. A fresh
+static inventory binds each profile's actual JS/Wasm exports; it does not prove
+runtime ownership or safe hidden-state restoration. Earlier failures and their
+producer identities remain retained above and in the linked evidence JSON.
+
+One reviewed headless browser attempt collects the first actual draw while
+preserving the normal callback's source decisions. This sample naturally ran
+one tick and one draw, source frame 180 → 181, with two audio returns and 1,067
+PCM frames. It records 1,763 events, 193 handles, 105 resource rows, 1,104 binding
+entries and 243 draw rows. One normal submission and its fence complete. Native
+retirement and owned browser/server cleanup pass. No depth request occurred;
+zero selected map owners become finalized at retirement. Multi-tick callbacks
+and pending depth-map completion remain fixture coverage, not this browser result.
+
+Collection is successful, but **renderer restore remains blocked**:
+`UNKNOWN_RESOURCE` (18) is first; `LOAD_ATTACHMENT` (7) and
+`COMMAND_SHAPE_MISMATCH` (27) are also present. The first unknown is the existing
+static bind group in slot 0: its descriptor registration call occurred during
+renderer initialization, before the observer was armed, and did not retain the
+descriptor. The next step is a bounded source control for retaining it with the
+actual live buffer/group owners. This is not permission to recreate resources, guess identities or
+weaken the comparison. Other recorded findings remain open.
+
+The H1 recorder has zero forced timing pauses, eight preparation incidents and
+no dropped incidents, but retains only 100 of 3,120 callback samples. Its lossy
+history does not establish timing acceptance. No restore/repeat pair, PCM/pixel
+equality, seven-tick corrective budget or two-computer acceptance is claimed.
+The same evidence entry retains the full build, browser, cleanup and reduction
+receipt hashes. Draft #324 remains open for the drawn restore/repeat milestone.
+
 ## Slippi profile source checkpoint
 
 The [profile inventory](../investigations/SLIPPI_GAMEPLAY_PROFILE_INVENTORY.md)
