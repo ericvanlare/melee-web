@@ -375,7 +375,9 @@ export async function closePageNativeNetworkOwnership() {
 
 export async function openNetInstance({chromium, launchOptions, url, disc, userDataDir, label,
   throttle = 1, arenaFill = -1, timeoutMs = 120000, deadline = Infinity, peerModuleHashes = null,
-  syntheticGamepad = null, runtimeOwned = false, dataPackageDiagnostics = false}) {
+  syntheticGamepad = null, runtimeOwned = false, dataPackageDiagnostics = false,
+  surface = 'development'}) {
+  if (!['development', 'staging-room'].includes(surface)) throw Error('Unsupported network instance surface');
   await fs.mkdir(path.resolve(userDataDir), {recursive: true});
   const context = await chromium.launchPersistentContext(path.resolve(userDataDir), {
     ...browserLaunchOptions(launchOptions, {timeout: timeoutMs}),
@@ -500,7 +502,7 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
         value: () => window.testPads});
     }, syntheticGamepad));
     instance = {label, page, context, errors, timingResumes: [], throttle, arenaFill, closed: false, close};
-    driver = createBrowserDriver(page, {surface: 'development', timeoutMs, deadline});
+    driver = createBrowserDriver(page, {surface, timeoutMs, deadline});
     instance.driver = driver;
     instance.freezePeerModuleIdentity = () => bounded(() => peerModules.freeze());
     instance.finishPeerModuleIdentity = () => bounded(() => peerModules.freeze({closed: true}));

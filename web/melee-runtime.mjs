@@ -108,7 +108,8 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   try {
     const url = new URL(globalThis.location.href);
     const localHost = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(url.hostname);
-    stagingDiagnosticsEnabled = recordDiagnostics && localHost &&
+    const hostedStaging = url.origin === 'https://melee-web-room-relay-staging-288.mywebcomic.workers.dev';
+    stagingDiagnosticsEnabled = recordDiagnostics && (localHost || hostedStaging) &&
       url.searchParams.get('melee-web-staging-diagnostics') === '1';
   } catch { /* Staging diagnostics remain disabled unless explicitly selected. */ }
   function diagnosticDeliveryBlocked() {

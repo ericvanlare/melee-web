@@ -4,6 +4,8 @@
   "gameplay_menu_browser.data",
   "runtime.html",
   "runtime-development.mjs",
+  "staging-room.mjs",
+  "staging-room.css",
   "net-timing-pause.mjs",
   "melee-runtime.mjs",
   "runtime-diagnostics.mjs",

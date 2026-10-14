@@ -114,9 +114,10 @@ requireCondition([values['gameplay-combat-ko'], values['gameplay-combat-ko-charg
   values['gameplay-combat-ko-prepared']].filter(Boolean).length <= 1,
   'C-stick, charged, and prepared combat KO modes are separate scenarios');
 const runtimeUrl = incidentRecordingUrl(values.url);
-requireCondition(runtimeUrl.protocol === 'http:' && runtimeUrl.hostname === '127.0.0.1' &&
-  runtimeUrl.port === '8787' && runtimeUrl.pathname === '/runtime.html',
-  'This harness requires the already-supported client page http://127.0.0.1:8787/runtime.html');
+const hostedStaging = runtimeUrl.origin === 'https://melee-web-room-relay-staging-288.mywebcomic.workers.dev';
+requireCondition(!hostedStaging || values['relay-url'] ===
+  'wss://melee-web-room-relay-staging-288.mywebcomic.workers.dev',
+  'The hosted staging page requires its deployed same-origin relay and preflight');
 const simulationConfiguration = resolveNetworkSimulation({profileName: values['network-profile'],
   relayUrl: values['relay-url'], preflight: values['relay-preflight']});
 let relayPreflightInput;
@@ -907,6 +908,7 @@ try {
     timeoutMs: Math.min(120000, remaining()),
     deadline: finalDeadline,
     runtimeOwned: true,
+    surface: hostedStaging ? 'staging-room' : 'development',
     dataPackageDiagnostics: values['controlled-cut-after-css'] === true,
     syntheticGamepad: null,
   });
@@ -949,7 +951,12 @@ try {
 
   const relayUrl = networkSimulation?.relayUrl ?? (relayMode.mode === 'external' ? relayMode.endpoint.url :
     'ws://127.0.0.1:' + worker.port);
-  await instances.alpha.page.locator('#lockstep-relay-url').fill(relayUrl, {timeout: remaining()});
+  if (hostedStaging) {
+    requireCondition(await instances.alpha.page.locator('#lockstep-relay-url').inputValue() === relayUrl,
+      'Hosted staging did not select its fixed same-origin relay');
+  } else {
+    await instances.alpha.page.locator('#lockstep-relay-url').fill(relayUrl, {timeout: remaining()});
+  }
   await instances.alpha.page.locator('#lockstep-host').click({timeout: remaining()});
   await instances.alpha.page.waitForFunction(() =>
     document.querySelector('#lockstep-host-invite')?.value?.length > 0,
