@@ -10896,5 +10896,168 @@
         "descriptor_scope": "Independently derived verification descriptor; not a retained intermediate crash checkpoint"
       }
     }
+  },
+  "browser_full7167_common_fields_seed_2026_10_14": {
+    "result": "PASS_INDEPENDENT_REPLAY_3501_COMMON_FIELDS_SEED_AND_LITERAL_SCHEDULE",
+    "scope": "One same-run lifetime-A observation of the literal 7,167-action Setup-to-terminal route, followed by an independent comparison of 3,501 post-tick samples (15 declared common fields plus one seed value each) against the retained original idle reference. This is not complete typed-state or per-owner RNG coverage, lifetime-B/recreation, rollback, or C3 acceptance.",
+    "source_and_build_identity": {
+      "runtime_producer_commit": "d3daa0e8b506e27ee377b3728d0fdfcf88a82ce9",
+      "runtime_producer_tree": "4de18c490360731899bd8ed4395b2ee2a62ecefa",
+      "runtime_source_sha256": "ae55fec162b5493e4058c9316a9690764a40a26bf5c0bff39989203ce068d037",
+      "capture_harness_commit": "d3daa0e8b506e27ee377b3728d0fdfcf88a82ce9",
+      "capture_harness_tree": "4de18c490360731899bd8ed4395b2ee2a62ecefa",
+      "runtime_and_harness_same_commit": true,
+      "working_tree_clean": true
+    },
+    "capture": {
+      "run_id": "rollback-sprint-resume-20261014-085704-6fe33b74",
+      "directory": "stadium-common-fields-capture-d3daa0e8-v1",
+      "state": "PASS",
+      "elapsed_seconds": 118.87069237511605,
+      "actions": 7167,
+      "source_ticks": 3585,
+      "source_draws": 3582,
+      "report": {
+        "path": "stadium-common-fields-capture-d3daa0e8-v1/browser-run/report.json",
+        "sha256": "0353691cf293b9969bab82cbabc3451e24d974dfd422b4f16aafec3edc3dc365"
+      },
+      "completion": {
+        "path": "stadium-common-fields-capture-d3daa0e8-v1/completion.json",
+        "sha256": "6c726524df0566a0a914f8a09a77f5d402ca12913172f5c0a5295d51c54406ec"
+      },
+      "owner_report": {
+        "path": "stadium-common-fields-capture-d3daa0e8-v1/owner.json",
+        "sha256": "56bf2e1e9d162b86da383ef3ff48bc362259b093e51631dbf1cc29f715abc7f5"
+      },
+      "runtime_build_identity": {
+        "path": "stadium-common-fields-capture-d3daa0e8-v1/runtime-build-identity.json",
+        "sha256": "7a3b9e1d007e8e5e4c75326e53af02207ae32cedbf4b1bba3fbebaa73f00f1f5"
+      },
+      "retirement_and_cleanup": {
+        "native_retired": true,
+        "observation_cleared": true,
+        "unload_completed": true,
+        "native_terminal": true,
+        "native_phase_after_close": 0,
+        "native_running_after_close": 0,
+        "owned_browser_absent": true,
+        "owned_server_absent": true,
+        "owned_outer_group_absent": true
+      }
+    },
+    "independent_comparison": {
+      "state": "PASS_INDEPENDENT_REPLAY_3501_COMMON_FIELDS_SEED_AND_LITERAL_SCHEDULE",
+      "receipt": {
+        "path": "stadium-common-fields-capture-d3daa0e8-v1/root-comparator-replay-v2.json",
+        "sha256": "2fd2ab30a3e74e59f7f6939c50d09d875654e287c0b0aae5683923d7b025f4ce"
+      },
+      "report_sha256": "0353691cf293b9969bab82cbabc3451e24d974dfd422b4f16aafec3edc3dc365",
+      "retained_original_seed_sidecar": {
+        "run_id": "match-rollback-feasibility-20261012-203633-e8f0c964/original-stadium-idle3500-reference-run2",
+        "file": "idle3500-reference.json",
+        "bytes": 2033197,
+        "sha256": "562969a7e6a6e7fd43457821f84464852a38da2a83c9dc20672ad713cd6010bc"
+      },
+      "original_source_tick_range": [
+        84,
+        3584
+      ],
+      "common_field_count_per_sample": 15,
+      "seed_values_per_sample": 1,
+      "samples": 3501,
+      "exact_values_matched": 56016,
+      "world_generation": 3,
+      "literal_action_schedule": {
+        "actions": 7167,
+        "ticks": 3585,
+        "draws": 3582,
+        "matched": true
+      },
+      "pad_c_f_go_checks": "Passed under the same strict replay; actual native GO membership at world tick 84, C at 85, F at 86. Four-port consumed PAD schedule matched.",
+      "journal": {
+        "segments": 14335,
+        "sha256": "1df99825b0bb9bcf5e1c46019e39b4d4fcbff2d479deec13e09095f78fe458b3",
+        "chain": "2fef389865b873a066cda169bf98eb9ef0fa8b1ea597a76a176c4571c31aaa83",
+        "all_dynamic_arrays_equal_inline": true,
+        "frozen_fields_equal_inline": true,
+        "strict_recovery_equal_inline": true,
+        "uncommitted_tail": null
+      },
+      "native_counters": {
+        "final_world_ticks": 3585,
+        "final_match_clock_frames": 3461,
+        "audio_calls": 3585,
+        "audio_frames": 1912000,
+        "interpretation": "Counters only; no PCM-content equality or uninterrupted-audio acceptance."
+      }
+    },
+    "validation": {
+      "source": "d3daa0e8b506e27ee377b3728d0fdfcf88a82ce9",
+      "tree": "4de18c490360731899bd8ed4395b2ee2a62ecefa",
+      "diagnostic_release_build": "PASS",
+      "ordinary_release_build": "PASS",
+      "both_build_artifact_inventories_verified": true,
+      "full_regression": {
+        "state": "PASS",
+        "tests_run": 2634,
+        "passed": true,
+        "skipped": 180,
+        "failures": 0,
+        "log_sha256": "d383d7b4c057fc9f2ab511ffcaf5449274df4252396033760def4bfc4f5f0418",
+        "result_json": {
+          "path": "stadium-common-validation-d3daa0e8-v1/evidence/result.json",
+          "sha256": "9dd9d11936fcfc83ba9fbc5eeaffdb741070073942f2daa52762b93bcabebdc3"
+        },
+        "root_review": {
+          "path": "stadium-common-validation-d3daa0e8-v1/evidence/root-result-review.json",
+          "sha256": "621f2aaa2ccda73f5e84cd98c7a9f190c7840d5a7847b9f1184c57fc1bbe87ab"
+        }
+      },
+      "diagnostic_release_artifacts": {
+        "declared_count": 44,
+        "javascript_sha256": "c4bd7b99a3163dbb18a54a0322ec9340db56bef0fb8156f03b532447c5fe98bb",
+        "wasm_sha256": "f5a542b3168cbbd6064090bc4cea2396dc60b55a759f69e77ea82dffc77be873"
+      },
+      "ordinary_release_artifacts": {
+        "declared_count": 44,
+        "javascript_sha256": "0befa55ea2fcd97f8e316a3f94d52e3acd2b5275884e528caa45e1bc175f64e9",
+        "wasm_sha256": "3bf554de061e2470ecdf764f5d9a8b487c7cd57b74e366544b309f8b2d46aaa6"
+      }
+    },
+    "retained_historical_failures": [
+      {
+        "source": "c25990397e65db7d81c5507f972c2cb35bc58dcc",
+        "state": "FAIL_FULL_REGRESSION_TWO_FAILURES",
+        "tests_run": 2634,
+        "skipped": 180,
+        "failed_tests": [
+          "tests/stadium_c3_report_checkpoint.test.mjs: actual persistReport preserves last-good checkpoint and blocks acceptance on failures",
+          "tests/stadium_matched_setup_cf_runner_gate.test.mjs: the matched Setup C/F opt-in and preflight gate fail before server/browser startup"
+        ],
+        "log": {
+          "path": "stadium-common-validation-v1/evidence/full-unittest-suite.log",
+          "sha256": "8ebc4b8657ab616f4a886d173ab89a0dd13d3300d4a35d0fa145e1d24347a535"
+        },
+        "note": "Retained historical full-suite failure; the later d3 suite passed on its own exact source identity."
+      },
+      {
+        "source": "d3daa0e8b506e27ee377b3728d0fdfcf88a82ce9",
+        "attempt": "root-comparator-replay-v1",
+        "state": "FAIL_BEFORE_COMPARISON_ON_SEED_IDENTITY_SHAPE",
+        "failure": "The strict consumer rejected the loaded idle seed artifact identity shape before comparing rows. The v2 packet repaired the identity binding and field naming; it retained exact artifact hashes and strict comparison rules.",
+        "log": {
+          "path": "stadium-common-fields-capture-d3daa0e8-v1/root-comparator-replay.log",
+          "sha256": "4f3d9d009008b5aa2a2d5049a97f9c7fb67369268054bc7eba0d1c62bab9bf19"
+        },
+        "superseded_by": "root-comparator-replay-v2.json"
+      }
+    ],
+    "limits": [
+      "One lifetime A only; no lifetime B or recreation result.",
+      "The 15 common fields plus one seed value are not a full typed-state comparison or per-owner RNG consumption ledger.",
+      "No pixels, PCM-content equality, rollback, C3 acceptance, live-timing or physical-input acceptance.",
+      "The earlier b055 full7167 capture remains a separate producer with its C/F-only comparison; this d3 result is not relabeled as b055 evidence."
+    ],
+    "next": "C3 remains open. Continue with a separately reviewed per-owner RNG/typed-state ownership boundary and lifetime-B/recreation planning; do not infer acceptance from this same-lifetime comparison."
   }
 }
