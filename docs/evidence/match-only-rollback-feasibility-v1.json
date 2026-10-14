@@ -2290,6 +2290,277 @@
           "focused_combined_sha256": "e6ede11b2e84b53f11c03d2478ca05fd2e35661e3da895d20f2b3b4156a70ba0"
         },
         "next": "Actual persistent attachment texture/view creation and parent identity source control; retain LOAD7 and UNKNOWN18 for unproven owners/content. No replay or restore released."
+      },
+      "private_wasm_boot": {
+        "state": "PASS_SCOPED_NO_DISC_INITIALIZATION_AND_REFUSAL_CONTROLS",
+        "source_head": "13922b8d3a84d7299e9121f1b09e7181c9793c2b",
+        "source_tree": "14923787782d3d4d67f75c9ea4477ad97465e5f4",
+        "static_private_profile": {
+          "binding": "private46-static-inventory-v2/binding-manifest.json",
+          "binding_sha256": "82969cd21e07a350ff33bda3bfd145845ead87d69d204e56a8f4cd039cd573dd",
+          "artifact_count": 46,
+          "wasm_bytes": 15980997,
+          "wasm_sha256": "607cd44775f24a7912c7a2fb0146e3bf16353afcb53b08085c2cd85cd2004b61",
+          "review": "private46-static-inventory-v2/execution-v1/root-result-review.json",
+          "review_sha256": "dc7de7bccfd75235036fc907ee88f299bf584444511f31572941526f7c88d0a5",
+          "scope": "Static identity and Wasm instruction inventory only; not runtime hidden-state closure."
+        },
+        "initial_private_controls": {
+          "state": "THREE_PRIVATE_CONTROLS_PASSED; V1_ORDINARY_CASE_TIMEOUT_RETAINED",
+          "passed_controls": [
+            "private-probe",
+            "missing-helper",
+            "missing-hook"
+          ],
+          "browser_report": "private-wasm-no-disc-boot-execution-v1/browser-run/report.json",
+          "browser_report_sha256": "02cfeb1328b96dd210880edd30ed1b4435bc88b9ad6303181526f73904261771",
+          "owner_report": "private-wasm-no-disc-boot-execution-v1/owner.json",
+          "owner_sha256": "92fd252ce6daa4810281ea4d78f5fdccf48847c1828cb14f5535903ab678092c",
+          "root_review": "private-wasm-no-disc-boot-execution-v1/root-result-review.json",
+          "root_review_sha256": "a5f357c943ab0378341303d7847f2ba332cb40dcf8972f46dea19fec79673c9e",
+          "retained_failure": {
+            "case": "ordinary-unflagged",
+            "failure": "TimeoutError after 90000ms",
+            "source_supported_harness_hypothesis": "path-only route.fulfill({path}) dropped the real server isolation headers; no isolated-state snapshot was captured",
+            "production_finding": false
+          }
+        },
+        "ordinary_unflagged_v3": {
+          "state": "PASS_ROOT_ORDINARY_NO_DISC_CONTROL_REVIEW",
+          "candidate_controller": "private-wasm-no-disc-boot-candidate-v3/boot_probe.mjs",
+          "controller_sha256": "3c123776ba1ae403a757a578646ac168571a970847e3089f684e36e99b349e44",
+          "candidate_manifest_sha256": "62b62b50ad42bd30e51e6cd674bc1e5effd321e68946e449b9d748571712f0dd",
+          "execution_result": "private-wasm-no-disc-boot-execution-v2/execution-result.json",
+          "execution_result_sha256": "aefd658a4ac388078fc05fdf900a8a21f131df604ae3efbaa7cc215871fbfc88",
+          "browser_report": "private-wasm-no-disc-boot-execution-v2/browser-run/report.json",
+          "browser_report_sha256": "31ab4a313652aaa653608b2852f87c1532ca6e31ebf51177ca6f3747297f9f09",
+          "owner_report": "private-wasm-no-disc-boot-execution-v2/owner.json",
+          "owner_sha256": "8bbd6acd324b3bf198e7dc4cf2ccde0fc14452ae26382df006f9b5285c8add01",
+          "root_review": "private-wasm-no-disc-boot-execution-v2/root-result-review-v1.json",
+          "root_review_sha256": "31794f316bc65938661b1505c5c8218a115db7f524ea8cfa57d9ac280b915e51",
+          "browser": {
+            "version": "155.0.8059.40",
+            "mode": "headless installed Chrome, audio muted",
+            "document_status": 200,
+            "coop": "same-origin",
+            "coep": "require-corp",
+            "cross_origin_isolated": true,
+            "module_present": true,
+            "first_native_callback_ms": 70.72,
+            "renderer_init_ms": 68.395,
+            "disc_input_empty": true,
+            "private_accessor_present": false,
+            "runtime_page_console_route_errors": 0,
+            "ordinary_requests_and_hash_verified_responses": 38
+          },
+          "cleanup": {
+            "owner_result": "pass",
+            "cleanup_passed": true,
+            "cdp_attribution_complete": true,
+            "owned_process_groups_absent": true,
+            "checkout_unchanged": true
+          },
+          "scope": "Ordinary no-disc native initialization only; no gameplay, runtime ownership closure, disc import, restore or performance acceptance."
+        }
+      },
+      "persistent_efb_component": {
+        "source_commit": "8c20a0daf450095c454011d0215f9fb489e5d037",
+        "included_in_source_head": "13922b8d3a84d7299e9121f1b09e7181c9793c2b",
+        "component_scope": "Creation provenance for three persistent EFB owners: color framebuffer, resolved-color target and depth buffer; six texture/view rows preserve original descriptors, parent identity and creation serial.",
+        "focused_path": "Native observer-collector fixture exercises pre-renderer creation through a LOAD pass using detached fake identity handles; verifies six resource/provenance rows and keeps LOAD_ATTACHMENT as first blocker.",
+        "browser_observation_in_component_receipt": false,
+        "restore_or_contents_proven": false,
+        "remaining": "The earlier 410e9dd9 browser report retains LOAD_ATTACHMENT (7) and UNKNOWN_RESOURCE (18). The component does not capture or restore GPU attachment bytes and does not close other texture/view owners."
+      },
+      "validation_checkpoint_13922": {
+        "source_head": "13922b8d3a84d7299e9121f1b09e7181c9793c2b",
+        "source_tree": "14923787782d3d4d67f75c9ea4477ad97465e5f4",
+        "release_builds": [
+          {
+            "profile": "ordinary",
+            "state": "PASS",
+            "artifact_count": 44,
+            "receipt": "net-private46-validation-v1/evidence/ordinary-release-build.json",
+            "sha256": "7239824f5167a671bc932020a6f67fecf2d53d435027006b32550d47b90c1bd5"
+          },
+          {
+            "profile": "frame-effect",
+            "state": "PASS",
+            "artifact_count": 44,
+            "receipt": "net-private46-validation-v1/evidence/frame-effect-release-build.json",
+            "sha256": "62aac5af712f311ef586a091927681a2fb0488c3d60644120ca8adc27d58261d"
+          },
+          {
+            "profile": "combined-first-pair",
+            "state": "PASS",
+            "artifact_count": 46,
+            "receipt": "net-private46-validation-v1/evidence/combined-first-pair-release-build.json",
+            "sha256": "040c5a2ac0c13d778af9227c4621b03f5debfa75b09f2255f0c7eb018ac5e9b9"
+          }
+        ],
+        "full_regression": {
+          "state": "PASS",
+          "tests_run": 2431,
+          "tests_passed": 2267,
+          "skipped": 164,
+          "failed": 0,
+          "receipt": "net-private46-validation-v1/evidence/full-unittest-suite.json",
+          "receipt_sha256": "f0182c35e1d686ea29784d39a54c32823b3e4bf181d4a1421fa4e4fb5ae69ed9",
+          "log_sha256": "e5013ae64ecde97b22f5f9f41d7c63972e6446ed903eae36335761fdac79aac3"
+        },
+        "root_review": {
+          "path": "net-private46-validation-v1/evidence/root-result-review.json",
+          "sha256": "728c5798eefbdeeddba691381077f120d23c8818e3c394dfdc9bb459f15431af",
+          "verified_artifacts": 134
+        }
+      },
+      "renderer_source_advance": {
+        "source_head": "fb63c3f2d26c2f266a384e04428d9b4b1fafdfb5",
+        "tree": "c8e6ab0a302b69b0a01f41c48852fc5a871b023f",
+        "aurora_tree": "c6b4982168244b0c1d467f7800041ef1c98bcd9b",
+        "aurora_patch_sha256": "d86dc769a90027cac3b175041c179874f1be49b75bef01900e77a385e4901800",
+        "validation": "PASS_SCOPED_BUILD_REGRESSION_AND_OBSERVATION_NOT_RESTORE",
+        "focused_controls": {
+          "path": "texture-owner-clear-observation-candidate-v3/execution-v1/root-result-review-v1.json",
+          "sha256": "e6e78adfa20d7a5f3d65bf165e8d94990952348cb7771b72dee5e28026e60ad4"
+        },
+        "full_validation": {
+          "path": "net-texture-owner-validation-v1/evidence/root-result-review.json",
+          "sha256": "8664ca7f95e4afb23619992f8996d4341d3ff164c55096ca2636d0befd787656"
+        },
+        "tests_run": 2431,
+        "skipped": 164,
+        "artifact_count": 134,
+        "retained_focused_failures": [
+          "texture-owner-clear-observation-candidate-v1: device mismatch classification before REUSE20",
+          "texture-owner-clear-observation-candidate-v2: zero capture ID matched unused provenance and bypassed capacity; exact reducer before v3"
+        ],
+        "first_draw": {
+          "scope": "One observation; 160 provenance rows and6APIclear facts do not establish starting texel contents or all-owner closure. Shape27 reflects261commands/242draws/3passes versus authored265/246/3; historical differing callback remains separate. No restore/PCM/pixel/performance acceptance.",
+          "packet": {
+            "path": "first-draw-observation-packet-v4/packet.json",
+            "sha256": "8af4d251c09393b7f97fa8816d44bc7788d404a45330101d026f206d409b5a78"
+          },
+          "served_binding": {
+            "path": "first-draw-observation-packet-v4/served-runtime.json",
+            "sha256": "fb3e4992df4da3213caaebb73ad308188cfa55495155543a94cfdb6d2721e1f4"
+          },
+          "raw_report": {
+            "path": "first-draw-observation-packet-v4/capture/browser/report.json",
+            "sha256": "4a93013119486c169d8a2b605527297e225943e2c1b8f7e82df0e4e85b225014"
+          },
+          "owner_report": {
+            "path": "first-draw-observation-packet-v4/capture/owner-report.json",
+            "sha256": "6c6783da2d68a259cc10fcb559a0f3c6688349e7596a81119e371f6a437e7a94"
+          },
+          "completion": {
+            "path": "first-draw-observation-packet-v4/capture/completion.json",
+            "sha256": "34388de496f489f2cab3d1645e38d1d050a04c2b4de84635677b552c5d963e9f"
+          },
+          "root_review": {
+            "path": "first-draw-observation-packet-v4/capture/root-result-review.json",
+            "sha256": "949e59d15b68425dd8235bcacd2f57ff2ea74f4f339ed404f212efc13467cd95"
+          },
+          "source_frames": [
+            180,
+            181
+          ],
+          "tick_draw_audio_returns": [
+            1,
+            1,
+            1
+          ],
+          "pcm_frames_counter_only": 533,
+          "renderer": {
+            "schema_version": 5,
+            "state": 4,
+            "first_blocker": 7,
+            "target_frame_index": 3167,
+            "frame_index": 3167,
+            "frame_id": "3168",
+            "event_count": 1755,
+            "handle_count": 266,
+            "op_count": 3,
+            "render_pass_count": 3,
+            "draw_command_count": 242,
+            "custom_draw_count": 0,
+            "encoder_task_count": 0,
+            "texture_copy_count": 0,
+            "texture_upload_count": 0,
+            "palette_conversion_count": 0,
+            "resolve_count": 2,
+            "snapshot_count": 1,
+            "staging_copy_count": 12,
+            "queue_write_count": 4,
+            "queue_write_bytes": "1222992",
+            "after_submit_callback_count": 0,
+            "submit_count": 1,
+            "fence_count": 1,
+            "fence_success": 1,
+            "finding_mask": "134217856",
+            "command_record_count": 261,
+            "actual_draw_count": 242,
+            "resource_count": 265,
+            "binding_entry_count": 1123,
+            "layout_entry_count": 19,
+            "provenance_count": 160,
+            "attachment_fact_count": 6,
+            "depth_trace_count": 3,
+            "depth_request_count": 0
+          },
+          "arrays": {
+            "raw_pad_bytes": 64,
+            "events": 1755,
+            "handles": 266,
+            "resources": 265,
+            "binding_entries": 1123,
+            "layout_entries": 19,
+            "provenance": 160,
+            "attachment_facts": 6,
+            "draws": 242
+          },
+          "exercised_roles": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "remaining_findings": [
+            7,
+            27
+          ],
+          "unknown18_observed": false,
+          "native_retired": true,
+          "owned_browser_pids_absent": 9,
+          "owned_capture_server_pids_absent": 2,
+          "owned_groups_absent": 3,
+          "h1": {
+            "callback_count": 3133,
+            "dropped_samples": 3033,
+            "dropped_incidents": 0,
+            "max_preparation_ms": 43.38000011444092
+          },
+          "forced_timing_pauses": 0
+        },
+        "content_dependency_contract": {
+          "path": "renderer-load7-content-contract-review-fb63-v1.json",
+          "sha256": "01df954ef4f52e68de5553d3948c2f0580c2ca29a107a99582fd3630f1f5fbad"
+        },
+        "next": "Classify first actual LOAD/sample content dependency from retained receipt without a new capture; preserve unknown starting texels and LOAD7. No restore admission."
       }
     }
   }

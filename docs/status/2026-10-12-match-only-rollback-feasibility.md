@@ -1,6 +1,6 @@
 # Match-only rollback feasibility
 
-**Compiled / Source-only snapshot diagnostic / Terminal browser tick-and-draw diagnostic / Browser rollback and frame-budget feasibility unproven**
+**Compiled / Source-only snapshot diagnostic / Terminal browser tick-and-draw diagnostic / No-disc native initialization control / Browser rollback and frame-budget feasibility unproven**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
 [merged #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
@@ -348,15 +348,20 @@ binding entries, 19 layout entries, 14 creation-provenance rows and 246 draw row
 One normal submission/fence completes, the native observer retires, and all ten
 owned browser processes plus capture/server groups are absent.
 
-**Renderer restore remains blocked.** `LOAD_ATTACHMENT` (7) is now first and
-`UNKNOWN_RESOURCE` (18) remains. The color/depth attachment views and further
-texture/view owners still lack descriptor rows. A LOAD operation does not prove
-the contents that must be restored. The next source control extends existing
-creation tracking for an actual persistent attachment texture/view, preserving
-parent identity, stale-identity refusals and the LOAD blocker. There is no
-resource recreation or content restore yet. Historical shape finding 27 is
-absent from this callback, whose draw count differs; that is not evidence of a
-shape repair or equality with the earlier run.
+**Renderer restore remains blocked.** The `410e9dd9` browser report still records
+`LOAD_ATTACHMENT` (7) first and `UNKNOWN_RESOURCE` (18); those findings belong to
+that captured producer. A later source/test component at `8c20a0da` adds
+creation provenance for the three persistent EFB owners (color, resolved color,
+and depth): six texture/view rows retain their original descriptors, parent
+identity and creation serial. Its observer-collector fixture exercises the
+metadata path through a LOAD pass with detached test handles, verifies the six
+resource/provenance rows and keeps `LOAD_ATTACHMENT` as the first blocker. This
+is component-only evidence: the browser observation predates the change, and no
+real GPU attachment bytes were captured or restored. Other texture/view owners
+and attachment contents remain unresolved; a LOAD operation does not establish
+the content that must be restored. Historical shape finding 27 is absent from
+that callback, whose draw count differs; that is not evidence of a shape repair
+or equality with the earlier run.
 
 The current H1 recorder has zero forced timing pauses, eight preparation
 incidents and no dropped incidents, but retains only 100 of 3,128 callback
@@ -373,6 +378,74 @@ reviewed repair renames only its three local references to `accessorPropertyName
 the fixed property string and all scanner rules remain unchanged. The complete
 tracked-content check and both existing Wasm ownership controls pass after the
 repair. This does not relabel the `fa58cb7b` build or browser evidence.
+
+### October 14 private-Wasm no-disc boot and 13922 validation checkpoint
+
+At validated source `13922b8d` (tree `14923787`), the ordinary, frame-effect
+and combined first-pair Release builds pass with 44, 44 and 46 inventoried
+artifacts. The full regression ran 2,431 tests: 2,267 passed and 164 were skipped, with no
+failures; the independent review verifies 134 emitted artifacts. A fresh static inventory binds the
+46-file private profile and its 15,980,997-byte Wasm. This is static binary and
+artifact evidence, not runtime hidden-state or restoration closure.
+
+The initial private-profile controls passed: the compiled private hook reaches a
+native callback. A missing copied helper refuses before the loader starts; a
+missing compiled hook refuses before native main. The separate ordinary-only attempt in the retained v1
+packet timed out after 90 seconds. Its review notes the path-only
+`route.fulfill({path})` harness response omitted the real server's isolation
+headers; because that attempt did not capture an isolated-status snapshot, this
+remains a harness failure with a source-supported explanation, not a runtime
+defect diagnosis. The reduced v3 control preserved the real loopback response
+headers and passed: COOP is `same-origin`, COEP is `require-corp`,
+`crossOriginIsolated` and `Module` are present, and the ordinary native callback
+arrives at 70.72 ms. All 38 requested responses match the ordinary artifact
+inventory; the disc input stays empty, the private accessor is absent, and
+runtime, page, console and route errors are zero. CDP attribution and owned
+browser/server/capture cleanup pass, with the checkout unchanged. These receipts
+bind `13922b8d` only. The later `fb63c3f2` renderer producer has its own
+validation and observation below.
+
+This proves ordinary no-disc native initialization and the listed private
+startup refusal controls only. It does not import a disc, reach CSS/SSS or
+Gameplay, prove runtime Wasm ownership, or establish a restore/repeat pair,
+visual/audio equality or whole-session acceptance.
+
+### October 14 texture ownership and actual clear-value observation
+
+Executable `fb63c3f2` adds copied creation identities for actual TextureRef
+factories/replacement and canonical snapshot/offscreen owners, plus exact
+BeginRenderPass clear values. The focused real collector, 17 current/historical
+JavaScript controls, native serialization, 11 translation units and 10 ordinary
+OFF compiler projections pass. Two reduced fixture failures remain retained:
+device-mismatch classification and a zero-ID capacity check. Their narrow repairs
+preserve the original refusal and capacity requirements.
+
+All three affected Release builds and the full 2,431-test regression pass with
+164 skips. Independent review rehashes all 134 artifacts and confirms the exact
+source/Aurora patch trees and owned-process absence. One new browser observation
+then reaches original CSS → SSS → the four-stock Mario/FD match and observes
+source frame 180 → 181 with one original tick, draw and audio render. The audio
+counter advances 533 frames; this is not a PCM comparison. The strict outer-6 /
+renderer-5 receipt contains 1,755 events, 266 handles, 265 resource descriptors,
+160 creation-provenance rows and six actual attachment clear-value records.
+Normal submit/fence and checked native retirement pass; all nine owned browser
+PIDs and the capture/server PIDs, across three groups, are absent.
+
+`UNKNOWN_RESOURCE` (18) is absent in this selected frame. `LOAD_ATTACHMENT` (7)
+remains first, and `COMMAND_SHAPE_MISMATCH` (27) is retained: this callback has
+261 command records, 242 draws and three passes, against the diagnostic's fixed
+265/246/3 shape. This differs from the historical `410e9dd9` callback and does
+not establish a rendering regression, shape equivalence or all-owner coverage.
+Only roles 1–18 were exercised; no snapshot/offscreen-role coverage is inferred.
+Exact clear values and descriptors do not establish prior texture contents.
+The next step traces the first actual LOAD/sample dependency in this retained
+receipt to an exact earlier definition or an explicit unknown starting input.
+No additional capture, texture-content restore or same-instance replay occurred.
+
+H1 retains eight preparation incidents and zero forced timing pauses or dropped
+incidents. Its sample history is incomplete: 100 samples remain from 3,133
+callbacks, with 3,033 samples evicted. This observation does not close live timing,
+pixel/PCM equality, complete host ownership or rollback/frame-budget acceptance.
 
 ## Slippi profile source checkpoint
 
