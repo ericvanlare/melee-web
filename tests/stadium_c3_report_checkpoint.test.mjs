@@ -376,9 +376,16 @@ test('frozen mutation, missing sidecar, and corrupt sidecar fail closed', async 
 
 test('actual persistReport preserves last-good checkpoint and blocks acceptance on failures', async () => {
   const runnerSource = await fs.readFile(RUNNER, 'utf8');
-  assert.ok(runnerSource.indexOf('await checkRuntimeDiagnostics(scheduleIndex, `${action.action}-before-ack`, cfState)') <
-    runnerSource.indexOf('() => driver.accept(cfState, comparison)'),
-  'actual before-ack diagnostic persistence remains before driver.accept');
+  const timedBefore = runnerSource.indexOf('() => checkRuntimeDiagnostics(scheduleIndex, `${action.action}-before-ack`, cfState)');
+  const timedAccept = runnerSource.indexOf('() => driver.accept(cfState, comparison, commonComparison)');
+  const untimedBefore = runnerSource.indexOf('await checkRuntimeDiagnostics(scheduleIndex, `${action.action}-before-ack`, cfState)');
+  const untimedAccept = runnerSource.indexOf('accepted = await driver.accept(cfState, comparison, commonComparison)');
+  for (const [label, index] of Object.entries({timedBefore, timedAccept, untimedBefore, untimedAccept}))
+    assert.ok(index >= 0, `actual source marker is present: ${label}`);
+  assert.ok(timedBefore < timedAccept,
+    'actual timed before-ack diagnostic persistence remains before driver.accept');
+  assert.ok(untimedBefore < untimedAccept,
+    'actual untimed before-ack diagnostic persistence remains before driver.accept');
   const dir = await makeTemp('stadium-c3-persist-failure-');
   try {
     for (const operation of ['writeFile', 'rename']) {

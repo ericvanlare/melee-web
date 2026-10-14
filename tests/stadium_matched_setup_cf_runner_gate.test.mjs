@@ -235,7 +235,8 @@ test('the matched Setup C/F opt-in and preflight gate fail before server/browser
   assert.throws(() => validateMatchedSetupCfPreflight({route_mode: 'first-sss-vs-setup',
     matched_setup_cf: {...explicitFrozen, scope: SCOPE}},
   {enabled: true, explicitStep: true, packetPath: packet,
-    assemblyPath: assembly, helperPath: HELPER}), /requires the reviewed v2 proper-prefix scope/);
+    assemblyPath: assembly, helperPath: HELPER}), {name: 'TypeError',
+    message: 'Matched Setup C/F explicit stepping differs from its reviewed full/prefix scope'});
   assert.throws(() => validateMatchedSetupCfPreflight({...preflight,
     matched_setup_cf: {...frozen, packet: {...packetId, path: `${packet}.other`}}},
   {enabled: true, packetPath: packet, assemblyPath: assembly, helperPath: HELPER}), /packet path/);
