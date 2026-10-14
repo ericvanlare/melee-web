@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {incidentRecordingUrl, requireIncidentRecorderReadiness,
   summarizeRuntimeIncidents} from '../scripts/a3_runtime_incidents.mjs';
 
@@ -30,6 +31,47 @@ test('missing recorder or declined staging opt-in refuses readiness', () => {
     const row = ready(); corrupt(row);
     assert.throws(() => requireIncidentRecorderReadiness(row));
   }
+});
+
+test('only the exact isolated HTTPS staging origin can opt into hosted incidents', () => {
+  const origin = 'https://melee-web-room-relay-staging-288.mywebcomic.workers.dev';
+  for (const pathname of ['/', '/runtime.html'])
+    assert.equal(incidentRecordingUrl(origin + pathname).origin, origin);
+  for (const invalid of [origin.replace('https:', 'http:') + '/', origin + '.invalid/',
+    origin + ':444/', origin + '/other.html', origin.replace('https://', 'https://user@') + '/',
+    origin + '/#invite=anything']) assert.throws(() => incidentRecordingUrl(invalid));
+  const hosted = ready();
+  hosted.ring_status.selection.staging_diagnostics_reason = 'explicit_hosted_staging_opt_in';
+  assert.equal(requireIncidentRecorderReadiness(hosted), hosted);
+});
+
+test('native and host recorder gates require opt-in on an allowed origin', () => {
+  const patch = readFileSync(new URL('../patches/aurora-browser.patch', import.meta.url), 'utf8');
+  const native = patch.slice(patch.indexOf('+bool resolve_browser_staging_diagnostics_enabled() noexcept {'));
+  const source = native.slice(native.indexOf('+    try {'), native.indexOf('+  }) != 0;'))
+    .split('\n').map(line => line.startsWith('+') ? line.slice(1) : line).join('\n');
+  const runNative = new Function('window', source);
+  const host = readFileSync(new URL('../web/melee-runtime.mjs', import.meta.url), 'utf8');
+  const start = host.indexOf('  let stagingDiagnosticsEnabled = false;');
+  const body = host.slice(start, host.indexOf('  function diagnosticDeliveryBlocked()', start));
+  const runHost = new Function('globalThis', 'recordDiagnostics', 'stagingDiagnosticsOrigin', body + '\nreturn stagingDiagnosticsEnabled;');
+  const staging = 'https://melee-web-room-relay-staging-288.mywebcomic.workers.dev';
+  for (const origin of ['http://127.0.0.1:8787', staging, 'https://example.com', staging + ':444']) {
+    for (const requested of [false, true]) for (const recorder of [false, true]) {
+      const url = new URL(origin + '/' + (requested ? '?melee-web-staging-diagnostics=1' : ''));
+      const expected = requested && recorder && ['http://127.0.0.1:8787', staging].includes(origin);
+      const hostEnabled = runHost({location: url}, recorder, staging);
+      const window = {location: url, __meleeWebStagingRingSelection: {}, menuStagingDiagnosticsEnabled: () => hostEnabled};
+      assert.equal(runNative(window), expected ? 1 : 0);
+      assert.equal(hostEnabled, expected);
+      if (expected) assert.equal(window.__meleeWebStagingRingSelection.staging_diagnostics_reason,
+        origin === staging ? 'explicit_hosted_staging_opt_in' : 'explicit_loopback_opt_in');
+    }
+  }
+  const hostedUrl = new URL(staging + '/?melee-web-staging-diagnostics=1');
+  assert.equal(runHost({location: hostedUrl}, true, null), false,
+    'Public/audio callers do not enable hosted telemetry without an explicit staging origin');
+  assert.equal(runNative({location: hostedUrl, __meleeWebStagingRingSelection: {}}), 0);
 });
 
 test('current timing incidents retain staging evidence and classify H1 without inferring combat failure', () => {

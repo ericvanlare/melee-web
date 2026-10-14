@@ -267,6 +267,16 @@ async function runScenario({name, failStartup = false, behavior = {}, fullscreen
     assert.equal(options.createAudio, undefined, 'public shell must not create an audio runtime');
     if (options.createAudio) audioCreated++;
     assert.equal(options.configureModule, undefined, 'required filesystem setup belongs to the shared owner');
+    const startupProfile = {schema: 'webmelee-startup-profile-v1', phase: 'adapter', elapsed_ms: 24};
+    options.onStartupProfile?.(startupProfile);
+    assert.equal(document.getElementById('startup-export').disabled, false,
+      'Startup report is available before the native owner exists');
+    document.getElementById('startup-open').click();
+    assert.equal(document.getElementById('startup-dialog').open, true);
+    assert.deepEqual(JSON.parse(document.getElementById('startup-report').textContent), startupProfile,
+      'Computer-use readers can inspect the bounded report without console injection');
+    document.getElementById('startup-close').click();
+    assert.equal(document.getElementById('startup-dialog').open, false);
     if (failStartup) throw Error('cache directory denied');
     trace.push('native-main');
     nativeMainCalled = true;
@@ -386,7 +396,8 @@ async function runScenario({name, failStartup = false, behavior = {}, fullscreen
 
 const success = await runScenario({name: 'success', failStartup: false});
 assert.deepEqual(success.trace.slice(0, 4), ['settings', 'save-settings', 'diagnostics-settings', 'mount']);
-assert.equal(success.trace[4], 'native-main');
+assert.deepEqual(success.trace.slice(4, 7), ['startup-open', 'startup-close', 'native-main'],
+  'Startup details can open and close before native initialization');
 assert.equal(success.nativeMainCalled, true);
 assert.equal(success.audioCreated, 0);
 assert.equal(success.diagnosticsSettingsOptions, undefined,
@@ -652,6 +663,37 @@ assert.equal(failedDocument.getElementById('error-dialog').open, true);
 assert.equal(failedDocument.getElementById('retry').hidden, false);
 assert.equal(failedDocument.getElementById('error').textContent, 'cache directory denied');
 assert.equal(failed.audioCreated, 0);
+const restoreFailed = installGlobals(failedDocument);
+const priorCreateURL = URL.createObjectURL, priorRevokeURL = URL.revokeObjectURL;
+const priorTimeout = globalThis.setTimeout, priorCreateElement = failedDocument.createElement;
+const exported = {links: [], revoke: []};
+try {
+  failedDocument.getElementById('error-close').click();
+  failedDocument.getElementById('startup-open').click();
+  assert.equal(failedDocument.getElementById('startup-dialog').open, true,
+    'The startup report remains reachable after dismissing a startup failure');
+  const expected = JSON.parse(failedDocument.getElementById('startup-report').textContent);
+  URL.createObjectURL = blob => { exported.blob = blob; return 'blob:startup-test'; };
+  URL.revokeObjectURL = url => exported.revoke.push(url);
+  globalThis.setTimeout = (callback, delay) => { exported.revokeLater = callback; exported.delay = delay; return 0; };
+  failedDocument.createElement = tag => {
+    const node = priorCreateElement(tag);
+    if (tag === 'a') exported.links.push(node);
+    return node;
+  };
+  failedDocument.getElementById('startup-export').click();
+  assert.deepEqual(JSON.parse(await exported.blob.text()), expected);
+  assert.equal(exported.links[0].download, 'webmelee-startup.json');
+  assert.equal(exported.links[0].href, 'blob:startup-test');
+  assert.equal(exported.links[0].clickCount, 1);
+  assert.equal(exported.delay, 1000);
+  exported.revokeLater();
+  assert.deepEqual(exported.revoke, ['blob:startup-test']);
+} finally {
+  URL.createObjectURL = priorCreateURL; URL.revokeObjectURL = priorRevokeURL;
+  globalThis.setTimeout = priorTimeout; failedDocument.createElement = priorCreateElement;
+  restoreFailed();
+}
 await runScenario({name: 'fullscreen-unsupported', fullscreen: 'unsupported', exerciseFullscreen: true});
 await runScenario({name: 'fullscreen-supported', fullscreen: 'supported', exerciseFullscreen: true});
 await runScenario({name: 'fullscreen-rejected', fullscreen: 'rejected', exerciseFullscreen: true});

@@ -212,3 +212,7 @@ select {
   background: #fff;
   max-width: 100%;
 }
+
+#startup-dialog { width: min(760px, calc(100vw - 40px)); }
+#startup-report { max-height: 50vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
+  padding: 12px; background: #f3f3f3; font-size: 12px; line-height: 1.5; }

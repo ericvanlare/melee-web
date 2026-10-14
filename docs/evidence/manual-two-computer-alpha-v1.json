@@ -1,0 +1,119 @@
+{
+  "schema": "melee-web-manual-two-computer-alpha-readiness-v1",
+  "state": "PACKAGE_AND_SAME_HOST_PUBLIC_CSS_PASS",
+  "observed_utc": "2026-10-14T01:06:26.593206+00:00",
+  "source": {
+    "clean": true,
+    "commit": "4b4322cb8f027326db59b4d36d8476f6c0d8d1e9",
+    "tree": "6eb407e8f1e14369d23a77020ff5f6235f5d7240"
+  },
+  "archive": {
+    "bytes": 5107356,
+    "path": "Melee-Web-PvP-Alpha-4b4322cb.zip",
+    "sha256": "477eaa2adf390776c5cc407495c2fd7fafea9edafd1c42fe7e74ff112c319554"
+  },
+  "package_files": 49,
+  "runtime_files": 41,
+  "focused_package_controls": {
+    "run": 8,
+    "passed": 8,
+    "exit_code": 0
+  },
+  "browser": {
+    "chrome_version": "155.0.8059.40",
+    "headless": true,
+    "audio_muted": true,
+    "audio_processing_disabled": false
+  },
+  "functional_check": {
+    "relay_mode": "external",
+    "relay_url": "wss://melee-web-room-relay-staging-288.mywebcomic.workers.dev",
+    "matched_checksums": 145,
+    "source_tick_range": [
+      0,
+      144
+    ],
+    "input_delay": 2,
+    "keyboard_roles": [
+      "alpha/P1",
+      "beta/P2"
+    ],
+    "timing_pause_observed": false,
+    "network_wait": {
+      "alpha": {
+        "active": 0,
+        "callbacks": 146,
+        "episodes": 60,
+        "start_tick": 147,
+        "last_tick": 147,
+        "resume_count": 60
+      },
+      "beta": {
+        "active": 0,
+        "callbacks": 143,
+        "episodes": 62,
+        "start_tick": 147,
+        "last_tick": 147,
+        "resume_count": 62
+      }
+    },
+    "rtt": "not measured in this CSS check",
+    "elapsed_owner_ms": 26114
+  },
+  "cleanup": {
+    "native_both_unloaded": true,
+    "both_relay_sockets_closed": true,
+    "exact_owned_process_cleanup": true,
+    "capture_group_absent": true,
+    "server_group_absent": true,
+    "staging_worker": "Left deployed unchanged; this test closed its room sockets. No deployment/configuration action."
+  },
+  "retained_observations": {
+    "requestfailed": {
+      "alpha": [
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "url": "http://127.0.0.1:8787/gameplay_menu_browser.data",
+          "failure": "net::ERR_ABORTED"
+        }
+      ],
+      "beta": [
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "url": "http://127.0.0.1:8787/gameplay_menu_browser.data",
+          "failure": "net::ERR_ABORTED"
+        }
+      ]
+    },
+    "historical_binding": "October12 deployment/origin receipts reused unchanged; no new provider version query.",
+    "diagnostic_history_eviction": {
+      "alpha": 77,
+      "beta": 43,
+      "incident_evicted": false
+    }
+  },
+  "unrun": [
+    "actual two-computer test",
+    "human keyboard or physical controllers",
+    "Windows/Linux launcher execution",
+    "current-package full match",
+    "foreground timing and audible output"
+  ],
+  "delivery_scope": "Private interim lockstep alpha. Target online match-only rollback remains unfinished.",
+  "evidence": {
+    "ordinary-release-build.json": "a87f0f0bb97114e7b26c37a035cdc72a5c1100543ea26fe626a626dd628d226e",
+    "build-owner.json": "cf256d8be1bf9bb9bb0414b34c304fd8bdaa54a9eca3cde4a491904d78115849",
+    "package-controls.log": "9a8217a98673f2ee42a075471dddae489bbb00e8e839d227521d9741f9edc70a",
+    "package-v4-independent-review.json": "be97b2174c506cb6e3439b24bc0a44aeb09d305fe0e9726962344e5965cabc4e",
+    "package-v5-independent-review-supplement.json": "3f88490a0ca127c0e39c990cfa3469fc1cf4e104d9b7e377f161e50befda7f63",
+    "Melee-Web-PvP-Alpha-4b4322cb.manifest.json": "fdecacdd9b2798bd3eb224e33aced4e9bc8030a385840c47509675078102a3ab",
+    "archive-verified.json": "37701028e578d55ee25ee06563162da669514128c17ba013cf8e9f4a01eb6b82",
+    "package-http-check.json": "febf49ca2003b3eae8f80377e2695f9ec4451b22b200a3b20e96cd1e5b7be5d1",
+    "public-css-check/report.json": "7f3e4753c3bbb29b355cd5f07950fd4d81c65fe2da7aeabf5f7fed3551106283",
+    "public-css-owner.json": "b213c9706552112bf104f972b107b7413512d58b42f5ffc87201b7437ccb27ea",
+    "result-review.json": "04d1f27fb0b1a28b34d9da85f735caca0a377aac44a20983adc136cff3a777a3"
+  },
+  "evidence_locator": "Private run directory two-computer-alpha-20261013-174018-a38c4ff8; no disc data or runtime artifacts are tracked."
+}

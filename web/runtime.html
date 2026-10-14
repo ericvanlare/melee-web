@@ -1,13 +1,101 @@
 <!doctype html>
-<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Melee Web · Original CSS/SSS player</title><link rel="icon" href="data:,">
-<style>:root{color-scheme:dark;font:15px system-ui;background:#10141e;color:#e7ebf4}body{max-width:900px;margin:24px auto;padding:0 18px}#game-host{position:relative;width:100%;aspect-ratio:4/3}canvas{display:block;width:100%;height:100%;background:black;outline:none}button,input,textarea{font:inherit}button{margin:12px 8px 12px 0;padding:8px 14px}textarea{box-sizing:border-box;width:100%;resize:vertical}pre{white-space:pre-wrap;font-size:12px;max-height:140px;overflow:auto}</style>
-<p>Original CSS/SSS player · Original screens, callbacks, and source match.</p>
-<label>Melee disc image <input id="disc" type="file" accept=".iso,.gcm,.ciso" disabled></label>
-<fieldset><legend>Experimental relay room</legend><p>Host is Player 1 (PAD port 0); Join is Player 2 (PAD port 1). Both use the existing Controls settings.</p><label>Verified relay URL <input id="lockstep-relay-url" type="url" autocomplete="url" placeholder="Enter the verified ws:// or wss:// relay base URL" size="48"></label><button id="lockstep-host" disabled>Host as P1</button><label>Host invite <textarea id="lockstep-host-invite" rows="2" maxlength="2048" readonly></textarea></label><button id="lockstep-copy" disabled>Copy invite</button><span id="lockstep-copy-status"></span><label>Join invite <textarea id="lockstep-join-invite" rows="2" maxlength="2048" placeholder="Paste the host invite"></textarea></label><button id="lockstep-join" disabled>Join as P2</button><button id="lockstep-leave" disabled>Stop / leave</button><p id="lockstep-status" role="status" aria-live="polite">Import a Melee disc, choose Controls, then host or join.</p></fieldset>
-<div><button id="launch" disabled>Open character select</button><button id="pause" disabled>Pause / resume</button><button id="unload" disabled>Unload</button><button id="controls-open" type="button">Controls</button><fieldset id="legacy-input-settings" hidden aria-hidden="true"><label><input id="keyboard" type="checkbox" checked> P1 keyboard</label><label><input id="keyboard2" type="checkbox" checked> P2 keyboard</label></fieldset></div>
-<dialog id="controls-dialog" aria-label="Controls"></dialog>
-<p id="status">Starting WebGPU…</p><p id="cache-status">Render cache is initializing.</p><p id="perf-metrics">Browser frame diagnostics are waiting for the native player.</p><p id="render-metrics">Native timing diagnostics are waiting for the native player.</p><p id="construction-metrics">Scene construction diagnostics are waiting for the native player.</p><p id="audio-metrics">Audio output is not initialized.</p>
-<div id="game-host"><canvas id="canvas" width="640" height="480" tabindex="0" aria-label="Game screen"></canvas><div id="touch-controls" hidden aria-hidden="true"></div></div>
-<p>Click the game for input. Open Controls to choose Auto, Keyboard, Controller only, or Off for each player; Player 1 also supports Touch controls. Controller ports use the original PAD path.</p>
-<details><summary>Diagnostics</summary><button id="confirm-check">Start input (diagnostic)</button><button id="stock-check" disabled>Four-stock input check</button><button id="drive-marth" disabled>Select Marth through source CSS</button><button id="drive-dream-land" disabled>Hover Dream Land through source SSS</button><button id="action-sweep" disabled>Run visible action/performance sweep</button><label><input id="hitch-capture" type="checkbox"> Capture bounded hitch diagnostics</label><button id="reload-app" disabled>Reload application state</button><button id="reset-render-cache" disabled>Clear render cache + reload</button><button id="export-render-cache" disabled>Export render cache</button><span id="cache-exports"></span><button id="save-cache-evidence" disabled>Save cache to local evidence server</button><fieldset><legend>Reference replay</legend><p>Each paired reference starts from a fresh original process. Reload application state and import the disc before each replay; enter the recipe before opening character select.</p><input id="retail-replay-file" type="file" accept=".mwrc"><select id="retail-replay-mode"><option value="performance">Performance</option><option value="state">State capture (instrumented)</option></select><button id="retail-replay-start" disabled>Play reference replay</button><span id="retail-replay-downloads"></span><button id="save-replay-evidence" disabled>Save replay to local evidence server</button><pre id="evidence-status"></pre><pre id="retail-replay-report">Load a paired retail input recipe after choosing the disc.</pre></fieldset><pre id="action-report">Action sweep is waiting for a supported, ready match.</pre><p>Application reload discards the complete WASM/native heap, imported archive bytes, decoded assets and audio graph. The render-cache reset also clears this origin's optional IDBFS pipeline database before renderer startup. Neither action clears the browser or graphics-driver cache.</p><fieldset><legend>Raw PAD sample</legend><label>Port <select id="pad-port"><option value="0">P1</option><option value="1">P2</option></select></label> <label>Buttons <input id="pad-buttons" value="0x100" size="8" inputmode="numeric"></label> <label>Stick X <input id="pad-stick-x" type="number" min="-80" max="80" value="0" size="4"></label> <label>Stick Y <input id="pad-stick-y" type="number" min="-80" max="80" value="0" size="4"></label> <label>Duration (source ticks) <input id="pad-duration" type="number" min="1" max="120" value="1" size="4"></label> <button id="pad-send" disabled>Send PAD sample</button><span id="pad-status"></span></fieldset><p id="scene-check"></p><p>Raw PAD samples are applied at the next strict source tick for the selected port. Buttons accept the original GameCube bitmask (for example A 0x100, B 0x200, X 0x400, Start 0x1000); axes are limited to -80…80. Samples are disabled during preparation and the stock diagnostic.</p><pre id="input"></pre><pre id="log"></pre></details>
-<script src="runtime-cache.js"></script><script type="module" src="runtime-development.mjs"></script></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Melee Web · Original CSS/SSS player</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="staging-room.css">
+  <style>
+    :root{color-scheme:dark;font:15px system-ui;background:#10141e;color:#e7ebf4}
+    body{max-width:900px;margin:24px auto;padding:0 18px}
+    [hidden]{display:none!important}
+    #game-host{position:relative;width:100%;aspect-ratio:4/3}
+    canvas{display:block;width:100%;height:100%;background:black;outline:none}
+    button,input,textarea{font:inherit}
+    button{margin:12px 8px 12px 0;padding:8px 14px}
+    textarea{box-sizing:border-box;width:100%;resize:vertical}
+    pre{white-space:pre-wrap;font-size:12px;max-height:140px;overflow:auto}
+  </style>
+</head>
+<body>
+<main id="runtime-page">
+  <header id="runtime-header">
+    <p class="runtime-kicker" id="runtime-kicker">Original menus and source match</p>
+    <h1 id="page-heading">Original CSS / SSS player</h1>
+    <p id="staging-intro" hidden>Play together using your own local Melee disc. Your disc stays on your device. Choose Host or Join after your disc is prepared.</p>
+  </header>
+
+  <label id="disc-label">Melee disc image <input id="disc" type="file" accept=".iso,.gcm,.ciso" disabled></label>
+
+  <fieldset id="lockstep-room">
+    <legend>Experimental relay room</legend>
+    <p id="room-help">Host is Player 1 (PAD port 0); Join is Player 2 (PAD port 1). Both use the existing Controls settings.</p>
+    <div id="role-controls-help" hidden>
+      <section aria-labelledby="host-controls-title">
+        <h2 id="host-controls-title">Host · Player 1</h2>
+        <p>For a keyboard, open Controls → Player input → Player 1 and choose Keyboard. Keys: WASD move, J attack, K special, U/I jump, Q/E shield, O grab, T/G/F/H C-stick, Z/X/C/V D-pad, Enter start.</p>
+      </section>
+      <section aria-labelledby="join-controls-title">
+        <h2 id="join-controls-title">Join · Player 2</h2>
+        <p>For a controller, connect it and open Controls → Advanced controller test and remapping. If it is not detected, press a button to let the browser detect it. Controllers start on Port 1: change its Player port to Port 2, then set Player 2 input to Controller only. Check that the controller shows as ready.</p>
+        <p>Keyboard fallback: arrows move, Right Shift attack, Right Ctrl special, Delete jump, Home/Page Up shield, Page Down grab, numpad 8/2/4/6 C-stick, End start.</p>
+      </section>
+      <p class="role-controls-note">Both players choose their own disc and set Controls before choosing Host or Join. Either choice starts the room and opens character select while the other player connects. The hosted relay requires Internet access.</p>
+    </div>
+    <label id="lockstep-relay-setting">Verified relay URL <input id="lockstep-relay-url" type="url" autocomplete="url" placeholder="Enter the verified ws:// or wss:// relay base URL" size="48"></label>
+    <div class="room-actions">
+      <button id="lockstep-host" disabled>Host as P1</button>
+      <button id="lockstep-join" disabled>Join as P2</button>
+      <button id="lockstep-leave" disabled>Stop / leave</button>
+    </div>
+    <label>Host invite <textarea id="lockstep-host-invite" rows="2" maxlength="2048" readonly></textarea></label>
+    <button id="lockstep-copy" disabled>Copy invite</button>
+    <label id="lockstep-link-label" hidden>Invite link <input id="lockstep-host-link" type="url" readonly></label>
+    <button id="lockstep-copy-link" hidden disabled>Copy invite link</button>
+    <span id="lockstep-copy-status" role="status" aria-live="polite"></span>
+    <label>Join invite <textarea id="lockstep-join-invite" rows="2" maxlength="2048" placeholder="Paste the host invite"></textarea></label>
+    <p id="lockstep-status" role="status" aria-live="polite">Import a Melee disc, choose Controls, then host or join.</p>
+    <button id="lockstep-retry" hidden>Reload to try again</button>
+  </fieldset>
+
+  <div id="runtime-actions">
+    <button id="launch" disabled>Open character select</button>
+    <button id="pause" disabled>Pause / resume</button>
+    <button id="unload" disabled>Unload</button>
+    <button id="controls-open" type="button">Controls</button>
+    <fieldset id="legacy-input-settings" hidden aria-hidden="true">
+      <label><input id="keyboard" type="checkbox" checked> P1 keyboard</label>
+      <label><input id="keyboard2" type="checkbox" checked> P2 keyboard</label>
+    </fieldset>
+  </div>
+  <dialog id="controls-dialog" aria-label="Controls"></dialog>
+
+  <p id="status">Starting WebGPU…</p>
+  <p id="cache-status">Render cache is initializing.</p>
+  <p id="perf-metrics">Browser frame diagnostics are waiting for the native player.</p>
+  <p id="render-metrics">Native timing diagnostics are waiting for the native player.</p>
+  <p id="construction-metrics">Scene construction diagnostics are waiting for the native player.</p>
+  <p id="audio-metrics">Audio output is not initialized.</p>
+  <div id="game-host">
+    <canvas id="canvas" width="640" height="480" tabindex="0" aria-label="Game screen"></canvas>
+    <div id="touch-controls" hidden aria-hidden="true"></div>
+  </div>
+  <p id="input-guidance">Click the game for input. Open Controls to choose Auto, Keyboard, Controller only, or Off for each player; Player 1 also supports Touch controls. Controller ports use the original PAD path.</p>
+
+  <details id="developer-diagnostics">
+    <summary>Diagnostics</summary>
+    <button id="confirm-check">Start input (diagnostic)</button><button id="stock-check" disabled>Four-stock input check</button><button id="drive-marth" disabled>Select Marth through source CSS</button><button id="drive-dream-land" disabled>Hover Dream Land through source SSS</button><button id="action-sweep" disabled>Run visible action/performance sweep</button>
+    <label><input id="hitch-capture" type="checkbox"> Capture bounded hitch diagnostics</label>
+    <button id="reload-app" disabled>Reload application state</button><button id="reset-render-cache" disabled>Clear render cache + reload</button><button id="export-render-cache" disabled>Export render cache</button><span id="cache-exports"></span><button id="save-cache-evidence" disabled>Save cache to local evidence server</button>
+    <fieldset><legend>Reference replay</legend><p>Each paired reference starts from a fresh original process. Reload application state and import the disc before each replay; enter the recipe before opening character select.</p><input id="retail-replay-file" type="file" accept=".mwrc"><select id="retail-replay-mode"><option value="performance">Performance</option><option value="state">State capture (instrumented)</option></select><button id="retail-replay-start" disabled>Play reference replay</button><span id="retail-replay-downloads"></span><button id="save-replay-evidence" disabled>Save replay to local evidence server</button><pre id="evidence-status"></pre><pre id="retail-replay-report">Load a paired retail input recipe after choosing the disc.</pre></fieldset>
+    <pre id="action-report">Action sweep is waiting for a supported, ready match.</pre>
+    <p>Application reload discards the complete WASM/native heap, imported archive bytes, decoded assets and audio graph. The render-cache reset also clears this origin's optional IDBFS pipeline database before renderer startup. Neither action clears the browser or graphics-driver cache.</p>
+    <fieldset><legend>Raw PAD sample</legend><label>Port <select id="pad-port"><option value="0">P1</option><option value="1">P2</option></select></label> <label>Buttons <input id="pad-buttons" value="0x100" size="8" inputmode="numeric"></label> <label>Stick X <input id="pad-stick-x" type="number" min="-80" max="80" value="0" size="4"></label> <label>Stick Y <input id="pad-stick-y" type="number" min="-80" max="80" value="0" size="4"></label> <label>Duration (source ticks) <input id="pad-duration" type="number" min="1" max="120" value="1" size="4"></label> <button id="pad-send" disabled>Send PAD sample</button><span id="pad-status"></span></fieldset>
+    <p id="scene-check"></p><p>Raw PAD samples are applied at the next strict source tick for the selected port. Buttons accept the original GameCube bitmask (for example A 0x100, B 0x200, X 0x400, Start 0x1000); axes are limited to -80…80. Samples are disabled during preparation and the stock diagnostic.</p><pre id="input"></pre><pre id="log"></pre>
+  </details>
+</main>
+<script src="runtime-cache.js"></script>
+<script type="module" src="runtime-development.mjs"></script>
+</body>
+</html>

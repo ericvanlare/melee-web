@@ -87,6 +87,18 @@ under the owner's Workers Free/$0 limit; no paid, billing, account/security,
 DNS or production changes are authorized. Do not repeat successful captures
 without a new hypothesis.
 
+**Owner-directed manual alpha (pending):** The owner selected a live hosted
+room page on the existing isolated staging Worker and declined local-package
+setup as the user-facing path. The proposed two-Mac trial uses the existing
+interim lockstep route: keyboard P1 on the host and controller P2 / Port 2 on
+the joiner. The final candidate passed build/regression validation, a second
+deployment's static HTTP checks and a bounded CSS/Host/Join/Leave check. The
+first candidate's full-route attempt failed while progressing through Results;
+the short check did not complete a full route. The two-Mac trial remains
+pending in the [scoped boundary](status/2026-10-13-hosted-staging-room.md).
+This experiment does not change or satisfy the match-only rollback target in
+A4, and does not establish broader #288 acceptance.
+
 **Feasibility checkpoint:** #318 retains source-only snapshot/replay measurements
 and one terminal browser tick with full source draw and no GPU submission in its
 [single receipt](status/2026-10-12-match-only-rollback-feasibility.md). The current

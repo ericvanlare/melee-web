@@ -3,6 +3,7 @@ import {loadNativeGameDisc, openNativeGameDiscSession} from './runtime-assets.mj
 import {createControllerManager} from './controller-input.mjs';
 import {createRuntimeDiagnostics} from './runtime-diagnostics.mjs';
 import {createDiagnosticsDelivery} from './runtime-diagnostics-delivery.mjs';
+import {createStartupProfile} from './startup-profile.mjs';
 import {DIAGNOSTICS_PREFERENCE_KEY, readDiagnosticsPreference, writeDiagnosticsPreference} from './diagnostics-settings.mjs';
 
 let documentOwner = null;
@@ -24,15 +25,34 @@ const DIAGNOSTIC_DESTROY_PERSIST_TIMEOUT_MS = 250;
 export async function mountMeleeRuntime({canvas, onState = () => {}, onError = () => {},
   onEvent = () => {}, onLog = () => {}, onOwner, configureModule,
   readDisc = loadNativeGameDisc, openDisc = openNativeGameDiscSession, createAudio,
-  diagnosticIdentity = null, recordDiagnostics = true,
+  diagnosticIdentity = null, onStartupProfile = () => {}, recordDiagnostics = true, stagingDiagnosticsOrigin = null,
   loaderUrl = new URL('./gameplay_public.js', import.meta.url), startupTimeout = 60000} = {}) {
-  if (!canvas || canvas.id !== 'canvas') throw Error('The player requires its own #canvas.');
-  if (documentOwner) throw Error('Reload the page to start a fresh player.');
-  if (!globalThis.isSecureContext) throw Error('The player requires HTTPS or a local server.');
-  if (!navigator.gpu) throw Error('WebGPU is unavailable in this browser or device. The player cannot start here.');
-  if (!globalThis.crossOriginIsolated) throw Error('The player requires cross-origin isolation headers.');
-  if (typeof navigator.gpu.requestAdapter !== 'function')
-    throw Error('This browser exposes WebGPU without the required adapter API. The player cannot start here.');
+  let packagedIdentity = diagnosticIdentity;
+  if (!packagedIdentity) {
+    try { packagedIdentity = JSON.parse(document.getElementById?.('runtime-diagnostic-identity')?.content || 'null'); }
+    catch { packagedIdentity = null; }
+  }
+  const startupProfile = createStartupProfile({identity: packagedIdentity, onUpdate: onStartupProfile,
+    initialNotify: false});
+  const profileCall = (method, ...args) => {
+    try { return startupProfile[method](...args); }
+    catch { return undefined; }
+  };
+  let startupProfilingPending = true;
+  const failProfile = kind => { profileCall('fail', kind); startupProfilingPending = false; };
+  const failPreflight = (kind, message) => { failProfile(kind); throw Error(message); };
+  try {
+    if (!canvas || canvas.id !== 'canvas') failPreflight('missing_canvas', 'The player requires its own #canvas.');
+    if (documentOwner) failPreflight('document_owned', 'Reload the page to start a fresh player.');
+    if (!globalThis.isSecureContext) failPreflight('insecure_context', 'The player requires HTTPS or a local server.');
+    if (!navigator.gpu) failPreflight('webgpu_unavailable', 'WebGPU is unavailable in this browser or device. The player cannot start here.');
+    if (!globalThis.crossOriginIsolated) failPreflight('isolation_unavailable', 'The player requires cross-origin isolation headers.');
+    if (typeof navigator.gpu.requestAdapter !== 'function')
+      failPreflight('adapter_api_unavailable', 'This browser exposes WebGPU without the required adapter API. The player cannot start here.');
+  } catch (error) {
+    failProfile('module_setup_failure');
+    throw error;
+  }
   // Claim the document before yielding. Every later startup side effect belongs
   // to this one attempt, even while the browser's adapter promise is pending.
   const reservation = {active: true, initialized: false, expired: false};
@@ -47,23 +67,28 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     reservation.expired = true;
     const error = reservation.initialized && ready && (!startupCacheReady || !graphicsPreparationReady()) ?
       Error('Renderer preparation timed out. Reload to recover.') : Error('Player startup timed out.');
+    failProfile('startup_timeout');
     if (reservation.initialized) failStartup?.(error);
     else {
       releaseDocumentReservation(reservation);
       rejectAdapterDeadline(error);
     }
   };
-  startupTimeoutHandle = setTimeout(expireStartup, startupTimeoutMs);
+  try { startupTimeoutHandle = setTimeout(expireStartup, startupTimeoutMs); }
+  catch (error) { failProfile('module_setup_failure'); throw error; }
   // A present WebGPU object does not guarantee that this browser can provide
   // an adapter (for example, when WebGPU is disabled or no usable GPU exists).
   // Check before creating audio or loading the large native module.
+  profileCall('environmentReady');
+  profileCall('adapterRequested');
   try {
     const adapter = await Promise.race([Promise.resolve(navigator.gpu.requestAdapter()), adapterDeadline]);
     if (!reservation.active || reservation.expired || documentOwner !== reservation)
-      throw Error('Player startup timed out.');
+      failPreflight('startup_timeout', 'Player startup timed out.');
     if (!adapter)
-      throw Error('No WebGPU adapter is available. The player cannot start on this browser or device.');
+      failPreflight('adapter_unavailable', 'No WebGPU adapter is available. The player cannot start on this browser or device.');
   } catch (error) {
+    failProfile(reservation.expired ? 'startup_timeout' : 'adapter_failure');
     // Null, rejected, and timed-out adapter preflights are retryable. Release
     // only this uninitialized reservation; later/initialized owners stay held.
     releaseDocumentReservation(reservation);
@@ -71,6 +96,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     startupTimeoutHandle = null;
     throw error;
   }
+  profileCall('adapterReady');
   // Preflight succeeded. Re-arm the same absolute deadline after synchronous
   // owner setup so setup exceptions cannot leave an orphaned timer.
   clearTimeout(startupTimeoutHandle);
@@ -78,7 +104,15 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   // From here onward setup can have externally visible effects. Keep ownership
   // for the document lifetime, including if audio or native setup later fails.
   reservation.initialized = true;
-  const assetBase = new URL('.', loaderUrl);
+  let assetBase;
+  try {
+    assetBase = new URL('.', loaderUrl);
+    profileCall('setAssetBase', assetBase);
+  } catch (error) {
+    failProfile('module_setup_failure');
+    clearTimeout(startupTimeoutHandle);
+    throw error;
+  }
   let ready = false, fatal = false, destroyed = false, bundle = false, prepared = false, hasLocalData = false;
   let startupCacheReady = false;
   let busy = '', message = '', progress = null, inputDirty = true, lastState = '';
@@ -110,7 +144,9 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   try {
     const url = new URL(globalThis.location.href);
     const localHost = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(url.hostname);
-    stagingDiagnosticsEnabled = recordDiagnostics && localHost &&
+    const hostedStaging = typeof stagingDiagnosticsOrigin === 'string' &&
+      url.protocol === 'https:' && url.origin === stagingDiagnosticsOrigin;
+    stagingDiagnosticsEnabled = recordDiagnostics && (localHost || hostedStaging) &&
       url.searchParams.get('melee-web-staging-diagnostics') === '1';
   } catch { /* Staging diagnostics remain disabled unless explicitly selected. */ }
   function diagnosticDeliveryBlocked() {
@@ -282,9 +318,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     }
   } catch { longtaskObserver?.disconnect(); longtaskObserver = null; }
   try {
-    const packaged = diagnosticIdentity || JSON.parse(
-      document.getElementById?.('runtime-diagnostic-identity')?.content || 'null');
-    if (recordDiagnostics) diagnostics = createRuntimeDiagnostics({identity: packaged,
+    if (recordDiagnostics) diagnostics = createRuntimeDiagnostics({identity: packagedIdentity,
       audioAvailable: !!createAudio, longtaskAvailable, stagingDiagnosticsEnabled});
   } catch { /* Optional diagnostics must never stop the player or touch saves. */ }
   if (!diagnostics) { longtaskObserver?.disconnect(); longtaskObserver = null; }
@@ -292,20 +326,27 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     try { diagnosticDelivery = createDiagnosticsDelivery({optOut: !automaticDiagnostics}); }
     catch { /* Local retention remains useful when delivery is unavailable. */ }
   }
-  const audio = createAudio?.({assetBase, onEvent: data => emit('audio', data),
-    onError: error => { message = error.message; onError(error); publish(); }, onFatal: stop});
+  let audio = null;
+  try {
+    audio = createAudio?.({assetBase, onEvent: data => emit('audio', data),
+      onError: error => { message = error.message; onError(error); publish(); }, onFatal: stop});
+  } catch (error) { failProfile('module_setup_failure'); throw error; }
   const emit = (name, data) => { if (name === 'audio') diagnosticAudio(data); onEvent(name, data); };
   let resolveStartup, rejectStartup;
   const startup = new Promise((resolve, reject) => { resolveStartup = resolve; rejectStartup = reject; });
+  let controllerManager;
+  try { controllerManager = createControllerManager(); }
+  catch (error) { failProfile('module_setup_failure'); throw error; }
   const Module = {
     canvas,
-    meleeControllers: createControllerManager(),
+    meleeControllers: controllerManager,
     locateFile: name => new URL(name, assetBase).href,
     print: text => onLog(String(text), false),
     printErr: text => onLog(String(text), true),
     onAbort: error => stop(error),
     onRuntimeInitialized() {
       if (fatal || destroyed || reservation.expired) return;
+      profileCall('runtimeInitialized');
       ready = true; publish(); resolveStartup();
     },
   };
@@ -317,6 +358,10 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     if (typeof idle !== 'function') throw Error('The native renderer-cache readiness service is unavailable. Reload to recover.');
     const state = idle();
     if (![1, 0, -1].includes(state)) throw Error(`Invalid native cache idle state: ${state}`);
+    if (startupProfilingPending) {
+      profileCall('observeCacheIdle', state);
+      try { startupProfile.observeGraphicsStartup(Module.graphicsStartup); } catch {}
+    }
     return state;
   }
   function clearStartupTimeout() {
@@ -389,6 +434,12 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     const active = ['css', 'sss', 'title', 'main', 'opening', 'opening-vs',
       'match', 'results', 'prize'].includes(scene);
     const graphicsReady = ready && startupCacheReady && graphicsPreparationReady();
+    if (startupProfilingPending) {
+      try { startupProfile.observePipeline(Module.pipelinePreparation); } catch {}
+      try { startupProfile.observeGraphicsStartup(Module.graphicsStartup); } catch {}
+      profileCall('observeGraphicsReady', graphicsReady);
+      if (graphicsReady) startupProfilingPending = false;
+    }
     const paused = active && !running && !preparationLabel && !busy;
     const state = destroyed ? 'destroyed' : fatal ? 'error' : !ready ? 'booting' : busy ||
       (preparationLabel ? 'preparing' : paused ? 'paused' : active ? scene : prepared ? 'prepared' : 'idle');
@@ -465,8 +516,9 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       recordNetworkCleanupError(error, 'Disc session cleanup failed');
     });
   }
-  function stop(error) {
+  function stop(error, startupFailureKind = 'runtime_failure') {
     if (fatal || destroyed) return;
+    failProfile(startupFailureKind);
     try { diagnosticIncident(4, null, null, null, null, 0); } catch {}
     diagnosticActivity(false);
     fatal = true; message = String(error?.message || error || 'Player stopped. Reload to recover.');
@@ -675,6 +727,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     },
     menuFrame(wasRunning) {
       if (!ready || fatal || destroyed) return;
+      if (startupProfilingPending) profileCall('nativeFrame');
       // Emscripten's onRuntimeInitialized precedes main/Aurora initialization.
       // Only a real native frame can establish renderer-cache readiness.
       refreshStartupCacheReadiness();
@@ -909,7 +962,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   }
   const handle = Object.freeze({
     controllers: Module.meleeControllers,
-    version: 1, getState: snapshot, focus,
+    version: 1, getState: snapshot, getStartupProfile: () => profileCall('snapshot'), focus,
     getDiagnosticsSettings() {
       let eligible = false;
       try { eligible = diagnosticDelivery?.getStatus().eligible === true; } catch {}
@@ -1021,6 +1074,8 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     },
     destroy() {
       if (destroyOperation) return destroyOperation;
+      profileCall('destroy');
+      startupProfilingPending = false;
       destroyOperation = (async () => {
         let operationError = null;
         try {
@@ -1068,10 +1123,12 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     return automaticDiagnostics;
   }
   // The development entry may attach tools before loading; these are never part of the public handle.
-  onOwner?.({Module, boundary, handle, status, check, put, prepareAudio, pauseAudioForPreparation,
-    syncAudio, unloadAndSave, prepareNativeResources, waitForAudioAck, waitForAudioRender, stop, callbacks,
-    attachNetworkSession, getNetworkCleanupErrors: () => Object.freeze(networkCleanupErrors.slice()), diagnostics});
-  configureModule?.(Module);
+  try {
+    onOwner?.({Module, boundary, handle, status, check, put, prepareAudio, pauseAudioForPreparation,
+      syncAudio, unloadAndSave, prepareNativeResources, waitForAudioAck, waitForAudioRender, stop, callbacks,
+      attachNetworkSession, getNetworkCleanupErrors: () => Object.freeze(networkCleanupErrors.slice()), diagnostics});
+    configureModule?.(Module);
+  } catch (error) { failProfile('module_setup_failure'); throw error; }
   // Native seed loading needs this directory even when optional browser
   // persistence is disabled or unavailable. Keep that prerequisite in the
   // shared owner, ahead of any entry-specific cache mount/populate callback.
@@ -1081,13 +1138,21 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     const callbacks = typeof configuredPreRun === 'function' ? [configuredPreRun] : configuredPreRun || [];
     for (const callback of callbacks) callback(Module);
   }];
-  window.Module = Module;
-  publish();
-  const loader = document.createElement('script'); loader.src = String(loaderUrl);
-  loader.onerror = () => stop(Error('The player files could not load. Reload to retry.'));
-  if (!fatal && !destroyed && !(ready && startupCacheReady && graphicsPreparationReady()))
-    startupTimeoutHandle = setTimeout(expireStartup, Math.max(0, startupDeadlineAt - Date.now()));
-  document.head.append(loader);
+  try {
+    window.Module = Module;
+    publish();
+    const loader = document.createElement('script'); loader.src = String(loaderUrl);
+    loader.onload = () => profileCall('loaderLoaded');
+    loader.onerror = () => stop(Error('The player files could not load. Reload to retry.'), 'loader_failure');
+    if (!fatal && !destroyed && !(ready && startupCacheReady && graphicsPreparationReady()))
+      startupTimeoutHandle = setTimeout(expireStartup, Math.max(0, startupDeadlineAt - Date.now()));
+    document.head.append(loader);
+    profileCall('loaderInserted');
+  } catch (error) {
+    failProfile('loader_failure');
+    clearStartupTimeout();
+    throw error;
+  }
   try { await startup; return handle; }
   finally {
     if (startupCacheReady || fatal || destroyed) {

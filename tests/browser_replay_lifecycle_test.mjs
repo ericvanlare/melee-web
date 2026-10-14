@@ -158,7 +158,9 @@ assert(start&&pause&&completion);
  const flush=page.slice(page.indexOf('window.menuCacheWritesFlushed='),page.indexOf('\n};',page.indexOf('window.menuCacheWritesFlushed='))+3);
  for(const finalState of [1,-1,2]){
   const events=[],display={};let idleCalls=0;
-  const scope={window:{},prepared:true,callbacks:{menuPreparationCanceled:()=>events.push('cancel')},performance,
+  // This fixture exercises teardown after startup profiling has completed.
+  const scope={window:{},prepared:true,startupProfilingPending:false,
+   callbacks:{menuPreparationCanceled:()=>events.push('cancel')},performance,
    closeNetworkSession:async mode=>{events.push(`network-close:${mode}`);},
    emit:(name,message)=>{assert.equal(name,'cacheWriteFailed');display.textContent=message;},
    $:()=>display,log:text=>events.push(text),syncAudio:()=>events.push('sync-audio'),

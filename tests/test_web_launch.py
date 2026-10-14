@@ -12,6 +12,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class WebLaunchTests(unittest.TestCase):
+    def test_staging_room_connection_controls(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        from check_gameplay import node_runtime
+        result = subprocess.run([str(node_runtime(ROOT)), "--test",
+                                 str(ROOT / "tests/staging_room_ui.test.mjs")],
+                                cwd=ROOT, capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_network_owner_modules_are_staged_only_for_private_runtimes(self):
         cmake = (ROOT / "cmake" / "FighterRuntime.cmake").read_text(encoding="utf-8")
         condition = "if(NOT MELEE_WEB_PUBLIC_RUNTIME AND NOT MELEE_WEB_AUDIO_PREVIEW_RUNTIME)"

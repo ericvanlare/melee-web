@@ -8,6 +8,39 @@ import {createRuntimeLockstepSession} from './net_lockstep_runtime_owner.mjs';
 import {createDevelopmentLockstepOwner} from './net_lockstep_development_owner.mjs';
 import {createRoomInvite, parseRoomInvite} from './net_lockstep_room_invite.mjs';
 import {LOCKSTEP_DELAY, LOCKSTEP_MAX_SOURCE_TICKS} from './net_lockstep_core.mjs';
+import {isStagingRoomSurface, parseStagingRoomInvite, stagingRoomInviteFromHash,
+  stagingRoomInviteLink, STAGING_HOST, STAGING_RELAY_URL} from './staging-room.mjs';
+const stagingRoomEnabled=isStagingRoomSurface(window.location);
+window.meleeStagingRoom=Object.freeze({enabled:stagingRoomEnabled,relayUrl:STAGING_RELAY_URL,
+  parseInvite:text=>parseStagingRoomInvite(text,parseRoomInvite),
+  inviteFromHash:hash=>stagingRoomInviteFromHash(hash,parseRoomInvite),
+  inviteLink:(url,text)=>stagingRoomInviteLink(url,text,parseRoomInvite)});
+if(stagingRoomEnabled){
+ document.body.dataset.surface='staging';document.title='Melee Web · Play together';
+ document.getElementById('runtime-kicker').textContent='Hosted multiplayer alpha';
+ document.getElementById('page-heading').textContent='Play together';
+ document.getElementById('staging-intro').textContent='Play together using your own local Melee disc; your disc stays on your device. Both players import their disc and set Controls before Host or Join. The hosted relay requires Internet access.';
+ document.getElementById('staging-intro').hidden=false;
+ document.getElementById('disc-label').firstChild.textContent='Choose your own Melee disc image ';
+ document.getElementById('room-help').textContent='Host is Player 1 (controller port 1 · PAD 0). Join is Player 2 (controller port 2 · PAD 1). Use the role-specific Controls steps below before connecting.';
+ document.getElementById('role-controls-help').hidden=false;
+ document.getElementById('lockstep-relay-url').value=STAGING_RELAY_URL;
+ document.getElementById('lockstep-status').textContent='Choose your own disc and open Controls. Host as Player 1 or join as Player 2 when your disc is ready.';
+ document.getElementById('input-guidance').textContent='After both players connect, continue through the original character and stage screens. This alpha does not assess match results.';
+ document.getElementById('lockstep-host').textContent='Host game · Player 1';
+ document.getElementById('lockstep-join').textContent='Join game · Player 2';
+ document.getElementById('lockstep-leave').textContent='Leave room';
+ document.getElementById('unload').textContent='Unload disc';
+ document.getElementById('lockstep-link-label').hidden=false;
+ document.getElementById('lockstep-copy-link').hidden=false;
+ try{
+  const invite=window.meleeStagingRoom.inviteFromHash(window.location.hash);
+  if(invite){
+   document.getElementById('lockstep-join-invite').value=invite;
+   document.getElementById('lockstep-status').textContent='Invite loaded. Choose your own disc, check Controls, then select Join game · Player 2.';
+  }
+ }catch(error){document.getElementById('lockstep-status').textContent=`Invite link could not be used: ${error?.message||String(error)}`;}
+}
 const developmentHooks = {};
 const markFirstReplayBoundary=(...args)=>{try{window.__meleeReplayBoundaryProbe?.mark?.(...args);}catch{}};
 const RETAIL_REPLAY_LEGACY_MAX_FRAMES = 36000;
@@ -33,6 +66,7 @@ const stop = error => owner.stop(error);
 const $=id=>document.getElementById(id);const startupUrl=new URL(location.href),clearRenderCacheOnLoad=startupUrl.searchParams.get('render-cache')==='clear',hitchCaptureFromUrl=startupUrl.searchParams.get('hitch-capture')==='1',hitchCausalFromUrl=startupUrl.searchParams.get('hitch-causal')==='1',hitchUserTimingFromUrl=startupUrl.searchParams.get('hitch-marks')==='1';if(clearRenderCacheOnLoad){startupUrl.searchParams.delete('render-cache');history.replaceState(null,'',startupUrl);}let ready=false,fatal=false,bundle=false,inputDirty=true,importing=false,uiMessage="";let frameLast=0,perfLastReport=0,activeFrames=0,worstFrame=0,worstBrowserCallback=null,longFrames=0,browserLongTasks=0,browserLongTaskWorst=0;let nativeTimingFrames=0,nativeTimingWorst=0,nativeLongFrames=0,nativeOverBudgetFrames=0,nativeSourceSteps=0,nativeSourceDraws=0,nativeWorstTiming=null,nativeFirstUse=0,nativeFirstUseWorst=0,nativePreviousTiming=null,nativeLastTiming=null,livePipelineQueued=0,livePipelineCreated=0,liveTextureUploads=0,liveStagingUsedBytes=0,peakStagingUsedBytes=0;let constructionCounts={},constructionWorst=0,constructionFirstUseWorst=0,preparationSince=0,preparationLabel="",preparationSequence=0,activePreparation=null,pendingEntryProfile=null,settlingEntryProfile=null,entryProfiles=[],latestNativePreparation=null;let preparationCount=0,preparationWorst=0;let diagnosticCaptureInvalid=false,audioStateAcknowledged=true,audioAckWaiters=[],stockCheckActive=false,latestAudio={queued:0,underruns:0,overflows:0},actionSweepActive=false,actionSweepFocusLost=false,selectionDriveActive=false,sweepAutomaticResumes=0;
 window.meleeHitchCapture=null;let runtimeCacheSyncCapability=null,runtimeCacheSyncDropped=0;const runtimeCacheSyncQueue=[];const reportRuntimeCacheSync=event=>{const capture=window.meleeHitchCapture;if(capture?.observeCacheSync){capture.observeCacheSync(event);return;}if(hitchCausalFromUrl){if(runtimeCacheSyncQueue.length<128)runtimeCacheSyncQueue.push(event);else runtimeCacheSyncDropped++;}};const hitchCaptureLoading=import('./hitch-capture.mjs').then(({createHitchCapture})=>{const capture=createHitchCapture({enabled:hitchCaptureFromUrl,userTiming:hitchUserTimingFromUrl,cacheSyncDiagnostics:hitchCausalFromUrl});window.meleeHitchCapture=capture;if(runtimeCacheSyncCapability)capture.setCacheSyncCapability(runtimeCacheSyncCapability);for(const event of runtimeCacheSyncQueue.splice(0))capture.observeCacheSync(event);if(runtimeCacheSyncDropped)capture.noteCacheSyncLoss(runtimeCacheSyncDropped);const toggle=$('hitch-capture');if(toggle){toggle.checked=hitchCaptureFromUrl;toggle.onchange=()=>{capture.setEnabled(toggle.checked);if(hitchCausalFromUrl)Module?.setRuntimeCacheSyncDiagnostics?.(toggle.checked);};}return capture;}).catch(error=>{window.meleeHitchCaptureLoadError=String(error?.message||error);const toggle=$('hitch-capture');if(toggle)toggle.disabled=true;return null;});window.meleeHitchCaptureLoading=hitchCaptureLoading;
 const LOCKSTEP_ROOM_TIMEOUT_MS=120000;
+const lockstepStagingMode=window.meleeStagingRoom?.enabled===true;
 let lockstepRoomCanStart=false,lockstepRoomConfigured=false,lockstepRoomStarting=false,lockstepRoomLeaving=false;
 let lockstepRoomArmed=false,lockstepRoomFinished=false,lockstepRoomCloseAttempted=false,lockstepRoomUnloading=false,lockstepRoomRole=null,lockstepRoomTimer=null;
 function lockstepRoomStatus(text){$('lockstep-status').textContent=text;}
@@ -46,6 +80,7 @@ function syncLockstepRoomControls(observedHealth=undefined){
  $('lockstep-host').disabled=!canStart;
  $('lockstep-join').disabled=!canStart;
  $('lockstep-copy').disabled=!$('lockstep-host-invite').value;
+ if($('lockstep-copy-link'))$('lockstep-copy-link').disabled=!$('lockstep-host-link')?.value;
  let health=observedHealth;
  if(health===undefined&&lockstepRoomConfigured)health=readLockstepRoomHealth().health;
  if(health?.armed===true)lockstepRoomArmed=true;
@@ -54,11 +89,13 @@ function syncLockstepRoomControls(observedHealth=undefined){
  $('launch').disabled=!lockstepRoomCanStart||!!retailRun||replayLoading||lockstepRoomConfigured||lockstepRoomStarting||lockstepRoomUnloading;
 }
 function finishLockstepRoomStatus(text,observedHealth=undefined){
- lockstepRoomFinished=true;stopLockstepRoomPolling();lockstepRoomStatus(text);syncLockstepRoomControls(observedHealth);
+ lockstepRoomFinished=true;stopLockstepRoomPolling();lockstepRoomStatus(text);
+ if(lockstepStagingMode)$('lockstep-retry').hidden=false;
+ syncLockstepRoomControls(observedHealth);
 }
 function waitingLockstepRoomStatus(){return lockstepRoomRole==='alpha'
- ?'Waiting for Player 2. Copy the host invite to the other player.'
- :'Waiting for Player 1.';}
+ ?(lockstepStagingMode?'Waiting for Player 2. Share the invite link with them.':'Waiting for Player 2. Copy the host invite to the other player.')
+ :(lockstepStagingMode?'Waiting for Player 1. Ask the host to share their invite link.':'Waiting for Player 1.');}
 function observeLockstepRoom(){
  if(!lockstepRoomConfigured||lockstepRoomFinished)return;
  const {health,error}=readLockstepRoomHealth();
@@ -80,7 +117,7 @@ function observeLockstepRoom(){
  if(Number(protocol?.local_checksum_ticks)>=LOCKSTEP_MAX_SOURCE_TICKS){
   finishLockstepRoomStatus('Session limit reached. Route completion is unverified.',health);return;
  }
- if(protocol?.ready===true){lockstepRoomStatus('Connected. Match results are not assessed here.');return;}
+ if(protocol?.ready===true){lockstepRoomStatus(lockstepStagingMode?'Connected. Choose your characters and stage to start the match.':'Connected. Match results are not assessed here.');return;}
  lockstepRoomStatus(health.armed===true?waitingLockstepRoomStatus():
   `Preparing ${lockstepRoomRole==='alpha'?'Host':'Join'} session.`);
 }
@@ -105,14 +142,21 @@ function startLockstepRoom(role,invite){
 function showLockstepRoomError(error){lockstepRoomStatus(`Error: ${error?.message||String(error)}`);}
 $('lockstep-host').onclick=()=>{
  try{
-  const text=createRoomInvite({url:$('lockstep-relay-url').value.trim()});
-  const invite=parseRoomInvite(text);
+  const text=createRoomInvite({url:lockstepStagingMode?window.meleeStagingRoom.relayUrl:$('lockstep-relay-url').value.trim()});
+  const invite=lockstepStagingMode?window.meleeStagingRoom.parseInvite(text):parseRoomInvite(text);
   $('lockstep-host-invite').value=text;syncLockstepRoomControls();
+  if(lockstepStagingMode){
+   const link=window.meleeStagingRoom.inviteLink(window.location.href,text);
+   $('lockstep-host-link').value=link;
+   try{history.replaceState(history.state,'',link);}catch{$('lockstep-copy-status').textContent=' Invite created; copy the invite link below.';}
+   syncLockstepRoomControls();
+  }
   startLockstepRoom('alpha',invite);
  }catch(error){showLockstepRoomError(error);}
 };
 $('lockstep-join').onclick=()=>{
- try{startLockstepRoom('beta',parseRoomInvite($('lockstep-join-invite').value.trim()));}
+ try{const inviteText=$('lockstep-join-invite').value.trim();
+  startLockstepRoom('beta',lockstepStagingMode?window.meleeStagingRoom.parseInvite(inviteText):parseRoomInvite(inviteText));}
  catch(error){showLockstepRoomError(error);}
 };
 $('lockstep-copy').onclick=async()=>{
@@ -120,7 +164,13 @@ $('lockstep-copy').onclick=async()=>{
  try{await navigator.clipboard.writeText(invite);$('lockstep-copy-status').textContent=' Invite copied.';}
  catch{$('lockstep-host-invite').focus();$('lockstep-host-invite').select();$('lockstep-copy-status').textContent=' Select and copy the invite.';}
 };
+$('lockstep-copy-link')?.addEventListener('click',async()=>{
+ const link=$('lockstep-host-link')?.value;if(!link)return;
+ try{await navigator.clipboard.writeText(link);$('lockstep-copy-status').textContent=' Invite link copied.';}
+ catch{$('lockstep-host-link').focus();$('lockstep-host-link').select();$('lockstep-copy-status').textContent=' Select and copy the invite link.';}
+});
 $('lockstep-host-invite').oninput=syncLockstepRoomControls;
+$('lockstep-retry')?.addEventListener('click',()=>window.location.reload());
 $('lockstep-leave').onclick=async()=>{
  if(!lockstepRoomConfigured||lockstepRoomLeaving||lockstepRoomCloseAttempted)return;
  const {health,error}=readLockstepRoomHealth();
@@ -129,8 +179,8 @@ $('lockstep-leave').onclick=async()=>{
  if(!lockstepRoomArmed){lockstepRoomStatus('Preparing session. Leave becomes available after the runtime owner is armed.');return;}
  lockstepRoomLeaving=true;lockstepRoomCloseAttempted=true;stopLockstepRoomPolling();
  lockstepRoomStatus('Leaving room; teardown is pending.');syncLockstepRoomControls(health);
- try{await window.meleeNetCloseRuntimeLockstep('normal');lockstepRoomFinished=true;lockstepRoomStatus('Disconnected by your choice. Route outcome is not assessed.');}
- catch(error){lockstepRoomFinished=true;lockstepRoomStatus(`Error: intentional disconnect teardown was not confirmed (${error?.message||String(error)}).`);}
+ try{await window.meleeNetCloseRuntimeLockstep('normal');lockstepRoomFinished=true;lockstepRoomStatus(lockstepStagingMode?'You left the room. Reload and import your disc to try again.':'Disconnected by your choice. Route outcome is not assessed.');if(lockstepStagingMode)$('lockstep-retry').hidden=false;}
+ catch(error){lockstepRoomFinished=true;lockstepRoomStatus(`Error: intentional disconnect teardown was not confirmed (${error?.message||String(error)}).`);if(lockstepStagingMode)$('lockstep-retry').hidden=false;}
  finally{lockstepRoomLeaving=false;syncLockstepRoomControls();}
 };
 // Diagnostic A/B only. Visibility preserves layout and every DOM/counter update;
@@ -552,7 +602,7 @@ $('unload').onclick=async()=>{$('status').dataset.runtimeError='';if(lockstepRoo
   if(retailRun)await finishRetailReplay('Manual unload stopped the replay');
   else await owner.handle.unload();
   stockCheckActive=false;
-  if(lockstepRoomConfigured){lockstepRoomUnloading=false;lockstepRoomFinished=true;lockstepRoomCloseAttempted=true;lockstepRoomStatus('Runtime unloaded. Room outcome is unverified.');syncLockstepRoomControls();}
+  if(lockstepRoomConfigured){lockstepRoomUnloading=false;lockstepRoomFinished=true;lockstepRoomCloseAttempted=true;lockstepRoomStatus('Runtime unloaded. Room outcome is unverified.');if(lockstepStagingMode)$('lockstep-retry').hidden=false;syncLockstepRoomControls();}
 }catch(error){log(error.message);$('status').dataset.runtimeError=error.message;if(lockstepRoomConfigured){lockstepRoomUnloading=false;lockstepRoomFinished=true;lockstepRoomStatus(`Error: runtime unload failed; room teardown is unconfirmed (${error?.message||String(error)}).`);syncLockstepRoomControls();}}};
 controllerSettings = mountControllerSettings({
   container: $('controls-dialog'),
@@ -565,6 +615,7 @@ controllerSettings = mountControllerSettings({
 });
 try {
   await mountMeleeRuntime({canvas:$('canvas'),createAudio:createRuntimeAudio,readDisc:loadNativeGameDisc,openDisc:openNativeGameSession,loaderUrl:new URL('./gameplay_menu_browser.js',import.meta.url),
+    stagingDiagnosticsOrigin:`https://${STAGING_HOST}`,
     onOwner(context){owner=context;({Module,boundary,status,check,put,prepareAudio,pauseAudioForPreparation,
       syncAudio,unloadAndSave,prepareNativeResources,waitForAudioAck,waitForAudioRender}=context);},
     configureModule(module){
