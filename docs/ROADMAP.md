@@ -87,7 +87,11 @@ under the owner's Workers Free/$0 limit; no paid, billing, account/security,
 DNS or production changes are authorized. Do not repeat successful captures
 without a new hypothesis.
 
-**Owner-directed manual alpha (pending):** The owner selected a live hosted
+**Owner-directed manual alpha (pending):** On October 14 the owner deferred the
+human PvP trial and directed the next autonomous sprint. Continue the drawn
+rollback and Stadium milestones below without waiting for human testing; keep
+physical-input, audible-output, foreground-timing and two-machine gates unrun.
+The owner selected a live hosted
 room page on the existing isolated staging Worker and declined local-package
 setup as the user-facing path. The proposed two-Mac trial uses the existing
 interim lockstep route: keyboard P1 on the host and controller P2 / Port 2 on

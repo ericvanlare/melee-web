@@ -52,6 +52,23 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
+
+### 2026-10-14 — Owner: resume the autonomous rollback and Stadium sprint
+
+**Ask:** The owner is unavailable for a PvP test. Proceed with the next sprint.
+
+**Status:** Accepted. Resume the existing drawn checkpoint/restore/repeat
+milestone under #318/#324 and Stadium C3 under #251/#301. Reuse the existing
+owners and private diagnostics; close state and host ownership before any
+browser restore. Keep one capture lane and the original timing/input/RNG guards.
+The human trial remains pending, and the deleted heartbeat is not recreated.
+The [rollback receipt](status/2026-10-12-match-only-rollback-feasibility.md)
+and draft Stadium boundary own the scoped results and retained failures.
+
+**Links:** [Priorities #158](https://github.com/ericvanlare/melee-web/issues/158),
+[rollback draft #324](https://github.com/ericvanlare/melee-web/pull/324),
+[Stadium draft #301](https://github.com/ericvanlare/melee-web/pull/301).
+
 ### 2026-10-13 — Owner: hosted room UI for a manual two-computer trial
 
 **Ask:** Replace the proposed local portable delivery with a live staging page

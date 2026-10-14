@@ -1827,6 +1827,212 @@
         }
       },
       "scope": "Draft checkpoint only; no restore or integration claim"
+    },
+    "october14_resume": {
+      "status": "OWNERSHIP_COMPONENTS_REVIEWED_NO_BROWSER_RESTORE",
+      "raw_run_id": "rollback-sprint-resume-20261014-085704-6fe33b74",
+      "runtime_producer": "a557e9ce444f7a40c80f9a55c58c8abf96719a44",
+      "metadata_and_harness_head": "bf59a893b56ac1aa8b02165349ac694445ef0acd",
+      "audio_file_component_source": "9bb0afc7c2164284b75b6286cb517da6547f7d95",
+      "validation": {
+        "release_builds": [
+          "ordinary",
+          "frame-effect",
+          "combined-first-pair"
+        ],
+        "release_state": "PASS",
+        "full_tests_run": 2425,
+        "full_tests_skipped": 164,
+        "full_tests_failed": 2,
+        "failure": "Producer/consumer source-fingerprint inventory mismatch, retained",
+        "metadata_repair_focused_tests": 56,
+        "metadata_repair_focused_state": "PASS",
+        "final_full_regression_and_ci": "PENDING"
+      },
+      "schema2_capture": {
+        "state": "FAIL_CLOSED_NATIVE_SINGLE_TICK_ADMISSION",
+        "runtime_producer": "a557e9ce444f7a40c80f9a55c58c8abf96719a44",
+        "harness_head": "bf59a893b56ac1aa8b02165349ac694445ef0acd",
+        "elapsed_ms": 58009,
+        "attempts": 1,
+        "first_failure": {
+          "reason": "ordinary_callback_not_one_ready_tick",
+          "requested_source_frame": 180,
+          "actual_source_after": 182,
+          "tick_returns": 2,
+          "draw_returns": 2,
+          "callback_steps": 2,
+          "callback_draws": 2,
+          "audio_returns": 1,
+          "pcm_frames": 534,
+          "admitted": false,
+          "renderer_armed": false,
+          "planned_steps_field": 0,
+          "plan_limit": "planned_steps=0 and source_before=0 are default values because refusal precedes provenance assignment; do not infer a zero-source callback from those fields."
+        },
+        "schema2_rows": {
+          "renderer_schema": 2,
+          "events": 0,
+          "handles": 0,
+          "resources": 0,
+          "binding_entries": 0,
+          "draws": 0,
+          "ownership_inference": "None: observer never armed. Empty rows are not ownership closure or a renderer failure."
+        },
+        "H1": {
+          "capture_failures": [],
+          "timing_pauses": 0,
+          "reason_counts": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            8,
+            0,
+            0
+          ],
+          "non_preparation_incidents": 0,
+          "preparation_incidents": 8,
+          "dropped_incidents": 0,
+          "unknown_reasons": 0,
+          "lossy_sample_count": 3039
+        },
+        "retirement": {
+          "native_retired": true,
+          "result": 1,
+          "browser_context_closed": true,
+          "browser_closed": true,
+          "owned_browser_absent": true,
+          "owned_server_absent": true,
+          "owned_process_group_absent": true,
+          "preexisting_not_owned": true
+        },
+        "source_and_runtime_unchanged": true,
+        "source_reduction": {
+          "guard": "src/gameplay_menu_frame_effect.cpp:59 rejects planned_steps!=1 (also prior-step/clock/audio/readiness/owner/cursor guards), records first refusal, leaves actual source callback behavior unchanged.",
+          "callsite": "src/gameplay_menu_browser.cpp:1888 passes unchanged elapsed.steps at each selected match tick; source tail then performs actual ticks/draws/audio and checked terminal stop.",
+          "observed": "Actual callback completed two ticks/two draws to182. This violates explicit one-tick admission. Generic refusal does not retain the original clock plan or distinguish every guard clause; avoid claiming a particular host delay caused it.",
+          "minimum_next_reducer": "Use maintained actual native hook fixture plus extracted SourceFrameSequence/tail seam to drive planned_steps2, two actual tick/draw notifications and one audio return. Assert refusal, zero renderer arm, unchanged two source steps/draws, first error retained and safe retirement. Add direct planned_steps1 positive and0 pending controls using existing fixtures; do not force clock budget, skip the first due callback, or relax original source work.",
+          "ownership_next_step": "No ownership change can be selected from this empty renderer observation. After deterministic admission reduction, root must explicitly choose scope: retain single-tick contract, or separately review an observation-only first-draw/normal-callback contract that preserves all multi-step source order. No automatic retry or restore."
+        },
+        "artifacts": [
+          {
+            "file": "renderer-schema2-observation-packet-v2/capture/browser/report.json",
+            "bytes": 446277,
+            "sha256": "39b197204a92fcb9ecbf89e5ce9410bb68fd9d4cae4e610c443603e882e38895"
+          },
+          {
+            "file": "renderer-schema2-observation-packet-v2/capture/owner-report.json",
+            "bytes": 83279,
+            "sha256": "facd97840538e1f96e72f288c84a349f377216d9b7501ed08fbe34e0dd9f9795"
+          },
+          {
+            "file": "renderer-schema2-observation-packet-v2/capture/completion.json",
+            "bytes": 161666,
+            "sha256": "3f86bbae6e7396e44018c1c5bcf2b984a4b930a05d3a0ba9d77d4a00059f3713"
+          },
+          {
+            "file": "renderer-schema2-observation-packet-v2/capture/launch.json",
+            "bytes": 161201,
+            "sha256": "068b25226106b56e4334ebf27221509cd4952c1227d9db70dc1a31c5723f666c"
+          },
+          {
+            "file": "renderer-schema2-observation-packet-v2/capture/capture.log",
+            "bytes": 1662,
+            "sha256": "71ccedc64c81af534252aa7b0730e47b93bfa50d9da4b328f1230fa3e3a1b2cf"
+          },
+          {
+            "file": "renderer-schema2-observation-packet-v2/root-capture-release.json",
+            "bytes": 1056,
+            "sha256": "242e8c6d2fdb4bef8e4ec45a8292505b1d07e51f1d76f29747f5cc12c0e76b55"
+          },
+          {
+            "file": "renderer-schema2-observation-packet-v2/root-launcher-review.json",
+            "bytes": 1064,
+            "sha256": "aecf665495a250222a9c1b05dc0f87bf2fb46b063ec73a4257b68f6f1cce52fa"
+          },
+          {
+            "file": "renderer-schema2-observation-packet-v2/served-runtime.json",
+            "bytes": 7147,
+            "sha256": "481c82a3d6b6f8234733529e0881f5eeef19e84f8ac7c4fd2af8d8fb7e44d51d"
+          }
+        ]
+      },
+      "review_artifacts": [
+        {
+          "file": "renderer-schema2-root-result-review.json",
+          "sha256": "e4609adb08b43f51da82886803d75b0c96f4e2783d662f5e32ef1ecd6fa80394"
+        },
+        {
+          "file": "renderer-schema2-focused-result-v1.json",
+          "sha256": "9a7cc53dc1218f23c1ffe2e3f47b3e663e6d4974ff7bec75bc21476c25761059"
+        },
+        {
+          "file": "renderer-schema2-validation-a557e9ce-v1/evidence/result.json",
+          "sha256": "855b3abed9a3d51dc6a53f4e61ed8b7703c0e3324f59b9af5c0cf2e1c94972a7"
+        },
+        {
+          "file": "renderer-schema2-validation-a557e9ce-v1/first-failure-review.json",
+          "sha256": "4377f3544de31c9295a895bda08c5385f732cf350950605a69d9cc1ca70a4523"
+        },
+        {
+          "file": "public-source-fingerprint-repair-v1/root-focused-review.json",
+          "sha256": "5cf3475da888d392cff929079626b16d604df47713a13af1f45d98d95d217976"
+        },
+        {
+          "file": "renderer-schema2-observation-packet-v2/root-result-review.json",
+          "sha256": "9ed7a0c6cb87be25e9549814b4f3fdb012ec71d2dc57253224ba63e9d0e12d28"
+        },
+        {
+          "file": "wasm-instance-ownership-maintained-validation-v1/root-result-review.json",
+          "sha256": "02c0f587cc78d4cfcb366b246e0db4b60b3570fd3360d5567afa99a0f543680a"
+        },
+        {
+          "file": "wasm-instance-ownership-maintained-validation-v1/execution-v1.json",
+          "sha256": "1dbf1281a0ed2614fced88c3a34ffb2148c21a3492c0026bc4c00354a7b15659"
+        },
+        {
+          "file": "wasm-instance-ownership-integration-execution-v3/root-result-review.json",
+          "sha256": "7c4e9af291b6190ec89fe2a51ec36b401c51b3a3979dff6c5cfe01a7d66f57ad"
+        },
+        {
+          "file": "wasm-instance-ownership-integration-execution-v3/execution-v2.json",
+          "sha256": "f762a144bdaa2b228a291cc06911e631df352d94ac44f1bc3037a5176a18048f"
+        },
+        {
+          "file": "wasm-instance-ownership-integration-execution-v3/execution-binding-erratum-v1.json",
+          "sha256": "3fbaa618fd70f81ef363a2d385e3ef5fadeae222eae13e54be94a9ad6b95af84"
+        },
+        {
+          "file": "normal-callback-step-admission-reducer-v1/root-result-review.json",
+          "sha256": "2b208b3f723e5de737723c2a02c138ef8cca3cae1249b49d9c9f712474ca4c40"
+        },
+        {
+          "file": "normal-callback-step-admission-reducer-v1/result-summary.json",
+          "sha256": "c1ae2e89c8233a5f9631b8a5c21dc0011a3cd954afa6019d9f7795a82868d5de"
+        }
+      ],
+      "scope": "Component controls and one refused admission only; historical schema1 success retained separately. No renderer ownership closure, real pair coordinator, restore or acceptance.",
+      "wasm_instance_component": {
+        "local_commit": "2d9e2927060944c44ca1aaf4587eeafad3f5f1c2",
+        "focused_tests": 46,
+        "reduced_actual_fixture": "PASS",
+        "positive_shapes": [
+          "preRun function",
+          "preRun array"
+        ],
+        "asyncify_writer_calls_each": 4,
+        "refusals_before_main": [
+          "missing installer",
+          "custom instantiateWasm"
+        ],
+        "historical_failed_fixture": "Missing canonical wasmTable dependency; retained v2, v3 dependency repair passes",
+        "private_game_artifact_scan": "PENDING",
+        "game_restore": "NOT_RUN"
+      }
     }
   }
 }

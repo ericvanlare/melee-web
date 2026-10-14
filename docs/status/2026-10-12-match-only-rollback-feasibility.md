@@ -269,6 +269,50 @@ This continues the approved same-instance draw/restore/repeat ownership work.
 No browser restore, complete state-size result or combined correction budget is
 claimed. Stadium C3 remains a separate parallel milestone.
 
+### October 14 ownership and schema-2 checkpoint
+
+The resumed sprint retains the earlier successful schema-1 observation above.
+New native audio/file guards, PCM journals and JavaScript unfinished-read
+accounting are reviewed component work. Their private profile still refuses
+pair admission: no actual returned-boundary coordinator or browser restore is
+implemented. The renderer now serializes complete schema-2 event, resource,
+binding and draw rows with exact integer and floating-point representations.
+Strict decoding and corruption controls pass. All 11 configured diagnostic-off
+preprocessor outputs match the prior renderer source; this is an off-projection
+check, not runtime equivalence or GPU-content closure.
+
+At runtime producer `a557e9ce`, the ordinary, frame-effect and combined private
+Release builds pass. The full 2,425-test regression (164 skips) failed two
+producer/consumer source-fingerprint inventory checks. The minimal metadata
+repair `bf59a893` passes all 56 affected checks. That focused pass does not replace
+the final full regression or exact-head CI required before integration. The
+runtime and capture producer remain distinct from the metadata-only harness.
+
+One schema-2 browser attempt used the retained original route and unchanged
+clock. After arming at source frame 180, its next naturally due callback ran two
+ticks and two draws to frame 182, plus one audio return of 534 PCM frames. The
+explicit single-tick admission guard refused before the renderer observer
+armed. Empty renderer rows therefore establish no resource ownership result.
+The first error is retained; default-zero planned-step fields are not observed
+clock decisions. Native retirement, owned browser/server cleanup and unchanged
+source/runtime checks pass. H1 recorded no timing pause and eight preparation
+incidents; its history remains lossy. No unchanged retry is authorized.
+
+The reduced actual-source admission control passes for zero, one and two
+planned ticks, including exact tick/draw/audio ordering and terminal retirement.
+The next step is a separately reviewed first-draw observation that preserves
+every naturally due source action.
+Any such observation must remain distinct from single-tick restore admission.
+The Wasm-instance ownership helper and private generated-glue hook are committed
+locally as `2d9e2927`. The reduced actual Emscripten fixture preserves prior
+preRun callbacks, observes all four Asyncify writer calls and rejects unsupported
+setup before main. The maintained helper, glue and packaging checks pass all
+46 affected tests. The first fixture failure, a missing canonical Wasm-table
+JavaScript dependency, remains retained; the explicit dependency repair passed
+the second bounded attempt. No gameplay private-profile build or restore result
+follows from these controls; GPU, audio/file and output ownership remain open. No snapshot/restore, seven-tick
+combined budget, human-input or two-computer acceptance is claimed.
+
 ## Slippi profile source checkpoint
 
 The [profile inventory](../investigations/SLIPPI_GAMEPLAY_PROFILE_INVENTORY.md)
