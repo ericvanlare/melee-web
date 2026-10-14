@@ -1829,7 +1829,7 @@
       "scope": "Draft checkpoint only; no restore or integration claim"
     },
     "october14_resume": {
-      "status": "FIRST_DRAW_OBSERVED_WITH_UNRESOLVED_RENDERER_FINDINGS",
+      "status": "CREATION_PROVENANCE_OBSERVATION_PASS_ATTACHMENT_AND_TEXTURE_OWNERS_OPEN",
       "raw_run_id": "rollback-sprint-resume-20261014-085704-6fe33b74",
       "runtime_producer": "a557e9ce444f7a40c80f9a55c58c8abf96719a44",
       "metadata_and_harness_head": "bf59a893b56ac1aa8b02165349ac694445ef0acd",
@@ -2015,7 +2015,7 @@
           "sha256": "c1ae2e89c8233a5f9631b8a5c21dc0011a3cd954afa6019d9f7795a82868d5de"
         }
       ],
-      "scope": "Earlier schema2 refusal and all historical producers retained. New fa58 first-draw collection is not resource closure, restore, repeated-tick equivalence or acceptance.",
+      "scope": "Historical producers retained. Current 410e9 first-draw creation-provenance observation is not resource/content closure, restore, repeated-tick equivalence or acceptance.",
       "wasm_instance_component": {
         "local_commit": "2d9e2927060944c44ca1aaf4587eeafad3f5f1c2",
         "focused_tests": 46,
@@ -2174,6 +2174,122 @@
           "log_sha256": "81bdbb761689ad713e52bf8f471fbaba4e76ab98fb579b3521da66881e1573fb"
         },
         "runtime_capture_producer": "fa58cb7b305ec6cd44e87f064311e39a98487f9f"
+      },
+      "renderer_owner_observation": {
+        "state": "PASS_SCOPED_OBSERVATION_NOT_RESTORE",
+        "source": "410e9dd95de54e7d0601cbf09ffc23b97946636e",
+        "at": "2026-10-14T20:38:10.018710+00:00",
+        "files": {
+          "browser/report.json": "307537051a5fda8409428d96589ddf06e4cdeb74fca56e5224f0dc1f52f1f3ec",
+          "completion.json": "197f287e874084e8a6d3aca44f26acfbb41bd862f34b1cd260aaaaa418d40b62",
+          "owner-report.json": "c31dfa6bd4b9c7814a2af3271b4a8e2854239cf2920d881ceef0aa3f449a4e1f"
+        },
+        "frame": {
+          "source_frame_before": 180,
+          "source_frame_after": 181,
+          "tick_returns": 1,
+          "draw_returns": 1,
+          "audio_returns": 1,
+          "pcm_frames": 534,
+          "audio_phase_before": 40,
+          "audio_phase_after": 0,
+          "unobserved_draws": 0
+        },
+        "renderer": {
+          "schema_version": 3,
+          "state": 4,
+          "first_blocker": 7,
+          "target_frame_index": 3165,
+          "frame_index": 3165,
+          "frame_id": "3166",
+          "event_count": 1783,
+          "handle_count": 196,
+          "op_count": 3,
+          "render_pass_count": 3,
+          "draw_command_count": 246,
+          "custom_draw_count": 0,
+          "encoder_task_count": 0,
+          "texture_copy_count": 0,
+          "texture_upload_count": 0,
+          "palette_conversion_count": 0,
+          "resolve_count": 2,
+          "snapshot_count": 1,
+          "staging_copy_count": 12,
+          "queue_write_count": 4,
+          "queue_write_bytes": "1231440",
+          "after_submit_callback_count": 0,
+          "submit_count": 1,
+          "fence_count": 1,
+          "fence_success": 1,
+          "finding_mask": "262272",
+          "command_record_count": 265,
+          "actual_draw_count": 246,
+          "resource_count": 119,
+          "binding_entry_count": 1123,
+          "layout_entry_count": 19,
+          "provenance_count": 14,
+          "depth_trace_count": 3,
+          "depth_request_count": 0
+        },
+        "finding_codes": [
+          7,
+          18
+        ],
+        "missing_resource_rows_by_kind": {
+          "7": 1,
+          "1": 73,
+          "2": 3
+        },
+        "missing_scope": "Not every handle requires a resource row; device kind7 is separate. Texture/view descriptor and content ownership remain unresolved.",
+        "h1": {
+          "sample_count": 100,
+          "callback_count": 3128,
+          "dropped_samples": 3028,
+          "incidents": 8,
+          "reason_counts": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            8,
+            0,
+            0
+          ],
+          "dropped_incidents": 0,
+          "scope": "Lossy sample ring; no timing acceptance."
+        },
+        "native_retired": true,
+        "owned_browser_pids_absent": 10,
+        "owned_process_groups_absent": true,
+        "owner_elapsed_ms": 62592,
+        "limits": [
+          "No restore/repeat pair",
+          "No PCM/pixel equivalence",
+          "No seven-tick combined budget",
+          "No physical-input or two-computer acceptance",
+          "Historical shape27 absent only in this differing actual callback; not a repair or cross-run equivalence proof"
+        ],
+        "raw_run_id": "rollback-sprint-resume-20261014-085704-6fe33b74",
+        "artifact_directory": "first-draw-observation-packet-v3/capture",
+        "aurora_tree": "ecd933889b07d5d91175e69200c37bdef35c00c8",
+        "root_review_sha256": "dd985038a1c37eaec1b0d578e8477299e2afe15bccf4017bc6fae4d18db277b3",
+        "independent_review_sha256": "a3b12c7bdb68466c0f9020bbf843985c3173b24f0d99e16e37f5193e8f81625e",
+        "validation": {
+          "source": "410e9dd95de54e7d0601cbf09ffc23b97946636e",
+          "release_artifacts": [
+            44,
+            44,
+            45
+          ],
+          "full_tests": 2429,
+          "skips": 164,
+          "result_sha256": "c144562c903c28c71dc45e4aedd42286b3378177ac33aa816f45d642c8d8f9d2",
+          "focused_combined_sha256": "e6ede11b2e84b53f11c03d2478ca05fd2e35661e3da895d20f2b3b4156a70ba0"
+        },
+        "next": "Actual persistent attachment texture/view creation and parent identity source control; retain LOAD7 and UNKNOWN18 for unproven owners/content. No replay or restore released."
       }
     }
   }

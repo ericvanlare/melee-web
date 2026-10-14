@@ -332,21 +332,40 @@ retirement and owned browser/server cleanup pass. No depth request occurred;
 zero selected map owners become finalized at retirement. Multi-tick callbacks
 and pending depth-map completion remain fixture coverage, not this browser result.
 
-Collection is successful, but **renderer restore remains blocked**:
-`UNKNOWN_RESOURCE` (18) is first; `LOAD_ATTACHMENT` (7) and
-`COMMAND_SHAPE_MISMATCH` (27) are also present. The first unknown is the existing
-static bind group in slot 0: its descriptor registration call occurred during
-renderer initialization, before the observer was armed, and did not retain the
-descriptor. The next step is a bounded source control for retaining it with the
-actual live buffer/group owners. This is not permission to recreate resources, guess identities or
-weaken the comparison. Other recorded findings remain open.
+The historical collection found `UNKNOWN_RESOURCE` (18) first, together with
+`LOAD_ATTACHMENT` (7) and `COMMAND_SHAPE_MISMATCH` (27). Its first unknown was a
+static bind-group descriptor created before observation was armed. That failed
+ownership result remains tied to `fa58cb7b`.
 
-The H1 recorder has zero forced timing pauses, eight preparation incidents and
-no dropped incidents, but retains only 100 of 3,120 callback samples. Its lossy
-history does not establish timing acceptance. No restore/repeat pair, PCM/pixel
-equality, seven-tick corrective budget or two-computer acceptance is claimed.
-The same evidence entry retains the full build, browser, cleanup and reduction
-receipt hashes. Draft #324 remains open for the drawn restore/repeat milestone.
+The reviewed follow-up at producer `410e9dd9` retains actual creation identities
+and descriptors for the shared/staging buffers, static/uniform/empty groups,
+layouts and selected empty sampler. All three Release builds and the full
+2,429-test regression pass, with 164 skips; all 133 build artifacts were checked.
+One changed-source browser observation passes at source frame 180 → 181:
+one tick, one draw, one audio return and 534 PCM frames. The current outer/renderer
+schemas are 4/3. It retains 1,783 events, 196 handles, 119 resource rows, 1,123
+binding entries, 19 layout entries, 14 creation-provenance rows and 246 draw rows.
+One normal submission/fence completes, the native observer retires, and all ten
+owned browser processes plus capture/server groups are absent.
+
+**Renderer restore remains blocked.** `LOAD_ATTACHMENT` (7) is now first and
+`UNKNOWN_RESOURCE` (18) remains. The color/depth attachment views and further
+texture/view owners still lack descriptor rows. A LOAD operation does not prove
+the contents that must be restored. The next source control extends existing
+creation tracking for an actual persistent attachment texture/view, preserving
+parent identity, stale-identity refusals and the LOAD blocker. There is no
+resource recreation or content restore yet. Historical shape finding 27 is
+absent from this callback, whose draw count differs; that is not evidence of a
+shape repair or equality with the earlier run.
+
+The current H1 recorder has zero forced timing pauses, eight preparation
+incidents and no dropped incidents, but retains only 100 of 3,128 callback
+samples. This lossy history does not establish timing acceptance. The historical
+`fa58cb7b` run retained 100 of 3,120 samples and its separate audio totals remain
+unchanged. Neither result demonstrates a restore/repeat pair, PCM/pixel equality,
+a seven-tick corrective budget or two-computer acceptance. The evidence JSON
+retains exact build, capture, review and cleanup identities. Draft #324 remains
+open for the drawn restore/repeat milestone.
 
 The first documentation head `c8095351` failed repository-content CI because a
 private helper variable named `apiKey` held a public Module property name. The
