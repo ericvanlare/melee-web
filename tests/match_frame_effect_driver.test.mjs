@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import {armNativeFrameEffect, readNativeFrameEffect, retireNativeFrameEffect,
-  frameEffectObservationFailures} from './match_frame_effect_driver.mjs';
+  frameEffectSchema1ObservationFailures as frameEffectObservationFailures} from './match_frame_effect_driver.mjs';
 
 function fixture({idle = true, returned = true} = {}) {
   const calls = [];

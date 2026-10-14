@@ -328,7 +328,7 @@ index 0000000000000000000000000000000000000000..2ecd22a6c10e9caf99ce33d9c0a465a0
 +              "future owner row identity offset changed");
 +#endif
 diff --git a/include/aurora/gfx.h b/include/aurora/gfx.h
-index 94504b177d6733244a9de40a8dfb49f5964363ae..dab08b506b1ebc978131e50ca756c4a42f7588e7 100644
+index 94504b177d6733244a9de40a8dfb49f5964363ae..6752e3a7fdb4a1170bda12ae3f75bb3e5d756371 100644
 --- a/include/aurora/gfx.h
 +++ b/include/aurora/gfx.h
 @@ -3,10 +3,12 @@
@@ -344,7 +344,7 @@ index 94504b177d6733244a9de40a8dfb49f5964363ae..dab08b506b1ebc978131e50ca756c4a4
  #endif
  
  #if !defined(NDEBUG) && !defined(AURORA_GFX_DEBUG_GROUPS)
-@@ -26,8 +28,253 @@ typedef struct {
+@@ -26,8 +28,312 @@ typedef struct {
    uint32_t lastIndexSize;
    uint32_t lastStorageSize;
    uint32_t lastTextureUploadSize;
@@ -519,7 +519,7 @@ index 94504b177d6733244a9de40a8dfb49f5964363ae..dab08b506b1ebc978131e50ca756c4a4
 +
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && !defined(__EMSCRIPTEN_PTHREADS__)
 +enum {
-+  AURORA_BROWSER_FRAME_EFFECT_SCHEMA_VERSION = 1,
++  AURORA_BROWSER_FRAME_EFFECT_SCHEMA_VERSION = 2,
 +  AURORA_BROWSER_FRAME_EFFECT_EVENT_FRAME_OP = 1,
 +  AURORA_BROWSER_FRAME_EFFECT_EVENT_RENDER_PASS = 2,
 +  AURORA_BROWSER_FRAME_EFFECT_EVENT_COLOR_ATTACHMENT = 3,
@@ -538,6 +538,12 @@ index 94504b177d6733244a9de40a8dfb49f5964363ae..dab08b506b1ebc978131e50ca756c4a4
 +  AURORA_BROWSER_FRAME_EFFECT_EVENT_PACKET_RETIRED = 16,
 +  AURORA_BROWSER_FRAME_EFFECT_EVENT_QUEUE_SUBMIT = 17,
 +  AURORA_BROWSER_FRAME_EFFECT_EVENT_QUEUE_FENCE = 18,
++  AURORA_BROWSER_FRAME_EFFECT_EVENT_COMMAND = 19,
++  AURORA_BROWSER_FRAME_EFFECT_EVENT_DRAW_DETAIL = 20,
++  AURORA_BROWSER_FRAME_EFFECT_EVENT_BIND_GROUP_STATE = 21,
++  AURORA_BROWSER_FRAME_EFFECT_EVENT_DEPTH_STATE = 22,
++  AURORA_BROWSER_FRAME_EFFECT_EVENT_DEPTH_READ = 23,
++  AURORA_BROWSER_FRAME_EFFECT_EVENT_FINDING = 24,
 +  AURORA_BROWSER_FRAME_EFFECT_UNUSED = 0,
 +  AURORA_BROWSER_FRAME_EFFECT_ARMED = 1,
 +  AURORA_BROWSER_FRAME_EFFECT_COLLECTING = 2,
@@ -561,9 +567,26 @@ index 94504b177d6733244a9de40a8dfb49f5964363ae..dab08b506b1ebc978131e50ca756c4a4
 +  AURORA_BROWSER_FRAME_EFFECT_DUPLICATE_SUBMIT = 14,
 +  AURORA_BROWSER_FRAME_EFFECT_FENCE_WITHOUT_ONE_SUBMIT = 15,
 +  AURORA_BROWSER_FRAME_EFFECT_FAILED_FENCE = 16,
++  AURORA_BROWSER_FRAME_EFFECT_UNCLASSIFIED_DRAW = 17,
++  AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE = 18,
++  AURORA_BROWSER_FRAME_EFFECT_DESCRIPTOR_OVERFLOW = 19,
++  AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE = 20,
++  AURORA_BROWSER_FRAME_EFFECT_DEPTH_MAP_PENDING = 21,
++  AURORA_BROWSER_FRAME_EFFECT_DEPTH_INVALID_SOURCE = 22,
++  AURORA_BROWSER_FRAME_EFFECT_DEPTH_SLOT_UNAVAILABLE = 23,
++  AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_COMMAND = 24,
++  AURORA_BROWSER_FRAME_EFFECT_DRAW_OVERFLOW = 25,
++  AURORA_BROWSER_FRAME_EFFECT_DEPTH_MAP_OWNER_UNKNOWN = 26,
++  AURORA_BROWSER_FRAME_EFFECT_COMMAND_SHAPE_MISMATCH = 27,
 +  AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE_VIEW = 1,
 +  AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE = 2,
 +  AURORA_BROWSER_FRAME_EFFECT_HANDLE_BUFFER = 3,
++  AURORA_BROWSER_FRAME_EFFECT_HANDLE_SAMPLER = 4,
++  AURORA_BROWSER_FRAME_EFFECT_HANDLE_BIND_GROUP = 5,
++  AURORA_BROWSER_FRAME_EFFECT_HANDLE_PIPELINE = 6,
++  AURORA_BROWSER_FRAME_EFFECT_HANDLE_DEVICE = 7,
++  AURORA_BROWSER_FRAME_EFFECT_HANDLE_QUEUE = 8,
++  AURORA_BROWSER_FRAME_EFFECT_HANDLE_BIND_GROUP_LAYOUT = 9,
 +  AURORA_BROWSER_FRAME_EFFECT_QUEUE_WRITE_VERTEX = 0,
 +  AURORA_BROWSER_FRAME_EFFECT_QUEUE_WRITE_UNIFORM = 1,
 +  AURORA_BROWSER_FRAME_EFFECT_QUEUE_WRITE_INDEX = 2,
@@ -571,6 +594,13 @@ index 94504b177d6733244a9de40a8dfb49f5964363ae..dab08b506b1ebc978131e50ca756c4a4
 +  AURORA_BROWSER_FRAME_EFFECT_QUEUE_WRITE_TEXTURE = 4,
 +  AURORA_BROWSER_FRAME_EFFECT_QUEUE_WRITE_OVERFLOW_UPLOAD = 5,
 +  AURORA_BROWSER_FRAME_EFFECT_QUEUE_WRITE_DEPTH_PEEK = 6,
++  AURORA_BROWSER_FRAME_EFFECT_DEPTH_ACTION_REQUEST = 1,
++  AURORA_BROWSER_FRAME_EFFECT_DEPTH_ACTION_ATTEMPT = 2,
++  AURORA_BROWSER_FRAME_EFFECT_DEPTH_ACTION_CONSUMED = 3,
++  AURORA_BROWSER_FRAME_EFFECT_DEPTH_ACTION_SLOT_SELECTED = 4,
++  AURORA_BROWSER_FRAME_EFFECT_DEPTH_ACTION_MAP_REGISTERED = 5,
++  AURORA_BROWSER_FRAME_EFFECT_DEPTH_ACTION_MAP_COMPLETE = 6,
++  AURORA_BROWSER_FRAME_EFFECT_DEPTH_ACTION_INVALID_SOURCE = 7,
 +};
 +typedef struct {
 +  uint32_t kind, frameIndex, opIndex, itemIndex;
@@ -579,18 +609,47 @@ index 94504b177d6733244a9de40a8dfb49f5964363ae..dab08b506b1ebc978131e50ca756c4a4
 +} AuroraBrowserFrameEffectEvent;
 +typedef struct { uint64_t captureId; uint32_t kind, reserved; } AuroraBrowserFrameEffectHandle;
 +typedef struct {
++  uint64_t captureId, ownerId;
++  uint32_t kind, wordCount;
++  uint32_t words[16];
++} AuroraBrowserFrameEffectResource;
++typedef struct {
++  uint64_t bindGroupId, resourceId, offset, size;
++  uint32_t binding, kind;
++} AuroraBrowserFrameEffectBindingEntry;
++typedef struct {
++  uint32_t frameIndex, opIndex, commandIndex, rendererKind;
++  uint64_t pipelineKey, pipelineId;
++  uint64_t bindGroupIds[4];
++  uint32_t dynamicOffsetCount[4];
++  uint32_t dynamicOffsets[4][4];
++  uint64_t indexBufferId, indexOffset, indexSize;
++  uint32_t indexFormat, vertexCount, indexCount, instanceCount;
++  float viewport[6];
++  uint32_t scissor[4];
++  uint32_t dstAlpha;
++  double clearColor[4];
++  uint32_t hasClearColor, reserved;
++} AuroraBrowserFrameEffectDraw;
++
++typedef struct {
 +  uint32_t schemaVersion, state, firstBlocker, targetFrameIndex, frameIndex;
 +  uint64_t frameId;
 +  uint32_t eventCount, handleCount, opCount, renderPassCount, drawCommandCount;
 +  uint32_t customDrawCount, encoderTaskCount, textureCopyCount, textureUploadCount;
 +  uint32_t paletteConversionCount, resolveCount, snapshotCount, stagingCopyCount;
 +  uint32_t queueWriteCount, afterSubmitCallbackCount, submitCount, fenceCount, fenceSuccess;
-+  uint64_t queueWriteBytes;
++  uint64_t queueWriteBytes, findingMask;
++  uint32_t commandRecordCount, actualDrawCount, resourceCount, bindingEntryCount;
++  uint32_t depthTraceCount, depthRequestCount;
 +} AuroraBrowserFrameEffectSnapshot;
 +int aurora_browser_frame_effect_observer_arm();
 +AuroraBrowserFrameEffectSnapshot aurora_browser_frame_effect_observer_snapshot();
 +int aurora_browser_frame_effect_observer_event(uint32_t index, AuroraBrowserFrameEffectEvent* out);
 +int aurora_browser_frame_effect_observer_handle(uint32_t index, AuroraBrowserFrameEffectHandle* out);
++int aurora_browser_frame_effect_observer_resource(uint32_t index, AuroraBrowserFrameEffectResource* out);
++int aurora_browser_frame_effect_observer_binding_entry(uint32_t index, AuroraBrowserFrameEffectBindingEntry* out);
++int aurora_browser_frame_effect_observer_draw(uint32_t index, AuroraBrowserFrameEffectDraw* out);
 +#endif
 +
 +#endif
@@ -721,7 +780,7 @@ index 252fca7d9a4056d9e19f31d0777ba153a30fcc65..3e36937e92a0c391d80194b7527fa4f8
  void PADSetVirtualStatus(u32 port, const PADStatus* status);
  void PADClearVirtualStatus(u32 port);
 diff --git a/lib/aurora.cpp b/lib/aurora.cpp
-index 9430842976e01edc8d43d2182e56a61f7def6ec8..3158b097982bfe21700c068c6f81c51198e200f7 100644
+index 9430842976e01edc8d43d2182e56a61f7def6ec8..304bc8d5456ca4f76eacc143e96b1e221e34e145 100644
 --- a/lib/aurora.cpp
 +++ b/lib/aurora.cpp
 @@ -1,10 +1,21 @@
@@ -1008,8 +1067,8 @@ index 9430842976e01edc8d43d2182e56a61f7def6ec8..3158b097982bfe21700c068c6f81c511
 +                         stats.lastEndFrameOuterPrepMs + stats.lastEndFrameRecordMs + stats.lastEndFrameWorkerMs);
 +#endif
 +
-+#endif
-+}
+ #endif
+ }
 +#if defined(AURORA_MATCH_DRAW_DISCARD_DIAGNOSTIC) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
 +int match_draw_discard_begin() {
 +#ifdef TRACY_ENABLE
@@ -1064,8 +1123,8 @@ index 9430842976e01edc8d43d2182e56a61f7def6ec8..3158b097982bfe21700c068c6f81c511
 +  return gfx::detail::browser_frame_effect_observer().arm(gfx::current_frame()) ? 1 : 0;
 +#else
 +  return 0;
- #endif
- }
++#endif
++}
 +#endif
 +
  } // namespace
@@ -1105,7 +1164,7 @@ index 9430842976e01edc8d43d2182e56a61f7def6ec8..3158b097982bfe21700c068c6f81c511
  AuroraBackend aurora_get_backend() { return aurora::g_config.desiredBackend; }
  const AuroraBackend* aurora_get_available_backends(size_t* count) {
    if (count != nullptr) {
-@@ -476,3 +701,26 @@ void aurora_set_resampler(AuroraSampler sampler) {
+@@ -476,3 +701,35 @@ void aurora_set_resampler(AuroraSampler sampler) {
  }
  void aurora_set_timescale(float scale) { aurora::time::set_scale(scale); }
  float aurora_get_timescale() { return aurora::time::scale(); }
@@ -1130,6 +1189,15 @@ index 9430842976e01edc8d43d2182e56a61f7def6ec8..3158b097982bfe21700c068c6f81c511
 +}
 +int aurora_browser_frame_effect_observer_handle(uint32_t index, AuroraBrowserFrameEffectHandle* out) {
 +  return aurora::gfx::detail::browser_frame_effect_observer().handle_row(index, out);
++}
++int aurora_browser_frame_effect_observer_resource(uint32_t index, AuroraBrowserFrameEffectResource* out) {
++  return aurora::gfx::detail::browser_frame_effect_observer().resource(index, out);
++}
++int aurora_browser_frame_effect_observer_binding_entry(uint32_t index, AuroraBrowserFrameEffectBindingEntry* out) {
++  return aurora::gfx::detail::browser_frame_effect_observer().binding_entry(index, out);
++}
++int aurora_browser_frame_effect_observer_draw(uint32_t index, AuroraBrowserFrameEffectDraw* out) {
++  return aurora::gfx::detail::browser_frame_effect_observer().draw(index, out);
 +}
 +#endif
 diff --git a/lib/dawn/BackendBinding.cpp b/lib/dawn/BackendBinding.cpp
@@ -1702,8 +1770,40 @@ index 0000000000000000000000000000000000000000..f0634a77889589f06a380984f6d69319
 +};
 +
 +}  // namespace aurora::gfx::detail
+diff --git a/lib/gfx/clear.cpp b/lib/gfx/clear.cpp
+index cc73248d4bd07f4171905248d5436bf95e30a0c4..c679f4865e982e2c94985a9870b07c501d6e0410 100644
+--- a/lib/gfx/clear.cpp
++++ b/lib/gfx/clear.cpp
+@@ -1,6 +1,9 @@
+ #include "clear.hpp"
+ 
+ #include "encoding.hpp"
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++#include "frame_effect_observer.hpp"
++#endif
+ #include "../webgpu/gpu.hpp"
+ #include "tracy/Tracy.hpp"
+ 
+@@ -157,7 +160,17 @@ void render(const DrawData& data, const wgpu::RenderPassEncoder& pass, const wgp
+   pass.SetBlendConstant(&data.color);
+   pass.SetViewport(0.f, 0.f, static_cast<float>(targetSize.width), static_cast<float>(targetSize.height), data.depth,
+                    data.depth);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  detail::browser_frame_effect_observer().observe_viewport(0.f, 0.f, static_cast<float>(targetSize.width),
++      static_cast<float>(targetSize.height), data.depth, data.depth);
++#endif
+   pass.SetScissorRect(0, 0, targetSize.width, targetSize.height);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  detail::browser_frame_effect_observer().observe_scissor(0, 0, targetSize.width, targetSize.height);
++#endif
+   pass.Draw(3);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  detail::browser_frame_effect_observer().observe_actual_draw(1u, 3u, 0u, 1u, UINT32_MAX, &data.color);
++#endif
+ }
+ } // namespace aurora::gfx::clear
 diff --git a/lib/gfx/depth_peek.cpp b/lib/gfx/depth_peek.cpp
-index 08f7743a08ff760628ca51ebb666fda75d9af6e6..00f8f8fc2fab8d54b2b4938991d7554d5b27871c 100644
+index 08f7743a08ff760628ca51ebb666fda75d9af6e6..0006bd6e2d77b3c1575782f2e4060963d497d426 100644
 --- a/lib/gfx/depth_peek.cpp
 +++ b/lib/gfx/depth_peek.cpp
 @@ -1,4 +1,7 @@
@@ -1714,7 +1814,7 @@ index 08f7743a08ff760628ca51ebb666fda75d9af6e6..00f8f8fc2fab8d54b2b4938991d7554d
  
  #include "../dolphin/vi/vi_internal.hpp"
  #include "../gx/gx.hpp"
-@@ -77,6 +80,11 @@ size_t g_nextSlot = 0;
+@@ -77,10 +80,29 @@ size_t g_nextSlot = 0;
  wgpu::BindGroupLayout g_bindGroupLayout;
  wgpu::ComputePipeline g_pipeline;
  bool g_snapshotRequested = false;
@@ -1726,7 +1826,94 @@ index 08f7743a08ff760628ca51ebb666fda75d9af6e6..00f8f8fc2fab8d54b2b4938991d7554d
  Clock::time_point g_nextSnapshotTime;
  LatestSnapshot g_latest;
  std::mutex g_mutex;
-@@ -323,16 +331,58 @@ void shutdown() {
+ 
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++void observe_slots_locked(uint32_t action, bool requested, bool due, bool validSource) noexcept {
++  auto& observer = aurora::gfx::detail::browser_frame_effect_observer();
++  for (uint32_t i = 0; i < g_slots.size(); ++i) {
++    const auto& slot = g_slots[i];
++    observer.observe_depth_state(action, g_enabled, requested, due, validSource, static_cast<uint32_t>(g_nextSlot), i,
++                                 static_cast<uint32_t>(slot.state), slot.width, slot.height, slot.byteSize,
++                                 reinterpret_cast<uintptr_t>(slot.storageBuffer.Get()),
++                                 reinterpret_cast<uintptr_t>(slot.readbackBuffer.Get()),
++                                 reinterpret_cast<uintptr_t>(slot.paramsBuffer.Get()), g_latest.width, g_latest.height);
++  }
++}
++#endif
++
+ constexpr std::string_view ShaderPreamble = R"(
+ struct Params {
+     dstSize: vec2u,
+@@ -252,6 +274,10 @@ bool ensure_slot(Slot& slot, uint32_t width, uint32_t height) {
+       .size = byteSize,
+   };
+   slot.storageBuffer = g_device.CreateBuffer(&storageDescriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  aurora::gfx::detail::browser_frame_effect_observer().observe_buffer_descriptor(
++      reinterpret_cast<uintptr_t>(slot.storageBuffer.Get()), reinterpret_cast<uintptr_t>(g_device.Get()), storageDescriptor);
++#endif
+ 
+   const wgpu::BufferDescriptor readbackDescriptor{
+       .label = "Depth Peek Readback Buffer",
+@@ -259,6 +285,10 @@ bool ensure_slot(Slot& slot, uint32_t width, uint32_t height) {
+       .size = byteSize,
+   };
+   slot.readbackBuffer = g_device.CreateBuffer(&readbackDescriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  aurora::gfx::detail::browser_frame_effect_observer().observe_buffer_descriptor(
++      reinterpret_cast<uintptr_t>(slot.readbackBuffer.Get()), reinterpret_cast<uintptr_t>(g_device.Get()), readbackDescriptor);
++#endif
+ 
+   const wgpu::BufferDescriptor paramsDescriptor{
+       .label = "Depth Peek Params Buffer",
+@@ -266,6 +296,10 @@ bool ensure_slot(Slot& slot, uint32_t width, uint32_t height) {
+       .size = sizeof(Params),
+   };
+   slot.paramsBuffer = g_device.CreateBuffer(&paramsDescriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  aurora::gfx::detail::browser_frame_effect_observer().observe_buffer_descriptor(
++      reinterpret_cast<uintptr_t>(slot.paramsBuffer.Get()), reinterpret_cast<uintptr_t>(g_device.Get()), paramsDescriptor);
++#endif
+   return slot.storageBuffer && slot.readbackBuffer && slot.paramsBuffer;
+ }
+ 
+@@ -285,13 +319,23 @@ Slot* find_available_slot(uint32_t width, uint32_t height) {
+   return nullptr;
+ }
+ 
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++void complete_slot(size_t slotIdx, uint64_t effectOwnerId, wgpu::MapAsyncStatus status, wgpu::StringView message) {
++#else
+ void complete_slot(size_t slotIdx, wgpu::MapAsyncStatus status, wgpu::StringView message) {
++#endif
+   std::lock_guard lock{g_mutex};
+   auto& slot = g_slots[slotIdx];
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  bool mappedRange = false;
++#endif
+   if (status == wgpu::MapAsyncStatus::Success) {
+     const auto valueCount = static_cast<size_t>(slot.width) * static_cast<size_t>(slot.height);
+     const auto* mapped =
+         static_cast<const uint32_t*>(slot.readbackBuffer.GetConstMappedRange(0, valueCount * sizeof(uint32_t)));
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    mappedRange = mapped != nullptr;
++#endif
+     if (mapped != nullptr) {
+       g_latest.width = slot.width;
+       g_latest.height = slot.height;
+@@ -302,6 +346,11 @@ void complete_slot(size_t slotIdx, wgpu::MapAsyncStatus status, wgpu::StringView
+     Log.warn("Depth Peek readback mapping failed {}: {}", magic_enum::enum_name(status), message);
+   }
+   slot.state = SlotState::Available;
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  aurora::gfx::detail::browser_frame_effect_observer().observe_depth_map_callback(
++      static_cast<uint32_t>(slotIdx), effectOwnerId, static_cast<uint32_t>(status), mappedRange,
++      static_cast<uint32_t>(slot.state), g_latest.width, g_latest.height);
++#endif
+ }
+ } // namespace
+ 
+@@ -323,31 +372,110 @@ void shutdown() {
    }
  }
  
@@ -1768,12 +1955,21 @@ index 08f7743a08ff760628ca51ebb666fda75d9af6e6..00f8f8fc2fab8d54b2b4938991d7554d
 +
  void request_snapshot() noexcept {
    if (!g_enabled) {
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    aurora::gfx::detail::browser_frame_effect_observer().observe_depth_request(
++        AURORA_BROWSER_FRAME_EFFECT_DEPTH_ACTION_REQUEST, false, false, false, 0, 0, 0);
++#endif
      return;
    }
    std::lock_guard lock{g_mutex};
    g_snapshotRequested = true;
 +#if defined(AURORA_MATCH_DRAW_DISCARD_DIAGNOSTIC) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
 +  if (g_matchDrawDiscardActive) ++g_matchDrawDiscardRequests;
++#endif
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  aurora::gfx::detail::browser_frame_effect_observer().observe_depth_request(
++      AURORA_BROWSER_FRAME_EFFECT_DEPTH_ACTION_REQUEST, g_enabled, g_snapshotRequested, false,
++      static_cast<uint32_t>(g_nextSlot), g_latest.width, g_latest.height);
 +#endif
  }
  
@@ -1783,9 +1979,90 @@ index 08f7743a08ff760628ca51ebb666fda75d9af6e6..00f8f8fc2fab8d54b2b4938991d7554d
 +  if (g_matchDrawDiscardActive) ++g_matchDrawDiscardLatestReads;
 +#endif
    if (x >= g_latest.width || y >= g_latest.height || g_latest.data.empty()) {
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    aurora::gfx::detail::browser_frame_effect_observer().observe_depth_read(x, y, false, 0);
++#endif
      return false;
    }
-@@ -385,6 +435,10 @@ void encode_frame_snapshot(const wgpu::CommandEncoder& cmd, const wgpu::TextureV
+   z = g_latest.data[static_cast<size_t>(y) * g_latest.width + x] & 0x00ffffffu;
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  aurora::gfx::detail::browser_frame_effect_observer().observe_depth_read(x, y, true, z);
++#endif
+   return true;
+ }
+ 
+ void encode_frame_snapshot(const wgpu::CommandEncoder& cmd, const wgpu::TextureView& depthView,
+                            wgpu::Extent3D sourceSize, uint32_t msaaSamples) noexcept {
+   if (!g_enabled) {
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    auto& observer = aurora::gfx::detail::browser_frame_effect_observer();
++    observer.observe_depth_request(AURORA_BROWSER_FRAME_EFFECT_DEPTH_ACTION_ATTEMPT, false, false, false,
++                                   0, 0, 0);
++#endif
+     return;
+   }
+ 
+   ZoneScoped;
+   const auto now = Clock::now();
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  bool due = false;
++  {
++    std::lock_guard lock{g_mutex};
++    due = now >= g_nextSnapshotTime;
++    const bool requested = g_snapshotRequested;
++    observe_slots_locked(AURORA_BROWSER_FRAME_EFFECT_DEPTH_ACTION_ATTEMPT, requested, due,
++                         static_cast<bool>(depthView) && sourceSize.width != 0 && sourceSize.height != 0);
++    if (!requested || !due) {
++      return;
++    }
++    g_snapshotRequested = false;
++    g_nextSnapshotTime = now + SnapshotInterval;
++    observe_slots_locked(AURORA_BROWSER_FRAME_EFFECT_DEPTH_ACTION_CONSUMED, false, due,
++                         static_cast<bool>(depthView) && sourceSize.width != 0 && sourceSize.height != 0);
++  }
++#else
+   {
+     std::lock_guard lock{g_mutex};
+     if (!g_snapshotRequested || now < g_nextSnapshotTime) {
+@@ -356,9 +484,19 @@ void encode_frame_snapshot(const wgpu::CommandEncoder& cmd, const wgpu::TextureV
+     g_snapshotRequested = false;
+     g_nextSnapshotTime = now + SnapshotInterval;
+   }
++#endif
+ 
+   const auto dstSize = vi::configured_fb_size();
+   if (!depthView || dstSize.x == 0 || dstSize.y == 0 || sourceSize.width == 0 || sourceSize.height == 0) {
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    {
++      std::lock_guard lock{g_mutex};
++      aurora::gfx::detail::browser_frame_effect_observer().observe_depth_request(
++          AURORA_BROWSER_FRAME_EFFECT_DEPTH_ACTION_INVALID_SOURCE, g_enabled, false, due,
++          static_cast<uint32_t>(g_nextSlot), g_latest.width, g_latest.height);
++    }
++    aurora::gfx::detail::browser_frame_effect_observer().note_depth_blocker(AURORA_BROWSER_FRAME_EFFECT_DEPTH_INVALID_SOURCE);
++#endif
+     return;
+   }
+   if (msaaSamples > 1) {
+@@ -374,9 +512,17 @@ void encode_frame_snapshot(const wgpu::CommandEncoder& cmd, const wgpu::TextureV
+     std::lock_guard lock{g_mutex};
+     auto* slot = find_available_slot(dstSize.x, dstSize.y);
+     if (slot == nullptr) {
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++      observe_slots_locked(AURORA_BROWSER_FRAME_EFFECT_DEPTH_ACTION_SLOT_SELECTED, false, due, true);
++      aurora::gfx::detail::browser_frame_effect_observer().note_depth_blocker(
++          AURORA_BROWSER_FRAME_EFFECT_DEPTH_SLOT_UNAVAILABLE);
++#endif
+       return;
+     }
+     slot->state = SlotState::CopySubmitted;
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    observe_slots_locked(AURORA_BROWSER_FRAME_EFFECT_DEPTH_ACTION_SLOT_SELECTED, false, due, true);
++#endif
+     storageBuffer = slot->storageBuffer;
+     readbackBuffer = slot->readbackBuffer;
+     paramsBuffer = slot->paramsBuffer;
+@@ -385,6 +531,10 @@ void encode_frame_snapshot(const wgpu::CommandEncoder& cmd, const wgpu::TextureV
  
    AURORA_ASSERT(render_worker::is_worker_thread(), "Depth peek queue write must run on the render worker");
    g_queue.WriteBuffer(paramsBuffer, 0, &params, sizeof(params));
@@ -1796,6 +2073,52 @@ index 08f7743a08ff760628ca51ebb666fda75d9af6e6..00f8f8fc2fab8d54b2b4938991d7554d
  
    const std::array bindGroupEntries{
        wgpu::BindGroupEntry{
+@@ -409,6 +559,11 @@ void encode_frame_snapshot(const wgpu::CommandEncoder& cmd, const wgpu::TextureV
+       .entries = bindGroupEntries.data(),
+   };
+   const auto bindGroup = g_device.CreateBindGroup(&bindGroupDescriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  aurora::gfx::detail::browser_frame_effect_observer().observe_bind_group_descriptor(
++      reinterpret_cast<uintptr_t>(bindGroup.Get()), reinterpret_cast<uintptr_t>(g_device.Get()),
++      reinterpret_cast<uintptr_t>(g_bindGroupLayout.Get()), 0, bindGroupDescriptor);
++#endif
+ 
+   const wgpu::ComputePassDescriptor passDescriptor{
+       .label = "Depth Peek Compute Pass",
+@@ -438,6 +593,9 @@ void after_submit() noexcept {
+         continue;
+       }
+       slot.state = SlotState::MapPending;
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++      observe_slots_locked(AURORA_BROWSER_FRAME_EFFECT_DEPTH_ACTION_MAP_REGISTERED, false, false, true);
++#endif
+       pendingMaps.push_back({
+           .slotIdx = i,
+           .readbackBuffer = slot.readbackBuffer,
+@@ -447,11 +605,23 @@ void after_submit() noexcept {
+   }
+ 
+   for (const auto& pending : pendingMaps) {
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    const uint64_t effectOwnerId = aurora::gfx::detail::browser_frame_effect_observer().observe_depth_map_registration(
++        static_cast<uint32_t>(pending.slotIdx), pending.byteSize,
++        reinterpret_cast<uintptr_t>(pending.readbackBuffer.Get()));
++    pending.readbackBuffer.MapAsync(
++        wgpu::MapMode::Read, 0, pending.byteSize, wgpu::CallbackMode::AllowSpontaneous,
++        [slotIdx = pending.slotIdx, effectOwnerId](wgpu::MapAsyncStatus status,
++                                                  wgpu::StringView message) {
++          complete_slot(slotIdx, effectOwnerId, status, message);
++        });
++#else
+     pending.readbackBuffer.MapAsync(
+         wgpu::MapMode::Read, 0, pending.byteSize, wgpu::CallbackMode::AllowSpontaneous,
+         [slotIdx = pending.slotIdx](wgpu::MapAsyncStatus status, wgpu::StringView message) {
+           complete_slot(slotIdx, status, message);
+         });
++#endif
+   }
+ }
+ 
 diff --git a/lib/gfx/depth_peek.hpp b/lib/gfx/depth_peek.hpp
 index 47e9a0aadfe1b88ae7e177f226e5b05f36b681e3..5e083b995163fa28b3a5dcf5802674ee7c2f3ccb 100644
 --- a/lib/gfx/depth_peek.hpp
@@ -1822,7 +2145,7 @@ index 47e9a0aadfe1b88ae7e177f226e5b05f36b681e3..5e083b995163fa28b3a5dcf5802674ee
  
  void encode_frame_snapshot(const wgpu::CommandEncoder& cmd, const wgpu::TextureView& depthView,
 diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
-index b3054be5ad2dc2a45c3de4ecb3e944114421526c..5ea1aa860e9e8114dbb1fbd5a4be8ca8939bb369 100644
+index b3054be5ad2dc2a45c3de4ecb3e944114421526c..4fcbed7b5a096799407c12bedc6014a236a0eb7f 100644
 --- a/lib/gfx/encoding.cpp
 +++ b/lib/gfx/encoding.cpp
 @@ -1,6 +1,9 @@
@@ -1835,7 +2158,35 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..5ea1aa860e9e8114dbb1fbd5a4be8ca8
  
  #include "clear.hpp"
  #include "depth_peek.hpp"
-@@ -62,8 +65,13 @@ DrawContext make_draw_context(const RenderPass& passInfo) {
+@@ -33,11 +36,17 @@ using webgpu::g_queue;
+ namespace {
+ constexpr Module Log{"aurora::gfx"};
+ PipelineRef g_currentPipeline;
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++uintptr_t g_currentPipelineObject = 0;
++#endif
+ 
+ void apply_viewport(const wgpu::RenderPassEncoder& pass, const Viewport& vp) {
+   const float minDepth = gx::UseReversedZ ? 1.f - vp.zfar : vp.znear;
+   const float maxDepth = gx::UseReversedZ ? 1.f - vp.znear : vp.zfar;
+   pass.SetViewport(vp.left, vp.top, vp.width, vp.height, minDepth, maxDepth);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  browser_frame_effect_observer().observe_viewport(vp.left, vp.top, vp.width, vp.height, minDepth, maxDepth);
++#endif
+ }
+ 
+ void apply_scissor(const wgpu::RenderPassEncoder& pass, const ClipRect& sc, const wgpu::Extent3D& size) {
+@@ -46,6 +55,9 @@ void apply_scissor(const wgpu::RenderPassEncoder& pass, const ClipRect& sc, cons
+   const auto w = std::clamp(static_cast<uint32_t>(sc.width), 0u, size.width - x);
+   const auto h = std::clamp(static_cast<uint32_t>(sc.height), 0u, size.height - y);
+   pass.SetScissorRect(x, y, w, h);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  browser_frame_effect_observer().observe_scissor(x, y, w, h);
++#endif
+ }
+ 
+ DrawContext make_draw_context(const RenderPass& passInfo) {
+@@ -62,8 +74,13 @@ DrawContext make_draw_context(const RenderPass& passInfo) {
  }
  
  void render_custom_draw(const CustomDrawCommand& draw, const wgpu::RenderPassEncoder& pass,
@@ -1850,7 +2201,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..5ea1aa860e9e8114dbb1fbd5a4be8ca8
    if (!drawType) {
      // Unregistered between record and replay; the command is a no-op.
      return;
-@@ -73,8 +81,12 @@ void render_custom_draw(const CustomDrawCommand& draw, const wgpu::RenderPassEnc
+@@ -73,8 +90,12 @@ void render_custom_draw(const CustomDrawCommand& draw, const wgpu::RenderPassEnc
    drawType->draw(context, pass, draw.payload.data(), draw.payloadSize, drawType->userdata);
  }
  
@@ -1864,7 +2215,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..5ea1aa860e9e8114dbb1fbd5a4be8ca8
    if (!taskType) {
      // Unregistered between record and encode; the task is a no-op.
      return;
-@@ -105,7 +117,7 @@ void execute_encoder_task(wgpu::CommandEncoder& cmd, FramePacket& frame, const E
+@@ -105,9 +126,13 @@ void execute_encoder_task(wgpu::CommandEncoder& cmd, FramePacket& frame, const E
    }
  }
  
@@ -1872,16 +2223,32 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..5ea1aa860e9e8114dbb1fbd5a4be8ca8
 +void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, RenderPass& passInfo, uint32_t opIndex) {
    ZoneScoped;
    g_currentPipeline = UINTPTR_MAX;
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  g_currentPipelineObject = 0;
++  browser_frame_effect_observer().begin_pass();
++#endif
  #ifdef AURORA_GFX_DEBUG_GROUPS
-@@ -120,6 +132,7 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
+   std::vector<std::string> lastDebugGroupStack;
+ #endif
+@@ -119,8 +144,17 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
+   // Bind bind group for the whole pass
    pass.SetBindGroup(0, resources().staticBindGroup);
    pass.SetBindGroup(2, gx::g_emptyTextureBindGroup);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  browser_frame_effect_observer().observe_bind_group_set(0, reinterpret_cast<uintptr_t>(resources().staticBindGroup.Get()), 0, nullptr);
++  browser_frame_effect_observer().observe_bind_group_set(2, reinterpret_cast<uintptr_t>(gx::g_emptyTextureBindGroup.Get()), 0, nullptr);
++#endif
  
 +  uint32_t commandIndex = 0;
    for (auto& cmd : passInfo.commands) {
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    browser_frame_effect_observer().observe_command(frame.frameIndex, frame.frameId, opIndex, commandIndex,
++        static_cast<uint32_t>(cmd.type), cmd.type == CommandType::Draw && cmd.data.draw.encoder != nullptr);
++#endif
  #ifdef AURORA_GFX_DEBUG_GROUPS
      {
-@@ -154,12 +167,18 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
+       size_t firstDiff = lastDebugGroupStack.size();
+@@ -154,15 +188,31 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
      } break;
      case CommandType::Draw: {
        auto& draw = cmd.data.draw;
@@ -1893,15 +2260,28 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..5ea1aa860e9e8114dbb1fbd5a4be8ca8
 +        browser_frame_effect_observer().observe_draw(frame.frameIndex, frame.frameId, opIndex, commandIndex);
 +#endif
          draw.encoder(draw.payload.data(), pass, passInfo);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++        browser_frame_effect_observer().end_draw_callback();
++#endif
        }
      } break;
      case CommandType::CustomDraw: {
 -      render_custom_draw(cmd.data.customDraw, pass, passInfo);
 +      render_custom_draw(cmd.data.customDraw, pass, passInfo, frame, opIndex, commandIndex);
        g_currentPipeline = UINTPTR_MAX;
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++      g_currentPipelineObject = 0;
++#endif
        pass.SetBindGroup(0, resources().staticBindGroup);
        pass.SetBindGroup(2, gx::g_emptyTextureBindGroup);
-@@ -176,6 +195,7 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++      browser_frame_effect_observer().observe_bind_group_set(0, reinterpret_cast<uintptr_t>(resources().staticBindGroup.Get()), 0, nullptr);
++      browser_frame_effect_observer().observe_bind_group_set(2, reinterpret_cast<uintptr_t>(gx::g_emptyTextureBindGroup.Get()), 0, nullptr);
++#endif
+       if (hasViewport) {
+         apply_viewport(pass, currentViewport);
+       }
+@@ -176,6 +226,7 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
  #endif
      } break;
      }
@@ -1909,7 +2289,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..5ea1aa860e9e8114dbb1fbd5a4be8ca8
    }
  
  #ifdef AURORA_GFX_DEBUG_GROUPS
-@@ -191,8 +211,13 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
+@@ -191,8 +242,13 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
      return;
    }
  
@@ -1923,7 +2303,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..5ea1aa860e9e8114dbb1fbd5a4be8ca8
    }
    if (passInfo.discardable) {
      // This pass has no effect and can be safely discarded (e.g. an empty EFB segment between two back-to-back pass
-@@ -246,10 +271,19 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
+@@ -246,10 +302,19 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
    };
  
    auto pass = cmd.BeginRenderPass(&renderPassDescriptor);
@@ -1944,7 +2324,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..5ea1aa860e9e8114dbb1fbd5a4be8ca8
      depth_peek::encode_frame_snapshot(cmd, passInfo.copySourceDepthView,
                                        passInfo.colorAttachments[SceneColorAttachmentIndex].size, passInfo.msaaSamples);
    }
-@@ -260,6 +294,13 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
+@@ -260,6 +325,13 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
      const bool needsScaling = dstSize.width != static_cast<uint32_t>(passInfo.resolveRect.width) ||
                                dstSize.height != static_cast<uint32_t>(passInfo.resolveRect.height);
      const bool isDepth = gx::is_depth_format(passInfo.resolveFormat);
@@ -1958,7 +2338,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..5ea1aa860e9e8114dbb1fbd5a4be8ca8
      if (isDepth && passInfo.msaaSamples > 1) {
        Log.fatal("Depth tex copies from multisampled EFB targets are not supported");
      }
-@@ -297,6 +338,12 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
+@@ -297,6 +369,12 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
    }
  
    if (passInfo.snapshotColorDst) {
@@ -1971,7 +2351,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..5ea1aa860e9e8114dbb1fbd5a4be8ca8
      const webgpu::gpu_prof::Zone zone{cmd, "Pass snapshot"};
      const wgpu::TexelCopyTextureInfo src{
          .texture = passInfo.copySourceTexture,
-@@ -312,6 +359,12 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
+@@ -312,6 +390,12 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
      cmd.CopyTextureToTexture(&src, &dst, &size);
    }
    if (passInfo.snapshotDepthDst) {
@@ -1984,7 +2364,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..5ea1aa860e9e8114dbb1fbd5a4be8ca8
      tex_copy_conv::snapshot_depth(cmd, passInfo.copySourceDepthView, passInfo.msaaSamples, passInfo.snapshotDepthDst);
    }
  }
-@@ -324,7 +377,7 @@ constexpr uint64_t TextureUploadStagingOffset = StorageStagingOffset + StorageBu
+@@ -324,7 +408,7 @@ constexpr uint64_t TextureUploadStagingOffset = StorageStagingOffset + StorageBu
  
  constexpr uint32_t align_down_copy_offset(uint32_t value) noexcept { return value & ~3u; }
  
@@ -1993,7 +2373,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..5ea1aa860e9e8114dbb1fbd5a4be8ca8
                                 uint32_t highWater, uint64_t stagingOffset, const wgpu::Buffer& dst) {
    if (highWater <= copied) {
      return;
-@@ -333,6 +386,10 @@ void copy_staging_buffer_range(wgpu::CommandEncoder& cmd, const FramePacket& fra
+@@ -333,6 +417,10 @@ void copy_staging_buffer_range(wgpu::CommandEncoder& cmd, const FramePacket& fra
    const uint32_t copyEnd = AURORA_ALIGN(highWater, 4);
    cmd.CopyBufferToBuffer(staging_buffer(frame.stagingBuffer), stagingOffset + copyStart, dst, copyStart,
                           copyEnd - copyStart);
@@ -2004,7 +2384,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..5ea1aa860e9e8114dbb1fbd5a4be8ca8
    copied = highWater;
  }
  
-@@ -355,11 +412,11 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
+@@ -355,11 +443,11 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
    const webgpu::gpu_prof::Zone zone{cmd, "Staging copies"};
    const auto& highWater = op.highWater;
    auto& res = resources();
@@ -2020,7 +2400,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..5ea1aa860e9e8114dbb1fbd5a4be8ca8
                              res.storageBuffer);
  
    if constexpr (UseTextureBuffer) {
-@@ -375,6 +432,11 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
+@@ -375,6 +463,11 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
            .buffer = item.buffer ? item.buffer : staging_buffer(frame.stagingBuffer),
        };
        cmd.CopyBufferToTexture(&buf, &item.tex, &item.size);
@@ -2032,8 +2412,80 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..5ea1aa860e9e8114dbb1fbd5a4be8ca8
      }
      frame.copied.textureUpload = highWater.textureUpload;
      frame.copied.textureUploadCount = op.textureUploads.size();
-@@ -384,6 +446,12 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
+@@ -382,8 +475,84 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
+ }
+ } // namespace
  
++#if defined(AURORA_BROWSER_FRAME_EFFECT_CONTROL_TEST) && defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++namespace {
++void renderer_observer_control_draw(void*, const wgpu::RenderPassEncoder&, const RenderPass&) {
++  browser_frame_effect_observer().observe_actual_draw(2, 3, 6, 1, 255);
++}
++}
++
++extern "C" int aurora_renderer_observer_control_run_command_switch() {
++  auto& observer = browser_frame_effect_observer();
++  constexpr uint32_t frameIndex = 47;
++  constexpr uint64_t frameId = 0x4f42534552564552ULL;
++  const WGPUBuffer warmBuffer = reinterpret_cast<WGPUBuffer>(uintptr_t{0x7100});
++  const WGPUBindGroup warmStaticGroup = reinterpret_cast<WGPUBindGroup>(uintptr_t{0x7200});
++  const WGPUBindGroup warmEmptyGroup = reinterpret_cast<WGPUBindGroup>(uintptr_t{0x7300});
++
++  wgpu::BufferDescriptor bufferDescriptor{};
++  bufferDescriptor.size = 64;
++  wgpu::BindGroupDescriptor bindGroupDescriptor{};
++  observer.observe_buffer_descriptor(reinterpret_cast<uintptr_t>(warmBuffer),
++                                     reinterpret_cast<uintptr_t>(g_device.Get()), bufferDescriptor);
++  if (observer.observe_bind_group_descriptor(reinterpret_cast<uintptr_t>(warmStaticGroup),
++                                              reinterpret_cast<uintptr_t>(g_device.Get()), 0, 0,
++                                              bindGroupDescriptor) != 0 ||
++      observer.observe_bind_group_descriptor(reinterpret_cast<uintptr_t>(warmEmptyGroup),
++                                              reinterpret_cast<uintptr_t>(g_device.Get()), 0, 0,
++                                              bindGroupDescriptor) != 0)
++    return 11;
++  resources().staticBindGroup = wgpu::BindGroup::Acquire(warmStaticGroup);
++  gx::g_emptyTextureBindGroup = wgpu::BindGroup::Acquire(warmEmptyGroup);
++  if (!observer.arm(frameIndex)) return 12;
++
++  FramePacket frame{};
++  frame.frameIndex = frameIndex;
++  frame.frameId = frameId;
++#ifdef AURORA_GFX_DEBUG_GROUPS
++  frame.debugMarkers.emplace_back("observer control marker");
++#endif
++  std::array<wgpu::RenderPassColorAttachment, MaxColorAttachments> attachments{};
++  uint32_t commandOrdinal = 0;
++  for (uint32_t passIndex = 0; passIndex < 3; ++passIndex) {
++    RenderPass passInfo{};
++    passInfo.hasDepth = false;
++    passInfo.colorAttachments[SceneColorAttachmentIndex].size = {320, 240, 1};
++    const uint32_t passCommandCount = passIndex == 0 ? 23u : passIndex == 1 ? 22u : 220u;
++    passInfo.commands.reserve(passCommandCount);
++    for (uint32_t i = 0; i < passCommandCount; ++i, ++commandOrdinal) {
++      Command command{};
++      if (commandOrdinal < 246) {
++        command.type = CommandType::Draw;
++        command.data.draw.encoder = renderer_observer_control_draw;
++      } else {
++        switch ((commandOrdinal - 246) % 4) {
++        case 0: command.type = CommandType::SetViewport; break;
++        case 1: command.type = CommandType::SetScissor; break;
++        case 2: command.type = CommandType::CustomDraw; break;
++        default: command.type = CommandType::DebugMarker; command.data.debugMarkerIndex = 0; break;
++        }
++      }
++      passInfo.commands.push_back(command);
++    }
++    observer.observe_render_pass(frame, passIndex, passInfo, attachments, nullptr);
++    render_pass(wgpu::RenderPassEncoder{}, frame, passInfo, passIndex);
++  }
++  observer.observe_packet_retire(frameId, frameIndex, true, 0);
++  observer.observe_submit(frameId);
++  observer.observe_fence(frameId, true);
++  return commandOrdinal == 265 ? 0 : 13;
++}
++#endif
++
  namespace detail {
  void encode_op(wgpu::CommandEncoder& cmd, FramePacket& frame, const FrameOp& op) {
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
@@ -2045,7 +2497,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..5ea1aa860e9e8114dbb1fbd5a4be8ca8
    copy_staging_to_high_water(cmd, frame, op);
    switch (op.type) {
    case FrameOpType::RenderPass:
-@@ -393,13 +461,16 @@ void encode_op(wgpu::CommandEncoder& cmd, FramePacket& frame, const FrameOp& op)
+@@ -393,13 +562,16 @@ void encode_op(wgpu::CommandEncoder& cmd, FramePacket& frame, const FrameOp& op)
      break;
    case FrameOpType::TextureCopy:
      if (op.textureCopy != nullptr) {
@@ -2063,8 +2515,32 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..5ea1aa860e9e8114dbb1fbd5a4be8ca8
      }
      break;
    }
+@@ -408,6 +580,11 @@ void encode_op(wgpu::CommandEncoder& cmd, FramePacket& frame, const FrameOp& op)
+ 
+ bool bind_pipeline(PipelineRef ref, const wgpu::RenderPassEncoder& pass) {
+   if (ref == g_currentPipeline) {
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    // Reuse the scalar from the original successful lookup; never create another owning wrapper.
++    browser_frame_effect_observer().observe_pipeline_bound(static_cast<uint64_t>(ref), g_currentPipelineObject,
++                                                            reinterpret_cast<uintptr_t>(g_device.Get()));
++#endif
+     return true;
+   }
+   wgpu::RenderPipeline pipeline;
+@@ -416,6 +593,11 @@ bool bind_pipeline(PipelineRef ref, const wgpu::RenderPassEncoder& pass) {
+   }
+   pass.SetPipeline(pipeline);
+   g_currentPipeline = ref;
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  g_currentPipelineObject = reinterpret_cast<uintptr_t>(pipeline.Get());
++  browser_frame_effect_observer().observe_pipeline_bound(static_cast<uint64_t>(ref), g_currentPipelineObject,
++                                                          reinterpret_cast<uintptr_t>(g_device.Get()));
++#endif
+   return true;
+ }
+ } // namespace aurora::gfx
 diff --git a/lib/gfx/frame.cpp b/lib/gfx/frame.cpp
-index 9fd83efc28ad8a19c3e902a6efc1096126982583..9ae5d816040b89fc83fa864a43d4d12b65709868 100644
+index 9fd83efc28ad8a19c3e902a6efc1096126982583..42b99d65f323c009c9ce27ab52fa85ce0d3c9001 100644
 --- a/lib/gfx/frame.cpp
 +++ b/lib/gfx/frame.cpp
 @@ -1,7 +1,19 @@
@@ -2681,7 +3157,21 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..9ae5d816040b89fc83fa864a43d4d12b
    // This appears to take a while and blocks the render thread for periods of time
    // render_worker::set_event_pump([] {
    //   if (g_instance) {
-@@ -418,17 +947,24 @@ void initialize() {
+@@ -408,6 +937,13 @@ void initialize() {
+         .size = size,
+     };
+     out = g_device.CreateBuffer(&descriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    const uint32_t words[] = {static_cast<uint32_t>(size), static_cast<uint32_t>(size >> 32),
++                              static_cast<uint32_t>(usage)};
++    browser_frame_effect_observer().observe_resource_descriptor(
++        AURORA_BROWSER_FRAME_EFFECT_HANDLE_BUFFER, reinterpret_cast<uintptr_t>(out.Get()),
++        reinterpret_cast<uintptr_t>(g_device.Get()), words, 3);
++#endif
+   };
+   createBuffer(g_resources.uniformBuffer, wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst, UniformBufferSize,
+                "Shared Uniform Buffer");
+@@ -418,17 +954,24 @@ void initialize() {
                 "Shared Index Buffer");
    createBuffer(g_resources.storageBuffer, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst, StorageBufferSize,
                 "Shared Storage Buffer");
@@ -2707,7 +3197,31 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..9ae5d816040b89fc83fa864a43d4d12b
  
    {
      constexpr std::array layoutEntries{
-@@ -519,6 +1055,10 @@ void initialize() {
+@@ -474,6 +1017,11 @@ void initialize() {
+         .entries = entries.data(),
+     };
+     g_resources.staticBindGroup = g_device.CreateBindGroup(&bindGroupDescriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    browser_frame_effect_observer().observe_bind_group_descriptor(
++        reinterpret_cast<uintptr_t>(g_resources.staticBindGroup.Get()), reinterpret_cast<uintptr_t>(g_device.Get()),
++        reinterpret_cast<uintptr_t>(g_resources.staticBindGroupLayout.Get()), 0, bindGroupDescriptor);
++#endif
+   }
+ 
+   {
+@@ -509,6 +1057,11 @@ void initialize() {
+         .entries = entries.data(),
+     };
+     g_resources.uniformBindGroup = g_device.CreateBindGroup(&bindGroupDescriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    browser_frame_effect_observer().observe_bind_group_descriptor(
++        reinterpret_cast<uintptr_t>(g_resources.uniformBindGroup.Get()), reinterpret_cast<uintptr_t>(g_device.Get()),
++        reinterpret_cast<uintptr_t>(g_resources.uniformBindGroupLayout.Get()), 0, bindGroupDescriptor);
++#endif
+   }
+ 
+   gx::initialize();
+@@ -519,6 +1072,10 @@ void initialize() {
  }
  
  void shutdown() {
@@ -2718,7 +3232,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..9ae5d816040b89fc83fa864a43d4d12b
    render_worker::synchronize();
    render_worker::shutdown();
    g_processEventsQueued.store(false, std::memory_order_release);
-@@ -556,12 +1096,29 @@ void shutdown() {
+@@ -556,12 +1113,29 @@ void shutdown() {
    for (auto& packet : g_framePackets) {
      packet = {};
    }
@@ -2748,7 +3262,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..9ae5d816040b89fc83fa864a43d4d12b
    g_frameSlots.reset();
    g_stagingSlots.reset();
    for (auto& state : g_mappingStates) {
-@@ -584,49 +1141,109 @@ bool wait_for_staging_buffer(size_t slot) {
+@@ -584,49 +1158,109 @@ bool wait_for_staging_buffer(size_t slot) {
    }
  }
  
@@ -2779,8 +3293,8 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..9ae5d816040b89fc83fa864a43d4d12b
    ZoneScopedN("Acquire mapped staging buffer");
 +  const double acquireStarted = phase_now_ms();
 +#ifdef __EMSCRIPTEN__
-+  while (true) {
-+    if (auto slot = g_stagingSlots.try_acquire()) {
+   while (true) {
+     if (auto slot = g_stagingSlots.try_acquire()) {
 +      timing.stagingSlotMs = phase_now_ms() - acquireStarted;
 +      return slot;
 +    }
@@ -2792,8 +3306,8 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..9ae5d816040b89fc83fa864a43d4d12b
 +    observe_begin_wait(timing, 2, waitStarted, waitEnded);
 +  }
 +#else
-   while (true) {
-     if (auto slot = g_stagingSlots.try_acquire()) {
++  while (true) {
++    if (auto slot = g_stagingSlots.try_acquire()) {
 +      const double mapStarted = phase_now_ms();
        if (wait_for_staging_buffer(*slot)) {
 +        timing.stagingSlotWaitMs += phase_now_ms() - mapStarted;
@@ -2862,7 +3376,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..9ae5d816040b89fc83fa864a43d4d12b
    size_t bufferOffset = 0;
    const auto& stagingBuf = g_stagingBuffers[*stagingSlot];
    const auto mapBuffer = [&](ByteBuffer& buf, uint64_t size) {
-@@ -643,20 +1260,74 @@ bool begin_frame() {
+@@ -643,20 +1277,74 @@ bool begin_frame() {
    if constexpr (UseTextureBuffer) {
      mapBuffer(frame.textureUpload, TextureUploadSize);
    }
@@ -2937,7 +3451,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..9ae5d816040b89fc83fa864a43d4d12b
    if (g_cpuFrameStart.time_since_epoch().count() != 0) {
      const auto cpuFrameTime = PresentClock::now() - g_cpuFrameStart;
      update_ema(g_cpuFrameTimeNs, duration_ns(cpuFrameTime));
-@@ -669,15 +1340,59 @@ void end_frame(EndFrameCallback callback) {
+@@ -669,15 +1357,59 @@ void end_frame(EndFrameCallback callback) {
    const uint64_t frameId = frame.frameId;
    end_pipeline_frame();
    ++g_frameIndex;
@@ -2999,20 +3513,20 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..9ae5d816040b89fc83fa864a43d4d12b
      packet = {};
      g_resources.stats.drawCallCount = stats.drawCallCount;
      g_resources.stats.mergedDrawCallCount = stats.mergedDrawCallCount;
-@@ -686,16 +1401,469 @@ void end_frame(EndFrameCallback callback) {
+@@ -686,16 +1418,469 @@ void end_frame(EndFrameCallback callback) {
      g_resources.stats.lastIndexSize = stats.lastIndexSize;
      g_resources.stats.lastStorageSize = stats.lastStorageSize;
      g_resources.stats.lastTextureUploadSize = stats.lastTextureUploadSize;
 +    stats.lastEndFramePacketMs = phase_now_ms() - packetStarted;
 +    const double callbackStarted = phase_now_ms();
-+    if (callback) {
+     if (callback) {
+-      callback(encoder, std::move(afterSubmitCallbacks));
 +      callback(encoder, std::move(afterSubmitCallbacks), stats);
-+    }
+     }
 +    stats.lastEndFrameCallbackMs = phase_now_ms() - callbackStarted;
 +#ifdef __EMSCRIPTEN__
 +#if defined(AURORA_BROWSER_QUIESCENCE_DIAGNOSTIC)
-     if (callback) {
--      callback(encoder, std::move(afterSubmitCallbacks));
++    if (callback) {
 +      // The caller's callback finishes and submits the command buffer before
 +      // this completion observer is registered. Publish a registration record
 +      // before the API call: AllowSpontaneous may invoke the callback before
@@ -3119,7 +3633,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..9ae5d816040b89fc83fa864a43d4d12b
 +      stats.lastEndFrameObserverMs = phase_now_ms() - observerStarted;
 +    } else {
 +      g_stagingSlots.release(stagingSlot);
-     }
++    }
 +#endif
 +#endif
 +    stats.lastEndFrameCallbackResidualMs =
@@ -3161,8 +3675,8 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..9ae5d816040b89fc83fa864a43d4d12b
 +                  g_resources.stats.lastEndFrameCallbackMs + g_resources.stats.lastEndFrameObserverMs +
 +                  g_resources.stats.lastEndFrameTailMs);
 +#endif
-+}
-+
+ }
+ 
 +#if defined(AURORA_MATCH_DRAW_DISCARD_DIAGNOSTIC) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
 +void end_frame_match_draw_discard(MatchDrawDiscardFrameStatus* out) {
 +  // Browser render worker dispatch is synchronous in this non-pthread build.
@@ -3428,8 +3942,8 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..9ae5d816040b89fc83fa864a43d4d12b
 +    return 0;
 +  }
 +  return std::memcmp(captured, current.data(), required) == 0 ? 1 : 0;
- }
- 
++}
++
 +int browser_quiescence_capture_lease(AuroraBrowserQuiescenceLease* out) noexcept {
 +  if (!browser_quiescence_supported()) {
 +    return 0;
@@ -3470,7 +3984,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..9ae5d816040b89fc83fa864a43d4d12b
  uint32_t current_frame() noexcept { return g_frameIndex; }
  
  void after_submit() noexcept { depth_peek::after_submit(); }
-@@ -734,5 +1902,41 @@ float calculate_fps() noexcept {
+@@ -734,5 +1919,41 @@ float calculate_fps() noexcept {
  }
  } // namespace aurora::gfx
  
@@ -3548,10 +4062,10 @@ index 0b86ffead6e8f6153d2acf52cf9daecf4f07ccfa..a5ad738b32d623acc50eb06d39589ff0
  void gpu_synchronize();
 diff --git a/lib/gfx/frame_effect_observer.hpp b/lib/gfx/frame_effect_observer.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..a50737f3b2da1f60881acf9df1d0c7d43e4218f4
+index 0000000000000000000000000000000000000000..6fc0fde95d4e5ca5958a12770a3c060a9f254bdb
 --- /dev/null
 +++ b/lib/gfx/frame_effect_observer.hpp
-@@ -0,0 +1,434 @@
+@@ -0,0 +1,992 @@
 +#pragma once
 +
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
@@ -3561,6 +4075,7 @@ index 0000000000000000000000000000000000000000..a50737f3b2da1f60881acf9df1d0c7d4
 +
 +#include <array>
 +#include <atomic>
++#include <bit>
 +#include <cstdint>
 +#include <limits>
 +
@@ -3571,8 +4086,452 @@ index 0000000000000000000000000000000000000000..a50737f3b2da1f60881acf9df1d0c7d4
 +  bool arm(uint32_t frameIndex) noexcept {
 +    if (state_.load(std::memory_order_acquire) != AURORA_BROWSER_FRAME_EFFECT_UNUSED) return false;
 +    targetFrameIndex_ = frameIndex;
++    if (preflightBlocker_ != AURORA_BROWSER_FRAME_EFFECT_BLOCKER_NONE) {
++      set_blocker(preflightBlocker_);
++      for (uint32_t blocker = 1; blocker < 64; ++blocker) {
++        if ((preflightFindingMask_ & (uint64_t{1} << blocker)) != 0) set_blocker(blocker);
++      }
++      state_.store(AURORA_BROWSER_FRAME_EFFECT_FAILED, std::memory_order_release);
++      return false;
++    }
 +    state_.store(AURORA_BROWSER_FRAME_EFFECT_ARMED, std::memory_order_release);
 +    return true;
++  }
++
++  void observe_command(uint32_t frameIndex, uint64_t frameId, uint32_t opIndex, uint32_t commandIndex,
++                       uint32_t commandType, bool callbackPresent) noexcept {
++    if (!begin_or_match(frameIndex, frameId)) return;
++    ++commandRecordCount_;
++    currentOpIndex_ = opIndex;
++    currentCommandIndex_ = commandIndex;
++    if (commandType > 4u) fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_COMMAND);
++    if (commandType == 2u && !callbackPresent) fail(AURORA_BROWSER_FRAME_EFFECT_UNCLASSIFIED_DRAW);
++    auto row = make_event(AURORA_BROWSER_FRAME_EFFECT_EVENT_COMMAND, opIndex, commandIndex);
++    row.flags = commandType;
++    row.value0 = callbackPresent ? 1u : 0u;
++    append(row);
++  }
++
++  void begin_pass() noexcept {
++    if (!collecting()) return;
++    currentPipelineKey_ = 0;
++    currentPipelineId_ = 0;
++    currentBindGroupIds_ = {};
++    currentDynamicOffsetCount_ = {};
++    currentDynamicOffsets_ = {};
++    currentIndexBufferId_ = currentIndexOffset_ = currentIndexSize_ = 0;
++    currentIndexFormat_ = 0;
++    currentViewport_ = {};
++    currentScissor_ = {};
++  }
++
++  uint64_t observe_resource_descriptor(uint32_t kind, uintptr_t address, uintptr_t device,
++                                       const uint32_t* words, uint32_t wordCount) noexcept {
++    if (!recording()) return 0;
++    const uint64_t ownerId = handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_DEVICE, device);
++    return register_resource(kind, address, ownerId, words, wordCount);
++  }
++
++  void observe_buffer_descriptor(uintptr_t buffer, uintptr_t device, const wgpu::BufferDescriptor& descriptor) noexcept {
++    if (!recording()) return;
++    if (descriptor.nextInChain != nullptr) { fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return; }
++    const uint64_t usage = static_cast<uint64_t>(descriptor.usage);
++    const uint32_t words[] = {static_cast<uint32_t>(descriptor.size), static_cast<uint32_t>(descriptor.size >> 32),
++                              static_cast<uint32_t>(usage), static_cast<uint32_t>(usage >> 32),
++                              descriptor.mappedAtCreation ? 1u : 0u};
++    observe_resource_descriptor(AURORA_BROWSER_FRAME_EFFECT_HANDLE_BUFFER, buffer, device, words, 5);
++  }
++
++  void observe_texture_descriptor(uintptr_t texture, uintptr_t device, const wgpu::TextureDescriptor& descriptor) noexcept {
++    if (!recording()) return;
++    if (descriptor.nextInChain != nullptr || descriptor.viewFormatCount > 6 ||
++        (descriptor.viewFormatCount != 0 && descriptor.viewFormats == nullptr)) {
++      fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE);
++      return;
++    }
++    const uint64_t usage = static_cast<uint64_t>(descriptor.usage);
++    uint32_t words[16] = {descriptor.size.width, descriptor.size.height, descriptor.size.depthOrArrayLayers,
++                           static_cast<uint32_t>(descriptor.format), static_cast<uint32_t>(descriptor.dimension),
++                           descriptor.mipLevelCount, descriptor.sampleCount, static_cast<uint32_t>(usage),
++                           static_cast<uint32_t>(usage >> 32), static_cast<uint32_t>(descriptor.viewFormatCount)};
++    for (size_t i = 0; i < descriptor.viewFormatCount; ++i) words[10 + i] = static_cast<uint32_t>(descriptor.viewFormats[i]);
++    const uint64_t ownerId = handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_DEVICE, device);
++    register_resource(AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE, texture, ownerId, words,
++                      static_cast<uint32_t>(10 + descriptor.viewFormatCount));
++  }
++
++  void observe_texture_view_descriptor(uintptr_t view, uintptr_t texture, uintptr_t device,
++                                       const wgpu::TextureViewDescriptor* descriptor) noexcept {
++    if (!recording()) return;
++    const wgpu::TextureViewDescriptor defaults{};
++    const auto& d = descriptor == nullptr ? defaults : *descriptor;
++    if (d.nextInChain != nullptr) { fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return; }
++    const uint64_t textureId = handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE, texture);
++    const uint32_t words[] = {static_cast<uint32_t>(textureId), static_cast<uint32_t>(textureId >> 32),
++                              static_cast<uint32_t>(d.format), static_cast<uint32_t>(d.dimension), d.baseMipLevel,
++                              d.mipLevelCount, d.baseArrayLayer, d.arrayLayerCount, static_cast<uint32_t>(d.aspect),
++                              static_cast<uint32_t>(d.usage)};
++    const uint64_t ownerId = textureId != 0 ? textureId : handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_DEVICE, device);
++    register_resource(AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE_VIEW, view, ownerId, words, 10);
++  }
++
++  void observe_sampler_descriptor(uintptr_t sampler, uintptr_t device, const wgpu::SamplerDescriptor& d) noexcept {
++    if (!recording()) return;
++    if (d.nextInChain != nullptr) { fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return; }
++    const uint32_t words[] = {static_cast<uint32_t>(d.addressModeU), static_cast<uint32_t>(d.addressModeV),
++                              static_cast<uint32_t>(d.addressModeW), static_cast<uint32_t>(d.magFilter),
++                              static_cast<uint32_t>(d.minFilter), static_cast<uint32_t>(d.mipmapFilter),
++                              std::bit_cast<uint32_t>(d.lodMinClamp), std::bit_cast<uint32_t>(d.lodMaxClamp),
++                              static_cast<uint32_t>(d.compare), d.maxAnisotropy};
++    const uint64_t ownerId = handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_DEVICE, device);
++    register_resource(AURORA_BROWSER_FRAME_EFFECT_HANDLE_SAMPLER, sampler, ownerId, words, 10);
++  }
++
++  void observe_depth_state(uint32_t action, bool enabled, bool requested, bool due, bool validSource,
++                           uint32_t nextSlot, uint32_t slotIndex, uint32_t slotState,
++                           uint32_t width, uint32_t height, uint64_t byteSize,
++                           uintptr_t storageBuffer, uintptr_t readbackBuffer, uintptr_t paramsBuffer,
++                           uint32_t latestWidth, uint32_t latestHeight) noexcept {
++    if (!collecting_or_submitted()) return;
++    ++depthTraceCount_;
++    auto row = make_event(AURORA_BROWSER_FRAME_EFFECT_EVENT_DEPTH_STATE, currentOpIndex_, slotIndex);
++    row.flags = action;
++    row.value0 = (enabled ? 1u : 0u) | (requested ? 2u : 0u) | (due ? 4u : 0u) | (validSource ? 8u : 0u);
++    row.value1 = nextSlot;
++    row.value2 = slotState;
++    row.value3 = width;
++    row.handleA = handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_BUFFER, storageBuffer);
++    row.handleB = handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_BUFFER, readbackBuffer);
++    append(row);
++    auto sizes = make_event(AURORA_BROWSER_FRAME_EFFECT_EVENT_DEPTH_STATE, currentOpIndex_, slotIndex);
++    sizes.flags = action | 0x100u;
++    sizes.value0 = height;
++    sizes.value1 = static_cast<uint32_t>(byteSize);
++    sizes.value2 = static_cast<uint32_t>(byteSize >> 32);
++    sizes.value3 = latestWidth;
++    sizes.handleA = handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_BUFFER, paramsBuffer);
++    sizes.handleB = (static_cast<uint64_t>(latestWidth) << 32) | latestHeight;
++    append(sizes);
++    if (slotState == 1u || slotState == 2u) set_blocker(AURORA_BROWSER_FRAME_EFFECT_DEPTH_MAP_PENDING);
++  }
++
++  void observe_depth_request(uint32_t action, bool enabled, bool requested, bool due,
++                             uint32_t nextSlot, uint32_t latestWidth, uint32_t latestHeight) noexcept {
++    const auto state = state_.load(std::memory_order_acquire);
++    if (state != AURORA_BROWSER_FRAME_EFFECT_ARMED && state != AURORA_BROWSER_FRAME_EFFECT_COLLECTING) return;
++    ++depthTraceCount_;
++    if (action == AURORA_BROWSER_FRAME_EFFECT_DEPTH_ACTION_REQUEST) ++depthRequestCount_;
++    auto row = make_event(AURORA_BROWSER_FRAME_EFFECT_EVENT_DEPTH_STATE, currentOpIndex_, depthRequestCount_);
++    row.flags = action;
++    row.value0 = (enabled ? 1u : 0u) | (requested ? 2u : 0u) | (due ? 4u : 0u);
++    row.value1 = depthRequestCount_;
++    row.value2 = nextSlot;
++    row.value3 = latestWidth;
++    row.handleA = (static_cast<uint64_t>(latestWidth) << 32) | latestHeight;
++    append_or_queue_prebegin(row);
++  }
++
++  uint64_t observe_depth_map_registration(uint32_t slotIndex, uint64_t byteSize, uintptr_t buffer) noexcept {
++    if (!collecting_or_submitted()) return 0;
++    ++depthTraceCount_;
++    const uint64_t ownerId = ++depthMapOwnerCount_;
++    auto row = make_event(AURORA_BROWSER_FRAME_EFFECT_EVENT_DEPTH_STATE, currentOpIndex_, slotIndex);
++    row.flags = AURORA_BROWSER_FRAME_EFFECT_DEPTH_ACTION_MAP_REGISTERED | 0x200u;
++    row.value0 = static_cast<uint32_t>(byteSize);
++    row.value1 = static_cast<uint32_t>(byteSize >> 32);
++    row.value2 = static_cast<uint32_t>(ownerId);
++    row.value3 = static_cast<uint32_t>(ownerId >> 32);
++    row.handleA = handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_BUFFER, buffer);
++    row.handleB = ownerId;
++    append(row);
++    return ownerId;
++  }
++
++  void note_depth_blocker(uint32_t blocker) noexcept { fail(blocker); }
++
++  void observe_depth_map_callback(uint32_t slotIndex, uint64_t ownerId, uint32_t mapStatus, bool mappedRange,
++                                 uint32_t slotState, uint32_t latestWidth, uint32_t latestHeight) noexcept {
++    if (!collecting_or_submitted()) return;
++    ++depthTraceCount_;
++    auto row = make_event(AURORA_BROWSER_FRAME_EFFECT_EVENT_DEPTH_STATE, currentOpIndex_, slotIndex);
++    row.flags = AURORA_BROWSER_FRAME_EFFECT_DEPTH_ACTION_MAP_COMPLETE;
++    row.value0 = mapStatus;
++    row.value1 = mappedRange ? 1u : 0u;
++    row.value2 = slotState;
++    row.value3 = latestWidth;
++    row.handleA = (static_cast<uint64_t>(latestWidth) << 32) | latestHeight;
++    row.handleB = ownerId;
++    append(row);
++    if (ownerId == 0) set_blocker(AURORA_BROWSER_FRAME_EFFECT_DEPTH_MAP_OWNER_UNKNOWN);
++  }
++
++  void observe_depth_read(uint16_t x, uint16_t y, bool found, uint32_t value) noexcept {
++    const auto state = state_.load(std::memory_order_acquire);
++    if (state != AURORA_BROWSER_FRAME_EFFECT_ARMED && state != AURORA_BROWSER_FRAME_EFFECT_COLLECTING) return;
++    ++depthTraceCount_;
++    auto row = make_event(AURORA_BROWSER_FRAME_EFFECT_EVENT_DEPTH_READ, currentOpIndex_, currentCommandIndex_);
++    row.flags = found ? 1u : 0u;
++    row.value0 = x;
++    row.value1 = y;
++    row.value2 = value;
++    append_or_queue_prebegin(row);
++  }
++
++  void begin_draw_callback() noexcept {
++    if (!collecting()) return;
++    drawCallbackActive_ = true;
++    drawCallbackStartCount_ = actualDrawCount_;
++  }
++
++  void end_draw_callback() noexcept {
++    if (!collecting() || !drawCallbackActive_) return;
++    if (actualDrawCount_ == drawCallbackStartCount_) fail(AURORA_BROWSER_FRAME_EFFECT_UNCLASSIFIED_DRAW);
++    drawCallbackActive_ = false;
++  }
++
++  void observe_pipeline_bound(uint64_t pipelineKey, uintptr_t pipelineObject, uintptr_t deviceObject) noexcept {
++    if (!collecting()) return;
++    currentPipelineKey_ = pipelineKey;
++    currentPipelineId_ = handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_PIPELINE, pipelineObject);
++    const uint32_t words[] = {static_cast<uint32_t>(pipelineKey), static_cast<uint32_t>(pipelineKey >> 32)};
++    register_resource(AURORA_BROWSER_FRAME_EFFECT_HANDLE_PIPELINE, pipelineObject,
++                      handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_DEVICE, deviceObject), words, 2);
++  }
++
++  void observe_bind_group_set(uint32_t slot, uintptr_t bindGroup, uint32_t offsetCount,
++                              const uint32_t* offsets) noexcept {
++    if (!collecting() || slot >= 4 || offsetCount > 4 || (offsetCount != 0 && offsets == nullptr)) {
++      if (collecting()) fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE);
++      return;
++    }
++    const uint64_t id = handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_BIND_GROUP, bindGroup);
++    currentBindGroupIds_[slot] = id;
++    currentDynamicOffsetCount_[slot] = offsetCount;
++    currentDynamicOffsets_[slot] = {};
++    for (uint32_t i = 0; i < offsetCount; ++i) currentDynamicOffsets_[slot][i] = offsets[i];
++    if (id == 0 || !resource_known(id)) fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE);
++  }
++
++  void observe_index_buffer(uintptr_t buffer, uint32_t format, uint64_t offset, uint64_t size) noexcept {
++    if (!collecting()) return;
++    currentIndexBufferId_ = handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_BUFFER, buffer);
++    currentIndexFormat_ = format;
++    currentIndexOffset_ = offset;
++    currentIndexSize_ = size;
++    if (currentIndexBufferId_ == 0 || !resource_known(currentIndexBufferId_))
++      fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE);
++  }
++
++  void observe_viewport(float x, float y, float width, float height, float minDepth, float maxDepth) noexcept {
++    if (!collecting()) return;
++    currentViewport_ = {x, y, width, height, minDepth, maxDepth};
++  }
++
++  void observe_scissor(uint32_t x, uint32_t y, uint32_t width, uint32_t height) noexcept {
++    if (!collecting()) return;
++    currentScissor_ = {x, y, width, height};
++  }
++
++  void observe_actual_draw(uint32_t rendererKind, uint32_t vertexCount, uint32_t indexCount,
++                           uint32_t instanceCount, uint32_t dstAlpha, const wgpu::Color* clearColor = nullptr) noexcept {
++    if (!collecting()) return;
++    if (!drawCallbackActive_ || actualDrawCount_ >= DrawCapacity) {
++      fail(actualDrawCount_ >= DrawCapacity ? AURORA_BROWSER_FRAME_EFFECT_DRAW_OVERFLOW
++                                           : AURORA_BROWSER_FRAME_EFFECT_UNCLASSIFIED_DRAW);
++      return;
++    }
++    auto& out = draws_[actualDrawCount_++];
++    out = {};
++    out.frameIndex = frameIndex_;
++    out.opIndex = currentOpIndex_;
++    out.commandIndex = currentCommandIndex_;
++    out.rendererKind = rendererKind;
++    out.pipelineKey = currentPipelineKey_;
++    out.pipelineId = currentPipelineId_;
++    out.indexBufferId = currentIndexBufferId_;
++    out.indexFormat = currentIndexFormat_;
++    out.indexOffset = currentIndexOffset_;
++    out.indexSize = currentIndexSize_;
++    out.vertexCount = vertexCount;
++    out.indexCount = indexCount;
++    out.instanceCount = instanceCount;
++    out.dstAlpha = dstAlpha;
++    if (clearColor != nullptr) {
++      out.hasClearColor = 1;
++      out.clearColor[0] = clearColor->r;
++      out.clearColor[1] = clearColor->g;
++      out.clearColor[2] = clearColor->b;
++      out.clearColor[3] = clearColor->a;
++    }
++    for (uint32_t i = 0; i < 4; ++i) {
++      out.bindGroupIds[i] = currentBindGroupIds_[i];
++      out.dynamicOffsetCount[i] = currentDynamicOffsetCount_[i];
++      for (uint32_t j = 0; j < 4; ++j) out.dynamicOffsets[i][j] = currentDynamicOffsets_[i][j];
++    }
++    for (uint32_t i = 0; i < 6; ++i) out.viewport[i] = currentViewport_[i];
++    for (uint32_t i = 0; i < 4; ++i) out.scissor[i] = currentScissor_[i];
++    auto row = make_event(AURORA_BROWSER_FRAME_EFFECT_EVENT_DRAW_DETAIL, currentOpIndex_, currentCommandIndex_);
++    row.flags = rendererKind;
++    row.value0 = vertexCount;
++    row.value1 = indexCount;
++    row.value2 = instanceCount;
++    row.value3 = dstAlpha;
++    row.handleA = currentPipelineId_;
++    row.handleB = currentIndexBufferId_;
++    append(row);
++    for (uint32_t slot = 0; slot < 4; ++slot) {
++      auto binding = make_event(AURORA_BROWSER_FRAME_EFFECT_EVENT_BIND_GROUP_STATE, currentOpIndex_, currentCommandIndex_);
++      binding.flags = slot;
++      binding.value0 = currentDynamicOffsetCount_[slot];
++      binding.value1 = currentDynamicOffsets_[slot][0];
++      binding.value2 = currentDynamicOffsets_[slot][1];
++      binding.value3 = currentDynamicOffsets_[slot][2];
++      binding.handleA = currentBindGroupIds_[slot];
++      append(binding);
++    }
++  }
++
++  uint64_t register_resource(uint32_t kind, uintptr_t address, uint64_t ownerId,
++                             const uint32_t* words, uint32_t wordCount) noexcept {
++    if (!recording()) return 0;
++    if (address == 0 || wordCount > 16 || (wordCount != 0 && words == nullptr)) {
++      fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE);
++      return 0;
++    }
++    const uint64_t id = handle(kind, address);
++    if (id == 0) return 0;
++    for (uint32_t i = 0; i < resourceCount_; ++i) {
++      if (resources_[i].captureId != id) continue;
++      bool same = resources_[i].ownerId == ownerId && resources_[i].kind == kind &&
++                  resources_[i].wordCount == wordCount;
++      for (uint32_t j = 0; same && j < wordCount; ++j) same = resources_[i].words[j] == words[j];
++      if (!same) fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
++      return id;
++    }
++    if (resourceCount_ >= ResourceCapacity) {
++      fail(AURORA_BROWSER_FRAME_EFFECT_DESCRIPTOR_OVERFLOW);
++      return 0;
++    }
++    auto& resource = resources_[resourceCount_++];
++    resource = {};
++    resource.captureId = id;
++    resource.ownerId = ownerId;
++    resource.kind = kind;
++    resource.wordCount = wordCount;
++    for (uint32_t j = 0; j < wordCount; ++j) resource.words[j] = words[j];
++    return id;
++  }
++
++  uint64_t observe_bind_group_descriptor(uintptr_t group, uintptr_t device, uintptr_t layout,
++                                         uint64_t refKey, const WGPUBindGroupDescriptor& descriptor) noexcept {
++    if (!recording()) return 0;
++    if (descriptor.nextInChain != nullptr || descriptor.entryCount > BindingEntryCapacity ||
++        (descriptor.entryCount != 0 && descriptor.entries == nullptr)) {
++      fail(AURORA_BROWSER_FRAME_EFFECT_DESCRIPTOR_OVERFLOW);
++      return 0;
++    }
++    const uint64_t layoutId = handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_BIND_GROUP_LAYOUT, layout);
++    uint64_t descriptorHash = 14695981039346656037ULL;
++    auto mix = [&descriptorHash](uint64_t value) noexcept {
++      for (unsigned shift = 0; shift < 64; shift += 8) {
++        descriptorHash ^= (value >> shift) & 255u;
++        descriptorHash *= 1099511628211ULL;
++      }
++    };
++    for (size_t i = 0; i < descriptor.entryCount; ++i) {
++      const auto& entry = descriptor.entries[i];
++      if (entry.nextInChain != nullptr) {
++        fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE);
++        return 0;
++      }
++      uint32_t kind = 0;
++      uintptr_t raw = 0;
++      uint64_t offset = 0, size = 0;
++      if (entry.buffer != nullptr) { kind = AURORA_BROWSER_FRAME_EFFECT_HANDLE_BUFFER; raw = reinterpret_cast<uintptr_t>(entry.buffer); offset = entry.offset; size = entry.size; }
++      else if (entry.textureView != nullptr) { kind = AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE_VIEW; raw = reinterpret_cast<uintptr_t>(entry.textureView); }
++      else if (entry.sampler != nullptr) { kind = AURORA_BROWSER_FRAME_EFFECT_HANDLE_SAMPLER; raw = reinterpret_cast<uintptr_t>(entry.sampler); }
++      mix(entry.binding); mix(kind); mix(handle(kind, raw)); mix(offset); mix(size);
++    }
++    const uint32_t words[] = {static_cast<uint32_t>(layoutId), static_cast<uint32_t>(layoutId >> 32),
++                              static_cast<uint32_t>(descriptor.entryCount), static_cast<uint32_t>(descriptorHash),
++                              static_cast<uint32_t>(descriptorHash >> 32)};
++    const uint64_t groupId = register_resource(AURORA_BROWSER_FRAME_EFFECT_HANDLE_BIND_GROUP, group,
++                                                handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_DEVICE, device),
++                                                words, 5);
++    if (groupId == 0) return 0;
++    if (refKey != 0) {
++      bool found = false;
++      for (uint32_t i = 0; i < bindGroupRefCount_; ++i) {
++        if (bindGroupRefs_[i].refKey != refKey) continue;
++        if (bindGroupRefs_[i].captureId != groupId) fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
++        found = true;
++        break;
++      }
++      if (!found) {
++        if (bindGroupRefCount_ >= BindGroupRefCapacity) fail(AURORA_BROWSER_FRAME_EFFECT_DESCRIPTOR_OVERFLOW);
++        else bindGroupRefs_[bindGroupRefCount_++] = {refKey, groupId};
++      }
++    }
++    for (uint32_t i = 0; i < descriptor.entryCount; ++i) {
++      const auto& entry = descriptor.entries[i];
++      uint32_t kind = 0;
++      uintptr_t raw = 0;
++      if (entry.buffer != nullptr) { kind = AURORA_BROWSER_FRAME_EFFECT_HANDLE_BUFFER; raw = reinterpret_cast<uintptr_t>(entry.buffer); }
++      else if (entry.textureView != nullptr) { kind = AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE_VIEW; raw = reinterpret_cast<uintptr_t>(entry.textureView); }
++      else if (entry.sampler != nullptr) { kind = AURORA_BROWSER_FRAME_EFFECT_HANDLE_SAMPLER; raw = reinterpret_cast<uintptr_t>(entry.sampler); }
++      if (kind == 0 || raw == 0) { fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); continue; }
++      const uint64_t resourceId = handle(kind, raw);
++      if (resourceId == 0 || !resource_known(resourceId)) fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE);
++      bool alreadyRecorded = false;
++      for (uint32_t prior = 0; prior < bindingEntryCount_; ++prior) {
++        const auto& existing = bindingEntries_[prior];
++        if (existing.bindGroupId == groupId && existing.binding == entry.binding &&
++            existing.resourceId == resourceId && existing.kind == kind &&
++            existing.offset == entry.offset && existing.size == entry.size) {
++          alreadyRecorded = true;
++          break;
++        }
++      }
++      if (alreadyRecorded) continue;
++      if (bindingEntryCount_ >= BindingEntryCapacity) { fail(AURORA_BROWSER_FRAME_EFFECT_DESCRIPTOR_OVERFLOW); return groupId; }
++      auto& out = bindingEntries_[bindingEntryCount_++];
++      out = {};
++      out.bindGroupId = groupId;
++      out.resourceId = resourceId;
++      out.binding = entry.binding;
++      out.kind = kind;
++      out.offset = entry.offset;
++      out.size = entry.size;
++    }
++    return groupId;
++  }
++
++  void observe_bind_group_ref(uint32_t slot, uint64_t refKey) noexcept {
++    if (!collecting() || slot >= 4 || refKey == 0) return;
++    for (uint32_t i = 0; i < bindGroupRefCount_; ++i) {
++      if (bindGroupRefs_[i].refKey != refKey) continue;
++      currentBindGroupIds_[slot] = bindGroupRefs_[i].captureId;
++      currentDynamicOffsetCount_[slot] = 0;
++      currentDynamicOffsets_[slot] = {};
++      return;
++    }
++    fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE);
++  }
++
++  int resource(uint32_t index, AuroraBrowserFrameEffectResource* out) const noexcept {
++    if (out == nullptr || index >= resourceCount_) return 0;
++    *out = resources_[index];
++    return 1;
++  }
++  int binding_entry(uint32_t index, AuroraBrowserFrameEffectBindingEntry* out) const noexcept {
++    if (out == nullptr || index >= bindingEntryCount_) return 0;
++    *out = bindingEntries_[index];
++    return 1;
++  }
++  int draw(uint32_t index, AuroraBrowserFrameEffectDraw* out) const noexcept {
++    if (out == nullptr || index >= actualDrawCount_) return 0;
++    *out = draws_[index];
++    return 1;
 +  }
 +
 +  void observe_op(const FramePacket& frame, const FrameOp& op) noexcept {
@@ -3608,6 +4567,10 @@ index 0000000000000000000000000000000000000000..a50737f3b2da1f60881acf9df1d0c7d4
 +                          const std::array<wgpu::RenderPassColorAttachment, MaxColorAttachments>& colors,
 +                          const wgpu::RenderPassDepthStencilAttachment* depth) noexcept {
 +    if (!begin_or_match(frame.frameIndex, frame.frameId)) return;
++    static constexpr uint32_t expectedCommandCounts[] = {23u, 22u, 220u};
++    const uint32_t passOrdinal = counts_.renderPassCount;
++    if (passOrdinal >= 3 || pass.commands.size() != expectedCommandCounts[passOrdinal])
++      fail(AURORA_BROWSER_FRAME_EFFECT_COMMAND_SHAPE_MISMATCH);
 +    ++counts_.renderPassCount;
 +    auto event = make_event(AURORA_BROWSER_FRAME_EFFECT_EVENT_RENDER_PASS, opIndex);
 +    event.flags = (pass.discardable ? 1u : 0u) | (pass.hasDepth ? 2u : 0u) |
@@ -3662,6 +4625,10 @@ index 0000000000000000000000000000000000000000..a50737f3b2da1f60881acf9df1d0c7d4
 +  void observe_draw(uint32_t frameIndex, uint64_t frameId, uint32_t opIndex, uint32_t commandIndex) noexcept {
 +    if (!begin_or_match(frameIndex, frameId)) return;
 +    ++counts_.drawCommandCount;
++    currentOpIndex_ = opIndex;
++    currentCommandIndex_ = commandIndex;
++    drawCallbackActive_ = true;
++    drawCallbackStartCount_ = actualDrawCount_;
 +    append(make_event(AURORA_BROWSER_FRAME_EFFECT_EVENT_DRAW, opIndex, commandIndex));
 +  }
 +
@@ -3801,6 +4768,8 @@ index 0000000000000000000000000000000000000000..a50737f3b2da1f60881acf9df1d0c7d4
 +                             uint32_t afterSubmitCallbacks) noexcept {
 +    if (!begin_or_match(frameIndex, frameId)) return;
 +    counts_.afterSubmitCallbackCount = afterSubmitCallbacks;
++    if (commandRecordCount_ != 265u || counts_.drawCommandCount != 246u || counts_.renderPassCount != 3u)
++      fail(AURORA_BROWSER_FRAME_EFFECT_COMMAND_SHAPE_MISMATCH);
 +    auto row = make_event(AURORA_BROWSER_FRAME_EFFECT_EVENT_PACKET_RETIRED);
 +    row.flags = callbackPresent ? 1u : 0u;
 +    row.value0 = afterSubmitCallbacks;
@@ -3850,6 +4819,12 @@ index 0000000000000000000000000000000000000000..a50737f3b2da1f60881acf9df1d0c7d4
 +    out.frameId = frameId_;
 +    out.eventCount = eventCount_.load(std::memory_order_acquire);
 +    out.handleCount = handleCount_.load(std::memory_order_acquire);
++    out.commandRecordCount = commandRecordCount_;
++    out.actualDrawCount = actualDrawCount_;
++    out.resourceCount = resourceCount_;
++    out.bindingEntryCount = bindingEntryCount_;
++    out.depthTraceCount = depthTraceCount_;
++    out.depthRequestCount = depthRequestCount_;
 +    out.opCount = counts_.opCount;
 +    out.renderPassCount = counts_.renderPassCount;
 +    out.drawCommandCount = counts_.drawCommandCount;
@@ -3863,6 +4838,7 @@ index 0000000000000000000000000000000000000000..a50737f3b2da1f60881acf9df1d0c7d4
 +    out.stagingCopyCount = counts_.stagingCopyCount;
 +    out.queueWriteCount = counts_.queueWriteCount;
 +    out.queueWriteBytes = counts_.queueWriteBytes;
++    out.findingMask = findingMask_;
 +    out.afterSubmitCallbackCount = counts_.afterSubmitCallbackCount;
 +    out.submitCount = counts_.submitCount;
 +    out.fenceCount = counts_.fenceCount;
@@ -3886,6 +4862,7 @@ index 0000000000000000000000000000000000000000..a50737f3b2da1f60881acf9df1d0c7d4
 +
 +private:
 +  struct HandleEntry { uintptr_t address = 0; uint32_t kind = 0; };
++  struct BindGroupRefEntry { uint64_t refKey = 0, captureId = 0; };
 +  struct Counts {
 +    uint32_t opCount = 0, renderPassCount = 0, drawCommandCount = 0, customDrawCount = 0;
 +    uint32_t encoderTaskCount = 0, textureCopyCount = 0, textureUploadCount = 0, paletteConversionCount = 0;
@@ -3893,8 +4870,13 @@ index 0000000000000000000000000000000000000000..a50737f3b2da1f60881acf9df1d0c7d4
 +    uint64_t queueWriteBytes = 0;
 +    uint32_t afterSubmitCallbackCount = 0, submitCount = 0, fenceCount = 0, fenceSuccess = 0;
 +  };
-+  static constexpr uint32_t EventCapacity = 1024;
-+  static constexpr uint32_t HandleCapacity = 512;
++  static constexpr uint32_t EventCapacity = 8192;
++  static constexpr uint32_t HandleCapacity = 6144;
++  static constexpr uint32_t ResourceCapacity = 6144;
++  static constexpr uint32_t BindingEntryCapacity = 3955;
++  static constexpr uint32_t DrawCapacity = 246;
++  static constexpr uint32_t BindGroupRefCapacity = 512;
++  static constexpr uint32_t PendingDepthCapacity = 64;
 +  std::atomic<uint32_t> state_{AURORA_BROWSER_FRAME_EFFECT_UNUSED};
 +  std::atomic<uint32_t> eventCount_{0};
 +  std::atomic<uint32_t> handleCount_{0};
@@ -3905,6 +4887,44 @@ index 0000000000000000000000000000000000000000..a50737f3b2da1f60881acf9df1d0c7d4
 +  Counts counts_{};
 +  std::array<AuroraBrowserFrameEffectEvent, EventCapacity> events_{};
 +  std::array<HandleEntry, HandleCapacity> handles_{};
++  std::array<AuroraBrowserFrameEffectResource, ResourceCapacity> resources_{};
++  std::array<AuroraBrowserFrameEffectBindingEntry, BindingEntryCapacity> bindingEntries_{};
++  std::array<AuroraBrowserFrameEffectDraw, DrawCapacity> draws_{};
++  std::array<BindGroupRefEntry, BindGroupRefCapacity> bindGroupRefs_{};
++  std::array<AuroraBrowserFrameEffectEvent, PendingDepthCapacity> pendingDepthEvents_{};
++  uint32_t commandRecordCount_ = 0, resourceCount_ = 0, bindingEntryCount_ = 0, actualDrawCount_ = 0;
++  uint64_t findingMask_ = 0;
++  uint32_t bindGroupRefCount_ = 0, pendingDepthEventCount_ = 0;
++  uint64_t findingEmittedMask_ = 0;
++  uint32_t depthTraceCount_ = 0, depthRequestCount_ = 0, currentOpIndex_ = 0, currentCommandIndex_ = 0;
++  uint64_t depthMapOwnerCount_ = 0;
++  uint32_t preflightBlocker_ = AURORA_BROWSER_FRAME_EFFECT_BLOCKER_NONE;
++  uint64_t preflightFindingMask_ = 0;
++  bool drawCallbackActive_ = false;
++  uint32_t drawCallbackStartCount_ = 0;
++  uint64_t currentPipelineKey_ = 0, currentPipelineId_ = 0;
++  std::array<uint64_t, 4> currentBindGroupIds_{};
++  std::array<uint32_t, 4> currentDynamicOffsetCount_{};
++  std::array<std::array<uint32_t, 4>, 4> currentDynamicOffsets_{};
++  uint64_t currentIndexBufferId_ = 0, currentIndexOffset_ = 0, currentIndexSize_ = 0;
++  uint32_t currentIndexFormat_ = 0;
++  std::array<float, 6> currentViewport_{};
++  std::array<uint32_t, 4> currentScissor_{};
++
++  bool resource_known(uint64_t id) const noexcept {
++    for (uint32_t i = 0; i < resourceCount_; ++i) if (resources_[i].captureId == id) return true;
++    return false;
++  }
++
++  void fail(uint32_t blocker) noexcept {
++    const auto state = state_.load(std::memory_order_acquire);
++    if (state == AURORA_BROWSER_FRAME_EFFECT_UNUSED) {
++      if (preflightBlocker_ == AURORA_BROWSER_FRAME_EFFECT_BLOCKER_NONE) preflightBlocker_ = blocker;
++      if (blocker < 64) preflightFindingMask_ |= uint64_t{1} << blocker;
++      return;
++    }
++    set_blocker(blocker);
++  }
 +
 +  bool begin_or_match(uint32_t frameIndex, uint64_t frameId) noexcept {
 +    auto state = state_.load(std::memory_order_acquire);
@@ -3913,6 +4933,20 @@ index 0000000000000000000000000000000000000000..a50737f3b2da1f60881acf9df1d0c7d4
 +      frameIndex_ = frameIndex;
 +      frameId_ = frameId;
 +      state_.store(AURORA_BROWSER_FRAME_EFFECT_COLLECTING, std::memory_order_release);
++      for (uint32_t i = 0; i < pendingDepthEventCount_; ++i) {
++        pendingDepthEvents_[i].frameIndex = frameIndex_;
++        append(pendingDepthEvents_[i]);
++      }
++      pendingDepthEventCount_ = 0;
++      for (uint32_t blocker = 1; blocker < 64; ++blocker) {
++        const uint64_t bit = uint64_t{1} << blocker;
++        if ((findingMask_ & bit) != 0 && (findingEmittedMask_ & bit) == 0) {
++          auto row = make_event(AURORA_BROWSER_FRAME_EFFECT_EVENT_FINDING);
++          row.flags = blocker;
++          append(row);
++          findingEmittedMask_ |= bit;
++        }
++      }
 +      return true;
 +    }
 +    if (state != AURORA_BROWSER_FRAME_EFFECT_COLLECTING) return false;
@@ -3924,6 +4958,14 @@ index 0000000000000000000000000000000000000000..a50737f3b2da1f60881acf9df1d0c7d4
 +
 +  bool collecting() const noexcept {
 +    return state_.load(std::memory_order_acquire) == AURORA_BROWSER_FRAME_EFFECT_COLLECTING;
++  }
++  bool recording() const noexcept {
++    const auto state = state_.load(std::memory_order_acquire);
++    return state == AURORA_BROWSER_FRAME_EFFECT_ARMED || state == AURORA_BROWSER_FRAME_EFFECT_COLLECTING;
++  }
++  bool collecting_or_submitted() const noexcept {
++    const auto state = state_.load(std::memory_order_acquire);
++    return state == AURORA_BROWSER_FRAME_EFFECT_COLLECTING || state == AURORA_BROWSER_FRAME_EFFECT_SUBMITTED;
 +  }
 +
 +  bool matches_frame(uint64_t frameId) noexcept {
@@ -3942,11 +4984,24 @@ index 0000000000000000000000000000000000000000..a50737f3b2da1f60881acf9df1d0c7d4
 +    return event;
 +  }
 +
++  void append_or_queue_prebegin(const AuroraBrowserFrameEffectEvent& event) noexcept {
++    if (state_.load(std::memory_order_acquire) != AURORA_BROWSER_FRAME_EFFECT_ARMED) {
++      append(event);
++      return;
++    }
++    if (pendingDepthEventCount_ >= PendingDepthCapacity) {
++      fail(AURORA_BROWSER_FRAME_EFFECT_EVENT_OVERFLOW);
++      return;
++    }
++    auto row = event;
++    row.frameIndex = targetFrameIndex_;
++    pendingDepthEvents_[pendingDepthEventCount_++] = row;
++  }
++
 +  void append(const AuroraBrowserFrameEffectEvent& event) noexcept {
 +    const uint32_t index = eventCount_.load(std::memory_order_relaxed);
 +    if (index >= EventCapacity) {
-+      set_blocker(AURORA_BROWSER_FRAME_EFFECT_EVENT_OVERFLOW);
-+      state_.store(AURORA_BROWSER_FRAME_EFFECT_FAILED, std::memory_order_release);
++      fail(AURORA_BROWSER_FRAME_EFFECT_EVENT_OVERFLOW);
 +      return;
 +    }
 +    events_[index] = event;
@@ -3960,8 +5015,7 @@ index 0000000000000000000000000000000000000000..a50737f3b2da1f60881acf9df1d0c7d4
 +      if (handles_[i].address == address && handles_[i].kind == kind) return static_cast<uint64_t>(i) + 1;
 +    }
 +    if (count >= HandleCapacity) {
-+      set_blocker(AURORA_BROWSER_FRAME_EFFECT_HANDLE_OVERFLOW);
-+      state_.store(AURORA_BROWSER_FRAME_EFFECT_FAILED, std::memory_order_release);
++      fail(AURORA_BROWSER_FRAME_EFFECT_HANDLE_OVERFLOW);
 +      return 0;
 +    }
 +    handles_[count] = {address, kind};
@@ -3974,7 +5028,25 @@ index 0000000000000000000000000000000000000000..a50737f3b2da1f60881acf9df1d0c7d4
 +  }
 +
 +  void set_blocker(uint32_t blocker) noexcept {
++    if (blocker == AURORA_BROWSER_FRAME_EFFECT_BLOCKER_NONE) return;
++    const uint64_t bit = blocker < 64 ? (uint64_t{1} << blocker) : 0;
++    const bool isNew = bit != 0 && (findingMask_ & bit) == 0;
 +    if (firstBlocker_ == AURORA_BROWSER_FRAME_EFFECT_BLOCKER_NONE) firstBlocker_ = blocker;
++    findingMask_ |= bit;
++    const auto state = state_.load(std::memory_order_acquire);
++    if (!isNew || state == AURORA_BROWSER_FRAME_EFFECT_UNUSED || state == AURORA_BROWSER_FRAME_EFFECT_ARMED) return;
++    const uint32_t index = eventCount_.load(std::memory_order_relaxed);
++    if (index >= EventCapacity) {
++      findingMask_ |= uint64_t{1} << AURORA_BROWSER_FRAME_EFFECT_EVENT_OVERFLOW;
++      if (firstBlocker_ == AURORA_BROWSER_FRAME_EFFECT_BLOCKER_NONE)
++        firstBlocker_ = AURORA_BROWSER_FRAME_EFFECT_EVENT_OVERFLOW;
++      return;
++    }
++    auto row = make_event(AURORA_BROWSER_FRAME_EFFECT_EVENT_FINDING);
++    row.flags = blocker;
++    events_[index] = row;
++    eventCount_.store(index + 1, std::memory_order_release);
++    findingEmittedMask_ |= bit;
 +  }
 +};
 +
@@ -5774,7 +6846,7 @@ index 0000000000000000000000000000000000000000..73b22bcdf71b1dd107ef0e26990fa4cf
 +
 +} // namespace aurora::gfx::selective
 diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
-index d04db0f34210fb56995de0793200c457aaf61233..97c90f23a1b380cbc06a1659f189209dbb90b807 100644
+index d04db0f34210fb56995de0793200c457aaf61233..cfcf6f0e9749ab55faaad8a7eccdce1dbacf0ea3 100644
 --- a/lib/gfx/recording.cpp
 +++ b/lib/gfx/recording.cpp
 @@ -2,6 +2,9 @@
@@ -5803,7 +6875,39 @@ index d04db0f34210fb56995de0793200c457aaf61233..97c90f23a1b380cbc06a1659f189209d
  using namespace detail;
  
  namespace {
-@@ -213,6 +218,9 @@ StagingHighWater current_high_water(const FramePacket& frame) noexcept {
+@@ -166,7 +171,15 @@ PassSnapshotEntry& acquire_pass_snapshot(uint32_t width, uint32_t height, bool w
+         .sampleCount = 1,
+     };
+     auto texture = webgpu::g_device.CreateTexture(&desc);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    browser_frame_effect_observer().observe_texture_descriptor(reinterpret_cast<uintptr_t>(texture.Get()),
++        reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), desc);
++#endif
+     auto view = texture.CreateView();
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    browser_frame_effect_observer().observe_texture_view_descriptor(reinterpret_cast<uintptr_t>(view.Get()),
++        reinterpret_cast<uintptr_t>(texture.Get()), reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), nullptr);
++#endif
+     entry.color = webgpu::TextureWithSampler{
+         .texture = std::move(texture),
+         .view = std::move(view),
+@@ -185,7 +198,15 @@ PassSnapshotEntry& acquire_pass_snapshot(uint32_t width, uint32_t height, bool w
+         .sampleCount = 1,
+     };
+     auto texture = webgpu::g_device.CreateTexture(&desc);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    browser_frame_effect_observer().observe_texture_descriptor(reinterpret_cast<uintptr_t>(texture.Get()),
++        reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), desc);
++#endif
+     auto view = texture.CreateView();
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    browser_frame_effect_observer().observe_texture_view_descriptor(reinterpret_cast<uintptr_t>(view.Get()),
++        reinterpret_cast<uintptr_t>(texture.Get()), reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), nullptr);
++#endif
+     entry.depth = webgpu::TextureWithSampler{
+         .texture = std::move(texture),
+         .view = std::move(view),
+@@ -213,6 +234,9 @@ StagingHighWater current_high_water(const FramePacket& frame) noexcept {
  
  FrameOp capture_frame_op(FramePacket& frame, FrameOpType type, uint32_t index) {
    FrameOp op{
@@ -5813,7 +6917,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..97c90f23a1b380cbc06a1659f189209d
        .type = type,
        .index = index,
        .renderPass =
-@@ -327,9 +335,13 @@ void encode_draw(void* payload, const wgpu::RenderPassEncoder& pass, const Rende
+@@ -327,9 +351,13 @@ void encode_draw(void* payload, const wgpu::RenderPassEncoder& pass, const Rende
  
  template <auto Renderer, InlinePayload T>
  DrawCommand make_draw_command(const T& data) {
@@ -5829,7 +6933,39 @@ index d04db0f34210fb56995de0793200c457aaf61233..97c90f23a1b380cbc06a1659f189209d
    std::memcpy(command.payload.data(), &data, sizeof(data));
    return command;
  }
-@@ -530,6 +542,8 @@ void enqueue_pass(FramePacket& frame, uint32_t passIndex) {
+@@ -357,7 +385,15 @@ OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
+       .sampleCount = 1,
+   };
+   auto colorTexture = webgpu::g_device.CreateTexture(&colorDesc);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  browser_frame_effect_observer().observe_texture_descriptor(reinterpret_cast<uintptr_t>(colorTexture.Get()),
++      reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), colorDesc);
++#endif
+   auto colorView = colorTexture.CreateView();
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  browser_frame_effect_observer().observe_texture_view_descriptor(reinterpret_cast<uintptr_t>(colorView.Get()),
++      reinterpret_cast<uintptr_t>(colorTexture.Get()), reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), nullptr);
++#endif
+   webgpu::TextureWithSampler color{
+       .texture = std::move(colorTexture),
+       .view = std::move(colorView),
+@@ -375,7 +411,15 @@ OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
+       .sampleCount = 1,
+   };
+   auto depthTexture = webgpu::g_device.CreateTexture(&depthDesc);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  browser_frame_effect_observer().observe_texture_descriptor(reinterpret_cast<uintptr_t>(depthTexture.Get()),
++      reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), depthDesc);
++#endif
+   auto depthView = depthTexture.CreateView();
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  browser_frame_effect_observer().observe_texture_view_descriptor(reinterpret_cast<uintptr_t>(depthView.Get()),
++      reinterpret_cast<uintptr_t>(depthTexture.Get()), reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), nullptr);
++#endif
+   webgpu::TextureWithSampler depth{
+       .texture = std::move(depthTexture),
+       .view = std::move(depthView),
+@@ -530,6 +574,8 @@ void enqueue_pass(FramePacket& frame, uint32_t passIndex) {
  
  namespace detail {
  
@@ -5838,7 +6974,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..97c90f23a1b380cbc06a1659f189209d
  void begin_recording(FramePacket& packet, size_t frameSlot) {
    CHECK(!g_recorder.active(), "A recording session is already active");
    g_recorder.packet = &packet;
-@@ -634,7 +648,8 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
+@@ -634,7 +680,8 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
                                 wgpu::TexelCopyTextureInfo tex, wgpu::Extent3D size) {
    const auto copyBytesPerRow = AURORA_ALIGN(bytesPerRow, 256);
    auto& frame = current_frame_packet();
@@ -5848,7 +6984,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..97c90f23a1b380cbc06a1659f189209d
      const auto range = push_texture_data(data, bytesPerRow, rowsPerImage);
      const wgpu::TexelCopyBufferLayout layout{
          .offset = range.offset,
-@@ -645,14 +660,48 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
+@@ -645,14 +692,52 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
      return;
    }
  
@@ -5866,6 +7002,10 @@ index d04db0f34210fb56995de0793200c457aaf61233..97c90f23a1b380cbc06a1659f189209d
 +#endif
    };
    auto buffer = webgpu::g_device.CreateBuffer(&descriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  browser_frame_effect_observer().observe_buffer_descriptor(reinterpret_cast<uintptr_t>(buffer.Get()),
++      reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), descriptor);
++#endif
 +#ifdef __EMSCRIPTEN__
 +  // Queue.WriteBuffer takes one contiguous source range. This call-local
 +  // zero-initialized buffer preserves the row padding without issuing one JS
@@ -5898,7 +7038,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..97c90f23a1b380cbc06a1659f189209d
    auto* dst = static_cast<uint8_t*>(buffer.GetMappedRange(0, uploadSize));
    for (uint32_t row = 0; row < rowsPerImage; ++row) {
      memcpy(dst, data, bytesPerRow);
-@@ -660,6 +709,7 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
+@@ -660,6 +745,7 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
      dst += copyBytesPerRow;
    }
    buffer.Unmap();
@@ -5973,6 +7113,59 @@ index 7d652cafbb8eed78f5baea55ff73426cb681c3e5..ad0a325784e60d0999c0364e66289bfc
    [[nodiscard]] size_t free_count() const;
  
  private:
+diff --git a/lib/gfx/resource_cache.cpp b/lib/gfx/resource_cache.cpp
+index 8c131ab871057c6d1d08d6c345927e2aff5c07ad..bb47fe3ef9f6ae64349ddb3eec5e59d0968ed188 100644
+--- a/lib/gfx/resource_cache.cpp
++++ b/lib/gfx/resource_cache.cpp
+@@ -1,4 +1,7 @@
+ #include "resource_cache.hpp"
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++#include "frame_effect_observer.hpp"
++#endif
+ 
+ #include "frame.hpp"
+ #include "hash.hpp"
+@@ -84,6 +87,21 @@ void shutdown_resource_cache() {
+ BindGroupRef bind_group_ref(const WGPUBindGroupDescriptor& descriptor) {
+   const auto id = xxh3_hash(descriptor);
+   std::lock_guard lock{g_bindGroupCacheMutex};
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  auto it = g_cachedBindGroups.find(id);
++  if (it == g_cachedBindGroups.end()) {
++    auto bindGroup = wgpu::BindGroup::Acquire(wgpuDeviceCreateBindGroup(webgpu::g_device.Get(), &descriptor));
++    it = g_cachedBindGroups.emplace(id, CachedBindGroup{
++                                       .bindGroup = std::move(bindGroup),
++                                       .lastUsedFrame = current_frame(),
++                                   }).first;
++  } else {
++    it->second.lastUsedFrame = current_frame();
++  }
++  detail::browser_frame_effect_observer().observe_bind_group_descriptor(
++      reinterpret_cast<uintptr_t>(it->second.bindGroup.Get()), reinterpret_cast<uintptr_t>(webgpu::g_device.Get()),
++      reinterpret_cast<uintptr_t>(descriptor.layout), id, descriptor);
++#else
+   const auto it = g_cachedBindGroups.find(id);
+   if (it == g_cachedBindGroups.end()) {
+     auto bindGroup = wgpu::BindGroup::Acquire(wgpuDeviceCreateBindGroup(webgpu::g_device.Get(), &descriptor));
+@@ -94,6 +112,7 @@ BindGroupRef bind_group_ref(const WGPUBindGroupDescriptor& descriptor) {
+   } else {
+     it->second.lastUsedFrame = current_frame();
+   }
++#endif
+   return id;
+ }
+ 
+@@ -111,6 +130,10 @@ wgpu::Sampler sampler_ref(const wgpu::SamplerDescriptor& descriptor) {
+   if (it == g_cachedSamplers.end()) {
+     it = g_cachedSamplers.try_emplace(id, webgpu::g_device.CreateSampler(&descriptor)).first;
+   }
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  detail::browser_frame_effect_observer().observe_sampler_descriptor(
++      reinterpret_cast<uintptr_t>(it->second.Get()), reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), descriptor);
++#endif
+   return it->second;
+ }
+ 
 diff --git a/lib/gfx/sha256.hpp b/lib/gfx/sha256.hpp
 new file mode 100644
 index 0000000000000000000000000000000000000000..8a76bfe19513fe6bf000224d301dbeb85da25038
@@ -6098,10 +7291,20 @@ index 0000000000000000000000000000000000000000..8a76bfe19513fe6bf000224d301dbeb8
 +
 +} // namespace aurora::gfx::selective
 diff --git a/lib/gfx/texture.cpp b/lib/gfx/texture.cpp
-index 029a3d047c357a5e1aed999af63a3dee8ea09f03..6ad1ff1e468194773386d4a6b3c1f098407133c5 100644
+index 029a3d047c357a5e1aed999af63a3dee8ea09f03..a1eb23850f3ea5757c404ec92d4abb5141801e84 100644
 --- a/lib/gfx/texture.cpp
 +++ b/lib/gfx/texture.cpp
-@@ -30,6 +30,7 @@ wgpu::Extent3D physical_size(wgpu::Extent3D size, TextureFormatInfo info) {
+@@ -5,6 +5,9 @@
+ #include "../webgpu/gpu.hpp"
+ #include "aurora/aurora.h"
+ #include "texture.hpp"
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++#include "frame_effect_observer.hpp"
++#endif
+ #include "texture_convert.hpp"
+ #include "../gx/gx_fmt.hpp"
+ 
+@@ -30,6 +33,7 @@ wgpu::Extent3D physical_size(wgpu::Extent3D size, TextureFormatInfo info) {
    return {.width = width, .height = height, .depthOrArrayLayers = size.depthOrArrayLayers};
  }
  
@@ -6109,7 +7312,7 @@ index 029a3d047c357a5e1aed999af63a3dee8ea09f03..6ad1ff1e468194773386d4a6b3c1f098
  bool setup_swizzle(wgpu::TextureComponentSwizzleDescriptor& swizzle, u32 format) noexcept {
    if (!webgpu::g_textureComponentSwizzleSupported) {
      return false;
-@@ -53,6 +54,8 @@ bool setup_swizzle(wgpu::TextureComponentSwizzleDescriptor& swizzle, u32 format)
+@@ -53,6 +57,8 @@ bool setup_swizzle(wgpu::TextureComponentSwizzleDescriptor& swizzle, u32 format)
    }
  }
  
@@ -6118,7 +7321,19 @@ index 029a3d047c357a5e1aed999af63a3dee8ea09f03..6ad1ff1e468194773386d4a6b3c1f098
  wgpu::AddressMode wgpu_address_mode(GXTexWrapMode mode) {
    switch (mode) {
      DEFAULT_FATAL("invalid wrap mode {}", underlying(mode));
-@@ -181,10 +184,12 @@ TextureHandle new_dynamic_texture_2d(uint32_t width, uint32_t height, uint32_t m
+@@ -174,6 +180,11 @@ TextureHandle new_dynamic_texture_2d(uint32_t width, uint32_t height, uint32_t m
+       .sampleCount = 1,
+   };
+   auto texture = g_device.CreateTexture(&textureDescriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  auto& effectObserver = detail::browser_frame_effect_observer();
++  effectObserver.observe_texture_descriptor(reinterpret_cast<uintptr_t>(texture.Get()),
++                                             reinterpret_cast<uintptr_t>(g_device.Get()), textureDescriptor);
++#endif
+   const auto viewLabel = fmt::format("{} view", label);
+   wgpu::TextureViewDescriptor textureViewDescriptor{
+       .label = viewLabel.c_str(),
+@@ -181,11 +192,18 @@ TextureHandle new_dynamic_texture_2d(uint32_t width, uint32_t height, uint32_t m
        .dimension = wgpu::TextureViewDimension::e2D,
        .mipLevelCount = mips,
    };
@@ -6129,13 +7344,75 @@ index 029a3d047c357a5e1aed999af63a3dee8ea09f03..6ad1ff1e468194773386d4a6b3c1f098
    }
 +#endif
    auto textureView = texture.CreateView(&textureViewDescriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  effectObserver.observe_texture_view_descriptor(reinterpret_cast<uintptr_t>(textureView.Get()),
++                                                  reinterpret_cast<uintptr_t>(texture.Get()),
++                                                  reinterpret_cast<uintptr_t>(g_device.Get()), &textureViewDescriptor);
++#endif
    return std::make_shared<TextureRef>(std::move(texture), std::move(textureView), wgpu::TextureView{}, size, wgpuFormat,
                                        mips, gxFormat);
+ }
+@@ -209,6 +227,11 @@ TextureHandle new_render_texture(uint32_t width, uint32_t height, u32 gxFormat,
+       .sampleCount = 1,
+   };
+   auto texture = g_device.CreateTexture(&textureDescriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  auto& effectObserver = detail::browser_frame_effect_observer();
++  effectObserver.observe_texture_descriptor(reinterpret_cast<uintptr_t>(texture.Get()),
++                                             reinterpret_cast<uintptr_t>(g_device.Get()), textureDescriptor);
++#endif
+ 
+   // Create texture view for color attachments
+   const auto viewLabel = fmt::format("{} view", label);
+@@ -218,6 +241,11 @@ TextureHandle new_render_texture(uint32_t width, uint32_t height, u32 gxFormat,
+       .dimension = wgpu::TextureViewDimension::e2D,
+   };
+   auto attachmentTextureView = texture.CreateView(&textureViewDescriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  effectObserver.observe_texture_view_descriptor(reinterpret_cast<uintptr_t>(attachmentTextureView.Get()),
++                                                  reinterpret_cast<uintptr_t>(texture.Get()),
++                                                  reinterpret_cast<uintptr_t>(g_device.Get()), &textureViewDescriptor);
++#endif
+   wgpu::TextureView sampleTextureView = attachmentTextureView;
+   return std::make_shared<TextureRef>(std::move(texture), std::move(sampleTextureView),
+                                       std::move(attachmentTextureView), size, wgpuFormat, 1, gxFormat);
+@@ -242,6 +270,11 @@ TextureHandle new_conv_texture(uint32_t width, uint32_t height, u32 gxFormat, co
+       .sampleCount = 1,
+   };
+   auto texture = g_device.CreateTexture(&textureDescriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  auto& effectObserver = detail::browser_frame_effect_observer();
++  effectObserver.observe_texture_descriptor(reinterpret_cast<uintptr_t>(texture.Get()),
++                                             reinterpret_cast<uintptr_t>(g_device.Get()), textureDescriptor);
++#endif
+ 
+   // Create texture view for color attachments
+   const auto viewLabel = fmt::format("{} view", label);
+@@ -251,6 +284,11 @@ TextureHandle new_conv_texture(uint32_t width, uint32_t height, u32 gxFormat, co
+       .dimension = wgpu::TextureViewDimension::e2D,
+   };
+   auto attachmentTextureView = texture.CreateView(&textureViewDescriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  effectObserver.observe_texture_view_descriptor(reinterpret_cast<uintptr_t>(attachmentTextureView.Get()),
++                                                  reinterpret_cast<uintptr_t>(texture.Get()),
++                                                  reinterpret_cast<uintptr_t>(g_device.Get()), &textureViewDescriptor);
++#endif
+   wgpu::TextureView sampleTextureView = attachmentTextureView;
+   return std::make_shared<TextureRef>(std::move(texture), std::move(sampleTextureView),
+                                       std::move(attachmentTextureView), size, wgpuFormat, 1, gxFormat);
 diff --git a/lib/gfx/texture_replacement.cpp b/lib/gfx/texture_replacement.cpp
-index 03dda4678ec0b5c9e6ca6d124d8519c90d093700..c810993364c2060b0b1fd346245294cef117fad4 100644
+index 03dda4678ec0b5c9e6ca6d124d8519c90d093700..52668300558ff401c38c1691b7bc2d588f479933 100644
 --- a/lib/gfx/texture_replacement.cpp
 +++ b/lib/gfx/texture_replacement.cpp
-@@ -462,7 +462,8 @@ bool remove_mipmaps(gfx::ConvertedTexture& texture) noexcept {
+@@ -1,4 +1,7 @@
+ #include "texture_replacement.hpp"
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++#include "frame_effect_observer.hpp"
++#endif
+ 
+ #include "../io.hpp"
+ #include "../gx/gx.hpp"
+@@ -462,7 +465,8 @@ bool remove_mipmaps(gfx::ConvertedTexture& texture) noexcept {
      return false;
    }
  
@@ -6145,7 +7422,7 @@ index 03dda4678ec0b5c9e6ca6d124d8519c90d093700..c810993364c2060b0b1fd346245294ce
    std::memcpy(data.data(), texture.data.data(), size);
    texture.mips = 1;
    texture.data = std::move(data);
-@@ -681,11 +682,11 @@ std::optional<gfx::ConvertedTexture> load_encoded_replacement(Source&& src) noex
+@@ -681,11 +685,11 @@ std::optional<gfx::ConvertedTexture> load_encoded_replacement(Source&& src) noex
  
    const uint32_t mips = 1u + static_cast<uint32_t>(more.size());
    const uint64_t n = gfx::calc_texture_size(base->format, base->width, base->height, mips);
@@ -6159,6 +7436,30 @@ index 03dda4678ec0b5c9e6ca6d124d8519c90d093700..c810993364c2060b0b1fd346245294ce
    uint8_t* const dst = blob.data();
    uint64_t o = 0;
    const auto append = [&](const ByteBuffer& d) noexcept -> bool {
+@@ -976,6 +980,11 @@ gfx::TextureHandle create_converted_texture_handle(const EntryLoadSnapshot& entr
+       .sampleCount = 1,
+   };
+   auto texture = webgpu::g_device.CreateTexture(&textureDescriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  auto& effectObserver = gfx::detail::browser_frame_effect_observer();
++  effectObserver.observe_texture_descriptor(reinterpret_cast<uintptr_t>(texture.Get()),
++                                             reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), textureDescriptor);
++#endif
+   const auto viewLabel = fmt::format("{} view", label);
+   const wgpu::TextureViewDescriptor textureViewDescriptor{
+       .label = viewLabel.c_str(),
+@@ -984,6 +993,11 @@ gfx::TextureHandle create_converted_texture_handle(const EntryLoadSnapshot& entr
+       .mipLevelCount = replacement.mips,
+   };
+   auto textureView = texture.CreateView(&textureViewDescriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  effectObserver.observe_texture_view_descriptor(reinterpret_cast<uintptr_t>(textureView.Get()),
++                                                  reinterpret_cast<uintptr_t>(texture.Get()),
++                                                  reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), &textureViewDescriptor);
++#endif
+   auto handle = std::make_shared<gfx::TextureRef>(std::move(texture), std::move(textureView), wgpu::TextureView{}, size,
+                                                   replacement.format, replacement.mips, gfx::InvalidTextureFormat);
+   handle->isReplacement = true;
 diff --git a/lib/gfx/types.hpp b/lib/gfx/types.hpp
 index 940d599b8bf31ff792c991f5b0319e25848fa217..4b3001346b8790d6c36ab004544bb49f004136b9 100644
 --- a/lib/gfx/types.hpp
@@ -6444,10 +7745,46 @@ index 0d6a5d8ab36c7992ab98418458bb21beb178faaf..510e6e7c675bad50276fb46ced412a45
      LIKELY {
        if (detail::sBufferSize < detail::sBufferCapacity)
 diff --git a/lib/gx/gx.cpp b/lib/gx/gx.cpp
-index b12b327fe4d3276c13b23e93baca64824ed50806..0fbfa7733ee223e6ff9802c662c633065747b975 100644
+index b12b327fe4d3276c13b23e93baca64824ed50806..7889c659d15019e51ff704e9c8a6e0cc8a3b4819 100644
 --- a/lib/gx/gx.cpp
 +++ b/lib/gx/gx.cpp
-@@ -567,12 +567,17 @@ void initialize() noexcept {
+@@ -1,4 +1,7 @@
+ #include "gx.hpp"
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++#include "../gfx/frame_effect_observer.hpp"
++#endif
+ 
+ #include "pipeline.hpp"
+ #include "texture.hpp"
+@@ -540,7 +543,16 @@ void initialize() noexcept {
+         .format = wgpu::TextureFormat::RGBA8Unorm,
+     };
+     sEmptyTexture = g_device.CreateTexture(&descriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    gfx::detail::browser_frame_effect_observer().observe_texture_descriptor(
++        reinterpret_cast<uintptr_t>(sEmptyTexture.Get()), reinterpret_cast<uintptr_t>(g_device.Get()), descriptor);
++#endif
+     sEmptyTextureView = sEmptyTexture.CreateView();
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    gfx::detail::browser_frame_effect_observer().observe_texture_view_descriptor(
++        reinterpret_cast<uintptr_t>(sEmptyTextureView.Get()), reinterpret_cast<uintptr_t>(sEmptyTexture.Get()),
++        reinterpret_cast<uintptr_t>(g_device.Get()), nullptr);
++#endif
+   }
+   {
+     std::array<wgpu::BindGroupEntry, MaxTextures * 2> entries;
+@@ -561,18 +573,28 @@ void initialize() noexcept {
+         .entries = entries.data(),
+     };
+     g_emptyTextureBindGroup = g_device.CreateBindGroup(&desc);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    gfx::detail::browser_frame_effect_observer().observe_bind_group_descriptor(
++        reinterpret_cast<uintptr_t>(g_emptyTextureBindGroup.Get()), reinterpret_cast<uintptr_t>(g_device.Get()),
++        reinterpret_cast<uintptr_t>(sTextureBindGroupLayout.Get()), 0, desc);
++#endif
+   }
+   {
+     const std::array layouts{
          gfx::detail::resources().staticBindGroupLayout,
          gfx::detail::resources().uniformBindGroupLayout,
          sTextureBindGroupLayout,
@@ -6466,17 +7803,26 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..0fbfa7733ee223e6ff9802c662c63306
      sPipelineLayout = g_device.CreatePipelineLayout(&desc);
    }
 diff --git a/lib/gx/pipeline.cpp b/lib/gx/pipeline.cpp
-index 0c3631c9b7b0638f7a60d057a44a9f37de6d9024..3cf50c489cd1644682fe4fe38052707765308180 100644
+index 0c3631c9b7b0638f7a60d057a44a9f37de6d9024..0adcd70f955c12e603e70139be64d84c67240b3f 100644
 --- a/lib/gx/pipeline.cpp
 +++ b/lib/gx/pipeline.cpp
-@@ -1,3 +1,6 @@
+@@ -1,9 +1,15 @@
 +#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
 +#include "pipeline_provenance_runtime.h"
 +#endif
  #include "pipeline.hpp"
  
  #include "../gfx/encoding.hpp"
-@@ -22,12 +25,21 @@ wgpu::RenderPipeline create_pipeline(const PipelineConfig& config) {
+ #include "../gfx/resources.hpp"
+ #include "../gfx/pipeline_cache.hpp"
+ #include "../gfx/resource_cache.hpp"
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++#include "../gfx/frame_effect_observer.hpp"
++#endif
+ 
+ #include "gx_fmt.hpp"
+ #include "shader_info.hpp"
+@@ -22,26 +28,59 @@ wgpu::RenderPipeline create_pipeline(const PipelineConfig& config) {
  }
  
  void render(const DrawData& data, const wgpu::RenderPassEncoder& pass) {
@@ -6492,12 +7838,50 @@ index 0c3631c9b7b0638f7a60d057a44a9f37de6d9024..3cf50c489cd1644682fe4fe380527077
 +  // Browser WebGPU uses a dynamic uniform for the same 64-byte draw data.
 +  const std::array immediateOffsets{data.immediateUniformRange.offset};
 +  pass.SetBindGroup(3, resources.uniformBindGroup, immediateOffsets.size(), immediateOffsets.data());
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  gfx::detail::browser_frame_effect_observer().observe_bind_group_set(3,
++      reinterpret_cast<uintptr_t>(resources.uniformBindGroup.Get()), immediateOffsets.size(), immediateOffsets.data());
++#endif
 +#else
    pass.SetImmediates(0, &data.immediateData, sizeof(data.immediateData));
 +#endif
    const std::array offsets{data.uniformRange.offset};
    pass.SetBindGroup(1, resources.uniformBindGroup, offsets.size(), offsets.data());
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  gfx::detail::browser_frame_effect_observer().observe_bind_group_set(1,
++      reinterpret_cast<uintptr_t>(resources.uniformBindGroup.Get()), offsets.size(), offsets.data());
++#endif
    if (data.bindGroups.textureBindGroup) {
+     pass.SetBindGroup(2, gfx::find_bind_group(data.bindGroups.textureBindGroup));
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    gfx::detail::browser_frame_effect_observer().observe_bind_group_ref(2, data.bindGroups.textureBindGroup);
++#endif
+   }
+   pass.SetIndexBuffer(resources.indexBuffer, wgpu::IndexFormat::Uint16, data.idxRange.offset, data.idxRange.size);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  gfx::detail::browser_frame_effect_observer().observe_index_buffer(
++      reinterpret_cast<uintptr_t>(resources.indexBuffer.Get()), static_cast<uint32_t>(wgpu::IndexFormat::Uint16),
++      data.idxRange.offset, data.idxRange.size);
++#endif
+   if (data.dstAlpha != UINT32_MAX) {
+     const wgpu::Color color{0.f, 0.f, 0.f, data.dstAlpha / 255.f};
+     pass.SetBlendConstant(&color);
+   }
+   if (data.indexCount == 0) {
+     pass.Draw(data.vtxCount, data.instanceCount);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    gfx::detail::browser_frame_effect_observer().observe_actual_draw(2u, data.vtxCount, 0u, data.instanceCount,
++                                                                     data.dstAlpha);
++#endif
+   } else {
+     pass.DrawIndexed(data.indexCount, data.instanceCount);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    gfx::detail::browser_frame_effect_observer().observe_actual_draw(2u, 0u, data.indexCount, data.instanceCount,
++                                                                     data.dstAlpha);
++#endif
+   }
+ }
+ 
 diff --git a/lib/gx/pipeline.hpp b/lib/gx/pipeline.hpp
 index 1abcbd518965b15fb9de612eee2f1811402975c2..c5fe2fa3f883a092fd5590758e90c35d44f90a96 100644
 --- a/lib/gx/pipeline.hpp

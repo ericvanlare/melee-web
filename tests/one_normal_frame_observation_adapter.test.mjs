@@ -11,6 +11,7 @@ import {
 } from './one_normal_frame_observation_adapter.mjs';
 
 import * as driver from './match_frame_effect_driver.mjs';
+import {schema2Fixture} from './match_frame_effect_schema2_fixture.mjs';
 import * as recorder from './runtime_callback_recorder.mjs';
 
 const originalModule = globalThis.Module;
@@ -62,21 +63,13 @@ function rendererEvent(kind, flags = 0) {
 }
 
 function validNativeStatus({fenced = true, retired = false} = {}) {
-  return {
-    schema_version: 1, scope: 'one_normal_callback_observation_only',
-    requested: true, terminal: true, native_retired: retired, admitted: true,
-    renderer_armed: true, resumable: false, requested_source_frame: 200,
-    source_frame_before: 200, source_frame_after: 201, tick_returns: 1, draw_returns: 1,
-    audio_returns: 1, pcm_frames: 533, planned_steps: 1, planned_audio_steps: 1,
-    callback_steps: 1, callback_draws: 1, owner_generation: 1,
-    audio_phase_before: 0, audio_phase_after: 20,
-    error: '', raw_pad_bytes: Array(64).fill(0),
-    renderer: {schema_version: 1, state: fenced ? 4 : 3, first_blocker: 7,
-      submit_count: 1, fence_count: fenced ? 1 : 0, fence_success: fenced ? 1 : 0,
-      event_count: 2, handle_count: 0, target_frame_index: 31, frame_index: 31,
-      frame_id: '9007199254740993'},
-    events: [rendererEvent(17), rendererEvent(18, 1)], handles: [],
-  };
+  const receipt = schema2Fixture();
+  receipt.native_retired = retired;
+  Object.assign(receipt.renderer, {state: fenced ? 4 : 3, fence_count: fenced ? 1 : 0,
+    fence_success: fenced ? 1 : 0, target_frame_index: 31, frame_index: 31});
+  for (const row of receipt.events) row.frame_index = 31;
+  for (const row of receipt.draws) row.frame_index = 31;
+  return receipt;
 }
 
 test('legacy match-start prefix stays default and observer mode has an explicit paired opt-in', () => {

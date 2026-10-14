@@ -2,6 +2,7 @@
 #include "gameplay_menu_frame_effect.hpp"
 #include <cstddef>
 #include <cstring>
+#include <bit>
 static_assert(sizeof(PADStatus)==16&&offsetof(PADStatus,err)==10&&offsetof(PADStatus,extButton)==12,
               "Frame observation serializes four native PADStatus records, including Aurora extButton and padding");
 
@@ -125,7 +126,8 @@ const char* melee_web_native_menu_frame_effect_status(){
  static std::string out;
  if(observation.active)return "{\"busy\":true}";
  const auto renderer=aurora_browser_frame_effect_observer_snapshot();
- out="{\"schema_version\":1,\"scope\":\"one_normal_callback_observation_only\"";
+ bool rows_complete=true;
+ out="{\"schema_version\":2,\"scope\":\"one_normal_callback_observation_only\"";
  const auto number=[&](const char* name,auto value){out+=",\"";out+=name;out+="\":";out+=std::to_string(value);};
  const auto boolean=[&](const char* name,bool value){out+=",\"";out+=name;out+=value?"\":true":"\":false";};
  boolean("requested",observation.requested);boolean("terminal",observation.terminal);
@@ -160,9 +162,14 @@ const char* melee_web_native_menu_frame_effect_status(){
  out+=",\"queue_write_bytes\":\""+std::to_string(renderer.queueWriteBytes)+"\"";
  number("after_submit_callback_count",renderer.afterSubmitCallbackCount);
  number("submit_count",renderer.submitCount);number("fence_count",renderer.fenceCount);
- number("fence_success",renderer.fenceSuccess);out+="},\"events\":[";
+ number("fence_success",renderer.fenceSuccess);
+ out+=",\"finding_mask\":\""+std::to_string(renderer.findingMask)+"\"";
+ number("command_record_count",renderer.commandRecordCount);number("actual_draw_count",renderer.actualDrawCount);
+ number("resource_count",renderer.resourceCount);number("binding_entry_count",renderer.bindingEntryCount);
+ number("depth_trace_count",renderer.depthTraceCount);number("depth_request_count",renderer.depthRequestCount);
+ out+="},\"events\":[";
  for(uint32_t i=0;i<renderer.eventCount;++i){
-  AuroraBrowserFrameEffectEvent e{};if(!aurora_browser_frame_effect_observer_event(i,&e))break;
+  AuroraBrowserFrameEffectEvent e{};if(!aurora_browser_frame_effect_observer_event(i,&e)){rows_complete=false;break;}
   if(i)out+=',';out+="{\"kind\":"+std::to_string(e.kind);
   number("frame_index",e.frameIndex);number("op_index",e.opIndex);number("item_index",e.itemIndex);
   number("flags",e.flags);number("value0",e.value0);number("value1",e.value1);
@@ -171,11 +178,54 @@ const char* melee_web_native_menu_frame_effect_status(){
  }
  out+="],\"handles\":[";
  for(uint32_t i=0;i<renderer.handleCount;++i){
-  AuroraBrowserFrameEffectHandle h{};if(!aurora_browser_frame_effect_observer_handle(i,&h))break;
+  AuroraBrowserFrameEffectHandle h{};if(!aurora_browser_frame_effect_observer_handle(i,&h)){rows_complete=false;break;}
   if(i)out+=',';out+="{\"capture_id\":\""+std::to_string(h.captureId)+"\"";
   number("kind",h.kind);number("reserved",h.reserved);out+='}';
  }
- out+="]}";return out.c_str();
+ out+="],\"resources\":[";
+ for(uint32_t i=0;i<renderer.resourceCount;++i){
+  AuroraBrowserFrameEffectResource r{};
+  if(!aurora_browser_frame_effect_observer_resource(i,&r)){rows_complete=false;break;}
+  if(i)out+=',';
+  out+="{\"capture_id\":\""+std::to_string(r.captureId)+"\",\"owner_id\":\""+std::to_string(r.ownerId)+"\"";
+  number("kind",r.kind);number("word_count",r.wordCount);out+=",\"words\":[";
+  for(unsigned j=0;j<16;++j){if(j)out+=',';out+=std::to_string(r.words[j]);}out+="]}";
+ }
+ out+="],\"binding_entries\":[";
+ for(uint32_t i=0;i<renderer.bindingEntryCount;++i){
+  AuroraBrowserFrameEffectBindingEntry b{};
+  if(!aurora_browser_frame_effect_observer_binding_entry(i,&b)){rows_complete=false;break;}
+  if(i)out+=',';
+  out+="{\"bind_group_id\":\""+std::to_string(b.bindGroupId)+"\",\"resource_id\":\""+std::to_string(b.resourceId)+"\"";
+  out+=",\"offset\":\""+std::to_string(b.offset)+"\",\"size\":\""+std::to_string(b.size)+"\"";
+  number("binding",b.binding);number("kind",b.kind);out+='}';
+ }
+ out+="],\"draws\":[";
+ for(uint32_t i=0;i<renderer.actualDrawCount;++i){
+  AuroraBrowserFrameEffectDraw d{};
+  if(!aurora_browser_frame_effect_observer_draw(i,&d)){rows_complete=false;break;}
+  if(i)out+=',';out+="{\"frame_index\":"+std::to_string(d.frameIndex);
+  number("op_index",d.opIndex);number("command_index",d.commandIndex);number("renderer_kind",d.rendererKind);
+  out+=",\"pipeline_key\":\""+std::to_string(d.pipelineKey)+"\",\"pipeline_id\":\""+std::to_string(d.pipelineId)+"\"";
+  out+=",\"bind_group_ids\":[";
+  for(unsigned j=0;j<4;++j){if(j)out+=',';out+='\"';out+=std::to_string(d.bindGroupIds[j]);out+='\"';}
+  out+="],\"dynamic_offset_count\":[";
+  for(unsigned j=0;j<4;++j){if(j)out+=',';out+=std::to_string(d.dynamicOffsetCount[j]);}
+  out+="],\"dynamic_offsets\":[";
+  for(unsigned j=0;j<4;++j){if(j)out+=',';out+='[';for(unsigned k=0;k<4;++k){if(k)out+=',';out+=std::to_string(d.dynamicOffsets[j][k]);}out+=']';}
+  out+="]";
+  out+=",\"index_buffer_id\":\""+std::to_string(d.indexBufferId)+"\",\"index_offset\":\""+std::to_string(d.indexOffset)+"\",\"index_size\":\""+std::to_string(d.indexSize)+"\"";
+  number("index_format",d.indexFormat);number("vertex_count",d.vertexCount);number("index_count",d.indexCount);
+  number("instance_count",d.instanceCount);number("dst_alpha",d.dstAlpha);number("has_clear_color",d.hasClearColor);number("reserved",d.reserved);
+  // Exact IEEE bits retain negative zero and NaN payloads; no decimal rounding.
+  out+=",\"viewport_bits\":[";
+  for(unsigned j=0;j<6;++j){if(j)out+=',';out+=std::to_string(std::bit_cast<uint32_t>(d.viewport[j]));}
+  out+="],\"scissor\":[";
+  for(unsigned j=0;j<4;++j){if(j)out+=',';out+=std::to_string(d.scissor[j]);}
+  out+="],\"clear_color_bits\":[";
+  for(unsigned j=0;j<4;++j){if(j)out+=',';out+='\"';out+=std::to_string(std::bit_cast<uint64_t>(d.clearColor[j]));out+='\"';}out+="]}";
+ }
+ out+="]";boolean("rows_complete",rows_complete);out+="}";return out.c_str();
 }
 int melee_web_native_menu_frame_effect_retire(){try{
  check(observation.terminal&&!observation.native_retired,

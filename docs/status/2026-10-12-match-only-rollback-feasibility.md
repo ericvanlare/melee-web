@@ -239,6 +239,8 @@ the observer at the first tick selected by the unchanged game clock. Pending
 owner/readiness changes and a stalled or multi-step first due callback still
 fail terminally; original source-free audio callbacks remain unchanged.
 
+The published observation checkpoint is `d68fd8b1`. Its first CI attempt failed only in the new native source-file fixture: strict C11 on Linux did not expose the POSIX `strnlen` declaration. The reviewed test-only compiler-flag repair is `99e6838f`; both focused methods pass, and all 14 checks on that head completed with 12 successes and two expected skips (run `38471800942`). Runtime and capture producers below remain unchanged. Draft #324 remains open for the restore/repeat milestone.
+
 The third capture passed: source frame 180 advanced to 181 with one original
 tick, one complete draw and one audio return of 533 PCM frames. Its actual
 four-port PAD bytes retain disconnected-port errors. The renderer recorded

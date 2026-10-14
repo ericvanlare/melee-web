@@ -1792,6 +1792,41 @@
         "Seven corrective ticks or combined frame budget",
         "Acceptance"
       ]
+    },
+    "observation_checkpoint_ci": {
+      "observation_commit": "d68fd8b16d8c1f63a3d3988471f5c8bca1575780",
+      "current_head": "99e6838fa2457a2ebc5917218d81b348ec9b733a",
+      "run": 38471800942,
+      "checks": 14,
+      "successes": 12,
+      "expected_skips": 2,
+      "runtime_changed": false,
+      "failed_run": 38469816339,
+      "failed_boundary": "Linux native source-file fixture strictC11 POSIX strnlen declaration",
+      "repair": "Native fixture compiler flag -D_POSIX_C_SOURCE=200809L;2 focused methodsPASS, independentreviewPASS",
+      "artifacts": {
+        "pr324-unit1-failed-job.log": {
+          "artifact": "pr324-unit1-failed-job.log",
+          "bytes": 443993,
+          "sha256": "0acd49b748ae8a2e935ac1c8436645b5a99ed529c92c05db137a8a84bfa5c2af"
+        },
+        "pr324-posix-fixture-independent-review-v1.json": {
+          "artifact": "pr324-posix-fixture-independent-review-v1.json",
+          "bytes": 2220,
+          "sha256": "7da264e06ba3a2bbd0aafc79c9a34b12af63889aac25b09769c2dc07d1bc0725"
+        },
+        "pr324-posix-fixture-repair-v1/focused.log": {
+          "artifact": "pr324-posix-fixture-repair-v1/focused.log",
+          "bytes": 418,
+          "sha256": "9e1adf0f320903f1e72905d2bea9fa85d91772a8f60cb8cdd78425139011b6ea"
+        },
+        "pr324-ci-99e6838f.json": {
+          "artifact": "pr324-ci-99e6838f.json",
+          "bytes": 5208,
+          "sha256": "f837aeb9ad45b6faaca7ba3cf1a1bb1d8673fc0b81b8f87d78253fc855119370"
+        }
+      },
+      "scope": "Draft checkpoint only; no restore or integration claim"
     }
   }
 }
