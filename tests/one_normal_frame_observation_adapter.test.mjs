@@ -74,6 +74,12 @@ function validNativeStatus({fenced = true, retired = false} = {}) {
 
 test('legacy match-start prefix stays default and observer mode has an explicit paired opt-in', () => {
   assert.equal(validateFrameEffectMode(), false);
+  assert.equal(buildOneFrameRecorderBinding(identityArgs()).identity.scenario,
+    'one-normal-frame-effect-observation-v1');
+  assert.equal(buildOneFrameRecorderBinding({...identityArgs(), observationScope: 'first_draw'}).identity.scenario,
+    'one-first-draw-effect-observation-v1');
+  assert.throws(() => buildOneFrameRecorderBinding({...identityArgs(), observationScope: 'arbitrary'}),
+    /Unsupported.*scope/);
   assert.equal(validateFrameEffectMode({competitiveMatchStartOnly: true}), false);
   assert.throws(() => validateFrameEffectMode({frameEffectObservationOnly: true,
     producerBindingPath: '/frozen/packet.json'}), /requires --competitive-match-start-only/);
@@ -81,8 +87,22 @@ test('legacy match-start prefix stays default and observer mode has an explicit 
     producerBindingPath: '/frozen/packet.json'}), /required only with/);
   assert.equal(validateFrameEffectMode({competitiveMatchStartOnly: true,
     frameEffectObservationOnly: true, producerBindingPath: '/frozen/packet.json'}), true);
+  assert.equal(validateFrameEffectMode({competitiveMatchStartOnly: true,
+    firstDrawObservationOnly: true, producerBindingPath: '/frozen/packet.json'}), true);
+  assert.throws(() => validateFrameEffectMode({competitiveMatchStartOnly: true,
+    frameEffectObservationOnly: true, firstDrawObservationOnly: true,
+    producerBindingPath: '/frozen/packet.json'}), /mutually exclusive/);
+  assert.throws(() => validateFrameEffectMode({firstDrawObservationOnly: true,
+    producerBindingPath: '/frozen/packet.json'}), /requires --competitive-match-start-only/);
+  assert.throws(() => validateFrameEffectMode({competitiveMatchStartOnly: true,
+    firstDrawObservationOnly: true}), /required only with/);
+  assert.throws(() => validateFrameEffectMode({competitiveMatchStartOnly: true,
+    firstDrawObservationOnly: true, otherRouteSelected: true,
+    producerBindingPath: '/frozen/packet.json'}), /exclusive competitive match-start/);
 });
 
+// Scoped identity is selected before installing the runtime recorder; arbitrary
+// identity/scope injection remains unsupported.
 test('served producer packet requires exact schema, private profile, and typed executable identities', () => {
   const valid = validProducerBinding();
   assert.equal(validateServedRuntimeBinding(valid).source, 'a'.repeat(40));

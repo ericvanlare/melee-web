@@ -10,7 +10,7 @@ namespace melee_web_menu_browser {
 namespace {
 struct FrameEffectObservation {
  bool requested=false, active=false, terminal=false, admitted=false, renderer_armed=false;
- bool native_retired=false;
+ bool native_retired=false, first_draw=false;
  const melee_web::GameplayMatchSession* owner=nullptr;
  uint32_t owner_generation=0;
  unsigned requested_frame=0, source_before=0, source_after=0;
@@ -54,6 +54,25 @@ void frame_effect_begin_tick(const PADStatus pads[4],unsigned prior_steps,
                              unsigned planned_steps,unsigned planned_audio_steps,
                              bool audio_before_construction,bool clock_stalled){
  if(!observation.requested||observation.terminal)return;
+ if(observation.first_draw){
+  if(!observation.active)observation.active=true;
+  // FixedTickClock::tick_with_budget selects at most eight source ticks.
+  const bool first=observation.tick_returns==0;
+  if(planned_steps==0||planned_steps>8||clock_stalled||audio_before_construction||
+     !running||!ready()||!same_owner()||prior_steps!=observation.tick_returns||
+     match->source_frames()!=observation.requested_frame+observation.tick_returns||
+     (!first&&planned_steps!=observation.planned_steps)){
+   refuse("first_draw_callback_tick_guard_changed");observation.admitted=false;return;
+  }
+  if(first){
+   observation.planned_steps=planned_steps;observation.planned_audio_steps=planned_audio_steps;
+   observation.source_before=match->source_frames();observation.audio_phase_before=audio_phase;
+   std::memcpy(observation.pads,pads,sizeof(observation.pads));observation.admitted=true;
+  }else if(planned_audio_steps!=observation.planned_audio_steps){
+   refuse("first_draw_callback_audio_plan_changed");observation.admitted=false;
+  }
+  return;
+ }
  // Activation is tied to the first source tick selected by the existing clock.
  if(!observation.active)observation.active=true;
  if(observation.tick_returns||prior_steps||planned_steps!=1||clock_stalled||
@@ -68,6 +87,15 @@ void frame_effect_begin_tick(const PADStatus pads[4],unsigned prior_steps,
 void frame_effect_tick_returned(){if(observation.active)++observation.tick_returns;}
 void frame_effect_begin_draw(){
  if(!observation.active||!observation.admitted)return;
+ if(observation.first_draw){
+  if(observation.tick_returns!=observation.draw_returns+1||!same_owner()||!running||!ready()){
+   refuse("first_draw_callback_draw_order_changed");return;
+  }
+  if(observation.draw_returns!=0)return; // Later original draws are unobserved.
+  observation.renderer_armed=aurora_browser_frame_effect_observer_arm_first_draw()!=0;
+  if(!observation.renderer_armed)refuse("renderer_observer_arm_refused");
+  return;
+ }
  if(observation.tick_returns!=1||observation.draw_returns||observation.renderer_armed){
   refuse("ordinary_callback_draw_order_changed");return;
  }
@@ -103,7 +131,13 @@ void frame_effect_callback_finished(unsigned steps,unsigned draws){
  }
  observation.callback_steps=steps;observation.callback_draws=draws;
  observation.source_after=match?match->source_frames():0;observation.audio_phase_after=audio_phase;
- if(!observation.admitted||steps!=1||draws!=1||observation.tick_returns!=1||
+ if(observation.first_draw){
+  if(!observation.admitted||steps!=observation.planned_steps||draws!=steps||
+     observation.tick_returns!=steps||observation.draw_returns!=draws||
+     observation.source_after!=observation.source_before+steps||
+     observation.audio_returns!=observation.planned_audio_steps||!observation.renderer_armed)
+   refuse("first_draw_callback_count_mismatch");
+ }else if(!observation.admitted||steps!=1||draws!=1||observation.tick_returns!=1||
     observation.draw_returns!=1||observation.source_after!=observation.source_before+1||
     observation.audio_returns!=observation.planned_audio_steps||!observation.renderer_armed)
   refuse("ordinary_callback_count_mismatch");
@@ -122,12 +156,18 @@ int melee_web_native_menu_frame_effect_arm(unsigned expected_frame){
  observation.requested=true;observation.requested_frame=expected_frame;
  return 1;
 }
+int melee_web_native_menu_frame_effect_arm_first_draw(unsigned expected_frame){
+ if(!melee_web_native_menu_frame_effect_arm(expected_frame))return 0;
+ observation.first_draw=true;return 1;
+}
 const char* melee_web_native_menu_frame_effect_status(){
  static std::string out;
  if(observation.active)return "{\"busy\":true}";
  const auto renderer=aurora_browser_frame_effect_observer_snapshot();
  bool rows_complete=true;
- out="{\"schema_version\":2,\"scope\":\"one_normal_callback_observation_only\"";
+ out=observation.first_draw?
+     "{\"schema_version\":3,\"scope\":\"first_draw_in_normal_callback_observation_only\"":
+     "{\"schema_version\":2,\"scope\":\"one_normal_callback_observation_only\"";
  const auto number=[&](const char* name,auto value){out+=",\"";out+=name;out+="\":";out+=std::to_string(value);};
  const auto boolean=[&](const char* name,bool value){out+=",\"";out+=name;out+=value?"\":true":"\":false";};
  boolean("requested",observation.requested);boolean("terminal",observation.terminal);
@@ -144,6 +184,15 @@ const char* melee_web_native_menu_frame_effect_status(){
  number("planned_steps",observation.planned_steps);number("planned_audio_steps",observation.planned_audio_steps);
  number("callback_steps",observation.callback_steps);number("callback_draws",observation.callback_draws);
  number("audio_phase_before",observation.audio_phase_before);number("audio_phase_after",observation.audio_phase_after);
+ if(observation.first_draw){
+  number("selected_source_frame",observation.source_before?observation.source_before+1:0);
+  number("unobserved_draws",observation.draw_returns?observation.draw_returns-1:0);
+  const auto owners=aurora_browser_frame_effect_observer_depth_owners();
+  out+=",\"selected_depth_owners\":{\"registered\":"+std::to_string(owners.registeredCount);
+  number("completed",owners.completedCount);number("pending",owners.pendingCount);
+  number("ignored_other_issuer",owners.ignoredOtherIssuerCount);
+  boolean("finalized",owners.finalized!=0);out+='}';
+ }
  out+=",\"error\":\"";out+=observation.error;out+="\",\"raw_pad_bytes\":[";
  const auto* bytes=reinterpret_cast<const unsigned char*>(observation.pads);
  for(size_t i=0;i<sizeof(observation.pads);++i){if(i)out+=',';out+=std::to_string(bytes[i]);}
@@ -244,6 +293,9 @@ int melee_web_native_menu_frame_effect_retire(){try{
  check(!observation.renderer_armed||(renderer.fenceCount==1&&renderer.fenceSuccess==1),
        "Frame effect retirement requires its successful normal queue fence");
  check(!melee_web_source_file_drive_busy(),"Frame effect retirement refuses pending source reads");
+ if(observation.first_draw&&observation.renderer_armed)
+  check(aurora_browser_frame_effect_observer_finalize_first_draw()!=0,
+        "First-draw observation refuses pending selected map callbacks");
  close();melee_web_input_shutdown();aurora_shutdown();emscripten_cancel_main_loop();
  observation.native_retired=true;
  check(EM_ASM_INT({return window.menuMatchFrameEffectRetired()===true?1:0;}),

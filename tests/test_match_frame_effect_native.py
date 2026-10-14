@@ -1,5 +1,7 @@
 """Compile the actual private observer seam with controlled source/GPU endpoints."""
 from pathlib import Path
+import json
+import shlex
 import shutil
 import subprocess
 import sys
@@ -40,6 +42,48 @@ class MatchFrameEffectNativeTests(OwnedWorkspaceTests):
         self.assertIn("tests 17", result.stdout)
         self.assertIn("fail 0", result.stdout)
 
+    def test_actual_first_draw_collector_issuing_identity(self):
+        database = ROOT / "build/browser-match-frame-effect-release/compile_commands.json"
+        compiler = ROOT / ".deps/emsdk/upstream/emscripten/em++"
+        if not database.is_file() or not compiler.is_file():
+            self.skipTest("Configure private frame-effect profile with pinned Emscripten for collector control")
+        entries = json.loads(database.read_text())
+        source = ROOT / ".deps/aurora/lib/gfx/encoding.cpp"
+        row = next((entry for entry in entries if Path(entry["file"]).resolve() == source.resolve()), None)
+        self.assertIsNotNone(row, "Actual pinned encoding compile row unavailable")
+        arguments = shlex.split(row["command"])[1:]
+        retained = []
+        index = 0
+        while index < len(arguments):
+            value = arguments[index]
+            if value in ("-o", "-MT", "-MF", "-MQ"):
+                index += 2
+                continue
+            if value in ("-c", "-MD", "-MMD", row["file"]):
+                index += 1
+                continue
+            retained.append(value)
+            index += 1
+        output = self.work / "first-draw-collector.js"
+        command = [str(compiler), *retained, "-UNDEBUG", "-I", str(ROOT / ".deps/aurora"),
+                   str(ROOT / "tests/match_frame_effect_first_draw_collector.cpp"),
+                   "-sENVIRONMENT=node", "-sEXIT_RUNTIME=1", "-sASSERTIONS=1", "-o", str(output)]
+        build = subprocess.run(command, cwd=row["directory"], capture_output=True, text=True, timeout=90)
+        (self.work / "first-draw-collector-build.log").write_text(build.stdout + build.stderr)
+        self.assertEqual(build.returncode, 0, build.stdout + build.stderr)
+        run = subprocess.run([str(node_runtime(ROOT)), str(output)], cwd=ROOT,
+                             capture_output=True, text=True, timeout=20)
+        (self.work / "first-draw-collector-run.log").write_text(run.stdout + run.stderr)
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertIn("first-draw actual collector issuing identity and selected map-owner controls passed", run.stdout)
+
+    def test_first_draw_scope_controls(self):
+        result = subprocess.run([str(node_runtime(ROOT)), "--test",
+                                 str(ROOT / "tests/match_frame_effect_first_draw.test.mjs"),
+                                 str(ROOT / "tests/one_first_draw_observation_adapter.test.mjs")],
+                                cwd=ROOT, capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_actual_seam_one_shot_admission_failure_and_retirement(self):
         header = ROOT / ".deps/aurora/include/aurora/gfx.h"
         if not header.is_file():
@@ -58,7 +102,7 @@ class MatchFrameEffectNativeTests(OwnedWorkspaceTests):
         compiler = shutil.which("clang++") or shutil.which("c++")
         self.assertIsNotNone(compiler)
         binary = self.work / "control"
-        build = subprocess.run([compiler, "-std=c++20", "-DTARGET_PC=1", "-I", str(ROOT / ".deps/aurora/include"), "-Wall", "-Wextra", "-Werror",
+        build = subprocess.run([compiler, "-std=c++20", "-DTARGET_PC=1", "-I", str(ROOT / ".deps/aurora/include"), "-I", str(ROOT / "src"), "-Wall", "-Wextra", "-Werror",
                                 str(unit), "-o", str(binary)], capture_output=True, text=True, timeout=60)
         (self.work / "build.log").write_text(build.stdout + build.stderr)
         self.assertEqual(build.returncode, 0, build.stdout + build.stderr)
@@ -77,6 +121,17 @@ class MatchFrameEffectNativeTests(OwnedWorkspaceTests):
                          "assert.deepEqual(frameEffectObservationFailures(r),[]);\n" +
                          "assert.deepEqual(compareFrameEffectObservations(r,structuredClone(r)),[]);\n" +
                          "console.log('actual native schema2 JSON decoded exactly');\n")
+        decoded = subprocess.run([str(node_runtime(ROOT)), str(check), str(raw)],
+                                 capture_output=True, text=True, timeout=15)
+        self.assertEqual(decoded.returncode, 0, decoded.stdout + decoded.stderr)
+
+        first_rows = [line[len("SCHEMA3_STATUS "):] for line in run.stdout.splitlines() if line.startswith("SCHEMA3_STATUS ")]
+        self.assertEqual(len(first_rows), 1)
+        raw.write_text(first_rows[0])
+        check.write_text(check.read_text().replace("match_frame_effect_driver.mjs", "match_frame_effect_first_draw_driver.mjs")
+                         .replace("frameEffectObservationFailures", "firstDrawObservationFailures")
+                         .replace("compareFrameEffectObservations", "compareFirstDrawObservations")
+                         .replace("actual native schema2 JSON decoded exactly", "actual native first-draw schema3 JSON decoded exactly"))
         decoded = subprocess.run([str(node_runtime(ROOT)), str(check), str(raw)],
                                  capture_output=True, text=True, timeout=15)
         self.assertEqual(decoded.returncode, 0, decoded.stdout + decoded.stderr)

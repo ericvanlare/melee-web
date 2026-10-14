@@ -746,7 +746,7 @@ if(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
   target_sources(gameplay_menu_browser PRIVATE src/gameplay_menu_frame_effect.cpp)
   target_compile_definitions(gameplay_menu_browser PRIVATE MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC=1)
   string(APPEND gameplay_menu_browser_exports
-    ",_melee_web_native_menu_frame_effect_arm,_melee_web_native_menu_frame_effect_status,_melee_web_native_menu_frame_effect_retire")
+    ",_melee_web_native_menu_frame_effect_arm,_melee_web_native_menu_frame_effect_arm_first_draw,_melee_web_native_menu_frame_effect_status,_melee_web_native_menu_frame_effect_retire")
 endif()
 if(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
   string(APPEND gameplay_menu_browser_exports

@@ -42,6 +42,7 @@ import {
 import {runSuddenDeathBrowserRoute,validateFinalSdCapture} from './vs_sudden_death_browser_route.mjs';
 import {runSparseMarioBrowserPrefix,installSparseVirtualController,validateFinalSparseCapture} from './vs_sparse_mario_browser_route.mjs';
 import * as matchFrameEffectDriver from './match_frame_effect_driver.mjs';
+import {observeOneFirstDraw,firstDrawDriver} from './one_first_draw_observation_adapter.mjs';
 import {CSS_SSS_TRANSITION_LIMITS} from './stadium_c1a_css_sss_reducer.mjs';
 import {
   buildOneFrameRecorderBinding,
@@ -68,6 +69,7 @@ options['sparse-mario-prefix'] = {type: 'boolean', default: false};
 options['competitive-profile-only'] = {type: 'boolean', default: false};
 options['competitive-match-start-only'] = {type: 'boolean', default: false};
 options['frame-effect-observation-only'] = {type: 'boolean', default: false};
+options['first-draw-observation-only'] = {type: 'boolean', default: false};
 options['frame-effect-producer-binding'] = {type: 'string'};
 options['competitive-timeout-route'] = {type: 'boolean', default: false};
 options['sudden-death-route'] = {type: 'boolean', default: false};
@@ -90,14 +92,21 @@ const stageOnly = values['stage-only'];
 const noContestOnly = values['no-contest-only'];
 const competitiveProfileOnly = values['competitive-profile-only'];
 const competitiveMatchStartOnly = values['competitive-match-start-only'];
-const frameEffectObservationOnly = values['frame-effect-observation-only'];
+const singleTickFrameEffectObservationOnly = values['frame-effect-observation-only'];
+const firstDrawObservationOnly = values['first-draw-observation-only'];
+const frameEffectObservationOnly = singleTickFrameEffectObservationOnly || firstDrawObservationOnly;
 const competitiveTimeoutRoute = values['competitive-timeout-route'];
 for (const name of ['url', 'disc', 'out'])
   if (!values[name]) throw Error('Use --url DEVELOPMENT_RUNTIME_URL --disc OWNED_DISC --out NEW_DIRECTORY [--playwright PACKAGE_DIR]');
 const competitiveSourceRoute = competitiveMatchStartOnly || competitiveTimeoutRoute;
 const frameEffectProducerBindingPath = values['frame-effect-producer-binding']
   ? path.resolve(values['frame-effect-producer-binding']) : null;
-validateFrameEffectMode({competitiveMatchStartOnly, frameEffectObservationOnly,
+validateFrameEffectMode({competitiveMatchStartOnly,
+  frameEffectObservationOnly: singleTickFrameEffectObservationOnly,
+  firstDrawObservationOnly,
+  otherRouteSelected: ['menu-only','rules-items-only','css-sss-only','stage-only','no-contest-only',
+    'team-battle','team-setup-only','sparse-mario-route','sparse-mario-css-only','sparse-mario-prefix',
+    'competitive-profile-only','competitive-timeout-route','sudden-death-route'].some(name => values[name]),
   producerBindingPath: frameEffectProducerBindingPath});
 let frameEffectProducerBinding = null;
 let frameEffectProducerBindingFile = null;
@@ -174,6 +183,8 @@ const report = {
     : menuOnly ? 'source-menu-boundary-reproducer' : 'source-rules-items-match-route',
   scope: sparseFullRoute ? 'Virtual Gamepad P3/keyboard P1; original sparse Mario CSS/SSS, live elimination and canonical Results/CSS. Functional only; no physical input, original comparison, pixels/PCM or timing acceptance.' : sparseCssOnly ? 'Rendered original sparse CSS and exact copied/raw PAD observation then Eject only; no SSS/world, physical input or timing acceptance.' : sparseMarioPrefix ? 'Virtual Browser Gamepad P3 and keyboard P1; original sparse CSS/SSS to a short ordinary Mario/FD prefix and Eject. No Results, original comparison, physical input or timing acceptance.' : suddenDeathRoute
     ? 'Original Rules one-minute four-stock two-human Mario/FD; natural timeout, active SD live input elimination, typed original Results and CSS/Eject. Zero timing-pause recovery. Functional only; no reference, timing, physical input or PCM acceptance.'
+    : firstDrawObservationOnly
+    ? 'Headless original CSS/Rules/SSS to normalized two-human four-stock Mario/Final Destination. Observe only the first drawn source frame in one naturally due callback; preserve every later original tick/draw/audio/submit, retain callback totals and first PAD/source identity, and label later draws unobserved. Wait for the selected normal fence and known selected map completions, then checked native retirement and owned browser cleanup. No Eject after retirement, restore/replay, complete GPU ownership, Results or full-route acceptance.'
     : frameEffectObservationOnly
     ? 'Headless original CSS -> Main/VS/Rules/Items/Rules Plus -> CSS; enable P2 through Controls and require the original CSS CPU/empty/Human transitions before Start; select Final Destination through original SSS and check normalized two-human Mario stock settings in the bounded 180–240 source-frame window. Observe exactly one ordinary callback with its original full draw and normal fence, then use checked private owner retirement and close the owned browser context. No Eject after retirement, 8-minute match, timeout, Results, retail comparison, or full-route acceptance claim.'
     : competitiveMatchStartOnly
@@ -1554,6 +1565,7 @@ route: {
       outputName: path.basename(output),
       discSha256: expectedDiscSha256,
       producerBinding: frameEffectProducerBinding,
+      observationScope: firstDrawObservationOnly ? 'first_draw' : 'single_tick',
     });
     report.competitiveMatchStart.frame_effect_runtime_identity = frameEffectRecorderBinding.identity;
     report.competitiveMatchStart.frame_effect_runtime_identity_scope = frameEffectRecorderBinding.identityScope;
@@ -1693,22 +1705,28 @@ route: {
       // From this call onward, an unexpected adapter exception may follow an
       // arm dispatch whose page response was lost; default to owner-only cleanup.
       frameEffectNativeCallsForbidden = true;
-      const frameEffectObservation = await observeOneNormalFrame({
+      const runObservation = firstDrawObservationOnly ? observeOneFirstDraw : observeOneNormalFrame;
+      const frameEffectObservation = await runObservation({
         page,
         normalizedMatch: liveMatch,
         normalizedMatchFailures: matchFailures,
         producerBinding: frameEffectProducerBinding,
         outputName: path.basename(output),
         discSha256: report.discSha256,
-        driver: matchFrameEffectDriver,
+        driver: firstDrawObservationOnly ? firstDrawDriver : matchFrameEffectDriver,
         readRuntimeCapture: readRuntimeDiagnosticsCapture,
       });
       report.competitiveMatchStart.frame_effect_observation = frameEffectObservation;
       frameEffectNativeCallsForbidden = frameEffectMustSkipOrdinaryNativeCleanup(frameEffectObservation);
       if (frameEffectObservation.native_retired === true) nativeSessionActive = false;
       if (frameEffectObservation.status !== 'pass')
-        throw Error(`One-normal-frame observation failed: ${JSON.stringify(frameEffectObservation.failures)}`);
-      report.checks.push(`Original two-human Mario match selected Final Destination; one normal callback advanced source frame ${frameEffectObservation.requested_source_frame} by one, published one complete draw, observed its normal fence, and retired the private native owner.`);
+        throw Error(`${firstDrawObservationOnly ? 'First-draw' : 'One-normal-frame'} observation failed: ${JSON.stringify(frameEffectObservation.failures)}`);
+      if (firstDrawObservationOnly) {
+        const observed = frameEffectObservation.renderer_status;
+        report.checks.push(`Observed selected first source draw ${observed.selected_source_frame} in the normal callback ${observed.source_frame_before} -> ${observed.source_frame_after}; ${observed.callback_steps} actual ticks, ${observed.callback_draws} actual draws and ${observed.audio_returns} audio renders were preserved. Only the first draw's renderer rows/fence were observed; ${observed.unobserved_draws} later draws remain unobserved. The checked private native owner retired.`);
+      } else {
+        report.checks.push(`Original two-human Mario match selected Final Destination; one normal callback advanced source frame ${frameEffectObservation.requested_source_frame} by one, published one complete draw, observed its normal fence, and retired the private native owner.`);
+      }
     } else if (competitiveMatchStartOnly) {
       const lastBeforeEject = await observeMatch();
       assert.equal(lastBeforeEject?.ready, true,

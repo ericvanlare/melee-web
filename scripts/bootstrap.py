@@ -21,6 +21,7 @@ from workspace_resources import operation
 AURORA_PREVIOUS_PATCH_TREES = (
     # Exact combined current-main predecessor before schema2 private observation.
     "cdb8ce62675f09c4fb9e7206700b2c270d3414e2",
+    "88eb80f1639faddd0963928485ab5d6ac76ceeeb",
     # Exact reviewed observer and hosted-staging predecessor trees.
     "a28936a4148fc2d62f7a51a1b47767adb512f86e",
     "55f61288df8e2bdeec93f14c3be2e83111fb91ab",

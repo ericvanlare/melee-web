@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include "source_frame_sequence.hpp"
 // ACTUAL_AURORA_API
 constexpr int St_Kind_Last=32, CKIND_MARIO=0, Gm_PKind_NA=3;
 struct Stats { unsigned queuedPipelines=0; } stats;
@@ -37,11 +38,17 @@ bool net=false,source_busy=false,arm_allowed=true,em_answer=true,throw_close=fal
 unsigned gpu_arms=0,cancel_calls=0,returned_tasks=0;
 std::vector<std::string> retired_calls;
 AuroraBrowserFrameEffectSnapshot gpu{};
+AuroraBrowserFrameEffectDepthOwners depth_owners{};
 int melee_web_net_active(){return net;}
 int melee_web_source_file_drive_busy(){return source_busy;}
 const Stats* aurora_get_stats(){return &stats;}
 Submission aurora_browser_submission_status(){return submission;}
 int aurora_browser_frame_effect_observer_arm(){++gpu_arms;return arm_allowed;}
+int aurora_browser_frame_effect_observer_arm_first_draw(){++gpu_arms;return arm_allowed;}
+AuroraBrowserFrameEffectDepthOwners aurora_browser_frame_effect_observer_depth_owners(){return depth_owners;}
+int aurora_browser_frame_effect_observer_finalize_first_draw(){
+ if(depth_owners.pendingCount)return 0;depth_owners.finalized=1;return 1;
+}
 AuroraBrowserFrameEffectSnapshot aurora_browser_frame_effect_observer_snapshot(){return gpu;}
 std::vector<AuroraBrowserFrameEffectEvent> event_rows;
 std::vector<AuroraBrowserFrameEffectHandle> handle_rows;
@@ -71,7 +78,7 @@ void reset(){
  observation={};match=std::make_unique<melee_web::GameplayMatchSession>();
  preparation={};faulted=pending=replay=results=prize=transition_audio_continues=false;running=true;
  stock_check=0;diagnostic_start_ticks=diagnostic_pad_remaining=audio_phase=0;asset_generation=1;
- net=source_busy=throw_close=false;arm_allowed=em_answer=true;stats={};submission={};gpu={};
+ depth_owners={};net=source_busy=throw_close=false;arm_allowed=em_answer=true;stats={};submission={};gpu={};
  gpu_arms=cancel_calls=returned_tasks=0;retired_calls.clear();message.clear();
  event_rows.clear();handle_rows.clear();resource_rows.clear();binding_rows.clear();draw_rows.clear();refused_category=0;
 }
@@ -123,7 +130,76 @@ void schema2_serialization_control(){
  refused_category=0;
 }
 
+
+void first_draw_actual_tail_control(unsigned plan){
+ reset();assert(melee_web_native_menu_frame_effect_arm_first_draw(200)==1);
+ frame_effect_callback_started();melee_web::SourceFrameSequence sequence;
+ std::vector<std::string> calls;
+ const auto present=[&](){frame_effect_begin_draw();calls.push_back("draw");frame_effect_draw_returned();return true;};
+ PADStatus pads[4]{};
+ for(unsigned i=0;i<plan;++i){
+  sequence.before_step(present);pads[0].button=static_cast<uint16_t>(0x100+i);
+  frame_effect_begin_tick(pads,sequence.steps(),plan,1,false,false);
+  calls.push_back("tick");++match->frame;frame_effect_tick_returned();sequence.did_step();
+ }
+ calls.push_back("audio");frame_effect_audio_returned(533);audio_phase=20;
+ sequence.finish(present);frame_effect_callback_finished(sequence.steps(),sequence.draws());
+ assert(sequence.steps()==plan&&sequence.draws()==plan&&match->frame==200+plan);
+ if(plan==0){
+  assert(!observation.active&&!observation.terminal&&running&&gpu_arms==0);
+  assert(observation.pre_tick_callbacks==1&&observation.pre_tick_audio_returns==1);
+  assert((calls==std::vector<std::string>{"audio"}));
+  return;
+ }
+ assert(observation.admitted&&observation.terminal&&!*observation.error&&!running);
+ assert(observation.tick_returns==plan&&observation.draw_returns==plan&&observation.audio_returns==1);
+ assert(observation.pads[0].button==0x100&&observation.source_before==200&&observation.source_after==200+plan);
+ assert(gpu_arms==1&&cancel_calls==1&&returned_tasks==1);
+ if(plan==2)assert((calls==std::vector<std::string>{"tick","draw","tick","audio","draw"}));
+ gpu.fenceCount=gpu.fenceSuccess=1;
+ depth_owners.registeredCount=1;depth_owners.pendingCount=1;
+ assert(melee_web_native_menu_frame_effect_retire()==0&&retired_calls.empty());
+ depth_owners.completedCount=1;depth_owners.pendingCount=0;
+ assert(melee_web_native_menu_frame_effect_retire()==1&&depth_owners.finalized==1);
+ assert((retired_calls==std::vector<std::string>{"close","input","gpu"}));
+ assert(melee_web_native_menu_frame_effect_retire()==0&&retired_calls.size()==3);
+}
+
+void first_draw_guard_controls(){
+ reset();assert(melee_web_native_menu_frame_effect_arm_first_draw(200)==1);
+ PADStatus pads[4]{};
+ frame_effect_begin_tick(pads,0,2,1,false,true);
+ assert(!observation.admitted&&gpu_arms==0);
+ frame_effect_callback_aborted("later_abort");
+ assert(std::string(observation.error)=="first_draw_callback_tick_guard_changed");
+ reset();assert(melee_web_native_menu_frame_effect_arm_first_draw(200)==1);
+ frame_effect_begin_tick(pads,0,2,1,false,false);++match->frame;frame_effect_tick_returned();
+ frame_effect_begin_draw();frame_effect_draw_returned();++asset_generation;
+ frame_effect_begin_tick(pads,1,2,1,false,false);
+ assert(!observation.admitted&&gpu_arms==1);
+ frame_effect_callback_finished(1,1);
+ assert(observation.terminal&&std::string(observation.error)=="first_draw_callback_tick_guard_changed");
+ reset();assert(melee_web_native_menu_frame_effect_arm_first_draw(200)==1);
+ frame_effect_begin_tick(pads,0,1,1,false,false);++match->frame;frame_effect_tick_returned();
+ arm_allowed=false;frame_effect_begin_draw();frame_effect_draw_returned();
+ frame_effect_audio_returned(533);audio_phase=20;frame_effect_callback_finished(1,1);
+ assert(observation.terminal&&std::string(observation.error)=="renderer_observer_arm_refused");
+}
+
+void first_draw_serialization_control(){
+ // Reuse the exact schema2 renderer rows including high uint64 and IEEE values.
+ schema2_serialization_control();
+ observation.first_draw=true;observation.planned_steps=2;observation.callback_steps=2;
+ observation.callback_draws=2;observation.tick_returns=2;observation.draw_returns=2;
+ observation.source_after=202;
+ const std::string raw=melee_web_native_menu_frame_effect_status();
+ assert(raw.find("\"schema_version\":3")!=std::string::npos);
+ assert(raw.find("\"selected_source_frame\":201,\"unobserved_draws\":1")!=std::string::npos);
+ std::printf("SCHEMA3_STATUS %s\n",raw.c_str());
+}
+
 int main(){
+ first_draw_actual_tail_control(0);first_draw_actual_tail_control(1);first_draw_actual_tail_control(2);first_draw_actual_tail_control(8);first_draw_guard_controls();
  reset();assert(melee_web_native_menu_frame_effect_arm(199)==0);assert(!observation.requested);
  request();assert(melee_web_native_menu_frame_effect_arm(200)==0);
  const std::string pending_status=melee_web_native_menu_frame_effect_status();
@@ -200,5 +276,5 @@ int main(){
  assert(!observation.admitted&&gpu_arms==0);
  reset();request();begin();faulted=true;tick_and_draw();
  assert(std::string(observation.error)=="ordinary_callback_guard_or_owner_changed");
- schema2_serialization_control();
+ first_draw_serialization_control();
 }

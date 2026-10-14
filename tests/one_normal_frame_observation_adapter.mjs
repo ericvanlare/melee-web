@@ -22,13 +22,20 @@ const FRAME_EFFECT_REQUIRED_FILES = Object.freeze({
 export function validateFrameEffectMode({
   competitiveMatchStartOnly = false,
   frameEffectObservationOnly = false,
+  firstDrawObservationOnly = false,
+  otherRouteSelected = false,
   producerBindingPath = null,
 } = {}) {
-  if (frameEffectObservationOnly && !competitiveMatchStartOnly)
-    throw Error('--frame-effect-observation-only requires --competitive-match-start-only');
-  if (frameEffectObservationOnly !== Boolean(producerBindingPath))
-    throw Error('--frame-effect-producer-binding is required only with --frame-effect-observation-only');
-  return frameEffectObservationOnly;
+  if (frameEffectObservationOnly && firstDrawObservationOnly)
+    throw Error('single-tick and first-draw observation modes are mutually exclusive');
+  if (firstDrawObservationOnly && otherRouteSelected)
+    throw Error('first-draw observation requires the exclusive competitive match-start route');
+  const observationOnly = frameEffectObservationOnly || firstDrawObservationOnly;
+  if (observationOnly && !competitiveMatchStartOnly)
+    throw Error(`${firstDrawObservationOnly ? '--first-draw-observation-only' : '--frame-effect-observation-only'} requires --competitive-match-start-only`);
+  if (observationOnly !== Boolean(producerBindingPath))
+    throw Error(`--frame-effect-producer-binding is required only with ${firstDrawObservationOnly ? '--first-draw-observation-only' : '--frame-effect-observation-only'}`);
+  return observationOnly;
 }
 
 export function validateServedRuntimeBinding(value) {
@@ -78,14 +85,17 @@ export async function verifyServedRuntimeAssets({binding, baseUrl, fetchImpl = g
   };
 }
 
-export function buildOneFrameRecorderBinding({outputName, discSha256, producerBinding}) {
+export function buildOneFrameRecorderBinding({outputName, discSha256, producerBinding, observationScope = 'single_tick'}) {
+  if (!['single_tick', 'first_draw'].includes(observationScope))
+    throw Error('Unsupported frame-effect recorder observation scope');
   if (typeof outputName !== 'string' || !outputName || outputName.includes('/') || outputName.includes('\\'))
     throw Error('outputName must be one directory name');
   if (!/^[a-f0-9]{64}$/.test(discSha256 || '')) throw Error('discSha256 must be a SHA-256 digest');
   const producer = validateServedRuntimeBinding(producerBinding);
   return {
     identity: {
-      scenario: 'one-normal-frame-effect-observation-v1',
+      scenario: observationScope === 'first_draw'
+        ? 'one-first-draw-effect-observation-v1' : 'one-normal-frame-effect-observation-v1',
       output_directory: outputName,
       disc_sha256: discSha256,
       producer_binding: producer,
@@ -257,6 +267,7 @@ export async function observeOneNormalFrame({
   discSha256,
   driver,
   readRuntimeCapture,
+  observationScope = 'single_tick',
   armTimeoutMs = 15000,
   callbackTimeoutMs = 15000,
   retirementTimeoutMs = 15000,
@@ -293,7 +304,7 @@ export async function observeOneNormalFrame({
     result.failures.push('invalid_adapter_deadline');
     return result;
   }
-  const binding = buildOneFrameRecorderBinding({outputName, discSha256, producerBinding});
+  const binding = buildOneFrameRecorderBinding({outputName, discSha256, producerBinding, observationScope});
   result.producer_binding = binding.identity.producer_binding;
   result.runtime_callback_identity = binding.identity;
   result.runtime_callback_identity_scope = binding.identityScope;
