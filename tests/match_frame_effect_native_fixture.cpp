@@ -55,6 +55,8 @@ std::vector<AuroraBrowserFrameEffectHandle> handle_rows;
 std::vector<AuroraBrowserFrameEffectResource> resource_rows;
 std::vector<AuroraBrowserFrameEffectBindingEntry> binding_rows;
 std::vector<AuroraBrowserFrameEffectDraw> draw_rows;
+std::vector<AuroraBrowserFrameEffectLayoutEntry> layout_rows;
+std::vector<AuroraBrowserFrameEffectProvenance> provenance_rows;
 unsigned refused_category=0;
 template<typename T> int fixture_row(unsigned category,uint32_t index,T* out,const std::vector<T>& rows){
  if(refused_category==category||index>=rows.size())return 0;*out=rows[index];return 1;
@@ -63,6 +65,8 @@ int aurora_browser_frame_effect_observer_event(uint32_t i,AuroraBrowserFrameEffe
 int aurora_browser_frame_effect_observer_handle(uint32_t i,AuroraBrowserFrameEffectHandle* out){return fixture_row(2,i,out,handle_rows);}
 int aurora_browser_frame_effect_observer_resource(uint32_t i,AuroraBrowserFrameEffectResource* out){return fixture_row(3,i,out,resource_rows);}
 int aurora_browser_frame_effect_observer_binding_entry(uint32_t i,AuroraBrowserFrameEffectBindingEntry* out){return fixture_row(4,i,out,binding_rows);}
+int aurora_browser_frame_effect_observer_layout_entry(uint32_t i,AuroraBrowserFrameEffectLayoutEntry* out){return fixture_row(6,i,out,layout_rows);}
+int aurora_browser_frame_effect_observer_provenance(uint32_t i,AuroraBrowserFrameEffectProvenance* out){return fixture_row(7,i,out,provenance_rows);}
 int aurora_browser_frame_effect_observer_draw(uint32_t i,AuroraBrowserFrameEffectDraw* out){return fixture_row(5,i,out,draw_rows);}
 void emscripten_cancel_main_loop(){++cancel_calls;}
 void close(){retired_calls.push_back("close");if(throw_close)throw std::runtime_error("close failed");melee_web_menu_browser::match.reset();}
@@ -80,7 +84,7 @@ void reset(){
  stock_check=0;diagnostic_start_ticks=diagnostic_pad_remaining=audio_phase=0;asset_generation=1;
  depth_owners={};net=source_busy=throw_close=false;arm_allowed=em_answer=true;stats={};submission={};gpu={};
  gpu_arms=cancel_calls=returned_tasks=0;retired_calls.clear();message.clear();
- event_rows.clear();handle_rows.clear();resource_rows.clear();binding_rows.clear();draw_rows.clear();refused_category=0;
+ event_rows.clear();handle_rows.clear();resource_rows.clear();binding_rows.clear();draw_rows.clear();layout_rows.clear();provenance_rows.clear();refused_category=0;
 }
 void request(){assert(melee_web_native_menu_frame_effect_arm(200)==1);frame_effect_callback_started();}
 void begin(unsigned planned_steps=1,bool clock_stalled=false){PADStatus pads[4]{};pads[1].button=0x100;pads[1].extButton=0x12345678;
@@ -93,17 +97,20 @@ void tick_and_draw(){++match->frame;frame_effect_tick_returned();frame_effect_au
 
 void schema2_serialization_control(){
  reset();request();begin();tick_and_draw();
- gpu.schemaVersion=2;gpu.state=4;gpu.targetFrameIndex=gpu.frameIndex=3;gpu.frameId=9007199254740993ULL;
+ gpu.schemaVersion=3;gpu.state=4;gpu.targetFrameIndex=gpu.frameIndex=3;gpu.frameId=9007199254740993ULL;
  gpu.submitCount=gpu.fenceCount=gpu.fenceSuccess=1;gpu.firstBlocker=7;gpu.findingMask=128|(uint64_t{1}<<27);
  gpu.commandRecordCount=gpu.actualDrawCount=1;gpu.opCount=gpu.renderPassCount=gpu.drawCommandCount=1;
- gpu.resourceCount=3;gpu.bindingEntryCount=1;gpu.handleCount=4;gpu.eventCount=8;
+ gpu.resourceCount=4;gpu.bindingEntryCount=1;gpu.handleCount=5;gpu.eventCount=8;gpu.layoutEntryCount=2;gpu.provenanceCount=2;
  gpu.queueWriteBytes=UINT64_MAX;
- handle_rows={{1,7,0},{2,6,0},{3,3,0},{4,5,0}};
- resource_rows.resize(3);
+ handle_rows={{1,7,0},{2,6,0},{3,3,0},{4,5,0},{5,9,0}};
+ resource_rows.resize(4);
  resource_rows[0].captureId=2;resource_rows[0].ownerId=1;resource_rows[0].kind=6;resource_rows[0].wordCount=2;
  resource_rows[0].words[0]=resource_rows[0].words[1]=UINT32_MAX;
  resource_rows[1].captureId=3;resource_rows[1].ownerId=1;resource_rows[1].kind=3;resource_rows[1].wordCount=5;resource_rows[1].words[0]=128;resource_rows[1].words[2]=4;
  resource_rows[2].captureId=4;resource_rows[2].ownerId=1;resource_rows[2].kind=5;resource_rows[2].wordCount=5;resource_rows[2].words[2]=1;
+ resource_rows[3].captureId=5;resource_rows[3].ownerId=1;resource_rows[3].kind=9;resource_rows[3].wordCount=1;resource_rows[3].words[0]=2;
+ layout_rows.resize(2);layout_rows[0].layoutId=layout_rows[1].layoutId=5;layout_rows[1].entryIndex=1;layout_rows[1].words[0]=1;
+ provenance_rows={{5,1,9007199254740993ULL,UINT64_MAX,6,0},{3,1,9007199254740994ULL,UINT64_MAX,3,0}};
  binding_rows={{4,3,9007199254740993ULL,UINT64_MAX,2,3}};
  draw_rows.resize(1);auto& d=draw_rows[0];d.frameIndex=3;d.rendererKind=2;d.pipelineKey=UINT64_MAX;d.pipelineId=2;
  d.bindGroupIds[0]=4;d.dynamicOffsetCount[0]=4;d.dynamicOffsets[0][0]=1;d.dynamicOffsets[0][1]=2;d.dynamicOffsets[0][2]=3;d.dynamicOffsets[0][3]=UINT32_MAX;
@@ -118,12 +125,14 @@ void schema2_serialization_control(){
  for(unsigned i=0;i<4;++i){auto& e=event_rows[i+2];e.kind=21;e.flags=i;if(i==0){e.value0=4;e.value1=1;e.value2=2;e.value3=3;e.handleA=4;}}
  event_rows[6].kind=17;event_rows[7].kind=18;event_rows[7].flags=1;
  const std::string complete=melee_web_native_menu_frame_effect_status();
- assert(complete.find("\"schema_version\":2")!=std::string::npos);
+ assert(complete.find("\"schema_version\":3")!=std::string::npos);
  assert(complete.find("\"rows_complete\":true")!=std::string::npos);
  assert(complete.find("\"viewport_bits\":[2147483648,2143289345,1065353216,1065353216,0,1065353216]")!=std::string::npos);
  assert(complete.find("\"clear_color_bits\":[\"9223372036854775808\",\"9221120237041090561\",\"0\",\"4607182418800017408\"]")!=std::string::npos);
+ assert(complete.find("\"layout_entries\":[{\"layout_id\":\"5\"")!=std::string::npos);
+ assert(complete.find("\"creation_serial\":\"9007199254740993\"")!=std::string::npos);
  std::printf("SCHEMA2_STATUS %s\n",complete.c_str());
- for(unsigned category=1;category<=5;++category){
+ for(unsigned category=1;category<=7;++category){
   refused_category=category;const std::string failed=melee_web_native_menu_frame_effect_status();
   assert(failed.find("\"rows_complete\":false")!=std::string::npos);
  }
@@ -193,7 +202,7 @@ void first_draw_serialization_control(){
  observation.callback_draws=2;observation.tick_returns=2;observation.draw_returns=2;
  observation.source_after=202;
  const std::string raw=melee_web_native_menu_frame_effect_status();
- assert(raw.find("\"schema_version\":3")!=std::string::npos);
+ assert(raw.find("\"schema_version\":4")!=std::string::npos);
  assert(raw.find("\"selected_source_frame\":201,\"unobserved_draws\":1")!=std::string::npos);
  std::printf("SCHEMA3_STATUS %s\n",raw.c_str());
 }

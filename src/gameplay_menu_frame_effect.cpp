@@ -166,8 +166,8 @@ const char* melee_web_native_menu_frame_effect_status(){
  const auto renderer=aurora_browser_frame_effect_observer_snapshot();
  bool rows_complete=true;
  out=observation.first_draw?
-     "{\"schema_version\":3,\"scope\":\"first_draw_in_normal_callback_observation_only\"":
-     "{\"schema_version\":2,\"scope\":\"one_normal_callback_observation_only\"";
+     "{\"schema_version\":4,\"scope\":\"first_draw_in_normal_callback_observation_only\"":
+     "{\"schema_version\":3,\"scope\":\"one_normal_callback_observation_only\"";
  const auto number=[&](const char* name,auto value){out+=",\"";out+=name;out+="\":";out+=std::to_string(value);};
  const auto boolean=[&](const char* name,bool value){out+=",\"";out+=name;out+=value?"\":true":"\":false";};
  boolean("requested",observation.requested);boolean("terminal",observation.terminal);
@@ -215,6 +215,7 @@ const char* melee_web_native_menu_frame_effect_status(){
  out+=",\"finding_mask\":\""+std::to_string(renderer.findingMask)+"\"";
  number("command_record_count",renderer.commandRecordCount);number("actual_draw_count",renderer.actualDrawCount);
  number("resource_count",renderer.resourceCount);number("binding_entry_count",renderer.bindingEntryCount);
+ number("layout_entry_count",renderer.layoutEntryCount);number("provenance_count",renderer.provenanceCount);
  number("depth_trace_count",renderer.depthTraceCount);number("depth_request_count",renderer.depthRequestCount);
  out+="},\"events\":[";
  for(uint32_t i=0;i<renderer.eventCount;++i){
@@ -248,6 +249,24 @@ const char* melee_web_native_menu_frame_effect_status(){
   out+="{\"bind_group_id\":\""+std::to_string(b.bindGroupId)+"\",\"resource_id\":\""+std::to_string(b.resourceId)+"\"";
   out+=",\"offset\":\""+std::to_string(b.offset)+"\",\"size\":\""+std::to_string(b.size)+"\"";
   number("binding",b.binding);number("kind",b.kind);out+='}';
+ }
+ out+="],\"layout_entries\":[";
+ for(uint32_t i=0;i<renderer.layoutEntryCount;++i){
+  AuroraBrowserFrameEffectLayoutEntry row{};
+  if(!aurora_browser_frame_effect_observer_layout_entry(i,&row)){rows_complete=false;break;}
+  if(i)out+=',';
+  out+="{\"layout_id\":\""+std::to_string(row.layoutId)+"\"";
+  number("entry_index",row.entryIndex);out+=",\"words\":[";
+  for(unsigned j=0;j<15;++j){if(j)out+=',';out+=std::to_string(row.words[j]);}out+="]}";
+ }
+ out+="],\"provenance\":[";
+ for(uint32_t i=0;i<renderer.provenanceCount;++i){
+  AuroraBrowserFrameEffectProvenance row{};
+  if(!aurora_browser_frame_effect_observer_provenance(i,&row)){rows_complete=false;break;}
+  if(i)out+=',';
+  out+="{\"capture_id\":\""+std::to_string(row.captureId)+"\",\"device_id\":\""+std::to_string(row.deviceId);
+  out+="\",\"creation_serial\":\""+std::to_string(row.creationSerial)+"\",\"renderer_epoch\":\""+std::to_string(row.rendererEpoch)+"\"";
+  number("role",row.role);number("slot",row.slot);out+='}';
  }
  out+="],\"draws\":[";
  for(uint32_t i=0;i<renderer.actualDrawCount;++i){

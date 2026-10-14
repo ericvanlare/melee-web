@@ -328,7 +328,7 @@ index 0000000000000000000000000000000000000000..2ecd22a6c10e9caf99ce33d9c0a465a0
 +              "future owner row identity offset changed");
 +#endif
 diff --git a/include/aurora/gfx.h b/include/aurora/gfx.h
-index 94504b177d6733244a9de40a8dfb49f5964363ae..ef95a700b5cec997eea7eb08d2ebbfa67e12d95a 100644
+index 94504b177d6733244a9de40a8dfb49f5964363ae..f1db3f16026b9222bde093e5d9d246c80be744cf 100644
 --- a/include/aurora/gfx.h
 +++ b/include/aurora/gfx.h
 @@ -3,10 +3,12 @@
@@ -344,7 +344,7 @@ index 94504b177d6733244a9de40a8dfb49f5964363ae..ef95a700b5cec997eea7eb08d2ebbfa6
  #endif
  
  #if !defined(NDEBUG) && !defined(AURORA_GFX_DEBUG_GROUPS)
-@@ -26,8 +28,318 @@ typedef struct {
+@@ -26,8 +28,323 @@ typedef struct {
    uint32_t lastIndexSize;
    uint32_t lastStorageSize;
    uint32_t lastTextureUploadSize;
@@ -519,7 +519,7 @@ index 94504b177d6733244a9de40a8dfb49f5964363ae..ef95a700b5cec997eea7eb08d2ebbfa6
 +
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && !defined(__EMSCRIPTEN_PTHREADS__)
 +enum {
-+  AURORA_BROWSER_FRAME_EFFECT_SCHEMA_VERSION = 2,
++  AURORA_BROWSER_FRAME_EFFECT_SCHEMA_VERSION = 3,
 +  AURORA_BROWSER_FRAME_EFFECT_EVENT_FRAME_OP = 1,
 +  AURORA_BROWSER_FRAME_EFFECT_EVENT_RENDER_PASS = 2,
 +  AURORA_BROWSER_FRAME_EFFECT_EVENT_COLOR_ATTACHMENT = 3,
@@ -617,6 +617,8 @@ index 94504b177d6733244a9de40a8dfb49f5964363ae..ef95a700b5cec997eea7eb08d2ebbfa6
 +  uint64_t bindGroupId, resourceId, offset, size;
 +  uint32_t binding, kind;
 +} AuroraBrowserFrameEffectBindingEntry;
++typedef struct { uint64_t layoutId; uint32_t entryIndex; uint32_t words[15]; } AuroraBrowserFrameEffectLayoutEntry;
++typedef struct { uint64_t captureId, deviceId, creationSerial, rendererEpoch; uint32_t role, slot; } AuroraBrowserFrameEffectProvenance;
 +typedef struct {
 +  uint32_t frameIndex, opIndex, commandIndex, rendererKind;
 +  uint64_t pipelineKey, pipelineId;
@@ -642,6 +644,7 @@ index 94504b177d6733244a9de40a8dfb49f5964363ae..ef95a700b5cec997eea7eb08d2ebbfa6
 +  uint64_t queueWriteBytes, findingMask;
 +  uint32_t commandRecordCount, actualDrawCount, resourceCount, bindingEntryCount;
 +  uint32_t depthTraceCount, depthRequestCount;
++  uint32_t layoutEntryCount, provenanceCount;
 +} AuroraBrowserFrameEffectSnapshot;
 +typedef struct {
 +  uint32_t registeredCount, completedCount, pendingCount, ignoredOtherIssuerCount, finalized;
@@ -655,6 +658,8 @@ index 94504b177d6733244a9de40a8dfb49f5964363ae..ef95a700b5cec997eea7eb08d2ebbfa6
 +int aurora_browser_frame_effect_observer_handle(uint32_t index, AuroraBrowserFrameEffectHandle* out);
 +int aurora_browser_frame_effect_observer_resource(uint32_t index, AuroraBrowserFrameEffectResource* out);
 +int aurora_browser_frame_effect_observer_binding_entry(uint32_t index, AuroraBrowserFrameEffectBindingEntry* out);
++int aurora_browser_frame_effect_observer_layout_entry(uint32_t index, AuroraBrowserFrameEffectLayoutEntry* out);
++int aurora_browser_frame_effect_observer_provenance(uint32_t index, AuroraBrowserFrameEffectProvenance* out);
 +int aurora_browser_frame_effect_observer_draw(uint32_t index, AuroraBrowserFrameEffectDraw* out);
 +#endif
 +
@@ -786,7 +791,7 @@ index 252fca7d9a4056d9e19f31d0777ba153a30fcc65..3e36937e92a0c391d80194b7527fa4f8
  void PADSetVirtualStatus(u32 port, const PADStatus* status);
  void PADClearVirtualStatus(u32 port);
 diff --git a/lib/aurora.cpp b/lib/aurora.cpp
-index 9430842976e01edc8d43d2182e56a61f7def6ec8..3bdffbd55bb2f3b1f26e7d1e7fb2c3b4e0aee738 100644
+index 9430842976e01edc8d43d2182e56a61f7def6ec8..05d995fdfac9bf4a995673bd30da0bffdb9516c1 100644
 --- a/lib/aurora.cpp
 +++ b/lib/aurora.cpp
 @@ -1,10 +1,21 @@
@@ -1170,7 +1175,7 @@ index 9430842976e01edc8d43d2182e56a61f7def6ec8..3bdffbd55bb2f3b1f26e7d1e7fb2c3b4
  AuroraBackend aurora_get_backend() { return aurora::g_config.desiredBackend; }
  const AuroraBackend* aurora_get_available_backends(size_t* count) {
    if (count != nullptr) {
-@@ -476,3 +701,54 @@ void aurora_set_resampler(AuroraSampler sampler) {
+@@ -476,3 +701,60 @@ void aurora_set_resampler(AuroraSampler sampler) {
  }
  void aurora_set_timescale(float scale) { aurora::time::set_scale(scale); }
  float aurora_get_timescale() { return aurora::time::scale(); }
@@ -1220,6 +1225,12 @@ index 9430842976e01edc8d43d2182e56a61f7def6ec8..3bdffbd55bb2f3b1f26e7d1e7fb2c3b4
 +}
 +int aurora_browser_frame_effect_observer_binding_entry(uint32_t index, AuroraBrowserFrameEffectBindingEntry* out) {
 +  return aurora::gfx::detail::browser_frame_effect_observer().binding_entry(index, out);
++}
++int aurora_browser_frame_effect_observer_layout_entry(uint32_t index, AuroraBrowserFrameEffectLayoutEntry* out) {
++  return aurora::gfx::detail::browser_frame_effect_observer().layout_entry(index, out);
++}
++int aurora_browser_frame_effect_observer_provenance(uint32_t index, AuroraBrowserFrameEffectProvenance* out) {
++  return aurora::gfx::detail::browser_frame_effect_observer().provenance(index, out);
 +}
 +int aurora_browser_frame_effect_observer_draw(uint32_t index, AuroraBrowserFrameEffectDraw* out) {
 +  return aurora::gfx::detail::browser_frame_effect_observer().draw(index, out);
@@ -2240,7 +2251,7 @@ index 47e9a0aadfe1b88ae7e177f226e5b05f36b681e3..4015ed7a80cbd7a154d6c778051abd3d
  
  namespace testing {
 diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
-index b3054be5ad2dc2a45c3de4ecb3e944114421526c..4dd54717aace9247f13962a90bf94c8c83b43c7b 100644
+index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1e0c8ddd8 100644
 --- a/lib/gfx/encoding.cpp
 +++ b/lib/gfx/encoding.cpp
 @@ -1,6 +1,9 @@
@@ -2325,7 +2336,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..4dd54717aace9247f13962a90bf94c8c
  #ifdef AURORA_GFX_DEBUG_GROUPS
    std::vector<std::string> lastDebugGroupStack;
  #endif
-@@ -119,8 +144,23 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
+@@ -119,8 +144,25 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
    // Bind bind group for the whole pass
    pass.SetBindGroup(0, resources().staticBindGroup);
    pass.SetBindGroup(2, gx::g_emptyTextureBindGroup);
@@ -2337,7 +2348,9 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..4dd54717aace9247f13962a90bf94c8c
 +      reinterpret_cast<uintptr_t>(staticGroupResources.staticBindGroupLayout.Get()),
 +      reinterpret_cast<uintptr_t>(staticGroupResources.vertexBuffer.Get()),
 +      reinterpret_cast<uintptr_t>(staticGroupResources.storageBuffer.Get()), 0, nullptr);
-+  browser_frame_effect_observer().observe_bind_group_set(2, reinterpret_cast<uintptr_t>(gx::g_emptyTextureBindGroup.Get()), 0, nullptr);
++  browser_frame_effect_observer().observe_renderer_group_set(BrowserFrameEffectObserver::EmptyGroupRole, 2,
++      reinterpret_cast<uintptr_t>(&resources()), reinterpret_cast<uintptr_t>(g_device.Get()),
++      reinterpret_cast<uintptr_t>(gx::g_emptyTextureBindGroup.Get()), gx::diagnostic_empty_texture_layout(), 0, nullptr);
 +#endif
  
 +  uint32_t commandIndex = 0;
@@ -2349,7 +2362,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..4dd54717aace9247f13962a90bf94c8c
  #ifdef AURORA_GFX_DEBUG_GROUPS
      {
        size_t firstDiff = lastDebugGroupStack.size();
-@@ -154,15 +194,37 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
+@@ -154,15 +196,39 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
      } break;
      case CommandType::Draw: {
        auto& draw = cmd.data.draw;
@@ -2383,12 +2396,14 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..4dd54717aace9247f13962a90bf94c8c
 +          reinterpret_cast<uintptr_t>(customDrawGroupResources.staticBindGroupLayout.Get()),
 +          reinterpret_cast<uintptr_t>(customDrawGroupResources.vertexBuffer.Get()),
 +          reinterpret_cast<uintptr_t>(customDrawGroupResources.storageBuffer.Get()), 0, nullptr);
-+      browser_frame_effect_observer().observe_bind_group_set(2, reinterpret_cast<uintptr_t>(gx::g_emptyTextureBindGroup.Get()), 0, nullptr);
++      browser_frame_effect_observer().observe_renderer_group_set(BrowserFrameEffectObserver::EmptyGroupRole, 2,
++      reinterpret_cast<uintptr_t>(&resources()), reinterpret_cast<uintptr_t>(g_device.Get()),
++      reinterpret_cast<uintptr_t>(gx::g_emptyTextureBindGroup.Get()), gx::diagnostic_empty_texture_layout(), 0, nullptr);
 +#endif
        if (hasViewport) {
          apply_viewport(pass, currentViewport);
        }
-@@ -176,6 +238,7 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
+@@ -176,6 +242,7 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
  #endif
      } break;
      }
@@ -2396,7 +2411,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..4dd54717aace9247f13962a90bf94c8c
    }
  
  #ifdef AURORA_GFX_DEBUG_GROUPS
-@@ -191,8 +254,13 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
+@@ -191,8 +258,13 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
      return;
    }
  
@@ -2410,7 +2425,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..4dd54717aace9247f13962a90bf94c8c
    }
    if (passInfo.discardable) {
      // This pass has no effect and can be safely discarded (e.g. an empty EFB segment between two back-to-back pass
-@@ -246,12 +314,25 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
+@@ -246,12 +318,25 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
    };
  
    auto pass = cmd.BeginRenderPass(&renderPassDescriptor);
@@ -2438,7 +2453,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..4dd54717aace9247f13962a90bf94c8c
    }
  
    if (passInfo.resolveTarget) {
-@@ -260,6 +341,13 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
+@@ -260,6 +345,13 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
      const bool needsScaling = dstSize.width != static_cast<uint32_t>(passInfo.resolveRect.width) ||
                                dstSize.height != static_cast<uint32_t>(passInfo.resolveRect.height);
      const bool isDepth = gx::is_depth_format(passInfo.resolveFormat);
@@ -2452,7 +2467,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..4dd54717aace9247f13962a90bf94c8c
      if (isDepth && passInfo.msaaSamples > 1) {
        Log.fatal("Depth tex copies from multisampled EFB targets are not supported");
      }
-@@ -297,6 +385,12 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
+@@ -297,6 +389,12 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
    }
  
    if (passInfo.snapshotColorDst) {
@@ -2465,7 +2480,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..4dd54717aace9247f13962a90bf94c8c
      const webgpu::gpu_prof::Zone zone{cmd, "Pass snapshot"};
      const wgpu::TexelCopyTextureInfo src{
          .texture = passInfo.copySourceTexture,
-@@ -312,6 +406,12 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
+@@ -312,6 +410,12 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
      cmd.CopyTextureToTexture(&src, &dst, &size);
    }
    if (passInfo.snapshotDepthDst) {
@@ -2478,7 +2493,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..4dd54717aace9247f13962a90bf94c8c
      tex_copy_conv::snapshot_depth(cmd, passInfo.copySourceDepthView, passInfo.msaaSamples, passInfo.snapshotDepthDst);
    }
  }
-@@ -324,7 +424,7 @@ constexpr uint64_t TextureUploadStagingOffset = StorageStagingOffset + StorageBu
+@@ -324,7 +428,7 @@ constexpr uint64_t TextureUploadStagingOffset = StorageStagingOffset + StorageBu
  
  constexpr uint32_t align_down_copy_offset(uint32_t value) noexcept { return value & ~3u; }
  
@@ -2487,7 +2502,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..4dd54717aace9247f13962a90bf94c8c
                                 uint32_t highWater, uint64_t stagingOffset, const wgpu::Buffer& dst) {
    if (highWater <= copied) {
      return;
-@@ -333,6 +433,10 @@ void copy_staging_buffer_range(wgpu::CommandEncoder& cmd, const FramePacket& fra
+@@ -333,6 +437,10 @@ void copy_staging_buffer_range(wgpu::CommandEncoder& cmd, const FramePacket& fra
    const uint32_t copyEnd = AURORA_ALIGN(highWater, 4);
    cmd.CopyBufferToBuffer(staging_buffer(frame.stagingBuffer), stagingOffset + copyStart, dst, copyStart,
                           copyEnd - copyStart);
@@ -2498,7 +2513,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..4dd54717aace9247f13962a90bf94c8c
    copied = highWater;
  }
  
-@@ -355,11 +459,11 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
+@@ -355,11 +463,11 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
    const webgpu::gpu_prof::Zone zone{cmd, "Staging copies"};
    const auto& highWater = op.highWater;
    auto& res = resources();
@@ -2514,7 +2529,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..4dd54717aace9247f13962a90bf94c8c
                              res.storageBuffer);
  
    if constexpr (UseTextureBuffer) {
-@@ -375,6 +479,11 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
+@@ -375,6 +483,11 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
            .buffer = item.buffer ? item.buffer : staging_buffer(frame.stagingBuffer),
        };
        cmd.CopyBufferToTexture(&buf, &item.tex, &item.size);
@@ -2526,7 +2541,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..4dd54717aace9247f13962a90bf94c8c
      }
      frame.copied.textureUpload = highWater.textureUpload;
      frame.copied.textureUploadCount = op.textureUploads.size();
-@@ -382,8 +491,84 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
+@@ -382,8 +495,84 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
  }
  } // namespace
  
@@ -2611,7 +2626,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..4dd54717aace9247f13962a90bf94c8c
    copy_staging_to_high_water(cmd, frame, op);
    switch (op.type) {
    case FrameOpType::RenderPass:
-@@ -393,13 +578,16 @@ void encode_op(wgpu::CommandEncoder& cmd, FramePacket& frame, const FrameOp& op)
+@@ -393,13 +582,16 @@ void encode_op(wgpu::CommandEncoder& cmd, FramePacket& frame, const FrameOp& op)
      break;
    case FrameOpType::TextureCopy:
      if (op.textureCopy != nullptr) {
@@ -2629,7 +2644,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..4dd54717aace9247f13962a90bf94c8c
      }
      break;
    }
-@@ -408,6 +596,11 @@ void encode_op(wgpu::CommandEncoder& cmd, FramePacket& frame, const FrameOp& op)
+@@ -408,6 +600,11 @@ void encode_op(wgpu::CommandEncoder& cmd, FramePacket& frame, const FrameOp& op)
  
  bool bind_pipeline(PipelineRef ref, const wgpu::RenderPassEncoder& pass) {
    if (ref == g_currentPipeline) {
@@ -2641,7 +2656,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..4dd54717aace9247f13962a90bf94c8c
      return true;
    }
    wgpu::RenderPipeline pipeline;
-@@ -416,6 +609,11 @@ bool bind_pipeline(PipelineRef ref, const wgpu::RenderPassEncoder& pass) {
+@@ -416,6 +613,11 @@ bool bind_pipeline(PipelineRef ref, const wgpu::RenderPassEncoder& pass) {
    }
    pass.SetPipeline(pipeline);
    g_currentPipeline = ref;
@@ -2654,7 +2669,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..4dd54717aace9247f13962a90bf94c8c
  }
  } // namespace aurora::gfx
 diff --git a/lib/gfx/frame.cpp b/lib/gfx/frame.cpp
-index 9fd83efc28ad8a19c3e902a6efc1096126982583..aec2df59ffea3e838bfa9cce47108f4d48811193 100644
+index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a37ea1998 100644
 --- a/lib/gfx/frame.cpp
 +++ b/lib/gfx/frame.cpp
 @@ -1,7 +1,19 @@
@@ -3259,7 +3274,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..aec2df59ffea3e838bfa9cce47108f4d
 +  g_browserStagingGeneration.fetch_add(1, std::memory_order_acq_rel);
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && !defined(__EMSCRIPTEN_PTHREADS__)
 +  browser_frame_effect_observer().begin_static_resource_lifetime(
-+      reinterpret_cast<uintptr_t>(&g_resources), reinterpret_cast<uintptr_t>(g_device.Get()));
++      reinterpret_cast<uintptr_t>(&g_resources), reinterpret_cast<uintptr_t>(g_device.Get()), active_staging_buffer_count());
 +#endif
 +  for (size_t slot = 0; slot < active_frame_slot_count(); ++slot) {
 +    auto& shadows = g_browserFrameStaging[slot];
@@ -3275,29 +3290,27 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..aec2df59ffea3e838bfa9cce47108f4d
    // This appears to take a while and blocks the render thread for periods of time
    // render_worker::set_event_pump([] {
    //   if (g_instance) {
-@@ -408,6 +941,21 @@ void initialize() {
+@@ -408,6 +941,19 @@ void initialize() {
          .size = size,
      };
      out = g_device.CreateBuffer(&descriptor);
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+    const uint32_t words[] = {static_cast<uint32_t>(size), static_cast<uint32_t>(size >> 32),
-+                              static_cast<uint32_t>(usage)};
-+    browser_frame_effect_observer().observe_resource_descriptor(
-+        AURORA_BROWSER_FRAME_EFFECT_HANDLE_BUFFER, reinterpret_cast<uintptr_t>(out.Get()),
-+        reinterpret_cast<uintptr_t>(g_device.Get()), words, 3);
-+    if (&out == &g_resources.vertexBuffer || &out == &g_resources.storageBuffer) {
-+      const uint32_t role = &out == &g_resources.vertexBuffer
-+          ? BrowserFrameEffectObserver::StaticVertexBufferRole
-+          : BrowserFrameEffectObserver::StaticStorageBufferRole;
-+      browser_frame_effect_observer().remember_static_buffer_descriptor(
-+          role, reinterpret_cast<uintptr_t>(&g_resources), reinterpret_cast<uintptr_t>(g_device.Get()),
-+          reinterpret_cast<uintptr_t>(out.Get()), descriptor);
++    uint32_t role = 0; size_t slot = 0;
++    if (&out == &g_resources.vertexBuffer) role = BrowserFrameEffectObserver::StaticVertexBufferRole;
++    else if (&out == &g_resources.storageBuffer) role = BrowserFrameEffectObserver::StaticStorageBufferRole;
++    else if (&out == &g_resources.uniformBuffer) role = BrowserFrameEffectObserver::UniformBufferRole;
++    else if (&out == &g_resources.indexBuffer) role = BrowserFrameEffectObserver::IndexBufferRole;
++    else for (size_t i = 0; i < active_staging_buffer_count(); ++i) if (&out == &g_stagingBuffers[i]) {
++      role = BrowserFrameEffectObserver::StagingBufferRole; slot = i; break;
 +    }
++    browser_frame_effect_observer().remember_renderer_buffer(role, slot,
++        reinterpret_cast<uintptr_t>(&g_resources), reinterpret_cast<uintptr_t>(g_device.Get()),
++        reinterpret_cast<uintptr_t>(out.Get()), descriptor);
 +#endif
    };
    createBuffer(g_resources.uniformBuffer, wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst, UniformBufferSize,
                 "Shared Uniform Buffer");
-@@ -418,17 +966,24 @@ void initialize() {
+@@ -418,17 +964,24 @@ void initialize() {
                 "Shared Index Buffer");
    createBuffer(g_resources.storageBuffer, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst, StorageBufferSize,
                 "Shared Storage Buffer");
@@ -3323,7 +3336,19 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..aec2df59ffea3e838bfa9cce47108f4d
  
    {
      constexpr std::array layoutEntries{
-@@ -474,6 +1029,14 @@ void initialize() {
+@@ -457,6 +1010,11 @@ void initialize() {
+         .entries = layoutEntries.data(),
+     };
+     g_resources.staticBindGroupLayout = g_device.CreateBindGroupLayout(&layoutDesc);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    browser_frame_effect_observer().remember_renderer_layout(BrowserFrameEffectObserver::StaticLayoutRole,
++        reinterpret_cast<uintptr_t>(&g_resources), reinterpret_cast<uintptr_t>(g_device.Get()),
++        reinterpret_cast<uintptr_t>(g_resources.staticBindGroupLayout.Get()), layoutDesc);
++#endif
+     const std::array entries{
+         wgpu::BindGroupEntry{
+             .binding = 0,
+@@ -474,6 +1032,14 @@ void initialize() {
          .entries = entries.data(),
      };
      g_resources.staticBindGroup = g_device.CreateBindGroup(&bindGroupDescriptor);
@@ -3338,19 +3363,31 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..aec2df59ffea3e838bfa9cce47108f4d
    }
  
    {
-@@ -509,6 +1072,11 @@ void initialize() {
+@@ -495,6 +1061,11 @@ void initialize() {
+         .entries = layoutEntries.data(),
+     };
+     g_resources.uniformBindGroupLayout = g_device.CreateBindGroupLayout(&layoutDesc);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    browser_frame_effect_observer().remember_renderer_layout(BrowserFrameEffectObserver::UniformLayoutRole,
++        reinterpret_cast<uintptr_t>(&g_resources), reinterpret_cast<uintptr_t>(g_device.Get()),
++        reinterpret_cast<uintptr_t>(g_resources.uniformBindGroupLayout.Get()), layoutDesc);
++#endif
+     const std::array entries{
+         wgpu::BindGroupEntry{
+             .binding = 0,
+@@ -509,6 +1080,11 @@ void initialize() {
          .entries = entries.data(),
      };
      g_resources.uniformBindGroup = g_device.CreateBindGroup(&bindGroupDescriptor);
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+    browser_frame_effect_observer().observe_bind_group_descriptor(
-+        reinterpret_cast<uintptr_t>(g_resources.uniformBindGroup.Get()), reinterpret_cast<uintptr_t>(g_device.Get()),
-+        reinterpret_cast<uintptr_t>(g_resources.uniformBindGroupLayout.Get()), 0, bindGroupDescriptor);
++    browser_frame_effect_observer().remember_renderer_group(BrowserFrameEffectObserver::UniformGroupRole,
++        reinterpret_cast<uintptr_t>(&g_resources), reinterpret_cast<uintptr_t>(g_device.Get()),
++        reinterpret_cast<uintptr_t>(g_resources.uniformBindGroup.Get()), bindGroupDescriptor);
 +#endif
    }
  
    gx::initialize();
-@@ -519,6 +1087,10 @@ void initialize() {
+@@ -519,6 +1095,10 @@ void initialize() {
  }
  
  void shutdown() {
@@ -3361,17 +3398,27 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..aec2df59ffea3e838bfa9cce47108f4d
    render_worker::synchronize();
    render_worker::shutdown();
    g_processEventsQueued.store(false, std::memory_order_release);
-@@ -548,6 +1120,9 @@ void shutdown() {
+@@ -548,6 +1128,19 @@ void shutdown() {
      g_runtimeEncoderTaskTypes.clear();
      g_freeEncoderTaskTypeSlots.clear();
    }
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  browser_frame_effect_observer().release_renderer_role(BrowserFrameEffectObserver::StaticVertexBufferRole, 0, reinterpret_cast<uintptr_t>(&g_resources), reinterpret_cast<uintptr_t>(g_resources.vertexBuffer.Get()));
++  browser_frame_effect_observer().release_renderer_role(BrowserFrameEffectObserver::StaticStorageBufferRole, 0, reinterpret_cast<uintptr_t>(&g_resources), reinterpret_cast<uintptr_t>(g_resources.storageBuffer.Get()));
++  browser_frame_effect_observer().release_renderer_role(BrowserFrameEffectObserver::UniformBufferRole, 0, reinterpret_cast<uintptr_t>(&g_resources), reinterpret_cast<uintptr_t>(g_resources.uniformBuffer.Get()));
++  browser_frame_effect_observer().release_renderer_role(BrowserFrameEffectObserver::IndexBufferRole, 0, reinterpret_cast<uintptr_t>(&g_resources), reinterpret_cast<uintptr_t>(g_resources.indexBuffer.Get()));
++  browser_frame_effect_observer().release_renderer_role(BrowserFrameEffectObserver::StaticGroupRole, 0, reinterpret_cast<uintptr_t>(&g_resources), reinterpret_cast<uintptr_t>(g_resources.staticBindGroup.Get()));
++  browser_frame_effect_observer().release_renderer_role(BrowserFrameEffectObserver::UniformGroupRole, 0, reinterpret_cast<uintptr_t>(&g_resources), reinterpret_cast<uintptr_t>(g_resources.uniformBindGroup.Get()));
++  browser_frame_effect_observer().release_renderer_role(BrowserFrameEffectObserver::StaticLayoutRole, 0, reinterpret_cast<uintptr_t>(&g_resources), reinterpret_cast<uintptr_t>(g_resources.staticBindGroupLayout.Get()));
++  browser_frame_effect_observer().release_renderer_role(BrowserFrameEffectObserver::UniformLayoutRole, 0, reinterpret_cast<uintptr_t>(&g_resources), reinterpret_cast<uintptr_t>(g_resources.uniformBindGroupLayout.Get()));
++  for (size_t slot = 0; slot < active_staging_buffer_count(); ++slot)
++    browser_frame_effect_observer().release_renderer_role(BrowserFrameEffectObserver::StagingBufferRole, slot, reinterpret_cast<uintptr_t>(&g_resources), reinterpret_cast<uintptr_t>(g_stagingBuffers[slot].Get()));
 +  browser_frame_effect_observer().end_static_resource_lifetime(reinterpret_cast<uintptr_t>(&g_resources));
 +#endif
    g_resources.vertexBuffer = {};
    g_resources.uniformBuffer = {};
    g_resources.indexBuffer = {};
-@@ -556,12 +1131,29 @@ void shutdown() {
+@@ -556,12 +1149,29 @@ void shutdown() {
    for (auto& packet : g_framePackets) {
      packet = {};
    }
@@ -3401,7 +3448,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..aec2df59ffea3e838bfa9cce47108f4d
    g_frameSlots.reset();
    g_stagingSlots.reset();
    for (auto& state : g_mappingStates) {
-@@ -584,49 +1176,109 @@ bool wait_for_staging_buffer(size_t slot) {
+@@ -584,49 +1194,109 @@ bool wait_for_staging_buffer(size_t slot) {
    }
  }
  
@@ -3515,7 +3562,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..aec2df59ffea3e838bfa9cce47108f4d
    size_t bufferOffset = 0;
    const auto& stagingBuf = g_stagingBuffers[*stagingSlot];
    const auto mapBuffer = [&](ByteBuffer& buf, uint64_t size) {
-@@ -643,20 +1295,74 @@ bool begin_frame() {
+@@ -643,20 +1313,74 @@ bool begin_frame() {
    if constexpr (UseTextureBuffer) {
      mapBuffer(frame.textureUpload, TextureUploadSize);
    }
@@ -3590,7 +3637,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..aec2df59ffea3e838bfa9cce47108f4d
    if (g_cpuFrameStart.time_since_epoch().count() != 0) {
      const auto cpuFrameTime = PresentClock::now() - g_cpuFrameStart;
      update_ema(g_cpuFrameTimeNs, duration_ns(cpuFrameTime));
-@@ -669,15 +1375,59 @@ void end_frame(EndFrameCallback callback) {
+@@ -669,15 +1393,59 @@ void end_frame(EndFrameCallback callback) {
    const uint64_t frameId = frame.frameId;
    end_pipeline_frame();
    ++g_frameIndex;
@@ -3652,7 +3699,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..aec2df59ffea3e838bfa9cce47108f4d
      packet = {};
      g_resources.stats.drawCallCount = stats.drawCallCount;
      g_resources.stats.mergedDrawCallCount = stats.mergedDrawCallCount;
-@@ -686,16 +1436,469 @@ void end_frame(EndFrameCallback callback) {
+@@ -686,15 +1454,468 @@ void end_frame(EndFrameCallback callback) {
      g_resources.stats.lastIndexSize = stats.lastIndexSize;
      g_resources.stats.lastStorageSize = stats.lastStorageSize;
      g_resources.stats.lastTextureUploadSize = stats.lastTextureUploadSize;
@@ -3914,8 +3961,8 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..aec2df59ffea3e838bfa9cce47108f4d
 +  out.byteSize = static_cast<uint32_t>(
 +      out.submissionDescriptorOffset +
 +      active_staging_buffer_count() * sizeof(AuroraBrowserSubmissionDescriptor));
- }
- 
++}
++
 +AuroraBrowserQuiescenceLease quiescence_lease(const AuroraBrowserSubmissionStatus& submission) noexcept {
 +  const auto& stats = g_resources.stats;
 +  AuroraBrowserQuiescenceLease out;
@@ -4108,7 +4155,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..aec2df59ffea3e838bfa9cce47108f4d
 +    return 0;
 +  }
 +  return quiescence_lease_equal(*lease, current) ? 1 : 0;
-+}
+ }
 +#else  // AURORA_BROWSER_QUIESCENCE_DIAGNOSTIC
 +bool browser_quiescence_supported() noexcept { return false; }
 +size_t browser_quiescence_descriptor_bytes() noexcept { return 0; }
@@ -4119,11 +4166,10 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..aec2df59ffea3e838bfa9cce47108f4d
 +int browser_quiescence_validate_lease(const AuroraBrowserQuiescenceLease*) noexcept { return 0; }
 +#endif  // AURORA_BROWSER_QUIESCENCE_DIAGNOSTIC
 +#endif
-+
+ 
  uint32_t current_frame() noexcept { return g_frameIndex; }
  
- void after_submit() noexcept { depth_peek::after_submit(); }
-@@ -734,5 +1937,41 @@ float calculate_fps() noexcept {
+@@ -734,5 +1955,41 @@ float calculate_fps() noexcept {
  }
  } // namespace aurora::gfx
  
@@ -4201,16 +4247,19 @@ index 0b86ffead6e8f6153d2acf52cf9daecf4f07ccfa..a5ad738b32d623acc50eb06d39589ff0
  void gpu_synchronize();
 diff --git a/lib/gfx/frame_effect_observer.hpp b/lib/gfx/frame_effect_observer.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..3366c8a538d2b2e6e2920288e27e1f0e056d4af9
+index 0000000000000000000000000000000000000000..68288b3177e1753dc7e27b557292c959bd485f01
 --- /dev/null
 +++ b/lib/gfx/frame_effect_observer.hpp
-@@ -0,0 +1,1266 @@
+@@ -0,0 +1,1460 @@
 +#pragma once
 +
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
 +
 +#include <aurora/gfx.h>
 +#include "frame_packet.hpp"
++#include "frame.hpp"
++#include <dolphin/gx/GXEnum.h>
++#include <algorithm>
 +
 +#include <array>
 +#include <atomic>
@@ -4222,51 +4271,251 @@ index 0000000000000000000000000000000000000000..3366c8a538d2b2e6e2920288e27e1f0e
 +
 +class BrowserFrameEffectObserver {
 +public:
-+  static constexpr uint32_t StaticVertexBufferRole = 1;
-+  static constexpr uint32_t StaticStorageBufferRole = 2;
++  // These roles name original creation sites, never descriptor sizes or handles.
++  static constexpr uint32_t StaticVertexBufferRole = 1, StaticStorageBufferRole = 2;
++  static constexpr uint32_t UniformBufferRole = 3, IndexBufferRole = 4, StagingBufferRole = 5;
++  static constexpr uint32_t StaticLayoutRole = 6, UniformLayoutRole = 7, EmptyLayoutRole = 8;
++  static constexpr uint32_t StaticGroupRole = 9, UniformGroupRole = 10, EmptyGroupRole = 11;
++  static constexpr uint32_t EmptyTextureRole = 12, EmptyViewRole = 13, EmptySamplerRole = 14;
++  static constexpr size_t TextureEntryCount = 2 * GX_MAX_TEXMAP;
++  static constexpr size_t WarmOwnerCapacity = 4 + StagingBufferCount + 3 + 3 + 3;
++  static constexpr size_t LayoutEntryCapacity = 2 + 1 + TextureEntryCount;
++  struct SamplerCreation {
++    SamplerCreation() = default;
++  private:
++    friend class BrowserFrameEffectObserver;
++    friend struct BrowserFrameEffectObserverControls;
++    uintptr_t raw = 0, device = 0;
++    uint64_t serial = 0;
++    std::array<uint32_t, 10> words{};
++    bool valid = false;
++  };
 +
-+  void begin_static_resource_lifetime(uintptr_t owner, uintptr_t device) noexcept {
-+    const auto state = state_.load(std::memory_order_acquire);
-+    if (state != AURORA_BROWSER_FRAME_EFFECT_UNUSED) {
-+      if (state == AURORA_BROWSER_FRAME_EFFECT_ARMED || state == AURORA_BROWSER_FRAME_EFFECT_COLLECTING ||
-+          state == AURORA_BROWSER_FRAME_EFFECT_SUBMITTED)
-+        fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
-+      staticLifetimeActive_ = false;
-+      return;
++  void begin_static_resource_lifetime(uintptr_t owner, uintptr_t device,
++                                     size_t activeStaging = StagingBufferCount) noexcept {
++    if (state_.load(std::memory_order_acquire) != AURORA_BROWSER_FRAME_EFFECT_UNUSED) {
++      if (capture_window_live()) fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
++      warmActive_ = false; return;
 +    }
-+    if (staticLifetimeGeneration_ == std::numeric_limits<uint64_t>::max()) {
-+      staticLifetimeActive_ = false;
-+      staticVertexBuffer_ = {};
-+      staticStorageBuffer_ = {};
-+      staticBindGroup_ = {};
-+      staticWarmInvalid_ = true;
-+      return;
-+    }
-+    // This epoch bounds observer metadata to one init/shutdown lifetime; it is not an allocator generation.
-+    ++staticLifetimeGeneration_;
-+    staticOwner_ = owner;
-+    staticDevice_ = device;
-+    staticLifetimeActive_ = owner != 0 && device != 0;
-+    staticPromoted_ = false;
-+    staticWarmInvalid_ = false;
-+    staticVertexBuffer_ = {};
-+    staticStorageBuffer_ = {};
-+    staticBindGroup_ = {};
++    warm_ = {}; warmOwner_ = owner; warmDevice_ = device; warmError_ = 0;
++    warmActive_ = owner != 0 && device != 0 && activeStaging <= StagingBufferCount;
++    activeStaging_ = activeStaging;
++    if (warmEpoch_ == UINT64_MAX) { warmActive_ = false; warmError_ = AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE; }
++    else ++warmEpoch_;
 +  }
-+
 +  void end_static_resource_lifetime(uintptr_t owner) noexcept {
-+    const auto state = state_.load(std::memory_order_acquire);
-+    if (owner != staticOwner_ || !staticLifetimeActive_) {
-+      if (state == AURORA_BROWSER_FRAME_EFFECT_ARMED || state == AURORA_BROWSER_FRAME_EFFECT_COLLECTING ||
-+          state == AURORA_BROWSER_FRAME_EFFECT_SUBMITTED)
-+        fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
-+      staticLifetimeActive_ = false;
-+      return;
++    if (owner != warmOwner_ || !warmActive_) warm_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
++    if (capture_window_live()) fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
++    // Metadata invalidation is not a native object destruction observation.
++    warmActive_ = false;
++  }
++  void release_renderer_role(uint32_t role, size_t slot, uintptr_t owner, uintptr_t raw) noexcept {
++    const size_t index = warm_index(role, slot);
++    if (index >= WarmOwnerCapacity || owner != warmOwner_ || !warm_[index].valid || warm_[index].raw != raw) {
++      warm_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE); return;
 +    }
-+    if (state == AURORA_BROWSER_FRAME_EFFECT_ARMED || state == AURORA_BROWSER_FRAME_EFFECT_COLLECTING ||
-+        state == AURORA_BROWSER_FRAME_EFFECT_SUBMITTED)
-+      fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
-+    staticLifetimeActive_ = false;
++    if (capture_window_live()) warm_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
++    warm_[index].valid = false;
++    // Existing child serials now fail graph validation; no pointer-based repair.
++  }
++  void detach_empty_renderer_roles(uintptr_t owner) noexcept {
++    if (owner != warmOwner_) { warm_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE); return; }
++    if (capture_window_live()) warm_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
++    for (uint32_t role : {EmptyLayoutRole, EmptyGroupRole, EmptyTextureRole, EmptyViewRole, EmptySamplerRole})
++      warm_[warm_index(role, 0)].valid = false;
++  }
++  void remember_renderer_buffer(uint32_t role, size_t slot, uintptr_t owner, uintptr_t device,
++                                uintptr_t raw, const wgpu::BufferDescriptor& d) noexcept {
++    if (role < StaticVertexBufferRole || role > StagingBufferRole) { warm_reject(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return; }
++    auto* w = warm_create(role, slot, owner, device, raw, AURORA_BROWSER_FRAME_EFFECT_HANDLE_BUFFER);
++    if (!w) return;
++    if (d.nextInChain != nullptr) { warm_reject(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return; }
++    const uint64_t usage = static_cast<uint64_t>(d.usage);
++    w->wordCount = 5;
++    w->words = {uint32_t(d.size), uint32_t(d.size >> 32), uint32_t(usage), uint32_t(usage >> 32), d.mappedAtCreation ? 1u : 0u};
++  }
++  void remember_static_buffer_descriptor(uint32_t role, uintptr_t owner, uintptr_t device, uintptr_t raw,
++                                        const wgpu::BufferDescriptor& d) noexcept {
++    remember_renderer_buffer(role, 0, owner, device, raw, d);
++  }
++  void remember_renderer_layout(uint32_t role, uintptr_t owner, uintptr_t device, uintptr_t raw,
++                                const wgpu::BindGroupLayoutDescriptor& d) noexcept {
++    if (role < StaticLayoutRole || role > EmptyLayoutRole) { warm_reject(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return; }
++    auto* w = warm_create(role, 0, owner, device, raw, AURORA_BROWSER_FRAME_EFFECT_HANDLE_BIND_GROUP_LAYOUT);
++    if (!w) return;
++    const size_t expected = role == StaticLayoutRole ? 2 : role == UniformLayoutRole ? 1 : TextureEntryCount;
++    if (d.nextInChain != nullptr || d.entryCount != expected || d.entries == nullptr) {
++      warm_reject(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return;
++    }
++    w->wordCount = 1; w->words[0] = uint32_t(d.entryCount); w->entryCount = uint32_t(d.entryCount);
++    for (size_t i = 0; i < d.entryCount; ++i) {
++      const auto& e = d.entries[i];
++      if (e.nextInChain || e.buffer.nextInChain || e.sampler.nextInChain || e.texture.nextInChain || e.storageTexture.nextInChain ||
++          e.binding != i || e.bindingArraySize != 0) { warm_reject(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return; }
++      const uint64_t visibility = static_cast<uint64_t>(e.visibility);
++      w->layoutEntries[i] = {e.binding, uint32_t(visibility), uint32_t(visibility >> 32), e.bindingArraySize,
++        uint32_t(e.buffer.type), uint32_t(e.buffer.hasDynamicOffset), uint32_t(e.buffer.minBindingSize), uint32_t(e.buffer.minBindingSize >> 32),
++        uint32_t(e.sampler.type), uint32_t(e.texture.sampleType), uint32_t(e.texture.viewDimension), uint32_t(e.texture.multisampled),
++        uint32_t(e.storageTexture.access), uint32_t(e.storageTexture.format), uint32_t(e.storageTexture.viewDimension)};
++      // The hook records exact fields; unsupported binding alternatives refuse.
++      const bool buffer = role != EmptyLayoutRole;
++      const bool texture = role == EmptyLayoutRole && i % 2 == 0;
++      if ((buffer && (e.buffer.type != (role == UniformLayoutRole ? wgpu::BufferBindingType::Uniform : wgpu::BufferBindingType::ReadOnlyStorage) ||
++                       e.buffer.hasDynamicOffset != (role == UniformLayoutRole) || e.sampler.type != wgpu::SamplerBindingType::BindingNotUsed ||
++                       e.texture.sampleType != wgpu::TextureSampleType::BindingNotUsed || e.storageTexture.access != wgpu::StorageTextureAccess::BindingNotUsed)) ||
++          (!buffer && (e.buffer.type != wgpu::BufferBindingType::BindingNotUsed || e.storageTexture.access != wgpu::StorageTextureAccess::BindingNotUsed ||
++             (texture ? e.texture.sampleType != wgpu::TextureSampleType::Float || e.texture.viewDimension != wgpu::TextureViewDimension::e2D || e.texture.multisampled ||
++                        e.sampler.type != wgpu::SamplerBindingType::BindingNotUsed
++                      : e.sampler.type != wgpu::SamplerBindingType::Filtering || e.texture.sampleType != wgpu::TextureSampleType::BindingNotUsed)))) {
++        warm_reject(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return;
++      }
++    }
++  }
++  void remember_renderer_group(uint32_t role, uintptr_t owner, uintptr_t device, uintptr_t raw,
++                               const WGPUBindGroupDescriptor& d) noexcept {
++    if (role < StaticGroupRole || role > EmptyGroupRole) { warm_reject(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return; }
++    auto* w = warm_create(role, 0, owner, device, raw, AURORA_BROWSER_FRAME_EFFECT_HANDLE_BIND_GROUP);
++    if (!w) return;
++    const uint32_t layoutRole = role == StaticGroupRole ? StaticLayoutRole : role == UniformGroupRole ? UniformLayoutRole : EmptyLayoutRole;
++    const auto& layout = warm_[warm_index(layoutRole, 0)];
++    const size_t count = role == StaticGroupRole ? 2 : role == UniformGroupRole ? 1 : TextureEntryCount;
++    if (d.nextInChain || !layout.valid || layout.raw != reinterpret_cast<uintptr_t>(d.layout) || d.entryCount != count || !d.entries) {
++      warm_reject(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return;
++    }
++    w->parent = warm_index(layoutRole, 0); w->parentSerial = layout.serial; w->entryCount = uint32_t(count);
++    for (size_t i = 0; i < count; ++i) {
++      const auto& e = d.entries[i];
++      const uint32_t childRole = role == StaticGroupRole ? (i == 0 ? StaticVertexBufferRole : StaticStorageBufferRole) :
++          role == UniformGroupRole ? UniformBufferRole : (i % 2 == 0 ? EmptyViewRole : EmptySamplerRole);
++      const auto childIndex = warm_index(childRole, 0); const auto& child = warm_[childIndex];
++      const uintptr_t referenced = e.buffer ? reinterpret_cast<uintptr_t>(e.buffer) :
++          e.textureView ? reinterpret_cast<uintptr_t>(e.textureView) : reinterpret_cast<uintptr_t>(e.sampler);
++      if (e.nextInChain || e.binding != i || unsigned(e.buffer != nullptr) + unsigned(e.textureView != nullptr) + unsigned(e.sampler != nullptr) != 1 ||
++          !child.valid || child.raw != referenced ||
++          (child.kind == AURORA_BROWSER_FRAME_EFFECT_HANDLE_BUFFER ? e.buffer == nullptr :
++           child.kind == AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE_VIEW ? e.textureView == nullptr : e.sampler == nullptr)) {
++        warm_reject(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return;
++      }
++      w->entries[i] = e; w->children[i] = childIndex; w->childSerials[i] = child.serial;
++    }
++  }
++  void remember_static_bind_group_descriptor(uintptr_t owner, uintptr_t device, uintptr_t raw, uintptr_t layout,
++      uintptr_t vertex, uintptr_t storage, const WGPUBindGroupDescriptor& d) noexcept {
++    if (layout != reinterpret_cast<uintptr_t>(d.layout) || vertex != warm_[0].raw || storage != warm_[1].raw) {
++      warm_reject(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return;
++    }
++    remember_renderer_group(StaticGroupRole, owner, device, raw, d);
++  }
++  void remember_empty_texture(uintptr_t owner, uintptr_t device, uintptr_t raw, const wgpu::TextureDescriptor& d) noexcept {
++    auto* w = warm_create(EmptyTextureRole, 0, owner, device, raw, AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE);
++    if (!w) return;
++    if (d.nextInChain || d.viewFormatCount != 0) { warm_reject(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return; }
++    const uint64_t usage = static_cast<uint64_t>(d.usage); w->wordCount = 10;
++    w->words = {d.size.width,d.size.height,d.size.depthOrArrayLayers,uint32_t(d.format),uint32_t(d.dimension),d.mipLevelCount,d.sampleCount,uint32_t(usage),uint32_t(usage >> 32),0};
++  }
++  void remember_empty_view(uintptr_t owner, uintptr_t device, uintptr_t raw, uintptr_t parent) noexcept {
++    auto* w = warm_create(EmptyViewRole, 0, owner, device, raw, AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE_VIEW);
++    if (!w) return;
++    const auto index = warm_index(EmptyTextureRole,0); const auto& texture = warm_[index];
++    if (!texture.valid || texture.raw != parent) { warm_reject(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return; }
++    w->parent = index; w->parentSerial = texture.serial; w->wordCount = 10;
++    const wgpu::TextureViewDescriptor d{}; w->words = {0,0,uint32_t(d.format),uint32_t(d.dimension),d.baseMipLevel,d.mipLevelCount,d.baseArrayLayer,d.arrayLayerCount,uint32_t(d.aspect),uint32_t(d.usage)};
++  }
++  SamplerCreation observe_sampler_creation(uintptr_t raw, uintptr_t device, const wgpu::SamplerDescriptor& d) noexcept {
++    SamplerCreation result{}; result.raw = raw; result.device = device;
++    if (!raw || !device || d.nextInChain || nextCreateSerial_ == UINT64_MAX) {
++      warm_reject(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return result;
++    }
++    result.serial = ++nextCreateSerial_; result.words = sampler_words(d); result.valid = true; return result;
++  }
++  void select_empty_sampler(uintptr_t owner, const SamplerCreation& created, const wgpu::SamplerDescriptor& request) noexcept {
++    if (!created.valid || request.nextInChain || created.words != sampler_words(request) || !created.serial || created.serial > nextCreateSerial_) {
++      warm_reject(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return;
++    }
++    const auto& selected=warm_[warm_index(EmptySamplerRole,0)];
++    if (selected.valid) {
++      bool same=selected.owner==owner && selected.device==created.device && selected.raw==created.raw &&
++          selected.serial==created.serial && selected.epoch==warmEpoch_;
++      for(size_t i=0;same&&i<created.words.size();++i)same=selected.words[i]==created.words[i];
++      if (!same) warm_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
++      return; // A genuine cache hit is not another CreateSampler call.
++    }
++    auto* w = warm_create(EmptySamplerRole, 0, owner, created.device, created.raw, AURORA_BROWSER_FRAME_EFFECT_HANDLE_SAMPLER, created.serial);
++    if (!w) return; w->wordCount = 10; std::copy(created.words.begin(),created.words.end(),w->words.begin());
++  }
++  void observe_cached_sampler_descriptor(const SamplerCreation& created,
++                                         const wgpu::SamplerDescriptor& request) noexcept {
++    if (!recording()) return;
++    if (!created.valid || !created.raw || !created.device || !created.serial || created.serial > nextCreateSerial_ ||
++        request.nextInChain || created.words != sampler_words(request)) {
++      warm_reject(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return;
++    }
++    auto& selected=warm_[warm_index(EmptySamplerRole,0)];
++    if (selected.valid && (created.raw==selected.raw || created.serial==selected.serial)) {
++      bool same=warmActive_ && selected.owner==warmOwner_ && selected.device==warmDevice_ &&
++          selected.epoch==warmEpoch_ && created.raw==selected.raw && created.device==selected.device && created.serial==selected.serial;
++      for(size_t i=0;same&&i<created.words.size();++i)same=created.words[i]==selected.words[i];
++      if (!same) { warm_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE); return; }
++      // Only this cache-entry token authenticates a generic-before-warm row.
++      // Matching descriptor words alone never confer creation provenance.
++      selected.cachedSamplerSerial=created.serial;
++    }
++    observe_sampler_descriptor(created.raw,created.device,request);
++  }
++  void observe_renderer_group_set(uint32_t role, uint32_t slot, uintptr_t owner, uintptr_t device,
++      uintptr_t raw, uintptr_t layout, uint32_t offsetCount, const uint32_t* offsets) noexcept {
++    if (!collecting()) return;
++    const bool properSlot = role == StaticGroupRole ? slot == 0 : role == UniformGroupRole ? slot == 1 || slot == 3 : slot == 2;
++    const auto index = warm_index(role,0);
++    if (!properSlot || index >= WarmOwnerCapacity) { fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return; }
++    const auto& group = warm_[index];
++    if (owner != warmOwner_ || device != warmDevice_ || group.raw != raw || group.parent >= WarmOwnerCapacity || warm_[group.parent].raw != layout) {
++      fail(group.valid ? AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE : AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return;
++    }
++    if (offsetCount != (role == UniformGroupRole ? 1u : 0u) || (offsetCount && !offsets)) {
++      fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return;
++    }
++    if (!promote_warm_graph(index)) return;
++    observe_bind_group_set(slot,raw,offsetCount,offsets);
++  }
++  void observe_static_bind_group_set(uint32_t slot, uintptr_t owner, uintptr_t device, uintptr_t raw, uintptr_t layout,
++      uintptr_t vertex, uintptr_t storage, uint32_t count, const uint32_t* offsets) noexcept {
++    if (!collecting()) return;
++    if (warmError_) { fail(warmError_); return; }
++    if (!warmActive_ || !warm_[0].valid || !warm_[1].valid) {
++      fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return;
++    }
++    if (vertex != warm_[0].raw || storage != warm_[1].raw) { fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE); return; }
++    observe_renderer_group_set(StaticGroupRole,slot,owner,device,raw,layout,count,offsets);
++  }
++  bool promote_renderer_buffer(uint32_t role, size_t slot, uintptr_t raw) noexcept {
++    const auto index = warm_index(role,slot);
++    if (!collecting() || index >= WarmOwnerCapacity || warm_[index].raw != raw) {
++      if (collecting()) fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return false;
++    }
++    return promote_warm_graph(index);
++  }
++  bool promote_renderer_copy(size_t stagingSlot, uintptr_t staging, uint32_t targetRole, uintptr_t target) noexcept {
++    if (!collecting()) return false;
++    const auto sourceIndex=warm_index(StagingBufferRole,stagingSlot), targetIndex=warm_index(targetRole,0);
++    if (sourceIndex>=WarmOwnerCapacity || targetIndex>=WarmOwnerCapacity || targetRole<StaticVertexBufferRole || targetRole>IndexBufferRole ||
++        warm_[sourceIndex].raw!=staging || warm_[targetIndex].raw!=target) {
++      fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE);return false;
++    }
++    return promote_warm_graph(sourceIndex,targetIndex);
++  }
++  void release_sampler_cache_owner(const SamplerCreation& created) noexcept {
++    auto& selected=warm_[warm_index(EmptySamplerRole,0)];
++    if (selected.valid && selected.serial==created.serial && selected.raw==created.raw) {
++      if (capture_window_live()) warm_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
++      selected.valid=false;
++    }
++  }
++  int layout_entry(uint32_t index, AuroraBrowserFrameEffectLayoutEntry* out) const noexcept {
++    if (!out || index >= layoutEntryCount_) return 0; *out = layoutEntries_[index]; return 1;
++  }
++  int provenance(uint32_t index, AuroraBrowserFrameEffectProvenance* out) const noexcept {
++    if (!out || index >= provenanceCount_) return 0; *out = provenance_[index]; return 1;
 +  }
 +
 +  bool arm(uint32_t frameIndex) noexcept {
@@ -4347,40 +4596,6 @@ index 0000000000000000000000000000000000000000..3366c8a538d2b2e6e2920288e27e1f0e
 +                              static_cast<uint32_t>(usage), static_cast<uint32_t>(usage >> 32),
 +                              descriptor.mappedAtCreation ? 1u : 0u};
 +    observe_resource_descriptor(AURORA_BROWSER_FRAME_EFFECT_HANDLE_BUFFER, buffer, device, words, 5);
-+  }
-+
-+  void remember_static_buffer_descriptor(uint32_t role, uintptr_t owner, uintptr_t device, uintptr_t buffer,
-+                                        const wgpu::BufferDescriptor& descriptor) noexcept {
-+    if (state_.load(std::memory_order_acquire) != AURORA_BROWSER_FRAME_EFFECT_UNUSED) return;
-+    StaticBufferWitness* witness = nullptr;
-+    if (role == StaticVertexBufferRole) witness = &staticVertexBuffer_;
-+    else if (role == StaticStorageBufferRole) witness = &staticStorageBuffer_;
-+    if (witness == nullptr) return;
-+    if (!staticLifetimeActive_ || owner != staticOwner_ || device != staticDevice_ || buffer == 0 ||
-+        descriptor.nextInChain != nullptr) {
-+      if (witness->valid) witness->valid = false;
-+      staticWarmInvalid_ = true;
-+      return;
-+    }
-+    const uint64_t usage = static_cast<uint64_t>(descriptor.usage);
-+    const std::array<uint32_t, 5> words{static_cast<uint32_t>(descriptor.size),
-+        static_cast<uint32_t>(descriptor.size >> 32), static_cast<uint32_t>(usage),
-+        static_cast<uint32_t>(usage >> 32), descriptor.mappedAtCreation ? 1u : 0u};
-+    if (witness->valid) {
-+      const bool same = witness->address == buffer && witness->owner == owner && witness->device == device &&
-+          witness->generation == staticLifetimeGeneration_ && witness->words == words;
-+      if (!same) {
-+        witness->valid = false;
-+        staticWarmInvalid_ = true;
-+      }
-+      return;
-+    }
-+    witness->address = buffer;
-+    witness->owner = owner;
-+    witness->device = device;
-+    witness->generation = staticLifetimeGeneration_;
-+    witness->words = words;
-+    witness->valid = true;
 +  }
 +
 +  void observe_texture_descriptor(uintptr_t texture, uintptr_t device, const wgpu::TextureDescriptor& descriptor) noexcept {
@@ -4772,114 +4987,6 @@ index 0000000000000000000000000000000000000000..3366c8a538d2b2e6e2920288e27e1f0e
 +    return groupId;
 +  }
 +
-+  void remember_static_bind_group_descriptor(uintptr_t owner, uintptr_t device, uintptr_t group, uintptr_t layout,
-+                                             uintptr_t vertexBuffer, uintptr_t storageBuffer,
-+                                             const WGPUBindGroupDescriptor& descriptor) noexcept {
-+    if (state_.load(std::memory_order_acquire) != AURORA_BROWSER_FRAME_EFFECT_UNUSED) return;
-+    if (!staticLifetimeActive_ || owner != staticOwner_ || device != staticDevice_ || group == 0 || layout == 0 ||
-+        !staticVertexBuffer_.valid || !staticStorageBuffer_.valid || descriptor.nextInChain != nullptr ||
-+        descriptor.entryCount != 2 || descriptor.entries == nullptr ||
-+        reinterpret_cast<uintptr_t>(descriptor.layout) != layout ||
-+        staticVertexBuffer_.address != vertexBuffer || staticStorageBuffer_.address != storageBuffer) {
-+      if (staticBindGroup_.valid) staticBindGroup_.valid = false;
-+      staticWarmInvalid_ = true;
-+      return;
-+    }
-+    const auto& vertex = descriptor.entries[0];
-+    const auto& storage = descriptor.entries[1];
-+    if (vertex.nextInChain != nullptr || storage.nextInChain != nullptr || vertex.binding != 0 || storage.binding != 1 ||
-+        reinterpret_cast<uintptr_t>(vertex.buffer) != vertexBuffer ||
-+        reinterpret_cast<uintptr_t>(storage.buffer) != storageBuffer || vertex.sampler != nullptr ||
-+        storage.sampler != nullptr || vertex.textureView != nullptr || storage.textureView != nullptr) {
-+      if (staticBindGroup_.valid) staticBindGroup_.valid = false;
-+      staticWarmInvalid_ = true;
-+      return;
-+    }
-+    if (staticBindGroup_.valid) {
-+      const auto sameEntry = [](const WGPUBindGroupEntry& a, const WGPUBindGroupEntry& b) noexcept {
-+        return a.nextInChain == b.nextInChain && a.binding == b.binding && a.buffer == b.buffer &&
-+               a.offset == b.offset && a.size == b.size && a.sampler == b.sampler && a.textureView == b.textureView;
-+      };
-+      const bool same = staticBindGroup_.owner == owner && staticBindGroup_.device == device &&
-+          staticBindGroup_.group == group && staticBindGroup_.layout == layout &&
-+          staticBindGroup_.vertexBuffer == vertexBuffer && staticBindGroup_.storageBuffer == storageBuffer &&
-+          staticBindGroup_.generation == staticLifetimeGeneration_ &&
-+          sameEntry(staticBindGroup_.entries[0], vertex) && sameEntry(staticBindGroup_.entries[1], storage);
-+      if (!same) {
-+        staticBindGroup_.valid = false;
-+        staticWarmInvalid_ = true;
-+      }
-+      return;
-+    }
-+    staticBindGroup_.owner = owner;
-+    staticBindGroup_.device = device;
-+    staticBindGroup_.group = group;
-+    staticBindGroup_.layout = layout;
-+    staticBindGroup_.vertexBuffer = vertexBuffer;
-+    staticBindGroup_.storageBuffer = storageBuffer;
-+    staticBindGroup_.generation = staticLifetimeGeneration_;
-+    staticBindGroup_.entries = {vertex, storage};
-+    staticBindGroup_.valid = true;
-+  }
-+
-+  void observe_static_bind_group_set(uint32_t slot, uintptr_t owner, uintptr_t device, uintptr_t group,
-+                                     uintptr_t layout, uintptr_t vertexBuffer, uintptr_t storageBuffer,
-+                                     uint32_t offsetCount, const uint32_t* offsets) noexcept {
-+    if (!collecting()) return;
-+    if (slot != 0) {
-+      fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE);
-+      observe_bind_group_set(slot, group, offsetCount, offsets);
-+      return;
-+    }
-+    const bool hasWitness = staticBindGroup_.valid || staticVertexBuffer_.valid || staticStorageBuffer_.valid;
-+    const bool complete = staticLifetimeActive_ && !staticWarmInvalid_ && staticBindGroup_.valid && staticVertexBuffer_.valid &&
-+        staticStorageBuffer_.valid && staticBindGroup_.generation == staticLifetimeGeneration_ &&
-+        staticVertexBuffer_.generation == staticLifetimeGeneration_ &&
-+        staticStorageBuffer_.generation == staticLifetimeGeneration_ &&
-+        staticBindGroup_.owner == staticOwner_ && staticBindGroup_.device == staticDevice_ &&
-+        staticBindGroup_.vertexBuffer == staticVertexBuffer_.address &&
-+        staticBindGroup_.storageBuffer == staticStorageBuffer_.address;
-+    const bool sameIdentity = owner == staticOwner_ && device == staticDevice_ &&
-+        owner == staticBindGroup_.owner && device == staticBindGroup_.device &&
-+        group == staticBindGroup_.group && layout == staticBindGroup_.layout &&
-+        vertexBuffer == staticBindGroup_.vertexBuffer && storageBuffer == staticBindGroup_.storageBuffer &&
-+        vertexBuffer == staticVertexBuffer_.address && storageBuffer == staticStorageBuffer_.address;
-+    const bool staleIdentity = hasWitness && (!staticLifetimeActive_ || owner != staticOwner_ || device != staticDevice_ ||
-+        (staticBindGroup_.valid && staticBindGroup_.generation != staticLifetimeGeneration_) ||
-+        (staticVertexBuffer_.valid && staticVertexBuffer_.generation != staticLifetimeGeneration_) ||
-+        (staticStorageBuffer_.valid && staticStorageBuffer_.generation != staticLifetimeGeneration_) ||
-+        (staticBindGroup_.valid && (group != staticBindGroup_.group || layout != staticBindGroup_.layout ||
-+          vertexBuffer != staticBindGroup_.vertexBuffer || storageBuffer != staticBindGroup_.storageBuffer)) ||
-+        (staticVertexBuffer_.valid && vertexBuffer != staticVertexBuffer_.address) ||
-+        (staticStorageBuffer_.valid && storageBuffer != staticStorageBuffer_.address));
-+    if (!complete || !sameIdentity) {
-+      fail(staleIdentity ? AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE
-+                         : AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE);
-+      observe_bind_group_set(slot, group, offsetCount, offsets);
-+      return;
-+    }
-+    if (!staticPromoted_) {
-+      const uint64_t vertexId = observe_resource_descriptor(AURORA_BROWSER_FRAME_EFFECT_HANDLE_BUFFER,
-+          staticVertexBuffer_.address, staticVertexBuffer_.device, staticVertexBuffer_.words.data(),
-+          static_cast<uint32_t>(staticVertexBuffer_.words.size()));
-+      const uint64_t storageId = observe_resource_descriptor(AURORA_BROWSER_FRAME_EFFECT_HANDLE_BUFFER,
-+          staticStorageBuffer_.address, staticStorageBuffer_.device, staticStorageBuffer_.words.data(),
-+          static_cast<uint32_t>(staticStorageBuffer_.words.size()));
-+      WGPUBindGroupDescriptor descriptor{};
-+      descriptor.entryCount = staticBindGroup_.entries.size();
-+      descriptor.entries = staticBindGroup_.entries.data();
-+      descriptor.layout = reinterpret_cast<WGPUBindGroupLayout>(staticBindGroup_.layout);
-+      const uint64_t groupId = observe_bind_group_descriptor(staticBindGroup_.group, staticBindGroup_.device,
-+          staticBindGroup_.layout, 0, descriptor);
-+      if (vertexId == 0 || storageId == 0 || groupId == 0 || !resource_known(vertexId) ||
-+          !resource_known(storageId) || !resource_known(groupId))
-+        fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE);
-+      else
-+        staticPromoted_ = true;
-+    }
-+    observe_bind_group_set(slot, group, offsetCount, offsets);
-+  }
-+
 +  void observe_bind_group_ref(uint32_t slot, uint64_t refKey) noexcept {
 +    if (!collecting() || slot >= 4 || refKey == 0) return;
 +    for (uint32_t i = 0; i < bindGroupRefCount_; ++i) {
@@ -5086,6 +5193,9 @@ index 0000000000000000000000000000000000000000..3366c8a538d2b2e6e2920288e27e1f0e
 +                           const wgpu::Buffer& destination, uint64_t sourceOffset, uint64_t destinationOffset,
 +                           uint32_t bytes) noexcept {
 +    if (!begin_or_match(frame.frameIndex, frame.frameId)) return;
++    if (role > 3 || !promote_renderer_copy(frame.stagingBuffer, reinterpret_cast<uintptr_t>(staging.Get()),
++        role == 0 ? StaticVertexBufferRole : role == 1 ? UniformBufferRole : role == 2 ? IndexBufferRole : StaticStorageBufferRole,
++        reinterpret_cast<uintptr_t>(destination.Get()))) return;
 +    ++counts_.stagingCopyCount;
 +    auto row = make_event(AURORA_BROWSER_FRAME_EFFECT_EVENT_STAGING_COPY, opIndex);
 +    row.flags = role;
@@ -5115,6 +5225,7 @@ index 0000000000000000000000000000000000000000..3366c8a538d2b2e6e2920288e27e1f0e
 +  void observe_staging_write(const FramePacket& frame, uint32_t role, uint64_t offset, uint32_t bytes,
 +                             const wgpu::Buffer& destination) noexcept {
 +    if (!begin_or_match(frame.frameIndex, frame.frameId)) return;
++    if (!promote_renderer_buffer(StagingBufferRole, frame.stagingBuffer, reinterpret_cast<uintptr_t>(destination.Get()))) return;
 +    ++counts_.queueWriteCount;
 +    counts_.queueWriteBytes += bytes;
 +    auto row = make_event(AURORA_BROWSER_FRAME_EFFECT_EVENT_QUEUE_WRITE);
@@ -5197,6 +5308,7 @@ index 0000000000000000000000000000000000000000..3366c8a538d2b2e6e2920288e27e1f0e
 +    out.actualDrawCount = actualDrawCount_;
 +    out.resourceCount = resourceCount_;
 +    out.bindingEntryCount = bindingEntryCount_;
++    out.layoutEntryCount = layoutEntryCount_; out.provenanceCount = provenanceCount_;
 +    out.depthTraceCount = depthTraceCount_;
 +    out.depthRequestCount = depthRequestCount_;
 +    out.opCount = counts_.opCount;
@@ -5235,20 +5347,154 @@ index 0000000000000000000000000000000000000000..3366c8a538d2b2e6e2920288e27e1f0e
 +  }
 +
 +private:
++  friend struct BrowserFrameEffectObserverControls;
 +  struct HandleEntry { uintptr_t address = 0; uint32_t kind = 0; };
 +  struct BindGroupRefEntry { uint64_t refKey = 0, captureId = 0; };
-+  struct StaticBufferWitness {
-+    uintptr_t address = 0, owner = 0, device = 0;
-+    uint64_t generation = 0;
-+    std::array<uint32_t, 5> words{};
-+    bool valid = false;
++  struct WarmWitness {
++    uintptr_t raw = 0, owner = 0, device = 0;
++    uint64_t serial = 0, epoch = 0, parentSerial = 0, cachedSamplerSerial = 0;
++    uint32_t role = 0, slot = 0, kind = 0, wordCount = 0, entryCount = 0;
++    size_t parent = WarmOwnerCapacity;
++    std::array<uint32_t,16> words{};
++    std::array<std::array<uint32_t,15>,TextureEntryCount> layoutEntries{};
++    std::array<WGPUBindGroupEntry,TextureEntryCount> entries{};
++    std::array<size_t,TextureEntryCount> children{};
++    std::array<uint64_t,TextureEntryCount> childSerials{};
++    bool valid = false, promoted = false;
 +  };
-+  struct StaticBindGroupWitness {
-+    uintptr_t owner = 0, device = 0, group = 0, layout = 0, vertexBuffer = 0, storageBuffer = 0;
-+    uint64_t generation = 0;
-+    std::array<WGPUBindGroupEntry, 2> entries{};
-+    bool valid = false;
-+  };
++  static size_t warm_index(uint32_t role, size_t slot) noexcept {
++    if (role >= StaticVertexBufferRole && role <= IndexBufferRole && slot == 0) return role - 1;
++    if (role == StagingBufferRole && slot < StagingBufferCount) return 4 + slot;
++    if (role >= StaticLayoutRole && role <= EmptySamplerRole && slot == 0) return 4 + StagingBufferCount + role - StaticLayoutRole;
++    return WarmOwnerCapacity;
++  }
++  bool capture_window_live() const noexcept {
++    const auto state = state_.load(std::memory_order_acquire);
++    return state == AURORA_BROWSER_FRAME_EFFECT_ARMED || state == AURORA_BROWSER_FRAME_EFFECT_COLLECTING || state == AURORA_BROWSER_FRAME_EFFECT_SUBMITTED;
++  }
++  void warm_reject(uint32_t blocker) noexcept {
++    if (!warmError_) warmError_ = blocker;
++    if (capture_window_live()) fail(blocker);
++  }
++  WarmWitness* warm_create(uint32_t role, size_t slot, uintptr_t owner, uintptr_t device, uintptr_t raw,
++                           uint32_t kind, uint64_t existingSerial = 0) noexcept {
++    const size_t index = warm_index(role,slot);
++    if (state_.load(std::memory_order_acquire) != AURORA_BROWSER_FRAME_EFFECT_UNUSED) {
++      warm_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE); return nullptr;
++    }
++    if (!warmActive_ || warmError_ || index >= WarmOwnerCapacity || !raw || owner != warmOwner_ || device != warmDevice_ ||
++        (role == StagingBufferRole && slot >= activeStaging_)) {
++      warm_reject(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return nullptr;
++    }
++    if (warm_[index].valid || (!existingSerial && nextCreateSerial_ == UINT64_MAX)) {
++      warm_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE); return nullptr;
++    }
++    auto& w = warm_[index]; w = {}; w.raw = raw; w.owner = owner; w.device = device;
++    w.serial = existingSerial ? existingSerial : ++nextCreateSerial_; w.epoch = warmEpoch_;
++    w.role = role; w.slot = uint32_t(slot); w.kind = kind; w.valid = true; return &w;
++  }
++  static std::array<uint32_t,10> sampler_words(const wgpu::SamplerDescriptor& d) noexcept {
++    return {uint32_t(d.addressModeU),uint32_t(d.addressModeV),uint32_t(d.addressModeW),uint32_t(d.magFilter),uint32_t(d.minFilter),
++      uint32_t(d.mipmapFilter),std::bit_cast<uint32_t>(d.lodMinClamp),std::bit_cast<uint32_t>(d.lodMaxClamp),uint32_t(d.compare),d.maxAnisotropy};
++  }
++  bool gather_warm(size_t index, std::array<bool,WarmOwnerCapacity>& visited,
++                   std::array<size_t,WarmOwnerCapacity>& order, size_t& count) noexcept {
++    if (index >= WarmOwnerCapacity) return false;
++    if (visited[index]) return true;
++    const auto& w = warm_[index];
++    if (!w.valid || !w.raw || !w.serial || w.epoch != warmEpoch_ || w.owner != warmOwner_ || w.device != warmDevice_) return false;
++    if (w.parent != WarmOwnerCapacity) {
++      if (w.parent >= WarmOwnerCapacity || warm_[w.parent].serial != w.parentSerial ||
++          !gather_warm(w.parent,visited,order,count)) return false;
++    }
++    if (w.kind == AURORA_BROWSER_FRAME_EFFECT_HANDLE_BIND_GROUP) {
++      for (uint32_t i=0;i<w.entryCount;++i)
++        if (w.children[i] >= WarmOwnerCapacity || warm_[w.children[i]].serial != w.childSerials[i] ||
++            !gather_warm(w.children[i],visited,order,count)) return false;
++    }
++    visited[index] = true; order[count++] = index; return true;
++  }
++  bool promote_warm_graph(size_t index, size_t second = WarmOwnerCapacity) noexcept {
++    if (!collecting()) return false;
++    if (!warmActive_ || warmError_) { fail(warmError_ ? warmError_ : AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return false; }
++    std::array<bool,WarmOwnerCapacity> visited{}; std::array<size_t,WarmOwnerCapacity> order{}; size_t count=0;
++    if (!gather_warm(index,visited,order,count) ||
++        (second != WarmOwnerCapacity && !gather_warm(second,visited,order,count))) {
++      fail(AURORA_BROWSER_FRAME_EFFECT_UNKNOWN_RESOURCE); return false;
++    }
++    // Count exact new handles before handle() can mutate its table.
++    uint32_t newHandles=0; const auto missingHandle=[&](uint32_t kind,uintptr_t raw) {
++      for(uint32_t i=0;i<handleCount_.load(std::memory_order_relaxed);++i)
++        if(handles_[i].kind==kind&&handles_[i].address==raw)return false;
++      return true;
++    };
++    const auto existingHandle=[&](uint32_t kind,uintptr_t raw)->uint64_t {
++      for(uint32_t i=0;i<handleCount_.load(std::memory_order_relaxed);++i)
++        if(handles_[i].kind==kind&&handles_[i].address==raw)return uint64_t(i)+1;
++      return 0;
++    };
++    if(missingHandle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_DEVICE,warmDevice_))++newHandles;
++    uint32_t newResources=0,newBindings=0,newLayouts=0,newProvenance=0;
++    for(size_t i=0;i<count;++i){
++      const auto& w=warm_[order[i]];
++      // Distinct role creations cannot alias one native object in this narrow graph.
++      for(size_t j=0;j<i;++j)if(w.kind==warm_[order[j]].kind&&w.raw==warm_[order[j]].raw){fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);return false;}
++      if(missingHandle(w.kind,w.raw))++newHandles;
++      if(!w.promoted){
++        const auto priorId=existingHandle(w.kind,w.raw);
++        if(!priorId || !resource_known(priorId))++newResources;
++        ++newProvenance;
++        if(w.kind==AURORA_BROWSER_FRAME_EFFECT_HANDLE_BIND_GROUP)newBindings+=w.entryCount;
++        if(w.kind==AURORA_BROWSER_FRAME_EFFECT_HANDLE_BIND_GROUP_LAYOUT)newLayouts+=w.entryCount;
++      }
++    }
++    if(newHandles>HandleCapacity-handleCount_.load(std::memory_order_relaxed)||newResources>ResourceCapacity-resourceCount_||
++       newBindings>BindingEntryCapacity-bindingEntryCount_||newLayouts>LayoutEntryCapacity-layoutEntryCount_||
++       newProvenance>WarmOwnerCapacity-provenanceCount_){fail(AURORA_BROWSER_FRAME_EFFECT_DESCRIPTOR_OVERFLOW);return false;}
++    const auto deviceId=handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_DEVICE,warmDevice_);
++    std::array<AuroraBrowserFrameEffectResource,WarmOwnerCapacity> prepared{};
++    std::array<uint64_t,WarmOwnerCapacity> ids{};
++    for(size_t i=0;i<count;++i){const auto& w=warm_[order[i]];ids[order[i]]=handle(w.kind,w.raw);}
++    for(size_t i=0;i<count;++i){
++      const auto& w=warm_[order[i]];auto& r=prepared[i];r.captureId=ids[order[i]];r.kind=w.kind;r.ownerId=deviceId;
++      r.wordCount=w.wordCount;std::copy(w.words.begin(),w.words.end(),r.words);
++      if(w.kind==AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE_VIEW){r.ownerId=ids[w.parent];r.words[0]=uint32_t(r.ownerId);r.words[1]=uint32_t(r.ownerId>>32);}
++      if(w.kind==AURORA_BROWSER_FRAME_EFFECT_HANDLE_BIND_GROUP){
++        uint64_t hash=14695981039346656037ULL;
++        const auto mix=[&](uint64_t value){for(unsigned shift=0;shift<64;shift+=8){hash^=(value>>shift)&255u;hash*=1099511628211ULL;}};
++        for(uint32_t j=0;j<w.entryCount;++j){const auto& e=w.entries[j];const auto& child=warm_[w.children[j]];
++          mix(e.binding);mix(child.kind);mix(ids[w.children[j]]);mix(child.kind==AURORA_BROWSER_FRAME_EFFECT_HANDLE_BUFFER?e.offset:0);
++          mix(child.kind==AURORA_BROWSER_FRAME_EFFECT_HANDLE_BUFFER?e.size:0);}
++        const auto layout=ids[w.parent];r.wordCount=5;r.words[0]=uint32_t(layout);r.words[1]=uint32_t(layout>>32);r.words[2]=w.entryCount;r.words[3]=uint32_t(hash);r.words[4]=uint32_t(hash>>32);
++      }
++      for(uint32_t j=0;j<resourceCount_;++j)if(resources_[j].captureId==r.captureId){
++        const auto& prior=resources_[j];bool same=prior.ownerId==r.ownerId&&prior.kind==r.kind&&prior.wordCount==r.wordCount;
++        for(uint32_t k=0;same&&k<16;++k)same=prior.words[k]==r.words[k];
++        const bool authenticCacheRow=w.kind==AURORA_BROWSER_FRAME_EFFECT_HANDLE_SAMPLER && w.role==EmptySamplerRole &&
++            w.cachedSamplerSerial!=0 && w.cachedSamplerSerial==w.serial;
++        if(!same||(!w.promoted&&!authenticCacheRow)){fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);return false;}
++      }
++    }
++    // All graph validation/capacity/conflict checks complete before resource publication.
++    for(size_t i=0;i<count;++i){
++      auto& w=warm_[order[i]];if(w.promoted)continue;const auto& r=prepared[i];
++      register_resource(w.kind,w.raw,r.ownerId,r.words,r.wordCount);
++      if(w.kind==AURORA_BROWSER_FRAME_EFFECT_HANDLE_BIND_GROUP_LAYOUT)
++        for(uint32_t j=0;j<w.entryCount;++j){auto& row=layoutEntries_[layoutEntryCount_++];row={};row.layoutId=r.captureId;row.entryIndex=j;std::copy(w.layoutEntries[j].begin(),w.layoutEntries[j].end(),row.words);}
++      if(w.kind==AURORA_BROWSER_FRAME_EFFECT_HANDLE_BIND_GROUP)
++        for(uint32_t j=0;j<w.entryCount;++j){const auto& e=w.entries[j];auto& row=bindingEntries_[bindingEntryCount_++];row={};row.bindGroupId=r.captureId;
++          row.resourceId=ids[w.children[j]];row.binding=e.binding;row.kind=warm_[w.children[j]].kind;row.offset=e.offset;row.size=e.size;}
++      auto& p=provenance_[provenanceCount_++];p={r.captureId,deviceId,w.serial,w.epoch,w.role,w.slot};w.promoted=true;
++    }
++    return true;
++  }
++  uintptr_t warmOwner_=0,warmDevice_=0;uint64_t warmEpoch_=0,nextCreateSerial_=0;
++  bool warmActive_=false;uint32_t warmError_=0;size_t activeStaging_=0;
++  std::array<WarmWitness,WarmOwnerCapacity> warm_{};
++  std::array<AuroraBrowserFrameEffectLayoutEntry,LayoutEntryCapacity> layoutEntries_{};
++  std::array<AuroraBrowserFrameEffectProvenance,WarmOwnerCapacity> provenance_{};
++  uint32_t layoutEntryCount_=0,provenanceCount_=0;
++
 +  struct Counts {
 +    uint32_t opCount = 0, renderPassCount = 0, drawCommandCount = 0, customDrawCount = 0;
 +    uint32_t encoderTaskCount = 0, textureCopyCount = 0, textureUploadCount = 0, paletteConversionCount = 0;
@@ -5266,12 +5512,6 @@ index 0000000000000000000000000000000000000000..3366c8a538d2b2e6e2920288e27e1f0e
 +  std::atomic<uint32_t> state_{AURORA_BROWSER_FRAME_EFFECT_UNUSED};
 +  std::atomic<uint32_t> eventCount_{0};
 +  std::atomic<uint32_t> handleCount_{0};
-+  uintptr_t staticOwner_ = 0, staticDevice_ = 0;
-+  uint64_t staticLifetimeGeneration_ = 0;
-+  bool staticLifetimeActive_ = false, staticPromoted_ = false, staticWarmInvalid_ = false;
-+  StaticBufferWitness staticVertexBuffer_{};
-+  StaticBufferWitness staticStorageBuffer_{};
-+  StaticBindGroupWitness staticBindGroup_{};
 +  uint32_t targetFrameIndex_ = 0;
 +  uint32_t frameIndex_ = 0;
 +  uint64_t frameId_ = 0;
@@ -7537,7 +7777,7 @@ index 7d652cafbb8eed78f5baea55ff73426cb681c3e5..ad0a325784e60d0999c0364e66289bfc
  
  private:
 diff --git a/lib/gfx/resource_cache.cpp b/lib/gfx/resource_cache.cpp
-index 8c131ab871057c6d1d08d6c345927e2aff5c07ad..bb47fe3ef9f6ae64349ddb3eec5e59d0968ed188 100644
+index 8c131ab871057c6d1d08d6c345927e2aff5c07ad..7306d0fee9d83838f59a766bed309d7f2de3ef89 100644
 --- a/lib/gfx/resource_cache.cpp
 +++ b/lib/gfx/resource_cache.cpp
 @@ -1,4 +1,7 @@
@@ -7548,7 +7788,35 @@ index 8c131ab871057c6d1d08d6c345927e2aff5c07ad..bb47fe3ef9f6ae64349ddb3eec5e59d0
  
  #include "frame.hpp"
  #include "hash.hpp"
-@@ -84,6 +87,21 @@ void shutdown_resource_cache() {
+@@ -43,7 +46,16 @@ constexpr uint32_t BindGroupCacheRetainFrames = 32;
+ constexpr uint32_t BindGroupCacheSweepPeriod = 16;
+ 
+ absl::flat_hash_map<BindGroupRef, CachedBindGroup> g_cachedBindGroups;
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++struct CachedSampler {
++  wgpu::Sampler sampler;
++  detail::BrowserFrameEffectObserver::SamplerCreation creation;
++};
++absl::flat_hash_map<SamplerRef, CachedSampler> g_cachedSamplers;
++#endif
++#if !defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) || !defined(__EMSCRIPTEN__) || defined(__EMSCRIPTEN_PTHREADS__)
+ absl::flat_hash_map<SamplerRef, wgpu::Sampler> g_cachedSamplers;
++#endif
+ std::mutex g_bindGroupCacheMutex;
+ std::mutex g_samplerCacheMutex;
+ 
+@@ -76,6 +88,10 @@ void expire_cached_bind_groups() {
+ void shutdown_resource_cache() {
+   clear_bind_group_cache();
+   std::lock_guard lock{g_samplerCacheMutex};
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  for (const auto& entry : g_cachedSamplers)
++    browser_frame_effect_observer().release_sampler_cache_owner(entry.second.creation);
++#endif
+   g_cachedSamplers.clear();
+ }
+ 
+@@ -84,6 +100,21 @@ void shutdown_resource_cache() {
  BindGroupRef bind_group_ref(const WGPUBindGroupDescriptor& descriptor) {
    const auto id = xxh3_hash(descriptor);
    std::lock_guard lock{g_bindGroupCacheMutex};
@@ -7570,7 +7838,7 @@ index 8c131ab871057c6d1d08d6c345927e2aff5c07ad..bb47fe3ef9f6ae64349ddb3eec5e59d0
    const auto it = g_cachedBindGroups.find(id);
    if (it == g_cachedBindGroups.end()) {
      auto bindGroup = wgpu::BindGroup::Acquire(wgpuDeviceCreateBindGroup(webgpu::g_device.Get(), &descriptor));
-@@ -94,6 +112,7 @@ BindGroupRef bind_group_ref(const WGPUBindGroupDescriptor& descriptor) {
+@@ -94,6 +125,7 @@ BindGroupRef bind_group_ref(const WGPUBindGroupDescriptor& descriptor) {
    } else {
      it->second.lastUsedFrame = current_frame();
    }
@@ -7578,17 +7846,63 @@ index 8c131ab871057c6d1d08d6c345927e2aff5c07ad..bb47fe3ef9f6ae64349ddb3eec5e59d0
    return id;
  }
  
-@@ -111,6 +130,10 @@ wgpu::Sampler sampler_ref(const wgpu::SamplerDescriptor& descriptor) {
-   if (it == g_cachedSamplers.end()) {
-     it = g_cachedSamplers.try_emplace(id, webgpu::g_device.CreateSampler(&descriptor)).first;
-   }
-+#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+  detail::browser_frame_effect_observer().observe_sampler_descriptor(
-+      reinterpret_cast<uintptr_t>(it->second.Get()), reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), descriptor);
-+#endif
-   return it->second;
+@@ -104,14 +136,42 @@ wgpu::BindGroup find_bind_group(BindGroupRef id) {
+   return it->second.bindGroup;
  }
  
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++wgpu::Sampler sampler_ref_internal(const wgpu::SamplerDescriptor& descriptor, uintptr_t emptyOwner) {
++#endif
++#if !defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) || !defined(__EMSCRIPTEN__) || defined(__EMSCRIPTEN_PTHREADS__)
+ wgpu::Sampler sampler_ref(const wgpu::SamplerDescriptor& descriptor) {
++#endif
+   const auto id = xxh3_hash(descriptor);
+   std::lock_guard lock{g_samplerCacheMutex};
+   auto it = g_cachedSamplers.find(id);
+   if (it == g_cachedSamplers.end()) {
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    auto sampler = webgpu::g_device.CreateSampler(&descriptor);
++    auto creation = detail::browser_frame_effect_observer().observe_sampler_creation(
++        reinterpret_cast<uintptr_t>(sampler.Get()), reinterpret_cast<uintptr_t>(webgpu::g_device.Get()), descriptor);
++    it = g_cachedSamplers.try_emplace(id, CachedSampler{std::move(sampler), creation}).first;
++#endif
++#if !defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) || !defined(__EMSCRIPTEN__) || defined(__EMSCRIPTEN_PTHREADS__)
+     it = g_cachedSamplers.try_emplace(id, webgpu::g_device.CreateSampler(&descriptor)).first;
++#endif
+   }
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  if (emptyOwner) detail::browser_frame_effect_observer().select_empty_sampler(emptyOwner, it->second.creation, descriptor);
++  detail::browser_frame_effect_observer().observe_cached_sampler_descriptor(it->second.creation, descriptor);
++  return it->second.sampler;
++#endif
++#if !defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) || !defined(__EMSCRIPTEN__) || defined(__EMSCRIPTEN_PTHREADS__)
+   return it->second;
++#endif
++}
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++wgpu::Sampler sampler_ref(const wgpu::SamplerDescriptor& descriptor) {
++  return sampler_ref_internal(descriptor, 0);
++}
++wgpu::Sampler sampler_ref_empty(const wgpu::SamplerDescriptor& descriptor, uintptr_t owner) {
++  return sampler_ref_internal(descriptor, owner);
+ }
++#endif
+ 
+ } // namespace aurora::gfx
+diff --git a/lib/gfx/resource_cache.hpp b/lib/gfx/resource_cache.hpp
+index c133abd8fece50517af45b5bc4dd9967eeccfc31..527c7ab99766679d2bdc904d8b9799382d2edb05 100644
+--- a/lib/gfx/resource_cache.hpp
++++ b/lib/gfx/resource_cache.hpp
+@@ -7,6 +7,9 @@ namespace aurora::gfx {
+ BindGroupRef bind_group_ref(const WGPUBindGroupDescriptor& descriptor);
+ wgpu::BindGroup find_bind_group(BindGroupRef id);
+ wgpu::Sampler sampler_ref(const wgpu::SamplerDescriptor& descriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++wgpu::Sampler sampler_ref_empty(const wgpu::SamplerDescriptor& descriptor, uintptr_t owner);
++#endif
+ 
+ namespace detail {
+ void clear_bind_group_cache();
 diff --git a/lib/gfx/sha256.hpp b/lib/gfx/sha256.hpp
 new file mode 100644
 index 0000000000000000000000000000000000000000..8a76bfe19513fe6bf000224d301dbeb85da25038
@@ -8168,7 +8482,7 @@ index 0d6a5d8ab36c7992ab98418458bb21beb178faaf..510e6e7c675bad50276fb46ced412a45
      LIKELY {
        if (detail::sBufferSize < detail::sBufferCapacity)
 diff --git a/lib/gx/gx.cpp b/lib/gx/gx.cpp
-index b12b327fe4d3276c13b23e93baca64824ed50806..7889c659d15019e51ff704e9c8a6e0cc8a3b4819 100644
+index b12b327fe4d3276c13b23e93baca64824ed50806..04d23c4fc0e9b7b3a8bea6753a39d725e48f7de0 100644
 --- a/lib/gx/gx.cpp
 +++ b/lib/gx/gx.cpp
 @@ -1,4 +1,7 @@
@@ -8179,31 +8493,69 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..7889c659d15019e51ff704e9c8a6e0cc
  
  #include "pipeline.hpp"
  #include "texture.hpp"
-@@ -540,7 +543,16 @@ void initialize() noexcept {
+@@ -502,6 +505,12 @@ GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept {
+   };
+ }
+ 
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++uintptr_t diagnostic_empty_texture_layout() noexcept {
++  return reinterpret_cast<uintptr_t>(sTextureBindGroupLayout.Get());
++}
++#endif
++
+ void initialize() noexcept {
+   {
+     std::array<wgpu::BindGroupLayoutEntry, MaxTextures * 2> textureEntries;
+@@ -527,10 +536,22 @@ void initialize() noexcept {
+         .entries = textureEntries.data(),
+     };
+     sTextureBindGroupLayout = g_device.CreateBindGroupLayout(&descriptor);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    static_assert(textureEntries.size() == gfx::detail::BrowserFrameEffectObserver::TextureEntryCount);
++    gfx::detail::browser_frame_effect_observer().remember_renderer_layout(
++        gfx::detail::BrowserFrameEffectObserver::EmptyLayoutRole,
++        reinterpret_cast<uintptr_t>(&gfx::detail::resources()), reinterpret_cast<uintptr_t>(g_device.Get()),
++        reinterpret_cast<uintptr_t>(sTextureBindGroupLayout.Get()), descriptor);
++#endif
+   }
+   {
+     constexpr wgpu::SamplerDescriptor descriptor{.label = "Empty sampler"};
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    sEmptySampler = gfx::sampler_ref_empty(descriptor, reinterpret_cast<uintptr_t>(&gfx::detail::resources()));
++#endif
++#if !defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) || !defined(__EMSCRIPTEN__) || defined(__EMSCRIPTEN_PTHREADS__)
+     sEmptySampler = gfx::sampler_ref(descriptor);
++#endif
+   }
+   {
+     constexpr wgpu::TextureDescriptor descriptor{
+@@ -540,7 +561,17 @@ void initialize() noexcept {
          .format = wgpu::TextureFormat::RGBA8Unorm,
      };
      sEmptyTexture = g_device.CreateTexture(&descriptor);
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+    gfx::detail::browser_frame_effect_observer().observe_texture_descriptor(
-+        reinterpret_cast<uintptr_t>(sEmptyTexture.Get()), reinterpret_cast<uintptr_t>(g_device.Get()), descriptor);
++    gfx::detail::browser_frame_effect_observer().remember_empty_texture(
++        reinterpret_cast<uintptr_t>(&gfx::detail::resources()), reinterpret_cast<uintptr_t>(g_device.Get()),
++        reinterpret_cast<uintptr_t>(sEmptyTexture.Get()), descriptor);
 +#endif
      sEmptyTextureView = sEmptyTexture.CreateView();
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+    gfx::detail::browser_frame_effect_observer().observe_texture_view_descriptor(
-+        reinterpret_cast<uintptr_t>(sEmptyTextureView.Get()), reinterpret_cast<uintptr_t>(sEmptyTexture.Get()),
-+        reinterpret_cast<uintptr_t>(g_device.Get()), nullptr);
++    gfx::detail::browser_frame_effect_observer().remember_empty_view(
++        reinterpret_cast<uintptr_t>(&gfx::detail::resources()), reinterpret_cast<uintptr_t>(g_device.Get()),
++        reinterpret_cast<uintptr_t>(sEmptyTextureView.Get()), reinterpret_cast<uintptr_t>(sEmptyTexture.Get()));
 +#endif
    }
    {
      std::array<wgpu::BindGroupEntry, MaxTextures * 2> entries;
-@@ -561,18 +573,28 @@ void initialize() noexcept {
+@@ -561,24 +592,40 @@ void initialize() noexcept {
          .entries = entries.data(),
      };
      g_emptyTextureBindGroup = g_device.CreateBindGroup(&desc);
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+    gfx::detail::browser_frame_effect_observer().observe_bind_group_descriptor(
-+        reinterpret_cast<uintptr_t>(g_emptyTextureBindGroup.Get()), reinterpret_cast<uintptr_t>(g_device.Get()),
-+        reinterpret_cast<uintptr_t>(sTextureBindGroupLayout.Get()), 0, desc);
++    gfx::detail::browser_frame_effect_observer().remember_renderer_group(
++        gfx::detail::BrowserFrameEffectObserver::EmptyGroupRole,
++        reinterpret_cast<uintptr_t>(&gfx::detail::resources()), reinterpret_cast<uintptr_t>(g_device.Get()),
++        reinterpret_cast<uintptr_t>(g_emptyTextureBindGroup.Get()), desc);
 +#endif
    }
    {
@@ -8225,8 +8577,33 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..7889c659d15019e51ff704e9c8a6e0cc
      };
      sPipelineLayout = g_device.CreatePipelineLayout(&desc);
    }
+ }
+ 
+ void shutdown() noexcept {
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  // These globals still own native references after shutdown; detach metadata only.
++  gfx::detail::browser_frame_effect_observer().detach_empty_renderer_roles(
++      reinterpret_cast<uintptr_t>(&gfx::detail::resources()));
++#endif
+   // TODO we should probably store this all in g_state.gx instead
+   sSamplerBindGroupLayout = {};
+   sTextureBindGroupLayout = {};
+diff --git a/lib/gx/gx.hpp b/lib/gx/gx.hpp
+index a97b98719ebff2914fa9e29844bbed02ae17633d..a2581f6c1f1bb0ce9c1c8d93c649b7f2c886f406 100644
+--- a/lib/gx/gx.hpp
++++ b/lib/gx/gx.hpp
+@@ -432,6 +432,9 @@ struct GXState {
+ extern GXState g_gxState;
+ struct ShaderInfo;
+ 
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++uintptr_t diagnostic_empty_texture_layout() noexcept;
++#endif
+ void initialize() noexcept;
+ void shutdown() noexcept;
+ void update() noexcept;
 diff --git a/lib/gx/pipeline.cpp b/lib/gx/pipeline.cpp
-index 0c3631c9b7b0638f7a60d057a44a9f37de6d9024..0adcd70f955c12e603e70139be64d84c67240b3f 100644
+index 0c3631c9b7b0638f7a60d057a44a9f37de6d9024..68151f3697e14c2297e1f320b91223aaf56d6d63 100644
 --- a/lib/gx/pipeline.cpp
 +++ b/lib/gx/pipeline.cpp
 @@ -1,9 +1,15 @@
@@ -8245,7 +8622,7 @@ index 0c3631c9b7b0638f7a60d057a44a9f37de6d9024..0adcd70f955c12e603e70139be64d84c
  
  #include "gx_fmt.hpp"
  #include "shader_info.hpp"
-@@ -22,26 +28,59 @@ wgpu::RenderPipeline create_pipeline(const PipelineConfig& config) {
+@@ -22,26 +28,67 @@ wgpu::RenderPipeline create_pipeline(const PipelineConfig& config) {
  }
  
  void render(const DrawData& data, const wgpu::RenderPassEncoder& pass) {
@@ -8262,8 +8639,11 @@ index 0c3631c9b7b0638f7a60d057a44a9f37de6d9024..0adcd70f955c12e603e70139be64d84c
 +  const std::array immediateOffsets{data.immediateUniformRange.offset};
 +  pass.SetBindGroup(3, resources.uniformBindGroup, immediateOffsets.size(), immediateOffsets.data());
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+  gfx::detail::browser_frame_effect_observer().observe_bind_group_set(3,
-+      reinterpret_cast<uintptr_t>(resources.uniformBindGroup.Get()), immediateOffsets.size(), immediateOffsets.data());
++  gfx::detail::browser_frame_effect_observer().observe_renderer_group_set(
++      gfx::detail::BrowserFrameEffectObserver::UniformGroupRole, 3,
++      reinterpret_cast<uintptr_t>(&resources), reinterpret_cast<uintptr_t>(webgpu::g_device.Get()),
++      reinterpret_cast<uintptr_t>(resources.uniformBindGroup.Get()),
++      reinterpret_cast<uintptr_t>(resources.uniformBindGroupLayout.Get()), immediateOffsets.size(), immediateOffsets.data());
 +#endif
 +#else
    pass.SetImmediates(0, &data.immediateData, sizeof(data.immediateData));
@@ -8271,8 +8651,11 @@ index 0c3631c9b7b0638f7a60d057a44a9f37de6d9024..0adcd70f955c12e603e70139be64d84c
    const std::array offsets{data.uniformRange.offset};
    pass.SetBindGroup(1, resources.uniformBindGroup, offsets.size(), offsets.data());
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+  gfx::detail::browser_frame_effect_observer().observe_bind_group_set(1,
-+      reinterpret_cast<uintptr_t>(resources.uniformBindGroup.Get()), offsets.size(), offsets.data());
++  gfx::detail::browser_frame_effect_observer().observe_renderer_group_set(
++      gfx::detail::BrowserFrameEffectObserver::UniformGroupRole, 1,
++      reinterpret_cast<uintptr_t>(&resources), reinterpret_cast<uintptr_t>(webgpu::g_device.Get()),
++      reinterpret_cast<uintptr_t>(resources.uniformBindGroup.Get()),
++      reinterpret_cast<uintptr_t>(resources.uniformBindGroupLayout.Get()), offsets.size(), offsets.data());
 +#endif
    if (data.bindGroups.textureBindGroup) {
      pass.SetBindGroup(2, gfx::find_bind_group(data.bindGroups.textureBindGroup));
@@ -8282,6 +8665,8 @@ index 0c3631c9b7b0638f7a60d057a44a9f37de6d9024..0adcd70f955c12e603e70139be64d84c
    }
    pass.SetIndexBuffer(resources.indexBuffer, wgpu::IndexFormat::Uint16, data.idxRange.offset, data.idxRange.size);
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  gfx::detail::browser_frame_effect_observer().promote_renderer_buffer(
++      gfx::detail::BrowserFrameEffectObserver::IndexBufferRole, 0, reinterpret_cast<uintptr_t>(resources.indexBuffer.Get()));
 +  gfx::detail::browser_frame_effect_observer().observe_index_buffer(
 +      reinterpret_cast<uintptr_t>(resources.indexBuffer.Get()), static_cast<uint32_t>(wgpu::IndexFormat::Uint16),
 +      data.idxRange.offset, data.idxRange.size);

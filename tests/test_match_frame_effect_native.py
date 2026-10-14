@@ -77,11 +77,13 @@ class MatchFrameEffectNativeTests(OwnedWorkspaceTests):
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
         self.assertIn("first-draw actual collector issuing identity and selected map-owner controls passed", run.stdout)
         self.assertIn("static slot-0 descriptor witness positive, draw-state event, malformed-entry no-healing, identity and lifecycle controls passed", run.stdout)
+        self.assertIn("actual collector authenticated sampler generic-before-warm, warm-before-generic and untrusted/mutated refusals passed", run.stdout)
 
     def test_first_draw_scope_controls(self):
         result = subprocess.run([str(node_runtime(ROOT)), "--test",
                                  str(ROOT / "tests/match_frame_effect_first_draw.test.mjs"),
-                                 str(ROOT / "tests/one_first_draw_observation_adapter.test.mjs")],
+                                 str(ROOT / "tests/one_first_draw_observation_adapter.test.mjs"),
+                                 str(ROOT / "tests/match_frame_effect_renderer_owners.test.mjs")],
                                 cwd=ROOT, capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
@@ -121,7 +123,7 @@ class MatchFrameEffectNativeTests(OwnedWorkspaceTests):
                          "const r=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));\n" +
                          "assert.deepEqual(frameEffectObservationFailures(r),[]);\n" +
                          "assert.deepEqual(compareFrameEffectObservations(r,structuredClone(r)),[]);\n" +
-                         "console.log('actual native schema2 JSON decoded exactly');\n")
+                         "console.log('actual native renderer3 normal JSON decoded exactly');\n")
         decoded = subprocess.run([str(node_runtime(ROOT)), str(check), str(raw)],
                                  capture_output=True, text=True, timeout=15)
         self.assertEqual(decoded.returncode, 0, decoded.stdout + decoded.stderr)
@@ -132,7 +134,7 @@ class MatchFrameEffectNativeTests(OwnedWorkspaceTests):
         check.write_text(check.read_text().replace("match_frame_effect_driver.mjs", "match_frame_effect_first_draw_driver.mjs")
                          .replace("frameEffectObservationFailures", "firstDrawObservationFailures")
                          .replace("compareFrameEffectObservations", "compareFirstDrawObservations")
-                         .replace("actual native schema2 JSON decoded exactly", "actual native first-draw schema3 JSON decoded exactly"))
+                         .replace("actual native renderer3 normal JSON decoded exactly", "actual native renderer3 first-draw JSON decoded exactly"))
         decoded = subprocess.run([str(node_runtime(ROOT)), str(check), str(raw)],
                                  capture_output=True, text=True, timeout=15)
         self.assertEqual(decoded.returncode, 0, decoded.stdout + decoded.stderr)
