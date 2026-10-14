@@ -99,17 +99,41 @@ external candidate freeze violations/errata, and all failed preparation attempts
 remain retained. Exact source, control, regression and cost identities are in
 the existing evidence receipt.
 
-**Next C3 boundary:** Add a separate, explicit full-schedule diagnostic mode.
-The current consumer and native manifest intentionally admit only the proper
-prefix ending three actions after F; the original full packet alone cannot
-extend that route. Preserve those default guards. A reviewed new mode and
-runtime must keep the exact original 7,167-action schedule, consumed four-port
-PAD bytes, C/F coordinates and fixed work/cleanup budgets. No longer capture is
-yet admitted. Completing the schedule would establish scoped functional
-lifetime A, not all 3,501 original typed-state comparisons or per-owner RNG.
-Those comparisons, checked recreation and lifetime B remain C3 gates. Stop on
-the first missing pairing, mismatch, unsupported service or incomplete teardown.
-Keep [PR #301](https://github.com/ericvanlare/melee-web/pull/301) draft.
+**Full-schedule functional checkpoint (October 14):** Runtime and harness
+`b0556cb3` preserve the existing prefix mode and add an explicit full-schedule
+mode. One headless replay completes all **7,167 original actions: 3,585 source
+ticks and 3,582 draws**. Every consumed four-port PAD record and source action
+order matches the original packet. Both C/F comparisons pass all 16 declared
+fields. Checked native retirement and host notification succeed on the first
+attempt, with phase/running both zero, observation cleared, and all 11 recorded
+browser processes, the owned server and process groups absent.
+
+The action loop takes **56,596.954 ms**, with 88,794 ms of the unchanged global
+budget remaining at entry. All 7,167 receipts complete on their first read,
+with zero polls. The 14,783 loop checkpoints serialize 2,495,580,073 compact
+report bytes and take 12,379.334 ms inclusive. These are nested host/harness
+measurements, not native/GPU time, average FPS or a future fit guarantee.
+The entire supervised attempt takes 118.854 seconds. Both Release builds and
+the full **2,633-test regression with 180 skips** pass on this exact source;
+all 88 declared build artifacts are hash-bound. Prior producer identities,
+failed candidates and synthetic cost measurements remain separate.
+
+This closes a **functional lifetime A schedule**, not C3. The 3,500 post-GO
+coordinates refer to the original capture's source ticks 85–3584. The retained
+native GO callback trace passes the ordered membership check at world tick 84;
+C and F follow at world ticks 85 and 86. The final native match clock is 3,461,
+separate from the 3,585 source-action ticks. This compares the declared C/F
+fields and GO membership, not all 3,501 original typed snapshots or per-owner RNG.
+No incident-recorder, live timing, pixel/PCM, ordinary-unload cache parity or
+JavaScript IDBFS persistence claim follows. Exact validation, capture and review
+identities are in the existing evidence receipt.
+
+**Next C3 boundary:** Extend the existing GO-aligned C/F comparison to the
+retained original typed snapshots using the source-action driver.
+Keep the completed full-schedule witness; do not repeat it unchanged. Per-owner
+RNG, checked recreation and lifetime B remain separate gates. Stop on the first
+unpaired field, divergence, unsupported service or incomplete teardown. Keep
+[PR #301](https://github.com/ericvanlare/melee-web/pull/301) draft.
 
 **Previous zero-tick Setup constructor checkpoint:** The separate `b71da6f0` run compared the declared Setup fields and recorded a native-only constructor receipt: countdown 3,629, authored x0/x4 3,600/3,800, one constructor RNG call with bound 200 and result 29, and seed `3bb84c53 → 263cc5ca`; the completed Setup seed was `35a455b9`. Construction took six steps with zero match ticks, source frames or draws. At that checkpoint those constructor values were not observed in the original. The newer original constructor receipt is separate; matching numbers alone do not establish parity. The newer C/F pass is a separate bounded field comparison, not constructor, GO-state or lifetime parity.
 

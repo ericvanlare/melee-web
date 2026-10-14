@@ -10674,6 +10674,227 @@
           "sha256": "b0ac682dda08d344d483e35c3f734cec9f33e38e530d8d56cf3d9fa2402387ed"
         }
       ]
+    },
+    "full_schedule_functional_a_2026_10_14": {
+      "state": "FUNCTIONAL_FULL7167_SCHEDULE_A_PASS_C3_OPEN",
+      "source": "b0556cb3625316f2169aa6fb11e6b748f790ec66",
+      "tree": "231e1d77a84b31bbb9dde87f8d79d2ae60f00958",
+      "run_id": "rollback-sprint-resume-20261014-085704-6fe33b74",
+      "runtime_and_harness_same_source": true,
+      "actions": 7167,
+      "source_ticks": 3585,
+      "source_draws": 3582,
+      "all_literal_four_port_consumed_PAD_records_equal": true,
+      "C_F_declared_fields_each": 16,
+      "native_retirement": {
+        "attempts": 1,
+        "phase": 0,
+        "running": 0,
+        "host_notification_accepted": true,
+        "observation_cleared": true,
+        "pipeline_cache_before": 1,
+        "pipeline_cache_after": 0
+      },
+      "owned_cleanup": {
+        "browser_pids_absent": 11,
+        "server_absent": true,
+        "groups_absent": true,
+        "owned_tmp_removed": true,
+        "preexisting_processes_not_owned": true
+      },
+      "validation": {
+        "full_tests": 2633,
+        "skips": 180,
+        "failures": 0,
+        "suite_seconds": 557.179,
+        "diagnostic_release": "PASS",
+        "ordinary_release": "PASS",
+        "declared_artifacts_hashed": 88
+      },
+      "host_timing": {
+        "action_loop_ms": 56596.954,
+        "remaining_global_budget_at_loop_entry_ms": 88794,
+        "first_read_complete_count": 7167,
+        "poll_count": 0,
+        "loop_report_persistence": {
+          "attempted_count": 14783,
+          "completed_count": 14783,
+          "failed_count": 0,
+          "serialized_bytes": 2495580073,
+          "timings_ms": {
+            "serialize": {
+              "count": 14783,
+              "total_ms": 4413.928,
+              "mean_ms": 0.299,
+              "p50_ms": 0.294,
+              "p95_ms": 0.343,
+              "max_ms": 5.659
+            },
+            "file_write": {
+              "count": 14783,
+              "total_ms": 3993,
+              "mean_ms": 0.27,
+              "p50_ms": 0.25,
+              "p95_ms": 0.381,
+              "max_ms": 8.197
+            },
+            "rename": {
+              "count": 14783,
+              "total_ms": 1466.223,
+              "mean_ms": 0.099,
+              "p50_ms": 0.093,
+              "p95_ms": 0.126,
+              "max_ms": 8.631
+            },
+            "total": {
+              "count": 14783,
+              "total_ms": 12379.334,
+              "mean_ms": 0.837,
+              "p50_ms": 0.785,
+              "p95_ms": 1.054,
+              "max_ms": 17.381
+            }
+          }
+        },
+        "supervised_elapsed_seconds": 118.8543782918714,
+        "intervals": "Nested inclusive host intervals, not additive or native/GPU cost"
+      },
+      "scope_limits": [
+        "Declared C/F16-field comparison only; not all3501typed original states or per-owner RNG",
+        "Actual native GO membership checked at world84; complete original per-tick state/clock/RNG parity remains unproved.",
+        "No recreation/lifetimeB,C3,rollback,pixel/PCM/live timing acceptance",
+        "No incident recorder coverage claim; ordinary diagnostics only",
+        "JavaScript IDBFS persistence not run; ordinary-unload cache parity not claimed",
+        "Synthetic persistence and historical prefix producers remain distinct; no future-fit guarantee"
+      ],
+      "retained_failures": [
+        "V1 fullschedule route constructed unused prefix encoder; repaired before capture",
+        "Earlier raw receipt was appended after approval; reviewed V2 persists it before ACK with focused failure control",
+        "Read-only root result inspection used incorrect timing key; no capture/source mutation"
+      ],
+      "artifacts": [
+        {
+          "file": "stadium-fullschedule-candidate-v2/manifest-v2.json",
+          "sha256": "fc2522a3cd3664a6387bebb39d47bcdf14e309945e0989d3c6a8edf8e5c5e03c"
+        },
+        {
+          "file": "stadium-fullschedule-integration-v2/root-focused-review.json",
+          "sha256": "e6888738cf24e948d302b99ca4c165f2e3e346b1aa7e27d2bdb08c13e8b105fe"
+        },
+        {
+          "file": "stadium-fullschedule-release-validation-b055-v1/evidence/root-result-review.json",
+          "sha256": "b35ad67818fd011f2e787a578f3ed61e1ca9bdb718625463b644fe508a2e2a30"
+        },
+        {
+          "file": "stadium-fullschedule-release-validation-b055-v1/evidence/full-unittest-suite.log",
+          "sha256": "13d776c1d3a0d5b6c58b52d1ea9a5b200402ab3afdca57fd2bba4bd4cf8bc01b"
+        },
+        {
+          "file": "stadium-fullschedule-release-validation-b055-v1/evidence/runtime-artifact-completeness.json",
+          "sha256": "93c02831602a34636b2c9f59e800567d201aca3bb46ad7f922526b8f59e891db"
+        },
+        {
+          "file": "stadium-full7167-costgate-decision-v1.json",
+          "sha256": "acc04110cc5b442fa1618672d5b30aef23f9152bfb9d22b794c7002c91912399"
+        },
+        {
+          "file": "stadium-full7167-capture-b055-v1/final-launcher-freeze.json",
+          "sha256": "4c49f41bfa7eadd6c608e772c1156ae72c0f51312c10c206c2ccbacc5d228801"
+        },
+        {
+          "file": "stadium-full7167-capture-b055-v1/root-packet-launcher-review.json",
+          "sha256": "9319eb28628915eb35d4e986c0610264ef3d0b131cc12ec116569972ef3923f2"
+        },
+        {
+          "file": "stadium-full7167-capture-b055-v1/root-capture-release.json",
+          "sha256": "09c2f77181b2083aeaee0788cd81014d0cc5b2559c89b22db448dc327a0833d1"
+        },
+        {
+          "file": "stadium-full7167-capture-b055-v1/browser-run/report.json",
+          "sha256": "3cd5c65f43ee11b04d14e557fdc813312552917c649135b9f696447696ba6b04"
+        },
+        {
+          "file": "stadium-full7167-capture-b055-v1/completion.json",
+          "sha256": "3bfffd557d4772a2c1fd5ccc1062e4403ce7a5c408feecdb399bc9a18b2eceaf"
+        },
+        {
+          "file": "stadium-full7167-capture-b055-v1/owner.json",
+          "sha256": "1a7954abdaaba2567bf71d81ca46bd8464437d58eaa38ccb5f2e47ea68e418bb"
+        },
+        {
+          "file": "stadium-full7167-capture-b055-v1/root-raw-result-review.json",
+          "sha256": "d4871d393ab0fb2bdea5307a82ee61bb63203951947b206355a1b4b0c8ee0b7a"
+        },
+        {
+          "file": "stadium-full7167-capture-b055-v1/root-result-inspection-key-error.json",
+          "sha256": "664255e5735af0ac9b069467a5868e519e64bd39fb139e95d61429d38e31e60d"
+        },
+        {
+          "file": "stadium-full7167-capture-b055-v1/independent-result-review-v1.json",
+          "sha256": "1864d1129a0aa31123e06d9c81d0bf18846991a44c353a7aaa431e2ab983eebf"
+        },
+        {
+          "file": "stadium-full7167-capture-b055-v1/root-go-scope-correction.json",
+          "sha256": "a378a3e70239e13e4bb0ab80ab58fc18147ba9f5a1d56cec688ff0bffa505875"
+        },
+        {
+          "file": "stadium-full7167-capture-b055-v1/browser-run/report.json.stadium-c3-action-records-v1.jsonl",
+          "sha256": "38ed76111fdee11fab88b57c5b7150cc0f9d6b607a545f5d6e188d9bf10b61e5"
+        },
+        {
+          "file": "stadium-full7167-capture-b055-v1/browser-run/report.json.stadium-c3-css-sss-history-v1.json",
+          "sha256": "a0532188e6e022a347951dce698f5627e277d7f8e8238359aaf7a5c77c229128"
+        },
+        {
+          "file": "stadium-full7167-capture-b055-v1/independent-result-review-provenance-v1.json",
+          "sha256": "285d08b41fff9a092c92e040d929294b499f97930b5bfb23c050a54d57b40c52"
+        }
+      ],
+      "independent_result_review": {
+        "file": "stadium-full7167-capture-b055-v1/independent-result-review-v1.json",
+        "sha256": "1864d1129a0aa31123e06d9c81d0bf18846991a44c353a7aaa431e2ab983eebf"
+      },
+      "native_GO": {
+        "original_source_tick": 84,
+        "original_first_full_post_GO_source_tick": 85,
+        "original_last_source_tick": 3584,
+        "planned_original_post_GO_ticks": 3500,
+        "native_go_after": {
+          "generation": 3,
+          "world_ticks": 84,
+          "source_frame": 0,
+          "sequence": 3,
+          "callback_index": 3,
+          "source_branch": 0,
+          "map2_gate": 0,
+          "display_mode": 11,
+          "remap_branch": 0,
+          "callback_identity": 1,
+          "hud_enabled": -1
+        },
+        "native_C_world_ticks": 85,
+        "native_F_world_ticks": 86,
+        "scope": "Actual native callback trace retained and accepted by original C/F comparator; source-action world counters and native match-clock frames remain distinct. No complete original per-tick state/clock/RNG parity."
+      },
+      "native_counters": {
+        "final_world_ticks": 3585,
+        "final_match_clock_frames": 3461,
+        "first_match_clock_advance": {
+          "schedule_index": 248,
+          "bundle": 124
+        },
+        "observed_tick_audio_calls": 3585,
+        "observed_tick_audio_frames": 1912000,
+        "claim": "Counters only; no PCM content equality or uninterrupted-audio acceptance"
+      },
+      "journal_verification": {
+        "segments": 14335,
+        "all_dynamic_arrays_equal_inline": true,
+        "frozen_fields_equal_inline": true,
+        "strict_recovery_equal_inline": true,
+        "uncommitted_tail": null,
+        "descriptor_scope": "Independently derived verification descriptor; not a retained intermediate crash checkpoint"
+      }
     }
   }
 }
