@@ -76,6 +76,7 @@ class MatchFrameEffectNativeTests(OwnedWorkspaceTests):
         (self.work / "first-draw-collector-run.log").write_text(run.stdout + run.stderr)
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
         self.assertIn("first-draw actual collector issuing identity and selected map-owner controls passed", run.stdout)
+        self.assertIn("static slot-0 descriptor witness positive, draw-state event, malformed-entry no-healing, identity and lifecycle controls passed", run.stdout)
 
     def test_first_draw_scope_controls(self):
         result = subprocess.run([str(node_runtime(ROOT)), "--test",

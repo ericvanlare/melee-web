@@ -19,6 +19,8 @@ from workspace_resources import operation
 # Future/object bootstrap path. Both are exact isolated-index trees, never an
 # arbitrary locally modified checkout.
 AURORA_PREVIOUS_PATCH_TREES = (
+    # Exact canonical observer predecessor before static slot-0 descriptor retention.
+    "dce8b9ecb931375e636947ec482f881c667d0cde",
     # Exact combined current-main predecessor before schema2 private observation.
     "cdb8ce62675f09c4fb9e7206700b2c270d3414e2",
     "88eb80f1639faddd0963928485ab5d6ac76ceeeb",
