@@ -11059,5 +11059,730 @@
       "The earlier b055 full7167 capture remains a separate producer with its C/F-only comparison; this d3 result is not relabeled as b055 evidence."
     ],
     "next": "C3 remains open. Continue with a separately reviewed per-owner RNG/typed-state ownership boundary and lifetime-B/recreation planning; do not infer acceptance from this same-lifetime comparison."
+  },
+  "stadium_recreation_canary_v6_2026_10_15": {
+    "schema": "stadium-same-instance-recreation-canary-evidence-v1",
+    "result": "FAIL_B_IMPORT_READINESS_TIMEOUT_AFTER_A_AND_CHECKED_CLOSE_RESTART",
+    "scope": "One 174-action lifetime-A proper-prefix route, checked close/RNG return and same-instance restart boundary, followed by a lifetime-B pre-import wait failure. No gameplay completion or C3 acceptance.",
+    "capture": {
+      "run_locator": "stadium-recreation-canary-capture-v6",
+      "runtime_and_harness": {
+        "commit": "cab313edae7f4541db1732457f682d27449bbabf",
+        "tree": "06f039d02fb2bfc0689cb5846d1572f6e00b8192"
+      },
+      "regression_source": {
+        "commit": "402c7d274aad8c43eb3801a7ec1d98ae9493e5cb",
+        "tree": "9b4ef8a2d15aefe279cabbe8ff8073cd5eac4a96"
+      },
+      "overall_decision": "CAPTURE_FINISHED",
+      "capture_return_code": 1,
+      "artifacts": {
+        "root_failure_review": {
+          "path": "stadium-recreation-canary-capture-v6/root-failure-review.json",
+          "bytes": 2557,
+          "sha256": "648f131d35fbfa02ef3cf3e89fc90385152dc15f52ad0b6c528dda7c7ca5364e"
+        },
+        "lifetime_a_report": {
+          "path": "stadium-recreation-canary-capture-v6/browser-run/report-A.json",
+          "bytes": 3320777,
+          "sha256": "cc7adbda61684c9a11bf87db3bb1e4c38dbb0267227e824cfc3db60ffb83564e"
+        },
+        "lifetime_b_report": {
+          "path": "stadium-recreation-canary-capture-v6/browser-run/report-B.json",
+          "bytes": 30446,
+          "sha256": "deaee334b5117755d47615cf7aa7ee19c0ed83342e3c26a2dbfc66bd09dad4f5"
+        },
+        "final_report": {
+          "path": "stadium-recreation-canary-capture-v6/browser-run/report.json",
+          "bytes": 30446,
+          "sha256": "deaee334b5117755d47615cf7aa7ee19c0ed83342e3c26a2dbfc66bd09dad4f5"
+        },
+        "a_close_receipt": {
+          "path": "stadium-recreation-canary-capture-v6/browser-run/recreation-close-A.json",
+          "bytes": 1143,
+          "sha256": "d2bb2c1df11464c44bbdecb41f13625e2e96cc73997059909b4c35b1340ca9c8"
+        },
+        "recreation_summary": {
+          "path": "stadium-recreation-canary-capture-v6/browser-run/recreation-summary.json",
+          "bytes": 3659,
+          "sha256": "60fc7b6807bb99dad5a8014759263faa0f0a0eb8a51c3ab31f72d83934c269f2"
+        },
+        "owner_report": {
+          "path": "stadium-recreation-canary-capture-v6/owner.json",
+          "bytes": 125483,
+          "sha256": "424df87c90e2a3447fd0554b688007aa9b97330ff2b51ce01f4e807256d3ab7f"
+        },
+        "launcher_result": {
+          "path": "stadium-recreation-canary-capture-v6/launcher-result.json",
+          "bytes": 668,
+          "sha256": "ea040b89064c2bd5c927e93c9ba1f2171981a3e4ac999efd9751bdf5c55e14dc"
+        }
+      }
+    },
+    "lifetime_a": {
+      "result": "pass",
+      "completed_actions": 174,
+      "route_elapsed_ms": 9223.080083,
+      "matched_setup_cf_decision": "PASS_RUN2_PROPER_PREFIX_C_F_STATE_ONLY",
+      "matched_setup_cf_actions_completed": 174,
+      "checked_close": {
+        "attempted": true,
+        "closed": true,
+        "match_to_host_restored": true,
+        "host_to_parent_restored": true,
+        "parent_seed": 1,
+        "prior_world_generation": 3
+      },
+      "close_receipt_restarted_field": false,
+      "restart_observation_boundary": "after-A-restart-before-B",
+      "same_instance_observation": [
+        {
+          "boundary": "after-A-restart-before-B",
+          "schema": "melee-web-stadium-instance-identity-v1",
+          "module_same": true,
+          "wasm_exports_same": true,
+          "wasm_memory_same": true,
+          "exported_wrappers_same": true,
+          "heap_buffer_same": false,
+          "memory_buffer_same": false,
+          "memory_buffer_changed": true,
+          "memory_bytes_before": 134217728,
+          "memory_bytes_now": 231997440,
+          "same_instance": true
+        }
+      ]
+    },
+    "lifetime_b": {
+      "result": "failed-before-disc-import",
+      "driver_step": "select-disc",
+      "wait_timeout_ms": 15000,
+      "disc_import_control_disabled_at_failure": true,
+      "route": "NOT_RUN",
+      "report_result": "fail",
+      "failure": "Browser driver waited for the disc-import control during select-disc and timed out after 15 seconds.",
+      "cause": "not assigned; this is the observed stopping boundary, not a causal diagnosis"
+    },
+    "a_archive_integrity": {
+      "final_post_cleanup_verification": {
+        "result": "pass",
+        "checked_after_owned_cleanup": true
+      },
+      "checks": "Frozen A report object, checkpoint sidecars, report file and A close receipt were checked against saved identities after owned cleanup.",
+      "summary_A_archived_bytes_unchanged_after_B_flag": false,
+      "flag_interpretation": "The flag becomes true only after B completes all 174 actions. B did not complete; final A integrity still passed, but no completed A-to-B immutability claim is made."
+    },
+    "cleanup": {
+      "owner_cleanup_passed": true,
+      "owned_process_ids_absent_count": 12,
+      "owned_process_groups_absent_count": 3,
+      "root_review_process_ids_absent": [
+        19460,
+        19553,
+        19564,
+        19575,
+        19602,
+        19603,
+        19608,
+        19618,
+        19620,
+        19621,
+        19627,
+        22100
+      ],
+      "root_review_process_groups_absent": [
+        19460,
+        19553,
+        19564
+      ]
+    },
+    "required_validation_402": {
+      "state": "PASS_REQUIRED_REGRESSION_AND_RETAINED_BUILDS",
+      "source_head": "402c7d274aad8c43eb3801a7ec1d98ae9493e5cb",
+      "source_tree": "9b4ef8a2d15aefe279cabbe8ff8073cd5eac4a96",
+      "runtime_producer_head": "cab313edae7f4541db1732457f682d27449bbabf",
+      "runtime_producer_tree": "06f039d02fb2bfc0689cb5846d1572f6e00b8192",
+      "full_unittest_suite": {
+        "tests": 2635,
+        "skips": 180,
+        "result": {
+          "path": "stadium-recreation-regression-repair-validation-v1/evidence/result.json",
+          "bytes": 5479,
+          "sha256": "11213614f6241dba401fc27c22ca7dbbe19a666f509ab817fc6dab75f4decc44"
+        },
+        "root_review": {
+          "path": "stadium-recreation-regression-repair-validation-v1/evidence/root-result-review.json",
+          "bytes": 2392,
+          "sha256": "6f94469fa94f4f37f2297fa6f480abce17176b007fdd0cb4e779fbf20be261e7"
+        },
+        "log": {
+          "path": "stadium-recreation-regression-repair-validation-v1/evidence/full-unittest-suite.log",
+          "bytes": 497296,
+          "sha256": "1feaff799bc58f5b85d5ff48a6887f75760fb4b20b3b08f0130d777d0f05c5ab"
+        }
+      },
+      "release_builds": [
+        {
+          "profile": "diagnostic",
+          "producer_commit": "cab313edae7f4541db1732457f682d27449bbabf",
+          "artifact_inventory_count_rehashed": 44,
+          "cache_match": true,
+          "build_receipt": {
+            "path": "stadium-recreation-release-validation-v4/evidence/diagnostic-release-build.json",
+            "bytes": 9835,
+            "sha256": "c20848f7edec3608265597e4c7372ee0353d80687f6e27bfe0634e8d80929476"
+          }
+        },
+        {
+          "profile": "ordinary",
+          "producer_commit": "cab313edae7f4541db1732457f682d27449bbabf",
+          "artifact_inventory_count_rehashed": 44,
+          "cache_match": true,
+          "build_receipt": {
+            "path": "stadium-recreation-release-validation-v4/evidence/ordinary-release-build.json",
+            "bytes": 9801,
+            "sha256": "32792a51d6a79f8ec895598facaea62049d14752d6f07e5ec8564597057f9a62"
+          }
+        }
+      ]
+    },
+    "retained_v3_v5_metadata_failures": [
+      {
+        "attempt": "V3",
+        "state": "FAIL_BEFORE_BROWSER_NO_RETRY",
+        "failure_recorded": "Actual matched Setup C/F validator JSON.stringify export-map insertion-order mismatch.",
+        "source_commit": "402c7d274aad8c43eb3801a7ec1d98ae9493e5cb",
+        "runtime_producer_commit": "cab313edae7f4541db1732457f682d27449bbabf",
+        "browser_game_execution": false,
+        "root_failure_review": {
+          "path": "stadium-recreation-canary-capture-v3/root-failure-review.json",
+          "bytes": 761,
+          "sha256": "cffa38110a26e3b4b7d5a47390bbcd7418278aaa0a9d654c4055ea95b1b9bab1"
+        },
+        "launcher_result": {
+          "path": "stadium-recreation-canary-capture-v3/launcher-result.json",
+          "bytes": 542,
+          "sha256": "c3d3ab5474e6ff76cf5a5c15ad9fc9493732cad999a7a838d5aef16f7ee816b8"
+        }
+      },
+      {
+        "attempt": "V4",
+        "state": "FAIL_PREBROWSER_SECOND_ATTEMPT_REDUCER_REQUIRED",
+        "failure_recorded": "loadFirstCssBrowserDrawInputs omitted exact external input identities.",
+        "source_commit": "402c7d274aad8c43eb3801a7ec1d98ae9493e5cb",
+        "runtime_producer_commit": "cab313edae7f4541db1732457f682d27449bbabf",
+        "browser_game_execution": false,
+        "root_failure_review": {
+          "path": "stadium-recreation-canary-capture-v4/root-failure-review.json",
+          "bytes": 562,
+          "sha256": "68fa0f81af32585cf847a7791ae8efa885b1234eb818867495ad456e4e636049"
+        },
+        "launcher_result": {
+          "path": "stadium-recreation-canary-capture-v4/launcher-result.json",
+          "bytes": 666,
+          "sha256": "3391212a2549b995dea5dfac38097260561585db411ea7f8227f64bad19b69fe"
+        }
+      },
+      {
+        "attempt": "V5",
+        "state": "FAIL_BEFORE_CHROME_AFTER_REAL_HTTP_INVENTORY",
+        "failure_recorded": "Missing preflight.producer.browser_artifacts receipt after HTTP inventory; no browser game execution was observed.",
+        "source_commit": "402c7d274aad8c43eb3801a7ec1d98ae9493e5cb",
+        "runtime_producer_commit": "cab313edae7f4541db1732457f682d27449bbabf",
+        "browser_game_execution": false,
+        "root_failure_review": {
+          "path": "stadium-recreation-canary-capture-v5/root-failure-review.json",
+          "bytes": 948,
+          "sha256": "63a3b3bdfe10694e4b6912d7d18ebb713b2bebbb1240d332725b084370d826d0"
+        },
+        "launcher_result": {
+          "path": "stadium-recreation-canary-capture-v5/launcher-result.json",
+          "bytes": 667,
+          "sha256": "03920bdc5d2000a2f4b997d72b91b94d127e568844e4ba228b4bf05c33a42064"
+        }
+      }
+    ],
+    "distinct_prior_full_schedule_evidence": {
+      "receipt_key": "browser_full7167_common_fields_seed_2026_10_14",
+      "runtime_and_harness_commit": "d3daa0e8b506e27ee377b3728d0fdfcf88a82ce9",
+      "runtime_and_harness_tree": "4de18c490360731899bd8ed4395b2ee2a62ecefa",
+      "relationship": "Separate prior full-schedule lifetime-A comparison; this V6 canary does not relabel or replace it."
+    },
+    "limits": [
+      "Lifetime B import and route did not run.",
+      "No A-to-B completed recreation pair or post-B 174-action comparison.",
+      "No Wasm snapshot/restore, full typed-state or per-owner RNG ledger, gameplay validation, or C3 acceptance.",
+      "The V3, V4 and V5 metadata/preflight failures remain retained under their own identities; V6 does not retroactively make them successful."
+    ]
+  },
+  "stadium_recreation_canary_v7_2026_10_15": {
+    "schema": "stadium-same-instance-recreation-canary-evidence-v1",
+    "result": "FAIL_FINALIZER_ENOENT_BEFORE_RESTART_AND_LIFETIME_B",
+    "scope": "One 174-action lifetime-A proper-prefix route with declared C/F comparison, checked native close and accepted host settlement. Finalizer failed before restart; lifetime B did not run.",
+    "capture": {
+      "run_locator": "stadium-recreation-canary-capture-v7",
+      "runtime_and_harness": {
+        "commit": "1d446d10d00dbdb89e3f8a3a17ec7e7fb950b13b",
+        "tree": "12ad5f0a9dbc5a4943561f0d623221d779cdb882"
+      },
+      "test_source": {
+        "commit": "87c4ebf6ef360619c3d6b89e5877764b9939edc3",
+        "tree": "28c133fe1fe3d062f1f49ba131b63fb2086fd097"
+      },
+      "overall_decision": "CAPTURE_FINISHED_WITH_FAILURE",
+      "capture_return_code": 1,
+      "artifacts": {
+        "root_failure_review": {
+          "path": "stadium-recreation-canary-capture-v7/root-failure-review.json",
+          "bytes": 1573,
+          "sha256": "e37937f2f17b71cfdfd16a4dc5cb3eed5b927d4b39d1c06579378937d5dcb1a1"
+        },
+        "independent_result_review": {
+          "path": "stadium-recreation-canary-capture-v7/independent-result-review.json",
+          "bytes": 3404,
+          "sha256": "c3d68824c1dc0a7380369fd6e8fb179bcd859e89fed2dd612dcd73fe2b84f428"
+        },
+        "lifetime_a_report": {
+          "path": "stadium-recreation-canary-capture-v7/browser-run/report-A.json",
+          "bytes": 3320754,
+          "sha256": "0f39b57bbbd72a9dc61bf0dec42ad1f14a4fc90a1c3dcae7882db665a3f8b6dc"
+        },
+        "final_report": {
+          "path": "stadium-recreation-canary-capture-v7/browser-run/report.json",
+          "bytes": 49089,
+          "sha256": "b63d72897f216f5c73f23a8a8515e6214b3fc96fa3bdf7eefc6414dbe9840a6b"
+        },
+        "a_close_receipt": {
+          "path": "stadium-recreation-canary-capture-v7/browser-run/recreation-close-A.json",
+          "bytes": 1141,
+          "sha256": "2d01f8494678496ae65e49f293991a15def736c44f98bf2123be129c3dd98948"
+        },
+        "recreation_summary": {
+          "path": "stadium-recreation-canary-capture-v7/browser-run/recreation-summary.json",
+          "bytes": 4134,
+          "sha256": "4b1f2503e9d323143a8c41a9366a08916a4ee8dc9ed82af082a8305d502fce35"
+        },
+        "owner_report": {
+          "path": "stadium-recreation-canary-capture-v7/owner.json",
+          "bytes": 120808,
+          "sha256": "79a56264d71e3f607d25d46137a01565ce79898103801792bdda01e3e75eb0a3"
+        },
+        "launcher_result": {
+          "path": "stadium-recreation-canary-capture-v7/launcher-result.json",
+          "bytes": 668,
+          "sha256": "1b0889d113b76ec9e06b9ca0f94ec2e1eb21ef5d197ae993bc81dedefd255100"
+        }
+      }
+    },
+    "lifetime_a": {
+      "result": "pass",
+      "completed_actions": 174,
+      "ticks": 87,
+      "draws": 87,
+      "matched_setup_cf_comparison": "PASS_C16_F16",
+      "matched_setup_cf_comparison_method": "unchanged hostEvidenceFromRun2Packet plus compareOriginalIdleSnapshot",
+      "checked_native_close": true,
+      "host_settlement_accepted": true,
+      "match_to_host_rng_restored": true,
+      "host_to_parent_rng_restored": true,
+      "parent_seed": 1,
+      "prior_world_generation": 3,
+      "same_instance_observation": {
+        "module_same": true,
+        "wasm_exports_same": true,
+        "wasm_memory_same": true,
+        "exported_wrappers_same": true,
+        "same_instance": true,
+        "memory_buffer_changed": true,
+        "memory_bytes_before": 134217728,
+        "memory_bytes_now": 231997440
+      }
+    },
+    "failure_boundary": {
+      "phase": "final summary publication before restart",
+      "error": "ENOENT reading recreation-control.json before it had been written",
+      "restart": "NOT_RUN",
+      "lifetime_b": "NOT_RUN",
+      "cause_scope": "The observed failure is the missing report file at finalization; no B import or route result exists."
+    },
+    "a_archive_integrity": {
+      "final_post_cleanup_verification": "PASS",
+      "frozen_a_report_checkpoint_and_close_receipt_unchanged": true,
+      "summary_A_archived_bytes_unchanged_after_B_flag": false,
+      "flag_interpretation": "B did not complete, so no completed A-to-B immutability claim is made."
+    },
+    "cleanup": {
+      "scope": "browser-only cleanup after checked A close; no second native unload claim",
+      "owner_cleanup_passed": true,
+      "owned_process_ids_absent_count": 12,
+      "owned_process_groups_absent_count": 3
+    },
+    "validation": {
+      "initial": {
+        "state": "TWO_RELEASE_BUILDS_PASS_FULL_SUITE_ONE_FIXTURE_FAILURE_RETAINED",
+        "result": {
+          "path": "stadium-recreation-host-settlement-validation-v2/evidence/result.json",
+          "bytes": 29058,
+          "sha256": "5ccfefe187477bc134e86999d0ac068357b4fd34c1bc38d680a664e34bc185ee"
+        },
+        "root_review": {
+          "path": "stadium-recreation-host-settlement-validation-v2/evidence/root-builds-and-failure-review.json",
+          "bytes": 874,
+          "sha256": "b611ed9e976f20b90826113ab59a5c449788e1aafd27a838afa6ea9e71b31f60"
+        },
+        "full_suite_log": {
+          "path": "stadium-recreation-host-settlement-validation-v2/evidence/full-unittest-suite.log",
+          "bytes": 505489,
+          "sha256": "56e1091626edc20de9b43c896042d30265310c1d57739e13a4ae820510493c12"
+        },
+        "builds": [
+          {
+            "profile": "diagnostic",
+            "producer_commit": "1d446d10d00dbdb89e3f8a3a17ec7e7fb950b13b",
+            "artifact_count_rehashed": 44,
+            "receipt": {
+              "path": "stadium-recreation-host-settlement-validation-v2/evidence/diagnostic-release-build.json",
+              "bytes": 9835,
+              "sha256": "a94373b2ba657a8b0f7349dba9253a7b2ca6e51332905d90ed7dd93ef2227cae"
+            }
+          },
+          {
+            "profile": "ordinary",
+            "producer_commit": "1d446d10d00dbdb89e3f8a3a17ec7e7fb950b13b",
+            "artifact_count_rehashed": 44,
+            "receipt": {
+              "path": "stadium-recreation-host-settlement-validation-v2/evidence/ordinary-release-build.json",
+              "bytes": 9800,
+              "sha256": "b6f9bcc2f928379c2863a14002f2dbebbef6141ba0802ac484b433003c66cbb0"
+            }
+          }
+        ],
+        "test_failure": "One test-only terminal callback extraction fixture failed; retained and followed by the successful test-only repair validation."
+      },
+      "subsequent": {
+        "state": "PASS",
+        "source_commit": "87c4ebf6ef360619c3d6b89e5877764b9939edc3",
+        "source_tree": "28c133fe1fe3d062f1f49ba131b63fb2086fd097",
+        "runtime_producer_commit": "1d446d10d00dbdb89e3f8a3a17ec7e7fb950b13b",
+        "runtime_producer_tree": "12ad5f0a9dbc5a4943561f0d623221d779cdb882",
+        "tests": 2636,
+        "skips": 180,
+        "result": {
+          "path": "stadium-recreation-host-settlement-full-regression-v3/evidence/result.json",
+          "bytes": 5479,
+          "sha256": "53e775e020d89aea410918e9347583a3bca2253571cd3a8146a4554f428db06a"
+        },
+        "full_suite_log": {
+          "path": "stadium-recreation-host-settlement-full-regression-v3/evidence/full-unittest-suite.log",
+          "bytes": 497502,
+          "sha256": "7d3e5952ea5a9415296893adf65eea2fbf110f82741770c45f4374356247d6c2"
+        },
+        "root_review": {
+          "path": "stadium-recreation-host-settlement-full-regression-v3/evidence/root-result-review.json",
+          "bytes": 2358,
+          "sha256": "8f2469a6ee1e49812c7421ae88e8fdf04dcda05c8d28995da4636fd112ccb436"
+        },
+        "runtime_and_harness_unchanged_from_1d": true
+      }
+    },
+    "retained_prior_failure": {
+      "attempt": "V6",
+      "result": "B_SELECT_DISC_READINESS_TIMEOUT_AFTER_A_AND_CHECKED_CLOSE_RESTART",
+      "root_failure_review": {
+        "path": "stadium-recreation-canary-capture-v6/root-failure-review.json",
+        "bytes": 2557,
+        "sha256": "648f131d35fbfa02ef3cf3e89fc90385152dc15f52ad0b6c528dda7c7ca5364e"
+      },
+      "launcher_result": {
+        "path": "stadium-recreation-canary-capture-v6/launcher-result.json",
+        "bytes": 668,
+        "sha256": "ea040b89064c2bd5c927e93c9ba1f2171981a3e4ac999efd9751bdf5c55e14dc"
+      },
+      "relationship": "Distinct prior run. V7 stopped before restart and does not replace or explain V6."
+    },
+    "follow_up_candidate": "Source-only finalizer repair exists outside this evidence; it is unvalidated and is not included as a successful result.",
+    "limits": [
+      "No restart or B lifetime.",
+      "No completed A-to-B pair or post-B archive immutability.",
+      "No second native unload.",
+      "No full typed-state/per-owner RNG ledger, pixels/PCM equivalence, or C3 acceptance."
+    ]
+  },
+  "stadium_recreation_canary_v8_2026_10_15": {
+    "schema": "stadium-same-instance-recreation-canary-evidence-v1",
+    "result": "PASS_SHORT_174_ACTION_SAME_INSTANCE_RECREATION_COMPONENT_INDEPENDENTLY_REPLAYED",
+    "scope": "One 174-action lifetime A and one 174-action lifetime B through the existing original Setup/C/F recreation route. This is a short component result, not full idle lifetime or C3 acceptance.",
+    "capture": {
+      "run_locator": "stadium-recreation-canary-capture-v8",
+      "root_review_state": "PASS_RAW_COMPONENT_PENDING_INDEPENDENT_COMPARATOR_REPLAY",
+      "elapsed_ms": 109095.689,
+      "root_review": {
+        "path": "stadium-recreation-canary-capture-v8/root-result-review.json",
+        "bytes": 1603,
+        "sha256": "5028ff83929bc506592e5c0a56e7222524a6db3be0e6df910d3f8a0284c3b429"
+      },
+      "report_a": {
+        "path": "stadium-recreation-canary-capture-v8/browser-run/report-A.json",
+        "bytes": 3320735,
+        "sha256": "2c6d7c3d547f9def1969d75492e71dc29ab46ba507e58854a8c405fa38dec154"
+      },
+      "report_b": {
+        "path": "stadium-recreation-canary-capture-v8/browser-run/report-B.json",
+        "bytes": 3316922,
+        "sha256": "882191bc94d7ee1de42aac86d00541a6935cb653bc7d5a46b3b892b088a5f026"
+      },
+      "final_supervisor_report": {
+        "path": "stadium-recreation-canary-capture-v8/browser-run/report.json",
+        "bytes": 3316922,
+        "sha256": "882191bc94d7ee1de42aac86d00541a6935cb653bc7d5a46b3b892b088a5f026"
+      },
+      "recreation_control": {
+        "path": "stadium-recreation-canary-capture-v8/browser-run/recreation-control.json",
+        "bytes": 15079,
+        "sha256": "88902c85f9eefe6ed283d953777dde06125c16e1f652acd124a7d3c1dea2a2e5"
+      },
+      "recreation_summary": {
+        "path": "stadium-recreation-canary-capture-v8/browser-run/recreation-summary.json",
+        "bytes": 5560,
+        "sha256": "ea29a4ea4388cdf3d57914bff809ca5aeef3a8a5d9dd20cb73cf9fd0af7e428a"
+      },
+      "a_close_receipt": {
+        "path": "stadium-recreation-canary-capture-v8/browser-run/recreation-close-A.json",
+        "bytes": 1143,
+        "sha256": "d2bb2c1df11464c44bbdecb41f13625e2e96cc73997059909b4c35b1340ca9c8"
+      },
+      "a_restart_receipt": {
+        "path": "stadium-recreation-canary-capture-v8/browser-run/recreation-restart-A.json",
+        "bytes": 1489,
+        "sha256": "584e42225a7f4b70351565eac913efecf292b9b89ff66a4a633868ead8c305ca"
+      },
+      "owner_report": {
+        "path": "stadium-recreation-canary-capture-v8/owner.json",
+        "bytes": 143916,
+        "sha256": "1de78172a8c9d4ca4bacdfea79da129a02fc54e5324b8b786f9a6e68fcef97d4"
+      },
+      "launcher_result": {
+        "path": "stadium-recreation-canary-capture-v8/launcher-result.json",
+        "bytes": 669,
+        "sha256": "93e796c2679169a15f295ea33e392fbda9b7e19163225b3328345cb4477a37d2"
+      },
+      "runtime_producer": {
+        "commit": "1d446d10d00dbdb89e3f8a3a17ec7e7fb950b13b",
+        "tree": "12ad5f0a9dbc5a4943561f0d623221d779cdb882"
+      },
+      "browser_harness_source": {
+        "commit": "52b504d0a0a98464fcaa6b576a2f8e44e30e26d0",
+        "tree": "d3dfdd715349d95f5ba0754588a521cfe8c91f4f"
+      },
+      "review_state_note": "The frozen root raw review preceded the separately retained passing independent replay."
+    },
+    "lifetimes": {
+      "A": {
+        "completed_actions": 174,
+        "world_generation": 3
+      },
+      "B": {
+        "completed_actions": 174,
+        "world_generation": 6
+      },
+      "same_instance": true,
+      "module_exports_memory_and_exported_wrappers_same": true,
+      "memory_buffer_changed": true,
+      "memory_bytes_before": 134217728,
+      "memory_bytes_after_growth": 231997440,
+      "frozen_A_report_and_sidecars_unchanged_after_B": true,
+      "final_supervisor_report_equals_B": true,
+      "final_archive_integrity_after_cleanup": "PASS"
+    },
+    "checked_close_and_rng": {
+      "A_native_close": true,
+      "A_host_settlement_accepted": true,
+      "B_rng_restore_admitted": true,
+      "B_world_generation": 6,
+      "B_prior_world_generation": 3,
+      "match_seed_before": 899962297,
+      "match_seed_at_retirement": 1624498540,
+      "host_seed": 1001933907,
+      "parent_seed": 1,
+      "match_to_host_restored": true,
+      "host_to_parent_restored": true,
+      "terminal_checked": true
+    },
+    "independent_comparator_replay": {
+      "state": "PASS_SCOPED_COMPONENT_REPLAY",
+      "review": {
+        "path": "stadium-recreation-canary-capture-v8/independent-result-review.json",
+        "bytes": 7026,
+        "sha256": "59de8910c19ea464b58b23bca3421016cbcadc6e14525f074ebb3c610730cef4"
+      },
+      "summary": {
+        "source_head": "52b504d0a0a98464fcaa6b576a2f8e44e30e26d0",
+        "runtime_producer": "1d446d10d00dbdb89e3f8a3a17ec7e7fb950b13b",
+        "A": {
+          "actions": 174,
+          "ticks": 87,
+          "draws": 87,
+          "world_generation": 3,
+          "C_fields": 16,
+          "F_fields": 16,
+          "journal_segments": 349,
+          "journal_chain_sha256": "c2de283d9df663b5af114a91165d46d439c8671cca3ff4584009e6ce556f66ec",
+          "journal_arrays_equal_terminal": true
+        },
+        "B": {
+          "actions": 174,
+          "ticks": 87,
+          "draws": 87,
+          "world_generation": 6,
+          "C_fields": 16,
+          "F_fields": 16,
+          "journal_segments": 349,
+          "journal_chain_sha256": "f570af377e478d65df1a405e94bd04ea09365efbb6b17f6a32247aa419cef990",
+          "journal_arrays_equal_terminal": true
+        },
+        "same_instance": true,
+        "backing_buffer_grew": true,
+        "immutable_A": true,
+        "supervisor_equals_B": true,
+        "terminal_B_rng_restored": true,
+        "owned_cleanup": true
+      },
+      "observation_limits": {
+        "state": "PASS_SCOPED_COMPONENT_WITH_OBSERVATION_LIMITS",
+        "review": {
+          "path": "stadium-recreation-canary-capture-v8/independent-result-review-addendum-v1.json",
+          "bytes": 3215,
+          "sha256": "8bac2aa3dfdd696223c192e23ebb2fe12370c133598639941a5a3463d36d2d25"
+        },
+        "global_page_console_errors": "The pageErrors and consoleErrors arrays are never reset; the successful B route checks both global arrays empty, covering the close/restart interval. Per-leg report slices alone do not establish this.",
+        "warnings_and_other_console": "There is no separate immutable close/restart warning or ordinary-console export; no zero-gap-warning claim is made.",
+        "gpu_events": "A/B snapshots record Apple Metal 3 adapter availability, WebGPU API availability, a 640x480 canvas, and failure:null. They do not record device-specific uncaptured validation or device-lost events and do not prove there was no GPU lifetime issue."
+      }
+    },
+    "cleanup": {
+      "owner_cleanup_passed": true,
+      "owned_pids_absent_count": 14,
+      "owned_process_groups_absent_count": 3
+    },
+    "validation": {
+      "full_regression": {
+        "state": "PASS",
+        "source_commit": "52b504d0a0a98464fcaa6b576a2f8e44e30e26d0",
+        "source_tree": "d3dfdd715349d95f5ba0754588a521cfe8c91f4f",
+        "runtime_producer_commit": "1d446d10d00dbdb89e3f8a3a17ec7e7fb950b13b",
+        "runtime_producer_tree": "12ad5f0a9dbc5a4943561f0d623221d779cdb882",
+        "tests": 2636,
+        "skips": 180,
+        "result": {
+          "path": "stadium-recreation-progress-publication-full-regression-v1/evidence/result.json",
+          "bytes": 5479,
+          "sha256": "89f4c8a238dc8f0d1ed63779b43bb0db40fb7e7a615c25e5268ab8e0df7a4d56"
+        },
+        "full_suite_log": {
+          "path": "stadium-recreation-progress-publication-full-regression-v1/evidence/full-unittest-suite.log",
+          "bytes": 497604,
+          "sha256": "e1c7ebb0e3920817f31256dd96e4c783da13af4655a89b78e2e28cd8536e8588"
+        },
+        "root_review": {
+          "path": "stadium-recreation-progress-publication-full-regression-v1/evidence/root-result-review.json",
+          "bytes": 2562,
+          "sha256": "2180750e7ac787a18ed0239178dd7f1cc98f594a36291541d52ec842b1eba774"
+        },
+        "runtime_unchanged_from_1d": true,
+        "runtime_harness_test_delta": [
+          "tests/stadium_c1a_browser_test.mjs",
+          "tests/stadium_matched_setup_cf_runner_gate.test.mjs",
+          "tests/test_stadium_recreation_canary_context.mjs"
+        ]
+      },
+      "release_builds": [
+        {
+          "profile": "diagnostic",
+          "runtime_producer": "1d446d10d00dbdb89e3f8a3a17ec7e7fb950b13b",
+          "artifacts_rehashed": 44,
+          "receipt": {
+            "path": "stadium-recreation-host-settlement-validation-v2/evidence/diagnostic-release-build.json",
+            "bytes": 9835,
+            "sha256": "a94373b2ba657a8b0f7349dba9253a7b2ca6e51332905d90ed7dd93ef2227cae"
+          }
+        },
+        {
+          "profile": "ordinary",
+          "runtime_producer": "1d446d10d00dbdb89e3f8a3a17ec7e7fb950b13b",
+          "artifacts_rehashed": 44,
+          "receipt": {
+            "path": "stadium-recreation-host-settlement-validation-v2/evidence/ordinary-release-build.json",
+            "bytes": 9800,
+            "sha256": "b6f9bcc2f928379c2863a14002f2dbebbef6141ba0802ac484b433003c66cbb0"
+          }
+        }
+      ],
+      "retained_initial_fixture_failure": {
+        "root_review": {
+          "path": "stadium-recreation-host-settlement-validation-v2/evidence/root-builds-and-failure-review.json",
+          "bytes": 874,
+          "sha256": "b611ed9e976f20b90826113ab59a5c449788e1aafd27a838afa6ea9e71b31f60"
+        },
+        "suite_result": {
+          "path": "stadium-recreation-host-settlement-validation-v2/evidence/result.json",
+          "bytes": 29058,
+          "sha256": "5ccfefe187477bc134e86999d0ac068357b4fd34c1bc38d680a664e34bc185ee"
+        },
+        "log": {
+          "path": "stadium-recreation-host-settlement-validation-v2/evidence/full-unittest-suite.log",
+          "bytes": 505489,
+          "sha256": "56e1091626edc20de9b43c896042d30265310c1d57739e13a4ae820510493c12"
+        },
+        "failure": "One test-only terminal callback extraction fixture failed; later test-only repair passed. The earlier failure remains retained."
+      }
+    },
+    "historical_short_pair_failures_preserved": [
+      "stadium_recreation_canary_v6_2026_10_15",
+      "stadium_recreation_canary_v7_2026_10_15"
+    ],
+    "limits": [
+      "The independently replayed result is scoped to the retained A/B C/F comparisons; it is not full-B or complete per-tick/per-owner parity.",
+      "No complete typed-state/per-owner RNG ledger, pixels/PCM equivalence, full-schedule A/B, or C3 acceptance.",
+      "Global page and console error arrays cover the close/restart interval, but warning/ordinary-console gap export and device-specific WebGPU validation/loss observation are incomplete."
+    ],
+    "next_full_B_contract": {
+      "state": "SOURCE_ONLY_NEXT_MILESTONE_NOT_EXECUTION_RELEASE",
+      "contract": {
+        "path": "stadium-full-B-next-contract-after-v8-v1.json",
+        "bytes": 3873,
+        "sha256": "d5548fb6a0ba70a1248b36bf1bd288efeb603beb803403f077a59edd316a045c"
+      },
+      "scope": "Keep A174 checkedclose/restart; add a separate explicit full-B common-fields+seed mode, retaining default174 A/B canary and ordinary/full-A paths. No new original recording or general RNG ledger.",
+      "minimum_implementation": [
+        "Reuse admitted fresh B generation/owner handles and existing full7167 payload encoder, exact original packet and retained3501seedsidecar; explicit mode must route both host and native version5 paths, not properprefix encoder.",
+        "Native B before-retire and host context currently hardcode174/properprefix. Extend only explicitfullB dimension contract to7167actions/3585ticks/3582draws and completed3501x16common+seed rows; preserve default174 checks, immutableA approval, sameinstance, persist-beforeACK, checkedterminalclose.",
+        "Reuse existing MatchContext/MenuHost RNG boundary accessors: save actual B entry match/host/outerparent owner+values, verify same admitted pointer/generation at terminal; after match close verify host restored, after host close verify exact outerparent restored. No seedimport/neworiginalgetter/pointernumericcrosscomparison.",
+        "Retain originalGOmembership/C-F/literal4portPAD/draw/source/audio order checks and standard supervisor shape; optionally persist close/restart event slice at existing boundary so warnings/console gap is explicit, without new nativepolling."
+      ],
+      "focused_falsification": [
+        "wrongexplicitmode/payloadversion/dimensions refusebeforearm; default174 unchanged",
+        "wrongpositiveBgeneration, host/parentowner/value change before/aftercallback refuse",
+        "persistfailurebeforeACK, wrong3501rowjoin/seed/floatbits, action/pad/drawchange refuse",
+        "actual full-B terminal receipt binds completedB owner and exact immutableA/restart bytes; no empty/missingreceipt healing"
+      ],
+      "budget": {
+        "unchanged_current_caps_ms": {
+          "work": 150000,
+          "overall": 180000,
+          "cleanup": 30000
+        },
+        "measured_V8_elapsed_ms": 109096.0,
+        "measured_B_loop_start_remaining_work_ms": 43450,
+        "measured_B174_loop_ms": 1547.458,
+        "historical_d3_full7167_common_loop_ms": 58648.289,
+        "historical_producer": "d3daa0e8 fullA commonfields result, separate runtime/harness; not a new fullB timing sample",
+        "simple_replacement_elapsed_estimate_ms": 166196.831,
+        "historical_loop_exceeds_B_available_work_ms": 15198.289,
+        "interpretation": "Estimate is a planning bound comparison, not acceptance or guaranteedfailure. Existing measurements do not admit likely full-B completion within150swork. Do not launch promising fit or extend deadlines silently.",
+        "next_launch_precondition": "Root must explicitly decide either one unchanged-cap partial/full measurement with earlydeadline failure retained, or a changed causal preparation/IO cost hypothesis yielding measured headroom. A longer owner/work budget requires a distinct reviewed protocol/explicit authorization; none is authorized here."
+      },
+      "pass": "One fullB7167 on sameModule/exports/Memory, exact3501x16common+seedvalues against existingoriginal evidence, fullinput/counter/order/C-F/GO checks, immutableA, checkedBparent RNG restoration, finalnative/processcleanup; still scoped originalfields, not completecrossownerRNGledger/live timing/render/audioacceptance.",
+      "stopping_rule": "First mismatch/unsafeownership/IOerror/deadline stops and retains completedprefix; no capextension/autoResume/repeatedunchangedcapture. After2sameboundaryexperiments require reducedfixture.",
+      "remaining_C3": "Original cross-owner RNG parity still needs corresponding retained original owner-boundary evidence (no guessing newownerledger); fullA/B commonfields do not establish allstate/render/PCM/liveperformance."
+    }
   }
 }
