@@ -13,6 +13,13 @@ from check_gameplay import node_runtime
 
 
 class StadiumRecreationCanaryContextTests(OwnedWorkspaceTests):
+    def test_browser_process_cleanup_ownership_and_refusal_controls(self):
+        result = subprocess.run(
+            [str(node_runtime(ROOT)), "--test",
+             str(SOURCE_ROOT / "tests/stadium_browser_process_cleanup.test.mjs")],
+            cwd=ROOT, capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_preparation_attribution_ownership_and_failure_publication(self):
         scratch = self.new_workspace(ROOT, "stadium-preparation-attribution-")
         environment = os.environ.copy()

@@ -426,10 +426,9 @@ let serverOut = null;
 let serverErr = null;
 let serverOutDone = null;
 let serverErrDone = null;
-let browserServer = null;
 let browser = null;
 let browserCdp = null;
-let browserProcess = null;
+let browserProcessPid = null;
 let context = null;
 let page = null;
 let driver = null;
@@ -4442,6 +4441,19 @@ async function runCssSssReducer({startKey, baseUrl, artifacts, before}) {
   report.result = 'pass';
 }
 
+async function waitForBrowserPidAbsent(pid, timeoutMs) {
+  if (!Number.isSafeInteger(pid) || pid <= 0 || !Number.isFinite(timeoutMs) || timeoutMs <= 0)
+    throw Error('Cannot verify Chrome absence without its exact CDP PID and a positive bound');
+  const startedNs = monotonicNowNs();
+  while (true) {
+    try { process.kill(pid, 0); }
+    catch (error) { if (error.code === 'ESRCH') return true; throw error; }
+    const remainingMs = timeoutMs - elapsedMs(startedNs);
+    if (remainingMs <= 0) return false;
+    await new Promise(resolve => setTimeout(resolve, Math.min(25, remainingMs)));
+  }
+}
+
 async function cleanupServer() {
   if (!serverProcess) return;
   const child = serverProcess;
@@ -4641,12 +4653,8 @@ async function main() {
     'Resolved Playwright version differs from frozen preflight');
   const launchConfig = browserLaunchOptions(tools.browser, {headed: false, audible: false,
     timeout: LIMITS.browserLaunchMs});
-  browserServer = await timeout(tools.chromium.launchServer(launchConfig), LIMITS.browserLaunchMs,
-    'Headless installed Chrome launch');
-  browserProcess = browserServer.process();
-  report.cleanup.browser_process_pid = browserProcess.pid ?? null;
-  browser = await timeout(tools.chromium.connect(browserServer.wsEndpoint()),
-    LIMITS.browserLaunchMs, 'Playwright connection to owned Chrome');
+  browser = await timeout(tools.chromium.launch(launchConfig), LIMITS.browserLaunchMs,
+    'Headless installed Chrome direct-local launch');
   const browserVersion = browser.version();
   assert.equal(browserVersion, preflight.browser.version,
     'Installed Chrome changed since the frozen preflight');
@@ -4662,7 +4670,7 @@ async function main() {
     cdp_revision: cdpIdentity.revision, cdp_user_agent: cdpIdentity.userAgent,
     cdp_javascript_version: cdpIdentity.jsVersion,
     playwright_version: playwrightPackage.version, playwright_package_path: tools.playwrightPath,
-    process_pid: browserProcess.pid ?? null, headless: true, speaker_output_muted: true,
+    process_pid: null, headless: true, speaker_output_muted: true,
     audio_processing_disabled: false,
     launch: {headless: launchConfig.headless, chromium_sandbox: launchConfig.chromiumSandbox,
       muted_audio: launchConfig.args.includes('--mute-audio')}};
@@ -4671,6 +4679,13 @@ async function main() {
   assert.ok(Array.isArray(cdpProcesses.processInfo) && cdpProcesses.processInfo.length > 0,
     'Chrome CDP did not report its live process inventory');
   report.browser_process_info = cdpProcesses.processInfo;
+  const cdpBrowserRows = cdpProcesses.processInfo.filter(row => row.type === 'browser');
+  assert.equal(cdpBrowserRows.length, 1, 'CDP must identify exactly one owned browser process');
+  browserProcessPid = cdpBrowserRows[0].id;
+  assert.ok(Number.isSafeInteger(browserProcessPid) && browserProcessPid > 0,
+    'CDP browser process ID is invalid');
+  report.cleanup.browser_process_pid = browserProcessPid;
+  report.browser.process_pid = browserProcessPid;
   report.browser.cdp_process_inventory_count = cdpProcesses.processInfo.length;
   await persistReport();
   context = await timeout(browser.newContext({viewport: {width: 1100, height: 820}, acceptDownloads: false}),
@@ -5214,16 +5229,16 @@ async function cleanupOwnedProcesses() {
     try { await timeout(browser.close(), cleanupRemaining(), 'Browser connection close'); report.cleanup.browser_connection_closed = true; }
     catch (error) { cleanupFailures.push({step: 'browser-connection-close', error: errorText(error)}); }
   }
-  if (browserServer) {
+  if (browser) {
     try {
-      await timeout(browserServer.close(), cleanupRemaining(), 'Owned Chrome process close');
+      report.cleanup.browser_process_terminated = await waitForBrowserPidAbsent(
+        browserProcessPid, Math.min(1000, cleanupRemaining()));
+      if (!report.cleanup.browser_process_terminated)
+        cleanupFailures.push({step: 'browser-process-absence',
+          error: 'Recorded CDP browser PID remains present after close; outer capture owner retains cleanup authority'});
     } catch (error) {
-      cleanupFailures.push({step: 'browser-process-close', error: errorText(error)});
-      try { await timeout(browserServer.kill(), cleanupRemaining(), 'Owned Chrome process kill'); }
-      catch (killError) { cleanupFailures.push({step: 'browser-process-kill', error: errorText(killError)}); }
+      cleanupFailures.push({step: 'browser-process-absence', error: errorText(error)});
     }
-    const proc = browserServer.process();
-    report.cleanup.browser_process_terminated = proc.exitCode !== null || proc.signalCode !== null;
   }
   try { await cleanupServer(); }
   catch (error) { cleanupFailures.push({step: 'server-process-cleanup', error: errorText(error)}); }
