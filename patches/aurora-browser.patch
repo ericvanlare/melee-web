@@ -2869,14 +2869,17 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
  }
  } // namespace aurora::gfx
 diff --git a/lib/gfx/frame.cpp b/lib/gfx/frame.cpp
-index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a37ea1998 100644
+index 9fd83efc28ad8a19c3e902a6efc1096126982583..7b56c3cf0b41b544f57ac6cb28e87dd1ea5ae33c 100644
 --- a/lib/gfx/frame.cpp
 +++ b/lib/gfx/frame.cpp
-@@ -1,7 +1,19 @@
+@@ -1,7 +1,22 @@
 +#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
 +#include "pipeline_provenance_runtime.h"
 +#endif
  #include "frame.hpp"
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++#include "frame_pending_facts.hpp"
++#endif
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
 +#include "frame_effect_observer.hpp"
 +#endif
@@ -2892,7 +2895,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
  #include "recording.hpp"
  #include "render_worker.hpp"
  #include "resource_cache.hpp"
-@@ -16,9 +28,12 @@
+@@ -16,9 +31,12 @@
  #include "../webgpu/gpu_prof.hpp"
  
  #include <array>
@@ -2905,7 +2908,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
  #include <deque>
  #include <mutex>
  #include <optional>
-@@ -27,15 +42,30 @@
+@@ -27,15 +45,30 @@
  #include <utility>
  #include <vector>
  
@@ -2936,7 +2939,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
  namespace {
  constexpr Module Log{"aurora::gfx"};
  
-@@ -49,12 +79,338 @@ enum class BufferMapState {
+@@ -49,12 +82,339 @@ enum class BufferMapState {
  
  std::array<wgpu::Buffer, StagingBufferCount> g_stagingBuffers;
  std::array<std::atomic<BufferMapState>, StagingBufferCount> g_mappingStates;
@@ -3164,6 +3167,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
  uint32_t g_frameIndex = UINT32_MAX;
  
  std::array<FramePacket, FrameSlotCount> g_framePackets;
++
  uint64_t g_nextFrameId = 1;
 -render_worker::FrameSlotPool g_frameSlots{FrameSlotCount};
 -render_worker::FrameSlotPool g_stagingSlots{StagingBufferCount};
@@ -3277,7 +3281,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
  
  struct RuntimeDrawType {
    std::string label;
-@@ -179,12 +535,17 @@ void wait_for_gpu_progress(std::chrono::nanoseconds sleepDuration) {
+@@ -179,12 +539,17 @@ void wait_for_gpu_progress(std::chrono::nanoseconds sleepDuration) {
    if (render_worker::is_idle()) {
      enqueue_process_events();
    }
@@ -3296,7 +3300,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
      return;
    }
  
-@@ -239,6 +600,134 @@ void map_staging_buffer(size_t slot, bool releaseSlotOnCompletion = false) {
+@@ -239,8 +604,184 @@ void map_staging_buffer(size_t slot, bool releaseSlotOnCompletion = false) {
          }
        });
  }
@@ -3430,8 +3434,58 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
 +#endif
  } // namespace
  
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++bool capture_native_recorder_frame_pending(NativeFramePendingFacts& out) noexcept {
++  out={};
++  if(g_frameIndex==UINT32_MAX)return false;
++  NativeRecorderPendingFacts recorder{};
++  copy_native_recorder_pending_facts(recorder);
++  // Do not call browser_submission_status(): it pumps process events.
++  // Packet reset precedes moved-out encoder/callback dispatch; this is facts only.
++  return copy_native_frame_pending_facts(recorder,g_framePackets.data(),active_frame_slot_count(),out);
++}
++bool capture_native_submission_pending(NativeSubmissionPendingFacts& out) noexcept {
++  out={};
++#if defined(AURORA_BROWSER_QUIESCENCE_DIAGNOSTIC)
++  if(g_frameIndex==UINT32_MAX)return false;
++  const auto stamp=[](){
++    NativeSubmissionObservationStamp value{};
++    value.generation=g_browserStagingGeneration.load(std::memory_order_acquire);
++    value.registrationSequence=g_browserSubmissionSequence.load(std::memory_order_acquire);
++    value.callbackSequence=g_browserCallbackSequence.load(std::memory_order_acquire);
++    value.staleCallbackCount=g_browserStaleCallbackCount.load(std::memory_order_acquire);
++    value.queueHandle=reinterpret_cast<uintptr_t>(g_queue.Get());
++    value.lastBeginFrameId=g_resources.stats.lastBeginFrameId;value.lastEndFrameId=g_resources.stats.lastEndFrameId;
++    value.frameIndex=g_frameIndex;
++    value.activeFrameCount=static_cast<uint32_t>(active_frame_slot_count());
++    value.activeStagingCount=static_cast<uint32_t>(active_staging_buffer_count());
++    value.freeFrameCount=static_cast<uint32_t>(g_frameSlots.free_count());
++    value.freeStagingCount=static_cast<uint32_t>(g_stagingSlots.free_count());
++    value.workerIdle=render_worker::is_idle()?1U:0U;
++    value.processEventsQueued=g_processEventsQueued.load(std::memory_order_acquire)?1U:0U;
++    return value;
++  };
++  NativeSubmissionPendingFacts copied{};
++  copied.before=stamp();
++  if(!copied.before.activeFrameCount || copied.before.activeFrameCount>FrameSlotCount ||
++      !copied.before.activeStagingCount || copied.before.activeStagingCount>StagingBufferCount ||
++      copied.before.freeFrameCount>copied.before.activeFrameCount || copied.before.freeStagingCount>copied.before.activeStagingCount ||
++      !capture_native_recorder_frame_pending(copied.packets))return false;
++  for(size_t i=0;i<copied.before.activeStagingCount;++i)copied.owners[i]=g_browserSubmissionOwners.snapshot(i);
++  copied.after=stamp();
++  if(!native_submission_stamp_equal(copied.before,copied.after))return false;
++  copied.schemaVersion=1;copied.ownerBookPresent=1;out=copied;
++  return true; // Copied only. Caller uses native component predicate separately.
++#else
++  return false;
++#endif
++}
++#endif
++
  namespace detail {
-@@ -374,6 +863,9 @@ void unregister_encoder_task_type(EncoderTaskId type) noexcept {
+ 
+ Resources& resources() noexcept { return g_resources; }
+@@ -374,6 +915,9 @@ void unregister_encoder_task_type(EncoderTaskId type) noexcept {
  }
  
  void initialize() {
@@ -3441,7 +3495,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
    g_frameIndex = 0;
    g_processEventsQueued.store(false, std::memory_order_release);
    g_lastPresentNs.store(0, std::memory_order_release);
-@@ -384,7 +876,48 @@ void initialize() {
+@@ -384,7 +928,48 @@ void initialize() {
      std::lock_guard lock{g_presentStatsMutex};
      g_presentTimes.clear();
    }
@@ -3490,7 +3544,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
    // This appears to take a while and blocks the render thread for periods of time
    // render_worker::set_event_pump([] {
    //   if (g_instance) {
-@@ -408,6 +941,19 @@ void initialize() {
+@@ -408,6 +993,19 @@ void initialize() {
          .size = size,
      };
      out = g_device.CreateBuffer(&descriptor);
@@ -3510,7 +3564,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
    };
    createBuffer(g_resources.uniformBuffer, wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst, UniformBufferSize,
                 "Shared Uniform Buffer");
-@@ -418,17 +964,24 @@ void initialize() {
+@@ -418,17 +1016,24 @@ void initialize() {
                 "Shared Index Buffer");
    createBuffer(g_resources.storageBuffer, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst, StorageBufferSize,
                 "Shared Storage Buffer");
@@ -3536,7 +3590,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
  
    {
      constexpr std::array layoutEntries{
-@@ -457,6 +1010,11 @@ void initialize() {
+@@ -457,6 +1062,11 @@ void initialize() {
          .entries = layoutEntries.data(),
      };
      g_resources.staticBindGroupLayout = g_device.CreateBindGroupLayout(&layoutDesc);
@@ -3548,7 +3602,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
      const std::array entries{
          wgpu::BindGroupEntry{
              .binding = 0,
-@@ -474,6 +1032,14 @@ void initialize() {
+@@ -474,6 +1084,14 @@ void initialize() {
          .entries = entries.data(),
      };
      g_resources.staticBindGroup = g_device.CreateBindGroup(&bindGroupDescriptor);
@@ -3563,7 +3617,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
    }
  
    {
-@@ -495,6 +1061,11 @@ void initialize() {
+@@ -495,6 +1113,11 @@ void initialize() {
          .entries = layoutEntries.data(),
      };
      g_resources.uniformBindGroupLayout = g_device.CreateBindGroupLayout(&layoutDesc);
@@ -3575,7 +3629,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
      const std::array entries{
          wgpu::BindGroupEntry{
              .binding = 0,
-@@ -509,6 +1080,11 @@ void initialize() {
+@@ -509,6 +1132,11 @@ void initialize() {
          .entries = entries.data(),
      };
      g_resources.uniformBindGroup = g_device.CreateBindGroup(&bindGroupDescriptor);
@@ -3587,7 +3641,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
    }
  
    gx::initialize();
-@@ -519,6 +1095,10 @@ void initialize() {
+@@ -519,6 +1147,10 @@ void initialize() {
  }
  
  void shutdown() {
@@ -3598,7 +3652,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
    render_worker::synchronize();
    render_worker::shutdown();
    g_processEventsQueued.store(false, std::memory_order_release);
-@@ -548,6 +1128,19 @@ void shutdown() {
+@@ -548,6 +1180,19 @@ void shutdown() {
      g_runtimeEncoderTaskTypes.clear();
      g_freeEncoderTaskTypeSlots.clear();
    }
@@ -3618,7 +3672,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
    g_resources.vertexBuffer = {};
    g_resources.uniformBuffer = {};
    g_resources.indexBuffer = {};
-@@ -556,12 +1149,29 @@ void shutdown() {
+@@ -556,12 +1201,29 @@ void shutdown() {
    for (auto& packet : g_framePackets) {
      packet = {};
    }
@@ -3648,7 +3702,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
    g_frameSlots.reset();
    g_stagingSlots.reset();
    for (auto& state : g_mappingStates) {
-@@ -584,49 +1194,109 @@ bool wait_for_staging_buffer(size_t slot) {
+@@ -584,49 +1246,109 @@ bool wait_for_staging_buffer(size_t slot) {
    }
  }
  
@@ -3679,8 +3733,8 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
    ZoneScopedN("Acquire mapped staging buffer");
 +  const double acquireStarted = phase_now_ms();
 +#ifdef __EMSCRIPTEN__
-+  while (true) {
-+    if (auto slot = g_stagingSlots.try_acquire()) {
+   while (true) {
+     if (auto slot = g_stagingSlots.try_acquire()) {
 +      timing.stagingSlotMs = phase_now_ms() - acquireStarted;
 +      return slot;
 +    }
@@ -3692,8 +3746,8 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
 +    observe_begin_wait(timing, 2, waitStarted, waitEnded);
 +  }
 +#else
-   while (true) {
-     if (auto slot = g_stagingSlots.try_acquire()) {
++  while (true) {
++    if (auto slot = g_stagingSlots.try_acquire()) {
 +      const double mapStarted = phase_now_ms();
        if (wait_for_staging_buffer(*slot)) {
 +        timing.stagingSlotWaitMs += phase_now_ms() - mapStarted;
@@ -3762,7 +3816,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
    size_t bufferOffset = 0;
    const auto& stagingBuf = g_stagingBuffers[*stagingSlot];
    const auto mapBuffer = [&](ByteBuffer& buf, uint64_t size) {
-@@ -643,20 +1313,74 @@ bool begin_frame() {
+@@ -643,20 +1365,74 @@ bool begin_frame() {
    if constexpr (UseTextureBuffer) {
      mapBuffer(frame.textureUpload, TextureUploadSize);
    }
@@ -3837,7 +3891,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
    if (g_cpuFrameStart.time_since_epoch().count() != 0) {
      const auto cpuFrameTime = PresentClock::now() - g_cpuFrameStart;
      update_ema(g_cpuFrameTimeNs, duration_ns(cpuFrameTime));
-@@ -669,15 +1393,59 @@ void end_frame(EndFrameCallback callback) {
+@@ -669,15 +1445,59 @@ void end_frame(EndFrameCallback callback) {
    const uint64_t frameId = frame.frameId;
    end_pipeline_frame();
    ++g_frameIndex;
@@ -3899,7 +3953,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
      packet = {};
      g_resources.stats.drawCallCount = stats.drawCallCount;
      g_resources.stats.mergedDrawCallCount = stats.mergedDrawCallCount;
-@@ -686,15 +1454,468 @@ void end_frame(EndFrameCallback callback) {
+@@ -686,16 +1506,469 @@ void end_frame(EndFrameCallback callback) {
      g_resources.stats.lastIndexSize = stats.lastIndexSize;
      g_resources.stats.lastStorageSize = stats.lastStorageSize;
      g_resources.stats.lastTextureUploadSize = stats.lastTextureUploadSize;
@@ -4328,8 +4382,8 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
 +    return 0;
 +  }
 +  return std::memcmp(captured, current.data(), required) == 0 ? 1 : 0;
-+}
-+
+ }
+ 
 +int browser_quiescence_capture_lease(AuroraBrowserQuiescenceLease* out) noexcept {
 +  if (!browser_quiescence_supported()) {
 +    return 0;
@@ -4355,7 +4409,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
 +    return 0;
 +  }
 +  return quiescence_lease_equal(*lease, current) ? 1 : 0;
- }
++}
 +#else  // AURORA_BROWSER_QUIESCENCE_DIAGNOSTIC
 +bool browser_quiescence_supported() noexcept { return false; }
 +size_t browser_quiescence_descriptor_bytes() noexcept { return 0; }
@@ -4366,10 +4420,11 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
 +int browser_quiescence_validate_lease(const AuroraBrowserQuiescenceLease*) noexcept { return 0; }
 +#endif  // AURORA_BROWSER_QUIESCENCE_DIAGNOSTIC
 +#endif
- 
++
  uint32_t current_frame() noexcept { return g_frameIndex; }
  
-@@ -734,5 +1955,41 @@ float calculate_fps() noexcept {
+ void after_submit() noexcept { depth_peek::after_submit(); }
+@@ -734,5 +2007,41 @@ float calculate_fps() noexcept {
  }
  } // namespace aurora::gfx
  
@@ -4412,12 +4467,17 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..b4265353c5c3334735375d5e9952fe7a
  const AuroraStats* aurora_get_stats() { return &aurora::gfx::detail::resources().stats; }
  float aurora_get_fps() { return aurora::gfx::calculate_fps(); }
 diff --git a/lib/gfx/frame.hpp b/lib/gfx/frame.hpp
-index 0b86ffead6e8f6153d2acf52cf9daecf4f07ccfa..a5ad738b32d623acc50eb06d39589ff0bcd54e3e 100644
+index 0b86ffead6e8f6153d2acf52cf9daecf4f07ccfa..3904b525390161c4f457127d3a2346a6014deaa9 100644
 --- a/lib/gfx/frame.hpp
 +++ b/lib/gfx/frame.hpp
-@@ -7,8 +7,15 @@
+@@ -6,9 +6,20 @@
+ #include <optional>
  
  namespace aurora::gfx::detail {
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++struct NativeFramePendingFacts;
++struct NativeSubmissionPendingFacts;
++#endif
  
 +#ifdef __EMSCRIPTEN__
 +// Browser experiments can use up to four active frame slots. The renderer
@@ -4431,7 +4491,7 @@ index 0b86ffead6e8f6153d2acf52cf9daecf4f07ccfa..a5ad738b32d623acc50eb06d39589ff0
  inline constexpr uint64_t StagingBufferSize = UniformBufferSize + VertexBufferSize + IndexBufferSize +
                                                StorageBufferSize + (UseTextureBuffer ? TextureUploadSize : 0);
  
-@@ -34,7 +41,13 @@ namespace aurora::gfx {
+@@ -34,10 +45,23 @@ namespace aurora::gfx {
  void initialize();
  void shutdown();
  bool begin_frame();
@@ -4445,6 +4505,16 @@ index 0b86ffead6e8f6153d2acf52cf9daecf4f07ccfa..a5ad738b32d623acc50eb06d39589ff0
  uint32_t current_frame() noexcept;
  void after_submit() noexcept;
  void gpu_synchronize();
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++// Caller pauses new native work and reads after the current native call returns.
++// A copied empty snapshot does not establish submission/deferred/GPU quiescence.
++bool capture_native_recorder_frame_pending(detail::NativeFramePendingFacts& out) noexcept;
++// Unsupported without the real quiescence owner book; no event pumping.
++bool capture_native_submission_pending(detail::NativeSubmissionPendingFacts& out) noexcept;
++#endif
+ void after_present() noexcept;
+ float calculate_fps() noexcept;
+ } // namespace aurora::gfx
 diff --git a/lib/gfx/frame_effect_observer.hpp b/lib/gfx/frame_effect_observer.hpp
 new file mode 100644
 index 0000000000000000000000000000000000000000..41adb4123d29c7cec6b6039ddead9e1cd25ceac3
@@ -6351,6 +6421,124 @@ index d50ce6a43a8af6071dc9e810e96e63eccc5c7640..8f7ded5ccb5c5b9d8b845c0b7780b599
    RenderPassList renderPasses;
    std::deque<TextureCopy> textureCopies;
    std::deque<EncoderTask> encoderTasks;
+diff --git a/lib/gfx/frame_pending_facts.hpp b/lib/gfx/frame_pending_facts.hpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..7e454321aa70f773e3756f4269f654defc1fb1c7
+--- /dev/null
++++ b/lib/gfx/frame_pending_facts.hpp
+@@ -0,0 +1,112 @@
++#pragma once
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++#include "frame.hpp"
++#include <type_traits>
++#include "browser_submission_owner.hpp"
++
++namespace aurora::gfx::detail {
++// Copied observations only; no object pointer, ownership or GPU completion claim.
++struct NativeRecorderPendingFacts {
++  uint32_t active=0,inOffscreen=0,hasSuspendedEfbPass=0;
++};
++struct NativeFrameSlotPendingFacts {
++  uint64_t frameId=0;
++  uint64_t renderPassCount=0,textureCopyCount=0,encoderTaskCount=0,opCount=0,textureUploadCount=0,afterSubmitCallbackCount=0;
++  uint64_t vertsBytes=0,uniformsBytes=0,indicesBytes=0,storageBytes=0,textureUploadBytes=0;
++  uint32_t slot=0,frameIndex=0,encoderPresent=0;
++};
++struct NativeFramePendingFacts {
++  uint32_t schemaVersion=0,activeSlotCount=0;
++  NativeRecorderPendingFacts recorder{};
++  std::array<NativeFrameSlotPendingFacts,FrameSlotCount> slots{};
++};
++static_assert(std::is_trivially_copyable_v<NativeFramePendingFacts> && std::is_standard_layout_v<NativeFramePendingFacts>);
++
++inline NativeFrameSlotPendingFacts copy_native_frame_slot_pending_facts(const FramePacket& packet,uint32_t slot) noexcept {
++  NativeFrameSlotPendingFacts out{};
++  out.slot=slot;out.frameId=packet.frameId;out.frameIndex=packet.frameIndex;
++  out.encoderPresent=packet.encoder?1U:0U;
++  out.renderPassCount=packet.renderPasses.size();out.textureCopyCount=packet.textureCopies.size();
++  out.encoderTaskCount=packet.encoderTasks.size();out.opCount=packet.ops.size();
++  out.textureUploadCount=packet.textureUploads.size();out.afterSubmitCallbackCount=packet.afterSubmitCallbacks.size();
++  out.vertsBytes=packet.verts.size();out.uniformsBytes=packet.uniforms.size();out.indicesBytes=packet.indices.size();
++  out.storageBytes=packet.storage.size();out.textureUploadBytes=packet.textureUpload.size();
++  return out;
++}
++// The production getter and focused controls share this exact copier.
++inline bool copy_native_frame_pending_facts(const NativeRecorderPendingFacts& recorder,const FramePacket* packets,
++    size_t activeCount,NativeFramePendingFacts& out) noexcept {
++  out={};
++  if(!packets || activeCount==0 || activeCount>FrameSlotCount || recorder.active>1 || recorder.inOffscreen>1 ||
++      recorder.hasSuspendedEfbPass>1)return false;
++  out.schemaVersion=1;out.activeSlotCount=static_cast<uint32_t>(activeCount);out.recorder=recorder;
++  for(size_t i=0;i<activeCount;++i)out.slots[i]=copy_native_frame_slot_pending_facts(packets[i],static_cast<uint32_t>(i));
++  return true;
++}
++inline bool native_frame_slot_pending_empty(const NativeFrameSlotPendingFacts& row) noexcept {
++  return row.encoderPresent==0 && row.renderPassCount==0 && row.textureCopyCount==0 && row.encoderTaskCount==0 &&
++    row.opCount==0 && row.textureUploadCount==0 && row.afterSubmitCallbackCount==0 && row.vertsBytes==0 &&
++    row.uniformsBytes==0 && row.indicesBytes==0 && row.storageBytes==0 && row.textureUploadBytes==0;
++}
++inline bool native_frame_pending_empty(const NativeFramePendingFacts& facts) noexcept {
++  if(facts.schemaVersion!=1 || facts.activeSlotCount==0 || facts.activeSlotCount>FrameSlotCount ||
++      facts.recorder.active!=0 || facts.recorder.inOffscreen!=0 || facts.recorder.hasSuspendedEfbPass!=0)return false;
++  for(size_t i=0;i<FrameSlotCount;++i){
++    const auto& row=facts.slots[i];
++    if(!native_frame_slot_pending_empty(row))return false;
++    if(i<facts.activeSlotCount){if(row.slot!=i)return false;}
++    else if(row.slot || row.frameId || row.frameIndex)return false;
++  }
++  return true;
++}
++// Native frame-submission component readiness only. This cannot admit a whole
++// paused interval: depth maps, device futures and host deferred work are separate.
++struct NativeSubmissionObservationStamp {
++  uint64_t generation=0,registrationSequence=0,callbackSequence=0,staleCallbackCount=0,queueHandle=0;
++  uint64_t lastBeginFrameId=0,lastEndFrameId=0;
++  uint32_t frameIndex=0,activeFrameCount=0,activeStagingCount=0,freeFrameCount=0,freeStagingCount=0;
++  uint32_t workerIdle=0,processEventsQueued=0;
++};
++struct NativeSubmissionPendingFacts {
++  uint32_t schemaVersion=0,ownerBookPresent=0;
++  NativeFramePendingFacts packets{};
++  NativeSubmissionObservationStamp before{},after{};
++  std::array<BrowserSubmissionOwner,StagingBufferCount> owners{};
++};
++static_assert(std::is_trivially_copyable_v<NativeSubmissionPendingFacts> && std::is_standard_layout_v<NativeSubmissionPendingFacts>);
++inline bool native_submission_stamp_equal(const NativeSubmissionObservationStamp& a,const NativeSubmissionObservationStamp& b) noexcept {
++  return a.generation==b.generation && a.registrationSequence==b.registrationSequence && a.callbackSequence==b.callbackSequence &&
++    a.staleCallbackCount==b.staleCallbackCount && a.queueHandle==b.queueHandle && a.lastBeginFrameId==b.lastBeginFrameId &&
++    a.lastEndFrameId==b.lastEndFrameId && a.frameIndex==b.frameIndex && a.activeFrameCount==b.activeFrameCount &&
++    a.activeStagingCount==b.activeStagingCount && a.freeFrameCount==b.freeFrameCount && a.freeStagingCount==b.freeStagingCount &&
++    a.workerIdle==b.workerIdle && a.processEventsQueued==b.processEventsQueued;
++}
++inline bool native_submission_owner_zero(const BrowserSubmissionOwner& row) noexcept {
++  return row.futureId==0 && row.registrationSequence==0 && row.callbackSequence==0 && row.capturedGeneration==0 &&
++    row.queueHandle==0 && row.encoderHandle==0 && row.state==AURORA_BROWSER_SUBMISSION_IDLE;
++}
++inline bool native_submission_component_ready(const NativeSubmissionPendingFacts& facts) noexcept {
++  const auto& s=facts.before;
++  if(facts.schemaVersion!=1 || facts.ownerBookPresent!=1 || !native_submission_stamp_equal(s,facts.after) ||
++      !s.generation || !s.queueHandle || !s.activeFrameCount || s.activeFrameCount>FrameSlotCount ||
++      !s.activeStagingCount || s.activeStagingCount>StagingBufferCount || s.freeFrameCount>s.activeFrameCount ||
++      s.freeStagingCount>s.activeStagingCount || s.freeFrameCount!=s.activeFrameCount || s.freeStagingCount!=s.activeStagingCount ||
++      s.workerIdle!=1 || s.processEventsQueued!=0 || s.staleCallbackCount!=0 || s.frameIndex==UINT32_MAX ||
++      facts.packets.activeSlotCount!=s.activeFrameCount || !native_frame_pending_empty(facts.packets))return false;
++  for(size_t i=0;i<StagingBufferCount;++i){
++    const auto& row=facts.owners[i];
++    if(i>=s.activeStagingCount || row.state==AURORA_BROWSER_SUBMISSION_IDLE){
++      if(!native_submission_owner_zero(row))return false;
++    }else if(row.state==AURORA_BROWSER_SUBMISSION_COMPLETED){
++      if(row.capturedGeneration!=s.generation || row.queueHandle!=s.queueHandle || !row.encoderHandle || !row.futureId ||
++          !row.registrationSequence || row.registrationSequence>s.registrationSequence || !row.callbackSequence ||
++          row.callbackSequence>s.callbackSequence)return false;
++    }else if(row.state==AURORA_BROWSER_SUBMISSION_IMMEDIATE_RELEASE){
++      if(row.capturedGeneration!=s.generation || row.futureId || row.registrationSequence || row.callbackSequence ||
++          row.queueHandle || row.encoderHandle)return false;
++    }else return false; // REGISTERED, FAILED, stale and unknown are never ready.
++  }
++  return true;
++}
++} // namespace aurora::gfx::detail
++#endif
 diff --git a/lib/gfx/pipeline_cache.cpp b/lib/gfx/pipeline_cache.cpp
 index bff9b4781bd4c7f0e78b4f47b886c6ef6d63b079..52b5ffef6583d22d2d3db7583d0d6ef77b8479ab 100644
 --- a/lib/gfx/pipeline_cache.cpp
@@ -8086,20 +8274,23 @@ index 0000000000000000000000000000000000000000..73b22bcdf71b1dd107ef0e26990fa4cf
 +
 +} // namespace aurora::gfx::selective
 diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
-index d04db0f34210fb56995de0793200c457aaf61233..5dd6fe60b4ccef68190c1c08c97e82ecbacceb9f 100644
+index d04db0f34210fb56995de0793200c457aaf61233..55b9b398ccaca2f38364c4297be8747477c28408 100644
 --- a/lib/gfx/recording.cpp
 +++ b/lib/gfx/recording.cpp
-@@ -2,6 +2,9 @@
+@@ -2,6 +2,12 @@
  
  #include "encoding.hpp"
  #include "frame.hpp"
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++#include "frame_pending_facts.hpp"
++#endif
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
 +#include "frame_effect_observer.hpp"
 +#endif
  #include "resource_cache.hpp"
  
  #include "clear.hpp"
-@@ -19,6 +22,7 @@
+@@ -19,6 +25,7 @@
  #include "../window.hpp"
  
  #include <array>
@@ -8107,7 +8298,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..5dd6fe60b4ccef68190c1c08c97e82ec
  #include <cstring>
  #include <new>
  #include <optional>
-@@ -33,6 +37,7 @@
+@@ -33,6 +40,7 @@
  #include <tracy/Tracy.hpp>
  
  namespace aurora::gfx {
@@ -8115,7 +8306,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..5dd6fe60b4ccef68190c1c08c97e82ec
  using namespace detail;
  
  namespace {
-@@ -69,6 +74,15 @@ struct FrameRecorder {
+@@ -69,6 +77,15 @@ struct FrameRecorder {
  
  FrameRecorder g_recorder;
  
@@ -8131,7 +8322,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..5dd6fe60b4ccef68190c1c08c97e82ec
  std::string pass_label(std::string_view kind) {
  #ifdef AURORA_GFX_DEBUG_GROUPS
    if (!g_recorder.debugGroupStack.empty()) {
-@@ -129,6 +143,9 @@ struct OffscreenCacheKey {
+@@ -129,6 +146,9 @@ struct OffscreenCacheKey {
  struct OffscreenCacheEntry {
    webgpu::TextureWithSampler color;
    webgpu::TextureWithSampler depth;
@@ -8141,7 +8332,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..5dd6fe60b4ccef68190c1c08c97e82ec
  };
  absl::flat_hash_map<OffscreenCacheKey, OffscreenCacheEntry> g_offscreenCache;
  
-@@ -139,6 +156,9 @@ absl::flat_hash_map<OffscreenCacheKey, OffscreenCacheEntry> g_offscreenCache;
+@@ -139,6 +159,9 @@ absl::flat_hash_map<OffscreenCacheKey, OffscreenCacheEntry> g_offscreenCache;
  struct PassSnapshotEntry {
    webgpu::TextureWithSampler color;
    webgpu::TextureWithSampler depth; // R32Float raw depth
@@ -8151,7 +8342,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..5dd6fe60b4ccef68190c1c08c97e82ec
  };
  struct PassSnapshotPool {
    std::vector<PassSnapshotEntry> entries;
-@@ -166,13 +186,26 @@ PassSnapshotEntry& acquire_pass_snapshot(uint32_t width, uint32_t height, bool w
+@@ -166,13 +189,26 @@ PassSnapshotEntry& acquire_pass_snapshot(uint32_t width, uint32_t height, bool w
          .sampleCount = 1,
      };
      auto texture = webgpu::g_device.CreateTexture(&desc);
@@ -8178,7 +8369,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..5dd6fe60b4ccef68190c1c08c97e82ec
    }
    if (wantDepth && (!entry.depth.texture || entry.depth.size.width != width || entry.depth.size.height != height)) {
      const wgpu::TextureDescriptor desc{
-@@ -185,14 +218,31 @@ PassSnapshotEntry& acquire_pass_snapshot(uint32_t width, uint32_t height, bool w
+@@ -185,14 +221,31 @@ PassSnapshotEntry& acquire_pass_snapshot(uint32_t width, uint32_t height, bool w
          .sampleCount = 1,
      };
      auto texture = webgpu::g_device.CreateTexture(&desc);
@@ -8210,7 +8401,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..5dd6fe60b4ccef68190c1c08c97e82ec
    return entry;
  }
  
-@@ -213,6 +263,9 @@ StagingHighWater current_high_water(const FramePacket& frame) noexcept {
+@@ -213,6 +266,9 @@ StagingHighWater current_high_water(const FramePacket& frame) noexcept {
  
  FrameOp capture_frame_op(FramePacket& frame, FrameOpType type, uint32_t index) {
    FrameOp op{
@@ -8220,7 +8411,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..5dd6fe60b4ccef68190c1c08c97e82ec
        .type = type,
        .index = index,
        .renderPass =
-@@ -327,9 +380,13 @@ void encode_draw(void* payload, const wgpu::RenderPassEncoder& pass, const Rende
+@@ -327,9 +383,13 @@ void encode_draw(void* payload, const wgpu::RenderPassEncoder& pass, const Rende
  
  template <auto Renderer, InlinePayload T>
  DrawCommand make_draw_command(const T& data) {
@@ -8236,7 +8427,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..5dd6fe60b4ccef68190c1c08c97e82ec
    std::memcpy(command.payload.data(), &data, sizeof(data));
    return command;
  }
-@@ -342,6 +399,10 @@ void push_draw_command(DrawCommand data) {
+@@ -342,6 +402,10 @@ void push_draw_command(DrawCommand data) {
  OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
    OffscreenCacheKey key{width, height};
    if (const auto it = g_offscreenCache.find(key); it != g_offscreenCache.end()) {
@@ -8247,7 +8438,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..5dd6fe60b4ccef68190c1c08c97e82ec
      return it->second;
    }
    const auto colorFormat = webgpu::g_graphicsConfig.surfaceConfiguration.format;
-@@ -357,7 +418,15 @@ OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
+@@ -357,7 +421,15 @@ OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
        .sampleCount = 1,
    };
    auto colorTexture = webgpu::g_device.CreateTexture(&colorDesc);
@@ -8263,7 +8454,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..5dd6fe60b4ccef68190c1c08c97e82ec
    webgpu::TextureWithSampler color{
        .texture = std::move(colorTexture),
        .view = std::move(colorView),
-@@ -375,7 +444,15 @@ OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
+@@ -375,7 +447,15 @@ OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
        .sampleCount = 1,
    };
    auto depthTexture = webgpu::g_device.CreateTexture(&depthDesc);
@@ -8279,7 +8470,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..5dd6fe60b4ccef68190c1c08c97e82ec
    webgpu::TextureWithSampler depth{
        .texture = std::move(depthTexture),
        .view = std::move(depthView),
-@@ -385,8 +462,15 @@ OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
+@@ -385,8 +465,15 @@ OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
    OffscreenCacheEntry entry{
        .color = std::move(color),
        .depth = std::move(depth),
@@ -8295,11 +8486,16 @@ index d04db0f34210fb56995de0793200c457aaf61233..5dd6fe60b4ccef68190c1c08c97e82ec
    return insertIt->second;
  }
  
-@@ -530,6 +614,15 @@ void enqueue_pass(FramePacket& frame, uint32_t passIndex) {
+@@ -530,6 +617,20 @@ void enqueue_pass(FramePacket& frame, uint32_t passIndex) {
  
  namespace detail {
  
 +bool recording_active() noexcept { return g_recorder.active(); }
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++void copy_native_recorder_pending_facts(NativeRecorderPendingFacts& out) noexcept {
++  out={g_recorder.packet?1U:0U,g_recorder.inOffscreen?1U:0U,g_recorder.suspendedEfbPass?1U:0U};
++}
++#endif
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
 +bool frame_effect_recording_identity(uint32_t& frameIndex, uint64_t& frameId) noexcept {
 +  if (!g_recorder.active()) { frameIndex = 0; frameId = 0; return false; }
@@ -8311,7 +8507,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..5dd6fe60b4ccef68190c1c08c97e82ec
  void begin_recording(FramePacket& packet, size_t frameSlot) {
    CHECK(!g_recorder.active(), "A recording session is already active");
    g_recorder.packet = &packet;
-@@ -584,6 +677,10 @@ RecordedFrame end_recording() {
+@@ -584,6 +685,10 @@ RecordedFrame end_recording() {
  }
  
  void shutdown_recording() {
@@ -8322,7 +8518,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..5dd6fe60b4ccef68190c1c08c97e82ec
    for (auto& pool : g_passSnapshotPools) {
      pool = {};
    }
-@@ -634,7 +731,8 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
+@@ -634,7 +739,8 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
                                 wgpu::TexelCopyTextureInfo tex, wgpu::Extent3D size) {
    const auto copyBytesPerRow = AURORA_ALIGN(bytesPerRow, 256);
    auto& frame = current_frame_packet();
@@ -8332,7 +8528,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..5dd6fe60b4ccef68190c1c08c97e82ec
      const auto range = push_texture_data(data, bytesPerRow, rowsPerImage);
      const wgpu::TexelCopyBufferLayout layout{
          .offset = range.offset,
-@@ -645,14 +743,52 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
+@@ -645,14 +751,52 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
      return;
    }
  
@@ -8386,7 +8582,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..5dd6fe60b4ccef68190c1c08c97e82ec
    auto* dst = static_cast<uint8_t*>(buffer.GetMappedRange(0, uploadSize));
    for (uint32_t row = 0; row < rowsPerImage; ++row) {
      memcpy(dst, data, bytesPerRow);
-@@ -660,6 +796,7 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
+@@ -660,6 +804,7 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
      dst += copyBytesPerRow;
    }
    buffer.Unmap();
@@ -8394,7 +8590,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..5dd6fe60b4ccef68190c1c08c97e82ec
  
    const wgpu::TexelCopyBufferLayout layout{
        .offset = 0,
-@@ -877,6 +1014,9 @@ RenderTargetLayout get_render_target_layout() noexcept {
+@@ -877,6 +1022,9 @@ RenderTargetLayout get_render_target_layout() noexcept {
  }
  
  void clear_caches() noexcept {
@@ -8405,14 +8601,18 @@ index d04db0f34210fb56995de0793200c457aaf61233..5dd6fe60b4ccef68190c1c08c97e82ec
    clear_bind_group_cache();
  }
 diff --git a/lib/gfx/recording.hpp b/lib/gfx/recording.hpp
-index cd2b794159d0daeca9dc0092300e0e808d2f5de4..e1b85f5fa8817ce669d5c4e0c24ca5cc91e67086 100644
+index cd2b794159d0daeca9dc0092300e0e808d2f5de4..4bf358ba4c5b641c5ccfc4ada13f510a59098e3f 100644
 --- a/lib/gfx/recording.hpp
 +++ b/lib/gfx/recording.hpp
-@@ -17,6 +17,10 @@ struct RecordedFrame {
+@@ -17,6 +17,14 @@ struct RecordedFrame {
  void begin_recording(FramePacket& packet, size_t frameSlot);
  RecordedFrame end_recording();
  void shutdown_recording();
 +bool recording_active() noexcept;
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++struct NativeRecorderPendingFacts;
++void copy_native_recorder_pending_facts(NativeRecorderPendingFacts& out) noexcept;
++#endif
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
 +bool frame_effect_recording_identity(uint32_t& frameIndex, uint64_t& frameId) noexcept;
 +#endif
