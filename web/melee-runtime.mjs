@@ -132,6 +132,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   let terminalDrawDiscardRetirementConsumed = false;
   let terminalMatchedSetupCfRetirementObserved = false;
   let terminalMatchedSetupCfRetirementConsumed = false;
+  let stadiumRecreationCloseSettled = false;
   let diagnostics = null, diagnosticActive = true, longtaskObserver = null, diagnosticPreparationAt = null;
   let diagnosticDelivery = null, diagnosticDeliveryTimer = null, diagnosticRetainedLoaded = false;
   let diagnosticMatureDeliveryPromise = null;
@@ -723,6 +724,39 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       else publish();
       if (diagnosticActive !== false) return false;
       terminalMatchedSetupCfRetirementConsumed = true;
+      return true;
+    },
+    // Private nonterminal canary boundary. Read native state only after the
+    // generated Asyncify idle predicate; never consume terminal retirement or
+    // hide B's native state. Ordinary unload/terminal paths stay unchanged.
+    menuStadiumRecreationClosed(receipt) {
+      if (!ready || fatal || destroyed || stadiumRecreationCloseSettled ||
+          terminalMatchedSetupCfRetirementObserved || terminalMatchedSetupCfRetirementConsumed ||
+          busy || assetTransfer || commands.length || (loading && loading.phase !== 'native')) return false;
+      try {
+        if (Module.stadiumMatchedSetupNativeIdle?.() !== true ||
+            typeof Module._melee_web_native_menu_stadium_recreation_status !== 'function' ||
+            typeof Module._melee_web_native_menu_phase !== 'function' ||
+            typeof Module._melee_web_native_menu_running !== 'function' ||
+            typeof Module.UTF8ToString !== 'function') return false;
+        const state = receipt?.matched_setup_cf;
+        if (receipt?.schema !== 'melee-web-stadium-recreation-boundary-v1' ||
+            receipt.attempted !== true || receipt.closed !== true || receipt.restarted !== false || receipt.error !== null ||
+            receipt.match_to_host_restored !== true || receipt.host_to_parent_restored !== true ||
+            !Number.isSafeInteger(receipt.prior_world_generation) || receipt.prior_world_generation <= 0 ||
+            ['match_seed', 'host_seed', 'parent_seed'].some(key => !Number.isInteger(receipt[key]) || receipt[key] < 0 || receipt[key] > 0xffffffff) ||
+            state?.schema !== 'melee-web-stadium-source-action-native-v2' ||
+            state.scope !== 'proper-prefix-next-draw-tick-draw' || state.action_count !== 174 || state.cursor !== 174 ||
+            state.state !== 'complete' || state.complete !== true || state.failed !== false || state.error !== null ||
+            state.queued !== false || state.awaiting_approval !== false) return false;
+        const pointer = Module._melee_web_native_menu_stadium_recreation_status();
+        if (!pointer || JSON.stringify(JSON.parse(Module.UTF8ToString(pointer))) !== JSON.stringify(receipt) ||
+            Module._melee_web_native_menu_phase() !== 0 || Module._melee_web_native_menu_running() !== 0) return false;
+      } catch { return false; }
+      if (preparationLabel || loading?.phase === 'native') callbacks.menuPreparationCanceled();
+      else publish();
+      if (diagnosticActive !== false) return false;
+      stadiumRecreationCloseSettled = true;
       return true;
     },
     menuFrame(wasRunning) {

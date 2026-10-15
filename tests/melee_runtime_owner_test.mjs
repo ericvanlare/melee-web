@@ -1,12 +1,14 @@
 /** Lifecycle unit evidence with a controlled native boundary, not gameplay validation. */
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {createRuntimeAudio} from '../web/runtime-audio.mjs';
 const withAudio = !process.argv.includes('--silent');
-const stadiumRetirementCase = process.argv.find(value => value.startsWith('--stadium-retirement-case='))?.split('=')[1] || '';
+const stadiumRecreationSettlementCase = process.argv.find(value => value.startsWith('--stadium-recreation-settlement-case='))?.split('=')[1] || '';
+const stadiumRetirementCase = process.argv.find(value => value.startsWith('--stadium-retirement-case='))?.split('=')[1] || (['busy-asset-transfer','disc-loading','handoff-loading'].includes(stadiumRecreationSettlementCase) ? stadiumRecreationSettlementCase : '');
 const stadiumExpectSettled = process.argv.includes('--stadium-retirement-expect-settled');
 const cacheUnavailable = process.argv.includes('--cache-unavailable');
 const failMkdir = process.argv.includes('--mkdir-failure');
@@ -479,6 +481,68 @@ assert.equal(player.getState().canImport, false,
   'Import remains disabled until the first post-main frame reports cache readiness');
 rendererStarted = true;
 window.menuFrame(false);
+if (stadiumRecreationSettlementCase) {
+  // Actual mountMeleeRuntime, controlled native endpoints only. This does not
+  // claim actual MatchContext/MenuHost close, which the browser canary owns.
+  const receipt = {schema:'melee-web-stadium-recreation-boundary-v1',attempted:true,
+    closed:true,restarted:false,error:null,prior_world_generation:3,match_seed:39,host_seed:29,parent_seed:19,
+    match_to_host_restored:true,host_to_parent_restored:true,
+    matched_setup_cf:{schema:'melee-web-stadium-source-action-native-v2',scope:'proper-prefix-next-draw-tick-draw',
+      action_count:174,cursor:174,state:'complete',complete:true,failed:false,error:null,queued:false,awaiting_approval:false}};
+  let reads=0;const nativePhase=Module._melee_web_native_menu_phase,nativeRunning=Module._melee_web_native_menu_running;
+  Module._melee_web_native_menu_phase=()=>{++reads;return nativePhase();};
+  Module._melee_web_native_menu_running=()=>{++reads;return nativeRunning();};
+  Module.stadiumMatchedSetupNativeIdle=()=>true;
+  Module._melee_web_native_menu_stadium_recreation_status=()=>{++reads;return JSON.stringify(receipt);};
+  window.menuPreparation('Preparing original next scene...',true);
+  let heldImport=null;
+  if(stadiumRecreationSettlementCase==='queued-command') {
+    owner.boundary(()=>1).catch(()=>{});
+  } else if(stadiumRecreationSettlementCase==='busy-asset-transfer') {
+    window.menuPreparationCanceled();await pump(player.importDisc({name:'stadium-asset-session-seed'}));
+    window.menuAssetsRequested(17);await Promise.resolve();
+  } else if(['disc-loading','handoff-loading'].includes(stadiumRecreationSettlementCase)) {
+    window.menuPreparationCanceled();heldImport=player.importDisc({name:'stadium-held-disc'});heldImport.catch(()=>{});
+    for(let i=0;!globalThis.releaseStadiumDiscRead&&i<100;++i){window.menuServiceCommands();await new Promise(resolve=>setImmediate(resolve));}
+    assert.equal(typeof globalThis.releaseStadiumDiscRead,'function');
+  } else if(stadiumRecreationSettlementCase==='unsafe-idle') Module.stadiumMatchedSetupNativeIdle=()=>false;
+  else if(stadiumRecreationSettlementCase==='missing-idle') delete Module.stadiumMatchedSetupNativeIdle;
+  else if(stadiumRecreationSettlementCase==='active-native') {phase=3;running=true;}
+  else if(stadiumRecreationSettlementCase==='fatal-owner') owner.stop(Error('controlled fatal owner'));
+  const before=player.getState();assert.equal(before.canImport,false);
+  let submitted=structuredClone(receipt);
+  if(stadiumRecreationSettlementCase==='foreign-receipt')submitted.parent_seed++;
+  if(stadiumRecreationSettlementCase==='invalid-receipt') {
+    for(const change of [x=>x.schema='wrong',x=>x.restarted=true,x=>x.prior_world_generation=0,
+      x=>x.matched_setup_cf.cursor=173,x=>x.match_to_host_restored=false,x=>x.parent_seed=-1]) {
+      const bad=structuredClone(receipt);change(bad);const count=reads;
+      assert.equal(owner.callbacks.menuStadiumRecreationClosed(bad),false);assert.equal(reads,count);
+      assert.equal(player.getState().canImport,false);
+    }
+  }
+  const runnerSource=await fs.readFile(new URL('./stadium_c1a_browser_test.mjs',import.meta.url),'utf8');
+  const callbackMarker='const hostSettlement = await timeout(page.evaluate(receipt => {';
+  const callbackStart=runnerSource.indexOf(callbackMarker);
+  const callbackEnd=runnerSource.indexOf('}, close.receipt)',callbackStart);
+  assert(callbackStart>=0&&callbackEnd>callbackStart);
+  const callbackText=runnerSource.slice(callbackStart+callbackMarker.indexOf('receipt => {'),callbackEnd+1);
+  const actualPageCallback=vm.runInThisContext(`(${callbackText})`);
+  const priorReads=reads;
+  const accepted=stadiumRecreationSettlementCase==='settled'
+    ? actualPageCallback(submitted).accepted : owner.callbacks.menuStadiumRecreationClosed(submitted);
+  const callReads=reads-priorReads;
+  const shouldAccept=['settled','invalid-receipt'].includes(stadiumRecreationSettlementCase);
+  assert.equal(accepted,shouldAccept);const after=player.getState();
+  if(shouldAccept){assert.equal(after.canImport,true);assert.equal(after.loading,null);assert.notEqual(after.state,'preparing');
+    assert.equal(owner.callbacks.menuStadiumRecreationClosed(receipt),false,'one-use close settlement');
+    phase=3;running=true;const b=player.getState();assert.equal(b.phase,3);assert.equal(b.running,true,'B native state remains visible; terminal flags untouched');
+  } else {
+    assert.equal(after.canImport,false);assert.equal(after.loading,before.loading);
+    if(['queued-command','busy-asset-transfer','disc-loading','handoff-loading','unsafe-idle','missing-idle','fatal-owner'].includes(stadiumRecreationSettlementCase))assert.equal(callReads,0,'refusal before native reads');
+  }
+  console.log('STADIUM_RECREATION_SETTLEMENT_RESULT '+JSON.stringify({case:stadiumRecreationSettlementCase,accepted,before_canImport:before.canImport,after_canImport:after.canImport,native_reads:callReads}));
+  process.exit(0);
+}
 if (stadiumRetirementCase) {
   const validReceipt = () => ({
     schema: 'melee-web-stadium-matched-setup-cf-retirement-v1',

@@ -48,6 +48,14 @@ class SharedRuntimeOwnerTests(unittest.TestCase):
     def test_native_command_audio_and_teardown_boundaries(self):
         self.run_owner([])
 
+    def test_stadium_recreation_host_close_settlement(self):
+        for case in ['settled', 'invalid-receipt', 'foreign-receipt', 'unsafe-idle',
+                     'missing-idle', 'active-native', 'queued-command',
+                     'busy-asset-transfer', 'disc-loading', 'handoff-loading', 'fatal-owner']:
+            with self.subTest(case=case):
+                self.run_owner(['--silent', '--stadium-recreation-settlement-case=' + case],
+                               'STADIUM_RECREATION_SETTLEMENT_RESULT')
+
     def test_stadium_retirement_clean_owner(self):
         self.run_owner(['--silent', '--stadium-retirement-case=clean'],
                        'STADIUM_RETIREMENT_RESULT')

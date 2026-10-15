@@ -3706,6 +3706,17 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
   recreationSummary.close_receipt = {path: 'recreation-close-A.json',
     sha256: recreationCloseFileSha256, identity: recreationCloseIdentity};
 
+  const hostSettlement = await timeout(page.evaluate(receipt => {
+    const module = globalThis.Module;
+    if (module?.stadiumMatchedSetupNativeIdle?.() !== true ||
+        typeof globalThis.menuStadiumRecreationClosed !== 'function')
+      throw Error('A host settlement requires the returned private idle boundary');
+    return {accepted: globalThis.menuStadiumRecreationClosed(receipt) === true};
+  }, close.receipt), Math.min(5000, remaining()), 'Settle only closed A native preparation in host owner');
+  assert.equal(hostSettlement.accepted, true, 'Checked nonterminal A host settlement was refused');
+  recreationSummary.close_receipt.host_settlement = hostSettlement;
+  await persistRecreationSummary();
+
   const restartStartedNs = monotonicNowNs();
   const restart = await timeout(page.evaluate(async () => {
     const module = globalThis.Module;
@@ -3736,6 +3747,15 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
   recreationRestartIdentity = restart.identity;
   const restartNativeMs = elapsedMs(restartStartedNs);
   const closeRestartMs = elapsedMs(closeRestartStartedNs);
+  const restartBytes = `${JSON.stringify(restart)}\n`;
+  const restartPath = path.join(output, 'recreation-restart-A.json');
+  const restartTemporary = `${restartPath}.tmp`;
+  await fs.writeFile(restartTemporary, restartBytes);
+  await fs.rename(restartTemporary, restartPath);
+  recreationSummary.restart_receipt = {path: path.basename(restartPath),
+    bytes: Buffer.byteLength(restartBytes), sha256: digest(restartBytes), identity: restart.identity};
+  await persistRecreationSummary();
+
   await page.evaluate(({helperKey, receipt}) => {
     globalThis[helperKey].acceptRestart(receipt);
   }, {helperKey: recreationHelperKey, receipt: restart.receipt});
