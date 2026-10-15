@@ -27,8 +27,29 @@ int main(){
  REQUIRE(!o->issue_texture_readonly_guard(pair,91,5,8,16));
  REQUIRE(!o->issue_texture_readonly_guard(pair,91,4,9,16));
  REQUIRE(!o->issue_texture_readonly_guard(pair,91,4,8,0));REQUIRE(issued==1);
- o->detach_owned_texture_ref(91,pair);REQUIRE(detached==1);
+ using Witness=BrowserFrameEffectObserver::SelectedSampledTextureWitness;
+ Witness witness{};
+ REQUIRE(!o->selected_sampled_texture_witness(witness));
+ auto select=[&](){o->request_selected_sampled_texture();o->observe_selected_sampled_texture(0,pair,91,4,8,16,0,181);};
+ select();REQUIRE(o->selected_sampled_texture_witness(witness));
+ REQUIRE(witness.owner==91 && witness.texture==4 && witness.view==8 && witness.device==12 && witness.frameId==181 && witness.slot==0);
+ REQUIRE(o->issue_selected_sampled_texture(pair,91,4,8,16));REQUIRE(issued==2);
+ REQUIRE(!o->issue_selected_sampled_texture(pair,91,4,8,16));REQUIRE(issued==2);
+ select();REQUIRE(!o->issue_selected_sampled_texture(pair,92,4,8,16));REQUIRE(issued==2);
+ select();REQUIRE(!o->issue_selected_sampled_texture(pair,91,5,8,16));REQUIRE(issued==2);
+ // Authentic newly created token, including reused raw identities, cannot replace selection.
+ auto replacement=o->observe_owned_texture_creation(o->TextureRefTextureRole,0,4,12,td);
+ auto replacementPair=o->observe_owned_texture_view_creation(replacement,8,4,12,nullptr);
+ o->bind_owned_texture_ref(91,replacementPair,4,8,0);
+ select();REQUIRE(!o->issue_selected_sampled_texture(replacementPair,91,4,8,16));REQUIRE(issued==2);
+ select();o->detach_owned_texture_ref(91,pair);REQUIRE(detached==1);
+ REQUIRE(!o->selected_sampled_texture_witness(witness));
+ REQUIRE(!o->issue_selected_sampled_texture(pair,91,4,8,16));REQUIRE(issued==2);
+ select();o->end_persistent_attachment_lifetime(12);o->begin_persistent_attachment_lifetime(24);
+ REQUIRE(!o->issue_selected_sampled_texture(pair,91,4,8,16));REQUIRE(issued==2);
+ o->end_persistent_attachment_lifetime(24);o->begin_persistent_attachment_lifetime(12);
+
  o->end_persistent_attachment_lifetime(12);REQUIRE(!o->issue_texture_readonly_guard(pair,91,4,8,16));
  o->begin_persistent_attachment_lifetime(12);REQUIRE(!o->issue_texture_readonly_guard(pair,91,4,8,16));
- REQUIRE(epochs==3);return 0;
+ REQUIRE(epochs==7);return 0;
 }
