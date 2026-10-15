@@ -11784,5 +11784,958 @@
       "stopping_rule": "First mismatch/unsafeownership/IOerror/deadline stops and retains completedprefix; no capextension/autoResume/repeatedunchangedcapture. After2sameboundaryexperiments require reducedfixture.",
       "remaining_C3": "Original cross-owner RNG parity still needs corresponding retained original owner-boundary evidence (no guessing newownerledger); fullA/B commonfields do not establish allstate/render/PCM/liveperformance."
     }
+  },
+  "stadium_recreation_canary_v9_2026_10_15": {
+    "capture": {
+      "artifacts": {
+        "close_a": {
+          "bytes": 1143,
+          "path": "stadium-preparation-attribution-capture-v9/browser-run/recreation-close-A.json",
+          "sha256": "fc793afec660b48a543a6c56017bf17b34825873c969a0c76838312d0c5f98b1"
+        },
+        "executor_receipt": {
+          "bytes": 103088,
+          "path": "stadium-preparation-attribution-capture-v9/executor-result-receipt.json",
+          "sha256": "d66bfaa36adeed90835b23d002013d1956e09dae5f9e06170c996360d5589356"
+        },
+        "independent_replay": {
+          "bytes": 10626,
+          "path": "stadium-preparation-attribution-capture-v9-independent-review-v1/independent-result-review.json",
+          "sha256": "d4e9a2fe53fab6005526625c5f87daf8baac13b2115631ec0168f6e467392649"
+        },
+        "launcher_result": {
+          "bytes": 669,
+          "path": "stadium-preparation-attribution-capture-v9/launcher-result.json",
+          "sha256": "95caafa3ab6bedebe8a7483a59a4b61b4b832cb33db2f6225a10352ec5e519e7"
+        },
+        "owner_report": {
+          "bytes": 132047,
+          "path": "stadium-preparation-attribution-capture-v9/owner.json",
+          "sha256": "022019e4d2747257898e9c37cbb7743d8e22be74f7740e328ba7e62d52da8ce3"
+        },
+        "recreation_summary": {
+          "bytes": 5557,
+          "path": "stadium-preparation-attribution-capture-v9/browser-run/recreation-summary.json",
+          "sha256": "b1b62b896ba196a4b35506647e780901297a3a9e59663d9b5052ea79ce4e94b9"
+        },
+        "report_a": {
+          "bytes": 3328308,
+          "path": "stadium-preparation-attribution-capture-v9/browser-run/report-A.json",
+          "sha256": "ed91d9c5d46679600250d09512e78be3f09c6d6c7b99c407074f7423a09490ab"
+        },
+        "report_b": {
+          "bytes": 3324390,
+          "path": "stadium-preparation-attribution-capture-v9/browser-run/report-B.json",
+          "sha256": "213894ed65ea31fe5bfca701b7f0677317ae44ce866926fedfbb1c82f4ad9d9e"
+        },
+        "restart_a": {
+          "bytes": 1489,
+          "path": "stadium-preparation-attribution-capture-v9/browser-run/recreation-restart-A.json",
+          "sha256": "2563fa53d0a10627c0d41b1daf9ba790955719582ef78ac5e15f7960f0f32eba"
+        },
+        "root_independent_acceptance": {
+          "bytes": 1074,
+          "path": "stadium-preparation-attribution-capture-v9/root-independent-review-acceptance.json",
+          "sha256": "1a4cace71dbee1f0c54fda424c4966b452f243dc386a7ddffc1dc757c24c7e7d"
+        },
+        "supervisor_report": {
+          "bytes": 3324390,
+          "path": "stadium-preparation-attribution-capture-v9/browser-run/report.json",
+          "sha256": "213894ed65ea31fe5bfca701b7f0677317ae44ce866926fedfbb1c82f4ad9d9e"
+        }
+      },
+      "elapsed_ms": 113703.376,
+      "return_code": 0,
+      "run_locator": "stadium-preparation-attribution-capture-v9",
+      "runtime_producer": {
+        "commit": "1d446d10d00dbdb89e3f8a3a17ec7e7fb950b13b",
+        "tree": "12ad5f0a9dbc5a4943561f0d623221d779cdb882"
+      },
+      "source_and_harness": {
+        "commit": "f9577a71f8c2837acefb799175823407441fae08",
+        "role": "capture/test harness source",
+        "tree": "0425802a5d0c4e158b2bf730ddaea50200a94372"
+      }
+    },
+    "checked_close_restart_and_rng": {
+      "A_host_settlement_accepted": true,
+      "A_native_close": true,
+      "A_report_and_sidecars_unchanged_after_B": true,
+      "B_terminal_rng": {
+        "host_to_parent_restored": true,
+        "match_to_host_restored": true,
+        "prior_world_generation": 3,
+        "terminal_checked": true,
+        "world_generation": 6
+      },
+      "backing_buffer_changed": true,
+      "exported_wrappers_same": true,
+      "host_to_parent_restored": true,
+      "match_to_host_restored": true,
+      "memory_bytes_after_growth": 231997440,
+      "memory_bytes_before": 134217728,
+      "module_same": true,
+      "parent_seed": 1,
+      "prior_world_generation": 3,
+      "same_instance": true,
+      "wasm_exports_same": true,
+      "wasm_memory_same": true
+    },
+    "cleanup": {
+      "cdp_attribution_complete": true,
+      "final_archive_integrity_after_cleanup": true,
+      "owned_pids_absent_count": 13,
+      "owned_process_groups_absent_count": 3,
+      "owner_cleanup_passed": true
+    },
+    "independent_comparator_replay": {
+      "A_journal_chain_sha256": "ca6fa5f002a00b84914a544bd4e8e0904e52e0fdba89d83fe0504fa2d6b7d187",
+      "B_journal_chain_sha256": "a9895576e310b9fa37c2aec1e500f556921023ad3bbcbca7bd1e7a7a368fb71a",
+      "journal_arrays_equal_terminal": true,
+      "journal_segments_per_lifetime": 349,
+      "method": "Retained V8 comparator replayed against V9 A/B reports and current matched-Setup/C/F consumer.",
+      "review_artifact": "stadium-preparation-attribution-capture-v9-independent-review-v1/independent-result-review.json",
+      "review_sha256": "d4e9a2fe53fab6005526625c5f87daf8baac13b2115631ec0168f6e467392649",
+      "state": "PASS_COMPONENT_REPLAY_ONLY",
+      "supervisor_report_equals_B": true
+    },
+    "lifetimes": {
+      "A": {
+        "C_fields": 16,
+        "F_fields": 16,
+        "actions": 174,
+        "draws": 87,
+        "result": "pass",
+        "route_elapsed_ms": 8530.939834,
+        "ticks": 87,
+        "world_generation": 3
+      },
+      "B": {
+        "C_fields": 16,
+        "F_fields": 16,
+        "actions": 174,
+        "draws": 87,
+        "result": "pass",
+        "route_elapsed_ms": 8386.245708,
+        "ticks": 87,
+        "world_generation": 6
+      },
+      "external_requests": 0,
+      "literal_four_port_PAD_and_action_order": "PASS",
+      "one_audio_render_call_per_source_tick": "PASS",
+      "report_console_errors": 0,
+      "report_page_errors": 0
+    },
+    "limits": [
+      "No full-B 7,167-action A/B run.",
+      "Complete typed state and same-original per-owner RNG parity remain open.",
+      "No full C3 acceptance, rollback restore, pixels/PCM equivalence, public-player performance, or physical/audible gate.",
+      "V6 and V7 failures remain historical; V8 remains a separate prior successful short pair."
+    ],
+    "preparation_attribution": {
+      "A": {
+        "created_delta": 0,
+        "import_minus_scene_prepare_ms": 44294.983582904635,
+        "import_total_ms": 44565.508583,
+        "queued_delta": 0,
+        "scene_prepare_at_ms": 47186.58500003815,
+        "scene_prepare_construct_ms": 270.52500009536743,
+        "scene_prepare_entry_ms": 0,
+        "scene_prepare_total_ms": 270.52500009536743,
+        "select_disc_ms": 44005.589833
+      },
+      "B": {
+        "created_delta": 0,
+        "import_minus_scene_prepare_ms": 44870.626375,
+        "import_total_ms": 45122.376375,
+        "queued_delta": 0,
+        "scene_prepare_at_ms": 101115.83500003815,
+        "scene_prepare_construct_ms": 251.75,
+        "scene_prepare_entry_ms": 0,
+        "scene_prepare_total_ms": 251.75,
+        "select_disc_ms": 44542.90275
+      },
+      "graphics_startup": {
+        "cache_idle": 1,
+        "created_pipelines": 890,
+        "graphics_status_to_cache_idle_ms": 2113.51,
+        "mount_to_graphics_ready_ms": 2356.545,
+        "renderer_init_ms": 95.42999982833862,
+        "startup_elapsed_ms": 2250.0049996376038,
+        "terminal": true
+      },
+      "interpretation": "The import spans are 44.6\u201345.1 s, but the one observed scene-prepare constructor callback is 0.25\u20130.27 s. The arithmetic remainder is outside that callback measurement and is not attributed to disc IO, archive decode, audio decode, or any specific subsystem.",
+      "schema": "melee-web-stadium-import-preparation-attribution-v1",
+      "scope": "Existing construction publication plus JS-only startup fields/UserTiming; no new native read or IO attribution."
+    },
+    "preserved_history": [
+      "stadium_recreation_canary_v6_2026_10_15",
+      "stadium_recreation_canary_v7_2026_10_15",
+      "stadium_recreation_canary_v8_2026_10_15"
+    ],
+    "result": "PASS_SHORT_174_ACTION_SAME_INSTANCE_RECREATION_INDEPENDENTLY_REPLAYED",
+    "schema": "stadium-same-instance-recreation-canary-evidence-v1",
+    "scope": "One 174-action lifetime A and one 174-action lifetime B through the existing original Setup/C/F recreation route, with existing constructor and JavaScript startup attribution sampled. Component-only; not full-B or C3 acceptance.",
+    "separate_bare_file_transport_probes": {
+      "direct_local": {
+        "browser_api": "chromium.launch (direct local browser connection), unlike V9 remote Playwright transport.",
+        "driver_select_disc_ms": 51.99241600000005,
+        "elapsed_ms": 1071,
+        "groups_absent": 2,
+        "owner_cleanup_passed": true,
+        "owner_sha256": "c15528257ed5e7a248ce6a437669e104d2c60691f2afb9e105bdf9f7d49fdff6",
+        "pids_absent": 9,
+        "receipt_sha256": "caf0c52b6aff99392a96813f8aac058adff14b7f027e9d194d70e591ad99967c",
+        "report_sha256": "c711345238c64d164e799329c67fb8e32f5c6c93a8121e83d7ae6fa673bf765a",
+        "reselection_performed": false,
+        "run_locator": "stadium-file-selection-attribution-execution-v1",
+        "set_input_files_ms": 24.369500000000016,
+        "state": "PASS_BARE_FILE_ONLY"
+      },
+      "inference_limit": "The remote bare-page probe isolates substantial test-harness file-transfer time, but it is a separate run with no game module/native import. It does not prove the remote transfer accounts for all V9 import time or establish a public-player startup optimization.",
+      "remote_v9_exact_route": {
+        "browser_api": "chromium.launchServer + chromium.connect; same remote transport branch used by V9.",
+        "console_errors": 0,
+        "driver_select_disc_ms": 38213.534292,
+        "enabled_wait_ms": 22.889083,
+        "groups_absent": 2,
+        "has_runtime_module": false,
+        "header_bytes": 64,
+        "header_read_and_hash_ms": 4.579999923706055,
+        "owner_cleanup_passed": true,
+        "owner_sha256": "f86b5b29f28ac4a73459ae4f1ccbee49784cf84ceaa3f36387b0b861db7527bc",
+        "page_errors": 0,
+        "pids_absent": 10,
+        "probe_source_sha256": "a4bddcdd8cbc2cc9526ab1b1c5906f16a9624e0eb12e96adba77aaa4a08aac6d",
+        "receipt_sha256": "88a05fd241d838dd720969f64b65ba0f57d108fa746d3814e43b560be4d9418d",
+        "report_sha256": "4a45659d64b975051eadbcd71e60d94405f59a7ece09d9960c870c3d721b6120",
+        "root_comparison_review_sha256": "e7d9ce1edda8aef2356159149eaea627ab79d07b4ecf8c8f08582642de92870d",
+        "run_locator": "stadium-file-selection-attribution-execution-v2",
+        "same_file_and_header_hash_equal": true,
+        "same_file_reselection_ms": 1.8499999046325684,
+        "scope_correction": {
+          "path": "stadium-file-selection-attribution-executor-v2/source-route-correction.json",
+          "sha256": "4e276df1a9a173d357cb75771eca6f745a156c793443b5549229d1e69fdaf3fc"
+        },
+        "set_input_files_ms": 38188.233125,
+        "state": "PASS_BARE_FILE_ONLY",
+        "total_probe_ms": 38928
+      }
+    },
+    "validation_scope_note": "This V9 record binds harness f957 and runtime producer 1d. It does not transfer the prior V8 52b full-suite result onto f957."
+  },
+  "stadium_direct_local_transport_preparation_2026_10_15": {
+    "state": "PASS_REQUIRED_REGRESSION_AND_SCOPED_V10_OBSERVATION",
+    "scope": "Test-transport change only; historicalV9 capturef957/runtime1d preserved. V10actualshortpair measured direct-local transport; no native/cache/File reuse change.",
+    "implementation": {
+      "commit": "0a2579ce8399a143af9350a1f4aa1dbc5b5a7f13",
+      "tree": "5f777b40f9d28974ebec477dad6ef87d2ab9b46e",
+      "files": [
+        "tests/stadium_c1a_browser_test.mjs",
+        "tests/stadium_browser_process_cleanup.test.mjs",
+        "tests/test_stadium_recreation_canary_context.py"
+      ],
+      "candidate": {
+        "path": "stadium-direct-local-launch-candidate-v2/manifest.json",
+        "bytes": 5077,
+        "sha256": "83688f42a68acc38cee6c6e1b2b7c045b4b72259fc786f6bf7acc1ef541d292c"
+      },
+      "focused_result": {
+        "path": "stadium-direct-local-launch-candidate-v2/execution-v1/run/completion.json",
+        "bytes": 1103,
+        "sha256": "b211eb770c1ac1909a713c8a6e8b23f75723c0571f2a8640d39de493abab46a2"
+      },
+      "root_focused_review": {
+        "path": "stadium-direct-local-launch-candidate-v2/root-focused-review.json",
+        "bytes": 455,
+        "sha256": "c7f695eda80bf3358600563768fdfd6aac9dce1727dc5f28fe0727f0cba59dd0"
+      },
+      "integration": {
+        "path": "stadium-direct-local-launch-candidate-v2/integration.json",
+        "bytes": 621,
+        "sha256": "bde6626bb2ea69455ea5b7818e3784fca47c85f0a49302264021e33c0fcb4679"
+      },
+      "behavior": "Directlocal chromium.launch using existing browser_tools; unique actual CDP browserPID; browser.close then monotonic bounded signal0-only absence. Outer unchanged capture owner owns fallback. No synthetic process/privateAPI/by-name cleanup."
+    },
+    "runtime_producer_unchanged": {
+      "commit": "1d446d10d00dbdb89e3f8a3a17ec7e7fb950b13b",
+      "tree": "12ad5f0a9dbc5a4943561f0d623221d779cdb882",
+      "artifact_count": {
+        "diagnostic": 44,
+        "ordinary": 44
+      },
+      "claim": "Historical successful Release artifacts retained; no rebuild performed for test-transport change."
+    },
+    "retained_failed_full_regression_v1": {
+      "state": "FAIL",
+      "source_head": "0a2579ce8399a143af9350a1f4aa1dbc5b5a7f13",
+      "tests": 2638,
+      "skips": 180,
+      "failures": 1,
+      "errors": 0,
+      "elapsed_seconds": 562.468,
+      "result": {
+        "path": "stadium-direct-local-launch-full-regression-v1/evidence/result.json",
+        "bytes": 110689,
+        "sha256": "04d3bef2ce304e764dee9c08330f9ac6a649c1964f3c7183fbf4fc1a6136f604"
+      },
+      "log": {
+        "path": "stadium-direct-local-launch-full-regression-v1/evidence/full-unittest-suite.log",
+        "bytes": 501152,
+        "sha256": "83f62a47de3e349ad1524301167e1a1e22c408791c6d365dfa73088edf08446c"
+      },
+      "first_failure": "Existing runner-gate extracted-finally VM fixture omitted new waitForBrowserPidAbsent/browserProcessPid and still supplied BrowserServer double; browser_process_terminated assertion failed. No native/game failure inferred."
+    },
+    "test_only_repair": {
+      "commit": "98e4a4bf2131704b4e5b321c2aa7b794864abefb",
+      "tree": "f8b56032191cd2e4c316234b7f033b43babe8797",
+      "file": "tests/stadium_matched_setup_cf_runner_gate.test.mjs",
+      "file_sha256": "b3514e8b386287aad1218ec7e6c2313ee757b9f138b2ff7c9874725a404fb197",
+      "independent_source_review": {
+        "path": "stadium-direct-local-finally-fixture-repair-v1/independent-source-review.json",
+        "bytes": 719,
+        "sha256": "77857120941d200865a839ed81f06f78264e69e111631e0e92133b6104486026"
+      },
+      "focused_result": {
+        "path": "stadium-direct-local-finally-fixture-repair-v1/focused/result.json",
+        "bytes": 688,
+        "sha256": "1457b8e06910b6c1b854f8f38b87256e0324d771db80157c7032180a59fe9c89"
+      },
+      "integration": {
+        "path": "stadium-direct-local-finally-fixture-repair-v1/integration.json",
+        "bytes": 431,
+        "sha256": "94f0646519a90ba0e40a945202769bb8a1c1ceac049fa9d4568fbfc530424c6f"
+      },
+      "focused_state": "PASS_ACTUAL_RUNNER_GATE_AND_RECREATION_WRAPPERS",
+      "scope": "Actual helper extraction and timing imports; exactPID signal0-only ESRCH afterbrowserclose; all nativeunsafe/error/persistence assertions preserved."
+    },
+    "current_full_regression_v2": {
+      "state": "PASS",
+      "source_head": "98e4a4bf2131704b4e5b321c2aa7b794864abefb",
+      "source_tree": "f8b56032191cd2e4c316234b7f033b43babe8797",
+      "run_locator": "stadium-direct-local-launch-full-regression-v2",
+      "result": {
+        "path": "stadium-direct-local-launch-full-regression-v2/evidence/result.json",
+        "bytes": 110714,
+        "sha256": "706c25d3e4e19065777f428edbd7a5a6539f4e2af733e82106f11b1df6893ebd"
+      },
+      "root_review": {
+        "path": "stadium-direct-local-launch-full-regression-v2/evidence/root-result-review.json",
+        "bytes": 2998,
+        "sha256": "a10da38dff210b260ddc3466d1fee178825b6f29e08e3e461da8f14adbc4bf30"
+      },
+      "tests": 2638,
+      "skips": 180,
+      "elapsed_seconds": 584.057,
+      "suite_log": {
+        "path": "stadium-direct-local-launch-full-regression-v2/evidence/full-unittest-suite.log",
+        "bytes": 497620,
+        "sha256": "057282ffc6a98e9cec8a837a713c6726e0f2a316aa9f9fb719397de9fefc5381"
+      }
+    },
+    "V10": {
+      "state": "PASS_SHORT_PAIR_INDEPENDENTLY_REPLAYED",
+      "preparer": {
+        "path": "stadium-direct-local-launch-packet-v10-preparation-v2/freeze.json",
+        "bytes": 1414,
+        "sha256": "43254ba518c9bd625ab7d47e44c6858aee09b6bf463242439112e917f54903c1"
+      },
+      "launch_prerequisite": "Actual current fullsuitePASS + independent rootreview + explicit packet/capture release",
+      "route": "Unchanged174A/checkedclose/restart/174B, original input/native/RNG/archive checks",
+      "limits_ms": {
+        "work": 150000,
+        "owner": 180000,
+        "cleanup": 30000
+      },
+      "packet": {
+        "path": "stadium-direct-local-launch-capture-packet-v10/manifest-final.json",
+        "bytes": 19244,
+        "sha256": "1d7762c5fb9edf31d2571f7b0458dd4a4389e1491acd43f27743b5611ec5854c"
+      },
+      "independent_result_review": {
+        "path": "stadium-direct-local-launch-capture-v10-independent-review-v1/independent-result-review.json",
+        "bytes": 10844,
+        "sha256": "c31d34ebac785bcbe4edc2cb53e8e0eb4de7338c5481278114f6d0ddf1054f6b"
+      }
+    },
+    "acceptance": {
+      "actual_runtime_transport_improvement": "OBSERVED_IN_ONE_SHORT_PAIR_ONLY",
+      "full_B": "NOT_RUN",
+      "C3": "OPEN",
+      "public_player_performance": "NOT_CLAIMED"
+    }
+  },
+  "stadium_recreation_canary_v10_2026_10_15": {
+    "schema": "stadium-same-instance-recreation-canary-evidence-v1",
+    "state": "PASS_SHORT_PAIR_INDEPENDENTLY_REPLAYED",
+    "scope": "One unchanged174A/checkedclose/restart/174B with directlocal Playwright transport; no fullB/C3 acceptance.",
+    "source_and_harness": {
+      "head": "98e4a4bf2131704b4e5b321c2aa7b794864abefb",
+      "tree": "f8b56032191cd2e4c316234b7f033b43babe8797",
+      "implementation_head": "0a2579ce8399a143af9350a1f4aa1dbc5b5a7f13"
+    },
+    "runtime_producer": {
+      "head": "1d446d10d00dbdb89e3f8a3a17ec7e7fb950b13b",
+      "tree": "12ad5f0a9dbc5a4943561f0d623221d779cdb882"
+    },
+    "capture_elapsed_ms": 26907.308,
+    "historical_V9_elapsed_ms": 113703.376,
+    "separate_run_elapsed_reduction_ms": 86796.068,
+    "replay": {
+      "state": "PASS_COMPONENT_REPLAY_ONLY",
+      "legs": [
+        {
+          "label": "A",
+          "actions": 174,
+          "ticks": 87,
+          "draws": 87,
+          "comparisons": [
+            {
+              "phase": "C",
+              "fields": 16
+            },
+            {
+              "phase": "F",
+              "fields": 16
+            }
+          ],
+          "world_generation": 3,
+          "journal_segments": 349,
+          "journal_chain_sha256": "ca6fa5f002a00b84914a544bd4e8e0904e52e0fdba89d83fe0504fa2d6b7d187",
+          "journal_arrays_equal_terminal": true
+        },
+        {
+          "label": "B",
+          "actions": 174,
+          "ticks": 87,
+          "draws": 87,
+          "comparisons": [
+            {
+              "phase": "C",
+              "fields": 16
+            },
+            {
+              "phase": "F",
+              "fields": 16
+            }
+          ],
+          "world_generation": 6,
+          "journal_segments": 349,
+          "journal_chain_sha256": "a9895576e310b9fa37c2aec1e500f556921023ad3bbcbca7bd1e7a7a368fb71a",
+          "journal_arrays_equal_terminal": true
+        }
+      ],
+      "close_parent_seed": 1,
+      "terminal_B_rng": {
+        "schema": "melee-web-stadium-recreation-b-rng-v1",
+        "admitted": true,
+        "world_generation": 6,
+        "prior_world_generation": 3,
+        "match_seed_before": 899962297,
+        "match_seed_at_retirement": 1624498540,
+        "host_seed": 1001933907,
+        "parent_seed": 1,
+        "match_to_host_restored": true,
+        "host_to_parent_restored": true,
+        "terminal_checked": true
+      },
+      "same_instance": true,
+      "backing_buffer_grew": true,
+      "immutable_A": true,
+      "supervisor_equals_B": true,
+      "owned_cleanup": true,
+      "restore": false,
+      "C3": false
+    },
+    "preparation_attribution": {
+      "A": {
+        "import_total_ms": 567.672458,
+        "select_disc_ms": 6.868167,
+        "construction": {
+          "role": "A",
+          "at_ms": 2844.055000305176,
+          "kind": "scene-prepare",
+          "total_ms": 265.9650001525879,
+          "construct_ms": 265.9650001525879,
+          "entry_ms": 0,
+          "queued_delta": 0,
+          "created_delta": 0,
+          "wasm_heap_bytes": 193331200
+        },
+        "action_loop_ms": 1431.393,
+        "global_remaining_work_at_loop_start_ms": 133806,
+        "poll_wait_count": 0,
+        "page_errors": [],
+        "console_errors": [],
+        "console_warnings": [],
+        "native_retired": null,
+        "cleanup_failures": []
+      },
+      "B": {
+        "import_total_ms": 572.676292,
+        "select_disc_ms": 12.605208,
+        "construction": {
+          "role": "B",
+          "at_ms": 11683.269999980927,
+          "kind": "scene-prepare",
+          "total_ms": 239.1399998664856,
+          "construct_ms": 239.1399998664856,
+          "entry_ms": 0,
+          "queued_delta": 0,
+          "created_delta": 0,
+          "wasm_heap_bytes": 231997440
+        },
+        "action_loop_ms": 1338.909,
+        "global_remaining_work_at_loop_start_ms": 125172,
+        "poll_wait_count": 0,
+        "page_errors": [],
+        "console_errors": [],
+        "console_warnings": [],
+        "native_retired": true,
+        "cleanup_failures": []
+      }
+    },
+    "close_restart_ms": 31.348834,
+    "cleanup": {
+      "owner_cleanup_passed": true,
+      "owned_pids_absent": [
+        36256,
+        36286,
+        36288,
+        36308,
+        36312,
+        36313,
+        36314,
+        36315,
+        36323,
+        36324,
+        36325,
+        36329,
+        36339,
+        36348
+      ],
+      "owned_groups_absent": [
+        36256,
+        36286,
+        36288
+      ]
+    },
+    "errors_scope": "A/control/B retained reports and capture log inspected; global error arrays are never reset and actual source asserts them empty. No separately retained close/restart warning/device-lost/error-scope observer; no stronger GPU closure claim.",
+    "next_full_B_gate": {
+      "decision": "MEASURED_HEADROOM_SUPPORTS_ONE_UNCHANGED_CAP_PROBE_AFTER_SOURCE_AND_VALIDATION_REVIEW",
+      "limits_ms": {
+        "work": 150000,
+        "owner": 180000,
+        "cleanup": 30000
+      },
+      "B_loop_start_remaining_ms": 125172,
+      "historical_full_A_common_loop_ms": 58648.289,
+      "historical_full_A_producer": "d3daa0e8 (separate source/runtime/harness)",
+      "planning_headroom_difference_ms": 66523.71100000001,
+      "simple_replacement_total_estimate_ms": 84216.688,
+      "limitations": "Planning comparison only, not measured fullB or guaranteedfit. FullB candidate/source/build/focused/fullregression/packet review and explicit oneattempt release still required. No capextension/autoresume."
+    },
+    "acceptance": {
+      "full_B": "NOT_RUN",
+      "complete_original_per_owner_RNG": "OPEN",
+      "C3": "OPEN",
+      "public_player_performance": "NOT_CLAIMED"
+    },
+    "artifacts": {
+      "launcher-result.json": {
+        "path": "stadium-direct-local-launch-capture-v10/launcher-result.json",
+        "bytes": 669,
+        "sha256": "8db56efc896188e5ea05ae303ae0d3774ef1d22cfdaab7bc5c166c05347cfa2d"
+      },
+      "owner.json": {
+        "path": "stadium-direct-local-launch-capture-v10/owner.json",
+        "bytes": 149432,
+        "sha256": "6becdb5605ec49b9f98da1811e1cabf11ce072e30262bfc8fc16efaa17fff413"
+      },
+      "capture.log": {
+        "path": "stadium-direct-local-launch-capture-v10/capture.log",
+        "bytes": 202,
+        "sha256": "7799f72035a0c7efe31f1e3060e6799aa0bdc3cd7b4c158248f7d4bee3a6c925"
+      },
+      "browser-run/report-A.json": {
+        "path": "stadium-direct-local-launch-capture-v10/browser-run/report-A.json",
+        "bytes": 3328269,
+        "sha256": "ec3d9712872a830fee170173cf506638fa4202a1aff1d3a5f7b8b11aa376dfcf"
+      },
+      "browser-run/report-B.json": {
+        "path": "stadium-direct-local-launch-capture-v10/browser-run/report-B.json",
+        "bytes": 3324415,
+        "sha256": "baa04c773290b1e6bca427201c9a885da5d6a7eb019af17a1a8d71933fb130fe"
+      },
+      "browser-run/recreation-control.json": {
+        "path": "stadium-direct-local-launch-capture-v10/browser-run/recreation-control.json",
+        "bytes": 22596,
+        "sha256": "e47a7be1d8f23fcbd60e41fbca59d865f60e1a097f13987e033028309430e04e"
+      },
+      "browser-run/recreation-close-A.json": {
+        "path": "stadium-direct-local-launch-capture-v10/browser-run/recreation-close-A.json",
+        "bytes": 1143,
+        "sha256": "fc793afec660b48a543a6c56017bf17b34825873c969a0c76838312d0c5f98b1"
+      },
+      "browser-run/recreation-restart-A.json": {
+        "path": "stadium-direct-local-launch-capture-v10/browser-run/recreation-restart-A.json",
+        "bytes": 1489,
+        "sha256": "2563fa53d0a10627c0d41b1daf9ba790955719582ef78ac5e15f7960f0f32eba"
+      },
+      "browser-run/recreation-summary.json": {
+        "path": "stadium-direct-local-launch-capture-v10/browser-run/recreation-summary.json",
+        "bytes": 5556,
+        "sha256": "e962446cf5de6106df6b553abc049eb44ac4c9f1ac9410473db0c4db3045dfc0"
+      },
+      "browser-run/report.json": {
+        "path": "stadium-direct-local-launch-capture-v10/browser-run/report.json",
+        "bytes": 3324415,
+        "sha256": "baa04c773290b1e6bca427201c9a885da5d6a7eb019af17a1a8d71933fb130fe"
+      }
+    },
+    "independent_review": {
+      "path": "stadium-direct-local-launch-capture-v10-independent-review-v1/independent-result-review.json",
+      "bytes": 10844,
+      "sha256": "c31d34ebac785bcbe4edc2cb53e8e0eb4de7338c5481278114f6d0ddf1054f6b"
+    },
+    "replay_source": {
+      "path": "stadium-direct-local-launch-capture-v10-independent-review-v1/review.mjs",
+      "bytes": 7007,
+      "sha256": "69231850fff76bbd52c2a7edff71fbf82ef46b0003aea5db16c259c9e7f49324"
+    },
+    "replay_stdout": {
+      "path": "stadium-direct-local-launch-capture-v10-independent-review-v1/replay.stdout",
+      "bytes": 1114,
+      "sha256": "71c56eeed149d9c6d7cb68f36f64bf89328b657f33af5267b73e2f9cebe4e087"
+    },
+    "replay_stderr": {
+      "path": "stadium-direct-local-launch-capture-v10-independent-review-v1/replay.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "packet": {
+      "path": "stadium-direct-local-launch-capture-packet-v10/manifest-final.json",
+      "bytes": 19244,
+      "sha256": "1d7762c5fb9edf31d2571f7b0458dd4a4389e1491acd43f27743b5611ec5854c"
+    },
+    "release": {
+      "path": "stadium-direct-local-launch-capture-packet-v10/root-release-v10.json",
+      "bytes": 5961,
+      "sha256": "41cda64adef6fadeb553398db5032cdd056528c491e8be4696863d95fcdb4d9d"
+    }
+  },
+  "stadium_short_A_full_B_v11_2026_10_15": {
+    "schema": "stadium-short-A-full-B-common-fields-seed-evidence-v1",
+    "state": "PASS_SCOPED_SAME_INSTANCE_SHORT_A_FULL_B",
+    "scope": "One short A174, checked close/restart, and full B7167. Not fullA/fullB or C3 acceptance.",
+    "source_and_test": {
+      "head": "4d7656fe2a1023a55bd8974e0d848863f71683ca",
+      "tree": "e17b6715561a6b67487b484225cb650e1c12d54b",
+      "delta_from_runtime": [
+        "tests/stadium_matched_setup_cf_runner_gate.test.mjs",
+        "tests/test_stadium_recreation_canary_context.mjs"
+      ]
+    },
+    "runtime_and_harness": {
+      "head": "ea0d709067aaf08ebf3b77f2e42f6cb4611da15c",
+      "tree": "b6cff327528e6d8b268284b4a6a700c754157f5a",
+      "diagnostic_build": {
+        "path": "stadium-full-b-release-validation-v1/evidence/diagnostic-release-build.json",
+        "bytes": 9835,
+        "sha256": "5aba1c9141f140c32e01734dc624e96610470b8b0b3c34aa53dc15136520ec74"
+      },
+      "ordinary_build": {
+        "path": "stadium-full-b-release-validation-v1/evidence/ordinary-release-build.json",
+        "bytes": 9801,
+        "sha256": "0190674a4e9a4fbab9cd63a62274ac618f7c6d2b7b70485f0bec2c3daaf09654"
+      },
+      "artifacts": {
+        "diagnostic": 44,
+        "ordinary": 44
+      }
+    },
+    "retained_failed_full_regression": {
+      "tests": 2639,
+      "skips": 180,
+      "failures": 2,
+      "result": {
+        "path": "stadium-full-b-release-validation-v1/evidence/result.json",
+        "bytes": 29059,
+        "sha256": "e428eba655ce3bc61919639d17569e2a38a7854ab1bed547d60f3cf7f221d124"
+      },
+      "log": {
+        "path": "stadium-full-b-release-validation-v1/evidence/full-unittest-suite.log",
+        "bytes": 504413,
+        "sha256": "2eb10271e82e60cb8dc8f9445ab1926bb6b872b0bfa868b8c9604b7cd035fa4f"
+      },
+      "root_builds_and_failure_review": {
+        "path": "stadium-full-b-release-validation-v1/evidence/root-builds-and-failure-review.json",
+        "bytes": 2018,
+        "sha256": "1ef45ebaac80a9da3b3e8e284f8ab31973b9973e5f6fd49b17e58436f0dc5f7d"
+      },
+      "cause": "Two stale extracted VM fixture lexical contexts: recreationFullB and recreationPassDecision. Production unchanged by two-test repair."
+    },
+    "test_only_repair": {
+      "manifest": {
+        "path": "stadium-full-b-vm-fixture-repair-v1/manifest.json",
+        "bytes": 3322,
+        "sha256": "1f8256cd004b4205b2e50c208dd9a56fb18391ccb61ad81c84e7391f3133e83b"
+      },
+      "focused_review": {
+        "path": "stadium-full-b-vm-fixture-repair-v1/root-focused-result-review.json",
+        "bytes": 689,
+        "sha256": "aacf4f29b47a5c7ccf10476afa9e4d15f61ce7f5fe1462996110e0a86412f7ae"
+      }
+    },
+    "full_regression": {
+      "tests": 2639,
+      "skips": 180,
+      "elapsed_seconds": 566.102,
+      "result": {
+        "path": "stadium-full-b-full-regression-v2/evidence/result.json",
+        "bytes": 108832,
+        "sha256": "7a98239674dedad94cb35cfd9f3b14fbd54f7778657b4a866f29a1ad0d65b942"
+      },
+      "log": {
+        "path": "stadium-full-b-full-regression-v2/evidence/full-unittest-suite.log",
+        "bytes": 497532,
+        "sha256": "62182120be4e731a99a35977a2f69f4173b3830304bd8fefd34c03d31de83dcc"
+      },
+      "root_review": {
+        "path": "stadium-full-b-full-regression-v2/evidence/root-result-review.json",
+        "bytes": 2968,
+        "sha256": "56dd9af3ab9f3b71c82242312265ab06834eb7351520b3c51734c6bf6d89794d"
+      }
+    },
+    "capture_elapsed_ms": 84457.524,
+    "replay": {
+      "state": "PASS_COMPONENT_REPLAY_ONLY",
+      "legs": [
+        {
+          "label": "A",
+          "actions": 174,
+          "ticks": 87,
+          "draws": 87,
+          "audioFrames": 46400,
+          "common_samples": 0,
+          "exact_common_values": 0,
+          "comparisons": [
+            {
+              "phase": "C",
+              "fields": 16
+            },
+            {
+              "phase": "F",
+              "fields": 16
+            }
+          ],
+          "world_generation": 3,
+          "journal_segments": 349,
+          "journal_chain_sha256": "ca6fa5f002a00b84914a544bd4e8e0904e52e0fdba89d83fe0504fa2d6b7d187",
+          "journal_arrays_equal_terminal": true
+        },
+        {
+          "label": "B",
+          "actions": 7167,
+          "ticks": 3585,
+          "draws": 3582,
+          "audioFrames": 1912000,
+          "common_samples": 3501,
+          "exact_common_values": 56016,
+          "comparisons": [
+            {
+              "phase": "C",
+              "fields": 16
+            },
+            {
+              "phase": "F",
+              "fields": 16
+            }
+          ],
+          "world_generation": 6,
+          "journal_segments": 14335,
+          "journal_chain_sha256": "bd75503c743445507e8d2a00c2ff208b0b19db3e5868ba13358c4716089cbac1",
+          "journal_arrays_equal_terminal": true
+        }
+      ],
+      "close_parent_seed": 1,
+      "terminal_B_rng": {
+        "schema": "melee-web-stadium-recreation-b-rng-v1",
+        "admitted": true,
+        "world_generation": 6,
+        "prior_world_generation": 3,
+        "match_seed_before": 899962297,
+        "match_seed_at_retirement": 824842692,
+        "host_seed": 1001933907,
+        "parent_seed": 1,
+        "match_to_host_restored": true,
+        "host_to_parent_restored": true,
+        "terminal_checked": true,
+        "full_common_fields_seed": true
+      },
+      "same_instance": true,
+      "backing_buffer_byte_lengths": [
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "immutable_A": true,
+      "supervisor_equals_B": true,
+      "owned_cleanup": true,
+      "restore": false,
+      "C3": false
+    },
+    "timings": {
+      "A": {
+        "actions": 174,
+        "import_total_ms": 564.36675,
+        "select_disc_ms": 11.394417,
+        "native_construct_ms": 265.34499979019165,
+        "action_loop_ms": 1443.2,
+        "remaining_work_at_loop_start_ms": 132142,
+        "route_elapsed_ms": 8175.776417,
+        "page_errors": [],
+        "console_errors": [],
+        "console_warnings": [],
+        "persistence": {
+          "completed": 360,
+          "compact_serialized_bytes": 63872168,
+          "inclusive_total_ms": 486.269
+        }
+      },
+      "B": {
+        "actions": 7167,
+        "import_total_ms": 551.812917,
+        "select_disc_ms": 3.987,
+        "native_construct_ms": 241.2350001335144,
+        "action_loop_ms": 55865.84,
+        "remaining_work_at_loop_start_ms": 122416,
+        "route_elapsed_ms": 63576.592792,
+        "page_errors": [],
+        "console_errors": [],
+        "console_warnings": [],
+        "persistence": {
+          "completed": 14783,
+          "compact_serialized_bytes": 2647071054,
+          "inclusive_total_ms": 17743.579
+        }
+      }
+    },
+    "close_restart_ms": 33.39925,
+    "memory_identity": {
+      "module_exports_wasm_memory_and_wrappers_same": true,
+      "backing_buffer_changed": true,
+      "memory_bytes_at_boundaries": [
+        134217728,
+        231997440,
+        231997440,
+        231997440,
+        231997440
+      ],
+      "scope": "Root read actual identity_samples; optional replay byte-length projection null was a missing field-name projection, not a runtime identity gap."
+    },
+    "cleanup": {
+      "root_verified_owned_pids_absent": 11,
+      "root_verified_owned_groups_absent": 3,
+      "owner_cleanup_passed": true,
+      "owned_empty_tmp_removed": true,
+      "capture_log": "Exact success message only. Interim recreation-control is an unfinished progress snapshot, not a final archive verdict. Final summary/archive and supervisor B report are authoritative."
+    },
+    "artifacts": {
+      "launcher-result.json": {
+        "path": "stadium-full-b-capture-v11/launcher-result.json",
+        "bytes": 658,
+        "sha256": "d30590021d3b62cfd8c3f044f5be8f5a01d4f2cf779ffb7ed925c698985995e3"
+      },
+      "owner.json": {
+        "path": "stadium-full-b-capture-v11/owner.json",
+        "bytes": 113101,
+        "sha256": "9cc82636b651b0349dec4c87b71d521fdb9f62553b9a4552d5419a0d79f43402"
+      },
+      "capture.log": {
+        "path": "stadium-full-b-capture-v11/capture.log",
+        "bytes": 189,
+        "sha256": "aa06203715f83faa26388df9da384ce39f0a96741d7a3266b272c44a55e9a5ef"
+      },
+      "root-result-review.json": {
+        "path": "stadium-full-b-capture-v11/root-result-review.json",
+        "bytes": 4256,
+        "sha256": "c979a5ba477ee421c8a643be23d3b761bb529276259f43fcc33ff44737bbb445"
+      },
+      "browser-run/report-A.json": {
+        "path": "stadium-full-b-capture-v11/browser-run/report-A.json",
+        "bytes": 3328235,
+        "sha256": "365447fd3df405cbb7e491c829b7825de73523428e4519b7f9ef4975822cb21f"
+      },
+      "browser-run/report-B.json": {
+        "path": "stadium-full-b-capture-v11/browser-run/report-B.json",
+        "bytes": 18709635,
+        "sha256": "2624be501b81a05a3c4f7d0ab4f45145fd12f1aab5b7d29ff0ab9f823558678d"
+      },
+      "browser-run/report.json": {
+        "path": "stadium-full-b-capture-v11/browser-run/report.json",
+        "bytes": 18709635,
+        "sha256": "2624be501b81a05a3c4f7d0ab4f45145fd12f1aab5b7d29ff0ab9f823558678d"
+      },
+      "browser-run/recreation-control.json": {
+        "path": "stadium-full-b-capture-v11/browser-run/recreation-control.json",
+        "bytes": 22564,
+        "sha256": "ee782b4ef82064f41a04aa0f57a40fe8fdb52512b8b592db99d2084625126c7a"
+      },
+      "browser-run/recreation-summary.json": {
+        "path": "stadium-full-b-capture-v11/browser-run/recreation-summary.json",
+        "bytes": 5568,
+        "sha256": "17ececbc8f2a958e8841b9fab17a9e02e2195b0c1a212059978939385648af7f"
+      },
+      "browser-run/recreation-close-A.json": {
+        "path": "stadium-full-b-capture-v11/browser-run/recreation-close-A.json",
+        "bytes": 1143,
+        "sha256": "fc793afec660b48a543a6c56017bf17b34825873c969a0c76838312d0c5f98b1"
+      },
+      "browser-run/recreation-restart-A.json": {
+        "path": "stadium-full-b-capture-v11/browser-run/recreation-restart-A.json",
+        "bytes": 1489,
+        "sha256": "2563fa53d0a10627c0d41b1daf9ba790955719582ef78ac5e15f7960f0f32eba"
+      },
+      "browser-run/report-A.json.stadium-c3-action-records-v1.jsonl": {
+        "path": "stadium-full-b-capture-v11/browser-run/report-A.json.stadium-c3-action-records-v1.jsonl",
+        "bytes": 383419,
+        "sha256": "34ee26b0ac52787789c77a03cdce9bf396e10253894b31f279870b876e71025b"
+      },
+      "browser-run/report-B.json.stadium-c3-action-records-v1.jsonl": {
+        "path": "stadium-full-b-capture-v11/browser-run/report-B.json.stadium-c3-action-records-v1.jsonl",
+        "bytes": 18966084,
+        "sha256": "67454a6313525ecaee7a51ac79c79324100be443e6a8de70f252fc18b42871d0"
+      }
+    },
+    "independent_replay": {
+      "path": "stadium-full-b-capture-v11-independent-review-v1/result.json",
+      "bytes": 1316,
+      "sha256": "3edc9c94bc589ce96136326d2c0cba31fdf07e7276d95fa6d7e138b46b74ff62"
+    },
+    "replay_source": {
+      "path": "stadium-full-b-capture-v11-independent-review-v1/review.mjs",
+      "bytes": 8867,
+      "sha256": "c3f8dd88c50461032f54f3659c46de02de3d993a4ef18e92f3f752c1a29cc66a"
+    },
+    "packet": {
+      "path": "stadium-full-b-capture-packet-v11/manifest-final.json",
+      "bytes": 7494,
+      "sha256": "3dec07c5b72ae16fd86da11b4226e757d2ef8991bc73161196f5220ef0bd617f"
+    },
+    "limits_ms": {
+      "work": 150000,
+      "owner": 180000,
+      "cleanup": 30000
+    },
+    "acceptance": {
+      "full_B_declared_comparisons": "PASS_IN_ONE_PAIR",
+      "full_A_full_B_same_instance": "NOT_RUN",
+      "complete_original_per_owner_lifecycle_RNG": "OPEN",
+      "C3": "OPEN",
+      "PCM_pixels_live_performance": "NOT_CLAIMED"
+    }
   }
 }
