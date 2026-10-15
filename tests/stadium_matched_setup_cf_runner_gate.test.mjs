@@ -157,10 +157,12 @@ test('the matched Setup C/F opt-in and preflight gate fail before server/browser
   assert.ok(scopeStart >= 0 && scopeEnd > scopeStart, 'actual scope expression markers exist');
   const scopeExpression = runnerSource.slice(scopeStart + 'source_request_scope: '.length, scopeEnd);
   const scope = flags => vm.runInNewContext(`(${scopeExpression})`, {
-    recreationCanary: false, firstSssVsSetupCf: true, firstSssVsSetupCfV2: true,
+    recreationCanary: false, recreationFullB: false, firstSssVsSetupCf: true, firstSssVsSetupCfV2: true,
     firstSssVsSetupCfCommonFields: false, firstSssVsSetupCfFullSchedule: false, ...flags});
   assert.equal(scope({recreationCanary: true}),
     'Two separately reported same-instance original-route 174-action lifetimes with checked A close/restart; no whole-session or recreation acceptance.');
+  assert.equal(scope({recreationCanary: true, recreationFullB: true}),
+    'Same-instance A174 checked close/restart then exact original full7167 B with3501 common+seed rows; no complete per-owner RNG ledger or C3 acceptance.');
   assert.equal(scope({}),
     'Strict same-run Entry and completed Setup comparison, then the extracted run2 proper prefix from action0 through the next draw/tick/draw after dynamically mapped C/F; compare C/F before their following draws, then stop.');
   assert.equal(scope({firstSssVsSetupCfV2: false}),
