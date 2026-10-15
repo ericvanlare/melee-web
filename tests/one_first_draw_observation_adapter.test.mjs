@@ -1,8 +1,9 @@
+import vm from 'node:vm';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {buildOneFrameRecorderBinding,frameEffectMustSkipOrdinaryNativeCleanup} from './one_normal_frame_observation_adapter.mjs';
-import {observeOneFirstDraw,firstDrawDriver as driver} from './one_first_draw_observation_adapter.mjs';
+import {observeOneFirstDraw,firstDrawDriver as driver,firstDrawComponentsDriver} from './one_first_draw_observation_adapter.mjs';
 import {schema2Fixture} from './match_frame_effect_schema2_fixture.mjs';
 import * as recorder from './runtime_callback_recorder.mjs';
 const originalModule = globalThis.Module;
@@ -176,3 +177,45 @@ test('lost arm response marks state uncertain and forbids all native reads/retir
   assert.equal(result.runtime_callback_capture_failures.length, 0);
 });
 
+
+// Adapter transport controls with declared synthetic endpoints. Actual serialized
+// component driver behavior is independently exercised in first_draw_components.test.mjs.
+for(const mode of ['positive','multiple-ticks','response-lost'])test('component transport '+mode+' remains before retirement',async()=>{
+ const one=value=>{for(const k of ['planned_steps','callback_steps','callback_draws','tick_returns','draw_returns'])value[k]=1;
+  value.source_frame_after=value.source_frame_before+1;value.unobserved_draws=0;return value;};
+ const {page,calls}=setupPage({statusTransform:mode==='multiple-ticks'?v=>v:one});
+ const binding=validProducerBinding();binding.profile='runtime-match-frame-effect Release --first-draw-components-diagnostic';
+ await installRecorder(page,{...identityArgs(),producerBinding:binding});
+ const synthetic={...driver,
+  armNativeFrameEffect:()=>({armed:true,match:{frame:200}}),
+  readFrameComponents:()=>{calls.push('component-read');if(mode==='response-lost')throw Error('synthetic response loss');return {component_only:true,depth_before:{sequence:3}};},
+  armFrameComponents:()=>{calls.push('component-arm');return {schema:'melee-web-first-draw-components-arm-v1',status:'armed',same_module:true,returned_idle:true,composite_eligible:false,depth_after:{}};},
+  componentObservationFailures:(v,options)=>{assert.equal(v.component_only,true);calls.push(options?.stage==='read'?'component-validate-read':'component-validate');return [];}};
+ const result=await observeOneFirstDraw(args(page,{driver:synthetic,producerBinding:binding}));
+ if(mode==='positive'){
+  assert.equal(result.status,'pass');assert.equal(result.native_retired,true);
+  assert(calls.indexOf('component-read')>=0);assert(calls.indexOf('component-validate-read')<calls.indexOf('component-arm'));assert(calls.indexOf('component-validate')<calls.indexOf('retire-evaluate'));
+ }else{
+  assert.equal(result.status,'failed');assert.equal(result.native_retired,false);assert.equal(result.cleanup_policy,'browser_owner_only');
+  assert.equal(calls.includes('retire-evaluate'),false);
+  if(mode==='multiple-ticks'){assert(result.failures.includes('component_requires_valid_exact_one_tick_draw'));assert.equal(calls.includes('component-read'),false);}
+  else assert(result.failures.includes('component_response_lost_or_failed'));
+ }
+});
+
+test('actual serialized claimed-ready malformed native read refuses before depth-arm and retirement',async()=>{
+ const one=value=>{for(const k of ['planned_steps','callback_steps','callback_draws','tick_returns','draw_returns'])value[k]=1;value.source_frame_after=value.source_frame_before+1;value.unobserved_draws=0;return value;};
+ const {page,calls}=setupPage({statusTransform:one});
+ const binding=validProducerBinding();binding.profile='runtime-match-frame-effect Release --first-draw-components-diagnostic';
+ await installRecorder(page,{...identityArgs(),producerBinding:binding});
+ const module=globalThis.Module;module.__meleeWebDepthNoWorkV1={status:()=>({phase:'READY',firstFailure:null,bridgeFailure:false})};
+ module._melee_web_native_menu_frame_effect_components=()=>{calls.push('actual-component-getter');return JSON.stringify({copied:true,component_ready:true});};
+ module._aurora_browser_depth_no_work_arm_component=()=>{calls.push('actual-depth-arm');return 1;};
+ const context=vm.createContext({Module:module});const originalEvaluate=page.evaluate.bind(page);
+ page.evaluate=async(fn,arg)=>[firstDrawComponentsDriver.armNativeFrameEffect,firstDrawComponentsDriver.readFrameComponents,firstDrawComponentsDriver.armFrameComponents].includes(fn)
+  ?vm.runInContext('('+fn.toString()+')',context)(arg):originalEvaluate(fn,arg);
+ const result=await observeOneFirstDraw(args(page,{driver:firstDrawComponentsDriver,producerBinding:binding}));
+ assert.equal(result.status,'failed');assert(result.component_failures.includes('native_component_receipt'));
+ assert.equal(calls.filter(v=>v==='actual-component-getter').length,1);assert.equal(calls.includes('actual-depth-arm'),false);
+ assert.equal(calls.includes('retire-evaluate'),false);assert.equal(result.native_retired,false);assert.equal(result.cleanup_policy,'browser_owner_only');
+});

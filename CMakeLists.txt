@@ -25,6 +25,13 @@ option(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC
   "Enable private audio/file prerequisite controls; no coordinator or restore" OFF)
 option(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC
   "Observe one normal submitted match frame without restoring state" OFF)
+option(MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC
+  "Read private depth/submission components after one original draw; no restore" OFF)
+if(MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC AND
+   (NOT MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC OR MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC OR
+    NOT AURORA_BROWSER_TEXTURE_READONLY_GUARD OR NOT MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC))
+  message(FATAL_ERROR "First-draw components require their explicit isolated frame-effect variant")
+endif()
 if(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC AND NOT MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
   message(FATAL_ERROR "First-pair audio/file prerequisite requires isolated frame-effect profile")
 endif()

@@ -42,6 +42,13 @@ class MatchFrameEffectNativeTests(OwnedWorkspaceTests):
         self.assertIn("tests 17", result.stdout)
         self.assertIn("fail 0", result.stdout)
 
+    def test_private_first_draw_components_driver_controls(self):
+        result = subprocess.run([str(node_runtime(ROOT)), "--test",
+                                 str(ROOT / "tests/first_draw_components.test.mjs")],
+                                cwd=ROOT, capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("fail 0", result.stdout)
+
     def test_actual_first_draw_collector_issuing_identity(self):
         database = ROOT / "build/browser-match-frame-effect-release/compile_commands.json"
         compiler = ROOT / ".deps/emsdk/upstream/emscripten/em++"

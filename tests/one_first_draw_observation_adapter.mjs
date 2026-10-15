@@ -2,7 +2,7 @@
 // selected draw scope is explicit; later original draws remain unobserved.
 import {observeOneNormalFrame} from './one_normal_frame_observation_adapter.mjs';
 import {retireNativeFrameEffect} from './match_frame_effect_driver.mjs';
-import {armNativeFrameEffectFirstDraw,readNativeFrameEffectFirstDraw,firstDrawObservationFailures}
+import {armNativeFrameEffectFirstDraw,readNativeFrameEffectFirstDraw,firstDrawObservationFailures,readFirstDrawComponents,armFirstDrawComponents,firstDrawComponentFailures}
   from './match_frame_effect_first_draw_driver.mjs';
 export const firstDrawDriver = Object.freeze({
   armNativeFrameEffect: armNativeFrameEffectFirstDraw,
@@ -10,6 +10,8 @@ export const firstDrawDriver = Object.freeze({
   retireNativeFrameEffect,
   frameEffectObservationFailures: firstDrawObservationFailures,
 });
+export const firstDrawComponentsDriver=Object.freeze({...firstDrawDriver,
+  readFrameComponents:readFirstDrawComponents,armFrameComponents:armFirstDrawComponents,componentObservationFailures:firstDrawComponentFailures});
 export async function observeOneFirstDraw(options) {
   const result = await observeOneNormalFrame({...options, driver: options.driver ?? firstDrawDriver, observationScope: 'first_draw'});
   result.schema = 'melee-web-one-first-draw-observation-v1';

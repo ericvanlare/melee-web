@@ -46,7 +46,7 @@ export function validateServedRuntimeBinding(value) {
     throw Error('frame-effect producer source must be a 40-character lowercase commit id');
   if (!/^[a-f0-9]{64}$/.test(binding.source_patch_sha256 || ''))
     throw Error('frame-effect producer source_patch_sha256 must be a lowercase SHA-256 digest');
-  if (binding.profile !== 'runtime-match-frame-effect Release')
+  if (!['runtime-match-frame-effect Release','runtime-match-frame-effect Release --first-draw-components-diagnostic'].includes(binding.profile))
     throw Error('frame-effect producer profile must be runtime-match-frame-effect Release');
   if (!binding.files || typeof binding.files !== 'object' || Array.isArray(binding.files))
     throw Error('frame-effect producer files must be an object');
@@ -313,11 +313,20 @@ export async function observeOneNormalFrame({
   // Playwright result means the private arm may have taken effect.
   result.arm_attempt = 'dispatched';
   result.cleanup_policy = 'browser_owner_only';
+  const components=typeof driver.readFrameComponents==='function';
+  if(components&&(observationScope!=='first_draw'||typeof driver.armFrameComponents!=='function'||typeof driver.componentObservationFailures!=='function'||
+      producerBinding.profile!=='runtime-match-frame-effect Release --first-draw-components-diagnostic')){
+    result.status='failed';result.failures.push('component_private_profile_required');result.arm_attempt='not_dispatched';return result;
+  }
+  if(!components&&producerBinding.profile!=='runtime-match-frame-effect Release'){
+    result.status='failed';result.failures.push('component_driver_required');result.arm_attempt='not_dispatched';return result;
+  }
   let arm;
   try {
     arm = await boundedTransport(() => page.evaluate(driver.armNativeFrameEffect, {
       minimumFrame: NORMAL_MATCH_FRAME_WINDOW.minimum,
       maximumFrame: NORMAL_MATCH_FRAME_WINDOW.maximum,
+      componentEligibility:components,
     }), armTimeoutMs, 'arm');
   } catch (error) {
     result.status = 'failed';
@@ -417,6 +426,28 @@ export async function observeOneNormalFrame({
   // use it to retain any callback rows already published before a stall.
   await retainRuntimeCaptureBestEffort(result, page, readRuntimeCapture,
     binding.identity, binding.identityScope);
+
+  if(components){
+    const exactOne=['planned_steps','callback_steps','callback_draws','tick_returns','draw_returns'].every(k=>nativeReceipt?.[k]===1);
+    if(!exactOne||result.observation_failures.length||result.runtime_callback_capture_failures?.length){
+      result.status='failed';result.failures.push('component_requires_valid_exact_one_tick_draw');return result;
+    }
+    try{
+      result.component_read=await boundedTransport(()=>page.evaluate(driver.readFrameComponents),retirementTimeoutMs,'component read');
+      result.component_failures=driver.componentObservationFailures(result.component_read,{stage:'read'});
+      if(result.component_failures.length){result.status='failed';result.failures.push(...result.component_failures);return result;}
+      // No diagnostic mutation until this exact read receipt passes the host decoder.
+      result.component_arm=await boundedTransport(()=>page.evaluate(driver.armFrameComponents,
+        {expectedDepthSequence:result.component_read.depth_before.sequence}),retirementTimeoutMs,'component arm');
+      const armed=result.component_arm;
+      if(armed?.schema!=='melee-web-first-draw-components-arm-v1'||armed.status!=='armed'||armed.same_module!==true||armed.returned_idle!==true||armed.composite_eligible!==false){
+        result.status='failed';result.failures.push('component_arm_refused_or_malformed');return result;
+      }
+      result.components={...result.component_read,schema:'melee-web-first-draw-components-v1',status:'observed',depth_after:armed.depth_after};
+      result.component_failures=driver.componentObservationFailures(result.components);
+      if(result.component_failures.length){result.status='failed';result.failures.push(...result.component_failures);return result;}
+    }catch(error){result.status='failed';result.failures.push('component_response_lost_or_failed');result.error=String(error?.message||error);return result;}
+  }
 
   // The private checked retirement is the only permitted native shutdown after
   // arm. A lost response or refused retirement never falls through to unload.

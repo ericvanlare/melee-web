@@ -3,6 +3,9 @@
 #include <cstddef>
 #include <cstring>
 #include <bit>
+#if defined(MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC)
+#include "lib/gfx/frame_pending_facts.hpp"
+#endif
 static_assert(sizeof(PADStatus)==16&&offsetof(PADStatus,err)==10&&offsetof(PADStatus,extButton)==12,
               "Frame observation serializes four native PADStatus records, including Aurora extButton and padding");
 
@@ -306,6 +309,49 @@ const char* melee_web_native_menu_frame_effect_status(){
  }
  out+="]";boolean("rows_complete",rows_complete);out+="}";return out.c_str();
 }
+#if defined(MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC)
+// Separate read-only component receipt. No submission_status/EventManager pump.
+const char* melee_web_native_menu_frame_effect_components(){
+ static std::string out;
+ auto refused=[&](const char* reason){out="{\"schema\":\"melee-web-native-first-draw-components-v1\",\"copied\":false,\"component_ready\":false,\"refusal\":\"";out+=reason;out+="\",\"composite_eligible\":false}";return out.c_str();};
+ if(!observation.terminal||observation.native_retired||!observation.first_draw||!observation.admitted||!same_owner()||*observation.error)
+  return refused("original_boundary_missing");
+ if(observation.tick_returns!=1||observation.draw_returns!=1||observation.planned_steps!=1||observation.callback_steps!=1||observation.callback_draws!=1)
+  return refused("exact_one_tick_draw_required");
+ if(!EM_ASM_INT({return Module.matchFrameEffectCallbackReturned===true&&!ABORT&&
+      Asyncify.state===Asyncify.State.Normal&&Asyncify.currData===null?1:0;}))return refused("callback_not_returned_idle");
+ const auto renderer=aurora_browser_frame_effect_observer_snapshot();
+ if(!observation.renderer_armed||renderer.fenceCount!=1||renderer.fenceSuccess!=1)return refused("normal_fence_missing");
+ if(melee_web_source_file_drive_busy())return refused("source_reads_pending");
+ aurora::gfx::detail::NativeSubmissionPendingFacts facts{};
+ if(!aurora::gfx::capture_native_submission_pending(facts))return refused("native_owner_book_unavailable");
+ const bool ready=aurora::gfx::detail::native_submission_component_ready(facts);
+ out="{\"schema\":\"melee-web-native-first-draw-components-v1\",\"copied\":true,\"component_ready\":";
+ out+=ready?"true":"false";out+=",\"refusal\":\"\",\"composite_eligible\":false,\"frame_slot_capacity\":";
+ out+=std::to_string(aurora::gfx::detail::FrameSlotCount);out+=",\"staging_slot_capacity\":";
+ out+=std::to_string(aurora::gfx::detail::StagingBufferCount);
+ auto u32=[&](const char* key,uint32_t value){out+=",\"";out+=key;out+="\":";out+=std::to_string(value);};
+ auto u64=[&](const char* key,uint64_t value){out+=",\"";out+=key;out+="\":\"";out+=std::to_string(value);out+='"';};
+ out+=",\"facts\":{\"schema_version\":"+std::to_string(facts.schemaVersion);u32("owner_book_present",facts.ownerBookPresent);
+ auto stamp=[&](const char* key,const aurora::gfx::detail::NativeSubmissionObservationStamp& v){out+=",\"";out+=key;out+="\":{\"generation\":\""+std::to_string(v.generation)+'"';
+  u64("registration_sequence",v.registrationSequence);u64("callback_sequence",v.callbackSequence);u64("stale_callback_count",v.staleCallbackCount);
+  u64("queue_handle",v.queueHandle);u64("last_begin_frame_id",v.lastBeginFrameId);u64("last_end_frame_id",v.lastEndFrameId);
+  u32("frame_index",v.frameIndex);u32("active_frame_count",v.activeFrameCount);u32("active_staging_count",v.activeStagingCount);
+  u32("free_frame_count",v.freeFrameCount);u32("free_staging_count",v.freeStagingCount);u32("worker_idle",v.workerIdle);u32("process_events_queued",v.processEventsQueued);out+='}';};
+ stamp("before",facts.before);stamp("after",facts.after);
+ const auto& p=facts.packets;out+=",\"packets\":{\"schema_version\":"+std::to_string(p.schemaVersion);u32("active_slot_count",p.activeSlotCount);
+ out+=",\"recorder\":{\"active\":"+std::to_string(p.recorder.active);u32("in_offscreen",p.recorder.inOffscreen);u32("suspended_efb_pass",p.recorder.hasSuspendedEfbPass);out+="},\"slots\":[";
+ for(size_t i=0;i<p.slots.size();++i){if(i)out+=',';const auto& v=p.slots[i];out+="{\"slot\":"+std::to_string(v.slot);
+  u32("frame_index",v.frameIndex);u32("encoder_present",v.encoderPresent);u64("frame_id",v.frameId);
+  u64("render_pass_count",v.renderPassCount);u64("texture_copy_count",v.textureCopyCount);u64("encoder_task_count",v.encoderTaskCount);u64("op_count",v.opCount);
+  u64("texture_upload_count",v.textureUploadCount);u64("after_submit_callback_count",v.afterSubmitCallbackCount);
+  u64("verts_bytes",v.vertsBytes);u64("uniforms_bytes",v.uniformsBytes);u64("indices_bytes",v.indicesBytes);u64("storage_bytes",v.storageBytes);u64("texture_upload_bytes",v.textureUploadBytes);out+='}';}
+ out+=" ]},\"owners\":[";
+ for(size_t i=0;i<facts.owners.size();++i){if(i)out+=',';const auto& v=facts.owners[i];out+="{\"state\":"+std::to_string(v.state);
+  u64("future_id",v.futureId);u64("registration_sequence",v.registrationSequence);u64("callback_sequence",v.callbackSequence);u64("captured_generation",v.capturedGeneration);u64("queue_handle",v.queueHandle);u64("encoder_handle",v.encoderHandle);out+='}';}
+ out+="]}}";return out.c_str();
+}
+#endif
 int melee_web_native_menu_frame_effect_retire(){try{
  check(observation.terminal&&!observation.native_retired,
        "Frame effect retirement requires a stopped, unretired callback");

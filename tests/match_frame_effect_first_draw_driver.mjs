@@ -2,7 +2,7 @@ import {rendererOwnerObservationFailures} from './match_frame_effect_renderer_ow
 // Explicit first-draw scope. The historical single-tick driver/validator is unchanged.
 // Reuses the reviewed schema2 row/value validation with a distinct exact outer
 // field allowlist and selected-map checks. No historical receipt/schema coercion.
-export function armNativeFrameEffectFirstDraw({minimumFrame = 180, maximumFrame = 240} = {}) {
+export function armNativeFrameEffectFirstDraw({minimumFrame = 180, maximumFrame = 240, componentEligibility = false} = {}) {
   const module = globalThis.Module;
   if (module?.matchFrameEffectNativeIdle?.() !== true)
     return {armed: false, reason: 'native_call_pending'};
@@ -13,7 +13,17 @@ export function armNativeFrameEffectFirstDraw({minimumFrame = 180, maximumFrame 
   if (match.ready !== true || !Number.isInteger(match.frame) ||
       match.frame < minimumFrame || match.frame > maximumFrame)
     return {armed: false, reason: 'source_frame_outside_declared_window', match};
+  if(componentEligibility){
+    const depth=module.__meleeWebDepthNoWorkV1?.status?.();
+    if(globalThis.__meleeWebFirstDrawComponentModuleV1!==undefined||
+       depth?.phase!=='READY'||depth.firstFailure||depth.bridgeFailure||
+       typeof module._melee_web_native_menu_frame_effect_components!=='function'||
+       typeof module._aurora_browser_depth_no_work_arm_component!=='function')
+      return {armed:false,reason:'component_premain_or_exports_missing'};
+  }
   const armed = module._melee_web_native_menu_frame_effect_arm_first_draw(match.frame) === 1;
+  if(armed&&componentEligibility)Object.defineProperty(globalThis,'__meleeWebFirstDrawComponentModuleV1',
+    {value:module,writable:false,configurable:false});
   return {armed, reason: armed ? null : 'native_arm_refused', match};
 }
 
@@ -277,4 +287,104 @@ export function compareFirstDrawObservations(reference, candidate) {
   }
   const path = first(reference, candidate, 'receipt');
   return path ? [`different:${path}`] : [];
+}
+
+// Serialized by Playwright: all dependencies are looked up in this page call.
+export function readFirstDrawComponents(){
+ const module=globalThis.Module;
+ const idle=()=>globalThis.Module===module&&globalThis.__meleeWebFirstDrawComponentModuleV1===module&&
+   module?.matchFrameEffectNativeIdle?.()===true&&module.matchFrameEffectCallbackReturned===true;
+ if(!idle())return {status:'refused',reason:'same_module_or_returned_idle_missing',composite_eligible:false};
+ const depthBefore=module.__meleeWebDepthNoWorkV1?.status?.();
+ if(depthBefore?.phase!=='READY'||depthBefore.firstFailure||depthBefore.bridgeFailure)
+  return {status:'refused',reason:'depth_history_not_clean',depth_before:depthBefore??null,composite_eligible:false};
+ if(typeof module._melee_web_native_menu_frame_effect_components!=='function'||
+    typeof module._aurora_browser_depth_no_work_arm_component!=='function')
+  return {status:'refused',reason:'private_exports_missing',composite_eligible:false};
+ const native=JSON.parse(module.UTF8ToString(module._melee_web_native_menu_frame_effect_components()));
+ // Never activate even this component after a native refusal.
+ if(native?.copied!==true||native.component_ready!==true)
+  return {status:'refused',reason:'native_component_not_ready',native,depth_before:depthBefore,composite_eligible:false};
+ if(!idle())return {status:'refused',reason:'module_or_idle_changed',native,composite_eligible:false};
+ return {schema:'melee-web-first-draw-components-read-v1',status:'read',same_module:true,returned_idle:true,
+   native,depth_before:depthBefore,composite_eligible:false,
+   remaining_gates:['LOAD-content','sampled-texture-continuous-guard','device-host-futures','native-refs','restore']};
+}
+// Separate serialized call, reached only after the host strictly decodes read.
+export function armFirstDrawComponents({expectedDepthSequence}={}){
+ const module=globalThis.Module;
+ const idle=()=>globalThis.Module===module&&globalThis.__meleeWebFirstDrawComponentModuleV1===module&&
+   module?.matchFrameEffectNativeIdle?.()===true&&module.matchFrameEffectCallbackReturned===true;
+ if(!idle())return {status:'refused',reason:'same_module_or_returned_idle_missing',composite_eligible:false};
+ const depthBefore=module.__meleeWebDepthNoWorkV1?.status?.();
+ if(!Number.isSafeInteger(expectedDepthSequence)||depthBefore?.sequence!==expectedDepthSequence||
+    depthBefore.phase!=='READY'||depthBefore.firstFailure||depthBefore.bridgeFailure||
+    typeof module._aurora_browser_depth_no_work_arm_component!=='function')
+  return {status:'refused',reason:'depth_history_changed_before_arm',depth_before:depthBefore??null,composite_eligible:false};
+ const depthArm=module._aurora_browser_depth_no_work_arm_component();
+ const depthAfter=module.__meleeWebDepthNoWorkV1.status();
+ if(depthArm!==1||depthAfter.phase!=='ACTIVE'||depthAfter.firstFailure||depthAfter.bridgeFailure||!idle())
+  return {status:'refused',reason:'depth_arm_or_final_idle_refused',depth_after:depthAfter,composite_eligible:false};
+ return {schema:'melee-web-first-draw-components-arm-v1',status:'armed',same_module:true,returned_idle:true,
+   depth_after:depthAfter,composite_eligible:false};
+}
+export function firstDrawComponentFailures(value,{stage='armed'}={}){
+ const read=stage==='read';
+ if(!read&&stage!=='armed')return ['component_decoder_stage'];
+ const failures=[];const bad=reason=>failures.push(reason);
+ const exact=(o,keys)=>o&&typeof o==='object'&&!Array.isArray(o)&&Object.keys(o).length===keys.length&&keys.every(k=>Object.hasOwn(o,k));
+ const u32=v=>Number.isInteger(v)&&v>=0&&v<=0xffffffff;
+ const u64=v=>typeof v==='string'&&/^(0|[1-9][0-9]{0,19})$/.test(v)&&BigInt(v)<=0xffffffffffffffffn;
+ if(!exact(value,['schema','status','same_module','returned_idle','native','depth_before',...(read?[]:['depth_after']),'composite_eligible','remaining_gates'])||
+    value.schema!==(read?'melee-web-first-draw-components-read-v1':'melee-web-first-draw-components-v1')||value.status!==(read?'read':'observed')||value.same_module!==true||value.returned_idle!==true||value.composite_eligible!==false)
+  return ['component_observation_refused_or_malformed'];
+ const n=value.native;
+ if(!exact(n,['schema','copied','component_ready','refusal','composite_eligible','frame_slot_capacity','staging_slot_capacity','facts'])||
+    n.schema!=='melee-web-native-first-draw-components-v1'||n.copied!==true||n.component_ready!==true||n.refusal!==''||n.composite_eligible!==false||
+    n.frame_slot_capacity!==4||n.staging_slot_capacity!==4)return ['native_component_receipt']; // authored Emscripten constants, not runtime guesses
+ const f=n.facts;
+ if(!exact(f,['schema_version','owner_book_present','before','after','packets','owners'])||f.schema_version!==1||f.owner_book_present!==1)return ['native_component_facts'];
+ const stamp64=['generation','registration_sequence','callback_sequence','stale_callback_count','queue_handle','last_begin_frame_id','last_end_frame_id'];
+ const stamp32=['frame_index','active_frame_count','active_staging_count','free_frame_count','free_staging_count','worker_idle','process_events_queued'];
+ for(const v of [f.before,f.after])if(!exact(v,[...stamp64,...stamp32])||!stamp64.every(k=>u64(v[k]))||!stamp32.every(k=>u32(v[k])))bad('native_stamp');
+ if(![...stamp64,...stamp32].every(k=>f.before?.[k]===f.after?.[k]))bad('native_stamp_drift');
+ const p=f.packets;
+ if(!exact(p,['schema_version','active_slot_count','recorder','slots'])||p.schema_version!==1||!u32(p.active_slot_count)||p.active_slot_count<1||p.active_slot_count>4||
+    !exact(p.recorder,['active','in_offscreen','suspended_efb_pass'])||Object.values(p.recorder).some(v=>v!==0)||!Array.isArray(p.slots)||p.slots.length!==4)bad('native_packets');
+ const slot64=['frame_id','render_pass_count','texture_copy_count','encoder_task_count','op_count','texture_upload_count','after_submit_callback_count','verts_bytes','uniforms_bytes','indices_bytes','storage_bytes','texture_upload_bytes'];
+ for(const v of Array.isArray(p?.slots)?p.slots:[])if(!exact(v,['slot','frame_index','encoder_present',...slot64])||!['slot','frame_index','encoder_present'].every(k=>u32(v[k]))||!slot64.every(k=>u64(v[k])))bad('native_slot');
+ const owner64=['future_id','registration_sequence','callback_sequence','captured_generation','queue_handle','encoder_handle'];
+ if(!Array.isArray(f.owners)||f.owners.length!==4)bad('native_owners');
+ for(const v of Array.isArray(f.owners)?f.owners:[])if(!exact(v,['state',...owner64])||!u32(v.state)||!owner64.every(k=>u64(v[k])))bad('native_owner');
+ // Do not accept a claimed native-ready bit with contradictory copied facts.
+ if(!failures.length){
+  const b=f.before;
+  if(b.generation==='0'||b.queue_handle==='0'||b.stale_callback_count!=='0'||b.worker_idle!==1||b.process_events_queued!==0||b.frame_index===0xffffffff||
+     b.active_frame_count<1||b.active_frame_count>4||b.active_staging_count<1||b.active_staging_count>4||
+     b.free_frame_count!==b.active_frame_count||b.free_staging_count!==b.active_staging_count||p.active_slot_count!==b.active_frame_count)bad('native_not_ready');
+  p.slots.forEach((row,i)=>{
+   if(row.encoder_present!==0||slot64.slice(1).some(k=>row[k]!=='0')||
+      (i<p.active_slot_count?row.slot!==i:row.slot!==0||row.frame_index!==0||row.frame_id!=='0'))bad('native_slot_not_empty');
+  });
+  f.owners.forEach((row,i)=>{
+   if(i>=b.active_staging_count||row.state===0){if(row.state!==0||owner64.some(k=>row[k]!=='0'))bad('native_owner_not_zero');}
+   else if(row.state===2){if(row.captured_generation!==b.generation||row.queue_handle!==b.queue_handle||row.encoder_handle==='0'||row.future_id==='0'||
+     row.registration_sequence==='0'||BigInt(row.registration_sequence)>BigInt(b.registration_sequence)||row.callback_sequence==='0'||BigInt(row.callback_sequence)>BigInt(b.callback_sequence))bad('native_completed_owner');}
+   else if(row.state===5){if(row.captured_generation!==b.generation||owner64.filter(k=>k!=='captured_generation').some(k=>row[k]!=='0'))bad('native_immediate_owner');}
+   else bad('native_pending_or_unknown_owner');
+  });
+ }
+ const pristine=(words,enabled)=>Array.isArray(words)&&words.length===35&&words.every(u32)&&
+   words[0]===1&&words[1]===enabled&&words[2]===0&&words[3]===0&&words[4]===3&&words.slice(5,8).every(v=>v===0)&&
+   [0,1,2].every(i=>words[8+i*9]===i&&words.slice(9+i*9,17+i*9).every(v=>v===0));
+ for(const [v,phase] of (read?[[value.depth_before,'READY']]:[[value.depth_before,'READY'],[value.depth_after,'ACTIVE']])){
+  if(v?.schema!=='melee-web-private-depth-no-work-v1'||v.phase!==phase||v.firstFailure!==null||v.bridgeFailure!==false||v.gameplayAdmission!==false||v.componentOnly!==true||v.initBegins!==1||v.initEnds!==1||
+     !Number.isSafeInteger(v.sequence)||v.sequence<3||!pristine(v.snapshots?.preMain,0)||!pristine(v.snapshots?.initialized,1)||
+     (phase==='ACTIVE'?!pristine(v.snapshots?.arm,1):v.snapshots?.arm!==null))bad('depth_component');
+ }
+ if(!read&&(value.depth_after?.sequence!==value.depth_before?.sequence+1||
+    !['preMain','initialized'].every(k=>Array.isArray(value.depth_before?.snapshots?.[k])&&Array.isArray(value.depth_after?.snapshots?.[k])&&value.depth_before.snapshots[k].length===35&&value.depth_before.snapshots[k].every((v,i)=>v===value.depth_after.snapshots[k][i]))))bad('depth_history_drift');
+ const gates=['LOAD-content','sampled-texture-continuous-guard','device-host-futures','native-refs','restore'];
+ if(!Array.isArray(value.remaining_gates)||value.remaining_gates.length!==gates.length||!gates.every((v,i)=>value.remaining_gates[i]===v))bad('composite_gates');
+ return failures;
 }
