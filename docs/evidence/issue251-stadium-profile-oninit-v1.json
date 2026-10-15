@@ -12737,5 +12737,447 @@
       "C3": "OPEN",
       "PCM_pixels_live_performance": "NOT_CLAIMED"
     }
+  },
+  "stadium_full_A_full_B_v15_2026_10_15": {
+    "schema": "stadium-full-A-full-B-common-fields-seed-component-evidence-v1",
+    "state": "PASS_COMPONENT_ROOT_AND_INDEPENDENT_FULL_PAIR_REPLAY",
+    "scope": "One unchanged-budget A7167 \u2192 checked native close/host settlement/restart \u2192 B7167 on the same Module/Wasm instance, with the retained original common-field/seed comparison. Component evidence only.",
+    "source_and_harness": {
+      "head": "53eb560d545911235cf937fbacde1b16bd4093e0",
+      "tree": "560d70650c21a594c1bc0634600d354c60896eab",
+      "runtime_harness_and_test_head_match": true,
+      "browser_harness_revision": "53eb560d545911235cf937fbacde1b16bd4093e0"
+    },
+    "validation": {
+      "diagnostic_artifacts_each": 44,
+      "ordinary_artifacts_each": 44,
+      "full_regression_tests": 2639,
+      "full_regression_skips": 180,
+      "diagnostic_release_build": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-host-settlement-repair-v1/validation-v1/evidence/diagnostic-release-build.json",
+        "bytes": 9834,
+        "sha256": "0395a433492452f05a7195ca2bb9ecff31c8142a4d1c61834b89cf4b6ac797f8"
+      },
+      "ordinary_release_build": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-host-settlement-repair-v1/validation-v1/evidence/ordinary-release-build.json",
+        "bytes": 9801,
+        "sha256": "d30ae757c64bb684fbcf4a541adfb952599236ae5b7a67c046e7fc3d45b4ad28"
+      },
+      "full_regression_result": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-host-settlement-repair-v1/validation-v1/evidence/result.json",
+        "bytes": 29082,
+        "sha256": "e389f77373f436297f23e74a3452987f9ab484c1a70f443cd368193ffbaa324a"
+      },
+      "full_regression_summary": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-host-settlement-repair-v1/validation-v1/evidence/full-unittest-suite.json",
+        "bytes": 2253,
+        "sha256": "92be8a0c74d0de2da402493530a4a0446086ad68a29b862417bd36d04a5d681d"
+      },
+      "full_regression_log": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-host-settlement-repair-v1/validation-v1/evidence/full-unittest-suite.log",
+        "bytes": 498041,
+        "sha256": "20252e005c0329607bd31c1d3556a4a04d135f0c3e422da4e07f9d107ff525ea"
+      },
+      "full_regression_root_review": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-host-settlement-repair-v1/validation-v1/evidence/root-result-review.json",
+        "bytes": 2792,
+        "sha256": "3d38a37e21f6d798d0624a009248c9a008218bf874a49cff96b74acadf4c3a90"
+      }
+    },
+    "retained_attempts": {
+      "V12_metadata_preflight": {
+        "state": "FAIL_PREBROWSER_PREFLIGHT_REFUSED",
+        "capture_started": false,
+        "packet_manifest": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-packet-v12/manifest-final.json",
+          "bytes": 6715,
+          "sha256": "8a23d86fb6d0a6b40c82737ab5e406753ff52f1bd4a67d56f0250acca498fab9"
+        },
+        "preflight": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-packet-v12/preflight-v12.json",
+          "bytes": 80610,
+          "sha256": "220e9fa38064bff9696c6e2404fcf35785ba8adc04150e8902a75240145c81bf"
+        },
+        "preflight_failure": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-packet-preparation-v3/preflight-failure-v1.json",
+          "bytes": 1040,
+          "sha256": "7c2cadd12949d7d486ed68365ded79311f76527118ac0a036a7c480e7dee0738",
+          "classification": "Actual launcher preflight refusal before browser launch: the inherited launcher looked for the renamed historical full-B review key and rejected the missing binding."
+        },
+        "classification": "Actual V12 launcher preflight refused before browser launch; the prepared packet and preflight inputs above are retained as context, not a successful launch."
+      },
+      "V13_browser_identity": {
+        "state": "FAIL_ENVIRONMENT_IDENTITY_BEFORE_GAME",
+        "expected_chrome": "155.0.8059.40",
+        "actual_chrome": "155.0.8059.80",
+        "browser_context_or_game_started": false,
+        "harness_cleanup_passed": false,
+        "supervisor_root_process_absence_verified": true,
+        "native_unload_claimed": false,
+        "root_failure_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v13/root-failure-review.json",
+          "bytes": 1425,
+          "sha256": "c181ada6b40edfa047543ba534bbbffd7241ddea579165587e3c79671eca4b8d"
+        },
+        "independent_failure_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v13/independent-failure-review.json",
+          "bytes": 2213,
+          "sha256": "65988511535dcc6862ffaeb1fe100252c8c845760a800a67529e5659828cd7f1"
+        }
+      },
+      "V14_host_settlement": {
+        "state": "FAIL_AT_FULL_A_HOST_SETTLEMENT_NO_B",
+        "A_actions": 7167,
+        "native_close_returned": true,
+        "same_instance_at_close": true,
+        "host_settlement": false,
+        "B_observed": false,
+        "root_failure_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v14/root-failure-review.json",
+          "bytes": 2210,
+          "sha256": "d67cdeeace4612ba90c357f4e42e4d820e78ecb8b76a07257308c8c025be95a0"
+        }
+      },
+      "V15_packet_metadata_refusals": {
+        "capture_started_for_refusals": false,
+        "refusal_1": "Three relative receipt-directory constants pointed at prior-source locations after hashes changed; corrected those constants only.",
+        "refusal_2": "Historical failed-suite exclusion was omitted from the root review binding; the exact failed result was then bound explicitly.",
+        "packet_manifest_with_corrections": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-packet-v15/manifest-final.json",
+          "bytes": 10532,
+          "sha256": "5d434f71e79862277a27fffff9868b8a981f747f8f1b97fe821e9f50b2651edc"
+        },
+        "final_successful_preflight": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-packet-v15/preflight-v15.json",
+          "bytes": 80560,
+          "sha256": "f77b878c3dcb1dfc6f85aa26c6ad9821beb8a037d1978231267d5680faf63d51"
+        }
+      },
+      "V15_independent_replay_v1_output_failure": {
+        "state": "FAIL_OUTPUT_FORMATTING_AFTER_A_ASSERTIONS",
+        "exit_code": 1,
+        "error": "Successful summary omitted `failure`; the A-only adapter attempted `summary.failure.split(...)`.",
+        "assertions_changed_in_v2": false,
+        "execution": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v15-independent-review-v1/execution.json",
+          "bytes": 16176,
+          "sha256": "a840165436cef38b1a5c43959fd7bd038be84110a975366244d1b85e02987d73"
+        },
+        "stderr": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v15-independent-review-v1/stderr.log",
+          "bytes": 512,
+          "sha256": "456d3534ffda775b7e4e3c2ad501e67a844f61c842d4ec42f9392771f9573680"
+        }
+      }
+    },
+    "host_settlement_repair": {
+      "candidate_manifest": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-host-settlement-repair-v1/manifest.json",
+        "bytes": 3061,
+        "sha256": "26cbf23e86a3eb9e11e2e7d58f3c151a6494e25884d54d5874be5f2acaed05f1"
+      },
+      "focused_completion": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-host-settlement-repair-v1/focused-v1/run/completion.json",
+        "bytes": 1645,
+        "sha256": "e6505decc9d50316f7b255482a5f141604cf7264aa4cf1c18b05de5792bf0690"
+      },
+      "independent_source_review": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-host-settlement-independent-review-v1/review.json",
+        "bytes": 5372,
+        "sha256": "89581097af6db68704a14e71df9843f969c1861923cdb0ddb1df6b45b77c4485"
+      },
+      "required_validation_release": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-host-settlement-repair-v1/root-required-validation-release.json",
+        "bytes": 446,
+        "sha256": "e183f4e4ca0434e83f6b86525de6a10fb0ad0afc93710b4c9ddb418e204089a3"
+      }
+    },
+    "capture": {
+      "state": "PASS_SAME_INSTANCE_A7167_B7167_COMMON_FIELDS_SEED_COMPONENT_ONLY",
+      "acceptance": "not_claimed",
+      "browser": {
+        "version": "155.0.8059.80",
+        "headless": true
+      },
+      "elapsed_ms": 140439.043,
+      "runtime_artifacts_rehashed": 44,
+      "screenshots": 13,
+      "source_revision": "53eb560d545911235cf937fbacde1b16bd4093e0",
+      "source_tree": "560d70650c21a594c1bc0634600d354c60896eab",
+      "legs": [
+        {
+          "label": "A",
+          "actions": 7167,
+          "source_ticks": 3585,
+          "draws": 3582,
+          "audio_render_calls": 3585,
+          "audio_render_frames": 1912000,
+          "common_samples": 3501,
+          "common_fields_per_sample": 15,
+          "seed_values_per_sample": 1,
+          "exact_values": 56016,
+          "C_fields": 16,
+          "F_fields": 16,
+          "world_generation": 3,
+          "journal_segments": 14335,
+          "journal_chain_sha256": "b0e19df1628b53f9f20b7b433f9c36ce7846a1663d6a18c9707d164e21cb6acd",
+          "journal_arrays_equal_terminal": true
+        },
+        {
+          "label": "B",
+          "actions": 7167,
+          "source_ticks": 3585,
+          "draws": 3582,
+          "audio_render_calls": 3585,
+          "audio_render_frames": 1912000,
+          "common_samples": 3501,
+          "common_fields_per_sample": 15,
+          "seed_values_per_sample": 1,
+          "exact_values": 56016,
+          "C_fields": 16,
+          "F_fields": 16,
+          "world_generation": 6,
+          "journal_segments": 14335,
+          "journal_chain_sha256": "fd29a4c8fcc2400cd2b126d8018a0a704486c2ceec5ef15b629abc218cb029a0",
+          "journal_arrays_equal_terminal": true
+        }
+      ],
+      "close_restart": {
+        "native_close_checked": true,
+        "host_settlement_accepted": true,
+        "same_instance": true,
+        "module_exports_memory_wrappers_same": true,
+        "world_generation": [
+          3,
+          6
+        ],
+        "memory_bytes": [
+          134217728,
+          231997440
+        ],
+        "backing_buffer_changed_without_instance_change": true,
+        "A_archived_bytes_unchanged_after_B": true,
+        "final_supervisor_report_equals_B": true
+      },
+      "terminal_B_rng": {
+        "close_parent_seed": 1,
+        "schema": "melee-web-stadium-recreation-b-rng-v1",
+        "admitted": true,
+        "world_generation": 6,
+        "prior_world_generation": 3,
+        "match_seed_before": 899962297,
+        "match_seed_at_retirement": 824842692,
+        "host_seed": 1001933907,
+        "parent_seed": 1,
+        "match_to_host_restored": true,
+        "host_to_parent_restored": true,
+        "terminal_checked": true,
+        "full_common_fields_seed": true
+      },
+      "cleanup": {
+        "owner_cleanup_passed": true,
+        "root_verified_owned_pids_absent": 11,
+        "root_verified_owned_groups_absent": 2
+      },
+      "artifacts": {
+        "packet": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-packet-v15/manifest-final.json",
+          "bytes": 10532,
+          "sha256": "5d434f71e79862277a27fffff9868b8a981f747f8f1b97fe821e9f50b2651edc"
+        },
+        "preflight": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-packet-v15/preflight-v15.json",
+          "bytes": 80560,
+          "sha256": "f77b878c3dcb1dfc6f85aa26c6ad9821beb8a037d1978231267d5680faf63d51"
+        },
+        "root_release": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-packet-v15/root-release-v15.json",
+          "bytes": 9244,
+          "sha256": "9f8a2ffe158138d0d118622bb485c8974037a3f9305e744a2df035258302bd99"
+        },
+        "owner": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v15/owner.json",
+          "bytes": 140456,
+          "sha256": "24fc9ff99e16b8ce2d2a6bd05e55c2d8d3a49b152405d750c133118814b270af"
+        },
+        "launcher_result": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v15/launcher-result.json",
+          "bytes": 659,
+          "sha256": "b398a86e0188abea7879351ac8d4df869acfe1d70c2b9488ceaff7761a1e02cc"
+        },
+        "capture_log": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v15/capture.log",
+          "bytes": 192,
+          "sha256": "5cd1852a152ce6215bfa64435daf5c98cebdd871edcd427446b277a9b5b3c574"
+        },
+        "browser_processes": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v15/browser-processes.jsonl",
+          "bytes": 117780,
+          "sha256": "86c304117355ccb4671975ef4a7c71a6031d90e2ceae8882a4d99e10c17899ed"
+        },
+        "report_A": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v15/browser-run/report-A.json",
+          "bytes": 18710296,
+          "sha256": "895863da1c78e6c7e079f2e0fdfd16c91d53d323109103534c477bd1e68c8096"
+        },
+        "report_B_and_final_supervisor_report": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v15/browser-run/report-B.json",
+          "bytes": 18716247,
+          "sha256": "2d54725cf9531a70f75c16bc72c357c49464b42d5df29949fa0f5f1101d67c9d"
+        },
+        "A_action_journal": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v15/browser-run/report-A.json.stadium-c3-action-records-v1.jsonl",
+          "bytes": 18963216,
+          "sha256": "9f7c916c42eef9aadb3a0aef2165e9e34b07cf8e3661f6141c2057b29adcf392"
+        },
+        "B_action_journal": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v15/browser-run/report-B.json.stadium-c3-action-records-v1.jsonl",
+          "bytes": 18972534,
+          "sha256": "ffcede3c3b2cc2e28ccce1cb6b5f4d167bc9e646cdfc9570cb4a84d21288b02b"
+        },
+        "A_css_sss_history": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v15/browser-run/report-A.json.stadium-c3-css-sss-history-v1.json",
+          "bytes": 2746422,
+          "sha256": "6c9d676730e660415c82c8f5ce4eecef4dbe25dfa0c465f49eb7ea6f97f66dbe"
+        },
+        "B_css_sss_history": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v15/browser-run/report-B.json.stadium-c3-css-sss-history-v1.json",
+          "bytes": 2746559,
+          "sha256": "6ec898edda1ae9bf79f7c358844a1a37aa0f42a6010a7b4ebb6675ce7b7716e0"
+        },
+        "recreation_summary": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v15/browser-run/recreation-summary.json",
+          "bytes": 5577,
+          "sha256": "e77022637a9e2971fc56ccef49e680b5d31bc07d2c8841e732951642269a58f6"
+        },
+        "close_A": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v15/browser-run/recreation-close-A.json",
+          "bytes": 1271,
+          "sha256": "bcde54977953469e1b6d97886a38d87ffb2522fca356dedaf8197aaf37123554"
+        },
+        "restart_A": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v15/browser-run/recreation-restart-A.json",
+          "bytes": 1617,
+          "sha256": "cff21aec3705b9ffe40e92baebb29f1919dc3a5180d7867bfa27fcbe375b04b1"
+        },
+        "final_root_result_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v15/root-result-review.json",
+          "bytes": 5236,
+          "sha256": "a4d56c194c72815fb499b4d3ef47e18f74d80bd4bb57fde7fcc850a08edfe666"
+        }
+      }
+    },
+    "independent_replay": {
+      "state": "PASS_COMPONENT_REPLAY_ONLY",
+      "scope": "Separate A-only adapter replay followed by the existing strict full-pair reviewer; retained data only.",
+      "A_only_adapter": {
+        "state": "PASS_A_ONLY_REPLAY_COMPONENT",
+        "legacy_B_unobserved_field": true,
+        "scope_note": "This adapter validates A only; its B-unobserved label is not the pair result."
+      },
+      "full_pair": {
+        "state": "PASS_COMPONENT_REPLAY_ONLY",
+        "legs": [
+          {
+            "label": "A",
+            "actions": 7167,
+            "ticks": 3585,
+            "draws": 3582,
+            "audioFrames": 1912000,
+            "common_samples": 3501,
+            "exact_common_values": 56016,
+            "comparisons": [
+              {
+                "phase": "C",
+                "fields": 16
+              },
+              {
+                "phase": "F",
+                "fields": 16
+              }
+            ],
+            "world_generation": 3,
+            "journal_segments": 14335,
+            "journal_chain_sha256": "b0e19df1628b53f9f20b7b433f9c36ce7846a1663d6a18c9707d164e21cb6acd",
+            "journal_arrays_equal_terminal": true
+          },
+          {
+            "label": "B",
+            "actions": 7167,
+            "ticks": 3585,
+            "draws": 3582,
+            "audioFrames": 1912000,
+            "common_samples": 3501,
+            "exact_common_values": 56016,
+            "comparisons": [
+              {
+                "phase": "C",
+                "fields": 16
+              },
+              {
+                "phase": "F",
+                "fields": 16
+              }
+            ],
+            "world_generation": 6,
+            "journal_segments": 14335,
+            "journal_chain_sha256": "fd29a4c8fcc2400cd2b126d8018a0a704486c2ceec5ef15b629abc218cb029a0",
+            "journal_arrays_equal_terminal": true
+          }
+        ],
+        "close_parent_seed": 1,
+        "terminal_B_rng": {
+          "schema": "melee-web-stadium-recreation-b-rng-v1",
+          "admitted": true,
+          "world_generation": 6,
+          "prior_world_generation": 3,
+          "match_seed_before": 899962297,
+          "match_seed_at_retirement": 824842692,
+          "host_seed": 1001933907,
+          "parent_seed": 1,
+          "match_to_host_restored": true,
+          "host_to_parent_restored": true,
+          "terminal_checked": true,
+          "full_common_fields_seed": true
+        },
+        "same_instance": true,
+        "immutable_A": true,
+        "supervisor_equals_B": true,
+        "owned_cleanup": true,
+        "restore": false,
+        "C3": false
+      },
+      "source_and_evidence_rehashed": 27,
+      "process_group_absent": 10413,
+      "v2_manifest": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v15-independent-review-v2/manifest.json",
+        "bytes": 2826,
+        "sha256": "14be6d5de4f0aeae42c51e28366de311c63b9519f4f19ccfbd5a2745086b1a20"
+      },
+      "execution": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v15-independent-review-v2/execution.json",
+        "bytes": 16177,
+        "sha256": "eeaf564b408b0f729b5968d9ba939c0c5f7269b3f58df3ce217d546e76a431d9"
+      },
+      "stdout": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v15-independent-review-v2/stdout.jsonl",
+        "bytes": 2096,
+        "sha256": "eb5e9313c6f527d1c629f4fa2dfc5590f77b5a3cff931fc2804353e813781c0f"
+      },
+      "stderr": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-full-pair-capture-v15-independent-review-v2/stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "limits": {
+      "original_second_lifetime_parity": "OPEN",
+      "complete_original_per_owner_rng_ledger": "OPEN",
+      "complete_typed_state": "OPEN",
+      "rollback_restore": "NOT_CLAIMED",
+      "C3_acceptance": "OPEN",
+      "pixels_pcm_live_performance": "NOT_CLAIMED",
+      "next_prerequisite": "Observe the original eight-scene owner/RNG boundary; do not repeat this pair unchanged."
+    }
   }
 }
