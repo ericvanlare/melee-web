@@ -2562,6 +2562,184 @@
         },
         "next": "Classify first actual LOAD/sample content dependency from retained receipt without a new capture; preserve unknown starting texels and LOAD7. No restore admission."
       }
+    },
+    "readonly_gpu_target_component": {
+      "state": "PASS_REAL_GPU_COMPONENT_NOT_GAMEPLAY_RESTORE",
+      "scope": "One continuous same-instance texture guard component; no Wasm restore and no gameplay admission.",
+      "source": {
+        "commit": "5cdcd2a7a133ace49acf17d5462370c5840e68cf",
+        "tree": "a5f3fa6c2f73da0c682078cffecdfece44a649be"
+      },
+      "source_paths": [
+        ".deps/aurora/lib/gfx/aurora_browser_texture_readonly_guard.cpp",
+        ".deps/aurora/lib/gfx/aurora_browser_texture_readonly_guard_library.js",
+        "patches/aurora-browser.patch",
+        "tests/aurora_texture_readonly_guard_probe.cpp",
+        "tests/texture_readonly_guard_real_gpu_fixture.mjs"
+      ],
+      "candidate_lineage": {
+        "target_guard_v3": {
+          "artifact": "texture-readonly-target-guard-candidate-v3/manifest.json",
+          "manifest_sha256": "fa6545509b2049173e1111138d5e752b3f7b46d47b5ffb8bbab832335b4b4185",
+          "candidate_patch_sha256": "688027d77087c3a5036cc728d1a217e9c5dc86690fae3eefd06f1ff027994718",
+          "proposal_base": "406da3aed587509a99add8a5dad681b24715ec3f",
+          "retained_failed_archive_link": {
+            "artifact": "texture-readonly-target-guard-candidate-v3/integrated-build-v1",
+            "base_commit": "a6cfbcba1c8a2e99f9388d2986a3df4051967688",
+            "outcome": "failed-at-wasm-link; retained; process group absent after cleanup",
+            "link_diagnostics_stdout": {
+              "artifact": "texture-readonly-target-guard-candidate-v3/integrated-build-v1/run/isolated-component-release-build.stdout",
+              "bytes": 701679,
+              "sha256": "23be1c6bc1eb14934f9526ae33e9c83cab62b0208741d2999b17a43319fc7438"
+            },
+            "build_wrapper_stderr": {
+              "artifact": "texture-readonly-target-guard-candidate-v3/integrated-build-v1/run/isolated-component-release-build.stderr",
+              "bytes": 2155,
+              "sha256": "8f5934f77116013fcc2685f16fc4f9b32da2456e72fd17a99b09d62867b2a7ac"
+            },
+            "failure_summary": {
+              "artifact": "texture-readonly-target-guard-candidate-v3/integrated-build-v1/run/failure.json",
+              "bytes": 557,
+              "sha256": "aa8e161ad1adfb201d4c1ad170a29133ea773e850d2d258303a9f19b1637be81"
+            },
+            "executor_result": {
+              "artifact": "texture-readonly-target-guard-candidate-v3/integrated-build-v1/run/isolated-component-release-build.result.json",
+              "bytes": 456,
+              "sha256": "7cb4b0e52399944939118b75c1f1a2d0badf6ceb60efe17f0519b64c59c4fab2"
+            },
+            "reported_unresolved_symbols": [
+              "texture_readonly_guard_device_epoch_change",
+              "detach_texture_readonly_guard_host",
+              "issue_texture_readonly_guard_host"
+            ],
+            "summary": "The original candidate archive-link attempt failed with wasm-ld undefined symbols. Its raw linker stdout, separate wrapper stderr, failure summary, and executor result are retained above. A later link repair is recorded separately and does not replace this failure."
+          }
+        },
+        "archive_link_repair": {
+          "artifact": "texture-readonly-target-guard-link-repair-v1/manifest.json",
+          "manifest_sha256": "51b72cfdcd4a36678c4140c66f2f68024dc0ebd918d1f9d4d6b5bf28704fb994",
+          "candidate_patch_sha256": "e5bf9836cfb3954e64376b8050a8333ac9f9d6523643cbb03a2ec82a85da6782",
+          "canonical_aurora_patch_sha256": "07221ca9bc67efa97ac3c1d20388dd8487d938e1e5aa88df468172ff7ddf8463",
+          "base_commit": "a6cfbcba1c8a2e99f9388d2986a3df4051967688",
+          "proposed_tree": "a5f3fa6c2f73da0c682078cffecdfece44a649be"
+        }
+      },
+      "real_gpu_capture": {
+        "run_locator": "texture-readonly-real-gpu-capture-5cd-v1",
+        "result": "pass",
+        "scope": "Continuous same-instance real-GPU component; no Wasm restore/gameplay admission.",
+        "elapsed_ms": 7712,
+        "source": {
+          "commit": "5cdcd2a7a133ace49acf17d5462370c5840e68cf",
+          "tree": "a5f3fa6c2f73da0c682078cffecdfece44a649be"
+        },
+        "artifacts": {
+          "browser_report": {
+            "path": "texture-readonly-real-gpu-capture-5cd-v1/browser-run/report.json",
+            "bytes": 70299,
+            "sha256": "d2784644916bde6ff9b312af775852ba6d68a7ed899dc622a3da544ca36f29f9"
+          },
+          "root_review": {
+            "path": "texture-readonly-real-gpu-capture-5cd-v1/root-result-review.json",
+            "bytes": 2455,
+            "sha256": "714a0ee0e39728f6c6bab09bdcd82a78fc6f31c94e58d9feb8fd3983097ed66f"
+          },
+          "owner_report_sha256": "a1ccad5ad15faf9cfbbdd9bed2c6c7d11aabad0df28bac2c4b34f7bfb3effc0b",
+          "release_record_sha256": "6c5a0d087c3c838b6377d583ee4aefc5ca166694b04b5f9c08b46462ca6fcd1c"
+        },
+        "gpu": {
+          "backend": "Apple Metal 3",
+          "browser_display_type": "ANGLE_METAL",
+          "adapter_vendor": "apple",
+          "adapter_architecture": "metal-3",
+          "is_fallback_adapter": false,
+          "device_description": "Apple M4"
+        },
+        "positive": {
+          "readback_count": 2,
+          "bytes_per_readback": 64,
+          "readback_sha256": "049b4074a769ef4ea3c085447bda41c242f8e6f547968048724d38dd000b83da",
+          "readbacks_match": true
+        },
+        "negative_expected_cases": {
+          "count": 17,
+          "codes": {
+            "write": "TARGET_writeTexture",
+            "method-alias": "TARGET_writeTexture",
+            "copy-buffer": "TARGET_copyBufferToTexture",
+            "copy-texture": "TARGET_copyTextureToTexture",
+            "destroy": "TARGET_destroy",
+            "device-destroy": "TARGET_destroy",
+            "set": "MAPPING_MUTATION",
+            "define": "MAPPING_MUTATION",
+            "delete": "NATIVE_FINAL_RELEASE_OR_TABLE_DELETE",
+            "truncate": "MAPPING_TRUNCATION",
+            "direct-table-alias": "MAPPING_MUTATION",
+            "import-alias": "MAPPING_MUTATION",
+            "replace-table": "TABLE_REPLACEMENT",
+            "replace-internals": "TABLE_REPLACEMENT",
+            "define-table": "TABLE_REPLACEMENT",
+            "detach": "OWNER_DETACH",
+            "last-native-release": "NATIVE_FINAL_RELEASE_OR_TABLE_DELETE"
+          }
+        },
+        "cleanup": {
+          "recorded_process_ids_absent": 30,
+          "owned_process_groups_absent": 2,
+          "empty_tmp_removed": true
+        },
+        "source_guards": {
+          "ordinary_profiles": "OFF",
+          "gameplay_arm": "REFUSED"
+        }
+      },
+      "not_proven": [
+        "Wasm snapshot or restore",
+        "gameplay arm, source draw, or actual match texture admission",
+        "LOAD_ATTACHMENT contents or complete GPU owner closure",
+        "native final-release/import-alias bookkeeping closure",
+        "pending/deferred work, audio/file state, or full native-reference lifetime",
+        "gameplay, pixel/PCM equality, or rollback acceptance"
+      ],
+      "required_validation": {
+        "state": "PASS",
+        "source": "5cdcd2a7a133ace49acf17d5462370c5840e68cf",
+        "tree": "a5f3fa6c2f73da0c682078cffecdfece44a649be",
+        "tests": 2435,
+        "skips": 164,
+        "release_profiles": 3,
+        "verified_artifacts": 134,
+        "root_review": {
+          "path": "net-texture-readonly-guard-validation-v1/evidence/root-result-review.json",
+          "sha256": "683c54233cc2e845fbdcfb2ea9784fa515dbb4bf9cd4ea033745ba6a05d090fe",
+          "bytes": 1632
+        },
+        "receipts": {
+          "ordinary-release-build": {
+            "sha256": "c5fccc72a15f5a65f486b969c9c6242da1b57688d76b984b6b88d720624f736d",
+            "log_sha256": "aaa62dd9271d58b04367574fa71f3861bbfd82caf8356cec251ee1a9087cc80f",
+            "elapsed_seconds": 31.001
+          },
+          "frame-effect-release-build": {
+            "sha256": "b6d7c342964e7f572d951470257e8b9335b146916556e4dd7ed57e79d7e23597",
+            "log_sha256": "ed097b358f95506a5af442a7e15b5b5acdb29b1345b9b8d670ac02c6ca6b409e",
+            "elapsed_seconds": 30.448
+          },
+          "combined-first-pair-release-build": {
+            "sha256": "3ea2306cf2c211f4abdbe9ea1eb6d396276e14b25369ea17de783b3174bdfb14",
+            "log_sha256": "1f1a57c8d63eb9cc80910d4c9994bfbb75ee28a37226718e6d5e81aa8edf4ffc",
+            "elapsed_seconds": 30.548
+          },
+          "full-unittest-suite": {
+            "sha256": "eb543bd75aff0f590cdd7fe2c2429a89919138d029ed5d728aaa81c680aa8f28",
+            "log_sha256": "5a76350a949cf756b19603d7f22f556fc46d4d2aafc1d5767e22f85375fc23a9",
+            "elapsed_seconds": 556.686
+          }
+        },
+        "owned_groups_absent": true,
+        "guard_off_in_existing_profiles": true,
+        "final_head_ci": "PENDING_NEW_DOCUMENTATION_HEAD"
+      }
     }
   }
 }

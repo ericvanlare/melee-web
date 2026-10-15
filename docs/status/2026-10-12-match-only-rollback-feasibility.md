@@ -447,6 +447,27 @@ incidents. Its sample history is incomplete: 100 samples remain from 3,133
 callbacks, with 3,033 samples evicted. This observation does not close live timing,
 pixel/PCM equality, complete host ownership or rollback/frame-budget acceptance.
 
+On October 15, a separate one-texture guard component passed on executable
+`5cdcd2a7` (tree `a5f3fa6c`). The real-GPU probe used Apple Metal 3 on Apple M4
+with a nonfallback adapter. Two 64-byte readbacks matched exactly; all 17
+expected refusal cases covered writes, aliases, copies, destruction, mapping
+changes and owner detach. All 30 recorded process IDs and both owned groups
+were absent. The first isolated build at `a6cfbcba` failed because the archive
+link did not extract its EM_JS bridge; the minimal executable-source link repair
+and the original failed output remain separately identified in the receipt.
+
+All three required Release builds and the full 2,435-test regression pass with
+164 skips on `5cdcd2a7`. Independent review verifies 134 emitted artifacts,
+source and patch identities, guard exclusion from the existing runtime profiles,
+and owned-process absence. The updated draft head still requires its own CI.
+
+This is component evidence only: gameplay arming remains refused. It does not
+restore Wasm, resolve `LOAD_ATTACHMENT`, or prove complete native/GPU ownership.
+Native final-release/import-alias bookkeeping, pending work, audio/file state and
+full reference lifetime remain open. Exact component, retained failure and
+validation identities are under `readonly_gpu_target_component` in the
+[existing structured receipt](../evidence/match-only-rollback-feasibility-v1.json).
+
 ## Slippi profile source checkpoint
 
 The [profile inventory](../investigations/SLIPPI_GAMEPLAY_PROFILE_INVENTORY.md)
