@@ -55,7 +55,7 @@ class AuroraBrowserQuiescenceOptionTests(OwnedWorkspaceTests):
         )
         self.assertIn('AURORA_QUIESCENCE_DIAGNOSTIC_TARGET = "aurora-browser-quiescence"', build)
         self.assertIn(
-            "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC={'ON' if target == AURORA_QUIESCENCE_DIAGNOSTIC_TARGET else 'OFF'}",
+            "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC={'ON' if target == AURORA_QUIESCENCE_DIAGNOSTIC_TARGET or first_draw_components_diagnostic else 'OFF'}",
             build,
         )
         self.assertEqual(
