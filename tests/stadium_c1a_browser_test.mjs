@@ -3341,6 +3341,106 @@ function recreationEventSnapshot() {
   };
 }
 
+const recreationPreparationAttributionKey = '__meleeStadiumPreparationAttributionV1';
+let recreationPreparationAttributionHandle = null;
+async function installRecreationPreparationAttribution() {
+  if (recreationPreparationAttributionHandle) throw Error('Preparation attribution handle already exists');
+  recreationPreparationAttributionHandle = await timeout(page.evaluateHandle(key => {
+    if (Object.prototype.hasOwnProperty.call(globalThis, key))
+      throw Error('Preparation attribution already has an owner');
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'menuConstructionTiming');
+    if (!descriptor || typeof descriptor.value !== 'function' || descriptor.get || descriptor.set)
+      throw Error('Existing construction timing callback is unavailable');
+    const original = descriptor.value, rows = [], boundaries = {};
+    let role = null, overflow = false, phase = 'awaiting-A';
+    const scalar = value => Number.isFinite(value) && value >= 0 ? value : null;
+    const startup = () => {
+      const value = globalThis.Module?.graphicsStartup;
+      const names = ['renderer_init_ms', 'queued_pipelines', 'created_pipelines',
+        'first_native_callback_ms', 'elapsed_ms'];
+      const graphics = value && typeof value === 'object'
+        ? Object.fromEntries(names.map(name => [name, scalar(value[name])])) : null;
+      if (graphics) { graphics.cache_idle = [-1, 0, 1].includes(value.cache_idle) ? value.cache_idle : null;
+        graphics.terminal = typeof value.terminal === 'boolean' ? value.terminal : null; }
+      const timings = [...performance.getEntriesByType('mark'), ...performance.getEntriesByType('measure')]
+        .filter(entry => /^webmelee-startup:[a-z0-9:_-]{1,120}$/i.test(entry.name));
+      if (timings.length > 128) overflow = true;
+      return {graphics, user_timing: timings.slice(0, 128).map(entry => ({name: entry.name,
+        type: entry.entryType, start_ms: scalar(entry.startTime), duration_ms: scalar(entry.duration)}))};
+    };
+    function wrapped(data) {
+      try { return original.apply(this, arguments); }
+      finally {
+        try {
+          if (role && data?.kind === 'scene-prepare') {
+            if (rows.length >= 4) overflow = true;
+            else rows.push({role, at_ms: performance.now(), kind: 'scene-prepare',
+              total_ms: scalar(data.total_ms), construct_ms: scalar(data.construct_ms),
+              entry_ms: scalar(data.entry_ms), queued_delta: scalar(data.queued_delta),
+              created_delta: scalar(data.created_delta), wasm_heap_bytes: scalar(data.wasm_heap_bytes)});
+          }
+        } catch { overflow = true; }
+      }
+    }
+    Object.defineProperty(globalThis, 'menuConstructionTiming', {...descriptor, value: wrapped});
+    const own = () => {
+      const capsule = Object.getOwnPropertyDescriptor(globalThis, key);
+      if (!capsule || capsule.value !== api || capsule.get || capsule.set ||
+          capsule.writable !== false || capsule.enumerable !== false || capsule.configurable !== true)
+        throw Error('Preparation attribution capsule owner changed');
+      const current = Object.getOwnPropertyDescriptor(globalThis, 'menuConstructionTiming');
+      if (!current || current.value !== wrapped || current.get !== descriptor.get ||
+          current.set !== descriptor.set || current.writable !== descriptor.writable ||
+          current.enumerable !== descriptor.enumerable || current.configurable !== descriptor.configurable)
+        throw Error('Preparation timing callback owner changed');
+    };
+    const api = Object.freeze({
+      begin(label) { own(); if (!['A', 'B'].includes(label) || boundaries[label] || role !== null ||
+          phase !== (label === 'A' ? 'awaiting-A' : 'A-finished'))
+        throw Error('Preparation attribution role is invalid or repeated');
+        phase = `${label}-active`; role = label; boundaries[label] = {before: startup(), begun_ms: performance.now()}; },
+      finish(label) { own(); if (role !== label || phase !== `${label}-active` ||
+          !boundaries[label] || boundaries[label].after)
+        throw Error('Preparation attribution completion is out of order');
+        boundaries[label].after = startup(); boundaries[label].finished_ms = performance.now(); role = null; phase = `${label}-finished`;
+        return {schema: 'melee-web-stadium-import-preparation-attribution-v1', role: label,
+          boundary: boundaries[label], construction: rows.filter(row => row.role === label), overflow,
+          scope: 'Existing construction publication plus JS-only startup fields/UserTiming; no new native read or IO attribution.'}; },
+      dispose() { own(); if (globalThis[key] !== api) throw Error('Preparation observer owner changed');
+        Object.defineProperty(globalThis, 'menuConstructionTiming', descriptor); delete globalThis[key]; return true; },
+    });
+    Object.defineProperty(globalThis, key, {value: api, configurable: true});
+    return api;
+  }, recreationPreparationAttributionKey), Math.min(5000, remaining()), 'Install owned preparation timing observer');
+  return true;
+}
+async function observeRecreationPreparation(operation, role) {
+  const handle = recreationPreparationAttributionHandle;
+  if (!handle) throw Error('Preparation attribution handle is absent');
+  const result = await timeout(handle.evaluate((api, {key, operation, role}) => {
+    if (globalThis[key] !== api || !['begin', 'finish', 'dispose'].includes(operation))
+      throw Error('Preparation timing observer identity/operation is unavailable');
+    return api[operation](role);
+  }, {key: recreationPreparationAttributionKey, operation, role}),
+  Math.min(5000, remaining()), 'Read existing preparation timing publication');
+  if (operation === 'dispose') {
+    recreationPreparationAttributionHandle = null;
+    await timeout(handle.dispose(), Math.min(5000, remaining()), 'Dispose owned preparation timing handle');
+  }
+  return result;
+}
+async function recordRecreationPreparationAttribution(role, timings) {
+  const attribution = await observeRecreationPreparation('finish', role);
+  // Retain malformed/missing/overflow attribution before the existing failure
+  // catch/final persistence executes. This observation never heals a failure.
+  report.scenario.preparation_attribution = {...attribution, ...timings};
+  assert.equal(attribution.overflow, false);
+  assert.equal(attribution.construction.length, 1,
+    `${role} import must publish exactly one scene-prepare timing`);
+  assert.ok(Number.isFinite(attribution.construction[0].construct_ms));
+  return attribution;
+}
+
 async function snapshotRecreationCheckpointFiles(checkpoint) {
   const paths = [checkpoint?.sidecarPath, checkpoint?.dynamicRecordPath].filter(Boolean);
   const records = [];
@@ -3787,6 +3887,7 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
   matchedSetupCfExplicitAsyncifyUnsafe = false;
   pendingMatchedSetupCfExplicitStep = null;
   const nextReport = structuredClone(recreationBaseReport);
+  delete nextReport.scenario.preparation_attribution;
   nextReport.result = 'fail';
   nextReport.execution_state = 'running';
   delete nextReport.completed_at;
@@ -3822,12 +3923,16 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
   report.scenario.recreation_canary.instance_identity_samples.push({boundary: 'after-A-restart-before-B',
     ...identityBeforeB});
   await persistReport();
+  await observeRecreationPreparation('begin', 'B');
   const bImportStartedNs = monotonicNowNs();
   await timeout(driver.selectDisc(values.disc), Math.min(LIMITS.discImportMs, remaining()),
     'Fresh B disc import after checked same-instance restart');
+  const bSelectDiscMs = elapsedMs(bImportStartedNs);
   await timeout(driver.waitForStart(), Math.min(LIMITS.discImportMs, remaining()),
     'Fresh B native menu preparation');
   const bImportMs = elapsedMs(bImportStartedNs);
+  await recordRecreationPreparationAttribution('B',
+    {import_total_ms: bImportMs, select_disc_ms: bSelectDiscMs});
   const bRouteStartedNs = monotonicNowNs();
   await runFirstCssBrowserDraw({baseUrl, artifacts, before});
   const bRouteMs = elapsedMs(bRouteStartedNs);
@@ -3873,6 +3978,7 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
         '__meleeWebStadiumRecreationCallbackScopeV1');
   }, recreationHelperKey);
   assert.equal(helperRemoved, true);
+  assert.equal(await observeRecreationPreparation('dispose', null), true);
 
   // Recheck A's in-memory archive, exact on-disk report/receipt and checkpoint
   // sidecars after all B work and callback disposal, immediately before return.
@@ -4640,8 +4746,19 @@ async function main() {
     css_to_sss_start_key: startKey, sss_a_confirm_key: attackKey,
   };
   await page.locator('#controls-close').click();
+  if (recreationCanary) {
+    await installRecreationPreparationAttribution();
+    await observeRecreationPreparation('begin', 'A');
+  }
+  const aImportStartedNs = recreationCanary ? monotonicNowNs() : null;
   await driver.selectDisc(values.disc);
+  const aSelectDiscMs = recreationCanary ? elapsedMs(aImportStartedNs) : null;
   await timeout(driver.waitForStart(), Math.min(LIMITS.discImportMs, remaining()), 'Disc import and native prep');
+  if (recreationCanary) {
+    const aImportMs = elapsedMs(aImportStartedNs);
+    await recordRecreationPreparationAttribution('A',
+      {import_total_ms: aImportMs, select_disc_ms: aSelectDiscMs});
+  }
   if (firstCssBrowserDraw) {
     if (recreationCanary)
       await runStadiumRecreationCanary({baseUrl, artifacts, before});
