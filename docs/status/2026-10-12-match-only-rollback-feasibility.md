@@ -488,6 +488,12 @@ profiles and the full 2,435-test regression pass, with 164 skips. The 134 build
 artifacts, source identities and four retired process groups were independently
 verified. The earlier `5cdcd2a7` validation and real-GPU result remain separate.
 
+### October 15 native pending/submission component
+
+At integrated source `299d5a04` (tree `05dba633`), the focused native component joins copied recorder-packet facts with the existing submission owner book, pool and sequence stamps without pumping or draining work. The 13-step focused run passed the actual packet copier and owner-book negative controls, both actual `frame.cpp` quiescence branches, `recording.cpp` syntax, both declared/defined symbol joins, and two byte-identical ordinary/OFF projections. Review rehashed 3,570 source/tool pins and 564 overlay files; all 13 owned process groups were absent.
+
+This is component evidence only. `native_submission_component_ready` remains a native predicate; no runtime getter/global invocation, GPU call, live match interval or gameplay arm was exercised. It does not close depth/device/host-asynchronous work or establish a safe interval. Three Release profiles pass on runtime producer `299d5a04`; the full 2,435-test regression (164 skips) passes on test-only child `927a07f0`, with all 134 retained runtime artifacts rehashed. The initial full-suite failure is retained: a test fixture classified the browser report as native because an ancestor directory contained “native”. A two-line fixture repair checks the immediate role directory and exercises the ancestor collision without changing any assertion. The reduced before/after reproducer and all 16 focused tests pass. Keep this source distinct from the `c89bae3d` selected-sampled component, `5cdcd2a7` real-GPU probe, `fb63c3f2` first-draw observation, and `13922b8d` no-disc boot. No Wasm restore or gameplay/rollback admission is claimed. Exact component and review identities are in `native_submission_pending_component` under the [existing structured receipt](../evidence/match-only-rollback-feasibility-v1.json).
+
 ## Slippi profile source checkpoint
 
 The [profile inventory](../investigations/SLIPPI_GAMEPLAY_PROFILE_INVENTORY.md)

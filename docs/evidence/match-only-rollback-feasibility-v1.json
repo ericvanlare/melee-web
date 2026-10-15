@@ -2799,6 +2799,130 @@
         "ci": "Current publication head tracked separately on PR324; local results do not imply CI."
       },
       "integration_state": "EXACT_INTEGRATION_COMMITTED_ROUTING_CANONICAL_PASS"
+    },
+    "native_submission_pending_component": {
+      "state": "PASS_NATIVE_COMPONENT_RELEASE_BUILDS_AND_TEST_ONLY_REGRESSION",
+      "scope": "Joined native recorder-packet and submission-pending component controls; no runtime invocation, GPU work, live safe-interval proof, gameplay admission or restore.",
+      "source": {
+        "integrated_commit": "299d5a04ee1cb73f6c43dab9d0198a58497d54db",
+        "integrated_tree": "05dba633e4289132c45acbe6be749cd833ac723e",
+        "integration_parent": "20fe9bce7297332a20e9906e33366ef7e3c40e5c",
+        "aurora_pinned_head": "749d6ee7a22bdfab78c8ece9047bca5d79aa72ca",
+        "aurora_actual_tree": "1d2974de28b9c5e08c2e88972e8cde945aa27bd7",
+        "canonical_aurora_patch_sha256": "58342c4ea0978399e875e1bcf397d3c10037d57c27bc843468240525f3a2057a"
+      },
+      "candidate": {
+        "manifest": {
+          "path": "native-submission-pending-candidate-v1/manifest.json",
+          "bytes": 5175,
+          "sha256": "19eeb2461f46d12285a9ec274df069f0545032e38e324d5c2b7c130c7537b470"
+        },
+        "integration": {
+          "path": "native-submission-pending-candidate-v1/integration.json",
+          "bytes": 1866,
+          "sha256": "2ba6e3533d0dfcf652c6ee01d8a9ce719d3a3f1fd7b2eb4bc00ec5aacabf9db8"
+        },
+        "component_execution_root_review": {
+          "path": "native-submission-pending-candidate-v1/execution-v1/root-result-review.json",
+          "bytes": 931,
+          "sha256": "5f3ea58657c637479e065bd05260914edda7cf38150b0f20ed61d260d3d6a55b"
+        },
+        "final_review": {
+          "path": "native-submission-pending-candidate-v1/execution-v1/final-review.json",
+          "bytes": 1203,
+          "sha256": "cf664ab344670f39d85f2386cf09830d7a8e2e2a44243ec7ea78f0d39c0c3a40"
+        },
+        "focused_summary": {
+          "path": "native-submission-pending-candidate-v1/execution-v1/run/summary.json",
+          "bytes": 9290,
+          "sha256": "fcd84000f49109a4c74c68b57c0f12427b1771ad38746f8dc648de9c7dbe6197"
+        }
+      },
+      "observed_component": {
+        "joins": "Existing active recorder packet POD facts plus existing native submission owner-book/pool/sequence stamps; copied with before/after stamp validation and refusal on drift.",
+        "no_pump_or_drain": true,
+        "native_component_predicate": "native_submission_component_ready is a component predicate only; no host/gameplay admission changed.",
+        "focused_steps": 13,
+        "source_tool_dependency_pins_rehashed": 3570,
+        "overlay_files_rehashed": 564,
+        "raw_log_pairs_rehashed": 13,
+        "owned_process_groups_absent": 13,
+        "actual_translation_unit_checks": [
+          "frame.cpp quiescence OFF branch",
+          "frame.cpp quiescence ON branch",
+          "recording.cpp diagnostic syntax"
+        ],
+        "external_symbols_joined": [
+          "_ZN6aurora3gfx37capture_native_recorder_frame_pendingERNS0_6detail23NativeFramePendingFactsE",
+          "_ZN6aurora3gfx33capture_native_submission_pendingERNS0_6detail28NativeSubmissionPendingFactsE"
+        ],
+        "ordinary_off_equalities": 2
+      },
+      "distinct_prior_component_identities": {
+        "selected_sampled_native_owner": "c89bae3d0d0e820deeae47242e67b0d2b695a190",
+        "real_gpu_target_component": "5cdcd2a7a133ace49acf17d5462370c5840e68cf",
+        "first_draw_observation": "fb63c3f2d26c2f266a384e04428d9b4b1fafdfb5",
+        "private_no_disc_boot": "13922b8d3a84d7299e9121f1b09e7181c9793c2b"
+      },
+      "validation": {
+        "state": "PASS_WITH_RETAINED_INITIAL_FIXTURE_FAILURE",
+        "runtime_source": "299d5a04ee1cb73f6c43dab9d0198a58497d54db",
+        "test_only_source": "927a07f039ca1381b376021501bba2b72a171e85",
+        "test_only_tree": "a689c5220fde746cff68d7b4d31e70110ff4f417",
+        "release_builds": [
+          {
+            "path": "net-native-submission-pending-validation-v1/evidence/ordinary-release-build.json",
+            "bytes": 9804,
+            "sha256": "cda8fe678cab081811ea50a6e7964883bbb23060fd27d4c86bb572152d5ac7b0"
+          },
+          {
+            "path": "net-native-submission-pending-validation-v1/evidence/frame-effect-release-build.json",
+            "bytes": 9827,
+            "sha256": "c2bc36c3b32cde1cf45d4be0015723c4aed73a65802b6ac1f9d651ff8b736496"
+          },
+          {
+            "path": "net-native-submission-pending-validation-v1/evidence/combined-first-pair-release-build.json",
+            "bytes": 10234,
+            "sha256": "e79d245c4a70d4f2f3f0fd45edff21f640600cd88fe891fdc28668bda8fe9af0"
+          }
+        ],
+        "full_regression": {
+          "path": "net-native-submission-pending-regression-v2/evidence/result.json",
+          "bytes": 5485,
+          "sha256": "99f6a34f811d4a664bd5e47de61b8f4b6904ca9a0ec70adf081b9d2ad1a4a29f"
+        },
+        "full_regression_log": {
+          "path": "net-native-submission-pending-regression-v2/evidence/full-unittest-suite.log",
+          "bytes": 447217,
+          "sha256": "95a967ff45c976c97fbe98c0d311831513a58d41bcac29590e853d28b192e445"
+        },
+        "root_review": {
+          "path": "net-native-submission-pending-regression-v2/evidence/root-result-review.json",
+          "bytes": 1047,
+          "sha256": "788924e1cc68f026aa11e2a247d005d1a0e19bf4c9e3868a89ec884d4fa16a24"
+        },
+        "initial_failure": {
+          "path": "net-native-submission-pending-validation-v1/evidence/root-builds-and-failure-review.json",
+          "bytes": 1142,
+          "sha256": "1daa96932b144070d5b6bf247a3a9307fd1df1197b4611e66d1b120078ed8741"
+        },
+        "repair_review": {
+          "path": "cpu-match-report-ancestor-fixture-repair-v1/root-result-review.json",
+          "bytes": 577,
+          "sha256": "e39e80aef0a517f463d86d5805bfeca6c32e1763224788a53125c32bc4001e7e"
+        },
+        "tests": 2435,
+        "skips": 164,
+        "runtime_artifacts_rehashed": 134,
+        "capture": false
+      },
+      "limits": [
+        "No actual runtime getter/global invocation.",
+        "No GPU operation or content observation.",
+        "No proof of a safe live match interval or gameplay arm.",
+        "Depth MapAsync, device-lost/future, host asynchronous work and native refcounts remain outside this component.",
+        "No Wasm restore, frame-repeat or rollback admission."
+      ]
     }
   }
 }
