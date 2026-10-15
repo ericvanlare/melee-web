@@ -205,7 +205,7 @@ test('actual supervisor publication retains full report attribution shape in eve
       assert.equal(await fs.readFile(inventoryOutput,'utf8'),bytes);
     }
     // Summary sidecar can never replace the supervisor's report path.
-    const summaryBody=between('async function persistRecreationSummary() {','\nasync function beginRecreationCallbackScope');
+    const summaryBody=between('async function persistRecreationSummary() {','\nasync function persistRecreationProgress');
     assert.ok(summaryBody.includes("path.join(output, 'recreation-summary.json')"));
     assert.equal(summaryBody.includes("path.join(output, 'report.json')"),false);
   } finally {await fs.rm(root,{recursive:true,force:true});}
@@ -228,4 +228,49 @@ test('actual private identity postset binds Module/exports/Memory and wrappers i
   Module._melee_web_native_menu_stadium_recreation_admit_b=wrapper;
   const exports=context.wasmExports;context.wasmExports={native:()=>{}};assert.equal(api.compare().same_instance,false);context.wasmExports=exports;
   context.Module={...Module};assert.equal(api.compare().same_instance,false);
+});
+
+
+test('actual progress publication persists control before hash and preserves final-only decision semantics', async () => {
+  const root=await fs.mkdtemp(path.join(process.env.MELEE_STADIUM_RECREATION_TEST_ROOT??os.tmpdir(),'canary-progress-'));
+  let passed=false;
+  try {
+    const checkpointModule=await import('./stadium_c3_report_checkpoint.mjs');
+    const crypto=await import('node:crypto');
+    const hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
+    const persistBody=between('const persistReport = async () => {','\n};');
+    const publishBody=between('async function publishRecreationSupervisorReport() {','\nasync function persistRecreationSummary');
+    const progressBody=between('async function persistRecreationProgress() {','\nasync function beginRecreationCallbackScope');
+    const finalBody=between('async function persistRecreationSummary() {','\nasync function persistRecreationProgress');
+    for (const failAt of [null,'control-write','control-rename','summary-write','summary-rename']) {
+      const output=path.join(root,failAt??'positive');await fs.mkdir(output);
+      const inventoryOutput=path.join(output,'recreation-control.json');
+      const events=[];let reachedRestart=false;
+      const controlledFs={...fs,
+        async writeFile(file,...args){const name=path.basename(file);events.push('write:'+name);if((failAt==='control-write'&&name==='recreation-control.json.tmp')||(failAt==='summary-write'&&name==='recreation-summary.json.tmp'))throw Error(failAt);return fs.writeFile(file,...args);},
+        async rename(from,to){const name=path.basename(to);events.push('rename:'+name);if((failAt==='control-rename'&&name==='recreation-control.json')||(failAt==='summary-rename'&&name==='recreation-summary.json'))throw Error(failAt);return fs.rename(from,to);}};
+      const report={result:'fail',execution_state:'running',cleanup:{failures:[],browser_process_terminated:false,server_process_terminated:false},scenario:{recreation_canary:{lifetime:'A-close-control'}}};
+      const summary={schema:'melee-web-stadium-recreation-canary-summary-v1',result:'running',decision:null,close_receipt:{host_settlement:{accepted:true}}};
+      const scope={fs:controlledFs,path,assert,output,inventoryOutput,report,recreationSummary:summary,recreationCanary:true,failure:null,matchedSetupCfTiming:null,
+        stadiumC3ReportCheckpoint:checkpointModule.createStadiumC3ReportCheckpoint({reportPath:inventoryOutput,fileSystem:controlledFs}),
+        hashFile:async file=>{events.push('hash:'+path.basename(file));return hash(await fs.readFile(file));}};
+      vm.createContext(scope);
+      vm.runInContext(`async function publishRecreationSupervisorReport(){${publishBody}\nconst persistReport=async()=>{${persistBody}\n};async function persistRecreationProgress(){${progressBody}\nasync function persistRecreationSummary(){${finalBody}`,scope);
+      const operation=async()=>{await vm.runInContext('persistRecreationProgress()',scope);reachedRestart=true;};
+      if(failAt){await assert.rejects(operation,new RegExp(failAt));assert.equal(reachedRestart,false);}
+      else {
+        await operation();assert.equal(reachedRestart,true);
+        const bytes=await fs.readFile(inventoryOutput);assert.deepEqual(await fs.readFile(path.join(output,'report.json')),bytes);
+        const published=JSON.parse(await fs.readFile(path.join(output,'recreation-summary.json'),'utf8'));
+        assert.equal(published.result,'running');assert.equal(published.decision,null);assert.equal(published.cleanup,undefined);assert.equal(published.final_report,undefined);assert.equal(published.progress_report.sha256,hash(bytes));
+        assert.ok(events.indexOf('rename:recreation-control.json')<events.indexOf('hash:recreation-control.json'));
+        assert.equal(summary.result,'running');assert.equal(summary.decision,null);
+        scope.report.result='pass';scope.report.execution_state='completed';scope.report.cleanup.browser_process_terminated=true;scope.report.cleanup.server_process_terminated=true;
+        summary.final_archive_integrity={result:'pass'};summary.decision='PASS_SAME_INSTANCE_174_ACTION_RECREATION_COMPONENT_ONLY';
+        await vm.runInContext('persistReport();',scope);await vm.runInContext('persistRecreationSummary()',scope);
+        const terminal=JSON.parse(await fs.readFile(path.join(output,'recreation-summary.json'),'utf8'));assert.equal(terminal.result,'pass');assert.equal(terminal.cleanup.browser_process_terminated,true);assert.equal(terminal.final_report.sha256,hash(await fs.readFile(inventoryOutput)));
+      }
+    }
+    passed=true;
+  } finally {if(passed)await fs.rm(root,{recursive:true,force:true});}
 });

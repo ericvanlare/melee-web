@@ -3446,6 +3446,21 @@ async function persistRecreationSummary() {
   await fs.rename(temporary, target);
 }
 
+async function persistRecreationProgress() {
+  assert.equal(recreationCanary, true);
+  assert.equal(report.execution_state, 'running');
+  assert.equal(recreationSummary?.result, 'running');
+  // Persist the current control owner before hashing it. Final cleanup/decision
+  // evaluation belongs only to persistRecreationSummary after owned teardown.
+  await persistReport();
+  const progress = {...recreationSummary,
+    progress_report: {path: path.basename(inventoryOutput), sha256: await hashFile(inventoryOutput)}};
+  const target = path.join(output, 'recreation-summary.json');
+  const temporary = `${target}.tmp`;
+  await fs.writeFile(temporary, `${JSON.stringify(progress)}\n`);
+  await fs.rename(temporary, target);
+}
+
 async function beginRecreationCallbackScope(label) {
   return timeout(page.evaluate(({label, names, helperKey, scopeKey}) => {
     if (!globalThis[scopeKey]) {
@@ -3715,7 +3730,7 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
   }, close.receipt), Math.min(5000, remaining()), 'Settle only closed A native preparation in host owner');
   assert.equal(hostSettlement.accepted, true, 'Checked nonterminal A host settlement was refused');
   recreationSummary.close_receipt.host_settlement = hostSettlement;
-  await persistRecreationSummary();
+  await persistRecreationProgress();
 
   const restartStartedNs = monotonicNowNs();
   const restart = await timeout(page.evaluate(async () => {
@@ -3754,7 +3769,7 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
   await fs.rename(restartTemporary, restartPath);
   recreationSummary.restart_receipt = {path: path.basename(restartPath),
     bytes: Buffer.byteLength(restartBytes), sha256: digest(restartBytes), identity: restart.identity};
-  await persistRecreationSummary();
+  await persistRecreationProgress();
 
   await page.evaluate(({helperKey, receipt}) => {
     globalThis[helperKey].acceptRestart(receipt);
