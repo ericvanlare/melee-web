@@ -6,16 +6,18 @@ import path from 'node:path';
 import {test} from 'node:test';
 import {hostEvidenceFromPacket,encodeRun2FullCommonNativeManifest} from './stadium_matched_setup_cf_consumer.mjs';
 const source=await fs.readFile(new URL('./stadium_c1a_browser_test.mjs',import.meta.url),'utf8');
-const begin=source.indexOf('if (recreationFullB && !recreationCanary)');
+const begin=source.indexOf("if (recreationFullPair && values['recreation-canary-full-b'])");
 const end=source.indexOf('if ((firstSssVsSetup &&',begin);
 assert(begin>=0&&end>begin);
 const guards=source.slice(begin,end);
-const valid={recreationFullB:false,recreationCanary:true,firstSssVsSetup:true,
+const valid={recreationFullPair:false,recreationFullB:false,recreationCanary:true,firstSssVsSetup:true,
   values:{'first-sss-vs-setup-cf':true},firstSssVsSetupCfExplicitStep:true,
   firstSssVsSetupCfFullSchedule:false,firstSssVsSetupCfCommonFields:false,firstSssVsSetupTextTail:false};
 test('actual CLI guard keeps A prefix and requires separate full-B canary opt-in',()=>{
   for(const recreationFullB of [false,true])vm.runInNewContext(guards,{...valid,recreationFullB});
-  for(const changes of [{recreationFullB:true,recreationCanary:false},
+  vm.runInNewContext(guards,{...valid,recreationFullPair:true,recreationFullB:true,firstSssVsSetupCfFullSchedule:true,firstSssVsSetupCfCommonFields:true});
+  for(const changes of [{recreationFullPair:true,recreationFullB:true,values:{...valid.values,'recreation-canary-full-b':true}},
+    {recreationFullPair:true,recreationFullB:true,values:{...valid.values,'first-sss-vs-setup-cf-full-schedule':true}}, {recreationFullB:true,recreationCanary:false},
     {recreationFullB:true,firstSssVsSetupCfFullSchedule:true},
     {recreationFullB:true,firstSssVsSetupCfCommonFields:true},
     {recreationFullB:true,firstSssVsSetupCfExplicitStep:false},

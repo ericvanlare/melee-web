@@ -5334,14 +5334,17 @@ extern "C" {
 const char* melee_web_native_menu_stadium_recreation_status(){
  static std::string json;json=stadium_recreation_canary_json();return json.c_str();
 }
-int melee_web_native_menu_stadium_recreation_close(){try{
+static int stadium_recreation_close_impl(bool full_pair){try{
  auto& s=stadium_recreation_canary;auto& cf=matched_setup_cf;
  check(!s.attempted&&!s.closed&&!s.restarted&&s.error.empty(),"Stadium recreation canary is one-use");
  check(melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire_ready()==1&&
        cf.complete&&!cf.failed&&!cf.awaiting_approval&&cf.cursor==cf.action_count&&
-       cf.version2&&!cf.full_schedule&&cf.action_count==174&&
+       cf.version2&&(full_pair
+         ? (cf.full_schedule&&cf.common_fields&&cf.action_count==7167&&
+            cf.source_ticks==3585&&cf.source_draws==3582)
+         : (!cf.full_schedule&&cf.action_count==174))&&
        !matched_setup_cf_retirement.native_retired&&matched_setup_cf_retirement.receipt.empty(),
-       "Stadium recreation requires an approved complete174-action original prefix");
+       "Stadium recreation requires its approved complete prefix or explicit full-pair A schedule");
  const auto* expected_match=match.get();const auto* expected_host=host;
  const auto* expected_cache=archive_cache.get();
  const auto expected_world_generation=cf.world_generation;
@@ -5387,6 +5390,12 @@ int melee_web_native_menu_stadium_recreation_close(){try{
  if(stadium_recreation_canary.error.empty())stadium_recreation_canary.error=error.what();
  message=error.what();return 0;
 }}
+int melee_web_native_menu_stadium_recreation_close(){
+ return stadium_recreation_close_impl(false);
+}
+int melee_web_native_menu_stadium_recreation_close_full_pair(){
+ return stadium_recreation_close_impl(true);
+}
 int melee_web_native_menu_stadium_recreation_restart(){try{
  auto& s=stadium_recreation_canary;
  check(s.attempted&&s.closed&&!s.restarted&&s.error.empty()&&

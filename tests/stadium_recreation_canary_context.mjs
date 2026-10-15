@@ -1,6 +1,7 @@
 // One canary's immutable report/approval ownership contract. Browser wiring
 // must separately prove returned Asyncify idle before dispatching native calls.
-export function createStadiumRecreationCanaryContext({reportA, checkpointA}) {
+export function createStadiumRecreationCanaryContext({reportA, checkpointA, fullPair = false}) {
+  if (typeof fullPair !== 'boolean') throw Error('Canary full-pair mode must be boolean');
   if (!reportA || !checkpointA) throw Error('Canary requires lifetime A report and checkpoint');
   let phase = 'A', archivedA = null, archivedNativeA = null, admittedGeneration = null;
   let closeReceipt = null, closeBytes = null;
@@ -8,10 +9,17 @@ export function createStadiumRecreationCanaryContext({reportA, checkpointA}) {
   const completeA = () => {
     const cf = reportA.scenario?.matched_setup_cf;
     const generation = reportA.scenario?.first_sss_vs_setup?.observation?.first_sss_vs_setup?.match_world_generation;
-    return cf?.actions_completed === 174 && cf.actions?.length === 174 &&
-      cf.decision === 'PASS_RUN2_PROPER_PREFIX_C_F_STATE_ONLY' &&
+    const count = fullPair ? 7167 : 174;
+    return cf?.actions_completed === count && cf.actions?.length === count &&
+      cf.decision === (fullPair ? 'PASS_ORIGINAL_FULL7167_3501_TICK_15_COMMON_FIELDS_AND_SEED_C_F_GO'
+        : 'PASS_RUN2_PROPER_PREFIX_C_F_STATE_ONLY') &&
+      (!fullPair || (cf.common_field_comparisons_passed === 3501 &&
+        cf.seed_value_comparisons_passed === 3501 && cf.exact_value_comparisons_passed === 56016 &&
+        cf.last_native_state?.action_count === 7167 &&
+        cf.last_native_state?.schema === 'melee-web-stadium-source-action-native-v5' &&
+        cf.last_native_state?.source_ticks === 3585 && cf.last_native_state?.source_draws === 3582)) &&
       cf.last_native_state?.complete === true && cf.last_native_state?.failed === false &&
-      cf.last_native_state?.cursor === 174 && Number.isSafeInteger(generation) && generation > 0;
+      cf.last_native_state?.cursor === count && Number.isSafeInteger(generation) && generation > 0;
   };
   return Object.freeze({
     async archiveA(persist) {

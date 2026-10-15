@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createStadiumRecreationCanaryContext} from './stadium_recreation_canary_context.mjs';
 
-function fixture() {
+function fixture(fullPair = false) {
   const native = {complete: true, failed: false, cursor: 174,
     match_seed: 0x1234, host_seed: 0x5678, parent_seed: 0x9abc};
   const reportA = {scenario: {
@@ -11,8 +11,17 @@ function fixture() {
       decision: 'PASS_RUN2_PROPER_PREFIX_C_F_STATE_ONLY', last_native_state: native},
     first_sss_vs_setup: {observation: {first_sss_vs_setup: {match_world_generation: 3}}},
   }};
+  if (fullPair) {
+    const cf = reportA.scenario.matched_setup_cf;
+    cf.actions_completed = 7167;cf.actions = Array.from({length:7167},(_,index)=>({index}));
+    cf.decision = 'PASS_ORIGINAL_FULL7167_3501_TICK_15_COMMON_FIELDS_AND_SEED_C_F_GO';
+    cf.common_field_comparisons_passed = 3501;cf.seed_value_comparisons_passed = 3501;
+    cf.exact_value_comparisons_passed = 56016;
+    Object.assign(native,{cursor:7167,action_count:7167,source_ticks:3585,source_draws:3582,
+      schema:'melee-web-stadium-source-action-native-v5'});
+  }
   const checkpointA = Object.freeze({owner: 'A'});
-  const context = createStadiumRecreationCanaryContext({reportA, checkpointA});
+  const context = createStadiumRecreationCanaryContext({reportA, checkpointA, fullPair});
   const close = {schema: 'melee-web-stadium-recreation-boundary-v1', attempted: true,
     closed: true, restarted: false, error: null, match_to_host_restored: true,
     host_to_parent_restored: true, prior_world_generation: 3,
@@ -98,7 +107,7 @@ const between = (start, end) => {
 };
 function pageCallback(name) {
   return between(`const ${name} = await timeout(page.evaluate(`,
-    name === 'close' ? "}), Math.min(LIMITS.unloadMs, remaining()), 'Checked native close of lifetime A'" :
+    name === 'close' ? "}, recreationFullPair), Math.min(LIMITS.unloadMs, remaining()), 'Checked native close of lifetime A'" :
       "}), Math.min(5000, remaining()), 'Restart ordinary ownerless loop on the retained instance'") + '}';
 }
 function browserFixture({idleAfter = true, pending = null} = {}) {
@@ -107,6 +116,7 @@ function browserFixture({idleAfter = true, pending = null} = {}) {
   const Module = {
     stadiumMatchedSetupNativeIdle: () => idle,
     _melee_web_native_menu_stadium_recreation_close() {},
+    _melee_web_native_menu_stadium_recreation_close_full_pair() {},
     _melee_web_native_menu_stadium_recreation_restart() {},
     _melee_web_native_menu_stadium_recreation_status() { getters++; return 1; },
     UTF8ToString() { return JSON.stringify(receipt); },
@@ -123,9 +133,9 @@ function browserFixture({idleAfter = true, pending = null} = {}) {
 }
 
 test('actual close/restart evaluate callbacks have no Node lexical dependency and await idle', async () => {
-  for (const kind of ['close', 'restart']) {
+  for (const kind of ['close', 'restart']) for (const fullPair of [false,true]) {
     const f = browserFixture();const callback = vm.runInContext(`(${pageCallback(kind)})`, f.browser);
-    const result = await callback();assert.equal(result.result, 1);assert.equal(result.identity.same_instance, true);
+    const result = await callback(fullPair);assert.equal(result.result, 1);assert.equal(result.identity.same_instance, true);
     assert.deepEqual(f.counts(), {calls: 1, getters: 1});
   }
 });
@@ -253,7 +263,7 @@ test('actual progress publication persists control before hash and preserves fin
       const report={result:'fail',execution_state:'running',cleanup:{failures:[],browser_process_terminated:false,server_process_terminated:false},scenario:{recreation_canary:{lifetime:'A-close-control'}}};
       const summary={schema:'melee-web-stadium-recreation-canary-summary-v1',result:'running',decision:null,close_receipt:{host_settlement:{accepted:true}}};
       const scope={fs:controlledFs,path,assert,output,inventoryOutput,report,recreationSummary:summary,recreationCanary:true,failure:null,matchedSetupCfTiming:null,
-        recreationPassDecision:vm.runInNewContext(`(${decisionExpression})`,{recreationFullB}),
+        recreationPassDecision:vm.runInNewContext(`(${decisionExpression})`,{recreationFullB,recreationFullPair:false}),
         stadiumC3ReportCheckpoint:checkpointModule.createStadiumC3ReportCheckpoint({reportPath:inventoryOutput,fileSystem:controlledFs}),
         hashFile:async file=>{events.push('hash:'+path.basename(file));return hash(await fs.readFile(file));}};
       assert.equal(scope.recreationPassDecision,recreationFullB
@@ -278,4 +288,26 @@ test('actual progress publication persists control before hash and preserves fin
     }
     passed=true;
   } finally {if(passed)await fs.rm(root,{recursive:true,force:true});}
+});
+
+
+test('full-pair A archive requires exact full counts/typed version/comparisons and preserves prefix default', async () => {
+  const f=fixture(true);await f.context.archiveA(async()=>{});
+  await f.context.archiveClose(f.close,async()=>{});f.context.acceptRestart({...f.close,restarted:true});
+  assert.equal(f.context.beginB({scenario:{matched_setup_cf:null}},Object.freeze({owner:'B'})).priorWorldGeneration,3);
+  for(const mutate of [cf=>cf.actions.pop(),cf=>cf.actions_completed=174,
+    cf=>cf.decision='PASS_RUN2_PROPER_PREFIX_C_F_STATE_ONLY',cf=>cf.common_field_comparisons_passed=3500,
+    cf=>cf.seed_value_comparisons_passed=3500,cf=>cf.exact_value_comparisons_passed=56015,
+    cf=>cf.last_native_state.schema='melee-web-stadium-source-action-native-v3',
+    cf=>cf.last_native_state.source_ticks=3584,cf=>cf.last_native_state.source_draws=3581]){
+    const bad=fixture(true);mutate(bad.reportA.scenario.matched_setup_cf);
+    await assert.rejects(bad.context.archiveA(async()=>{throw Error('must not persist');}),/complete lifetime A/);
+    assert.equal(bad.context.beforeClose(),false);
+  }
+  const defaultFull=fixture(true);
+  const defaultContext=createStadiumRecreationCanaryContext({reportA:defaultFull.reportA,checkpointA:defaultFull.checkpointA});
+  await assert.rejects(defaultContext.archiveA(async()=>{}),/complete lifetime A/);
+  const prefix=fixture();
+  const fullContext=createStadiumRecreationCanaryContext({reportA:prefix.reportA,checkpointA:prefix.checkpointA,fullPair:true});
+  await assert.rejects(fullContext.archiveA(async()=>{}),/complete lifetime A/);
 });

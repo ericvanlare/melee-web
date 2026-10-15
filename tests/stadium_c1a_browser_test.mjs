@@ -56,20 +56,25 @@ const {values} = parseArgs({options: Object.fromEntries(
       ['first-sss-vs-setup-text-tail', {type: 'boolean', default: false}],
       ['recreation-canary', {type: 'boolean', default: false}],
       ['recreation-canary-full-b', {type: 'boolean', default: false}],
+      ['recreation-canary-full-pair', {type: 'boolean', default: false}],
     ])), strict: true});
 const cssSssReducer = values['css-sss-reducer'];
 const recreationCanary = values['recreation-canary'];
-const recreationFullB = values['recreation-canary-full-b'];
+const recreationFullPair = values['recreation-canary-full-pair'];
+const recreationFullB = values['recreation-canary-full-b'] || recreationFullPair;
+const recreationAActionCount = recreationFullPair ? 7167 : 174;
 const recreationBActionCount = recreationFullB ? 7167 : 174;
-const recreationPassDecision = recreationFullB
+const recreationPassDecision = recreationFullPair
+  ? 'PASS_SAME_INSTANCE_A7167_B7167_COMMON_FIELDS_SEED_COMPONENT_ONLY'
+  : recreationFullB
   ? 'PASS_SAME_INSTANCE_A174_B7167_COMMON_FIELDS_SEED_COMPONENT_ONLY'
   : 'PASS_SAME_INSTANCE_174_ACTION_RECREATION_COMPONENT_ONLY';
 let recreationLifetime = null;
 const firstSssVsSetup = values['first-sss-vs-setup'];
 const firstSssVsSetupTextTail = values['first-sss-vs-setup-text-tail'];
 const firstSssVsSetupCfExplicitStep = values['first-sss-vs-setup-cf-explicit-step'];
-const firstSssVsSetupCfFullSchedule = values['first-sss-vs-setup-cf-full-schedule'];
-const firstSssVsSetupCfCommonFields = values['first-sss-vs-setup-cf-common-fields'];
+const firstSssVsSetupCfFullSchedule = values['first-sss-vs-setup-cf-full-schedule'] || recreationFullPair;
+const firstSssVsSetupCfCommonFields = values['first-sss-vs-setup-cf-common-fields'] || recreationFullPair;
 const firstSssVsSetupCf = validateMatchedSetupCfRequest({
   enabled: values['first-sss-vs-setup-cf'], explicitStep: firstSssVsSetupCfExplicitStep,
   fullSchedule: firstSssVsSetupCfFullSchedule, commonFields: firstSssVsSetupCfCommonFields,
@@ -86,12 +91,16 @@ const firstSssConstructorPair = values['first-sss-constructor-pair'] || firstSss
 const firstCssBrowserFinalDraw = values['first-css-browser-final-draw'] || firstSssConstructorPair;
 const firstCssBrowserStream = values['first-css-browser-stream'] || firstCssBrowserFinalDraw;
 const firstCssBrowserDraw = values['first-css-browser-draw'] || firstCssBrowserStream;
+if (recreationFullPair && values['recreation-canary-full-b'])
+  throw Error('Full pair requires its distinct opt-in, not the short A/full B option');
 if (recreationFullB && !recreationCanary)
   throw Error('Full B requires the explicit recreation canary');
 if (recreationCanary && (!firstSssVsSetup || !values['first-sss-vs-setup-cf'] ||
-    !firstSssVsSetupCfExplicitStep || firstSssVsSetupCfFullSchedule ||
-    firstSssVsSetupCfCommonFields || firstSssVsSetupTextTail))
-  throw Error('Stadium recreation canary requires only the explicit 174-action proper-prefix route');
+    !firstSssVsSetupCfExplicitStep ||
+    (!recreationFullPair && (firstSssVsSetupCfFullSchedule || firstSssVsSetupCfCommonFields)) ||
+    values['first-sss-vs-setup-cf-full-schedule'] || values['first-sss-vs-setup-cf-common-fields'] ||
+    firstSssVsSetupTextTail))
+  throw Error('Stadium recreation canary requires its explicit prefix or full-pair route without standalone full-schedule flags');
 if ((firstSssVsSetup && values['first-sss-vs-entry']) ||
     (firstSssVsSetupTextTail && !firstSssVsSetup) ||
     (firstSssVsSetup && !values['first-sss-vs-setup-expected']) ||
@@ -321,7 +330,7 @@ let report = {
   local_http_artifacts: {count: 0, before: null, after: null, unchanged: false},
   scenario: {
     route_mode: recreationCanary ? (recreationFullB
-      ? 'same-instance-recreation-A174-B7167-common-fields-seed'
+      ? (recreationFullPair ? 'same-instance-recreation-A7167-B7167-common-fields-seed' : 'same-instance-recreation-A174-B7167-common-fields-seed')
       : 'same-instance-recreation-canary-174') : firstSssVsSetup ? 'first-sss-vs-setup' : firstSssVsEntry ? 'first-sss-vs-entry' : firstSssPrefix ? 'first-sss-prefix' : firstSssDraw ? 'first-sss-draw' :
       firstSssConsumedPadTick ? 'first-sss-consumed-pad-tick' :
       firstSssConstructorPair ? 'first-sss-constructor-pair' :
@@ -369,7 +378,9 @@ let report = {
     server_process_exit: null, failures: []},
   source_request_scope: recreationCanary
     ? (recreationFullB
-      ? 'Same-instance A174 checked close/restart then exact original full7167 B with3501 common+seed rows; no complete per-owner RNG ledger or C3 acceptance.'
+      ? (recreationFullPair
+        ? 'Same-instance full7167 A and B with3501 common+seed rows each and checked close/restart; no complete original per-owner RNG ledger or C3 acceptance.'
+        : 'Same-instance A174 checked close/restart then exact original full7167 B with3501 common+seed rows; no complete per-owner RNG ledger or C3 acceptance.')
       : 'Two separately reported same-instance original-route 174-action lifetimes with checked A close/restart; no whole-session or recreation acceptance.')
     : firstSssVsSetupCf
     ? firstSssVsSetupCfV2
@@ -2670,7 +2681,9 @@ async function runFirstSssVsSetup(entryNative) {
     await persistReport();
   }
   if (firstSssVsSetupCf) native = await runMatchedSetupCfContinuation(native);
-  report.scenario.first_sss_vs_setup.claim = recreationFullB && recreationLifetime === 'B'
+  report.scenario.first_sss_vs_setup.claim = recreationFullPair && recreationLifetime === 'A'
+    ? 'Same-instance pair A: exact original7167 actions and3501 declared common+seed rows, pending checked close/restart/B; no original per-owner ledger or C3 acceptance.'
+    : recreationFullB && recreationLifetime === 'B'
     ? 'Recreated same-instance B: exact original7167 actions and3501 declared common+seed rows; native parent RNG restoration checked, original per-owner ledger/C3 acceptance remain open.'
     : firstSssVsSetupCfFullSchedule
     ? 'Strict same-run Setup plus original7167-action functionalA and declaredC/F only; no recreatedB, per-ownerRNG or C3 acceptance.'
@@ -3685,17 +3698,17 @@ async function installRecreationCanaryContext(reportA, checkpointFiles) {
     artifacts: Object.freeze(checkpointFiles.map(file => Object.freeze({...file})))});
   const helperSource = await fs.readFile(recreationContextHelperPath, 'utf8');
   const moduleUrl = `data:text/javascript;base64,${Buffer.from(helperSource).toString('base64')}`;
-  return timeout(page.evaluate(async ({moduleUrl, reportA, checkpointA, helperKey}) => {
+  return timeout(page.evaluate(async ({moduleUrl, reportA, checkpointA, helperKey, fullPair}) => {
     if (Object.prototype.hasOwnProperty.call(globalThis, helperKey))
       throw Error('Stadium recreation context was already installed');
     const {createStadiumRecreationCanaryContext} = await import(moduleUrl);
-    const context = createStadiumRecreationCanaryContext({reportA, checkpointA});
+    const context = createStadiumRecreationCanaryContext({reportA, checkpointA, fullPair});
     Object.defineProperty(globalThis, helperKey, {
       value: context, enumerable: false, writable: false, configurable: true,
     });
     return {schema: 'melee-web-stadium-recreation-context-v1', installed: true};
   }, {moduleUrl, reportA: recreationApprovalProjection(reportA), checkpointA,
-    helperKey: recreationHelperKey}),
+    helperKey: recreationHelperKey, fullPair: recreationFullPair}),
   Math.min(5000, remaining()), 'Install immutable same-page A/B canary context');
 }
 
@@ -3707,7 +3720,7 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
   recreationBaseReport = structuredClone(report);
   report.scenario.recreation_canary = {...report.scenario.recreation_canary,
     lifetime: 'A', role: 'source-lifetime-A',
-    status: 'awaiting-174-action-comparison'};
+    status: recreationFullPair ? 'awaiting-7167-action-comparison' : 'awaiting-174-action-comparison'};
   await page.exposeFunction('__persistStadiumRecreationCanaryA', async projection => {
     if (JSON.stringify(projection) !== JSON.stringify(recreationApprovalProjection(recreationReportAObject)) ||
         report !== recreationReportAObject || stadiumC3ReportCheckpoint !== recreationCheckpointAObject)
@@ -3735,9 +3748,17 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
   const aRouteStartedNs = monotonicNowNs();
   await runFirstCssBrowserDraw({baseUrl, artifacts, before});
   const aRouteMs = elapsedMs(aRouteStartedNs);
-  assert.equal(report.result, 'pass', 'Lifetime A did not finish the exact retained 174-action route');
-  assert.equal(report.scenario.matched_setup_cf?.decision, 'PASS_RUN2_PROPER_PREFIX_C_F_STATE_ONLY');
-  assert.equal(report.scenario.matched_setup_cf?.actions_completed, 174);
+  assert.equal(report.result, 'pass', 'Lifetime A did not finish its exact admitted original schedule');
+  assert.equal(report.scenario.matched_setup_cf?.decision, recreationFullPair
+    ? 'PASS_ORIGINAL_FULL7167_3501_TICK_15_COMMON_FIELDS_AND_SEED_C_F_GO'
+    : 'PASS_RUN2_PROPER_PREFIX_C_F_STATE_ONLY');
+  assert.equal(report.scenario.matched_setup_cf?.actions_completed, recreationAActionCount);
+  if (recreationFullPair) {
+    const cf = report.scenario.matched_setup_cf;
+    assert.equal(cf.common_field_comparisons_passed, 3501);
+    assert.equal(cf.seed_value_comparisons_passed, 3501);
+    assert.equal(cf.exact_value_comparisons_passed, 56016);
+  }
   report.scenario.recreation_canary.status = 'complete-awaiting-checked-close';
   report.execution_state = 'completed';
   report.completed_at = new Date().toISOString();
@@ -3745,7 +3766,7 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
   await persistReport();
   report.scenario.recreation_canary.route_elapsed_ms = aRouteMs;
   report.scenario.recreation_canary.elapsed_scope =
-    'Host monotonic wall duration for the bounded first-draw plus exact 174-action route; diagnostic timing only.';
+    `Host monotonic wall duration for the bounded first-draw plus exact ${recreationAActionCount}-action route; diagnostic timing only.`;
   await persistReport();
   recreationReportABytes = JSON.stringify(report);
   const aFile = path.join(output, 'report-A.json');
@@ -3789,7 +3810,7 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
   recreationSummary = {schema: 'melee-web-stadium-recreation-canary-summary-v1',
     result: 'running', decision: null, acceptance: 'not_claimed',
     lifetime_a: {path: path.basename(aFile), sha256: aFileSha256,
-      completed_actions: 174, route_elapsed_ms: aRouteMs,
+      completed_actions: recreationAActionCount, route_elapsed_ms: aRouteMs,
       checkpoint_files: recreationCheckpointAFiles},
     close_receipt: null, lifetime_b: null, identity_samples: [],
     A_archived_bytes_unchanged_after_B: false,
@@ -3799,17 +3820,19 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
   const closeRestartStartedNs = monotonicNowNs();
   const closeStartedNs = monotonicNowNs();
   matchedSetupCfExplicitNativeAccessClosed = true;
-  const close = await timeout(page.evaluate(async () => {
+  const close = await timeout(page.evaluate(async fullPair => {
     const module = globalThis.Module;
     if (!module || module.ABORT === true ||
         module.stadiumMatchedSetupNativeIdle?.() !== true ||
         globalThis.menuOwnerStopped?.() !== false ||
         globalThis.__meleeWebStadiumRecreationCanary?.beforeClose?.() !== true)
       throw Error('A close requires a returned, non-aborted idle boundary and persisted A approval');
-    const closeFunction = module._melee_web_native_menu_stadium_recreation_close;
+    const closeName = fullPair ? 'melee_web_native_menu_stadium_recreation_close_full_pair'
+      : 'melee_web_native_menu_stadium_recreation_close';
+    const closeFunction = module[`_${closeName}`];
     if (typeof closeFunction !== 'function') throw Error('Private recreation close export is absent');
     if (typeof module.ccall !== 'function') throw Error('Generated asynchronous ccall is absent');
-    const pending = module.ccall('melee_web_native_menu_stadium_recreation_close', 'number', [], [], {async: true});
+    const pending = module.ccall(closeName, 'number', [], [], {async: true});
     if (!pending || typeof pending.then !== 'function') throw Error('Native canary call did not return its owned promise');
     const result = await pending;
     if (module.stadiumMatchedSetupNativeIdle?.() !== true)
@@ -3820,7 +3843,7 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
     if (!pointer) throw Error('Private recreation status returned no receipt');
     return {result, receipt: JSON.parse(module.UTF8ToString(pointer)),
       identity: module.__meleeWebStadiumRecreationIdentityV1?.compare?.() ?? null};
-  }), Math.min(LIMITS.unloadMs, remaining()), 'Checked native close of lifetime A');
+  }, recreationFullPair), Math.min(LIMITS.unloadMs, remaining()), 'Checked native close of lifetime A');
   recreationCloseReceipt = close.receipt;
   assert.equal(close.result, 1, close.receipt?.error || 'Native A close was refused');
   assert.equal(close.receipt?.closed, true);
@@ -4616,10 +4639,12 @@ async function main() {
   const privateJs = await fs.readFile(path.join(build, 'gameplay_menu_browser.js'), 'utf8');
   const defaultJs = await fs.readFile(path.join(defaultBuild, 'gameplay_menu_browser.js'), 'utf8');
   if (recreationCanary) {
-    assert.equal(matchedSetupCfPreflight.scope, PREFIX_V2_SCOPE,
-      'Recreation canary only accepts the explicit proper-prefix V2 route');
+    assert.equal(matchedSetupCfPreflight.scope, recreationFullPair ? FULL_COMMON_FIELDS_SEED_V1_SCOPE : PREFIX_V2_SCOPE,
+      'Recreation canary A scope differs from its explicit prefix/full-pair mode');
     const bound = preflight.recreation_canary;
     assert.equal(bound?.schema, 'melee-web-stadium-recreation-canary-preflight-v1');
+    assert.equal(bound.full_pair_common_fields_seed ?? false, recreationFullPair,
+      'Full pair opt-in differs from its frozen canary scope');
     assert.equal(bound.full_b_common_fields_seed ?? false, recreationFullB,
       'Full B opt-in differs from its frozen canary scope');
     assert.equal(path.resolve(bound.identity_library?.path || ''), recreationIdentityLibraryPath);
@@ -4633,6 +4658,8 @@ async function main() {
       '_melee_web_native_menu_stadium_recreation_restart',
       '_melee_web_native_menu_stadium_recreation_admit_b'])
       assert.ok(privateJs.includes(name), `Private recreation export is absent: ${name}`);
+    if (recreationFullPair) assert.ok(privateJs.includes('_melee_web_native_menu_stadium_recreation_close_full_pair'),
+      'Private full-pair close export is absent');
     if (recreationFullB) assert.ok(privateJs.includes('_melee_web_native_menu_stadium_recreation_admit_full_b'),
       'Private full-B admission export is absent');
     assert.ok(privateJs.includes('__meleeWebStadiumRecreationIdentityV1'),
