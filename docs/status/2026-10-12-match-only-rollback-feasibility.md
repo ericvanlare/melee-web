@@ -468,6 +468,26 @@ full reference lifetime remain open. Exact component, retained failure and
 validation identities are under `readonly_gpu_target_component` in the
 [existing structured receipt](../evidence/match-only-rollback-feasibility-v1.json).
 
+On October 15, the selected-sampled-owner native diagnostic component was
+integrated at source `c89bae3d` (tree `6c9f1158`), with reviewed Aurora tree
+`4be066f4`. The focused candidate controls passed: native observer controls,
+actual GX translation-unit syntax with the diagnostic enabled, and
+byte-identical ordinary/OFF preprocessing. The diagnostic remains OFF in
+ordinary profiles. The root review rehashed 3,566 inputs, all five command log
+pairs, and confirmed all five process groups absent. The checks cover selection
+of the next sampled candidate and its owner/serial/epoch/seal validation; GX
+slot reborrow is source/TU evidence only.
+
+This is a native diagnostic/source component, not a real GX scene, browser
+capture, or quiescence result. It uses diagnostic identities; gameplay arming
+remains refused. It does not establish pending-work coverage, GPU-content
+ownership, Wasm restore, or complete renderer closure. Keep this source
+(`c89bae3d`) distinct from the earlier real-GPU probe (`5cdcd2a7`) and
+first-draw observation (`fb63c3f2`). On `c89bae3d`, all three existing Release
+profiles and the full 2,435-test regression pass, with 164 skips. The 134 build
+artifacts, source identities and four retired process groups were independently
+verified. The earlier `5cdcd2a7` validation and real-GPU result remain separate.
+
 ## Slippi profile source checkpoint
 
 The [profile inventory](../investigations/SLIPPI_GAMEPLAY_PROFILE_INVENTORY.md)

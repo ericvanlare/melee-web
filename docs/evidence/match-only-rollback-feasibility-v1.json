@@ -2740,6 +2740,65 @@
         "guard_off_in_existing_profiles": true,
         "final_head_ci": "PENDING_NEW_DOCUMENTATION_HEAD"
       }
+    },
+    "selected_sampled_native_owner_component": {
+      "state": "PASS_FOCUSED_SOURCE_COMPONENT_ONLY",
+      "scope": "Selected-sampled-owner native diagnostic controls and actual GX source/TU checks; no scene, browser capture, or gameplay admission.",
+      "source": {
+        "commit": "c89bae3d0d0e820deeae47242e67b0d2b695a190",
+        "tree": "6c9f11589fb00c4ba7069993a3bb196d9929548a",
+        "aurora_pinned_head": "749d6ee7a22bdfab78c8ece9047bca5d79aa72ca",
+        "aurora_actual_tree": "4be066f4ea89c5c9840897b8dee41629c1affd94",
+        "aurora_patch_sha256": "28f526af14fc343a7193723e860c90c4f4a05d22528dd0e4648597c4ec41254b"
+      },
+      "candidate": {
+        "artifact": "selected-sampled-texture-issue-candidate-v2/manifest.json",
+        "manifest_sha256": "6737a9d8857c92905d1fd7c17e246cad1de2bd23c337d29b6856297b2fea4b7a",
+        "integration_artifact": "selected-sampled-texture-issue-candidate-v2/integration.json",
+        "integration_sha256": "6a96b7f1b9d8158fb634e9310078a99776fd529430a4d8a8f5d095d14e36f67f",
+        "focused_execution_was_candidate_overlay_before_integration": true,
+        "focused_execution_base_head": "1e733d1294a26ea1a78cbb4e0a946ae08f952308"
+      },
+      "focused_controls": {
+        "summary_artifact": "selected-sampled-texture-issue-candidate-v2/execution-v1/run/summary.json",
+        "summary_sha256": "60174cf527e593c6a7ef617bfa7c9e0fa7dd32a1189e9f6f60ba629e658de078",
+        "root_review_artifact": "selected-sampled-texture-issue-candidate-v2/execution-v1/root-result-review.json",
+        "root_review_sha256": "c009d3bad957e93d079ff6f390ec68408e8f05503f95cc700f1f0c4a8b1a3d95",
+        "review_state": "PASS_FOCUSED_SOURCE_COMPONENT_ONLY",
+        "inputs_rehashed": 3566,
+        "command_steps": 5,
+        "all_command_log_pairs_rehashed": true,
+        "owned_process_groups_absent": 5,
+        "ordinary_off_preprocess_byte_equal": true,
+        "scope": "Actual native observer control and GX guard-on syntax; ordinary OFF projection comparison. Diagnostic identities only; no executed render scene."
+      },
+      "ordinary_profiles": "OFF; candidate ordinary gx.cpp preprocessing matched base byte-for-byte.",
+      "not_proven": [
+        "real GX scene or browser observation",
+        "GPU quiescence, pending-work closure, or complete texture/renderer ownership",
+        "Wasm snapshot/restore or gameplay admission",
+        "pixels, PCM, repeated-tick equivalence, or rollback acceptance"
+      ],
+      "related_runtime_identities_are_distinct": {
+        "prior_real_gpu_component_source": "5cdcd2a7a133ace49acf17d5462370c5840e68cf",
+        "prior_first_draw_observation_source": "fb63c3f2d26c2f266a384e04428d9b4b1fafdfb5",
+        "this_component_source": "c89bae3d0d0e820deeae47242e67b0d2b695a190"
+      },
+      "required_validation": {
+        "state": "PASS_REQUIRED_LOCAL_VALIDATION",
+        "source": "c89bae3d0d0e820deeae47242e67b0d2b695a190",
+        "artifact": "net-selected-sampled-texture-validation-v1/evidence/result.json",
+        "sha256": "9e5d4b743a97ca7906951d1bae3526a5c09a3d2c57d74428730a1c26b69ca3fa",
+        "root_review_artifact": "net-selected-sampled-texture-validation-v1/evidence/root-result-review.json",
+        "root_review_sha256": "75a2eaf48b80a77778ab466b21d648a36090f5710884b4a234f44c033a327ae6",
+        "release_profiles": 3,
+        "artifacts_verified": 134,
+        "full_tests": 2435,
+        "skipped": 164,
+        "all_four_owned_process_groups_absent": true,
+        "ci": "Current publication head tracked separately on PR324; local results do not imply CI."
+      },
+      "integration_state": "EXACT_INTEGRATION_COMMITTED_ROUTING_CANONICAL_PASS"
     }
   }
 }
