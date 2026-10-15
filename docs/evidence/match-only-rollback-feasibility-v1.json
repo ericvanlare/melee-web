@@ -1467,7 +1467,7 @@
     ]
   },
   "drawn_synctest_sprint": {
-    "status": "First-draw schema3 observation collected; UNKNOWN_RESOURCE, LOAD_ATTACHMENT and COMMAND_SHAPE_MISMATCH remain; no restore",
+    "status": "Depth no-work component validated; first-draw component controls and four Release builds pass at 9a22eec3, with full regression pending; first-draw browser observation and restore remain open.",
     "artifact_run": "rollback-stadium-sprint-20261013-111001-9f8df4a4",
     "source": "a34d5acfa540af173d97679f7c54650ac577930a",
     "private_build_source_patch_sha256": "e932d6e21be0960b16160b0f77b81aa874b30976e899ce09848c406493a9bf61",
@@ -1539,7 +1539,7 @@
       "source_and_runtime_unchanged": true,
       "h1": "No forced timing pause reported; recorder retained seven reason-code7 incidents, no dropped incidents, 7998 evicted samples, and zero match source steps. Not a match timing result."
     },
-    "next": "Reduce the first actual static bind-group descriptor lost before observer arm; preserve original descriptors and live owner identity in a focused source control before another browser attempt.",
+    "next": "Use the retained first-draw attachment and sampled-input lineage to close bounded renderer-content prerequisites. Existing native readiness/depth component facts are non-atomic; sampled protection, device/host futures, native refs and actual restore/repeat remain open. No unchanged observation capture.",
     "scope": "Observer and idle predicates are prerequisites only. No same-instance drawn restore, minimum complete state size or combined seven-tick budget result.",
     "hps_quiescence_controls": {
       "result": "pass-focused-component-only",
@@ -2923,6 +2923,257 @@
         "Depth MapAsync, device-lost/future, host asynchronous work and native refcounts remain outside this component.",
         "No Wasm restore, frame-repeat or rollback admission."
       ]
+    },
+    "first_draw_components_candidate_v3": {
+      "state": "PASS_FOCUSED_RELEASE_BUILDS_FULL_REGRESSION",
+      "source": {
+        "commit": "9a22eec3f6672c156ef127d849df8266d7924ff8",
+        "tree": "9b98597207a2ace1d2b572390eeee7b1569ca09f",
+        "aurora_actual_tree": "5142c624dc0a5bc7a77db484985552f777047fcc",
+        "aurora_patch_sha256": "c334e3b88bda5c37e95b71a4ba7bc5db35c76a1a9f8059b61bc6091e8339a868",
+        "candidate_manifest_sha256": "6575e401c091a0f180007bc746093f25999480eb22df419f82870271a464fbf4",
+        "candidate_patch_sha256": "f8d5f15251e6077f21481955763706f3a5c32521a7edf734d245fcf8705c6c77",
+        "integration_receipt_sha256": "afe5daef611ea78c0a4d7c0addf1bdd65df68167a5b2503f63c98d49d63ec122",
+        "runtime_producer": "9a22eec3f6672c156ef127d849df8266d7924ff8",
+        "runtime_tree": "9b98597207a2ace1d2b572390eeee7b1569ca09f"
+      },
+      "focused": {
+        "state": "PASS_FOCUSED_SCOPED_WITH_RETAINED_FAILURES",
+        "artifact": "first-draw-components-candidate-v3/root-focused-result-review.json",
+        "sha256": "3ca1dda70639ead9be3ef8cb30d6d6e66e51e0d4d5c27d152ea548a66f8e11ca",
+        "focused_result_sha256": "8927fc4ca7689df7e88645df3ef726190de4c2c5ae70031b721fbfc6bac27438",
+        "successful_command_phases": 13,
+        "owned_process_groups_checked_absent": 15,
+        "scope": "Frozen candidate-overlay JS and routing controls, actual native syntax/object/symbol controls, private component-OFF byte equality and bounded first-draw component protocol controls. The later actual-checkout 50-test invocation is separately bound. No browser/GPU observation from these focused controls."
+      },
+      "release_builds": [
+        {
+          "name": "first-draw-components-private",
+          "inventory_files": 44,
+          "artifact": "net-first-draw-components-validation-v1/evidence/first-draw-components-release-build.json",
+          "sha256": "98e3314d41f61435dcca652aaeefbf9c24d75766ab0a311146f8d1b3bfd656b2",
+          "state": "PASS"
+        },
+        {
+          "name": "ordinary",
+          "inventory_files": 44,
+          "artifact": "net-first-draw-components-validation-v1/evidence/ordinary-release-build.json",
+          "sha256": "2abfc7d076816f1ec56ab86934806d70eb9c699f4fbc4cbffd81b529fb47936d",
+          "state": "PASS"
+        },
+        {
+          "name": "frame-effect",
+          "inventory_files": 44,
+          "artifact": "net-first-draw-components-validation-v1/evidence/frame-effect-release-build.json",
+          "sha256": "3cac47ee6c5c5b8f8a405425c35c0c842ed8cd1ca033c38206ebcbc5f8376322",
+          "state": "PASS"
+        },
+        {
+          "name": "combined-first-pair",
+          "inventory_files": 46,
+          "artifact": "net-first-draw-components-validation-v1/evidence/combined-first-pair-release-build.json",
+          "sha256": "ddf396d36418120bbc1a7a9ea7ee5b618a6dbb72fcf10b2a56a2317eaf6f4cbc",
+          "state": "PASS"
+        }
+      ],
+      "full_regression": {
+        "state": "PASS",
+        "artifact": "net-first-draw-components-regression-v3/evidence/result.json",
+        "sha256": "44254aed997814281e992d93133d1350e700c1ee51c6a1d6ab8911434f5c5e32",
+        "suite_receipt": "net-first-draw-components-regression-v3/evidence/full-unittest-suite.json",
+        "suite_receipt_sha256": "3f4f76001926cc102f0b94e0e76b108f674d59572e04f1c70d1d12e62e8c1627",
+        "root_review": "net-first-draw-components-regression-v3/evidence/root-result-review.json",
+        "root_review_sha256": "6b39d95c32b90230ce6fd129f55c5014276b44b33239f600a662de930c02640d",
+        "runtime_producer": "9a22eec3f6672c156ef127d849df8266d7924ff8",
+        "test_revision": "baf667782ebf36f01dec7de10c21b0c3c6a9aa22",
+        "tests": 2440,
+        "skips": 164,
+        "elapsed_seconds": 580.897,
+        "suite_log_sha256": "857c3c62cbc7e809dd252e9baba25f7ee0b8c3225fbe868f31cbbc44101a7a92",
+        "artifacts_rehashed": 178,
+        "caches_rehashed": 4,
+        "prior_evidence_rehashed": 18,
+        "owned_group_absent": true
+      },
+      "retained_failures": [
+        {
+          "stage": "V2 first syntax attempt",
+          "artifact": "first-draw-components-candidate-v2/execution-v1/run/failure.json",
+          "sha256": "fcc7167528f316888e70c0944c6e7c8f0ad10bfb0bb401364c0399c8b5924f95",
+          "detail": "The source overlay omitted lib/gfx/frame_pending_facts.hpp; the syntax command stopped before controls or capture."
+        },
+        {
+          "stage": "V2 later JavaScript fixture attempt",
+          "artifact": "first-draw-components-candidate-v2/execution-v2/run/failure.json",
+          "sha256": "6ce85beb3ae4ea1765dda823242871ac8cbb58de2283a679aa1ab9a185b5aac9",
+          "control_stdout_sha256": "e75160573dc6d78c7a22cb611f85f33b059ad873850843f196265139eaba4f08",
+          "detail": "Four JavaScript controls failed in this fixture invocation, including a missing source-overlay input and a fixture-binding/recorder-installation mismatch. The selected four controls later passed after test-only fixture-binding repairs; production component bytes were unchanged."
+        },
+        {
+          "stage": "Initial full unittest suite before test-only assertion repair",
+          "state": "FULL_SUITE_FAILED_ONE_STALE_TEST_ASSERTION",
+          "artifact": "net-first-draw-components-validation-v1/evidence/root-builds-and-failure-review.json",
+          "sha256": "43c208e7f3bf29a5e3c9087f2a0dece6b463c824d2406d9eeb68652110168bd4",
+          "tests": 2440,
+          "skips": 164,
+          "failures": 1,
+          "failure": "The quiescence routing test did not allow the explicit first-draw-components diagnostic flag.",
+          "repair_commit": "baf667782ebf36f01dec7de10c21b0c3c6a9aa22",
+          "repair_files": [
+            "tests/test_aurora_browser_quiescence_option.py"
+          ],
+          "runtime_changed": false
+        }
+      ],
+      "scope": {
+        "read_and_depth_arm_are_separate_non_atomic_observations": true,
+        "same_module_idle_and_depth_sequence_rechecked_before_depth_arm": true,
+        "composite_eligible": false,
+        "restore_or_replay_claim": false,
+        "browser_capture": false,
+        "gameplay_or_gpu_ownership_closed": false
+      },
+      "test_only_followup": {
+        "commit": "baf667782ebf36f01dec7de10c21b0c3c6a9aa22",
+        "parent": "9a22eec3f6672c156ef127d849df8266d7924ff8",
+        "tree": "21cde9935aade1732c9bbc20fb7e3b093f04459e",
+        "changed_files": [
+          "tests/test_aurora_browser_quiescence_option.py"
+        ],
+        "change": "One-line assertion expectation now includes the explicit first_draw_components_diagnostic routing case; runtime/build producer unchanged."
+      },
+      "historical_split_control_attempts": {
+        "state": "RETAINED_AS_SEPARATE_RUNS_NOT_A_SINGLE_50_PASS",
+        "initial_candidate_review": {
+          "artifact": "first-draw-components-candidate-v3/root-focused-result-review.json",
+          "sha256": "3ca1dda70639ead9be3ef8cb30d6d6e66e51e0d4d5c27d152ea548a66f8e11ca",
+          "note": "The initial candidate reported 46 JavaScript controls passing while four selected controls failed in that invocation."
+        },
+        "reduced_four_control_review": {
+          "artifact": "first-draw-components-candidate-v3/execution-reduced-v1/run/root-reduced-result-review.json",
+          "sha256": "9b05fd383bfad6d62649621867bb9feb91101000bb2727a8014082e6beb0ade5",
+          "note": "The selected four controls passed in a later reduced run; this was separate from the initial 46-control run."
+        }
+      },
+      "actual_checkout_js_controls": {
+        "state": "PASS_50_OF_50_IN_ONE_ACTUAL_CHECKOUT_INVOCATION",
+        "runtime_checkout_head": "9a22eec3f6672c156ef127d849df8266d7924ff8",
+        "runtime_checkout_tree": "9b98597207a2ace1d2b572390eeee7b1569ca09f",
+        "command_receipt": "net-first-draw-components-validation-v1/evidence/actual-checkout-firstdraw-normal-js-controls.json",
+        "command_receipt_sha256": "1634b668a68aac678b03269b93a5ec6c88d013139d1372049deb55d59a48932d",
+        "log": "net-first-draw-components-validation-v1/evidence/actual-checkout-firstdraw-normal-js-controls.log",
+        "log_sha256": "a4a2383719703643f759535bcc65564a582e4d03f22206992bda21155c5e5f45",
+        "tests": 50,
+        "passed": 50,
+        "failed": 0,
+        "source_unchanged": true
+      },
+      "retained_preflight_stop": {
+        "state": "PRELAUNCH_ASSERTION_FAILURE_NOT_A_SUITE_RUN",
+        "artifact": "net-first-draw-components-regression-v2/preflight-stop.json",
+        "sha256": "51481ce8ee6a18109dccb2f1d221b717b609debe945b25f7be1dc110a53d64cd",
+        "runner_sha256": "f41da62493a87640cb7a8d5acdc6c11a9b5f2d86f24f102743be33dd144cb78c",
+        "cause": "The preflight compared git helper stdout without stripping its trailing newline.",
+        "child_process_launched": false,
+        "repair": {
+          "artifact": "net-first-draw-components-regression-v3/binding.json",
+          "sha256": "ef0f3dfb946fd4ecd7eb30b1fa3f69f589a2bbd5f3ad2ae4864f9680fc6d06df",
+          "scope": "Strip only the two git identity text comparisons; no suite or child ran under the failed preflight."
+        },
+        "evidence_directory_created": false
+      }
+    },
+    "first_draw_observation_v5": {
+      "state": "PASS_COMPONENT_OBSERVATION_ROOT_AND_INDEPENDENT_DECODE",
+      "packet": "first-draw-observation-packet-v5/manifest.json",
+      "packet_sha256": "49c8c4324caa88f8c022789484ba18d4613b700fb4a2e0a6b1c81c158a558621",
+      "runtime_producer": "9a22eec3f6672c156ef127d849df8266d7924ff8",
+      "harness_revision": "baf667782ebf36f01dec7de10c21b0c3c6a9aa22",
+      "served_runtime_manifest_sha256": "153b203b211a0be2d43a0ee1484d823ec36df4fbc853540464be06756061a591",
+      "capture": {
+        "root_review": "first-draw-observation-packet-v5/capture/root-result-review.json",
+        "root_review_sha256": "6a93477bbeb4ae78ccaffedb26bc7d4acd768ee5e94efae014dab22a4fbb03b6",
+        "raw_report": "first-draw-observation-packet-v5/capture/browser/report.json",
+        "raw_report_sha256": "fe8cd31d7f887b0552f06f860406eb2844627a19c2cd8cf283558a7a22436e4b",
+        "completion": "first-draw-observation-packet-v5/capture/completion.json",
+        "completion_sha256": "615d3c7683de03b0d19a7c0ec6d0322ac8e71c7e98d29ff7c3ca790b8939c7cb",
+        "owner_report": "first-draw-observation-packet-v5/capture/owner-report.json",
+        "owner_report_sha256": "1978fc4505321cf434a5bc4834ae8214a01f3f7b222f81f2dd33f8df1ace73ed",
+        "root_capture_audit_sha256": "ce0b08235ae2085b2f21afd98901cf92e8faebcb98715e72adf0934628bec290",
+        "source_frames": [
+          180,
+          181
+        ],
+        "tick_draw_audio_returns": [
+          1,
+          1,
+          1
+        ],
+        "pcm_frames_counter": 534,
+        "native_component_ready": true,
+        "depth_read": {
+          "phase": "READY",
+          "sequence": 3
+        },
+        "separate_depth_arm": {
+          "phase": "ACTIVE",
+          "sequence": 4
+        },
+        "read_and_arm_are_atomic": false,
+        "h1": {
+          "preparation_incidents": 8,
+          "forced_timing_pauses": 0,
+          "dropped_incidents": 0,
+          "retained_samples": 100,
+          "callbacks": 3115,
+          "evicted_samples": 3015,
+          "scope": "Lossy callback recorder; not timing acceptance or preparation completeness."
+        },
+        "renderer_findings": [
+          {
+            "code": 7,
+            "name": "LOAD_ATTACHMENT"
+          },
+          {
+            "code": 27,
+            "name": "COMMAND_SHAPE_MISMATCH"
+          }
+        ],
+        "composite_eligible": false,
+        "owned_pids_absent": 13,
+        "owned_process_groups_absent": 3,
+        "runtime_files_rehashed": 44,
+        "screenshots_rehashed": 11,
+        "completion_state": "PASS"
+      },
+      "independent_replay": {
+        "result": "first-draw-observation-packet-v5/independent-replay-v1/result.json",
+        "result_sha256": "bd1516d0bf06381a61a405fad96c116707faba33d7dbdcea0b9215374306d06a",
+        "state": "PASS_STRICT_EXISTING_DECODER_REPLAY",
+        "strict_decoders": [
+          "outer_before",
+          "outer_after",
+          "component_read",
+          "component_final"
+        ],
+        "all_decoder_failures_empty": true,
+        "replay_tool_sha256": "7fafcbf492e3d5c1604d4d05d987036c1f1a0c3620c935579dfbf43f376829b0",
+        "agent_review": "first-draw-observation-packet-v5/independent-replay-v1/agent-review.json",
+        "agent_review_sha256": "64096793cf46ac3bd4f7f0ed9daa23a9e29dcb043bdfd974cb6a27299af4cb72",
+        "owned_group_absent": 94826
+      },
+      "limits": [
+        "Native readiness and depth arm are distinct non-atomic reads; no safe interval or combined eligibility is established.",
+        "Finding 7 LOAD_ATTACHMENT and finding 27 COMMAND_SHAPE_MISMATCH remain.",
+        "No Wasm snapshot/restore, replay equivalence, GPU-content equivalence, PCM comparison, later-draw coverage, gameplay acceptance, or whole-session acceptance.",
+        "LOAD content, sampled-texture continuous protection, device/host futures, native references, and restore remain open."
+      ],
+      "browser": {
+        "name": "Google Chrome",
+        "version": "155.0.8059.40",
+        "headless": true,
+        "speaker_output": "muted; audio processing retained"
+      }
     }
   }
 }
