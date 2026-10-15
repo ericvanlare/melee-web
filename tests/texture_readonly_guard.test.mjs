@@ -96,3 +96,51 @@ for(const [name,action,code] of [
  f.api.close(f.api.capability());++passed;
 }
 console.log(JSON.stringify({scope:'synthetic-dispatch-and-identity-controls',passed,realGpu:false}));
+
+// Depth no-work is a separate component. Synthetic GPU classes above are not real devices.
+function depthFacts(enabled){const words=Array(35).fill(0);words[0]=1;words[1]=enabled;words[4]=3;for(let i=0;i<3;++i)words[8+i*9]=i;return words;}
+function depthReady(){const f=fixture();assert.equal(f.native.observeDepthFacts(0,0,depthFacts(0)),true);f.native.deviceEpochChange();f.native.observeDepthEvent(1);assert.equal(f.native.observeDepthFacts(2,12,depthFacts(1)),true);return f;}
+let depthPassed=0;
+{
+ const f=depthReady(),status=f.Module.__meleeWebDepthNoWorkV1.status;
+ assert.equal(status().phase,'READY');assert.equal(f.native.observeDepthFacts(11,12,depthFacts(1)),true);
+ assert.equal(status().phase,'ACTIVE');assert.equal(status().gameplayAdmission,false);assert.equal(f.calls.length,0);
+ assert.equal(status().snapshots.preMain.length,35);assert.equal(status().snapshots.arm.length,35);++depthPassed;
+}
+for(const [kind,name] of [[3,'READ'],[4,'REQUEST'],[5,'CONSUME'],[6,'COPY'],[7,'MAP'],[8,'CALLBACK'],[9,'RESET'],[10,'SHUTDOWN']]){
+ for(const active of [false,true]){
+  const f=depthReady();if(active)assert.equal(f.native.observeDepthFacts(11,12,depthFacts(1)),true);
+  const before=f.calls.length;assert.doesNotThrow(()=>f.native.observeDepthEvent(kind));
+  const first=f.Module.__meleeWebDepthNoWorkV1.status().firstFailure;assert.equal(first.code,'DEPTH_FORBIDDEN_'+name);
+  assert.equal(f.calls.length,before); // observation neither dispatches nor suppresses a native API
+  assert.equal(f.native.observeDepthFacts(0,0,depthFacts(0)),false); // a native reset/rewind cannot clear host history
+  assert.equal(f.Module.__meleeWebDepthNoWorkV1.status().firstFailure,first);++depthPassed;
+ }
+}
+{
+ const f=fixture();f.native.observeDepthEvent(1);assert.equal(f.native.observeDepthFacts(0,0,depthFacts(0)),false);
+ assert.equal(f.Module.__meleeWebDepthNoWorkV1.status().firstFailure.code,'DEPTH_INITIALIZE_ORDER');++depthPassed;
+}
+for(const mutate of [w=>w.pop(),w=>w[0]=2,w=>w[2]=1,w=>w[4]=2,w=>w[7]=1,w=>w[9]=1,w=>w[14]=4,w=>w[17]=0,w=>w[0]=NaN]){
+ const f=fixture(),words=depthFacts(0);mutate(words);assert.equal(f.native.observeDepthFacts(0,0,words),false);
+ assert.equal(f.Module.__meleeWebDepthNoWorkV1.status().firstFailure.code,'DEPTH_PREMAIN_COVERAGE');++depthPassed;
+}
+{
+ const f=depthReady();f.native.deviceEpochChange();assert.equal(f.native.observeDepthFacts(11,12,depthFacts(1)),false);
+ assert.equal(f.Module.__meleeWebDepthNoWorkV1.status().firstFailure.code,'DEPTH_DEVICE_EPOCH_CHANGE');++depthPassed;
+}
+{
+ const f=depthReady();f.raw[12]=new f.types.GPUDevice(f.queue);assert.equal(f.native.observeDepthFacts(11,12,depthFacts(1)),false);
+ assert.equal(f.Module.__meleeWebDepthNoWorkV1.status().firstFailure.code,'DEPTH_ARM_STATE');++depthPassed;
+}
+{
+ const f=depthReady();f.Module.__meleeWebDepthNoWorkBridgeFailureV1=true;assert.equal(f.native.observeDepthFacts(11,12,depthFacts(1)),false);
+ assert.equal(f.Module.__meleeWebDepthNoWorkV1.status().firstFailure.code,'DEPTH_BRIDGE_COVERAGE');++depthPassed;
+}
+console.log(`depth no-work actual factory: ${depthPassed} focused synthetic controls passed; no gameplay admission`);
+
+{
+ const f=depthReady();Object.freeze(f.Module);f.Module.__meleeWebDepthNoWorkBridgeFailureV1=true;f.Module.__meleeWebDepthNoWorkBridgeFailureV1=false;
+ assert.equal(f.Module.__meleeWebDepthNoWorkBridgeFailureV1,true);assert.equal(f.native.observeDepthFacts(11,12,depthFacts(1)),false);++depthPassed;
+}
+console.log(`depth monotonic bridge failure control passed; total ${depthPassed}`);

@@ -1290,3 +1290,23 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     }
   }
 }
+
+// Explicit private opt-in only. Emscripten calls this before main/Aurora init.
+export function configureDepthNoWorkBootV1(module) {
+  const prior=module.onRuntimeInitialized;
+  if(typeof prior!=='function')throw Error('Depth no-work probe requires runtime-ready callback');
+  module.onRuntimeInitialized=function(...args){
+    const api=module.__meleeWebDepthNoWorkV1;
+    if(api?.status()?.schema!=='melee-web-private-depth-no-work-v1'||typeof module._aurora_browser_depth_no_work_premain!=='function')
+      throw Error('Depth no-work probe requested, but compiled private hook is unavailable');
+    if(module._aurora_browser_depth_no_work_premain()!==1||api.status().phase!=='PREMAIN'||api.status().firstFailure||api.status().bridgeFailure)
+      throw Error('Depth no-work probe failed continuous pre-main coverage');
+    return Reflect.apply(prior,this,args);
+  };
+}
+export function requireDepthNoWorkComponentV1(module) {
+  const status=module.__meleeWebDepthNoWorkV1?.status();
+  if(status?.schema!=='melee-web-private-depth-no-work-v1'||status.phase!=='ACTIVE'||status.firstFailure||status.bridgeFailure)
+    throw Error('Depth no-work component is unavailable or poisoned');
+  return status; // Only this component; never gameplay/restore admission.
+}

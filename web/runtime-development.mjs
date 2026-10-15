@@ -1,5 +1,5 @@
 /** Development tools attach to the shared player; this file is excluded from public builds. */
-import {mountMeleeRuntime} from './melee-runtime.mjs';
+import {mountMeleeRuntime, configureDepthNoWorkBootV1} from './melee-runtime.mjs';
 import {mountControllerSettings} from './controller-settings.mjs';
 import {createRuntimeAudio} from './runtime-audio.mjs';
 import {loadNativeGameDisc, openNativeGameSession} from './runtime-audio-assets.mjs';
@@ -10,6 +10,7 @@ import {createRoomInvite, parseRoomInvite} from './net_lockstep_room_invite.mjs'
 import {LOCKSTEP_DELAY, LOCKSTEP_MAX_SOURCE_TICKS} from './net_lockstep_core.mjs';
 import {isStagingRoomSurface, parseStagingRoomInvite, stagingRoomInviteFromHash,
   stagingRoomInviteLink, STAGING_HOST, STAGING_RELAY_URL} from './staging-room.mjs';
+const depthNoWorkBootProbe = new URL(window.location.href).searchParams.get('__depth_no_work_v1') === '1';
 const wasmOwnershipBootProbe = new URL(window.location.href).searchParams.get('__wasm_ownership_accessor_v1') === '1';
 let wasmOwnershipInstaller = null, wasmOwnershipInstallerLoadError = null;
 if (wasmOwnershipBootProbe) {
@@ -615,6 +616,7 @@ try {
           return Reflect.apply(priorRuntimeInitialized,this,args);
         };
       }
+      if(depthNoWorkBootProbe)configureDepthNoWorkBootV1(module);
       installRuntimeCache(module,report=>{const size=report.fileBytes?` · ${report.fileBytes} persisted bytes`:'';
         $('cache-status').textContent=report.message+size;runtimeCacheSyncCapability=report.sync_diagnostics||null;window.meleeHitchCapture?.setCacheSyncCapability?.(runtimeCacheSyncCapability||{});$('export-render-cache').disabled=!report.mounted||!report.populated;
         if(report.state==='saved'&&report.lastSaveMs!==null)log(`Render cache save ${JSON.stringify({duration_ms:report.lastSaveMs,file_bytes:report.fileBytes})}`);

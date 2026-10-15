@@ -381,7 +381,7 @@ if(EMSCRIPTEN AND AURORA_BROWSER_TEXTURE_READONLY_GUARD)
     "SHELL:--js-library=${CMAKE_CURRENT_SOURCE_DIR}/.deps/aurora/lib/gfx/aurora_browser_future_owner_accessor_library.js"
     -sENVIRONMENT=web -sEXIT_RUNTIME=0 -sALLOW_MEMORY_GROWTH=1
     -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=TextureReadonlyGuardFixture
-    "-sEXPORTED_FUNCTIONS=_main,_texture_guard_fixture_init,_texture_guard_fixture_issue,_texture_guard_fixture_detach,_texture_guard_fixture_last_release,_texture_guard_fixture_cleanup")
+    "-sEXPORTED_FUNCTIONS=_main,_texture_guard_fixture_init,_texture_guard_fixture_issue,_texture_guard_fixture_detach,_texture_guard_fixture_last_release,_texture_guard_fixture_cleanup,_aurora_browser_depth_no_work_premain,_aurora_browser_depth_no_work_arm_component")
   set_target_properties(aurora_texture_readonly_guard_probe PROPERTIES SUFFIX ".js")
 endif()
 if(MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC)
