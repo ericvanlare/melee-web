@@ -6,6 +6,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import test from 'node:test';
 import vm from 'node:vm';
+import {monotonicNowNs, elapsedMs} from './stadium_c3_timing.mjs';
 import {validateMatchedSetupCfRequest, validateMatchedSetupCfPreflight,
   validateMatchedSetupCfIdentities, matchedSetupCfRuntimeFailure, PREFIX_V2_SCOPE,
   trackMatchedSetupCfExplicitStep, matchedSetupCfNativeAccessAllowed,
@@ -697,10 +698,14 @@ test('actual runner finally retains unsafe arm timeout and closes owned browser 
     context: {close: async () => calls.push('context-close')},
     browserCdp: null,
     browser: {close: async () => calls.push('browser-close')},
-    browserServer: {
-      close: async () => calls.push('browser-process-close'),
-      process: () => ({exitCode: 0, signalCode: null}),
-    },
+    browserProcessPid: 12345,
+    monotonicNowNs, elapsedMs, setTimeout,
+    process: {kill: (pid, signal) => {
+      assert.equal(pid, 12345); assert.equal(signal, 0);
+      assert(calls.includes('browser-close'), 'absence check must follow browser close');
+      calls.push('browser-process-absence');
+      throw Object.assign(Error('recorded test PID absent'), {code: 'ESRCH'});
+    }},
     cleanupServer: async () => {
       calls.push('server-close'); context.report.cleanup.server_process_terminated = true;
     },
@@ -711,6 +716,10 @@ test('actual runner finally retains unsafe arm timeout and closes owned browser 
     requestRows: [], responseRows: [], externalRequests: [],
   });
   const source = await fs.readFile(RUNNER, 'utf8');
+  const absenceStart = source.indexOf('async function waitForBrowserPidAbsent(');
+  const absenceEnd = source.indexOf('async function cleanupServer()', absenceStart);
+  assert(absenceStart >= 0 && absenceEnd > absenceStart);
+  vm.runInContext(source.slice(absenceStart, absenceEnd), context);
   const cleanupStart = source.indexOf('async function cleanupOwnedProcesses()');
   const cleanupEnd = source.indexOf('\ntry {\n  await main();', cleanupStart);
   assert(cleanupStart >= 0 && cleanupEnd > cleanupStart);
@@ -730,7 +739,7 @@ test('actual runner finally retains unsafe arm timeout and closes owned browser 
   assert.equal(context.report.cleanup.browser_process_terminated, true);
   assert.equal(context.report.cleanup.server_process_terminated, true);
   assert.equal(persisted.length, 1, 'the actual finally must reach final report persistence');
-  for (const required of ['page-close', 'context-close', 'browser-close', 'browser-process-close', 'server-close'])
+  for (const required of ['page-close', 'context-close', 'browser-close', 'browser-process-absence', 'server-close'])
     assert(calls.includes(required), `${required} must run after unsafe admission refusal`);
   assert.equal(calls.includes('native-unload'), false);
   assert.equal(calls.includes('native-getter'), false);
