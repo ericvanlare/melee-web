@@ -147,8 +147,21 @@ test('the matched Setup C/F opt-in and preflight gate fail before server/browser
     /if \(matchedSetupCfExplicitArmed\) \{[\s\S]*?retireMatchedSetupCfExplicitNative\(\)/,
     'the armed explicit path must use one-shot retire instead of the queued ordinary unload');
   assert.match(runnerSource,
-    /source_request_scope: firstSssVsSetupCf\s*\? firstSssVsSetupCfV2\s*\?/,
+    /source_request_scope: recreationCanary[\s\S]*?: firstSssVsSetupCf\s*\? firstSssVsSetupCfV2\s*\?/,
     'the v2 proper-prefix scope must be separately labeled');
+  const scopeStart = runnerSource.indexOf('source_request_scope: ');
+  const scopeEnd = runnerSource.indexOf(',\n  error: null,', scopeStart);
+  assert.ok(scopeStart >= 0 && scopeEnd > scopeStart, 'actual scope expression markers exist');
+  const scopeExpression = runnerSource.slice(scopeStart + 'source_request_scope: '.length, scopeEnd);
+  const scope = flags => vm.runInNewContext(`(${scopeExpression})`, {
+    recreationCanary: false, firstSssVsSetupCf: true, firstSssVsSetupCfV2: true,
+    firstSssVsSetupCfCommonFields: false, firstSssVsSetupCfFullSchedule: false, ...flags});
+  assert.equal(scope({recreationCanary: true}),
+    'Two separately reported same-instance original-route 174-action lifetimes with checked A close/restart; no whole-session or recreation acceptance.');
+  assert.equal(scope({}),
+    'Strict same-run Entry and completed Setup comparison, then the extracted run2 proper prefix from action0 through the next draw/tick/draw after dynamically mapped C/F; compare C/F before their following draws, then stop.');
+  assert.equal(scope({firstSssVsSetupCfV2: false}),
+    'Strict same-run Entry and completed Setup comparison, then the exact original 86-tick/85-draw schedule; compare C after tick84 before draw84 and F after tick85 before draw85, then stop.');
   assert.match(runnerSource,
     /exact original 86-tick\/85-draw schedule; compare C after tick84 before draw84 and F after tick85 before draw85/,
     'legacy v1 scope must retain its fixed schedule wording');
@@ -649,6 +662,10 @@ test('actual runner finally retains unsafe arm timeout and closes owned browser 
   const calls = [], persisted = [];
   let closed = false;
   Object.assign(context, {
+    recreationCanary: false,
+    recreationEventSnapshot: () => { throw Error('legacy cleanup must not read canary events'); },
+    verifyRecreationArchiveAfterFinalCleanup: async () => { throw Error('legacy cleanup must not inspect canary archives'); },
+    persistRecreationSummary: async () => { throw Error('legacy cleanup must not publish canary summary'); },
     firstSssVsSetupCfExplicitStep: true,
     pendingMatchedSetupCfExplicitStep: null,
     unloadAttempted: false,

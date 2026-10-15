@@ -67,6 +67,8 @@ async function actualPersistReport({report, reportPath, checkpoint, reportFs, ev
     }};
   const context = {
     report, inventoryOutput: reportPath, stadiumC3ReportCheckpoint: checkpointApi,
+    recreationCanary: false,
+    publishRecreationSupervisorReport: async () => { throw Error('legacy persist must not publish canary report'); },
     matchedSetupCfTiming: null, fs: observedFs, Buffer, JSON, Error,
     monotonicNowNs: () => 0n, elapsedMs: () => 0,
     timedActionSync: (_sample, _stage, _field, operation) => operation(),
