@@ -373,7 +373,8 @@ endif()
 # merely by the existing private owner accessor profile.
 if(EMSCRIPTEN AND AURORA_BROWSER_TEXTURE_READONLY_GUARD)
   add_executable(aurora_texture_readonly_guard_probe EXCLUDE_FROM_ALL tests/aurora_texture_readonly_guard_probe.cpp
-    .deps/aurora/lib/gfx/aurora_browser_future_owner_accessor.cpp)
+    .deps/aurora/lib/gfx/aurora_browser_future_owner_accessor.cpp
+    .deps/aurora/lib/gfx/aurora_browser_texture_readonly_guard.cpp)
   target_include_directories(aurora_texture_readonly_guard_probe PRIVATE .deps/aurora)
   target_link_libraries(aurora_texture_readonly_guard_probe PRIVATE aurora::gx)
   target_link_options(aurora_texture_readonly_guard_probe PRIVATE
