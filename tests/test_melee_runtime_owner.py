@@ -51,7 +51,9 @@ class SharedRuntimeOwnerTests(unittest.TestCase):
     def test_stadium_recreation_host_close_settlement(self):
         for case in ['settled', 'invalid-receipt', 'foreign-receipt', 'unsafe-idle',
                      'missing-idle', 'active-native', 'queued-command',
-                     'busy-asset-transfer', 'disc-loading', 'handoff-loading', 'fatal-owner']:
+                     'busy-asset-transfer', 'disc-loading', 'handoff-loading', 'fatal-owner',
+                     'full-pair-settled', 'full-pair-invalid-receipt', 'full-pair-foreign-receipt',
+                     'full-pair-unsafe-idle', 'full-pair-active-native']:
             with self.subTest(case=case):
                 self.run_owner(['--silent', '--stadium-recreation-settlement-case=' + case],
                                'STADIUM_RECREATION_SETTLEMENT_RESULT')

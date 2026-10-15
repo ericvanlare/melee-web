@@ -5,6 +5,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {createHash} from 'node:crypto';
 import {createRuntimeAudio} from '../web/runtime-audio.mjs';
 const withAudio = !process.argv.includes('--silent');
 const stadiumRecreationSettlementCase = process.argv.find(value => value.startsWith('--stadium-recreation-settlement-case='))?.split('=')[1] || '';
@@ -484,11 +485,24 @@ window.menuFrame(false);
 if (stadiumRecreationSettlementCase) {
   // Actual mountMeleeRuntime, controlled native endpoints only. This does not
   // claim actual MatchContext/MenuHost close, which the browser canary owns.
-  const receipt = {schema:'melee-web-stadium-recreation-boundary-v1',attempted:true,
+  let receipt = {schema:'melee-web-stadium-recreation-boundary-v1',attempted:true,
     closed:true,restarted:false,error:null,prior_world_generation:3,match_seed:39,host_seed:29,parent_seed:19,
     match_to_host_restored:true,host_to_parent_restored:true,
     matched_setup_cf:{schema:'melee-web-stadium-source-action-native-v2',scope:'proper-prefix-next-draw-tick-draw',
       action_count:174,cursor:174,state:'complete',complete:true,failed:false,error:null,queued:false,awaiting_approval:false}};
+  const fullPair = stadiumRecreationSettlementCase.startsWith('full-pair-');
+  const settlementCase = fullPair ? stadiumRecreationSettlementCase.slice('full-pair-'.length) : stadiumRecreationSettlementCase;
+  if (fullPair) {
+    if (process.env.MELEE_STADIUM_RECREATION_FULL_PAIR_RECEIPT) {
+      const bytes=await fs.readFile(process.env.MELEE_STADIUM_RECREATION_FULL_PAIR_RECEIPT);
+      assert.equal(createHash('sha256').update(bytes).digest('hex'),process.env.MELEE_STADIUM_RECREATION_FULL_PAIR_RECEIPT_SHA256);
+      receipt=JSON.parse(bytes);
+    } else {
+      receipt.matched_setup_cf={...receipt.matched_setup_cf,
+        schema:'melee-web-stadium-source-action-native-v5',scope:'original-full7167-common-fields-seed-observation-only',
+        action_count:7167,cursor:7167,common_field_count:15,seed_value_count:1,source_ticks:3585,source_draws:3582};
+    }
+  }
   let reads=0;const nativePhase=Module._melee_web_native_menu_phase,nativeRunning=Module._melee_web_native_menu_running;
   Module._melee_web_native_menu_phase=()=>{++reads;return nativePhase();};
   Module._melee_web_native_menu_running=()=>{++reads;return nativeRunning();};
@@ -496,24 +510,28 @@ if (stadiumRecreationSettlementCase) {
   Module._melee_web_native_menu_stadium_recreation_status=()=>{++reads;return JSON.stringify(receipt);};
   window.menuPreparation('Preparing original next scene...',true);
   let heldImport=null;
-  if(stadiumRecreationSettlementCase==='queued-command') {
+  if(settlementCase==='queued-command') {
     owner.boundary(()=>1).catch(()=>{});
-  } else if(stadiumRecreationSettlementCase==='busy-asset-transfer') {
+  } else if(settlementCase==='busy-asset-transfer') {
     window.menuPreparationCanceled();await pump(player.importDisc({name:'stadium-asset-session-seed'}));
     window.menuAssetsRequested(17);await Promise.resolve();
-  } else if(['disc-loading','handoff-loading'].includes(stadiumRecreationSettlementCase)) {
+  } else if(['disc-loading','handoff-loading'].includes(settlementCase)) {
     window.menuPreparationCanceled();heldImport=player.importDisc({name:'stadium-held-disc'});heldImport.catch(()=>{});
     for(let i=0;!globalThis.releaseStadiumDiscRead&&i<100;++i){window.menuServiceCommands();await new Promise(resolve=>setImmediate(resolve));}
     assert.equal(typeof globalThis.releaseStadiumDiscRead,'function');
-  } else if(stadiumRecreationSettlementCase==='unsafe-idle') Module.stadiumMatchedSetupNativeIdle=()=>false;
-  else if(stadiumRecreationSettlementCase==='missing-idle') delete Module.stadiumMatchedSetupNativeIdle;
-  else if(stadiumRecreationSettlementCase==='active-native') {phase=3;running=true;}
-  else if(stadiumRecreationSettlementCase==='fatal-owner') owner.stop(Error('controlled fatal owner'));
+  } else if(settlementCase==='unsafe-idle') Module.stadiumMatchedSetupNativeIdle=()=>false;
+  else if(settlementCase==='missing-idle') delete Module.stadiumMatchedSetupNativeIdle;
+  else if(settlementCase==='active-native') {phase=3;running=true;}
+  else if(settlementCase==='fatal-owner') owner.stop(Error('controlled fatal owner'));
   const before=player.getState();assert.equal(before.canImport,false);
   let submitted=structuredClone(receipt);
-  if(stadiumRecreationSettlementCase==='foreign-receipt')submitted.parent_seed++;
-  if(stadiumRecreationSettlementCase==='invalid-receipt') {
-    for(const change of [x=>x.schema='wrong',x=>x.restarted=true,x=>x.prior_world_generation=0,
+  if(settlementCase==='foreign-receipt')submitted.parent_seed++;
+  if(settlementCase==='invalid-receipt') {
+    const extraChanges=fullPair ? [x=>x.matched_setup_cf.schema='melee-web-stadium-source-action-native-v3',
+      x=>x.matched_setup_cf.scope='proper-prefix-next-draw-tick-draw',x=>x.matched_setup_cf.action_count=174,
+      x=>x.matched_setup_cf.common_field_count=14,x=>x.matched_setup_cf.seed_value_count=0,
+      x=>x.matched_setup_cf.source_ticks=3584,x=>x.matched_setup_cf.source_draws=3581] : [];
+    for(const change of [...extraChanges,x=>x.schema='wrong',x=>x.restarted=true,x=>x.prior_world_generation=0,
       x=>x.matched_setup_cf.cursor=173,x=>x.match_to_host_restored=false,x=>x.parent_seed=-1]) {
       const bad=structuredClone(receipt);change(bad);const count=reads;
       assert.equal(owner.callbacks.menuStadiumRecreationClosed(bad),false);assert.equal(reads,count);
@@ -528,19 +546,19 @@ if (stadiumRecreationSettlementCase) {
   const callbackText=runnerSource.slice(callbackStart+callbackMarker.indexOf('receipt => {'),callbackEnd+1);
   const actualPageCallback=vm.runInThisContext(`(${callbackText})`);
   const priorReads=reads;
-  const accepted=stadiumRecreationSettlementCase==='settled'
+  const accepted=settlementCase==='settled'
     ? actualPageCallback(submitted).accepted : owner.callbacks.menuStadiumRecreationClosed(submitted);
   const callReads=reads-priorReads;
-  const shouldAccept=['settled','invalid-receipt'].includes(stadiumRecreationSettlementCase);
+  const shouldAccept=['settled','invalid-receipt'].includes(settlementCase);
   assert.equal(accepted,shouldAccept);const after=player.getState();
   if(shouldAccept){assert.equal(after.canImport,true);assert.equal(after.loading,null);assert.notEqual(after.state,'preparing');
     assert.equal(owner.callbacks.menuStadiumRecreationClosed(receipt),false,'one-use close settlement');
     phase=3;running=true;const b=player.getState();assert.equal(b.phase,3);assert.equal(b.running,true,'B native state remains visible; terminal flags untouched');
   } else {
     assert.equal(after.canImport,false);assert.equal(after.loading,before.loading);
-    if(['queued-command','busy-asset-transfer','disc-loading','handoff-loading','unsafe-idle','missing-idle','fatal-owner'].includes(stadiumRecreationSettlementCase))assert.equal(callReads,0,'refusal before native reads');
+    if(['queued-command','busy-asset-transfer','disc-loading','handoff-loading','unsafe-idle','missing-idle','fatal-owner'].includes(settlementCase))assert.equal(callReads,0,'refusal before native reads');
   }
-  console.log('STADIUM_RECREATION_SETTLEMENT_RESULT '+JSON.stringify({case:stadiumRecreationSettlementCase,accepted,before_canImport:before.canImport,after_canImport:after.canImport,native_reads:callReads}));
+  console.log('STADIUM_RECREATION_SETTLEMENT_RESULT '+JSON.stringify({case:stadiumRecreationSettlementCase,full_pair:fullPair,accepted,before_canImport:before.canImport,after_canImport:after.canImport,native_reads:callReads}));
   process.exit(0);
 }
 if (stadiumRetirementCase) {
