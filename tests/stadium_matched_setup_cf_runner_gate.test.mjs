@@ -125,9 +125,11 @@ test('the matched Setup C/F opt-in and preflight gate fail before server/browser
     'retirement must notify the shared runtime owner only after native shutdown');
   const runtimeSource = await fs.readFile(path.join(CANDIDATE_ROOT, 'web/melee-runtime.mjs'), 'utf8');
   const callbackStart = runtimeSource.indexOf('menuMatchedSetupCfRetired(receipt)');
-  const callbackEnd = runtimeSource.indexOf('menuFrame(wasRunning)', callbackStart);
+  const callbackEnd = runtimeSource.indexOf('menuStadiumRecreationClosed(receipt)', callbackStart);
+  const frameCallbackStart = runtimeSource.indexOf('menuFrame(wasRunning)', callbackEnd);
+  assert.ok(callbackStart >= 0 && callbackEnd > callbackStart && frameCallbackStart > callbackEnd,
+    'the terminal retirement, separate nonterminal recreation, and frame callbacks must exist in order');
   const callbackSource = runtimeSource.slice(callbackStart, callbackEnd);
-  assert.ok(callbackStart >= 0 && callbackEnd > callbackStart);
   assert.doesNotMatch(callbackSource, /Module\._melee_web_native_menu_/,
     'the runtime retirement callback must not call a native getter inside the yielding ccall');
   assert.match(callbackSource,
