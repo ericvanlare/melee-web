@@ -369,6 +369,20 @@ if(EMSCRIPTEN AND MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC)
     "SHELL:--js-library=${CMAKE_CURRENT_SOURCE_DIR}/.deps/aurora/lib/gfx/aurora_browser_future_owner_accessor_library.js")
   set_target_properties(aurora_future_owner_probe PROPERTIES SUFFIX ".js")
 endif()
+# Separate, explicit component fixture; never enabled by the normal player or
+# merely by the existing private owner accessor profile.
+if(EMSCRIPTEN AND AURORA_BROWSER_TEXTURE_READONLY_GUARD)
+  add_executable(aurora_texture_readonly_guard_probe EXCLUDE_FROM_ALL tests/aurora_texture_readonly_guard_probe.cpp
+    .deps/aurora/lib/gfx/aurora_browser_future_owner_accessor.cpp)
+  target_include_directories(aurora_texture_readonly_guard_probe PRIVATE .deps/aurora)
+  target_link_libraries(aurora_texture_readonly_guard_probe PRIVATE aurora::gx)
+  target_link_options(aurora_texture_readonly_guard_probe PRIVATE
+    "SHELL:--js-library=${CMAKE_CURRENT_SOURCE_DIR}/.deps/aurora/lib/gfx/aurora_browser_future_owner_accessor_library.js"
+    -sENVIRONMENT=web -sEXIT_RUNTIME=0 -sALLOW_MEMORY_GROWTH=1
+    -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=TextureReadonlyGuardFixture
+    "-sEXPORTED_FUNCTIONS=_main,_texture_guard_fixture_init,_texture_guard_fixture_issue,_texture_guard_fixture_detach,_texture_guard_fixture_last_release,_texture_guard_fixture_cleanup")
+  set_target_properties(aurora_texture_readonly_guard_probe PROPERTIES SUFFIX ".js")
+endif()
 if(MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC)
   if(NOT TARGET aurora_gx)
     message(FATAL_ERROR "Aurora GX target is required for browser quiescence diagnostics")

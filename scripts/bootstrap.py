@@ -19,6 +19,8 @@ from workspace_resources import operation
 # Future/object bootstrap path. Both are exact isolated-index trees, never an
 # arbitrary locally modified checkout.
 AURORA_PREVIOUS_PATCH_TREES = (
+    # Exact copied TextureRef/pool owner predecessor before private read-only component.
+    "c6b4982168244b0c1d467f7800041ef1c98bcd9b",
     # Exact persistent EFB-owner predecessor before copied texture/pool ownership and clear API facts.
     "e3479f5b50440999b0c8a6db262d936971a5f775",
     # Exact typed renderer-owner predecessor before persistent EFB attachment provenance.

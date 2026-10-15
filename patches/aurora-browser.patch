@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 8bc473c3b04cf0728c161ebec142008fcc57d8b3..c5a8a796aab8d9473070ae847530b521f4f886cc 100644
+index 8bc473c3b04cf0728c161ebec142008fcc57d8b3..7349f21bb5448c624e3270d19ceb1d32f88d4194 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -5,9 +5,17 @@ if (APPLE)
@@ -30,7 +30,7 @@ index 8bc473c3b04cf0728c161ebec142008fcc57d8b3..c5a8a796aab8d9473070ae847530b521
  set(AURORA_DAWN_LINKAGE "${_default_linkage}" CACHE STRING "Dawn linkage type preference")
  set_property(CACHE AURORA_DAWN_LINKAGE PROPERTY STRINGS shared static)
  
-@@ -54,6 +62,15 @@ if (AURORA_ENABLE_GX)
+@@ -54,6 +62,24 @@ if (AURORA_ENABLE_GX)
    include(cmake/aurora_gx.cmake)
    include(cmake/aurora_gd.cmake)
  endif ()
@@ -43,6 +43,15 @@ index 8bc473c3b04cf0728c161ebec142008fcc57d8b3..c5a8a796aab8d9473070ae847530b521
 +  endif ()
 +  target_compile_definitions(aurora_core PUBLIC AURORA_BROWSER_FRAME_EFFECT_OBSERVER=1)
 +endif ()
++option(AURORA_BROWSER_TEXTURE_READONLY_GUARD "Private one-texture component fixture only" OFF)
++if(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++  if(NOT AURORA_BROWSER_FRAME_EFFECT_OBSERVER OR NOT EMSCRIPTEN)
++    message(FATAL_ERROR "Texture guard requires the single-thread browser frame observer")
++  endif()
++  target_compile_definitions(aurora_core PUBLIC AURORA_BROWSER_TEXTURE_READONLY_GUARD=1)
++  target_sources(aurora_gx PRIVATE lib/gfx/aurora_browser_texture_readonly_guard.cpp)
++  target_link_options(aurora_gx PUBLIC "SHELL:--js-library=${CMAKE_CURRENT_SOURCE_DIR}/lib/gfx/aurora_browser_texture_readonly_guard_library.js")
++endif()
  include(cmake/aurora_pad.cmake)
  include(cmake/aurora_ms.cmake)
  include(cmake/aurora_si.cmake)
@@ -1696,6 +1705,188 @@ index 0000000000000000000000000000000000000000..69d2ea3a2418c7640cba5791d638d9e2
 +})()
 +;
 +  `,
++});
+diff --git a/lib/gfx/aurora_browser_texture_readonly_guard.cpp b/lib/gfx/aurora_browser_texture_readonly_guard.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..2778e778c106f976d2bbb321f459a69112599472
+--- /dev/null
++++ b/lib/gfx/aurora_browser_texture_readonly_guard.cpp
+@@ -0,0 +1,19 @@
++#if !defined(__EMSCRIPTEN__) || defined(__EMSCRIPTEN_PTHREADS__)
++#error "Texture guard component requires single-thread Emscripten"
++#endif
++#include <cstdint>
++#include <emscripten/em_js.h>
++EM_JS_DEPS(aurora_texture_readonly_guard_v1, "$WebGPU,$AuroraTextureReadonlyGuardV1");
++namespace aurora::gfx::detail {
++EM_JS(int, issue_texture_readonly_guard_host,
++ (uintptr_t owner,uintptr_t texture,uintptr_t view,uintptr_t device,uintptr_t queue,
++  uint32_t sl,uint32_t sh,uint32_t vl,uint32_t vh,uint32_t el,uint32_t eh), {
++ return AuroraTextureReadonlyGuardV1.issue(owner>>>0,texture>>>0,view>>>0,device>>>0,queue>>>0,sl>>>0,sh>>>0,vl>>>0,vh>>>0,el>>>0,eh>>>0);
++});
++EM_JS(void, detach_texture_readonly_guard_host,(uintptr_t owner), {
++ AuroraTextureReadonlyGuardV1.detach(owner>>>0);
++});
++EM_JS(void, texture_readonly_guard_device_epoch_change,(), {
++ AuroraTextureReadonlyGuardV1.deviceEpochChange();
++});
++} // namespace aurora::gfx::detail
+diff --git a/lib/gfx/aurora_browser_texture_readonly_guard_library.js b/lib/gfx/aurora_browser_texture_readonly_guard_library.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..b62888cb07895adf1a015da91b7dd9627ddf726c
+--- /dev/null
++++ b/lib/gfx/aurora_browser_texture_readonly_guard_library.js
+@@ -0,0 +1,151 @@
++/* One-resource private component. This source is also evaluated unchanged by
++ * the focused controls. It is not a gameplay admission or restore service. */
++function createAuroraTextureReadonlyGuardV1(WebGPU, Module, types) {
++  'use strict';
++  let phase = 'INSTALLED', firstFailure = null, epoch = 0, selected = null;
++  let capability = null, attempts = 0, dispatches = 0, fenceComplete = false;
++  const originalWebGPU = WebGPU;
++  const rawInternals = WebGPU.Internals;
++  const raw = rawInternals.jsObjects;
++  const bindings = [];
++  const actualFence = types.GPUQueue.prototype.onSubmittedWorkDone;
++  if(typeof actualFence!=='function')throw new Error('texture-readonly-guard: no actual queue fence');
++  const active = () => selected && phase !== 'CLOSED';
++  function terminal(code, detail) {
++    if (!firstFailure) firstFailure = Object.freeze({code, detail, epoch, attempts, dispatches});
++    phase = 'TERMINAL';
++    return new Error('texture-readonly-guard: ' + firstFailure.code);
++  }
++  function refuse(code, detail) { throw terminal(code, detail); }
++  function live() { if (phase === 'TERMINAL') throw new Error('texture-readonly-guard: ' + firstFailure.code); }
++  function mapped() {
++    live();
++    if (!selected) refuse('NO_CAPABILITY', 'No native-issued live owner');
++    for (const [key, value] of bindings) {
++      const d = Object.getOwnPropertyDescriptor(raw, String(key));
++      if (!d || !('value' in d) || d.value !== value) refuse('MAPPING_IDENTITY', String(key));
++    }
++    if (WebGPU.Internals !== internals || internals.jsObjects !== proxy || selected.device.queue !== selected.queue)
++      refuse('DEVICE_TABLE_IDENTITY', 'Binding changed');
++  }
++  function mutation(key, value, kind) {
++    live();
++    if (!active()) return;
++    if(key!=='length' && (typeof key!=='string' || !/^(0|[1-9][0-9]*)$/.test(key) || Number(key)>0xfffffffe))
++      refuse('TABLE_KEY','Not a native numeric key');
++    if (key === 'length' && kind !== 'delete' && Number(value) <= Math.max(...bindings.map(x => x[0])))
++      refuse('MAPPING_TRUNCATION', String(value));
++    if (bindings.some(([k,v]) => String(k) === String(key) || value === v))
++      refuse(kind === 'delete' ? 'NATIVE_FINAL_RELEASE_OR_TABLE_DELETE' : 'MAPPING_MUTATION', String(key));
++  }
++  const proxy = new Proxy(raw, {
++    set(t,k,v) { mutation(k,v,'set'); return Reflect.set(t,k,v,t); },
++    defineProperty(t,k,d) { mutation(k,d.value,'define'); if (active() && !('value' in d)) refuse('MAPPING_DESCRIPTOR','Accessor'); return Reflect.defineProperty(t,k,d); },
++    deleteProperty(t,k) { mutation(k,undefined,'delete'); return Reflect.deleteProperty(t,k); },
++    setPrototypeOf(t,p) { if (active()) refuse('TABLE_PROTOTYPE','Mutation'); return Reflect.setPrototypeOf(t,p); },
++    preventExtensions(t) { if (active()) refuse('TABLE_EXTENSIBILITY','Mutation'); return Reflect.preventExtensions(t); }
++  });
++  if (!Array.isArray(raw)) throw new Error('texture-readonly-guard: unsupported table');
++  function bindingProxy(object, key, value) {
++    return new Proxy(object, {
++      get(t,k,r) { return k===key ? value : Reflect.get(t,k,r); },
++      getOwnPropertyDescriptor(t,k) {
++        const d=Reflect.getOwnPropertyDescriptor(t,k);
++        if(k!==key || !d)return d;
++        if(!d.configurable || !('value' in d))refuse('TABLE_DESCRIPTOR','Unsupported binding');
++        return {...d,value};
++      },
++      set(t,k,v) { if(k===key || k==='__proto__')refuse('TABLE_REPLACEMENT',String(k)); return Reflect.set(t,k,v,t); },
++      defineProperty(t,k,d) { if(k===key || k==='__proto__')refuse('TABLE_REPLACEMENT',String(k)); return Reflect.defineProperty(t,k,d); },
++      deleteProperty(t,k) { if(k===key || k==='__proto__')refuse('TABLE_REPLACEMENT',String(k)); return Reflect.deleteProperty(t,k); },
++      setPrototypeOf() { refuse('TABLE_PROTOTYPE','Binding object'); },
++      preventExtensions() { refuse('TABLE_EXTENSIBILITY','Binding object'); }
++    });
++  }
++  const internals = bindingProxy(rawInternals,'jsObjects',proxy);
++  WebGPU = bindingProxy(originalWebGPU,'Internals',internals);
++  function destination(value) {
++    const d = value && Object.getOwnPropertyDescriptor(value,'texture');
++    if (!d || !('value' in d)) refuse('UNKNOWN_DESTINATION','No own texture value');
++    return d.value;
++  }
++  function wrap(type, name, target) {
++    const proto = type && type.prototype;
++    const d = proto && Object.getOwnPropertyDescriptor(proto,name);
++    if (!d || typeof d.value !== 'function' || !d.configurable)
++      throw new Error('texture-readonly-guard: unsupported method ' + name);
++    const original = d.value;
++    function guarded(...args) {
++      live();
++      if (active()) {
++        mapped(); ++attempts;
++        if (target(this,args)) refuse('TARGET_' + name,'Before original GPU dispatch');
++      }
++      ++dispatches;
++      return Reflect.apply(original,this,args);
++    }
++    Object.defineProperty(proto,name,{get:()=>guarded,set:()=>refuse('METHOD_REPLACEMENT',name),enumerable:d.enumerable,configurable:false});
++  }
++  wrap(types.GPUQueue,'writeTexture',(_,a)=>destination(a[0])===selected.texture);
++  wrap(types.GPUCommandEncoder,'copyBufferToTexture',(_,a)=>destination(a[1])===selected.texture);
++  wrap(types.GPUCommandEncoder,'copyTextureToTexture',(_,a)=>destination(a[1])===selected.texture);
++  if (types.GPUQueue.prototype.copyExternalImageToTexture)
++    wrap(types.GPUQueue,'copyExternalImageToTexture',(_,a)=>destination(a[1])===selected.texture);
++  wrap(types.GPUTexture,'destroy',(self)=>self===selected.texture);
++  wrap(types.GPUDevice,'destroy',(self)=>self===selected.device);
++  function issue(owner, textureKey, viewKey, deviceKey, queueKey, serialLo, serialHi, viewLo, viewHi, epochLo, epochHi) {
++    live();
++    if (phase !== 'INSTALLED' || selected) refuse('DUPLICATE_CAPABILITY','One target per module');
++    const keys = [textureKey,viewKey,deviceKey,queueKey];
++    if (keys.some(k=>!Number.isSafeInteger(k)||k<=0) || new Set(keys).size!==4 || !owner ||
++        !(serialLo||serialHi) || !(viewLo||viewHi) || !(epochLo||epochHi) ||
++        (serialLo===viewLo && serialHi===viewHi)) refuse('NATIVE_CAPABILITY','Invalid native facts');
++    const values = keys.map(k=>{
++      const d=Object.getOwnPropertyDescriptor(raw,String(k));
++      if (!d || !('value' in d)) refuse('MAPPING_IDENTITY','Missing native entry');
++      return d.value;
++    });
++    const [texture,view,device,queue]=values;
++    if (!(texture instanceof types.GPUTexture) || !(view instanceof types.GPUTextureView) ||
++        !(device instanceof types.GPUDevice) || !(queue instanceof types.GPUQueue) || device.queue!==queue ||
++        texture.usage!==6) refuse('UNSUPPORTED_NATIVE_TARGET','Requires CopyDst|TextureBinding only');
++    ++epoch;
++    selected=Object.freeze({owner,texture,view,device,queue,serialLo,serialHi,viewLo,viewHi,epochLo,epochHi});
++    keys.forEach((k,i)=>bindings.push([k,values[i]]));
++    capability=Object.freeze({}); phase='ISSUED'; mapped();
++    // A real persistent lost future is classified for this component only.
++    device.lost.then(()=>{if(active())terminal('DEVICE_LOST','Actual device.lost');},()=>{if(active())terminal('DEVICE_LOST_REJECTED','Actual device.lost rejection');});
++    return 1;
++  }
++  function detach(owner) {
++    live();
++    if (active() && selected.owner===owner) refuse('OWNER_DETACH','Before TextureRef member release');
++  }
++  function deviceEpochChange() {
++    live(); if (active()) refuse('DEVICE_EPOCH_CHANGE','Before native ownership change');
++  }
++  async function armFixture(cap) {
++    live();
++    if (cap!==capability || phase!=='ISSUED') refuse('CAPABILITY_IDENTITY','Wrong or reused capability');
++    if (Module['__meleeWebTextureReadonlyFixtureV1']!==true)
++      refuse('PENDING_WORK_UNCLASSIFIED','Only the reviewed fresh fixture schedule is admitted');
++    mapped(); phase='ARMING';
++    try { await Reflect.apply(actualFence,selected.queue,[]); }
++    catch (_) { refuse('PRIOR_QUEUE_FENCE','Actual fence rejected'); }
++    mapped(); fenceComplete=true; phase='ACTIVE';
++  }
++  function close(cap) {
++    live(); if(cap!==capability || phase!=='ACTIVE' || !fenceComplete) refuse('CLOSE_STATE','Not active');
++    mapped(); phase='CLOSED'; return status();
++  }
++  function status() { return Object.freeze({identity:selected?Object.freeze({nativeKeys:Object.freeze(bindings.map(x=>x[0])),textureSerial:Object.freeze([selected.serialLo,selected.serialHi]),viewSerial:Object.freeze([selected.viewLo,selected.viewHi]),deviceEpoch:Object.freeze([selected.epochLo,selected.epochHi])}):null,schema:1,scope:'fixture-component-only',phase,epoch,attempts,dispatches,fenceComplete,firstFailure,gameplayAdmission:false}); }
++  const facade=Object.freeze({capability:()=>capability,armFixture,close,status,
++    armGameplay:()=>refuse('GAMEPLAY_ADMISSION_UNCLASSIFIED','Pending work/futures/native reference/restore gates remain open')});
++  Object.defineProperty(Module,'__meleeWebTextureReadonlyGuardV1',{value:facade,writable:false,configurable:false});
++  return Object.freeze({issue,detach,deviceEpochChange,webGPU:WebGPU});
++}
++addToLibrary({
++  $AuroraTextureReadonlyGuardV1__deps: ['$WebGPU'],
++  $AuroraTextureReadonlyGuardV1: {},
++  $AuroraTextureReadonlyGuardV1__postset: 'AuroraTextureReadonlyGuardV1 = ('+createAuroraTextureReadonlyGuardV1.toString()+')(WebGPU,Module,{GPUQueue,GPUCommandEncoder,GPUTexture,GPUTextureView,GPUDevice}); WebGPU = AuroraTextureReadonlyGuardV1.webGPU;'
 +});
 diff --git a/lib/gfx/browser_submission_owner.hpp b/lib/gfx/browser_submission_owner.hpp
 new file mode 100644
@@ -4257,10 +4448,10 @@ index 0b86ffead6e8f6153d2acf52cf9daecf4f07ccfa..a5ad738b32d623acc50eb06d39589ff0
  void gpu_synchronize();
 diff --git a/lib/gfx/frame_effect_observer.hpp b/lib/gfx/frame_effect_observer.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..37089bb225eeb507ac168e115bfb30dda023aebb
+index 0000000000000000000000000000000000000000..6db7a2d62b831fafe3c840b863fca2b4c54a1ebf
 --- /dev/null
 +++ b/lib/gfx/frame_effect_observer.hpp
-@@ -0,0 +1,1729 @@
+@@ -0,0 +1,1752 @@
 +#pragma once
 +
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
@@ -4314,6 +4505,9 @@ index 0000000000000000000000000000000000000000..37089bb225eeb507ac168e115bfb30dd
 +  // GPU initialization precedes renderer initialization. These authored creation
 +  // rows retain their real serials; renderer begin only assigns observer epoch.
 +  void begin_persistent_attachment_lifetime(uintptr_t device) noexcept {
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++    texture_readonly_guard_device_epoch_change();
++#endif
 +    if (state_.load(std::memory_order_acquire) != AURORA_BROWSER_FRAME_EFFECT_UNUSED || attachmentActive_ || !device) {
 +      attachment_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE); return;
 +    }
@@ -4324,6 +4518,9 @@ index 0000000000000000000000000000000000000000..37089bb225eeb507ac168e115bfb30dd
 +    for (size_t i=SharedWarmOwnerCapacity;i<WarmOwnerCapacity;++i) warm_[i] = {};
 +  }
 +  void end_persistent_attachment_lifetime(uintptr_t device) noexcept {
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++    texture_readonly_guard_device_epoch_change();
++#endif
 +    if (!attachmentActive_ || device != attachmentDevice_) attachment_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
 +    if (capture_window_live()) attachment_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
 +    attachmentActive_ = false;
@@ -4422,7 +4619,24 @@ index 0000000000000000000000000000000000000000..37089bb225eeb507ac168e115bfb30dd
 +    }
 +    pair.textureRefOwner=owner;
 +  }
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++  // Called with an actual live TextureRef, never a host-supplied raw owner.
++  int issue_texture_readonly_guard(const TextureOwnerPair& pair,uintptr_t owner,uintptr_t texture,uintptr_t view,uintptr_t queue) const noexcept {
++    const auto& t=pair.texture; const auto& v=pair.view;
++    if(!attachmentActive_ || !valid_texture_creation(t) || !valid_texture_creation(v) ||
++       t.role!=TextureRefTextureRole || v.role!=TextureRefViewRole || !owner || pair.textureRefOwner!=owner ||
++       t.device!=attachmentDevice_ || t.raw!=texture || v.raw!=view || v.parentSerial!=t.serial ||
++       v.device!=t.device || v.deviceEpoch!=t.deviceEpoch || v.domainEpoch!=t.domainEpoch ||
++       t.serial==v.serial || t.words[7]!=6 || t.words[8]!=0 || !queue) return 0;
++    return issue_texture_readonly_guard_host(owner,t.raw,v.raw,t.device,queue,
++      uint32_t(t.serial),uint32_t(t.serial>>32),uint32_t(v.serial),uint32_t(v.serial>>32),
++      uint32_t(t.deviceEpoch),uint32_t(t.deviceEpoch>>32));
++  }
++#endif
 +  void detach_owned_texture_ref(uintptr_t owner,const TextureOwnerPair& pair) noexcept {
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++    detach_texture_readonly_guard_host(owner);
++#endif
 +    if(!pair.texture.valid || !pair.view.valid)return;
 +    if(pair.textureRefOwner!=owner){if(capture_window_live())texture_owner_fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);return;}
 +    if(pair.texture.deviceEpoch==deviceEpoch_ && capture_window_live())texture_owner_fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
@@ -5992,15 +6206,21 @@ index 0000000000000000000000000000000000000000..37089bb225eeb507ac168e115bfb30dd
 +#endif
 diff --git a/lib/gfx/frame_effect_texture_owner.hpp b/lib/gfx/frame_effect_texture_owner.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..afb2febe8508aa9a6e44c51756c01979d262ac35
+index 0000000000000000000000000000000000000000..d636649842b7bf4a7c868c982a5c79f5c1163fa9
 --- /dev/null
 +++ b/lib/gfx/frame_effect_texture_owner.hpp
-@@ -0,0 +1,33 @@
+@@ -0,0 +1,39 @@
 +#pragma once
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
 +#include <array>
 +#include <cstdint>
 +namespace aurora::gfx::detail {
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++extern "C" int issue_texture_readonly_guard_host(uintptr_t owner,uintptr_t texture,uintptr_t view,uintptr_t device,uintptr_t queue,
++  uint32_t serialLo,uint32_t serialHi,uint32_t viewLo,uint32_t viewHi,uint32_t epochLo,uint32_t epochHi);
++extern "C" void detach_texture_readonly_guard_host(uintptr_t owner);
++extern "C" void texture_readonly_guard_device_epoch_change();
++#endif
 +class BrowserFrameEffectObserver;
 +struct BrowserFrameEffectObserverControls;
 +// Copied facts only. These tokens never own a native object or a cache entry.
@@ -8457,7 +8677,7 @@ index 0000000000000000000000000000000000000000..8a76bfe19513fe6bf000224d301dbeb8
 +
 +} // namespace aurora::gfx::selective
 diff --git a/lib/gfx/texture.cpp b/lib/gfx/texture.cpp
-index 029a3d047c357a5e1aed999af63a3dee8ea09f03..b754d6117649d5f1744d077ebc361e91340b8d07 100644
+index 029a3d047c357a5e1aed999af63a3dee8ea09f03..ee31bc2124a828624e17a477d813d771d6437ab1 100644
 --- a/lib/gfx/texture.cpp
 +++ b/lib/gfx/texture.cpp
 @@ -5,6 +5,9 @@
@@ -8487,7 +8707,7 @@ index 029a3d047c357a5e1aed999af63a3dee8ea09f03..b754d6117649d5f1744d077ebc361e91
  wgpu::AddressMode wgpu_address_mode(GXTexWrapMode mode) {
    switch (mode) {
      DEFAULT_FATAL("invalid wrap mode {}", underlying(mode));
-@@ -97,6 +103,17 @@ u16 wgpu_aniso(GXAnisotropy aniso) {
+@@ -97,6 +103,25 @@ u16 wgpu_aniso(GXAnisotropy aniso) {
  }
  } // namespace
  
@@ -8502,10 +8722,18 @@ index 029a3d047c357a5e1aed999af63a3dee8ea09f03..b754d6117649d5f1744d077ebc361e91
 +}
 +#endif
 +
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++int issue_texture_readonly_guard(const TextureRef& ref) noexcept {
++  return detail::browser_frame_effect_observer().issue_texture_readonly_guard(ref.frameEffectOwnerFacts,
++    reinterpret_cast<uintptr_t>(&ref),reinterpret_cast<uintptr_t>(ref.texture.Get()),
++    reinterpret_cast<uintptr_t>(ref.sampleTextureView.Get()),reinterpret_cast<uintptr_t>(g_queue.Get()));
++}
++#endif
++
  TextureHandle new_static_texture_2d(uint32_t width, uint32_t height, uint32_t mips, u32 format, ArrayRef<uint8_t> data,
                                      bool tlut, const char* label) noexcept {
    ZoneScoped;
-@@ -174,6 +191,12 @@ TextureHandle new_dynamic_texture_2d(uint32_t width, uint32_t height, uint32_t m
+@@ -174,6 +199,12 @@ TextureHandle new_dynamic_texture_2d(uint32_t width, uint32_t height, uint32_t m
        .sampleCount = 1,
    };
    auto texture = g_device.CreateTexture(&textureDescriptor);
@@ -8518,7 +8746,7 @@ index 029a3d047c357a5e1aed999af63a3dee8ea09f03..b754d6117649d5f1744d077ebc361e91
    const auto viewLabel = fmt::format("{} view", label);
    wgpu::TextureViewDescriptor textureViewDescriptor{
        .label = viewLabel.c_str(),
-@@ -181,13 +204,24 @@ TextureHandle new_dynamic_texture_2d(uint32_t width, uint32_t height, uint32_t m
+@@ -181,13 +212,24 @@ TextureHandle new_dynamic_texture_2d(uint32_t width, uint32_t height, uint32_t m
        .dimension = wgpu::TextureViewDimension::e2D,
        .mipLevelCount = mips,
    };
@@ -8544,7 +8772,7 @@ index 029a3d047c357a5e1aed999af63a3dee8ea09f03..b754d6117649d5f1744d077ebc361e91
  }
  
  TextureHandle new_render_texture(uint32_t width, uint32_t height, u32 gxFormat, const char* label) noexcept {
-@@ -209,6 +243,12 @@ TextureHandle new_render_texture(uint32_t width, uint32_t height, u32 gxFormat,
+@@ -209,6 +251,12 @@ TextureHandle new_render_texture(uint32_t width, uint32_t height, u32 gxFormat,
        .sampleCount = 1,
    };
    auto texture = g_device.CreateTexture(&textureDescriptor);
@@ -8557,7 +8785,7 @@ index 029a3d047c357a5e1aed999af63a3dee8ea09f03..b754d6117649d5f1744d077ebc361e91
  
    // Create texture view for color attachments
    const auto viewLabel = fmt::format("{} view", label);
-@@ -218,9 +258,18 @@ TextureHandle new_render_texture(uint32_t width, uint32_t height, u32 gxFormat,
+@@ -218,9 +266,18 @@ TextureHandle new_render_texture(uint32_t width, uint32_t height, u32 gxFormat,
        .dimension = wgpu::TextureViewDimension::e2D,
    };
    auto attachmentTextureView = texture.CreateView(&textureViewDescriptor);
@@ -8577,7 +8805,7 @@ index 029a3d047c357a5e1aed999af63a3dee8ea09f03..b754d6117649d5f1744d077ebc361e91
  }
  
  TextureHandle new_conv_texture(uint32_t width, uint32_t height, u32 gxFormat, const char* label) noexcept {
-@@ -242,6 +291,12 @@ TextureHandle new_conv_texture(uint32_t width, uint32_t height, u32 gxFormat, co
+@@ -242,6 +299,12 @@ TextureHandle new_conv_texture(uint32_t width, uint32_t height, u32 gxFormat, co
        .sampleCount = 1,
    };
    auto texture = g_device.CreateTexture(&textureDescriptor);
@@ -8590,7 +8818,7 @@ index 029a3d047c357a5e1aed999af63a3dee8ea09f03..b754d6117649d5f1744d077ebc361e91
  
    // Create texture view for color attachments
    const auto viewLabel = fmt::format("{} view", label);
-@@ -251,9 +306,18 @@ TextureHandle new_conv_texture(uint32_t width, uint32_t height, u32 gxFormat, co
+@@ -251,9 +314,18 @@ TextureHandle new_conv_texture(uint32_t width, uint32_t height, u32 gxFormat, co
        .dimension = wgpu::TextureViewDimension::e2D,
    };
    auto attachmentTextureView = texture.CreateView(&textureViewDescriptor);
@@ -8611,7 +8839,7 @@ index 029a3d047c357a5e1aed999af63a3dee8ea09f03..b754d6117649d5f1744d077ebc361e91
  
  void write_texture(TextureRef& ref, ArrayRef<uint8_t> data) noexcept {
 diff --git a/lib/gfx/texture.hpp b/lib/gfx/texture.hpp
-index 0a5ca8343b0e4349cd5b2e3ddd0db7f34b8fa1c5..056514e3a72eb732296481a103767690b3c0a6f1 100644
+index 0a5ca8343b0e4349cd5b2e3ddd0db7f34b8fa1c5..facb499d903c598021dbc39d792aeacb3c4a5784 100644
 --- a/lib/gfx/texture.hpp
 +++ b/lib/gfx/texture.hpp
 @@ -4,6 +4,9 @@
@@ -8663,6 +8891,16 @@ index 0a5ca8343b0e4349cd5b2e3ddd0db7f34b8fa1c5..056514e3a72eb732296481a103767690
  };
  
  TextureHandle new_static_texture_2d(uint32_t width, uint32_t height, uint32_t mips, u32 gxFormat,
+@@ -62,6 +86,9 @@ TextureHandle new_dynamic_texture_2d(uint32_t width, uint32_t height, uint32_t m
+ TextureHandle new_render_texture(uint32_t width, uint32_t height, u32 gxFormat, const char* label) noexcept;
+ TextureHandle new_conv_texture(uint32_t width, uint32_t height, u32 gxFormat, const char* label) noexcept;
+ void write_texture(TextureRef& ref, ArrayRef<uint8_t> data) noexcept;
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++int issue_texture_readonly_guard(const TextureRef& ref) noexcept;
++#endif
+ }; // namespace aurora::gfx
+ 
+ struct GXTexObj_ {
 diff --git a/lib/gfx/texture_replacement.cpp b/lib/gfx/texture_replacement.cpp
 index 03dda4678ec0b5c9e6ca6d124d8519c90d093700..0e9f9292d72f8c189b9db954671a188b68f83abc 100644
 --- a/lib/gfx/texture_replacement.cpp

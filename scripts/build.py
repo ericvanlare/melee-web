@@ -26,6 +26,7 @@ AUDIO_PREVIEW_RUNTIME_EXECUTABLE = "gameplay_audio_preview"
 AURORA_QUIESCENCE_DIAGNOSTIC_TARGET = "aurora-browser-quiescence"
 MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET = "runtime-match-draw-discard"
 MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET = "runtime-match-frame-effect"
+TEXTURE_READONLY_GUARD_TARGET = "aurora-texture-readonly-guard"
 FMA_DIAGNOSTIC_TARGET = "runtime-fma-diagnostic"
 FMA_COLLISION_OPERATION_INVENTORY = (
     ("80006e80", "broadphase_radius"),
@@ -98,6 +99,7 @@ BUILD_TARGETS = {
     AURORA_QUIESCENCE_DIAGNOSTIC_TARGET: ("gx_probe",),
     MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET: ("gameplay_menu_browser",),
     MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET: ("gameplay_menu_browser",),
+    TEXTURE_READONLY_GUARD_TARGET: ("aurora_texture_readonly_guard_probe",),
     FMA_DIAGNOSTIC_TARGET: ("gameplay_menu_browser",),
     "gameplay": ("gameplay_checks",),
     "runtime": ("gameplay_menu_browser",),
@@ -134,6 +136,13 @@ def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
         raise ValueError(f"Unsupported build target: {target}")
     if first_pair_audio_file_diagnostic and target != MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET:
         raise ValueError("First-pair audio/file controls require runtime-match-frame-effect")
+    if target == TEXTURE_READONLY_GUARD_TARGET:
+        if configuration != "Release":
+            raise ValueError("aurora-texture-readonly-guard is Release-only")
+        if (pipeline_provenance or selective_pipelines or stadium_c1a_diagnostic or
+                fma_collision_diagnostic or fma_velocity_y_diagnostic or first_pair_audio_file_diagnostic):
+            raise ValueError("aurora-texture-readonly-guard requires its isolated component profile")
+        return root / "build/browser-texture-readonly-guard-release"
     if target == MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET:
         if configuration != "Release":
             raise ValueError("runtime-match-frame-effect is Release-only")
@@ -1025,7 +1034,7 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         raise ValueError("FMA diagnostic switches require --target runtime-fma-diagnostic")
     if first_pair_audio_file_diagnostic and target != MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET:
         raise ValueError("First-pair audio/file controls require runtime-match-frame-effect")
-    if target == MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET:
+    if target in {MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET, TEXTURE_READONLY_GUARD_TARGET}:
         # Validate the isolated profile before source preparation or tool use.
         build_directory(root, target=target, configuration=configuration,
                         pipeline_provenance=pipeline_provenance,
@@ -1119,8 +1128,11 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         )
         configure.extend([
             f"-DMELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC={'ON' if first_pair_audio_file_diagnostic else 'OFF'}",
-            f"-DMELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC={'ON' if target == MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET else 'OFF'}"
+            f"-DMELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC={'ON' if target in {MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET, TEXTURE_READONLY_GUARD_TARGET} else 'OFF'}"
         ])
+        configure.append(
+            f"-DAURORA_BROWSER_TEXTURE_READONLY_GUARD={'ON' if target == TEXTURE_READONLY_GUARD_TARGET else 'OFF'}"
+        )
         configure.append(
             f"-DMELEE_WEB_FMA_COLLISION_DIAGNOSTIC={'ON' if fma_collision_diagnostic else 'OFF'}"
         )
@@ -1171,6 +1183,7 @@ def main():
     parser.add_argument("--target", choices=("graphics", AURORA_QUIESCENCE_DIAGNOSTIC_TARGET,
                                               MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET,
                                               MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET,
+                                              TEXTURE_READONLY_GUARD_TARGET,
                                               FMA_DIAGNOSTIC_TARGET,
                                               "gameplay", "fighter", "runtime",
                                               PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET, "all"))
