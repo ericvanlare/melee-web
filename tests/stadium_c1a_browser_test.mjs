@@ -55,9 +55,15 @@ const {values} = parseArgs({options: Object.fromEntries(
       ['first-sss-vs-setup-cf-common-fields', {type: 'boolean', default: false}],
       ['first-sss-vs-setup-text-tail', {type: 'boolean', default: false}],
       ['recreation-canary', {type: 'boolean', default: false}],
+      ['recreation-canary-full-b', {type: 'boolean', default: false}],
     ])), strict: true});
 const cssSssReducer = values['css-sss-reducer'];
 const recreationCanary = values['recreation-canary'];
+const recreationFullB = values['recreation-canary-full-b'];
+const recreationBActionCount = recreationFullB ? 7167 : 174;
+const recreationPassDecision = recreationFullB
+  ? 'PASS_SAME_INSTANCE_A174_B7167_COMMON_FIELDS_SEED_COMPONENT_ONLY'
+  : 'PASS_SAME_INSTANCE_174_ACTION_RECREATION_COMPONENT_ONLY';
 let recreationLifetime = null;
 const firstSssVsSetup = values['first-sss-vs-setup'];
 const firstSssVsSetupTextTail = values['first-sss-vs-setup-text-tail'];
@@ -80,6 +86,8 @@ const firstSssConstructorPair = values['first-sss-constructor-pair'] || firstSss
 const firstCssBrowserFinalDraw = values['first-css-browser-final-draw'] || firstSssConstructorPair;
 const firstCssBrowserStream = values['first-css-browser-stream'] || firstCssBrowserFinalDraw;
 const firstCssBrowserDraw = values['first-css-browser-draw'] || firstCssBrowserStream;
+if (recreationFullB && !recreationCanary)
+  throw Error('Full B requires the explicit recreation canary');
 if (recreationCanary && (!firstSssVsSetup || !values['first-sss-vs-setup-cf'] ||
     !firstSssVsSetupCfExplicitStep || firstSssVsSetupCfFullSchedule ||
     firstSssVsSetupCfCommonFields || firstSssVsSetupTextTail))
@@ -145,6 +153,14 @@ const matchedSetupCfPreflight = validateMatchedSetupCfPreflight(preflight, {
 });
 const recreationIdentityLibraryPath = path.join(ROOT, 'src/stadium_recreation_identity_library.js');
 const recreationContextHelperPath = path.join(ROOT, 'tests/stadium_recreation_canary_context.mjs');
+const matchedSetupCfBPreflight = recreationFullB ? validateMatchedSetupCfPreflight(
+  {...preflight, matched_setup_cf: preflight.recreation_canary?.full_b_matched_setup_cf}, {
+    enabled: true, explicitStep: true, fullSchedule: true, commonFields: true,
+    packetPath: path.resolve(values['first-sss-vs-setup-cf-packet']),
+    assemblyPath: path.resolve(values['first-sss-vs-setup-cf-assembly']),
+    helperPath: path.join(ROOT, 'tests/stadium_matched_setup_cf_consumer.mjs'),
+  }) : null;
+let matchedSetupCfBInputs = null;
 const firstSssVsSetupCfV2 = firstSssVsSetupCf &&
   (matchedSetupCfPreflight.scope === PREFIX_V2_SCOPE || matchedSetupCfPreflight.scope === FULL_V3_SCOPE ||
    matchedSetupCfPreflight.scope === FULL_COMMON_FIELDS_SEED_V1_SCOPE);
@@ -304,7 +320,9 @@ let report = {
   browser: null,
   local_http_artifacts: {count: 0, before: null, after: null, unchanged: false},
   scenario: {
-    route_mode: recreationCanary ? 'same-instance-recreation-canary-174' : firstSssVsSetup ? 'first-sss-vs-setup' : firstSssVsEntry ? 'first-sss-vs-entry' : firstSssPrefix ? 'first-sss-prefix' : firstSssDraw ? 'first-sss-draw' :
+    route_mode: recreationCanary ? (recreationFullB
+      ? 'same-instance-recreation-A174-B7167-common-fields-seed'
+      : 'same-instance-recreation-canary-174') : firstSssVsSetup ? 'first-sss-vs-setup' : firstSssVsEntry ? 'first-sss-vs-entry' : firstSssPrefix ? 'first-sss-prefix' : firstSssDraw ? 'first-sss-draw' :
       firstSssConsumedPadTick ? 'first-sss-consumed-pad-tick' :
       firstSssConstructorPair ? 'first-sss-constructor-pair' :
       firstCssBrowserFinalDraw ? 'first-css-browser-final-pending-draw' :
@@ -350,7 +368,9 @@ let report = {
     browser_process_pid: null, server_process_terminated: false, server_process_pid: null,
     server_process_exit: null, failures: []},
   source_request_scope: recreationCanary
-    ? 'Two separately reported same-instance original-route 174-action lifetimes with checked A close/restart; no whole-session or recreation acceptance.'
+    ? (recreationFullB
+      ? 'Same-instance A174 checked close/restart then exact original full7167 B with3501 common+seed rows; no complete per-owner RNG ledger or C3 acceptance.'
+      : 'Two separately reported same-instance original-route 174-action lifetimes with checked A close/restart; no whole-session or recreation acceptance.')
     : firstSssVsSetupCf
     ? firstSssVsSetupCfV2
       ? firstSssVsSetupCfCommonFields
@@ -804,7 +824,8 @@ async function loadFirstSssVsSetupInputs() {
   return result;
 }
 
-async function loadMatchedSetupCfInputs() {
+async function loadMatchedSetupCfInputs({fullSchedule = firstSssVsSetupCfFullSchedule,
+  commonFields = firstSssVsSetupCfCommonFields, frozen = matchedSetupCfPreflight} = {}) {
   if (!firstSssVsSetupCf) return null;
   const packetPath = path.resolve(values['first-sss-vs-setup-cf-packet']);
   const assemblyPath = path.resolve(values['first-sss-vs-setup-cf-assembly']);
@@ -842,7 +863,7 @@ async function loadMatchedSetupCfInputs() {
   const [packetIdentity, assemblyIdentity, helperIdentity] = await Promise.all([
     readIdentity(packetPath), readIdentity(assemblyPath), readIdentity(helperPath),
   ]);
-  validateMatchedSetupCfIdentities(matchedSetupCfPreflight, {
+  validateMatchedSetupCfIdentities(frozen, {
     packet: Object.fromEntries(Object.entries(packetIdentity).filter(([key]) => key !== 'content')),
     assembly_manifest: Object.fromEntries(Object.entries(assemblyIdentity).filter(([key]) => key !== 'content')),
     helper: Object.fromEntries(Object.entries(helperIdentity).filter(([key]) => key !== 'content')),
@@ -854,7 +875,7 @@ async function loadMatchedSetupCfInputs() {
   catch (error) { throw Error(`Matched Setup C/F evidence assembly is malformed: ${errorText(error)}`); }
   const helper = await import(pathToFileURL(helperPath).href);
   let seedSidecar = null, seedIdentity = null, seedReferenceIdentity = null;
-  if (firstSssVsSetupCfCommonFields) {
+  if (commonFields) {
     const expected = helper.IDLE_SEED_REFERENCE_IDENTITY;
     const binding = packet?.host_only?.source_identity?.source_run?.run_artifacts?.[
       'idle3500-reference.json'];
@@ -878,7 +899,7 @@ async function loadMatchedSetupCfInputs() {
     seedReferenceIdentity = {...seedIdentity, hash_source: binding.hash_source};
   }
   const hostEvidence = helper.hostEvidenceFromPacket(packet, {
-    fullSchedule: firstSssVsSetupCfFullSchedule, commonFields: firstSssVsSetupCfCommonFields,
+    fullSchedule, commonFields,
     seedSidecar, seedIdentity});
   assert.equal(['run2-proper-prefix-v2', 'run2-full-schedule-v3',
     'run2-full-common-fields-seed-v1'].includes(hostEvidence.mode), firstSssVsSetupCfV2,
@@ -2612,21 +2633,23 @@ async function runFirstSssVsSetup(entryNative) {
     const generation = native.first_sss_vs_setup.match_world_generation;
     assert.ok(Number.isSafeInteger(generation) && generation > recreationCloseReceipt.prior_world_generation,
       'Recreated B Setup generation must be newer than retired A');
-    const admitted = await timeout(page.evaluate(() => {
+    const admitted = await timeout(page.evaluate(fullB => {
       const m = globalThis.Module;
       if (m?.stadiumMatchedSetupNativeIdle?.() !== true || globalThis.menuOwnerStopped?.() !== false)
         throw Error('B admission requires a returned non-stopped native boundary');
-      const admit = m._melee_web_native_menu_stadium_recreation_admit_b;
+      const admit = fullB ? m._melee_web_native_menu_stadium_recreation_admit_full_b
+        : m._melee_web_native_menu_stadium_recreation_admit_b;
       const getter = m._melee_web_native_menu_stadium_recreation_status;
       if (typeof admit !== 'function' || typeof getter !== 'function') throw Error('Private B admission exports are absent');
       const result = admit();
       const pointer = getter();if (!pointer) throw Error('B admission status is absent');
       return {result, receipt: JSON.parse(m.UTF8ToString(pointer))};
-    }), Math.min(3000, remaining()), 'Admit actual fresh B owner and RNG chain');
+    }, recreationFullB), Math.min(3000, remaining()), 'Admit actual fresh B owner and RNG chain');
     assert.equal(admitted.result, 1, admitted.receipt?.error || 'Native B admission refused');
     assert.equal(admitted.receipt?.lifetime_b?.admitted, true);
     assert.equal(admitted.receipt.lifetime_b.world_generation, generation);
     assert.equal(admitted.receipt.lifetime_b.prior_world_generation, recreationCloseReceipt.prior_world_generation);
+    if (recreationFullB) assert.equal(admitted.receipt.lifetime_b.full_common_fields_seed, true);
     report.scenario.recreation_canary.native_B_admission = admitted.receipt.lifetime_b;
     await persistReport();
   }
@@ -2647,7 +2670,9 @@ async function runFirstSssVsSetup(entryNative) {
     await persistReport();
   }
   if (firstSssVsSetupCf) native = await runMatchedSetupCfContinuation(native);
-  report.scenario.first_sss_vs_setup.claim = firstSssVsSetupCfFullSchedule
+  report.scenario.first_sss_vs_setup.claim = recreationFullB && recreationLifetime === 'B'
+    ? 'Recreated same-instance B: exact original7167 actions and3501 declared common+seed rows; native parent RNG restoration checked, original per-owner ledger/C3 acceptance remain open.'
+    : firstSssVsSetupCfFullSchedule
     ? 'Strict same-run Setup plus original7167-action functionalA and declaredC/F only; no recreatedB, per-ownerRNG or C3 acceptance.'
     : firstSssVsSetupCf
     ? (report.scenario.matched_setup_cf?.mode === 'run2-proper-prefix-v2'
@@ -3490,7 +3515,7 @@ async function verifyRecreationArchiveAfterFinalCleanup() {
     }
     recreationSummary ??= {};
     recreationSummary.final_archive_integrity = {result: 'pass', checked_after_owned_cleanup: true};
-    if (recreationSummary.lifetime_b?.completed_actions === 174)
+    if (recreationSummary.lifetime_b?.completed_actions === recreationBActionCount)
       recreationSummary.A_archived_bytes_unchanged_after_B = true;
   } catch (error) {
     const message = errorText(error);
@@ -3528,7 +3553,7 @@ async function persistRecreationSummary() {
     !report.cleanup.browser_process_terminated || !report.cleanup.server_process_terminated;
   const passed = !failure && !cleanupFailed && report.result === 'pass' &&
     summary.final_archive_integrity?.result === 'pass' &&
-    summary.decision === 'PASS_SAME_INSTANCE_174_ACTION_RECREATION_COMPONENT_ONLY';
+    summary.decision === recreationPassDecision;
   summary.result = passed ? 'pass' : 'fail';
   if (!passed) summary.decision = 'OPEN_FAILURE';
   summary.acceptance = 'not_claimed';
@@ -3906,6 +3931,10 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
     persistence: [], currentActionSample: null, explicitStep: firstSssVsSetupCfExplicitStep,
   } : null;
   recreationLifetime = 'B';
+  if (recreationFullB) {
+    assert.equal(matchedSetupCfBInputs?.hostEvidence?.mode, 'run2-full-common-fields-seed-v1');
+    matchedSetupCfInputs = matchedSetupCfBInputs;
+  }
   assert.notEqual(stadiumC3ReportCheckpoint, recreationCheckpointAObject);
   recreationEventStart = {requests: requestRows.length, responses: responseRows.length,
     external: externalRequests.length, pageErrors: pageErrors.length,
@@ -3935,9 +3964,17 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
   const bRouteStartedNs = monotonicNowNs();
   await runFirstCssBrowserDraw({baseUrl, artifacts, before});
   const bRouteMs = elapsedMs(bRouteStartedNs);
-  assert.equal(report.result, 'pass', 'Lifetime B did not finish the exact retained 174-action route');
-  assert.equal(report.scenario.matched_setup_cf?.decision, 'PASS_RUN2_PROPER_PREFIX_C_F_STATE_ONLY');
-  assert.equal(report.scenario.matched_setup_cf?.actions_completed, 174);
+  assert.equal(report.result, 'pass', 'Lifetime B did not finish its exact admitted original schedule');
+  assert.equal(report.scenario.matched_setup_cf?.decision, recreationFullB
+    ? 'PASS_ORIGINAL_FULL7167_3501_TICK_15_COMMON_FIELDS_AND_SEED_C_F_GO'
+    : 'PASS_RUN2_PROPER_PREFIX_C_F_STATE_ONLY');
+  assert.equal(report.scenario.matched_setup_cf?.actions_completed, recreationBActionCount);
+  if (recreationFullB) {
+    const cf = report.scenario.matched_setup_cf;
+    assert.equal(cf.common_field_comparisons_passed, 3501);
+    assert.equal(cf.seed_value_comparisons_passed, 3501);
+    assert.equal(cf.exact_value_comparisons_passed, 56016);
+  }
   const bSetupGeneration = report.scenario.first_sss_vs_setup.observation.first_sss_vs_setup.match_world_generation;
   assert.ok(bSetupGeneration > close.receipt.prior_world_generation, 'B generation did not advance after A retirement');
   const bRng = report.cleanup.matched_setup_cf_retirement?.retirement?.recreation_b_rng;
@@ -3947,6 +3984,7 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
   assert.equal(bRng.match_to_host_restored, true);assert.equal(bRng.host_to_parent_restored, true);
   assert.equal(bRng.terminal_checked, true);
   assert.equal(bRng.parent_seed, close.receipt.parent_seed);
+  if (recreationFullB) assert.equal(bRng.full_common_fields_seed, true);
   report.scenario.recreation_canary.terminal_B_rng = structuredClone(bRng);
   recreationCheckpointBFiles = Object.freeze(
     (await snapshotRecreationCheckpointFiles(recreationCheckpointBObject))
@@ -3987,7 +4025,7 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
   assert.equal(await hashFile(aFile), aFileSha256, 'A report file changed while B ran');
   assert.equal(await hashFile(path.join(output, 'recreation-close-A.json')),
     recreationCloseFileSha256, 'Persisted A close receipt changed while B ran');
-  report.scenario.recreation_canary.completed_actions = 174;
+  report.scenario.recreation_canary.completed_actions = recreationBActionCount;
   report.scenario.recreation_canary.report_path = path.basename(inventoryOutput);
   report.scenario.recreation_canary.close_receipt_path = 'recreation-close-A.json';
   report.scenario.recreation_canary.close_receipt_sha256 = recreationCloseFileSha256;
@@ -3997,11 +4035,11 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
   report.scenario.recreation_canary.instance_identity_claim =
     'Actual Module, wasmExports and WebAssembly.Memory references plus exported wrappers remained identical; HEAP/memory buffer replacement is recorded separately and does not infer a new instance.';
   recreationSummary.result = 'pass';
-  recreationSummary.decision = 'PASS_SAME_INSTANCE_174_ACTION_RECREATION_COMPONENT_ONLY';
+  recreationSummary.decision = recreationPassDecision;
   recreationSummary.close_restart_elapsed_ms = closeRestartMs;
   recreationSummary.close_native_elapsed_ms = closeNativeMs;
   recreationSummary.restart_native_elapsed_ms = restartNativeMs;
-  recreationSummary.lifetime_b = {path: 'report-B.json', completed_actions: 174,
+  recreationSummary.lifetime_b = {path: 'report-B.json', completed_actions: recreationBActionCount,
     import_prepare_elapsed_ms: bImportMs, route_elapsed_ms: bRouteMs,
     checkpoint_files: recreationCheckpointBFiles};
   recreationSummary.identity_samples = [
@@ -4534,6 +4572,8 @@ async function main() {
   assert.equal(await hashFile(runnerPath), preflight.test_script.sha256,
     'Browser runner bytes differ from frozen preflight');
   matchedSetupCfInputs = await loadMatchedSetupCfInputs();
+  if (recreationFullB) matchedSetupCfBInputs = await loadMatchedSetupCfInputs({
+    fullSchedule: true, commonFields: true, frozen: matchedSetupCfBPreflight});
   if (values['css-sss-reducer']) {
     const helperPath = path.join(ROOT, 'tests/stadium_c1a_css_sss_reducer.mjs');
     assert.equal(path.resolve(preflight.reducer_helper?.path || ''), helperPath,
@@ -4580,6 +4620,8 @@ async function main() {
       'Recreation canary only accepts the explicit proper-prefix V2 route');
     const bound = preflight.recreation_canary;
     assert.equal(bound?.schema, 'melee-web-stadium-recreation-canary-preflight-v1');
+    assert.equal(bound.full_b_common_fields_seed ?? false, recreationFullB,
+      'Full B opt-in differs from its frozen canary scope');
     assert.equal(path.resolve(bound.identity_library?.path || ''), recreationIdentityLibraryPath);
     assert.equal(bound.identity_library.sha256, await hashFile(recreationIdentityLibraryPath),
       'Private same-instance accessor differs from the frozen canary preflight');
@@ -4591,6 +4633,8 @@ async function main() {
       '_melee_web_native_menu_stadium_recreation_restart',
       '_melee_web_native_menu_stadium_recreation_admit_b'])
       assert.ok(privateJs.includes(name), `Private recreation export is absent: ${name}`);
+    if (recreationFullB) assert.ok(privateJs.includes('_melee_web_native_menu_stadium_recreation_admit_full_b'),
+      'Private full-B admission export is absent');
     assert.ok(privateJs.includes('__meleeWebStadiumRecreationIdentityV1'),
       'Private generated glue omitted the same-instance identity accessor');
   }

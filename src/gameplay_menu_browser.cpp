@@ -394,6 +394,7 @@ MatchedSetupCfRetirement matched_setup_cf_retirement;
 std::string matched_setup_cf_json();
 std::string stadium_recreation_b_json();
 void stadium_recreation_b_before_retire();
+void stadium_recreation_b_require_arm(bool version2,bool full_schedule,bool common_fields,unsigned action_count);
 void stadium_recreation_b_after_close();
 bool matched_setup_cf_service();
 struct FirstSssTextTailProbeState {
@@ -4852,6 +4853,7 @@ int matched_setup_cf_arm_internal(bool version2,unsigned action_count,
     unsigned c_action_index,unsigned f_action_index,unsigned c_source_tick,
     unsigned f_source_tick,bool full_schedule=false,bool common_fields=false){try{
  auto& state=matched_setup_cf;auto& setup=first_sss_vs_setup;
+ stadium_recreation_b_require_arm(version2,full_schedule,common_fields,action_count);
  check(!state.opted_in&&!state.armed&&!state.failed&&!state.complete,
        "Matched Setup C/F continuation is one-use");
  state.opted_in=true;
@@ -5208,6 +5210,7 @@ struct StadiumRecreationCanary {
  uint32_t match_seed=0,host_seed=0,parent_seed=0;
  bool match_to_host_restored=false,host_to_parent_restored=false;
  bool b_admitted=false,b_retiring=false,b_match_restored=false,b_parent_restored=false,b_terminal_checked=false;
+ bool b_full_common_fields_seed=false;
  uint64_t b_generation=0;
  uint32_t b_asset_generation=0,b_match_seed_before=0,b_match_seed_at_retirement=0,b_host_seed=0,b_parent_seed=0;
  const melee_web::GameplayMatchSession* b_match_owner=nullptr;
@@ -5218,6 +5221,14 @@ struct StadiumRecreationCanary {
  std::string action_receipt,error;
 };
 StadiumRecreationCanary stadium_recreation_canary;
+void stadium_recreation_b_require_arm(bool version2,bool full_schedule,bool common_fields,unsigned action_count){
+ const auto& s=stadium_recreation_canary;if(!s.b_admitted)return;
+ check(version2&&(s.b_full_common_fields_seed
+       ? (full_schedule&&common_fields&&action_count==7167)
+       : (!full_schedule&&!common_fields&&action_count==174)),
+       "Stadium B arm differs from its explicit admitted lifetime scope");
+}
+
 void stadium_recreation_match_retired(){
  auto& s=stadium_recreation_canary;
  if(s.b_admitted){
@@ -5254,7 +5265,9 @@ std::string stadium_recreation_b_json(){
    <<",\"host_seed\":"<<s.b_host_seed<<",\"parent_seed\":"<<s.b_parent_seed
    <<",\"match_to_host_restored\":"<<(s.b_match_restored?"true":"false")
    <<",\"host_to_parent_restored\":"<<(s.b_parent_restored?"true":"false")
-   <<",\"terminal_checked\":"<<(s.b_terminal_checked?"true":"false")<<'}';return out.str();
+   <<",\"terminal_checked\":"<<(s.b_terminal_checked?"true":"false");
+ if(s.b_full_common_fields_seed)out<<",\"full_common_fields_seed\":true";
+ out<<'}';return out.str();
 }
 } // namespace melee_web_menu_browser
 extern "C" {
@@ -5282,13 +5295,24 @@ int melee_web_native_menu_stadium_recreation_admit_b(){try{
 }catch(const std::exception& error){
  if(stadium_recreation_canary.error.empty())stadium_recreation_canary.error=error.what();message=error.what();return 0;
 }}
+int melee_web_native_menu_stadium_recreation_admit_full_b(){
+ // Reuse every original fresh-owner/RNG admission check; bind only the explicit
+ // full common-fields+seed intent before any source action is armed.
+ if(melee_web_native_menu_stadium_recreation_admit_b()!=1)return 0;
+ stadium_recreation_canary.b_full_common_fields_seed=true;
+ return 1;
+}
 } // extern "C"
 namespace melee_web_menu_browser {
 void stadium_recreation_b_before_retire(){
  auto& s=stadium_recreation_canary;if(!s.b_admitted)return;
  const auto& cf=matched_setup_cf;MeleeWebMenuHostRngBoundary rng{};
  check(s.closed&&s.restarted&&s.error.empty()&&!s.b_retiring&&!s.b_terminal_checked&&
-       cf.complete&&!cf.failed&&!cf.awaiting_approval&&cf.cursor==174&&cf.action_count==174&&!cf.full_schedule&&
+       cf.complete&&!cf.failed&&!cf.awaiting_approval&&cf.cursor==cf.action_count&&
+       (s.b_full_common_fields_seed
+        ? (cf.version2&&cf.full_schedule&&cf.common_fields&&cf.action_count==7167&&
+           cf.source_ticks==3585&&cf.source_draws==3582)
+        : (cf.cursor==174&&cf.action_count==174&&!cf.full_schedule))&&
        match.get()==s.b_match_owner&&archive_cache.get()==s.b_cache_owner&&host==s.b_host_owner&&
        cf.world_generation==s.b_generation&&melee_web_gameplay_generation()==s.b_generation&&
        cf.asset_generation==s.b_asset_generation&&asset_generation==s.b_asset_generation&&

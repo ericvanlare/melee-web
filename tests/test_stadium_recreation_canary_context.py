@@ -13,6 +13,13 @@ from check_gameplay import node_runtime
 
 
 class StadiumRecreationCanaryContextTests(OwnedWorkspaceTests):
+    def test_full_b_scope_and_retained_input_controls(self):
+        result = subprocess.run(
+            [str(node_runtime(ROOT)), "--test",
+             str(SOURCE_ROOT / "tests/stadium_recreation_full_b.test.mjs")],
+            cwd=ROOT, capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_browser_process_cleanup_ownership_and_refusal_controls(self):
         result = subprocess.run(
             [str(node_runtime(ROOT)), "--test",
