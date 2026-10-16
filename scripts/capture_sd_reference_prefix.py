@@ -2068,6 +2068,42 @@ def drive_stadium_whole_three(receiver, tail, controller, menus, deadline):
     return measurements
 
 
+def _require_stadium_output_disjoint(output, *source_trees):
+    """Refuse copy/output overlap before creating any owned destination."""
+    resolved=Path(output).resolve()
+    for source in source_trees:
+        source=Path(source).resolve()
+        require(not resolved.is_relative_to(source) and not source.is_relative_to(resolved),
+                'Whole Stadium output overlaps a source tree')
+
+
+def prepare_stadium_setup_gci_folder(checkpoint_gc, initial_gci, destination, setup):
+    """Copy the exact card already admitted by validate_setup_receipt; no save decoding."""
+    source=Path(initial_gci)
+    expected=setup.get('initial_profile_sha256')
+    declared={'USA/Card A/'+source.name:expected}
+    require(setup.get('card_baseline')=='single imported Everything unlocked GCI' and
+            isinstance(expected,str) and len(expected)==64 and
+            expected.strip('0123456789abcdef')=='' and expected!='0'*64 and
+            setup.get('external_save_hashes')==declared,
+            'Whole Stadium requires the exact strict-admitted card inventory')
+    require(not source.is_symlink() and source.is_file() and
+            hashlib.sha256(source.read_bytes()).hexdigest()==expected,
+            'Whole Stadium initial GCI differs from the strict-admitted identity')
+    card=Path(checkpoint_gc)/'USA/Card A'
+    require(not card.is_symlink() and card.is_dir(), 'Whole Stadium source card is not ordinary')
+    destination=Path(destination)
+    _require_stadium_output_disjoint(destination,card)
+    destination.mkdir()  # Fresh owned card root; never reuse/overwrite a destination.
+    _copy_tree(card,destination/'USA')  # Existing checked regular-byte copy, no symlink/special files.
+    copied=list((destination/'USA').iterdir())
+    require(len(copied)==1 and copied[0].name==source.name and copied[0].is_file() and
+            not copied[0].is_symlink() and hashlib.sha256(copied[0].read_bytes()).hexdigest()==expected,
+            'Whole Stadium owned GCI copy differs from the strict-admitted inventory')
+    copied[0].chmod(0o400)
+    return copied[0]
+
+
 def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, build_manifest,
                              target_path, setup_path, checkpoint_gc, dol, provenance, gci, timeout):
     """Explicit private whole3/sidecar2 diagnostic using the existing passive route."""
@@ -2075,7 +2111,6 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
     from capture_allocation_history import (validate_setup_receipt, stadium_three_target,
                                             validate_stadium_three_native)
     from retail_allocation_profile import build_profile
-    from sd_gci_profile import prepare_gci_folder
     from reference_observer_stream import iter_records
     deadline = time.monotonic()+180
     require(timeout == 180 and all(x is not None for x in
@@ -2084,6 +2119,7 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
     require(not any(k.startswith('MWRC_') for k in os.environ),
             'Whole Stadium refuses inherited native observer settings')
     output=Path(output)
+    _require_stadium_output_disjoint(output,checkpoint_gc,profile)
     output.mkdir()
     process=bounded_log=log=None
     report=dict(scope='original-stadium-whole3-feedback-allocation2',result='fail',
@@ -2110,7 +2146,7 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
         menus['css']['costumes']=[p['costume'] for p in expected['players']]
         user=output/'user'
         p1,p2,profile_inventory=prepare_rules_profile(profile,user)
-        loaded_profile,owned_gci=prepare_gci_folder(gci,output/'gci-folder')
+        owned_gci=prepare_stadium_setup_gci_folder(checkpoint_gc,gci,output/'gci-folder',setup)
         allocation_profile=output/'allocation-profile.json'
         allocation_profile.write_bytes(canonical(build_profile(Path(dol),ROOT/'.deps/melee/config/GALE01/symbols.txt')))
         raw,status=output/'native-primary.mwro',output/'native-primary-status.json'
@@ -2129,7 +2165,7 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
         receiver=StadiumWholeFeedbackReceiver(menus,setup['sha256'],expected)
         controller=StadiumIntentController(p1,p2,output/'input-intentions.jsonl')
         launch=dict(command=command,environment_delta={k:v for k,v in env.items() if k.startswith('MWRC_')},manifest=build,setup=setup,expected=expected,
-                    profile_inventory=profile_inventory,operation_seconds=180,owner_seconds=210,cleanup_seconds=30)
+                    profile_inventory=profile_inventory,owned_gci=dict(path=str(owned_gci),bytes=owned_gci.stat().st_size,sha256=hashlib.sha256(owned_gci.read_bytes()).hexdigest()),operation_seconds=180,owner_seconds=210,cleanup_seconds=30)
         (output/'launch.json').write_bytes(canonical(launch))
         require(time.monotonic()<deadline,'Whole Stadium operation expired before native launch')
         log=(output/'dolphin.log').open('xb')

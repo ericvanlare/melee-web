@@ -30,6 +30,64 @@ class StadiumWholeFeedbackTests(OwnedWorkspaceTests):
         decoder=load_exact('stadium_go_prefix',SOURCE_ROOT/'tools/stadium_go_prefix.py')
         driver=load_exact('capture_sd_reference_prefix',SOURCE_ROOT/'scripts/capture_sd_reference_prefix.py')
 
+    def test_actual_strict_admitted_gci_copy_and_profile_separation(self):
+        packet_setting=os.environ.get('MELEE_STADIUM_WHOLE_CAPTURE_PACKET')
+        if not packet_setting:self.skipTest('Retained strict-admitted whole Stadium packet not configured')
+        packet=Path(packet_setting)
+        contract=json.loads((packet/'capture-plan.json').read_text())
+        admission_path=packet/'strict-loader-admission.json'
+        self.assertEqual(hashlib.sha256(admission_path.read_bytes()).hexdigest(),contract['strict_admission_sha256'])
+        setup=json.loads(admission_path.read_text())['setup']
+        def argument(flag):return Path(contract['argv'][contract['argv'].index(flag)+1])
+        self.assertEqual(hashlib.sha256(argument('--stadium-whole-setup').read_bytes()).hexdigest(),setup['sha256'])
+        source=argument('--gci');card=argument('--stadium-whole-gc')
+        original=source.read_bytes()
+        self.assertEqual(hashlib.sha256(original).hexdigest(),setup['initial_profile_sha256'])
+        # This real original file is admitted by strict setup, not the separate fixed personal profile.
+        from sd_gci_profile import load_profile
+        with self.assertRaisesRegex(ValueError,'Selected original profile GCI identity differs'):load_profile(source)
+        target=driver.prepare_stadium_setup_gci_folder(card,source,self.workspace/'admitted-card',setup)
+        self.assertEqual(target.name,source.name);self.assertEqual(target.read_bytes(),original)
+        self.assertEqual(target.stat().st_mode&0o777,0o400);self.assertEqual(source.read_bytes(),original)
+        with self.assertRaises(FileExistsError):driver.prepare_stadium_setup_gci_folder(card,source,self.workspace/'admitted-card',setup)
+        wrong=copy.deepcopy(setup);wrong['initial_profile_sha256']='0'*64
+        with self.assertRaises(ValueError):driver.prepare_stadium_setup_gci_folder(card,source,self.workspace/'wrong-admission',wrong)
+        mutated=self.workspace/source.name;mutated.write_bytes(original[:-1]+bytes([original[-1]^1]))
+        with self.assertRaises(ValueError):driver.prepare_stadium_setup_gci_folder(card,mutated,self.workspace/'wrong-bytes',setup)
+        link_parent=self.workspace/'linked-source';link_parent.mkdir()
+        linked=link_parent/source.name;linked.symlink_to(source)
+        with self.assertRaises(ValueError):driver.prepare_stadium_setup_gci_folder(card,linked,self.workspace/'linked-card',setup)
+        copied_card=self.workspace/'changed-checkpoint'
+        driver._copy_tree(card/'USA/Card A',copied_card/'USA/Card A')
+        (copied_card/'USA/Card A/extra.gci').write_bytes(b'not an admitted card row')
+        with self.assertRaises(ValueError):driver.prepare_stadium_setup_gci_folder(copied_card,copied_card/'USA/Card A'/source.name,self.workspace/'extra-card',setup)
+        self.assertEqual(source.read_bytes(),original)
+        # Use owned copies of actual retained inputs so a regression cannot mutate originals.
+        safe_card=self.workspace/'safe-checkpoint';safe_profile=self.workspace/'safe-profile'
+        driver._copy_tree(card/'USA/Card A',safe_card/'USA/Card A')
+        driver._copy_tree(argument('--profile'),safe_profile)
+        def inventory(tree):
+            return {x.relative_to(tree).as_posix():('directory' if x.is_dir() else hashlib.sha256(x.read_bytes()).hexdigest())
+                    for x in tree.rglob('*')}
+        before_card=inventory(safe_card);before_profile=inventory(safe_profile)
+        run_args=dict(dolphin=argument('--dolphin'),disc=argument('--disc'),profile=safe_profile,
+            menu_recipe=argument('--menu-recipe'),build_manifest=argument('--build-manifest'),
+            target_path=argument('--stadium-whole-target'),setup_path=argument('--stadium-whole-setup'),
+            checkpoint_gc=safe_card,dol=argument('--stadium-whole-dol'),
+            provenance=argument('--stadium-whole-provenance'),gci=safe_card/'USA/Card A'/source.name,timeout=180)
+        alias=self.workspace/'card-alias';alias.symlink_to(safe_card,target_is_directory=True)
+        for output in [safe_card,safe_card/'not-created',safe_profile/'not-created',alias/'not-created']:
+            existed=output.exists()
+            with self.assertRaisesRegex(ValueError,'output overlaps a source tree'):
+                driver.run_stadium_whole_three(output=output,**run_args)
+            self.assertEqual(output.exists(),existed)
+            self.assertEqual(inventory(safe_card),before_card);self.assertEqual(inventory(safe_profile),before_profile)
+        nested=safe_card/'USA/Card A/not-created'
+        with self.assertRaisesRegex(ValueError,'output overlaps a source tree'):
+            driver.prepare_stadium_setup_gci_folder(safe_card,safe_card/'USA/Card A'/source.name,nested,setup)
+        self.assertFalse(nested.exists());self.assertEqual(inventory(safe_card),before_card)
+        self.assertEqual(source.read_bytes(),original)
+
     def test_retained_prefix_and_scoped_whole_sss_operands(self):
         if TRACE is None:self.skipTest('Retained original SSS trace was not configured')
         rows=[r for r in iter_records(TRACE) if r['event']=='progress' and r['payload'].get('phase') in decoder.SSS_POSITION_PHASES]
