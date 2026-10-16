@@ -3573,6 +3573,442 @@
         "suite_log_sha256": "804a8e06fab6b729b45c9016810e3f9d1df7364f6105d66fb844ff5c9b7410d6"
       },
       "artifact_run": "rollback-sprint-resume-20261014-085704-6fe33b74"
+    },
+    "natural_one_tick_enrollment": {
+      "state": "VALIDATED_NATURAL_ONE_TWO_ISSUE_REFUSALS_REDUCED_CURRENT_SLOT_MECHANISM_PASS",
+      "scope": "Private opt-in enrollment for selecting a naturally due exact-one-tick callback in the selected-texture diagnostic. Original callbacks and ordinary first-draw behavior are unchanged. This is not gameplay admission or restore.",
+      "source": {
+        "commit": "dbd0ed9cec29db4ecbbdacfeda262343b92b98ac",
+        "tree": "2107676ca4de8141bfa9ee18cef83373e54f0c4b",
+        "profile": "runtime-match-frame-effect Release --first-draw-components-diagnostic",
+        "served_artifacts": 44,
+        "served_manifest_sha256": "146217ddb05234abf5a3a7a7c1ad685368925f5649e7f0ad3e1449077f7b19d5",
+        "source_review_manifest": "selected-texture-natural-one-tick-source-review-v1/review.json",
+        "source_review_sha256": "a78bfc3af5eadb3b25c83b8552510807686af330ad3bbd537457efa7fe56aaa8",
+        "runtime_source": "dbd0ed9cec29db4ecbbdacfeda262343b92b98ac",
+        "diagnostic_harness_source": "f62b1afc29846c0c0bc3de063e5a7a206e74cc87"
+      },
+      "behavior": {
+        "private_request": "melee_web_native_menu_frame_effect_request_natural_one(origin_frame)",
+        "copied_receipt": "melee_web_native_menu_frame_effect_natural_one_enrollment()",
+        "eligible_source_window": [
+          180,
+          240
+        ],
+        "selection": "Promote only at the existing begin-tick hook when the actual original plan is exactly one step; preserve all noneligible original callbacks and work.",
+        "legacy_behavior": "Ordinary first-draw mode remains on its original 1..8-step path."
+      },
+      "validation": {
+        "release_profiles": [
+          {
+            "profile": "first-draw-components-private",
+            "artifacts": 44,
+            "state": "PASS"
+          },
+          {
+            "profile": "ordinary",
+            "artifacts": 44,
+            "state": "PASS"
+          },
+          {
+            "profile": "frame-effect",
+            "artifacts": 44,
+            "state": "PASS"
+          },
+          {
+            "profile": "combined-first-pair",
+            "artifacts": 46,
+            "state": "PASS"
+          }
+        ],
+        "release_build_review": {
+          "artifact": "net-natural-one-tick-enrollment-validation-v1/evidence/root-builds-review.json",
+          "sha256": "03895fbaaf32b3ad4fa9e1f88f5d75cdcc2922baee88c270e78a8890181edbf2",
+          "artifact_instances_rehashed": 178
+        },
+        "full_regression": {
+          "artifact": "net-natural-one-tick-enrollment-validation-v1/evidence/result.json",
+          "sha256": "709da0a6751a1cad7f1b24adfdc3b8ebcba6039c47257f2f6a8ab2f146ebba91",
+          "root_review_artifact": "net-natural-one-tick-enrollment-validation-v1/evidence/root-final-review.json",
+          "root_review_sha256": "45158047c607bb108f7f24883f369418fcfebbc41b9625064549dce9ce04317a",
+          "tests": 2442,
+          "skips": 164,
+          "state": "PASS"
+        },
+        "permanent_enrollment_controls": {
+          "artifact": "net-natural-one-tick-enrollment-validation-v1/evidence/actual-checkout-permanent-natural-enrollment-controls.json",
+          "sha256": "4be8a1547f6671dafb725ff97afa47e799576c76d357df601bf9c6b102b5f49a",
+          "state": "PASS"
+        }
+      },
+      "preserved_prior_refusal": {
+        "artifact": "selected-texture-actual-game-observation-packet-v1/capture/browser/report.json",
+        "sha256": "74a3ddb513f7787485794ef5e4348b97aadadab7d25f0e2d0b615396d1cbe8ca",
+        "source_frame_before_after": [
+          181,
+          183
+        ],
+        "planned_steps": 2,
+        "tick_returns": 2,
+        "draw_returns": 2,
+        "selected_source_frame": 182,
+        "later_draws_unobserved": 1,
+        "first_refusal": "component_requires_valid_exact_one_tick_draw",
+        "interval_dispatched": false,
+        "interpretation": "The one-tick prerequisite refused before interval dispatch. This prior callback is not an interval observation and does not identify why two steps were due."
+      },
+      "prepared_packet": {
+        "manifest": "selected-texture-natural-one-tick-packet-v1-preparation/manifest.json",
+        "manifest_sha256": "7f8407ffcecd4940cf8349b4d8dc64880f358d8708115b25c971cde47a05e20a",
+        "packet": "selected-texture-natural-one-tick-packet-v1-preparation/packet.json",
+        "packet_sha256": "69c831f00b5dac01920fd8f440d3a66695d9936243a8df6772b347a8bc5a3408",
+        "capture_release": "ISSUED_SINGLE_ATTEMPT_CAPTURE_RETAINED",
+        "release_receipt": {
+          "artifact": "selected-texture-natural-one-tick-packet-v1-preparation/root-capture-release.json",
+          "sha256": "3b0d79429156c5db3d259ba6803c6d59bfa3ece608a9ec13a9f63f14b61ac160"
+        }
+      },
+      "next": "Review a narrow authenticated live reborrow of the exact first selected TextureRef at the stopped boundary, or retain explicit no-go when complete lifetime/current identity proof is unavailable. Current mutable GX slot can legitimately differ after the original full draw. No alternate sample, stale-pointer dereference, extra strongref/cachewalk, guard weakening, runtime implementation or newcapture authorized.",
+      "limits": [
+        "Natural enrollment, component read/depth arm, native selected-witness test and GX issuance are separate boundaries. No successful selected interval, atomicity or restore established.",
+        "Second capture records current_owner_mismatch but not the exact GX current-slot/current-owner/bridge subcondition; first capture exact native branch remains unobserved.",
+        "Renderer LOAD/other finding bits do not identify the issue refusal cause.",
+        "Usage20 first-sampled diagnosis withdrawn; do not select a later convenient texture or relax usage/identity predicates.",
+        "H1 is bounded/lossy and does not establish event completeness or timing.",
+        "No interval fences/close, native retirement, Wasm restore/repeat, composite eligibility or gameplay rollback acceptance.",
+        "No clock/planner/PAD/audio/draw-order/deadline change or unchanged third capture authorized."
+      ],
+      "capture_attempt": {
+        "state": "FAIL_FIRST_SELECTED_TEXTURE_ISSUE_REFUSAL",
+        "runtime_source": "dbd0ed9cec29db4ecbbdacfeda262343b92b98ac",
+        "runtime_manifest_sha256": "146217ddb05234abf5a3a7a7c1ad685368925f5649e7f0ad3e1449077f7b19d5",
+        "browser": {
+          "executable": "Google Chrome",
+          "version": "155.0.8059.80",
+          "report_artifact": "selected-texture-natural-one-tick-packet-v1-preparation/capture/browser/report.json",
+          "report_bytes": 1880007,
+          "report_sha256": "b67ac4a7d049021ba7416b153ba51d3fdae8add71276f4dd156a047ebe8d65b7",
+          "completion_artifact": "selected-texture-natural-one-tick-packet-v1-preparation/capture/completion.json",
+          "completion_bytes": 168165,
+          "completion_sha256": "76974b2fb7667b822a741249b9c7de990d11c8fd36accd5eb4fc184193fb445f"
+        },
+        "natural_one_selection": {
+          "state": "PASS",
+          "origin_source_frame": 180,
+          "source_before_after": [
+            180,
+            181
+          ],
+          "planned_steps": 1,
+          "tick_returns": 1,
+          "draw_returns": 1,
+          "audio_returns": 1,
+          "pcm_frames": 533,
+          "skipped_callbacks_ticks_draws_audio_pcm_frames": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "selection_callback_sequence": 1,
+          "renderer_selected_source_frame": 181
+        },
+        "selected_texture_interval": {
+          "first_failure": "selected_texture_issue_refused",
+          "operations": [
+            "readSelectedTextureBoundary",
+            "issueSelectedTextureBoundary"
+          ],
+          "issue_result": 0,
+          "guard": {
+            "scope": "fixture-component-only",
+            "phase": "INSTALLED",
+            "identity": null,
+            "attempts": 0,
+            "fenceComplete": false,
+            "gameplayAdmission": false
+          },
+          "interval_close_observed": false,
+          "interval_fence_observed": false,
+          "strict_replay": {
+            "artifact": "selected-texture-natural-one-tick-packet-v1-preparation/capture/strict-selected-replay.result.json",
+            "sha256": "f69af62768e2ca37aaa928c1e0eb48fb034d3b4e08cf22d93d9e48ab9fa444ef",
+            "exit_code": 1,
+            "stderr_sha256": "695205a07c599e25669bb9471d08ec94f8882454ef8e9727d2a65536e151ca21",
+            "interpretation": "Secondary refusal because the interval was refused rather than closed; it is not the first failure."
+          },
+          "component_read_and_arm": "PASS_INDEPENDENT_STRICT_DECODERS",
+          "native_issued_zero_branch": "UNOBSERVED; issue refusal cause not established"
+        },
+        "renderer_packet": {
+          "first_blocker": "LOAD_ATTACHMENT",
+          "first_blocker_code": 7,
+          "finding_mask": "134217856",
+          "finding_bits": [
+            7,
+            27
+          ],
+          "event_count": 1776,
+          "handle_count": 266,
+          "render_pass_count": 3,
+          "draw_command_count": 245,
+          "submit_count": 1,
+          "fence_count": 1,
+          "fence_success": 1,
+          "scope_note": "Renderer packet observation is separate from the selected-texture issue refusal and does not establish its cause."
+        },
+        "audio_and_h1": {
+          "audio_returns": 1,
+          "pcm_frames": 533,
+          "pre_tick_audio_returns": 0,
+          "pre_tick_pcm_frames": 0,
+          "h1_incidents": 8,
+          "h1_reason_code_counts": {
+            "7": 8
+          },
+          "h1_callbacks": 3124,
+          "h1_retained_samples": 100,
+          "h1_evicted_samples": 3024,
+          "h1_dropped_incidents": 0,
+          "scope_note": "Bounded lossy H1 diagnostic; it does not establish completeness or timing."
+        },
+        "cleanup": {
+          "owner_report_artifact": "selected-texture-natural-one-tick-packet-v1-preparation/capture/owner-report.json",
+          "owner_report_bytes": 92452,
+          "owner_report_sha256": "04fb9b038f43085699c8cf902d331945259505cbd02b31d0288be2372a7ac68a",
+          "root_review_artifact": "selected-texture-natural-one-tick-packet-v1-preparation/capture/root-failure-review.json",
+          "root_review_sha256": "ab43903a947b6971b46c7b5541bb464ed57f1b576979436ee4c3f51666352204",
+          "decoder_review_artifact": "selected-texture-natural-one-tick-packet-v1-preparation/capture/root-decoder-review.json",
+          "decoder_review_sha256": "e98b5a6f3396ca15659e00852a78731957e0be737e1e77846f03b39cf644f857",
+          "cleanup_passed": true,
+          "process_observation_passed": true,
+          "elapsed_ms": 59421,
+          "cleanup_ms": 135,
+          "browser_process_entries": 13,
+          "unique_browser_pids": 11,
+          "all_browser_processes_absent": true,
+          "absent_process_groups": [
+            94287,
+            94288,
+            94296,
+            94633
+          ],
+          "page_errors": 0,
+          "timing_pauses": 0,
+          "native_retirement": false,
+          "restore": false
+        },
+        "next": "Reduce the first issue refusal from retained data/source before any further capture. Do not infer the native issued-zero path or retry unchanged. No interval completion, restore admission, or gameplay acceptance."
+      },
+      "diagnostic_harness": {
+        "commit": "f62b1afc29846c0c0bc3de063e5a7a206e74cc87",
+        "tree": "f4f8ba81663ddc3c40546cf77f5825f357bdd014",
+        "runtime_unchanged": true,
+        "runtime_rebuilt": false,
+        "scope": "Two-file harness-only copied_raw native issuance refusal after synchronous issue0 and authenticated idle/Module checks; positive issue response and strict refusal unchanged.",
+        "focused_controls": {
+          "artifact": "selected-issue-refusal-diagnostic-candidate-v2/execution-focused-v1/run/summary.json",
+          "sha256": "1ef85ea5132b0a922e6f30795ddb83af2b4196bbad5510097e9a2d5d14ba01f9",
+          "actual_helper_tests": 13,
+          "retained_data_loss_and_synthetic_sticky_reason_controls": 2,
+          "state": "PASS"
+        },
+        "full_regression": {
+          "artifact": "net-selected-issue-refusal-harness-validation-v1/evidence/result.json",
+          "sha256": "9cea598750721c9bc7fd60062331094af3d6fd6707fcfab590067bdc62f88d0f",
+          "tests": 2442,
+          "skips": 164,
+          "seconds": 568.711,
+          "state": "PASS",
+          "retained_runtime_artifacts": 178,
+          "retained_runtime_caches": 4,
+          "root_review_artifact": "net-selected-issue-refusal-harness-validation-v1/evidence/root-final-review.json",
+          "root_review_sha256": "c83ffc04edadef04f2276788daf27794a28142449c88792f41254784c2eeb6b0"
+        }
+      },
+      "reason_capture_attempt": {
+        "state": "FAIL_USEFUL_NATIVE_CURRENT_OWNER_REFUSAL_CLEANUP_PASS",
+        "runtime_source": "dbd0ed9cec29db4ecbbdacfeda262343b92b98ac",
+        "harness_source": "f62b1afc29846c0c0bc3de063e5a7a206e74cc87",
+        "packet_manifest": {
+          "artifact": "selected-texture-natural-one-tick-reason-packet-v1/manifest.json",
+          "sha256": "64ba0273040ff7ed012b6cc66a5a06cba3751db1cdf0acb1859cb4c55f495cce"
+        },
+        "report": {
+          "artifact": "selected-texture-natural-one-tick-reason-packet-v1/capture/browser/report.json",
+          "sha256": "f2f3fda1b2fde64f4d34a56c6527d8f05d0ae02c6e2453c20502af190ae50d55",
+          "bytes": 5797765
+        },
+        "root_review": {
+          "artifact": "selected-texture-natural-one-tick-reason-packet-v1/capture/root-failure-review.json",
+          "sha256": "dde813f6fef34d25a31dbc63de669c810bd5e6125911ec246473551f0037059e"
+        },
+        "natural_one_enrollment": {
+          "schema": "melee-web-natural-one-tick-enrollment-v1",
+          "copied": true,
+          "state": 3,
+          "minimum_frame": 180,
+          "maximum_frame": 240,
+          "origin_frame": 180,
+          "selected_frame": 182,
+          "owner_generation": 2,
+          "origin_audio_phase": 40,
+          "row_capacity": 61,
+          "row_count": 2,
+          "callback_sequence": "2",
+          "selection_callback": "2",
+          "skipped_callbacks": "1",
+          "skipped_ticks": "2",
+          "skipped_draws": "2",
+          "skipped_audio": "1",
+          "skipped_pcm_frames": "534",
+          "source_free_callbacks": "0",
+          "source_free_audio": "0",
+          "source_free_pcm_frames": "0",
+          "callback_open": false,
+          "error": "",
+          "rows": [
+            {
+              "callback_sequence": "1",
+              "source_before": 180,
+              "source_after": 182,
+              "planned_steps": 2,
+              "planned_audio_steps": 1,
+              "tick_returns": 2,
+              "draw_returns": 2,
+              "audio_returns": 1,
+              "pcm_frames": 534,
+              "audio_phase_before": 40,
+              "audio_phase_after": 0,
+              "selected": false
+            },
+            {
+              "callback_sequence": "2",
+              "source_before": 182,
+              "source_after": 183,
+              "planned_steps": 1,
+              "planned_audio_steps": 1,
+              "tick_returns": 1,
+              "draw_returns": 1,
+              "audio_returns": 1,
+              "pcm_frames": 533,
+              "audio_phase_before": 0,
+              "audio_phase_after": 20,
+              "selected": true
+            }
+          ]
+        },
+        "natural_one_enrollment_failures": [],
+        "component_failures": [],
+        "component_read_and_arm": "PASS_ROOT_STRICT_DECODERS",
+        "selected_interval": {
+          "first_failure": "selected_texture_issue_refused",
+          "native_refusal_status": "copied_raw",
+          "native_refusal": "selected_texture_current_owner_mismatch",
+          "native_path_scope": "Submitted witness/frame/queue project gate passed; actual GX returned non1. Current slot/current owner facts/bridge subcondition not directly serialized.",
+          "transport_operations": [
+            "readSelectedTextureBoundary",
+            "issueSelectedTextureBoundary"
+          ],
+          "issued": 0,
+          "guard": {
+            "identity": null,
+            "schema": 1,
+            "scope": "fixture-component-only",
+            "phase": "INSTALLED",
+            "epoch": 0,
+            "attempts": 0,
+            "dispatches": 404,
+            "fenceComplete": false,
+            "firstFailure": null,
+            "gameplayAdmission": false
+          },
+          "interval_fences": false,
+          "interval_close": false,
+          "native_retired": false,
+          "restore": false
+        },
+        "renderer_packet": {
+          "first_blocker": 7,
+          "finding_mask": "167903360",
+          "finding_bits": [
+            7,
+            17,
+            25,
+            27
+          ],
+          "event_count": 1787,
+          "command_record_count": 266,
+          "actual_draw_count": 246,
+          "render_pass_count": 3,
+          "scope_note": "Separate observation, no implication that renderer blocker caused GX issue refusal."
+        },
+        "h1": {
+          "callback_count": 3169,
+          "samples_retained": 100,
+          "samples_evicted": 3069,
+          "incident_count": 8,
+          "reason_counts": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            8,
+            0,
+            0
+          ],
+          "dropped_incidents": 0,
+          "scope": "Bounded lossy diagnostic, no completeness/timing admission"
+        },
+        "cleanup": {
+          "owner_artifact": "selected-texture-natural-one-tick-reason-packet-v1/capture/owner-report.json",
+          "owner_sha256": "a0da498b9f671e1b99b4ff3b34de0e9c056b36f1c19e57b9e84f4b7efcc1264c",
+          "completion_artifact": "selected-texture-natural-one-tick-reason-packet-v1/capture/completion.json",
+          "completion_sha256": "f45e2e51f7b377b1b8399ba71c0f91bec4c28d95a16be5f69d2e1a13c170f0fa",
+          "root_reviewed_process_groups_absent": [
+            43972,
+            43973,
+            44354,
+            43978
+          ],
+          "browser_inventory_entries": 11,
+          "unique_browser_pids": 11,
+          "owner_elapsed_ms": 63879,
+          "cleanup_ms": 143,
+          "page_errors": 0,
+          "timing_pauses": 0,
+          "runtime_artifacts_rehashed": 44,
+          "source_unchanged": true
+        }
+      },
+      "source_reduction_correction": {
+        "artifact": "selected-sampled-usage20-source-reduction-v1/correction-v3.json",
+        "sha256": "5caf3a0de10bb5b3f383769bc20de65db94f70941a345560017bdb2894d13989",
+        "scope": "Withdraw first-sampled usage20 diagnosis: retained rows do not distinguish promotion through resolve from GX sampling. Resolve can reuse an already published pair; no promotion-order/capability-widening cause claim."
+      },
+      "reduced_next_contract": {
+        "artifact": "selected-current-slot-reborrow-reduction-v1/post-control-contract-v2.json",
+        "sha256": "6d2a834c3566a5d7b35d4b5efed19f53c0214ca152c183f9ff767ed9021103db",
+        "state": "SOURCE_CONTRACT_ONLY_NO_RUNTIME_IMPLEMENTATION"
+      },
+      "reduced_current_slot_control": {
+        "state": "PASS_FOCUSED_SYNTHETIC_ACTUAL_GX_BODY_OBSERVER_ONLY",
+        "result_artifact": "selected-current-slot-reborrow-reduction-v1/focused-result.json",
+        "result_sha256": "cc54f02749caa5e48c7b4064f0fb2cf1f3f8395d78f20f9f9eb5e50b861e338b",
+        "actual_control_artifact": "selected-current-slot-reborrow-reduction-v1/actual-gx-reborrow-control.cpp",
+        "actual_control_sha256": "e133279c07c11c3f3e005a02d031167315c215cd6cf77c1cbf71c195cf97a964",
+        "compile_seconds": 1.455,
+        "verified_compile_dependencies": 849,
+        "node_modes": 6,
+        "owned_groups_absent": 7,
+        "positive": "Unchanged exact owner result1/hostbridge1",
+        "negative_results": "Slot pointer replacement, new authentic serial, current view mismatch and missingref result0/hostbridge0; synthetic hostzero result0/hostbridge1",
+        "scope": "Actual GX function body byte-identical +actual observer methods; synthetic slot/owner/raw/host endpoints only. No actual-capture changed-field attribution or live TextureRef/GPU lifetime proof."
+      }
     }
   }
 }
