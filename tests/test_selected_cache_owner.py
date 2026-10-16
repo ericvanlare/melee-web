@@ -22,6 +22,7 @@ def actual_control_source(root):
     texture=(aura/'lib/gx/texture.cpp').read_text()
     gx=(aura/'lib/gx/gx.cpp').read_text()
     bridges=(aura/'lib/gfx/texture.cpp').read_text()
+    project=(root/'src/gameplay_menu_frame_effect.cpp').read_text()
     fixture=(root/'tests/selected_cache_owner_controls.cpp').read_text()
     expected='texture::observe_selected_cached_texture(i,tex,selectedFrameIndex,selectedFrameId);'
     if gx.count(expected)!=1:
@@ -33,6 +34,7 @@ def actual_control_source(root):
             section(texture,'uint64_t s_bindGeneration = 1;','\nTextureStats s_stats;')+'\nTextureStats s_stats;',
         '// ACTUAL_CACHE_OPERATIONS':section(texture,'// Private exact authored-key borrow;','\n#endif'),
         '// ACTUAL_GX_OPERATIONS':section(gx,'void request_selected_sampled_texture() noexcept {','\n#endif'),
+        '// ACTUAL_PROJECT_ISSUER':section(project,'int melee_web_native_menu_frame_effect_issue_selected_texture(){','\n#endif'),
     }
     for marker,body in replacements.items():
         if fixture.count(marker)!=1:
@@ -87,9 +89,10 @@ class SelectedCacheOwnerTests(OwnedWorkspaceTests):
         built=subprocess.run(command,cwd=row['directory'],capture_output=True,text=True,timeout=90)
         (self.work/'compile.log').write_text(built.stdout+built.stderr)
         self.assertEqual(built.returncode,0,built.stdout+built.stderr)
-        for mode in range(25):
+        for mode in range(32):
             result=subprocess.run([str(node_runtime(ROOT)),str(output),str(mode)],cwd=ROOT,
                                   capture_output=True,text=True,timeout=30)
             (self.work/f'case-{mode}.log').write_text(result.stdout+result.stderr)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
-            self.assertIn(f'actual cache-owner case {mode} passed',result.stdout)
+            expected=f'actual cache-owner case {mode} passed' if mode<28 else f'actual project issue case {mode} error='
+            self.assertIn(expected,result.stdout)

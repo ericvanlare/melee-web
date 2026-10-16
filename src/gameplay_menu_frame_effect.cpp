@@ -452,8 +452,9 @@ int melee_web_native_menu_frame_effect_issue_selected_texture(){
     witness.frameId!=facts.before.lastEndFrameId||witness.queue!=facts.before.queueHandle){
   refuse("selected_texture_submitted_owner_mismatch");return 0;
  }
- const int issued=aurora::gx::issue_selected_sampled_texture_readonly_guard();
- if(issued!=1){refuse("selected_texture_current_owner_mismatch");return 0;}
+ aurora::gx::SelectedTextureIssueRefusal issue_refusal=aurora::gx::SelectedTextureIssueRefusal::None;
+ const int issued=aurora::gx::issue_selected_sampled_texture_readonly_guard(issue_refusal);
+ if(issued!=1){refuse(aurora::gx::selected_texture_issue_refusal_literal(issue_refusal));return 0;}
  observation.selected_texture_issued=true;return 1;
 }
 #endif

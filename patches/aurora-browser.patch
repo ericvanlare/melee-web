@@ -4802,10 +4802,10 @@ index 0b86ffead6e8f6153d2acf52cf9daecf4f07ccfa..3904b525390161c4f457127d3a2346a6
  } // namespace aurora::gfx
 diff --git a/lib/gfx/frame_effect_observer.hpp b/lib/gfx/frame_effect_observer.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..a9b330ddf115205566ed42d8cc1905f53e03397e
+index 0000000000000000000000000000000000000000..3948e8789bd8de71af0c1af4b869f64c3d2c2c4e
 --- /dev/null
 +++ b/lib/gfx/frame_effect_observer.hpp
-@@ -0,0 +1,1847 @@
+@@ -0,0 +1,1877 @@
 +#pragma once
 +
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
@@ -4822,6 +4822,9 @@ index 0000000000000000000000000000000000000000..a9b330ddf115205566ed42d8cc1905f5
 +#include <bit>
 +#include <cstdint>
 +#include <limits>
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++#include "../gx/selected_texture_readonly_diagnostic.hpp"
++#endif
 +
 +namespace aurora::gfx::detail {
 +
@@ -4976,22 +4979,39 @@ index 0000000000000000000000000000000000000000..a9b330ddf115205566ed42d8cc1905f5
 +    pair.textureRefOwner=owner;
 +  }
 +#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++  using IssueRefusal=aurora::gx::SelectedTextureIssueRefusal;
 +  // Called with an actual live TextureRef, never a host-supplied raw owner.
-+  bool texture_readonly_guard_owner_valid(const TextureOwnerPair& pair,uintptr_t owner,uintptr_t texture,uintptr_t view,uintptr_t queue) const noexcept {
++  bool texture_readonly_guard_owner_valid(const TextureOwnerPair& pair,uintptr_t owner,uintptr_t texture,uintptr_t view,uintptr_t queue,IssueRefusal* refusal=nullptr) const noexcept {
 +    const auto& t=pair.texture; const auto& v=pair.view;
-+    if(!attachmentActive_ || !valid_texture_creation(t) || !valid_texture_creation(v) ||
-+       t.role!=TextureRefTextureRole || v.role!=TextureRefViewRole || !owner || pair.textureRefOwner!=owner ||
-+       t.device!=attachmentDevice_ || t.raw!=texture || v.raw!=view || v.parentSerial!=t.serial ||
-+       v.device!=t.device || v.deviceEpoch!=t.deviceEpoch || v.domainEpoch!=t.domainEpoch ||
-+       t.serial==v.serial || t.words[7]!=6 || t.words[8]!=0 || !queue) return false;
++    const auto fail=[&](IssueRefusal value){if(refusal && *refusal==IssueRefusal::None)*refusal=value;return false;};
++    if(!attachmentActive_)return fail(IssueRefusal::OwnerInactive);
++    if(!valid_texture_creation(t))return fail(IssueRefusal::OwnerTextureCreation);
++    if(!valid_texture_creation(v))return fail(IssueRefusal::OwnerViewCreation);
++    if(t.role!=TextureRefTextureRole)return fail(IssueRefusal::OwnerTextureRole);
++    if(v.role!=TextureRefViewRole)return fail(IssueRefusal::OwnerViewRole);
++    if(!owner)return fail(IssueRefusal::OwnerMissing);
++    if(pair.textureRefOwner!=owner)return fail(IssueRefusal::OwnerRef);
++    if(t.device!=attachmentDevice_)return fail(IssueRefusal::OwnerDevice);
++    if(t.raw!=texture)return fail(IssueRefusal::OwnerTexture);
++    if(v.raw!=view)return fail(IssueRefusal::OwnerView);
++    if(v.parentSerial!=t.serial)return fail(IssueRefusal::OwnerParentSerial);
++    if(v.device!=t.device)return fail(IssueRefusal::OwnerViewDevice);
++    if(v.deviceEpoch!=t.deviceEpoch)return fail(IssueRefusal::OwnerViewDeviceEpoch);
++    if(v.domainEpoch!=t.domainEpoch)return fail(IssueRefusal::OwnerViewDomainEpoch);
++    if(t.serial==v.serial)return fail(IssueRefusal::OwnerSerialAlias);
++    if(t.words[7]!=6)return fail(IssueRefusal::OwnerUsageLow);
++    if(t.words[8]!=0)return fail(IssueRefusal::OwnerUsageHigh);
++    if(!queue)return fail(IssueRefusal::OwnerQueueMissing);
 +    return true;
 +  }
-+  int issue_texture_readonly_guard(const TextureOwnerPair& pair,uintptr_t owner,uintptr_t texture,uintptr_t view,uintptr_t queue) const noexcept {
-+    if(!texture_readonly_guard_owner_valid(pair,owner,texture,view,queue))return 0;
++  int issue_texture_readonly_guard(const TextureOwnerPair& pair,uintptr_t owner,uintptr_t texture,uintptr_t view,uintptr_t queue,IssueRefusal* refusal=nullptr) const noexcept {
++    if(!texture_readonly_guard_owner_valid(pair,owner,texture,view,queue,refusal))return 0;
 +    const auto& t=pair.texture;const auto& v=pair.view;
-+    return issue_texture_readonly_guard_host(owner,t.raw,v.raw,t.device,queue,
++    const int result=issue_texture_readonly_guard_host(owner,t.raw,v.raw,t.device,queue,
 +      uint32_t(t.serial),uint32_t(t.serial>>32),uint32_t(v.serial),uint32_t(v.serial>>32),
 +      uint32_t(t.deviceEpoch),uint32_t(t.deviceEpoch>>32));
++    if(result!=1 && refusal && *refusal==IssueRefusal::None)*refusal=IssueRefusal::HostBridgeRefused;
++    return result;
 +  }
 +  // One explicit request observes the next actually sampled GX owner. POD only;
 +  // neither the request nor the witness retains a TextureRef/native GPU object.
@@ -5007,10 +5027,11 @@ index 0000000000000000000000000000000000000000..a9b330ddf115205566ed42d8cc1905f5
 +  };
 +  void clear_selected_sampled_texture() noexcept {
 +    selectedSampledRequested_=false;selectedSampledValid_=false;selectedSampledIssued_=false;
-+    selectedSampledWitness_={};selectedSampledPair_={};selectedSampledCacheKey_={};
++    selectedSampledWitness_={};selectedSampledPair_={};selectedSampledCacheKey_={};selectedSampledCacheCaptureRefusal_=IssueRefusal::None;
 +  }
 +  bool selected_sampled_texture_requested() const noexcept { return selectedSampledRequested_; }
-+  bool selected_sampled_texture_cache_key(SelectedSampledTextureCacheKey& out) const noexcept {
++  bool selected_sampled_texture_cache_key(SelectedSampledTextureCacheKey& out,IssueRefusal* captureRefusal=nullptr) const noexcept {
++    if(captureRefusal)*captureRefusal=selectedSampledCacheCaptureRefusal_;
 +    out={};if((!selectedSampledValid_&&!selectedSampledIssued_)||!selectedSampledCacheKey_.valid)return false;
 +    out=selectedSampledCacheKey_;return true;
 +  }
@@ -5019,9 +5040,10 @@ index 0000000000000000000000000000000000000000..a9b330ddf115205566ed42d8cc1905f5
 +  }
 +  void observe_selected_sampled_texture(uint32_t slot,const TextureOwnerPair& pair,uintptr_t owner,
 +      uintptr_t texture,uintptr_t view,uintptr_t queue,uint32_t frameIndex,uint64_t frameId,
-+      const SelectedSampledTextureCacheKey* cacheKey=nullptr) noexcept {
++      const SelectedSampledTextureCacheKey* cacheKey=nullptr,IssueRefusal captureRefusal=IssueRefusal::CacheKeyAbsent) noexcept {
 +    if(!selectedSampledRequested_)return;
 +    selectedSampledRequested_=false;selectedSampledCacheKey_={};
++    selectedSampledCacheCaptureRefusal_=cacheKey && cacheKey->valid ? IssueRefusal::None : captureRefusal;
 +    if(slot>=GX_MAX_TEXMAP || !frameId || !texture_readonly_guard_owner_valid(pair,owner,texture,view,queue))return;
 +    selectedSampledPair_=pair;
 +    selectedSampledWitness_={owner,texture,view,pair.texture.device,queue,pair.texture.serial,pair.view.serial,
@@ -5043,11 +5065,11 @@ index 0000000000000000000000000000000000000000..a9b330ddf115205566ed42d8cc1905f5
 +  // The caller reborrows an exact still-owning cache handle. Copied identity is
 +  // never dereferenced; exact live facts must agree before the host bridge.
 +  int issue_selected_sampled_texture(const TextureOwnerPair& current,uintptr_t owner,uintptr_t texture,
-+      uintptr_t view,uintptr_t queue) noexcept {
-+    if(!selectedSampledValid_)return 0;
++      uintptr_t view,uintptr_t queue,IssueRefusal* refusal=nullptr) noexcept {
++    if(!selectedSampledValid_){if(refusal && *refusal==IssueRefusal::None)*refusal=IssueRefusal::SelectedWitnessMissing;return 0;}
 +    selectedSampledValid_=false; // Every issuance attempt consumes the witness.
-+    if(!selected_sampled_texture_owner_matches(current,owner,texture,view,queue)){selectedSampledCacheKey_={};return 0;}
-+    const int result=issue_texture_readonly_guard(current,owner,texture,view,queue);
++    if(!selected_sampled_texture_owner_matches(current,owner,texture,view,queue,refusal)){selectedSampledCacheKey_={};return 0;}
++    const int result=issue_texture_readonly_guard(current,owner,texture,view,queue,refusal);
 +    selectedSampledIssued_=result==1;if(!selectedSampledIssued_)selectedSampledCacheKey_={};return result;
 +  }
 +
@@ -6229,17 +6251,25 @@ index 0000000000000000000000000000000000000000..a9b330ddf115205566ed42d8cc1905f5
 +#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
 +  bool selectedSampledRequested_=false,selectedSampledValid_=false,selectedSampledIssued_=false;
 +  bool selected_sampled_texture_owner_matches(const TextureOwnerPair& current,uintptr_t owner,
-+      uintptr_t texture,uintptr_t view,uintptr_t queue) const noexcept {
++      uintptr_t texture,uintptr_t view,uintptr_t queue,IssueRefusal* refusal=nullptr) const noexcept {
 +    const auto& w=selectedSampledWitness_;
-+    return owner==w.owner&&texture==w.texture&&view==w.view&&queue==w.queue&&
-+      current.texture.serial==w.textureSerial&&current.view.serial==w.viewSerial&&
-+      current.texture.device==w.device&&current.texture.deviceEpoch==w.deviceEpoch&&
-+      current.texture.seal==selectedSampledPair_.texture.seal&&current.view.seal==selectedSampledPair_.view.seal&&
-+      texture_readonly_guard_owner_valid(current,owner,texture,view,queue);
++    const auto fail=[&](IssueRefusal value){if(refusal && *refusal==IssueRefusal::None)*refusal=value;return false;};
++    if(owner!=w.owner)return fail(IssueRefusal::CurrentOwner);
++    if(texture!=w.texture)return fail(IssueRefusal::CurrentTexture);
++    if(view!=w.view)return fail(IssueRefusal::CurrentView);
++    if(queue!=w.queue)return fail(IssueRefusal::CurrentQueue);
++    if(current.texture.serial!=w.textureSerial)return fail(IssueRefusal::CurrentTextureSerial);
++    if(current.view.serial!=w.viewSerial)return fail(IssueRefusal::CurrentViewSerial);
++    if(current.texture.device!=w.device)return fail(IssueRefusal::CurrentDevice);
++    if(current.texture.deviceEpoch!=w.deviceEpoch)return fail(IssueRefusal::CurrentDeviceEpoch);
++    if(current.texture.seal!=selectedSampledPair_.texture.seal)return fail(IssueRefusal::CurrentTextureSeal);
++    if(current.view.seal!=selectedSampledPair_.view.seal)return fail(IssueRefusal::CurrentViewSeal);
++    return texture_readonly_guard_owner_valid(current,owner,texture,view,queue,refusal);
 +  }
 +  SelectedSampledTextureWitness selectedSampledWitness_{};
 +  TextureOwnerPair selectedSampledPair_{};
 +  SelectedSampledTextureCacheKey selectedSampledCacheKey_{};
++  IssueRefusal selectedSampledCacheCaptureRefusal_=IssueRefusal::None;
 +#endif
 +  friend struct BrowserFrameEffectObserverControls;
 +  struct HandleEntry { uintptr_t address = 0; uint32_t kind = 0; };
@@ -9833,7 +9863,7 @@ index 0d6a5d8ab36c7992ab98418458bb21beb178faaf..510e6e7c675bad50276fb46ced412a45
      LIKELY {
        if (detail::sBufferSize < detail::sBufferCapacity)
 diff --git a/lib/gx/gx.cpp b/lib/gx/gx.cpp
-index b12b327fe4d3276c13b23e93baca64824ed50806..b1ab7238f75876832d87f5469dfef6fc9656d65c 100644
+index b12b327fe4d3276c13b23e93baca64824ed50806..6031f43e9217fe084dd245cfcf47d43e6b8df6c1 100644
 --- a/lib/gx/gx.cpp
 +++ b/lib/gx/gx.cpp
 @@ -1,4 +1,10 @@
@@ -9847,7 +9877,7 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..b1ab7238f75876832d87f5469dfef6fc
  
  #include "pipeline.hpp"
  #include "texture.hpp"
-@@ -467,6 +473,22 @@ void populate_pipeline_config(PipelineConfig& config, GXPrimitive primitive, GXV
+@@ -467,6 +473,25 @@ void populate_pipeline_config(PipelineConfig& config, GXPrimitive primitive, GXV
    };
  }
  
@@ -9861,6 +9891,9 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..b1ab7238f75876832d87f5469dfef6fc
 +int issue_selected_sampled_texture_readonly_guard() noexcept {
 +  return texture::issue_selected_cached_texture_readonly_guard();
 +}
++int issue_selected_sampled_texture_readonly_guard(SelectedTextureIssueRefusal& refusal) noexcept {
++  return texture::issue_selected_cached_texture_readonly_guard(refusal);
++}
 +bool selected_sampled_texture_readonly_guard_current() noexcept {
 +  return texture::selected_cached_texture_readonly_guard_current();
 +}
@@ -9870,7 +9903,7 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..b1ab7238f75876832d87f5469dfef6fc
  GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept {
    ZoneScoped;
  
-@@ -484,6 +506,18 @@ GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept {
+@@ -484,6 +509,18 @@ GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept {
      textureEntry.binding = i * 2;
      samplerEntry.binding = i * 2 + 1;
      if (tex && (info.sampledTextures[i] || info.sampledIndTextures[i])) {
@@ -9889,7 +9922,7 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..b1ab7238f75876832d87f5469dfef6fc
        textureEntry.textureView = tex.ref->sampleTextureView.Get();
        samplerEntry.sampler = gfx::sampler_ref(tex.get_descriptor()).Get();
      } else {
-@@ -502,6 +536,12 @@ GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept {
+@@ -502,6 +539,12 @@ GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept {
    };
  }
  
@@ -9902,7 +9935,7 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..b1ab7238f75876832d87f5469dfef6fc
  void initialize() noexcept {
    {
      std::array<wgpu::BindGroupLayoutEntry, MaxTextures * 2> textureEntries;
-@@ -527,10 +567,22 @@ void initialize() noexcept {
+@@ -527,10 +570,22 @@ void initialize() noexcept {
          .entries = textureEntries.data(),
      };
      sTextureBindGroupLayout = g_device.CreateBindGroupLayout(&descriptor);
@@ -9925,7 +9958,7 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..b1ab7238f75876832d87f5469dfef6fc
    }
    {
      constexpr wgpu::TextureDescriptor descriptor{
-@@ -540,7 +592,17 @@ void initialize() noexcept {
+@@ -540,7 +595,17 @@ void initialize() noexcept {
          .format = wgpu::TextureFormat::RGBA8Unorm,
      };
      sEmptyTexture = g_device.CreateTexture(&descriptor);
@@ -9943,7 +9976,7 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..b1ab7238f75876832d87f5469dfef6fc
    }
    {
      std::array<wgpu::BindGroupEntry, MaxTextures * 2> entries;
-@@ -561,24 +623,40 @@ void initialize() noexcept {
+@@ -561,24 +626,40 @@ void initialize() noexcept {
          .entries = entries.data(),
      };
      g_emptyTextureBindGroup = g_device.CreateBindGroup(&desc);
@@ -10154,17 +10187,130 @@ index 1abcbd518965b15fb9de612eee2f1811402975c2..c5fe2fa3f883a092fd5590758e90c35d
    uint32_t msaaSamples = 1;
 diff --git a/lib/gx/selected_texture_readonly_diagnostic.hpp b/lib/gx/selected_texture_readonly_diagnostic.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..8423cb797226913831b724911888bc4f7f71e6ee
+index 0000000000000000000000000000000000000000..b0693028d8284cbd7760b3dda0555b768c8701b2
 --- /dev/null
 +++ b/lib/gx/selected_texture_readonly_diagnostic.hpp
-@@ -0,0 +1,10 @@
+@@ -0,0 +1,123 @@
 +#pragma once
 +
 +#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
 +// Private primitive diagnostic interface; no owner types or gameplay admission.
 +namespace aurora::gx {
++// Private bounded refusal values; diagnostic only, never admission.
++enum class SelectedTextureIssueRefusal : unsigned {
++  None,
++  CaptureMissingRef,
++  CaptureMissingId,
++  CaptureNoCache,
++  CaptureGeneration,
++  CapturePendingInvalidation,
++  CapturePendingClear,
++  CaptureEntryAbsent,
++  CaptureOwnerMismatch,
++  CaptureDataVersion,
++  SubmittedWitnessMissing,
++  SelectedWitnessMissing,
++  CacheKeyAbsent,
++  CacheGeneration,
++  CachePendingInvalidation,
++  CachePendingClear,
++  CacheEntryAbsent,
++  CacheHandleAbsent,
++  CacheDataVersion,
++  CacheTlutOwner,
++  CacheTlutVersion,
++  CacheReplacement,
++  CurrentOwner,
++  CurrentTexture,
++  CurrentView,
++  CurrentQueue,
++  CurrentTextureSerial,
++  CurrentViewSerial,
++  CurrentDevice,
++  CurrentDeviceEpoch,
++  CurrentTextureSeal,
++  CurrentViewSeal,
++  OwnerInactive,
++  OwnerTextureCreation,
++  OwnerViewCreation,
++  OwnerTextureRole,
++  OwnerViewRole,
++  OwnerMissing,
++  OwnerRef,
++  OwnerDevice,
++  OwnerTexture,
++  OwnerView,
++  OwnerParentSerial,
++  OwnerViewDevice,
++  OwnerViewDeviceEpoch,
++  OwnerViewDomainEpoch,
++  OwnerSerialAlias,
++  OwnerUsageLow,
++  OwnerUsageHigh,
++  OwnerQueueMissing,
++  HostBridgeRefused,
++};
++constexpr const char* selected_texture_issue_refusal_literal(SelectedTextureIssueRefusal value) noexcept {
++  switch(value) {
++  case SelectedTextureIssueRefusal::None: return "selected_texture_current_owner_mismatch";
++  case SelectedTextureIssueRefusal::CaptureMissingRef: return "selected_texture_cache_capture_missing_ref";
++  case SelectedTextureIssueRefusal::CaptureMissingId: return "selected_texture_cache_capture_missing_id";
++  case SelectedTextureIssueRefusal::CaptureNoCache: return "selected_texture_cache_capture_no_cache";
++  case SelectedTextureIssueRefusal::CaptureGeneration: return "selected_texture_cache_capture_generation";
++  case SelectedTextureIssueRefusal::CapturePendingInvalidation: return "selected_texture_cache_capture_pending_invalidation";
++  case SelectedTextureIssueRefusal::CapturePendingClear: return "selected_texture_cache_capture_pending_clear";
++  case SelectedTextureIssueRefusal::CaptureEntryAbsent: return "selected_texture_cache_capture_entry_absent";
++  case SelectedTextureIssueRefusal::CaptureOwnerMismatch: return "selected_texture_cache_capture_owner_mismatch";
++  case SelectedTextureIssueRefusal::CaptureDataVersion: return "selected_texture_cache_capture_data_version";
++  case SelectedTextureIssueRefusal::SubmittedWitnessMissing: return "selected_texture_submitted_witness_missing";
++  case SelectedTextureIssueRefusal::SelectedWitnessMissing: return "selected_texture_selected_witness_missing";
++  case SelectedTextureIssueRefusal::CacheKeyAbsent: return "selected_texture_cache_key_absent";
++  case SelectedTextureIssueRefusal::CacheGeneration: return "selected_texture_cache_generation";
++  case SelectedTextureIssueRefusal::CachePendingInvalidation: return "selected_texture_cache_pending_invalidation";
++  case SelectedTextureIssueRefusal::CachePendingClear: return "selected_texture_cache_pending_clear";
++  case SelectedTextureIssueRefusal::CacheEntryAbsent: return "selected_texture_cache_entry_absent";
++  case SelectedTextureIssueRefusal::CacheHandleAbsent: return "selected_texture_cache_handle_absent";
++  case SelectedTextureIssueRefusal::CacheDataVersion: return "selected_texture_cache_data_version";
++  case SelectedTextureIssueRefusal::CacheTlutOwner: return "selected_texture_cache_tlut_owner";
++  case SelectedTextureIssueRefusal::CacheTlutVersion: return "selected_texture_cache_tlut_version";
++  case SelectedTextureIssueRefusal::CacheReplacement: return "selected_texture_cache_replacement";
++  case SelectedTextureIssueRefusal::CurrentOwner: return "selected_texture_current_owner";
++  case SelectedTextureIssueRefusal::CurrentTexture: return "selected_texture_current_texture";
++  case SelectedTextureIssueRefusal::CurrentView: return "selected_texture_current_view";
++  case SelectedTextureIssueRefusal::CurrentQueue: return "selected_texture_current_queue";
++  case SelectedTextureIssueRefusal::CurrentTextureSerial: return "selected_texture_current_texture_serial";
++  case SelectedTextureIssueRefusal::CurrentViewSerial: return "selected_texture_current_view_serial";
++  case SelectedTextureIssueRefusal::CurrentDevice: return "selected_texture_current_device";
++  case SelectedTextureIssueRefusal::CurrentDeviceEpoch: return "selected_texture_current_device_epoch";
++  case SelectedTextureIssueRefusal::CurrentTextureSeal: return "selected_texture_current_texture_seal";
++  case SelectedTextureIssueRefusal::CurrentViewSeal: return "selected_texture_current_view_seal";
++  case SelectedTextureIssueRefusal::OwnerInactive: return "selected_texture_owner_inactive";
++  case SelectedTextureIssueRefusal::OwnerTextureCreation: return "selected_texture_owner_texture_creation";
++  case SelectedTextureIssueRefusal::OwnerViewCreation: return "selected_texture_owner_view_creation";
++  case SelectedTextureIssueRefusal::OwnerTextureRole: return "selected_texture_owner_texture_role";
++  case SelectedTextureIssueRefusal::OwnerViewRole: return "selected_texture_owner_view_role";
++  case SelectedTextureIssueRefusal::OwnerMissing: return "selected_texture_owner_missing";
++  case SelectedTextureIssueRefusal::OwnerRef: return "selected_texture_owner_ref";
++  case SelectedTextureIssueRefusal::OwnerDevice: return "selected_texture_owner_device";
++  case SelectedTextureIssueRefusal::OwnerTexture: return "selected_texture_owner_texture";
++  case SelectedTextureIssueRefusal::OwnerView: return "selected_texture_owner_view";
++  case SelectedTextureIssueRefusal::OwnerParentSerial: return "selected_texture_owner_parent_serial";
++  case SelectedTextureIssueRefusal::OwnerViewDevice: return "selected_texture_owner_view_device";
++  case SelectedTextureIssueRefusal::OwnerViewDeviceEpoch: return "selected_texture_owner_view_device_epoch";
++  case SelectedTextureIssueRefusal::OwnerViewDomainEpoch: return "selected_texture_owner_view_domain_epoch";
++  case SelectedTextureIssueRefusal::OwnerSerialAlias: return "selected_texture_owner_serial_alias";
++  case SelectedTextureIssueRefusal::OwnerUsageLow: return "selected_texture_owner_usage_low";
++  case SelectedTextureIssueRefusal::OwnerUsageHigh: return "selected_texture_owner_usage_high";
++  case SelectedTextureIssueRefusal::OwnerQueueMissing: return "selected_texture_owner_queue_missing";
++  case SelectedTextureIssueRefusal::HostBridgeRefused: return "selected_texture_host_bridge_refused";
++  }
++  return "selected_texture_current_owner_mismatch";
++}
++
 +void request_selected_sampled_texture() noexcept;
 +int issue_selected_sampled_texture_readonly_guard() noexcept;
++// Internal call-stack diagnostic overload; zero-argument service remains intact.
++int issue_selected_sampled_texture_readonly_guard(SelectedTextureIssueRefusal& refusal) noexcept;
 +bool selected_sampled_texture_readonly_guard_current() noexcept;
 +} // namespace aurora::gx
 +#endif
@@ -10203,7 +10349,7 @@ index 92f358b4642a7d439e66ef548deea230bb3c3539..c6683dbcd881c55b3bf20d9e12eb074a
      Log.info("Generated shader (hash {:x}): {}", hash, shaderSource);
    }
 diff --git a/lib/gx/texture.cpp b/lib/gx/texture.cpp
-index a56709a9f62e77563e90a36fb3d08b6c233bff7f..9ee12215c1d238350e86cf9454c44fb8bc0efbb2 100644
+index a56709a9f62e77563e90a36fb3d08b6c233bff7f..95875981628702eb3218c02cfc1fb911bfba89f1 100644
 --- a/lib/gx/texture.cpp
 +++ b/lib/gx/texture.cpp
 @@ -1,4 +1,7 @@
@@ -10214,7 +10360,7 @@ index a56709a9f62e77563e90a36fb3d08b6c233bff7f..9ee12215c1d238350e86cf9454c44fb8
  
  #include "../gfx/recording.hpp"
  #include "../gfx/tex_palette_conv.hpp"
-@@ -515,6 +518,54 @@ bool use_replacement(std::optional<gfx::texture_replacement::ReplacementResult>
+@@ -515,6 +518,80 @@ bool use_replacement(std::optional<gfx::texture_replacement::ReplacementResult>
  const TextureStats& texture_stats() noexcept { return s_stats; }
  
  namespace texture {
@@ -10223,53 +10369,79 @@ index a56709a9f62e77563e90a36fb3d08b6c233bff7f..9ee12215c1d238350e86cf9454c44fb8
 +void observe_selected_cached_texture(uint32_t slot,const gfx::TextureBind& bind,uint32_t frameIndex,uint64_t frameId) noexcept {
 +  auto& observer=gfx::detail::browser_frame_effect_observer();
 +  if(!observer.selected_sampled_texture_requested())return;
++  using Reason=SelectedTextureIssueRefusal;
++  Reason reason=Reason::None;
 +  gfx::detail::BrowserFrameEffectObserver::SelectedSampledTextureCacheKey key{};
-+  if(bind.ref && bind.texObj.texObjId && !bind.texObj.no_cache() && bind.generation==s_bindGeneration &&
-+      !s_pendingInvalidations.load(std::memory_order_acquire) && !s_pendingCacheClears.load(std::memory_order_acquire)) {
++  if(!bind.ref)reason=Reason::CaptureMissingRef;
++  else if(!bind.texObj.texObjId)reason=Reason::CaptureMissingId;
++  else if(bind.texObj.no_cache())reason=Reason::CaptureNoCache;
++  else if(bind.generation!=s_bindGeneration)reason=Reason::CaptureGeneration;
++  else if(s_pendingInvalidations.load(std::memory_order_acquire))reason=Reason::CapturePendingInvalidation;
++  else if(s_pendingCacheClears.load(std::memory_order_acquire))reason=Reason::CapturePendingClear;
++  else {
 +    const auto it=s_textureObjectCaches.find(bind.texObj.texObjId);
-+    if(it!=s_textureObjectCaches.end() && it->second.handle.get()==bind.ref.get() &&
-+        it->second.texDataVersion==bind.texObj.texDataVersion) {
++    if(it==s_textureObjectCaches.end())reason=Reason::CaptureEntryAbsent;
++    else if(it->second.handle.get()!=bind.ref.get())reason=Reason::CaptureOwnerMismatch;
++    else if(it->second.texDataVersion!=bind.texObj.texDataVersion)reason=Reason::CaptureDataVersion;
++    else {
 +      const auto& entry=it->second;
 +      key={bind.texObj.texObjId,entry.texDataVersion,entry.tlutObjId,entry.tlutDataVersion,
 +        entry.replacementId,s_bindGeneration,true};
 +    }
 +  }
 +  // Unsupported first candidates still consume the request. Never search later.
-+  if(!bind.ref){observer.observe_selected_sampled_texture(slot,{},0,0,0,0,frameIndex,frameId);return;}
++  if(!bind.ref){observer.observe_selected_sampled_texture(slot,{},0,0,0,0,frameIndex,frameId,nullptr,reason);return;}
 +  observer.observe_selected_sampled_texture(slot,bind.ref->frameEffectOwnerFacts,
 +    reinterpret_cast<uintptr_t>(bind.ref.get()),reinterpret_cast<uintptr_t>(bind.ref->texture.Get()),
 +    reinterpret_cast<uintptr_t>(bind.ref->sampleTextureView.Get()),reinterpret_cast<uintptr_t>(webgpu::g_queue.Get()),
-+    frameIndex,frameId,&key);
++    frameIndex,frameId,&key,reason);
 +}
-+static int selected_cached_texture_operation(bool issue) noexcept {
++static int selected_cached_texture_operation(bool issue,SelectedTextureIssueRefusal* refusal=nullptr) noexcept {
++  using Reason=SelectedTextureIssueRefusal;
 +  auto& observer=gfx::detail::browser_frame_effect_observer();
 +  gfx::detail::BrowserFrameEffectObserver::SelectedSampledTextureWitness witness{};
 +  if(issue ? !observer.submitted_selected_sampled_texture_witness(witness) :
-+             !observer.issued_selected_sampled_texture_witness(witness))return 0;
-+  const auto refuse=[&]() {return issue ? observer.issue_selected_sampled_texture({},0,0,0,0) : 0;};
++             !observer.issued_selected_sampled_texture_witness(witness)) {
++    if(refusal && *refusal==Reason::None)*refusal=Reason::SubmittedWitnessMissing;
++    return 0;
++  }
++  const auto refuse=[&](Reason reason) {
++    if(refusal && *refusal==Reason::None)*refusal=reason;
++    return issue ? observer.issue_selected_sampled_texture({},0,0,0,0) : 0;
++  };
 +  gfx::detail::BrowserFrameEffectObserver::SelectedSampledTextureCacheKey key{};
-+  if(!observer.selected_sampled_texture_cache_key(key) || key.bindGeneration!=s_bindGeneration ||
-+      s_pendingInvalidations.load(std::memory_order_acquire) || s_pendingCacheClears.load(std::memory_order_acquire))return refuse();
++  Reason captureReason=Reason::None;
++  if(!observer.selected_sampled_texture_cache_key(key,issue ? &captureReason : nullptr))
++    return refuse(captureReason==Reason::None ? Reason::CacheKeyAbsent : captureReason);
++  if(key.bindGeneration!=s_bindGeneration)return refuse(Reason::CacheGeneration);
++  if(s_pendingInvalidations.load(std::memory_order_acquire))return refuse(Reason::CachePendingInvalidation);
++  if(s_pendingCacheClears.load(std::memory_order_acquire))return refuse(Reason::CachePendingClear);
 +  const auto it=s_textureObjectCaches.find(key.texObjId);
-+  if(it==s_textureObjectCaches.end())return refuse();
++  if(it==s_textureObjectCaches.end())return refuse(Reason::CacheEntryAbsent);
 +  const auto& entry=it->second;
-+  if(!entry.handle || entry.texDataVersion!=key.texDataVersion || entry.tlutObjId!=key.tlutObjId ||
-+      entry.tlutDataVersion!=key.tlutDataVersion || entry.replacementId!=key.replacementId)return refuse();
++  if(!entry.handle)return refuse(Reason::CacheHandleAbsent);
++  if(entry.texDataVersion!=key.texDataVersion)return refuse(Reason::CacheDataVersion);
++  if(entry.tlutObjId!=key.tlutObjId)return refuse(Reason::CacheTlutOwner);
++  if(entry.tlutDataVersion!=key.tlutDataVersion)return refuse(Reason::CacheTlutVersion);
++  if(entry.replacementId!=key.replacementId)return refuse(Reason::CacheReplacement);
 +  const auto& current=entry.handle; // The existing map remains the strong owner.
 +  const auto owner=reinterpret_cast<uintptr_t>(current.get());
 +  const auto texture=reinterpret_cast<uintptr_t>(current->texture.Get());
 +  const auto view=reinterpret_cast<uintptr_t>(current->sampleTextureView.Get());
 +  const auto queue=reinterpret_cast<uintptr_t>(webgpu::g_queue.Get());
-+  return issue ? observer.issue_selected_sampled_texture(current->frameEffectOwnerFacts,owner,texture,view,queue) :
++  return issue ? observer.issue_selected_sampled_texture(current->frameEffectOwnerFacts,owner,texture,view,queue,refusal) :
 +    observer.issued_selected_sampled_texture_owner_matches(current->frameEffectOwnerFacts,owner,texture,view,queue);
 +}
 +int issue_selected_cached_texture_readonly_guard() noexcept {return selected_cached_texture_operation(true);}
++int issue_selected_cached_texture_readonly_guard(SelectedTextureIssueRefusal& refusal) noexcept {
++  refusal=SelectedTextureIssueRefusal::None;return selected_cached_texture_operation(true,&refusal);
++}
 +bool selected_cached_texture_readonly_guard_current() noexcept {return selected_cached_texture_operation(false)!=0;}
 +#endif
  size_t texture_source_size(u32 format, u32 width, u32 height, u32 mipCount) noexcept {
    if (width == 0 || height == 0 || mipCount == 0) {
      return 0;
-@@ -725,6 +776,9 @@ void end_frame() noexcept {
+@@ -725,6 +802,9 @@ void end_frame() noexcept {
  }
  
  void shutdown() noexcept {
@@ -10280,10 +10452,10 @@ index a56709a9f62e77563e90a36fb3d08b6c233bff7f..9ee12215c1d238350e86cf9454c44fb8
    s_tlutObjectCaches.clear();
    s_replacementUsers.clear();
 diff --git a/lib/gx/texture.hpp b/lib/gx/texture.hpp
-index 29c9a48bfa21fe4da1f30933125ca1907393dac3..df26dd5e5f44d3a4a97478d62c7ceb4cb9d532fb 100644
+index 29c9a48bfa21fe4da1f30933125ca1907393dac3..db1a47e9a590c7f41691e98ec4c97019521ac6f5 100644
 --- a/lib/gx/texture.hpp
 +++ b/lib/gx/texture.hpp
-@@ -26,13 +26,22 @@ const TextureStats& texture_stats() noexcept;
+@@ -26,13 +26,23 @@ const TextureStats& texture_stats() noexcept;
  namespace texture {
  constexpr uint64_t ContentCacheBudgetBytes = 128ull * 1024ull * 1024ull;
  constexpr uint64_t ObjectCacheIdleFrames = 600;
@@ -10301,6 +10473,7 @@ index 29c9a48bfa21fe4da1f30933125ca1907393dac3..df26dd5e5f44d3a4a97478d62c7ceb4c
 +#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
 +void observe_selected_cached_texture(uint32_t slot,const gfx::TextureBind& bind,uint32_t frameIndex,uint64_t frameId) noexcept;
 +int issue_selected_cached_texture_readonly_guard() noexcept;
++int issue_selected_cached_texture_readonly_guard(SelectedTextureIssueRefusal& refusal) noexcept;
 +bool selected_cached_texture_readonly_guard_current() noexcept;
 +#endif
  void invalidate_bindings() noexcept;
