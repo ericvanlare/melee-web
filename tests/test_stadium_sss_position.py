@@ -117,6 +117,12 @@ class StadiumSssPositionTests(OwnedWorkspaceTests):
         methods=source[source.index("  bool StadiumSssPositionOwner"):source.index("  void ObserveStadiumMenuHook")]
         publish=source[source.index("  void PublishStadiumProgress"):source.index("  // Pinned fn_8025A310")]
         fields=source[source.index("  struct StadiumSssPositionCall"):source.index("  bool stadium_go_prefix_enabled = false;")]
+        whole_fields="\n".join(
+            source[source.index(marker):source.index(";",source.index(marker))+1]
+            for marker in ("  bool stadium_whole_feedback = false;",
+                           "  bool stadium_whole_sss_ready = false;",
+                           "  std::string stadium_whole_setup_receipt;",
+                           "  u32 match_index = 0;", "  u32 whole_phase = 0;"))
         add_slice=source[source.index("  bool AddSlice("):source.index("  bool HasSingleSlice(")]
         enum=source[source.index("enum class SliceTag"):source.index("struct SliceRef")]
         # None of these exact production blocks can store through the guest API/state.
@@ -183,7 +189,7 @@ int main(){Core::System sys;
 }
 """
         work=self.new_workspace(ROOT,"sss-position-control-");cpp=work/"control.cpp";exe=work/"control"
-        cpp.write_text(prefix+enum+middle+fields+add_slice+publish+methods+setup+main)
+        cpp.write_text(prefix+enum+middle+whole_fields+fields+add_slice+publish+methods+setup+main)
         build=subprocess.run([compiler,"-std=c++17","-Wall","-Wextra","-Werror",str(cpp),"-o",str(exe)],capture_output=True,text=True,timeout=30)
         (work/"compile.stdout").write_text(build.stdout);(work/"compile.stderr").write_text(build.stderr)
         self.assertEqual(build.returncode,0,build.stderr)

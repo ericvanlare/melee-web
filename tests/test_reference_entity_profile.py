@@ -89,6 +89,7 @@ class ReferenceEntityProfileTests(unittest.TestCase):
         start = source.index('    if (checked_entity_profile)\n      handshake +=')
         metadata = source[start:source.index('    handshake += "}";', start)]
         count_function=source[source.index('u32 WholeSessionMatchCount()'):source.index('bool ValidIdentity(')]
+        allocation_configured = _extract_braced_declaration(source, 'bool AllocationConfigured()')
         harness = r'''
 #include <cassert>
 #include <cstdint>
@@ -108,7 +109,7 @@ std::string Env(const char* name){return environment[name];}
 using u8=std::uint8_t;
 using u32=unsigned;
 constexpr unsigned WHOLE_SESSION_MIN_MATCHES=3,WHOLE_SESSION_MAX_MATCHES=64;
-'''+stadium_receipt+"\n"+stadium_phase+"\n"+count_function+r'''
+'''+stadium_receipt+"\n"+stadium_phase+"\n"+count_function+"\n"+allocation_configured+r'''
 bool SdInitRequested(){return !Env("MWRC_SD_INIT").empty();}
 struct Reader {
  unsigned whole_session_matches=0;bool checked_entity_profile=false,active_entity_profile=false;std::string error;
@@ -122,7 +123,7 @@ std::string identity(){std::string handshake="base";
 return handshake;}
 };
 int main(){
- Reader r;assert(r.configure());assert(!r.checked_entity_profile);assert(r.identity()=="base");
+ Reader r;assert(r.configure());assert(!r.checked_entity_profile);assert(!r.stadium_whole_feedback);assert(r.identity()=="base");
  environment["MWRC_WHOLE_SESSION_MATCHES"]="1";
  r=Reader{};assert(!r.configure()||r.whole_session_matches==0);
  environment["MWRC_ENTITY_PROFILE"]="jiggly-ice-mario-fox-v1";
