@@ -417,7 +417,24 @@ function issueSelectedTextureBoundary(){
     typeof m._melee_web_native_menu_frame_effect_issue_selected_texture!=='function'||
     m.__meleeWebTextureReadonlyGuardV1?.status().phase!=='INSTALLED')return {issued:0};
  const issued=m._melee_web_native_menu_frame_effect_issue_selected_texture();
- return {issued,guard:m.__meleeWebTextureReadonlyGuardV1.status()};
+ const result={issued,guard:m.__meleeWebTextureReadonlyGuardV1.status()};
+ if(issued!==0)return result; // Successful dispatch retains the historical response exactly.
+ const idle=()=>globalThis.Module===m&&globalThis.__meleeWebFirstDrawComponentModuleV1===m&&
+   m.matchFrameEffectNativeIdle?.()===true&&m.matchFrameEffectCallbackReturned===true;
+ const unavailable=reason=>({...result,native_refusal:{status:'unavailable',reason}});
+ // This is inline after a known synchronous zero return, never a second page
+ // call after timeout/transport loss. Uncertain native state forbids the getter.
+ if(!idle())return unavailable('same_module_or_returned_idle_missing');
+ if(typeof m._melee_web_native_menu_frame_effect_status!=='function')return unavailable('status_export_missing');
+ try{
+  const receipt=JSON.parse(m.UTF8ToString(m._melee_web_native_menu_frame_effect_status()));
+  if(!idle())return unavailable('same_module_or_returned_idle_changed');
+  if(!receipt||typeof receipt!=='object'||Array.isArray(receipt)||receipt.terminal!==true||
+     receipt.native_retired!==false||typeof receipt.error!=='string'||receipt.error.length===0)
+   return unavailable('native_refusal_receipt_malformed');
+  // Copied raw diagnostic only: it never grants issuance or interval admission.
+  return {...result,native_refusal:{status:'copied_raw',receipt}};
+ }catch{return unavailable('native_refusal_receipt_unavailable');}
 }
 async function fenceSelectedTextureBoundary({end=false}={}){
  const m=globalThis.Module,idle=()=>m&&globalThis.Module===m&&m===globalThis.__meleeWebFirstDrawComponentModuleV1&&

@@ -124,3 +124,66 @@ test('selected transport refuses historical fixture label on unarmed native issu
  f.module.__meleeWebTextureReadonlyGuardV1.status=()=>{const value=original();if(value.phase==='ISSUED')value.scope='fixture-component-only';return value;};
  const result=await startFirstDrawSelectedTextureInterval(f);assert.equal(result.status,'refused');assert(result.failures.includes('selected_texture_issue_refused'));assert(!f.calls.includes('start-fence'));assert(!f.calls.includes('selected-close'));assert(!f.calls.includes('retire'));
 });
+
+// Actual serialized page helper, synthetic returned-zero native endpoint.
+// Raw refusal copying is diagnostic only and never admits a selected interval.
+function issueRefusalFixture(reason='selected_texture_submitted_owner_mismatch'){
+ const f=intervalFixture();
+ f.module._melee_web_native_menu_frame_effect_issue_selected_texture=()=>{f.calls.push('selected-issue');return 0;};
+ f.module._melee_web_native_menu_frame_effect_status=()=>{f.calls.push('native-refusal-status');return JSON.stringify({terminal:true,native_retired:false,error:reason});};
+ return f;
+}
+for(const reason of ['selected_texture_submitted_owner_mismatch','selected_texture_current_owner_mismatch'])
+ test('native issue refusal diagnostic preserves exact sticky reason '+reason,async()=>{
+  const f=issueRefusalFixture(reason),value=await startFirstDrawSelectedTextureInterval(f);
+  assert.equal(value.status,'refused');assert.deepEqual(value.failures,['selected_texture_issue_refused']);
+  assert.equal(value.issue.issued,0);assert.equal(value.issue.guard.phase,'INSTALLED');
+  assert.equal(value.issue.native_refusal.status,'copied_raw');assert.equal(value.issue.native_refusal.receipt.error,reason);
+  assert.equal(f.calls.filter(x=>x==='selected-issue').length,1);assert.equal(f.calls.filter(x=>x==='native-refusal-status').length,1);
+  assert(!f.calls.some(x=>['start-fence','end-fence','selected-close','retire'].includes(x)));
+ });
+for(const [name,change] of [
+ ['Module replacement',f=>f.replace()],
+ ['native busy',f=>f.busy()],
+ ['callback not returned',f=>{f.module.matchFrameEffectCallbackReturned=false;}],
+])test('native issue refusal diagnostic forbids getter after '+name,async()=>{
+ const f=issueRefusalFixture();f.module._melee_web_native_menu_frame_effect_issue_selected_texture=()=>{f.calls.push('selected-issue');change(f);return 0;};
+ const value=await startFirstDrawSelectedTextureInterval(f);assert.equal(value.status,'refused');
+ assert.equal(value.issue.native_refusal.status,'unavailable');assert.equal(value.issue.native_refusal.reason,'same_module_or_returned_idle_missing');
+ assert(!f.calls.includes('native-refusal-status'));assert(!f.calls.includes('start-fence'));assert(!f.calls.includes('retire'));
+});
+test('native issue refusal diagnostic performs no followup after a completed page response is lost',async()=>{
+ const f=issueRefusalFixture(),invoke=f.invoke,operations=[];f.invoke=async(fn,arg)=>{
+  operations.push(fn.name);const value=await invoke(fn,arg);
+  if(fn.name==='issueSelectedTextureBoundary')throw Error('synthetic lost completed page response');
+  return value;
+ };
+ const value=await startFirstDrawSelectedTextureInterval(f);assert.equal(value.status,'refused');
+ assert.deepEqual(operations,['readSelectedTextureBoundary','issueSelectedTextureBoundary']);
+ // Inline copying happened before response loss; there is no subsequent native/page call.
+ assert.equal(f.calls.filter(x=>x==='selected-issue').length,1);assert.equal(f.calls.filter(x=>x==='native-refusal-status').length,1);
+ assert(!f.calls.includes('start-fence'));assert(!f.calls.includes('retire'));
+});
+test('native issue refusal diagnostic does not follow a throwing native issuer',async()=>{
+ const f=issueRefusalFixture();f.module._melee_web_native_menu_frame_effect_issue_selected_texture=()=>{f.calls.push('selected-issue');throw Error('issuer failed');};
+ const value=await startFirstDrawSelectedTextureInterval(f);assert.equal(value.status,'refused');assert(!f.calls.includes('native-refusal-status'));assert(!f.calls.includes('start-fence'));
+});
+test('native issue refusal diagnostic preserves positive dispatch and does not read refusal status',async()=>{
+ const f=intervalFixture();f.module._melee_web_native_menu_frame_effect_status=()=>{f.calls.push('native-refusal-status');throw Error('positive path must not read this');};
+ const value=await startFirstDrawSelectedTextureInterval(f);assert.equal(value.status,'active');
+ assert.equal(value.issue.issued,1);assert.equal(Object.hasOwn(value.issue,'native_refusal'),false);
+ assert.equal(f.calls.filter(x=>x==='selected-issue').length,1);assert(!f.calls.includes('native-refusal-status'));
+});
+for(const [name,read] of [
+ ['malformed JSON',()=>'{'],['missing error',()=>JSON.stringify({terminal:true,native_retired:false})],
+ ['getter throw',()=>{throw Error('getter failed');}],
+])test('native issue refusal diagnostic remains refusal on '+name,async()=>{
+ const f=issueRefusalFixture();f.module._melee_web_native_menu_frame_effect_status=()=>{f.calls.push('native-refusal-status');return read();};
+ const value=await startFirstDrawSelectedTextureInterval(f);assert.equal(value.status,'refused');assert.deepEqual(value.failures,['selected_texture_issue_refused']);
+ assert.equal(value.issue.native_refusal.status,'unavailable');assert(!f.calls.includes('start-fence'));assert(!f.calls.includes('retire'));
+});
+test('native issue refusal diagnostic discards raw receipt if Module changes inside getter',async()=>{
+ const f=issueRefusalFixture();f.module._melee_web_native_menu_frame_effect_status=()=>{f.calls.push('native-refusal-status');f.replace();return JSON.stringify({terminal:true,native_retired:false,error:'selected_texture_current_owner_mismatch'});};
+ const value=await startFirstDrawSelectedTextureInterval(f);assert.equal(value.status,'refused');
+ assert.equal(value.issue.native_refusal.reason,'same_module_or_returned_idle_changed');assert(!Object.hasOwn(value.issue.native_refusal,'receipt'));assert(!f.calls.includes('start-fence'));
+});
