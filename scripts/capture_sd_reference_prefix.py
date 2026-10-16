@@ -2000,6 +2000,43 @@ class StadiumDeadlineController:
         DualPipeController.hold(self, p1, p2, seconds, action=action)
 
 
+def drive_stadium_cold_css(receiver, menus, next_row, wait_source, tap):
+    """Reuse checked cold/Main/VS inputs without entering Rules or editing saves."""
+    if receiver.css is not None:
+        return
+    actions = menus['actions'][:2]
+    require([a['label'] for a in actions] == ['main-down-to-VS', 'main-select-VS'],
+            'Whole Stadium cold entry lacks the existing Main/VS policy')
+    boot_actions = 0
+    while receiver.css is None and not matches(receiver.latest_menu, actions[0]['before']):
+        require(receiver.menu_polls < menus['boot_max_polls'],
+                'Whole Stadium cold startup polling cap')
+        next_row()
+        scene = (receiver.latest_menu or {}).get('scene')
+        for action in menus['boot']:
+            if scene == action['scene']:
+                boot_actions += 1
+                require(boot_actions <= menus['boot_max_actions'],
+                        'Whole Stadium cold startup action cap')
+                tap(action, 'whole-cold-scene-'+str(scene), 600)
+                first = receiver.menu_polls
+                wait_source(lambda: receiver.menu_polls > first, 'whole-cold-source-poll', 600)
+                break
+    if receiver.css is not None:
+        return
+    for action in actions:
+        wait_source(lambda: matches(receiver.latest_menu, action['before']),
+                    action['label']+':ready', action['max_polls'])
+        tap(action, action['label'], action['max_polls'])
+        wait_source(lambda: matches(receiver.latest_menu, action['after']),
+                    action['label']+':observed', action['max_polls'])
+    # Original MENU_KIND_VS/SEL_VS_MELEE is kind2/row0. The checked
+    # second action's after-state includes that exact source owner/cooldown.
+    # mnmain.c confirms A here requests GM_VS; no Rules/Items action follows.
+    tap(actions[1], 'whole-VS-Melee-to-CSS', actions[1]['max_polls'])
+    wait_source(lambda: receiver.css is not None, 'whole-first-CSS', 600)
+
+
 def drive_stadium_whole_three(receiver, tail, controller, menus, deadline):
     """Existing input policies, three natural completions; no pause or source writes."""
     controller = StadiumDeadlineController(controller, deadline)
@@ -2021,14 +2058,7 @@ def drive_stadium_whole_three(receiver, tail, controller, menus, deadline):
         before = receiver.menu_consumed
         controller.set_both(NEUTRAL_PAD,NEUTRAL_PAD,action=label+':release')
         wait_source(lambda: receiver.menu_consumed>before and receiver.last_pad[:2]==[NEUTRAL_PAD]*2,label+':released',max_polls)
-    # Reuse original cold-menu policy until its checked first CSS owner.
-    while receiver.css is None:
-        next_row()
-        scene = (receiver.latest_menu or {}).get('scene')
-        for action in menus['boot']:
-            if scene == action['scene']:
-                tap(action,'whole-cold-scene-'+str(scene),600)
-                break
+    drive_stadium_cold_css(receiver, menus, next_row, wait_source, tap)
     measurements = []
     for index in range(3):
         drive_authored_css_sss(receiver,menus,controller,next_row,wait_source,tap)

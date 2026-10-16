@@ -203,6 +203,101 @@ assert(scoped.emitted.find("\\\"whole_session\\\":true,\\\"match_index\\\":2")!=
         subprocess.run(['/usr/bin/clang++','-std=c++17','-Wall','-Wextra','-Werror',str(cpp),'-o',str(binary)],check=True,timeout=60)
         subprocess.run([str(binary)],check=True,timeout=15)
 
+    def test_actual_cold_scene1_route_and_consumed_input_refusals(self):
+        # Synthetic endpoint transcript only. Run the actual whole driver,
+        # including its wait_source/tap and deadline wrapper; no native service.
+        from sd_original_menu_plan import stadium_go_feedback_packet
+        from retail_input_plan import DISCONNECTED_PAD
+        class ReachedCss(Exception):
+            pass
+        def simulate(mode):
+            menus=stadium_go_feedback_packet()
+            class Receiver:
+                css=None;latest_menu=None;seq=0;menu_polls=0;menu_consumed=0;ended=False
+                last_pad=[driver.NEUTRAL_PAD]*2
+                def accept(self,row):
+                    self.seq+=1
+                    if row['kind']=='consume':
+                        self.last_pad=row['ports'][:2]
+                        if not row.get('stale'):self.menu_consumed+=1
+                    else:
+                        self.menu_polls+=1;self.latest_menu=row['menu']
+                        if row.get('css'):self.css=True
+            receiver=Receiver();writes=[];queue=[]
+            initial=dict(menus['actions'][0]['before'])
+            # Actual menu transition is not ready until source cooldown clears.
+            queue.extend([dict(kind='poll',menu=dict(initial,cooldown=20)),
+                          dict(kind='poll',menu=initial)])
+            class Controller:
+                sleep=staticmethod(lambda seconds:None)
+                def set_both(self,p1,p2,*,action):
+                    writes.append(dict(action=action,p1=p1,p2=p2,
+                                       observed=copy.deepcopy(receiver.latest_menu)))
+                    queue.append(dict(kind='consume',ports=[p1,p2,DISCONNECTED_PAD,DISCONNECTED_PAD],
+                                      stale=mode=='stale-consume'))
+                    if not action.endswith(':release'):return
+                    label=action[:-len(':release')]
+                    if label=='main-down-to-VS':
+                        state=dict(menus['actions'][0]['after'])
+                        if mode=='wrong-kind':state['kind']=13
+                        queue.append(dict(kind='poll',menu=state))
+                    elif label=='main-select-VS':
+                        state=dict(menus['actions'][1]['after'])
+                        if mode=='wrong-row':state['row']=3
+                        queue.append(dict(kind='poll',menu=state))
+                    elif label=='whole-VS-Melee-to-CSS' and mode!='missing-CSS':
+                        queue.append(dict(kind='poll',menu=dict(scene=8),css=True))
+            class Tail:
+                def next(self,deadline):
+                    if queue:return queue.pop(0)
+                    return dict(kind='poll',menu=copy.deepcopy(receiver.latest_menu))
+            def reached(*args):raise ReachedCss()
+            with patch.object(driver.time,'monotonic',return_value=0.0),patch.object(driver,'drive_authored_css_sss',reached):
+                try:
+                    driver.drive_stadium_whole_three(receiver,Tail(),Controller(),menus,10.0)
+                except (ReachedCss,ValueError) as error:
+                    return error,writes,receiver
+            self.fail('Cold route unexpectedly bypassed CSS endpoint control')
+        error,writes,receiver=simulate('positive')
+        self.assertIsInstance(error,ReachedCss)
+        self.assertEqual([r['action'] for r in writes],[
+            'main-down-to-VS','main-down-to-VS:release',
+            'main-select-VS','main-select-VS:release',
+            'whole-VS-Melee-to-CSS','whole-VS-Melee-to-CSS:release'])
+        self.assertEqual(receiver.menu_consumed,6)
+        self.assertEqual(receiver.last_pad,[driver.NEUTRAL_PAD]*2)
+        self.assertTrue(receiver.css)
+        for row in writes:
+            self.assertEqual(row['observed']['cooldown'],0)
+            self.assertEqual(row['p2'],driver.NEUTRAL_PAD)
+        self.assertEqual(writes[0]['p1'],stadium_go_feedback_packet()['actions'][0]['p1'])
+        self.assertEqual(writes[4]['observed'],stadium_go_feedback_packet()['actions'][1]['after'])
+        # Never enter Rules/Items or select a different row to bypass readiness.
+        for mode,maximum_writes in [('wrong-kind',2),('wrong-row',4),('stale-consume',1),('missing-CSS',6)]:
+            with self.subTest(mode=mode):
+                error,writes,receiver=simulate(mode)
+                self.assertIsInstance(error,ValueError)
+                self.assertLessEqual(len(writes),maximum_writes)
+                self.assertIsNone(receiver.css)
+                self.assertLessEqual(receiver.menu_polls,605)
+                self.assertTrue(all(r['action'] in {
+                    'main-down-to-VS','main-down-to-VS:release',
+                    'main-select-VS','main-select-VS:release',
+                    'whole-VS-Melee-to-CSS','whole-VS-Melee-to-CSS:release'} for r in writes))
+        # Direct helper control: a continuously nonzero transition cooldown
+        # must exhaust the inherited boot poll budget without any input.
+        from sd_original_menu_plan import stadium_go_feedback_packet
+        menus=stadium_go_feedback_packet();writes=[]
+        class Waiting:
+            css=None;latest_menu=dict(scene=1,kind=0,row=0,entering=0,cooldown=1)
+            menu_polls=0
+        receiver=Waiting()
+        def next_row():receiver.menu_polls+=1
+        driver_wait=lambda *args:self.fail('Unexpected wait or input during cooldown')
+        with self.assertRaisesRegex(ValueError,'cold startup polling cap'):
+            driver.drive_stadium_cold_css(receiver,menus,next_row,driver_wait,driver_wait)
+        self.assertEqual(receiver.menu_polls,menus['boot_max_polls'])
+
     def test_actual_driver_exit_results_order_and_remaining_deadline(self):
         # These are source transport endpoints, not a simulated game/graphics service.
         from reference_versus_sequence_capture import raw_pad, SequenceRunner
