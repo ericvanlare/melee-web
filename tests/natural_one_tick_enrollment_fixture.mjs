@@ -1,0 +1,6 @@
+// Authored synthetic copied-book values only, not native/GPU evidence.
+export function naturalEnrollmentFixture(origin=180){
+ const row=(sequence,before,planned,phase,pcm,afterPhase,selected)=>({callback_sequence:String(sequence),source_before:before,source_after:before+planned,planned_steps:planned,planned_audio_steps:1,tick_returns:planned,draw_returns:planned,audio_returns:1,pcm_frames:pcm,audio_phase_before:phase,audio_phase_after:afterPhase,selected});
+ return {schema:'melee-web-natural-one-tick-enrollment-v1',copied:true,state:3,minimum_frame:180,maximum_frame:240,origin_frame:origin,selected_frame:origin+2,owner_generation:9,origin_audio_phase:0,row_capacity:61,row_count:2,callback_sequence:'3',selection_callback:'3',skipped_callbacks:'2',skipped_ticks:'2',skipped_draws:'2',skipped_audio:'2',skipped_pcm_frames:'1066',source_free_callbacks:'1',source_free_audio:'1',source_free_pcm_frames:'533',callback_open:false,error:'',rows:[row(2,origin,2,20,533,40,false),row(3,origin+2,1,40,534,0,true)]};
+}
+export function enrolledOuterJoin(origin=180){return {requested_source_frame:origin+2,source_frame_before:origin+2,source_frame_after:origin+3,owner_generation:9,planned_steps:1,tick_returns:1,draw_returns:1,callback_steps:1,callback_draws:1,audio_phase_before:40,audio_phase_after:0,audio_returns:1,pcm_frames:534};}

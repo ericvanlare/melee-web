@@ -2,7 +2,7 @@
 // selected draw scope is explicit; later original draws remain unobserved.
 import {observeOneNormalFrame} from './one_normal_frame_observation_adapter.mjs';
 import {retireNativeFrameEffect} from './match_frame_effect_driver.mjs';
-import {armNativeFrameEffectFirstDraw,readNativeFrameEffectFirstDraw,firstDrawObservationFailures,readFirstDrawComponents,armFirstDrawComponents,firstDrawComponentFailures,startFirstDrawSelectedTextureInterval,endFirstDrawSelectedTextureInterval}
+import {armNativeFrameEffectFirstDraw,readNativeFrameEffectFirstDraw,firstDrawObservationFailures,readFirstDrawComponents,armFirstDrawComponents,firstDrawComponentFailures,startFirstDrawSelectedTextureInterval,endFirstDrawSelectedTextureInterval,naturalOneEnrollmentFailures}
   from './match_frame_effect_first_draw_driver.mjs';
 export const firstDrawDriver = Object.freeze({
   armNativeFrameEffect: armNativeFrameEffectFirstDraw,
@@ -27,7 +27,7 @@ export async function observeSelectedTextureInterval({invoke,components}){
   return {schema:'melee-web-selected-texture-interval-observation-v1',status:ended?.status==='closed'&&!failures.length?'closed':'refused',
     composite_eligible:false,started,ended,transport,failures};
 }
-export const firstDrawSelectedTextureIntervalDriver=Object.freeze({...firstDrawComponentsDriver,observeSelectedTextureInterval});
+export const firstDrawSelectedTextureIntervalDriver=Object.freeze({...firstDrawComponentsDriver,observeSelectedTextureInterval,naturalOneEligibility:true,naturalOneEnrollmentFailures});
 export async function observeOneFirstDraw(options) {
   const result = await observeOneNormalFrame({...options, driver: options.driver ?? firstDrawDriver, observationScope: 'first_draw'});
   result.schema = 'melee-web-one-first-draw-observation-v1';

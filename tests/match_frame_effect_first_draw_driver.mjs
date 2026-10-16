@@ -2,7 +2,7 @@ import {rendererOwnerObservationFailures} from './match_frame_effect_renderer_ow
 // Explicit first-draw scope. The historical single-tick driver/validator is unchanged.
 // Reuses the reviewed schema2 row/value validation with a distinct exact outer
 // field allowlist and selected-map checks. No historical receipt/schema coercion.
-export function armNativeFrameEffectFirstDraw({minimumFrame = 180, maximumFrame = 240, componentEligibility = false} = {}) {
+export function armNativeFrameEffectFirstDraw({minimumFrame = 180, maximumFrame = 240, componentEligibility = false, naturalOneEligibility = false} = {}) {
   const module = globalThis.Module;
   if (module?.matchFrameEffectNativeIdle?.() !== true)
     return {armed: false, reason: 'native_call_pending'};
@@ -21,13 +21,19 @@ export function armNativeFrameEffectFirstDraw({minimumFrame = 180, maximumFrame 
        typeof module._aurora_browser_depth_no_work_arm_component!=='function')
       return {armed:false,reason:'component_premain_or_exports_missing'};
   }
-  const armed = module._melee_web_native_menu_frame_effect_arm_first_draw(match.frame) === 1;
+  if(naturalOneEligibility&&(!componentEligibility||minimumFrame!==180||maximumFrame!==240||
+      typeof module._melee_web_native_menu_frame_effect_request_natural_one!=='function'||
+      typeof module._melee_web_native_menu_frame_effect_natural_one_enrollment!=='function'))
+    return {armed:false,reason:'natural_one_private_exports_or_window_missing'};
+  const armed = naturalOneEligibility
+    ?module._melee_web_native_menu_frame_effect_request_natural_one(match.frame)===1
+    :module._melee_web_native_menu_frame_effect_arm_first_draw(match.frame)===1;
   if(armed&&componentEligibility)Object.defineProperty(globalThis,'__meleeWebFirstDrawComponentModuleV1',
     {value:module,writable:false,configurable:false});
-  return {armed, reason: armed ? null : 'native_arm_refused', match};
+  return {armed, reason: armed ? null : 'native_arm_refused', match,...(naturalOneEligibility?{selection_pending:armed,enrollment_mode:'naturally_due_one_tick'}:{})};
 }
 
-export function readNativeFrameEffectFirstDraw() {
+export function readNativeFrameEffectFirstDraw({naturalOneEligibility=false}={}) {
   const module = globalThis.Module;
   // No native getter even on a timeout until the actual callback returns.
   if (module?.matchFrameEffectNativeIdle?.() !== true ||
@@ -39,7 +45,13 @@ export function readNativeFrameEffectFirstDraw() {
   const completed = (status.schema_version === 3 || status.schema_version === 4 || status.schema_version === 5 || status.schema_version === 6) && status.terminal === true &&
     status.selected_depth_owners?.pending === 0 && (status.error !== '' ||
     renderer?.state === 5 || renderer?.fence_count === 1);
-  return {settled: true, completed, status};
+  let enrollment;
+  if(naturalOneEligibility&&completed){
+    if(typeof module._melee_web_native_menu_frame_effect_natural_one_enrollment!=='function')return {settled:false};
+    enrollment=JSON.parse(module.UTF8ToString(module._melee_web_native_menu_frame_effect_natural_one_enrollment()));
+    if(module!==globalThis.Module||module.matchFrameEffectNativeIdle?.()!==true||module.matchFrameEffectCallbackReturned!==true)return {settled:false};
+  }
+  return {settled: true, completed, status,...(naturalOneEligibility&&completed?{enrollment}:{})};
 }
 
 export function firstDrawObservationFailures(receipt) {
@@ -485,4 +497,41 @@ export async function endFirstDrawSelectedTextureInterval({invoke,components,sta
   failures.push(...selectedTextureGuardFailures(closed?.guard,'CLOSED',started.issue.guard));
   return {status:failures.length?'refused':'closed',before,end,after,closed,failures,composite_eligible:false};
  }catch(error){return {status:'refused',failures:['selected_texture_end_response_failed'],error:String(error?.message||error),composite_eligible:false};}
+}
+
+// Independent private copied enrollment schema; historical outer3..6/renderer2..5 are unchanged.
+export function naturalOneEnrollmentFailures(v,receipt,{originFrame}={}){
+ const fail=()=>['natural_one_enrollment_receipt'];
+ const exact=(o,keys)=>o&&typeof o==='object'&&!Array.isArray(o)&&Object.keys(o).length===keys.length&&keys.every(k=>Object.hasOwn(o,k));
+ const u=x=>Number.isInteger(x)&&x>=0&&x<=0xffffffff;
+ const wide=x=>typeof x==='string'&&/^(0|[1-9][0-9]{0,19})$/.test(x)&&BigInt(x)<=0xffffffffffffffffn;
+ const totals=['callback_sequence','selection_callback','skipped_callbacks','skipped_ticks','skipped_draws','skipped_audio','skipped_pcm_frames','source_free_callbacks','source_free_audio','source_free_pcm_frames'];
+ const keys=['schema','copied','state','minimum_frame','maximum_frame','origin_frame','selected_frame','owner_generation','origin_audio_phase','row_capacity','row_count',...totals,'callback_open','error','rows'];
+ if(!exact(v,keys)||v.schema!=='melee-web-natural-one-tick-enrollment-v1'||v.copied!==true||v.state!==3||v.callback_open!==false||v.error!==''||
+    v.minimum_frame!==180||v.maximum_frame!==240||v.row_capacity!==61||!u(v.origin_frame)||v.origin_frame!==originFrame||v.origin_frame<180||v.origin_frame>240||
+    !u(v.selected_frame)||v.selected_frame<v.origin_frame||v.selected_frame>240||!u(v.owner_generation)||!u(v.origin_audio_phase)||v.origin_audio_phase>=60||
+    !u(v.row_count)||v.row_count<1||v.row_count>61||!Array.isArray(v.rows)||v.rows.length!==v.row_count||!totals.every(k=>wide(v[k])))return fail();
+ if(v.owner_generation!==receipt?.owner_generation||v.selected_frame!==receipt?.requested_source_frame||v.selected_frame!==receipt?.source_frame_before||
+    receipt?.source_frame_after!==v.selected_frame+1||!['planned_steps','tick_returns','draw_returns','callback_steps','callback_draws'].every(k=>receipt?.[k]===1))return fail();
+ const z=k=>BigInt(v[k]);
+ if(z('callback_sequence')===0n||z('selection_callback')!==z('callback_sequence')||z('skipped_callbacks')+1n!==z('callback_sequence')||
+    z('source_free_callbacks')+BigInt(v.row_count)!==z('callback_sequence')||BigInt(v.selected_frame-v.origin_frame)!==z('skipped_ticks'))return fail();
+ let frame=v.origin_frame,last=0n,ticks=0n,draws=0n,audio=0n,pcm=0n;
+ const rowKeys=['callback_sequence','source_before','source_after','planned_steps','planned_audio_steps','tick_returns','draw_returns','audio_returns','pcm_frames','audio_phase_before','audio_phase_after','selected'];
+ for(let i=0;i<v.rows.length;++i){const row=v.rows[i],selected=i===v.rows.length-1;
+  if(!exact(row,rowKeys)||!wide(row.callback_sequence)||BigInt(row.callback_sequence)<=last||BigInt(row.callback_sequence)>z('selection_callback')||row.selected!==selected||
+     !rowKeys.filter(k=>!['callback_sequence','selected'].includes(k)).every(k=>u(row[k]))||row.source_before!==frame||row.source_after!==frame+row.tick_returns||
+     row.tick_returns<1||row.planned_steps<1||row.planned_steps>8||row.tick_returns>row.planned_steps||row.draw_returns>row.tick_returns||
+     row.planned_audio_steps>8||row.audio_returns!==row.planned_audio_steps||row.audio_phase_before>=60||row.audio_phase_after>=60||
+     row.pcm_frames!==Math.floor((row.audio_phase_before+32000*row.audio_returns)/60)||row.audio_phase_after!==(row.audio_phase_before+32000*row.audio_returns)%60)return fail();
+  if(selected){
+   if(BigInt(row.callback_sequence)!==z('selection_callback')||row.planned_steps!==1||row.tick_returns!==1||row.draw_returns!==1||row.source_before!==v.selected_frame||
+      row.audio_phase_before!==receipt.audio_phase_before||row.audio_phase_after!==receipt.audio_phase_after||row.audio_returns!==receipt.audio_returns||row.pcm_frames!==receipt.pcm_frames)return fail();
+  }else{if(row.planned_steps===1)return fail();ticks+=BigInt(row.tick_returns);draws+=BigInt(row.draw_returns);audio+=BigInt(row.audio_returns);pcm+=BigInt(row.pcm_frames);}
+  frame=row.source_after;last=BigInt(row.callback_sequence);
+ }
+ if(ticks!==z('skipped_ticks')||draws!==z('skipped_draws')||audio+z('source_free_audio')!==z('skipped_audio')||pcm+z('source_free_pcm_frames')!==z('skipped_pcm_frames')||
+    z('skipped_pcm_frames')!==(BigInt(v.origin_audio_phase)+32000n*z('skipped_audio'))/60n||
+    BigInt(receipt.audio_phase_before)!==(BigInt(v.origin_audio_phase)+32000n*z('skipped_audio'))%60n)return fail();
+ return [];
 }

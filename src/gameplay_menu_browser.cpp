@@ -1775,6 +1775,9 @@ void tick(){
  #if defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
  if(first_pair_plan_capture_enabled)first_pair_source_planned_steps=elapsed.steps;
 #endif
+#if defined(MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC)
+ frame_effect_native_plan(elapsed.steps,audio_elapsed.steps,elapsed.stalled||audio_elapsed.stalled,audio_before_construction);
+#endif
   if(elapsed.stalled){running=false;message="Paused after a timing disruption. Resume to continue.";}
   if(elapsed.steps&&transition_audio_continues){
    transition_audio_continues=false;

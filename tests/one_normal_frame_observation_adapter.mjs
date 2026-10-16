@@ -318,6 +318,9 @@ export async function observeOneNormalFrame({
       producerBinding.profile!=='runtime-match-frame-effect Release --first-draw-components-diagnostic')){
     result.status='failed';result.failures.push('component_private_profile_required');result.arm_attempt='not_dispatched';return result;
   }
+  if(driver.naturalOneEligibility===true&&(typeof driver.observeSelectedTextureInterval!=='function'||typeof driver.naturalOneEnrollmentFailures!=='function')){
+    result.status='failed';result.failures.push('natural_one_private_interval_required');result.arm_attempt='not_dispatched';return result;
+  }
   if(typeof driver.observeSelectedTextureInterval==='function'&&!components){
     result.status='failed';result.failures.push('selected_texture_interval_requires_components');result.arm_attempt='not_dispatched';return result;
   }
@@ -330,6 +333,7 @@ export async function observeOneNormalFrame({
       minimumFrame: NORMAL_MATCH_FRAME_WINDOW.minimum,
       maximumFrame: NORMAL_MATCH_FRAME_WINDOW.maximum,
       componentEligibility:components,
+      ...(driver.naturalOneEligibility===true?{naturalOneEligibility:true}:{}),
     }), armTimeoutMs, 'arm');
   } catch (error) {
     result.status = 'failed';
@@ -358,6 +362,9 @@ export async function observeOneNormalFrame({
       result.runtime_callback_identity, result.runtime_callback_identity_scope);
     return result;
   }
+  if(driver.naturalOneEligibility===true&&(arm.selection_pending!==true||arm.enrollment_mode!=='naturally_due_one_tick')){
+    result.status='failed';result.failures.push('natural_one_request_response_malformed');return result;
+  }
   result.callback_state = 'waiting_for_callback_return';
   try {
     await boundedTransport(async () => {
@@ -381,7 +388,7 @@ export async function observeOneNormalFrame({
   let observation = null;
   while (Date.now() < fenceDeadline) {
     try {
-      observation = await boundedTransport(() => page.evaluate(driver.readNativeFrameEffect),
+      observation = await boundedTransport(() => page.evaluate(driver.readNativeFrameEffect,driver.naturalOneEligibility===true?{naturalOneEligibility:true}:undefined),
         Math.max(1, fenceDeadline - Date.now()), 'normal fence');
     }
     catch (error) {
@@ -421,7 +428,13 @@ export async function observeOneNormalFrame({
       nativeReceipt.requested_source_frame < NORMAL_MATCH_FRAME_WINDOW.minimum ||
       nativeReceipt.requested_source_frame > NORMAL_MATCH_FRAME_WINDOW.maximum)
     result.observation_failures.push('armed_source_frame_outside_window');
-  if (!Number.isInteger(result.requested_source_frame) ||
+  if(driver.naturalOneEligibility===true){
+    result.selection_origin_frame=result.requested_source_frame;
+    result.selection_enrollment=observation.enrollment;
+    result.selection_enrollment_failures=driver.naturalOneEnrollmentFailures(observation.enrollment,nativeReceipt,{originFrame:result.selection_origin_frame});
+    result.observation_failures.push(...result.selection_enrollment_failures);
+    if(!result.selection_enrollment_failures.length)result.requested_source_frame=observation.enrollment.selected_frame;
+  }else if (!Number.isInteger(result.requested_source_frame) ||
       nativeReceipt?.requested_source_frame !== result.requested_source_frame)
     result.observation_failures.push('armed_source_frame_mismatch');
 

@@ -1,4 +1,6 @@
 import vm from 'node:vm';
+import {naturalOneEnrollmentFailures} from './match_frame_effect_first_draw_driver.mjs';
+import {naturalEnrollmentFixture,enrolledOuterJoin} from './natural_one_tick_enrollment_fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
@@ -240,4 +242,26 @@ for(const mode of ['closed','refused','malformed','response-lost'])test('selecte
  assert(calls.indexOf('strict-component-validate')<calls.indexOf('selected-interval'));
  if(mode==='closed'){assert.equal(result.status,'pass');assert.equal(result.native_retired,true);assert(calls.indexOf('selected-interval')<calls.indexOf('retire-evaluate'));}
  else{assert.equal(result.status,'failed');assert.equal(result.native_retired,false);assert.equal(result.cleanup_policy,'browser_owner_only');assert(!calls.includes('retire-evaluate'));assert(result.failures.includes(mode==='response-lost'?'selected_texture_interval_response_lost_or_failed':'selected_texture_interval_refused_or_malformed'));}
+});
+
+// Actual adapter origin/selected join, declared synthetic endpoints; no timing/GPU claim.
+for(const mode of ['selected','malformed','callback-lost'])test('natural enrollment '+mode+' keeps origin distinct and uncertainty browser-only',async()=>{
+ const {page,calls}=setupPage({waitFails:mode==='callback-lost',statusTransform:value=>{
+  Object.assign(value,enrolledOuterJoin(200));value.selected_source_frame=203;value.unobserved_draws=0;return value;}});
+ const binding=validProducerBinding();binding.profile='runtime-match-frame-effect Release --first-draw-components-diagnostic';
+ await installRecorder(page,{...identityArgs(),producerBinding:binding});
+ const synthetic={...driver,naturalOneEligibility:true,naturalOneEnrollmentFailures,
+  armNativeFrameEffect:()=>({armed:true,match:{frame:200},selection_pending:true,enrollment_mode:'naturally_due_one_tick'}),
+  readNativeFrameEffect:()=>{calls.push('selected-read');const status=JSON.parse(globalThis.Module._melee_web_native_menu_frame_effect_status());return {settled:true,completed:true,status,enrollment:mode==='malformed'?{copied:true}:naturalEnrollmentFixture(200)};},
+  readFrameComponents:()=>{calls.push('component-read');return {component_only:true,depth_before:{sequence:3}};},
+  armFrameComponents:()=>({schema:'melee-web-first-draw-components-arm-v1',status:'armed',same_module:true,returned_idle:true,composite_eligible:false,depth_after:{}}),
+  componentObservationFailures:()=>[],
+  observeSelectedTextureInterval:async()=>{calls.push('selected-interval');return {schema:'melee-web-selected-texture-interval-observation-v1',status:'closed',composite_eligible:false,started:{status:'active'},ended:{status:'closed'},failures:[]};}};
+ const result=await observeOneFirstDraw(args(page,{driver:synthetic,producerBinding:binding}));
+ if(mode==='selected'){
+  assert.equal(result.status,'pass');assert.equal(result.selection_origin_frame,200);assert.equal(result.requested_source_frame,202);assert.equal(result.native_retired,true);
+ }else{
+  assert.equal(result.status,'failed');assert.equal(result.cleanup_policy,'browser_owner_only');assert.equal(result.native_retired,false);assert(!calls.includes('component-read'));assert(!calls.includes('selected-interval'));assert(!calls.includes('retire-evaluate'));
+  if(mode==='callback-lost')assert(!calls.includes('selected-read'));else assert(result.selection_enrollment_failures.includes('natural_one_enrollment_receipt'));
+ }
 });
