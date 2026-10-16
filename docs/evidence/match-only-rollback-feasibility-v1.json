@@ -1467,7 +1467,7 @@
     ]
   },
   "drawn_synctest_sprint": {
-    "status": "Depth no-work component validated; first-draw component controls and four Release builds pass at 9a22eec3, with full regression pending; first-draw browser observation and restore remain open.",
+    "status": "Selected-texture continuous-interval guard source and isolated real-GPU component pass at 635fc17; actual-game interval, gameplay admission and restore remain open.",
     "artifact_run": "rollback-stadium-sprint-20261013-111001-9f8df4a4",
     "source": "a34d5acfa540af173d97679f7c54650ac577930a",
     "private_build_source_patch_sha256": "e932d6e21be0960b16160b0f77b81aa874b30976e899ce09848c406493a9bf61",
@@ -1539,7 +1539,7 @@
       "source_and_runtime_unchanged": true,
       "h1": "No forced timing pause reported; recorder retained seven reason-code7 incidents, no dropped incidents, 7998 evicted samples, and zero match source steps. Not a match timing result."
     },
-    "next": "Use the retained first-draw attachment and sampled-input lineage to close bounded renderer-content prerequisites. Existing native readiness/depth component facts are non-atomic; sampled protection, device/host futures, native refs and actual restore/repeat remain open. No unchanged observation capture.",
+    "next": "The 1f74 harness closed the packet transcript completeness/replay requirement. Before any new actual-game capture, reduce and review native enrollment for a naturally one-step callback in the existing 180\u2013240 source-frame window. Preserve every nonselected tick, draw, audio return and source order; do not force a step count, reset clocks, or change legacy 1\u20138 step behavior. Keep gameplay admission false and preserve LOAD/content, native-reference, host-asynchronous and restore blockers; do not repeat the isolated GPU component run.",
     "scope": "Observer and idle predicates are prerequisites only. No same-instance drawn restore, minimum complete state size or combined seven-tick budget result.",
     "hps_quiescence_controls": {
       "result": "pass-focused-component-only",
@@ -3174,6 +3174,405 @@
         "headless": true,
         "speaker_output": "muted; audio processing retained"
       }
+    },
+    "selected_texture_continuous_interval_component": {
+      "state": "PASS_ISOLATED_REAL_GPU_COMPONENT_ACTUAL_GAME_ATTEMPT_REFUSED_BEFORE_INTERVAL",
+      "scope": "Private selected-texture guard component only. The first actual-game callback was refused at the exact one-tick/draw gate before any selected-texture interval; no gameplay admission, GPU/content ownership closure, Wasm restore, or rollback acceptance is established.",
+      "source": {
+        "commit": "635fc17b759991b4f26d8901007d5663ea0ceb37",
+        "tree": "7f5fe1997b3f47c10b40a790cb24ddbab61e722a",
+        "aurora_actual_tree": "19cea02f04e6b961a516c1346d4d25a73cd2e80d",
+        "canonical_aurora_patch_sha256": "ba8e57fe56f50ffe35becd55ba04f9127f5835c2ece24da67337add0501fad3c",
+        "candidate_manifest": {
+          "artifact": "selected-texture-continuous-interval-candidate-v5/manifest.json",
+          "bytes": 6430,
+          "sha256": "76f26f5ae9310587f88734d80aee0dceccd03da149f0c419a1f39f74ba8b069d"
+        },
+        "integration_receipt": {
+          "artifact": "selected-texture-continuous-interval-candidate-v5/integration-v1/result.json",
+          "bytes": 10483,
+          "sha256": "8ab40aa98bafea3feb7e6a860bad5af30400fa9e0b9f1634bff9cf68a4652bef"
+        },
+        "candidate_patch_sha256": "613ada0fa199440635fe174bbc5015f6436dfda5f4fc032599a58a2d8111f882"
+      },
+      "focused_controls": {
+        "actual_project_tu": {
+          "artifact": "selected-texture-continuous-interval-candidate-v5/execution-reduced-project-v1/root-result-review.json",
+          "bytes": 1245,
+          "sha256": "219f1f8bcb733c660e4de368c9bf4e7f2e98b4620eead5a4ed6ed19342c537c3"
+        },
+        "remaining_actual_integration_controls": {
+          "artifact": "selected-texture-continuous-interval-candidate-v5/execution-stage2-remaining-v1/root-result-review.json",
+          "bytes": 759,
+          "sha256": "4a74296a4d9789cc3d2ba87d24c2f0dfae6fc4d1361ec90d43e7da7c38b69b5c"
+        },
+        "remaining_controls_summary": {
+          "artifact": "selected-texture-continuous-interval-candidate-v5/execution-stage2-remaining-v1/run/summary.json",
+          "bytes": 7691,
+          "sha256": "fff50482f1cae9d23fca8ecba09db4934ff6776e30dd5da462645f6627e44400"
+        },
+        "scope": "Actual project/GX syntax and object-symbol joins, issuer, ordinary/OFF projections, and private canonical reconstruction; no gameplay capture."
+      },
+      "validation": {
+        "state": "PASS_FIVE_RELEASE_BUILDS_AND_FULL_REGRESSION",
+        "result": {
+          "artifact": "net-selected-texture-continuous-interval-validation-v1/evidence/result.json",
+          "bytes": 68613,
+          "sha256": "db3b3550be444453102f113bb8d0d49f1a5759a0c49508f2e35a5e5a51646741"
+        },
+        "root_review": {
+          "artifact": "net-selected-texture-continuous-interval-validation-v1/evidence/root-final-review.json",
+          "bytes": 2561,
+          "sha256": "fadc97ad999101a13bfce5aeba73e73a7f85dd227cbf28391d547b355771e667"
+        },
+        "builds_review_before_suite_completion": {
+          "artifact": "net-selected-texture-continuous-interval-validation-v1/evidence/root-builds-review.json",
+          "bytes": 1608,
+          "sha256": "952a810f35abfb5eccb391a4af9ed56290fd90e14058ccb27fb2cc40805d7511"
+        },
+        "release_builds": [
+          {
+            "name": "isolated-selected-texture-guard-release-build",
+            "artifact": {
+              "artifact": "net-selected-texture-continuous-interval-validation-v1/evidence/isolated-selected-texture-guard-release-build.json",
+              "bytes": 2948,
+              "sha256": "e051c456f3d136be9d540c0d263d7bdf53eb833ac0bcbedfcba0bccf98d856e2"
+            },
+            "inventory_files": 2,
+            "elapsed_seconds": 15.762,
+            "owned_process_group_absent": true
+          },
+          {
+            "name": "first-draw-components-release-build",
+            "artifact": {
+              "artifact": "net-selected-texture-continuous-interval-validation-v1/evidence/first-draw-components-release-build.json",
+              "bytes": 9961,
+              "sha256": "1b7a75c80a0ca0b61d59e75f30154d30724d66c1cab2de585eda4822520f971b"
+            },
+            "inventory_files": 44,
+            "elapsed_seconds": 30.878,
+            "owned_process_group_absent": true
+          },
+          {
+            "name": "ordinary-release-build",
+            "artifact": {
+              "artifact": "net-selected-texture-continuous-interval-validation-v1/evidence/ordinary-release-build.json",
+              "bytes": 9804,
+              "sha256": "7aa845d36361b1b2783a41d3d11466bfc6ce073b2fb5b545d5db6d6020ac6bf7"
+            },
+            "inventory_files": 44,
+            "elapsed_seconds": 30.119,
+            "owned_process_group_absent": true
+          },
+          {
+            "name": "frame-effect-release-build",
+            "artifact": {
+              "artifact": "net-selected-texture-continuous-interval-validation-v1/evidence/frame-effect-release-build.json",
+              "bytes": 9825,
+              "sha256": "8678252c4039790ed91f2659bd3cd6be90dd86eadb683ef418be898ad41440bd"
+            },
+            "inventory_files": 44,
+            "elapsed_seconds": 32.6,
+            "owned_process_group_absent": true
+          },
+          {
+            "name": "combined-first-pair-release-build",
+            "artifact": {
+              "artifact": "net-selected-texture-continuous-interval-validation-v1/evidence/combined-first-pair-release-build.json",
+              "bytes": 10233,
+              "sha256": "3f20b3b6eda54f5536af5876aeae3eacc2890a49fbf42ab62d2fed3eb670bb0f"
+            },
+            "inventory_files": 46,
+            "elapsed_seconds": 32.41,
+            "owned_process_group_absent": true
+          }
+        ],
+        "full_unittest_receipt": {
+          "artifact": "net-selected-texture-continuous-interval-validation-v1/evidence/full-unittest-suite.json",
+          "bytes": 2256,
+          "sha256": "82ff35aa700f689ff50ae83f57116585b916ba20ab46ec83ce30a4888d04ecf2"
+        },
+        "tests": 2440,
+        "skips": 164,
+        "suite_elapsed_seconds": 567.803,
+        "artifacts_rehashed": 180,
+        "all_owned_process_groups_absent": true,
+        "actual_checkout_focused_commands": [
+          {
+            "name": "actual-checkout-firstdraw-normal-js-controls",
+            "log_sha256": "0241660e31da99ac04041407ead67f9b2bd27338bde9e8fa62f21514169906fb",
+            "elapsed_seconds": 0.245,
+            "exit_code": 0
+          },
+          {
+            "name": "actual-checkout-private-build-routing",
+            "log_sha256": "12a7ae8fba3f556c3f974b60b81e5908859cefcfcb39d131a2cdaa9ff0801fb0",
+            "elapsed_seconds": 0.09,
+            "exit_code": 0
+          },
+          {
+            "name": "actual-checkout-frameeffect-cmake-routing",
+            "log_sha256": "280f58f9f9e3736b42b081193c30f21b83bf31a551a7616239525c99d90c23dd",
+            "elapsed_seconds": 1.099,
+            "exit_code": 0
+          }
+        ]
+      },
+      "isolated_real_gpu_capture_v6": {
+        "state": "PASS_ROOT_AND_INDEPENDENT_REVIEW_COMPONENT_ONLY",
+        "report": {
+          "artifact": "texture-readonly-real-gpu-capture-v6/browser-run/report.json",
+          "bytes": 39914,
+          "sha256": "e824477ccb51aa2478fbcf116d04a9727f6e0938c1d11166b21539d0007afa56"
+        },
+        "owner": {
+          "artifact": "texture-readonly-real-gpu-capture-v6/owner.json",
+          "bytes": 142956,
+          "sha256": "75f85de4c7ab4e9564cbd9babde632c3d79d960b55e19b76ee3df2a53e5ba279"
+        },
+        "root_review": {
+          "artifact": "texture-readonly-real-gpu-capture-v6/root-result-review.json",
+          "bytes": 1419,
+          "sha256": "a30067501ed0643a86316193b93efe4db37511a314b2dd40c1723bce65b69791"
+        },
+        "independent_review": {
+          "artifact": "texture-readonly-real-gpu-capture-v6-independent-review-v1/review.json",
+          "bytes": 4272,
+          "sha256": "5028e479cb42203b2a04df8af70f29235978a3179f1a23c82c1834bd0e787cdb"
+        },
+        "process_trace": {
+          "artifact": "texture-readonly-real-gpu-capture-v6/browser-processes.jsonl",
+          "bytes": 120163,
+          "sha256": "63f923201e3f002e6b93b0e363ad80dbbd020c86aaf3e2a7467989a1f36c1893"
+        },
+        "source_runtime_head": "635fc17b759991b4f26d8901007d5663ea0ceb37",
+        "probe_js_sha256": "b66d6d1b37f5270e00a6580e15b778db2ee97ff659d2e4e3331d84f02222eb37",
+        "probe_wasm_sha256": "6f9a347c266888625033339b794fb9ac0a61cd7fd732faba399f3140db0e34e9",
+        "cases": [
+          "positive",
+          "preissue-buffer",
+          "preissue-encoder",
+          "import-preinstall-buffer",
+          "import-preinstall-encoder",
+          "close-before-end",
+          "submit-after-end"
+        ],
+        "negative_codes": [
+          "PREISSUE_COMMAND_BUFFER",
+          "PREISSUE_OR_FOREIGN_ENCODER",
+          "UNKNOWN_COMMAND_BUFFER",
+          "UNKNOWN_ENCODER",
+          "CLOSE_STATE",
+          "COMPONENT_QUEUE_PHASE"
+        ],
+        "adapter": {
+          "classification": "Apple Metal 3 / ANGLE Metal on Apple M4; all seven cases used actual non-fallback adapter",
+          "vendor": "apple",
+          "architecture": "metal-3",
+          "is_fallback_adapter": false
+        },
+        "positive_readback": {
+          "legs": 2,
+          "bytes_each": 64,
+          "both_equal_expected": true,
+          "sha256_each": "049b4074a769ef4ea3c085447bda41c242f8e6f547968048724d38dd000b83da"
+        },
+        "errors": {
+          "page_console_uncaptured_validation": "zero for all seven cases",
+          "device_lost": "The positive fixture records destroyed only after component close and intentional fixture teardown; this is not device-loss robustness evidence."
+        },
+        "cleanup": {
+          "owner_result": "pass",
+          "browser_pid_records": 18,
+          "all_recorded_browser_pids_absent": true,
+          "owned_process_groups": [
+            30960,
+            30962
+          ],
+          "owned_process_groups_absent": true
+        },
+        "scope": "Isolated WebGPU component only; no gameplay, actual match texture, actual-game interval, Wasm restore or composite admission. Six terminal failures refused close/dispatch; imported-object negatives note bookkeeping may already have changed."
+      },
+      "retained_source_and_syntax_attempts": [
+        {
+          "stage": "v3 stage1 external source overlay",
+          "artifact": "selected-texture-continuous-interval-candidate-v3/execution-stage1-v1/run/root-failure-review.json",
+          "bytes": 522,
+          "sha256": "06edfabc017cf3de00b5e44d625f5e6e926e3e9e300517ecf665cac6a03d8a43",
+          "finding": "The overlay omitted aurora_browser_future_owner_accessor_library.js; failure preceded new controls and the remaining five commands were unrun.",
+          "candidate_manifest": {
+            "artifact": "selected-texture-continuous-interval-candidate-v3/manifest.json",
+            "bytes": 6294,
+            "sha256": "49d1b1cdf68274211302777b46428895ccd739cb49a6977f4c86baf7ed9b05a9"
+          },
+          "candidate_patch_sha256": "cbd17c92924c705c769cbcf2dd9326e7ac37b34aa6acaeff93c3052eb1333d82"
+        },
+        {
+          "stage": "v3 stage2 source-overlay project TU",
+          "artifact": "selected-texture-continuous-interval-candidate-v3/execution-stage2-v1/root-failure-review.json",
+          "bytes": 656,
+          "sha256": "a6abf35219f57d3a84fdb0f049154e65984234ff06d5c6e6d15c86b5f1479476",
+          "finding": "The overlay omitted ../tests/native_menu_fighter_input.h; actual project syntax stopped before integration assertions.",
+          "candidate_manifest": {
+            "artifact": "selected-texture-continuous-interval-candidate-v3/manifest.json",
+            "bytes": 6294,
+            "sha256": "49d1b1cdf68274211302777b46428895ccd739cb49a6977f4c86baf7ed9b05a9"
+          },
+          "candidate_patch_sha256": "cbd17c92924c705c769cbcf2dd9326e7ac37b34aa6acaeff93c3052eb1333d82"
+        },
+        {
+          "stage": "v3 stage2 actual project TU",
+          "artifact": "selected-texture-continuous-interval-candidate-v3/execution-stage2-v2/root-failure-review.json",
+          "bytes": 616,
+          "sha256": "8b2cac7c36d70df4e8f3e6e58e616bdabefb926bdeb73bc98c06cf42c2bebe3c",
+          "finding": "The candidate GX header introduced a private Abseil dependency absent from the actual project compile row.",
+          "candidate_manifest": {
+            "artifact": "selected-texture-continuous-interval-candidate-v3/manifest.json",
+            "bytes": 6294,
+            "sha256": "49d1b1cdf68274211302777b46428895ccd739cb49a6977f4c86baf7ed9b05a9"
+          },
+          "candidate_patch_sha256": "cbd17c92924c705c769cbcf2dd9326e7ac37b34aa6acaeff93c3052eb1333d82"
+        },
+        {
+          "stage": "v4 reduced actual project TU",
+          "artifact": "selected-texture-continuous-interval-candidate-v4/execution-reduced-project-v1/root-failure-review.json",
+          "bytes": 655,
+          "sha256": "a854860822306a6a6dabdf5e674eb4d8940a83f8c75adcf9a2c5e79029296f85",
+          "finding": "The thin declaration fix still lacked the explicit observer definition header; compiler reported an incomplete nested witness and missing getter declaration.",
+          "candidate_manifest": {
+            "artifact": "selected-texture-continuous-interval-candidate-v4/manifest.json",
+            "bytes": 6430,
+            "sha256": "edf026064b62e795d34a1005427c668b330ec81863a48ef5325c447443956cd5"
+          },
+          "candidate_patch_sha256": "5f865d65b1539e81d1ee84d68941aead53f09972d0dd413d768adabd9b36c8ce"
+        }
+      ],
+      "actual_game_interval": {
+        "state": "ATTEMPTED_CALLBACK_REFUSED_INTERVAL_NOT_OBSERVED",
+        "candidate_manifest": {
+          "artifact": "selected-texture-actual-game-packet-candidate-v1/manifest.json",
+          "bytes": 1655,
+          "sha256": "b3454981fbe0d0364fa4cc1e4aa0d0bfe573f33bc14b21edf33ec99914015e1f"
+        },
+        "candidate_patch": {
+          "artifact": "selected-texture-actual-game-packet-candidate-v1/candidate.patch",
+          "bytes": 10686,
+          "sha256": "9faf55598c1a8133da0de1a32c92bd6bb4bbe2cceac3d26f422fb661e7a234a2"
+        },
+        "source_review": {
+          "artifact": "selected-texture-actual-game-source-review-v1/review.json",
+          "bytes": 2915,
+          "sha256": "ea46eb92b7056519bf936d7d08d054757f8db718292a5de818d7ecbafad34ef2"
+        },
+        "review_scope_note": "The packet was executed once. The requested normal callback advanced two source ticks/draws and was refused by the exact-one-tick component gate; no selected-texture interval or target-guard behavior was observed.",
+        "execution": {
+          "artifact": "selected-texture-actual-game-observation-packet-v1/capture/completion.json",
+          "bytes": 160645,
+          "sha256": "e5f776b1c566f503d89c202425c49bb6abb18bd657d32507fdd1e29b24508874",
+          "report": {
+            "artifact": "selected-texture-actual-game-observation-packet-v1/capture/browser/report.json",
+            "bytes": 1856501,
+            "sha256": "74a3ddb513f7787485794ef5e4348b97aadadab7d25f0e2d0b615396d1cbe8ca"
+          },
+          "owner_report": {
+            "artifact": "selected-texture-actual-game-observation-packet-v1/capture/owner-report.json",
+            "bytes": 77638,
+            "sha256": "e1555c1e5b6aae96a58ef1e35fa656ca84a5af79f5f95ee039db0b4f1cf30268"
+          },
+          "root_review": {
+            "artifact": "selected-texture-actual-game-observation-packet-v1/capture/root-failure-review.json",
+            "bytes": 2056,
+            "sha256": "2e878e9e0a64575304f61bb4572628e3f528edf4156dcb9fe280a4eb930e9f28"
+          },
+          "independent_review": {
+            "artifact": "selected-texture-status-draft-v2/actual-game-failure-review.json",
+            "bytes": 6002,
+            "sha256": "dee3bdbb00e6b701a02165f025c9a9251b8150459218876f24cf43114b3531bd"
+          },
+          "runtime_producer": "635fc17b759991b4f26d8901007d5663ea0ceb37",
+          "harness_head": "1f74eb2c4892296969f94cfefa8fde0f358a8b62",
+          "harness_tree": "62b6bcbc2b4e836a2080f845831acad60b96ceb1",
+          "first_failure": "component_requires_valid_exact_one_tick_draw",
+          "source_frames": [
+            181,
+            183
+          ],
+          "ticks": 2,
+          "draws": 2,
+          "selected_source_frame": 182,
+          "later_draws_unobserved": 1,
+          "renderer_event_rows": 1789,
+          "renderer_handle_rows": 269,
+          "renderer_actual_draw_rows": 246,
+          "renderer_draw_command_count": 248,
+          "renderer_first_blocker": 7,
+          "renderer_finding_mask": "167903360",
+          "renderer_submit_count": 1,
+          "renderer_successful_fence_count": 1,
+          "audio_returns": 1,
+          "pcm_frames": 533,
+          "pre_tick_audio_returns": 1,
+          "pre_tick_pcm_frames": 534,
+          "h1_callback_count": 3119,
+          "h1_retained_samples": 100,
+          "h1_dropped_samples": 3019,
+          "h1_reason_7_incidents": 8,
+          "h1_dropped_incidents": 0,
+          "page_errors": 0,
+          "timing_pauses": 0,
+          "cleanup_passed": true,
+          "browser_pid_records": 10,
+          "browser_pid_records_absent": true,
+          "capture_process_group_absent": true,
+          "server_process_group_absent": true,
+          "reviewed_process_groups_absent": [
+            68048,
+            68052,
+            68080,
+            68946
+          ],
+          "native_retirement_attempted": false,
+          "strict_replay_stderr": {
+            "artifact": "selected-texture-actual-game-observation-packet-v1/capture/strict-selected-replay.stderr",
+            "bytes": 1037,
+            "sha256": "0d5d94d9b788469417a65e077d3b161fbd77e1dca38a7cb1badb0c3876c15343"
+          },
+          "component_read_emitted": false,
+          "selected_interval_observed": false
+        }
+      },
+      "remaining_limits": [
+        "One actual-game attempt was made, but its callback failed the exact one-tick/draw gate before the selected-texture interval; no selected-resource guard behavior was observed.",
+        "No gameplay arm, Wasm snapshot/restore, source replay, pixel/PCM equality, composite eligibility, or acceptance claim.",
+        "The prior first-draw findings LOAD_ATTACHMENT (7) and COMMAND_SHAPE_MISMATCH (27) remain tied to their earlier producer; the isolated component does not alter them.",
+        "Device loss, native final release/import aliases, pending work, asynchronous host/future ownership, and full GPU reference lifetime remain open."
+      ],
+      "actual_game_harness_validation_1f74": {
+        "state": "PASS_FULL_HARNESS_REGRESSION",
+        "harness_head": "1f74eb2c4892296969f94cfefa8fde0f358a8b62",
+        "harness_tree": "62b6bcbc2b4e836a2080f845831acad60b96ceb1",
+        "runtime_producer": "635fc17b759991b4f26d8901007d5663ea0ceb37",
+        "tests": 2440,
+        "skips": 164,
+        "suite_seconds": 578.338,
+        "result": {
+          "artifact": "net-selected-texture-actual-game-harness-validation-v1/evidence/result.json",
+          "bytes": 5485,
+          "sha256": "36a5e72feed54142bc3a8d7accc0eb8a3607b5ef01f3cae72fdb90f47eb00e2c"
+        },
+        "root_review": {
+          "artifact": "net-selected-texture-actual-game-harness-validation-v1/evidence/root-final-review.json",
+          "bytes": 681,
+          "sha256": "daaf0f0b22ea931fb51c2eb79d714d1d8514d1bb2b5f46c017c35b27fb9419b9"
+        },
+        "suite_receipt": {
+          "artifact": "net-selected-texture-actual-game-harness-validation-v1/evidence/full-unittest-suite.json",
+          "bytes": 2256,
+          "sha256": "73b41d445ed354962d728f2d19d05d801f9c90ecf1507f63a996cedcfe81578e"
+        },
+        "suite_log_sha256": "804a8e06fab6b729b45c9016810e3f9d1df7364f6105d66fb844ff5c9b7410d6"
+      },
+      "artifact_run": "rollback-sprint-resume-20261014-085704-6fe33b74"
     }
   }
 }

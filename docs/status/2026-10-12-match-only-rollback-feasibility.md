@@ -502,6 +502,24 @@ The actual V5 first-draw capture observed the first naturally due callback from 
 
 The V5 root review and independent replay passed the four strict outer/component decoders. The capture owner recorded 13 owned PIDs and three owned process groups absent after cleanup. Renderer findings 7 (`LOAD_ATTACHMENT`) and 27 (`COMMAND_SHAPE_MISMATCH`) remain. This is one component observation, not a restore, GPU-content equivalence, later-draw, gameplay, or whole-session acceptance result. Composite eligibility remains false; LOAD content, sampled-texture continuous protection, device/host futures, native references, and restore remain open. Exact validation, capture, replay, and retained-failure identities are recorded under `first_draw_components_candidate_v3` and `first_draw_observation_v5` in the existing receipt.
 
+
+On October 15, the selected-texture continuous-interval guard was integrated at
+`635fc17b` (tree `7f5fe199`; Aurora tree `19cea02f`). The focused actual-TU,
+symbol and ordinary/OFF controls pass. Five Release builds pass, and the full
+regression passes 2,440 tests with 164 skips; the independent validation review
+rehashes all 180 declared artifacts. Candidate source-overlay and syntax failures
+from earlier v3/v4 attempts remain separately identified in the structured
+receipt; they were setup/compiler integration failures, not GPU behavior results.
+
+The isolated v6 real-GPU fixture also passes root and independent review: it
+uses an actual non-fallback Apple Metal 3 adapter, validates two equal 64-byte
+readbacks, and retains six distinct terminal refusal cases. Errors and owned
+process cleanup pass. This remains an isolated component result. No actual-game interval had run at the time of the v6 fixture; the first actual-game attempt is recorded below. The first-draw blockers—including findings 7 and 27 from their earlier producer—remain open. Gameplay arm and Wasm restore remain refused/unimplemented. Exact isolated build, capture, cleanup, and retained source-failure identities are recorded under `selected_texture_continuous_interval_component` in the existing receipt.
+
+The first actual-game attempt used runtime producer `635fc17b` and harness head `1f74eb2c`. The harness full regression passed 2,440 tests with 164 skips; that test identity is separate from the five Release builds above. The route reached normalized Mario-versus-Mario Final Destination VS ready at source frame 181. The requested callback advanced source frame 181→183, with two planned steps, two tick returns, and two draw returns. It selected frame 182 and left one later draw unobserved. The one-frame observer refused this callback with `component_requires_valid_exact_one_tick_draw`; it emitted no component read and did not start the selected-texture interval. The retained callback renderer packet was fenced (one submit and one successful fence), with 1,789 event rows, 269 handles, 246 actual draw rows, and first blocker `LOAD_ATTACHMENT` (7); finding mask `167903360` has bits 7, 17, 25, and 27 set. The callback returned one audio result/533 PCM frames; the separate pre-tick observation recorded one audio return/534 PCM frames. H1 recorded eight reason-7 incidents, no dropped incidents, and no timing pauses; 100 samples were retained from 3,119 callbacks, with 3,019 older samples evicted. This is a valid gate refusal, not a selected-texture guard result. The retained evidence does not establish why the callback accumulated two steps.
+
+The failed run had no page errors. Browser-owner cleanup passed: all ten recorded browser process entries were absent, and the capture, server, browser, and strict-replay process groups were absent. Native retirement was not attempted under the browser-owner-only failure policy. A secondary strict replay failed because the selected-interval schema was absent after the component gate refused. The actual selected-texture interval remains unobserved; gameplay arm, Wasm restore, and renderer-ownership closure remain unestablished. Exact capture, cleanup, suite, and retained source-failure identities are recorded under `selected_texture_continuous_interval_component` in the existing receipt.
+
 ## Slippi profile source checkpoint
 
 The [profile inventory](../investigations/SLIPPI_GAMEPLAY_PROFILE_INVENTORY.md)
