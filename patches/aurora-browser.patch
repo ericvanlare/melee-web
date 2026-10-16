@@ -4802,10 +4802,10 @@ index 0b86ffead6e8f6153d2acf52cf9daecf4f07ccfa..3904b525390161c4f457127d3a2346a6
  } // namespace aurora::gfx
 diff --git a/lib/gfx/frame_effect_observer.hpp b/lib/gfx/frame_effect_observer.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..c244799503626300a599ffbd68b63390975fff5c
+index 0000000000000000000000000000000000000000..a9b330ddf115205566ed42d8cc1905f53e03397e
 --- /dev/null
 +++ b/lib/gfx/frame_effect_observer.hpp
-@@ -0,0 +1,1824 @@
+@@ -0,0 +1,1847 @@
 +#pragma once
 +
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
@@ -4860,7 +4860,7 @@ index 0000000000000000000000000000000000000000..c244799503626300a599ffbd68b63390
 +  // rows retain their real serials; renderer begin only assigns observer epoch.
 +  void begin_persistent_attachment_lifetime(uintptr_t device) noexcept {
 +#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
-+    selectedSampledRequested_=false;selectedSampledValid_=false;selectedSampledIssued_=false;
++    clear_selected_sampled_texture();
 +    texture_readonly_guard_device_epoch_change();
 +#endif
 +    if (state_.load(std::memory_order_acquire) != AURORA_BROWSER_FRAME_EFFECT_UNUSED || attachmentActive_ || !device) {
@@ -4874,7 +4874,7 @@ index 0000000000000000000000000000000000000000..c244799503626300a599ffbd68b63390
 +  }
 +  void end_persistent_attachment_lifetime(uintptr_t device) noexcept {
 +#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
-+    selectedSampledRequested_=false;selectedSampledValid_=false;selectedSampledIssued_=false;
++    clear_selected_sampled_texture();
 +    texture_readonly_guard_device_epoch_change();
 +#endif
 +    if (!attachmentActive_ || device != attachmentDevice_) attachment_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
@@ -5000,17 +5000,33 @@ index 0000000000000000000000000000000000000000..c244799503626300a599ffbd68b63390
 +    uint64_t textureSerial=0,viewSerial=0,deviceEpoch=0,frameId=0;
 +    uint32_t slot=0,frameIndex=0;
 +  };
++  struct SelectedSampledTextureCacheKey {
++    uint32_t texObjId=0,texDataVersion=0,tlutObjId=0,tlutDataVersion=0;
++    uint64_t replacementId=0,bindGeneration=0;
++    bool valid=false;
++  };
++  void clear_selected_sampled_texture() noexcept {
++    selectedSampledRequested_=false;selectedSampledValid_=false;selectedSampledIssued_=false;
++    selectedSampledWitness_={};selectedSampledPair_={};selectedSampledCacheKey_={};
++  }
++  bool selected_sampled_texture_requested() const noexcept { return selectedSampledRequested_; }
++  bool selected_sampled_texture_cache_key(SelectedSampledTextureCacheKey& out) const noexcept {
++    out={};if((!selectedSampledValid_&&!selectedSampledIssued_)||!selectedSampledCacheKey_.valid)return false;
++    out=selectedSampledCacheKey_;return true;
++  }
 +  void request_selected_sampled_texture() noexcept {
-+    selectedSampledRequested_=true;selectedSampledValid_=false;selectedSampledIssued_=false;selectedSampledWitness_={};selectedSampledPair_={};
++    clear_selected_sampled_texture();selectedSampledRequested_=true;
 +  }
 +  void observe_selected_sampled_texture(uint32_t slot,const TextureOwnerPair& pair,uintptr_t owner,
-+      uintptr_t texture,uintptr_t view,uintptr_t queue,uint32_t frameIndex,uint64_t frameId) noexcept {
++      uintptr_t texture,uintptr_t view,uintptr_t queue,uint32_t frameIndex,uint64_t frameId,
++      const SelectedSampledTextureCacheKey* cacheKey=nullptr) noexcept {
 +    if(!selectedSampledRequested_)return;
-+    selectedSampledRequested_=false;
++    selectedSampledRequested_=false;selectedSampledCacheKey_={};
 +    if(slot>=GX_MAX_TEXMAP || !frameId || !texture_readonly_guard_owner_valid(pair,owner,texture,view,queue))return;
 +    selectedSampledPair_=pair;
 +    selectedSampledWitness_={owner,texture,view,pair.texture.device,queue,pair.texture.serial,pair.view.serial,
 +      pair.texture.deviceEpoch,frameId,slot,frameIndex};
++    if(cacheKey && cacheKey->valid)selectedSampledCacheKey_=*cacheKey;
 +    selectedSampledValid_=true;
 +  }
 +  bool selected_sampled_texture_witness(SelectedSampledTextureWitness& out) const noexcept {
@@ -5024,15 +5040,15 @@ index 0000000000000000000000000000000000000000..c244799503626300a599ffbd68b63390
 +       selectedSampledWitness_.frameId!=frameId_||frameId_!=issuingFrameId_)return false;
 +    out=selectedSampledWitness_;return true;
 +  }
-+  // The caller reborrows the current authored GX slot. A stale copied token is
-+  // never dereferenced; exact current facts must agree before the host bridge.
++  // The caller reborrows an exact still-owning cache handle. Copied identity is
++  // never dereferenced; exact live facts must agree before the host bridge.
 +  int issue_selected_sampled_texture(const TextureOwnerPair& current,uintptr_t owner,uintptr_t texture,
 +      uintptr_t view,uintptr_t queue) noexcept {
 +    if(!selectedSampledValid_)return 0;
 +    selectedSampledValid_=false; // Every issuance attempt consumes the witness.
-+    if(!selected_sampled_texture_owner_matches(current,owner,texture,view,queue))return 0;
++    if(!selected_sampled_texture_owner_matches(current,owner,texture,view,queue)){selectedSampledCacheKey_={};return 0;}
 +    const int result=issue_texture_readonly_guard(current,owner,texture,view,queue);
-+    selectedSampledIssued_=result==1;return result;
++    selectedSampledIssued_=result==1;if(!selectedSampledIssued_)selectedSampledCacheKey_={};return result;
 +  }
 +
 +  bool issued_selected_sampled_texture_witness(SelectedSampledTextureWitness& out) const noexcept {
@@ -5046,7 +5062,7 @@ index 0000000000000000000000000000000000000000..c244799503626300a599ffbd68b63390
 +#endif
 +  void detach_owned_texture_ref(uintptr_t owner,const TextureOwnerPair& pair) noexcept {
 +#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
-+    if((selectedSampledValid_||selectedSampledIssued_)&&selectedSampledWitness_.owner==owner){selectedSampledValid_=false;selectedSampledIssued_=false;}
++    if((selectedSampledValid_||selectedSampledIssued_)&&selectedSampledWitness_.owner==owner)clear_selected_sampled_texture();
 +    detach_texture_readonly_guard_host(owner);
 +#endif
 +    if(!pair.texture.valid || !pair.view.valid)return;
@@ -5142,6 +5158,9 @@ index 0000000000000000000000000000000000000000..c244799503626300a599ffbd68b63390
 +    if (capture_window_live()) fail(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
 +    // Metadata invalidation is not a native object destruction observation.
 +    warmActive_ = false;
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++    clear_selected_sampled_texture();
++#endif
 +  }
 +  void release_renderer_role(uint32_t role, size_t slot, uintptr_t owner, uintptr_t raw) noexcept {
 +    const size_t index = warm_index(role, slot);
@@ -5387,6 +5406,9 @@ index 0000000000000000000000000000000000000000..c244799503626300a599ffbd68b63390
 +    if (!firstDrawMode_ || firstDrawFinalized_ || depth_owners().pendingCount != 0) return false;
 +    const auto state = state_.load(std::memory_order_acquire);
 +    if (state != AURORA_BROWSER_FRAME_EFFECT_FENCED && state != AURORA_BROWSER_FRAME_EFFECT_FAILED) return false;
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++    clear_selected_sampled_texture();
++#endif
 +    firstDrawFinalized_ = true;
 +    return true;
 +  }
@@ -6217,6 +6239,7 @@ index 0000000000000000000000000000000000000000..c244799503626300a599ffbd68b63390
 +  }
 +  SelectedSampledTextureWitness selectedSampledWitness_{};
 +  TextureOwnerPair selectedSampledPair_{};
++  SelectedSampledTextureCacheKey selectedSampledCacheKey_{};
 +#endif
 +  friend struct BrowserFrameEffectObserverControls;
 +  struct HandleEntry { uintptr_t address = 0; uint32_t kind = 0; };
@@ -9810,7 +9833,7 @@ index 0d6a5d8ab36c7992ab98418458bb21beb178faaf..510e6e7c675bad50276fb46ced412a45
      LIKELY {
        if (detail::sBufferSize < detail::sBufferCapacity)
 diff --git a/lib/gx/gx.cpp b/lib/gx/gx.cpp
-index b12b327fe4d3276c13b23e93baca64824ed50806..4db6b4bf823bfbfe951565e53bd7f07a59d6e95c 100644
+index b12b327fe4d3276c13b23e93baca64824ed50806..b1ab7238f75876832d87f5469dfef6fc9656d65c 100644
 --- a/lib/gx/gx.cpp
 +++ b/lib/gx/gx.cpp
 @@ -1,4 +1,10 @@
@@ -9824,7 +9847,7 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..4db6b4bf823bfbfe951565e53bd7f07a
  
  #include "pipeline.hpp"
  #include "texture.hpp"
-@@ -467,6 +473,37 @@ void populate_pipeline_config(PipelineConfig& config, GXPrimitive primitive, GXV
+@@ -467,6 +473,22 @@ void populate_pipeline_config(PipelineConfig& config, GXPrimitive primitive, GXV
    };
  }
  
@@ -9836,25 +9859,10 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..4db6b4bf823bfbfe951565e53bd7f07a
 +  return gfx::detail::browser_frame_effect_observer().selected_sampled_texture_witness(out);
 +}
 +int issue_selected_sampled_texture_readonly_guard() noexcept {
-+  auto& observer=gfx::detail::browser_frame_effect_observer();
-+  gfx::detail::BrowserFrameEffectObserver::SelectedSampledTextureWitness witness{};
-+  if(!observer.submitted_selected_sampled_texture_witness(witness) || witness.slot>=MaxTextures)return 0;
-+  const auto& current=g_gxState.textures[witness.slot].ref;
-+  if(!current)return observer.issue_selected_sampled_texture({},0,0,0,0);
-+  return observer.issue_selected_sampled_texture(current->frameEffectOwnerFacts,
-+    reinterpret_cast<uintptr_t>(current.get()),reinterpret_cast<uintptr_t>(current->texture.Get()),
-+    reinterpret_cast<uintptr_t>(current->sampleTextureView.Get()),reinterpret_cast<uintptr_t>(webgpu::g_queue.Get()));
++  return texture::issue_selected_cached_texture_readonly_guard();
 +}
 +bool selected_sampled_texture_readonly_guard_current() noexcept {
-+  auto& observer=gfx::detail::browser_frame_effect_observer();
-+  // The consumed witness remains copied POD; its original slot is reborrowed.
-+  gfx::detail::BrowserFrameEffectObserver::SelectedSampledTextureWitness witness{};
-+  // This getter is deliberately independent of the consumed valid bit.
-+  if(!observer.issued_selected_sampled_texture_witness(witness)||witness.slot>=MaxTextures)return false;
-+  const auto& current=g_gxState.textures[witness.slot].ref;
-+  return current&&observer.issued_selected_sampled_texture_owner_matches(current->frameEffectOwnerFacts,
-+    reinterpret_cast<uintptr_t>(current.get()),reinterpret_cast<uintptr_t>(current->texture.Get()),
-+    reinterpret_cast<uintptr_t>(current->sampleTextureView.Get()),reinterpret_cast<uintptr_t>(webgpu::g_queue.Get()));
++  return texture::selected_cached_texture_readonly_guard_current();
 +}
 +
 +#endif
@@ -9862,7 +9870,7 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..4db6b4bf823bfbfe951565e53bd7f07a
  GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept {
    ZoneScoped;
  
-@@ -484,6 +521,21 @@ GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept {
+@@ -484,6 +506,18 @@ GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept {
      textureEntry.binding = i * 2;
      samplerEntry.binding = i * 2 + 1;
      if (tex && (info.sampledTextures[i] || info.sampledIndTextures[i])) {
@@ -9876,15 +9884,12 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..4db6b4bf823bfbfe951565e53bd7f07a
 +#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
 +      uint32_t selectedFrameIndex=0;uint64_t selectedFrameId=0;
 +      if(gfx::detail::frame_effect_recording_identity(selectedFrameIndex,selectedFrameId))
-+        gfx::detail::browser_frame_effect_observer().observe_selected_sampled_texture(i,tex.ref->frameEffectOwnerFacts,
-+          reinterpret_cast<uintptr_t>(tex.ref.get()),reinterpret_cast<uintptr_t>(tex.ref->texture.Get()),
-+          reinterpret_cast<uintptr_t>(tex.ref->sampleTextureView.Get()),reinterpret_cast<uintptr_t>(webgpu::g_queue.Get()),
-+          selectedFrameIndex,selectedFrameId);
++        texture::observe_selected_cached_texture(i,tex,selectedFrameIndex,selectedFrameId);
 +#endif
        textureEntry.textureView = tex.ref->sampleTextureView.Get();
        samplerEntry.sampler = gfx::sampler_ref(tex.get_descriptor()).Get();
      } else {
-@@ -502,6 +554,12 @@ GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept {
+@@ -502,6 +536,12 @@ GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept {
    };
  }
  
@@ -9897,7 +9902,7 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..4db6b4bf823bfbfe951565e53bd7f07a
  void initialize() noexcept {
    {
      std::array<wgpu::BindGroupLayoutEntry, MaxTextures * 2> textureEntries;
-@@ -527,10 +585,22 @@ void initialize() noexcept {
+@@ -527,10 +567,22 @@ void initialize() noexcept {
          .entries = textureEntries.data(),
      };
      sTextureBindGroupLayout = g_device.CreateBindGroupLayout(&descriptor);
@@ -9920,7 +9925,7 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..4db6b4bf823bfbfe951565e53bd7f07a
    }
    {
      constexpr wgpu::TextureDescriptor descriptor{
-@@ -540,7 +610,17 @@ void initialize() noexcept {
+@@ -540,7 +592,17 @@ void initialize() noexcept {
          .format = wgpu::TextureFormat::RGBA8Unorm,
      };
      sEmptyTexture = g_device.CreateTexture(&descriptor);
@@ -9938,7 +9943,7 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..4db6b4bf823bfbfe951565e53bd7f07a
    }
    {
      std::array<wgpu::BindGroupEntry, MaxTextures * 2> entries;
-@@ -561,24 +641,40 @@ void initialize() noexcept {
+@@ -561,24 +623,40 @@ void initialize() noexcept {
          .entries = entries.data(),
      };
      g_emptyTextureBindGroup = g_device.CreateBindGroup(&desc);
@@ -10197,11 +10202,88 @@ index 92f358b4642a7d439e66ef548deea230bb3c3539..c6683dbcd881c55b3bf20d9e12eb074a
    if (EnableDebugPrints) {
      Log.info("Generated shader (hash {:x}): {}", hash, shaderSource);
    }
+diff --git a/lib/gx/texture.cpp b/lib/gx/texture.cpp
+index a56709a9f62e77563e90a36fb3d08b6c233bff7f..9ee12215c1d238350e86cf9454c44fb8bc0efbb2 100644
+--- a/lib/gx/texture.cpp
++++ b/lib/gx/texture.cpp
+@@ -1,4 +1,7 @@
+ #include "texture.hpp"
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++#include "../gfx/frame_effect_observer.hpp"
++#endif
+ 
+ #include "../gfx/recording.hpp"
+ #include "../gfx/tex_palette_conv.hpp"
+@@ -515,6 +518,54 @@ bool use_replacement(std::optional<gfx::texture_replacement::ReplacementResult>
+ const TextureStats& texture_stats() noexcept { return s_stats; }
+ 
+ namespace texture {
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++// Private exact authored-key borrow; no resolver, sweep, reference copy or yield.
++void observe_selected_cached_texture(uint32_t slot,const gfx::TextureBind& bind,uint32_t frameIndex,uint64_t frameId) noexcept {
++  auto& observer=gfx::detail::browser_frame_effect_observer();
++  if(!observer.selected_sampled_texture_requested())return;
++  gfx::detail::BrowserFrameEffectObserver::SelectedSampledTextureCacheKey key{};
++  if(bind.ref && bind.texObj.texObjId && !bind.texObj.no_cache() && bind.generation==s_bindGeneration &&
++      !s_pendingInvalidations.load(std::memory_order_acquire) && !s_pendingCacheClears.load(std::memory_order_acquire)) {
++    const auto it=s_textureObjectCaches.find(bind.texObj.texObjId);
++    if(it!=s_textureObjectCaches.end() && it->second.handle.get()==bind.ref.get() &&
++        it->second.texDataVersion==bind.texObj.texDataVersion) {
++      const auto& entry=it->second;
++      key={bind.texObj.texObjId,entry.texDataVersion,entry.tlutObjId,entry.tlutDataVersion,
++        entry.replacementId,s_bindGeneration,true};
++    }
++  }
++  // Unsupported first candidates still consume the request. Never search later.
++  if(!bind.ref){observer.observe_selected_sampled_texture(slot,{},0,0,0,0,frameIndex,frameId);return;}
++  observer.observe_selected_sampled_texture(slot,bind.ref->frameEffectOwnerFacts,
++    reinterpret_cast<uintptr_t>(bind.ref.get()),reinterpret_cast<uintptr_t>(bind.ref->texture.Get()),
++    reinterpret_cast<uintptr_t>(bind.ref->sampleTextureView.Get()),reinterpret_cast<uintptr_t>(webgpu::g_queue.Get()),
++    frameIndex,frameId,&key);
++}
++static int selected_cached_texture_operation(bool issue) noexcept {
++  auto& observer=gfx::detail::browser_frame_effect_observer();
++  gfx::detail::BrowserFrameEffectObserver::SelectedSampledTextureWitness witness{};
++  if(issue ? !observer.submitted_selected_sampled_texture_witness(witness) :
++             !observer.issued_selected_sampled_texture_witness(witness))return 0;
++  const auto refuse=[&]() {return issue ? observer.issue_selected_sampled_texture({},0,0,0,0) : 0;};
++  gfx::detail::BrowserFrameEffectObserver::SelectedSampledTextureCacheKey key{};
++  if(!observer.selected_sampled_texture_cache_key(key) || key.bindGeneration!=s_bindGeneration ||
++      s_pendingInvalidations.load(std::memory_order_acquire) || s_pendingCacheClears.load(std::memory_order_acquire))return refuse();
++  const auto it=s_textureObjectCaches.find(key.texObjId);
++  if(it==s_textureObjectCaches.end())return refuse();
++  const auto& entry=it->second;
++  if(!entry.handle || entry.texDataVersion!=key.texDataVersion || entry.tlutObjId!=key.tlutObjId ||
++      entry.tlutDataVersion!=key.tlutDataVersion || entry.replacementId!=key.replacementId)return refuse();
++  const auto& current=entry.handle; // The existing map remains the strong owner.
++  const auto owner=reinterpret_cast<uintptr_t>(current.get());
++  const auto texture=reinterpret_cast<uintptr_t>(current->texture.Get());
++  const auto view=reinterpret_cast<uintptr_t>(current->sampleTextureView.Get());
++  const auto queue=reinterpret_cast<uintptr_t>(webgpu::g_queue.Get());
++  return issue ? observer.issue_selected_sampled_texture(current->frameEffectOwnerFacts,owner,texture,view,queue) :
++    observer.issued_selected_sampled_texture_owner_matches(current->frameEffectOwnerFacts,owner,texture,view,queue);
++}
++int issue_selected_cached_texture_readonly_guard() noexcept {return selected_cached_texture_operation(true);}
++bool selected_cached_texture_readonly_guard_current() noexcept {return selected_cached_texture_operation(false)!=0;}
++#endif
+ size_t texture_source_size(u32 format, u32 width, u32 height, u32 mipCount) noexcept {
+   if (width == 0 || height == 0 || mipCount == 0) {
+     return 0;
+@@ -725,6 +776,9 @@ void end_frame() noexcept {
+ }
+ 
+ void shutdown() noexcept {
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++  gfx::detail::browser_frame_effect_observer().clear_selected_sampled_texture();
++#endif
+   s_textureObjectCaches.clear();
+   s_tlutObjectCaches.clear();
+   s_replacementUsers.clear();
 diff --git a/lib/gx/texture.hpp b/lib/gx/texture.hpp
-index 29c9a48bfa21fe4da1f30933125ca1907393dac3..deeb0aa9b5501271e241e98bfcdb9ed5c3c0cb12 100644
+index 29c9a48bfa21fe4da1f30933125ca1907393dac3..df26dd5e5f44d3a4a97478d62c7ceb4cb9d532fb 100644
 --- a/lib/gx/texture.hpp
 +++ b/lib/gx/texture.hpp
-@@ -26,7 +26,11 @@ const TextureStats& texture_stats() noexcept;
+@@ -26,13 +26,22 @@ const TextureStats& texture_stats() noexcept;
  namespace texture {
  constexpr uint64_t ContentCacheBudgetBytes = 128ull * 1024ull * 1024ull;
  constexpr uint64_t ObjectCacheIdleFrames = 600;
@@ -10213,6 +10295,17 @@ index 29c9a48bfa21fe4da1f30933125ca1907393dac3..deeb0aa9b5501271e241e98bfcdb9ed5
  constexpr uint32_t ReplacementThumbnailDim = 64;
  constexpr uint64_t ReplacementPublishBudgetBytes = 12ull * 1024ull * 1024ull;
  
+ size_t texture_source_size(u32 format, u32 width, u32 height, u32 mipCount) noexcept;
+ size_t tlut_source_size(u16 numEntries) noexcept;
+ 
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++void observe_selected_cached_texture(uint32_t slot,const gfx::TextureBind& bind,uint32_t frameIndex,uint64_t frameId) noexcept;
++int issue_selected_cached_texture_readonly_guard() noexcept;
++bool selected_cached_texture_readonly_guard_current() noexcept;
++#endif
+ void invalidate_bindings() noexcept;
+ uint64_t current_bind_generation() noexcept;
+ void invalidate_replacement(uint64_t replacementId) noexcept;
 diff --git a/lib/internal.hpp b/lib/internal.hpp
 index d1adb6ce2e124816790f4c86e0ccc69d981ac406..eb5cbe925ba64b7b8aac8e188136a2d5f5712866 100644
 --- a/lib/internal.hpp
