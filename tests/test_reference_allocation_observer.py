@@ -142,6 +142,8 @@ struct Fixture {
                     std::string_view(kGlobals[i]) == "lbMemory_804318B0" ? 0x6f0u : 4u};
       system.memory.Write(globals[i].address, 0x1000u + static_cast<u32>(i));
     }
+    system.memory.Write(globals[7].address, globals[6].address);
+    system.memory.Write(globals[6].address, 0x89abcdefu);
     system.memory.Write(0x800000e4u, 0x80000100u);
     system.memory.Write(0x80479d58u, 1);
     system.memory.Write(0x804d7420u, 1);
@@ -433,6 +435,17 @@ int Run(std::string_view mode, const char* output) {
     assert(Observer::Finish(true));
     return 0;
   }
+  if (mode == "rng-null" || mode == "rng-outside-mem1" || mode == "rng-unaligned") {
+    const u32 pointer = mode == "rng-null" ? 0u :
+                        mode == "rng-outside-mem1" ? 0x81800000u : 0x81000601u;
+    fixture.system.memory.Write(fixture.globals[7].address, pointer);
+    fixture.cpu.pc = fixture.functions[43].address;
+    fixture.cpu.spr[8] = 0x8000beefu;
+    Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
+    assert(Observer::Error().find("metadata escaped a bounded source identity") != std::string::npos);
+    assert(!Observer::Finish(false));
+    return 0;
+  }
   const auto invoke_vs = [&](size_t index) {
     fixture.cpu.pc = fixture.functions[index].address;
     fixture.cpu.spr[8] = 0x8000beefu;
@@ -454,12 +467,25 @@ int Run(std::string_view mode, const char* output) {
     assert(Observer::Finish(false));
     return 0;
   }
-  if (mode == "vs-three-exits") {
-    for (int generation = 0; generation < 3; ++generation) {
+  if (mode == "vs-three-exits" || mode == "vs-two-exits") {
+    const int count = mode == "vs-two-exits" ? 2 : 3;
+    for (int generation = 0; generation < count; ++generation) {
       invoke_vs(43);
       invoke_vs(44);
     }
-    assert(Observer::Finish(false));
+    assert(Observer::Finish(true));
+    return 0;
+  }
+  if (mode == "vs-two-then-third") {
+    invoke_vs(43); invoke_vs(44); invoke_vs(43); invoke_vs(44);
+    assert(Observer::Finish(true));
+    std::ifstream before_file(output,std::ios::binary);
+    const std::string before((std::istreambuf_iterator<char>(before_file)),{});
+    invoke_vs(43); invoke_vs(44);
+    assert(Observer::Finish(true));
+    std::ifstream after_file(output,std::ios::binary);
+    const std::string after((std::istreambuf_iterator<char>(after_file)),{});
+    assert(!before.empty() && before==after);
     return 0;
   }
   if (mode == "vs-unmatched-exit") {
@@ -717,7 +743,8 @@ class ReferenceAllocationObserverTests(unittest.TestCase):
                          "null-state", "finish-race", "write-failure", "fighter-invalid",
                          "demo-fighter", "demo-fighter-invalid",
                          "paused-burst", "queue-overflow", "compaction-invalid",
-                         "vs-unmatched-exit", "vs-reentrant-entry", "vs-overlap-return"):
+                         "vs-unmatched-exit", "vs-reentrant-entry", "vs-overlap-return",
+                         "rng-null", "rng-outside-mem1", "rng-unaligned"):
                 checked = run_mode(mode)
                 self.assertEqual(checked.returncode, 0, f"{mode}: {checked.stderr}")
             demo_rows = [json.loads(line) for line in
@@ -865,6 +892,42 @@ class ReferenceAllocationObserverTests(unittest.TestCase):
             self.assertEqual(end["vs_exits"], 3)
             self.assertFalse(end["active_owner"])
             self.assertTrue(end["ownership_complete"])
+
+            output = temp / "vs-two-exits.jsonl"
+            checked = run_mode("vs-two-exits", MWRC_ALLOCATION_VS_TARGET="2",
+                               MWRC_ALLOCATION_STOP_AT="exit")
+            self.assertEqual(checked.returncode, 0, checked.stderr)
+            rows = [json.loads(line) for line in output.read_text().splitlines()]
+            self.assertIs(rows[0]['original_rng_scene_boundaries_v1'], True)
+            self.assertIs(rows[-1]['original_rng_scene_boundaries_v1'], True)
+            samples = [row['observed']['original_rng'] for row in rows
+                       if row.get('record') in ('enter', 'return') and
+                       row.get('function') in ('gm_Scene_Vs_OnEnter', 'gm_Scene_Vs_OnExit')]
+            self.assertEqual(len(samples), 8)
+            from tools.allocation_lifetime_replay import validate_original_rng_scene_boundaries
+            decoded = validate_original_rng_scene_boundaries(synthetic_profile(), rows[0], rows[-1], rows)
+            self.assertEqual(decoded['sample_count'], 8)
+            self.assertEqual([row['value'] for row in decoded['samples']], [0x89abcdef] * 8)
+            for sample in samples:
+                self.assertEqual(sample['pointer_slot_address'], 0x81000700)
+                self.assertEqual(sample['pointer_value'], 0x81000600)
+                self.assertEqual(sample['value_address'], 0x81000600)
+                self.assertEqual(sample['value'], 0x89abcdef)
+                self.assertEqual(sample['pointer_bytes'], [0x81, 0, 6, 0])
+                self.assertEqual(sample['value_bytes'], [0x89, 0xab, 0xcd, 0xef])
+
+            checked = run_mode("vs-three-exits",output_name="three-route-target-two.jsonl",
+                               MWRC_ALLOCATION_VS_TARGET="2",MWRC_ALLOCATION_STOP_AT="exit")
+            self.assertEqual(checked.returncode,0,checked.stderr)
+            retained=[json.loads(line) for line in (temp/"three-route-target-two.jsonl").read_text().splitlines()]
+            self.assertEqual(retained[-1]['status'],'captured')
+            self.assertEqual((retained[-1]['vs_entries'],retained[-1]['vs_exits']),(2,2))
+            from tools.allocation_lifetime_replay import validate_original_rng_scene_boundaries
+            self.assertEqual(validate_original_rng_scene_boundaries(synthetic_profile(),retained[0],retained[-1],retained)['sample_count'],8)
+
+            checked = run_mode("vs-two-then-third",MWRC_ALLOCATION_VS_TARGET="2",
+                               MWRC_ALLOCATION_STOP_AT="exit")
+            self.assertEqual(checked.returncode,0,checked.stderr)
 
             invalid = run_mode("invalid-config", MWRC_ALLOCATION_VS_TARGET="17")
             self.assertEqual(invalid.returncode, 0, invalid.stderr)

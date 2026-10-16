@@ -19,7 +19,7 @@ from tools.compaction_manager_state import FIELDS
 from tools.allocation_history_replay import ReplayProblem
 from tools.allocation_history_replay import ModelDriver
 from tools.allocation_lifetime_replay import (
-    replay_lifetimes, validate_layout, validate_metadata_shape,
+    replay_lifetimes, validate_layout, validate_metadata_shape, validate_original_rng_scene_boundaries,
 )
 
 
@@ -1286,6 +1286,66 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
         report = self._run_fighter(rows, enters, returns)
         self.assertEqual(report["status"], "validation")
         self.assertIn("fighter identity", report["first_unsupported"]["reason"])
+
+
+class OriginalRngSceneBoundaryTests(unittest.TestCase):
+    def fixture(self):
+        feature = {'original_rng_scene_boundaries_v1': True}
+        header = {**feature, 'vs_target': 2, 'stop_at': 'exit'}
+        end = {**feature, 'status': 'captured', 'vs_entries': 2, 'vs_exits': 2}
+        profile = {'globals': {'seed_ptr': {'address': 0x804d5f94}}}
+        rows = []
+        for lifetime in range(2):
+            for function in ['gm_Scene_Vs_OnEnter', 'gm_Scene_Vs_OnExit']:
+                call = len(rows) // 2
+                for phase in ['enter', 'return']:
+                    pointer = 0x804d5f90 + lifetime * 4
+                    value = 0xffffffff - len(rows)
+                    rows.append({'record': phase, 'function': function, 'sequence': len(rows),
+                        'call': call, 'thread': 0x80010000, 'machine': {'r1': 0x81700000, 'lr': 0x80012340},
+                        'observed': {'original_rng': {'pointer_slot_address': 0x804d5f94,
+                            'pointer_value': pointer, 'value_address': pointer, 'value': value,
+                            'pointer_bytes': list(pointer.to_bytes(4, 'big')),
+                            'value_bytes': list(value.to_bytes(4, 'big'))}}})
+        return profile, header, end, rows
+
+    def test_exact_eight_dynamic_pointer_and_raw_words_without_owner_stack(self):
+        result = validate_original_rng_scene_boundaries(*self.fixture())
+        self.assertEqual(result['sample_count'], 8)
+        self.assertFalse(result['all_writers_observed'])
+        self.assertEqual(result['samples'][0]['value'], 0xffffffff)
+        self.assertNotEqual(result['samples'][0]['pointer_value'], result['samples'][4]['pointer_value'])
+
+    def test_missing_order_value_and_identity_corruptions_refuse(self):
+        changes = [lambda p,h,e,r: r.pop(), lambda p,h,e,r: r.reverse(),
+            lambda p,h,e,r: h.pop('original_rng_scene_boundaries_v1'),
+            lambda p,h,e,r: e.update(original_rng_scene_boundaries_v1=False),
+            lambda p,h,e,r: r[0]['observed']['original_rng'].pop('value_bytes'),
+            lambda p,h,e,r: r[0]['observed']['original_rng'].update(extra=1),
+            lambda p,h,e,r: r[0]['observed']['original_rng'].update(pointer_slot_address=0x804d5f90),
+            lambda p,h,e,r: r[0]['observed']['original_rng'].update(pointer_value=0x80000001),
+            lambda p,h,e,r: r[0]['observed']['original_rng'].update(value_address=0x804d6000),
+            lambda p,h,e,r: r[0]['observed']['original_rng'].update(value=-1),
+            lambda p,h,e,r: r[0]['observed']['original_rng']['value_bytes'].__setitem__(0,False),
+            lambda p,h,e,r: r[0]['observed']['original_rng']['value_bytes'].__setitem__(0,0),
+            lambda p,h,e,r: r[1].update(call=999),
+            lambda p,h,e,r: r[1]['machine'].update(lr=0),
+            lambda p,h,e,r: e.update(vs_exits=1),
+            lambda p,h,e,r: r[0].update(observed=None),
+            lambda p,h,e,r: r[0].update(machine=[]),
+            lambda p,h,e,r: r[0]['observed']['original_rng'].update(pointer_slot_address=float(0x804d5f94)),
+            lambda p,h,e,r: r[0]['observed']['original_rng'].update(value_address=float(0x804d5f90))]
+        for mutate in changes:
+            with self.subTest(mutation=changes.index(mutate)):
+                args = self.fixture(); mutate(*args)
+                with self.assertRaises(ReplayProblem): validate_original_rng_scene_boundaries(*args)
+
+    def test_historical_nonfeature_is_explicit_and_cannot_hide_samples(self):
+        p,h,e,r = self.fixture()
+        del h['original_rng_scene_boundaries_v1'];del e['original_rng_scene_boundaries_v1']
+        with self.assertRaises(ReplayProblem):validate_original_rng_scene_boundaries(p,h,e,r)
+        for row in r:row['observed'].clear()
+        self.assertFalse(validate_original_rng_scene_boundaries(p,h,e,r)['observed'])
 
 
 if __name__ == "__main__":

@@ -835,5 +835,95 @@ fs.writeFileSync(path, createMeleeGCI(profile, new Date('2026-01-01T00:00:00Z'))
 
 
 
+class StadiumPrimaryThreeAllocationTwoControls(unittest.TestCase):
+    def test_existing_setup_validator_requires_explicit_stage3_two_human_baseline(self):
+        from capture_allocation_history import stadium_three_target
+        from test_retail_setup_validation import expected_setup
+        setup=expected_setup();setup.update(stage=3,match_kind=0,is_stock=False,
+            timer_enabled=True,timer_counts_up=False,time_limit_seconds=120,disable_pausing=False,item_frequency=2)
+        setup['players']=setup['players'][:2]
+        for player in setup['players']:
+            player['player_type']=0;player['stocks']=3
+            player.pop('cpu_kind',None);player.pop('cpu_level',None)
+            player['rumble_enabled']=True
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'target.json'
+            path.write_text(json.dumps({'expected_setup':setup}))
+            target=stadium_three_target(path)
+            self.assertEqual(target['source_expected_setup'],setup)
+            self.assertEqual(target['expected_setup']['stage'],3)
+            for mutation in [lambda d:d.update(stage=32),lambda d:d.update(is_teams=True),
+                             lambda d:d.update(time_limit_seconds=60),lambda d:d.update(is_stock=True),
+                             lambda d:d.update(match_kind=1),lambda d:d.update(extra=True)]:
+                changed=copy.deepcopy(setup);mutation(changed);path.write_text(json.dumps({'expected_setup':changed}))
+                with self.assertRaises(ValueError):stadium_three_target(path)
+
+    def test_actual_callback_join_refuses_attract_duplicates_or_cpu_identity_drift(self):
+        from capture_allocation_history import join_stadium_allocation_samples
+        labels=['entry','setup','vs_exit','vs_exit_return']
+        selected=[];boundaries=[]
+        for i in range(8):
+            function='gm_Scene_Vs_OnEnter' if i%4<2 else 'gm_Scene_Vs_OnExit'
+            machine={'pc':0x80010000+i*4,'scene_frame':i,'lr':0x80012000,
+                     **{'r'+str(k):k for k in range(32)}}
+            selected.append({'function':function,'record':'enter' if i%2==0 else 'return','machine':machine})
+            boundaries.append({'source_tick':i,'payload':{'boundary':labels[i%4],
+                'match_index':i//4,'pc':machine['pc'],'lr':machine['lr'],'gprs':list(range(32))}})
+        join_stadium_allocation_samples(selected,boundaries)
+        for mutate in [lambda r:r.pop(),lambda r:r.append(copy.deepcopy(r[0])),
+                       lambda r:r[0]['payload'].update(match_index=2),
+                       lambda r:r[0]['payload'].update(lr=0),
+                       lambda r:r[0].update(source_tick=99),
+                       lambda r:r[0]['payload']['gprs'].__setitem__(1,123)]:
+            with self.subTest(mutation=str(mutate)):
+                rows=copy.deepcopy(boundaries);mutate(rows)
+                with self.assertRaises(ValueError):join_stadium_allocation_samples(selected,rows)
+
+    def test_actual_rendered_route_has_no_executed_rules_detour_and_bounded_native_drain(self):
+        import ast
+        from tools.retail_allocation_menu import render_stadium_three_route_driver
+        source=render_stadium_three_route_driver();tree=ast.parse(source)
+        route=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='_cold_boot_stadium_three_route')
+        calls=[n.func.id for n in ast.walk(route) if isinstance(n,ast.Call) and isinstance(n.func,ast.Name)]
+        self.assertNotIn('_vs_rules_css_to_parent_menu',calls)
+        self.assertNotIn('set_rules_via_original_menu',calls)
+        self.assertIn('cold_boot_to_css',calls);self.assertIn('_cold_boot_enter_sss',calls)
+        self.assertIn('MELEE_STADIUM_OPERATION_DEADLINE',source)
+        self.assertIn("MWRC_STATUS",source)
+        self.assertIn("selected_stage_kind()!=3",source)
+        self.assertIn("mem(0x804D6CAE,1)[0]!=18",source)
+        self.assertEqual(source.count('\n_cold_boot_stadium_three_route()\n'),1)
+        # Execute the actual extracted route with explicit endpoint doubles;
+        # this checks host order/refusal only, never original game behavior.
+        emitted=[];state={'scene':8};expected={'time_limit_seconds':120,'item_frequency':2,'item_mask_hex':'ffffffffffffffff'}
+        players=[{'character_kind':8,'player_type':0,'stocks':3,'costume':0}]*2
+        def pulse(port,button,settle):
+            if button=='A':state['scene']=10
+            elif button=='START':state['scene']=8
+        def step(count):
+            if count==1:state['scene']=14
+        class NativeStatus:
+            def is_file(self):return True
+            def read_text(self):return '{"state":"completed","completed":true,"invalid":false}'
+        class Memory:
+            def __call__(self,address,size):
+                return bytes([18 if address==0x804D6CAE else 7 if address==0x8047C02C else 2])
+        ns={'TARGET':{'source_expected_setup':expected},'EXPECTED_STAGE':3,'EXPECTED_PLAYERS':players,
+            'EXPECTED_STOCKS':3,'EXPECTED_TIMER':2,'EXPECTED_PAUSE':1,'GM_VS':2,
+            'SCENE_CSS':8,'SCENE_VS':10,'SCENE_RESULTS':14,'VS_RESULTS_DATA_ADDRESS':0x8047C020,
+            'os':SimpleNamespace(environ={'MWRC_STATUS':'status'}),'Path':lambda _:NativeStatus(),
+            'json':json,'mem':Memory(),'_record_menu_route_marker':emitted.append,
+            'cold_boot_to_css':lambda:None,'rules_state':lambda:{'mode':0,'time_limit':2,'stock_count':3,'stock_time_limit':0,'pause':1,'item_frequency':2,'item_mask':0xffffffffffffffff},
+            '_cold_boot_enter_sss':lambda:None,'select_stage':lambda _:None,'selected_stage_kind':lambda:3,
+            'pulse':pulse,'step':step,'command':lambda *a:None,'_vs_wait_scene':lambda scene,mode:state.update(scene=scene),
+            'scene_kind':lambda:state['scene'],'_check_collector_failure':lambda:None,
+            '_vs_start_data_state':lambda:{'stage':3,**expected,'players':[{'character_kind':8,'slot_type':0,'stocks':3,'color':0}]*2+[{'slot_type':3}]*4}}
+        exec(compile(ast.Module(body=[route],type_ignores=[]),'<actual-route>','exec'),ns)
+        ns['_cold_boot_stadium_three_route']()
+        self.assertEqual([v for v in emitted if v.endswith('_returned_css')],['stadium_1_returned_css','stadium_2_returned_css','stadium_3_returned_css'])
+        ns['rules_state']=lambda:{'mode':0,'time_limit':2,'stock_count':4,'stock_time_limit':0,'pause':1,'item_frequency':2,'item_mask':0xffffffffffffffff}
+        with self.assertRaisesRegex(RuntimeError,'Owned GCI rules'):ns['_cold_boot_stadium_three_route']()
+
+
 if __name__ == "__main__":
     unittest.main()
