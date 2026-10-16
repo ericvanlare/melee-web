@@ -127,5 +127,27 @@ int main(){
 
  o->end_persistent_attachment_lifetime(12);REQUIRE(!o->issue_texture_readonly_guard(pair,91,4,8,16));
  o->begin_persistent_attachment_lifetime(12);REQUIRE(!o->issue_texture_readonly_guard(pair,91,4,8,16));
- REQUIRE(epochs==7);return 0;
+ REQUIRE(epochs==7);
+ // Actual observer submission/fence/frame join, no mirrored predicate or GPU call.
+ for(unsigned mode=0;mode<6;++mode){
+  auto selected=std::make_unique<BrowserFrameEffectObserver>();selected->begin_persistent_attachment_lifetime(12);
+  auto texture=selected->observe_owned_texture_creation(selected->TextureRefTextureRole,0,4,12,td);
+  auto current=selected->observe_owned_texture_view_creation(texture,8,4,12,nullptr);selected->bind_owned_texture_ref(91,current,4,8,0);
+  REQUIRE(selected->arm_first_draw(0,181));selected->observe_draw(0,181,0,0);
+  selected->request_selected_sampled_texture();selected->observe_selected_sampled_texture(0,current,91,4,8,16,mode==1?1:0,mode==2?182:181);
+  REQUIRE(!selected->submitted_selected_sampled_texture_witness(witness));
+  if(mode!=3)selected->observe_submit(181);
+  if(mode!=4)selected->observe_fence(181,mode!=5);
+  REQUIRE(selected->submitted_selected_sampled_texture_witness(witness)==(mode==0));
+  if(mode==0){
+   REQUIRE(witness.frameIndex==0&&witness.frameId==181);REQUIRE(selected->issue_selected_sampled_texture(current,91,4,8,16));
+   REQUIRE(selected->issued_selected_sampled_texture_witness(witness));
+   REQUIRE(selected->issued_selected_sampled_texture_owner_matches(current,91,4,8,16));
+   REQUIRE(!selected->issued_selected_sampled_texture_owner_matches(current,92,4,8,16));
+   REQUIRE(!selected->issued_selected_sampled_texture_owner_matches(current,91,5,8,16));
+   selected->detach_owned_texture_ref(91,current);REQUIRE(!selected->issued_selected_sampled_texture_witness(witness));
+   REQUIRE(!selected->issued_selected_sampled_texture_owner_matches(current,91,4,8,16));
+  }
+ }
+ std::puts("actual selected submission/frame/fence witness controls passed");return 0;
 }

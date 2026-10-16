@@ -756,7 +756,7 @@ if(MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC)
   target_include_directories(gameplay_menu_browser PRIVATE .deps/aurora)
   target_compile_definitions(gameplay_menu_browser PRIVATE MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC=1)
   string(APPEND gameplay_menu_browser_exports
-    ",_aurora_browser_depth_no_work_premain,_aurora_browser_depth_no_work_arm_component,_melee_web_native_menu_frame_effect_components")
+    ",_aurora_browser_depth_no_work_premain,_aurora_browser_depth_no_work_arm_component,_melee_web_native_menu_frame_effect_components,_melee_web_native_menu_frame_effect_issue_selected_texture")
 endif()
 if(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
   string(APPEND gameplay_menu_browser_exports

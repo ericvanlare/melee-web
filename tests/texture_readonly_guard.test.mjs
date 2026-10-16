@@ -8,11 +8,12 @@ function fixture({optin=true, deferred=false}={}) {
   // Synthetic dispatch tests only; these objects are deliberately not GPUs.
   const calls=[];let resolveFence,resolveLost;
   const fence=deferred ? new Promise(r=>{resolveFence=r;}) : Promise.resolve();
-  class GPUQueue {writeTexture(...a){calls.push(['write',this,a]);return 37;} copyExternalImageToTexture(...a){calls.push(['external',this,a]);} onSubmittedWorkDone(){calls.push(['fence',this,[]]);return fence;}}
-  class GPUCommandEncoder {copyBufferToTexture(...a){calls.push(['buffer',this,a]);} copyTextureToTexture(...a){calls.push(['texture',this,a]);}}
+  class GPUQueue {submit(...a){calls.push(['submit',this,a]);return 41;} writeTexture(...a){calls.push(['write',this,a]);return 37;} copyExternalImageToTexture(...a){calls.push(['external',this,a]);} onSubmittedWorkDone(){calls.push(['fence',this,[]]);return fence;}}
+  class GPUCommandBuffer {}
+  class GPUCommandEncoder {finish(...a){calls.push(['finish',this,a]);return new GPUCommandBuffer();} copyBufferToTexture(...a){calls.push(['buffer',this,a]);} copyTextureToTexture(...a){calls.push(['texture',this,a]);}}
   class GPUTexture {constructor(){this.usage=6;}destroy(...a){calls.push(['destroy',this,a]);}}
   class GPUTextureView {}
-  class GPUDevice {constructor(q){this.queue=q;this.lost=new Promise(r=>{resolveLost=r;});} destroy(...a){calls.push(['device-destroy',this,a]);}}
+  class GPUDevice {constructor(q){this.queue=q;this.lost=new Promise(r=>{resolveLost=r;});} createCommandEncoder(...a){calls.push(['create-encoder',this,a]);return new GPUCommandEncoder();} destroy(...a){calls.push(['device-destroy',this,a]);}}
   const types={GPUQueue,GPUCommandEncoder,GPUTexture,GPUTextureView,GPUDevice};
   const queue=new GPUQueue(),texture=new GPUTexture(),view=new GPUTextureView(),device=new GPUDevice(queue);
   const Module={__meleeWebTextureReadonlyFixtureV1:optin};
@@ -24,7 +25,7 @@ function fixture({optin=true, deferred=false}={}) {
   const issue=()=>native.issue(91,4,8,12,16,635,0,636,0,1,0);
   return {calls,context,native,api,Module,queue,texture,view,device,raw,types,issue,resolveFence,resolveLost};
 }
-async function active(options) {const f=fixture(options);assert.equal(f.issue(),1);await f.api.armFixture(f.api.capability());return f;}
+async function active(options) {const f=fixture(options);assert.equal(f.issue(),1);assert.equal(f.api.status().scope,'native-issued-unarmed-component-only');await f.api.armFixture(f.api.capability());assert.equal(f.api.status().scope,'fixture-component-only');return f;}
 function refused(f,fn,code) {
  const count=f.calls.length,dispatch=f.api.status().dispatches;
  assert.throws(fn,/texture-readonly-guard/);
@@ -144,3 +145,64 @@ console.log(`depth no-work actual factory: ${depthPassed} focused synthetic cont
  assert.equal(f.Module.__meleeWebDepthNoWorkBridgeFailureV1,true);assert.equal(f.native.observeDepthFacts(11,12,depthFacts(1)),false);++depthPassed;
 }
 console.log(`depth monotonic bridge failure control passed; total ${depthPassed}`);
+
+// Prospective selected component, synthetic objects only. No gameplay/restore.
+let intervalPassed=0;
+async function selectedActive(options){const f=fixture(options);f.issue();assert.equal(f.api.status().scope,'native-issued-unarmed-component-only');await f.api.armSelectedComponent(f.api.capability());return f;}
+{
+ const f=await selectedActive(),createArgs={label:'actual args'},finishArgs={label:'finish args'};
+ const before=f.calls.length,e=f.device.createCommandEncoder(createArgs),b=e.finish(finishArgs),list=[b];
+ assert.equal(f.queue.submit(list),41);
+ assert.deepEqual(f.calls.slice(before).map(x=>x[0]),['create-encoder','finish','submit']);
+ assert.equal(f.calls[before][1],f.device);assert.deepEqual(f.calls[before][2],[createArgs]);
+ assert.equal(f.calls[before+1][1],e);assert.deepEqual(f.calls[before+1][2],[finishArgs]);
+ assert.equal(f.calls.at(-1)[2][0],list);assert.equal(f.api.status().schema,2);
+ assert.equal(f.api.status().scope,'selected-texture-readonly-component-only');
+ assert.equal(f.api.status().endFenceComplete,false);
+ await f.api.endSelectedComponent(f.api.capability());assert.equal(f.api.status().endFenceComplete,true);
+ assert.equal(f.api.close(f.api.capability()).phase,'CLOSED');assert.equal(f.api.status().gameplayAdmission,false);++intervalPassed;
+}
+{
+ const f=fixture(),e=f.device.createCommandEncoder(),b=e.finish();f.issue();await f.api.armSelectedComponent(f.api.capability());
+ refused(f,()=>f.queue.submit([b]),'PREISSUE_COMMAND_BUFFER');++intervalPassed;
+}
+{
+ const f=fixture(),e=f.device.createCommandEncoder();f.issue();await f.api.armSelectedComponent(f.api.capability());
+ refused(f,()=>e.finish(),'PREISSUE_OR_FOREIGN_ENCODER');++intervalPassed;
+}
+{
+ const f=await selectedActive();refused(f,()=>f.queue.submit([{}]),'UNKNOWN_COMMAND_BUFFER');++intervalPassed;
+}
+{
+ const f=await selectedActive(),e=new f.types.GPUCommandEncoder();refused(f,()=>e.finish(),'UNKNOWN_ENCODER');++intervalPassed;
+}
+{
+ const f=await selectedActive(),other=new f.types.GPUDevice(new f.types.GPUQueue()),e=other.createCommandEncoder();
+ refused(f,()=>e.finish(),'PREISSUE_OR_FOREIGN_ENCODER');++intervalPassed;
+}
+{
+ const f=await selectedActive(),e=f.device.createCommandEncoder(),b=e.finish();
+ refused(f,()=>f.queue.submit({[Symbol.iterator]:function*(){yield b;}}),'SUBMIT_ARGUMENT');++intervalPassed;
+}
+{
+ const f=await selectedActive();refused(f,()=>f.api.close(f.api.capability()),'CLOSE_STATE');++intervalPassed;
+}
+{
+ const f=fixture({deferred:true});f.issue();const start=f.api.armSelectedComponent(f.api.capability());
+ assert.equal(f.api.status().phase,'COMPONENT_ARMING');
+ refused(f,()=>f.queue.submit([]),'COMPONENT_QUEUE_PHASE');f.resolveFence();await assert.rejects(start,/COMPONENT_QUEUE_PHASE/);++intervalPassed;
+}
+{
+ const f=await selectedActive();const ending=f.api.endSelectedComponent(f.api.capability());
+ assert.equal(f.api.status().phase,'COMPONENT_ENDING');
+ refused(f,()=>f.queue.submit([]),'COMPONENT_QUEUE_PHASE');await assert.rejects(ending,/COMPONENT_QUEUE_PHASE/);++intervalPassed;
+}
+{
+ const f=await selectedActive();await f.api.endSelectedComponent(f.api.capability());
+ refused(f,()=>f.queue.submit([]),'COMPONENT_QUEUE_PHASE');++intervalPassed;
+}
+{
+ const f=fixture({optin:false});f.issue();await f.api.armSelectedComponent(f.api.capability());
+ assert.equal(f.api.status().gameplayAdmission,false);await f.api.endSelectedComponent(f.api.capability());f.api.close(f.api.capability());++intervalPassed;
+}
+console.log(JSON.stringify({scope:'actual-library-selected-component-synthetic-controls',passed:intervalPassed,realGpu:false}));

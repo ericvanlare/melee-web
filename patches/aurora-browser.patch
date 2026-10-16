@@ -1747,10 +1747,10 @@ index 0000000000000000000000000000000000000000..1651745d789775ab726811e4b707f61d
 +} // namespace aurora::gfx::depth_peek
 diff --git a/lib/gfx/aurora_browser_texture_readonly_guard_library.js b/lib/gfx/aurora_browser_texture_readonly_guard_library.js
 new file mode 100644
-index 0000000000000000000000000000000000000000..f6218b44c24c980ee4cae7ccd7f64916661389a1
+index 0000000000000000000000000000000000000000..1f263274d72da8bc751854757d5087a7433555c6
 --- /dev/null
 +++ b/lib/gfx/aurora_browser_texture_readonly_guard_library.js
-@@ -0,0 +1,220 @@
+@@ -0,0 +1,299 @@
 +/* One-resource private component. This source is also evaluated unchanged by
 + * the focused controls. It is not a gameplay admission or restore service. */
 +function createAuroraTextureReadonlyGuardV1(WebGPU, Module, types) {
@@ -1827,6 +1827,13 @@ index 0000000000000000000000000000000000000000..f6218b44c24c980ee4cae7ccd7f64916
 +  const rawInternals = WebGPU.Internals;
 +  const raw = rawInternals.jsObjects;
 +  const bindings = [];
++  // Weak object provenance only: no command scan, GPU retention or native pointer.
++  const encoderBirth = new WeakMap(), bufferBirth = new WeakMap();
++  let intervalMode = 'fixture', endFenceComplete = false, commandDispatches = 0, submitChecks = 0;
++  function componentQueuePhase(receiver) {
++    if (intervalMode === 'selected' && receiver === selected.queue && phase !== 'COMPONENT_ACTIVE')
++      refuse('COMPONENT_QUEUE_PHASE',phase);
++  }
 +  const actualFence = types.GPUQueue.prototype.onSubmittedWorkDone;
 +  if(typeof actualFence!=='function')throw new Error('texture-readonly-guard: no actual queue fence');
 +  const active = () => selected && phase !== 'CLOSED';
@@ -1899,6 +1906,7 @@ index 0000000000000000000000000000000000000000..f6218b44c24c980ee4cae7ccd7f64916
 +      if (active()) {
 +        mapped(); ++attempts;
 +        if (target(this,args)) refuse('TARGET_' + name,'Before original GPU dispatch');
++        if (name === 'writeTexture' || name === 'copyExternalImageToTexture') componentQueuePhase(this);
 +      }
 +      ++dispatches;
 +      return Reflect.apply(original,this,args);
@@ -1912,6 +1920,48 @@ index 0000000000000000000000000000000000000000..f6218b44c24c980ee4cae7ccd7f64916
 +    wrap(types.GPUQueue,'copyExternalImageToTexture',(_,a)=>destination(a[1])===selected.texture);
 +  wrap(types.GPUTexture,'destroy',(self)=>self===selected.texture);
 +  wrap(types.GPUDevice,'destroy',(self)=>self===selected.device);
++  function commandDispatch(){
++    if(commandDispatches>=Number.MAX_SAFE_INTEGER)refuse('COMMAND_SEQUENCE_OVERFLOW','Host counter exhausted');
++    ++commandDispatches;
++  }
++  function commandWrapper(type,name,body) {
++    const proto=type&&type.prototype,d=proto&&Object.getOwnPropertyDescriptor(proto,name);
++    if(!d||typeof d.value!=='function'||!d.configurable)
++      throw new Error('texture-readonly-guard: unsupported method '+name);
++    const original=d.value;
++    function guarded(...args){live();if(active())mapped();return body(original,this,args);}
++    Object.defineProperty(proto,name,{get:()=>guarded,set:()=>refuse('METHOD_REPLACEMENT',name),enumerable:d.enumerable,configurable:false});
++  }
++  commandWrapper(types.GPUDevice,'createCommandEncoder',(original,self,args)=>{
++    commandDispatch();const result=Reflect.apply(original,self,args);
++    encoderBirth.set(result,Object.freeze({device:self,epoch:selected?epoch:0}));return result;
++  });
++  commandWrapper(types.GPUCommandEncoder,'finish',(original,self,args)=>{
++    const birth=encoderBirth.get(self);
++    if(active()&&(!birth||birth.epoch!==epoch||birth.device!==selected.device))
++      refuse(birth?'PREISSUE_OR_FOREIGN_ENCODER':'UNKNOWN_ENCODER','Before original finish');
++    commandDispatch();const result=Reflect.apply(original,self,args);
++    if(birth)bufferBirth.set(result,birth);return result;
++  });
++  commandWrapper(types.GPUQueue,'submit',(original,self,args)=>{
++    if(active()){
++      if(submitChecks>=Number.MAX_SAFE_INTEGER)refuse('COMMAND_SEQUENCE_OVERFLOW','Host submit counter exhausted');
++      ++submitChecks;
++      if(self!==selected.queue)refuse('SUBMIT_QUEUE_IDENTITY','Not selected queue');
++      componentQueuePhase(self);
++      const list=args[0];
++      if(args.length!==1||!Array.isArray(list))refuse('SUBMIT_ARGUMENT','Expected actual native Array');
++      for(let i=0;i<list.length;++i){
++        const entry=Object.getOwnPropertyDescriptor(list,String(i));
++        if(!entry||!('value' in entry))refuse('SUBMIT_ARGUMENT','Sparse/accessor commands');
++        const birth=bufferBirth.get(entry.value);
++        if(!birth)refuse('UNKNOWN_COMMAND_BUFFER','Before original submit');
++        if(birth.epoch!==epoch)refuse('PREISSUE_COMMAND_BUFFER','Before original submit');
++        if(birth.device!==selected.device)refuse('FOREIGN_COMMAND_BUFFER','Before original submit');
++      }
++    }
++    commandDispatch();const result=Reflect.apply(original,self,args);return result;
++  });
 +  function issue(owner, textureKey, viewKey, deviceKey, queueKey, serialLo, serialHi, viewLo, viewHi, epochLo, epochHi) {
 +    live();
 +    if (phase !== 'INSTALLED' || selected) refuse('DUPLICATE_CAPABILITY','One target per module');
@@ -1928,6 +1978,7 @@ index 0000000000000000000000000000000000000000..f6218b44c24c980ee4cae7ccd7f64916
 +    if (!(texture instanceof types.GPUTexture) || !(view instanceof types.GPUTextureView) ||
 +        !(device instanceof types.GPUDevice) || !(queue instanceof types.GPUQueue) || device.queue!==queue ||
 +        texture.usage!==6) refuse('UNSUPPORTED_NATIVE_TARGET','Requires CopyDst|TextureBinding only');
++    if(epoch>=Number.MAX_SAFE_INTEGER)refuse('EPOCH_OVERFLOW','Host epoch exhausted');
 +    ++epoch;
 +    selected=Object.freeze({owner,texture,view,device,queue,serialLo,serialHi,viewLo,viewHi,epochLo,epochHi});
 +    keys.forEach((k,i)=>bindings.push([k,values[i]]));
@@ -1956,12 +2007,40 @@ index 0000000000000000000000000000000000000000..f6218b44c24c980ee4cae7ccd7f64916
 +    catch (_) { refuse('PRIOR_QUEUE_FENCE','Actual fence rejected'); }
 +    mapped(); fenceComplete=true; phase='ACTIVE';
 +  }
++  async function armSelectedComponent(cap) {
++    live();
++    if(cap!==capability||phase!=='ISSUED')refuse('CAPABILITY_IDENTITY','Wrong or reused capability');
++    intervalMode='selected';mapped();phase='COMPONENT_ARMING';
++    try{await Reflect.apply(actualFence,selected.queue,[]);}
++    catch(_){refuse('PRIOR_QUEUE_FENCE','Actual fence rejected');}
++    mapped();
++    if(phase!=='COMPONENT_ARMING')refuse('COMPONENT_ARM_STATE',phase);
++    fenceComplete=true;phase='COMPONENT_ACTIVE';return status();
++  }
++  async function endSelectedComponent(cap) {
++    live();
++    if(cap!==capability||intervalMode!=='selected'||phase!=='COMPONENT_ACTIVE'||!fenceComplete)
++      refuse('COMPONENT_END_STATE','Not an active component interval');
++    mapped();phase='COMPONENT_ENDING';
++    try{await Reflect.apply(actualFence,selected.queue,[]);}
++    catch(_){refuse('END_QUEUE_FENCE','Actual end fence rejected');}
++    mapped();
++    if(phase!=='COMPONENT_ENDING')refuse('COMPONENT_END_STATE',phase);
++    endFenceComplete=true;phase='COMPONENT_ENDED';return status();
++  }
 +  function close(cap) {
-+    live(); if(cap!==capability || phase!=='ACTIVE' || !fenceComplete) refuse('CLOSE_STATE','Not active');
++    live();
++    if(cap!==capability||!fenceComplete||(intervalMode==='selected'?
++        phase!=='COMPONENT_ENDED'||!endFenceComplete:phase!=='ACTIVE'))
++      refuse('CLOSE_STATE','Required component fences incomplete');
 +    mapped(); phase='CLOSED'; return status();
 +  }
-+  function status() { return Object.freeze({identity:selected?Object.freeze({nativeKeys:Object.freeze(bindings.map(x=>x[0])),textureSerial:Object.freeze([selected.serialLo,selected.serialHi]),viewSerial:Object.freeze([selected.viewLo,selected.viewHi]),deviceEpoch:Object.freeze([selected.epochLo,selected.epochHi])}):null,schema:1,scope:'fixture-component-only',phase,epoch,attempts,dispatches,fenceComplete,firstFailure,gameplayAdmission:false}); }
-+  const facade=Object.freeze({capability:()=>capability,armFixture,close,status,
++  function status() { const value={identity:selected?Object.freeze({nativeKeys:Object.freeze(bindings.map(x=>x[0])),textureSerial:Object.freeze([selected.serialLo,selected.serialHi]),viewSerial:Object.freeze([selected.viewLo,selected.viewHi]),deviceEpoch:Object.freeze([selected.epochLo,selected.epochHi])}):null,schema:1,scope:phase==='ISSUED'?'native-issued-unarmed-component-only':'fixture-component-only',phase,epoch,attempts,dispatches,fenceComplete,firstFailure,gameplayAdmission:false};
++    if(intervalMode==='selected')Object.assign(value,{schema:2,scope:'selected-texture-readonly-component-only',
++      endFenceComplete,commandEpoch:epoch,commandDispatches,submitChecks});
++    return Object.freeze(value);
++  }
++  const facade=Object.freeze({capability:()=>capability,armFixture,armSelectedComponent,endSelectedComponent,close,status,
 +    armGameplay:()=>refuse('GAMEPLAY_ADMISSION_UNCLASSIFIED','Pending work/futures/native reference/restore gates remain open')});
 +  Object.defineProperty(Module,'__meleeWebTextureReadonlyGuardV1',{value:facade,writable:false,configurable:false});
 +  return Object.freeze({issue,detach,deviceEpochChange,observeDepthEvent,observeDepthFacts,webGPU:WebGPU});
@@ -4723,10 +4802,10 @@ index 0b86ffead6e8f6153d2acf52cf9daecf4f07ccfa..3904b525390161c4f457127d3a2346a6
  } // namespace aurora::gfx
 diff --git a/lib/gfx/frame_effect_observer.hpp b/lib/gfx/frame_effect_observer.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..41adb4123d29c7cec6b6039ddead9e1cd25ceac3
+index 0000000000000000000000000000000000000000..c244799503626300a599ffbd68b63390975fff5c
 --- /dev/null
 +++ b/lib/gfx/frame_effect_observer.hpp
-@@ -0,0 +1,1802 @@
+@@ -0,0 +1,1824 @@
 +#pragma once
 +
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
@@ -4781,7 +4860,7 @@ index 0000000000000000000000000000000000000000..41adb4123d29c7cec6b6039ddead9e1c
 +  // rows retain their real serials; renderer begin only assigns observer epoch.
 +  void begin_persistent_attachment_lifetime(uintptr_t device) noexcept {
 +#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
-+    selectedSampledRequested_=false;selectedSampledValid_=false;
++    selectedSampledRequested_=false;selectedSampledValid_=false;selectedSampledIssued_=false;
 +    texture_readonly_guard_device_epoch_change();
 +#endif
 +    if (state_.load(std::memory_order_acquire) != AURORA_BROWSER_FRAME_EFFECT_UNUSED || attachmentActive_ || !device) {
@@ -4795,7 +4874,7 @@ index 0000000000000000000000000000000000000000..41adb4123d29c7cec6b6039ddead9e1c
 +  }
 +  void end_persistent_attachment_lifetime(uintptr_t device) noexcept {
 +#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
-+    selectedSampledRequested_=false;selectedSampledValid_=false;
++    selectedSampledRequested_=false;selectedSampledValid_=false;selectedSampledIssued_=false;
 +    texture_readonly_guard_device_epoch_change();
 +#endif
 +    if (!attachmentActive_ || device != attachmentDevice_) attachment_reject(AURORA_BROWSER_FRAME_EFFECT_RESOURCE_ID_REUSE);
@@ -4922,7 +5001,7 @@ index 0000000000000000000000000000000000000000..41adb4123d29c7cec6b6039ddead9e1c
 +    uint32_t slot=0,frameIndex=0;
 +  };
 +  void request_selected_sampled_texture() noexcept {
-+    selectedSampledRequested_=true;selectedSampledValid_=false;selectedSampledWitness_={};selectedSampledPair_={};
++    selectedSampledRequested_=true;selectedSampledValid_=false;selectedSampledIssued_=false;selectedSampledWitness_={};selectedSampledPair_={};
 +  }
 +  void observe_selected_sampled_texture(uint32_t slot,const TextureOwnerPair& pair,uintptr_t owner,
 +      uintptr_t texture,uintptr_t view,uintptr_t queue,uint32_t frameIndex,uint64_t frameId) noexcept {
@@ -4937,24 +5016,37 @@ index 0000000000000000000000000000000000000000..41adb4123d29c7cec6b6039ddead9e1c
 +  bool selected_sampled_texture_witness(SelectedSampledTextureWitness& out) const noexcept {
 +    out={};if(!selectedSampledValid_)return false;out=selectedSampledWitness_;return true;
 +  }
++  bool submitted_selected_sampled_texture_witness(SelectedSampledTextureWitness& out) const noexcept {
++    out={};
++    if(!selectedSampledValid_||!firstDrawMode_||firstDrawFinalized_||!frameId_||
++       counts_.submitCount!=1||counts_.fenceCount!=1||counts_.fenceSuccess!=1||
++       selectedSampledWitness_.frameIndex!=frameIndex_||frameIndex_!=targetFrameIndex_||
++       selectedSampledWitness_.frameId!=frameId_||frameId_!=issuingFrameId_)return false;
++    out=selectedSampledWitness_;return true;
++  }
 +  // The caller reborrows the current authored GX slot. A stale copied token is
 +  // never dereferenced; exact current facts must agree before the host bridge.
 +  int issue_selected_sampled_texture(const TextureOwnerPair& current,uintptr_t owner,uintptr_t texture,
 +      uintptr_t view,uintptr_t queue) noexcept {
 +    if(!selectedSampledValid_)return 0;
 +    selectedSampledValid_=false; // Every issuance attempt consumes the witness.
-+    const auto& w=selectedSampledWitness_;
-+    if(owner!=w.owner || texture!=w.texture || view!=w.view || queue!=w.queue ||
-+       current.texture.serial!=w.textureSerial || current.view.serial!=w.viewSerial ||
-+       current.texture.device!=w.device || current.texture.deviceEpoch!=w.deviceEpoch ||
-+       current.texture.seal!=selectedSampledPair_.texture.seal || current.view.seal!=selectedSampledPair_.view.seal)return 0;
-+    return issue_texture_readonly_guard(current,owner,texture,view,queue);
++    if(!selected_sampled_texture_owner_matches(current,owner,texture,view,queue))return 0;
++    const int result=issue_texture_readonly_guard(current,owner,texture,view,queue);
++    selectedSampledIssued_=result==1;return result;
++  }
++
++  bool issued_selected_sampled_texture_witness(SelectedSampledTextureWitness& out) const noexcept {
++    out={};if(!selectedSampledIssued_)return false;out=selectedSampledWitness_;return true;
++  }
++  bool issued_selected_sampled_texture_owner_matches(const TextureOwnerPair& current,uintptr_t owner,
++      uintptr_t texture,uintptr_t view,uintptr_t queue) const noexcept {
++    return selectedSampledIssued_&&selected_sampled_texture_owner_matches(current,owner,texture,view,queue);
 +  }
 +
 +#endif
 +  void detach_owned_texture_ref(uintptr_t owner,const TextureOwnerPair& pair) noexcept {
 +#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
-+    if(selectedSampledValid_ && selectedSampledWitness_.owner==owner)selectedSampledValid_=false;
++    if((selectedSampledValid_||selectedSampledIssued_)&&selectedSampledWitness_.owner==owner){selectedSampledValid_=false;selectedSampledIssued_=false;}
 +    detach_texture_readonly_guard_host(owner);
 +#endif
 +    if(!pair.texture.valid || !pair.view.valid)return;
@@ -6113,7 +6205,16 @@ index 0000000000000000000000000000000000000000..41adb4123d29c7cec6b6039ddead9e1c
 +
 +private:
 +#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
-+  bool selectedSampledRequested_=false,selectedSampledValid_=false;
++  bool selectedSampledRequested_=false,selectedSampledValid_=false,selectedSampledIssued_=false;
++  bool selected_sampled_texture_owner_matches(const TextureOwnerPair& current,uintptr_t owner,
++      uintptr_t texture,uintptr_t view,uintptr_t queue) const noexcept {
++    const auto& w=selectedSampledWitness_;
++    return owner==w.owner&&texture==w.texture&&view==w.view&&queue==w.queue&&
++      current.texture.serial==w.textureSerial&&current.view.serial==w.viewSerial&&
++      current.texture.device==w.device&&current.texture.deviceEpoch==w.deviceEpoch&&
++      current.texture.seal==selectedSampledPair_.texture.seal&&current.view.seal==selectedSampledPair_.view.seal&&
++      texture_readonly_guard_owner_valid(current,owner,texture,view,queue);
++  }
 +  SelectedSampledTextureWitness selectedSampledWitness_{};
 +  TextureOwnerPair selectedSampledPair_{};
 +#endif
@@ -9709,18 +9810,21 @@ index 0d6a5d8ab36c7992ab98418458bb21beb178faaf..510e6e7c675bad50276fb46ced412a45
      LIKELY {
        if (detail::sBufferSize < detail::sBufferCapacity)
 diff --git a/lib/gx/gx.cpp b/lib/gx/gx.cpp
-index b12b327fe4d3276c13b23e93baca64824ed50806..9fdf833d941c4e5d364f2c0b715b4c1ae8e327d9 100644
+index b12b327fe4d3276c13b23e93baca64824ed50806..4db6b4bf823bfbfe951565e53bd7f07a59d6e95c 100644
 --- a/lib/gx/gx.cpp
 +++ b/lib/gx/gx.cpp
-@@ -1,4 +1,7 @@
+@@ -1,4 +1,10 @@
  #include "gx.hpp"
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++#include "selected_texture_readonly_diagnostic.hpp"
++#endif
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
 +#include "../gfx/frame_effect_observer.hpp"
 +#endif
  
  #include "pipeline.hpp"
  #include "texture.hpp"
-@@ -467,6 +470,25 @@ void populate_pipeline_config(PipelineConfig& config, GXPrimitive primitive, GXV
+@@ -467,6 +473,37 @@ void populate_pipeline_config(PipelineConfig& config, GXPrimitive primitive, GXV
    };
  }
  
@@ -9734,19 +9838,31 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..9fdf833d941c4e5d364f2c0b715b4c1a
 +int issue_selected_sampled_texture_readonly_guard() noexcept {
 +  auto& observer=gfx::detail::browser_frame_effect_observer();
 +  gfx::detail::BrowserFrameEffectObserver::SelectedSampledTextureWitness witness{};
-+  if(!observer.selected_sampled_texture_witness(witness) || witness.slot>=MaxTextures)return 0;
++  if(!observer.submitted_selected_sampled_texture_witness(witness) || witness.slot>=MaxTextures)return 0;
 +  const auto& current=g_gxState.textures[witness.slot].ref;
 +  if(!current)return observer.issue_selected_sampled_texture({},0,0,0,0);
 +  return observer.issue_selected_sampled_texture(current->frameEffectOwnerFacts,
 +    reinterpret_cast<uintptr_t>(current.get()),reinterpret_cast<uintptr_t>(current->texture.Get()),
 +    reinterpret_cast<uintptr_t>(current->sampleTextureView.Get()),reinterpret_cast<uintptr_t>(webgpu::g_queue.Get()));
 +}
++bool selected_sampled_texture_readonly_guard_current() noexcept {
++  auto& observer=gfx::detail::browser_frame_effect_observer();
++  // The consumed witness remains copied POD; its original slot is reborrowed.
++  gfx::detail::BrowserFrameEffectObserver::SelectedSampledTextureWitness witness{};
++  // This getter is deliberately independent of the consumed valid bit.
++  if(!observer.issued_selected_sampled_texture_witness(witness)||witness.slot>=MaxTextures)return false;
++  const auto& current=g_gxState.textures[witness.slot].ref;
++  return current&&observer.issued_selected_sampled_texture_owner_matches(current->frameEffectOwnerFacts,
++    reinterpret_cast<uintptr_t>(current.get()),reinterpret_cast<uintptr_t>(current->texture.Get()),
++    reinterpret_cast<uintptr_t>(current->sampleTextureView.Get()),reinterpret_cast<uintptr_t>(webgpu::g_queue.Get()));
++}
++
 +#endif
 +
  GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept {
    ZoneScoped;
  
-@@ -484,6 +506,21 @@ GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept {
+@@ -484,6 +521,21 @@ GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept {
      textureEntry.binding = i * 2;
      samplerEntry.binding = i * 2 + 1;
      if (tex && (info.sampledTextures[i] || info.sampledIndTextures[i])) {
@@ -9768,7 +9884,7 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..9fdf833d941c4e5d364f2c0b715b4c1a
        textureEntry.textureView = tex.ref->sampleTextureView.Get();
        samplerEntry.sampler = gfx::sampler_ref(tex.get_descriptor()).Get();
      } else {
-@@ -502,6 +539,12 @@ GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept {
+@@ -502,6 +554,12 @@ GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept {
    };
  }
  
@@ -9781,7 +9897,7 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..9fdf833d941c4e5d364f2c0b715b4c1a
  void initialize() noexcept {
    {
      std::array<wgpu::BindGroupLayoutEntry, MaxTextures * 2> textureEntries;
-@@ -527,10 +570,22 @@ void initialize() noexcept {
+@@ -527,10 +585,22 @@ void initialize() noexcept {
          .entries = textureEntries.data(),
      };
      sTextureBindGroupLayout = g_device.CreateBindGroupLayout(&descriptor);
@@ -9804,7 +9920,7 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..9fdf833d941c4e5d364f2c0b715b4c1a
    }
    {
      constexpr wgpu::TextureDescriptor descriptor{
-@@ -540,7 +595,17 @@ void initialize() noexcept {
+@@ -540,7 +610,17 @@ void initialize() noexcept {
          .format = wgpu::TextureFormat::RGBA8Unorm,
      };
      sEmptyTexture = g_device.CreateTexture(&descriptor);
@@ -9822,7 +9938,7 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..9fdf833d941c4e5d364f2c0b715b4c1a
    }
    {
      std::array<wgpu::BindGroupEntry, MaxTextures * 2> entries;
-@@ -561,24 +626,40 @@ void initialize() noexcept {
+@@ -561,24 +641,40 @@ void initialize() noexcept {
          .entries = entries.data(),
      };
      g_emptyTextureBindGroup = g_device.CreateBindGroup(&desc);
@@ -9864,7 +9980,7 @@ index b12b327fe4d3276c13b23e93baca64824ed50806..9fdf833d941c4e5d364f2c0b715b4c1a
    sSamplerBindGroupLayout = {};
    sTextureBindGroupLayout = {};
 diff --git a/lib/gx/gx.hpp b/lib/gx/gx.hpp
-index a97b98719ebff2914fa9e29844bbed02ae17633d..d180f628fc8caab35d153cb77b6968b009c862d2 100644
+index a97b98719ebff2914fa9e29844bbed02ae17633d..058979646e4138a0b5dbfbd09784d5ee803da7cf 100644
 --- a/lib/gx/gx.hpp
 +++ b/lib/gx/gx.hpp
 @@ -5,6 +5,9 @@
@@ -9887,15 +10003,13 @@ index a97b98719ebff2914fa9e29844bbed02ae17633d..d180f628fc8caab35d153cb77b6968b0
  void initialize() noexcept;
  void shutdown() noexcept;
  void update() noexcept;
-@@ -538,6 +544,12 @@ wgpu::RenderPipeline build_pipeline(const PipelineConfig& config, ArrayRef<wgpu:
+@@ -538,6 +544,10 @@ wgpu::RenderPipeline build_pipeline(const PipelineConfig& config, ArrayRef<wgpu:
                                      wgpu::ShaderModule shader, const char* label) noexcept;
  std::string build_shader_source(const ShaderConfig& config) noexcept;
  wgpu::ShaderModule build_shader(const ShaderConfig& config) noexcept;
 +#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
 +// Native private diagnostic interface; does not arm gameplay or certify quiescence.
-+void request_selected_sampled_texture() noexcept;
 +bool selected_sampled_texture_witness(gfx::detail::BrowserFrameEffectObserver::SelectedSampledTextureWitness& out) noexcept;
-+int issue_selected_sampled_texture_readonly_guard() noexcept;
 +#endif
  GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept;
  
@@ -10033,6 +10147,22 @@ index 1abcbd518965b15fb9de612eee2f1811402975c2..c5fe2fa3f883a092fd5590758e90c35d
  struct PipelineConfig {
    uint32_t version = GXPipelineConfigVersion;
    uint32_t msaaSamples = 1;
+diff --git a/lib/gx/selected_texture_readonly_diagnostic.hpp b/lib/gx/selected_texture_readonly_diagnostic.hpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..8423cb797226913831b724911888bc4f7f71e6ee
+--- /dev/null
++++ b/lib/gx/selected_texture_readonly_diagnostic.hpp
+@@ -0,0 +1,10 @@
++#pragma once
++
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++// Private primitive diagnostic interface; no owner types or gameplay admission.
++namespace aurora::gx {
++void request_selected_sampled_texture() noexcept;
++int issue_selected_sampled_texture_readonly_guard() noexcept;
++bool selected_sampled_texture_readonly_guard_current() noexcept;
++} // namespace aurora::gx
++#endif
 diff --git a/lib/gx/shader.cpp b/lib/gx/shader.cpp
 index 92f358b4642a7d439e66ef548deea230bb3c3539..c6683dbcd881c55b3bf20d9e12eb074afc97a775 100644
 --- a/lib/gx/shader.cpp

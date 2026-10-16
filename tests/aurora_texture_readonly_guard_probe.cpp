@@ -18,6 +18,8 @@ EM_JS(void, expose_fixture_objects,(uintptr_t t,uintptr_t v,uintptr_t d,uintptr_
  const values=keys.map(k=>WebGPU.Internals.jsObjects[k]);
  Module['__meleeWebTextureReadonlyFixtureObjectsV1']=Object.freeze({
    texture:values[0],view:values[1],device:values[2],queue:values[3],keys,
+   importCommandBuffer(value) {return WebGPU.importJsCommandBuffer(value);},
+   importCommandEncoder(value) {return WebGPU.importJsCommandEncoder(value);},
    mutate(kind) {
      const table=WebGPU.Internals.jsObjects;
      if(kind==='set')table[keys[0]]=values[0];

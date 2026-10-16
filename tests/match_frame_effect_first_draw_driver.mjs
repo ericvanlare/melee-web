@@ -388,3 +388,101 @@ export function firstDrawComponentFailures(value,{stage='armed'}={}){
  if(!Array.isArray(value.remaining_gates)||value.remaining_gates.length!==gates.length||!gates.every((v,i)=>value.remaining_gates[i]===v))bad('composite_gates');
  return failures;
 }
+
+// The supplied invoke is the existing owner's bounded page.evaluate transport.
+// These helpers never retire native state or resume/tick/restore a match.
+function readSelectedTextureBoundary(){
+ const m=globalThis.Module,idle=()=>m&&globalThis.Module===m&&globalThis.__meleeWebFirstDrawComponentModuleV1===m&&
+   m.matchFrameEffectNativeIdle?.()===true&&m.matchFrameEffectCallbackReturned===true;
+ if(!idle()||typeof m._melee_web_native_menu_frame_effect_components!=='function')return {status:'refused'};
+ const native=JSON.parse(m.UTF8ToString(m._melee_web_native_menu_frame_effect_components()));
+ return {status:idle()?'read':'refused',native,depth:m.__meleeWebDepthNoWorkV1?.status()};
+}
+function issueSelectedTextureBoundary(){
+ const m=globalThis.Module;
+ if(!m||m!==globalThis.__meleeWebFirstDrawComponentModuleV1||m.matchFrameEffectNativeIdle?.()!==true||
+    m.matchFrameEffectCallbackReturned!==true||
+    typeof m._melee_web_native_menu_frame_effect_issue_selected_texture!=='function'||
+    m.__meleeWebTextureReadonlyGuardV1?.status().phase!=='INSTALLED')return {issued:0};
+ const issued=m._melee_web_native_menu_frame_effect_issue_selected_texture();
+ return {issued,guard:m.__meleeWebTextureReadonlyGuardV1.status()};
+}
+async function fenceSelectedTextureBoundary({end=false}={}){
+ const m=globalThis.Module,idle=()=>m&&globalThis.Module===m&&m===globalThis.__meleeWebFirstDrawComponentModuleV1&&
+   m.matchFrameEffectNativeIdle?.()===true&&m.matchFrameEffectCallbackReturned===true;
+ if(!idle())return {status:'refused'};
+ const api=m.__meleeWebTextureReadonlyGuardV1,cap=api?.capability();
+ if(!cap)return {status:'refused'};
+ const guard=await (end?api.endSelectedComponent(cap):api.armSelectedComponent(cap));
+ return {status:idle()?'fenced':'refused',guard};
+}
+function closeSelectedTextureBoundary(){
+ const m=globalThis.Module;
+ if(!m||m!==globalThis.__meleeWebFirstDrawComponentModuleV1||m.matchFrameEffectNativeIdle?.()!==true||
+    m.matchFrameEffectCallbackReturned!==true)return {status:'refused'};
+ const api=m.__meleeWebTextureReadonlyGuardV1;
+ return {status:'closed',guard:api.close(api.capability())};
+}
+function selectedTextureBoundaryFailures(base,read){
+ if(read?.status!=='read')return ['selected_texture_boundary_refused'];
+ const failures=firstDrawComponentFailures({...base,native:read.native,depth_after:read.depth});
+ if(!failures.length&&JSON.stringify(base.native.facts.before)!==JSON.stringify(read.native.facts.before))
+  failures.push('selected_texture_native_boundary_drift');
+ return failures;
+}
+function selectedTextureGuardFailures(value,phase,reference){
+ const exact=(v,keys)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k));
+ const uint=v=>Number.isInteger(v)&&v>=0&&v<=0xffffffff;
+ const count=v=>Number.isSafeInteger(v)&&v>=0;
+ const pair=v=>Array.isArray(v)&&v.length===2&&v.every(uint)&&(v[0]!==0||v[1]!==0);
+ const component=phase!=='ISSUED';
+ const keys=['identity','schema','scope','phase','epoch','attempts','dispatches','fenceComplete','firstFailure','gameplayAdmission',
+   ...(component?['endFenceComplete','commandEpoch','commandDispatches','submitChecks']:[])];
+ if(!exact(value,keys)||value.schema!==(component?2:1)||value.scope!==(component?'selected-texture-readonly-component-only':'native-issued-unarmed-component-only')||
+    value.phase!==phase||!count(value.epoch)||value.epoch===0||!count(value.attempts)||!count(value.dispatches)||
+    value.fenceComplete!==component||value.firstFailure!==null||value.gameplayAdmission!==false)return ['selected_texture_guard_status'];
+ const id=value.identity;
+ if(!exact(id,['nativeKeys','textureSerial','viewSerial','deviceEpoch'])||!Array.isArray(id.nativeKeys)||id.nativeKeys.length!==4||
+    !id.nativeKeys.every(v=>uint(v)&&v!==0)||new Set(id.nativeKeys).size!==4||
+    !pair(id.textureSerial)||!pair(id.viewSerial)||!pair(id.deviceEpoch)||JSON.stringify(id.textureSerial)===JSON.stringify(id.viewSerial))
+  return ['selected_texture_guard_identity'];
+ if(component&&(value.commandEpoch!==value.epoch||!count(value.commandDispatches)||!count(value.submitChecks)||
+    value.endFenceComplete!==(phase!=='COMPONENT_ACTIVE')))return ['selected_texture_guard_fences'];
+ if(reference&&(value.epoch!==reference.epoch||JSON.stringify(id)!==JSON.stringify(reference.identity)))return ['selected_texture_guard_identity_drift'];
+ return [];
+}
+export async function startFirstDrawSelectedTextureInterval({invoke,components}){
+ let failures=firstDrawComponentFailures(components);
+ if(typeof invoke!=='function'||failures.length)return {status:'refused',failures,composite_eligible:false};
+ try{
+  const before=await invoke(readSelectedTextureBoundary);failures=selectedTextureBoundaryFailures(components,before);
+  if(failures.length)return {status:'refused',before,failures,composite_eligible:false};
+  const issue=await invoke(issueSelectedTextureBoundary);
+  if(issue?.issued!==1||selectedTextureGuardFailures(issue.guard,'ISSUED').length||
+     BigInt(issue.guard.identity.nativeKeys[3])!==BigInt(components.native.facts.before.queue_handle))return {status:'refused',issue,failures:['selected_texture_issue_refused'],composite_eligible:false};
+  const start=await invoke(fenceSelectedTextureBoundary,{end:false});
+  const after=await invoke(readSelectedTextureBoundary);failures=selectedTextureBoundaryFailures(components,after);
+  if(start?.status!=='fenced')failures.push('selected_texture_start_fence_refused');
+  failures.push(...selectedTextureGuardFailures(start?.guard,'COMPONENT_ACTIVE',issue.guard));
+  return {status:failures.length?'refused':'active',before,issue,start,after,failures,composite_eligible:false};
+ }catch(error){return {status:'refused',failures:['selected_texture_start_response_failed'],error:String(error?.message||error),composite_eligible:false};}
+}
+export async function endFirstDrawSelectedTextureInterval({invoke,components,started}){
+ if(typeof invoke!=='function'||started?.status!=='active'||started.composite_eligible!==false||
+    firstDrawComponentFailures(components).length||selectedTextureGuardFailures(started?.issue?.guard,'ISSUED').length)
+  return {status:'refused',failures:['selected_texture_interval_not_active'],composite_eligible:false};
+ try{
+  const before=await invoke(readSelectedTextureBoundary);let failures=selectedTextureBoundaryFailures(components,before);
+  if(failures.length)return {status:'refused',before,failures,composite_eligible:false};
+  const end=await invoke(fenceSelectedTextureBoundary,{end:true});
+  const after=await invoke(readSelectedTextureBoundary);failures=selectedTextureBoundaryFailures(components,after);
+  if(end?.status!=='fenced')failures.push('selected_texture_end_fence_refused');
+  failures.push(...selectedTextureGuardFailures(end?.guard,'COMPONENT_ENDED',started.issue.guard));
+  // No close or native retirement after malformed/claimed-ready post-fence facts.
+  if(failures.length)return {status:'refused',before,end,after,failures,composite_eligible:false};
+  const closed=await invoke(closeSelectedTextureBoundary);
+  if(closed?.status!=='closed')failures.push('selected_texture_close_refused');
+  failures.push(...selectedTextureGuardFailures(closed?.guard,'CLOSED',started.issue.guard));
+  return {status:failures.length?'refused':'closed',before,end,after,closed,failures,composite_eligible:false};
+ }catch(error){return {status:'refused',failures:['selected_texture_end_response_failed'],error:String(error?.message||error),composite_eligible:false};}
+}

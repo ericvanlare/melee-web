@@ -5,6 +5,8 @@
 #include <bit>
 #if defined(MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC)
 #include "lib/gfx/frame_pending_facts.hpp"
+#include "lib/gfx/frame_effect_observer.hpp"
+#include "lib/gx/selected_texture_readonly_diagnostic.hpp"
 #endif
 static_assert(sizeof(PADStatus)==16&&offsetof(PADStatus,err)==10&&offsetof(PADStatus,extButton)==12,
               "Frame observation serializes four native PADStatus records, including Aurora extButton and padding");
@@ -14,6 +16,9 @@ namespace {
 struct FrameEffectObservation {
  bool requested=false, active=false, terminal=false, admitted=false, renderer_armed=false;
  bool native_retired=false, first_draw=false;
+#if defined(MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC)
+ bool selected_texture_issue_attempted=false,selected_texture_issued=false;
+#endif
  const melee_web::GameplayMatchSession* owner=nullptr;
  uint32_t owner_generation=0;
  unsigned requested_frame=0, source_before=0, source_after=0;
@@ -97,6 +102,9 @@ void frame_effect_begin_draw(){
   if(observation.draw_returns!=0)return; // Later original draws are unobserved.
   observation.renderer_armed=aurora_browser_frame_effect_observer_arm_first_draw()!=0;
   if(!observation.renderer_armed)refuse("renderer_observer_arm_refused");
+#if defined(MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC)
+  else aurora::gx::request_selected_sampled_texture();
+#endif
   return;
  }
  if(observation.tick_returns!=1||observation.draw_returns||observation.renderer_armed){
@@ -310,21 +318,28 @@ const char* melee_web_native_menu_frame_effect_status(){
  out+="]";boolean("rows_complete",rows_complete);out+="}";return out.c_str();
 }
 #if defined(MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC)
+namespace {
+const char* copy_ready_first_draw_component_facts(aurora::gfx::detail::NativeSubmissionPendingFacts& facts){
+ if(!observation.terminal||running||observation.native_retired||!observation.first_draw||!observation.admitted||!same_owner()||*observation.error)
+  return "original_boundary_missing";
+ if(observation.tick_returns!=1||observation.draw_returns!=1||observation.planned_steps!=1||observation.callback_steps!=1||observation.callback_draws!=1)
+  return "exact_one_tick_draw_required";
+ if(!EM_ASM_INT({return Module.matchFrameEffectCallbackReturned===true&&!ABORT&&
+      Asyncify.state===Asyncify.State.Normal&&Asyncify.currData===null?1:0;}))return "callback_not_returned_idle";
+ const auto renderer=aurora_browser_frame_effect_observer_snapshot();
+ if(!observation.renderer_armed||renderer.submitCount!=1||renderer.fenceCount!=1||renderer.fenceSuccess!=1)return "normal_fence_missing";
+ if(melee_web_source_file_drive_busy())return "source_reads_pending";
+ if(!aurora::gfx::capture_native_submission_pending(facts))return "native_owner_book_unavailable";
+ if(observation.selected_texture_issued&&!aurora::gx::selected_sampled_texture_readonly_guard_current())return "selected_texture_current_owner_mismatch";
+ return nullptr;
+}
+}
 // Separate read-only component receipt. No submission_status/EventManager pump.
 const char* melee_web_native_menu_frame_effect_components(){
  static std::string out;
  auto refused=[&](const char* reason){out="{\"schema\":\"melee-web-native-first-draw-components-v1\",\"copied\":false,\"component_ready\":false,\"refusal\":\"";out+=reason;out+="\",\"composite_eligible\":false}";return out.c_str();};
- if(!observation.terminal||observation.native_retired||!observation.first_draw||!observation.admitted||!same_owner()||*observation.error)
-  return refused("original_boundary_missing");
- if(observation.tick_returns!=1||observation.draw_returns!=1||observation.planned_steps!=1||observation.callback_steps!=1||observation.callback_draws!=1)
-  return refused("exact_one_tick_draw_required");
- if(!EM_ASM_INT({return Module.matchFrameEffectCallbackReturned===true&&!ABORT&&
-      Asyncify.state===Asyncify.State.Normal&&Asyncify.currData===null?1:0;}))return refused("callback_not_returned_idle");
- const auto renderer=aurora_browser_frame_effect_observer_snapshot();
- if(!observation.renderer_armed||renderer.fenceCount!=1||renderer.fenceSuccess!=1)return refused("normal_fence_missing");
- if(melee_web_source_file_drive_busy())return refused("source_reads_pending");
  aurora::gfx::detail::NativeSubmissionPendingFacts facts{};
- if(!aurora::gfx::capture_native_submission_pending(facts))return refused("native_owner_book_unavailable");
+ if(const auto* reason=copy_ready_first_draw_component_facts(facts))return refused(reason);
  const bool ready=aurora::gfx::detail::native_submission_component_ready(facts);
  out="{\"schema\":\"melee-web-native-first-draw-components-v1\",\"copied\":true,\"component_ready\":";
  out+=ready?"true":"false";out+=",\"refusal\":\"\",\"composite_eligible\":false,\"frame_slot_capacity\":";
@@ -350,6 +365,23 @@ const char* melee_web_native_menu_frame_effect_components(){
  for(size_t i=0;i<facts.owners.size();++i){if(i)out+=',';const auto& v=facts.owners[i];out+="{\"state\":"+std::to_string(v.state);
   u64("future_id",v.futureId);u64("registration_sequence",v.registrationSequence);u64("callback_sequence",v.callbackSequence);u64("captured_generation",v.capturedGeneration);u64("queue_handle",v.queueHandle);u64("encoder_handle",v.encoderHandle);out+='}';}
  out+="]}}";return out.c_str();
+}
+// Explicit consume-once mutating service; never folded into the read-only getter.
+int melee_web_native_menu_frame_effect_issue_selected_texture(){
+ if(observation.selected_texture_issue_attempted){refuse("selected_texture_duplicate_issue");return 0;}
+ observation.selected_texture_issue_attempted=true;
+ aurora::gfx::detail::NativeSubmissionPendingFacts facts{};
+ if(const auto* reason=copy_ready_first_draw_component_facts(facts)){refuse(reason);return 0;}
+ if(!aurora::gfx::detail::native_submission_component_ready(facts)){refuse("selected_texture_native_not_ready");return 0;}
+ aurora::gfx::detail::BrowserFrameEffectObserver::SelectedSampledTextureWitness witness{};
+ const auto& observer=aurora::gfx::detail::browser_frame_effect_observer();
+ if(!observer.submitted_selected_sampled_texture_witness(witness)||
+    witness.frameId!=facts.before.lastEndFrameId||witness.queue!=facts.before.queueHandle){
+  refuse("selected_texture_submitted_owner_mismatch");return 0;
+ }
+ const int issued=aurora::gx::issue_selected_sampled_texture_readonly_guard();
+ if(issued!=1){refuse("selected_texture_current_owner_mismatch");return 0;}
+ observation.selected_texture_issued=true;return 1;
 }
 #endif
 int melee_web_native_menu_frame_effect_retire(){try{

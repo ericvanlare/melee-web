@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {armNativeFrameEffectFirstDraw,readFirstDrawComponents,armFirstDrawComponents,firstDrawComponentFailures} from './match_frame_effect_first_draw_driver.mjs';
+import {armNativeFrameEffectFirstDraw,readFirstDrawComponents,armFirstDrawComponents,firstDrawComponentFailures,startFirstDrawSelectedTextureInterval,endFirstDrawSelectedTextureInterval} from './match_frame_effect_first_draw_driver.mjs';
 function nativeReceipt(){
  const before={generation:'1',registration_sequence:'3',callback_sequence:'3',stale_callback_count:'0',queue_handle:'9',last_begin_frame_id:'4',last_end_frame_id:'4',frame_index:1,active_frame_count:2,active_staging_count:2,free_frame_count:2,free_staging_count:2,worker_idle:1,process_events_queued:0};
  const slots=Array.from({length:4},(_,i)=>Object.fromEntries([['slot',i<2?i:0],['frame_index',0],['encoder_present',0],...['frame_id','render_pass_count','texture_copy_count','encoder_task_count','op_count','texture_upload_count','after_submit_callback_count','verts_bytes','uniforms_bytes','indices_bytes','storage_bytes','texture_upload_bytes'].map(k=>[k,'0'])]));
@@ -59,4 +59,68 @@ test('actual serialized malformed claimed-ready read never reaches depth arm',()
  const f=fixture();f.arm();f.module._melee_web_native_menu_frame_effect_components=()=>JSON.stringify({copied:true,component_ready:true});
  const read=f.read();assert.equal(read.status,'read');assert(firstDrawComponentFailures(JSON.parse(JSON.stringify(read)),{stage:'read'}).length);
  assert.equal(f.calls.includes('depth-arm'),false);
+});
+
+function intervalFixture(){
+ const f=fixture();f.arm();const components=observe(f);let phase='INSTALLED',endFence=false;
+ const cap=Object.freeze({});
+ f.module._melee_web_native_menu_frame_effect_issue_selected_texture=()=>{f.calls.push('selected-issue');phase='ISSUED';return 1;};
+ const identity={nativeKeys:[4,8,12,9],textureSerial:[635,0],viewSerial:[636,0],deviceEpoch:[1,0]};
+ const status=()=>{const component=!['INSTALLED','ISSUED'].includes(phase);return {identity,schema:component?2:1,scope:component?'selected-texture-readonly-component-only':phase==='ISSUED'?'native-issued-unarmed-component-only':'fixture-component-only',
+  phase,epoch:1,attempts:0,dispatches:0,fenceComplete:component,firstFailure:null,gameplayAdmission:false,
+  ...(component?{endFenceComplete:endFence,commandEpoch:1,commandDispatches:0,submitChecks:0}:{})};};
+ f.module.__meleeWebTextureReadonlyGuardV1={capability:()=>phase==='INSTALLED'?null:cap,status,
+  async armSelectedComponent(){f.calls.push('start-fence');phase='COMPONENT_ACTIVE';return status();},
+  async endSelectedComponent(){f.calls.push('end-fence');endFence=true;phase='COMPONENT_ENDED';return status();},
+  close(){f.calls.push('selected-close');phase='CLOSED';return status();}};
+ const invoke=(fn,arg)=>Promise.resolve(vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg??null)+')',f.context));
+ return {...f,components,invoke};
+}
+test('actual selected interval transport keeps strict native/depth checks across separate genuine-fence services',async()=>{
+ const f=intervalFixture(),started=await startFirstDrawSelectedTextureInterval(f);assert.equal(started.status,'active');
+ const ended=await endFirstDrawSelectedTextureInterval({...f,started});assert.equal(ended.status,'closed');assert.equal(ended.composite_eligible,false);
+ assert.deepEqual(f.calls.filter(x=>['selected-issue','start-fence','end-fence','selected-close'].includes(x)),['selected-issue','start-fence','end-fence','selected-close']);
+});
+test('actual selected interval refuses malformed claimed-ready pre-start facts before issuer',async()=>{
+ const f=intervalFixture();f.module._melee_web_native_menu_frame_effect_components=()=>JSON.stringify({copied:true,component_ready:true});
+ const result=await startFirstDrawSelectedTextureInterval(f);assert.equal(result.status,'refused');assert(!f.calls.includes('selected-issue'));
+});
+test('actual selected interval refuses malformed claimed-ready end facts before close or native retire',async()=>{
+ const f=intervalFixture(),started=await startFirstDrawSelectedTextureInterval(f);assert.equal(started.status,'active');
+ const original=f.module.__meleeWebTextureReadonlyGuardV1.endSelectedComponent;
+ f.module.__meleeWebTextureReadonlyGuardV1.endSelectedComponent=async()=>{const value=await original();f.module._melee_web_native_menu_frame_effect_components=()=>JSON.stringify({copied:true,component_ready:true});return value;};
+ const result=await endFirstDrawSelectedTextureInterval({...f,started});assert.equal(result.status,'refused');assert(!f.calls.includes('selected-close'));assert(!f.calls.includes('retire'));
+});
+test('actual selected interval rechecks same Module after initial fence',async()=>{
+ const f=intervalFixture(),original=f.module.__meleeWebTextureReadonlyGuardV1.armSelectedComponent;
+ f.module.__meleeWebTextureReadonlyGuardV1.armSelectedComponent=async()=>{const value=await original();f.replace();return value;};
+ const result=await startFirstDrawSelectedTextureInterval(f);assert.equal(result.status,'refused');assert(!f.calls.includes('selected-close'));
+});
+test('actual selected interval refuses current-owner native refusal after initial fence',async()=>{
+ const f=intervalFixture(),original=f.module.__meleeWebTextureReadonlyGuardV1.armSelectedComponent;
+ f.module.__meleeWebTextureReadonlyGuardV1.armSelectedComponent=async()=>{const value=await original();f.module._melee_web_native_menu_frame_effect_components=()=>JSON.stringify({copied:false,component_ready:false,refusal:'selected_texture_current_owner_mismatch'});return value;};
+ const result=await startFirstDrawSelectedTextureInterval(f);assert.equal(result.status,'refused');assert(!f.calls.includes('selected-close'));
+});
+test('actual selected interval refuses otherwise-valid native stamp drift before end fence',async()=>{
+ const f=intervalFixture(),started=await startFirstDrawSelectedTextureInterval(f);assert.equal(started.status,'active');
+ f.module._melee_web_native_menu_frame_effect_components=()=>{const v=nativeReceipt();v.facts.before.registration_sequence=v.facts.after.registration_sequence='4';v.facts.before.callback_sequence=v.facts.after.callback_sequence='4';return JSON.stringify(v);};
+ const result=await endFirstDrawSelectedTextureInterval({...f,started});assert.equal(result.status,'refused');assert(result.failures.includes('selected_texture_native_boundary_drift'));assert(!f.calls.includes('end-fence'));assert(!f.calls.includes('selected-close'));
+});
+
+test('selected transport refuses incomplete schema2 guard status before end or close',async()=>{
+ const f=intervalFixture(),original=f.module.__meleeWebTextureReadonlyGuardV1.armSelectedComponent;
+ f.module.__meleeWebTextureReadonlyGuardV1.armSelectedComponent=async()=>{const value=await original();delete value.identity;return value;};
+ const result=await startFirstDrawSelectedTextureInterval(f);assert.equal(result.status,'refused');assert(result.failures.includes('selected_texture_guard_status'));assert(!f.calls.includes('selected-close'));
+});
+test('selected transport refuses typed guard identity drift after end fence before close',async()=>{
+ const f=intervalFixture(),started=await startFirstDrawSelectedTextureInterval(f);assert.equal(started.status,'active');
+ const original=f.module.__meleeWebTextureReadonlyGuardV1.endSelectedComponent;
+ f.module.__meleeWebTextureReadonlyGuardV1.endSelectedComponent=async()=>{const value=await original();value.identity={...value.identity,viewSerial:[637,0]};return value;};
+ const result=await endFirstDrawSelectedTextureInterval({...f,started});assert.equal(result.status,'refused');assert(result.failures.includes('selected_texture_guard_identity_drift'));assert(!f.calls.includes('selected-close'));
+});
+
+test('selected transport refuses historical fixture label on unarmed native issue',async()=>{
+ const f=intervalFixture(),original=f.module.__meleeWebTextureReadonlyGuardV1.status;
+ f.module.__meleeWebTextureReadonlyGuardV1.status=()=>{const value=original();if(value.phase==='ISSUED')value.scope='fixture-component-only';return value;};
+ const result=await startFirstDrawSelectedTextureInterval(f);assert.equal(result.status,'refused');assert(result.failures.includes('selected_texture_issue_refused'));assert(!f.calls.includes('start-fence'));assert(!f.calls.includes('selected-close'));assert(!f.calls.includes('retire'));
 });

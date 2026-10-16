@@ -1,6 +1,6 @@
 // Browser-module fixture logic only. A reviewed headless browser_tools owner
 // must run each negative in a fresh realm/module and retain GPU diagnostics.
-export async function runTextureReadonlyGuardFixtureV1(Module, kind='positive') {
+export async function runTextureReadonlyGuardFixtureV1(Module, kind='positive', selectedComponent=false) {
   const check=(x,m)=>{if(!x)throw new Error(m);};
   const expectedCodes=Object.freeze({
     write:'TARGET_writeTexture','method-alias':'TARGET_writeTexture',
@@ -12,7 +12,10 @@ export async function runTextureReadonlyGuardFixtureV1(Module, kind='positive') 
     delete:'NATIVE_FINAL_RELEASE_OR_TABLE_DELETE',truncate:'MAPPING_TRUNCATION',
     'replace-table':'TABLE_REPLACEMENT','replace-internals':'TABLE_REPLACEMENT','define-table':'TABLE_REPLACEMENT'
   });
-  const expectedCode=kind==='positive'?null:expectedCodes[kind];
+  const componentCodes=Object.freeze({'preissue-buffer':'PREISSUE_COMMAND_BUFFER',
+    'preissue-encoder':'PREISSUE_OR_FOREIGN_ENCODER','import-preinstall-buffer':'UNKNOWN_COMMAND_BUFFER',
+    'import-preinstall-encoder':'UNKNOWN_ENCODER','close-before-end':'CLOSE_STATE','submit-after-end':'COMPONENT_QUEUE_PHASE'});
+  const expectedCode=kind==='positive'?null:(selectedComponent?componentCodes[kind]:expectedCodes[kind]);
   check(kind==='positive' || typeof expectedCode==='string','Known exact negative seam required');
   check(Module._texture_guard_fixture_init()===1,'Actual factory initialization');
   const objects=Module.__meleeWebTextureReadonlyFixtureObjectsV1;
@@ -22,18 +25,39 @@ export async function runTextureReadonlyGuardFixtureV1(Module, kind='positive') 
   for(let i=0;i<data.length;i+=4)data.set([19,51,103,255],i);
   queue.writeTexture({texture},data,{bytesPerRow:16,rowsPerImage:4},{width:4,height:4});
   await queue.onSubmittedWorkDone();
+  let oldEncoder=null,oldBuffer=null;
+  if(selectedComponent&&(kind==='preissue-buffer'||kind==='preissue-encoder')){
+    const source=device.createBuffer({size:1024,usage:GPUBufferUsage.COPY_SRC,mappedAtCreation:true});
+    new Uint8Array(source.getMappedRange()).fill(127);source.unmap();
+    oldEncoder=device.createCommandEncoder();
+    oldEncoder.copyBufferToTexture({buffer:source,bytesPerRow:256},{texture},{width:4,height:4});
+    if(kind==='preissue-buffer')oldBuffer=oldEncoder.finish();
+  }
   check(Module._texture_guard_fixture_issue()===1,'Authentic live native capability');
   const cap=guard.capability();
-  await guard.armFixture(cap);
+  if(selectedComponent)await guard.armSelectedComponent(cap);else await guard.armFixture(cap);
   const before=guard.status();
   if(kind!=='positive') {
     const encoder=device.createCommandEncoder();
     const other=device.createTexture({size:[4,4],format:'rgba8unorm',usage:GPUTextureUsage.COPY_SRC|GPUTextureUsage.COPY_DST|GPUTextureUsage.TEXTURE_BINDING});
     const src=device.createBuffer({size:1024,usage:GPUBufferUsage.COPY_SRC,mappedAtCreation:true});
     new Uint8Array(src.getMappedRange()).fill(127);src.unmap();
+    const commandBefore=guard.status().commandDispatches;
     let caught=false,caughtMessage='';
     try {
-      if(kind==='write')queue.writeTexture({texture},data,{bytesPerRow:16},{width:4,height:4});
+      if(selectedComponent){
+        if(kind==='preissue-buffer')queue.submit([oldBuffer]);
+        else if(kind==='preissue-encoder')oldEncoder.finish();
+        else if(kind==='import-preinstall-buffer'){
+          const value=Module.__meleeWebTextureReadonlyPreinstallCommandBufferV1;
+          check(value,'Actual pre-install command buffer required');objects.importCommandBuffer(value);queue.submit([value]);
+        }else if(kind==='import-preinstall-encoder'){
+          const value=Module.__meleeWebTextureReadonlyPreinstallCommandEncoderV1;
+          check(value,'Actual pre-install encoder required');objects.importCommandEncoder(value);value.finish();
+        }else if(kind==='close-before-end')guard.close(cap);
+        else if(kind==='submit-after-end'){await guard.endSelectedComponent(cap);queue.submit([]);}
+        else throw Error('Unknown selected component negative');
+      }else if(kind==='write')queue.writeTexture({texture},data,{bytesPerRow:16},{width:4,height:4});
       else if(kind==='method-alias'){const f=queue.writeTexture;Reflect.apply(f,queue,[{texture},data,{bytesPerRow:16},{width:4,height:4}]);}
       else if(kind==='copy-buffer')encoder.copyBufferToTexture({buffer:src,bytesPerRow:256},{texture},{width:4,height:4});
       else if(kind==='copy-texture')encoder.copyTextureToTexture({texture:other},{texture},{width:4,height:4});
@@ -55,8 +79,9 @@ export async function runTextureReadonlyGuardFixtureV1(Module, kind='positive') 
     check(retained.firstFailure===firstFailure && JSON.stringify(retained.firstFailure)===firstFailureBytes,'First failure retained exactly');
     check(retained.dispatches===result.dispatches,'Close refusal must not dispatch GPU work');
     check(result.dispatches===before.dispatches,'No guarded original GPU API dispatched');
+    if(selectedComponent)check(result.commandDispatches===commandBefore,'No original command finish/submit dispatched at refusal');
     // No calls into the poisoned native module, GPU cleanup, restore or resume.
-    return {scope:'real-GPU-component-negative',kind,expectedCode,result,retained,closeRefused,nativeBookkeepingMayAlreadyBeMutated:kind==='last-native-release'||kind==='import-alias'};
+    return {scope:'real-GPU-component-negative',kind,expectedCode,result,retained,closeRefused,nativeBookkeepingMayAlreadyBeMutated:kind==='last-native-release'||kind==='import-alias'||kind==='import-preinstall-buffer'||kind==='import-preinstall-encoder'};
   }
   const shader=device.createShaderModule({code:`
     @group(0) @binding(0) var image:texture_2d<f32>;
@@ -79,13 +104,21 @@ export async function runTextureReadonlyGuardFixtureV1(Module, kind='positive') 
     await read.mapAsync(GPUMapMode.READ);
     const bytes=new Uint8Array(read.getMappedRange());
     for(let row=0;row<4;++row)for(let x=0;x<16;++x)check(bytes[row*256+x]===data[row*16+x],'Actual sampled output bytes');
-    read.unmap();read.destroy();out.destroy();
+    const retained=[];for(let row=0;row<4;++row)retained.push(...bytes.slice(row*256,row*256+16));
+    read.unmap();read.destroy();out.destroy();return retained;
   }
-  await leg();
+  const firstReadback=await leg();
   const hostMarker=Object.freeze({epoch:guard.status().epoch,scope:'host-marker-no-Wasm-restore'});
-  await leg();
+  const secondReadback=await leg();
+  if(selectedComponent)await guard.endSelectedComponent(cap);
   const result=guard.close(cap);
   check(result.phase==='CLOSED' && !result.firstFailure && !result.gameplayAdmission,'Continuous component only');
   Module._texture_guard_fixture_cleanup();other.destroy();device.destroy();
+  if(selectedComponent)return {scope:'real-GPU-selected-texture-component-positive',result,hostMarker,legs:2,
+    expectedBytes:Array.from(data),readbacks:[firstReadback,secondReadback]};
   return {scope:'real-GPU-component-positive',result,hostMarker,legs:2};
+}
+
+export async function runTextureReadonlySelectedIntervalFixtureV2(Module,kind='positive'){
+ return runTextureReadonlyGuardFixtureV1(Module,kind,true);
 }
