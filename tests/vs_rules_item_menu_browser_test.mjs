@@ -42,7 +42,7 @@ import {
 import {runSuddenDeathBrowserRoute,validateFinalSdCapture} from './vs_sudden_death_browser_route.mjs';
 import {runSparseMarioBrowserPrefix,installSparseVirtualController,validateFinalSparseCapture} from './vs_sparse_mario_browser_route.mjs';
 import * as matchFrameEffectDriver from './match_frame_effect_driver.mjs';
-import {observeOneFirstDraw,firstDrawDriver,firstDrawComponentsDriver} from './one_first_draw_observation_adapter.mjs';
+import {observeOneFirstDraw,firstDrawDriver,firstDrawComponentsDriver,firstDrawSelectedTextureIntervalDriver} from './one_first_draw_observation_adapter.mjs';
 import {CSS_SSS_TRANSITION_LIMITS} from './stadium_c1a_css_sss_reducer.mjs';
 import {
   buildOneFrameRecorderBinding,
@@ -70,6 +70,7 @@ options['competitive-profile-only'] = {type: 'boolean', default: false};
 options['competitive-match-start-only'] = {type: 'boolean', default: false};
 options['frame-effect-observation-only'] = {type: 'boolean', default: false};
 options['first-draw-components-only'] = {type:'boolean',default:false};
+options['first-draw-selected-texture-interval-only'] = {type:'boolean',default:false};
 options['first-draw-observation-only'] = {type: 'boolean', default: false};
 options['frame-effect-producer-binding'] = {type: 'string'};
 options['competitive-timeout-route'] = {type: 'boolean', default: false};
@@ -96,6 +97,8 @@ const competitiveMatchStartOnly = values['competitive-match-start-only'];
 const singleTickFrameEffectObservationOnly = values['frame-effect-observation-only'];
 const firstDrawObservationOnly = values['first-draw-observation-only'];
 const firstDrawComponentsOnly=values['first-draw-components-only'];
+const firstDrawSelectedTextureIntervalOnly=values['first-draw-selected-texture-interval-only'];
+if(firstDrawSelectedTextureIntervalOnly&&!firstDrawComponentsOnly)throw Error('Selected texture interval requires explicit first-draw components mode');
 if(firstDrawComponentsOnly&&(!firstDrawObservationOnly||new URL(values.url).searchParams.get('__depth_no_work_v1')!=='1'))throw Error('First-draw components require first-draw mode and explicit pre-main depth query');
 const frameEffectObservationOnly = singleTickFrameEffectObservationOnly || firstDrawObservationOnly;
 const competitiveTimeoutRoute = values['competitive-timeout-route'];
@@ -1716,7 +1719,7 @@ route: {
         producerBinding: frameEffectProducerBinding,
         outputName: path.basename(output),
         discSha256: report.discSha256,
-        driver: firstDrawComponentsOnly ? firstDrawComponentsDriver : firstDrawObservationOnly ? firstDrawDriver : matchFrameEffectDriver,
+        driver: firstDrawSelectedTextureIntervalOnly ? firstDrawSelectedTextureIntervalDriver : firstDrawComponentsOnly ? firstDrawComponentsDriver : firstDrawObservationOnly ? firstDrawDriver : matchFrameEffectDriver,
         readRuntimeCapture: readRuntimeDiagnosticsCapture,
       });
       report.competitiveMatchStart.frame_effect_observation = frameEffectObservation;

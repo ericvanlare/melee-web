@@ -318,6 +318,9 @@ export async function observeOneNormalFrame({
       producerBinding.profile!=='runtime-match-frame-effect Release --first-draw-components-diagnostic')){
     result.status='failed';result.failures.push('component_private_profile_required');result.arm_attempt='not_dispatched';return result;
   }
+  if(typeof driver.observeSelectedTextureInterval==='function'&&!components){
+    result.status='failed';result.failures.push('selected_texture_interval_requires_components');result.arm_attempt='not_dispatched';return result;
+  }
   if(!components&&producerBinding.profile!=='runtime-match-frame-effect Release'){
     result.status='failed';result.failures.push('component_driver_required');result.arm_attempt='not_dispatched';return result;
   }
@@ -447,6 +450,19 @@ export async function observeOneNormalFrame({
       result.component_failures=driver.componentObservationFailures(result.components);
       if(result.component_failures.length){result.status='failed';result.failures.push(...result.component_failures);return result;}
     }catch(error){result.status='failed';result.failures.push('component_response_lost_or_failed');result.error=String(error?.message||error);return result;}
+  }
+
+  if(typeof driver.observeSelectedTextureInterval==='function'){
+    try{
+      result.selected_texture_interval=await driver.observeSelectedTextureInterval({components:result.components,
+        invoke:(fn,arg)=>boundedTransport(()=>page.evaluate(fn,arg),retirementTimeoutMs,'selected texture '+fn.name)});
+      const interval=result.selected_texture_interval;
+      if(interval?.schema!=='melee-web-selected-texture-interval-observation-v1'||interval.status!=='closed'||
+         interval.composite_eligible!==false||interval.started?.status!=='active'||interval.ended?.status!=='closed'||
+         !Array.isArray(interval.failures)||interval.failures.length){
+        result.status='failed';result.failures.push('selected_texture_interval_refused_or_malformed');return result;
+      }
+    }catch(error){result.status='failed';result.failures.push('selected_texture_interval_response_lost_or_failed');result.error=String(error?.message||error);return result;}
   }
 
   // The private checked retirement is the only permitted native shutdown after

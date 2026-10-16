@@ -219,3 +219,25 @@ test('actual serialized claimed-ready malformed native read refuses before depth
  assert.equal(calls.filter(v=>v==='actual-component-getter').length,1);assert.equal(calls.includes('actual-depth-arm'),false);
  assert.equal(calls.includes('retire-evaluate'),false);assert.equal(result.native_retired,false);assert.equal(result.cleanup_policy,'browser_owner_only');
 });
+
+// Synthetic adapter-order controls only. Actual strict helper transport tests remain first_draw_components.test.mjs.
+for(const mode of ['closed','refused','malformed','response-lost'])test('selected texture interval '+mode+' is checked before retirement',async()=>{
+ const one=value=>{for(const k of ['planned_steps','callback_steps','callback_draws','tick_returns','draw_returns'])value[k]=1;
+  value.source_frame_after=value.source_frame_before+1;value.unobserved_draws=0;return value;};
+ const {page,calls}=setupPage({statusTransform:one});
+ const binding=validProducerBinding();binding.profile='runtime-match-frame-effect Release --first-draw-components-diagnostic';
+ await installRecorder(page,{...identityArgs(),producerBinding:binding});
+ const synthetic={...driver,armNativeFrameEffect:()=>({armed:true,match:{frame:200}}),
+  readFrameComponents:()=>({component_only:true,depth_before:{sequence:3}}),
+  armFrameComponents:()=>({schema:'melee-web-first-draw-components-arm-v1',status:'armed',same_module:true,returned_idle:true,composite_eligible:false,depth_after:{}}),
+  componentObservationFailures:()=>{calls.push('strict-component-validate');return [];},
+  observeSelectedTextureInterval:async({invoke,components})=>{assert.equal(components.status,'observed');calls.push('selected-interval');
+   assert.equal(await invoke(()=>37),37);
+   if(mode==='response-lost')throw Error('synthetic interval response loss');
+   if(mode==='malformed')return {schema:'melee-web-selected-texture-interval-observation-v1',status:'closed'};
+   return {schema:'melee-web-selected-texture-interval-observation-v1',status:mode,composite_eligible:false,started:{status:'active'},ended:{status:mode},failures:mode==='closed'?[]:['synthetic_refusal']};}};
+ const result=await observeOneFirstDraw(args(page,{driver:synthetic,producerBinding:binding}));
+ assert(calls.indexOf('strict-component-validate')<calls.indexOf('selected-interval'));
+ if(mode==='closed'){assert.equal(result.status,'pass');assert.equal(result.native_retired,true);assert(calls.indexOf('selected-interval')<calls.indexOf('retire-evaluate'));}
+ else{assert.equal(result.status,'failed');assert.equal(result.native_retired,false);assert.equal(result.cleanup_policy,'browser_owner_only');assert(!calls.includes('retire-evaluate'));assert(result.failures.includes(mode==='response-lost'?'selected_texture_interval_response_lost_or_failed':'selected_texture_interval_refused_or_malformed'));}
+});
