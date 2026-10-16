@@ -1,0 +1,341 @@
+"""Actual-source controls; projected retained scope metadata is synthetic, not whole3 evidence."""
+from pathlib import Path
+import copy, hashlib, importlib.util, json, os, subprocess, sys, unittest
+from unittest.mock import patch
+from owned_test_workspace import OwnedWorkspaceTests
+REPO_ROOT=Path(os.environ.get('MELEE_STADIUM_FEEDBACK_REPO_ROOT',Path(__file__).resolve().parents[1]))
+SOURCE_ROOT=Path(os.environ.get('MELEE_STADIUM_FEEDBACK_SOURCE_ROOT',REPO_ROOT))
+sys.path[:0]=[str(SOURCE_ROOT/'scripts'),str(SOURCE_ROOT/'tools'),str(REPO_ROOT/'scripts'),str(REPO_ROOT/'tools'),str(REPO_ROOT/'reference-capture/dolphin')]
+from reference_observer_stream import iter_records
+TRACE=Path(os.environ['MELEE_STADIUM_RETAINED_SSS_TRACE']) if os.environ.get('MELEE_STADIUM_RETAINED_SSS_TRACE') else None
+def load_exact(name,path):
+    digest=hashlib.sha256(path.read_bytes()).hexdigest()
+    spec=importlib.util.spec_from_file_location(name,path)
+    module=importlib.util.module_from_spec(spec);sys.modules[name]=module
+    spec.loader.exec_module(module)
+    assert Path(module.__file__).resolve()==path.resolve()
+    assert hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest()==digest
+    return module
+class StadiumWholeFeedbackTests(OwnedWorkspaceTests):
+    @classmethod
+    def setUpClass(cls):
+        global decoder, driver
+        cls.workspace=cls.new_workspace(REPO_ROOT,'stadium-whole-feedback-')
+        prior={name:sys.modules.get(name) for name in ('stadium_go_prefix','capture_sd_reference_prefix')}
+        def restore():
+            for name,value in prior.items():
+                if value is None:sys.modules.pop(name,None)
+                else:sys.modules[name]=value
+        cls.addClassCleanup(restore)
+        decoder=load_exact('stadium_go_prefix',SOURCE_ROOT/'tools/stadium_go_prefix.py')
+        driver=load_exact('capture_sd_reference_prefix',SOURCE_ROOT/'scripts/capture_sd_reference_prefix.py')
+
+    def test_retained_prefix_and_scoped_whole_sss_operands(self):
+        if TRACE is None:self.skipTest('Retained original SSS trace was not configured')
+        rows=[r for r in iter_records(TRACE) if r['event']=='progress' and r['payload'].get('phase') in decoder.SSS_POSITION_PHASES]
+        self.assertGreater(len(rows),3)
+        old=decoder.StadiumSssPositionObservations()
+        for r in rows:old.accept(r,route_ready=True)
+        old.require_closed()
+        # Controlled metadata projection only; operands remain actual retained original bytes.
+        projected=copy.deepcopy(rows)
+        for r in projected:r['payload'].update(diagnostic='stadium_whole3_feedback_v1',whole_session=True,match_index=0)
+        receipt=rows[0]['payload']['setup_receipt_sha256']
+        fresh=decoder.StadiumSssPositionObservations()
+        for r in projected:fresh.accept(r,route_ready=True,expected_receipt=receipt,scope='stadium_whole3_feedback_v1',match_index=0)
+        fresh.require_closed()
+        for changes,kwargs in [({'match_index':1},{}),({'match_index':True},{}),({'whole_session':False},{}),({'diagnostic':decoder.DIAGNOSTIC},{}),({},dict(match_index=3)),({},dict(scope='unknown')),({},dict(expected_receipt='0'*64))]:
+            r=copy.deepcopy(projected[0]);r['payload'].update(changes)
+            options=dict(route_ready=True,expected_receipt=receipt,scope='stadium_whole3_feedback_v1',match_index=0);options.update(kwargs)
+            with self.assertRaises(ValueError):decoder.StadiumSssPositionObservations().accept(r,**options)
+        with self.assertRaises(ValueError):decoder.StadiumSssPositionObservations().accept(projected[0],route_ready=True)
+    def test_native_admission_actual_slice(self):
+        source=(SOURCE_ROOT/'reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp').read_text()
+        start=source.index('    const std::string whole_feedback_setting =')
+        stop=source.index('    const std::string constructor_setting =',start)
+        body=source[start:stop]
+        fixture=r'''
+#include <cassert>
+#include <map>
+#include <string>
+std::map<std::string,std::string> env;
+std::string Env(const char* key){return env[key];}
+bool SdInitRequested(){return !Env("MWRC_SD_INIT").empty();}
+bool AllocationConfigured(){return !Env("MWRC_ALLOCATION_OUTPUT").empty();}
+namespace InputStream { bool recording=true,replaying=false; bool IsRecording(){return recording;} bool IsReplaying(){return replaying;} }
+struct Gate { unsigned whole_session_matches=3;bool stadium_go_prefix_enabled=false,stadium_whole_feedback=false;std::string stadium_whole_setup_receipt,error;void SetInvalid(const char* e){error=e;}
+bool Run(){
+''' + body + r'''
+return true;
+}};
+void reset(){env.clear();InputStream::recording=true;InputStream::replaying=false;env["MWRC_STADIUM_WHOLE_FEEDBACK"]="1";env["MWRC_STADIUM_WHOLE_SETUP_RECEIPT_SHA256"]=std::string(64,'a');env["MWRC_ALLOCATION_OUTPUT"]="owned";env["MWRC_ALLOCATION_VS_TARGET"]="2";env["MWRC_ALLOCATION_STOP_AT"]="exit";}
+int main(){reset();assert(Gate().Run());
+for(const char* key:{"MWRC_STADIUM_CONSTRUCTOR_OWNER","MWRC_STADIUM_IDLE_3500","MWRC_TRANSFORM_PREFIX","MWRC_ENTITY_PROFILE","MWRC_SD_MENU_PROBE","MWRC_ORDINARY_POLICY_SHA256","MWRC_CPU_PROBE_OUTPUT","MWRC_ITEM_PROBE_OUTPUT","MWRC_SD_INIT"}){reset();env[key]="1";assert(!Gate().Run());}
+reset();env["MWRC_ALLOCATION_VS_TARGET"]="1";assert(!Gate().Run());
+reset();env["MWRC_ALLOCATION_OUTPUT"]="";assert(!Gate().Run());
+reset();env["MWRC_ALLOCATION_STOP_AT"]="entry";assert(!Gate().Run());
+reset();env["MWRC_STADIUM_WHOLE_SETUP_RECEIPT_SHA256"]=std::string(64,'0');assert(!Gate().Run());
+reset();InputStream::replaying=true;assert(!Gate().Run());
+reset();Gate g;g.whole_session_matches=2;assert(!g.Run());
+reset();g=Gate();g.stadium_go_prefix_enabled=true;assert(!g.Run());
+reset();env["MWRC_STADIUM_WHOLE_FEEDBACK"]="";env["MWRC_STADIUM_WHOLE_SETUP_RECEIPT_SHA256"]="";g=Gate();assert(g.Run()&&!g.stadium_whole_feedback);
+}
+'''
+        tmp=self.workspace;cpp=tmp/'actual-whole-feedback-admission.cpp';binary=tmp/'actual-whole-feedback-admission'
+        cpp.write_text(fixture)
+        subprocess.run(['/usr/bin/clang++','-std=c++17','-Wall','-Wextra','-Werror',str(cpp),'-o',str(binary)],check=True,timeout=60)
+        subprocess.run([str(binary)],check=True,timeout=15)
+    def test_driver_whole_identity_before_callbacks(self):
+        # Real menu policy retained; no synthetic source menu samples.
+        from sd_original_menu_plan import stadium_go_feedback_packet
+        menus=stadium_go_feedback_packet()
+        receipt='a'*64
+        target={}  # Identity refusals do not enter Setup decoding.
+        r=driver.StadiumWholeFeedbackReceiver(menus,receipt,target)
+        with self.assertRaises(ValueError):r.next_lifetime()
+        row=dict(seq=0,event='handshake',payload=dict(whole_session=True,match_count=3,stadium_whole_feedback=True,setup_receipt_sha256=receipt))
+        r.accept(row)
+        r.accept(dict(seq=1,event='start',payload=row['payload']))
+        with self.assertRaises(ValueError):r.accept(dict(seq=2,event='progress',payload=dict(whole_session=True,match_index=1,diagnostic='stadium_whole3_feedback_v1',setup_receipt_sha256=receipt)))
+    def test_actual_publisher_default_off_bytes_and_scoped_identity(self):
+        source=(SOURCE_ROOT/'reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp').read_text()
+        start=source.index('  void PublishStadiumProgress(')
+        stop=source.index('  // Pinned fn_8025A310',start)
+        current=source[start:stop]
+        helper=source[source.index('bool AppendBounded('):source.index('\n}  // namespace\n\nstruct Observer::Impl')]
+        import re
+        constants='\n'.join(re.findall(r'^constexpr size_t (?:RING_PAYLOAD|CPU_PROBE_MAX_JSON_BYTES) = .*?;',source,re.M))
+        self.assertEqual(len(constants.splitlines()),2)
+        fixture='''#include <array>
+#include <cassert>
+#include <cstdint>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <utility>
+using u8=uint8_t;using u16=uint16_t;using u32=uint32_t;using u64=uint64_t;
+namespace PowerPC {struct PowerPCState {std::array<u32,32> gpr{};std::array<u32,1024> spr{};};}
+enum class Event:u16 {Progress=4};enum class SliceTag:u16 {Sample=1};
+struct SliceRef {SliceTag tag;u16 flags;u32 address,size,offset;};
+'''+constants+'\n'+helper
+        fields='''bool stadium_whole_feedback=false;
+std::string stadium_whole_setup_receipt=std::string(64,'b');
+std::string stadium_go_prefix_setup_receipt_sha256=std::string(64,'a');
+u32 match_index=2,draw_ordinal=7;size_t slice_count=1;
+std::array<u8,4> raw{{1,2,3,4}};
+std::array<SliceRef,1> slices{{{SliceTag::Sample,0,0x80010000,4,0}}};
+struct Position {bool cursor_seen=true,target_seen=true;u32 id=1,gobj=0x80001000,jobj=0x80002000,proc=0x80003000,frame_sp=0x80004000,entry_cursor_state=0;} stadium_sss_position;
+std::string emitted;
+void SetInvalid(const char* error){throw std::runtime_error(error);}
+void PushJson(Event,const std::string& value,u32,u32,u32){emitted=value;}
+'''
+        fixture+='struct Before {'+fields+LEGACY_PUBLISHER+'};\nstruct After {'+fields+current+'};\n'
+        fixture+='''int main(){PowerPC::PowerPCState state;state.gpr[30]=18;state.spr[8]=0x8025a4e8;
+for(auto phase:{"css_entry","css_return","sss_return","sss_position_cursor","sss_position_target","sss_position_end","constructor_commit","go_after"}){
+for(size_t count:{0,1}){Before a;After b;a.slice_count=b.slice_count=count;
+a.PublishStadiumProgress(phase,0x8025a548,0x8001003c,0x80001000,&state,40);
+b.PublishStadiumProgress(phase,0x8025a548,0x8001003c,0x80001000,&state,40);assert(a.emitted==b.emitted);}}
+After scoped;scoped.stadium_whole_feedback=true;scoped.PublishStadiumProgress("sss_return",1,2,3,&state,4);
+assert(scoped.emitted.find("stadium_whole3_feedback_v1")!=std::string::npos);
+assert(scoped.emitted.find("\\\"whole_session\\\":true,\\\"match_index\\\":2")!=std::string::npos);
+}
+'''
+        cpp=self.workspace/'actual-publisher-off.cpp';binary=self.workspace/'actual-publisher-off'
+        cpp.write_text(fixture)
+        subprocess.run(['/usr/bin/clang++','-std=c++17','-Wall','-Wextra','-Werror',str(cpp),'-o',str(binary)],check=True,timeout=60)
+        subprocess.run([str(binary)],check=True,timeout=15)
+
+    def test_actual_driver_exit_results_order_and_remaining_deadline(self):
+        # These are source transport endpoints, not a simulated game/graphics service.
+        from reference_versus_sequence_capture import raw_pad, SequenceRunner
+        class Receiver:
+            def __init__(self):
+                self.seq=self.match_index=self.menu_polls=self.menu_consumed=self.tick_count=0
+                self.css=True;self.latest_menu=None;self.setup_seen=True;self.previous_tick=None
+                self.ended=self.returned_css=self.outcome_seen=self.chord_requested=self.start_allowed=False
+                self.chord_consumed=self.chord_released=None;self.last_pad=[driver.NEUTRAL_PAD]*2
+            def accept(self,row):
+                self.seq+=1;kind=row['payload']['boundary'] if row['event']=='boundary' else 'end'
+                if kind=='source_tick':self.tick_count+=1;self.previous_tick=self.tick_count
+                elif kind=='pad_consume':
+                    self.menu_consumed+=1;self.menu_polls+=1;self.last_pad=controller.pad
+                    if controller.pad[0]==raw_pad(buttons=['L','R','A','START']):self.chord_consumed=dict(sequence=self.seq,source_tick=self.tick_count+3)
+                    elif self.chord_consumed is not None:self.chord_released=dict(sequence=self.seq,source_tick=self.tick_count+4)
+                elif kind=='vs_exit_return':self.outcome_seen=True
+                elif kind=='return_css':self.returned_css=True
+                elif kind=='end':self.ended=True
+            def next_lifetime(self):
+                index=self.match_index+1;seq=self.seq;self.__init__();self.match_index=index;self.seq=seq
+        class Controller:
+            def __init__(self):self.pad=[driver.NEUTRAL_PAD]*2;self.pending=False;self.requests=[];self.sleep=lambda seconds:None
+            def set_both(self,p1,p2,*,action):
+                self.pad=[p1,p2];self.pending=True
+                self.requests.append((receiver.match_index,receiver.tick_count,action))
+        class Tail:
+            def __init__(self):self.phase={};self.waits=[];self.seen=[]
+            def next(self,deadline):
+                if controller.pending:controller.pending=False;kind='pad_consume'
+                elif not receiver.chord_requested:kind='source_tick'
+                elif not receiver.outcome_seen:kind='vs_exit_return'
+                else:
+                    index=receiver.match_index;phase=self.phase.get(index,0)
+                    kind=['vs_mode_exit','results_enter','return_css','end'][phase]
+                    self.phase[index]=phase+1
+                self.seen.append(kind)
+                return dict(seq=receiver.seq,event='end' if kind=='end' else 'boundary',
+                    payload=dict(boundary=kind,whole_session=True,match_index=receiver.match_index),source_tick=0,draw_ordinal=0)
+            def require_completed_status(self,timeout=5):self.waits.append(timeout)
+        receiver=Receiver();controller=Controller();tail=Tail();order=[]
+        def confirm(policy,index,deadline):
+            self.assertEqual(tail.seen[-2:],['vs_mode_exit','results_enter'])
+            self.assertTrue(receiver.start_allowed)
+            order.append(index);policy.observer.next(deadline)
+        with patch.object(driver,'drive_authored_css_sss',lambda *args:None),patch.object(SequenceRunner,'_confirm_results',confirm):
+            values=driver.drive_stadium_whole_three(receiver,tail,controller,{'boot':[]},driver.time.monotonic()+20)
+        self.assertEqual(order,[0,1,2]);self.assertEqual(len(values),3)
+        self.assertEqual([x['request']['minimum_neutral_ticks'] for x in values],[180]*3)
+        self.assertTrue(all(x['actual_chord']['source_tick']==183 for x in values))
+        self.assertEqual(len(tail.waits),1);self.assertGreater(tail.waits[0],0);self.assertLessEqual(tail.waits[0],5)
+        self.assertTrue(all(ticks>=180 for _,ticks,label in controller.requests if label=='whole-no-contest'))
+        # Deterministic remaining<5 falsifies an unconditional five-second wait.
+        receiver=Receiver();controller=Controller();tail=Tail()
+        with patch.object(driver.time,'monotonic',return_value=0.0),patch.object(driver,'drive_authored_css_sss',lambda *args:None),patch.object(SequenceRunner,'_confirm_results',confirm):
+            driver.drive_stadium_whole_three(receiver,tail,controller,{'boot':[]},2.5)
+        self.assertEqual(tail.waits,[2.5])
+        # The same actual driver must refuse a completion-status call that
+        # returns after the absolute operation deadline.
+        receiver=Receiver();controller=Controller();tail=Tail();clock=[0.0]
+        tail.require_completed_status=lambda timeout:clock.__setitem__(0,21.0)
+        with patch.object(driver.time,'monotonic',side_effect=lambda:clock[0]),patch.object(driver,'drive_authored_css_sss',lambda *args:None),patch.object(SequenceRunner,'_confirm_results',confirm):
+            with self.assertRaises(ValueError):
+                driver.drive_stadium_whole_three(receiver,tail,controller,{'boot':[]},20.0)
+
+
+
+    def test_actual_deadline_controller_refuses_press_release_and_late_status(self):
+        class Pipe:
+            def __init__(self):self.writes=[];self.sleep=lambda seconds:None
+            def set_both(self,p1,p2,*,action):self.writes.append((p1,p2,action))
+        pipe=Pipe()
+        with patch.object(driver.time,'monotonic',return_value=10):
+            wrapped=driver.StadiumDeadlineController(pipe,10)
+            with self.assertRaises(ValueError):wrapped.set_both('p1','p2',action='expired')
+            with self.assertRaises(ValueError):wrapped.hold('p1','p2',.12,action='expired-hold')
+        self.assertEqual(pipe.writes,[])
+        with patch.object(driver.time,'monotonic',side_effect=[0,0,11]):
+            wrapped=driver.StadiumDeadlineController(pipe,10)
+            with self.assertRaises(ValueError):wrapped.hold('p1','p2',.12,action='overslept')
+        self.assertEqual(pipe.writes,[('p1','p2','overslept')])
+
+
+    def test_actual_retained_first_tick_consumed_owner_and_stale_refusals(self):
+        if TRACE is None:self.skipTest('Retained original source tick/PAD trace was not configured')
+        from sd_original_menu_plan import stadium_go_feedback_packet
+        rows=list(iter_records(TRACE))
+        setup=next(r for r in rows if r['event']=='boundary' and r['payload']['boundary']=='setup')
+        actual=[r for r in rows if r['seq']>setup['seq'] and r['event']=='boundary' and
+                r['payload']['boundary'] in ('pad_consume','source_tick')]
+        self.assertGreaterEqual(len(actual),4)
+        first_consume,first_tick=actual[:2]
+        self.assertEqual((first_consume['payload']['boundary'],first_tick['payload']['boundary']),('pad_consume','source_tick'))
+        self.assertEqual((first_consume['source_tick'],first_tick['source_tick']),(0,0))
+        pending=None;pairs=0
+        for row in actual:
+            if row['payload']['boundary']=='pad_consume':
+                self.assertIsNone(pending);pending=row
+            else:
+                self.assertIsNotNone(pending)
+                self.assertLess(pending['seq'],row['seq'])
+                self.assertEqual(pending['source_tick'],row['source_tick'])
+                pending=None;pairs+=1
+        self.assertIsNone(pending)
+        self.assertGreater(pairs,1)
+        def projected(row,seq=None):
+            value=copy.deepcopy(row)
+            value['payload'].update(whole_session=True,match_index=0)
+            if seq is not None:value['seq']=seq
+            return value
+        def receiver(seq):
+            value=driver.StadiumWholeFeedbackReceiver(stadium_go_feedback_packet(),'a'*64,{})
+            # Synthetic scope/Setup admission wrapper only; retained original
+            # PAD/source operands and callback identities are not rewritten.
+            value.announcements=['handshake','start'];value.setup_seen=True;value.seq=seq
+            return value
+        value=receiver(first_consume['seq'])
+        value.accept(projected(first_consume));value.accept(projected(first_tick))
+        self.assertEqual(value.tick_count,1)
+        self.assertIsNone(value.pending_neutral_sample)
+        stale=projected(actual[3],value.seq)
+        with self.assertRaisesRegex(ValueError,'fresh neutral'):value.accept(stale)
+        value=receiver(first_tick['seq']);value.last_pad=[driver.NEUTRAL_PAD]*2
+        with self.assertRaisesRegex(ValueError,'fresh neutral'):value.accept(projected(first_tick))
+        value=receiver(first_consume['seq']);value.accept(projected(first_consume))
+        with self.assertRaisesRegex(ValueError,'repeated unpaired'):value.accept(projected(first_consume,value.seq))
+        value=receiver(first_consume['seq']);value.accept(projected(first_consume))
+        wrong=projected(first_tick);wrong['source_tick']=1
+        with self.assertRaises(ValueError):value.accept(wrong)
+
+
+    def test_actual_native_boundary_dispatch_five_pcs_and_default_off(self):
+        import re
+        source=(SOURCE_ROOT/'reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp').read_text()
+        start=source.index('static bool IsCaptureBoundary(')
+        stop=source.index('\nbool Observer::IsRngReturnBoundary',start)
+        predicate=source[start:stop]
+        start=source.index('void Observer::OnBoundary(')
+        stop=source.index('\nvoid Observer::Observe(',start)
+        dispatch=source[start:stop]
+        constants='\n'.join(re.findall(r'^constexpr u32 (?:SSS_ENTER_RETURN|STADIUM_GO_AFTER_PC) = .*?;',source,re.M))
+        array=re.search(r'constexpr std::array<u32, 7> STADIUM_CONSTRUCTOR_PCS = \{.*?\};',source,re.S).group(0)
+        fixture=r'''
+#include <algorithm>
+#include <array>
+#include <cassert>
+#include <cstdint>
+#include <map>
+#include <string>
+using u32=uint32_t;
+std::map<std::string,std::string> env;
+std::string Env(const char* key){return env[key];}
+bool SdInitRequested(){return !Env("MWRC_SD_INIT").empty();}
+bool OrdinaryTimeoutRequested(){return false;} bool SparsePairRequested(){return false;}
+bool CpuProbeEnabled(){return false;} bool ItemProbeEnabled(){return false;}
+struct ProbeEnvironment{u32 rng_return_pc=0;};
+ProbeEnvironment CpuProbeEnvironment(){return {};}
+const void* FindCpuProbePoint(u32){return nullptr;}
+const void* FindItemProbePoint(u32){return nullptr;}
+bool IsEnabled(){return true;} bool AllocationConfigured(){return !Env("MWRC_ALLOCATION_OUTPUT").empty();}
+namespace Core{struct System{};} namespace PowerPC{struct PowerPCState{};}
+unsigned allocation_calls=0,primary_calls=0;
+namespace ReferenceAllocation{struct Observer{static void Observe(Core::System*,u32,PowerPC::PowerPCState*){++allocation_calls;}static std::string Error(){return {};}};}
+struct Impl{void SetInvalid(const std::string&) {assert(false);}};
+struct Observer{Impl* m_impl;void Observe(Core::System*,u32,PowerPC::PowerPCState*){++primary_calls;}static void OnBoundary(Core::System*,u32,PowerPC::PowerPCState*);};
+Impl impl;Observer instance{&impl};Observer& Instance(){return instance;}
+'''+constants+'\n'+array+'\n'+LEGACY_CAPTURE_BOUNDARY.replace('IsCaptureBoundary','BeforeCaptureBoundary',1)+predicate+dispatch
+        fixture+=r'''
+int main(){Core::System system;PowerPC::PowerPCState state;
+const std::array<u32,5> added{SSS_ENTER_RETURN,0x8025a310,0x8025a4c0,0x8025a4e8,0x8025a548};
+for(const char* legacy:{"none","go","constructor","transform","sd"}){
+env.clear();if(std::string(legacy)=="go"||std::string(legacy)=="constructor")env["MWRC_STADIUM_GO_PREFIX"]="1";
+if(std::string(legacy)=="constructor")env["MWRC_STADIUM_CONSTRUCTOR_OWNER"]="1";
+if(std::string(legacy)=="transform")env["MWRC_TRANSFORM_PREFIX"]="1";
+if(std::string(legacy)=="sd"){env["MWRC_SD_INIT"]="1";env["MWRC_SD_MENU_PROBE"]="sd_prefix";}
+for(u32 pc:added)assert(BeforeCaptureBoundary(pc)==IsCaptureBoundary(pc));
+for(u32 pc:STADIUM_CONSTRUCTOR_PCS)assert(BeforeCaptureBoundary(pc)==IsCaptureBoundary(pc));
+for(u32 pc:{STADIUM_GO_AFTER_PC,0x8025bbd0u,0x8034dd8cu,0xdeadbeefu})assert(BeforeCaptureBoundary(pc)==IsCaptureBoundary(pc));}
+env.clear();env["MWRC_STADIUM_WHOLE_FEEDBACK"]="1";env["MWRC_ALLOCATION_OUTPUT"]="owned";
+for(u32 pc:added){assert(IsCaptureBoundary(pc));primary_calls=allocation_calls=0;Observer::OnBoundary(&system,pc,&state);assert(primary_calls==1&&allocation_calls==1);}
+for(u32 pc:STADIUM_CONSTRUCTOR_PCS){assert(!IsCaptureBoundary(pc));primary_calls=0;Observer::OnBoundary(&system,pc,&state);assert(primary_calls==0);}
+assert(!IsCaptureBoundary(STADIUM_GO_AFTER_PC));assert(!IsCaptureBoundary(0xdeadbeef));
+env.clear();for(u32 pc:added){primary_calls=0;Observer::OnBoundary(&system,pc,&state);assert(primary_calls==0);}
+}
+'''
+        cpp=self.workspace/'actual-five-pc-dispatch.cpp';binary=self.workspace/'actual-five-pc-dispatch'
+        cpp.write_text(fixture)
+        subprocess.run(['/usr/bin/clang++','-std=c++17','-Wall','-Wextra','-Werror',str(cpp),'-o',str(binary)],check=True,timeout=60)
+        subprocess.run([str(binary)],check=True,timeout=15)
+
+
+LEGACY_PUBLISHER = '  void PublishStadiumProgress(const char* phase, u32 pc, u32 word, u32 argument,\n                              PowerPC::PowerPCState* state, u32 source_tick)\n  {\n    std::string json =\n        "{\\"diagnostic\\":\\"stadium_go_prefix_v3\\",\\"phase\\":\\"" +\n        std::string(phase) + "\\",\\"setup_receipt_sha256\\":\\"" +\n        stadium_go_prefix_setup_receipt_sha256 +\n        "\\",\\"setup_profile_verified_by_observer\\":false,\\"pc\\":\\"0x";\n    if (!AppendHex(&json, pc, 8))\n      return SetInvalid("Stadium named Progress PC serialization exceeded its bound"), void();\n    json += "\\",\\"word\\":\\"0x";\n    if (!AppendHex(&json, word, 8))\n      return SetInvalid("Stadium named Progress word serialization exceeded its bound"), void();\n    json += "\\",\\"argument\\":\\"0x";\n    if (!AppendHex(&json, argument, 8))\n      return SetInvalid("Stadium named Progress argument serialization exceeded its bound"), void();\n    json += "\\",\\"lr\\":\\"0x";\n    if (!AppendHex(&json, state->spr[8], 8))\n      return SetInvalid("Stadium named Progress LR serialization exceeded its bound"), void();\n    json += "\\"";\n    if (std::string(phase).rfind("constructor_", 0) == 0)\n    {\n      json += ",\\"constructor_gprs\\":[";\n      const std::array<u32, 6> indices = {3, 13, 27, 28, 30, 31};\n      for (size_t i = 0; i < indices.size(); ++i)\n      {\n        if (i) json += ",";\n        json += std::to_string(state->gpr[indices[i]]);\n      }\n      json += "]";\n    }\n    if (std::string(phase).rfind("sss_position_", 0) == 0)\n    {\n      json += ",\\"position_call\\":" + std::to_string(stadium_sss_position.id);\n      const std::array<std::pair<const char*, u32>, 4> owners = {{{"cursor_gobj", stadium_sss_position.gobj},\n          {"cursor_jobj", stadium_sss_position.jobj}, {"cursor_proc", stadium_sss_position.proc},\n          {"frame_sp", stadium_sss_position.frame_sp}}};\n      for (const auto& owner : owners)\n      {\n        json += ",\\"" + std::string(owner.first) + "\\":\\"0x";\n        if (!AppendHex(&json, owner.second, 8))\n          return SetInvalid("Stadium position owner serialization exceeded its bound"), void();\n        json += "\\"";\n      }\n      json += ",\\"entry_cursor_state\\":" + std::to_string(stadium_sss_position.entry_cursor_state);\n      if (std::string(phase) == "sss_position_end" && stadium_sss_position.cursor_seen)\n        json += ",\\"end_row_index\\":" + std::to_string(state->gpr[30]);\n      else\n        json += ",\\"end_row_index\\":null";\n      json += std::string(",\\"cursor_observed\\":") + (stadium_sss_position.cursor_seen ? "true" : "false") +\n              ",\\"target_observed\\":" + (stadium_sss_position.target_seen ? "true" : "false");\n    }\n    if (std::string(phase) == "go_after")\n      json += ",\\"callsite_pc\\":\\"0x8016b820\\",\\"callsite_word\\":\\"0x48068821\\"";\n    if (std::string(phase) == "go_after")\n      json += ",\\"state_snapshot_schema\\":\\"stadium_idle_state_v1\\",\\"sis_table_entry_relationship_observed\\":false,\\"dynamic_title_text_bytes_observed\\":false";\n    json += ",\\"source_tick\\":" + std::to_string(source_tick) +\n            ",\\"draw_ordinal\\":" + std::to_string(draw_ordinal) + ",\\"slices\\":[";\n    for (size_t index = 0; index < slice_count; ++index)\n    {\n      const SliceRef& slice = slices[index];\n      if (index)\n        json += ",";\n      json += "{\\"tag\\":" + std::to_string(static_cast<u16>(slice.tag)) +\n              ",\\"flags\\":" + std::to_string(slice.flags) +\n              ",\\"address\\":" + std::to_string(slice.address) +\n              ",\\"size\\":" + std::to_string(slice.size) + ",\\"hex\\":\\"";\n      if (!AppendHexBytes(&json, raw.data() + slice.offset, slice.size))\n        return SetInvalid("Stadium named Progress slices exceed their JSON bound"), void();\n      json += "\\"}";\n    }\n    json += "]}";\n    if (json.size() > RING_PAYLOAD)\n      return SetInvalid("Stadium named Progress exceeds its bounded payload"), void();\n    PushJson(Event::Progress, json, pc, source_tick, draw_ordinal);\n  }\n\n'
+
+LEGACY_CAPTURE_BOUNDARY = 'static bool IsCaptureBoundary(u32 guest_pc)\n{\n  switch (guest_pc)\n  {\n  case 0x8034DD8C:\n  case 0x80377584:\n  case 0x800693A8:\n  case 0x8016E934:\n  case 0x8016E9C4:\n  case 0x80390EB4:\n  case 0x80390FC0:\n  case 0x80391040:\n  case 0x8016E9C8:\n  case 0x8016EBBC:\n  case 0x8039157C:\n  case 0x801A4B70:\n  case 0x8026688C:\n  case 0x802669F0:\n  case 0x80266D70:\n  case 0x8025A998:\n  case 0x8025BBD0:\n  case 0x801A5AF0:\n  case 0x80177368:\n  case 0x80177704:\n  case 0x801A5F64:\n  case 0x80179350:\n  case 0x801BFCFC:\n  case 0x802FEBE0:\n  case 0x802FED10:\n  case 0x801A6308:\n  case 0x801BFF7C:\n  case 0x8038E8EC:\n    return true;\n  default:\n    // Diagnostic CPU PCs are JIT boundaries only for the fully validated,\n    // opt-in companion configuration.  The normal observer boundary set and\n    // its disabled path remain unchanged.\n    return (Env("MWRC_STADIUM_GO_PREFIX") == "1" &&\n            Env("MWRC_STADIUM_CONSTRUCTOR_OWNER") == "1" &&\n            std::find(STADIUM_CONSTRUCTOR_PCS.begin(), STADIUM_CONSTRUCTOR_PCS.end(), guest_pc) != STADIUM_CONSTRUCTOR_PCS.end()) ||\n           (Env("MWRC_STADIUM_GO_PREFIX") == "1" &&\n            (guest_pc == STADIUM_GO_AFTER_PC || guest_pc == SSS_ENTER_RETURN ||\n             guest_pc == 0x8025a310 || guest_pc == 0x8025a4c0 ||\n             guest_pc == 0x8025a4e8 || guest_pc == 0x8025a548)) ||\n           (Env("MWRC_TRANSFORM_PREFIX") == "1" && guest_pc == SSS_ENTER_RETURN) ||\n           (SdInitRequested() && (guest_pc == 0x8016ebc0 || guest_pc == 0x8016ec24 ||\n            ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() || SparsePairRequested()) && guest_pc == 0x8025b84c))) ||\n           (CpuProbeEnabled() && FindCpuProbePoint(guest_pc) != nullptr &&\n            (CpuProbeEnvironment().rng_return_pc == 0 ||\n             CpuProbeEnvironment().rng_return_pc == guest_pc)) ||\n           (ItemProbeEnabled() && FindItemProbePoint(guest_pc) != nullptr);\n  }\n}\n'

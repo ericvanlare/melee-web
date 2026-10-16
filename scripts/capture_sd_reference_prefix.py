@@ -914,8 +914,20 @@ def prepare_rules_profile(profile, user, *, source_slots=(0, 1)):
 
 
 def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_manifest, timeout=180, gci=None,
-        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False):
+        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False, stadium_whole_target=None, stadium_whole_setup=None, stadium_whole_gc=None, stadium_whole_dol=None, stadium_whole_provenance=None):
     """Own fresh output before preparation so failures cannot vanish before launch."""
+    whole_args = (stadium_whole_target, stadium_whole_setup, stadium_whole_gc,
+                  stadium_whole_dol, stadium_whole_provenance)
+    if any(x is not None for x in whole_args):
+        require(all(x is not None for x in whole_args) and input_plan is None and
+                input_replay is None and ordinary_policy is None and not stop_after_items and
+                not stadium_constructor_owner and not stadium_idle_3500,
+                'Whole Stadium route requires its complete exclusive input tuple')
+        return run_stadium_whole_three(dolphin=dolphin, disc=disc, profile=profile,
+            menu_recipe=menu_recipe, output=output, build_manifest=build_manifest,
+            target_path=stadium_whole_target, setup_path=stadium_whole_setup,
+            checkpoint_gc=stadium_whole_gc, dol=stadium_whole_dol,
+            provenance=stadium_whole_provenance, gci=gci, timeout=timeout)
     output = Path(output)
     replay_receipt = (stadium_replay_preflight(input_replay, output, build_manifest)
                       if input_replay is not None else None)
@@ -1821,6 +1833,346 @@ def drive_stadium_sss_feedback(receiver, menus, controller, next_row, wait_sourc
             "SSS Stadium confirm/release did not retain exact consumed PAD rows")
 
 
+class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
+    """Strict whole-session rows feeding the existing CSS/SSS input policies."""
+    def __init__(self, menus, receipt, expected):
+        super().__init__(menus)
+        require(isinstance(receipt, str) and len(receipt) == 64 and
+                all(c in '0123456789abcdef' for c in receipt) and receipt != '0'*64,
+                'Whole Stadium receipt identity differs')
+        self.receipt, self.expected = receipt, expected
+        self.match_index = 0
+        self.announcements = []
+        self.boundaries = []
+        self.tick_count = 0
+        self.previous_tick = None
+        self.pending_neutral_sample = None
+        self.chord_requested = False
+        self.chord_consumed = None
+        self.chord_released = None
+        self.outcome_seen = False
+        self.returned_css = False
+        self.start_allowed = False
+
+    def next_lifetime(self):
+        require(self.returned_css and self.match_index < 2 and not self.ended,
+                'Whole Stadium lifetime reset preceded natural ReturnCss')
+        self.sss_positions.require_closed()
+        seq, boundaries, announcements, index = self.seq, self.boundaries, self.announcements, self.match_index
+        fresh = type(self)(self.menus, self.receipt, self.expected)
+        self.__dict__.update(fresh.__dict__)
+        self.seq, self.boundaries, self.announcements, self.match_index = seq, boundaries, announcements, index+1
+
+    def accept(self, row):
+        from stadium_go_prefix import SSS_POSITION_PHASES
+        from retail_setup_validation import _decode_setup
+        from reference_versus_sequence_capture import raw_pad
+        from retail_input_plan import DISCONNECTED_PAD
+        require(not self.ended and type(row.get('seq')) is int and row['seq'] == self.seq,
+                'Whole Stadium source sequence differs')
+        self.seq += 1
+        event, payload = row['event'], row['payload']
+        if event in ('handshake', 'start'):
+            require(self.announcements == ([] if event == 'handshake' else ['handshake']) and
+                    payload.get('whole_session') is True and payload.get('match_count') == 3 and
+                    payload.get('stadium_whole_feedback') is True and
+                    payload.get('setup_receipt_sha256') == self.receipt,
+                    'Whole Stadium source announcement differs')
+            self.announcements.append(event)
+            return
+        require(self.announcements == ['handshake', 'start'], 'Whole Stadium row preceded announcements')
+        if event == 'error':
+            raise SdDiagnosticError('Whole Stadium native error: '+str(payload))
+        if event == 'end':
+            require(self.match_index == 2 and self.returned_css and payload.get('natural') is True and
+                    payload.get('status') == 'completed', 'Whole Stadium ended before third natural CSS')
+            self.ended = True
+            return
+        require(event in ('progress', 'boundary') and payload.get('whole_session') is True and
+                type(payload.get('match_index')) is int and payload['match_index'] == self.match_index,
+                'Whole Stadium scope or match index differs')
+        if event == 'progress':
+            require(payload.get('diagnostic') == 'stadium_whole3_feedback_v1' and
+                    payload.get('setup_receipt_sha256') == self.receipt,
+                    'Whole Stadium Progress identity differs')
+            phase = payload.get('phase')
+            if phase == 'sss_return':
+                require(not self.sss_position_route_ready and self.sss_live_owner_sequence is None,
+                        'Whole Stadium duplicate SSS readiness')
+                self.sss_position_route_ready = True
+            else:
+                require(phase in SSS_POSITION_PHASES, 'Whole Stadium unsupported Progress phase')
+                observation = self.sss_positions.accept(row, route_ready=self.sss_position_route_ready,
+                    expected_receipt=self.receipt, scope='stadium_whole3_feedback_v1',
+                    match_index=self.match_index)
+                self._feedback_position(row, observation)
+            return
+        name = payload.get('boundary')
+        self.boundaries.append(row)
+        if name == 'css_enter' and self.match_index == 0:
+            from whole_session_replay import _first_css_context
+            context = _first_css_context([row])
+            rules = bytes.fromhex(context['game_rules_hex'])
+            require((rules[2],rules[3],rules[4],rules[8],rules[10],rules[6]) == (0,2,3,0,1,10),
+                    'Whole Stadium first CSS source TIME120 baseline differs')
+        elif name == 'pad_poll':
+            self._pad_poll(row)
+        elif name == 'pad_consume':
+            if not self.setup_seen:
+                self._pad_consume_stadium(row)
+            else:
+                ports, errors, queue = _transform_consumed_ports(payload, row['seq'])
+                chord = raw_pad(buttons=['L','R','A','START'])
+                start = raw_pad(buttons=['START'])
+                allowed = [[NEUTRAL_PAD, NEUTRAL_PAD]]
+                if self.chord_requested and not self.outcome_seen:
+                    allowed.append([chord, NEUTRAL_PAD])
+                if self.start_allowed:
+                    allowed.extend([[start, NEUTRAL_PAD], [start, start]])
+                require(ports[2:] == [DISCONNECTED_PAD]*2 and errors == [0,0,-1,-1] and
+                        ports[:2] in allowed, 'Whole Stadium consumed PAD escaped current phase')
+                sample = dict(sequence=row['seq'], source_tick=row['source_tick'],
+                              phase='whole-post-setup', ports=ports, errors=errors,
+                              pc=payload['pc'], lr=payload['lr'], gprs=list(payload['gprs']), **queue)
+                if not self.chord_requested:
+                    require(self.pending_neutral_sample is None,
+                            'Whole Stadium repeated unpaired neutral consumed sample')
+                    self.pending_neutral_sample = sample
+                self.consumed_samples.append(sample)
+                self.menu_consumed += 1
+                self.last_pad = ports
+                if ports[:2] == [chord, NEUTRAL_PAD] and self.chord_consumed is None:
+                    self.chord_consumed = sample.copy()
+                elif self.chord_consumed is not None and self.chord_released is None and ports[:2] == [NEUTRAL_PAD]*2:
+                    self.chord_released = sample.copy()
+        elif name == 'sss_exit':
+            self.sss_positions.require_closed()
+            self.sss_position_route_ready = False
+            self.sss_geometry_token = self.sss_geometry_pending = self.sss_completed_input = None
+        elif name in ('entry', 'setup'):
+            items = [x for x in payload.get('slices', []) if x.get('name') == 'match_setup']
+            require(len(items) == 1 and _decode_setup(items[0]['hex']) == self.expected,
+                    'Whole Stadium source Setup differs from TIME120 declaration')
+            if name == 'setup':
+                require(not self.setup_seen and self.confirm_release_sequence is not None,
+                        'Whole Stadium Setup preceded consumed menu confirmation/release')
+                self.setup_seen = True
+        elif name == 'source_tick':
+            require(self.setup_seen and self.last_pad is not None and
+                    (row['source_tick'] == 0 if self.previous_tick is None else row['source_tick'] == self.previous_tick+1),
+                    'Whole Stadium source tick lacks ordered Setup/PAD')
+            if not self.chord_requested:
+                sample = self.pending_neutral_sample
+                require(sample is not None and sample['sequence'] < row['seq'] and
+                        sample['source_tick'] == row['source_tick'] and
+                        sample['ports'][:2] == [NEUTRAL_PAD]*2,
+                        'Whole Stadium counted tick lacks its fresh neutral consumed owner')
+                self.pending_neutral_sample = None
+                self.tick_count += 1
+            self.previous_tick = row['source_tick']
+        elif name == 'vs_exit_return':
+            items = [x for x in payload.get('slices', []) if x.get('name') == 'result']
+            require(self.chord_consumed is not None and self.chord_released is not None and
+                    len(items) == 1 and bytes.fromhex(items[0]['hex'])[0] == 7,
+                    'Whole Stadium exit lacks consumed chord/release or no-contest outcome7')
+            self.outcome_seen = True
+        elif name == 'return_css':
+            require(self.outcome_seen, 'Whole Stadium CSS return preceded outcome7')
+            self.returned_css = True
+
+
+class StadiumDeadlineController:
+    """Bound existing Pipe actions; no alternate input or Results policy."""
+    def __init__(self, controller, deadline):
+        self.controller, self.deadline = controller, deadline
+        self.sleep = controller.sleep
+
+    def set_both(self, p1, p2, *, action):
+        require(time.monotonic() < self.deadline, 'Whole Stadium deadline expired before input')
+        self.controller.set_both(p1, p2, action=action)
+
+    def hold(self, p1, p2, seconds, *, action):
+        require(type(seconds) in (int, float) and seconds > 0 and
+                seconds < self.deadline-time.monotonic(),
+                'Whole Stadium remaining deadline cannot fit existing input hold')
+        # Keep the shared policy's exact press/sleep/release behavior. Its
+        # release routes through this checked set_both as well.
+        DualPipeController.hold(self, p1, p2, seconds, action=action)
+
+
+def drive_stadium_whole_three(receiver, tail, controller, menus, deadline):
+    """Existing input policies, three natural completions; no pause or source writes."""
+    controller = StadiumDeadlineController(controller, deadline)
+    from reference_versus_sequence_capture import raw_pad
+    def next_row():
+        row = tail.next(deadline)
+        receiver.accept(row)
+        return row
+    def wait_source(predicate, label, max_polls):
+        first = receiver.menu_polls
+        while not predicate():
+            require(not receiver.ended and receiver.menu_polls-first < max_polls and time.monotonic()<deadline,
+                    'Whole Stadium source predicate/deadline: '+label)
+            next_row()
+    def tap(action, label, max_polls):
+        before = receiver.menu_consumed
+        controller.set_both(action['p1'], action['p2'], action=label)
+        wait_source(lambda: receiver.menu_consumed>before and receiver.last_pad[:2]==[action['p1'],action['p2']],label+':consumed',max_polls)
+        before = receiver.menu_consumed
+        controller.set_both(NEUTRAL_PAD,NEUTRAL_PAD,action=label+':release')
+        wait_source(lambda: receiver.menu_consumed>before and receiver.last_pad[:2]==[NEUTRAL_PAD]*2,label+':released',max_polls)
+    # Reuse original cold-menu policy until its checked first CSS owner.
+    while receiver.css is None:
+        next_row()
+        scene = (receiver.latest_menu or {}).get('scene')
+        for action in menus['boot']:
+            if scene == action['scene']:
+                tap(action,'whole-cold-scene-'+str(scene),600)
+                break
+    measurements = []
+    for index in range(3):
+        drive_authored_css_sss(receiver,menus,controller,next_row,wait_source,tap)
+        wait_source(lambda: receiver.setup_seen,'Setup',600)
+        while receiver.tick_count < 180:
+            next_row()
+        receiver.chord_requested = True
+        requested_after = dict(sequence=receiver.seq-1, source_tick=receiver.previous_tick,
+                               minimum_neutral_ticks=receiver.tick_count)
+        tap({'p1':raw_pad(buttons=['L','R','A','START']),'p2':NEUTRAL_PAD},'whole-no-contest',600)
+        wait_source(lambda: receiver.outcome_seen,'natural-exit-outcome7',600)
+        # Use the existing checked exit/Results/Prize protocol intact.
+        from reference_versus_sequence_capture import SequenceRunner
+        class ObservedResultsTail:
+            def next(self, phase_deadline):
+                row = tail.next(min(deadline, phase_deadline))
+                receiver.accept(row)
+                return row
+            boundary = staticmethod(ObserverTail.boundary)
+            wait_boundary = ObserverTail.wait_boundary
+        result_policy = SequenceRunner([], [], ObservedResultsTail(), controller)
+        result_policy._boundary('vs_mode_exit', index, deadline)
+        result_policy._boundary('results_enter', index, deadline)
+        receiver.start_allowed = True
+        result_policy._confirm_results(index, deadline)
+        require(receiver.returned_css,'Whole Stadium Results lacks checked natural CSS return')
+        measurements.append(dict(match_index=index, request=requested_after,
+            actual_chord=receiver.chord_consumed, actual_release=receiver.chord_released))
+        if index < 2:
+            receiver.next_lifetime()
+    while not receiver.ended:
+        next_row()
+    remaining = deadline-time.monotonic()
+    require(remaining > 0, 'Whole Stadium deadline expired before writer status')
+    tail.require_completed_status(timeout=min(5.0, remaining))
+    require(time.monotonic() < deadline, 'Whole Stadium deadline expired during writer status')
+    return measurements
+
+
+def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, build_manifest,
+                             target_path, setup_path, checkpoint_gc, dol, provenance, gci, timeout):
+    """Explicit private whole3/sidecar2 diagnostic using the existing passive route."""
+    import types
+    from capture_allocation_history import (validate_setup_receipt, stadium_three_target,
+                                            validate_stadium_three_native)
+    from retail_allocation_profile import build_profile
+    from sd_gci_profile import prepare_gci_folder
+    from reference_observer_stream import iter_records
+    deadline = time.monotonic()+180
+    require(timeout == 180 and all(x is not None for x in
+        [target_path,setup_path,checkpoint_gc,dol,provenance,gci]),
+        'Whole Stadium requires exact180s and complete owned input tuple')
+    require(not any(k.startswith('MWRC_') for k in os.environ),
+            'Whole Stadium refuses inherited native observer settings')
+    output=Path(output)
+    output.mkdir()
+    process=bounded_log=log=None
+    report=dict(scope='original-stadium-whole3-feedback-allocation2',result='fail',
+                endpoint_scope='firsttwo short natural lifetimes only; no C3/per-owner ledger',
+                input_contract='minimum180 observed neutral ticks before ordinary chord request; actual consume ticks retained')
+    try:
+        build=validate_reference_build_manifest(Path(build_manifest),Path(dolphin))
+        actual_manifest=json.loads(Path(build_manifest).read_text())
+        overlay=ROOT/'reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp'
+        require(actual_manifest.get('observer_source_overlay_sha256',{}).get('Core/PowerPC/ReferenceCaptureObserver.cpp') == hashlib.sha256(overlay.read_bytes()).hexdigest(),
+                'Whole Stadium linked observer producer is stale')
+        inputs=types.SimpleNamespace(disc=Path(disc),dol=Path(dol),dolphin=Path(dolphin),
+            template_user=Path(profile),checkpoint_gc=Path(checkpoint_gc),initial_gci=Path(gci),
+            provenance=Path(provenance))
+        setup=validate_setup_receipt(Path(setup_path),inputs,build)
+        expected=stadium_three_target(Path(target_path))['source_expected_setup']
+        menus,_=menu_actions(menu_recipe)
+        require(menus['scope']=='stadium_go_prefix' and menus['version']==11 and
+                menus['sss'].get('policy')=='same_call_feedback_v1',
+                'Whole Stadium must reuse the existing reviewed same-call input policy')
+        # The historical policy document is input-geometry provenance only.
+        # Actual source Setup/receipt are admitted separately, never relabeled GO-prefix.
+        menus=json.loads(json.dumps(menus))
+        menus['css']['costumes']=[p['costume'] for p in expected['players']]
+        user=output/'user'
+        p1,p2,profile_inventory=prepare_rules_profile(profile,user)
+        loaded_profile,owned_gci=prepare_gci_folder(gci,output/'gci-folder')
+        allocation_profile=output/'allocation-profile.json'
+        allocation_profile.write_bytes(canonical(build_profile(Path(dol),ROOT/'.deps/melee/config/GALE01/symbols.txt')))
+        raw,status=output/'native-primary.mwro',output/'native-primary-status.json'
+        native,native_status=output/'native-inputs.mwri',output/'native-input-status.json'
+        env={k:v for k,v in os.environ.items() if not k.startswith(('MWRC_','DOLPHIN_','SDL_'))}
+        env.update(MWRC_ENABLE='1',MWRC_CPU='JITARM64',MWRC_SOURCE_REV='GALE01r2',
+            MWRC_DOL_SHA256=hashlib.sha256(Path(dol).read_bytes()).hexdigest(),
+            MWRC_OUTPUT=str(raw),MWRC_STATUS=str(status),MWRC_INPUT_RECORD=str(native),
+            MWRC_INPUT_STATUS=str(native_status),MWRC_WHOLE_SESSION_MATCHES='3',
+            MWRC_CAPTURE_ID='stadium-whole3',MWRC_SEQUENCE_ID='primary3-allocation2-feedback',
+            MWRC_ALLOCATION_OUTPUT=str(output/'native-allocations.jsonl'),
+            MWRC_ALLOCATION_VS_TARGET='2',MWRC_ALLOCATION_STOP_AT='exit',
+            MWRC_STADIUM_WHOLE_FEEDBACK='1',MWRC_STADIUM_WHOLE_SETUP_RECEIPT_SHA256=setup['sha256'])
+        command=rules_dolphin_command(dolphin,user,disc)+['-C','Dolphin.Core.SlotA=8',
+            '-C','Dolphin.Core.GCIFolderAPath='+str(output/'gci-folder')]
+        receiver=StadiumWholeFeedbackReceiver(menus,setup['sha256'],expected)
+        controller=StadiumIntentController(p1,p2,output/'input-intentions.jsonl')
+        launch=dict(command=command,environment_delta={k:v for k,v in env.items() if k.startswith('MWRC_')},manifest=build,setup=setup,expected=expected,
+                    profile_inventory=profile_inventory,operation_seconds=180,owner_seconds=210,cleanup_seconds=30)
+        (output/'launch.json').write_bytes(canonical(launch))
+        require(time.monotonic()<deadline,'Whole Stadium operation expired before native launch')
+        log=(output/'dolphin.log').open('xb')
+        process=subprocess.Popen(command,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,start_new_session=True)
+        bounded_log=BoundedLog(process.stdout,log,STADIUM_CAPTURE_CAPS['log_bytes'])
+        def wait_check():
+            check_owned_native_wait(process,bounded_log)
+            check_stadium_capture_bounds(raw,native,deadline,receiver.seq)
+        with ObserverTail(raw,status,wait_check=wait_check) as tail:
+            report['actual_inputs']=drive_stadium_whole_three(receiver,tail,controller,menus,deadline)
+        wait_transform_terminal_statuses(status,native_status,deadline,wait_check=wait_check)
+        report['input_stream']=validate_input_stream(native)
+        report['native']=validate_stadium_three_native(output,allocation_profile,expected)
+        require(time.monotonic()<deadline,'Whole Stadium operation expired during final validation')
+        report['result']='pass'
+        cleanup_process(process,output,scope=report['scope'])
+        process=None
+        bounded_log.finish()
+        bounded_log=None
+    except BaseException as error:
+        report['error']=repr(error)
+        report['result']='fail'
+        raise
+    finally:
+        primary_error=sys.exc_info()[1]
+        errors=[]
+        if process is not None:
+            try:cleanup_process(process,output,scope=report['scope'])
+            except BaseException as error:errors.append(repr(error))
+        if bounded_log is not None:
+            try:bounded_log.finish()
+            except BaseException as error:errors.append(repr(error))
+        if log is not None:
+            try:log.close()
+            except BaseException as error:errors.append(repr(error))
+        report['cleanup_errors']=errors
+        if errors:report['result']='fail'
+        (output/'report.json').write_bytes(canonical(report))
+        if errors and primary_error is None:raise SdDiagnosticError('Whole Stadium cleanup failed: '+str(errors))
+    return report
+
+
+
 def main(argv=None):
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
@@ -1838,6 +2190,10 @@ def main(argv=None):
     parser.add_argument("--stop-after-items", action="store_true",
                         help="Stop the same original transform menu route at observed Items readiness; no setup/transform claim")
     parser.add_argument("--timeout", type=float, default=180)
+    for name in ('stadium-whole-target','stadium-whole-setup','stadium-whole-gc',
+                 'stadium-whole-dol','stadium-whole-provenance'):
+        parser.add_argument('--'+name,type=Path,
+                            help='Explicit whole3/allocation2 passive source-route input identity')
     args = parser.parse_args(argv)
     try:
         comparator = None

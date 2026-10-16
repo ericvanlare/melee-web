@@ -310,12 +310,26 @@ class StadiumSssPositionObservations:
         self.active = None
         self.last_call = 0
 
-    def accept(self, row, *, route_ready, expected_receipt=EXPECTED_SETUP_RECEIPT_SHA256):
+    def accept(self, row, *, route_ready, expected_receipt=EXPECTED_SETUP_RECEIPT_SHA256,
+               scope="stadium_go_prefix_v3", match_index=None):
         p = row["payload"]
         phase = p.get("phase")
         _require(route_ready and phase in SSS_POSITION_PHASES,
                  "SSS position is outside its accepted live source route")
-        _require(p.get("diagnostic") == DIAGNOSTIC and
+        _require(scope in (DIAGNOSTIC, "stadium_whole3_feedback_v1"),
+                 "SSS position diagnostic scope is unsupported")
+        if scope == "stadium_whole3_feedback_v1":
+            _require(type(match_index) is int and 0 <= match_index < 3 and
+                     p.get("whole_session") is True and
+                     type(p.get("match_index")) is int and p["match_index"] == match_index and
+                     isinstance(expected_receipt, str) and len(expected_receipt) == 64 and
+                     all(c in "0123456789abcdef" for c in expected_receipt) and
+                     expected_receipt != "0" * 64,
+                     "SSS whole feedback identity/index differs")
+        else:
+            _require(match_index is None and p.get("whole_session") is not True,
+                     "Historical SSS prefix cannot admit whole-session rows")
+        _require(p.get("diagnostic") == scope and
                  p.get("setup_receipt_sha256") == expected_receipt and
                  p.get("setup_profile_verified_by_observer") is False,
                  "SSS position has a foreign diagnostic/receipt")

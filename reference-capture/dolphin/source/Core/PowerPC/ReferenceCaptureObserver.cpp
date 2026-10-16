@@ -1174,6 +1174,30 @@ struct Observer::Impl
     if (!stadium_go_prefix_setting.empty() && stadium_go_prefix_setting != "1")
       return SetInvalid("MWRC_STADIUM_GO_PREFIX must be 1 when set"), false;
     stadium_go_prefix_enabled = stadium_go_prefix_setting == "1";
+    const std::string whole_feedback_setting = Env("MWRC_STADIUM_WHOLE_FEEDBACK");
+    if (!whole_feedback_setting.empty() && whole_feedback_setting != "1")
+      return SetInvalid("Stadium whole feedback must be explicitly 1"), false;
+    stadium_whole_feedback = whole_feedback_setting == "1";
+    stadium_whole_setup_receipt = Env("MWRC_STADIUM_WHOLE_SETUP_RECEIPT_SHA256");
+    if (stadium_whole_feedback &&
+        (whole_session_matches != 3 || stadium_go_prefix_enabled || SdInitRequested() ||
+         !Env("MWRC_STADIUM_CONSTRUCTOR_OWNER").empty() ||
+         !Env("MWRC_STADIUM_IDLE_3500").empty() ||
+         !Env("MWRC_TRANSFORM_PREFIX").empty() ||
+         !Env("MWRC_ENTITY_PROFILE").empty() ||
+         !Env("MWRC_SD_MENU_PROBE").empty() ||
+         !Env("MWRC_ORDINARY_POLICY_SHA256").empty() ||
+         !Env("MWRC_CPU_PROBE_OUTPUT").empty() ||
+         !Env("MWRC_ITEM_PROBE_OUTPUT").empty() || !AllocationConfigured() ||
+         Env("MWRC_ALLOCATION_VS_TARGET") != "2" ||
+         Env("MWRC_ALLOCATION_STOP_AT") != "exit" ||
+         !InputStream::IsRecording() || InputStream::IsReplaying() ||
+         stadium_whole_setup_receipt.size() != 64 ||
+         stadium_whole_setup_receipt.find_first_not_of("0123456789abcdef") != std::string::npos ||
+         stadium_whole_setup_receipt == std::string(64, '0')))
+      return SetInvalid("Stadium whole feedback requires exclusive whole3/allocation2 recording"), false;
+    if (!stadium_whole_feedback && !stadium_whole_setup_receipt.empty())
+      return SetInvalid("Stadium whole feedback receipt lacks explicit scope"), false;
     const std::string constructor_setting = Env("MWRC_STADIUM_CONSTRUCTOR_OWNER");
     if ((!constructor_setting.empty() && constructor_setting != "1") ||
         (!constructor_setting.empty() && !stadium_go_prefix_enabled))
@@ -1412,6 +1436,8 @@ struct Observer::Impl
       handshake += ",\"entity_profile\":\"" + Env("MWRC_ENTITY_PROFILE") + "\"";
     if (stadium_idle_3500)
       handshake += ",\"original_idle_post_go_ticks\":3500";
+    if (stadium_whole_feedback)
+      handshake += ",\"stadium_whole_feedback\":true,\"setup_receipt_sha256\":\"" + stadium_whole_setup_receipt + "\"";
     handshake += "}";
     PushJson(Event::Handshake, handshake);
     std::string start =
@@ -1439,6 +1465,8 @@ struct Observer::Impl
       start += ",\"constructor_owner_observations\":true";
     if (stadium_idle_3500)
       start += ",\"original_idle_post_go_ticks\":3500";
+    if (stadium_whole_feedback)
+      start += ",\"stadium_whole_feedback\":true,\"setup_receipt_sha256\":\"" + stadium_whole_setup_receipt + "\"";
     start += "}";
     PushJson(Event::Start, start);
     return !invalid.load();
@@ -2877,9 +2905,9 @@ struct Observer::Impl
       return true;
     if (scene_kind == 9 && stadium_go_prefix_enabled && !stadium_go_prefix_sss_ready)
       return true;
-    if (scene_kind == 9 && (Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() || SparsePairRequested()))
+    if (scene_kind == 9 && (Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() || SparsePairRequested() || stadium_whole_feedback))
     {
-      if (!sd_sss_ready)
+      if (!(stadium_whole_feedback ? stadium_whole_sss_ready : sd_sss_ready))
         return true;
       // mnStageSel_80259C28 tests lwz r0,-0x49fc(r13), cmpwi, bne
       // before accepting confirmation. Original GALE01r2 r13 is 0x804db6a0.
@@ -3805,10 +3833,12 @@ struct Observer::Impl
   void PublishStadiumProgress(const char* phase, u32 pc, u32 word, u32 argument,
                               PowerPC::PowerPCState* state, u32 source_tick)
   {
+    const std::string diagnostic = stadium_whole_feedback ?
+        "stadium_whole3_feedback_v1" : "stadium_go_prefix_v3";
     std::string json =
-        "{\"diagnostic\":\"stadium_go_prefix_v3\",\"phase\":\"" +
+        "{\"diagnostic\":\"" + diagnostic + "\",\"phase\":\"" +
         std::string(phase) + "\",\"setup_receipt_sha256\":\"" +
-        stadium_go_prefix_setup_receipt_sha256 +
+        (stadium_whole_feedback ? stadium_whole_setup_receipt : stadium_go_prefix_setup_receipt_sha256) +
         "\",\"setup_profile_verified_by_observer\":false,\"pc\":\"0x";
     if (!AppendHex(&json, pc, 8))
       return SetInvalid("Stadium named Progress PC serialization exceeded its bound"), void();
@@ -3874,6 +3904,11 @@ struct Observer::Impl
       json += "\"}";
     }
     json += "]}";
+    if (stadium_whole_feedback)
+    {
+      json.pop_back();
+      json += ",\"whole_session\":true,\"match_index\":" + std::to_string(match_index) + "}";
+    }
     if (json.size() > RING_PAYLOAD)
       return SetInvalid("Stadium named Progress exceeds its bounded payload"), void();
     PushJson(Event::Progress, json, pc, source_tick, draw_ordinal);
@@ -3894,8 +3929,10 @@ struct Observer::Impl
 
   void ObserveStadiumSssPosition(Core::System* system, u32 pc, PowerPC::PowerPCState* state)
   {
-    const bool live_phase = stadium_go_prefix_phase == StadiumGoPrefixPhase::AwaitSssExit &&
-                            stadium_go_prefix_sss_ready && !stadium_go_prefix_sss_exit_seen;
+    const bool live_phase = stadium_whole_feedback ?
+        (whole_phase == 3 && stadium_whole_sss_ready) :
+        (stadium_go_prefix_phase == StadiumGoPrefixPhase::AwaitSssExit &&
+         stadium_go_prefix_sss_ready && !stadium_go_prefix_sss_exit_seen);
     if (!live_phase)
     {
       stadium_sss_position = {};
@@ -4249,6 +4286,34 @@ struct Observer::Impl
       if (pc != 0x80390eb4 && pc != 0x80391040)
         return;
     }
+    if (stadium_whole_feedback)
+    {
+      if (pc == SSS_ENTER_RETURN)
+      {
+        u32 word = 0, tick = 0;
+        if (whole_phase != 3 || stadium_whole_sss_ready ||
+            !ReadU32(system, pc, &word) || word != 0x4e800020 ||
+            !ReadU32(system, 0x80479d58, &tick))
+          return SetInvalid("Stadium whole SSS readiness lacks ordered source return"), void();
+        raw_size = 0;
+        slice_count = 0;
+        if (!AddMenuSlices(system, Boundary::SssExit, 0))
+          return SetInvalid("Stadium whole SSS return lacks live source owner"), void();
+        stadium_whole_sss_ready = true;
+        PublishStadiumProgress("sss_return", pc, word, 0, state, tick);
+        return;
+      }
+      if (pc == 0x8025a310 || pc == 0x8025a4c0 || pc == 0x8025a4e8 || pc == 0x8025a548)
+        return ObserveStadiumSssPosition(system, pc, state), void();
+      if (pc == 0x8025bbd0)
+      {
+        if (whole_phase != 3 || !stadium_whole_sss_ready || stadium_sss_position.active)
+          return SetInvalid("Stadium whole SSS exit lacks closed source callback"), void();
+        stadium_whole_sss_ready = false;
+        stadium_sss_position = {};
+        // Continue through unchanged whole-session exit validation/publication.
+      }
+    }
     if (whole_session_enabled() && pc == CSS_ENTER_RETURN)
     {
       u32 word = 0;
@@ -4443,6 +4508,13 @@ struct Observer::Impl
         if (whole_phase != 2)
           return SetInvalid("whole-session SSS enter was missing or out of order"), void();
         whole_phase = 3;
+        if (stadium_whole_feedback)
+        {
+          if (stadium_sss_position.active)
+            return SetInvalid("Stadium whole SSS entry retained prior callback"), void();
+          stadium_whole_sss_ready = false;
+          stadium_sss_position = {};
+        }
       }
       else
       {
@@ -6146,6 +6218,9 @@ struct Observer::Impl
   u32 stadium_constructor_gobj = 0, stadium_constructor_ground = 0;
   u32 stadium_constructor_parameter_slot = 0, stadium_constructor_parameters = 0;
   bool stadium_go_prefix_enabled = false;
+  bool stadium_whole_feedback = false;
+  bool stadium_whole_sss_ready = false;
+  std::string stadium_whole_setup_receipt;
   std::string stadium_go_prefix_setup_receipt_sha256;
   StadiumGoPrefixPhase stadium_go_prefix_phase = StadiumGoPrefixPhase::Disabled;
   bool stadium_go_prefix_css_ready = false;
@@ -6291,6 +6366,9 @@ static bool IsCaptureBoundary(u32 guest_pc)
             (guest_pc == STADIUM_GO_AFTER_PC || guest_pc == SSS_ENTER_RETURN ||
              guest_pc == 0x8025a310 || guest_pc == 0x8025a4c0 ||
              guest_pc == 0x8025a4e8 || guest_pc == 0x8025a548)) ||
+           (Env("MWRC_STADIUM_WHOLE_FEEDBACK") == "1" &&
+            (guest_pc == SSS_ENTER_RETURN || guest_pc == 0x8025a310 ||
+             guest_pc == 0x8025a4c0 || guest_pc == 0x8025a4e8 || guest_pc == 0x8025a548)) ||
            (Env("MWRC_TRANSFORM_PREFIX") == "1" && guest_pc == SSS_ENTER_RETURN) ||
            (SdInitRequested() && (guest_pc == 0x8016ebc0 || guest_pc == 0x8016ec24 ||
             ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() || SparsePairRequested()) && guest_pc == 0x8025b84c))) ||
