@@ -1848,6 +1848,9 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
         self.previous_tick = None
         self.pending_neutral_sample = None
         self.chord_requested = False
+        self.pause_consumed = self.pause_released = None
+        self.pause_positive_clock = self.pause_ready_clock = None
+        self.exit_requested = False
         self.chord_consumed = None
         self.chord_released = None
         self.outcome_seen = False
@@ -1862,6 +1865,46 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
         fresh = type(self)(self.menus, self.receipt, self.expected)
         self.__dict__.update(fresh.__dict__)
         self.seq, self.boundaries, self.announcements, self.match_index = seq, boundaries, announcements, index+1
+
+    def observe_pause_clock(self, row):
+        """Indirect pause evidence from existing source clock, never a pause getter."""
+        if not self.chord_requested or self.exit_requested or self.pause_consumed is None:
+            return
+        require(row.get('event') == 'boundary' and row['payload'].get('boundary') == 'source_tick' and
+                row['payload'].get('whole_session') is True and
+                type(row['payload'].get('match_index')) is int and
+                row['payload']['match_index'] == self.match_index,
+                'Whole Stadium pause readiness has a foreign source tick')
+        data, metadata = _transform_slices(row['payload'])
+        raw = data.get((14, 0), b'')
+        require(len(raw) == 0x2e and metadata[(14, 0)]['address'] == 0x8046b6a0,
+                'Whole Stadium pause clock source identity differs')
+        clock = dict(sequence=row['seq'], source_tick=row['source_tick'],
+                     match_index=self.match_index, pauser=int.from_bytes(raw[1:2], 'big', signed=True),
+                     pause_timer=raw[2], unk3=raw[3], hud_enabled=raw[5], outcome=raw[8],
+                     frame_count=int.from_bytes(raw[0x24:0x28], 'big'),
+                     timer_seconds=int.from_bytes(raw[0x28:0x2c], 'big'),
+                     timer_frames=int.from_bytes(raw[0x2c:0x2e], 'big'),
+                     evidence='indirect_source_pause_timer_and_frozen_clock')
+        require(clock['pauser'] == 0 and clock['hud_enabled'] == 1 and
+                clock['unk3'] == 0 and clock['outcome'] == 0 and clock['pause_timer'] <= 10 and
+                clock['sequence'] > self.pause_consumed['sequence'] and
+                self.pause_consumed['match_index'] == self.match_index,
+                'Whole Stadium pause clock owner/state differs')
+        if self.pause_positive_clock is None:
+            if clock['pause_timer'] > 0:
+                self.pause_positive_clock = clock
+            return
+        prior = self.pause_positive_clock
+        require(clock['sequence'] > prior['sequence'] and
+                all(clock[k] == prior[k] for k in ('frame_count', 'timer_seconds', 'timer_frames')),
+                'Whole Stadium pause clock is stale or advanced')
+        if clock['pause_timer'] == 0 and self.pause_released is not None:
+            require(clock['sequence'] > self.pause_released['sequence'] and
+                    self.pause_released['match_index'] == self.match_index,
+                    'Whole Stadium pause readiness preceded consumed release')
+            if self.pause_ready_clock is None:
+                self.pause_ready_clock = clock
 
     def accept(self, row):
         from stadium_go_prefix import SSS_POSITION_PHASES
@@ -1925,14 +1968,15 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                 chord = raw_pad(buttons=['L','R','A','START'])
                 start = raw_pad(buttons=['START'])
                 allowed = [[NEUTRAL_PAD, NEUTRAL_PAD]]
-                if self.chord_requested and not self.outcome_seen:
+                if self.chord_requested and ((not self.exit_requested and self.pause_released is None) or
+                                             (self.exit_requested and self.chord_released is None)):
                     allowed.append([chord, NEUTRAL_PAD])
                 if self.start_allowed:
                     allowed.extend([[start, NEUTRAL_PAD], [start, start]])
                 require(ports[2:] == [DISCONNECTED_PAD]*2 and errors == [0,0,-1,-1] and
                         ports[:2] in allowed, 'Whole Stadium consumed PAD escaped current phase')
                 sample = dict(sequence=row['seq'], source_tick=row['source_tick'],
-                              phase='whole-post-setup', ports=ports, errors=errors,
+                              phase='whole-post-setup', match_index=self.match_index, ports=ports, errors=errors,
                               pc=payload['pc'], lr=payload['lr'], gprs=list(payload['gprs']), **queue)
                 if not self.chord_requested:
                     require(self.pending_neutral_sample is None,
@@ -1941,10 +1985,20 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                 self.consumed_samples.append(sample)
                 self.menu_consumed += 1
                 self.last_pad = ports
-                if ports[:2] == [chord, NEUTRAL_PAD] and self.chord_consumed is None:
-                    self.chord_consumed = sample.copy()
-                elif self.chord_consumed is not None and self.chord_released is None and ports[:2] == [NEUTRAL_PAD]*2:
-                    self.chord_released = sample.copy()
+                if self.chord_requested and not self.exit_requested:
+                    if ports[:2] == [chord, NEUTRAL_PAD] and self.pause_consumed is None:
+                        require(self.tick_count >= 180, 'Whole Stadium pause preceded minimum neutral ticks')
+                        self.pause_consumed = sample.copy()
+                    elif self.pause_consumed is not None and self.pause_released is None and ports[:2] == [NEUTRAL_PAD]*2:
+                        self.pause_released = sample.copy()
+                elif self.exit_requested:
+                    require(self.pause_ready_clock is not None and
+                            row['seq'] > self.pause_ready_clock['sequence'],
+                            'Whole Stadium exit input preceded pause readiness')
+                    if ports[:2] == [chord, NEUTRAL_PAD] and self.chord_consumed is None:
+                        self.chord_consumed = sample.copy()
+                    elif self.chord_consumed is not None and self.chord_released is None and ports[:2] == [NEUTRAL_PAD]*2:
+                        self.chord_released = sample.copy()
         elif name == 'sss_exit':
             self.sss_positions.require_closed()
             self.sss_position_route_ready = False
@@ -1970,14 +2024,18 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                 self.pending_neutral_sample = None
                 self.tick_count += 1
             self.previous_tick = row['source_tick']
+            self.observe_pause_clock(row)
         elif name == 'vs_exit_return':
             items = [x for x in payload.get('slices', []) if x.get('name') == 'result']
-            require(self.chord_consumed is not None and self.chord_released is not None and
+            require(self.pause_released is not None and self.pause_ready_clock is not None and
+                    self.chord_consumed is not None and self.exit_requested and
+                    self.chord_consumed['sequence'] < row['seq'] and
                     len(items) == 1 and bytes.fromhex(items[0]['hex'])[0] == 7,
-                    'Whole Stadium exit lacks consumed chord/release or no-contest outcome7')
+                    'Whole Stadium exit lacks fresh ready chord or no-contest outcome7')
             self.outcome_seen = True
         elif name == 'return_css':
-            require(self.outcome_seen, 'Whole Stadium CSS return preceded outcome7')
+            require(self.outcome_seen and self.chord_released is not None,
+                    'Whole Stadium CSS return preceded outcome7 or consumed exit release')
             self.returned_css = True
 
 
@@ -2038,7 +2096,7 @@ def drive_stadium_cold_css(receiver, menus, next_row, wait_source, tap):
 
 
 def drive_stadium_whole_three(receiver, tail, controller, menus, deadline):
-    """Existing input policies, three natural completions; no pause or source writes."""
+    """Existing input policies, three natural completions; no source writes."""
     controller = StadiumDeadlineController(controller, deadline)
     from reference_versus_sequence_capture import raw_pad
     def next_row():
@@ -2068,7 +2126,16 @@ def drive_stadium_whole_three(receiver, tail, controller, menus, deadline):
         receiver.chord_requested = True
         requested_after = dict(sequence=receiver.seq-1, source_tick=receiver.previous_tick,
                                minimum_neutral_ticks=receiver.tick_count)
-        tap({'p1':raw_pad(buttons=['L','R','A','START']),'p2':NEUTRAL_PAD},'whole-no-contest',600)
+        chord = raw_pad(buttons=['L','R','A','START'])
+        tap({'p1':chord,'p2':NEUTRAL_PAD},'whole-pause-request',600)
+        wait_source(lambda: receiver.pause_ready_clock is not None,'source-pause-ready',600)
+        receiver.exit_requested = True
+        controller.set_both(chord, NEUTRAL_PAD, action='whole-no-contest')
+        wait_source(lambda: receiver.chord_consumed is not None,'fresh-exit-chord-consumed',600)
+        # Release immediately; source may exit before its next PAD consume.
+        # Preserve exit/mode/Results ordering rather than draining those rows
+        # inside a tap waiting for the release to become source-visible.
+        controller.set_both(NEUTRAL_PAD, NEUTRAL_PAD, action='whole-no-contest:release')
         wait_source(lambda: receiver.outcome_seen,'natural-exit-outcome7',600)
         # Use the existing checked exit/Results/Prize protocol intact.
         from reference_versus_sequence_capture import SequenceRunner
@@ -2082,10 +2149,19 @@ def drive_stadium_whole_three(receiver, tail, controller, menus, deadline):
         result_policy = SequenceRunner([], [], ObservedResultsTail(), controller)
         result_policy._boundary('vs_mode_exit', index, deadline)
         result_policy._boundary('results_enter', index, deadline)
-        receiver.start_allowed = True
-        result_policy._confirm_results(index, deadline)
+        release_wait_start = receiver.menu_polls
+        def input_ready():
+            require(receiver.menu_polls-release_wait_start < 600,
+                    'Whole Stadium exit release consume polling cap')
+            if receiver.chord_released is None:
+                return False
+            receiver.start_allowed = True
+            return True
+        result_policy._confirm_results(index, deadline, input_ready=input_ready)
         require(receiver.returned_css,'Whole Stadium Results lacks checked natural CSS return')
         measurements.append(dict(match_index=index, request=requested_after,
+            actual_pause_chord=receiver.pause_consumed, actual_pause_release=receiver.pause_released,
+            pause_ready=receiver.pause_ready_clock,
             actual_chord=receiver.chord_consumed, actual_release=receiver.chord_released))
         if index < 2:
             receiver.next_lifetime()

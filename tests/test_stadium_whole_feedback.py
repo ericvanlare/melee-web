@@ -298,6 +298,126 @@ assert(scoped.emitted.find("\\\"whole_session\\\":true,\\\"match_index\\\":2")!=
             driver.drive_stadium_cold_css(receiver,menus,next_row,driver_wait,driver_wait)
         self.assertEqual(receiver.menu_polls,menus['boot_max_polls'])
 
+    def test_retained_pause_ready_and_fresh_exit_input_contract(self):
+        trace=os.environ.get('MELEE_STADIUM_PAUSE_TRACE')
+        if not trace:self.skipTest('Retained first-pause source trace not configured')
+        path=Path(trace)
+        self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),os.environ['MELEE_STADIUM_PAUSE_TRACE_SHA256'])
+        from sd_original_menu_plan import stadium_go_feedback_packet
+        from retail_setup_validation import _decode_setup
+        rows={};header=None;expected=None
+        for row in iter_records(path):
+            if row['seq']==0:header=row
+            if row['event']=='boundary' and row['payload']['boundary']=='setup':
+                expected=_decode_setup(next(x['hex'] for x in row['payload']['slices'] if x['tag']==4))
+            if row['seq'] in (2525,2526,2530,2576):rows[row['seq']]=row
+            if row['seq']==2576:break
+        # Actual full prefix/operands, not synthetic pause samples. Expected
+        # Setup is retained bytes here; this does not admit a new declaration.
+        receiver=driver.StadiumWholeFeedbackReceiver(stadium_go_feedback_packet(),header['payload']['setup_receipt_sha256'],expected)
+        receiver.recorded_input=True
+        positive=None
+        for row in iter_records(path):
+            if row['seq']==2525:
+                self.assertEqual(receiver.tick_count,180)
+                self.assertIsNone(receiver.pending_neutral_sample)
+                receiver.chord_requested=True
+            receiver.accept(row)
+            if row['seq']==2526:positive=copy.copy(receiver)
+            if row['seq']==2576:break
+        self.assertEqual(receiver.pause_consumed['sequence'],2525)
+        self.assertEqual(receiver.pause_released['sequence'],2530)
+        self.assertEqual(receiver.pause_positive_clock['pause_timer'],10)
+        self.assertEqual(receiver.pause_ready_clock['sequence'],2576)
+        self.assertEqual(receiver.pause_ready_clock['pause_timer'],0)
+        self.assertEqual(receiver.pause_ready_clock['frame_count'],56)
+        self.assertIn('indirect',receiver.pause_ready_clock['evidence'])
+        self.assertIsNone(receiver.chord_consumed)
+        def clock_mutation(offset,value):
+            row=copy.deepcopy(rows[2576]);item=next(x for x in row['payload']['slices'] if x['tag']==14)
+            raw=bytearray.fromhex(item['hex']);raw[offset]=value;item['hex']=raw.hex();return row
+        for offset,value in [(1,1),(2,11),(3,1),(5,0),(8,7),(0x27,57)]:
+            with self.subTest(offset=offset):
+                with self.assertRaises(ValueError):copy.copy(positive).observe_pause_clock(clock_mutation(offset,value))
+        for field in ('address','size'):
+            row=copy.deepcopy(rows[2576]);item=next(x for x in row['payload']['slices'] if x['tag']==14)
+            if field=='address':item[field]+=4
+            else:item['size']=1;item['hex']='00'
+            with self.assertRaises(ValueError):copy.copy(positive).observe_pause_clock(row)
+        stale=copy.deepcopy(rows[2576]);stale['seq']=2526
+        with self.assertRaises(ValueError):copy.copy(positive).observe_pause_clock(stale)
+        foreign=copy.deepcopy(rows[2576]);foreign['payload']['match_index']=1
+        with self.assertRaises(ValueError):copy.copy(positive).observe_pause_clock(foreign)
+        missing=copy.copy(positive);missing.pause_released=None;missing.observe_pause_clock(rows[2576])
+        self.assertIsNone(missing.pause_ready_clock)
+        wrong=copy.copy(positive);wrong.pause_released=dict(receiver.pause_released,match_index=1)
+        with self.assertRaises(ValueError):wrong.observe_pause_clock(rows[2576])
+        # Synthetic continuation only: actual consumed operands copied into
+        # distinct later sequences to falsify the fresh-ready/exit contract.
+        def fresh_consume(original,seq):
+            row=copy.deepcopy(original);row['seq']=seq;row['source_tick']=191;return row
+        def clone():
+            r=copy.copy(receiver);r.boundaries=[];r.consumed_samples=[];r.exit_requested=True;r.seq=2577
+            return r
+        premature=copy.copy(positive);premature.exit_requested=True;premature.seq=2577;premature.boundaries=[];premature.consumed_samples=[]
+        with self.assertRaises(ValueError):premature.accept(fresh_consume(rows[2525],2577))
+        def outcome(seq,value):
+            return dict(seq=seq,event='boundary',source_tick=191,draw_ordinal=191,
+                payload=dict(whole_session=True,match_index=0,boundary='vs_exit_return',
+                             slices=[dict(name='result',hex=bytes([value]).hex())]))
+        missing=clone()
+        with self.assertRaises(ValueError):missing.accept(outcome(2577,7))
+        ready=clone();ready.accept(fresh_consume(rows[2525],2577))
+        self.assertEqual(ready.chord_consumed['sequence'],2577)
+        wrong=copy.copy(ready);wrong.boundaries=[]
+        with self.assertRaises(ValueError):wrong.accept(outcome(2578,0))
+        ready.accept(outcome(2578,7))
+        self.assertTrue(ready.outcome_seen);self.assertIsNone(ready.chord_released)
+        ready.accept(fresh_consume(rows[2530],2579))
+        self.assertEqual(ready.chord_released['sequence'],2579)
+        self.assertGreater(ready.chord_consumed['sequence'],receiver.pause_ready_clock['sequence'])
+
+    def test_actual_results_helper_retains_events_before_exit_release(self):
+        # Synthetic transport rows exercise the actual Results state machine;
+        # they are not a new original Results observation.
+        from reference_versus_sequence_capture import SequenceRunner, ObserverTail, CaptureError
+        def row(name,seq,index=0):
+            return dict(seq=seq,event='boundary',source_tick=191,draw_ordinal=191,
+                        payload=dict(whole_session=True,match_index=index,boundary=name))
+        class Tail:
+            boundary=staticmethod(ObserverTail.boundary)
+            def __init__(self,names):self.rows=[row(name,i) for i,name in enumerate(names)];self.released=False;self.seen=[]
+            def next(self,deadline):
+                if not self.rows:raise CaptureError('observer record did not arrive before deadline')
+                value=self.rows.pop(0);self.seen.append(value['payload']['boundary'])
+                if value['payload']['boundary']=='pad_consume':self.released=True
+                return value
+        class Controller:
+            def __init__(self,tail,require_release=True):self.tail=tail;self.require_release=require_release;self.calls=[]
+            def hold(self,*args,**kwargs):
+                if self.require_release:self_outer.assertTrue(self.tail.released)
+                self.calls.append(kwargs['action'])
+        self_outer=self
+        chain=['results_gobj','pad_consume','results_exit','results_mode_exit','scene_teardown','return_css']
+        tail=Tail(chain);controller=Controller(tail);policy=SequenceRunner([],[],tail,controller)
+        with patch('reference_versus_sequence_capture.time.monotonic',return_value=0):
+            policy._confirm_results(0,2.5,input_ready=lambda:tail.released)
+        self.assertEqual(controller.calls,['results-start-1'])
+        self.assertEqual([x['name'] for x in policy.boundaries],['results_gobj','results_exit','results_mode_exit','scene_teardown','return_css'])
+        # Default None retains immediate Start and the same required boundaries.
+        tail=Tail([x for x in chain if x!='pad_consume']);controller=Controller(tail,False);policy=SequenceRunner([],[],tail,controller)
+        with patch('reference_versus_sequence_capture.time.monotonic',return_value=0):policy._confirm_results(0,2.5)
+        self.assertEqual(controller.calls,['results-start-1'])
+        for names in (['results_gobj'],['vs_mode_exit','pad_consume'],['pad_consume','results_exit','results_mode_exit','scene_teardown','return_css']):
+            tail=Tail(names);controller=Controller(tail);policy=SequenceRunner([],[],tail,controller)
+            with patch('reference_versus_sequence_capture.time.monotonic',return_value=0):
+                with self.assertRaises(CaptureError):policy._confirm_results(0,2.5,input_ready=lambda:tail.released)
+            if 'pad_consume' not in names or names[0]=='vs_mode_exit':self.assertEqual(controller.calls,[])
+        tail=Tail(['results_gobj','pad_consume']);tail.rows[0]['payload']['match_index']=1
+        controller=Controller(tail);policy=SequenceRunner([],[],tail,controller)
+        with self.assertRaises(CaptureError):policy._confirm_results(0,driver.time.monotonic()+2.5,input_ready=lambda:tail.released)
+        self.assertEqual(controller.calls,[])
+
     def test_actual_driver_exit_results_order_and_remaining_deadline(self):
         # These are source transport endpoints, not a simulated game/graphics service.
         from reference_versus_sequence_capture import raw_pad, SequenceRunner
@@ -307,40 +427,56 @@ assert(scoped.emitted.find("\\\"whole_session\\\":true,\\\"match_index\\\":2")!=
                 self.css=True;self.latest_menu=None;self.setup_seen=True;self.previous_tick=None
                 self.ended=self.returned_css=self.outcome_seen=self.chord_requested=self.start_allowed=False
                 self.chord_consumed=self.chord_released=None;self.last_pad=[driver.NEUTRAL_PAD]*2
+                self.pause_consumed=self.pause_released=self.pause_ready_clock=None
+                self.exit_requested=False;self.results_entered=False
             def accept(self,row):
                 self.seq+=1;kind=row['payload']['boundary'] if row['event']=='boundary' else 'end'
-                if kind=='source_tick':self.tick_count+=1;self.previous_tick=self.tick_count
+                if kind=='source_tick':
+                    if not self.chord_requested:self.tick_count+=1
+                    elif self.pause_released is not None:self.pause_ready_clock=dict(sequence=self.seq)
+                    self.previous_tick=self.tick_count
                 elif kind=='pad_consume':
                     self.menu_consumed+=1;self.menu_polls+=1;self.last_pad=controller.pad
-                    if controller.pad[0]==raw_pad(buttons=['L','R','A','START']):self.chord_consumed=dict(sequence=self.seq,source_tick=self.tick_count+3)
-                    elif self.chord_consumed is not None:self.chord_released=dict(sequence=self.seq,source_tick=self.tick_count+4)
+                    if controller.pad[0]==raw_pad(buttons=['L','R','A','START']):
+                        if self.exit_requested:self.chord_consumed=dict(sequence=self.seq,source_tick=self.tick_count+3)
+                        else:self.pause_consumed=dict(sequence=self.seq)
+                    elif self.exit_requested and self.chord_consumed is not None:self.chord_released=dict(sequence=self.seq,source_tick=self.tick_count+4)
+                    elif self.pause_consumed is not None:self.pause_released=dict(sequence=self.seq)
                 elif kind=='vs_exit_return':self.outcome_seen=True
+                elif kind=='results_enter':self.results_entered=True
+                elif kind=='pad_poll':self.menu_polls+=1
                 elif kind=='return_css':self.returned_css=True
                 elif kind=='end':self.ended=True
             def next_lifetime(self):
                 index=self.match_index+1;seq=self.seq;self.__init__();self.match_index=index;self.seq=seq
         class Controller:
-            def __init__(self):self.pad=[driver.NEUTRAL_PAD]*2;self.pending=False;self.requests=[];self.sleep=lambda seconds:None
+            def __init__(self):self.pad=[driver.NEUTRAL_PAD]*2;self.pending=False;self.requests=[];self.sleep=lambda seconds:None;self.defer_release=False;self.drop_release=False;self.bad_order=False
             def set_both(self,p1,p2,*,action):
                 self.pad=[p1,p2];self.pending=True
                 self.requests.append((receiver.match_index,receiver.tick_count,action))
         class Tail:
             def __init__(self):self.phase={};self.waits=[];self.seen=[]
             def next(self,deadline):
-                if controller.pending:controller.pending=False;kind='pad_consume'
-                elif not receiver.chord_requested:kind='source_tick'
+                if (controller.pending and not (receiver.exit_requested and controller.pad==[driver.NEUTRAL_PAD]*2 and
+                    (controller.drop_release or (controller.defer_release and not receiver.results_entered)))):
+                    controller.pending=False;kind='pad_consume'
+                elif controller.drop_release and receiver.results_entered:kind='pad_poll'
+                elif not receiver.chord_requested or receiver.pause_ready_clock is None:kind='source_tick'
                 elif not receiver.outcome_seen:kind='vs_exit_return'
                 else:
                     index=receiver.match_index;phase=self.phase.get(index,0)
-                    kind=['vs_mode_exit','results_enter','return_css','end'][phase]
+                    kinds=['results_enter','vs_mode_exit','return_css','end'] if controller.bad_order else ['vs_mode_exit','results_enter','return_css','end']
+                    kind=kinds[phase]
                     self.phase[index]=phase+1
                 self.seen.append(kind)
                 return dict(seq=receiver.seq,event='end' if kind=='end' else 'boundary',
                     payload=dict(boundary=kind,whole_session=True,match_index=receiver.match_index),source_tick=0,draw_ordinal=0)
             def require_completed_status(self,timeout=5):self.waits.append(timeout)
         receiver=Receiver();controller=Controller();tail=Tail();order=[]
-        def confirm(policy,index,deadline):
-            self.assertEqual(tail.seen[-2:],['vs_mode_exit','results_enter'])
+        def confirm(policy,index,deadline,*,input_ready=None):
+            self.assertEqual([x for x in tail.seen if x in ('vs_mode_exit','results_enter')][-2:],['vs_mode_exit','results_enter'])
+            while input_ready is not None and not input_ready():policy.observer.next(deadline)
+            self.assertIsNotNone(receiver.chord_released)
             self.assertTrue(receiver.start_allowed)
             order.append(index);policy.observer.next(deadline)
         with patch.object(driver,'drive_authored_css_sss',lambda *args:None),patch.object(SequenceRunner,'_confirm_results',confirm):
@@ -350,6 +486,21 @@ assert(scoped.emitted.find("\\\"whole_session\\\":true,\\\"match_index\\\":2")!=
         self.assertTrue(all(x['actual_chord']['source_tick']==183 for x in values))
         self.assertEqual(len(tail.waits),1);self.assertGreater(tail.waits[0],0);self.assertLessEqual(tail.waits[0],5)
         self.assertTrue(all(ticks>=180 for _,ticks,label in controller.requests if label=='whole-no-contest'))
+        # Source can finish VS before the next PAD consume sees release.
+        # Actual driver must preserve mode/Results order and delay Start.
+        receiver=Receiver();controller=Controller();controller.defer_release=True;tail=Tail();order=[]
+        with patch.object(driver,'drive_authored_css_sss',lambda *args:None),patch.object(SequenceRunner,'_confirm_results',confirm):
+            delayed=driver.drive_stadium_whole_three(receiver,tail,controller,{'boot':[]},driver.time.monotonic()+20)
+        self.assertEqual(order,[0,1,2]);self.assertEqual(len(delayed),3)
+        self.assertTrue(all(x['actual_pause_chord'] is not None and x['actual_pause_release'] is not None and
+                            x['pause_ready'] is not None for x in delayed))
+        for mode in ('drop_release','bad_order'):
+            receiver=Receiver();controller=Controller();setattr(controller,mode,True);tail=Tail();order=[]
+            with patch.object(driver,'drive_authored_css_sss',lambda *args:None),patch.object(SequenceRunner,'_confirm_results',confirm):
+                with self.assertRaises((ValueError,RuntimeError)):
+                    driver.drive_stadium_whole_three(receiver,tail,controller,{'boot':[]},driver.time.monotonic()+20)
+            self.assertEqual(order,[])
+
         # Deterministic remaining<5 falsifies an unconditional five-second wait.
         receiver=Receiver();controller=Controller();tail=Tail()
         with patch.object(driver.time,'monotonic',return_value=0.0),patch.object(driver,'drive_authored_css_sss',lambda *args:None),patch.object(SequenceRunner,'_confirm_results',confirm):
