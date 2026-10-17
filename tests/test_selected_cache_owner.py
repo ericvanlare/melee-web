@@ -29,10 +29,18 @@ def actual_control_source(root):
         raise AssertionError('Actual GX first-sampled cache capture call changed')
     replacements={
         '// ACTUAL_TEXTURE_OWNER_BRIDGES': 'namespace aurora::gfx {\n'+section(bridges,'namespace detail {\nvoid bind_texture_ref_owner','\n#endif')+'\n}',
-        '// ACTUAL_CACHE_ENTRY_AND_GLOBALS':section(texture,'struct CachedTextureEntry {','\nstruct CachedTlutTextureEntry')+'\n'+
+        '// ACTUAL_CACHE_ENTRY_AND_GLOBALS':section(texture,'struct DynamicPaletteKey {','\nstruct TextureContentKey')+'\n'+
             section(texture,'absl::flat_hash_map<u32, CachedTextureEntry> s_textureObjectCaches;','\nabsl::flat_hash_map<u32, TlutObjectCache>')+'\n'+
-            section(texture,'uint64_t s_bindGeneration = 1;','\nTextureStats s_stats;')+'\nTextureStats s_stats;',
+            section(texture,'absl::flat_hash_map<u32, TlutObjectCache> s_tlutObjectCaches;','\nabsl::flat_hash_map<TextureContentKey, ContentCacheEntry>')+'\n'+
+            section(texture,'absl::flat_hash_map<uint64_t, absl::flat_hash_set<u32>> s_replacementUsers;','\nstd::list<TextureContentKey>')+'\n'+
+            section(texture,'uint64_t s_frameCount = 0;','\nTextureStats s_stats;')+'\nTextureStats s_stats;',
+        '// ACTUAL_PENDING_INVALIDATION_OPERATIONS':section(texture,'void do_clear_static_texture_cache() noexcept {','\nDynamicPaletteKey make_dynamic_palette_key'),
+        '// ACTUAL_CACHE_STORE':section(texture,'void clear_texture_dependency(u32 texObjId, u32 tlutObjId, uint64_t replacementId) {','\nvoid touch_content_cache'),
         '// ACTUAL_CACHE_OPERATIONS':section(texture,'// Private exact authored-key borrow;','\n#endif'),
+        '// ACTUAL_GENERATION_OPERATIONS':section(texture,'void invalidate_bindings() noexcept {','\n\nvoid invalidate_replacement')+'\n'+
+            section(texture,'void clear_static_texture_cache() noexcept {','\n\nvoid evict_copy_texture'),
+        '// ACTUAL_REPLACEMENT_INVALIDATION':section(texture,'void invalidate_replacement(uint64_t replacementId) noexcept {','\n\ngfx::TextureHandle resolve_static_texture'),
+        '// ACTUAL_CACHE_RETIREMENT':section(texture,'void evict_texture_object(u32 texObjId) noexcept {','\nvoid evict_tlut_object'),
         '// ACTUAL_GX_OPERATIONS':section(gx,'void request_selected_sampled_texture() noexcept {','\n#endif'),
         '// ACTUAL_PROJECT_ISSUER':section(project,'int melee_web_native_menu_frame_effect_issue_selected_texture(){','\n#endif'),
     }
@@ -89,10 +97,10 @@ class SelectedCacheOwnerTests(OwnedWorkspaceTests):
         built=subprocess.run(command,cwd=row['directory'],capture_output=True,text=True,timeout=90)
         (self.work/'compile.log').write_text(built.stdout+built.stderr)
         self.assertEqual(built.returncode,0,built.stdout+built.stderr)
-        for mode in range(32):
+        for mode in range(49):
             result=subprocess.run([str(node_runtime(ROOT)),str(output),str(mode)],cwd=ROOT,
                                   capture_output=True,text=True,timeout=30)
             (self.work/f'case-{mode}.log').write_text(result.stdout+result.stderr)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
-            expected=f'actual cache-owner case {mode} passed' if mode<28 else f'actual project issue case {mode} error='
+            expected=f'actual cache-owner case {mode} passed' if mode<28 or mode>=32 else f'actual project issue case {mode} error='
             self.assertIn(expected,result.stdout)

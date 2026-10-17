@@ -4802,10 +4802,10 @@ index 0b86ffead6e8f6153d2acf52cf9daecf4f07ccfa..3904b525390161c4f457127d3a2346a6
  } // namespace aurora::gfx
 diff --git a/lib/gfx/frame_effect_observer.hpp b/lib/gfx/frame_effect_observer.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..3948e8789bd8de71af0c1af4b869f64c3d2c2c4e
+index 0000000000000000000000000000000000000000..8912844aabecbc69be46aef56bcdd93bcaf51650
 --- /dev/null
 +++ b/lib/gfx/frame_effect_observer.hpp
-@@ -0,0 +1,1877 @@
+@@ -0,0 +1,1878 @@
 +#pragma once
 +
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
@@ -5023,6 +5023,7 @@ index 0000000000000000000000000000000000000000..3948e8789bd8de71af0c1af4b869f64c
 +  struct SelectedSampledTextureCacheKey {
 +    uint32_t texObjId=0,texDataVersion=0,tlutObjId=0,tlutDataVersion=0;
 +    uint64_t replacementId=0,bindGeneration=0;
++    uint64_t cacheAuthoritySerial=0;
 +    bool valid=false;
 +  };
 +  void clear_selected_sampled_texture() noexcept {
@@ -10187,10 +10188,10 @@ index 1abcbd518965b15fb9de612eee2f1811402975c2..c5fe2fa3f883a092fd5590758e90c35d
    uint32_t msaaSamples = 1;
 diff --git a/lib/gx/selected_texture_readonly_diagnostic.hpp b/lib/gx/selected_texture_readonly_diagnostic.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..b0693028d8284cbd7760b3dda0555b768c8701b2
+index 0000000000000000000000000000000000000000..09e5d42a40098c7791455c24c37362c1b9480638
 --- /dev/null
 +++ b/lib/gx/selected_texture_readonly_diagnostic.hpp
-@@ -0,0 +1,123 @@
+@@ -0,0 +1,127 @@
 +#pragma once
 +
 +#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
@@ -10249,6 +10250,8 @@ index 0000000000000000000000000000000000000000..b0693028d8284cbd7760b3dda0555b76
 +  OwnerUsageHigh,
 +  OwnerQueueMissing,
 +  HostBridgeRefused,
++  CaptureEntryAuthority,
++  CacheEntryAuthority,
 +};
 +constexpr const char* selected_texture_issue_refusal_literal(SelectedTextureIssueRefusal value) noexcept {
 +  switch(value) {
@@ -10303,6 +10306,8 @@ index 0000000000000000000000000000000000000000..b0693028d8284cbd7760b3dda0555b76
 +  case SelectedTextureIssueRefusal::OwnerUsageHigh: return "selected_texture_owner_usage_high";
 +  case SelectedTextureIssueRefusal::OwnerQueueMissing: return "selected_texture_owner_queue_missing";
 +  case SelectedTextureIssueRefusal::HostBridgeRefused: return "selected_texture_host_bridge_refused";
++  case SelectedTextureIssueRefusal::CaptureEntryAuthority: return "selected_texture_cache_capture_entry_authority";
++  case SelectedTextureIssueRefusal::CacheEntryAuthority: return "selected_texture_cache_entry_authority";
 +  }
 +  return "selected_texture_current_owner_mismatch";
 +}
@@ -10349,7 +10354,7 @@ index 92f358b4642a7d439e66ef548deea230bb3c3539..c6683dbcd881c55b3bf20d9e12eb074a
      Log.info("Generated shader (hash {:x}): {}", hash, shaderSource);
    }
 diff --git a/lib/gx/texture.cpp b/lib/gx/texture.cpp
-index a56709a9f62e77563e90a36fb3d08b6c233bff7f..95875981628702eb3218c02cfc1fb911bfba89f1 100644
+index a56709a9f62e77563e90a36fb3d08b6c233bff7f..f5b4df82669f85581db044d047882f88f65cfbc7 100644
 --- a/lib/gx/texture.cpp
 +++ b/lib/gx/texture.cpp
 @@ -1,4 +1,7 @@
@@ -10360,7 +10365,45 @@ index a56709a9f62e77563e90a36fb3d08b6c233bff7f..95875981628702eb3218c02cfc1fb911
  
  #include "../gfx/recording.hpp"
  #include "../gfx/tex_palette_conv.hpp"
-@@ -515,6 +518,80 @@ bool use_replacement(std::optional<gfx::texture_replacement::ReplacementResult>
+@@ -51,6 +54,9 @@ struct CachedTextureEntry {
+   u32 tlutDataVersion = 0;
+   uint64_t replacementId = 0;
+   uint64_t lastUsedFrame = 0;
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++  uint64_t cacheAuthoritySerial = 0;
++#endif
+ };
+ 
+ struct CachedTlutTextureEntry {
+@@ -126,6 +132,12 @@ uint64_t s_contentCacheBytes = 0;
+ uint64_t s_contentCacheBudgetBytes = texture::ContentCacheBudgetBytes;
+ uint64_t s_frameCount = 0;
+ uint64_t s_bindGeneration = 1;
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++// Private first-sampled cache-entry authority. Deliberately module-lifetime:
++// cache/device cleanup must not make an old entry serial reusable.
++uint64_t s_cacheAuthoritySerial = 0;
++bool s_cacheAuthorityExhausted = false;
++#endif
+ std::atomic<uint64_t> s_pendingInvalidations = 0;
+ std::atomic<uint64_t> s_pendingCacheClears = 0;
+ TextureStats s_stats;
+@@ -201,6 +213,14 @@ void store_cached_texture(const GXTexObj_& obj, gfx::TextureHandle handle, u32 t
+   }
+ 
+   auto& entry = s_textureObjectCaches[obj.texObjId];
++#if defined(AURORA_BROWSER_TEXTURE_READONLY_GUARD)
++  if (s_cacheAuthorityExhausted || s_cacheAuthoritySerial == UINT64_MAX) {
++    s_cacheAuthorityExhausted = true;
++    entry.cacheAuthoritySerial = 0;
++  } else {
++    entry.cacheAuthoritySerial = ++s_cacheAuthoritySerial;
++  }
++#endif
+   if (entry.tlutObjId != tlutObjId || entry.replacementId != replacementId) {
+     clear_texture_dependency(obj.texObjId, entry);
+   }
+@@ -515,6 +535,84 @@ bool use_replacement(std::optional<gfx::texture_replacement::ReplacementResult>
  const TextureStats& texture_stats() noexcept { return s_stats; }
  
  namespace texture {
@@ -10378,15 +10421,17 @@ index a56709a9f62e77563e90a36fb3d08b6c233bff7f..95875981628702eb3218c02cfc1fb911
 +  else if(bind.generation!=s_bindGeneration)reason=Reason::CaptureGeneration;
 +  else if(s_pendingInvalidations.load(std::memory_order_acquire))reason=Reason::CapturePendingInvalidation;
 +  else if(s_pendingCacheClears.load(std::memory_order_acquire))reason=Reason::CapturePendingClear;
++  else if(s_cacheAuthorityExhausted)reason=Reason::CaptureEntryAuthority;
 +  else {
 +    const auto it=s_textureObjectCaches.find(bind.texObj.texObjId);
 +    if(it==s_textureObjectCaches.end())reason=Reason::CaptureEntryAbsent;
 +    else if(it->second.handle.get()!=bind.ref.get())reason=Reason::CaptureOwnerMismatch;
 +    else if(it->second.texDataVersion!=bind.texObj.texDataVersion)reason=Reason::CaptureDataVersion;
++    else if(!it->second.cacheAuthoritySerial)reason=Reason::CaptureEntryAuthority;
 +    else {
 +      const auto& entry=it->second;
 +      key={bind.texObj.texObjId,entry.texDataVersion,entry.tlutObjId,entry.tlutDataVersion,
-+        entry.replacementId,s_bindGeneration,true};
++        entry.replacementId,s_bindGeneration,entry.cacheAuthoritySerial,true};
 +    }
 +  }
 +  // Unsupported first candidates still consume the request. Never search later.
@@ -10413,12 +10458,14 @@ index a56709a9f62e77563e90a36fb3d08b6c233bff7f..95875981628702eb3218c02cfc1fb911
 +  Reason captureReason=Reason::None;
 +  if(!observer.selected_sampled_texture_cache_key(key,issue ? &captureReason : nullptr))
 +    return refuse(captureReason==Reason::None ? Reason::CacheKeyAbsent : captureReason);
-+  if(key.bindGeneration!=s_bindGeneration)return refuse(Reason::CacheGeneration);
 +  if(s_pendingInvalidations.load(std::memory_order_acquire))return refuse(Reason::CachePendingInvalidation);
 +  if(s_pendingCacheClears.load(std::memory_order_acquire))return refuse(Reason::CachePendingClear);
++  if(s_cacheAuthorityExhausted)return refuse(Reason::CacheEntryAuthority);
 +  const auto it=s_textureObjectCaches.find(key.texObjId);
 +  if(it==s_textureObjectCaches.end())return refuse(Reason::CacheEntryAbsent);
 +  const auto& entry=it->second;
++  if(!key.cacheAuthoritySerial||entry.cacheAuthoritySerial!=key.cacheAuthoritySerial)
++    return refuse(Reason::CacheEntryAuthority);
 +  if(!entry.handle)return refuse(Reason::CacheHandleAbsent);
 +  if(entry.texDataVersion!=key.texDataVersion)return refuse(Reason::CacheDataVersion);
 +  if(entry.tlutObjId!=key.tlutObjId)return refuse(Reason::CacheTlutOwner);
@@ -10441,7 +10488,7 @@ index a56709a9f62e77563e90a36fb3d08b6c233bff7f..95875981628702eb3218c02cfc1fb911
  size_t texture_source_size(u32 format, u32 width, u32 height, u32 mipCount) noexcept {
    if (width == 0 || height == 0 || mipCount == 0) {
      return 0;
-@@ -725,6 +802,9 @@ void end_frame() noexcept {
+@@ -725,6 +823,9 @@ void end_frame() noexcept {
  }
  
  void shutdown() noexcept {
