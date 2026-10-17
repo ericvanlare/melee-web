@@ -1467,7 +1467,7 @@
     ]
   },
   "drawn_synctest_sprint": {
-    "status": "Default-context combined host point, stopped interval and conversion dependency observation passed on38f/33cd; final38f regression passed2447/164; raw7/27 and drawn restore/repeat remain open.",
+    "status": "The combined stopped-point observation remains scoped to 38f/33cd. Shared ordinary execution on 704 passed six Release builds, 2,449 tests with 164 skips, and the original 42,127-frame three-match CPU9 comparison. Rollback remains open.",
     "artifact_run": "rollback-stadium-sprint-20261013-111001-9f8df4a4",
     "source": "a34d5acfa540af173d97679f7c54650ac577930a",
     "private_build_source_patch_sha256": "e932d6e21be0960b16160b0f77b81aa874b30976e899ce09848c406493a9bf61",
@@ -1539,7 +1539,7 @@
       "source_and_runtime_unchanged": true,
       "h1": "No forced timing pause reported; recorder retained seven reason-code7 incidents, no dropped incidents, 7998 evicted samples, and zero match source steps. Not a match timing result."
     },
-    "next": "Implement the reviewed shared-presentation extraction, then same-source match-step/audio/finish extraction with real ordinary callers, before authentic returned-idle prepare/dispatch; GPU content/reference/future closure remains NO-GO.",
+    "next": "Prepare the held C1 value-owned normal-callback execution record at unchanged synchronous ordinary callsites; review actual ordering before any returned-idle prepare/dispatch. GPU content/reference/future closure and drawn restore/repeat remain NO-GO.",
     "scope": "Observer and idle predicates are prerequisites only. No same-instance drawn restore, minimum complete state size or combined seven-tick budget result.",
     "hps_quiescence_controls": {
       "result": "pass-focused-component-only",
@@ -3668,7 +3668,7 @@
           "sha256": "3b0d79429156c5db3d259ba6803c6d59bfa3ece608a9ec13a9f63f14b61ac160"
         }
       },
-      "next": "Implement the reviewed shared-presentation extraction, then same-source match-step/audio/finish extraction with real ordinary callers, before authentic returned-idle prepare/dispatch; GPU content/reference/future closure remains NO-GO.",
+      "next": "Prepare the held C1 value-owned normal-callback execution record at unchanged synchronous ordinary callsites; review actual ordering before any returned-idle prepare/dispatch. GPU content/reference/future closure and drawn restore/repeat remain NO-GO.",
       "limits": [
         "The historical enrollment checkpoint did not establish a successful selected interval, atomicity or restore; the current scoped stopped observation is recorded under the combined boundary.",
         "The historical dbd0/f62 and 4d00 observations remain separate; the 4d00 selected_texture_current_owner_mismatch subcondition is unobserved. The f3340de run records selected_texture_cache_generation, but not its mutation site/amount, selected-owner survival, or resource-content validity.",
@@ -5089,11 +5089,170 @@
             "Selectedcallback audio0/PCM0 reflects original scheduledcadence; no missingaudio fix, PCM equivalence or uninterruptedaudio claim",
             "Native references, host/device futures, resource content/recreation and same-instance drawn restore/repeat remain open"
           ],
-          "next": "Implement the reviewed shared-presentation extraction, then same-source match-step/audio/finish extraction with real ordinary callers, before authentic returned-idle prepare/dispatch; GPU content/reference/future closure remains NO-GO.",
+          "next": "Prepare the held C1 value-owned normal-callback execution record at unchanged synchronous ordinary callsites; review actual ordering before any returned-idle prepare/dispatch. GPU content/reference/future closure and drawn restore/repeat remain NO-GO.",
           "next_prerequisite_review": {
-            "artifact": "shared-menu-presentation-extraction-candidate-v1/root-source-review.json",
-            "sha256": "0032644319d1fc30c0f93d3c5ce6a6f43943a0a943e8ab06114cabe3d1b016db",
-            "state": "SOURCE_REVIEW_PASS_UNAPPLIED_UNRUN"
+            "artifact": "sprint-20261016/shared-normal-match-stage-c-next-boundary-v1/contract.json",
+            "sha256": "41b0e2231f737704122d0760794e990650b8c29427f05aea819388d9ba8821e2",
+            "state": "SOURCE_ONLY_HELD_NO_IMPLEMENTATION_OR_RESTORE"
+          },
+          "shared_ordinary_execution_regression": {
+            "state": "PASS_SHARED_ORDINARY_SOURCE_EXECUTION_AND_SCOPED_ORIGINAL_RECORDING_REGRESSION",
+            "source": {
+              "runtime_and_capture_harness_head": "704bf3d1810c67da3cf4c310fbc1871488367df4",
+              "tree": "2526d0a941702871512f450823772da1b2eef7f8",
+              "aurora_tree": "b5415846c8f7cb298d30f2dae1d75864e95dc168",
+              "prior_combined_point_harness_and_runtime": "The existing source and capture objects above remain 38f/33cd; this 704 ordinary regression does not recapture or relabel that stopped host point."
+            },
+            "change": "Shared presentation and same-source match step, normal audio and finish extraction at real ordinary callsites. Original ordering, transition audio, sampling and owner branches retained; no prepare/dispatch or restore enabled.",
+            "validation": {
+              "result": {
+                "artifact": "net-shared-normal-match-ab-validation-v1/evidence/result.json",
+                "sha256": "3c6236ba7da5b54e94e81065f469e20b53011eb242012295efa57c6d9a4b94da"
+              },
+              "root_review": {
+                "artifact": "net-shared-normal-match-ab-validation-v1/evidence/root-final-review.json",
+                "sha256": "0a3b83ed4a2bd07de03f0d17f144877a9a01a03326d2f9249479013e4beb3c3f"
+              },
+              "owner_audit": {
+                "artifact": "net-shared-normal-match-ab-validation-v1/evidence/owner-final-review.json",
+                "sha256": "4d7d5f1d8577dd27e6f3b061a8d0db7837faa96837fe43e86d35fbc24325863f"
+              },
+              "fullsuite": {
+                "tests": 2449,
+                "skips": 164,
+                "seconds": 567.285,
+                "result": "PASS"
+              },
+              "six_Release_profiles": [
+                {
+                  "name": "ordinary-Release",
+                  "required_artifacts": 44,
+                  "observed_root_web_artifacts": 71
+                },
+                {
+                  "name": "frame-effect-Release",
+                  "required_artifacts": 44,
+                  "observed_root_web_artifacts": 49
+                },
+                {
+                  "name": "private-firstdraw-Release",
+                  "required_artifacts": 44,
+                  "observed_root_web_artifacts": 49
+                },
+                {
+                  "name": "combined-host-read-Release",
+                  "required_artifacts": 45,
+                  "observed_root_web_artifacts": 51
+                },
+                {
+                  "name": "first-pair-only-Release",
+                  "required_artifacts": 45,
+                  "observed_root_web_artifacts": 51
+                },
+                {
+                  "name": "public-Release",
+                  "required_artifacts": 3,
+                  "observed_root_web_artifacts": 40
+                }
+              ],
+              "ordinary_audio_enabled": true,
+              "public_product": "Separate public Release build passed; its legacy silent product and public identity are distinct from this ordinary audio-enabled development runtime.",
+              "ordinary_inventory": {
+                "artifact": "net-ab-ordinary-mwrc-regression-preparation-v1/materialized-v3/ordinary-identities.json",
+                "sha256": "755caf7a94e48b432d800cafff81a1a287de0bc4838be48b822a5fb1f1c4e789"
+              }
+            },
+            "ordinary_original_recording": {
+              "recipe": {
+                "version": 8,
+                "frames": 42127,
+                "seed": 3980218793,
+                "bytes": 1877246,
+                "sha256": "e1cc93725525e52e7d9be198337e54d103bb1a9b027156252b69f9ed3f975f0e"
+              },
+              "original_reference": {
+                "bytes": 1555401454,
+                "sha256": "18531db0d92fead60044deacef9eedc22d7cb5c19773faa63a6c9df7528546f5",
+                "Dolphin_commit": "c77bbaa0f372c3f72281602a8b087206706542cb",
+                "source_capture_report_sha256": "e5c5e53740094e81a4ae4c9d5dfc9f5dfb0b9cdc0ccf46b723ba05ff65d63048",
+                "current_runtime_producer_is_separate": true
+              },
+              "input_rehash": {
+                "artifact": "net-ab-ordinary-mwrc-regression-preparation-v1/retained-input-rehash.json",
+                "sha256": "3dd13835470d4b975110c62b0218dbbf5698f04783142ef1bdb4b7da7622869b"
+              },
+              "context": "Three natural matches with four CPU9 Mario fighters, four stocks and Final Destination, through original CSS, SSS, Results and CSS returns; distinct from the two-human PvP and stopped-point contexts.",
+              "capture_report": {
+                "artifact": "net-ab-ordinary-mwrc-regression-preparation-v1/capture/report.json",
+                "sha256": "570422b3ed5bba01c012c5d9c0485df8c7232ef0d72cc88ff49a615f481e5494"
+              },
+              "browser_report": {
+                "artifact": "net-ab-ordinary-mwrc-regression-preparation-v1/capture/retail-browser-report.json",
+                "sha256": "29f80dab47a4642265061414c392114351815598aa5c6097a385112fa4d24e30"
+              },
+              "comparison": {
+                "artifact": "net-ab-ordinary-mwrc-regression-preparation-v1/comparison.json",
+                "sha256": "ce5a56fe87f5d94df115b488df7d6d8da4a1f5020c5db2accad99e1351c8f123"
+              },
+              "raw_manifest": {
+                "artifact": "net-ab-ordinary-mwrc-regression-preparation-v1/materialized-v3/raw-manifest.json",
+                "sha256": "5a33fa509a48aa79e1dea5285ebb016591f2973c4ef5b86f5ecd9eaaee448454"
+              },
+              "agent_review": {
+                "artifact": "net-ab-ordinary-mwrc-regression-preparation-v1/materialized-v3/agent-result-review.json",
+                "sha256": "15e7c896eedf3fc0b6c8fa7eafa90f2249875d192641909c7dbd7e149c1ac721"
+              },
+              "actual_comparison": {
+                "result": "equivalent",
+                "frames_compared": 42127,
+                "match_ticks_compared": 38547,
+                "nonmatch_order_rows": 3580,
+                "setups_compared": 3,
+                "match_fields": "Exact declared RNG, match frame, semantic PAD and Fighter state",
+                "menu_scope": "Input/scene ordering only; no complete per-tick menu scalar comparison"
+              },
+              "source_steps": 42127,
+              "source_draws": 42127,
+              "automatic_resume_count": 0,
+              "H1": {
+                "raw": {
+                  "artifact": "net-ab-ordinary-mwrc-regression-preparation-v1/capture/rawruntime-incidents.json",
+                  "sha256": "08c8504b8c4ed3cdce0c7159473b2f797bb8c92fe6d4cbcf5666e6869905ed9b"
+                },
+                "readiness_passed": true,
+                "no_observed_timing_pause": true,
+                "history_evicted": 6382,
+                "recent_events_evicted": 1493,
+                "native_callback_count": 42492,
+                "native_unavailable_count": 2517,
+                "incident_evicted": 0,
+                "limit": "Bounded/lossy history; no continuous callback or timing coverage claim."
+              },
+              "visual_gpu": {
+                "final_png_sha256": "0ff3d4470079e1f7d401b09d674e3d16323c0962e0455ad5f8d6f0f1d3e39438",
+                "screenshot": "Existing final.png is black after native unload, not final-CSS visual proof. No new screenshot.",
+                "gpu": "No standalone GPU diagnostic file; native/GPU phase metrics remain in the actual capture/browser reports. No raw command or pixel equivalence."
+              },
+              "cleanup": {
+                "recorded_processes_absent": 15,
+                "recorded_groups_absent": 4,
+                "port8787_bindable": true,
+                "capture_owner_elapsed_ms": 721165,
+                "capture_cleanup_ms": 170,
+                "compare_owner_elapsed_ms": 23064,
+                "compare_cleanup_ms": 68,
+                "source_and293pins_unchanged": true
+              },
+              "root_review": {
+                "artifact": "net-ab-ordinary-mwrc-regression-preparation-v1/materialized-v3/root-result-review.json",
+                "sha256": "36832c78f06d2ed700c5c2789fe87f73c0ade00fa01c56f07d82ac0fe5f2d786"
+              }
+            },
+            "limits": [
+              "Original per-tick traversal is retained; matching 42,127 source steps and draws does not establish original draw cadence.",
+              "No PCM/audio fidelity, raw GPU command, pixel, sustained performance, two-human context equivalence or live physical-input acceptance.",
+              "No returned-idle prepare/dispatch, one-use continuation ownership, heap restoration, hostfuture closure or actual same-instance drawn restore/repeat."
+            ]
           }
         }
       }

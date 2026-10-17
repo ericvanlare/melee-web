@@ -657,9 +657,33 @@ packet content, restore, composite and internal GPU creation qualification remai
 false. H1 had no dropped incidents, but its sampled timeline remains lossy.
 All recorded browser identities and owned groups are independently absent.
 
-The next prerequisite is the reviewed shared-presentation extraction, followed
-by same-source match-step/audio/finish extraction with real ordinary callers,
-before authentic returned-idle prepare/dispatch. GPU content, references and
+The shared presentation, match-step, normal-audio and finish extractions now
+run through the real ordinary callsites in `704bf3d1`. Six genuine Release
+builds passed, including the ordinary audio-enabled runtime and the separate
+public product; the latter retains its legacy silent-audio scope. The full
+suite passed 2,449 tests with 164 skips in 567.285 seconds. The historical
+`38f8c91d`/`33cd306c` stopped-point capture above remains a separate observation.
+
+One changed-hypothesis ordinary replay used the unchanged authentic MWRC v8
+recording: three natural four-CPU9-Mario, four-stock Final Destination matches
+through original CSS, SSS, Results and CSS returns. The original-state comparator
+passed all 42,127 frames: three setups, 38,547 exact declared match ticks
+(RNG, match frame, semantic PAD and Fighter state), and 3,580 menu/order rows.
+Menu scalar state is not fully compared, and this CPU9 context is distinct from
+two-human PvP. Source accounting records 42,127 steps and draws; it does not
+establish original draw cadence, raw GPU commands, pixels or PCM equivalence.
+
+H1 readiness and export passed with no observed timing pause. Its history
+evicted 6,382 samples and 1,493 recent events; 2,517 native observations were
+unavailable, so continuous coverage is not claimed. The existing `final.png`
+is black after native unload and supplies no final-CSS visual proof. Actual
+native/GPU phase metrics remain in the reports; no standalone GPU diagnostic
+file or new screenshot was produced. All 15 recorded processes and four owned
+groups are absent, with source and frozen runtime/input pins unchanged.
+
+The smallest next boundary is the held C1 value-owned normal-callback execution
+record at unchanged synchronous ordinary callsites. Returned-idle preparation,
+dispatch and restore remain absent or refused. GPU content, references and
 future closure remain NO-GO.
 
 This closes only the scoped default-context point/component observation. No
