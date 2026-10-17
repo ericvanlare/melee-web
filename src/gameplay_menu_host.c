@@ -182,6 +182,10 @@ struct MeleeWebMenuHost {
     MeleeWebMenuFirstSssPairNoteSnapshot first_sss_pair_entry;
     MeleeWebMenuFirstSssPairNoteSnapshot first_sss_pair_returned;
     char first_sss_pair_error[160];
+    MeleeWebMenuCurrentSssExitObservation current_sss_exit;
+    const void* current_sss_exit_context;
+    MeleeWebMenuCurrentSssExitNotify current_sss_exit_notify;
+    void* current_sss_exit_notify_data;
     MeleeWebMenuSssSequenceObservation first_sss_draw, first_sss_prefix;
     MeleeWebMenuSssSampleCallback first_sss_draw_callback, first_sss_prefix_callback;
     void* first_sss_draw_callback_data;
@@ -1060,6 +1064,60 @@ static int sss_sequence_capture(MeleeWebMenuHost* h,int prefix,int phase,
 
 extern int melee_web_sss_selected_stage(int*,int*);
 
+static void current_sss_exit_note(void* data,MeleeWebMenuSession* session,
+    const SSSData* sss,uint64_t ticks,int boundary)
+{
+    MeleeWebMenuHost* h=data;
+    if (!h || h!=owner) return;
+    MeleeWebMenuCurrentSssExitObservation* o=&h->current_sss_exit;
+    if (o->state!=1 || !live(h,o->error,sizeof(o->error)) ||
+        !h->current_sss_exit_context || !h->current_sss_exit_notify ||
+        session!=h->session || sss!=melee_web_menu_sss(session) || !h->entered ||
+        h->drawing || seed_ptr!=&h->seed || !h->vs_mode_owned ||
+        !h->audio_generation || melee_web_audio_generation(h->audio)!=h->audio_generation ||
+        h->source_mode_kind!=GM_VS || gm_GetCurrentGameMode()!=GM_VS ||
+        gm_GetCurrentSceneIndex()!=gmVsMode_State_Sss ||
+        h->source_scene!=MELEE_WEB_HOST_SCENE_SSS ||
+        melee_web_menu_phase(session)!=MELEE_WEB_MENU_SSS ||
+        boundary!=MELEE_WEB_MENU_SSS_PREFIX_EXIT ||
+        melee_web_current_scene_info()!=&h->source_scene_info ||
+        h->source_scene_info.scene_kind!=GS_SSS ||
+        h->source_scene_info.enter_data!=sss || h->source_scene_info.exit_data!=sss ||
+        !sss || sss->start_game!=1 || sss->force_stage_id!=-1 ||
+        sss->vs.start.rules.stkind!=St_Kind_PStadium) {
+        o->state=3;
+        if (!o->error[0]) snprintf(o->error,sizeof(o->error),"Current-context SSS exit lost its exact owner");
+    } else {
+        MeleeWebMenuFirstSssPairNoteSnapshot* n=&o->note;
+        memset(n,0,sizeof(*n));n->phase=MELEE_WEB_MENU_SSS_PREFIX_EXIT;
+        n->host_entered=h->entered;n->session_phase=melee_web_menu_phase(session);
+        n->source_scene=h->source_scene;n->scene_kind=h->source_scene_info.scene_kind;
+        n->scene_frame=gm_801A4BA8();n->random_seed=h->seed;n->session_ticks=ticks;
+        n->world_generation=h->generation;n->audio_generation=h->audio_generation;
+        n->sss=*sss;melee_web_pad_state_capture(n->pad_state);
+        n->scene_routing_getters[0]=gm_GetCurrentGameMode();
+        n->scene_routing_getters[1]=gm_GetPreviousGameMode();
+        n->scene_routing_getters[2]=gm_GetCurrentSceneIndex();
+        n->scene_routing_getters[3]=gm_GetPreviousSceneIndex();
+        for (unsigned i=0;i<8;++i)n->owners[i]=1;
+        n->captured=1;o->state=2;
+    }
+    if (h->current_sss_exit_notify)h->current_sss_exit_notify(h->current_sss_exit_notify_data,o);
+}
+int melee_web_menu_host_arm_current_sss_exit(MeleeWebMenuHost* h,const void* context,
+    MeleeWebMenuCurrentSssExitNotify notify,void* data,char* e,size_t n)
+{
+    if (!h || h!=owner || !context || !notify || !data || h->entered || h->audio ||
+        h->source_scene!=MELEE_WEB_HOST_SCENE_NONE || !h->initial_replay_context ||
+        !h->stadium_c1a_enabled || seed_ptr!=&h->seed || h->current_sss_exit.state ||
+        h->first_sss_pair_state || h->first_sss_sequence_operation ||
+        melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_CREATED)
+        return fail(e,n,"Current-context SSS exit arm requires its unentered replay host");
+    if (!melee_web_menu_arm_current_sss_exit(h->session,current_sss_exit_note,e,n))return 0;
+    h->current_sss_exit_context=context;h->current_sss_exit_notify=notify;
+    h->current_sss_exit_notify_data=data;h->current_sss_exit.state=1;
+    return ok(e,n);
+}
 static void first_sss_prefix_exit_note(void* data,MeleeWebMenuSession* session,
     const SSSData* sss,uint64_t ticks,int boundary)
 {

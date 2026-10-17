@@ -18,6 +18,7 @@ extern "C" int gm_GetPreviousSceneIndex(void);
 #include "gameplay_vs_sis.h"
 #include "gameplay_stadium_display_owner.h"
 #include <sstream>
+#include <iostream>
 #include <exception>
 extern "C" void HSD_SisLib_C1TextProbeSet(int enabled);
 extern "C" void* melee_web_current_scene_info(void);
@@ -128,6 +129,54 @@ struct FirstCssBrowserPostdrawStreamState {
  FirstCssDrawSample tick{},draw{},transition{};
 };
 FirstCssBrowserDrawState first_css_browser_draw;
+struct CurrentSssExitState {
+ bool armed=false,notified=false,failed=false;
+ bool notification_received=false,host_tick_in_flight=false,last_host_tick_returned=false;
+ bool notification_in_host_tick=false,notification_last_tick_returned=false;
+ size_t notification_cursor=0,notification_steps=0,notification_draws=0;
+ uint64_t notification_order=0;
+ const melee_web::RetailReplayRecipe* recipe=nullptr;
+ const melee_web::RetailReplayInitialCssContext* context=nullptr;
+ MeleeWebMenuHost* host_owner=nullptr;
+ uint64_t world_generation=0,order=0;
+ MeleeWebMenuCurrentSssExitObservation observation{};
+ std::string error,json;
+};
+CurrentSssExitState current_sss_exit;
+void current_sss_exit_notify(void* data,const MeleeWebMenuCurrentSssExitObservation* o){
+ auto& s=current_sss_exit;
+ if(data==&s&&s.armed&&!s.notification_received){
+  s.notification_received=true;s.notification_cursor=replay_cursor;
+  s.notification_steps=replay_source_frames.steps();
+  s.notification_draws=replay_source_frames.draws();s.notification_order=s.order++;
+  s.notification_in_host_tick=s.host_tick_in_flight;
+  s.notification_last_tick_returned=s.last_host_tick_returned;
+ }
+ if(data!=&s || !s.armed || s.notified || !o || replay.get()!=s.recipe ||
+    !replay || replay->initial_css.get()!=s.context || host!=s.host_owner ||
+    (o->state==2&&(!o->note.captured||
+     o->note.world_generation!=melee_web_gameplay_generation()))){
+  s.failed=true;s.error="Current SSS exit notification lost its replay/context owner";return;
+ }
+ s.observation=*o;s.notified=true;s.failed=o->state!=2;
+ if(s.failed)s.error=o->error;
+}
+void current_sss_exit_tick_begin(){
+ if(current_sss_exit.armed){current_sss_exit.host_tick_in_flight=true;current_sss_exit.last_host_tick_returned=false;}
+}
+void current_sss_exit_tick_returned(){
+ if(current_sss_exit.armed){current_sss_exit.host_tick_in_flight=false;current_sss_exit.last_host_tick_returned=true;}
+}
+void current_sss_exit_trace(const char* kind,size_t steps,size_t draws){
+ auto& s=current_sss_exit;
+ if(!s.armed||s.notified)return;
+ check(replay.get()==s.recipe&&host==s.host_owner&&
+       replay->initial_css.get()==s.context,"Current SSS trace lost its parsed replay/context owner");
+ std::cout<<"{\"record\":\"current_sss_exit_order\",\"order\":"<<s.order++
+   <<",\"kind\":\""<<kind<<"\",\"replay_cursor\":"<<replay_cursor
+   <<",\"source_steps\":"<<steps<<",\"source_draws\":"<<draws
+   <<",\"menu_draw_reference\":\"UNKNOWN\"}\n";
+}
 FirstCssBrowserPostdrawStreamState first_css_browser_postdraw_stream;
 struct FirstCssFinalPendingDrawState {
  bool armed=false,kicked=false,attempted=false,captured=false,compared=false;
@@ -1776,6 +1825,15 @@ void enter_world(){
       replay->initial_css->css_data.data(),replay->initial_css->ko_counts.data(),
       replay->initial_css->game_rules.data(),replay->initial_css->save_data.data(),
       error,sizeof(error)),error);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(current_sss_exit.armed){
+   check(replay.get()==current_sss_exit.recipe&&host==current_sss_exit.host_owner&&
+         replay->initial_css.get()==current_sss_exit.context,
+         "Current SSS exit arm lost the parsed replay before context application");
+   check(melee_web_menu_host_arm_current_sss_exit(host,current_sss_exit.context,
+       current_sss_exit_notify,&current_sss_exit,error,sizeof(error)),error);
+  }
+#endif
  }
  if(melee_web_net_active()&&melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CREATED)
   check(melee_web_net_apply_start_context(host,error,sizeof(error)),error);
@@ -3558,6 +3616,9 @@ void tick(){
    if(tag_staging_byte_draw)EM_ASM({window.__meleeWebStagingByteCapture?.clearSourceDrawTag();});
    if(collect_staging_diagnostics)aurora_browser_staging_set_diagnostic_source_frame(-1);
    end_done=emscripten_get_now();check(drawn,error);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+   if(drew_source)current_sss_exit_trace("draw_aurora_return",source_frames.steps(),source_frames.draws());
+#endif
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
    melee_web_provenance_frame(0);
    if(drew_source)provenance_return_draw=false;
@@ -4028,7 +4089,14 @@ void tick(){
          first_css_browser_draw.draw.scene_frame+stream.matched_ticks);
      ++stream.host_tick_calls;
      ++stream.consumed_inputs;
+
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+     current_sss_exit_tick_begin();
+#endif
      result=melee_web_menu_host_tick(host,sample,error,sizeof(error));
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+     current_sss_exit_tick_returned();
+#endif
      ++stream.executed_host_ticks;
      stream.tick_result=result;
      check(result==1||result==3,error[0]?error:
@@ -4092,7 +4160,14 @@ void tick(){
             "First-CSS source tick did not begin at exact frame-zero owner");
       first_css_browser_draw_check_live("before original source tick");
      }
+
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+     current_sss_exit_tick_begin();
+#endif
      result=melee_web_menu_host_tick(host,sample,error,sizeof(error));
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+     current_sss_exit_tick_returned();
+#endif
      if(first_css_browser_draw.armed){
       auto& state=first_css_browser_draw;
       state.tick_result=result;
@@ -4120,7 +4195,14 @@ void tick(){
      }
     }
 #else
-    result=melee_web_menu_host_tick(host,sample,error,sizeof(error));
+
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+     current_sss_exit_tick_begin();
+#endif
+     result=melee_web_menu_host_tick(host,sample,error,sizeof(error));
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+     current_sss_exit_tick_returned();
+#endif
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
     if(probe_css_tick)
      replay_boundary_mark("css_tick_returned",static_cast<int>(source_frames.steps()),
@@ -4157,6 +4239,9 @@ void tick(){
                           static_cast<int>(source_frames.steps()));
 #endif
     }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    current_sss_exit_trace("tick_return",source_frames.steps(),source_frames.draws());
+#endif
     ++replay_cursor;
     ++replay_steps;
     replay_draw_boundaries+=replay->closes_draw_batch(replay_cursor-1)?1U:0U;
@@ -4621,6 +4706,57 @@ int melee_web_native_menu_phase(){
  return host?melee_web_menu_host_phase(host):0;
 }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+int melee_web_native_menu_stadium_current_sss_exit_arm(){try{
+ auto& s=current_sss_exit;
+ check(!s.armed&&replay&&replay_trace&&replay->version==8&&replay->initial_css&&
+       !replay->diagnostic_entity_prefix&&replay_cursor==0&&!replay_started&&
+       scoped_assets&&scoped_disc_import&&source_session_owned&&
+       world&&host&&!host_entered&&!world_exposed&&!match&&!results&&!prize&&
+       !running&&!pending&&!faulted&&!preparation.busy()&&
+       asset_destination==AssetDestination::None&&asset_scope.pending_generation()==0&&
+       !first_css_browser_draw.armed&&!stadium_c1a_armed&&!melee_web_net_active()&&
+       melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CREATED,
+       "Current SSS exit arm requires one fresh parsed v8 replay/context owner");
+ const auto& selection=replay->selection;const auto& r=selection.start.rules;
+ check(selection.save_profile_present&&selection.unlocked_characters==2047&&
+       selection.unlocked_stages==2047&&selection.player_count==2&&
+       r.stkind==St_Kind_PStadium&&r.match_kind==MatchKind_Time&&!r.is_stock&&
+       r.is_vs&&r.time_limit==120&&r.xB==2&&r.x20==UINT64_MAX&&
+       selection.start.players[0].ckind==8&&selection.start.players[1].ckind==8&&
+       selection.start.players[0].slot_type==Gm_PKind_Human&&
+       selection.start.players[1].slot_type==Gm_PKind_Human&&
+       selection.start.players[0].color==1&&selection.start.players[1].color==0&&
+       selection.start.players[0].stocks==3&&selection.start.players[1].stocks==3,
+       "Current SSS exit arm refuses a different declared source profile");
+ check(melee_web_gameplay_generation()!=0,"Current SSS exit arm has no prepared native world");
+ char error[256]{};
+ check(melee_web_menu_host_enable_stadium_c1a(host,error,sizeof(error)),error);
+ s.recipe=replay.get();s.context=replay->initial_css.get();s.host_owner=host;
+ s.world_generation=melee_web_gameplay_generation();
+ s.armed=true;return 1;
+}catch(const std::exception& e){message=e.what();return 0;}}
+const char* melee_web_native_menu_stadium_current_sss_exit_observe(){
+ auto& s=current_sss_exit;std::ostringstream out;
+ out<<"{\"scope\":\"passive_sss_onexit_return_only\",\"armed\":"<<(s.armed?"true":"false")
+    <<",\"notified\":"<<(s.notified?"true":"false")<<",\"failed\":"<<(s.failed?"true":"false")
+    <<",\"menu_draw_reference\":\"UNKNOWN\",\"runtime_admission\":false,\"Entry\":false,\"C3\":false"
+    <<",\"error\":"<<(s.error.empty()?"null":first_css_browser_draw_json_quote(s.error))
+    <<",\"notification_received\":"<<(s.notification_received?"true":"false")
+    <<",\"notification_coordinates\":";
+ if(s.notification_received)out<<"{\"replay_cursor\":"<<s.notification_cursor
+    <<",\"callback_source_steps\":"<<s.notification_steps<<",\"callback_source_draws\":"<<s.notification_draws
+    <<",\"order\":"<<s.notification_order<<",\"enclosing_host_tick_status\":\""
+    <<(s.notification_in_host_tick?"in_flight_not_returned":"not_in_host_tick")
+    <<"\",\"last_host_tick_call_returned\":"<<(s.notification_last_tick_returned?"true":"false")<<'}';
+ else out<<"null";
+ out<<",\"observation_state\":"<<s.observation.state<<",\"note\":";
+ if(s.notified&&s.observation.note.captured)first_sss_pair_write_note(out,s.observation.note);else out<<"null";
+ out<<",\"native_sss_bytes_scope\":\"native_ABI_only_not_original_raw_equivalence\",\"native_sss_bytes_hex\":";
+ if(s.notified&&s.observation.note.captured)out<<'"'<<melee_web::stadium_first_css_diagnostic::hex(
+     reinterpret_cast<const uint8_t*>(&s.observation.note.sss),sizeof(s.observation.note.sss))<<'"';
+ else out<<"null";
+ out<<'}';s.json=out.str();return s.json.c_str();
+}
 int melee_web_native_menu_stadium_first_css_draw_arm(
     const uint8_t* context_bytes,unsigned context_size,
     const uint8_t* consumed_pad_bytes,unsigned consumed_pad_size){try{

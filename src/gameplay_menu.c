@@ -52,6 +52,8 @@ struct MeleeWebMenuSession {
     int first_sss_pair_state; /* 0 unused, 1 CSS armed, 2 SSS eligible, 3 entering, 4 noted, 5 invalid */
     int stadium_c1a_enabled;
     int stadium_c1a_ready;
+    int current_sss_exit_state; /* 0 OFF, 1 armed, 2 invoked */
+    MeleeWebMenuFirstSssPairNote current_sss_exit_note;
 #endif
     HSD_GObj** gobj_snapshot;
     size_t gobj_snapshot_count;
@@ -1029,6 +1031,18 @@ int melee_web_menu_session_destroy(MeleeWebMenuSession* session, char* error,
 }
 
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+int melee_web_menu_arm_current_sss_exit(MeleeWebMenuSession* session,
+    MeleeWebMenuFirstSssPairNote note, char* error, size_t error_size)
+{
+    if (!session_live(session,error,error_size)) return 0;
+    if (!note || session->phase!=MELEE_WEB_MENU_CREATED || session->ticks ||
+        session->css_open || session->sss_open || !session->stadium_c1a_enabled ||
+        session->current_sss_exit_state || session->first_css_return_armed ||
+        session->first_sss_pair_state || session->first_sss_prefix_state)
+        return fail(error,error_size,"Current-context SSS exit requires a fresh exclusive session");
+    session->current_sss_exit_note=note;session->current_sss_exit_state=1;
+    return ok(error,error_size);
+}
 int melee_web_menu_arm_first_css_return(MeleeWebMenuSession* session,
     MeleeWebMenuFirstCssReturnNote note, char* error, size_t error_size)
 {
@@ -1566,6 +1580,13 @@ int melee_web_menu_leave_sss(MeleeWebMenuSession* session, char* error,
                     "Cannot commit an unavailable stage selection");
     }
     mnStageSel_Scene_OnExit(NULL);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (session->current_sss_exit_state==1) {
+        session->current_sss_exit_state=2; /* Consume before the passive callback. */
+        session->current_sss_exit_note(session->runtime.user,session,&session->sss,
+            session->ticks,MELEE_WEB_MENU_SSS_PREFIX_EXIT);
+    }
+#endif
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     if (session->first_sss_prefix_state == 1 &&
         session->first_sss_prefix_remaining == 0 &&

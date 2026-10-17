@@ -107,6 +107,11 @@ void gm_InitVsMode(VsModeData* vs)
     }
 }
 
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+static int source_prepare_time_control;
+static int current_exit_control_enabled,current_exit_control_order;
+static int current_exit_control_onexit,current_exit_control_notes,current_exit_control_prepare;
+#endif
 static int source_item_frequency = -1;
 static uint64_t source_item_mask = UINT64_MAX;
 
@@ -127,6 +132,19 @@ int melee_web_vs_prepare_start_source(StartMeleeData* start,
     for (int i = 0; i < GM_MAX_PLAYERS; ++i)
         start->players[i].rumble_enabled =
             i < 4 && start->players[i].slot_type == Gm_PKind_Human;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    /* Test-only preparation double: historical Stock4 remains default.
+     * This branch tests wrapper refusal/order, not original service execution. */
+    if(source_prepare_time_control){
+        if(current_exit_control_order!=3)return 0;
+        ++current_exit_control_prepare;current_exit_control_order=4;
+        post_mode->start.rules.match_kind=MatchKind_Time;
+        post_mode->start.rules.is_stock=false;post_mode->start.rules.xB=2;
+        post_mode->start.rules.time_limit=120;
+        for(int i=0;i<GM_MAX_PLAYERS;++i)post_mode->start.players[i].stocks=3;
+        *start=post_mode->start;start->rules.is_vs=true;
+    }
+#endif
     return 1;
 }
 
@@ -170,6 +188,9 @@ void mnStageSel_Scene_OnExit(void* data)
                                  : sss_start_override != 0;
     if (invalid_exit == 2) active_sss->vs.start.rules.stkind = St_Kind_Dummy;
     if (invalid_exit == 3) active_sss->vs.start.rules.stkind = 25;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(current_exit_control_enabled){++current_exit_control_onexit;current_exit_control_order=1;}
+#endif
     active_sss = NULL;
 }
 
@@ -323,8 +344,75 @@ int melee_web_css_observe_port(unsigned port,int kind,int ids[14],float geometry
     memcpy(ids,fields,sizeof(fields));memcpy(geometry,bounds,sizeof(bounds));return 1;
 }
 
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+static SSSData current_exit_control_snapshot;
+static MeleeWebMenuSession* current_exit_control_session;
+static int current_exit_control_failed;
+static void current_exit_control_note(void* data,MeleeWebMenuSession* session,
+    const SSSData* sss,uint64_t ticks,int boundary)
+{
+    (void)ticks;
+    if(data!=&current_exit_control_session||session!=current_exit_control_session||
+       sss!=melee_web_menu_sss(session)||current_exit_control_order!=1||
+       boundary!=MELEE_WEB_MENU_SSS_PREFIX_EXIT||sss->start_game!=1||
+       sss->vs.start.rules.stkind!=St_Kind_PStadium||
+       sss->vs.start.rules.match_kind!=MatchKind_Time||sss->vs.start.rules.xB!=2)
+        current_exit_control_failed=1;
+    memcpy(&current_exit_control_snapshot,sss,sizeof(*sss));
+    ++current_exit_control_notes;current_exit_control_order=2;
+}
+static int current_exit_control_scene_exit(void* data,MeleeWebMenuScene scene,
+    char* error,size_t n)
+{
+    (void)data;
+    if(scene==MELEE_WEB_MENU_SCENE_SSS&&current_exit_control_enabled){
+        if(current_exit_control_order!=2)current_exit_control_failed=1;
+        current_exit_control_order=3;
+    }
+    if(error&&n)error[0]=0;return 1;
+}
+static int current_exit_control_contract(void)
+{
+    char error[160]={0};
+    MeleeWebMenuRuntime runtime={&current_exit_control_session,check,scheduler,transition,
+                               NULL,current_exit_control_scene_exit};
+    MeleeWebMenuSession* session=melee_web_menu_session_create(&runtime,NULL,error,sizeof(error));
+    current_exit_control_session=session;
+    if(!session||melee_web_menu_arm_current_sss_exit(session,current_exit_control_note,error,sizeof(error))||
+       !melee_web_menu_enable_stadium_c1a(session,error,sizeof(error))||
+       !melee_web_menu_arm_current_sss_exit(session,current_exit_control_note,error,sizeof(error))||
+       melee_web_menu_arm_current_sss_exit(session,current_exit_control_note,error,sizeof(error))||
+       !melee_web_menu_enter_css(session,error,sizeof(error))||
+       melee_web_menu_arm_current_sss_exit(session,current_exit_control_note,error,sizeof(error)))return 130;
+    transition_request=1;
+    if(melee_web_menu_tick(session,error,sizeof(error))!=MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED||
+       !melee_web_menu_leave_css(session,error,sizeof(error))||
+       !melee_web_menu_enter_sss(session,error,sizeof(error)))return 131;
+    active_sss->vs.start.rules.stkind=St_Kind_PStadium;transition_request=1;
+    if(melee_web_menu_tick(session,error,sizeof(error))!=MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED)return 132;
+    current_exit_control_enabled=source_prepare_time_control=1;
+    if(melee_web_menu_leave_sss(session,error,sizeof(error))||
+       !strstr(error,"unsupported Stadium diagnostic payload")||
+       melee_web_menu_phase(session)!=MELEE_WEB_MENU_CLOSED||current_exit_control_failed||
+       current_exit_control_order!=4||current_exit_control_notes!=1||
+       current_exit_control_onexit!=1||current_exit_control_prepare!=1)return 133;
+    const SSSData frozen=current_exit_control_snapshot;
+    if(!melee_web_menu_abort(session,error,sizeof(error))||
+       !melee_web_menu_session_destroy(session,error,sizeof(error))||
+       current_exit_control_notes!=1||current_exit_control_onexit!=1||
+       memcmp(&frozen,&current_exit_control_snapshot,sizeof(frozen)))return 134;
+    current_exit_control_enabled=source_prepare_time_control=0;
+    current_exit_control_session=NULL;
+    puts("current-context SSS note: after OnExit/before mode-exit/prepare; TIME refused; abort/destroy retained note; legacy Stock4 unchanged");
+    return 0;
+}
+#endif
+
 int main(void)
 {
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    {const int result=current_exit_control_contract();if(result)return result;}
+#endif
     if (!sparse_port_mapping_contract()) return 1;
     /* Reduced owner-lifetime check; source callbacks here are fixtures. The
      * owned-asset recipe separately exercises original SSS confirmation. */
