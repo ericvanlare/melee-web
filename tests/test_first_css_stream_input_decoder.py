@@ -1,0 +1,172 @@
+"""Compile the actual input decoder against SDK PADStatus; synthetic bytes only.
+
+No source world, assets, game execution or original/native agreement is tested.
+"""
+from pathlib import Path
+import os
+import shutil
+import subprocess
+from owned_test_workspace import OwnedWorkspaceTests
+
+ROOT = Path(__file__).resolve().parents[1]
+HEADER = ROOT / "src/stadium_first_css_diagnostic_input.hpp"
+SOURCE_INCLUDE = ROOT / "src"
+GENERATED_INCLUDE = ROOT / "build/gameplay-source/src"
+AURORA_INCLUDE = ROOT / ".deps/aurora/include"
+EMXX = ROOT / ".deps/emsdk/upstream/emscripten/em++"
+
+
+class FirstCssStreamInputDecoderTests(OwnedWorkspaceTests):
+    @classmethod
+    def setUpClass(cls):
+        cls.scratch = cls.new_workspace(ROOT, "first-css-stream-decoder-")
+
+    def test_compiled_exact_header_bounds_and_pad_bytes(self):
+        if not EMXX.is_file() or not (GENERATED_INCLUDE / "melee/gm/types.h").is_file():
+            self.skipTest("Prepared SDK headers and installed Emscripten required")
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node required for asset-free decoder control")
+        cpp = self.scratch / "decoder.cpp"
+        binary = self.scratch / "decoder.js"
+        cpp.write_text('#include "' + str(HEADER) + '"\n' + CONTROL)
+        command = [str(EMXX), str(cpp), "-o", str(binary), "-std=gnu++20",
+                   "-O0", "-fexceptions", "-DAURORA", "-DAURORA_ENABLE_GX",
+                   "-DTARGET_PC", "-sEXIT_RUNTIME=1", "-sSTACK_SIZE=1048576",
+                   "-I" + str(SOURCE_INCLUDE), "-I" + str(GENERATED_INCLUDE),
+                   "-I" + str(AURORA_INCLUDE)]
+        environment = dict(os.environ, TMPDIR=str(self.scratch))
+        with (self.scratch / "compile.log").open("w") as log:
+            compiled = subprocess.run(command, env=environment, stdout=log,
+                                      stderr=subprocess.STDOUT, timeout=60)
+        self.assertEqual(compiled.returncode, 0,
+                         (self.scratch / "compile.log").read_text())
+        with (self.scratch / "control.log").open("w") as log:
+            result = subprocess.run([node, str(binary)], env=environment,
+                                    stdout=log, stderr=subprocess.STDOUT, timeout=30)
+        self.assertEqual(result.returncode, 0,
+                         (self.scratch / "control.log").read_text())
+        self.assertIn("PASS exact decoder 148 batches/592 ports; 6573 envelope refusals; 2 index refusals",
+                      (self.scratch / "control.log").read_text())
+
+
+CONTROL = r'''
+#include <cassert>
+#include <cstring>
+#include <iostream>
+#include <vector>
+using namespace melee_web::stadium_first_css_diagnostic;
+int main() {
+    // Independently authored wire fixture: header constants are literal, and
+    // every payload byte varies across ports/batches to expose swaps/sign loss.
+    std::vector<uint8_t> wire(6564);
+    std::memcpy(wire.data(), "STC1PSTR", 8);
+    wire[11] = 1;
+    const uint8_t source[] = {0x36,0x1e,0x8c,0x11,0x08,0xcc,0x2d,0x02,
+        0xba,0x94,0xd1,0xf3,0xb3,0xbe,0x96,0x12,0xa8,0x0d,0x02,0x27,
+        0x67,0x24,0x45,0xcd,0x4a,0x2b,0x0e,0x21,0x19,0x91,0x77,0x78};
+    std::memcpy(wire.data()+12, source, 32);
+    wire[46]=3; wire[47]=0x47; wire[51]=148;
+    for (size_t i=52;i<wire.size();++i) wire[i]=uint8_t((i*37+(i/11)*19)&255);
+    const auto before=wire;
+    const std::string sha="361e8c1108cc2d02ba94d1f3b3be9612a80d0227672445cd4a2b0e2119917778";
+    const auto input=decode_postdraw_input(wire.data(),wire.size(),sha);
+    assert(input.first_consume_sequence==839 && input.source_sha256==sha);
+    assert(input.statuses.size()==6512 &&
+           std::equal(input.statuses.begin(),input.statuses.end(),wire.begin()+52));
+    for (unsigned batch=0;batch<148;++batch) {
+        PADStatus ports[4]{};
+        decode_postdraw_pad_statuses(input,batch,ports);
+        for (unsigned port=0;port<4;++port) {
+            const auto& p=ports[port];
+            const uint8_t roundtrip[] = {uint8_t(p.button>>8),uint8_t(p.button),
+                uint8_t(p.stickX),uint8_t(p.stickY),uint8_t(p.substickX),uint8_t(p.substickY),
+                uint8_t(p.triggerLeft),uint8_t(p.triggerRight),uint8_t(p.analogA),
+                uint8_t(p.analogB),uint8_t(p.err)};
+            assert(std::equal(std::begin(roundtrip),std::end(roundtrip),
+                              wire.begin()+52+batch*44+port*11));
+        }
+    }
+    assert(wire==before);
+    unsigned refused=0;
+    const auto reject=[&](const uint8_t* data,size_t size,const std::string& identity) {
+        bool caught=false;
+        try { (void)decode_postdraw_input(data,size,identity); }
+        catch (const std::runtime_error&) { caught=true; }
+        assert(caught); ++refused;
+    };
+    // Every truncation, not merely a convenient header/payload cut.
+    for(size_t size=0;size<wire.size();++size) reject(wire.data(),size,sha);
+    reject(nullptr,wire.size(),sha);
+    auto extra=wire; extra.push_back(0); reject(extra.data(),extra.size(),sha);
+    for (size_t offset : {size_t(0),size_t(11),size_t(12),size_t(47),size_t(51)}) {
+        auto changed=wire; changed[offset]^=1;
+        reject(changed.data(),changed.size(),sha);
+    }
+    reject(wire.data(),wire.size(),std::string(64,'0'));
+    auto foreign=wire; foreign[12]^=1;
+    // Matching foreign context identity still cannot bypass the retained pin.
+    reject(foreign.data(),foreign.size(),hex(foreign.data()+12,32));
+    assert(refused==6573 && wire==before);
+    for (uint32_t index : {uint32_t(148),UINT32_MAX}) {
+        PADStatus ports[4]; std::memset(ports,0xA5,sizeof(ports));
+        uint8_t saved[sizeof(ports)]; std::memcpy(saved,ports,sizeof(ports));
+        bool caught=false;
+        try { decode_postdraw_pad_statuses(input,index,ports); }
+        catch(const std::runtime_error&) { caught=true; }
+        assert(caught && std::memcmp(saved,ports,sizeof(ports))==0);
+    }
+    // Existing one-shot decoder remains callable and bit-equivalent for port0.
+    ConsumedPadInput old{}; std::copy_n(input.statuses.begin(),44,old.ports.begin());
+    PADStatus old_ports[4]{},stream_ports[4]{};
+    decode_consumed_pad_statuses(old,old_ports);
+    decode_postdraw_pad_statuses(input,0,stream_ports);
+    assert(std::memcmp(old_ports,stream_ports,sizeof(old_ports))==0);
+
+    std::vector<uint8_t> sss(96); std::memcpy(sss.data(),"STC1SSS1",8);
+    sss[11]=1;std::memcpy(sss.data()+12,source,32);
+    sss[46]=6;sss[47]=0x44;sss[50]=6;sss[51]=0x48;
+    for(unsigned i=52;i<96;++i)sss[i]=uint8_t(i*29);
+    const auto saved_sss=sss;
+    const auto tick=decode_first_sss_tick_input(sss.data(),sss.size(),sha);
+    ConsumedPadInput tick_consumed{};tick_consumed.ports=tick.ports;
+    PADStatus tick_ports[4]{};decode_consumed_pad_statuses(tick_consumed,tick_ports);
+    for(unsigned i=0;i<4;++i){const auto&p=tick_ports[i];const uint8_t bytes[]={
+      uint8_t(p.button>>8),uint8_t(p.button),uint8_t(p.stickX),uint8_t(p.stickY),
+      uint8_t(p.substickX),uint8_t(p.substickY),p.triggerLeft,p.triggerRight,
+      p.analogA,p.analogB,uint8_t(p.err)};
+      assert(std::equal(std::begin(bytes),std::end(bytes),sss.begin()+52+11*i));}
+    unsigned tick_refused=0;
+    const auto reject_tick=[&](const uint8_t* data,size_t size,const std::string&id){
+      bool caught=false;try{(void)decode_first_sss_tick_input(data,size,id);}
+      catch(const std::runtime_error&){caught=true;}assert(caught);++tick_refused;};
+    for(size_t i=0;i<96;++i)reject_tick(sss.data(),i,sha);
+    reject_tick(nullptr,96,sha);auto long_sss=sss;long_sss.push_back(0);reject_tick(long_sss.data(),97,sha);
+    for(unsigned offset:{0u,11u,12u,47u,51u}){auto bad=sss;bad[offset]^=1;reject_tick(bad.data(),96,sha);}
+    reject_tick(sss.data(),96,std::string(64,'0'));
+    auto foreign_sss=sss;foreign_sss[12]^=1;reject_tick(foreign_sss.data(),96,hex(foreign_sss.data()+12,32));
+    assert(tick_refused==105&&sss==saved_sss);
+    std::cout<<"PASS SSS exact96/4ports;105 envelope refusals;input unchanged\n";
+
+    std::vector<uint8_t> prefix(7488);std::memcpy(prefix.data(),"STC1SSSP",8);
+    prefix[11]=1;std::memcpy(prefix.data()+12,source,32);prefix[47]=124;
+    const auto put=[&](unsigned offset,uint32_t v){for(unsigned b=0;b<4;++b)prefix[offset+b]=uint8_t(v>>(24-8*b));};
+    for(unsigned i=0;i<124;++i){for(unsigned j=0;j<4;++j)put(48+i*60+j*4,1611+i*5+j);
+      for(unsigned j=0;j<44;++j)prefix[48+i*60+16+j]=uint8_t(i*11+j*37);}
+    const auto prefix_saved=prefix;
+    const auto finite=decode_first_sss_prefix_input(prefix.data(),prefix.size(),sha);
+    for(unsigned i=0;i<124;++i){assert(std::equal(finite.records[i].ports.begin(),finite.records[i].ports.end(),prefix.begin()+48+i*60+16));
+      ConsumedPadInput consumed{};consumed.ports=finite.records[i].ports;PADStatus raw[4]{};decode_consumed_pad_statuses(consumed,raw);
+      for(unsigned port=0;port<4;++port){const auto&p=raw[port];const uint8_t bytes[]={uint8_t(p.button>>8),uint8_t(p.button),uint8_t(p.stickX),uint8_t(p.stickY),uint8_t(p.substickX),uint8_t(p.substickY),p.triggerLeft,p.triggerRight,p.analogA,p.analogB,uint8_t(p.err)};assert(std::equal(std::begin(bytes),std::end(bytes),prefix.begin()+48+i*60+16+port*11));}}
+    unsigned prefix_refused=0;const auto reject_prefix=[&](const uint8_t* p,size_t n,const std::string&id){bool caught=false;try{(void)decode_first_sss_prefix_input(p,n,id);}catch(const std::runtime_error&){caught=true;}assert(caught);++prefix_refused;};
+    for(unsigned n=0;n<7488;++n)reject_prefix(prefix.data(),n,sha);
+    reject_prefix(nullptr,7488,sha);auto extra_prefix=prefix;extra_prefix.push_back(0);reject_prefix(extra_prefix.data(),extra_prefix.size(),sha);
+    for(unsigned offset:{0u,11u,12u,47u}){auto bad=prefix;bad[offset]^=1;reject_prefix(bad.data(),bad.size(),sha);}
+    reject_prefix(prefix.data(),prefix.size(),std::string(64,'0'));
+    auto foreign_prefix=prefix;foreign_prefix[12]^=1;reject_prefix(foreign_prefix.data(),foreign_prefix.size(),hex(foreign_prefix.data()+12,32));
+    for(unsigned i=0;i<124;++i){auto bad=prefix;std::fill_n(bad.begin()+48+i*60,4,0);reject_prefix(bad.data(),bad.size(),sha);}
+    assert(prefix_refused==7620&&prefix==prefix_saved);
+    std::cout<<"PASS SSS prefix exact7488/124rows/496ports;7620 envelope/order refusals;input unchanged\n";
+    std::cout << "PASS exact decoder 148 batches/592 ports; 6573 envelope refusals; 2 index refusals\n";
+}
+'''

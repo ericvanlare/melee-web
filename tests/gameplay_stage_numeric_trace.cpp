@@ -52,5 +52,6 @@ int main(int argc,char** argv){
   if(melee_web_gameplay_stats().objects!=0)return 5;
   if(!melee_web_gameplay_shutdown(error,sizeof(error)))throw std::runtime_error(error);
  }
+ std::cout<<"FD source-stage readiness negative and unchanged-state controls passed\n";
  std::cout<<"Original FD marker range context loaded/unloaded/restarted twice\n";
 }

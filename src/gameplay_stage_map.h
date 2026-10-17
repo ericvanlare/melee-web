@@ -26,6 +26,14 @@ typedef struct MeleeWebMapLightOverride {void* descriptor; int found; uint8_t fl
 int melee_web_stage_map_set_overrides(MeleeWebStageMap*,const MeleeWebMapLightOverride*,size_t,char*,size_t);
 int melee_web_stage_map_lookup_override(void*,int*,uint8_t*);
 int melee_web_stage_map_close(MeleeWebStageMap*,char*,size_t);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+/* Bracket the original E8 grDatFiles load while its StageMap catalog is live.
+ * The boundary never clears rows: begin requires the ordinary table empty,
+ * capture records only registry-proven non-heap preload rows. */
+int melee_web_stage_map_grdatfiles_begin(void);
+int melee_web_stage_map_grdatfiles_capture(void);
+int melee_web_stage_map_grdatfiles_arm(MeleeWebStageMap*,char*,size_t);
+#endif
 /* Original grDatFiles storage adapters. NULL means no owned native context. */
 void* melee_web_stage_map_archives(void);
 void* melee_web_stage_map_lookup(int map_id);

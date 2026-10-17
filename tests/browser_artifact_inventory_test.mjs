@@ -10,6 +10,15 @@ import {browserArtifactInventory, validateBrowserArtifactNames} from '../scripts
 const names = JSON.parse(await fs.readFile(new URL('../tools/browser_build_artifacts.json', import.meta.url), 'utf8'));
 assert(names.includes('net_lockstep_core.mjs'));
 assert(names.includes('net_lockstep_native_adapter.mjs'));
+const runtimeSource = await fs.readFile(new URL('../web/melee-runtime.mjs', import.meta.url), 'utf8');
+assert.match(runtimeSource, /from\s+['"]\.\/startup-profile\.mjs['"]/,
+  'melee-runtime must keep the startup-profile dependency explicit');
+assert(names.includes('melee-runtime.mjs') && names.includes('startup-profile.mjs'),
+  'The browser artifact allowlist must include the runtime and its startup-profile import');
+const cmake = await fs.readFile(new URL('../cmake/FighterRuntime.cmake', import.meta.url), 'utf8');
+const moduleCopyList = cmake.match(/foreach\(module ([^)]+)\)/)?.[1]?.trim().split(/\s+/) ?? [];
+assert(moduleCopyList.includes('melee-runtime') && moduleCopyList.includes('startup-profile'),
+  'CMake must copy the startup-profile module imported by the runtime into build output');
 assert.deepEqual(validateBrowserArtifactNames(names), names);
 for (const invalid of [[], ['one', 'one'], [''], [' '], [42], [null],
   ['../outside'], ['sub/../outside'], ['/absolute'], ['\\outside'],

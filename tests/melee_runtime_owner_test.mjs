@@ -1,11 +1,16 @@
 /** Lifecycle unit evidence with a controlled native boundary, not gameplay validation. */
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {createHash} from 'node:crypto';
 import {createRuntimeAudio} from '../web/runtime-audio.mjs';
 const withAudio = !process.argv.includes('--silent');
+const stadiumRecreationSettlementCase = process.argv.find(value => value.startsWith('--stadium-recreation-settlement-case='))?.split('=')[1] || '';
+const stadiumRetirementCase = process.argv.find(value => value.startsWith('--stadium-retirement-case='))?.split('=')[1] || (['busy-asset-transfer','disc-loading','handoff-loading'].includes(stadiumRecreationSettlementCase) ? stadiumRecreationSettlementCase : '');
+const stadiumExpectSettled = process.argv.includes('--stadium-retirement-expect-settled');
 const cacheUnavailable = process.argv.includes('--cache-unavailable');
 const failMkdir = process.argv.includes('--mkdir-failure');
 const startupCacheDelay = process.argv.includes('--startup-cache-delay');
@@ -168,6 +173,15 @@ globalThis.AudioWorkletNode = class {
 };
 globalThis.testDiscReader = async (file, report) => {
   calls.push(['readDisc', file.name]);
+  if (file.name === 'stadium-held-disc' && ['disc-loading', 'handoff-loading'].includes(stadiumRetirementCase)) {
+    const handoff = stadiumRetirementCase === 'handoff-loading';
+    report({phase: handoff ? 'complete' : 'read', complete: handoff ? 1 : 0, total: 1});
+    await new Promise((resolve, reject) => {
+      globalThis.releaseStadiumDiscRead = () => resolve();
+      globalThis.rejectStadiumDiscRead = reject;
+    });
+    return new Map([['local.dat', new Uint8Array([1, 2, 3])]]);
+  }
   if (file.invalid) throw Error('Invalid local disc');
   const entries = file.batch ? Array.from({length: 19}, (_, index) =>
     [`local-${index}.dat`, new Uint8Array([index, index + 1, index + 2])]) :
@@ -183,7 +197,7 @@ globalThis.testDiscReader = async (file, report) => {
   return new Map(entries);
 };
 globalThis.testOpenNativeGameDiscSession = async file => {
-  assert.equal(fatalAudioDiscOperation || networkOwnerLifecycle, true,
+  assert.equal(fatalAudioDiscOperation || networkOwnerLifecycle || stadiumRetirementCase === 'busy-asset-transfer', true,
     'The controlled session is only used by a scoped runtime owner case');
   calls.push(['openDisc', file.name]);
   let release;
@@ -200,7 +214,7 @@ globalThis.testOpenNativeGameDiscSession = async file => {
       calls.push(['streamScope', names.length]);
       reportDiscProgress = report;
       report({phase: 'read', complete: 0, total: names.length});
-      if (!networkOwnerLifecycle) await released;
+      if (!networkOwnerLifecycle && stadiumRetirementCase !== 'busy-asset-transfer') await released;
       if (this.closed) throw Error('DiscAssetSession is closed');
       yield ['asset.dat', new Uint8Array([1])];
     },
@@ -351,7 +365,8 @@ if (adapterRace || adapterRetry || adapterTimeoutLate || adapterDeadlineSpan || 
 }
 let owner;
 const mounted = mountMeleeRuntime({canvas,
-  openDisc: fatalAudioDiscOperation || networkOwnerLifecycle ? globalThis.testOpenNativeGameDiscSession : null,
+  openDisc: fatalAudioDiscOperation || networkOwnerLifecycle || stadiumRetirementCase === 'busy-asset-transfer'
+    ? globalThis.testOpenNativeGameDiscSession : null,
   createAudio: withAudio ? options => {
   calls.push(['createAudio']); return createRuntimeAudio(options);
 } : undefined, loaderUrl: new URL('http://localhost/runtime/version/gameplay_public.js'),
@@ -437,7 +452,7 @@ Object.assign(Module, {
   _melee_web_input_set_activity(focused, visible) { calls.push(['activity', focused, visible]); },
   _melee_web_input_set_keyboard_layout(value) { calls.push(['layout', value]); return 1; },
 });
-if (fatalAudioDiscOperation || networkOwnerLifecycle) Object.assign(Module, {
+if (fatalAudioDiscOperation || networkOwnerLifecycle || stadiumRetirementCase === 'busy-asset-transfer') Object.assign(Module, {
   _melee_web_native_source_file_external_set(_pointer, size) {
     calls.push(['sourceRegister', size]); return 1;
   },
@@ -467,6 +482,213 @@ assert.equal(player.getState().canImport, false,
   'Import remains disabled until the first post-main frame reports cache readiness');
 rendererStarted = true;
 window.menuFrame(false);
+if (stadiumRecreationSettlementCase) {
+  // Actual mountMeleeRuntime, controlled native endpoints only. This does not
+  // claim actual MatchContext/MenuHost close, which the browser canary owns.
+  let receipt = {schema:'melee-web-stadium-recreation-boundary-v1',attempted:true,
+    closed:true,restarted:false,error:null,prior_world_generation:3,match_seed:39,host_seed:29,parent_seed:19,
+    match_to_host_restored:true,host_to_parent_restored:true,
+    matched_setup_cf:{schema:'melee-web-stadium-source-action-native-v2',scope:'proper-prefix-next-draw-tick-draw',
+      action_count:174,cursor:174,state:'complete',complete:true,failed:false,error:null,queued:false,awaiting_approval:false}};
+  const fullPair = stadiumRecreationSettlementCase.startsWith('full-pair-');
+  const settlementCase = fullPair ? stadiumRecreationSettlementCase.slice('full-pair-'.length) : stadiumRecreationSettlementCase;
+  if (fullPair) {
+    if (process.env.MELEE_STADIUM_RECREATION_FULL_PAIR_RECEIPT) {
+      const bytes=await fs.readFile(process.env.MELEE_STADIUM_RECREATION_FULL_PAIR_RECEIPT);
+      assert.equal(createHash('sha256').update(bytes).digest('hex'),process.env.MELEE_STADIUM_RECREATION_FULL_PAIR_RECEIPT_SHA256);
+      receipt=JSON.parse(bytes);
+    } else {
+      receipt.matched_setup_cf={...receipt.matched_setup_cf,
+        schema:'melee-web-stadium-source-action-native-v5',scope:'original-full7167-common-fields-seed-observation-only',
+        action_count:7167,cursor:7167,common_field_count:15,seed_value_count:1,source_ticks:3585,source_draws:3582};
+    }
+  }
+  let reads=0;const nativePhase=Module._melee_web_native_menu_phase,nativeRunning=Module._melee_web_native_menu_running;
+  Module._melee_web_native_menu_phase=()=>{++reads;return nativePhase();};
+  Module._melee_web_native_menu_running=()=>{++reads;return nativeRunning();};
+  Module.stadiumMatchedSetupNativeIdle=()=>true;
+  Module._melee_web_native_menu_stadium_recreation_status=()=>{++reads;return JSON.stringify(receipt);};
+  window.menuPreparation('Preparing original next scene...',true);
+  let heldImport=null;
+  if(settlementCase==='queued-command') {
+    owner.boundary(()=>1).catch(()=>{});
+  } else if(settlementCase==='busy-asset-transfer') {
+    window.menuPreparationCanceled();await pump(player.importDisc({name:'stadium-asset-session-seed'}));
+    window.menuAssetsRequested(17);await Promise.resolve();
+  } else if(['disc-loading','handoff-loading'].includes(settlementCase)) {
+    window.menuPreparationCanceled();heldImport=player.importDisc({name:'stadium-held-disc'});heldImport.catch(()=>{});
+    for(let i=0;!globalThis.releaseStadiumDiscRead&&i<100;++i){window.menuServiceCommands();await new Promise(resolve=>setImmediate(resolve));}
+    assert.equal(typeof globalThis.releaseStadiumDiscRead,'function');
+  } else if(settlementCase==='unsafe-idle') Module.stadiumMatchedSetupNativeIdle=()=>false;
+  else if(settlementCase==='missing-idle') delete Module.stadiumMatchedSetupNativeIdle;
+  else if(settlementCase==='active-native') {phase=3;running=true;}
+  else if(settlementCase==='fatal-owner') owner.stop(Error('controlled fatal owner'));
+  const before=player.getState();assert.equal(before.canImport,false);
+  let submitted=structuredClone(receipt);
+  if(settlementCase==='foreign-receipt')submitted.parent_seed++;
+  if(settlementCase==='invalid-receipt') {
+    const extraChanges=fullPair ? [x=>x.matched_setup_cf.schema='melee-web-stadium-source-action-native-v3',
+      x=>x.matched_setup_cf.scope='proper-prefix-next-draw-tick-draw',x=>x.matched_setup_cf.action_count=174,
+      x=>x.matched_setup_cf.common_field_count=14,x=>x.matched_setup_cf.seed_value_count=0,
+      x=>x.matched_setup_cf.source_ticks=3584,x=>x.matched_setup_cf.source_draws=3581] : [];
+    for(const change of [...extraChanges,x=>x.schema='wrong',x=>x.restarted=true,x=>x.prior_world_generation=0,
+      x=>x.matched_setup_cf.cursor=173,x=>x.match_to_host_restored=false,x=>x.parent_seed=-1]) {
+      const bad=structuredClone(receipt);change(bad);const count=reads;
+      assert.equal(owner.callbacks.menuStadiumRecreationClosed(bad),false);assert.equal(reads,count);
+      assert.equal(player.getState().canImport,false);
+    }
+  }
+  const runnerSource=await fs.readFile(new URL('./stadium_c1a_browser_test.mjs',import.meta.url),'utf8');
+  const callbackMarker='const hostSettlement = await timeout(page.evaluate(receipt => {';
+  const callbackStart=runnerSource.indexOf(callbackMarker);
+  const callbackEnd=runnerSource.indexOf('}, close.receipt)',callbackStart);
+  assert(callbackStart>=0&&callbackEnd>callbackStart);
+  const callbackText=runnerSource.slice(callbackStart+callbackMarker.indexOf('receipt => {'),callbackEnd+1);
+  const actualPageCallback=vm.runInThisContext(`(${callbackText})`);
+  const priorReads=reads;
+  const accepted=settlementCase==='settled'
+    ? actualPageCallback(submitted).accepted : owner.callbacks.menuStadiumRecreationClosed(submitted);
+  const callReads=reads-priorReads;
+  const shouldAccept=['settled','invalid-receipt'].includes(settlementCase);
+  assert.equal(accepted,shouldAccept);const after=player.getState();
+  if(shouldAccept){assert.equal(after.canImport,true);assert.equal(after.loading,null);assert.notEqual(after.state,'preparing');
+    assert.equal(owner.callbacks.menuStadiumRecreationClosed(receipt),false,'one-use close settlement');
+    phase=3;running=true;const b=player.getState();assert.equal(b.phase,3);assert.equal(b.running,true,'B native state remains visible; terminal flags untouched');
+  } else {
+    assert.equal(after.canImport,false);assert.equal(after.loading,before.loading);
+    if(['queued-command','busy-asset-transfer','disc-loading','handoff-loading','unsafe-idle','missing-idle','fatal-owner'].includes(settlementCase))assert.equal(callReads,0,'refusal before native reads');
+  }
+  console.log('STADIUM_RECREATION_SETTLEMENT_RESULT '+JSON.stringify({case:stadiumRecreationSettlementCase,full_pair:fullPair,accepted,before_canImport:before.canImport,after_canImport:after.canImport,native_reads:callReads}));
+  process.exit(0);
+}
+if (stadiumRetirementCase) {
+  const validReceipt = () => ({
+    schema: 'melee-web-stadium-matched-setup-cf-retirement-v1',
+    native_retired: true, terminal: true, error: null,
+    phase_after_close: 0, running_after_close: 0,
+    matched_setup_cf: {queued: false, complete: true, error: null, failed: false, state: 'complete'},
+  });
+  const nativeGetterNames = ['_melee_web_native_menu_phase', '_melee_web_native_menu_running',
+    '_melee_web_native_menu_message', '_melee_web_native_menu_cache_idle'];
+  const instrumentNativeGetters = () => {
+    let count = 0;
+    for (const name of nativeGetterNames) {
+      const originalGetter = Module[name];
+      Module[name] = (...args) => { ++count; return originalGetter(...args); };
+    }
+    return () => count;
+  };
+  let heldImport = null, assetCountBeforeTransfer = null;
+  if (stadiumRetirementCase === 'stale-native-preparation') {
+    window.menuPreparation('Stale native preparation', true);
+  } else if (stadiumRetirementCase === 'busy-asset-transfer') {
+    await pump(player.importDisc({name: 'stadium-asset-session-seed'}));
+    assetCountBeforeTransfer = calls.filter(row => row[0] === 'assetCount').length;
+    window.menuAssetsRequested(17);
+    await Promise.resolve();
+    assert.equal(calls.filter(row => row[0] === 'assetCount').length, assetCountBeforeTransfer,
+      'Asset transfer is held at its queued native boundary, not rejected or serviced');
+  } else if (stadiumRetirementCase === 'disc-loading' || stadiumRetirementCase === 'handoff-loading') {
+    heldImport = player.importDisc({name: 'stadium-held-disc'});
+    heldImport.catch(() => {});
+    for (let i = 0; !globalThis.releaseStadiumDiscRead && i < 100; ++i) {
+      window.menuServiceCommands();
+      await new Promise(resolve => setImmediate(resolve));
+    }
+    assert.equal(typeof globalThis.releaseStadiumDiscRead, 'function', 'Controlled disc read reached its held state');
+  } else if (stadiumRetirementCase === 'fatal-owner') {
+    owner.stop(Error('Controlled fatal owner refusal'));
+  } else if (stadiumRetirementCase !== 'clean') {
+    throw Error(`Unknown Stadium retirement reducer case: ${stadiumRetirementCase}`);
+  }
+
+  const before = player.getState();
+  if (stadiumRetirementCase === 'disc-loading') assert.equal(before.loading?.phase, 'disc');
+  if (stadiumRetirementCase === 'handoff-loading') assert.equal(before.loading?.phase, 'handoff');
+  if (stadiumRetirementCase === 'busy-asset-transfer') assert.equal(before.busy, true);
+  if (stadiumRetirementCase === 'stale-native-preparation') {
+    assert.equal(before.loading?.phase, 'native');
+    assert.equal(before.state, 'preparing');
+  }
+
+  const readNativeGetterCount = instrumentNativeGetters();
+  let malformedRefusal = null;
+  if (stadiumRetirementCase === 'clean') {
+    const malformed = validReceipt(); malformed.error = 'not a closed receipt';
+    malformedRefusal = owner.callbacks.menuMatchedSetupCfRetired(malformed);
+    assert.equal(malformedRefusal, false, 'Malformed receipt is refused without consuming the one-shot callback');
+  }
+  const receipt = validReceipt();
+  const result = owner.callbacks.menuMatchedSetupCfRetired(receipt);
+  const after = player.getState();
+  let retriedResult = null, afterOperation = null, duplicate = null;
+  if (stadiumRetirementCase === 'disc-loading') {
+    globalThis.rejectStadiumDiscRead(Error('controlled held reader rejection'));
+    await assert.rejects(heldImport, /controlled held reader rejection/);
+    afterOperation = player.getState();
+    retriedResult = owner.callbacks.menuMatchedSetupCfRetired(receipt);
+    duplicate = owner.callbacks.menuMatchedSetupCfRetired(receipt);
+  } else {
+    duplicate = owner.callbacks.menuMatchedSetupCfRetired(receipt);
+  }
+  const getterCount = readNativeGetterCount();
+  assert.equal(getterCount, 0, 'Terminal notification, snapshot, and safe retry must not read native exports');
+
+  if (stadiumRetirementCase === 'clean') {
+    assert.equal(result, true, 'An ordinary inactive owner accepts a valid retired receipt');
+    assert.equal(duplicate, false, 'Ordinary terminal retirement is consumed exactly once');
+    assert.equal(after.busy, false);
+    assert.equal(after.loading, null);
+  } else if (stadiumRetirementCase === 'stale-native-preparation') {
+    if (stadiumExpectSettled) {
+      assert.equal(result, true, 'An inactive terminal owner settles only stale native preparation');
+      assert.equal(after.busy, false);
+      assert.equal(after.loading, null);
+      assert.notEqual(after.state, 'preparing');
+      assert.equal(duplicate, false);
+    } else {
+      assert.equal(result, false, 'Baseline preserves the observed refusal with stale native preparation');
+      assert.equal(after.busy, false);
+      assert.equal(after.loading?.phase, 'native');
+      assert.equal(after.state, 'preparing');
+      assert.equal(duplicate, false, 'The refused terminal receipt remains one-shot after consumption');
+    }
+  } else if (stadiumRetirementCase === 'busy-asset-transfer') {
+    assert.equal(result, false, 'A live native asset transfer cannot be canceled by terminal retirement');
+    assert.equal(after.busy, true);
+    assert.equal(after.loading, before.loading);
+    assert.equal(calls.filter(row => row[0] === 'assetCount').length, assetCountBeforeTransfer,
+      'Terminal notification does not consume the pending native transfer boundary');
+    assert.equal(duplicate, false, 'An active-transfer refusal remains a refusal without host settlement');
+  } else if (stadiumRetirementCase === 'disc-loading' || stadiumRetirementCase === 'handoff-loading') {
+    assert.equal(result, false, 'A live disc read or handoff cannot be canceled by terminal retirement');
+    assert.equal(after.busy, true);
+    assert.deepEqual(after.loading, before.loading, 'Live loading phase and progress are preserved exactly');
+    if (stadiumRetirementCase === 'disc-loading') {
+      assert.equal(afterOperation.busy, false, 'The controlled host read rejection unwinds the live import');
+      assert.equal(afterOperation.loading, null, 'Ordinary import unwind owns its loading cleanup');
+      if (stadiumExpectSettled) {
+        assert.equal(retriedResult, true, 'A valid receipt remains available for later safe host settlement');
+        assert.equal(duplicate, false, 'Later safe settlement consumes the terminal receipt exactly once');
+      } else {
+        assert.equal(retriedResult, false, 'Baseline incorrectly consumed the terminal receipt on active refusal');
+        assert.equal(duplicate, false);
+      }
+    } else {
+      assert.equal(duplicate, false);
+    }
+  } else if (stadiumRetirementCase === 'fatal-owner') {
+    assert.equal(result, false, 'Fatal owner keeps its original stop refusal');
+    assert.equal(after.requiresReload, true);
+  }
+  console.log('STADIUM_RETIREMENT_RESULT ' + JSON.stringify({case: stadiumRetirementCase, before: {
+    state: before.state, busy: before.busy, loading: before.loading, requiresReload: before.requiresReload,
+  }, result, after: {state: after.state, busy: after.busy, loading: after.loading, requiresReload: after.requiresReload},
+  malformed_refusal: malformedRefusal, retried_result: retriedResult, after_operation: afterOperation ? {
+    state: afterOperation.state, busy: afterOperation.busy, loading: afterOperation.loading, requiresReload: afterOperation.requiresReload,
+  } : null, duplicate, native_getter_calls: getterCount}));
+  process.exit(0);
+}
 if (startupCacheTimeout) {
   assert.equal(player.getState().canImport, false);
   await new Promise(resolve => setTimeout(resolve, 25));
