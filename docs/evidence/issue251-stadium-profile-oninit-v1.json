@@ -15267,6 +15267,210 @@
             "sha256": "983805bedd26f1ae12ddc194354c08b0b157b4eaa6bb38f9f2ada897c3b1c1c1"
           }
         ]
+      },
+      "stock4_sss_exit_browser_component": {
+        "state": "REVIEWED_SCOPED_COMPONENT_PASS_C3_OPEN",
+        "producer": {
+          "runtime_harness_tests": "e6f0f1b49e3f9f581aa68166cb7928605e86f38b",
+          "tree": "cf2d7eea46d508f48952716b1be9059e9a10f6b5",
+          "original_native": "9494fc69526db469dd969ab0832eae24200260e0",
+          "original_capture_validator": "db52ff305c11eb40713f92f5afa588e03878bbb5"
+        },
+        "validation": {
+          "diagnostic_release": "PASS_44_ARTIFACTS",
+          "ordinary_release": "PASS_44_ARTIFACTS",
+          "full_suite": {
+            "state": "PASS",
+            "tests": 2683,
+            "skipped": 182,
+            "seconds": 580.068
+          },
+          "validation_pins": 138,
+          "packet_pins": 153,
+          "runtime_artifacts": 88,
+          "cmake_caches": 2,
+          "phase_logs": 3
+        },
+        "capture": {
+          "exit_code": 0,
+          "seconds": 11.274434874765575,
+          "result": "component_pass_replay_stopped",
+          "original_replay_capture_result": "fail",
+          "full_replay_complete": false,
+          "full_replay_pass": false,
+          "preserved_full_replay_failures": [
+            "whole-session final CSS was not entered",
+            "Manual unload stopped the replay",
+            "incomplete input timeline",
+            "source tick/draw count mismatch"
+          ],
+          "first_error": null,
+          "browser_errors": [],
+          "unexpected_requests": []
+        },
+        "comparison": {
+          "pass": true,
+          "scope": "retained_first_sss_exit_common_fields_only",
+          "original_coordinate": {
+            "sequence": 1599,
+            "source_tick": 125,
+            "draw_ordinal": 0
+          },
+          "notification_coordinates": {
+            "replay_cursor": 270,
+            "callback_source_steps": 0,
+            "callback_source_draws": 0,
+            "order": 543,
+            "enclosing_host_tick_status": "not_in_host_tick",
+            "last_host_tick_call_returned": true
+          },
+          "menu_draw_reference": "UNKNOWN",
+          "unpaired": [
+            "other_sss_header_fields",
+            "vs_leading_eight_bytes",
+            "native_ABI_bytes",
+            "native_pointer_addresses"
+          ],
+          "Entry": false,
+          "C3": false
+        },
+        "trace_comparison": {
+          "pass": true,
+          "literal_supplied_inputs": 270,
+          "local_order_rows": 543,
+          "original_menu_draw_parity": "UNKNOWN"
+        },
+        "terminal": {
+          "pass": true,
+          "runtime_replay": "FAIL_INCOMPLETE_EXPLICIT_SSS_STOP",
+          "checked_unload": true,
+          "runtime_admission": false,
+          "Entry": false,
+          "C3": false
+        },
+        "wrapper_restored": true,
+        "original_raw_prefix": "Literal pre-preparation SSS values retained; prepared Entry/Setup profile evidence is separate, not browser Entry/Setup comparison.",
+        "cleanup": {
+          "owner_cleanup_passed": true,
+          "pids_absent": {
+            "28050": true,
+            "28057": true,
+            "28062": true,
+            "28063": true,
+            "28064": true,
+            "28069": true,
+            "28073": true,
+            "28080": true,
+            "28081": true,
+            "28082": true,
+            "28083": true,
+            "28087": true,
+            "28089": true,
+            "28091": true,
+            "28100": true,
+            "28105": true
+          },
+          "groups_absent": {
+            "28050": true,
+            "28063": true,
+            "28064": true,
+            "28069": true
+          },
+          "port": 52895,
+          "port_absent": true
+        },
+        "limits": [
+          "No Entry or Setup comparison",
+          "Original menu draws UNKNOWN",
+          "Other SSS header, leading VsModeData, native ABI/pointer bytes unpaired",
+          "H1 incident recorder/export UNRUN/unsupported in pre-match component; no continuous H1 claim",
+          "No full-duration lifetime, all-writer RNG, audio/pixel or C3 acceptance"
+        ],
+        "next": "Planned source-only Entry-before-assets seam: compare actual prepared Start fields and seed with original Entry row1640, preserving literal270-input prefix and actual service/state order. No source/capture release; Entry/Setup/C3 remain unproved.",
+        "preserved_failures": [
+          "V1 raw SSS versus prepared-profile phase projection",
+          "V2 extraction delimiter fixture",
+          "V3 executor tool-pin lookup preparation"
+        ],
+        "evidence": [
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-current-sss-exit-observation-capture-v1/launcher-result.json",
+            "sha256": "7a363b9d30f78f8f607494202f3a908d161cb2a070a088bfe0325dcf802fe40d"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-current-sss-exit-observation-capture-v1/owner.json",
+            "sha256": "79a5e739300e3ce3ac48f5b53b739ca9339d227377a6cd903c3243e2c11946f2"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-current-sss-exit-observation-capture-v1/browser-run/report.json",
+            "sha256": "f2a0ed3081a022507dc62f2dfa8edb90245bf0a966beb81d21e2bb845eee16b6"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-current-sss-exit-observation-capture-v1/capture.log",
+            "sha256": "38c30310b8f68261cdf9109c549f4cd7d6f60bb30468e62fa5d6e8d746355dca"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-current-sss-exit-observation-capture-v1/owner-result-review.json",
+            "sha256": "74daaf224ba2cd4716c56ccfa943f74be6682f1d901198e411f9984ed3a47713"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-current-sss-exit-observation-capture-v1/processes.jsonl",
+            "sha256": "a37f5740cd8a8eac1b0550355338411816740f0441456c3c8347924061620147"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-sss-stop-capture-preparation-v1/packet/manifest.json",
+            "sha256": "ee60ad754d33b23bf455ffd31c641f46d3e37eba387f23d81940d7ea57201029"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-sss-stop-capture-preparation-v1/packet/expected.json",
+            "sha256": "2e2653d717a6e1335240695dde4439f31b1eadd76d7492ad8d499fb2a8fb3ca5"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-sss-stop-capture-preparation-v1/packet/current.mwrc",
+            "sha256": "41ac043ca7d869a08f86cf81fc7d4ce6f05aba4394243f4aabf6f57aa1c94e36"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-sss-stop-capture-preparation-v1/packet/launch_once.py",
+            "sha256": "70d4026c36b5e694fc9ade5bfd3ce22e08efeb513de190113c53363453f97cca"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-sss-stop-capture-preparation-v1/packet/root-packet-review.json",
+            "sha256": "4287baade46d6241c1b339717af6bd63037de6de39bf109615597d31b1df7082"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-sss-stop-capture-preparation-v1/packet/root-one-launch-release.json",
+            "sha256": "9c72c8071a2dd9c748c27d72194d8bca9461d1a2ca80866c54da9f66471954c2"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-sss-stop-capture-preparation-v1/preflight-v1/result.json",
+            "sha256": "e0778846011c841374022082518522a7b52289d2af6684f032eae5120e198c19"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-sss-stop-release-validation-e6f0f1b4-v1/evidence/result.json",
+            "sha256": "c7cd6d7ef54ce3b6f746094d96a697f779e91ca7f104fb2146fdda8a8df04e91"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-sss-stop-release-validation-e6f0f1b4-v1/evidence/root-result-review.json",
+            "sha256": "6710103ae72779b4457cea55024db3513359ec6e3c335a05572f6b87b7bbdedb"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-sss-stop-release-validation-e6f0f1b4-v1/evidence/full-unittest-suite.log",
+            "sha256": "470b3476d1c612dc2fe57c7a3d67d5825fd4681279794f848521072118a3a1dd"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-current-context-browser-candidate-v3/owner-focused-result-summary.json",
+            "sha256": "7a7c74dfc3b2ea51fc89a37c3298bdcbb4408cb0555903330252dbda05b3a473"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-current-sss-exit-observation-capture-v1/root-result-review.json",
+            "sha256": "e4684ce05d8a4d8657c56f2728b6f03fc18ffefa4783f4e2284d9928b8dc5f1d"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-current-sss-exit-observation-capture-v1/independent-result-review.json",
+            "sha256": "7ce2d60b567b71d8f054ea54249936af12665a46b26bff603d99729c6f8282cc"
+          }
+        ],
+        "reviews": "Root and independent retained-raw reviews PASS for exact component scope; no full replay or C3 acceptance."
       }
     }
   }
