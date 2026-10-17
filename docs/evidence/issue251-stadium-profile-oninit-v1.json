@@ -15039,7 +15039,234 @@
           "sha256": "adb3df0f86d713c4147c312ab9aecb93f4b6d6d6136a8e131039efcd1d007513"
         },
         "execution": "NOT_AUTHORIZED; source-only decision, no new capture.",
-        "terminal_decision": "PENDING bounded existing GO/C/F reuse review; no new observer build/mode implied."
+        "terminal_decision": "PENDING bounded existing GO/C/F reuse review; no new observer build/mode implied.",
+        "historical_status": "SUPERSEDED_BY_RETAINED_GO_REUSE_AND_OBSERVED_STOCK4_SHORT_LIFECYCLE; original decision fields below are preserved historical proposal, not current authorization.",
+        "superseded_by": "stock4_none_original_short_lifecycle"
+      },
+      "stock4_none_original_short_lifecycle": {
+        "state": "OBSERVED_SCOPED_COMPONENT_PASS_DOCUMENTATION_DRAFT",
+        "native_producer": "9494fc69526db469dd969ab0832eae24200260e0",
+        "native_tree": "271016963e11b9d2efd5c86b37a0bf0795ae5547",
+        "host_test_source": "db52ff305c11eb40713f92f5afa588e03878bbb5",
+        "host_test_tree": "58ae75a8ee43ff912b7954e85289bfe541a7ff81",
+        "native_manifest_sha256": "5d51abf2120db5d980590f28179d6a70efcf1c2e56e275784793b4ff2eae8a42",
+        "native_binary_sha256": "be1c48e5af41971f96f37ebc033a0e49fb71eaabddfe82706cbae86791bbc431",
+        "profile": "Strict exact retained Personal5184; original export/report/package/preparation and derived genuine retail provenance. Everything branch unchanged.",
+        "host_fixes": [
+          "Rules byte7 is unknown; stocktimer8 and friendlyfire9 guarded and independently poisoned",
+          "Truthful exact Personal report/card admission, ordinary source/card links refused, disjoint immutable-byte copy",
+          "Legacy actual-body defaultOFF fixture and derived current-test source binding preserve historical raw pins"
+        ],
+        "historical_parent_suite": {
+          "tests": 2679,
+          "skipped": 182,
+          "errors": 2,
+          "seconds": 593.206,
+          "state": "FAIL_RETAINED_NATIVE_BUILD_PASS_DISTINCT"
+        },
+        "current_suite": {
+          "tests": 2681,
+          "skipped": 182,
+          "seconds": 597.718,
+          "state": "PASS",
+          "pins": 125,
+          "pgid": 84485,
+          "absent": true
+        },
+        "capture": {
+          "state": "pass",
+          "seconds": 63.272839500103146,
+          "primary_events": 8605,
+          "recorded_input_events": 13784,
+          "short_lifetimes": 3,
+          "original_rng_endpoints": 8,
+          "actual_input": "At least180 observed neutral ticks; two distinct consumed pause/exit chords and releases; full four-port rows retained.",
+          "owned_pids": [
+            95901,
+            95906,
+            95909
+          ],
+          "owned_pids_and_groups_absent": true,
+          "cleanup": "PASS",
+          "input_pins_unchanged": 72
+        },
+        "setup": {
+          "stage": 3,
+          "character_kind": 8,
+          "costumes": [
+            1,
+            0
+          ],
+          "is_stock": true,
+          "stocks": 4,
+          "time_limit_seconds": 0,
+          "item_frequency": -1,
+          "item_mask": "ffffffffffffffff"
+        },
+        "rng": {
+          "first_entry": "e2624ac3",
+          "first_setup": "083a62a9",
+          "second_entry": "7fc17cf1",
+          "second_setup": "25d557a7",
+          "all_writers_observed": false,
+          "port_wrapper_correspondence": "not claimed"
+        },
+        "generic_reference_bundle": {
+          "experimental": true,
+          "complete": false,
+          "accepted_for_reference_bundle": false,
+          "missing": [
+            "transition_trace_css_sss_join",
+            "audio_pcm",
+            "persistent_record_semantics"
+          ]
+        },
+        "retained_V15_context_pairing": {
+          "admitted": false,
+          "first_mismatch": "newEntrye2624ac3 !=V15actual3bb84c53; newSetup083a62a9 !=V15actual35a455b9",
+          "PAD_histories_spliced": false,
+          "historical_GO_run2_witness": "Retained and reused independently; no duplicate original GO capture."
+        },
+        "packet_builder": {
+          "state": "PASS_UNCHANGED_BUILDER_AFTER_SEPARATE_OFFLINE_FINALIZATION",
+          "first_refusal_retained": "Capture result pass vs required offline result PASS; raw hashes matched. No relaxation.",
+          "original_capture_result": "pass",
+          "offline_result": "PASS",
+          "offline_capture": false,
+          "literal_four_port_inputs": 2006,
+          "per_lifetime_steps": [
+            192,
+            192,
+            193
+          ],
+          "eight_joins": 8,
+          "complete_repeated_raw_setup_equality": true,
+          "menu_draw_schedule": "UNKNOWN",
+          "runtime_admission": false,
+          "typed_common_rule_player_mapper": "No declared rule/player mismatch for3Entry/Setup pairs; existing native6/source4 and ABI exclusions.",
+          "seed_context_equal_to_V15": false,
+          "next": "First current210c native arm refuses newstock4 because exactTIME120/nonstock/items2/stocks3 guard; JS additionally requires2013frames rather than new2006. Legacy firstCSS sourcehash/sequence and constructor148input/fullF7167 exactowner chains are not replacementadmission. Next explicitlyscoped source/harness change must preserve oldTIME guard and prove freshcontext/actualinputs plus checkedstop/unload beforeassets; no code/capture release.",
+          "steps_description": "Three lifetimes contain192,192,193source steps respectively;2006literal4portinputs cover full recordedmenu/lifecycle stream, not just gameplay."
+        },
+        "C3": false,
+        "evidence": [
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-whole3-release-validation-9494fc69-v1/artifact/build-manifest.json",
+            "sha256": "5d51abf2120db5d980590f28179d6a70efcf1c2e56e275784793b4ff2eae8a42"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-whole3-release-validation-9494fc69-v1/evidence/result.json",
+            "sha256": "86d1ed173d6f7c2ea3bf1a40a2064b21d6d563230fc560bff87bc3bd03f03796"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-whole3-release-validation-9494fc69-v1/evidence/owner-final-review.json",
+            "sha256": "7b10f7b6617c550e6ce586db097e98bf4357c6e4f8a64a9a69b25bab1723ebed"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-none-whole3-candidate-v1/host-byte-offset-repair-v1/independent-source-review.json",
+            "sha256": "208be57981bf8e01c2152592c80b08dbf689cba30dae2b2198c1fe26a892f755"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-retained-personal-profile-admission-contract-v1/candidate-v3/independent-extra-review.json",
+            "sha256": "397d53d3fc63dd332478d39aa060ed856a20c05f4011c2f3a25dbaf0dbe30df7"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-retained-personal-profile-admission-contract-v1/candidate-v3/focused-owner-result.json",
+            "sha256": "706493c8d95baa1ea58f03e52fadbbab7325736aa58b31ac13b78806759ecfa0"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-retained-personal-profile-admission-contract-v1/candidate-v3/commit-receipt.json",
+            "sha256": "ae0ce342edfd7708b9723bd1c6631e6fee1c970fb376376cc74a8e45a33170e3"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-personal-host-child-full-regression-db52ff30-v1/evidence/result.json",
+            "sha256": "f1d22da2bbee657e44cba6dcb620cee0cf9ca91d53ab1d92a29dffe9531c658c"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-personal-host-child-full-regression-db52ff30-v1/evidence/root-final-review.json",
+            "sha256": "93d5585ffdfd61de92c70d950e0d69787a78448b97db438a72c61e3de6f5364f"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-personal-capture-preparation-db52ff30-v1/packet-personal-stock4/strict-loader-admission.json",
+            "sha256": "713be14526487714bdf543c3bfcd252413fc4ed548c9a243e353ecab2058f05d"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-personal-capture-preparation-db52ff30-v1/packet-personal-stock4/launch-result.json",
+            "sha256": "4166442fb20fe1c72875c77bf1740e6972f16bb3d77dedab345e00c503b99f92"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-personal-capture-preparation-db52ff30-v1/packet-personal-stock4/root-capture-review.json",
+            "sha256": "743442bc84097f8e7c373bb4e6beeb7d26753aef5606b289a22cda560abfe60d"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-personal-capture-preparation-db52ff30-v1/packet-personal-stock4/owner-result-review.json",
+            "sha256": "95aefdba015e1071c2bf7903187e738e7ebd651df4370f42dfd02fcff9304dc6"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-personal-whole3-capture-db52ff30-v1/report.json",
+            "sha256": "8cfdcf83ebaf32ac30f706119ba34170f2bc71db384719743d2fb519deef119a"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-personal-whole3-capture-db52ff30-v1/cleanup.json",
+            "sha256": "5363929f4d39b2cb637c6386d55387d16536aa947dbafede3f534749b9b94535"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-personal-whole3-capture-db52ff30-v1/native-primary-status.json",
+            "sha256": "21d7fe19a1acc6cf386da8d7a37324f781e14102e31467058b33656649140ee6"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-personal-whole3-capture-db52ff30-v1/native-input-status.json",
+            "sha256": "a68f1c82fe08581115e7bae94ce04e980438cacae8da2ffa8302a265453a2f1b"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-personal-capture-preparation-db52ff30-v1/context-reuse-decision.json",
+            "sha256": "50377c464f9519c3a4b3423797ebb79cdaf10d6ce3048c8b790ef2cd655857d1"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-personal-capture-preparation-db52ff30-v1/current-packet-first-refusal.json",
+            "sha256": "55f809f401dbc91f8510e0a8e53a0a77ccdb7a3455cb30fdcd01d4679e9f5130"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-none-original-go-capture-preparation-v1/historical-original-witness-reuse-review.json",
+            "sha256": "6e9fb6d4f94459b75622825c0179b4a55b3bf5871608327900757f01dcc0c0f0"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-personal-offline-finalization-db52ff30-v1/freeze.json",
+            "sha256": "208577f51a93dff08b608052c573df4e89ca51eb4a9c6fe04db886f582b1509e"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-personal-offline-finalization-db52ff30-v1/execution-v1/completion.json",
+            "sha256": "d4a6ff08d5ddf1202a64df39f5d33cf5e3c5838d3cb5522e11784d82b3698902"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-personal-offline-finalization-db52ff30-v1/validated/offline-validated-report.json",
+            "sha256": "c4b4317e877a7259f4a44515fc81737f4c034b582c7662ccde57bcffffb04bce"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-personal-capture-preparation-db52ff30-v1/new-original-current-context-finalized-binding.json",
+            "sha256": "7d954aec2b7409fde75dbd3f396d566f5efa52300543908b1305020f0585d2ff"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-personal-capture-preparation-db52ff30-v1/new-original-current-context-packet.json",
+            "sha256": "7cd4b7d1671ae9bdb4efd566cefbb3a5c6624110d0977691aebdfcc440180c3c"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-personal-capture-preparation-db52ff30-v1/actual-start-common-mapper-result.json",
+            "sha256": "65c6eebabe16bca78cfeb7067d9ebab933c46f5fabb5bcd5d7fc126f1b4802fe"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-personal-capture-preparation-db52ff30-v1/offline-reuse-result.json",
+            "sha256": "b530789036ec452c921208d6c3409aa087a1a8ca78689891a7890f1b95ff4d7c"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-personal-whole3-independent-review-v1.json",
+            "sha256": "3624ea373c51cb5d287f850eb14f636eaa714238e29e5672a6ded47752727c57"
+          },
+          {
+            "artifact": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-personal-capture-preparation-db52ff30-v1/current-browser-arm-reuse-source-review.json",
+            "sha256": "983805bedd26f1ae12ddc194354c08b0b157b4eaa6bb38f9f2ada897c3b1c1c1"
+          }
+        ]
       }
     }
   }
