@@ -495,6 +495,65 @@ assert(scoped.emitted.find("\\\"whole_session\\\":true,\\\"match_index\\\":2")!=
         for row in first_positions[:3]:accept(legacy,row,index=0)
         legacy.require_closed();self.assertEqual(legacy.last_call,1)
 
+    def test_retained_Results_mixed_release_preserves_phase_and_PAD_guards(self):
+        trace=os.environ.get('MELEE_STADIUM_RESULTS_RELEASE_TRACE')
+        if not trace:self.skipTest('Retained Results mixed-release source trace not configured')
+        path=Path(trace)
+        self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),os.environ['MELEE_STADIUM_RESULTS_RELEASE_TRACE_SHA256'])
+        from sd_original_menu_plan import stadium_go_feedback_packet
+        from retail_setup_validation import _decode_setup
+        from reference_versus_sequence_capture import raw_pad
+        rows=[]
+        for row in iter_records(path):
+            rows.append(row)
+            if row['seq']==3181:break
+        setup=next(r for r in rows if r['payload'].get('boundary')=='setup')
+        expected=_decode_setup(next(x['hex'] for x in setup['payload']['slices'] if x['tag']==4))
+        receiver=driver.StadiumWholeFeedbackReceiver(stadium_go_feedback_packet(),rows[0]['payload']['setup_receipt_sha256'],expected)
+        receiver.recorded_input=True;chord=raw_pad(buttons=['L','R','A','START']);start=raw_pad(buttons=['START']);before=None
+        for row in rows:
+            p=row['payload']
+            if p.get('boundary')=='pad_consume' and receiver.setup_seen:
+                ports,_,_=driver._transform_consumed_ports(p,row['seq'])
+                if ports[:2]==[chord,driver.NEUTRAL_PAD]:
+                    if receiver.pause_consumed is None:
+                        self.assertGreaterEqual(receiver.tick_count,180);receiver.chord_requested=True
+                    else:self.assertIsNotNone(receiver.pause_ready_clock);receiver.exit_requested=True
+                if start in ports[:2] and receiver.outcome_seen:
+                    self.assertIsNotNone(receiver.chord_released);receiver.start_allowed=True
+            if row is rows[-1]:before=copy.copy(receiver)
+            receiver.accept(row)
+        self.assertTrue(before.start_allowed);self.assertTrue(before.outcome_seen)
+        self.assertEqual(before.chord_released['sequence'],2554)
+        self.assertEqual(before.last_pad[:2],[start,start])
+        self.assertEqual(receiver.last_pad[:2],[driver.NEUTRAL_PAD,start])
+        actual_ports,actual_errors,actual_queue=driver._transform_consumed_ports(rows[-1]['payload'],3181)
+        self.assertEqual(actual_errors,[0,0,-1,-1]);self.assertEqual(actual_queue['queue_slot_address'],0x8046b108)
+        # Synthetic negative/finite-state interpositions retain the real queue,
+        # register and source identity; they are not new original observations.
+        def clone():
+            value=copy.copy(before);value.boundaries=[];value.consumed_samples=[];return value
+        def with_ports(pads):
+            row=copy.deepcopy(rows[-1]);item=next(x for x in row['payload']['slices'] if x['tag']==3)
+            raw=bytearray.fromhex(item['hex'])
+            for i,pad in enumerate(pads):raw[i*12:i*12+11]=bytes.fromhex(pad)
+            item['hex']=raw.hex();return row
+        for p1 in (driver.NEUTRAL_PAD,start):
+            for p2 in (driver.NEUTRAL_PAD,start):
+                value=clone();value.accept(with_ports([p1,p2,*actual_ports[2:]]))
+                self.assertEqual(value.last_pad[:2],[p1,p2])
+        outside=clone();outside.start_allowed=False
+        with self.assertRaises(ValueError):outside.accept(rows[-1])
+        bad_pairs=([raw_pad(buttons=['A']),start],[driver.NEUTRAL_PAD,raw_pad(buttons=['L','START'])],[chord,driver.NEUTRAL_PAD])
+        for pair in bad_pairs:
+            with self.assertRaises(ValueError):clone().accept(with_ports([*pair,*actual_ports[2:]]))
+        with self.assertRaises(ValueError):clone().accept(with_ports([*actual_ports[:2],driver.NEUTRAL_PAD,actual_ports[3]]))
+        bad=copy.deepcopy(rows[-1]);item=next(x for x in bad['payload']['slices'] if x['tag']==3)
+        raw=bytearray.fromhex(item['hex']);raw[10]=0xff;item['hex']=raw.hex()
+        with self.assertRaises(ValueError):clone().accept(bad)
+        bad=copy.deepcopy(rows[-1]);bad['payload']['gprs'][25]+=0x30
+        with self.assertRaises(ValueError):clone().accept(bad)
+
     def test_actual_results_helper_retains_events_before_exit_release(self):
         # Synthetic transport rows exercise the actual Results state machine;
         # they are not a new original Results observation.

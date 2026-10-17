@@ -1976,7 +1976,7 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                                              (self.exit_requested and self.chord_released is None)):
                     allowed.append([chord, NEUTRAL_PAD])
                 if self.start_allowed:
-                    allowed.extend([[start, NEUTRAL_PAD], [start, start]])
+                    allowed.extend([[start, NEUTRAL_PAD], [NEUTRAL_PAD, start], [start, start]])
                 require(ports[2:] == [DISCONNECTED_PAD]*2 and errors == [0,0,-1,-1] and
                         ports[:2] in allowed, 'Whole Stadium consumed PAD escaped current phase')
                 sample = dict(sequence=row['seq'], source_tick=row['source_tick'],
