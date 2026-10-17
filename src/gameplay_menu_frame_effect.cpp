@@ -244,33 +244,6 @@ const char* melee_web_native_menu_frame_effect_natural_one_enrollment(){
  out+="]}";return out.c_str();
 }
 #endif
-#if defined(MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC)
-// Separate additive getter: the historical frame-effect receipt is unchanged.
-const char* melee_web_native_menu_frame_effect_color_conversions(){
- static std::string out;const auto& owner=aurora::gfx::detail::browser_frame_effect_observer();
- const auto snapshot=owner.snapshot();
- out=R"({"schema":"melee-web-color-conversion-facts-v1","packet_frame_id":")"+
-   std::to_string(snapshot.frameId)+R"(","internal_gpu_creation_ownership_qualified":false,"packet_content_qualified":false,"restore_eligible":false,"composite_eligible":false,"overflow":)"+
-   std::string(owner.color_conversion_overflow()?"true":"false")+R"(,"facts":[)";
- for(uint32_t i=0;i<owner.color_conversion_count();++i){
-  aurora::gfx::detail::BrowserFrameEffectObserver::ColorConversionFact f{};
-  if(!owner.color_conversion_fact(i,f))break;
-  if(i)out+=',';out+='{';
-  const auto u=[&](const char* key,uint64_t v){out+='"';out+=key;out+='"';out+=':';out+=std::to_string(v);out+=',';};
-  const auto id=[&](const char* key,uint64_t v){out+='"';out+=key;out+='"';out+=':';out+='"';out+=std::to_string(v);out+='"';out+=',';};
-  u("event_index",f.eventIndex);u("refusal",f.refusal);u("returned",f.returned);u("gx_format",f.gxFormat);u("filter",f.filter);u("draw_count",f.drawCount);u("load_op",f.loadOp);u("store_op",f.storeOp);
-  id("uniform_offset",f.uniformOffset);id("uniform_size",f.uniformSize);
-  id("source_texture",f.sourceTexture);id("source_view",f.sourceView);id("destination_texture",f.destinationTexture);id("destination_view",f.destinationView);id("uniform_buffer",f.uniformBuffer);
-  id("local_call_pipeline",f.localPipeline);id("local_call_group",f.localGroup);id("local_call_sampler",f.localSampler);
-  out+=R"("rect":[)";for(unsigned j=0;j<4;++j){if(j)out+=',';out+=std::to_string(f.rect[j]);}
-  out+=R"(],"uv_bits":[)";for(unsigned j=0;j<4;++j){if(j)out+=',';out+=std::to_string(f.uvBits[j]);}
-  out+=R"(],"clear_bits":[)";for(unsigned j=0;j<4;++j){if(j)out+=',';out+='"';out+=std::to_string(f.clearBits[j]);out+='"';}
-  out+="]}";
- }
- out+="]}";return out.c_str();
-}
-
-#endif
 const char* melee_web_native_menu_frame_effect_status(){
  static std::string out;
  if(observation.active)return "{\"busy\":true}";
@@ -511,6 +484,34 @@ int melee_web_native_menu_frame_effect_retire(){try{
        "Frame effect native retirement completed but runtime notification was refused");
  return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
+#if defined(MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC)
+// Separate additive getter: the historical frame-effect receipt is unchanged.
+const char* melee_web_native_menu_frame_effect_color_conversions(){
+ static std::string out;const auto& owner=aurora::gfx::detail::browser_frame_effect_observer();
+ const auto snapshot=owner.snapshot();
+ out=R"({"schema":"melee-web-color-conversion-facts-v1","packet_frame_id":")"+
+   std::to_string(snapshot.frameId)+R"(","internal_gpu_creation_ownership_qualified":false,"packet_content_qualified":false,"restore_eligible":false,"composite_eligible":false,"overflow":)"+
+   std::string(owner.color_conversion_overflow()?"true":"false")+R"(,"facts":[)";
+ for(uint32_t i=0;i<owner.color_conversion_count();++i){
+  aurora::gfx::detail::BrowserFrameEffectObserver::ColorConversionFact f{};
+  if(!owner.color_conversion_fact(i,f))break;
+  if(i)out+=',';out+='{';
+  const auto u=[&](const char* key,uint64_t v){out+='"';out+=key;out+='"';out+=':';out+=std::to_string(v);out+=',';};
+  const auto id=[&](const char* key,uint64_t v){out+='"';out+=key;out+='"';out+=':';out+='"';out+=std::to_string(v);out+='"';out+=',';};
+  u("event_index",f.eventIndex);u("refusal",f.refusal);u("returned",f.returned);u("gx_format",f.gxFormat);u("filter",f.filter);u("draw_count",f.drawCount);u("load_op",f.loadOp);u("store_op",f.storeOp);
+  id("uniform_offset",f.uniformOffset);id("uniform_size",f.uniformSize);
+  id("source_texture",f.sourceTexture);id("source_view",f.sourceView);id("destination_texture",f.destinationTexture);id("destination_view",f.destinationView);id("uniform_buffer",f.uniformBuffer);
+  id("local_call_pipeline",f.localPipeline);id("local_call_group",f.localGroup);id("local_call_sampler",f.localSampler);
+  out+=R"("rect":[)";for(unsigned j=0;j<4;++j){if(j)out+=',';out+=std::to_string(f.rect[j]);}
+  out+=R"(],"uv_bits":[)";for(unsigned j=0;j<4;++j){if(j)out+=',';out+=std::to_string(f.uvBits[j]);}
+  out+=R"(],"clear_bits":[)";for(unsigned j=0;j<4;++j){if(j)out+=',';out+='"';out+=std::to_string(f.clearBits[j]);out+='"';}
+  out+="]}";
+ }
+ out+="]}";return out.c_str();
+}
+
+#endif
+
 }
 
 #if defined(MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC) && defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)

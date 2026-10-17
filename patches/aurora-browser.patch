@@ -2736,6 +2736,7 @@ index 47e9a0aadfe1b88ae7e177f226e5b05f36b681e3..803d16d877f2a63dd8b3fc56af75bfb9
  
  namespace testing {
 diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
+index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8f53d55b5f20b1d0dd0f6957bcc446dc7e48d9e8 100644
 --- a/lib/gfx/encoding.cpp
 +++ b/lib/gfx/encoding.cpp
 @@ -1,6 +1,9 @@
@@ -2748,7 +2749,7 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
  
  #include "clear.hpp"
  #include "depth_peek.hpp"
-@@ -33,11 +36,17 @@
+@@ -33,11 +36,17 @@ using webgpu::g_queue;
  namespace {
  constexpr Module Log{"aurora::gfx"};
  PipelineRef g_currentPipeline;
@@ -2766,7 +2767,7 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
  }
  
  void apply_scissor(const wgpu::RenderPassEncoder& pass, const ClipRect& sc, const wgpu::Extent3D& size) {
-@@ -46,6 +55,9 @@
+@@ -46,6 +55,9 @@ void apply_scissor(const wgpu::RenderPassEncoder& pass, const ClipRect& sc, cons
    const auto w = std::clamp(static_cast<uint32_t>(sc.width), 0u, size.width - x);
    const auto h = std::clamp(static_cast<uint32_t>(sc.height), 0u, size.height - y);
    pass.SetScissorRect(x, y, w, h);
@@ -2776,7 +2777,7 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
  }
  
  DrawContext make_draw_context(const RenderPass& passInfo) {
-@@ -62,8 +74,13 @@
+@@ -62,8 +74,13 @@ DrawContext make_draw_context(const RenderPass& passInfo) {
  }
  
  void render_custom_draw(const CustomDrawCommand& draw, const wgpu::RenderPassEncoder& pass,
@@ -2791,7 +2792,7 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
    if (!drawType) {
      // Unregistered between record and replay; the command is a no-op.
      return;
-@@ -73,8 +90,12 @@
+@@ -73,8 +90,12 @@ void render_custom_draw(const CustomDrawCommand& draw, const wgpu::RenderPassEnc
    drawType->draw(context, pass, draw.payload.data(), draw.payloadSize, drawType->userdata);
  }
  
@@ -2805,7 +2806,7 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
    if (!taskType) {
      // Unregistered between record and encode; the task is a no-op.
      return;
-@@ -105,9 +126,13 @@
+@@ -105,9 +126,13 @@ void execute_encoder_task(wgpu::CommandEncoder& cmd, FramePacket& frame, const E
    }
  }
  
@@ -2820,11 +2821,10 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
  #ifdef AURORA_GFX_DEBUG_GROUPS
    std::vector<std::string> lastDebugGroupStack;
  #endif
-@@ -119,8 +144,25 @@
+@@ -119,8 +144,25 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
    // Bind bind group for the whole pass
    pass.SetBindGroup(0, resources().staticBindGroup);
    pass.SetBindGroup(2, gx::g_emptyTextureBindGroup);
--
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
 +  const auto& staticGroupResources = resources();
 +  browser_frame_effect_observer().observe_static_bind_group_set(
@@ -2837,7 +2837,7 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
 +      reinterpret_cast<uintptr_t>(&resources()), reinterpret_cast<uintptr_t>(g_device.Get()),
 +      reinterpret_cast<uintptr_t>(gx::g_emptyTextureBindGroup.Get()), gx::diagnostic_empty_texture_layout(), 0, nullptr);
 +#endif
-+
+ 
 +  uint32_t commandIndex = 0;
    for (auto& cmd : passInfo.commands) {
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
@@ -2847,7 +2847,7 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
  #ifdef AURORA_GFX_DEBUG_GROUPS
      {
        size_t firstDiff = lastDebugGroupStack.size();
-@@ -154,15 +196,39 @@
+@@ -154,15 +196,39 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
      } break;
      case CommandType::Draw: {
        auto& draw = cmd.data.draw;
@@ -2888,7 +2888,7 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
        if (hasViewport) {
          apply_viewport(pass, currentViewport);
        }
-@@ -176,6 +242,7 @@
+@@ -176,6 +242,7 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
  #endif
      } break;
      }
@@ -2896,7 +2896,7 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
    }
  
  #ifdef AURORA_GFX_DEBUG_GROUPS
-@@ -191,8 +258,13 @@
+@@ -191,8 +258,13 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
      return;
    }
  
@@ -2910,7 +2910,7 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
    }
    if (passInfo.discardable) {
      // This pass has no effect and can be safely discarded (e.g. an empty EFB segment between two back-to-back pass
-@@ -246,12 +318,25 @@
+@@ -246,12 +318,25 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
    };
  
    auto pass = cmd.BeginRenderPass(&renderPassDescriptor);
@@ -2938,7 +2938,7 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
    }
  
    if (passInfo.resolveTarget) {
-@@ -260,6 +345,13 @@
+@@ -260,6 +345,13 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
      const bool needsScaling = dstSize.width != static_cast<uint32_t>(passInfo.resolveRect.width) ||
                                dstSize.height != static_cast<uint32_t>(passInfo.resolveRect.height);
      const bool isDepth = gx::is_depth_format(passInfo.resolveFormat);
@@ -2952,7 +2952,7 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
      if (isDepth && passInfo.msaaSamples > 1) {
        Log.fatal("Depth tex copies from multisampled EFB targets are not supported");
      }
-@@ -271,7 +363,14 @@
+@@ -271,7 +363,14 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
          .sampleFilter = needsScaling ? tex_copy_conv::SampleFilter::Linear : tex_copy_conv::SampleFilter::Nearest,
      };
      if (needsConversion) {
@@ -2967,7 +2967,7 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
      } else if (needsScaling) {
        tex_copy_conv::blit(cmd, convReq);
      } else {
-@@ -297,6 +396,12 @@
+@@ -297,6 +396,12 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
    }
  
    if (passInfo.snapshotColorDst) {
@@ -2980,7 +2980,7 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
      const webgpu::gpu_prof::Zone zone{cmd, "Pass snapshot"};
      const wgpu::TexelCopyTextureInfo src{
          .texture = passInfo.copySourceTexture,
-@@ -312,6 +417,12 @@
+@@ -312,6 +417,12 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
      cmd.CopyTextureToTexture(&src, &dst, &size);
    }
    if (passInfo.snapshotDepthDst) {
@@ -2993,7 +2993,7 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
      tex_copy_conv::snapshot_depth(cmd, passInfo.copySourceDepthView, passInfo.msaaSamples, passInfo.snapshotDepthDst);
    }
  }
-@@ -324,7 +435,7 @@
+@@ -324,7 +435,7 @@ constexpr uint64_t TextureUploadStagingOffset = StorageStagingOffset + StorageBu
  
  constexpr uint32_t align_down_copy_offset(uint32_t value) noexcept { return value & ~3u; }
  
@@ -3002,7 +3002,7 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
                                 uint32_t highWater, uint64_t stagingOffset, const wgpu::Buffer& dst) {
    if (highWater <= copied) {
      return;
-@@ -333,6 +444,10 @@
+@@ -333,6 +444,10 @@ void copy_staging_buffer_range(wgpu::CommandEncoder& cmd, const FramePacket& fra
    const uint32_t copyEnd = AURORA_ALIGN(highWater, 4);
    cmd.CopyBufferToBuffer(staging_buffer(frame.stagingBuffer), stagingOffset + copyStart, dst, copyStart,
                           copyEnd - copyStart);
@@ -3013,7 +3013,7 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
    copied = highWater;
  }
  
-@@ -355,11 +470,11 @@
+@@ -355,11 +470,11 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
    const webgpu::gpu_prof::Zone zone{cmd, "Staging copies"};
    const auto& highWater = op.highWater;
    auto& res = resources();
@@ -3029,7 +3029,7 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
                              res.storageBuffer);
  
    if constexpr (UseTextureBuffer) {
-@@ -375,6 +490,11 @@
+@@ -375,6 +490,11 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
            .buffer = item.buffer ? item.buffer : staging_buffer(frame.stagingBuffer),
        };
        cmd.CopyBufferToTexture(&buf, &item.tex, &item.size);
@@ -3041,7 +3041,7 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
      }
      frame.copied.textureUpload = highWater.textureUpload;
      frame.copied.textureUploadCount = op.textureUploads.size();
-@@ -382,8 +502,84 @@
+@@ -382,8 +502,84 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
  }
  } // namespace
  
@@ -3126,7 +3126,7 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
    copy_staging_to_high_water(cmd, frame, op);
    switch (op.type) {
    case FrameOpType::RenderPass:
-@@ -393,13 +589,16 @@
+@@ -393,13 +589,16 @@ void encode_op(wgpu::CommandEncoder& cmd, FramePacket& frame, const FrameOp& op)
      break;
    case FrameOpType::TextureCopy:
      if (op.textureCopy != nullptr) {
@@ -3144,7 +3144,7 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
      }
      break;
    }
-@@ -408,6 +607,11 @@
+@@ -408,6 +607,11 @@ void encode_op(wgpu::CommandEncoder& cmd, FramePacket& frame, const FrameOp& op)
  
  bool bind_pipeline(PipelineRef ref, const wgpu::RenderPassEncoder& pass) {
    if (ref == g_currentPipeline) {
@@ -3156,7 +3156,7 @@ diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
      return true;
    }
    wgpu::RenderPipeline pipeline;
-@@ -416,6 +620,11 @@
+@@ -416,6 +620,11 @@ bool bind_pipeline(PipelineRef ref, const wgpu::RenderPassEncoder& pass) {
    }
    pass.SetPipeline(pipeline);
    g_currentPipeline = ref;
@@ -4817,6 +4817,7 @@ index 0b86ffead6e8f6153d2acf52cf9daecf4f07ccfa..3904b525390161c4f457127d3a2346a6
  } // namespace aurora::gfx
 diff --git a/lib/gfx/frame_effect_observer.hpp b/lib/gfx/frame_effect_observer.hpp
 new file mode 100644
+index 0000000000000000000000000000000000000000..ad443bab3c218ed9ca465963c41024aa975a392a
 --- /dev/null
 +++ b/lib/gfx/frame_effect_observer.hpp
 @@ -0,0 +1,1974 @@
@@ -6840,6 +6841,7 @@ index 0000000000000000000000000000000000000000..d636649842b7bf4a7c868c982a5c79f5
 +} // namespace aurora::gfx::detail
 +#endif
 diff --git a/lib/gfx/frame_packet.hpp b/lib/gfx/frame_packet.hpp
+index d50ce6a43a8af6071dc9e810e96e63eccc5c7640..710b83f096bc24b1a48c6cfa3d47f67f62d18383 100644
 --- a/lib/gfx/frame_packet.hpp
 +++ b/lib/gfx/frame_packet.hpp
 @@ -1,3 +1,6 @@
@@ -6849,7 +6851,7 @@ diff --git a/lib/gfx/frame_packet.hpp b/lib/gfx/frame_packet.hpp
  #pragma once
  
  #include "pipeline_cache.hpp"
-@@ -32,9 +35,20 @@
+@@ -32,9 +35,20 @@ struct CustomDrawCommand {
  struct RenderPass;
  using DrawEncoder = void (*)(void* payload, const wgpu::RenderPassEncoder& pass, const RenderPass& passInfo);
  
@@ -6871,7 +6873,7 @@ diff --git a/lib/gfx/frame_packet.hpp b/lib/gfx/frame_packet.hpp
  };
  
  enum class CommandType {
-@@ -88,6 +102,10 @@
+@@ -88,6 +102,10 @@ struct RenderPass {
    GXTexFmt resolveFormat = GX_TF_RGBA8;
    ClipRect resolveRect;
    Range resolveUniformRange;
@@ -6882,7 +6884,7 @@ diff --git a/lib/gfx/frame_packet.hpp b/lib/gfx/frame_packet.hpp
    wgpu::Texture snapshotColorDst;
    wgpu::TextureView snapshotDepthDst;
    float clearDepthValue = 1.f;
-@@ -170,6 +188,9 @@
+@@ -170,6 +188,9 @@ enum class FrameOpType : uint8_t {
  };
  
  struct FrameOp {
@@ -6892,7 +6894,7 @@ diff --git a/lib/gfx/frame_packet.hpp b/lib/gfx/frame_packet.hpp
    FrameOpType type = FrameOpType::RenderPass;
    uint32_t index = 0;
    RenderPass* renderPass = nullptr;
-@@ -182,6 +203,9 @@
+@@ -182,6 +203,9 @@ struct FrameOp {
  using RenderPassList = std::deque<RenderPass>;
  
  struct FramePacket {
@@ -8755,6 +8757,7 @@ index 0000000000000000000000000000000000000000..73b22bcdf71b1dd107ef0e26990fa4cf
 +
 +} // namespace aurora::gfx::selective
 diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
+index d04db0f34210fb56995de0793200c457aaf61233..e8638bbd11d9acaaf030b5db1251fe74d30fae1c 100644
 --- a/lib/gfx/recording.cpp
 +++ b/lib/gfx/recording.cpp
 @@ -2,6 +2,12 @@
@@ -8786,7 +8789,7 @@ diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
  using namespace detail;
  
  namespace {
-@@ -69,6 +77,15 @@
+@@ -69,6 +77,15 @@ struct FrameRecorder {
  
  FrameRecorder g_recorder;
  
@@ -8802,7 +8805,7 @@ diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
  std::string pass_label(std::string_view kind) {
  #ifdef AURORA_GFX_DEBUG_GROUPS
    if (!g_recorder.debugGroupStack.empty()) {
-@@ -129,6 +146,9 @@
+@@ -129,6 +146,9 @@ struct OffscreenCacheKey {
  struct OffscreenCacheEntry {
    webgpu::TextureWithSampler color;
    webgpu::TextureWithSampler depth;
@@ -8812,7 +8815,7 @@ diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
  };
  absl::flat_hash_map<OffscreenCacheKey, OffscreenCacheEntry> g_offscreenCache;
  
-@@ -139,6 +159,9 @@
+@@ -139,6 +159,9 @@ absl::flat_hash_map<OffscreenCacheKey, OffscreenCacheEntry> g_offscreenCache;
  struct PassSnapshotEntry {
    webgpu::TextureWithSampler color;
    webgpu::TextureWithSampler depth; // R32Float raw depth
@@ -8822,7 +8825,7 @@ diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
  };
  struct PassSnapshotPool {
    std::vector<PassSnapshotEntry> entries;
-@@ -166,13 +189,26 @@
+@@ -166,13 +189,26 @@ PassSnapshotEntry& acquire_pass_snapshot(uint32_t width, uint32_t height, bool w
          .sampleCount = 1,
      };
      auto texture = webgpu::g_device.CreateTexture(&desc);
@@ -8849,7 +8852,7 @@ diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
    }
    if (wantDepth && (!entry.depth.texture || entry.depth.size.width != width || entry.depth.size.height != height)) {
      const wgpu::TextureDescriptor desc{
-@@ -185,14 +221,31 @@
+@@ -185,14 +221,31 @@ PassSnapshotEntry& acquire_pass_snapshot(uint32_t width, uint32_t height, bool w
          .sampleCount = 1,
      };
      auto texture = webgpu::g_device.CreateTexture(&desc);
@@ -8870,11 +8873,10 @@ diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
          .size = size,
          .format = wgpu::TextureFormat::R32Float,
      };
--  }
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
 +    entry.depthFacts=ownerFacts;
 +#endif
-+  }
+   }
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
 +  if(wantColor)promote_recorded_pool_owner(entry.colorFacts,entry.color);
 +  if(wantDepth)promote_recorded_pool_owner(entry.depthFacts,entry.depth);
@@ -8882,7 +8884,7 @@ diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
    return entry;
  }
  
-@@ -213,6 +266,9 @@
+@@ -213,6 +266,9 @@ StagingHighWater current_high_water(const FramePacket& frame) noexcept {
  
  FrameOp capture_frame_op(FramePacket& frame, FrameOpType type, uint32_t index) {
    FrameOp op{
@@ -8892,7 +8894,7 @@ diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
        .type = type,
        .index = index,
        .renderPass =
-@@ -327,9 +383,13 @@
+@@ -327,9 +383,13 @@ void encode_draw(void* payload, const wgpu::RenderPassEncoder& pass, const Rende
  
  template <auto Renderer, InlinePayload T>
  DrawCommand make_draw_command(const T& data) {
@@ -8908,7 +8910,7 @@ diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
    std::memcpy(command.payload.data(), &data, sizeof(data));
    return command;
  }
-@@ -342,6 +402,10 @@
+@@ -342,6 +402,10 @@ void push_draw_command(DrawCommand data) {
  OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
    OffscreenCacheKey key{width, height};
    if (const auto it = g_offscreenCache.find(key); it != g_offscreenCache.end()) {
@@ -8919,7 +8921,7 @@ diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
      return it->second;
    }
    const auto colorFormat = webgpu::g_graphicsConfig.surfaceConfiguration.format;
-@@ -357,7 +421,15 @@
+@@ -357,7 +421,15 @@ OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
        .sampleCount = 1,
    };
    auto colorTexture = webgpu::g_device.CreateTexture(&colorDesc);
@@ -8935,7 +8937,7 @@ diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
    webgpu::TextureWithSampler color{
        .texture = std::move(colorTexture),
        .view = std::move(colorView),
-@@ -375,7 +447,15 @@
+@@ -375,7 +447,15 @@ OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
        .sampleCount = 1,
    };
    auto depthTexture = webgpu::g_device.CreateTexture(&depthDesc);
@@ -8951,7 +8953,7 @@ diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
    webgpu::TextureWithSampler depth{
        .texture = std::move(depthTexture),
        .view = std::move(depthView),
-@@ -385,8 +465,15 @@
+@@ -385,8 +465,15 @@ OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
    OffscreenCacheEntry entry{
        .color = std::move(color),
        .depth = std::move(depth),
@@ -8967,7 +8969,7 @@ diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
    return insertIt->second;
  }
  
-@@ -530,6 +617,20 @@
+@@ -530,6 +617,20 @@ void enqueue_pass(FramePacket& frame, uint32_t passIndex) {
  
  namespace detail {
  
@@ -8988,7 +8990,7 @@ diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
  void begin_recording(FramePacket& packet, size_t frameSlot) {
    CHECK(!g_recorder.active(), "A recording session is already active");
    g_recorder.packet = &packet;
-@@ -584,6 +685,10 @@
+@@ -584,6 +685,10 @@ RecordedFrame end_recording() {
  }
  
  void shutdown_recording() {
@@ -8999,7 +9001,7 @@ diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
    for (auto& pool : g_passSnapshotPools) {
      pool = {};
    }
-@@ -634,7 +739,8 @@
+@@ -634,7 +739,8 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
                                 wgpu::TexelCopyTextureInfo tex, wgpu::Extent3D size) {
    const auto copyBytesPerRow = AURORA_ALIGN(bytesPerRow, 256);
    auto& frame = current_frame_packet();
@@ -9009,7 +9011,7 @@ diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
      const auto range = push_texture_data(data, bytesPerRow, rowsPerImage);
      const wgpu::TexelCopyBufferLayout layout{
          .offset = range.offset,
-@@ -645,14 +751,52 @@
+@@ -645,14 +751,52 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
      return;
    }
  
@@ -9063,7 +9065,7 @@ diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
    auto* dst = static_cast<uint8_t*>(buffer.GetMappedRange(0, uploadSize));
    for (uint32_t row = 0; row < rowsPerImage; ++row) {
      memcpy(dst, data, bytesPerRow);
-@@ -660,6 +804,7 @@
+@@ -660,6 +804,7 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
      dst += copyBytesPerRow;
    }
    buffer.Unmap();
@@ -9071,7 +9073,7 @@ diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
  
    const wgpu::TexelCopyBufferLayout layout{
        .offset = 0,
-@@ -805,6 +950,11 @@
+@@ -805,6 +950,11 @@ void resolve_pass_into(TextureHandle texture, ClipRect rect, bool clearColor, bo
        static_cast<float>(rect.height) / srcH,
    };
    prevPass.resolveUniformRange = push_uniform(uvTransform);
@@ -9083,7 +9085,7 @@ diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
    enqueue_pass(current_frame_packet(), g_recorder.currentRenderPass);
  
    // Populate new render pass from previous
-@@ -877,6 +1027,9 @@
+@@ -877,6 +1027,9 @@ RenderTargetLayout get_render_target_layout() noexcept {
  }
  
  void clear_caches() noexcept {
@@ -9418,6 +9420,118 @@ index 0000000000000000000000000000000000000000..8a76bfe19513fe6bf000224d301dbeb8
 +}
 +
 +} // namespace aurora::gfx::selective
+diff --git a/lib/gfx/tex_copy_conv.cpp b/lib/gfx/tex_copy_conv.cpp
+index 83c3786397b7637d98b5bd5e9c2b1787fe82b7ba..eefad1f006d00b2ca38d1eaa7cfd9683597e3dff 100644
+--- a/lib/gfx/tex_copy_conv.cpp
++++ b/lib/gfx/tex_copy_conv.cpp
+@@ -1,6 +1,9 @@
+ #include "tex_copy_conv.hpp"
+ 
+ #include "resources.hpp"
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++#include "frame_effect_observer.hpp"
++#endif
+ 
+ #include "../internal.hpp"
+ #include "../gx/gx.hpp"
+@@ -563,10 +566,21 @@ void shutdown() {
+   g_depthSnapshotPipelineMS = {};
+ }
+ 
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++static void execute(const wgpu::CommandEncoder& cmd, const ConvRequest& req, const wgpu::RenderPipeline& pipeline,ColorConversionContext* diagnostic=nullptr) {
++#else
+ static void execute(const wgpu::CommandEncoder& cmd, const ConvRequest& req, const wgpu::RenderPipeline& pipeline) {
++#endif
+   if (!pipeline) {
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    if(diagnostic)diagnostic->observer->refuse_color_conversion(diagnostic->factIndex,6);
++#endif
+     return;
+   }
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  uintptr_t localSampler=0;
++  if(diagnostic&&gx::is_depth_format(req.fmt))diagnostic->observer->refuse_color_conversion(diagnostic->factIndex,1);
++#endif
+   wgpu::BindGroup bindGroup;
+   if (gx::is_depth_format(req.fmt)) {
+     // Skip depth copies in compatibility mode
+@@ -593,6 +607,9 @@ static void execute(const wgpu::CommandEncoder& cmd, const ConvRequest& req, con
+     bindGroup = g_device.CreateBindGroup(&bindGroupDescriptor);
+   } else {
+     const auto& sampler = req.sampleFilter == SampleFilter::Linear ? g_linearSampler : g_nearestSampler;
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    localSampler=reinterpret_cast<uintptr_t>(sampler.Get());
++#endif
+     const std::array bindGroupEntries{
+         wgpu::BindGroupEntry{
+             .binding = 0,
+@@ -636,14 +653,32 @@ static void execute(const wgpu::CommandEncoder& cmd, const ConvRequest& req, con
+   pass.SetBindGroup(0, bindGroup);
+   pass.Draw(3);
+   pass.End();
+-}
+-
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  if(diagnostic)diagnostic->observer->return_color_conversion(diagnostic->factIndex,
++      uint32_t(req.fmt),uint32_t(req.sampleFilter),reinterpret_cast<uintptr_t>(req.srcView.Get()),
++      reinterpret_cast<uintptr_t>(req.dst->texture.Get()),reinterpret_cast<uintptr_t>(req.dst->attachmentTextureView.Get()),
++      req.uniformRange.offset,req.uniformRange.size,reinterpret_cast<uintptr_t>(pipeline.Get()),
++      reinterpret_cast<uintptr_t>(bindGroup.Get()),localSampler,reinterpret_cast<uintptr_t>(detail::resources().uniformBuffer.Get()),colorAttachments[0]);
++#endif
++}
++
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++void run(const wgpu::CommandEncoder& cmd, const ConvRequest& req,ColorConversionContext* diagnostic) {
++#else
+ void run(const wgpu::CommandEncoder& cmd, const ConvRequest& req) {
++#endif
+   const auto it = g_pipelines.find(req.fmt);
+   if (it == g_pipelines.end()) {
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    if(diagnostic)diagnostic->observer->refuse_color_conversion(diagnostic->factIndex,6);
++#endif
+     Log.fatal("No copy conversion pipeline for format {}", static_cast<int>(req.fmt));
+   }
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  execute(cmd, req, it->second,diagnostic);
++#else
+   execute(cmd, req, it->second);
++#endif
+ }
+ 
+ void blit(const wgpu::CommandEncoder& cmd, const ConvRequest& req) { execute(cmd, req, g_blitPipeline); }
+diff --git a/lib/gfx/tex_copy_conv.hpp b/lib/gfx/tex_copy_conv.hpp
+index 34fc5f49320936edae9f51cbf94a8f17b3639311..36e7bf92887132d93245be144a1a768094845df2 100644
+--- a/lib/gfx/tex_copy_conv.hpp
++++ b/lib/gfx/tex_copy_conv.hpp
+@@ -4,7 +4,14 @@
+ 
+ #include <dolphin/gx/GXEnum.h>
+ 
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++namespace aurora::gfx::detail {class BrowserFrameEffectObserver;}
++#endif
++
+ namespace aurora::gfx::tex_copy_conv {
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++struct ColorConversionContext {detail::BrowserFrameEffectObserver* observer=nullptr;uint32_t factIndex=UINT32_MAX;};
++#endif
+ 
+ enum class SampleFilter : uint8_t {
+   Nearest,
+@@ -23,7 +30,11 @@ bool needs_conversion(GXTexFmt fmt);
+ 
+ void initialize();
+ void shutdown();
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++void run(const wgpu::CommandEncoder& cmd, const ConvRequest& req,ColorConversionContext* diagnostic=nullptr);
++#else
+ void run(const wgpu::CommandEncoder& cmd, const ConvRequest& req);
++#endif
+ void blit(const wgpu::CommandEncoder& cmd, const ConvRequest& req);
+ 
+ bool snapshot_depth_supported() noexcept;
 diff --git a/lib/gfx/texture.cpp b/lib/gfx/texture.cpp
 index 029a3d047c357a5e1aed999af63a3dee8ea09f03..ee31bc2124a828624e17a477d813d771d6437ab1 100644
 --- a/lib/gfx/texture.cpp
@@ -11269,113 +11383,3 @@ index 0000000000000000000000000000000000000000..17fb09eca1b46fad73f97f6f3a8d24c7
 +  assert(registry.find(exact) == nullptr);
 +  return 0;
 +}
-diff --git a/lib/gfx/tex_copy_conv.cpp b/lib/gfx/tex_copy_conv.cpp
---- a/lib/gfx/tex_copy_conv.cpp
-+++ b/lib/gfx/tex_copy_conv.cpp
-@@ -1,6 +1,9 @@
- #include "tex_copy_conv.hpp"
- 
- #include "resources.hpp"
-+#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+#include "frame_effect_observer.hpp"
-+#endif
- 
- #include "../internal.hpp"
- #include "../gx/gx.hpp"
-@@ -563,10 +566,21 @@
-   g_depthSnapshotPipelineMS = {};
- }
- 
-+#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+static void execute(const wgpu::CommandEncoder& cmd, const ConvRequest& req, const wgpu::RenderPipeline& pipeline,ColorConversionContext* diagnostic=nullptr) {
-+#else
- static void execute(const wgpu::CommandEncoder& cmd, const ConvRequest& req, const wgpu::RenderPipeline& pipeline) {
-+#endif
-   if (!pipeline) {
-+#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+    if(diagnostic)diagnostic->observer->refuse_color_conversion(diagnostic->factIndex,6);
-+#endif
-     return;
-   }
-+#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+  uintptr_t localSampler=0;
-+  if(diagnostic&&gx::is_depth_format(req.fmt))diagnostic->observer->refuse_color_conversion(diagnostic->factIndex,1);
-+#endif
-   wgpu::BindGroup bindGroup;
-   if (gx::is_depth_format(req.fmt)) {
-     // Skip depth copies in compatibility mode
-@@ -593,6 +607,9 @@
-     bindGroup = g_device.CreateBindGroup(&bindGroupDescriptor);
-   } else {
-     const auto& sampler = req.sampleFilter == SampleFilter::Linear ? g_linearSampler : g_nearestSampler;
-+#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+    localSampler=reinterpret_cast<uintptr_t>(sampler.Get());
-+#endif
-     const std::array bindGroupEntries{
-         wgpu::BindGroupEntry{
-             .binding = 0,
-@@ -636,14 +653,32 @@
-   pass.SetBindGroup(0, bindGroup);
-   pass.Draw(3);
-   pass.End();
--}
--
-+#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+  if(diagnostic)diagnostic->observer->return_color_conversion(diagnostic->factIndex,
-+      uint32_t(req.fmt),uint32_t(req.sampleFilter),reinterpret_cast<uintptr_t>(req.srcView.Get()),
-+      reinterpret_cast<uintptr_t>(req.dst->texture.Get()),reinterpret_cast<uintptr_t>(req.dst->attachmentTextureView.Get()),
-+      req.uniformRange.offset,req.uniformRange.size,reinterpret_cast<uintptr_t>(pipeline.Get()),
-+      reinterpret_cast<uintptr_t>(bindGroup.Get()),localSampler,reinterpret_cast<uintptr_t>(detail::resources().uniformBuffer.Get()),colorAttachments[0]);
-+#endif
-+}
-+
-+#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+void run(const wgpu::CommandEncoder& cmd, const ConvRequest& req,ColorConversionContext* diagnostic) {
-+#else
- void run(const wgpu::CommandEncoder& cmd, const ConvRequest& req) {
-+#endif
-   const auto it = g_pipelines.find(req.fmt);
-   if (it == g_pipelines.end()) {
-+#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+    if(diagnostic)diagnostic->observer->refuse_color_conversion(diagnostic->factIndex,6);
-+#endif
-     Log.fatal("No copy conversion pipeline for format {}", static_cast<int>(req.fmt));
-   }
-+#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+  execute(cmd, req, it->second,diagnostic);
-+#else
-   execute(cmd, req, it->second);
-+#endif
- }
- 
- void blit(const wgpu::CommandEncoder& cmd, const ConvRequest& req) { execute(cmd, req, g_blitPipeline); }
-diff --git a/lib/gfx/tex_copy_conv.hpp b/lib/gfx/tex_copy_conv.hpp
---- a/lib/gfx/tex_copy_conv.hpp
-+++ b/lib/gfx/tex_copy_conv.hpp
-@@ -4,7 +4,14 @@
- 
- #include <dolphin/gx/GXEnum.h>
- 
-+#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+namespace aurora::gfx::detail {class BrowserFrameEffectObserver;}
-+#endif
-+
- namespace aurora::gfx::tex_copy_conv {
-+#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+struct ColorConversionContext {detail::BrowserFrameEffectObserver* observer=nullptr;uint32_t factIndex=UINT32_MAX;};
-+#endif
- 
- enum class SampleFilter : uint8_t {
-   Nearest,
-@@ -23,7 +30,11 @@
- 
- void initialize();
- void shutdown();
-+#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+void run(const wgpu::CommandEncoder& cmd, const ConvRequest& req,ColorConversionContext* diagnostic=nullptr);
-+#else
- void run(const wgpu::CommandEncoder& cmd, const ConvRequest& req);
-+#endif
- void blit(const wgpu::CommandEncoder& cmd, const ConvRequest& req);
- 
- bool snapshot_depth_supported() noexcept;
