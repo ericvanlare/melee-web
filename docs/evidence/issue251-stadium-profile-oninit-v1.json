@@ -13179,5 +13179,1435 @@
       "pixels_pcm_live_performance": "NOT_CLAIMED",
       "next_prerequisite": "Observe the original eight-scene owner/RNG boundary; do not repeat this pair unchanged."
     }
+  },
+  "stadium_whole3_sidecar2_capture_71a19ca6_2026_10_16": {
+    "schema": "stadium-whole3-sidecar2-capture-evidence-v1",
+    "state": "FAIL_PREMATCH_MENU_ROUTE_OBSERVER_RECORD_CAP_RAW_CLEANUP_FAILURE_FINAL_OWNED_ABSENCE_VERIFIED",
+    "scope": "Attempted original whole-three-match observer capture; record cap occurred during menu-route preparation before a match was entered. Partial output only. No full three-match terminal, original comparison, eight RNG endpoint comparison, per-owner RNG mapping, or C3 acceptance.",
+    "harness_repair_and_validation": {
+      "pre_native_attempt": {
+        "source_head": "22cd07d14ccca3b71a0b9a5e594aaf33f961399a",
+        "state": "FAIL_PRE_NATIVE_WRONG_LEGACY_GCI_LOADER_AFTER_STRICT_SETUP_ADMISSION",
+        "first_failure": "ValueError('Selected original profile GCI identity differs')",
+        "native_launch": false,
+        "root_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-capture-22cd07d1-v1/root-failure-review.json",
+          "bytes": 899,
+          "sha256": "6fe2db0bb485f0102e3c2b3b09f2ba841002c12e0721d3e45dc878ddd9a5eb48"
+        },
+        "strict_setup_admission": {
+          "state": "PASS",
+          "admitted_initial_gci_sha256": "73812da1f6782df5ffe32e8c3f54a686130417fb67f341030483f3e266fba855",
+          "description": "Everything-unlocked card admitted by the strict setup receipt; no save identity substitution."
+        },
+        "cause": "After strict admission passed, the whole-three helper called the fixed sd_gci_profile.prepare_gci_folder/load_profile path, which accepts the retained personal re-export profile rather than this admitted Everything-unlocked card. The failure is a wrong legacy loader after admission, not rejection by the strict setup receipt.",
+        "owner_failure_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-capture-22cd07d1-v1/owner-failure-review.json",
+          "bytes": 10948,
+          "sha256": "cf86c8d1ab7f0e3548fb972879e54e011714a01803f8bd8330a843a581a127b6"
+        }
+      },
+      "reviewed_v3_repair": {
+        "manifest_sha256": "896ee645a021787955cfa3258888e5bb7536d11755b9dcae1fac63d187427689",
+        "patch_sha256": "ac35b3ec4dd7a663459487e752597efd76276e145e6577ee6035cbf8ab85ebaf",
+        "v2_to_v3_delta_sha256": "06deacbf81e50a705a61409a1eac0f46e9c7284a11c6936224668c91e4d76255",
+        "integration": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-admitted-gci-copy-repair-v3/integration.json",
+          "bytes": 756,
+          "sha256": "cbf4ee4f225735fcd00b19b7069f0d0425d4f17b80551a25ad23250ca8c29f3d"
+        },
+        "source_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-admitted-gci-copy-repair-v3/root-source-review.json",
+          "bytes": 856,
+          "sha256": "b6b26bd6ceab4dfa8ce4e7c37e510157d9dbfd265842a102a0e850efb6b30fdc"
+        },
+        "focused_actual_input_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-admitted-gci-copy-repair-v3/focused-independent-review-v1/review.json",
+          "bytes": 3550,
+          "sha256": "bacf1b72d2f04e8bb0a0e8591e967a0cafd749190af407bc9f5c2ec90e04835a"
+        },
+        "focused_actual_input_result": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-admitted-gci-copy-repair-v3/focused-execution-v1/run/result.json",
+          "bytes": 817,
+          "sha256": "a586aff5bbc4318c513bd149911a12a09df6ccabbb126dabfa47c7b1551365fb"
+        },
+        "retained_data_test_result": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-admitted-gci-copy-repair-v3/focused-execution-v1/run/actual-admitted-gci-copy.result.json",
+          "bytes": 806,
+          "sha256": "8e33df892036b7e7c8d9f3cf5e4b1d614f7810205c3b7a56cc154a865418becf"
+        },
+        "behavior": "Copy already-admitted GCI to fresh isolated destination; reject source/destination overlap before writes; fixed save-profile identity contract unchanged. Harness/test repair only."
+      }
+    },
+    "producer_and_validation": {
+      "capture_harness_test_head": "71a19ca64429e1e9b61d303188fa3c3fb925391f",
+      "capture_harness_tree": "52eb1827636bede44f9ac05f24a4f58c3c8cd36d",
+      "native_producer_head": "7fa05a93f04459e27aa11bd948027456f18f7861",
+      "native_producer_tree": "4b3046d06984a6369f1ae755101740050a2ac093",
+      "harness_bytes_unchanged_from_native_producer": false,
+      "native_rebuilt_for_harness_repair": false,
+      "native_build_manifest_sha256": "81ffbde6e614dd17c0487e4bc93cad8a99a7490b1dd8b9ad30e05a79ff1dac10",
+      "native_binary_sha256": "7f828025941de6d7255e67f5ebe936ac3701280e04db2531c8101379d97ed7c9",
+      "full_regression": {
+        "state": "PASS",
+        "tests": 2654,
+        "skips": 182,
+        "seconds": 580.254,
+        "result": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-admitted-gci-full-regression-71a19ca6-v1/evidence/result.json",
+          "bytes": 4248,
+          "sha256": "2884acbee200e35c85f517bcaa64087a88037166f230ac1e681712bbaaf79741"
+        },
+        "root_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-admitted-gci-full-regression-71a19ca6-v1/evidence/root-final-review.json",
+          "bytes": 1283,
+          "sha256": "e54b333e69f9f0aa2e876586efd6e40ded364ae935093a56e4ca94342b64751d"
+        },
+        "stdout": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-admitted-gci-full-regression-71a19ca6-v1/evidence/full-unittest-suite.stdout",
+          "bytes": 16873,
+          "sha256": "0a8a2191ac692829b9af1a72ee323c5a8a72a1434df60e45fbc30a3be9143b41"
+        },
+        "stderr": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-admitted-gci-full-regression-71a19ca6-v1/evidence/full-unittest-suite.stderr",
+          "bytes": 484148,
+          "sha256": "f1b402f0aa80c6e5a4ec8238ed6a2e00a1a3d9129928f63ea067d7707bdd7ff1"
+        }
+      }
+    },
+    "capture": {
+      "state": "FAIL_PREMATCH_MENU_ROUTE_OBSERVER_RECORD_CAP",
+      "first_error": "SdDiagnosticError('Stadium observer record cap')",
+      "observed_phase": "menu-route preparation before a match was entered; exact retained row/source reduction is separately bound and not reproduced here.",
+      "raw_report": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-capture-71a19ca6-v1/report.json",
+        "bytes": 494,
+        "sha256": "5cb4fd31cbfd3ccff2c61f06197c593da44d45715c9dec38808f89ea29d06ff9"
+      },
+      "planned_endpoint_scope": "first two short natural lifetimes only; no C3/per-owner ledger",
+      "native_primary": {
+        "status": "interrupted",
+        "event_count": 16406,
+        "last_seq": 16405,
+        "source_tick": 7971,
+        "draw_ordinal": 0,
+        "completed": false,
+        "invalid": false,
+        "status_file": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-capture-71a19ca6-v1/native-primary-status.json",
+          "bytes": 144,
+          "sha256": "9bff64202de61da24344759d3cadbdf7f9553e376df00fe81711c05e06bedcc1"
+        },
+        "output_file": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-capture-71a19ca6-v1/native-primary.mwro",
+          "bytes": 13534572,
+          "sha256": "f3e768410fb215d2377defb1247c0e30386d8d4361652afbdb6d66b2f9a025a3"
+        }
+      },
+      "native_input": {
+        "events": 33670,
+        "complete": false,
+        "invalid": false,
+        "error": null,
+        "status_file": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-capture-71a19ca6-v1/native-input-status.json",
+          "bytes": 91,
+          "sha256": "7ad059eb9365b69e01f79ab6d537ab9ccd550c9302277139547f65fa394b4cb5"
+        },
+        "output_file": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-capture-71a19ca6-v1/native-inputs.mwri",
+          "bytes": 1346856,
+          "sha256": "e0a86a25aa7e52a47fb08ee0d85f2d23f27c6d180b131c45054e0d7673ec3a6c"
+        }
+      },
+      "allocation_records": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-capture-71a19ca6-v1/native-allocations.jsonl",
+        "bytes": 222298963,
+        "sha256": "5f4e982fc7b6ae50eb6abc1747e6ca09ceb66f6c10d4fa555a3c6dfb2e044a23"
+      },
+      "no_cap_change_or_retry": true,
+      "cap_cause_not_attributed_here": true
+    },
+    "cleanup": {
+      "state": "FAIL_RAW_CLEANUP_FINAL_OWNED_ABSENCE_VERIFIED",
+      "raw_supervisor_completed": false,
+      "raw_supervisor_native_pid_absent": false,
+      "raw_cleanup_errors": [
+        "SdDiagnosticError('Rules probe direct process cleanup failed')",
+        "SdDiagnosticError('Ordinary owned log drain did not finish after child cleanup')"
+      ],
+      "cleanup_file": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-capture-71a19ca6-v1/cleanup.json",
+        "bytes": 1304,
+        "sha256": "d0b4097de192341a8006edd539339ac7ecfbd07f32d8445440a83dd498add5be"
+      },
+      "recorded_owned_pids_later_absent": [
+        68050,
+        68064,
+        68068
+      ],
+      "recorded_owned_groups_later_absent": [
+        68040,
+        68064,
+        68068
+      ],
+      "root_process_review": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-capture-71a19ca6-v1/root-failure-review.json",
+        "bytes": 4401,
+        "sha256": "3a08c4f7a1fb2949a9186e48b6161a076ba2b93d9119d462daf4dc38a4fc19a5"
+      },
+      "independent_exact_ps_and_signal0_check": "No rows for PIDs 68050, 68064, 68068; no process rows in PGIDs 68040, 68064, 68068. No further signals were sent.",
+      "absence_is_not_cleanup_pass": true
+    },
+    "input_and_source_integrity": {
+      "pinned_inputs_rehashed_unchanged": 37,
+      "source_clean": true,
+      "allocation_profile": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-capture-71a19ca6-v1/allocation-profile.json",
+        "bytes": 14448,
+        "sha256": "84f9fe7db756e56166b817d1720a0627b76ed261473a77c7a17d20b855a92b39"
+      },
+      "input_intentions": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-capture-71a19ca6-v1/input-intentions.jsonl",
+        "bytes": 3100,
+        "sha256": "4a6a4fec7cacd981716f9e1942b48a73cf882f251493da98d66d37e4289ec78e"
+      },
+      "launch": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-capture-71a19ca6-v1/launch.json",
+        "bytes": 5229,
+        "sha256": "4f890dbe30d4d5e42e569bd662afe213fede06927b720b33b51595ee5b5d883e"
+      },
+      "emulator_log": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-capture-71a19ca6-v1/dolphin.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "preserved_prior_result": "stadium_full_A_full_B_v15_2026_10_15 remains unchanged; this native observer attempt is a separate result.",
+    "limits": [
+      "No successful full three-match terminal or eight RNG endpoint comparison across two scene lifetimes.",
+      "No per-owner RNG mapping, original parity, or C3 acceptance.",
+      "The record-cap cause is not assigned by this receipt; retain the first error and existing raw artifacts."
+    ],
+    "record_cap_reduction": {
+      "state": "REDUCED_PREMATCH_SCENE1_MENU_POLICY_OMISSION",
+      "scope": "Read-only retained-row/source reduction; no source mutation, native build, capture, or cap increase.",
+      "finding": "The whole-three boot loop handles only menus.boot scenes 28/0/39 and does not dispatch the existing scene1 Main-down-to-VS, Main-select-VS, and VS-Melee route. The retained run remained neutral at scene1 main kind0/row0/cooldown0.",
+      "observations": {
+        "scene1_neutral_four_port_consumes": 7971,
+        "all_four_port_consumes": 7997,
+        "primary_rows": 16406,
+        "configured_record_limit": 16384,
+        "exact_first_host_check_sequence": "Not recorded; the final file row count is not the exact host-accepted prefix.",
+        "reached_css_sss_setup_draw_vs_or_scene_rng_endpoint": false,
+        "raw_pad_intentions": "1,000 entries were START, not Down."
+      },
+      "limits": [
+        "No lower-level native cap or writer-backpressure cause.",
+        "No cleanup cause.",
+        "No in-match or successful-capture evidence."
+      ],
+      "manifest": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-record-cap-reduction-v1/manifest.json",
+        "bytes": 2279,
+        "sha256": "5af7c3ec35afa5d131c8bf9142128ccb87c057b2a425cca8e6137e5a2955930b"
+      },
+      "report": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-record-cap-reduction-v1/report.json",
+        "bytes": 23372,
+        "sha256": "1d6bf82df05420c53fc5aa8d51785dc3d7bcdac6d604d26a1efa95034e6c6de3"
+      },
+      "root_review": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-record-cap-reduction-v1/root-review.json",
+        "bytes": 1269,
+        "sha256": "7ce94966ae93aca028f901f59b3b0899a96f129ac99e0cfb62def905432a3c08"
+      }
+    },
+    "followup_after_scene1_route_repair": {
+      "state": "FOLLOWUP_AFTER_SCENE1_ROUTE_REPAIR",
+      "scope": "A full regression and two short capture attempts after the whole-three driver added the existing Main-to-VS-to-Melee route. No capture reached an endpoint; no C3 or per-owner RNG result.",
+      "harness_and_native_identity": {
+        "harness_test_head": "2db18d7b9f934dd6833722aef83641475961f107",
+        "harness_test_tree": "3f255ebe4b5e89256d7285f23f72e40302791e7e",
+        "native_observer_producer": "7fa05a93f04459e27aa11bd948027456f18f7861",
+        "native_observer_tree": "4b3046d06984a6369f1ae755101740050a2ac093",
+        "native_rebuilt_for_harness_change": false,
+        "harness_bytes_unchanged_from_native_producer": false
+      },
+      "route_harness_full_regression": {
+        "state": "PASS",
+        "tests": 2655,
+        "skips": 182,
+        "seconds": 616.777,
+        "result": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-scene1-full-regression-2db18d7b-v1/evidence/result.json",
+          "bytes": 4248,
+          "sha256": "f56c1261ada850e999475eb38b14c452f7e4e718b6e310eeeaf1184fbc9ca5d3"
+        },
+        "root_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-scene1-full-regression-2db18d7b-v1/evidence/root-final-review.json",
+          "bytes": 1956,
+          "sha256": "e68c58d741678cb9cccdac41b9287bba0122f7f3665ba05d4a63c7c5a79288e2"
+        },
+        "owner_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-scene1-full-regression-2db18d7b-v1/evidence/owner-final-review.json",
+          "bytes": 5892,
+          "sha256": "2580e587b44ebf184a031eb79a0336f0eba89bbc1566cc7a7c791249cd4b6331"
+        },
+        "stdout": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-scene1-full-regression-2db18d7b-v1/evidence/full-unittest-suite.stdout",
+          "bytes": 16853,
+          "sha256": "e1ca0d7c9e93dfb52093b732e3016c3cd02ca163edd6f63de49a23647e81891c"
+        },
+        "stderr": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-scene1-full-regression-2db18d7b-v1/evidence/full-unittest-suite.stderr",
+          "bytes": 484237,
+          "sha256": "3850907ee7a3cfacd2b4d2eeca16789fed73648973f4e228298c334ddf46a7dd"
+        },
+        "capture": false
+      },
+      "declared_costume_00_capture": {
+        "state": "FAIL_MARIO_COSTUME_CAP_CLEANUP_PASS",
+        "capture_report": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-capture-2db18d7b-v1/report.json",
+          "bytes": 337,
+          "sha256": "9eb9df65ad1d0f5c377e8efd481912b7ccabaedc4bb18ee533f6ba0b75a8da20"
+        },
+        "root_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-capture-2db18d7b-v1/root-failure-review.json",
+          "bytes": 1153,
+          "sha256": "317041bacff5f094d54b96b6bfb09fe8d37801e36592aaa29925c48d483f7a4f"
+        },
+        "cleanup": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-capture-2db18d7b-v1/cleanup.json",
+          "bytes": 164,
+          "sha256": "e561c03f03c9187acbc3b1980e4d63a3f15ae62c0a8a5bf428a41211bdb0c3ba"
+        },
+        "first_error": "SdDiagnosticError('Mario costume cap')",
+        "observed_primary": {
+          "records": 1011,
+          "last_seq": 1010,
+          "source_tick": 160,
+          "draw_ordinal": 0,
+          "completed": false
+        },
+        "owned_processes_and_groups_absent": true,
+        "reduction": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-costume-cap-reduction-v1/report.json",
+          "bytes": 34500,
+          "sha256": "f1c4fce0480f64f156aef48aa73df0f40db3e98bbee56dff806c2741dca0ffdd"
+        },
+        "reduction_manifest": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-costume-cap-reduction-v1/manifest.json",
+          "bytes": 1219,
+          "sha256": "67d0281a4118c53eeefe8123aff8d1857c5a09b8e5191a674ef4339d06b54394"
+        },
+        "browser_and_target_addendum": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-costume-cap-reduction-v1/target-and-browser-provenance-addendum.json",
+          "bytes": 17324,
+          "sha256": "9666eb32d4d136238bd7ca29a7651c79a8c931193fe95a4dd58d405d7951bd5e"
+        },
+        "interpretation": "Capture reached CSS and recorded costume transitions. [0,0] is the declared driver target, not an observed final CSS state; retained-source reduction found that this declared target conflicts with original duplicate-costume exclusion. The existing legal recipe is [1,0].",
+        "observed_css": true,
+        "first_css_observation_seq": 690
+      },
+      "legal_costume_01_input_packet": {
+        "state": "PASS_INPUT_ONLY_PACKET_REVIEW",
+        "changed_field": "expected_setup.players[0].costume only: 0 to 1",
+        "packet_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-legal-costume-capture-preparation-v1/root-packet-review.json",
+          "bytes": 990,
+          "sha256": "f69ace9ce2bdc0e1659ceaa7a80b4c293a60ff89c8eb508e122242251a6676ab"
+        },
+        "target": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-legal-costume-capture-preparation-v1/legal-costume-time120-target.json",
+          "bytes": 721,
+          "sha256": "fbc23c896df3dad9a0a8539e4d33ea9ce38880c341cfbd2f7ccb6b9da5c4d66c"
+        },
+        "source_policy": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-legal-costume-capture-preparation-v1/source-policy-review.json",
+          "bytes": 3740,
+          "sha256": "39a8a635f643026865a782f230aeac934000461671f098e16f2cc4567ef73f5f"
+        },
+        "strict_admission": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-legal-costume-capture-preparation-v1/packet-legal-costume/strict-loader-admission.json",
+          "bytes": 11383,
+          "sha256": "596893235d44621bd36526b3bde895fdb1005e0da1e577b7b96598602329ffe3"
+        },
+        "source_mutation": false,
+        "capture_authorized_by_packet": false
+      },
+      "legal_costume_01_capture": {
+        "state": "FAIL_UNKNOWN_SLICE_TAG55_CLEANUP_PASS",
+        "capture_report": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-legal-costume-capture-v1/report.json",
+          "bytes": 357,
+          "sha256": "b883c6856f663f8df1af9c07493f30777b7b42c2964fd5d85d2df8d8ed0d4a50"
+        },
+        "root_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-legal-costume-capture-v1/root-failure-review.json",
+          "bytes": 1013,
+          "sha256": "501e10348ddc91519a3b1485e5a6bd32cdc182f512080791271ace14d4e80c07"
+        },
+        "cleanup": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-legal-costume-capture-v1/cleanup.json",
+          "bytes": 164,
+          "sha256": "268005fcbbe6ec751dcc331422c415709cbf1dab4d5391370bcf381ae68ba69e"
+        },
+        "first_error": "CaptureError('observer record 1022: unknown slice tag 55')",
+        "observed_before_endpoint": true,
+        "owned_processes_and_groups_absent": true,
+        "observed_phases_before_failure": [
+          "CSS",
+          "SSS"
+        ],
+        "phase_at_failure": "SSS",
+        "observed_before_setup_or_endpoint": true,
+        "cleanup_passed": true
+      },
+      "tag55_decoder_repair": {
+        "commit": "cf3148184dabde9c68e07e409c305c9bd5b1c88c",
+        "tree": "d5c209795e0c2a11c4e37c281d3243218e219a30",
+        "focused_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-sss-cooldown-tag-repair-v1/root-focused-review.json",
+          "bytes": 1149,
+          "sha256": "6f04d0cfad4315eca94e738ec002293ac3da3942443821ad68feb345136ebfef"
+        },
+        "focused_scope": "15 focused unit tests; separately, an actual retained record-1022 control through the original ObserverTail/stage_state path and four malformed transport/semantic refusals; no native build or capture.",
+        "full_regression": {
+          "state": "PASS",
+          "capture": false,
+          "head": "cf3148184dabde9c68e07e409c305c9bd5b1c88c",
+          "plan": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-sss-cooldown-full-regression-cf314818-v1/plan.json",
+            "bytes": 17353,
+            "sha256": "e8f4857661111778f31529d351a8ae684cd6114fa738a940f83d27aa02768e34"
+          },
+          "command": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-sss-cooldown-full-regression-cf314818-v1/evidence/full-unittest-suite.command.json",
+            "bytes": 2075,
+            "sha256": "0eee12bfd91b2b3de9c5ce888a3ae6d61d2110777b9d432d6354fb989752f88c"
+          },
+          "root_review_pending": false,
+          "tree": "d5c209795e0c2a11c4e37c281d3243218e219a30",
+          "tests": 2656,
+          "skips": 182,
+          "seconds": 576.635,
+          "result": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-sss-cooldown-full-regression-cf314818-v1/evidence/result.json",
+            "bytes": 4248,
+            "sha256": "8725d519afad71c754c4f28bb1e31695cad544df362dc353037f4848d17afb8c"
+          },
+          "root_review": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-sss-cooldown-full-regression-cf314818-v1/evidence/root-final-review.json",
+            "bytes": 2181,
+            "sha256": "b982354ef97e7988ed873c583d29f985507177ccd79ff6d7ab002490584b6015"
+          },
+          "owner_review": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-sss-cooldown-full-regression-cf314818-v1/evidence/owner-final-review.json",
+            "bytes": 6202,
+            "sha256": "15d2360bb842440984cf795fdc749c56fb7d92ec1ef0df4a391a54c83958192c"
+          },
+          "stdout": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-sss-cooldown-full-regression-cf314818-v1/evidence/full-unittest-suite.stdout",
+            "bytes": 16873,
+            "sha256": "d9b34f633e85ef72f63ee8cb3946b2873dbd336a929e45a24b56dbbc07f59152"
+          },
+          "stderr": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-sss-cooldown-full-regression-cf314818-v1/evidence/full-unittest-suite.stderr",
+            "bytes": 484519,
+            "sha256": "c49ce5a4ef80ec201fc03befa092ba61b6d5297eadac2d941a03a25e268530cf"
+          }
+        }
+      },
+      "preserved_separate_result": {
+        "browser_pair": "stadium_full_A_full_B_v15_2026_10_15",
+        "limitation": "The browser pair used stock four and is not equivalent to this TIME 120/three-stock-counter original target."
+      },
+      "limits": [
+        "Both 2db captures reached CSS; the costume-1 attempt also reached SSS. Neither reached Setup or an endpoint.",
+        "No original eight endpoint samples across two scene lifetimes, per-owner mapping, or lifecycle/RNG parity.",
+        "One capture after the tag55 repair failed the declared natural-exit-outcome7 predicate; retained source/PAD reduction identifies the first chord as a pause request, with no fresh second exit trigger; no completed route result is established.",
+        "No C3 acceptance."
+      ],
+      "post_repair_capture": {
+        "state": "FAIL_NATURAL_EXIT_OUTCOME7_CLEANUP_PASS",
+        "source": "cf3148184dabde9c68e07e409c305c9bd5b1c88c",
+        "source_tree": "d5c209795e0c2a11c4e37c281d3243218e219a30",
+        "native_producer": "7fa05a93f04459e27aa11bd948027456f18f7861",
+        "native_producer_tree": "4b3046d06984a6369f1ae755101740050a2ac093",
+        "first_error": "SdDiagnosticError('Whole Stadium source predicate/deadline: natural-exit-outcome7')",
+        "root_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-decoder-capture-v1/root-failure-review.json",
+          "bytes": 903,
+          "sha256": "07eb83e082a0d4547e7ef19c1ff58a9605efde1eb92607a128bc6ddb955c6a2d"
+        },
+        "report": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-decoder-capture-v1/report.json",
+          "bytes": 382,
+          "sha256": "0b421e3b97169241748c83c6f0248594ce7c6675a8ce13dd7428354d7bcaf504"
+        },
+        "cleanup": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-decoder-capture-v1/cleanup.json",
+          "bytes": 163,
+          "sha256": "cddf5589348a68d8d5bc678c28169d5dbe7b7376d3b1954534eae8c3923294a4"
+        },
+        "supervisor_result_sha256": "38bd3efe56750edf7a01f9c38da3739ba6e97df891caa5233e85e03d125171e9",
+        "recorded_owned_pids_absent": [
+          5406,
+          5412,
+          5413
+        ],
+        "recorded_owned_groups_absent": [
+          5399,
+          5412,
+          5413
+        ],
+        "cause_and_PAD_analysis": "REDUCED_FIRST_PRESS_PAUSED_NO_FRESH_SECOND_TRIGGER",
+        "interpretation": "Retained raw rows reached the exact first Stadium TIME120/Mario setup. First chord consumed at source_tick180, neutral release181; pause_timer10 to0 and frozen clock were observed. Original source handles the no-contest chord only in the already-paused branch with a fresh trigger. No second chord was sent; no outcome7/exit/Results or complete endpoint set was observed. Cleanup passed. This is not C3 or per-owner parity.",
+        "retry": "None",
+        "reduction": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-no-contest-reduction-v1/report.json",
+          "bytes": 41592,
+          "sha256": "6ad5709b4627e3ef522dc10b72434be20aa6632255b5b17d6cf05909586ee0e2"
+        },
+        "reduced_policy_contract": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-no-contest-reduction-v1/two-phase-policy-proposal.json",
+          "bytes": 3096,
+          "sha256": "1b7d6a12ff586856b08d1ecb04f7833cc17a29301d73f5a19570b6881a58b34c"
+        }
+      },
+      "two_phase_exit_repair": {
+        "state": "PASS_FOCUSED_AND_REQUIRED_REGRESSION_CAPTURE_HELD",
+        "head": "9cd4db1fcd5374c3ec09bff7930dbbe0bb5df9fb",
+        "tree": "fc6c2ca690518d48aa2d7089bc88359446cd08f3",
+        "native_producer_head": "7fa05a93f04459e27aa11bd948027456f18f7861",
+        "native_rebuilt": false,
+        "change": "Harness-only first consumed pause press/release, indirect source pause-timer/frozen-clock readiness, fresh second exit press/release. Existing Results state machine retains Results events while waiting for release before first Start. Default input_ready=None preserves historical behavior.",
+        "focused": {
+          "candidate": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-two-phase-exit-candidate-v2/manifest.json",
+            "bytes": 2202,
+            "sha256": "7313db7e5285dc4b74c286fef02cba019f5a293930513885357f9d10719c3b76"
+          },
+          "source_review": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-two-phase-exit-candidate-v2/root-source-focused-review.json",
+            "bytes": 1502,
+            "sha256": "5e8a0414177067ab311dbb77a6e7c85f86720733862bd5b5a5c23692c5184bbf"
+          },
+          "completion": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-two-phase-exit-candidate-v2/focused-execution-v1/run/completion.json",
+            "bytes": 1611,
+            "sha256": "538f31947901645cab15635511d5bcfb65efe66eaadf11775637363266cbe350"
+          },
+          "owner_review": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-two-phase-exit-candidate-v2/owner-focused-review.json",
+            "bytes": 6110,
+            "sha256": "e2ad913182821a03e786b3bd5fb486f5208c6abfe161fb72c1685e616c6e96f8"
+          },
+          "native_identity": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-two-phase-exit-candidate-v2/retained-native-identity.json",
+            "bytes": 659,
+            "sha256": "cc6bf0103c82e47ed71ad2a5fb50c0618432917c301c824bf06799b5545129c5"
+          },
+          "scope": "Actual retained pause trace; synthetic second-trigger continuation; actual Results-helper interleaving/default/refusals and actual whole3 driver orchestration. No new original natural-exit observation.",
+          "retained_fixture_failure": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-two-phase-exit-candidate-v1/focused-execution-v1/run/owner-failure-review.json",
+            "bytes": 1761,
+            "sha256": "f3d05d8a07fe556e5f71f7110aacc8adef1abc83ba6f1f56e7d808ccf5de107f"
+          }
+        },
+        "required_regression": {
+          "tests": 2658,
+          "skips": 182,
+          "seconds": 568.86,
+          "result": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-two-phase-exit-full-regression-9cd4db1f-v1/evidence/result.json",
+            "bytes": 4247,
+            "sha256": "6b559e1178dcfdb2c2b0d32b6663185a9496cb9ca6fc3f523dcf6d147547c36d"
+          },
+          "owner_review": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-two-phase-exit-full-regression-9cd4db1f-v1/evidence/owner-final-review.json",
+            "bytes": 1987,
+            "sha256": "8979cba05933bf20dd347df694554060fb9432f73f1eb6d824863263fd47d4c0"
+          },
+          "stdout": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-two-phase-exit-full-regression-9cd4db1f-v1/evidence/full-unittest-suite.stdout",
+            "bytes": 16893,
+            "sha256": "316fdc1570ceaddf98296691456488ee7077261a9a3f48e0ca5b33ef5365a3dd"
+          },
+          "stderr": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-two-phase-exit-full-regression-9cd4db1f-v1/evidence/full-unittest-suite.stderr",
+            "bytes": 484911,
+            "sha256": "78664cab8264a82c75811485a95dfab7db8159702d76094e7885e98808a8dfab"
+          },
+          "root_review": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-two-phase-exit-full-regression-9cd4db1f-v1/evidence/root-final-review.json",
+            "bytes": 2615,
+            "sha256": "fa57cb9d44d1e5a03f4265706af9eb7c548b625699d169ad8e1e28db1e339d18"
+          },
+          "root_review_state": "PASS",
+          "retained_pause_and_GCI_controls_non_skipped": true,
+          "owned_group20491_absent": true
+        },
+        "capture": "FAIL_HARNESS_RESULT_HEADER_OFFSET_AFTER_FIRST_NATIVE_NO_CONTEST_EXIT",
+        "limits": "Unchanged180/210/30; no native rebuild, original game edit, endpoint/per-owner parity or C3 acceptance.",
+        "capture_result": {
+          "state": "FAIL_STRICT_RECEIVER_WRONG_RESULT_BYTE_CLEANUP_PASS",
+          "source_head": "9cd4db1fcd5374c3ec09bff7930dbbe0bb5df9fb",
+          "native_producer_head": "7fa05a93f04459e27aa11bd948027456f18f7861",
+          "elapsed_seconds": 23.147312083281577,
+          "report": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-two-phase-capture-v1/report.json",
+            "bytes": 385,
+            "sha256": "e437f3accd14c985a889cc5fc558e4c9c91af43be2bb75cc064b5afc2201d928"
+          },
+          "cleanup": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-two-phase-capture-v1/cleanup.json",
+            "bytes": 164,
+            "sha256": "c613621fb50d3662b68d8df4e880b65ad7fea269cfdefd08483d978d202604d7"
+          },
+          "supervisor": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-two-phase-exit-capture-preparation-v1/packet-two-phase/launch-result.json",
+            "bytes": 1870,
+            "sha256": "2a7738e431fa7211b4f7fa533eaefe31f611dec549d9b1b082cdb3a9c44aac53"
+          },
+          "owner_failure_review": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-two-phase-exit-result-reduction-v1/owner-failure-review.json",
+            "bytes": 1568,
+            "sha256": "61aecc04c529ce800db3abc09cd55bc8d3e3d9e2c5b532aa99c6504ec1eaf3a4"
+          },
+          "reduction": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-two-phase-exit-result-reduction-v1/report-v2.json",
+            "bytes": 21249,
+            "sha256": "043559f3a50448d1708902e74800a7319cd7fa90b6444f89b3c9bbbf7d51e6db"
+          },
+          "root_reduction_review": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-two-phase-exit-result-reduction-v1/root-review.json",
+            "bytes": 1032,
+            "sha256": "32cd3f06fd93b5371affe3969dde978202a6127e80c6e2d694a7c407633f60af"
+          },
+          "actual_order": [
+            {
+              "sequence": 2489,
+              "source_tick": 180,
+              "event": "first pause chord consumed"
+            },
+            {
+              "sequence": 2494,
+              "source_tick": 181,
+              "event": "first neutral release consumed"
+            },
+            {
+              "sequence": 2540,
+              "source_tick": 190,
+              "event": "pause timer0/frozen-clock readiness"
+            },
+            {
+              "sequence": 2549,
+              "source_tick": 192,
+              "event": "fresh second chord consumed"
+            },
+            {
+              "sequence": 2550,
+              "source_tick": 192,
+              "event": "source MatchClock outcome7"
+            },
+            {
+              "sequence": 2553,
+              "source_tick": 193,
+              "event": "vs_exit"
+            },
+            {
+              "sequence": 2554,
+              "source_tick": 193,
+              "event": "vs_exit_return, MatchEnd header outcome7 at+4"
+            },
+            {
+              "sequence": 2555,
+              "source_tick": 193,
+              "event": "vs_mode_exit"
+            },
+            {
+              "sequence": 2556,
+              "source_tick": 193,
+              "event": "results_enter"
+            }
+          ],
+          "raw_partial_original_RNG_scene_samples": 4,
+          "eight_sample_complete_admission": false,
+          "second_exit_release_consumed_observed": false,
+          "three_natural_completions": false,
+          "all_recorded_owned_pids_absent": [
+            51671,
+            51676,
+            51678
+          ],
+          "recorded_collector_native_groups_absent": [
+            51676,
+            51678
+          ],
+          "supervisor_group": "Not recorded; no inferred PGID absence claim. Supervisor PID absence checked.",
+          "scope": "Original first no-contest exit and Results entry are observed; strict harness rejected timerMSB rather than reading outcome. No completed Results/CSS leg or full3/eightendpoint result. The second release intention is retained but its consumption was not observed before failure."
+        }
+      },
+      "result_header_outcome_repair": {
+        "state": "COMMITTED_FOCUSED_AND_REQUIRED_REGRESSION_PASS",
+        "base_head": "9cd4db1fcd5374c3ec09bff7930dbbe0bb5df9fb",
+        "candidate": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-result-header-outcome-repair-v1/manifest.json",
+          "bytes": 2383,
+          "sha256": "58a3f890d5321e798f8155cfdf29ae9b1ada8c4424b49f4488deb22708470dbd"
+        },
+        "patch": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-result-header-outcome-repair-v1/candidate.patch",
+          "bytes": 6026,
+          "sha256": "5042cc630c8eec5c4b577990140a064851d4e34eef740ed9cb040a17311fe129"
+        },
+        "focused_completion": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-result-header-outcome-repair-v1/focused-execution-v1/run/completion.json",
+          "bytes": 1192,
+          "sha256": "c8080f889752d885c70701ca69dabdd98bf0c87f19467bc6fffdacf48fddab7c"
+        },
+        "owner_focused_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-result-header-outcome-repair-v1/owner-focused-review.json",
+          "bytes": 1811,
+          "sha256": "25491d41f7d61904d502f11531cc7d0f21019b942f93c738526aa1f7c151b6b2"
+        },
+        "scope": "Exact tag15/flags0/address0x80479da4/size0x28 MatchEnd HEADER PREFIX and outcome+4. Whole original MatchEnd size0x227C; no misleading40byte type-size claim. Native7fa unchanged, all input/release/freshtrigger guards retained. Positive actual retained exit row and malformed/header/wrongoutcome/missing/duplicate negatives passed; no new capture.",
+        "head": "6cb7cb769b35e65fa8f9fe480c02ac2a2d32bae8",
+        "tree": "33598ab5be94317be6fecf84f6fc0b87aa39eeda",
+        "root_focused_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-result-header-outcome-repair-v1/root-focused-review.json",
+          "bytes": 891,
+          "sha256": "f749b122ac9c055c8e544975195e9b477389066d6c23622c85d124be355c5e00"
+        },
+        "required_regression": {
+          "tests": 2659,
+          "skips": 182,
+          "seconds": 571.537,
+          "result": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-result-header-full-regression-6cb7cb76-v1/evidence/result.json",
+            "bytes": 4248,
+            "sha256": "daf00239955c9a4f4b25fb06481a4f6a2aa95f2aa36a5b0d20575c0bed4a7b36"
+          },
+          "root_review": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-result-header-full-regression-6cb7cb76-v1/evidence/root-final-review.json",
+            "bytes": 2961,
+            "sha256": "34509c1c7cbd2079a907e102e8c49911c745a45d47ba11d9e02fc2aba7ee4d85"
+          },
+          "owner_review": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-result-header-full-regression-6cb7cb76-v1/evidence/owner-final-review.json",
+            "bytes": 3268,
+            "sha256": "b800afd9ae0780370157e7af74549d6f2c346f4dd7a802cc84473b9442fe36ee"
+          },
+          "prose_erratum": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-result-header-full-regression-6cb7cb76-v1/identity-prose-erratum.json",
+            "bytes": 786,
+            "sha256": "cd60b0e0a7fbf0506bb5b36197fc9f534b13fc4527c2eee206a9b8993a2768d8"
+          },
+          "actual_controls_non_skipped": 5,
+          "native_rebuilt": false
+        }
+      },
+      "first_natural_lifetime_then_second_SSS_failure": {
+        "state": "FAIL_SECOND_SSS_HOST_COUNTER_RESET_AFTER_FIRST_NATURAL_LIFETIME_CLEANUP_PASS",
+        "source_head": "6cb7cb769b35e65fa8f9fe480c02ac2a2d32bae8",
+        "native_producer_head": "7fa05a93f04459e27aa11bd948027456f18f7861",
+        "elapsed_seconds": 34.02497391682118,
+        "report": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-result-header-capture-v1/report.json",
+          "bytes": 368,
+          "sha256": "87b73a89a639c42f4222c03198f86bf02582e9a851630a62c5554916ea24e40f"
+        },
+        "cleanup": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-result-header-capture-v1/cleanup.json",
+          "bytes": 164,
+          "sha256": "03b07fa8ff781b954c6dc2f070bf2005eaf964b758b47e7c90fa7ec64fc3104b"
+        },
+        "supervisor": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-result-header-capture-preparation-v1/packet-result-header/launch-result.json",
+          "bytes": 1885,
+          "sha256": "9614d4d7efacd1b8d56c3874ea1bb4be7bc551473cd6f1f1909fec189139bb82"
+        },
+        "reduction": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-sss-call-continuity-reduction-v1/report.json",
+          "bytes": 15459,
+          "sha256": "7905a431a76b11a630123b15cb80d85970673ad6367a190999ccda1665ea8408"
+        },
+        "owner_failure_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-sss-call-continuity-reduction-v1/owner-failure-review.json",
+          "bytes": 1920,
+          "sha256": "249d07aeee5222b7312a29a1a8fe5a57e8df4cd63e4310126ffaf3c5c661992f"
+        },
+        "process_absence": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-result-header-capture-preparation-v1/packet-result-header/owned-final-absence.json",
+          "bytes": 189,
+          "sha256": "b290be186c49cdc406c86284f2ce5cab532e820e08dde8605a5ef5314af364a0"
+        },
+        "first_leg_actual_input_receipts": {
+          "pause_consumed": {
+            "sequence": 2476,
+            "source_tick": 180,
+            "phase": "whole-post-setup",
+            "match_index": 0,
+            "ports": [
+              "116000000000ffff000000",
+              "0000000000000000000000",
+              "00000000000000000000ff",
+              "00000000000000000000ff"
+            ],
+            "errors": [
+              0,
+              0,
+              -1,
+              -1
+            ],
+            "pc": 2151118212,
+            "lr": 2151118136,
+            "gprs": [
+              0,
+              2152655384,
+              2152593888,
+              1,
+              2,
+              2152116488,
+              1,
+              0,
+              4294967283,
+              13,
+              3908108288,
+              0,
+              0,
+              2152576672,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              2148980736,
+              2152116536,
+              2152472492,
+              1,
+              2152472479,
+              2152472478,
+              2152472440,
+              2151524552
+            ],
+            "queue_base": 2152116488,
+            "queue_count": 5,
+            "queue_slot_index": 1,
+            "queue_slot_address": 2152116536
+          },
+          "pause_released": {
+            "sequence": 2481,
+            "source_tick": 181,
+            "phase": "whole-post-setup",
+            "match_index": 0,
+            "ports": [
+              "0000000000000000000000",
+              "0000000000000000000000",
+              "00000000000000000000ff",
+              "00000000000000000000ff"
+            ],
+            "errors": [
+              0,
+              0,
+              -1,
+              -1
+            ],
+            "pc": 2151118212,
+            "lr": 2151118136,
+            "gprs": [
+              0,
+              2152655384,
+              2152593888,
+              1,
+              3,
+              2152116488,
+              2,
+              0,
+              4294967283,
+              13,
+              3913687040,
+              0,
+              0,
+              2152576672,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              2148980736,
+              2152116584,
+              2152472492,
+              1,
+              2152472479,
+              2152472478,
+              2152472440,
+              2151524552
+            ],
+            "queue_base": 2152116488,
+            "queue_count": 5,
+            "queue_slot_index": 2,
+            "queue_slot_address": 2152116584
+          },
+          "pause_ready_clock": {
+            "sequence": 2527,
+            "source_tick": 190,
+            "match_index": 0,
+            "pauser": 0,
+            "pause_timer": 0,
+            "unk3": 0,
+            "hud_enabled": 1,
+            "outcome": 0,
+            "frame_count": 56,
+            "timer_seconds": 119,
+            "timer_frames": 55,
+            "evidence": "indirect_source_pause_timer_and_frozen_clock"
+          },
+          "chord_consumed": {
+            "sequence": 2536,
+            "source_tick": 192,
+            "phase": "whole-post-setup",
+            "match_index": 0,
+            "ports": [
+              "116000000000ffff000000",
+              "0000000000000000000000",
+              "00000000000000000000ff",
+              "00000000000000000000ff"
+            ],
+            "errors": [
+              0,
+              0,
+              -1,
+              -1
+            ],
+            "pc": 2151118212,
+            "lr": 2151118136,
+            "gprs": [
+              0,
+              2152655384,
+              2152593888,
+              1,
+              4,
+              2152116488,
+              3,
+              0,
+              4294967283,
+              13,
+              3974512640,
+              0,
+              0,
+              2152576672,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              2148980736,
+              2152116632,
+              2152472492,
+              1,
+              2152472479,
+              2152472478,
+              2152472440,
+              2151524552
+            ],
+            "queue_base": 2152116488,
+            "queue_count": 5,
+            "queue_slot_index": 3,
+            "queue_slot_address": 2152116632
+          },
+          "chord_released": {
+            "sequence": 2580,
+            "source_tick": 0,
+            "phase": "whole-post-setup",
+            "match_index": 0,
+            "ports": [
+              "0000000000000000000000",
+              "0000000000000000000000",
+              "00000000000000000000ff",
+              "00000000000000000000ff"
+            ],
+            "errors": [
+              0,
+              0,
+              -1,
+              -1
+            ],
+            "pc": 2151118212,
+            "lr": 2151118136,
+            "gprs": [
+              0,
+              2152655384,
+              2152593888,
+              1,
+              5,
+              2152116488,
+              4,
+              0,
+              2152529920,
+              2151702508,
+              0,
+              32,
+              2151064300,
+              2152576672,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              2152116680,
+              2152472492,
+              1,
+              2152472479,
+              2152472478,
+              2152472440,
+              2151524552
+            ],
+            "queue_base": 2152116488,
+            "queue_count": 5,
+            "queue_slot_index": 4,
+            "queue_slot_address": 2152116680
+          },
+          "outcome_seen": true,
+          "returned_css": true,
+          "return_css_seq": 3461
+        },
+        "first_leg_source_ticks": 193,
+        "first_leg_draws": 193,
+        "first_leg_results_gobj_rows": 276,
+        "first_leg_required_boundary_sequence": {
+          "vs_exit_return": 2542,
+          "results_enter": 2544,
+          "results_exit": 3409,
+          "results_mode_exit": 3410,
+          "scene_teardown": 3460,
+          "return_css": 3461
+        },
+        "first_failure": {
+          "seq": 3855,
+          "match_index": 1,
+          "phase": "sss_position_cursor",
+          "position_call": 132,
+          "error": "SSS cursor observation is duplicate/reordered",
+          "decoder_last_call": 0
+        },
+        "native_global_SSS_call_continuity": {
+          "prior_closed_call": 131,
+          "next_call": 132,
+          "host_fresh_last_call": 0
+        },
+        "second_lifetime_scope": "CSS and SSS entered; no second Setup or endpoint.",
+        "partial_original_scene_RNG_samples": 4,
+        "full_eight_sample_admission": false,
+        "full_three_terminal": false,
+        "cleanup_passed": true,
+        "owned_pids_absent": [
+          62886,
+          62895,
+          62901,
+          62902
+        ],
+        "owned_groups_absent": [
+          62886,
+          62901,
+          62902
+        ],
+        "all37_inputs_unchanged": true,
+        "limits": "Actual first natural no-contest Results\u2192CSS lifetime, not full idle-duration parity or C3. Native7fa unchanged. Historical71a rawcleanupFAIL remains retained separately."
+      },
+      "SSS_global_call_continuity_repair": {
+        "state": "COMMITTED_FOCUSED_AND_REQUIRED_REGRESSION_PASS",
+        "head": "ddbf2ed7783c1ce68cd81df785f50daf5d08bd91",
+        "tree": "0dea77eed42958b0f230570c54c6c2a162b56603",
+        "candidate": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-sss-call-continuity-repair-v1/manifest.json",
+          "bytes": 2329,
+          "sha256": "65fbf0d99851b0d3570b4b84b80e9f9293f694c1e30911dfbb63a66d57460cb6"
+        },
+        "patch": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-sss-call-continuity-repair-v1/candidate.patch",
+          "bytes": 6326,
+          "sha256": "7dc790846bc34c89df1f52c3fb79b0eb7add5fe572289343c736629c55b8ec5e"
+        },
+        "root_source_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-sss-call-continuity-repair-v1/root-source-review.json",
+          "bytes": 745,
+          "sha256": "9f5b16a54a217e11e575ef3235baf837bd154b703c5b64b3507ed08a4d135a2a"
+        },
+        "root_focused_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-sss-call-continuity-repair-v1/root-focused-review.json",
+          "bytes": 563,
+          "sha256": "66c8f1fbac8b011aaa7e554066ad22bddf87fc583fa2426bae76f3f6a3ac4c9b"
+        },
+        "focused_completion": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-sss-call-continuity-repair-v1/focused-execution-v1/run/completion.json",
+          "bytes": 1195,
+          "sha256": "c48f7dbf553a0c796e91d2b5c8a3b671498f783fb61efad53413b5f74adbdd50"
+        },
+        "integration": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-sss-call-continuity-repair-v1/integration.json",
+          "bytes": 855,
+          "sha256": "1f53e92669d8006339a2b9fbcbb67c9e8f6faf8a276490bd9a3a6bc13b4f0e6a"
+        },
+        "scope": "Preserve only closed native session-global SSS last_call through checked natural ReturnCSS reset; fresh geometry/active tuple/live owner/token and strict contiguous identity/default decoder unchanged. Actual retained firstleg\u2192secondSSSthrough147 and duplicate/gap/foreign/targetfirst/partialcallback/earlyReturnCSS/default0\u21921 negatives passed; driver ordering/deadline control also passed. No native rebuild. Its subsequent failed capture is recorded separately below.",
+        "required_regression": {
+          "tests": 2660,
+          "skips": 182,
+          "seconds": 621.046,
+          "result": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-sss-call-full-regression-ddbf2ed7-v1/evidence/result.json",
+            "bytes": 4247,
+            "sha256": "d81129d3717fc68a0cb48b669435828f75bff10b5709b0711e5885b1f7db655f"
+          },
+          "owner_review": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-sss-call-full-regression-ddbf2ed7-v1/evidence/owner-final-review.json",
+            "bytes": 3384,
+            "sha256": "fc45755bba8d030bdf0ec99c362c73fb3832d746ff28a642f4f573695fd75b6c"
+          },
+          "root_review": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-sss-call-full-regression-ddbf2ed7-v1/evidence/root-final-review.json",
+            "bytes": 3525,
+            "sha256": "1d249445319cae092b6ac5bacf8dfc7a64e3a5677d6fee00d511401be2d98855"
+          },
+          "execution_release_and_prose_erratum": {
+            "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-sss-call-full-regression-ddbf2ed7-v1/root-release.json",
+            "bytes": 984,
+            "sha256": "86b2f4659784c76065286ec9532f1a49cb8e6fdcb959e673a741dbd6fe6818fa"
+          },
+          "actual_controls_non_skipped": 6,
+          "native_rebuilt": false
+        },
+        "limits": [
+          1500,
+          30
+        ]
+      },
+      "results_mixed_release_capture": {
+        "state": "FAIL_RESULTS_INPUT_PHASE_MISSING_MIXED_PORT_CORNER_CLEANUP_PASS",
+        "source_head": "ddbf2ed7783c1ce68cd81df785f50daf5d08bd91",
+        "native_producer_head": "7fa05a93f04459e27aa11bd948027456f18f7861",
+        "elapsed_seconds": 26.871403916738927,
+        "report": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-sss-call-capture-v1/report.json",
+          "bytes": 368,
+          "sha256": "06e2b0b3501c4f91a7182a12347e0869002bc1b202b822f294576deb55e28bee"
+        },
+        "cleanup": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-sss-call-capture-v1/cleanup.json",
+          "bytes": 164,
+          "sha256": "779017071c93502e022c324cc1f374d3a53e8b38d20142e22d774d76dc598444"
+        },
+        "supervisor": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-sss-call-capture-preparation-v1/packet-sss-call/launch-result.json",
+          "bytes": 1866,
+          "sha256": "8ccdc343cd1824e1318a8b4135b3d34ca8d4bad28e035a9236831d620510becb"
+        },
+        "reduction": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-results-release-pad-reduction-v1/report.json",
+          "bytes": 20367,
+          "sha256": "9ca76891b3bac04648cf50afea0fdcb40b8634adeed426cf837077833a7ebc1d"
+        },
+        "owner_failure_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-results-release-pad-reduction-v1/owner-failure-review.json",
+          "bytes": 1341,
+          "sha256": "e3a8eaa6a0fb31c8a39dffb280df4c8fae94d60593ec03936be750da95bccf34"
+        },
+        "owned_process_absence": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-sss-call-capture-preparation-v1/packet-sss-call/owned-final-absence.json",
+          "bytes": 190,
+          "sha256": "992bc7781417cec57f24d96cd818e33744709f03caffcf4dc86160dd02231305"
+        },
+        "failed_sequence": 3181,
+        "source_tick": 209,
+        "match_index": 0,
+        "actual_ports": [
+          "0000000000000000000000",
+          "1000000000000000000000",
+          "00000000000000000000ff",
+          "00000000000000000000ff"
+        ],
+        "errors": [
+          0,
+          0,
+          -1,
+          -1
+        ],
+        "queue": {
+          "base": "0x8046b108",
+          "count": 5,
+          "slot": 0,
+          "slot_address": "0x8046b108"
+        },
+        "source_consume_pc": "0x80377584",
+        "phase": "Existing checked Results start_allowed, after sourceoutcome7 and consumed exitneutral release2554",
+        "actual_neighbor_inputs": "BothSTART through3178, neutral/START3181, bothneutral3184. Separate per-port release delivery is consistent with existing set_both write1 thenwrite2; no exact numberedpulse attribution assumed.",
+        "progress": "First no-contest exit/Results rows retained,192ticks/draws. Raw later ResultsExit3196/modeexit3197; noReturnCSS or secondSSS in thisrun. Prior6cb naturalfirstleg remains a separate retained result.",
+        "partial_original_scene_RNG_samples": 4,
+        "eight_sample_admission": false,
+        "full_three_terminal": false,
+        "cleanup_passed": true,
+        "owned_pids_absent": [
+          85266,
+          85288,
+          85311,
+          85319
+        ],
+        "owned_groups_absent": [
+          85266,
+          85311,
+          85319
+        ],
+        "all37_inputs_unchanged": true,
+        "limits": "Currentfailure does notliveexercise closed-call continuity. No C3/per-owner ledger/fullidle parity. Historical71a cleanupFAIL retained separately."
+      },
+      "Results_mixed_release_repair_proposal": {
+        "state": "COMMITTED_FOCUSED_PASS_FULL_CURRENT_REGRESSION_REQUIRED",
+        "candidate": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-results-release-pad-repair-v1/manifest.json",
+          "bytes": 2286,
+          "sha256": "43e1136f6b2c9f01c81b798ba833e090c603bac4e499a09058f1a438beb88fb3"
+        },
+        "patch": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-results-release-pad-repair-v1/candidate.patch",
+          "bytes": 5402,
+          "sha256": "754d70d0d05c4bbfb9cff0f407bc84956622ebd67e414ace6dfaa3ba9d3a9b6b"
+        },
+        "scope": "One added neutral/START corner inside existing checked Results phase. Actual retained-prefix/exactrow and finite4corner/outsidephase/buttons/port/error/queue negatives passed, plus actual Results helper and driver order/deadline controls. Same command inputs/hold/order/deadlines/native/profile. Root independently reviewed source/rawresults/processabsence. No currentfullsuite/integration acceptance or capture.",
+        "validation_scope": "Distinct ddbf fullsuite is retained; no currentcandidate fullsuite or integration claim. Root allows focused tiny harness iteration after independent review, with explicit provenance, while currentfull regression/CI remains required before integration.",
+        "capture_authorized": false,
+        "head": "80c37aaaa6d7e889d62ff0849199b942d2a92eae",
+        "tree": "616bbfb21dc84fa89b561b6a3917a544b45db311",
+        "fullsuite_for_current": false,
+        "historical_fullsuite_source": "ddbf2ed7783c1ce68cd81df785f50daf5d08bd91",
+        "historical_fullsuite": [
+          2660,
+          182
+        ],
+        "source_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-results-release-pad-repair-v1/source-review.json",
+          "bytes": 2864,
+          "sha256": "1094b7c8c4a22b0a693ac6b87815bdf216f880a9d0ea2e733aea6734f9fc1925"
+        },
+        "focused_completion": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-results-release-pad-repair-v1/focused-execution-v1/run/completion.json",
+          "bytes": 1743,
+          "sha256": "e13ad6aed93aea49ac1654632a5bf0c42acd6da43b11c06f60e97b6781c5752b"
+        },
+        "owner_focused_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-results-release-pad-repair-v1/owner-focused-review.json",
+          "bytes": 2304,
+          "sha256": "2182d3ce0a8babde748e61815fe51abf3d3f1612e12619d65879daa2b0310a03"
+        },
+        "root_focused_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-results-release-pad-repair-v1/root-focused-review-v2.json",
+          "bytes": 874,
+          "sha256": "621b7d424e8808e2e9c19bb44053404d48825893bef54fbb2876499891630a5b"
+        },
+        "integration_checkpoint": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-results-release-pad-repair-v1/integration.json",
+          "bytes": 934,
+          "sha256": "7853aea4c5a9efdffaf4b27e296aa21fcdf228402dc15d88a224a25cac68631d"
+        },
+        "focused_tests": 3,
+        "focused_skips": 0,
+        "all3_owned_groups_absent": [
+          86948,
+          86951,
+          86954
+        ],
+        "packet_preparation": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-results-release-pad-capture-preparation-v1/preparation-freeze.json",
+          "bytes": 1162,
+          "sha256": "d217ee3aec4c411e6b458282cddabafd88350849e663149e48caa676da5d5a52"
+        },
+        "materialization_or_capture": false
+      }
+    }
+  },
+  "original_short_endpoint_offline_finalization_2026_10_16": {
+    "state": "OFFLINE_SHORT_ENDPOINT_PREREQUISITE_AND_CURRENT_FULL_REGRESSION_PASS_REVIEW_BEFORE_PUBLICATION",
+    "native_producer": "7fa05a93f04459e27aa11bd948027456f18f7861",
+    "capture_harness": "80c37aaaa6d7e889d62ff0849199b942d2a92eae",
+    "offline_validator": "d0af936d0bab4f203cbd79974efd2a67b0ac274f",
+    "offline_validator_tree": "ba551d04aaadb7947e5ffc47f2eab8b82d3da201",
+    "original_capture_result": "fail",
+    "capture_failure": "Package-relative decoder imported under unqualified name during postprocessing; original failed report preserved unchanged.",
+    "capture_seconds": 62.16466054087505,
+    "offline_seconds": 3.073,
+    "strict_primary_match_count": 3,
+    "strict_original_rng_sample_count": 8,
+    "recorded_input_events": 13632,
+    "native_primary_terminal": "completed, valid,8500 events",
+    "native_input_terminal": "record complete, valid,13632 events",
+    "allocation_terminal": "captured,target_complete,boundary_complete,ownership_complete;first2 entries/exits;third natural tail belongs primary only",
+    "setup": "Original Stadium stage3/Mario kind8, costumes[1,0],TIME120/nonstock,three stock counters; no stock-four browser equivalence.",
+    "actual_input_receipts": "Three capture-produced two-phase pause/exit and release receipts retained; offline report does not rerun controller or independently replay driver.",
+    "rng_scope": {
+      "property": "Actual dynamic seed pointer-slot/value bytes at eight original VS OnEnter/OnExit enter/return callbacks, exact primary CPU/context joins",
+      "all_writers_observed": false,
+      "port_wrapper_correspondence": "not claimed"
+    },
+    "generic_lifecycle_admission": {
+      "complete": false,
+      "experimental": true,
+      "accepted_for_reference_bundle": false,
+      "missing_coverage": [
+        "transition_trace_css_sss_join",
+        "audio_pcm",
+        "persistent_record_semantics"
+      ]
+    },
+    "process_cleanup": {
+      "raw_cleanup": "PASS",
+      "recorded_capture_pids_absent": [
+        87307,
+        87318,
+        87323,
+        87324
+      ],
+      "recorded_capture_groups_absent": [
+        87307,
+        87323,
+        87324
+      ],
+      "offline_pid_group": 89262,
+      "offline_absent": true,
+      "earlier_71a_raw_cleanup": "FAIL retained separately"
+    },
+    "regression": {
+      "current": {
+        "head": "d0af936d0bab4f203cbd79974efd2a67b0ac274f",
+        "tree": "ba551d04aaadb7947e5ffc47f2eab8b82d3da201",
+        "result": "PASS",
+        "tests": 2662,
+        "skips": 182,
+        "seconds": 639.223,
+        "actual_relevant_controls": 8,
+        "relevant_skips": 0,
+        "source_clean_unchanged": true,
+        "native_rebuild": false,
+        "root_final_review": {
+          "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-offline-finalizer-full-regression-d0af936d-v1/evidence/root-final-review.json",
+          "bytes": 1492,
+          "sha256": "e510160070e2137cf6a406bf31a6ef617e640fc354bf075df9c56b9430816950"
+        }
+      },
+      "historical_fullsuite": "ddbf2ed7:2660tests/182skips",
+      "80_focused_only": true,
+      "d0af_isolated_focus": {
+        "tests": 1,
+        "skips": 0,
+        "result": "PASS",
+        "scope": "Also rediscovered successfully in current fullsuite."
+      },
+      "plan_parent_tree_erratum": {
+        "field": "integration_base_tree",
+        "actual_parent_tree": "616bbfb21dc84fa89b561b6a3917a544b45db311",
+        "scope": "Stale unenforced historical metadata corrected additively in root-release; frozen plan unchanged. Enforced head/tree/HEAD-parent source identities actual d0af/ba551d04/80 throughout."
+      }
+    },
+    "C3": false,
+    "remaining": [
+      "Full-duration matched original/browser TIME120/input/seed/setup prerequisite",
+      "Broad original RNG-writer/source coverage and required lifetime comparison",
+      "Generic whole-session transition/audio/persistent-record acceptance",
+      "Current full regression and CI before integration"
+    ],
+    "evidence": {
+      "offline_report": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-offline-finalization-v1/validated/offline-validated-report.json",
+        "bytes": 88325,
+        "sha256": "6fd1362427f602bda16ae875aec64a7510c570c09af6bdda80edee645149c1f2"
+      },
+      "offline_completion": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-offline-finalization-v1/execution-v1/completion.json",
+        "bytes": 560,
+        "sha256": "461137dbd8cdc74e4d270c6cf33a198f0d5c1ac2e54c8db9e0a4c07a8697058c"
+      },
+      "owner_review": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-offline-finalization-v1/owner-result-review.json",
+        "bytes": 372,
+        "sha256": "7e888363b0e8ec54fef52bc0b2a4d98b7152b8c524f5948be80c27053c1ffc7d"
+      },
+      "offline_manifest": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-offline-finalization-v1/manifest.json",
+        "bytes": 3198,
+        "sha256": "c412c6b6f56569f6227c5a351950fa6a4ee554e8a8fbb082a59fc226749fa3c4"
+      },
+      "root_offline_replay": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-offline-finalization-v1/root-result-review.json",
+        "bytes": 1436,
+        "sha256": "6a802623de300d9ce05289577e457d3b5540a1bfadf4abc6ca45ffe973111641"
+      },
+      "current_fullsuite": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-offline-finalizer-full-regression-d0af936d-v1/evidence/result.json",
+        "bytes": 4248,
+        "sha256": "987e7cd1c5988f8a3ec401d5c455e85755177f087e0af7dbfbe5e5aebafaa05e"
+      },
+      "current_fullsuite_stdout": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-offline-finalizer-full-regression-d0af936d-v1/evidence/full-unittest-suite.stdout",
+        "bytes": 16899,
+        "sha256": "6cd91780f2b068d29b06354ecfc17b30984f6ba72144dfcb1827b3c4a2d53417"
+      },
+      "current_fullsuite_stderr": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-offline-finalizer-full-regression-d0af936d-v1/evidence/full-unittest-suite.stderr",
+        "bytes": 485714,
+        "sha256": "e6b87ec41ca4ba3c0458f5f0cc6f1b73018132bafbc187d886ea98d7c9e6c1cf"
+      },
+      "owner_fullsuite_review": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-offline-finalizer-full-regression-d0af936d-v1/evidence/owner-final-review.json",
+        "bytes": 2578,
+        "sha256": "7a77bc6b5c254f78d1e8d2738618062cf902e7503b8575b05192faf8e2e8c6d8"
+      },
+      "fullsuite_release_with_erratum": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-offline-finalizer-full-regression-d0af936d-v1/root-release.json",
+        "bytes": 1805,
+        "sha256": "a7768e2cad9ef8f36dbc45bea3ce1a99ce90b03ac47cf5ada808ee912423c1a8"
+      },
+      "root_current_fullsuite_review": {
+        "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-offline-finalizer-full-regression-d0af936d-v1/evidence/root-final-review.json",
+        "bytes": 1492,
+        "sha256": "e510160070e2137cf6a406bf31a6ef617e640fc354bf075df9c56b9430816950"
+      }
+    },
+    "failed_report": {
+      "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-results-release-capture-v1/report.json",
+      "bytes": 8223,
+      "sha256": "2213b40935bdca531e9fadbcb0a702a2e3ecc95deeaa06320ec837eb73b30e9f"
+    },
+    "capture_cleanup": {
+      "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-whole3-sidecar2-results-release-capture-v1/cleanup.json",
+      "bytes": 164,
+      "sha256": "b4b67c3c738fd6afd014748bfecfbdb5e9eebbbf2d62e7e554bc3008476c09b6"
+    },
+    "package_repair_root_focus": {
+      "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-offline-finalizer-package-repair-v1/root-focused-review.json",
+      "bytes": 723,
+      "sha256": "dd6a119dbd68b240f3f11e1a7bc04670598c3a3f907f34253d124826ec5950a9"
+    }
   }
 }
