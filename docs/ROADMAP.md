@@ -142,6 +142,15 @@ records the parallel Slippi behavior mapping, pending owner licensing decision,
 and deferred A5 gateway/cadence research. Copy no related-project code, and send
 no automated traffic to Slippi production services or real accounts.
 
+The owner-directed October 16 [execution sprint](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6227720936)
+continues these existing milestones. First distinguish cache invalidation from
+selected-texture lifetime, close the reachable host owners, then attempt one
+restored tick and an identical repeat. Stadium progresses through the original
+short-lifetime route and compatible lifecycle/RNG comparison in parallel.
+Each item has a bounded experiment, pass criterion and stopping rule; neither
+a component pass nor a checkpoint of an unresolved blocker completes the
+restored-tick or C3 target.
+
 The owner-approved October 13 sprint targets one same-instance Mario/FD
 checkpoint → original tick/full draw → restore → repeat comparison under
 [#318](https://github.com/ericvanlare/melee-web/issues/318). First close the

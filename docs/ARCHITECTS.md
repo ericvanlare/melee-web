@@ -53,6 +53,25 @@ ships with a migration path, and is measured against those PRs before merge.
 ## Log
 
 
+### 2026-10-16 — Owner: plan and execute the next sprint
+
+**Ask:** Plan and execute an autonomous sprint, using judgment to advance the
+project toward online rollback and competitive-rules completeness.
+
+**Status:** Accepted. The [12-item queue](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6227720936)
+continues #318/#324 and #251/#301. Start with the actual texture-cache lifetime
+reduction and the reviewed original Stadium pause/quit route. Advance to one
+safe checkpoint/restore/repeat only after the reachable host owners are closed;
+advance Stadium through a compatible original comparison. Preserve the original
+inputs, arithmetic, source ordering, failure evidence and shared capture lane.
+Keep each milestone in its existing issue, draft PR and status boundary.
+Human-only gates remain unrun and the deleted heartbeat remains deleted.
+
+**Links:** [Rollback #318](https://github.com/ericvanlare/melee-web/issues/318),
+[Stadium #251](https://github.com/ericvanlare/melee-web/issues/251),
+[priorities #158](https://github.com/ericvanlare/melee-web/issues/158).
+
+
 ### 2026-10-14 — Owner: resume the autonomous rollback and Stadium sprint
 
 **Ask:** The owner is unavailable for a PvP test. Proceed with the next sprint.
