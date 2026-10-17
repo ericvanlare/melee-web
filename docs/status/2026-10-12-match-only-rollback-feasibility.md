@@ -565,9 +565,9 @@ This closes the selected-entry stopped-interval component only. Its publication
 counter lives in Wasm and is rewindable: it cannot authorize heap restore.
 Renderer findings 7 (`LOAD_ATTACHMENT`) and 27 (`COMMAND_SHAPE_MISMATCH`) remain,
 as do previous-content preservation, complete device/native references and host
-futures. Composite eligibility is false. The next bounded source task joins the
-existing audio/file reader at the same fenced boundary; current profiles still
-forbid combining those hooks with first-draw components. No restore/repeat,
+futures. Composite eligibility is false. At that checkpoint, the next source task
+was to join the existing audio/file reader at the same fenced boundary. The
+combined profile and its first refusal are recorded below. No restore/repeat,
 combined seven-tick budget, gameplay rollback or whole-session acceptance follows.
 
 Earlier generic-owner and global-generation refused captures remain above with
@@ -579,6 +579,50 @@ PID/group records remain retained, separate from later exact cleanup receipts.
 Current validation, actual capture and independent/root reviews are bound in
 `entry_authority_validation` and `entry_authority_actual_interval` in the
 [existing structured receipt](../evidence/match-only-rollback-feasibility-v1.json).
+
+The combined private runtime at `76dcf31d` now includes the existing audio/file
+point reader, the first-draw components, and an additive conversion-dependency
+observation. The conversion JSON getter runs only after a successful closed
+texture interval; it allocates and is not safe inside a future heap checkpoint
+interval. Its local handles do not establish GPU creation or lifetime authority.
+The ordinary runtime keeps these diagnostics disabled. A narrow opt-in server
+option uses `no-cache` for the runtime `.data` response after a reduced Chrome
+loader control; unrelated responses and the default server policy are unchanged.
+
+Both affected Release builds pass. Full regression passes 2,447 tests with 164
+skips in 562.944 seconds, and the actual generated JS-to-Wasm getter export is
+verified. All 45 required combined-profile artifacts and 44 ordinary artifacts
+were rehashed separately from their larger observed web directories. The earlier
+`af8922d9` suite failed two checks: noncanonical patch bytes and an extracted
+function fixture interrupted by a neighboring getter. The two-file repair
+preserves the actual Aurora tree and getter body; those failures remain retained.
+Independent source review and root validation review pass. This is source/build
+validation, not rollback validation.
+
+One headless original-route capture on `76dcf31d` selected frame 180→181 with
+one naturally planned tick, full draw and audio return, 533 PCM frames, and no
+skipped work. Component read and depth `READY`→`ACTIVE` passed. The first combined
+host point then refused with `native_file_owners_not_quiescent`: its native
+predicate returned zero although the browser's before/after file snapshots were
+identical, with no unresolved reads or result entries. The specific native
+boundary, HPS/IO, SSM or source-file subcondition was not recorded and remains
+unknown. An idle browser file map cannot prove native ownership is idle.
+
+The refusal occurred before texture issuance: there are no interval responses,
+interval fences, conversion getter result, native diagnostic retirement or
+restore. The separate renderer packet retains first blocker 7 and finding bits
+7/27; it does not explain the host refusal. The secondary offline eight-response
+replay failed because no interval existed. All 15 recorded owned PIDs and four
+groups are independently absent; cleanup passed in 146 ms. There were no page
+errors or timing pauses. H1 retained 100 of 3,139 samples, with 3,039 evicted,
+eight reason-7 incidents and no dropped incidents. Its coverage remains lossy.
+
+The next step is a small, same-call diagnostic of the native predicate's first
+failed condition, preserving its short-circuit order and refusal. No unchanged
+capture retry is authorized. The combined host boundary, conversion observation,
+renderer content preservation and same-instance restore/repeat remain open.
+Exact current validation, capture and retained-failure identities are under
+`combined_host_point_and_conversion_observation` in the existing receipt.
 
 ## Slippi profile source checkpoint
 
