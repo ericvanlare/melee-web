@@ -51,6 +51,7 @@ VS_RULES_ITEMS_ROUTE_SOURCE_FILES = (
     "tools/retail_cpu_menu_prepare.py",
     "tools/retail_allocation_menu.py",
 )
+sys.path.insert(0, str(ROOT)) # Support package-relative tools imports from script entry points.
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "tools"))
 import capture_retail_replay as retail
@@ -1136,7 +1137,7 @@ def join_stadium_allocation_samples(selected, boundaries):
 def validate_stadium_three_native(output, profile_path, expected):
     from whole_session_replay import capture_from_path
     from reference_observer_stream import iter_records
-    from allocation_lifetime_replay import validate_original_rng_scene_boundaries
+    from tools.allocation_lifetime_replay import validate_original_rng_scene_boundaries
     primary=capture_from_path(output/'native-primary.mwro',output/'native-primary-status.json')
     if primary['identity']['match_count']!=3 or primary['declared_setups']!=[expected]*3:
         raise ValueError('Native primary does not contain three declared Stadium matches')

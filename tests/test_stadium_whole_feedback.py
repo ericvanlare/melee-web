@@ -554,6 +554,36 @@ assert(scoped.emitted.find("\\\"whole_session\\\":true,\\\"match_index\\\":2")!=
         bad=copy.deepcopy(rows[-1]);bad['payload']['gprs'][25]+=0x30
         with self.assertRaises(ValueError):clone().accept(bad)
 
+    def test_native_finalizer_package_import_from_isolated_script_context(self):
+        # -I removes cwd/PYTHONPATH import help, matching the script entry
+        # boundary. The real decoder must reach real missing-stream refusal;
+        # there is no native/game success endpoint or capture here.
+        code="""from pathlib import Path
+import sys
+root=Path(sys.argv[1]);scratch=Path(sys.argv[2])
+assert str(root) not in sys.path
+sys.path.insert(0,str(root/'scripts'))
+import capture_allocation_history as capture
+assert capture.ROOT==root
+from whole_session_replay import WholeSessionReplayError
+try:
+    capture.validate_stadium_three_native(scratch/'absent-native',scratch/'absent-profile.json',{})
+except WholeSessionReplayError as error:
+    assert 'cannot decode raw observer stream' in str(error)
+    assert 'native-primary.mwro' in str(error)
+else:
+    raise AssertionError('Missing source stream must refuse')
+module=sys.modules['tools.allocation_lifetime_replay']
+assert module.__package__=='tools'
+assert Path(module.__file__).resolve()==root/'tools/allocation_lifetime_replay.py'
+assert 'allocation_lifetime_replay' not in sys.modules
+print('Actual package finalizer imports; real missing-stream guard retained')
+"""
+        result=subprocess.run([sys.executable,'-I','-c',code,str(REPO_ROOT),str(self.workspace)],
+                              capture_output=True,text=True,timeout=30)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn('real missing-stream guard retained',result.stdout)
+
     def test_actual_results_helper_retains_events_before_exit_release(self):
         # Synthetic transport rows exercise the actual Results state machine;
         # they are not a new original Results observation.
