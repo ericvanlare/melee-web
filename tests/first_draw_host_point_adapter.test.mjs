@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {observeOneNormalFrame,validateServedRuntimeBinding} from './one_normal_frame_observation_adapter.mjs';
-import {firstDrawSelectedTextureIntervalDriver,firstDrawHostOwnersIntervalDriver,firstDrawHostOwnerFailures,observeSelectedTextureIntervalWithHostRead} from './one_first_draw_observation_adapter.mjs';
+import {firstDrawDriver,firstDrawComponentsDriver,firstDrawSelectedTextureIntervalDriver,firstDrawHostOwnersIntervalDriver,firstDrawHostOwnerFailures,observeSelectedTextureIntervalWithHostRead} from './one_first_draw_observation_adapter.mjs';
 const oldProfile='runtime-match-frame-effect Release --first-draw-components-diagnostic';
 const joined=oldProfile+' --first-pair-audio-file-diagnostic';
 const producer=profile=>({schema:'melee-web-normal-frame-served-runtime-v1',source:'a'.repeat(40),source_patch_sha256:'b'.repeat(64),profile,files:Object.fromEntries(['gameplay_menu_browser.js','gameplay_menu_browser.wasm','gameplay_menu_browser.data'].map(n=>[n,{bytes:1,sha256:'c'.repeat(64)}]))});
@@ -16,3 +17,12 @@ for(const v of [null,{}, {...valid(),composite_eligible:true},{...valid(),point_
 for(const response of [null,{status:'refused',reason:'native_file_owners_not_quiescent'}]){let calls=0;const v=await observeSelectedTextureIntervalWithHostRead({invoke:async()=>{calls++;return response;},components:{}});assert.equal(calls,1);assert.equal(v.status,'refused');assert.equal(v.started,null);assert.deepEqual(v.transport,[]);assert.deepEqual(v.host_transport.response,response);}
 let calls=0;const lost=await observeSelectedTextureIntervalWithHostRead({invoke:async()=>{calls++;throw Error('lost');},components:{}});assert.equal(calls,1);assert.equal(lost.host_transport.error,'lost');assert.equal(lost.started,null);assert.deepEqual(lost.transport,[]);
 console.log('Host point profile pairing and strict refusal controls PASS; accepted profile only reaches synthetic transport sentinel.');
+
+// Execute the actual CLI call-site selector; no browser/server or route module import.
+const routeSource=fs.readFileSync(new URL('./vs_rules_item_menu_browser_test.mjs',import.meta.url),'utf8');
+const selection=routeSource.match(/driver: (firstDrawSelectedTextureIntervalOnly[^\n]+),\n\s*readRuntimeCapture:/g);assert.equal(selection?.length,1);
+const expression=selection[0].slice('driver: '.length,selection[0].lastIndexOf(',\n'));
+const route=(profile,interval=true)=>Function('firstDrawSelectedTextureIntervalOnly','firstDrawComponentsOnly','firstDrawObservationOnly','frameEffectProducerBinding','firstDrawHostOwnersIntervalDriver','firstDrawSelectedTextureIntervalDriver','firstDrawComponentsDriver','firstDrawDriver','matchFrameEffectDriver','return ('+expression+');')(interval,true,true,{profile},firstDrawHostOwnersIntervalDriver,firstDrawSelectedTextureIntervalDriver,firstDrawComponentsDriver,firstDrawDriver,{});
+assert.equal(route(joined),firstDrawHostOwnersIntervalDriver);assert.equal(route(oldProfile),firstDrawSelectedTextureIntervalDriver);assert.equal(route(joined,false),firstDrawComponentsDriver);
+dispatches=0;const disconnected=await observeOneNormalFrame(opts(joined,route(joined,false)));assert.deepEqual(disconnected.failures,['host_owner_point_profile_driver_mismatch']);assert.equal(dispatches,0);
+console.log('Actual CLI profile-to-driver selection PASS; joined without explicit interval refuses before dispatch.');

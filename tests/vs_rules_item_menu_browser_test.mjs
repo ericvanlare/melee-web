@@ -42,7 +42,7 @@ import {
 import {runSuddenDeathBrowserRoute,validateFinalSdCapture} from './vs_sudden_death_browser_route.mjs';
 import {runSparseMarioBrowserPrefix,installSparseVirtualController,validateFinalSparseCapture} from './vs_sparse_mario_browser_route.mjs';
 import * as matchFrameEffectDriver from './match_frame_effect_driver.mjs';
-import {observeOneFirstDraw,firstDrawDriver,firstDrawComponentsDriver,firstDrawSelectedTextureIntervalDriver} from './one_first_draw_observation_adapter.mjs';
+import {observeOneFirstDraw,firstDrawDriver,firstDrawComponentsDriver,firstDrawSelectedTextureIntervalDriver,firstDrawHostOwnersIntervalDriver} from './one_first_draw_observation_adapter.mjs';
 import {CSS_SSS_TRANSITION_LIMITS} from './stadium_c1a_css_sss_reducer.mjs';
 import {
   buildOneFrameRecorderBinding,
@@ -1719,7 +1719,7 @@ route: {
         producerBinding: frameEffectProducerBinding,
         outputName: path.basename(output),
         discSha256: report.discSha256,
-        driver: firstDrawSelectedTextureIntervalOnly ? firstDrawSelectedTextureIntervalDriver : firstDrawComponentsOnly ? firstDrawComponentsDriver : firstDrawObservationOnly ? firstDrawDriver : matchFrameEffectDriver,
+        driver: firstDrawSelectedTextureIntervalOnly ? (frameEffectProducerBinding.profile==='runtime-match-frame-effect Release --first-draw-components-diagnostic --first-pair-audio-file-diagnostic' ? firstDrawHostOwnersIntervalDriver : firstDrawSelectedTextureIntervalDriver) : firstDrawComponentsOnly ? firstDrawComponentsDriver : firstDrawObservationOnly ? firstDrawDriver : matchFrameEffectDriver,
         readRuntimeCapture: readRuntimeDiagnosticsCapture,
       });
       report.competitiveMatchStart.frame_effect_observation = frameEffectObservation;
