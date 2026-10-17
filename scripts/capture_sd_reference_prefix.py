@@ -1861,8 +1861,12 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
         require(self.returned_css and self.match_index < 2 and not self.ended,
                 'Whole Stadium lifetime reset preceded natural ReturnCss')
         self.sss_positions.require_closed()
+        # The native observer numbers SSS calls for the entire recording.
+        # Carry only its closed counter; all geometry and owner state is fresh.
+        last_sss_call = self.sss_positions.last_call
         seq, boundaries, announcements, index = self.seq, self.boundaries, self.announcements, self.match_index
         fresh = type(self)(self.menus, self.receipt, self.expected)
+        fresh.sss_positions.last_call = last_sss_call
         self.__dict__.update(fresh.__dict__)
         self.seq, self.boundaries, self.announcements, self.match_index = seq, boundaries, announcements, index+1
 

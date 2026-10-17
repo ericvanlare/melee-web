@@ -429,6 +429,72 @@ assert(scoped.emitted.find("\\\"whole_session\\\":true,\\\"match_index\\\":2")!=
             else:row['payload']['slices']=[x for x in items if x['name']!='result']
             refuse(row)
 
+    def test_retained_SSS_global_call_continuity_after_natural_CSS(self):
+        trace=os.environ.get('MELEE_STADIUM_SSS_CONTINUITY_TRACE')
+        if not trace:self.skipTest('Retained second-SSS source trace not configured')
+        path=Path(trace)
+        self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),os.environ['MELEE_STADIUM_SSS_CONTINUITY_TRACE_SHA256'])
+        from sd_original_menu_plan import stadium_go_feedback_packet
+        from stadium_go_prefix import StadiumSssPositionObservations
+        from retail_setup_validation import _decode_setup
+        from reference_versus_sequence_capture import raw_pad
+        rows=list(iter_records(path));setup=next(r for r in rows if r['payload'].get('boundary')=='setup')
+        expected=_decode_setup(next(x['hex'] for x in setup['payload']['slices'] if x['tag']==4))
+        receipt=rows[0]['payload']['setup_receipt_sha256']
+        receiver=driver.StadiumWholeFeedbackReceiver(stadium_go_feedback_packet(),receipt,expected)
+        receiver.recorded_input=True;chord=raw_pad(buttons=['L','R','A','START']);prior=None;handoff=None
+        first_positions=[];second_positions=[]
+        for row in rows:
+            p=row['payload'];name=p.get('boundary')
+            if row['event']=='end':break # Raw run is incomplete, not a positive terminal.
+            if name=='pad_consume' and receiver.setup_seen:
+                ports,_,_=driver._transform_consumed_ports(p,row['seq'])
+                if ports[:2]==[chord,driver.NEUTRAL_PAD]:
+                    if receiver.pause_consumed is None:
+                        self.assertGreaterEqual(receiver.tick_count,180);receiver.chord_requested=True
+                    else:self.assertIsNotNone(receiver.pause_ready_clock);receiver.exit_requested=True
+                if ports[0]==raw_pad(buttons=['START']):
+                    self.assertIsNotNone(receiver.chord_released);receiver.start_allowed=True
+            receiver.accept(row)
+            if row['event']=='progress' and p.get('phase','').startswith('sss_position_'):
+                (first_positions if p['match_index']==0 else second_positions).append(row)
+            if name=='return_css':
+                self.assertTrue(receiver.outcome_seen);self.assertIsNotNone(receiver.chord_released)
+                self.assertEqual(row['seq'],3461);prior=receiver.sss_positions
+                self.assertEqual(prior.last_call,131);prior.require_closed()
+                natural_return_context=copy.copy(receiver)
+                receiver.next_lifetime();receiver.recorded_input=True;handoff=receiver.sss_positions
+                self.assertIsNot(prior,handoff);self.assertEqual(handoff.last_call,131)
+                self.assertIsNone(handoff.active);self.assertIsNone(receiver.sss_geometry_token)
+                self.assertIsNone(receiver.sss_live_owner_sequence)
+        self.assertEqual(receiver.match_index,1);self.assertFalse(receiver.setup_seen)
+        receiver.sss_positions.require_closed();self.assertEqual(receiver.sss_positions.last_call,147)
+        self.assertEqual(second_positions[0]['seq'],3855)
+        self.assertEqual(second_positions[0]['payload']['position_call'],132)
+        # Component interpositions below use real retained operands; no game
+        # or source fields are changed, and no new capture is implied.
+        def fresh():
+            value=StadiumSssPositionObservations();value.last_call=131;return value
+        def accept(value,row,index=1):
+            return value.accept(row,route_ready=True,expected_receipt=receipt,scope='stadium_whole3_feedback_v1',match_index=index)
+        for bad_call in (131,133):
+            row=copy.deepcopy(second_positions[0]);row['payload']['position_call']=bad_call
+            with self.assertRaises(ValueError):accept(fresh(),row)
+        row=copy.deepcopy(second_positions[0]);row['payload']['match_index']=0
+        with self.assertRaises(ValueError):accept(fresh(),row)
+        with self.assertRaises(ValueError):accept(fresh(),second_positions[1]) # target before cursor
+        partial=fresh();accept(partial,second_positions[0])
+        with self.assertRaises(ValueError):partial.require_closed()
+        # Actual checked ReturnCss context with synthetic invalid interpositions.
+        active_reset=copy.copy(natural_return_context);active_reset.sss_positions=partial
+        with self.assertRaises(ValueError):active_reset.next_lifetime()
+        early_reset=copy.copy(natural_return_context);early_reset.returned_css=False
+        with self.assertRaises(ValueError):early_reset.next_lifetime()
+        # Historical fresh construction still starts at0 and admits call1.
+        legacy=StadiumSssPositionObservations();self.assertEqual(legacy.last_call,0)
+        for row in first_positions[:3]:accept(legacy,row,index=0)
+        legacy.require_closed();self.assertEqual(legacy.last_call,1)
+
     def test_actual_results_helper_retains_events_before_exit_release(self):
         # Synthetic transport rows exercise the actual Results state machine;
         # they are not a new original Results observation.
