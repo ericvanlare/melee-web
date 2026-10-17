@@ -31,6 +31,7 @@ typedef struct {uint32_t counter_0,counter_4,counter_8;} MeleeWebMenuClockCounte
  fields=hs[hs.index('    MeleeWebMenuSssSequenceObservation first_sss_draw,'):hs.index('    char first_sss_tick_error[160];')+len('    char first_sss_tick_error[160];')]
  seqtypes=header[header.index('enum { MELEE_WEB_SSS_SAMPLE_TICK='):header.index('int melee_web_menu_host_arm_first_sss_draw(')]
  pre=pre.replace('typedef struct MeleeWebMenuHost MeleeWebMenuHost;',seqtypes+'typedef struct MeleeWebMenuHost MeleeWebMenuHost;')
+ pre='typedef struct MeleeWebMenuHost MeleeWebMenuHost;\n'+pre
  pre=pre.replace('  int first_sss_pair_state;',fields+'\n  MeleeWebMenuFirstSssPairNoteSnapshot first_sss_pair_entry,first_sss_pair_returned;\n  MeleeWebAudio* first_sss_pair_audio_owner; uint64_t first_sss_pair_audio_generation,first_sss_pair_world_generation;\n  int first_sss_pair_state;')
  stubs=STUBS_AND_TESTS[:STUBS_AND_TESTS.index('static void setup(')]
  old=_function(stubs,'static int melee_web_menu_tick(');stubs=stubs.replace(old,'')
