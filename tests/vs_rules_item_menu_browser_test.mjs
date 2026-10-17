@@ -24,6 +24,8 @@ import {
 import {
   ITEM_ROW_TO_PREFERENCE_BIT,
   competitiveMatchStartFailures,
+  defaultFirstDrawCssFailures,
+  defaultFirstDrawMatchFailures,
   competitiveProfileFailures,
   deriveAllOffItemMasks,
 } from './vs_rules_competitive_profile_helpers.mjs';
@@ -67,6 +69,7 @@ options['sparse-mario-route'] = {type: 'boolean', default: false};
 options['sparse-mario-css-only'] = {type: 'boolean', default: false};
 options['sparse-mario-prefix'] = {type: 'boolean', default: false};
 options['competitive-profile-only'] = {type: 'boolean', default: false};
+options['default-first-draw-only'] = {type: 'boolean', default: false};
 options['competitive-match-start-only'] = {type: 'boolean', default: false};
 options['frame-effect-observation-only'] = {type: 'boolean', default: false};
 options['first-draw-color-conversion-facts-only'] = {type:'boolean',default:false};
@@ -95,6 +98,7 @@ const stageOnly = values['stage-only'];
 const noContestOnly = values['no-contest-only'];
 const competitiveProfileOnly = values['competitive-profile-only'];
 const competitiveMatchStartOnly = values['competitive-match-start-only'];
+const defaultFirstDrawOnly = values['default-first-draw-only'];
 const singleTickFrameEffectObservationOnly = values['frame-effect-observation-only'];
 const firstDrawObservationOnly = values['first-draw-observation-only'];
 const firstDrawComponentsOnly=values['first-draw-components-only'];
@@ -108,10 +112,12 @@ const competitiveTimeoutRoute = values['competitive-timeout-route'];
 for (const name of ['url', 'disc', 'out'])
   if (!values[name]) throw Error('Use --url DEVELOPMENT_RUNTIME_URL --disc OWNED_DISC --out NEW_DIRECTORY [--playwright PACKAGE_DIR]');
 const competitiveSourceRoute = competitiveMatchStartOnly || competitiveTimeoutRoute;
-if(firstDrawColorConversionFactsOnly&&!competitiveMatchStartOnly)throw Error('Color conversion companion requires match-start observation');
+const matchStartRoute = competitiveSourceRoute || defaultFirstDrawOnly;
+if(defaultFirstDrawOnly&&(!firstDrawComponentsOnly||!firstDrawSelectedTextureIntervalOnly))throw Error('Default first-draw requires explicit components and selected interval');
+if(firstDrawColorConversionFactsOnly&&!competitiveMatchStartOnly&&!defaultFirstDrawOnly)throw Error('Color conversion companion requires match-start observation');
 const frameEffectProducerBindingPath = values['frame-effect-producer-binding']
   ? path.resolve(values['frame-effect-producer-binding']) : null;
-validateFrameEffectMode({competitiveMatchStartOnly,
+validateFrameEffectMode({competitiveMatchStartOnly,defaultFirstDrawOnly,
   frameEffectObservationOnly: singleTickFrameEffectObservationOnly,
   firstDrawObservationOnly,
   otherRouteSelected: ['menu-only','rules-items-only','css-sss-only','stage-only','no-contest-only',
@@ -170,7 +176,7 @@ const sha256File = file => new Promise((resolve, reject) => {
   stream.on('data', bytes => hash.update(bytes));
   stream.on('end', () => resolve(hash.digest('hex')));
 });
-if(firstDrawColorConversionFactsOnly&&frameEffectProducerBinding?.profile!=='runtime-match-frame-effect Release --first-draw-components-diagnostic --first-pair-audio-file-diagnostic')throw Error('Color conversion companion requires joined private profile');
+if((firstDrawColorConversionFactsOnly||defaultFirstDrawOnly)&&frameEffectProducerBinding?.profile!=='runtime-match-frame-effect Release --first-draw-components-diagnostic --first-pair-audio-file-diagnostic')throw Error('Color conversion companion requires joined private profile');
 let browser, context, page, driver, browserPath, playwrightPath;
 let frameEffectRecorderBinding = null;
 let lastRuntimeCounterPollAt = 0;
@@ -182,6 +188,7 @@ let reportWriteError = null;
 const report = {
   schema: 'melee-web-vs-rules-item-menu-browser-v1',
   mode: sparseFullRoute ? 'source-sparse-mario-elimination-results-css' : sparseCssOnly ? 'source-sparse-mario-css-only-reducer' : sparseMarioPrefix ? 'source-sparse-mario-rendered-prefix' : suddenDeathRoute ? 'source-natural-timeout-sudden-death-results-css'
+    : defaultFirstDrawOnly ? 'source-default-two-human-first-draw-owner-prerequisite'
     : competitiveMatchStartOnly ? 'source-competitive-normalized-match-start-prefix'
     : competitiveTimeoutRoute ? 'source-competitive-natural-timeout-results-route'
     : competitiveProfileOnly ? 'source-competitive-rules-profile-preflight'
@@ -194,6 +201,8 @@ const report = {
     : menuOnly ? 'source-menu-boundary-reproducer' : 'source-rules-items-match-route',
   scope: sparseFullRoute ? 'Virtual Gamepad P3/keyboard P1; original sparse Mario CSS/SSS, live elimination and canonical Results/CSS. Functional only; no physical input, original comparison, pixels/PCM or timing acceptance.' : sparseCssOnly ? 'Rendered original sparse CSS and exact copied/raw PAD observation then Eject only; no SSS/world, physical input or timing acceptance.' : sparseMarioPrefix ? 'Virtual Browser Gamepad P3 and keyboard P1; original sparse CSS/SSS to a short ordinary Mario/FD prefix and Eject. No Results, original comparison, physical input or timing acceptance.' : suddenDeathRoute
     ? 'Original Rules one-minute four-stock two-human Mario/FD; natural timeout, active SD live input elimination, typed original Results and CSS/Eject. Zero timing-pause recovery. Functional only; no reference, timing, physical input or PCM acceptance.'
+    : defaultFirstDrawOnly
+    ? 'Different default source context: original CSS two-human Mario join -> original SSS FD -> natural-one selected owner prerequisite. No Main/Rules/Items tour or setting injection. Retain actual normalized context, RNG and source input history; no reproduction claim for competitive native0. All existing guards/fences/retirement and no-Resume policy remain.'
     : firstDrawObservationOnly
     ? 'Headless original CSS/Rules/SSS to normalized two-human four-stock Mario/Final Destination. Observe only the first drawn source frame in one naturally due callback; preserve every later original tick/draw/audio/submit, retain callback totals and first PAD/source identity, and label later draws unobserved. Wait for the selected normal fence and known selected map completions, then checked native retirement and owned browser cleanup. No Eject after retirement, restore/replay, complete GPU ownership, Results or full-route acceptance.'
     : frameEffectObservationOnly
@@ -283,10 +292,14 @@ const report = {
     derived_masks: null,
     final_css_selection: null,
   } : null,
-  competitiveMatchStart: competitiveSourceRoute ? {
+  defaultFirstDrawContext: defaultFirstDrawOnly ? {schema:'melee-web-default-first-draw-context-v1',
+    scope:'Different default settings and upstream RNG/cache/audio history; generic native-owner prerequisite only',
+    css:null,normalized_match:null,failures:null} : null,
+  // Legacy transport field name; report.mode/defaultFirstDrawContext identify the actual context.
+  competitiveMatchStart: matchStartRoute ? {
     requested: {players: ['Mario', 'Mario'], css_port_identities: [1, 2],
       raw_match_payload_slot_fields: [0, 0], resolved_controller_ports: [0, 1],
-      stage: 'Final Destination', normalized_stock_timer_seconds: 480,
+      stage: 'Final Destination', normalized_stock_timer_seconds: defaultFirstDrawOnly ? 0 : 480,
       source_frame_observation_window: [180, 240]},
     controls_change: null,
     css_roster: [],
@@ -554,7 +567,7 @@ const observeTimeoutOwner = async (label, options) => {
   if (state.message?.startsWith('Paused after a timing disruption')) {
     report.timingPauses.push({label, phase: state.phase, message: state.message,
       observedAt: new Date().toISOString(), status: 'failed_route'});
-    throw Error(`${label}: competitive route stops on a runtime timing disruption: ${state.message}`);
+    throw Error(`${label}: ${defaultFirstDrawOnly ? 'default first-draw' : 'competitive'} route stops on a runtime timing disruption: ${state.message}`);
   }
   if (report.errors.length)
     throw Error(`${label}: browser emitted errors: ${JSON.stringify(report.errors)}`);
@@ -582,7 +595,7 @@ const resumeTimingPause = async label => {
   const pause = {label, phase: state.phase, message: state.message,
     observedAt: new Date().toISOString()};
   report.timingPauses.push(pause);
-  if (competitiveProfileOnly || competitiveMatchStartOnly || competitiveTimeoutRoute) {
+  if (defaultFirstDrawOnly || competitiveProfileOnly || competitiveMatchStartOnly || competitiveTimeoutRoute) {
     pause.status = 'failed_route';
     throw Error(`${label}: competitive route stops on a runtime timing disruption: ${state.message}`);
   }
@@ -1611,9 +1624,9 @@ route: {
       waitItemInputReady,waitItemsCursor,waitItemFrequency,waitRulesPlusTimer,shot,verifyTeardown});
     nativeSessionActive=false;break route;
   }
-  const initialProfileCss = competitiveProfileOnly || competitiveSourceRoute ? await observeSource() : null;
-  if (competitiveProfileOnly || competitiveSourceRoute)
-    report.sourceObservations.push({label: 'initial CSS profile baseline', ...initialProfileCss});
+  const initialProfileCss = competitiveProfileOnly || matchStartRoute ? await observeSource() : null;
+  if (competitiveProfileOnly || matchStartRoute)
+    report.sourceObservations.push({label: defaultFirstDrawOnly ? 'initial CSS default baseline' : 'initial CSS profile baseline', ...initialProfileCss});
 
   if (noContestOnly) {
     await page.waitForTimeout(800);
@@ -1667,14 +1680,17 @@ route: {
     break route;
   }
 
-  await chord(['q', '9', '7']);
-  await waitMessage('Original main menu', 'CSS -> source Main');
-  await waitMenu(MAIN_MENU_KIND, 0, 'source Main root');
-  await shot('01-main-root');
-  let rules = await enterVsRules('02-first');
+  let rules;
+  if (!defaultFirstDrawOnly) {
+    await chord(['q', '9', '7']);
+    await waitMessage('Original main menu', 'CSS -> source Main');
+    await waitMenu(MAIN_MENU_KIND, 0, 'source Main root');
+    await shot('01-main-root');
+    rules = await enterVsRules('02-first');
+  }
 
-  if (competitiveProfileOnly || competitiveSourceRoute) {
-    await runCompetitiveProfilePreflight(initialProfileCss);
+  if (competitiveProfileOnly || matchStartRoute) {
+    if (!defaultFirstDrawOnly) await runCompetitiveProfilePreflight(initialProfileCss);
     if (competitiveProfileOnly) {
       await driver.unload();
       nativeSessionActive = false;
@@ -1684,6 +1700,14 @@ route: {
     }
 
     await configureCompetitiveSecondHuman();
+    if (defaultFirstDrawOnly) {
+      const css = await observeSource();
+      const failures = defaultFirstDrawCssFailures(css);
+      report.defaultFirstDrawContext.css = css;
+      report.defaultFirstDrawContext.failures = failures;
+      assert.deepEqual(failures, [], 'Original default CSS context differs before SSS');
+      report.sourceObservations.push({label:'default two-human CSS before original SSS conversion',...css});
+    }
     if (frameEffectObservationOnly) await startNormalObservationCssWhenReady();
     else {
       await press('Enter');
@@ -1706,10 +1730,16 @@ route: {
     await waitPhase(7, 'two-human Mario Final Destination source match', 60000);
     const gameplayStartedAt = Date.now();
     const liveMatch = await waitForMatchSourceFrames(180, 240);
-    const sourcePreferenceMaskHex = report.competitiveProfile.derived_masks.preferenceMaskHex;
-    const matchFailures = competitiveMatchStartFailures(liveMatch, {sourcePreferenceMaskHex});
+    const sourcePreferenceMaskHex = defaultFirstDrawOnly ? null : report.competitiveProfile.derived_masks.preferenceMaskHex;
+    const matchFailures = defaultFirstDrawOnly
+      ? defaultFirstDrawMatchFailures(liveMatch, report.defaultFirstDrawContext.css)
+      : competitiveMatchStartFailures(liveMatch, {sourcePreferenceMaskHex});
+    if (defaultFirstDrawOnly) {
+      report.defaultFirstDrawContext.normalized_match = liveMatch;
+      report.defaultFirstDrawContext.failures = matchFailures;
+    }
     assert.deepEqual(matchFailures, [],
-      `Normalized source match differs from the competitive profile: ${JSON.stringify({matchFailures, liveMatch})}`);
+      `${defaultFirstDrawOnly ? 'Original default context' : 'Normalized source match'} differs from ${defaultFirstDrawOnly ? 'its strict default oracle' : 'the competitive profile'}: ${JSON.stringify({matchFailures, liveMatch})}`);
     report.competitiveMatchStart.normalized_match = liveMatch;
     report.matchObservations.push({label: 'normalized source match at its first ready observation from frame 180 through 240', ...liveMatch});
     if (frameEffectObservationOnly) {

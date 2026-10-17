@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
+import path from 'node:path';
+import {parseArgs} from 'node:util';
+import {defaultFirstDrawCssFailures,defaultFirstDrawMatchFailures} from './vs_rules_competitive_profile_helpers.mjs';
 import {
   buildOneFrameRecorderBinding,
   frameEffectMustSkipOrdinaryNativeCleanup,
@@ -74,6 +79,12 @@ function validNativeStatus({fenced = true, retired = false} = {}) {
 
 test('legacy match-start prefix stays default and observer mode has an explicit paired opt-in', () => {
   assert.equal(validateFrameEffectMode(), false);
+  const defaults={defaultFirstDrawOnly:true,firstDrawObservationOnly:true,producerBindingPath:'/frozen/default.json'};
+  assert.equal(validateFrameEffectMode(defaults),true);
+  for(const delta of [{competitiveMatchStartOnly:true},{firstDrawObservationOnly:false},
+    {frameEffectObservationOnly:true},{otherRouteSelected:true},{producerBindingPath:null}])
+    assert.throws(()=>validateFrameEffectMode({...defaults,...delta}),/default first-draw/);
+
   assert.equal(buildOneFrameRecorderBinding(identityArgs()).identity.scenario,
     'one-normal-frame-effect-observation-v1');
   assert.equal(buildOneFrameRecorderBinding({...identityArgs(), observationScope: 'first_draw'}).identity.scenario,
@@ -402,3 +413,88 @@ for (const [phase, helper, expectedFailure] of [
     assert.equal(calls.some(call => Array.isArray(call) && call[0] === 'retire'), false);
   });
 }
+
+const defaultCss = () => ({source:{valid:true,scene:1,
+  rules:{mode:1,stock_count:4,time_limit:2,stock_time_limit:0,handicap:0,damage_ratio:10,friendly_fire:0,pause:1},
+  items:{frequency:-1,mask_hex:'ffffffffffffffff'},css_setup:{valid:true,is_teams:0,player_teams:[0,0]}},
+  selection:{valid:true,scene:1,provenance:'raw_css_vs_start',match_kind:0,timer_enabled:0,time_limit_seconds:0,
+    friendly_fire:0,disable_pausing:0,damage_ratio_bits:'3f800000',item_frequency:2,
+    item_mask_hex:'ffffffffffffffff',player_stocks:[0,0]}});
+const defaultMatch = () => ({leg:'vs',ready:true,paused:false,ending:false,complete:false,outcome:0,
+  frame:180,rng:123,observed_player_source_slots:[0,1],rules:{match_kind:1,stage:32,timer_enabled:0,
+    time_limit:0,disable_pausing:0,friendly_fire:0,damage_ratio_bits:'3f800000',item_frequency:-1,
+    item_mask_hex:'ffffffffffffffff',is_stock:1,is_vs:1,source_sudden_death_flag:0,is_teams:0,
+    player_teams:[0,0],player_stocks:[4,4],player_source_slots:[0,0],resolved_controller_ports:[0,1],
+    player_slot_types:[0,0],player_source_stocks:[4,4],player_source_characters:[8,8],
+    player_attack_ratio_bits:['3f800000','3f800000'],player_defense_ratio_bits:['3f800000','3f800000']},
+  players:[0,1].map(i=>({fighter:0,source_player_index:i,source_slot:0,source_port:i,source_character:8,
+    slot_type:0,human:true,stocks:4,source_stocks:4,source_initial_damage:0,damage_percent:0}))});
+test('separate default oracle strictly joins actual raw CSS and normalized source fields',()=>{
+  const css=defaultCss(),match=defaultMatch();
+  const original=JSON.stringify({css,match});
+  assert.deepEqual(defaultFirstDrawCssFailures(css),[]);
+  assert.deepEqual(defaultFirstDrawMatchFailures(match,css),[]);
+  assert.equal(JSON.stringify({css,match}),original,'Oracle must not rewrite observations');
+  for(const [field,value] of [['stock_time_limit',8],['friendly_fire',1],['pause',0],['stock_count',3]]){
+    const wrong=structuredClone(css);wrong.source.rules[field]=value;
+    assert(defaultFirstDrawMatchFailures(match,wrong).length,field);
+  }
+  for(const [field,value] of [['time_limit_seconds',120],['item_frequency',-1],['provenance','normalized']]){
+    const wrong=structuredClone(css);wrong.selection[field]=value;
+    assert(defaultFirstDrawMatchFailures(match,wrong).length,field);
+  }
+  for(const [field,value] of [['timer_enabled',1],['time_limit',480],['friendly_fire',1],['disable_pausing',1],
+    ['item_frequency',2],['item_mask_hex','fffffff80000000f'],['stage',3],['damage_ratio_bits','3f7fffff'],
+    ['player_slot_types',[0,1]],['resolved_controller_ports',[0,2]],['player_attack_ratio_bits',['3f800000','3f7fffff']]]){
+    const wrong=structuredClone(match);wrong.rules[field]=value;
+    assert(defaultFirstDrawMatchFailures(wrong,css).length,field);
+  }
+  for(const [field,value] of [['rng',undefined],['frame',241],['ready',false],['paused',true],['outcome',1]]){
+    const wrong=structuredClone(match);wrong[field]=value;
+    assert(defaultFirstDrawMatchFailures(wrong,css).length,field);
+  }
+  for(const [field,value] of [['source_port',2],['human',false],['fighter',1],['source_initial_damage',1]]){
+    const wrong=structuredClone(match);wrong.players[1][field]=value;
+    assert(defaultFirstDrawMatchFailures(wrong,css).length,field);
+  }
+  assert(defaultFirstDrawMatchFailures({...match,players:[]},css).length);
+  assert(defaultFirstDrawMatchFailures(match,null).length);
+});
+
+test('actual CLI and route bodies isolate the default context and preserve source PAD recording',async()=>{
+  const source=readFileSync(new URL('./vs_rules_item_menu_browser_test.mjs',import.meta.url),'utf8');
+  const prefix=source.slice(source.indexOf('const options ='),source.indexOf('let frameEffectProducerBinding = null;'));
+  const args=['--url','http://localhost/runtime.html?__depth_no_work_v1=1',
+    '--disc','owned.ciso','--out','fresh','--default-first-draw-only','--first-draw-observation-only',
+    '--first-draw-components-only','--first-draw-selected-texture-interval-only',
+    '--frame-effect-producer-binding','frozen.json'];
+  const cli=argv=>vm.runInNewContext(prefix,{assert,URL,path,validateFrameEffectMode,
+    parseArgs:options=>parseArgs({...options,args:argv})});
+  cli(args);
+  for(const foreign of ['menu-only','rules-items-only','css-sss-only','stage-only','no-contest-only',
+    'team-battle','team-setup-only','sparse-mario-route','sparse-mario-css-only','sparse-mario-prefix',
+    'competitive-profile-only','competitive-match-start-only','competitive-timeout-route','sudden-death-route'])
+    assert.throws(()=>cli([...args,'--'+foreign]),/exclusive|requires|incompatible|frozen/);
+  assert.throws(()=>cli(args.filter(x=>x!=='--first-draw-components-only')),/requires/);
+  assert.throws(()=>cli(args.filter(x=>x!=='--first-draw-observation-only')),/require/);
+  const bypass=source.slice(source.indexOf('  let rules;'),source.indexOf('  if (competitiveProfileOnly || matchStartRoute) {'));
+  const calls=[];
+  const runBypass=new Function('defaultFirstDrawOnly','chord','waitMessage','waitMenu','shot','enterVsRules',
+    'MAIN_MENU_KIND','return (async()=>{'+bypass+'})()');
+  const record=async name=>calls.push(name);
+  await runBypass(true,()=>{throw Error('Main chord forbidden');},record,record,record,record,0);
+  assert.deepEqual(calls,[]);
+  await runBypass(false,()=>record('chord'),()=>record('message'),()=>record('menu'),()=>record('shot'),()=>record('rules'),0);
+  assert.deepEqual(calls,['chord','message','menu','shot','rules']);
+  const body=source.slice(source.indexOf('const sourcePadSample ='),source.indexOf('const sourcePadTap ='));
+  const report={sourcePadSamples:[]},delivered=[],drains=[];
+  const make=new Function('page','assert','report','ensureNoError','waitForNoQueuedPad',body+'return sourcePadSample;');
+  const sample=make({evaluate:async(fn,arg)=>{delivered.push(arg);return 1;}},assert,report,async()=>{},async(...arg)=>drains.push(arg));
+  await sample(0x100,80,-80,'actual recorded sample',1,2);
+  assert.deepEqual(delivered,[[1,0x100,80,-80,2]]);
+  assert.deepEqual(report.sourcePadSamples,[{port:1,buttons:0x100,stickX:80,stickY:-80,duration:2,label:'actual recorded sample'}]);
+  assert.equal(drains.length,1);
+  const rejected=make({evaluate:async()=>0},assert,report,async()=>{},async()=>{throw Error('Rejected PAD must not drain');});
+  await assert.rejects(rejected(0,0,0,'rejected'),/Source PAD rejected/);
+  assert.equal(report.sourcePadSamples.length,1);
+});

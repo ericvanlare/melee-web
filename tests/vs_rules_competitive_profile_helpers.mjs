@@ -179,3 +179,50 @@ export function competitiveMatchStartFailures(match, {sourcePreferenceMaskHex} =
   }
   return failures;
 }
+
+// Separate original-default context. These predicates never alter the observation
+// or call the competitive profile predicate with fabricated replacement fields.
+export function defaultFirstDrawCssFailures(css) {
+  const failures=[];
+  const expect=(label,value,want)=>{if(JSON.stringify(value)!==JSON.stringify(want))failures.push(label);};
+  expect('default CSS source',[css?.source?.valid,css?.source?.scene,css?.source?.css_setup?.valid],[true,1,true]);
+  const r=css?.source?.rules;
+  for(const [key,want] of Object.entries({mode:1,stock_count:4,time_limit:2,stock_time_limit:0,
+    handicap:0,damage_ratio:10,friendly_fire:0,pause:1}))expect('default CSS '+key,r?.[key],want);
+  expect('default CSS preferences',css?.source?.items,{frequency:-1,mask_hex:'ffffffffffffffff'});
+  const raw=css?.selection;
+  expect('default raw CSS provenance',[raw?.valid,raw?.scene,raw?.provenance],[true,1,'raw_css_vs_start']);
+  for(const [key,want] of Object.entries({match_kind:0,timer_enabled:0,time_limit_seconds:0,
+    friendly_fire:0,disable_pausing:0,damage_ratio_bits:'3f800000',item_frequency:2,
+    item_mask_hex:'ffffffffffffffff',player_stocks:[0,0]}))expect('default raw CSS '+key,raw?.[key],want);
+  expect('default CSS teams',[css?.source?.css_setup?.is_teams,css?.source?.css_setup?.player_teams],[0,[0,0]]);
+  return failures;
+}
+export function defaultFirstDrawMatchFailures(match,css) {
+  const failures=defaultFirstDrawCssFailures(css);
+  const expect=(label,value,want)=>{if(JSON.stringify(value)!==JSON.stringify(want))failures.push(label);};
+  expect('default live match state',[match?.leg,match?.ready,match?.paused,match?.ending,match?.complete,
+    match?.observer_error??false,match?.outcome],['vs',true,false,false,false,false,0]);
+  if(!Number.isSafeInteger(match?.frame)||match.frame<180||match.frame>240)failures.push('default source frame180..240');
+  if(!Number.isInteger(match?.rng)||match.rng<0||match.rng>0xffffffff)failures.push('default actual RNG missing');
+  // gm_80167BC8 leaves raw time_limit unchanged when stock_time_limit is zero;
+  // it copies item frequency and converts actual preference bits by the source table.
+  const rules=match?.rules;
+  for(const [key,want] of Object.entries({match_kind:1,stage:32,timer_enabled:0,
+    time_limit:css?.selection?.time_limit_seconds,disable_pausing:0,friendly_fire:0,
+    damage_ratio_bits:'3f800000',item_frequency:-1,item_mask_hex:'ffffffffffffffff',
+    is_stock:1,is_vs:1,source_sudden_death_flag:0,is_teams:0,
+    player_teams:[0,0],player_stocks:[4,4],player_source_slots:[0,0],resolved_controller_ports:[0,1],
+    player_slot_types:[0,0],player_source_stocks:[4,4],player_source_characters:[8,8],
+    player_attack_ratio_bits:['3f800000','3f800000'],player_defense_ratio_bits:['3f800000','3f800000']}))
+    expect('default normalized '+key,rules?.[key],want);
+  expect('default original source slots',match?.observed_player_source_slots,[0,1]);
+  if(!Array.isArray(match?.players)||match.players.length!==2)failures.push('default two live players required');
+  else for(let i=0;i<2;i++){
+    const p=match.players[i];
+    for(const [key,want] of Object.entries({fighter:0,source_player_index:i,source_slot:0,source_port:i,
+      source_character:8,slot_type:0,human:true,stocks:4,source_stocks:4,source_initial_damage:0,damage_percent:0}))
+      expect('default P'+(i+1)+' '+key,p?.[key],want);
+  }
+  return failures;
+}

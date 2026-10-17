@@ -21,11 +21,19 @@ const FRAME_EFFECT_REQUIRED_FILES = Object.freeze({
 
 export function validateFrameEffectMode({
   competitiveMatchStartOnly = false,
+  defaultFirstDrawOnly = false,
   frameEffectObservationOnly = false,
   firstDrawObservationOnly = false,
   otherRouteSelected = false,
   producerBindingPath = null,
 } = {}) {
+  // Separate opt-in context; all legacy competitive-mode constraints stay below.
+  if (defaultFirstDrawOnly) {
+    if (competitiveMatchStartOnly || !firstDrawObservationOnly || frameEffectObservationOnly || otherRouteSelected)
+      throw Error('default first-draw requires exclusive first-draw observation route');
+    if (!producerBindingPath) throw Error('default first-draw requires frozen producer binding');
+    return true;
+  }
   if (frameEffectObservationOnly && firstDrawObservationOnly)
     throw Error('single-tick and first-draw observation modes are mutually exclusive');
   if (firstDrawObservationOnly && otherRouteSelected)

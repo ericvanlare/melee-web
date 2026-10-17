@@ -39,7 +39,7 @@ class MatchFrameEffectNativeTests(OwnedWorkspaceTests):
                                  str(ROOT / "tests/one_normal_frame_observation_adapter.test.mjs")],
                                 cwd=ROOT, capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("tests 17", result.stdout)
+        self.assertIn("tests 19", result.stdout)
         self.assertIn("fail 0", result.stdout)
 
     def test_private_first_draw_components_driver_controls(self):
