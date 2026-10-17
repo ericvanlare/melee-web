@@ -68,8 +68,14 @@ function joinedFixture(){
 {
  const f=joinedFixture();const invoke=async(fn,arg)=>{if(fn.name==='readFirstDrawColorConversions')throw Error('lost conversion response');return f.invoke(fn,arg);};const v=await observeHostIntervalThenColorConversions({...f,invoke,packet:null});assert.equal(v.status,'refused');assert.equal(v.color_conversion_point.transport.error,'lost conversion response');assert.equal(f.calls.includes('conversion-getter'),false);
 }
-const colorGate=routeSource.split('\n').find(line=>line.startsWith('if(firstDrawColorConversionFactsOnly&&frameEffectProducerBinding?.profile'));assert(colorGate);
-const gate=Function('firstDrawColorConversionFactsOnly','frameEffectProducerBinding',colorGate);assert.throws(()=>gate(true,{profile:oldProfile}),/joined private profile/);gate(true,{profile:joined});gate(false,{profile:oldProfile});
+const colorGates=routeSource.split('\n').filter(line=>line.startsWith('if((firstDrawColorConversionFactsOnly||defaultFirstDrawOnly)&&frameEffectProducerBinding?.profile'));
+assert.equal(colorGates.length,1,'Actual joined-profile gate must remain unique');
+const gate=Function('firstDrawColorConversionFactsOnly','defaultFirstDrawOnly','frameEffectProducerBinding',colorGates[0]);
+for(const [conversion,defaults] of [[true,false],[false,true],[true,true]]){
+ assert.throws(()=>gate(conversion,defaults,{profile:oldProfile}),/joined private profile/);
+ gate(conversion,defaults,{profile:joined});
+}
+gate(false,false,{profile:oldProfile});
 console.log('Conversion getter readiness, after-closed order, loss/refusal, exact CLI selection and diagnostic-only scope PASS.');
 
 
