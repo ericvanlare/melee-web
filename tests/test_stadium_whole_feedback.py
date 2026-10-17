@@ -846,6 +846,168 @@ env.clear();for(u32 pc:added){primary_calls=0;Observer::OnBoundary(&system,pc,&s
         subprocess.run(['/usr/bin/clang++','-std=c++17','-Wall','-Wextra','-Werror',str(cpp),'-o',str(binary)],check=True,timeout=60)
         subprocess.run([str(binary)],check=True,timeout=15)
 
+    def test_actual_stock4_none_target_and_context_refusals(self):
+        allocation=load_exact('capture_allocation_history',SOURCE_ROOT/'scripts/capture_allocation_history.py')
+        expected=dict(stage=3,match_kind=1,timer_enabled=False,timer_counts_up=False,
+            time_limit_seconds=0,is_stock=True,disable_pausing=False,is_teams=False,
+            item_frequency=-1,item_mask_hex='ffffffffffffffff',damage_ratio_bits='3f800000',
+            game_speed_bits='3f800000',players=[dict(port=p,character_kind=8,costume=c,
+                stocks=4,player_type=0,rumble_enabled=True) for p,c in [(1,1),(2,0)]])
+        target=self.workspace/'stock4-none.json'
+        target.write_text(json.dumps({'expected_setup':expected}))
+        self.assertEqual(allocation.stadium_three_target(target)['source_expected_setup'],expected)
+        self.assertEqual(allocation.stadium_three_rule_profile(expected),'stock4_none')
+        time120=copy.deepcopy(expected)
+        time120.update(match_kind=0,is_stock=False,timer_enabled=True,time_limit_seconds=120,item_frequency=2)
+        for p in time120['players']:p['stocks']=3
+        self.assertEqual(allocation.stadium_three_rule_profile(time120),'boot_time120')
+        for key,value in [('stage',32),('timer_enabled',True),('time_limit_seconds',60),
+                          ('item_frequency',0),('item_mask_hex','0000000000000000'),
+                          ('disable_pausing',True),('damage_ratio_bits','40000000')]:
+            bad=copy.deepcopy(expected);bad[key]=value
+            with self.subTest(key=key),self.assertRaises(ValueError):allocation.stadium_three_rule_profile(bad)
+        for key,value in [('costume',0),('stocks',3),('character_kind',0),('rumble_enabled',False)]:
+            bad=copy.deepcopy(expected);bad['players'][0][key]=value
+            with self.subTest(player_key=key),self.assertRaises(ValueError):allocation.stadium_three_rule_profile(bad)
+        # Execute the actual receiver branch; this synthetic context is a mechanism
+        # fixture, not an original recording or proof of firstCSS ownership.
+        from sd_original_menu_plan import stadium_go_feedback_packet
+        rules=bytearray(24);rules[2:9]=bytes([1,2,4,0,10,0,0]);rules[10]=1
+        save=bytearray(0x55e8);save[0x448]=255;save[0x450:0x458]=b'\xff'*8;save[0x458:0x45a]=b'\x01\x01'
+        def admit(raw_rules,raw_save):
+            r=driver.StadiumWholeFeedbackReceiver(stadium_go_feedback_packet(),'a'*64,expected)
+            r.announcements=['handshake','start']
+            row=dict(seq=0,event='boundary',payload=dict(whole_session=True,match_index=0,boundary='css_enter'))
+            with patch('whole_session_replay._first_css_context',return_value={
+                'game_rules_hex':raw_rules.hex(),'save_data_hex':raw_save.hex()}):r.accept(row)
+        admit(rules,save)
+        for index,value in [(2,0),(4,3),(7,1),(10,0)]:
+            bad=rules.copy();bad[index]=value
+            with self.assertRaises(ValueError):admit(bad,save)
+        for index,value in [(0x448,2),(0x450,0),(0x458,0)]:
+            bad=save.copy();bad[index]=value
+            with self.assertRaises(ValueError):admit(rules,bad)
+
+    def test_actual_whole_items_lock_receiver_identity(self):
+        from sd_original_menu_plan import stadium_go_feedback_packet
+        from reference_observer_stream import SLICE_NAMES
+        def sample(kind=16,lock=0,address=0x804d6bec,missing=False):
+            def field(tag,addr,raw):return dict(name=SLICE_NAMES[tag],tag=tag,flags=0,address=addr,size=len(raw),hex=raw.hex())
+            flow=bytearray(0x18);flow[0]=kind;flow[4]=1;flow[0x11]=1
+            fields=[field(40,0x80479d30,b'\x01'),field(45,0x804a04f0,flow),field(46,0x804d6bc8,b'\0'*8)]
+            if not missing:fields.append(field(56,address,bytes([lock])))
+            return dict(seq=1,event='boundary',payload=dict(pc='0x8001985c',slices=fields))
+        def receive(row):
+            r=driver.StadiumWholeFeedbackReceiver(stadium_go_feedback_packet(),'a'*64,{})
+            r._pad_poll(row);return r.latest_menu
+        self.assertEqual(receive(sample())['items_locked'],0)
+        self.assertEqual(receive(sample(lock=1))['items_locked'],1)
+        for row in [sample(missing=True),sample(address=0x804d6bed),sample(lock=2),sample(kind=13)]:
+            with self.assertRaises(ValueError):receive(row)
+
+    def test_actual_stock4_cold_rules_route_and_refusals(self):
+        # Synthetic endpoints drive the actual wait_source/tap/cold-route body.
+        # This proves finite policy/order/refusal, not live game progression.
+        from sd_original_menu_plan import stadium_go_feedback_packet
+        from retail_input_plan import DISCONNECTED_PAD
+        class ReachedCss(Exception):pass
+        def simulate(mode):
+            menus=stadium_go_feedback_packet();actions={a['label']:a for a in menus['actions']}
+            class Receiver:
+                css=None;latest_menu=None;seq=0;menu_polls=0;menu_consumed=0;ended=False
+                expected={'is_stock':True};last_pad=[driver.NEUTRAL_PAD]*2
+                def accept(self,row):
+                    self.seq+=1
+                    if row['kind']=='consume':
+                        self.last_pad=row['ports'][:2]
+                        if not row.get('stale'):self.menu_consumed+=1
+                    else:
+                        self.menu_polls+=1;self.latest_menu=row['menu']
+                        if row.get('css'):self.css=True
+            r=Receiver();queue=[dict(kind='poll',menu=dict(menus['actions'][0]['before']))];writes=[]
+            class Controller:
+                sleep=staticmethod(lambda seconds:None)
+                def set_both(self,p1,p2,*,action):
+                    writes.append((action,p1,p2,copy.deepcopy(r.latest_menu)))
+                    queue.append(dict(kind='consume',ports=[p1,p2,DISCONNECTED_PAD,DISCONNECTED_PAD],stale=mode=='stale-consume'))
+                    if not action.endswith(':release'):return
+                    a=actions[action[:-len(':release')]];state=dict(a['after'])
+                    if state.get('kind')==16:state.setdefault('items_locked',0)
+                    if mode=='locked' and a['label']=='open-items':state['items_locked']=1
+                    if mode=='wrong-owner' and a['label']=='open-items':state['kind']=13
+                    queue.append(dict(kind='poll',menu=state,css=state.get('scene')==8 and mode!='missing-CSS'))
+            class Tail:
+                def next(self,deadline):
+                    if queue:return queue.pop(0)
+                    return dict(kind='poll',menu=copy.deepcopy(r.latest_menu))
+            def reached(*args):raise ReachedCss()
+            with patch.object(driver.time,'monotonic',return_value=0.0),patch.object(driver,'drive_authored_css_sss',reached):
+                try:driver.drive_stadium_whole_three(r,Tail(),Controller(),menus,10.0)
+                except (ReachedCss,ValueError) as error:return error,writes,r,menus
+            self.fail('Policy bypassed CSS control')
+        error,writes,r,menus=simulate('positive');self.assertIsInstance(error,ReachedCss)
+        self.assertEqual([x[0] for x in writes],[v for a in menus['actions'] for v in [a['label'],a['label']+':release']])
+        self.assertEqual(r.menu_consumed,len(menus['actions'])*2);self.assertTrue(r.css)
+        for a in menus['actions']:
+            press=next(x for x in writes if x[0]==a['label'])
+            self.assertEqual(press[1:3],(a['p1'],a['p2']))
+            self.assertTrue(driver.matches(press[3],a['before']))
+        for mode in ['locked','wrong-owner','missing-CSS','stale-consume']:
+            error,writes,r,menus=simulate(mode)
+            with self.subTest(mode=mode):
+                self.assertIsInstance(error,ValueError);self.assertIsNone(r.css)
+                if mode in ['locked','wrong-owner']:self.assertNotIn('items-frequency-row',[x[0] for x in writes])
+                if mode=='stale-consume':self.assertEqual(len(writes),1)
+
+    def test_actual_whole_items_emitter_on_off_and_owner(self):
+        source=(SOURCE_ROOT/'reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp').read_text()
+        begin=source.index('  bool AddMenuSteeringSlices(')
+        end=source.index('    // Source menu globals survive arena teardown.',begin)
+        body=source[begin:end]+'    return true;\n  }\n'
+        enum_begin=source.index('enum class SliceTag : u16');enum_end=source.index('\n};',enum_begin)+3
+        fixture=r'''
+#include <array>
+#include <cassert>
+#include <cstdint>
+#include <map>
+#include <string>
+#include <vector>
+using u8=uint8_t;using u16=uint16_t;using u32=uint32_t;
+namespace Core {struct System{};}
+std::map<std::string,std::string> env;
+std::string Env(const char* key){return env[key];}
+bool OrdinaryTimeoutRequested(){return false;} bool SparsePairRequested(){return false;}
+''' + source[enum_begin:enum_end] + r'''
+struct Gate {
+ bool transform_prefix_enabled=false,stadium_go_prefix_enabled=false,stadium_whole_feedback=false;
+ u8 scene=1,kind=16;bool valid_word=true;std::vector<SliceTag> tags;
+ bool ReadU32(Core::System*,u32 address,u32* value){
+  if(address==0x804d6720){*value=0x80479d30;return true;}
+  const std::array<u32,3> words={0x880db54c,0x28000000,0x40820180};
+  assert(address>=0x80233ec0 && address<=0x80233ec8);
+  *value=words[(address-0x80233ec0)/4]^(valid_word?0:1);return true;
+ }
+ bool ReadBytes(Core::System*,u32 address,size_t size,u8* value){assert(size==1);if(address==0x80479d30)*value=scene;else{assert(address==0x804a04f0);*value=kind;}return true;}
+ bool AddSlice(Core::System*,SliceTag tag,u32 address,size_t size){
+  if(tag==SliceTag::SdItemsLock){assert(address==0x804d6bec&&size==1);}tags.push_back(tag);return true;
+ }
+''' + body + r'''
+};
+bool lock(const Gate& g){for(auto tag:g.tags)if(tag==SliceTag::SdItemsLock)return true;return false;}
+int main(){Core::System s;Gate off;assert(off.AddMenuSteeringSlices(&s));assert(!lock(off));assert(off.tags==std::vector<SliceTag>({SliceTag::MenuMainFlow,SliceTag::MenuMainInput}));
+ Gate on;on.stadium_whole_feedback=true;assert(on.AddMenuSteeringSlices(&s));assert(lock(on));
+ Gate old;old.stadium_go_prefix_enabled=true;assert(old.AddMenuSteeringSlices(&s));assert(old.tags==on.tags);
+ Gate wrong;wrong.stadium_whole_feedback=true;wrong.valid_word=false;assert(!wrong.AddMenuSteeringSlices(&s));assert(!lock(wrong));
+ Gate owner;owner.stadium_whole_feedback=true;owner.kind=13;assert(owner.AddMenuSteeringSlices(&s));assert(!lock(owner));
+ owner=Gate();owner.stadium_whole_feedback=true;owner.scene=8;assert(owner.AddMenuSteeringSlices(&s));assert(!lock(owner));
+}
+'''
+        cpp=self.workspace/'actual-whole-items-emitter.cpp';binary=self.workspace/'actual-whole-items-emitter'
+        cpp.write_text(fixture)
+        subprocess.run(['/usr/bin/clang++','-std=c++17','-Wall','-Wextra','-Werror',str(cpp),'-o',str(binary)],check=True,timeout=60)
+        subprocess.run([str(binary)],check=True,timeout=15)
+
+
 
 LEGACY_PUBLISHER = '  void PublishStadiumProgress(const char* phase, u32 pc, u32 word, u32 argument,\n                              PowerPC::PowerPCState* state, u32 source_tick)\n  {\n    std::string json =\n        "{\\"diagnostic\\":\\"stadium_go_prefix_v3\\",\\"phase\\":\\"" +\n        std::string(phase) + "\\",\\"setup_receipt_sha256\\":\\"" +\n        stadium_go_prefix_setup_receipt_sha256 +\n        "\\",\\"setup_profile_verified_by_observer\\":false,\\"pc\\":\\"0x";\n    if (!AppendHex(&json, pc, 8))\n      return SetInvalid("Stadium named Progress PC serialization exceeded its bound"), void();\n    json += "\\",\\"word\\":\\"0x";\n    if (!AppendHex(&json, word, 8))\n      return SetInvalid("Stadium named Progress word serialization exceeded its bound"), void();\n    json += "\\",\\"argument\\":\\"0x";\n    if (!AppendHex(&json, argument, 8))\n      return SetInvalid("Stadium named Progress argument serialization exceeded its bound"), void();\n    json += "\\",\\"lr\\":\\"0x";\n    if (!AppendHex(&json, state->spr[8], 8))\n      return SetInvalid("Stadium named Progress LR serialization exceeded its bound"), void();\n    json += "\\"";\n    if (std::string(phase).rfind("constructor_", 0) == 0)\n    {\n      json += ",\\"constructor_gprs\\":[";\n      const std::array<u32, 6> indices = {3, 13, 27, 28, 30, 31};\n      for (size_t i = 0; i < indices.size(); ++i)\n      {\n        if (i) json += ",";\n        json += std::to_string(state->gpr[indices[i]]);\n      }\n      json += "]";\n    }\n    if (std::string(phase).rfind("sss_position_", 0) == 0)\n    {\n      json += ",\\"position_call\\":" + std::to_string(stadium_sss_position.id);\n      const std::array<std::pair<const char*, u32>, 4> owners = {{{"cursor_gobj", stadium_sss_position.gobj},\n          {"cursor_jobj", stadium_sss_position.jobj}, {"cursor_proc", stadium_sss_position.proc},\n          {"frame_sp", stadium_sss_position.frame_sp}}};\n      for (const auto& owner : owners)\n      {\n        json += ",\\"" + std::string(owner.first) + "\\":\\"0x";\n        if (!AppendHex(&json, owner.second, 8))\n          return SetInvalid("Stadium position owner serialization exceeded its bound"), void();\n        json += "\\"";\n      }\n      json += ",\\"entry_cursor_state\\":" + std::to_string(stadium_sss_position.entry_cursor_state);\n      if (std::string(phase) == "sss_position_end" && stadium_sss_position.cursor_seen)\n        json += ",\\"end_row_index\\":" + std::to_string(state->gpr[30]);\n      else\n        json += ",\\"end_row_index\\":null";\n      json += std::string(",\\"cursor_observed\\":") + (stadium_sss_position.cursor_seen ? "true" : "false") +\n              ",\\"target_observed\\":" + (stadium_sss_position.target_seen ? "true" : "false");\n    }\n    if (std::string(phase) == "go_after")\n      json += ",\\"callsite_pc\\":\\"0x8016b820\\",\\"callsite_word\\":\\"0x48068821\\"";\n    if (std::string(phase) == "go_after")\n      json += ",\\"state_snapshot_schema\\":\\"stadium_idle_state_v1\\",\\"sis_table_entry_relationship_observed\\":false,\\"dynamic_title_text_bytes_observed\\":false";\n    json += ",\\"source_tick\\":" + std::to_string(source_tick) +\n            ",\\"draw_ordinal\\":" + std::to_string(draw_ordinal) + ",\\"slices\\":[";\n    for (size_t index = 0; index < slice_count; ++index)\n    {\n      const SliceRef& slice = slices[index];\n      if (index)\n        json += ",";\n      json += "{\\"tag\\":" + std::to_string(static_cast<u16>(slice.tag)) +\n              ",\\"flags\\":" + std::to_string(slice.flags) +\n              ",\\"address\\":" + std::to_string(slice.address) +\n              ",\\"size\\":" + std::to_string(slice.size) + ",\\"hex\\":\\"";\n      if (!AppendHexBytes(&json, raw.data() + slice.offset, slice.size))\n        return SetInvalid("Stadium named Progress slices exceed their JSON bound"), void();\n      json += "\\"}";\n    }\n    json += "]}";\n    if (json.size() > RING_PAYLOAD)\n      return SetInvalid("Stadium named Progress exceeds its bounded payload"), void();\n    PushJson(Event::Progress, json, pc, source_tick, draw_ordinal);\n  }\n\n'
 

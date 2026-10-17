@@ -1960,8 +1960,17 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
             from whole_session_replay import _first_css_context
             context = _first_css_context([row])
             rules = bytes.fromhex(context['game_rules_hex'])
-            require((rules[2],rules[3],rules[4],rules[8],rules[10],rules[6]) == (0,2,3,0,1,10),
-                    'Whole Stadium first CSS source TIME120 baseline differs')
+            from capture_allocation_history import stadium_three_rule_profile
+            if stadium_three_rule_profile(self.expected) == 'stock4_none':
+                save=bytes.fromhex(context['save_data_hex'])
+                require((rules[2],rules[3],rules[4],rules[5],rules[6],rules[7],rules[8],rules[10],rules[11]) ==
+                        (1,2,4,0,10,0,0,1,0) and save[0x448] == 0xff and
+                        save[0x450:0x458].hex() == self.expected['item_mask_hex'] and
+                        list(save[0x458:0x45a]) == [1,1],
+                        'Whole Stadium first CSS stock4/ItemsNone source context differs')
+            else:
+                require((rules[2],rules[3],rules[4],rules[8],rules[10],rules[6]) == (0,2,3,0,1,10),
+                        'Whole Stadium first CSS source TIME120 baseline differs')
         elif name == 'pad_poll':
             self._pad_poll(row)
         elif name == 'pad_consume':
@@ -2010,7 +2019,7 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
         elif name in ('entry', 'setup'):
             items = [x for x in payload.get('slices', []) if x.get('name') == 'match_setup']
             require(len(items) == 1 and _decode_setup(items[0]['hex']) == self.expected,
-                    'Whole Stadium source Setup differs from TIME120 declaration')
+                    'Whole Stadium source Setup differs from its exact declaration')
             if name == 'setup':
                 require(not self.setup_seen and self.confirm_release_sequence is not None,
                         'Whole Stadium Setup preceded consumed menu confirmation/release')
@@ -2071,12 +2080,12 @@ class StadiumDeadlineController:
         DualPipeController.hold(self, p1, p2, seconds, action=action)
 
 
-def drive_stadium_cold_css(receiver, menus, next_row, wait_source, tap):
-    """Reuse checked cold/Main/VS inputs without entering Rules or editing saves."""
+def drive_stadium_cold_css(receiver, menus, next_row, wait_source, tap, *, stock4_none=False):
+    """Reuse checked menu inputs; only the explicit stock declaration enters Rules."""
     if receiver.css is not None:
         return
-    actions = menus['actions'][:2]
-    require([a['label'] for a in actions] == ['main-down-to-VS', 'main-select-VS'],
+    actions = menus['actions'] if stock4_none else menus['actions'][:2]
+    require([a['label'] for a in actions[:2]] == ['main-down-to-VS', 'main-select-VS'],
             'Whole Stadium cold entry lacks the existing Main/VS policy')
     boot_actions = 0
     while receiver.css is None and not matches(receiver.latest_menu, actions[0]['before']):
@@ -2101,6 +2110,10 @@ def drive_stadium_cold_css(receiver, menus, next_row, wait_source, tap):
         tap(action, action['label'], action['max_polls'])
         wait_source(lambda: matches(receiver.latest_menu, action['after']),
                     action['label']+':observed', action['max_polls'])
+    if stock4_none:
+        # Existing final Rules-start-CSS descriptor already reached the real CSS.
+        wait_source(lambda: receiver.css is not None, 'whole-first-CSS', 600)
+        return
     # Original MENU_KIND_VS/SEL_VS_MELEE is kind2/row0. The checked
     # second action's after-state includes that exact source owner/cooldown.
     # mnmain.c confirms A here requests GM_VS; no Rules/Items action follows.
@@ -2129,7 +2142,8 @@ def drive_stadium_whole_three(receiver, tail, controller, menus, deadline):
         before = receiver.menu_consumed
         controller.set_both(NEUTRAL_PAD,NEUTRAL_PAD,action=label+':release')
         wait_source(lambda: receiver.menu_consumed>before and receiver.last_pad[:2]==[NEUTRAL_PAD]*2,label+':released',max_polls)
-    drive_stadium_cold_css(receiver, menus, next_row, wait_source, tap)
+    drive_stadium_cold_css(receiver, menus, next_row, wait_source, tap,
+        stock4_none=getattr(receiver,'expected',{}).get('is_stock') is True)
     measurements = []
     for index in range(3):
         drive_authored_css_sss(receiver,menus,controller,next_row,wait_source,tap)

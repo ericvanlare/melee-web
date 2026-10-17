@@ -1102,18 +1102,35 @@ def gdb_script(paths, boot_only=False, menu_round_trip=False,
     return "\n".join(lines)
 
 
+def stadium_three_rule_profile(expected):
+    """Two exact host declarations; does not alter original/native rules."""
+    from retail_setup_validation import _validate_expected_setup
+    expected=_validate_expected_setup(expected)
+    time120 = not (expected['stage']!=3 or expected['is_teams'] or len(expected['players'])!=2 or
+            any(p['player_type']!=0 for p in expected['players']) or expected['is_stock'] or
+            expected['match_kind']!=0 or expected['timer_enabled'] is not True or
+            expected['timer_counts_up'] is not False or expected['time_limit_seconds']!=120 or
+            expected['disable_pausing'] is not False or
+            any(p['stocks']!=3 for p in expected['players']))
+    if time120:
+        return 'boot_time120'
+    stock4_none = dict(stage=3,match_kind=1,timer_enabled=False,timer_counts_up=False,
+        time_limit_seconds=0,is_stock=True,disable_pausing=False,is_teams=False,
+        item_frequency=-1,item_mask_hex='ffffffffffffffff',
+        damage_ratio_bits='3f800000',game_speed_bits='3f800000',players=[
+            dict(port=port,character_kind=8,costume=costume,stocks=4,player_type=0,rumble_enabled=True)
+            for port,costume in [(1,1),(2,0)]])
+    if expected == stock4_none:
+        return 'stock4_none'
+    raise ValueError('Stadium route requires exact boot TIME120 or stock4/ItemsNone declaration')
+
+
 def stadium_three_target(path):
     from retail_setup_validation import _validate_expected_setup
     value=json.loads(path.read_text())
     if set(value)!={'expected_setup'}:raise ValueError('Stadium baseline must use existing expected_setup declaration')
     expected=_validate_expected_setup(value['expected_setup'])
-    if (expected['stage']!=3 or expected['is_teams'] or len(expected['players'])!=2 or
-            any(p['player_type']!=0 for p in expected['players']) or expected['is_stock'] or
-            expected['match_kind']!=0 or expected['timer_enabled'] is not True or
-            expected['timer_counts_up'] is not False or expected['time_limit_seconds']!=120 or
-            expected['disable_pausing'] is not False or
-            any(p['stocks']!=3 for p in expected['players'])):
-        raise ValueError('Stadium route requires source boot TIME120/three-stock-counter/two-human stage3 declaration')
+    stadium_three_rule_profile(expected)
     target={'source_expected_setup':expected,'expected_setup':{
         'stage':3,'teams_enabled':False,'time_limit_seconds':expected['time_limit_seconds'],
         'disable_pausing':expected['disable_pausing'],
