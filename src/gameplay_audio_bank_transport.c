@@ -53,7 +53,18 @@ static MeleeWebAudioResidencyInfo info(int file){
 }
 int melee_web_audio_bank_transport_active(void){return state.audio!=NULL;}
 int melee_web_audio_bank_transport_busy(void){return state.pending||state.pumping;}
-int melee_web_audio_bank_transport_quiescent_for(MeleeWebAudio* audio){return audio&&state.audio==audio&&!state.pending&&!state.requests&&!state.pumping;}
+int melee_web_audio_bank_transport_quiescent_for(MeleeWebAudio* audio){
+ if(!melee_web_audio_is_active(audio))return 0;
+ if(state.audio)return state.audio==audio&&!state.pending&&!state.requests&&!state.pumping;
+ /* A resident match bank need not own a source SSM transport. Qualify only
+  * complete absence; dormant mappings, requests or foreign state still refuse. */
+ if(state.registry||state.auxiliary||state.size||state.next_id||state.pending||state.requests||
+    state.mapping_count||state.pumping||state.configured)return 0;
+ for(size_t i=0;i<sizeof(state.sem_path);++i)if(state.sem_path[i])return 0;
+ for(size_t i=0;i<MELEE_WEB_AUDIO_RESIDENCY_MAX_ASSETS;++i)
+  if(state.mappings[i].file||state.mappings[i].base||state.mappings[i].size)return 0;
+ return 1;
+}
 int melee_web_audio_bank_transport_configured(void){return state.configured;}
 int melee_web_audio_bank_transport_begin(MeleeWebAudio* audio,MeleeWebAudioResidency* registry,const char* sem_path,char* e,size_t n){
  if(!melee_web_first_pair_file_operation("native.ssm.begin"))return fail(e,n,"First-pair file-operation guard refused SSM owner change");
