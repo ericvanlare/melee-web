@@ -5089,11 +5089,11 @@
             "Selectedcallback audio0/PCM0 reflects original scheduledcadence; no missingaudio fix, PCM equivalence or uninterruptedaudio claim",
             "Native references, host/device futures, resource content/recreation and same-instance drawn restore/repeat remain open"
           ],
-          "next": "Prepare the held C1 value-owned normal-callback execution record at unchanged synchronous ordinary callsites; review actual ordering before any returned-idle prepare/dispatch. GPU content/reference/future closure and drawn restore/repeat remain NO-GO.",
+          "next": "The in-callback owned PAD/Tick plan milestone now passes actual controls, six Release builds/full regression and one live default-context branch observation. Next is a coherent private pair: authenticated returned-idle preparation/one-use dispatch plus explicit snapshot/restore and host/GPU content/lifetime closure. No further runtime experiment is authorized here; all restore/gameplay admission remains NO-GO.",
           "next_prerequisite_review": {
             "artifact": "sprint-20261016/shared-normal-match-stage-c-next-boundary-v1/contract.json",
             "sha256": "41b0e2231f737704122d0760794e990650b8c29427f05aea819388d9ba8821e2",
-            "state": "SOURCE_ONLY_HELD_NO_IMPLEMENTATION_OR_RESTORE"
+            "state": "HISTORICAL_SOURCE_ONLY_BOUNDARY_SUPERSEDED_BY_IN_CALLBACK_OWNED_PLAN_NOT_IDLE_ADMISSION"
           },
           "shared_ordinary_execution_regression": {
             "state": "PASS_SHARED_ORDINARY_SOURCE_EXECUTION_AND_SCOPED_ORIGINAL_RECORDING_REGRESSION",
@@ -5253,6 +5253,146 @@
               "No PCM/audio fidelity, raw GPU command, pixel, sustained performance, two-human context equivalence or live physical-input acceptance.",
               "No returned-idle prepare/dispatch, one-use continuation ownership, heap restoration, hostfuture closure or actual same-instance drawn restore/repeat."
             ]
+          },
+          "owned_normal_match_plan": {
+            "state": "PASS_SYNCHRONOUS_IN_CALLBACK_VALUE_OWNERSHIP_AND_SCOPED_LIVE_BRANCH_REGRESSION",
+            "source": {
+              "runtime_and_harness_head": "ebf68b247752907a824be60534abd745230d8449",
+              "tree": "a4ab71a7b92909edc1c0d475c0a6f6f76d1a2992",
+              "aurora_tree": "b5415846c8f7cb298d30f2dae1d75864e95dc168",
+              "prior_704_MWRC": "Retained separately above; replay intentionally bypasses new owned-plan eligibility."
+            },
+            "ownership": "Own exact selected four-port actual TARGET_PC PADStatus storage including extButton and already-sampled source/audio Tick. Copy/move deleted. Immediate synchronous consume latches used before real global owner validation and source helper. Native match/audio pointers borrowed only for current callback; original audio/draw/finish sites unchanged; unsupported callbacks preserve original path.",
+            "focused": {
+              "review": {
+                "artifact": "owned-normal-match-plan-candidate-v2/execution-focused-v2/result-review.json",
+                "sha256": "041794cd911984bc147e6774e7c87b746258a52b8002fdba52394c1be44d4ccb"
+              },
+              "scope": "Actual-function controls for final queued PAD1->0, poisoned original PAD/Ticks, real audio0/1 cadence, global null/foreign owner, unchanged endpoint order/errors/writeback and double-consume refusal. Five genuine ordinary/frameeffect/private/combined/public TU projections passed."
+            },
+            "validation": {
+              "result": {
+                "artifact": "net-owned-normal-match-plan-validation-v1/evidence/result.json",
+                "sha256": "f18458a6f62cfa06e0b0326d2a0e9eb26cc64bcfb924bb94d520614bd39ee068"
+              },
+              "root_review": {
+                "artifact": "net-owned-normal-match-plan-validation-v1/evidence/root-result-review.json",
+                "sha256": "cb1f3316311c3a72465f4a6d09bf2320ff5d1b93c6e2faacb51fa4a2122622d8"
+              },
+              "tests": 2449,
+              "skips": 164,
+              "seconds": 562.577,
+              "Release_profiles": [
+                "ordinary",
+                "frame-effect",
+                "private-firstdraw",
+                "combined-host-read",
+                "first-pair-only",
+                "public"
+              ],
+              "artifacts_rehashed": 311,
+              "caches": 6,
+              "phase_groups_absent": 7,
+              "public_scope": "Separate public product retains its legacy silent audio policy."
+            },
+            "live_default_context": {
+              "packet": {
+                "artifact": "owned-normal-match-plan-default-capture-packet-v2/packet.json",
+                "sha256": "84b98ae0214f5bb07b4f1b17643a80d862d0be7871c54b00fb702b5c13bb66af"
+              },
+              "completion": {
+                "artifact": "owned-normal-match-plan-default-capture-packet-v2/capture/completion.json",
+                "sha256": "2262e15aba01785744cc0b2f07e69970cef72beba9c91f026d06a640984a74f1"
+              },
+              "raw_report": {
+                "artifact": "owned-normal-match-plan-default-capture-packet-v2/capture/browser/report.json",
+                "sha256": "cb11c31aa5e155b72a641bfc20362474cdedde9034c15e75ad2d3b58ee14bd8b"
+              },
+              "owner_report": {
+                "artifact": "owned-normal-match-plan-default-capture-packet-v2/capture/owner-report.json",
+                "sha256": "6d30cd7a30d9fe0f123c7d05692a97db3b074ca00cf6d23ae4a7f407e95cccc3"
+              },
+              "owner_review": {
+                "artifact": "owned-normal-match-plan-default-capture-packet-v2/capture/agent-result-review.json",
+                "sha256": "2dada353fe272c0448f09cd5e5736b738f5145e8e8f9c9aae4bb93e1bda52683"
+              },
+              "root_review": {
+                "artifact": "owned-normal-match-plan-default-capture-packet-v2/capture/root-result-review.json",
+                "sha256": "b36ced3d4d2e10ea2b862d5baef56d7fe0f83e96d12834bc1e40175c10febab7"
+              },
+              "independent_raw_review_sha256": "4e4070cefd4efae3ae97bdefc313a8271efaee55cfe9615390c06594a773e652",
+              "elapsed_ms": 18628,
+              "context": "Same strict default two-human Mario/FD source route, distinct from historical competitive tour and CPU9 MWRC replay.",
+              "branch_prerequisites": "Actual naturally_due_one_tick arm_response armed/pending true establishes ready()/queue0 BEFORE selected PAD; unchanged pinned adapter injects no later input. Fresh default source stock_check0, no replay/network; actual selected source1/audio1 and strict host audio owner pass. Source-backed path implication, not a new branch counter or saved callback permission.",
+              "selected_row": {
+                "callback_sequence": "1",
+                "source_before": 180,
+                "source_after": 181,
+                "planned_steps": 1,
+                "planned_audio_steps": 1,
+                "tick_returns": 1,
+                "draw_returns": 1,
+                "audio_returns": 1,
+                "pcm_frames": 534,
+                "audio_phase_before": 40,
+                "audio_phase_after": 0,
+                "selected": true
+              },
+              "host_components_depth": true,
+              "strict_interval_responses_consumed": 8,
+              "conversion_event_indices": [
+                121,
+                249
+              ],
+              "conversion_scope": "Returned dependency facts only, allocating serialization after closed interval and before retirement. All packet content/GPU creation/restore/composite qualification false.",
+              "native_retired": true,
+              "raw_renderer_findings": {
+                "first_blocker": 7,
+                "finding_mask": "128",
+                "command_records": 265,
+                "actual_draws": 246,
+                "passes": 3,
+                "note": "Historical raw7/27 receipt stays distinct; current mask has LOAD7 only."
+              },
+              "H1": {
+                "callback_count": 528,
+                "samples_retained": 81,
+                "sample_evictions": 447,
+                "incidents_retained": 1,
+                "dropped_incidents": 0,
+                "reason_counts": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0
+                ],
+                "unknown_reason_count": 0,
+                "scope": "Lossy100-sample ring; raw callbacks/evictions retained, not uninterrupted performance/physical input/PCM equivalence proof."
+              },
+              "cleanup": {
+                "recorded_unique_processes_absent": 15,
+                "owned_groups_absent": 4,
+                "server_port_closed": 51290,
+                "observed_served_files_unchanged": 51,
+                "required_artifacts_separately_pinned": 45,
+                "source_clean": true
+              }
+            },
+            "retained_preparation": "PacketV1 source-authoring refusal and source-detected focus/integration provenance mismatch retained; corrected V2 preflight joins exact focused base+applied files to new commit parent/files. No failed capture or runtime bytes were overwritten.",
+            "remaining": [
+              "No native owner lifetime across callback return or returned-idle prepare/dispatch interface",
+              "No same-instance snapshot/tick/full draw/restore/repeat",
+              "No full heap/Asyncify/global/table/host authority restoration",
+              "No all-owner GPU content/native-reference/device/hostfuture lifecycle closure or gameplay arm",
+              "No complete timing, physical-input, uninterrupted audio, PCM or pixel equivalence"
+            ],
+            "next": "Review one coherent private pair boundary using existing one-use value plan, with explicit owner/authentication and host/GPU restoration mechanisms; do not infer eligibility from stopped point snapshots."
           }
         }
       }

@@ -151,6 +151,18 @@ Each item has a bounded experiment, pass criterion and stopping rule; neither
 a component pass nor a checkpoint of an unresolved blocker completes the
 restored-tick or C3 target.
 
+The next rollback implementation is one coherent private paired-tick experiment.
+Carry the actual sampled input and clock decisions across a real returned-idle
+boundary, retain an exact
+set of reachable renderer resources and pending work, and restore the complete
+native state before dispatching the identical plan once more. Unknown content,
+reference or asynchronous ownership must refuse before memory restoration.
+Keep the original full draw and its fences in both legs. The
+[rollback boundary](status/2026-10-12-match-only-rollback-feasibility.md)
+owns the current component results and the precise no-go; they do not establish
+that this combined experiment is safe yet. Batch this interface and its
+falsification controls before the next full validation cycle.
+
 The owner-approved October 13 sprint targets one same-instance Mario/FD
 checkpoint → original tick/full draw → restore → repeat comparison under
 [#318](https://github.com/ericvanlare/melee-web/issues/318). First close the

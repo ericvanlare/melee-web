@@ -681,10 +681,47 @@ native/GPU phase metrics remain in the reports; no standalone GPU diagnostic
 file or new screenshot was produced. All 15 recorded processes and four owned
 groups are absent, with source and frozen runtime/input pins unchanged.
 
-The smallest next boundary is the held C1 value-owned normal-callback execution
-record at unchanged synchronous ordinary callsites. Returned-idle preparation,
-dispatch and restore remain absent or refused. GPU content, references and
-future closure remain NO-GO.
+The next in-callback ownership milestone is implemented in `ebf68b24`. The
+normal callback copies its final four-port PAD storage, including the actual
+host `extButton`, and its already sampled source/audio Tick values into a
+noncopyable, nonmovable one-use plan. It consumes that plan immediately at the
+original match-step site. Consumption is latched before checking the actual
+global match owner or invoking source work. Audio and draw remain at their
+original sites; unsupported callbacks retain the original path. Native match
+and audio references are borrowed only for that current callback.
+
+Actual-body controls cover the last queued PAD sample, poisoned original
+PAD/plan values, audio-zero/one cadence, foreign/null match owners, error/order
+writeback and retry refusal. Five genuine diagnostic/public TU projections
+passed. Six genuine Release builds and the required full regression passed
+2,449 tests with 164 skips in 562.577 seconds. The prior `704bf3d1` MWRC replay
+above remains separate: replay deliberately bypasses this new live branch.
+
+One new default-context capture on `ebf68b24` source and runtime passed in
+18.628 seconds. Natural arming succeeded before PAD selection with the queue
+empty; the unchanged adapter injected no later input. The copied selected row
+advanced 180→181 with one planned/returned tick, draw and audio call, producing
+534 PCM frames. The source-backed branch prerequisites passed. Host point-read,
+components/depth, the closed eight-response selected-texture interval, strict
+replay, conversion dependencies at events 121/249 and checked retirement all
+passed. This run's raw renderer finding mask was 128 (LOAD7 only); historical
+7/27 findings above are not relabeled. Content, internal GPU creation, restore
+and composite qualification remain false.
+
+H1 retained 81 of 528 phase callbacks, with 447 sample evictions; its one
+reason-7 incident was retained, with no dropped incidents or unknown reasons.
+The bounded history does not establish continuous timing, physical-input,
+uninterrupted audio or PCM equivalence. All 15 recorded process identities and
+four owned groups are absent, and the server port is closed. Frozen source,
+51 observed served files and 45 separately required artifacts stayed unchanged.
+
+The obsolete held C1 grouping proposal is superseded by this synchronous
+owned-plan milestone. Returned-idle preparation and one-use dispatch are still
+absent: current-callback borrowed owners cannot be retained across return.
+The next coherent private pair needs an authenticated pre-leg owner boundary,
+then actual snapshot→tick/full draw→restore→repeat with explicit host and GPU
+content/lifetime closure. GPU references/futures, mutable resource preservation
+and gameplay admission remain NO-GO; this capture enables none of them.
 
 This closes only the scoped default-context point/component observation. No
 same-instance drawn restore/repeat, continuous host-future closure, PCM

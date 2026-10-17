@@ -67,6 +67,15 @@ inputs, arithmetic, source ordering, failure evidence and shared capture lane.
 Keep each milestone in its existing issue, draft PR and status boundary.
 Human-only gates remain unrun and the deleted heartbeat remains deleted.
 
+- 2026-10-17, Codex: Keep both milestones open and consolidate the next rollback
+  implementation into one complete private paired-tick interface, including
+  returned-idle continuation and the exact renderer/native state it can restore.
+  Batch the interface and its falsification controls before full validation;
+  component observations alone cannot establish restore safety. Reuse the
+  original Stadium stock-rules reference for the next scoped browser boundary.
+  Detailed results and remaining gates stay in the
+  existing status receipts; publication remains in the two draft PRs.
+
 **Links:** [Rollback #318](https://github.com/ericvanlare/melee-web/issues/318),
 [Stadium #251](https://github.com/ericvanlare/melee-web/issues/251),
 [priorities #158](https://github.com/ericvanlare/melee-web/issues/158).
