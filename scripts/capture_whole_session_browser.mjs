@@ -8,7 +8,7 @@
  * changes, and every failure writes the report before the browser closes.
  */
 import {installCurrentSssExitReplayArm, validateCurrentSssExitExpected, compareCurrentSssExitObservation,
-  validateCurrentSssExitTrace, validateCurrentSssExitTerminal} from './stadium_current_sss_exit_observation.mjs';
+  validateCurrentSssExitTrace, validateCurrentSssExitTerminal, validateCurrentSssExitFinalization} from './stadium_current_sss_exit_observation.mjs';
 import fs from 'node:fs/promises';
 import {closeSync, createReadStream, fsyncSync, openSync, writeSync} from 'node:fs';
 import path from 'node:path';
@@ -1710,12 +1710,9 @@ try {
         if (!report.artifact_inventory_post.equal ||
             JSON.stringify(report.artifact_inventory_post) !== JSON.stringify(report.artifact_inventory_pre))
           throw Error('Current SSS artifact inventory changed');
-        const expectedLegacyFailures = ['Whole-session replay did not complete successfully',
-          'Browser replay report is incomplete or failed'];
-        if (JSON.stringify(report.finalization_failures) !== JSON.stringify(expectedLegacyFailures))
-          throw Error('Current SSS capture has additional standard finalization failures');
+        report.current_sss_exit.finalization = validateCurrentSssExitFinalization(report, currentSssExpected);
         if (!report.current_sss_exit?.comparison?.pass || !report.current_sss_exit?.terminal?.pass ||
-            !currentSssTrace || report.first_error || report.browser_errors.length || report.unexpected_requests.length ||
+            !currentSssTrace || report.browser_errors.length || report.unexpected_requests.length ||
             report.close_error || report.cdp_close_error || report.download_error || report.screenshot_error ||
             report.current_sss_exit.wrapper_restored !== true || report.cleanup?.browser_close_returned !== true)
           throw Error('Current SSS component evidence/diagnostics/cleanup incomplete');

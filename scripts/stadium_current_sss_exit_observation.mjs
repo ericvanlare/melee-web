@@ -195,3 +195,39 @@ export function validateCurrentSssExitTerminal(replayReport, finalSnapshot, expe
   return {pass: true, runtime_replay: 'FAIL_INCOMPLETE_EXPECTED_TIME_REFUSAL',
     checked_unload: true, runtime_admission: false, Entry: false, C3: false};
 }
+
+// Additive component classification only. The generic whole-replay finalizer
+// and its retained first_error/failures remain unchanged.
+export function validateCurrentSssExitFinalization(report, expected) {
+  validateCurrentSssExitExpected(expected);
+  const first = report.first_error;
+  const expectedFirst = first?.kind === 'runtime' &&
+    first.message === CURRENT_SSS_EXIT_REFUSAL && first.phase === 'current-sss-exit-component';
+  requireValue(!report.failure && !report.first_mismatch && (!first || expectedFirst),
+    'Current SSS finalization contains an unexpected fatal diagnostic');
+  // The production snapshot store stops appending at 2048. Saturation or
+  // missing history cannot establish absence of a later different diagnostic.
+  requireValue(Array.isArray(report.snapshots) && report.snapshots.length > 0 &&
+    report.snapshots.length < 2048 && report.cleanup?.browser_close_returned === true,
+    'Current SSS snapshot history is unknown/saturated or browser cleanup incomplete');
+  const snapshots = [...report.snapshots, report.last_successful_snapshot, report.final_snapshot]
+    .filter(value => value != null);
+  requireValue(snapshots.length > 0 && snapshots.every(value => !value.snapshot_error &&
+    (!value.runtime_error || value.runtime_error === CURRENT_SSS_EXIT_REFUSAL)) &&
+    (!expectedFirst || snapshots.some(value => value.runtime_error === CURRENT_SSS_EXIT_REFUSAL)),
+    'Current SSS finalization contains a missing or later different runtime observation');
+  requireValue(Array.isArray(report.phases) && report.phases.length > 0 &&
+    report.phases.every(value => value.result === 'pass') &&
+    report.phases.some(value => value.name === 'current-sss-exit-component'),
+    'Current SSS component phase did not finish cleanly');
+  validateCurrentSssExitTerminal(report.browser_report, report.final_snapshot, expected);
+  const failures = ['Whole-session replay did not complete successfully',
+    'Browser replay report is incomplete or failed'];
+  if (expectedFirst) failures.push('A fatal harness diagnostic was recorded');
+  requireValue(report.original_replay_capture_result === 'fail' &&
+    JSON.stringify(report.finalization_failures) === JSON.stringify(failures),
+    'Current SSS capture has additional standard finalization failures');
+  return {pass: true, scope: 'expected_TIME_refusal_component_only',
+    expected_runtime_diagnostic_retained: expectedFirst, original_replay_capture_result: 'fail',
+    runtime_admission: false, Entry: false, C3: false};
+}

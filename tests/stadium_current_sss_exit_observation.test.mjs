@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import {finalizeSessionCapture} from '../scripts/whole_session_capture_result.mjs';
 import {installCurrentSssExitReplayArm, compareCurrentSssExitObservation,
-  validateCurrentSssExitTrace, validateCurrentSssExitTerminal,
+  validateCurrentSssExitTrace, validateCurrentSssExitTerminal, validateCurrentSssExitFinalization,
   CURRENT_SSS_EXIT_REFUSAL} from '../scripts/stadium_current_sss_exit_observation.mjs';
 
 // Endpoint doubles establish only wrapper order/descriptor/refusal behavior.
@@ -118,4 +119,39 @@ test('retained source operands + synthetic native note exercise strict paired fi
   for(const mutate of [r=>r.pass=true,r=>r.complete=true,r=>r.failures.push('teardown incomplete'),
     r=>r.source_match.complete=true,r=>r.instrumented_timing_resumes=1,r=>r.metrics.sourceFrames++]) {const changed=structuredClone(terminal);mutate(changed);assert.throws(()=>validateCurrentSssExitTerminal(changed,{phase:0,running:0},expected));}
   assert.throws(()=>validateCurrentSssExitTerminal(terminal,{phase:2,running:0},expected));
+});
+
+const actualReportPath = process.env.MELEE_STADIUM_CURRENT_SSS_REPORT;
+test('retained actual SSS finalization preserves TIME diagnostic and rejects additional failures',
+  {skip: !actualReportPath || !expectedPath}, () => {
+  const raw = JSON.parse(fs.readFileSync(actualReportPath));
+  const expected = JSON.parse(fs.readFileSync(expectedPath));
+  const first = structuredClone(raw.first_error);
+  const report = structuredClone(raw);
+  finalizeSessionCapture(report); // Actual unchanged default/full-route gate stays FAIL.
+  assert.equal(report.result, 'fail');
+  report.original_replay_capture_result = report.result;
+  assert.equal(validateCurrentSssExitFinalization(report, expected).pass, true);
+  assert.deepEqual(report.first_error, first, 'classification must preserve raw fatal diagnostic');
+  assert.equal(report.result, 'fail', 'classifier cannot relabel the original replay');
+  assert.equal(report.browser_report.pass, false);
+  assert.equal(report.browser_report.complete, false);
+  for (const mutate of [r=>r.first_error.message+=' extra', r=>r.first_error.kind='snapshot',
+    r=>r.first_error.phase='disc-import', r=>r.failure='later failure',
+    r=>r.first_mismatch={message:'later mismatch'},
+    r=>r.snapshots.push({runtime_error:'later different runtime error'}),
+    r=>r.final_snapshot.runtime_error='later different runtime error',
+    r=>r.last_successful_snapshot.snapshot_error='later observation timeout',
+    r=>r.phases.push({name:'later phase',result:'fail'}),
+    r=>r.snapshots=undefined, r=>r.snapshots=[],
+    r=>r.snapshots=Array.from({length:2048},()=>structuredClone(r.final_snapshot)),
+    r=>r.browser_errors.push({message:'unexpected browser failure'}),
+    r=>r.unexpected_requests.push({method:'POST'}),
+    r=>r.close_error='browser cleanup failed', r=>r.cleanup.browser_close_returned=false,
+    r=>r.final_snapshot.running=1, r=>r.browser_report.pass=true]) {
+    const changed = structuredClone(raw);mutate(changed);
+    finalizeSessionCapture(changed);changed.original_replay_capture_result=changed.result;
+    assert.throws(()=>validateCurrentSssExitFinalization(changed,expected));
+    assert.equal(changed.result,'fail','default/full-route finalization must remain failed');
+  }
 });
