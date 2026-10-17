@@ -560,11 +560,13 @@ export function readFirstDrawHostOwners(){
  const module=globalThis.Module, host=globalThis.window;
  const reader=host?.menuFirstPairHostReadSnapshot;
  const native=module?._melee_web_native_menu_first_pair_file_owners_quiescent;
+ const nativeReason=module?._melee_web_native_menu_first_pair_file_owners_reason;
  const idle=()=>globalThis.Module===module&&globalThis.__meleeWebFirstDrawComponentModuleV1===module&&
    module?.matchFrameEffectNativeIdle?.()===true&&module.matchFrameEffectCallbackReturned===true&&
    typeof module._melee_web_native_menu_running==='function'&&module._melee_web_native_menu_running()===0;
  const stable=()=>idle()&&globalThis.window===host&&host.menuFirstPairHostReadSnapshot===reader&&
-   module._melee_web_native_menu_first_pair_file_owners_quiescent===native&&host.__meleeWebFirstPairFileGuardArmed===false;
+   module._melee_web_native_menu_first_pair_file_owners_quiescent===native&&
+   module._melee_web_native_menu_first_pair_file_owners_reason===nativeReason&&host.__meleeWebFirstPairFileGuardArmed===false;
  const valid=v=>v&&typeof v==='object'&&!Array.isArray(v)&&
    Object.keys(v).sort().join(',')==='assetTransfer,discSession,generation,preparing,resultCount,unresolvedReads'&&
    typeof v.generation==='string'&&/^(0|[1-9][0-9]*)$/.test(v.generation)&&
@@ -581,7 +583,22 @@ export function readFirstDrawHostOwners(){
   const after=reader();
   if(!valid(after))return refuse('host_owner_snapshot_malformed',{before});
   if(!stable())return refuse('module_reader_or_arm_changed',{before,after});
-  if(native_quiescent!==1)return refuse('native_file_owners_not_quiescent',{before,after,native_quiescent});
+  if(native_quiescent!==1){
+   // Read the completed category from THAT call, only after existing snapshots.
+   // This does not re-run native queries; it never enables interval admission.
+   const labels=['unobserved','ready','match_missing','running_boundary_missing',
+    'faulted','pending','preparation_busy','replay','asset_destination','results','prize',
+    'audio_missing','hps_not_quiescent','ssm_not_quiescent','source_scope_missing',
+    'source_scope_not_quiescent','stopped_boundary_not_ready'];
+   let native_refusal={status:'unavailable',code:null,category:null};
+   if(native_quiescent===0&&typeof nativeReason==='function'){
+    let code,read_failed=false;try{code=nativeReason();}catch{read_failed=true;}
+    if(!stable())return refuse('module_reader_or_arm_changed',{before,after,native_quiescent});
+    native_refusal={status:read_failed?'read_failed':Number.isInteger(code)&&code>=2&&code<labels.length?'observed':'invalid',
+     code:Number.isSafeInteger(code)?code:null,category:Number.isInteger(code)&&code>=2&&code<labels.length?labels[code]:null};
+   }
+   return refuse('native_file_owners_not_quiescent',{before,after,native_quiescent,native_refusal});
+  }
   if(Object.keys(before).some(k=>before[k]!==after[k]))return refuse('host_owner_snapshot_drift',{before,after,native_quiescent});
   if(before.unresolvedReads!==0||before.resultCount!==0||!before.discSession||before.assetTransfer||before.preparing)
    return refuse('host_file_work_pending',{before,after,native_quiescent});

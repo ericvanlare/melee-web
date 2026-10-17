@@ -2228,18 +2228,34 @@ using namespace melee_web_menu_browser;
 extern "C" {
 
 #if defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
+// Private category latch: diagnostic memory write only, no service mutation.
+// 0=unobserved, 1=ready, 2..16=first failed top-level condition below.
+static unsigned first_pair_file_owner_reason=0;
+unsigned melee_web_native_menu_first_pair_file_owners_reason(){return first_pair_file_owner_reason;}
 int melee_web_native_menu_first_pair_file_owners_quiescent(){
- bool boundary_running=running;
+ first_pair_file_owner_reason=0;
+ const auto refuse=[](unsigned reason){first_pair_file_owner_reason=reason;return 0;};
+ bool boundary_running=running;unsigned boundary_reason=3;
 #if defined(MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC)
- if(!boundary_running)boundary_running=frame_effect_host_read_boundary_ready();
+ if(!boundary_running){boundary_reason=16;boundary_running=frame_effect_host_read_boundary_ready();}
 #endif
- if(!match||!boundary_running||faulted||pending||preparation.busy()||replay||
-    asset_destination!=AssetDestination::None||results||prize)return 0;
+ if(!match)return refuse(2);
+ if(!boundary_running)return refuse(boundary_reason);
+ if(faulted)return refuse(4);
+ if(pending)return refuse(5);
+ if(preparation.busy())return refuse(6);
+ if(replay)return refuse(7);
+ if(asset_destination!=AssetDestination::None)return refuse(8);
+ if(results)return refuse(9);
+ if(prize)return refuse(10);
  MeleeWebAudio* const audio=match->audio();
  const MeleeWebSourceFileScope* const source_files=match->source_file_scope();
- return audio&&melee_web_audio_stream_quiescent_for(audio)&&
-        melee_web_audio_bank_transport_quiescent_for(audio)&&
-        source_files&&melee_web_source_files_quiescent_for(source_files);
+ if(!audio)return refuse(11);
+ if(!melee_web_audio_stream_quiescent_for(audio))return refuse(12);
+ if(!melee_web_audio_bank_transport_quiescent_for(audio))return refuse(13);
+ if(!source_files)return refuse(14);
+ if(!melee_web_source_files_quiescent_for(source_files))return refuse(15);
+ first_pair_file_owner_reason=1;return 1;
 }
 void melee_web_native_menu_first_pair_plan_capture(int enabled){
  first_pair_plan_capture_enabled=enabled!=0;

@@ -71,3 +71,53 @@ function joinedFixture(){
 const colorGate=routeSource.split('\n').find(line=>line.startsWith('if(firstDrawColorConversionFactsOnly&&frameEffectProducerBinding?.profile'));assert(colorGate);
 const gate=Function('firstDrawColorConversionFactsOnly','frameEffectProducerBinding',colorGate);assert.throws(()=>gate(true,{profile:oldProfile}),/joined private profile/);gate(true,{profile:joined});gate(false,{profile:oldProfile});
 console.log('Conversion getter readiness, after-closed order, loss/refusal, exact CLI selection and diagnostic-only scope PASS.');
+
+
+// Top-level native refusal categories only; lower HPS/SSM/source cause unknown.
+function hostReasonFixture(value=0,code=12){
+ const calls=[];const module={matchFrameEffectNativeIdle:()=>true,matchFrameEffectCallbackReturned:true,
+  _melee_web_native_menu_running:()=>0,
+  _melee_web_native_menu_first_pair_file_owners_quiescent:()=>{calls.push('native');return value;},
+  _melee_web_native_menu_first_pair_file_owners_reason:()=>{calls.push('reason');return code;}};
+ const window={__meleeWebFirstPairFileGuardArmed:false,menuFirstPairHostReadSnapshot:()=>{calls.push('host');return facts();}};
+ const context=vm.createContext({Module:module,window,__meleeWebFirstDrawComponentModuleV1:module});
+ return {calls,module,context,read:vm.runInContext('('+firstDrawFunctions.readFirstDrawHostOwners.toString()+')',context)};
+}
+{
+ const f=hostReasonFixture(),v=f.read();assert.equal(v.reason,'native_file_owners_not_quiescent');
+ assert.equal(v.native_quiescent,0);assert.equal(v.native_refusal.status,'observed');
+ assert.equal(v.native_refusal.code,12);assert.equal(v.native_refusal.category,'hps_not_quiescent');
+ assert.equal(v.composite_eligible,false);assert.deepEqual(f.calls,['host','native','host','reason']);
+}
+for(const code of Array.from({length:15},(_,i)=>i+2)){
+ const f=hostReasonFixture(0,code),v=f.read();assert.equal(v.native_refusal.status,'observed');assert.equal(v.native_refusal.code,code);assert.equal(typeof v.native_refusal.category,'string');
+}
+for(const code of [0,1,17,-1,NaN,undefined,{},'12']){
+ const f=hostReasonFixture(0,code);
+ f.module._melee_web_native_menu_first_pair_file_owners_reason=()=>{f.calls.push('reason');return code;};
+ const v=f.read();assert.equal(v.native_refusal.status,'invalid');assert.equal(v.native_refusal.category,null);assert.equal(v.status,'refused');assert.equal(v.composite_eligible,false);
+}
+{
+ const f=hostReasonFixture(1),v=f.read();assert.equal(v.status,'observed');assert.equal(Object.hasOwn(v,'native_refusal'),false);assert.deepEqual(f.calls,['host','native','host']);
+}
+{
+ const f=hostReasonFixture();delete f.module._melee_web_native_menu_first_pair_file_owners_reason;
+ const v=f.read();assert.equal(v.reason,'native_file_owners_not_quiescent');assert.equal(v.native_refusal.status,'unavailable');assert.deepEqual(f.calls,['host','native','host']);
+}
+{
+ const f=hostReasonFixture();f.module._melee_web_native_menu_first_pair_file_owners_reason=()=>{f.calls.push('reason');f.context.Module={};return 12;};
+ assert.equal(f.read().reason,'module_reader_or_arm_changed');assert.deepEqual(f.calls,['host','native','host','reason']);
+}
+{
+ const f=hostReasonFixture();f.module._melee_web_native_menu_first_pair_file_owners_quiescent=()=>{f.calls.push('native');f.module._melee_web_native_menu_first_pair_file_owners_reason=()=>13;return 0;};
+ assert.equal(f.read().reason,'module_reader_or_arm_changed');assert.deepEqual(f.calls,['host','native']);
+}
+console.log('Actual serialized native top-category refusal, same-call order, missing/invalid/stale getter and READY no-read controls PASS.');
+
+{
+ const f=hostReasonFixture();f.module._melee_web_native_menu_first_pair_file_owners_reason=()=>{f.calls.push('reason');throw Error('lost category');};
+ const v=f.read();assert.equal(v.reason,'native_file_owners_not_quiescent');assert.equal(v.native_refusal.status,'read_failed');assert.equal(v.native_quiescent,0);assert.deepEqual(f.calls,['host','native','host','reason']);
+}
+{
+ const f=hostReasonFixture(2),v=f.read();assert.equal(v.reason,'native_file_owners_not_quiescent');assert.equal(v.native_refusal.status,'unavailable');assert.deepEqual(f.calls,['host','native','host']);
+}

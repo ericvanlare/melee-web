@@ -152,26 +152,80 @@ def _prepare_compile_argv(entry, argv, replacement, output, private=True):
     return args
 
 
+def _owner_functions(source):
+    declarations = re.findall(r"^static unsigned first_pair_file_owner_reason=0;$", source, re.M)
+    if len(declarations) != 1:
+        raise AssertionError("expected one actual diagnostic reason latch")
+    return declarations[0] + "\n" + _function_body(source,
+        "unsigned melee_web_native_menu_first_pair_file_owners_reason()") + "\n" + _function_body(source,
+        "int melee_web_native_menu_first_pair_file_owners_quiescent()")
+
+
 OWNER_STUBS = r'''
 #include <cstdio>
 #include <cstdlib>
 #include <initializer_list>
+#include <string>
+std::string ownerTrace;
+bool poisonAccessors=false,poisonPreparation=false,poisonHps=false,poisonSsm=false,poisonSource=false;
+unsigned melee_web_native_menu_first_pair_file_owners_reason();
+int melee_web_native_menu_first_pair_file_owners_quiescent();
 struct MeleeWebAudio{}; struct MeleeWebSourceFileScope{};
 MeleeWebAudio ownedAudio, wrongAudio; MeleeWebSourceFileScope ownedFiles, wrongFiles;
 bool hpsIdle=true, ssmIdle=true, filesIdle=true;
 struct Session { MeleeWebAudio* a=&ownedAudio; MeleeWebSourceFileScope* f=&ownedFiles;
-MeleeWebAudio* audio(){return a;} const MeleeWebSourceFileScope* source_file_scope(){return f;} } session;
+MeleeWebAudio* audio(){if(poisonAccessors)std::abort();ownerTrace+='A';return a;} const MeleeWebSourceFileScope* source_file_scope(){if(poisonAccessors)std::abort();ownerTrace+='F';return f;} } session;
 Session* match=&session;
 bool running=true,faulted=false,pending=false,replay=false,results=false,prize=false,scoped_assets=true;
-struct Preparation {bool active=false;bool busy(){return active;}} preparation;
+struct Preparation {bool active=false;bool busy(){if(poisonPreparation)std::abort();ownerTrace+='P';return active;}} preparation;
 enum class AssetDestination {None, Match};AssetDestination asset_destination=AssetDestination::None;
-bool melee_web_audio_stream_quiescent_for(MeleeWebAudio* a){return a==&ownedAudio&&hpsIdle;}
-bool melee_web_audio_bank_transport_quiescent_for(MeleeWebAudio* a){return a==&ownedAudio&&ssmIdle;}
-bool melee_web_source_files_quiescent_for(const MeleeWebSourceFileScope* f){return f==&ownedFiles&&filesIdle;}
+bool melee_web_audio_stream_quiescent_for(MeleeWebAudio* a){if(poisonHps)std::abort();ownerTrace+='H';return a==&ownedAudio&&hpsIdle;}
+bool melee_web_audio_bank_transport_quiescent_for(MeleeWebAudio* a){if(poisonSsm)std::abort();ownerTrace+='S';return a==&ownedAudio&&ssmIdle;}
+bool melee_web_source_files_quiescent_for(const MeleeWebSourceFileScope* f){if(poisonSource)std::abort();ownerTrace+='T';return f==&ownedFiles&&filesIdle;}
 #define CHECK(x) do {if(!(x)){std::fprintf(stderr,"owner CHECK %d\n",__LINE__);std::exit(86);}}while(0)
+void expect_owner(int value,unsigned reason,const char* trace){
+ ownerTrace.clear();CHECK(melee_web_native_menu_first_pair_file_owners_quiescent()==value);
+ CHECK(melee_web_native_menu_first_pair_file_owners_reason()==reason);CHECK(ownerTrace==trace);
+ const auto before=ownerTrace;CHECK(melee_web_native_menu_first_pair_file_owners_reason()==reason);CHECK(ownerTrace==before);
+}
+
+'''
+OWNER_REASON_CASES = r'''
+void owner_reason_cases(){
+ match=&session;running=true;
+ expect_owner(1,1,"PAFHST");
+ // Earlier failures poison all later service accessors/queries.
+ poisonAccessors=poisonHps=poisonSsm=poisonSource=true;
+ match=nullptr;expect_owner(0,2,"");match=&session;
+ running=false;
+#if !defined(MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC)
+ expect_owner(0,3,"");
+#endif
+ running=true;poisonPreparation=true;faulted=true;pending=true;expect_owner(0,4,"");faulted=false;
+ expect_owner(0,5,"");pending=false;poisonPreparation=false;
+ preparation.active=true;expect_owner(0,6,"P");preparation.active=false;
+ replay=true;expect_owner(0,7,"P");replay=false;
+ asset_destination=AssetDestination::Match;expect_owner(0,8,"P");asset_destination=AssetDestination::None;
+ results=true;expect_owner(0,9,"P");results=false;prize=true;expect_owner(0,10,"P");prize=false;
+ poisonAccessors=false;session.a=nullptr;expect_owner(0,11,"PAF");session.a=&ownedAudio;
+ poisonHps=false;hpsIdle=false;expect_owner(0,12,"PAFH");hpsIdle=true;
+ poisonSsm=false;ssmIdle=false;expect_owner(0,13,"PAFHS");ssmIdle=true;
+ session.f=nullptr;expect_owner(0,14,"PAFHS");session.f=&ownedFiles;
+ poisonSource=false;filesIdle=false;expect_owner(0,15,"PAFHST");filesIdle=true;
+ expect_owner(1,1,"PAFHST");
+#if defined(MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC)
+ running=false;copyRefusal="original_boundary_missing";expect_owner(0,16,"B");
+ // Stopped helper still executes before the top-level missing-match guard.
+ match=nullptr;expect_owner(0,2,"B");match=&session;copyRefusal=nullptr;
+ aurora::gfx::detail::submissionReady=false;expect_owner(0,16,"BN");aurora::gfx::detail::submissionReady=true;
+ expect_owner(1,1,"BNPAFHST");
+ poisonSsm=poisonSource=true;hpsIdle=false;expect_owner(0,12,"BNPAFH");hpsIdle=true;poisonSsm=poisonSource=false;
+ running=true;expect_owner(1,1,"PAFHST");
+#endif
+}
 '''
 OWNER_MAIN = r'''
-int main(){CHECK(melee_web_native_menu_first_pair_file_owners_quiescent()==1);
+int main(){CHECK(melee_web_native_menu_first_pair_file_owners_reason()==0);CHECK(melee_web_native_menu_first_pair_file_owners_quiescent()==1);
 scoped_assets=false;CHECK(melee_web_native_menu_first_pair_file_owners_quiescent()==1);scoped_assets=true;
 asset_destination=AssetDestination::Match;CHECK(!melee_web_native_menu_first_pair_file_owners_quiescent());asset_destination=AssetDestination::None;
 preparation.active=true;CHECK(!melee_web_native_menu_first_pair_file_owners_quiescent());preparation.active=false;
@@ -180,7 +234,7 @@ session.f=&wrongFiles;CHECK(!melee_web_native_menu_first_pair_file_owners_quiesc
 for(bool* value:{&hpsIdle,&ssmIdle,&filesIdle,&running}){*value=false;CHECK(!melee_web_native_menu_first_pair_file_owners_quiescent());*value=true;}
 for(bool* value:{&faulted,&pending,&replay,&results,&prize}){*value=true;CHECK(!melee_web_native_menu_first_pair_file_owners_quiescent());*value=false;}
 match=nullptr;CHECK(!melee_web_native_menu_first_pair_file_owners_quiescent());match=&session;
-std::puts("Actual scoped-disc owner accessor PASS");}
+owner_reason_cases();std::puts("Actual scoped-disc owner accessor PASS");}
 '''
 
 
@@ -239,16 +293,15 @@ class FirstPairAudioFileNativeTests(OwnedWorkspaceTests):
                    EM_CACHE=str(emsdk / "upstream/emscripten/cache"), EMSDK_PYTHON=sys.executable,
                    TMPDIR=str(self.work))
         env.pop("_EMCC_CCACHE", None)
-        owner = _function_body((ROOT / "src/gameplay_menu_browser.cpp").read_text(),
-                               "int melee_web_native_menu_first_pair_file_owners_quiescent()")
+        owner = _owner_functions((ROOT / "src/gameplay_menu_browser.cpp").read_text())
         helper = _function_body((ROOT / "src/gameplay_menu_frame_effect.cpp").read_text(),
                                 "bool frame_effect_host_read_boundary_ready()")
         dependencies = r"""
 namespace aurora::gfx::detail { struct NativeSubmissionPendingFacts{};
 bool submissionReady=true;
-bool native_submission_component_ready(const NativeSubmissionPendingFacts&){return submissionReady;} }
+bool native_submission_component_ready(const NativeSubmissionPendingFacts&){ownerTrace+='N';return submissionReady;} }
 const char* copyRefusal=nullptr;unsigned copyCalls=0;
-const char* copy_ready_first_draw_component_facts(aurora::gfx::detail::NativeSubmissionPendingFacts&){++copyCalls;return copyRefusal;}
+const char* copy_ready_first_draw_component_facts(aurora::gfx::detail::NativeSubmissionPendingFacts&){CHECK(melee_web_native_menu_first_pair_file_owners_reason()==0);ownerTrace+='B';++copyCalls;return copyRefusal;}
 """
         main = r"""
 int main(){
@@ -268,7 +321,7 @@ int main(){
 #else
  CHECK(!melee_web_native_menu_first_pair_file_owners_quiescent());CHECK(copyCalls==0);
 #endif
- std::puts("Actual host owner qualification join PASS");}
+ owner_reason_cases();std::puts("Actual host owner qualification join PASS");}
 """
         for label,flags in [("legacy",[]),("joined",["-DMELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC=1"])]:
             source=self.work / f"host_join_{label}.cpp"
@@ -280,7 +333,7 @@ int main(){
                               + ('#define MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC 1\n' if flags else '')
                               + OWNER_STUBS + dependencies
                               + 'namespace melee_web_menu_browser {\n' + helper + '\n}\n'
-                              + 'using namespace melee_web_menu_browser;\n' + owner + main)
+                              + 'using namespace melee_web_menu_browser;\n' + owner + OWNER_REASON_CASES + main)
             output=self.work / f"host_join_{label}.js"
             self._run(f"compile actual {label} host-owner join",
                       [emxx,"-O3","-DNDEBUG","-std=gnu++20","-sENVIRONMENT=node",
@@ -404,9 +457,9 @@ int main(){
         source = (ROOT / "src/gameplay_menu_browser.cpp").read_text(encoding="utf-8")
         marker = "int melee_web_native_menu_first_pair_file_owners_quiescent()"
         self.assertEqual(source.count(marker), 1, "expected one actual scoped owner predicate")
-        owner_source = _function_body(source, marker)
+        owner_source = _owner_functions(source)
         owner_fixture = self.work / "owner_accessor.cpp"
-        owner_fixture.write_text(OWNER_STUBS + owner_source + OWNER_MAIN, encoding="utf-8")
+        owner_fixture.write_text(OWNER_STUBS + owner_source + OWNER_REASON_CASES + OWNER_MAIN, encoding="utf-8")
         owner_executable = self.work / "owner_accessor.js"
         owner_compile = [str(emxx), "-O3", "-DNDEBUG", "-std=gnu++20", "-DTARGET_PC",
                          "-sENVIRONMENT=node", "-sEXIT_RUNTIME=1", str(owner_fixture),
