@@ -98,6 +98,8 @@ class MatchFrameEffectNativeTests(OwnedWorkspaceTests):
                                  str(ROOT / "tests/match_frame_effect_first_draw.test.mjs"),
                                  str(ROOT / "tests/one_first_draw_observation_adapter.test.mjs"),
                                   str(ROOT / "tests/first_draw_host_point_adapter.test.mjs"),
+                                 str(ROOT / "tests/match_frame_effect_attachment_origin.test.mjs"),
+                                 str(ROOT / "tests/color_conversion_facts.test.mjs"),
                                  str(ROOT / "tests/match_frame_effect_renderer_owners.test.mjs")],
                                 cwd=ROOT, capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

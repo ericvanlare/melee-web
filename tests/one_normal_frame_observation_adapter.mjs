@@ -472,7 +472,7 @@ export async function observeOneNormalFrame({
 
   if(typeof driver.observeSelectedTextureInterval==='function'){
     try{
-      result.selected_texture_interval=await driver.observeSelectedTextureInterval({components:result.components,
+      result.selected_texture_interval=await driver.observeSelectedTextureInterval({components:result.components,packet:nativeReceipt,
         invoke:(fn,arg)=>boundedTransport(()=>page.evaluate(fn,arg),retirementTimeoutMs,'selected texture '+fn.name)});
       const interval=result.selected_texture_interval;
       if(interval?.schema!=='melee-web-selected-texture-interval-observation-v1'||interval.status!=='closed'||

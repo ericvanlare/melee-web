@@ -1,3 +1,4 @@
+import {readColorConversionDependencies} from './color_conversion_facts.mjs';
 // Reuse the bounded normal-callback transport and terminal-owner policy. The
 // selected draw scope is explicit; later original draws remain unobserved.
 import {observeOneNormalFrame} from './one_normal_frame_observation_adapter.mjs';
@@ -66,3 +67,49 @@ export async function observeSelectedTextureIntervalWithHostRead({invoke,compone
 export const firstDrawHostOwnersIntervalDriver=Object.freeze({...firstDrawSelectedTextureIntervalDriver,
  hostOwnerPointRead:'first-draw-host-owners-v1',
  observeSelectedTextureInterval:observeSelectedTextureIntervalWithHostRead});
+
+// The getter serializes through diagnostic Wasm storage. It runs only after the
+// actual start/end helpers have closed the interval, before observer retirement.
+export function readFirstDrawColorConversions(){
+ const refuse=reason=>({schema:'melee-web-color-conversion-point-read-v1',status:'refused',reason,composite_eligible:false});
+ try{
+  const module=globalThis.Module;
+  const getter=module?._melee_web_native_menu_frame_effect_color_conversions;
+  const stable=()=>globalThis.Module===module&&globalThis.__meleeWebFirstDrawComponentModuleV1===module&&
+   typeof module?.matchFrameEffectNativeIdle==='function'&&module.matchFrameEffectNativeIdle()===true&&
+   module.matchFrameEffectCallbackReturned===true&&typeof module._melee_web_native_menu_running==='function'&&module._melee_web_native_menu_running()===0;
+  if(!stable())return refuse('same_module_or_returned_idle_missing');
+  if(typeof getter!=='function'||typeof module.UTF8ToString!=='function')return refuse('conversion_reader_missing');
+  const raw=module.UTF8ToString(getter());
+  if(!stable()||module._melee_web_native_menu_frame_effect_color_conversions!==getter)return refuse('module_or_reader_changed');
+  if(typeof raw!=='string')return refuse('conversion_raw_missing');
+  const companion=JSON.parse(raw);
+  return {schema:'melee-web-color-conversion-point-read-v1',status:'observed',raw,companion,
+   same_module:true,returned_idle:true,diagnostic_wasm_serialization:true,composite_eligible:false};
+ }catch{return refuse('conversion_reader_failed');}
+}
+export async function observeHostIntervalThenColorConversions({invoke,components,packet}){
+ const interval=await observeSelectedTextureIntervalWithHostRead({invoke,components});
+ if(interval.status!=='closed')return interval;
+ // Reuse the actual helpers' closed result; no second fence, replay dispatch or
+ // interval validation engine. The eight original response rows remain intact.
+ if(interval.started?.status!=='active'||interval.ended?.status!=='closed'||interval.failures.length||interval.transport.length!==8)
+  return {...interval,status:'refused',failures:['closed_eight_response_interval_required']};
+ const transport={sequence:0,operation:'readFirstDrawColorConversions',argument:null};
+ let point;
+ try{transport.response=await invoke(readFirstDrawColorConversions);point=transport.response;}
+ catch(error){transport.error=String(error?.message||error);return {...interval,status:'refused',color_conversion_point:{transport},failures:['conversion_point_transport_failed']};}
+ const exact=v=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).sort().join(',')===
+  'companion,composite_eligible,diagnostic_wasm_serialization,raw,returned_idle,same_module,schema,status';
+ let failures=[],dependencies=null;
+ try{
+  if(!exact(point)||point.schema!=='melee-web-color-conversion-point-read-v1'||point.status!=='observed'||
+    point.same_module!==true||point.returned_idle!==true||point.diagnostic_wasm_serialization!==true||point.composite_eligible!==false||
+    typeof point.raw!=='string'||JSON.stringify(JSON.parse(point.raw))!==JSON.stringify(point.companion))failures.push('conversion_point_refused_or_malformed');
+  else {dependencies=readColorConversionDependencies(packet,point.companion);failures.push(...dependencies.failures);if(dependencies.dependenciesObserved!==true)failures.push('conversion_dependencies_not_observed');}
+ }catch{failures.push('conversion_point_decoder_failed');}
+ return {...interval,status:failures.length?'refused':interval.status,
+  color_conversion_point:{transport,dependencies,after_closed_interval:true,diagnostic_wasm_serialization:true,composite_eligible:false},failures};
+}
+export const firstDrawHostOwnersColorConversionsIntervalDriver=Object.freeze({...firstDrawHostOwnersIntervalDriver,
+ observeSelectedTextureInterval:observeHostIntervalThenColorConversions});

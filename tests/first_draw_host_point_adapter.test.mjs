@@ -1,7 +1,9 @@
+import vm from 'node:vm';
+import * as firstDrawFunctions from './match_frame_effect_first_draw_driver.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {observeOneNormalFrame,validateServedRuntimeBinding} from './one_normal_frame_observation_adapter.mjs';
-import {firstDrawDriver,firstDrawComponentsDriver,firstDrawSelectedTextureIntervalDriver,firstDrawHostOwnersIntervalDriver,firstDrawHostOwnerFailures,observeSelectedTextureIntervalWithHostRead} from './one_first_draw_observation_adapter.mjs';
+import {firstDrawDriver,firstDrawComponentsDriver,firstDrawSelectedTextureIntervalDriver,firstDrawHostOwnersIntervalDriver,firstDrawHostOwnerFailures,observeSelectedTextureIntervalWithHostRead,readFirstDrawColorConversions,observeHostIntervalThenColorConversions,firstDrawHostOwnersColorConversionsIntervalDriver} from './one_first_draw_observation_adapter.mjs';
 const oldProfile='runtime-match-frame-effect Release --first-draw-components-diagnostic';
 const joined=oldProfile+' --first-pair-audio-file-diagnostic';
 const producer=profile=>({schema:'melee-web-normal-frame-served-runtime-v1',source:'a'.repeat(40),source_patch_sha256:'b'.repeat(64),profile,files:Object.fromEntries(['gameplay_menu_browser.js','gameplay_menu_browser.wasm','gameplay_menu_browser.data'].map(n=>[n,{bytes:1,sha256:'c'.repeat(64)}]))});
@@ -22,7 +24,50 @@ console.log('Host point profile pairing and strict refusal controls PASS; accept
 const routeSource=fs.readFileSync(new URL('./vs_rules_item_menu_browser_test.mjs',import.meta.url),'utf8');
 const selection=routeSource.match(/driver: (firstDrawSelectedTextureIntervalOnly[^\n]+),\n\s*readRuntimeCapture:/g);assert.equal(selection?.length,1);
 const expression=selection[0].slice('driver: '.length,selection[0].lastIndexOf(',\n'));
-const route=(profile,interval=true)=>Function('firstDrawSelectedTextureIntervalOnly','firstDrawComponentsOnly','firstDrawObservationOnly','frameEffectProducerBinding','firstDrawHostOwnersIntervalDriver','firstDrawSelectedTextureIntervalDriver','firstDrawComponentsDriver','firstDrawDriver','matchFrameEffectDriver','return ('+expression+');')(interval,true,true,{profile},firstDrawHostOwnersIntervalDriver,firstDrawSelectedTextureIntervalDriver,firstDrawComponentsDriver,firstDrawDriver,{});
-assert.equal(route(joined),firstDrawHostOwnersIntervalDriver);assert.equal(route(oldProfile),firstDrawSelectedTextureIntervalDriver);assert.equal(route(joined,false),firstDrawComponentsDriver);
+const route=(profile,interval=true,conversion=false)=>Function('firstDrawColorConversionFactsOnly','firstDrawHostOwnersColorConversionsIntervalDriver','firstDrawSelectedTextureIntervalOnly','firstDrawComponentsOnly','firstDrawObservationOnly','frameEffectProducerBinding','firstDrawHostOwnersIntervalDriver','firstDrawSelectedTextureIntervalDriver','firstDrawComponentsDriver','firstDrawDriver','matchFrameEffectDriver','return ('+expression+');')(conversion,firstDrawHostOwnersColorConversionsIntervalDriver,interval,true,true,{profile},firstDrawHostOwnersIntervalDriver,firstDrawSelectedTextureIntervalDriver,firstDrawComponentsDriver,firstDrawDriver,{});
+assert.equal(route(joined,true,true),firstDrawHostOwnersColorConversionsIntervalDriver);assert.equal(route(joined),firstDrawHostOwnersIntervalDriver);assert.equal(route(oldProfile),firstDrawSelectedTextureIntervalDriver);assert.equal(route(joined,false),firstDrawComponentsDriver);
 dispatches=0;const disconnected=await observeOneNormalFrame(opts(joined,route(joined,false)));assert.deepEqual(disconnected.failures,['host_owner_point_profile_driver_mismatch']);assert.equal(dispatches,0);
 console.log('Actual CLI profile-to-driver selection PASS; joined without explicit interval refuses before dispatch.');
+
+// Actual serialized conversion reader, synthetic native endpoint only.
+const companion=()=>({schema:'melee-web-color-conversion-facts-v1',packet_frame_id:'4',internal_gpu_creation_ownership_qualified:false,packet_content_qualified:false,restore_eligible:false,composite_eligible:false,overflow:false,facts:[]});
+function conversionReaderFixture(){
+ const calls=[];const module={matchFrameEffectNativeIdle:()=>true,matchFrameEffectCallbackReturned:true,
+  _melee_web_native_menu_running:()=>0,UTF8ToString:x=>x,
+  _melee_web_native_menu_frame_effect_color_conversions:()=>{calls.push('conversion-getter');return JSON.stringify(companion());}};
+ const context=vm.createContext({Module:module,__meleeWebFirstDrawComponentModuleV1:module});
+ const read=vm.runInContext('('+readFirstDrawColorConversions.toString()+')',context);
+ return {calls,module,context,read};
+}
+{
+ const f=conversionReaderFixture(),v=f.read();assert.equal(v.status,'observed');assert.equal(v.raw,JSON.stringify(companion()));assert.equal(v.diagnostic_wasm_serialization,true);assert.equal(v.composite_eligible,false);assert.equal(f.calls.length,1);
+}
+for(const edit of [f=>{f.module.matchFrameEffectNativeIdle=()=>false;},f=>{f.module.matchFrameEffectCallbackReturned=false;},f=>{f.module._melee_web_native_menu_running=()=>1;},f=>{f.context.__meleeWebFirstDrawComponentModuleV1={};},f=>{delete f.module._melee_web_native_menu_frame_effect_color_conversions;}]){
+ const f=conversionReaderFixture();edit(f);assert.equal(f.read().status,'refused');assert.equal(f.calls.length,0);
+}
+{
+ const f=conversionReaderFixture();f.module._melee_web_native_menu_frame_effect_color_conversions=()=>{f.calls.push('conversion-getter');f.context.Module={};return '{}';};assert.equal(f.read().reason,'module_or_reader_changed');assert.equal(f.calls.length,1);
+}
+// Reuse the existing actual-helper test fixture source; this remains synthetic
+// native/host services and never supplies purported captured conversion facts.
+const componentFixtureSource=fs.readFileSync(new URL('./first_draw_components.test.mjs',import.meta.url),'utf8');
+const bodies=['nativeReceipt','fixture','observe','intervalFixture'].map(name=>{const start=componentFixtureSource.indexOf('function '+name+'(');assert(start>=0);const end=componentFixtureSource.indexOf('\n}',start);assert(end>start);return componentFixtureSource.slice(start,end+2);}).join('\n');
+const helperNames=['armNativeFrameEffectFirstDraw','readFirstDrawComponents','armFirstDrawComponents','firstDrawComponentFailures','startFirstDrawSelectedTextureInterval','endFirstDrawSelectedTextureInterval'];
+const actualIntervalFixture=Function('vm',...helperNames,bodies+'\nreturn intervalFixture;')(vm,...helperNames.map(k=>firstDrawFunctions[k]));
+function joinedFixture(){
+ const f=actualIntervalFixture();f.module._melee_web_native_menu_running=()=>0;f.module._melee_web_native_menu_first_pair_file_owners_quiescent=()=>1;
+ f.context.window={menuFirstPairHostReadSnapshot:facts,__meleeWebFirstPairFileGuardArmed:false};
+ f.module._melee_web_native_menu_frame_effect_color_conversions=()=>{assert.equal(f.calls.at(-1),'selected-close');f.calls.push('conversion-getter');return JSON.stringify(companion());};return f;
+}
+{
+ const f=joinedFixture();const v=await observeHostIntervalThenColorConversions({...f,packet:null});assert.equal(v.transport.length,8);assert.equal(v.started.status,'active');assert.equal(v.ended.status,'closed');assert.equal(f.calls.at(-1),'conversion-getter');assert.equal(v.color_conversion_point.after_closed_interval,true);assert.equal(v.color_conversion_point.diagnostic_wasm_serialization,true);assert.equal(v.color_conversion_point.transport.response.raw,JSON.stringify(companion()));assert.equal(v.status,'refused');assert.ok(v.failures.length);assert.equal(v.color_conversion_point.dependencies.restoreEligible,false);
+}
+{
+ const f=joinedFixture();f.module._melee_web_native_menu_frame_effect_issue_selected_texture=()=>0;const v=await observeHostIntervalThenColorConversions({...f,packet:null});assert.equal(v.status,'refused');assert.equal(f.calls.includes('conversion-getter'),false);
+}
+{
+ const f=joinedFixture();const invoke=async(fn,arg)=>{if(fn.name==='readFirstDrawColorConversions')throw Error('lost conversion response');return f.invoke(fn,arg);};const v=await observeHostIntervalThenColorConversions({...f,invoke,packet:null});assert.equal(v.status,'refused');assert.equal(v.color_conversion_point.transport.error,'lost conversion response');assert.equal(f.calls.includes('conversion-getter'),false);
+}
+const colorGate=routeSource.split('\n').find(line=>line.startsWith('if(firstDrawColorConversionFactsOnly&&frameEffectProducerBinding?.profile'));assert(colorGate);
+const gate=Function('firstDrawColorConversionFactsOnly','frameEffectProducerBinding',colorGate);assert.throws(()=>gate(true,{profile:oldProfile}),/joined private profile/);gate(true,{profile:joined});gate(false,{profile:oldProfile});
+console.log('Conversion getter readiness, after-closed order, loss/refusal, exact CLI selection and diagnostic-only scope PASS.');

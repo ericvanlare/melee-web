@@ -42,7 +42,7 @@ import {
 import {runSuddenDeathBrowserRoute,validateFinalSdCapture} from './vs_sudden_death_browser_route.mjs';
 import {runSparseMarioBrowserPrefix,installSparseVirtualController,validateFinalSparseCapture} from './vs_sparse_mario_browser_route.mjs';
 import * as matchFrameEffectDriver from './match_frame_effect_driver.mjs';
-import {observeOneFirstDraw,firstDrawDriver,firstDrawComponentsDriver,firstDrawSelectedTextureIntervalDriver,firstDrawHostOwnersIntervalDriver} from './one_first_draw_observation_adapter.mjs';
+import {observeOneFirstDraw,firstDrawDriver,firstDrawComponentsDriver,firstDrawSelectedTextureIntervalDriver,firstDrawHostOwnersIntervalDriver,firstDrawHostOwnersColorConversionsIntervalDriver} from './one_first_draw_observation_adapter.mjs';
 import {CSS_SSS_TRANSITION_LIMITS} from './stadium_c1a_css_sss_reducer.mjs';
 import {
   buildOneFrameRecorderBinding,
@@ -69,6 +69,7 @@ options['sparse-mario-prefix'] = {type: 'boolean', default: false};
 options['competitive-profile-only'] = {type: 'boolean', default: false};
 options['competitive-match-start-only'] = {type: 'boolean', default: false};
 options['frame-effect-observation-only'] = {type: 'boolean', default: false};
+options['first-draw-color-conversion-facts-only'] = {type:'boolean',default:false};
 options['first-draw-components-only'] = {type:'boolean',default:false};
 options['first-draw-selected-texture-interval-only'] = {type:'boolean',default:false};
 options['first-draw-observation-only'] = {type: 'boolean', default: false};
@@ -98,6 +99,8 @@ const singleTickFrameEffectObservationOnly = values['frame-effect-observation-on
 const firstDrawObservationOnly = values['first-draw-observation-only'];
 const firstDrawComponentsOnly=values['first-draw-components-only'];
 const firstDrawSelectedTextureIntervalOnly=values['first-draw-selected-texture-interval-only'];
+const firstDrawColorConversionFactsOnly=values['first-draw-color-conversion-facts-only'];
+if(firstDrawColorConversionFactsOnly&&!firstDrawSelectedTextureIntervalOnly)throw Error('Color conversion companion requires explicit selected interval');
 if(firstDrawSelectedTextureIntervalOnly&&!firstDrawComponentsOnly)throw Error('Selected texture interval requires explicit first-draw components mode');
 if(firstDrawComponentsOnly&&(!firstDrawObservationOnly||new URL(values.url).searchParams.get('__depth_no_work_v1')!=='1'))throw Error('First-draw components require first-draw mode and explicit pre-main depth query');
 const frameEffectObservationOnly = singleTickFrameEffectObservationOnly || firstDrawObservationOnly;
@@ -105,6 +108,7 @@ const competitiveTimeoutRoute = values['competitive-timeout-route'];
 for (const name of ['url', 'disc', 'out'])
   if (!values[name]) throw Error('Use --url DEVELOPMENT_RUNTIME_URL --disc OWNED_DISC --out NEW_DIRECTORY [--playwright PACKAGE_DIR]');
 const competitiveSourceRoute = competitiveMatchStartOnly || competitiveTimeoutRoute;
+if(firstDrawColorConversionFactsOnly&&!competitiveMatchStartOnly)throw Error('Color conversion companion requires match-start observation');
 const frameEffectProducerBindingPath = values['frame-effect-producer-binding']
   ? path.resolve(values['frame-effect-producer-binding']) : null;
 validateFrameEffectMode({competitiveMatchStartOnly,
@@ -166,6 +170,7 @@ const sha256File = file => new Promise((resolve, reject) => {
   stream.on('data', bytes => hash.update(bytes));
   stream.on('end', () => resolve(hash.digest('hex')));
 });
+if(firstDrawColorConversionFactsOnly&&frameEffectProducerBinding?.profile!=='runtime-match-frame-effect Release --first-draw-components-diagnostic --first-pair-audio-file-diagnostic')throw Error('Color conversion companion requires joined private profile');
 let browser, context, page, driver, browserPath, playwrightPath;
 let frameEffectRecorderBinding = null;
 let lastRuntimeCounterPollAt = 0;
@@ -1719,7 +1724,7 @@ route: {
         producerBinding: frameEffectProducerBinding,
         outputName: path.basename(output),
         discSha256: report.discSha256,
-        driver: firstDrawSelectedTextureIntervalOnly ? (frameEffectProducerBinding.profile==='runtime-match-frame-effect Release --first-draw-components-diagnostic --first-pair-audio-file-diagnostic' ? firstDrawHostOwnersIntervalDriver : firstDrawSelectedTextureIntervalDriver) : firstDrawComponentsOnly ? firstDrawComponentsDriver : firstDrawObservationOnly ? firstDrawDriver : matchFrameEffectDriver,
+        driver: firstDrawSelectedTextureIntervalOnly ? (frameEffectProducerBinding.profile==='runtime-match-frame-effect Release --first-draw-components-diagnostic --first-pair-audio-file-diagnostic' ? (firstDrawColorConversionFactsOnly ? firstDrawHostOwnersColorConversionsIntervalDriver : firstDrawHostOwnersIntervalDriver) : firstDrawSelectedTextureIntervalDriver) : firstDrawComponentsOnly ? firstDrawComponentsDriver : firstDrawObservationOnly ? firstDrawDriver : matchFrameEffectDriver,
         readRuntimeCapture: readRuntimeDiagnosticsCapture,
       });
       report.competitiveMatchStart.frame_effect_observation = frameEffectObservation;

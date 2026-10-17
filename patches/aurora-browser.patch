@@ -2736,7 +2736,6 @@ index 47e9a0aadfe1b88ae7e177f226e5b05f36b681e3..803d16d877f2a63dd8b3fc56af75bfb9
  
  namespace testing {
 diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
-index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1e0c8ddd8 100644
 --- a/lib/gfx/encoding.cpp
 +++ b/lib/gfx/encoding.cpp
 @@ -1,6 +1,9 @@
@@ -2749,7 +2748,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
  
  #include "clear.hpp"
  #include "depth_peek.hpp"
-@@ -33,11 +36,17 @@ using webgpu::g_queue;
+@@ -33,11 +36,17 @@
  namespace {
  constexpr Module Log{"aurora::gfx"};
  PipelineRef g_currentPipeline;
@@ -2767,7 +2766,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
  }
  
  void apply_scissor(const wgpu::RenderPassEncoder& pass, const ClipRect& sc, const wgpu::Extent3D& size) {
-@@ -46,6 +55,9 @@ void apply_scissor(const wgpu::RenderPassEncoder& pass, const ClipRect& sc, cons
+@@ -46,6 +55,9 @@
    const auto w = std::clamp(static_cast<uint32_t>(sc.width), 0u, size.width - x);
    const auto h = std::clamp(static_cast<uint32_t>(sc.height), 0u, size.height - y);
    pass.SetScissorRect(x, y, w, h);
@@ -2777,7 +2776,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
  }
  
  DrawContext make_draw_context(const RenderPass& passInfo) {
-@@ -62,8 +74,13 @@ DrawContext make_draw_context(const RenderPass& passInfo) {
+@@ -62,8 +74,13 @@
  }
  
  void render_custom_draw(const CustomDrawCommand& draw, const wgpu::RenderPassEncoder& pass,
@@ -2792,7 +2791,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
    if (!drawType) {
      // Unregistered between record and replay; the command is a no-op.
      return;
-@@ -73,8 +90,12 @@ void render_custom_draw(const CustomDrawCommand& draw, const wgpu::RenderPassEnc
+@@ -73,8 +90,12 @@
    drawType->draw(context, pass, draw.payload.data(), draw.payloadSize, drawType->userdata);
  }
  
@@ -2806,7 +2805,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
    if (!taskType) {
      // Unregistered between record and encode; the task is a no-op.
      return;
-@@ -105,9 +126,13 @@ void execute_encoder_task(wgpu::CommandEncoder& cmd, FramePacket& frame, const E
+@@ -105,9 +126,13 @@
    }
  }
  
@@ -2821,10 +2820,11 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
  #ifdef AURORA_GFX_DEBUG_GROUPS
    std::vector<std::string> lastDebugGroupStack;
  #endif
-@@ -119,8 +144,25 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
+@@ -119,8 +144,25 @@
    // Bind bind group for the whole pass
    pass.SetBindGroup(0, resources().staticBindGroup);
    pass.SetBindGroup(2, gx::g_emptyTextureBindGroup);
+-
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
 +  const auto& staticGroupResources = resources();
 +  browser_frame_effect_observer().observe_static_bind_group_set(
@@ -2837,7 +2837,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
 +      reinterpret_cast<uintptr_t>(&resources()), reinterpret_cast<uintptr_t>(g_device.Get()),
 +      reinterpret_cast<uintptr_t>(gx::g_emptyTextureBindGroup.Get()), gx::diagnostic_empty_texture_layout(), 0, nullptr);
 +#endif
- 
++
 +  uint32_t commandIndex = 0;
    for (auto& cmd : passInfo.commands) {
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
@@ -2847,7 +2847,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
  #ifdef AURORA_GFX_DEBUG_GROUPS
      {
        size_t firstDiff = lastDebugGroupStack.size();
-@@ -154,15 +196,39 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
+@@ -154,15 +196,39 @@
      } break;
      case CommandType::Draw: {
        auto& draw = cmd.data.draw;
@@ -2888,7 +2888,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
        if (hasViewport) {
          apply_viewport(pass, currentViewport);
        }
-@@ -176,6 +242,7 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
+@@ -176,6 +242,7 @@
  #endif
      } break;
      }
@@ -2896,7 +2896,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
    }
  
  #ifdef AURORA_GFX_DEBUG_GROUPS
-@@ -191,8 +258,13 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
+@@ -191,8 +258,13 @@
      return;
    }
  
@@ -2910,7 +2910,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
    }
    if (passInfo.discardable) {
      // This pass has no effect and can be safely discarded (e.g. an empty EFB segment between two back-to-back pass
-@@ -246,12 +318,25 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
+@@ -246,12 +318,25 @@
    };
  
    auto pass = cmd.BeginRenderPass(&renderPassDescriptor);
@@ -2938,12 +2938,12 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
    }
  
    if (passInfo.resolveTarget) {
-@@ -260,6 +345,13 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
+@@ -260,6 +345,13 @@
      const bool needsScaling = dstSize.width != static_cast<uint32_t>(passInfo.resolveRect.width) ||
                                dstSize.height != static_cast<uint32_t>(passInfo.resolveRect.height);
      const bool isDepth = gx::is_depth_format(passInfo.resolveFormat);
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
-+    browser_frame_effect_observer().observe_resolve(
++    const auto resolveEvent=browser_frame_effect_observer().observe_resolve(
 +        frame, passIndex, (needsConversion ? 1u : 0u) | (needsScaling ? 2u : 0u) |
 +                              (isDepth ? 4u : 0u) | (passInfo.msaaSamples > 1 ? 8u : 0u),
 +        static_cast<uint32_t>(passInfo.resolveRect.width), static_cast<uint32_t>(passInfo.resolveRect.height),
@@ -2952,7 +2952,22 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
      if (isDepth && passInfo.msaaSamples > 1) {
        Log.fatal("Depth tex copies from multisampled EFB targets are not supported");
      }
-@@ -297,6 +389,12 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
+@@ -271,7 +363,14 @@
+         .sampleFilter = needsScaling ? tex_copy_conv::SampleFilter::Linear : tex_copy_conv::SampleFilter::Nearest,
+     };
+     if (needsConversion) {
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++      auto& observer=browser_frame_effect_observer();
++      tex_copy_conv::ColorConversionContext diagnostic{&observer,
++          observer.begin_color_conversion(resolveEvent,frame,passInfo,uint32_t(convReq.sampleFilter))};
++      tex_copy_conv::run(cmd, convReq,&diagnostic);
++#else
+       tex_copy_conv::run(cmd, convReq);
++#endif
+     } else if (needsScaling) {
+       tex_copy_conv::blit(cmd, convReq);
+     } else {
+@@ -297,6 +396,12 @@
    }
  
    if (passInfo.snapshotColorDst) {
@@ -2965,7 +2980,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
      const webgpu::gpu_prof::Zone zone{cmd, "Pass snapshot"};
      const wgpu::TexelCopyTextureInfo src{
          .texture = passInfo.copySourceTexture,
-@@ -312,6 +410,12 @@ void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& passInfo,
+@@ -312,6 +417,12 @@
      cmd.CopyTextureToTexture(&src, &dst, &size);
    }
    if (passInfo.snapshotDepthDst) {
@@ -2978,7 +2993,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
      tex_copy_conv::snapshot_depth(cmd, passInfo.copySourceDepthView, passInfo.msaaSamples, passInfo.snapshotDepthDst);
    }
  }
-@@ -324,7 +428,7 @@ constexpr uint64_t TextureUploadStagingOffset = StorageStagingOffset + StorageBu
+@@ -324,7 +435,7 @@
  
  constexpr uint32_t align_down_copy_offset(uint32_t value) noexcept { return value & ~3u; }
  
@@ -2987,7 +3002,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
                                 uint32_t highWater, uint64_t stagingOffset, const wgpu::Buffer& dst) {
    if (highWater <= copied) {
      return;
-@@ -333,6 +437,10 @@ void copy_staging_buffer_range(wgpu::CommandEncoder& cmd, const FramePacket& fra
+@@ -333,6 +444,10 @@
    const uint32_t copyEnd = AURORA_ALIGN(highWater, 4);
    cmd.CopyBufferToBuffer(staging_buffer(frame.stagingBuffer), stagingOffset + copyStart, dst, copyStart,
                           copyEnd - copyStart);
@@ -2998,7 +3013,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
    copied = highWater;
  }
  
-@@ -355,11 +463,11 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
+@@ -355,11 +470,11 @@
    const webgpu::gpu_prof::Zone zone{cmd, "Staging copies"};
    const auto& highWater = op.highWater;
    auto& res = resources();
@@ -3014,7 +3029,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
                              res.storageBuffer);
  
    if constexpr (UseTextureBuffer) {
-@@ -375,6 +483,11 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
+@@ -375,6 +490,11 @@
            .buffer = item.buffer ? item.buffer : staging_buffer(frame.stagingBuffer),
        };
        cmd.CopyBufferToTexture(&buf, &item.tex, &item.size);
@@ -3026,7 +3041,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
      }
      frame.copied.textureUpload = highWater.textureUpload;
      frame.copied.textureUploadCount = op.textureUploads.size();
-@@ -382,8 +495,84 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
+@@ -382,8 +502,84 @@
  }
  } // namespace
  
@@ -3111,7 +3126,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
    copy_staging_to_high_water(cmd, frame, op);
    switch (op.type) {
    case FrameOpType::RenderPass:
-@@ -393,13 +582,16 @@ void encode_op(wgpu::CommandEncoder& cmd, FramePacket& frame, const FrameOp& op)
+@@ -393,13 +589,16 @@
      break;
    case FrameOpType::TextureCopy:
      if (op.textureCopy != nullptr) {
@@ -3129,7 +3144,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
      }
      break;
    }
-@@ -408,6 +600,11 @@ void encode_op(wgpu::CommandEncoder& cmd, FramePacket& frame, const FrameOp& op)
+@@ -408,6 +607,11 @@
  
  bool bind_pipeline(PipelineRef ref, const wgpu::RenderPassEncoder& pass) {
    if (ref == g_currentPipeline) {
@@ -3141,7 +3156,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..8b0881f0d225ee46b37daa96968b3fb1
      return true;
    }
    wgpu::RenderPipeline pipeline;
-@@ -416,6 +613,11 @@ bool bind_pipeline(PipelineRef ref, const wgpu::RenderPassEncoder& pass) {
+@@ -416,6 +620,11 @@
    }
    pass.SetPipeline(pipeline);
    g_currentPipeline = ref;
@@ -4802,10 +4817,9 @@ index 0b86ffead6e8f6153d2acf52cf9daecf4f07ccfa..3904b525390161c4f457127d3a2346a6
  } // namespace aurora::gfx
 diff --git a/lib/gfx/frame_effect_observer.hpp b/lib/gfx/frame_effect_observer.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..8912844aabecbc69be46aef56bcdd93bcaf51650
 --- /dev/null
 +++ b/lib/gfx/frame_effect_observer.hpp
-@@ -0,0 +1,1878 @@
+@@ -0,0 +1,1974 @@
 +#pragma once
 +
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
@@ -4816,6 +4830,7 @@ index 0000000000000000000000000000000000000000..8912844aabecbc69be46aef56bcdd93b
 +#include "frame_effect_texture_owner.hpp"
 +#include <dolphin/gx/GXEnum.h>
 +#include <algorithm>
++#include <cstring>
 +
 +#include <array>
 +#include <atomic>
@@ -5397,6 +5412,97 @@ index 0000000000000000000000000000000000000000..8912844aabecbc69be46aef56bcdd93b
 +  int attachment_fact(uint32_t index,AuroraBrowserFrameEffectAttachmentFact* out) const noexcept {
 +    if(!out || index>=attachmentFactCount_)return 0;*out=attachmentFacts_[index];return 1;
 +  }
++
++  // Additive per-resolve facts. Legacy events, handles, resources and findings
++  // are never published/mutated by these readers. IDs must already exist.
++  struct ColorConversionFact {
++    uint32_t eventIndex=0, refusal=0, returned=0, gxFormat=0, filter=0, drawCount=0,loadOp=0,storeOp=0;
++    int32_t rect[4]{};
++    uint32_t uvBits[4]{};
++    uint64_t clearBits[4]{};
++    uint64_t uniformOffset=0,uniformSize=0,sourceTexture=0,sourceView=0;
++    uint64_t destinationTexture=0,destinationView=0,uniformBuffer=0;
++    uintptr_t localPipeline=0,localGroup=0,localSampler=0;
++  };
++  uint32_t color_conversion_count() const noexcept {return colorConversionCount_;}
++  bool color_conversion_overflow() const noexcept {return colorConversionOverflow_;}
++  bool color_conversion_fact(uint32_t index,ColorConversionFact& out) const noexcept {
++    if(index>=colorConversionCount_)return false;out=colorConversions_[index];return true;
++  }
++  uint64_t existing_color_resource(uint32_t kind,uintptr_t raw) const noexcept {
++    uint64_t id=0;
++    for(uint32_t i=0;i<handleCount_.load(std::memory_order_relaxed);++i)
++      if(handles_[i].kind==kind&&handles_[i].address==raw){id=uint64_t(i)+1;break;}
++    bool resource=false,provenance=false;
++    for(uint32_t i=0;i<resourceCount_;++i)resource|=resources_[i].captureId==id;
++    for(uint32_t i=0;i<provenanceCount_;++i)provenance|=provenance_[i].captureId==id;
++    return resource&&provenance?id:0;
++  }
++  bool color_view_parent(uint64_t view,uint64_t texture) const noexcept {
++    if(!view||!texture)return false;
++    for(uint32_t i=0;i<resourceCount_;++i)if(resources_[i].captureId==view)
++      return resources_[i].kind==AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE_VIEW&&
++        resources_[i].ownerId==texture;
++    return false;
++  }
++  uint32_t begin_color_conversion(uint32_t eventIndex,const FramePacket& frame,
++                                  const RenderPass& pass,uint32_t filter) noexcept {
++    if(!collecting()||frame.frameId!=frameId_||eventIndex>=eventCount_.load())return UINT32_MAX;
++    if(colorConversionCount_>=EventCapacity){colorConversionOverflow_=true;return UINT32_MAX;}
++    const uint32_t index=colorConversionCount_++;auto& fact=colorConversions_[index];
++    fact.eventIndex=eventIndex;fact.gxFormat=uint32_t(pass.resolveFormat);fact.filter=filter;
++    fact.rect[0]=pass.resolveRect.x;fact.rect[1]=pass.resolveRect.y;
++    fact.rect[2]=pass.resolveRect.width;fact.rect[3]=pass.resolveRect.height;
++    std::copy(pass.resolveUvBits.begin(),pass.resolveUvBits.end(),fact.uvBits);
++    fact.uniformOffset=pass.resolveUniformRange.offset;fact.uniformSize=pass.resolveUniformRange.size;
++    const auto& event=events_[eventIndex];
++    if(event.kind!=AURORA_BROWSER_FRAME_EFFECT_EVENT_RESOLVE||event.flags!=1||filter!=0||
++       !pass.resolveTarget){fact.refusal=1;return index;}
++    fact.sourceTexture=existing_color_resource(AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE,
++        reinterpret_cast<uintptr_t>(pass.copySourceTexture.Get()));
++    fact.sourceView=existing_color_resource(AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE_VIEW,
++        reinterpret_cast<uintptr_t>(pass.copySourceView.Get()));
++    fact.destinationTexture=existing_color_resource(AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE,
++        reinterpret_cast<uintptr_t>(pass.resolveTarget->texture.Get()));
++    fact.destinationView=existing_color_resource(AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE_VIEW,
++        reinterpret_cast<uintptr_t>(pass.resolveTarget->attachmentTextureView.Get()));
++    if(!color_view_parent(fact.sourceView,fact.sourceTexture))fact.refusal=2;
++    else if(!color_view_parent(fact.destinationView,fact.destinationTexture))fact.refusal=3;
++    else if(fact.sourceTexture==fact.destinationTexture)fact.refusal=4;
++    else if(!pass.resolveUvCopied||fact.uniformSize!=16||fact.uniformOffset>frame.uniforms.size()||
++            fact.uniformSize>frame.uniforms.size()-fact.uniformOffset||
++            std::memcmp(frame.uniforms.data()+fact.uniformOffset,fact.uvBits,16)!=0)fact.refusal=5;
++    else if(event.handleA!=fact.sourceTexture||event.handleB!=fact.destinationTexture)fact.refusal=7;
++    return index;
++  }
++  void refuse_color_conversion(uint32_t index,uint32_t reason) noexcept {
++    if(index<colorConversionCount_&&!colorConversions_[index].refusal)colorConversions_[index].refusal=reason;
++  }
++  void return_color_conversion(uint32_t index,uint32_t format,uint32_t filter,uintptr_t sourceView,
++      uintptr_t destinationTexture,uintptr_t destinationView,uint64_t offset,uint64_t size,
++      uintptr_t pipeline,uintptr_t group,uintptr_t sampler,uintptr_t uniformBuffer,
++      const wgpu::RenderPassColorAttachment& attachment) noexcept {
++    if(index>=colorConversionCount_)return;auto& fact=colorConversions_[index];
++    if(fact.returned){refuse_color_conversion(index,8);return;}
++    fact.returned=1;fact.drawCount=3;
++    fact.localPipeline=pipeline;fact.localGroup=group;fact.localSampler=sampler;
++    fact.loadOp=uint32_t(attachment.loadOp);fact.storeOp=uint32_t(attachment.storeOp);
++    fact.clearBits[0]=std::bit_cast<uint64_t>(attachment.clearValue.r);
++    fact.clearBits[1]=std::bit_cast<uint64_t>(attachment.clearValue.g);
++    fact.clearBits[2]=std::bit_cast<uint64_t>(attachment.clearValue.b);
++    fact.clearBits[3]=std::bit_cast<uint64_t>(attachment.clearValue.a);
++    fact.uniformBuffer=existing_color_resource(AURORA_BROWSER_FRAME_EFFECT_HANDLE_BUFFER,uniformBuffer);
++    if(fact.gxFormat!=format||fact.filter!=filter||fact.uniformOffset!=offset||fact.uniformSize!=size||
++       fact.sourceView!=existing_color_resource(AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE_VIEW,sourceView)||
++       fact.destinationTexture!=existing_color_resource(AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE,destinationTexture)||
++       fact.destinationView!=existing_color_resource(AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE_VIEW,destinationView)||
++       fact.destinationView!=existing_color_resource(AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE_VIEW,
++           reinterpret_cast<uintptr_t>(attachment.view.Get()))||
++       attachment.loadOp!=wgpu::LoadOp::Clear||attachment.storeOp!=wgpu::StoreOp::Store||
++       fact.clearBits[0]||fact.clearBits[1]||fact.clearBits[2]||fact.clearBits[3]||
++       !pipeline||!group||!sampler||!fact.uniformBuffer)refuse_color_conversion(index,7);
++  }
++
 +  bool arm(uint32_t frameIndex) noexcept {
 +    if (state_.load(std::memory_order_acquire) != AURORA_BROWSER_FRAME_EFFECT_UNUSED) return false;
 +    targetFrameIndex_ = frameIndex;
@@ -6062,9 +6168,9 @@ index 0000000000000000000000000000000000000000..8912844aabecbc69be46aef56bcdd93b
 +    append(row);
 +  }
 +
-+  void observe_resolve(const FramePacket& frame, uint32_t opIndex, uint32_t flags, uint32_t width,
++  uint32_t observe_resolve(const FramePacket& frame, uint32_t opIndex, uint32_t flags, uint32_t width,
 +                       uint32_t height, const wgpu::Texture& source, const TextureHandle& target) noexcept {
-+    if (!begin_or_match(frame.frameIndex, frame.frameId)) return;
++    if (!begin_or_match(frame.frameIndex, frame.frameId)) return UINT32_MAX;
 +    if(target)promote_owned_texture_pair(target->frameEffectOwnerFacts,reinterpret_cast<uintptr_t>(target.get()),
 +        reinterpret_cast<uintptr_t>(target->texture.Get()),reinterpret_cast<uintptr_t>(target->sampleTextureView.Get()),frame.frameIndex,frame.frameId);
 +    ++counts_.resolveCount;
@@ -6074,7 +6180,9 @@ index 0000000000000000000000000000000000000000..8912844aabecbc69be46aef56bcdd93b
 +    row.value1 = height;
 +    row.handleA = handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE, source.Get());
 +    row.handleB = handle(AURORA_BROWSER_FRAME_EFFECT_HANDLE_TEXTURE, target ? target->texture.Get() : nullptr);
++    const auto index=eventCount_.load(std::memory_order_relaxed);
 +    append(row);
++    return eventCount_.load(std::memory_order_relaxed)==index+1?index:UINT32_MAX;
 +  }
 +
 +  void observe_snapshot(const FramePacket& frame, uint32_t opIndex, bool depth, uint32_t width, uint32_t height,
@@ -6487,6 +6595,8 @@ index 0000000000000000000000000000000000000000..8912844aabecbc69be46aef56bcdd93b
 +  // Each fact corresponds to one existing attachment event; same authored cap.
 +  std::array<AuroraBrowserFrameEffectAttachmentFact,EventCapacity> attachmentFacts_{};
 +  uint32_t attachmentFactCount_=0;
++  std::array<ColorConversionFact,EventCapacity> colorConversions_{};
++  uint32_t colorConversionCount_=0;bool colorConversionOverflow_=false;
 +  std::array<HandleEntry, HandleCapacity> handles_{};
 +  std::array<AuroraBrowserFrameEffectResource, ResourceCapacity> resources_{};
 +  std::array<AuroraBrowserFrameEffectBindingEntry, BindingEntryCapacity> bindingEntries_{};
@@ -6730,7 +6840,6 @@ index 0000000000000000000000000000000000000000..d636649842b7bf4a7c868c982a5c79f5
 +} // namespace aurora::gfx::detail
 +#endif
 diff --git a/lib/gfx/frame_packet.hpp b/lib/gfx/frame_packet.hpp
-index d50ce6a43a8af6071dc9e810e96e63eccc5c7640..8f7ded5ccb5c5b9d8b845c0b7780b5997e4d67e6 100644
 --- a/lib/gfx/frame_packet.hpp
 +++ b/lib/gfx/frame_packet.hpp
 @@ -1,3 +1,6 @@
@@ -6740,7 +6849,7 @@ index d50ce6a43a8af6071dc9e810e96e63eccc5c7640..8f7ded5ccb5c5b9d8b845c0b7780b599
  #pragma once
  
  #include "pipeline_cache.hpp"
-@@ -32,9 +35,20 @@ struct CustomDrawCommand {
+@@ -32,9 +35,20 @@
  struct RenderPass;
  using DrawEncoder = void (*)(void* payload, const wgpu::RenderPassEncoder& pass, const RenderPass& passInfo);
  
@@ -6762,7 +6871,18 @@ index d50ce6a43a8af6071dc9e810e96e63eccc5c7640..8f7ded5ccb5c5b9d8b845c0b7780b599
  };
  
  enum class CommandType {
-@@ -170,6 +184,9 @@ enum class FrameOpType : uint8_t {
+@@ -88,6 +102,10 @@
+   GXTexFmt resolveFormat = GX_TF_RGBA8;
+   ClipRect resolveRect;
+   Range resolveUniformRange;
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  std::array<uint32_t,4> resolveUvBits{};
++  bool resolveUvCopied=false;
++#endif
+   wgpu::Texture snapshotColorDst;
+   wgpu::TextureView snapshotDepthDst;
+   float clearDepthValue = 1.f;
+@@ -170,6 +188,9 @@
  };
  
  struct FrameOp {
@@ -6772,7 +6892,7 @@ index d50ce6a43a8af6071dc9e810e96e63eccc5c7640..8f7ded5ccb5c5b9d8b845c0b7780b599
    FrameOpType type = FrameOpType::RenderPass;
    uint32_t index = 0;
    RenderPass* renderPass = nullptr;
-@@ -182,6 +199,9 @@ struct FrameOp {
+@@ -182,6 +203,9 @@
  using RenderPassList = std::deque<RenderPass>;
  
  struct FramePacket {
@@ -8635,7 +8755,6 @@ index 0000000000000000000000000000000000000000..73b22bcdf71b1dd107ef0e26990fa4cf
 +
 +} // namespace aurora::gfx::selective
 diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
-index d04db0f34210fb56995de0793200c457aaf61233..55b9b398ccaca2f38364c4297be8747477c28408 100644
 --- a/lib/gfx/recording.cpp
 +++ b/lib/gfx/recording.cpp
 @@ -2,6 +2,12 @@
@@ -8667,7 +8786,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..55b9b398ccaca2f38364c4297be87474
  using namespace detail;
  
  namespace {
-@@ -69,6 +77,15 @@ struct FrameRecorder {
+@@ -69,6 +77,15 @@
  
  FrameRecorder g_recorder;
  
@@ -8683,7 +8802,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..55b9b398ccaca2f38364c4297be87474
  std::string pass_label(std::string_view kind) {
  #ifdef AURORA_GFX_DEBUG_GROUPS
    if (!g_recorder.debugGroupStack.empty()) {
-@@ -129,6 +146,9 @@ struct OffscreenCacheKey {
+@@ -129,6 +146,9 @@
  struct OffscreenCacheEntry {
    webgpu::TextureWithSampler color;
    webgpu::TextureWithSampler depth;
@@ -8693,7 +8812,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..55b9b398ccaca2f38364c4297be87474
  };
  absl::flat_hash_map<OffscreenCacheKey, OffscreenCacheEntry> g_offscreenCache;
  
-@@ -139,6 +159,9 @@ absl::flat_hash_map<OffscreenCacheKey, OffscreenCacheEntry> g_offscreenCache;
+@@ -139,6 +159,9 @@
  struct PassSnapshotEntry {
    webgpu::TextureWithSampler color;
    webgpu::TextureWithSampler depth; // R32Float raw depth
@@ -8703,7 +8822,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..55b9b398ccaca2f38364c4297be87474
  };
  struct PassSnapshotPool {
    std::vector<PassSnapshotEntry> entries;
-@@ -166,13 +189,26 @@ PassSnapshotEntry& acquire_pass_snapshot(uint32_t width, uint32_t height, bool w
+@@ -166,13 +189,26 @@
          .sampleCount = 1,
      };
      auto texture = webgpu::g_device.CreateTexture(&desc);
@@ -8730,7 +8849,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..55b9b398ccaca2f38364c4297be87474
    }
    if (wantDepth && (!entry.depth.texture || entry.depth.size.width != width || entry.depth.size.height != height)) {
      const wgpu::TextureDescriptor desc{
-@@ -185,14 +221,31 @@ PassSnapshotEntry& acquire_pass_snapshot(uint32_t width, uint32_t height, bool w
+@@ -185,14 +221,31 @@
          .sampleCount = 1,
      };
      auto texture = webgpu::g_device.CreateTexture(&desc);
@@ -8751,10 +8870,11 @@ index d04db0f34210fb56995de0793200c457aaf61233..55b9b398ccaca2f38364c4297be87474
          .size = size,
          .format = wgpu::TextureFormat::R32Float,
      };
+-  }
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
 +    entry.depthFacts=ownerFacts;
 +#endif
-   }
++  }
 +#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
 +  if(wantColor)promote_recorded_pool_owner(entry.colorFacts,entry.color);
 +  if(wantDepth)promote_recorded_pool_owner(entry.depthFacts,entry.depth);
@@ -8762,7 +8882,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..55b9b398ccaca2f38364c4297be87474
    return entry;
  }
  
-@@ -213,6 +266,9 @@ StagingHighWater current_high_water(const FramePacket& frame) noexcept {
+@@ -213,6 +266,9 @@
  
  FrameOp capture_frame_op(FramePacket& frame, FrameOpType type, uint32_t index) {
    FrameOp op{
@@ -8772,7 +8892,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..55b9b398ccaca2f38364c4297be87474
        .type = type,
        .index = index,
        .renderPass =
-@@ -327,9 +383,13 @@ void encode_draw(void* payload, const wgpu::RenderPassEncoder& pass, const Rende
+@@ -327,9 +383,13 @@
  
  template <auto Renderer, InlinePayload T>
  DrawCommand make_draw_command(const T& data) {
@@ -8788,7 +8908,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..55b9b398ccaca2f38364c4297be87474
    std::memcpy(command.payload.data(), &data, sizeof(data));
    return command;
  }
-@@ -342,6 +402,10 @@ void push_draw_command(DrawCommand data) {
+@@ -342,6 +402,10 @@
  OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
    OffscreenCacheKey key{width, height};
    if (const auto it = g_offscreenCache.find(key); it != g_offscreenCache.end()) {
@@ -8799,7 +8919,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..55b9b398ccaca2f38364c4297be87474
      return it->second;
    }
    const auto colorFormat = webgpu::g_graphicsConfig.surfaceConfiguration.format;
-@@ -357,7 +421,15 @@ OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
+@@ -357,7 +421,15 @@
        .sampleCount = 1,
    };
    auto colorTexture = webgpu::g_device.CreateTexture(&colorDesc);
@@ -8815,7 +8935,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..55b9b398ccaca2f38364c4297be87474
    webgpu::TextureWithSampler color{
        .texture = std::move(colorTexture),
        .view = std::move(colorView),
-@@ -375,7 +447,15 @@ OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
+@@ -375,7 +447,15 @@
        .sampleCount = 1,
    };
    auto depthTexture = webgpu::g_device.CreateTexture(&depthDesc);
@@ -8831,7 +8951,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..55b9b398ccaca2f38364c4297be87474
    webgpu::TextureWithSampler depth{
        .texture = std::move(depthTexture),
        .view = std::move(depthView),
-@@ -385,8 +465,15 @@ OffscreenCacheEntry get_offscreen_textures(uint32_t width, uint32_t height) {
+@@ -385,8 +465,15 @@
    OffscreenCacheEntry entry{
        .color = std::move(color),
        .depth = std::move(depth),
@@ -8847,7 +8967,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..55b9b398ccaca2f38364c4297be87474
    return insertIt->second;
  }
  
-@@ -530,6 +617,20 @@ void enqueue_pass(FramePacket& frame, uint32_t passIndex) {
+@@ -530,6 +617,20 @@
  
  namespace detail {
  
@@ -8868,7 +8988,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..55b9b398ccaca2f38364c4297be87474
  void begin_recording(FramePacket& packet, size_t frameSlot) {
    CHECK(!g_recorder.active(), "A recording session is already active");
    g_recorder.packet = &packet;
-@@ -584,6 +685,10 @@ RecordedFrame end_recording() {
+@@ -584,6 +685,10 @@
  }
  
  void shutdown_recording() {
@@ -8879,7 +8999,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..55b9b398ccaca2f38364c4297be87474
    for (auto& pool : g_passSnapshotPools) {
      pool = {};
    }
-@@ -634,7 +739,8 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
+@@ -634,7 +739,8 @@
                                 wgpu::TexelCopyTextureInfo tex, wgpu::Extent3D size) {
    const auto copyBytesPerRow = AURORA_ALIGN(bytesPerRow, 256);
    auto& frame = current_frame_packet();
@@ -8889,7 +9009,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..55b9b398ccaca2f38364c4297be87474
      const auto range = push_texture_data(data, bytesPerRow, rowsPerImage);
      const wgpu::TexelCopyBufferLayout layout{
          .offset = range.offset,
-@@ -645,14 +751,52 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
+@@ -645,14 +751,52 @@
      return;
    }
  
@@ -8943,7 +9063,7 @@ index d04db0f34210fb56995de0793200c457aaf61233..55b9b398ccaca2f38364c4297be87474
    auto* dst = static_cast<uint8_t*>(buffer.GetMappedRange(0, uploadSize));
    for (uint32_t row = 0; row < rowsPerImage; ++row) {
      memcpy(dst, data, bytesPerRow);
-@@ -660,6 +804,7 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
+@@ -660,6 +804,7 @@
      dst += copyBytesPerRow;
    }
    buffer.Unmap();
@@ -8951,7 +9071,19 @@ index d04db0f34210fb56995de0793200c457aaf61233..55b9b398ccaca2f38364c4297be87474
  
    const wgpu::TexelCopyBufferLayout layout{
        .offset = 0,
-@@ -877,6 +1022,9 @@ RenderTargetLayout get_render_target_layout() noexcept {
+@@ -805,6 +950,11 @@
+       static_cast<float>(rect.height) / srcH,
+   };
+   prevPass.resolveUniformRange = push_uniform(uvTransform);
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  static_assert(sizeof(uvTransform)==sizeof(prevPass.resolveUvBits));
++  std::memcpy(prevPass.resolveUvBits.data(),uvTransform.data(),sizeof(uvTransform));
++  prevPass.resolveUvCopied=true;
++#endif
+   enqueue_pass(current_frame_packet(), g_recorder.currentRenderPass);
+ 
+   // Populate new render pass from previous
+@@ -877,6 +1027,9 @@
  }
  
  void clear_caches() noexcept {
@@ -11137,3 +11269,113 @@ index 0000000000000000000000000000000000000000..17fb09eca1b46fad73f97f6f3a8d24c7
 +  assert(registry.find(exact) == nullptr);
 +  return 0;
 +}
+diff --git a/lib/gfx/tex_copy_conv.cpp b/lib/gfx/tex_copy_conv.cpp
+--- a/lib/gfx/tex_copy_conv.cpp
++++ b/lib/gfx/tex_copy_conv.cpp
+@@ -1,6 +1,9 @@
+ #include "tex_copy_conv.hpp"
+ 
+ #include "resources.hpp"
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++#include "frame_effect_observer.hpp"
++#endif
+ 
+ #include "../internal.hpp"
+ #include "../gx/gx.hpp"
+@@ -563,10 +566,21 @@
+   g_depthSnapshotPipelineMS = {};
+ }
+ 
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++static void execute(const wgpu::CommandEncoder& cmd, const ConvRequest& req, const wgpu::RenderPipeline& pipeline,ColorConversionContext* diagnostic=nullptr) {
++#else
+ static void execute(const wgpu::CommandEncoder& cmd, const ConvRequest& req, const wgpu::RenderPipeline& pipeline) {
++#endif
+   if (!pipeline) {
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    if(diagnostic)diagnostic->observer->refuse_color_conversion(diagnostic->factIndex,6);
++#endif
+     return;
+   }
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  uintptr_t localSampler=0;
++  if(diagnostic&&gx::is_depth_format(req.fmt))diagnostic->observer->refuse_color_conversion(diagnostic->factIndex,1);
++#endif
+   wgpu::BindGroup bindGroup;
+   if (gx::is_depth_format(req.fmt)) {
+     // Skip depth copies in compatibility mode
+@@ -593,6 +607,9 @@
+     bindGroup = g_device.CreateBindGroup(&bindGroupDescriptor);
+   } else {
+     const auto& sampler = req.sampleFilter == SampleFilter::Linear ? g_linearSampler : g_nearestSampler;
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    localSampler=reinterpret_cast<uintptr_t>(sampler.Get());
++#endif
+     const std::array bindGroupEntries{
+         wgpu::BindGroupEntry{
+             .binding = 0,
+@@ -636,14 +653,32 @@
+   pass.SetBindGroup(0, bindGroup);
+   pass.Draw(3);
+   pass.End();
+-}
+-
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  if(diagnostic)diagnostic->observer->return_color_conversion(diagnostic->factIndex,
++      uint32_t(req.fmt),uint32_t(req.sampleFilter),reinterpret_cast<uintptr_t>(req.srcView.Get()),
++      reinterpret_cast<uintptr_t>(req.dst->texture.Get()),reinterpret_cast<uintptr_t>(req.dst->attachmentTextureView.Get()),
++      req.uniformRange.offset,req.uniformRange.size,reinterpret_cast<uintptr_t>(pipeline.Get()),
++      reinterpret_cast<uintptr_t>(bindGroup.Get()),localSampler,reinterpret_cast<uintptr_t>(detail::resources().uniformBuffer.Get()),colorAttachments[0]);
++#endif
++}
++
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++void run(const wgpu::CommandEncoder& cmd, const ConvRequest& req,ColorConversionContext* diagnostic) {
++#else
+ void run(const wgpu::CommandEncoder& cmd, const ConvRequest& req) {
++#endif
+   const auto it = g_pipelines.find(req.fmt);
+   if (it == g_pipelines.end()) {
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    if(diagnostic)diagnostic->observer->refuse_color_conversion(diagnostic->factIndex,6);
++#endif
+     Log.fatal("No copy conversion pipeline for format {}", static_cast<int>(req.fmt));
+   }
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  execute(cmd, req, it->second,diagnostic);
++#else
+   execute(cmd, req, it->second);
++#endif
+ }
+ 
+ void blit(const wgpu::CommandEncoder& cmd, const ConvRequest& req) { execute(cmd, req, g_blitPipeline); }
+diff --git a/lib/gfx/tex_copy_conv.hpp b/lib/gfx/tex_copy_conv.hpp
+--- a/lib/gfx/tex_copy_conv.hpp
++++ b/lib/gfx/tex_copy_conv.hpp
+@@ -4,7 +4,14 @@
+ 
+ #include <dolphin/gx/GXEnum.h>
+ 
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++namespace aurora::gfx::detail {class BrowserFrameEffectObserver;}
++#endif
++
+ namespace aurora::gfx::tex_copy_conv {
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++struct ColorConversionContext {detail::BrowserFrameEffectObserver* observer=nullptr;uint32_t factIndex=UINT32_MAX;};
++#endif
+ 
+ enum class SampleFilter : uint8_t {
+   Nearest,
+@@ -23,7 +30,11 @@
+ 
+ void initialize();
+ void shutdown();
++#if defined(AURORA_BROWSER_FRAME_EFFECT_OBSERVER) && defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++void run(const wgpu::CommandEncoder& cmd, const ConvRequest& req,ColorConversionContext* diagnostic=nullptr);
++#else
+ void run(const wgpu::CommandEncoder& cmd, const ConvRequest& req);
++#endif
+ void blit(const wgpu::CommandEncoder& cmd, const ConvRequest& req);
+ 
+ bool snapshot_depth_supported() noexcept;
