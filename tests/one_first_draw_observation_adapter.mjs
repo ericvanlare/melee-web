@@ -2,7 +2,7 @@
 // selected draw scope is explicit; later original draws remain unobserved.
 import {observeOneNormalFrame} from './one_normal_frame_observation_adapter.mjs';
 import {retireNativeFrameEffect} from './match_frame_effect_driver.mjs';
-import {armNativeFrameEffectFirstDraw,readNativeFrameEffectFirstDraw,firstDrawObservationFailures,readFirstDrawComponents,armFirstDrawComponents,firstDrawComponentFailures,startFirstDrawSelectedTextureInterval,endFirstDrawSelectedTextureInterval,naturalOneEnrollmentFailures}
+import {armNativeFrameEffectFirstDraw,readNativeFrameEffectFirstDraw,firstDrawObservationFailures,readFirstDrawComponents,armFirstDrawComponents,firstDrawComponentFailures,startFirstDrawSelectedTextureInterval,endFirstDrawSelectedTextureInterval,naturalOneEnrollmentFailures,readFirstDrawHostOwners}
   from './match_frame_effect_first_draw_driver.mjs';
 export const firstDrawDriver = Object.freeze({
   armNativeFrameEffect: armNativeFrameEffectFirstDraw,
@@ -40,3 +40,29 @@ export async function observeOneFirstDraw(options) {
   }
   return result;
 }
+
+// Separate point-read record: the selected interval's eight rows stay unchanged.
+export function firstDrawHostOwnerFailures(value){
+ const exact=(v,keys)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).sort().join(',')===[...keys].sort().join(',');
+ const keys=['generation','unresolvedReads','resultCount','discSession','assetTransfer','preparing'];
+ const snapshot=v=>exact(v,keys)&&typeof v.generation==='string'&&/^(0|[1-9][0-9]*)$/.test(v.generation)&&
+   v.unresolvedReads===0&&v.resultCount===0&&v.discSession===true&&v.assetTransfer===false&&v.preparing===false;
+ if(!exact(value,['schema','status','before','after','native_quiescent','same_module','returned_idle','point_observation_only','composite_eligible'])||
+    value.schema!=='melee-web-first-draw-host-owners-v1'||value.status!=='observed'||value.native_quiescent!==1||
+    value.same_module!==true||value.returned_idle!==true||value.point_observation_only!==true||value.composite_eligible!==false||
+    !snapshot(value.before)||!snapshot(value.after)||keys.some(k=>value.before[k]!==value.after[k]))return ['host_owner_point_read_refused_or_malformed'];
+ return [];
+}
+export async function observeSelectedTextureIntervalWithHostRead({invoke,components}){
+ const host_transport={sequence:0,operation:'readFirstDrawHostOwners',argument:null};
+ try{host_transport.response=await invoke(readFirstDrawHostOwners);}
+ catch(error){host_transport.error=String(error?.message||error);return {schema:'melee-web-selected-texture-interval-observation-v1',status:'refused',
+   composite_eligible:false,started:null,ended:null,transport:[],host_owners:null,host_transport,failures:['host_owner_point_read_transport_failed']};}
+ const host_owners=host_transport.response,failures=firstDrawHostOwnerFailures(host_owners);
+ if(failures.length)return {schema:'melee-web-selected-texture-interval-observation-v1',status:'refused',composite_eligible:false,
+   started:null,ended:null,transport:[],host_owners,host_transport,failures};
+ return {...await observeSelectedTextureInterval({invoke,components}),host_owners,host_transport};
+}
+export const firstDrawHostOwnersIntervalDriver=Object.freeze({...firstDrawSelectedTextureIntervalDriver,
+ hostOwnerPointRead:'first-draw-host-owners-v1',
+ observeSelectedTextureInterval:observeSelectedTextureIntervalWithHostRead});

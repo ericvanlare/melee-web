@@ -46,7 +46,7 @@ export function validateServedRuntimeBinding(value) {
     throw Error('frame-effect producer source must be a 40-character lowercase commit id');
   if (!/^[a-f0-9]{64}$/.test(binding.source_patch_sha256 || ''))
     throw Error('frame-effect producer source_patch_sha256 must be a lowercase SHA-256 digest');
-  if (!['runtime-match-frame-effect Release','runtime-match-frame-effect Release --first-draw-components-diagnostic'].includes(binding.profile))
+  if (!['runtime-match-frame-effect Release','runtime-match-frame-effect Release --first-draw-components-diagnostic','runtime-match-frame-effect Release --first-draw-components-diagnostic --first-pair-audio-file-diagnostic'].includes(binding.profile))
     throw Error('frame-effect producer profile must be runtime-match-frame-effect Release');
   if (!binding.files || typeof binding.files !== 'object' || Array.isArray(binding.files))
     throw Error('frame-effect producer files must be an object');
@@ -314,8 +314,13 @@ export async function observeOneNormalFrame({
   result.arm_attempt = 'dispatched';
   result.cleanup_policy = 'browser_owner_only';
   const components=typeof driver.readFrameComponents==='function';
+  const hostPoint=driver.hostOwnerPointRead==='first-draw-host-owners-v1';
+  const joinedProfile=producerBinding.profile==='runtime-match-frame-effect Release --first-draw-components-diagnostic --first-pair-audio-file-diagnostic';
+  if(joinedProfile!==hostPoint||hostPoint&&(!components||driver.naturalOneEligibility!==true||typeof driver.observeSelectedTextureInterval!=='function')){
+    result.status='failed';result.failures.push('host_owner_point_profile_driver_mismatch');result.arm_attempt='not_dispatched';return result;
+  }
   if(components&&(observationScope!=='first_draw'||typeof driver.armFrameComponents!=='function'||typeof driver.componentObservationFailures!=='function'||
-      producerBinding.profile!=='runtime-match-frame-effect Release --first-draw-components-diagnostic')){
+      producerBinding.profile!==(hostPoint?'runtime-match-frame-effect Release --first-draw-components-diagnostic --first-pair-audio-file-diagnostic':'runtime-match-frame-effect Release --first-draw-components-diagnostic'))){
     result.status='failed';result.failures.push('component_private_profile_required');result.arm_attempt='not_dispatched';return result;
   }
   if(driver.naturalOneEligibility===true&&(typeof driver.observeSelectedTextureInterval!=='function'||typeof driver.naturalOneEnrollmentFailures!=='function')){
