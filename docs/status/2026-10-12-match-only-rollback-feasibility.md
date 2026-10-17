@@ -580,7 +580,7 @@ Current validation, actual capture and independent/root reviews are bound in
 `entry_authority_validation` and `entry_authority_actual_interval` in the
 [existing structured receipt](../evidence/match-only-rollback-feasibility-v1.json).
 
-The combined private runtime at `76dcf31d` now includes the existing audio/file
+The historical combined private runtime at `76dcf31d` includes the existing audio/file
 point reader, the first-draw components, and an additive conversion-dependency
 observation. The conversion JSON getter runs only after a successful closed
 texture interval; it allocates and is not safe inside a future heap checkpoint
@@ -589,7 +589,7 @@ The ordinary runtime keeps these diagnostics disabled. A narrow opt-in server
 option uses `no-cache` for the runtime `.data` response after a reduced Chrome
 loader control; unrelated responses and the default server policy are unchanged.
 
-Both affected Release builds pass. Full regression passes 2,447 tests with 164
+At that checkpoint both affected Release builds passed. Full regression passed 2,447 tests with 164
 skips in 562.944 seconds, and the actual generated JS-to-Wasm getter export is
 verified. All 45 required combined-profile artifacts and 44 ordinary artifacts
 were rehashed separately from their larger observed web directories. The earlier
@@ -617,12 +617,57 @@ groups are independently absent; cleanup passed in 146 ms. There were no page
 errors or timing pauses. H1 retained 100 of 3,139 samples, with 3,039 evicted,
 eight reason-7 incidents and no dropped incidents. Its coverage remains lossy.
 
-The next step is a small, same-call diagnostic of the native predicate's first
-failed condition, preserving its short-circuit order and refusal. No unchanged
-capture retry is authorized. The combined host boundary, conversion observation,
-renderer content preservation and same-instance restore/repeat remain open.
-Exact current validation, capture and retained-failure identities are under
-`combined_host_point_and_conversion_observation` in the existing receipt.
+That `76dcf31d` refusal remains historical evidence with its native subcondition
+unknown. The later `d5b4a1dc` diagnostic attempt stopped earlier at the original
+Items timing guard, before gameplay or a native category; it did not resume.
+The smaller `fcbb655d` route reached the same class of selected boundary under
+explicitly different original defaults: two Human Mario ports 0/1, Final
+Destination, four stocks, stock timer off, friendly fire off, pause enabled and
+full item preferences. It reuses the original CSS join and SSS inputs without
+the unrelated Main/Rules/Items tour. This is not competitive-context parity.
+
+That default-context attempt observed category 13, `ssm_not_quiescent`, without
+copying private SSM fields. Source review and the existing actual-C fixture
+then reproduced a contract mismatch: the match uses resident banks after the
+menu's SSM transport has ended, while the predicate required an active matching
+transport. The `33cd306c` query accepts a fully pristine absent SSM transport
+only for live audio. It preserves same-owner and foreign/pending/request/pumping
+checks and changes no service, pending destination, request order, PAD or RNG.
+
+Both `33cd306c` Release builds passed. Its full suite retained one failing
+exact-source test fixture for the extended profile gate. The test-only
+`38f8c91d` correction passed the entire affected wrapper and the real generated
+reason-getter export/ordinary-OFF check. Its final full regression passed 2,447
+tests with 164 skips in 560.206 seconds, with all 124 retained runtime files
+unchanged; the earlier failed result remains retained.
+
+One separately released default-context capture, using `38f8c91d` harness and
+`33cd306c` runtime, passed the combined stopped point/component observation.
+The natural callback advanced 180→181 with one original tick and full draw;
+its actual audio plan and returns were zero, with zero PCM frames. No audio
+work was invented or suppressed. The native host point returned one with
+stable before/after file facts. Component read, depth `READY`→`ACTIVE`, all eight
+interval responses, strict actual-helper replay and checked retirement passed.
+
+The allocating conversion getter ran after the closed interval and before
+retirement. Its two actual conversion records passed authenticated texture/view
+dependency joins. Pipeline/group/sampler values remain local call identities,
+not GPU creation or lifetime proof. Raw renderer findings 7/27 remain unchanged;
+packet content, restore, composite and internal GPU creation qualification remain
+false. H1 had no dropped incidents, but its sampled timeline remains lossy.
+All recorded browser identities and owned groups are independently absent.
+
+The next prerequisite is the reviewed shared-presentation extraction, followed
+by same-source match-step/audio/finish extraction with real ordinary callers,
+before authentic returned-idle prepare/dispatch. GPU content, references and
+future closure remain NO-GO.
+
+This closes only the scoped default-context point/component observation. No
+same-instance drawn restore/repeat, continuous host-future closure, PCM
+equivalence, performance or all-owner acceptance is claimed. Current validation,
+actual capture, root review and the preserved `76dc`/`d5`/`fcbb` failures are under
+`combined_host_point_and_conversion_observation` in the
+[existing structured receipt](../evidence/match-only-rollback-feasibility-v1.json).
 
 ## Slippi profile source checkpoint
 

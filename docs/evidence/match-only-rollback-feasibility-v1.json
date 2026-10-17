@@ -1467,7 +1467,7 @@
     ]
   },
   "drawn_synctest_sprint": {
-    "status": "Selected-entry stopped component passed on ba2b4b83; combined host-point capture on 76dcf31d refused native quiescence. Same-instance restore/repeat remains open.",
+    "status": "Default-context combined host point, stopped interval and conversion dependency observation passed on38f/33cd; final38f regression passed2447/164; raw7/27 and drawn restore/repeat remain open.",
     "artifact_run": "rollback-stadium-sprint-20261013-111001-9f8df4a4",
     "source": "a34d5acfa540af173d97679f7c54650ac577930a",
     "private_build_source_patch_sha256": "e932d6e21be0960b16160b0f77b81aa874b30976e899ce09848c406493a9bf61",
@@ -1539,7 +1539,7 @@
       "source_and_runtime_unchanged": true,
       "h1": "No forced timing pause reported; recorder retained seven reason-code7 incidents, no dropped incidents, 7998 evicted samples, and zero match source steps. Not a match timing result."
     },
-    "next": "Preserve aggregate refusal and exact original short-circuit order while recording same-call first native reason. Source/control review before another browser experiment.",
+    "next": "Implement the reviewed shared-presentation extraction, then same-source match-step/audio/finish extraction with real ordinary callers, before authentic returned-idle prepare/dispatch; GPU content/reference/future closure remains NO-GO.",
     "scope": "Observer and idle predicates are prerequisites only. No same-instance drawn restore, minimum complete state size or combined seven-tick budget result.",
     "hps_quiescence_controls": {
       "result": "pass-focused-component-only",
@@ -3668,14 +3668,14 @@
           "sha256": "3b0d79429156c5db3d259ba6803c6d59bfa3ece608a9ec13a9f63f14b61ac160"
         }
       },
-      "next": "Source-only reduction of broad binding-generation changes against the selected owner lifecycle. Preserve the generation check, first-sample selection, and original order; no guard weakening, later-texture reselection, unchanged retry, interval admission, or restore.",
+      "next": "Implement the reviewed shared-presentation extraction, then same-source match-step/audio/finish extraction with real ordinary callers, before authentic returned-idle prepare/dispatch; GPU content/reference/future closure remains NO-GO.",
       "limits": [
-        "Natural enrollment, component read/depth arm, native selected-witness test and GX issuance are separate boundaries. No successful selected interval, atomicity or restore established.",
+        "The historical enrollment checkpoint did not establish a successful selected interval, atomicity or restore; the current scoped stopped observation is recorded under the combined boundary.",
         "The historical dbd0/f62 and 4d00 observations remain separate; the 4d00 selected_texture_current_owner_mismatch subcondition is unobserved. The f3340de run records selected_texture_cache_generation, but not its mutation site/amount, selected-owner survival, or resource-content validity.",
         "Renderer LOAD/other finding bits do not identify the issue refusal cause.",
         "Usage20 first-sampled diagnosis withdrawn; do not select a later convenient texture or relax usage/identity predicates.",
         "H1 is bounded/lossy and does not establish event completeness or timing.",
-        "No interval fences/close, native retirement, Wasm restore/repeat, composite eligibility or gameplay rollback acceptance.",
+        "The historical enrollment checkpoint had no interval close or native retirement; the current combined boundary records those scoped observations, with no Wasm restore/repeat, composite eligibility or gameplay rollback acceptance.",
         "No clock/planner/PAD/audio/draw-order/deadline change, guard weakening, later-owner reselection, unchanged retry, or restore admission authorized."
       ],
       "capture_attempt": {
@@ -4538,89 +4538,168 @@
           ]
         },
         "combined_host_point_and_conversion_observation": {
-          "state": "SOURCE_AND_BUILD_VALIDATED_FIRST_CAPTURE_NATIVE_HOST_POINT_REFUSED",
+          "state": "PASS_DEFAULT_STOPPED_HOST_POINT_INTERVAL_CONVERSION_OBSERVATION",
           "source": {
-            "commit": "76dcf31d33646261379a60390c559157e8c14aa4",
-            "tree": "350ab2da1e9b539049bbfcd7943a7e050f81084a",
-            "parent_failed_validation": "af8922d977ad81fcd12719dcd03078ae57b5b11a",
+            "harness_commit": "38f8c91d1a8c6d628e83c466c3da2f587a84c010",
+            "harness_tree": "64eccff320567afd0116714fd8320e72ed85adac",
+            "runtime_commit": "33cd306c6963c1a46da6d67518b39e7fb3b72c70",
+            "runtime_tree": "87c674068def8e4b7ec50cb96cce6cc37fb94434",
             "aurora_tree": "b5415846c8f7cb298d30f2dae1d75864e95dc168",
-            "aurora_patch_sha256": "3d6cbf8265369baf492760ca2cbff4c4bd542f38787c6aeee54a79afa83c23df"
+            "aurora_patch_sha256": "3d6cbf8265369baf492760ca2cbff4c4bd542f38787c6aeee54a79afa83c23df",
+            "test_only_child_distinct_from_runtime": true
+          },
+          "context": {
+            "mode": "original_default_two_human_mario_final_destination",
+            "scope": "Generic stopped native-owner/component prerequisite under DEFAULT context, not reproduction/parity of the earlier competitive setup. Original CSS CPU-empty-Human join, original SSS PADstage32, exact source frame180..240; no Main/Rules/Items tour or setting injection.",
+            "rules": {
+              "match_kind": 1,
+              "stage": 32,
+              "timer_enabled": 0,
+              "time_limit": 0,
+              "disable_pausing": 0,
+              "damage_ratio_bits": "3f800000",
+              "is_stock": 1,
+              "is_vs": 1,
+              "source_sudden_death_flag": 0,
+              "item_frequency": -1,
+              "item_mask_hex": "ffffffffffffffff",
+              "is_teams": 0,
+              "player_teams": [
+                0,
+                0
+              ],
+              "player_stocks": [
+                4,
+                4
+              ],
+              "door_teams": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "friendly_fire": 0,
+              "player_source_slots": [
+                0,
+                0
+              ],
+              "resolved_controller_ports": [
+                0,
+                1
+              ],
+              "player_slot_types": [
+                0,
+                0
+              ],
+              "player_source_stocks": [
+                4,
+                4
+              ],
+              "player_source_characters": [
+                8,
+                8
+              ],
+              "player_attack_ratio_bits": [
+                "3f800000",
+                "3f800000"
+              ],
+              "player_defense_ratio_bits": [
+                "3f800000",
+                "3f800000"
+              ]
+            },
+            "rng": 3612058604,
+            "source_colors": [
+              1,
+              0
+            ],
+            "source_input_recording": "Original sourcePadSample and sourcePadTap code unchanged; actual source PAD records, CSS roster transitions and source draw order retained in report. RNG/cache/audio history is actual per attempt; equality with previous attempts is not claimed."
           },
           "validation": {
-            "result": {
-              "artifact": "renderer-hostpoint-batch-full-validation-v2/evidence/result.json",
-              "sha256": "265b0e91fd3c57d13a42a38451d9bb3e0c3433f9b203fd4897c3f447940ca400"
+            "runtime_combined_Release": {
+              "artifact": "native-ssm-absent-owner-full-validation-v1/evidence/combined-host-read-Release.json",
+              "sha256": "0577915ede565b811e1556bbf37f9e2e76f62db3a140b2589ef52af102c64998"
             },
-            "root_review": {
-              "artifact": "renderer-hostpoint-batch-full-validation-v2/evidence/root-final-review.json",
-              "sha256": "9470a6fb505309b3048137d9165b8bb6a502e6ce1f938debd7723807eb48efac"
+            "runtime_ordinary_Release": {
+              "artifact": "native-ssm-absent-owner-full-validation-v1/evidence/ordinary-Release.json",
+              "sha256": "53d4522433767d155f6f31cd5df21d36d0e29331f3212b20239d46127953f09c"
             },
-            "tests": 2447,
-            "skips": 164,
-            "suite_seconds": 562.944,
-            "affected_release_profiles": [
-              "combined first-draw/audio-file",
-              "ordinary"
-            ],
-            "required_artifacts": {
+            "required_artifact_counts": {
               "combined": 45,
               "ordinary": 44
             },
-            "observed_web_artifacts": {
+            "observed_root_web_artifact_counts": {
               "combined": 51,
               "ordinary": 71
             },
-            "actual_js_wasm_getter": "Oh"
+            "native_actual_reproduction": {
+              "artifact": "native-ssm-absent-owner-reproduction-v1/reproduction-review.json",
+              "sha256": "8e86033e56d135c65aaf1c3e7986138bf4efb1ec67e7ccfb86e41e6ff233c885"
+            },
+            "native_actual_repair": {
+              "artifact": "native-ssm-absent-owner-repair-v1/manifest.json",
+              "sha256": "f2d1c123eff574375bf8902324913cadb0ac36dd8cd5a61307f51864ad19ab23"
+            },
+            "affected_wrapper_and_real_export_OFF": {
+              "artifact": "first-draw-profile-gate-fixture-focused-v1/completion.json",
+              "sha256": "63f5d996d01a45179042c86a4b7b9f61a1dedec45d3ec9a3ad1dcb666c7869db"
+            },
+            "reason_getter_actual_Wasm_export": "Cg",
+            "ordinary_reason_binding_absent": true,
+            "final_regression": {
+              "state": "PASS",
+              "artifact": "native-ssm-final-full-regression-preparation-v1/evidence/result.json",
+              "sha256": "41371d87f0b4b317d3008a6ce4479b9c899a273c52437bcae547a27ce10c144a",
+              "source": "38f8c91d1a8c6d628e83c466c3da2f587a84c010",
+              "tests": 2447,
+              "skips": 164,
+              "test_seconds": 560.206,
+              "phase_seconds": 560.632,
+              "no_rebuild": true,
+              "runtime_files_rehashed_unchanged": 124,
+              "final_source_runtime_identities": {
+                "artifact": "native-ssm-final-full-regression-preparation-v1/final-source-runtime-identities.json",
+                "sha256": "c7dc9a1508a5a27018e737e004b769b42d26e7d9c7600dfe15a5d85576480f0f"
+              },
+              "agent_review": {
+                "artifact": "native-ssm-final-full-regression-preparation-v1/agent-result-review.json",
+                "sha256": "3f3e19a9bb9a2760ffc8f36c4fd16a6000569667aa4b9ee281c647ceb10b7543"
+              },
+              "root_review": {
+                "artifact": "native-ssm-final-full-regression-preparation-v1/root-final-review.json",
+                "sha256": "21f17b93add65eef06a05baf1a3cec92c1d3917104a43bfe27fb98e58486fa1d"
+              }
+            }
           },
           "capture": {
             "report": {
-              "artifact": "first-draw-host-conversion-capture-packet-v1/capture/browser/report.json",
-              "sha256": "a11cee1b2a614772fde23bdc0dee931cb237f03f7fbed90396220950fde1bf25"
+              "artifact": "native-ssm-pristine-absent-default-capture-packet-v1/capture/browser/report.json",
+              "sha256": "9c1165e958afebaf301797f7ac9b040527946779388be4bb4e7305f721ce59dd"
             },
             "completion": {
-              "artifact": "first-draw-host-conversion-capture-packet-v1/capture/completion.json",
-              "sha256": "827ccb4ad82373f0396392bfff3525679ecb0a0db035f9a1573d75b930120c3a"
+              "artifact": "native-ssm-pristine-absent-default-capture-packet-v1/capture/completion.json",
+              "sha256": "02cc51068fb28946173cd5a254a1ca7ea1bb478222b6d6d5a0c7089b8ecc247f"
             },
-            "owner_review": {
-              "artifact": "first-draw-host-conversion-capture-packet-v1/capture/owner-failure-review.json",
-              "sha256": "f8e556959a9408c2393a73bda238841d3ba1eb010b8c36cd5a1d0a5e5757b383"
+            "agent_review": {
+              "artifact": "native-ssm-pristine-absent-default-capture-packet-v1/capture/agent-result-review.json",
+              "sha256": "610c9d9219e21bf616f5da0e8f2abfc4265443b3d2b8e1b2d48df3d0c5a07828"
             },
             "root_review": {
-              "artifact": "first-draw-host-conversion-capture-packet-v1/capture/root-failure-review.json",
-              "sha256": "f95b6aef4be7b262023440bc7b133330a2af3331f68b58c5259a8699165fec94"
+              "artifact": "native-ssm-pristine-absent-default-capture-packet-v1/capture/root-result-review.json",
+              "sha256": "8eb9558ff7fb6e7d004fb5e87c5aa7e8e0a10b31d4ffa66706a355ac12488414"
             },
             "served_manifest": {
-              "artifact": "first-draw-host-conversion-capture-packet-v1/served-runtime.json",
-              "sha256": "7100c6fdc15b4432e95342549eea237d97b80c8bac28e30d0254b41d837296c3"
+              "artifact": "native-ssm-pristine-absent-default-capture-packet-v1/served-runtime.json",
+              "sha256": "8df6edbc36f46a07208069f8939633777f6fea8f618023bf52b4b4c72a3cd25e"
             },
-            "release": {
-              "artifact": "first-draw-host-conversion-capture-packet-v1/root-capture-release.json",
-              "sha256": "240e2723513d5126d287fa262d467e1214bb9a2e9b87f60c09a63041d62436b5"
+            "raw_manifest": {
+              "artifact": "native-ssm-pristine-absent-default-capture-packet-v1/capture/raw-manifest.json",
+              "sha256": "c2a33cf75506b18087d0bdefd64aa92c760f9202a05701856ef1c83faa711000"
             },
-            "first_failure": {
-              "schema": "melee-web-first-draw-host-owners-v1",
-              "status": "refused",
-              "reason": "native_file_owners_not_quiescent",
-              "before": {
-                "generation": "2",
-                "unresolvedReads": 0,
-                "resultCount": 0,
-                "discSession": true,
-                "assetTransfer": false,
-                "preparing": false
-              },
-              "after": {
-                "generation": "2",
-                "unresolvedReads": 0,
-                "resultCount": 0,
-                "discSession": true,
-                "assetTransfer": false,
-                "preparing": false
-              },
-              "native_quiescent": 0,
-              "composite_eligible": false
+            "strict_replay": {
+              "artifact": "native-ssm-pristine-absent-default-capture-packet-v1/capture/strict-selected-replay.result.json",
+              "sha256": "d6dcc15e7863278fc1738b978de945c6867e8e980b6ecb5d39c0061a177c1048"
             },
-            "exact_native_subcondition": "UNKNOWN",
             "natural_enrollment": {
               "schema": "melee-web-natural-one-tick-enrollment-v1",
               "copied": true,
@@ -4630,7 +4709,7 @@
               "origin_frame": 180,
               "selected_frame": 180,
               "owner_generation": 2,
-              "origin_audio_phase": 0,
+              "origin_audio_phase": 40,
               "row_capacity": 61,
               "row_count": 1,
               "callback_sequence": "1",
@@ -4651,61 +4730,371 @@
                   "source_before": 180,
                   "source_after": 181,
                   "planned_steps": 1,
-                  "planned_audio_steps": 1,
+                  "planned_audio_steps": 0,
                   "tick_returns": 1,
                   "draw_returns": 1,
-                  "audio_returns": 1,
-                  "pcm_frames": 533,
-                  "audio_phase_before": 0,
-                  "audio_phase_after": 20,
+                  "audio_returns": 0,
+                  "pcm_frames": 0,
+                  "audio_phase_before": 40,
+                  "audio_phase_after": 40,
                   "selected": true
                 }
               ]
             },
+            "host_point": {
+              "schema": "melee-web-first-draw-host-owners-v1",
+              "status": "observed",
+              "before": {
+                "generation": "2",
+                "unresolvedReads": 0,
+                "resultCount": 0,
+                "discSession": true,
+                "assetTransfer": false,
+                "preparing": false
+              },
+              "after": {
+                "generation": "2",
+                "unresolvedReads": 0,
+                "resultCount": 0,
+                "discSession": true,
+                "assetTransfer": false,
+                "preparing": false
+              },
+              "native_quiescent": 1,
+              "same_module": true,
+              "returned_idle": true,
+              "point_observation_only": true,
+              "composite_eligible": false
+            },
+            "host_transport": {
+              "sequence": 0,
+              "operation": "readFirstDrawHostOwners",
+              "argument": null,
+              "response": {
+                "schema": "melee-web-first-draw-host-owners-v1",
+                "status": "observed",
+                "before": {
+                  "generation": "2",
+                  "unresolvedReads": 0,
+                  "resultCount": 0,
+                  "discSession": true,
+                  "assetTransfer": false,
+                  "preparing": false
+                },
+                "after": {
+                  "generation": "2",
+                  "unresolvedReads": 0,
+                  "resultCount": 0,
+                  "discSession": true,
+                  "assetTransfer": false,
+                  "preparing": false
+                },
+                "native_quiescent": 1,
+                "same_module": true,
+                "returned_idle": true,
+                "point_observation_only": true,
+                "composite_eligible": false
+              }
+            },
             "component_read": "read",
             "depth_before": "READY",
             "depth_after": "ACTIVE",
-            "interval_responses": 0,
-            "conversion_getter_ran": false,
-            "native_retired": false,
+            "interval_responses": 8,
+            "strict_actual_helper_replay": "PASS consumed8",
+            "conversion_getter_ran": true,
+            "conversion_getter_timing": "Diagnostic allocating Wasm serialization only after actual closed8response interval and before checked native retirement; not heap-pure.",
+            "conversion_event_indices": [
+              121,
+              249
+            ],
+            "conversion_dependenciesObserved": true,
+            "conversion_count": 2,
+            "conversion_identity_scope": "Authenticated texture/view/device/renderer_epoch joins; pipeline/group/sampler are local_call_identity only, not creation or lifetime authority.",
+            "packetContentQualified": false,
+            "restoreEligible": false,
+            "compositeEligible": false,
+            "internalGpuCreationOwnershipQualified": false,
+            "native_retired": true,
+            "resumable": false,
             "restore_ran": false,
             "renderer_first_blocker": 7,
             "renderer_finding_bits": [
               7,
               27
             ],
-            "cleanup": {
-              "owned_pids_absent": 15,
-              "owned_groups_absent": 4,
-              "owner_elapsed_ms": 58334,
-              "cleanup_ms": 146
-            },
+            "renderer_finding_mask": "134217856",
             "h1": {
-              "callbacks": 3139,
-              "retained": 100,
-              "evicted": 3039,
-              "incidents": 8,
+              "callbacks": 523,
+              "samples": 81,
+              "sample_capacity": 100,
+              "dropped_samples": 442,
+              "sample_gap_scope": "Intentional thinning/ring-bounded, not continuous timing proof",
+              "incidents": [
+                {
+                  "at_ms": 7166.025000095367,
+                  "reason_code": 7,
+                  "value": 0,
+                  "threshold": 0,
+                  "source_frame": 0,
+                  "scene": 7,
+                  "clock_owner_code": 0,
+                  "callback_ms": 0.0950002670288086
+                }
+              ],
+              "incident_capacity": 24,
               "dropped_incidents": 0,
-              "scope": "Lossy component evidence; no timing acceptance"
+              "unknown_reasons": 0,
+              "failures": []
             },
-            "page_errors": [],
-            "timing_pauses": [],
-            "secondary_failure": "Strict offline replay refused absent interval after first host-point refusal"
+            "cleanup": {
+              "owned_browser_pids_absent": 9,
+              "owned_groups_absent": 5,
+              "owner_elapsed_ms": 19029,
+              "cleanup_ms": 151,
+              "scope": "Exact nine browser identities and fivegroups checked independently absent; cleanup time is distinct from capture elapsed."
+            },
+            "source_runtime_unchanged": true
+          },
+          "ssm_contract_reduction": {
+            "observed_before_repair": "Default-context fcbb/d5 capture reported first native category13 ssm_not_quiescent. It did not copy private SSM fields.",
+            "source_and_component_evidence": "Menu SSM transport is ended and zeroed before match; match resident banks do not start it. Existing actual-C fixture reproduced pristine absent+activeaudio refusal without changing production predicate or state bytes.",
+            "repair": "Pure query now validates liveaudio and accepts only completely pristine absent SSM; original same-owner idle branch and all foreign/pending/request/pumping refusals preserved. Every logical scalar, all256pathbytes and all55mappingrows3fields checked; 431 poison cases and request/order/destination immutability controls passed. No drain/pump/cancel/state/input/RNG mutation was introduced."
           },
           "retained_failures": {
-            "initial_full_suite": "af8922d9: canonical patch bytes and neighboring getter exact-body fixture; no build ran after failure",
-            "repair": "Two-file repair keeps actual Aurora tree and getter body; failed outputs retained in renderer-hostpoint-batch-full-validation-v1",
-            "capture_preparation": "Import enumerator initially matched prose; declaration-anchored inventory corrected before any launch",
-            "audit_preparation": "Root first compared every build-root file with web inventory; corrected to original launcher web suffix set without artifact/capture changes"
+            "76dc_competitive_native0": {
+              "scope": "Original first combined capture retains aggregate native0; exact subcondition remains UNKNOWN, not retroactively assigned13.",
+              "checkpoint": "historical_76dc_checkpoint"
+            },
+            "d5_competitive_H1_route": {
+              "report": {
+                "artifact": "native-file-quiescence-reason-capture-packet-v1/capture/browser/report.json",
+                "sha256": "e4f85139a3e766e26bcc133f9a14b415fcaff620555cfcb1ed405882a2830ca5"
+              },
+              "review": {
+                "artifact": "native-file-quiescence-reason-capture-packet-v1/capture/agent-failure-review.json",
+                "sha256": "d078e3a0b30bb68bbc0baab972722ec30cec5614c4100e60e9c467c20a4f0da8"
+              },
+              "failure": "Original Items simulation_debt10>8 before first m; no gameplay/nativecategory/interval/conversion. No Resume/retry. Screenshot perturbation not proved."
+            },
+            "fcbb_default_SSM_category13": {
+              "report": {
+                "artifact": "native-file-default-first-draw-capture-packet-v1/capture/browser/report.json",
+                "sha256": "564721661d8b8cd2551eedc8aec005590ddbbb65c249bb1a7d56d25c815d8297"
+              },
+              "review": {
+                "artifact": "native-file-default-first-draw-capture-packet-v1/capture/agent-result-review.json",
+                "sha256": "4208e86c6f75c11741d12329b5c42d97d2c023a0e968486b9d3b2b5cfe43685b"
+              },
+              "harness": "fcbb655d72e052cad0cb50b2dc2373cb57036fbc",
+              "runtime": "d5b4a1dc53955f5c7b3dd3d136af6f71c7e54aa0",
+              "native_refusal": {
+                "code": 13,
+                "category": "ssm_not_quiescent"
+              },
+              "audio_returns": 2,
+              "pcm_frames": 1067,
+              "interval_responses": 0,
+              "native_retired": false
+            },
+            "33cd_single_suite_fixture_failure": {
+              "result": {
+                "artifact": "native-ssm-absent-owner-full-validation-v1/evidence/result.json",
+                "sha256": "307ea9d614b17584eb565a604fc0ffe39d9ba4f8a2ba6a51cd3c5da22b18b69c"
+              },
+              "root_review": {
+                "artifact": "native-ssm-absent-owner-full-validation-v1/root-failure-review.json",
+                "sha256": "1b6372805553c19b9e4ea296da896114a3bdf8c6dc7c2fb8444ddea9e409bf06"
+              },
+              "tests": 2447,
+              "skips": 164,
+              "failures": 1,
+              "seconds": 561.833,
+              "cause": "Actual joinedprofile guard exact-source fixture searched old spelling and lacked default bool binding; no runtime repair was needed. Onefiletest-only38f fix passed entire affectedwrapper and real reasonexport/OFF."
+            }
+          },
+          "historical_76dc_checkpoint": {
+            "state": "SOURCE_AND_BUILD_VALIDATED_FIRST_CAPTURE_NATIVE_HOST_POINT_REFUSED",
+            "source": {
+              "commit": "76dcf31d33646261379a60390c559157e8c14aa4",
+              "tree": "350ab2da1e9b539049bbfcd7943a7e050f81084a",
+              "parent_failed_validation": "af8922d977ad81fcd12719dcd03078ae57b5b11a",
+              "aurora_tree": "b5415846c8f7cb298d30f2dae1d75864e95dc168",
+              "aurora_patch_sha256": "3d6cbf8265369baf492760ca2cbff4c4bd542f38787c6aeee54a79afa83c23df"
+            },
+            "validation": {
+              "result": {
+                "artifact": "renderer-hostpoint-batch-full-validation-v2/evidence/result.json",
+                "sha256": "265b0e91fd3c57d13a42a38451d9bb3e0c3433f9b203fd4897c3f447940ca400"
+              },
+              "root_review": {
+                "artifact": "renderer-hostpoint-batch-full-validation-v2/evidence/root-final-review.json",
+                "sha256": "9470a6fb505309b3048137d9165b8bb6a502e6ce1f938debd7723807eb48efac"
+              },
+              "tests": 2447,
+              "skips": 164,
+              "suite_seconds": 562.944,
+              "affected_release_profiles": [
+                "combined first-draw/audio-file",
+                "ordinary"
+              ],
+              "required_artifacts": {
+                "combined": 45,
+                "ordinary": 44
+              },
+              "observed_web_artifacts": {
+                "combined": 51,
+                "ordinary": 71
+              },
+              "actual_js_wasm_getter": "Oh"
+            },
+            "capture": {
+              "report": {
+                "artifact": "first-draw-host-conversion-capture-packet-v1/capture/browser/report.json",
+                "sha256": "a11cee1b2a614772fde23bdc0dee931cb237f03f7fbed90396220950fde1bf25"
+              },
+              "completion": {
+                "artifact": "first-draw-host-conversion-capture-packet-v1/capture/completion.json",
+                "sha256": "827ccb4ad82373f0396392bfff3525679ecb0a0db035f9a1573d75b930120c3a"
+              },
+              "owner_review": {
+                "artifact": "first-draw-host-conversion-capture-packet-v1/capture/owner-failure-review.json",
+                "sha256": "f8e556959a9408c2393a73bda238841d3ba1eb010b8c36cd5a1d0a5e5757b383"
+              },
+              "root_review": {
+                "artifact": "first-draw-host-conversion-capture-packet-v1/capture/root-failure-review.json",
+                "sha256": "f95b6aef4be7b262023440bc7b133330a2af3331f68b58c5259a8699165fec94"
+              },
+              "served_manifest": {
+                "artifact": "first-draw-host-conversion-capture-packet-v1/served-runtime.json",
+                "sha256": "7100c6fdc15b4432e95342549eea237d97b80c8bac28e30d0254b41d837296c3"
+              },
+              "release": {
+                "artifact": "first-draw-host-conversion-capture-packet-v1/root-capture-release.json",
+                "sha256": "240e2723513d5126d287fa262d467e1214bb9a2e9b87f60c09a63041d62436b5"
+              },
+              "first_failure": {
+                "schema": "melee-web-first-draw-host-owners-v1",
+                "status": "refused",
+                "reason": "native_file_owners_not_quiescent",
+                "before": {
+                  "generation": "2",
+                  "unresolvedReads": 0,
+                  "resultCount": 0,
+                  "discSession": true,
+                  "assetTransfer": false,
+                  "preparing": false
+                },
+                "after": {
+                  "generation": "2",
+                  "unresolvedReads": 0,
+                  "resultCount": 0,
+                  "discSession": true,
+                  "assetTransfer": false,
+                  "preparing": false
+                },
+                "native_quiescent": 0,
+                "composite_eligible": false
+              },
+              "exact_native_subcondition": "UNKNOWN",
+              "natural_enrollment": {
+                "schema": "melee-web-natural-one-tick-enrollment-v1",
+                "copied": true,
+                "state": 3,
+                "minimum_frame": 180,
+                "maximum_frame": 240,
+                "origin_frame": 180,
+                "selected_frame": 180,
+                "owner_generation": 2,
+                "origin_audio_phase": 0,
+                "row_capacity": 61,
+                "row_count": 1,
+                "callback_sequence": "1",
+                "selection_callback": "1",
+                "skipped_callbacks": "0",
+                "skipped_ticks": "0",
+                "skipped_draws": "0",
+                "skipped_audio": "0",
+                "skipped_pcm_frames": "0",
+                "source_free_callbacks": "0",
+                "source_free_audio": "0",
+                "source_free_pcm_frames": "0",
+                "callback_open": false,
+                "error": "",
+                "rows": [
+                  {
+                    "callback_sequence": "1",
+                    "source_before": 180,
+                    "source_after": 181,
+                    "planned_steps": 1,
+                    "planned_audio_steps": 1,
+                    "tick_returns": 1,
+                    "draw_returns": 1,
+                    "audio_returns": 1,
+                    "pcm_frames": 533,
+                    "audio_phase_before": 0,
+                    "audio_phase_after": 20,
+                    "selected": true
+                  }
+                ]
+              },
+              "component_read": "read",
+              "depth_before": "READY",
+              "depth_after": "ACTIVE",
+              "interval_responses": 0,
+              "conversion_getter_ran": false,
+              "native_retired": false,
+              "restore_ran": false,
+              "renderer_first_blocker": 7,
+              "renderer_finding_bits": [
+                7,
+                27
+              ],
+              "cleanup": {
+                "owned_pids_absent": 15,
+                "owned_groups_absent": 4,
+                "owner_elapsed_ms": 58334,
+                "cleanup_ms": 146
+              },
+              "h1": {
+                "callbacks": 3139,
+                "retained": 100,
+                "evicted": 3039,
+                "incidents": 8,
+                "dropped_incidents": 0,
+                "scope": "Lossy component evidence; no timing acceptance"
+              },
+              "page_errors": [],
+              "timing_pauses": [],
+              "secondary_failure": "Strict offline replay refused absent interval after first host-point refusal"
+            },
+            "retained_failures": {
+              "initial_full_suite": "af8922d9: canonical patch bytes and neighboring getter exact-body fixture; no build ran after failure",
+              "repair": "Two-file repair keeps actual Aurora tree and getter body; failed outputs retained in renderer-hostpoint-batch-full-validation-v1",
+              "capture_preparation": "Import enumerator initially matched prose; declaration-anchored inventory corrected before any launch",
+              "audit_preparation": "Root first compared every build-root file with web inventory; corrected to original launcher web suffix set without artifact/capture changes"
+            },
+            "limits": [
+              "Point read is not continuous lifecycle authority",
+              "Allocating conversion JSON getter is outside any future heap interval",
+              "Conversion handles are not GPU creation/lifetime authority",
+              "No interval, conversion result, native retirement or restore in this capture",
+              "Renderer contents, native references, host futures and composite admission remain open"
+            ],
+            "next": "Preserve aggregate refusal and exact original short-circuit order while recording same-call first native reason. Source/control review before another browser experiment."
           },
           "limits": [
-            "Point read is not continuous lifecycle authority",
-            "Allocating conversion JSON getter is outside any future heap interval",
-            "Conversion handles are not GPU creation/lifetime authority",
-            "No interval, conversion result, native retirement or restore in this capture",
-            "Renderer contents, native references, host futures and composite admission remain open"
+            "Point-read and stopped component observations are not continuous lifecycle authority or all-owner coverage",
+            "Raw LOAD7/shape27 findings preserved; dependency facts do not qualify packetcontent",
+            "Conversion JSON allocation is outside a future heap checkpoint; local GPU handles do not qualify creation/lifetime",
+            "Selectedcallback audio0/PCM0 reflects original scheduledcadence; no missingaudio fix, PCM equivalence or uninterruptedaudio claim",
+            "Native references, host/device futures, resource content/recreation and same-instance drawn restore/repeat remain open"
           ],
-          "next": "Preserve aggregate refusal and exact original short-circuit order while recording same-call first native reason. Source/control review before another browser experiment."
+          "next": "Implement the reviewed shared-presentation extraction, then same-source match-step/audio/finish extraction with real ordinary callers, before authentic returned-idle prepare/dispatch; GPU content/reference/future closure remains NO-GO.",
+          "next_prerequisite_review": {
+            "artifact": "shared-menu-presentation-extraction-candidate-v1/root-source-review.json",
+            "sha256": "0032644319d1fc30c0f93d3c5ce6a6f43943a0a943e8ab06114cabe3d1b016db",
+            "state": "SOURCE_REVIEW_PASS_UNAPPLIED_UNRUN"
+          }
         }
       }
     }
