@@ -25,21 +25,25 @@ class NormalMatchExecutionNativeTests(OwnedWorkspaceTests):
             self.assertEqual(hashlib.sha256(body.encode()).hexdigest(),expected,
                              'Reviewed original block changed: '+name)
         for call in ['execute_match_source_step(sample,source_frames,elapsed,audio_elapsed,',
-                     'render_normal_callback_audio(audio_owner,audio_elapsed,audio_before_construction,error\n',
+                     'render_normal_callback_audio(callback_audio_owner,callback_audio_elapsed,audio_before_construction,error\n',
                      'finish_source_callback_draw(source_frames,present_source\n']:
             self.assertEqual(source.count(call),1)
         fixture=(ROOT/'tests/normal_match_execution_native_controls.cpp').read_text()
+        selector_start=source.index('   if(diagnostic_pad_remaining){',source.index('void tick(){'))
+        selector_end=source.index('   if(match&&match->sudden_death())',selector_start)
+        selector=source[selector_start:selector_end]
         self.assertNotIn('static unsigned replay_steps',fixture)
         self.assertNotIn('static void replay_boundary_mark',fixture)
-        self.assertEqual(fixture.count('const LocalMarker replay_boundary_mark{'),3)
+        self.assertEqual(fixture.count('const LocalMarker replay_boundary_mark{'),4)
         self.assertEqual(fixture.count('// ACTUAL_NORMAL_MATCH_IMPLEMENTATION'),1)
         scratch=self.new_workspace(ROOT,'normal-match-execution-native-')
         cpp=scratch/'actual-normal-match.cpp'
-        cpp.write_text(fixture.replace('// ACTUAL_NORMAL_MATCH_IMPLEMENTATION',implementation))
+        cpp.write_text(fixture.replace('// ACTUAL_NORMAL_MATCH_IMPLEMENTATION',implementation)
+                       .replace('// ACTUAL_QUEUED_DIAGNOSTIC_PAD_SELECTION',selector))
         for name,flags in [('diagnostic',['-DMELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC']),
                            ('public',['-DMELEE_WEB_PUBLIC_RUNTIME'])]:
             binary=scratch/name
-            argv=[compiler,'-std=c++20','-O3','-DNDEBUG',*flags,'-I',str(ROOT/'src'),str(cpp),'-o',str(binary)]
+            argv=[compiler,'-std=c++20','-O3','-DNDEBUG','-DTARGET_PC',*flags,'-I',str(ROOT/'src'),'-I',str(ROOT/'.deps/aurora/include'),str(cpp),'-o',str(binary)]
             build=subprocess.run(argv,capture_output=True,text=True,timeout=90)
             (scratch/(name+'-compile.log')).write_text(build.stdout+build.stderr)
             self.assertEqual(build.returncode,0,build.stdout+build.stderr)

@@ -6,6 +6,8 @@
 #include "gameplay_menu_frame_effect.hpp"
 #endif
 #include <emscripten/em_macros.h>
+#include <cstring>
+#include <optional>
 extern "C" uint32_t gm_801A4BA8(void);
 #if defined(MELEE_WEB_NET_SESSION)
 extern "C" int melee_web_net_publish_local_input(
@@ -1772,6 +1774,53 @@ void finish_source_callback_draw(melee_web::SourceFrameSequence& source_frames,
  // SOURCE_FINISH_BODY_END
 }
 
+// Own final selected PAD bytes and the actual already-sampled plan only.
+// Native owner pointers are borrowed for this current synchronous callback.
+bool owned_normal_match_plan_eligible(const melee_web::FixedTickClock::Tick& elapsed,
+                                     const melee_web::FixedTickClock::Tick& audio_elapsed,
+                                     bool audio_before_construction,bool has_replay,
+                                     bool network_before_step,bool copied_input,
+                                     bool normal_owner_ready,bool preparing,int stock_check,
+                                     bool has_audio){
+ return elapsed.steps==1&&audio_elapsed.steps<=1&&!elapsed.stalled&&!audio_elapsed.stalled&&
+        !audio_before_construction&&!has_replay&&!network_before_step&&!copied_input&&
+        normal_owner_ready&&!preparing&&stock_check==0&&has_audio;
+}
+class OwnedNormalMatchPlan {
+ std::array<PADStatus,4> pads_;
+ melee_web::FixedTickClock::Tick elapsed_,audio_elapsed_;
+ melee_web::GameplayMatchSession* borrowed_match_;
+ MeleeWebAudio* borrowed_audio_;
+ bool consumed_=false;
+public:
+ OwnedNormalMatchPlan(const PADStatus* selected,
+                      const melee_web::FixedTickClock::Tick& elapsed,
+                      const melee_web::FixedTickClock::Tick& audio_elapsed,
+                      melee_web::GameplayMatchSession* borrowed_match,MeleeWebAudio* borrowed_audio):
+  elapsed_(elapsed),audio_elapsed_(audio_elapsed),borrowed_match_(borrowed_match),borrowed_audio_(borrowed_audio){
+  check(selected!=nullptr,"Owned normal match plan lacks selected input");
+  std::memcpy(pads_.data(),selected,sizeof(pads_));
+ }
+ OwnedNormalMatchPlan(const OwnedNormalMatchPlan&)=delete;
+ OwnedNormalMatchPlan& operator=(const OwnedNormalMatchPlan&)=delete;
+ OwnedNormalMatchPlan(OwnedNormalMatchPlan&&)=delete;
+ OwnedNormalMatchPlan& operator=(OwnedNormalMatchPlan&&)=delete;
+ const PADStatus* pads()const{return pads_.data();}
+ const melee_web::FixedTickClock::Tick& source_elapsed()const{return elapsed_;}
+ const melee_web::FixedTickClock::Tick& audio_elapsed()const{return audio_elapsed_;}
+ MeleeWebAudio* borrowed_audio()const{return borrowed_audio_;}
+ void consume(melee_web::SourceFrameSequence& source_frames,int& result,
+              unsigned& replay_steps,unsigned& replay_draw_boundaries){
+  check(!consumed_,"Owned normal match plan was already consumed");
+  consumed_=true;
+  check(match&&match.get()==borrowed_match_,
+        "Owned normal match plan current callback owner changed");
+  const PADStatus* sample=pads_.data();
+  execute_match_source_step(sample,source_frames,elapsed_,audio_elapsed_,false,false,result,
+                            replay_steps,replay_draw_boundaries);
+ }
+};
+
 void tick(){
 #if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
  if(frame_effect_terminal())return;
@@ -1847,6 +1896,7 @@ void tick(){
  const bool replay_input_already_drawn=replay_completion.final_input_drawn;
  unsigned replay_steps=0;
  unsigned replay_draw_boundaries=0;
+ std::optional<OwnedNormalMatchPlan> owned_normal_plan;
  try{
   if(startup_pipeline_service_failed){
    startup_pipeline_service_failed=false;
@@ -2041,7 +2091,8 @@ void tick(){
    }
    if(match&&match->sudden_death())
     check(!replay&&!melee_web_net_active(),"Sudden Death has no admitted replay/network timeline");
-   if(melee_web_net_active()){
+   const bool network_before_step=melee_web_net_active();
+   if(network_before_step){
     // Agreed network input replaces the sample at the replay seam. Without
     // the next frame this is a network wait: no tick and no clock debt.
     if(!melee_web_net_capture_local_input(input->samples,input->raw)){
@@ -2095,9 +2146,16 @@ void tick(){
     }
    }
    if(match){
+    if(owned_normal_match_plan_eligible(elapsed,audio_elapsed,audio_before_construction,
+          bool(replay),network_before_step,copied_input||sample!=input->raw,running&&!faulted&&!pending,
+          preparation.busy(),stock_check,audio_owner!=nullptr)){
+     owned_normal_plan.emplace(sample,elapsed,audio_elapsed,match.get(),audio_owner);
+     owned_normal_plan->consume(source_frames,result,replay_steps,replay_draw_boundaries);
+    }else{
     execute_match_source_step(sample,source_frames,elapsed,audio_elapsed,
                               audio_before_construction,replay_whole,result,
                               replay_steps,replay_draw_boundaries);
+    }
    }
    else if(results){
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
@@ -2172,7 +2230,9 @@ void tick(){
     pending=true;clear_diagnostic_pad();break;
    }
   }
-  render_normal_callback_audio(audio_owner,audio_elapsed,audio_before_construction,error
+  const auto& callback_audio_elapsed=owned_normal_plan?owned_normal_plan->audio_elapsed():audio_elapsed;
+  MeleeWebAudio* const callback_audio_owner=owned_normal_plan?owned_normal_plan->borrowed_audio():audio_owner;
+  render_normal_callback_audio(callback_audio_owner,callback_audio_elapsed,audio_before_construction,error
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
                                ,replay_boundary_mark
 #endif
