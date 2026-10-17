@@ -1564,3 +1564,13 @@ export function createFirstSssVsSetupComparator(expectedSetup, prefix, entryStat
   return Object.freeze({compare, status: () => Object.freeze({attempted, approved, failed,
     first_mismatch: firstMismatch})});
 }
+
+// Pure field comparison shared by the separately source-bound current-context
+// endpoint. Historical constructor/prefix admission remains unchanged.
+export function compareCurrentSssExitCommonFields(actual, expected) {
+  if (!exactRoute(actual?.scene_routing_getters, expected?.scene_routing_getters))
+    return mismatch('current_sss_exit.scene_routing_getters', expected?.scene_routing_getters,
+      actual?.scene_routing_getters);
+  return actualRulesMismatch(actual, expected, 'current_sss_exit') ||
+    actualPlayersMismatch(actual, expected, 'current_sss_exit');
+}

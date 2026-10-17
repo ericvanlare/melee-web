@@ -7,6 +7,8 @@
  * supplied. Native source phase/cursor snapshots are retained at bounded
  * changes, and every failure writes the report before the browser closes.
  */
+import {installCurrentSssExitReplayArm, validateCurrentSssExitExpected, compareCurrentSssExitObservation,
+  validateCurrentSssExitTrace, validateCurrentSssExitTerminal} from './stadium_current_sss_exit_observation.mjs';
 import fs from 'node:fs/promises';
 import {closeSync, createReadStream, fsyncSync, openSync, writeSync} from 'node:fs';
 import path from 'node:path';
@@ -59,6 +61,8 @@ const {values, tokens} = parseArgs({tokens: true, options: {
   'first-replay-callback-probe': {type: 'boolean', default: false},
   'runtime-incidents': {type: 'boolean', default: false},
   'expected-frame0': {type: 'string'},
+  'stadium-current-sss-exit-expected': {type: 'string'},
+  'stadium-current-sss-exit-expected-sha256': {type: 'string'},
   'artifact-root': {type: 'string'},
 }});
 
@@ -147,12 +151,21 @@ if (diagnostic && (values['cpu-observations'] || rngDrawProbe || hitTransitionPr
 if (firstReplayCallbackProbe && (diagnostic || !expectedFrame0Path || stopAfter || resumeTimingPauses ||
     captureCpuObservations || rngDrawProbe || hitTransitionProbe))
   throw Error('--first-replay-callback-probe requires --expected-frame0 and cannot be combined with prefix, resume, CPU, or RNG probes');
-if (!firstReplayCallbackProbe && (expectedFrame0Path || values['artifact-root']))
+const currentSssExitPath = values['stadium-current-sss-exit-expected']
+  ? path.resolve(values['stadium-current-sss-exit-expected']) : null;
+const currentSssExit = currentSssExitPath !== null;
+if (currentSssExit !== !!values['stadium-current-sss-exit-expected-sha256'] ||
+    (currentSssExit && (diagnostic || firstReplayCallbackProbe || captureCpuObservations ||
+      rngDrawProbe || hitTransitionProbe || stopAfter || resumeTimingPauses || runtimeIncidentRecording ||
+      values.mode !== 'state' || !values['artifact-root'] || !values['runtime-data'] ||
+      phaseTimeoutMs > 150000 || replayTimeoutMs > 150000)))
+  throw Error('Current SSS observation requires explicit state/expectation/hash/artifacts/data and unchanged150s bounds only');
+if (!firstReplayCallbackProbe && !currentSssExit && (expectedFrame0Path || values['artifact-root']))
   throw Error('--expected-frame0 and --artifact-root require --first-replay-callback-probe');
 const runtimeDataUrl = new URL('gameplay_menu_browser.data', url).href;
 const output = path.resolve(values.out);
 const observationTimeoutMs = diagnostic ? diagnosticProtocol.observation_timeout_ms : Math.min(phaseTimeoutMs, 5000);
-const inputPaths = [values.disc, values.recipe, values.manifest, values['runtime-data'], expectedFrame0Path]
+const inputPaths = [values.disc, values.recipe, values.manifest, values['runtime-data'], expectedFrame0Path, currentSssExitPath]
   .filter(Boolean).map(value => path.resolve(value));
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const artifactRoot = path.resolve(values['artifact-root'] || path.join(repoRoot, 'build/browser-release'));
@@ -165,7 +178,7 @@ if (firstReplayCallbackProbe) {
 }
 const report = {
   schema: 'melee-web-headless-whole-session-replay-v1',
-  scope: firstReplayCallbackProbe ? 'Single headless first-replay-callback boundary observation; not a complete replay or GPU-cause finding' :
+  scope: currentSssExit ? 'Retained first SSS OnExit common-field component; expected TIME replay refusal, UNKNOWN menu draw parity, no Entry/C3' : firstReplayCallbackProbe ? 'Single headless first-replay-callback boundary observation; not a complete replay or GPU-cause finding' :
     stoppedScenePair ? 'One bounded paired stopped-scene screenshot timing check; image presence does not establish visible gameplay' :
     diagnostic ? 'One bounded headless natural-pause performance diagnosis; no admission, pixel, PCM, foreground, or physical-input claim' :
     'Single headless browser MWRC v8/v9/v10 diagnostic; no pixel, PCM, performance, or admission claim',
@@ -203,6 +216,8 @@ const report = {
   browser_errors: [],
   unexpected_requests: [],
 };
+let currentSssExpected, currentSssRecipeBytes, currentSssArm;
+let currentSssTrace = null;
 let browser;
 let page;
 let driver;
@@ -217,7 +232,10 @@ async function closeOwnedCaptureBrowser() {
       report.cleanup ||= {};
       report.cleanup.browser_context_closed = true;
     }
-    else if (browser) await boundedCaptureOperation(browser.close(), observationTimeoutMs, 'owned browser close');
+    else if (browser) {
+      await boundedCaptureOperation(browser.close(), observationTimeoutMs, 'owned browser close');
+      if (currentSssExit) { report.cleanup ||= {}; report.cleanup.browser_close_returned = true; }
+    }
   } catch (error) { report.close_error = String(error); }
   try {
     if (diagnosticCdp)
@@ -398,8 +416,10 @@ async function snapshot(reason = 'poll', {captureCss = !diagnostic} = {}) {
   let value;
   try {
     if (pageObservationTimedOut) return {reason, snapshot_error: 'Page observation already timed out'};
-    value = await observePageOperation(`snapshot ${reason}`, page.evaluate(({reason, captureCss}) => {
+    value = await observePageOperation(`snapshot ${reason}`, page.evaluate(({reason, captureCss, currentSssExit}) => {
       const module = globalThis.Module;
+      if (currentSssExit && module?.stadiumMatchedSetupNativeIdle?.() !== true)
+        return {reason, busy: true}; // Suppress every native snapshot call during Asyncify.
       const ready = globalThis.__meleeNativeRuntimeReady === true;
       const call = name => {
         if (!ready) return null;
@@ -446,7 +466,7 @@ async function snapshot(reason = 'poll', {captureCss = !diagnostic} = {}) {
         replay_report: replayReport,
         replay_downloads: [...document.querySelectorAll('#retail-replay-downloads a')].map(link => link.download),
       };
-    }, {reason, captureCss}));
+    }, {reason, captureCss, currentSssExit}));
   } catch (error) {
     firstError('snapshot', error.message || error);
     return {reason, snapshot_error: String(error.message || error)};
@@ -769,6 +789,22 @@ try {
     if (!report.artifact_inventory_pre.equal)
       throw Error(`Local and served browser artifact inventory differs before capture: ${report.artifact_inventory_pre.mismatches.join(', ')}`);
   }
+  if (currentSssExit) {
+    report.inputs.current_sss_expected = await statInput(currentSssExitPath);
+    if (report.inputs.current_sss_expected.sha256 !== values['stadium-current-sss-exit-expected-sha256'])
+      throw Error('Current SSS expectation hash differs');
+    currentSssExpected = validateCurrentSssExitExpected(JSON.parse(await fs.readFile(currentSssExitPath, 'utf8')));
+    if (currentSssExpected.recipe.sha256 !== report.inputs.recipe.sha256 ||
+        currentSssExpected.recipe.bytes !== recipeBytes.length || report.requested_entity_prefix)
+      throw Error('Current SSS literal recipe/profile differs');
+    for (const identity of Object.values(currentSssExpected.source_binding.files))
+      if (await digest(identity.path) !== identity.sha256) throw Error('Current SSS original source input changed');
+    currentSssRecipeBytes = Array.from(recipeBytes);
+    report.current_sss_exit = {component_pass: false, runtime_replay: 'NOT_RUN',
+      original_menu_draw_parity: 'UNKNOWN', Entry: false, C3: false};
+    report.artifact_inventory_pre = await browserArtifactInventory();
+    if (!report.artifact_inventory_pre.equal) throw Error('Current SSS served/local artifact inventory differs');
+  }
   const cpuObservationRowLimit = report.recipe_header.frames;
   report.cpu_observation_row_limit = cpuObservationRowLimit;
   browserTools ||= await loadBrowserTools(values.playwright);
@@ -780,7 +816,7 @@ try {
       viewport: {width: diagnosticProtocol.viewport_width,
       height: diagnosticProtocol.viewport_height},
       deviceScaleFactor: diagnosticProtocol.device_scale_factor} : {})};
-  if (firstReplayCallbackProbe) browserOptions.args = [...(browserOptions.args || []), '--enable-automation'];
+  if (firstReplayCallbackProbe || currentSssExit) browserOptions.args = [...(browserOptions.args || []), '--enable-automation'];
   if (diagnostic) {
     const chromeVersionOutput = execFileSync(browserPath, ['--version'], {encoding: 'utf8'}).trim();
     const chromeVersion = chromeVersionOutput.match(/\d+(?:\.\d+){2,3}/)?.[0] ?? null;
@@ -825,7 +861,7 @@ try {
     if (!Array.isArray(report.browser_process_info) || !report.browser_process_info.length)
       throw Error('Owned Chrome CDP process inventory is unavailable');
     await write('report.json', report);
-    if (firstReplayCallbackProbe) {
+    if (firstReplayCallbackProbe || currentSssExit) {
       report.browser.command_line = (await browserCdp.send('Browser.getBrowserCommandLine')).arguments || [];
       report.browser_system_info = await browserCdp.send('SystemInfo.getInfo');
       await write('report.json', report);
@@ -1037,7 +1073,45 @@ try {
     report.trace_configuration = naturalPauseTraceSettings.trace;
     report.trace_started_at_utc = new Date().toISOString();
   }
-  if (firstReplayCallbackProbe) await firstReplayCallbackPhase();
+  if (currentSssExit) {
+    currentSssArm = await observePageOperation('install current SSS returned-parser arm', () =>
+      page.evaluateHandle(installCurrentSssExitReplayArm, {recipeBytes: currentSssRecipeBytes}));
+    await phase('current-sss-exit-component', async () => {
+      const deadline = Date.now() + replayTimeoutMs;
+      await page.locator('#retail-replay-start').click();
+      while (Date.now() < deadline) {
+        const wrapper = await observePageOperation('current SSS wrapper state', () =>
+          currentSssArm.evaluate(scope => scope.state()));
+        report.current_sss_exit.wrapper = wrapper;
+        if (!wrapper.owned || wrapper.failure) throw Error(wrapper.failure || 'Current SSS replay wrapper replaced');
+        const observed = await observePageOperation('current SSS copied observation', () =>
+          currentSssArm.evaluate(scope => scope.observe()));
+        if (observed.busy) { await new Promise(resolve => setTimeout(resolve, replayPollMs)); continue; }
+        const value = observed.value;
+        if (value.notification_received && !report.current_sss_exit.observation) {
+          report.current_sss_exit.observation = value;
+          await write('current-sss-exit-observation.json', value); // retain before assertions
+          report.current_sss_exit.comparison = compareCurrentSssExitObservation(value, currentSssExpected);
+        }
+        const last = await snapshot('current-sss-exit-poll', {captureCss: false});
+        if (!last || last.snapshot_error) throw Error(last?.snapshot_error || 'Current SSS page unavailable');
+        if (last.busy) { await new Promise(resolve => setTimeout(resolve, replayPollMs)); continue; }
+        if ((last.replay_downloads || []).includes('retail-browser-report.json')) {
+          report.browser_report = last.replay_report;
+          if (!report.current_sss_exit.observation)
+            throw Error(wrapper.failure || 'Replay ended before current SSS note');
+          report.current_sss_exit.terminal = validateCurrentSssExitTerminal(last.replay_report, last, currentSssExpected);
+          report.current_sss_exit.runtime_replay = 'FAIL_INCOMPLETE_EXPECTED_TIME_REFUSAL';
+          return;
+        }
+        if (last.runtime_error && !String(last.runtime_error).includes(currentSssExpected.expected_runtime_refusal))
+          throw Error(last.runtime_error);
+        if (pageErrors.length) throw Error('Current SSS browser diagnostics failed');
+        await new Promise(resolve => setTimeout(resolve, replayPollMs));
+      }
+      throw Error('Current SSS observation exceeded unchanged bounded replay interval');
+    }, replayTimeoutMs, 0);
+  } else if (firstReplayCallbackProbe) await firstReplayCallbackPhase();
   else await phase('whole-session-replay', async () => {
     const replayStartedAt = Date.now();
     let lastProgressWriteAt = 0;
@@ -1458,6 +1532,7 @@ try {
         if (report.saved_downloads.some(row => row.name === artifact.name))
           throw Error(`Duplicate exported artifact: ${artifact.name}`);
         await write(artifact.name, artifact.text);
+        if (currentSssExit && artifact.name === 'retail-port.jsonl') currentSssTrace = artifact.text;
         report.saved_downloads.push({name: artifact.name, bytes: Buffer.byteLength(artifact.text), sha256: createHash('sha256').update(artifact.text).digest('hex')});
       }
     } catch (error) { report.download_error = String(error?.message || error); }
@@ -1518,6 +1593,15 @@ try {
     firstError('runtime_incident_recording', reason, report.last_successful_snapshot ?? null);
   }
   } finally {
+    if (currentSssArm && !pageObservationTimedOut && page && !page.isClosed()) {
+      try {
+        report.current_sss_exit.wrapper_final = await observePageOperation('current SSS callback ownership', () =>
+          currentSssArm.evaluate(scope => scope.state()));
+        report.current_sss_exit.wrapper_restored = await observePageOperation('restore current SSS replay callback', () =>
+          currentSssArm.evaluate(scope => scope.dispose()));
+        await currentSssArm.dispose();
+      } catch (error) { firstError('current_sss_callback_cleanup', error.message || error); }
+    }
     await closeOwnedCaptureBrowser();
   }
   for (const candidate of runtimeDataAbortCandidates) {
@@ -1617,7 +1701,36 @@ try {
       clean_prefix: captureValid && ['cursor_limit', 'replay_timeout', 'paired_screenshot_target'].includes(terminal?.outcome),
       terminal_failure: terminal?.outcome === 'runtime_error'};
     report.result = captureValid ? 'captured' : 'incomplete';
-  } else finalizeSessionCapture(report);
+  } else {
+    finalizeSessionCapture(report); // Keep original incomplete-replay classification truthful.
+    if (currentSssExit) {
+      report.original_replay_capture_result = report.result;
+      try {
+        report.artifact_inventory_post = await browserArtifactInventory();
+        if (!report.artifact_inventory_post.equal ||
+            JSON.stringify(report.artifact_inventory_post) !== JSON.stringify(report.artifact_inventory_pre))
+          throw Error('Current SSS artifact inventory changed');
+        const expectedLegacyFailures = ['Whole-session replay did not complete successfully',
+          'Browser replay report is incomplete or failed'];
+        if (JSON.stringify(report.finalization_failures) !== JSON.stringify(expectedLegacyFailures))
+          throw Error('Current SSS capture has additional standard finalization failures');
+        if (!report.current_sss_exit?.comparison?.pass || !report.current_sss_exit?.terminal?.pass ||
+            !currentSssTrace || report.first_error || report.browser_errors.length || report.unexpected_requests.length ||
+            report.close_error || report.cdp_close_error || report.download_error || report.screenshot_error ||
+            report.current_sss_exit.wrapper_restored !== true || report.cleanup?.browser_close_returned !== true)
+          throw Error('Current SSS component evidence/diagnostics/cleanup incomplete');
+        report.current_sss_exit.trace_comparison = validateCurrentSssExitTrace(currentSssTrace,
+          currentSssExpected, report.current_sss_exit.observation);
+        report.current_sss_exit.component_pass = true;
+        report.result = 'component_pass_replay_refused';
+      } catch (error) {
+        report.current_sss_exit ||= {};
+        report.current_sss_exit.component_pass = false;
+        report.current_sss_exit.failure = String(error.message || error);
+        report.result = 'fail';
+      }
+    }
+  }
   await write('report.json', report);
   if (report.failure) await write('failure.txt', report.failure + '\n');
   }
@@ -1626,6 +1739,9 @@ try {
 if (diagnostic) {
   if (report.result !== 'captured' || process.exitCode) process.exitCode = 1;
   else console.log(`captured: ${report.natural_pause_terminal?.outcome || 'unknown'}; diagnosis only`);
+} else if (currentSssExit) {
+  if (report.result !== 'component_pass_replay_refused') process.exitCode = 1;
+  else console.log('component pass: retained SSS OnExit fields; original TIME replay refused/incomplete; no Entry/C3');
 } else if (report.result !== 'pass') process.exitCode = 1;
 else if (firstReplayCallbackProbe)
   console.log(`pass: first replay callback returned at cursor ${report.post_callback_native_state?.source_cursor}; ${report.boundary_markers_received} durable markers; no full-session or GPU-cause claim`);

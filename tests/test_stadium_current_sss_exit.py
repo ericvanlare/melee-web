@@ -91,4 +91,14 @@ int main(){auto& s=current_sss_exit;auto reset=[&]{s=State{};s.recipe=replay.get
 '''
   run(fixture+fn+main,self.new_workspace(ROOT,'current-sss-notify-'))
 
+class CurrentSssExitHostControls(unittest.TestCase):
+ def test_replay_wrapper_and_common_field_controls(self):
+  node=shutil.which('node')
+  if not node:self.skipTest('Node required for host mechanism controls')
+  result=subprocess.run([node,'--test',str(ROOT/'tests/stadium_current_sss_exit_observation.test.mjs')],
+      text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=30)
+  print(result.stdout,end='')
+  self.assertEqual(result.returncode,0,result.stdout)
+  self.assertIn('# fail 0',result.stdout)
+
 if __name__=='__main__':unittest.main()
