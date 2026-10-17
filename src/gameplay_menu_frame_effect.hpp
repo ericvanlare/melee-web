@@ -6,6 +6,9 @@ extern bool transition_audio_continues;
 bool frame_effect_terminal();
 void frame_effect_callback_started();
 #if defined(MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC)
+#if defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
+bool frame_effect_host_read_boundary_ready();
+#endif
 void frame_effect_native_plan(unsigned steps,unsigned audio_steps,bool stalled,bool construction);
 #endif
 void frame_effect_callback_aborted(const char* reason);

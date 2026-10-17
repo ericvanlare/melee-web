@@ -552,3 +552,40 @@ export function naturalOneEnrollmentFailures(v,receipt,{originFrame}={}){
     BigInt(receipt.audio_phase_before)!==(BigInt(v.origin_audio_phase)+32000n*z('skipped_audio'))%60n)return fail();
  return [];
 }
+
+// Opt-in point observation only; no pair arm, advancement or pumping.
+export function readFirstDrawHostOwners(){
+ const refuse=(reason,extra={})=>({schema:'melee-web-first-draw-host-owners-v1',status:'refused',reason,...extra,composite_eligible:false});
+ try{
+ const module=globalThis.Module, host=globalThis.window;
+ const reader=host?.menuFirstPairHostReadSnapshot;
+ const native=module?._melee_web_native_menu_first_pair_file_owners_quiescent;
+ const idle=()=>globalThis.Module===module&&globalThis.__meleeWebFirstDrawComponentModuleV1===module&&
+   module?.matchFrameEffectNativeIdle?.()===true&&module.matchFrameEffectCallbackReturned===true&&
+   typeof module._melee_web_native_menu_running==='function'&&module._melee_web_native_menu_running()===0;
+ const stable=()=>idle()&&globalThis.window===host&&host.menuFirstPairHostReadSnapshot===reader&&
+   module._melee_web_native_menu_first_pair_file_owners_quiescent===native&&host.__meleeWebFirstPairFileGuardArmed===false;
+ const valid=v=>v&&typeof v==='object'&&!Array.isArray(v)&&
+   Object.keys(v).sort().join(',')==='assetTransfer,discSession,generation,preparing,resultCount,unresolvedReads'&&
+   typeof v.generation==='string'&&/^(0|[1-9][0-9]*)$/.test(v.generation)&&
+   Number.isSafeInteger(v.unresolvedReads)&&v.unresolvedReads>=0&&Number.isSafeInteger(v.resultCount)&&v.resultCount>=0&&
+   ['discSession','assetTransfer','preparing'].every(k=>typeof v[k]==='boolean');
+ if(!idle())return refuse('same_module_or_returned_idle_missing');
+ if(typeof reader!=='function'||typeof native!=='function')return refuse('host_owner_readers_missing');
+ if(!stable())return refuse('module_reader_or_arm_changed');
+  const before=reader();
+  if(!valid(before))return refuse('host_owner_snapshot_malformed');
+  if(!stable())return refuse('module_reader_or_arm_changed');
+  const native_quiescent=native();
+  if(!stable())return refuse('module_reader_or_arm_changed');
+  const after=reader();
+  if(!valid(after))return refuse('host_owner_snapshot_malformed',{before});
+  if(!stable())return refuse('module_reader_or_arm_changed',{before,after});
+  if(native_quiescent!==1)return refuse('native_file_owners_not_quiescent',{before,after,native_quiescent});
+  if(Object.keys(before).some(k=>before[k]!==after[k]))return refuse('host_owner_snapshot_drift',{before,after,native_quiescent});
+  if(before.unresolvedReads!==0||before.resultCount!==0||!before.discSession||before.assetTransfer||before.preparing)
+   return refuse('host_file_work_pending',{before,after,native_quiescent});
+  return {schema:'melee-web-first-draw-host-owners-v1',status:'observed',before,after,native_quiescent,
+    same_module:true,returned_idle:true,point_observation_only:true,composite_eligible:false};
+ }catch{return refuse('host_owner_reader_failed');}
+}

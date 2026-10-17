@@ -70,11 +70,18 @@ class TextureReadonlyGuardBuildTests(unittest.TestCase):
         self.assertIn('-DMELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC=OFF',ordinary)
         self.assertIn('-DAURORA_BROWSER_TEXTURE_READONLY_GUARD=OFF',ordinary)
 
+    def test_explicit_first_draw_host_read_profile(self):
+        root=self.configured_root();build=fixture.BUILD
+        configure=next(c for c in self.calls(root,build.MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET,
+                       first_draw_components_diagnostic=True,first_pair_audio_file_diagnostic=True,configure_only=True) if '-S' in c)
+        self.assertEqual(configure[configure.index('-B')+1],str(root/'build/browser-first-draw-host-read-release'))
+        for flag in ['MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC','MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC','AURORA_BROWSER_TEXTURE_READONLY_GUARD','MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC']:
+            self.assertIn('-D'+flag+'=ON',configure)
+
     def test_first_draw_components_invalid_combinations_refuse_before_prepare(self):
         build=fixture.BUILD
         for target,options in [('runtime',{}),(build.TEXTURE_READONLY_GUARD_TARGET,{}),
-                               (build.MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET,{'configuration':'RelWithDebInfo'}),
-                               (build.MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET,{'first_pair_audio_file_diagnostic':True})]:
+                               (build.MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET,{'configuration':'RelWithDebInfo'})]:
             with self.subTest(target=target,options=options),patch.object(build,'prepare_sources') as prepare:
                 with self.assertRaises(ValueError):
                     build.build(3,target=target,**{'configuration':'Release','first_draw_components_diagnostic':True,**options})

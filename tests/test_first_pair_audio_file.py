@@ -21,6 +21,13 @@ class FirstPairAudioFileGuardTests(unittest.TestCase):
         self.assertIn("postcallback provenance cannot arm", output)
         self.assertIn("Zero-audio returned provenance and later actual audio schedule PASS", output)
 
+    def test_first_draw_host_owner_point_read_controls(self):
+        node = pinned_node_or_skip(self, ROOT)
+        result = subprocess.run([str(node), str(ROOT / "tests/first_draw_host_owners_test.mjs")],
+                                cwd=ROOT, capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Actual first-draw host owner point-read controls PASS", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

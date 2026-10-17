@@ -2229,7 +2229,11 @@ extern "C" {
 
 #if defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
 int melee_web_native_menu_first_pair_file_owners_quiescent(){
- if(!match||!running||faulted||pending||preparation.busy()||replay||
+ bool boundary_running=running;
+#if defined(MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC)
+ if(!boundary_running)boundary_running=frame_effect_host_read_boundary_ready();
+#endif
+ if(!match||!boundary_running||faulted||pending||preparation.busy()||replay||
     asset_destination!=AssetDestination::None||results||prize)return 0;
  MeleeWebAudio* const audio=match->audio();
  const MeleeWebSourceFileScope* const source_files=match->source_file_scope();

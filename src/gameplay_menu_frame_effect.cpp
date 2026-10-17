@@ -485,3 +485,13 @@ int melee_web_native_menu_frame_effect_retire(){try{
  return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
 }
+
+#if defined(MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC) && defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
+namespace melee_web_menu_browser {
+bool frame_effect_host_read_boundary_ready(){
+ aurora::gfx::detail::NativeSubmissionPendingFacts facts{};
+ return copy_ready_first_draw_component_facts(facts)==nullptr&&
+        aurora::gfx::detail::native_submission_component_ready(facts);
+}
+}
+#endif

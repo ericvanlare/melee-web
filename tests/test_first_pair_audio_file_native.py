@@ -231,6 +231,63 @@ class FirstPairAudioFileNativeTests(OwnedWorkspaceTests):
                          f"{result.stdout}{result.stderr}")
         return result
 
+    def test_actual_first_draw_host_owner_qualification_join(self):
+        # Actual join/export bodies; lower readiness outcomes are synthetic here.
+        # Existing source-owner and component-copier controls cover lower services.
+        emsdk, _, emxx, _, node = self._prerequisites()
+        env = dict(os.environ, EMSDK=str(emsdk), EM_CONFIG=str(emsdk / ".emscripten"),
+                   EM_CACHE=str(emsdk / "upstream/emscripten/cache"), EMSDK_PYTHON=sys.executable,
+                   TMPDIR=str(self.work))
+        env.pop("_EMCC_CCACHE", None)
+        owner = _function_body((ROOT / "src/gameplay_menu_browser.cpp").read_text(),
+                               "int melee_web_native_menu_first_pair_file_owners_quiescent()")
+        helper = _function_body((ROOT / "src/gameplay_menu_frame_effect.cpp").read_text(),
+                                "bool frame_effect_host_read_boundary_ready()")
+        dependencies = r"""
+namespace aurora::gfx::detail { struct NativeSubmissionPendingFacts{};
+bool submissionReady=true;
+bool native_submission_component_ready(const NativeSubmissionPendingFacts&){return submissionReady;} }
+const char* copyRefusal=nullptr;unsigned copyCalls=0;
+const char* copy_ready_first_draw_component_facts(aurora::gfx::detail::NativeSubmissionPendingFacts&){++copyCalls;return copyRefusal;}
+"""
+        main = r"""
+int main(){
+ CHECK(melee_web_native_menu_first_pair_file_owners_quiescent()==1);CHECK(copyCalls==0);
+ running=false;
+#if defined(MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC)
+ CHECK(melee_web_native_menu_first_pair_file_owners_quiescent()==1);
+ copyRefusal="original_boundary_missing";CHECK(!melee_web_native_menu_first_pair_file_owners_quiescent());copyRefusal=nullptr;
+ aurora::gfx::detail::submissionReady=false;CHECK(!melee_web_native_menu_first_pair_file_owners_quiescent());aurora::gfx::detail::submissionReady=true;
+ for(bool* flag:{&hpsIdle,&ssmIdle,&filesIdle}){*flag=false;CHECK(!melee_web_native_menu_first_pair_file_owners_quiescent());*flag=true;}
+ for(bool* flag:{&faulted,&pending,&replay,&results,&prize}){*flag=true;CHECK(!melee_web_native_menu_first_pair_file_owners_quiescent());*flag=false;}
+ session.a=&wrongAudio;CHECK(!melee_web_native_menu_first_pair_file_owners_quiescent());session.a=&ownedAudio;
+ session.f=&wrongFiles;CHECK(!melee_web_native_menu_first_pair_file_owners_quiescent());session.f=&ownedFiles;
+ preparation.active=true;CHECK(!melee_web_native_menu_first_pair_file_owners_quiescent());preparation.active=false;
+ asset_destination=AssetDestination::Match;CHECK(!melee_web_native_menu_first_pair_file_owners_quiescent());asset_destination=AssetDestination::None;
+ match=nullptr;CHECK(!melee_web_native_menu_first_pair_file_owners_quiescent());
+#else
+ CHECK(!melee_web_native_menu_first_pair_file_owners_quiescent());CHECK(copyCalls==0);
+#endif
+ std::puts("Actual host owner qualification join PASS");}
+"""
+        for label,flags in [("legacy",[]),("joined",["-DMELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC=1"])]:
+            source=self.work / f"host_join_{label}.cpp"
+            header = ROOT / "src/gameplay_menu_frame_effect.hpp"
+            source.write_text('#define MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC 1\n'
+                              '#define MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC 1\n'
+                              'struct PADStatus;\n#include "' + str(header) + '"\n'
+                              '#undef MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC\n'
+                              + ('#define MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC 1\n' if flags else '')
+                              + OWNER_STUBS + dependencies
+                              + 'namespace melee_web_menu_browser {\n' + helper + '\n}\n'
+                              + 'using namespace melee_web_menu_browser;\n' + owner + main)
+            output=self.work / f"host_join_{label}.js"
+            self._run(f"compile actual {label} host-owner join",
+                      [emxx,"-O3","-DNDEBUG","-std=gnu++20","-sENVIRONMENT=node",
+                       "-sEXIT_RUNTIME=1",*flags,source,"-o",output],self.work,env,timeout=90)
+            result=self._run(f"run actual {label} host-owner join",[node,output],self.work,env,timeout=30)
+            self.assertIn("Actual host owner qualification join PASS",result.stdout)
+
     def test_actual_hps_ssm_source_file_and_owner_controls(self):
         emsdk, emcc, emxx, database, node = self._prerequisites()
         entries = json.loads(database.read_text(encoding="utf-8"))

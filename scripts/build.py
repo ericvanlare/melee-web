@@ -134,7 +134,7 @@ def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
     root = Path(root)
     if target not in BUILD_TARGETS and target not in TRACE_TARGETS:
         raise ValueError(f"Unsupported build target: {target}")
-    if first_draw_components_diagnostic and (target != MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET or first_pair_audio_file_diagnostic):
+    if first_draw_components_diagnostic and target != MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET:
         raise ValueError("First-draw components require an isolated runtime-match-frame-effect variant")
     if first_pair_audio_file_diagnostic and target != MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET:
         raise ValueError("First-pair audio/file controls require runtime-match-frame-effect")
@@ -152,7 +152,7 @@ def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
                 fma_collision_diagnostic or fma_velocity_y_diagnostic):
             raise ValueError("runtime-match-frame-effect requires its isolated private build profile")
         if first_draw_components_diagnostic:
-            return root / "build/browser-first-draw-components-release"
+            return root / ("build/browser-first-draw-host-read-release" if first_pair_audio_file_diagnostic else "build/browser-first-draw-components-release")
         return root / ("build/browser-first-pair-audio-file-release" if first_pair_audio_file_diagnostic else "build/browser-match-frame-effect-release")
     fma_requested = fma_collision_diagnostic or fma_velocity_y_diagnostic
     if target == FMA_DIAGNOSTIC_TARGET:
@@ -1036,7 +1036,7 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
             raise ValueError("runtime-fma-diagnostic cannot be combined with another private build profile")
     elif fma_collision_diagnostic or fma_velocity_y_diagnostic:
         raise ValueError("FMA diagnostic switches require --target runtime-fma-diagnostic")
-    if first_draw_components_diagnostic and (target != MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET or first_pair_audio_file_diagnostic):
+    if first_draw_components_diagnostic and target != MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET:
         raise ValueError("First-draw components require an isolated runtime-match-frame-effect variant")
     if first_pair_audio_file_diagnostic and target != MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET:
         raise ValueError("First-pair audio/file controls require runtime-match-frame-effect")
