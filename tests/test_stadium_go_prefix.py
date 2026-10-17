@@ -820,6 +820,7 @@ enum class SliceTag { SdItemsLock = 56 };
 struct Probe {
   Core::System system;
   bool stadium_go_prefix_enabled = false, transform_prefix_enabled = false;
+  bool stadium_whole_feedback = false;
   bool read_bytes_ok = true, read_words_ok = true, add_ok = true;
   u8 menu_kind = 16;
   int byte_reads = 0, word_reads = 0, adds = 0;

@@ -881,7 +881,7 @@ env.clear();for(u32 pc:added){primary_calls=0;Observer::OnBoundary(&system,pc,&s
             with patch('whole_session_replay._first_css_context',return_value={
                 'game_rules_hex':raw_rules.hex(),'save_data_hex':raw_save.hex()}):r.accept(row)
         admit(rules,save)
-        for index,value in [(2,0),(4,3),(7,1),(10,0)]:
+        for index,value in [(2,0),(4,3),(8,1),(9,1),(10,0)]:
             bad=rules.copy();bad[index]=value
             with self.assertRaises(ValueError):admit(bad,save)
         for index,value in [(0x448,2),(0x450,0),(0x458,0)]:
@@ -1006,6 +1006,118 @@ int main(){Core::System s;Gate off;assert(off.AddMenuSteeringSlices(&s));assert(
         cpp.write_text(fixture)
         subprocess.run(['/usr/bin/clang++','-std=c++17','-Wall','-Wextra','-Werror',str(cpp),'-o',str(binary)],check=True,timeout=60)
         subprocess.run([str(binary)],check=True,timeout=15)
+
+
+    def test_retained_personal_export_wrong_gci_always_refuses(self):
+        allocation=load_exact('capture_allocation_history',SOURCE_ROOT/'scripts/capture_allocation_history.py')
+        bad=self.workspace/'wrong-personal.gci';bad.write_bytes(b'not the retained source export')
+        with self.assertRaises(ValueError):allocation.validate_retained_personal_export({},bad)
+
+    def test_actual_retained_personal_export_admission_and_copy_refusals(self):
+        setting=os.environ.get('MELEE_STADIUM_PERSONAL_EXPORT_BINDING')
+        if not setting:self.skipTest('Retained exact Personal export binding not configured')
+        binding=json.loads(Path(setting).read_text())
+        for path,digest in binding['files'].items():
+            self.assertEqual(hashlib.sha256(Path(path).read_bytes()).hexdigest(),digest)
+        allocation=load_exact('capture_allocation_history',SOURCE_ROOT/'scripts/capture_allocation_history.py')
+        card=Path(binding['card']);source_report=Path(binding['report']);source_manifest=Path(binding['manifest'])
+        expected_hash=hashlib.sha256(card.read_bytes()).hexdigest()
+        original=card.read_bytes()
+        provenance=json.loads(Path(binding['provenance']).read_text())
+        allocation.validate_retained_personal_provenance(provenance,
+            {'USA/Card A/'+card.name:expected_hash},expected_hash,
+            hashlib.sha256(source_report.read_bytes()).hexdigest())
+        for key,value in [('source_profile_mode','Everything unlocked'),('source_profile_gci_sha256','0'*64),
+                          ('source_profile_export_report_sha256','0'*64),('source_revision','0'*40)]:
+            bad=copy.deepcopy(provenance);bad[key]=value
+            with self.subTest(provenance_key=key),self.assertRaises(ValueError):
+                allocation.validate_retained_personal_provenance(bad,{'USA/Card A/'+card.name:expected_hash},
+                    expected_hash,hashlib.sha256(source_report.read_bytes()).hexdigest())
+        bad=copy.deepcopy(provenance);bad.pop('parent_provenance')
+        with self.assertRaises(ValueError):allocation.validate_retained_personal_provenance(bad,
+            {'USA/Card A/'+card.name:expected_hash},expected_hash,hashlib.sha256(source_report.read_bytes()).hexdigest())
+        export=dict(source_run_report=str(source_report),source_run_report_sha256=hashlib.sha256(source_report.read_bytes()).hexdigest(),
+            source_run_manifest=str(source_manifest),source_run_manifest_sha256=hashlib.sha256(source_manifest.read_bytes()).hexdigest(),
+            source_run_check='personalStateSurvivedReload',profile_mode='Personal progress',
+            exported_gci_sha256=expected_hash,exported_gci_bytes=card.stat().st_size)
+        receipt=dict(disc=dict(sha256='b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c'),
+            initial_card=dict(file_count=1,format='single imported retained Personal progress GCI',
+                gci_filename=card.name,gci_sha256=expected_hash,save_mode='Personal progress'),
+            source_profile_export=export)
+        link=self.workspace/'personal-link.gci';link.symlink_to(card)
+        with self.assertRaises(ValueError):allocation.validate_retained_personal_export(receipt,link)
+        # Execute the complete existing setup loader over actual retained files
+        # and the genuinely linked9494 manifest; no native process or fake service.
+        from types import SimpleNamespace
+        setup_path=Path(binding['setup_receipt'])
+        full_args=SimpleNamespace(disc=Path(binding['disc']),dol=Path(binding['dol']),
+            dolphin=Path(binding['native_binary']),template_user=Path(binding['profile']),
+            checkpoint_gc=Path(binding['checkpoint_gc']),initial_gci=card,
+            provenance=Path(binding['provenance']))
+        actual_manifest=allocation.validate_reference_build_manifest(
+            Path(binding['native_manifest']),Path(binding['native_binary']))
+        admitted=allocation.validate_setup_receipt(setup_path,full_args,actual_manifest)
+        self.assertEqual(admitted['card_baseline'],'single imported retained Personal progress GCI')
+        self.assertEqual(admitted['initial_profile_sha256'],expected_hash)
+        bad_args=copy.copy(full_args);bad_args.initial_gci=link
+        with self.assertRaises(ValueError):allocation.validate_setup_receipt(setup_path,bad_args,actual_manifest)
+        # The initial source is ordinary; independently reject a linked card
+        # directory or linked isolated card file before admission, not only copy.
+        for linked_directory in [True,False]:
+            root=self.workspace/('linked-personal-directory' if linked_directory else 'linked-personal-file')
+            (root/'USA').mkdir(parents=True)
+            if linked_directory:
+                (root/'USA/Card A').symlink_to(Path(binding['checkpoint_gc'])/'USA/Card A',target_is_directory=True)
+            else:
+                (root/'USA/Card A').mkdir()
+                (root/'USA/Card A'/card.name).symlink_to(card)
+            linked_args=copy.copy(full_args);linked_args.checkpoint_gc=root
+            with self.subTest(linked_directory=linked_directory),self.assertRaises(ValueError):
+                allocation.validate_setup_receipt(setup_path,linked_args,actual_manifest)
+            self.assertEqual(card.read_bytes(),original)
+        false_setup=json.loads(setup_path.read_text());false_setup['initial_card']['save_mode']='Everything unlocked'
+        false_path=self.workspace/'wrong-personal-setup.json';false_path.write_text(json.dumps(false_setup))
+        with self.assertRaises(ValueError):allocation.validate_setup_receipt(false_path,full_args,actual_manifest)
+        bad_manifest=copy.deepcopy(actual_manifest);bad_manifest['sha256']='0'*64
+        with self.assertRaises(ValueError):allocation.validate_setup_receipt(setup_path,full_args,bad_manifest)
+        result=allocation.validate_retained_personal_export(receipt,card)
+        self.assertEqual(result[0],source_report.resolve());self.assertEqual(result[2],source_manifest.resolve())
+        for key,value in [('profile_mode','Everything unlocked'),('exported_gci_sha256','0'*64),
+                          ('exported_gci_bytes',1),('source_run_check','invented-PASS'),
+                          ('source_run_report_sha256','0'*64),('source_run_manifest_sha256','0'*64)]:
+            wrong=copy.deepcopy(receipt);wrong['source_profile_export'][key]=value
+            with self.subTest(key=key),self.assertRaises(ValueError):allocation.validate_retained_personal_export(wrong,card)
+        for key,value in [('save_mode','Everything unlocked'),('file_count',2),('format','single imported Everything unlocked GCI')]:
+            wrong=copy.deepcopy(receipt);wrong['initial_card'][key]=value
+            with self.subTest(card_key=key),self.assertRaises(ValueError):allocation.validate_retained_personal_export(wrong,card)
+        wrong=copy.deepcopy(receipt);wrong['disc']['sha256']='0'*64
+        with self.assertRaises(ValueError):allocation.validate_retained_personal_export(wrong,card)
+        wrong=copy.deepcopy(receipt);wrong['source_profile_export']['source_run_result']='pass'
+        with self.assertRaises(ValueError):allocation.validate_retained_personal_export(wrong,card)
+        for source_key in ['source_run_report','source_run_manifest']:
+            changed=self.workspace/(source_key+'.json');value=json.loads(Path(export[source_key]).read_text());value['unreviewed_change']=True;changed.write_text(json.dumps(value))
+            wrong=copy.deepcopy(receipt);wrong['source_profile_export'][source_key]=str(changed)
+            wrong['source_profile_export'][source_key+'_sha256']=hashlib.sha256(changed.read_bytes()).hexdigest()
+            with self.assertRaises(ValueError):allocation.validate_retained_personal_export(wrong,card)
+        setup=dict(card_baseline='single imported retained Personal progress GCI',
+            initial_profile_sha256=expected_hash,external_save_hashes={'USA/Card A/'+card.name:expected_hash})
+        checkpoint=self.workspace/'personal-checkpoint';(checkpoint/'USA/Card A').mkdir(parents=True)
+        copied=checkpoint/'USA/Card A'/card.name;copied.write_bytes(original)
+        out=self.workspace/'personal-owned'
+        result=driver.prepare_stadium_setup_gci_folder(checkpoint,copied,out,setup)
+        self.assertEqual(result.read_bytes(),original);self.assertEqual(result.stat().st_mode&0o777,0o400)
+        for label in ['unknown','single imported Everything unlocked GCI']:
+            wrong=copy.deepcopy(setup);wrong['card_baseline']=label
+            if label=='unknown':
+                with self.assertRaises(ValueError):driver.prepare_stadium_setup_gci_folder(checkpoint,copied,self.workspace/'wrong-label',wrong)
+            # Existing Everything label alone is not this strict admission: the
+            # unchanged full setup loader rejects its hash/export-mode mismatch.
+        nested=checkpoint/'USA/Card A/not-created'
+        with self.assertRaises(ValueError):driver.prepare_stadium_setup_gci_folder(checkpoint,copied,nested,setup)
+        self.assertFalse(nested.exists())
+        (checkpoint/'USA/Card A/extra.gci').write_bytes(b'extra')
+        with self.assertRaises(ValueError):driver.prepare_stadium_setup_gci_folder(checkpoint,copied,self.workspace/'extra-card-personal',setup)
+        self.assertEqual(card.read_bytes(),original)
 
 
 

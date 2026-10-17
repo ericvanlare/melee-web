@@ -1963,7 +1963,7 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
             from capture_allocation_history import stadium_three_rule_profile
             if stadium_three_rule_profile(self.expected) == 'stock4_none':
                 save=bytes.fromhex(context['save_data_hex'])
-                require((rules[2],rules[3],rules[4],rules[5],rules[6],rules[7],rules[8],rules[10],rules[11]) ==
+                require((rules[2],rules[3],rules[4],rules[5],rules[6],rules[8],rules[9],rules[10],rules[11]) ==
                         (1,2,4,0,10,0,0,1,0) and save[0x448] == 0xff and
                         save[0x450:0x458].hex() == self.expected['item_mask_hex'] and
                         list(save[0x458:0x45a]) == [1,1],
@@ -2215,7 +2215,13 @@ def prepare_stadium_setup_gci_folder(checkpoint_gc, initial_gci, destination, se
     source=Path(initial_gci)
     expected=setup.get('initial_profile_sha256')
     declared={'USA/Card A/'+source.name:expected}
-    require(setup.get('card_baseline')=='single imported Everything unlocked GCI' and
+    baseline=setup.get('card_baseline')
+    if baseline=='single imported retained Personal progress GCI':
+        from sd_gci_profile import load_profile
+        require(load_profile(source)['sha256']==expected,
+                'Whole Stadium retained Personal source profile differs')
+    require(baseline in ('single imported Everything unlocked GCI',
+                         'single imported retained Personal progress GCI') and
             isinstance(expected,str) and len(expected)==64 and
             expected.strip('0123456789abcdef')=='' and expected!='0'*64 and
             setup.get('external_save_hashes')==declared,

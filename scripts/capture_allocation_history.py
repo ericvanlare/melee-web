@@ -102,6 +102,84 @@ def validate_reference_build_manifest(path, dolphin):
             "target": manifest["target"], "build_cpu": identity.get("cpu")}
 
 
+def validate_retained_personal_export(receipt, initial_gci):
+    """Admit only the already recorded personal re-export, never arbitrary saves."""
+    from sd_gci_profile import GCI_SHA256, load_profile
+    profile=load_profile(initial_gci)
+    expected_card=dict(file_count=1,format='single imported retained Personal progress GCI',
+        gci_filename=initial_gci.name,gci_sha256=GCI_SHA256,save_mode='Personal progress')
+    if receipt.get('initial_card') != expected_card:
+        raise ValueError('setup receipt does not bind the exact retained Personal progress card')
+    export=receipt.get('source_profile_export')
+    keys={'source_run_report','source_run_report_sha256','source_run_manifest',
+          'source_run_manifest_sha256','source_run_check','profile_mode',
+          'exported_gci_sha256','exported_gci_bytes'}
+    if not isinstance(export,dict) or set(export)!=keys:
+        raise ValueError('retained Personal export receipt fields differ')
+    report_path=Path(export['source_run_report']).expanduser().resolve()
+    manifest_path=Path(export['source_run_manifest']).expanduser().resolve()
+    report_hash=retail._sha256(report_path);manifest_hash=retail._sha256(manifest_path)
+    if (report_hash!='17e16a0238b9b920e9d41714b02ddc69d983ce090b73bb66f08ddeff7bd0586c' or
+            manifest_hash!='0222524ae26c10b44fdefcc623fb6a0f25a92373c0df4c4513dc0b87c34e47cb' or
+            export['source_run_report_sha256']!=report_hash or
+            export['source_run_manifest_sha256']!=manifest_hash or
+            export['profile_mode']!='Personal progress' or
+            export['source_run_check']!='personalStateSurvivedReload' or
+            export['exported_gci_sha256']!=profile['sha256'] or
+            export['exported_gci_bytes']!=initial_gci.stat().st_size):
+        raise ValueError('retained Personal source report/manifest/card identity differs')
+    report=json.loads(report_path.read_text());manifest=json.loads(manifest_path.read_text())
+    expected_package=manifest_path.with_name('roundtrip-player').resolve()
+    if (report.get('discSha256')!=receipt.get('disc',{}).get('sha256') or
+            report.get('inputGciSha256')!='fec85d3faf3df55c1b3476f174f9d6885626ca660ae05321167e409948bfe286' or
+            report.get('reloadedMode')!='personal' or
+            report.get('reloadedExportSha256')!=profile['sha256'] or
+            report.get('personalStateSurvivedReload') is not True or
+            Path(report.get('package','')).resolve()!=expected_package or
+            manifest.get('schema')!='melee-web-public-release-v1' or manifest.get('profile')!='player' or
+            manifest.get('runtime',{}).get('identity_sha256')!=
+                '60cd0a3e200f771420bc8452383a7584b569259637872d053dcbcbc9c8af6113'):
+        raise ValueError('retained Personal actual reload/package evidence differs')
+    # This older report has no result/schema/build_identity. Never manufacture
+    # an Everything public-player PASS or a contemporaneous served-build claim.
+    return report_path,report_hash,manifest_path,manifest_hash,export['source_run_check']
+
+
+def validate_retained_personal_provenance(value, external_hashes, profile_hash, export_report_hash):
+    """Preserve the genuine retail source facts while binding this exact card."""
+    from sd_gci_profile import GCI_SHA256
+    parent=value.get('parent_provenance')
+    if not isinstance(parent,dict) or set(parent)!={'path','sha256'}:
+        raise ValueError('retained Personal provenance lacks its historical parent')
+    parent_path=Path(parent['path']).expanduser().resolve()
+    if (parent['sha256']!='b5ed80140070157dde8b5e4709242ed8fee1262874894b9c107a3ce47f3809ac' or
+            retail._sha256(parent_path)!=parent['sha256']):
+        raise ValueError('retained Personal provenance parent identity differs')
+    preparation=value.get('source_profile_preparation')
+    if not isinstance(preparation,dict) or set(preparation)!={'path','sha256'}:
+        raise ValueError('retained Personal provenance lacks exact preparation evidence')
+    prep_path=Path(preparation['path']).expanduser().resolve()
+    if (preparation['sha256']!='edb1cf5f9eee974c4cf6cd042a3664c58e44adc6ecbc5b3df33c707c85677be2' or
+            retail._sha256(prep_path)!=preparation['sha256']):
+        raise ValueError('retained Personal preparation identity differs')
+    prep=json.loads(prep_path.read_text())
+    if (prep.get('selected',{}).get('sha256')!=GCI_SHA256 or
+            prep.get('owned_copy',{}).get('sha256')!=GCI_SHA256 or
+            prep.get('source_unchanged') is not True or prep.get('original_save_mutated') is not False or
+            len(prep.get('comparison',[]))!=8 or any(x.get('equal') is not True for x in prep['comparison'])):
+        raise ValueError('retained Personal preparation source facts differ')
+    original=json.loads(parent_path.read_text())
+    changed={'external_save_hashes','source_profile_mode','source_profile_gci_sha256',
+             'source_profile_export_report_sha256'}
+    if (any(value.get(k)!=v for k,v in original.items() if k not in changed) or
+            profile_hash!=GCI_SHA256 or value.get('external_save_hashes')!=external_hashes or
+            value.get('source_profile_mode')!='Personal progress' or
+            value.get('source_profile_gci_sha256')!=GCI_SHA256 or
+            value.get('source_profile_export_report_sha256')!=export_report_hash or
+            export_report_hash!='17e16a0238b9b920e9d41714b02ddc69d983ce090b73bb66f08ddeff7bd0586c'):
+        raise ValueError('retained Personal provenance source/card/export facts differ')
+
+
 def validate_setup_receipt(path, args, manifest):
     """Bind the private run inputs to the receipt made during local setup."""
     try:
@@ -148,56 +226,69 @@ def validate_setup_receipt(path, args, manifest):
         if not initial_gci.is_file() or initial_gci.suffix.lower() != ".gci":
             raise ValueError("initial Everything unlocked profile must be a readable .gci file")
         initial_profile_hash = retail._sha256(initial_gci)
-        expected_card = {
-            "file_count": 1,
-            "format": "single imported Everything unlocked GCI",
-            "gci_filename": initial_gci.name,
-            "gci_sha256": initial_profile_hash,
-            "save_mode": "Everything unlocked",
-        }
-        if receipt.get("initial_card") != expected_card:
-            raise ValueError("owned-input setup receipt does not bind the imported Everything unlocked GCI")
-        source_export = receipt.get("source_profile_export")
-        if not isinstance(source_export, dict):
-            raise ValueError("setup receipt lacks the source profile export receipt")
-        report_path = Path(source_export.get("source_run_report", "")).expanduser().resolve()
-        manifest_path = Path(source_export.get("source_run_manifest", "")).expanduser().resolve()
-        try:
-            source_report = json.loads(report_path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise ValueError(f"cannot read the Everything unlocked export report: {error}") from error
-        report_hash = retail._sha256(report_path)
-        try:
-            source_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise ValueError(f"cannot read the Everything unlocked runtime manifest: {error}") from error
-        manifest_hash = retail._sha256(manifest_path)
-        source_check = source_export.get("source_run_check")
-        manifest_runtime = source_manifest.get("runtime")
-        source_build_identity = source_report.get("build_identity")
-        if (source_export.get("source_run_report_sha256") != report_hash or
-                source_export.get("source_run_manifest_sha256") != manifest_hash or
-                source_manifest.get("schema") != "melee-web-public-release-v1" or
-                source_manifest.get("profile") != "player" or
-                not isinstance(manifest_runtime, dict) or
-                not manifest_runtime.get("identity_sha256") or
-                source_report.get("schema") != "webmelee-public-player-browser-v1" or
-                not isinstance(source_build_identity, dict) or
-                source_build_identity.get("schema") != "melee-web-public-release-v1" or
-                source_build_identity.get("profile") != "player" or
-                source_export.get("source_run_result") != "pass" or
-                source_export.get("source_run_result") != source_report.get("result") or
-                source_export.get("source_run_scope") != source_report.get("scope") or
-                source_check not in source_report.get("checks", []) or
-                source_export.get("profile_mode") != "Everything unlocked" or
-                source_export.get("exported_gci_sha256") != initial_profile_hash or
-                source_export.get("exported_gci_bytes") != initial_gci.stat().st_size):
-            raise ValueError("source profile export report, manifest, GCI hash, or save mode disagrees with the setup receipt")
-        card_files = sorted(card.iterdir()) if card.is_dir() else []
-        if (len(card_files) != 1 or card_files[0].name != initial_gci.name or
-                not card_files[0].is_file() or retail._sha256(card_files[0]) != initial_profile_hash):
-            raise ValueError("the isolated GCI folder does not contain the declared Everything unlocked profile")
-        card_baseline = "single imported Everything unlocked GCI"
+        from sd_gci_profile import GCI_SHA256
+        if initial_profile_hash == GCI_SHA256:
+            report_path,report_hash,manifest_path,manifest_hash,source_check = \
+                validate_retained_personal_export(receipt,Path(args.initial_gci).expanduser())
+            if card.is_symlink():
+                raise ValueError('isolated Personal card directory must not be a symlink')
+            card_files = sorted(card.iterdir()) if card.is_dir() else []
+            if (len(card_files)!=1 or card_files[0].name!=initial_gci.name or
+                    card_files[0].is_symlink() or not card_files[0].is_file() or
+                    retail._sha256(card_files[0])!=initial_profile_hash):
+                raise ValueError('isolated card differs from exact retained Personal profile')
+            card_baseline = 'single imported retained Personal progress GCI'
+        else:
+            expected_card = {
+                "file_count": 1,
+                "format": "single imported Everything unlocked GCI",
+                "gci_filename": initial_gci.name,
+                "gci_sha256": initial_profile_hash,
+                "save_mode": "Everything unlocked",
+            }
+            if receipt.get("initial_card") != expected_card:
+                raise ValueError("owned-input setup receipt does not bind the imported Everything unlocked GCI")
+            source_export = receipt.get("source_profile_export")
+            if not isinstance(source_export, dict):
+                raise ValueError("setup receipt lacks the source profile export receipt")
+            report_path = Path(source_export.get("source_run_report", "")).expanduser().resolve()
+            manifest_path = Path(source_export.get("source_run_manifest", "")).expanduser().resolve()
+            try:
+                source_report = json.loads(report_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+                raise ValueError(f"cannot read the Everything unlocked export report: {error}") from error
+            report_hash = retail._sha256(report_path)
+            try:
+                source_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+                raise ValueError(f"cannot read the Everything unlocked runtime manifest: {error}") from error
+            manifest_hash = retail._sha256(manifest_path)
+            source_check = source_export.get("source_run_check")
+            manifest_runtime = source_manifest.get("runtime")
+            source_build_identity = source_report.get("build_identity")
+            if (source_export.get("source_run_report_sha256") != report_hash or
+                    source_export.get("source_run_manifest_sha256") != manifest_hash or
+                    source_manifest.get("schema") != "melee-web-public-release-v1" or
+                    source_manifest.get("profile") != "player" or
+                    not isinstance(manifest_runtime, dict) or
+                    not manifest_runtime.get("identity_sha256") or
+                    source_report.get("schema") != "webmelee-public-player-browser-v1" or
+                    not isinstance(source_build_identity, dict) or
+                    source_build_identity.get("schema") != "melee-web-public-release-v1" or
+                    source_build_identity.get("profile") != "player" or
+                    source_export.get("source_run_result") != "pass" or
+                    source_export.get("source_run_result") != source_report.get("result") or
+                    source_export.get("source_run_scope") != source_report.get("scope") or
+                    source_check not in source_report.get("checks", []) or
+                    source_export.get("profile_mode") != "Everything unlocked" or
+                    source_export.get("exported_gci_sha256") != initial_profile_hash or
+                    source_export.get("exported_gci_bytes") != initial_gci.stat().st_size):
+                raise ValueError("source profile export report, manifest, GCI hash, or save mode disagrees with the setup receipt")
+            card_files = sorted(card.iterdir()) if card.is_dir() else []
+            if (len(card_files) != 1 or card_files[0].name != initial_gci.name or
+                    not card_files[0].is_file() or retail._sha256(card_files[0]) != initial_profile_hash):
+                raise ValueError("the isolated GCI folder does not contain the declared Everything unlocked profile")
+            card_baseline = "single imported Everything unlocked GCI"
     external_hashes = tree_hashes(args.checkpoint_gc)
     if external_hashes != receipt.get("external_save_hashes"):
         raise ValueError("checkpoint memory-card files differ from the setup receipt")
@@ -216,9 +307,16 @@ def validate_setup_receipt(path, args, manifest):
                 source_provenance_receipt.get("sha256") != provenance_hash or
                 source_provenance_receipt.get("external_save_hashes") != external_hashes or
                 source_provenance.get("external_save_hashes") != external_hashes or
-                source_provenance.get("source_profile_mode") != "Everything unlocked" or
+                source_provenance.get("source_profile_mode") !=
+                    ('Personal progress' if card_baseline == 'single imported retained Personal progress GCI'
+                     else 'Everything unlocked') or
                 source_provenance.get("source_profile_gci_sha256") != initial_profile_hash):
             raise ValueError("retail provenance does not bind the imported Everything unlocked GCI")
+    if initial_profile_hash is not None and card_baseline == 'single imported retained Personal progress GCI':
+        if provenance_path is None:
+            raise ValueError('retained Personal requires its exact source provenance')
+        validate_retained_personal_provenance(source_provenance,external_hashes,
+                                             initial_profile_hash,report_hash)
     configured_ini = args.template_user / "Config/Dolphin.ini"
     if receipt.get("template_source", {}).get("capture_dolphin_ini_sha256") != retail._sha256(configured_ini):
         raise ValueError("capture template Dolphin.ini differs from the setup receipt")
