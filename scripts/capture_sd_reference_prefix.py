@@ -2030,8 +2030,17 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
             require(self.pause_released is not None and self.pause_ready_clock is not None and
                     self.chord_consumed is not None and self.exit_requested and
                     self.chord_consumed['sequence'] < row['seq'] and
-                    len(items) == 1 and bytes.fromhex(items[0]['hex'])[0] == 7,
-                    'Whole Stadium exit lacks fresh ready chord or no-contest outcome7')
+                    len(items) == 1,
+                    'Whole Stadium exit lacks fresh ready chord or result header')
+            # Native Result is the first0x28 bytes of original MatchEnd at
+            # MatchExitInfo0x80479d98 +0xc, not the whole0x227c-byte object.
+            # gm/types.h declares timer+0 and outcome+4 in this header prefix.
+            result = items[0]
+            raw = bytes.fromhex(result['hex'])
+            require(result.get('tag') == 15 and result.get('flags') == 0 and
+                    result.get('address') == 0x80479da4 and
+                    result.get('size') == len(raw) == 0x28 and raw[4] == 7,
+                    'Whole Stadium completed MatchEnd header lacks source outcome7')
             self.outcome_seen = True
         elif name == 'return_css':
             require(self.outcome_seen and self.chord_released is not None,

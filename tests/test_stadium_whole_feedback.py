@@ -364,7 +364,8 @@ assert(scoped.emitted.find("\\\"whole_session\\\":true,\\\"match_index\\\":2")!=
         def outcome(seq,value):
             return dict(seq=seq,event='boundary',source_tick=191,draw_ordinal=191,
                 payload=dict(whole_session=True,match_index=0,boundary='vs_exit_return',
-                             slices=[dict(name='result',hex=bytes([value]).hex())]))
+                             slices=[dict(name='result',tag=15,flags=0,address=0x80479da4,
+                                          size=0x28,hex=(bytes(4)+bytes([value])+bytes(0x23)).hex())]))
         missing=clone()
         with self.assertRaises(ValueError):missing.accept(outcome(2577,7))
         ready=clone();ready.accept(fresh_consume(rows[2525],2577))
@@ -376,6 +377,57 @@ assert(scoped.emitted.find("\\\"whole_session\\\":true,\\\"match_index\\\":2")!=
         ready.accept(fresh_consume(rows[2530],2579))
         self.assertEqual(ready.chord_released['sequence'],2579)
         self.assertGreater(ready.chord_consumed['sequence'],receiver.pause_ready_clock['sequence'])
+
+    def test_retained_completed_MatchEnd_header_and_outcome_refusals(self):
+        trace=os.environ.get('MELEE_STADIUM_EXIT_TRACE')
+        if not trace:self.skipTest('Retained two-phase source exit trace not configured')
+        path=Path(trace)
+        self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),os.environ['MELEE_STADIUM_EXIT_TRACE_SHA256'])
+        from sd_original_menu_plan import stadium_go_feedback_packet
+        from retail_setup_validation import _decode_setup
+        rows=[]
+        for row in iter_records(path):
+            rows.append(row)
+            if row['payload'].get('boundary')=='vs_exit_return':break
+        expected=_decode_setup(next(x['hex'] for r in rows if r['payload'].get('boundary')=='setup' for x in r['payload']['slices'] if x['tag']==4))
+        receiver=driver.StadiumWholeFeedbackReceiver(stadium_go_feedback_packet(),rows[0]['payload']['setup_receipt_sha256'],expected)
+        receiver.recorded_input=True;before=None
+        from reference_versus_sequence_capture import raw_pad
+        chord=raw_pad(buttons=['L','R','A','START'])
+        for row in rows:
+            if row['payload'].get('boundary')=='pad_consume' and receiver.setup_seen:
+                ports,_,_=driver._transform_consumed_ports(row['payload'],row['seq'])
+                if ports[:2]==[chord,driver.NEUTRAL_PAD]:
+                    if receiver.pause_consumed is None:
+                        self.assertGreaterEqual(receiver.tick_count,180);receiver.chord_requested=True
+                    else:
+                        self.assertIsNotNone(receiver.pause_ready_clock);receiver.exit_requested=True
+            if row is rows[-1]:before=copy.copy(receiver)
+            receiver.accept(row)
+        self.assertTrue(receiver.outcome_seen)
+        self.assertEqual(receiver.pause_consumed['sequence'],2489)
+        self.assertEqual(receiver.pause_released['sequence'],2494)
+        self.assertEqual(receiver.pause_ready_clock['sequence'],2540)
+        self.assertEqual(receiver.chord_consumed['sequence'],2549)
+        self.assertIsNone(receiver.chord_released) # Not retained before this exit.
+        item=next(x for x in rows[-1]['payload']['slices'] if x['name']=='result')
+        self.assertEqual((item['address'],item['size']),(0x80479da4,0x28))
+        self.assertEqual((bytes.fromhex(item['hex'])[0],bytes.fromhex(item['hex'])[4]),(0,7))
+        def refuse(row):
+            test=copy.copy(before);test.boundaries=[]
+            with self.assertRaises(ValueError):test.accept(row)
+            self.assertFalse(test.outcome_seen)
+        for field,value in [('tag',14),('flags',1),('address',0x80479da0),('size',0x227c),('hex','07')]:
+            row=copy.deepcopy(rows[-1]);next(x for x in row['payload']['slices'] if x['name']=='result')[field]=value
+            refuse(row)
+        for outcome in (0,1,6,8):
+            row=copy.deepcopy(rows[-1]);item=next(x for x in row['payload']['slices'] if x['name']=='result')
+            data=bytearray.fromhex(item['hex']);data[0]=7;data[4]=outcome;item['hex']=data.hex();refuse(row)
+        for duplicate in (False,True):
+            row=copy.deepcopy(rows[-1]);items=row['payload']['slices']
+            if duplicate:items.append(copy.deepcopy(next(x for x in items if x['name']=='result')))
+            else:row['payload']['slices']=[x for x in items if x['name']!='result']
+            refuse(row)
 
     def test_actual_results_helper_retains_events_before_exit_release(self):
         # Synthetic transport rows exercise the actual Results state machine;
