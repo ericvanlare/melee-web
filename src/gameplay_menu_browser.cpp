@@ -1415,104 +1415,67 @@ void service_render_cache_writes(){
  EM_ASM({window.menuCacheWritesFlushed?.({ok:!!$0,flushed:!!$1,duration_ms:$2});},
         ok,flushed,duration);
 }
-void tick(){
-#if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
- if(frame_effect_terminal())return;
- frame_effect_callback_started();
-#endif
-#if defined(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC)
- if(match_draw_discard_terminal)return;
-#endif
- if(graphics_startup_started_ms>=0&&graphics_startup_first_callback_ms<0)
-  graphics_startup_first_callback_ms=emscripten_get_now()-graphics_startup_started_ms;
- // Consume owner failure and lifecycle suspension before source or clock work.
- // A hidden/frozen interval may contain no callback at all; its handoff leaves
- // running/manual pause intent unchanged and excludes only inactive wall time.
- const int owner_action=EM_ASM_INT({return window.menuServiceCommands?.() || 0;});
- if(owner_action<0){
-  // A terminal JS/audio failure is consumed only at this source-free boundary.
-  // Preserve the first owner error and frozen scene for diagnostics; recovery
-  // requires a new document, so no native preparation or source work may follow.
-  running=false;faulted=true;
-  menu_clock.reset();audio_clock.reset();
-  emscripten_cancel_main_loop();
-#if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
-  frame_effect_callback_aborted("runtime_owner_stopped");
-#endif
-  return;
- }
- if(owner_action==1){
-  menu_clock.reset();audio_clock.reset();
- }
-#if defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
- if(first_pair_plan_capture_enabled){
-  if(first_pair_plan_sequence==UINT32_MAX){
-   EM_ASM({globalThis.window?.menuFirstPairNativeFileOperationFailure?.('native callback-plan identity exhausted');});
-   check(0,"First-pair callback-plan identity exhausted");
-  }
-  first_pair_active_callback_id=++first_pair_plan_sequence;
-  first_pair_audio_call_index=0;
-  first_pair_audio_phase_before=audio_phase;
-  first_pair_source_planned_steps=0;
-  first_pair_audio_planned_steps=0;
-  first_pair_audio_before_construction=false;
-  first_pair_audio_stalled=false;
- }
-#endif
- service_render_cache_writes();
- const double started=emscripten_get_now();
- const bool running_at_callback_start=running;
- const AuroraStats stats_before=aurora_stats_snapshot();
- double input_done=started,simulation_done=started,begin_done=started,draw_done=started,end_done=started;
- double preparation_ms=0,preparation_started=0;
- double render_begin_ms=0,render_draw_ms=0,render_end_ms=0,render_total_ms=0,simulation_cpu_ms=0;
- uint32_t callback_draw_calls=0,callback_texture_upload=0,callback_staging_used=0;
- AuroraStats callback_begin_stats{};
- AuroraStats callback_end_stats{};
- melee_web::SourceFrameSequence callback_source_frames;
- auto& source_frames=replay?replay_source_frames:callback_source_frames;
- source_frames.begin_callback();
+// Synchronous borrowed callback state only; never retained across a callback.
+struct CallbackPresentationContext {
+ melee_web::SourceFrameSequence& source_frames;
+ char (&error)[256];
+ int& began;
+ int& drawn;
+ int& first_use;
+ int& suppress_draw;
+ bool& actual_source_draw;
+ bool& replay_completed_now;
+ double& begin_done;
+ double& draw_done;
+ double& end_done;
+ double& render_begin_ms;
+ double& render_draw_ms;
+ double& render_end_ms;
+ double& render_total_ms;
+ uint32_t& callback_draw_calls;
+ uint32_t& callback_texture_upload;
+ uint32_t& callback_staging_used;
+ AuroraStats& callback_begin_stats;
+ AuroraStats& callback_end_stats;
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
- bool first_replay_callback_probe=false;
- unsigned replay_boundary_draw_index=0;
- const auto replay_boundary_mark=[&](const char* name,int a,int b,int c){
-  if(!first_replay_callback_probe)return;
-  EM_ASM({try{globalThis.__meleeReplayBoundaryProbe?.mark?.(
-    UTF8ToString($0),$1,$2,$3);}catch(_){}},name,a,b,c);
- };
+ bool& first_replay_callback_probe;
+ unsigned& replay_boundary_draw_index;
 #endif
- int began=0,drawn=1,timing_valid=1,first_use=0;
- // A transition request owns the whole callback in which it is observed.
- // Keep the source presenter out of both the request and audio-ack waits.
- int suppress_draw=preparation.suppress_source_draw(pending)||replay_final_draw;
- bool actual_source_draw=false;
- bool replay_completed_now=false;
- const bool replay_input_already_drawn=replay_completion.final_input_drawn;
- unsigned replay_steps=0;
- unsigned replay_draw_boundaries=0;
- try{
-  if(startup_pipeline_service_failed){
-   startup_pipeline_service_failed=false;
-   throw std::runtime_error("Renderer startup pipeline preparation failed");
-  }
-#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
-  (void)melee_web::pipeline_preparation::status();
-  (void)prepare_deferred_pipelines();
+};
+
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+template <typename BoundaryMarker>
 #endif
-  for(const AuroraEvent* event=aurora_update();event&&event->type!=AURORA_NONE;++event){
-   if(event->type==AURORA_EXIT){
-    close();melee_web_input_shutdown();aurora_shutdown();emscripten_cancel_main_loop();
-#if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
-    frame_effect_callback_aborted("aurora_exit");
+static bool present_source_frame(CallbackPresentationContext& context
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+ ,BoundaryMarker& replay_boundary_mark
 #endif
-    return;
-   }
-  }
-  const auto* input=melee_web_input_poll();
-  input_done=emscripten_get_now();
-  const double clock_now=emscripten_get_now();
-  char error[256]{};
-  const auto present_source_impl=[&](){
+){
+ auto& source_frames=context.source_frames;
+ auto& error=context.error;
+ auto& began=context.began;
+ auto& drawn=context.drawn;
+ auto& first_use=context.first_use;
+ auto& suppress_draw=context.suppress_draw;
+ auto& actual_source_draw=context.actual_source_draw;
+ auto& replay_completed_now=context.replay_completed_now;
+ auto& begin_done=context.begin_done;
+ auto& draw_done=context.draw_done;
+ auto& end_done=context.end_done;
+ auto& render_begin_ms=context.render_begin_ms;
+ auto& render_draw_ms=context.render_draw_ms;
+ auto& render_end_ms=context.render_end_ms;
+ auto& render_total_ms=context.render_total_ms;
+ auto& callback_draw_calls=context.callback_draw_calls;
+ auto& callback_texture_upload=context.callback_texture_upload;
+ auto& callback_staging_used=context.callback_staging_used;
+ auto& callback_begin_stats=context.callback_begin_stats;
+ auto& callback_end_stats=context.callback_end_stats;
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+ auto& first_replay_callback_probe=context.first_replay_callback_probe;
+ auto& replay_boundary_draw_index=context.replay_boundary_draw_index;
+#endif
+ // PRESENTATION_BODY_BEGIN
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
   const melee_web::provenance::Scope provenance(pipeline_context());
 #endif
@@ -1681,9 +1644,263 @@ void tick(){
    callback_end_stats.lastEndFrameResidualMs+=rendered.lastEndFrameResidualMs;
   }
   return drew_source;
+
+ // PRESENTATION_BODY_END
+}
+
+// Synchronous source execution only; all borrowed state dies with tick().
+// The ordinary callback remains the sole caller; no plan sampling or ownership moves.
+void execute_match_source_step(const PADStatus*& sample,
+                              melee_web::SourceFrameSequence& source_frames,
+                              const melee_web::FixedTickClock::Tick& elapsed,
+                              const melee_web::FixedTickClock::Tick& audio_elapsed,
+                              bool audio_before_construction,const bool replay_whole,int& result,
+                              unsigned& replay_steps,unsigned& replay_draw_boundaries){
+ // MATCH_STEP_BODY_BEGIN
+    if(replay&&!replay_whole){
+     check(!match->paused()&&!match->complete(),"Replay reached an unsupported source pause/exit");
+     if(!replay_started){
+      replay_started=true;
+      EM_ASM({window.menuReplayStarted?.($0,!!$1,$2,$3);},replay->frames.size(),replay_trace,replay->expected_draws(),replay->scheduling_mode());
+     }
+     sample=replay->frames[replay_cursor].pads.data();
+    }
+    else if(replay_whole)
+     check(!match->paused(),"Whole-session replay reached an unsupported source pause");
+    if(replay_whole)melee_web_cpu_observation_set_event_cursor(replay_cursor);
+    // gm_801A4BA8 is the original scene traversal cursor (MWRO80479d58),
+    // not the gameplay timer returned by source_frames()/gm_GetFrameCount.
+    const auto prefix_tick_before=replay&&replay->diagnostic_entity_prefix?gm_801A4BA8():0;
+#if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
+    frame_effect_begin_tick(sample,source_frames.steps(),elapsed.steps,audio_elapsed.steps,
+                            audio_before_construction,elapsed.stalled||audio_elapsed.stalled);
+#endif
+    match->tick(sample);
+#if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
+    frame_effect_tick_returned();
+#endif
+    if(replay&&replay->diagnostic_entity_prefix)
+     check(replay_prefix_progress.observe(prefix_tick_before,gm_801A4BA8(),replay->diagnostic_active_entity_prefix) &&
+           !match->paused()&&!match->complete()&&!match->ending(),
+           "Diagnostic entity prefix lost its original live source boundary");
+    if(replay_whole)melee_web_cpu_observation_scheduler_return();
+    source_frames.did_step(!replay||replay->closes_draw_batch(replay_cursor));
+    int winner=-1;const int outcome=match->outcome(winner);
+    if(replay){
+     replay_match_complete=match->complete();replay_outcome=outcome;replay_winner=winner;
+     if(!replay_whole){
+      if(replay_trace)melee_web::retail_replay_frame(*replay,replay_cursor);
+      ++replay_cursor;
+      ++replay_steps;
+      replay_draw_boundaries+=replay->closes_draw_batch(replay_cursor-1)?1U:0U;
+      check(!match->complete()||replay_cursor==replay->frames.size(),"Replay source match exited before all input was consumed");
+     }
+    }
+    if(stock_check==-1){
+     const auto player=match->player_stats(0);
+     check(match->player_stats(1).stocks==4,"Stock diagnostic: stationary opponent lost a stock");
+     stock_jump=!stock_lost&&stock_count<4&&player.ground_or_air==0&&player.position[0]>65;
+     if(player.stocks<stock_count){stock_lost=true;stock_count=player.stocks;}
+     if(stock_lost&&player.motion_id==14&&player.ground_or_air==0){stock_lost=false;++stock_respawns;}
+     ++stock_tick;
+     if(outcome)check(outcome==OUTCOME_ELIMINATION&&stock_count==0&&stock_respawns==3,"Stock diagnostic: unexpected source outcome");
+     if(!match->complete())check(stock_tick<4000,"Stock diagnostic: no source exit after 4000 ticks");
+    }
+    if(match->complete()&&(!replay||replay_whole)){
+     if(match->opening_demo()){
+      pending=true;result=3;
+     }else{
+      check(outcome,"Original match transitioned without an outcome");pending=true;result=3;
+     }
+    }
+ // MATCH_STEP_BODY_END
+}
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+template<class BoundaryMarker>
+#endif
+void render_normal_callback_audio(MeleeWebAudio* const audio_owner,
+                                  const melee_web::FixedTickClock::Tick& audio_elapsed,
+                                  bool audio_before_construction,char (&error)[256]
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+                                  ,BoundaryMarker& replay_boundary_mark
+#endif
+){
+ // NORMAL_AUDIO_BODY_BEGIN
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+  replay_boundary_mark("ordinary_audio_boundary_begin",static_cast<int>(audio_elapsed.steps),
+                       audio_elapsed.stalled?1:0,audio_before_construction?1:0);
+#endif
+  if(!audio_before_construction&&!audio_elapsed.stalled)
+   for(unsigned step=0;step<audio_elapsed.steps;step++){
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+    replay_boundary_mark("ordinary_audio_tick_begin",static_cast<int>(step),
+                         static_cast<int>(audio_elapsed.steps),static_cast<int>(replay_cursor));
+#endif
+    render_audio_tick(audio_owner,error,sizeof(error));
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+    replay_boundary_mark("ordinary_audio_tick_returned",static_cast<int>(step),
+                         static_cast<int>(audio_elapsed.steps),static_cast<int>(replay_cursor));
+#endif
+   }
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+  replay_boundary_mark("ordinary_audio_boundary_returned",static_cast<int>(audio_elapsed.steps),
+                       audio_elapsed.stalled?1:0,audio_before_construction?1:0);
+#endif
+ // NORMAL_AUDIO_BODY_END
+}
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+template<class Present,class BoundaryMarker>
+#else
+template<class Present>
+#endif
+void finish_source_callback_draw(melee_web::SourceFrameSequence& source_frames,
+                                 const Present& present_source
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+                                 ,BoundaryMarker& replay_boundary_mark
+#endif
+){
+ // SOURCE_FINISH_BODY_BEGIN
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+  replay_boundary_mark("source_frames_finish_begin",static_cast<int>(source_frames.steps()),
+                       static_cast<int>(source_frames.draws()),static_cast<int>(replay_cursor));
+#endif
+  source_frames.finish(present_source);
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+  replay_boundary_mark("source_frames_finish_returned",static_cast<int>(source_frames.steps()),
+                       static_cast<int>(source_frames.draws()),static_cast<int>(replay_cursor));
+#endif
+ // SOURCE_FINISH_BODY_END
+}
+
+void tick(){
+#if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
+ if(frame_effect_terminal())return;
+ frame_effect_callback_started();
+#endif
+#if defined(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC)
+ if(match_draw_discard_terminal)return;
+#endif
+ if(graphics_startup_started_ms>=0&&graphics_startup_first_callback_ms<0)
+  graphics_startup_first_callback_ms=emscripten_get_now()-graphics_startup_started_ms;
+ // Consume owner failure and lifecycle suspension before source or clock work.
+ // A hidden/frozen interval may contain no callback at all; its handoff leaves
+ // running/manual pause intent unchanged and excludes only inactive wall time.
+ const int owner_action=EM_ASM_INT({return window.menuServiceCommands?.() || 0;});
+ if(owner_action<0){
+  // A terminal JS/audio failure is consumed only at this source-free boundary.
+  // Preserve the first owner error and frozen scene for diagnostics; recovery
+  // requires a new document, so no native preparation or source work may follow.
+  running=false;faulted=true;
+  menu_clock.reset();audio_clock.reset();
+  emscripten_cancel_main_loop();
+#if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
+  frame_effect_callback_aborted("runtime_owner_stopped");
+#endif
+  return;
+ }
+ if(owner_action==1){
+  menu_clock.reset();audio_clock.reset();
+ }
+#if defined(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC)
+ if(first_pair_plan_capture_enabled){
+  if(first_pair_plan_sequence==UINT32_MAX){
+   EM_ASM({globalThis.window?.menuFirstPairNativeFileOperationFailure?.('native callback-plan identity exhausted');});
+   check(0,"First-pair callback-plan identity exhausted");
+  }
+  first_pair_active_callback_id=++first_pair_plan_sequence;
+  first_pair_audio_call_index=0;
+  first_pair_audio_phase_before=audio_phase;
+  first_pair_source_planned_steps=0;
+  first_pair_audio_planned_steps=0;
+  first_pair_audio_before_construction=false;
+  first_pair_audio_stalled=false;
+ }
+#endif
+ service_render_cache_writes();
+ const double started=emscripten_get_now();
+ const bool running_at_callback_start=running;
+ const AuroraStats stats_before=aurora_stats_snapshot();
+ double input_done=started,simulation_done=started,begin_done=started,draw_done=started,end_done=started;
+ double preparation_ms=0,preparation_started=0;
+ double render_begin_ms=0,render_draw_ms=0,render_end_ms=0,render_total_ms=0,simulation_cpu_ms=0;
+ uint32_t callback_draw_calls=0,callback_texture_upload=0,callback_staging_used=0;
+ AuroraStats callback_begin_stats{};
+ AuroraStats callback_end_stats{};
+ melee_web::SourceFrameSequence callback_source_frames;
+ auto& source_frames=replay?replay_source_frames:callback_source_frames;
+ source_frames.begin_callback();
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+ bool first_replay_callback_probe=false;
+ unsigned replay_boundary_draw_index=0;
+ const auto replay_boundary_mark=[&](const char* name,int a,int b,int c){
+  if(!first_replay_callback_probe)return;
+  EM_ASM({try{globalThis.__meleeReplayBoundaryProbe?.mark?.(
+    UTF8ToString($0),$1,$2,$3);}catch(_){}},name,a,b,c);
+ };
+#endif
+ int began=0,drawn=1,timing_valid=1,first_use=0;
+ // A transition request owns the whole callback in which it is observed.
+ // Keep the source presenter out of both the request and audio-ack waits.
+ int suppress_draw=preparation.suppress_source_draw(pending)||replay_final_draw;
+ bool actual_source_draw=false;
+ bool replay_completed_now=false;
+ const bool replay_input_already_drawn=replay_completion.final_input_drawn;
+ unsigned replay_steps=0;
+ unsigned replay_draw_boundaries=0;
+ try{
+  if(startup_pipeline_service_failed){
+   startup_pipeline_service_failed=false;
+   throw std::runtime_error("Renderer startup pipeline preparation failed");
+  }
+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
+  (void)melee_web::pipeline_preparation::status();
+  (void)prepare_deferred_pipelines();
+#endif
+  for(const AuroraEvent* event=aurora_update();event&&event->type!=AURORA_NONE;++event){
+   if(event->type==AURORA_EXIT){
+    close();melee_web_input_shutdown();aurora_shutdown();emscripten_cancel_main_loop();
+#if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
+    frame_effect_callback_aborted("aurora_exit");
+#endif
+    return;
+   }
+  }
+  const auto* input=melee_web_input_poll();
+  input_done=emscripten_get_now();
+  const double clock_now=emscripten_get_now();
+  char error[256]{};
+  CallbackPresentationContext presentation_context{
+   .source_frames=source_frames,
+   .error=error,
+   .began=began,
+   .drawn=drawn,
+   .first_use=first_use,
+   .suppress_draw=suppress_draw,
+   .actual_source_draw=actual_source_draw,
+   .replay_completed_now=replay_completed_now,
+   .begin_done=begin_done,
+   .draw_done=draw_done,
+   .end_done=end_done,
+   .render_begin_ms=render_begin_ms,
+   .render_draw_ms=render_draw_ms,
+   .render_end_ms=render_end_ms,
+   .render_total_ms=render_total_ms,
+   .callback_draw_calls=callback_draw_calls,
+   .callback_texture_upload=callback_texture_upload,
+   .callback_staging_used=callback_staging_used,
+   .callback_begin_stats=callback_begin_stats,
+   .callback_end_stats=callback_end_stats,
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+   .first_replay_callback_probe=first_replay_callback_probe,
+   .replay_boundary_draw_index=replay_boundary_draw_index,
+#endif
   };
   const auto present_source=[&](){
-   const bool drew_source=present_source_impl();
+   const bool drew_source=present_source_frame(presentation_context
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+     ,replay_boundary_mark
+#endif
+   );
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
    // The source draw scope is closed before exporting this ordered chunk.
    drain_pipeline_provenance();
@@ -1878,62 +2095,9 @@ void tick(){
     }
    }
    if(match){
-    if(replay&&!replay_whole){
-     check(!match->paused()&&!match->complete(),"Replay reached an unsupported source pause/exit");
-     if(!replay_started){
-      replay_started=true;
-      EM_ASM({window.menuReplayStarted?.($0,!!$1,$2,$3);},replay->frames.size(),replay_trace,replay->expected_draws(),replay->scheduling_mode());
-     }
-     sample=replay->frames[replay_cursor].pads.data();
-    }
-    else if(replay_whole)
-     check(!match->paused(),"Whole-session replay reached an unsupported source pause");
-    if(replay_whole)melee_web_cpu_observation_set_event_cursor(replay_cursor);
-    // gm_801A4BA8 is the original scene traversal cursor (MWRO80479d58),
-    // not the gameplay timer returned by source_frames()/gm_GetFrameCount.
-    const auto prefix_tick_before=replay&&replay->diagnostic_entity_prefix?gm_801A4BA8():0;
-#if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
-    frame_effect_begin_tick(sample,source_frames.steps(),elapsed.steps,audio_elapsed.steps,
-                            audio_before_construction,elapsed.stalled||audio_elapsed.stalled);
-#endif
-    match->tick(sample);
-#if defined(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
-    frame_effect_tick_returned();
-#endif
-    if(replay&&replay->diagnostic_entity_prefix)
-     check(replay_prefix_progress.observe(prefix_tick_before,gm_801A4BA8(),replay->diagnostic_active_entity_prefix) &&
-           !match->paused()&&!match->complete()&&!match->ending(),
-           "Diagnostic entity prefix lost its original live source boundary");
-    if(replay_whole)melee_web_cpu_observation_scheduler_return();
-    source_frames.did_step(!replay||replay->closes_draw_batch(replay_cursor));
-    int winner=-1;const int outcome=match->outcome(winner);
-    if(replay){
-     replay_match_complete=match->complete();replay_outcome=outcome;replay_winner=winner;
-     if(!replay_whole){
-      if(replay_trace)melee_web::retail_replay_frame(*replay,replay_cursor);
-      ++replay_cursor;
-      ++replay_steps;
-      replay_draw_boundaries+=replay->closes_draw_batch(replay_cursor-1)?1U:0U;
-      check(!match->complete()||replay_cursor==replay->frames.size(),"Replay source match exited before all input was consumed");
-     }
-    }
-    if(stock_check==-1){
-     const auto player=match->player_stats(0);
-     check(match->player_stats(1).stocks==4,"Stock diagnostic: stationary opponent lost a stock");
-     stock_jump=!stock_lost&&stock_count<4&&player.ground_or_air==0&&player.position[0]>65;
-     if(player.stocks<stock_count){stock_lost=true;stock_count=player.stocks;}
-     if(stock_lost&&player.motion_id==14&&player.ground_or_air==0){stock_lost=false;++stock_respawns;}
-     ++stock_tick;
-     if(outcome)check(outcome==OUTCOME_ELIMINATION&&stock_count==0&&stock_respawns==3,"Stock diagnostic: unexpected source outcome");
-     if(!match->complete())check(stock_tick<4000,"Stock diagnostic: no source exit after 4000 ticks");
-    }
-    if(match->complete()&&(!replay||replay_whole)){
-     if(match->opening_demo()){
-      pending=true;result=3;
-     }else{
-      check(outcome,"Original match transitioned without an outcome");pending=true;result=3;
-     }
-    }
+    execute_match_source_step(sample,source_frames,elapsed,audio_elapsed,
+                              audio_before_construction,replay_whole,result,
+                              replay_steps,replay_draw_boundaries);
    }
    else if(results){
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
@@ -2008,37 +2172,18 @@ void tick(){
     pending=true;clear_diagnostic_pad();break;
    }
   }
+  render_normal_callback_audio(audio_owner,audio_elapsed,audio_before_construction,error
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
-  replay_boundary_mark("ordinary_audio_boundary_begin",static_cast<int>(audio_elapsed.steps),
-                       audio_elapsed.stalled?1:0,audio_before_construction?1:0);
+                               ,replay_boundary_mark
 #endif
-  if(!audio_before_construction&&!audio_elapsed.stalled)
-   for(unsigned step=0;step<audio_elapsed.steps;step++){
-#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
-    replay_boundary_mark("ordinary_audio_tick_begin",static_cast<int>(step),
-                         static_cast<int>(audio_elapsed.steps),static_cast<int>(replay_cursor));
-#endif
-    render_audio_tick(audio_owner,error,sizeof(error));
-#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
-    replay_boundary_mark("ordinary_audio_tick_returned",static_cast<int>(step),
-                         static_cast<int>(audio_elapsed.steps),static_cast<int>(replay_cursor));
-#endif
-   }
-#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
-  replay_boundary_mark("ordinary_audio_boundary_returned",static_cast<int>(audio_elapsed.steps),
-                       audio_elapsed.stalled?1:0,audio_before_construction?1:0);
-#endif
+  );
   simulation_done=emscripten_get_now();
   simulation_cpu_ms=std::max(0.0,simulation_done-input_done-preparation_ms-render_total_ms);
+  finish_source_callback_draw(source_frames,present_source
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
-  replay_boundary_mark("source_frames_finish_begin",static_cast<int>(source_frames.steps()),
-                       static_cast<int>(source_frames.draws()),static_cast<int>(replay_cursor));
+                              ,replay_boundary_mark
 #endif
-  source_frames.finish(present_source);
-#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
-  replay_boundary_mark("source_frames_finish_returned",static_cast<int>(source_frames.steps()),
-                       static_cast<int>(source_frames.draws()),static_cast<int>(replay_cursor));
-#endif
+  );
   (void)prepare_deferred_pipelines();
   // Camera callbacks mutate source state (including magnifier damage flags).
   // A callback without a source tick retains the last match image when the
