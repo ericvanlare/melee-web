@@ -920,6 +920,9 @@ uint32_t GameplayWorld::unresolved_fighter_fields()const{
 void GameplayWorld::verify_immutable_archives()const{storage_->verify();}
 bool GameplayWorld::advance_construction(){return storage_->advance_construction();}
 bool GameplayWorld::construction_complete()const{return storage_->construction_phase==4;}
+const MeleeWebSourceFileScope* GameplayWorld::source_file_scope()const noexcept{
+    return storage_?storage_->source_files:nullptr;
+}
 void GameplayWorld::initialize_match(const StartMeleeData& start) {
     check(storage_!=nullptr,"Gameplay world is closed");char error[256]{};
     if(storage_->source_start_data&&storage_->source_start_data!=&start)

@@ -76,7 +76,8 @@ class BuildRequestHandler(SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header("Cross-Origin-Opener-Policy", "same-origin")
         self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Cache-Control", "no-cache" if self.server.no_cache_runtime_data and
+                         urlsplit(self.path).path == "/gameplay_menu_browser.data" else "no-store")
         super().end_headers()
 
     def _inside_root(self, path):
@@ -114,10 +115,12 @@ class BuildRequestHandler(SimpleHTTPRequestHandler):
         return None
 
 
-def create_server(directory, port=8787, evidence_directory=None):
+def create_server(directory, port=8787, evidence_directory=None, no_cache_runtime_data=False):
     """Return a loopback server. Port zero is supported for test allocation."""
     if type(port) is not int or not 0 <= port <= 65535:
         raise ValueError("Port must be an integer between 0 and 65535")
+    if type(no_cache_runtime_data) is not bool:
+        raise ValueError("Runtime data cache option must be boolean")
     root = Path(directory).expanduser().resolve(strict=True)
     if not root.is_dir():
         raise NotADirectoryError(f"Build directory is not a directory: {root}")
@@ -129,6 +132,7 @@ def create_server(directory, port=8787, evidence_directory=None):
         evidence.mkdir(parents=True, exist_ok=True)
     handler = partial(BuildRequestHandler, directory=str(root))
     server = ThreadingHTTPServer(("127.0.0.1", port), handler)
+    server.no_cache_runtime_data = no_cache_runtime_data
     server.evidence_directory = evidence
     return server
 
@@ -148,9 +152,11 @@ def main():
     parser.add_argument("--directory", required=True, help="Existing build directory to serve")
     parser.add_argument("--port", type=cli_port, default=8787)
     parser.add_argument("--evidence-directory", help="Opt in to saving replay diagnostics outside the build directory")
+    parser.add_argument("--no-cache-runtime-data", action="store_true",
+                        help="Use no-cache only for gameplay_menu_browser.data; default remains no-store")
     args = parser.parse_args()
     try:
-        server = create_server(args.directory, args.port, args.evidence_directory)
+        server = create_server(args.directory, args.port, args.evidence_directory, args.no_cache_runtime_data)
     except (OSError, ValueError) as error:
         parser.error(str(error))
     with server:

@@ -61,6 +61,32 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(body, b"<h1>Melee port</h1>")
         self.assert_isolated(headers)
 
+    def test_runtime_data_cache_option_changes_only_exact_data_path(self):
+        data = b"complete runtime package bytes"
+        (self.root / "gameplay_menu_browser.data").write_bytes(data)
+        (self.root / "other.data").write_bytes(data)
+        status, headers, body = self.request("/gameplay_menu_browser.data")
+        self.assertEqual(status, 200)
+        self.assertEqual(body, data)
+        self.assert_isolated(headers)
+        self.server.no_cache_runtime_data = True
+        for method in ("GET", "HEAD"):
+            status, headers, body = self.request("/gameplay_menu_browser.data?version=1", method)
+            self.assertEqual(status, 200)
+            self.assertEqual(headers["Cache-Control"], "no-cache")
+            self.assertEqual(headers["Cross-Origin-Opener-Policy"], "same-origin")
+            self.assertEqual(headers["Cross-Origin-Embedder-Policy"], "require-corp")
+            self.assertEqual(headers["Content-Length"], str(len(data)))
+            self.assertEqual(body, b"" if method == "HEAD" else data)
+        for path in ("/", "/game.wasm", "/other.data", "/missing"):
+            self.assert_isolated(self.request(path)[1])
+        for bad in (None, 1, "yes"):
+            with self.assertRaises(ValueError):
+                serve.create_server(self.root, no_cache_runtime_data=bad)
+        server = serve.create_server(self.root, port=0, no_cache_runtime_data=True)
+        self.assertTrue(server.no_cache_runtime_data)
+        server.server_close()
+
     def test_wasm_mime_and_head(self):
         for method in ("GET", "HEAD"):
             with self.subTest(method=method):

@@ -14,6 +14,9 @@ int melee_web_audio_bank_transport_begin(MeleeWebAudio*,MeleeWebAudioResidency*,
 int melee_web_audio_bank_transport_end(char*,size_t);
 int melee_web_audio_bank_transport_active(void);
 int melee_web_audio_bank_transport_busy(void);
+/* Pure query for a live audio owner: same-owner idle SSM, or fully pristine
+ * absent SSM transport. This does not qualify resident audio/restore state. */
+int melee_web_audio_bank_transport_quiescent_for(MeleeWebAudio*);
 int melee_web_audio_bank_transport_configured(void);
 void melee_web_audio_bank_transport_configure(uint32_t bytes);
 int melee_web_audio_bank_transport_path(const char*);

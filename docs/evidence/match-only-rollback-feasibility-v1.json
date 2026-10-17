@@ -1465,5 +1465,3937 @@
       "profile port or equivalent reference",
       "retail/Slippi or physical/foreground/audible/two-machine acceptance"
     ]
+  },
+  "drawn_synctest_sprint": {
+    "status": "The combined stopped-point observation remains scoped to 38f/33cd. Shared ordinary execution on 704 passed six Release builds, 2,449 tests with 164 skips, and the original 42,127-frame three-match CPU9 comparison. Rollback remains open.",
+    "artifact_run": "rollback-stadium-sprint-20261013-111001-9f8df4a4",
+    "source": "a34d5acfa540af173d97679f7c54650ac577930a",
+    "private_build_source_patch_sha256": "e932d6e21be0960b16160b0f77b81aa874b30976e899ce09848c406493a9bf61",
+    "runtime": {
+      "artifact": "normal-frame-served-runtime-v2.json",
+      "bytes": 7416,
+      "sha256": "efa770fdd90c708306a09fb7f0eacc91e7b89ba5b52ed025cda4dc5d11c07dec"
+    },
+    "private_release": {
+      "artifact": "normal-frame-build-v3/private-release.json",
+      "bytes": 703,
+      "sha256": "91c6e5c8ab54df0f1d1f73b188d544c7657c18a7a07e4cb92764c6573d0ae5e6"
+    },
+    "ordinary_release": {
+      "artifact": "normal-frame-build-v3/ordinary-release.json",
+      "bytes": 682,
+      "sha256": "e7146156a4b2aacfc9176ae9e4871a552ef9c6c82115e498a0b33cb1209904d6"
+    },
+    "validation": {
+      "receipt": {
+        "artifact": "normal-frame-regression-v3/full-regression.json",
+        "bytes": 797,
+        "sha256": "9b37a9205b4af24767bf5d9f9cb82b68f5713de7ae75d100e69c4adb978ff1fa"
+      },
+      "tests": 2400,
+      "skips": 164,
+      "result": "pass",
+      "source_patch_sha256": "e388731246285d12b400131f55214ca1dbb6057bb19f15a306dabb16ebd2c6e9"
+    },
+    "retained_regression_failures": [
+      {
+        "artifact": "normal-frame-regression-v1/full-regression.json",
+        "bytes": 796,
+        "sha256": "0b976dfccea2a061edc8e675cb4d47e326cb6edc611dc78f7a418a836d130458"
+      },
+      {
+        "artifact": "normal-frame-regression-v2/full-regression.json",
+        "bytes": 795,
+        "sha256": "a1ef4d2714e4cd58cc5fda6acb3656467342c443d45d165a0fdb54effd5fd165"
+      }
+    ],
+    "first_capture": {
+      "report": {
+        "artifact": "normal-frame-capture-v1/browser/report.json",
+        "bytes": 389493,
+        "sha256": "d10bf1b1ca381f2ab67a0523809718730ec0a3d097109010a885f534d7fa7814"
+      },
+      "owner": {
+        "artifact": "normal-frame-capture-v1/owner-report.json",
+        "bytes": 93358,
+        "sha256": "c00fb279c19224458b3bc1fd07a137664de67a673eedd304507114aa3378f651"
+      },
+      "completion": {
+        "artifact": "normal-frame-capture-v1/completion.json",
+        "bytes": 171855,
+        "sha256": "d6e6ea8e2707075c5d8165c263e11156c0343dae62ef977fbaae82436fb75b1e"
+      },
+      "reduction": {
+        "artifact": "normal-frame-capture-v1/first-failure.json",
+        "bytes": 188457,
+        "sha256": "0869b38bd8cb3fe11ea84e3160502f8290bfc37c0c5afe0dbccc20078ccbf059"
+      },
+      "result": "fail-before-observer-arm",
+      "boundary": "Original CSS to SSS after CPU-to-empty-to-Human P2 transition",
+      "match_observations": 0,
+      "observer_armed": false,
+      "native_cleanup": "pass: source/menu owners and cached assets released",
+      "owned_browser_and_server_absent": true,
+      "source_and_runtime_unchanged": true,
+      "h1": "No forced timing pause reported; recorder retained seven reason-code7 incidents, no dropped incidents, 7998 evicted samples, and zero match source steps. Not a match timing result."
+    },
+    "next": "Prepare the held C1 value-owned normal-callback execution record at unchanged synchronous ordinary callsites; review actual ordering before any returned-idle prepare/dispatch. GPU content/reference/future closure and drawn restore/repeat remain NO-GO.",
+    "scope": "Observer and idle predicates are prerequisites only. No same-instance drawn restore, minimum complete state size or combined seven-tick budget result.",
+    "hps_quiescence_controls": {
+      "result": "pass-focused-component-only",
+      "source": "a34d5acfa540af173d97679f7c54650ac577930a",
+      "candidate": {
+        "artifact": "hps-native-quiescence-controls-v6/manifest-v6.json",
+        "bytes": 7653,
+        "sha256": "a7b99f17692935c9371e06edb8e82993eeccb8c4f37557bd3845f57b1f928999"
+      },
+      "attempt": {
+        "artifact": "hps-native-quiescence-controls-v6/attempt-v1/attempt.json",
+        "bytes": 3023,
+        "sha256": "34564339b5d5484824b02e9ddf03737b24f231692390e150d141b56bc8fbfe3a"
+      },
+      "review": {
+        "artifact": "hps-native-quiescence-root-result-review-v6.json",
+        "bytes": 1353,
+        "sha256": "c0a5ddf4ce9a6e02ae4b362595eb1ac141aad3a94ca58d7e8e3efd0614d163aa"
+      },
+      "controls": "Actual HPS stream and inner IO code reject wrong owner, queued request and callback-time pumping; same idle owner is admitted. Always-on CHECK negative reaches C via argv and fails as expected under Release flags.",
+      "scope": "Audio identity/source lifecycle collaborators are fixture-only. No decoded HPS, full DSP, host Promise/destination ownership, browser checkpoint or restore claim.",
+      "retained_failures": [
+        "v1 host-ABI compile",
+        "v3 actual TARGET_PC callback signature compile",
+        "v5 environment-driven negative did not reach C getenv; overall attempt failed"
+      ]
+    },
+    "second_capture": {
+      "receipt": "rollback-stadium-sprint-20261013-111001-9f8df4a4/normal-frame-capture-v2/first-failure.json",
+      "sha256": "393ff0bb2ecabc2208923936bbb8dc6a1f77da396169762e7f2b94dbe1d71d81",
+      "state": "FAIL",
+      "harness_patch_sha256": "0730cef984dc68c60180da8e7a23b837c6377577b188074ca37090ca5b00fb29",
+      "runtime": "Unchanged frozen runtime-v2; source a34d5acf plus e932d6e2",
+      "css_readiness": "PASS; actual two-keyboard/source readiness, one Start edge, original SSS",
+      "normalized_source_frame": 180,
+      "failure": "Observer selected valid zero-source callback before a due tick; zero tick/draw, one audio render of533 PCM frames",
+      "native_retirement": true,
+      "owned_browser_server_absent": true,
+      "h1_validation_failures": [],
+      "not_claimed": [
+        "Actual consumed PAD receipt",
+        "Renderer event inventory",
+        "Browser restore",
+        "Acceptance"
+      ],
+      "next": "Reduced actual-native zero-step->due-step control and independent review before a new runtime build/capture"
+    },
+    "third_capture": {
+      "result": "pass-observation-only",
+      "report": {
+        "artifact": "normal-frame-capture-v3/browser/report.json",
+        "bytes": 634550,
+        "sha256": "5ab01c209e832e9b4b681783cd5cdce53f715b2321770d92a3e94a11929bdd5f"
+      },
+      "owner": {
+        "artifact": "normal-frame-capture-v3/owner-report.json",
+        "bytes": 71819,
+        "sha256": "8e6118296b42c284f0ab5c4d505e8613ff827238f52a445ac0de89ad67e2df1c"
+      },
+      "completion": {
+        "artifact": "normal-frame-capture-v3/completion.json",
+        "bytes": 168116,
+        "sha256": "dc07c0c63661ff9c937a3b9a66296915180007076d2427f8121791ef20d6f0b8"
+      },
+      "independent_review": {
+        "artifact": "normal-frame-capture-v3-independent-review-v1.json",
+        "bytes": 6057,
+        "sha256": "27f10fa689aeb507365c4cbd6f6ffba676cb750129cea7ecb974a5f25667ba0f"
+      },
+      "source": "a34d5acfa540af173d97679f7c54650ac577930a",
+      "source_patch_sha256": "c50aa00bd6c3ef86e7ab6774eaa5c8b537c254ce13a21fba44ad7a35377195e8",
+      "runtime": {
+        "artifact": "normal-frame-served-runtime-v3.json",
+        "bytes": 7557,
+        "sha256": "38ab7a0731090b78306e0b2067108be87e705739315794e0535b1c7a93c3f178"
+      },
+      "private_release": {
+        "artifact": "normal-frame-build-v4/private-release.json",
+        "bytes": 703,
+        "sha256": "92b3b438834a710eb0280d8415f2462a7edb88a33b28cc2b47b7bd23f6f0cc59"
+      },
+      "ordinary_release": {
+        "artifact": "normal-frame-build-v4/ordinary-release.json",
+        "bytes": 682,
+        "sha256": "fff2b531be23a9aa01e562f5f4d70b6a02f09d28a83b7cb61765329171471683"
+      },
+      "validation": {
+        "receipt": {
+          "artifact": "normal-frame-regression-v4/full-regression.json",
+          "bytes": 796,
+          "sha256": "41aff8f587c160d79867c1e7d6d6bdb7241ab3f283d1d18c36ffda335c1916b1"
+        },
+        "tests": 2402,
+        "skips": 164,
+        "source_unchanged": true
+      },
+      "due_tick_repair": {
+        "activation": "first original begin_tick selected by unchanged clock; source-free callbacks retain original audio work and first-due failure is terminal",
+        "review": {
+          "artifact": "normal-frame-due-tick-final-component-review-v3.json",
+          "bytes": 5003,
+          "sha256": "15bd856af3aee378cd6a91358c59c9850136cde6643b69245c415dd81e8060f5"
+        },
+        "actual_source_wasm32_controls": {
+          "artifact": "normal-frame-due-tick-controls-v3/receipt.json",
+          "bytes": 19632,
+          "sha256": "c63c9a395ae6e618acac7c700de6e98af8fef2cce3aa943845a4e3f51524e9b0"
+        },
+        "integrated_controls": {
+          "artifact": "normal-frame-due-tick-integrated-controls-v3.json",
+          "bytes": 528,
+          "sha256": "78f3c565f70481c80c4062db2dffeccb6b58035468befa7d4f1746a23d91e8fb"
+        }
+      },
+      "callback": {
+        "requested_source_frame": 180,
+        "source_frame_before": 180,
+        "source_frame_after": 181,
+        "tick_returns": 1,
+        "draw_returns": 1,
+        "audio_returns": 1,
+        "pcm_frames": 533,
+        "audio_phase_before": 20,
+        "audio_phase_after": 40,
+        "pre_tick_callbacks": 0,
+        "pre_tick_audio_returns": 0,
+        "pre_tick_pcm_frames": 0,
+        "raw_pad_bytes": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          255,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          255,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "renderer": {
+        "schema_version": 1,
+        "state": 4,
+        "first_blocker": 7,
+        "target_frame_index": 3238,
+        "frame_index": 3238,
+        "frame_id": "3239",
+        "event_count": 280,
+        "handle_count": 10,
+        "op_count": 3,
+        "render_pass_count": 3,
+        "draw_command_count": 246,
+        "custom_draw_count": 0,
+        "encoder_task_count": 0,
+        "texture_copy_count": 0,
+        "texture_upload_count": 0,
+        "palette_conversion_count": 0,
+        "resolve_count": 2,
+        "snapshot_count": 1,
+        "staging_copy_count": 12,
+        "queue_write_count": 4,
+        "queue_write_bytes": "1231440",
+        "after_submit_callback_count": 0,
+        "submit_count": 1,
+        "fence_count": 1,
+        "fence_success": 1
+      },
+      "renderer_first_blocker_name": "LOAD_ATTACHMENT",
+      "renderer_handle_scope": "Capture-local IDs identify observed handles, not full owner/content/retirement coverage",
+      "h1": {
+        "timing_pauses": 0,
+        "dropped_samples": 3029,
+        "dropped_incidents": 0,
+        "reason_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          8,
+          0,
+          0
+        ],
+        "scope": "Lossy route callback recorder includes setup and match; no acceptance or no-stall claim beyond observed boundary"
+      },
+      "native_retirement": true,
+      "owned_browser_server_absent": true,
+      "source_runtime_unchanged": true,
+      "not_claimed": [
+        "Browser-observed zero-source callback skip (pre_tick counts are zero here; actual-source fixture covers it)",
+        "Renderer content/handle ownership closure",
+        "Actual file-operation inventory or decoded/native PCM equality",
+        "Snapshot/restore/replay",
+        "Seven corrective ticks or combined frame budget",
+        "Acceptance"
+      ]
+    },
+    "observation_checkpoint_ci": {
+      "observation_commit": "d68fd8b16d8c1f63a3d3988471f5c8bca1575780",
+      "current_head": "99e6838fa2457a2ebc5917218d81b348ec9b733a",
+      "run": 38471800942,
+      "checks": 14,
+      "successes": 12,
+      "expected_skips": 2,
+      "runtime_changed": false,
+      "failed_run": 38469816339,
+      "failed_boundary": "Linux native source-file fixture strictC11 POSIX strnlen declaration",
+      "repair": "Native fixture compiler flag -D_POSIX_C_SOURCE=200809L;2 focused methodsPASS, independentreviewPASS",
+      "artifacts": {
+        "pr324-unit1-failed-job.log": {
+          "artifact": "pr324-unit1-failed-job.log",
+          "bytes": 443993,
+          "sha256": "0acd49b748ae8a2e935ac1c8436645b5a99ed529c92c05db137a8a84bfa5c2af"
+        },
+        "pr324-posix-fixture-independent-review-v1.json": {
+          "artifact": "pr324-posix-fixture-independent-review-v1.json",
+          "bytes": 2220,
+          "sha256": "7da264e06ba3a2bbd0aafc79c9a34b12af63889aac25b09769c2dc07d1bc0725"
+        },
+        "pr324-posix-fixture-repair-v1/focused.log": {
+          "artifact": "pr324-posix-fixture-repair-v1/focused.log",
+          "bytes": 418,
+          "sha256": "9e1adf0f320903f1e72905d2bea9fa85d91772a8f60cb8cdd78425139011b6ea"
+        },
+        "pr324-ci-99e6838f.json": {
+          "artifact": "pr324-ci-99e6838f.json",
+          "bytes": 5208,
+          "sha256": "f837aeb9ad45b6faaca7ba3cf1a1bb1d8673fc0b81b8f87d78253fc855119370"
+        }
+      },
+      "scope": "Draft checkpoint only; no restore or integration claim"
+    },
+    "october14_resume": {
+      "status": "CREATION_PROVENANCE_OBSERVATION_PASS_ATTACHMENT_AND_TEXTURE_OWNERS_OPEN",
+      "raw_run_id": "rollback-sprint-resume-20261014-085704-6fe33b74",
+      "runtime_producer": "a557e9ce444f7a40c80f9a55c58c8abf96719a44",
+      "metadata_and_harness_head": "bf59a893b56ac1aa8b02165349ac694445ef0acd",
+      "audio_file_component_source": "9bb0afc7c2164284b75b6286cb517da6547f7d95",
+      "validation": {
+        "release_builds": [
+          "ordinary",
+          "frame-effect",
+          "combined-first-pair"
+        ],
+        "release_state": "PASS",
+        "full_tests_run": 2425,
+        "full_tests_skipped": 164,
+        "full_tests_failed": 2,
+        "failure": "Producer/consumer source-fingerprint inventory mismatch, retained",
+        "metadata_repair_focused_tests": 56,
+        "metadata_repair_focused_state": "PASS",
+        "final_full_regression_and_ci": "PENDING"
+      },
+      "schema2_capture": {
+        "state": "FAIL_CLOSED_NATIVE_SINGLE_TICK_ADMISSION",
+        "runtime_producer": "a557e9ce444f7a40c80f9a55c58c8abf96719a44",
+        "harness_head": "bf59a893b56ac1aa8b02165349ac694445ef0acd",
+        "elapsed_ms": 58009,
+        "attempts": 1,
+        "first_failure": {
+          "reason": "ordinary_callback_not_one_ready_tick",
+          "requested_source_frame": 180,
+          "actual_source_after": 182,
+          "tick_returns": 2,
+          "draw_returns": 2,
+          "callback_steps": 2,
+          "callback_draws": 2,
+          "audio_returns": 1,
+          "pcm_frames": 534,
+          "admitted": false,
+          "renderer_armed": false,
+          "planned_steps_field": 0,
+          "plan_limit": "planned_steps=0 and source_before=0 are default values because refusal precedes provenance assignment; do not infer a zero-source callback from those fields."
+        },
+        "schema2_rows": {
+          "renderer_schema": 2,
+          "events": 0,
+          "handles": 0,
+          "resources": 0,
+          "binding_entries": 0,
+          "draws": 0,
+          "ownership_inference": "None: observer never armed. Empty rows are not ownership closure or a renderer failure."
+        },
+        "H1": {
+          "capture_failures": [],
+          "timing_pauses": 0,
+          "reason_counts": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            8,
+            0,
+            0
+          ],
+          "non_preparation_incidents": 0,
+          "preparation_incidents": 8,
+          "dropped_incidents": 0,
+          "unknown_reasons": 0,
+          "lossy_sample_count": 3039
+        },
+        "retirement": {
+          "native_retired": true,
+          "result": 1,
+          "browser_context_closed": true,
+          "browser_closed": true,
+          "owned_browser_absent": true,
+          "owned_server_absent": true,
+          "owned_process_group_absent": true,
+          "preexisting_not_owned": true
+        },
+        "source_and_runtime_unchanged": true,
+        "source_reduction": {
+          "guard": "src/gameplay_menu_frame_effect.cpp:59 rejects planned_steps!=1 (also prior-step/clock/audio/readiness/owner/cursor guards), records first refusal, leaves actual source callback behavior unchanged.",
+          "callsite": "src/gameplay_menu_browser.cpp:1888 passes unchanged elapsed.steps at each selected match tick; source tail then performs actual ticks/draws/audio and checked terminal stop.",
+          "observed": "Actual callback completed two ticks/two draws to182. This violates explicit one-tick admission. Generic refusal does not retain the original clock plan or distinguish every guard clause; avoid claiming a particular host delay caused it.",
+          "minimum_next_reducer": "Use maintained actual native hook fixture plus extracted SourceFrameSequence/tail seam to drive planned_steps2, two actual tick/draw notifications and one audio return. Assert refusal, zero renderer arm, unchanged two source steps/draws, first error retained and safe retirement. Add direct planned_steps1 positive and0 pending controls using existing fixtures; do not force clock budget, skip the first due callback, or relax original source work.",
+          "ownership_next_step": "No ownership change can be selected from this empty renderer observation. After deterministic admission reduction, root must explicitly choose scope: retain single-tick contract, or separately review an observation-only first-draw/normal-callback contract that preserves all multi-step source order. No automatic retry or restore."
+        },
+        "artifacts": [
+          {
+            "file": "renderer-schema2-observation-packet-v2/capture/browser/report.json",
+            "bytes": 446277,
+            "sha256": "39b197204a92fcb9ecbf89e5ce9410bb68fd9d4cae4e610c443603e882e38895"
+          },
+          {
+            "file": "renderer-schema2-observation-packet-v2/capture/owner-report.json",
+            "bytes": 83279,
+            "sha256": "facd97840538e1f96e72f288c84a349f377216d9b7501ed08fbe34e0dd9f9795"
+          },
+          {
+            "file": "renderer-schema2-observation-packet-v2/capture/completion.json",
+            "bytes": 161666,
+            "sha256": "3f86bbae6e7396e44018c1c5bcf2b984a4b930a05d3a0ba9d77d4a00059f3713"
+          },
+          {
+            "file": "renderer-schema2-observation-packet-v2/capture/launch.json",
+            "bytes": 161201,
+            "sha256": "068b25226106b56e4334ebf27221509cd4952c1227d9db70dc1a31c5723f666c"
+          },
+          {
+            "file": "renderer-schema2-observation-packet-v2/capture/capture.log",
+            "bytes": 1662,
+            "sha256": "71ccedc64c81af534252aa7b0730e47b93bfa50d9da4b328f1230fa3e3a1b2cf"
+          },
+          {
+            "file": "renderer-schema2-observation-packet-v2/root-capture-release.json",
+            "bytes": 1056,
+            "sha256": "242e8c6d2fdb4bef8e4ec45a8292505b1d07e51f1d76f29747f5cc12c0e76b55"
+          },
+          {
+            "file": "renderer-schema2-observation-packet-v2/root-launcher-review.json",
+            "bytes": 1064,
+            "sha256": "aecf665495a250222a9c1b05dc0f87bf2fb46b063ec73a4257b68f6f1cce52fa"
+          },
+          {
+            "file": "renderer-schema2-observation-packet-v2/served-runtime.json",
+            "bytes": 7147,
+            "sha256": "481c82a3d6b6f8234733529e0881f5eeef19e84f8ac7c4fd2af8d8fb7e44d51d"
+          }
+        ]
+      },
+      "review_artifacts": [
+        {
+          "file": "renderer-schema2-root-result-review.json",
+          "sha256": "e4609adb08b43f51da82886803d75b0c96f4e2783d662f5e32ef1ecd6fa80394"
+        },
+        {
+          "file": "renderer-schema2-focused-result-v1.json",
+          "sha256": "9a7cc53dc1218f23c1ffe2e3f47b3e663e6d4974ff7bec75bc21476c25761059"
+        },
+        {
+          "file": "renderer-schema2-validation-a557e9ce-v1/evidence/result.json",
+          "sha256": "855b3abed9a3d51dc6a53f4e61ed8b7703c0e3324f59b9af5c0cf2e1c94972a7"
+        },
+        {
+          "file": "renderer-schema2-validation-a557e9ce-v1/first-failure-review.json",
+          "sha256": "4377f3544de31c9295a895bda08c5385f732cf350950605a69d9cc1ca70a4523"
+        },
+        {
+          "file": "public-source-fingerprint-repair-v1/root-focused-review.json",
+          "sha256": "5cf3475da888d392cff929079626b16d604df47713a13af1f45d98d95d217976"
+        },
+        {
+          "file": "renderer-schema2-observation-packet-v2/root-result-review.json",
+          "sha256": "9ed7a0c6cb87be25e9549814b4f3fdb012ec71d2dc57253224ba63e9d0e12d28"
+        },
+        {
+          "file": "wasm-instance-ownership-maintained-validation-v1/root-result-review.json",
+          "sha256": "02c0f587cc78d4cfcb366b246e0db4b60b3570fd3360d5567afa99a0f543680a"
+        },
+        {
+          "file": "wasm-instance-ownership-maintained-validation-v1/execution-v1.json",
+          "sha256": "1dbf1281a0ed2614fced88c3a34ffb2148c21a3492c0026bc4c00354a7b15659"
+        },
+        {
+          "file": "wasm-instance-ownership-integration-execution-v3/root-result-review.json",
+          "sha256": "7c4e9af291b6190ec89fe2a51ec36b401c51b3a3979dff6c5cfe01a7d66f57ad"
+        },
+        {
+          "file": "wasm-instance-ownership-integration-execution-v3/execution-v2.json",
+          "sha256": "f762a144bdaa2b228a291cc06911e631df352d94ac44f1bc3037a5176a18048f"
+        },
+        {
+          "file": "wasm-instance-ownership-integration-execution-v3/execution-binding-erratum-v1.json",
+          "sha256": "3fbaa618fd70f81ef363a2d385e3ef5fadeae222eae13e54be94a9ad6b95af84"
+        },
+        {
+          "file": "normal-callback-step-admission-reducer-v1/root-result-review.json",
+          "sha256": "2b208b3f723e5de737723c2a02c138ef8cca3cae1249b49d9c9f712474ca4c40"
+        },
+        {
+          "file": "normal-callback-step-admission-reducer-v1/result-summary.json",
+          "sha256": "c1ae2e89c8233a5f9631b8a5c21dc0011a3cd954afa6019d9f7795a82868d5de"
+        }
+      ],
+      "scope": "Historical producers retained. Current 410e9 first-draw creation-provenance observation is not resource/content closure, restore, repeated-tick equivalence or acceptance.",
+      "wasm_instance_component": {
+        "local_commit": "2d9e2927060944c44ca1aaf4587eeafad3f5f1c2",
+        "focused_tests": 46,
+        "reduced_actual_fixture": "PASS",
+        "positive_shapes": [
+          "preRun function",
+          "preRun array"
+        ],
+        "asyncify_writer_calls_each": 4,
+        "refusals_before_main": [
+          "missing installer",
+          "custom instantiateWasm"
+        ],
+        "historical_failed_fixture": "Missing canonical wasmTable dependency; retained v2, v3 dependency repair passes",
+        "private_game_artifact_scan": "PENDING",
+        "game_restore": "NOT_RUN"
+      },
+      "first_draw_observation": {
+        "state": "OBSERVATION_COLLECTED_RENDERER_RESTORE_BLOCKED",
+        "producer": "fa58cb7b305ec6cd44e87f064311e39a98487f9f",
+        "report_sha256": "66434c675015454c366a1c6ac97a76df449e916556fc4e51e5a1f7dae1765e95",
+        "owner_sha256": "6106c96f3cf37ab485ac73164dfa11c76b53bd152b72f22bfe8d5cd16f7e5c39",
+        "completion_sha256": "a928775a8499d3cbe765635e3de46c2c0860dc1142fa2375c4a0d9c338351780",
+        "independent_review_sha256": "dcac640641bdb74c3946477302db6064034eca2e732525ea96839a98752feed0",
+        "source": {
+          "source_frame_before": 180,
+          "source_frame_after": 181,
+          "planned_steps": 1,
+          "planned_audio_steps": 2,
+          "tick_returns": 1,
+          "draw_returns": 1,
+          "audio_returns": 2,
+          "pcm_frames": 1067,
+          "selected_source_frame": 181,
+          "unobserved_draws": 0
+        },
+        "renderer": {
+          "schema_version": 2,
+          "state": 4,
+          "first_blocker": 18,
+          "target_frame_index": 3158,
+          "frame_index": 3158,
+          "frame_id": "3159",
+          "event_count": 1763,
+          "handle_count": 193,
+          "op_count": 3,
+          "render_pass_count": 3,
+          "draw_command_count": 243,
+          "custom_draw_count": 0,
+          "encoder_task_count": 0,
+          "texture_copy_count": 0,
+          "texture_upload_count": 0,
+          "palette_conversion_count": 0,
+          "resolve_count": 2,
+          "snapshot_count": 1,
+          "staging_copy_count": 12,
+          "queue_write_count": 4,
+          "queue_write_bytes": "1225104",
+          "after_submit_callback_count": 0,
+          "submit_count": 1,
+          "fence_count": 1,
+          "fence_success": 1,
+          "finding_mask": "134480000",
+          "command_record_count": 262,
+          "actual_draw_count": 243,
+          "resource_count": 105,
+          "binding_entry_count": 1104,
+          "depth_trace_count": 3,
+          "depth_request_count": 0
+        },
+        "array_lengths": {
+          "raw_pad_bytes": 64,
+          "events": 1763,
+          "handles": 193,
+          "resources": 105,
+          "binding_entries": 1104,
+          "draws": 243
+        },
+        "depth_after_retirement": {
+          "registered": 0,
+          "completed": 0,
+          "pending": 0,
+          "ignored_other_issuer": 0,
+          "finalized": true
+        },
+        "h1": {
+          "callback_count": 3120,
+          "dropped_samples": 3020,
+          "dropped_incidents": 0,
+          "reason_counts": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            8,
+            0,
+            0
+          ],
+          "unknown_reason_count": 0,
+          "invalid_preparation_count": 0,
+          "status": "installed"
+        },
+        "timing_pauses": 0,
+        "native_retired": true,
+        "owner_elapsed_ms": 62234,
+        "owned_browser_server_absent": true,
+        "scope": "One naturallydue1tick callback observed. Multi-tick and pending-depth-map browsercoverage absent; fixturecontrols separate. Unknownresource18,LOAD7,commandshape27 remain blockers; no restore/repeat/acceptance.",
+        "raw_run_id": "rollback-sprint-resume-20261014-085704-6fe33b74",
+        "artifact_directory": "first-draw-observation-packet-v2/capture",
+        "aurora_tree": "dce8b9ecb931375e636947ec482f881c667d0cde",
+        "validation": {
+          "release_artifact_counts": [
+            44,
+            44,
+            45
+          ],
+          "full_suite_run": 2429,
+          "full_suite_skipped": 164,
+          "full_suite_failed": 0,
+          "result_sha256": "aed4a747c6fc3937507f752d14614448451c442e4ce99ce0b8a10d4eb4bfda2d",
+          "focused_tests": 52,
+          "off_projection_translation_units": 4
+        },
+        "fresh_static_wasm_inventory": {
+          "result_sha256": "84a44b51471c8f5cc10b0067a0b17f44cd1923d4121626d38e94901b5516e839",
+          "profiles": [
+            "ordinary",
+            "frame_effect",
+            "first_pair"
+          ],
+          "scope": "Fresh bindings and full static instruction inventory only; no runtime hidden-state closure."
+        },
+        "first_blocker_reduction": {
+          "receipt_sha256": "584d94c2f7d378e9b62761310a32b6a6f144d1c9cf226ba617143834498bfeeb",
+          "finding": "event8 static slot0 bindgroup capture_id8 lacks its real pre-arm initialization descriptor; no swapchain identity claim",
+          "state": "source/raw-result reduction only; repair pending"
+        }
+      },
+      "ci_content_repair": {
+        "failed_head": "c809535175167cf51c0989a5a2d991b85aee58bd",
+        "failed_run": 38616421982,
+        "failure": "sensitive_assignment at private local apiKey name holding fixed Module property",
+        "repair": "Three lexical identifier references renamed accessorPropertyName; property literal and scanner unchanged",
+        "review_manifest_sha256": "1a7849b4e49c8d28cc830ffbb670df120f66bbd4c63c089561c073c62d00760f",
+        "focused_tests": {
+          "run": 2,
+          "passed": 2,
+          "log_sha256": "131bacc7cbaad1e66b36ec317cccedf9ac5c4d55e5c02ea04b92660fdc8e3371"
+        },
+        "tracked_content": {
+          "entries": 2245,
+          "findings": 0,
+          "log_sha256": "81bdbb761689ad713e52bf8f471fbaba4e76ab98fb579b3521da66881e1573fb"
+        },
+        "runtime_capture_producer": "fa58cb7b305ec6cd44e87f064311e39a98487f9f"
+      },
+      "renderer_owner_observation": {
+        "state": "PASS_SCOPED_OBSERVATION_NOT_RESTORE",
+        "source": "410e9dd95de54e7d0601cbf09ffc23b97946636e",
+        "at": "2026-10-14T20:38:10.018710+00:00",
+        "files": {
+          "browser/report.json": "307537051a5fda8409428d96589ddf06e4cdeb74fca56e5224f0dc1f52f1f3ec",
+          "completion.json": "197f287e874084e8a6d3aca44f26acfbb41bd862f34b1cd260aaaaa418d40b62",
+          "owner-report.json": "c31dfa6bd4b9c7814a2af3271b4a8e2854239cf2920d881ceef0aa3f449a4e1f"
+        },
+        "frame": {
+          "source_frame_before": 180,
+          "source_frame_after": 181,
+          "tick_returns": 1,
+          "draw_returns": 1,
+          "audio_returns": 1,
+          "pcm_frames": 534,
+          "audio_phase_before": 40,
+          "audio_phase_after": 0,
+          "unobserved_draws": 0
+        },
+        "renderer": {
+          "schema_version": 3,
+          "state": 4,
+          "first_blocker": 7,
+          "target_frame_index": 3165,
+          "frame_index": 3165,
+          "frame_id": "3166",
+          "event_count": 1783,
+          "handle_count": 196,
+          "op_count": 3,
+          "render_pass_count": 3,
+          "draw_command_count": 246,
+          "custom_draw_count": 0,
+          "encoder_task_count": 0,
+          "texture_copy_count": 0,
+          "texture_upload_count": 0,
+          "palette_conversion_count": 0,
+          "resolve_count": 2,
+          "snapshot_count": 1,
+          "staging_copy_count": 12,
+          "queue_write_count": 4,
+          "queue_write_bytes": "1231440",
+          "after_submit_callback_count": 0,
+          "submit_count": 1,
+          "fence_count": 1,
+          "fence_success": 1,
+          "finding_mask": "262272",
+          "command_record_count": 265,
+          "actual_draw_count": 246,
+          "resource_count": 119,
+          "binding_entry_count": 1123,
+          "layout_entry_count": 19,
+          "provenance_count": 14,
+          "depth_trace_count": 3,
+          "depth_request_count": 0
+        },
+        "finding_codes": [
+          7,
+          18
+        ],
+        "missing_resource_rows_by_kind": {
+          "7": 1,
+          "1": 73,
+          "2": 3
+        },
+        "missing_scope": "Not every handle requires a resource row; device kind7 is separate. Texture/view descriptor and content ownership remain unresolved.",
+        "h1": {
+          "sample_count": 100,
+          "callback_count": 3128,
+          "dropped_samples": 3028,
+          "incidents": 8,
+          "reason_counts": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            8,
+            0,
+            0
+          ],
+          "dropped_incidents": 0,
+          "scope": "Lossy sample ring; no timing acceptance."
+        },
+        "native_retired": true,
+        "owned_browser_pids_absent": 10,
+        "owned_process_groups_absent": true,
+        "owner_elapsed_ms": 62592,
+        "limits": [
+          "No restore/repeat pair",
+          "No PCM/pixel equivalence",
+          "No seven-tick combined budget",
+          "No physical-input or two-computer acceptance",
+          "Historical shape27 absent only in this differing actual callback; not a repair or cross-run equivalence proof"
+        ],
+        "raw_run_id": "rollback-sprint-resume-20261014-085704-6fe33b74",
+        "artifact_directory": "first-draw-observation-packet-v3/capture",
+        "aurora_tree": "ecd933889b07d5d91175e69200c37bdef35c00c8",
+        "root_review_sha256": "dd985038a1c37eaec1b0d578e8477299e2afe15bccf4017bc6fae4d18db277b3",
+        "independent_review_sha256": "a3b12c7bdb68466c0f9020bbf843985c3173b24f0d99e16e37f5193e8f81625e",
+        "validation": {
+          "source": "410e9dd95de54e7d0601cbf09ffc23b97946636e",
+          "release_artifacts": [
+            44,
+            44,
+            45
+          ],
+          "full_tests": 2429,
+          "skips": 164,
+          "result_sha256": "c144562c903c28c71dc45e4aedd42286b3378177ac33aa816f45d642c8d8f9d2",
+          "focused_combined_sha256": "e6ede11b2e84b53f11c03d2478ca05fd2e35661e3da895d20f2b3b4156a70ba0"
+        },
+        "next": "Actual persistent attachment texture/view creation and parent identity source control; retain LOAD7 and UNKNOWN18 for unproven owners/content. No replay or restore released."
+      },
+      "private_wasm_boot": {
+        "state": "PASS_SCOPED_NO_DISC_INITIALIZATION_AND_REFUSAL_CONTROLS",
+        "source_head": "13922b8d3a84d7299e9121f1b09e7181c9793c2b",
+        "source_tree": "14923787782d3d4d67f75c9ea4477ad97465e5f4",
+        "static_private_profile": {
+          "binding": "private46-static-inventory-v2/binding-manifest.json",
+          "binding_sha256": "82969cd21e07a350ff33bda3bfd145845ead87d69d204e56a8f4cd039cd573dd",
+          "artifact_count": 46,
+          "wasm_bytes": 15980997,
+          "wasm_sha256": "607cd44775f24a7912c7a2fb0146e3bf16353afcb53b08085c2cd85cd2004b61",
+          "review": "private46-static-inventory-v2/execution-v1/root-result-review.json",
+          "review_sha256": "dc7de7bccfd75235036fc907ee88f299bf584444511f31572941526f7c88d0a5",
+          "scope": "Static identity and Wasm instruction inventory only; not runtime hidden-state closure."
+        },
+        "initial_private_controls": {
+          "state": "THREE_PRIVATE_CONTROLS_PASSED; V1_ORDINARY_CASE_TIMEOUT_RETAINED",
+          "passed_controls": [
+            "private-probe",
+            "missing-helper",
+            "missing-hook"
+          ],
+          "browser_report": "private-wasm-no-disc-boot-execution-v1/browser-run/report.json",
+          "browser_report_sha256": "02cfeb1328b96dd210880edd30ed1b4435bc88b9ad6303181526f73904261771",
+          "owner_report": "private-wasm-no-disc-boot-execution-v1/owner.json",
+          "owner_sha256": "92fd252ce6daa4810281ea4d78f5fdccf48847c1828cb14f5535903ab678092c",
+          "root_review": "private-wasm-no-disc-boot-execution-v1/root-result-review.json",
+          "root_review_sha256": "a5f357c943ab0378341303d7847f2ba332cb40dcf8972f46dea19fec79673c9e",
+          "retained_failure": {
+            "case": "ordinary-unflagged",
+            "failure": "TimeoutError after 90000ms",
+            "source_supported_harness_hypothesis": "path-only route.fulfill({path}) dropped the real server isolation headers; no isolated-state snapshot was captured",
+            "production_finding": false
+          }
+        },
+        "ordinary_unflagged_v3": {
+          "state": "PASS_ROOT_ORDINARY_NO_DISC_CONTROL_REVIEW",
+          "candidate_controller": "private-wasm-no-disc-boot-candidate-v3/boot_probe.mjs",
+          "controller_sha256": "3c123776ba1ae403a757a578646ac168571a970847e3089f684e36e99b349e44",
+          "candidate_manifest_sha256": "62b62b50ad42bd30e51e6cd674bc1e5effd321e68946e449b9d748571712f0dd",
+          "execution_result": "private-wasm-no-disc-boot-execution-v2/execution-result.json",
+          "execution_result_sha256": "aefd658a4ac388078fc05fdf900a8a21f131df604ae3efbaa7cc215871fbfc88",
+          "browser_report": "private-wasm-no-disc-boot-execution-v2/browser-run/report.json",
+          "browser_report_sha256": "31ab4a313652aaa653608b2852f87c1532ca6e31ebf51177ca6f3747297f9f09",
+          "owner_report": "private-wasm-no-disc-boot-execution-v2/owner.json",
+          "owner_sha256": "8bbd6acd324b3bf198e7dc4cf2ccde0fc14452ae26382df006f9b5285c8add01",
+          "root_review": "private-wasm-no-disc-boot-execution-v2/root-result-review-v1.json",
+          "root_review_sha256": "31794f316bc65938661b1505c5c8218a115db7f524ea8cfa57d9ac280b915e51",
+          "browser": {
+            "version": "155.0.8059.40",
+            "mode": "headless installed Chrome, audio muted",
+            "document_status": 200,
+            "coop": "same-origin",
+            "coep": "require-corp",
+            "cross_origin_isolated": true,
+            "module_present": true,
+            "first_native_callback_ms": 70.72,
+            "renderer_init_ms": 68.395,
+            "disc_input_empty": true,
+            "private_accessor_present": false,
+            "runtime_page_console_route_errors": 0,
+            "ordinary_requests_and_hash_verified_responses": 38
+          },
+          "cleanup": {
+            "owner_result": "pass",
+            "cleanup_passed": true,
+            "cdp_attribution_complete": true,
+            "owned_process_groups_absent": true,
+            "checkout_unchanged": true
+          },
+          "scope": "Ordinary no-disc native initialization only; no gameplay, runtime ownership closure, disc import, restore or performance acceptance."
+        }
+      },
+      "persistent_efb_component": {
+        "source_commit": "8c20a0daf450095c454011d0215f9fb489e5d037",
+        "included_in_source_head": "13922b8d3a84d7299e9121f1b09e7181c9793c2b",
+        "component_scope": "Creation provenance for three persistent EFB owners: color framebuffer, resolved-color target and depth buffer; six texture/view rows preserve original descriptors, parent identity and creation serial.",
+        "focused_path": "Native observer-collector fixture exercises pre-renderer creation through a LOAD pass using detached fake identity handles; verifies six resource/provenance rows and keeps LOAD_ATTACHMENT as first blocker.",
+        "browser_observation_in_component_receipt": false,
+        "restore_or_contents_proven": false,
+        "remaining": "The earlier 410e9dd9 browser report retains LOAD_ATTACHMENT (7) and UNKNOWN_RESOURCE (18). The component does not capture or restore GPU attachment bytes and does not close other texture/view owners."
+      },
+      "validation_checkpoint_13922": {
+        "source_head": "13922b8d3a84d7299e9121f1b09e7181c9793c2b",
+        "source_tree": "14923787782d3d4d67f75c9ea4477ad97465e5f4",
+        "release_builds": [
+          {
+            "profile": "ordinary",
+            "state": "PASS",
+            "artifact_count": 44,
+            "receipt": "net-private46-validation-v1/evidence/ordinary-release-build.json",
+            "sha256": "7239824f5167a671bc932020a6f67fecf2d53d435027006b32550d47b90c1bd5"
+          },
+          {
+            "profile": "frame-effect",
+            "state": "PASS",
+            "artifact_count": 44,
+            "receipt": "net-private46-validation-v1/evidence/frame-effect-release-build.json",
+            "sha256": "62aac5af712f311ef586a091927681a2fb0488c3d60644120ca8adc27d58261d"
+          },
+          {
+            "profile": "combined-first-pair",
+            "state": "PASS",
+            "artifact_count": 46,
+            "receipt": "net-private46-validation-v1/evidence/combined-first-pair-release-build.json",
+            "sha256": "040c5a2ac0c13d778af9227c4621b03f5debfa75b09f2255f0c7eb018ac5e9b9"
+          }
+        ],
+        "full_regression": {
+          "state": "PASS",
+          "tests_run": 2431,
+          "tests_passed": 2267,
+          "skipped": 164,
+          "failed": 0,
+          "receipt": "net-private46-validation-v1/evidence/full-unittest-suite.json",
+          "receipt_sha256": "f0182c35e1d686ea29784d39a54c32823b3e4bf181d4a1421fa4e4fb5ae69ed9",
+          "log_sha256": "e5013ae64ecde97b22f5f9f41d7c63972e6446ed903eae36335761fdac79aac3"
+        },
+        "root_review": {
+          "path": "net-private46-validation-v1/evidence/root-result-review.json",
+          "sha256": "728c5798eefbdeeddba691381077f120d23c8818e3c394dfdc9bb459f15431af",
+          "verified_artifacts": 134
+        }
+      },
+      "renderer_source_advance": {
+        "source_head": "fb63c3f2d26c2f266a384e04428d9b4b1fafdfb5",
+        "tree": "c8e6ab0a302b69b0a01f41c48852fc5a871b023f",
+        "aurora_tree": "c6b4982168244b0c1d467f7800041ef1c98bcd9b",
+        "aurora_patch_sha256": "d86dc769a90027cac3b175041c179874f1be49b75bef01900e77a385e4901800",
+        "validation": "PASS_SCOPED_BUILD_REGRESSION_AND_OBSERVATION_NOT_RESTORE",
+        "focused_controls": {
+          "path": "texture-owner-clear-observation-candidate-v3/execution-v1/root-result-review-v1.json",
+          "sha256": "e6e78adfa20d7a5f3d65bf165e8d94990952348cb7771b72dee5e28026e60ad4"
+        },
+        "full_validation": {
+          "path": "net-texture-owner-validation-v1/evidence/root-result-review.json",
+          "sha256": "8664ca7f95e4afb23619992f8996d4341d3ff164c55096ca2636d0befd787656"
+        },
+        "tests_run": 2431,
+        "skipped": 164,
+        "artifact_count": 134,
+        "retained_focused_failures": [
+          "texture-owner-clear-observation-candidate-v1: device mismatch classification before REUSE20",
+          "texture-owner-clear-observation-candidate-v2: zero capture ID matched unused provenance and bypassed capacity; exact reducer before v3"
+        ],
+        "first_draw": {
+          "scope": "One observation; 160 provenance rows and6APIclear facts do not establish starting texel contents or all-owner closure. Shape27 reflects261commands/242draws/3passes versus authored265/246/3; historical differing callback remains separate. No restore/PCM/pixel/performance acceptance.",
+          "packet": {
+            "path": "first-draw-observation-packet-v4/packet.json",
+            "sha256": "8af4d251c09393b7f97fa8816d44bc7788d404a45330101d026f206d409b5a78"
+          },
+          "served_binding": {
+            "path": "first-draw-observation-packet-v4/served-runtime.json",
+            "sha256": "fb3e4992df4da3213caaebb73ad308188cfa55495155543a94cfdb6d2721e1f4"
+          },
+          "raw_report": {
+            "path": "first-draw-observation-packet-v4/capture/browser/report.json",
+            "sha256": "4a93013119486c169d8a2b605527297e225943e2c1b8f7e82df0e4e85b225014"
+          },
+          "owner_report": {
+            "path": "first-draw-observation-packet-v4/capture/owner-report.json",
+            "sha256": "6c6783da2d68a259cc10fcb559a0f3c6688349e7596a81119e371f6a437e7a94"
+          },
+          "completion": {
+            "path": "first-draw-observation-packet-v4/capture/completion.json",
+            "sha256": "34388de496f489f2cab3d1645e38d1d050a04c2b4de84635677b552c5d963e9f"
+          },
+          "root_review": {
+            "path": "first-draw-observation-packet-v4/capture/root-result-review.json",
+            "sha256": "949e59d15b68425dd8235bcacd2f57ff2ea74f4f339ed404f212efc13467cd95"
+          },
+          "source_frames": [
+            180,
+            181
+          ],
+          "tick_draw_audio_returns": [
+            1,
+            1,
+            1
+          ],
+          "pcm_frames_counter_only": 533,
+          "renderer": {
+            "schema_version": 5,
+            "state": 4,
+            "first_blocker": 7,
+            "target_frame_index": 3167,
+            "frame_index": 3167,
+            "frame_id": "3168",
+            "event_count": 1755,
+            "handle_count": 266,
+            "op_count": 3,
+            "render_pass_count": 3,
+            "draw_command_count": 242,
+            "custom_draw_count": 0,
+            "encoder_task_count": 0,
+            "texture_copy_count": 0,
+            "texture_upload_count": 0,
+            "palette_conversion_count": 0,
+            "resolve_count": 2,
+            "snapshot_count": 1,
+            "staging_copy_count": 12,
+            "queue_write_count": 4,
+            "queue_write_bytes": "1222992",
+            "after_submit_callback_count": 0,
+            "submit_count": 1,
+            "fence_count": 1,
+            "fence_success": 1,
+            "finding_mask": "134217856",
+            "command_record_count": 261,
+            "actual_draw_count": 242,
+            "resource_count": 265,
+            "binding_entry_count": 1123,
+            "layout_entry_count": 19,
+            "provenance_count": 160,
+            "attachment_fact_count": 6,
+            "depth_trace_count": 3,
+            "depth_request_count": 0
+          },
+          "arrays": {
+            "raw_pad_bytes": 64,
+            "events": 1755,
+            "handles": 266,
+            "resources": 265,
+            "binding_entries": 1123,
+            "layout_entries": 19,
+            "provenance": 160,
+            "attachment_facts": 6,
+            "draws": 242
+          },
+          "exercised_roles": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "remaining_findings": [
+            7,
+            27
+          ],
+          "unknown18_observed": false,
+          "native_retired": true,
+          "owned_browser_pids_absent": 9,
+          "owned_capture_server_pids_absent": 2,
+          "owned_groups_absent": 3,
+          "h1": {
+            "callback_count": 3133,
+            "dropped_samples": 3033,
+            "dropped_incidents": 0,
+            "max_preparation_ms": 43.38000011444092
+          },
+          "forced_timing_pauses": 0
+        },
+        "content_dependency_contract": {
+          "path": "renderer-load7-content-contract-review-fb63-v1.json",
+          "sha256": "01df954ef4f52e68de5553d3948c2f0580c2ca29a107a99582fd3630f1f5fbad"
+        },
+        "next": "Classify first actual LOAD/sample content dependency from retained receipt without a new capture; preserve unknown starting texels and LOAD7. No restore admission."
+      }
+    },
+    "readonly_gpu_target_component": {
+      "state": "PASS_REAL_GPU_COMPONENT_NOT_GAMEPLAY_RESTORE",
+      "scope": "One continuous same-instance texture guard component; no Wasm restore and no gameplay admission.",
+      "source": {
+        "commit": "5cdcd2a7a133ace49acf17d5462370c5840e68cf",
+        "tree": "a5f3fa6c2f73da0c682078cffecdfece44a649be"
+      },
+      "source_paths": [
+        ".deps/aurora/lib/gfx/aurora_browser_texture_readonly_guard.cpp",
+        ".deps/aurora/lib/gfx/aurora_browser_texture_readonly_guard_library.js",
+        "patches/aurora-browser.patch",
+        "tests/aurora_texture_readonly_guard_probe.cpp",
+        "tests/texture_readonly_guard_real_gpu_fixture.mjs"
+      ],
+      "candidate_lineage": {
+        "target_guard_v3": {
+          "artifact": "texture-readonly-target-guard-candidate-v3/manifest.json",
+          "manifest_sha256": "fa6545509b2049173e1111138d5e752b3f7b46d47b5ffb8bbab832335b4b4185",
+          "candidate_patch_sha256": "688027d77087c3a5036cc728d1a217e9c5dc86690fae3eefd06f1ff027994718",
+          "proposal_base": "406da3aed587509a99add8a5dad681b24715ec3f",
+          "retained_failed_archive_link": {
+            "artifact": "texture-readonly-target-guard-candidate-v3/integrated-build-v1",
+            "base_commit": "a6cfbcba1c8a2e99f9388d2986a3df4051967688",
+            "outcome": "failed-at-wasm-link; retained; process group absent after cleanup",
+            "link_diagnostics_stdout": {
+              "artifact": "texture-readonly-target-guard-candidate-v3/integrated-build-v1/run/isolated-component-release-build.stdout",
+              "bytes": 701679,
+              "sha256": "23be1c6bc1eb14934f9526ae33e9c83cab62b0208741d2999b17a43319fc7438"
+            },
+            "build_wrapper_stderr": {
+              "artifact": "texture-readonly-target-guard-candidate-v3/integrated-build-v1/run/isolated-component-release-build.stderr",
+              "bytes": 2155,
+              "sha256": "8f5934f77116013fcc2685f16fc4f9b32da2456e72fd17a99b09d62867b2a7ac"
+            },
+            "failure_summary": {
+              "artifact": "texture-readonly-target-guard-candidate-v3/integrated-build-v1/run/failure.json",
+              "bytes": 557,
+              "sha256": "aa8e161ad1adfb201d4c1ad170a29133ea773e850d2d258303a9f19b1637be81"
+            },
+            "executor_result": {
+              "artifact": "texture-readonly-target-guard-candidate-v3/integrated-build-v1/run/isolated-component-release-build.result.json",
+              "bytes": 456,
+              "sha256": "7cb4b0e52399944939118b75c1f1a2d0badf6ceb60efe17f0519b64c59c4fab2"
+            },
+            "reported_unresolved_symbols": [
+              "texture_readonly_guard_device_epoch_change",
+              "detach_texture_readonly_guard_host",
+              "issue_texture_readonly_guard_host"
+            ],
+            "summary": "The original candidate archive-link attempt failed with wasm-ld undefined symbols. Its raw linker stdout, separate wrapper stderr, failure summary, and executor result are retained above. A later link repair is recorded separately and does not replace this failure."
+          }
+        },
+        "archive_link_repair": {
+          "artifact": "texture-readonly-target-guard-link-repair-v1/manifest.json",
+          "manifest_sha256": "51b72cfdcd4a36678c4140c66f2f68024dc0ebd918d1f9d4d6b5bf28704fb994",
+          "candidate_patch_sha256": "e5bf9836cfb3954e64376b8050a8333ac9f9d6523643cbb03a2ec82a85da6782",
+          "canonical_aurora_patch_sha256": "07221ca9bc67efa97ac3c1d20388dd8487d938e1e5aa88df468172ff7ddf8463",
+          "base_commit": "a6cfbcba1c8a2e99f9388d2986a3df4051967688",
+          "proposed_tree": "a5f3fa6c2f73da0c682078cffecdfece44a649be"
+        }
+      },
+      "real_gpu_capture": {
+        "run_locator": "texture-readonly-real-gpu-capture-5cd-v1",
+        "result": "pass",
+        "scope": "Continuous same-instance real-GPU component; no Wasm restore/gameplay admission.",
+        "elapsed_ms": 7712,
+        "source": {
+          "commit": "5cdcd2a7a133ace49acf17d5462370c5840e68cf",
+          "tree": "a5f3fa6c2f73da0c682078cffecdfece44a649be"
+        },
+        "artifacts": {
+          "browser_report": {
+            "path": "texture-readonly-real-gpu-capture-5cd-v1/browser-run/report.json",
+            "bytes": 70299,
+            "sha256": "d2784644916bde6ff9b312af775852ba6d68a7ed899dc622a3da544ca36f29f9"
+          },
+          "root_review": {
+            "path": "texture-readonly-real-gpu-capture-5cd-v1/root-result-review.json",
+            "bytes": 2455,
+            "sha256": "714a0ee0e39728f6c6bab09bdcd82a78fc6f31c94e58d9feb8fd3983097ed66f"
+          },
+          "owner_report_sha256": "a1ccad5ad15faf9cfbbdd9bed2c6c7d11aabad0df28bac2c4b34f7bfb3effc0b",
+          "release_record_sha256": "6c5a0d087c3c838b6377d583ee4aefc5ca166694b04b5f9c08b46462ca6fcd1c"
+        },
+        "gpu": {
+          "backend": "Apple Metal 3",
+          "browser_display_type": "ANGLE_METAL",
+          "adapter_vendor": "apple",
+          "adapter_architecture": "metal-3",
+          "is_fallback_adapter": false,
+          "device_description": "Apple M4"
+        },
+        "positive": {
+          "readback_count": 2,
+          "bytes_per_readback": 64,
+          "readback_sha256": "049b4074a769ef4ea3c085447bda41c242f8e6f547968048724d38dd000b83da",
+          "readbacks_match": true
+        },
+        "negative_expected_cases": {
+          "count": 17,
+          "codes": {
+            "write": "TARGET_writeTexture",
+            "method-alias": "TARGET_writeTexture",
+            "copy-buffer": "TARGET_copyBufferToTexture",
+            "copy-texture": "TARGET_copyTextureToTexture",
+            "destroy": "TARGET_destroy",
+            "device-destroy": "TARGET_destroy",
+            "set": "MAPPING_MUTATION",
+            "define": "MAPPING_MUTATION",
+            "delete": "NATIVE_FINAL_RELEASE_OR_TABLE_DELETE",
+            "truncate": "MAPPING_TRUNCATION",
+            "direct-table-alias": "MAPPING_MUTATION",
+            "import-alias": "MAPPING_MUTATION",
+            "replace-table": "TABLE_REPLACEMENT",
+            "replace-internals": "TABLE_REPLACEMENT",
+            "define-table": "TABLE_REPLACEMENT",
+            "detach": "OWNER_DETACH",
+            "last-native-release": "NATIVE_FINAL_RELEASE_OR_TABLE_DELETE"
+          }
+        },
+        "cleanup": {
+          "recorded_process_ids_absent": 30,
+          "owned_process_groups_absent": 2,
+          "empty_tmp_removed": true
+        },
+        "source_guards": {
+          "ordinary_profiles": "OFF",
+          "gameplay_arm": "REFUSED"
+        }
+      },
+      "not_proven": [
+        "Wasm snapshot or restore",
+        "gameplay arm, source draw, or actual match texture admission",
+        "LOAD_ATTACHMENT contents or complete GPU owner closure",
+        "native final-release/import-alias bookkeeping closure",
+        "pending/deferred work, audio/file state, or full native-reference lifetime",
+        "gameplay, pixel/PCM equality, or rollback acceptance"
+      ],
+      "required_validation": {
+        "state": "PASS",
+        "source": "5cdcd2a7a133ace49acf17d5462370c5840e68cf",
+        "tree": "a5f3fa6c2f73da0c682078cffecdfece44a649be",
+        "tests": 2435,
+        "skips": 164,
+        "release_profiles": 3,
+        "verified_artifacts": 134,
+        "root_review": {
+          "path": "net-texture-readonly-guard-validation-v1/evidence/root-result-review.json",
+          "sha256": "683c54233cc2e845fbdcfb2ea9784fa515dbb4bf9cd4ea033745ba6a05d090fe",
+          "bytes": 1632
+        },
+        "receipts": {
+          "ordinary-release-build": {
+            "sha256": "c5fccc72a15f5a65f486b969c9c6242da1b57688d76b984b6b88d720624f736d",
+            "log_sha256": "aaa62dd9271d58b04367574fa71f3861bbfd82caf8356cec251ee1a9087cc80f",
+            "elapsed_seconds": 31.001
+          },
+          "frame-effect-release-build": {
+            "sha256": "b6d7c342964e7f572d951470257e8b9335b146916556e4dd7ed57e79d7e23597",
+            "log_sha256": "ed097b358f95506a5af442a7e15b5b5acdb29b1345b9b8d670ac02c6ca6b409e",
+            "elapsed_seconds": 30.448
+          },
+          "combined-first-pair-release-build": {
+            "sha256": "3ea2306cf2c211f4abdbe9ea1eb6d396276e14b25369ea17de783b3174bdfb14",
+            "log_sha256": "1f1a57c8d63eb9cc80910d4c9994bfbb75ee28a37226718e6d5e81aa8edf4ffc",
+            "elapsed_seconds": 30.548
+          },
+          "full-unittest-suite": {
+            "sha256": "eb543bd75aff0f590cdd7fe2c2429a89919138d029ed5d728aaa81c680aa8f28",
+            "log_sha256": "5a76350a949cf756b19603d7f22f556fc46d4d2aafc1d5767e22f85375fc23a9",
+            "elapsed_seconds": 556.686
+          }
+        },
+        "owned_groups_absent": true,
+        "guard_off_in_existing_profiles": true,
+        "final_head_ci": "PENDING_NEW_DOCUMENTATION_HEAD"
+      }
+    },
+    "selected_sampled_native_owner_component": {
+      "state": "PASS_FOCUSED_SOURCE_COMPONENT_ONLY",
+      "scope": "Selected-sampled-owner native diagnostic controls and actual GX source/TU checks; no scene, browser capture, or gameplay admission.",
+      "source": {
+        "commit": "c89bae3d0d0e820deeae47242e67b0d2b695a190",
+        "tree": "6c9f11589fb00c4ba7069993a3bb196d9929548a",
+        "aurora_pinned_head": "749d6ee7a22bdfab78c8ece9047bca5d79aa72ca",
+        "aurora_actual_tree": "4be066f4ea89c5c9840897b8dee41629c1affd94",
+        "aurora_patch_sha256": "28f526af14fc343a7193723e860c90c4f4a05d22528dd0e4648597c4ec41254b"
+      },
+      "candidate": {
+        "artifact": "selected-sampled-texture-issue-candidate-v2/manifest.json",
+        "manifest_sha256": "6737a9d8857c92905d1fd7c17e246cad1de2bd23c337d29b6856297b2fea4b7a",
+        "integration_artifact": "selected-sampled-texture-issue-candidate-v2/integration.json",
+        "integration_sha256": "6a96b7f1b9d8158fb634e9310078a99776fd529430a4d8a8f5d095d14e36f67f",
+        "focused_execution_was_candidate_overlay_before_integration": true,
+        "focused_execution_base_head": "1e733d1294a26ea1a78cbb4e0a946ae08f952308"
+      },
+      "focused_controls": {
+        "summary_artifact": "selected-sampled-texture-issue-candidate-v2/execution-v1/run/summary.json",
+        "summary_sha256": "60174cf527e593c6a7ef617bfa7c9e0fa7dd32a1189e9f6f60ba629e658de078",
+        "root_review_artifact": "selected-sampled-texture-issue-candidate-v2/execution-v1/root-result-review.json",
+        "root_review_sha256": "c009d3bad957e93d079ff6f390ec68408e8f05503f95cc700f1f0c4a8b1a3d95",
+        "review_state": "PASS_FOCUSED_SOURCE_COMPONENT_ONLY",
+        "inputs_rehashed": 3566,
+        "command_steps": 5,
+        "all_command_log_pairs_rehashed": true,
+        "owned_process_groups_absent": 5,
+        "ordinary_off_preprocess_byte_equal": true,
+        "scope": "Actual native observer control and GX guard-on syntax; ordinary OFF projection comparison. Diagnostic identities only; no executed render scene."
+      },
+      "ordinary_profiles": "OFF; candidate ordinary gx.cpp preprocessing matched base byte-for-byte.",
+      "not_proven": [
+        "real GX scene or browser observation",
+        "GPU quiescence, pending-work closure, or complete texture/renderer ownership",
+        "Wasm snapshot/restore or gameplay admission",
+        "pixels, PCM, repeated-tick equivalence, or rollback acceptance"
+      ],
+      "related_runtime_identities_are_distinct": {
+        "prior_real_gpu_component_source": "5cdcd2a7a133ace49acf17d5462370c5840e68cf",
+        "prior_first_draw_observation_source": "fb63c3f2d26c2f266a384e04428d9b4b1fafdfb5",
+        "this_component_source": "c89bae3d0d0e820deeae47242e67b0d2b695a190"
+      },
+      "required_validation": {
+        "state": "PASS_REQUIRED_LOCAL_VALIDATION",
+        "source": "c89bae3d0d0e820deeae47242e67b0d2b695a190",
+        "artifact": "net-selected-sampled-texture-validation-v1/evidence/result.json",
+        "sha256": "9e5d4b743a97ca7906951d1bae3526a5c09a3d2c57d74428730a1c26b69ca3fa",
+        "root_review_artifact": "net-selected-sampled-texture-validation-v1/evidence/root-result-review.json",
+        "root_review_sha256": "75a2eaf48b80a77778ab466b21d648a36090f5710884b4a234f44c033a327ae6",
+        "release_profiles": 3,
+        "artifacts_verified": 134,
+        "full_tests": 2435,
+        "skipped": 164,
+        "all_four_owned_process_groups_absent": true,
+        "ci": "Current publication head tracked separately on PR324; local results do not imply CI."
+      },
+      "integration_state": "EXACT_INTEGRATION_COMMITTED_ROUTING_CANONICAL_PASS"
+    },
+    "native_submission_pending_component": {
+      "state": "PASS_NATIVE_COMPONENT_RELEASE_BUILDS_AND_TEST_ONLY_REGRESSION",
+      "scope": "Joined native recorder-packet and submission-pending component controls; no runtime invocation, GPU work, live safe-interval proof, gameplay admission or restore.",
+      "source": {
+        "integrated_commit": "299d5a04ee1cb73f6c43dab9d0198a58497d54db",
+        "integrated_tree": "05dba633e4289132c45acbe6be749cd833ac723e",
+        "integration_parent": "20fe9bce7297332a20e9906e33366ef7e3c40e5c",
+        "aurora_pinned_head": "749d6ee7a22bdfab78c8ece9047bca5d79aa72ca",
+        "aurora_actual_tree": "1d2974de28b9c5e08c2e88972e8cde945aa27bd7",
+        "canonical_aurora_patch_sha256": "58342c4ea0978399e875e1bcf397d3c10037d57c27bc843468240525f3a2057a"
+      },
+      "candidate": {
+        "manifest": {
+          "path": "native-submission-pending-candidate-v1/manifest.json",
+          "bytes": 5175,
+          "sha256": "19eeb2461f46d12285a9ec274df069f0545032e38e324d5c2b7c130c7537b470"
+        },
+        "integration": {
+          "path": "native-submission-pending-candidate-v1/integration.json",
+          "bytes": 1866,
+          "sha256": "2ba6e3533d0dfcf652c6ee01d8a9ce719d3a3f1fd7b2eb4bc00ec5aacabf9db8"
+        },
+        "component_execution_root_review": {
+          "path": "native-submission-pending-candidate-v1/execution-v1/root-result-review.json",
+          "bytes": 931,
+          "sha256": "5f3ea58657c637479e065bd05260914edda7cf38150b0f20ed61d260d3d6a55b"
+        },
+        "final_review": {
+          "path": "native-submission-pending-candidate-v1/execution-v1/final-review.json",
+          "bytes": 1203,
+          "sha256": "cf664ab344670f39d85f2386cf09830d7a8e2e2a44243ec7ea78f0d39c0c3a40"
+        },
+        "focused_summary": {
+          "path": "native-submission-pending-candidate-v1/execution-v1/run/summary.json",
+          "bytes": 9290,
+          "sha256": "fcd84000f49109a4c74c68b57c0f12427b1771ad38746f8dc648de9c7dbe6197"
+        }
+      },
+      "observed_component": {
+        "joins": "Existing active recorder packet POD facts plus existing native submission owner-book/pool/sequence stamps; copied with before/after stamp validation and refusal on drift.",
+        "no_pump_or_drain": true,
+        "native_component_predicate": "native_submission_component_ready is a component predicate only; no host/gameplay admission changed.",
+        "focused_steps": 13,
+        "source_tool_dependency_pins_rehashed": 3570,
+        "overlay_files_rehashed": 564,
+        "raw_log_pairs_rehashed": 13,
+        "owned_process_groups_absent": 13,
+        "actual_translation_unit_checks": [
+          "frame.cpp quiescence OFF branch",
+          "frame.cpp quiescence ON branch",
+          "recording.cpp diagnostic syntax"
+        ],
+        "external_symbols_joined": [
+          "_ZN6aurora3gfx37capture_native_recorder_frame_pendingERNS0_6detail23NativeFramePendingFactsE",
+          "_ZN6aurora3gfx33capture_native_submission_pendingERNS0_6detail28NativeSubmissionPendingFactsE"
+        ],
+        "ordinary_off_equalities": 2
+      },
+      "distinct_prior_component_identities": {
+        "selected_sampled_native_owner": "c89bae3d0d0e820deeae47242e67b0d2b695a190",
+        "real_gpu_target_component": "5cdcd2a7a133ace49acf17d5462370c5840e68cf",
+        "first_draw_observation": "fb63c3f2d26c2f266a384e04428d9b4b1fafdfb5",
+        "private_no_disc_boot": "13922b8d3a84d7299e9121f1b09e7181c9793c2b"
+      },
+      "validation": {
+        "state": "PASS_WITH_RETAINED_INITIAL_FIXTURE_FAILURE",
+        "runtime_source": "299d5a04ee1cb73f6c43dab9d0198a58497d54db",
+        "test_only_source": "927a07f039ca1381b376021501bba2b72a171e85",
+        "test_only_tree": "a689c5220fde746cff68d7b4d31e70110ff4f417",
+        "release_builds": [
+          {
+            "path": "net-native-submission-pending-validation-v1/evidence/ordinary-release-build.json",
+            "bytes": 9804,
+            "sha256": "cda8fe678cab081811ea50a6e7964883bbb23060fd27d4c86bb572152d5ac7b0"
+          },
+          {
+            "path": "net-native-submission-pending-validation-v1/evidence/frame-effect-release-build.json",
+            "bytes": 9827,
+            "sha256": "c2bc36c3b32cde1cf45d4be0015723c4aed73a65802b6ac1f9d651ff8b736496"
+          },
+          {
+            "path": "net-native-submission-pending-validation-v1/evidence/combined-first-pair-release-build.json",
+            "bytes": 10234,
+            "sha256": "e79d245c4a70d4f2f3f0fd45edff21f640600cd88fe891fdc28668bda8fe9af0"
+          }
+        ],
+        "full_regression": {
+          "path": "net-native-submission-pending-regression-v2/evidence/result.json",
+          "bytes": 5485,
+          "sha256": "99f6a34f811d4a664bd5e47de61b8f4b6904ca9a0ec70adf081b9d2ad1a4a29f"
+        },
+        "full_regression_log": {
+          "path": "net-native-submission-pending-regression-v2/evidence/full-unittest-suite.log",
+          "bytes": 447217,
+          "sha256": "95a967ff45c976c97fbe98c0d311831513a58d41bcac29590e853d28b192e445"
+        },
+        "root_review": {
+          "path": "net-native-submission-pending-regression-v2/evidence/root-result-review.json",
+          "bytes": 1047,
+          "sha256": "788924e1cc68f026aa11e2a247d005d1a0e19bf4c9e3868a89ec884d4fa16a24"
+        },
+        "initial_failure": {
+          "path": "net-native-submission-pending-validation-v1/evidence/root-builds-and-failure-review.json",
+          "bytes": 1142,
+          "sha256": "1daa96932b144070d5b6bf247a3a9307fd1df1197b4611e66d1b120078ed8741"
+        },
+        "repair_review": {
+          "path": "cpu-match-report-ancestor-fixture-repair-v1/root-result-review.json",
+          "bytes": 577,
+          "sha256": "e39e80aef0a517f463d86d5805bfeca6c32e1763224788a53125c32bc4001e7e"
+        },
+        "tests": 2435,
+        "skips": 164,
+        "runtime_artifacts_rehashed": 134,
+        "capture": false
+      },
+      "limits": [
+        "No actual runtime getter/global invocation.",
+        "No GPU operation or content observation.",
+        "No proof of a safe live match interval or gameplay arm.",
+        "Depth MapAsync, device-lost/future, host asynchronous work and native refcounts remain outside this component.",
+        "No Wasm restore, frame-repeat or rollback admission."
+      ]
+    },
+    "first_draw_components_candidate_v3": {
+      "state": "PASS_FOCUSED_RELEASE_BUILDS_FULL_REGRESSION",
+      "source": {
+        "commit": "9a22eec3f6672c156ef127d849df8266d7924ff8",
+        "tree": "9b98597207a2ace1d2b572390eeee7b1569ca09f",
+        "aurora_actual_tree": "5142c624dc0a5bc7a77db484985552f777047fcc",
+        "aurora_patch_sha256": "c334e3b88bda5c37e95b71a4ba7bc5db35c76a1a9f8059b61bc6091e8339a868",
+        "candidate_manifest_sha256": "6575e401c091a0f180007bc746093f25999480eb22df419f82870271a464fbf4",
+        "candidate_patch_sha256": "f8d5f15251e6077f21481955763706f3a5c32521a7edf734d245fcf8705c6c77",
+        "integration_receipt_sha256": "afe5daef611ea78c0a4d7c0addf1bdd65df68167a5b2503f63c98d49d63ec122",
+        "runtime_producer": "9a22eec3f6672c156ef127d849df8266d7924ff8",
+        "runtime_tree": "9b98597207a2ace1d2b572390eeee7b1569ca09f"
+      },
+      "focused": {
+        "state": "PASS_FOCUSED_SCOPED_WITH_RETAINED_FAILURES",
+        "artifact": "first-draw-components-candidate-v3/root-focused-result-review.json",
+        "sha256": "3ca1dda70639ead9be3ef8cb30d6d6e66e51e0d4d5c27d152ea548a66f8e11ca",
+        "focused_result_sha256": "8927fc4ca7689df7e88645df3ef726190de4c2c5ae70031b721fbfc6bac27438",
+        "successful_command_phases": 13,
+        "owned_process_groups_checked_absent": 15,
+        "scope": "Frozen candidate-overlay JS and routing controls, actual native syntax/object/symbol controls, private component-OFF byte equality and bounded first-draw component protocol controls. The later actual-checkout 50-test invocation is separately bound. No browser/GPU observation from these focused controls."
+      },
+      "release_builds": [
+        {
+          "name": "first-draw-components-private",
+          "inventory_files": 44,
+          "artifact": "net-first-draw-components-validation-v1/evidence/first-draw-components-release-build.json",
+          "sha256": "98e3314d41f61435dcca652aaeefbf9c24d75766ab0a311146f8d1b3bfd656b2",
+          "state": "PASS"
+        },
+        {
+          "name": "ordinary",
+          "inventory_files": 44,
+          "artifact": "net-first-draw-components-validation-v1/evidence/ordinary-release-build.json",
+          "sha256": "2abfc7d076816f1ec56ab86934806d70eb9c699f4fbc4cbffd81b529fb47936d",
+          "state": "PASS"
+        },
+        {
+          "name": "frame-effect",
+          "inventory_files": 44,
+          "artifact": "net-first-draw-components-validation-v1/evidence/frame-effect-release-build.json",
+          "sha256": "3cac47ee6c5c5b8f8a405425c35c0c842ed8cd1ca033c38206ebcbc5f8376322",
+          "state": "PASS"
+        },
+        {
+          "name": "combined-first-pair",
+          "inventory_files": 46,
+          "artifact": "net-first-draw-components-validation-v1/evidence/combined-first-pair-release-build.json",
+          "sha256": "ddf396d36418120bbc1a7a9ea7ee5b618a6dbb72fcf10b2a56a2317eaf6f4cbc",
+          "state": "PASS"
+        }
+      ],
+      "full_regression": {
+        "state": "PASS",
+        "artifact": "net-first-draw-components-regression-v3/evidence/result.json",
+        "sha256": "44254aed997814281e992d93133d1350e700c1ee51c6a1d6ab8911434f5c5e32",
+        "suite_receipt": "net-first-draw-components-regression-v3/evidence/full-unittest-suite.json",
+        "suite_receipt_sha256": "3f4f76001926cc102f0b94e0e76b108f674d59572e04f1c70d1d12e62e8c1627",
+        "root_review": "net-first-draw-components-regression-v3/evidence/root-result-review.json",
+        "root_review_sha256": "6b39d95c32b90230ce6fd129f55c5014276b44b33239f600a662de930c02640d",
+        "runtime_producer": "9a22eec3f6672c156ef127d849df8266d7924ff8",
+        "test_revision": "baf667782ebf36f01dec7de10c21b0c3c6a9aa22",
+        "tests": 2440,
+        "skips": 164,
+        "elapsed_seconds": 580.897,
+        "suite_log_sha256": "857c3c62cbc7e809dd252e9baba25f7ee0b8c3225fbe868f31cbbc44101a7a92",
+        "artifacts_rehashed": 178,
+        "caches_rehashed": 4,
+        "prior_evidence_rehashed": 18,
+        "owned_group_absent": true
+      },
+      "retained_failures": [
+        {
+          "stage": "V2 first syntax attempt",
+          "artifact": "first-draw-components-candidate-v2/execution-v1/run/failure.json",
+          "sha256": "fcc7167528f316888e70c0944c6e7c8f0ad10bfb0bb401364c0399c8b5924f95",
+          "detail": "The source overlay omitted lib/gfx/frame_pending_facts.hpp; the syntax command stopped before controls or capture."
+        },
+        {
+          "stage": "V2 later JavaScript fixture attempt",
+          "artifact": "first-draw-components-candidate-v2/execution-v2/run/failure.json",
+          "sha256": "6ce85beb3ae4ea1765dda823242871ac8cbb58de2283a679aa1ab9a185b5aac9",
+          "control_stdout_sha256": "e75160573dc6d78c7a22cb611f85f33b059ad873850843f196265139eaba4f08",
+          "detail": "Four JavaScript controls failed in this fixture invocation, including a missing source-overlay input and a fixture-binding/recorder-installation mismatch. The selected four controls later passed after test-only fixture-binding repairs; production component bytes were unchanged."
+        },
+        {
+          "stage": "Initial full unittest suite before test-only assertion repair",
+          "state": "FULL_SUITE_FAILED_ONE_STALE_TEST_ASSERTION",
+          "artifact": "net-first-draw-components-validation-v1/evidence/root-builds-and-failure-review.json",
+          "sha256": "43c208e7f3bf29a5e3c9087f2a0dece6b463c824d2406d9eeb68652110168bd4",
+          "tests": 2440,
+          "skips": 164,
+          "failures": 1,
+          "failure": "The quiescence routing test did not allow the explicit first-draw-components diagnostic flag.",
+          "repair_commit": "baf667782ebf36f01dec7de10c21b0c3c6a9aa22",
+          "repair_files": [
+            "tests/test_aurora_browser_quiescence_option.py"
+          ],
+          "runtime_changed": false
+        }
+      ],
+      "scope": {
+        "read_and_depth_arm_are_separate_non_atomic_observations": true,
+        "same_module_idle_and_depth_sequence_rechecked_before_depth_arm": true,
+        "composite_eligible": false,
+        "restore_or_replay_claim": false,
+        "browser_capture": false,
+        "gameplay_or_gpu_ownership_closed": false
+      },
+      "test_only_followup": {
+        "commit": "baf667782ebf36f01dec7de10c21b0c3c6a9aa22",
+        "parent": "9a22eec3f6672c156ef127d849df8266d7924ff8",
+        "tree": "21cde9935aade1732c9bbc20fb7e3b093f04459e",
+        "changed_files": [
+          "tests/test_aurora_browser_quiescence_option.py"
+        ],
+        "change": "One-line assertion expectation now includes the explicit first_draw_components_diagnostic routing case; runtime/build producer unchanged."
+      },
+      "historical_split_control_attempts": {
+        "state": "RETAINED_AS_SEPARATE_RUNS_NOT_A_SINGLE_50_PASS",
+        "initial_candidate_review": {
+          "artifact": "first-draw-components-candidate-v3/root-focused-result-review.json",
+          "sha256": "3ca1dda70639ead9be3ef8cb30d6d6e66e51e0d4d5c27d152ea548a66f8e11ca",
+          "note": "The initial candidate reported 46 JavaScript controls passing while four selected controls failed in that invocation."
+        },
+        "reduced_four_control_review": {
+          "artifact": "first-draw-components-candidate-v3/execution-reduced-v1/run/root-reduced-result-review.json",
+          "sha256": "9b05fd383bfad6d62649621867bb9feb91101000bb2727a8014082e6beb0ade5",
+          "note": "The selected four controls passed in a later reduced run; this was separate from the initial 46-control run."
+        }
+      },
+      "actual_checkout_js_controls": {
+        "state": "PASS_50_OF_50_IN_ONE_ACTUAL_CHECKOUT_INVOCATION",
+        "runtime_checkout_head": "9a22eec3f6672c156ef127d849df8266d7924ff8",
+        "runtime_checkout_tree": "9b98597207a2ace1d2b572390eeee7b1569ca09f",
+        "command_receipt": "net-first-draw-components-validation-v1/evidence/actual-checkout-firstdraw-normal-js-controls.json",
+        "command_receipt_sha256": "1634b668a68aac678b03269b93a5ec6c88d013139d1372049deb55d59a48932d",
+        "log": "net-first-draw-components-validation-v1/evidence/actual-checkout-firstdraw-normal-js-controls.log",
+        "log_sha256": "a4a2383719703643f759535bcc65564a582e4d03f22206992bda21155c5e5f45",
+        "tests": 50,
+        "passed": 50,
+        "failed": 0,
+        "source_unchanged": true
+      },
+      "retained_preflight_stop": {
+        "state": "PRELAUNCH_ASSERTION_FAILURE_NOT_A_SUITE_RUN",
+        "artifact": "net-first-draw-components-regression-v2/preflight-stop.json",
+        "sha256": "51481ce8ee6a18109dccb2f1d221b717b609debe945b25f7be1dc110a53d64cd",
+        "runner_sha256": "f41da62493a87640cb7a8d5acdc6c11a9b5f2d86f24f102743be33dd144cb78c",
+        "cause": "The preflight compared git helper stdout without stripping its trailing newline.",
+        "child_process_launched": false,
+        "repair": {
+          "artifact": "net-first-draw-components-regression-v3/binding.json",
+          "sha256": "ef0f3dfb946fd4ecd7eb30b1fa3f69f589a2bbd5f3ad2ae4864f9680fc6d06df",
+          "scope": "Strip only the two git identity text comparisons; no suite or child ran under the failed preflight."
+        },
+        "evidence_directory_created": false
+      }
+    },
+    "first_draw_observation_v5": {
+      "state": "PASS_COMPONENT_OBSERVATION_ROOT_AND_INDEPENDENT_DECODE",
+      "packet": "first-draw-observation-packet-v5/manifest.json",
+      "packet_sha256": "49c8c4324caa88f8c022789484ba18d4613b700fb4a2e0a6b1c81c158a558621",
+      "runtime_producer": "9a22eec3f6672c156ef127d849df8266d7924ff8",
+      "harness_revision": "baf667782ebf36f01dec7de10c21b0c3c6a9aa22",
+      "served_runtime_manifest_sha256": "153b203b211a0be2d43a0ee1484d823ec36df4fbc853540464be06756061a591",
+      "capture": {
+        "root_review": "first-draw-observation-packet-v5/capture/root-result-review.json",
+        "root_review_sha256": "6a93477bbeb4ae78ccaffedb26bc7d4acd768ee5e94efae014dab22a4fbb03b6",
+        "raw_report": "first-draw-observation-packet-v5/capture/browser/report.json",
+        "raw_report_sha256": "fe8cd31d7f887b0552f06f860406eb2844627a19c2cd8cf283558a7a22436e4b",
+        "completion": "first-draw-observation-packet-v5/capture/completion.json",
+        "completion_sha256": "615d3c7683de03b0d19a7c0ec6d0322ac8e71c7e98d29ff7c3ca790b8939c7cb",
+        "owner_report": "first-draw-observation-packet-v5/capture/owner-report.json",
+        "owner_report_sha256": "1978fc4505321cf434a5bc4834ae8214a01f3f7b222f81f2dd33f8df1ace73ed",
+        "root_capture_audit_sha256": "ce0b08235ae2085b2f21afd98901cf92e8faebcb98715e72adf0934628bec290",
+        "source_frames": [
+          180,
+          181
+        ],
+        "tick_draw_audio_returns": [
+          1,
+          1,
+          1
+        ],
+        "pcm_frames_counter": 534,
+        "native_component_ready": true,
+        "depth_read": {
+          "phase": "READY",
+          "sequence": 3
+        },
+        "separate_depth_arm": {
+          "phase": "ACTIVE",
+          "sequence": 4
+        },
+        "read_and_arm_are_atomic": false,
+        "h1": {
+          "preparation_incidents": 8,
+          "forced_timing_pauses": 0,
+          "dropped_incidents": 0,
+          "retained_samples": 100,
+          "callbacks": 3115,
+          "evicted_samples": 3015,
+          "scope": "Lossy callback recorder; not timing acceptance or preparation completeness."
+        },
+        "renderer_findings": [
+          {
+            "code": 7,
+            "name": "LOAD_ATTACHMENT"
+          },
+          {
+            "code": 27,
+            "name": "COMMAND_SHAPE_MISMATCH"
+          }
+        ],
+        "composite_eligible": false,
+        "owned_pids_absent": 13,
+        "owned_process_groups_absent": 3,
+        "runtime_files_rehashed": 44,
+        "screenshots_rehashed": 11,
+        "completion_state": "PASS"
+      },
+      "independent_replay": {
+        "result": "first-draw-observation-packet-v5/independent-replay-v1/result.json",
+        "result_sha256": "bd1516d0bf06381a61a405fad96c116707faba33d7dbdcea0b9215374306d06a",
+        "state": "PASS_STRICT_EXISTING_DECODER_REPLAY",
+        "strict_decoders": [
+          "outer_before",
+          "outer_after",
+          "component_read",
+          "component_final"
+        ],
+        "all_decoder_failures_empty": true,
+        "replay_tool_sha256": "7fafcbf492e3d5c1604d4d05d987036c1f1a0c3620c935579dfbf43f376829b0",
+        "agent_review": "first-draw-observation-packet-v5/independent-replay-v1/agent-review.json",
+        "agent_review_sha256": "64096793cf46ac3bd4f7f0ed9daa23a9e29dcb043bdfd974cb6a27299af4cb72",
+        "owned_group_absent": 94826
+      },
+      "limits": [
+        "Native readiness and depth arm are distinct non-atomic reads; no safe interval or combined eligibility is established.",
+        "Finding 7 LOAD_ATTACHMENT and finding 27 COMMAND_SHAPE_MISMATCH remain.",
+        "No Wasm snapshot/restore, replay equivalence, GPU-content equivalence, PCM comparison, later-draw coverage, gameplay acceptance, or whole-session acceptance.",
+        "LOAD content, sampled-texture continuous protection, device/host futures, native references, and restore remain open."
+      ],
+      "browser": {
+        "name": "Google Chrome",
+        "version": "155.0.8059.40",
+        "headless": true,
+        "speaker_output": "muted; audio processing retained"
+      }
+    },
+    "selected_texture_continuous_interval_component": {
+      "state": "PASS_ISOLATED_REAL_GPU_COMPONENT_ACTUAL_GAME_ATTEMPT_REFUSED_BEFORE_INTERVAL",
+      "scope": "Private selected-texture guard component only. The first actual-game callback was refused at the exact one-tick/draw gate before any selected-texture interval; no gameplay admission, GPU/content ownership closure, Wasm restore, or rollback acceptance is established.",
+      "source": {
+        "commit": "635fc17b759991b4f26d8901007d5663ea0ceb37",
+        "tree": "7f5fe1997b3f47c10b40a790cb24ddbab61e722a",
+        "aurora_actual_tree": "19cea02f04e6b961a516c1346d4d25a73cd2e80d",
+        "canonical_aurora_patch_sha256": "ba8e57fe56f50ffe35becd55ba04f9127f5835c2ece24da67337add0501fad3c",
+        "candidate_manifest": {
+          "artifact": "selected-texture-continuous-interval-candidate-v5/manifest.json",
+          "bytes": 6430,
+          "sha256": "76f26f5ae9310587f88734d80aee0dceccd03da149f0c419a1f39f74ba8b069d"
+        },
+        "integration_receipt": {
+          "artifact": "selected-texture-continuous-interval-candidate-v5/integration-v1/result.json",
+          "bytes": 10483,
+          "sha256": "8ab40aa98bafea3feb7e6a860bad5af30400fa9e0b9f1634bff9cf68a4652bef"
+        },
+        "candidate_patch_sha256": "613ada0fa199440635fe174bbc5015f6436dfda5f4fc032599a58a2d8111f882"
+      },
+      "focused_controls": {
+        "actual_project_tu": {
+          "artifact": "selected-texture-continuous-interval-candidate-v5/execution-reduced-project-v1/root-result-review.json",
+          "bytes": 1245,
+          "sha256": "219f1f8bcb733c660e4de368c9bf4e7f2e98b4620eead5a4ed6ed19342c537c3"
+        },
+        "remaining_actual_integration_controls": {
+          "artifact": "selected-texture-continuous-interval-candidate-v5/execution-stage2-remaining-v1/root-result-review.json",
+          "bytes": 759,
+          "sha256": "4a74296a4d9789cc3d2ba87d24c2f0dfae6fc4d1361ec90d43e7da7c38b69b5c"
+        },
+        "remaining_controls_summary": {
+          "artifact": "selected-texture-continuous-interval-candidate-v5/execution-stage2-remaining-v1/run/summary.json",
+          "bytes": 7691,
+          "sha256": "fff50482f1cae9d23fca8ecba09db4934ff6776e30dd5da462645f6627e44400"
+        },
+        "scope": "Actual project/GX syntax and object-symbol joins, issuer, ordinary/OFF projections, and private canonical reconstruction; no gameplay capture."
+      },
+      "validation": {
+        "state": "PASS_FIVE_RELEASE_BUILDS_AND_FULL_REGRESSION",
+        "result": {
+          "artifact": "net-selected-texture-continuous-interval-validation-v1/evidence/result.json",
+          "bytes": 68613,
+          "sha256": "db3b3550be444453102f113bb8d0d49f1a5759a0c49508f2e35a5e5a51646741"
+        },
+        "root_review": {
+          "artifact": "net-selected-texture-continuous-interval-validation-v1/evidence/root-final-review.json",
+          "bytes": 2561,
+          "sha256": "fadc97ad999101a13bfce5aeba73e73a7f85dd227cbf28391d547b355771e667"
+        },
+        "builds_review_before_suite_completion": {
+          "artifact": "net-selected-texture-continuous-interval-validation-v1/evidence/root-builds-review.json",
+          "bytes": 1608,
+          "sha256": "952a810f35abfb5eccb391a4af9ed56290fd90e14058ccb27fb2cc40805d7511"
+        },
+        "release_builds": [
+          {
+            "name": "isolated-selected-texture-guard-release-build",
+            "artifact": {
+              "artifact": "net-selected-texture-continuous-interval-validation-v1/evidence/isolated-selected-texture-guard-release-build.json",
+              "bytes": 2948,
+              "sha256": "e051c456f3d136be9d540c0d263d7bdf53eb833ac0bcbedfcba0bccf98d856e2"
+            },
+            "inventory_files": 2,
+            "elapsed_seconds": 15.762,
+            "owned_process_group_absent": true
+          },
+          {
+            "name": "first-draw-components-release-build",
+            "artifact": {
+              "artifact": "net-selected-texture-continuous-interval-validation-v1/evidence/first-draw-components-release-build.json",
+              "bytes": 9961,
+              "sha256": "1b7a75c80a0ca0b61d59e75f30154d30724d66c1cab2de585eda4822520f971b"
+            },
+            "inventory_files": 44,
+            "elapsed_seconds": 30.878,
+            "owned_process_group_absent": true
+          },
+          {
+            "name": "ordinary-release-build",
+            "artifact": {
+              "artifact": "net-selected-texture-continuous-interval-validation-v1/evidence/ordinary-release-build.json",
+              "bytes": 9804,
+              "sha256": "7aa845d36361b1b2783a41d3d11466bfc6ce073b2fb5b545d5db6d6020ac6bf7"
+            },
+            "inventory_files": 44,
+            "elapsed_seconds": 30.119,
+            "owned_process_group_absent": true
+          },
+          {
+            "name": "frame-effect-release-build",
+            "artifact": {
+              "artifact": "net-selected-texture-continuous-interval-validation-v1/evidence/frame-effect-release-build.json",
+              "bytes": 9825,
+              "sha256": "8678252c4039790ed91f2659bd3cd6be90dd86eadb683ef418be898ad41440bd"
+            },
+            "inventory_files": 44,
+            "elapsed_seconds": 32.6,
+            "owned_process_group_absent": true
+          },
+          {
+            "name": "combined-first-pair-release-build",
+            "artifact": {
+              "artifact": "net-selected-texture-continuous-interval-validation-v1/evidence/combined-first-pair-release-build.json",
+              "bytes": 10233,
+              "sha256": "3f20b3b6eda54f5536af5876aeae3eacc2890a49fbf42ab62d2fed3eb670bb0f"
+            },
+            "inventory_files": 46,
+            "elapsed_seconds": 32.41,
+            "owned_process_group_absent": true
+          }
+        ],
+        "full_unittest_receipt": {
+          "artifact": "net-selected-texture-continuous-interval-validation-v1/evidence/full-unittest-suite.json",
+          "bytes": 2256,
+          "sha256": "82ff35aa700f689ff50ae83f57116585b916ba20ab46ec83ce30a4888d04ecf2"
+        },
+        "tests": 2440,
+        "skips": 164,
+        "suite_elapsed_seconds": 567.803,
+        "artifacts_rehashed": 180,
+        "all_owned_process_groups_absent": true,
+        "actual_checkout_focused_commands": [
+          {
+            "name": "actual-checkout-firstdraw-normal-js-controls",
+            "log_sha256": "0241660e31da99ac04041407ead67f9b2bd27338bde9e8fa62f21514169906fb",
+            "elapsed_seconds": 0.245,
+            "exit_code": 0
+          },
+          {
+            "name": "actual-checkout-private-build-routing",
+            "log_sha256": "12a7ae8fba3f556c3f974b60b81e5908859cefcfcb39d131a2cdaa9ff0801fb0",
+            "elapsed_seconds": 0.09,
+            "exit_code": 0
+          },
+          {
+            "name": "actual-checkout-frameeffect-cmake-routing",
+            "log_sha256": "280f58f9f9e3736b42b081193c30f21b83bf31a551a7616239525c99d90c23dd",
+            "elapsed_seconds": 1.099,
+            "exit_code": 0
+          }
+        ]
+      },
+      "isolated_real_gpu_capture_v6": {
+        "state": "PASS_ROOT_AND_INDEPENDENT_REVIEW_COMPONENT_ONLY",
+        "report": {
+          "artifact": "texture-readonly-real-gpu-capture-v6/browser-run/report.json",
+          "bytes": 39914,
+          "sha256": "e824477ccb51aa2478fbcf116d04a9727f6e0938c1d11166b21539d0007afa56"
+        },
+        "owner": {
+          "artifact": "texture-readonly-real-gpu-capture-v6/owner.json",
+          "bytes": 142956,
+          "sha256": "75f85de4c7ab4e9564cbd9babde632c3d79d960b55e19b76ee3df2a53e5ba279"
+        },
+        "root_review": {
+          "artifact": "texture-readonly-real-gpu-capture-v6/root-result-review.json",
+          "bytes": 1419,
+          "sha256": "a30067501ed0643a86316193b93efe4db37511a314b2dd40c1723bce65b69791"
+        },
+        "independent_review": {
+          "artifact": "texture-readonly-real-gpu-capture-v6-independent-review-v1/review.json",
+          "bytes": 4272,
+          "sha256": "5028e479cb42203b2a04df8af70f29235978a3179f1a23c82c1834bd0e787cdb"
+        },
+        "process_trace": {
+          "artifact": "texture-readonly-real-gpu-capture-v6/browser-processes.jsonl",
+          "bytes": 120163,
+          "sha256": "63f923201e3f002e6b93b0e363ad80dbbd020c86aaf3e2a7467989a1f36c1893"
+        },
+        "source_runtime_head": "635fc17b759991b4f26d8901007d5663ea0ceb37",
+        "probe_js_sha256": "b66d6d1b37f5270e00a6580e15b778db2ee97ff659d2e4e3331d84f02222eb37",
+        "probe_wasm_sha256": "6f9a347c266888625033339b794fb9ac0a61cd7fd732faba399f3140db0e34e9",
+        "cases": [
+          "positive",
+          "preissue-buffer",
+          "preissue-encoder",
+          "import-preinstall-buffer",
+          "import-preinstall-encoder",
+          "close-before-end",
+          "submit-after-end"
+        ],
+        "negative_codes": [
+          "PREISSUE_COMMAND_BUFFER",
+          "PREISSUE_OR_FOREIGN_ENCODER",
+          "UNKNOWN_COMMAND_BUFFER",
+          "UNKNOWN_ENCODER",
+          "CLOSE_STATE",
+          "COMPONENT_QUEUE_PHASE"
+        ],
+        "adapter": {
+          "classification": "Apple Metal 3 / ANGLE Metal on Apple M4; all seven cases used actual non-fallback adapter",
+          "vendor": "apple",
+          "architecture": "metal-3",
+          "is_fallback_adapter": false
+        },
+        "positive_readback": {
+          "legs": 2,
+          "bytes_each": 64,
+          "both_equal_expected": true,
+          "sha256_each": "049b4074a769ef4ea3c085447bda41c242f8e6f547968048724d38dd000b83da"
+        },
+        "errors": {
+          "page_console_uncaptured_validation": "zero for all seven cases",
+          "device_lost": "The positive fixture records destroyed only after component close and intentional fixture teardown; this is not device-loss robustness evidence."
+        },
+        "cleanup": {
+          "owner_result": "pass",
+          "browser_pid_records": 18,
+          "all_recorded_browser_pids_absent": true,
+          "owned_process_groups": [
+            30960,
+            30962
+          ],
+          "owned_process_groups_absent": true
+        },
+        "scope": "Isolated WebGPU component only; no gameplay, actual match texture, actual-game interval, Wasm restore or composite admission. Six terminal failures refused close/dispatch; imported-object negatives note bookkeeping may already have changed."
+      },
+      "retained_source_and_syntax_attempts": [
+        {
+          "stage": "v3 stage1 external source overlay",
+          "artifact": "selected-texture-continuous-interval-candidate-v3/execution-stage1-v1/run/root-failure-review.json",
+          "bytes": 522,
+          "sha256": "06edfabc017cf3de00b5e44d625f5e6e926e3e9e300517ecf665cac6a03d8a43",
+          "finding": "The overlay omitted aurora_browser_future_owner_accessor_library.js; failure preceded new controls and the remaining five commands were unrun.",
+          "candidate_manifest": {
+            "artifact": "selected-texture-continuous-interval-candidate-v3/manifest.json",
+            "bytes": 6294,
+            "sha256": "49d1b1cdf68274211302777b46428895ccd739cb49a6977f4c86baf7ed9b05a9"
+          },
+          "candidate_patch_sha256": "cbd17c92924c705c769cbcf2dd9326e7ac37b34aa6acaeff93c3052eb1333d82"
+        },
+        {
+          "stage": "v3 stage2 source-overlay project TU",
+          "artifact": "selected-texture-continuous-interval-candidate-v3/execution-stage2-v1/root-failure-review.json",
+          "bytes": 656,
+          "sha256": "a6abf35219f57d3a84fdb0f049154e65984234ff06d5c6e6d15c86b5f1479476",
+          "finding": "The overlay omitted ../tests/native_menu_fighter_input.h; actual project syntax stopped before integration assertions.",
+          "candidate_manifest": {
+            "artifact": "selected-texture-continuous-interval-candidate-v3/manifest.json",
+            "bytes": 6294,
+            "sha256": "49d1b1cdf68274211302777b46428895ccd739cb49a6977f4c86baf7ed9b05a9"
+          },
+          "candidate_patch_sha256": "cbd17c92924c705c769cbcf2dd9326e7ac37b34aa6acaeff93c3052eb1333d82"
+        },
+        {
+          "stage": "v3 stage2 actual project TU",
+          "artifact": "selected-texture-continuous-interval-candidate-v3/execution-stage2-v2/root-failure-review.json",
+          "bytes": 616,
+          "sha256": "8b2cac7c36d70df4e8f3e6e58e616bdabefb926bdeb73bc98c06cf42c2bebe3c",
+          "finding": "The candidate GX header introduced a private Abseil dependency absent from the actual project compile row.",
+          "candidate_manifest": {
+            "artifact": "selected-texture-continuous-interval-candidate-v3/manifest.json",
+            "bytes": 6294,
+            "sha256": "49d1b1cdf68274211302777b46428895ccd739cb49a6977f4c86baf7ed9b05a9"
+          },
+          "candidate_patch_sha256": "cbd17c92924c705c769cbcf2dd9326e7ac37b34aa6acaeff93c3052eb1333d82"
+        },
+        {
+          "stage": "v4 reduced actual project TU",
+          "artifact": "selected-texture-continuous-interval-candidate-v4/execution-reduced-project-v1/root-failure-review.json",
+          "bytes": 655,
+          "sha256": "a854860822306a6a6dabdf5e674eb4d8940a83f8c75adcf9a2c5e79029296f85",
+          "finding": "The thin declaration fix still lacked the explicit observer definition header; compiler reported an incomplete nested witness and missing getter declaration.",
+          "candidate_manifest": {
+            "artifact": "selected-texture-continuous-interval-candidate-v4/manifest.json",
+            "bytes": 6430,
+            "sha256": "edf026064b62e795d34a1005427c668b330ec81863a48ef5325c447443956cd5"
+          },
+          "candidate_patch_sha256": "5f865d65b1539e81d1ee84d68941aead53f09972d0dd413d768adabd9b36c8ce"
+        }
+      ],
+      "actual_game_interval": {
+        "state": "ATTEMPTED_CALLBACK_REFUSED_INTERVAL_NOT_OBSERVED",
+        "candidate_manifest": {
+          "artifact": "selected-texture-actual-game-packet-candidate-v1/manifest.json",
+          "bytes": 1655,
+          "sha256": "b3454981fbe0d0364fa4cc1e4aa0d0bfe573f33bc14b21edf33ec99914015e1f"
+        },
+        "candidate_patch": {
+          "artifact": "selected-texture-actual-game-packet-candidate-v1/candidate.patch",
+          "bytes": 10686,
+          "sha256": "9faf55598c1a8133da0de1a32c92bd6bb4bbe2cceac3d26f422fb661e7a234a2"
+        },
+        "source_review": {
+          "artifact": "selected-texture-actual-game-source-review-v1/review.json",
+          "bytes": 2915,
+          "sha256": "ea46eb92b7056519bf936d7d08d054757f8db718292a5de818d7ecbafad34ef2"
+        },
+        "review_scope_note": "The packet was executed once. The requested normal callback advanced two source ticks/draws and was refused by the exact-one-tick component gate; no selected-texture interval or target-guard behavior was observed.",
+        "execution": {
+          "artifact": "selected-texture-actual-game-observation-packet-v1/capture/completion.json",
+          "bytes": 160645,
+          "sha256": "e5f776b1c566f503d89c202425c49bb6abb18bd657d32507fdd1e29b24508874",
+          "report": {
+            "artifact": "selected-texture-actual-game-observation-packet-v1/capture/browser/report.json",
+            "bytes": 1856501,
+            "sha256": "74a3ddb513f7787485794ef5e4348b97aadadab7d25f0e2d0b615396d1cbe8ca"
+          },
+          "owner_report": {
+            "artifact": "selected-texture-actual-game-observation-packet-v1/capture/owner-report.json",
+            "bytes": 77638,
+            "sha256": "e1555c1e5b6aae96a58ef1e35fa656ca84a5af79f5f95ee039db0b4f1cf30268"
+          },
+          "root_review": {
+            "artifact": "selected-texture-actual-game-observation-packet-v1/capture/root-failure-review.json",
+            "bytes": 2056,
+            "sha256": "2e878e9e0a64575304f61bb4572628e3f528edf4156dcb9fe280a4eb930e9f28"
+          },
+          "independent_review": {
+            "artifact": "selected-texture-status-draft-v2/actual-game-failure-review.json",
+            "bytes": 6002,
+            "sha256": "dee3bdbb00e6b701a02165f025c9a9251b8150459218876f24cf43114b3531bd"
+          },
+          "runtime_producer": "635fc17b759991b4f26d8901007d5663ea0ceb37",
+          "harness_head": "1f74eb2c4892296969f94cfefa8fde0f358a8b62",
+          "harness_tree": "62b6bcbc2b4e836a2080f845831acad60b96ceb1",
+          "first_failure": "component_requires_valid_exact_one_tick_draw",
+          "source_frames": [
+            181,
+            183
+          ],
+          "ticks": 2,
+          "draws": 2,
+          "selected_source_frame": 182,
+          "later_draws_unobserved": 1,
+          "renderer_event_rows": 1789,
+          "renderer_handle_rows": 269,
+          "renderer_actual_draw_rows": 246,
+          "renderer_draw_command_count": 248,
+          "renderer_first_blocker": 7,
+          "renderer_finding_mask": "167903360",
+          "renderer_submit_count": 1,
+          "renderer_successful_fence_count": 1,
+          "audio_returns": 1,
+          "pcm_frames": 533,
+          "pre_tick_audio_returns": 1,
+          "pre_tick_pcm_frames": 534,
+          "h1_callback_count": 3119,
+          "h1_retained_samples": 100,
+          "h1_dropped_samples": 3019,
+          "h1_reason_7_incidents": 8,
+          "h1_dropped_incidents": 0,
+          "page_errors": 0,
+          "timing_pauses": 0,
+          "cleanup_passed": true,
+          "browser_pid_records": 10,
+          "browser_pid_records_absent": true,
+          "capture_process_group_absent": true,
+          "server_process_group_absent": true,
+          "reviewed_process_groups_absent": [
+            68048,
+            68052,
+            68080,
+            68946
+          ],
+          "native_retirement_attempted": false,
+          "strict_replay_stderr": {
+            "artifact": "selected-texture-actual-game-observation-packet-v1/capture/strict-selected-replay.stderr",
+            "bytes": 1037,
+            "sha256": "0d5d94d9b788469417a65e077d3b161fbd77e1dca38a7cb1badb0c3876c15343"
+          },
+          "component_read_emitted": false,
+          "selected_interval_observed": false
+        }
+      },
+      "remaining_limits": [
+        "One actual-game attempt was made, but its callback failed the exact one-tick/draw gate before the selected-texture interval; no selected-resource guard behavior was observed.",
+        "No gameplay arm, Wasm snapshot/restore, source replay, pixel/PCM equality, composite eligibility, or acceptance claim.",
+        "The prior first-draw findings LOAD_ATTACHMENT (7) and COMMAND_SHAPE_MISMATCH (27) remain tied to their earlier producer; the isolated component does not alter them.",
+        "Device loss, native final release/import aliases, pending work, asynchronous host/future ownership, and full GPU reference lifetime remain open."
+      ],
+      "actual_game_harness_validation_1f74": {
+        "state": "PASS_FULL_HARNESS_REGRESSION",
+        "harness_head": "1f74eb2c4892296969f94cfefa8fde0f358a8b62",
+        "harness_tree": "62b6bcbc2b4e836a2080f845831acad60b96ceb1",
+        "runtime_producer": "635fc17b759991b4f26d8901007d5663ea0ceb37",
+        "tests": 2440,
+        "skips": 164,
+        "suite_seconds": 578.338,
+        "result": {
+          "artifact": "net-selected-texture-actual-game-harness-validation-v1/evidence/result.json",
+          "bytes": 5485,
+          "sha256": "36a5e72feed54142bc3a8d7accc0eb8a3607b5ef01f3cae72fdb90f47eb00e2c"
+        },
+        "root_review": {
+          "artifact": "net-selected-texture-actual-game-harness-validation-v1/evidence/root-final-review.json",
+          "bytes": 681,
+          "sha256": "daaf0f0b22ea931fb51c2eb79d714d1d8514d1bb2b5f46c017c35b27fb9419b9"
+        },
+        "suite_receipt": {
+          "artifact": "net-selected-texture-actual-game-harness-validation-v1/evidence/full-unittest-suite.json",
+          "bytes": 2256,
+          "sha256": "73b41d445ed354962d728f2d19d05d801f9c90ecf1507f63a996cedcfe81578e"
+        },
+        "suite_log_sha256": "804a8e06fab6b729b45c9016810e3f9d1df7364f6105d66fb844ff5c9b7410d6"
+      },
+      "artifact_run": "rollback-sprint-resume-20261014-085704-6fe33b74"
+    },
+    "natural_one_tick_enrollment": {
+      "state": "EXACT_CACHE_OWNER_VALIDATED_ACTUAL_ISSUE_REFUSAL_RETAINED",
+      "scope": "Private opt-in enrollment for selecting a naturally due exact-one-tick callback in the selected-texture diagnostic. Original callbacks and ordinary first-draw behavior are unchanged. This is not gameplay admission or restore.",
+      "source": {
+        "commit": "dbd0ed9cec29db4ecbbdacfeda262343b92b98ac",
+        "tree": "2107676ca4de8141bfa9ee18cef83373e54f0c4b",
+        "profile": "runtime-match-frame-effect Release --first-draw-components-diagnostic",
+        "served_artifacts": 44,
+        "served_manifest_sha256": "146217ddb05234abf5a3a7a7c1ad685368925f5649e7f0ad3e1449077f7b19d5",
+        "source_review_manifest": "selected-texture-natural-one-tick-source-review-v1/review.json",
+        "source_review_sha256": "a78bfc3af5eadb3b25c83b8552510807686af330ad3bbd537457efa7fe56aaa8",
+        "runtime_source": "dbd0ed9cec29db4ecbbdacfeda262343b92b98ac",
+        "diagnostic_harness_source": "f62b1afc29846c0c0bc3de063e5a7a206e74cc87"
+      },
+      "behavior": {
+        "private_request": "melee_web_native_menu_frame_effect_request_natural_one(origin_frame)",
+        "copied_receipt": "melee_web_native_menu_frame_effect_natural_one_enrollment()",
+        "eligible_source_window": [
+          180,
+          240
+        ],
+        "selection": "Promote only at the existing begin-tick hook when the actual original plan is exactly one step; preserve all noneligible original callbacks and work.",
+        "legacy_behavior": "Ordinary first-draw mode remains on its original 1..8-step path."
+      },
+      "validation": {
+        "release_profiles": [
+          {
+            "profile": "first-draw-components-private",
+            "artifacts": 44,
+            "state": "PASS"
+          },
+          {
+            "profile": "ordinary",
+            "artifacts": 44,
+            "state": "PASS"
+          },
+          {
+            "profile": "frame-effect",
+            "artifacts": 44,
+            "state": "PASS"
+          },
+          {
+            "profile": "combined-first-pair",
+            "artifacts": 46,
+            "state": "PASS"
+          }
+        ],
+        "release_build_review": {
+          "artifact": "net-natural-one-tick-enrollment-validation-v1/evidence/root-builds-review.json",
+          "sha256": "03895fbaaf32b3ad4fa9e1f88f5d75cdcc2922baee88c270e78a8890181edbf2",
+          "artifact_instances_rehashed": 178
+        },
+        "full_regression": {
+          "artifact": "net-natural-one-tick-enrollment-validation-v1/evidence/result.json",
+          "sha256": "709da0a6751a1cad7f1b24adfdc3b8ebcba6039c47257f2f6a8ab2f146ebba91",
+          "root_review_artifact": "net-natural-one-tick-enrollment-validation-v1/evidence/root-final-review.json",
+          "root_review_sha256": "45158047c607bb108f7f24883f369418fcfebbc41b9625064549dce9ce04317a",
+          "tests": 2442,
+          "skips": 164,
+          "state": "PASS"
+        },
+        "permanent_enrollment_controls": {
+          "artifact": "net-natural-one-tick-enrollment-validation-v1/evidence/actual-checkout-permanent-natural-enrollment-controls.json",
+          "sha256": "4be8a1547f6671dafb725ff97afa47e799576c76d357df601bf9c6b102b5f49a",
+          "state": "PASS"
+        }
+      },
+      "preserved_prior_refusal": {
+        "artifact": "selected-texture-actual-game-observation-packet-v1/capture/browser/report.json",
+        "sha256": "74a3ddb513f7787485794ef5e4348b97aadadab7d25f0e2d0b615396d1cbe8ca",
+        "source_frame_before_after": [
+          181,
+          183
+        ],
+        "planned_steps": 2,
+        "tick_returns": 2,
+        "draw_returns": 2,
+        "selected_source_frame": 182,
+        "later_draws_unobserved": 1,
+        "first_refusal": "component_requires_valid_exact_one_tick_draw",
+        "interval_dispatched": false,
+        "interpretation": "The one-tick prerequisite refused before interval dispatch. This prior callback is not an interval observation and does not identify why two steps were due."
+      },
+      "prepared_packet": {
+        "manifest": "selected-texture-natural-one-tick-packet-v1-preparation/manifest.json",
+        "manifest_sha256": "7f8407ffcecd4940cf8349b4d8dc64880f358d8708115b25c971cde47a05e20a",
+        "packet": "selected-texture-natural-one-tick-packet-v1-preparation/packet.json",
+        "packet_sha256": "69c831f00b5dac01920fd8f440d3a66695d9936243a8df6772b347a8bc5a3408",
+        "capture_release": "ISSUED_SINGLE_ATTEMPT_CAPTURE_RETAINED",
+        "release_receipt": {
+          "artifact": "selected-texture-natural-one-tick-packet-v1-preparation/root-capture-release.json",
+          "sha256": "3b0d79429156c5db3d259ba6803c6d59bfa3ece608a9ec13a9f63f14b61ac160"
+        }
+      },
+      "next": "Prepare the held C1 value-owned normal-callback execution record at unchanged synchronous ordinary callsites; review actual ordering before any returned-idle prepare/dispatch. GPU content/reference/future closure and drawn restore/repeat remain NO-GO.",
+      "limits": [
+        "The historical enrollment checkpoint did not establish a successful selected interval, atomicity or restore; the current scoped stopped observation is recorded under the combined boundary.",
+        "The historical dbd0/f62 and 4d00 observations remain separate; the 4d00 selected_texture_current_owner_mismatch subcondition is unobserved. The f3340de run records selected_texture_cache_generation, but not its mutation site/amount, selected-owner survival, or resource-content validity.",
+        "Renderer LOAD/other finding bits do not identify the issue refusal cause.",
+        "Usage20 first-sampled diagnosis withdrawn; do not select a later convenient texture or relax usage/identity predicates.",
+        "H1 is bounded/lossy and does not establish event completeness or timing.",
+        "The historical enrollment checkpoint had no interval close or native retirement; the current combined boundary records those scoped observations, with no Wasm restore/repeat, composite eligibility or gameplay rollback acceptance.",
+        "No clock/planner/PAD/audio/draw-order/deadline change, guard weakening, later-owner reselection, unchanged retry, or restore admission authorized."
+      ],
+      "capture_attempt": {
+        "state": "FAIL_FIRST_SELECTED_TEXTURE_ISSUE_REFUSAL",
+        "runtime_source": "dbd0ed9cec29db4ecbbdacfeda262343b92b98ac",
+        "runtime_manifest_sha256": "146217ddb05234abf5a3a7a7c1ad685368925f5649e7f0ad3e1449077f7b19d5",
+        "browser": {
+          "executable": "Google Chrome",
+          "version": "155.0.8059.80",
+          "report_artifact": "selected-texture-natural-one-tick-packet-v1-preparation/capture/browser/report.json",
+          "report_bytes": 1880007,
+          "report_sha256": "b67ac4a7d049021ba7416b153ba51d3fdae8add71276f4dd156a047ebe8d65b7",
+          "completion_artifact": "selected-texture-natural-one-tick-packet-v1-preparation/capture/completion.json",
+          "completion_bytes": 168165,
+          "completion_sha256": "76974b2fb7667b822a741249b9c7de990d11c8fd36accd5eb4fc184193fb445f"
+        },
+        "natural_one_selection": {
+          "state": "PASS",
+          "origin_source_frame": 180,
+          "source_before_after": [
+            180,
+            181
+          ],
+          "planned_steps": 1,
+          "tick_returns": 1,
+          "draw_returns": 1,
+          "audio_returns": 1,
+          "pcm_frames": 533,
+          "skipped_callbacks_ticks_draws_audio_pcm_frames": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "selection_callback_sequence": 1,
+          "renderer_selected_source_frame": 181
+        },
+        "selected_texture_interval": {
+          "first_failure": "selected_texture_issue_refused",
+          "operations": [
+            "readSelectedTextureBoundary",
+            "issueSelectedTextureBoundary"
+          ],
+          "issue_result": 0,
+          "guard": {
+            "scope": "fixture-component-only",
+            "phase": "INSTALLED",
+            "identity": null,
+            "attempts": 0,
+            "fenceComplete": false,
+            "gameplayAdmission": false
+          },
+          "interval_close_observed": false,
+          "interval_fence_observed": false,
+          "strict_replay": {
+            "artifact": "selected-texture-natural-one-tick-packet-v1-preparation/capture/strict-selected-replay.result.json",
+            "sha256": "f69af62768e2ca37aaa928c1e0eb48fb034d3b4e08cf22d93d9e48ab9fa444ef",
+            "exit_code": 1,
+            "stderr_sha256": "695205a07c599e25669bb9471d08ec94f8882454ef8e9727d2a65536e151ca21",
+            "interpretation": "Secondary refusal because the interval was refused rather than closed; it is not the first failure."
+          },
+          "component_read_and_arm": "PASS_INDEPENDENT_STRICT_DECODERS",
+          "native_issued_zero_branch": "UNOBSERVED; issue refusal cause not established"
+        },
+        "renderer_packet": {
+          "first_blocker": "LOAD_ATTACHMENT",
+          "first_blocker_code": 7,
+          "finding_mask": "134217856",
+          "finding_bits": [
+            7,
+            27
+          ],
+          "event_count": 1776,
+          "handle_count": 266,
+          "render_pass_count": 3,
+          "draw_command_count": 245,
+          "submit_count": 1,
+          "fence_count": 1,
+          "fence_success": 1,
+          "scope_note": "Renderer packet observation is separate from the selected-texture issue refusal and does not establish its cause."
+        },
+        "audio_and_h1": {
+          "audio_returns": 1,
+          "pcm_frames": 533,
+          "pre_tick_audio_returns": 0,
+          "pre_tick_pcm_frames": 0,
+          "h1_incidents": 8,
+          "h1_reason_code_counts": {
+            "7": 8
+          },
+          "h1_callbacks": 3124,
+          "h1_retained_samples": 100,
+          "h1_evicted_samples": 3024,
+          "h1_dropped_incidents": 0,
+          "scope_note": "Bounded lossy H1 diagnostic; it does not establish completeness or timing."
+        },
+        "cleanup": {
+          "owner_report_artifact": "selected-texture-natural-one-tick-packet-v1-preparation/capture/owner-report.json",
+          "owner_report_bytes": 92452,
+          "owner_report_sha256": "04fb9b038f43085699c8cf902d331945259505cbd02b31d0288be2372a7ac68a",
+          "root_review_artifact": "selected-texture-natural-one-tick-packet-v1-preparation/capture/root-failure-review.json",
+          "root_review_sha256": "ab43903a947b6971b46c7b5541bb464ed57f1b576979436ee4c3f51666352204",
+          "decoder_review_artifact": "selected-texture-natural-one-tick-packet-v1-preparation/capture/root-decoder-review.json",
+          "decoder_review_sha256": "e98b5a6f3396ca15659e00852a78731957e0be737e1e77846f03b39cf644f857",
+          "cleanup_passed": true,
+          "process_observation_passed": true,
+          "elapsed_ms": 59421,
+          "cleanup_ms": 135,
+          "browser_process_entries": 13,
+          "unique_browser_pids": 11,
+          "all_browser_processes_absent": true,
+          "absent_process_groups": [
+            94287,
+            94288,
+            94296,
+            94633
+          ],
+          "page_errors": 0,
+          "timing_pauses": 0,
+          "native_retirement": false,
+          "restore": false
+        },
+        "next": "Reduce the first issue refusal from retained data/source before any further capture. Do not infer the native issued-zero path or retry unchanged. No interval completion, restore admission, or gameplay acceptance."
+      },
+      "diagnostic_harness": {
+        "commit": "f62b1afc29846c0c0bc3de063e5a7a206e74cc87",
+        "tree": "f4f8ba81663ddc3c40546cf77f5825f357bdd014",
+        "runtime_unchanged": true,
+        "runtime_rebuilt": false,
+        "scope": "Two-file harness-only copied_raw native issuance refusal after synchronous issue0 and authenticated idle/Module checks; positive issue response and strict refusal unchanged.",
+        "focused_controls": {
+          "artifact": "selected-issue-refusal-diagnostic-candidate-v2/execution-focused-v1/run/summary.json",
+          "sha256": "1ef85ea5132b0a922e6f30795ddb83af2b4196bbad5510097e9a2d5d14ba01f9",
+          "actual_helper_tests": 13,
+          "retained_data_loss_and_synthetic_sticky_reason_controls": 2,
+          "state": "PASS"
+        },
+        "full_regression": {
+          "artifact": "net-selected-issue-refusal-harness-validation-v1/evidence/result.json",
+          "sha256": "9cea598750721c9bc7fd60062331094af3d6fd6707fcfab590067bdc62f88d0f",
+          "tests": 2442,
+          "skips": 164,
+          "seconds": 568.711,
+          "state": "PASS",
+          "retained_runtime_artifacts": 178,
+          "retained_runtime_caches": 4,
+          "root_review_artifact": "net-selected-issue-refusal-harness-validation-v1/evidence/root-final-review.json",
+          "root_review_sha256": "c83ffc04edadef04f2276788daf27794a28142449c88792f41254784c2eeb6b0"
+        }
+      },
+      "reason_capture_attempt": {
+        "state": "FAIL_USEFUL_NATIVE_CURRENT_OWNER_REFUSAL_CLEANUP_PASS",
+        "runtime_source": "dbd0ed9cec29db4ecbbdacfeda262343b92b98ac",
+        "harness_source": "f62b1afc29846c0c0bc3de063e5a7a206e74cc87",
+        "packet_manifest": {
+          "artifact": "selected-texture-natural-one-tick-reason-packet-v1/manifest.json",
+          "sha256": "64ba0273040ff7ed012b6cc66a5a06cba3751db1cdf0acb1859cb4c55f495cce"
+        },
+        "report": {
+          "artifact": "selected-texture-natural-one-tick-reason-packet-v1/capture/browser/report.json",
+          "sha256": "f2f3fda1b2fde64f4d34a56c6527d8f05d0ae02c6e2453c20502af190ae50d55",
+          "bytes": 5797765
+        },
+        "root_review": {
+          "artifact": "selected-texture-natural-one-tick-reason-packet-v1/capture/root-failure-review.json",
+          "sha256": "dde813f6fef34d25a31dbc63de669c810bd5e6125911ec246473551f0037059e"
+        },
+        "natural_one_enrollment": {
+          "schema": "melee-web-natural-one-tick-enrollment-v1",
+          "copied": true,
+          "state": 3,
+          "minimum_frame": 180,
+          "maximum_frame": 240,
+          "origin_frame": 180,
+          "selected_frame": 182,
+          "owner_generation": 2,
+          "origin_audio_phase": 40,
+          "row_capacity": 61,
+          "row_count": 2,
+          "callback_sequence": "2",
+          "selection_callback": "2",
+          "skipped_callbacks": "1",
+          "skipped_ticks": "2",
+          "skipped_draws": "2",
+          "skipped_audio": "1",
+          "skipped_pcm_frames": "534",
+          "source_free_callbacks": "0",
+          "source_free_audio": "0",
+          "source_free_pcm_frames": "0",
+          "callback_open": false,
+          "error": "",
+          "rows": [
+            {
+              "callback_sequence": "1",
+              "source_before": 180,
+              "source_after": 182,
+              "planned_steps": 2,
+              "planned_audio_steps": 1,
+              "tick_returns": 2,
+              "draw_returns": 2,
+              "audio_returns": 1,
+              "pcm_frames": 534,
+              "audio_phase_before": 40,
+              "audio_phase_after": 0,
+              "selected": false
+            },
+            {
+              "callback_sequence": "2",
+              "source_before": 182,
+              "source_after": 183,
+              "planned_steps": 1,
+              "planned_audio_steps": 1,
+              "tick_returns": 1,
+              "draw_returns": 1,
+              "audio_returns": 1,
+              "pcm_frames": 533,
+              "audio_phase_before": 0,
+              "audio_phase_after": 20,
+              "selected": true
+            }
+          ]
+        },
+        "natural_one_enrollment_failures": [],
+        "component_failures": [],
+        "component_read_and_arm": "PASS_ROOT_STRICT_DECODERS",
+        "selected_interval": {
+          "first_failure": "selected_texture_issue_refused",
+          "native_refusal_status": "copied_raw",
+          "native_refusal": "selected_texture_current_owner_mismatch",
+          "native_path_scope": "Submitted witness/frame/queue project gate passed; actual GX returned non1. Current slot/current owner facts/bridge subcondition not directly serialized.",
+          "transport_operations": [
+            "readSelectedTextureBoundary",
+            "issueSelectedTextureBoundary"
+          ],
+          "issued": 0,
+          "guard": {
+            "identity": null,
+            "schema": 1,
+            "scope": "fixture-component-only",
+            "phase": "INSTALLED",
+            "epoch": 0,
+            "attempts": 0,
+            "dispatches": 404,
+            "fenceComplete": false,
+            "firstFailure": null,
+            "gameplayAdmission": false
+          },
+          "interval_fences": false,
+          "interval_close": false,
+          "native_retired": false,
+          "restore": false
+        },
+        "renderer_packet": {
+          "first_blocker": 7,
+          "finding_mask": "167903360",
+          "finding_bits": [
+            7,
+            17,
+            25,
+            27
+          ],
+          "event_count": 1787,
+          "command_record_count": 266,
+          "actual_draw_count": 246,
+          "render_pass_count": 3,
+          "scope_note": "Separate observation, no implication that renderer blocker caused GX issue refusal."
+        },
+        "h1": {
+          "callback_count": 3169,
+          "samples_retained": 100,
+          "samples_evicted": 3069,
+          "incident_count": 8,
+          "reason_counts": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            8,
+            0,
+            0
+          ],
+          "dropped_incidents": 0,
+          "scope": "Bounded lossy diagnostic, no completeness/timing admission"
+        },
+        "cleanup": {
+          "owner_artifact": "selected-texture-natural-one-tick-reason-packet-v1/capture/owner-report.json",
+          "owner_sha256": "a0da498b9f671e1b99b4ff3b34de0e9c056b36f1c19e57b9e84f4b7efcc1264c",
+          "completion_artifact": "selected-texture-natural-one-tick-reason-packet-v1/capture/completion.json",
+          "completion_sha256": "f45e2e51f7b377b1b8399ba71c0f91bec4c28d95a16be5f69d2e1a13c170f0fa",
+          "root_reviewed_process_groups_absent": [
+            43972,
+            43973,
+            44354,
+            43978
+          ],
+          "browser_inventory_entries": 11,
+          "unique_browser_pids": 11,
+          "owner_elapsed_ms": 63879,
+          "cleanup_ms": 143,
+          "page_errors": 0,
+          "timing_pauses": 0,
+          "runtime_artifacts_rehashed": 44,
+          "source_unchanged": true
+        }
+      },
+      "source_reduction_correction": {
+        "artifact": "selected-sampled-usage20-source-reduction-v1/correction-v3.json",
+        "sha256": "5caf3a0de10bb5b3f383769bc20de65db94f70941a345560017bdb2894d13989",
+        "scope": "Withdraw first-sampled usage20 diagnosis: retained rows do not distinguish promotion through resolve from GX sampling. Resolve can reuse an already published pair; no promotion-order/capability-widening cause claim."
+      },
+      "reduced_next_contract": {
+        "artifact": "selected-current-slot-reborrow-reduction-v1/post-control-contract-v2.json",
+        "sha256": "6d2a834c3566a5d7b35d4b5efed19f53c0214ca152c183f9ff767ed9021103db",
+        "state": "SOURCE_CONTRACT_ONLY_NO_RUNTIME_IMPLEMENTATION"
+      },
+      "reduced_current_slot_control": {
+        "state": "PASS_FOCUSED_SYNTHETIC_ACTUAL_GX_BODY_OBSERVER_ONLY",
+        "result_artifact": "selected-current-slot-reborrow-reduction-v1/focused-result.json",
+        "result_sha256": "cc54f02749caa5e48c7b4064f0fb2cf1f3f8395d78f20f9f9eb5e50b861e338b",
+        "actual_control_artifact": "selected-current-slot-reborrow-reduction-v1/actual-gx-reborrow-control.cpp",
+        "actual_control_sha256": "e133279c07c11c3f3e005a02d031167315c215cd6cf77c1cbf71c195cf97a964",
+        "compile_seconds": 1.455,
+        "verified_compile_dependencies": 849,
+        "node_modes": 6,
+        "owned_groups_absent": 7,
+        "positive": "Unchanged exact owner result1/hostbridge1",
+        "negative_results": "Slot pointer replacement, new authentic serial, current view mismatch and missingref result0/hostbridge0; synthetic hostzero result0/hostbridge1",
+        "scope": "Actual GX function body byte-identical +actual observer methods; synthetic slot/owner/raw/host endpoints only. No actual-capture changed-field attribution or live TextureRef/GPU lifetime proof."
+      },
+      "exact_cache_owner_component": {
+        "state": "PASS_STOPPED_SELECTED_ENTRY_COMPONENT_INTERVAL_RESTORE_OPEN",
+        "source": {
+          "commit": "4d00abc97c0eb8ff78df53ace6e60791654125fa",
+          "tree": "a29cc88929093bd125578262db75a29f39d46a85",
+          "Aurora_upstream": "749d6ee7a22bdfab78c8ece9047bca5d79aa72ca",
+          "Aurora_actual_canonical_tree": "7b63f2df61a580fab4cf6747c1132342ae3cfbca",
+          "canonical_patch_sha256": "2fe0c7ada637abd0a99448c40af004ea05b3e78199fc756f863a06ca7d6a1299",
+          "candidate": {
+            "artifact": "selected-cache-owner-candidate-v2/manifest.json",
+            "sha256": "3156f10d278307f33a86c2664e9d43b0cb3fa30bbe081c79d426919830ad1711"
+          },
+          "integration": {
+            "artifact": "selected-cache-owner-candidate-v2/integration.json",
+            "sha256": "260bdf4f7c9129dbd93ca2da81de46b3744c58cc3702e0934025ca6561d53f5f"
+          },
+          "historical_source_scope": "The source field above is the earlier 4d00 cache-owner implementation and its 4d00 observation; the f3340de source and current capture are bound separately below."
+        },
+        "behavior": {
+          "authority": "Exact authored object-cache key captured only at the consumed first sampling event when actual entry.handle.get()==actual sampled ref.get().",
+          "issue_and_current": "Same immutable key; single exact find and local const-handle borrow, no added strong reference or pointer escape. Existing owner/serial/device/view/queue predicates preserved.",
+          "unsupported": "Missing, replaced, erased, retired, stale or pending-invalidation authority refuses; no resolver/cache walk/touch/invalidation processing, later-owner selection or fallback.",
+          "lifecycle": "Request/final detach/device/reset invalidate native authority; no native reset clears the host-monotonic guard.",
+          "ordinary_default": "Private default-OFF; no TextureRef layout, ownership timing, usage bits or original GPU/source-call order change."
+        },
+        "focused_validation": {
+          "V1": {
+            "summary": {
+              "artifact": "selected-cache-owner-candidate-v2/execution-focused-v1/run/summary.json",
+              "sha256": "79748582b89aa92396710caade394bdca52d0bb039fda990154ed1102f2dac99"
+            },
+            "owner_review": {
+              "artifact": "selected-cache-owner-candidate-v2/execution-focused-v1/run/owner-focused-result-review.json",
+              "sha256": "cf02f7dd512e3df8239aff247e0383cdd0d1a1974ab8db68cc55e3f63220e591"
+            },
+            "commands_passed": 39,
+            "limitation": "Compiler em++ shim inherited PATH python3 selection with EMSDK_PYTHON null and ccache seam insufficiently bound. Current interpreter matched pinned bytes, but historical process image was not retained; V1 is not the final interpreter-closure result."
+          },
+          "V2": {
+            "summary": {
+              "artifact": "selected-cache-owner-candidate-v2/execution-focused-v2/run/summary.json",
+              "sha256": "e250e8f243d82010e3b112cfa3aacaf35fc642a4e6c3533b101597c92e7f188a"
+            },
+            "root_review": {
+              "artifact": "selected-cache-owner-candidate-v2/execution-focused-v2/root-result-review.json",
+              "sha256": "e7f5bc9f622be73807f947312b1f79722b8de64488b7c8b4d56d25ded6ec7378"
+            },
+            "commands_passed": 39,
+            "native_case_launches": 25,
+            "redundancy": "Mode18 duplicates mode0; duplicate issuance is already checked in each successful case.",
+            "compiler_environment": "Explicit already-pinned absolute EMSDK_PYTHON and absent _EMCC_CCACHE, effective environment recorded before every launch.",
+            "actual_dependency_closures": 10,
+            "external_native_symbol_joins": 3,
+            "ordinary_OFF_equalities": 2,
+            "owned_groups_absent": 39,
+            "scope": "Actual methods/TextureRef constructor/detach with synthetic GPU release and host endpoints; no real-GPU/capture-cause or restore proof."
+          }
+        },
+        "required_validation": {
+          "result": {
+            "artifact": "net-selected-cache-owner-validation-v1/evidence/result.json",
+            "sha256": "0d3839fab147b238531284a2246f07178c6dc7bd14544e962f0c3600c504925c"
+          },
+          "root_review": {
+            "artifact": "net-selected-cache-owner-validation-v1/evidence/root-final-review.json",
+            "sha256": "37702fcaad94c191915e84132e7ecbde922c18a72ffbea71afefaab711f06be8"
+          },
+          "artifact_inventory": {
+            "artifact": "net-selected-cache-owner-validation-v1/evidence/owner-artifact-inventory.json",
+            "sha256": "45860c36470a11cd18e395826791b554ee4a07eb66dfd627899b2059d69416b6"
+          },
+          "release_profiles": [
+            {
+              "profile": "isolated texture readonly guard",
+              "artifacts": 2
+            },
+            {
+              "profile": "private first-draw components",
+              "artifacts": 44
+            },
+            {
+              "profile": "ordinary runtime",
+              "artifacts": 44
+            },
+            {
+              "profile": "frame-effect runtime",
+              "artifacts": 44
+            },
+            {
+              "profile": "combined first-pair runtime",
+              "artifacts": 46
+            }
+          ],
+          "artifacts_rehashed": 180,
+          "caches_rehashed": 5,
+          "step_logs_rehashed": 10,
+          "owned_groups_absent": 10,
+          "full_suite": {
+            "tests": 2443,
+            "skipped": 164,
+            "seconds": 564.888,
+            "actual_selected_cache_owner_test": "PASS in focused actual checkout and full suite"
+          },
+          "source_unchanged": true
+        },
+        "fresh_browser_result": {
+          "state": "FAIL_SELECTED_TEXTURE_ISSUE_REFUSAL_CLEANUP_PASS",
+          "executed": true,
+          "success_claim": false,
+          "source": "4d00abc97c0eb8ff78df53ace6e60791654125fa",
+          "packet": {
+            "artifact": "selected-texture-natural-one-cache-owner-capture-v2/packet.json",
+            "sha256": "7cb28cf60214a89ae364ea9cc17d6264c4bfa672f720ec80af4a27ed8f135ca4"
+          },
+          "launcher": {
+            "artifact": "selected-texture-natural-one-cache-owner-capture-v2/run-first-draw-capture-v1.py",
+            "sha256": "1eb753fd5f93be480013685e9fa194f383c5f234cd7f8b67195e4e951bf71203"
+          },
+          "materialization": {
+            "artifact": "selected-texture-natural-one-cache-owner-capture-v2/materialization.json",
+            "sha256": "8dfa8524dda3a0397b9e889dbdb567d84596449a7b35ae71093fd5de00a75ebc"
+          },
+          "preflight": {
+            "artifact": "selected-texture-natural-one-cache-owner-capture-v2/preflight-review.json",
+            "sha256": "6a7199eebd1c4a4c213242c7af34a2347fbcb5f0465769c2abcb9119f319248d"
+          },
+          "root_launcher_review": {
+            "artifact": "selected-texture-natural-one-cache-owner-capture-v2/root-launcher-review.json",
+            "sha256": "b332434f94e3211517d85d07c67403a94ed3f44e3e264ff86013df6f9645c035"
+          },
+          "root_release": {
+            "artifact": "selected-texture-natural-one-cache-owner-capture-v2/root-capture-release.json",
+            "sha256": "ab44a2d0e4a24eb632c580821104fbf7d6b3d0baed4e23bf6f0671df527a55c3"
+          },
+          "report": {
+            "artifact": "selected-texture-natural-one-cache-owner-capture-v2/capture/browser/report.json",
+            "sha256": "c652d9e084c312babbbda1d8cb65697a75801b6b9fd3e7a9a4bbf42a66e0ba37"
+          },
+          "completion": {
+            "artifact": "selected-texture-natural-one-cache-owner-capture-v2/capture/completion.json",
+            "sha256": "7c78598651f438f4ddd108a797065b6cccfb364f5b5f59f9843d805bd6261c64"
+          },
+          "owner": {
+            "artifact": "selected-texture-natural-one-cache-owner-capture-v2/capture/owner-report.json",
+            "sha256": "a6f7c3be946142c13ef1f7ef241bb05beb96c3ef364b340fb13870dedd60e067"
+          },
+          "root_failure_review": {
+            "artifact": "selected-texture-natural-one-cache-owner-capture-v2/capture/root-failure-review.json",
+            "sha256": "d515e07a28ce225a3f0d4248a49b65608ef1e6f98dc67f07ba9c2c45641e2760"
+          },
+          "owner_failure_audit": {
+            "artifact": "selected-texture-natural-one-cache-owner-capture-v2/capture/owner-failure-audit.json",
+            "sha256": "ee9ab7889e97ebbabc55369da79d29f236e7fbb6ab9511dfe163d55867c42c47"
+          },
+          "natural_enrollment": {
+            "source_before": 180,
+            "source_after": 181,
+            "planned_steps": 1,
+            "tick_returns": 1,
+            "draw_returns": 1,
+            "audio_returns": 1,
+            "pcm_frames": 534,
+            "skipped_callbacks": 0,
+            "skipped_ticks": 0,
+            "skipped_draws": 0,
+            "skipped_audio": 0,
+            "skipped_pcm_frames": 0
+          },
+          "component_substeps": {
+            "strict_outer_renderer_schema": true,
+            "observation_failures": [],
+            "component_read": "read",
+            "native_component_ready": true,
+            "component_failures": [],
+            "depth_before": "READY",
+            "depth_arm": "armed",
+            "depth_after": "ACTIVE",
+            "final_component_completion": false
+          },
+          "first_issue_refusal": {
+            "issued": 0,
+            "copied_native_error": "selected_texture_current_owner_mismatch",
+            "guard_phase": "INSTALLED",
+            "guard_attempts": 0,
+            "guard_identity": null,
+            "guard_dispatches": 404,
+            "proven": "Project submitted-witness/frame/queue prerequisite passed; actual GX issue returned non-one.",
+            "unproven": "Exact cache-borrow/current-owner/host predicate; attempts0 and renderer findings do not identify the rejecting clause."
+          },
+          "transport_rows": 2,
+          "interval_fences": false,
+          "interval_close": false,
+          "native_retired": false,
+          "restore": false,
+          "renderer_separate_observation": {
+            "first_blocker": 7,
+            "finding_mask": "134217856",
+            "finding_bits": [
+              7,
+              27
+            ],
+            "command_records": 256,
+            "actual_draws": 237,
+            "events": 1720,
+            "normal_submit_count": 1,
+            "normal_fence_success": 1,
+            "not_issuance_cause": true
+          },
+          "H1": {
+            "callback_count": 3119,
+            "samples_retained": 100,
+            "samples_evicted": 3019,
+            "incidents_retained": 8,
+            "reason7_count": 8,
+            "incidents_dropped": 0,
+            "scope": "Bounded lossy preparation diagnostic; no completeness/timing acceptance."
+          },
+          "errors": [],
+          "timing_pauses": [],
+          "cleanup": {
+            "passed": true,
+            "owner_elapsed_ms": 59710,
+            "cleanup_ms": 155,
+            "browser_inventory_entries": 13,
+            "unique_browser_PIDs": 11,
+            "all_unique_owned_PIDs_absent": 15,
+            "all_owned_groups_absent": 4,
+            "source_and_runtime44_unchanged": true
+          },
+          "secondary_replay_refusal": "Retained; missing successful interval is secondary to native issue0, not an independent cause."
+        },
+        "limits": [
+          "Historical dbd0/f62 refusals do not identify their exact current-owner subcondition; new code is a conditional forward boundary, not retrospective attribution.",
+          "Actual first sampled owner must have the exact existing cache authority; unknown/unsupported remains a no-go, never choose a later passing texture.",
+          "Local C++ ownership/POD identity does not prove native GPU lifetime, unchanged GPU content, asynchronous completion, restoration safety or full interval admission.",
+          "JS mapping/device/queue/continuous host guard and fence lifecycle remain required; usage6 is not widened.",
+          "LOAD/content and remaining host/device/refcount/restore gates remain explicit; armGameplay stays refused."
+        ],
+        "packet_preparation_correction": {
+          "parent_V1": {
+            "artifact": "selected-texture-natural-one-cache-owner-capture-v1/materialization.json",
+            "sha256": "aaebe955578e19c467a3ba7e24529a49eca4f08672750e1ccf656b0133a7a2e0"
+          },
+          "child_V2": {
+            "artifact": "selected-texture-natural-one-cache-owner-capture-v2/materialization.json",
+            "sha256": "8dfa8524dda3a0397b9e889dbdb567d84596449a7b35ae71093fd5de00a75ebc"
+          },
+          "delta": {
+            "artifact": "selected-texture-natural-one-cache-owner-capture-v2/parent.delta.patch",
+            "sha256": "c6c4136bf8e2daeb23f1b82c82297b3ebfa5bda5ceb2be7d5ac2c7a58017e583"
+          },
+          "scope": "Source-detected unexecuted release alias mismatch; metadata actual5profiles corrected; root review hash binding restored; verified disc bytes deleted before gameplay. No packet-V1 capture ran. Capture body unchanged."
+        },
+        "implemented_issue_reason_contract": {
+          "artifact": "selected-cache-owner-refusal-propagation-contract-v1.json",
+          "sha256": "5d75cab4465c34819b98a5f170cab542bccf1cc6854053dbb0b70b3936511a0f",
+          "state": "IMPLEMENTED_AND_VALIDATED_BY_F3340DE",
+          "scope": "Bounded exact first native rejection propagated within existing issue/status.error path; no new native export/host getter or changed acceptance."
+        },
+        "latest_validation_f3340de": {
+          "source": {
+            "commit": "f3340de495046fc2d00960cb84a771ec18c14784",
+            "tree": "c1e016fea43af011a10b5fff94b5a5e153f66e97",
+            "aurora_reviewed_tree": "1b97fa0247839e444f55f1b1817d58b4966c6b13"
+          },
+          "result": {
+            "artifact": "net-selected-cache-refusal-validation-v1/evidence/result.json",
+            "sha256": "639c7dc8153ce282e480cfcaf605e69bc67b19c8669d683474e98a049d6b22f5",
+            "bytes": 72183
+          },
+          "root_review": {
+            "artifact": "net-selected-cache-refusal-validation-v1/evidence/root-final-review.json",
+            "sha256": "d85a5c99e12ac385d311342042cfe72f05c0cf34d1524183a724535115d8f616",
+            "bytes": 4832
+          },
+          "first_draw_profile": {
+            "artifact": "net-selected-cache-refusal-validation-v1/evidence/first-draw-components-release-build.json",
+            "sha256": "2fe0b7457de632b7e48026388aac66429e30eed10365600722772922433f97db",
+            "bytes": 9958,
+            "artifact_count": 44
+          },
+          "release_profiles": [
+            {
+              "profile": "isolated texture readonly guard",
+              "artifacts": 2,
+              "state": "PASS"
+            },
+            {
+              "profile": "private first-draw components",
+              "artifacts": 44,
+              "state": "PASS"
+            },
+            {
+              "profile": "ordinary runtime",
+              "artifacts": 44,
+              "state": "PASS"
+            },
+            {
+              "profile": "frame-effect runtime",
+              "artifacts": 44,
+              "state": "PASS"
+            },
+            {
+              "profile": "combined first-pair runtime",
+              "artifacts": 46,
+              "state": "PASS"
+            }
+          ],
+          "validation_totals": {
+            "artifact_instances_rehashed": 180,
+            "caches_rehashed": 5,
+            "step_logs_rehashed": 10,
+            "tests": 2443,
+            "skips": 164,
+            "suite_seconds": 558.752,
+            "owned_process_groups_absent": 10
+          },
+          "actual_cache_owner_control": "test_actual_first_sample_cache_owner_issue_current_and_lifetime passed in the actual checkout and full suite",
+          "capture": false,
+          "scope": "Clean source validation, release builds, and regression only; no browser capture, restore, GPU-lifetime closure, or admission."
+        },
+        "latest_cache_generation_capture_f3340de": {
+          "state": "FAIL_SELECTED_TEXTURE_CACHE_GENERATION_CLEANUP_PASS",
+          "runtime_harness_source": "f3340de495046fc2d00960cb84a771ec18c14784",
+          "root_failure_review": {
+            "artifact": "selected-texture-natural-one-cache-refusal-capture-v2/capture/root-failure-review.json",
+            "sha256": "32b7f25d1156143c4f21dd6c511e35e42b1661eccfed7c9ef714e0b2c05cdfe9",
+            "bytes": 2353
+          },
+          "raw_files": {
+            "browser_report": {
+              "artifact": "selected-texture-natural-one-cache-refusal-capture-v2/capture/browser/report.json",
+              "sha256": "2d54ac33d77dd1c5abc8871e2fa353dfe7b7b56db876a9812ecea605438444c5",
+              "bytes": 5818267
+            },
+            "owner_report": {
+              "artifact": "selected-texture-natural-one-cache-refusal-capture-v2/capture/owner-report.json",
+              "sha256": "2a167b756c5a92c66a747df2235748763a3f0224bd7a782ca1eafa1433c99846",
+              "bytes": 92359
+            },
+            "completion": {
+              "artifact": "selected-texture-natural-one-cache-refusal-capture-v2/capture/completion.json",
+              "sha256": "428d89b71f80f94ae80ea0562ecc18fff4f927bcba2589114f10022f7bf8d965",
+              "bytes": 1476683
+            },
+            "capture_log": {
+              "artifact": "selected-texture-natural-one-cache-refusal-capture-v2/capture/capture.log",
+              "sha256": "6b0ecabe9fbb2ab4a3ef302ce1b20ab1a0ee5945b5f0717dfa17a90d3ad84d46",
+              "bytes": 1392
+            },
+            "strict_replay_result": {
+              "artifact": "selected-texture-natural-one-cache-refusal-capture-v2/capture/strict-selected-replay.result.json",
+              "sha256": "2430c450a8bca6adaf391dc029ea5007a000134476dd0366f65d03b4d5a99cb5",
+              "bytes": 441
+            },
+            "strict_replay_stderr": {
+              "artifact": "selected-texture-natural-one-cache-refusal-capture-v2/capture/strict-selected-replay.stderr",
+              "sha256": "237976d828df7684614d490686dffe7a5dc1151bf0fc4aadaa41419d5804a288",
+              "bytes": 956
+            }
+          },
+          "selected_callback": {
+            "source_before": 180,
+            "source_after": 181,
+            "planned_steps": 1,
+            "tick_returns": 1,
+            "draw_returns": 1,
+            "audio_returns": 1,
+            "pcm_frames": 533,
+            "sequence": "1"
+          },
+          "first_native_refusal": {
+            "reason": "selected_texture_cache_generation",
+            "issue_return": 0,
+            "scope": "The captured bind generation differed from the current generation at native issue. The mutation site and amount, selected-owner survival, and resource-content validity remain unobserved."
+          },
+          "component_observation_failures": [],
+          "component_failures": [],
+          "interval_issued": false,
+          "interval_closed": false,
+          "native_retired": false,
+          "later_draws_observed": false,
+          "restore": false,
+          "cleanup": {
+            "passed": true,
+            "owner_elapsed_ms": 62868,
+            "cleanup_ms": 152,
+            "owned_pids_absent": 13,
+            "owned_groups_absent": 3
+          },
+          "H1": {
+            "callback_count": 3140,
+            "retained_samples": 100,
+            "evicted_samples": 3040,
+            "incidents": 8,
+            "dropped_incidents": 0,
+            "scope": "Bounded lossy diagnostic ring; does not establish complete event or timing coverage."
+          },
+          "historical_refusal_note": "The earlier 4d00 result remains selected_texture_current_owner_mismatch; this f3340de reason does not retroactively identify that refusal's exact subcondition."
+        },
+        "next_source_reduction": {
+          "state": "ACTUAL_SOURCE_THREE_CASE_CONTROLS_PASS_COMPONENT_ONLY",
+          "base_runtime_head": "f3340de495046fc2d00960cb84a771ec18c14784",
+          "candidate_manifest": {
+            "artifact": "selected-cache-generation-native-controls-candidate-v2/manifest.json",
+            "sha256": "2f9a1ac6ac66b806aafe789007a467cbb32dbce2ea09403b4ed5008de9e622c4"
+          },
+          "retained_result": {
+            "artifact": "selected-cache-generation-native-controls-candidate-v2/retained-execution-v1/result.json",
+            "sha256": "9a3996bee9f7a3c70161bdf0c8882b43bd1ec1fd38f6284373481d0ceb6cb65a"
+          },
+          "root_review": {
+            "artifact": "selected-cache-generation-native-controls-candidate-v2/retained-execution-v1/root-review.json",
+            "sha256": "292f2b50410df06597977c27bc8d0498c9384db0d7afd1693d11ca95ea0ff435"
+          },
+          "cases": 35,
+          "new_actual_method_cases": [
+            32,
+            33,
+            34
+          ],
+          "scope": "Verbatim cache invalidation/apply/clear and exact entry-owner fixture; synthetic GPU endpoints. No cause attribution for actual capture, live content/lifetime closure or restore."
+        },
+        "entry_authority_contract": {
+          "artifact": "selected-cache-entry-authority-contract-v1.json",
+          "sha256": "c9e4fbc658f7afa9d3af989894eac786a4690eeaf30cef9f29de607ac35f2008",
+          "state": "IMPLEMENTED_FOCUSED49_FULL_VALIDATION_AND_ONE_ACTUAL_INTERVAL_PASS",
+          "limit": "Wasm publication serial is rewindable; readonly interval only before any restore."
+        },
+        "held_host_reader_join": {
+          "artifact": "sprint-20261016/item6-host-owner-prerequisite-v1.json",
+          "sha256": "7f770a8a2b2a5231db7f9b5eb14a00214dd5072631b6d24725646f9cf68c44be",
+          "state": "HISTORICAL_SOURCE_DESIGN; see combined_host_point_and_conversion_observation"
+        },
+        "entry_authority_validation": {
+          "source": "ba2b4b83cffd316b38defafe9441234ca3033702",
+          "tree": "7ce4399aa3492799e7821e00f342259e4a91b9d5",
+          "aurora_tree": "7643f5b9402f44cc8123bf6f62ea893d72d3bd45",
+          "patch_sha256": "cf8fd223d0fef51a666d7ea54320af3a96e3b34bc24c818e9eb069878f76adc3",
+          "focused_cases": 49,
+          "focused_review": {
+            "artifact": "selected-cache-entry-authority-candidate-v3/root-focused-review.json",
+            "sha256": "e8a5ae9341c458c985b4d84dfec457c5a62412f4078f3e88b3d80d64c0319f6a"
+          },
+          "validation_review": {
+            "artifact": "net-selected-cache-entry-authority-validation-v1/evidence/root-final-review.json",
+            "sha256": "a760808eff718375618b5ef36908cd23f617920f459dd54025bd2cdbec1877c7"
+          },
+          "full_regression": {
+            "tests": 2443,
+            "skips": 164,
+            "seconds": 566.212
+          },
+          "release_artifact_counts": [
+            2,
+            44,
+            44,
+            44,
+            46
+          ],
+          "retained_failure": {
+            "artifact": "selected-cache-entry-authority-candidate-v2/execution-unwrapped-failure-v1/receipt.json",
+            "sha256": "1e893490e9c680e78efdcff11256465a826bd6a1e0be9cdb48e96380330b9845"
+          },
+          "failed_attempt_limits": "No cases executed; missing extracted s_frameCount and unwrapped command. Historical PID/group receipts absent; later scan is not retroactive cleanup proof."
+        },
+        "entry_authority_actual_interval": {
+          "state": "PASS_STOPPED_COMPONENT_ONLY",
+          "root_review": {
+            "artifact": "selected-texture-entry-authority-capture-v1/capture/root-result-review.json",
+            "sha256": "1b51de646e5c97d8a81b9fb6c3aa8a367a31c456fee1ac166c502cbf89f5a9a9"
+          },
+          "owner_review": {
+            "artifact": "selected-texture-entry-authority-capture-v1/capture/owner-result-review.json",
+            "sha256": "34e2491826a12f30a7a9d6b433e5b4638a8da7f5aea74c008db469ea280ac5d2"
+          },
+          "completion": {
+            "artifact": "selected-texture-entry-authority-capture-v1/capture/completion.json",
+            "sha256": "fb95c0d062798a5af089c0d7737618af5b634f4400b438483877d0ebc1f4d94c"
+          },
+          "report": {
+            "artifact": "selected-texture-entry-authority-capture-v1/capture/browser/report.json",
+            "sha256": "ef8eb70b7fdc12dd1612435c1087fc607294c9ecbbf72a5332bf9344f77e382e"
+          },
+          "runtime_manifest": {
+            "artifact": "selected-texture-entry-authority-capture-v1/served-runtime.json",
+            "sha256": "e3d77c110a615531ea746a0aca8a30d2d795709b07a482fd293d215416e187dd"
+          },
+          "capture_release": {
+            "artifact": "selected-texture-entry-authority-capture-v1/root-capture-release.json",
+            "sha256": "a8c17ef9b0451b6fd310e213ecf53118853034fcbb25c554a5c78de7035e661c"
+          },
+          "original_callback": {
+            "before": 180,
+            "after": 181,
+            "tick": 1,
+            "draw": 1,
+            "audio": 1,
+            "pcm_frames": 533
+          },
+          "strict_responses": 8,
+          "interval": "Stopped after original callback and normal fence. No tick or submission inside guarded interval. Start/end fence and close pass.",
+          "native_retired": true,
+          "composite_eligible": false,
+          "renderer_findings": [
+            7,
+            27
+          ],
+          "H1": {
+            "callbacks": 3144,
+            "retained_samples": 100,
+            "evicted_samples": 3044,
+            "incidents": 8,
+            "dropped_incidents": 0
+          },
+          "cleanup": {
+            "owned_pids_absent": 14,
+            "owned_groups_absent": 4,
+            "owner_elapsed_ms": 62753,
+            "cleanup_ms": 140
+          },
+          "limits": [
+            "Wasm publication serial rewinds with heap; pre-restore only",
+            "No previous-content/native-lifetime/device-future closure",
+            "No same-instance restore/repeat",
+            "No seven-tick combined budget or rollback acceptance"
+          ]
+        },
+        "combined_host_point_and_conversion_observation": {
+          "state": "PASS_DEFAULT_STOPPED_HOST_POINT_INTERVAL_CONVERSION_OBSERVATION",
+          "source": {
+            "harness_commit": "38f8c91d1a8c6d628e83c466c3da2f587a84c010",
+            "harness_tree": "64eccff320567afd0116714fd8320e72ed85adac",
+            "runtime_commit": "33cd306c6963c1a46da6d67518b39e7fb3b72c70",
+            "runtime_tree": "87c674068def8e4b7ec50cb96cce6cc37fb94434",
+            "aurora_tree": "b5415846c8f7cb298d30f2dae1d75864e95dc168",
+            "aurora_patch_sha256": "3d6cbf8265369baf492760ca2cbff4c4bd542f38787c6aeee54a79afa83c23df",
+            "test_only_child_distinct_from_runtime": true
+          },
+          "context": {
+            "mode": "original_default_two_human_mario_final_destination",
+            "scope": "Generic stopped native-owner/component prerequisite under DEFAULT context, not reproduction/parity of the earlier competitive setup. Original CSS CPU-empty-Human join, original SSS PADstage32, exact source frame180..240; no Main/Rules/Items tour or setting injection.",
+            "rules": {
+              "match_kind": 1,
+              "stage": 32,
+              "timer_enabled": 0,
+              "time_limit": 0,
+              "disable_pausing": 0,
+              "damage_ratio_bits": "3f800000",
+              "is_stock": 1,
+              "is_vs": 1,
+              "source_sudden_death_flag": 0,
+              "item_frequency": -1,
+              "item_mask_hex": "ffffffffffffffff",
+              "is_teams": 0,
+              "player_teams": [
+                0,
+                0
+              ],
+              "player_stocks": [
+                4,
+                4
+              ],
+              "door_teams": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "friendly_fire": 0,
+              "player_source_slots": [
+                0,
+                0
+              ],
+              "resolved_controller_ports": [
+                0,
+                1
+              ],
+              "player_slot_types": [
+                0,
+                0
+              ],
+              "player_source_stocks": [
+                4,
+                4
+              ],
+              "player_source_characters": [
+                8,
+                8
+              ],
+              "player_attack_ratio_bits": [
+                "3f800000",
+                "3f800000"
+              ],
+              "player_defense_ratio_bits": [
+                "3f800000",
+                "3f800000"
+              ]
+            },
+            "rng": 3612058604,
+            "source_colors": [
+              1,
+              0
+            ],
+            "source_input_recording": "Original sourcePadSample and sourcePadTap code unchanged; actual source PAD records, CSS roster transitions and source draw order retained in report. RNG/cache/audio history is actual per attempt; equality with previous attempts is not claimed."
+          },
+          "validation": {
+            "runtime_combined_Release": {
+              "artifact": "native-ssm-absent-owner-full-validation-v1/evidence/combined-host-read-Release.json",
+              "sha256": "0577915ede565b811e1556bbf37f9e2e76f62db3a140b2589ef52af102c64998"
+            },
+            "runtime_ordinary_Release": {
+              "artifact": "native-ssm-absent-owner-full-validation-v1/evidence/ordinary-Release.json",
+              "sha256": "53d4522433767d155f6f31cd5df21d36d0e29331f3212b20239d46127953f09c"
+            },
+            "required_artifact_counts": {
+              "combined": 45,
+              "ordinary": 44
+            },
+            "observed_root_web_artifact_counts": {
+              "combined": 51,
+              "ordinary": 71
+            },
+            "native_actual_reproduction": {
+              "artifact": "native-ssm-absent-owner-reproduction-v1/reproduction-review.json",
+              "sha256": "8e86033e56d135c65aaf1c3e7986138bf4efb1ec67e7ccfb86e41e6ff233c885"
+            },
+            "native_actual_repair": {
+              "artifact": "native-ssm-absent-owner-repair-v1/manifest.json",
+              "sha256": "f2d1c123eff574375bf8902324913cadb0ac36dd8cd5a61307f51864ad19ab23"
+            },
+            "affected_wrapper_and_real_export_OFF": {
+              "artifact": "first-draw-profile-gate-fixture-focused-v1/completion.json",
+              "sha256": "63f5d996d01a45179042c86a4b7b9f61a1dedec45d3ec9a3ad1dcb666c7869db"
+            },
+            "reason_getter_actual_Wasm_export": "Cg",
+            "ordinary_reason_binding_absent": true,
+            "final_regression": {
+              "state": "PASS",
+              "artifact": "native-ssm-final-full-regression-preparation-v1/evidence/result.json",
+              "sha256": "41371d87f0b4b317d3008a6ce4479b9c899a273c52437bcae547a27ce10c144a",
+              "source": "38f8c91d1a8c6d628e83c466c3da2f587a84c010",
+              "tests": 2447,
+              "skips": 164,
+              "test_seconds": 560.206,
+              "phase_seconds": 560.632,
+              "no_rebuild": true,
+              "runtime_files_rehashed_unchanged": 124,
+              "final_source_runtime_identities": {
+                "artifact": "native-ssm-final-full-regression-preparation-v1/final-source-runtime-identities.json",
+                "sha256": "c7dc9a1508a5a27018e737e004b769b42d26e7d9c7600dfe15a5d85576480f0f"
+              },
+              "agent_review": {
+                "artifact": "native-ssm-final-full-regression-preparation-v1/agent-result-review.json",
+                "sha256": "3f3e19a9bb9a2760ffc8f36c4fd16a6000569667aa4b9ee281c647ceb10b7543"
+              },
+              "root_review": {
+                "artifact": "native-ssm-final-full-regression-preparation-v1/root-final-review.json",
+                "sha256": "21f17b93add65eef06a05baf1a3cec92c1d3917104a43bfe27fb98e58486fa1d"
+              }
+            }
+          },
+          "capture": {
+            "report": {
+              "artifact": "native-ssm-pristine-absent-default-capture-packet-v1/capture/browser/report.json",
+              "sha256": "9c1165e958afebaf301797f7ac9b040527946779388be4bb4e7305f721ce59dd"
+            },
+            "completion": {
+              "artifact": "native-ssm-pristine-absent-default-capture-packet-v1/capture/completion.json",
+              "sha256": "02cc51068fb28946173cd5a254a1ca7ea1bb478222b6d6d5a0c7089b8ecc247f"
+            },
+            "agent_review": {
+              "artifact": "native-ssm-pristine-absent-default-capture-packet-v1/capture/agent-result-review.json",
+              "sha256": "610c9d9219e21bf616f5da0e8f2abfc4265443b3d2b8e1b2d48df3d0c5a07828"
+            },
+            "root_review": {
+              "artifact": "native-ssm-pristine-absent-default-capture-packet-v1/capture/root-result-review.json",
+              "sha256": "8eb9558ff7fb6e7d004fb5e87c5aa7e8e0a10b31d4ffa66706a355ac12488414"
+            },
+            "served_manifest": {
+              "artifact": "native-ssm-pristine-absent-default-capture-packet-v1/served-runtime.json",
+              "sha256": "8df6edbc36f46a07208069f8939633777f6fea8f618023bf52b4b4c72a3cd25e"
+            },
+            "raw_manifest": {
+              "artifact": "native-ssm-pristine-absent-default-capture-packet-v1/capture/raw-manifest.json",
+              "sha256": "c2a33cf75506b18087d0bdefd64aa92c760f9202a05701856ef1c83faa711000"
+            },
+            "strict_replay": {
+              "artifact": "native-ssm-pristine-absent-default-capture-packet-v1/capture/strict-selected-replay.result.json",
+              "sha256": "d6dcc15e7863278fc1738b978de945c6867e8e980b6ecb5d39c0061a177c1048"
+            },
+            "natural_enrollment": {
+              "schema": "melee-web-natural-one-tick-enrollment-v1",
+              "copied": true,
+              "state": 3,
+              "minimum_frame": 180,
+              "maximum_frame": 240,
+              "origin_frame": 180,
+              "selected_frame": 180,
+              "owner_generation": 2,
+              "origin_audio_phase": 40,
+              "row_capacity": 61,
+              "row_count": 1,
+              "callback_sequence": "1",
+              "selection_callback": "1",
+              "skipped_callbacks": "0",
+              "skipped_ticks": "0",
+              "skipped_draws": "0",
+              "skipped_audio": "0",
+              "skipped_pcm_frames": "0",
+              "source_free_callbacks": "0",
+              "source_free_audio": "0",
+              "source_free_pcm_frames": "0",
+              "callback_open": false,
+              "error": "",
+              "rows": [
+                {
+                  "callback_sequence": "1",
+                  "source_before": 180,
+                  "source_after": 181,
+                  "planned_steps": 1,
+                  "planned_audio_steps": 0,
+                  "tick_returns": 1,
+                  "draw_returns": 1,
+                  "audio_returns": 0,
+                  "pcm_frames": 0,
+                  "audio_phase_before": 40,
+                  "audio_phase_after": 40,
+                  "selected": true
+                }
+              ]
+            },
+            "host_point": {
+              "schema": "melee-web-first-draw-host-owners-v1",
+              "status": "observed",
+              "before": {
+                "generation": "2",
+                "unresolvedReads": 0,
+                "resultCount": 0,
+                "discSession": true,
+                "assetTransfer": false,
+                "preparing": false
+              },
+              "after": {
+                "generation": "2",
+                "unresolvedReads": 0,
+                "resultCount": 0,
+                "discSession": true,
+                "assetTransfer": false,
+                "preparing": false
+              },
+              "native_quiescent": 1,
+              "same_module": true,
+              "returned_idle": true,
+              "point_observation_only": true,
+              "composite_eligible": false
+            },
+            "host_transport": {
+              "sequence": 0,
+              "operation": "readFirstDrawHostOwners",
+              "argument": null,
+              "response": {
+                "schema": "melee-web-first-draw-host-owners-v1",
+                "status": "observed",
+                "before": {
+                  "generation": "2",
+                  "unresolvedReads": 0,
+                  "resultCount": 0,
+                  "discSession": true,
+                  "assetTransfer": false,
+                  "preparing": false
+                },
+                "after": {
+                  "generation": "2",
+                  "unresolvedReads": 0,
+                  "resultCount": 0,
+                  "discSession": true,
+                  "assetTransfer": false,
+                  "preparing": false
+                },
+                "native_quiescent": 1,
+                "same_module": true,
+                "returned_idle": true,
+                "point_observation_only": true,
+                "composite_eligible": false
+              }
+            },
+            "component_read": "read",
+            "depth_before": "READY",
+            "depth_after": "ACTIVE",
+            "interval_responses": 8,
+            "strict_actual_helper_replay": "PASS consumed8",
+            "conversion_getter_ran": true,
+            "conversion_getter_timing": "Diagnostic allocating Wasm serialization only after actual closed8response interval and before checked native retirement; not heap-pure.",
+            "conversion_event_indices": [
+              121,
+              249
+            ],
+            "conversion_dependenciesObserved": true,
+            "conversion_count": 2,
+            "conversion_identity_scope": "Authenticated texture/view/device/renderer_epoch joins; pipeline/group/sampler are local_call_identity only, not creation or lifetime authority.",
+            "packetContentQualified": false,
+            "restoreEligible": false,
+            "compositeEligible": false,
+            "internalGpuCreationOwnershipQualified": false,
+            "native_retired": true,
+            "resumable": false,
+            "restore_ran": false,
+            "renderer_first_blocker": 7,
+            "renderer_finding_bits": [
+              7,
+              27
+            ],
+            "renderer_finding_mask": "134217856",
+            "h1": {
+              "callbacks": 523,
+              "samples": 81,
+              "sample_capacity": 100,
+              "dropped_samples": 442,
+              "sample_gap_scope": "Intentional thinning/ring-bounded, not continuous timing proof",
+              "incidents": [
+                {
+                  "at_ms": 7166.025000095367,
+                  "reason_code": 7,
+                  "value": 0,
+                  "threshold": 0,
+                  "source_frame": 0,
+                  "scene": 7,
+                  "clock_owner_code": 0,
+                  "callback_ms": 0.0950002670288086
+                }
+              ],
+              "incident_capacity": 24,
+              "dropped_incidents": 0,
+              "unknown_reasons": 0,
+              "failures": []
+            },
+            "cleanup": {
+              "owned_browser_pids_absent": 9,
+              "owned_groups_absent": 5,
+              "owner_elapsed_ms": 19029,
+              "cleanup_ms": 151,
+              "scope": "Exact nine browser identities and fivegroups checked independently absent; cleanup time is distinct from capture elapsed."
+            },
+            "source_runtime_unchanged": true
+          },
+          "ssm_contract_reduction": {
+            "observed_before_repair": "Default-context fcbb/d5 capture reported first native category13 ssm_not_quiescent. It did not copy private SSM fields.",
+            "source_and_component_evidence": "Menu SSM transport is ended and zeroed before match; match resident banks do not start it. Existing actual-C fixture reproduced pristine absent+activeaudio refusal without changing production predicate or state bytes.",
+            "repair": "Pure query now validates liveaudio and accepts only completely pristine absent SSM; original same-owner idle branch and all foreign/pending/request/pumping refusals preserved. Every logical scalar, all256pathbytes and all55mappingrows3fields checked; 431 poison cases and request/order/destination immutability controls passed. No drain/pump/cancel/state/input/RNG mutation was introduced."
+          },
+          "retained_failures": {
+            "76dc_competitive_native0": {
+              "scope": "Original first combined capture retains aggregate native0; exact subcondition remains UNKNOWN, not retroactively assigned13.",
+              "checkpoint": "historical_76dc_checkpoint"
+            },
+            "d5_competitive_H1_route": {
+              "report": {
+                "artifact": "native-file-quiescence-reason-capture-packet-v1/capture/browser/report.json",
+                "sha256": "e4f85139a3e766e26bcc133f9a14b415fcaff620555cfcb1ed405882a2830ca5"
+              },
+              "review": {
+                "artifact": "native-file-quiescence-reason-capture-packet-v1/capture/agent-failure-review.json",
+                "sha256": "d078e3a0b30bb68bbc0baab972722ec30cec5614c4100e60e9c467c20a4f0da8"
+              },
+              "failure": "Original Items simulation_debt10>8 before first m; no gameplay/nativecategory/interval/conversion. No Resume/retry. Screenshot perturbation not proved."
+            },
+            "fcbb_default_SSM_category13": {
+              "report": {
+                "artifact": "native-file-default-first-draw-capture-packet-v1/capture/browser/report.json",
+                "sha256": "564721661d8b8cd2551eedc8aec005590ddbbb65c249bb1a7d56d25c815d8297"
+              },
+              "review": {
+                "artifact": "native-file-default-first-draw-capture-packet-v1/capture/agent-result-review.json",
+                "sha256": "4208e86c6f75c11741d12329b5c42d97d2c023a0e968486b9d3b2b5cfe43685b"
+              },
+              "harness": "fcbb655d72e052cad0cb50b2dc2373cb57036fbc",
+              "runtime": "d5b4a1dc53955f5c7b3dd3d136af6f71c7e54aa0",
+              "native_refusal": {
+                "code": 13,
+                "category": "ssm_not_quiescent"
+              },
+              "audio_returns": 2,
+              "pcm_frames": 1067,
+              "interval_responses": 0,
+              "native_retired": false
+            },
+            "33cd_single_suite_fixture_failure": {
+              "result": {
+                "artifact": "native-ssm-absent-owner-full-validation-v1/evidence/result.json",
+                "sha256": "307ea9d614b17584eb565a604fc0ffe39d9ba4f8a2ba6a51cd3c5da22b18b69c"
+              },
+              "root_review": {
+                "artifact": "native-ssm-absent-owner-full-validation-v1/root-failure-review.json",
+                "sha256": "1b6372805553c19b9e4ea296da896114a3bdf8c6dc7c2fb8444ddea9e409bf06"
+              },
+              "tests": 2447,
+              "skips": 164,
+              "failures": 1,
+              "seconds": 561.833,
+              "cause": "Actual joinedprofile guard exact-source fixture searched old spelling and lacked default bool binding; no runtime repair was needed. Onefiletest-only38f fix passed entire affectedwrapper and real reasonexport/OFF."
+            }
+          },
+          "historical_76dc_checkpoint": {
+            "state": "SOURCE_AND_BUILD_VALIDATED_FIRST_CAPTURE_NATIVE_HOST_POINT_REFUSED",
+            "source": {
+              "commit": "76dcf31d33646261379a60390c559157e8c14aa4",
+              "tree": "350ab2da1e9b539049bbfcd7943a7e050f81084a",
+              "parent_failed_validation": "af8922d977ad81fcd12719dcd03078ae57b5b11a",
+              "aurora_tree": "b5415846c8f7cb298d30f2dae1d75864e95dc168",
+              "aurora_patch_sha256": "3d6cbf8265369baf492760ca2cbff4c4bd542f38787c6aeee54a79afa83c23df"
+            },
+            "validation": {
+              "result": {
+                "artifact": "renderer-hostpoint-batch-full-validation-v2/evidence/result.json",
+                "sha256": "265b0e91fd3c57d13a42a38451d9bb3e0c3433f9b203fd4897c3f447940ca400"
+              },
+              "root_review": {
+                "artifact": "renderer-hostpoint-batch-full-validation-v2/evidence/root-final-review.json",
+                "sha256": "9470a6fb505309b3048137d9165b8bb6a502e6ce1f938debd7723807eb48efac"
+              },
+              "tests": 2447,
+              "skips": 164,
+              "suite_seconds": 562.944,
+              "affected_release_profiles": [
+                "combined first-draw/audio-file",
+                "ordinary"
+              ],
+              "required_artifacts": {
+                "combined": 45,
+                "ordinary": 44
+              },
+              "observed_web_artifacts": {
+                "combined": 51,
+                "ordinary": 71
+              },
+              "actual_js_wasm_getter": "Oh"
+            },
+            "capture": {
+              "report": {
+                "artifact": "first-draw-host-conversion-capture-packet-v1/capture/browser/report.json",
+                "sha256": "a11cee1b2a614772fde23bdc0dee931cb237f03f7fbed90396220950fde1bf25"
+              },
+              "completion": {
+                "artifact": "first-draw-host-conversion-capture-packet-v1/capture/completion.json",
+                "sha256": "827ccb4ad82373f0396392bfff3525679ecb0a0db035f9a1573d75b930120c3a"
+              },
+              "owner_review": {
+                "artifact": "first-draw-host-conversion-capture-packet-v1/capture/owner-failure-review.json",
+                "sha256": "f8e556959a9408c2393a73bda238841d3ba1eb010b8c36cd5a1d0a5e5757b383"
+              },
+              "root_review": {
+                "artifact": "first-draw-host-conversion-capture-packet-v1/capture/root-failure-review.json",
+                "sha256": "f95b6aef4be7b262023440bc7b133330a2af3331f68b58c5259a8699165fec94"
+              },
+              "served_manifest": {
+                "artifact": "first-draw-host-conversion-capture-packet-v1/served-runtime.json",
+                "sha256": "7100c6fdc15b4432e95342549eea237d97b80c8bac28e30d0254b41d837296c3"
+              },
+              "release": {
+                "artifact": "first-draw-host-conversion-capture-packet-v1/root-capture-release.json",
+                "sha256": "240e2723513d5126d287fa262d467e1214bb9a2e9b87f60c09a63041d62436b5"
+              },
+              "first_failure": {
+                "schema": "melee-web-first-draw-host-owners-v1",
+                "status": "refused",
+                "reason": "native_file_owners_not_quiescent",
+                "before": {
+                  "generation": "2",
+                  "unresolvedReads": 0,
+                  "resultCount": 0,
+                  "discSession": true,
+                  "assetTransfer": false,
+                  "preparing": false
+                },
+                "after": {
+                  "generation": "2",
+                  "unresolvedReads": 0,
+                  "resultCount": 0,
+                  "discSession": true,
+                  "assetTransfer": false,
+                  "preparing": false
+                },
+                "native_quiescent": 0,
+                "composite_eligible": false
+              },
+              "exact_native_subcondition": "UNKNOWN",
+              "natural_enrollment": {
+                "schema": "melee-web-natural-one-tick-enrollment-v1",
+                "copied": true,
+                "state": 3,
+                "minimum_frame": 180,
+                "maximum_frame": 240,
+                "origin_frame": 180,
+                "selected_frame": 180,
+                "owner_generation": 2,
+                "origin_audio_phase": 0,
+                "row_capacity": 61,
+                "row_count": 1,
+                "callback_sequence": "1",
+                "selection_callback": "1",
+                "skipped_callbacks": "0",
+                "skipped_ticks": "0",
+                "skipped_draws": "0",
+                "skipped_audio": "0",
+                "skipped_pcm_frames": "0",
+                "source_free_callbacks": "0",
+                "source_free_audio": "0",
+                "source_free_pcm_frames": "0",
+                "callback_open": false,
+                "error": "",
+                "rows": [
+                  {
+                    "callback_sequence": "1",
+                    "source_before": 180,
+                    "source_after": 181,
+                    "planned_steps": 1,
+                    "planned_audio_steps": 1,
+                    "tick_returns": 1,
+                    "draw_returns": 1,
+                    "audio_returns": 1,
+                    "pcm_frames": 533,
+                    "audio_phase_before": 0,
+                    "audio_phase_after": 20,
+                    "selected": true
+                  }
+                ]
+              },
+              "component_read": "read",
+              "depth_before": "READY",
+              "depth_after": "ACTIVE",
+              "interval_responses": 0,
+              "conversion_getter_ran": false,
+              "native_retired": false,
+              "restore_ran": false,
+              "renderer_first_blocker": 7,
+              "renderer_finding_bits": [
+                7,
+                27
+              ],
+              "cleanup": {
+                "owned_pids_absent": 15,
+                "owned_groups_absent": 4,
+                "owner_elapsed_ms": 58334,
+                "cleanup_ms": 146
+              },
+              "h1": {
+                "callbacks": 3139,
+                "retained": 100,
+                "evicted": 3039,
+                "incidents": 8,
+                "dropped_incidents": 0,
+                "scope": "Lossy component evidence; no timing acceptance"
+              },
+              "page_errors": [],
+              "timing_pauses": [],
+              "secondary_failure": "Strict offline replay refused absent interval after first host-point refusal"
+            },
+            "retained_failures": {
+              "initial_full_suite": "af8922d9: canonical patch bytes and neighboring getter exact-body fixture; no build ran after failure",
+              "repair": "Two-file repair keeps actual Aurora tree and getter body; failed outputs retained in renderer-hostpoint-batch-full-validation-v1",
+              "capture_preparation": "Import enumerator initially matched prose; declaration-anchored inventory corrected before any launch",
+              "audit_preparation": "Root first compared every build-root file with web inventory; corrected to original launcher web suffix set without artifact/capture changes"
+            },
+            "limits": [
+              "Point read is not continuous lifecycle authority",
+              "Allocating conversion JSON getter is outside any future heap interval",
+              "Conversion handles are not GPU creation/lifetime authority",
+              "No interval, conversion result, native retirement or restore in this capture",
+              "Renderer contents, native references, host futures and composite admission remain open"
+            ],
+            "next": "Preserve aggregate refusal and exact original short-circuit order while recording same-call first native reason. Source/control review before another browser experiment."
+          },
+          "limits": [
+            "Point-read and stopped component observations are not continuous lifecycle authority or all-owner coverage",
+            "Raw LOAD7/shape27 findings preserved; dependency facts do not qualify packetcontent",
+            "Conversion JSON allocation is outside a future heap checkpoint; local GPU handles do not qualify creation/lifetime",
+            "Selectedcallback audio0/PCM0 reflects original scheduledcadence; no missingaudio fix, PCM equivalence or uninterruptedaudio claim",
+            "Native references, host/device futures, resource content/recreation and same-instance drawn restore/repeat remain open"
+          ],
+          "next": "The in-callback owned PAD/Tick plan milestone now passes actual controls, six Release builds/full regression and one live default-context branch observation. Next is a coherent private pair: authenticated returned-idle preparation/one-use dispatch plus explicit snapshot/restore and host/GPU content/lifetime closure. No further runtime experiment is authorized here; all restore/gameplay admission remains NO-GO.",
+          "next_prerequisite_review": {
+            "artifact": "sprint-20261016/shared-normal-match-stage-c-next-boundary-v1/contract.json",
+            "sha256": "41b0e2231f737704122d0760794e990650b8c29427f05aea819388d9ba8821e2",
+            "state": "HISTORICAL_SOURCE_ONLY_BOUNDARY_SUPERSEDED_BY_IN_CALLBACK_OWNED_PLAN_NOT_IDLE_ADMISSION"
+          },
+          "shared_ordinary_execution_regression": {
+            "state": "PASS_SHARED_ORDINARY_SOURCE_EXECUTION_AND_SCOPED_ORIGINAL_RECORDING_REGRESSION",
+            "source": {
+              "runtime_and_capture_harness_head": "704bf3d1810c67da3cf4c310fbc1871488367df4",
+              "tree": "2526d0a941702871512f450823772da1b2eef7f8",
+              "aurora_tree": "b5415846c8f7cb298d30f2dae1d75864e95dc168",
+              "prior_combined_point_harness_and_runtime": "The existing source and capture objects above remain 38f/33cd; this 704 ordinary regression does not recapture or relabel that stopped host point."
+            },
+            "change": "Shared presentation and same-source match step, normal audio and finish extraction at real ordinary callsites. Original ordering, transition audio, sampling and owner branches retained; no prepare/dispatch or restore enabled.",
+            "validation": {
+              "result": {
+                "artifact": "net-shared-normal-match-ab-validation-v1/evidence/result.json",
+                "sha256": "3c6236ba7da5b54e94e81065f469e20b53011eb242012295efa57c6d9a4b94da"
+              },
+              "root_review": {
+                "artifact": "net-shared-normal-match-ab-validation-v1/evidence/root-final-review.json",
+                "sha256": "0a3b83ed4a2bd07de03f0d17f144877a9a01a03326d2f9249479013e4beb3c3f"
+              },
+              "owner_audit": {
+                "artifact": "net-shared-normal-match-ab-validation-v1/evidence/owner-final-review.json",
+                "sha256": "4d7d5f1d8577dd27e6f3b061a8d0db7837faa96837fe43e86d35fbc24325863f"
+              },
+              "fullsuite": {
+                "tests": 2449,
+                "skips": 164,
+                "seconds": 567.285,
+                "result": "PASS"
+              },
+              "six_Release_profiles": [
+                {
+                  "name": "ordinary-Release",
+                  "required_artifacts": 44,
+                  "observed_root_web_artifacts": 71
+                },
+                {
+                  "name": "frame-effect-Release",
+                  "required_artifacts": 44,
+                  "observed_root_web_artifacts": 49
+                },
+                {
+                  "name": "private-firstdraw-Release",
+                  "required_artifacts": 44,
+                  "observed_root_web_artifacts": 49
+                },
+                {
+                  "name": "combined-host-read-Release",
+                  "required_artifacts": 45,
+                  "observed_root_web_artifacts": 51
+                },
+                {
+                  "name": "first-pair-only-Release",
+                  "required_artifacts": 45,
+                  "observed_root_web_artifacts": 51
+                },
+                {
+                  "name": "public-Release",
+                  "required_artifacts": 3,
+                  "observed_root_web_artifacts": 40
+                }
+              ],
+              "ordinary_audio_enabled": true,
+              "public_product": "Separate public Release build passed; its legacy silent product and public identity are distinct from this ordinary audio-enabled development runtime.",
+              "ordinary_inventory": {
+                "artifact": "net-ab-ordinary-mwrc-regression-preparation-v1/materialized-v3/ordinary-identities.json",
+                "sha256": "755caf7a94e48b432d800cafff81a1a287de0bc4838be48b822a5fb1f1c4e789"
+              }
+            },
+            "ordinary_original_recording": {
+              "recipe": {
+                "version": 8,
+                "frames": 42127,
+                "seed": 3980218793,
+                "bytes": 1877246,
+                "sha256": "e1cc93725525e52e7d9be198337e54d103bb1a9b027156252b69f9ed3f975f0e"
+              },
+              "original_reference": {
+                "bytes": 1555401454,
+                "sha256": "18531db0d92fead60044deacef9eedc22d7cb5c19773faa63a6c9df7528546f5",
+                "Dolphin_commit": "c77bbaa0f372c3f72281602a8b087206706542cb",
+                "source_capture_report_sha256": "e5c5e53740094e81a4ae4c9d5dfc9f5dfb0b9cdc0ccf46b723ba05ff65d63048",
+                "current_runtime_producer_is_separate": true
+              },
+              "input_rehash": {
+                "artifact": "net-ab-ordinary-mwrc-regression-preparation-v1/retained-input-rehash.json",
+                "sha256": "3dd13835470d4b975110c62b0218dbbf5698f04783142ef1bdb4b7da7622869b"
+              },
+              "context": "Three natural matches with four CPU9 Mario fighters, four stocks and Final Destination, through original CSS, SSS, Results and CSS returns; distinct from the two-human PvP and stopped-point contexts.",
+              "capture_report": {
+                "artifact": "net-ab-ordinary-mwrc-regression-preparation-v1/capture/report.json",
+                "sha256": "570422b3ed5bba01c012c5d9c0485df8c7232ef0d72cc88ff49a615f481e5494"
+              },
+              "browser_report": {
+                "artifact": "net-ab-ordinary-mwrc-regression-preparation-v1/capture/retail-browser-report.json",
+                "sha256": "29f80dab47a4642265061414c392114351815598aa5c6097a385112fa4d24e30"
+              },
+              "comparison": {
+                "artifact": "net-ab-ordinary-mwrc-regression-preparation-v1/comparison.json",
+                "sha256": "ce5a56fe87f5d94df115b488df7d6d8da4a1f5020c5db2accad99e1351c8f123"
+              },
+              "raw_manifest": {
+                "artifact": "net-ab-ordinary-mwrc-regression-preparation-v1/materialized-v3/raw-manifest.json",
+                "sha256": "5a33fa509a48aa79e1dea5285ebb016591f2973c4ef5b86f5ecd9eaaee448454"
+              },
+              "agent_review": {
+                "artifact": "net-ab-ordinary-mwrc-regression-preparation-v1/materialized-v3/agent-result-review.json",
+                "sha256": "15e7c896eedf3fc0b6c8fa7eafa90f2249875d192641909c7dbd7e149c1ac721"
+              },
+              "actual_comparison": {
+                "result": "equivalent",
+                "frames_compared": 42127,
+                "match_ticks_compared": 38547,
+                "nonmatch_order_rows": 3580,
+                "setups_compared": 3,
+                "match_fields": "Exact declared RNG, match frame, semantic PAD and Fighter state",
+                "menu_scope": "Input/scene ordering only; no complete per-tick menu scalar comparison"
+              },
+              "source_steps": 42127,
+              "source_draws": 42127,
+              "automatic_resume_count": 0,
+              "H1": {
+                "raw": {
+                  "artifact": "net-ab-ordinary-mwrc-regression-preparation-v1/capture/rawruntime-incidents.json",
+                  "sha256": "08c8504b8c4ed3cdce0c7159473b2f797bb8c92fe6d4cbcf5666e6869905ed9b"
+                },
+                "readiness_passed": true,
+                "no_observed_timing_pause": true,
+                "history_evicted": 6382,
+                "recent_events_evicted": 1493,
+                "native_callback_count": 42492,
+                "native_unavailable_count": 2517,
+                "incident_evicted": 0,
+                "limit": "Bounded/lossy history; no continuous callback or timing coverage claim."
+              },
+              "visual_gpu": {
+                "final_png_sha256": "0ff3d4470079e1f7d401b09d674e3d16323c0962e0455ad5f8d6f0f1d3e39438",
+                "screenshot": "Existing final.png is black after native unload, not final-CSS visual proof. No new screenshot.",
+                "gpu": "No standalone GPU diagnostic file; native/GPU phase metrics remain in the actual capture/browser reports. No raw command or pixel equivalence."
+              },
+              "cleanup": {
+                "recorded_processes_absent": 15,
+                "recorded_groups_absent": 4,
+                "port8787_bindable": true,
+                "capture_owner_elapsed_ms": 721165,
+                "capture_cleanup_ms": 170,
+                "compare_owner_elapsed_ms": 23064,
+                "compare_cleanup_ms": 68,
+                "source_and293pins_unchanged": true
+              },
+              "root_review": {
+                "artifact": "net-ab-ordinary-mwrc-regression-preparation-v1/materialized-v3/root-result-review.json",
+                "sha256": "36832c78f06d2ed700c5c2789fe87f73c0ade00fa01c56f07d82ac0fe5f2d786"
+              }
+            },
+            "limits": [
+              "Original per-tick traversal is retained; matching 42,127 source steps and draws does not establish original draw cadence.",
+              "No PCM/audio fidelity, raw GPU command, pixel, sustained performance, two-human context equivalence or live physical-input acceptance.",
+              "No returned-idle prepare/dispatch, one-use continuation ownership, heap restoration, hostfuture closure or actual same-instance drawn restore/repeat."
+            ]
+          },
+          "owned_normal_match_plan": {
+            "state": "PASS_SYNCHRONOUS_IN_CALLBACK_VALUE_OWNERSHIP_AND_SCOPED_LIVE_BRANCH_REGRESSION",
+            "source": {
+              "runtime_and_harness_head": "ebf68b247752907a824be60534abd745230d8449",
+              "tree": "a4ab71a7b92909edc1c0d475c0a6f6f76d1a2992",
+              "aurora_tree": "b5415846c8f7cb298d30f2dae1d75864e95dc168",
+              "prior_704_MWRC": "Retained separately above; replay intentionally bypasses new owned-plan eligibility."
+            },
+            "ownership": "Own exact selected four-port actual TARGET_PC PADStatus storage including extButton and already-sampled source/audio Tick. Copy/move deleted. Immediate synchronous consume latches used before real global owner validation and source helper. Native match/audio pointers borrowed only for current callback; original audio/draw/finish sites unchanged; unsupported callbacks preserve original path.",
+            "focused": {
+              "review": {
+                "artifact": "owned-normal-match-plan-candidate-v2/execution-focused-v2/result-review.json",
+                "sha256": "041794cd911984bc147e6774e7c87b746258a52b8002fdba52394c1be44d4ccb"
+              },
+              "scope": "Actual-function controls for final queued PAD1->0, poisoned original PAD/Ticks, real audio0/1 cadence, global null/foreign owner, unchanged endpoint order/errors/writeback and double-consume refusal. Five genuine ordinary/frameeffect/private/combined/public TU projections passed."
+            },
+            "validation": {
+              "result": {
+                "artifact": "net-owned-normal-match-plan-validation-v1/evidence/result.json",
+                "sha256": "f18458a6f62cfa06e0b0326d2a0e9eb26cc64bcfb924bb94d520614bd39ee068"
+              },
+              "root_review": {
+                "artifact": "net-owned-normal-match-plan-validation-v1/evidence/root-result-review.json",
+                "sha256": "cb1f3316311c3a72465f4a6d09bf2320ff5d1b93c6e2faacb51fa4a2122622d8"
+              },
+              "tests": 2449,
+              "skips": 164,
+              "seconds": 562.577,
+              "Release_profiles": [
+                "ordinary",
+                "frame-effect",
+                "private-firstdraw",
+                "combined-host-read",
+                "first-pair-only",
+                "public"
+              ],
+              "artifacts_rehashed": 311,
+              "caches": 6,
+              "phase_groups_absent": 7,
+              "public_scope": "Separate public product retains its legacy silent audio policy."
+            },
+            "live_default_context": {
+              "packet": {
+                "artifact": "owned-normal-match-plan-default-capture-packet-v2/packet.json",
+                "sha256": "84b98ae0214f5bb07b4f1b17643a80d862d0be7871c54b00fb702b5c13bb66af"
+              },
+              "completion": {
+                "artifact": "owned-normal-match-plan-default-capture-packet-v2/capture/completion.json",
+                "sha256": "2262e15aba01785744cc0b2f07e69970cef72beba9c91f026d06a640984a74f1"
+              },
+              "raw_report": {
+                "artifact": "owned-normal-match-plan-default-capture-packet-v2/capture/browser/report.json",
+                "sha256": "cb11c31aa5e155b72a641bfc20362474cdedde9034c15e75ad2d3b58ee14bd8b"
+              },
+              "owner_report": {
+                "artifact": "owned-normal-match-plan-default-capture-packet-v2/capture/owner-report.json",
+                "sha256": "6d30cd7a30d9fe0f123c7d05692a97db3b074ca00cf6d23ae4a7f407e95cccc3"
+              },
+              "owner_review": {
+                "artifact": "owned-normal-match-plan-default-capture-packet-v2/capture/agent-result-review.json",
+                "sha256": "2dada353fe272c0448f09cd5e5736b738f5145e8e8f9c9aae4bb93e1bda52683"
+              },
+              "root_review": {
+                "artifact": "owned-normal-match-plan-default-capture-packet-v2/capture/root-result-review.json",
+                "sha256": "b36ced3d4d2e10ea2b862d5baef56d7fe0f83e96d12834bc1e40175c10febab7"
+              },
+              "independent_raw_review_sha256": "4e4070cefd4efae3ae97bdefc313a8271efaee55cfe9615390c06594a773e652",
+              "elapsed_ms": 18628,
+              "context": "Same strict default two-human Mario/FD source route, distinct from historical competitive tour and CPU9 MWRC replay.",
+              "branch_prerequisites": "Actual naturally_due_one_tick arm_response armed/pending true establishes ready()/queue0 BEFORE selected PAD; unchanged pinned adapter injects no later input. Fresh default source stock_check0, no replay/network; actual selected source1/audio1 and strict host audio owner pass. Source-backed path implication, not a new branch counter or saved callback permission.",
+              "selected_row": {
+                "callback_sequence": "1",
+                "source_before": 180,
+                "source_after": 181,
+                "planned_steps": 1,
+                "planned_audio_steps": 1,
+                "tick_returns": 1,
+                "draw_returns": 1,
+                "audio_returns": 1,
+                "pcm_frames": 534,
+                "audio_phase_before": 40,
+                "audio_phase_after": 0,
+                "selected": true
+              },
+              "host_components_depth": true,
+              "strict_interval_responses_consumed": 8,
+              "conversion_event_indices": [
+                121,
+                249
+              ],
+              "conversion_scope": "Returned dependency facts only, allocating serialization after closed interval and before retirement. All packet content/GPU creation/restore/composite qualification false.",
+              "native_retired": true,
+              "raw_renderer_findings": {
+                "first_blocker": 7,
+                "finding_mask": "128",
+                "command_records": 265,
+                "actual_draws": 246,
+                "passes": 3,
+                "note": "Historical raw7/27 receipt stays distinct; current mask has LOAD7 only."
+              },
+              "H1": {
+                "callback_count": 528,
+                "samples_retained": 81,
+                "sample_evictions": 447,
+                "incidents_retained": 1,
+                "dropped_incidents": 0,
+                "reason_counts": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0
+                ],
+                "unknown_reason_count": 0,
+                "scope": "Lossy100-sample ring; raw callbacks/evictions retained, not uninterrupted performance/physical input/PCM equivalence proof."
+              },
+              "cleanup": {
+                "recorded_unique_processes_absent": 15,
+                "owned_groups_absent": 4,
+                "server_port_closed": 51290,
+                "observed_served_files_unchanged": 51,
+                "required_artifacts_separately_pinned": 45,
+                "source_clean": true
+              }
+            },
+            "retained_preparation": "PacketV1 source-authoring refusal and source-detected focus/integration provenance mismatch retained; corrected V2 preflight joins exact focused base+applied files to new commit parent/files. No failed capture or runtime bytes were overwritten.",
+            "remaining": [
+              "No native owner lifetime across callback return or returned-idle prepare/dispatch interface",
+              "No same-instance snapshot/tick/full draw/restore/repeat",
+              "No full heap/Asyncify/global/table/host authority restoration",
+              "No all-owner GPU content/native-reference/device/hostfuture lifecycle closure or gameplay arm",
+              "No complete timing, physical-input, uninterrupted audio, PCM or pixel equivalence"
+            ],
+            "next": "Review one coherent private pair boundary using existing one-use value plan, with explicit owner/authentication and host/GPU restoration mechanisms; do not infer eligibility from stopped point snapshots."
+          }
+        }
+      }
+    }
   }
 }

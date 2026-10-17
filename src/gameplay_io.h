@@ -34,6 +34,9 @@ int melee_web_io_cancel(MeleeWebIo*,uint64_t request,char*,size_t);
  * submissions wait for the next pump. Reentrant pumping/destruction rejects. */
 int melee_web_io_pump(MeleeWebIo*,uint32_t max_requests,uint32_t* completed,char*,size_t);
 size_t melee_web_io_pending(const MeleeWebIo*);
+/* Read-only endpoint check. A callback can be running after the final request
+ * was removed, so pending()==0 alone is insufficient. Absent owners refuse. */
+int melee_web_io_quiescent(const MeleeWebIo*);
 /* Refuses pending transfers; callers must pump completion/cancellation first. */
 int melee_web_io_destroy(MeleeWebIo*,char*,size_t);
 #ifdef __cplusplus

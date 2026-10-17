@@ -1,5 +1,5 @@
 /** Development tools attach to the shared player; this file is excluded from public builds. */
-import {mountMeleeRuntime} from './melee-runtime.mjs';
+import {mountMeleeRuntime, configureDepthNoWorkBootV1} from './melee-runtime.mjs';
 import {mountControllerSettings} from './controller-settings.mjs';
 import {createRuntimeAudio} from './runtime-audio.mjs';
 import {loadNativeGameDisc, openNativeGameSession} from './runtime-audio-assets.mjs';
@@ -10,6 +10,16 @@ import {createRoomInvite, parseRoomInvite} from './net_lockstep_room_invite.mjs'
 import {LOCKSTEP_DELAY, LOCKSTEP_MAX_SOURCE_TICKS} from './net_lockstep_core.mjs';
 import {isStagingRoomSurface, parseStagingRoomInvite, stagingRoomInviteFromHash,
   stagingRoomInviteLink, STAGING_HOST, STAGING_RELAY_URL} from './staging-room.mjs';
+const depthNoWorkBootProbe = new URL(window.location.href).searchParams.get('__depth_no_work_v1') === '1';
+const wasmOwnershipBootProbe = new URL(window.location.href).searchParams.get('__wasm_ownership_accessor_v1') === '1';
+let wasmOwnershipInstaller = null, wasmOwnershipInstallerLoadError = null;
+if (wasmOwnershipBootProbe) {
+ try {
+  ({installAsyncifyWriterCounterV1: wasmOwnershipInstaller} =
+    await import('./wasm_ownership_accessor_v1.test.mjs'));
+  if (typeof wasmOwnershipInstaller !== 'function') throw Error('Accessor installer export is unavailable.');
+ } catch (error) { wasmOwnershipInstallerLoadError = error; }
+}
 const stagingRoomEnabled=isStagingRoomSurface(window.location);
 window.meleeStagingRoom=Object.freeze({enabled:stagingRoomEnabled,relayUrl:STAGING_RELAY_URL,
   parseInvite:text=>parseStagingRoomInvite(text,parseRoomInvite),
@@ -584,6 +594,29 @@ try {
     onOwner(context){owner=context;({Module,boundary,status,check,put,prepareAudio,pauseAudioForPreparation,
       syncAudio,unloadAndSave,prepareNativeResources,waitForAudioAck,waitForAudioRender}=context);},
     configureModule(module){
+      if(wasmOwnershipBootProbe){
+        if(wasmOwnershipInstallerLoadError||typeof wasmOwnershipInstaller!=='function')
+          throw Error('Private Wasm ownership boot probe requested, but its test-only accessor is unavailable.');
+        module.__meleeWebWasmOwnershipInstallV1=options=>wasmOwnershipInstaller(options);
+        const priorRuntimeInitialized=module.onRuntimeInitialized;
+        if(typeof priorRuntimeInitialized!=='function')
+          throw Error('Private Wasm ownership boot probe requires the shared runtime-ready callback.');
+        module.onRuntimeInitialized=function(...args){
+          const api=module.__meleeWebWasmOwnershipPrivateV1;
+          if(api?.schema!=='melee-web-private-wasm-instance-v1'||api.status()?.state!=='ready')
+            throw Error('Private Wasm ownership boot probe requested, but the compiled hook is missing or not ready.');
+          const bindings=api.getBindings();
+          if(bindings.module!==module||bindings.schema!==api.schema||
+             typeof bindings.writerCounter?.validateBindings!=='function'||
+             typeof bindings.writerCounter?.readCount!=='function')
+            throw Error('Private Wasm ownership boot probe received incomplete live bindings.');
+          bindings.writerCounter.validateBindings();
+          if(bindings.writerCounter.readCount()!==0)
+            throw Error('Private Wasm ownership boot probe expected idle Asyncify writers before main.');
+          return Reflect.apply(priorRuntimeInitialized,this,args);
+        };
+      }
+      if(depthNoWorkBootProbe)configureDepthNoWorkBootV1(module);
       installRuntimeCache(module,report=>{const size=report.fileBytes?` · ${report.fileBytes} persisted bytes`:'';
         $('cache-status').textContent=report.message+size;runtimeCacheSyncCapability=report.sync_diagnostics||null;window.meleeHitchCapture?.setCacheSyncCapability?.(runtimeCacheSyncCapability||{});$('export-render-cache').disabled=!report.mounted||!report.populated;
         if(report.state==='saved'&&report.lastSaveMs!==null)log(`Render cache save ${JSON.stringify({duration_ms:report.lastSaveMs,file_bytes:report.fileBytes})}`);

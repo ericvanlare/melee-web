@@ -24,6 +24,8 @@ import {
 import {
   ITEM_ROW_TO_PREFERENCE_BIT,
   competitiveMatchStartFailures,
+  defaultFirstDrawCssFailures,
+  defaultFirstDrawMatchFailures,
   competitiveProfileFailures,
   deriveAllOffItemMasks,
 } from './vs_rules_competitive_profile_helpers.mjs';
@@ -41,6 +43,18 @@ import {
 } from './vs_rules_timeout_route_helpers.mjs';
 import {runSuddenDeathBrowserRoute,validateFinalSdCapture} from './vs_sudden_death_browser_route.mjs';
 import {runSparseMarioBrowserPrefix,installSparseVirtualController,validateFinalSparseCapture} from './vs_sparse_mario_browser_route.mjs';
+import * as matchFrameEffectDriver from './match_frame_effect_driver.mjs';
+import {observeOneFirstDraw,firstDrawDriver,firstDrawComponentsDriver,firstDrawSelectedTextureIntervalDriver,firstDrawHostOwnersIntervalDriver,firstDrawHostOwnersColorConversionsIntervalDriver} from './one_first_draw_observation_adapter.mjs';
+import {CSS_SSS_TRANSITION_LIMITS} from './stadium_c1a_css_sss_reducer.mjs';
+import {
+  buildOneFrameRecorderBinding,
+  captureOneFrameRuntimeRingBestEffort,
+  frameEffectMustSkipOrdinaryNativeCleanup,
+  observeOneNormalFrame,
+  validateServedRuntimeBinding,
+  validateFrameEffectMode,
+  verifyServedRuntimeAssets,
+} from './one_normal_frame_observation_adapter.mjs';
 
 const options = Object.fromEntries(['url', 'disc', 'out', 'playwright', 'runtime-wasm-sha256']
   .map(name => [name, {type: 'string'}]));
@@ -55,7 +69,14 @@ options['sparse-mario-route'] = {type: 'boolean', default: false};
 options['sparse-mario-css-only'] = {type: 'boolean', default: false};
 options['sparse-mario-prefix'] = {type: 'boolean', default: false};
 options['competitive-profile-only'] = {type: 'boolean', default: false};
+options['default-first-draw-only'] = {type: 'boolean', default: false};
 options['competitive-match-start-only'] = {type: 'boolean', default: false};
+options['frame-effect-observation-only'] = {type: 'boolean', default: false};
+options['first-draw-color-conversion-facts-only'] = {type:'boolean',default:false};
+options['first-draw-components-only'] = {type:'boolean',default:false};
+options['first-draw-selected-texture-interval-only'] = {type:'boolean',default:false};
+options['first-draw-observation-only'] = {type: 'boolean', default: false};
+options['frame-effect-producer-binding'] = {type: 'string'};
 options['competitive-timeout-route'] = {type: 'boolean', default: false};
 options['sudden-death-route'] = {type: 'boolean', default: false};
 const {values} = parseArgs({options, strict: true});
@@ -77,8 +98,48 @@ const stageOnly = values['stage-only'];
 const noContestOnly = values['no-contest-only'];
 const competitiveProfileOnly = values['competitive-profile-only'];
 const competitiveMatchStartOnly = values['competitive-match-start-only'];
+const defaultFirstDrawOnly = values['default-first-draw-only'];
+const singleTickFrameEffectObservationOnly = values['frame-effect-observation-only'];
+const firstDrawObservationOnly = values['first-draw-observation-only'];
+const firstDrawComponentsOnly=values['first-draw-components-only'];
+const firstDrawSelectedTextureIntervalOnly=values['first-draw-selected-texture-interval-only'];
+const firstDrawColorConversionFactsOnly=values['first-draw-color-conversion-facts-only'];
+if(firstDrawColorConversionFactsOnly&&!firstDrawSelectedTextureIntervalOnly)throw Error('Color conversion companion requires explicit selected interval');
+if(firstDrawSelectedTextureIntervalOnly&&!firstDrawComponentsOnly)throw Error('Selected texture interval requires explicit first-draw components mode');
+if(firstDrawComponentsOnly&&(!firstDrawObservationOnly||new URL(values.url).searchParams.get('__depth_no_work_v1')!=='1'))throw Error('First-draw components require first-draw mode and explicit pre-main depth query');
+const frameEffectObservationOnly = singleTickFrameEffectObservationOnly || firstDrawObservationOnly;
 const competitiveTimeoutRoute = values['competitive-timeout-route'];
+for (const name of ['url', 'disc', 'out'])
+  if (!values[name]) throw Error('Use --url DEVELOPMENT_RUNTIME_URL --disc OWNED_DISC --out NEW_DIRECTORY [--playwright PACKAGE_DIR]');
 const competitiveSourceRoute = competitiveMatchStartOnly || competitiveTimeoutRoute;
+const matchStartRoute = competitiveSourceRoute || defaultFirstDrawOnly;
+if(defaultFirstDrawOnly&&(!firstDrawComponentsOnly||!firstDrawSelectedTextureIntervalOnly))throw Error('Default first-draw requires explicit components and selected interval');
+if(firstDrawColorConversionFactsOnly&&!competitiveMatchStartOnly&&!defaultFirstDrawOnly)throw Error('Color conversion companion requires match-start observation');
+const frameEffectProducerBindingPath = values['frame-effect-producer-binding']
+  ? path.resolve(values['frame-effect-producer-binding']) : null;
+validateFrameEffectMode({competitiveMatchStartOnly,defaultFirstDrawOnly,
+  frameEffectObservationOnly: singleTickFrameEffectObservationOnly,
+  firstDrawObservationOnly,
+  otherRouteSelected: ['menu-only','rules-items-only','css-sss-only','stage-only','no-contest-only',
+    'team-battle','team-setup-only','sparse-mario-route','sparse-mario-css-only','sparse-mario-prefix',
+    'competitive-profile-only','competitive-timeout-route','sudden-death-route'].some(name => values[name]),
+  producerBindingPath: frameEffectProducerBindingPath});
+let frameEffectProducerBinding = null;
+let frameEffectProducerBindingFile = null;
+let frameEffectRuntimePreflight = null;
+if (frameEffectProducerBindingPath) {
+  const bindingBytes = await fs.readFile(frameEffectProducerBindingPath);
+  frameEffectProducerBinding = validateServedRuntimeBinding(
+    JSON.parse(new TextDecoder('utf-8', {fatal: true}).decode(bindingBytes)));
+  frameEffectProducerBindingFile = {
+    bytes: bindingBytes.byteLength,
+    sha256: createHash('sha256').update(bindingBytes).digest('hex'),
+  };
+  frameEffectRuntimePreflight = await verifyServedRuntimeAssets({
+    binding: frameEffectProducerBinding,
+    baseUrl: values.url,
+  });
+}
 if(sparseMarioPrefix && (competitiveProfileOnly || competitiveSourceRoute))
   throw Error('Sparse and competitive modes are exclusive');
 const teamSetupOnly = values['team-setup-only'];
@@ -100,8 +161,6 @@ if (competitiveTimeoutRoute &&
     (menuOnly || rulesItemsOnly || cssSssOnly || stageOnly || noContestOnly || teamSetupOnly ||
       teamBattle || competitiveProfileOnly || competitiveMatchStartOnly))
   throw Error('--competitive-timeout-route runs the original competitive profile through natural timeout, Results, CSS and Eject');
-for (const name of ['url', 'disc', 'out'])
-  if (!values[name]) throw Error('Use --url DEVELOPMENT_RUNTIME_URL --disc OWNED_DISC --out NEW_DIRECTORY [--playwright PACKAGE_DIR]');
 const output = path.resolve(values.out);
 const discPath = path.resolve(values.disc);
 const expectedDiscSha256 = 'b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c';
@@ -117,7 +176,9 @@ const sha256File = file => new Promise((resolve, reject) => {
   stream.on('data', bytes => hash.update(bytes));
   stream.on('end', () => resolve(hash.digest('hex')));
 });
+if((firstDrawColorConversionFactsOnly||defaultFirstDrawOnly)&&frameEffectProducerBinding?.profile!=='runtime-match-frame-effect Release --first-draw-components-diagnostic --first-pair-audio-file-diagnostic')throw Error('Color conversion companion requires joined private profile');
 let browser, context, page, driver, browserPath, playwrightPath;
+let frameEffectRecorderBinding = null;
 let lastRuntimeCounterPollAt = 0;
 let failure;
 let interruptionSignal = null;
@@ -127,6 +188,7 @@ let reportWriteError = null;
 const report = {
   schema: 'melee-web-vs-rules-item-menu-browser-v1',
   mode: sparseFullRoute ? 'source-sparse-mario-elimination-results-css' : sparseCssOnly ? 'source-sparse-mario-css-only-reducer' : sparseMarioPrefix ? 'source-sparse-mario-rendered-prefix' : suddenDeathRoute ? 'source-natural-timeout-sudden-death-results-css'
+    : defaultFirstDrawOnly ? 'source-default-two-human-first-draw-owner-prerequisite'
     : competitiveMatchStartOnly ? 'source-competitive-normalized-match-start-prefix'
     : competitiveTimeoutRoute ? 'source-competitive-natural-timeout-results-route'
     : competitiveProfileOnly ? 'source-competitive-rules-profile-preflight'
@@ -139,6 +201,12 @@ const report = {
     : menuOnly ? 'source-menu-boundary-reproducer' : 'source-rules-items-match-route',
   scope: sparseFullRoute ? 'Virtual Gamepad P3/keyboard P1; original sparse Mario CSS/SSS, live elimination and canonical Results/CSS. Functional only; no physical input, original comparison, pixels/PCM or timing acceptance.' : sparseCssOnly ? 'Rendered original sparse CSS and exact copied/raw PAD observation then Eject only; no SSS/world, physical input or timing acceptance.' : sparseMarioPrefix ? 'Virtual Browser Gamepad P3 and keyboard P1; original sparse CSS/SSS to a short ordinary Mario/FD prefix and Eject. No Results, original comparison, physical input or timing acceptance.' : suddenDeathRoute
     ? 'Original Rules one-minute four-stock two-human Mario/FD; natural timeout, active SD live input elimination, typed original Results and CSS/Eject. Zero timing-pause recovery. Functional only; no reference, timing, physical input or PCM acceptance.'
+    : defaultFirstDrawOnly
+    ? 'Different default source context: original CSS two-human Mario join -> original SSS FD -> natural-one selected owner prerequisite. No Main/Rules/Items tour or setting injection. Retain actual normalized context, RNG and source input history; no reproduction claim for competitive native0. All existing guards/fences/retirement and no-Resume policy remain.'
+    : firstDrawObservationOnly
+    ? 'Headless original CSS/Rules/SSS to normalized two-human four-stock Mario/Final Destination. Observe only the first drawn source frame in one naturally due callback; preserve every later original tick/draw/audio/submit, retain callback totals and first PAD/source identity, and label later draws unobserved. Wait for the selected normal fence and known selected map completions, then checked native retirement and owned browser cleanup. No Eject after retirement, restore/replay, complete GPU ownership, Results or full-route acceptance.'
+    : frameEffectObservationOnly
+    ? 'Headless original CSS -> Main/VS/Rules/Items/Rules Plus -> CSS; enable P2 through Controls and require the original CSS CPU/empty/Human transitions before Start; select Final Destination through original SSS and check normalized two-human Mario stock settings in the bounded 180–240 source-frame window. Observe exactly one ordinary callback with its original full draw and normal fence, then use checked private owner retirement and close the owned browser context. No Eject after retirement, 8-minute match, timeout, Results, retail comparison, or full-route acceptance claim.'
     : competitiveMatchStartOnly
     ? 'Headless original CSS -> Main/VS/Rules/Items/Rules Plus -> CSS; enable P2 through Controls and require the original CSS CPU/empty/Human transitions before Start; select Final Destination through original SSS, check normalized two-human Mario stock settings once at the first available observation in the bounded 180–240 source-frame window (about a 3-second prefix), then Eject. No 8-minute match, timeout, Results, retail comparison, or full-route acceptance claim.'
     : competitiveTimeoutRoute
@@ -162,6 +230,7 @@ const report = {
     : 'Headless rendered original-source VS Rules, Items, and Rules Plus route, changed stock/item/timer setup, source-selected match, No Contest Results return to CSS, retained settings on re-entry, and clean Eject/reimport. Keyboard PAD delivery only; retail/Dolphin, physical input, and performance equivalence are separate unrun claims.',
   url: values.url,
   browser: {executable: null, version: null, playwright: null},
+  ...(frameEffectObservationOnly ? {frame_effect_runtime_preflight: frameEffectRuntimePreflight} : {}),
   viewport: {width: 1280, height: 960},
   discIdentity: 'USA Rev. 2 CISO',
   discSha256: null,
@@ -223,15 +292,23 @@ const report = {
     derived_masks: null,
     final_css_selection: null,
   } : null,
-  competitiveMatchStart: competitiveSourceRoute ? {
+  defaultFirstDrawContext: defaultFirstDrawOnly ? {schema:'melee-web-default-first-draw-context-v1',
+    scope:'Different default settings and upstream RNG/cache/audio history; generic native-owner prerequisite only',
+    css:null,normalized_match:null,failures:null} : null,
+  // Legacy transport field name; report.mode/defaultFirstDrawContext identify the actual context.
+  competitiveMatchStart: matchStartRoute ? {
     requested: {players: ['Mario', 'Mario'], css_port_identities: [1, 2],
       raw_match_payload_slot_fields: [0, 0], resolved_controller_ports: [0, 1],
-      stage: 'Final Destination', normalized_stock_timer_seconds: 480,
+      stage: 'Final Destination', normalized_stock_timer_seconds: defaultFirstDrawOnly ? 0 : 480,
       source_frame_observation_window: [180, 240]},
     controls_change: null,
     css_roster: [],
     normalized_match: null,
     last_observation_before_eject: null,
+    ...(frameEffectObservationOnly ? {
+      frame_effect_observation: null,
+      frame_effect_producer_binding_file: frameEffectProducerBindingFile,
+    } : {}),
   } : null,
   competitiveTimeoutRoute: competitiveTimeoutRoute ? {
     input_schedule: {
@@ -354,7 +431,8 @@ try {
   page = await context.newPage();
   checkInterruption();
   driver = createBrowserDriver(page, {surface: 'development', timeoutMs: 90000,
-    deadline: Date.now() + (suddenDeathRoute ? 10 : 15) * 60 * 1000});
+    deadline: Date.now() + (suddenDeathRoute ? 10 : 15) * 60 * 1000,
+    ...(frameEffectObservationOnly ? {nativeIdlePredicate: 'matchFrameEffectNativeIdle'} : {})});
   checkInterruption();
   report.browser = {executable: path.basename(browserPath), version: browser.version(), playwright: playwrightPath};
   report.discSha256 = await sha256File(discPath);
@@ -489,7 +567,7 @@ const observeTimeoutOwner = async (label, options) => {
   if (state.message?.startsWith('Paused after a timing disruption')) {
     report.timingPauses.push({label, phase: state.phase, message: state.message,
       observedAt: new Date().toISOString(), status: 'failed_route'});
-    throw Error(`${label}: competitive route stops on a runtime timing disruption: ${state.message}`);
+    throw Error(`${label}: ${defaultFirstDrawOnly ? 'default first-draw' : 'competitive'} route stops on a runtime timing disruption: ${state.message}`);
   }
   if (report.errors.length)
     throw Error(`${label}: browser emitted errors: ${JSON.stringify(report.errors)}`);
@@ -517,7 +595,7 @@ const resumeTimingPause = async label => {
   const pause = {label, phase: state.phase, message: state.message,
     observedAt: new Date().toISOString()};
   report.timingPauses.push(pause);
-  if (competitiveProfileOnly || competitiveMatchStartOnly || competitiveTimeoutRoute) {
+  if (defaultFirstDrawOnly || competitiveProfileOnly || competitiveMatchStartOnly || competitiveTimeoutRoute) {
     pause.status = 'failed_route';
     throw Error(`${label}: competitive route stops on a runtime timing disruption: ${state.message}`);
   }
@@ -1004,6 +1082,132 @@ const runCompetitiveProfilePreflight = async initial => {
 };
 const cssHumanJoinDriver = createCssHumanJoinDriver({page, report, shot,
   observeCssSetup, sourcePadSample, sourcePadTap, resumeTimingPause, ensureNoError});
+// Existing source observer ABI: cooldown[5], pending[7], ready counter[8],
+// model state[9], callback count[10], last Start trigger/ready/pending[11..13].
+async function readNormalObservationCssStart(timeoutMs = 3000) {
+  let timer;
+  try {
+    if (timeoutMs <= 0) throw Error('CSS Start observation deadline expired');
+    const observation = await Promise.race([page.evaluate(() => {
+    const dom = {hidden: document.hidden, focused: document.hasFocus(),
+      error: document.querySelector('#status')?.dataset.runtimeError ||
+        document.querySelector('#error-dialog[open] #error')?.textContent || null};
+    const module = globalThis.Module;
+    if (module?.matchFrameEffectNativeIdle?.() !== true) return {native_idle: false, dom};
+    const message = module.UTF8ToString(module._melee_web_native_menu_message());
+    const phase = module._melee_web_native_menu_phase();
+    const running = module._melee_web_native_menu_running();
+    const input = JSON.parse(module.UTF8ToString(module._melee_web_input_message()));
+    if (phase !== 1) return {native_idle: true, dom, message, phase, running, input, css: null};
+    const ids = module._malloc(14 * 4), geometry = module._malloc(8 * 4);
+    if (!ids || !geometry) {
+      if (ids) module._free(ids);
+      if (geometry) module._free(geometry);
+      throw Error('Existing CSS Start observer allocation failed');
+    }
+    try {
+      if (module._melee_web_css_observe_port(0, 8, ids, geometry) !== 1)
+        throw Error('Existing P1 Mario CSS Start observer refused');
+      return {native_idle: true, dom, message, phase, running, input,
+        css: {ids: Array.from(module.HEAP32.subarray(ids >> 2, (ids >> 2) + 14)),
+          geometry: Array.from(module.HEAPF32.subarray(geometry >> 2, (geometry >> 2) + 8))}};
+    } finally { module._free(ids); module._free(geometry); }
+    }), new Promise((_, reject) => {
+      timer = setTimeout(() => reject(Error('CSS Start observation transport deadline expired')), timeoutMs);
+    })]);
+    frameEffectNativeCallsForbidden = observation.native_idle !== true;
+    return observation;
+  } catch (error) {
+    // A lost read response must not authorize additional ordinary native calls.
+    frameEffectNativeCallsForbidden = true;
+    throw error;
+  } finally { clearTimeout(timer); }
+}
+
+async function startNormalObservationCssWhenReady() {
+  // Share the original CSS-to-SSS90s budget: readiness never extends transition.
+  const deadline = Date.now() + 90000;
+  const readinessDeadline = Math.min(deadline, Date.now() + 3000);
+  const evidence = report.competitiveMatchStart.css_start_transition = {
+    schema: 'melee-web-normal-observation-css-start-v1',
+    scope: 'two-keyboard CSS readiness and one original Enter edge only',
+    readiness_callback_limit: CSS_SSS_TRANSITION_LIMITS.readinessFrames,
+    samples: [], readiness: null, start_attempts: 0, post_input: null, failure: null,
+  };
+  try {
+    const checkFailure = sample => {
+      if (sample.dom?.error) throw Error(`CSS Start runtime error: ${sample.dom.error}`);
+      if (sample.message?.startsWith('Paused after a timing disruption')) {
+        report.timingPauses.push({label: 'normal observation CSS Start', phase: sample.phase,
+          message: sample.message, observedAt: new Date().toISOString(), status: 'failed_route'});
+        throw Error(`CSS Start timing disruption; no Resume: ${sample.message}`);
+      }
+    };
+    await page.locator('#canvas').focus();
+    for (;;) {
+      const sample = await readNormalObservationCssStart(readinessDeadline - Date.now());
+      evidence.samples.push(sample);
+      frameEffectNativeCallsForbidden = sample.native_idle !== true;
+      checkFailure(sample);
+      if (sample.native_idle === true) {
+        const ids = sample.css?.ids, input = sample.input;
+        if (sample.phase !== 1 || sample.running !== 1 ||
+            !Array.isArray(ids) || ids.length !== 14 || !ids.every(Number.isInteger))
+          throw Error('Original CSS Start observation is unavailable or no longer live');
+        const first = evidence.samples.find(row => row.css?.ids?.length === 14);
+        const progressed = ids[10] > first.css.ids[10] && input?.samples > first.input?.samples;
+        const twoKeyboard = input?.ready === 1 && input.focused === 1 && input.visible === 1 &&
+          input.active === 1 && input.keyboard_layout === 0 && input.keyboard_requested_mask === 3 &&
+          input.keyboard_active_mask === 3 && input.physical_mask === 0 &&
+          input.pads?.[0]?.source === 'keyboard' && input.pads[0].err === 0 &&
+          input.pads?.[1]?.source === 'keyboard' && input.pads[1].err === 0;
+        // ready is the original animation counter, not a boolean: source accepts nonzero.
+        if (progressed && ids[0] === 0 && ids[6] === 4 && ids[5] === 0 && ids[7] === 0 &&
+            ids[8] > 0 && ids[9] === 0 && twoKeyboard && input.pads[0].buttons === 0) {
+          evidence.readiness = sample;
+          break;
+        }
+        if (ids[10] - first.css.ids[10] >= CSS_SSS_TRANSITION_LIMITS.readinessFrames)
+          throw Error('Original CSS Start readiness exceeded its existing source-callback bound');
+      }
+      if (Date.now() >= readinessDeadline || evidence.samples.length >= CSS_SSS_TRANSITION_LIMITS.readinessFrames)
+        throw Error('Original CSS Start readiness was not observed before its bounded deadline');
+      await page.waitForTimeout(Math.min(20, readinessDeadline - Date.now()));
+    }
+    await persistReport();
+    evidence.start_attempts = 1;
+    report.input.push('Enter');
+    // Preserve the original input edge/timing without legacy raw native getters.
+    await driver.pressChord(['Enter'], {holdMs: 120, releaseMs: 220});
+    evidence.transition_remaining_ms_at_start = deadline - Date.now();
+    let sample = await readNormalObservationCssStart(Math.min(3000, deadline - Date.now()));
+    evidence.post_input = sample;
+    evidence.transition_observations = 0;
+    for (;;) {
+      ++evidence.transition_observations;
+      evidence.transition_last = sample;
+      if (sample.css) evidence.last_css = sample;
+      await persistReport();
+      checkFailure(sample);
+      if (sample.native_idle === true && sample.phase === 3 && sample.running === 1) break;
+      if (Date.now() >= deadline) throw Error('Original CSS-to-SSS deadline expired');
+      await page.waitForTimeout(Math.min(20, deadline - Date.now()));
+      sample = await readNormalObservationCssStart(Math.min(3000, deadline - Date.now()));
+    }
+    evidence.status = 'sss_entered';
+  } catch (error) {
+    evidence.failure = String(error?.message || error);
+    // After an input/transition failure, retain available source trigger/PAD evidence.
+    if (evidence.start_attempts === 1 && !frameEffectNativeCallsForbidden) {
+      try { evidence.final = await readNormalObservationCssStart(); }
+      catch (cause) { evidence.final_error = String(cause?.message || cause); }
+    }
+    await persistReport();
+    throw error;
+  }
+  await persistReport();
+}
+
 const configureCompetitiveSecondHuman = () => cssHumanJoinDriver.configureSecondHuman();
 const moveCssCursor = async (label, isInside, directionFor) => {
   for (let step = 0; step < 240; step++) {
@@ -1345,6 +1549,7 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
   report.checks.push('Original timeout Results returned to CSS; the read-only source observer confirmed the committed Rules and exact item mask/frequency, then Eject cleared the source owners. This route did not re-enter the Rules/Items row menus after Results.');
 };
 let nativeSessionActive = false;
+let frameEffectNativeCallsForbidden = false;
 try {
 route: {
   if(sparseMarioPrefix)await installSparseVirtualController(page);
@@ -1379,6 +1584,29 @@ route: {
       'The bounded original callback recorder must be installed before source gameplay begins');
     report.checks.push('Installed the bounded sample/incident recorder before launching the source route');
   }
+  if (frameEffectObservationOnly) {
+    frameEffectRecorderBinding = buildOneFrameRecorderBinding({
+      outputName: path.basename(output),
+      discSha256: expectedDiscSha256,
+      producerBinding: frameEffectProducerBinding,
+      observationScope: firstDrawObservationOnly ? 'first_draw' : 'single_tick',
+    });
+    report.competitiveMatchStart.frame_effect_runtime_identity = frameEffectRecorderBinding.identity;
+    report.competitiveMatchStart.frame_effect_runtime_identity_scope = frameEffectRecorderBinding.identityScope;
+    await installRuntimeDiagnosticsCapture(
+      frameEffectRecorderBinding.identity,
+      frameEffectRecorderBinding.identityScope,
+      page,
+    );
+    const recorderHooks = await page.evaluate(() => ({
+      sample: typeof window.menuDiagnosticSample,
+      incident: typeof window.menuDiagnosticIncident,
+      capture: window.__meleeWebRuntimeIncidentCampaignCapture?.status ?? null,
+    }));
+    assert.deepEqual(recorderHooks, {sample: 'function', incident: 'function', capture: 'installed'},
+      'The bounded H1 recorder must be installed before the source gameplay route begins');
+    report.checks.push('Installed the bounded H1 callback recorder before launching the one-frame route');
+  }
   nativeSessionActive = true;
   await driver.launch();
   await waitMessage('Original character select', 'initial CSS');
@@ -1396,9 +1624,9 @@ route: {
       waitItemInputReady,waitItemsCursor,waitItemFrequency,waitRulesPlusTimer,shot,verifyTeardown});
     nativeSessionActive=false;break route;
   }
-  const initialProfileCss = competitiveProfileOnly || competitiveSourceRoute ? await observeSource() : null;
-  if (competitiveProfileOnly || competitiveSourceRoute)
-    report.sourceObservations.push({label: 'initial CSS profile baseline', ...initialProfileCss});
+  const initialProfileCss = competitiveProfileOnly || matchStartRoute ? await observeSource() : null;
+  if (competitiveProfileOnly || matchStartRoute)
+    report.sourceObservations.push({label: defaultFirstDrawOnly ? 'initial CSS default baseline' : 'initial CSS profile baseline', ...initialProfileCss});
 
   if (noContestOnly) {
     await page.waitForTimeout(800);
@@ -1452,14 +1680,17 @@ route: {
     break route;
   }
 
-  await chord(['q', '9', '7']);
-  await waitMessage('Original main menu', 'CSS -> source Main');
-  await waitMenu(MAIN_MENU_KIND, 0, 'source Main root');
-  await shot('01-main-root');
-  let rules = await enterVsRules('02-first');
+  let rules;
+  if (!defaultFirstDrawOnly) {
+    await chord(['q', '9', '7']);
+    await waitMessage('Original main menu', 'CSS -> source Main');
+    await waitMenu(MAIN_MENU_KIND, 0, 'source Main root');
+    await shot('01-main-root');
+    rules = await enterVsRules('02-first');
+  }
 
-  if (competitiveProfileOnly || competitiveSourceRoute) {
-    await runCompetitiveProfilePreflight(initialProfileCss);
+  if (competitiveProfileOnly || matchStartRoute) {
+    if (!defaultFirstDrawOnly) await runCompetitiveProfilePreflight(initialProfileCss);
     if (competitiveProfileOnly) {
       await driver.unload();
       nativeSessionActive = false;
@@ -1469,8 +1700,19 @@ route: {
     }
 
     await configureCompetitiveSecondHuman();
-    await press('Enter');
-    await waitPhase(3, 'original SSS after P2 joins as a source Human');
+    if (defaultFirstDrawOnly) {
+      const css = await observeSource();
+      const failures = defaultFirstDrawCssFailures(css);
+      report.defaultFirstDrawContext.css = css;
+      report.defaultFirstDrawContext.failures = failures;
+      assert.deepEqual(failures, [], 'Original default CSS context differs before SSS');
+      report.sourceObservations.push({label:'default two-human CSS before original SSS conversion',...css});
+    }
+    if (frameEffectObservationOnly) await startNormalObservationCssWhenReady();
+    else {
+      await press('Enter');
+      await waitPhase(3, 'original SSS after P2 joins as a source Human');
+    }
     report.checks.push('P1 Start on the two-player keyboard layout enters the original SSS after CSS confirmed P2 Human');
     await shot('09-original-sss');
     await waitForNoQueuedPad('CSS Start sample drains before source SSS stage driver');
@@ -1488,13 +1730,45 @@ route: {
     await waitPhase(7, 'two-human Mario Final Destination source match', 60000);
     const gameplayStartedAt = Date.now();
     const liveMatch = await waitForMatchSourceFrames(180, 240);
-    const sourcePreferenceMaskHex = report.competitiveProfile.derived_masks.preferenceMaskHex;
-    const matchFailures = competitiveMatchStartFailures(liveMatch, {sourcePreferenceMaskHex});
+    const sourcePreferenceMaskHex = defaultFirstDrawOnly ? null : report.competitiveProfile.derived_masks.preferenceMaskHex;
+    const matchFailures = defaultFirstDrawOnly
+      ? defaultFirstDrawMatchFailures(liveMatch, report.defaultFirstDrawContext.css)
+      : competitiveMatchStartFailures(liveMatch, {sourcePreferenceMaskHex});
+    if (defaultFirstDrawOnly) {
+      report.defaultFirstDrawContext.normalized_match = liveMatch;
+      report.defaultFirstDrawContext.failures = matchFailures;
+    }
     assert.deepEqual(matchFailures, [],
-      `Normalized source match differs from the competitive profile: ${JSON.stringify({matchFailures, liveMatch})}`);
+      `${defaultFirstDrawOnly ? 'Original default context' : 'Normalized source match'} differs from ${defaultFirstDrawOnly ? 'its strict default oracle' : 'the competitive profile'}: ${JSON.stringify({matchFailures, liveMatch})}`);
     report.competitiveMatchStart.normalized_match = liveMatch;
     report.matchObservations.push({label: 'normalized source match at its first ready observation from frame 180 through 240', ...liveMatch});
-    if (competitiveMatchStartOnly) {
+    if (frameEffectObservationOnly) {
+      // From this call onward, an unexpected adapter exception may follow an
+      // arm dispatch whose page response was lost; default to owner-only cleanup.
+      frameEffectNativeCallsForbidden = true;
+      const runObservation = firstDrawObservationOnly ? observeOneFirstDraw : observeOneNormalFrame;
+      const frameEffectObservation = await runObservation({
+        page,
+        normalizedMatch: liveMatch,
+        normalizedMatchFailures: matchFailures,
+        producerBinding: frameEffectProducerBinding,
+        outputName: path.basename(output),
+        discSha256: report.discSha256,
+        driver: firstDrawSelectedTextureIntervalOnly ? (frameEffectProducerBinding.profile==='runtime-match-frame-effect Release --first-draw-components-diagnostic --first-pair-audio-file-diagnostic' ? (firstDrawColorConversionFactsOnly ? firstDrawHostOwnersColorConversionsIntervalDriver : firstDrawHostOwnersIntervalDriver) : firstDrawSelectedTextureIntervalDriver) : firstDrawComponentsOnly ? firstDrawComponentsDriver : firstDrawObservationOnly ? firstDrawDriver : matchFrameEffectDriver,
+        readRuntimeCapture: readRuntimeDiagnosticsCapture,
+      });
+      report.competitiveMatchStart.frame_effect_observation = frameEffectObservation;
+      frameEffectNativeCallsForbidden = frameEffectMustSkipOrdinaryNativeCleanup(frameEffectObservation);
+      if (frameEffectObservation.native_retired === true) nativeSessionActive = false;
+      if (frameEffectObservation.status !== 'pass')
+        throw Error(`${firstDrawObservationOnly ? 'First-draw' : 'One-normal-frame'} observation failed: ${JSON.stringify(frameEffectObservation.failures)}`);
+      if (firstDrawObservationOnly) {
+        const observed = frameEffectObservation.renderer_status;
+        report.checks.push(`Observed selected first source draw ${observed.selected_source_frame} in the normal callback ${observed.source_frame_before} -> ${observed.source_frame_after}; ${observed.callback_steps} actual ticks, ${observed.callback_draws} actual draws and ${observed.audio_returns} audio renders were preserved. Only the first draw's renderer rows/fence were observed; ${observed.unobserved_draws} later draws remain unobserved. The checked private native owner retired.`);
+      } else {
+        report.checks.push(`Original two-human Mario match selected Final Destination; one normal callback advanced source frame ${frameEffectObservation.requested_source_frame} by one, published one complete draw, observed its normal fence, and retired the private native owner.`);
+      }
+    } else if (competitiveMatchStartOnly) {
       const lastBeforeEject = await observeMatch();
       assert.equal(lastBeforeEject?.ready, true,
         'The match observer must remain available immediately before Eject');
@@ -1954,17 +2228,35 @@ route: {
   report.evidenceClaims.sourceStateAndNavigation.status = nativeSessionActive ||
     (competitiveTimeoutRoute && report.competitiveTimeoutRoute.match_snapshots.length > 0)
     ? 'partial' : 'not_started';
-  report.failure = {message: redactDiscPath(error.message), stack: redactDiscPath(error.stack), diagnostics: error.diagnostics || null,
-    state: await current().catch(cause => ({error: cause.message})),
-    source: await observeSource().catch(cause => ({error: cause.message})),
-    match: await observeMatch().catch(cause => ({error: cause.message}))};
-  try {
-    const file = path.join(output, 'failure.png');
-    await page.locator('#canvas').screenshot({path: file});
-    report.failureScreenshot = {path: file, sha256: await sha256File(file)};
-  } catch {}
+  report.failure = frameEffectNativeCallsForbidden
+    ? {message: redactDiscPath(error.message), stack: redactDiscPath(error.stack), diagnostics: null,
+      state: {status: 'skipped_native_owner_uncertain'}, source: {status: 'skipped_native_owner_uncertain'},
+      match: {status: 'skipped_native_owner_uncertain'}}
+    : {message: redactDiscPath(error.message), stack: redactDiscPath(error.stack), diagnostics: error.diagnostics || null,
+      state: await current().catch(cause => ({error: cause.message})),
+      source: await observeSource().catch(cause => ({error: cause.message})),
+      match: await observeMatch().catch(cause => ({error: cause.message}))};
+  if (!frameEffectNativeCallsForbidden) {
+    try {
+      const file = path.join(output, 'failure.png');
+      await page.locator('#canvas').screenshot({path: file});
+      report.failureScreenshot = {path: file, sha256: await sha256File(file)};
+    } catch {}
+  }
 } finally {
-  if (failure && nativeSessionActive) {
+  if (frameEffectObservationOnly && !report.competitiveMatchStart.frame_effect_observation &&
+      frameEffectRecorderBinding && page && !page.isClosed()) {
+    const retained = await captureOneFrameRuntimeRingBestEffort({
+      page,
+      readRuntimeCapture: readRuntimeDiagnosticsCapture,
+      identity: frameEffectRecorderBinding.identity,
+      identityScope: frameEffectRecorderBinding.identityScope,
+    });
+    report.competitiveMatchStart.runtime_callback_capture = retained.capture;
+    report.competitiveMatchStart.runtime_callback_capture_failures = retained.failures;
+    if (retained.error) report.competitiveMatchStart.runtime_callback_capture_error = retained.error;
+  }
+  if (failure && nativeSessionActive && !frameEffectNativeCallsForbidden) {
     try {
       await driver.unload();
       nativeSessionActive = false;
@@ -1982,6 +2274,12 @@ route: {
     } catch (error) {
       report.failureCleanup = {status: 'failed', message: redactDiscPath(error.message)};
     }
+  } else if (failure && nativeSessionActive && frameEffectNativeCallsForbidden) {
+    report.failureCleanup = {
+      status: 'unconfirmed',
+      policy: 'browser_owner_only',
+      note: 'Native owner cleanup was not queried or attempted; the existing route closes only its owned browser resources.',
+    };
   }
   if(suddenDeathRoute||sparseMarioPrefix){
     try{
@@ -2017,8 +2315,12 @@ route: {
       }
     }
   }
-  try{report.diagnostics=await driver.diagnostics();}
-  catch(error){report.diagnostics_error=redactDiscPath(error.message);}
+  if (frameEffectNativeCallsForbidden) {
+    report.diagnostics = {status: 'skipped', reason: 'frame-effect owner policy forbids ordinary diagnostics'};
+  } else {
+    try{report.diagnostics=await driver.diagnostics();}
+    catch(error){report.diagnostics_error=redactDiscPath(error.message);}
+  }
   await persistReport();
   await closeOwnedResources();
   const cleanupFailed=Object.values(report.cleanup).some(item=>item.status==='failed');

@@ -51,6 +51,7 @@ static void read_complete(int request, int args, void* buffer, int cancelled)
 {
     assert(args == 0);
     assert(buffer == NULL);
+    assert(!melee_web_source_files_quiescent());
     ++completions;
     completion_request = request;
     completion_cancelled = cancelled;
@@ -70,6 +71,7 @@ int main(void)
     };
     char error[128];
     size_t size = 0;
+    assert(!melee_web_source_files_quiescent());
 
     assert(melee_web_source_files_external_set("movies/MvOpen.mth", 32u * 1024u * 1024u,
                                                 error, sizeof(error)));
@@ -77,6 +79,7 @@ int main(void)
     MeleeWebSourceFileScope* scope = melee_web_source_files_begin(
         input, sizeof(input) / sizeof(input[0]), error, sizeof(error));
     assert(scope && error[0] == '\0');
+    assert(melee_web_source_files_quiescent());
     name[0] = 'X'; /* The exact lookup index owns its names. */
 
     assert(melee_web_source_file_size("LbRf.dat", &size));
@@ -127,6 +130,7 @@ int main(void)
         (uintptr_t)movie_output, 32, 0x21, 1, read_complete, NULL,
         &request, error, sizeof(error)));
     assert(request >= 0x50000000 && melee_web_source_file_drive_busy());
+    assert(!melee_web_source_files_quiescent());
     assert(movie_output[0] == 0 && completions == 0);
     assert(!melee_web_source_files_end(scope, error, sizeof(error)));
     assert(!melee_web_source_file_region_unregister(movie_output,
@@ -134,6 +138,7 @@ int main(void)
                                                      error, sizeof(error)));
     assert(melee_web_source_files_pump(error, sizeof(error)));
     assert(!melee_web_source_file_drive_busy());
+    assert(melee_web_source_files_quiescent());
     assert(completions == 1 && completion_request == request &&
            !completion_cancelled);
     assert(memcmp(movie_output, movie_bytes, 32) == 0);
@@ -195,6 +200,7 @@ int main(void)
                                                     sizeof(movie_output),
                                                     error, sizeof(error)));
     assert(melee_web_source_files_end(scope, error, sizeof(error)));
+    assert(!melee_web_source_files_quiescent());
     assert(melee_web_source_files_external_clear(error, sizeof(error)));
     assert(!melee_web_source_file_size("LbRf.dat", &size));
     assert(!melee_web_source_files_end(scope, error, sizeof(error)));

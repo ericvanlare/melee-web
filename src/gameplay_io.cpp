@@ -1,4 +1,5 @@
 #include "gameplay_io.h"
+#include "gameplay_first_pair_file_guard.h"
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
@@ -64,11 +65,13 @@ int add(MeleeWebIo* io,MeleeWebIoKind kind,const char* name,const void* input,si
 }
 extern "C" {
 MeleeWebIo* melee_web_io_create(char* error,size_t size){
+    if(!melee_web_first_pair_file_operation("native.hps.io-create")){fail(error,size,"First-pair file-operation guard refused I/O owner creation");return nullptr;}
     auto* io=new(std::nothrow)MeleeWebIo;
     if(!io){fail(error,size,"Cannot allocate I/O context");return nullptr;}
     ok(error,size);return io;
 }
 int melee_web_io_add_file(MeleeWebIo* io,const char* name,const void* bytes,size_t length,uint64_t* handle,char* error,size_t size){
+    if(!melee_web_first_pair_file_operation("native.hps.io-add-file"))return fail(error,size,"First-pair file-operation guard refused I/O file registration");
     if(!io||!valid_name(name)||!bytes)return fail(error,size,"I/O file requires a bounded nonempty name and actual bytes");
     for(const auto& [id,b]:io->blocks)if(b->kind==MELEE_WEB_IO_FILE&&b->name==name)return fail(error,size,"I/O file name already registered");
     return add(io,MELEE_WEB_IO_FILE,name,bytes,length,handle,error,size);
@@ -79,6 +82,7 @@ int melee_web_io_find_file(MeleeWebIo* io,const char* name,uint64_t* handle,size
     return fail(error,size,"Requested local I/O file is not registered");
 }
 int melee_web_io_add_buffer(MeleeWebIo* io,MeleeWebIoKind kind,size_t length,uint64_t* handle,char* error,size_t size){
+    if(!melee_web_first_pair_file_operation("native.hps.io-add-buffer"))return fail(error,size,"First-pair file-operation guard refused I/O buffer registration");
     if(kind!=MELEE_WEB_IO_MEMORY&&kind!=MELEE_WEB_IO_AUXILIARY)return fail(error,size,"I/O buffer requires an explicit memory or auxiliary kind");
     return add(io,kind,nullptr,nullptr,length,handle,error,size);
 }
@@ -89,6 +93,7 @@ int melee_web_io_buffer(MeleeWebIo* io,uint64_t handle,void** bytes,size_t* leng
     *bytes=it->second->bytes.get();*length=it->second->size;return ok(error,size);
 }
 int melee_web_io_remove(MeleeWebIo* io,uint64_t handle,char* error,size_t size){
+    if(!melee_web_first_pair_file_operation("native.hps.io-remove"))return fail(error,size,"First-pair file-operation guard refused I/O owner removal");
     if(!io)return fail(error,size,"I/O context is missing");
     auto it=io->blocks.find(handle);
     if(it==io->blocks.end())return fail(error,size,"I/O handle is stale or belongs to another context");
@@ -96,6 +101,7 @@ int melee_web_io_remove(MeleeWebIo* io,uint64_t handle,char* error,size_t size){
     io->bytes-=it->second->size;io->blocks.erase(it);return ok(error,size);
 }
 int melee_web_io_submit(MeleeWebIo* io,MeleeWebIoEndpoint source,MeleeWebIoEndpoint dest,size_t length,MeleeWebIoCallback cb,void* user,uint64_t* request,char* error,size_t size){
+    if(!melee_web_first_pair_file_operation("native.hps.io-submit"))return fail(error,size,"First-pair file-operation guard refused I/O transfer");
     if(!io||!request||!length||io->requests.size()>=max_requests||dest.kind==MELEE_WEB_IO_FILE)
         return fail(error,size,"Invalid I/O transfer or queue capacity exceeded");
     auto src=endpoint(io,source,length),dst=endpoint(io,dest,length);
@@ -106,13 +112,16 @@ int melee_web_io_submit(MeleeWebIo* io,MeleeWebIoEndpoint source,MeleeWebIoEndpo
     }catch(const std::bad_alloc&){return fail(error,size,"Cannot allocate queued I/O request");}
 }
 int melee_web_io_cancel(MeleeWebIo* io,uint64_t request,char* error,size_t size){
+    if(!melee_web_first_pair_file_operation("native.hps.io-cancel"))return fail(error,size,"First-pair file-operation guard refused I/O cancellation");
     if(!io)return fail(error,size,"I/O context is missing");
     for(auto& r:io->requests)if(r.id==request){r.cancelled=true;return ok(error,size);}
     return fail(error,size,"I/O request is no longer queued");
 }
 int melee_web_io_pump(MeleeWebIo* io,uint32_t limit,uint32_t* completed,char* error,size_t size){
     if(!io||!completed||io->pumping||!limit)return fail(error,size,"I/O pump requires a context, positive budget and no reentry");
-    const size_t count=std::min(size_t{limit},io->requests.size());io->pumping=true;*completed=0;
+    const size_t count=std::min(size_t{limit},io->requests.size());
+    if(count&&!melee_web_first_pair_file_operation("native.hps.io-pump"))return fail(error,size,"First-pair file-operation guard refused I/O completion");
+    io->pumping=true;*completed=0;
     for(size_t i=0;i<count;i++){
         Request r=std::move(io->requests.front());io->requests.pop_front();
         if(!r.cancelled)std::memmove(r.dest->bytes.get()+r.dest_offset,r.source->bytes.get()+r.source_offset,r.length);
@@ -123,7 +132,9 @@ int melee_web_io_pump(MeleeWebIo* io,uint32_t limit,uint32_t* completed,char* er
     io->pumping=false;return ok(error,size);
 }
 size_t melee_web_io_pending(const MeleeWebIo* io){return io?io->requests.size():0;}
+int melee_web_io_quiescent(const MeleeWebIo* io){return io&&!io->pumping&&io->requests.empty();}
 int melee_web_io_destroy(MeleeWebIo* io,char* error,size_t size){
+    if(io&&!melee_web_first_pair_file_operation("native.hps.io-destroy"))return fail(error,size,"First-pair file-operation guard refused I/O owner release");
     if(!io)return ok(error,size);
     if(io->pumping||!io->requests.empty())return fail(error,size,"I/O context still has active or queued transfers");
     delete io;return ok(error,size);

@@ -13,6 +13,7 @@
 extern "C" int lbAudioAx_80023F28(int);
 static std::vector<uint8_t> read(const char* path){std::ifstream f(path,std::ios::binary);CHECK(f.good());return {std::istreambuf_iterator<char>(f),{}};}
 int main(int argc,char** argv){try{
+ CHECK(!melee_web_audio_stream_quiescent_for(nullptr));
  CHECK(argc==6||argc==7||argc==9);auto main=read(argv[1]),mario=read(argv[2]),sem=read(argv[3]),coef=read(argv[4]),hps=read(argv[5]);uint64_t first_hash=0;
  if(argc==9){
   auto info1=read(argv[6]),info2=read(argv[7]),info3=read(argv[8]);
@@ -46,7 +47,10 @@ int main(int argc,char** argv){try{
   puts("Original CSS/SSS BGM IDs selected and streamed menu01.hps/menu3.hps through one owner");return 0;
  }
  for(unsigned cycle=0;cycle<2;cycle++){
-  melee_web::GameplayAudioBank bank(sem,{main,mario},coef);melee_web::GameplayAudioStream stream(bank.get(),"/audio/sp_end.hps",hps);
+  melee_web::GameplayAudioBank bank(sem,{main,mario},coef);
+  CHECK(!melee_web_audio_stream_quiescent_for(bank.get()));
+  melee_web::GameplayAudioStream stream(bank.get(),"/audio/sp_end.hps",hps);
+  CHECK(melee_web_audio_stream_quiescent_for(bank.get()));
   CHECK(lbAudioAx_80023F28(78)==0);char error[256];std::vector<float> pcm(64000);double energy=0;uint64_t hash=14695981039346656037ULL;
   // Cross all fifty block boundaries and the original intro-to-loop transition.
   for(unsigned second=0;second<100;second++){

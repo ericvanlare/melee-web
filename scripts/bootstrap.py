@@ -19,6 +19,24 @@ from workspace_resources import operation
 # Future/object bootstrap path. Both are exact isolated-index trees, never an
 # arbitrary locally modified checkout.
 AURORA_PREVIOUS_PATCH_TREES = (
+    # Exact archived guard-bridge predecessor before executable metadata linkage.
+    "f806b61a71b34a548221acf3f58e4e8a7013ad53",
+    # Exact copied TextureRef/pool owner predecessor before private read-only component.
+    "c6b4982168244b0c1d467f7800041ef1c98bcd9b",
+    # Exact persistent EFB-owner predecessor before copied texture/pool ownership and clear API facts.
+    "e3479f5b50440999b0c8a6db262d936971a5f775",
+    # Exact typed renderer-owner predecessor before persistent EFB attachment provenance.
+    "ecd933889b07d5d91175e69200c37bdef35c00c8",
+    # Exact static-descriptor observer predecessor before typed renderer-owner provenance.
+    "80b7095bde6d00e8e8330e044793610e9adc2e9d",
+    # Exact canonical observer predecessor before static slot-0 descriptor retention.
+    "dce8b9ecb931375e636947ec482f881c667d0cde",
+    # Exact combined current-main predecessor before schema2 private observation.
+    "cdb8ce62675f09c4fb9e7206700b2c270d3414e2",
+    "88eb80f1639faddd0963928485ab5d6ac76ceeeb",
+    # Exact reviewed observer and hosted-staging predecessor trees.
+    "a28936a4148fc2d62f7a51a1b47767adb512f86e",
+    "55f61288df8e2bdeec93f14c3be2e83111fb91ab",
     # Exact reviewed hosted-telemetry candidate before caller-owned admission.
     "fa255c8adc3bab486929b388b89ef922455e00c6",
     # Exact main predecessor before allowing opt-in telemetry on the isolated

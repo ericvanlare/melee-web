@@ -87,7 +87,11 @@ under the owner's Workers Free/$0 limit; no paid, billing, account/security,
 DNS or production changes are authorized. Do not repeat successful captures
 without a new hypothesis.
 
-**Owner-directed manual alpha (pending):** The owner selected a live hosted
+**Owner-directed manual alpha (pending):** On October 14 the owner deferred the
+human PvP trial and directed the next autonomous sprint. Continue the drawn
+rollback and Stadium milestones below without waiting for human testing; keep
+physical-input, audible-output, foreground-timing and two-machine gates unrun.
+The owner selected a live hosted
 room page on the existing isolated staging Worker and declined local-package
 setup as the user-facing path. The proposed two-Mac trial uses the existing
 interim lockstep route: keyboard P1 on the host and controller P2 / Port 2 on
@@ -137,6 +141,39 @@ Any later adopted arithmetic change reopens exact-receipt validation. The
 records the parallel Slippi behavior mapping, pending owner licensing decision,
 and deferred A5 gateway/cadence research. Copy no related-project code, and send
 no automated traffic to Slippi production services or real accounts.
+
+The owner-directed October 16 [execution sprint](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6227720936)
+continues these existing milestones. First distinguish cache invalidation from
+selected-texture lifetime, close the reachable host owners, then attempt one
+restored tick and an identical repeat. Stadium progresses through the original
+short-lifetime route and compatible lifecycle/RNG comparison in parallel.
+Each item has a bounded experiment, pass criterion and stopping rule; neither
+a component pass nor a checkpoint of an unresolved blocker completes the
+restored-tick or C3 target.
+
+The next rollback implementation is one coherent private paired-tick experiment.
+Carry the actual sampled input and clock decisions across a real returned-idle
+boundary, retain an exact
+set of reachable renderer resources and pending work, and restore the complete
+native state before dispatching the identical plan once more. Unknown content,
+reference or asynchronous ownership must refuse before memory restoration.
+Keep the original full draw and its fences in both legs. The
+[rollback boundary](status/2026-10-12-match-only-rollback-feasibility.md)
+owns the current component results and the precise no-go; they do not establish
+that this combined experiment is safe yet. Batch this interface and its
+falsification controls before the next full validation cycle.
+
+The owner-approved October 13 sprint targets one same-instance Mario/FD
+checkpoint → original tick/full draw → restore → repeat comparison under
+[#318](https://github.com/ericvanlare/melee-web/issues/318). First close the
+reachable renderer content/handle, native audio/output and file-completion
+owners. Freeze actual clock and input decisions, then return from native code
+before copying memory. A normal-frame renderer observation and native idle-owner
+controls are prerequisites, not browser restore evidence. Only a reviewed
+one-tick pass can open a longer correction measurement; no combined budget
+claim follows from separate timings. The existing terminal diagnostic remains
+one-shot. The [sprint queue](https://github.com/ericvanlare/melee-web/issues/158)
+owns work-item ordering and stopping rules.
 
 Pokémon Stadium C3 [#251](https://github.com/ericvanlare/melee-web/issues/251) /
 [draft #301](https://github.com/ericvanlare/melee-web/pull/301) remains the next

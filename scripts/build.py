@@ -25,6 +25,8 @@ AUDIO_PREVIEW_RUNTIME_BUILD_DIR = "build/browser-audio-preview-release"
 AUDIO_PREVIEW_RUNTIME_EXECUTABLE = "gameplay_audio_preview"
 AURORA_QUIESCENCE_DIAGNOSTIC_TARGET = "aurora-browser-quiescence"
 MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET = "runtime-match-draw-discard"
+MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET = "runtime-match-frame-effect"
+TEXTURE_READONLY_GUARD_TARGET = "aurora-texture-readonly-guard"
 FMA_DIAGNOSTIC_TARGET = "runtime-fma-diagnostic"
 FMA_COLLISION_OPERATION_INVENTORY = (
     ("80006e80", "broadphase_radius"),
@@ -96,6 +98,8 @@ BUILD_TARGETS = {
     # submission-owner/quiescence instrumentation.
     AURORA_QUIESCENCE_DIAGNOSTIC_TARGET: ("gx_probe",),
     MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET: ("gameplay_menu_browser",),
+    MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET: ("gameplay_menu_browser",),
+    TEXTURE_READONLY_GUARD_TARGET: ("aurora_texture_readonly_guard_probe",),
     FMA_DIAGNOSTIC_TARGET: ("gameplay_menu_browser",),
     "gameplay": ("gameplay_checks",),
     "runtime": ("gameplay_menu_browser",),
@@ -119,7 +123,7 @@ def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
                     pipeline_provenance=False, selective_pipelines=False,
                     stadium_c1a_diagnostic=False,
                     fma_collision_diagnostic=False,
-                    fma_velocity_y_diagnostic=False):
+                    fma_velocity_y_diagnostic=False, first_pair_audio_file_diagnostic=False, first_draw_components_diagnostic=False):
     """Return the build directory selected by the normal build contract.
 
     Trace targets use the private development build directory and intentionally
@@ -130,6 +134,26 @@ def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
     root = Path(root)
     if target not in BUILD_TARGETS and target not in TRACE_TARGETS:
         raise ValueError(f"Unsupported build target: {target}")
+    if first_draw_components_diagnostic and target != MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET:
+        raise ValueError("First-draw components require an isolated runtime-match-frame-effect variant")
+    if first_pair_audio_file_diagnostic and target != MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET:
+        raise ValueError("First-pair audio/file controls require runtime-match-frame-effect")
+    if target == TEXTURE_READONLY_GUARD_TARGET:
+        if configuration != "Release":
+            raise ValueError("aurora-texture-readonly-guard is Release-only")
+        if (pipeline_provenance or selective_pipelines or stadium_c1a_diagnostic or
+                fma_collision_diagnostic or fma_velocity_y_diagnostic or first_pair_audio_file_diagnostic):
+            raise ValueError("aurora-texture-readonly-guard requires its isolated component profile")
+        return root / "build/browser-texture-readonly-guard-release"
+    if target == MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET:
+        if configuration != "Release":
+            raise ValueError("runtime-match-frame-effect is Release-only")
+        if (pipeline_provenance or selective_pipelines or stadium_c1a_diagnostic or
+                fma_collision_diagnostic or fma_velocity_y_diagnostic):
+            raise ValueError("runtime-match-frame-effect requires its isolated private build profile")
+        if first_draw_components_diagnostic:
+            return root / ("build/browser-first-draw-host-read-release" if first_pair_audio_file_diagnostic else "build/browser-first-draw-components-release")
+        return root / ("build/browser-first-pair-audio-file-release" if first_pair_audio_file_diagnostic else "build/browser-match-frame-effect-release")
     fma_requested = fma_collision_diagnostic or fma_velocity_y_diagnostic
     if target == FMA_DIAGNOSTIC_TARGET:
         if not fma_requested:
@@ -240,6 +264,7 @@ PUBLIC_RUNTIME_SOURCE_FILES = (
     "cmake/FighterRuntime.cmake",
     "patches/melee-gameplay.patch",
     "src/gameplay_menu_browser.cpp",
+    "src/melee_web_wasm_ownership_library.js",
     "src/gameplay_menu_browser_state.hpp",
     "src/gameplay_menu_browser_menu.cpp",
     "src/gameplay_menu_browser_match.cpp",
@@ -256,7 +281,19 @@ PUBLIC_RUNTIME_SOURCE_FILES = (
     "src/runtime_asset_scope.hpp",
     "src/gameplay_menu_world.cpp",
     "src/gameplay_match_session.cpp",
+    "src/gameplay_match_session.hpp",
+    "src/gameplay_world.cpp",
+    "src/gameplay_world.hpp",
     "src/gameplay_audio.c",
+    "src/gameplay_audio_stream.c",
+    "src/gameplay_audio_stream.h",
+    "src/gameplay_audio_bank_transport.c",
+    "src/gameplay_audio_bank_transport.h",
+    "src/gameplay_io.cpp",
+    "src/gameplay_source_files.c",
+    "src/gameplay_source_files.h",
+    "src/gameplay_first_pair_file_guard.c",
+    "src/gameplay_first_pair_file_guard.h",
     "src/gameplay_audio_bank.cpp",
     "src/gameplay_platform.c",
     "src/browser_input.cpp",
@@ -274,6 +311,7 @@ PUBLIC_RUNTIME_SOURCE_FILES = (
     "web/disc-session.mjs",
     "web/melee-runtime.mjs",
     "web/startup-profile.mjs",
+    "web/first-pair-audio-file-guard.mjs",
     "web/runtime-assets.mjs",
     "web/runtime-audio-assets.mjs",
     "web/runtime-diagnostics-delivery.mjs",
@@ -306,6 +344,26 @@ def _file_record(path, root):
         "bytes": path.stat().st_size,
         "sha256": _sha256(path),
     }
+
+
+FIRST_PAIR_PRIVATE_TEST_ASSETS = (
+    ("wasm_ownership_accessor_v1.test.mjs", "tests/wasm_ownership_accessor_v1.mjs"),
+)
+
+
+def _verify_first_pair_private_test_assets(root, build_dir):
+    """Require private test-only assets to be exact copies of their sources."""
+    verified = []
+    for artifact_name, source_name in FIRST_PAIR_PRIVATE_TEST_ASSETS:
+        source = root / source_name
+        artifact = build_dir / artifact_name
+        source_record = _file_record(source, root)
+        artifact_record = _file_record(artifact, root)
+        if source_record["bytes"] != artifact_record["bytes"] or source_record["sha256"] != artifact_record["sha256"]:
+            raise ValueError(f"private test asset differs from its reviewed source: {artifact_name}")
+        verified.append({"path": artifact_name, "bytes": artifact_record["bytes"],
+                         "sha256": artifact_record["sha256"]})
+    return tuple(verified)
 
 
 def _tree_record(path, root):
@@ -951,7 +1009,7 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
           pipeline_provenance=False, selective_pipelines=False, configure_only=False,
           trace_targets=None, gameplay_bootstrap_state=False,
           stadium_c1a_diagnostic=False, fma_collision_diagnostic=False,
-          fma_velocity_y_diagnostic=False):
+          fma_velocity_y_diagnostic=False, first_pair_audio_file_diagnostic=False, first_draw_components_diagnostic=False):
     trace_targets = tuple(trace_targets or ())
     if gameplay_bootstrap_state and (
         tuple(trace_targets or ()) != ("gameplay_snapshot_probe",)):
@@ -978,6 +1036,18 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
             raise ValueError("runtime-fma-diagnostic cannot be combined with another private build profile")
     elif fma_collision_diagnostic or fma_velocity_y_diagnostic:
         raise ValueError("FMA diagnostic switches require --target runtime-fma-diagnostic")
+    if first_draw_components_diagnostic and target != MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET:
+        raise ValueError("First-draw components require an isolated runtime-match-frame-effect variant")
+    if first_pair_audio_file_diagnostic and target != MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET:
+        raise ValueError("First-pair audio/file controls require runtime-match-frame-effect")
+    if target in {MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET, TEXTURE_READONLY_GUARD_TARGET}:
+        # Validate the isolated profile before source preparation or tool use.
+        build_directory(root, target=target, configuration=configuration,
+                        pipeline_provenance=pipeline_provenance,
+                        selective_pipelines=selective_pipelines,
+                        stadium_c1a_diagnostic=stadium_c1a_diagnostic,
+                        first_pair_audio_file_diagnostic=first_pair_audio_file_diagnostic,
+                        first_draw_components_diagnostic=first_draw_components_diagnostic)
     if selective_pipelines and (target not in {"runtime", PUBLIC_RUNTIME_TARGET} or pipeline_provenance):
         raise ValueError("--selective-pipelines requires runtime/runtime-public without --pipeline-provenance")
     if pipeline_provenance and target != "runtime":
@@ -1028,7 +1098,9 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
                                     selective_pipelines=selective_pipelines,
                                     stadium_c1a_diagnostic=stadium_c1a_diagnostic,
                                     fma_collision_diagnostic=fma_collision_diagnostic,
-                                    fma_velocity_y_diagnostic=fma_velocity_y_diagnostic)
+                                    fma_velocity_y_diagnostic=fma_velocity_y_diagnostic,
+                                    first_pair_audio_file_diagnostic=first_pair_audio_file_diagnostic,
+                        first_draw_components_diagnostic=first_draw_components_diagnostic)
         if (root / "build").is_symlink() or build_dir.is_symlink():
             raise ValueError("Build output must be a local directory, not a symlink")
         source_inputs_before = (
@@ -1057,10 +1129,18 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
             f"-DMELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC={'ON' if 'aurora_future_owner_probe' in trace_targets else 'OFF'}"
         )
         configure.append(
-            f"-DMELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC={'ON' if target == AURORA_QUIESCENCE_DIAGNOSTIC_TARGET else 'OFF'}"
+            f"-DMELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC={'ON' if target == AURORA_QUIESCENCE_DIAGNOSTIC_TARGET or first_draw_components_diagnostic else 'OFF'}"
         )
         configure.append(
             f"-DMELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC={'ON' if target == MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET else 'OFF'}"
+        )
+        configure.append(f"-DMELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC={'ON' if first_draw_components_diagnostic else 'OFF'}")
+        configure.extend([
+            f"-DMELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC={'ON' if first_pair_audio_file_diagnostic else 'OFF'}",
+            f"-DMELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC={'ON' if target in {MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET, TEXTURE_READONLY_GUARD_TARGET} else 'OFF'}"
+        ])
+        configure.append(
+            f"-DAURORA_BROWSER_TEXTURE_READONLY_GUARD={'ON' if target == TEXTURE_READONLY_GUARD_TARGET or first_draw_components_diagnostic else 'OFF'}"
         )
         configure.append(
             f"-DMELEE_WEB_FMA_COLLISION_DIAGNOSTIC={'ON' if fma_collision_diagnostic else 'OFF'}"
@@ -1099,6 +1179,9 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
                 fma_velocity_y_diagnostic, gameplay_source,
             )
             print(f"Wrote {identity_path.relative_to(root)}")
+        if target == MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET and first_pair_audio_file_diagnostic:
+            for asset in _verify_first_pair_private_test_assets(root, build_dir):
+                print(f"Verified private test asset {asset['path']} sha256={asset['sha256']}")
 
         record_build(root, build_dir, True)
 
@@ -1108,6 +1191,8 @@ def main():
     parser.add_argument("--jobs", type=int, default=min(os.cpu_count() or 2, 6))
     parser.add_argument("--target", choices=("graphics", AURORA_QUIESCENCE_DIAGNOSTIC_TARGET,
                                               MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET,
+                                              MATCH_FRAME_EFFECT_DIAGNOSTIC_TARGET,
+                                              TEXTURE_READONLY_GUARD_TARGET,
                                               FMA_DIAGNOSTIC_TARGET,
                                               "gameplay", "fighter", "runtime",
                                               PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET, "all"))
@@ -1121,6 +1206,10 @@ def main():
                         help="Prepare certified upcoming pipeline unions in a separate runtime build")
     parser.add_argument("--configure-only", action="store_true",
                         help="Configure the selected build directory without compiling targets")
+    parser.add_argument("--first-draw-components-diagnostic", action="store_true",
+                        help="Private first-draw depth/submission facts; no interval or restore admission")
+    parser.add_argument("--first-pair-audio-file-diagnostic", action="store_true",
+                        help="Private prerequisite controls; no pair coordinator or restore")
     parser.add_argument("--fma-collision-diagnostic", action="store_true",
                         help="Enable the private 37-site lbColl_80006E58 FMA diagnostic")
     parser.add_argument("--fma-velocity-y-diagnostic", action="store_true",
@@ -1140,6 +1229,8 @@ def main():
               configure_only=args.configure_only, trace_targets=args.trace_targets,
               gameplay_bootstrap_state=args.gameplay_bootstrap_state,
               stadium_c1a_diagnostic=args.stadium_c1a_diagnostic,
+              first_pair_audio_file_diagnostic=args.first_pair_audio_file_diagnostic,
+              first_draw_components_diagnostic=args.first_draw_components_diagnostic,
               fma_collision_diagnostic=args.fma_collision_diagnostic,
               fma_velocity_y_diagnostic=args.fma_velocity_y_diagnostic)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:

@@ -1,6 +1,7 @@
 #include "gameplay_audio_bank_transport.h"
 #include "gameplay_platform.h"
 #include "gameplay_audio_stream.h"
+#include "gameplay_first_pair_file_guard.h"
 #include <melee/lb/lbaudio_ax.h>
 #include <dolphin/ax.h>
 #include <sysdolphin/baselib/synth.h>
@@ -52,8 +53,21 @@ static MeleeWebAudioResidencyInfo info(int file){
 }
 int melee_web_audio_bank_transport_active(void){return state.audio!=NULL;}
 int melee_web_audio_bank_transport_busy(void){return state.pending||state.pumping;}
+int melee_web_audio_bank_transport_quiescent_for(MeleeWebAudio* audio){
+ if(!melee_web_audio_is_active(audio))return 0;
+ if(state.audio)return state.audio==audio&&!state.pending&&!state.requests&&!state.pumping;
+ /* A resident match bank need not own a source SSM transport. Qualify only
+  * complete absence; dormant mappings, requests or foreign state still refuse. */
+ if(state.registry||state.auxiliary||state.size||state.next_id||state.pending||state.requests||
+    state.mapping_count||state.pumping||state.configured)return 0;
+ for(size_t i=0;i<sizeof(state.sem_path);++i)if(state.sem_path[i])return 0;
+ for(size_t i=0;i<MELEE_WEB_AUDIO_RESIDENCY_MAX_ASSETS;++i)
+  if(state.mappings[i].file||state.mappings[i].base||state.mappings[i].size)return 0;
+ return 1;
+}
 int melee_web_audio_bank_transport_configured(void){return state.configured;}
 int melee_web_audio_bank_transport_begin(MeleeWebAudio* audio,MeleeWebAudioResidency* registry,const char* sem_path,char* e,size_t n){
+ if(!melee_web_first_pair_file_operation("native.ssm.begin"))return fail(e,n,"First-pair file-operation guard refused SSM owner change");
  if(state.audio||!melee_web_audio_is_active(audio)||melee_web_audio_stream_owned(audio)||!registry||!sem_path||!*sem_path||strlen(sem_path)>=sizeof(state.sem_path))return fail(e,n,"Invalid or already active source audio bank transport");
  MeleeWebAudioResidencyInfo reserved;
  if(melee_web_audio_residency_info(registry,1,&reserved,NULL,0))return fail(e,n,"SSM entry identity conflicts with the reserved HPS file");
@@ -63,6 +77,7 @@ int melee_web_audio_bank_transport_begin(MeleeWebAudio* audio,MeleeWebAudioResid
  if(e&&n)*e=0;return 1;
 }
 void melee_web_audio_bank_transport_configure(uint32_t bytes){
+ check(melee_web_first_pair_file_operation("native.ssm.configure"),"First-pair file-operation guard refused SSM allocation");
  check(state.audio&&!state.configured&&bytes&&bytes<=32u*1024u*1024u,"Invalid original audio bank allocation");
  state.auxiliary=aligned_alloc(32,(bytes+31u)&~31u);check(state.auxiliary!=NULL,"Cannot allocate source audio auxiliary storage");
  memset(state.auxiliary,0,bytes);state.size=bytes;
@@ -73,6 +88,7 @@ int melee_web_audio_bank_transport_path(const char* path){
 }
 int melee_web_audio_bank_transport_file(int file){MeleeWebAudioResidencyInfo found;return state.registry&&melee_web_audio_residency_info(state.registry,file,&found,NULL,0);}
 int melee_web_audio_bank_transport_request(int file,uintptr_t source,uintptr_t dest,size_t size,int type,int priority,HSD_DevComCallback callback,void* args){
+ check(melee_web_first_pair_file_operation("native.ssm.request"),"First-pair file-operation guard refused SSM request");
  const MeleeWebAudioResidencyInfo f=type==0x1B?(MeleeWebAudioResidencyInfo){0}:info(file);
  check(state.configured&&state.pending<MAX_REQUESTS&&priority>=0&&priority<=2&&!(source%32)&&!(size%32)&&size,"Invalid source SSM transfer");
  const uint32_t payload=(f.header_bytes+47u)&~31u;
@@ -90,6 +106,7 @@ int melee_web_audio_bank_transport_request(int file,uintptr_t source,uintptr_t d
 int melee_web_audio_bank_transport_cancel(int id,u32 flags,HSD_DevComCallback callback,void* args){
  if(id<(int)REQUEST_BASE||id>=0x40000000)return 0;
  check(state.audio&&!(flags&~3u),"Invalid source SSM cancellation");
+ check(melee_web_first_pair_file_operation("native.ssm.cancel"),"First-pair file-operation guard refused SSM cancellation");
  for(Transfer* r=state.requests;r;r=r->next)if(r->id==id){if(flags&1)r->callback=callback;if(flags&2)r->args=args;r->cancelled=1;break;}
  return 1;
 }
@@ -108,10 +125,11 @@ static void header_read(const Transfer* r,const MeleeWebAudioResidencyInfo* f){
  memcpy((void*)r->dest,native+r->source,r->size);free(native);
 }
 void melee_web_audio_bank_transport_forget(int file,uint32_t base){
+ check(melee_web_first_pair_file_operation("native.ssm.forget"),"First-pair file-operation guard refused SSM mapping change");
  for(unsigned i=0;i<state.mapping_count;)if(state.mappings[i].file==file&&state.mappings[i].base==base){memmove(state.mappings+i,state.mappings+i+1,(--state.mapping_count-i)*sizeof(Mapping));}else i++;
 }
 void melee_web_audio_bank_transport_pump(void){
- if(!state.audio)return;check(!state.pumping,"Reentrant source SSM transfer pump");state.pumping=1;
+ if(!state.audio)return;if(state.requests)check(melee_web_first_pair_file_operation("native.ssm.pump"),"First-pair file-operation guard refused SSM completion");check(!state.pumping,"Reentrant source SSM transfer pump");state.pumping=1;
  unsigned budget=MAX_REQUESTS;
  while(state.requests&&budget--){
   Transfer** chosen=&state.requests;for(Transfer** p=&state.requests;*p;p=&(*p)->next)if((*p)->priority<(*chosen)->priority)chosen=p;
@@ -153,8 +171,9 @@ int melee_web_audio_bank_transport_resolve(MeleeWebAudio* audio,uint32_t address
  return 0;
 }
 uint32_t melee_web_audio_bank_sem_size(const char* path){check(state.audio&&path&&!strcmp(path,state.sem_path),"SEM source path is not the validated program file");return melee_web_audio_source_sem_size(state.audio);}
-void melee_web_audio_bank_sem_read(const char* path,void* dest,uint32_t size){check(size==melee_web_audio_bank_sem_size(path),"SEM source byte count mismatch");melee_web_audio_source_sem_read(state.audio,dest,size);}
+void melee_web_audio_bank_sem_read(const char* path,void* dest,uint32_t size){check(melee_web_first_pair_file_operation("native.ssm.sem-read"),"First-pair file-operation guard refused SEM source read");check(size==melee_web_audio_bank_sem_size(path),"SEM source byte count mismatch");melee_web_audio_source_sem_read(state.audio,dest,size);}
 int melee_web_audio_bank_transport_end(char* e,size_t n){
+ if(!melee_web_first_pair_file_operation("native.ssm.end"))return fail(e,n,"First-pair file-operation guard refused SSM owner release");
  if(!state.audio||state.pumping||state.requests||melee_web_audio_stream_owned(state.audio))return fail(e,n,"Source SSM transport is absent, busy or still owns a nested HPS scope");
  if(state.configured)lbAudioAx_80027DBC();
  melee_web_audio_bank_transport_pump();

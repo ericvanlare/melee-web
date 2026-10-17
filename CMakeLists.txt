@@ -21,6 +21,32 @@ option(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC
   "Enable the development-only Pokémon Stadium selection/preparation checkpoint" OFF)
 option(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC
   "Build the private one-shot terminal match draw/discard diagnostic" OFF)
+option(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC
+  "Enable private audio/file prerequisite controls; no coordinator or restore" OFF)
+option(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC
+  "Observe one normal submitted match frame without restoring state" OFF)
+option(MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC
+  "Read private depth/submission components after one original draw; no restore" OFF)
+if(MELEE_WEB_FIRST_DRAW_COMPONENTS_DIAGNOSTIC AND
+   (NOT MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC OR
+    NOT AURORA_BROWSER_TEXTURE_READONLY_GUARD OR NOT MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC))
+  message(FATAL_ERROR "First-draw components require their explicit isolated frame-effect variant")
+endif()
+if(MELEE_WEB_FIRST_PAIR_AUDIO_FILE_DIAGNOSTIC AND NOT MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC)
+  message(FATAL_ERROR "First-pair audio/file prerequisite requires isolated frame-effect profile")
+endif()
+if(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC AND
+   (MELEE_WEB_PUBLIC_RUNTIME OR MELEE_WEB_AUDIO_PREVIEW_RUNTIME OR
+    MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC OR MELEE_WEB_STADIUM_C1A_DIAGNOSTIC OR
+    MELEE_WEB_PIPELINE_PROVENANCE OR MELEE_WEB_SELECTIVE_PIPELINES OR
+    MELEE_WEB_FMA_COLLISION_DIAGNOSTIC OR MELEE_WEB_FMA_VELOCITY_Y_DIAGNOSTIC))
+  message(FATAL_ERROR "Match frame-effect observation requires its isolated private runtime")
+endif()
+if(MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC AND NOT EMSCRIPTEN)
+  message(FATAL_ERROR "Match frame-effect observation requires Emscripten")
+endif()
+set(AURORA_BROWSER_FRAME_EFFECT_OBSERVER ${MELEE_WEB_MATCH_FRAME_EFFECT_DIAGNOSTIC}
+  CACHE BOOL "Private normal-frame effect observer" FORCE)
 option(MELEE_WEB_FMA_COLLISION_DIAGNOSTIC
   "Enable the private PC-mapped scalar collision FMA diagnostic" OFF)
 option(MELEE_WEB_FMA_VELOCITY_Y_DIAGNOSTIC
@@ -109,6 +135,7 @@ if(EMSCRIPTEN)
   endif()
   add_library(gameplay_runtime STATIC src/gameplay_bootstrap.c src/gameplay_abi.c
     src/gameplay_source_context.c src/gameplay_source_files.c
+    src/gameplay_first_pair_file_guard.c
     src/gameplay_source_memory_runtime.cpp
     src/source_address_context.cpp src/source_game_heap_context.cpp
     src/gameplay_ps_math.c
@@ -271,7 +298,7 @@ if(EMSCRIPTEN)
     set_target_properties(${target} PROPERTIES SUFFIX ".js")
   endforeach()
   add_executable(gameplay_source_files_trace tests/gameplay_source_files_trace.c
-    src/gameplay_source_files.c)
+    src/gameplay_source_files.c src/gameplay_first_pair_file_guard.c)
   target_include_directories(gameplay_source_files_trace PRIVATE src)
   target_compile_options(gameplay_source_files_trace PRIVATE -UNDEBUG)
   target_link_options(gameplay_source_files_trace PRIVATE -sENVIRONMENT=node
@@ -348,6 +375,21 @@ if(EMSCRIPTEN AND MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC)
     "-sEXPORTED_FUNCTIONS=_main,_malloc,_free,_future_owner_abi_fixture,_future_owner_emdawn_link_anchor,_future_owner_capability,_future_owner_summary_bytes,_future_owner_summary,_future_owner_row_bytes,_future_owner_row_count,_future_owner_row,_future_owner_dispose,_future_owner_real_start,_future_owner_real_poll,_future_owner_real_submit,_future_owner_real_state,_future_owner_real_ids_bytes,_future_owner_real_ids,_future_owner_real_pending_callbacks,_future_owner_real_lifecycle,_future_owner_real_late_callback,_future_owner_real_observer_bytes,_future_owner_real_observer,_future_owner_real_cleanup"
     "SHELL:--js-library=${CMAKE_CURRENT_SOURCE_DIR}/.deps/aurora/lib/gfx/aurora_browser_future_owner_accessor_library.js")
   set_target_properties(aurora_future_owner_probe PROPERTIES SUFFIX ".js")
+endif()
+# Separate, explicit component fixture; never enabled by the normal player or
+# merely by the existing private owner accessor profile.
+if(EMSCRIPTEN AND AURORA_BROWSER_TEXTURE_READONLY_GUARD)
+  add_executable(aurora_texture_readonly_guard_probe EXCLUDE_FROM_ALL tests/aurora_texture_readonly_guard_probe.cpp
+    .deps/aurora/lib/gfx/aurora_browser_future_owner_accessor.cpp
+    .deps/aurora/lib/gfx/aurora_browser_texture_readonly_guard.cpp)
+  target_include_directories(aurora_texture_readonly_guard_probe PRIVATE .deps/aurora)
+  target_link_libraries(aurora_texture_readonly_guard_probe PRIVATE aurora::gx)
+  target_link_options(aurora_texture_readonly_guard_probe PRIVATE
+    "SHELL:--js-library=${CMAKE_CURRENT_SOURCE_DIR}/.deps/aurora/lib/gfx/aurora_browser_future_owner_accessor_library.js"
+    -sENVIRONMENT=web -sEXIT_RUNTIME=0 -sALLOW_MEMORY_GROWTH=1
+    -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=TextureReadonlyGuardFixture
+    "-sEXPORTED_FUNCTIONS=_main,_texture_guard_fixture_init,_texture_guard_fixture_issue,_texture_guard_fixture_detach,_texture_guard_fixture_last_release,_texture_guard_fixture_cleanup,_aurora_browser_depth_no_work_premain,_aurora_browser_depth_no_work_arm_component")
+  set_target_properties(aurora_texture_readonly_guard_probe PROPERTIES SUFFIX ".js")
 endif()
 if(MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC)
   if(NOT TARGET aurora_gx)

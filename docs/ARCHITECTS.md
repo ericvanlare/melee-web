@@ -52,6 +52,51 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
+
+### 2026-10-16 — Owner: plan and execute the next sprint
+
+**Ask:** Plan and execute an autonomous sprint, using judgment to advance the
+project toward online rollback and competitive-rules completeness.
+
+**Status:** Accepted. The [12-item queue](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6227720936)
+continues #318/#324 and #251/#301. Start with the actual texture-cache lifetime
+reduction and the reviewed original Stadium pause/quit route. Advance to one
+safe checkpoint/restore/repeat only after the reachable host owners are closed;
+advance Stadium through a compatible original comparison. Preserve the original
+inputs, arithmetic, source ordering, failure evidence and shared capture lane.
+Keep each milestone in its existing issue, draft PR and status boundary.
+Human-only gates remain unrun and the deleted heartbeat remains deleted.
+
+- 2026-10-17, Codex: Keep both milestones open and consolidate the next rollback
+  implementation into one complete private paired-tick interface, including
+  returned-idle continuation and the exact renderer/native state it can restore.
+  Batch the interface and its falsification controls before full validation;
+  component observations alone cannot establish restore safety. Reuse the
+  original Stadium stock-rules reference for the next scoped browser boundary.
+  Detailed results and remaining gates stay in the
+  existing status receipts; publication remains in the two draft PRs.
+
+**Links:** [Rollback #318](https://github.com/ericvanlare/melee-web/issues/318),
+[Stadium #251](https://github.com/ericvanlare/melee-web/issues/251),
+[priorities #158](https://github.com/ericvanlare/melee-web/issues/158).
+
+
+### 2026-10-14 — Owner: resume the autonomous rollback and Stadium sprint
+
+**Ask:** The owner is unavailable for a PvP test. Proceed with the next sprint.
+
+**Status:** Accepted. Resume the existing drawn checkpoint/restore/repeat
+milestone under #318/#324 and Stadium C3 under #251/#301. Reuse the existing
+owners and private diagnostics; close state and host ownership before any
+browser restore. Keep one capture lane and the original timing/input/RNG guards.
+The human trial remains pending, and the deleted heartbeat is not recreated.
+The [rollback receipt](status/2026-10-12-match-only-rollback-feasibility.md)
+and draft Stadium boundary own the scoped results and retained failures.
+
+**Links:** [Priorities #158](https://github.com/ericvanlare/melee-web/issues/158),
+[rollback draft #324](https://github.com/ericvanlare/melee-web/pull/324),
+[Stadium draft #301](https://github.com/ericvanlare/melee-web/pull/301).
+
 ### 2026-10-13 — Owner: hosted room UI for a manual two-computer trial
 
 **Ask:** Replace the proposed local portable delivery with a live staging page
@@ -88,6 +133,24 @@ completed by the short check. The two-Mac trial has not run. See the
 [current local readiness boundary](status/2026-10-11-local-room-ui-readiness.md),
 [historical local-package preparation](status/2026-10-13-manual-two-computer-alpha.md),
 [A4 match-only rollback target](ROADMAP.md#track-a-match-only-rollback-online).
+
+### 2026-10-13 — Owner: rollback checkpoint and Stadium sprint
+
+**Ask:** Proceed with the next sprint: one same-instance Mario/FD checkpoint,
+original tick and draw, restore and repeat; in parallel, complete the Stadium C3
+idle lifetime comparison and checked recreation.
+
+**Status:** Accepted. Close the reachable renderer, audio and file owners before
+restoring browser memory. Freeze actual input and clock decisions at a returned
+native-call boundary; do not rewind an active native continuation. Keep the
+terminal draw-discard diagnostic one-shot. A new normal-frame renderer receipt
+is a prerequisite observation, not a restore result. Stadium may optimize its
+diagnostic replay driver while preserving every source action, comparison and
+approval; production timing guards and capture deadlines stay unchanged.
+
+**Links:** [Sprint queue #158](https://github.com/ericvanlare/melee-web/issues/158),
+[rollback #318](https://github.com/ericvanlare/melee-web/issues/318),
+[Stadium #251](https://github.com/ericvanlare/melee-web/issues/251).
 
 ### 2026-10-13 — Owner: related-project research and exact arithmetic
 

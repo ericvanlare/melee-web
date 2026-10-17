@@ -9,10 +9,13 @@ const SURFACES = Object.freeze({
 });
 
 export function createBrowserDriver(page, {surface='development', timeoutMs=60000,
-  deadline=Infinity}={}) {
+  deadline=Infinity,nativeIdlePredicate=null}={}) {
   const controls=SURFACES[surface];
   if (!controls) throw Error('Unknown browser driver surface: '+surface);
   if (!Number.isFinite(timeoutMs)||timeoutMs<=0||!(deadline>0)) throw Error('Invalid browser driver deadline');
+  if (nativeIdlePredicate !== null && (typeof nativeIdlePredicate !== 'string' ||
+      !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(nativeIdlePredicate)))
+    throw Error('Invalid browser driver native idle predicate name');
   const errors=[];
   const note=(kind,message)=>{if(errors.length<32)errors.push({kind,message:String(message).slice(0,2000)});};
   const pageError=error=>note('pageerror',error.message||error);
@@ -28,20 +31,29 @@ export function createBrowserDriver(page, {surface='development', timeoutMs=6000
     // Run only at an explicit boundary/failure, never sample every source tick.
     let timer;
     try {
-      return {...await Promise.race([page.evaluate(controls=>{
+      return {...await Promise.race([page.evaluate(({controls,nativeIdlePredicate})=>{
         const text=id=>document.getElementById(id)?.textContent?.slice(-4000)||null;
+        // Opt-in diagnostics must prove JS idle in this same evaluation before
+        // any native getter. Missing/false/throwing predicates keep DOM evidence.
+        let nativeIdle=nativeIdlePredicate===null;
+        if (!nativeIdle) {
+          try {nativeIdle=typeof globalThis.Module?.[nativeIdlePredicate]==='function' &&
+            globalThis.Module[nativeIdlePredicate]()===true;} catch {}
+        }
         const read=name=>{
+          if (!nativeIdle) return null;
           try {return typeof globalThis.Module?.[name]==='function'?globalThis.Module[name]():null;}
           catch {return null;}
         };
         return {url:location.href,hidden:document.hidden,focused:document.hasFocus(),
           status:text('status'),error:document.querySelector('#status')?.dataset.runtimeError||text('error'),log:text('log'),
           phase:read('_melee_web_native_menu_phase'),running:read('_melee_web_native_menu_running'),
+          ...(nativeIdlePredicate===null?{}:{native_idle:nativeIdle}),
           controls:Object.fromEntries(Object.entries(controls).map(([name,selector])=>{
             const node=document.querySelector(selector);
             return [name,node?{disabled:!!node.disabled,visible:!!node.getClientRects().length}:null];
           }))};
-      },controls),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Diagnostic snapshot timed out')),3000);})]),errors:[...errors]};
+      },{controls,nativeIdlePredicate}),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Diagnostic snapshot timed out')),3000);})]),errors:[...errors]};
     } catch(error) {return {unavailable:String(error.message||error),errors:[...errors]};}
     finally {clearTimeout(timer);}
   }

@@ -13,6 +13,7 @@
 #include <cstdint>
 
 struct StartMeleeData;
+struct MeleeWebSourceFileScope;
 namespace melee_web {
 using RuntimeFiles = std::map<std::string, std::vector<uint8_t>, std::less<>>;
 // Source lbFileGetFullName treats a trailing-dot basename as a language
@@ -86,6 +87,9 @@ public:
     void verify_immutable_archives() const;
     bool advance_construction();
     bool construction_complete() const;
+    // Readonly identity of the source-file scope this world opened. Null means
+    // the world is absent or its source owner has already closed.
+    const MeleeWebSourceFileScope* source_file_scope() const noexcept;
 private:
     struct Storage;
     std::unique_ptr<Storage> storage_;

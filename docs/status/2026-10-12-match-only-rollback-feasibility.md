@@ -1,6 +1,6 @@
 # Match-only rollback feasibility
 
-**Compiled / Source-only snapshot diagnostic / Terminal browser tick-and-draw diagnostic / Browser rollback and frame-budget feasibility unproven**
+**Compiled / Source-only snapshot diagnostic / Terminal browser tick-and-draw diagnostic / No-disc native initialization control / Browser rollback and frame-budget feasibility unproven**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
 [merged #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
@@ -181,12 +181,13 @@ own sample cadence, separately from match ticks. This is configured-source
 inspection, not final-link retention or a runtime call count. Exact review and
 source identities are in the structured receipt.
 
-The recommendation is to retain these controls, keep A4 blocked on a concrete
-state/host-ownership design and the Slippi profile gates, and move independent
-engineering to the requested H1 first-use respawn/common-effect preparation
-investigation. H1 keeps every timing guard and source tick/RNG/order invariant.
-Stadium C3 remains next Track B. Source-only Slippi semantic/license/reference
-work continues under #9; the profile is not ready to port. Original comparison,
+The recommendation is to retain these controls and keep A4 blocked on a concrete
+state/host-ownership design and the Slippi profile gates. The owner-approved
+October 13 sprint continues the smallest drawn-browser checkpoint/restore/repeat
+boundary under #115/#318. The H1 first-use respawn preparation component merged
+in #322; broader H1 keeps every timing guard and source tick/RNG/order invariant.
+Stadium C3 proceeds in parallel as the next Track B milestone. Source-only Slippi
+semantic/license/reference work continues under #9; the profile is not ready to port. Original comparison,
 physical input, foreground timing, audible output and two-machine acceptance
 remain separate unrun gates.
 
@@ -201,6 +202,533 @@ layout is now compile-checked: match stats 192 bytes, observation 1280 bytes, wi
 explicit field/PAD offsets. The checker refuses an incompatible layout and
 invalid or partial checkpoint/depth selection. The default full-fixture matrix
 and its strict original assertions remain unchanged.
+
+## Drawn synctest sprint checkpoint
+
+The October 13 sprint now has one successful normal submitted Mario/FD callback
+observation. The private observer and ordinary Release builds pass, as does the
+exact-source 2,402-test regression (164 skips). Producer and tested source are
+`a34d5acf` plus patch `c50aa00b`; the structured receipt binds the new artifacts
+and independent raw-result review. The earlier runtime patch `e932d6e2` and
+harness/regression patch `e3887312` remain historical identities with their
+retained failures.
+
+The first capture failed before the observer was armed: after original CSS
+changed P2 from CPU through empty to Human, one Start press did not enter SSS.
+There were zero match observations. The pre-Start screenshot still has P2 faded;
+the later failure screenshot shows READY TO FIGHT. Source inspection identifies
+a readiness/cooldown gate, so an early Start is the current hypothesis, not a
+confirmed input-delivery diagnosis. The next harness change reuses the existing
+full CSS observer and waits for original readiness before one Start edge; it
+changes no game state, timing threshold or deadline. No unchanged retry is
+admitted. Native cleanup passed, all recorded Chrome/server processes are absent,
+and served runtime/source identities are unchanged. The H1 recorder and failed
+packet remain retained; no match timing or renderer-effect result follows.
+
+The changed-hypothesis second capture passed that readiness gate with one Start
+edge and reached the normalized Mario/FD match at source frame 180. It then
+exposed a private-observer scheduling error: the next browser callback had zero
+source ticks/draws while audio rendered normally. The observer had activated
+before the source clock decided whether a tick was due, so its strict one-tick
+check failed. No renderer events or consumed PAD records were collected; the
+zero-filled diagnostic PAD buffer is not input evidence. The callback recorder
+passed its checks with no timing pause, checked native retirement passed, and
+all owned browser/server processes exited. That retained failure drove an
+actual-source zero-step-then-due-step fixture and a reviewed repair that activates
+the observer at the first tick selected by the unchanged game clock. Pending
+owner/readiness changes and a stalled or multi-step first due callback still
+fail terminally; original source-free audio callbacks remain unchanged.
+
+The published observation checkpoint is `d68fd8b1`. Its first CI attempt failed only in the new native source-file fixture: strict C11 on Linux did not expose the POSIX `strnlen` declaration. The reviewed test-only compiler-flag repair is `99e6838f`; both focused methods pass, and all 14 checks on that head completed with 12 successes and two expected skips (run `38471800942`). Runtime and capture producers below remain unchanged. Draft #324 remains open for the restore/repeat milestone.
+
+The third capture passed: source frame 180 advanced to 181 with one original
+tick, one complete draw and one audio return of 533 PCM frames. Its actual
+four-port PAD bytes retain disconnected-port errors. The renderer recorded
+three operations/render passes, 246 draw commands, two resolves, one snapshot,
+12 staging copies and four queue writes totaling 1,231,440 bytes. One normal
+submission and its fence completed; checked native retirement and owned browser/
+server absence passed. The observation kept **LOAD_ATTACHMENT (blocker 7)**,
+so these events do not establish safe GPU-content or handle restoration.
+The successful browser run had zero pre-tick callbacks; zero-source callback
+skipping is covered by the actual-source fixture, not this browser sample.
+
+There were no forced timing pauses in this route. The H1 recorder retained eight
+reason-code-7 preparation incidents, zero dropped incidents and 3,029 evicted
+samples; it is a lossy setup-and-match record. Audio-frame counting does not
+establish PCM equality or a file-operation inventory. Snapshot/restore, renderer
+ownership closure and the combined corrective-tick budget remain unproven.
+
+A separate actual-source HPS/inner-I/O control now passes the idle-owner,
+wrong-owner, queued-request and active-callback checks under the configured
+Emscripten Release ABI. Its deliberate CHECK failure also reaches C and fails as
+expected. Earlier host-ABI, callback-signature and environment-sentinel test
+failures are retained. Fixture collaborators isolate audio identity and source
+lifecycle; this does not establish decoded audio, browser file closure or restore.
+
+This continues the approved same-instance draw/restore/repeat ownership work.
+No browser restore, complete state-size result or combined correction budget is
+claimed. Stadium C3 remains a separate parallel milestone.
+
+### October 14 ownership and schema-2 checkpoint
+
+The resumed sprint retains the earlier successful schema-1 observation above.
+New native audio/file guards, PCM journals and JavaScript unfinished-read
+accounting are reviewed component work. Their private profile still refuses
+pair admission: no actual returned-boundary coordinator or browser restore is
+implemented. The renderer now serializes complete schema-2 event, resource,
+binding and draw rows with exact integer and floating-point representations.
+Strict decoding and corruption controls pass. All 11 configured diagnostic-off
+preprocessor outputs match the prior renderer source; this is an off-projection
+check, not runtime equivalence or GPU-content closure.
+
+At runtime producer `a557e9ce`, the ordinary, frame-effect and combined private
+Release builds pass. The full 2,425-test regression (164 skips) failed two
+producer/consumer source-fingerprint inventory checks. The minimal metadata
+repair `bf59a893` passes all 56 affected checks. That focused pass does not replace
+the final full regression or exact-head CI required before integration. The
+runtime and capture producer remain distinct from the metadata-only harness.
+
+One schema-2 browser attempt used the retained original route and unchanged
+clock. After arming at source frame 180, its next naturally due callback ran two
+ticks and two draws to frame 182, plus one audio return of 534 PCM frames. The
+explicit single-tick admission guard refused before the renderer observer
+armed. Empty renderer rows therefore establish no resource ownership result.
+The first error is retained; default-zero planned-step fields are not observed
+clock decisions. Native retirement, owned browser/server cleanup and unchanged
+source/runtime checks pass. H1 recorded no timing pause and eight preparation
+incidents; its history remains lossy. No unchanged retry is authorized.
+
+The reduced actual-source admission control passes for zero, one and two
+planned ticks, including exact tick/draw/audio ordering and terminal retirement.
+The next step is a separately reviewed first-draw observation that preserves
+every naturally due source action.
+Any such observation must remain distinct from single-tick restore admission.
+The Wasm-instance ownership helper and private generated-glue hook are committed
+locally as `2d9e2927`. The reduced actual Emscripten fixture preserves prior
+preRun callbacks, observes all four Asyncify writer calls and rejects unsupported
+setup before main. The maintained helper, glue and packaging checks pass all
+46 affected tests. The first fixture failure, a missing canonical Wasm-table
+JavaScript dependency, remains retained; the explicit dependency repair passed
+the second bounded attempt. No gameplay private-profile build or restore result
+follows from these controls; GPU, audio/file and output ownership remain open. No snapshot/restore, seven-tick
+combined budget, human-input or two-computer acceptance is claimed.
+
+### October 14 first-draw observation
+
+At runtime and harness producer `fa58cb7b`, all three Release builds pass
+(ordinary/frame-effect/combined private artifacts: 44/44/45). The full regression
+runs 2,429 tests with 164 skips and no failures. The 52 focused checks and four
+changed Aurora translation units' diagnostic-off projection also pass. A fresh
+static inventory binds each profile's actual JS/Wasm exports; it does not prove
+runtime ownership or safe hidden-state restoration. Earlier failures and their
+producer identities remain retained above and in the linked evidence JSON.
+
+One reviewed headless browser attempt collects the first actual draw while
+preserving the normal callback's source decisions. This sample naturally ran
+one tick and one draw, source frame 180 → 181, with two audio returns and 1,067
+PCM frames. It records 1,763 events, 193 handles, 105 resource rows, 1,104 binding
+entries and 243 draw rows. One normal submission and its fence complete. Native
+retirement and owned browser/server cleanup pass. No depth request occurred;
+zero selected map owners become finalized at retirement. Multi-tick callbacks
+and pending depth-map completion remain fixture coverage, not this browser result.
+
+The historical collection found `UNKNOWN_RESOURCE` (18) first, together with
+`LOAD_ATTACHMENT` (7) and `COMMAND_SHAPE_MISMATCH` (27). Its first unknown was a
+static bind-group descriptor created before observation was armed. That failed
+ownership result remains tied to `fa58cb7b`.
+
+The reviewed follow-up at producer `410e9dd9` retains actual creation identities
+and descriptors for the shared/staging buffers, static/uniform/empty groups,
+layouts and selected empty sampler. All three Release builds and the full
+2,429-test regression pass, with 164 skips; all 133 build artifacts were checked.
+One changed-source browser observation passes at source frame 180 → 181:
+one tick, one draw, one audio return and 534 PCM frames. The current outer/renderer
+schemas are 4/3. It retains 1,783 events, 196 handles, 119 resource rows, 1,123
+binding entries, 19 layout entries, 14 creation-provenance rows and 246 draw rows.
+One normal submission/fence completes, the native observer retires, and all ten
+owned browser processes plus capture/server groups are absent.
+
+**Renderer restore remains blocked.** The `410e9dd9` browser report still records
+`LOAD_ATTACHMENT` (7) first and `UNKNOWN_RESOURCE` (18); those findings belong to
+that captured producer. A later source/test component at `8c20a0da` adds
+creation provenance for the three persistent EFB owners (color, resolved color,
+and depth): six texture/view rows retain their original descriptors, parent
+identity and creation serial. Its observer-collector fixture exercises the
+metadata path through a LOAD pass with detached test handles, verifies the six
+resource/provenance rows and keeps `LOAD_ATTACHMENT` as the first blocker. This
+is component-only evidence: the browser observation predates the change, and no
+real GPU attachment bytes were captured or restored. Other texture/view owners
+and attachment contents remain unresolved; a LOAD operation does not establish
+the content that must be restored. Historical shape finding 27 is absent from
+that callback, whose draw count differs; that is not evidence of a shape repair
+or equality with the earlier run.
+
+The current H1 recorder has zero forced timing pauses, eight preparation
+incidents and no dropped incidents, but retains only 100 of 3,128 callback
+samples. This lossy history does not establish timing acceptance. The historical
+`fa58cb7b` run retained 100 of 3,120 samples and its separate audio totals remain
+unchanged. Neither result demonstrates a restore/repeat pair, PCM/pixel equality,
+a seven-tick corrective budget or two-computer acceptance. The evidence JSON
+retains exact build, capture, review and cleanup identities. Draft #324 remains
+open for the drawn restore/repeat milestone.
+
+The first documentation head `c8095351` failed repository-content CI because a
+private helper variable named `apiKey` held a public Module property name. The
+reviewed repair renames only its three local references to `accessorPropertyName`;
+the fixed property string and all scanner rules remain unchanged. The complete
+tracked-content check and both existing Wasm ownership controls pass after the
+repair. This does not relabel the `fa58cb7b` build or browser evidence.
+
+### October 14 private-Wasm no-disc boot and 13922 validation checkpoint
+
+At validated source `13922b8d` (tree `14923787`), the ordinary, frame-effect
+and combined first-pair Release builds pass with 44, 44 and 46 inventoried
+artifacts. The full regression ran 2,431 tests: 2,267 passed and 164 were skipped, with no
+failures; the independent review verifies 134 emitted artifacts. A fresh static inventory binds the
+46-file private profile and its 15,980,997-byte Wasm. This is static binary and
+artifact evidence, not runtime hidden-state or restoration closure.
+
+The initial private-profile controls passed: the compiled private hook reaches a
+native callback. A missing copied helper refuses before the loader starts; a
+missing compiled hook refuses before native main. The separate ordinary-only attempt in the retained v1
+packet timed out after 90 seconds. Its review notes the path-only
+`route.fulfill({path})` harness response omitted the real server's isolation
+headers; because that attempt did not capture an isolated-status snapshot, this
+remains a harness failure with a source-supported explanation, not a runtime
+defect diagnosis. The reduced v3 control preserved the real loopback response
+headers and passed: COOP is `same-origin`, COEP is `require-corp`,
+`crossOriginIsolated` and `Module` are present, and the ordinary native callback
+arrives at 70.72 ms. All 38 requested responses match the ordinary artifact
+inventory; the disc input stays empty, the private accessor is absent, and
+runtime, page, console and route errors are zero. CDP attribution and owned
+browser/server/capture cleanup pass, with the checkout unchanged. These receipts
+bind `13922b8d` only. The later `fb63c3f2` renderer producer has its own
+validation and observation below.
+
+This proves ordinary no-disc native initialization and the listed private
+startup refusal controls only. It does not import a disc, reach CSS/SSS or
+Gameplay, prove runtime Wasm ownership, or establish a restore/repeat pair,
+visual/audio equality or whole-session acceptance.
+
+### October 14 texture ownership and actual clear-value observation
+
+Executable `fb63c3f2` adds copied creation identities for actual TextureRef
+factories/replacement and canonical snapshot/offscreen owners, plus exact
+BeginRenderPass clear values. The focused real collector, 17 current/historical
+JavaScript controls, native serialization, 11 translation units and 10 ordinary
+OFF compiler projections pass. Two reduced fixture failures remain retained:
+device-mismatch classification and a zero-ID capacity check. Their narrow repairs
+preserve the original refusal and capacity requirements.
+
+All three affected Release builds and the full 2,431-test regression pass with
+164 skips. Independent review rehashes all 134 artifacts and confirms the exact
+source/Aurora patch trees and owned-process absence. One new browser observation
+then reaches original CSS → SSS → the four-stock Mario/FD match and observes
+source frame 180 → 181 with one original tick, draw and audio render. The audio
+counter advances 533 frames; this is not a PCM comparison. The strict outer-6 /
+renderer-5 receipt contains 1,755 events, 266 handles, 265 resource descriptors,
+160 creation-provenance rows and six actual attachment clear-value records.
+Normal submit/fence and checked native retirement pass; all nine owned browser
+PIDs and the capture/server PIDs, across three groups, are absent.
+
+`UNKNOWN_RESOURCE` (18) is absent in this selected frame. `LOAD_ATTACHMENT` (7)
+remains first, and `COMMAND_SHAPE_MISMATCH` (27) is retained: this callback has
+261 command records, 242 draws and three passes, against the diagnostic's fixed
+265/246/3 shape. This differs from the historical `410e9dd9` callback and does
+not establish a rendering regression, shape equivalence or all-owner coverage.
+Only roles 1–18 were exercised; no snapshot/offscreen-role coverage is inferred.
+Exact clear values and descriptors do not establish prior texture contents.
+The next step traces the first actual LOAD/sample dependency in this retained
+receipt to an exact earlier definition or an explicit unknown starting input.
+No additional capture, texture-content restore or same-instance replay occurred.
+
+H1 retains eight preparation incidents and zero forced timing pauses or dropped
+incidents. Its sample history is incomplete: 100 samples remain from 3,133
+callbacks, with 3,033 samples evicted. This observation does not close live timing,
+pixel/PCM equality, complete host ownership or rollback/frame-budget acceptance.
+
+On October 15, a separate one-texture guard component passed on executable
+`5cdcd2a7` (tree `a5f3fa6c`). The real-GPU probe used Apple Metal 3 on Apple M4
+with a nonfallback adapter. Two 64-byte readbacks matched exactly; all 17
+expected refusal cases covered writes, aliases, copies, destruction, mapping
+changes and owner detach. All 30 recorded process IDs and both owned groups
+were absent. The first isolated build at `a6cfbcba` failed because the archive
+link did not extract its EM_JS bridge; the minimal executable-source link repair
+and the original failed output remain separately identified in the receipt.
+
+All three required Release builds and the full 2,435-test regression pass with
+164 skips on `5cdcd2a7`. Independent review verifies 134 emitted artifacts,
+source and patch identities, guard exclusion from the existing runtime profiles,
+and owned-process absence. The updated draft head still requires its own CI.
+
+This is component evidence only: gameplay arming remains refused. It does not
+restore Wasm, resolve `LOAD_ATTACHMENT`, or prove complete native/GPU ownership.
+Native final-release/import-alias bookkeeping, pending work, audio/file state and
+full reference lifetime remain open. Exact component, retained failure and
+validation identities are under `readonly_gpu_target_component` in the
+[existing structured receipt](../evidence/match-only-rollback-feasibility-v1.json).
+
+On October 15, the selected-sampled-owner native diagnostic component was
+integrated at source `c89bae3d` (tree `6c9f1158`), with reviewed Aurora tree
+`4be066f4`. The focused candidate controls passed: native observer controls,
+actual GX translation-unit syntax with the diagnostic enabled, and
+byte-identical ordinary/OFF preprocessing. The diagnostic remains OFF in
+ordinary profiles. The root review rehashed 3,566 inputs, all five command log
+pairs, and confirmed all five process groups absent. The checks cover selection
+of the next sampled candidate and its owner/serial/epoch/seal validation; GX
+slot reborrow is source/TU evidence only.
+
+This is a native diagnostic/source component, not a real GX scene, browser
+capture, or quiescence result. It uses diagnostic identities; gameplay arming
+remains refused. It does not establish pending-work coverage, GPU-content
+ownership, Wasm restore, or complete renderer closure. Keep this source
+(`c89bae3d`) distinct from the earlier real-GPU probe (`5cdcd2a7`) and
+first-draw observation (`fb63c3f2`). On `c89bae3d`, all three existing Release
+profiles and the full 2,435-test regression pass, with 164 skips. The 134 build
+artifacts, source identities and four retired process groups were independently
+verified. The earlier `5cdcd2a7` validation and real-GPU result remain separate.
+
+### October 15 native pending/submission component
+
+At integrated source `299d5a04` (tree `05dba633`), the focused native component joins copied recorder-packet facts with the existing submission owner book, pool and sequence stamps without pumping or draining work. The 13-step focused run passed the actual packet copier and owner-book negative controls, both actual `frame.cpp` quiescence branches, `recording.cpp` syntax, both declared/defined symbol joins, and two byte-identical ordinary/OFF projections. Review rehashed 3,570 source/tool pins and 564 overlay files; all 13 owned process groups were absent.
+
+This is component evidence only. `native_submission_component_ready` remains a native predicate; no runtime getter/global invocation, GPU call, live match interval or gameplay arm was exercised. It does not close depth/device/host-asynchronous work or establish a safe interval. Three Release profiles pass on runtime producer `299d5a04`; the full 2,435-test regression (164 skips) passes on test-only child `927a07f0`, with all 134 retained runtime artifacts rehashed. The initial full-suite failure is retained: a test fixture classified the browser report as native because an ancestor directory contained “native”. A two-line fixture repair checks the immediate role directory and exercises the ancestor collision without changing any assertion. The reduced before/after reproducer and all 16 focused tests pass. Keep this source distinct from the `c89bae3d` selected-sampled component, `5cdcd2a7` real-GPU probe, `fb63c3f2` first-draw observation, and `13922b8d` no-disc boot. No Wasm restore or gameplay/rollback admission is claimed. Exact component and review identities are in `native_submission_pending_component` under the [existing structured receipt](../evidence/match-only-rollback-feasibility-v1.json).
+
+At source `ad871c96` (tree `e68b31d4`), the depth no-work diagnostic component and its required local validation pass: four Release builds and 2,437 tests with 164 skips. The validation binds Aurora tree `5142c624` and patch `c334e3b8`. This is component/source evidence only; live gameplay depth eligibility and restore remain unrun. Exact validation identities are in `depth_no_work_component` in the existing structured receipt.
+
+The first-draw-components diagnostic is integrated at runtime producer `9a22eec3` (tree `9b985972`). Its private diagnostic, ordinary, frame-effect and combined first-pair Release builds pass with inventories of 44, 44, 44 and 46 files. The earlier candidate's 46 JavaScript controls and four reduced controls passed in separate runs; they were not one 50-pass invocation. A later actual-checkout `node --test` run passed all 50 selected JavaScript subtests in one command. The initial full suite exposed one stale test assertion for the explicit private first-draw build flag. A later V2 regression-launch preflight stopped before its rerun because its `git` helper comparison retained the trailing newline; that preflight launched no child. The two identity comparisons were normalized before the successful rerun. The only checkout change after producer `9a22eec3` was a one-line test expectation in `tests/test_aurora_browser_quiescence_option.py` at test-only child `baf66778`; the runtime producer stayed `9a22eec3`. The rerun passed 2,440 tests with 164 skips in 580.897 seconds. Independent review rehashed 178 build artifacts, four caches, and 18 prior evidence items.
+
+The actual V5 first-draw capture observed the first naturally due callback from source frame 180 to 181: one tick, one draw, one audio return, and 534 PCM frames. The native readiness read reported the component ready and depth `READY` at sequence 3; a later, separate depth arm read `ACTIVE` at sequence 4. These are separate observations, not an atomic admission interval. The bounded H1 recorder retained 100 samples from 3,115 callbacks, with 3,015 older samples evicted; it recorded eight preparation incidents, zero dropped incidents, and zero forced timing pauses. This lossy recorder does not establish timing or preparation completeness.
+
+The V5 root review and independent replay passed the four strict outer/component decoders. The capture owner recorded 13 owned PIDs and three owned process groups absent after cleanup. Renderer findings 7 (`LOAD_ATTACHMENT`) and 27 (`COMMAND_SHAPE_MISMATCH`) remain. This is one component observation, not a restore, GPU-content equivalence, later-draw, gameplay, or whole-session acceptance result. Composite eligibility remains false; LOAD content, sampled-texture continuous protection, device/host futures, native references, and restore remain open. Exact validation, capture, replay, and retained-failure identities are recorded under `first_draw_components_candidate_v3` and `first_draw_observation_v5` in the existing receipt.
+
+
+On October 15, the selected-texture continuous-interval guard was integrated at
+`635fc17b` (tree `7f5fe199`; Aurora tree `19cea02f`). The focused actual-TU,
+symbol and ordinary/OFF controls pass. Five Release builds pass, and the full
+regression passes 2,440 tests with 164 skips; the independent validation review
+rehashes all 180 declared artifacts. Candidate source-overlay and syntax failures
+from earlier v3/v4 attempts remain separately identified in the structured
+receipt; they were setup/compiler integration failures, not GPU behavior results.
+
+The isolated v6 real-GPU fixture also passes root and independent review: it
+uses an actual non-fallback Apple Metal 3 adapter, validates two equal 64-byte
+readbacks, and retains six distinct terminal refusal cases. Errors and owned
+process cleanup pass. This remains an isolated component result. No actual-game interval had run at the time of the v6 fixture; the first actual-game attempt is recorded below. The first-draw blockers—including findings 7 and 27 from their earlier producer—remain open. Gameplay arm and Wasm restore remain refused/unimplemented. Exact isolated build, capture, cleanup, and retained source-failure identities are recorded under `selected_texture_continuous_interval_component` in the existing receipt.
+
+The first actual-game attempt used runtime producer `635fc17b` and harness head `1f74eb2c`. The harness full regression passed 2,440 tests with 164 skips; that test identity is separate from the five Release builds above. The route reached normalized Mario-versus-Mario Final Destination VS ready at source frame 181. The requested callback advanced source frame 181→183, with two planned steps, two tick returns, and two draw returns. It selected frame 182 and left one later draw unobserved. The one-frame observer refused this callback with `component_requires_valid_exact_one_tick_draw`; it emitted no component read and did not start the selected-texture interval. The retained callback renderer packet was fenced (one submit and one successful fence), with 1,789 event rows, 269 handles, 246 actual draw rows, and first blocker `LOAD_ATTACHMENT` (7); finding mask `167903360` has bits 7, 17, 25, and 27 set. The callback returned one audio result/533 PCM frames; the separate pre-tick observation recorded one audio return/534 PCM frames. H1 recorded eight reason-7 incidents, no dropped incidents, and no timing pauses; 100 samples were retained from 3,119 callbacks, with 3,019 older samples evicted. This is a valid gate refusal, not a selected-texture guard result. The retained evidence does not establish why the callback accumulated two steps.
+
+The failed run had no page errors. Browser-owner cleanup passed: all ten recorded browser process entries were absent, and the capture, server, browser, and strict-replay process groups were absent. Native retirement was not attempted under the browser-owner-only failure policy. A secondary strict replay failed because the selected-interval schema was absent after the component gate refused. In that first attempt the selected-texture interval was unobserved; gameplay arm, Wasm restore, and renderer-ownership closure remained unestablished. Exact capture, cleanup, suite, and retained source-failure identities are recorded under `selected_texture_continuous_interval_component` in the existing receipt.
+
+The follow-up runtime producer `dbd0ed9c` adds a private, opt-in natural-one enrollment request and copied receipt for the selected-texture diagnostic. It preserves the ordinary first-draw path and its 1–8-step behavior: enrollment is promoted only at the real begin-tick hook when the naturally computed plan is exactly one step within source frames 180–240; other callbacks keep their original work. The earlier `635fc17b` attempt remains a two-step gate refusal (181→183, selecting frame 182, with no interval dispatch), not an interval result, and does not explain why the callback accumulated two steps.
+
+Four Release profiles pass (44/44/44/46 artifacts), with 178 artifact instances rehashed; the full regression passes 2,442 tests with 164 skips. The permanent natural-enrollment controls pass. One released original-route attempt then selected the naturally due callback at source frame 180→181: the copied receipt records one planned step, tick, draw, and audio return, with 533 PCM frames and no skipped callbacks, ticks, draws, audio, or PCM. The first interval issue operation returned `issued=0`; its guard remained `INSTALLED` with no identity or attempts, so no interval close or interval fence was observed. Independent strict decoders accepted the component read and arm, but that is not a successful issue or restore. The renderer packet separately reports `LOAD_ATTACHMENT` as its first blocker and finding bits 7 and 27; that does not establish the cause of the issue refusal. The exact native issued-zero branch was not observed, so the refusal cause remains unresolved. The bounded run had no page errors or timing pauses; cleanup passed after 59.421 seconds, with 13 browser-process entries covering 11 PIDs and all recorded browser, capture, server, and replay groups absent. H1 retained 100 of 3,124 callbacks (3,024 evicted), with eight reason-7 incidents and zero dropped incidents; this is lossy diagnostic coverage, not a completeness or timing claim. The next step is retained-data/source reduction of the first issue refusal, not an unchanged capture retry. No restore or gameplay acceptance is established. Exact source, validation, preserved refusal, packet, and capture identities are in `natural_one_tick_enrollment` in the existing structured receipt.
+
+The reason-bearing follow-up retains runtime `dbd0ed9c` and uses only the reviewed diagnostic harness child `f62b1afc`; no runtime rebuild was needed. Thirteen focused actual-helper controls and the retained-data loss reproducer pass, and the harness-only full regression passes 2,442 tests with 164 skips while all 178 runtime artifact instances and four caches remain unchanged. This second released attempt preserved an initial noneligible callback at frame 180→182 with its original plan/two ticks/two draws/one audio return and 534 PCM frames, then naturally selected frame 182→183 with one planned tick/draw/audio return and 533 PCM frames. Component read/depth arm and strict enrollment decoding passed. Issuance again returned zero, now with copied native reason `selected_texture_current_owner_mismatch`: the project submitted-witness/frame/queue gate passed and the actual GX issuer returned non-one. The particular current-slot/owner-fact/host subcondition was not recorded. The guard remained unarmed `INSTALLED`, identity-null and attempts-zero; only read and issue ran, with no interval fences/close, native retirement or restore. The renderer separately reported first blocker 7 and finding bits 7/17/25/27 (167903360), with 266 command records, 246 actual draws and 1,787 events; these findings do not identify the issuance cause. Cleanup passed after 63.879 seconds: all 11 unique recorded browser PIDs and four owned groups were absent, with no page errors or timing pauses. H1 retained 100 of 3,169 callback samples (3,069 evicted), eight reason-7 incidents and zero dropped incidents; its lossy scope is unchanged.
+
+The earlier source-only suggestion that usage-20 publication identified the first sampled owner was withdrawn: resolve also promotes `TextureRef` owner facts, and retained rows do not distinguish promotion through resolve from GX sampling. Both failed interval-boundary attempts and the additive correction remain retained. A smaller control now passes using the verbatim actual GX issuer and current observer: unchanged owner reaches the synthetic host bridge once; current-slot replacement, new authentic serial, raw view mismatch and missing ref refuse before the bridge; forced host-zero is distinguishable by one bridge call. The six fresh cases and 849 pinned compile dependencies establish the mechanism only, not which field differed in the capture or live native-resource lifetime. Later original draws can legitimately replace an authored GX slot, so the current first-sample/current-slot contract is soundly fail-stop. That checkpoint proposed a narrow authenticated reborrow of the exact still-live first owner at the stopped boundary, or an explicit no-go if its lifetime/current identity could not be established; it did not yet implement a runtime seam. This is a diagnostic ownership-contract question, not a game bug or permission to choose a later passing texture. No unchanged capture retry, guard-usage widening, full interval/restore/composite admission or rollback acceptance is established.
+
+Source `4d00abc9` now implements that conditional exact-cache borrow. At the actual first sampling event it copies an authored object-cache key only when the existing entry owns the exact sampled `TextureRef`. Both issuance and the later current-owner check use the same immutable key and a local borrow of the still-owning cache handle. They do not resolve, scan, touch cache accounting, retain another strong reference or fall back to the later GX slot. Missing/replaced/retired authority refuses; first-sample consumption, identity checks and the usage-6 guard predicate remain unchanged. Request, detach, device and diagnostic reset invalidate the copied authority without resetting the host guard. This establishes a local C++ owner boundary, not native GPU lifetime or unchanged contents.
+
+Five affected existing Release targets pass: isolated guard (2 artifacts), private first-draw (44), ordinary (44), frame-effect (44) and combined first-pair (46). All 180 artifact instances and five caches were rehashed after 2,443 tests passed with 164 skips in 564.888 seconds; the new permanent actual-source cache-owner test ran successfully. The first focused execution passed all 39 commands but left the compiler shim's inherited interpreter/ccache selection insufficiently bound. Its outputs remain retained with that limitation. A reviewed executor-only correction bound the existing Python explicitly and required ccache absent; all 39 commands then passed with the effective environment recorded, ten dependency closures verified, three native symbol joins, exact ordinary-OFF byte equality for both changed TUs, and canonical Aurora tree reconstruction. The 25 synthetic native cases include one documented redundant mode. The prior `dbd0ed9c`/`f62b1afc` failed captures and withdrawn usage-20 inference remain unchanged. The changed-owner browser observation is retained below. That earlier `4d00abc9` attempt did not establish a successful actual-game interval; native GPU lifetime/content closure, restore/repeat and gameplay admission remained open. Exact identities are in `natural_one_tick_enrollment.exact_cache_owner_component` in the existing structured receipt.
+
+The one released `4d00abc9` cache-owner observation also refused issuance. Natural enrollment selected frame 180→181 with the original one planned tick/draw/audio return and 534 PCM frames, without skipped work. Strict outer/renderer decoding, component read and depth `READY`→`ACTIVE` arm passed, but issue returned zero with copied native `selected_texture_current_owner_mismatch`. The submitted-witness/frame/queue prerequisite passed; the specific cache authority, current-owner facts or host-bridge predicate remains unobserved. Guard state stayed unarmed `INSTALLED`, identity-null and attempts-zero. Only read and issue ran; there was no interval fence/close, native retirement or restore. The separate renderer packet has first blocker 7 and finding bits 7/27 (134217856), 256 command records, 237 draws and 1,720 events; those findings do not identify the issue cause. Browser ownership cleanup passed after 59.710 seconds (155 ms cleanup), with 15 owned PIDs and four groups independently absent. There were no page errors or timing pauses. H1 retained 100 of 3,119 callbacks (3,019 evicted), eight reason-7 incidents and no dropped incidents; it remains lossy diagnostic evidence.
+
+Before that launch, source review caught an unexecuted packet-V1 release-variable mismatch and four-profile metadata despite five actual builds. Packet V2 corrected the alias/metadata, restored the release-to-launcher-review hash check and deleted the verified disc buffer before browser work; the capture body was unchanged, and no packet-V1 capture ran. The failed V2 capture and its secondary strict-replay refusal remain retained as preparation history.
+
+The later `f3340de4` runtime/harness passed five Release profiles (2/44/44/44/46 artifacts), rehashed all 180 build artifact instances and five caches, and passed the full regression (2,443 tests, 164 skips). Its released natural-one callback advanced source frame 180→181 with one planned step, tick, draw, and audio return and 533 PCM frames. Component observation failures and component failures were empty, but native issue returned zero with the exact refusal `selected_texture_cache_generation`. The root review scopes this to the captured bind-generation differing from the current generation at issue; it does not identify the mutation site or amount, establish selected-owner survival, or validate resource contents. No interval was issued or closed, and there was no native retirement or restore. Browser-owner cleanup passed after 62.868 seconds (152 ms cleanup), with all 13 recorded PIDs and three process groups absent. H1 retained 100 of 3,140 callbacks (3,040 evicted), with eight incidents and zero dropped incidents; this is a bounded lossy ring, not complete event or timing evidence. The earlier `4d00abc9` `selected_texture_current_owner_mismatch` remains a separate generic refusal and is not retroactively reclassified by this result.
+
+The reduced actual-source controls now distinguish three cases: pending invalidation refuses without draining work; applying a generic invalidation changes the global generation while preserving the exact cache entry, owner and authored tuple; applying a cache clear removes the entry and releases its map-owned reference. All 35 cases in the focused permanent test pass against the unchanged `f3340de4` production methods with the separately hashed test candidate. GPU endpoints remain synthetic. This proves the distinction between binding invalidation and entry lifetime, not which invalidation caused the browser failure. The earlier unexecuted fixture draft had a pre-clear reference-count assertion; its reviewed correction and the retained actual-method result remain separate from production behavior.
+
+The private per-entry publication-serial contract is now implemented at `ba2b4b83`
+(tree `7ce4399a`; Aurora tree `7643f5b9`). Every actual store creates a fresh
+nonzero serial; invalidation preserves a still-live entry, while replacement,
+erase/reinsert, overflow and stale first-sample authority refuse. Pending-work,
+native owner, device and host checks remain unchanged. The 49-case actual-source
+control passes, including the previously failing invalidation distinction.
+Five affected Release profiles pass with all 180 artifact instances verified;
+the full regression passes 2,443 tests with 164 skips in 566.212 seconds.
+
+One actual-game observation on that producer passes the selected-texture
+read-only component interval. Natural enrollment advances source frame 180→181
+with one original tick, full draw and audio return (533 PCM frames). After that
+callback and its normal fence, the stopped returned-idle interval arms, completes
+both host fences and closes, with no tick or GPU submission inside the interval.
+Native diagnostic retirement succeeds. Independent strict replay consumes all
+eight responses, and root raw-result review rehashes every retained output and
+all 44 served artifacts. All 14 recorded or lineage-derived owned PIDs and four
+process groups are absent; browser-owner cleanup takes 140 ms. H1 remains enabled:
+100 samples retained from 3,144 callbacks, 3,044 evicted, eight reason-7 incidents
+and zero dropped incidents. This is a lossy diagnostic record, not timing acceptance.
+
+This closes the selected-entry stopped-interval component only. Its publication
+counter lives in Wasm and is rewindable: it cannot authorize heap restore.
+Renderer findings 7 (`LOAD_ATTACHMENT`) and 27 (`COMMAND_SHAPE_MISMATCH`) remain,
+as do previous-content preservation, complete device/native references and host
+futures. Composite eligibility is false. At that checkpoint, the next source task
+was to join the existing audio/file reader at the same fenced boundary. The
+combined profile and its first refusal are recorded below. No restore/repeat,
+combined seven-tick budget, gameplay rollback or whole-session acceptance follows.
+
+Earlier generic-owner and global-generation refused captures remain above with
+their original identities. The first entry-serial focused attempt failed before
+any case because its extraction omitted `s_frameCount`; its unwrapped invocation
+also violated workspace ownership. A reviewed extraction-only repair passed
+under the wrapper. Those failed outputs and the explicit missing historical
+PID/group records remain retained, separate from later exact cleanup receipts.
+Current validation, actual capture and independent/root reviews are bound in
+`entry_authority_validation` and `entry_authority_actual_interval` in the
+[existing structured receipt](../evidence/match-only-rollback-feasibility-v1.json).
+
+The historical combined private runtime at `76dcf31d` includes the existing audio/file
+point reader, the first-draw components, and an additive conversion-dependency
+observation. The conversion JSON getter runs only after a successful closed
+texture interval; it allocates and is not safe inside a future heap checkpoint
+interval. Its local handles do not establish GPU creation or lifetime authority.
+The ordinary runtime keeps these diagnostics disabled. A narrow opt-in server
+option uses `no-cache` for the runtime `.data` response after a reduced Chrome
+loader control; unrelated responses and the default server policy are unchanged.
+
+At that checkpoint both affected Release builds passed. Full regression passed 2,447 tests with 164
+skips in 562.944 seconds, and the actual generated JS-to-Wasm getter export is
+verified. All 45 required combined-profile artifacts and 44 ordinary artifacts
+were rehashed separately from their larger observed web directories. The earlier
+`af8922d9` suite failed two checks: noncanonical patch bytes and an extracted
+function fixture interrupted by a neighboring getter. The two-file repair
+preserves the actual Aurora tree and getter body; those failures remain retained.
+Independent source review and root validation review pass. This is source/build
+validation, not rollback validation.
+
+One headless original-route capture on `76dcf31d` selected frame 180→181 with
+one naturally planned tick, full draw and audio return, 533 PCM frames, and no
+skipped work. Component read and depth `READY`→`ACTIVE` passed. The first combined
+host point then refused with `native_file_owners_not_quiescent`: its native
+predicate returned zero although the browser's before/after file snapshots were
+identical, with no unresolved reads or result entries. The specific native
+boundary, HPS/IO, SSM or source-file subcondition was not recorded and remains
+unknown. An idle browser file map cannot prove native ownership is idle.
+
+The refusal occurred before texture issuance: there are no interval responses,
+interval fences, conversion getter result, native diagnostic retirement or
+restore. The separate renderer packet retains first blocker 7 and finding bits
+7/27; it does not explain the host refusal. The secondary offline eight-response
+replay failed because no interval existed. All 15 recorded owned PIDs and four
+groups are independently absent; cleanup passed in 146 ms. There were no page
+errors or timing pauses. H1 retained 100 of 3,139 samples, with 3,039 evicted,
+eight reason-7 incidents and no dropped incidents. Its coverage remains lossy.
+
+That `76dcf31d` refusal remains historical evidence with its native subcondition
+unknown. The later `d5b4a1dc` diagnostic attempt stopped earlier at the original
+Items timing guard, before gameplay or a native category; it did not resume.
+The smaller `fcbb655d` route reached the same class of selected boundary under
+explicitly different original defaults: two Human Mario ports 0/1, Final
+Destination, four stocks, stock timer off, friendly fire off, pause enabled and
+full item preferences. It reuses the original CSS join and SSS inputs without
+the unrelated Main/Rules/Items tour. This is not competitive-context parity.
+
+That default-context attempt observed category 13, `ssm_not_quiescent`, without
+copying private SSM fields. Source review and the existing actual-C fixture
+then reproduced a contract mismatch: the match uses resident banks after the
+menu's SSM transport has ended, while the predicate required an active matching
+transport. The `33cd306c` query accepts a fully pristine absent SSM transport
+only for live audio. It preserves same-owner and foreign/pending/request/pumping
+checks and changes no service, pending destination, request order, PAD or RNG.
+
+Both `33cd306c` Release builds passed. Its full suite retained one failing
+exact-source test fixture for the extended profile gate. The test-only
+`38f8c91d` correction passed the entire affected wrapper and the real generated
+reason-getter export/ordinary-OFF check. Its final full regression passed 2,447
+tests with 164 skips in 560.206 seconds, with all 124 retained runtime files
+unchanged; the earlier failed result remains retained.
+
+One separately released default-context capture, using `38f8c91d` harness and
+`33cd306c` runtime, passed the combined stopped point/component observation.
+The natural callback advanced 180→181 with one original tick and full draw;
+its actual audio plan and returns were zero, with zero PCM frames. No audio
+work was invented or suppressed. The native host point returned one with
+stable before/after file facts. Component read, depth `READY`→`ACTIVE`, all eight
+interval responses, strict actual-helper replay and checked retirement passed.
+
+The allocating conversion getter ran after the closed interval and before
+retirement. Its two actual conversion records passed authenticated texture/view
+dependency joins. Pipeline/group/sampler values remain local call identities,
+not GPU creation or lifetime proof. Raw renderer findings 7/27 remain unchanged;
+packet content, restore, composite and internal GPU creation qualification remain
+false. H1 had no dropped incidents, but its sampled timeline remains lossy.
+All recorded browser identities and owned groups are independently absent.
+
+The shared presentation, match-step, normal-audio and finish extractions now
+run through the real ordinary callsites in `704bf3d1`. Six genuine Release
+builds passed, including the ordinary audio-enabled runtime and the separate
+public product; the latter retains its legacy silent-audio scope. The full
+suite passed 2,449 tests with 164 skips in 567.285 seconds. The historical
+`38f8c91d`/`33cd306c` stopped-point capture above remains a separate observation.
+
+One changed-hypothesis ordinary replay used the unchanged authentic MWRC v8
+recording: three natural four-CPU9-Mario, four-stock Final Destination matches
+through original CSS, SSS, Results and CSS returns. The original-state comparator
+passed all 42,127 frames: three setups, 38,547 exact declared match ticks
+(RNG, match frame, semantic PAD and Fighter state), and 3,580 menu/order rows.
+Menu scalar state is not fully compared, and this CPU9 context is distinct from
+two-human PvP. Source accounting records 42,127 steps and draws; it does not
+establish original draw cadence, raw GPU commands, pixels or PCM equivalence.
+
+H1 readiness and export passed with no observed timing pause. Its history
+evicted 6,382 samples and 1,493 recent events; 2,517 native observations were
+unavailable, so continuous coverage is not claimed. The existing `final.png`
+is black after native unload and supplies no final-CSS visual proof. Actual
+native/GPU phase metrics remain in the reports; no standalone GPU diagnostic
+file or new screenshot was produced. All 15 recorded processes and four owned
+groups are absent, with source and frozen runtime/input pins unchanged.
+
+The next in-callback ownership milestone is implemented in `ebf68b24`. The
+normal callback copies its final four-port PAD storage, including the actual
+host `extButton`, and its already sampled source/audio Tick values into a
+noncopyable, nonmovable one-use plan. It consumes that plan immediately at the
+original match-step site. Consumption is latched before checking the actual
+global match owner or invoking source work. Audio and draw remain at their
+original sites; unsupported callbacks retain the original path. Native match
+and audio references are borrowed only for that current callback.
+
+Actual-body controls cover the last queued PAD sample, poisoned original
+PAD/plan values, audio-zero/one cadence, foreign/null match owners, error/order
+writeback and retry refusal. Five genuine diagnostic/public TU projections
+passed. Six genuine Release builds and the required full regression passed
+2,449 tests with 164 skips in 562.577 seconds. The prior `704bf3d1` MWRC replay
+above remains separate: replay deliberately bypasses this new live branch.
+
+One new default-context capture on `ebf68b24` source and runtime passed in
+18.628 seconds. Natural arming succeeded before PAD selection with the queue
+empty; the unchanged adapter injected no later input. The copied selected row
+advanced 180→181 with one planned/returned tick, draw and audio call, producing
+534 PCM frames. The source-backed branch prerequisites passed. Host point-read,
+components/depth, the closed eight-response selected-texture interval, strict
+replay, conversion dependencies at events 121/249 and checked retirement all
+passed. This run's raw renderer finding mask was 128 (LOAD7 only); historical
+7/27 findings above are not relabeled. Content, internal GPU creation, restore
+and composite qualification remain false.
+
+H1 retained 81 of 528 phase callbacks, with 447 sample evictions; its one
+reason-7 incident was retained, with no dropped incidents or unknown reasons.
+The bounded history does not establish continuous timing, physical-input,
+uninterrupted audio or PCM equivalence. All 15 recorded process identities and
+four owned groups are absent, and the server port is closed. Frozen source,
+51 observed served files and 45 separately required artifacts stayed unchanged.
+
+The obsolete held C1 grouping proposal is superseded by this synchronous
+owned-plan milestone. Returned-idle preparation and one-use dispatch are still
+absent: current-callback borrowed owners cannot be retained across return.
+The next coherent private pair needs an authenticated pre-leg owner boundary,
+then actual snapshot→tick/full draw→restore→repeat with explicit host and GPU
+content/lifetime closure. GPU references/futures, mutable resource preservation
+and gameplay admission remain NO-GO; this capture enables none of them.
+
+This closes only the scoped default-context point/component observation. No
+same-instance drawn restore/repeat, continuous host-future closure, PCM
+equivalence, performance or all-owner acceptance is claimed. Current validation,
+actual capture, root review and the preserved `76dc`/`d5`/`fcbb` failures are under
+`combined_host_point_and_conversion_observation` in the
+[existing structured receipt](../evidence/match-only-rollback-feasibility-v1.json).
 
 ## Slippi profile source checkpoint
 

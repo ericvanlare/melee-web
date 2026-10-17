@@ -17,6 +17,7 @@ struct Callbacks {
 };
 void callback(uint64_t id,MeleeWebIoResult result,size_t size,void* user){
     auto& s=*static_cast<Callbacks*>(user);char error[256];uint32_t completed=99;
+    check(!melee_web_io_quiescent(s.io),"A dequeued request still owns its running callback");
     check(!melee_web_io_pump(s.io,1,&completed,error,sizeof(error)),"Reentrant pump rejected");
     check(!melee_web_io_destroy(s.io,error,sizeof(error)),"Callback-time destruction rejected");
     check(!melee_web_io_remove(s.io,s.dest.handle,error,sizeof(error)),"Active callback destination retained");
@@ -25,6 +26,8 @@ void callback(uint64_t id,MeleeWebIoResult result,size_t size,void* user){
 }
 int main(){try{
     char error[256];auto* io=melee_web_io_create(error,sizeof(error));check(io,error);
+    check(!melee_web_io_quiescent(nullptr),"Absent I/O owner does not establish quiescence");
+    check(melee_web_io_quiescent(io),"New live owner is quiescent");
     std::array<unsigned char,64> source;for(unsigned i=0;i<source.size();i++)source[i]=i+1;
     uint64_t file,memory,aux,found;size_t len;
     check(melee_web_io_add_file(io,"/EfMr.dat",source.data(),source.size(),&file,error,sizeof(error)),error);
@@ -41,12 +44,14 @@ int main(){try{
     check(melee_web_io_submit(io,state.source,{MELEE_WEB_IO_AUXILIARY,aux,0},64,nullptr,nullptr,&first,error,sizeof(error)),error);
     check(melee_web_io_submit(io,{MELEE_WEB_IO_AUXILIARY,aux,0},state.dest,64,callback,&state,&second,error,sizeof(error)),error);
     check(state.ids.empty()&&melee_web_io_pending(io)==2&&static_cast<unsigned char*>(output)[0]==0,"Posting never completes inline");
+    check(!melee_web_io_quiescent(io),"Queued transfer prevents endpoint admission");
     check(!melee_web_io_remove(io,file,error,sizeof(error)),"Queued source cannot disappear");
     check(!melee_web_io_destroy(io,error,sizeof(error)),"Pending work cannot be silently dropped");
     uint32_t completed;check(melee_web_io_pump(io,1,&completed,error,sizeof(error))&&completed==1,"Bounded pump");
     check(state.ids.empty()&&static_cast<unsigned char*>(output)[0]==0,"FIFO first leg only");
     check(melee_web_io_pump(io,16,&completed,error,sizeof(error))&&completed==1,"FIFO second leg");
     check(state.ids==std::vector<uint64_t>{second}&&state.results[0]==MELEE_WEB_IO_COMPLETE&&state.sizes[0]==64,"Completion identity and actual byte count");
+    check(melee_web_io_quiescent(io),"Completed pump releases endpoint admission");
     for(unsigned i=0;i<64;i++)check(static_cast<unsigned char*>(output)[i]==i+1,"File through auxiliary to memory bytes");
     // Reject every invalid transfer before touching the destination or invoking callbacks.
     uint64_t ignored;

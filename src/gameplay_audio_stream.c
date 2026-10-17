@@ -2,6 +2,7 @@
 #include "gameplay_audio_stream.h"
 #include "gameplay_io.h"
 #include "gameplay_source_files.h"
+#include "gameplay_first_pair_file_guard.h"
 #include <dolphin/ax.h>
 #include <dolphin/dvd.h>
 #include <sysdolphin/baselib/devcom.h>
@@ -99,6 +100,7 @@ static int decode_slot(unsigned slot,const MeleeWebAudioStreamBlock* block,const
  return 1;
 }
 MeleeWebAudioStream* melee_web_audio_stream_begin_registry(MeleeWebAudio* audio,const MeleeWebAudioStreamInput* inputs,uint32_t input_count,char* e,size_t n){
+ if(!melee_web_first_pair_file_operation("native.hps.begin")){fail(e,n,"First-pair file-operation guard refused HPS ownership change");return NULL;}
  if(active||!melee_web_audio_is_active(audio)||!inputs||!input_count||input_count>STREAM_MAX_FILES){fail(e,n,"Invalid or already-owned HPS scope");return NULL;}
  size_t total_blocks=0;
  for(uint32_t i=0;i<input_count;i++){
@@ -134,6 +136,7 @@ s32 DVDConvertPathToEntrynum(const char* path){
  int entry=melee_web_audio_bank_transport_path(path);if(entry>=0)return entry;
  entry=melee_web_source_file_entry(path);if(entry>=0)return entry;
  if(!active)stop("DVD path requested without an owned file registry");
+ if(!melee_web_first_pair_file_operation("native.hps.select-file"))stop("first-pair file-operation guard refused HPS file selection");
  if(!melee_web_audio_stream_pump_for(active->audio,NULL,0))stop("pending HPS transfer failed before file selection");
  const StreamFile* file=file_for_path(path);if(file){active->selected_file=(unsigned)(file-active->files)+1;return (s32)active->selected_file;}
  fprintf(stderr,"Original HPS path is not owned: %s\n",path?path:"(null)");
@@ -149,11 +152,13 @@ int HSD_DevComRequest(int file,uintptr_t src,uintptr_t dest,size_t size,int type
  }
  const StreamFile* selected=active?file_at((unsigned)file):NULL;
  if(!active||!selected||priority<0||priority>2||src%32||size%32||!size||!callback){
+  if(!melee_web_first_pair_file_operation("native.unknown-devcom-request"))stop("first-pair file-operation guard refused unknown DevCom request");
   fprintf(stderr,"DevCom file=%d src=%lu dest=%lu size=%lu type=%d priority=%d callback=%p stream=%p bank=%d\n",
       file,(unsigned long)src,(unsigned long)dest,(unsigned long)size,type,priority,(void*)callback,(void*)active,
       melee_web_audio_bank_transport_active());
   stop("unsupported file/request alignment, priority, or callback");
  }
+ if(!melee_web_first_pair_file_operation("native.hps.request"))stop("first-pair file-operation guard refused HPS request");
  Request* r=calloc(1,sizeof(*r));if(!r)stop("request allocation failed");
  r->src=src;r->dest=dest;r->size=size;r->type=type;r->priority=priority;r->callback=callback;r->args=(uintptr_t)args;r->file=(unsigned)file;
  if(type==0x22){if(src||dest||size!=128)stop("unsupported relay request");}
@@ -171,10 +176,10 @@ int HSD_DevComCancelEx(int id,u32 flags,HSD_DevComCallback callback,void* args){
  if(melee_web_audio_bank_transport_cancel(id,flags,callback,args))return 0;
  if(melee_web_source_file_cancel(id,flags,callback,args))return 0;
  if(!active||flags&~3u)stop("unsupported DevCom cancellation");
- for(Request* r=active->requests;r;r=r->next)if(r->id==id){if(flags&1)r->callback=callback;if(flags&2)r->args=(uintptr_t)args;r->cancelled=1;break;}return 0;
+ for(Request* r=active->requests;r;r=r->next)if(r->id==id){if(!melee_web_first_pair_file_operation("native.hps.cancel"))stop("first-pair file-operation guard refused HPS cancellation");if(flags&1)r->callback=callback;if(flags&2)r->args=(uintptr_t)args;r->cancelled=1;break;}return 0;
 }
 int melee_web_audio_stream_pump_for(MeleeWebAudio* audio,char* e,size_t n){
- if(!active||active->audio!=audio)return 1;if(active->pumping)return fail(e,n,"Reentrant HPS transport pump");active->pumping=1;
+ if(!active||active->audio!=audio)return 1;if(active->pumping)return fail(e,n,"Reentrant HPS transport pump");if(active->requests&&!melee_web_first_pair_file_operation("native.hps.pump"))return fail(e,n,"First-pair file-operation guard refused HPS completion");active->pumping=1;
  unsigned budget=64;
  while(active->requests&&budget--){
  Request** chosen=&active->requests;for(Request** at=&active->requests;*at;at=&(*at)->next)if((*at)->priority<(*chosen)->priority)chosen=at;
@@ -204,7 +209,12 @@ int melee_web_audio_stream_resolve(MeleeWebAudio* audio,uint32_t address,const M
 int melee_web_audio_stream_progress(MeleeWebAudio* a,uint32_t* completed,uint32_t* revisited){if(!active||active->audio!=a||!completed||!revisited)return 0;*completed=active->completed;*revisited=active->revisited;return 1;}
 const char* melee_web_audio_stream_path(MeleeWebAudio* a){if(!active||active->audio!=a||!active->selected_file)return NULL;return active->files[active->selected_file-1].input->path;}
 int melee_web_audio_stream_owned(MeleeWebAudio* a){return active&&active->audio==a;}
+int melee_web_audio_stream_quiescent_for(MeleeWebAudio* a){
+ return a&&active&&active->audio==a&&!active->requests&&!active->pumping&&
+        melee_web_io_quiescent(active->io);
+}
 int melee_web_audio_stream_end(MeleeWebAudioStream* s,char* e,size_t n){
+ if(!melee_web_first_pair_file_operation("native.hps.end"))return fail(e,n,"First-pair file-operation guard refused HPS owner release");
  if(!s||active!=s||s->pumping)return fail(e,n,"HPS scope is not active or is pumping");
  if(!melee_web_audio_stream_pump_for(s->audio,e,n))return 0;
  if(melee_web_audio_is_active(s->audio)){
