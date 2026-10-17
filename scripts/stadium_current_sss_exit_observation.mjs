@@ -8,11 +8,13 @@ const requireValue = (v, message) => { if (!v) throw Error(message); };
 
 // Passed as the actual page function; deliberately has no module-scope closure.
 // Controls use a synthetic Module solely for call ordering/ownership semantics.
-export function installCurrentSssExitReplayArm({recipeBytes}) {
+export function installCurrentSssExitReplayArm({recipeBytes, observationProfile = 0}) {
   const module = globalThis.Module;
   const key = '_melee_web_native_menu_replay';
   const original = Object.getOwnPropertyDescriptor(module || {}, key);
-  const arm = module?._melee_web_native_menu_stadium_current_sss_exit_arm;
+  if (observationProfile !== 0 && observationProfile !== 1) throw Error('Unknown private SSS observation profile');
+  const armKey = observationProfile === 1 ? '_melee_web_native_menu_stadium_current_sss_exit_arm_profile' : '_melee_web_native_menu_stadium_current_sss_exit_arm';
+  const arm = module?.[armKey];
   const observe = module?._melee_web_native_menu_stadium_current_sss_exit_observe;
   const idle = module?.stadiumMatchedSetupNativeIdle;
   if (!original || !Object.hasOwn(original, 'value') ||
@@ -31,7 +33,7 @@ export function installCurrentSssExitReplayArm({recipeBytes}) {
     return globalThis.Module === module && now && now.value === installed.value &&
       now.writable === installed.writable && now.enumerable === installed.enumerable &&
       now.configurable === installed.configurable &&
-      module._melee_web_native_menu_stadium_current_sss_exit_arm === arm &&
+      module[armKey] === arm &&
       module._melee_web_native_menu_stadium_current_sss_exit_observe === observe &&
       module.stadiumMatchedSetupNativeIdle === idle;
   };
@@ -48,7 +50,7 @@ export function installCurrentSssExitReplayArm({recipeBytes}) {
           !(module.HEAPU8 instanceof Uint8Array) || args[0] + bytes.length > module.HEAPU8.length ||
           !bytes.every((v, i) => module.HEAPU8[args[0] + i] === v) || idle() !== true)
         throw Error('Current SSS diagnostic parsed a foreign recipe or lost its returned idle owner');
-      if (Reflect.apply(arm, module, []) !== 1)
+      if (Reflect.apply(arm, module, observationProfile === 1 ? [1] : []) !== 1)
         throw Error('Current SSS diagnostic native arm refused; ordinary launch suppressed');
       if (!owns()) throw Error('Current SSS native arm changed replay callback ownership');
       state.armed = true;
@@ -87,6 +89,10 @@ export function validateCurrentSssExitExpected(v) {
     Number.isSafeInteger(v.notification_cursor) && v.notification_cursor > 0 &&
     Array.isArray(v.literal_inputs) && v.literal_inputs.length === v.notification_cursor,
   'Current SSS expectation scope/recipe/input shape differs');
+  return validateSssExitExpectedFields(v);
+}
+
+export function validateSssExitExpectedFields(v) {
   for (const [index, row] of v.literal_inputs.entries())
     requireValue(row.index === index && [1, 2].includes(row.scene) &&
       Array.isArray(row.pads) && row.pads.length === 4 && row.pads.every(p => hex(p, 11)),
@@ -104,6 +110,10 @@ export function validateCurrentSssExitExpected(v) {
 
 export function compareCurrentSssExitObservation(actual, expected) {
   validateCurrentSssExitExpected(expected);
+  return compareSssExitObservationFields(actual, expected);
+}
+
+export function compareSssExitObservationFields(actual, expected) {
   requireValue(actual?.scope === 'passive_sss_onexit_return_only' &&
     actual.armed === true && actual.notified === true && actual.failed === false &&
     actual.error === null && actual.notification_received === true && actual.observation_state === 2 &&
@@ -142,6 +152,10 @@ export function compareCurrentSssExitObservation(actual, expected) {
 
 export function validateCurrentSssExitTrace(text, expected, actual) {
   validateCurrentSssExitExpected(expected);
+  return validateSssExitTraceFields(text, expected, actual);
+}
+
+export function validateSssExitTraceFields(text, expected, actual) {
   const rows = text.trim().split('\n').map(line => JSON.parse(line));
   requireValue(rows.every(r => ['header', 'session_frame', 'current_sss_exit_order'].includes(r.record)),
     'Current SSS trace contains an unexpected native record');

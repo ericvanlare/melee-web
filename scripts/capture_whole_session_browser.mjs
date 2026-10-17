@@ -9,6 +9,8 @@
  */
 import {installCurrentSssExitReplayArm, validateCurrentSssExitExpected, compareCurrentSssExitObservation,
   validateCurrentSssExitTrace, validateCurrentSssExitTerminal, validateCurrentSssExitFinalization} from './stadium_current_sss_exit_observation.mjs';
+import {validateStock4SssExitExpected, compareStock4SssExitObservation, validateStock4SssExitTrace,
+  validateStock4SssExitTerminal, validateStock4SssExitFinalization} from './stadium_stock4_sss_exit_observation.mjs';
 import fs from 'node:fs/promises';
 import {closeSync, createReadStream, fsyncSync, openSync, writeSync} from 'node:fs';
 import path from 'node:path';
@@ -217,6 +219,9 @@ const report = {
   unexpected_requests: [],
 };
 let currentSssExpected, currentSssRecipeBytes, currentSssArm;
+let currentSssStock4 = false;
+let currentSssPolicy = {compare: compareCurrentSssExitObservation, terminal: validateCurrentSssExitTerminal,
+  trace: validateCurrentSssExitTrace, finalization: validateCurrentSssExitFinalization};
 let currentSssTrace = null;
 let browser;
 let page;
@@ -793,7 +798,14 @@ try {
     report.inputs.current_sss_expected = await statInput(currentSssExitPath);
     if (report.inputs.current_sss_expected.sha256 !== values['stadium-current-sss-exit-expected-sha256'])
       throw Error('Current SSS expectation hash differs');
-    currentSssExpected = validateCurrentSssExitExpected(JSON.parse(await fs.readFile(currentSssExitPath, 'utf8')));
+    const expected = JSON.parse(await fs.readFile(currentSssExitPath, 'utf8'));
+    currentSssStock4 = expected?.schema === 'melee-web-stock4-none-sss-exit-host-expectation-v1';
+    currentSssExpected = currentSssStock4 ? validateStock4SssExitExpected(expected) : validateCurrentSssExitExpected(expected);
+    if (currentSssStock4) {
+      currentSssPolicy = {compare: compareStock4SssExitObservation, terminal: validateStock4SssExitTerminal,
+        trace: validateStock4SssExitTrace, finalization: validateStock4SssExitFinalization};
+      report.scope = 'Retained stock4/None first SSS OnExit common-field component; explicit stopped/incomplete replay, UNKNOWN menu draws, no Entry/C3';
+    }
     if (currentSssExpected.recipe.sha256 !== report.inputs.recipe.sha256 ||
         currentSssExpected.recipe.bytes !== recipeBytes.length || report.requested_entity_prefix)
       throw Error('Current SSS literal recipe/profile differs');
@@ -1075,7 +1087,7 @@ try {
   }
   if (currentSssExit) {
     currentSssArm = await observePageOperation('install current SSS returned-parser arm', () =>
-      page.evaluateHandle(installCurrentSssExitReplayArm, {recipeBytes: currentSssRecipeBytes}));
+      page.evaluateHandle(installCurrentSssExitReplayArm, {recipeBytes: currentSssRecipeBytes, observationProfile: currentSssStock4 ? 1 : 0}));
     await phase('current-sss-exit-component', async () => {
       const deadline = Date.now() + replayTimeoutMs;
       await page.locator('#retail-replay-start').click();
@@ -1091,7 +1103,20 @@ try {
         if (value.notification_received && !report.current_sss_exit.observation) {
           report.current_sss_exit.observation = value;
           await write('current-sss-exit-observation.json', value); // retain before assertions
-          report.current_sss_exit.comparison = compareCurrentSssExitObservation(value, currentSssExpected);
+        }
+        if (value.failed) throw Error(value.error || 'Current SSS native observation failed');
+        if (value.notification_received && !report.current_sss_exit.comparison &&
+            (!currentSssStock4 || value.terminal?.complete === true)) {
+          report.current_sss_exit.observation = value;
+          await write('current-sss-exit-observation.json', value);
+          report.current_sss_exit.comparison = currentSssPolicy.compare(value, currentSssExpected);
+        }
+        if (currentSssStock4 && report.current_sss_exit.comparison?.pass &&
+            !report.current_sss_exit.unload_requested) {
+          // Invoke the existing UI stop once. Its retained reason and normal
+          // finishRetailReplay/unloadAndSave path keep full replay incomplete.
+          report.current_sss_exit.unload_requested = true;
+          await page.locator('#unload').click();
         }
         const last = await snapshot('current-sss-exit-poll', {captureCss: false});
         if (!last || last.snapshot_error) throw Error(last?.snapshot_error || 'Current SSS page unavailable');
@@ -1100,11 +1125,21 @@ try {
           report.browser_report = last.replay_report;
           if (!report.current_sss_exit.observation)
             throw Error(wrapper.failure || 'Replay ended before current SSS note');
-          report.current_sss_exit.terminal = validateCurrentSssExitTerminal(last.replay_report, last, currentSssExpected);
-          report.current_sss_exit.runtime_replay = 'FAIL_INCOMPLETE_EXPECTED_TIME_REFUSAL';
+          if (currentSssStock4) {
+            const unloaded = await observePageOperation('current SSS normal unload receipt', () =>
+              currentSssArm.evaluate(scope => scope.observe()));
+            report.current_sss_exit.unloaded_observation = unloaded.value;
+            await write('current-sss-exit-unloaded-observation.json', unloaded);
+            if (unloaded.busy || !unloaded.value) throw Error('Current SSS unload is still busy');
+          }
+          report.current_sss_exit.terminal = currentSssPolicy.terminal(last.replay_report, last,
+            currentSssExpected, report.current_sss_exit.unloaded_observation);
+          report.current_sss_exit.runtime_replay = currentSssStock4 ?
+            'FAIL_INCOMPLETE_EXPLICIT_SSS_STOP' : 'FAIL_INCOMPLETE_EXPECTED_TIME_REFUSAL';
           return;
         }
-        if (last.runtime_error && !String(last.runtime_error).includes(currentSssExpected.expected_runtime_refusal))
+        if (last.runtime_error && (currentSssStock4 ||
+            !String(last.runtime_error).includes(currentSssExpected.expected_runtime_refusal)))
           throw Error(last.runtime_error);
         if (pageErrors.length) throw Error('Current SSS browser diagnostics failed');
         await new Promise(resolve => setTimeout(resolve, replayPollMs));
@@ -1710,16 +1745,16 @@ try {
         if (!report.artifact_inventory_post.equal ||
             JSON.stringify(report.artifact_inventory_post) !== JSON.stringify(report.artifact_inventory_pre))
           throw Error('Current SSS artifact inventory changed');
-        report.current_sss_exit.finalization = validateCurrentSssExitFinalization(report, currentSssExpected);
+        report.current_sss_exit.finalization = currentSssPolicy.finalization(report, currentSssExpected);
         if (!report.current_sss_exit?.comparison?.pass || !report.current_sss_exit?.terminal?.pass ||
             !currentSssTrace || report.browser_errors.length || report.unexpected_requests.length ||
             report.close_error || report.cdp_close_error || report.download_error || report.screenshot_error ||
             report.current_sss_exit.wrapper_restored !== true || report.cleanup?.browser_close_returned !== true)
           throw Error('Current SSS component evidence/diagnostics/cleanup incomplete');
-        report.current_sss_exit.trace_comparison = validateCurrentSssExitTrace(currentSssTrace,
+        report.current_sss_exit.trace_comparison = currentSssPolicy.trace(currentSssTrace,
           currentSssExpected, report.current_sss_exit.observation);
         report.current_sss_exit.component_pass = true;
-        report.result = 'component_pass_replay_refused';
+        report.result = currentSssStock4 ? 'component_pass_replay_stopped' : 'component_pass_replay_refused';
       } catch (error) {
         report.current_sss_exit ||= {};
         report.current_sss_exit.component_pass = false;
@@ -1737,8 +1772,9 @@ if (diagnostic) {
   if (report.result !== 'captured' || process.exitCode) process.exitCode = 1;
   else console.log(`captured: ${report.natural_pause_terminal?.outcome || 'unknown'}; diagnosis only`);
 } else if (currentSssExit) {
-  if (report.result !== 'component_pass_replay_refused') process.exitCode = 1;
-  else console.log('component pass: retained SSS OnExit fields; original TIME replay refused/incomplete; no Entry/C3');
+  if (report.result !== (currentSssStock4 ? 'component_pass_replay_stopped' : 'component_pass_replay_refused')) process.exitCode = 1;
+  else console.log(currentSssStock4 ? 'component pass: retained stock4 SSS OnExit fields; replay explicitly stopped/incomplete; no Entry/C3' :
+    'component pass: retained SSS OnExit fields; original TIME replay refused/incomplete; no Entry/C3');
 } else if (report.result !== 'pass') process.exitCode = 1;
 else if (firstReplayCallbackProbe)
   console.log(`pass: first replay callback returned at cursor ${report.post_callback_native_state?.source_cursor}; ${report.boundary_markers_received} durable markers; no full-session or GPU-cause claim`);

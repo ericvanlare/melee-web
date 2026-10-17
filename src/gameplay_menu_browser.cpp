@@ -129,7 +129,16 @@ struct FirstCssBrowserPostdrawStreamState {
  FirstCssDrawSample tick{},draw{},transition{};
 };
 FirstCssBrowserDrawState first_css_browser_draw;
+enum class CurrentSssExitProfile : unsigned { Time120 = 0, Stock4None = 1 };
+uint64_t current_sss_asset_request_calls=0;
 struct CurrentSssExitState {
+ CurrentSssExitProfile profile=CurrentSssExitProfile::Time120;
+ bool leave_started=false,terminal_pending=false,terminal=false;
+ size_t terminal_cursor=0,terminal_steps=0,terminal_draws=0;
+ uint64_t leave_asset_requests=0,terminal_asset_requests=0;
+ uint32_t leave_asset_generation=0;
+ const void* leave_world=nullptr;
+ const void* leave_cache=nullptr;
  bool armed=false,notified=false,failed=false;
  bool notification_received=false,host_tick_in_flight=false,last_host_tick_returned=false;
  bool notification_in_host_tick=false,notification_last_tick_returned=false;
@@ -1744,6 +1753,9 @@ void request_assets(AssetDestination destination,
                     const MeleeWebMenuMatchSelection* selection,
                     const MeleeWebOpeningPreview* opening_preview,
                     int opening_state){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ ++current_sss_asset_request_calls;
+#endif
  check(!world&&!match&&!host_entered&&!results&&!prize,
        "Close source asset owners before requesting a scope");
  std::vector<std::string> names;
@@ -3258,6 +3270,96 @@ bool first_sss_vs_setup_service(){
 }
 #endif
 
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+bool current_sss_exit_profile_valid(const melee_web::RetailReplayRecipe& recipe,
+                                    CurrentSssExitProfile profile){
+ const auto& selection=recipe.selection;const auto& r=selection.start.rules;
+ const bool common=selection.save_profile_present&&selection.unlocked_characters==2047&&
+     selection.unlocked_stages==2047&&selection.player_count==2&&r.stkind==St_Kind_PStadium&&
+     r.is_vs&&r.x20==UINT64_MAX&&selection.start.players[0].ckind==8&&
+     selection.start.players[1].ckind==8&&selection.start.players[0].slot_type==Gm_PKind_Human&&
+     selection.start.players[1].slot_type==Gm_PKind_Human&&
+     selection.start.players[0].color==1&&selection.start.players[1].color==0;
+ if(!common)return false;
+ if(profile==CurrentSssExitProfile::Time120)
+  return r.match_kind==MatchKind_Time&&!r.is_stock&&r.time_limit==120&&r.xB==2&&
+         selection.start.players[0].stocks==3&&selection.start.players[1].stocks==3;
+ if(profile==CurrentSssExitProfile::Stock4None)
+  return recipe.frames.size()==2006&&r.match_kind==1&&r.is_stock&&r.time_limit==0&&r.xB==-1&&
+         !r.timer_enabled&&!r.timer_counts_up&&!r.disable_pausing&&!r.is_teams&&
+         selection.start.players[0].stocks==4&&selection.start.players[1].stocks==4;
+ return false;
+}
+void current_sss_exit_before_leave(){
+ auto& s=current_sss_exit;
+ if(!s.armed||s.profile!=CurrentSssExitProfile::Stock4None||
+    !host||melee_web_menu_host_source_scene(host)!=MELEE_WEB_MENU_HOST_SCENE_SSS)return;
+ check(!s.leave_started&&!s.terminal_pending&&!s.terminal&&!s.notified&&!s.failed&&
+       replay&&replay.get()==s.recipe&&host==s.host_owner&&host_entered&&world&&
+       !match&&!results&&!prize&&pending&&!preparation.busy()&&
+       replay_source_frames.steps()==0&&replay_source_frames.draws()==0&&!replay_source_frames.pending(),
+       "Stock4 SSS leave stop requires its original pending SSS owner");
+ s.leave_started=true;s.leave_world=world.get();s.leave_cache=archive_cache.get();
+ s.leave_asset_generation=asset_generation;s.leave_asset_requests=current_sss_asset_request_calls;
+}
+void current_sss_exit_after_preparation(){
+ auto& s=current_sss_exit;
+ if(!s.leave_started)return;
+ check(!s.terminal_pending&&!s.terminal&&!s.failed&&s.notified&&
+       s.observation.state==2&&s.observation.note.captured&&s.notification_received&&
+       !s.notification_in_host_tick&&s.notification_last_tick_returned&&
+       !s.host_tick_in_flight&&s.last_host_tick_returned,
+       "Stock4 SSS stop requires the ordinary menu leave note and returned host tick");
+ // The actual request/profile/clear/running/clock/leave/audio/notification order
+ // is untouched. Retain WaitingForAudio until normal unload cancels it.
+ s.terminal_pending=true;
+}
+void current_sss_exit_finish_stock4(size_t steps,size_t draws,bool source_pending){
+ auto& s=current_sss_exit;
+ if(!s.terminal_pending)return;
+ check(s.armed&&s.profile==CurrentSssExitProfile::Stock4None&&!s.terminal&&!s.failed&&
+       replay&&replay.get()==s.recipe&&replay->initial_css.get()==s.context&&
+       host==s.host_owner&&world&&world.get()==s.leave_world&&archive_cache.get()==s.leave_cache&&
+       !match&&!results&&!prize&&!faulted&&!host_entered&&
+       melee_web_menu_host_phase(host)==MELEE_WEB_MENU_READY&&
+       s.observation.note.world_generation==melee_web_gameplay_generation()&&
+       !pending&&!running&&preparation.waiting_for_audio()&&!menu_scene_rebuild_pending&&
+       asset_destination==AssetDestination::None&&asset_scope.pending_generation()==0&&
+       asset_generation==s.leave_asset_generation&&current_sss_asset_request_calls==s.leave_asset_requests,
+       "Stock4 SSS stop lost its returned pre-assets owner or pending preparation");
+ check(replay_cursor==s.notification_cursor&&steps==0&&draws==0&&!source_pending&&
+       s.notification_steps==0&&s.notification_draws==0,
+       "Stock4 SSS stop has unaccounted source input/tick/draw work");
+ s.terminal_cursor=replay_cursor;s.terminal_steps=steps;s.terminal_draws=draws;
+ s.terminal_asset_requests=current_sss_asset_request_calls-s.leave_asset_requests;
+ s.terminal_pending=false;s.terminal=true;
+ // No state reset, pause, or synthetic completion: this callback already ran
+ // its unchanged scheduled audio and source-frame finish/presentation policy.
+}
+int current_sss_exit_arm(CurrentSssExitProfile profile){try{
+ auto& s=current_sss_exit;
+ check(!s.armed&&replay&&replay_trace&&replay->version==8&&replay->initial_css&&
+       !replay->diagnostic_entity_prefix&&replay_cursor==0&&!replay_started&&
+       scoped_assets&&scoped_disc_import&&source_session_owned&&
+       world&&host&&!host_entered&&!world_exposed&&!match&&!results&&!prize&&
+       !running&&!pending&&!faulted&&!preparation.busy()&&
+       asset_destination==AssetDestination::None&&asset_scope.pending_generation()==0&&
+       !first_css_browser_draw.armed&&!stadium_c1a_armed&&!melee_web_net_active()&&
+       melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CREATED,
+       "Current SSS exit arm requires one fresh parsed v8 replay/context owner");
+ check(profile==CurrentSssExitProfile::Time120||profile==CurrentSssExitProfile::Stock4None,
+       "Current SSS exit observation profile is unknown");
+ check(current_sss_exit_profile_valid(*replay,profile),
+       "Current SSS exit arm refuses a different declared source profile");
+ check(melee_web_gameplay_generation()!=0,"Current SSS exit arm has no prepared native world");
+ char error[256]{};
+ check(melee_web_menu_host_enable_stadium_c1a(host,error,sizeof(error)),error);
+ s.recipe=replay.get();s.context=replay->initial_css.get();s.host_owner=host;
+ s.world_generation=melee_web_gameplay_generation();
+ s.profile=profile;s.armed=true;return 1;
+}catch(const std::exception& e){message=e.what();return 0;}}
+#endif
+
 void tick(){
 #if defined(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC)
  if(match_draw_discard_terminal)return;
@@ -3296,6 +3398,14 @@ void tick(){
  if(first_sss_sequence_service())return;
 #endif
  service_render_cache_writes();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(current_sss_exit.profile==CurrentSssExitProfile::Stock4None&&current_sss_exit.terminal){
+  // Owner/unload commands above still run. UI-only polling drives the existing
+  // stopped-replay finalizer. Normal cache flush above remains reachable
+  // after unload; no source clock, transition or draw work follows.
+  EM_ASM({window.menuFrame?.(false);});return;
+ }
+#endif
  const double started=emscripten_get_now();
  const bool running_at_callback_start=running;
  const AuroraStats stats_before=aurora_stats_snapshot();
@@ -3797,7 +3907,13 @@ void tick(){
           "GPU completion timed out during scene preparation");
    }
   }else if(pending){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    current_sss_exit_before_leave();
+#endif
    begin_preparation();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    current_sss_exit_after_preparation();
+#endif
   }
   // Preparation can reset the simulation clock after doing substantial native
   // construction work. Sample again here so that work is not charged to the
@@ -4410,8 +4526,16 @@ void tick(){
     message="Whole-session replay complete; final original character select entered.";
    }
   }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  current_sss_exit_finish_stock4(source_frames.steps(),source_frames.draws(),source_frames.pending());
+#endif
  }catch(const std::exception& e){
   const std::string primary=e.what();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(current_sss_exit.armed&&current_sss_exit.profile==CurrentSssExitProfile::Stock4None){
+   current_sss_exit.failed=true;current_sss_exit.error=primary;
+  }
+#endif
   abort_sudden_death_after_failure(primary);
   diagnostic_incident(4);running=false;faulted=true;preparation.reset();render_only_preparation=false;pending=false;clear_diagnostic_pad();clear_scheduled_results_pad();clear_scheduled_results_pauses();menu_clock.reset();
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
@@ -4706,35 +4830,15 @@ int melee_web_native_menu_phase(){
  return host?melee_web_menu_host_phase(host):0;
 }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-int melee_web_native_menu_stadium_current_sss_exit_arm(){try{
- auto& s=current_sss_exit;
- check(!s.armed&&replay&&replay_trace&&replay->version==8&&replay->initial_css&&
-       !replay->diagnostic_entity_prefix&&replay_cursor==0&&!replay_started&&
-       scoped_assets&&scoped_disc_import&&source_session_owned&&
-       world&&host&&!host_entered&&!world_exposed&&!match&&!results&&!prize&&
-       !running&&!pending&&!faulted&&!preparation.busy()&&
-       asset_destination==AssetDestination::None&&asset_scope.pending_generation()==0&&
-       !first_css_browser_draw.armed&&!stadium_c1a_armed&&!melee_web_net_active()&&
-       melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CREATED,
-       "Current SSS exit arm requires one fresh parsed v8 replay/context owner");
- const auto& selection=replay->selection;const auto& r=selection.start.rules;
- check(selection.save_profile_present&&selection.unlocked_characters==2047&&
-       selection.unlocked_stages==2047&&selection.player_count==2&&
-       r.stkind==St_Kind_PStadium&&r.match_kind==MatchKind_Time&&!r.is_stock&&
-       r.is_vs&&r.time_limit==120&&r.xB==2&&r.x20==UINT64_MAX&&
-       selection.start.players[0].ckind==8&&selection.start.players[1].ckind==8&&
-       selection.start.players[0].slot_type==Gm_PKind_Human&&
-       selection.start.players[1].slot_type==Gm_PKind_Human&&
-       selection.start.players[0].color==1&&selection.start.players[1].color==0&&
-       selection.start.players[0].stocks==3&&selection.start.players[1].stocks==3,
-       "Current SSS exit arm refuses a different declared source profile");
- check(melee_web_gameplay_generation()!=0,"Current SSS exit arm has no prepared native world");
- char error[256]{};
- check(melee_web_menu_host_enable_stadium_c1a(host,error,sizeof(error)),error);
- s.recipe=replay.get();s.context=replay->initial_css.get();s.host_owner=host;
- s.world_generation=melee_web_gameplay_generation();
- s.armed=true;return 1;
-}catch(const std::exception& e){message=e.what();return 0;}}
+int melee_web_native_menu_stadium_current_sss_exit_arm(){
+ return current_sss_exit_arm(CurrentSssExitProfile::Time120);
+}
+int melee_web_native_menu_stadium_current_sss_exit_arm_profile(unsigned profile){
+ if(profile!=static_cast<unsigned>(CurrentSssExitProfile::Stock4None)){
+  message="Typed current SSS arm requires the explicit stock4/None profile";return 0;
+ }
+ return current_sss_exit_arm(CurrentSssExitProfile::Stock4None);
+}
 const char* melee_web_native_menu_stadium_current_sss_exit_observe(){
  auto& s=current_sss_exit;std::ostringstream out;
  out<<"{\"scope\":\"passive_sss_onexit_return_only\",\"armed\":"<<(s.armed?"true":"false")
@@ -4755,6 +4859,15 @@ const char* melee_web_native_menu_stadium_current_sss_exit_observe(){
  if(s.notified&&s.observation.note.captured)out<<'"'<<melee_web::stadium_first_css_diagnostic::hex(
      reinterpret_cast<const uint8_t*>(&s.observation.note.sss),sizeof(s.observation.note.sss))<<'"';
  else out<<"null";
+ if(s.profile==CurrentSssExitProfile::Stock4None){
+  out<<",\"observation_profile\":1,\"terminal\":{\"complete\":"<<(s.terminal&&!s.failed&&!faulted?"true":"false")
+     <<",\"host_call_returned\":"<<(s.last_host_tick_returned&&!s.host_tick_in_flight?"true":"false")
+     <<",\"cursor\":"<<s.terminal_cursor<<",\"callback_source_steps\":"<<s.terminal_steps
+     <<",\"callback_source_draws\":"<<s.terminal_draws
+     <<",\"asset_requests_after_leave_boundary\":"<<(current_sss_asset_request_calls-s.leave_asset_requests)
+     <<",\"waiting_for_audio_retained_until_unload\":"<<(s.terminal?"true":"false")
+     <<",\"native_unloaded\":"<<(!world&&!host&&!match&&!results&&!prize&&!pending&&!running&&!preparation.busy()&&asset_destination==AssetDestination::None&&asset_scope.pending_generation()==0?"true":"false")<<'}';
+ }
  out<<'}';s.json=out.str();return s.json.c_str();
 }
 int melee_web_native_menu_stadium_first_css_draw_arm(

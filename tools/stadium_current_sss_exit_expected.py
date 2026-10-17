@@ -66,14 +66,53 @@ def build_expected(binding):
             'expected_runtime_refusal': 'Original VS entry produced an unsupported Stadium diagnostic payload'}
 
 
+def build_stock4_expected(binding):
+    # Reuse the admitted packet and exact recorded first-SSS projection. This
+    # does not rewrite its seed, PAD, input coordinates, or original operands.
+    value = build_expected(binding)
+    # Rules are applied AFTER the SSS exit note. The earlier SSS payload is
+    # left entirely literal; admit the prepared profile from the strict packet's
+    # actual later Entry/Setup, never by rewriting earlier source operands.
+    current = packet.build_packet(binding)
+    first = current['matches'][0]
+    entry, setup = first['entry'], first['setup']
+    want = entry['declared_setup']
+    packet.require(value['recipe']['frames'] == 2006 and
+                   want['match_kind'] == 1 and want['is_stock'] is True and
+                   want['stage'] == 3 and want['time_limit_seconds'] == 0 and
+                   want['item_frequency'] == -1 and not want['timer_enabled'] and
+                   not want['timer_counts_up'] and not want['disable_pausing'] and
+                   not want['is_teams'] and
+                   [(p['character_kind'], p['costume'], p['stocks'], p['player_type'])
+                    for p in want['players']] == [(8, 1, 4, 0), (8, 0, 4, 0)] and
+                   entry['declared_setup'] == setup['declared_setup'] and
+                   entry['start_melee_hex'] == setup['start_melee_hex'] and
+                   value['source']['sequence'] < entry['sequence'] < setup['sequence'],
+                   'Recorded prepared Entry/Setup stock4/None profile differs')
+    keys = ('sequence', 'source_tick', 'draw_ordinal', 'match_index', 'boundary', 'pc',
+            'start_melee_hex', 'start_melee_sha256', 'declared_setup')
+    value['prepared_profile'] = {
+        'scope': 'original_prepared_Entry_Setup_profile_not_SSS_payload',
+        'source_primary_sha256': value['primary_sha256'],
+        'entry': {k: entry[k] for k in keys},
+        'setup': {k: setup[k] for k in keys}}
+    value['schema'] = 'melee-web-stock4-none-sss-exit-host-expectation-v1'
+    value['observation_profile'] = 1
+    del value['expected_runtime_refusal']
+    value['expected_replay_stop'] = 'Manual unload stopped the replay'
+    return value
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--binding', type=Path, required=True)
     p.add_argument('--binding-sha256', required=True)
     p.add_argument('--out', type=Path, required=True)
+    p.add_argument('--observation-profile', choices=('time120', 'stock4-none'), default='time120')
     a = p.parse_args()
     packet.require(packet.sha(a.binding) == a.binding_sha256, 'Binding hash mismatch')
-    value = build_expected(json.loads(a.binding.read_text()))
+    builder = build_stock4_expected if a.observation_profile == 'stock4-none' else build_expected
+    value = builder(json.loads(a.binding.read_text()))
     with a.out.open('x') as f:
         f.write(json.dumps(value, indent=2) + '\n')
 
