@@ -70,7 +70,7 @@ test('valid PAD mutation is structurally possible; pinned host identity and cons
       source_frames_before: 0, source_frames_after: 1, source_frames: 1}};
   assert.equal(await driver.accept(observation), false);
   assert.equal(approvals, 0);
-  assert.match(driver.status().first_error, /literal consumed PAD/);
+  assert.match(driver.status().first_error, /scheduled raw-argument PAD/);
 });
 
 test('full scope requires exact explicit preflight/export mapping; defaults remain prefix', () => {

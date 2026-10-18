@@ -263,7 +263,7 @@ def _checker_fakes(captures, *, winner_b=1, winners_b=None,
         return {"status": "declared_state_match"}
 
     def compare_port(*_args):
-        return {"status": native_status if "native" in str(_args[-1])
+        return {"status": native_status if Path(_args[-1]).parent.name == "native"
                 else "declared_state_match"}
 
     def fake_analyze(*_args, **_kwargs):
@@ -460,7 +460,7 @@ class CpuMatchReportTests(unittest.TestCase):
                 CHECKER.check_manifest(manifest)
 
     def test_complete_pair_preserves_distinct_native_and_browser_statuses(self):
-        with tempfile.TemporaryDirectory(prefix="cpu-match-report-") as directory:
+        with tempfile.TemporaryDirectory(prefix="cpu-match-native-parent-") as directory:
             root = Path(directory)
             manifest, plan_sha, _ = _write_manifest(root)
             captures = _fake_captures(root, plan_sha)
