@@ -1,14 +1,17 @@
 # UCF input-history lifetime and rollback ownership
 
-**Source identified / Reference compiled / Selected initialization metadata observed**
+**Source identified / Reference compiled / Selected initialization metadata observed / Isolated storage validated**
 
 [Milestone #339](https://github.com/ericvanlare/melee-web/issues/339) binds the
 shared UCF Pad Buffer/Cardinals history before its dependent behaviors are
 implemented. The source describes four 12-byte rows with 40 meaningful bytes,
-indexed by the processed PAD slot. Selected endpoint observations now identify a candidate runtime table span.
-History updates, match reset and dynamic snapshot/restore behavior remain open.
-The [structured receipt](../evidence/ucf-history-ownership-v1.json) keeps exact
-source, failure, review and build identities.
+indexed by the processed PAD slot. Selected endpoint observations identify a
+candidate runtime table span. A standalone format-v1 storage component now
+passes independent review and the full repository suite, but it is not wired
+to a live producer, consumer, match reset, or Slippi snapshot path. Actual
+nonzero history updates, match lifetime and dynamic capture/restore behavior
+remain open. The [structured receipt](../evidence/ucf-history-ownership-v1.json)
+keeps exact source, failure, review and build identities.
 
 ## Reference source and build
 
@@ -101,6 +104,29 @@ initialization metadata, not a gameplay or rollback witness. The six grants
 were supported as a group by the conversion fixture; neither their individual
 necessity nor the client's original failure cause was proved.
 
+## Isolated history storage component
+
+Source commit `11c24f87a266c237b1a4c53edceae6f2962fdd5f` adds the standalone
+GPL own-C `ucf_input_history` component at storage format version 1. Its payload
+is exactly four 12-byte rows (48 bytes total), including all eight reserved
+bytes. Fresh ownership uses a caller-provided unique nonzero token; snapshots
+copy payload bytes and fieldwise format/token metadata, and disposal invalidates
+the token. The existing active identity remains
+`slippi-render-dependencies-dbooc-shield-drop-v5`; this component is unreferenced
+by the overlay and adds no live history producer or consumer, per-match reset,
+or runtime snapshot integration.
+
+Independent code review passed for the seven component, fixture, discovery and
+README files. The focused native/Wasm fixture passed and emitted the same
+captured 48-byte vector in both environments. A retained disposable
+copy-before-refusal mutant failed the fixture's unchanged-state assertion as
+expected. The full regression at this source commit exited successfully after
+unittest reported 2,427 tests, with 166 skipped, in 530.218 seconds (530.759
+seconds runner elapsed). These controls validate only the isolated storage API;
+they do not demonstrate a real UCF history update, live reset, or game
+Capture/Load behavior. Exact file and receipt hashes are in the structured
+receipt.
+
 ## Next boundary
 
 Pinned source places the entire observed 48-byte span inside the fixed backup
@@ -109,9 +135,13 @@ It lies below the observed main heap; fixed-region membership is the ownership
 basis. This static projection does not establish that Capture/Load ran, or that
 guest preserve blocks did not overwrite restored bytes.
 
-The next component is isolated 48-byte storage and transactional snapshots,
-preserving all eight reserved bytes and using explicit fresh-session ownership.
-It will have no live producer or per-match reset API. Nonzero history updates,
-match lifetime and dynamic reference capture/restore remain gates before
-activation or closing #339. Do not repeat successful initialization without a
-new hypothesis. No complete profile or live rollback claim follows.
+The next engineering step is preparation of the minimal phase and ordinary-input
+bridge under the reviewed source plan; no runtime route or attempt has been
+released. The first proposed observation is a local chooser input and phase
+change, without confirming a mode. A later eligible human-fighter observation
+will seek nonzero history under a valid installed-pointer epoch. The five
+still-open consumer paths, actual match/reset lifetime, and Slippi Capture/Load
+preserve-block and restore-order behavior remain separate gates. The isolated component
+does not establish those runtime behaviors. Do not repeat successful
+initialization without a new hypothesis. No complete profile or live rollback
+claim follows.

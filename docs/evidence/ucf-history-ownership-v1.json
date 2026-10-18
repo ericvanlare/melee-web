@@ -1,9 +1,9 @@
 {
   "schema": "melee-web-ucf-history-ownership-v1",
   "issue": 339,
-  "state": "selected_initialization_metadata_observed_history_lifetime_open",
+  "state": "selected_initialization_metadata_observed_isolated_storage_v1_validated_history_lifetime_open",
   "source_base": "130438fd2b86d00cfec98cd2ba0a5f66084ae15c",
-  "scope": "Source-bound reference build, two retained failed init-only attempts, source/fixture reduction and selected initialization metadata from a third bounded offline attempt. Unauthenticated endpoint; no gameplay, complete profile or rollback claim.",
+  "scope": "Source-bound reference build, two retained failed init-only attempts, source/fixture reduction and selected initialization metadata from a third bounded offline attempt, plus an independently reviewed isolated history-storage component and passing full regression. Unauthenticated endpoint; no live history behavior, complete profile or rollback claim.",
   "history_contract": {
     "source_audit_sha256": "07fcbf61535816c488be1e1e341ee839139f4e98efac9046d7d26b0deed987b4",
     "snapshot_followup_sha256": "2d112f6e1fa8be776a1ddf514a058e51419a1337b21c76c92eb9ac90c25e65f3",
@@ -14,7 +14,8 @@
     "unobserved": [
       "authenticated installation and history updates",
       "actual match reset and lifetime",
-      "dynamic snapshot capture/load and dependent behavior agreement"
+      "five remaining consumer paths and their runtime behavior",
+      "dynamic Slippi snapshot capture/load integration and dependent behavior agreement"
     ],
     "source_projection": {
       "packet_sha256": "527fb6390edeeb4e8efdb3aeb5fe92bd58b81847916b9637558b5d4024fae6b4",
@@ -89,13 +90,108 @@
     "old_lock_unchanged": true,
     "policy": "Process-local builder network denial plus offline Cargo; owned external cache/output. No client executable launch or application staging."
   },
+  "isolated_storage_component": {
+    "component_identity": "slippi-profile/ucf_input_history; storage format version 1",
+    "source_commit": "11c24f87a266c237b1a4c53edceae6f2962fdd5f",
+    "reviewed_candidate_source_head": "a42a853fdb6884b3e92467775ae5e50aa0a2272b",
+    "active_profile_identity_unchanged": "slippi-render-dependencies-dbooc-shield-drop-v5",
+    "layout": {
+      "rows": 4,
+      "row_bytes": 12,
+      "payload_bytes": 48,
+      "meaningful_bytes": 40,
+      "reserved_bytes_preserved": 8,
+      "owner": "caller-provided unique nonzero token; fresh object precondition; no registry"
+    },
+    "component_files": [
+      {
+        "path": "src/slippi_profile/ucf_input_history.h",
+        "sha256": "3394d3050ff8a8086964b830bfc0218864ca8d2ee1742e5424577d5d2f7427d2"
+      },
+      {
+        "path": "src/slippi_profile/ucf_input_history.c",
+        "sha256": "e3179d8647f5804eac0ce53a21ab3070d71699564af7bcb6ba5d7ef0a06fa4d9"
+      },
+      {
+        "path": "src/slippi_profile/tests/ucf_input_history_fixture.c",
+        "sha256": "0449f82145a2602a219adb3303106fd67566338109e037bf3414fd4fc20910ab"
+      },
+      {
+        "path": "src/slippi_profile/tests/test_ucf_input_history.py",
+        "sha256": "eca321d402db7a925d039e17d927b81df5dbee7a28610f72bbe39bb1907ab705"
+      },
+      {
+        "path": "tests/test_slippi_profile_controls_discovery.py",
+        "sha256": "3bb3cd9df6b8237f83f4bca51cfd57a26fadfeeb9ee3519234d665e027587c12"
+      },
+      {
+        "path": "src/slippi_profile/tests/test_ci_discovery.py",
+        "sha256": "992da4829079129df6da4f77ca4f02e21c764509e02a85c7703f283ba6ae8b0a"
+      },
+      {
+        "path": "src/slippi_profile/README.md",
+        "sha256": "304c5490886d039815cdd7b697bfcc37c0a07e6dedf70740150f84ba8c6608e7"
+      }
+    ],
+    "independent_code_review": {
+      "receipt_sha256": "c9f3bdf6df54ce3a8e65279db4b5b97a4d862bd3c9efddce82f733bc98d813b8",
+      "candidate_receipt": "implementation-candidate-v2.json",
+      "candidate_receipt_sha256": "9d84c0a613fee9c0822ef1d662f5e1d02e9f208cefc14e82a76f678e08ca11c2",
+      "verdict": "PASS_ISOLATED_STORAGE_COMPONENT_ONLY",
+      "live_producer": false,
+      "live_consumer": false,
+      "per_match_reset_api": false,
+      "production_overlay_or_runtime_snapshot_integration": false
+    },
+    "focused_native_wasm": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest src.slippi_profile.tests.test_ucf_input_history -v",
+      "status": "PASS",
+      "tests": 1,
+      "native_wasm_stdout_equal": true,
+      "captured_payload_hex": "007f80ff010203040001a1a211223344556677880102a3a4908172635445362702fea5a6f0e1d2c3b4a5968703ffa7a8",
+      "stdout_sha256": "eee4ce2377e2b770cada1f3e5c45365f4fb8815df0d8a4053f9c27dd98c768d7",
+      "candidate_receipt_sha256": "9d84c0a613fee9c0822ef1d662f5e1d02e9f208cefc14e82a76f678e08ca11c2"
+    },
+    "transaction_negative_control": {
+      "receipt": "transaction-negative-control-v1/receipt.json",
+      "receipt_sha256": "1695881474d0bd194a1f09f1f18e147c25f2e83484a005178e2a297d7b657db9",
+      "mutant_source_sha256": "b77a28ee1649e8ef9c3e2f1d9cebc3ce13c8f316097ed92b6d63b1660332bff1",
+      "status": "EXPECTED_GUARD_FAILURE_DETECTED",
+      "mutation": "Disposable copy-before-refusal of 47 bytes before rejecting payload_size 47",
+      "expected_unchanged_state_assertion": "memcmp(payload, expected, sizeof(payload)) == 0",
+      "run_returncode": -6,
+      "stderr_sha256": "da81e85c6b8cbcbdf2730efa04b07afb7e45c483fef572ea1525aba60ab1314f",
+      "production_source_unchanged": true,
+      "mutant_binary_removed": true
+    },
+    "full_regression": {
+      "source_commit": "11c24f87a266c237b1a4c53edceae6f2962fdd5f",
+      "status": "PASS",
+      "tests_reported": 2427,
+      "skipped": 166,
+      "unittest_seconds": 530.218,
+      "runner_elapsed_seconds": 530.7594342501834,
+      "log_sha256": "4fdc71e3381da162dcd551ce8a63bf528031c051b75fb2cf3a9cb2bcacf17bfb",
+      "result_sha256": "eeaa88e0ae908eca191c9f0923d9f58c219d512a04b10db8d28f65940fb68c4b",
+      "returncode": 0,
+      "timeout": false,
+      "tracked_source_changes": [],
+      "owned_groups_remaining": []
+    },
+    "scope": "Isolated C storage and synthetic byte-snapshot controls only. This does not establish an actual UCF producer/update, any of the five consumer paths, match/reset lifetime, or actual Slippi Capture/Load behavior."
+  },
   "historical_binary": {
     "actual_sha256": "b5697c69fbe6b18359f173c85c5c2cad4fa34cfa307558234af07937211b0c7a",
     "locked_sha256": "e4c8a5fb914baf10f25ccbf1077b9a6880a7abb84619db5a1cf294d866ff673b",
     "matching_build_receipt_found": false,
     "new_build_relabels_historical_artifact": false
   },
-  "next": "Review and implement only the isolated 48-byte history storage/snapshot component with explicit fresh session ownership and no producer or per-match reset API. Nonzero reference history/reset/restore gates remain open before activation or issue closure.",
+  "next": "Prepare and review the minimal phase/ordinary-input bridge, then observe only its local chooser change without confirming a mode. A later eligible human-fighter observation will seek nonzero history under a valid installed-pointer epoch. The five remaining consumer paths, actual match/reset lifetime, and Slippi Capture/Load preserve-block overlap and restore order remain separate gates. No producer activation, per-match reset, complete profile or issue closure follows from the isolated component tests.",
+  "route_admission": {
+    "status": "ENGINEERING_PREPARATION_PENDING",
+    "reviewed_source_plan": "minimal-menu-input-bridge-packet-v1.json",
+    "reviewed_source_plan_sha256": "e5302bdb22192ca934a13f436a5196b40dd24374e7fe55712a82fc9517f99e1c"
+  },
   "exclusions": [
     "official Slippi services/contact",
     "complete UCF profile",
