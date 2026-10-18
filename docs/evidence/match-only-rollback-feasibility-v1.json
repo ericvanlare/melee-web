@@ -1642,7 +1642,7 @@
       "result_sha256": "aedf80e459a7c2c643bab6598028fd9770e41bc9a04ef263ccec07c139015aba"
     },
     "mainline_extraction": {
-      "status": "BOUNDED_COMPARISON_PASS_CI_DISCOVERY_REPAIRED_FINAL_VALIDATION_PENDING",
+      "status": "MERGED_REVIEWED_TREE_BOUNDED_COMPONENT_PASS",
       "base_commit": "95113326ecf81379879c43e0a725a3962286b4de",
       "dirty_candidate": true,
       "freeze": {
@@ -1753,7 +1753,15 @@
           "log": "mainline-validation-v2/full-regression.log",
           "log_sha256": "12411619a3689a8133858d27cfbdcbff3c9549d52538dc1f7e0945c91e1544f7"
         },
-        "current_head_CI": "fresh head pending; strict CI audit unchanged",
+        "current_head_CI": {
+          "result": "pass",
+          "head": "bf996e692d19097d54c87ddc44b9281ce5b5d8b2",
+          "run_id": 39103409619,
+          "checks": 14,
+          "successes": 12,
+          "expected_skips": 2,
+          "receipt": "pr328-final-ci-readback.json"
+        },
         "default_trace_prerequisites": "Normal default configure plus bootstrap, collision and fighter-assets focused checks passed; same frozen executable source.",
         "current_head_CI_v1": {
           "head": "97a806fcc4cc660893e34b7bac3d2edbc3fddc03",
@@ -1782,9 +1790,27 @@
           "result": "independently reviewed pass; behavior-free forwarding classes keep normal flat test IDs; actual discovery/shard/aggregate positive and misassignment negative controls pass",
           "runtime_and_capture_sources_unchanged": true
         },
-        "full_regression_v3": "pending on repaired test-discovery source; prior successful runtime builds and bounded capture remain distinct"
+        "full_regression_v3": {
+          "result": "pass",
+          "head": "bf996e692d19097d54c87ddc44b9281ce5b5d8b2",
+          "tests": 2413,
+          "skipped": 166,
+          "failures": 0,
+          "errors": 0,
+          "log": "mainline-validation-v3/full-regression.log",
+          "log_sha256": "b9f08d9f639872e0fd20ec8fe8dc34ef8759d90ddb8935c88874e88ffc9ccbca"
+        }
       },
-      "limits": "Same bounded declared-state/PCM/PAD component limits as historical precursor; no combat path witnesses, whole hidden-state/host closure, original Slippi reference, live rollback or frame-budget acceptance."
+      "limits": "Same bounded declared-state/PCM/PAD component limits as historical precursor; no combat path witnesses, whole hidden-state/host closure, original Slippi reference, live rollback or frame-budget acceptance.",
+      "integration": {
+        "pr": 328,
+        "merge": "0aea806b7f7cf9f62118a05d17c03bc7fd2c0166",
+        "reviewed_head": "bf996e692d19097d54c87ddc44b9281ce5b5d8b2",
+        "reviewed_and_merged_tree": "aafa9014b6b61b0388789d374648cb2bca1004d3",
+        "trees_equal": true,
+        "receipt": "pr328-integration-receipt.json",
+        "historical_runtime_bytes": "retained-pr328-v1-builds/manifest.json"
+      }
     },
     "historical_full_regression": {
       "tests": 2458,
@@ -1792,6 +1818,124 @@
       "failures": 1,
       "retained_log": "validation-v1/full-regression.log",
       "failure": "Ordinary build mock expected prepare_sources(root,lock); candidate passed optional slippi_profile=False. NEW preserves ordinary call shape; historical candidate remains unchanged."
+    }
+  },
+  "render_dependency_coverage_v2": {
+    "status": "REVIEWED_NATIVE_PROFILE_V2_BUILDS_AND_REGRESSION_PASS_CI_PENDING",
+    "issue": 329,
+    "artifact_run": "slippi-no-draw-pivot-20261017-212701-0e394502",
+    "base_commit": "0aea806b7f7cf9f62118a05d17c03bc7fd2c0166",
+    "offscreen_timer": {
+      "scope": "Actual extracted Fighter_8006A360 outer gate, timer threshold, damage request and reset with explicit synthetic state/service fixtures; not the complete damage service or a gameplay run",
+      "source_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+      "timer_block_sha256": "e41438c2abea413c96f035e63c975c0ded58eb89a62d8da0b3a4b13c92edcca5",
+      "freeze": "offscreen-root-repair-v4-freeze.json",
+      "focused": "offscreen-root-validation-v4/focused.json",
+      "focused_log_sha256": "d1fb3c5ebb3b1365581c0ad43534655da3329e82730b73c3ba767f442958db5e",
+      "result": "pass; 12 Python tests and 9 nested Node controls on the recorded candidate",
+      "review": "independent-offscreen-timer-reduction-review-v4.json",
+      "review_sha256": "d08d3d8ec1978a70980dde08232c666ec95cf93dadabd9f0a30f40c7143028cf",
+      "negative": "independent-action-negative-v2/receipt.json",
+      "negative_result": "Mutated Star-KO exclusion 4 to5; independently parsed authored enum remained4/6 and damage_calls==0 assertion failed as required",
+      "limits": "Synthetic threshold/bounds/damage/cap, no browser combat witness, no full damage/RNG or original Slippi runtime comparison",
+      "retained_failures": [
+        "offscreen-timer-reduction-candidate-v1: initial missing fixture brace and vertical test with inherited outside X",
+        "independent-action-negative/failure-receipt.json: missing adjacent header prevented mutant execution; not counted as successful negative"
+      ]
+    },
+    "deadupfall_original_causal_red": {
+      "result": "PASS_REDUCED_ORIGINAL_DRAW_DEPENDENCY_COUNTEREXAMPLE",
+      "receipt": "deadupfall-causal-reduction-v1/receipt.json",
+      "receipt_sha256": "12ed9edbc2efbf79ecb35b881662aa0c84aa9ba19eb82895452834c9449afa02",
+      "review": "independent-deadupfall-causal-red-review-v1.json",
+      "review_sha256": "452c2412c2e191abf9059105b357b2b83000c1555d7ef58de34c902683aee4f7",
+      "source_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+      "source_components": [
+        "actual ftDrawCommon_80080E18_inline2 and four outer guards",
+        "actual melee_web_ps_mtx_mult_vec math body",
+        "actual Fighter_8006A360 position-consumer prefix",
+        "actual fn_800D4DD4 callback"
+      ],
+      "synthetic_camera_translation_y": -2,
+      "drawn": {
+        "cur_pos_y_bits": "c0000000",
+        "pos_delta_y_bits": "c0000000",
+        "terminal_service_requests": 1
+      },
+      "omitted_draw": {
+        "cur_pos_y_bits": "00000000",
+        "pos_delta_y_bits": "00000000",
+        "terminal_service_requests": 0
+      },
+      "controls": "identity-view and four draw-guard controls pass",
+      "limits": "Native reduced source result with explicit synthetic adapters; not live KO, full service semantics or general reader closure"
+    },
+    "next": "Complete exact-head CI and reviewed integration for #329; continue inventory and a path-entering restored-interval comparison before expanding profile/live rollback claims.",
+    "limits": [
+      "Incomplete diagnostic profile only; no player mode toggle or live rollback",
+      "Indirect model/collision/roster/stage reader closure remains open",
+      "Exceptional FP status/NaN payload parity and pinned original Slippi runtime comparison remain unverified"
+    ],
+    "parent_issues": [
+      318,
+      9
+    ],
+    "profile_identity": "slippi-render-dependencies-v2",
+    "deadupfall_profile": {
+      "implementation": "Three own-C hooks for private velocity initialization, ordered update and draw-only model position; vanilla generated source remains separate",
+      "slippi_source_commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+      "mapping": "Online/Core/FreezeDeadUpFallPhysics/{InitHitVelocity,UpdateFallVelocity,UpdateModelPos}.asm at pinned commit fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+      "spec_audit": "deadupfall-hook-continuation-audit-v1.json",
+      "spec_audit_sha256": "11cb3ada055c9ec172b04264a0a2750e4a78f6b111b9e66ee7d84d01c6cd43d1",
+      "spec_correction": "Retained retail DOL continuation proves the hook replaces temp+=self XYZ. Preserve existing tempX; use privateZ+tempZ operand order. Earlier design wording and candidate own expectations were incorrect and remain retained.",
+      "freeze": "deadupfall-spec-repair-v1/freeze.json",
+      "freeze_sha256": "3a9195948d588308d49643a51f331817f22533d57d6ae80ba324d55977ad4338",
+      "source_helper_sha256": "4c9840a1f629a6d2c751fd47d7368bcc91a5f3b0b43a090b6e13e49ad67c8458",
+      "focused": "deadupfall-spec-repair-v1/focused-result.json",
+      "focused_result": "13 Python and 9 nested Node controls pass; native all-hooks exit0 and three omitted hooks each exit86 at their specific expected invariant",
+      "controls": [
+        "Actual composed source phase2 initialization and phase3 physics, original draw helper/driver, actual math and next-tick position consumer",
+        "Compare declared motion/velocity/position bytes with omitted, repeated and changed-view draw; preserve original gate/early-break/clear",
+        "Nonzero ordinary selfX cannot change preexisting tempX; carry across early break consumed once",
+        "Literal float-bit signedzero, finite clamp and float store/reload controls; no NaN payload or FPSCR claim"
+      ],
+      "review": "deadupfall-v2-root-source-review-v1.json",
+      "review_sha256": "bc9bd443c155803d8c4fe410f0020ff74ac04a0ca69b57bd2254a9c547a675ea",
+      "limits": "Synthetic Fighter/JObj projections and bounded service adapters; extracted case2/3, not full phase1/KO reachability, full game state or original Slippi runtime comparison"
+    },
+    "retained_profile_failures": [
+      "Earlier phase-1 switch chosen by generator: retained NEW/work/slippi-deadupfall-v2-9qx9n_e7",
+      "Draw helper/driver renaming anchor failure: retained NEW/work/slippi-deadupfall-v2-wdherp41",
+      "Duplicate timer placeholder before compilation: deadupfall-v2-focused-v1/focused-result-v1.json",
+      "Escalated generation passed but native vector assertion failed: deadupfall-v2-generator-escalation-v1/freeze.json",
+      "External diagnostic proved expected Y5.5 was incorrect; source accumulation yields5.25: deadupfall-v2-vector-diagnostic-v1/receipt.json",
+      "Candidate focused pass in deadupfall-v2-focused-cohort-v2/freeze.json encoded incorrect extraX expectation; not counted as Slippi behavior validation; superseded by retained DOL audit and spec repair"
+    ],
+    "model_events_inventory": {
+      "receipt": "root-ftparts-model-events-edge-v1.json",
+      "sha256": "0382fafe5aaa44bf590fb75eae2b4ea30191178a1f0973d7700b9e8d2083ad23",
+      "review": "model-events-edge-root-review-v1.json",
+      "review_sha256": "37eae5d3a53f1d92315eb48da4b7d98c3e7b25ff83a179dd470748f6bcf08ad2",
+      "finding": "Mario callback table slot0 is null; only Kirby/Purin slots populated. Inspected callbacks write model visibility/cache, with no direct simulation write found.",
+      "scope": "Pinned C table/calls; no new test or runtime change; generic ftParts and indirect/external consumers remain open."
+    },
+    "validation": {
+      "freeze": "deadupfall-v2-build-validation-v1/freeze.json",
+      "freeze_sha256": "34b5aa2c04c7641703e19827be73126cec96ffdbabf2230aa7e9a0aa8617c78e",
+      "builds": [
+        "Opt-in profile Release: pass",
+        "Ordinary runtime Release: pass"
+      ],
+      "full_regression": {
+        "tests": 2415,
+        "skipped": 166,
+        "failures": 0,
+        "log": "deadupfall-v2-build-validation-v1/full-suite.log",
+        "log_sha256": "a87da6847d12ef54b8428fe84029b734e9530eb5044cbed906dad6a8db1b22dd"
+      },
+      "source_and_runtime_equality": "17 changed non-root-doc files and 13 runtime/build artifacts unchanged across build/regression; retained v1 bytes verified before overwrite",
+      "browser_capture": "not run for v2; reduced source controls are scoped separately",
+      "ci": "pending exact PR head"
     }
   }
 }

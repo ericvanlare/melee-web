@@ -21,6 +21,8 @@ import ci_verify
 PROFILE_TEST_CLASSES = (
     ("src.slippi_profile.tests.test_build_contract", "SlippiSynctestBuildContractTests"),
     ("src.slippi_profile.tests.test_profile_controls", "ProfileControlsTests"),
+    ("src.slippi_profile.tests.test_offscreen_timer_block", "OffscreenTimerBlockTests"),
+    ("src.slippi_profile.tests.test_deadupfall_reduction", "DeadUpFallReductionTests"),
     ("src.slippi_profile.tests.test_runner_contract", "SlippiSynctestRunnerContractTests"),
     ("src.slippi_profile.tests.test_source_composition", "SlippiSourceCompositionTests"),
 )

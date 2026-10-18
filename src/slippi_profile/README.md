@@ -1,11 +1,12 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-# Slippi render-dependency diagnostic profile
+# Slippi render-dependency diagnostic profile (v2)
 
-`slippi-render-dependencies-v1` is an intentionally incomplete diagnostic
-identity. It covers two source-side dependency fixes and a source-draw decision
-for the first correction-tick fixture. It does not identify a complete Slippi
-gameplay, online, rollback, roster, or stage profile. The identity is fixed
-before initialization; there is no runtime mode-switch API.
+`slippi-render-dependencies-v2` is an intentionally incomplete diagnostic
+identity. It covers three source-side dependency fixes and a source-draw
+decision for the bounded correction fixture. It does not identify a complete
+Slippi gameplay, online, rollback, roster, or stage profile. The identity is
+fixed before initialization; there is no runtime mode-switch API. The v1
+identity is historical and is rejected by the current profile implementation.
 
 The C implementation in this directory is licensed under
 [GPL-3.0-or-later](COPYING). The small source overlay is
@@ -30,14 +31,15 @@ unset.
 | --- | --- | --- | --- |
 | `Common/FastForward/DynamicsFix.asm`, `fcf47f10dc244152c2ebaa3a9dec142ea42243b7`, `0x8009E090` | [`patches/melee-profile-hooks.patch`](patches/melee-profile-hooks.patch); `.deps/melee/src/melee/ft/ftdynamics.c`, tail of `ftCo_8009DD94` after its dynamics and Flatzone work. `Fighter_8006D9AC` calls `ftCo_8009E0A8`, whose only call is `ftCo_8009DD94`. | Render-to-update dependency: fighter dynamics leave some JObj matrices dirty, and the shadow-render path normally resolves matrices. The profile walks root, child, then sibling; it calls `HSD_JObjSetupMatrixSub` only for `JOBJ_MTX_DIRTY` nodes without `JOBJ_USER_DEF_MTX`, using the upstream HSD flags. This runs in both present and correction fixtures. | The patch is placed at the source routine's exit corresponding to the pinned injection point. Downstream bone-position, collision, and hitbox reader closure remains incomplete; no claim is made that this closes every render-to-simulation dependency. |
 | `Online/Core/BrawlOffscreenDamage.asm`, same pin, `0x8006A880` | [`patches/melee-profile-hooks.patch`](patches/melee-profile-hooks.patch); `.deps/melee/src/melee/ft/fighter.c`, existing `ifMagnify_802FC998` predicate in `Fighter_8006A360`'s offscreen-damage timer. | Render-to-update dependency: native `ifMagnify_802FBBDC` is a camera render callback that writes `is_offscreen`, then `Fighter_8006A360` reads it through `ifMagnify_802FC998`. The profile replaces that one predicate with strict camera-bound comparisons on fighter position, while excluding Home Run Contest in-game, the typed dead bit `fp->x221F_b1`, and action states 4 and 6. Equal-to-bound positions are inside; ordinary C comparisons leave NaN comparisons false. | Camera bounds are read through the existing stage getters. The first runtime fixture is Mario on Final Destination and does not validate all fighters, actions, or stages. |
+| `Online/Core/FreezeDeadUpFallPhysics/`: `InitHitVelocity.asm` (`0x800D4C1C`), `UpdateFallVelocity.asm` (`0x800D4D68`), and `UpdateModelPos.asm` (`0x80080E80`) | [`patches/melee-profile-hooks.patch`](patches/melee-profile-hooks.patch); `.deps/melee/src/melee/ft/ft_0D31.c` cases in `ftCo_DeadUpFall_Anim` and `ftCo_DeadUpFall_Phys`, plus `ftdrawcommon.c`'s `ftDrawCommon_80080E18_inline2`. The C helpers are [`deadupfall_fix.c`](deadupfall_fix.c) and [`deadupfall_fix.h`](deadupfall_fix.h). | Case-2 initialization stores initial Y/Z in unused motion-union slots and zeros ordinary self velocity. Case-3 physics updates private Y with the original double subtraction, ordered strict terminal comparison, binary32 store/reload, and source-order vector accumulation, preserving the original later position update and early-break order. The draw helper transforms model position to a stack temporary for JObj translation and leaves `cur_pos` untouched; the original next-tick consumer and `fn_800D4DD4` path are included in the reduction. | The native fixture extracts actual case 2 and case 3 only. Its phase-1 no-dispatch check is a reduced-wrapper boundary control, not full phase-1 source coverage; full phase-1 behavior, interpolation, rotation, reader closure, and exceptional floating-point behavior remain unresolved. |
 
-The two source fixes are compiled identically in drawn-present and correction
-fixtures. The draw policy accepts only this profile identity: present ticks
+Both drawn-present and correction fixtures are configured to compile the same
+three source fixes. The draw policy accepts only this profile identity: present ticks
 allow source draw, correction ticks skip source draw, and invalid identities or
 tick kinds return an error. The profile-compiled fixture cannot label itself
 vanilla. This policy is not yet connected to an in-game rollback dispatcher.
 
-## Other selected hooks reviewed, not implemented by v1
+## Other selected hooks reviewed, not implemented by v2
 
 These entries bound the initial source-dependency review; they are not a whole
 roster or stage call graph.
@@ -45,10 +47,9 @@ roster or stage call graph.
 | Pinned Slippi source and injection | Source producer or consumer found | Classification and remaining gap |
 | --- | --- | --- |
 | `Online/Core/Hacks/FD/DesyncProofBGTransformations.asm`, `0x8021AAE4` | `.deps/melee/src/melee/gr/grlast.c`: `grLast_8021AAB0` calls `grLast_8021B2E8` in the Final Destination stage update path. `grLast_8021B2E8` mutates stage-owned state; in case 15, when `xC4_b27` is set, it calls `HSD_Randi` to choose background color and duration. The pinned patch wraps that exact call with save/restore of the shared HSD RNG seed. | Update/RNG edge around display-owned background state, not a direct draw-to-simulation read. The ASM comments place the call after `PlayerThink_Interrupt` and before `PlayerThink_Physics`, and say most gameplay RNG uses have already occurred. Other background RNG consumers and downstream stage-state closure remain unverified. |
-| `Common/PSCameraIndependentMonitor/PSCameraIndependentMonitor.asm`, `0x801D24FC` | `.deps/melee/src/melee/gr/grpstadium.c`: `grStadium_801D2344` runs the monitor state machine; state 8 calls `grStadium_801D32D0`. That helper gets the active `HSD_CObj`, obtains the player's bone position through `ftLib_80086B90`, projects it with `lbVector_WorldToScreen`, clamps the monitor rectangle to the viewport, and writes wrapper coordinates. | Camera/view-derived display state feeds a Stadium update/state decision. The selected fixed-bounds patch is not part of v1's two implementations. The complete stage, RNG, and camera-state consumer closure is unverified. |
+| `Common/PSCameraIndependentMonitor/PSCameraIndependentMonitor.asm`, `0x801D24FC` | `.deps/melee/src/melee/gr/grpstadium.c`: `grStadium_801D2344` runs the monitor state machine; state 8 calls `grStadium_801D32D0`. That helper gets the active `HSD_CObj`, obtains the player's bone position through `ftLib_80086B90`, projects it with `lbVector_WorldToScreen`, clamps the monitor rectangle to the viewport, and writes wrapper coordinates. | Camera/view-derived display state feeds a Stadium update/state decision. The selected fixed-bounds patch is not part of this profile. The complete stage, RNG, and camera-state consumer closure is unverified. |
 | `Online/Core/WhispyBlowDirFix/WhispyBlowDirFix.asm`, `0x8008653C` | `.deps/melee/src/melee/ft/ftlib.c`: the hook is inside `ftLib_800864A8`, which scans fighter entities, obtains bone positions through `ftLib_800866DC`, and compares their X positions to choose a horizontal direction. Callers include Green Greens stage logic (`grGreens_80213C10`) and other stage/item helpers. The helper also uses `HSD_Randi(2)` when the accumulated direction is tied. | Render-derived bone data can feed update-time direction, with a shared-RNG fallback; the pinned patch excludes Star KO and Screen KO states. Exact downstream force and all caller closure remain unresolved. |
-| `Online/Core/FreezeDeadUpFallPhysics/InitHitVelocity.asm` (`0x800D4C1C`), `UpdateFallVelocity.asm` (`0x800D4D68`), and `UpdateModelPos.asm` (`0x80080E80`) | `.deps/melee/src/melee/ft/ft_0D31.c` identifies `ftCo_DeadUpFall_Anim` and `ftCo_DeadUpFall_Phys`; their shared `unk_deadup` overlay uses the stored position/velocity vectors also addressed by the ASM. The physics routine runs `ftCommon_Fall`, adds self velocity to the stored vector, advances position, then clears the temporary vector. `ftdrawcommon.c` maps `UpdateModelPos` to the `ftDrawCommon_80080E18` render callback: its inline helper transforms that stored vector through the inverse viewing matrix, writes `fp->cur_pos`, then sets the fighter JObj translation. | Direct draw-to-physics-position write plus camera-dependent model placement. The ASM splits stored Dead-Up-Fall velocity/position from the ordinary velocity and updates the model position independently of the view transform's write to physics position. Downstream gameplay readers include Ice Climbers' Nana follower logic (`ftCo_800B101C` → `ftCo_CpuUpdateNanaFollow` → `ftCo_800B0E98`), which reads Popo's `cur_pos`; full model, collision, and other reader closure is unresolved. |
-| `Common/NanaDeterminism/NanaDeterminism.asm`, `0x800AC5B8` | `.deps/melee/src/melee/ft/kinds/ftCommon/ftCo_0A01.c`: `ftCo_800AC5A0` computes CPU throw-DI sticks and its source comment confirms `stick_x`/`stick_y` can remain uninitialized when the knockback vector is nearly zero. | Input initialization/determinism behavior, not a render dependency. It is outside v1. |
+| `Common/NanaDeterminism/NanaDeterminism.asm`, `0x800AC5B8` | `.deps/melee/src/melee/ft/kinds/ftCommon/ftCo_0A01.c`: `ftCo_800AC5A0` computes CPU throw-DI sticks and its source comment confirms `stick_x`/`stick_y` can remain uninitialized when the knockback vector is nearly zero. | Input initialization/determinism behavior, not a render dependency. It is outside v2. |
 | `gm_80479D58.unk_4` presentation counter | The generated `gm_1A45.c` helper `melee_web_source_clock_present()` increments `unk_4`; the upstream render loop also increments it after `HSD_VICopyXFBAsync`. `gm_801A4B88(info)` only stores the active `GameSceneInfo*`; searches of pinned C found no read of `unk_4` outside its reset/increment sites. | Presentation-only counter in the inspected C, with non-decomp/ASM consumer closure unresolved. It is not advanced on correction ticks without source authority. |
 | Display- and update-owned state across selected hooks | Confirmed examples include render callback state written by `ifMagnify_802FBBDC` and consumed by fighter offscreen-damage timing; fighter JObj matrices refreshed by the shadow-render path and read by later bone queries; camera/view-derived Stadium monitor placement; Final Destination background state with shared-RNG isolation; and the KO model callback that writes `cur_pos`. | These are distinct direct render-to-update, camera/view-to-update, and update/RNG edges. This bounded review does not establish that these are the only such edges or that any roster or stage family is complete. |
 
@@ -57,6 +58,18 @@ comparison. A passing fixture would establish only that fixture's declared
 state and draw behavior; it would not establish original gameplay accuracy,
 whole-session rollback agreement, online acceptance, other fighter behavior,
 or other stage behavior.
+
+### Historical v1 capture, not v2 validation
+
+The retained v1 browser receipt records a 300-sample prefix and one restored
+sample-300 tick, with 1,280 bytes of declared simulation state, 4,272 PCM
+frames, and a 44-byte raw PAD record. Its restore applied only to Node's
+128 MiB snapshot; the browser lane was never restored, and its first screenshot
+showed the starfield. The reported `corruptedLowByte` value 108 was observed
+after the step; the pre-step mutation was `195 ^ 1 = 194`. This evidence
+predates the v2 DeadUpFall hooks and does not validate them. See the
+[scoped receipt](../../docs/status/2026-10-12-match-only-rollback-feasibility.md#first-no-draw-profile-comparison)
+for that historical result and its limits.
 
 ## Build and run the bounded diagnostic
 
@@ -97,4 +110,13 @@ failure, exact build/source/assets and owner cleanup receipts. After two failed
 experiments, reduce the boundary or obtain bounded review before another run.
 A successful run must not be repeated without a new hypothesis. The current
 [scoped receipt](../../docs/status/2026-10-12-match-only-rollback-feasibility.md#first-no-draw-profile-comparison)
-records evidence and remaining gates.
+records the historical v1 evidence. It does not validate this v2 implementation;
+record a v2-specific receipt after running the current build and capture.
+
+The DeadUpFall spec repair supersedes earlier candidate wording about retaining
+ordinary X accumulation: the retained hook resumes at `0x800D4D84`, after the
+entire original `temp += self_vel` call. The profile preserves existing temp X,
+adds `tempY + storedPrivateY` and `privateZ + tempZ` in that order, then retains
+the original early-break, position update and clear. Focused native controls are
+synthetic source reductions; they do not establish PPC NaN payload/FPSCR parity
+or browser gameplay acceptance.

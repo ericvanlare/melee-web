@@ -1,0 +1,563 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Actual pinned-source fragments are substituted by test_deadupfall_reduction.py.
+ * Fighter and JObj are explicit fixture-owned projections. HSD_GObj remains
+ * the actual pinned declaration from ft/forward.h and baselib/gobj.h. Service
+ * implementations are synthetic bounded observers; unexpected render calls
+ * abort. */
+#include <slippi_profile/deadupfall_fix.h>
+#include <slippi_profile/profile.h>
+#include <melee/ft/kinds/ftCommon/types.h>
+
+#include <assert.h>
+#include <math.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+struct Fighter {
+    struct { union ftCommon_MotionVars co; } mv;
+    Vec3 self_vel;
+    int x221F_b3;
+    int x221E_b5;
+    int x2226_b5;
+    int x2220_b7;
+    int x2223_b3;
+    int x2222_b6;
+    int invisible;
+    struct { void *xC[5]; } x5AC;
+    Vec3 cur_pos;
+    Vec3 pos_delta;
+    Vec3 prev_pos;
+};
+struct HSD_JObj { Vec3 translated; };
+
+_Static_assert(offsetof(HSD_GObj, hsd_obj) ==
+                   offsetof(HSD_GObj, gxlink_prios) + sizeof(u64),
+               "pinned HSD_GObj hsd_obj field order");
+_Static_assert(offsetof(HSD_GObj, user_data) ==
+                   offsetof(HSD_GObj, hsd_obj) + sizeof(void *),
+               "pinned HSD_GObj user_data field order");
+
+_Static_assert(offsetof(union ftCommon_MotionVars, unk_deadup.pad_x48) == 8,
+               "actual source private Y offset");
+_Static_assert(offsetof(union ftCommon_MotionVars, unk_deadup.x4C) == 12,
+               "actual source private Z offset");
+_Static_assert(offsetof(union ftCommon_MotionVars, unk_deadup.x50) == 16,
+               "actual source draw position offset");
+_Static_assert(offsetof(union ftCommon_MotionVars, unk_deadup.x5C) == 28,
+               "actual source accumulation offset");
+
+#define HSD_ASSERT(line, condition) do { (void) (line); assert(condition); } while (0)
+#define GET_FIGHTER(gobj) ((Fighter *) (gobj)->user_data)
+#undef PSMTXMultVec
+#define PSMTXMultVec fixture_recording_ps_mtx_mult_vec
+#define FIXTURE_EXPECT(name, condition) \
+    do { \
+        if (!(condition)) { \
+            fprintf(stderr, "EXPECTED_FAILURE:%s\n", (name)); \
+            fflush(stderr); \
+            exit(86); \
+        } \
+    } while (0)
+
+static Fighter fixture_fighter;
+static HSD_GObj fixture_gobj;
+static HSD_JObj fixture_jobj;
+static Mtx fixture_inverse_view;
+static int fixture_camera_tag;
+static int fixture_camera_mode;
+static int fixture_fighter_usable;
+static float fixture_bottom_bound;
+static unsigned matrix_multiply_calls;
+static unsigned matrix_getter_calls;
+static unsigned camera_getter_calls;
+static unsigned camera_mode_calls;
+static unsigned translation_calls;
+static unsigned anim_calls;
+static unsigned bottom_calls;
+static unsigned terminal_calls;
+static unsigned unused_draw_calls;
+static int translation_source_was_cur_pos;
+
+static void set_identity_view(float translate_y);
+static void reset_fixture(void);
+static void set_config(float *config, float init_y, float init_z,
+                       float gravity, float terminal_velocity, int timer);
+/* Exact source functions extracted from pinned gameplay helpers. */
+@ACTUAL_FALL@
+@ACTUAL_VECTOR_ADD@
+@ACTUAL_MATRIX_FUNCTION@
+
+/* Source case fragments remain verbatim, including original guards/order. */
+static void fixture_anim_original(Fighter *fp, int32_t *data)
+{
+@TIMER_DECREMENT_ORIGINAL@
+    if (fp->mv.co.unk_deadup.x40 == 0) {
+        switch (fp->mv.co.unk_deadup.x44) {
+@ANIM_CASE_ORIGINAL@
+        }
+    }
+}
+
+static void fixture_anim_profile(Fighter *fp, int32_t *data)
+{
+@TIMER_DECREMENT_PROFILE@
+    if (fp->mv.co.unk_deadup.x40 == 0) {
+        switch (fp->mv.co.unk_deadup.x44) {
+@ANIM_CASE_PROFILE@
+        }
+    }
+}
+
+static int fixture_anim_result;
+bool ftAnim_80070FD0(Fighter *fp)
+{
+    assert(fp == &fixture_fighter);
+    anim_calls++;
+    return fixture_anim_result != 0;
+}
+
+static void fixture_physics_original(Fighter *fp, float *config)
+{
+    unsigned char *ca = (unsigned char *) config;
+    switch (fp->mv.co.unk_deadup.x44) {
+@PHYSICS_CASE_ORIGINAL@
+    }
+}
+
+static void fixture_physics_profile(Fighter *fp, float *config)
+{
+    unsigned char *ca = (unsigned char *) config;
+    switch (fp->mv.co.unk_deadup.x44) {
+@PHYSICS_CASE_PROFILE@
+    }
+}
+
+/* The matrix routine's name is changed only to count calls around the actual
+ * source arithmetic. The matrix operation body itself is unmodified. */
+static void fixture_recording_ps_mtx_mult_vec(const Mtx matrix,
+                                               const Vec *source,
+                                               Vec *destination)
+{
+    matrix_multiply_calls++;
+    extracted_melee_web_ps_mtx_mult_vec(matrix, source, destination);
+}
+
+void *Camera_800310B8(void) { camera_getter_calls++; return &fixture_camera_tag; }
+MtxPtr HSD_CObjGetInvViewingMtxPtr(void *camera)
+{
+    assert(camera == &fixture_camera_tag);
+    matrix_getter_calls++;
+    return fixture_inverse_view;
+}
+int Camera_80031060(void) { camera_mode_calls++; return fixture_camera_mode; }
+bool ftLib_80086A8C(HSD_GObj *gobj)
+{
+    assert(gobj == &fixture_gobj);
+    return fixture_fighter_usable != 0;
+}
+void HSD_JObjSetTranslate(HSD_JObj *jobj, Vec3 *position)
+{
+    assert(jobj == &fixture_jobj);
+    translation_calls++;
+    translation_source_was_cur_pos = position == &fixture_fighter.cur_pos;
+    jobj->translated = *position;
+}
+void ftDrawCommon_80080E18_inline0(HSD_GObj *gobj, int flags)
+{
+    (void) gobj; (void) flags;
+    fputs("unexpected inline0 service\n", stderr);
+    abort();
+}
+void ftDrawCommon_80080E18_inline1(HSD_GObj *gobj, int flags)
+{
+    (void) gobj; (void) flags;
+    fputs("unexpected inline1 service\n", stderr);
+    abort();
+}
+void ftDrawCommon_800805C8(HSD_GObj *gobj, int flags, bool visible)
+{
+    (void) flags; (void) visible;
+    assert(gobj == &fixture_gobj);
+    unused_draw_calls++;
+}
+float Stage_GetCamBoundsBottomOffset(void)
+{
+    bottom_calls++;
+    return fixture_bottom_bound;
+}
+void ftCommon_8007E2FC(HSD_GObj *gobj)
+{
+    assert(gobj == &fixture_gobj);
+    terminal_calls++;
+}
+
+@DRAW_HELPER_ORIGINAL@
+@DRAW_HELPER_PROFILE@
+@DRAW_DRIVER_ORIGINAL@
+@DRAW_DRIVER_PROFILE@
+@ACTUAL_ACCESSORY@
+
+static void run_next_tick_position_consumer(Fighter *fp)
+{
+@POSITION_BLOCK@}
+
+static void set_identity_view(float translate_y)
+{
+    memset(fixture_inverse_view, 0, sizeof(fixture_inverse_view));
+    fixture_inverse_view[0][0] = 1.0f;
+    fixture_inverse_view[1][1] = 1.0f;
+    fixture_inverse_view[2][2] = 1.0f;
+    fixture_inverse_view[1][3] = translate_y;
+}
+
+static void reset_fixture(void)
+{
+    memset(&fixture_fighter, 0, sizeof(fixture_fighter));
+    memset(&fixture_gobj, 0, sizeof(fixture_gobj));
+    memset(&fixture_jobj, 0, sizeof(fixture_jobj));
+    fixture_gobj.user_data = &fixture_fighter;
+    fixture_gobj.hsd_obj = &fixture_jobj;
+    fixture_fighter.x2220_b7 = 1;
+    fixture_fighter_usable = 1;
+    fixture_camera_mode = 1;
+    fixture_bottom_bound = -1.0f;
+    matrix_multiply_calls = matrix_getter_calls = camera_getter_calls = 0;
+    camera_mode_calls = translation_calls = anim_calls = 0;
+    bottom_calls = terminal_calls = unused_draw_calls = 0;
+    translation_source_was_cur_pos = 0;
+    fixture_anim_result = 1;
+    set_identity_view(0.0f);
+}
+
+static void set_config(float *config, float init_y, float init_z,
+                       float gravity, float terminal_velocity, int timer)
+{
+    memset(config, 0, sizeof(float) * 16);
+    memcpy(config + 12, &init_y, sizeof(init_y));
+    memcpy(config + 15, &init_z, sizeof(init_z));
+    memcpy((unsigned char *) config + 0x34, &gravity, sizeof(gravity));
+    memcpy((unsigned char *) config + 0x38, &terminal_velocity,
+           sizeof(terminal_velocity));
+    (void) timer;
+}
+
+static void profile_anim(Fighter *fp, float *config, int timer)
+{
+    int32_t data[16];
+    memset(data, 0, sizeof(data));
+    memcpy(data + 12, config + 12, sizeof(float));
+    memcpy(data + 15, config + 15, sizeof(float));
+    data[4] = timer;
+    fixture_anim_profile(fp, data);
+}
+
+static void original_anim(Fighter *fp, float *config, int timer)
+{
+    int32_t data[16];
+    memset(data, 0, sizeof(data));
+    memcpy(data + 12, config + 12, sizeof(float));
+    memcpy(data + 15, config + 15, sizeof(float));
+    data[4] = timer;
+    fixture_anim_original(fp, data);
+}
+
+static void assert_vec(Vec3 got, Vec3 expected)
+{
+    assert(got.x == expected.x && got.y == expected.y && got.z == expected.z);
+}
+
+static void test_original_source_causal_red(void)
+{
+    float config[16];
+    set_config(config, 2.0f, 0.5f, 0.25f, 1.5f, 1);
+    reset_fixture();
+    fixture_fighter.mv.co.unk_deadup.x44 = 2;
+    fixture_fighter.mv.co.unk_deadup.x40 = 1;
+    original_anim(&fixture_fighter, config, 1);
+    assert(fixture_fighter.mv.co.unk_deadup.x44 == 3);
+    fixture_fighter.mv.co.unk_deadup.x50 = (Vec3){3.0f, 0.0f, 0.0f};
+    fixture_fighter.cur_pos = (Vec3){3.0f, 0.0f, 0.0f};
+    fixture_fighter.prev_pos = fixture_fighter.cur_pos;
+    fixture_fighter.cur_pos.x = 3.0f;
+    fixture_bottom_bound = -1.0f;
+    set_identity_view(-2.0f);
+    fixture_draw_original(&fixture_gobj, 17);
+    run_next_tick_position_consumer(&fixture_fighter);
+    fn_800D4DD4(&fixture_gobj);
+    assert_vec(fixture_fighter.cur_pos, (Vec3){3.0f, -2.0f, 0.0f});
+    assert_vec(fixture_fighter.pos_delta, (Vec3){0.0f, -2.0f, 0.0f});
+    assert(terminal_calls == 1);
+
+    reset_fixture();
+    fixture_fighter.mv.co.unk_deadup.x44 = 2;
+    fixture_fighter.mv.co.unk_deadup.x40 = 1;
+    original_anim(&fixture_fighter, config, 1);
+    assert(fixture_fighter.mv.co.unk_deadup.x44 == 3);
+    fixture_fighter.mv.co.unk_deadup.x50 = (Vec3){3.0f, 0.0f, 0.0f};
+    fixture_fighter.cur_pos = (Vec3){3.0f, 0.0f, 0.0f};
+    fixture_fighter.prev_pos = fixture_fighter.cur_pos;
+    set_identity_view(0.0f);
+    fixture_draw_original(&fixture_gobj, 17);
+    run_next_tick_position_consumer(&fixture_fighter);
+    fn_800D4DD4(&fixture_gobj);
+    assert_vec(fixture_fighter.cur_pos, (Vec3){3.0f, 0.0f, 0.0f});
+    assert_vec(fixture_fighter.pos_delta, (Vec3){0.0f, 0.0f, 0.0f});
+    assert(terminal_calls == 0);
+}
+
+static void test_original_physics_source_control(void)
+{
+    float config[16];
+    set_config(config, 2.0f, 0.5f, 0.25f, 1.5f, 1);
+    reset_fixture();
+    fixture_fighter.mv.co.unk_deadup.x44 = 3;
+    fixture_fighter.mv.co.unk_deadup.x50 = (Vec3){3.0f, 4.0f, 5.0f};
+    fixture_fighter.mv.co.unk_deadup.x5C = (Vec3){0.0f, 0.0f, 0.0f};
+    fixture_fighter.self_vel = (Vec3){0.0f, 1.0f, 0.5f};
+    fixture_physics_original(&fixture_fighter, config);
+    assert(fixture_fighter.self_vel.y == 0.75f);
+    assert_vec(fixture_fighter.mv.co.unk_deadup.x50,
+               (Vec3){3.0f, 4.75f, 5.5f});
+    assert_vec(fixture_fighter.mv.co.unk_deadup.x5C,
+               (Vec3){0.0f, 0.0f, 0.0f});
+}
+
+typedef struct SimulationState {
+    union ftCommon_MotionVars motion;
+    Vec3 self_vel;
+    Vec3 cur_pos;
+    Vec3 pos_delta;
+    Vec3 prev_pos;
+    int phase;
+    int timer;
+} SimulationState;
+
+static SimulationState simulation_state(void)
+{
+    return (SimulationState){
+        fixture_fighter.mv.co,
+        fixture_fighter.self_vel,
+        fixture_fighter.cur_pos,
+        fixture_fighter.pos_delta,
+        fixture_fighter.prev_pos,
+        fixture_fighter.mv.co.unk_deadup.x44,
+        fixture_fighter.mv.co.unk_deadup.x40,
+    };
+}
+
+static void assert_same_simulation(SimulationState left, SimulationState right)
+{
+    assert(memcmp(&left.motion, &right.motion, sizeof(left.motion)) == 0);
+    assert(memcmp(&left.self_vel, &right.self_vel, sizeof(left.self_vel)) == 0);
+    assert(memcmp(&left.cur_pos, &right.cur_pos, sizeof(left.cur_pos)) == 0);
+    assert(memcmp(&left.pos_delta, &right.pos_delta, sizeof(left.pos_delta)) == 0);
+    assert(memcmp(&left.prev_pos, &right.prev_pos, sizeof(left.prev_pos)) == 0);
+    assert(left.phase == right.phase && left.timer == right.timer);
+}
+
+static void test_profile_draw_vs_correction(void)
+{
+    puts("PROFILE_GREEN_ENTRY_REACHED");
+    fflush(stdout);
+    float config[16];
+    set_config(config, 2.0f, 0.5f, 0.25f, 1.5f, 1);
+
+    reset_fixture();
+    memset(&fixture_fighter.mv.co, 0xA5, sizeof(fixture_fighter.mv.co));
+    fixture_fighter.mv.co.unk_deadup.x44 = 2;
+    fixture_fighter.mv.co.unk_deadup.x40 = 2;
+    fixture_fighter.mv.co.unk_deadup.x50 = (Vec3){3.0f, 4.0f, 5.0f};
+    fixture_fighter.mv.co.unk_deadup.x5C = (Vec3){0.25f, 0.5f, 0.75f};
+    fixture_fighter.cur_pos = (Vec3){7.0f, 8.0f, 9.0f};
+    fixture_fighter.prev_pos = (Vec3){6.0f, 7.0f, 8.0f};
+    profile_anim(&fixture_fighter, config, 1);
+    assert(fixture_fighter.mv.co.unk_deadup.x40 == 1);
+    assert(fixture_fighter.mv.co.unk_deadup.x44 == 2);
+    profile_anim(&fixture_fighter, config, 1);
+    /* The source countdown reaches zero on call two; case 2 stores timer 1. */
+    assert(fixture_fighter.mv.co.unk_deadup.x40 == 1);
+    assert(fixture_fighter.mv.co.unk_deadup.x44 == 3);
+    FIXTURE_EXPECT("deadupfall_init_private_velocity",
+                   fixture_fighter.self_vel.x == 0.0f &&
+                       fixture_fighter.self_vel.y == 0.0f &&
+                       fixture_fighter.self_vel.z == 0.0f);
+    float private_y, private_z;
+    memcpy(&private_y, (unsigned char *) &fixture_fighter.mv.co + 8, 4);
+    memcpy(&private_z, (unsigned char *) &fixture_fighter.mv.co + 12, 4);
+    assert(private_y == 2.0f && private_z == 0.5f);
+
+    /* Poison ordinary self X: the retained hook replaces temp+=self XYZ.
+     * Existing temp X must survive unchanged until position consumes it. */
+    fixture_fighter.self_vel.x = 0.25f;
+    fixture_fighter.mv.co.unk_deadup.x44 = 3;
+    fixture_physics_profile(&fixture_fighter, config);
+    FIXTURE_EXPECT("deadupfall_physics_private_update",
+                   fixture_fighter.mv.co.unk_deadup.x50.x == 3.25f &&
+                       fixture_fighter.mv.co.unk_deadup.x50.y == 6.25f &&
+                       fixture_fighter.mv.co.unk_deadup.x50.z == 6.25f);
+    assert_vec(fixture_fighter.mv.co.unk_deadup.x5C, (Vec3){0.0f, 0.0f, 0.0f});
+    memcpy(&private_y, (unsigned char *) &fixture_fighter.mv.co + 8, 4);
+    FIXTURE_EXPECT("deadupfall_physics_private_update", private_y == 1.75f);
+
+    SimulationState correction_state = simulation_state();
+    reset_fixture();
+    memset(&fixture_fighter.mv.co, 0xA5, sizeof(fixture_fighter.mv.co));
+    fixture_fighter.mv.co.unk_deadup.x44 = 2;
+    fixture_fighter.mv.co.unk_deadup.x40 = 2;
+    fixture_fighter.mv.co.unk_deadup.x50 = (Vec3){3.0f, 4.0f, 5.0f};
+    fixture_fighter.mv.co.unk_deadup.x5C = (Vec3){0.25f, 0.5f, 0.75f};
+    fixture_fighter.cur_pos = (Vec3){7.0f, 8.0f, 9.0f};
+    fixture_fighter.prev_pos = (Vec3){6.0f, 7.0f, 8.0f};
+    profile_anim(&fixture_fighter, config, 1);
+    profile_anim(&fixture_fighter, config, 1);
+    fixture_fighter.self_vel.x = 0.25f;
+    fixture_fighter.mv.co.unk_deadup.x44 = 3;
+    fixture_physics_profile(&fixture_fighter, config);
+    SimulationState before_draw = simulation_state();
+    assert_same_simulation(correction_state, before_draw);
+
+    set_identity_view(-2.0f);
+    assert(slippi_profile_source_draw_decision(
+               SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_V2,
+               SLIPPI_TICK_PRESENT) == SLIPPI_SOURCE_DRAW_ALLOW);
+    fixture_draw_profile(&fixture_gobj, 17);
+    assert(translation_calls == 1 && matrix_multiply_calls == 1);
+    FIXTURE_EXPECT("deadupfall_model_draw_is_simulation_pure",
+                   translation_source_was_cur_pos == 0);
+    assert_vec(fixture_jobj.translated, (Vec3){3.25f, 4.25f, 6.25f});
+    assert_same_simulation(before_draw, simulation_state());
+    fixture_draw_profile(&fixture_gobj, 17);
+    assert(translation_calls == 2 && matrix_multiply_calls == 2);
+    assert_same_simulation(before_draw, simulation_state());
+    assert_vec(fixture_jobj.translated, (Vec3){3.25f, 4.25f, 6.25f});
+    set_identity_view(1.0f);
+    fixture_draw_profile(&fixture_gobj, 17);
+    assert(translation_calls == 3 && matrix_multiply_calls == 3);
+    assert_vec(fixture_jobj.translated, (Vec3){3.25f, 7.25f, 6.25f});
+    assert_same_simulation(before_draw, simulation_state());
+    run_next_tick_position_consumer(&fixture_fighter);
+    SimulationState drawn_after_consumer = simulation_state();
+
+    /* Same source profile and input, but the correction draw policy skips the
+     * original draw callback. Compare only declared simulation state. */
+    reset_fixture();
+    memset(&fixture_fighter.mv.co, 0xA5, sizeof(fixture_fighter.mv.co));
+    fixture_fighter.mv.co.unk_deadup.x44 = 2;
+    fixture_fighter.mv.co.unk_deadup.x40 = 2;
+    fixture_fighter.mv.co.unk_deadup.x50 = (Vec3){3.0f, 4.0f, 5.0f};
+    fixture_fighter.mv.co.unk_deadup.x5C = (Vec3){0.25f, 0.5f, 0.75f};
+    fixture_fighter.cur_pos = (Vec3){7.0f, 8.0f, 9.0f};
+    fixture_fighter.prev_pos = (Vec3){6.0f, 7.0f, 8.0f};
+    profile_anim(&fixture_fighter, config, 1);
+    profile_anim(&fixture_fighter, config, 1);
+    fixture_fighter.self_vel.x = 0.25f;
+    fixture_fighter.mv.co.unk_deadup.x44 = 3;
+    fixture_physics_profile(&fixture_fighter, config);
+    assert(slippi_profile_source_draw_decision(
+               SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_V2,
+               SLIPPI_TICK_CORRECTION) == SLIPPI_SOURCE_DRAW_SKIP);
+    assert(translation_calls == 0 && matrix_multiply_calls == 0);
+    run_next_tick_position_consumer(&fixture_fighter);
+    SimulationState no_draw_state = simulation_state();
+    assert_same_simulation(drawn_after_consumer, no_draw_state);
+}
+
+static void test_physics_phase_clamp_and_early_break(void)
+{
+    float config[16];
+    set_config(config, 2.0f, 0.5f, 0.25f, 1.5f, 1);
+    reset_fixture();
+    fixture_fighter.mv.co.unk_deadup.x44 = 2;
+    fixture_fighter.mv.co.unk_deadup.x40 = 2;
+    profile_anim(&fixture_fighter, config, 1);
+    profile_anim(&fixture_fighter, config, 1);
+    fixture_fighter.mv.co.unk_deadup.x44 = 3;
+    fixture_fighter.mv.co.unk_deadup.x5C = (Vec3){0.25f, 0.0f, 0.0f};
+    fixture_fighter.mv.co.unk_deadup.x50 = (Vec3){1.0f, 2.0f, 3.0f};
+    fixture_fighter.self_vel.x = 0.125f;
+    fixture_fighter.x2222_b6 = 1;
+    fixture_anim_result = 0;
+    fixture_physics_profile(&fixture_fighter, config);
+    float private_y;
+    memcpy(&private_y, (unsigned char *) &fixture_fighter.mv.co + 8, 4);
+    assert(private_y == 1.75f);
+    assert_vec(fixture_fighter.mv.co.unk_deadup.x50, (Vec3){1.0f, 2.0f, 3.0f});
+    assert_vec(fixture_fighter.mv.co.unk_deadup.x5C,
+               (Vec3){0.25f, 1.75f, 0.5f});
+    assert(anim_calls == 1);
+
+    /* A continuing source callback reaches the existing position update and
+     * clear, preserving the early-break order above. */
+    fixture_anim_result = 1;
+    fixture_physics_profile(&fixture_fighter, config);
+    memcpy(&private_y, (unsigned char *) &fixture_fighter.mv.co + 8, 4);
+    assert(private_y == 1.5f);
+    assert_vec(fixture_fighter.mv.co.unk_deadup.x50,
+               (Vec3){1.25f, 5.25f, 4.0f});
+    assert_vec(fixture_fighter.mv.co.unk_deadup.x5C,
+               (Vec3){0.0f, 0.0f, 0.0f});
+    assert(anim_calls == 2);
+
+    /* Strict ordered comparison selects the terminal clamp at equality. */
+    reset_fixture();
+    float init_y = -1.25f;
+    set_config(config, init_y, 0.0f, 0.25f, 1.5f, 1);
+    fixture_fighter.mv.co.unk_deadup.x44 = 2;
+    fixture_fighter.mv.co.unk_deadup.x40 = 2;
+    profile_anim(&fixture_fighter, config, 1);
+    profile_anim(&fixture_fighter, config, 1);
+    fixture_fighter.mv.co.unk_deadup.x44 = 3;
+    fixture_physics_profile(&fixture_fighter, config);
+    memcpy(&private_y, (unsigned char *) &fixture_fighter.mv.co + 8, 4);
+    assert(private_y == -1.5f);
+
+    /* This reduced wrapper contains only actual source case 3. Its phase-1
+     * no-dispatch check is a reducer-boundary control, not full phase-1
+     * source behavior coverage. */
+    reset_fixture();
+    fixture_fighter.mv.co.unk_deadup.x44 = 1;
+    fixture_fighter.self_vel = (Vec3){1.0f, 2.0f, 3.0f};
+    fixture_fighter.mv.co.unk_deadup.x5C = (Vec3){4.0f, 5.0f, 6.0f};
+    union ftCommon_MotionVars before = fixture_fighter.mv.co;
+    fixture_physics_profile(&fixture_fighter, config);
+    assert(memcmp(&before, &fixture_fighter.mv.co, sizeof(before)) == 0);
+    assert_vec(fixture_fighter.self_vel, (Vec3){1.0f, 2.0f, 3.0f});
+}
+
+static void test_draw_source_guards(void)
+{
+    for (int gate = 0; gate < 4; ++gate) {
+        reset_fixture();
+        fixture_fighter.mv.co.unk_deadup.x50 = (Vec3){3.0f, 4.0f, 5.0f};
+        set_identity_view(-2.0f);
+        if (gate == 0) fixture_fighter.x221F_b3 = 1;
+        if (gate == 1) fixture_fighter_usable = 0;
+        if (gate == 2) fixture_camera_mode = 0;
+        if (gate == 3) fixture_fighter.x2220_b7 = 0;
+        const Vec3 original = fixture_fighter.cur_pos;
+        fixture_draw_profile(&fixture_gobj, 17);
+        assert_vec(fixture_fighter.cur_pos, original);
+        assert(translation_calls == 0 && matrix_multiply_calls == 0);
+        assert(matrix_getter_calls == 0 && camera_getter_calls == 0);
+    }
+}
+
+int main(void)
+{
+#ifdef RUN_PROFILE_GREEN_ONLY
+    test_profile_draw_vs_correction();
+#else
+    test_original_source_causal_red();
+    test_original_physics_source_control();
+    puts("ORIGINAL_SOURCE_CONTROLS_PASSED");
+    fflush(stdout);
+    test_profile_draw_vs_correction();
+    test_physics_phase_clamp_and_early_break();
+    test_draw_source_guards();
+#endif
+    puts("DeadUpFall actual-source v2 reduction passed");
+    return 0;
+}

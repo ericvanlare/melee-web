@@ -37,13 +37,13 @@ extern "C" {
 EMSCRIPTEN_KEEPALIVE const char *melee_web_synctest_profile_identity(void)
 {
     return slippi_profile_identity_name(
-        SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_V1);
+        SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_V2);
 }
 
 EMSCRIPTEN_KEEPALIVE int melee_web_synctest_draw_decision(int tick_kind)
 {
     return slippi_profile_source_draw_decision(
-        SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_V1,
+        SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_V2,
         static_cast<SlippiTickKind>(tick_kind));
 }
 
@@ -82,7 +82,7 @@ EMSCRIPTEN_KEEPALIVE int melee_web_synctest_draw_present(void)
         require(stats_before != nullptr, "Aurora stats are unavailable before source draw");
         const uint64_t previous_begin_id = stats_before->lastBeginFrameId;
         const auto decision = slippi_profile_source_draw_decision(
-            SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_V1,
+            SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_V2,
             SLIPPI_TICK_PRESENT);
         require(decision == SLIPPI_SOURCE_DRAW_ALLOW,
                 "Slippi present tick did not permit the original source draw");
