@@ -16660,7 +16660,15 @@
             "retained_current_artifacts": 50,
             "scope": "Current-main build products remain distinct from earlier failed-capture producers. No new capture or C3 pass."
           },
-          "exact_head_ci": "PENDING_FINAL_CHECKPOINT_PUSH"
+          "exact_head_ci": {
+            "state": "PASS_PUBLISHED_CHECKPOINT_ONLY",
+            "head": "bd035e39731b65ea9adf07145b39dfd4072d60c0",
+            "run_id": 39118538457,
+            "complete_checks": 14,
+            "success": 12,
+            "expected_skips": 2,
+            "scope": "Earlier published draft checkpoint; later current-main source and validation remain separate."
+          }
         },
         "evidence_path_base": "stadium-prepared-setup-build-v1-20261018-083639Z; stadium-prepared-setup-seed-phase-fix-v1-20261018; stadium-setup-comparator-finalization-repair-v1-20261018",
         "publication_drafts": {
@@ -16672,6 +16680,192 @@
           "issue_251_update": {
             "path": "stadium-setup-comparator-finalization-repair-v1-20261018/publication-drafts-v1/issue-251-update.md",
             "sha256": "9ddc08f71a579886ce5d8a688812c5528ddc0c936ad07778f9668adf7651a3db"
+          }
+        },
+        "retained_v6_posthoc_declared_setup_audit_v1": {
+          "schema": "melee-web-stadium-v6-posthoc-declared-setup-audit-v1",
+          "status": "PASS_POSTHOC_DECLARED_SETUP_FIELDS_ONLY",
+          "scope": "A separate offline audit of the original v6 producer\u2019s own retained Setup tag-4 record against an independently sourced expected object. It is not a browser capture result and does not change either failed prepared-Setup capture.",
+          "audit_receipt": {
+            "run_directory": "stadium-setup-go-review-repair-20261018-050651-5cfb537c",
+            "file": "retained-v6-audit-after-root-review.json",
+            "sha256": "8e6fd093b5b597bfb59c80a6e927e44f62318284b8b636adc56a7870388f9460",
+            "root_review_file": "root-review-v1.json",
+            "root_review_sha256": "46353ca3c102921d20c7f64d82d85e813d9fdbb96c9afc44d2b2d0a038ee6bd8",
+            "decision": "APPROVE_ONE_RETAINED_V6_OFFLINE_AUDIT; NO_CAPTURE"
+          },
+          "source_and_tool_pins": {
+            "source_spec_file": "v6-expected-profile-source-spec-v2.json",
+            "source_spec_sha256": "6819f6a6ffe5bcee11d813fe4c17475a26a51d228c39f9a9c0de837d0d6c2041",
+            "frozen_command_file": "freeze-v1.json",
+            "freeze_sha256": "3bd2187f8c1269176ab742d06a53a0ebfb769b593fd6197f1db825b27b1d2162",
+            "audit_helper_sha256": "2b7e1c0aa7cf7831b7d21ea8ebaeb7b66040bee5b0f52f3eb7232657094e2137",
+            "focused_test_sha256": "516cd7ef5890745ee1b29f583e2a9d424d6e9032b116f9751be900b7ad9ff8ce",
+            "external_adapter_sha256": "9408ef028d0bb63f472b00107669d0639b99234f178949e491af6b59eca06ab7",
+            "observer_parser_sha256": "43637ff9cc37dcfe945c6d9bdea29c54ce07ae30498b075de82146a1420b4ccc",
+            "existing_setup_validator_sha256": "c91f96975ee72681391480c54e68a9f5d7955618b2e55bed9a1eb1f82d45e6e3"
+          },
+          "producer": {
+            "run_id": "original-stadium-go-prefix-7d406f63-feedback-v6",
+            "report_sha256": "14711ec4f0905bcad1de44844731b984ec1bdf778cfbbea32cde1c2b0fa2e46b",
+            "observer_sha256": "361e8c1108cc2d02ba94d1f3b3be9612a80d0227672445cd4a2b0e2119917778",
+            "harness_source_head": "7d406f63a0ae9fde60174ff9db2174d482c522fe",
+            "harness_source_tree": "d929b37efdc7362fdd6ddcfb0d85a5a9df4ad710",
+            "native_source_head": "91fc1fb9eae7310a200f3e53d8baeea210654e1a",
+            "dolphin_binary_sha256": "efbdc78947d8caab43f4b716092688d03144d281f864fcc6d95a09fa3fa924bc",
+            "dolphin_build_manifest_sha256": "321038167774a583fded9380cd262ff5f68a6c8568decf6edc71c7df0d9e2dc0",
+            "owner_packet_sha256": "9349d09f3390f5081dad5d5bafb9562d9024828533d2341a562b00068ebc7d81"
+          },
+          "recipe_provenance": {
+            "original_input_bytes": 10250,
+            "original_input_sha256": "85d64433715ba61db429b0c15de70f7c48b6689c877e061c5111f58bd7c2957f",
+            "retained_canonical_bytes": 6155,
+            "retained_canonical_sha256": "5f4dd95fb2e00cd35aa9fa42de10758acc4998624c964a1a077d683ebebe95f8",
+            "parsed_json_equal": true,
+            "canonical_original_bytes_equal_retained": true,
+            "expected_values_changed": false
+          },
+          "selected_record_and_result": {
+            "entry_sequence": 2468,
+            "setup_sequence": 2503,
+            "setup_pc": "0x8016e9c4",
+            "setup_source_tick": 125,
+            "setup_draw_ordinal": 0,
+            "selected_tag4_bytes": 312,
+            "selected_tag4_sha256": "918a23d68a3b5024f94baf1f5e26e6c0db56c5fbbbffdc79c5e620e82af3b728",
+            "go_after_sequence": 2925,
+            "go_after_pc": "0x8016b824",
+            "declared_fields_match": true,
+            "first_mismatch": null,
+            "expected_profile_source_spec_sha256": "6819f6a6ffe5bcee11d813fe4c17475a26a51d228c39f9a9c0de837d0d6c2041",
+            "original_input_go_claim": "PASS_ORIGINAL_RAW_GO_PREFIX_ONLY"
+          },
+          "historical_original_report_flags_unchanged": {
+            "setup_phase_mapping": "pending_original_setup_observation",
+            "setup_profile_verified_by_observer": false,
+            "profile_setup_equivalence": false,
+            "port_rng_equivalence": false,
+            "rng_equality": "not_compared",
+            "whole_match_or_results": false,
+            "pixels_or_pcm_equivalence": false
+          },
+          "capture_failure_preservation": {
+            "prepared_setup_v1": "FAIL_BEFORE_SETUP_CONSTRUCTION; unchanged in failed_capture_attempts",
+            "prepared_setup_seed_phase_v1": "FAIL_AFTER_SETUP_CONSTRUCTION; NO_RETRY; raw comparison null and launcher aggregate failed",
+            "retained_raw_report_sha256": "10d6295510c1dc5ae958d9c22449e3409af3edbd40970f0c4f8bd7fa39aa9188",
+            "retained_setup_observation_sha256": "133df8479990768337f8085b9fda6fd5875da8b8c40745e440fdddb9be9f75cf"
+          },
+          "limits": [
+            "Only independently expected declared Setup fields were audited; the other opaque bytes in the 312-byte object are not compared.",
+            "This v6 original producer is distinct from native producer 9494fc69 and harness db52ff30 used by the earlier prepared handoff; no records are spliced across them.",
+            "No complete Entry-to-Setup service/order, browser execution, consumed-input ownership, GO parity, per-owner RNG, gameplay, full session, Results, or C3 acceptance is established."
+          ],
+          "next_step_plan": {
+            "file": "stadium-setup-go-review-repair-20261018-050651-5cfb537c/next-v6-consumed-four-port-go-source-plan-v3.json",
+            "sha256": "33be71b22ec0ca65a21c795ba0b71faca3f3aa6c0d7f4f64c5ab039856d705bb",
+            "state": "EXECUTED_AS_REVIEWED_V2_OFFLINE_AUDIT; NO_CAPTURE",
+            "prior_wording_version_sha256": "80893b1d39469e63f77f0829b1a246f55fccdd4bd8e76d36ad7c2617c5b910dc",
+            "prior_identity_label_version_sha256": "3066b5ce3ca39d753cb644971c9125cd71764547322b0c02bc734341a824fbd0"
+          },
+          "retained_audit_failure_and_repair": {
+            "first_freeze_sha256": "a7e7d5eb32362b25b91d7d7a1635f6175c2d85e1d60a48b2a98e6481bcb4566f",
+            "first_result_sha256": "493525a9a56652e8c46283f9329a4dd5c92254d3624018c4aa5de6f00e786cf9",
+            "first_failure": "producer_recipe_identity_mismatch before observer decoding: original raw file hash was incorrectly compared to canonical serialization hash",
+            "repair": "Small generic comparator reuses existing strict decoder. External adapter retains separate original/canonical recipe and owner-packet identities; expected fields unchanged.",
+            "focused_helper_tests": 5,
+            "focused_external_synthetic_tests": 6,
+            "repair_freeze_sha256": "3bd2187f8c1269176ab742d06a53a0ebfb769b593fd6197f1db825b27b1d2162",
+            "source_commit": "02a7b72f66db2b62cd3d24b9773088b04b659e47"
+          },
+          "integration_validation": {
+            "source_commit": "02a7b72f66db2b62cd3d24b9773088b04b659e47",
+            "state": "failed_run_retained_context_repair_reviewed_pending_current_main_full_validation",
+            "result_sha256": "3e306f1df50aa623e939d537bc070367d69a8dce4352ceb3a7893ff3b73c5fa3",
+            "builds": [
+              {
+                "target": "diagnostic Release runtime",
+                "returncode": 0,
+                "log_sha256": "2bd923cb88ce9963a2037dcfadd62eb429d8c0f56a6f72531e08fece77d2e37f"
+              },
+              {
+                "target": "ordinary Release runtime",
+                "returncode": 0,
+                "log_sha256": "121b2e0956f332775d740aaab4ca7111e842a03c878985cecddc3eadf934969d"
+              }
+            ],
+            "full_regression": {
+              "tests": 2710,
+              "skips": 189,
+              "errors": 2,
+              "seconds": 588.554,
+              "log_sha256": "0c4cb9e494eab72592089fc15d627787d94110074972bcd88e79536fdee7be6b",
+              "failure": "Profile include hunk no longer applies after ordinary base adds ground.h in grpstadium.c. Actual production composition and two reducer tests affected; no behavior executed in these failed cases."
+            },
+            "next": "Integrate current main, then full regression and affected builds. No capture.",
+            "context_repair": {
+              "source_commit": "5e38096f",
+              "freeze_sha256": "6b44aaf70be60b4292edca3b957bb309311c633422c6e8a852a0a8e141aba040",
+              "root_review_sha256": "b22d753bb4e1ad1d045ae466a6e95d98f2444a4b4d225db5dd1709e9c97b0f89",
+              "focused_tests": 6,
+              "raw_artifacts_verified": 65,
+              "authored_added_deleted_source_lines_unchanged": true,
+              "scope": "Only include-hunk context rebased; production profile composition and native/Wasm reducers pass."
+            }
+          },
+          "same_producer_consumed_input_go_audit": {
+            "state": "PASS_ORIGINAL_REFERENCE_PROVENANCE_ONLY",
+            "result_sha256": "db5106bd8382e7f78b70def2ed0ba9cb05af39ddf6ddca942d7b4f7a993920d2",
+            "candidate_sha256": "b7c5cf34d886b00e0a7ddb585d42463e46394d2d3d0cae1b0b6ae6b9754ef39f",
+            "candidate_freeze_sha256": "2e5eb952c72ac8f92e753b12f495375cef6dc35efb674b0e18f20b3745fcbcda",
+            "root_review_sha256": "b0c02b5f23d2b7e9cdb52eb71347019dbac9d55979c5f72cc3e57c89e0b6beac",
+            "synthetic_controls": {
+              "tests": 9,
+              "positives": 4,
+              "refusals": 28,
+              "result_sha256": "d58ccc2429ae125eb24355d961c458daf974e0715c4b453a790d3c95d8628d4c"
+            },
+            "first_consumed": {
+              "sequence": 2504,
+              "source_tick": 0,
+              "draw_ordinal": 0,
+              "bundle": 0,
+              "ports": [
+                {
+                  "port": 0,
+                  "status_hex": "0000000000000000000000"
+                },
+                {
+                  "port": 1,
+                  "status_hex": "0000000000000000000000"
+                },
+                {
+                  "port": 2,
+                  "status_hex": "00000000000000000000ff"
+                },
+                {
+                  "port": 3,
+                  "status_hex": "00000000000000000000ff"
+                }
+              ],
+              "semantic_bytes_per_port": 11
+            },
+            "go_c": {
+              "go_sequence": 2925,
+              "c_sequence": 2926,
+              "source_tick": 84,
+              "draw_ordinal": 84,
+              "source_callsite_validated": true
+            },
+            "exclusions": [
+              "raw48byte padding parity",
+              "MWRI provides four ports",
+              "b71 native consumed-input parity",
+              "live input timing/ownership",
+              "RNG mutation/equality",
+              "GO gameplay parity",
+              "C3 admission"
+            ],
+            "historical_report_unchanged": true
           }
         }
       }
