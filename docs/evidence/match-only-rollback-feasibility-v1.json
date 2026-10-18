@@ -2,7 +2,7 @@
   "schema": "match-only-rollback-feasibility-v1",
   "issue": 318,
   "pr": 319,
-  "status": "bounded_measurement_checkpoint_no_go_naive_browser_heap_rewind",
+  "status": "no_draw_profile_declared_interval_component_pass_broader_closure_open",
   "source_only_baseline": {
     "boundary": "synchronous-source-only-exported-call-return",
     "sourceDrawing": false,
@@ -1465,5 +1465,305 @@
       "profile port or equivalent reference",
       "retail/Slippi or physical/foreground/audible/two-machine acceptance"
     ]
+  },
+  "owner_direction_20261017": {
+    "source": "Owner-adopted architect input, October 17, 2026",
+    "correction_model": "Slippi-profile-only simulation ticks without source draw; present frame draws",
+    "prior_drawn_sprint_items_2_to_9": "paused; reopen only with demonstrated dependency and prior #158 report",
+    "implementation_scope": "Own C behavioral implementations and tests in src/slippi_profile/, GPL-3.0-or-later; existing MIT scope unchanged",
+    "reference_notices": "Slippi ASM GPLv3 text; Slippi Dolphin GPL-2.0-or-later notices; preserve distinctions",
+    "online_services": "own browser-to-browser relay only; no official Slippi traffic or team contact",
+    "A5": "parked indefinitely pending separate explicit owner decision",
+    "order": [
+      "render-to-simulation dependency fixes plus strict drawn/no-draw synctest",
+      "UCF 0.84 and remaining online-profile behaviors",
+      "match-only rollback between two browsers on own relay"
+    ],
+    "parallel": "Stadium C3; unfrozen transformations remain in scope",
+    "historical_recommendation": "recommendation and drawn_synctest_sprint retain their original evidence; their next-step ordering is superseded by this owner direction",
+    "combined_budget": "unmeasured; seven correction ticks without source draw plus snapshot/restore and present frame must be measured together"
+  },
+  "no_draw_profile_synctest_v1": {
+    "status": "BROWSER_EXERCISED_DECLARED_STATE_PCM_PAD_COMPONENT_PASS_NOT_ROLLBACK_ACCEPTANCE",
+    "artifact_run": "slippi-no-draw-pivot-20261017-212701-0e394502",
+    "profile": "slippi-render-dependencies-v1",
+    "producer": {
+      "base_commit": "65e6c78ec8d461da937b9b06d6a4321a510feecf",
+      "dirty_candidate": true,
+      "source_sha256": {
+        "tests/gameplay_snapshot_probe.cpp": "5489bff017d0d92bf5345321feab641b222923514218b626e534bcf6f1ef6911",
+        "tests/quiescent_wasm_snapshot.mjs": "4a8250b744ac3d00fd4e6b09168829d4adec8a6ebc043e07121e5f3173836570",
+        "src/slippi_profile/profile.h": "3ff35af9f900c63e144ee98a6dff1eb133a385d385e9fe5bb6f4c658c904184b",
+        "src/slippi_profile/profile.c": "781ee88a30d89444396fbc93134e59fca6292a5ff9a1c29681f4ae2bc5d5ef6f",
+        "src/slippi_profile/offscreen_damage.h": "871e76629efbf4cf80eef84d963ce69fdb1f8255bfceb498a9c4955ce4983412",
+        "src/slippi_profile/offscreen_damage.c": "bb1d671a088b4bd397bad71d22017ff4d09902916422254e0c82d21997dae1f7",
+        "src/slippi_profile/dynamics_fix.h": "e17c24e09ac247f0b98e3f5fff233f854867a191a4990142ef467400e8b63171",
+        "src/slippi_profile/dynamics_fix.c": "d66255c051abfc2acebe3ac50e0060a475478d226a076821a7fd6c1a55c4343c",
+        "src/slippi_profile/patches/melee-profile-hooks.patch": "7382341ee3621226be7345d4ed40f05a3a8c758cb13452e9e58220ddbc76f59e",
+        "src/slippi_profile/tests/synctest_node.cpp": "01fae885d67eabee1d5960afb1c61a07bdb056cc26a2bb8b45b853ae28bfa5ed",
+        "src/slippi_profile/tests/synctest_browser.cpp": "8f00a0ab985ce071f446c03f8c65f0ee9066f0b60bb0d88e749abccff194309f",
+        "src/slippi_profile/tests/run_synctest.mjs": "110843ac4089aebdb031059593a782fcfb882017a27908f4248e0db40d837194",
+        "src/slippi_profile/tests/runner_contract.mjs": "7a53e766c84d98ee55d01de080203e4f011e1503269676374ad930bd4157a1d5",
+        "cmake/FighterRuntime.cmake": "44aadc933e457e2078774442550dbc82322a8fca9b38f3b205080bfa10cae4e7",
+        "CMakeLists.txt": "2dc48d31d20ac66c4e603a14b2728de14ba9b891726ca2d927ba74d40287d2e0",
+        "scripts/build.py": "c77224a4c98c35c7f0f7ae461345d4f2cb497d08c2f77dce1c9e45dd5747163c",
+        "scripts/gameplay_sources.py": "fd526fbd94059234f156f59935694c359ea44dfc5a44b3da42aacd44e5680853"
+      },
+      "runtimes_sha256": {
+        "gameplay_slippi_synctest_node.js": "2353e2a8baeff673eb07d3dae073248473b7514ca666b49b6cc6d5f54ad5a1b7",
+        "gameplay_slippi_synctest_node.wasm": "61ec4510d48040859d1710c529f83c2bcdaf81480cc0418b5722df4c8e54577f",
+        "gameplay_slippi_synctest_browser.mjs": "648c2ff77cd44f33dff8bb96db3852c6c616dd08b02f4de7e8fa3bad8f48a402",
+        "gameplay_slippi_synctest_browser.wasm": "3a386bbb77e4ebdf40d24cd53b00a3176baffe0ae92e6d73edbd89b0e0c3125f",
+        "gameplay_slippi_synctest_browser.data": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c"
+      },
+      "prelaunch_manifest": "capture-v3/prelaunch.json",
+      "prelaunch_sha256": "ba567ef205b80a1e80e608c298bbce195541279b34b6498b4e85d5cbc3d59ccd"
+    },
+    "implemented": [
+      "Own C DynamicsFix matrix refresh and BrawlOffscreenDamage camera-bound predicate in separate GPL3orLater scope",
+      "Opt-in isolated source/build targets; default vanilla unchanged",
+      "Real drawn browser reference and independent restored no-draw Node lane; browser/GPU memory never restored"
+    ],
+    "capture": {
+      "report": "capture-v3/runner/evidence.json",
+      "report_sha256": "4b3f25188de0179bf687fe150b742ac21a468b8560dcd6c8e6b71c1affb4715e",
+      "owner": "capture-v3/owner.json",
+      "owner_sha256": "1ea0f89cd9fc8d4ffe71f85fada3da556dc20a798c7553c35970fa64dd2dfcac",
+      "source_draw_calls": 301,
+      "prefix_samples": 300,
+      "interval_depth": 1,
+      "observed_domains": {
+        "declared_v2_state_bytes": 1280,
+        "native_PCM_bytes": 4272,
+        "literal_PAD_bytes": 44
+      },
+      "interval": {
+        "checkpointInputSample": 300,
+        "inputSample": 300,
+        "depth": 1,
+        "prefixSamples": 300,
+        "drawnReference": {
+          "sample": 300,
+          "observationSha256": "a97c03e66301419bcba8aba75cba1ed88ee3aed3b3a6fc80d9f0fd0f9de8f967",
+          "pcmSha256": "462733f725a874052aba5c73b03dd4b8799b78bb1f973b097768548b16d9833c",
+          "rawPad44Sha256": "46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288"
+        },
+        "noDrawBaseline": {
+          "sample": 300,
+          "observationSha256": "a97c03e66301419bcba8aba75cba1ed88ee3aed3b3a6fc80d9f0fd0f9de8f967",
+          "pcmSha256": "462733f725a874052aba5c73b03dd4b8799b78bb1f973b097768548b16d9833c",
+          "rawPad44Sha256": "46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288"
+        },
+        "drawnReferenceDrawCalls": 237
+      },
+      "node_restore": {
+        "checkpointInputSample": 300,
+        "checkpointHeapBytes": 134217728,
+        "checkpointHeapSha256": "be34673c7c201266db2d4eebe18a9b0a0e012195b50f99ef683a1b2b0d2e2b20",
+        "endpointHeapSha256": "0adaa94b6496dc5500253432a2435aeaf183e7281b9a1c43e5aa141a73b8a10c",
+        "restoredCheckpointHeapSha256": "be34673c7c201266db2d4eebe18a9b0a0e012195b50f99ef683a1b2b0d2e2b20",
+        "replayEndpointHeapSha256": "0adaa94b6496dc5500253432a2435aeaf183e7281b9a1c43e5aa141a73b8a10c",
+        "originalEndpointVsReplayExact": true,
+        "restoredCheckpointExact": true,
+        "result": "passed",
+        "finalRecoveryEndpointHeapSha256": "0adaa94b6496dc5500253432a2435aeaf183e7281b9a1c43e5aa141a73b8a10c",
+        "fullHeapComparedAcrossLanes": false
+      },
+      "negatives": [
+        {
+          "kind": "source-RNG-bit corruption",
+          "result": "detected",
+          "byteOffset": 83605204,
+          "originalLowByte": 195,
+          "corruptedLowByte": 108,
+          "firstObservationDifference": {
+            "offset": 4,
+            "expected": 239,
+            "actual": 108
+          },
+          "expectedObservationSha256": "a97c03e66301419bcba8aba75cba1ed88ee3aed3b3a6fc80d9f0fd0f9de8f967",
+          "actualObservationSha256": "ab4ccf43aa98ee080255d1ab67326ce36cedd13fa9956e30ad5111fb9dd1cfcf"
+        },
+        {
+          "kind": "raw PAD byte mutation",
+          "result": "detected",
+          "padBytes": 44,
+          "changedByteOffset": 2,
+          "expectedPadSha256": "46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288",
+          "actualPadSha256": "e845da00ffa4830b501233227c2caefc13cc9ff67c8614d26a4f33bb1554ea7b",
+          "firstDifference": {
+            "offset": 2,
+            "expected": 0,
+            "actual": 1
+          },
+          "changedStateSha256": "5e1a2726882e889722ee1173af68a965e2eae111d0aea27e754923675b65d6ea"
+        }
+      ],
+      "rng_negative_reporting_note": "Source flips one bit before the step (195 XOR1 =194). Raw report corruptedLowByte108 is read after stepping, not the immediate perturbation.",
+      "native_and_process_cleanup_pass": true,
+      "first_frame_png_sha256": "96accfdcfa4905067ab1b3dcf9cf88ee64fd675704448263e19a2960043c4978",
+      "image_scope": "FD background/starfield visible; no gameplay pixel acceptance"
+    },
+    "retained_failures": [
+      {
+        "attempt": "capture-v1",
+        "failure": "SDL requestFullscreen getter-only assignment before fixture initialization",
+        "review": "capture-v1/post-capture-review.json",
+        "review_sha256": "b420c761bc9190cb8d2408a2c955570f605a07de8fa895293c2d0aa851293521",
+        "repair": "Browser-only real runtime export; assertions retained",
+        "runtime_retained": "capture-v1/retained-runtime"
+      },
+      {
+        "attempt": "capture-v2",
+        "failure": "Missing pipeline-cache parent directory; strict native-error stop before source fixture init",
+        "review": "capture-v2/post-capture-review.json",
+        "review_sha256": "b88a741dac91540c1476f748b2c13f6008a53fa832e106b1d0ce2c661eaea32e",
+        "repair": "Existing shared runtime FS.mkdirTree prerequisite; real SQLite contract reduction after two attempts",
+        "runtime_retained": "capture-v2/retained-runtime"
+      }
+    ],
+    "validation": {
+      "profile_Release": "pass; source compile and final real-export relinks",
+      "ordinary_Release": "pass; default profile option OFF, no profile macro/source path in actual Ninja graph",
+      "full_regression": "failed: 2458 total, 164 skipped, one ordinary prepare_sources call-shape assertion; historical failure retained, targeted mainline repair pending",
+      "current_head_CI": "not run for historical NET candidate; no integration attempted"
+    },
+    "limits": [
+      "Fixed Mario/FD interval; not combat, offscreen-damage timing, dynamics-reader closure, roster/stage breadth or full profile",
+      "Declared observations are not complete simulation state; full heap equality only inside Node",
+      "No GPU/browser rewind, host-state ownership or live rollback dispatcher proven",
+      "No original Slippi/Dolphin runtime comparison or reference-profile acceptance",
+      "No combined seven-correction-plus-present budget, foreground timing, audible output, physical-input or two-machine acceptance"
+    ],
+    "next": "Close remaining render dependencies and exercise affected paths before UCF/remaining profile behaviors and own-relay match-only rollback",
+    "reviews": {
+      "source": "sol-synctest-review-v3.json plus initialization/cache repair source reviews",
+      "result": "capture-v3/post-capture-review.json",
+      "result_sha256": "aedf80e459a7c2c643bab6598028fd9770e41bc9a04ef263ccec07c139015aba"
+    },
+    "mainline_extraction": {
+      "status": "BOUNDED_COMPARISON_AND_LOCAL_VALIDATION_PASS_CI_PENDING",
+      "base_commit": "95113326ecf81379879c43e0a725a3962286b4de",
+      "dirty_candidate": true,
+      "freeze": {
+        "path": "mainline-extraction-v1/freeze-v2.json",
+        "sha256": "63dfdf625de57972b347870dd4b8dd29d0ad381f7593f0f17802d24bbee034ba"
+      },
+      "scope": "21 isolated profile files plus behavior-free MIT discovery shim and narrow4shared build/source files; paused renderer ownership excluded; main Aurora/runtime and original source fixture unchanged",
+      "source_sha256": {
+        "tests/gameplay_snapshot_probe.cpp": "5489bff017d0d92bf5345321feab641b222923514218b626e534bcf6f1ef6911",
+        "tests/quiescent_wasm_snapshot.mjs": "4a8250b744ac3d00fd4e6b09168829d4adec8a6ebc043e07121e5f3173836570",
+        "src/slippi_profile/profile.h": "3ff35af9f900c63e144ee98a6dff1eb133a385d385e9fe5bb6f4c658c904184b",
+        "src/slippi_profile/profile.c": "781ee88a30d89444396fbc93134e59fca6292a5ff9a1c29681f4ae2bc5d5ef6f",
+        "src/slippi_profile/offscreen_damage.h": "871e76629efbf4cf80eef84d963ce69fdb1f8255bfceb498a9c4955ce4983412",
+        "src/slippi_profile/offscreen_damage.c": "bb1d671a088b4bd397bad71d22017ff4d09902916422254e0c82d21997dae1f7",
+        "src/slippi_profile/dynamics_fix.h": "e17c24e09ac247f0b98e3f5fff233f854867a191a4990142ef467400e8b63171",
+        "src/slippi_profile/dynamics_fix.c": "d66255c051abfc2acebe3ac50e0060a475478d226a076821a7fd6c1a55c4343c",
+        "src/slippi_profile/patches/melee-profile-hooks.patch": "7382341ee3621226be7345d4ed40f05a3a8c758cb13452e9e58220ddbc76f59e",
+        "src/slippi_profile/tests/synctest_node.cpp": "01fae885d67eabee1d5960afb1c61a07bdb056cc26a2bb8b45b853ae28bfa5ed",
+        "src/slippi_profile/tests/synctest_browser.cpp": "8f00a0ab985ce071f446c03f8c65f0ee9066f0b60bb0d88e749abccff194309f",
+        "src/slippi_profile/tests/run_synctest.mjs": "110843ac4089aebdb031059593a782fcfb882017a27908f4248e0db40d837194",
+        "src/slippi_profile/tests/runner_contract.mjs": "7a53e766c84d98ee55d01de080203e4f011e1503269676374ad930bd4157a1d5",
+        "cmake/FighterRuntime.cmake": "5df8a3cb01d8003252b45c51c0eb2ad5a80f4aac196d566d54441c3bfac546ec",
+        "CMakeLists.txt": "7a122748cd23c1b07a29eddaf869bcac71760a047ca8d84b16b2bca0040aa391",
+        "scripts/build.py": "7a3d6eb2f27e69397b6e964b3ccbd1c33a27aeea856b3d22e9ec501ceca57b84",
+        "scripts/gameplay_sources.py": "fd526fbd94059234f156f59935694c359ea44dfc5a44b3da42aacd44e5680853"
+      },
+      "runtimes_sha256": {
+        "gameplay_slippi_synctest_node.js": "46a14ed98678796dc1c322c5ba5829c74494186b7b31ae3db73898ac71d28389",
+        "gameplay_slippi_synctest_node.wasm": "1c6635ebc9debe3a1d338a467893d2b2f52930d467eddcc0bf8236db63b8d539",
+        "gameplay_slippi_synctest_browser.mjs": "1eaabe3dce7296d180667bd858e151208786dc392be6786d992aab76d0859dac",
+        "gameplay_slippi_synctest_browser.wasm": "d9207e7a270c1f51c4eaefb531a4d2d462353a05376eb0a7d4689728bea2436b",
+        "gameplay_slippi_synctest_browser.data": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c"
+      },
+      "capture": {
+        "path": "mainline-capture-v1/runner/evidence.json",
+        "sha256": "67bf0271820ecf674a0ae3db886aa73fe614dda27b0d21fad6245337d1c5e485",
+        "owner_path": "mainline-capture-v1/owner.json",
+        "owner_sha256": "9ea8e6f4f6755dbecb3e0d00d8d648c15affbd2090a85609f26d9bd3efd559c3",
+        "prelaunch_sha256": "bfc9f5c826a51779fd3b6e3d4815359604a86dc6c761b8f0be0fedf5bdc10c31",
+        "pins_verified_before_after": 82,
+        "prefix_samples": 300,
+        "restored_interval_samples": 1,
+        "completed_draw_frames": 301,
+        "node_heap_restore": {
+          "checkpointInputSample": 300,
+          "checkpointHeapBytes": 134217728,
+          "checkpointHeapSha256": "7fb205c008d0c7f16fd87a00a82b8f0da51661d7fc8e96a9d2db20e9c84fb7c5",
+          "endpointHeapSha256": "e4b569f30b7b9ee64a1bde7b394fc1ba1a5ae05ab83b29199e538d268dfdd9c8",
+          "restoredCheckpointHeapSha256": "7fb205c008d0c7f16fd87a00a82b8f0da51661d7fc8e96a9d2db20e9c84fb7c5",
+          "replayEndpointHeapSha256": "e4b569f30b7b9ee64a1bde7b394fc1ba1a5ae05ab83b29199e538d268dfdd9c8",
+          "originalEndpointVsReplayExact": true,
+          "restoredCheckpointExact": true,
+          "result": "passed",
+          "finalRecoveryEndpointHeapSha256": "e4b569f30b7b9ee64a1bde7b394fc1ba1a5ae05ab83b29199e538d268dfdd9c8",
+          "fullHeapComparedAcrossLanes": false
+        },
+        "interval": {
+          "checkpointInputSample": 300,
+          "inputSample": 300,
+          "depth": 1,
+          "prefixSamples": 300,
+          "drawnReference": {
+            "sample": 300,
+            "observationSha256": "a97c03e66301419bcba8aba75cba1ed88ee3aed3b3a6fc80d9f0fd0f9de8f967",
+            "pcmSha256": "462733f725a874052aba5c73b03dd4b8799b78bb1f973b097768548b16d9833c",
+            "rawPad44Sha256": "46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288"
+          },
+          "noDrawBaseline": {
+            "sample": 300,
+            "observationSha256": "a97c03e66301419bcba8aba75cba1ed88ee3aed3b3a6fc80d9f0fd0f9de8f967",
+            "pcmSha256": "462733f725a874052aba5c73b03dd4b8799b78bb1f973b097768548b16d9833c",
+            "rawPad44Sha256": "46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288"
+          },
+          "drawnReferenceDrawCalls": 237
+        },
+        "corruptions_detected": [
+          "source-RNG-bit corruption",
+          "raw PAD byte mutation"
+        ],
+        "owned_cleanup": "pass",
+        "root_review_sha256": "528434ab835a544a7263cc24c7146600ca8dd1280976aade074d623c38e1eb11",
+        "independent_review": {
+          "path": "mainline-capture-v1/independent-result-review.json",
+          "sha256": "4ebedc97a485f9e1c1e37ecd713831b5a5e7c1b265f14bfd5a8925d28cd0084b",
+          "result": "PASS_BOUNDED_MAINLINE_NO_DRAW_COMPONENT_REVIEW"
+        }
+      },
+      "validation": {
+        "profile_release": "pass",
+        "ordinary_release": "pass; actual Ninja excludes profile macro/source; CMake option OFF",
+        "full_regression_v1": {
+          "result": "failed missing default trace build directory",
+          "tests": 2389,
+          "skipped": 170,
+          "failures": 2,
+          "errors": 1,
+          "log": "mainline-validation-v1/full-regression.log",
+          "log_sha256": "d352b9f58007eb259dc354925a33aa2c6a612e38b7dba1dceb3852a8314343a7"
+        },
+        "prerequisite_repair": "Normal default configure and existing focused CMake-backed tests; no source change, comparison weakening or new skip. One unsupported trace-target CLI invocation retained in mainline-validation-v2/default-trace-prerequisite.log.",
+        "full_regression_v2": {
+          "result": "pass",
+          "tests": 2412,
+          "skipped": 166,
+          "failures": 0,
+          "errors": 0,
+          "seconds": 520.061,
+          "log": "mainline-validation-v2/full-regression.log",
+          "log_sha256": "12411619a3689a8133858d27cfbdcbff3c9549d52538dc1f7e0945c91e1544f7"
+        },
+        "current_head_CI": "pending",
+        "default_trace_prerequisites": "Normal default configure plus bootstrap, collision and fighter-assets focused checks passed; same frozen executable source."
+      },
+      "limits": "Same bounded declared-state/PCM/PAD component limits as historical precursor; no combat path witnesses, whole hidden-state/host closure, original Slippi reference, live rollback or frame-budget acceptance."
+    },
+    "historical_full_regression": {
+      "tests": 2458,
+      "skipped": 164,
+      "failures": 1,
+      "retained_log": "validation-v1/full-regression.log",
+      "failure": "Ordinary build mock expected prepare_sources(root,lock); candidate passed optional slippi_profile=False. NEW preserves ordinary call shape; historical candidate remains unchanged."
+    }
   }
 }

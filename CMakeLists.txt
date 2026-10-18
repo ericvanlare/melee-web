@@ -21,6 +21,8 @@ option(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC
   "Enable the development-only Pokémon Stadium selection/preparation checkpoint" OFF)
 option(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC
   "Build the private one-shot terminal match draw/discard diagnostic" OFF)
+option(MELEE_WEB_SLIPPI_SYNCTEST
+  "Build the private drawn-reference versus no-draw Slippi dependency synctest" OFF)
 option(MELEE_WEB_FMA_COLLISION_DIAGNOSTIC
   "Enable the private PC-mapped scalar collision FMA diagnostic" OFF)
 option(MELEE_WEB_FMA_VELOCITY_Y_DIAGNOSTIC
@@ -136,6 +138,12 @@ if(EMSCRIPTEN)
   endforeach()
   target_include_directories(gameplay_runtime PUBLIC src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}")
   target_compile_definitions(gameplay_runtime PUBLIC TARGET_PC)
+  if(MELEE_WEB_SLIPPI_SYNCTEST)
+    target_sources(gameplay_runtime PRIVATE
+      src/slippi_profile/profile.c src/slippi_profile/offscreen_damage.c)
+    target_compile_definitions(gameplay_runtime PRIVATE
+      MELEE_WEB_SLIPPI_PROFILE=1)
+  endif()
   if(MELEE_WEB_FMA_COLLISION_DIAGNOSTIC OR MELEE_WEB_FMA_VELOCITY_Y_DIAGNOSTIC)
     target_sources(gameplay_runtime PRIVATE src/gameplay_fma_diagnostic.c)
     target_compile_definitions(gameplay_runtime PRIVATE MELEE_WEB_FMA_DIAGNOSTIC=1)
@@ -163,6 +171,11 @@ if(EMSCRIPTEN)
   endforeach()
   target_include_directories(hsd_native_runtime PUBLIC src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}")
   target_compile_definitions(hsd_native_runtime PUBLIC TARGET_PC)
+  if(MELEE_WEB_SLIPPI_SYNCTEST)
+    target_sources(hsd_native_runtime PRIVATE src/slippi_profile/dynamics_fix.c)
+    target_compile_definitions(hsd_native_runtime PRIVATE
+      MELEE_WEB_SLIPPI_PROFILE=1)
+  endif()
   if(NOT MELEE_WEB_PUBLIC_RUNTIME AND NOT MELEE_WEB_AUDIO_PREVIEW_RUNTIME)
     target_compile_definitions(hsd_native_runtime PRIVATE MELEE_WEB_RNG_DRAW_OBSERVER=1)
     # Fighter collision-owner and motion hooks live in the lower source target.

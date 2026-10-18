@@ -339,9 +339,12 @@ Reuse existing protocol/checksums, relay, room UI, deterministic PAD consumption
 and runtime session interfaces. Preserve the current full-route lockstep path
 as interim evidence; add no further menu/Results/rematch lockstep behavior.
 Before production rollback, #318/#115 must measure complete state ownership,
-capture/restore and up to seven corrective tick costs. Original game draw
-callbacks execute during re-simulation; GPU submission may be withheld only
-through a checked lifetime boundary. GPU readbacks/uploads, audio output,
+capture/restore and up to seven corrective tick costs. The October 17 owner
+decision uses Slippi-profile correction ticks without source draw; only the present frame draws. Replace render-to-simulation
+dependencies inside the isolated profile and require a drawn/no-draw synctest.
+Vanilla retains its original draw policy. Drawn-correction ownership work is
+paused unless a demonstrated dependency cannot be removed and is reported on
+#158 first. GPU readbacks/uploads, audio output,
 asynchronous file work and persistence need explicit deterministic ownership or
 commit semantics. Do not restore a browser heap over unowned external handles.
 

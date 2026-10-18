@@ -32,6 +32,25 @@ actual dependency graph before a playable public release. The maintenance shell 
 No Nintendo disc images, extracted assets, audio, textures or game executables
 are tracked. This repository does not grant rights to upstream code or game data.
 
+## Project Slippi behavioral reference and separate profile
+
+Credit Project Slippi for the behavior referenced by the independently authored
+`src/slippi_profile/` implementations and tests, licensed GPL-3.0-or-later under
+the separate [scope](LICENSE_SCOPE.md#separate-slippi-compatible-profile-scope).
+Each behavior identifies its pinned upstream patch. The inspected
+[Slippi Dolphin source](https://github.com/project-slippi/Ishiiruka/tree/60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2)
+carries GPL-2.0-or-later notices; the pinned
+[Slippi ASM source](https://github.com/project-slippi/slippi-ssbm-asm/tree/fcf47f10dc244152c2ebaa3a9dec142ea42243b7)
+carries GPLv3 license text. Do not collapse those distinct notices or infer
+rights in separate generated payloads from them. No payload or other-port code
+is included by this profile decision.
+
+The player-facing mode is **Slippi-compatible rules (unofficial)**. This project
+is not affiliated with or endorsed by Project Slippi and uses no Slippi logos or
+branding. Online play uses our own relay; this does not authorize access to
+Slippi's official services. Builds containing the profile follow GPL distribution
+terms with public corresponding source and reproducible build instructions.
+
 ## Audio implementation and separate Dolphin reference tools
 
 The current `src/gameplay_audio_resample.c/.h` and `web/dsp-coefficients.mjs`
