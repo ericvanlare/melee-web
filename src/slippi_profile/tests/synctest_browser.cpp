@@ -4,6 +4,7 @@
 #include "../../../tests/gameplay_snapshot_probe.cpp"
 
 #include "slippi_profile/profile.h"
+#include "slippi_profile/draw_diagnostics.h"
 
 #include <aurora/aurora.h>
 #include <aurora/gfx.h>
@@ -15,6 +16,13 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+
+static_assert(offsetof(MeleeWebMatchStats, player_slot) == 136,
+              "v2 observation player-slot decoder offset changed");
+static_assert(offsetof(MeleeWebMatchStats, stocks) == 148,
+              "v2 observation stock decoder offset changed");
+static_assert(offsetof(MeleeWebMatchStats, fighter_kind) == 152,
+              "v2 observation fighter-kind decoder offset changed");
 
 namespace {
 bool renderer_ready = false;
@@ -34,6 +42,26 @@ void renderer_log(AuroraLogLevel level, const char *module,
 }
 
 extern "C" {
+EMSCRIPTEN_KEEPALIVE const void *melee_web_synctest_draw_diagnostics(void)
+{
+    return slippi_profile_draw_diagnostics_snapshot();
+}
+
+EMSCRIPTEN_KEEPALIVE unsigned melee_web_synctest_draw_diagnostics_size(void)
+{
+    return sizeof(SlippiProfileDrawDiagnostics);
+}
+
+EMSCRIPTEN_KEEPALIVE int melee_web_synctest_motion_boundary(int motion_id)
+{
+    return slippi_profile_draw_motion_boundary(motion_id);
+}
+
+EMSCRIPTEN_KEEPALIVE int melee_web_synctest_is_mario_kind(int fighter_kind)
+{
+    return slippi_profile_draw_is_mario_kind(fighter_kind);
+}
+
 EMSCRIPTEN_KEEPALIVE const char *melee_web_synctest_profile_identity(void)
 {
     return slippi_profile_identity_name(

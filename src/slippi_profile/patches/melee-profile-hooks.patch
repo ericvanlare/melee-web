@@ -110,15 +110,35 @@ diff --git a/src/melee/ft/ft_0D31.c b/src/melee/ft/ft_0D31.c
 diff --git a/src/melee/ft/ftdrawcommon.c b/src/melee/ft/ftdrawcommon.c
 --- a/src/melee/ft/ftdrawcommon.c
 +++ b/src/melee/ft/ftdrawcommon.c
-@@ -364,5 +364,7 @@ static inline void ftDrawCommon_80080E18_inline2(HSD_GObj* gobj, Fighter* old)
+@@ -22,4 +22,8 @@
+ #include <sysdolphin/baselib/cobj.h>
+ #include <sysdolphin/baselib/gobj.h>
+ #include <sysdolphin/baselib/state.h>
++
++#ifdef MELEE_WEB_SLIPPI_PROFILE
++#include <slippi_profile/draw_diagnostics.h>
++#endif
+ 
+@@ -250,2 +254,6 @@
+         HSD_JObjDispAll(GET_JOBJ(gobj), mtx, HSD_GObj_80390EB8(arg1), 0);
++#ifdef MELEE_WEB_SLIPPI_PROFILE
++        slippi_profile_draw_diagnostics_record_normal_model_dispatch(
++            fighter->player_id, fighter->x618_player_id, fighter->kind);
++#endif
+         if (ftData_UnkMtxFunc0[fighter->kind] != NULL) {
+@@ -364,5 +372,11 @@ static inline void ftDrawCommon_80080E18_inline2(HSD_GObj* gobj, Fighter* old)
  {
++#ifdef MELEE_WEB_SLIPPI_PROFILE
++    slippi_profile_draw_diagnostics_record_model_transform(
++        old->player_id, old->x618_player_id, old->kind);
++#endif
 +#ifndef MELEE_WEB_SLIPPI_PROFILE
      Fighter* fp = GET_FIGHTER(gobj);
 +#endif
      HSD_JObj* jobj = gobj->hsd_obj;
      Vec3* pos;
  
-@@ -370,8 +372,15 @@ static inline void ftDrawCommon_80080E18_inline2(HSD_GObj* gobj, Fighter* old)
+@@ -370,8 +384,15 @@ static inline void ftDrawCommon_80080E18_inline2(HSD_GObj* gobj, Fighter* old)
      MtxPtr matrix = HSD_CObjGetInvViewingMtxPtr(Camera_800310B8());
      /// @todo this seems to be using the wrong common attributes
 +#ifdef MELEE_WEB_SLIPPI_PROFILE
@@ -134,3 +154,12 @@ diff --git a/src/melee/ft/ftdrawcommon.c b/src/melee/ft/ftdrawcommon.c
  
      HSD_JObjSetTranslate(jobj, pos);
  }
+@@ -379,4 +400,8 @@ void ftDrawCommon_80080E18(HSD_GObj* gobj, int arg1)
+ {
+     Fighter* fp = gobj->user_data;
++#ifdef MELEE_WEB_SLIPPI_PROFILE
++    slippi_profile_draw_diagnostics_record_callback(
++        fp->player_id, fp->x618_player_id, fp->kind);
++#endif
+ 
+     if (!fp->x221F_b3 && ftLib_80086A8C(gobj)) {
