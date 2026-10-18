@@ -3,10 +3,13 @@
 
 #include "slippi_profile/dynamics_fix.h"
 #include "slippi_profile/deadupfall_fix.h"
+#include "slippi_profile/draw_diagnostics.h"
 #include "slippi_profile/offscreen_damage.h"
 #include "slippi_profile/profile.h"
 
 #include <melee/ft/kinds/ftCommon/types.h>
+#include <melee/ft/kinds/ftMario/forward.h>
+#include <melee/ft/types.h>
 
 #include <assert.h>
 #include <stddef.h>
@@ -27,7 +30,10 @@ _Static_assert(offsetof(union ftCommon_MotionVars,
 _Static_assert(offsetof(union ftCommon_MotionVars,
                         unk_deadup.x5C) == 28,
                "pinned DeadUpFall temporary offset changed");
-
+_Static_assert(GM_MAX_PLAYERS == Gm_Player_NumMax,
+               "draw diagnostic slots follow the authored player bound");
+_Static_assert(sizeof(SlippiProfileDrawDiagnostics) == 132,
+               "draw diagnostic ABI width changed");
 static HSD_JObj *matrix_calls[8];
 static size_t matrix_call_count;
 
@@ -57,6 +63,66 @@ static void test_draw_policy(void)
            SLIPPI_SOURCE_DRAW_ERROR);
     assert(slippi_profile_source_draw_decision(profile, (SlippiTickKind)99) ==
            SLIPPI_SOURCE_DRAW_ERROR);
+}
+
+static void test_draw_diagnostics(void)
+{
+    const SlippiProfileDrawDiagnostics *initial =
+        slippi_profile_draw_diagnostics_snapshot();
+    assert(initial != NULL && initial->slot_count == GM_MAX_PLAYERS);
+    assert(initial->status == SLIPPI_DRAW_DIAGNOSTIC_OK);
+    assert(initial->metadata_seen_mask == 0);
+
+    slippi_profile_draw_diagnostics_record_callback(0, 0, FTKIND_MARIO);
+    slippi_profile_draw_diagnostics_record_model_transform(0, 0, FTKIND_MARIO);
+    slippi_profile_draw_diagnostics_record_normal_model_dispatch(
+        0, 0, FTKIND_MARIO);
+    slippi_profile_draw_diagnostics_record_callback(1, 1, FTKIND_MARIO);
+    slippi_profile_draw_diagnostics_record_model_transform(1, 1, FTKIND_MARIO);
+    slippi_profile_draw_diagnostics_record_normal_model_dispatch(
+        1, 1, FTKIND_MARIO);
+    const SlippiProfileDrawDiagnostics *observed =
+        slippi_profile_draw_diagnostics_snapshot();
+    assert(observed->callback_entries[0] == 1);
+    assert(observed->callback_entries[1] == 1);
+    assert(observed->model_transform_entries[0] == 1);
+    assert(observed->model_transform_entries[1] == 1);
+    assert(observed->normal_model_dispatch_entries[0] == 1);
+    assert(observed->normal_model_dispatch_entries[1] == 1);
+    assert(observed->processed_pad_slots[0] == 0 &&
+           observed->processed_pad_slots[1] == 1);
+    assert(observed->fighter_kinds[0] == FTKIND_MARIO &&
+           observed->fighter_kinds[1] == FTKIND_MARIO);
+    assert(observed->metadata_seen_mask == 3u);
+    assert(observed->status == SLIPPI_DRAW_DIAGNOSTIC_OK);
+
+    slippi_profile_draw_diagnostics_record_callback(
+        (int32_t) GM_MAX_PLAYERS, 0, FTKIND_MARIO);
+    assert(observed->status & SLIPPI_DRAW_DIAGNOSTIC_INVALID_SOURCE_SLOT);
+    slippi_profile_draw_diagnostics_record_callback(1, 0, FTKIND_MARIO);
+    assert(observed->status & SLIPPI_DRAW_DIAGNOSTIC_METADATA_CHANGED);
+    assert(observed->callback_entries[1] == 2);
+
+    assert(slippi_profile_draw_motion_boundary(ftCo_MS_Wait) ==
+           SLIPPI_PROFILE_MOTION_INTERACTIVE);
+    assert(slippi_profile_draw_motion_boundary(ftCo_MS_Entry) ==
+           SLIPPI_PROFILE_MOTION_ENTRY);
+    assert(slippi_profile_draw_motion_boundary(ftCo_MS_EntryEnd) ==
+           SLIPPI_PROFILE_MOTION_ENTRY);
+    assert(slippi_profile_draw_motion_boundary(ftCo_MS_DeadDown) ==
+           SLIPPI_PROFILE_MOTION_DEATH);
+    assert(slippi_profile_draw_motion_boundary(ftCo_MS_DeadUpFallHitCameraIce) ==
+           SLIPPI_PROFILE_MOTION_DEATH);
+    assert(slippi_profile_draw_motion_boundary(ftCo_MS_Rebirth) ==
+           SLIPPI_PROFILE_MOTION_RESPAWN);
+    assert(slippi_profile_draw_motion_boundary(ftCo_MS_RebirthWait) ==
+           SLIPPI_PROFILE_MOTION_RESPAWN);
+    assert(slippi_profile_draw_motion_boundary(-1) ==
+           SLIPPI_PROFILE_MOTION_UNKNOWN);
+    assert(slippi_profile_draw_motion_boundary(ftMr_MS_Count) ==
+           SLIPPI_PROFILE_MOTION_UNKNOWN);
+    assert(slippi_profile_draw_is_mario_kind(FTKIND_MARIO));
+    assert(!slippi_profile_draw_is_mario_kind(FTKIND_FOX));
 }
 
 static void test_offscreen_predicate(void)
@@ -215,6 +281,7 @@ static void test_deadupfall_private_velocity(void)
 int main(void)
 {
     test_draw_policy();
+    test_draw_diagnostics();
     test_offscreen_predicate();
     test_dirty_matrix_traversal();
     test_deadupfall_private_velocity();

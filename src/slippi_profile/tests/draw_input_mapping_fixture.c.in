@@ -1,0 +1,188 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef uint8_t u8;
+typedef int8_t s8;
+
+typedef struct StaticPlayer {
+    u8 controller_index;
+    u8 player_id;
+} StaticPlayer;
+
+static StaticPlayer player_slots[4];
+
+static void Player_CheckSlot(int slot)
+{
+    if (slot < 0 || slot >= 4) {
+        fputs("synthetic Player_CheckSlot rejected an unknown slot\n", stderr);
+        abort();
+    }
+}
+
+{{PLAYER_ACCESSORS}}
+
+typedef struct MeleeWebPlayerContext {
+    int slot;
+    int sub_color;
+} MeleeWebPlayerContext;
+
+static void source_context_assign_input_ids(MeleeWebPlayerContext *s)
+{
+{{CONTEXT_ASSIGNMENTS}}
+}
+
+typedef struct Fighter {
+    uint32_t player_id;
+    int x618_player_id;
+    int x61A_controller_index;
+    struct { uint32_t held_buttons[1]; } input;
+} Fighter;
+
+struct plAllocInfo {
+    uint8_t slot;
+};
+
+static void source_fighter_assign_input_ids(Fighter *fp, struct plAllocInfo *argdata)
+{
+{{FIGHTER_ASSIGNMENTS}}
+}
+
+typedef struct PADStatus {
+    uint32_t button;
+} PADStatus;
+
+PADStatus HSD_PadGameStatus[4];
+
+static uint32_t source_human_held_buttons(Fighter *fp)
+{
+{{HUMAN_BUTTON_READ}}
+    return fp->input.held_buttons[0];
+}
+
+typedef struct InputQueue {
+    PADStatus stat[4];
+} InputQueue;
+
+typedef struct MeleeWebMatchContext {
+    uint32_t player_count;
+    uint32_t slots[4];
+    uint32_t controllers[4];
+    InputQueue input_queue;
+} MeleeWebMatchContext;
+
+static void source_map_raw_pad(MeleeWebMatchContext *h, const PADStatus raw[4])
+{
+    for (uint32_t i = 0; i < h->player_count; ++i) {
+{{RAW_TO_PROCESSED_QUEUE}}
+    }
+}
+
+static uint32_t copied_start_raw_controller(uint32_t source_index, uint32_t initializer_port)
+{
+    const struct { uint32_t slot; } source = {initializer_port};
+    const uint32_t slot = source_index;
+    return (uint32_t) ({{COPIED_START_FORMULA}});
+}
+
+static uint32_t session_source_port(uint32_t source_index, uint32_t initializer_port)
+{
+    const struct { uint32_t slot; } source = {initializer_port};
+    const uint32_t source_slot = source_index;
+    const uint32_t source_port = (uint32_t) ({{SESSION_SOURCE_PORT_FORMULA}});
+    if (!({{SESSION_IDENTITY_GUARD}})) return UINT32_MAX;
+    return source_port;
+}
+
+static int input_routes_match(uint32_t source_slot, uint32_t initializer_port,
+    uint32_t raw_controller, const Fighter *fighter, const MeleeWebMatchContext *h,
+    const PADStatus raw[4])
+{
+    if (source_slot >= 2 || raw_controller >= 4 ||
+        session_source_port(source_slot, initializer_port) != source_slot ||
+        copied_start_raw_controller(source_slot, initializer_port) != raw_controller ||
+        fighter->player_id != source_slot || fighter->x618_player_id < 0 ||
+        (uint32_t) fighter->x618_player_id != source_slot ||
+        h->slots[source_slot] != source_slot || h->controllers[source_slot] != raw_controller ||
+        h->input_queue.stat[source_slot].button != raw[raw_controller].button) {
+        return 0;
+    }
+    return 1;
+}
+
+int main(void)
+{
+    const PADStatus raw[4] = {{0x101u}, {0x202u}, {0x303u}, {0x404u}};
+    const uint32_t initializer_ports[2] = {0, 0};
+    Fighter fighters[2] = {{0}};
+    MeleeWebMatchContext h = {0};
+    h.player_count = 2;
+
+    for (uint32_t source_slot = 0; source_slot < 2; ++source_slot) {
+        const uint32_t initializer_port = initializer_ports[source_slot];
+        const uint32_t raw_controller = copied_start_raw_controller(source_slot, initializer_port);
+        if (raw_controller != session_source_port(source_slot, initializer_port) ||
+            raw_controller != source_slot) {
+            fputs("copied start-data mapping differs from accepted match source slot\n", stderr);
+            return 1;
+        }
+        MeleeWebPlayerContext context = {(int) source_slot, 0};
+        source_context_assign_input_ids(&context);
+        struct plAllocInfo allocation = {(uint8_t) source_slot};
+        source_fighter_assign_input_ids(&fighters[source_slot], &allocation);
+        if (Player_GetControllerIndex((int) source_slot) != 0) {
+            fputs("fixture tint did not remain zero\n", stderr);
+            return 1;
+        }
+        h.slots[source_slot] = source_slot;
+        h.controllers[source_slot] = raw_controller;
+    }
+
+    source_map_raw_pad(&h, raw);
+    for (uint32_t source_slot = 0; source_slot < 2; ++source_slot) {
+        HSD_PadGameStatus[source_slot] = h.input_queue.stat[source_slot];
+        if (!input_routes_match(source_slot, initializer_ports[source_slot],
+                h.controllers[source_slot], &fighters[source_slot], &h, raw) ||
+            source_human_held_buttons(&fighters[source_slot]) != raw[source_slot].button ||
+            fighters[source_slot].x61A_controller_index != 0) {
+            fputs("source input routing did not preserve player-id/PAD identity and tint\n", stderr);
+            return 1;
+        }
+    }
+
+    Fighter wrong_player_id = fighters[1];
+    wrong_player_id.x618_player_id = 0;
+    if (input_routes_match(1, initializer_ports[1], 1, &wrong_player_id, &h, raw) ||
+        source_human_held_buttons(&wrong_player_id) != 0x101u) {
+        fputs("wrong Fighter x618 player id escaped the actual PAD-read control\n", stderr);
+        return 1;
+    }
+
+    MeleeWebMatchContext wrong_controller = h;
+    wrong_controller.controllers[1] = 0;
+    memset(&wrong_controller.input_queue, 0, sizeof(wrong_controller.input_queue));
+    source_map_raw_pad(&wrong_controller, raw);
+    if (input_routes_match(1, initializer_ports[1], 1, &fighters[1], &wrong_controller, raw)) {
+        fputs("wrong copied raw-controller map escaped the actual queue control\n", stderr);
+        return 1;
+    }
+
+    MeleeWebMatchContext wrong_source_slot = h;
+    wrong_source_slot.slots[1] = 0;
+    memset(&wrong_source_slot.input_queue, 0, sizeof(wrong_source_slot.input_queue));
+    source_map_raw_pad(&wrong_source_slot, raw);
+    if (input_routes_match(1, initializer_ports[1], 1, &fighters[1], &wrong_source_slot, raw)) {
+        fputs("wrong source-slot map escaped the actual queue control\n", stderr);
+        return 1;
+    }
+
+    if (copied_start_raw_controller(1, 1) != 0 ||
+        session_source_port(1, 1) != UINT32_MAX) {
+        fputs("invalid one-based port/source-slot mapping was accepted\n", stderr);
+        return 1;
+    }
+    puts("PASS actual-source mapping: tint0/0, processed0/1, raw0/1; wrong processed/raw/source/port mappings refused");
+    return 0;
+}

@@ -33,6 +33,22 @@ ABI_HEADERS = {
         "src/melee/ft/forward.h",
         "73cf4918e768aa15477d7c9e17d6fa58ded77ee60c9e0398820dda1ac6cfc7fe",
     ),
+    "fighter_types": (
+        "src/melee/ft/types.h",
+        "74b7246a0fe4199def6610aa0692378e86a404a0eea815bca5bc422e44b125a8",
+    ),
+    "motion_state_forward": (
+        "src/melee/ft/kinds/ftCommon/forward.h",
+        "514cd2e4a2ebf3729255efce6b88bb6b91acd685a519e2b4bb01bcb09f7492ca",
+    ),
+    "mario_motion_state_forward": (
+        "src/melee/ft/kinds/ftMario/forward.h",
+        "8b0dce96646aa03e1ba590c2f76be2e3d193d25cd3ed6e969381f3b71180fbfa",
+    ),
+    "game_player_forward": (
+        "src/melee/gm/forward.h",
+        "ae4794b4bf864910ef56da42840ead9056470ad0a2f0844c45b33326c7e19aa5",
+    ),
     "hsd_gobj": (
         "src/sysdolphin/baselib/gobj.h",
         "22edd67f12be7c47abd78c78c1a9e0c27f288cedcde9338e6aa4c75195b517a2",
@@ -226,8 +242,47 @@ def _materialize_sources(output):
     profile_driver = _function(
         profile_draw_source, "void ftDrawCommon_80080E18(HSD_GObj* gobj, int arg1)",
     )
-    if original_driver != profile_driver:
-        raise AssertionError("the profile overlay unexpectedly changed the draw driver")
+    callback_recorder = (
+        "#ifdef MELEE_WEB_SLIPPI_PROFILE\n"
+        "    slippi_profile_draw_diagnostics_record_callback(\n"
+        "        fp->player_id, fp->x618_player_id, fp->kind);\n"
+        "#endif\n"
+    )
+    if profile_driver.count(callback_recorder) != 1:
+        raise AssertionError("source fighter callback entry recorder is not unique")
+    if profile_driver.replace(callback_recorder, "", 1) != original_driver:
+        raise AssertionError("callback instrumentation changed the original draw driver")
+    if "slippi_profile_draw_diagnostics_record_callback" in original_driver:
+        raise AssertionError("original source draw driver unexpectedly has profile diagnostics")
+    if profile_draw.count("slippi_profile_draw_diagnostics_record_model_transform(") != 1:
+        raise AssertionError("admitted model-transform branch recorder is not unique")
+
+    model_dispatch_original = _function(
+        original_draw_source,
+        "void ftDrawCommon_800805C8(HSD_GObj* gobj, s32 arg1, bool arg2)",
+    )
+    model_dispatch_profile = _function(
+        profile_draw_source,
+        "void ftDrawCommon_800805C8(HSD_GObj* gobj, s32 arg1, bool arg2)",
+    )
+    dispatch_recorder = (
+        "#ifdef MELEE_WEB_SLIPPI_PROFILE\n"
+        "        slippi_profile_draw_diagnostics_record_normal_model_dispatch(\n"
+        "            fighter->player_id, fighter->x618_player_id, fighter->kind);\n"
+        "#endif\n"
+    )
+    if model_dispatch_profile.count(dispatch_recorder) != 1:
+        raise AssertionError("normal main-model dispatch recorder is not unique")
+    main_model_call = "HSD_JObjDispAll(GET_JOBJ(gobj), mtx, HSD_GObj_80390EB8(arg1), 0);"
+    accessory_call = "HSD_JObjDispAll(fighter->x20A0_accessory, NULL,"
+    dispatch_at = model_dispatch_profile.index(dispatch_recorder)
+    if not (model_dispatch_profile.index(main_model_call) < dispatch_at <
+            model_dispatch_profile.index("if (ftData_UnkMtxFunc0[fighter->kind]")):
+        raise AssertionError("normal-model recorder moved outside the source dispatch return edge")
+    if model_dispatch_profile.replace(dispatch_recorder, "", 1) != model_dispatch_original:
+        raise AssertionError("normal-model instrumentation changed source gates or call order")
+    if model_dispatch_profile.index(accessory_call) < dispatch_at:
+        raise AssertionError("normal-model recorder was attached to an accessory draw")
 
     timer = _timer_decrement(original_anim)
     case_init_original = _case_fragment(original_anim, "case 2:", "case 3:")
@@ -279,7 +334,10 @@ def _materialize_sources(output):
         "profile_phys": profile_phys,
         "original_draw": original_draw,
         "profile_draw": profile_draw,
-        "draw_driver": original_driver,
+        "draw_driver_original": original_driver,
+        "draw_driver_profile": profile_driver,
+        "model_dispatch_original": model_dispatch_original,
+        "model_dispatch_profile": model_dispatch_profile,
         "timer": timer,
         "anim_case_original": case_init_original,
         "anim_case_profile": case_init_profile,
@@ -302,6 +360,8 @@ def _materialize_sources(output):
             "deadupfall_helper_sha256": _file_sha(ROOT / "src/slippi_profile/deadupfall_fix.c"),
             "deadupfall_header_sha256": _file_sha(ROOT / "src/slippi_profile/deadupfall_fix.h"),
             "profile_identity_sha256": _file_sha(ROOT / "src/slippi_profile/profile.c"),
+            "draw_diagnostics_sha256": _file_sha(ROOT / "src/slippi_profile/draw_diagnostics.c"),
+            "draw_diagnostics_header_sha256": _file_sha(ROOT / "src/slippi_profile/draw_diagnostics.h"),
             "gameplay_ps_math_sha256": _file_sha(ROOT / "src/gameplay_ps_math.c"),
             "gameplay_compat_sha256": _file_sha(ROOT / "src/gameplay_compat.h"),
             "compatibility_binding": compat_binding,
@@ -314,6 +374,9 @@ def _materialize_sources(output):
                 "draw_helper_original": _sha(original_draw.encode()),
                 "draw_helper_profile": _sha(profile_draw.encode()),
                 "draw_driver": _sha(original_driver.encode()),
+                "draw_driver_profile": _sha(profile_driver.encode()),
+                "normal_model_dispatch_original": _sha(model_dispatch_original.encode()),
+                "normal_model_dispatch_profile": _sha(model_dispatch_profile.encode()),
                 "ftCommon_Fall": _sha(fall.encode()),
                 "lbVector_Add": _sha(vector_add.encode()),
                 "matrix_function": _sha(matrix.encode()),
@@ -359,10 +422,10 @@ def _build_fixture(output, sources, mutation=None, *, generation_only=False):
     )
     profile_helper = _rename_draw_helper(selected_draw, "fixture_profile_inline2")
     original_driver = _rename_draw_driver(
-        sources["draw_driver"], "fixture_original_inline2", "fixture_draw_original",
+        sources["draw_driver_original"], "fixture_original_inline2", "fixture_draw_original",
     )
     profile_driver = _rename_draw_driver(
-        sources["draw_driver"], "fixture_profile_inline2", "fixture_draw_profile",
+        sources["draw_driver_profile"], "fixture_profile_inline2", "fixture_draw_profile",
     )
     replacements = {
         "@ACTUAL_FALL@": sources["fall"],
@@ -405,6 +468,7 @@ def _build_fixture(output, sources, mutation=None, *, generation_only=False):
         str(fixture_source),
         str(ROOT / "src/slippi_profile/profile.c"),
         str(ROOT / "src/slippi_profile/deadupfall_fix.c"),
+        str(ROOT / "src/slippi_profile/draw_diagnostics.c"),
         "-lm", "-o", str(executable),
     ]
     wrapped = [
@@ -488,6 +552,7 @@ class DeadUpFallReductionTests(unittest.TestCase):
                     "identity-view original-source control stays unchanged",
                     "profile present draw and correction no-draw compare declared motion/velocity/position bytes",
                     "actual source draw driver guards, repeated draws, changed view, timer/phase/clamp/early-break order",
+                    "normal-model HSD_JObjDispAll return is counted after its unchanged source admission gates, separately from callback and inline2 counts",
                     "independent omitted phase-2 init, case-3 physics and model-position hooks are detected",
                     "native fixture service adapters are synthetic, bounded observers; unexpected render helpers abort",
                     "reduced phase coverage extracts actual case-2 initialization and case-3 physics only; its phase-1 no-dispatch control does not establish full phase-1 behavior",

@@ -12,18 +12,22 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {browserLaunchOptions, loadBrowserTools} from '../../../scripts/browser_tools.mjs';
 import {QuiescentWasmSnapshot} from '../../../tests/quiescent_wasm_snapshot.mjs';
 import {
-  applyCleanupVerdict, checkedAsyncCcall, chromeUserDataDirectoryFromSpawnArgs,
-  launchOwnedChromeServer, ownedProcessPresent, recordBrowserProcessInfo,
-  validateAuroraFrame,
+  applyCleanupVerdict, assertDrawDiagnosticsClear, checkedAsyncCcall,
+  chromeUserDataDirectoryFromSpawnArgs, decodeDrawDiagnostics,
+  inspectInteractiveObservation, launchOwnedChromeServer, ownedProcessPresent,
+  requireDrawDiagnosticSize,
+  recordBrowserProcessInfo, validateAuroraFrame, validateSelectedDrawPath,
+  validateSourceInputMapping,
 } from './runner_contract.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const OBSERVATION_BYTES = 1280;
 const PCM_BYTES = 1068 * 4;
 const PAD_BYTES = 44;
+const DRAW_DIAGNOSTIC_BYTES = 132;
 const SOURCE_SEED = 0x13579bdf;
 const PREFIX_SAMPLES = 300;
-const INTERVAL_SAMPLE = 300;
+const INTERVAL_SAMPLES = Object.freeze([300, 301]);
 const SUBMISSION_TIMEOUT_MS = 5000;
 const POLL_MS = 10;
 const MAX_HEAP_BYTES = 512 * 1024 * 1024;
@@ -79,6 +83,34 @@ function laneBytes(module) {
   };
 }
 
+function runtimeDrawDiagnostics(module) {
+  const size = module._melee_web_synctest_draw_diagnostics_size();
+  if (size !== DRAW_DIAGNOSTIC_BYTES) {
+    throw new Error(`Draw diagnostic ABI size is invalid: ${size}`);
+  }
+  return decodeDrawDiagnostics(copyBytes(
+    module, module._melee_web_synctest_draw_diagnostics(), size));
+}
+
+function nodeInteractiveState(module, lane, expectedInputMapping, expectedStocks) {
+  const diagnostics = runtimeDrawDiagnostics(module);
+  return inspectInteractiveObservation(lane.observation, {
+    classifyMotion: motion => module._melee_web_synctest_motion_boundary(motion),
+    isMarioKind: kind => module._melee_web_synctest_is_mario_kind(kind) === 1,
+    slotCount: diagnostics.slotCount,
+    expectedInputMapping, expectedStocks,
+  });
+}
+
+function requireInteractive(state, lane, sample, phase) {
+  if (!state.interactive) {
+    const refusal = {kind: 'interactive-boundary-refusal', lane, sample, phase,
+      reasons: state.refusalReasons, players: state.players};
+    throw Object.assign(new Error(`Interactive boundary refused: ${JSON.stringify(refusal)}`),
+      {interactiveBoundaryRefusal: refusal});
+  }
+}
+
 function firstDifference(expected, actual) {
   const limit = Math.min(expected.length, actual.length);
   for (let offset = 0; offset < limit; offset++) {
@@ -92,15 +124,47 @@ function firstDifference(expected, actual) {
 }
 
 function checksumRecord(sample, lane) {
+  const observation = new DataView(lane.observation.buffer,
+    lane.observation.byteOffset, lane.observation.byteLength);
+  const pcmFrames = observation.getUint32(32, true);
+  const audioPhase = observation.getUint32(36, true);
+  if (pcmFrames > 534 || audioPhase >= 60) {
+    throw new Error(`PCM observation metadata is outside source bounds: frames=${pcmFrames}, phase=${audioPhase}`);
+  }
   return {
     sample,
+    pcmFrames,
+    audioPhase,
     observationSha256: sha256(lane.observation),
     pcmSha256: sha256(lane.pcm),
     rawPad44Sha256: sha256(lane.pad),
   };
 }
 
-function compareLane(sample, domain, expected, actual) {
+export function rawLaneRecord(lane) {
+  const view = new DataView(lane.observation.buffer,
+    lane.observation.byteOffset, lane.observation.byteLength);
+  // Preserve bytes even if the subsequent timing or boundary guard refuses.
+  return {
+    observationBase64: lane.observation.toString('base64'),
+    pcmBase64: lane.pcm.toString('base64'),
+    rawPad44Base64: lane.pad.toString('base64'),
+    pcmFrames: view.getUint32(32, true), audioPhase: view.getUint32(36, true),
+    observationSha256: sha256(lane.observation), pcmSha256: sha256(lane.pcm),
+    rawPad44Sha256: sha256(lane.pad),
+  };
+}
+
+function browserSampleLane(sample) {
+  return Object.fromEntries(['observation', 'pcm', 'pad'].map(key =>
+    [key, Buffer.from(sample[key], 'base64')]));
+}
+
+function browserSampleDiagnostics(sample) {
+  return decodeDrawDiagnostics(Buffer.from(sample.drawDiagnostics, 'base64'));
+}
+
+export function compareLane(sample, domain, expected, actual) {
   for (const key of ['observation', 'pcm', 'pad']) {
     if (!expected[key].equals(actual[key])) {
       const diff = firstDifference(expected[key], actual[key]);
@@ -146,6 +210,9 @@ function reportSourceHashes() {
     'src/slippi_profile/dynamics_fix.c',
     'src/slippi_profile/deadupfall_fix.h',
     'src/slippi_profile/deadupfall_fix.c',
+    'src/slippi_profile/draw_diagnostics.h',
+    'src/slippi_profile/draw_diagnostics.c',
+    '.deps/melee/src/melee/ft/kinds/ftMario/forward.h',
     'src/slippi_profile/patches/melee-profile-hooks.patch',
     'src/slippi_profile/tests/synctest_node.cpp',
     'src/slippi_profile/tests/synctest_browser.cpp',
@@ -194,8 +261,9 @@ function checkedNode(module, label, call) {
   if (result !== 1) throw new Error(`${label}: ${cstring(module, module._melee_web_snapshot_error())}`);
 }
 
-async function runBrowserInit(page, origin, runtimeName) {
-  return page.evaluate(async ({origin, runtimeName, seed, checkedSource}) => {
+export async function runBrowserInit(page, origin, runtimeName) {
+  return page.evaluate(async ({origin, runtimeName, seed, checkedSource,
+    diagnosticSizeSource, drawDiagnosticBytes}) => {
     const encodeBase64 = bytes => {
       let binary = '';
       for (let start = 0; start < bytes.length; start += 0x6000) {
@@ -240,6 +308,9 @@ async function runBrowserInit(page, origin, runtimeName) {
       pad: module.HEAPU8.slice(module._melee_web_snapshot_input(),
         module._melee_web_snapshot_input() + 44),
     });
+    const checkDrawDiagnosticSize = new Function(`return (${diagnosticSizeSource})`)();
+    const diagnosticSize = checkDrawDiagnosticSize(
+      module._melee_web_synctest_draw_diagnostics_size(), drawDiagnosticBytes);
     const init = {
       featureAvailable,
       backend,
@@ -252,15 +323,21 @@ async function runBrowserInit(page, origin, runtimeName) {
         module._melee_web_snapshot_initializer_diagnostic(),
         module._melee_web_snapshot_initializer_diagnostic() +
           module._melee_web_snapshot_initializer_diagnostic_size())),
+      drawDiagnostics: encodeBase64(module.HEAPU8.slice(
+        module._melee_web_synctest_draw_diagnostics(),
+        module._melee_web_synctest_draw_diagnostics() + diagnosticSize)),
       initial: Object.fromEntries(Object.entries(read()).map(([key, bytes]) => [key, encodeBase64(bytes)])),
       logs,
     };
     return init;
-  }, {origin, runtimeName, seed: SOURCE_SEED, checkedSource: checkedAsyncCcall.toString()});
+  }, {origin, runtimeName, seed: SOURCE_SEED, checkedSource: checkedAsyncCcall.toString(),
+    diagnosticSizeSource: requireDrawDiagnosticSize.toString(),
+    drawDiagnosticBytes: DRAW_DIAGNOSTIC_BYTES});
 }
 
-async function runBrowserSample(page, sample) {
-  return page.evaluate(async ({sample, checkedSource}) => {
+export async function runBrowserSample(page, sample, expectedInputMapping, expectedStocks) {
+  return page.evaluate(async ({sample, expectedInputMapping, expectedStocks, checkedSource, inspectSource,
+    inputMappingSource, diagnosticSizeSource, drawDiagnosticBytes}) => {
     const {module} = window.__slippiSynctest;
     const checkedAsyncCcall = new Function(`return (${checkedSource})`)();
     const checked = (label, identifier, argumentTypes = [], args = []) =>
@@ -297,6 +374,23 @@ async function runBrowserSample(page, sample) {
     const observation = read(module._melee_web_snapshot_observation(), observationSize);
     const pcm = read(module._melee_web_snapshot_pcm(), pcmSize);
     const pad = read(module._melee_web_snapshot_input(), 44);
+    const checkDrawDiagnosticSize = new Function(`return (${diagnosticSizeSource})`)();
+    const diagnosticSize = checkDrawDiagnosticSize(
+      module._melee_web_synctest_draw_diagnostics_size(), drawDiagnosticBytes);
+    const diagnostics = read(module._melee_web_synctest_draw_diagnostics(), diagnosticSize);
+    const diagnosticView = new DataView(diagnostics.buffer, diagnostics.byteOffset, diagnostics.byteLength);
+    const mappingValidator = new Function(`return (${inputMappingSource})`)();
+    const makeInspector = new Function('DRAW_MOTION_BOUNDARY', 'validateSourceInputMapping',
+      `return (${inspectSource})`);
+    const inspectInteractiveObservation = makeInspector({
+      interactive: 0, entry: 1, death: 2, respawn: 3, unknown: 4,
+    }, mappingValidator);
+    const boundary = inspectInteractiveObservation(observation, {
+      classifyMotion: motion => module._melee_web_synctest_motion_boundary(motion),
+      isMarioKind: kind => module._melee_web_synctest_is_mario_kind(kind) === 1,
+      slotCount: diagnosticView.getUint32(0, true),
+      expectedInputMapping, expectedStocks,
+    });
     const encode = bytes => {
       let binary = '';
       for (let i = 0; i < bytes.length; i += 0x6000) {
@@ -304,8 +398,13 @@ async function runBrowserSample(page, sample) {
       }
       return btoa(binary);
     };
-    return {observation: encode(observation), pcm: encode(pcm), pad: encode(pad), status};
-  }, {sample, checkedSource: checkedAsyncCcall.toString()});
+    return {observation: encode(observation), pcm: encode(pcm), pad: encode(pad),
+      drawDiagnostics: encode(diagnostics), boundary, status};
+  }, {sample, expectedInputMapping, expectedStocks, checkedSource: checkedAsyncCcall.toString(),
+    inputMappingSource: validateSourceInputMapping.toString(),
+    diagnosticSizeSource: requireDrawDiagnosticSize.toString(),
+    inspectSource: inspectInteractiveObservation.toString(),
+    drawDiagnosticBytes: DRAW_DIAGNOSTIC_BYTES});
 }
 
 async function closeBrowser(page) {
@@ -345,8 +444,9 @@ async function main() {
     profile: 'slippi-render-dependencies-v2',
     statement: 'Unofficial Slippi-compatible dependency diagnostic; not a complete Slippi or rollback profile.',
     scenario: 'two human Mario players / Final Destination / four stocks; deterministic fixture inputs',
-    interval: {checkpointInputSample: PREFIX_SAMPLES, inputSample: INTERVAL_SAMPLE,
-      depth: 1, prefixSamples: PREFIX_SAMPLES},
+    interval: {checkpointInputSample: PREFIX_SAMPLES, inputSamples: [...INTERVAL_SAMPLES],
+      depth: INTERVAL_SAMPLES.length, prefixSamples: PREFIX_SAMPLES,
+      checkpointRawBytes: null, comparedRawBytes: []},
     schedule: {
       drawnReference: 'source tick → source PCM → actual GameplayMatchSession::draw() inside Aurora begin/end frame → wait until Aurora frame packets, staging buffers, and worker are idle → refresh v2 observation',
       correction: 'source tick → source PCM → capture v2/PCM/raw PAD; source draw policy must return SKIP',
@@ -356,12 +456,16 @@ async function main() {
       observation: {schema: 'melee-web-source-snapshot-observation-v2', bytes: OBSERVATION_BYTES},
       pcmBytes: PCM_BYTES,
       rawPadBytes: PAD_BYTES,
+      drawDiagnosticBytes: DRAW_DIAGNOSTIC_BYTES,
+      ticks: 'exact byte equality after each of input samples 300 and 301; each sample is checked independently',
+      fighterPath: 'source callback entry and normal fighter-model dispatch-return counters must advance for both selected Mario fighters on each drawn sample; this is path reachability, not pixel acceptance',
       exactBytesAndSha256: true,
       fullHeap: 'Node no-draw lane checkpoint restore integrity and endpoint replay only; never compared with drawn browser heap',
     },
-    sourceDraw: {drawnLane: true, correctionLane: false, calls: 0, completedFrames: 0},
+    sourceDraw: {drawnLane: true, correctionLane: false, calls: 0, completedFrames: 0,
+      selectedFighterPathSamples: []},
     snapshotScope: 'The Node no-draw lane alone snapshots its complete Wasm linear memory. Aurora WebGPU, Chrome, OS/GPU caches, browser surface, pending submissions, DOM, Node process state, audio output, filesystem, and external allocator state are host-owned and are not snapshotted.',
-    audio: 'Native PCM bytes are compared after each source tick; fixture PCM is not sent to Web Audio or host speakers.',
+      audio: 'All 4272 native PCM bytes are compared after each source tick, including the unused zero tail; the observation separately records actual pcmFrames (bounded to 534) and audioPhase (<60). Fixture PCM is not sent to Web Audio or host speakers.',
     controls: {drawPolicy: 'native focused test', offscreenAndMatrices: 'native focused tests; not claimed exercised by this fixed interval'},
     licenses: {
       profileBehavior: 'GPL-3.0-or-later',
@@ -418,6 +522,7 @@ async function main() {
       stageBridge: cstring(nodeModule, nodeModule._melee_web_snapshot_stage_kind_bridge_identity()),
       initializer: JSON.parse(cstring(nodeModule, nodeModule._melee_web_snapshot_initializer_json())),
       initializerBytes: initializerBytes(nodeModule),
+      drawDiagnostics: runtimeDrawDiagnostics(nodeModule),
       initial: initialNode,
     };
     const buildRoot = path.dirname(browserRuntime);
@@ -494,6 +599,7 @@ async function main() {
       stageBridge: browserInit.stageBridge,
       initializer: JSON.parse(browserInit.initializer),
       initializerBytes: Buffer.from(browserInit.initializerBytes, 'base64'),
+      drawDiagnostics: decodeDrawDiagnostics(Buffer.from(browserInit.drawDiagnostics, 'base64')),
       initial: initialBrowser,
     };
     const identityFields = ['profile', 'source', 'rngHelper', 'stageBridge'];
@@ -516,6 +622,28 @@ async function main() {
     if (!nodeInit.initializerBytes.equals(browserInitRecord.initializerBytes)) {
       throw new Error(`Initial profile/seed state differs before snapshot: ${JSON.stringify(firstDifference(nodeInit.initializerBytes, browserInitRecord.initializerBytes))}`);
     }
+    assertDrawDiagnosticsClear(nodeInit.drawDiagnostics, 'Node initialization');
+    assertDrawDiagnosticsClear(browserInitRecord.drawDiagnostics, 'browser initialization');
+    const initializerPlayers = nodeInit.initializer.players;
+    if (!Array.isArray(initializerPlayers)) {
+      throw new Error('Copied start-data initializer has no source-player mapping');
+    }
+    const expectedInputMapping = validateSourceInputMapping(
+      initializerPlayers.map((player, sourceSlot) => ({
+        sourceSlot, initializerPort: player.port, rawController: player.controller,
+      })), nodeInit.drawDiagnostics.slotCount);
+    const browserInputMapping = validateSourceInputMapping(
+      browserInitRecord.initializer.players?.map((player, sourceSlot) => ({
+        sourceSlot, initializerPort: player.port, rawController: player.controller,
+      })), browserInitRecord.drawDiagnostics.slotCount);
+    if (JSON.stringify(expectedInputMapping) !== JSON.stringify(browserInputMapping)) {
+      throw new Error(`Copied start-data input maps differ by lane: node=${JSON.stringify(expectedInputMapping)} browser=${JSON.stringify(browserInputMapping)}`);
+    }
+    const expectedStocks = nodeInit.initializer.players?.map(player => player.stocks);
+    if (!Array.isArray(expectedStocks) || expectedStocks.length !== 2 ||
+        expectedStocks.some(stocks => stocks !== 4)) {
+      throw new Error(`Fixture must initialize exactly four stocks: ${JSON.stringify(expectedStocks)}`);
+    }
     compareLane(-1, 'initialization', nodeInit.initial, initialBrowser);
     report.initialization = {
       exactProfileSeedAndInitializer: true,
@@ -523,6 +651,8 @@ async function main() {
       profileSeedResetOrCallback: false,
       profileIdentity: nodeInit.profile,
       sourceIdentity: nodeInit.source,
+      sourceInputMapping: expectedInputMapping,
+      sourceInputMappingEvidence: 'initializer JSON copied from start_data; rawController uses source.slot ? source.slot - 1 : sourceSlot, and match entry requires source_port == source_slot',
       oldRngHelperIdentity: nodeInit.rngHelper,
       oldRngHelperEnabled: false,
       initializer: nodeInit.initializer,
@@ -540,13 +670,15 @@ async function main() {
       throw new Error('Correction lane draw policy did not skip drawing');
     }
     const nodePrefix = [];
+    let browserPrefixEndpoint = null;
     for (let sample = 0; sample < PREFIX_SAMPLES; sample++) {
       const decision = nodeModule._melee_web_synctest_draw_decision(1);
       if (decision !== 0) throw new Error(`Correction draw policy was ${decision} at sample ${sample}`);
       checkN(`no-draw source step ${sample}`, () => nodeModule._melee_web_snapshot_step(sample));
       if (sample === 0) checkN('no-draw native quiescence', () => nodeModule._melee_web_snapshot_quiescent());
       const noDraw = laneBytes(nodeModule);
-      const drawn = await runBrowserSample(page, sample);
+      assertDrawDiagnosticsClear(runtimeDrawDiagnostics(nodeModule), `Node no-draw prefix sample ${sample}`);
+      const drawn = await runBrowserSample(page, sample, expectedInputMapping, expectedStocks);
       previousBrowserFrame = validateAuroraFrame(drawn.status,
         previousBrowserFrame.beginFrameId, previousBrowserFrame.endFrameId);
       if (sample === 0) {
@@ -559,8 +691,25 @@ async function main() {
         }
         report.browser.screenshot = {path: path.basename(screenshot), sha256: sha256(screenshotBytes), bytes: screenshotBytes.length};
       }
-      const drawRef = Object.fromEntries(Object.entries(drawn).filter(([key]) => key !== 'status')
-        .map(([key, base64]) => [key, Buffer.from(base64, 'base64')]));
+      const drawRef = browserSampleLane(drawn);
+      if (sample === PREFIX_SAMPLES - 1) {
+        report.interval.checkpointRawBytes = {sample,
+          nodeNoDraw: rawLaneRecord(noDraw), browserDrawn: rawLaneRecord(drawRef),
+          nodeBoundary: nodeInteractiveState(nodeModule, noDraw, expectedInputMapping, expectedStocks),
+          browserBoundary: drawn.boundary, browserDrawDiagnostics: browserSampleDiagnostics(drawn)};
+        writeReport();
+      }
+      if (sample === PREFIX_SAMPLES - 1) {
+        const screenshot = path.join(options['--out'], 'drawn-reference-checkpoint-sample-299.png');
+        await page.screenshot({path: screenshot, fullPage: true});
+        const screenshotBytes = fs.readFileSync(screenshot);
+        if (screenshotBytes.length < 100 || !screenshotBytes.subarray(0, 8).equals(
+          Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
+          throw new Error('Headless Chrome did not retain a valid sample-299 checkpoint PNG');
+        }
+        report.browser.screenshotCheckpointSample299 = {path: path.basename(screenshot),
+          sha256: sha256(screenshotBytes), bytes: screenshotBytes.length};
+      }
       compareLane(sample, 'drawn-reference versus correction-prefix', noDraw, drawRef);
       const record = {
         ...checksumRecord(sample, noDraw),
@@ -573,8 +722,24 @@ async function main() {
       report.sourceDraw.calls++;
       report.sourceDraw.completedFrames++;
       nodePrefix.push(noDraw);
+      browserPrefixEndpoint = drawn;
+
       writeReport();
     }
+
+    const prefixCheckpoint = PREFIX_SAMPLES - 1;
+    if (!browserPrefixEndpoint) throw new Error('Drawn reference did not reach the checkpoint input sample');
+    const prefixNodeState = nodeInteractiveState(nodeModule, nodePrefix.at(-1), expectedInputMapping, expectedStocks);
+    checksumRecord(prefixCheckpoint, nodePrefix.at(-1));
+    checksumRecord(prefixCheckpoint, browserSampleLane(browserPrefixEndpoint));
+    requireInteractive(prefixNodeState, 'node-no-draw', prefixCheckpoint, 'pre-interval-checkpoint');
+    requireInteractive(browserPrefixEndpoint.boundary, 'browser-drawn-reference',
+      prefixCheckpoint, 'pre-interval-checkpoint');
+    const browserDrawBeforeInterval = browserSampleDiagnostics(browserPrefixEndpoint);
+    if (browserDrawBeforeInterval.status !== 0) {
+      throw new Error(`Draw diagnostics reported a status before interval: ${browserDrawBeforeInterval.status}`);
+    }
+    assertDrawDiagnosticsClear(runtimeDrawDiagnostics(nodeModule), 'Node checkpoint before snapshot');
 
     checkN('no-draw checkpoint quiescence', () => nodeModule._melee_web_snapshot_quiescent());
     nodeSnapshot = new QuiescentWasmSnapshot(nodeModule, MAX_HEAP_BYTES);
@@ -583,6 +748,7 @@ async function main() {
     const checkpointSha = sha256(checkpointHeap);
     report.nodeRestore = {
       checkpointInputSample: PREFIX_SAMPLES,
+      intervalInputSamples: [...INTERVAL_SAMPLES],
       checkpointHeapBytes: checkpointHeap.byteLength,
       checkpointHeapSha256: checkpointSha,
       endpointHeapSha256: null,
@@ -592,28 +758,95 @@ async function main() {
       restoredCheckpointExact: null,
       result: 'incomplete',
     };
-    const correctionStep = sample => {
+    const correctionStep = (sample, retain = () => {}) => {
       const decision = nodeModule._melee_web_synctest_draw_decision(1);
       if (decision !== 0) throw new Error(`Correction draw policy was ${decision} at sample ${sample}`);
       checkN(`correction interval step ${sample}`, () => nodeModule._melee_web_snapshot_step(sample));
-      return laneBytes(nodeModule);
+      const lane = laneBytes(nodeModule);
+      const state = nodeInteractiveState(nodeModule, lane, expectedInputMapping, expectedStocks);
+      const diagnostics = runtimeDrawDiagnostics(nodeModule);
+      report.nodeRestore.lastCorrectionSample = {sample,
+        raw: rawLaneRecord(lane), boundary: state, drawDiagnostics: diagnostics};
+      retain(lane, state, diagnostics);
+      writeReport();
+      checksumRecord(sample, lane); // Timing guard follows durable raw evidence.
+      requireInteractive(state, 'node-no-draw', sample, 'interval-sample');
+      assertDrawDiagnosticsClear(runtimeDrawDiagnostics(nodeModule), `Node no-draw interval sample ${sample}`);
+      return lane;
     };
-    const noDrawEndpoint = correctionStep(INTERVAL_SAMPLE);
+    const noDrawInterval = [];
+    const drawnInterval = [];
+    let browserDrawBaseline = browserDrawBeforeInterval;
+    for (const sample of INTERVAL_SAMPLES) {
+      const retained = {sample, comparisonStarted: false};
+      report.interval.comparedRawBytes.push(retained);
+      const noDrawStep = correctionStep(sample, (lane, state, diagnostics) => {
+        retained.nodeNoDraw = rawLaneRecord(lane);
+        retained.nodeBoundary = state;
+        retained.nodeDrawDiagnostics = diagnostics;
+        writeReport();
+      });
+      const drawnStep = await runBrowserSample(page, sample, expectedInputMapping, expectedStocks);
+      const browserDrawCurrent = browserSampleDiagnostics(drawnStep);
+      const drawnLane = browserSampleLane(drawnStep);
+      retained.browserDrawn = rawLaneRecord(drawnLane);
+      retained.browserBoundary = drawnStep.boundary;
+      retained.browserDrawDiagnostics = browserDrawCurrent;
+      writeReport();
+      if (sample === INTERVAL_SAMPLES.at(-1)) {
+        const screenshot = path.join(options['--out'], 'drawn-reference-sample-301.png');
+        await page.screenshot({path: screenshot, fullPage: true});
+        const screenshotBytes = fs.readFileSync(screenshot);
+        if (screenshotBytes.length < 100 || !screenshotBytes.subarray(0, 8).equals(
+          Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
+          throw new Error('Headless Chrome did not retain a valid sample-301 PNG');
+        }
+        report.browser.screenshotSample301 = {path: path.basename(screenshot),
+          sha256: sha256(screenshotBytes), bytes: screenshotBytes.length};
+      }
+      writeReport();
+      previousBrowserFrame = validateAuroraFrame(drawnStep.status,
+        previousBrowserFrame.beginFrameId, previousBrowserFrame.endFrameId);
+      checksumRecord(sample, drawnLane);
+      requireInteractive(drawnStep.boundary, 'browser-drawn-reference', sample, 'interval-sample');
+      const selectedPaths = validateSelectedDrawPath(browserDrawBaseline,
+        browserDrawCurrent, drawnStep.boundary.players, expectedInputMapping);
+      retained.comparisonStarted = true;
+      writeReport();
+      compareLane(sample, 'drawn-reference versus no-draw interval', noDrawStep, drawnLane);
+      report.interval.comparedRawBytes.at(-1).comparisonPassed = true;
+      const pathRecord = {sample, sourceFrame: drawnStep.boundary.sourceFrame,
+        fighters: selectedPaths};
+      report.sourceDraw.selectedFighterPathSamples.push(pathRecord);
+      noDrawInterval.push(noDrawStep);
+      drawnInterval.push(drawnLane);
+      const record = {
+        ...checksumRecord(sample, noDrawStep),
+        comparison: 'exact-v2-observation/PCM/raw-PAD bytes passed',
+        drawCallCount: drawnStep.status.drawCallCount,
+        createdPipelines: drawnStep.status.createdPipelines,
+        queuedPipelines: drawnStep.status.queuedPipelines,
+        selectedFighterPaths: selectedPaths,
+      };
+      report.samples.push(record);
+      report.sourceDraw.calls++;
+      report.sourceDraw.completedFrames++;
+      browserDrawBaseline = browserDrawCurrent;
+
+      writeReport();
+    }
+
     const endpointHeap = Buffer.from(nodeModule.HEAPU8);
     const endpointSha = sha256(endpointHeap);
     report.nodeRestore.endpointHeapSha256 = endpointSha;
-    const drawnEndpointBase64 = await runBrowserSample(page, INTERVAL_SAMPLE);
-    previousBrowserFrame = validateAuroraFrame(drawnEndpointBase64.status,
-      previousBrowserFrame.beginFrameId, previousBrowserFrame.endFrameId);
-    const drawnEndpoint = Object.fromEntries(Object.entries(drawnEndpointBase64)
-      .filter(([key]) => key !== 'status').map(([key, base64]) => [key, Buffer.from(base64, 'base64')]));
-    compareLane(INTERVAL_SAMPLE, 'drawn-reference versus no-draw interval',
-      noDrawEndpoint, drawnEndpoint);
-    report.interval.drawnReference = checksumRecord(INTERVAL_SAMPLE, drawnEndpoint);
-    report.interval.noDrawBaseline = checksumRecord(INTERVAL_SAMPLE, noDrawEndpoint);
-    report.interval.drawnReferenceDrawCalls = drawnEndpointBase64.status.drawCallCount;
-    report.sourceDraw.calls++;
-    report.sourceDraw.completedFrames++;
+    report.interval.drawnReference = drawnInterval.map((lane, index) =>
+      checksumRecord(INTERVAL_SAMPLES[index], lane));
+    report.interval.noDrawBaseline = noDrawInterval.map((lane, index) =>
+      checksumRecord(INTERVAL_SAMPLES[index], lane));
+    report.interval.drawnReferenceAuroraFrames = report.samples
+      .filter(record => INTERVAL_SAMPLES.includes(record.sample))
+      .map(({sample, drawCallCount, createdPipelines, queuedPipelines}) =>
+        ({sample, drawCallCount, createdPipelines, queuedPipelines}));
     writeReport();
 
     checkpoint.restore();
@@ -622,6 +855,7 @@ async function main() {
     if (!checkpointHeap.equals(restoredCheckpointHeap)) {
       throw new Error(`No-draw full-heap restore did not reproduce checkpoint: ${JSON.stringify(firstDifference(checkpointHeap, restoredCheckpointHeap))}`);
     }
+    assertDrawDiagnosticsClear(runtimeDrawDiagnostics(nodeModule), 'Node restored checkpoint');
     report.nodeRestore.restoredCheckpointHeapSha256 = restoredCheckpointSha;
     report.nodeRestore.restoredCheckpointExact = true;
 
@@ -631,14 +865,17 @@ async function main() {
     }
     const rngBefore = nodeModule.HEAPU8[rngPointer];
     nodeModule.HEAPU8[rngPointer] ^= 1;
-    const corrupted = correctionStep(INTERVAL_SAMPLE);
-    const rngMismatch = firstDifference(noDrawEndpoint.observation, corrupted.observation);
+    const corruptedSeedLowByte = nodeModule.HEAPU8[rngPointer];
+    const corrupted = correctionStep(INTERVAL_SAMPLES[0]);
+    assertDrawDiagnosticsClear(runtimeDrawDiagnostics(nodeModule), 'Node corrupted no-draw sample');
+    const rngMismatch = firstDifference(noDrawInterval[0].observation, corrupted.observation);
     if (!rngMismatch) throw new Error('One-bit source RNG corruption was not detected by observation bytes');
     report.negatives.push({
       kind: 'source-RNG-bit corruption', result: 'detected', byteOffset: rngPointer,
-      originalLowByte: rngBefore, corruptedLowByte: nodeModule.HEAPU8[rngPointer],
+      originalLowByteBeforeStep: rngBefore, corruptedLowByteBeforeStep: corruptedSeedLowByte,
+      sourceLowByteAfterStep: nodeModule.HEAPU8[rngPointer],
       firstObservationDifference: rngMismatch,
-      expectedObservationSha256: sha256(noDrawEndpoint.observation),
+      expectedObservationSha256: sha256(noDrawInterval[0].observation),
       actualObservationSha256: sha256(corrupted.observation),
     });
     writeReport();
@@ -648,10 +885,14 @@ async function main() {
     if (postCorruptionRestoreSha !== checkpointSha) {
       throw new Error(`Corruption recovery restore differs from checkpoint: ${postCorruptionRestoreSha}`);
     }
-    const replay = correctionStep(INTERVAL_SAMPLE);
+    assertDrawDiagnosticsClear(runtimeDrawDiagnostics(nodeModule), 'Node post-corruption restored checkpoint');
+    const replayInterval = INTERVAL_SAMPLES.map(sample => correctionStep(sample));
     const replayHeap = Buffer.from(nodeModule.HEAPU8);
     const replaySha = sha256(replayHeap);
-    compareLane(INTERVAL_SAMPLE, 'no-draw restored replay', noDrawEndpoint, replay);
+    for (let index = 0; index < INTERVAL_SAMPLES.length; index++) {
+      compareLane(INTERVAL_SAMPLES[index], 'no-draw restored replay',
+        noDrawInterval[index], replayInterval[index]);
+    }
     if (!endpointHeap.equals(replayHeap)) {
       throw new Error(`No-draw endpoint heap differs after replay: ${JSON.stringify(firstDifference(endpointHeap, replayHeap))}`);
     }
@@ -662,7 +903,7 @@ async function main() {
     if (sha256(nodeModule.HEAPU8) !== checkpointSha) {
       throw new Error('Checkpoint heap changed before raw-PAD negative control');
     }
-    const expectedPad = Buffer.from(noDrawEndpoint.pad);
+    const expectedPad = Buffer.from(noDrawInterval[0].pad);
     if (expectedPad[2] !== 0) throw new Error(`PAD mutation control expected neutral stickX at offset 2; got ${expectedPad[2]}`);
     const changedPad = Buffer.from(expectedPad);
     changedPad[2] ^= 0x01;
@@ -676,6 +917,7 @@ async function main() {
     }
     checkN('raw-PAD negative control step', () => nodeModule._melee_web_snapshot_step_raw());
     const changedPadObservation = laneBytes(nodeModule);
+    assertDrawDiagnosticsClear(runtimeDrawDiagnostics(nodeModule), 'Node raw-PAD negative control');
     const padDifference = firstDifference(expectedPad, changedPadObservation.pad);
     if (!padDifference || padDifference.offset !== 2 || padDifference.actual !== (padDifference.expected ^ 1)) {
       throw new Error(`Raw-PAD checksum did not detect the single-bit input mutation: ${JSON.stringify(padDifference)}`);
@@ -690,9 +932,12 @@ async function main() {
     if (sha256(nodeModule.HEAPU8) !== checkpointSha) {
       throw new Error('Raw-PAD negative-control recovery did not restore full checkpoint heap');
     }
-    const finalRecovery = correctionStep(INTERVAL_SAMPLE);
+    const finalRecoveryInterval = INTERVAL_SAMPLES.map(sample => correctionStep(sample));
     const finalRecoveryHeapSha = sha256(nodeModule.HEAPU8);
-    compareLane(INTERVAL_SAMPLE, 'post-negative-control recovery', noDrawEndpoint, finalRecovery);
+    for (let index = 0; index < INTERVAL_SAMPLES.length; index++) {
+      compareLane(INTERVAL_SAMPLES[index], 'post-negative-control recovery',
+        noDrawInterval[index], finalRecoveryInterval[index]);
+    }
     if (finalRecoveryHeapSha !== endpointSha) {
       throw new Error('Post-negative-control endpoint heap did not recover exactly');
     }
@@ -716,8 +961,9 @@ async function main() {
     if (pageErrors.length) throw new Error(`Browser reported page errors: ${pageErrors[0]}`);
     writeReport();
   } catch (error) {
-    report.result = 'failed';
-    report.failure = error.synctestFailure || {message: String(error?.stack || error)};
+    report.result = error.interactiveBoundaryRefusal ? 'refused' : 'failed';
+    report.failure = error.synctestFailure || error.interactiveBoundaryRefusal ||
+      {message: String(error?.stack || error)};
     if (page) {
       try {
         const screenshot = path.join(options['--out'], 'failure.png');
@@ -808,7 +1054,9 @@ async function main() {
   }
 }
 
-main().catch(error => {
-  process.stderr.write(`Slippi synctest failed: ${error?.stack || error}\n`);
-  process.exitCode = 1;
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch(error => {
+    process.stderr.write(`Slippi synctest failed: ${error?.stack || error}\n`);
+    process.exitCode = 1;
+  });
+}

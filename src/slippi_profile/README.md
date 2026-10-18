@@ -59,11 +59,50 @@ state and draw behavior; it would not establish original gameplay accuracy,
 whole-session rollback agreement, online acceptance, other fighter behavior,
 or other stage behavior.
 
+### Additional bounded source review
+
+The pinned Mario model-event table slot is null; the only populated slots in
+that table belong to Kirby and Jigglypuff. Those callbacks change model
+visibility and caches. The separate accessory-matrix callbacks also belong to
+Kirby/Jigglypuff: they write an accessory JObj root matrix, and Jigglypuff's
+costume-2/3 dynamics can read a parent matrix. Actual asset ancestry and all
+indirect consumers remain unverified; the root matrix refresh does not itself
+prove closure for accessory roots.
+
+The inspected refraction reset reads the fighter's cloak flag and changes
+GX/HSD graphics state. The cloak timer and gameplay readers are real, but this
+reset does not write those flags. The inspected afterimage draw path reads its
+history and emits local vertices/GX state; history is produced in the fighter
+update path. Its bone-matrix reads retain the separate DynamicsFix dependency.
+These bounded source findings do not establish full callback, alias, roster or
+stage closure and do not justify additional fixes for the Mario fixture.
+
+### Fighter drawing witness
+
+The diagnostic records callback entry, normal fighter-model dispatch return,
+and the special model-transform branch separately, keyed by authored source
+player slot with processed PAD slot and fighter-kind metadata. The processed
+slot is checked against the copied initializer's separate raw-controller map;
+the recovered `controller_index` field is costume tint and is not input routing.
+These counters sit
+outside the 1,280-byte comparison observation. Invalid slots, metadata changes
+and counter overflow fail explicitly. The no-draw lane must keep all counters
+clear.
+
+Each of the two interval ticks must advance callback and normal model-dispatch
+counters for both selected Mario fighters. The observation must be ready,
+unpaused and nonterminal, with four stocks and authored motion classifications
+outside Entry, death and respawn. Raw observations, PCM and PAD plus decoded
+fields are retained before comparison guards; screenshots cover the checkpoint
+and final interval frame. A zero special-transform count leaves that branch's
+live reachability unproved. The scoped two-tick result and retained first failure
+are recorded in the [evidence receipt](../../docs/status/2026-10-12-match-only-rollback-feasibility.md#first-no-draw-profile-comparison).
+
 ### Historical v1 capture, not v2 validation
 
 The retained v1 browser receipt records a 300-sample prefix and one restored
 sample-300 tick, with 1,280 bytes of declared simulation state, 4,272 PCM
-frames, and a 44-byte raw PAD record. Its restore applied only to Node's
+bytes, and a 44-byte raw PAD record. Its restore applied only to Node's
 128 MiB snapshot; the browser lane was never restored, and its first screenshot
 showed the starfield. The reported `corruptedLowByte` value 108 was observed
 after the step; the pre-step mutation was `195 ^ 1 = 194`. This evidence
@@ -104,14 +143,16 @@ The supervised command is Node 22 or newer running
 - Optional `--playwright /path/to/installed/playwright` for the shared browser loader.
 
 The headless browser retains audio processing with speaker output muted. This
-fixed diagnostic checks 300 prefix samples and one restored sample-300 tick;
+fixed diagnostic checks 300 prefix samples and a restored two-tick interval at
+input samples 300 and 301;
 it is not a performance measurement or full-profile test. Retain the first
 failure, exact build/source/assets and owner cleanup receipts. After two failed
 experiments, reduce the boundary or obtain bounded review before another run.
 A successful run must not be repeated without a new hypothesis. The current
 [scoped receipt](../../docs/status/2026-10-12-match-only-rollback-feasibility.md#first-no-draw-profile-comparison)
-records the historical v1 evidence. It does not validate this v2 implementation;
-record a v2-specific receipt after running the current build and capture.
+keeps the historical v1 result separate from the corrected v2 two-tick result
+and its retained attribution failure. Neither establishes complete profile or
+live KO-path coverage.
 
 The DeadUpFall spec repair supersedes earlier candidate wording about retaining
 ordinary X accumulation: the retained hook resumes at `0x800D4D84`, after the

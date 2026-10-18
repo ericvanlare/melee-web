@@ -305,14 +305,16 @@ position during draw. Skipped, repeated and changed-view draws agree on the
 fixture's declared simulation bytes. Removing each hook separately fails its
 specific invariant. The focused cohort passes 13 Python and nine nested Node
 controls. Both the opt-in profile and ordinary Release builds pass. The full
-regression passes 2,415 tests with 166 skips; exact-head CI and integration remain
-pending. Source and runtime identities are preserved in the validation freeze.
+regression passes 2,415 tests with 166 skips. Source and runtime identities
+are preserved in the validation freeze.
 The first PR #330 CI run exposed a Linux-only compilation failure in two native
 test fixtures: the upstream `__fabs` macro was active before glibc declared its
 math functions. Moving `<math.h>` before upstream headers fixes the include
 boundary without changing arithmetic, controls or warning flags. Both affected
-controls pass locally; the repaired head still requires complete CI. The failed
-job log and its test report are retained.
+controls pass locally. All 14 exact-head checks on `1a0e5bfd` completed with
+12 successes and two expected skips (run `39109121768`). PR #330 merged as
+`310e3309`; the merged tree matches the reviewed head. The failed job log and
+its test report are retained.
 
 Review also caught an incorrect extra X-velocity update despite an earlier green
 fixture. Retained retail instructions show that the reference hook replaces the
@@ -331,6 +333,43 @@ synthetic Fighter/JObj projections and service adapters; it does not establish
 live KO reachability or complete state-machine behavior. Complete render-dependency
 and host-state closure, live rollback, original Slippi reference and acceptance
 remain open. The v1 browser witness above is not relabeled as v2 validation.
+
+
+Issue #331 adds a two-tick comparison with actual fighter callback and normal
+model-dispatch counters. Its first capture stopped at the sample-300 attribution
+guard: the recovered `controller_index` field is costume tint, not the input
+controller. Both fighters correctly had tint zero. The 300-sample prefix matched;
+offline comparison of the retained sample-300 raw state, PCM and PAD also matches.
+Both fighters' callback and normal model-dispatch counters advanced. Sample 301,
+restore and corruption controls remain unrun, so the capture remains failed.
+Native/browser/server cleanup and owned-process absence passed. The next repair
+records the actual processed PAD slot and checks its exact mapping through the
+existing constructor and copied initializer; gameplay input routing is unchanged.
+The structured receipt retains the failed runtime/harness and bounded diagnosis.
+
+The corrected second capture **passes the two-tick component** on the v2 profile.
+After the same 300-sample prefix, input samples 300 and 301 (source frames 177
+and 178) match all 1,280 declared state bytes, 4,272 PCM capacity bytes and
+44 raw PAD bytes. Both fighters advance the source callback counter by five and
+normal model-dispatch return counter by three on each tick. Their actual source
+slots, processed PAD slots and copied raw controllers map exactly to 0/1.
+The 128 MiB Node-only checkpoint restores exactly, replays both ticks to the
+same heap endpoint and recovers after the detected RNG/PAD corruption controls.
+The browser heap is never restored. Actual PCM production is 533 stereo frames
+on each target tick, with phases 20 and 40; capacity bytes are not frame counts.
+Owned renderer/browser/server cleanup and process absence pass.
+
+The special model-transform count is zero, so this does not exercise the live
+KO branch or establish offscreen/dynamics path coverage. Screenshots show the
+checkpoint and endpoint but supply no pixel-accuracy claim. Complete simulation
+and host-state ownership, original Slippi parity, seven-tick performance and
+online rollback remain open. The structured receipt pins the corrected source,
+runtime, harness, raw evidence and retained failures. Independent raw-result review passed. Pre-integration review caught stale field
+references in a native test fixture; four test-only lines were corrected and
+its focused causal/omission controls pass. The interrupted regression and native
+compile failure are retained. Runtime/capture source is unchanged. The final
+full regression passes 2,416 tests with 166 skips in 505.482 seconds; the log
+identity is in the structured receipt. Exact-head CI and integration are pending.
 
 ## Slippi profile source checkpoint
 

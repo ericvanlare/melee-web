@@ -64,7 +64,8 @@ target_compile_definitions(fighter_source_runtime PUBLIC TARGET_PC PRIVATE
   MELEE_WEB_MENU_MARIO_FD)
 if(MELEE_WEB_SLIPPI_SYNCTEST)
   target_sources(fighter_source_runtime PRIVATE
-    src/slippi_profile/deadupfall_fix.c)
+    src/slippi_profile/deadupfall_fix.c
+    src/slippi_profile/draw_diagnostics.c)
   target_compile_definitions(fighter_source_runtime PRIVATE
     MELEE_WEB_SLIPPI_PROFILE=1)
 endif()
