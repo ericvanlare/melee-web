@@ -3,11 +3,11 @@
 #define MELEE_WEB_SLIPPI_PROFILE_H
 
 /* This is a deliberately incomplete diagnostic profile identity. */
-#define SLIPPI_PROFILE_RENDER_DEPENDENCIES_V3_ID \
-    "slippi-render-dependencies-v3"
+#define SLIPPI_PROFILE_RENDER_DEPENDENCIES_DBOOC_V4_ID \
+    "slippi-render-dependencies-dbooc-v4"
 
 typedef enum SlippiProfileIdentity {
-    SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_V3 = 3,
+    SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_DBOOC_V4 = 4,
 } SlippiProfileIdentity;
 
 typedef enum SlippiTickKind {

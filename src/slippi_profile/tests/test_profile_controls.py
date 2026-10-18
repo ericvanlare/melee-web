@@ -65,6 +65,7 @@ class ProfileControlsTests(unittest.TestCase):
             str(ROOT / "src/slippi_profile/draw_diagnostics.c"),
             str(ROOT / "src/slippi_profile/whispy_direction_fix.c"),
             str(ROOT / "src/slippi_profile/ps_camera_independent_monitor_fix.c"),
+            str(ROOT / "src/slippi_profile/ucf_dbooc_fix.c"),
             str(ROOT / "src/slippi_profile/tests/profile_controls_test.c"),
             "-lm",
             "-o", str(executable),

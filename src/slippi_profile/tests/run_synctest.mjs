@@ -212,6 +212,13 @@ function reportSourceHashes() {
     'src/slippi_profile/deadupfall_fix.c',
     'src/slippi_profile/draw_diagnostics.h',
     'src/slippi_profile/draw_diagnostics.c',
+    'src/slippi_profile/whispy_direction_fix.h',
+    'src/slippi_profile/whispy_direction_fix.c',
+    'src/slippi_profile/ps_camera_independent_monitor_fix.h',
+    'src/slippi_profile/ps_camera_independent_monitor_fix.c',
+    'src/slippi_profile/ucf_dbooc_fix.h',
+    'src/slippi_profile/ucf_dbooc_fix.c',
+    'src/gameplay_trig.h',
     '.deps/melee/src/melee/ft/kinds/ftMario/forward.h',
     'src/slippi_profile/patches/melee-profile-hooks.patch',
     'src/slippi_profile/tests/synctest_node.cpp',
@@ -441,7 +448,7 @@ async function main() {
   const report = {
     schema: 'melee-web-slippi-drawn-reference-no-draw-synctest-v1',
     result: 'incomplete',
-    profile: 'slippi-render-dependencies-v3',
+    profile: 'slippi-render-dependencies-dbooc-v4',
     statement: 'Unofficial Slippi-compatible dependency diagnostic; not a complete Slippi or rollback profile.',
     scenario: 'two human Mario players / Final Destination / four stocks; deterministic fixture inputs',
     interval: {checkpointInputSample: PREFIX_SAMPLES, inputSamples: [...INTERVAL_SAMPLES],
@@ -608,7 +615,7 @@ async function main() {
         throw new Error(`Initial ${field} identity differs: Node=${nodeInit[field]} browser=${browserInitRecord[field]}`);
       }
     }
-    if (nodeInit.profile !== 'slippi-render-dependencies-v3') {
+    if (nodeInit.profile !== 'slippi-render-dependencies-dbooc-v4') {
       throw new Error(`Unexpected profile identity: ${nodeInit.profile}`);
     }
     const expectedProbeHash = report.sourceSha256['tests/gameplay_snapshot_probe.cpp'];

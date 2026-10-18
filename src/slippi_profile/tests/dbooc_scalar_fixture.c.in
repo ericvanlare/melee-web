@@ -1,0 +1,308 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/*
+ * Fixture adapter around exact functions extracted from pinned ftCo_SquatRv.c.
+ * Fighter input/common data and Fighter_ChangeMotionState are synthetic; all
+ * other referenced services are intentionally unresolved and fail compilation.
+ */
+#include <assert.h>
+#include <fenv.h>
+#include <inttypes.h>
+#include <math.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
+
+#include <gameplay_trig.h>
+#include <slippi_profile/ucf_dbooc_fix.h>
+
+typedef int melee_source_bool;
+typedef struct FighterInputStick {
+    float x;
+    float y;
+} FighterInputStick;
+typedef struct FighterInput {
+    FighterInputStick lstick[1];
+} FighterInput;
+typedef struct Fighter {
+    FighterInput input;
+    uint8_t x670_timer_lstick_tilt_x;
+    uint8_t x671_timer_lstick_tilt_y;
+} Fighter;
+typedef struct Fighter_GObj {
+    Fighter *fighter;
+} Fighter_GObj;
+typedef struct FtCommonData {
+    float x94;
+} FtCommonData;
+
+enum { ftCo_MS_SquatRv = 41 };
+static const int Ft_MF_None = 0;
+static FtCommonData fixture_common_data;
+static FtCommonData *p_ftCommonData = &fixture_common_data;
+
+#define GET_FIGHTER(gobj) ((gobj)->fighter)
+
+typedef struct ChangeMotionRecord {
+    unsigned call_count;
+    unsigned call_order;
+    int target_is_expected_gobj;
+    int motion_state;
+    int motion_flags;
+    uint32_t animation_start_bits;
+    uint32_t animation_rate_bits;
+    uint32_t blend_bits;
+    int opaque_argument_is_null;
+} ChangeMotionRecord;
+
+static ChangeMotionRecord fixture_change_record;
+static Fighter_GObj fixture_gobj;
+static Fighter fixture_fighter;
+static unsigned fixture_omitted_helper_calls;
+
+_Static_assert(sizeof(((Fighter *) 0)->x670_timer_lstick_tilt_x) == 1,
+               "typed X stick-tilt timer must model the source byte");
+_Static_assert(sizeof(((Fighter *) 0)->x671_timer_lstick_tilt_y) == 1,
+               "typed Y stick-tilt timer must model the source byte");
+
+/* Explicitly named test control: it preserves the source common threshold so
+ * the overlaid branch can be compared with the original unmodified source. */
+static float slippi_profile_ucf_dbooc_squat_reversal_threshold_omitted_for_test(
+    float stick_x, float stick_y, uint8_t timer, float common_threshold)
+{
+    (void) stick_x;
+    (void) stick_y;
+    (void) timer;
+    ++fixture_omitted_helper_calls;
+    return common_threshold;
+}
+
+static float fixture_float_from_bits(uint32_t bits)
+{
+    float value;
+    memcpy(&value, &bits, sizeof(value));
+    return value;
+}
+
+static uint32_t fixture_float_to_bits(float value)
+{
+    uint32_t bits;
+    memcpy(&bits, &value, sizeof(bits));
+    return bits;
+}
+
+static void Fighter_ChangeMotionState(Fighter_GObj *gobj, int motion_state,
+                                      int motion_flags, float animation_start,
+                                      float animation_rate, float blend,
+                                      void *opaque_argument)
+{
+    fixture_change_record.call_order = fixture_change_record.call_count + 1;
+    fixture_change_record.call_count++;
+    fixture_change_record.target_is_expected_gobj = gobj == &fixture_gobj;
+    fixture_change_record.motion_state = motion_state;
+    fixture_change_record.motion_flags = motion_flags;
+    fixture_change_record.animation_start_bits = fixture_float_to_bits(animation_start);
+    fixture_change_record.animation_rate_bits = fixture_float_to_bits(animation_rate);
+    fixture_change_record.blend_bits = fixture_float_to_bits(blend);
+    fixture_change_record.opaque_argument_is_null = opaque_argument == NULL;
+}
+
+/* Source declaration and definitions are inserted verbatim after the base
+ * source/boolean composition and pinned function extraction. */
+@@SOURCE_ENTER_DECLARATION@@
+@@SOURCE_ORIGINAL_CHECK_INPUT@@
+@@SOURCE_PROFILE_CHECK_INPUT@@
+@@SOURCE_OMITTED_CHECK_INPUT@@
+@@SOURCE_ENTER_FUNCTION@@
+
+static void print_float_word(uint32_t bits)
+{
+    if (isnan(fixture_float_from_bits(bits))) {
+        fputs("nan", stdout);
+    } else {
+        printf("%08" PRIx32, bits);
+    }
+}
+
+static void emit_scalar(const char *name, uint32_t x_bits, uint32_t y_bits,
+                        uint8_t timer, uint32_t common_bits)
+{
+    SlippiUcfDboocTrace trace;
+    const uint32_t selected = slippi_profile_ucf_dbooc_threshold_bits(
+        x_bits, y_bits, timer, common_bits, &trace);
+    printf("R|%s|", name);
+    print_float_word(trace.x_fmsubs_bits);
+    putchar('|');
+    print_float_word(trace.y_fmsubs_bits);
+    printf("|%08" PRIx32 "|%08" PRIx32 "|%08" PRIx32 "|%08" PRIx32
+           "|%08" PRIx32 "|%08" PRIx32 "|%08" PRIx32 "|%08" PRIx32
+           "|%u|%u\n",
+           trace.x_conversion_word, trace.y_conversion_word,
+           trace.x_q_word, trace.y_q_word, trace.x_square_low32,
+           trace.y_square_low32, trace.radius_sum_low32, selected,
+           (unsigned) trace.override_selected, (unsigned) trace.timer);
+}
+
+static void emit_conversion(const char *name, uint32_t input_bits)
+{
+    const int32_t converted = melee_web_trig_integer(
+        fixture_float_from_bits(input_bits));
+    printf("C|%s|%08" PRIx32 "|%08" PRIx32 "\n", name, input_bits,
+           (uint32_t) converted);
+}
+
+static void emit_radius_word(uint32_t radius_word)
+{
+    printf("B|%08" PRIx32 "|%u\n", radius_word,
+           (unsigned) slippi_profile_ucf_dbooc_radius_exceeds_threshold(radius_word));
+}
+
+typedef melee_source_bool (*CheckInputFunction)(Fighter_GObj *gobj);
+
+static void emit_source_result(const char *name, CheckInputFunction check_input,
+                               uint32_t x_bits, uint32_t y_bits,
+                               uint8_t x_timer, uint8_t y_timer,
+                               uint32_t threshold_bits)
+{
+    fixture_fighter.input.lstick[0].x = fixture_float_from_bits(x_bits);
+    fixture_fighter.input.lstick[0].y = fixture_float_from_bits(y_bits);
+    fixture_fighter.x670_timer_lstick_tilt_x = x_timer;
+    fixture_fighter.x671_timer_lstick_tilt_y = y_timer;
+    fixture_gobj.fighter = &fixture_fighter;
+    fixture_common_data.x94 = fixture_float_from_bits(threshold_bits);
+    memset(&fixture_change_record, 0, sizeof(fixture_change_record));
+    const unsigned omitted_calls_before = fixture_omitted_helper_calls;
+    const int result = check_input(&fixture_gobj);
+    printf("S|%s|%08" PRIx32 "|%08" PRIx32 "|%u|%u|%08" PRIx32
+           "|%d|%u|%u|%d|%d|%d|%08" PRIx32 "|%08" PRIx32
+           "|%08" PRIx32 "|%d|%u\n",
+           name, x_bits, y_bits, (unsigned) x_timer, (unsigned) y_timer,
+           threshold_bits, result,
+           fixture_change_record.call_count, fixture_change_record.call_order,
+           fixture_change_record.target_is_expected_gobj,
+           fixture_change_record.motion_state, fixture_change_record.motion_flags,
+           fixture_change_record.animation_start_bits,
+           fixture_change_record.animation_rate_bits,
+           fixture_change_record.blend_bits,
+           fixture_change_record.opaque_argument_is_null,
+           fixture_omitted_helper_calls - omitted_calls_before);
+}
+
+static int emit_source_controls(void)
+{
+    const uint32_t common = UINT32_C(0x3F200000);
+    const uint32_t causal_x = UINT32_C(0x3F4CCCCD);
+    const uint32_t causal_y = UINT32_C(0xBF19999A);
+
+#define EMIT_SOURCE_TRIPLE(label, x, y, tx, ty, threshold) \
+    emit_source_result(label "_original", \
+                       ftCo_SquatRv_CheckInput_original, \
+                       x, y, tx, ty, threshold); \
+    emit_source_result(label "_profile", \
+                       ftCo_SquatRv_CheckInput_profile, \
+                       x, y, tx, ty, threshold); \
+    emit_source_result(label "_omitted", \
+                       ftCo_SquatRv_CheckInput_omitted, \
+                       x, y, tx, ty, threshold)
+
+    /* Both axes exceed the strict squared-radius threshold. With the common
+     * 0.625 threshold, Y=-0.6 enters; with the DBOOC 0.59 threshold it does
+     * not. Y timer=255 proves the source hook reads the X timer field. */
+    EMIT_SOURCE_TRIPLE("causal", causal_x, causal_y, 0, UINT8_MAX, common);
+    EMIT_SOURCE_TRIPLE("x_timer_bypass", causal_x, causal_y, 1, 0, common);
+    EMIT_SOURCE_TRIPLE("override_equal", UINT32_C(0x3F800000),
+                       UINT32_C(0xBF170A3D), 0, 0, common);
+    EMIT_SOURCE_TRIPLE("override_adjacent_above", UINT32_C(0x3F800000),
+                       UINT32_C(0xBF170A3C), 0, 0, common);
+    EMIT_SOURCE_TRIPLE("override_adjacent_below", UINT32_C(0x3F800000),
+                       UINT32_C(0xBF170A3E), 0, 0, common);
+    EMIT_SOURCE_TRIPLE("common_equal", 0, UINT32_C(0xBF200000), 0, 0,
+                       common);
+    EMIT_SOURCE_TRIPLE("common_adjacent_above", 0,
+                       UINT32_C(0xBF1FFFFF), 0, 0, common);
+#undef EMIT_SOURCE_TRIPLE
+    return 0;
+}
+
+int main(void)
+{
+    char name[64];
+    unsigned long long x_bits;
+    unsigned long long y_bits;
+    unsigned long long timer;
+    unsigned long long common_bits;
+
+    if (fesetround(FE_TONEAREST) != 0 || fegetround() != FE_TONEAREST) {
+        fputs("fixture could not establish RN-even\n", stderr);
+        return 2;
+    }
+    printf("ENV|%d\n", fegetround());
+
+    while (scanf("%63s %llx %llx %llx %llx", name, &x_bits, &y_bits, &timer,
+                 &common_bits) == 5) {
+        if (x_bits > UINT32_MAX || y_bits > UINT32_MAX ||
+            common_bits > UINT32_MAX || timer > UINT8_MAX) {
+            fputs("fixture input word is out of range\n", stderr);
+            return 3;
+        }
+        emit_scalar(name, (uint32_t) x_bits, (uint32_t) y_bits,
+                    (uint8_t) timer, (uint32_t) common_bits);
+    }
+    if (ferror(stdin)) {
+        fputs("fixture input read failed\n", stderr);
+        return 4;
+    }
+
+    emit_conversion("pos_inf", UINT32_C(0x7F800000));
+    emit_conversion("neg_inf", UINT32_C(0xFF800000));
+    emit_conversion("qnan", UINT32_C(0x7FC00000));
+    emit_conversion("snan", UINT32_C(0x7F800001));
+    emit_conversion("negative_qnan", UINT32_C(0xFFC00000));
+    emit_conversion("negative_snan", UINT32_C(0xFF800001));
+    emit_conversion("conversion_positive_zero", 0);
+    emit_conversion("conversion_negative_zero", UINT32_C(0x80000000));
+    emit_conversion("negative_int32", UINT32_C(0xCF000000));
+    emit_conversion("negative_below_int32", UINT32_C(0xCF000001));
+    emit_conversion("negative_above_int32", UINT32_C(0xCEFFFFFF));
+    emit_conversion("positive_int32", UINT32_C(0x4F000000));
+    emit_conversion("positive_below_int32", UINT32_C(0x4EFFFFFF));
+    emit_conversion("positive_above_int32", UINT32_C(0x4F000001));
+
+    emit_radius_word(UINT32_C(6400));
+    emit_radius_word(UINT32_C(6401));
+    emit_radius_word(UINT32_C(0x7FFFFFFF));
+    emit_radius_word(UINT32_C(0x80000000));
+    emit_radius_word(UINT32_C(0xFFFFFFFF));
+
+    emit_scalar("large_600_single", UINT32_C(0x44160000), 0, 0,
+                UINT32_C(0x3F200000));
+    emit_scalar("large_600_pair", UINT32_C(0x44160000),
+                UINT32_C(0x44160000), 0, UINT32_C(0x3F200000));
+    emit_scalar("max_finite", UINT32_C(0x7F7FFFFF), 0, 0,
+                UINT32_C(0x3F200000));
+    emit_scalar("axis_before_conversion_overflow", UINT32_C(0x4BCCCCCC), 0,
+                0, UINT32_C(0x3F200000));
+    emit_scalar("axis_at_conversion_overflow", UINT32_C(0x4BCCCCCD), 0,
+                0, UINT32_C(0x3F200000));
+    emit_scalar("negative_axis_before_conversion_overflow", UINT32_C(0xCBCCCCCC),
+                0, 0, UINT32_C(0x3F200000));
+    emit_scalar("positive_infinity", UINT32_C(0x7F800000), 0, 0,
+                UINT32_C(0x3F200000));
+    emit_scalar("negative_infinity_abs", UINT32_C(0xFF800000), 0, 0,
+                UINT32_C(0x3F200000));
+    emit_scalar("quiet_nan", UINT32_C(0x7FC00000), 0, 0,
+                UINT32_C(0x3F200000));
+    emit_scalar("signaling_nan", UINT32_C(0x7F800001), 0, 0,
+                UINT32_C(0x3F200000));
+    emit_scalar("negative_signaling_nan", UINT32_C(0xFF800001), 0, 0,
+                UINT32_C(0x3F200000));
+    emit_scalar("timer_before_snan", UINT32_C(0x7F800001), 0, 128,
+                UINT32_C(0x3F200000));
+    emit_scalar("timer_one_before_snan", UINT32_C(0x7F800001), 0, 1,
+                UINT32_C(0x3F200000));
+    emit_scalar("timer_255_before_snan", UINT32_C(0x7F800001), 0, 255,
+                UINT32_C(0x3F200000));
+
+    return emit_source_controls();
+}

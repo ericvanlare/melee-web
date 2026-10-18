@@ -3,16 +3,16 @@
 
 const char *slippi_profile_identity_name(SlippiProfileIdentity identity)
 {
-    if (identity != SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_V3) {
+    if (identity != SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_DBOOC_V4) {
         return 0;
     }
-    return SLIPPI_PROFILE_RENDER_DEPENDENCIES_V3_ID;
+    return SLIPPI_PROFILE_RENDER_DEPENDENCIES_DBOOC_V4_ID;
 }
 
 SlippiSourceDrawDecision slippi_profile_source_draw_decision(
     SlippiProfileIdentity identity, SlippiTickKind tick_kind)
 {
-    if (identity != SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_V3) {
+    if (identity != SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_DBOOC_V4) {
         return SLIPPI_SOURCE_DRAW_ERROR;
     }
     switch (tick_kind) {

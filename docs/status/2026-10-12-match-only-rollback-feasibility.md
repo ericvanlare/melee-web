@@ -403,7 +403,8 @@ difference: SDL embedded the parent repository revision, moving its string and
 relocating references. No unexplained instruction/data difference remains; this
 is artifact attribution, not gameplay equivalence. The current manifest retains
 24 entries covering 16 distinct artifacts alongside the prior products.
-Exact-head CI remains pending.
+PR #334 merged as `ecb2fe99` after all 14 checks on reviewed head `34a0c57b`
+completed (12 successes, two expected skips); merged and reviewed trees match.
 Historical v1/v2 captures retain their original identities and
 do not validate these new hooks. The structured receipt records the current
 candidate and its limits.
