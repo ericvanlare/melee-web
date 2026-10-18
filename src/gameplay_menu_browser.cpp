@@ -138,6 +138,7 @@ struct CurrentSssExitState {
  bool leave_started=false,terminal_pending=false,terminal=false;
  size_t terminal_cursor=0,terminal_steps=0,terminal_draws=0;
  uint64_t leave_asset_requests=0,terminal_asset_requests=0;
+ bool terminal_waiting_for_audio=false;
  uint64_t leave_world_generation=0;
  uint32_t leave_asset_generation=0;
  const void* leave_world=nullptr;
@@ -154,7 +155,14 @@ struct CurrentSssExitState {
  MeleeWebMenuCurrentSssExitObservation observation{};
  std::string error,json;
  bool prepared_start_attempted=false,prepared_start_captured=false;
+ bool prepared_start_selection_captured=false;
+ MeleeWebMenuMatchSelection prepared_start_selection{};
+ const MeleeWebPadState* prepared_start_input_owner=nullptr;
+ std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> prepared_start_input_bytes{};
  std::string prepared_start_error,prepared_start_json;
+ bool prepared_setup_attempted=false,prepared_setup_approved=false;
+ bool prepared_setup_failed=false,prepared_setup_consumed=false;
+ std::string prepared_setup_error;
 };
 CurrentSssExitState current_sss_exit;
 void current_sss_exit_notify(void* data,const MeleeWebMenuCurrentSssExitObservation* o){
@@ -396,9 +404,13 @@ std::string first_sss_vs_entry_json(){
     <<",\"error\":"<<(s.error.empty()?"null":first_css_browser_draw_json_quote(s.error))
     <<",\"actual\":"<<(s.actual.empty()?"null":s.actual)<<'}';return out.str();
 }
+enum class FirstSssVsSetupOrigin : unsigned { LegacyEntry124, CurrentPreparedStock4_270 };
+bool current_sss_selection_equal(const MeleeWebMenuMatchSelection&,
+                                 const MeleeWebMenuMatchSelection&);
 struct FirstSssVsSetupState {
  bool attempted=false,requested=false,import_committed=false,captured=false,complete=false,failed=false;
  bool construction_complete=false,menu_retired=false;
+ FirstSssVsSetupOrigin origin=FirstSssVsSetupOrigin::LegacyEntry124;
  unsigned requested_generation=0,committed_generation=0,construction_steps=0,source_frames=0;
  unsigned host_tick_calls=0,host_draw_calls=0,getter_calls=0;
  uint64_t prior_world_generation=0,match_world_generation=0;
@@ -605,6 +617,10 @@ std::string first_sss_vs_setup_json(){
     <<",\"prior_observations\":\"historical_at_setup_begin_before_menu_retirement\""
     <<",\"operation_counters_scope\":\"setup_service_only_no_tick_draw_calls\""
     <<",\"source_frames_scope\":\"actual_match_flow_clock_not_original_scene_frame\""
+    ;
+ if(s.origin==FirstSssVsSetupOrigin::CurrentPreparedStock4_270)
+  out<<",\"handoff_origin\":\"current_sss_prepared_stock4_270\"";
+ out
     <<",\"current_owners\":"<<first_sss_vs_setup_current_json()
     <<",\"actual\":"<<(s.actual.empty()?"null":s.actual)
     <<",\"stadium_setup_state\":"<<(s.stadium_setup_state.empty()?"null":s.stadium_setup_state)
@@ -2386,6 +2402,18 @@ bool first_sss_vs_setup_finish_handoff(){
         melee_web_menu_host_phase(host)==MELEE_WEB_MENU_READY&&
         s.input&&s.host_input==melee_web_menu_host_input(host),
         "VS Setup handoff lost its exact stopped host/input/generation");
+  if(s.origin==FirstSssVsSetupOrigin::CurrentPreparedStock4_270){
+    MeleeWebMenuMatchSelection live_selection{};char selection_error[256]{};
+    check(current_sss_exit.prepared_setup_approved&&current_sss_exit.prepared_setup_consumed&&
+          current_sss_exit.prepared_start_selection_captured&&
+          melee_web_menu_host_stadium_c1a_selection(host,&live_selection,
+              selection_error,sizeof(selection_error)),
+          selection_error[0]?selection_error:
+              "Prepared Setup handoff lost its accepted current-SSS approval");
+    check(current_sss_selection_equal(live_selection,asset_selection)&&
+          current_sss_selection_equal(live_selection,current_sss_exit.prepared_start_selection),
+          "Prepared Setup selection changed between accepted handoff and asset commit");
+  }
   std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> input_now{};
   check(melee_web_pad_state_encode(s.host_input,input_now.data(),input_now.size())&&
         input_now==s.input_bytes,"VS Setup retained host PAD changed during asset handoff");
@@ -3295,6 +3323,57 @@ bool current_sss_exit_profile_valid(const melee_web::RetailReplayRecipe& recipe,
          selection.start.players[0].stocks==4&&selection.start.players[1].stocks==4;
  return false;
 }
+std::string current_sss_selection_difference(const MeleeWebMenuMatchSelection& a,
+    const MeleeWebMenuMatchSelection& b,bool compare_random_seed){
+ if(a.player_count!=b.player_count)
+  return "player_count live="+std::to_string(a.player_count)+" expected="+std::to_string(b.player_count);
+ if(compare_random_seed&&a.random_seed!=b.random_seed)
+  return "random_seed live=0x"+melee_web::stadium_first_css_diagnostic::hex32(a.random_seed)+
+         " expected=0x"+melee_web::stadium_first_css_diagnostic::hex32(b.random_seed);
+ if(a.hud_layout!=b.hud_layout)
+  return "hud_layout live="+std::to_string(a.hud_layout)+" expected="+std::to_string(b.hud_layout);
+ if(a.unlocked_characters!=b.unlocked_characters)
+  return "unlocked_characters live="+std::to_string(a.unlocked_characters)+
+         " expected="+std::to_string(b.unlocked_characters);
+ if(a.unlocked_stages!=b.unlocked_stages)
+  return "unlocked_stages live="+std::to_string(a.unlocked_stages)+
+         " expected="+std::to_string(b.unlocked_stages);
+ if(a.save_profile_present!=b.save_profile_present)
+  return "save_profile_present live="+std::to_string(a.save_profile_present)+
+         " expected="+std::to_string(b.save_profile_present);
+ if(a.opening_demo!=b.opening_demo)
+  return "opening_demo live="+std::to_string(a.opening_demo)+
+         " expected="+std::to_string(b.opening_demo);
+ if(a.sudden_death!=b.sudden_death)
+  return "sudden_death live="+std::to_string(a.sudden_death)+
+         " expected="+std::to_string(b.sudden_death);
+ for(unsigned i=0;i<4;++i){
+  if(a.players[i].controller!=b.players[i].controller)
+   return "players["+std::to_string(i)+"].controller live="+
+          std::to_string(a.players[i].controller)+" expected="+
+          std::to_string(b.players[i].controller);
+  if(a.players[i].stocks!=b.players[i].stocks)
+   return "players["+std::to_string(i)+"].stocks live="+
+          std::to_string(a.players[i].stocks)+" expected="+
+          std::to_string(b.players[i].stocks);
+  if(a.players[i].costume!=b.players[i].costume)
+   return "players["+std::to_string(i)+"].costume live="+
+          std::to_string(a.players[i].costume)+" expected="+
+          std::to_string(b.players[i].costume);
+  if(a.players[i].sub_color!=b.players[i].sub_color)
+   return "players["+std::to_string(i)+"].sub_color live="+
+          std::to_string(a.players[i].sub_color)+" expected="+
+          std::to_string(b.players[i].sub_color);
+ }
+ std::ostringstream left,right;
+ melee_web::stadium_first_css_diagnostic::write_start(left,a.start);
+ melee_web::stadium_first_css_diagnostic::write_start(right,b.start);
+ return left.str()==right.str()?std::string{}:"start serialized source payload differs";
+}
+bool current_sss_selection_equal(const MeleeWebMenuMatchSelection& a,
+                                 const MeleeWebMenuMatchSelection& b){
+ return current_sss_selection_difference(a,b,true).empty();
+}
 void current_sss_exit_before_leave(){
  auto& s=current_sss_exit;
  if(!s.armed||s.profile!=CurrentSssExitProfile::Stock4None||
@@ -3341,6 +3420,7 @@ void current_sss_exit_finish_stock4(size_t steps,size_t draws,bool source_pendin
        "Stock4 SSS stop has unaccounted source input/tick/draw work");
  s.terminal_cursor=replay_cursor;s.terminal_steps=steps;s.terminal_draws=draws;
  s.terminal_asset_requests=current_sss_asset_request_calls-s.leave_asset_requests;
+ s.terminal_waiting_for_audio=preparation.waiting_for_audio();
  s.terminal_pending=false;s.terminal=true;
  // No state reset, pause, or synthetic completion: this callback already ran
  // its unchanged scheduled audio and source-frame finish/presentation policy.
@@ -3367,6 +3447,178 @@ int current_sss_exit_arm(CurrentSssExitProfile profile){try{
  s.world_generation=melee_web_gameplay_generation();
  s.profile=profile;s.armed=true;return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
+int current_sss_prepared_setup_begin(){
+ auto& owner=current_sss_exit;
+ auto& setup=first_sss_vs_setup;
+ if(owner.prepared_setup_attempted){
+  owner.prepared_setup_failed=true;
+  if(owner.prepared_setup_error.empty())
+   owner.prepared_setup_error="Prepared Setup handoff is one-use";
+  message=owner.prepared_setup_error;return 0;
+ }
+ owner.prepared_setup_attempted=true;
+ try{
+  check(owner.armed&&owner.profile==CurrentSssExitProfile::Stock4None&&
+        owner.terminal&&!owner.failed&&!faulted&&owner.recipe&&replay&&
+        replay.get()==owner.recipe&&replay->initial_css.get()==owner.context&&
+        host&&host==owner.host_owner&&world&&world.get()==owner.leave_world&&
+        archive_cache&&archive_cache.get()==owner.leave_cache,
+        "Prepared Setup admission lost the checked stock4 SSS owner");
+  check(owner.prepared_start_attempted&&owner.prepared_start_captured&&
+        owner.prepared_start_selection_captured&&!owner.prepared_start_json.empty(),
+        "Prepared Setup admission requires the captured prepared-Start receipt");
+  check(owner.terminal_cursor==270&&owner.notification_cursor==270&&
+        owner.notification_order==543&&owner.terminal_steps==0&&owner.terminal_draws==0&&
+        owner.notification_steps==0&&owner.notification_draws==0&&
+        owner.terminal_asset_requests==0&&replay_cursor==owner.terminal_cursor&&
+        !replay_source_frames.pending()&&replay_source_frames.steps()==0&&
+        replay_source_frames.draws()==0,
+        "Prepared Setup admission requires the exact stopped 270/543 SSS boundary");
+  check(owner.notified&&owner.observation.state==2&&owner.observation.note.captured&&
+        owner.observation.note.world_generation==owner.leave_world_generation&&
+        owner.leave_world_generation!=0&&
+        owner.leave_world_generation==melee_web_gameplay_generation()&&
+        owner.last_host_tick_returned&&!owner.host_tick_in_flight&&
+        melee_web_menu_host_phase(host)==MELEE_WEB_MENU_READY&&
+        melee_web_menu_host_source_scene(host)==0&&!host_entered&&world_exposed,
+        "Prepared Setup admission requires the returned READY host and same live world");
+  check(!match&&!results&&!prize&&!running&&!pending&&!menu_scene_rebuild_pending&&
+        preparation.waiting_for_audio()&&
+        preparation.phase()==melee_web::MenuPreparationState::Phase::WaitingForAudio&&
+        asset_destination==AssetDestination::None&&asset_scope.pending_generation()==0&&
+        asset_generation==owner.leave_asset_generation&&
+        current_sss_asset_request_calls-owner.leave_asset_requests==0,
+        "Prepared Setup admission requires only the retained WaitingForAudio transition");
+  check(scoped_assets&&scoped_disc_import&&source_session_owned&&!stadium_c1a_armed&&
+        !melee_web_net_active()&&!first_sss_vs_entry.attempted&&
+        !first_sss_prefix_sequence.armed&&!first_sss_prefix_sequence.complete&&
+        !first_sss_vs_setup.attempted&&!first_sss_vs_setup.failed&&
+        !matched_setup_cf.opted_in&&!matched_setup_cf.armed&&
+        !first_sss_text_tail_probe.opted_in,
+        "Prepared Setup admission conflicts with another route owner");
+  check(seed_ptr&&owner.prepared_start_input_owner&&
+        owner.prepared_start_input_owner==melee_web_menu_host_input(host),
+        "Prepared Setup admission lost its retained host PAD/RNG owner");
+  check(EM_ASM_INT({
+        const approved=globalThis.__meleeWebStadiumCurrentSssPreparedStartApproved;
+        if(typeof approved!=="function")return 0;
+        try{return approved()===true?1:0;}catch(_){return 0;}
+       })==1,
+        "Prepared Setup admission requires the exact same-run strict Start comparison");
+  check(!owner.prepared_setup_failed&&owner.prepared_setup_error.empty(),
+        "Prepared Setup approval reentered or poisoned the one-use handoff");
+  check(owner.prepared_setup_attempted&&!owner.prepared_setup_consumed&&owner.armed&&
+        owner.profile==CurrentSssExitProfile::Stock4None&&owner.terminal&&!owner.failed&&!faulted&&
+        owner.recipe&&replay&&replay.get()==owner.recipe&&replay->initial_css.get()==owner.context&&
+        host&&host==owner.host_owner&&world&&world.get()==owner.leave_world&&world_exposed&&
+        archive_cache&&archive_cache.get()==owner.leave_cache&&
+        owner.prepared_start_attempted&&owner.prepared_start_captured&&
+        owner.prepared_start_selection_captured&&!owner.prepared_start_json.empty()&&
+        owner.terminal_cursor==270&&owner.notification_cursor==270&&owner.notification_order==543&&
+        owner.terminal_steps==0&&owner.terminal_draws==0&&owner.notification_steps==0&&
+        owner.notification_draws==0&&owner.terminal_asset_requests==0&&
+        replay_cursor==owner.terminal_cursor&&!replay_source_frames.pending()&&
+        replay_source_frames.steps()==0&&replay_source_frames.draws()==0&&
+        owner.notified&&owner.observation.state==2&&owner.observation.note.captured&&
+        owner.leave_world_generation!=0&&
+        owner.observation.note.world_generation==owner.leave_world_generation&&
+        owner.leave_world_generation==melee_web_gameplay_generation()&&
+        owner.last_host_tick_returned&&!owner.host_tick_in_flight&&
+        melee_web_menu_host_phase(host)==MELEE_WEB_MENU_READY&&
+        melee_web_menu_host_source_scene(host)==0&&!host_entered&&
+        !match&&!results&&!prize&&!running&&!pending&&!menu_scene_rebuild_pending&&
+        preparation.waiting_for_audio()&&
+        preparation.phase()==melee_web::MenuPreparationState::Phase::WaitingForAudio&&
+        asset_destination==AssetDestination::None&&asset_scope.pending_generation()==0&&
+        asset_generation==owner.leave_asset_generation&&
+        current_sss_asset_request_calls==owner.leave_asset_requests&&
+        scoped_assets&&scoped_disc_import&&source_session_owned&&!stadium_c1a_armed&&
+        !melee_web_net_active()&&!first_sss_vs_entry.attempted&&
+        !first_sss_prefix_sequence.armed&&!first_sss_prefix_sequence.complete&&
+        !first_sss_prefix_sequence.failed&&!setup.attempted&&!setup.failed&&!setup.complete&&
+        !matched_setup_cf.opted_in&&!matched_setup_cf.armed&&
+        !first_sss_text_tail_probe.opted_in&&seed_ptr&&owner.prepared_start_input_owner&&
+        owner.prepared_start_input_owner==melee_web_menu_host_input(host),
+        "Prepared Start approval changed its checked live owner or pending transition");
+  MeleeWebMenuMatchSelection selection{};char error[256]{};
+  check(melee_web_menu_host_stadium_c1a_selection(host,&selection,error,sizeof(error)),error);
+  const std::string seed_provenance=
+      "seed provenance live_current=0x"+
+      melee_web::stadium_first_css_diagnostic::hex32(selection.random_seed)+
+      " accepted_prepared_start=0x"+
+      melee_web::stadium_first_css_diagnostic::hex32(owner.prepared_start_selection.random_seed)+
+      " recipe_initial_css=0x"+
+      melee_web::stadium_first_css_diagnostic::hex32(owner.recipe->seed);
+  const std::string accepted_difference=current_sss_selection_difference(
+      selection,owner.prepared_start_selection,true);
+  const std::string accepted_error=
+      "Prepared Setup live-vs-accepted selection differs at "+accepted_difference+
+      "; "+seed_provenance;
+  check(accepted_difference.empty(),accepted_error.c_str());
+  // The recipe seed initializes the first CSS. Its decoded selection carries
+  // that initial seed, while the live host selection carries the RNG after SSS.
+  // Keep every phase-invariant recipe field strict, but do not equate those RNGs.
+  const std::string recipe_difference=current_sss_selection_difference(
+      selection,owner.recipe->selection,false);
+  const std::string recipe_error=
+      "Prepared Setup live-vs-recipe configuration differs at "+recipe_difference+
+      "; "+seed_provenance;
+  check(recipe_difference.empty(),recipe_error.c_str());
+  std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> input_now{};
+  check(melee_web_pad_state_encode(owner.prepared_start_input_owner,input_now.data(),
+        input_now.size())&&input_now==owner.prepared_start_input_bytes,
+        "Prepared Setup admission changed the accepted host PAD bytes");
+  check(HSD_SynthSFXGetPendingLoadCount()==0&&
+        melee_web_audio_bank_transport_active()==1&&
+        melee_web_audio_bank_transport_configured()==1&&
+        melee_web_audio_bank_transport_busy()==0,
+        "Prepared Setup admission lost the returned, drained announcer service");
+  auto retained_input=std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)>(
+      melee_web_pad_state_decode(owner.prepared_start_input_bytes.data(),
+          owner.prepared_start_input_bytes.size(),error,sizeof(error)),melee_web_pad_state_free);
+  check(retained_input!=nullptr,error[0]?error:
+        "Prepared Setup could not retain the accepted host PAD bytes");
+
+  setup.attempted=true;
+  setup.audio_calls_before=setup.audio_calls_after=diagnostic_audio_render_calls;
+  setup.audio_frames_before=setup.audio_frames_after=diagnostic_audio_render_frames;
+  setup.host_input=owner.prepared_start_input_owner;
+  setup.input_bytes=owner.prepared_start_input_bytes;
+  setup.owned_input=std::move(retained_input);setup.input=setup.owned_input.get();
+  setup.prior_world_generation=owner.leave_world_generation;
+  setup.parent_seed_owner=seed_ptr;setup.parent_seed=*seed_ptr;
+  setup.origin=FirstSssVsSetupOrigin::CurrentPreparedStock4_270;
+  owner.prepared_setup_approved=true;
+  owner.prepared_setup_consumed=true;
+
+  // This checked owner is the exact stopped SSS transition retained at the
+  // 270/543 boundary. Retire only its scheduler intent before the existing
+  // world-close/assets/deferred-Setup path; never enter ordinary construction.
+  preparation.reset();
+  menu_clock.reset();audio_clock.reset();
+  world->close();world.reset();world_exposed=false;setup.menu_retired=true;
+  setup.parent_seed_after_retirement=seed_ptr?*seed_ptr:0;
+  setup.parent_seed_restored=seed_ptr==setup.parent_seed_owner&&
+      setup.parent_seed_after_retirement==setup.parent_seed;
+  check(!melee_web_gameplay_world_exists(),
+        "Prepared Setup menu world retirement did not complete");
+  check(setup.parent_seed_restored,
+        "Prepared Setup menu retirement changed parent RNG owner/value");
+  // Pass the accepted current-SSS selection through construction. In
+  // particular, preserve its live source RNG rather than replacing it with the
+  // recipe's initial-CSS seed.
+  request_assets(AssetDestination::FirstSssVsSetup,&selection,nullptr,-1);
+  setup.requested_generation=asset_generation;setup.requested=true;
+  first_css_browser_draw_refresh_observation();return 1;
+ }catch(const std::exception& error){
+  owner.prepared_setup_failed=true;
+  if(owner.prepared_setup_error.empty())owner.prepared_setup_error=error.what();
+  message=owner.prepared_setup_error;
+  if(setup.attempted&&!setup.failed)first_sss_vs_setup_fail(error.what());
+  else first_css_browser_draw_refresh_observation();
+  return 0;
+ }
+}
 #endif
 
 void tick(){
@@ -4873,9 +5125,31 @@ const char* melee_web_native_menu_stadium_current_sss_exit_observe(){
      <<",\"host_call_returned\":"<<(s.last_host_tick_returned&&!s.host_tick_in_flight?"true":"false")
      <<",\"cursor\":"<<s.terminal_cursor<<",\"callback_source_steps\":"<<s.terminal_steps
      <<",\"callback_source_draws\":"<<s.terminal_draws
-     <<",\"asset_requests_after_leave_boundary\":"<<(current_sss_asset_request_calls-s.leave_asset_requests)
-     <<",\"waiting_for_audio_retained_until_unload\":"<<(s.terminal?"true":"false")
+     <<",\"asset_requests_after_leave_boundary\":"
+     <<(current_sss_asset_request_calls-s.leave_asset_requests)
+     <<",\"asset_requests_at_terminal\":"<<s.terminal_asset_requests
+     <<",\"waiting_for_audio_retained_until_unload\":"
+     <<(s.terminal&&!s.prepared_setup_consumed&&s.terminal_waiting_for_audio?"true":"false")
+     <<",\"waiting_for_audio_at_terminal\":"<<(s.terminal_waiting_for_audio?"true":"false")
+     <<",\"waiting_for_audio_current\":"<<(preparation.waiting_for_audio()?"true":"false")
      <<",\"native_unloaded\":"<<(!world&&!host&&!match&&!results&&!prize&&!pending&&!running&&!preparation.busy()&&asset_destination==AssetDestination::None&&asset_scope.pending_generation()==0?"true":"false")<<'}';
+ }
+ if(s.prepared_setup_attempted){
+  out<<",\"prepared_to_setup\":{\"attempted\":true"
+     <<",\"approved\":"<<(s.prepared_setup_approved?"true":"false")
+     <<",\"consumed\":"<<(s.prepared_setup_consumed?"true":"false")
+     <<",\"failed\":"<<(s.prepared_setup_failed?"true":"false")
+     <<",\"asset_requests_at_handoff\":"<<s.terminal_asset_requests
+     <<",\"asset_requests_current_after_handoff\":"
+     <<(current_sss_asset_request_calls-s.leave_asset_requests)
+     <<",\"waiting_for_audio_at_handoff\":"<<(s.terminal_waiting_for_audio?"true":"false")
+     <<",\"waiting_for_audio_current\":"<<(preparation.waiting_for_audio()?"true":"false")
+     <<",\"waiting_for_audio_retired\":"
+     <<(s.prepared_setup_consumed&&!preparation.waiting_for_audio()?"true":"false")
+     <<",\"error\":"<<(s.prepared_setup_error.empty()?"null":
+          first_css_browser_draw_json_quote(s.prepared_setup_error))
+     <<",\"setup\":"<<(first_sss_vs_setup.attempted||first_sss_vs_setup.failed?
+          first_sss_vs_setup_json():"null")<<'}';
  }
  out<<'}';s.json=out.str();return s.json.c_str();
 }
@@ -4941,6 +5215,11 @@ const char* melee_web_native_menu_stadium_current_sss_prepared_start_observe(){
   check(melee_web_menu_host_stadium_c1a_selection(host,&selection,error,sizeof(error)),error);
   check(selection.start.rules.stkind==St_Kind_PStadium,
         "Prepared Start observation lost its source Stadium StKind");
+  const auto* const prepared_input=melee_web_menu_host_input(host);
+  require_guard(prepared_input!=nullptr,"prepared_host_input");
+  std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> prepared_input_bytes{};
+  require_guard(melee_web_pad_state_encode(prepared_input,prepared_input_bytes.data(),
+      prepared_input_bytes.size()),"prepared_host_pad_serialization");
   std::ostringstream out;
   out<<"{\"schema\":\"melee-web-stadium-prepared-start-before-assets-v2\""
      <<",\"scope\":\"source_prepared_start_after_sss_leave_before_assets\""
@@ -4963,6 +5242,10 @@ const char* melee_web_native_menu_stadium_current_sss_prepared_start_observe(){
   melee_web::stadium_first_css_diagnostic::write_start(out,selection.start);
   out<<",\"menu_draw_reference\":\"UNKNOWN\",\"runtime_admission\":false"
      <<",\"Entry\":false,\"C3\":false}";
+  s.prepared_start_selection=selection;
+  s.prepared_start_input_owner=prepared_input;
+  s.prepared_start_input_bytes=prepared_input_bytes;
+  s.prepared_start_selection_captured=true;
   s.prepared_start_json=out.str();s.prepared_start_captured=true;
  }catch(const std::exception& error){
   s.prepared_start_error=error.what();
@@ -4974,6 +5257,9 @@ const char* melee_web_native_menu_stadium_current_sss_prepared_start_observe(){
   s.prepared_start_json=out.str();
  }
  return s.prepared_start_json.c_str();
+}
+int melee_web_native_menu_stadium_current_sss_prepared_setup_begin(){
+ return current_sss_prepared_setup_begin();
 }
 int melee_web_native_menu_stadium_first_css_draw_arm(
     const uint8_t* context_bytes,unsigned context_size,

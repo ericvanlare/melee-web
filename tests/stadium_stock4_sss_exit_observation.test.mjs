@@ -3,12 +3,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import test from 'node:test';
-import {installCurrentSssExitReplayArm} from '../scripts/stadium_current_sss_exit_observation.mjs';
+import {installCurrentSssExitReplayArm, continuePreparedStartInPage}
+  from '../scripts/stadium_current_sss_exit_observation.mjs';
 import {validateStock4SssExitExpected, validateStock4SssExitStop,
   compareStock4PreparedStartProjection, compareStock4PreparedStartReceipt,
-  compareStock4PreparedStartObservation,
+  compareStock4PreparedStartObservation, compareStock4PreparedSetupObservation,
   validateStock4SssExitTerminal, validateStock4SssExitFinalization,
-  validateStock4PreparedStartFinalization} from '../scripts/stadium_stock4_sss_exit_observation.mjs';
+  validateStock4PreparedStartFinalization, validateStock4PreparedSetupFinalization}
+  from '../scripts/stadium_stock4_sss_exit_observation.mjs';
 
 // Synthetic shapes exercise refusal/classification only; no original result.
 function expected() {
@@ -45,6 +47,32 @@ function report() {
     failures:['whole-session final CSS was not entered','Manual unload stopped the replay',
       'incomplete input timeline','source tick/draw count mismatch']};
 }
+function preparedSetupObservation(e=expected()) {
+  const player=(costume,slot=0,slot_type=0)=>({slot,slot_type,ckind:8,color:costume,stocks:4,flags_c:128});
+  const start={rules:{match_kind:1,is_stock:1,stage_kind:3,xB:-1,time_limit:0,timer_enabled:0,
+    timer_counts_up:0,disable_pausing:0,is_teams:0,item_mask:'ffffffffffffffff',damage_ratio_bits:'3f800000',
+    game_speed_bits:'3f800000',is_vs:1,friendly_fire:0,timer_shows_hours:0,x14:0},
+    players:[player(1),player(0),...Array.from({length:4},()=>player(0,0,3))]};
+  const generation=12;
+  const snapshot={schema:'melee-web-stadium-zero-tick-setup-state-v1',world_generation:generation,
+    world_ticks:0,source_frame:0,map_id:2,constructor_callback_count:1,source_parameter_roots_agree:true,
+    ground_source_heap_handle:3,ground_requested_bytes:256,ground_allocation_generation:12,
+    object_source_heap_handle:3,object_requested_bytes:128,object_allocation_generation:11};
+  return {terminal:{complete:true,native_unloaded:false,asset_requests_after_leave_boundary:1,
+    asset_requests_at_terminal:0,waiting_for_audio_retained_until_unload:false,
+    waiting_for_audio_at_terminal:true,waiting_for_audio_current:false},
+    prepared_to_setup:{attempted:true,approved:true,consumed:true,failed:false,error:null,
+    asset_requests_at_handoff:0,asset_requests_current_after_handoff:1,
+    waiting_for_audio_at_handoff:true,waiting_for_audio_current:false,waiting_for_audio_retired:true,setup:{
+    handoff_origin:'current_sss_prepared_stock4_270',attempted:true,requested:true,import_committed:true,
+    menu_retired:true,parent_seed_owner_value_restored:true,complete:true,captured:true,failed:false,
+    construction_complete:true,source_frames:0,host_tick_calls:0,host_draw_calls:0,requested_generation:4,
+    committed_generation:4,prior_world_generation:9,match_world_generation:generation,
+    current_owners:{host:true,host_entered:false,match:true,cache:true,source_world_exists:true,running:false,
+      pending:false,first_use_draw_pending:false,pending_scope_generation:0,asset_generation:4,active_files:2},
+    actual:{phase:'vs_setup',random_seed_hex:e.prepared_profile.setup.rng.value_hex,start},
+    stadium_setup_state:snapshot}}};
+}
 test('synthetic stock4 selector forwards original once and exact profile, refuses foreign profile/arm',()=>{
   for(const armResult of [1,0]) {
     const bytes=Array(328).fill(7), calls=[],receiver={};const heap=new Uint8Array(400);heap.set(bytes,16);
@@ -77,6 +105,36 @@ test('prepared Start getter remains opt-in when installing the historical stock4
   assert.equal(Module._melee_web_native_menu_replay.call(receiver,16,328,1),1);
   assert.deepEqual(candidate.observePreparedStart(),{busy:false,value:{captured:true}});
   candidate.dispose();
+});
+test('prepared Setup approval rechecks the exact retained native receipt and consumes one use',()=>{
+  const receipt={schema:'prepared-start-v2',replay_cursor:270,random_seed_hex:'e2624ac3'};
+  let beginCalls=0;
+  const bytes=Array(328).fill(4),heap=new Uint8Array(400);heap.set(bytes,16);
+  const original=function(){return 1;};
+  globalThis.Module={HEAPU8:heap,UTF8ToString:()=>JSON.stringify(receipt),stadiumMatchedSetupNativeIdle:()=>true,
+    _melee_web_native_menu_replay:original,
+    _melee_web_native_menu_stadium_current_sss_exit_arm_profile:()=>1,
+    _melee_web_native_menu_stadium_current_sss_exit_observe:()=>1,
+    _melee_web_native_menu_stadium_current_sss_prepared_start_observe:()=>1,
+    _melee_web_native_menu_stadium_current_sss_prepared_setup_begin(){
+      ++beginCalls;assert.equal(globalThis.__meleeWebStadiumCurrentSssPreparedStartApproved(),true);return 1;
+    }};
+  const scope=installCurrentSssExitReplayArm({recipeBytes:bytes,observationProfile:1,preparedStartProbe:true});
+  assert.equal(Module._melee_web_native_menu_replay(16,bytes.length,1),1);
+  assert.deepEqual(scope.continuePreparedStart(receipt),{result:1,accepted_receipt_rechecked:true});
+  assert.equal(beginCalls,1);assert.equal(Object.hasOwn(globalThis,
+    '__meleeWebStadiumCurrentSssPreparedStartApproved'),false);
+  assert.throws(()=>scope.continuePreparedStart(receipt),/one-use owner/);
+  scope.dispose();
+});
+test('the serialized Setup continuation forwards the explicit accepted receipt in a fresh page realm',()=>{
+  const realm=vm.createContext({});
+  const pageFunction=vm.runInContext(`(${continuePreparedStartInPage.toString()})`,realm);
+  const accepted=Object.freeze({schema:'prepared-start-v2',replay_cursor:270,random_seed_hex:'e2624ac3'});
+  let received=null;
+  const scope={continuePreparedStart(value){received=value;return 'continued';}};
+  assert.equal(pageFunction(scope,accepted),'continued');
+  assert.strictEqual(received,accepted);
 });
 test('synthetic prepared-entry compact projection compares only declared common fields',()=>{
   const declared=expected().prepared_profile.entry.declared_setup;
@@ -207,6 +265,110 @@ test('synthetic terminal preserves incomplete full replay and rejects later diag
     r=>r.snapshots=Array(2048).fill(snapshot)]) {
     const r=structuredClone(full);change(r);assert.throws(()=>validateStock4SssExitFinalization(r,expected()));
   }
+});
+test('prepared-to-Setup comparator requires completed same-origin zero-tick Setup and the retained endpoint seed',()=>{
+  const e=expected(),actual=preparedSetupObservation(e);
+  assert.equal(compareStock4PreparedSetupObservation(actual,e).scope,
+    'PASS_BOUNDED_PREPARED_ENTRY_TO_SETUP_COMMON_FIELDS_AND_SEED_COMPONENT');
+  const indexZeroHeap=structuredClone(actual);
+  indexZeroHeap.prepared_to_setup.setup.stadium_setup_state.ground_source_heap_handle=0;
+  indexZeroHeap.prepared_to_setup.setup.stadium_setup_state.object_source_heap_handle=0;
+  assert.equal(compareStock4PreparedSetupObservation(indexZeroHeap,e).pass,true);
+  const faults=[
+    x=>x.terminal.asset_requests_after_leave_boundary=0,
+    x=>x.terminal.asset_requests_at_terminal=1,
+    x=>x.terminal.waiting_for_audio_at_terminal=false,
+    x=>x.terminal.waiting_for_audio_current=true,
+    x=>x.prepared_to_setup.approved=false,
+    x=>x.prepared_to_setup.asset_requests_at_handoff=1,
+    x=>x.prepared_to_setup.asset_requests_current_after_handoff=0,
+    x=>x.prepared_to_setup.waiting_for_audio_at_handoff=false,
+    x=>x.prepared_to_setup.waiting_for_audio_retired=false,
+    x=>x.prepared_to_setup.setup.handoff_origin='legacy_entry_124',
+    x=>x.prepared_to_setup.setup.complete=false,
+    x=>x.prepared_to_setup.setup.current_owners.source_world_exists=false,
+    x=>x.prepared_to_setup.setup.actual.phase='sss_exit',
+    x=>x.prepared_to_setup.setup.actual.random_seed_hex='e2624ac3',
+    x=>x.prepared_to_setup.setup.stadium_setup_state.world_ticks=1,
+    x=>x.prepared_to_setup.setup.stadium_setup_state.constructor_callback_count=2,
+    x=>x.prepared_to_setup.setup.stadium_setup_state.ground_source_heap_handle=-1,
+    x=>x.prepared_to_setup.setup.stadium_setup_state.object_source_heap_handle=-1,
+    x=>x.prepared_to_setup.setup.stadium_setup_state.ground_source_heap_handle=1.5,
+    x=>x.prepared_to_setup.setup.stadium_setup_state.object_source_heap_handle='0',
+    x=>{x.prepared_to_setup.setup.stadium_setup_state.ground_source_heap_handle=1;
+      x.prepared_to_setup.setup.stadium_setup_state.object_source_heap_handle=0;},
+    x=>x.prepared_to_setup.setup.stadium_setup_state.ground_requested_bytes=0,
+    x=>x.prepared_to_setup.setup.stadium_setup_state.object_requested_bytes=0,
+    x=>x.prepared_to_setup.setup.stadium_setup_state.ground_allocation_generation=0,
+    x=>x.prepared_to_setup.setup.stadium_setup_state.object_allocation_generation=0,
+    x=>x.prepared_to_setup.setup.stadium_setup_state.world_generation++,
+    x=>x.prepared_to_setup.setup.stadium_setup_state.source_parameter_roots_agree=false,
+  ];
+  for(const mutate of faults){const bad=structuredClone(actual);mutate(bad);assert.throws(()=>compareStock4PreparedSetupObservation(bad,e));}
+  const doubleEncoded=structuredClone(actual);
+  doubleEncoded.prepared_to_setup.setup.actual=JSON.stringify(doubleEncoded.prepared_to_setup.setup.actual);
+  assert.throws(()=>compareStock4PreparedSetupObservation(doubleEncoded,e),/producer-shaped JSON objects/);
+  const final={current_sss_exit:{prepared_setup_comparison:compareStock4PreparedSetupObservation(actual,e)}};
+  assert.equal(validateStock4PreparedSetupFinalization(final,e).pass,true);
+  assert.throws(()=>validateStock4PreparedSetupFinalization({current_sss_exit:{}},e));
+});
+test('prepared Setup finalization checks the original live handoff and separate current unload state',()=>{
+  const e=expected(),handoff=stop(false),unloaded=preparedSetupObservation(e);
+  handoff.terminal.asset_requests_at_terminal=0;
+  handoff.terminal.waiting_for_audio_at_terminal=true;
+  handoff.terminal.waiting_for_audio_current=true;
+  handoff.terminal.native_unloaded=false;
+  unloaded.terminal.native_unloaded=true;
+  assert.equal(validateStock4SssExitTerminal(report(),{phase:0,running:0,runtime_error:''},e,
+    handoff,unloaded).pass,true);
+  const full={browser_report:report(),final_snapshot:{phase:0,running:0,runtime_error:''},
+    last_successful_snapshot:{phase:0,running:0,runtime_error:''},snapshots:[{phase:0,running:0,runtime_error:''}],
+    cleanup:{browser_close_returned:true},phases:[{name:'current-sss-exit-component',result:'pass'}],
+    current_sss_exit:{unload_requested:true,observation:handoff,unloaded_observation:unloaded,
+      prepared_setup_begin:{result:1,accepted_receipt_rechecked:true},
+      prepared_setup_comparison:{pass:true},},original_replay_capture_result:'fail',
+    finalization_failures:['Whole-session replay did not complete successfully','Browser replay report is incomplete or failed']};
+  assert.equal(validateStock4SssExitFinalization(full,e).pass,true);
+  assert.throws(()=>validateStock4SssExitStop(unloaded,e),/ordinary-leave\/pre-assets boundary/);
+  const comparisonMissing=structuredClone(full);
+  delete comparisonMissing.current_sss_exit.prepared_setup_comparison;
+  comparisonMissing.current_sss_exit.prepared_setup_failure='retained comparator refusal';
+  assert.equal(validateStock4SssExitFinalization(comparisonMissing,e).pass,true);
+  assert.throws(()=>validateStock4PreparedSetupFinalization(comparisonMissing,e),
+    /separately checked completed zero-tick Setup comparison/);
+  const comparisonFailed=structuredClone(comparisonMissing);
+  comparisonFailed.current_sss_exit.prepared_setup_comparison={pass:false};
+  assert.throws(()=>validateStock4PreparedSetupFinalization(comparisonFailed,e),
+    /separately checked completed zero-tick Setup comparison/);
+  for(const mutate of [x=>x.terminal.asset_requests_after_leave_boundary=1,
+    x=>x.terminal.waiting_for_audio_retained_until_unload=false]) {
+    const changed=structuredClone(handoff);mutate(changed);
+    assert.throws(()=>validateStock4SssExitTerminal(report(),{phase:0,running:0,runtime_error:''},e,
+      changed,unloaded));
+  }
+  for(const mutate of [x=>x.terminal.asset_requests_after_leave_boundary=0,
+    x=>x.terminal.waiting_for_audio_current=true,
+    x=>x.prepared_to_setup.asset_requests_current_after_handoff=0]) {
+    const changed=structuredClone(unloaded);mutate(changed);
+    assert.throws(()=>validateStock4SssExitTerminal(report(),{phase:0,running:0,runtime_error:''},e,
+      handoff,changed));
+  }
+  for(const mutate of [x=>x.current_sss_exit.prepared_setup_begin.result=0,
+    x=>x.current_sss_exit.prepared_setup_begin.accepted_receipt_rechecked=false,
+    x=>x.current_sss_exit.unloaded_observation.prepared_to_setup.consumed=false,
+    x=>x.current_sss_exit.unloaded_observation.prepared_to_setup.approved=false,
+    x=>x.current_sss_exit.unloaded_observation.prepared_to_setup.failed=true,
+    x=>x.current_sss_exit.unloaded_observation.prepared_to_setup.error='failed',
+    x=>x.current_sss_exit.unloaded_observation.terminal.asset_requests_after_leave_boundary=0,
+    x=>x.current_sss_exit.unloaded_observation.terminal.waiting_for_audio_current=true,
+    x=>x.current_sss_exit.unloaded_observation.terminal.native_unloaded=false]) {
+    const changed=structuredClone(full);mutate(changed);
+    assert.throws(()=>validateStock4SssExitFinalization(changed,e));
+  }
+  const passWithoutConsumedRoute=structuredClone(full);
+  passWithoutConsumedRoute.current_sss_exit.unloaded_observation.prepared_to_setup.consumed=false;
+  assert.throws(()=>validateStock4SssExitFinalization(passWithoutConsumedRoute,e),
+    /consumed route at unload/);
 });
 test('actual unloadAndSave body cancels preparation and waits for observed cache drain',async()=>{
   const root=process.env.MELEE_STADIUM_STOCK4_BASE_ROOT||new URL('..',import.meta.url).pathname;

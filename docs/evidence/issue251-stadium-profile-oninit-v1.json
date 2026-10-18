@@ -16364,6 +16364,280 @@
           "PR330_main_integration": "pending at documentation checkpoint"
         },
         "evidence_path_base": "stadium-announcer-observer-capture-v1-20261018-004134-38523dd4"
+      },
+      "prepared_setup_offline_reduction_v1": {
+        "schema": "melee-web-stadium-prepared-setup-offline-reduction-v1",
+        "state": "OFFLINE_SETUP_COMPARISON_PASS_CAPTURE_AGGREGATE_FAIL",
+        "scope": {
+          "profile": "stock4/ItemsNone, original CSS to SSS route with checked prepared-entry continuation",
+          "capture_count": 2,
+          "captures_are_immutable_and_failed": true,
+          "no_third_capture": true,
+          "prepared_setup_component_result": "bounded retained-object comparator pass only",
+          "capture_aggregate": "FAIL; raw report and original launcher outcomes remain failed",
+          "full_replay": "FAIL_INCOMPLETE_EXPLICIT_SSS_STOP",
+          "Entry": false,
+          "Setup_aggregate": false,
+          "runtime_admission": false,
+          "C3": false,
+          "original_menu_draw_parity": "UNKNOWN",
+          "raw_StartMeleeData_312_bytes_compared": false,
+          "announcer_bank_transfer_occurrence": "UNOBSERVED"
+        },
+        "seed_phase_semantics": {
+          "recipe_initial_css_seed_hex": "312151c3",
+          "accepted_live_sss_and_prepared_start_seed_hex": "e2624ac3",
+          "retained_original_entry": {
+            "sequence": 1640,
+            "pc_hex": "0x8016e934",
+            "source_tick": 125,
+            "draw_ordinal": 0,
+            "rng_value_hex": "e2624ac3",
+            "start_melee_bytes": 312,
+            "start_melee_sha256": "918a23d68a3b5024f94baf1f5e26e6c0db56c5fbbbffdc79c5e620e82af3b728",
+            "raw_bytes_compared": false
+          },
+          "retained_original_setup": {
+            "sequence": 1674,
+            "pc_hex": "0x8016e9c4",
+            "source_tick": 125,
+            "draw_ordinal": 0,
+            "rng_value_hex": "083a62a9",
+            "declared_common_fields_only": true
+          },
+          "observed_current_sss_source": {
+            "sequence": 1599,
+            "pc_hex": "0x8025bbd0",
+            "source_tick": 125,
+            "rng_value_hex": "e2624ac3"
+          },
+          "comparison_rule": "Keep strict live selection equality to accepted prepared Start, including progressed RNG, PAD and source owner. Compare recipe selection configuration but never compare its initial-CSS RNG seed to current post-SSS seed. Do not inject or normalize seed/state."
+        },
+        "failed_capture_attempts": [
+          {
+            "id": "prepared-setup-v1",
+            "evidence_path_base": "stadium-prepared-setup-build-v1-20261018-083639Z/packet-setup-v1",
+            "packet_manifest_sha256": "76ef002c77e27f9d6153ff3c1ef0f30a87a3ebbe424c0885f9f19ff8a0e691be",
+            "launch_manifest_sha256": "ffe387f8ec952f5a6d0042d5b926532887255ec0eb1970ca239b7230321e7a77",
+            "root_packet_review_sha256": "6b85c7efdbcce8f6b785bbd5ffa67ed31a9abbb0663a811510d773ea45a45bda",
+            "one_launch_release_sha256": "152e0525e6681b7989492d15f539726569f958a24381ca5fa71aca6fc263912a",
+            "launcher_summary_sha256": "b8c80e0ff10afb668d1a172412ecddcc249515f4fb9db65f590f7740847bb5eb",
+            "raw_report_sha256": "3b3961f423e2291f42753210afdda9e590c54c718a39dc1db65f84385dfcadc0",
+            "prepared_start_observation_sha256": "668b1eca7b78c03ce20fb9a603b7dcfa9acf21be8d5d752f17a90383e93440b6",
+            "sss_observation_sha256": "3d4bc8b042c6f0737a60c363b94e9afd39d6bb9fae5fab46db9cb52138accb26",
+            "result": "FAIL_BEFORE_SETUP_CONSTRUCTION",
+            "observed": {
+              "prepared_start_comparison_pass": true,
+              "sss_input_cursor": 270,
+              "sss_local_order_rows": 543,
+              "prepared_setup_begin": null,
+              "setup_observation": null,
+              "runtime_replay": "NOT_RUN"
+            },
+            "first_boundary": "The native prepared Setup continuation refused with \u201cPrepared Setup selection differs from the accepted receipt or replay owner\u201d; no Setup constructor or Setup observation was reached. The failed report also records a finalizer error because it applied the Setup-unload state check while validating the SSS stop.",
+            "captured_source_pins": {
+              "src/gameplay_menu_browser.cpp": "6eaf5ca120b32737925ee443f5bfdc3543a5769df8aac12963801ef7d399d9d7",
+              "scripts/stadium_stock4_sss_exit_observation.mjs": "439a93bfdc2d11342a486297f791c89b79fd33126d00fed5599bbc298d18fa64",
+              "scripts/capture_whole_session_browser.mjs": "68d155b1450a9ec78d31c457c381ca85a2687cd4f18ea934f30f715e961caafe",
+              "scripts/stadium_current_sss_exit_observation.mjs": "8d3d5bc904a300088f9dd43c9da0518e9df555e64ad4836712ce031e14a6affa"
+            },
+            "captured_runtime": {
+              "diagnostic_release": {
+                "gameplay_menu_browser.js": "3617a1e9e1bdf920392c38deec29c9c08e976a601464eb6106013ad75ba63676",
+                "gameplay_menu_browser.wasm": "13dfa1710524a46ec86a0a324f6d88e144854404c0ffd9bd3c1376fd4c4a9c7f",
+                "gameplay_menu_browser.data": "1eb094d18d16f0894840e297d975f52bb97ead994e723fa13887b6ecda0a17a6"
+              },
+              "ordinary_release": {
+                "gameplay_menu_browser.js": "0befa55ea2fcd97f8e316a3f94d52e3acd2b5275884e528caa45e1bc175f64e9",
+                "gameplay_menu_browser.wasm": "68b696555a253ca1193bde89db50ed3e5f1c94d0a68d0fdfdfff19df83f7fa24",
+                "gameplay_menu_browser.data": "1eb094d18d16f0894840e297d975f52bb97ead994e723fa13887b6ecda0a17a6"
+              }
+            },
+            "cleanup": {
+              "owner_cleanup_passed": true,
+              "native_unloaded": true,
+              "browser_close_returned": true,
+              "capture_process_group_absent": true,
+              "server_process_group_absent": true,
+              "browser_processes_absent": true,
+              "loopback_port_absent": true,
+              "root_lane_retirement_receipt_sha256": "a69a53a1ab629ba27e8457457ad1f1ccb0bab12db7fa4f53ef434caa20a0f736",
+              "launcher_aggregate_postflight_passed": false
+            }
+          },
+          {
+            "id": "prepared-setup-seed-phase-v1",
+            "evidence_path_base": "stadium-prepared-setup-seed-phase-fix-v1-20261018/packet-seed-phase-v1",
+            "packet_manifest_sha256": "f85d5d6c7e24a6467e72d36c67c9118589f5144fbbb2b4aad6bbfbf2172cfb31",
+            "launch_manifest_sha256": "bf31dea2c19906ca6202685bfe44834480a41c5ee5cd1c28f946e1222a7234ea",
+            "root_packet_review_sha256": "345b3d24690b5fec21526c58e53deed644bfbf8644ce4f0f680ef97aa3477338",
+            "one_launch_release_sha256": "0d211a88bc9644ae775fbb4800ef62f552cad88b395fe9830a0cbacea4abb71b",
+            "launcher_summary_sha256": "dbaf30e157570bb569f3d819a330689155a4eb7c7be127d43194b7a46da61c18",
+            "raw_report_sha256": "10d6295510c1dc5ae958d9c22449e3409af3edbd40970f0c4f8bd7fa39aa9188",
+            "sss_observation_sha256": "3d4bc8b042c6f0737a60c363b94e9afd39d6bb9fae5fab46db9cb52138accb26",
+            "setup_observation_sha256": "133df8479990768337f8085b9fda6fd5875da8b8c40745e440fdddb9be9f75cf",
+            "unloaded_observation_sha256": "2af3f6d9ded738fed78e3be7183dd154404afb7e349775cbd998e1159a434eb5",
+            "result": "FAIL_AFTER_SETUP_CONSTRUCTION; NO_RETRY",
+            "observed": {
+              "prepared_start_comparison_pass": true,
+              "input_cursor": 270,
+              "local_order_rows": 543,
+              "prepared_setup_begin_result": 1,
+              "accepted_receipt_rechecked": true,
+              "actual_setup": {
+                "complete": true,
+                "phase": "vs_setup",
+                "map_id": 2,
+                "seed_hex": "083a62a9",
+                "world_generation": 3,
+                "match_world_generation": 3,
+                "world_ticks": 0,
+                "source_frames": 0,
+                "host_tick_calls": 0,
+                "host_draw_calls": 0,
+                "constructor_callback_count": 1,
+                "constructor_randi_call_count": 1,
+                "constructor_randi_bound": 200,
+                "constructor_randi_result": 66,
+                "ground_allocation_bytes": 516,
+                "object_allocation_bytes": 56,
+                "ground_allocation_generation": 2988,
+                "object_allocation_generation": 2987,
+                "ground_source_heap_index": 0,
+                "object_source_heap_index": 0,
+                "source_parameter_roots_agree": true
+              },
+              "raw_setup_comparison": null,
+              "raw_setup_component_pass": false,
+              "full_replay": "FAIL_INCOMPLETE_EXPLICIT_SSS_STOP"
+            },
+            "first_guard": "The captured Setup observation had source heap indices 0/0; the old comparator required a positive index (>0), so it refused before a Setup comparison was emitted. The old finalizer also checked post-Setup unload as the historical SSS pre-assets stop and failed that boundary.",
+            "captured_source_pins": {
+              "src/gameplay_menu_browser.cpp": "743a2ed34d08183825d38a1abde5233d345cc4c8f30b1c5f8cadbeff9c27795f",
+              "scripts/stadium_stock4_sss_exit_observation.mjs": "439a93bfdc2d11342a486297f791c89b79fd33126d00fed5599bbc298d18fa64",
+              "scripts/capture_whole_session_browser.mjs": "68d155b1450a9ec78d31c457c381ca85a2687cd4f18ea934f30f715e961caafe",
+              "tests/test_first_sss_vs_setup_endpoint.py": "7e98ee7e49bdc90a6c970e0dcd4e18bf45cc0eddd5729c6bb6aa4e4a9cccddc4"
+            },
+            "captured_runtime": {
+              "diagnostic_release": {
+                "gameplay_menu_browser.js": "62e3f0d46bfb4f852302afb304020b36c10d00f1db63f716b5b8748c6f985725",
+                "gameplay_menu_browser.wasm": "6dc5dc65b8ec7b6e074ce13678d854da2a93004835a0301777013eb373c82b82",
+                "gameplay_menu_browser.data": "1eb094d18d16f0894840e297d975f52bb97ead994e723fa13887b6ecda0a17a6"
+              },
+              "ordinary_release": {
+                "gameplay_menu_browser.js": "0befa55ea2fcd97f8e316a3f94d52e3acd2b5275884e528caa45e1bc175f64e9",
+                "gameplay_menu_browser.wasm": "68b696555a253ca1193bde89db50ed3e5f1c94d0a68d0fdfdfff19df83f7fa24",
+                "gameplay_menu_browser.data": "1eb094d18d16f0894840e297d975f52bb97ead994e723fa13887b6ecda0a17a6"
+              }
+            },
+            "cleanup": {
+              "owner_cleanup_passed": true,
+              "native_unloaded": true,
+              "browser_close_returned": true,
+              "capture_process_group_absent": true,
+              "server_process_group_absent": true,
+              "browser_processes_absent": true,
+              "loopback_port": 61978,
+              "loopback_port_absent": true,
+              "postflight_receipt_sha256": "def4661e50dc820f62934abc7ffe4748c9e9a6ba5bedd9d072b61f9f3d25e3ea",
+              "launcher_aggregate_postflight_passed": false
+            }
+          }
+        ],
+        "retained_object_offline_reanalysis": {
+          "evidence_path_base": "stadium-setup-comparator-finalization-repair-v1-20261018",
+          "source_repair_freeze_path": "freeze-v1.json",
+          "source_repair_freeze_sha256": "e4062f6ace2c0a8f535e9310a2e1c745f831cfd315de6e28e3dfe4a6648f367c",
+          "source_review_sha256": "e5f20d125e6aae28ad717fb9606d5d144d72928f179cf4477694846bd952e3f1",
+          "offline_replayer": {
+            "path": "retained-object-reproducer.mjs",
+            "post_repair_result_path": "post-repair-retained-replay-v3.json",
+            "post_repair_result_sha256": "9fb37843d06cd420b5ad4db93ced9540c54282f40353e977e87656af619c2513",
+            "baseline_result_path": "baseline-pre-repair.json",
+            "baseline_result_sha256": "22d18d18919f723d578a009d0699bdebbbe03e0f7a965b9b303ca2002f38c90d",
+            "actual_raw_capture_objects_mutated": false,
+            "raw_report_sha256": "10d6295510c1dc5ae958d9c22449e3409af3edbd40970f0c4f8bd7fa39aa9188",
+            "expected_sha256": "69f4fc6434f85f0db1e5eb449fb026e1d91a7c5db7b40d5949424c6a67e63f8f",
+            "setup_observation_sha256": "133df8479990768337f8085b9fda6fd5875da8b8c40745e440fdddb9be9f75cf",
+            "unloaded_observation_sha256": "2af3f6d9ded738fed78e3be7183dd154404afb7e349775cbd998e1159a434eb5",
+            "outcomes": {
+              "setup_declared_common_fields_and_seed": "PASS_BOUNDED_COMPONENT; setup seed 083a62a9",
+              "strict_original_sss_pre_assets_stop_component": "PASS_OFFLINE",
+              "separate_setup_aggregate_gate": "FAIL_CAPTURE_REMAINS_FAILED_AND_SETUP_COMPARISON_WAS_NULL_IN_RAW_REPORT"
+            },
+            "constructor_rng_profile_vs_original": "UNKNOWN"
+          },
+          "source_repair": {
+            "scripts/stadium_stock4_sss_exit_observation.mjs": "cc04712d4d94c35059692bed6900a7b9dd4062a9180d9687e4a7c542aec59e93",
+            "tests/stadium_stock4_sss_exit_observation.test.mjs": "5c660c3123a680c33e27210e8109a6a9921cc3b5f050a513d46ebb1523b35971",
+            "behavior": [
+              "Accept safe integer source heap indices >= 0, require the ground/object indices equal, and retain positive allocation-byte and generation requirements plus all existing map, world, constructor, roots, phase, seed, route and lease guards.",
+              "Choose consumed Setup finalization from the actual consumed route and accepted one-use begin state; validate the saved original SSS pre-assets snapshot separately from post-Setup unload state.",
+              "Keep the Setup aggregate gate dependent on a passing Setup comparison; failed/missing capture comparison remains aggregate failure."
+            ],
+            "focused_validation": {
+              "command": "python3 scripts/agent_workspace.py run -- node --test tests/stadium_stock4_sss_exit_observation.test.mjs",
+              "result": "PASS 14/14",
+              "log_sha256": "b234cecdfca53f4c07cc99fdf7ee782edf39cfeb814292a7833ccf081a0c7b87"
+            },
+            "negative_mutations_refused": [
+              "negative/fractional/non-integer or unequal heap indices",
+              "zero allocation bytes or generations",
+              "changed world/root, wrong Setup phase/seed",
+              "missing or failed Setup comparison",
+              "successful begin without consumed route",
+              "wrong post-Setup wait/unload state or missing native unload"
+            ]
+          },
+          "runtime_capture_after_offline_repair": false,
+          "build_after_offline_repair": false,
+          "full_suite_after_offline_repair": false
+        },
+        "original_producer_and_inputs": {
+          "native_original_producer": "9494fc69526db469dd969ab0832eae24200260e0",
+          "capture_harness": "db52ff305c11eb40713f92f5afa588e03878bbb5",
+          "native_primary_sha256": "982e6c2022efe270be1e973b68e663392423c858b8bc6b8ff3ddbdb49e8c4fc9",
+          "recipe_sha256": "41ac043ca7d869a08f86cf81fc7d4ce6f05aba4394243f4aabf6f57aa1c94e36",
+          "expected_sha256": "69f4fc6434f85f0db1e5eb449fb026e1d91a7c5db7b40d5949424c6a67e63f8f",
+          "legacy_sss_expected_sha256": "2e2653d717a6e1335240695dde4439f31b1eadd76d7492ad8d499fb2a8fb3ca5",
+          "legacy_sss_manifest_sha256": "ee60ad754d33b23bf455ffd31c641f46d3e37eba387f23d81940d7ea57201029",
+          "input_contract": {
+            "literal_recipe_frames": 2006,
+            "sss_prefix_inputs": 270,
+            "sss_local_order_rows": 543,
+            "original_entry_sequence": 1640,
+            "original_entry_rng_seed_hex": "e2624ac3",
+            "original_setup_sequence": 1674,
+            "original_setup_rng_seed_hex": "083a62a9",
+            "original_entry_raw_bytes": 312,
+            "original_entry_raw_bytes_compared": false
+          }
+        },
+        "next_c3_prerequisites": [
+          "Preserve and compare the full authored original Entry-to-Setup service and state ordering through the corresponding checked browser owners.",
+          "Observe and compare the actually consumed input state at the real owner boundaries; preserve literal source input/order and PAD without synthesis.",
+          "Observe the authored GO event at its real callback/owner, rather than inferring GO from Setup construction or a seed.",
+          "Trace per-owner RNG state/endpoints with source-bound pointers/values across Entry, Setup and following owners; do not infer writer coverage from endpoint equality.",
+          "Retain all existing owner, asset, audio, loader/wait, phase and unload guards; no seed injection, fabricated Entry stamp or source callback masquerading."
+        ],
+        "validation_status": {
+          "current_main_integration": "PR332 merged as 706fa1bb; integration into Stadium checkout and current-main full regression pending",
+          "full_regression_on_final_offline_repair_candidate": "PENDING",
+          "publication_or_merge_acceptance": false,
+          "PR301": "draft"
+        },
+        "evidence_path_base": "stadium-prepared-setup-build-v1-20261018-083639Z; stadium-prepared-setup-seed-phase-fix-v1-20261018; stadium-setup-comparator-finalization-repair-v1-20261018",
+        "publication_drafts": {
+          "state": "PREPARED_EXTERNALLY_NOT_PUBLISHED",
+          "pr301_update": {
+            "path": "stadium-setup-comparator-finalization-repair-v1-20261018/publication-drafts-v1/pr301-update.md",
+            "sha256": "fc9b9b98ef1ab2347fe7c19cce94a862c8b150640fe01fdf0da02aedd175f0e4"
+          },
+          "issue_251_update": {
+            "path": "stadium-setup-comparator-finalization-repair-v1-20261018/publication-drafts-v1/issue-251-update.md",
+            "sha256": "9ddc08f71a579886ce5d8a688812c5528ddc0c936ad07778f9668adf7651a3db"
+          }
+        }
       }
     }
   }

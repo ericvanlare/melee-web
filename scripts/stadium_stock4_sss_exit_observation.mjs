@@ -152,12 +152,95 @@ export function compareStock4PreparedStartObservation(actual, expected) {
     raw_start_melee_bytes: 'not_compared',
     runtime_admission: false, Entry: false, C3: false};
 }
+export function compareStock4PreparedSetupObservation(actual, expected) {
+  validateStock4SssExitExpected(expected);
+  const route = actual?.prepared_to_setup, setup = route?.setup;
+  const terminal = actual?.terminal;
+  requireValue(terminal?.complete === true && terminal.native_unloaded === false &&
+    terminal.asset_requests_after_leave_boundary === 1 && terminal.asset_requests_at_terminal === 0 &&
+    terminal.waiting_for_audio_retained_until_unload === false &&
+    terminal.waiting_for_audio_at_terminal === true && terminal.waiting_for_audio_current === false,
+  'Prepared Setup observation does not distinguish its historical SSS handoff from current state');
+  requireValue(route?.attempted === true && route.approved === true && route.consumed === true &&
+    route.failed === false && route.error === null &&
+    route.asset_requests_at_handoff === 0 && route.asset_requests_current_after_handoff === 1 &&
+    route.waiting_for_audio_at_handoff === true && route.waiting_for_audio_current === false &&
+    route.waiting_for_audio_retired === true &&
+    setup?.handoff_origin === 'current_sss_prepared_stock4_270' && setup.attempted === true &&
+    setup.requested === true && setup.import_committed === true && setup.menu_retired === true &&
+    setup.parent_seed_owner_value_restored === true && setup.complete === true &&
+    setup.captured === true && setup.failed === false && setup.construction_complete === true &&
+    setup.source_frames === 0 && setup.host_tick_calls === 0 && setup.host_draw_calls === 0 &&
+    Number.isSafeInteger(setup.requested_generation) && setup.requested_generation > 0 &&
+    setup.committed_generation === setup.requested_generation &&
+    Number.isSafeInteger(setup.prior_world_generation) && setup.prior_world_generation > 0 &&
+    Number.isSafeInteger(setup.match_world_generation) && setup.match_world_generation > 0 &&
+    setup.match_world_generation !== setup.prior_world_generation,
+  'Prepared-to-Setup route did not complete the approved one-use handoff');
+  const owners = setup.current_owners;
+  requireValue(owners?.host === true && owners.host_entered === false && owners.match === true &&
+    owners.cache === true && owners.source_world_exists === true && owners.running === false &&
+    owners.pending === false && owners.first_use_draw_pending === false &&
+    owners.pending_scope_generation === 0 && owners.asset_generation === setup.committed_generation &&
+    Number.isSafeInteger(owners.active_files) && owners.active_files > 0,
+  'Prepared-to-Setup snapshot lost its deferred host/assets/world owners');
+  const boundary = setup.actual, snapshot = setup.stadium_setup_state;
+  requireValue(boundary && typeof boundary === 'object' && !Array.isArray(boundary) &&
+    snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot),
+  'Prepared-to-Setup actual Start and Stadium snapshot must be producer-shaped JSON objects');
+  const expectedSetup = expected.prepared_profile.setup;
+  requireValue(boundary?.phase === 'vs_setup' && boundary.random_seed_hex === expectedSetup.rng.value_hex,
+    'Completed Stadium Setup seed/phase differs from the retained Setup endpoint');
+  const projection = compareStock4PreparedStartProjection(boundary.start,
+    expectedSetup.declared_setup, expected.prepared_profile.entry.start_melee_hex);
+  requireValue(snapshot?.schema === 'melee-web-stadium-zero-tick-setup-state-v1' &&
+    snapshot.world_generation === setup.match_world_generation && snapshot.world_ticks === 0 &&
+    snapshot.source_frame === 0 && snapshot.map_id === 2 &&
+    snapshot.constructor_callback_count === 1 && snapshot.source_parameter_roots_agree === true &&
+    Number.isSafeInteger(snapshot.ground_source_heap_handle) && snapshot.ground_source_heap_handle >= 0 &&
+    Number.isSafeInteger(snapshot.ground_requested_bytes) && snapshot.ground_requested_bytes > 0 &&
+    Number.isSafeInteger(snapshot.ground_allocation_generation) && snapshot.ground_allocation_generation > 0 &&
+    Number.isSafeInteger(snapshot.object_source_heap_handle) && snapshot.object_source_heap_handle >= 0 &&
+    snapshot.ground_source_heap_handle === snapshot.object_source_heap_handle &&
+    Number.isSafeInteger(snapshot.object_requested_bytes) && snapshot.object_requested_bytes > 0 &&
+    Number.isSafeInteger(snapshot.object_allocation_generation) && snapshot.object_allocation_generation > 0,
+  'Completed Stadium Setup is not the live map-2 zero-tick owner with valid allocation leases');
+  return {pass: true, scope: 'PASS_BOUNDED_PREPARED_ENTRY_TO_SETUP_COMMON_FIELDS_AND_SEED_COMPONENT',
+    projection, setup_seed_hex: boundary.random_seed_hex,
+    constructor_randi_profile_match: 'UNKNOWN', original_callback_dispatch: 'NOT_CLAIMED',
+    raw_start_melee_bytes: 'not_compared', runtime_admission: false, Entry: false, C3: false};
+}
 export function validateStock4SssExitTrace(text, expected, actual) {
   validateStock4SssExitExpected(expected);
   return validateSssExitTraceFields(text, expected, actual);
 }
-export function validateStock4SssExitTerminal(report, snapshot, expected, actual) {
-  validateStock4SssExitStop(actual, expected, true);
+function validateStock4PreparedSetupUnload(handoff, unloaded) {
+  const terminal = unloaded?.terminal, route = unloaded?.prepared_to_setup;
+  requireValue(terminal?.native_unloaded === true &&
+    terminal.asset_requests_after_leave_boundary === 1 &&
+    terminal.asset_requests_at_terminal === 0 &&
+    terminal.waiting_for_audio_retained_until_unload === false &&
+    terminal.waiting_for_audio_at_terminal === true &&
+    terminal.waiting_for_audio_current === false &&
+    route?.attempted === true && route.approved === true && route.consumed === true &&
+    route.failed === false && route.error === null && route.asset_requests_at_handoff === 0 &&
+    route.asset_requests_current_after_handoff === 1 &&
+    route.waiting_for_audio_at_handoff === true &&
+    route.waiting_for_audio_current === false && route.waiting_for_audio_retired === true,
+  'Prepared Setup unload lost the distinct handoff-time or current service state');
+  requireValue(handoff?.terminal?.native_unloaded === false &&
+    handoff.terminal.asset_requests_after_leave_boundary === 0 &&
+    handoff.terminal.asset_requests_at_terminal === 0 &&
+    handoff.terminal.waiting_for_audio_retained_until_unload === true &&
+    handoff.terminal.waiting_for_audio_at_terminal === true &&
+    handoff.terminal.waiting_for_audio_current === true,
+  'Prepared Setup handoff did not retain the original live SSS terminal state');
+}
+export function validateStock4SssExitTerminal(report, snapshot, expected, actual, preparedSetupUnload = null) {
+  if (preparedSetupUnload) {
+    validateStock4SssExitStop(actual, expected, false);
+    validateStock4PreparedSetupUnload(actual, preparedSetupUnload);
+  } else validateStock4SssExitStop(actual, expected, true);
   const failures = ['whole-session final CSS was not entered', STOCK4_SSS_STOP,
     'incomplete input timeline', 'source tick/draw count mismatch'];
   requireValue(report?.pass === false && report.complete === false &&
@@ -189,8 +272,25 @@ export function validateStock4SssExitFinalization(report, expected) {
     JSON.stringify(report.finalization_failures) === JSON.stringify([
       'Whole-session replay did not complete successfully', 'Browser replay report is incomplete or failed']),
   'Stock4 SSS capture contains additional failure or lacks its explicit stop');
-  validateStock4SssExitTerminal(report.browser_report, report.final_snapshot, expected,
-    report.current_sss_exit.unloaded_observation);
+  const exit = report.current_sss_exit;
+  const setupRoute = exit?.unloaded_observation?.prepared_to_setup;
+  const setupConsumed = setupRoute?.consumed === true;
+  if (setupConsumed) {
+    requireValue(exit.prepared_setup_begin?.result === 1 &&
+      exit.prepared_setup_begin.accepted_receipt_rechecked === true &&
+      setupRoute.attempted === true && setupRoute.approved === true &&
+      setupRoute.failed === false && setupRoute.error === null,
+    'Prepared Setup route consumption lacks its accepted one-use continuation');
+    validateStock4SssExitTerminal(report.browser_report, report.final_snapshot, expected,
+      exit.observation, exit.unloaded_observation);
+  } else {
+    requireValue(exit?.prepared_setup_comparison?.pass !== true &&
+      !(exit?.prepared_setup_begin?.result === 1 &&
+        exit.prepared_setup_begin.accepted_receipt_rechecked === true),
+    'Prepared Setup success is not backed by the consumed route at unload');
+    validateStock4SssExitTerminal(report.browser_report, report.final_snapshot, expected,
+      exit.unloaded_observation);
+  }
   return {pass: true, scope: 'explicit_stock4_SSS_stop_component_only',
     original_replay_capture_result: 'fail', runtime_admission: false, Entry: false, C3: false};
 }
@@ -202,5 +302,16 @@ export function validateStock4PreparedStartFinalization(report, expected) {
     !report.current_sss_exit.prepared_start_failure,
   'Prepared Start candidate is missing its separately enabled exact-boundary comparison');
   return {pass: true, scope: 'prepared_start_common_fields_and_announcer_service_drain_against_original_entry_profile',
+    Entry: false, C3: false, runtime_admission: false};
+}
+export function validateStock4PreparedSetupFinalization(report, expected) {
+  validateStock4SssExitExpected(expected);
+  requireValue(report?.current_sss_exit?.prepared_setup_comparison?.pass === true &&
+    report.current_sss_exit.prepared_setup_comparison.scope ===
+      'PASS_BOUNDED_PREPARED_ENTRY_TO_SETUP_COMMON_FIELDS_AND_SEED_COMPONENT' &&
+    !report.current_sss_exit.prepared_setup_failure,
+  'Prepared-to-Setup candidate is missing its separately checked completed zero-tick Setup comparison');
+  return {pass: true,
+    scope: 'PASS_BOUNDED_PREPARED_ENTRY_TO_SETUP_COMMON_FIELDS_AND_SEED_COMPONENT',
     Entry: false, C3: false, runtime_admission: false};
 }

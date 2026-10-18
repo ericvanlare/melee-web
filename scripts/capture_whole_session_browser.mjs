@@ -7,10 +7,12 @@
  * supplied. Native source phase/cursor snapshots are retained at bounded
  * changes, and every failure writes the report before the browser closes.
  */
-import {installCurrentSssExitReplayArm, validateCurrentSssExitExpected, compareCurrentSssExitObservation,
+import {installCurrentSssExitReplayArm, continuePreparedStartInPage,
+  validateCurrentSssExitExpected, compareCurrentSssExitObservation,
   validateCurrentSssExitTrace, validateCurrentSssExitTerminal, validateCurrentSssExitFinalization} from './stadium_current_sss_exit_observation.mjs';
 import {validateStock4SssExitExpected, compareStock4SssExitObservation, validateStock4SssExitTrace,
-  compareStock4PreparedStartObservation, validateStock4PreparedStartFinalization,
+  compareStock4PreparedStartObservation, compareStock4PreparedSetupObservation,
+  validateStock4PreparedStartFinalization, validateStock4PreparedSetupFinalization,
   validateStock4SssExitTerminal, validateStock4SssExitFinalization} from './stadium_stock4_sss_exit_observation.mjs';
 import fs from 'node:fs/promises';
 import {closeSync, createReadStream, fsyncSync, openSync, writeSync} from 'node:fs';
@@ -811,7 +813,8 @@ try {
         trace: validateStock4SssExitTrace, finalization: validateStock4SssExitFinalization};
       if (currentSssPreparedStart) {
         currentSssPolicy.preparedStart = compareStock4PreparedStartObservation;
-        report.scope = 'Retained stock4/None SSS stop plus separately enabled prepared Start common-field comparison; explicit stopped/incomplete replay, UNKNOWN menu draws, no Entry/C3';
+        currentSssPolicy.preparedSetup = compareStock4PreparedSetupObservation;
+        report.scope = 'Retained stock4/None SSS stop, same-run prepared Start comparison, and bounded completed zero-tick Setup common-field/seed comparison; explicit stopped/incomplete replay, UNKNOWN menu draws, no Entry/C3';
       } else report.scope = 'Retained stock4/None first SSS OnExit common-field component; explicit stopped/incomplete replay, UNKNOWN menu draws, no Entry/C3';
     }
     if (currentSssPreparedStart && !currentSssStock4)
@@ -1134,8 +1137,40 @@ try {
                 throw Error('Prepared Start observation was busy or absent at the stopped SSS boundary');
               report.current_sss_exit.prepared_start_comparison =
                 currentSssPolicy.preparedStart(prepared.value, currentSssExpected);
+              const continuation = await observePageOperation('prepared Start to Setup handoff', () =>
+                currentSssArm.evaluate(continuePreparedStartInPage, prepared.value));
+              report.current_sss_exit.prepared_setup_begin = continuation;
+              if (continuation.result !== 1 || !continuation.accepted_receipt_rechecked)
+                throw Error('Prepared Start to Setup continuation did not retain its approved receipt');
+              let setupFinished = false;
+              while (Date.now() < deadline) {
+                const observedSetup = await observePageOperation('completed prepared Setup receipt', () =>
+                  currentSssArm.evaluate(scope => scope.observe()));
+                if (observedSetup.busy) {
+                  await new Promise(resolve => setTimeout(resolve, replayPollMs));
+                  continue;
+                }
+                const setupRoute = observedSetup.value?.prepared_to_setup;
+                report.current_sss_exit.prepared_setup_observation = observedSetup.value ?? null;
+                if (setupRoute?.failed) {
+                  await write('current-sss-prepared-to-setup-observation.json', observedSetup.value);
+                  throw Error(setupRoute.error || 'Prepared Start to Setup native continuation failed');
+                }
+                if (setupRoute?.setup?.complete === true && setupRoute.setup.captured === true) {
+                  await write('current-sss-prepared-to-setup-observation.json', observedSetup.value);
+                  report.current_sss_exit.prepared_setup_comparison =
+                    currentSssPolicy.preparedSetup(observedSetup.value, currentSssExpected);
+                  setupFinished = true;
+                  break;
+                }
+                await new Promise(resolve => setTimeout(resolve, replayPollMs));
+              }
+              if (!setupFinished)
+                throw Error('Prepared Start to completed Setup exceeded the unchanged bounded replay interval');
             } catch (error) {
-              report.current_sss_exit.prepared_start_failure = String(error.message || error);
+              report.current_sss_exit.prepared_setup_failure = String(error.message || error);
+              if (!report.current_sss_exit.prepared_start_comparison?.pass)
+                report.current_sss_exit.prepared_start_failure = report.current_sss_exit.prepared_setup_failure;
             }
           }
           // Invoke the existing UI stop once. Its retained reason and normal
@@ -1157,8 +1192,11 @@ try {
             await write('current-sss-exit-unloaded-observation.json', unloaded);
             if (unloaded.busy || !unloaded.value) throw Error('Current SSS unload is still busy');
           }
-          report.current_sss_exit.terminal = currentSssPolicy.terminal(last.replay_report, last,
-            currentSssExpected, report.current_sss_exit.unloaded_observation);
+          report.current_sss_exit.terminal = currentSssPreparedStart ?
+            currentSssPolicy.terminal(last.replay_report, last, currentSssExpected,
+              report.current_sss_exit.observation, report.current_sss_exit.unloaded_observation) :
+            currentSssPolicy.terminal(last.replay_report, last,
+              currentSssExpected, report.current_sss_exit.unloaded_observation);
           report.current_sss_exit.runtime_replay = currentSssStock4 ?
             'FAIL_INCOMPLETE_EXPLICIT_SSS_STOP' : 'FAIL_INCOMPLETE_EXPECTED_TIME_REFUSAL';
           return;
@@ -1774,8 +1812,12 @@ try {
         if (currentSssPreparedStart)
           report.current_sss_exit.prepared_start_finalization =
             validateStock4PreparedStartFinalization(report, currentSssExpected);
+        if (currentSssPreparedStart)
+          report.current_sss_exit.prepared_setup_finalization =
+            validateStock4PreparedSetupFinalization(report, currentSssExpected);
         if (!report.current_sss_exit?.comparison?.pass || !report.current_sss_exit?.terminal?.pass ||
             (currentSssPreparedStart && !report.current_sss_exit?.prepared_start_finalization?.pass) ||
+            (currentSssPreparedStart && !report.current_sss_exit?.prepared_setup_finalization?.pass) ||
             !currentSssTrace || report.browser_errors.length || report.unexpected_requests.length ||
             report.close_error || report.cdp_close_error || report.download_error || report.screenshot_error ||
             report.current_sss_exit.wrapper_restored !== true || report.cleanup?.browser_close_returned !== true)
@@ -1784,7 +1826,7 @@ try {
           currentSssExpected, report.current_sss_exit.observation);
         report.current_sss_exit.component_pass = true;
         report.result = currentSssStock4 ? (currentSssPreparedStart ?
-          'prepared_start_candidate_pass_replay_stopped' : 'component_pass_replay_stopped') :
+          'prepared_entry_setup_candidate_pass_replay_stopped' : 'component_pass_replay_stopped') :
           'component_pass_replay_refused';
       } catch (error) {
         report.current_sss_exit ||= {};
@@ -1804,10 +1846,10 @@ if (diagnostic) {
   else console.log(`captured: ${report.natural_pause_terminal?.outcome || 'unknown'}; diagnosis only`);
 } else if (currentSssExit) {
   const expectedResult = currentSssStock4 ? (currentSssPreparedStart ?
-    'prepared_start_candidate_pass_replay_stopped' : 'component_pass_replay_stopped') : 'component_pass_replay_refused';
+    'prepared_entry_setup_candidate_pass_replay_stopped' : 'component_pass_replay_stopped') : 'component_pass_replay_refused';
   if (report.result !== expectedResult) process.exitCode = 1;
   else console.log(currentSssStock4 ? (currentSssPreparedStart ?
-    'candidate pass: stopped stock4 SSS boundary and prepared Start common fields; replay explicitly stopped/incomplete; no Entry/C3' :
+    'candidate pass: prepared Start to completed zero-tick Setup common fields and seed; replay explicitly stopped/incomplete; no original Entry dispatch/C3 claim' :
     'component pass: retained stock4 SSS OnExit fields; replay explicitly stopped/incomplete; no Entry/C3') :
     'component pass: retained SSS OnExit fields; original TIME replay refused/incomplete; no Entry/C3');
 } else if (report.result !== 'pass') process.exitCode = 1;

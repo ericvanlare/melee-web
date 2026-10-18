@@ -6,6 +6,10 @@ const own = (v, keys) => v && typeof v === 'object' && !Array.isArray(v) &&
 const hex = (v, bytes) => typeof v === 'string' && new RegExp(`^[0-9a-f]{${bytes * 2}}$`).test(v);
 const requireValue = (v, message) => { if (!v) throw Error(message); };
 
+export function continuePreparedStartInPage(scope, acceptedReceipt) {
+  return scope.continuePreparedStart(acceptedReceipt);
+}
+
 // Passed as the actual page function; deliberately has no module-scope closure.
 // Controls use a synthetic Module solely for call ordering/ownership semantics.
 export function installCurrentSssExitReplayArm({recipeBytes, observationProfile = 0, preparedStartProbe = false}) {
@@ -18,6 +22,8 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
   const observe = module?._melee_web_native_menu_stadium_current_sss_exit_observe;
   const preparedStartObserve = observationProfile === 1 && preparedStartProbe
     ? module?._melee_web_native_menu_stadium_current_sss_prepared_start_observe : null;
+  const preparedSetupBegin = observationProfile === 1 && preparedStartProbe
+    ? module?._melee_web_native_menu_stadium_current_sss_prepared_setup_begin : null;
   const idle = module?.stadiumMatchedSetupNativeIdle;
   if (!original || !Object.hasOwn(original, 'value') ||
       typeof original.value !== 'function' || !original.writable ||
@@ -40,8 +46,17 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
       module._melee_web_native_menu_stadium_current_sss_exit_observe === observe &&
       (!preparedStartProbe ||
         module._melee_web_native_menu_stadium_current_sss_prepared_start_observe === preparedStartObserve) &&
+      (!preparedStartProbe ||
+        module._melee_web_native_menu_stadium_current_sss_prepared_setup_begin === preparedSetupBegin) &&
       module.stadiumMatchedSetupNativeIdle === idle;
   };
+  const stableJson = value => {
+    if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+    if (value && typeof value === 'object') return `{${Object.keys(value).sort().map(key =>
+      `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`;
+    return JSON.stringify(value);
+  };
+  let preparedSetupAttempted = false;
   function wrapped(...args) {
     if (state.disposed || state.calls || !owns())
       throw Error('Current SSS replay callback ownership/reuse refused');
@@ -85,6 +100,36 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
       const pointer = Reflect.apply(preparedStartObserve, module, []);
       if (!pointer) throw Error('Prepared Start native observation pointer is absent');
       return {busy: false, value: JSON.parse(module.UTF8ToString(pointer))};
+    },
+    continuePreparedStart(acceptedReceipt) {
+      if (!preparedStartProbe || !preparedStartObserve || typeof preparedSetupBegin !== 'function' ||
+          preparedSetupAttempted || state.disposed || !state.armed || !owns() || idle() !== true)
+        throw Error('Prepared Setup continuation lacks its same-run one-use owner');
+      preparedSetupAttempted = true;
+      const pointer = Reflect.apply(preparedStartObserve, module, []);
+      if (!pointer || stableJson(JSON.parse(module.UTF8ToString(pointer))) !== stableJson(acceptedReceipt))
+        throw Error('Prepared Setup continuation receipt differs from the accepted comparison input');
+      const approvalName = '__meleeWebStadiumCurrentSssPreparedStartApproved';
+      if (Object.hasOwn(globalThis, approvalName))
+        throw Error('Prepared Setup approval callback already exists');
+      const acceptedJson = stableJson(acceptedReceipt);
+      let approvalCalls = 0;
+      const approved = () => {
+        if (++approvalCalls !== 1 || state.disposed || !owns() || globalThis.Module !== module ||
+            idle() !== true) return false;
+        const current = Reflect.apply(preparedStartObserve, module, []);
+        return !!current && stableJson(JSON.parse(module.UTF8ToString(current))) === acceptedJson;
+      };
+      Object.defineProperty(globalThis, approvalName, {value: approved, configurable: true});
+      try {
+        if (!owns() || globalThis[approvalName] !== approved)
+          throw Error('Prepared Setup approval lost its current SSS Module owner');
+        const result = Reflect.apply(preparedSetupBegin, module, []);
+        if (result !== 1) throw Error('Native prepared Setup handoff refused');
+        return {result, accepted_receipt_rechecked: true};
+      } finally {
+        if (globalThis[approvalName] === approved) delete globalThis[approvalName];
+      }
     },
     dispose() {
       if (state.disposed || !owns()) throw Error('Current SSS callback disposal refuses foreign replacement');
