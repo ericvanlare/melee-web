@@ -271,10 +271,66 @@ profile test identities as belonging to another shard. The strict audit remains
 unchanged. Empty forwarding classes in the behavior-free discovery shim retain
 all ten original profile test methods exactly once; an eleventh GPL control
 checks actual discovery, shard assignment and aggregate acceptance/rejection.
-Independent review and focused controls pass. Final full regression and complete
-new-head CI remain pending at this source checkpoint. Runtime/harness files and
-the retained capture identities are unchanged. Integration remains pending. The structured receipt keeps
-this result under `mainline_extraction`, separately from the historical capture.
+Independent review and focused controls pass. The final regression passed 2,413
+tests with 166 skips and no failures. All 14 exact-head CI checks on `bf996e69`
+completed with 12 successes and two expected skips, including the strict
+aggregate. PR #328 merged as `0aea806b`; its tree exactly matches the reviewed
+head. Runtime/harness files and retained capture identities are unchanged.
+The structured receipt keeps this result under `mainline_extraction`, separately
+from the historical capture. The v1 runtime bytes were explicitly retained
+before starting the next profile revision.
+
+## Render-dependency coverage follow-on
+
+The next revision keeps the initial browser comparison separate from path-specific
+native controls. The actual offscreen timer block now has a reviewed reduced
+fixture for its outer gate, threshold, damage request and reset. It composes the
+ordinary source patch and isolated profile overlay, preserving authored types and
+source guards. The fixture uses explicit synthetic bounds, timer values and damage
+services. Its KO exclusions are checked against the independent authored action
+enum; deliberately changing the Star-KO exclusion causes the expected failure.
+This covers the extracted block, not full damage semantics or browser combat.
+
+A separate original-source DeadUpFall reduction demonstrates why another profile
+fix is needed. With a synthetic translated camera view, the original draw helper
+writes a different fighter position; the actual next-tick position consumer and
+terminal callback consequently differ from the omitted-draw path. Identity-view
+and draw-guard controls pass. This is a causal native source counterexample,
+not a full KO or original Slippi runtime comparison.
+
+The three own-C hooks now pass independently reviewed native controls under the
+distinct `slippi-render-dependencies-v2` identity. They initialize private fall
+velocity, preserve its ordered update and transform only a temporary model
+position during draw. Skipped, repeated and changed-view draws agree on the
+fixture's declared simulation bytes. Removing each hook separately fails its
+specific invariant. The focused cohort passes 13 Python and nine nested Node
+controls. Both the opt-in profile and ordinary Release builds pass. The full
+regression passes 2,415 tests with 166 skips; exact-head CI and integration remain
+pending. Source and runtime identities are preserved in the validation freeze.
+The first PR #330 CI run exposed a Linux-only compilation failure in two native
+test fixtures: the upstream `__fabs` macro was active before glibc declared its
+math functions. Moving `<math.h>` before upstream headers fixes the include
+boundary without changing arithmetic, controls or warning flags. Both affected
+controls pass locally; the repaired head still requires complete CI. The failed
+job log and its test report are retained.
+
+Review also caught an incorrect extra X-velocity update despite an earlier green
+fixture. Retained retail instructions show that the reference hook replaces the
+entire original velocity accumulation. The corrected implementation preserves
+existing temporary X and uses the authored Z operand order. Nonzero X sentinels,
+signed-zero bits, clamp and float store/reload controls now cover those boundaries.
+The earlier candidate and its self-consistent but incorrect expectations remain
+retained; their pass is not used as reference-behavior validation.
+
+The structured receipt's `render_dependency_coverage_v2` retains the source pins,
+raw results, independent reviews and fixture failures. The first offscreen mutant
+attempt failed to compile because an adjacent header was missing; only the later
+executed mutant supplies the falsification result. Generator failures and the
+reduced vector-expectation failure are also retained. The native fixture uses
+synthetic Fighter/JObj projections and service adapters; it does not establish
+live KO reachability or complete state-machine behavior. Complete render-dependency
+and host-state closure, live rollback, original Slippi reference and acceptance
+remain open. The v1 browser witness above is not relabeled as v2 validation.
 
 ## Slippi profile source checkpoint
 
