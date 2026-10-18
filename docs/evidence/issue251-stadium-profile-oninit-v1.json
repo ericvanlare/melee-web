@@ -16870,7 +16870,7 @@
           "current_main_validation_v2": {
             "source_commit": "4eabfc9b3bc011fe3e6360fe89a8e893866298f6",
             "integrated_main": "130438fd2b86d00cfec98cd2ba0a5f66084ae15c",
-            "state": "local_validation_and_independent_docs_review_passed_exact_head_ci_pending",
+            "state": "passed_independent_review_and_all_14_exact_head_checks",
             "source_freeze_sha256": "17b8096caeb1a233a4aaed40754ae2c664b6749dd70eb10465610390ee6c5be4",
             "tracked_non_docs_source_pins": 1769,
             "result_sha256": "ed25c58c10a68143784fb11563fb4227c77dd7b6edeeecf94fd97782da875e5f",
@@ -16915,7 +16915,80 @@
             "retained_runtime_manifest_sha256": "f826e63cb1514ded9f093fe8b3461f452ec026011c397cdf46c68b69540149f2",
             "retained_runtime_products": 62,
             "scope": "Focused profile composition, private profile plus diagnostic/ordinary Release builds and regression only. No new gameplay capture. Older capture/harness/native producers remain distinct; C3 stays open and PR301 stays draft.",
-            "independent_final_review_sha256": "6698a79c88b68ba33e408f911665ac119dc8f1bf8dfc8b66ee2cf95fdac6bee4"
+            "independent_final_review_sha256": "6698a79c88b68ba33e408f911665ac119dc8f1bf8dfc8b66ee2cf95fdac6bee4",
+            "published_checkpoint": {
+              "head": "4335d2bfefade2e2ec35722f807135334213a15a",
+              "ci_run": 39130080009,
+              "completed": 14,
+              "success": 12,
+              "expected_skips": 2
+            }
+          },
+          "actual_hsd_queue_observer_v1": {
+            "state": "COMPONENT_VALIDATED_BROWSER_COMPARISON_UNRUN",
+            "source_commit": "f4c44f8e83e95d017536c5a9f6e386caeabac025",
+            "validated_head": "4bd306ce9276a7ef2637f639d1ce156cb9687c4f",
+            "candidate_sha256": "5f227c500ed067f9be8cfd8c65057f4b96a354a034ee33c83b55f2da0884d002",
+            "root_review_sha256": "9cde80b5e6838ba64449b28c64a8b2d2a85785f2c19549c7b5529b37f74d7675",
+            "scope": "Diagnostic-only copy of the actual four HSD queue slots immediately before Master renewal; publication requires successful enclosing tick and same current owner. Source arithmetic, input, queue/callback order unchanged. Strict packet compares actual rows against same-v6 bundle0 with admitted Setup generation.",
+            "focused_controls": {
+              "production_c_tests": 1,
+              "js_tests": 27,
+              "semantic_byte_mutations": 44,
+              "candidate_file": "candidate-freeze-v4.json"
+            },
+            "failed_validation": {
+              "source": "f4c44f8e83e95d017536c5a9f6e386caeabac025",
+              "tests": 2712,
+              "skips": 189,
+              "failures": 2,
+              "result_sha256": "cb95af9164552b488f3e0f3141e63018eefae995b12b2748a01fef1d7ebf6209",
+              "log_sha256": "51d7db63aff4ea0be44883040d2aed5644007517d4b31c639b00c1e696cdd885",
+              "finding": "Test fake used full-path native substring, incorrectly classifying browser in this external run directory; second fixture expected stale consumed-PAD wording. Both retained; no runtime failure inferred."
+            },
+            "test_only_repair": {
+              "freeze_sha256": "4fe50cadb98eba08e5c3abe87db1ce5a3841b452aa68824ac857dc401d2c1442",
+              "patch_sha256": "65d5f9268a07a34ea163a2443ea691fa0ead2e5a195e54505efb7d50bea2741d",
+              "production_source_unchanged": true,
+              "independent_review_and_focused_results_sha256": "49b61040a3fb1bb8651e1a4634a4743222885cc288d96fc05db64f28543ddcd0"
+            },
+            "validation": {
+              "result_sha256": "a7c4a8d8b2c9a700039e83457021e32ad2e6fb628a37dac5fe327975704a2c6a",
+              "source_freeze_sha256": "4b40b589470b3c76dcdf83be3625351fc158b1ecb294b57cb98a6c0f2451ff7a",
+              "retained_runtime_sha256": "74a64ed8cdf1941b81f2b7bbca33e0271153294e6d4317f350bc7dad3831fd2f",
+              "products": 50,
+              "full_regression": {
+                "tests": 2712,
+                "seconds": 564.665,
+                "skips": 189,
+                "log_sha256": "cd57c13e5c1a668823a8c52accd0df670220293b62087639d02078669a1d0501"
+              },
+              "scope": "Diagnostic/ordinary Release builds at observer source; test-only repair then full regression. No new private-profile build or browser capture."
+            },
+            "limits": [
+              "Existing failed prepared-Setup aggregate gates remain failed.",
+              "No browser input-consumption/Entry/Setup/GO/RNG equivalence or C3 admission.",
+              "All original capture/runtime/harness producer identities remain distinct."
+            ]
+          },
+          "same_v6_entry_setup_raw_slice_and_packet_v1": {
+            "state": "PASS_OFFLINE_SAME_PRODUCER_COMPONENT_ONLY",
+            "freeze_sha256": "81676252196853ff35789ac25242a84874871ae00c9d2e6879b246f6649c3e1f",
+            "root_review_sha256": "bfe291392d6e2a47dd4afedcf8188a4cfd0f62c6e413e6f134c4cd2de4bdb473",
+            "result_sha256": "8a9f8418f92acd8924d6a75036943b0df4b1cee403ac92b818bb0f0f6cdf3583",
+            "postpins_sha256": "49b61040a3fb1bb8651e1a4634a4743222885cc288d96fc05db64f28543ddcd0",
+            "candidate_packet_sha256": "371c56291d5fb175562eb3781d514af3d56ed28198b89a2753b97f7a8adcc528",
+            "parser_log_sha256": "1b37b0ddd0d8330da941bbc48d6e5626db05b1fc49ae43ce2d6194605af8912b",
+            "entry_sequence": 2468,
+            "setup_sequence": 2503,
+            "each_raw_tag4_bytes": 312,
+            "equal_raw_sha256": "918a23d68a3b5024f94baf1f5e26e6c0db56c5fbbbffdc79c5e620e82af3b728",
+            "entry_seed_hex": "3bb84c53",
+            "setup_seed_hex": "35a455b9",
+            "bundles": 86,
+            "actions": 171,
+            "source_queue_sequence": 2504,
+            "scope": "Equality of two raw original tag4 slices and existing parser compatibility only. Full original/browser opaque byte comparison, side effects, Entry/Setup ordering, RNG ownership, browser queue consumption and C3 remain unproved. No historical flags or runtime payload changed."
           }
         }
       }
