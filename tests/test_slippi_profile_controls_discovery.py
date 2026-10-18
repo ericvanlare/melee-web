@@ -8,6 +8,7 @@ from src.slippi_profile.tests import test_offscreen_timer_block as _offscreen_ti
 from src.slippi_profile.tests import test_profile_controls as _profile_controls
 from src.slippi_profile.tests import test_runner_contract as _runner_contract
 from src.slippi_profile.tests import test_source_composition as _source_composition
+from src.slippi_profile.tests import test_stage_render_reductions as _stage_render_reductions
 
 
 class SlippiBuildContractTests(_build_contract.SlippiSynctestBuildContractTests):
@@ -35,4 +36,8 @@ class SlippiRunnerContractTests(_runner_contract.SlippiSynctestRunnerContractTes
 
 
 class SlippiSourceCompositionTests(_source_composition.SlippiSourceCompositionTests):
+    pass
+
+
+class SlippiStageRenderReductionTests(_stage_render_reductions.StageRenderReductionTests):
     pass

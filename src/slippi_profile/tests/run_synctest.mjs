@@ -441,7 +441,7 @@ async function main() {
   const report = {
     schema: 'melee-web-slippi-drawn-reference-no-draw-synctest-v1',
     result: 'incomplete',
-    profile: 'slippi-render-dependencies-v2',
+    profile: 'slippi-render-dependencies-v3',
     statement: 'Unofficial Slippi-compatible dependency diagnostic; not a complete Slippi or rollback profile.',
     scenario: 'two human Mario players / Final Destination / four stocks; deterministic fixture inputs',
     interval: {checkpointInputSample: PREFIX_SAMPLES, inputSamples: [...INTERVAL_SAMPLES],
@@ -608,7 +608,7 @@ async function main() {
         throw new Error(`Initial ${field} identity differs: Node=${nodeInit[field]} browser=${browserInitRecord[field]}`);
       }
     }
-    if (nodeInit.profile !== 'slippi-render-dependencies-v2') {
+    if (nodeInit.profile !== 'slippi-render-dependencies-v3') {
       throw new Error(`Unexpected profile identity: ${nodeInit.profile}`);
     }
     const expectedProbeHash = report.sourceSha256['tests/gameplay_snapshot_probe.cpp'];
