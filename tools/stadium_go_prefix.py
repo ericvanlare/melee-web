@@ -2098,16 +2098,24 @@ def _validate_progress_constructor(row: dict[str, Any]) -> dict[str, Any]:
     return p
 
 
-def validate_stadium_go_prefix(stream_path: str | Path,
-                               expected_setup_receipt_sha256: str = EXPECTED_SETUP_RECEIPT_SHA256,
-                               status_path: str | Path | None = None, *,
-                               constructor_observations: bool = False,
-                               original_idle_3500: bool = False) -> dict[str, Any]:
-    """Admit one natural C→F→DrawReturn raw prefix and retain source identities."""
+def _validate_stadium_go_prefix_scope(stream_path: str | Path,
+                                      expected_setup_receipt_sha256: str = EXPECTED_SETUP_RECEIPT_SHA256,
+                                      status_path: str | Path | None = None, *,
+                                      constructor_observations: bool = False,
+                                      original_idle_3500: bool = False,
+                                      post_go_target_ordinal: int | None = None) -> dict[str, Any]:
+    """Shared parser for separately named, explicitly scoped Stadium terminals."""
 
     _require(type(original_idle_3500) is bool and
              (not original_idle_3500 or constructor_observations is True),
              "idle3500 requires explicit constructor observations")
+    _require((post_go_target_ordinal is None or
+              (type(post_go_target_ordinal) is int and post_go_target_ordinal == 2)) and
+             (post_go_target_ordinal is None or
+              (constructor_observations is True and not original_idle_3500)),
+             "GO+2 requires explicit constructor observations and is exclusive of idle3500")
+    natural_batch_tail_limit = (MAX_SOURCE_TICK_BATCH if post_go_target_ordinal is not None
+                                else MAX_TAIL_AFTER_F)
     _require(type(constructor_observations) is bool, "constructor option must be boolean")
     _require(isinstance(expected_setup_receipt_sha256, str) and
              re.fullmatch(r"[0-9a-f]{64}", expected_setup_receipt_sha256) is not None and
@@ -2135,6 +2143,7 @@ def validate_stadium_go_prefix(stream_path: str | Path,
     menu_pad_consume_count = 0
     c_tick = None
     f_tick = None
+    target_tick_seen = False
     final_draw_sequence = None
     source_ticks_since_draw = 0
     batch_at_go = None
@@ -2330,10 +2339,19 @@ def validate_stadium_go_prefix(stream_path: str | Path,
                         _require(last_source_tick is not None and tick == last_source_tick + 1,
                                  "source tick after F is not contiguous")
                         last_source_tick = tick
+                        if post_go_target_ordinal is not None:
+                            target_tick = c_tick + post_go_target_ordinal
+                            _require(tick <= target_tick + natural_batch_tail_limit - 1,
+                                     "GO+2 natural batch exceeded the five-sample DrawReturn bound")
+                            if tick == target_tick:
+                                target_tick_seen = True
+                            else:
+                                _require(tick < target_tick or target_tick_seen,
+                                         "GO+2 target SourceTick was skipped")
                         if not original_idle_3500 or tick > c_tick + 3500:
                             tail_after_f += 1
-                        _require(tail_after_f <= MAX_TAIL_AFTER_F,
-                                 "first qualifying DrawReturn exceeded the four-tick tail bound")
+                        _require(tail_after_f <= natural_batch_tail_limit,
+                                 "first qualifying DrawReturn exceeded the active source batch bound")
                 elif boundary == "draw_return":
                     _require(payload.get("pc") == DRAW_RETURN_PC,
                              "DrawReturn does not use the pinned natural queue close")
@@ -2341,10 +2359,11 @@ def validate_stadium_go_prefix(stream_path: str | Path,
                     _require(not (go_seen and c_tick is None),
                              "DrawReturn preceded containing tick C")
                     previous_draw_sequence = row["seq"]
-                    if go_seen and f_tick is not None and (not original_idle_3500 or
-                                                          last_source_tick >= c_tick + 3500):
+                    target_reached = (target_tick_seen if post_go_target_ordinal is not None else
+                                      last_source_tick >= c_tick + 3500 if original_idle_3500 else True)
+                    if go_seen and f_tick is not None and target_reached:
                         _require(source_ticks_since_draw <= MAX_SOURCE_TICK_BATCH and
-                                 tail_after_f <= MAX_TAIL_AFTER_F,
+                                 tail_after_f <= natural_batch_tail_limit,
                                  "qualifying DrawReturn exceeded the authored batch bound")
                         final_draw_sequence = row["seq"]
                         final_tail_after_f = tail_after_f
@@ -2379,7 +2398,7 @@ def validate_stadium_go_prefix(stream_path: str | Path,
              "observer end is not the natural bounded Stadium prefix completion")
     _require(type(end.get("tail_ticks_before_draw_return")) is int and
              end["tail_ticks_before_draw_return"] == final_tail_after_f and
-             0 <= final_tail_after_f <= MAX_TAIL_AFTER_F,
+             0 <= final_tail_after_f <= natural_batch_tail_limit,
              "observer end tail accounting disagrees with the retained batch rows")
     _require(status.get("state") == "completed" and status.get("completed") is True and
              status.get("invalid") is False and status.get("error") is None and
@@ -2391,8 +2410,16 @@ def validate_stadium_go_prefix(stream_path: str | Path,
                   marker["original_idle_post_go_ticks"] == 3500) if original_idle_3500 else
                  "original_idle_post_go_ticks" not in marker,
                  "idle3500 declaration differs from explicit validation scope")
+        _require(marker.get("original_post_go_target_ordinal") == post_go_target_ordinal
+                 if post_go_target_ordinal is not None else
+                 "original_post_go_target_ordinal" not in marker,
+                 "GO+2 declaration differs from explicit validation scope")
         _require(marker.get("constructor_owner_observations", False) is constructor_observations,
                  "constructor adjunct declaration differs from requested scope")
+    _require(status.get("original_post_go_target_ordinal") == post_go_target_ordinal
+             if post_go_target_ordinal is not None else
+             "original_post_go_target_ordinal" not in status,
+             "GO+2 status declaration differs from explicit validation scope")
     if constructor_observations:
         constructor.finish()
         _require(end.get("constructor_observations_complete") is True and
@@ -2406,6 +2433,15 @@ def validate_stadium_go_prefix(stream_path: str | Path,
                  type(end.get("comparison_end_tick")) is int and
                  last_source_tick == c_tick + 3500 + final_tail_after_f,
                  "idle3500 terminal target accounting differs")
+    if post_go_target_ordinal is not None:
+        target_tick = c_tick + post_go_target_ordinal
+        _require(all(marker.get('completion_boundary') ==
+                     'relative_post_go_tick_2_then_first_draw_return' for marker in (start, end)),
+                 'GO+2 completion declaration differs')
+        _require(target_tick_seen and end.get("comparison_end_tick") == target_tick and
+                 type(end.get("comparison_end_tick")) is int and
+                 last_source_tick >= target_tick and final_tail_after_f >= 1,
+                 "GO+2 target accounting or natural DrawReturn differs")
     go_setup = _slice(phase_payloads["go_after"], MATCH_SETUP_TAG, "GO marker", 0x138)
     go_setup_sha256 = hashlib.sha256(go_setup["raw"]).hexdigest()
     rng_snapshots = {}
@@ -2422,10 +2458,15 @@ def validate_stadium_go_prefix(stream_path: str | Path,
         "schema": SCHEMA,
         "version": VERSION,
         **({"constructor_observations": constructor.finish()} if constructor_observations else {}),
-        "decision": ("PASS_ORIGINAL_RAW_3500_ROUTE_ONLY" if original_idle_3500 else
+        "decision": ("PASS_ORIGINAL_RAW_GO_ORDINAL2_ONLY" if post_go_target_ordinal is not None else
+                     "PASS_ORIGINAL_RAW_3500_ROUTE_ONLY" if original_idle_3500 else
                      "PASS_ORIGINAL_RAW_GO_PREFIX_ONLY"),
         **({"comparison_end_tick": c_tick + 3500,
             "tail_ticks_after_comparison_end": final_tail_after_f} if original_idle_3500 else {}),
+        **({"original_post_go_target_ordinal": post_go_target_ordinal,
+            "comparison_end_tick": c_tick + post_go_target_ordinal,
+            "natural_batch_ticks_after_F": final_tail_after_f}
+           if post_go_target_ordinal is not None else {}),
         "source": {"dolphin_commit": EXPECTED_DOLPHIN_COMMIT,
                    "dol_sha1": EXPECTED_DOL_SHA1,
                    "dol_sha256": EXPECTED_DOL_SHA256},
@@ -2455,6 +2496,196 @@ def validate_stadium_go_prefix(stream_path: str | Path,
         "stream_sha256": stats.prefix_sha256,
         "stream_bytes": stats.bytes_read,
         "stream_records": stats.records_read,
+    }
+
+
+def validate_stadium_go_prefix(stream_path: str | Path,
+                               expected_setup_receipt_sha256: str = EXPECTED_SETUP_RECEIPT_SHA256,
+                               status_path: str | Path | None = None, *,
+                               constructor_observations: bool = False,
+                               original_idle_3500: bool = False) -> dict[str, Any]:
+    """Admit the historical C→F→first-DrawReturn contract unchanged."""
+    return _validate_stadium_go_prefix_scope(
+        stream_path, expected_setup_receipt_sha256, status_path,
+        constructor_observations=constructor_observations,
+        original_idle_3500=original_idle_3500)
+
+
+class StadiumGoOrdinal2Observations:
+    """Retain actual four-slot consume rows paired with the checked GO+2 ticks."""
+
+    EXPECTED_POST_SETUP_PORTS = ["00" * 11, "00" * 11,
+                                 "00" * 10 + "ff", "00" * 10 + "ff"]
+
+    def __init__(self):
+        self.setup_seen = False
+        self.go = None
+        self.pending = None
+        self.last_ordinal = -1
+        self.target_seen = False
+        self.final_draw_sequence = None
+        self.rows = []
+
+    def accept(self, row: dict[str, Any]) -> None:
+        from whole_session_replay import _consumed_ports, WholeSessionReplayError, _gpr, _slice as replay_slice
+
+        if self.final_draw_sequence is not None:
+            _require(row.get("event") == "end",
+                     "GO+2 observer emitted a source event after its first qualifying DrawReturn")
+        event, payload = row.get("event"), row.get("payload", {})
+        if event == "progress":
+            if payload.get("phase") == "go_after":
+                _require(self.setup_seen and self.go is None,
+                         "GO+2 lacks the unique checked Setup→GO origin")
+                tick = payload.get("source_tick")
+                _require(type(tick) is int and tick >= 0,
+                         "GO+2 origin source tick is malformed")
+                _validate_stadium_idle_state_record(row, "GO", tick)
+                self.go = row
+            return
+        if event != "boundary":
+            return
+        boundary = payload.get("boundary")
+        if boundary == "setup":
+            _require(not self.setup_seen, "GO+2 has duplicate VS Setup boundary")
+            self.setup_seen = True
+            return
+        if not self.setup_seen:
+            return
+        if boundary == "pad_consume":
+            _require(self.pending is None,
+                     "GO+2 has duplicate PAD consume before its SourceTick")
+            try:
+                ports = _consumed_ports(row, row.get("seq"))
+                queue_item, queue = replay_slice(row, "pad_queue", 0xC,
+                                                 f"GO+2 PAD consume {row.get('seq')}")
+            except WholeSessionReplayError as error:
+                raise StadiumGoPrefixError(str(error)) from error
+            _require(ports == self.EXPECTED_POST_SETUP_PORTS,
+                     "GO+2 consumed queue is not literal active-neutral/inactive-disconnected input")
+            gprs = payload.get("gprs")
+            _require(queue_item.get("address") == 0x804C1F78 and
+                     isinstance(gprs, list) and len(gprs) == 32,
+                     "GO+2 consumed queue source identity is malformed")
+            read_index = _gpr(payload, 6, f"GO+2 PAD consume {row.get('seq')}") & 0xFF
+            slot_address = _gpr(payload, 25, f"GO+2 PAD consume {row.get('seq')}")
+            self.pending = (row, ports, {
+                "queue_hex": queue.hex(),
+                "qnum": queue[0],
+                "qread": read_index,
+                "slot_address": f"0x{slot_address:08x}",
+            })
+            return
+        if boundary == "source_tick":
+            _require(self.pending is not None,
+                     "GO+2 SourceTick lacks its actual preceding PAD consume")
+            consume, ports, queue = self.pending
+            self.pending = None
+            tick = payload.get("source_tick")
+            _require(type(tick) is int and
+                     consume.get("source_tick") == tick and
+                     consume.get("draw_ordinal") == row.get("draw_ordinal"),
+                     "GO+2 PAD consume and SourceTick identities differ")
+            if self.go is None:
+                return
+            go_tick = self.go["source_tick"]
+            ordinal = tick - go_tick
+            _require(ordinal == self.last_ordinal + 1 and 0 <= ordinal <= 2 + 4,
+                     "GO+2 source tick is missing, reordered, or beyond the natural batch bound")
+            if ordinal == 0:
+                label = "C"
+            elif ordinal == 1:
+                label = "F"
+            elif ordinal == 2:
+                label = "GO2"
+                self.target_seen = True
+            else:
+                label = None
+                _require(self.target_seen,
+                         "GO+2 natural tail appeared before the target SourceTick")
+            if label is not None:
+                _validate_stadium_idle_state_record(row, label, tick)
+            self.rows.append({
+                "ordinal": ordinal,
+                "source_tick": tick,
+                "consume_sequence": consume["seq"],
+                "source_tick_sequence": row["seq"],
+                "draw_ordinal": row["draw_ordinal"],
+                "queue": queue,
+                "ports": ports,
+                "source_state_snapshot_validated": label is not None,
+            })
+            self.last_ordinal = ordinal
+            return
+        if boundary == "draw_return":
+            _require(self.pending is None, "GO+2 DrawReturn split a PAD consume/SourceTick pair")
+            if self.go is not None and self.target_seen and self.final_draw_sequence is None:
+                self.final_draw_sequence = row["seq"]
+
+    def finish(self, route: dict[str, Any]) -> dict[str, Any]:
+        _require(self.setup_seen and self.go is not None and self.pending is None and
+                 self.target_seen and self.final_draw_sequence == route["draw_return_sequence"] and
+                 len(self.rows) >= 3 and
+                 [row["ordinal"] for row in self.rows[:3]] == [0, 1, 2] and
+                 self.last_ordinal <= 6,
+                 "GO+2 actual consumed queue/source state sequence is incomplete")
+        return {
+            "decision": "PASS_ACTUAL_GO_PLUS_2_QUEUE_AND_SOURCE_STATE_ONLY",
+            "go_source_tick_C": self.go["source_tick"],
+            "target_source_tick": self.go["source_tick"] + 2,
+            "first_qualifying_draw_return_sequence": self.final_draw_sequence,
+            "actual_consumed_queue_rows": self.rows,
+            "source_state_snapshots_validated_at_ordinals": [0, 1, 2],
+            "queue_rows_are_synthetic": False,
+        }
+
+
+def validate_stadium_go_ordinal2_reference(observer_path: str | Path, *,
+                                            input_path: str | Path,
+                                            input_status_path: str | Path,
+                                            expected_setup_receipt_sha256: str = EXPECTED_SETUP_RECEIPT_SHA256,
+                                            status_path: str | Path | None = None) -> dict[str, Any]:
+    """Validate one fresh-record C/F/GO+2 natural source reference, not a replay."""
+    from reference_input_stream import validate_status as validate_input_status
+    from reference_input_stream import validate_stream as validate_input_stream
+
+    route = _validate_stadium_go_prefix_scope(
+        observer_path, expected_setup_receipt_sha256, status_path,
+        constructor_observations=True, post_go_target_ordinal=2)
+    observations = StadiumGoOrdinal2Observations()
+    stats = ObserverStreamStats()
+    for row in iter_records(observer_path, max_bytes=MAX_STREAM_BYTES,
+                            max_records=MAX_STREAM_RECORDS, stats=stats):
+        observations.accept(row)
+    _require(stats.prefix_sha256 == route["stream_sha256"],
+             "GO+2 source changed during consumed-queue validation")
+    consumed = observations.finish(route)
+    try:
+        input_summary = validate_input_stream(input_path)
+        input_status = validate_input_status(input_status_path, mode="record",
+                                             events=input_summary["events"],
+                                             require_complete=True)
+    except ValueError as error:
+        raise StadiumGoPrefixError(f"GO+2 fresh input recording is invalid: {error}") from error
+    _require(input_summary.get("complete") is True and input_summary.get("events", 0) > 0,
+             "GO+2 fresh input stream is empty or incomplete")
+    return {
+        "schema": "melee-web-original-stadium-go-ordinal2-reference",
+        "version": 1,
+        "decision": "PASS_FRESH_RECORD_GO_ORDINAL2_REFERENCE_ONLY",
+        "route": route,
+        "consumed_queue_state": consumed,
+        "input_stream": input_summary,
+        "input_status": input_status,
+        "scope": "Fresh original input recording and actual C/F/GO+2 queue/state through the first subsequent natural DrawReturn",
+        "claims": {
+            "fresh_input_recording_complete": True,
+            "actual_four_port_source_queue_rows": True,
+            "historical_recording_equivalence": False,
+            "whole_session_or_C3_equivalence": False,
+            "per_owner_rng_equivalence": False,
+            "browser_comparison": False,
+        },
     }
 
 
@@ -3543,7 +3774,7 @@ def _state_pointer(raw: bytes, context: str, size: int = 1) -> int:
 
 def _validate_stadium_idle_state_record(row: dict[str, Any], label: str,
                                         expected_tick: int) -> dict[str, Any]:
-    _require(label in ("GO", "C", "F", "IDLE"), "state snapshot label is unknown")
+    _require(label in ("GO", "C", "F", "IDLE", "GO2"), "state snapshot label is unknown")
     _require(type(expected_tick) is int and expected_tick >= 0,
              f"{label}: expected source tick is malformed")
     payload = row.get("payload")

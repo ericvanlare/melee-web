@@ -914,20 +914,24 @@ def prepare_rules_profile(profile, user, *, source_slots=(0, 1)):
 
 
 def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_manifest, timeout=180, gci=None,
-        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False, stadium_whole_target=None, stadium_whole_setup=None, stadium_whole_gc=None, stadium_whole_dol=None, stadium_whole_provenance=None):
+        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False, stadium_go_ordinal2=False, stadium_whole_target=None, stadium_whole_setup=None, stadium_whole_gc=None, stadium_whole_dol=None, stadium_whole_provenance=None):
     """Own fresh output before preparation so failures cannot vanish before launch."""
     whole_args = (stadium_whole_target, stadium_whole_setup, stadium_whole_gc,
                   stadium_whole_dol, stadium_whole_provenance)
     if any(x is not None for x in whole_args):
         require(all(x is not None for x in whole_args) and input_plan is None and
                 input_replay is None and ordinary_policy is None and not stop_after_items and
-                not stadium_constructor_owner and not stadium_idle_3500,
+                not stadium_constructor_owner and not stadium_idle_3500 and
+                not stadium_go_ordinal2,
                 'Whole Stadium route requires its complete exclusive input tuple')
         return run_stadium_whole_three(dolphin=dolphin, disc=disc, profile=profile,
             menu_recipe=menu_recipe, output=output, build_manifest=build_manifest,
             target_path=stadium_whole_target, setup_path=stadium_whole_setup,
             checkpoint_gc=stadium_whole_gc, dol=stadium_whole_dol,
             provenance=stadium_whole_provenance, gci=gci, timeout=timeout)
+    require(type(stadium_go_ordinal2) is bool and
+            (not stadium_go_ordinal2 or input_replay is None),
+            'Stadium GO+2 requires a fresh recording, never replay or hybrid input')
     output = Path(output)
     replay_receipt = (stadium_replay_preflight(input_replay, output, build_manifest)
                       if input_replay is not None else None)
@@ -943,7 +947,8 @@ def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_m
                     common_wire_comparator=common_wire_comparator,
                     stop_after_items=stop_after_items,
                     stadium_constructor_owner=stadium_constructor_owner,
-                    stadium_idle_3500=stadium_idle_3500)
+                    stadium_idle_3500=stadium_idle_3500,
+                    stadium_go_ordinal2=stadium_go_ordinal2)
     except Exception as error:
         failure = output / "failure.json"
         if not failure.exists():
@@ -954,7 +959,7 @@ def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_m
 
 
 def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_manifest, timeout, gci=None,
-         ordinary_policy=None, replay_receipt=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False):
+         ordinary_policy=None, replay_receipt=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False, stadium_go_ordinal2=False):
     build = validate_reference_build_manifest(Path(build_manifest), Path(dolphin))
     menus, menu_hash = menu_actions(menu_recipe)
     stadium_prefix = menus["scope"] == "stadium_go_prefix"
@@ -963,9 +968,16 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
             "Stadium idle3500 requires fresh recording, never replay or hybrid input")
     if stadium_idle_3500:
         stadium_constructor_owner = True
+    require(type(stadium_go_ordinal2) is bool and
+            (not stadium_go_ordinal2 or
+             (stadium_prefix and replay_receipt is None and not stadium_idle_3500)),
+            "Stadium GO+2 requires its fresh-record Stadium route, exclusive of replay and idle3500")
+    if stadium_go_ordinal2:
+        stadium_constructor_owner = True
     require(type(stadium_constructor_owner) is bool and
-            (not stadium_constructor_owner or (stadium_prefix and (replay_receipt is not None or stadium_idle_3500))),
-            "Stadium constructor adjunct requires explicit recorded Stadium replay")
+            (not stadium_constructor_owner or
+             (stadium_prefix and (replay_receipt is not None or stadium_idle_3500 or stadium_go_ordinal2))),
+            "Stadium constructor adjunct requires an explicit checked capture mode")
     require(replay_receipt is None or stadium_prefix,
             "Recorded MWRI replay is exclusive to Stadium prefix")
     if replay_receipt is not None:
@@ -1073,6 +1085,8 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
             environment["MWRC_STADIUM_CONSTRUCTOR_OWNER"] = "1"
         if stadium_idle_3500:
             environment["MWRC_STADIUM_IDLE_3500"] = "1"
+        if stadium_go_ordinal2:
+            environment["MWRC_STADIUM_GO_ORDINAL2"] = "1"
     else:
         environment.update(MWRC_SD_INIT="1",
                            MWRC_SD_RECIPE_SHA256=plan["authored_recipe_sha256"],
@@ -1104,6 +1118,10 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
     if stadium_prefix:
         launch["observer_profile"] = ("MWRC_STADIUM_GO_PREFIX=1; exact setup-receipt binding; "
                                        "supplied profile; optional exact retained read-only GCI copy")
+        if stadium_go_ordinal2:
+            launch.update(stadium_go_ordinal2=True, original_post_go_target_ordinal=2,
+                          input_mode="record")
+            launch["observer_profile"] += "; fresh MWRI recording; first DrawReturn after GO+2"
     if ordinary:
         launch.update(ordinary_policy_sha256=policy_hash,caps=CAPS)
     elif stadium_prefix:
@@ -1112,6 +1130,8 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
                                if stadium_idle_3500 else {})}, wall_seconds=timeout)
         if stadium_idle_3500:
             launch['original_idle_post_go_ticks'] = 3500
+        if stadium_go_ordinal2:
+            launch['original_post_go_target_ordinal'] = 2
     if replay_receipt is not None:
         launch.update(input_mode="replay", input_replay=replay_receipt,
                       adaptive_controller_enabled=False)
@@ -1253,16 +1273,27 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
                         input_mode="replay" if replay_receipt is not None else "record")
                     from reference_input_stream import validate_stream as validate_input_stream
                     from stadium_go_prefix import validate_stadium_go_prefix
-                    input_summary = validate_input_stream(native)
-                    input_status = (stadium_replay_complete(replay_receipt, native_status)
-                                    if replay_receipt is not None else
-                                    validate_status(native_status, mode="record",
-                                        events=input_summary["events"], require_complete=True))
-                    check_stadium_capture_bounds(raw, native, deadline, receiver.seq, original_idle_3500=stadium_idle_3500)
                     constructor_scope = {"constructor_observations": True} if stadium_constructor_owner else {}
-                    prefix_report = validate_stadium_go_prefix(
-                        raw, menus["setup_receipt_sha256"], status_path=status,
-                        **constructor_scope, **({"original_idle_3500":True} if stadium_idle_3500 else {}))
+                    go_ordinal2_reference = None
+                    if stadium_go_ordinal2:
+                        from stadium_go_prefix import validate_stadium_go_ordinal2_reference
+                        go_ordinal2_reference = validate_stadium_go_ordinal2_reference(
+                            raw, input_path=native, input_status_path=native_status,
+                            expected_setup_receipt_sha256=menus["setup_receipt_sha256"],
+                            status_path=status)
+                        input_summary = go_ordinal2_reference["input_stream"]
+                        input_status = go_ordinal2_reference["input_status"]
+                        prefix_report = go_ordinal2_reference["route"]
+                    else:
+                        input_summary = validate_input_stream(native)
+                        input_status = (stadium_replay_complete(replay_receipt, native_status)
+                                        if replay_receipt is not None else
+                                        validate_status(native_status, mode="record",
+                                            events=input_summary["events"], require_complete=True))
+                        prefix_report = validate_stadium_go_prefix(
+                            raw, menus["setup_receipt_sha256"], status_path=status,
+                            **constructor_scope, **({"original_idle_3500":True} if stadium_idle_3500 else {}))
+                    check_stadium_capture_bounds(raw, native, deadline, receiver.seq, original_idle_3500=stadium_idle_3500)
                     idle_reference = None
                     if stadium_idle_3500:
                         from stadium_go_prefix import validate_stadium_idle_3500_reference
@@ -1284,7 +1315,8 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
                                 "Stadium replay common-wire comparison did not pass")
                     bounded_log.check()
                     report = {
-                        "schema": "melee-web-original-stadium-go-prefix-capture",
+                        "schema": ("melee-web-original-stadium-go-ordinal2-capture" if stadium_go_ordinal2 else
+                                   "melee-web-original-stadium-go-prefix-capture"),
                         "version": 1,
                         "scope": scope,
                         "status": "pass",
@@ -1308,9 +1340,13 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
                         "input_stream": input_summary,
                         "driver": receiver.finish(),
                         "stadium_go_prefix": prefix_report,
+                        **({"stadium_go_ordinal2_reference": go_ordinal2_reference}
+                           if stadium_go_ordinal2 else {}),
                         "claims": {"original_css_sss_stadium_setup": True,
                                    "source_consumed_stadium_confirm_and_release": True,
-                                   "natural_go_draw_return_prefix": True,
+                                   **({"natural_go_ordinal2_draw_return": True}
+                                      if stadium_go_ordinal2 else {}),
+                                   "natural_go_draw_return_prefix": not stadium_go_ordinal2,
                                    "profile_setup_equivalence": False,
                                    "port_rng_equivalence": False,
                                    "whole_match_or_results": False,
@@ -2362,6 +2398,8 @@ def main(argv=None):
                         help="Observe map2 constructor within exact recorded Stadium replay; F terminal unchanged")
     parser.add_argument("--stadium-idle-3500", action="store_true",
                         help="Fresh original recording through3500 relative post-GO ticks and natural batch close")
+    parser.add_argument("--stadium-go-ordinal2", action="store_true",
+                        help="Fresh original recording through GO+2 and its first subsequent natural DrawReturn")
     parser.add_argument("--stop-after-items", action="store_true",
                         help="Stop the same original transform menu route at observed Items readiness; no setup/transform claim")
     parser.add_argument("--timeout", type=float, default=180)

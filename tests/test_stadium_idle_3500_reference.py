@@ -298,7 +298,7 @@ class StadiumIdle3500ReferenceTests(unittest.TestCase):
     def test_actual_cpp_boundary_progress_default_and_3500(self):
         import subprocess
         source=(ROOT/'reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp').read_text()
-        begin=source.index('    if (stadium_idle_3500 && setup_ready)')
+        begin=source.index('    if ((stadium_idle_3500 || stadium_go_ordinal2) && setup_ready)')
         end=source.index('    if (boundary == Boundary::SourceTick)\n      CloseCpuProbeAtSourceTick',begin)
         body=source[begin:end]
         enum_begin=source.index('enum class StadiumGoPrefixPhase')
@@ -315,7 +315,7 @@ enum class Boundary {PadPoll,PadConsume,SourceTick,DrawEnter,DrawReturn,Setup};
 struct EntityPrefixBoundaryProgress {static constexpr u32 queue_capacity=5;};
 '''+source[enum_begin:enum_end]+'''
 struct H {
- bool stadium_idle_3500=true,setup_ready=true,stadium_go_prefix_enabled=true;
+ bool stadium_idle_3500=true,stadium_go_ordinal2=false,setup_ready=true,stadium_go_prefix_enabled=true;
  bool stadium_idle_pending_consume=false,stadium_idle_c_seen=false,stadium_go_prefix_go_seen=true;
  bool invalid=false,snapshot=false,complete=false;
  u32 stadium_go_prefix_batch_ticks=0,stadium_go_prefix_go_tick=137,stadium_go_prefix_last_tick=137;
@@ -328,6 +328,7 @@ struct H {
  snapshot=stadium_state_snapshot_this_tick;complete=stadium_go_prefix_complete_after_publish;
  }
  void tick(u32 ordinal){run(Boundary::PadConsume,137+ordinal);run(Boundary::SourceTick,137+ordinal);}
+ void go2_tick(u32 ordinal){tick(ordinal);}
 };
 struct Cap {
  bool stadium_idle_3500=true,stadium_idle_c_seen=false,invalid=false;
@@ -351,6 +352,26 @@ int main(){
  H excessive;for(u32 i=0;i<6;i++)excessive.tick(i);assert(excessive.invalid);
  H old;old.stadium_idle_3500=false;old.tick(0);old.run(Boundary::DrawReturn,137);old.tick(1);
  old.run(Boundary::DrawReturn,138);assert(old.complete&&!old.invalid);
+ H go2;go2.stadium_idle_3500=false;go2.stadium_go_ordinal2=true;
+ go2.go2_tick(0);go2.run(Boundary::DrawReturn,137);assert(!go2.complete);
+ go2.go2_tick(1);go2.run(Boundary::DrawReturn,138);assert(!go2.complete);
+ go2.go2_tick(2);assert(go2.stadium_go_prefix_phase==StadiumGoPrefixPhase::AwaitDrawReturn);
+ go2.run(Boundary::DrawReturn,139);assert(go2.complete&&!go2.invalid&&go2.stadium_go_prefix_tail_ticks==1);
+ H go2_five;go2_five.stadium_idle_3500=false;go2_five.stadium_go_ordinal2=true;
+ go2_five.go2_tick(0);go2_five.run(Boundary::DrawReturn,137);
+ go2_five.go2_tick(1);go2_five.run(Boundary::DrawReturn,138);
+ for(u32 i=2;i<=6;i++)go2_five.go2_tick(i);
+ assert(!go2_five.invalid&&!go2_five.complete&&go2_five.stadium_go_prefix_batch_ticks==5&&
+        go2_five.stadium_go_prefix_tail_ticks==5);
+ go2_five.run(Boundary::DrawReturn,143);
+ assert(go2_five.complete&&!go2_five.invalid&&go2_five.stadium_go_prefix_tail_ticks==5);
+ H go2_six;go2_six.stadium_idle_3500=false;go2_six.stadium_go_ordinal2=true;
+ go2_six.go2_tick(0);go2_six.run(Boundary::DrawReturn,137);
+ go2_six.go2_tick(1);go2_six.run(Boundary::DrawReturn,138);
+ for(u32 i=2;i<=6;i++)go2_six.go2_tick(i);
+ go2_six.go2_tick(7);assert(go2_six.invalid&&!go2_six.complete);
+ H go2_missing;go2_missing.stadium_idle_3500=false;go2_missing.stadium_go_ordinal2=true;
+ go2_missing.run(Boundary::SourceTick,137);assert(go2_missing.invalid);
 }
 '''
         with tempfile.TemporaryDirectory() as d:

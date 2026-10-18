@@ -1183,6 +1183,7 @@ struct Observer::Impl
         (whole_session_matches != 3 || stadium_go_prefix_enabled || SdInitRequested() ||
          !Env("MWRC_STADIUM_CONSTRUCTOR_OWNER").empty() ||
          !Env("MWRC_STADIUM_IDLE_3500").empty() ||
+         !Env("MWRC_STADIUM_GO_ORDINAL2").empty() ||
          !Env("MWRC_TRANSFORM_PREFIX").empty() ||
          !Env("MWRC_ENTITY_PROFILE").empty() ||
          !Env("MWRC_SD_MENU_PROBE").empty() ||
@@ -1209,6 +1210,12 @@ struct Observer::Impl
           !InputStream::IsRecording() || InputStream::IsReplaying())))
       return SetInvalid("Stadium idle3500 requires constructor adjunct and fresh input recording"), false;
     stadium_idle_3500 = idle_setting == "1";
+    const std::string ordinal2_setting = Env("MWRC_STADIUM_GO_ORDINAL2");
+    if ((!ordinal2_setting.empty() && ordinal2_setting != "1") ||
+        (!ordinal2_setting.empty() && (!stadium_constructor_enabled || stadium_idle_3500 ||
+          !InputStream::IsRecording() || InputStream::IsReplaying())))
+      return SetInvalid("Stadium ordinal2 requires its constructor adjunct and fresh input recording"), false;
+    stadium_go_ordinal2 = ordinal2_setting == "1";
     // This SHA is an external setup-receipt identity only. The observer emits
     // the selected raw MatchSetup for a separate driver-side semantic check.
     stadium_go_prefix_setup_receipt_sha256 = Env("MWRC_STADIUM_SETUP_RECEIPT_SHA256");
@@ -1436,6 +1443,8 @@ struct Observer::Impl
       handshake += ",\"entity_profile\":\"" + Env("MWRC_ENTITY_PROFILE") + "\"";
     if (stadium_idle_3500)
       handshake += ",\"original_idle_post_go_ticks\":3500";
+    if (stadium_go_ordinal2)
+      handshake += ",\"original_post_go_target_ordinal\":2";
     if (stadium_whole_feedback)
       handshake += ",\"stadium_whole_feedback\":true,\"setup_receipt_sha256\":\"" + stadium_whole_setup_receipt + "\"";
     handshake += "}";
@@ -1465,6 +1474,8 @@ struct Observer::Impl
       start += ",\"constructor_owner_observations\":true";
     if (stadium_idle_3500)
       start += ",\"original_idle_post_go_ticks\":3500";
+    if (stadium_go_ordinal2)
+      start += ",\"original_post_go_target_ordinal\":2";
     if (stadium_whole_feedback)
       start += ",\"stadium_whole_feedback\":true,\"setup_receipt_sha256\":\"" + stadium_whole_setup_receipt + "\"";
     start += "}";
@@ -1474,7 +1485,8 @@ struct Observer::Impl
 
   const char* StadiumCompletionBoundary() const
   {
-    return stadium_idle_3500 ? "relative_post_go_tick_3500_then_first_draw_return" :
+    return stadium_go_ordinal2 ? "relative_post_go_tick_2_then_first_draw_return" :
+           stadium_idle_3500 ? "relative_post_go_tick_3500_then_first_draw_return" :
                                "source_tick_C_then_source_tick_F_then_first_draw_return";
   }
 
@@ -4365,19 +4377,22 @@ struct Observer::Impl
     bool stadium_go_prefix_complete_after_publish = false;
     bool stadium_state_snapshot_this_tick = false;
     // SourceTick and DrawReturn are not one-to-one: preserve the authored
-    // queue count on every row and stop only at the first return after F.
-    if (stadium_idle_3500 && setup_ready)
+    // queue count on every row and stop only at the first return after the
+    // explicitly selected target (F for the legacy prefix, C+2 for GO2).
+    if ((stadium_idle_3500 || stadium_go_ordinal2) && setup_ready)
     {
       if (boundary == Boundary::PadConsume)
       {
         if (stadium_idle_pending_consume)
-          return SetInvalid("Stadium idle3500 duplicate unpaired consume"), void();
+          return SetInvalid(stadium_idle_3500 ? "Stadium idle3500 duplicate unpaired consume" :
+                                                "Stadium ordinal2 duplicate unpaired consume"), void();
         stadium_idle_pending_consume = true;
       }
       if (boundary == Boundary::SourceTick)
       {
         if (!stadium_idle_pending_consume)
-          return SetInvalid("Stadium idle3500 SourceTick lacks consumed input"), void();
+          return SetInvalid(stadium_idle_3500 ? "Stadium idle3500 SourceTick lacks consumed input" :
+                                                "Stadium ordinal2 SourceTick lacks consumed input"), void();
         stadium_idle_pending_consume = false;
         if (stadium_go_prefix_go_seen)
         {
@@ -4388,7 +4403,8 @@ struct Observer::Impl
       if (stadium_idle_c_seen && boundary != Boundary::PadPoll &&
           boundary != Boundary::PadConsume && boundary != Boundary::SourceTick &&
           boundary != Boundary::DrawEnter && boundary != Boundary::DrawReturn)
-        return SetInvalid("Stadium idle3500 post-C boundary inventory"), void();
+        return SetInvalid(stadium_idle_3500 ? "Stadium idle3500 post-C boundary inventory" :
+                                              "Stadium ordinal2 post-C boundary inventory"), void();
     }
     if (stadium_go_prefix_enabled && boundary == Boundary::SourceTick)
     {
@@ -4415,15 +4431,21 @@ struct Observer::Impl
           return SetInvalid("Stadium GO prefix did not observe the next contiguous source tick F"),
                  void();
         stadium_state_snapshot_this_tick = true;
-        if (!stadium_idle_3500 || source_tick - stadium_go_prefix_go_tick >= 3500)
+        if ((!stadium_idle_3500 && !stadium_go_ordinal2) ||
+            (stadium_idle_3500 && source_tick - stadium_go_prefix_go_tick >= 3500) ||
+            (stadium_go_ordinal2 && source_tick - stadium_go_prefix_go_tick >= 2))
           stadium_go_prefix_phase = StadiumGoPrefixPhase::AwaitDrawReturn;
+        if (stadium_go_ordinal2 && source_tick - stadium_go_prefix_go_tick == 2)
+          ++stadium_go_prefix_tail_ticks;
         ++stadium_go_prefix_batch_ticks;
       }
       else if (stadium_go_prefix_phase == StadiumGoPrefixPhase::AwaitDrawReturn)
       {
         if (source_tick != stadium_go_prefix_last_tick + 1 ||
             stadium_go_prefix_batch_ticks >= EntityPrefixBoundaryProgress::queue_capacity ||
-            stadium_go_prefix_tail_ticks >= EntityPrefixBoundaryProgress::queue_capacity - 1)
+            stadium_go_prefix_tail_ticks >= (stadium_go_ordinal2 ?
+                EntityPrefixBoundaryProgress::queue_capacity :
+                EntityPrefixBoundaryProgress::queue_capacity - 1))
           return SetInvalid("Stadium GO finishing DrawReturn exceeded contiguous five-sample batch bounds"),
                  void();
         ++stadium_go_prefix_batch_ticks;
@@ -4435,11 +4457,14 @@ struct Observer::Impl
     }
     if (stadium_go_prefix_enabled && boundary == Boundary::DrawReturn)
     {
-      if (stadium_idle_3500 && stadium_idle_pending_consume)
-        return SetInvalid("Stadium idle3500 DrawReturn splits consume/tick pair"), void();
+      if ((stadium_idle_3500 || stadium_go_ordinal2) && stadium_idle_pending_consume)
+        return SetInvalid(stadium_idle_3500 ? "Stadium idle3500 DrawReturn splits consume/tick pair" :
+                                              "Stadium ordinal2 DrawReturn splits consume/tick pair"), void();
       if (stadium_go_prefix_phase == StadiumGoPrefixPhase::AwaitDrawReturn)
       {
-        if (!stadium_go_prefix_batch_ticks || stadium_go_prefix_tail_ticks > 4)
+        const u32 tail_limit = stadium_go_ordinal2 ?
+                                   EntityPrefixBoundaryProgress::queue_capacity : 4;
+        if (!stadium_go_prefix_batch_ticks || stadium_go_prefix_tail_ticks > tail_limit)
           return SetInvalid("Stadium GO prefix finishing DrawReturn lacks its observed F batch"), void();
         stadium_go_prefix_phase = StadiumGoPrefixPhase::Complete;
         stadium_go_prefix_complete_after_publish = true;
@@ -5964,6 +5989,12 @@ struct Observer::Impl
             json += ",\"original_idle_post_go_ticks\":3500,\"comparison_end_tick\":" +
                     std::to_string(stadium_go_prefix_go_tick + 3500) + "}";
           }
+          else if (stadium_go_ordinal2)
+          {
+            json.pop_back();
+            json += ",\"original_post_go_target_ordinal\":2,\"comparison_end_tick\":" +
+                    std::to_string(stadium_go_prefix_go_tick + 2) + "}";
+          }
           end_slot.payload_size = static_cast<u32>(json.size());
           std::memcpy(end_slot.payload.data(), json.data(), json.size());
           end_slot.checksum = CRC32(end_slot.payload.data(), end_slot.payload_size);
@@ -6056,6 +6087,8 @@ struct Observer::Impl
               (stadium_go_prefix_phase == StadiumGoPrefixPhase::Complete ? "true" : "false") +
               ",\"tail_ticks_before_draw_return\":" +
               std::to_string(stadium_go_prefix_tail_ticks);
+    if (stadium_go_ordinal2)
+      json += ",\"original_post_go_target_ordinal\":2";
     json += CpuProbeCloseStatusJson();
     json += "}\n";
     if (!status.Write(reinterpret_cast<const u8*>(json.data()), json.size()) || !status.Flush() ||
@@ -6212,6 +6245,7 @@ struct Observer::Impl
   } stadium_sss_position;
   u32 stadium_sss_position_calls = 0;
   bool stadium_idle_3500 = false;
+  bool stadium_go_ordinal2 = false;
   bool stadium_idle_c_seen = false, stadium_idle_pending_consume = false;
   bool stadium_constructor_enabled = false;
   size_t stadium_constructor_step = 0, stadium_constructor_call = 0;
