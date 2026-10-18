@@ -17,7 +17,12 @@ def cut(text,start,end):
 class Stock4SssExitControls(OwnedWorkspaceTests):
     def test_actual_leave_finish_audio_and_pending_draw(self):
         text=(ROOT/'src/gameplay_menu_browser.cpp').read_text()
-        helpers=cut(text,'bool current_sss_exit_profile_valid(','int current_sss_exit_arm(')
+        # Selection comparison belongs to prepared-setup validation, not this
+        # stopped-boundary fixture. Keep only the actual helpers exercised here.
+        helpers=(cut(text,'bool current_sss_exit_profile_valid(',
+                     'std::string current_sss_selection_difference(')+
+                 cut(text,'void current_sss_exit_before_leave(',
+                     'int current_sss_exit_arm('))
         preparation=cut(text,'void begin_preparation(){','bool preparation_uses_source_draws(){')
         audio=cut(text,'  if(!audio_before_construction&&!audio_elapsed.stalled',
                   '#if !defined(MELEE_WEB_PUBLIC_RUNTIME)\n  replay_boundary_mark("ordinary_audio_boundary_returned"')
@@ -25,9 +30,11 @@ class Stock4SssExitControls(OwnedWorkspaceTests):
                          ['menu_preparation_state.hpp','source_frame_sequence.hpp'])
         fixture=r'''
 #define MELEE_WEB_PUBLIC_RUNTIME 1
+#include <array>
 #include <cassert>
 #include <cstdint>
 #include <memory>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -36,9 +43,11 @@ enum{MELEE_WEB_MENU_HOST_SCENE_SSS=2,MELEE_WEB_MENU_READY=5,St_Kind_PStadium=3,G
 enum class CurrentSssExitProfile{Time120,Stock4None};
 struct Rules{int stkind=3,match_kind=1,time_limit=0,xB=-1;bool is_vs=true,is_stock=true,timer_enabled=false,timer_counts_up=false,disable_pausing=false,is_teams=false;uint64_t x20=UINT64_MAX;};
 struct Player{int ckind=8,slot_type=0,color=0,stocks=4;};
-struct Selection{bool save_profile_present=true;unsigned unlocked_characters=2047,unlocked_stages=2047,player_count=2;struct{Rules rules;Player players[2];}start;Selection(){start.players[0].color=1;}};
+struct StartMeleeData{Rules rules;Player players[2];};
+struct MeleeWebMenuMatchSelection{StartMeleeData start;struct{uint32_t controller=0,stocks=0,costume=0,sub_color=0;}players[4];uint32_t player_count=2,random_seed=0xe2624ac3,hud_layout=0;uint16_t unlocked_characters=2047,unlocked_stages=2047;uint8_t save_profile_present=1,opening_demo=0,sudden_death=0;MeleeWebMenuMatchSelection(){start.players[0].color=1;}};
+using Selection=MeleeWebMenuMatchSelection;
 struct Recipe{Selection selection;std::vector<int> frames=std::vector<int>(2006);std::unique_ptr<int> initial_css{new int};};namespace melee_web{using RetailReplayRecipe=::Recipe;}std::unique_ptr<Recipe> replay{new Recipe};
-struct State{CurrentSssExitProfile profile=CurrentSssExitProfile::Stock4None;bool armed=true,leave_started=false,terminal_pending=false,terminal=false,notified=false,failed=false,notification_received=false,notification_in_host_tick=false,notification_last_tick_returned=true,host_tick_in_flight=false,last_host_tick_returned=true;size_t notification_cursor=270,notification_steps=0,notification_draws=0,terminal_cursor=0,terminal_steps=0,terminal_draws=0;uint64_t leave_world_generation=0,leave_asset_requests=0,terminal_asset_requests=0;unsigned leave_asset_generation=0;const void* leave_world=nullptr;const void* leave_cache=nullptr;const Recipe* recipe=nullptr;const int* context=nullptr;const int* host_owner=nullptr;struct{int state=2;struct{bool captured=true;uint64_t world_generation=7;}note;}observation;}current_sss_exit;
+struct State{CurrentSssExitProfile profile=CurrentSssExitProfile::Stock4None;bool armed=true,leave_started=false,terminal_pending=false,terminal=false,terminal_waiting_for_audio=false,notified=false,failed=false,notification_received=false,notification_in_host_tick=false,notification_last_tick_returned=true,host_tick_in_flight=false,last_host_tick_returned=true;size_t notification_cursor=270,notification_steps=0,notification_draws=0,terminal_cursor=0,terminal_steps=0,terminal_draws=0;uint64_t leave_world_generation=0,leave_asset_requests=0,terminal_asset_requests=0;unsigned leave_asset_generation=0;const void* leave_world=nullptr;const void* leave_cache=nullptr;const Recipe* recipe=nullptr;const int* context=nullptr;const int* host_owner=nullptr;struct{int state=2;struct{bool captured=true;uint64_t world_generation=7;}note;}observation;}current_sss_exit;
 std::unique_ptr<int> world{new int},archive_cache{new int};int h;int* host=&h;int* match=nullptr;int* results=nullptr;int* prize=nullptr;
 bool host_entered=true,pending=true,running=true,faulted=false,menu_scene_rebuild_pending=false,transition_audio_continues=false;int phase=3,scene=2,pending_menu_source_scene=0;size_t replay_cursor=270;unsigned asset_generation=8;uint64_t current_sss_asset_request_calls=10;
 enum class AssetDestination{None,Match};AssetDestination asset_destination=AssetDestination::None;struct{int pending_generation(){return 0;}}asset_scope;
@@ -95,12 +104,18 @@ reset();scene=1;current_sss_exit_before_leave();assert(!current_sss_exit.leave_s
                           'MeleeWebMenuHost* h=static_cast<MeleeWebMenuHost*>(data);')
         host_arm=cut(host_text,'int melee_web_menu_host_arm_current_sss_exit(', 'static void first_sss_prefix_exit_note(')
         notify=cut(text,'void current_sss_exit_notify(', 'void current_sss_exit_tick_begin(')
-        helpers=cut(text,'bool current_sss_exit_profile_valid(', '\nvoid tick(){').split('\n#endif')[0]
+        helpers=(cut(text,'bool current_sss_exit_profile_valid(',
+                     'std::string current_sss_selection_difference(')+
+                 cut(text,'void current_sss_exit_before_leave(',
+                     'int current_sss_exit_arm('))
+        arm=cut(text,'int current_sss_exit_arm(',
+                'int current_sss_prepared_setup_begin(')
         preparation=cut(text,'void begin_preparation(){','bool preparation_uses_source_draws(){')
         getter=cut(text,'const char* melee_web_native_menu_stadium_current_sss_prepared_start_observe(){',
-                   'int melee_web_native_menu_stadium_first_css_draw_arm(')
+                   'int melee_web_native_menu_stadium_current_sss_prepared_setup_begin(')
         fixture=r'''
 #define MELEE_WEB_PUBLIC_RUNTIME 1
+#include <array>
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
@@ -117,15 +132,16 @@ enum class CurrentSssExitProfile{Time120,Stock4None};enum class AssetDestination
 struct Rules{int stkind=3,match_kind=1,time_limit=0,xB=-1;bool is_vs=true,is_stock=true,timer_enabled=false,timer_counts_up=false,disable_pausing=false,is_teams=false;uint64_t x20=UINT64_MAX;};
 struct Player{int ckind=8,slot_type=0,color=0,stocks=4;};
 struct StartMeleeData{Rules rules;Player players[2];};
-struct MeleeWebMenuMatchSelection{bool save_profile_present=true;unsigned unlocked_characters=2047,unlocked_stages=2047,player_count=2;StartMeleeData start;uint32_t random_seed=0xe2624ac3;MeleeWebMenuMatchSelection(){start.players[0].color=1;}};
+struct MeleeWebMenuMatchSelection{StartMeleeData start;struct{uint32_t controller=0,stocks=0,costume=0,sub_color=0;}players[4];uint32_t player_count=2,random_seed=0xe2624ac3,hud_layout=0;uint16_t unlocked_characters=2047,unlocked_stages=2047;uint8_t save_profile_present=1,opening_demo=0,sudden_death=0;MeleeWebMenuMatchSelection(){start.players[0].color=1;}};
 struct Recipe{unsigned version=8;bool diagnostic_entity_prefix=false;MeleeWebMenuMatchSelection selection;std::vector<int> frames=std::vector<int>(2006);std::unique_ptr<int> initial_css{new int};};namespace melee_web{using RetailReplayRecipe=::Recipe;}
 struct MeleeWebMenuSession{};struct SSSData{int start_game=1,force_stage_id=-1;struct{StartMeleeData start;}vs;};SSSData payload;
 struct Note{bool captured=false;int phase=0,host_entered=0,session_phase=0,source_scene=0,scene_kind=0;unsigned scene_frame=0,random_seed=0;uint64_t session_ticks=0,world_generation=0,audio_generation=0;SSSData sss;unsigned char pad_state[4]{};int scene_routing_getters[4]{},owners[8]{};};
 using MeleeWebMenuFirstSssPairNoteSnapshot=Note;
 struct MeleeWebMenuCurrentSssExitObservation{int state=0;char error[160]{};Note note;};
 using MeleeWebMenuCurrentSssExitNotify=void(*)(void*,const MeleeWebMenuCurrentSssExitObservation*);
-struct MeleeWebMenuHost{MeleeWebMenuCurrentSssExitObservation current_sss_exit;const void* current_sss_exit_context=nullptr;MeleeWebMenuCurrentSssExitNotify current_sss_exit_notify=nullptr;void* current_sss_exit_notify_data=nullptr;MeleeWebMenuSession* session=nullptr;bool entered=false,drawing=false,vs_mode_owned=true,initial_replay_context=true,stadium_c1a_enabled=false;int source_scene=0,source_mode_kind=GM_VS,first_sss_pair_state=0,first_sss_sequence_operation=0;unsigned seed=42;void* audio=nullptr;uint64_t generation=0,audio_generation=1;struct{int scene_kind=GS_SSS;const void* enter_data=nullptr;const void* exit_data=nullptr;}source_scene_info;};
-struct State{CurrentSssExitProfile profile=CurrentSssExitProfile::Time120;bool armed=false,notified=false,failed=false,notification_received=false,host_tick_in_flight=false,last_host_tick_returned=true,notification_in_host_tick=false,notification_last_tick_returned=false;bool leave_started=false,terminal_pending=false,terminal=false,prepared_start_attempted=false,prepared_start_captured=false;size_t notification_cursor=0,notification_steps=0,notification_draws=0,terminal_cursor=0,terminal_steps=0,terminal_draws=0;uint64_t notification_order=0,order=543,world_generation=0,leave_world_generation=0,leave_asset_requests=0,terminal_asset_requests=0;unsigned leave_asset_generation=0;const Recipe* recipe=nullptr;const int* context=nullptr;MeleeWebMenuHost* host_owner=nullptr;const void* leave_world=nullptr;const void* leave_cache=nullptr;MeleeWebMenuCurrentSssExitObservation observation;std::string error,prepared_start_json,prepared_start_error;};State current_sss_exit;
+struct MeleeWebPadState{uint8_t tag=0x5a;};
+struct MeleeWebMenuHost{MeleeWebMenuCurrentSssExitObservation current_sss_exit;const void* current_sss_exit_context=nullptr;MeleeWebMenuCurrentSssExitNotify current_sss_exit_notify=nullptr;void* current_sss_exit_notify_data=nullptr;MeleeWebMenuSession* session=nullptr;bool entered=false,drawing=false,vs_mode_owned=true,initial_replay_context=true,stadium_c1a_enabled=false;int source_scene=0,source_mode_kind=GM_VS,first_sss_pair_state=0,first_sss_sequence_operation=0;unsigned seed=42;void* audio=nullptr;uint64_t generation=0,audio_generation=1;MeleeWebPadState input;struct{int scene_kind=GS_SSS;const void* enter_data=nullptr;const void* exit_data=nullptr;}source_scene_info;};
+struct State{CurrentSssExitProfile profile=CurrentSssExitProfile::Time120;bool armed=false,notified=false,failed=false,notification_received=false,host_tick_in_flight=false,last_host_tick_returned=true,notification_in_host_tick=false,notification_last_tick_returned=false;bool leave_started=false,terminal_pending=false,terminal=false,terminal_waiting_for_audio=false,prepared_start_attempted=false,prepared_start_captured=false,prepared_start_selection_captured=false;size_t notification_cursor=0,notification_steps=0,notification_draws=0,terminal_cursor=0,terminal_steps=0,terminal_draws=0;uint64_t notification_order=0,order=543,world_generation=0,leave_world_generation=0,leave_asset_requests=0,terminal_asset_requests=0;unsigned leave_asset_generation=0;const Recipe* recipe=nullptr;const int* context=nullptr;MeleeWebMenuHost* host_owner=nullptr;const void* leave_world=nullptr;const void* leave_cache=nullptr;MeleeWebMenuCurrentSssExitObservation observation;std::string error,prepared_start_json,prepared_start_error;MeleeWebMenuMatchSelection prepared_start_selection{};const MeleeWebPadState* prepared_start_input_owner=nullptr;std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> prepared_start_input_bytes{};};State current_sss_exit;
 std::unique_ptr<Recipe> replay;std::unique_ptr<int> world,archive_cache;MeleeWebMenuHost host_object,*host=&host_object,*owner=&host_object;MeleeWebMenuSession session;unsigned* seed_ptr=&host_object.seed;
 uint64_t generation=7,current_sss_asset_request_calls=9;unsigned asset_generation=4;size_t replay_cursor=0;int phase=0,scene=0,selection_calls=0,pending_menu_source_scene=0;
 bool host_entered=false,world_exposed=false,match=false,results=false,prize=false,pending=false,running=false,faulted=false,menu_scene_rebuild_pending=false,replay_trace=true,replay_started=false,scoped_assets=true,scoped_disc_import=true,source_session_owned=true,stadium_c1a_armed=false,transition_audio_continues=false,skip_note=false;
@@ -146,6 +162,8 @@ int melee_web_menu_host_leave(MeleeWebMenuHost*,int,char*,size_t);
 int HSD_SynthSFXGetPendingLoadCount(){return 0;}int melee_web_audio_bank_transport_active(){return 1;}
 int melee_web_audio_bank_transport_configured(){return 1;}int melee_web_audio_bank_transport_busy(){return 0;}
 int melee_web_menu_host_stadium_c1a_selection(MeleeWebMenuHost*,MeleeWebMenuMatchSelection* out,char*,size_t){++selection_calls;*out=replay->selection;return 1;}
+const MeleeWebPadState* melee_web_menu_host_input(const MeleeWebMenuHost* value){return value?&value->input:nullptr;}
+int melee_web_pad_state_encode(const MeleeWebPadState* input,uint8_t* output,size_t size){if(!input||!output||size!=MELEE_WEB_PAD_STATE_BYTES)return 0;for(size_t i=0;i<size;++i)output[i]=input->tag;return 1;}
 std::string first_css_browser_draw_json_quote(const std::string& s){return "\""+s+"\"";}
 namespace melee_web{namespace stadium_first_css_diagnostic{std::string hex32(uint32_t){return "e2624ac3";}void write_start(std::ostream& out,const StartMeleeData&){out<<"{}";}}}
 '''
@@ -189,15 +207,16 @@ int main(){reset();complete_leave();auto& s=current_sss_exit;
 }
 '''
         includes=''.join('#include "'+str(BASE/'src'/name)+'"\n' for name in
-                         ['menu_preparation_state.hpp','source_frame_sequence.hpp'])
-        run(includes+fixture+notify+note+host_arm+helpers+preparation+getter+main,
+                         ['gameplay_pad_state.h','menu_preparation_state.hpp','source_frame_sequence.hpp'])
+        run(includes+fixture+notify+note+host_arm+helpers+arm+preparation+getter+main,
             self.new_workspace(ROOT,'stock4-leave-generation-lifecycle-'))
 
     def test_actual_prepared_start_getter_is_read_only_and_requires_the_exact_stopped_boundary(self):
         text=(ROOT/'src/gameplay_menu_browser.cpp').read_text()
         fn=cut(text,'const char* melee_web_native_menu_stadium_current_sss_prepared_start_observe(){',
-               'int melee_web_native_menu_stadium_first_css_draw_arm(')
+               'int melee_web_native_menu_stadium_current_sss_prepared_setup_begin(')
         fixture=r'''
+#include <array>
 #include <cassert>
 #include <cstdint>
 #include <memory>
@@ -206,18 +225,20 @@ int main(){reset();complete_leave();auto& s=current_sss_exit;
 #include <stdexcept>
 #include <string>
 enum class CurrentSssExitProfile{Time120,Stock4None};enum{MELEE_WEB_MENU_READY=1,St_Kind_PStadium=3};
-enum class AssetDestination{None,Match};struct Host{};struct Recipe{std::unique_ptr<int> initial_css{new int(1)};};
+enum class AssetDestination{None,Match};struct MeleeWebPadState{uint8_t tag=0x5a;};struct Host{MeleeWebPadState input;};struct Recipe{std::unique_ptr<int> initial_css{new int(1)};};
 struct StartMeleeRules{int stkind=St_Kind_PStadium;};struct StartMeleeData{StartMeleeRules rules;};
-struct MeleeWebMenuMatchSelection{StartMeleeData start;uint32_t random_seed=0xe2624ac3;};
+struct MeleeWebMenuMatchSelection{StartMeleeData start;struct{uint32_t controller=0,stocks=0,costume=0,sub_color=0;}players[4];uint32_t player_count=2,random_seed=0xe2624ac3,hud_layout=0;uint16_t unlocked_characters=2047,unlocked_stages=2047;uint8_t save_profile_present=1,opening_demo=0,sudden_death=0;};
 struct Note{bool captured=true;uint64_t world_generation=7;};struct Observation{int state=2;Note note;};
-struct CurrentSssExitState{bool prepared_start_attempted=false,prepared_start_captured=false;
+struct CurrentSssExitState{bool prepared_start_attempted=false,prepared_start_captured=false,prepared_start_selection_captured=false;
  std::string prepared_start_error,prepared_start_json;bool armed=true,terminal=true,failed=false,notified=true;
  CurrentSssExitProfile profile=CurrentSssExitProfile::Stock4None;Observation observation;
  uint64_t world_generation=7,leave_world_generation=7,leave_asset_generation=4,leave_asset_requests=9,notification_order=543;
  size_t terminal_cursor=270,notification_cursor=270,terminal_steps=0,terminal_draws=0;
  size_t notification_steps=0,notification_draws=0,terminal_asset_requests=0;
  bool last_host_tick_returned=true,host_tick_in_flight=false;const Recipe* recipe=nullptr;
- const int* context=nullptr;Host* host_owner=nullptr;int* leave_world=nullptr;int* leave_cache=nullptr;};
+ const int* context=nullptr;Host* host_owner=nullptr;int* leave_world=nullptr;int* leave_cache=nullptr;
+ MeleeWebMenuMatchSelection prepared_start_selection{};const MeleeWebPadState* prepared_start_input_owner=nullptr;
+ std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> prepared_start_input_bytes{};};
 CurrentSssExitState current_sss_exit;std::unique_ptr<Recipe> replay;Host host_object,*host=nullptr;
 std::unique_ptr<int> world,archive_cache;uint32_t asset_generation=4;uint64_t current_sss_asset_request_calls=9;
 bool host_entered=false,world_exposed=true,match=false,results=false,prize=false,pending=false,running=false;
@@ -238,6 +259,10 @@ int melee_web_menu_host_phase(Host*){return host_phase;}
 int melee_web_menu_host_source_scene(Host*){return host_scene;}
 int melee_web_menu_host_stadium_c1a_selection(Host*,MeleeWebMenuMatchSelection* out,char* e,size_t){
  ++selection_calls;(void)e;out->start.rules.stkind=St_Kind_PStadium;return 1;}
+const MeleeWebPadState* melee_web_menu_host_input(Host* value){return value?&value->input:nullptr;}
+int melee_web_pad_state_encode(const MeleeWebPadState* input,uint8_t* output,size_t size){
+ if(!input||!output||size!=MELEE_WEB_PAD_STATE_BYTES)return 0;
+ for(size_t i=0;i<size;++i)output[i]=input->tag;return 1;}
 std::string first_css_browser_draw_json_quote(const std::string& s){return "\""+s+"\"";}
 namespace melee_web{namespace stadium_first_css_diagnostic{
 std::string hex32(uint32_t){return "e2624ac3";}
@@ -258,6 +283,10 @@ int main(){reset();std::string first=melee_web_native_menu_stadium_current_sss_p
  assert(first.find("\"captured\":true")!=std::string::npos&&first.find("\"replay_cursor\":270")!=std::string::npos);
  assert(first.find("\"local_order_rows\":543")!=std::string::npos&&first.find("\"Entry\":false")!=std::string::npos);
  assert(first.find("\"hsd_pending_loads_at_return\":0")!=std::string::npos&&service_reads==4);
+ assert(current_sss_exit.prepared_start_selection_captured&&current_sss_exit.prepared_start_selection.random_seed==0xe2624ac3);
+ assert(current_sss_exit.prepared_start_input_owner==melee_web_menu_host_input(host));
+ assert(current_sss_exit.prepared_start_input_bytes.front()==host->input.tag&&
+        current_sss_exit.prepared_start_input_bytes.back()==host->input.tag);
  assert(selection_calls==1&&source_steps==0&&source_draws==0&&asset_calls==0);
  assert(first==melee_web_native_menu_stadium_current_sss_prepared_start_observe()&&selection_calls==1);
  for(int fault=0;fault<21;++fault){reset();auto& s=current_sss_exit;const char* reason="";
@@ -290,7 +319,8 @@ int main(){reset();std::string first=melee_web_native_menu_stadium_current_sss_p
  }
 }
 '''
-        run(fixture+fn+main,self.new_workspace(ROOT,'stock4-prepared-start-getter-'))
+        pad_header='#include "'+str(BASE/'src'/'gameplay_pad_state.h')+'"\n'
+        run(pad_header+fixture+fn+main,self.new_workspace(ROOT,'stock4-prepared-start-getter-'))
 
     def test_prepared_start_export_stays_diagnostic_gated_and_runner_opt_in(self):
         cmake=(ROOT/'cmake/FighterRuntime.cmake').read_text()

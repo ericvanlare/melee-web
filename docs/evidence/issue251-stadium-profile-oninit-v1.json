@@ -16621,10 +16621,46 @@
           "Retain all existing owner, asset, audio, loader/wait, phase and unload guards; no seed injection, fabricated Entry stamp or source callback masquerading."
         ],
         "validation_status": {
-          "current_main_integration": "PR332 merged as 706fa1bb; integration into Stadium checkout and current-main full regression pending",
-          "full_regression_on_final_offline_repair_candidate": "PENDING",
+          "current_main_integration": "PR332 main706fa1bb integrated as8d6a755c; capture/source checkpoint467a4ca2 remains distinct",
+          "full_regression_on_final_offline_repair_candidate": {
+            "result": "PASS",
+            "tests": 2696,
+            "skipped": 189,
+            "seconds": 556.332,
+            "log_sha256": "28959d746abb6005c4dc63b10f9b2ce57cabdf5447e1fb4b3a4b563a2a786bd1",
+            "source_head": "8d6a755c65d6039eef79b9d64ca95d217736c0fd",
+            "test_only_delta_sha256": "4874bad7ddd1a0a51b88edd8c38d640901c4079c33634335f557f7d0075217dc"
+          },
           "publication_or_merge_acceptance": false,
-          "PR301": "draft"
+          "PR301": "draft",
+          "retained_first_full_regression": {
+            "result": "FAILED",
+            "head": "8d6a755c65d6039eef79b9d64ca95d217736c0fd",
+            "tests": 2696,
+            "skipped": 189,
+            "errors": 3,
+            "seconds": 564.0,
+            "log": "stadium-setup-comparator-finalization-repair-v1-20261018/full-regression-current-main-v1.log",
+            "sha256": "336146029edaa6d137deaa3265a2730955f670420359cc025a0114c1ff70d606",
+            "cause": "Stale extracted-source test fixtures omitted current selection/PAD fields and swept adjacent helpers into translation units."
+          },
+          "fixture_repair": {
+            "file": "tests/test_stadium_stock4_sss_exit.py",
+            "sha256": "4874bad7ddd1a0a51b88edd8c38d640901c4079c33634335f557f7d0075217dc",
+            "freeze_sha256": "e4bbc23db02b8599b8e3f2a2cb70ab25593b74015b97ab8191c52067683d6da0",
+            "root_review_sha256": "06505bbc1272c47db0b5bd0616a675983fab45fd7ff916fc671451b8dc993697",
+            "focused_result": "5 Python tests and14nested Node controls pass",
+            "scope": "Test-only repair; original negative assertions preserved; no runtime/capture source or raw data changed. Two preceding focused compile failures retained."
+          },
+          "current_main_builds": {
+            "result": "PASS_BOTH_RELEASE_BUILDS",
+            "receipt": "stadium-setup-comparator-finalization-repair-v1-20261018/current-main-fixture-repair-v1/build-validation-current-main-v2.json",
+            "sha256": "4e497e916da2171bc3fe33766f9cf4594a6a234766b1636db27ca5eb349ae1e8",
+            "retained_prior_artifacts": 50,
+            "retained_current_artifacts": 50,
+            "scope": "Current-main build products remain distinct from earlier failed-capture producers. No new capture or C3 pass."
+          },
+          "exact_head_ci": "PENDING_FINAL_CHECKPOINT_PUSH"
         },
         "evidence_path_base": "stadium-prepared-setup-build-v1-20261018-083639Z; stadium-prepared-setup-seed-phase-fix-v1-20261018; stadium-setup-comparator-finalization-repair-v1-20261018",
         "publication_drafts": {
