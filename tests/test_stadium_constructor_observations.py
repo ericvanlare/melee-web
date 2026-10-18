@@ -16,7 +16,8 @@ ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 from stadium_go_prefix import (CONSTRUCTOR_POINTS, StadiumConstructorObservations,
                                StadiumGoPrefixError, EXPECTED_SETUP_RECEIPT_SHA256,
-                               DIAGNOSTIC, _ppc_randi_result, validate_stadium_go_prefix)
+                               DIAGNOSTIC, _ppc_randi_result, validate_stadium_go_prefix,
+                               validate_stadium_idle_3500_reference)
 from test_stadium_go_prefix import _fixture, observer_stream
 
 
@@ -331,8 +332,25 @@ class StadiumConstructorWiringTests(OwnedWorkspaceTests):
             if enabled: self.assertIs(run.call_args.kwargs['common_wire_comparator'],compare_stadium_common_wire)
         for scope,replay,value in [('stadium_go_prefix',None,True),('transform_prefix',{},True),('stadium_go_prefix',{},1)]:
             with patch.object(driver,'validate_reference_build_manifest',return_value={}), patch.object(driver,'menu_actions',return_value=({'scope':scope},'hash')):
-                with self.assertRaisesRegex(ValueError,'explicit recorded Stadium replay'):
+                with self.assertRaisesRegex(ValueError,'explicit checked capture mode'):
                     driver._run(dolphin='unused',disc='unused',profile='unused',menu_recipe='unused',output=self.workspace,build_manifest='unused',timeout=180,replay_receipt=replay,stadium_constructor_owner=value)
+
+    def test_idle3500_pre_go_draw_return_short_circuits_post_go_target(self):
+        # This actual idle fixture includes the authored DrawReturn before GO,
+        # when there is no C tick yet. It must reach the later scoped terminal
+        # refusal rather than evaluating the post-GO 3500-tick target early.
+        import test_stadium_idle_3500_reference as idle
+
+        raw, status = idle.fixture(end_ordinal=0)
+        with tempfile.TemporaryDirectory() as directory:
+            stream = Path(directory) / 'idle3500-observer.bin'
+            stream.write_bytes(raw)
+            status_path = Path(str(stream) + '.status.json')
+            status_path.write_text(json.dumps(status))
+            with self.assertRaisesRegex(
+                    StadiumGoPrefixError,
+                    'observer stream lacks containing C, next full F, or finishing DrawReturn'):
+                validate_stadium_idle_3500_reference(stream, status_path=status_path)
 
 
 if __name__=='__main__': unittest.main()

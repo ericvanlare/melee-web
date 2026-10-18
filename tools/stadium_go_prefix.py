@@ -2359,14 +2359,15 @@ def _validate_stadium_go_prefix_scope(stream_path: str | Path,
                     _require(not (go_seen and c_tick is None),
                              "DrawReturn preceded containing tick C")
                     previous_draw_sequence = row["seq"]
-                    target_reached = (target_tick_seen if post_go_target_ordinal is not None else
-                                      last_source_tick >= c_tick + 3500 if original_idle_3500 else True)
-                    if go_seen and f_tick is not None and target_reached:
-                        _require(source_ticks_since_draw <= MAX_SOURCE_TICK_BATCH and
-                                 tail_after_f <= natural_batch_tail_limit,
-                                 "qualifying DrawReturn exceeded the authored batch bound")
-                        final_draw_sequence = row["seq"]
-                        final_tail_after_f = tail_after_f
+                    if go_seen and f_tick is not None:
+                        target_reached = (target_tick_seen if post_go_target_ordinal is not None else
+                                          last_source_tick >= c_tick + 3500 if original_idle_3500 else True)
+                        if target_reached:
+                            _require(source_ticks_since_draw <= MAX_SOURCE_TICK_BATCH and
+                                     tail_after_f <= natural_batch_tail_limit,
+                                     "qualifying DrawReturn exceeded the authored batch bound")
+                            final_draw_sequence = row["seq"]
+                            final_tail_after_f = tail_after_f
                     source_ticks_since_draw = 0
                     if final_draw_sequence is None:
                         tail_after_f = 0
