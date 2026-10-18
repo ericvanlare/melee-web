@@ -4350,9 +4350,13 @@ async function runFirstCssConstructorReturn({baseUrl, artifacts, before}) {
   report.scenario.armed_before_css_entry = true;
   await persistReport();
 
-  await timeout(page.locator('#launch').click({timeout: remaining()}),
+  await timeout(page.evaluate(async generation => {
+    const launch = globalThis.meleeStadiumFirstCssConstructorReturnLaunch;
+    if (typeof launch !== 'function') throw Error('Private prepared constructor launch is absent');
+    await launch(generation);
+  }, armed.observation.armed_world_generation),
     Math.min(LIMITS.sourceTransitionMs, remaining()),
-    'Original CSS constructor entry through the existing launch control');
+    'Original CSS constructor entry through the queued prepared owner');
   await timeout(page.waitForFunction(() => {
     const module = globalThis.Module;
     const pointer = module?._melee_web_native_menu_stadium_first_css_draw_observe?.();

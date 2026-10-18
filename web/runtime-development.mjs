@@ -455,6 +455,54 @@ window.menuReplayPoll=()=>{
 // whole-session replay entry: the canonical freshly prepared CSS owner receives
 // one agreed seed, then the ordinary native launch enters it. Per-tick PAD
 // frames and checksum records cross only the _melee_web_net_* exports.
+// Private constructor-only diagnostic entry. The ordinary Play control still prepares.
+let firstCssConstructorLaunchAttempted=false;
+window.meleeStadiumFirstCssConstructorReturnLaunch=async expectedGeneration=>{
+ if(firstCssConstructorLaunchAttempted)throw Error('CSS constructor launch was already attempted.');
+ firstCssConstructorLaunchAttempted=true;
+ const launchOwner=owner,launchModule=Module,launchHandle=owner?.handle;
+ const launchBoundary=boundary,launchCheck=check;
+ const assertIdentity=()=>{
+  if(!launchOwner||owner!==launchOwner||Module!==launchModule||
+     owner.handle!==launchHandle||boundary!==launchBoundary||check!==launchCheck)
+   throw Error('CSS constructor launch owner changed.');
+ };
+ const assertOwner=()=>{
+  assertIdentity();
+  const state=launchHandle.getState();
+  if(state.state!=='prepared'||state.busy||state.loading||state.requiresReload||
+     state.ready!==true||state.canStart!==true||state.phase!==0||state.running)
+   throw Error('CSS constructor launch requires an idle prepared owner.');
+ };
+ const assertArmed=()=>{
+  assertOwner();
+  if(!Number.isSafeInteger(expectedGeneration)||expectedGeneration<=0||
+     typeof launchModule._melee_web_native_menu_stadium_first_css_constructor_return_v2_arm!=='function'||
+     typeof launchModule._melee_web_native_menu_stadium_first_css_draw_observe!=='function')
+   throw Error('Private CSS constructor launch capability is absent.');
+  const pointer=launchModule._melee_web_native_menu_stadium_first_css_draw_observe();
+  const observation=pointer?JSON.parse(launchModule.UTF8ToString(pointer)):null;
+  if(observation?.schema!=='melee-web-stadium-first-css-constructor-return-observation-v2'||
+     observation.mode!=='constructor_return_only_v2'||observation.state!=='armed'||
+     observation.error!==null||observation.native_phase!==0||observation.running!==false||
+     observation.host_entered!==false||observation.armed_owner_stable!==true||
+     observation.armed_world_generation!==expectedGeneration||
+     observation.constructor_return_terminal!==false||
+     observation.source_steps!==0||observation.source_draws!==0||
+     launchModule._melee_web_native_menu_phase()!==0||
+     launchModule._melee_web_native_menu_running()!==0)
+   throw Error('CSS constructor launch requires the unchanged armed CREATED owner.');
+ };
+ // All native observations and entry use the existing owner command boundary.
+ assertIdentity();
+ if(typeof launchBoundary!=='function')throw Error('CSS constructor launch boundary is absent.');
+ await launchBoundary(assertArmed);
+ resetTiming(false);
+ await prepareAudio();await pauseAudioForPreparation();await waitForAudioRender();
+ await launchBoundary(()=>{assertArmed();launchCheck(launchModule._melee_web_native_menu_launch());});
+ $('canvas').focus();inputDirty=true;syncAudio();
+};
+
 window.meleeNetTimingPauseEligibilitySnapshot=()=>{
  if(!owner?.handle||typeof Module._melee_web_net_status!=='function')
   return {eligible:false,reasons:['owner-unavailable'],network_status:null,native_running:null,native_message:null,owner_state:null};
