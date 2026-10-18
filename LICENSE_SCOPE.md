@@ -99,6 +99,7 @@ build or serve. Preserve the license and this scope when redistributing them.
 - `reference-capture/slippi/generate_service_lineage.py`
 - `reference-capture/slippi/transport_fault_recipes.py`
 - `tests/test_slippi_transport_fault_recipes.py`
+- `tests/test_slippi_profile_controls_discovery.py` (behavior-free test discovery only)
 - `docs/evidence/desktop-transport-matrix-e06-v1.json`
 - `web/gamecube-save.mjs`
 - `web/save-profile-settings.mjs`
@@ -145,6 +146,25 @@ fixture and its stage-kind bridge are project-authored diagnostic orchestration;
 this grant does not extend to recovered game/SDK declarations or implementations
 that they include or call, nor to the compiled runtime, assets or generated
 evidence.
+
+The profile test discovery shim listed above only exposes isolated test classes;
+all profile behavior and controls remain in the GPL directory below.
+
+## Separate Slippi-compatible profile scope
+
+`src/slippi_profile/`, including its behavioral specifications and tests, is
+separate GPL-3.0-or-later scope and is not included in the MIT allowlist above.
+These are independently written C implementations from behavioral specifications,
+with per-behavior Project Slippi patch mappings; no line-by-line ASM translation
+or implementation copied from other ports is authorized. Preserve the full GPL
+notice and SPDX headers in that directory. Project Slippi source notices are
+credited separately in [THIRD_PARTY.md](THIRD_PARTY.md).
+
+Distribute builds incorporating this profile under GPL terms, with public
+corresponding source and reproducible build instructions. This does not expand
+the root MIT grant or grant rights in recovered game/SDK code, supplied disc
+content or other excluded material. The owner authorized this profile boundary
+on October 17, 2026; existing unrelated scopes remain unchanged.
 
 ## Exclusions and existing terms
 

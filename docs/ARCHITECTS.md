@@ -52,6 +52,43 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
+### 2026-10-17 — Owner and Claude: no-draw rollback and isolated profile
+
+**Ask:** Use Slippi's match-only fast-forward model: correction ticks execute
+simulation without source draw; draw only the present frame. Remove the
+render-to-simulation dependencies in the Slippi profile and verify drawn versus
+no-draw re-simulation with strict checksums. Pause October 16 sprint items 2–9
+(drawn renderer ownership); reopen only for a demonstrated dependency that the
+no-draw model cannot remove, reported on #158 first.
+
+**Status:** Accepted. The previous step is checkpointed. Implement dependency
+fixes and the no-draw synctest together, then UCF 0.84 and the remaining online
+profile behaviors, then a match with rollback between two browsers on our relay.
+Vanilla remains the unchanged offline accuracy reference. Stadium C3 continues
+alongside; Ranked/Unranked use unfrozen Stadium, including transformations.
+
+The owner authorizes independently written C implementations from the behavioral
+inventory, with per-behavior Slippi patch mappings. All derived behavior and its
+tests stay under `src/slippi_profile/`, GPL-3.0-or-later, separately scoped in
+`LICENSE_SCOPE.md` and credited in `THIRD_PARTY.md`. Do not transliterate ASM or
+copy other ports. Builds including this profile follow GPL distribution terms
+with public corresponding source and reproducible builds; the existing MIT
+scope is unchanged. Player-facing naming is **Slippi-compatible rules
+(unofficial)** with an unaffiliated/unendorsed disclaimer and no Slippi branding.
+Preserve the actual upstream notices: Slippi Dolphin has GPL-2.0-or-later
+notices; the pinned ASM repository carries GPLv3 text.
+
+Online delivery is browser-to-browser on our own relay only. No traffic to
+official Slippi matchmaking, accounts or replay upload; no team contact is
+authorized. A5 cross-play with official Slippi users is parked indefinitely
+pending a separate explicit owner decision. Prior research and evidence stay
+retained and do not authorize service use.
+
+**Links:** [Mode identity #9](https://github.com/ericvanlare/melee-web/issues/9),
+[rollback #318](https://github.com/ericvanlare/melee-web/issues/318),
+[priorities #158](https://github.com/ericvanlare/melee-web/issues/158),
+[Stadium #251](https://github.com/ericvanlare/melee-web/issues/251).
+
 ### 2026-10-13 — Owner: hosted room UI for a manual two-computer trial
 
 **Ask:** Replace the proposed local portable delivery with a live staging page

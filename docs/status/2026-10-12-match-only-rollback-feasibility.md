@@ -1,6 +1,6 @@
 # Match-only rollback feasibility
 
-**Compiled / Source-only snapshot diagnostic / Terminal browser tick-and-draw diagnostic / Browser rollback and frame-budget feasibility unproven**
+**Compiled / Source-only snapshot diagnostic / Terminal browser tick-and-draw diagnostic / No-draw declared-state component / Browser rollback and frame-budget feasibility unproven**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
 [merged #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
@@ -186,7 +186,7 @@ state/host-ownership design and the Slippi profile gates, and move independent
 engineering to the requested H1 first-use respawn/common-effect preparation
 investigation. H1 keeps every timing guard and source tick/RNG/order invariant.
 Stadium C3 remains next Track B. Source-only Slippi semantic/license/reference
-work continues under #9; the profile is not ready to port. Original comparison,
+work continues under #9; the complete profile and its reference agreement remain open. Original comparison,
 physical input, foreground timing, audible output and two-machine acceptance
 remain separate unrun gates.
 
@@ -201,6 +201,80 @@ layout is now compile-checked: match stats 192 bytes, observation 1280 bytes, wi
 explicit field/PAD offsets. The checker refuses an incompatible layout and
 invalid or partial checkpoint/depth selection. The default full-fixture matrix
 and its strict original assertions remain unchanged.
+
+## October 17 owner pivot: no-draw correction ticks
+
+The paused drawn ownership results in draft #324 remain historical component evidence.
+Their proposed next drawn restore/repeat is paused by the owner's new decision;
+October 16 sprint items 2–9 are not an active prerequisite. The next milestone
+combines Slippi-profile render-to-simulation fixes with a strict drawn/no-draw
+re-simulation synctest. No new synctest, performance or profile pass is claimed
+by this decision. Vanilla drawing and its original comparison gates stay intact.
+
+Profile implementation is now authorized in the isolated GPL-3.0-or-later scope;
+complete semantics and independent reference validation remain open. The
+[architects' log](../ARCHITECTS.md) and [roadmap](../ROADMAP.md) record the license,
+unofficial naming, own-relay-only service policy and indefinitely parked A5.
+
+## First no-draw profile comparison
+
+The isolated **`slippi-render-dependencies-v1`** diagnostic implements our own
+C versions of the DynamicsFix matrix refresh and BrawlOffscreenDamage predicate.
+It does not enable a player toggle or identify a complete online profile.
+Vanilla retains its existing source/build path. The
+[profile boundary and source mappings](../../src/slippi_profile/README.md)
+record the remaining dependency inventory.
+
+One headless Chrome run executed 301 original source draws. Its 300 setup/neutral
+prefix samples and one subsequent input sample matched the no-draw Node lane exactly in
+all 1,280 declared state bytes, 4,272 native PCM bytes and 44 literal PAD bytes.
+The Node lane restored its 128 MiB checkpoint, repeated that one tick without
+source draw, and reproduced the exact observation/PCM/PAD and full Node heap
+endpoint. The browser and its GPU heap were never restored. RNG and raw-input
+single-bit controls were detected, and recovery returned to the exact endpoint.
+The report's `corruptedLowByte` is the RNG byte **after** the corrupted step;
+the frozen source performs the single-bit change before it.
+
+Native shutdown, browser/server closure and independently attributed owned-process
+absence passed. The first-frame screenshot shows FD's background/starfield;
+it supplies no gameplay pixel acceptance. The two earlier initialization failures
+(SDL's read-only runtime property and missing cache directory) and their exact
+runtimes remain retained. The repairs export the actual Emscripten helpers and
+reuse normal cache preparation; native errors and comparisons remain strict.
+
+This is **Browser exercised / declared-state, PCM and raw-input component
+evidence**. It does not demonstrate the new offscreen and matrix predicates in
+combat, complete state or host ownership, original Slippi reference agreement,
+other fighters/stages, live rollback or a seven-correction frame budget. Those
+boundaries remain open. The existing structured receipt's
+`no_draw_profile_synctest_v1` records the dirty source based on `65e6c78e`, exact
+runtime/harness/evidence hashes, failures and validation; capture identity must
+not be replaced by a later documentation or integration commit. This precursor
+ran on the paused draft branch; its full regression retained one ordinary
+source-preparation call-shape failure. The focused mainline extraction restores
+that existing call shape and excludes the paused renderer-ownership changes.
+
+The fresh mainline candidate, based on `95113326`, separately passed the same
+bounded comparison with its own linked runtimes: 82 pre/post source, runtime,
+asset and tool pins agree, all declared state/PCM/PAD comparisons and corruption
+controls pass, and owned cleanup passes. Independent source/raw-result review
+passes for this bounded component. The Node heap hashes differ from the
+precursor and remain bound to this build. Both profile and ordinary Release
+builds pass; the actual ordinary Ninja graph excludes the profile sources and
+define. The first fresh-checkout full regression retained three missing-default-
+trace-build failures (two test failures and one setup error). The normal default
+configuration and focused trace checks then passed, followed by the complete
+2,412-test regression with 166 skips and no failures. This supplied the missing
+environment prerequisite without source or assertion changes. The first exact-head
+CI run passed every test/build partition but the aggregate rejected two imported
+profile test identities as belonging to another shard. The strict audit remains
+unchanged. Empty forwarding classes in the behavior-free discovery shim retain
+all ten original profile test methods exactly once; an eleventh GPL control
+checks actual discovery, shard assignment and aggregate acceptance/rejection.
+Independent review and focused controls pass. Final full regression and complete
+new-head CI remain pending at this source checkpoint. Runtime/harness files and
+the retained capture identities are unchanged. Integration remains pending. The structured receipt keeps
+this result under `mainline_extraction`, separately from the historical capture.
 
 ## Slippi profile source checkpoint
 
@@ -230,13 +304,13 @@ that guard. The builder's match-kind-3 score path calls `pl_80039450`, which
 clears and writes live bonus-table data. Standard stock scoring avoids that
 branch; the seven deeper bonus routines remain open.
 
-Cross-play, gateway/services and frame-cadence acceptance are deferred; no real
-Slippi services or accounts were used. The pinned Slippi ASM source carries a
-GPL-3.0 notice, and Dolphin/EXI licensing is separate. The owner's GPL
-distribution question remains pending; repository notices are not clearance.
+This historical inventory used no real Slippi services or accounts. The October
+17 owner decision parks official-service cross-play indefinitely and authorizes
+the isolated GPL-3.0-or-later implementation scope described above. The pinned
+Slippi ASM source carries GPLv3 text; Dolphin/EXI notices remain separate.
 Other open boundaries include original hook branches/continuations, UCF
 predicates and private-history lifetime, opaque `Binary/m-ex.bin` provenance,
 `FreezeGlitchFix`, recommended FoD/XFB behavior, source-to-generated bundle
-pairing and backend activation. No code or profile was ported, and this
-source-only checkpoint does not establish online match activation, release
+pairing and backend activation. No code was ported by that inventory checkpoint;
+its source review does not establish online match activation, release
 executable correspondence, peer agreement or profile acceptance.
