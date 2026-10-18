@@ -1566,3 +1566,26 @@ This proves only same-producer original-reference consumption/extraction and GO/
 The diagnostic now records the four actual HSD queue slots immediately before Master renewal, then publishes them only after the enclosing tick succeeds with the same current match owner. The strict same-v6 gate checks literal semantic bytes, source event, controller mapping and independently admitted Setup generation. Production-C controls and 27 JavaScript tests pass, including all 44 byte mutations and stale/foreign/failed-owner refusals. The first full regression retained two test-fixture failures: a full-path substring mistook browser files for native evidence, and another assertion expected obsolete PAD wording. The reviewed test-only repair preserves the production guards and explicit negative assertions. Diagnostic and ordinary Release builds pass; the repaired full regression passes 2712 tests with 189 skips in 564.665 seconds. Fifty build products remain bound to the observer source. This is component validation only: no new browser capture, Entry/Setup aggregate approval, input/GO/RNG parity or C3 acceptance. The existing failed captures and all producer identities remain unchanged.
 
 A separate offline reduction binds the same original v6 Entry and Setup endpoints: both raw 312-byte tag-4 slices agree with each other and their retained report digest. Their phase seeds stay distinct (`3bb84c53` and `35a455b9`). The existing parser accepts the unchanged 86-bundle/171-action schedule with its new host-only queue requirement for source sequence 2,504. This is original-record equality and packet compatibility; no original/browser full-object, service-order or RNG equivalence is implied.
+
+
+The fresh same-v6 Setup endpoint now passes with harness `e06fd98e`, runtime
+`f4c44f8e` and regression source `4bd306ce` kept distinct. The original Entry
+2,468 and Setup 2,503 declared Start rules, players 0–3 and phase seeds compare
+successfully after the strict CSS/SSS prefix; independent offline replay of both
+comparators passes. The prepared match completes six
+construction steps with zero gameplay ticks/draws. Normal native unload then
+passes and clears its observation. The owner journal verifies all nine browser
+descendants absent; a fresh root scan independently finds its six-PID subset
+(capture leader, server and CDP-attributed processes) absent. The supervised run
+completed in 13.297 seconds.
+
+This tests the `a767cd79` prepared-cancel transfer on the path that previously
+refused unload. It does not retroactively pass the original `e12bea88` failure
+or the later `266f3dc7` diagnostic. The fresh preflight preserves the inherited
+older CSS-failure provenance and separately binds those Setup failures in its
+route review. Expected comparison data remained host-only and the retained
+input schedule was unchanged.
+The next boundary is actual same-v6 consumed input and Ready/GO ordering; this
+endpoint did not exercise the new HSD queue observer, gameplay, full object
+parity, per-owner RNG or C3. Exact receipt identities are under
+`same_v6_setup_browser_e06_v1` in the existing evidence entry.

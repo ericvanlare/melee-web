@@ -16989,6 +16989,58 @@
             "actions": 171,
             "source_queue_sequence": 2504,
             "scope": "Equality of two raw original tag4 slices and existing parser compatibility only. Full original/browser opaque byte comparison, side effects, Entry/Setup ordering, RNG ownership, browser queue consumption and C3 remain unproved. No historical flags or runtime payload changed."
+          },
+          "same_v6_setup_browser_e06_v1": {
+            "status": "passed_bounded_setup_and_native_unload",
+            "harness_source": "e06fd98e29a1c46d0bd165ae9f720f952fc4064d",
+            "runtime_source": "f4c44f8e83e95d017536c5a9f6e386caeabac025",
+            "regression_source": "4bd306ce9276a7ef2637f639d1ce156cb9687c4f",
+            "original_source_stream_sha256": "361e8c1108cc2d02ba94d1f3b3be9612a80d0227672445cd4a2b0e2119917778",
+            "freeze_sha256": "be1df8f914d44a6e563420e42509796b4e0aba2abe695a7e5fa7e790eca87627",
+            "preflight_sha256": "5623c0a0f4c87cd04753e412ac72655e95592a0eed1770dac45ec3395f1c7be0",
+            "route_gate_sha256": "45986578b4b46af83ef648d63632fbcabc43aace493e9a4ad537a6e042324999",
+            "root_release_sha256": "9cf7a3ee75b0184849df2b155a665ce86efa9f1b2ab1abfdf55143f3819ec6ce",
+            "report_sha256": "670a07baf588ae6cfb3dfd9d479e682a992eba5b47ca1058b5c31a290b589794",
+            "owner_sha256": "770d8d37c68746fb835a71c383711674a6f0b0e3ce75650a1804d15c5f1b2771",
+            "retention_sha256": "e3ef87c5c6e123c7171d0b548373bdd22b00e84e92818f6446e4193f76698ec9",
+            "changed_hypothesis": "Prepared-cancel transfer introduced by a767cd79 lies on checked Setup then native unload path; historical e12 generic failure and later266f text-topology diagnosis remain separately attributed.",
+            "declared_comparisons": {
+              "entry_sequence": 2468,
+              "entry_seed": "3bb84c53",
+              "entry_approved": true,
+              "setup_sequence": 2503,
+              "setup_seed": "35a455b9",
+              "setup_approved": true,
+              "scope": "phase, Start rules, players0-3 and phase seed only; not opaque312byte object parity"
+            },
+            "construction": {
+              "construction_complete": true,
+              "construction_steps": 6,
+              "source_frames": 0,
+              "host_tick_calls": 0,
+              "host_draw_calls": 0,
+              "match_world_generation": 3
+            },
+            "cleanup": {
+              "native_unload_completed": true,
+              "observation_cleared": true,
+              "owner_passed": true,
+              "owner_elapsed_ms": 13297,
+              "fresh_ps_subset_count": 6,
+              "fresh_ps_subset_scope": "capture leader, server and four distinct CDP-attributed PIDs; six unique identities, separate from owner descendant inventory",
+              "owner_journal_browser_descendants_absent": 9
+            },
+            "limits": [
+              "No new tick, Ready/GO or actual HSD queue observation was exercised.",
+              "Other Setup fields, complete original/browser source ordering, per-owner RNG and C3 remain open.",
+              "No repeat of historical C/F evidence; all prior failed captures unchanged."
+            ],
+            "independent_result_review_sha256": "fe3cd5e4f1702ffb28f9f75e4d92b9917f10688ce51a30bbed70de3d1977f56a",
+            "independent_comparator_replay": {
+              "Entry": true,
+              "Setup": true,
+              "browser_rerun": false
+            }
           }
         }
       }
