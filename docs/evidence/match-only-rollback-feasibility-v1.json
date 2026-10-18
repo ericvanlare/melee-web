@@ -2327,7 +2327,7 @@
       9
     ],
     "profile_identity": "slippi-render-dependencies-v3",
-    "state": "PASS_NATIVE_SOURCE_REDUCERS_RELEASE_BUILDS_FULL_REGRESSION_AND_BINARY_REVIEW; EXACT_HEAD_CI_PENDING",
+    "state": "MERGED_PR334_NATIVE_SOURCE_REDUCERS_RELEASE_BUILDS_FULL_REGRESSION_AND_EXACT_HEAD_CI_PASS",
     "run_root": "slippi-no-draw-pivot-20261017-212701-0e394502",
     "base": "706fa1bb662d95c91c4187f29803184cc73e0fd9",
     "plan": "remaining-render-dependencies-plan-v2.json",
@@ -2389,7 +2389,13 @@
         },
         "log_sha256": "8390a4c8cbaeaf6a02cfc984104b01cd7eadc063e2065fd060c95e865ac7da86"
       },
-      "exact_head_ci": "Pending",
+      "exact_head_ci": {
+        "run": 39119166887,
+        "head": "34a0c57b65b42c43118ffc58944f8a170682be62",
+        "completed": 14,
+        "successes": 12,
+        "expected_skips": 2
+      },
       "current_runtime_artifacts_preserved": 16,
       "current_runtime_preservation_sha256": "8f61ef4de99c5a2a12f0760f02fff5287a7750b5e196e66b88371b458c3a6595",
       "current_runtime_manifest_entries": 24
@@ -2410,6 +2416,15 @@
       "Stadium": "Actual case8, projection helper and transition Randf loop: original/omitted camera views differ branch/RNG schedule; profile inside/outside decisions agree and preserve per-view wrapper coordinates. Pointer capture before helper, position after helper, source early gates, bounds and quiet NaN controls pass.",
       "scope": "Synthetic bone/projector/RNG services and downstream mode-setter call observer; no full mode-setter, actual stage runtime or whole-profile claim."
     },
-    "next": "UCF0.84 source/continuation and activation mapping, then own-C behavior validation under a new incomplete profile identity. Existing reference/activation gaps remain explicit."
+    "next": "Issue335: reviewed finite binary32 oracle, then total scalar own-C UCF DBOOC helper and actual-source native/Wasm controls before diagnostic wiring. Live reference/activation remain separate.",
+    "integration": {
+      "pr": 334,
+      "merge": "ecb2fe998d5e0458ef13900224341294e143fc9e",
+      "reviewed_head": "34a0c57b65b42c43118ffc58944f8a170682be62",
+      "tree": "c0347b4ca8333a236dbb0a3fbcfe90421e77de25",
+      "reviewed_merged_tree_equal": true,
+      "receipt": "pr334-integration-receipt.json",
+      "receipt_sha256": "4c6cb66bddebd40201749a4de7c9412432d06eec8eba2683f1fceea809802d40"
+    }
   }
 }

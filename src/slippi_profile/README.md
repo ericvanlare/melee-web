@@ -1,15 +1,15 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-# Slippi render-dependency diagnostic profile (v3)
+# Slippi render-dependency and DBOOC diagnostic profile (v4)
 
-`slippi-render-dependencies-v3` is an intentionally incomplete diagnostic
-identity. It retains the three v2 source-side dependency fixes and source-draw
-decision, and adds the Whispy direction and Stadium monitor source hooks. It
-does not identify a complete Slippi gameplay, online, rollback, roster, or
-stage profile. The identity is fixed before initialization; there is no runtime
-mode-switch API. The v1 and v2 identities are historical and are rejected by
-the current profile implementation. The retained v2 browser result does not
-validate either v3 hook. No v3 browser or live stage result exists. Both actual-source reducers pass
-their declared synthetic-service controls; see the existing boundary receipt.
+`slippi-render-dependencies-dbooc-v4` is an intentionally incomplete diagnostic
+identity. It retains the five source dependency behaviors from v3 and adds the
+UCF 0.84 DBOOC SquatRv threshold behavior. It does not identify complete UCF,
+Slippi gameplay, online, rollback, roster or stage support. The identity is fixed
+before initialization; there is no runtime mode-switch API. Earlier identities
+are historical and rejected by the current implementation. The retained v2
+browser result does not validate v3 stage hooks or the v4 UCF hook. No v3 or v4
+browser or live stage result exists. The actual-source reducers cover only their
+declared synthetic-service controls; see the scoped receipts below.
 
 The C implementation in this directory is licensed under
 [GPL-3.0-or-later](COPYING). The small source overlay is
@@ -28,7 +28,7 @@ and behavior. The profile fixtures compile this checkout with
 `MELEE_WEB_SLIPPI_PROFILE=1`; the source-hook code is absent when that define is
 unset.
 
-## Source behavior in the v3 candidate
+## Source behavior in the v4 candidate
 
 | Pinned Slippi source and injection | Downstream patch site and source path | Behavior and dependency classification | Evidence limit |
 | --- | --- | --- | --- |
@@ -37,18 +37,19 @@ unset.
 | `Online/Core/FreezeDeadUpFallPhysics/`: `InitHitVelocity.asm` (`0x800D4C1C`), `UpdateFallVelocity.asm` (`0x800D4D68`), and `UpdateModelPos.asm` (`0x80080E80`) | [`patches/melee-profile-hooks.patch`](patches/melee-profile-hooks.patch); `.deps/melee/src/melee/ft/ft_0D31.c` cases in `ftCo_DeadUpFall_Anim` and `ftCo_DeadUpFall_Phys`, plus `ftdrawcommon.c`'s `ftDrawCommon_80080E18_inline2`. The C helpers are [`deadupfall_fix.c`](deadupfall_fix.c) and [`deadupfall_fix.h`](deadupfall_fix.h). | Case-2 initialization stores initial Y/Z in unused motion-union slots and zeros ordinary self velocity. Case-3 physics updates private Y with the original double subtraction, ordered strict terminal comparison, binary32 store/reload, and source-order vector accumulation, preserving the original later position update and early-break order. The draw helper transforms model position to a stack temporary for JObj translation and leaves `cur_pos` untouched; the original next-tick consumer and `fn_800D4DD4` path are included in the reduction. | The native fixture extracts actual case 2 and case 3 only. Its phase-1 no-dispatch check is a reduced-wrapper boundary control, not full phase-1 source coverage; full phase-1 behavior, interpolation, rotation, reader closure, and exceptional floating-point behavior remain unresolved. |
 | `Online/Core/WhispyBlowDirFix/WhispyBlowDirFix.asm`, `39f9d2a4b70d0b9be72da3e7fed718d0fd4831e5fa10fcca48ec2294a744ede1`, `0x8008653C` | [`patches/melee-profile-hooks.patch`](patches/melee-profile-hooks.patch); `.deps/melee/src/melee/ft/ftlib.c`, inside `ftLib_800864A8`, after `ftLib_800866DC(cur, &vec)` and before adding `sgn(vec.x - v->x)`. The helper is [`whispy_direction_fix.c`](whispy_direction_fix.c). | Render-to-update dependency: for the signed authored condition `motion_id <= ftCo_MS_Sleep` (value 11), the queried fighter contributes zero to the direction sum. The bone query, entity walk, existing eligibility gates, accumulator order, and `HSD_Randi(2)` tie fallback remain in source order. | The pure helper controls cover signed boundary values. The actual-source reducer demonstrates original and omitted-hook direction divergence, profile agreement, and preserved query/RNG order using synthetic bone and RNG services. No live Whispy/KO route or stage behavior is established. |
 | `Common/PSCameraIndependentMonitor/PSCameraIndependentMonitor.asm`, `a05d2964f9219e5b76d8ed667f9df319b0372ec87778c7a5949fce686d7d08ca`, `0x801D24FC` | [`patches/melee-profile-hooks.patch`](patches/melee-profile-hooks.patch); `.deps/melee/src/melee/gr/grpstadium.c`, state 8 in `grStadium_801D2344`, at the existing `grStadium_801D32D0` call. The helper is [`ps_camera_independent_monitor_fix.c`](ps_camera_independent_monitor_fix.c). | Camera/view-to-update dependency: the selected fighter is captured before the original camera/bone/projection helper runs. Its presentation-coordinate and wrapper side effects remain; afterward, the state decision uses the fighter's current position with authored sequential comparisons for the inclusive rectangle `-120 <= x <= 120`, `-20 <= y <= 80`. Ordered comparisons leave quiet NaN comparisons false, as in the source branch sequence. | Pure helper controls cover inclusive bounds, adjacent outside values and quiet-NaN fallthrough. The actual-source state-8 gate, projection helper and transition RNG loop pass paired-view and omission controls. Projector/RNG inputs and the downstream mode-setter observer are synthetic; there is no live Stadium runtime or display result. |
+| `External/UCF 0.84/UCF/UCF DBOOC SquatRv Fix.asm`, `fcf47f10dc244152c2ebaa3a9dec142ea42243b7`, source SHA-256 `39a50bcab5c454d9fbf5865ca2ebdb947031959d0c4c8b188abf4d337da29c80`, `0x800D65EC` | [`patches/melee-profile-hooks.patch`](patches/melee-profile-hooks.patch); `.deps/melee/src/melee/ft/kinds/ftCommon/ftCo_SquatRv.c`, the positive threshold in `ftCo_SquatRv_CheckInput`. Own-C helper [`ucf_dbooc_fix.c`](ucf_dbooc_fix.c). | Input behavior: only the unsigned X-tilt timer byte at `Fighter+0x670` equal to zero admits the fused axis calculation. Checked conversion and modulo-32 arithmetic reproduce the signed squared-radius decision; only then select positive threshold bits `3f170a3d`. Preserve original stick-Y comparison, Enter and return order. | The independent finite rational oracle, native/Wasm scalar controls and source-transition reducer are recorded in the [DBOOC boundary](../../docs/status/2026-10-18-ucf-dbooc-threshold.md). Nearest-even/masked-exception scalar results do not establish FPSCR/trap/NaN-payload parity, matched patched-Slippi execution, live activation or complete UCF. |
 
 Both drawn-present and correction fixtures are configured to compile the same
 profile source hooks. The draw policy accepts only this profile identity:
 present ticks allow source draw, correction ticks skip source draw, and invalid
 identities or tick kinds return an error. The profile-compiled fixture cannot
 label itself vanilla. This policy is not connected to an in-game rollback
-dispatcher. The two new actual-source reducers exercise their declared boundaries
-with omitted-hook controls; prior helper/source controls remain separately
-scoped. They do not establish whole-stage execution, and the prior v2 browser
-capture remains separate.
+dispatcher. The actual-source reducers exercise their declared boundaries with
+omitted-hook controls; prior helper/source results remain separately scoped.
+They do not establish whole-stage execution, and the prior v2 browser capture
+remains separate.
 
-## Other selected hooks reviewed, not implemented by v3
+## Other selected hooks reviewed, not implemented by v4
 
 These entries bound the initial source-dependency review; they are not a whole
 roster or stage call graph.
@@ -119,7 +120,7 @@ predates the v2 DeadUpFall hooks and does not validate them. A later two-tick
 browser result used the v2 identity; it remains v2 evidence and does not
 validate the Whispy or Stadium hooks added under v3. See the
 [scoped receipt](../../docs/status/2026-10-12-match-only-rollback-feasibility.md#first-no-draw-profile-comparison)
-for the separate historical results and their limits. No browser capture under v3 has run.
+for the separate historical results and their limits. No browser capture under v3 or v4 has run.
 
 ## Build and run the bounded diagnostic
 
@@ -164,8 +165,7 @@ experiments, reduce the boundary or obtain bounded review before another run.
 A successful run must not be repeated without a new hypothesis. The
 [scoped receipt](../../docs/status/2026-10-12-match-only-rollback-feasibility.md#first-no-draw-profile-comparison)
 keeps the historical v1 result separate from the v2 two-tick result. Neither
-establishes complete profile or live KO-path coverage, and neither is v3
-validation.
+establishes complete profile or live KO-path coverage, and neither validates the v3 or v4 additions.
 
 The DeadUpFall spec repair supersedes earlier candidate wording about retaining
 ordinary X accumulation: the retained hook resumes at `0x800D4D84`, after the
