@@ -7,6 +7,7 @@
 #include <math.h>
 
 #include <slippi_profile/deadupfall_fix.h>
+#include <slippi_profile/draw_diagnostics.h>
 #include <slippi_profile/profile.h>
 #include <melee/ft/kinds/ftCommon/types.h>
 
@@ -18,6 +19,9 @@
 #include <string.h>
 
 struct Fighter {
+    int32_t player_id;
+    int32_t x618_player_id;
+    int32_t kind;
     struct { union ftCommon_MotionVars co; } mv;
     Vec3 self_vel;
     int x221F_b3;
@@ -217,6 +221,9 @@ static void set_identity_view(float translate_y)
 static void reset_fixture(void)
 {
     memset(&fixture_fighter, 0, sizeof(fixture_fighter));
+    fixture_fighter.player_id = 0;
+    fixture_fighter.x618_player_id = 0;
+    fixture_fighter.kind = FTKIND_MARIO;
     memset(&fixture_gobj, 0, sizeof(fixture_gobj));
     memset(&fixture_jobj, 0, sizeof(fixture_jobj));
     fixture_gobj.user_data = &fixture_fighter;
@@ -424,13 +431,33 @@ static void test_profile_draw_vs_correction(void)
     assert(slippi_profile_source_draw_decision(
                SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_V2,
                SLIPPI_TICK_PRESENT) == SLIPPI_SOURCE_DRAW_ALLOW);
+    const SlippiProfileDrawDiagnostics *diagnostics_before =
+        slippi_profile_draw_diagnostics_snapshot();
+    const uint32_t callbacks_before = diagnostics_before->callback_entries[0];
+    const uint32_t model_transform_before =
+        diagnostics_before->model_transform_entries[0];
     fixture_draw_profile(&fixture_gobj, 17);
-    assert(translation_calls == 1 && matrix_multiply_calls == 1);
+    /* Keep the original causal omission oracle ahead of diagnostics: omitting
+     * the model fix must fail for writing simulation state, not a counter. */
     FIXTURE_EXPECT("deadupfall_model_draw_is_simulation_pure",
                    translation_source_was_cur_pos == 0);
+    const SlippiProfileDrawDiagnostics *diagnostics_after =
+        slippi_profile_draw_diagnostics_snapshot();
+    FIXTURE_EXPECT("fighter_draw_callback_entry_counter",
+                   diagnostics_after->callback_entries[0] == callbacks_before + 1);
+    FIXTURE_EXPECT("fighter_model_transform_branch_counter",
+                   diagnostics_after->model_transform_entries[0] ==
+                       model_transform_before + 1);
+    assert(translation_calls == 1 && matrix_multiply_calls == 1);
     assert_vec(fixture_jobj.translated, (Vec3){3.25f, 4.25f, 6.25f});
     assert_same_simulation(before_draw, simulation_state());
     fixture_draw_profile(&fixture_gobj, 17);
+    diagnostics_after = slippi_profile_draw_diagnostics_snapshot();
+    FIXTURE_EXPECT("fighter_draw_callback_entry_counter_repeated",
+                   diagnostics_after->callback_entries[0] == callbacks_before + 2);
+    FIXTURE_EXPECT("fighter_model_transform_branch_counter_repeated",
+                   diagnostics_after->model_transform_entries[0] ==
+                       model_transform_before + 2);
     assert(translation_calls == 2 && matrix_multiply_calls == 2);
     assert_same_simulation(before_draw, simulation_state());
     assert_vec(fixture_jobj.translated, (Vec3){3.25f, 4.25f, 6.25f});

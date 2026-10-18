@@ -1870,7 +1870,7 @@
       "controls": "identity-view and four draw-guard controls pass",
       "limits": "Native reduced source result with explicit synthetic adapters; not live KO, full service semantics or general reader closure"
     },
-    "next": "Complete exact-head CI and reviewed integration for #329; continue inventory and a path-entering restored-interval comparison before expanding profile/live rollback claims.",
+    "next": "Issue331: two-tick restored comparison with actual per-fighter draw/model-path witnesses; broader dependency and host-state closure remain open.",
     "limits": [
       "Incomplete diagnostic profile only; no player mode toggle or live rollback",
       "Indirect model/collision/roster/stage reader closure remains open",
@@ -1935,7 +1935,13 @@
       },
       "source_and_runtime_equality": "17 changed non-root-doc files and 13 runtime/build artifacts unchanged across build/regression; retained v1 bytes verified before overwrite",
       "browser_capture": "not run for v2; reduced source controls are scoped separately",
-      "ci": "Initial PR330 head8ddb68e2 failed Linux fixture compilation; reviewed header-order repair requires new exact-head CI.",
+      "ci": {
+        "run": 39109121768,
+        "head": "1a0e5bfd1bef6868b504aefee1ff058022f8614b",
+        "complete_checks": 14,
+        "success": 12,
+        "expected_skips": 2
+      },
       "test_portability_repair": {
         "initial_ci_run": 39108303631,
         "failed_head": "8ddb68e2966176553bce299af841844de6bbc2c4",
@@ -1944,9 +1950,353 @@
         "receipt": "pr330-linux-fixture-repair-v1/review-receipt.json",
         "receipt_sha256": "0796dd181cc82315b654877ea1017aa04b692bb0a4bcbc91fb6f8f8898db3827",
         "patch_sha256": "2a64d9e058906e98867acfab1b89b37e35fefbaa87318e5077648a140738318d",
-        "scope": "Two native test translation units include libc math.h before upstream placeholder macros; no runtime arithmetic, assertions, compiler warning flags or production source change. Two affected controls pass on Darwin; Linux CI remains required.",
+        "scope": "Two native test translation units include libc math.h before upstream placeholder macros; no runtime arithmetic, assertions, warning flags or production source change. Affected controls pass on Darwin; final exact-head Linux CI also passes.",
         "independent_review": "pr330-linux-fixture-repair-v1/independent-review-v1.json",
         "independent_review_sha256": "7fa56aaae6fe3fb46690cc8c3624a9fbecd48ccc72cb401daee4e34fcff42b49"
+      },
+      "integration": {
+        "pr": 330,
+        "merge": "310e330939b5a06bd7f0e454d9d5a2a43998f436",
+        "reviewed_head": "1a0e5bfd1bef6868b504aefee1ff058022f8614b",
+        "tree": "d591793ecb34af74a5efb7725c1a17b7fa7a61a0",
+        "merged_tree_matches_reviewed": true,
+        "receipt": "pr330-integration-receipt.json"
+      }
+    },
+    "additional_source_inventory": [
+      {
+        "receipt": "root-ftdata-unkmtx-edge-v1.json",
+        "sha256": "8c1ef8d42941040a7c906c78c819928f201961b536292e862e2f61272ddc1f22",
+        "finding": "Accessory JObj matrix writer/conditional Jigglypuff costume2/3 parent-matrix dynamics reader. Actual asset ancestry and full indirect closure unverified; Mario table slot null.",
+        "scope": "Read-only pinned source review, not a new runtime or comparison result"
+      },
+      {
+        "receipt": "refraction-draw-edge-source-review-v1.json",
+        "sha256": "f8ec5412c28e98541c6b833d828073ca61cd658d5ae96612a268f9d039258f0a",
+        "finding": "Inspected draw reset only changes GX/HSD graphics state. Cloak update/gameplay readers exist but are not written by this reset. Full alias/resource closure remains open.",
+        "scope": "Read-only pinned source review, not a new runtime or comparison result"
+      },
+      {
+        "receipt": "root-afterimage-draw-edge-v1.json",
+        "sha256": "fbd830be54514e273356fd82b444c0eea57be958ae8388395c27f2d19b84b0de",
+        "finding": "Inspected draw consumes history and emits local vertices/GX; ring history written in fighter update. Bone-matrix dependency remains; no actual trail reachability claim.",
+        "scope": "Read-only pinned source review, not a new runtime or comparison result"
+      }
+    ],
+    "fighter_entry_witness": {
+      "issue": 331,
+      "state": "PASSED_TWO_TICK_COMPONENT_PENDING_INTEGRATION",
+      "source_base": "310e330939b5a06bd7f0e454d9d5a2a43998f436",
+      "failed_capture": {
+        "path": "fighter-entry-capture-v1",
+        "report_sha256": "a6922f93cbec7bae3b296273ca1976f5d4da569303cdda9b0af7dbb07409034c",
+        "owner_sha256": "e11608a09619e508f9965e241b2eaf81eea859ea410770f6966a1ce37fd70fd9",
+        "source_freeze": "fighter-entry-capture-v1/failed-candidate-v1/freeze.json",
+        "source_freeze_sha256": "d687adfa78462b63ea993f7dc22441b78f24ae2a229a88714aa8ed47f4cd8fa5",
+        "result": "Failed at the sample-300 strict controller-attribution guard; all 300 prefix samples matched. Sample 301, restore and negative controls remain unrun.",
+        "offline_raw300": "All 1,280 declared state bytes, 4,272 PCM capacity bytes and 44 raw PAD bytes independently match. The failed run is not relabeled passed.",
+        "path_observation": "Each selected Mario callback advances by 5 and normal model-dispatch return by 3 at sample 300. The special model-transform counter remains zero.",
+        "cleanup": "Native renderer close, owned Chrome/server closure and attributed launched-process absence pass."
+      },
+      "diagnosis": {
+        "path": "fighter-entry-capture-v1/independent-first-failure-diagnosis-v1.json",
+        "sha256": "013074b31ddf3a7f4546e305acb054d3cf04daf5b6792b781edb130679db13f0",
+        "cause": "Recovered x61A controller_index is costume tint, not PAD routing. Actual source x618 identifies the processed PAD slot; the owned bridge maps a raw controller to each source slot. Both tint-zero values are expected.",
+        "repair_contract": "Record the processed PAD slot and verify its exact slot/raw-controller mapping from the existing checked constructor and copied initializer. No game-input mutation, relaxed uniqueness or new production getter."
+      },
+      "builds": {
+        "freeze": "fighter-entry-build-v1/freeze.json",
+        "sha256": "2027281145dc830343056a8cac2243852855d593ea18dadaf6c7dcab31fa6e8e",
+        "profile_release": "pass",
+        "ordinary_release": "Pass; profile flags and sources are excluded.",
+        "ordinary_wasm_delta": "Same byte size; code/data payloads differ after relinking, with cause unresolved. JS/data companions are identical. Both identities are retained; ordinary binary reproducibility is not claimed."
+      },
+      "scope": "Two-tick observed fighter-path and declared state/PCM/PAD comparison. No full simulation-state or host-owner closure, live KO/offscreen path, original Slippi parity, seven-tick frame budget, online rollback or acceptance claim.",
+      "passed_capture": {
+        "path": "fighter-entry-capture-v2",
+        "report_sha256": "c0bfe19d87574c43ef0b8b1fdb9e3b8b3c60b93781d349ca38ac5e19f6018d62",
+        "owner_sha256": "1211f3bcf4eb350171378c5ce2bd6b91d450fbc59e4de255efb057e99c03cfa2",
+        "profile": "slippi-render-dependencies-v2",
+        "source_base": "310e330939b5a06bd7f0e454d9d5a2a43998f436",
+        "source_freeze_sha256": "9a3a13bfbfcc6804420f85b6f91c739e6da018498f0527155fbb02f11b8e2a75",
+        "build_receipt_sha256": "1f3dd2bdace8aa664e7df941e88adf222fc1f25a47d905bdfc808cdbc09e2b1a",
+        "source_sha256": {
+          "tests/gameplay_snapshot_probe.cpp": "5489bff017d0d92bf5345321feab641b222923514218b626e534bcf6f1ef6911",
+          "tests/quiescent_wasm_snapshot.mjs": "4a8250b744ac3d00fd4e6b09168829d4adec8a6ebc043e07121e5f3173836570",
+          "src/slippi_profile/profile.h": "c333892c5b1d3a4356e01af74323507b4db537678accd7d90c7c71d037d31e31",
+          "src/slippi_profile/profile.c": "27322c371d72fcbfb5f616a76bb558dd6060a86a13ecbbcc1d9c161063d6b391",
+          "src/slippi_profile/offscreen_damage.h": "871e76629efbf4cf80eef84d963ce69fdb1f8255bfceb498a9c4955ce4983412",
+          "src/slippi_profile/offscreen_damage.c": "bb1d671a088b4bd397bad71d22017ff4d09902916422254e0c82d21997dae1f7",
+          "src/slippi_profile/dynamics_fix.h": "e17c24e09ac247f0b98e3f5fff233f854867a191a4990142ef467400e8b63171",
+          "src/slippi_profile/dynamics_fix.c": "d66255c051abfc2acebe3ac50e0060a475478d226a076821a7fd6c1a55c4343c",
+          "src/slippi_profile/deadupfall_fix.h": "4de60b1f6614c2ab4c6536e4ea27845d374424494734e3d82986b7603891c152",
+          "src/slippi_profile/deadupfall_fix.c": "4c9840a1f629a6d2c751fd47d7368bcc91a5f3b0b43a090b6e13e49ad67c8458",
+          "src/slippi_profile/draw_diagnostics.h": "6ca9834cea701d1f050f492f4eae6433b808071e27410238a5d4a952f30563e0",
+          "src/slippi_profile/draw_diagnostics.c": "ce5be300b229d4533f75ecead321dfa231f946ec1131d0bb27627e22ea6f773d",
+          ".deps/melee/src/melee/ft/kinds/ftMario/forward.h": "8b0dce96646aa03e1ba590c2f76be2e3d193d25cd3ed6e969381f3b71180fbfa",
+          "src/slippi_profile/patches/melee-profile-hooks.patch": "e549d7db496a4e129397954ca1060f02be7c700049dc28bf2cb6d0f758802e71",
+          "src/slippi_profile/tests/synctest_node.cpp": "326566ebbb855c3edea646f3897cc3693e7462d8d48058acd895ae993a63c626",
+          "src/slippi_profile/tests/synctest_browser.cpp": "4635b5ef5dd7ac01f44fa8e1d83829fb035d48a38d10cddd0e6cee2147cc26a3",
+          "src/slippi_profile/tests/run_synctest.mjs": "cb094c5c5fa4b271b45b060de22e8f471a6f4eb225a89f24896abccab46f3768",
+          "src/slippi_profile/tests/runner_contract.mjs": "1040d4c0104fd27eb8df2b7fa9e568d9da3b3cef721d4e553b4dc0c67c44ed9b",
+          "cmake/FighterRuntime.cmake": "9cbcb9f7c6b4195f17f29cb47538b97d41a9d3b9867354944db79865900ff967",
+          "CMakeLists.txt": "7a122748cd23c1b07a29eddaf869bcac71760a047ca8d84b16b2bca0040aa391",
+          "scripts/build.py": "7a3d6eb2f27e69397b6e964b3ccbd1c33a27aeea856b3d22e9ec501ceca57b84",
+          "scripts/gameplay_sources.py": "fd526fbd94059234f156f59935694c359ea44dfc5a44b3da42aacd44e5680853"
+        },
+        "runtime_sha256": {
+          "gameplay_slippi_synctest_node.js": "3e1af5f9eedf2dc13a85759da83c7310fe99ff890bd3b070b58519f5b00318fd",
+          "gameplay_slippi_synctest_node.wasm": "26e58941b675dde17889f1544e6f403f9d7e0e339f575a32e97a696a4d251a28",
+          "gameplay_slippi_synctest_browser.mjs": "fdf8336baa4ac4308ca4a317075bb3ab4da6c696090db3c1a222a5aa1fea0440",
+          "gameplay_slippi_synctest_browser.wasm": "e4f505d12eb527a52f797bdd9cda7d09e812b412203e208cab971aeaf66b8e6a",
+          "gameplay_slippi_synctest_browser.data": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c"
+        },
+        "machine": {
+          "cpu": "Apple M4",
+          "arch": "arm64",
+          "os": "Darwin",
+          "os_release": "25.6.0",
+          "node": "v22.23.2",
+          "chrome": "155.0.8059.80",
+          "headless": true
+        },
+        "interval": {
+          "prefix_samples": 300,
+          "input_samples": [
+            300,
+            301
+          ],
+          "source_frames": [
+            177,
+            178
+          ],
+          "actual_pcm_frames": [
+            533,
+            533
+          ],
+          "audio_phases": [
+            20,
+            40
+          ]
+        },
+        "comparison": {
+          "observation": {
+            "schema": "melee-web-source-snapshot-observation-v2",
+            "bytes": 1280
+          },
+          "pcmBytes": 4272,
+          "rawPadBytes": 44,
+          "drawDiagnosticBytes": 132,
+          "ticks": "exact byte equality after each of input samples 300 and 301; each sample is checked independently",
+          "fighterPath": "source callback entry and normal fighter-model dispatch-return counters must advance for both selected Mario fighters on each drawn sample; this is path reachability, not pixel acceptance",
+          "exactBytesAndSha256": true,
+          "fullHeap": "Node no-draw lane checkpoint restore integrity and endpoint replay only; never compared with drawn browser heap"
+        },
+        "source_draw": {
+          "drawnLane": true,
+          "correctionLane": false,
+          "calls": 302,
+          "completedFrames": 302,
+          "selectedFighterPathSamples": [
+            {
+              "sample": 300,
+              "sourceFrame": 177,
+              "fighters": [
+                {
+                  "sourceSlot": 0,
+                  "processedPadSlot": 0,
+                  "rawController": 0,
+                  "initializerPort": 0,
+                  "fighterKind": 0,
+                  "callbackDelta": 5,
+                  "normalModelDispatchDelta": 3,
+                  "modelTransformDelta": 0
+                },
+                {
+                  "sourceSlot": 1,
+                  "processedPadSlot": 1,
+                  "rawController": 1,
+                  "initializerPort": 0,
+                  "fighterKind": 0,
+                  "callbackDelta": 5,
+                  "normalModelDispatchDelta": 3,
+                  "modelTransformDelta": 0
+                }
+              ]
+            },
+            {
+              "sample": 301,
+              "sourceFrame": 178,
+              "fighters": [
+                {
+                  "sourceSlot": 0,
+                  "processedPadSlot": 0,
+                  "rawController": 0,
+                  "initializerPort": 0,
+                  "fighterKind": 0,
+                  "callbackDelta": 5,
+                  "normalModelDispatchDelta": 3,
+                  "modelTransformDelta": 0
+                },
+                {
+                  "sourceSlot": 1,
+                  "processedPadSlot": 1,
+                  "rawController": 1,
+                  "initializerPort": 0,
+                  "fighterKind": 0,
+                  "callbackDelta": 5,
+                  "normalModelDispatchDelta": 3,
+                  "modelTransformDelta": 0
+                }
+              ]
+            }
+          ]
+        },
+        "target_samples": [
+          {
+            "sample": 300,
+            "pcmFrames": 533,
+            "audioPhase": 20,
+            "observationSha256": "a97c03e66301419bcba8aba75cba1ed88ee3aed3b3a6fc80d9f0fd0f9de8f967",
+            "pcmSha256": "462733f725a874052aba5c73b03dd4b8799b78bb1f973b097768548b16d9833c",
+            "rawPad44Sha256": "46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288",
+            "comparison": "exact-v2-observation/PCM/raw-PAD bytes passed",
+            "drawCallCount": 237,
+            "createdPipelines": 57,
+            "queuedPipelines": 0,
+            "selectedFighterPaths": [
+              {
+                "sourceSlot": 0,
+                "processedPadSlot": 0,
+                "rawController": 0,
+                "initializerPort": 0,
+                "fighterKind": 0,
+                "callbackDelta": 5,
+                "normalModelDispatchDelta": 3,
+                "modelTransformDelta": 0
+              },
+              {
+                "sourceSlot": 1,
+                "processedPadSlot": 1,
+                "rawController": 1,
+                "initializerPort": 0,
+                "fighterKind": 0,
+                "callbackDelta": 5,
+                "normalModelDispatchDelta": 3,
+                "modelTransformDelta": 0
+              }
+            ]
+          },
+          {
+            "sample": 301,
+            "pcmFrames": 533,
+            "audioPhase": 40,
+            "observationSha256": "695dcf7e144dc8fcd8c79e03cdd68da5c9b560aa57aec7d5023bacb73cd6a61a",
+            "pcmSha256": "74ab5495dd17a98755b76bd9c5bd7bb4cfa1b5075cde75c9a904a7a138fd0d8c",
+            "rawPad44Sha256": "c1be1a004e9e0fafa868a1f51540cef6f2fa3d6104e7b503c3b9eb5f79cbe63d",
+            "comparison": "exact-v2-observation/PCM/raw-PAD bytes passed",
+            "drawCallCount": 236,
+            "createdPipelines": 57,
+            "queuedPipelines": 0,
+            "selectedFighterPaths": [
+              {
+                "sourceSlot": 0,
+                "processedPadSlot": 0,
+                "rawController": 0,
+                "initializerPort": 0,
+                "fighterKind": 0,
+                "callbackDelta": 5,
+                "normalModelDispatchDelta": 3,
+                "modelTransformDelta": 0
+              },
+              {
+                "sourceSlot": 1,
+                "processedPadSlot": 1,
+                "rawController": 1,
+                "initializerPort": 0,
+                "fighterKind": 0,
+                "callbackDelta": 5,
+                "normalModelDispatchDelta": 3,
+                "modelTransformDelta": 0
+              }
+            ]
+          }
+        ],
+        "node_restore": {
+          "checkpointInputSample": 300,
+          "intervalInputSamples": [
+            300,
+            301
+          ],
+          "checkpointHeapBytes": 134217728,
+          "checkpointHeapSha256": "d1512b404b41bcbb5bea9f95674dfd365285b17122704ea34fc68f8cc2cc0a3f",
+          "endpointHeapSha256": "c8b4ba9223b516cbe138d202631ce47acb9959585d591a818b749e95eebdbfa2",
+          "restoredCheckpointHeapSha256": "d1512b404b41bcbb5bea9f95674dfd365285b17122704ea34fc68f8cc2cc0a3f",
+          "replayEndpointHeapSha256": "c8b4ba9223b516cbe138d202631ce47acb9959585d591a818b749e95eebdbfa2",
+          "originalEndpointVsReplayExact": true,
+          "restoredCheckpointExact": true,
+          "result": "passed",
+          "finalRecoveryEndpointHeapSha256": "c8b4ba9223b516cbe138d202631ce47acb9959585d591a818b749e95eebdbfa2",
+          "fullHeapComparedAcrossLanes": false
+        },
+        "negative_controls": [
+          {
+            "kind": "source-RNG-bit corruption",
+            "result": "detected",
+            "byteOffset": 83605940,
+            "originalLowByteBeforeStep": 195,
+            "corruptedLowByteBeforeStep": 194,
+            "sourceLowByteAfterStep": 108,
+            "firstObservationDifference": {
+              "offset": 4,
+              "expected": 239,
+              "actual": 108
+            },
+            "expectedObservationSha256": "a97c03e66301419bcba8aba75cba1ed88ee3aed3b3a6fc80d9f0fd0f9de8f967",
+            "actualObservationSha256": "ab4ccf43aa98ee080255d1ab67326ce36cedd13fa9956e30ad5111fb9dd1cfcf"
+          },
+          {
+            "kind": "raw PAD byte mutation",
+            "result": "detected",
+            "padBytes": 44,
+            "changedByteOffset": 2,
+            "expectedPadSha256": "46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288",
+            "actualPadSha256": "e845da00ffa4830b501233227c2caefc13cc9ff67c8614d26a4f33bb1554ea7b",
+            "firstDifference": {
+              "offset": 2,
+              "expected": 0,
+              "actual": 1
+            },
+            "changedStateSha256": "5e1a2726882e889722ee1173af68a965e2eae111d0aea27e754923675b65d6ea"
+          }
+        ],
+        "cleanup": "Renderer close, browser exit, server close, complete CDP attribution and all owned process absence passed.",
+        "ordinary_runtime": "Byte-identical to first #331 witness ordinary build; earlier PR330-to-witness code/data difference remains unexplained and retained.",
+        "integration": "Independent source/raw review and final full regression passed after bounded test-only repair; exact-head CI and integration pending.",
+        "independent_review": {
+          "result": "PASS_BOUNDED_TWO_TICK_COMPONENT",
+          "receipt": "fighter-entry-capture-v2/independent-result-review-v1.json",
+          "sha256": "065306ae22d3e29be001fc5070474216c9e4fd7b8176644beb16fc72333dd577"
+        }
+      },
+      "validation": {
+        "preintegration_review_sha256": "d5ea7d92f610ebd7a7247ca007904ffc462d568815e0cd57c64c559ed1c67c16",
+        "test_only_repair_review_sha256": "a4cd0f793fd4bd843ad319585cb5a13351869085d78f3b9088135060e61582ec",
+        "retained_failure": "DeadUpFall source test had two stale x61A recorder literals and a synthetic tint field after the observer switched to x618. Root interrupted the first full regression, retained it and native compile failure work/slippi-deadupfall-v2-kdty1_xn, corrected only four test lines, then the focused reducer and all omission controls passed. Runtime and capture source unchanged.",
+        "test_only_delta_sha256": {
+          "src/slippi_profile/tests/test_deadupfall_reduction.py": "3152518b5985ebdb2901841666c3f9c0e41c05202a53fc2e9d9e771a0adeb2d2",
+          "src/slippi_profile/tests/deadupfall_reduction_fixture.c.in": "00fd7278832bb93c4fd59e8de33a3fefd96922288fa1ec839fdc778d65bc5ea6"
+        },
+        "full_regression": {
+          "result": "PASS",
+          "tests": 2416,
+          "skipped": 166,
+          "elapsed_seconds": 505.482,
+          "log": "fighter-entry-capture-v2/full-regression-v2.log",
+          "sha256": "d3b638cabe391c196808d8e18bf2bb62c4404390d6a57445d26fb2b22d6939ee",
+          "source_note": "Reviewed four-line test-only repair applied; runtime/capture source unchanged."
+        },
+        "ci": "Pending"
       }
     }
   }
