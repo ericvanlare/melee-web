@@ -1,6 +1,6 @@
 # UCF input-history lifetime and rollback ownership
 
-**Source identified / Reference compiled / Selected initialization metadata observed / Isolated storage validated**
+**Source identified / Reference compiled / Selected initialization metadata observed / Isolated storage validated / Selected Capture–Load boundary observed**
 
 [Milestone #339](https://github.com/ericvanlare/melee-web/issues/339) binds the
 shared UCF Pad Buffer/Cardinals history before its dependent behaviors are
@@ -8,10 +8,11 @@ implemented. The source describes four 12-byte rows with 40 meaningful bytes,
 indexed by the processed PAD slot. Selected endpoint observations identify a
 candidate runtime table span. A standalone format-v1 storage component now
 passes independent review and the full repository suite, but it is not wired
-to a live producer, consumer, match reset, or Slippi snapshot path. Actual
-nonzero history updates, match lifetime and dynamic capture/restore behavior
-remain open. The [structured receipt](../evidence/ucf-history-ownership-v1.json)
-keeps exact source, failure, review and build identities.
+to a live producer, consumer, match reset, or Slippi snapshot path. A
+source-bound native run now observes a selected Capture/Load and changing
+history bytes. Its saved value is zero, so nonzero-history restoration,
+producer ordering and match lifetime remain open. The
+[structured receipt](../evidence/ucf-history-ownership-v1.json) keeps exact source, failure, review and build identities.
 
 ## Reference source and build
 
@@ -241,15 +242,17 @@ the reference lifetime gates are incomplete.
 
 ## Own-local first-load prerequisite
 
-Four bounded attempts retain distinct profiles and raw failures. None reached
-Capture/Load or establishes a history lifetime or restoration result.
+Five bounded prerequisite failures retain distinct profiles and raw output.
+A sixth attempt reaches a real Capture/Load. It establishes the narrow
+reachability result below, while nonzero saved-history acceptance remains open.
 
 | Attempt | First failure | Bounded reduction / resulting progress |
 | --- | --- | --- |
 | v1 | Nested process sandbox application refused before native startup. | A tiny nesting control justified moving only the trusted supervisor outside the policy; each native child retains its default-deny policy. |
 | v2 | The local service could not start its HTTP sink. | The source-equivalent socket fixture isolated `listen`, after successful explicit loopback bind. A reviewed local-port inbound rule allowed the service to start; it does not establish peer authentication. |
 | v3 | No create-ticket acknowledgement; native Shift-JIS conversion yielded an empty result. | The exact-policy converter failed; a paired read-only system encoding-data grant passed all seven declared conversions. Unchanged ASCII P1/P2 identities and input bytes remain source-checked. |
-| v4 | Conversion and confirmation succeeded, then native matchmaking failed before the local ticket was acknowledged. | The first unresolved boundary is ENet I/O; the actual failed syscall/errno has not yet been observed. A smaller socket reproducer is required before another client run. |
+| v4 | Conversion and confirmation succeeded, then native matchmaking failed before the local ticket was acknowledged. | An exact-role socket reducer isolated missing receive permission in the fixture; the original native syscall/errno remains unobserved. Three fixed local UDP inbound grants passed the reviewed controls. |
+| v5 | Both actual clients paired and entered a match; the observer parser rejected the native pregame sequence `-1`. | Source-bound controls distinguished pregame and early receive records from actual game Capture/Load rows. All context sequences and same-game checks remain strict. |
 
 The service is our own loopback fixture; no official Slippi service is allowed.
 All recorded owned processes/groups were independently verified absent, and
@@ -259,16 +262,50 @@ identity, input, game arithmetic, observation deadline or cleanup budget was
 changed to pass a guard. Read-only encoding access concerns system data only;
 network and executable grants did not change in v4.
 
-The next client attempt remains gated on the smaller ENet reduction and review.
-Its first actual Load is a reachability boundary; full restoration acceptance
-still requires the nonzero saved/current/restored history checks below.
+The reviewed receive reducer passed all nine role/policy controls: the exact
+local-port grant permits an empty nonblocking receive, while the original and
+wrong-port controls reject it. The next actual run paired both clients and
+started the match, then stopped at the pregame parser boundary in 15.605
+seconds. It recorded no Capture/Load. The failed output is retained.
 
-First complete and review the source-equivalent ENet I/O reduction. A separately
-reviewed client attempt can then reuse the own-local two-peer route to reach
-Capture/Load. Beyond reachability, restoration acceptance must show nonzero
-saved history, a different current value, and restoration of all 48 saved bytes
-after the actual load. No further offline menu expansion is planned. The five
-still-open consumer paths, actual match/reset lifetime, and Slippi Capture/Load
+The source-bound parser repair passed 32 controls before the sixth run. In
+16.958 seconds, that run reached P1 game 0, signed frame 92: Capture completion
+sequence 242, Load entry 279 and Load completion 280. The saved and restored
+48 bytes are all zero; the pre-load bytes differ. All authored bytes, including
+the eight reserved bytes, are compared. The dynamic layout matches the selected
+composition, and none of the three actual preservation intervals overlaps the
+history span. The fixed backup-region claim remains source-derived, separate
+from the recorded call boundaries.
+
+This result does **not** pass nonzero saved-history restoration. The full retained
+logs contain nonzero captures, but the earliest one (frame 77 in each peer) was
+not loaded. P1 has one completed Load; P2 has none. P2’s separate transport
+stream records a hold at frame 98 and repeated holds at 99, with no release at
+104. Its timing relative to P1’s Load is unknown: the streams have independent
+sequences and no common event timestamps. Selection uses P1-then-P2 polling,
+not a globally earliest event across both peers. The selected Load cannot be
+attributed to that fault.
+
+Independent review also found P2 exited with signal 6 after the diagnostic
+eight-packet hold-queue bound was exceeded. The driver reported first-Load
+reachability without classifying that final client failure. The valid P1
+observation is retained, but this is **not a clean passing run**. The failure
+requires a smaller fault/cleanup-classifier reduction before another capture;
+do not increase the queue bound or ignore repeated packets.
+
+Independent strict replay agrees with both retained streams. All 83 retained
+regular files match their manifest, and all three recorded owned
+processes/groups are absent. The reference binary, policies, input bytes, source
+arithmetic and time limits are unchanged from the reviewed candidate. The
+documentation checkpoint `100da5c1` completed all 14 exact-head checks (12
+successes and two expected skips). This does not close draft #340.
+
+First reduce the repeated-frame hold failure and require final client outcomes
+to be classified. Then use a source-derived, reviewed observation that loads
+the earliest nonzero saved history, with different current bytes and exact
+restoration of all 48 bytes. Inspect the retained logs first; do not repeat
+the first-Load run or relax the acceptance predicate. No further offline menu expansion is
+planned. The five still-open consumer paths, actual match/reset lifetime, and Slippi Capture/Load
 preserve-block and restore-order behavior remain separate gates. The isolated component
 does not establish those runtime behaviors. Do not repeat successful
 initialization without a new hypothesis. No complete profile or live rollback

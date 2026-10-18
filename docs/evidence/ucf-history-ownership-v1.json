@@ -1,9 +1,9 @@
 {
   "schema": "melee-web-ucf-history-ownership-v1",
   "issue": 339,
-  "state": "selected_initialization_metadata_observed_isolated_storage_v1_validated_history_lifetime_open",
+  "state": "selected_capture_load_zero_saved_bytes_observed_peer_fault_failed_nonzero_restoration_open",
   "source_base": "130438fd2b86d00cfec98cd2ba0a5f66084ae15c",
-  "scope": "Source-bound reference build, two retained failed init-only attempts, source/fixture reduction and selected initialization metadata from a third bounded offline attempt, plus an independently reviewed isolated history-storage component and passing full regression. Unauthenticated endpoint; no live history behavior, complete profile or rollback claim. Four separate retained first-load prerequisite attempts remain blocked before Capture/Load, most recently at local ENet I/O after conversion and confirmation.",
+  "scope": "Source-bound reference build, retained prerequisite failures, isolated storage controls and one actual own-local two-peer Capture/Load. Saved/post 48 bytes are zero while pre-load differs; nonzero saved-history restoration and match lifetime remain unproved. No complete profile or browser rollback claim. Independent raw review found P2 signal6 at the diagnostic eight-packet hold-queue bound; the driver first-Load status did not classify that final client failure, so this is not a clean passing run.",
   "history_contract": {
     "source_audit_sha256": "07fcbf61535816c488be1e1e341ee839139f4e98efac9046d7d26b0deed987b4",
     "snapshot_followup_sha256": "2d112f6e1fa8be776a1ddf514a058e51419a1337b21c76c92eb9ac90c25e65f3",
@@ -12,10 +12,10 @@
     "meaningful_bytes_total": 40,
     "index_owner": "processed PAD slot at Fighter offset 0x618; not raw port offset 0x61a",
     "unobserved": [
-      "authenticated installation and history updates",
+      "actual producer callback/processed-slot ordering behind observed changing table bytes",
       "actual match reset and lifetime",
       "five remaining consumer paths and their runtime behavior",
-      "dynamic Slippi snapshot capture/load integration and dependent behavior agreement"
+      "nonzero saved-history restoration and dependent behavior agreement"
     ],
     "source_projection": {
       "packet_sha256": "527fb6390edeeb4e8efdb3aeb5fe92bd58b81847916b9637558b5d4024fae6b4",
@@ -200,12 +200,12 @@
     "matching_build_receipt_found": false,
     "new_build_relabels_historical_artifact": false
   },
-  "next": "Complete and independently review the source-equivalent ENet I/O reduction before releasing a separate own-local two-peer client attempt. First actual Load establishes reachability only; nonzero saved history, changed current bytes, exact 48-byte restoration and preservation ownership remain required for restoration acceptance.",
+  "next": "Reduce the repeated-frame diagnostic hold failure and final client outcome classifier before another capture. Then separately review an explicit input/fault scenario satisfying the earliest nonzero Capture/Load requirement, with all48 bytes, context/frame/order/layout and preservation guards unchanged. Match/reset lifetime and producer/consumer scheduling remain separate gates.",
   "route_admission": {
-    "status": "SCOPED_MENU_READINESS_COMPLETE_V8_OWN_LOCAL_CAPTURE_LOAD_PENDING",
+    "status": "SCOPED_MENU_READINESS_COMPLETE_ACTUAL_ZERO_SAVED_LOAD_OBSERVED_NONZERO_ACCEPTANCE_PENDING",
     "reviewed_source_plan": "minimal-menu-input-bridge-packet-v1.json",
     "reviewed_source_plan_sha256": "e5302bdb22192ca934a13f436a5196b40dd24374e7fe55712a82fc9517f99e1c",
-    "scope": "The original minimal phase/input bridge completed at the v8 chooser-to-parent boundary; this does not admit a match or Capture/Load result."
+    "scope": "The historical v8 chooser-to-parent result remains menu-only. The separate own-local v6 observation reaches actual P1 Capture/Load with zero saved bytes; nonzero restoration remains open and the P2 diagnostic hold fault failed."
   },
   "exclusions": [
     "official Slippi services/contact",
@@ -436,7 +436,7 @@
       "observation": 45,
       "cleanup_reserve": 6
     },
-    "next": "Menu readiness boundary complete. Use the existing own-local two-peer route for real Capture/Load after building the reviewed optional history observer; no more offline menu expansion.",
+    "next": "Menu readiness is complete. The reviewed reference observer was built and actual own-local Capture/Load reached separately; first reduce the retained P2 fault/final-outcome failure before the nonzero restoration observation. No further offline menu expansion.",
     "limits": [
       "Local B-only menu observation; no history evolution/reset, Capture/Load or gameplay result.",
       "Default-deny IP and official-service prohibition remain unchanged.",
@@ -622,7 +622,7 @@
     }
   },
   "reference_history_snapshot_candidate": {
-    "state": "SEVEN_PATCH_REFERENCE_BUILT_FIRST_LOAD_BLOCKED_AT_LOCAL_ENET",
+    "state": "ACTUAL_ZERO_SAVED_FIRST_LOAD_OBSERVED_PEER_FAULT_FAILED",
     "candidate_v2_packet_sha256": "8a32add1d3419ebfd6df13c440e3b29ef25fb793cc143e2659f2efee410dddf7",
     "production_source_review_sha256": "dd57109b431f58e8d7489b152cc3804eefce5d814ca65dc262d0b78ca292f294",
     "focused_cpp_result_sha256": "4ae01e8e3d41dd43e3a23fe20e169ff9649659109227801ac3949caca8823762",
@@ -657,7 +657,7 @@
       }
     },
     "limits": [
-      "New reference executable linked, staged and launched with its own identity; no Capture/Load has been observed.",
+      "Actual native Capture/Load observed with zero saved/post history and differing pre-load bytes; nonzero saved-history acceptance remains open.",
       "Selected composition metadata is not whole-GCT source equivalence.",
       "No live profile history producer/consumer/reset integration."
     ],
@@ -713,7 +713,7 @@
       "receipt_sha256": "dcc0e8d4926499388da7002c3aa6674facb921bad66c6139b889fbf305cfdd4b"
     },
     "first_load_prerequisite": {
-      "capture_load_observed": false,
+      "capture_load_observed": true,
       "official_services_contacted": false,
       "all_owned_groups_absent": true,
       "failures": [
@@ -739,9 +739,67 @@
           "packet_sha256": "3dd0445c69c1caed100f617bf96a54b6b5304715b23fd76e60b3ea11b477e408",
           "review_sha256": "3c988e8cf03c0a1f93147caabf785e706bdcd88618615840c0a248a2c2ca0fe2",
           "retention_sha256": "388e5f9d6a026bef2c07a617d9b4a65bb73c927251d445de8e07b0f2ad3d9d5e"
+        },
+        {
+          "attempt": 5,
+          "boundary": "Actual own-local pairing/match start succeeded; parser rejected native pregame sequence-1 before Capture/Load",
+          "driver_seconds": 15.604591915849596,
+          "packet_sha256": "a392038c606ff9a2375f7f20233f55580dc6e5a42d35ffab1a7a83bd4a7597a2",
+          "review_sha256": "e8c3abeb0d4f20856bb9cbba9fb25d67326b0080ec5810c1418354642f4b95ad",
+          "retention_sha256": "9811adbfdaa3535b693ae0410496968d2954eb0915cd220d7b7ded4369a150b3"
         }
       ],
-      "next": "Smaller source-equivalent ENet I/O reduction before another client attempt; no syscall/errno cause inferred yet."
+      "next": "Reduce the repeated-frame diagnostic hold failure and final client outcome classifier before another capture. Then separately review an explicit input/fault scenario satisfying the earliest nonzero Capture/Load requirement, with all48 bytes, context/frame/order/layout and preservation guards unchanged. Match/reset lifetime and producer/consumer scheduling remain separate gates.",
+      "receive_reduction": {
+        "packet_sha256": "6fbc1134e674914a91ade705b433c81bc490ecba59628c42590f338c2d93a14f",
+        "review_sha256": "8797b1475f424903c4c4d2fddbe8dfff284ea11c4472bc872a0e65d8858f7182",
+        "controls": 9,
+        "native_v4_syscall_errno_observed": false,
+        "scope": "Exact-role empty receive fixtures: baseline/wrong-port deny, fixed-local-port grant permits nonblocking empty receive. Native v5 subsequently paired. No peer-authentication claim."
+      },
+      "attempt6": {
+        "state": "P1_ZERO_SAVED_LOAD_OBSERVED_P2_DIAGNOSTIC_HOLD_FAULT_FAILED",
+        "packet_sha256": "ec50254f91297bfa7cb491f8c3e2cf14eda689b044b8643196de3504b702eb52",
+        "candidate_review_sha256": "ba5c4f8bad53df19480df765aa121531794c2e51354160918d2a53676db72d22",
+        "retention_sha256": "1316cf897c1f6b499c976830da53d9ade0776325aa94b0ee8c0f0ab16985d0ec",
+        "focused_controls": 32,
+        "driver_seconds": 16.957772166933864,
+        "retained_regular_files": 83,
+        "owned_pids_and_groups_absent": 3,
+        "selected_peer": "p1",
+        "game_sequence": 0,
+        "signed_frame": 92,
+        "capture_complete_sequence": 242,
+        "load_entry_sequence": 279,
+        "load_complete_sequence": 280,
+        "saved_nonzero": false,
+        "pre_load_differs": true,
+        "post_load_equals_saved": true,
+        "authored_bytes": 48,
+        "reserved_bytes": 8,
+        "preserve_history_overlaps": 0,
+        "restoration_acceptance": false,
+        "selection": "first complete owner-observed record; p1 then p2 polling, no global cross-peer ordering claim",
+        "full_retained_log_scope": "Earliest nonzero CaptureComplete in each peer is frame77/sequence163 and never loaded; only P1 has a Load. Independent P2 stream includes hold_begin98 and repeatedhold99, no release104; relative timing to P1 Load is unknown. Selected Load is not attributed to that fault.",
+        "original_driver_state": "FIRST_OWNER_OBSERVED_LOAD_REACHABILITY_CHECKPOINT",
+        "independent_result_review_sha256": "1a2f658c7eea7fe9fd123e448c1c3344e625eb57667a57cdaaafc7ace8023aec",
+        "final_process_outcomes": {
+          "matchmaker": 0,
+          "p1": 0,
+          "p2": -6,
+          "p2_diagnostic": "diagnostic hold packet queue exceeded its eight-packet bound",
+          "driver_failed_to_classify_final_client_failure": true,
+          "clean_run_pass": false,
+          "private_profiles_retained": true
+        }
+      }
+    },
+    "exact_head_ci_100da5c1": {
+      "head": "100da5c10ac76564571b1a686b18433fdb0e05bd",
+      "run": 39153753306,
+      "successes": 12,
+      "expected_skips": 2,
+      "receipt_sha256": "35f4e0252a048e092f57795cfa8b039ca6c7217bf4eb8969eadf879969860a37"
     }
   }
 }
