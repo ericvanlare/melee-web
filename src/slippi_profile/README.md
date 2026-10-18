@@ -150,8 +150,9 @@ failure, exact build/source/assets and owner cleanup receipts. After two failed
 experiments, reduce the boundary or obtain bounded review before another run.
 A successful run must not be repeated without a new hypothesis. The current
 [scoped receipt](../../docs/status/2026-10-12-match-only-rollback-feasibility.md#first-no-draw-profile-comparison)
-records the historical v1 evidence. It does not validate this v2 implementation;
-record a v2-specific receipt after running the current build and capture.
+keeps the historical v1 result separate from the corrected v2 two-tick result
+and its retained attribution failure. Neither establishes complete profile or
+live KO-path coverage.
 
 The DeadUpFall spec repair supersedes earlier candidate wording about retaining
 ordinary X accumulation: the retained hook resumes at `0x800D4D84`, after the
