@@ -457,7 +457,8 @@ window.menuReplayPoll=()=>{
 // frames and checksum records cross only the _melee_web_net_* exports.
 // Private constructor-only diagnostic entry. The ordinary Play control still prepares.
 let firstCssConstructorLaunchAttempted=false;
-window.meleeStadiumFirstCssConstructorReturnLaunch=async expectedGeneration=>{
+let freshFirstCssLaunchLease=null,freshFirstCssKickAttempted=false;
+const launchPreparedFirstCss=async(expectedGeneration,fresh)=>{
  if(firstCssConstructorLaunchAttempted)throw Error('CSS constructor launch was already attempted.');
  firstCssConstructorLaunchAttempted=true;
  const launchOwner=owner,launchModule=Module,launchHandle=owner?.handle;
@@ -477,17 +478,21 @@ window.meleeStadiumFirstCssConstructorReturnLaunch=async expectedGeneration=>{
  const assertArmed=()=>{
   assertOwner();
   if(!Number.isSafeInteger(expectedGeneration)||expectedGeneration<=0||
-     typeof launchModule._melee_web_native_menu_stadium_first_css_constructor_return_v2_arm!=='function'||
+     typeof launchModule[fresh?'_melee_web_native_menu_stadium_first_css_fresh_row_v3_arm':
+       '_melee_web_native_menu_stadium_first_css_constructor_return_v2_arm']!=='function'||
      typeof launchModule._melee_web_native_menu_stadium_first_css_draw_observe!=='function')
    throw Error('Private CSS constructor launch capability is absent.');
   const pointer=launchModule._melee_web_native_menu_stadium_first_css_draw_observe();
   const observation=pointer?JSON.parse(launchModule.UTF8ToString(pointer)):null;
-  if(observation?.schema!=='melee-web-stadium-first-css-constructor-return-observation-v2'||
-     observation.mode!=='constructor_return_only_v2'||observation.state!=='armed'||
+  if(observation?.schema!==(fresh?'melee-web-stadium-first-css-fresh-row-observation-v3':
+       'melee-web-stadium-first-css-constructor-return-observation-v2')||
+     observation.mode!==(fresh?'fresh_consumed_tick_draw_v3':'constructor_return_only_v2')||observation.state!=='armed'||
      observation.error!==null||observation.native_phase!==0||observation.running!==false||
      observation.host_entered!==false||observation.armed_owner_stable!==true||
      observation.armed_world_generation!==expectedGeneration||
-     observation.constructor_return_terminal!==false||
+     (!fresh&&observation.constructor_return_terminal!==false)||
+     (fresh&&(observation.host_tick_calls!==0||observation.host_draw_calls!==0||
+       observation.aurora_begin_calls!==0||observation.aurora_end_calls!==0))||
      observation.source_steps!==0||observation.source_draws!==0||
      launchModule._melee_web_native_menu_phase()!==0||
      launchModule._melee_web_native_menu_running()!==0)
@@ -500,7 +505,40 @@ window.meleeStadiumFirstCssConstructorReturnLaunch=async expectedGeneration=>{
  resetTiming(false);
  await prepareAudio();await pauseAudioForPreparation();await waitForAudioRender();
  await launchBoundary(()=>{assertArmed();launchCheck(launchModule._melee_web_native_menu_launch());});
+ if(fresh)freshFirstCssLaunchLease={owner:launchOwner,Module:launchModule,handle:launchHandle,
+   boundary:launchBoundary,check:launchCheck,generation:expectedGeneration};
  $('canvas').focus();inputDirty=true;syncAudio();
+};
+
+window.meleeStadiumFirstCssConstructorReturnLaunch=generation=>launchPreparedFirstCss(generation,false);
+window.meleeStadiumFirstCssFreshRowLaunch=generation=>launchPreparedFirstCss(generation,true);
+
+window.meleeStadiumFirstCssFreshRowKick=async()=>{
+ if(freshFirstCssKickAttempted)throw Error('Fresh CSS row kick was already attempted.');
+ freshFirstCssKickAttempted=true;
+ const lease=freshFirstCssLaunchLease;
+ if(!lease)throw Error('Fresh CSS row has no successful prepared-launch lease.');
+ return await lease.boundary(()=>{
+  if(owner!==lease.owner||Module!==lease.Module||owner.handle!==lease.handle||
+     boundary!==lease.boundary||check!==lease.check)
+   throw Error('Fresh CSS row kick owner changed.');
+  const state=lease.handle.getState();
+  if(state.state!=='css'||state.busy||state.loading||state.requiresReload||
+     state.phase!==1||state.running!==true)
+   throw Error('Fresh CSS row requires its held CSS owner before kick.');
+  const pointer=Module._melee_web_native_menu_stadium_first_css_draw_observe?.();
+  const observed=pointer?JSON.parse(Module.UTF8ToString(pointer)):null;
+  if(observed?.schema!=='melee-web-stadium-first-css-fresh-row-observation-v3'||
+     observed.mode!=='fresh_consumed_tick_draw_v3'||observed.state!=='entered'||
+     observed.error!==null||observed.armed_owner_stable!==true||
+     observed.armed_world_generation!==lease.generation||
+     observed.source_steps!==0||observed.source_draws!==0||
+     observed.host_tick_calls!==0||observed.host_draw_calls!==0||
+     observed.aurora_begin_calls!==0||observed.aurora_end_calls!==0||
+     typeof Module._melee_web_native_menu_stadium_first_css_fresh_row_v3_kick!=='function')
+   throw Error('Fresh CSS row kick lost its unchanged one-use CSS entry.');
+  return lease.check(Module._melee_web_native_menu_stadium_first_css_fresh_row_v3_kick());
+ });
 };
 
 window.meleeNetTimingPauseEligibilitySnapshot=()=>{

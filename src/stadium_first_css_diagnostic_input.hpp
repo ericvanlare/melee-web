@@ -79,6 +79,52 @@ struct ConsumedPadInput {
     std::string source_sha256;
 };
 
+// Version3 input-only first-row capability: source references and literal PAD,
+// never post-tick/draw expectations. Context remains the checked v2 bootstrap.
+inline constexpr size_t kFreshRowInputBytes = 8 + 4 + 32 + 12 * 4 + 4 * 11;
+struct FreshRowInput {
+    ConsumedPadInput consumed{};
+    uint32_t entry_sequence=0,return_sequence=0,consume_sequence=0;
+    uint32_t tick_sequence=0,draw_enter_sequence=0,draw_return_sequence=0;
+    uint32_t poll_sequence=0,source_tick=0,draw_ordinal=0;
+    uint32_t draw_source_tick=0,poll_source_tick=0,poll_draw_ordinal=0;
+};
+
+inline FreshRowInput decode_fresh_row_v3(const uint8_t* bytes, size_t size,
+                                         const ContextInput& context) {
+    if (!bytes || size != kFreshRowInputBytes ||
+        std::string(reinterpret_cast<const char*>(bytes), 8) != "STC3PAD1" ||
+        read_be32(bytes + 8) != 3)
+        throw std::runtime_error("Fresh CSS row input has an invalid exact size/magic/version");
+    if (context.envelope_version != 2 || context.source_sha256.empty() ||
+        std::all_of(bytes+12,bytes+44,[](uint8_t value){return value==0;}) ||
+        hex(bytes + 12, 32) != context.source_sha256)
+        throw std::runtime_error("Fresh CSS row input does not belong to its v2 bootstrap source");
+    FreshRowInput input{};
+    input.consumed.source_sha256 = context.source_sha256;
+    uint32_t* fields[] = {&input.entry_sequence,&input.return_sequence,
+        &input.consume_sequence,&input.tick_sequence,&input.draw_enter_sequence,
+        &input.draw_return_sequence,&input.poll_sequence,&input.source_tick,
+        &input.draw_ordinal,&input.draw_source_tick,&input.poll_source_tick,
+        &input.poll_draw_ordinal};
+    size_t offset = 44;
+    for (auto* field : fields) { *field=read_be32(bytes+offset);offset+=4; }
+    if (input.entry_sequence != context.source_entry_sequence ||
+        input.return_sequence != context.source_return_sequence ||
+        !(input.entry_sequence < input.return_sequence &&
+          input.return_sequence < input.consume_sequence &&
+          input.consume_sequence < input.tick_sequence &&
+          input.tick_sequence < input.draw_enter_sequence &&
+          input.draw_enter_sequence < input.draw_return_sequence &&
+          input.draw_return_sequence < input.poll_sequence) ||
+        input.source_tick != 0 || input.draw_ordinal != 0 ||
+        input.draw_source_tick != 1 || input.poll_source_tick != 1 ||
+        input.poll_draw_ordinal != 1)
+        throw std::runtime_error("Fresh CSS row input source pairing/first local clock differs");
+    std::copy_n(bytes+offset,input.consumed.ports.size(),input.consumed.ports.begin());
+    return input;
+}
+
 struct FirstSssTickInput {
     std::array<uint8_t, 4 * 11> ports{};
     std::string source_sha256;

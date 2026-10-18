@@ -5,14 +5,15 @@ and preparation admission/cleanup fragments with explicit state doubles. They
 do not execute a browser, native menu host, source callback, or original service.
 """
 from pathlib import Path
+import os
 import shutil
 import subprocess
 import unittest
 
 from owned_test_workspace import OwnedWorkspaceTests
 
-ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "src/gameplay_menu_browser.cpp"
+ROOT = Path(os.environ.get("MELEE_FRESH_ROW_SOURCE_ROOT", Path(__file__).resolve().parents[1]))
+SOURCE = Path(__file__).resolve().parents[1] / "src/gameplay_menu_browser.cpp"
 
 
 def source_slice(start, end):
@@ -37,7 +38,7 @@ class StadiumCssConstructorReturnControls(OwnedWorkspaceTests):
         source = SOURCE.read_text(encoding="utf-8")
         gate_start = source.index("  const bool pointer_owner_live=")
         gate = source[gate_start:source.index(";", gate_start) + 1]
-        menu = (ROOT / "src/gameplay_menu_browser_menu.cpp").read_text(encoding="utf-8")
+        menu = SOURCE.with_name("gameplay_menu_browser_menu.cpp").read_text(encoding="utf-8")
         prepare = menu[menu.index("int melee_web_native_menu_prepare(){"):
                        menu.index("int melee_web_native_menu_launch(){")]
         # Compile the actual admission prefix and unchanged destructive catch.
@@ -77,6 +78,7 @@ bool host_entered=false,world_exposed=false;
 std::string message;
 bool constructor_active=false;
 bool stadium_first_css_constructor_return_active(){return constructor_active;}
+bool stadium_first_css_prepared_diagnostic_active(){return constructor_active;}
 unsigned close_calls=0,world_destroys=0,host_destroys=0,session_ends=0;
 unsigned incidents=0,normal_body_calls=0;
 struct World {

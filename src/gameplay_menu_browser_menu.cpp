@@ -149,7 +149,7 @@ constexpr std::array<std::string_view,278> route_asset_keys={
 }
 extern "C" {
 unsigned melee_web_native_asset_begin(){try{
- check(!stadium_first_css_constructor_return_active(),
+ check(!stadium_first_css_prepared_diagnostic_active(),
        "CSS constructor-return diagnostic refuses a second asset import");
  close();scoped_disc_import=true;scoped_assets=true;
  request_assets(AssetDestination::InitialMenu);
@@ -275,7 +275,7 @@ int melee_web_native_source_files_external_clear(){try{
  return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_menu_prepare(){
- if(stadium_first_css_constructor_return_active()){
+ if(stadium_first_css_prepared_diagnostic_active()){
   message="CSS constructor-return diagnostic refuses menu re-preparation";
   return 0;
  }
@@ -320,9 +320,9 @@ int melee_web_native_menu_prepare(){
  message=e.what();return 0;
 }}
 int melee_web_native_menu_launch(){try{
- const bool constructor_return=stadium_first_css_constructor_return_active();
+ const bool constructor_return=stadium_first_css_prepared_diagnostic_active();
  if(constructor_return)
-  check(stadium_first_css_constructor_return_consume_launch(),
+  check(stadium_first_css_prepared_diagnostic_consume_launch(),
         "CSS constructor-return diagnostic permits exactly one prepared owner launch");
  if(preparation.busy()||pending)
   throw std::runtime_error("Native menu transition is still preparing");
@@ -334,7 +334,7 @@ int melee_web_native_menu_launch(){try{
      configured_save_profile.size(),error,sizeof(error));check(host!=nullptr,error);}
  VISetFrameBufferScale(1);enter_world();
  if(constructor_return)
-  check(stadium_first_css_constructor_return_entry_succeeded(),
+  check(stadium_first_css_prepared_diagnostic_entry_succeeded(),
         "CSS constructor-return entry did not produce its checked source-free terminal");
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
  // The initial owner has entered but has not advanced a source tick. Settle
@@ -349,7 +349,7 @@ int melee_web_native_menu_launch(){try{
 #endif
  return 1;
 }catch(const std::exception& e){
- stadium_first_css_constructor_return_fail(e.what());
+ stadium_first_css_prepared_diagnostic_fail(e.what());
  diagnostic_incident(4);message=e.what();running=false;return 0;}}
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 int melee_web_native_menu_stadium_c1a_arm(){try{

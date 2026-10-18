@@ -3,7 +3,7 @@
 using namespace melee_web_menu_browser;
 extern "C" {
 int melee_web_native_menu_replay(const uint8_t* data,unsigned size,int observe){try{
- check(!stadium_first_css_constructor_return_active(),
+ check(!stadium_first_css_prepared_diagnostic_active(),
        "CSS constructor-return diagnostic refuses replay ownership");
  replay_source_frames=melee_web::SourceFrameSequence{};
  check(data&&size<=melee_web::kRetailReplayMaxBytes,"Invalid reference replay bytes");
@@ -47,7 +47,7 @@ int melee_web_native_menu_replay(const uint8_t* data,unsigned size,int observe){
 }catch(const std::exception& e){message=e.what();running=false;return 0;}}
 #if defined(MELEE_WEB_NET_SESSION)
 int melee_web_native_menu_net_begin(unsigned seed,unsigned max_frames){try{
- check(!stadium_first_css_constructor_return_active(),
+ check(!stadium_first_css_prepared_diagnostic_active(),
        "CSS constructor-return diagnostic refuses network ownership");
  check(!replay&&!reference_heap_used&&world&&host&&!host_entered&&!world_exposed&&!match&&
        !results&&!prize&&melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CREATED,
@@ -56,7 +56,7 @@ int melee_web_native_menu_net_begin(unsigned seed,unsigned max_frames){try{
  reference_heap_used=true;message="Networked session ready; launch to enter character select.";return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_menu_net_begin_lockstep(unsigned seed,unsigned max_frames){try{
- check(!stadium_first_css_constructor_return_active(),
+ check(!stadium_first_css_prepared_diagnostic_active(),
        "CSS constructor-return diagnostic refuses lockstep ownership");
  check(!replay&&!reference_heap_used&&world&&host&&!host_entered&&!world_exposed&&!match&&
        !results&&!prize&&melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CREATED,

@@ -45,6 +45,8 @@ const {values} = parseArgs({options: Object.fromEntries(
       ['first-css-browser-stream', {type: 'boolean', default: false}],
       ['first-css-browser-final-draw', {type: 'boolean', default: false}],
       ['first-css-constructor-return', {type: 'boolean', default: false}],
+      ['first-css-fresh-row', {type: 'boolean', default: false}],
+      ['first-css-row-receipt', {type: 'string'}],
       ['first-sss-constructor-pair', {type: 'boolean', default: false}],
       ['first-sss-consumed-pad-tick', {type: 'boolean', default: false}],
       ['first-sss-draw', {type: 'boolean', default: false}],
@@ -74,6 +76,7 @@ const recreationPassDecision = recreationFullPair
 let recreationLifetime = null;
 const firstSssVsSetup = values['first-sss-vs-setup'];
 const firstCssConstructorReturn = values['first-css-constructor-return'];
+const firstCssFreshRow = values['first-css-fresh-row'];
 const firstCssConstructorManifest = values['first-css-constructor-manifest'];
 const firstSssVsSetupTextTail = values['first-sss-vs-setup-text-tail'];
 const firstSssVsSetupCfExplicitStep = values['first-sss-vs-setup-cf-explicit-step'];
@@ -94,8 +97,14 @@ const firstSssConsumedPadTick = values['first-sss-consumed-pad-tick'] || firstSs
 const firstSssConstructorPair = values['first-sss-constructor-pair'] || firstSssConsumedPadTick;
 const firstCssBrowserFinalDraw = values['first-css-browser-final-draw'] || firstSssConstructorPair;
 const firstCssBrowserStream = values['first-css-browser-stream'] || firstCssBrowserFinalDraw;
-const firstCssBrowserDraw = values['first-css-browser-draw'] || firstCssBrowserStream;
-if (firstCssConstructorReturn !== !!firstCssConstructorManifest ||
+const firstCssBrowserDraw = values['first-css-browser-draw'] || firstCssBrowserStream || firstCssFreshRow;
+if (firstCssFreshRow !== !!values['first-css-row-receipt'] ||
+    (firstCssFreshRow && (firstCssConstructorReturn || firstCssBrowserStream ||
+      values['first-css-browser-draw'] || cssSssReducer ||
+      ['first-css-context', 'first-css-consumed-pad', 'first-css-return-expected',
+       'first-css-tick-expected', 'first-css-draw-expected', 'first-css-postdraw-input',
+       'first-css-postdraw-expected'].some(key => values[key]))) ||
+    (firstCssConstructorReturn || firstCssFreshRow) !== !!firstCssConstructorManifest ||
     (firstCssConstructorReturn && (cssSssReducer || firstCssBrowserDraw ||
       firstSssConstructorPair || firstSssConsumedPadTick || firstSssDraw ||
       firstSssPrefix || firstSssVsEntry || firstSssVsSetup || firstSssVsSetupTextTail ||
@@ -345,6 +354,7 @@ let report = {
     route_mode: recreationCanary ? (recreationFullB
       ? (recreationFullPair ? 'same-instance-recreation-A7167-B7167-common-fields-seed' : 'same-instance-recreation-A174-B7167-common-fields-seed')
       : 'same-instance-recreation-canary-174') : firstSssVsSetup ? 'first-sss-vs-setup' : firstSssVsEntry ? 'first-sss-vs-entry' : firstSssPrefix ? 'first-sss-prefix' : firstSssDraw ? 'first-sss-draw' :
+      firstCssFreshRow ? 'first-css-fresh-row-v3' :
       firstCssConstructorReturn ? 'first-css-constructor-return-v2' :
       firstSssConsumedPadTick ? 'first-sss-consumed-pad-tick' :
       firstSssConstructorPair ? 'first-sss-constructor-pair' :
@@ -546,6 +556,7 @@ let firstSssVsSetupInputs = null;
 let matchedSetupCfInputs = null;
 async function loadFirstCssBrowserDrawInputs() {
   if (!firstCssBrowserDraw) return null;
+  if (firstCssFreshRow) return loadFirstCssFreshRowInputs();
   const specs = {
     context_bundle: values['first-css-context'],
     consumed_pad_bundle: values['first-css-consumed-pad'],
@@ -610,7 +621,7 @@ async function loadFirstCssBrowserDrawInputs() {
 }
 
 async function loadFirstCssConstructorReturnInputs() {
-  if (!firstCssConstructorReturn) return null;
+  if (!firstCssConstructorReturn && !firstCssFreshRow) return null;
   const manifestPath = path.resolve(firstCssConstructorManifest);
   const frozen = preflight.first_css_constructor_return?.manifest;
   assert.ok(frozen && typeof frozen === 'object',
@@ -758,6 +769,87 @@ async function loadFirstCssConstructorReturnInputs() {
     pinIdentities: Object.fromEntries(roles.map(role => [role,
       {path: manifest.producer_pins[role].path, bytes: pinBytes[role].byteLength,
         sha256: digest(pinBytes[role])}]))};
+}
+
+async function loadFirstCssFreshRowInputs() {
+  const context = await loadFirstCssConstructorReturnInputs();
+  const frozen = preflight.first_css_fresh_row?.receipt;
+  const receiptPath = path.resolve(values['first-css-row-receipt']);
+  assert.ok(frozen && typeof frozen === 'object', 'Fresh CSS row receipt is not frozen');
+  assert.equal(path.resolve(frozen.path), receiptPath);
+  const receiptBytes = await fs.readFile(receiptPath);
+  assert.equal(receiptBytes.byteLength, frozen.bytes);
+  assert.equal(digest(receiptBytes), frozen.sha256);
+  const receipt = JSON.parse(receiptBytes.toString('utf8'));
+  assert.equal(receipt.schema, 'stadium-fresh-first-css-consumed-row-receipt-v1');
+  assert.equal(receipt.result, 'PASS_ORIGINAL_ONLY_FIRST_ROW_PREPARATION');
+  assert.deepEqual(receipt.constructor_manifest, context.manifestIdentity);
+  assert.deepEqual(receipt.producer_pins, context.pinIdentities);
+  const readPinned = async pin => {
+    assert.ok(pin && typeof pin.path === 'string' && Number.isSafeInteger(pin.bytes));
+    const bytes = await fs.readFile(pin.path);
+    assert.equal(bytes.byteLength, pin.bytes);assert.equal(digest(bytes), pin.sha256);
+    return bytes;
+  };
+  const raw = await readPinned(receipt.raw_row);
+  const expected = JSON.parse((await readPinned(receipt.expected_host_only)).toString('utf8'));
+  const selected = JSON.parse((await readPinned(receipt.selected_source_rows)).toString('utf8'));
+  await readPinned(receipt.topology);
+  assert.equal(raw.byteLength, 44);
+  assert.deepEqual(receipt.literal_port_status_hex,
+    [0, 1, 2, 3].map(port => raw.subarray(port * 11, (port + 1) * 11).toString('hex')));
+  assert.equal(expected.schema, 'stadium-fresh-first-css-row-host-expected-v1');
+  assert.equal(expected.source_admission, false);assert.equal(expected.whole_session_equivalent, false);
+  assert.deepEqual(expected.provenance.constructor_manifest, context.manifestIdentity);
+  assert.deepEqual(expected.provenance.topology, receipt.topology);
+  assert.equal(expected.provenance.stream_sha256, context.contextBinding.source_sha256);
+  const row = expected.provenance.row;
+  assert.equal(row.ordinal, 0);assert.equal(row.raw_four_port_hex, raw.toString('hex'));
+  const refs = [row.consumed_pad_sequence, row.source_tick_sequence, row.draw_enter_sequence,
+    row.draw_return_sequence, row.pad_poll_sequence];
+  const names = ['pad_consume', 'source_tick', 'draw_enter', 'draw_return', 'pad_poll'];
+  assert.equal(receipt.source_pairing.length, 5);assert.equal(selected.rows.length, 5);
+  assert.equal(selected.stream_sha256, context.contextBinding.source_sha256);
+  for (let index = 0; index < refs.length; index++) {
+    assert.ok(Number.isSafeInteger(refs[index]) && refs[index] >
+      (index ? refs[index - 1] : context.contextBinding.return_sequence));
+    assert.equal(receipt.source_pairing[index].seq, refs[index]);
+    assert.equal(receipt.source_pairing[index].boundary, names[index]);
+    assert.equal(selected.rows[index].seq, refs[index]);
+    assert.equal(selected.rows[index].payload.boundary, names[index]);
+  }
+  assert.equal(row.consume_source_tick, 0);assert.equal(row.tick_source_tick, 0);
+  assert.equal(row.consume_draw_ordinal, 0);assert.equal(row.tick_draw_ordinal, 0);
+  assert.equal(row.draw_source_tick, 1);assert.equal(row.draw_ordinal, 0);
+  assert.equal(row.poll_source_tick, 1);assert.equal(row.poll_draw_ordinal, 1);
+  assert.equal(expected.expected_post_tick.source_stream_sha256, context.contextBinding.source_sha256);
+  assert.equal(expected.expected_post_tick.consumed_pad_sequence, refs[0]);
+  assert.equal(expected.expected_post_tick.source_tick_sequence, refs[1]);
+  assert.deepEqual(expected.comparison_fields, ['source_tick', 'draw_ordinal',
+    'pad_state_hex', 'random_seed_hex', 'scene_frame', 'scene_kind', 'scene_routing_getters']);
+  assert.deepEqual(expected.tick_scalar_comparison_fields, [
+    'source_stream_sha256', 'consumed_pad_sequence', 'source_tick_sequence',
+    'source_tick_value', 'source_draw_ordinal', 'original_source_frame', 'phase_relation',
+    'source_scene_kind', 'host_source_scene', 'host_menu_phase',
+    'native_post_host_tick_frame', 'random_seed_hex', 'pad_state_hex']);
+  assert.deepEqual(expected.tick_deep_comparison_fields, ['scene_routing_getters']);
+  // This input envelope contains only source references/local clock metadata
+  // and the observed PAD row. Expected tick/draw state stays in this process.
+  const metadata = [context.contextBinding.entry_sequence, context.contextBinding.return_sequence,
+    ...refs, row.tick_source_tick, row.tick_draw_ordinal, row.draw_source_tick,
+    row.poll_source_tick, row.poll_draw_ordinal];
+  assert.equal(metadata.length, 12);
+  const consumed = Buffer.alloc(136);
+  consumed.write('STC3PAD1', 0, 8, 'ascii');consumed.writeUInt32BE(3, 8);
+  Buffer.from(context.contextBinding.source_sha256, 'hex').copy(consumed, 12);
+  metadata.forEach((value, index) => consumed.writeUInt32BE(value, 44 + index * 4));
+  raw.copy(consumed, 92);
+  const bytes = {context_bundle: context.contextBytes, consumed_pad_bundle: consumed};
+  return {bytes, contextExpected: context.expectedForComparison,
+    tickExpected: {expected_post_tick: expected.expected_post_tick}, drawExpected: expected,
+    receiptIdentity: {path: receiptPath, bytes: receiptBytes.byteLength, sha256: digest(receiptBytes)},
+    bundle_hashes: Object.fromEntries(Object.entries(bytes).map(([name, data]) =>
+      [name, {bytes: data.byteLength, sha256: digest(data)}]))};
 }
 
 let firstCssBrowserStreamInputs = null;
@@ -4509,9 +4601,10 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
   assert.equal(prearm.memory.asset_generation, 0);
   assert.ok(prearm.memory.asset_files > 0,
     'First-CSS diagnostic requires the committed menu assets');
-  const arm = await timeout(page.evaluate(({contextBytes, consumedBytes}) => {
+  const arm = await timeout(page.evaluate(({contextBytes, consumedBytes, fresh}) => {
     const module = globalThis.Module;
-    const armFunction = module?._melee_web_native_menu_stadium_first_css_draw_arm;
+    const armFunction = fresh ? module?._melee_web_native_menu_stadium_first_css_fresh_row_v3_arm :
+      module?._melee_web_native_menu_stadium_first_css_draw_arm;
     const observe = module?._melee_web_native_menu_stadium_first_css_draw_observe;
     if (typeof armFunction !== 'function' || typeof observe !== 'function')
       throw Error('Private first-CSS browser-draw exports are absent');
@@ -4533,13 +4626,14 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
         throw Error(pointer ? module.UTF8ToString(pointer) : 'First-CSS source context arm was rejected');
       }
       return {result, phase: module._melee_web_native_menu_phase(),
-        running: module._melee_web_native_menu_running()};
+        running: module._melee_web_native_menu_running(),
+        observation: JSON.parse(module.UTF8ToString(observe()))};
     } finally {
       module._free(context);
       module._free(consumed);
     }
   }, {contextBytes: [...firstCssBrowserDrawInputs.bytes.context_bundle],
-      consumedBytes: [...firstCssBrowserDrawInputs.bytes.consumed_pad_bundle]}),
+      consumedBytes: [...firstCssBrowserDrawInputs.bytes.consumed_pad_bundle], fresh: firstCssFreshRow}),
   Math.min(10000, remaining()), 'Arm retained first-CSS browser draw inputs');
   assert.equal(arm.result, 1);
   assert.equal(arm.phase, 0);
@@ -4547,7 +4641,12 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
   report.scenario.armed_before_css_entry = true;
   report.scenario.first_css_input_bundles = firstCssBrowserDrawInputs.bundle_hashes;
 
-  await timeout(driver.launch(1), Math.min(LIMITS.sourceTransitionMs, remaining()),
+  const launch = firstCssFreshRow ? page.evaluate(async generation => {
+    if (typeof globalThis.meleeStadiumFirstCssFreshRowLaunch !== 'function')
+      throw Error('Queued fresh CSS prepared launch is absent');
+    await globalThis.meleeStadiumFirstCssFreshRowLaunch(generation);
+  }, arm.observation.armed_world_generation) : driver.launch(1);
+  await timeout(launch, Math.min(LIMITS.sourceTransitionMs, remaining()),
     'Original CSS launch with source time held before the retained tick');
   report.scenario.original_css_phase = await sourceSnapshot('Original first-CSS phase before retained tick');
   assert.equal(report.scenario.original_css_phase.phase, 1);
@@ -4566,7 +4665,12 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
   report.scenario.first_css_browser_draw = observation;
   await persistReport();
 
-  const kick = await timeout(page.evaluate(() => {
+  const kick = await timeout(page.evaluate(async fresh => {
+    if (fresh) {
+      if (typeof globalThis.meleeStadiumFirstCssFreshRowKick !== 'function')
+        throw Error('Queued fresh CSS row kick is absent');
+      return await globalThis.meleeStadiumFirstCssFreshRowKick();
+    }
     const module = globalThis.Module;
     const kickFunction = module?._melee_web_native_menu_stadium_first_css_draw_kick;
     if (typeof kickFunction !== 'function') throw Error('First-CSS one-shot kick export is absent');
@@ -4576,7 +4680,7 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
       throw Error(pointer ? module.UTF8ToString(pointer) : 'First-CSS one-shot kick was rejected');
     }
     return result;
-  }), Math.min(5000, remaining()), 'Release one retained CSS source tick');
+  }, firstCssFreshRow), Math.min(5000, remaining()), 'Release one retained CSS source tick');
   assert.equal(kick, 1);
   await timeout(page.waitForFunction(() => {
     const module = globalThis.Module;
@@ -4588,6 +4692,27 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
   Math.min(60000, remaining()), 'One native CSS tick and one browser source draw');
   observation = await timeout(readFirstCssBrowserDrawObservation(),
     Math.min(5000, remaining()), 'Final first-CSS browser draw observation');
+  if (firstCssFreshRow) {
+    assert.equal(observation.schema, 'melee-web-stadium-first-css-fresh-row-observation-v3');
+    const target = observation.terminal_source_free_callbacks + 2;
+    await timeout(page.waitForFunction(target => {
+      const module = globalThis.Module;
+      const pointer = module?._melee_web_native_menu_stadium_first_css_draw_observe?.();
+      const value = pointer ? JSON.parse(module.UTF8ToString(pointer)) : null;
+      return value?.state === 'failed' ||
+        (value?.state === 'complete' && value.terminal_source_free_callbacks >= target);
+    }, target, {timeout: Math.min(LIMITS.sourceTransitionMs, remaining())}),
+    Math.min(LIMITS.sourceTransitionMs, remaining()), 'Source-free callbacks after fresh CSS row');
+    const stopped = await readFirstCssBrowserDrawObservation();
+    for (const field of ['entry', 'tick', 'draw', 'source_steps', 'source_draws',
+      'host_tick_calls', 'host_draw_calls', 'aurora_begin_calls', 'aurora_end_calls',
+      'frame_end_returned', 'input_row_provenance'])
+      assert.deepEqual(stopped[field], observation[field], `Fresh terminal changed at ${field}`);
+    observation = stopped;
+    assert.equal(observation.mode, 'fresh_consumed_tick_draw_v3');
+    assert.equal(observation.armed_owner_stable, true);
+    report.scenario.first_css_fresh_row_receipt = firstCssBrowserDrawInputs.receiptIdentity;
+  }
   report.scenario.first_css_browser_draw = observation;
   await persistReport();
   assert.equal(observation.state, 'complete',
@@ -4955,7 +5080,10 @@ async function cleanupServer() {
 async function main() {
   assert.equal(build, expectedBuild, 'Only the isolated C1a diagnostic runtime may be served');
   assert.equal(preflight.schema, 'melee-web-stadium-c1a-browser-preflight-v1');
-  if (firstCssConstructorReturn) {
+  if (firstCssFreshRow) {
+    assert.equal(preflight.route_mode, 'first-css-fresh-row-v3');
+    assert.ok(preflight.first_css_fresh_row?.receipt);
+  } else if (firstCssConstructorReturn) {
     assert.equal(preflight.route_mode, 'first-css-constructor-return-v2',
       'Constructor-return command requires its exact frozen route');
     const manifestBinding = preflight.first_css_constructor_return?.manifest;
@@ -5068,6 +5196,10 @@ async function main() {
   assert.match(defaultCache, /^MELEE_WEB_STADIUM_C1A_DIAGNOSTIC:BOOL=OFF$/m);
   const privateJs = await fs.readFile(path.join(build, 'gameplay_menu_browser.js'), 'utf8');
   const defaultJs = await fs.readFile(path.join(defaultBuild, 'gameplay_menu_browser.js'), 'utf8');
+  if (firstCssFreshRow) {
+    assert.ok(privateJs.includes('_melee_web_native_menu_stadium_first_css_fresh_row_v3_arm'));
+    assert.ok(privateJs.includes('_melee_web_native_menu_stadium_first_css_fresh_row_v3_kick'));
+  }
   if (firstCssConstructorReturn)
     assert.ok(privateJs.includes('_melee_web_native_menu_stadium_first_css_constructor_return_v2_arm'),
       'Private CSS constructor-return v2 export is absent from the diagnostic runtime');
@@ -5106,6 +5238,9 @@ async function main() {
     'Ordinary default runtime unexpectedly exports the private C1a arm gate');
   assert.equal(defaultJs.includes('_melee_web_native_menu_stadium_first_css_draw_arm'), false,
     'Ordinary default runtime unexpectedly exports the private first-CSS diagnostic gate');
+  for (const name of ['_melee_web_native_menu_stadium_first_css_fresh_row_v3_arm',
+    '_melee_web_native_menu_stadium_first_css_fresh_row_v3_kick'])
+    assert.equal(defaultJs.includes(name), false, 'Ordinary runtime exports a private fresh row gate');
   assert.equal(defaultJs.includes('_melee_web_native_menu_stadium_first_css_constructor_return_v2_arm'), false,
     'Ordinary default runtime unexpectedly exports the private CSS constructor-return v2 gate');
 
