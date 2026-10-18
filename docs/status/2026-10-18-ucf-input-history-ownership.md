@@ -125,9 +125,97 @@ unittest reported 2,427 tests, with 166 skipped, in 530.218 seconds (530.759
 seconds runner elapsed). These controls validate only the isolated storage API;
 they do not demonstrate a real UCF history update, live reset, or game
 Capture/Load behavior. Exact file and receipt hashes are in the structured
-receipt.
+receipt. Draft PR #340 at `78abf9f0` also completed all 14 exact-head CI
+checks (12 successes and two expected skips). The PR remains a draft while the
+reference lifetime gates below are open.
+
+## Local input prerequisite
+
+Independent review stopped two runner candidates before launch. Repairs enabled
+the existing serial-input observer, checked the actual disc identity, retained
+preflight failures, ordered SI reads before queued menu observations, and bound
+the launch arguments to the same fresh profile used by the policy and observer.
+Sixteen focused controls passed before one separately reviewed attempt.
+
+That attempt stopped after 3.894 seconds, before any controller write. It
+received 18 datagrams and 248 bytes of serial-input observation; startup
+metadata completed, but the phase snapshot had scene kind 42, online code 40
+and menu word zero. The runner required the chooser's kind 1/code 1 and refused
+the snapshot. Both owned processes and the observer socket are absent. All 23
+regular output/profile files are retained. The decoder formulas match the
+existing runtime helper. Pinned source identifies the snapshot as the original
+boot/memory-card phase, so a reviewed repair reuses the existing exact chooser
+readiness predicate before unchanged strict admission.
+
+The fresh second attempt passed 24 focused controls before release. It reached
+the chooser, then stopped after 3.841 seconds: scene kind 1, code 1 and submenu 8
+were present, but the selected option was 5 rather than the expected 1. Its
+22 datagrams and 248 serial-input bytes are retained; no controller write
+occurred. The owned PID/group and observer socket are absent, with all 23
+regular output/profile files retained. The unchanged strict guard exposed a
+menu-source assumption that needed reduction after these two attempts.
+
+That reduction found the logged-out menu locks every option except Log-in
+(option 5). Its direction handler skips locked entries; the older driver assumed
+a logged-in profile. Four relevant compiled handler payloads agree with the
+retained annotated source. A separately reviewed B-only candidate instead used
+the original Back handler, whose exact target is parent-menu word `0x01080002`.
+Thirty-five focused controls passed; an earlier test import failure is retained.
+
+The bounded B-only attempt observed neutral input followed by exact B input
+(buttons `0x0200`, centered sticks, zero triggers and analog B 255). It never
+observed the expected menu transition and stopped at the unchanged 45-second
+observation deadline, taking 46.880 seconds overall. All 2,686 datagrams and 500
+serial-input bytes are retained. The owned PID/group and observer socket are
+absent; all 25 regular output/profile files are retained. This proves neither
+menu consumption nor a source-frame causal link. No chooser movement, nonzero
+history, reset, or Capture/Load result follows.
+
+A readiness candidate added direct observations of the source menu cooldown and
+processed button mask. Review first caught a missing canonical manifest field
+before launch. After that repair, actual preflight and loader checks passed,
+but the next bounded run stopped after 46.720 seconds without admitting the
+chooser or writing input. Its generated Locations file had accidentally replaced
+the four existing scene/menu keys with the two new readiness keys. Thus all
+scene/menu observations were missing, and the cooldown hypothesis was not tested.
+All 2,685 datagrams, 248 serial-input bytes and 24 output/profile files are
+retained; the owned PID/group and socket are absent. This is a harness
+configuration failure, not a game or history failure. A reduced control then
+checked the actual serialized configuration against every required decoder key.
+
+The corrected candidate preserved all 34 keys and passed 15 controls plus actual
+preflight. Its single bounded run passed in 3.677 seconds: exact chooser admission
+at sequence 22, a fresh direct zero-cooldown event at 46, exact B at serial input,
+and parent-menu word `0x01080002` with processed Back mask `0x20` at 48.
+Independent replay agrees with all 48 datagrams and 37 phase events. The neutral
+FIFO action was recorded immediately after the target; no later neutral SI echo
+was captured. All 24 output/profile files are retained and the owned process
+group/socket are absent. The terminal summary clears the zero marker when the
+new cooldown becomes five; the raw event list retains the zero event. This is
+a reporting gap, not an admission failure. The successful boundary will not be
+repeated without a new hypothesis.
 
 ## Next boundary
+
+A default-off reference diagnostic candidate now reads all 48 bytes
+at the existing synchronous Capture/Load entry and completion boundaries. It
+resolves the dynamic installed pointer and checks the selected composition,
+full authored GCT span and branch target before reading the history. Eight
+actual C++ controls pass, including the reserved bytes. Deliberately removing
+the range or opcode guards makes the corresponding controls fail; an earlier
+fixture compile failure remains retained. Both candidate EXI and diagnostic
+translation units compile against the actual pinned dependencies. These are
+component checks; no Capture/Load history result follows.
+
+The optional configuration writer has a separately reviewed candidate.
+Its 16 focused controls pass; absent or null composition leaves the original
+serialized shape unchanged, unknown layouts reject, and existing runners do not
+enable it. A tiny driver linked to the actual compiled diagnostic object then
+passed 26 native configuration cases: nine valid/default projections and 17
+expected native aborts with their exact diagnostic reasons. It used no parser
+or fatal-path stubs; all owned groups are absent. This exercises configuration,
+not a game client or save/load operation. Exact candidate, review and compiler
+identities are in the structured receipt.
 
 Pinned source places the entire observed 48-byte span inside the fixed backup
 region `[0x8065c000, 0x8071b000)`, with no overlap among 30 active exclusions.
@@ -135,11 +223,22 @@ It lies below the observed main heap; fixed-region membership is the ownership
 basis. This static projection does not establish that Capture/Load ran, or that
 guest preserve blocks did not overwrite restored bytes.
 
-The next engineering step is preparation of the minimal phase and ordinary-input
-bridge under the reviewed source plan; no runtime route or attempt has been
-released. The first proposed observation is a local chooser input and phase
-change, without confirming a mode. A later eligible human-fighter observation
-will seek nonzero history under a valid installed-pointer epoch. The five
+The exact reviewed helper/config are now packaged as downstream patch 0007.
+The existing source verifier passes before and after application; all 31 real
+Git indices remain unchanged and every candidate postimage matches. The six-patch
+binary used above remains separate. The affected repository controls pass
+(61 tests, one skip). The affected arm64 client then built and staged in 14.110
+seconds: all 15 commands passed, source checks agreed before/after, and all
+15 owned process groups are absent. The old app and actual Rust library are
+unchanged. This new seven-patch executable has its own artifact receipt and
+has not yet run a game. Full regression at `0273b905` passed 2,432 tests with
+166 skips in 524.954 seconds. Its owned process group is absent; successful disposable scratch was
+removed while logs and receipts remain retained.
+
+Next is the existing own-local two-peer route to the first real Capture/Load,
+using the new artifact after adapter and service review. It
+must show nonzero history, a different current value, and restoration of all 48
+saved bytes after the actual load. No further offline menu expansion is planned. The five
 still-open consumer paths, actual match/reset lifetime, and Slippi Capture/Load
 preserve-block and restore-order behavior remain separate gates. The isolated component
 does not establish those runtime behaviors. Do not repeat successful
