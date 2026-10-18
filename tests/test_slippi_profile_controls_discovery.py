@@ -3,6 +3,8 @@
 
 from src.slippi_profile.tests import test_build_contract as _build_contract
 from src.slippi_profile.tests import test_ci_discovery as _ci_discovery
+from src.slippi_profile.tests import test_deadupfall_reduction as _deadupfall_reduction
+from src.slippi_profile.tests import test_offscreen_timer_block as _offscreen_timer
 from src.slippi_profile.tests import test_profile_controls as _profile_controls
 from src.slippi_profile.tests import test_runner_contract as _runner_contract
 from src.slippi_profile.tests import test_source_composition as _source_composition
@@ -17,6 +19,14 @@ class SlippiDiscoveryContractTests(_ci_discovery.SlippiDiscoveryContractTests):
 
 
 class SlippiProfileControlsTests(_profile_controls.ProfileControlsTests):
+    pass
+
+
+class SlippiOffscreenTimerTests(_offscreen_timer.OffscreenTimerBlockTests):
+    pass
+
+
+class SlippiDeadUpFallReductionTests(_deadupfall_reduction.DeadUpFallReductionTests):
     pass
 
 
