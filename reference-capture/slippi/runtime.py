@@ -268,7 +268,10 @@ def create_client_profile(
     _write_private(slippi_root / "direct-codes.json", json.dumps(direct_code) + "\n")
     _write_private(slippi_root / "teams-codes.json", "[]\n")
 
-    _write_private(game_settings_root / "GALE01r2.ini", raw_mod.decode("utf-8"))
+    # Normal boot loads the verified bundle's Sys/GameSettings INI. Gecko
+    # entries from User/GameSettings are appended, not deduplicated: copying
+    # that bundle here would install every enabled patch a second time.
+    # The new private GameSettings directory intentionally stays empty.
 
     return ClientProfile(
         root=root,

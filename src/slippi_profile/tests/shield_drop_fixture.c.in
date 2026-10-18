@@ -1,0 +1,121 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Exact prepared caller bodies; named synthetic services only. */
+#include <assert.h>
+#include <fenv.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#include <slippi_profile/ucf_shield_drop_fix.h>
+#include <slippi_profile/ucf_dbooc_fix.h>
+typedef int melee_source_bool;
+enum { false = 0, true = 1, HSD_PAD_LR = 0x60, FTKIND_YOSHI = 14 };
+typedef struct { float x, y; } Stick;
+typedef struct Fighter {
+    struct { Stick lstick[1], cstick[1]; unsigned held_buttons[1]; } input;
+    uint8_t x670_timer_lstick_tilt_x, x671_timer_lstick_tilt_y;
+    struct { struct { int index; uint32_t flags; } floor; } coll_data;
+    int kind;
+} Fighter;
+typedef struct { Fighter *user_data; } Fighter_GObj;
+typedef struct { float x314; int x318, x320; } ftCommonData;
+static ftCommonData common_data;
+static ftCommonData *p_ftCommonData = &common_data;
+static int order, dispatch, cleanup;
+static void ftCo_80099954(Fighter_GObj *gobj) {
+    assert(gobj->user_data->kind == FTKIND_YOSHI); assert(order++ == 0); dispatch = 2;
+}
+static void ftCo_800998EC(Fighter_GObj *gobj) {
+    assert(gobj->user_data->kind != FTKIND_YOSHI); assert(order++ == 0); dispatch = 1;
+}
+static void ftCommon_8007EBAC(Fighter *fp, int a, int b) {
+    assert(fp != NULL && a == 23 && b == 0); assert(order++ == 1); cleanup++;
+}
+static int omitted_suppression(float cy, float ct, uint8_t xt, int xw,
+    float x, float y, int floor, uint32_t flags) {
+    (void)cy; (void)ct; (void)xt; (void)xw;
+    (void)x; (void)y; (void)floor; (void)flags; return 0;
+}
+static void ftCo_80099894(Fighter_GObj *gobj);
+@COMMON@
+@VARIANTS@
+static float from_bits(uint32_t bits) { float f; memcpy(&f, &bits, 4); return f; }
+static void reset(Fighter *fp) {
+    memset(fp, 0, sizeof(*fp)); common_data = (ftCommonData){-.7f, 4, 4};
+    fp->input.held_buttons[0] = HSD_PAD_LR;
+    fp->input.lstick[0] = (Stick){from_bits(0x3f147ae1), -from_bits(0x3f4a3d71)};
+    fp->input.cstick[0].y = .5f;
+    fp->x670_timer_lstick_tilt_x = 4;
+    fp->coll_data.floor.index = 3; fp->coll_data.floor.flags = 0x100;
+}
+int main(void) {
+    assert(fegetround() == FE_TONEAREST);
+    for (int scenario = 0; scenario < 26; scenario++) {
+        Fighter fp; reset(&fp); Fighter_GObj gobj = {&fp};
+        int suppress = 1, eligible0 = 1, eligible1 = 1;
+        switch (scenario) {
+        case 0: break;
+        case 1: fp.input.cstick[0].y = common_data.x314; suppress = 0; break;
+        case 2: fp.input.cstick[0].y = from_bits(0x7fc12345); suppress = 0; break;
+        case 3: fp.x670_timer_lstick_tilt_x = 3; suppress = 0; break;
+        case 4: common_data.x320 = -1; fp.x670_timer_lstick_tilt_x = 0; break;
+        case 5: fp.x670_timer_lstick_tilt_x = 255; common_data.x320 = 255; break;
+        case 6: fp.x670_timer_lstick_tilt_x = 255; common_data.x320 = 256; suppress = 0; break;
+        case 7: fp.input.lstick[0].y = -.8f; suppress = 0; break;
+        case 8: fp.input.lstick[0].y = from_bits(0x7fc12345); suppress = 0; eligible0 = eligible1 = 0; break;
+        case 9: fp.coll_data.floor.index = -1; suppress = 0; break;
+        case 10: fp.coll_data.floor.index = -2; break;
+        case 11: fp.coll_data.floor.flags = 0x200; suppress = 0; break;
+        case 12: fp.coll_data.floor.flags = 0xffffffff; break;
+        case 13: fp.input.lstick[0].y = -from_bits(0x3f47ae14); suppress = 0; break;
+        case 14: fp.input.lstick[0].y = -from_bits(0x3f451eb8); suppress = 0; break;
+        case 15: fp.input.held_buttons[0] = 0; eligible0 = 0; break;
+        case 16: fp.x671_timer_lstick_tilt_y = 4; eligible0 = eligible1 = 0; break;
+        case 17: fp.input.lstick[0].y = 0; fp.input.cstick[0].y = -.8f;
+                 suppress = 0; eligible0 = 0; break; /* C-stick-only original path */
+        case 18: fp.input.lstick[0].y = 0; suppress = 0; eligible0 = eligible1 = 0; break;
+        case 19: fp.kind = FTKIND_YOSHI; break;
+        case 20: fp.kind = FTKIND_YOSHI; fp.coll_data.floor.index = -1; suppress = 0; break;
+        case 21: fp.x670_timer_lstick_tilt_x = 0; fp.x671_timer_lstick_tilt_y = 3; suppress = 0; break;
+        case 22: fp.input.cstick[0].y = -1; suppress = 0; break;
+        case 23: common_data.x320 = 0; fp.x670_timer_lstick_tilt_x = 0; break;
+        case 24: fp.input.lstick[0].y = -.81f; suppress = 0; break;
+        case 25: common_data.x314 = from_bits(0x7fc12345); suppress = 0;
+                 eligible0 = eligible1 = 0; break;
+        }
+        int scalar = slippi_profile_ucf_shield_drop_suppresses(
+            fp.input.cstick[0].y, common_data.x314, fp.x670_timer_lstick_tilt_x,
+            common_data.x320, fp.input.lstick[0].x, fp.input.lstick[0].y,
+            fp.coll_data.floor.index, fp.coll_data.floor.flags);
+        /* Scalar suppression and caller eligibility are independent controls. */
+        assert(scalar == suppress);
+        melee_source_bool (*callers[3][2])(Fighter_GObj *) = {
+            {ftCo_80099794_original, ftCo_8009980C_original},
+            {ftCo_80099794_profile, ftCo_8009980C_profile},
+            {ftCo_80099794_omitted, ftCo_8009980C_omitted},
+        };
+        for (int variant = 0; variant < 3; variant++) for (int caller = 0; caller < 2; caller++) {
+            order = dispatch = cleanup = 0;
+            int expected = (caller ? eligible1 : eligible0) && !(variant == 1 && suppress);
+            int result = callers[variant][caller](&gobj);
+            assert(result == expected);
+            assert(cleanup == expected && order == expected * 2);
+            assert(dispatch == (expected ? (fp.kind == FTKIND_YOSHI ? 2 : 1) : 0));
+            printf("SOURCE|%d|%d|%d|%d|%d|%d|%d\n", scenario, variant, caller,
+                   result, order, dispatch, cleanup);
+        }
+    }
+    /* The shared primitive preserves the DBOOC component trace byte for byte. */
+    const uint32_t xs[] = {0, 0x80000000, 0x3f147ae1, 0x7f800000, 0x7fc00001};
+    const uint32_t ys[] = {0, 0x3f451eb8, 0x3f47ae14, 0x3f4a3d71};
+    for (unsigned x = 0; x < sizeof(xs)/sizeof(xs[0]); x++)
+        for (unsigned y = 0; y < sizeof(ys)/sizeof(ys[0]); y++) {
+            SlippiUcfDboocTrace dbooc; SlippiUcfQuantizedRadiusTrace shared;
+            uint32_t radius = slippi_profile_ucf_quantized_radius_word(xs[x], ys[y], &shared);
+            slippi_profile_ucf_dbooc_threshold_bits(xs[x], ys[y], 0, 0x3f200000, &dbooc);
+            assert(memcmp(&shared, &dbooc, sizeof(shared)) == 0);
+            assert(radius == shared.radius_sum_low32);
+            printf("RADIUS|%08x|%08x|%08x\n", xs[x], ys[y], radius);
+        }
+    puts("PASS shield-drop: 26 scalar cases, 156 caller controls, 20 shared traces");
+    return 0;
+}

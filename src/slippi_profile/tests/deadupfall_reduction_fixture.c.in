@@ -429,7 +429,7 @@ static void test_profile_draw_vs_correction(void)
 
     set_identity_view(-2.0f);
     assert(slippi_profile_source_draw_decision(
-               SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_DBOOC_V4,
+               SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_DBOOC_SHIELD_DROP_V5,
                SLIPPI_TICK_PRESENT) == SLIPPI_SOURCE_DRAW_ALLOW);
     const SlippiProfileDrawDiagnostics *diagnostics_before =
         slippi_profile_draw_diagnostics_snapshot();
@@ -485,7 +485,7 @@ static void test_profile_draw_vs_correction(void)
     fixture_fighter.mv.co.unk_deadup.x44 = 3;
     fixture_physics_profile(&fixture_fighter, config);
     assert(slippi_profile_source_draw_decision(
-               SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_DBOOC_V4,
+               SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_DBOOC_SHIELD_DROP_V5,
                SLIPPI_TICK_CORRECTION) == SLIPPI_SOURCE_DRAW_SKIP);
     assert(translation_calls == 0 && matrix_multiply_calls == 0);
     run_next_tick_position_consumer(&fixture_fighter);
