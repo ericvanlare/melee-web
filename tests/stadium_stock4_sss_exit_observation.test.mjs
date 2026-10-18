@@ -105,25 +105,64 @@ test('prepared-entry receipt requires the stopped boundary and expected RNG; str
     timer_shows_hours:0,x14:0},players:[
     {slot:0,slot_type:0,ckind:8,color:1,stocks:4,flags_c:128},
     {slot:0,slot_type:0,ckind:8,color:0,stocks:4,flags_c:128},...Array(4).fill({slot_type:3})]};
-  const receipt={schema:'melee-web-stadium-prepared-start-before-assets-v1',
+  const receipt={schema:'melee-web-stadium-prepared-start-before-assets-v2',
     scope:'source_prepared_start_after_sss_leave_before_assets',phase:'prepared_entry',observation_profile:1,
     captured:true,source_scene:0,host_entered:false,waiting_for_audio_retained_until_unload:true,
     replay_cursor:270,local_order_rows:543,callback_source_steps:0,callback_source_draws:0,
-    asset_requests_after_leave_boundary:0,world_generation:1,random_seed_hex:'00000000',start,
+    asset_requests_after_leave_boundary:0,world_generation:1,hsd_pending_loads_at_return:0,
+    bank_transport_active_at_return:true,bank_transport_configured_at_return:true,
+    bank_transport_busy_at_return:false,random_seed_hex:'00000000',start,
     menu_draw_reference:'UNKNOWN',runtime_admission:false,Entry:false,C3:false};
-  assert.equal(compareStock4PreparedStartReceipt(receipt,rng,declared,sourceStartHex).scope,
-    'prepared_start_boundary_common_fields_only');
+  const comparison=compareStock4PreparedStartReceipt(receipt,rng,declared,sourceStartHex);
+  assert.equal(comparison.scope,'prepared_start_boundary_common_fields_and_announcer_service_drain');
+  assert.equal(comparison.announcer_service_completion.transfer_occurrence,'UNOBSERVED');
+  assert.match(comparison.announcer_service_completion.helper_return,/C1A host READY follows helper success/);
   for(const mutate of [x=>x.random_seed_hex='12345678',x=>x.local_order_rows++,
-    x=>x.asset_requests_after_leave_boundary++,x=>x.Entry=true]) {
+    x=>x.asset_requests_after_leave_boundary++,x=>x.Entry=true,
+    x=>x.hsd_pending_loads_at_return=1,x=>x.bank_transport_active_at_return=false,
+    x=>x.bank_transport_configured_at_return=false,x=>x.bank_transport_busy_at_return=true,
+    x=>delete x.hsd_pending_loads_at_return,x=>delete x.bank_transport_active_at_return,
+    x=>delete x.bank_transport_busy_at_return]) {
     const changed=structuredClone(receipt);mutate(changed);
     assert.throws(()=>compareStock4PreparedStartReceipt(changed,rng,declared,sourceStartHex));
   }
+  const legacy=structuredClone(receipt);legacy.schema='melee-web-stadium-prepared-start-before-assets-v1';
+  assert.throws(()=>compareStock4PreparedStartReceipt(legacy,rng,declared,sourceStartHex));
   assert.throws(()=>compareStock4PreparedStartObservation(receipt,e),
     /retained original Entry\/RNG identity/);
 });
+test('outer prepared-start comparator forwards the validated announcer completion (wrapper-only control)',()=>{
+  const identity={sequence:1640,source_tick:125,draw_ordinal:0,start_melee_sha256:'a'.repeat(64),
+    rng:{pointer_slot_address:0x100,pointer_hex:'00000001',value_address:0x104,value_hex:'12345678'}};
+  const declaredSetup={fixture:'synthetic-only'},startHex='synthetic-wrapper-control';
+  const entry={...identity,boundary:'entry',start_melee_hex:startHex,declared_setup:declaredSetup};
+  const expectedProfile={prepared_profile:{entry}},actual={fixture:'actual-shape-passed-to-inner-control'};
+  const projection={pass:true,scope:'synthetic-projection'};
+  const serviceCompletion={basis:'synthetic-only',transfer_occurrence:'UNOBSERVED'};
+  const validatedReceipt={pass:true,projection,announcer_service_completion:serviceCompletion};
+  let validatedExpected=null,receiptArguments=null;
+  const context={ORIGINAL_ENTRY:identity,requireValue:(condition,message)=>{if(!condition)throw Error(message);},
+    validateStock4SssExitExpected:value=>{validatedExpected=value;},
+    compareStock4PreparedStartReceipt:(...args)=>{receiptArguments=args;return validatedReceipt;}};
+  vm.createContext(context);
+  vm.runInContext(`globalThis.invoke=${compareStock4PreparedStartObservation.toString()};`,context);
+  const result=context.invoke(actual,expectedProfile);
+  assert.equal(validatedExpected,expectedProfile);
+  assert.equal(receiptArguments[0],actual);
+  assert.equal(receiptArguments[1],entry.rng);
+  assert.equal(receiptArguments[2],declaredSetup);
+  assert.equal(receiptArguments[3],startHex);
+  assert.equal(result.pass,true);
+  assert.equal(result.announcer_service_completion,serviceCompletion);
+  assert.equal(result.projection,projection);
+  assert.equal(result.raw_start_melee_bytes,'not_compared');
+  assert.equal(result.runtime_admission,false);
+  assert.equal(result.Entry,false);
+  assert.equal(result.C3,false);
+});
 test('prepared-start finalization is a separate opt-in control from the historical SSS stop',()=>{
   const e=expected(), report={current_sss_exit:{prepared_start_comparison:{pass:true,
-    scope:'prepared_start_common_fields_against_original_entry_profile'}}};
+    scope:'prepared_start_common_fields_and_announcer_service_drain_against_original_entry_profile'}}};
   assert.equal(validateStock4PreparedStartFinalization(report,e).pass,true);
   assert.throws(()=>validateStock4PreparedStartFinalization({current_sss_exit:{}},e),/separately enabled/);
 });

@@ -12,6 +12,7 @@ extern "C" int gm_GetPreviousGameMode(void);
 extern "C" int gm_GetCurrentSceneIndex(void);
 extern "C" int gm_GetPreviousSceneIndex(void);
 #include "gameplay_menu.h"
+#include "gameplay_audio_bank_transport.h"
 #include "stadium_first_css_diagnostic_input.hpp"
 #include "stadium_first_css_diagnostic_snapshot_json.hpp"
 #include "gameplay_source_memory_runtime.h"
@@ -20,6 +21,7 @@ extern "C" int gm_GetPreviousSceneIndex(void);
 #include <sstream>
 #include <iostream>
 #include <exception>
+extern "C" int HSD_SynthSFXGetPendingLoadCount(void);
 extern "C" void HSD_SisLib_C1TextProbeSet(int enabled);
 extern "C" void* melee_web_current_scene_info(void);
 #endif
@@ -4921,13 +4923,26 @@ const char* melee_web_native_menu_stadium_current_sss_prepared_start_observe(){
   require_guard(s.terminal_asset_requests==0,"no_terminal_asset_requests");
   require_guard(s.last_host_tick_returned&&!s.host_tick_in_flight,
                 "returned_host_tick");
+  // C1A marks the host READY only after melee_web_vs_prepare_start_source
+  // returns. That source helper calls gm_LoadAnnouncer synchronously, whose
+  // authored wait drains the real HSD queue before returning. Sample the
+  // existing service state at this already-guarded boundary; this is not a
+  // separate call marker and does not establish whether a transfer occurred.
+  const int hsd_pending_loads=HSD_SynthSFXGetPendingLoadCount();
+  const int bank_transport_active=melee_web_audio_bank_transport_active();
+  const int bank_transport_configured=melee_web_audio_bank_transport_configured();
+  const int bank_transport_busy=melee_web_audio_bank_transport_busy();
+  require_guard(hsd_pending_loads==0,"hsd_pending_loads_at_return");
+  require_guard(bank_transport_active==1,"bank_transport_active_at_return");
+  require_guard(bank_transport_configured==1,"bank_transport_configured_at_return");
+  require_guard(bank_transport_busy==0,"bank_transport_busy_at_return");
   MeleeWebMenuMatchSelection selection{};
   char error[256]{};
   check(melee_web_menu_host_stadium_c1a_selection(host,&selection,error,sizeof(error)),error);
   check(selection.start.rules.stkind==St_Kind_PStadium,
         "Prepared Start observation lost its source Stadium StKind");
   std::ostringstream out;
-  out<<"{\"schema\":\"melee-web-stadium-prepared-start-before-assets-v1\""
+  out<<"{\"schema\":\"melee-web-stadium-prepared-start-before-assets-v2\""
      <<",\"scope\":\"source_prepared_start_after_sss_leave_before_assets\""
      <<",\"phase\":\"prepared_entry\",\"observation_profile\":1"
      <<",\"captured\":true,\"source_scene\":0,\"host_entered\":false"
@@ -4938,6 +4953,10 @@ const char* melee_web_native_menu_stadium_current_sss_prepared_start_observe(){
      <<",\"callback_source_draws\":"<<s.terminal_draws
      <<",\"asset_requests_after_leave_boundary\":"<<s.terminal_asset_requests
      <<",\"world_generation\":"<<s.leave_world_generation
+     <<",\"hsd_pending_loads_at_return\":"<<hsd_pending_loads
+     <<",\"bank_transport_active_at_return\":"<<(bank_transport_active==1?"true":"false")
+     <<",\"bank_transport_configured_at_return\":"<<(bank_transport_configured==1?"true":"false")
+     <<",\"bank_transport_busy_at_return\":"<<(bank_transport_busy==1?"true":"false")
      <<",\"random_seed_hex\":"
      <<first_css_browser_draw_json_quote(melee_web::stadium_first_css_diagnostic::hex32(selection.random_seed))
      <<",\"start\":";
@@ -4948,7 +4967,7 @@ const char* melee_web_native_menu_stadium_current_sss_prepared_start_observe(){
  }catch(const std::exception& error){
   s.prepared_start_error=error.what();
   std::ostringstream out;
-  out<<"{\"schema\":\"melee-web-stadium-prepared-start-before-assets-v1\""
+  out<<"{\"schema\":\"melee-web-stadium-prepared-start-before-assets-v2\""
      <<",\"scope\":\"source_prepared_start_after_sss_leave_before_assets\""
      <<",\"captured\":false,\"error\":"
      <<first_css_browser_draw_json_quote(s.prepared_start_error)<<'}';

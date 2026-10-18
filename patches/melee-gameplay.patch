@@ -5146,18 +5146,19 @@ index 706ec65b2fc143d94a68493af6851648a716055d..55e8f92830a5b0720053ad71cb2a728d
  
  #endif
 diff --git a/src/melee/gm/gmvsmelee.c b/src/melee/gm/gmvsmelee.c
-index eb0b42c246c1a9529d791c99e2b78bd080e67d84..5b74b9d740eb03233a32b15832d100d3fb18ba0a 100644
+index eb0b42c246c1a9529d791c99e2b78bd080e67d84..688273bdf9e07d77a042c8eb3ef5b7019f2ab491 100644
 --- a/src/melee/gm/gmvsmelee.c
 +++ b/src/melee/gm/gmvsmelee.c
-@@ -204,6 +204,40 @@ void gmVsMelee_EnterVs(GameModeState* state, VsModeData* vs,
+@@ -204,6 +204,42 @@ void gmVsMelee_EnterVs(GameModeState* state, VsModeData* vs,
      gm_LoadAnnouncer();
  }
  
 +#if defined(MELEE_WEB_GAMEPLAY)
-+/* Build the same StartMeleeData published by ordinary VS OnEnter without
-+ * starting the announcer preload. The browser owns that audio dependency in
-+ * its checked match construction phase. Keep the menu-owned VsModeData raw:
-+ * retail does not apply persistent rules until after SSS has exited. */
++/* Build the same StartMeleeData published by ordinary VS OnEnter. Run the
++ * authored announcer preload while the leaving SSS host still owns its
++ * registered bank transport and source wait callback. Keep the menu-owned
++ * VsModeData raw: retail does not apply persistent rules until after SSS has
++ * exited. */
 +int melee_web_vs_prepare_start_source(StartMeleeData* start,
 +                                      const VsModeData* menu,
 +                                      VsModeData* prepared_mode)
@@ -5183,6 +5184,7 @@ index eb0b42c246c1a9529d791c99e2b78bd080e67d84..5b74b9d740eb03233a32b15832d100d3
 +    }
 +    gm_SetupSubColors(start);
 +    gm_LoadRumbleEnabled(start);
++    gm_LoadAnnouncer();
 +    return 1;
 +}
 +#endif

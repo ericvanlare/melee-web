@@ -143,6 +143,8 @@ int melee_web_menu_host_enable_stadium_c1a(MeleeWebMenuHost* h,char*,size_t){h->
 int melee_web_menu_host_source_scene(MeleeWebMenuHost*){return scene;}int melee_web_menu_host_phase(MeleeWebMenuHost*){return phase;}bool melee_web_net_active(){return false;}
 void clear_diagnostic_pad(){}double emscripten_get_now(){return 0;}
 int melee_web_menu_host_leave(MeleeWebMenuHost*,int,char*,size_t);
+int HSD_SynthSFXGetPendingLoadCount(){return 0;}int melee_web_audio_bank_transport_active(){return 1;}
+int melee_web_audio_bank_transport_configured(){return 1;}int melee_web_audio_bank_transport_busy(){return 0;}
 int melee_web_menu_host_stadium_c1a_selection(MeleeWebMenuHost*,MeleeWebMenuMatchSelection* out,char*,size_t){++selection_calls;*out=replay->selection;return 1;}
 std::string first_css_browser_draw_json_quote(const std::string& s){return "\""+s+"\"";}
 namespace melee_web{namespace stadium_first_css_diagnostic{std::string hex32(uint32_t){return "e2624ac3";}void write_start(std::ostream& out,const StartMeleeData&){out<<"{}";}}}
@@ -169,6 +171,10 @@ int main(){reset();complete_leave();auto& s=current_sss_exit;
  std::string result=melee_web_native_menu_stadium_current_sss_prepared_start_observe();std::cout<<result<<std::endl;
  assert(result.find("\"captured\":true")!=std::string::npos&&selection_calls==1);
  assert(result.find("\"world_generation\":8")!=std::string::npos);
+ assert(result.find("\"hsd_pending_loads_at_return\":0")!=std::string::npos&&
+        result.find("\"bank_transport_active_at_return\":true")!=std::string::npos&&
+        result.find("\"bank_transport_configured_at_return\":true")!=std::string::npos&&
+        result.find("\"bank_transport_busy_at_return\":false")!=std::string::npos);
  assert(s.world_generation==7&&replay_source_frames.steps()==0&&replay_source_frames.draws()==0&&current_sss_asset_request_calls==9);
  assert(result==melee_web_native_menu_stadium_current_sss_prepared_start_observe()&&selection_calls==1);
  // Retained completed leave must refuse any later owner/generation replacement.
@@ -221,6 +227,11 @@ uint64_t gameplay_generation=7;AssetDestination asset_destination=AssetDestinati
 struct AssetScope{int pending_generation()const{return pending_asset_generation;}}asset_scope;
 struct Preparation{bool waiting_for_audio()const{return preparation_waiting;}}preparation;
 int selection_calls=0,source_steps=0,source_draws=0,asset_calls=0;
+int pending_loads=0,transport_active=1,transport_configured=1,transport_busy=0,service_reads=0;
+int HSD_SynthSFXGetPendingLoadCount(){++service_reads;return pending_loads;}
+int melee_web_audio_bank_transport_active(){++service_reads;return transport_active;}
+int melee_web_audio_bank_transport_configured(){++service_reads;return transport_configured;}
+int melee_web_audio_bank_transport_busy(){++service_reads;return transport_busy;}
 void check(bool v,const char* e){if(!v)throw std::runtime_error(e);}
 uint64_t melee_web_gameplay_generation(){return gameplay_generation;}
 int melee_web_menu_host_phase(Host*){return host_phase;}
@@ -241,13 +252,15 @@ void reset(){current_sss_exit=CurrentSssExitState{};auto& s=current_sss_exit;
  current_sss_asset_request_calls=9;host_entered=false;world_exposed=true;match=results=prize=pending=running=false;
  faulted=menu_scene_rebuild_pending=false;preparation_waiting=true;host_phase=MELEE_WEB_MENU_READY;
  host_scene=0;pending_asset_generation=0;gameplay_generation=7;asset_destination=AssetDestination::None;
+ pending_loads=0;transport_active=1;transport_configured=1;transport_busy=0;service_reads=0;
  selection_calls=source_steps=source_draws=asset_calls=0;}
 int main(){reset();std::string first=melee_web_native_menu_stadium_current_sss_prepared_start_observe();
  assert(first.find("\"captured\":true")!=std::string::npos&&first.find("\"replay_cursor\":270")!=std::string::npos);
  assert(first.find("\"local_order_rows\":543")!=std::string::npos&&first.find("\"Entry\":false")!=std::string::npos);
+ assert(first.find("\"hsd_pending_loads_at_return\":0")!=std::string::npos&&service_reads==4);
  assert(selection_calls==1&&source_steps==0&&source_draws==0&&asset_calls==0);
  assert(first==melee_web_native_menu_stadium_current_sss_prepared_start_observe()&&selection_calls==1);
- for(int fault=0;fault<17;++fault){reset();auto& s=current_sss_exit;const char* reason="";
+ for(int fault=0;fault<21;++fault){reset();auto& s=current_sss_exit;const char* reason="";
   if(fault==0){s.leave_world=nullptr;reason="live_exposed_world_identity";}
   if(fault==1){world_exposed=false;reason="live_exposed_world_identity";}
   if(fault==2){s.leave_cache=nullptr;reason="archive_cache_identity";}
@@ -265,10 +278,15 @@ int main(){reset();std::string first=melee_web_native_menu_stadium_current_sss_p
   if(fault==14){s.host_tick_in_flight=true;reason="returned_host_tick";}
   if(fault==15){s.context=nullptr;reason="replay_and_css_context_identity";}
   if(fault==16){gameplay_generation++;reason="world_generation";}
+  if(fault==17){pending_loads=1;reason="hsd_pending_loads_at_return";}
+  if(fault==18){transport_active=0;reason="bank_transport_active_at_return";}
+  if(fault==19){transport_configured=0;reason="bank_transport_configured_at_return";}
+  if(fault==20){transport_busy=1;reason="bank_transport_busy_at_return";}
   std::string refused=melee_web_native_menu_stadium_current_sss_prepared_start_observe();
   std::string first_failure=std::string("Prepared Start guard failed: ")+reason;
   assert(refused.find("\"captured\":false")!=std::string::npos&&
          refused.find(first_failure)!=std::string::npos&&selection_calls==0);
+  assert(service_reads==(fault<17?0:4));
  }
 }
 '''

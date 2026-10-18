@@ -101,9 +101,11 @@ export function compareStock4PreparedStartReceipt(actual, expectedRng, declaredS
     'schema','scope','phase','observation_profile','captured','source_scene','host_entered',
     'waiting_for_audio_retained_until_unload','replay_cursor','local_order_rows',
     'callback_source_steps','callback_source_draws','asset_requests_after_leave_boundary',
-    'world_generation','random_seed_hex','start','menu_draw_reference','runtime_admission','Entry','C3'
+    'world_generation','hsd_pending_loads_at_return','bank_transport_active_at_return',
+    'bank_transport_configured_at_return','bank_transport_busy_at_return','random_seed_hex','start',
+    'menu_draw_reference','runtime_admission','Entry','C3'
   ].sort().join('|') &&
-    actual.schema === 'melee-web-stadium-prepared-start-before-assets-v1' &&
+    actual.schema === 'melee-web-stadium-prepared-start-before-assets-v2' &&
     actual.scope === 'source_prepared_start_after_sss_leave_before_assets' &&
     actual.phase === 'prepared_entry' && actual.observation_profile === 1 && actual.captured === true &&
     actual.source_scene === 0 && actual.host_entered === false &&
@@ -112,12 +114,22 @@ export function compareStock4PreparedStartReceipt(actual, expectedRng, declaredS
     actual.callback_source_steps === 0 && actual.callback_source_draws === 0 &&
     actual.asset_requests_after_leave_boundary === 0 &&
     Number.isSafeInteger(actual.world_generation) && actual.world_generation > 0 &&
+    actual.hsd_pending_loads_at_return === 0 &&
+    actual.bank_transport_active_at_return === true &&
+    actual.bank_transport_configured_at_return === true &&
+    actual.bank_transport_busy_at_return === false &&
     actual.random_seed_hex === expectedRng?.value_hex && actual.menu_draw_reference === 'UNKNOWN' &&
     actual.runtime_admission === false && actual.Entry === false && actual.C3 === false,
   'Prepared Start receipt escaped the exact stopped stock4 SSS pre-assets boundary or Entry seed');
   const projection = compareStock4PreparedStartProjection(actual.start, declaredSetup, originalEntryStartHex);
-  return {pass: true, scope: 'prepared_start_boundary_common_fields_only', projection,
-    runtime_admission: false, Entry: false, C3: false};
+  return {pass: true, scope: 'prepared_start_boundary_common_fields_and_announcer_service_drain', projection,
+    announcer_service_completion: {
+      basis: 'source_backed_synchronous_helper_return_and_drained_real_service',
+      helper_return: 'C1A host READY follows helper success; the helper calls authored gm_LoadAnnouncer synchronously',
+      hsd_pending_loads_at_return: 0, bank_transport_active_at_return: true,
+      bank_transport_configured_at_return: true, bank_transport_busy_at_return: false,
+      transfer_occurrence: 'UNOBSERVED'
+    }, runtime_admission: false, Entry: false, C3: false};
 }
 export function compareStock4PreparedStartObservation(actual, expected) {
   validateStock4SssExitExpected(expected);
@@ -131,11 +143,13 @@ export function compareStock4PreparedStartObservation(actual, expected) {
     rng?.value_hex === ORIGINAL_ENTRY.rng.value_hex,
   'Prepared Start comparison is not bound to the retained original Entry/RNG identity');
   const receipt = compareStock4PreparedStartReceipt(actual, rng, entry.declared_setup, entry.start_melee_hex);
-  return {pass: true, scope: 'prepared_start_common_fields_against_original_entry_profile',
+  return {pass: true, scope: 'prepared_start_common_fields_and_announcer_service_drain_against_original_entry_profile',
     original_entry: {sequence: entry.sequence, source_tick: entry.source_tick,
       draw_ordinal: entry.draw_ordinal, start_melee_sha256: entry.start_melee_sha256,
       rng_pointer_hex: rng.pointer_hex, rng_value_hex: rng.value_hex},
-    projection: receipt.projection, raw_start_melee_bytes: 'not_compared',
+    projection: receipt.projection,
+    announcer_service_completion: receipt.announcer_service_completion,
+    raw_start_melee_bytes: 'not_compared',
     runtime_admission: false, Entry: false, C3: false};
 }
 export function validateStock4SssExitTrace(text, expected, actual) {
@@ -184,9 +198,9 @@ export function validateStock4PreparedStartFinalization(report, expected) {
   validateStock4SssExitExpected(expected);
   requireValue(report?.current_sss_exit?.prepared_start_comparison?.pass === true &&
     report.current_sss_exit.prepared_start_comparison.scope ===
-      'prepared_start_common_fields_against_original_entry_profile' &&
+      'prepared_start_common_fields_and_announcer_service_drain_against_original_entry_profile' &&
     !report.current_sss_exit.prepared_start_failure,
   'Prepared Start candidate is missing its separately enabled exact-boundary comparison');
-  return {pass: true, scope: 'prepared_start_common_fields_against_original_entry_profile',
+  return {pass: true, scope: 'prepared_start_common_fields_and_announcer_service_drain_against_original_entry_profile',
     Entry: false, C3: false, runtime_admission: false};
 }

@@ -16216,6 +16216,154 @@
           "Entry, Setup, runtime admission and C3 remain false; original menu-draw parity is UNKNOWN."
         ],
         "evidence_path_base": "Verified external melee-web runs directory; absolute machine paths remain in retained private manifests."
+      },
+      "prepared_start_announcer_component_v1": {
+        "schema": "melee-web-stadium-prepared-start-announcer-component-v1",
+        "state": "BROWSER_COMPONENT_PASS; FROZEN_LAUNCHER_FAILURE_RETAINED; OFFLINE_COMPARATOR_AND_INDEPENDENT_REVIEW_PASS",
+        "scope": "Same-run prepared-Start common-field/seed comparison against retained original Entry row 1640 plus source-backed synchronous gm_LoadAnnouncer helper return and drained-service observation. The browser attempt stops before Entry/Setup execution.",
+        "inputs": {
+          "original_primary_sha256": "982e6c2022efe270be1e973b68e663392423c858b8bc6b8ff3ddbdb49e8c4fc9",
+          "native_producer": "9494fc69526db469dd969ab0832eae24200260e0",
+          "capture_harness": "db52ff305c11eb40713f92f5afa588e03878bbb5",
+          "recipe_sha256": "41ac043ca7d869a08f86cf81fc7d4ce6f05aba4394243f4aabf6f57aa1c94e36",
+          "source_binding_sha256": "7d954aec2b7409fde75dbd3f396d566f5efa52300543908b1305020f0585d2ff",
+          "legacy_sss_expected_sha256": "2e2653d717a6e1335240695dde4439f31b1eadd76d7492ad8d499fb2a8fb3ca5",
+          "prepared_start_expected_sha256": "69f4fc6434f85f0db1e5eb449fb026e1d91a7c5db7b40d5949424c6a67e63f8f",
+          "entry_1640": {
+            "pc": "0x8016e934",
+            "source_tick": 125,
+            "draw_ordinal": 0,
+            "seed": "e2624ac3",
+            "raw_bytes": 312,
+            "raw_sha256": "918a23d68a3b5024f94baf1f5e26e6c0db56c5fbbbffdc79c5e620e82af3b728"
+          },
+          "setup_1674": {
+            "pc": "0x8016e9c4",
+            "source_tick": 125,
+            "draw_ordinal": 0,
+            "seed": "083a62a9"
+          }
+        },
+        "capture": {
+          "run_locator": "stadium-announcer-observer-capture-v1-20261018-004134-38523dd4",
+          "attempt": 1,
+          "capture_lane": "stadium-prepared-start-announcer-once",
+          "packet_manifest_sha256": "c762396e8c4404e528c113cd939290c06c9c4df8e83184f67a67ae00f751718b",
+          "packet_review_sha256": "4d8c2affe7412884394469747eb000a73ee95db8234256222a9fb8a44d91ffae",
+          "one_launch_release_sha256": "57a64ed1ca91603dcd8b2b6cb8e1b70a0f1e188635523d0d8d5be3da77bfa9b2",
+          "launcher_sha256": "8ad1e745a881d5f8bf61587ed9cc2d376514051e6b2ace44eba83ad84a942f94",
+          "command_sha256": "949c61227d0e886d03a064a6273ffeb833609a0519ba7bd73f9c6794c59a9b57",
+          "release_consumed_sha256": "92c4b4d4c96fa82fa53274b2b00d0f90f84d219b94f91d5148c2cf4b387c6fa8",
+          "result": "prepared_start_candidate_pass_replay_stopped",
+          "browser_report_sha256": "57a866ca5139a57f7b15ed6e67553f0ec6f6e6dcb529fc9102eaaac378186c30",
+          "prepared_observation_sha256": "668b1eca7b78c03ce20fb9a603b7dcfa9acf21be8d5d752f17a90383e93440b6",
+          "observed": {
+            "literal_inputs": 270,
+            "local_order_rows": 543,
+            "callback_source_steps": 0,
+            "callback_source_draws": 0,
+            "post_leave_asset_requests": 0,
+            "prepared_seed": "e2624ac3",
+            "hsd_pending_loads_at_return": 0,
+            "bank_transport_active_at_return": true,
+            "bank_transport_configured_at_return": true,
+            "bank_transport_busy_at_return": false
+          },
+          "prepared_start_comparison": {
+            "result": "pass",
+            "scope": "declared_source_common_fields_only",
+            "original_entry_sequence": 1640,
+            "raw_start_melee_bytes": "not_compared",
+            "Entry": false,
+            "C3": false
+          },
+          "full_replay": "FAIL_INCOMPLETE_EXPLICIT_SSS_STOP",
+          "raw_transfer_occurrence": "UNOBSERVED"
+        },
+        "launcher_failure_retained": {
+          "launcher_summary_sha256": "0ed4b958a546d2dc0d047c228eb62013ce3e596018174a036a594b9a5cc2fd5e",
+          "retention_receipt_sha256": "064d3aef6428da123db33bc1adaeb2f24c17b0a847b230b71fa7dc3b4201c251",
+          "launcher_exit_code": 1,
+          "browser_owner_exit_code": 0,
+          "browser_owner_result": "pass",
+          "reason": "Frozen outer launcher expected announcer_service_completion under prepared_start_comparison; comparator wrapper failed to forward the validated object. Original raw report and launcher summary remain immutable and failed; no retry.",
+          "cleanup": {
+            "native_unload_requested": true,
+            "native_unloaded": true,
+            "browser_close_returned": true,
+            "browser_pids_absent": true,
+            "capture_process_group_absent": true,
+            "server_process_group_absent": true,
+            "loopback_port": 58179,
+            "loopback_port_absent": true
+          }
+        },
+        "offline_reanalysis": {
+          "post_capture_analysis_sha256": "1f13cbeca6fb76b53d805934f7d9160d6558f9ac932b099bba8dca4aa9b248c6",
+          "comparator_receipt_sha256": "44e95a9ba47a0c86dc16b0219ec3f8ba6cc13cc7b7e350628350f6c84e72e3bf",
+          "result": "PASS_EXACT_RETAINED_OUTER_COMPARATOR",
+          "raw_observation_sha256": "668b1eca7b78c03ce20fb9a603b7dcfa9acf21be8d5d752f17a90383e93440b6",
+          "expected_sha256": "69f4fc6434f85f0db1e5eb449fb026e1d91a7c5db7b40d5949424c6a67e63f8f",
+          "wrapper_repair": {
+            "source_before_sha256": "dc19c7817c49a7e6c1f723896c840c0eeea1b364dd719441c0ebf4c7564a1e61",
+            "source_after_sha256": "eeedc94170f54210632703670c9cdf29de2f6ac610c74b21ce9aa72d71441e8b",
+            "change": "Forward the validated announcer_service_completion object in the outer comparison projection only."
+          },
+          "focused_controls": {
+            "python_tests": 5,
+            "embedded_node_tests": 10,
+            "exit_code": 0,
+            "log_sha256": "836e31181debb44842deb21ec2dc50980719745d940c796ad676eb0ed8c261c1",
+            "test_sha256": "b100956affbe5f93ff29828ddc74507e396704e7267d6a197bdee0385139af1c"
+          },
+          "candidate_diff_sha256": "6583fed66945dfdbb246db51ff02a97da57afa8ce345876fbd971a264d87040a",
+          "independent_review": {
+            "path": "independent-final-review-v1.json",
+            "sha256": "ff014eed73aa2b1699e17250fad6e595678bca043e6513d2c02d979451647074",
+            "result": "PASS_SCOPED_PREPARED_COMPONENT_AND_OFFLINE_FORWARDING_REPAIR_ORIGINAL_LAUNCH_FAILURE_RETAINED"
+          }
+        },
+        "producer_identities": {
+          "captured_source": {
+            "src/gameplay_menu_browser.cpp": "a5f50941b29a413fe8b3ea9357227e3f56d42c5e4297ad29bdcc2979fc25cc2f",
+            "scripts/stadium_stock4_sss_exit_observation.mjs": "dc19c7817c49a7e6c1f723896c840c0eeea1b364dd719441c0ebf4c7564a1e61",
+            "patches/melee-gameplay.patch": "84d514aa8fdf698c803b0a94303b8ec16f4fe50fc2725298d3fe192c46d76c07"
+          },
+          "captured_diagnostic_release_artifacts": {
+            "gameplay_menu_browser.js": "26cb2ea59384f654024d9ebaed05a7c471729bedbfda087c78d2b4baff398c4e",
+            "gameplay_menu_browser.wasm": "62bc48d37de2da9a23bca4c65fec7b6dc8bebb42aa3d6bc26bb5b5dcac47b901",
+            "gameplay_menu_browser.data": "1eb094d18d16f0894840e297d975f52bb97ead994e723fa13887b6ecda0a17a6"
+          },
+          "wrapper_repair_not_in_captured_runtime": true,
+          "wrapper_repair_focused_tests_only_no_new_build_or_capture": true
+        },
+        "metadata_correction": {
+          "immutable_packet_manifest_original_entry_pc_hex": "0x8025bbd4 (descriptive typo; retained unchanged)",
+          "hash_pinned_expected_entry_pc": "0x8016e934",
+          "hash_pinned_expected_setup_pc": "0x8016e9c4",
+          "comparison_basis": "Offline comparator used the exact expected.json SHA above and retained source IDs/seed. The manifest typo did not affect compared values; do not edit or replace the packet."
+        },
+        "next_source_only_step": {
+          "contract_path": "stadium-announcer-observer-capture-v1-20261018-004134-38523dd4/next-entry-setup-probe-contract-v1.json",
+          "contract_sha256": "868ae441d7cb421a3765c64b7f9ecd522f272dca21f9a205392fbb76acef9b70",
+          "proposal": "Continue the same checked 270/543 prepared handoff through existing scoped assets/deferred source match owners to the existing zero-tick Stadium Setup snapshot. Preserve the separate 124-input route and expected files; compare declared common Start fields and Entry/Setup seeds only. No callback stamp/global dispatcher or C3 claim."
+        },
+        "limits": {
+          "Entry_execution": false,
+          "Setup_parity": false,
+          "C3": false,
+          "runtime_admission": false,
+          "full_replay": "FAIL_INCOMPLETE_EXPLICIT_SSS_STOP",
+          "raw_StartMeleeData_312_bytes_compared": false,
+          "original_menu_draw_parity": "UNKNOWN",
+          "bank_transfer_occurrence": "UNOBSERVED",
+          "build_after_wrapper_repair": false,
+          "full_suite_after_wrapper_repair": false,
+          "capture_retries": 0,
+          "PR301": "draft",
+          "PR330_main_integration": "pending at documentation checkpoint"
+        },
+        "evidence_path_base": "stadium-announcer-observer-capture-v1-20261018-004134-38523dd4"
       }
     }
   }
