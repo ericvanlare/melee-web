@@ -82,6 +82,10 @@ matched patched-Slippi execution witness remain unproved. No official Slippi
 service is contacted. The existing private Slippi testbed has known loopback
 redirects, but those settings and periodic socket sampling do not prove that
 every network path stays local. It remains unrun until that restriction can be
-verified. A separate offline stock-Dolphin single-patch diagnostic is being
-investigated; it would not satisfy the selected Slippi Dolphin reference gate. Integration requires complete current-head CI after the final documentation
-commit. Vanilla source behavior is unchanged by this private profile hook.
+verified for the actual client. The separate process-local default-deny fixture
+and remaining client-lineage gate are recorded in the
+[shield-drop boundary](2026-10-18-ucf-shield-drop.md); they do not establish
+patched-client execution. [PR #336](https://github.com/ericvanlare/melee-web/pull/336)
+merged as `220e8ad9` after independent review and all 14 exact-head checks
+(12 successes and two expected skips). Reviewed and merged trees match.
+Vanilla source behavior is unchanged by this private profile hook.
