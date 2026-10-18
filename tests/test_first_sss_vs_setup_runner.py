@@ -11,7 +11,11 @@ class FirstSssVsSetupRunnerTests(OwnedWorkspaceTests):
   cli=source[source.index('const {values} = parseArgs'):source.index('const LIMITS =')]
   self.assertEqual(cli.count('parseArgs({options:'),1)
   cli=cli.replace('parseArgs({options:','parseArgs({args, options:')
-  route=source[source.index('  if (firstSssVsSetup) {',source.index('async function main()')):source.index('  assert.equal(preflight.source_revision',source.index('async function main()'))]
+  route_start=source.index('} else if (firstSssVsSetup) {',source.index('async function main()'))+len('} else ')
+  route_end=source.index('  assert.equal(preflight.source_revision',route_start)
+  route=source[route_start:route_end]
+  self.assertTrue(route.startswith('if (firstSssVsSetup) {'))
+  self.assertIn("assert.equal(preflight.route_mode, 'first-sss-vs-setup')",route)
   js="import assert from 'node:assert/strict';import {parseArgs} from 'node:util';import {pathToFileURL} from 'node:url';\n"
   js+="import {validateMatchedSetupCfRequest} from "+repr((ROOT/'tests/stadium_matched_setup_cf_runner_gate.mjs').as_uri())+";\n"
   js+='const cli='+repr(cli)+',route='+repr(route)+';\n'

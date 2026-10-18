@@ -1,9 +1,10 @@
 """Execute the native scoped-import boundaries used by single-match replay."""
 from pathlib import Path
 import shutil
+import json
 import subprocess
-import tempfile
 import unittest
+from owned_test_workspace import OwnedWorkspaceTests
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -19,7 +20,11 @@ def block(source, marker):
     raise AssertionError(marker)
 
 
-class ReplayScopedImportLifecycleTests(unittest.TestCase):
+class ReplayScopedImportLifecycleTests(OwnedWorkspaceTests):
+    @classmethod
+    def setUpClass(cls):
+        cls.scratch = cls.new_workspace(ROOT, 'replay-scoped-import-')
+
     def test_native_import_mode_and_replay_asset_route(self):
         compiler = shutil.which('c++')
         if not compiler:
@@ -43,6 +48,10 @@ class ReplayScopedImportLifecycleTests(unittest.TestCase):
 #include <string_view>
 #include <vector>
 #include <cstdint>
+// The real constructor predicate is covered by its own native owner controls.
+// This fixture supplies its explicit ownership state to the extracted boundary.
+bool constructor_owned=false;
+bool stadium_first_css_constructor_return_active(){return constructor_owned;}
 bool scoped_disc_import=false, scoped_assets=false, asset_committed=false;
 bool world=false,match=false,results=false,prize=false,host_entered=false;
 bool asset_selection_valid=false,asset_opening_preview_valid=false;
@@ -110,15 +119,39 @@ int main(){
  auto releases=asset_scope.releases;select_replay(&whole);
  assert(world&&host_entered&&scoped_assets&&scoped_disc_import);
  assert(asset_scope.releases==releases);
+ // The actual asset-begin boundary must reject a constructor-owned import
+ // before close(), request_assets(), or any protected owner/scope mutation.
+ constructor_owned=true;
+ const auto protected_files=files;
+ auto* const protected_cache=archive_cache.get();
+ const auto protected_destination=asset_destination;
+ const auto protected_generation=asset_generation;
+ const auto protected_pending=asset_scope.pending;
+ const auto protected_releases=asset_scope.releases;
+ const auto protected_aborts=asset_scope.aborts;
+ const auto protected_requests=requested_assets;
+ assert(!melee_web_native_asset_begin());
+ assert(message=="CSS constructor-return diagnostic refuses a second asset import");
+ assert(constructor_owned&&world&&host_entered&&scoped_assets&&scoped_disc_import);
+ assert(files==protected_files&&archive_cache.get()==protected_cache);
+ assert(asset_destination==protected_destination&&asset_generation==protected_generation);
+ assert(asset_scope.pending==protected_pending&&asset_scope.releases==protected_releases&&
+        asset_scope.aborts==protected_aborts&&requested_assets==protected_requests);
 }
 '''
-        with tempfile.TemporaryDirectory(prefix='melee-replay-scope-') as directory:
-            cpp = Path(directory) / 'test.cpp'
-            exe = Path(directory) / 'test'
-            cpp.write_text(source)
-            subprocess.run([compiler, '-std=c++20', str(cpp), '-o', str(exe)], check=True,
-                           capture_output=True, text=True)
-            subprocess.run([str(exe)], check=True, capture_output=True, text=True)
+        cpp = self.scratch / 'test.cpp'
+        exe = self.scratch / 'test'
+        cpp.write_text(source)
+        command = [compiler, '-std=c++20', str(cpp), '-o', str(exe)]
+        (self.scratch / 'compile-command.json').write_text(json.dumps(command) + '\n')
+        compiled = subprocess.run(command, capture_output=True, text=True)
+        (self.scratch / 'compile.stdout').write_text(compiled.stdout)
+        (self.scratch / 'compile.stderr').write_text(compiled.stderr)
+        self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+        result = subprocess.run([str(exe)], capture_output=True, text=True)
+        (self.scratch / 'run.stdout').write_text(result.stdout)
+        (self.scratch / 'run.stderr').write_text(result.stderr)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
 if __name__ == '__main__':
