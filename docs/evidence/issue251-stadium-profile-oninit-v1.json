@@ -17289,7 +17289,7 @@
   },
   "fresh_go2_comparison_2026_10_18": {
     "state": "ORIGINAL_GO2_REFERENCE_PASS_BROWSER_FIRST_C_COMPARISON_FAIL",
-    "next": "Offline fresh-versus-retained Entry/Setup and constructor/RNG context reduction, independently reviewed before any new capture. No retry or long lifetime released.",
+    "next": "Offline producer-bound initial CSS extraction and representability, followed by a reviewed v2 codec and constructor-return comparison before advancing ticks. The mandatory Entry/Setup guard is implemented and reviewed; no new capture or long lifetime released.",
     "native": {
       "binary_sha256": "4bebd3a21cf48da558c7380f45b73e394fe46f47cef774d939cd4659051918fa",
       "producer_manifest_sha256": "2da988e27c334b4530935ea32af3edc319707482e276b064e9b08c132d4cedbd",
@@ -17395,6 +17395,113 @@
       "per-owner RNG",
       "C3",
       "pixels/PCM/live timing/human acceptance"
-    ]
+    ],
+    "start_context_reduction": {
+      "state": "PASS_SCOPED_OFFLINE_REDUCTION",
+      "reduction_sha256": "902fff17105c49d5d4da291a16600eac6bb4faec0490abfef342cc53a366af71",
+      "addendum_sha256": "604c085623c70c2147542f7bbcfb9994ebea0fbf0aef57c64e8129ad23b8bb46",
+      "independent_review_sha256": "5d8591e7ac45c04ff22a9bfca7f27bc6611d131210429c93a941358464eab479",
+      "start_payload_bytes": 312,
+      "start_payload_sha256": "918a23d68a3b5024f94baf1f5e26e6c0db56c5fbbbffdc79c5e620e82af3b728",
+      "fresh_entry_seed": "e2624ac3",
+      "fresh_setup_seed": "083a62a9",
+      "retained_entry_seed": "3bb84c53",
+      "retained_setup_seed": "35a455b9",
+      "browser_matches_retained_phase_seeds": true,
+      "fresh_constructor_random_result": 66,
+      "browser_constructor_random_result": 29,
+      "fresh_initial_countdown": 3666,
+      "browser_initial_countdown": 3629,
+      "full_upstream_cause_proven": false
+    },
+    "fresh_prefix_inventory": {
+      "state": "PASS_SCOPED_OFFLINE_INPUT_INVENTORY",
+      "result_sha256": "bdab8453bd2b74a30d5346012dfc1ad729ddc9d531e0b65175766274dc6ea085",
+      "independent_review_sha256": "e5bf70a197c95dad31799a90b5a8f1fb911dca527f43fc368d6f14d3f185cfe7",
+      "css_consumes": {
+        "fresh": 142,
+        "retained": 149,
+        "first_differing_interval_ordinal": 2
+      },
+      "sss_consumes": {
+        "fresh": 133,
+        "retained": 125,
+        "first_differing_interval_ordinal": 4
+      },
+      "initial_css_equivalence_proven": false,
+      "browser_replay_claimed": false
+    },
+    "checkpoint_ci": {
+      "head": "5ad6f35f68b2727ef3e1b3289c80acbd5bd8d3c9",
+      "run": 39158266054,
+      "complete": 14,
+      "success": 12,
+      "expected_skips": 2,
+      "receipt_sha256": "4da490f629d4865b08fb717a4dddd83908b321d96891ac93903c54db10e45797",
+      "scope": "Historical published documentation head only; subsequent guard source review and regression have separate identities and published exact-head CI remains pending."
+    },
+    "run2_reuse_reduction": {
+      "state": "REFUSE_RUN2_AS_HISTORICAL_BROWSER_MENU_SCHEDULE",
+      "freeze_sha256": "ffddab9f8d30e81b699cf0cbbfa3f94127f1e6ebe2fd651dbe9fe39075f494e8",
+      "result_sha256": "4be33e2a932c65cb8ceb1ddc783bb02361c51568a057762fd49d77831a905e92",
+      "source_only_design_sha256": "b757f002c926d5096a15ec4265210077ab6e2ece4bab764c926265a651566541",
+      "css_consumes": {
+        "run2": 154,
+        "retained": 149,
+        "first_differing_interval_ordinal": 20
+      },
+      "sss_consumes": {
+        "run2": 124,
+        "retained": 125,
+        "first_differing_interval_ordinal": 15
+      },
+      "same_entry_and_setup_seeds": true,
+      "menu_schedule_equal": false,
+      "replay_performed": false,
+      "independent_review": "PASS_SCOPED_OFFLINE_REFUSAL",
+      "independent_review_sha256": "2ef05ab2eb66f8f521170461a5412a8c7fec79e9803ac0a43fdb3d003fd3cf59"
+    },
+    "start_context_guard": {
+      "state": "REVIEWED_FULL_REGRESSION_PASS_PUBLICATION_CI_PENDING",
+      "base_head": "5ad6f35f68b2727ef3e1b3289c80acbd5bd8d3c9",
+      "candidate_freeze_sha256": "e45e0dea8e8a9db3094e2270fdc092514ca2636ac018a5a05d2a8a512df98360",
+      "patch_sha256": "c43f7377bf503e8c90b172487ee3c6ccc28dd728f3552e0f0b211150ab4656d3",
+      "independent_review_sha256": "f34067d8d70034346acc05493f9b06078a530704758f507ac6998d877d237e59",
+      "freeze_metadata_correction_sha256": "071bd175a9e5f419f50af9bf39eb8b24960686a249cf82aec5073af9f462414e",
+      "correct_entry_setup_source_tick": 133,
+      "focused_controls": {
+        "python": 10,
+        "javascript_consumer": 30,
+        "runner_gate": 3
+      },
+      "retained_context_revalidation_sha256": "7f0efbf8b37bf06c3d76267b255956217b50d4cf87c31c9f63fb5014cf414250",
+      "historical_preflight_result_sha256": "1bca1b3ae03332eff7d4bb3c0d8a69085b60d03820b1427a3865731530f4a307",
+      "observed_refusal": "GO+2 same-producer vs_entry context differs from the selected host-only expected source",
+      "failed_focused_attempts": {
+        "count": 5,
+        "standalone_raw_logs_retained": false,
+        "summary_retained_in_candidate_freeze": true
+      },
+      "runtime_changed": false,
+      "new_browser_capture": false,
+      "scope": "Host-only same-producer preflight and existing actual Entry/Setup comparison gates; no game state/seed writes or timing/input/draw changes.",
+      "full_regression": {
+        "directory": "stadium-start-context-gate-regression-20261018-124606-3ab051ad",
+        "base_head": "5ad6f35f68b2727ef3e1b3289c80acbd5bd8d3c9",
+        "patch_sha256": "c43f7377bf503e8c90b172487ee3c6ccc28dd728f3552e0f0b211150ab4656d3",
+        "tests": 2724,
+        "skipped": 189,
+        "suite_seconds": 567.899,
+        "wrapper_seconds": 568.3458465831354,
+        "source_unchanged": true,
+        "log_sha256": "7c639cd61e21f133e3135b0d217bd34d4c5499029700c354a218ad85b3990a4b",
+        "result_sha256": "e16fcea66eaf2c7c4668cd811dd0dadf58fbf79018a73046eb23c90adc8a4fa6",
+        "retention_sha256": "19713a02948fa3f595ddc645c38d209bde4919a6c1d600325fa34ae435aa590d",
+        "owned_pid_pgid": 72033,
+        "owned_process_group_absent": true,
+        "owned_disposable_scratch_removed": true
+      },
+      "new_runtime_build": false
+    }
   }
 }

@@ -2520,6 +2520,8 @@ class StadiumGoOrdinal2Observations:
 
     def __init__(self):
         self.setup_seen = False
+        self.entry_row = None
+        self.setup_row = None
         self.go = None
         self.pending = None
         self.last_ordinal = -1
@@ -2549,8 +2551,14 @@ class StadiumGoOrdinal2Observations:
         if event != "boundary":
             return
         boundary = payload.get("boundary")
+        if boundary == "entry":
+            _require(self.entry_row is None and not self.setup_seen,
+                     "GO+2 has a duplicate or out-of-order VS Entry boundary")
+            self.entry_row = row
+            return
         if boundary == "setup":
             _require(not self.setup_seen, "GO+2 has duplicate VS Setup boundary")
+            self.setup_row = row
             self.setup_seen = True
             return
         if not self.setup_seen:
@@ -2648,8 +2656,17 @@ class StadiumGoOrdinal2Observations:
         }
         if include_go2_state:
             _require(self.go2_typed_state is not None and
-                     self.go2_seed_row is not None,
-                     "GO+2 typed state/seed row was not retained")
+                     self.go2_seed_row is not None and self.entry_row is not None and
+                     self.setup_row is not None,
+                     "GO+2 typed state/seed or same-producer Entry/Setup row was not retained")
+            entry_context = _go2_start_context_record(self.entry_row, "vs_entry")
+            setup_context = _go2_start_context_record(self.setup_row, "vs_setup")
+            _require(entry_context["sequence"] < setup_context["sequence"] < self.go["seq"] and
+                     entry_context["source_tick"] == setup_context["source_tick"] and
+                     entry_context["draw_ordinal"] == setup_context["draw_ordinal"] and
+                     entry_context["start_sha256"] == setup_context["start_sha256"] and
+                     entry_context["typed_start"] == setup_context["typed_start"],
+                     "GO+2 same-producer Entry/Setup context is not one ordered Start handoff")
             result["go2_declared_state"] = {
                 "schema": "melee-web-original-stadium-go2-declared-state",
                 "version": 1,
@@ -2669,8 +2686,74 @@ class StadiumGoOrdinal2Observations:
                     "queue_slot_status_hex": list(self.rows[2]["ports"]),
                 },
                 "scope": "One actual GO-relative ordinal-2 SourceTick typed snapshot and direct seed bytes; no pointer comparison or whole-state parity.",
+                "start_context": {
+                    "schema": "melee-web-stadium-go2-same-producer-start-context-v1",
+                    "version": 1,
+                    "entry": entry_context,
+                    "setup": setup_context,
+                    "scope": "Same retained fresh producer's actual ordered Entry and completed Setup StartMeleeData plus pointer-owned RNG scalar; no browser or whole-session parity.",
+                },
             }
         return result
+
+
+def _go2_start_context_record(row: dict[str, Any], phase: str) -> dict[str, Any]:
+    boundary, pc = ("entry", VS_ENTRY_PC) if phase == "vs_entry" else ("setup", VS_SETUP_PC)
+    payload = row.get("payload")
+    _require(row.get("event") == "boundary" and isinstance(payload, dict) and
+             payload.get("boundary") == boundary and payload.get("pc") == pc and
+             type(row.get("seq")) is int and row["seq"] >= 0 and
+             type(row.get("source_tick")) is int and row["source_tick"] >= 0 and
+             type(row.get("draw_ordinal")) is int and row["draw_ordinal"] >= 0 and
+             payload.get("source_tick") == row.get("source_tick") and
+             payload.get("draw_ordinal") == row.get("draw_ordinal"),
+             f"GO+2 {phase} source identity is malformed")
+    _check_boundary_contract(payload)
+    start = _slice(payload, MATCH_SETUP_TAG, f"GO+2 {phase} StartMeleeData", 0x138)
+    pointer = _slice(payload, RNG_POINTER_TAG, f"GO+2 {phase} RNG pointer", 4)
+    seed = _slice(payload, RNG_VALUE_TAG, f"GO+2 {phase} RNG seed", 4)
+    seed_address = seed["address"]
+    _require(start["address"] == 0x80480530 and
+             pointer["address"] == 0x804D5F94 and
+             seed_address % 4 == 0 and seed_address + len(seed["raw"]) <= 0x81800000 and
+             int.from_bytes(pointer["raw"], "big") == seed_address,
+             f"GO+2 {phase} tag4/19/20 ownership or source address differs")
+    _validate_mario_roster(start["raw"], f"GO+2 {phase}")
+    try:
+        from transition_trace_format import decode_start_melee_data
+        typed_start = decode_start_melee_data(start["raw"][:0xF0])
+    except (ValueError, TypeError) as error:
+        raise StadiumGoPrefixError(f"GO+2 {phase} StartMeleeData is invalid: {error}") from error
+    items = payload.get("slices")
+    _require(isinstance(items, list) and all(isinstance(item, dict) for item in items),
+             f"GO+2 {phase} has no source slice inventory")
+    keys = [(item.get("tag"), item.get("flags")) for item in items]
+    _require(len(keys) == len(set(keys)), f"GO+2 {phase} has duplicate slice identities")
+    selected = (start, pointer, seed)
+    return {
+        "phase": phase,
+        "sequence": row["seq"],
+        "event": "boundary",
+        "boundary": boundary,
+        "pc": f"0x{pc:08x}",
+        "source_tick": row["source_tick"],
+        "draw_ordinal": row["draw_ordinal"],
+        "start_slice_address": start["address"],
+        "start_sha256": hashlib.sha256(start["raw"]).hexdigest(),
+        "typed_start": typed_start,
+        "rng_pointer_address": pointer["address"],
+        "rng_pointer_hex": pointer["raw"].hex(),
+        "seed_address": seed["address"],
+        "seed_hex": seed["raw"].hex(),
+        "source_slices_hex": {
+            f"{item['tag']}:0": item["raw"].hex() for item in selected
+        },
+        "source_slice_inventory": [
+            {"tag": item["tag"], "flags": item["flags"],
+             "address": item["address"], "size": item["size"]}
+            for item in selected
+        ],
+    }
 
 
 def _go2_seed_observation(row: dict[str, Any]) -> dict[str, Any]:
@@ -2696,10 +2779,26 @@ def validate_stadium_go_ordinal2_reference(observer_path: str | Path, *,
                                             input_status_path: str | Path,
                                             expected_setup_receipt_sha256: str = EXPECTED_SETUP_RECEIPT_SHA256,
                                             status_path: str | Path | None = None,
-                                            include_go2_state: bool = False) -> dict[str, Any]:
+                                            include_go2_state: bool = False,
+                                            producer_identity: dict[str, Any] | None = None) -> dict[str, Any]:
     """Validate one fresh-record C/F/GO+2 natural source reference, not a replay."""
     _require(type(include_go2_state) is bool,
              "GO+2 typed-state opt-in must be boolean")
+    if include_go2_state:
+        _require(isinstance(producer_identity, dict) and
+                 set(producer_identity) == {"menu_recipe_sha256", "input_plan_sha256",
+                                            "input_intentions_sha256"} and
+                 isinstance(producer_identity.get("menu_recipe_sha256"), str) and
+                 re.fullmatch(r"[0-9a-f]{64}", producer_identity["menu_recipe_sha256"]) is not None and
+                 (producer_identity.get("input_plan_sha256") is None or
+                  (isinstance(producer_identity.get("input_plan_sha256"), str) and
+                   re.fullmatch(r"[0-9a-f]{64}", producer_identity["input_plan_sha256"]) is not None)) and
+                 isinstance(producer_identity.get("input_intentions_sha256"), str) and
+                 re.fullmatch(r"[0-9a-f]{64}", producer_identity["input_intentions_sha256"]) is not None,
+                 "GO+2 start context requires exact recipe, input-plan, and input-intentions identities")
+    else:
+        _require(producer_identity is None,
+                 "producer identity is only admitted for explicit typed GO+2 validation")
     from reference_input_stream import validate_status as validate_input_status
     from reference_input_stream import validate_stream as validate_input_stream
 
@@ -2746,11 +2845,28 @@ def validate_stadium_go_ordinal2_reference(observer_path: str | Path, *,
         go2 = result["consumed_queue_state"].get("go2_declared_state")
         _require(isinstance(go2, dict),
                  "GO+2 typed state was not retained for the explicit comparison branch")
+        observer_status_file = Path(status_path) if status_path is not None else Path(str(observer_path) + ".status.json")
+        observer_status_bytes = observer_status_file.read_bytes()
+        input_status_bytes = Path(input_status_path).read_bytes()
         go2["provenance"] = {
             "source_stream_sha256": route["stream_sha256"],
             "input_stream_sha256": input_summary["sha256"],
             "setup_receipt_sha256": expected_setup_receipt_sha256,
             "scope": "same fresh native producer and its own complete MWRI record",
+        }
+        go2["start_context"]["provenance"] = {
+            "source_stream_sha256": route["stream_sha256"],
+            "source_stream_bytes": route["stream_bytes"],
+            "observer_status_sha256": hashlib.sha256(observer_status_bytes).hexdigest(),
+            "observer_status_bytes": len(observer_status_bytes),
+            "input_stream_sha256": input_summary["sha256"],
+            "input_status_sha256": hashlib.sha256(input_status_bytes).hexdigest(),
+            "input_status_bytes": len(input_status_bytes),
+            "setup_receipt_sha256": expected_setup_receipt_sha256,
+            **producer_identity,
+            "dolphin_commit": route["source"]["dolphin_commit"],
+            "dol_sha1": route["source"]["dol_sha1"],
+            "dol_sha256": route["source"]["dol_sha256"],
         }
     return result
 

@@ -2959,6 +2959,17 @@ async function runMatchedSetupCfContinuation(setupNative) {
   assert.equal(setupStatus?.approved, true,
     'Matched Setup C/F arm requires the completed strict Setup comparison');
   assertFirstSssVsSetupOwners(setupNative.first_sss_vs_setup);
+  if (hostEvidence.go2StartContext) {
+    assert.equal(inputs.go2StartContextAdmission?.schema,
+      'melee-web-stadium-go2-same-producer-start-context-v1',
+      'GO+2 arm requires preflight admission of this producer\'s Entry/Setup context');
+    assert.equal(inputs.go2StartContextAdmission?.decision,
+      'PASS_SELECTED_ENTRY_SETUP_MATCH_SAME_PRODUCER');
+    assert.equal(report.scenario.first_sss_vs_entry?.comparison?.approved, true,
+      'GO+2 arm requires the actual declared Entry Start/seed comparison');
+    assert.equal(report.scenario.first_sss_vs_setup?.comparison?.approved, true,
+      'GO+2 arm requires the actual completed Setup Start/seed comparison');
+  }
   const admittedWorldGeneration = setupNative.first_sss_vs_setup.match_world_generation;
 
   const cf = report.scenario.matched_setup_cf = {
@@ -2976,6 +2987,7 @@ async function runMatchedSetupCfContinuation(setupNative) {
       ? 'Module.stadiumMatchedSetupNativeIdle' : null,
     input_bundles: hostEvidence.runtimePayload.bundles.length,
     setup_comparison: structuredClone(setupStatus), branch: 0,
+    go2_start_context_admission: inputs.go2StartContextAdmission ?? null,
     go2_declared_comparison: hostEvidence.go2Snapshot ? {
       schema: 'melee-web-stadium-go2-browser-comparison-scope-v1',
       source_tick: hostEvidence.go2Snapshot.source_tick,
@@ -4634,6 +4646,18 @@ async function main() {
   firstSssPrefixInputs = await loadFirstSssPrefixInputs();
   firstSssVsEntryInputs = await loadFirstSssVsEntryInputs();
   firstSssVsSetupInputs = await loadFirstSssVsSetupInputs();
+  if (matchedSetupCfInputs?.hostEvidence.go2StartContext) {
+    assert.equal(firstSssVsEntry, true,
+      'GO+2 same-producer start context requires the checked VS Entry endpoint');
+    assert.equal(firstSssVsSetup, true,
+      'GO+2 same-producer start context requires the checked completed VS Setup endpoint');
+    assert.ok(firstSssVsEntryInputs?.expected && firstSssVsSetupInputs?.expected,
+      'GO+2 same-producer start context requires both host-only phase expectations');
+    matchedSetupCfInputs.go2StartContextAdmission =
+      matchedSetupCfInputs.helper.validateGo2StartContextExpectations(
+        matchedSetupCfInputs.hostEvidence.go2StartContext,
+        firstSssVsEntryInputs.expected, firstSssVsSetupInputs.expected);
+  }
   assert.deepEqual(preflight.limits_ms, LIMITS, 'Runtime bounds differ from frozen preflight');
   assert.equal(LIMITS.captureWorkMs,
     preflight.owner_deadline.overall_timeout_ms - preflight.owner_deadline.cleanup_reserve_ms,

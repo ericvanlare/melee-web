@@ -1,10 +1,154 @@
 import path from 'node:path';
+import {createHash} from 'node:crypto';
 
 const PLAN_SCHEMA = 'melee-web-stadium-typed-pad-action-plan';
 const PLAN_BUNDLES = 86;
 const PLAN_ACTIONS = 171;
 const PAD_STATUS_BYTES = 11;
 const PAD_PORTS = 4;
+const GO2_START_CONTEXT_SCHEMA = 'melee-web-stadium-go2-same-producer-start-context-v1';
+const GO2_START_CONTEXT_SCOPE = 'Same retained fresh producer\'s actual ordered Entry and completed Setup StartMeleeData plus pointer-owned RNG scalar; no browser or whole-session parity.';
+const GO2_DOLPHIN_COMMIT = 'c77bbaa0f372c3f72281602a8b087206706542cb';
+const GO2_START_CONTEXT_PROVENANCE_KEYS = Object.freeze([
+  'source_stream_sha256', 'source_stream_bytes', 'observer_status_sha256',
+  'observer_status_bytes', 'input_stream_sha256', 'input_status_sha256',
+  'input_status_bytes', 'setup_receipt_sha256', 'menu_recipe_sha256',
+  'input_plan_sha256', 'input_intentions_sha256', 'dolphin_commit', 'dol_sha1', 'dol_sha256',
+]);
+
+function canonicalJson(value) {
+  if (Array.isArray(value)) return value.map(canonicalJson);
+  if (value && typeof value === 'object') return Object.fromEntries(
+    Object.keys(value).sort().map(key => [key, canonicalJson(value[key])]));
+  return value;
+}
+
+function sameJson(left, right) {
+  return JSON.stringify(canonicalJson(left)) === JSON.stringify(canonicalJson(right));
+}
+
+function validSha(value, length = 64) {
+  return typeof value === 'string' && new RegExp(`^[0-9a-f]{${length}}$`).test(value);
+}
+
+function validateGo2StartContextRecord(record, phase) {
+  exactKeys(record, ['phase', 'sequence', 'event', 'boundary', 'pc', 'source_tick',
+    'draw_ordinal', 'start_slice_address', 'start_sha256', 'typed_start',
+    'rng_pointer_address', 'rng_pointer_hex', 'seed_address', 'seed_hex',
+    'source_slices_hex', 'source_slice_inventory'], `GO+2 ${phase} context`);
+  const boundary = phase === 'vs_entry' ? 'entry' : 'setup';
+  const pc = phase === 'vs_entry' ? '0x8016e934' : '0x8016e9c4';
+  const seedAddress = record.seed_address;
+  const inventory = [
+    {tag: 4, flags: 0, address: 0x80480530, size: 0x138},
+    {tag: 19, flags: 0, address: 0x804d5f94, size: 4},
+    {tag: 20, flags: 0, address: seedAddress, size: 4},
+  ];
+  exactKeys(record.source_slices_hex, ['19:0', '20:0', '4:0'],
+    `GO+2 ${phase} selected source slices`);
+  if (record.phase !== phase || record.event !== 'boundary' || record.boundary !== boundary ||
+      record.pc !== pc || !Number.isSafeInteger(record.sequence) || record.sequence < 0 ||
+      !Number.isSafeInteger(record.source_tick) || record.source_tick < 0 ||
+      !Number.isSafeInteger(record.draw_ordinal) || record.draw_ordinal < 0 ||
+      record.start_slice_address !== 0x80480530 || !validSha(record.start_sha256) ||
+      record.rng_pointer_address !== 0x804d5f94 || !Number.isSafeInteger(seedAddress) ||
+      seedAddress < 0x80000000 || seedAddress + 4 > 0x81800000 || seedAddress % 4 !== 0 ||
+      !/^[0-9a-f]{8}$/.test(record.rng_pointer_hex ?? '') ||
+      !/^[0-9a-f]{8}$/.test(record.seed_hex ?? '') ||
+      record.source_slices_hex['4:0']?.length !== 0x138 * 2 ||
+      !/^(?:[0-9a-f]{2})+$/.test(record.source_slices_hex['4:0']) ||
+      record.source_slices_hex['19:0'] !== record.rng_pointer_hex ||
+      record.source_slices_hex['20:0'] !== record.seed_hex ||
+      Number.parseInt(record.rng_pointer_hex, 16) !== record.seed_address ||
+      createHash('sha256').update(Buffer.from(record.source_slices_hex['4:0'], 'hex')).digest('hex') !==
+        record.start_sha256 || !record.typed_start || typeof record.typed_start !== 'object' ||
+      !Array.isArray(record.typed_start.players) || !record.typed_start.rules ||
+      !Array.isArray(record.source_slice_inventory) || !sameJson(record.source_slice_inventory, inventory))
+    throw new TypeError(`GO+2 ${phase} Entry/Setup source identity, tagged pointer ownership, or Start bytes are malformed`);
+  return record;
+}
+
+function validateGo2StartContext(context, go2, reference, source) {
+  exactKeys(context, ['schema', 'version', 'entry', 'setup', 'scope', 'provenance'],
+    'GO+2 same-producer Entry/Setup context');
+  exactKeys(context.provenance, GO2_START_CONTEXT_PROVENANCE_KEYS,
+    'GO+2 same-producer context provenance');
+  const provenance = context.provenance;
+  if (context.schema !== GO2_START_CONTEXT_SCHEMA || context.version !== 1 ||
+      context.scope !== GO2_START_CONTEXT_SCOPE ||
+      !validSha(provenance.source_stream_sha256) ||
+      !Number.isSafeInteger(provenance.source_stream_bytes) || provenance.source_stream_bytes <= 0 ||
+      !validSha(provenance.observer_status_sha256) ||
+      !Number.isSafeInteger(provenance.observer_status_bytes) || provenance.observer_status_bytes <= 0 ||
+      !validSha(provenance.input_stream_sha256) || !validSha(provenance.input_status_sha256) ||
+      !Number.isSafeInteger(provenance.input_status_bytes) || provenance.input_status_bytes <= 0 ||
+      !validSha(provenance.setup_receipt_sha256) || !validSha(provenance.menu_recipe_sha256) ||
+      (provenance.input_plan_sha256 !== null && !validSha(provenance.input_plan_sha256)) ||
+      !validSha(provenance.input_intentions_sha256) || !validSha(provenance.dol_sha1, 40) ||
+      !validSha(provenance.dol_sha256) || !validSha(provenance.dolphin_commit, 40))
+    throw new TypeError('GO+2 same-producer Entry/Setup context provenance is malformed');
+  validateGo2StartContextRecord(context.entry, 'vs_entry');
+  validateGo2StartContextRecord(context.setup, 'vs_setup');
+  exactKeys(reference, ['schema', ...GO2_START_CONTEXT_PROVENANCE_KEYS],
+    'GO+2 source reference');
+  if (context.entry.sequence >= context.setup.sequence ||
+      context.setup.sequence >= go2.raw_identity.sequence ||
+      context.entry.source_tick !== context.setup.source_tick ||
+      context.entry.draw_ordinal !== context.setup.draw_ordinal ||
+      context.entry.start_sha256 !== context.setup.start_sha256 ||
+      !sameJson(context.entry.typed_start, context.setup.typed_start) ||
+      go2.provenance.source_stream_sha256 !== provenance.source_stream_sha256 ||
+      go2.provenance.input_stream_sha256 !== provenance.input_stream_sha256 ||
+      go2.provenance.setup_receipt_sha256 !== provenance.setup_receipt_sha256 ||
+      !reference || reference.schema !== 'melee-web-stadium-go2-source-reference-v2' ||
+      !sameJson(Object.fromEntries(GO2_START_CONTEXT_PROVENANCE_KEYS.map(key => [key, provenance[key]])),
+        Object.fromEntries(GO2_START_CONTEXT_PROVENANCE_KEYS.map(key => [key, reference[key]]))) ||
+      provenance.dolphin_commit !== GO2_DOLPHIN_COMMIT ||
+      source?.dol_sha1 !== provenance.dol_sha1 || source?.dol_sha256 !== provenance.dol_sha256)
+    throw new TypeError('GO+2 same-producer Entry/Setup order or provenance differs');
+  return context;
+}
+
+function compareGo2StartPhaseToExpected(record, expected, phase, provenance) {
+  const source = expected?.[phase === 'vs_entry' ? 'source_entry' : 'source_setup'];
+  const p = expected?.provenance;
+  const expectedInventory = Array.isArray(source?.source_slice_inventory)
+    ? source.source_slice_inventory
+      .filter(item => item && item.flags === 0 && [4, 19, 20].includes(item.tag))
+      .map(item => ({tag: item.tag, flags: item.flags, address: item.address, size: item.size}))
+      .sort((a, b) => a.tag - b.tag)
+    : null;
+  const actualInventory = [...record.source_slice_inventory].sort((a, b) => a.tag - b.tag);
+  if (!source || !p || p.observer_sha256 !== provenance.source_stream_sha256 ||
+      p.observer_bytes !== provenance.source_stream_bytes ||
+      p.observer_status_sha256 !== provenance.observer_status_sha256 ||
+      p.observer_status_bytes !== provenance.observer_status_bytes ||
+      p.sequence !== record.sequence || p.pc !== record.pc ||
+      p.source_tick !== record.source_tick || p.draw_ordinal !== record.draw_ordinal ||
+      source.sequence !== record.sequence || source.event !== record.event ||
+      source.boundary !== record.boundary || source.pc !== Number.parseInt(record.pc, 16) ||
+      source.source_tick !== record.source_tick || source.draw_ordinal !== record.draw_ordinal ||
+      source.start_slice_address !== record.start_slice_address ||
+      source.source_slices_hex?.['4:0'] !== record.source_slices_hex['4:0'] ||
+      source.source_slices_hex?.['19:0'] !== record.source_slices_hex['19:0'] ||
+      source.source_slices_hex?.['20:0'] !== record.source_slices_hex['20:0'] ||
+      !expectedInventory || expectedInventory.length !== 3 ||
+      !sameJson(expectedInventory, actualInventory) ||
+      expected.expected?.random_seed_hex !== record.seed_hex ||
+      !sameJson(expected.expected?.start, record.typed_start) ||
+      createHash('sha256').update(Buffer.from(source.source_slices_hex['4:0'], 'hex')).digest('hex') !==
+        record.start_sha256)
+    throw new TypeError(`GO+2 same-producer ${phase} context differs from the selected host-only expected source`);
+}
+
+export function validateGo2StartContextExpectations(context, entryExpected, setupExpected) {
+  compareGo2StartPhaseToExpected(context.entry, entryExpected, 'vs_entry', context.provenance);
+  compareGo2StartPhaseToExpected(context.setup, setupExpected, 'vs_setup', context.provenance);
+  return Object.freeze({schema: GO2_START_CONTEXT_SCHEMA, decision: 'PASS_SELECTED_ENTRY_SETUP_MATCH_SAME_PRODUCER',
+    source_stream_sha256: context.provenance.source_stream_sha256,
+    entry_sequence: context.entry.sequence, setup_sequence: context.setup.sequence,
+    scope: 'Selected declared typed Start fields and phase seed agree with this producer\'s Entry/Setup; no raw 312-byte browser claim.'});
+}
 
 function exactKeys(value, keys, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value) ||
@@ -124,6 +268,7 @@ export function deriveRun2ProperPrefix(runtimePayload, hostOnly) {
   }
   let go2ActionIndex = null;
   let go2Expected = null;
+  let go2StartContext = null;
   if (go2 !== null) {
     const raw = go2.raw_identity;
     const fields = go2.typed_fields;
@@ -144,11 +289,13 @@ export function deriveRun2ProperPrefix(runtimePayload, hostOnly) {
         !/^[0-9a-f]{64}$/.test(provenance.source_stream_sha256 ?? '') ||
         !/^[0-9a-f]{64}$/.test(provenance.input_stream_sha256 ?? '') ||
         !/^[0-9a-f]{64}$/.test(provenance.setup_receipt_sha256 ?? '') ||
-        !reference || reference.schema !== 'melee-web-stadium-go2-source-reference-v1' ||
+        !reference || reference.schema !== 'melee-web-stadium-go2-source-reference-v2' ||
         reference.source_stream_sha256 !== provenance.source_stream_sha256 ||
         reference.input_stream_sha256 !== provenance.input_stream_sha256 ||
         reference.setup_receipt_sha256 !== provenance.setup_receipt_sha256)
       throw new TypeError('run2 GO+2 typed state or same-producer provenance is malformed');
+    go2StartContext = validateGo2StartContext(go2.start_context, go2, reference,
+      hostOnly.source_identity.strict_route.source);
     const seed = go2.seed_observation;
     if (!seed || seed.sequence !== raw.sequence || seed.event !== 'boundary' ||
         seed.boundary !== 'source_tick' || seed.source_tick !== raw.source_tick ||
@@ -198,7 +345,7 @@ export function deriveRun2ProperPrefix(runtimePayload, hostOnly) {
   return {prefix, c, f, go, expectedState: state,
     expectedSeeds: {C: seedRows[0].seed_hex, F: seedRows[1].seed_hex,
       ...(go2 ? {GO2: go2.seed_observation.seed_hex} : {})},
-    go2Expected, go2ActionIndex};
+    go2Expected, go2StartContext, go2ActionIndex};
 }
 
 export function deriveRun2FullSchedule(runtimePayload, hostOnly) {
@@ -1078,7 +1225,7 @@ export function hostEvidenceFromRun2Packet(packet, {fullSchedule = false, common
   const go = {label: 'GO', sequence: goRaw.sequence, source_tick: goRaw.source_tick,
     draw_ordinal: goRaw.draw_ordinal};
   const snapshots = [go, normalize('C'), normalize('F')];
-  let go2Snapshot = null, go2QueueExpectation = null;
+  let go2Snapshot = null, go2QueueExpectation = null, go2StartContext = null;
   if (derived.go2Expected) {
     const state = derived.go2Expected;
     const raw = state.raw_identity;
@@ -1095,6 +1242,7 @@ export function hostEvidenceFromRun2Packet(packet, {fullSchedule = false, common
       expected_queue_slot_status_hex: [...state.source_queue.queue_slot_status_hex],
       expected_players: structuredClone(HSD_QUEUE_EXPECTED_PLAYERS),
     };
+    go2StartContext = derived.go2StartContext;
   }
   const commonFieldRowsByAction = commonFields
     ? deriveRun2CommonTickExpectations(packet.runtime_payload, hostOnly) : null;
@@ -1108,7 +1256,8 @@ export function hostEvidenceFromRun2Packet(packet, {fullSchedule = false, common
       go2Tick: go2Snapshot.source_tick, go2Draw: go2Snapshot.draw_ordinal} : {})};
   return {runtimePayload: derived.prefix, sourceRuntimePayload: packet.runtime_payload,
     originalSnapshots: snapshots, originalSeeds: derived.expectedSeeds, coordinates,
-    go2Snapshot, go2QueueExpectation, go2ActionIndex: derived.go2ActionIndex,
+    go2Snapshot, go2QueueExpectation, go2StartContext,
+    go2ActionIndex: derived.go2ActionIndex,
     checkpoints: derived.prefix.checkpoints,
     mode: commonFields ? 'run2-full-common-fields-seed-v1' :
       fullSchedule ? 'run2-full-schedule-v3' : 'run2-proper-prefix-v2',

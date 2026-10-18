@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {test} from 'node:test';
 import {readFileSync} from 'node:fs';
 import {
@@ -8,6 +9,7 @@ import {
   deriveRun2ProperPrefix,
   encodeRun2NativeManifest,
   StadiumSetupCfActionDriver,
+  validateGo2StartContextExpectations,
   validateRuntimePayload,
 } from './stadium_matched_setup_cf_consumer.mjs';
 
@@ -60,14 +62,50 @@ function run2Packet({go2 = false} = {}) {
         post_go_ordinal: 1, pointer_hex: '804d5f90', seed_hex: '89abcdef'},
     ]};
   if (go2) {
+    const startBytes = 'ab'.repeat(0x138);
+    const start = {rules: {fixture_rule: 1}, players: [{fixture_player: 0}]};
     const provenance = {source_stream_sha256: 'a'.repeat(64),
       input_stream_sha256: 'b'.repeat(64), setup_receipt_sha256: 'c'.repeat(64),
       scope: 'same fresh native producer and its own complete MWRI record'};
+    const startContextProvenance = {
+      source_stream_sha256: provenance.source_stream_sha256, source_stream_bytes: 4096,
+      observer_status_sha256: 'd'.repeat(64), observer_status_bytes: 512,
+      input_stream_sha256: provenance.input_stream_sha256,
+      input_status_sha256: 'e'.repeat(64), input_status_bytes: 256,
+      setup_receipt_sha256: provenance.setup_receipt_sha256,
+      menu_recipe_sha256: 'f'.repeat(64), input_plan_sha256: null,
+      input_intentions_sha256: '1'.repeat(64),
+      dolphin_commit: 'c77bbaa0f372c3f72281602a8b087206706542cb',
+      dol_sha1: '08e0bf20134dfcb260699671004527b2d6bb1a45',
+      dol_sha256: 'dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646',
+    };
+    const phaseContext = (phase, sequence, seed) => {
+      const entry = phase === 'vs_entry';
+      const source_slices_hex = {'4:0': startBytes, '19:0': '804d5f90', '20:0': seed};
+      return {phase, sequence, event: 'boundary', boundary: entry ? 'entry' : 'setup',
+        pc: entry ? '0x8016e934' : '0x8016e9c4', source_tick: 0, draw_ordinal: 0,
+        start_slice_address: 0x80480530,
+        start_sha256: createHash('sha256').update(Buffer.from(startBytes, 'hex')).digest('hex'),
+        typed_start: structuredClone(start), rng_pointer_address: 0x804d5f94,
+        rng_pointer_hex: '804d5f90', seed_address: 0x804d5f90, seed_hex: seed,
+        source_slices_hex,
+        source_slice_inventory: [
+          {tag: 4, flags: 0, address: 0x80480530, size: 0x138},
+          {tag: 19, flags: 0, address: 0x804d5f94, size: 4},
+          {tag: 20, flags: 0, address: 0x804d5f90, size: 4},
+        ]};
+    };
+    const start_context = {schema: 'melee-web-stadium-go2-same-producer-start-context-v1',
+      version: 1, entry: phaseContext('vs_entry', 80, '01234567'),
+      setup: phaseContext('vs_setup', 90, '89abcdef'),
+      scope: 'Same retained fresh producer\'s actual ordered Entry and completed Setup StartMeleeData plus pointer-owned RNG scalar; no browser or whole-session parity.',
+      provenance: startContextProvenance};
     host_only.source_identity.go2_reference = {
-      schema: 'melee-web-stadium-go2-source-reference-v1',
+      schema: 'melee-web-stadium-go2-source-reference-v2',
       source_stream_sha256: provenance.source_stream_sha256,
       input_stream_sha256: provenance.input_stream_sha256,
-      setup_receipt_sha256: provenance.setup_receipt_sha256};
+      setup_receipt_sha256: provenance.setup_receipt_sha256,
+      ...startContextProvenance};
     const rows = bundles[3].ports.map(port => port.status_hex);
     host_only.expected_state.GO2 = {
       schema: 'melee-web-original-stadium-go2-declared-state', version: 1,
@@ -81,7 +119,8 @@ function run2Packet({go2 = false} = {}) {
         seed_hex: 'fedcba98', pointer_equals_seed_address: true},
       source_queue: {consume_sequence: 114, source_tick: 3, draw_ordinal: 3,
         queue_slot_status_hex: rows},
-      provenance, scope: 'One actual GO-relative ordinal-2 SourceTick typed snapshot and direct seed bytes; no pointer comparison or whole-state parity.',
+      provenance, start_context,
+      scope: 'One actual GO-relative ordinal-2 SourceTick typed snapshot and direct seed bytes; no pointer comparison or whole-state parity.',
     };
   }
   return {schema: 'melee-web-stadium-source-action-replay-packet', version: 2,
@@ -220,6 +259,8 @@ test('opt-in same-producer GO+2 branch binds typed state, seed, source queue and
     go2Sequence: 115, go2Tick: 3, go2Draw: 3});
   assert.equal(evidence.go2Snapshot.label, 'GO2');
   assert.equal(evidence.originalSeeds.GO2, 'fedcba98');
+  assert.equal(evidence.go2StartContext.entry.sequence, 80);
+  assert.equal(evidence.go2StartContext.setup.sequence, 90);
   assert.deepEqual(evidence.go2QueueExpectation.expected_queue_slot_status_hex,
     packet.runtime_payload.bundles[3].ports.map(port => port.status_hex));
   assert.throws(() => hostEvidenceFromPacket(packet, {fullSchedule: true}),
@@ -269,6 +310,79 @@ test('opt-in same-producer GO+2 branch binds typed state, seed, source queue and
   const wrongQueue = structuredClone(packet);
   wrongQueue.host_only.expected_state.GO2.source_queue.queue_slot_status_hex[3] = '00'.repeat(11);
   assert.throws(() => hostEvidenceFromPacket(wrongQueue), /literal scheduled four-port input/);
+  const missingContext = structuredClone(packet);
+  delete missingContext.host_only.expected_state.GO2.start_context;
+  assert.throws(() => hostEvidenceFromPacket(missingContext), /unexpected shape/);
+  const wrongPointer = structuredClone(packet);
+  wrongPointer.host_only.expected_state.GO2.start_context.entry.source_slices_hex['19:0'] = '804d5f94';
+  assert.throws(() => hostEvidenceFromPacket(wrongPointer), /pointer ownership/);
+  const wrongOrder = structuredClone(packet);
+  wrongOrder.host_only.expected_state.GO2.start_context.setup.sequence = 120;
+  assert.throws(() => hostEvidenceFromPacket(wrongOrder), /order or provenance differs/);
+  const wrongPhase = structuredClone(packet);
+  wrongPhase.host_only.expected_state.GO2.start_context.entry.phase = 'vs_setup';
+  assert.throws(() => hostEvidenceFromPacket(wrongPhase), /unexpected shape|source identity/);
+  const wrongReference = structuredClone(packet);
+  wrongReference.host_only.source_identity.go2_reference.menu_recipe_sha256 = '0'.repeat(64);
+  assert.throws(() => hostEvidenceFromPacket(wrongReference), /order or provenance differs/);
+});
+
+test('GO+2 same-producer start preflight admits dynamic pointer targets and rejects historical/mutated context', () => {
+  const packet = run2Packet({go2: true});
+  const alternateTarget = 0x804d5fa0;
+  for (const phase of ['entry', 'setup']) {
+    const row = packet.host_only.expected_state.GO2.start_context[phase];
+    row.seed_address = alternateTarget;
+    row.rng_pointer_hex = alternateTarget.toString(16);
+    row.seed_hex = phase === 'entry' ? '01234567' : '89abcdef';
+    row.source_slices_hex['19:0'] = row.rng_pointer_hex;
+    row.source_slices_hex['20:0'] = row.seed_hex;
+    row.source_slice_inventory.find(item => item.tag === 20).address = alternateTarget;
+  }
+  const evidence = hostEvidenceFromPacket(packet);
+  const context = evidence.go2StartContext;
+  const expected = (record, phase) => ({
+    provenance: {observer_sha256: context.provenance.source_stream_sha256,
+      observer_bytes: context.provenance.source_stream_bytes,
+      observer_status_sha256: context.provenance.observer_status_sha256,
+      observer_status_bytes: context.provenance.observer_status_bytes,
+      sequence: record.sequence, pc: record.pc, source_tick: record.source_tick,
+      draw_ordinal: record.draw_ordinal},
+    [phase === 'vs_entry' ? 'source_entry' : 'source_setup']: {
+      sequence: record.sequence, event: record.event, boundary: record.boundary,
+      pc: Number.parseInt(record.pc, 16), source_tick: record.source_tick,
+      draw_ordinal: record.draw_ordinal, start_slice_address: record.start_slice_address,
+      source_slices_hex: structuredClone(record.source_slices_hex),
+      source_slice_inventory: structuredClone(record.source_slice_inventory)},
+    expected: {phase, random_seed_hex: record.seed_hex,
+      start: structuredClone(record.typed_start)},
+  });
+  const entry = expected(context.entry, 'vs_entry');
+  const setup = expected(context.setup, 'vs_setup');
+  const admission = validateGo2StartContextExpectations(context, entry, setup);
+  assert.equal(admission.decision, 'PASS_SELECTED_ENTRY_SETUP_MATCH_SAME_PRODUCER');
+  const historic = structuredClone(entry);
+  historic.provenance.observer_sha256 = '5'.repeat(64);
+  assert.throws(() => validateGo2StartContextExpectations(context, historic, setup),
+    /same-producer vs_entry context differs/);
+  const changedSeed = structuredClone(setup);
+  changedSeed.expected.random_seed_hex = '00000000';
+  assert.throws(() => validateGo2StartContextExpectations(context, entry, changedSeed),
+    /same-producer vs_setup context differs/);
+  const changedStart = structuredClone(entry);
+  changedStart.expected.start.players[0].fixture_player = 1;
+  assert.throws(() => validateGo2StartContextExpectations(context, changedStart, setup),
+    /same-producer vs_entry context differs/);
+  const changedSeedTarget = structuredClone(setup);
+  changedSeedTarget.source_setup.source_slice_inventory.find(item => item.tag === 20).address += 4;
+  assert.throws(() => validateGo2StartContextExpectations(context, entry, changedSeedTarget),
+    /same-producer vs_setup context differs/);
+  const unownedTarget = structuredClone(packet);
+  unownedTarget.host_only.expected_state.GO2.start_context.setup.rng_pointer_hex = '804d5fb0';
+  assert.throws(() => hostEvidenceFromPacket(unownedTarget), /source identity, tagged pointer ownership/);
+  const unalignedTarget = structuredClone(packet);
+  unalignedTarget.host_only.expected_state.GO2.start_context.setup.seed_address = 0x804d5fa1;
+  assert.throws(() => hostEvidenceFromPacket(unalignedTarget), /source identity, tagged pointer ownership/);
 });
 
 test('GO+2 strict driver compares the actual HSD queue and rejects byte drift', async () => {

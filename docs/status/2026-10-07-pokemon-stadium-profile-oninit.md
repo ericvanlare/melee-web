@@ -4,9 +4,12 @@
 
 **Current boundary (October 18):** The fresh original GO+2 recording is retained,
 but the first browser comparison against it failed at C, before F or GO+2.
-The countdown and seed differ; the other 14 declared fields match. The browser
-still starts from the older checked Setup context, so fresh-producer start
-identity must be resolved before attributing the mismatch to simulation.
+The countdown and seed differ; the other 14 declared fields match. Independent
+raw reduction now locates different seeds at VS Entry and completed Setup,
+with the countdown difference already present at constructor initialization.
+The recordings also contain different CSS/SSS input schedules. A same-producer
+start guard is implemented and independently reviewed; its full regression
+passes. No new browser comparison has run.
 The [structured receipt](../evidence/issue251-stadium-profile-oninit-v1.json),
 under `fresh_go2_comparison_2026_10_18`, records the failure, passing component
 validation and cleanup. C3 and public Stadium admission remain open.
@@ -1702,11 +1705,63 @@ retry is released.
 
 The browser's earlier Setup gate passed against the retained older Setup
 expectation (`423b73c4`, seed `35a455b9`). The new C/GO+2 expectation comes from
-a different fresh producer. No same-producer fresh start comparison establishes
-that the two executions began with equivalent context, so the first measured
-C mismatch does not locate a simulation defect. The next bounded work is an
-offline comparison of those actual start contexts and their constructor/RNG
-provenance, followed by independent review before another capture.
+a different fresh producer. Independent raw replay finds identical 312-byte
+Start payloads but different dynamic seed values: fresh Entry `e2624ac3` and
+completed Setup `083a62a9`, versus retained Entry `3bb84c53` and Setup
+`35a455b9`. The browser follows the retained values. Original constructor
+parameters agree; the fresh random result is 66 and the browser result is 29,
+producing initial countdowns 3,666 and 3,629 before their first decrement.
+The 37-count difference therefore exists before C. This identifies a mismatched
+starting context, without proving its entire upstream cause or a simulation bug.
+
+A separate raw input inventory, independently reviewed, finds 142 consumed CSS
+rows in the fresh interval versus 149 retained, and 133 SSS rows versus 125.
+Their first differing four-port input rows occur at interval ordinals 2 and 4,
+respectively. This is an offline inventory, not proof of initial CSS equivalence
+or a replay. Fixed historical menu interfaces cannot accept the fresh recording
+by changing a seed or relabeling its identity. The reviewed mandatory
+same-producer Entry/Setup guard is now implemented. The next bounded step is
+offline producer-bound initial CSS extraction and representability, followed
+by a versioned codec and constructor-return comparison before any ticks.
+No new capture or long lifetime is released.
+
+A smaller replay alternative was checked offline before implementation. The
+retained long run2 reference reaches the same Entry/Setup seeds as the browser,
+but its actual menu schedule differs too: CSS has 154 rows versus 149 and SSS
+has 124 versus 125, with first differing input rows at ordinals 20 and 15.
+Equal phase seeds therefore do not establish schedule identity. This rejects
+run2 as a shortcut to the historical browser menu schedule; no replay was run.
+The next interface must derive its input and phase metadata from its own
+producer while retaining the existing source routines and strict comparisons.
+Independent review confirms this offline refusal; no replay is authorized from it.
+
+The mandatory GO+2 start-context guard now passes independent source review and
+focused controls: 10 Python cases, 30 JavaScript consumer cases and three runner
+gate cases. It binds the same producer's raw Entry and completed Setup slices,
+phase/order, typed Start fields, dynamic seed-pointer ownership and input/recipe
+identities. Selected expectations must match before server/browser startup; the
+actual Entry and completed Setup comparisons and existing owner guards must pass
+before gameplay is armed. The actual retained fresh context extracts correctly,
+then rejects the historical expectations at the Entry context comparison. Legacy
+v1/full-schedule behavior remains separately guarded. No source tick, draw,
+input, seed or game state is changed by this host-only check.
+
+The original candidate freeze accidentally labeled the fresh phase source tick
+as 125; a versioned correction records 133 for both Entry and Setup, agreeing
+with the raw stream and derived packet. Five earlier focused attempts are
+summarized in that freeze but have no standalone raw logs. Passing focused logs
+are retained. The frozen seven-file candidate passes the full regression:
+2,724 tests with 189 skips in 567.899 seconds. Source hashes remain unchanged;
+the complete log and result are retained, the owned process group is absent,
+and only its disposable temporary test directories were removed. The guard
+changes host tooling and tests, with no runtime C/C++ change or fresh runtime
+build. Neither it nor its offline rejection establishes a new browser or C3
+result. Published exact-head CI for this candidate is still pending.
+
+The documentation checkpoint `5ad6f35f` completed all 14 exact-head CI checks
+(12 successes and two expected skips) in run `39158266054`. This does not validate
+subsequent guard changes; their separate source review and regression are
+recorded above, and their published exact-head CI remains pending.
 
 The supervised attempt took 15.248 seconds (15.317 seconds including the root
 launcher). Checked native retirement and observation clearing passed, with

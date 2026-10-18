@@ -19,12 +19,30 @@ from stadium_go_prefix import (EXPECTED_SETUP_RECEIPT_SHA256, StadiumGoPrefixErr
                                validate_stadium_go_prefix)
 
 
-def go2_fixture(*, end_ordinal: int = 2, tail: int = 0):
+def go2_fixture(*, end_ordinal: int = 2, tail: int = 0, rng_target: int = 0x804D5F90,
+                rng_pointer_target: int | None = None):
     raw, status = idle.fixture(end_ordinal=end_ordinal, tail=tail)
     records = []
     for h, b in idle.literal_frames(raw):
         row = wire._decode_record(h, b, "GO+2 fixture")
         payload = row["payload"]
+        if row["event"] == "boundary" and payload.get("boundary") in ("entry", "setup"):
+            seed = "e2624ac3" if payload["boundary"] == "entry" else "083a62a9"
+            pointer_target = rng_target if rng_pointer_target is None else rng_pointer_target
+            for item in payload["slices"]:
+                if item.get("tag") == 4:
+                    item["address"] = 0x80480530
+            payload["slices"] += [
+                {"tag": 19, "flags": 0, "address": 0x804D5F94,
+                 "size": 4, "hex": f"{pointer_target:08x}"},
+                {"tag": 20, "flags": 0, "address": rng_target,
+                 "size": 4, "hex": seed},
+            ]
+            kind = 4 if payload["boundary"] == "entry" else 5
+            records.append(idle.route._boundary(kind, row["seq"], pc=payload["pc"],
+                                                source_tick=row["source_tick"],
+                                                slices=payload["slices"]))
+            continue
         if row["event"] in ("handshake", "start", "end"):
             payload.pop("original_idle_post_go_ticks", None)
             payload["original_post_go_target_ordinal"] = 2
@@ -106,6 +124,10 @@ def remove_go2_seed_slices(data: bytes) -> bytes:
 
 
 class StadiumGoOrdinal2ReferenceTests(unittest.TestCase):
+    PRODUCER_IDENTITY = {"menu_recipe_sha256": "a" * 64,
+                         "input_plan_sha256": None,
+                         "input_intentions_sha256": "b" * 64}
+
     def validate(self, data, status, input_data=None, input_status=None, *,
                  include_go2_state=False):
         with tempfile.TemporaryDirectory(prefix="stadium-go-ordinal2-") as directory:
@@ -125,7 +147,9 @@ class StadiumGoOrdinal2ReferenceTests(unittest.TestCase):
                 observer, input_path=native, input_status_path=native_status,
                 expected_setup_receipt_sha256=EXPECTED_SETUP_RECEIPT_SHA256,
                 status_path=observer_status,
-                include_go2_state=include_go2_state), observer
+                include_go2_state=include_go2_state,
+                producer_identity=(self.PRODUCER_IDENTITY.copy()
+                                   if include_go2_state else None)), observer
 
     def test_fresh_record_go2_retains_actual_queue_and_source_state(self):
         data, status = go2_fixture()
@@ -178,6 +202,87 @@ class StadiumGoOrdinal2ReferenceTests(unittest.TestCase):
                          result["route"]["stream_sha256"])
         self.assertEqual(go2["provenance"]["input_stream_sha256"],
                          result["input_stream"]["sha256"])
+
+    def test_explicit_go2_context_binds_actual_ordered_entry_setup_start_and_seed(self):
+        data, status = go2_fixture()
+        result, _ = self.validate(data, status, include_go2_state=True)
+        context = result["consumed_queue_state"]["go2_declared_state"]["start_context"]
+        self.assertEqual(context["schema"],
+                         "melee-web-stadium-go2-same-producer-start-context-v1")
+        self.assertLess(context["entry"]["sequence"], context["setup"]["sequence"])
+        self.assertEqual(context["entry"]["phase"], "vs_entry")
+        self.assertEqual(context["entry"]["pc"], "0x8016e934")
+        self.assertEqual(context["setup"]["phase"], "vs_setup")
+        self.assertEqual(context["setup"]["pc"], "0x8016e9c4")
+        self.assertEqual(context["entry"]["start_sha256"], context["setup"]["start_sha256"])
+        self.assertEqual(context["entry"]["typed_start"], context["setup"]["typed_start"])
+        self.assertEqual(context["entry"]["seed_hex"], "e2624ac3")
+        self.assertEqual(context["setup"]["seed_hex"], "083a62a9")
+        self.assertEqual(context["setup"]["rng_pointer_hex"], "804d5f90")
+        self.assertEqual(context["provenance"]["menu_recipe_sha256"], "a" * 64)
+        self.assertIsNone(context["provenance"]["input_plan_sha256"])
+        self.assertEqual(context["provenance"]["input_intentions_sha256"], "b" * 64)
+
+    def test_explicit_go2_context_accepts_dynamic_aligned_pointer_target_and_rejects_mismatch(self):
+        target = 0x804D5FA0
+        data, status = go2_fixture(rng_target=target)
+        result, _ = self.validate(data, status, include_go2_state=True)
+        context = result["consumed_queue_state"]["go2_declared_state"]["start_context"]
+        self.assertEqual(context["entry"]["seed_address"], target)
+        self.assertEqual(context["setup"]["seed_address"], target)
+        self.assertEqual(context["setup"]["rng_pointer_hex"], f"{target:08x}")
+        mismatched, mismatch_status = go2_fixture(rng_target=target,
+                                                  rng_pointer_target=target + 4)
+        with self.assertRaisesRegex(StadiumGoPrefixError,
+                                    "tag4/19/20 ownership or source address differs"):
+            self.validate(mismatched, mismatch_status, include_go2_state=True)
+
+    def test_explicit_go2_context_rejects_malformed_recipe_or_input_identity(self):
+        data, status = go2_fixture()
+        with tempfile.TemporaryDirectory(prefix="stadium-go2-identity-") as directory:
+            root = Path(directory)
+            observer = root / "observer.bin"
+            observer.write_bytes(data)
+            observer_status = root / "observer-status.json"
+            observer_status.write_text(json.dumps(status))
+            native = root / "inputs.mwri"
+            native.write_bytes(input_stream_fixture())
+            native_status = root / "input-status.json"
+            native_status.write_text(json.dumps({"version": 1, "mode": "record", "events": 1,
+                "complete": True, "invalid": False, "error": None}))
+            for identity in (
+                    {"menu_recipe_sha256": "z" * 64, "input_plan_sha256": None,
+                     "input_intentions_sha256": "b" * 64},
+                    {"menu_recipe_sha256": "a" * 64, "input_plan_sha256": None,
+                     "input_intentions_sha256": "b" * 63}):
+                with self.subTest(identity=identity), self.assertRaisesRegex(
+                        StadiumGoPrefixError,
+                        "exact recipe, input-plan, and input-intentions identities"):
+                    validate_stadium_go_ordinal2_reference(
+                        observer, input_path=native, input_status_path=native_status,
+                        expected_setup_receipt_sha256=EXPECTED_SETUP_RECEIPT_SHA256,
+                        status_path=observer_status, include_go2_state=True,
+                        producer_identity=identity)
+
+    def test_explicit_go2_context_refuses_missing_or_unowned_entry_rng_slices(self):
+        data, status = go2_fixture()
+        records = []
+        for h, b in idle.literal_frames(data):
+            row = wire._decode_record(h, b, "GO+2 start-context refusal")
+            payload = row["payload"]
+            if row["event"] == "boundary" and payload.get("boundary") == "entry":
+                payload["slices"] = [item for item in payload["slices"] if item.get("tag") != 19]
+                raw_record = idle.route._boundary(4, row["seq"], pc=payload["pc"],
+                                                  source_tick=row["source_tick"],
+                                                  slices=payload["slices"])
+                records.append(idle.literal_frames(raw_record)[0])
+                continue
+            records.append((h, b))
+        altered = b"".join(idle.stored_frame(h, b, sequence=index,
+                                               replacement_payload=b)
+                           for index, (h, b) in enumerate(records))
+        with self.assertRaisesRegex(StadiumGoPrefixError, "expected one tag=19"):
+            self.validate(altered, status, include_go2_state=True)
 
     def test_target_and_actual_consume_are_mandatory(self):
         missing_target, status = go2_fixture(end_ordinal=1)

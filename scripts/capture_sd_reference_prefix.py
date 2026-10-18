@@ -1280,7 +1280,13 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
                         go_ordinal2_reference = validate_stadium_go_ordinal2_reference(
                             raw, input_path=native, input_status_path=native_status,
                             expected_setup_receipt_sha256=menus["setup_receipt_sha256"],
-                            status_path=status)
+                            status_path=status, include_go2_state=True,
+                            producer_identity={
+                                "menu_recipe_sha256": menu_hash,
+                                "input_plan_sha256": plan_hash,
+                                "input_intentions_sha256": hashlib.sha256(
+                                    (output / "input-intentions.jsonl").read_bytes()).hexdigest(),
+                            })
                         input_summary = go_ordinal2_reference["input_stream"]
                         input_status = go_ordinal2_reference["input_status"]
                         prefix_report = go_ordinal2_reference["route"]

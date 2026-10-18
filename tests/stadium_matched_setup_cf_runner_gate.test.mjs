@@ -46,6 +46,20 @@ test('the matched Setup C/F opt-in and preflight gate fail before server/browser
   const scratch = process.env.MELEE_STADIUM_CF_RUNNER_TEST_ROOT;
   assert.ok(scratch, 'Python OwnedWorkspaceTests scratch path is required');
   const runnerSource = await fs.readFile(RUNNER, 'utf8');
+  const contextPreflight = runnerSource.indexOf('validateGo2StartContextExpectations(');
+  const serverStartup = runnerSource.indexOf('serverProcess = spawn(');
+  assert.ok(contextPreflight >= 0 && contextPreflight < serverStartup,
+    'same-producer Entry/Setup rejection must happen before the local server/browser can start');
+  const continuationStart = runnerSource.indexOf('async function runMatchedSetupCfContinuation(');
+  const continuationEnd = runnerSource.indexOf('\nfunction ', continuationStart + 1);
+  const continuation = runnerSource.slice(continuationStart, continuationEnd);
+  const contextGate = continuation.indexOf('GO+2 arm requires preflight admission');
+  const driverArm = continuation.indexOf('driver.arm(');
+  assert.ok(contextGate >= 0 && contextGate < driverArm,
+    'GO+2 continuation must require same-producer context and actual phase approvals before arm');
+  assert.match(continuation.slice(contextGate, driverArm),
+    /first_sss_vs_entry\?\.comparison\?\.approved[\s\S]*?first_sss_vs_setup\?\.comparison\?\.approved/,
+    'Entry and completed Setup actual typed Start/seed approvals must gate the GO+2 arm');
   assert.match(runnerSource,
     /\['first-sss-vs-setup-cf', \{type: 'boolean', default: false\}\]/,
     'the continuation must remain opt-in by default');
