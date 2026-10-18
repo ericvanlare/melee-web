@@ -3,7 +3,7 @@
   "issue": 339,
   "state": "selected_initialization_metadata_observed_isolated_storage_v1_validated_history_lifetime_open",
   "source_base": "130438fd2b86d00cfec98cd2ba0a5f66084ae15c",
-  "scope": "Source-bound reference build, two retained failed init-only attempts, source/fixture reduction and selected initialization metadata from a third bounded offline attempt, plus an independently reviewed isolated history-storage component and passing full regression. Unauthenticated endpoint; no live history behavior, complete profile or rollback claim.",
+  "scope": "Source-bound reference build, two retained failed init-only attempts, source/fixture reduction and selected initialization metadata from a third bounded offline attempt, plus an independently reviewed isolated history-storage component and passing full regression. Unauthenticated endpoint; no live history behavior, complete profile or rollback claim. Four separate retained first-load prerequisite attempts remain blocked before Capture/Load, most recently at local ENet I/O after conversion and confirmation.",
   "history_contract": {
     "source_audit_sha256": "07fcbf61535816c488be1e1e341ee839139f4e98efac9046d7d26b0deed987b4",
     "snapshot_followup_sha256": "2d112f6e1fa8be776a1ddf514a058e51419a1337b21c76c92eb9ac90c25e65f3",
@@ -200,7 +200,7 @@
     "matching_build_receipt_found": false,
     "new_build_relabels_historical_artifact": false
   },
-  "next": "Review the own-local service and first-load adapter, then use the source-bound seven-patch client for actual Capture/Load. Match/reset and consumer gates remain open.",
+  "next": "Complete and independently review the source-equivalent ENet I/O reduction before releasing a separate own-local two-peer client attempt. First actual Load establishes reachability only; nonzero saved history, changed current bytes, exact 48-byte restoration and preservation ownership remain required for restoration acceptance.",
   "route_admission": {
     "status": "SCOPED_MENU_READINESS_COMPLETE_V8_OWN_LOCAL_CAPTURE_LOAD_PENDING",
     "reviewed_source_plan": "minimal-menu-input-bridge-packet-v1.json",
@@ -622,7 +622,7 @@
     }
   },
   "reference_history_snapshot_candidate": {
-    "state": "REVIEWED_SEVEN_PATCH_REFERENCE_CLIENT_BUILT_NO_CAPTURE_LOAD_RUN",
+    "state": "SEVEN_PATCH_REFERENCE_BUILT_FIRST_LOAD_BLOCKED_AT_LOCAL_ENET",
     "candidate_v2_packet_sha256": "8a32add1d3419ebfd6df13c440e3b29ef25fb793cc143e2659f2efee410dddf7",
     "production_source_review_sha256": "dd57109b431f58e8d7489b152cc3804eefce5d814ca65dc262d0b78ca292f294",
     "focused_cpp_result_sha256": "4ae01e8e3d41dd43e3a23fe20e169ff9649659109227801ac3949caca8823762",
@@ -657,7 +657,7 @@
       }
     },
     "limits": [
-      "New reference executable linked and staged with its own identity; actual client Capture/Load remains unrun.",
+      "New reference executable linked, staged and launched with its own identity; no Capture/Load has been observed.",
       "Selected composition metadata is not whole-GCT source equivalence.",
       "No live profile history producer/consumer/reset integration."
     ],
@@ -704,6 +704,44 @@
       ],
       "retention_sha256": "019e4f4c1ee7c335c080f6196b5c2cbe6c504fd72f34f7be2264ce166610edc4",
       "runner_seconds": 525.331864291802
+    },
+    "exact_head_ci": {
+      "head": "5b044db7d106148624ed739d3bcaba99dd0f7ff9",
+      "run": 39150276785,
+      "successes": 12,
+      "expected_skips": 2,
+      "receipt_sha256": "dcc0e8d4926499388da7002c3aa6674facb921bad66c6139b889fbf305cfdd4b"
+    },
+    "first_load_prerequisite": {
+      "capture_load_observed": false,
+      "official_services_contacted": false,
+      "all_owned_groups_absent": true,
+      "failures": [
+        {
+          "attempt": 1,
+          "boundary": "nested sandbox application before native startup",
+          "retention_sha256": "8156c89b7f10e447f845b7c35de49c86f4265eb9ba1f990a2748e1919ecab5c8"
+        },
+        {
+          "attempt": 2,
+          "boundary": "local service listen after explicit loopback bind",
+          "retention_sha256": "2e48e7537eef9edc190ca6f382b31409d0a62da8442127380af4555d186dd603"
+        },
+        {
+          "attempt": 3,
+          "boundary": "empty SJIS conversion before local ticket",
+          "retention_sha256": "5ee9e1751a66c0d441021fe2610cbf92e6781daea68ec7baa0ea7b83562c3a31"
+        },
+        {
+          "attempt": 4,
+          "boundary": "native ENet matchmaking after successful conversion and confirmation",
+          "driver_seconds": 20.523190333973616,
+          "packet_sha256": "3dd0445c69c1caed100f617bf96a54b6b5304715b23fd76e60b3ea11b477e408",
+          "review_sha256": "3c988e8cf03c0a1f93147caabf785e706bdcd88618615840c0a248a2c2ca0fe2",
+          "retention_sha256": "388e5f9d6a026bef2c07a617d9b4a65bb73c927251d445de8e07b0f2ad3d9d5e"
+        }
+      ],
+      "next": "Smaller source-equivalent ENet I/O reduction before another client attempt; no syscall/errno cause inferred yet."
     }
   }
 }

@@ -231,14 +231,43 @@ binary used above remains separate. The affected repository controls pass
 seconds: all 15 commands passed, source checks agreed before/after, and all
 15 owned process groups are absent. The old app and actual Rust library are
 unchanged. This new seven-patch executable has its own artifact receipt and
-has not yet run a game. Full regression at `0273b905` passed 2,432 tests with
+had not launched at that build boundary. Full regression at `0273b905` passed 2,432 tests with
 166 skips in 524.954 seconds. Its owned process group is absent; successful disposable scratch was
 removed while logs and receipts remain retained.
 
-Next is the existing own-local two-peer route to the first real Capture/Load,
-using the new artifact after adapter and service review. It
-must show nonzero history, a different current value, and restoration of all 48
-saved bytes after the actual load. No further offline menu expansion is planned. The five
+The source/documentation checkpoint `5b044db7` completed all 14 exact-head
+CI checks (12 successes and two expected skips). Draft #340 remains open while
+the reference lifetime gates are incomplete.
+
+## Own-local first-load prerequisite
+
+Four bounded attempts retain distinct profiles and raw failures. None reached
+Capture/Load or establishes a history lifetime or restoration result.
+
+| Attempt | First failure | Bounded reduction / resulting progress |
+| --- | --- | --- |
+| v1 | Nested process sandbox application refused before native startup. | A tiny nesting control justified moving only the trusted supervisor outside the policy; each native child retains its default-deny policy. |
+| v2 | The local service could not start its HTTP sink. | The source-equivalent socket fixture isolated `listen`, after successful explicit loopback bind. A reviewed local-port inbound rule allowed the service to start; it does not establish peer authentication. |
+| v3 | No create-ticket acknowledgement; native Shift-JIS conversion yielded an empty result. | The exact-policy converter failed; a paired read-only system encoding-data grant passed all seven declared conversions. Unchanged ASCII P1/P2 identities and input bytes remain source-checked. |
+| v4 | Conversion and confirmation succeeded, then native matchmaking failed before the local ticket was acknowledged. | The first unresolved boundary is ENet I/O; the actual failed syscall/errno has not yet been observed. A smaller socket reproducer is required before another client run. |
+
+The service is our own loopback fixture; no official Slippi service is allowed.
+All recorded owned processes/groups were independently verified absent, and
+failed profiles and outputs remain retained. The v4 run took 20.523 seconds
+inside the driver; its three owned process groups are absent. No runtime,
+identity, input, game arithmetic, observation deadline or cleanup budget was
+changed to pass a guard. Read-only encoding access concerns system data only;
+network and executable grants did not change in v4.
+
+The next client attempt remains gated on the smaller ENet reduction and review.
+Its first actual Load is a reachability boundary; full restoration acceptance
+still requires the nonzero saved/current/restored history checks below.
+
+First complete and review the source-equivalent ENet I/O reduction. A separately
+reviewed client attempt can then reuse the own-local two-peer route to reach
+Capture/Load. Beyond reachability, restoration acceptance must show nonzero
+saved history, a different current value, and restoration of all 48 saved bytes
+after the actual load. No further offline menu expansion is planned. The five
 still-open consumer paths, actual match/reset lifetime, and Slippi Capture/Load
 preserve-block and restore-order behavior remain separate gates. The isolated component
 does not establish those runtime behaviors. Do not repeat successful
