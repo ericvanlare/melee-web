@@ -5,6 +5,8 @@
 #include "slippi_profile/deadupfall_fix.h"
 #include "slippi_profile/draw_diagnostics.h"
 #include "slippi_profile/offscreen_damage.h"
+#include "slippi_profile/ps_camera_independent_monitor_fix.h"
+#include "slippi_profile/whispy_direction_fix.h"
 #include "slippi_profile/profile.h"
 
 #include <melee/ft/kinds/ftCommon/types.h>
@@ -46,9 +48,9 @@ void HSD_JObjSetupMatrixSub(HSD_JObj *jobj)
 static void test_draw_policy(void)
 {
     const SlippiProfileIdentity profile =
-        SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_V2;
+        SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_DBOOC_V4;
     assert(strcmp(slippi_profile_identity_name(profile),
-                  "slippi-render-dependencies-v2") == 0);
+                  "slippi-render-dependencies-dbooc-v4") == 0);
     assert(slippi_profile_source_draw_decision(profile, SLIPPI_TICK_PRESENT) ==
            SLIPPI_SOURCE_DRAW_ALLOW);
     assert(slippi_profile_source_draw_decision(profile, SLIPPI_TICK_CORRECTION) ==
@@ -58,11 +60,43 @@ static void test_draw_policy(void)
            SLIPPI_SOURCE_DRAW_ERROR);
     assert(slippi_profile_identity_name((SlippiProfileIdentity)99) == NULL);
     assert(slippi_profile_identity_name((SlippiProfileIdentity)1) == NULL);
+    assert(slippi_profile_identity_name((SlippiProfileIdentity)2) == NULL);
+    assert(slippi_profile_identity_name((SlippiProfileIdentity)3) == NULL);
     assert(slippi_profile_source_draw_decision((SlippiProfileIdentity)1,
+                                                SLIPPI_TICK_PRESENT) ==
+           SLIPPI_SOURCE_DRAW_ERROR);
+    assert(slippi_profile_source_draw_decision((SlippiProfileIdentity)2,
+                                                SLIPPI_TICK_PRESENT) ==
+           SLIPPI_SOURCE_DRAW_ERROR);
+    assert(slippi_profile_source_draw_decision((SlippiProfileIdentity)3,
                                                 SLIPPI_TICK_PRESENT) ==
            SLIPPI_SOURCE_DRAW_ERROR);
     assert(slippi_profile_source_draw_decision(profile, (SlippiTickKind)99) ==
            SLIPPI_SOURCE_DRAW_ERROR);
+}
+
+
+static void test_whispy_motion_predicate(void)
+{
+    assert(slippi_profile_whispy_zero_direction_contribution(-1));
+    assert(slippi_profile_whispy_zero_direction_contribution(0));
+    assert(slippi_profile_whispy_zero_direction_contribution(11));
+    assert(!slippi_profile_whispy_zero_direction_contribution(12));
+}
+
+static void test_stadium_position_predicate(void)
+{
+    assert(slippi_profile_ps_camera_independent_monitor_inside(0.0f, 0.0f));
+    assert(slippi_profile_ps_camera_independent_monitor_inside(-120.0f, -20.0f));
+    assert(slippi_profile_ps_camera_independent_monitor_inside(120.0f, 80.0f));
+    assert(slippi_profile_ps_camera_independent_monitor_inside(-119.999f, 79.999f));
+    assert(!slippi_profile_ps_camera_independent_monitor_inside(-120.001f, 0.0f));
+    assert(!slippi_profile_ps_camera_independent_monitor_inside(120.001f, 0.0f));
+    assert(!slippi_profile_ps_camera_independent_monitor_inside(0.0f, 80.001f));
+    assert(!slippi_profile_ps_camera_independent_monitor_inside(0.0f, -20.001f));
+    assert(slippi_profile_ps_camera_independent_monitor_inside(NAN, 0.0f));
+    assert(slippi_profile_ps_camera_independent_monitor_inside(0.0f, NAN));
+    assert(!slippi_profile_ps_camera_independent_monitor_inside(NAN, 80.001f));
 }
 
 static void test_draw_diagnostics(void)
@@ -281,6 +315,8 @@ static void test_deadupfall_private_velocity(void)
 int main(void)
 {
     test_draw_policy();
+    test_whispy_motion_predicate();
+    test_stadium_position_predicate();
     test_draw_diagnostics();
     test_offscreen_predicate();
     test_dirty_matrix_traversal();

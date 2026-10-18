@@ -369,7 +369,45 @@ references in a native test fixture; four test-only lines were corrected and
 its focused causal/omission controls pass. The interrupted regression and native
 compile failure are retained. Runtime/capture source is unchanged. The final
 full regression passes 2,416 tests with 166 skips in 505.482 seconds; the log
-identity is in the structured receipt. Exact-head CI and integration are pending.
+identity is in the structured receipt. PR #332 merged as `706fa1bb` after all
+14 checks on reviewed head `86e00ca2` completed (12 successes, two expected
+skips). The merged tree exactly matches the independently reviewed tree.
+Capture, runtime and harness identities above remain distinct from integration.
+
+## Stage decision dependencies, issue #333
+
+The next incomplete profile revision, `slippi-render-dependencies-v3`, adds two
+independent source hooks from the pinned Slippi behavior inventory. Whispy's
+shared direction helper still queries each eligible fighter in original order,
+but a fighter in the authored signed motion-state range through Sleep contributes
+zero. The existing tie RNG remains. Stadium still runs its original tracking
+helper and writes camera-specific presentation coordinates; only its transition
+decision uses the selected fighter's post-helper position and the authored
+inclusive rectangle. The selected fighter pointer is captured before that helper.
+
+The source and retail-instruction mapping review passed. The first overlay
+composition failures and the subsequent Whispy fixture failures are retained;
+no native reducer or browser success is inferred from those attempts. The repaired
+actual-source controls now pass independent review: the original and omitted-hook
+lanes diverge, while each profile decision agrees across its paired lanes. Whispy
+preserves query order and the existing tie RNG. Stadium preserves view-specific
+wrapper coordinates while its decision and ordered transition RNG trace agree.
+The projector, bone, RNG inputs and downstream mode-setter observer are explicit
+synthetic services; this is not live stage execution. Both affected Release builds
+succeeded; the private build lost its raw tool-exit field, so its success is bound
+to fresh outputs and the post-build success journal. Full regression passed
+2,418 tests with 166 skips in 544.101 seconds. All 15 reviewed source pins matched
+and 13 prior runtime artifacts were preserved. The ordinary Wasm changed despite
+unchanged JavaScript, data and CMake cache. Independent analysis accounts for every
+difference: SDL embedded the parent repository revision, moving its string and
+relocating references. No unexplained instruction/data difference remains; this
+is artifact attribution, not gameplay equivalence. The current manifest retains
+24 entries covering 16 distinct artifacts alongside the prior products.
+PR #334 merged as `ecb2fe99` after all 14 checks on reviewed head `34a0c57b`
+completed (12 successes, two expected skips); merged and reviewed trees match.
+Historical v1/v2 captures retain their original identities and
+do not validate these new hooks. The structured receipt records the current
+candidate and its limits.
 
 ## Slippi profile source checkpoint
 

@@ -8,7 +8,7 @@ union ftCommon_MotionVars;
 extern "C" {
 #endif
 
-/* These helpers are only compiled into the opt-in v2 Slippi fixture. The
+/* These helpers are only compiled into the opt-in Slippi diagnostic profile.
  * private velocity words use the pinned source union's otherwise-unused
  * DeadUpFall padding and phase-3 interpolation slot. */
 int slippi_profile_deadupfall_initialize(

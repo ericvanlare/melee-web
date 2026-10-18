@@ -163,3 +163,107 @@ diff --git a/src/melee/ft/ftdrawcommon.c b/src/melee/ft/ftdrawcommon.c
 +#endif
  
      if (!fp->x221F_b3 && ftLib_80086A8C(gobj)) {
+diff --git a/src/melee/ft/ftlib.c b/src/melee/ft/ftlib.c
+--- a/src/melee/ft/ftlib.c
++++ b/src/melee/ft/ftlib.c
+@@ -1,4 +1,8 @@
+ #include "ftlib.h"
++
++#ifdef MELEE_WEB_SLIPPI_PROFILE
++#include <slippi_profile/whispy_direction_fix.h>
++#endif
+ 
+ #include <melee/it/forward.h>
+ 
+@@ -250,7 +254,15 @@
+             }
+ 
+             ftLib_800866DC(cur, &vec);
++#ifdef MELEE_WEB_SLIPPI_PROFILE
++            if (!slippi_profile_whispy_zero_direction_contribution(
++                    cur_fp->motion_id))
++            {
++                result += sgn(vec.x - v->x);
++            }
++#else
+             result += sgn(vec.x - v->x);
++#endif
+         }
+     }
+ 
+diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
+--- a/src/melee/gr/grpstadium.c
++++ b/src/melee/gr/grpstadium.c
+@@ -18,6 +18,10 @@
+ #include <dolphin/gx/GXStruct.h>
+ #include <melee/cm/camera.h>
+ #include <melee/ft/ftlib.h>
++#ifdef MELEE_WEB_SLIPPI_PROFILE
++#include <melee/ft/types.h>
++#include <slippi_profile/ps_camera_independent_monitor_fix.h>
++#endif
+ #include <melee/gm/gm_unsplit.h>
+ #include <melee/lb/lb_00B0.h>
+ #include <melee/lb/lb_00F9.h>
+@@ -951,12 +955,31 @@
+         }
+         temp_r3_8 = GET_WRAPPER(gp->u.display.xDC);
+         temp_r3_8->flag = 0;
++#ifdef MELEE_WEB_SLIPPI_PROFILE
++        if (gp->u.display.xDC == NULL ||
++            Player_GetEntity(gp->u.display.xEE) == NULL ||
++            Player_8003219C(gp->u.display.xEE))
++        {
++            grStadium_801D2A60(gobj);
++        } else {
++            HSD_GObj* slippi_player_gobj =
++                Player_GetEntity(gp->u.display.xEE);
++            Fighter* slippi_player = slippi_player_gobj->user_data;
++            (void) grStadium_801D32D0(gobj);
++            if (!slippi_profile_ps_camera_independent_monitor_inside(
++                    slippi_player->cur_pos.x, slippi_player->cur_pos.y))
++            {
++                grStadium_801D2A60(gobj);
++            }
++        }
++#else
+         if (gp->u.display.xDC == NULL ||
+             Player_GetEntity(gp->u.display.xEE) == NULL ||
+             Player_8003219C(gp->u.display.xEE) || !grStadium_801D32D0(gobj))
+         {
+             grStadium_801D2A60(gobj);
+         }
++#endif
+         break;
+     }
+ }
+diff --git a/src/melee/ft/kinds/ftCommon/ftCo_SquatRv.c b/src/melee/ft/kinds/ftCommon/ftCo_SquatRv.c
+--- a/src/melee/ft/kinds/ftCommon/ftCo_SquatRv.c
++++ b/src/melee/ft/kinds/ftCommon/ftCo_SquatRv.c
+@@ -5,6 +5,10 @@
+ #include <melee/ft/forward.h>
+ 
+ #include <stdbool.h>
++
++#ifdef MELEE_WEB_SLIPPI_PROFILE
++#include <slippi_profile/ucf_dbooc_fix.h>
++#endif
+ 
+ #include "forward.h"
+ #include "ftCo_AppealS.h"
+@@ -31,7 +35,15 @@
+ melee_source_bool ftCo_SquatRv_CheckInput(Fighter_GObj* gobj)
+ {
+     Fighter* fp = GET_FIGHTER(gobj);
++#ifdef MELEE_WEB_SLIPPI_PROFILE
++    const float squat_reversal_threshold =
++        slippi_profile_ucf_dbooc_squat_reversal_threshold(
++            fp->input.lstick[0].x, fp->input.lstick[0].y,
++            fp->x670_timer_lstick_tilt_x, p_ftCommonData->x94);
++    if (fp->input.lstick[0].y > -squat_reversal_threshold) {
++#else
+     if (fp->input.lstick[0].y > -p_ftCommonData->x94) {
++#endif
+         ftCo_SquatRv_Enter(gobj);
+         return true;
+     }

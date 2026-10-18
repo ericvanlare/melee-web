@@ -1,0 +1,282 @@
+{
+  "schema": "melee-web-ucf-dbooc-threshold-v1",
+  "issue": 335,
+  "state": "reviewed_private_v4_component_local_validation_passed",
+  "source_base": "ecb2fe998d5e0458ef13900224341294e143fc9e",
+  "scope": "Private incomplete GPL profile; native and Node/Wasm scalar and actual-source fixture, no live activation or original patched-game execution.",
+  "behavior": {
+    "upstream_commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+    "path": "External/UCF 0.84/UCF/UCF DBOOC SquatRv Fix.asm",
+    "sha256": "39a50bcab5c454d9fbf5865ca2ebdb947031959d0c4c8b188abf4d337da29c80",
+    "injection": "0x800D65EC",
+    "timer_field": "Fighter.x670_timer_lstick_tilt_x",
+    "scale_bits": "42a00000",
+    "epsilon_bits": "38d1b717",
+    "replacement_positive_threshold_bits": "3f170a3d",
+    "rounding": "single fused binary32 nearest-even",
+    "integer_behavior": "checked fctiwz result, unsigned modulo32 +2, low32 square and sum, signed sum >6400"
+  },
+  "source_identity": {
+    "production_base_composed_patch_sha256": "5d4635ab282968d8ed07710c94e3c8598049c1340715d97e5e5ce477388ddb94",
+    "production_profile_composed_patch_sha256": "4060021076a641f65972ce92734b370a1b5974c591e2230a0e904237ffcc2061",
+    "production_composition_functions": [
+      "gameplay_bool.composed_patch",
+      "gameplay_sources.compose_slippi_profile_patch"
+    ],
+    "melee_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+    "dependency_lock_sha256": "b51fcde84db09641e4936339af970d74e97c71043ce6f6efee0c70e09211b385",
+    "upstream_squat_sha256": "7a31e8bda702f6448ebeda5613f71f75a220ae302f1f3713bab4db26e6f9d4b3",
+    "base_patch_sha256": "f18e8a34aba1e55a5883c0eec42144e712eb2099ecf903623b82221b08fcaf02",
+    "base_patch_changes_target": false,
+    "boolean_transform_sha256": "7609be54e0e7c29c86a63fd4dfa37078d2d7baba643600e6c1fff40e4f2c46b7",
+    "composed_squat_sha256": "e51b8756a21c7074502023da8b2bd6b0b8da9688a6b07bf26d7c188af1060777",
+    "profile_overlay_sha256": "23c2518de9e6d832bcf455325c65b31ba15a7b8c002d966375d9175b63296f52",
+    "profile_composed_squat_sha256": "9adf2f60b69f330932ab6c4663c4ab2dffb701bd43126e6c75a50f97e2066cad",
+    "extracted_profile_check_input_sha256": "87022e0260f742848a68b9930ce92161cce5b4cbf108fa57de418d61fba7e7b1",
+    "extracted_base_check_input_sha256": "1c9fbe6b5fa9f7b4afcf3070c9699951afcbef53e18d1c037545ee9f00c1ed38",
+    "original_check_input_sha256": "3f832be570d9d72d0e820c51c301528e66b425fadee941bc68a8e00c8719fe39",
+    "profile_overlay_applied_after_bool_transform": true,
+    "profile_off_preprocessed_equals_original": true,
+    "hook_changes_threshold_expression_only": true,
+    "extracted_enter_sha256": "5922425ace3e31d87f6b6ea47b62ed39c510793e16fbcfa17f7289518134b13d",
+    "motion_state_catalog_sha256": "8785cfcb7091ce29268a8c2172aecd97a60bc6352c545a472aa77e4cbd66141a",
+    "common_forward_sha256": "514cd2e4a2ebf3729255efce6b88bb6b91acd685a519e2b4bb01bcb09f7492ca",
+    "ft_forward_sha256": "73cf4918e768aa15477d7c9e17d6fa58ded77ee60c9e0398820dda1ac6cfc7fe",
+    "motion_state_source_value": 41,
+    "motion_flags_source_value": 0,
+    "fixture_template_sha256": "7951b8ddf9b4d86924a710fed36ba4fe5acac3273f70a98169f1c67be18550e4",
+    "fixture_generated_sha256": "983c678f23e5728cf3645c2e5a8963636c97457f70808b51a0b8010b2f7d47b1",
+    "profile_header_sha256": "cb06167ef5c0373cb8310aaf0c7a9e62135f5a0f648ce9f1c39ae1c8e865da15",
+    "profile_helper_sha256": "f487fdc420340b6ef5b5cd1e7d4a453653ec14b788c996f9098ee218d52597d9",
+    "profile_identity": "slippi-render-dependencies-dbooc-v4",
+    "gameplay_trig_sha256": "f5d724d31a79b3e42cfbe2a7a07a63184b9636481b2653d9d3ff8c1ad7c82014",
+    "emscripten_version": "6.0.9"
+  },
+  "oracle": {
+    "source": "src/slippi_profile/tests/test_dbooc_binary32_oracle.py",
+    "sha256": "fa1536797775fa6011cede192fe41572dd21c101323a0788566fce58d004c70b",
+    "reviewed_freeze_sha256": "60625fde4f9161e9ffd1aa58f44ae13cd567dc543810d83a8909e318e5d123a1",
+    "root_review_sha256": "50c9f286ab197be99ab4665f362ee71501041a47f66946fe178ba6b195459462",
+    "domain": "finite binary32 axes [-1,1], unsigned byte timer, finite synthetic common threshold, RN-even",
+    "reachable_transitions": 79,
+    "both_sign_neighbor_checks": 316,
+    "limits": "No exhaustive pair or exceptional-input oracle; transition80 outside domain."
+  },
+  "scalar_contract_review_sha256": "e7393286001c16dedb9113d6d4094a9d1619010568e25b23c9908363ea36c59e",
+  "focused_result": {
+    "status": "passed",
+    "rn_even_checked_by_fixture": true,
+    "masked_exceptions_assumption": "process defaults; no trap-enable equivalence claimed",
+    "input_vectors_sha256": "55b8f29efc6caac51b26127ab2b1aa84cfca20fff2945b88731895fe718603b4",
+    "native_stdout_sha256": "7761f91f76823d59d15c14caad1614ba8aa72911a15daaab05a1144fd9641fff",
+    "wasm_stdout_sha256": "7761f91f76823d59d15c14caad1614ba8aa72911a15daaab05a1144fd9641fff",
+    "native_equals_wasm": true,
+    "finite_oracle_cases": 331,
+    "conversion_cases": 14,
+    "modular_radius_word_cases": 5,
+    "source_cases": 21,
+    "claims": [
+      "own-C scalar helper agrees with independent finite rational oracle vectors",
+      "native and Node/Wasm helper outputs agree for the listed finite and exceptional controls",
+      "pinned original and overlay-composed SquatRv predicates execute beside an explicit omitted-helper control"
+    ],
+    "exclusions": [
+      "no FPSCR flag/trap or non-default rounding equivalence",
+      "no original PPC execution, patched Slippi activation, live UCF or gameplay parity",
+      "source services and Fighter data are fixture-only synthetic boundaries"
+    ],
+    "receipt_sha256": "d3c4acfbcbb2ff9f41646b07522845f1d93dcd92dac0a1f6d2e7013f285fa81e",
+    "total_output_rows": 386,
+    "exceptional_modular_scalar_cases": 14,
+    "source_triples": 7
+  },
+  "retained_failures": [
+    {
+      "boundary": "source extraction",
+      "attempt": 1,
+      "cause": "forward declaration counted as function definition"
+    },
+    {
+      "boundary": "source extraction",
+      "attempt": 2,
+      "cause": "stale expected extracted function hashes; independently verified original and boolean-transformed source before repair",
+      "freeze_sha256": "02c926cf23db2a96d000d4b7c5250aed2060c8421d906003b853154e9b41aab1"
+    },
+    {
+      "boundary": "Wasm compile",
+      "cause": "-frounding-math unsupported by pinned Wasm compiler; native-only flag after review, no weakened FP mode"
+    },
+    {
+      "boundary": "expanded fixture parser",
+      "cause": "duplicate negative_zero control name collided; conversion labels made distinct before final pass"
+    },
+    {
+      "boundary": "profile overlay preparation",
+      "cause": "Malformed unified diff hunk; no compile reached",
+      "receipt_sha256": "be7464788c8b680e76f515ad34ff9ebf78aa35ccfdece24e5114f8d750e8739c"
+    },
+    {
+      "boundary": "profile overlay preparation",
+      "cause": "Generated overlay used raw bool context instead of the production boolean-transformed source; no compile reached",
+      "receipt_sha256": "e38ee848143d869232252652e5cef85d44813d0454a778b96bc160e37f86a56e"
+    },
+    {
+      "boundary": "conditional source extraction",
+      "cause": "Mutually exclusive preprocessor if openings defeat raw brace balancing; bounded extraction verified against entire composed-file identity and unchanged Enter body.",
+      "log_sha256": "2bc53512fae882a284ed342f574ec1abe6cb13b62b3835365d051132af1613b2"
+    },
+    {
+      "boundary": "test discovery invocation",
+      "cause": "Direct discovery in nested package created short-module identity while forwarder used canonical package; same 23 tests pass with canonical imports without source or assertion change.",
+      "log_sha256": "6049d1204cce6ccdf9782ddab43ef3c3f17f3f4f4ed6aef474e75cec77c0eff5"
+    }
+  ],
+  "open_gates": [
+    "exact-head CI and integration",
+    "pinned patched-Slippi execution and live mode activation",
+    "complete UCF/online profile",
+    "FPSCR flags/traps, non-RN rounding and NaN payload fidelity",
+    "browser match-scoped rollback and whole-profile acceptance"
+  ],
+  "evidence_locator": "Retained issue335 scalar/oracle/wiring and validation receipts under the external slippi-no-draw-pivot run; coordination checkpoint records exact private paths.",
+  "scalar_repair_freeze_sha256": "f4ac49b89c73996738640fa1e6084f11bc15d90a2a357bd2d73215cdbea07f72",
+  "scalar_root_review_sha256": "6ea8f99cf2a39629e0bb839d7d832844ae43e757542d22fb2667a9226d333bd8",
+  "falsification": {
+    "receipt_sha256": "7ad7cfb9b0cc8ba758a27565d24a824946bcabc8f40958dc9fe463e21df72856",
+    "mutants_rejected": [
+      "split multiply/subtract instead of fused operation",
+      "signed timer instead of zero-extended byte",
+      "unsigned radius comparison instead of signed comparison"
+    ],
+    "scope": "native scratch mutants; no shipped-source mutation"
+  },
+  "implementation_commit": "89646f46542940ff3a8f7a5543db797f489f55cc",
+  "profile_identity": "slippi-render-dependencies-dbooc-v4",
+  "historical_prewiring_scalar_result": {
+    "scope": "Scalar helper supplied through synthetic common threshold, before actual profile overlay; not current v4 wiring validation.",
+    "source_identity": {
+      "melee_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+      "dependency_lock_sha256": "b51fcde84db09641e4936339af970d74e97c71043ce6f6efee0c70e09211b385",
+      "upstream_squat_sha256": "7a31e8bda702f6448ebeda5613f71f75a220ae302f1f3713bab4db26e6f9d4b3",
+      "base_patch_sha256": "f18e8a34aba1e55a5883c0eec42144e712eb2099ecf903623b82221b08fcaf02",
+      "base_patch_changes_target": false,
+      "boolean_transform_sha256": "7609be54e0e7c29c86a63fd4dfa37078d2d7baba643600e6c1fff40e4f2c46b7",
+      "composed_squat_sha256": "e51b8756a21c7074502023da8b2bd6b0b8da9688a6b07bf26d7c188af1060777",
+      "extracted_check_input_sha256": "1c9fbe6b5fa9f7b4afcf3070c9699951afcbef53e18d1c037545ee9f00c1ed38",
+      "original_check_input_sha256": "3f832be570d9d72d0e820c51c301528e66b425fadee941bc68a8e00c8719fe39",
+      "composition_only_changes_return_type_token": true,
+      "extracted_enter_sha256": "5922425ace3e31d87f6b6ea47b62ed39c510793e16fbcfa17f7289518134b13d",
+      "motion_state_catalog_sha256": "8785cfcb7091ce29268a8c2172aecd97a60bc6352c545a472aa77e4cbd66141a",
+      "common_forward_sha256": "514cd2e4a2ebf3729255efce6b88bb6b91acd685a519e2b4bb01bcb09f7492ca",
+      "ft_forward_sha256": "73cf4918e768aa15477d7c9e17d6fa58ded77ee60c9e0398820dda1ac6cfc7fe",
+      "motion_state_source_value": 41,
+      "motion_flags_source_value": 0,
+      "fixture_template_sha256": "f33f4dc103bcc3e981ecb282e4666e69ff600c19000ebee9a229abb4e7e330ed",
+      "fixture_generated_sha256": "8c7999a93b9ff897cd073f4b3fa498ee33a8e38b6cb28ac21cecca51a288f584",
+      "profile_header_sha256": "9a3f97d385931af834e54204ab0e3090b9952b225aa523b431364aecf7d3894b",
+      "profile_helper_sha256": "2566623b8d35b8e2c6e775371e83e63898a55da628b33306e5e7b763b2e35740",
+      "gameplay_trig_sha256": "f5d724d31a79b3e42cfbe2a7a07a63184b9636481b2653d9d3ff8c1ad7c82014",
+      "emscripten_version": "6.0.9"
+    },
+    "result": {
+      "receipt_sha256": "f88994acc6520930e6816faa0ac82500044a133a65a3c21dd55f41e449070b41",
+      "input_vectors_sha256": "55b8f29efc6caac51b26127ab2b1aa84cfca20fff2945b88731895fe718603b4",
+      "native_stdout_sha256": "ca32bbbbc485e2f91e18783d343a93f36dea6eaf5fc237800cd15478e95ecda5",
+      "wasm_stdout_sha256": "ca32bbbbc485e2f91e18783d343a93f36dea6eaf5fc237800cd15478e95ecda5",
+      "native_equals_wasm": true,
+      "finite_oracle_cases": 331,
+      "conversion_cases": 14,
+      "modular_radius_word_cases": 5,
+      "source_cases": 8,
+      "claims": [
+        "own-C scalar helper agrees with independent finite rational oracle vectors",
+        "native and Node/Wasm helper outputs agree for the listed finite and exceptional controls",
+        "pinned original SquatRv predicate and Enter transition execute in a synthetic fixture"
+      ],
+      "exclusions": [
+        "no FPSCR flag/trap or non-default rounding equivalence",
+        "no original PPC execution, patched Slippi activation, live UCF or gameplay parity",
+        "source services and Fighter data are fixture-only synthetic boundaries"
+      ],
+      "exceptional_modular_scalar_cases": 14,
+      "total_output_rows": 373
+    }
+  },
+  "wiring_review": {
+    "freeze_sha256": "3923c2e51a341cd12facfcf97b25c0c03fdaf133c324abeba1595fac85b620ca",
+    "root_review_sha256": "a3c94c5d9b161e43f84b50fd2f2514654be3690d4c26ebd2786ffaaf1a4a2787",
+    "source_oracle_discovery_files_verified": 17,
+    "profile_off_preprocessed_equals_original": true,
+    "focused_tests": 23,
+    "focused_seconds": 8.691,
+    "focused_log_sha256": "9944baf8a627f9157c361a5c56e8c41dda8154c24cb26b5914547b1e01a04b46",
+    "wrong_y_timer_mutant_rejected": true,
+    "wrong_y_timer_falsification_sha256": "e0a915eb017dadff66605220c95ac901a1358897ebb03e96fd50de2f69074633"
+  },
+  "reference_gate": {
+    "state": "unrun_blocked_until_service_isolation_verified",
+    "pinned_testbed_client": "project-slippi/dolphin@41a7a3a110ed52999486ae1901c8fbb9a63d4f13",
+    "finding": "Known loopback redirects and disabled integrations do not establish all network paths; periodic owned-socket sampling cannot prevent or exclude transient official-service traffic. Full pinned client source is absent from this checkout.",
+    "next": "Investigate a separate offline stock-Dolphin single-patch diagnostic without changing accepted vanilla configuration. This would not satisfy the selected SlippiDolphin reference gate; no execution path is yet proven service-free.",
+    "official_service_traffic": "None performed; prohibited by owner.",
+    "architecture_plan_sha256": "6d69bab19d58307dcbcd91594e9664cd7a714f679b50cbf4bfb3092eba9efbcb",
+    "superseded_statement": "Earlier activation-plan receipt941b1f... claimed a service-free route existed; that statement is unproved and superseded by this gate."
+  },
+  "validation": {
+    "source_commit": "89646f46542940ff3a8f7a5543db797f489f55cc",
+    "source_freeze_sha256": "982a79cd3b8f0b0b60c80592f35857fea9f5a923536d5a621725af0491321954",
+    "result_sha256": "f17cf582cbd74e1230700f2bb8823107be2a906e6a878b4e2f1d7a0d63be1da0",
+    "builds": [
+      {
+        "phase": "private_profile_release",
+        "returncode": 0,
+        "seconds": 25.468940708320588,
+        "log_sha256": "0b98682deb362ddc76e56b544d0d39500a592714713d93fa0e33f023b423c900"
+      },
+      {
+        "phase": "ordinary_release",
+        "returncode": 0,
+        "seconds": 20.75238262489438,
+        "log_sha256": "b8c353f05c30fb17ef62a5f9a1afd7d745e53aaa359db0f1c5a891aa40c7f745"
+      }
+    ],
+    "full_regression": {
+      "tests": 2425,
+      "seconds": 526.988,
+      "skips": 166,
+      "log_sha256": "06e5b552860cee02e2a211988946486c7da86652420eeb95b1fc5f377b68ac26"
+    },
+    "retained_artifacts": 17,
+    "artifact_manifest_sha256": "831470a87193c3b396c7f6d0480b4adf70ee699d53def84e941537bdbb5c4490",
+    "wasm_artifacts": [
+      {
+        "source": "build/browser-release/gameplay_menu_browser.wasm",
+        "bytes": 15825300,
+        "sha256": "5858f48aacac8379c1bdcf10e8292025c27c8ea8a9a4334290a24b4875f4d4c3"
+      },
+      {
+        "source": "build/slippi-synctest-release/gameplay_slippi_synctest_node.wasm",
+        "bytes": 7786074,
+        "sha256": "6d15db38e7998b1640f32f8cea5179f506e9ad6aba8c31dc3b49402ef8bea9f9"
+      },
+      {
+        "source": "build/slippi-synctest-release/gameplay_slippi_synctest_browser.wasm",
+        "bytes": 15330749,
+        "sha256": "b75b9b157a322400eb6652dc5c698925c0609bf119406bb780b027652379e23a"
+      }
+    ],
+    "docs_review_sha256": "130121db912c42b1478b2701a5ce265732a6b6da665dd7f4bfaed6ee5ddf2fae",
+    "scope": "Local code/test producer; final documentation/PR head and current-head CI are separate identities, tracked on the milestone issue."
+  },
+  "ordinary_artifact_attribution": {
+    "receipt_sha256": "c1b93d9be45f63b9f50b6c5c4b47d50e5cb542af8771e480f5dc8dd240fc6913",
+    "previous_wasm_sha256": "dac021ebbb065463be2e006903b50dcd2f7bc49590dc1fb643615e5faec78f1e",
+    "current_wasm_sha256": "5858f48aacac8379c1bdcf10e8292025c27c8ea8a9a4334290a24b4875f4d4c3",
+    "previous_revision": "SDL-3.4.10-706fa1bb",
+    "current_revision": "SDL-3.4.10-89646f46",
+    "changed_string_and_relocations_only": true,
+    "unexplained_differences": 0,
+    "scope": "Read-only section/data/instruction comparison; SDL embeds the parent repository revision. Not gameplay equivalence.",
+    "initial_unclassified_load_offset_receipt_sha256": "b3603f1740f81a340d60566bb53912632733ee8ff6bda2efde59139f445a9960"
+  }
+}
