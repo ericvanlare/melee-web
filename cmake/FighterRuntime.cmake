@@ -65,7 +65,9 @@ target_compile_definitions(fighter_source_runtime PUBLIC TARGET_PC PRIVATE
 if(MELEE_WEB_SLIPPI_SYNCTEST)
   target_sources(fighter_source_runtime PRIVATE
     src/slippi_profile/deadupfall_fix.c
-    src/slippi_profile/draw_diagnostics.c)
+    src/slippi_profile/draw_diagnostics.c
+    src/slippi_profile/whispy_direction_fix.c
+    src/slippi_profile/ps_camera_independent_monitor_fix.c)
   target_compile_definitions(fighter_source_runtime PRIVATE
     MELEE_WEB_SLIPPI_PROFILE=1)
 endif()

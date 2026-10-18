@@ -37,13 +37,13 @@ EMSCRIPTEN_KEEPALIVE int melee_web_synctest_is_mario_kind(int fighter_kind)
 EMSCRIPTEN_KEEPALIVE const char *melee_web_synctest_profile_identity(void)
 {
     return slippi_profile_identity_name(
-        SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_V2);
+        SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_V3);
 }
 
 EMSCRIPTEN_KEEPALIVE int melee_web_synctest_draw_decision(int tick_kind)
 {
     return slippi_profile_source_draw_decision(
-        SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_V2,
+        SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_V3,
         static_cast<SlippiTickKind>(tick_kind));
 }
 }

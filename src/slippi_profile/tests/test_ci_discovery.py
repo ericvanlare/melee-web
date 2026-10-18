@@ -25,6 +25,7 @@ PROFILE_TEST_CLASSES = (
     ("src.slippi_profile.tests.test_deadupfall_reduction", "DeadUpFallReductionTests"),
     ("src.slippi_profile.tests.test_runner_contract", "SlippiSynctestRunnerContractTests"),
     ("src.slippi_profile.tests.test_source_composition", "SlippiSourceCompositionTests"),
+    ("src.slippi_profile.tests.test_stage_render_reductions", "StageRenderReductionTests"),
 )
 
 
