@@ -154,11 +154,15 @@ renderer ownership and drawn corrective ticks are no longer the active path.
 Resume them only for a demonstrated dependency the no-draw model cannot remove,
 with the evidence and reasoning posted on #158 before implementation.
 
-The next coherent milestone combines render-to-simulation dependency fixes with
-a no-draw synctest. Start with the actual fighter dynamics/matrix producer and
-the offscreen/magnifier damage path; inventory other draw writes and consumers.
-Implement the profile behavior in our own C under `src/slippi_profile/`, alongside
-its tests and per-behavior patch mapping, under GPL-3.0-or-later. The separate
+The render-to-simulation and no-draw synctest components are recorded in the
+[rollback boundary](status/2026-10-12-match-only-rollback-feasibility.md); they do
+not establish complete dependency coverage or live rollback. The current UCF
+milestone is [#339](https://github.com/ericvanlare/melee-web/issues/339): bind the
+shared input-history lifetime and snapshot ownership before implementing its
+dependent behaviors. Keep the plain DBOOC and shield-drop components scoped to
+their receipts. Continue implementing the profile in our own C under
+`src/slippi_profile/`, alongside its tests and per-behavior patch mapping, under
+GPL-3.0-or-later. The separate
 [license scope](../LICENSE_SCOPE.md) and [notices](../THIRD_PARTY.md) preserve the
 rest of the repository's existing terms. Builds including the profile follow
 GPL terms with public corresponding source and reproducible build instructions.

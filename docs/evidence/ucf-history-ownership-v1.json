@@ -1,0 +1,82 @@
+{
+  "schema": "melee-web-ucf-history-ownership-v1",
+  "issue": 339,
+  "state": "source_bound_reference_build_passed_offline_initialization_unrun",
+  "source_base": "130438fd2b86d00cfec98cd2ba0a5f66084ae15c",
+  "scope": "Source research and offline reference build prerequisite only. No new profile behavior, client execution, input-history state observation or rollback claim.",
+  "history_contract": {
+    "source_audit_sha256": "07fcbf61535816c488be1e1e341ee839139f4e98efac9046d7d26b0deed987b4",
+    "snapshot_followup_sha256": "2d112f6e1fa8be776a1ddf514a058e51419a1337b21c76c92eb9ac90c25e65f3",
+    "controller_rows": 4,
+    "row_stride": 12,
+    "meaningful_bytes_total": 40,
+    "index_owner": "processed PAD slot at Fighter offset 0x618; not raw port offset 0x61a",
+    "unobserved": [
+      "installed table address",
+      "actual initializer and match reset",
+      "fixed snapshot region membership",
+      "restoration and dependent behavior agreement"
+    ]
+  },
+  "source_gate": {
+    "client_commit": "41a7a3a110ed52999486ae1901c8fbb9a63d4f13",
+    "semver": "4.0.0-mainline-beta.19",
+    "recursive_submodules": 30,
+    "ordered_patches": 6,
+    "source_transfer_receipt_sha256": "3eca837307221acd44d408c2852ba4e5e09cd382de2f20c85519c28961e44ff5",
+    "receipt_sha256": "b2634ca730b65c1b781ad82518a979a9ffcbe28e68094e443c7840d558949e43",
+    "independent_review_sha256": "a3de40e79ef23b02d57c5496500bc3e156b4353b5e9c8b81c5689665c5cec203",
+    "dolphin_patch_tree": "58e9930fbc31dce00a044df849876210154cc69f",
+    "rust_patch_tree": "3762ffaca98d8f8b50d77256ff783d5296314b5f",
+    "seed_indices_unchanged": 31
+  },
+  "source_copy_failure": {
+    "retained": true,
+    "first_failure_sha256": "54df02f525a8d1d961fe51b822e4f8bae88bbc7298eb35d1015e3e52604911fa",
+    "reduction_sha256": "b993a6f058ee6d07dcd1ddc5406dd630df1223f7cedbd3bf4d6040191d731f4c",
+    "finding": "Local copy/repack stopped on incomplete Git ancestry. Reviewed exact-commit file-only shallow transfer preserved true commit and independently owned object stores; no fabricated history."
+  },
+  "resource_hash_correction": {
+    "source_staged_and_lock_sha256": "525d3333b4eed701982ada34942b83cecd9accc6e96b18a27a1b6d863e499946",
+    "files": 750,
+    "file_differences": 0,
+    "correction_sha256": "3e28ec9d03e627f72005cf33186eb2b93c9c5bc60e24d3f20d4c0e4ce9cd17a7",
+    "finding": "Earlier a8a978 resource hash used a different method. The actual pinned helper agrees across source, staged resources and lock. Historical inventory remains retained, but resource mismatch is withdrawn."
+  },
+  "new_build": {
+    "run_id": "nogui-build-execution-v1",
+    "receipt_sha256": "e63fabc93b88f54b2f0cc2cf68cad1b939fe29110b246316501e8133c1f2c5ee",
+    "root_review_sha256": "c9c81f3bac42cfbfccb5e674b6e0c6d5fc6da6bd69af046acb07a65262d0ee24",
+    "seconds": 162.768,
+    "binary_sha256": "4ba9bd13e102e7ce87444bde080506e00c3623f056cd7aae355fde5e271ffb75",
+    "rust_library_sha256": "097cb30fddb82eff8da29e3b6f156e7eb9ed818f1511cdf53927ea1a30a79efa",
+    "architecture": "arm64",
+    "CMakeCache_sha256": "dff1954462b39970ba5b744a2c63746d05536191df4b6e4db2e7baacb52dab55",
+    "cmake": "3.31.6",
+    "ninja": "1.13.0.git.kitware.jobserver-pipe-1",
+    "clang": "21.0.0 (clang-2100.1.1.101)",
+    "rust_cargo": "1.88.0",
+    "configuration": "Release; 14 locked CMake options; deployment target 11.0.0; FMT_CONSTEVAL empty",
+    "commands_passed": 16,
+    "owned_process_groups_absent": 16,
+    "pre_post_source_verification_equal": true,
+    "old_lock_unchanged": true,
+    "policy": "Process-local builder network denial plus offline Cargo; owned external cache/output. No client executable launch or application staging."
+  },
+  "historical_binary": {
+    "actual_sha256": "b5697c69fbe6b18359f173c85c5c2cad4fa34cfa307558234af07937211b0c7a",
+    "locked_sha256": "e4c8a5fb914baf10f25ccbf1077b9a6880a7abb84619db5a1cf294d866ff673b",
+    "matching_build_receipt_found": false,
+    "new_build_relabels_historical_artifact": false
+  },
+  "next": "Review exact offline initialization and memory-observation entrypoint with process-local default-deny network isolation; no client launch released by this receipt.",
+  "exclusions": [
+    "official Slippi services/contact",
+    "complete UCF profile",
+    "live profile activation",
+    "browser rollback",
+    "Stadium acceptance",
+    "human physical/audio/timing/two-machine gates"
+  ],
+  "independent_checkpoint_review_sha256": "fead67df8846178827715ea2606dd227b3fba6a703c80ae87ca3f5a7991b7055"
+}
