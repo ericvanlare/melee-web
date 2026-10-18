@@ -11,6 +11,7 @@ from src.slippi_profile.tests import test_profile_controls as _profile_controls
 from src.slippi_profile.tests import test_runner_contract as _runner_contract
 from src.slippi_profile.tests import test_source_composition as _source_composition
 from src.slippi_profile.tests import test_stage_render_reductions as _stage_render_reductions
+from src.slippi_profile.tests import test_ucf_shield_drop as _ucf_shield_drop
 
 
 class SlippiBuildContractTests(_build_contract.SlippiSynctestBuildContractTests):
@@ -50,4 +51,8 @@ class SlippiDboocOracleTests(_dbooc_oracle.DboocBinary32OracleTests):
 
 
 class SlippiDboocScalarTests(_dbooc_scalar.DboocScalarHelperTests):
+    pass
+
+
+class SlippiUcfShieldDropTests(_ucf_shield_drop.UcfShieldDropTests):
     pass

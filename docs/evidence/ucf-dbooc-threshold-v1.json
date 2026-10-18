@@ -1,7 +1,7 @@
 {
   "schema": "melee-web-ucf-dbooc-threshold-v1",
   "issue": 335,
-  "state": "reviewed_private_v4_component_local_validation_passed",
+  "state": "merged_private_v4_component_local_validation_and_exact_head_ci_passed",
   "source_base": "ecb2fe998d5e0458ef13900224341294e143fc9e",
   "scope": "Private incomplete GPL profile; native and Node/Wasm scalar and actual-source fixture, no live activation or original patched-game execution.",
   "behavior": {
@@ -132,7 +132,6 @@
     }
   ],
   "open_gates": [
-    "exact-head CI and integration",
     "pinned patched-Slippi execution and live mode activation",
     "complete UCF/online profile",
     "FPSCR flags/traps, non-RN rounding and NaN payload fidelity",
@@ -278,5 +277,16 @@
     "unexplained_differences": 0,
     "scope": "Read-only section/data/instruction comparison; SDL embeds the parent repository revision. Not gameplay equivalence.",
     "initial_unclassified_load_offset_receipt_sha256": "b3603f1740f81a340d60566bb53912632733ee8ff6bda2efde59139f445a9960"
+  },
+  "integration": {
+    "pr": 336,
+    "reviewed_head": "b1e5bd5a7525a8db09fca13e7c20a1302a2c13a8",
+    "merge": "220e8ad969e45edc9d39b747f99411a8f00c7880",
+    "reviewed_and_merged_tree": "a363c6bfcb0fd9fae1de0c5403dbeba34566a55a",
+    "ci_run": 39123761817,
+    "complete_checks": 14,
+    "success_checks": 12,
+    "expected_skips": 2,
+    "receipt_sha256": "972ecdfa6bf6f3fc9244bc3833387e079cd8afcab68b643ea0b7adfd5152393c"
   }
 }

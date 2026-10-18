@@ -37,7 +37,8 @@ class LocalRuntimeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir="/tmp", prefix="p-") as directory:
             root = Path(directory)
             mod = root / "GALE01r2.ini"
-            mod.write_text("pinned game modification\n", encoding="utf-8")
+            mod.write_text("[Gecko]\n$Fixture patch\n04000000 00000000\n"
+                           "[Gecko_Enabled]\n$Fixture patch\n", encoding="utf-8")
             digest = hashlib.sha256(mod.read_bytes()).hexdigest()
             profile = create_client_profile(
                 root=root / "client1",
@@ -60,10 +61,8 @@ class LocalRuntimeTests(unittest.TestCase):
             pad_config = (profile.user_root / "Config" / "GCPadNew.ini").read_text()
             self.assertIn("Device = Pipe/0/pad1", pad_config)
             self.assertIn("Device = Pipe/0/pad2", pad_config)
-            self.assertEqual(
-                (profile.user_root / "GameSettings" / "GALE01r2.ini").read_bytes(),
-                mod.read_bytes(),
-            )
+            self.assertEqual(list((profile.user_root / "GameSettings").iterdir()), [])
+            self.assertEqual(hashlib.sha256(mod.read_bytes()).hexdigest(), digest)
             user = json.loads((profile.user_root / "Slippi" / "user.json").read_text())
             codes = json.loads(
                 (profile.user_root / "Slippi" / "direct-codes.json").read_text()
@@ -102,6 +101,8 @@ class LocalRuntimeTests(unittest.TestCase):
             }
             with self.assertRaisesRegex(ValueError, "hash differs"):
                 create_client_profile(root=root / "client", **args)
+            self.assertFalse((root / "client").exists())
+            self.assertFalse((root / "replays").exists())
             with self.assertRaisesRegex(ValueError, "local test identity"):
                 create_client_profile(
                     root=root / "official-client",
