@@ -300,13 +300,28 @@ arithmetic and time limits are unchanged from the reviewed candidate. The
 documentation checkpoint `100da5c1` completed all 14 exact-head checks (12
 successes and two expected skips). This does not close draft #340.
 
-First reduce the repeated-frame hold failure and require final client outcomes
-to be classified. Then use a source-derived, reviewed observation that loads
-the earliest nonzero saved history, with different current bytes and exact
-restoration of all 48 bytes. Inspect the retained logs first; do not repeat
-the first-Load run or relax the acceptance predicate. No further offline menu expansion is
-planned. The five still-open consumer paths, actual match/reset lifetime, and Slippi Capture/Load
-preserve-block and restore-order behavior remain separate gates. The isolated component
-does not establish those runtime behaviors. Do not repeat successful
-initialization without a new hypothesis. No complete profile or live rollback
-claim follows.
+The repeated-frame failure has a source-level explanation for the overflow:
+each send attempt inside the configured hold interval queues a packet, including
+repeated frame 99, until the unchanged eight-packet guard aborts. The reason
+frame 99 stopped advancing remains unproved. A separately reviewed external
+classifier candidate now requires both peer diagnostic streams and valid first
+cleanup receipts, rejects fatal diagnostics and nonzero client outcomes, and
+preserves an earlier error. Seven focused adapter controls pass. Reclassification
+of the retained run reports failure while keeping the selected P1 observation.
+This candidate is prepared and reviewed offline; it is not applied to the
+checkout or released for runtime use. The first rejected classifier candidate
+and its repairs remain retained.
+
+Preparation of a separate nonzero-history experiment was then stopped by an
+automatic review for possible cybersecurity risk. No more specific reason was
+provided. Its ten partial candidate files are retained unchanged; the candidate
+was not released or run and is not retried or routed through another agent.
+This is a tooling block, separate from the recorded P2 failure and the reviewed
+offline classifier. Independent Stadium work continues.
+
+The required history result remains an earliest nonzero saved value, different
+current bytes and exact restoration of all 48 bytes. Match/reset lifetime, the
+five consumer paths and preserve-block/restore order remain open. No further
+offline menu expansion, relaxed acceptance, complete profile or live rollback
+claim follows. Documentation head `9ae5cb9e` completed all 14 exact-head checks
+(12 successes and two expected skips); this does not close draft #340.

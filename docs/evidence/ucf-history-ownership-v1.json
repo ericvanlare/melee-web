@@ -200,7 +200,7 @@
     "matching_build_receipt_found": false,
     "new_build_relabels_historical_artifact": false
   },
-  "next": "Reduce the repeated-frame diagnostic hold failure and final client outcome classifier before another capture. Then separately review an explicit input/fault scenario satisfying the earliest nonzero Capture/Load requirement, with all48 bytes, context/frame/order/layout and preservation guards unchanged. Match/reset lifetime and producer/consumer scheduling remain separate gates.",
+  "next": "Nonzero-history experiment preparation is halted by automatic review; preserve partial candidate and do not retry or reroute it. Required nonzero restore, match/reset and consumer gates remain open. Continue independent Stadium work.",
   "route_admission": {
     "status": "SCOPED_MENU_READINESS_COMPLETE_ACTUAL_ZERO_SAVED_LOAD_OBSERVED_NONZERO_ACCEPTANCE_PENDING",
     "reviewed_source_plan": "minimal-menu-input-bridge-packet-v1.json",
@@ -749,7 +749,7 @@
           "retention_sha256": "9811adbfdaa3535b693ae0410496968d2954eb0915cd220d7b7ded4369a150b3"
         }
       ],
-      "next": "Reduce the repeated-frame diagnostic hold failure and final client outcome classifier before another capture. Then separately review an explicit input/fault scenario satisfying the earliest nonzero Capture/Load requirement, with all48 bytes, context/frame/order/layout and preservation guards unchanged. Match/reset lifetime and producer/consumer scheduling remain separate gates.",
+      "next": "Nonzero-history experiment preparation is halted by automatic review; preserve partial candidate and do not retry or reroute it. Required nonzero restore, match/reset and consumer gates remain open. Continue independent Stadium work.",
       "receive_reduction": {
         "packet_sha256": "6fbc1134e674914a91ade705b433c81bc490ecba59628c42590f338c2d93a14f",
         "review_sha256": "8797b1475f424903c4c4d2fddbe8dfff284ea11c4472bc872a0e65d8858f7182",
@@ -792,6 +792,22 @@
           "clean_run_pass": false,
           "private_profiles_retained": true
         }
+      },
+      "offline_final_outcome_classifier": {
+        "state": "EXTERNAL_CANDIDATE_PREPARED_REVIEWED_NOT_APPLIED_OR_RUNTIME_RELEASED",
+        "packet_sha256": "2bc80d3058643eb07e93aab77d11db8721f4e719e4cc73a1f8ae5ea6e2ddafa2",
+        "review_sha256": "776a77d0aef64157ce8f32bc029493be79f4e11694d6c4ea8c8d6ec11870d1c0",
+        "focused_adapter_controls": 7,
+        "scope": "Required strict peer streams and first cleanup receipt; nonzero client result/fatal diagnostic fails; earlier errors preserved. Retained v6 classifies as failed while preserving selected P1 observation. No new capture.",
+        "v1_rejected_review_sha256": "a8f061a9f9f0a0c8b3cc5b437227fadf93e96018c2553cdd84ffa7ed5bd3887a"
+      },
+      "nonzero_candidate_automatic_review_block": {
+        "state": "PREPARATION_HALTED_NOT_RELEASED_NOT_RUN",
+        "reason": "Automatic review flagged possible cybersecurity risk; no more specific reason supplied.",
+        "partial_candidate_files_retained": 10,
+        "retention_sha256": "07877e38eb8ef109e4875c3f0bd4e9ca5c458d39006dea80ae3665368b713a42",
+        "retry_or_reroute": false,
+        "game_failure_claim": false
       }
     },
     "exact_head_ci_100da5c1": {
@@ -800,6 +816,13 @@
       "successes": 12,
       "expected_skips": 2,
       "receipt_sha256": "35f4e0252a048e092f57795cfa8b039ca6c7217bf4eb8969eadf879969860a37"
+    },
+    "exact_head_ci_9ae5cb9e": {
+      "head": "9ae5cb9e96d2441695da318bb3a861512de727c1",
+      "run": 39155747772,
+      "successes": 12,
+      "expected_skips": 2,
+      "receipt_sha256": "abcb1413739bfdfb5cb10c08cbd752353b17073588c854a22f75a4855d7cb2a3"
     }
   }
 }
