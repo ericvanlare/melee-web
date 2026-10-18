@@ -35,10 +35,12 @@ class ReplayScopedImportLifecycleTests(OwnedWorkspaceTests):
         close_assets = block(block(core, 'void close()'), 'if(scoped_assets)')
         replay_close = block(replay, 'if(!candidate->whole_session())')
         advance_replay = block(core, 'if(scoped_assets){request_assets(AssetDestination::Replay')
+        prepared_active = block(core, 'bool stadium_first_css_prepared_diagnostic_active()')
         begin = block(menu, 'unsigned melee_web_native_asset_begin()')
         clear = block(menu, 'int melee_web_native_source_files_external_clear()')
         file = block(menu, 'int melee_web_native_menu_file(')
         source = r'''
+#define MELEE_WEB_STADIUM_C1A_DIAGNOSTIC 1
 #include <cassert>
 #include <cstring>
 #include <map>
@@ -48,10 +50,14 @@ class ReplayScopedImportLifecycleTests(OwnedWorkspaceTests):
 #include <string_view>
 #include <vector>
 #include <cstdint>
-// The real constructor predicate is covered by its own native owner controls.
-// This fixture supplies its explicit ownership state to the extracted boundary.
+// Constructor lifecycle remains covered by its native owner controls. Supply
+// its explicit predicate double plus the fresh-mode state consumed by the
+// actual shared diagnostic predicate extracted below.
 bool constructor_owned=false;
 bool stadium_first_css_constructor_return_active(){return constructor_owned;}
+enum class FirstCssBrowserMode {None=0,FreshConsumedTickDrawV3=3};
+struct {FirstCssBrowserMode mode=FirstCssBrowserMode::None;} first_css_browser_draw;
+''' + prepared_active + r'''
 bool scoped_disc_import=false, scoped_assets=false, asset_committed=false;
 bool world=false,match=false,results=false,prize=false,host_entered=false;
 bool asset_selection_valid=false,asset_opening_preview_valid=false;
@@ -119,9 +125,16 @@ int main(){
  auto releases=asset_scope.releases;select_replay(&whole);
  assert(world&&host_entered&&scoped_assets&&scoped_disc_import);
  assert(asset_scope.releases==releases);
- // The actual asset-begin boundary must reject a constructor-owned import
- // before close(), request_assets(), or any protected owner/scope mutation.
- constructor_owned=true;
+ // The actual shared predicate rejects both private diagnostic owners before
+ // close(), request_assets(), or any protected owner/scope mutation.
+ assert(!stadium_first_css_prepared_diagnostic_active());
+ for(unsigned diagnostic_owner:{0u,1u}){
+ constructor_owned=diagnostic_owner==0;
+ first_css_browser_draw.mode=diagnostic_owner==1?
+     FirstCssBrowserMode::FreshConsumedTickDrawV3:FirstCssBrowserMode::None;
+ const bool protected_constructor_owned=constructor_owned;
+ const auto protected_diagnostic_mode=first_css_browser_draw.mode;
+ assert(stadium_first_css_prepared_diagnostic_active());
  const auto protected_files=files;
  auto* const protected_cache=archive_cache.get();
  const auto protected_destination=asset_destination;
@@ -132,11 +145,15 @@ int main(){
  const auto protected_requests=requested_assets;
  assert(!melee_web_native_asset_begin());
  assert(message=="CSS constructor-return diagnostic refuses a second asset import");
- assert(constructor_owned&&world&&host_entered&&scoped_assets&&scoped_disc_import);
+ assert(constructor_owned==protected_constructor_owned&&
+        first_css_browser_draw.mode==protected_diagnostic_mode);
+ assert(stadium_first_css_prepared_diagnostic_active()&&
+        world&&host_entered&&scoped_assets&&scoped_disc_import);
  assert(files==protected_files&&archive_cache.get()==protected_cache);
  assert(asset_destination==protected_destination&&asset_generation==protected_generation);
  assert(asset_scope.pending==protected_pending&&asset_scope.releases==protected_releases&&
         asset_scope.aborts==protected_aborts&&requested_assets==protected_requests);
+ }
 }
 '''
         cpp = self.scratch / 'test.cpp'
