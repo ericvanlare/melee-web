@@ -2526,6 +2526,8 @@ class StadiumGoOrdinal2Observations:
         self.target_seen = False
         self.final_draw_sequence = None
         self.rows = []
+        self.go2_typed_state = None
+        self.go2_seed_row = None
 
     def accept(self, row: dict[str, Any]) -> None:
         from whole_session_replay import _consumed_ports, WholeSessionReplayError, _gpr, _slice as replay_slice
@@ -2605,7 +2607,10 @@ class StadiumGoOrdinal2Observations:
                 _require(self.target_seen,
                          "GO+2 natural tail appeared before the target SourceTick")
             if label is not None:
-                _validate_stadium_idle_state_record(row, label, tick)
+                typed = _validate_stadium_idle_state_record(row, label, tick)
+                if label == "GO2":
+                    self.go2_typed_state = typed
+                    self.go2_seed_row = row
             self.rows.append({
                 "ordinal": ordinal,
                 "source_tick": tick,
@@ -2623,14 +2628,16 @@ class StadiumGoOrdinal2Observations:
             if self.go is not None and self.target_seen and self.final_draw_sequence is None:
                 self.final_draw_sequence = row["seq"]
 
-    def finish(self, route: dict[str, Any]) -> dict[str, Any]:
+    def finish(self, route: dict[str, Any], *, include_go2_state: bool = False) -> dict[str, Any]:
+        _require(type(include_go2_state) is bool,
+                 "GO+2 typed-state opt-in must be boolean")
         _require(self.setup_seen and self.go is not None and self.pending is None and
                  self.target_seen and self.final_draw_sequence == route["draw_return_sequence"] and
                  len(self.rows) >= 3 and
                  [row["ordinal"] for row in self.rows[:3]] == [0, 1, 2] and
                  self.last_ordinal <= 6,
                  "GO+2 actual consumed queue/source state sequence is incomplete")
-        return {
+        result = {
             "decision": "PASS_ACTUAL_GO_PLUS_2_QUEUE_AND_SOURCE_STATE_ONLY",
             "go_source_tick_C": self.go["source_tick"],
             "target_source_tick": self.go["source_tick"] + 2,
@@ -2639,14 +2646,60 @@ class StadiumGoOrdinal2Observations:
             "source_state_snapshots_validated_at_ordinals": [0, 1, 2],
             "queue_rows_are_synthetic": False,
         }
+        if include_go2_state:
+            _require(self.go2_typed_state is not None and
+                     self.go2_seed_row is not None,
+                     "GO+2 typed state/seed row was not retained")
+            result["go2_declared_state"] = {
+                "schema": "melee-web-original-stadium-go2-declared-state",
+                "version": 1,
+                "decision": "PASS_SOURCE_TYPED_FIELDS_ONLY",
+                "raw_identity": {
+                    "sequence": self.go2_typed_state["sequence"],
+                    "event": "boundary", "boundary": "source_tick",
+                    "source_tick": self.go2_typed_state["source_tick"],
+                    "draw_ordinal": self.go2_typed_state["draw_ordinal"],
+                },
+                "typed_fields": self.go2_typed_state,
+                "seed_observation": _go2_seed_observation(self.go2_seed_row),
+                "source_queue": {
+                    "consume_sequence": self.rows[2]["consume_sequence"],
+                    "source_tick": self.rows[2]["source_tick"],
+                    "draw_ordinal": self.rows[2]["draw_ordinal"],
+                    "queue_slot_status_hex": list(self.rows[2]["ports"]),
+                },
+                "scope": "One actual GO-relative ordinal-2 SourceTick typed snapshot and direct seed bytes; no pointer comparison or whole-state parity.",
+            }
+        return result
+
+
+def _go2_seed_observation(row: dict[str, Any]) -> dict[str, Any]:
+    payload = row.get("payload")
+    _require(row.get("event") == "boundary" and isinstance(payload, dict) and
+             payload.get("boundary") == "source_tick",
+             "GO+2 seed does not belong to an actual SourceTick record")
+    pointer = _slice(payload, RNG_POINTER_TAG, "GO+2 RNG pointer", 4)
+    seed = _slice(payload, RNG_VALUE_TAG, "GO+2 RNG seed", 4)
+    _require(pointer["address"] == 0x804D5F94 and
+             int.from_bytes(pointer["raw"], "big") == seed["address"],
+             "GO+2 RNG pointer does not own the observed seed bytes")
+    return {"sequence": row["seq"], "event": "boundary", "boundary": "source_tick",
+            "source_tick": row["source_tick"], "draw_ordinal": row["draw_ordinal"],
+            "pointer_slot_address": pointer["address"],
+            "pointer_raw_hex": pointer["raw"].hex(),
+            "seed_address": seed["address"], "seed_hex": seed["raw"].hex(),
+            "pointer_equals_seed_address": True}
 
 
 def validate_stadium_go_ordinal2_reference(observer_path: str | Path, *,
                                             input_path: str | Path,
                                             input_status_path: str | Path,
                                             expected_setup_receipt_sha256: str = EXPECTED_SETUP_RECEIPT_SHA256,
-                                            status_path: str | Path | None = None) -> dict[str, Any]:
+                                            status_path: str | Path | None = None,
+                                            include_go2_state: bool = False) -> dict[str, Any]:
     """Validate one fresh-record C/F/GO+2 natural source reference, not a replay."""
+    _require(type(include_go2_state) is bool,
+             "GO+2 typed-state opt-in must be boolean")
     from reference_input_stream import validate_status as validate_input_status
     from reference_input_stream import validate_stream as validate_input_stream
 
@@ -2660,7 +2713,7 @@ def validate_stadium_go_ordinal2_reference(observer_path: str | Path, *,
         observations.accept(row)
     _require(stats.prefix_sha256 == route["stream_sha256"],
              "GO+2 source changed during consumed-queue validation")
-    consumed = observations.finish(route)
+    consumed = observations.finish(route, include_go2_state=include_go2_state)
     try:
         input_summary = validate_input_stream(input_path)
         input_status = validate_input_status(input_status_path, mode="record",
@@ -2670,10 +2723,11 @@ def validate_stadium_go_ordinal2_reference(observer_path: str | Path, *,
         raise StadiumGoPrefixError(f"GO+2 fresh input recording is invalid: {error}") from error
     _require(input_summary.get("complete") is True and input_summary.get("events", 0) > 0,
              "GO+2 fresh input stream is empty or incomplete")
-    return {
+    result = {
         "schema": "melee-web-original-stadium-go-ordinal2-reference",
-        "version": 1,
-        "decision": "PASS_FRESH_RECORD_GO_ORDINAL2_REFERENCE_ONLY",
+        "version": 2 if include_go2_state else 1,
+        "decision": "PASS_FRESH_RECORD_GO_ORDINAL2_TYPED_STATE_REFERENCE_ONLY"
+            if include_go2_state else "PASS_FRESH_RECORD_GO_ORDINAL2_REFERENCE_ONLY",
         "route": route,
         "consumed_queue_state": consumed,
         "input_stream": input_summary,
@@ -2688,6 +2742,17 @@ def validate_stadium_go_ordinal2_reference(observer_path: str | Path, *,
             "browser_comparison": False,
         },
     }
+    if include_go2_state:
+        go2 = result["consumed_queue_state"].get("go2_declared_state")
+        _require(isinstance(go2, dict),
+                 "GO+2 typed state was not retained for the explicit comparison branch")
+        go2["provenance"] = {
+            "source_stream_sha256": route["stream_sha256"],
+            "input_stream_sha256": input_summary["sha256"],
+            "setup_receipt_sha256": expected_setup_receipt_sha256,
+            "scope": "same fresh native producer and its own complete MWRI record",
+        }
+    return result
 
 
 _FIRST_CSS_ENTRY_SLICES = {

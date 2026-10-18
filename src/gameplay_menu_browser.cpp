@@ -3147,6 +3147,7 @@ bool matched_setup_cf_service(){
   std::ostringstream actual;
   const unsigned c_tick=state.version2?state.c_source_tick:84U;
   const unsigned f_tick=state.version2?state.f_source_tick:85U;
+  std::string go2_state_observation_json="null";
   if(tick_action&&(ordinal==c_tick||ordinal==f_tick)){
    const char* label=ordinal==c_tick?"C":"F";
    check(state.expected_branch==0,"Matched Setup C/F supports only the approved branch-0 Setup");
@@ -3184,6 +3185,21 @@ bool matched_setup_cf_service(){
          owner_error[0]?owner_error:"Matched Setup C/F v2 idle snapshot refused");
    check(match->diagnostic_stadium_go_alignment_snapshot(&state.go,owner_error,sizeof(owner_error)),
          owner_error[0]?owner_error:"Matched Setup C/F v2 GO snapshot refused");
+  }
+  if(state.version2&&!state.full_schedule&&!state.common_fields&&tick_action&&
+     ordinal==c_tick+2){
+   check(state.idle.world_generation==state.world_generation&&
+         state.idle.world_ticks==ordinal+1&&
+         state.idle.source_frame==state.last_source_frame_after&&
+         state.go.generation==state.world_generation&&state.go.failure==0&&
+         state.go.armed==1,
+         "Matched Setup C/F GO+2 snapshot lost its admitted owner/tick boundary");
+   go2_state_observation_json="{\"schema\":\"melee-web-stadium-go2-declared-state-native-v1\",\"label\":\"GO2\",\"ordinal\":"+
+      std::to_string(ordinal)+",\"seed_hex\":\""+
+      melee_web::stadium_first_css_diagnostic::hex32(state.seed_after_action)+
+      "\",\"expected_branch\":"+std::to_string(state.expected_branch)+
+      ",\"idle_snapshot\":"+matched_setup_cf_idle_json(state.idle)+
+      ",\"go_trace\":"+matched_setup_cf_go_json(state.go)+"}";
   }
   std::string common_sample_json;
   if(state.common_fields){
@@ -3228,6 +3244,7 @@ bool matched_setup_cf_service(){
       +",\"aurora_begin_calls\":"+std::to_string(state.aurora_begin_calls)
       +",\"aurora_end_calls\":"+std::to_string(state.aurora_end_calls)
       +",\"observation\":"+actual.str()+
+      (go2_state_observation_json!="null"?",\"go2_state_observation\":"+go2_state_observation_json:"")+
       (tick_action?",\"pad_hsd_queue_observation\":"+pad_queue_observation_json:"")+
       (state.common_fields?",\"common_fields_sample\":"+common_sample_json:"")+"}";
   state.awaiting_approval=true;

@@ -23,7 +23,7 @@ function runtimePayload() {
   return {schema: 'melee-web-stadium-typed-pad-action-plan', version: 1, bundles, schedule};
 }
 
-function run2Packet() {
+function run2Packet({go2 = false} = {}) {
   const bundles = Array.from({length: 4}, (_, bundle) => ({bundle,
     ports: Array.from({length: 4}, (_, port) => ({port,
       status_hex: `${bundle.toString(16).padStart(2, '0')}${'00'.repeat(10)}`}))}));
@@ -59,6 +59,31 @@ function run2Packet() {
       {label: 'F', sequence: 110, source_tick: 2, draw_ordinal: 2,
         post_go_ordinal: 1, pointer_hex: '804d5f90', seed_hex: '89abcdef'},
     ]};
+  if (go2) {
+    const provenance = {source_stream_sha256: 'a'.repeat(64),
+      input_stream_sha256: 'b'.repeat(64), setup_receipt_sha256: 'c'.repeat(64),
+      scope: 'same fresh native producer and its own complete MWRI record'};
+    host_only.source_identity.go2_reference = {
+      schema: 'melee-web-stadium-go2-source-reference-v1',
+      source_stream_sha256: provenance.source_stream_sha256,
+      input_stream_sha256: provenance.input_stream_sha256,
+      setup_receipt_sha256: provenance.setup_receipt_sha256};
+    const rows = bundles[3].ports.map(port => port.status_hex);
+    host_only.expected_state.GO2 = {
+      schema: 'melee-web-original-stadium-go2-declared-state', version: 1,
+      decision: 'PASS_SOURCE_TYPED_FIELDS_ONLY',
+      raw_identity: {sequence: 115, event: 'boundary', boundary: 'source_tick',
+        source_tick: 3, draw_ordinal: 3},
+      typed_fields: {...expected('GO2'), sequence: 115, source_tick: 3, draw_ordinal: 3},
+      seed_observation: {sequence: 115, event: 'boundary', boundary: 'source_tick',
+        source_tick: 3, draw_ordinal: 3, pointer_slot_address: 0x804D5F94,
+        pointer_raw_hex: '804d5f90', seed_address: 0x804D5F90,
+        seed_hex: 'fedcba98', pointer_equals_seed_address: true},
+      source_queue: {consume_sequence: 114, source_tick: 3, draw_ordinal: 3,
+        queue_slot_status_hex: rows},
+      provenance, scope: 'One actual GO-relative ordinal-2 SourceTick typed snapshot and direct seed bytes; no pointer comparison or whole-state parity.',
+    };
+  }
   return {schema: 'melee-web-stadium-source-action-replay-packet', version: 2,
     runtime_payload: {schema: 'melee-web-stadium-pad-action-plan', version: 1,
       bundles, schedule}, host_only};
@@ -102,8 +127,9 @@ function sameV6QueueObservationPacket() {
 }
 
 function expected(label) {
-  const ordinal = label === 'C' ? 84 : label === 'F' ? 85 : 84;
-  return {label, sequence: label === 'GO' ? 2925 : label === 'C' ? 2926 : 2931,
+  const ordinal = label === 'C' ? 84 : label === 'F' ? 85 : label === 'GO2' ? 86 : 84;
+  return {label, sequence: label === 'GO' ? 2925 : label === 'C' ? 2926 :
+    label === 'F' ? 2931 : label === 'GO2' ? 2938 : 2931,
     source_tick: ordinal, draw_ordinal: ordinal,
     map2: {countdown_s32: 3628 - (label === 'F' ? 1 : 0), phase_s16: 0, form_s16: 5,
       previous_form_s16: -1, prior_form_s16: -1, gate_mask_40: false, gate_mask_80: false},
@@ -115,9 +141,10 @@ function expected(label) {
 }
 
 function actual(label) {
-  const ordinal = label === 'C' ? 84 : 85;
+  const ordinal = label === 'C' ? 84 : label === 'F' ? 85 : 86;
   const original = expected(label);
-  return {label, ordinal, seed_hex: label === 'C' ? '868d77be' : 'b50f624b',
+  return {label, ordinal, seed_hex: label === 'C' ? '868d77be' :
+    label === 'F' ? 'b50f624b' : 'fedcba98',
     expected_branch: 0,
     idle_snapshot: {world_generation: 7, world_ticks: ordinal + 1, source_frame: ordinal + 1,
       map2_gate: 0, map2_countdown: original.map2.countdown_s32, map2_phase: 0,
@@ -180,6 +207,113 @@ test('derives a proper run2 prefix and dynamic C/F seed identities from host-onl
   wrongSequence.runtime_payload.schedule[4].bundle = 1;
   assert.throws(() => deriveRun2ProperPrefix(wrongSequence.runtime_payload,
     wrongSequence.host_only), /discontinuous/);
+});
+
+test('opt-in same-producer GO+2 branch binds typed state, seed, source queue and dynamic action', () => {
+  const packet = run2Packet({go2: true});
+  const evidence = hostEvidenceFromPacket(packet);
+  assert.equal(evidence.mode, 'run2-proper-prefix-v2');
+  assert.equal(evidence.runtimePayload.schedule.length, 8);
+  assert.equal(evidence.go2ActionIndex, 6);
+  assert.deepEqual(evidence.coordinates, {cTick: 1, fTick: 2, goSequence: 100,
+    cSequence: 105, fSequence: 110, goDraw: 1, cDraw: 1, fDraw: 2,
+    go2Sequence: 115, go2Tick: 3, go2Draw: 3});
+  assert.equal(evidence.go2Snapshot.label, 'GO2');
+  assert.equal(evidence.originalSeeds.GO2, 'fedcba98');
+  assert.deepEqual(evidence.go2QueueExpectation.expected_queue_slot_status_hex,
+    packet.runtime_payload.bundles[3].ports.map(port => port.status_hex));
+  assert.throws(() => hostEvidenceFromPacket(packet, {fullSchedule: true}),
+    /scoped only to the bounded proper-prefix branch/);
+  assert.throws(() => hostEvidenceFromPacket(packet, {fullSchedule: true, commonFields: true}),
+    /scoped only to the bounded proper-prefix branch/);
+
+  const go2 = actual('GO2');
+  go2.ordinal = 3;
+  go2.idle_snapshot.world_ticks = 4;
+  go2.idle_snapshot.source_frame = 4;
+  for (const event of [go2.go_trace.stage_before, go2.go_trace.stage_after,
+    go2.go_trace.go_after]) event.world_ticks = 1;
+  const result = compareOriginalIdleSnapshot({label: 'GO2',
+    expected: evidence.go2Snapshot, expectedGo: evidence.originalSnapshots[0],
+    expectedSeedHex: evidence.originalSeeds.GO2, actual: go2,
+    coordinates: evidence.coordinates});
+  assert.equal(result.decision, 'PASS_EXACT_DECLARED_GO2_FIELDS_AND_SEED');
+  const altered = structuredClone(go2);
+  altered.seed_hex = 'fedcba99';
+  assert.equal(compareOriginalIdleSnapshot({label: 'GO2', expected: evidence.go2Snapshot,
+    expectedGo: evidence.originalSnapshots[0], expectedSeedHex: evidence.originalSeeds.GO2,
+    actual: altered, coordinates: evidence.coordinates}).decision,
+  'REFUSE_FIRST_GO2_FIELD_MISMATCH');
+
+  const callbacks = createHostCallbacks({setupApproved: () => true,
+    originalSnapshots: evidence.originalSnapshots, originalSeeds: evidence.originalSeeds,
+    coordinates: evidence.coordinates, go2Snapshot: evidence.go2Snapshot});
+  const c = actual('C'); c.ordinal = 1; c.idle_snapshot.world_ticks = 2;
+  c.idle_snapshot.source_frame = 2;
+  for (const event of [c.go_trace.stage_before, c.go_trace.stage_after, c.go_trace.go_after])
+    event.world_ticks = 1;
+  c.seed_hex = '01234567';
+  const f = actual('F'); f.ordinal = 2; f.idle_snapshot.world_ticks = 3;
+  f.idle_snapshot.source_frame = 3;
+  for (const event of [f.go_trace.stage_before, f.go_trace.stage_after, f.go_trace.go_after])
+    event.world_ticks = 1;
+  f.seed_hex = '89abcdef';
+  assert.equal(callbacks.compare('C', JSON.stringify(c)), true);
+  assert.equal(callbacks.compare('F', JSON.stringify(f)), true);
+  assert.equal(callbacks.compare('GO2', JSON.stringify(go2)), true);
+  assert.deepEqual(callbacks.receipts().map(row => row.phase), ['C', 'F', 'GO2']);
+
+  const wrongProducer = structuredClone(packet);
+  wrongProducer.host_only.source_identity.go2_reference.input_stream_sha256 = 'd'.repeat(64);
+  assert.throws(() => hostEvidenceFromPacket(wrongProducer), /same-producer provenance/);
+  const wrongQueue = structuredClone(packet);
+  wrongQueue.host_only.expected_state.GO2.source_queue.queue_slot_status_hex[3] = '00'.repeat(11);
+  assert.throws(() => hostEvidenceFromPacket(wrongQueue), /literal scheduled four-port input/);
+});
+
+test('GO+2 strict driver compares the actual HSD queue and rejects byte drift', async () => {
+  const evidence = hostEvidenceFromPacket(run2Packet({go2: true}));
+  const mkDriver = approvals => {
+    const driver = new StadiumSetupCfActionDriver({runtimePayload: evidence.runtimePayload,
+      admittedWorldGeneration: 7, go2QueueExpectation: evidence.go2QueueExpectation,
+      native: {arm: async () => 1, queue: async () => 1,
+        approve: async (_index, accepted) => { approvals.push(accepted); return 1; }}});
+    driver.armed = true; driver.cursor = evidence.go2ActionIndex; driver.pending = true;
+    driver.sourceFrame = 3;
+    return driver;
+  };
+  const nativeReceipt = () => {
+    const statuses = evidence.go2QueueExpectation.expected_queue_slot_status_hex;
+    const bundleHex = evidence.runtimePayload.bundles[3].ports.map(port => port.status_hex).join('');
+    return {failed: false, last_action: {complete: true, schedule_index: 6,
+      action: 'tick', ordinal: 3, bundle: 3, source_ticks_before: 3, source_ticks_after: 4,
+      source_draws_before: 3, source_draws_after: 3, world_ticks: 4,
+      world_generation: 7,
+      source_tick_input_pad_hex: bundleHex, source_frames_before: 3, source_frames_after: 4,
+      source_frames: 4, go2_state_observation: {idle_snapshot: {source_frame: 4}},
+      pad_hsd_queue_observation: {schema: 'melee-web-stadium-hsd-pad-queue-observation',
+        version: 2, source_generation: 7, source_tick_before: 3, source_tick_after: 4,
+        qnum_before: 1, qread_before: 0, qcount_before: 1, qcount_after_hsd: 0,
+        player_count: 2, tick_complete: true,
+        players: [{player_index: 0, setup_port_1based: 1, source_slot_index: 0,
+          controller_index: 0, start_slot_field_raw: 0},
+        {player_index: 1, setup_port_1based: 2, source_slot_index: 1,
+          controller_index: 1, start_slot_field_raw: 0}],
+        queue_slot_status_hex: statuses}}};
+  };
+  const hostComparison = {phase: 'GO2', decision: 'PASS_EXACT_DECLARED_GO2_FIELDS_AND_SEED'};
+  const approvals = [];
+  const driver = mkDriver(approvals);
+  assert.equal(await driver.accept(nativeReceipt(), hostComparison), true);
+  assert.deepEqual(approvals, [true]);
+
+  const rejectedApprovals = [];
+  const rejected = mkDriver(rejectedApprovals);
+  const mismatch = nativeReceipt();
+  mismatch.last_action.pad_hsd_queue_observation.queue_slot_status_hex[3] = '00'.repeat(11);
+  assert.equal(await rejected.accept(mismatch, hostComparison), false);
+  assert.deepEqual(rejectedApprovals, [false]);
+  assert.match(rejected.status().first_error, /GO\+2 HSD queue/);
 });
 
 test('encodes and gates each v2 manifest action with independent counters and C/F approval', async () => {
@@ -579,7 +713,8 @@ test('browser caller forwards the strict queue gate and checked Setup generation
   assert.ok(driverCall, 'actual browser harness driver construction is present');
   assert.match(driverCall, /requiredQueueObservation:\s*hostEvidence\.requiredQueueObservation/);
   assert.match(driverCall,
-    /admittedWorldGeneration:\s*\(commonFieldsMode \|\| hostEvidence\.requiredQueueObservation\)\s*\?\s*admittedWorldGeneration\s*:\s*null/);
+    /admittedWorldGeneration:\s*\(commonFieldsMode \|\| hostEvidence\.requiredQueueObservation \|\|\s*hostEvidence\.go2QueueExpectation\)\s*\?\s*admittedWorldGeneration\s*:\s*null/);
+  assert.match(driverCall, /go2QueueExpectation:\s*hostEvidence\.go2QueueExpectation\s*\?\?\s*null/);
   assert.match(source, /const admittedWorldGeneration = setupNative\.first_sss_vs_setup\.match_world_generation/);
 });
 
@@ -838,4 +973,7 @@ test('native source clock predicate and owner wiring preserve separate wait/acti
   assert.doesNotMatch(owner, /match->source_frames\(\)==expected_ticks/);
   assert.match(source, /matched_setup_cf_clock_transition\(tick_action,state.queued_source_frame_before,/);
   assert.match(source, /state.idle.source_frame==state.last_source_frame_after/);
+  assert.match(source,
+    /state\.version2&&!state\.full_schedule&&!state\.common_fields&&tick_action&&\s*ordinal==c_tick\+2/,
+    'GO+2 diagnostic serialization is restricted to its explicit bounded proper-prefix mode');
 });

@@ -78,8 +78,36 @@ def remove_consume_for_tick(data: bytes, status: dict, target_tick: int) -> tupl
     return b"".join(kept), altered_status
 
 
+def remove_go2_seed_slices(data: bytes) -> bytes:
+    output = []
+    go_tick = None
+    removed = 0
+    for h, b in idle.literal_frames(data):
+        row = wire._decode_record(h, b, "GO+2 seed compatibility fixture")
+        payload = row["payload"]
+        if row["event"] == "progress" and payload.get("phase") == "go_after":
+            go_tick = row["source_tick"]
+        elif (go_tick is not None and row["event"] == "boundary" and
+              payload.get("boundary") == "source_tick" and
+              row["source_tick"] == go_tick + 2):
+            slices = payload.get("slices", [])
+            retained = [item for item in slices if item.get("tag") not in (19, 20)]
+            removed = len(slices) - len(retained)
+            rebuilt = idle.frame(6, row["source_tick"], retained)
+            rebuilt_header, b = idle.literal_frames(rebuilt)[0]
+            h = list(h)
+            h[-2:] = rebuilt_header[-2:]
+            h = tuple(h)
+        output.append((h, b))
+    if removed != 2:
+        raise AssertionError(f"expected two GO+2 RNG slices to remove, removed {removed}")
+    return b"".join(idle.stored_frame(h, b, sequence=index, replacement_payload=b)
+                    for index, (h, b) in enumerate(output))
+
+
 class StadiumGoOrdinal2ReferenceTests(unittest.TestCase):
-    def validate(self, data, status, input_data=None, input_status=None):
+    def validate(self, data, status, input_data=None, input_status=None, *,
+                 include_go2_state=False):
         with tempfile.TemporaryDirectory(prefix="stadium-go-ordinal2-") as directory:
             root = Path(directory)
             observer = root / "observer.bin"
@@ -96,7 +124,8 @@ class StadiumGoOrdinal2ReferenceTests(unittest.TestCase):
             return validate_stadium_go_ordinal2_reference(
                 observer, input_path=native, input_status_path=native_status,
                 expected_setup_receipt_sha256=EXPECTED_SETUP_RECEIPT_SHA256,
-                status_path=observer_status), observer
+                status_path=observer_status,
+                include_go2_state=include_go2_state), observer
 
     def test_fresh_record_go2_retains_actual_queue_and_source_state(self):
         data, status = go2_fixture()
@@ -118,6 +147,37 @@ class StadiumGoOrdinal2ReferenceTests(unittest.TestCase):
                     r"GO\+2 declaration differs from explicit validation scope"):
                 validate_stadium_go_prefix(path, constructor_observations=True,
                                            status_path=status_path)
+
+    def test_default_reference_does_not_decode_go2_seed_but_explicit_branch_requires_it(self):
+        data, status = go2_fixture()
+        without_go2_seed = remove_go2_seed_slices(data)
+        legacy, _ = self.validate(without_go2_seed, status)
+        self.assertEqual(legacy["version"], 1)
+        self.assertNotIn("go2_declared_state", legacy["consumed_queue_state"])
+        with self.assertRaisesRegex(StadiumGoPrefixError,
+                                    r"GO\+2 RNG pointer: expected one tag=19 flags=0x0"):
+            self.validate(without_go2_seed, status, include_go2_state=True)
+
+    def test_explicit_go2_comparison_branch_exports_typed_fields_seed_and_literal_queue(self):
+        data, status = go2_fixture()
+        result, _ = self.validate(data, status, include_go2_state=True)
+        self.assertEqual(result["version"], 2)
+        self.assertEqual(result["decision"],
+                         "PASS_FRESH_RECORD_GO_ORDINAL2_TYPED_STATE_REFERENCE_ONLY")
+        go2 = result["consumed_queue_state"]["go2_declared_state"]
+        self.assertEqual(go2["schema"], "melee-web-original-stadium-go2-declared-state")
+        self.assertEqual(go2["typed_fields"]["label"], "GO2")
+        expected_tick = result["consumed_queue_state"]["go_source_tick_C"] + 2
+        self.assertEqual(go2["typed_fields"]["source_tick"], expected_tick)
+        self.assertEqual(go2["seed_observation"]["source_tick"], expected_tick)
+        self.assertEqual(go2["source_queue"]["source_tick"], expected_tick)
+        self.assertEqual(go2["source_queue"]["queue_slot_status_hex"], [
+            "0000000000000000000000", "0000000000000000000000",
+            "00000000000000000000ff", "00000000000000000000ff"])
+        self.assertEqual(go2["provenance"]["source_stream_sha256"],
+                         result["route"]["stream_sha256"])
+        self.assertEqual(go2["provenance"]["input_stream_sha256"],
+                         result["input_stream"]["sha256"])
 
     def test_target_and_actual_consume_are_mandatory(self):
         missing_target, status = go2_fixture(end_ordinal=1)

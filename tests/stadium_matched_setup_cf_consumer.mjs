@@ -106,6 +106,7 @@ export function deriveRun2ProperPrefix(runtimePayload, hostOnly) {
   if (state.GO.raw_identity.phase !== 'go_after') throw new TypeError('run2 GO marker differs');
   const c = run2Coordinate(state.C, 'C', 'boundary', 'source_tick');
   const f = run2Coordinate(state.F, 'F', 'boundary', 'source_tick');
+  const go2 = state.GO2 ?? null;
   if (c.sequence === f.sequence || c.source_tick !== go.source_tick ||
       f.source_tick !== c.source_tick + 1 ||
       c.draw_ordinal !== go.draw_ordinal)
@@ -120,6 +121,59 @@ export function deriveRun2ProperPrefix(runtimePayload, hostOnly) {
         !/^[0-9a-f]{8}$/.test(row.seed_hex ?? '') ||
         !/^[0-9a-f]{8}$/.test(row.pointer_hex ?? ''))
       throw new TypeError(`run2 ${row.label} seed row differs from its typed raw source identity`);
+  }
+  let go2ActionIndex = null;
+  let go2Expected = null;
+  if (go2 !== null) {
+    const raw = go2.raw_identity;
+    const fields = go2.typed_fields;
+    const provenance = go2.provenance;
+    const sourceQueue = go2.source_queue;
+    const reference = hostOnly.source_identity?.go2_reference;
+    if (go2.schema !== 'melee-web-original-stadium-go2-declared-state' ||
+        go2.version !== 1 || go2.decision !== 'PASS_SOURCE_TYPED_FIELDS_ONLY' ||
+        go2.scope !== 'One actual GO-relative ordinal-2 SourceTick typed snapshot and direct seed bytes; no pointer comparison or whole-state parity.' ||
+        !raw || raw.event !== 'boundary' || raw.boundary !== 'source_tick' ||
+        !Number.isSafeInteger(raw.sequence) || raw.source_tick !== f.source_tick + 1 ||
+        raw.source_tick !== c.source_tick + 2 || raw.draw_ordinal !== c.draw_ordinal + 2 ||
+        !fields || fields.label !== 'GO2' || fields.sequence !== raw.sequence ||
+        fields.source_tick !== raw.source_tick || fields.draw_ordinal !== raw.draw_ordinal ||
+        !fields.map2 || !fields.display || fields.map_root_allocation_lifetime_proved !== false ||
+        fields.map_root_object_type_observed !== false ||
+        provenance?.scope !== 'same fresh native producer and its own complete MWRI record' ||
+        !/^[0-9a-f]{64}$/.test(provenance.source_stream_sha256 ?? '') ||
+        !/^[0-9a-f]{64}$/.test(provenance.input_stream_sha256 ?? '') ||
+        !/^[0-9a-f]{64}$/.test(provenance.setup_receipt_sha256 ?? '') ||
+        !reference || reference.schema !== 'melee-web-stadium-go2-source-reference-v1' ||
+        reference.source_stream_sha256 !== provenance.source_stream_sha256 ||
+        reference.input_stream_sha256 !== provenance.input_stream_sha256 ||
+        reference.setup_receipt_sha256 !== provenance.setup_receipt_sha256)
+      throw new TypeError('run2 GO+2 typed state or same-producer provenance is malformed');
+    const seed = go2.seed_observation;
+    if (!seed || seed.sequence !== raw.sequence || seed.event !== 'boundary' ||
+        seed.boundary !== 'source_tick' || seed.source_tick !== raw.source_tick ||
+        seed.draw_ordinal !== raw.draw_ordinal || seed.pointer_slot_address !== 0x804D5F94 ||
+        !/^[0-9a-f]{8}$/.test(seed.pointer_raw_hex ?? '') ||
+        Number.parseInt(seed.pointer_raw_hex, 16) !== seed.seed_address ||
+        !/^[0-9a-f]{8}$/.test(seed.seed_hex ?? '') ||
+        seed.pointer_equals_seed_address !== true)
+      throw new TypeError('run2 GO+2 seed observation is malformed or detached from its SourceTick');
+    if (!sourceQueue || sourceQueue.source_tick !== raw.source_tick ||
+        sourceQueue.draw_ordinal !== raw.draw_ordinal ||
+        !Number.isSafeInteger(sourceQueue.consume_sequence) ||
+        !Array.isArray(sourceQueue.queue_slot_status_hex) ||
+        sourceQueue.queue_slot_status_hex.length !== 4 ||
+        sourceQueue.queue_slot_status_hex.some(value => !/^[0-9a-f]{22}$/.test(value)))
+      throw new TypeError('run2 GO+2 source queue is malformed');
+    go2ActionIndex = payload.schedule.findIndex(action =>
+      action.action === 'tick' && action.bundle === raw.source_tick);
+    if (go2ActionIndex < 0 || payload.schedule[go2ActionIndex]?.action !== 'tick' ||
+        payload.schedule[go2ActionIndex - 1]?.action !== 'draw' ||
+        payload.schedule[go2ActionIndex + 1]?.action !== 'draw' ||
+        sourceQueue.queue_slot_status_hex.join(',') !==
+          payload.bundles[raw.source_tick]?.ports?.map(port => port.status_hex).join(','))
+      throw new TypeError('run2 GO+2 source row is not the literal scheduled four-port input');
+    go2Expected = go2;
   }
   const cIndex = payload.schedule.findIndex(action => action.action === 'tick' && action.bundle === c.source_tick);
   const fIndex = payload.schedule.findIndex(action => action.action === 'tick' && action.bundle === f.source_tick);
@@ -142,7 +196,9 @@ export function deriveRun2ProperPrefix(runtimePayload, hostOnly) {
       c_source_tick: c.source_tick, f_source_tick: f.source_tick,
       terminal_action_index: terminalIndex, terminal_draw_ordinal: terminal.draw}};
   return {prefix, c, f, go, expectedState: state,
-    expectedSeeds: {C: seedRows[0].seed_hex, F: seedRows[1].seed_hex}};
+    expectedSeeds: {C: seedRows[0].seed_hex, F: seedRows[1].seed_hex,
+      ...(go2 ? {GO2: go2.seed_observation.seed_hex} : {})},
+    go2Expected, go2ActionIndex};
 }
 
 export function deriveRun2FullSchedule(runtimePayload, hostOnly) {
@@ -666,18 +722,22 @@ function requiredBoolean(value, label) {
 
 export function compareOriginalIdleSnapshot({label, expected, expectedGo, expectedSeedHex, actual,
   coordinates = null}) {
-  if (!['C', 'F'].includes(label)) throw new TypeError('only C and F are comparable boundaries');
+  if (!['C', 'F', 'GO2'].includes(label))
+    throw new TypeError('only C, F, and the explicit GO+2 checkpoint are comparable boundaries');
   if (!expected || expected.label !== label || !expectedGo || expectedGo.label !== 'GO' ||
       !actual || typeof actual !== 'object')
     throw new TypeError(`${label} comparison lacks its exact host-only source records`);
   const dynamic = coordinates ?? {cTick: 84, fTick: 85, goSequence: 2925,
     cSequence: 2926, fSequence: 2931, goDraw: 84, cDraw: 84, fDraw: 85};
-  const ordinal = label === 'C' ? dynamic.cTick : dynamic.fTick;
-  const drawOrdinal = label === 'C' ? dynamic.cDraw : dynamic.fDraw;
+  if (label === 'GO2' && (!Number.isSafeInteger(dynamic.go2Tick) ||
+      !Number.isSafeInteger(dynamic.go2Sequence) || !Number.isSafeInteger(dynamic.go2Draw)))
+    throw new TypeError('GO+2 comparison lacks its packet-bound dynamic source coordinates');
+  const ordinal = label === 'C' ? dynamic.cTick : label === 'F' ? dynamic.fTick : dynamic.go2Tick;
+  const drawOrdinal = label === 'C' ? dynamic.cDraw : label === 'F' ? dynamic.fDraw : dynamic.go2Draw;
   const goSequence = requiredInteger(expectedGo.sequence, 'original GO event sequence');
   const rowSequence = requiredInteger(expected.sequence, `${label} original state sequence`);
   if (goSequence !== dynamic.goSequence ||
-      rowSequence !== (label === 'C' ? dynamic.cSequence : dynamic.fSequence) ||
+      rowSequence !== (label === 'C' ? dynamic.cSequence : label === 'F' ? dynamic.fSequence : dynamic.go2Sequence) ||
       expectedGo.source_tick !== dynamic.cTick || expectedGo.draw_ordinal !== dynamic.goDraw ||
       expected.source_tick !== ordinal ||
       expected.draw_ordinal !== drawOrdinal || actual.ordinal !== ordinal || actual.label !== label)
@@ -750,10 +810,15 @@ export function compareOriginalIdleSnapshot({label, expected, expectedGo, expect
       actual: go ?? null};
 
   const approved = mismatch === null;
+  const schema = label === 'GO2' ? 'melee-web-stadium-go2-declared-comparison-v1'
+    : 'melee-web-stadium-matched-setup-cf-comparison-v1';
+  const passDecision = label === 'GO2' ? 'PASS_EXACT_DECLARED_GO2_FIELDS_AND_SEED'
+    : 'PASS_EXACT_DECLARED_C_F_FIELDS';
   return {
-    schema: 'melee-web-stadium-matched-setup-cf-comparison-v1',
+    schema,
     phase: label,
-    decision: approved ? 'PASS_EXACT_DECLARED_C_F_FIELDS' : 'REFUSE_FIRST_C_F_FIELD_MISMATCH',
+    decision: approved ? passDecision : label === 'GO2'
+      ? 'REFUSE_FIRST_GO2_FIELD_MISMATCH' : 'REFUSE_FIRST_C_F_FIELD_MISMATCH',
     compared_fields: fields,
     first_mismatch: mismatch,
     unpaired: {
@@ -777,15 +842,22 @@ export function compareOriginalIdleSnapshot({label, expected, expectedGo, expect
   };
 }
 
-export function createHostCallbacks({setupApproved, originalSnapshots, originalSeeds, coordinates = null}) {
+export function createHostCallbacks({setupApproved, originalSnapshots, originalSeeds, coordinates = null,
+  go2Snapshot = null}) {
   if (typeof setupApproved !== 'function') throw new TypeError('strict Setup approval callback is required');
   if (!Array.isArray(originalSnapshots) || originalSnapshots.length !== 3 ||
       originalSnapshots.some(snapshot => !snapshot || !['GO', 'C', 'F'].includes(snapshot.label)))
     throw new TypeError('host-only original GO/C/F state records are required exactly once');
   const byLabel = new Map(structuredClone(originalSnapshots).map(snapshot => [snapshot.label, snapshot]));
   const seeds = new Map(Object.entries(originalSeeds ?? {}));
+  const hasGo2 = go2Snapshot !== null;
+  if (hasGo2 && (!go2Snapshot || go2Snapshot.label !== 'GO2' ||
+      !Number.isSafeInteger(go2Snapshot.sequence) ||
+      !Number.isSafeInteger(go2Snapshot.source_tick) ||
+      !Number.isSafeInteger(go2Snapshot.draw_ordinal) || !seeds.has('GO2')))
+    throw new TypeError('explicit GO+2 checkpoint and seed are malformed');
   if (byLabel.size !== 3 || !['C', 'F'].every(label => seeds.has(label)) ||
-      [...seeds.keys()].some(label => !['C', 'F'].includes(label)))
+      [...seeds.keys()].some(label => !['C', 'F', ...(hasGo2 ? ['GO2'] : [])].includes(label)))
     throw new TypeError('host-only original GO/C/F state and observed C/F RNG evidence are required');
   const receipts = [];
   let nextBoundary = 'C';
@@ -796,24 +868,32 @@ export function createHostCallbacks({setupApproved, originalSnapshots, originalS
       if (refused) return false;
       if (phase !== nextBoundary) {
         refused = true;
-        receipts.push({schema: 'melee-web-stadium-matched-setup-cf-comparison-v1',
-          phase, decision: 'REFUSE_C_F_ORDER', expected_phase: nextBoundary});
+        receipts.push({schema: phase === 'GO2'
+          ? 'melee-web-stadium-go2-declared-comparison-v1'
+          : 'melee-web-stadium-matched-setup-cf-comparison-v1',
+          phase, decision: phase === 'GO2' ? 'REFUSE_GO2_ORDER' : 'REFUSE_C_F_ORDER',
+          expected_phase: nextBoundary});
         return false;
       }
       try {
         const actual = JSON.parse(actualJson);
+        const expected = phase === 'GO2' ? go2Snapshot : byLabel.get(phase);
         const receipt = compareOriginalIdleSnapshot({label: phase,
-          expected: byLabel.get(phase), expectedGo: byLabel.get('GO'),
+          expected, expectedGo: byLabel.get('GO'),
           expectedSeedHex: seeds.get(phase), actual, coordinates});
         receipts.push(receipt);
-        const accepted = receipt.decision === 'PASS_EXACT_DECLARED_C_F_FIELDS';
-        if (accepted) nextBoundary = phase === 'C' ? 'F' : 'complete';
+        const accepted = receipt.decision === (phase === 'GO2'
+          ? 'PASS_EXACT_DECLARED_GO2_FIELDS_AND_SEED' : 'PASS_EXACT_DECLARED_C_F_FIELDS');
+        if (accepted) nextBoundary = phase === 'C' ? 'F' : phase === 'F' && hasGo2 ? 'GO2' : 'complete';
         else refused = true;
         return accepted;
       } catch (error) {
         refused = true;
-        receipts.push({schema: 'melee-web-stadium-matched-setup-cf-comparison-v1',
-          phase, decision: 'REFUSE_INVALID_C_F_RECEIPT', error: String(error)});
+        receipts.push({schema: phase === 'GO2'
+          ? 'melee-web-stadium-go2-declared-comparison-v1'
+          : 'melee-web-stadium-matched-setup-cf-comparison-v1',
+          phase, decision: phase === 'GO2' ? 'REFUSE_INVALID_GO2_RECEIPT'
+            : 'REFUSE_INVALID_C_F_RECEIPT', error: String(error)});
         return false;
       }
     },
@@ -968,6 +1048,8 @@ export function hostEvidenceFromRun2Packet(packet, {fullSchedule = false, common
       hostOnly.expected_state?.comparison_scope?.setup_profile_verified_by_observer !== false ||
       hostOnly.expected_state?.comparison_scope?.profile_equivalence?.startsWith('pending') !== true)
     throw new TypeError('run2 host-only source identity or evidence scope differs');
+  if ((fullSchedule || commonFields) && hostOnly.expected_state.GO2 !== undefined)
+    throw new TypeError('GO+2 declared-state comparison is scoped only to the bounded proper-prefix branch');
   const derived = fullSchedule ? deriveRun2FullSchedule(packet.runtime_payload, hostOnly)
     : deriveRun2ProperPrefix(packet.runtime_payload, hostOnly);
   const normalize = label => {
@@ -996,6 +1078,24 @@ export function hostEvidenceFromRun2Packet(packet, {fullSchedule = false, common
   const go = {label: 'GO', sequence: goRaw.sequence, source_tick: goRaw.source_tick,
     draw_ordinal: goRaw.draw_ordinal};
   const snapshots = [go, normalize('C'), normalize('F')];
+  let go2Snapshot = null, go2QueueExpectation = null;
+  if (derived.go2Expected) {
+    const state = derived.go2Expected;
+    const raw = state.raw_identity;
+    const fields = state.typed_fields;
+    go2Snapshot = {label: 'GO2', sequence: raw.sequence, source_tick: raw.source_tick,
+      draw_ordinal: raw.draw_ordinal, map2: fields.map2, display: fields.display,
+      title: fields.title, map_root_allocation_lifetime_proved:
+        fields.map_root_allocation_lifetime_proved,
+      map_root_object_type_observed: fields.map_root_object_type_observed};
+    go2QueueExpectation = {
+      schema: 'melee-web-stadium-go2-queue-expectation-v1',
+      source_sequence: state.source_queue.consume_sequence,
+      source_tick: raw.source_tick, draw_ordinal: raw.draw_ordinal,
+      expected_queue_slot_status_hex: [...state.source_queue.queue_slot_status_hex],
+      expected_players: structuredClone(HSD_QUEUE_EXPECTED_PLAYERS),
+    };
+  }
   const commonFieldRowsByAction = commonFields
     ? deriveRun2CommonTickExpectations(packet.runtime_payload, hostOnly) : null;
   const commonRowsByAction = commonFields
@@ -1003,9 +1103,12 @@ export function hostEvidenceFromRun2Packet(packet, {fullSchedule = false, common
       commonFieldRowsByAction, seedSidecar, seedIdentity) : null;
   const coordinates = {cTick: derived.c.source_tick, fTick: derived.f.source_tick,
     goSequence: go.sequence, cSequence: derived.c.sequence, fSequence: derived.f.sequence,
-    goDraw: go.draw_ordinal, cDraw: derived.c.draw_ordinal, fDraw: derived.f.draw_ordinal};
+    goDraw: go.draw_ordinal, cDraw: derived.c.draw_ordinal, fDraw: derived.f.draw_ordinal,
+    ...(go2Snapshot ? {go2Sequence: go2Snapshot.sequence,
+      go2Tick: go2Snapshot.source_tick, go2Draw: go2Snapshot.draw_ordinal} : {})};
   return {runtimePayload: derived.prefix, sourceRuntimePayload: packet.runtime_payload,
     originalSnapshots: snapshots, originalSeeds: derived.expectedSeeds, coordinates,
+    go2Snapshot, go2QueueExpectation, go2ActionIndex: derived.go2ActionIndex,
     checkpoints: derived.prefix.checkpoints,
     mode: commonFields ? 'run2-full-common-fields-seed-v1' :
       fullSchedule ? 'run2-full-schedule-v3' : 'run2-proper-prefix-v2',
@@ -1019,7 +1122,8 @@ function bundleBytes(bundle) {
 
 export class StadiumSetupCfActionDriver {
   constructor({runtimePayload, native, commonFields = false, commonRowsByAction = null,
-    admittedWorldGeneration = null, requiredQueueObservation = null}) {
+    admittedWorldGeneration = null, requiredQueueObservation = null,
+    go2QueueExpectation = null}) {
     if (typeof commonFields !== 'boolean' || (commonFields &&
         runtimePayload?.schema !== 'melee-web-stadium-run2-full-schedule-v3'))
       throw new TypeError('Per-tick common fields require an explicit full-schedule manifest');
@@ -1029,7 +1133,7 @@ export class StadiumSetupCfActionDriver {
       ? 'run2-proper-prefix-v2' : 'legacy-v1';
     this.commonFields = commonFields;
     this.commonRowsByAction = commonFields ? commonRowsByAction : null;
-    const generationBound = commonFields || requiredQueueObservation !== null;
+    const generationBound = commonFields || requiredQueueObservation !== null || go2QueueExpectation !== null;
     if (generationBound && (!Number.isSafeInteger(admittedWorldGeneration) || admittedWorldGeneration <= 0))
       throw new TypeError('Per-tick common fields or queue observation require the positive safe generation from checked Setup');
     this.admittedWorldGeneration = generationBound ? admittedWorldGeneration : null;
@@ -1062,6 +1166,28 @@ export class StadiumSetupCfActionDriver {
     }
     this.requiredQueueObservation = requiredQueueObservation === null ? null
       : validateRequiredQueueObservation(requiredQueueObservation, this.payload);
+    this.go2QueueExpectation = null;
+    if (go2QueueExpectation !== null) {
+      exactKeys(go2QueueExpectation, ['draw_ordinal', 'expected_players',
+        'expected_queue_slot_status_hex', 'schema', 'source_sequence', 'source_tick'],
+      'GO+2 queue expectation');
+      const actionIndex = this.payload.schedule.findIndex(action =>
+        action.action === 'tick' && action.bundle === go2QueueExpectation.source_tick);
+      if (go2QueueExpectation.schema !== 'melee-web-stadium-go2-queue-expectation-v1' ||
+          !Number.isSafeInteger(go2QueueExpectation.source_sequence) ||
+          go2QueueExpectation.source_tick !== go2QueueExpectation.draw_ordinal ||
+          !Array.isArray(go2QueueExpectation.expected_queue_slot_status_hex) ||
+          go2QueueExpectation.expected_queue_slot_status_hex.length !== 4 ||
+          go2QueueExpectation.expected_queue_slot_status_hex.some(value =>
+            typeof value !== 'string' || !/^[0-9a-f]{22}$/.test(value)) ||
+          !queueObservationPlayersMatch(go2QueueExpectation.expected_players, HSD_QUEUE_EXPECTED_PLAYERS) ||
+          actionIndex < 0 || this.payload.schedule[actionIndex - 1]?.action !== 'draw' ||
+          this.payload.schedule[actionIndex + 1]?.action !== 'draw' ||
+          this.payload.bundles[go2QueueExpectation.source_tick]?.ports?.map(port => port.status_hex).join(',') !==
+            go2QueueExpectation.expected_queue_slot_status_hex.join(','))
+        throw new TypeError('GO+2 queue expectation is not the exact same-producer scheduled four-port row');
+      this.go2QueueExpectation = {...structuredClone(go2QueueExpectation), action_index: actionIndex};
+    }
     if (!native || typeof native.arm !== 'function' || typeof native.queue !== 'function' ||
         typeof native.approve !== 'function')
       throw new TypeError('bounded native arm/queue/approval API is required');
@@ -1162,6 +1288,8 @@ export class StadiumSetupCfActionDriver {
     const cIndex = this.mode === 'legacy-v1' ? 168 : this.payload.checkpoints.c_action_index;
     const fIndex = this.mode === 'legacy-v1' ? 170 : this.payload.checkpoints.f_action_index;
     const isBoundary = action.action === 'tick' && (this.cursor === cIndex || this.cursor === fIndex);
+    const isGo2 = this.go2QueueExpectation !== null &&
+      action.action === 'tick' && this.cursor === this.go2QueueExpectation.action_index;
     let refusal = null;
     if (this.requiredQueueObservation && action.action === 'tick' &&
         action.bundle === this.requiredQueueObservation.bundle) {
@@ -1182,6 +1310,24 @@ export class StadiumSetupCfActionDriver {
             status !== this.requiredQueueObservation.expected_queue_slot_status_hex[index]))
         refusal = 'HSD queue-slot observation, Setup map, world generation, or completed tick differs';
     }
+    if (isGo2) {
+      const queue = result.pad_hsd_queue_observation;
+      const expected = this.go2QueueExpectation;
+      if (action.bundle !== expected.source_tick || result.world_generation !== this.admittedWorldGeneration ||
+          queue?.schema !== HSD_QUEUE_OBSERVATION_SCHEMA ||
+          queue.version !== HSD_QUEUE_ACTUAL_OBSERVATION_VERSION ||
+          queue.source_generation !== this.admittedWorldGeneration ||
+          queue.source_tick_before !== expected.source_tick ||
+          queue.source_tick_after !== expected.source_tick + 1 ||
+          queue.qnum_before !== 1 || queue.qread_before !== 0 || queue.qcount_before !== 1 ||
+          queue.qcount_after_hsd !== 0 || queue.player_count !== expected.expected_players.length ||
+          queue.tick_complete !== true ||
+          !actualQueueObservationPlayersMatch(queue.players, expected.expected_players) ||
+          !Array.isArray(queue.queue_slot_status_hex) || queue.queue_slot_status_hex.length !== 4 ||
+          queue.queue_slot_status_hex.some((status, index) =>
+            status !== expected.expected_queue_slot_status_hex[index]))
+        refusal ??= 'GO+2 HSD queue, Setup map, admitted generation, or completed tick differs';
+    }
     if (isBoundary) {
       const expectedLabel = this.cursor === cIndex ? 'C' : 'F';
       if (this.mode !== 'legacy-v1' &&
@@ -1190,8 +1336,13 @@ export class StadiumSetupCfActionDriver {
       if (hostComparison?.phase !== expectedLabel ||
           hostComparison?.decision !== 'PASS_EXACT_DECLARED_C_F_FIELDS')
         refusal = `${expectedLabel} host comparison failed or is absent`;
+    } else if (isGo2) {
+      if (result.source_frames_after !== result.go2_state_observation?.idle_snapshot?.source_frame ||
+          hostComparison?.phase !== 'GO2' ||
+          hostComparison?.decision !== 'PASS_EXACT_DECLARED_GO2_FIELDS_AND_SEED')
+        refusal ??= 'GO+2 declared state/seed comparison or action clock binding failed';
     } else if (hostComparison !== null) {
-      refusal = 'host comparison was supplied outside C/F';
+      refusal = 'host comparison was supplied outside C/F/GO2';
     }
     if (this.mode === 'run2-full-common-fields-seed-v1') {
       const selectedTick = action.action === 'tick' && action.bundle >= 84 && action.bundle <= 3584;

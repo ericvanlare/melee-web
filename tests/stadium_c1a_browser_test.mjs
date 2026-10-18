@@ -2688,7 +2688,9 @@ async function runFirstSssVsSetup(entryNative) {
     : firstSssVsSetupCfFullSchedule
     ? 'Strict same-run Setup plus original7167-action functionalA and declaredC/F only; no recreatedB, per-ownerRNG or C3 acceptance.'
     : firstSssVsSetupCf
-    ? (report.scenario.matched_setup_cf?.mode === 'run2-proper-prefix-v2'
+    ? (report.scenario.matched_setup_cf?.go2_declared_comparison
+      ? 'Strict same-run Setup plus same-producer fresh GO+2 original queue/state/seed through its first subsequent draw; declared 15 fields and one seed compared, no whole-state or C3 acceptance.'
+      : report.scenario.matched_setup_cf?.mode === 'run2-proper-prefix-v2'
       ? 'Strict same-run Setup2503 endpoint plus the extracted run2 prefix through draw86 after dynamic C/F; no later lifetime or whole-session acceptance.'
       : 'Strict same-run Setup2503 Start/player0-3/seed endpoint plus the bounded exact matched original C/F prefix; no later match route, source draw85, or whole-session acceptance.')
     : 'Declared Setup2503 Start/player0-3/seed endpoint only; zero gameplay ticks/draws and stop before Ready/GO. Other setup fields and per-owner RNG remain unpaired.';
@@ -2974,6 +2976,14 @@ async function runMatchedSetupCfContinuation(setupNative) {
       ? 'Module.stadiumMatchedSetupNativeIdle' : null,
     input_bundles: hostEvidence.runtimePayload.bundles.length,
     setup_comparison: structuredClone(setupStatus), branch: 0,
+    go2_declared_comparison: hostEvidence.go2Snapshot ? {
+      schema: 'melee-web-stadium-go2-browser-comparison-scope-v1',
+      source_tick: hostEvidence.go2Snapshot.source_tick,
+      source_sequence: hostEvidence.go2Snapshot.sequence,
+      action_index: hostEvidence.go2ActionIndex,
+      source_queue_sequence: hostEvidence.go2QueueExpectation.source_sequence,
+      scope: 'same fresh original GO-relative tick+2: declared 15-field state, exact seed, and literal four-port HSD queue; no whole-state or C3 claim',
+    } : null,
     actions: [], host_comparisons: [], runtime_diagnostics: [], last_native_state: null,
     common_field_comparisons_attempted: commonFieldsMode ? 0 : null,
     common_field_comparisons_passed: commonFieldsMode ? 0 : null,
@@ -3046,15 +3056,18 @@ async function runMatchedSetupCfContinuation(setupNative) {
     originalSnapshots: hostEvidence.originalSnapshots,
     originalSeeds: hostEvidence.originalSeeds,
     coordinates: hostEvidence.coordinates ?? null,
+    go2Snapshot: hostEvidence.go2Snapshot ?? null,
   });
   const nativeAdapter = matchedSetupCfNativeAdapter({mode,
     explicitStep: firstSssVsSetupCfExplicitStep});
   const driver = new helper.StadiumSetupCfActionDriver({
     runtimePayload: hostEvidence.runtimePayload, native: nativeAdapter,
     commonFields: commonFieldsMode,
-    admittedWorldGeneration: (commonFieldsMode || hostEvidence.requiredQueueObservation)
+    admittedWorldGeneration: (commonFieldsMode || hostEvidence.requiredQueueObservation ||
+      hostEvidence.go2QueueExpectation)
       ? admittedWorldGeneration : null,
     requiredQueueObservation: hostEvidence.requiredQueueObservation,
+    go2QueueExpectation: hostEvidence.go2QueueExpectation ?? null,
     commonRowsByAction: commonFieldsMode ? hostEvidence.commonRowsByAction : null});
   await page.evaluate(() => {
     if (globalThis.__meleeWebStadiumFirstSssVsSetupCfApproved)
@@ -3185,14 +3198,20 @@ async function runMatchedSetupCfContinuation(setupNative) {
           : structuredClone(cfState.last_action);
         const boundary = action.action === 'tick' &&
           (scheduleIndex === cIndex || scheduleIndex === fIndex);
+        const go2Boundary = hostEvidence.go2Snapshot !== null &&
+          action.action === 'tick' && scheduleIndex === hostEvidence.go2ActionIndex;
         let comparison = null;
-        if (boundary) {
-          const label = scheduleIndex === cIndex ? 'C' : 'F';
+        if (boundary || go2Boundary) {
+          const label = go2Boundary ? 'GO2' : scheduleIndex === cIndex ? 'C' : 'F';
           const compareOperation = () => {
-            const accepted = hostCallbacks.compare(label, JSON.stringify(actionReceipt.observation));
+            const snapshot = go2Boundary ? actionReceipt.go2_state_observation
+              : actionReceipt.observation;
+            const accepted = hostCallbacks.compare(label, JSON.stringify(snapshot));
             comparison = hostCallbacks.receipts().at(-1) ?? null;
             cf.host_comparisons.push(comparison);
-            assert.equal(accepted, comparison?.decision === 'PASS_EXACT_DECLARED_C_F_FIELDS',
+            const wanted = label === 'GO2' ? 'PASS_EXACT_DECLARED_GO2_FIELDS_AND_SEED'
+              : 'PASS_EXACT_DECLARED_C_F_FIELDS';
+            assert.equal(accepted, comparison?.decision === wanted,
               `${label} callback acceptance differs from its strict host receipt`);
           };
           if (timingSample)
@@ -3255,7 +3274,7 @@ async function runMatchedSetupCfContinuation(setupNative) {
         } else {
           await checkRuntimeDiagnostics(scheduleIndex, `${action.action}-after-ack`, cfState);
         }
-        if (scheduleIndex % 16 === 15 || boundary || !accepted) await persistReport();
+        if (scheduleIndex % 16 === 15 || boundary || go2Boundary || !accepted) await persistReport();
         if (timingSample) {
           timedActionSync(timingSample, 'accept_validation', null, () =>
             assert.equal(accepted, true,
@@ -3315,6 +3334,7 @@ async function runMatchedSetupCfContinuation(setupNative) {
     }
     cf.decision = commonFieldsMode ? 'PASS_ORIGINAL_FULL7167_3501_TICK_15_COMMON_FIELDS_AND_SEED_C_F_GO'
       : fullScheduleMode ? 'PASS_ORIGINAL_FULL7167_FUNCTIONAL_A_C_F_ONLY'
+      : hostEvidence.go2Snapshot ? 'PASS_RUN2_PROPER_PREFIX_C_F_AND_GO2_DECLARED_STATE_SEED_QUEUE_ONLY'
       : isV2 ? 'PASS_RUN2_PROPER_PREFIX_C_F_STATE_ONLY'
       : 'PASS_MATCHED_SETUP_CF_C_AND_F_STATE_ONLY';
     cf.actions_completed = cf.actions.length;
