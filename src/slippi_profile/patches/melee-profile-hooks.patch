@@ -237,3 +237,33 @@ diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
          break;
      }
  }
+diff --git a/src/melee/ft/kinds/ftCommon/ftCo_SquatRv.c b/src/melee/ft/kinds/ftCommon/ftCo_SquatRv.c
+--- a/src/melee/ft/kinds/ftCommon/ftCo_SquatRv.c
++++ b/src/melee/ft/kinds/ftCommon/ftCo_SquatRv.c
+@@ -5,6 +5,10 @@
+ #include <melee/ft/forward.h>
+ 
+ #include <stdbool.h>
++
++#ifdef MELEE_WEB_SLIPPI_PROFILE
++#include <slippi_profile/ucf_dbooc_fix.h>
++#endif
+ 
+ #include "forward.h"
+ #include "ftCo_AppealS.h"
+@@ -31,7 +35,15 @@
+ melee_source_bool ftCo_SquatRv_CheckInput(Fighter_GObj* gobj)
+ {
+     Fighter* fp = GET_FIGHTER(gobj);
++#ifdef MELEE_WEB_SLIPPI_PROFILE
++    const float squat_reversal_threshold =
++        slippi_profile_ucf_dbooc_squat_reversal_threshold(
++            fp->input.lstick[0].x, fp->input.lstick[0].y,
++            fp->x670_timer_lstick_tilt_x, p_ftCommonData->x94);
++    if (fp->input.lstick[0].y > -squat_reversal_threshold) {
++#else
+     if (fp->input.lstick[0].y > -p_ftCommonData->x94) {
++#endif
+         ftCo_SquatRv_Enter(gobj);
+         return true;
+     }

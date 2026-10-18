@@ -48,9 +48,9 @@ void HSD_JObjSetupMatrixSub(HSD_JObj *jobj)
 static void test_draw_policy(void)
 {
     const SlippiProfileIdentity profile =
-        SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_V3;
+        SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_DBOOC_V4;
     assert(strcmp(slippi_profile_identity_name(profile),
-                  "slippi-render-dependencies-v3") == 0);
+                  "slippi-render-dependencies-dbooc-v4") == 0);
     assert(slippi_profile_source_draw_decision(profile, SLIPPI_TICK_PRESENT) ==
            SLIPPI_SOURCE_DRAW_ALLOW);
     assert(slippi_profile_source_draw_decision(profile, SLIPPI_TICK_CORRECTION) ==
@@ -60,7 +60,15 @@ static void test_draw_policy(void)
            SLIPPI_SOURCE_DRAW_ERROR);
     assert(slippi_profile_identity_name((SlippiProfileIdentity)99) == NULL);
     assert(slippi_profile_identity_name((SlippiProfileIdentity)1) == NULL);
+    assert(slippi_profile_identity_name((SlippiProfileIdentity)2) == NULL);
+    assert(slippi_profile_identity_name((SlippiProfileIdentity)3) == NULL);
     assert(slippi_profile_source_draw_decision((SlippiProfileIdentity)1,
+                                                SLIPPI_TICK_PRESENT) ==
+           SLIPPI_SOURCE_DRAW_ERROR);
+    assert(slippi_profile_source_draw_decision((SlippiProfileIdentity)2,
+                                                SLIPPI_TICK_PRESENT) ==
+           SLIPPI_SOURCE_DRAW_ERROR);
+    assert(slippi_profile_source_draw_decision((SlippiProfileIdentity)3,
                                                 SLIPPI_TICK_PRESENT) ==
            SLIPPI_SOURCE_DRAW_ERROR);
     assert(slippi_profile_source_draw_decision(profile, (SlippiTickKind)99) ==
