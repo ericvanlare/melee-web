@@ -1589,3 +1589,46 @@ The next boundary is actual same-v6 consumed input and Ready/GO ordering; this
 endpoint did not exercise the new HSD queue observer, gameplay, full object
 parity, per-owner RNG or C3. Exact receipt identities are under
 `same_v6_setup_browser_e06_v1` in the existing evidence entry.
+
+
+The first actual consumed-tick attempt is retained as **FAIL**, separately from
+the earlier zero-tick Setup pass. An initial attempt stopped in the host
+preflight validator before any browser/server launch because its serialized
+export object had the wrong insertion order. A smaller actual-validator check
+reproduced that refusal and accepted the same semantic packet with the required
+order. The next supervised run, at harness `fd6569fb` and unchanged runtime
+`f4c44f8e`, completed exactly one gameplay tick before stopping at action 0,
+before the first draw. All four literal 11-byte HSD queue rows matched the same-v6
+reference; source slots, controllers, generation and queue/tick counts also
+matched. The player-map comparison refused raw port observations `0,0` against
+effective Setup ports `1,2`.
+
+Source reduction identifies an observation-label error: original Start slot zero
+means use that player's source slot, and the constructor already derives and
+checks the effective port. The diagnostic instead labeled the raw slot byte as
+a one-based port. This explains that first refusal; it does not alter the failed
+capture or establish equality of raw Start bytes. The reviewed version-2 observation repair
+retains both raw and effective values while keeping the independent expected
+map and all queue checks strict.
+
+Native unload then separately refused a mismatched live display owner. The exact
+internal clause was not retained, so it remains unknown. The earlier successful
+zero-tick cancellation does not cover this post-tick path. Process cleanup still
+passed: all nine browser descendants and the capture/server groups were absent,
+with a fresh root scan confirming all 12 recorded owned PIDs absent. The run took
+13.155 seconds. The next diagnostic retains the bounded unload exception data
+already collected by the browser driver; it adds no native calls or weaker
+ownership guards. No C/F, GO, native retirement or C3 result follows. Exact failed
+raw results and both source reviews are under
+`same_v6_first_consumed_tick_attempt_v1` in the existing evidence receipt.
+
+The observation/diagnostic repair is committed at `d4aca36c`. Independent root
+review, an extracted-production serializer control, 27 strict consumer tests,
+and the existing cleanup-path control pass. The initial cleanup test assertion
+failed on a JavaScript VM object-prototype difference; its log is retained, and
+the corrected assertion compares the emitted JSON without changing production
+behavior. Both diagnostic and ordinary Release builds pass. Full regression
+passes 2,713 tests with 189 skips in 568.376 seconds, and all owned validation
+process groups are absent. Fifty new build products are retained separately
+from `f4c44f8e`. These are component checks; the next browser attempt still needs
+a fresh reviewed packet, and native unload/C3 remain open.

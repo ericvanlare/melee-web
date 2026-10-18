@@ -17041,6 +17041,177 @@
               "Setup": true,
               "browser_rerun": false
             }
+          },
+          "same_v6_first_consumed_tick_attempt_v1": {
+            "status": "failed_at_action0_observation_map_then_native_unload",
+            "harness_source": "fd6569fb64c7c3b7f118a117010d380469b56c41",
+            "runtime_source": "f4c44f8e83e95d017536c5a9f6e386caeabac025",
+            "regression_source": "4bd306ce9276a7ef2637f639d1ce156cb9687c4f",
+            "retained_prebrowser_refusal": {
+              "scope": "actual host preflight validator rejected export-object insertion order before browser/server launch; expected key/value data were unchanged",
+              "retention_sha256": "e1f936fe123b3127fdc6122ea7c5d5e16d08347ad904d3332d101de3530288fd",
+              "offline_reduction_sha256": "47b447aa0f27f2a3c7b35c14c71c5798ca3e6061179d24ae89e6f6995841f45d",
+              "repair": "external packet-v2 preserves semantic JSON and uses required arm/queue/approve insertion order; no validator relaxation"
+            },
+            "actual_browser": {
+              "elapsed_seconds": 13.155287457630038,
+              "report_sha256": "f4db807afd90ef072ba27b3d9393df9d2b9fe94322876e01e82f7b91f29a9f70",
+              "owner_sha256": "7d011d6e5f5936dd2c7510c514c1bc0e76e05df8a3db579267c4660f89c2c980",
+              "release_sha256": "df8513bb913416654212e5e0e4e559cf935c297272f9cbd8673181dfa2e3d56c",
+              "preflight_sha256": "b2aecddc04ff679cfb3d173daaed8b822f334ce605328dd9eaa2417f9007458c",
+              "retention_sha256": "0173d8428315aaa68f5807f0e464e5c8f0854eb8394e6e96648ec2317d21b7b6",
+              "completed_ticks": 1,
+              "completed_draws": 0,
+              "first_action": 0,
+              "source_generation": 3,
+              "actual_queue_observation": {
+                "schema": "melee-web-stadium-hsd-pad-queue-observation",
+                "version": 1,
+                "source_generation": 3,
+                "source_tick_before": 0,
+                "source_tick_after": 1,
+                "qnum_before": 1,
+                "qread_before": 0,
+                "qcount_before": 1,
+                "qcount_after_hsd": 0,
+                "player_count": 2,
+                "players": [
+                  {
+                    "player_index": 0,
+                    "setup_port_1based": 0,
+                    "source_slot_index": 0,
+                    "controller_index": 0
+                  },
+                  {
+                    "player_index": 1,
+                    "setup_port_1based": 0,
+                    "source_slot_index": 1,
+                    "controller_index": 1
+                  }
+                ],
+                "queue_slot_status_hex": [
+                  "0000000000000000000000",
+                  "0000000000000000000000",
+                  "00000000000000000000ff",
+                  "00000000000000000000ff"
+                ],
+                "tick_complete": true
+              },
+              "expected_queue_observation": {
+                "bundle": 0,
+                "expected_players": [
+                  {
+                    "controller_index": 0,
+                    "player_index": 0,
+                    "setup_port_1based": 1,
+                    "source_slot_index": 0
+                  },
+                  {
+                    "controller_index": 1,
+                    "player_index": 1,
+                    "setup_port_1based": 2,
+                    "source_slot_index": 1
+                  }
+                ],
+                "expected_queue_slot_status_hex": [
+                  "0000000000000000000000",
+                  "0000000000000000000000",
+                  "00000000000000000000ff",
+                  "00000000000000000000ff"
+                ],
+                "schema": "melee-web-stadium-hsd-pad-queue-observation",
+                "source_sequence": 2504,
+                "source_tick": 0,
+                "version": 1
+              },
+              "four_literal_status_rows_equal": true,
+              "declared_setup_comparison_approved": true
+            },
+            "source_reduction": {
+              "receipt_sha256": "c32e406cff2db93a673b4a5cda65c0434b3756781c68d90f796f7a1ad1e65bee",
+              "first_refusal": "version1 serializer labeled raw Start slot bytes0/0 as effective one-based Setup ports; independently expected ports remain1/2",
+              "source_rule": "source_port = source.slot ? source.slot - 1 : source_slot; constructor requires this to match its source slot/controller",
+              "scope": "explains diagnostic labeling only; preserves failed report and does not establish raw Start slot equality or later execution"
+            },
+            "cleanup": {
+              "native_unload_completed": false,
+              "native_observation_cleared": false,
+              "native_error": "Stadium display teardown refused a mismatched live owner",
+              "internal_clause": "unobserved; three generic preflight return sites remain possible",
+              "secondary_review_sha256": "681ededbc5390c15de94f4fb1edd5f08e9ad50796fc1b04431e5f8d209e1bb91",
+              "owned_process_cleanup_passed": true,
+              "owner_browser_descendants_absent": 9,
+              "fresh_root_pid_absence_count": 12
+            },
+            "next": "Use the reviewed observation-v2 producer and preserved expected-v1 input/map requirement in one bounded unchanged171-action continuation after fresh packet review; native unload remains unresolved until observed.",
+            "limits": [
+              "No C/F or GO comparison, native owner retirement or C3 pass follows.",
+              "The successful zero-tick Setup unload is a separate earlier path.",
+              "No expectation bytes, deadlines, game inputs, RNG, source draw order or ownership guard were changed for these attempts."
+            ],
+            "reviewed_observation_repair_v2": {
+              "source_commit": "d4aca36c9ef588cf2d38dbb6036c69a45e1518c3",
+              "candidate_freeze_sha256": "a5d79c785163a9e990f468f4659a45de537a58b98e23c5ce079187370d218c3b",
+              "independent_root_review_sha256": "98f1503dec1b40da369036b8edf7b1753a6550561e883c4fa7cb29e74d6509bf",
+              "offline_retained_action_normalization_sha256": "62fb819b7bad1c8d98709f07da9c8ee4a59c719a74c913a67a7e7ee746ca17ee",
+              "actual_observation_version": 2,
+              "independent_expected_requirement_version": 1,
+              "focused_controls": {
+                "actual_serializer": "passed defaults, explicit ports, sparse source-slot lookup and bounds refusals",
+                "strict_consumer_tests": 27,
+                "cleanup_retention": "passed; primary failure preserved",
+                "initial_cleanup_fixture_failure_retained": "cross-realm object prototype assertion; JSON report comparison repair only"
+              },
+              "full_regression": {
+                "tests": 2713,
+                "seconds": 568.376,
+                "skips": 189,
+                "log_sha256": "5186d12e727e09a278005e024d8d88933de48e63107877020490cd46975ed418"
+              },
+              "validation_result_sha256": "5e674e5925c6f3d8af6ad4c31a409ab04623ad56cc3081d0cb567b1d0b760e6c",
+              "retained_runtime_sha256": "5e3c2bd677d80edb893a5ab476fa60f10b9421e42a3ba2539a866738fe059b47",
+              "retained_runtime_products": 50,
+              "builds": [
+                {
+                  "command": [
+                    "python3",
+                    "scripts/agent_workspace.py",
+                    "run",
+                    "--",
+                    "python3",
+                    "scripts/build.py",
+                    "--target",
+                    "runtime",
+                    "--configuration",
+                    "Release",
+                    "--stadium-c1a-diagnostic"
+                  ],
+                  "returncode": 0,
+                  "seconds": 23.046504667028785,
+                  "log_sha256": "8410f221f240b9c899ae63521620396a39e9126021f477401d49cc1cbcf89520",
+                  "owned_group_members_after": []
+                },
+                {
+                  "command": [
+                    "python3",
+                    "scripts/agent_workspace.py",
+                    "run",
+                    "--",
+                    "python3",
+                    "scripts/build.py",
+                    "--target",
+                    "runtime",
+                    "--configuration",
+                    "Release"
+                  ],
+                  "returncode": 0,
+                  "seconds": 21.496645915787667,
+                  "log_sha256": "485a70b16bf0173c628bee9811dc05cb85a5a8d4f133610f7d9448ac21ae6f68",
+                  "owned_group_members_after": []
+                }
+              ],
+              "scope": "Observation/diagnostic component only; no new browser comparison or native unload result."
+            }
           }
         }
       }
