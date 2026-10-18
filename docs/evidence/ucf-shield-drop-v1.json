@@ -1,0 +1,221 @@
+{
+  "schema": "melee-web-ucf-shield-drop-v1",
+  "issue": 337,
+  "state": "reviewed_private_v5_component_local_validation_passed_pending_ci_integration",
+  "source_base": "220e8ad969e45edc9d39b747f99411a8f00c7880",
+  "implementation_commit": "9ae4d79427532bff91f0c7ca62070c55bc025d2f",
+  "profile_identity": "slippi-render-dependencies-dbooc-shield-drop-v5",
+  "scope": "Own-C GPL profile component and reference configuration repair. Synthetic services/data with actual prepared source caller bodies; no live activation or original patched-game execution.",
+  "behavior": {
+    "upstream_commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+    "path": "External/UCF 0.84/UCF/UCF Shield Drop.asm",
+    "sha256": "5b95d5ae91523453fa8b8cb71349e3d01b2cbb3d4265ebf008351cef9b77b8dd",
+    "injection": "0x800998A4",
+    "source_contract_sha256": "a4b482d7ab64c4f54e762e8b2555fb52266e618c7d4e38d901f998bdee67f69f",
+    "callers": [
+      "ftCo_80099794",
+      "ftCo_8009980C"
+    ],
+    "source_timer": "Fighter.x670_timer_lstick_tilt_x",
+    "platform_mask": "00000100",
+    "main_stick_y_threshold_bits": "bf4ccccd",
+    "radius_comparison": "signed low32 sum >6400; shared fmaf/fctiwz/+2 quantization with DBOOC",
+    "preserved": "Original caller eligibility, non-suppressed Yoshi/default dispatch and cleanup ordering"
+  },
+  "source_pins": [
+    {
+      "path": "cmake/FighterRuntime.cmake",
+      "bytes": 72876,
+      "sha256": "6d76937cfe3d67728e7c78234ac9a8e08b2f98a3831c606b1005b246785206ca"
+    },
+    {
+      "path": "src/slippi_profile/patches/melee-profile-hooks.patch",
+      "bytes": 11084,
+      "sha256": "e895e72bad3567d63e04a4d9a8559566fd33613a8b7b765dd0d4fe5a9a6984f7"
+    },
+    {
+      "path": "src/slippi_profile/profile.c",
+      "bytes": 839,
+      "sha256": "1c0f2309efa5dd359ae83db3c221110a563592e2b0ffdb4e7d8487e151eeb5b8"
+    },
+    {
+      "path": "src/slippi_profile/profile.h",
+      "bytes": 1006,
+      "sha256": "408ef68009d19f5f5a8aec18d3d2943c783eb0bf4661a8b93b1ee6179d861247"
+    },
+    {
+      "path": "src/slippi_profile/tests/deadupfall_reduction_fixture.c.in",
+      "bytes": 22993,
+      "sha256": "f63d58a786ae5b52c0f37d0b0653f954c16a10d2b340d9c068aa50bb1caee142"
+    },
+    {
+      "path": "src/slippi_profile/tests/profile_controls_test.c",
+      "bytes": 15069,
+      "sha256": "4330c8d547ce65d50d900a6c21ea9e0b9dadb2b28b47330b4e55fbc760a91150"
+    },
+    {
+      "path": "src/slippi_profile/tests/run_synctest.mjs",
+      "bytes": 55963,
+      "sha256": "3bd1acc136a7f29cf41eba9c0db9fb1411dbf40f5a8f513372797c17fe1f04fe"
+    },
+    {
+      "path": "src/slippi_profile/tests/shield_drop_fixture.c.in",
+      "bytes": 6675,
+      "sha256": "1a35c0c208d4c1afca75863202970a05b4effa4c28832eb3fe7c460c3cbce08c"
+    },
+    {
+      "path": "src/slippi_profile/tests/synctest_browser.cpp",
+      "bytes": 7178,
+      "sha256": "b930941051cee62aadcbda4afbdb943314a196aeed6f9439b25bbb4edadbee7e"
+    },
+    {
+      "path": "src/slippi_profile/tests/synctest_node.cpp",
+      "bytes": 1721,
+      "sha256": "3d060e524e1f162dea813f5d82c15276be42083a94803cb878456fdcb9016c1e"
+    },
+    {
+      "path": "src/slippi_profile/tests/test_ci_discovery.py",
+      "bytes": 7086,
+      "sha256": "cfd16f3180c5db59f67ab70972f1e3da1d60b07e39f9e5688dc758e29131c4cb"
+    },
+    {
+      "path": "src/slippi_profile/tests/test_ucf_shield_drop.py",
+      "bytes": 8930,
+      "sha256": "5fe0b9361670e73ec624e9f7c3475bea768604af2bc439236c185121987d4996"
+    },
+    {
+      "path": "src/slippi_profile/ucf_dbooc_fix.c",
+      "bytes": 4843,
+      "sha256": "18dfc9b1f97c19952121e15c89cd9dad269cd4708360ebafd5e79982cd50ffee"
+    },
+    {
+      "path": "src/slippi_profile/ucf_dbooc_fix.h",
+      "bytes": 2601,
+      "sha256": "68cdae545acc48e5b69cd3de7b637eda66a85ca74442440012a4a0746709a98c"
+    },
+    {
+      "path": "src/slippi_profile/ucf_shield_drop_fix.c",
+      "bytes": 1166,
+      "sha256": "79d4cbeee4eaaee3e28b2bc315897d218e29b763dee7cb9b9d90ae77cc9a259b"
+    },
+    {
+      "path": "src/slippi_profile/ucf_shield_drop_fix.h",
+      "bytes": 656,
+      "sha256": "a7b68e364d2403b0e539474b3183697ce9c89a4f169bd84e1ebbb203fee2673f"
+    },
+    {
+      "path": "src/slippi_profile/ucf_shield_drop_source_guards.h",
+      "bytes": 3265,
+      "sha256": "089bfe90fb9bc37081285d8f9bd3762473f66cbee8e7628a32c3da71ffa1f18a"
+    },
+    {
+      "path": "tests/test_slippi_profile_controls_discovery.py",
+      "bytes": 1998,
+      "sha256": "e2ffb928f8cc71c05dbba50844c54f1a730225023c6eed41489cfb8edcc08387"
+    }
+  ],
+  "focused": {
+    "schema": "issue337-shield-drop-focused-v1",
+    "status": "passed",
+    "ordinary_source_sha256": "c6396dbfc37b9d3fec0f6811751747a426d8cb576f6ac4ca4c6e0aabba6a9776",
+    "profile_source_sha256": "0cc33d5b704196fbd17330795617f7d0b1d8476c2d446f821660e9a00d1c3806",
+    "fixture_sha256": "093b2777fdee2d5e973b3660cfa32ab59be0f0a6814ff8cb2fc8a65f522a3e35",
+    "native_equals_wasm": true,
+    "scalar_scenarios": 26,
+    "source_caller_controls": 156,
+    "shared_trace_controls": 20,
+    "profile_source_hashes": {
+      "ucf_dbooc_fix.c": "18dfc9b1f97c19952121e15c89cd9dad269cd4708360ebafd5e79982cd50ffee",
+      "ucf_dbooc_fix.h": "68cdae545acc48e5b69cd3de7b637eda66a85ca74442440012a4a0746709a98c",
+      "ucf_shield_drop_fix.c": "79d4cbeee4eaaee3e28b2bc315897d218e29b763dee7cb9b9d90ae77cc9a259b",
+      "ucf_shield_drop_fix.h": "a7b68e364d2403b0e539474b3183697ce9c89a4f169bd84e1ebbb203fee2673f",
+      "ucf_shield_drop_source_guards.h": "089bfe90fb9bc37081285d8f9bd3762473f66cbee8e7628a32c3da71ffa1f18a"
+    },
+    "stdout_sha256": "c92290c71364b5d15d0195285ec9f5929466855b15eb25647ed90ec8cc8ba37e",
+    "exclusions": [
+      "synthetic services and Fighter storage in caller reducer",
+      "no original PPC execution, FPSCR flags/traps, live activation or gameplay acceptance"
+    ],
+    "review_packet_sha256": "c6020f64cee76aada905236d7a05541496d6028465bd82663c8a318250a0ddba",
+    "root_review_sha256": "d7f1c3c2be9a9cf9e45665a97c8b5983d2fe837278edcb3d5988031629ce2e3d",
+    "result_sha256": "85090399e667bdff367b01da8578f541b786f868b7d767b01a66270c872de80a",
+    "scalar_assertions": 26,
+    "profile_off_preprocessed_equals_original": true,
+    "actual_wasm_field_types_offsets_compile": true,
+    "actual_prepared_escape_translation_unit_syntax": "pass"
+  },
+  "dbooc_regression": {
+    "native_wasm_stdout_sha256": "7761f91f76823d59d15c14caad1614ba8aa72911a15daaab05a1144fd9641fff",
+    "unchanged_from_v4": true,
+    "rows": 386,
+    "independent_finite_oracle_cases": 331,
+    "source_cases": 21,
+    "current_result_sha256": "b445e58071d84541b0d90c5af4f5f00f7779117ea16deaafe8cf72849f93dc77"
+  },
+  "reference_configuration": {
+    "change": "Do not copy bundled GALE01r2.ini into fresh User/GameSettings; pinned client appends global/local code lists. Keep validated bundled source and empty local directory.",
+    "focused_tests": 6,
+    "independent_review_sha256": "a6bf123588dcc61dddae1d4fc7fbcd85c88ebf9dbfdb8393dada21d02752266e",
+    "client_execution": false,
+    "policy_prerequisite": {
+      "scope": "Separate external synthetic default-deny fixture only; not client admission",
+      "freeze_sha256": "bf3bcfb92b732900013357548fd974d5e2017a3a16ba93cbc00895cf848ce626",
+      "root_review_sha256": "9455c4a1b986e20f2d136c9fe0dfd54760d66d5624bfd3b024e98506e4c448e9",
+      "final_policy_rows": 16,
+      "separate_exec_inheritance_rows": 32,
+      "network_scope": "All IP denied; exact owned Unix datagram only; no official service traffic"
+    },
+    "known_artifact_inventory_sha256": "e43e61785a13e71322a0f1e925fd5b2d4b23898de3dab4b1da3612a83f3af0e8",
+    "reference_gate": "Known prior binary does not match current retained build lineage; no compatible artifact admitted or launched."
+  },
+  "retained_failures": [
+    {
+      "boundary": "standalone native helper headers",
+      "count": 2,
+      "freeze_sha256": "681cb48232e8d5970dfc83cd9931e6a9a7ba94dd8449b715ad3c0020a728070d",
+      "repair": "Reduced review separates pure scalar implementation from actual-source type/layout adapter; no broad warning suppression."
+    },
+    {
+      "boundary": "source extraction",
+      "cause": "Incorrect boolean-transform source path did not yield the expected function; reducer now reads actual ordinary-prepared source."
+    },
+    {
+      "boundary": "root fixture review",
+      "cause": "Three scenarios lacked explicit scalar assertions. Final fixture asserts all26 without changing implementation or output.",
+      "prior_packet_sha256": "d5b8a2b9db2ce0d8187ae181c51263a92a4c7e1aa2556eb895a0921c60e055f2"
+    }
+  ],
+  "open_gates": [
+    "Exact-head CI and integration",
+    "Pinned offline patched-Slippi execution and live activation",
+    "Shared Pad Buffer/Cardinals history snapshot/reset ownership and remaining UCF behaviors",
+    "FPSCR/traps, non-default rounding and NaN payload fidelity",
+    "Complete profile and browser match-scoped rollback"
+  ],
+  "evidence_locator": "Retained issue337 focused/validation packets under the external slippi-no-draw-pivot run and ucf-client-lifecycle-source-audit run. Coordination checkpoint owns private absolute paths.",
+  "local_validation": {
+    "source_commit": "9ae4d79427532bff91f0c7ca62070c55bc025d2f",
+    "result_sha256": "27adf87cda7fa4e5151305d0190fb5b94067d056d3d855137e7e6bfeaac548dd",
+    "full_regression": {
+      "tests": 2426,
+      "seconds": 544.979,
+      "skips": 166,
+      "log_sha256": "e33d82fb0ff89ef3cf3a137b65af3e885788bab553b5fdf9bf355bf17ef22e32"
+    },
+    "builds": [
+      {
+        "target": "profile Release",
+        "returncode": 0,
+        "log_sha256": "81f2ecfbfe5d17085185e7f894486536820b5600c00d1cd824b8f1f451b7aa7a"
+      },
+      {
+        "target": "ordinary Release runtime",
+        "returncode": 0,
+        "log_sha256": "adbb8813edd7ea815fdfa75d38b29d88907d9548b30e5fac6576eb47b7010795"
+      }
+    ],
+    "retained_runtime_manifest_sha256": "93fea7adb548c09f6f5fd7e2f20080200298d1782a0fbf91ac68e37843b0cba5",
+    "retained_runtime_artifacts": 18,
+    "scope": "Affected builds and regression only; no new browser, client, capture or online result."
+  }
+}

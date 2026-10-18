@@ -24,6 +24,27 @@ typedef struct SlippiUcfDboocTrace {
     uint8_t override_selected;
 } SlippiUcfDboocTrace;
 
+/* Shared scalar trace for the exact UCF fmsubs/fctiwz/+2 radius sequence.
+ * This is an internal helper contract; behavior-specific timer and threshold
+ * rules remain in their own callers. */
+typedef struct SlippiUcfQuantizedRadiusTrace {
+    uint32_t x_fmsubs_bits;
+    uint32_t y_fmsubs_bits;
+    uint32_t x_conversion_word;
+    uint32_t y_conversion_word;
+    uint32_t x_q_word;
+    uint32_t y_q_word;
+    uint32_t x_square_low32;
+    uint32_t y_square_low32;
+    uint32_t radius_sum_low32;
+} SlippiUcfQuantizedRadiusTrace;
+
+/* Shared low-level arithmetic only; does not apply a timer or behavior
+ * threshold. IEEE words preserve the caller's exact binary32 input bits. */
+uint32_t slippi_profile_ucf_quantized_radius_word(
+    uint32_t stick_x_bits, uint32_t stick_y_bits,
+    SlippiUcfQuantizedRadiusTrace *trace);
+
 /*
  * Apply the total binary32 scalar rule to raw IEEE-754 words.  Callers must
  * provide the source's unsigned timer byte and incoming threshold word.  The

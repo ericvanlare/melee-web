@@ -267,3 +267,52 @@ diff --git a/src/melee/ft/kinds/ftCommon/ftCo_SquatRv.c b/src/melee/ft/kinds/ftC
          ftCo_SquatRv_Enter(gobj);
          return true;
      }
+
+diff --git a/src/melee/ft/kinds/ftCommon/ftCo_Escape.c b/src/melee/ft/kinds/ftCommon/ftCo_Escape.c
+index 0000000..0000000 100644
+--- a/src/melee/ft/kinds/ftCommon/ftCo_Escape.c
++++ b/src/melee/ft/kinds/ftCommon/ftCo_Escape.c
+@@ -22,6 +22,11 @@
+ #include <melee/ft/kinds/ftYoshi/ftyoshiguard.h>
+ #include <melee/ft/types.h>
+ 
++#ifdef MELEE_WEB_SLIPPI_PROFILE
++#include <slippi_profile/ucf_shield_drop_fix.h>
++#include <slippi_profile/ucf_shield_drop_source_guards.h>
++#endif
++
+ /* 0992A8 */ static void ftCo_800992A8(Fighter_GObj* gobj, FtMotionId msid,
+                                        melee_source_bool);
+ /* 099314 */ static void ftCo_80099314(Fighter_GObj* gobj, FtMotionId msid,
+@@ -209,6 +214,15 @@ melee_source_bool ftCo_80099794(Fighter_GObj* gobj)
+ {
+     Fighter* fp = gobj->user_data;
+     if (fp->input.held_buttons[0] & HSD_PAD_LR && inlineB0(fp)) {
++#ifdef MELEE_WEB_SLIPPI_PROFILE
++        if (slippi_profile_ucf_shield_drop_suppresses(
++                fp->input.cstick[0].y, p_ftCommonData->x314,
++                fp->x670_timer_lstick_tilt_x, p_ftCommonData->x320,
++                fp->input.lstick[0].x, fp->input.lstick[0].y,
++                fp->coll_data.floor.index, fp->coll_data.floor.flags)) {
++            return false;
++        }
++#endif
+         ftCo_80099894(gobj);
+         return true;
+     }
+@@ -219,6 +233,15 @@ melee_source_bool ftCo_8009980C(Fighter_GObj* gobj)
+ {
+     Fighter* fp = gobj->user_data;
+     if (inlineB0(fp) || ftCo_800DF8E8(fp)) {
++#ifdef MELEE_WEB_SLIPPI_PROFILE
++        if (slippi_profile_ucf_shield_drop_suppresses(
++                fp->input.cstick[0].y, p_ftCommonData->x314,
++                fp->x670_timer_lstick_tilt_x, p_ftCommonData->x320,
++                fp->input.lstick[0].x, fp->input.lstick[0].y,
++                fp->coll_data.floor.index, fp->coll_data.floor.flags)) {
++            return false;
++        }
++#endif
+         ftCo_80099894(gobj);
+         return true;
+     }
