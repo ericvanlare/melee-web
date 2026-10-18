@@ -5221,7 +5221,14 @@ async function cleanupOwnedProcesses() {
         await assertMatchedSetupCfAsyncifyIdle('Check Asyncify before failure-path unload');
         await timeout(driver.unload(), Math.min(LIMITS.cleanupMs, cleanupRemaining()), 'Failure-path unload');
         report.cleanup.unload_completed = true;
-      } catch (error) { cleanupFailures.push({step: 'unload', error: errorText(error)}); }
+      } catch (error) {
+        const failure = {step: 'unload', error: errorText(error)};
+        if (typeof error?.step === 'string') failure.driver_step = error.step.slice(0, 128);
+        if (error?.cause != null) failure.cause = errorText(error.cause);
+        if (error?.diagnostics && typeof error.diagnostics === 'object' &&
+            !Array.isArray(error.diagnostics)) failure.diagnostics = error.diagnostics;
+        cleanupFailures.push(failure);
+      }
     }
   }
   if (!nativeCleanupSuppressed && firstSssVsSetupTextTail && unloadAttempted && page && !page.isClosed() &&

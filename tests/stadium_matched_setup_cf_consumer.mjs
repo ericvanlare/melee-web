@@ -822,6 +822,7 @@ export function createHostCallbacks({setupApproved, originalSnapshots, originalS
 }
 
 const HSD_QUEUE_OBSERVATION_SCHEMA = 'melee-web-stadium-hsd-pad-queue-observation';
+const HSD_QUEUE_ACTUAL_OBSERVATION_VERSION = 2;
 const HSD_QUEUE_EXPECTED_PLAYERS = Object.freeze([
   {player_index: 0, setup_port_1based: 1, source_slot_index: 0, controller_index: 0},
   {player_index: 1, setup_port_1based: 2, source_slot_index: 1, controller_index: 1},
@@ -833,6 +834,26 @@ function queueObservationPlayersMatch(players, expectedPlayers) {
     if (!row || typeof row !== 'object' || Array.isArray(row) ||
         Object.keys(row).sort().join(',') !== Object.keys(expected).sort().join(',')) return false;
     return row.player_index === expected.player_index &&
+      row.setup_port_1based === expected.setup_port_1based &&
+      row.source_slot_index === expected.source_slot_index &&
+      row.controller_index === expected.controller_index;
+  });
+}
+function actualQueueObservationPlayersMatch(players, expectedPlayers) {
+  if (!Array.isArray(players) || players.length !== expectedPlayers.length) return false;
+  return players.every((row, index) => {
+    const expected = expectedPlayers[index];
+    const keys = ['controller_index', 'player_index', 'setup_port_1based',
+      'source_slot_index', 'start_slot_field_raw'];
+    if (!row || typeof row !== 'object' || Array.isArray(row) ||
+        Object.keys(row).sort().join(',') !== keys.join(',')) return false;
+    const raw = row.start_slot_field_raw;
+    if (!Number.isSafeInteger(raw) || raw < 0 || raw > 255) return false;
+    const sourcePort = raw === 0 ? row.source_slot_index : raw - 1;
+    const effectivePort = sourcePort + 1;
+    return Number.isSafeInteger(effectivePort) &&
+      row.player_index === expected.player_index &&
+      row.setup_port_1based === effectivePort &&
       row.setup_port_1based === expected.setup_port_1based &&
       row.source_slot_index === expected.source_slot_index &&
       row.controller_index === expected.controller_index;
@@ -1146,7 +1167,8 @@ export class StadiumSetupCfActionDriver {
         action.bundle === this.requiredQueueObservation.bundle) {
       const queue = result.pad_hsd_queue_observation;
       const expectedPlayers = this.requiredQueueObservation.expected_players;
-      if (queue?.schema !== HSD_QUEUE_OBSERVATION_SCHEMA || queue.version !== 1 ||
+      if (queue?.schema !== HSD_QUEUE_OBSERVATION_SCHEMA ||
+          queue.version !== HSD_QUEUE_ACTUAL_OBSERVATION_VERSION ||
           result.world_generation !== this.admittedWorldGeneration ||
           queue.source_generation !== this.admittedWorldGeneration ||
           queue.source_tick_before !== this.requiredQueueObservation.source_tick ||
@@ -1154,7 +1176,7 @@ export class StadiumSetupCfActionDriver {
           queue.qnum_before !== 1 || queue.qread_before !== 0 || queue.qcount_before !== 1 ||
           queue.qcount_after_hsd !== 0 || queue.player_count !== expectedPlayers.length ||
           queue.tick_complete !== true ||
-          !queueObservationPlayersMatch(queue.players, expectedPlayers) ||
+          !actualQueueObservationPlayersMatch(queue.players, expectedPlayers) ||
           !Array.isArray(queue.queue_slot_status_hex) || queue.queue_slot_status_hex.length !== 4 ||
           queue.queue_slot_status_hex.some((status, index) =>
             status !== this.requiredQueueObservation.expected_queue_slot_status_hex[index]))

@@ -49,6 +49,9 @@ namespace melee_web_menu_browser {
 std::string matched_setup_cf_pad_queue_observation_json(
     const MeleeWebStadiumPadQueueObservation& observation,const StartMeleeData& setup)
 {
+ check(observation.player_count<=sizeof(observation.slots)/sizeof(observation.slots[0])&&
+       observation.player_count<=sizeof(observation.controllers)/sizeof(observation.controllers[0]),
+       "HSD queue observation player count exceeds its retained source map");
  static constexpr char digits[]="0123456789abcdef";
  auto append_byte=[&](std::ostringstream& out,uint8_t value){
   out<<digits[value>>4]<<digits[value&0x0f];
@@ -67,7 +70,7 @@ std::string matched_setup_cf_pad_queue_observation_json(
   return out.str();
  };
  std::ostringstream out;
- out<<"{\"schema\":\"melee-web-stadium-hsd-pad-queue-observation\",\"version\":1"
+ out<<"{\"schema\":\"melee-web-stadium-hsd-pad-queue-observation\",\"version\":2"
     <<",\"source_generation\":"<<observation.source_generation
     <<",\"source_tick_before\":"<<observation.source_tick_before
     <<",\"source_tick_after\":"<<observation.source_tick_after
@@ -78,9 +81,18 @@ std::string matched_setup_cf_pad_queue_observation_json(
     <<",\"player_count\":"<<observation.player_count<<",\"players\":[";
  for(uint32_t i=0;i<observation.player_count;i++){
   if(i)out<<',';
+  const auto source_slot=observation.slots[i];
+  check(source_slot<sizeof(setup.players)/sizeof(setup.players[0]),
+        "HSD queue observation source slot exceeds StartMeleeData");
+  const auto start_slot_field_raw=static_cast<unsigned>(setup.players[source_slot].slot);
+  // MatchSession uses nonzero slot-1, otherwise source_slot; report that port
+  // one-based while keeping the original Start field available unchanged.
+  const auto source_port=start_slot_field_raw?start_slot_field_raw-1:source_slot;
+  const auto effective_port_1based=source_port+1;
   out<<"{\"player_index\":"<<i
-     <<",\"setup_port_1based\":"<<static_cast<unsigned>(setup.players[i].slot)
-     <<",\"source_slot_index\":"<<observation.slots[i]
+     <<",\"setup_port_1based\":"<<effective_port_1based
+     <<",\"start_slot_field_raw\":"<<start_slot_field_raw
+     <<",\"source_slot_index\":"<<source_slot
      <<",\"controller_index\":"<<observation.controllers[i]<<'}';
  }
  out<<"],\"queue_slot_status_hex\":[";

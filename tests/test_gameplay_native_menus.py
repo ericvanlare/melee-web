@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from check_gameplay import node_runtime
 sys.path.insert(0, str(ROOT / "tests"))
 from owned_test_workspace import OwnedWorkspaceTests
+from test_first_css_final_pending_draw_host import _function
 sys.path.insert(0, str(ROOT / "tools"))
 import compare_transition_trace as transition_compare
 
@@ -677,6 +678,93 @@ int main(void)
             run.stdout + run.stderr, encoding="utf-8")
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
         self.assertIn("production phased fill/order", run.stdout)
+
+    def test_stadium_hsd_queue_serializer_uses_observed_source_slot(self):
+        """Compile the actual serializer and verify raw/effective Start slot fields."""
+        import shutil
+        compiler = shutil.which("clang++") or shutil.which("c++")
+        if not compiler:
+            self.skipTest("A C++ compiler is required for the production serializer fixture")
+        production = (ROOT / "src/gameplay_menu_browser.cpp").read_text(encoding="utf-8")
+        serializer = _function(production,
+            "std::string matched_setup_cf_pad_queue_observation_json(")
+        fixture = r"""
+#include <cstdint>
+#include <iostream>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+struct PADStatus {
+  uint16_t button; int8_t stickX, stickY, substickX, substickY;
+  uint8_t triggerLeft, triggerRight, analogA, analogB; int8_t err;
+};
+struct StartPlayer { uint8_t slot; };
+struct StartMeleeData { StartPlayer players[6]; };
+struct MeleeWebStadiumPadQueueObservation {
+  uint64_t source_generation, source_tick_before, source_tick_after;
+  uint32_t qnum_before, qread_before, qcount_before, qcount_after_hsd;
+  uint32_t player_count, slots[4], controllers[4]; PADStatus queue_slots[4];
+};
+namespace melee_web_menu_browser {
+inline void check(int value, const char* error) {
+  if (!value) throw std::runtime_error(error);
+}
+""" + serializer + r"""
+}
+static MeleeWebStadiumPadQueueObservation observation() {
+  MeleeWebStadiumPadQueueObservation value{};
+  value.source_generation=3; value.source_tick_before=0; value.source_tick_after=1;
+  value.qnum_before=1; value.qread_before=0; value.qcount_before=1; value.qcount_after_hsd=0;
+  value.player_count=2; value.slots[0]=0; value.slots[1]=1;
+  value.controllers[0]=0; value.controllers[1]=1;
+  for (auto& status : value.queue_slots) status.err=-1;
+  return value;
+}
+int main() {
+  using melee_web_menu_browser::matched_setup_cf_pad_queue_observation_json;
+  StartMeleeData defaults{};
+  auto obs=observation();
+  std::cout << matched_setup_cf_pad_queue_observation_json(obs,defaults) << '\n';
+  StartMeleeData explicit_ports{}; explicit_ports.players[0].slot=1; explicit_ports.players[1].slot=2;
+  std::cout << matched_setup_cf_pad_queue_observation_json(obs,explicit_ports) << '\n';
+  StartMeleeData sparse{}; sparse.players[1].slot=2; sparse.players[2].slot=0;
+  obs.slots[1]=2; obs.controllers[1]=2;
+  std::cout << matched_setup_cf_pad_queue_observation_json(obs,sparse) << '\n';
+  obs.slots[0]=6;
+  try { (void)matched_setup_cf_pad_queue_observation_json(obs,sparse); return 11; }
+  catch (const std::runtime_error&) { std::cout << "SOURCE_SLOT_REJECTED\n"; }
+  obs=observation(); obs.player_count=5;
+  try { (void)matched_setup_cf_pad_queue_observation_json(obs,defaults); return 12; }
+  catch (const std::runtime_error&) { std::cout << "PLAYER_COUNT_REJECTED\n"; }
+}
+"""
+        input_path = self.scratch / "stadium-pad-queue-serializer.cpp"
+        output_path = self.scratch / "stadium-pad-queue-serializer"
+        input_path.write_text(fixture, encoding="utf-8")
+        command = [compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror",
+                   str(input_path), "-o", str(output_path)]
+        (self.scratch / "stadium-pad-queue-serializer-command.json").write_text(
+            json.dumps(command), encoding="utf-8")
+        build = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=60)
+        (self.scratch / "stadium-pad-queue-serializer-build.log").write_text(
+            build.stdout + build.stderr, encoding="utf-8")
+        self.assertEqual(build.returncode, 0, build.stdout + build.stderr)
+        run = subprocess.run([str(output_path)], cwd=ROOT, capture_output=True,
+                             text=True, timeout=10)
+        (self.scratch / "stadium-pad-queue-serializer-run.log").write_text(
+            run.stdout + run.stderr, encoding="utf-8")
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        rows = run.stdout.splitlines()
+        self.assertEqual(rows[-2:], ["SOURCE_SLOT_REJECTED", "PLAYER_COUNT_REJECTED"])
+        default, explicit, sparse = (json.loads(row) for row in rows[:3])
+        self.assertEqual(default["version"], 2)
+        self.assertEqual([(row["setup_port_1based"], row["start_slot_field_raw"])
+                          for row in default["players"]], [(1, 0), (2, 0)])
+        self.assertEqual([(row["setup_port_1based"], row["start_slot_field_raw"])
+                          for row in explicit["players"]], [(1, 1), (2, 2)])
+        self.assertEqual(sparse["players"][1]["source_slot_index"], 2)
+        self.assertEqual(sparse["players"][1]["setup_port_1based"], 3)
+        self.assertEqual(sparse["players"][1]["start_slot_field_raw"], 0)
 
     def test_stadium_first_css_context_return_one_shot(self):
         if os.environ.get("MELEE_RUN_STADIUM_FIRST_CSS_CONTEXT") != "1":

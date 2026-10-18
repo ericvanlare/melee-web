@@ -14,6 +14,7 @@ assert.ok(cleanupMatch, 'Actual cleanupOwnedProcesses function is present');
 
 async function exerciseCleanup({unloadAttemptedInitially, unloadCompletedInitially,
   failureLog, afterUnloadLog,
+  unloadError = null,
   genuinePreUnloadLog = {sample: 'genuine-pre-unload'},
   genuinePreUnloadValidation = {complete: true, source: 'original-capture'},
   originalError = 'original scenario failure',
@@ -50,7 +51,7 @@ async function exerciseCleanup({unloadAttemptedInitially, unloadCompletedInitial
     report,
     page: {isClosed: () => false},
     driver: {
-      unload: async () => { events.push('unload'); },
+      unload: async () => { events.push('unload'); if (unloadError) throw unloadError; },
       dispose: () => { events.push('dispose'); },
     },
     unloadAttempted: unloadAttemptedInitially,
@@ -101,8 +102,15 @@ async function exerciseCleanup({unloadAttemptedInitially, unloadCompletedInitial
     .runInContext(context);
   await context.runActualCleanup();
   return {report, events, genuinePreUnloadLog, genuinePreUnloadValidation,
-    originalError, originalCleanupFailures};
+    originalError, originalCleanupFailures, unloadError};
 }
+
+const unloadDiagnostic = {url: 'http://127.0.0.1:8787/runtime.html',
+  phase: 5, native_owner: 'mismatched-live-owner', errors: ['native unload refused']};
+const unloadCause = new Error('Stadium display teardown refused a mismatched live owner');
+const wrappedUnloadError = new Error('Browser driver unload step failed', {cause: unloadCause});
+wrappedUnloadError.step = 'unload';
+wrappedUnloadError.diagnostics = unloadDiagnostic;
 
 for (const scenario of [
   {name: 'early failure before unload without a genuine pre-unload sample',
@@ -121,6 +129,11 @@ for (const scenario of [
       error: 'Stadium display teardown refused a mismatched live owner'}],
     failureLog: {sample: 'failure-after-refused-unload'},
     afterUnloadLog: {sample: 'harvest-after-refused-unload'}},
+  {name: 'failure-path unload retains driver diagnostics without replacing primary failure',
+    unloadAttemptedInitially: false, unloadCompletedInitially: false,
+    originalError: 'primary action failure remains authoritative', unloadError: wrappedUnloadError,
+    failureLog: {sample: 'primary-failure'},
+    afterUnloadLog: {sample: 'harvest-after-diagnostic-unload'}},
 ]) {
   const result = await exerciseCleanup(scenario);
   const probe = result.report.scenario.first_sss_vs_setup.text_tail_probe;
@@ -137,10 +150,19 @@ for (const scenario of [
   assert.notDeepEqual(probe.failure_time_log, probe.after_unload.text_tail_log, scenario.name);
   assert.equal(result.report.cleanup.unload_attempted, true, scenario.name);
   assert.equal(result.report.cleanup.unload_completed,
-    scenario.unloadCompletedInitially || !scenario.unloadAttemptedInitially, scenario.name);
+    scenario.unloadCompletedInitially || (!scenario.unloadAttemptedInitially && !scenario.unloadError),
+    scenario.name);
   assert.equal(result.report.error, result.originalError, scenario.name);
   assert.equal(result.report.result, 'fail', scenario.name);
-  assert.deepEqual(result.report.cleanup.failures, result.originalCleanupFailures, scenario.name);
+  if (scenario.unloadError) {
+    assert.equal(result.report.cleanup.failures.length, 1, scenario.name);
+    assert.deepEqual(JSON.parse(JSON.stringify(result.report.cleanup.failures[0])), {
+      step: 'unload', error: String(scenario.unloadError),
+      driver_step: 'unload', cause: String(unloadCause), diagnostics: unloadDiagnostic,
+    }, scenario.name);
+  } else {
+    assert.deepEqual(result.report.cleanup.failures, result.originalCleanupFailures, scenario.name);
+  }
   assert.ok(result.events.indexOf('failure-time-log') <
     result.events.indexOf('after-unload-harvest'), scenario.name);
   if (scenario.unloadAttemptedInitially) {

@@ -469,10 +469,12 @@ test('strict same-v6 HSD queue gate binds the literal native rows and Setup map'
   /positive safe generation from checked Setup/);
   assert.equal(await accepted.arm(true), true);
   assert.equal(await accepted.submit(evidence.runtimePayload.schedule[0]), true);
-  const queueObservation = {schema: 'melee-web-stadium-hsd-pad-queue-observation', version: 1,
+  const queueObservation = {schema: 'melee-web-stadium-hsd-pad-queue-observation', version: 2,
     source_generation: 7, source_tick_before: 0, source_tick_after: 1,
     qnum_before: 1, qread_before: 0, qcount_before: 1, qcount_after_hsd: 0,
-    player_count: 2, players: structuredClone(packet.host_only.required_queue_observation.expected_players),
+    player_count: 2, players: packet.host_only.required_queue_observation.expected_players.map(row => ({
+      ...row, start_slot_field_raw: 0,
+    })),
     queue_slot_status_hex: [...packet.host_only.required_queue_observation.expected_queue_slot_status_hex],
     tick_complete: true};
   const good = {last_action: {complete: true, schedule_index: 0, action: 'tick',
@@ -480,10 +482,21 @@ test('strict same-v6 HSD queue gate binds the literal native rows and Setup map'
   assert.equal(await accepted.accept(good), true, accepted.status().first_error || 'strict queue receipt refused');
   assert.deepEqual(native.approvals, [[0, true]]);
 
+  const explicitPortDriver = new StadiumSetupCfActionDriver({runtimePayload: evidence.runtimePayload,
+    admittedWorldGeneration: 7, requiredQueueObservation: evidence.requiredQueueObservation,
+    native: {arm: () => 1, queue: () => 1, approve: () => 1}});
+  assert.equal(await explicitPortDriver.arm(true), true);
+  assert.equal(await explicitPortDriver.submit(evidence.runtimePayload.schedule[0]), true);
+  const explicitPortReceipt = structuredClone(good);
+  explicitPortReceipt.last_action.pad_hsd_queue_observation.players[0].start_slot_field_raw = 1;
+  explicitPortReceipt.last_action.pad_hsd_queue_observation.players[1].start_slot_field_raw = 2;
+  assert.equal(await explicitPortDriver.accept(explicitPortReceipt), true,
+    explicitPortDriver.status().first_error || 'explicit Start port fields were refused');
+
   const badReceipts = [
     ['missing observation', receipt => { delete receipt.last_action.pad_hsd_queue_observation; }],
     ['schema', receipt => { receipt.last_action.pad_hsd_queue_observation.schema = 'wrong'; }],
-    ['version', receipt => { receipt.last_action.pad_hsd_queue_observation.version = 2; }],
+    ['legacy actual observation version', receipt => { receipt.last_action.pad_hsd_queue_observation.version = 1; }],
     ['generation', receipt => { receipt.last_action.pad_hsd_queue_observation.source_generation++; }],
     ['self-consistent but unadmitted generation', receipt => {
       receipt.last_action.world_generation = 8;
@@ -497,6 +510,16 @@ test('strict same-v6 HSD queue gate binds the literal native rows and Setup map'
     ['source tick before', receipt => { receipt.last_action.pad_hsd_queue_observation.source_tick_before = 1; }],
     ['source tick after', receipt => { receipt.last_action.pad_hsd_queue_observation.source_tick_after = 0; }],
     ['Setup map', receipt => { receipt.last_action.pad_hsd_queue_observation.players[1].controller_index = 0; }],
+    ['missing raw Start slot field', receipt => {
+      delete receipt.last_action.pad_hsd_queue_observation.players[0].start_slot_field_raw;
+    }],
+    ['effective port differs from raw Start slot field', receipt => {
+      receipt.last_action.pad_hsd_queue_observation.players[0].setup_port_1based = 0;
+    }],
+    ['cross-slot explicit Start port', receipt => {
+      receipt.last_action.pad_hsd_queue_observation.players[0].start_slot_field_raw = 2;
+      receipt.last_action.pad_hsd_queue_observation.players[0].setup_port_1based = 2;
+    }],
     ['duplicate player map', receipt => { receipt.last_action.pad_hsd_queue_observation.players[1].player_index = 0; }],
     ['reordered player map', receipt => {
       receipt.last_action.pad_hsd_queue_observation.players.reverse();
