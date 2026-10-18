@@ -147,6 +147,9 @@ test('actual receipt/diagnostic/persist/accept tail saves raw evidence before AC
       source_frames_before: 0, source_frames_after: 1, source_frames: 1};
     const cf = {actions: [], host_comparisons: [], runtime_diagnostics: [], last_native_state: null};
     const context = {assert, structuredClone, driver, cf, commonFieldsMode: false,
+      // Production hostEvidenceFromPacket includes an explicit null GO+2
+      // checkpoint for the unchanged full-schedule mode.
+      hostEvidence: {go2Snapshot: null},
       timingSample: null, matchedSetupCfTiming: null,
       cfState: {schema: 'melee-web-stadium-source-action-native-v3',
         scope: 'original-full7167-schedule-observation-only', action_count: 7167, last_action: receipt},
