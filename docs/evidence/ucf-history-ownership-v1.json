@@ -1,9 +1,9 @@
 {
   "schema": "melee-web-ucf-history-ownership-v1",
   "issue": 339,
-  "state": "source_bound_reference_build_passed_offline_initialization_unrun",
+  "state": "selected_initialization_metadata_observed_history_lifetime_open",
   "source_base": "130438fd2b86d00cfec98cd2ba0a5f66084ae15c",
-  "scope": "Source research and offline reference build prerequisite only. No new profile behavior, client execution, input-history state observation or rollback claim.",
+  "scope": "Source-bound reference build, two retained failed init-only attempts, source/fixture reduction and selected initialization metadata from a third bounded offline attempt. Unauthenticated endpoint; no gameplay, complete profile or rollback claim.",
   "history_contract": {
     "source_audit_sha256": "07fcbf61535816c488be1e1e341ee839139f4e98efac9046d7d26b0deed987b4",
     "snapshot_followup_sha256": "2d112f6e1fa8be776a1ddf514a058e51419a1337b21c76c92eb9ac90c25e65f3",
@@ -12,11 +12,37 @@
     "meaningful_bytes_total": 40,
     "index_owner": "processed PAD slot at Fighter offset 0x618; not raw port offset 0x61a",
     "unobserved": [
-      "installed table address",
-      "actual initializer and match reset",
-      "fixed snapshot region membership",
-      "restoration and dependent behavior agreement"
-    ]
+      "authenticated installation and history updates",
+      "actual match reset and lifetime",
+      "dynamic snapshot capture/load and dependent behavior agreement"
+    ],
+    "source_projection": {
+      "packet_sha256": "527fb6390edeeb4e8efdb3aeb5fe92bd58b81847916b9637558b5d4024fae6b4",
+      "projection_sha256": "e15c80a5eed188f0bbd533c66e27f0c3a14af9edd24db8228fe170f7e3feaa10",
+      "implementation_contract_sha256": "5ea1d1602a560dcf8e8081342ae6a3a3cb45005c41c930eac2e2e63ee16229a1",
+      "observed_table": [
+        "0x8065d4dc",
+        "0x8065d50c"
+      ],
+      "fixed_backup_region": [
+        "0x8065c000",
+        "0x8071b000"
+      ],
+      "authored_bytes": 48,
+      "meaningful_bytes": 40,
+      "reserved_bytes": 8,
+      "active_exclusion_count": 30,
+      "exclusion_overlaps": [],
+      "observed_main_heap": [
+        "0x806ed800",
+        "0x817f8ac0"
+      ],
+      "main_heap_owns_table": false,
+      "scope": "Static source membership for the selected endpoint span. Capture/Load execution, guest preserve-block overwrite and restore ordering remain unobserved.",
+      "independent_review_sha256": "60b112403c3b0cf5af0929467de8146ff8144873918b3903e7cd9bc733f83b3f",
+      "projection_clarity_supplement_sha256": "ffb2a353cebc61773f956ada46db37b49b2169ec45db448e1bf4c1f9269cf09e",
+      "projection_schema_clarification": "Frozen sample_pairs values denote exclusive8byte interval endpoints, not two sample start addresses; supplement preserves frozen bytes."
+    }
   },
   "source_gate": {
     "client_commit": "41a7a3a110ed52999486ae1901c8fbb9a63d4f13",
@@ -69,7 +95,7 @@
     "matching_build_receipt_found": false,
     "new_build_relabels_historical_artifact": false
   },
-  "next": "Review exact offline initialization and memory-observation entrypoint with process-local default-deny network isolation; no client launch released by this receipt.",
+  "next": "Review and implement only the isolated 48-byte history storage/snapshot component with explicit fresh session ownership and no producer or per-match reset API. Nonzero reference history/reset/restore gates remain open before activation or issue closure.",
   "exclusions": [
     "official Slippi services/contact",
     "complete UCF profile",
@@ -78,5 +104,163 @@
     "Stadium acceptance",
     "human physical/audio/timing/two-machine gates"
   ],
-  "independent_checkpoint_review_sha256": "fead67df8846178827715ea2606dd227b3fba6a703c80ae87ca3f5a7991b7055"
+  "independent_checkpoint_review_sha256": "fead67df8846178827715ea2606dd227b3fba6a703c80ae87ca3f5a7991b7055",
+  "offline_initialization": {
+    "build_binary_sha256": "4ba9bd13e102e7ce87444bde080506e00c3623f056cd7aae355fde5e271ffb75",
+    "network_scope": "Process-local default deny; exact private Unix observer endpoint only. No IP, official service, account, replay upload or helper launch authority.",
+    "caps_seconds": {
+      "whole": 90,
+      "observation": 45,
+      "cleanup": 6
+    },
+    "attempt1": {
+      "result_sha256": "b31234b938b956d3b1e113c759f12d527bce25ea86ea4450bfaa3d49583a88d2",
+      "retention_sha256": "68a01bcde5e3f5c42bce879e65d8fd550ebbb0a54059f7200a00d3be346bc3af",
+      "elapsed_seconds": 4.439226333,
+      "failure": "Initial original DOL extab word2a080000 rejected as invalid GCT pointer; no metadata admitted.",
+      "owned_group": 39719,
+      "cleanup_verified_absent": true
+    },
+    "preinstall_reduction": {
+      "packet_sha256": "cfb2b62323d55ff50e00bdae844fced16827b99fa7e273ecb804b61632b12379",
+      "independent_review_sha256": "45ebb4abcdee6d7886dfe000578907fd5c836168880521390f481e5254d1d30c",
+      "finding": "Exact first marked snapshot contains original extab data at80005600;23 pointer chains stop after invalid intermediate. It is not table payload.",
+      "pure_tests": 8,
+      "unchanged_decoder_tests": 12
+    },
+    "v5_integration": {
+      "packet_sha256": "5fed09587e2a76491a55887605ec8c303325971acab366fe1f775e6eb9754293",
+      "root_review_sha256": "c5f4135ebeaf0824abcf0279b0c22ff9bc49cd0c9f612e4ed1745c055f3f42b7",
+      "independent_review_sha256": "e269f7c9022820f929fe23631cdac1df2523bd8d5d7089e13febb8218333ff54",
+      "pure_tests": 17,
+      "strict_decoder_and_caps_unchanged": true,
+      "fresh_profile": true,
+      "policy_change": "Only exact new private profile prefix."
+    },
+    "attempt2": {
+      "result_sha256": "e1b77a1abb00d8bc7c59312157f8847e24f83d64ad9b1d50a28cb09f6f0c5cae",
+      "retention_sha256": "d0faae6ac9af0bdfba19ecf6378e2e0158d1822d50a17e23f119465924d8ce50",
+      "elapsed_seconds": 46.807184166274965,
+      "failure": "45-second observation deadline; no installed pointer or hook was emitted.",
+      "initial_slot_raw_hex": "2a080000",
+      "initial_hook_raw_hex": "887f0678",
+      "valid_pointer_epoch": 0,
+      "metadata_complete": false,
+      "last_observed_main_heap_hex": [
+        "806dd440",
+        "817f8ac0"
+      ],
+      "heap_scope": "Actual fixed-address endpoint word observations; no table membership, atomic snapshot or complete source progress proof.",
+      "owned_group": 60462,
+      "cleanup_verified_absent": true,
+      "socket_absent": true,
+      "diagnostic_80479d58_used_for_success": false,
+      "same_uid_sender_authenticated": false,
+      "independent_result_review_sha256": "45e1a839aa75de50213fe91a2c50b0a766c24e40d0a9057acadb86f66414d26d",
+      "fresh_cleanup_review_addendum_sha256": "a355d576e7c3f8ae116aa171ca743c3496d5ee14453e8cd6bd6ffa4e7e5be6f6"
+    },
+    "stop_rule": "After two failures, source reduction and a tiny paired conversion fixture preceded independent review of a changed six-file-read hypothesis. One third attempt observed selected metadata under unchanged deadlines/decoder; no same-hypothesis retry follows.",
+    "second_attempt_reduction": {
+      "packet_sha256": "97341e508ca85f412774ead7237918eb4129d39ea13a26d769e555f0b9802c01",
+      "independent_review_sha256": "6ee9de42df306eae0ee1e8442ce76ff002b9cb247e69e7e146c82c55bcfc4431",
+      "pins_verified": 45,
+      "finding": "An empty Running-state game-ID statistics key supports an identity lead; normal teardown resets to 00000000 after joining the writer. Actual boot ID/patch vector/raw disc read remain unobserved.",
+      "conditional": "Empty ID during LoadPatches would select no game INIs, leaving no active codes and returning before installation. Not proof of actual boot cause.",
+      "converter": {
+        "source_sha256": "d2eb7c78aaec4c07f3a416b856443ea72432df684832333c3506edade0b3fa26",
+        "policy_sha256": "af7c4caebaac8489be0591cf0e23fcac21aab12452bcd1e3495a00db934f8171",
+        "execution_receipt_sha256": "879f70810b1ec4fb6c247e9a4bc223a371a20879ae3804f3283c2294d8609177",
+        "compile_passed": true,
+        "probe_stage": "open_failed",
+        "errno": 22,
+        "input_bytes_remaining": 6,
+        "output_bytes": 0,
+        "owned_groups": [
+          62126,
+          62133
+        ],
+        "owned_groups_absent": true,
+        "no_client_or_disc": true,
+        "network_denied": true,
+        "scope": "Standard API fixture conversion fails under current resource policy; exact missing dependency and client cause are not established.",
+        "result_packet_sha256": "3ec99c60860548023b99e8de2c6fa5cbb7c52c55311dc399e541ed938910efbe",
+        "paired": {
+          "proposal_sha256": "223ad9d1d4cd853e689a844660cb811e092891dd7bddef22f7634de4c0014ea9",
+          "receipt_sha256": "e53bc098e3861b8627a4fe42de3f4231df34f9b553b04c3d249782dcd76d0eec",
+          "policy_sha256": "f1fd6ee02dbe294e30c69f7e96a9bb37a0c752e026cfd796e35578f2581e6140",
+          "binary_unchanged": true,
+          "literal_system_data_files": 6,
+          "result": "exact_match",
+          "output_hex": "47414c453031",
+          "owned_group": 63191,
+          "owned_group_absent": true,
+          "network_denied": true,
+          "scope": "The six-file read-grant set allowed the same converter to succeed; aggregate fixture evidence only, with no per-file necessity/minimality or client-cause proof.",
+          "independent_review_sha256": "ccbd01318c719a8cdb827a539242c451caed155ace95f49ce2dff4971e10716a"
+        }
+      }
+    },
+    "v6_integration": {
+      "packet_sha256": "06cfaa5e50a1a289a87defb9d64cfbae6b2b3b60b66dd460932f6a198b786277",
+      "independent_review_sha256": "abb8744266de7271fcd5ae9f7653849f51466f5e74e4a07cdeaae8840544404a",
+      "root_release_sha256": "7550e477e015684714c12a5e2a342d56dc189204f083e9086c5459b91fa8f4ca",
+      "strict_decoder_and_caps_unchanged": true,
+      "fresh_profile": true,
+      "policy_change": "Six fixture-supported exact conversion-file read grants, with related path metadata; unchanged network denial. Aggregate fixture enablement does not prove individual necessity or client cause.",
+      "frozen_contract_wording_correction": "The frozen contract says SIX_PROVEN_CONVERSION_DATA_READS. Review/release narrows this to SIX_FIXTURE_SUPPORTED_CONVERSION_FILE_READ_GRANTS without rewriting frozen bytes."
+    },
+    "attempt3": {
+      "run_id": "offline-init-candidate-v6",
+      "result_sha256": "9546ec2dcf16cd4fc36d6f2975dde3a3049bb06bc590e4e200faee4c3900ffb9",
+      "retention_sha256": "418b15f3dd75f1afc2d445c3699d3ea49433c84f22d2952a58e4a78fdd8dbb1f",
+      "independent_result_review_sha256": "b1389c9049da3090cf42d08f4200e2642708059a642dcbbdb496cd706e39abb5",
+      "status": "selected_metadata_stop",
+      "elapsed_seconds": 3.6403747922740877,
+      "selected_metadata": {
+        "status": "selected_metadata_stop",
+        "pointer": "0x8065cc80",
+        "payload": "0x8065d4d8",
+        "authored_table_span_exclusive": [
+          "0x8065d4dc",
+          "0x8065d50c"
+        ],
+        "branch_site": "0x8006b460",
+        "branch_word": "0x485f2078",
+        "decoded_branch_target": "0x8065d4d8",
+        "expected_branch_target": "0x8065d4d8",
+        "header_words": {
+          "GCT+0x850": "0xc206b460",
+          "GCT+0x854": "0x00000054",
+          "GCT+0x858": "0x480000b1"
+        },
+        "fingerprints": {
+          "GCT+0x88c": "0xbf1c0000",
+          "GCT+0x890": "0x38d1b717",
+          "GCT+0x894": "0x42a00000"
+        },
+        "sampled_table_words": {
+          "offsets": "0x85c through 0x888 inclusive, step 4",
+          "count": 12,
+          "all_values": "0x00000000",
+          "interpretation": "One observed selected-word snapshot only. It does not prove an installed table is absent, nor establish table history or reset/initialization behavior."
+        },
+        "main_heap_bounds": [
+          "0x806ed800",
+          "0x817f8ac0"
+        ],
+        "diagnostic_0x80479d58_used_for_classification_or_completion": false,
+        "decoder_metadata_complete": true
+      },
+      "raw_datagrams": 3,
+      "strict_replay_matches_saved_report": true,
+      "selected_metadata_observed_while_launcher_alive": true,
+      "client_exec_confirmed": false,
+      "same_uid_sender_authenticated": false,
+      "owned_group": 63980,
+      "cleanup_verified_absent": true,
+      "socket_absent": true,
+      "retained_files": 17,
+      "scope": "Selected endpoint observations only, not an atomic/loss-free full state or authenticated installation, history/reset/restore witness."
+    }
+  }
 }
