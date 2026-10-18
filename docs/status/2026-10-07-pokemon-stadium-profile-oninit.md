@@ -1722,10 +1722,9 @@ Their first differing four-port input rows occur at interval ordinals 2 and 4,
 respectively. This is an offline inventory, not proof of initial CSS equivalence
 or a replay. Fixed historical menu interfaces cannot accept the fresh recording
 by changing a seed or relabeling its identity. The reviewed mandatory
-same-producer Entry/Setup guard is now implemented. The next bounded step is
-a private versioned constructor-only comparison before any ticks. Offline
-producer-bound extraction and representation now pass after the reduced repairs
-below. No new capture or long lifetime is released.
+same-producer Entry/Setup guard is now implemented. The private constructor-only comparison before any ticks now passes, as recorded
+below. The next bounded step is the first actual four-port consumed input and
+source tick/draw from this same producer. No longer lifetime is released.
 
 A smaller replay alternative was checked offline before implementation. The
 retained long run2 reference reaches the same Entry/Setup seeds as the browser,
@@ -1792,11 +1791,65 @@ actual host loader accepts the frozen producer and rejects stale identity and
 narrowed comparison fields; incompatible route flags refuse before browser
 startup. Independent review verifies these scopes, the fixed comparison inventory,
 and unchanged v1 source pins outside the repair. Original source coordinates stay
-provenance; native counters describe actual execution. No affected build, full
-regression or browser result for the probe is claimed yet. The previous runtime's
-50 products are retained with verified hashes before any rebuild.
+provenance; native counters describe actual execution. Historical runtime products
+are retained with verified hashes before rebuilding.
 
-The supervised attempt took 15.248 seconds (15.317 seconds including the root
+The constructor-only probe built successfully in diagnostic and ordinary Release
+at runtime source `299cfd06`. Its first full regression retained two extracted
+fixture failures: an empty setup-runner slice and a missing constructor-owner
+predicate in the replay-import fixture. Reviewed fixture repairs at `46e66912`
+passed all 2,726 tests with 189 skips. The original failures and reduced compiler
+reproducer remain retained; the repairs did not change native execution.
+
+The first capture attempt stopped at the artifact preflight before Chrome: the
+packet omitted the required producer artifact map. It had started its owned
+server, which was retired. The corrected packet passed the actual offline
+preflight contract. The next browser attempt imported and armed the owner but
+the ordinary Play control tried to prepare it again. The native guard correctly
+refused that operation; the constructor was never compared. Checked unload
+completed and all recorded processes retired, while observation clearing remained
+unverified. Both failures remain retained.
+
+An extracted test reproduced one preparation call and zero launch calls. The
+reviewed repair at `a4830eba` gives only the private constructor diagnostic a
+queued prepared-owner launch, retaining audio readiness and owner/generation
+checks. The ordinary Play control and native refusal guards remain unchanged.
+All 64 focused controls and both affected Release builds pass. These are control
+and build results, not constructor equivalence.
+
+A proposed audio-activation review blocker was resolved with a smaller browser
+control before another game capture. The pinned Playwright call marks evaluation
+as a user gesture. With the exact helper and real audio module/worklet, readiness
+passed after a queued callback and after transient activation expired; a raw CDP
+call without activation correctly refused. This control used explicit native and
+owner doubles. The original review and amended approval remain retained; no
+production audio protocol was changed.
+
+The single reviewed constructor capture on `a4830eba` passes. The fixed inventory
+checks the local CSS scene enum and five raw-reference fields: original scene
+kind, RNG seed, PAD state, KO counts and the full declared typed CSS state. The
+existing explicit ABI-padding exclusion and checked null-pointer representation
+remain unchanged. The constructor reached its stopped terminal with no source
+ticks, draws, host tick/draw calls or Aurora begin/end calls. Two later callbacks
+left the state unchanged. Checked unload cleared the observation and restored
+the idle import boundary. Both 44-file HTTP/local inventories match, WebGPU is
+available, and there are no page or console errors. The supervisor and an
+independent scan confirm all 13 recorded owned process identifiers absent.
+The screenshot shows the expected undrawn canvas; it is not pixel evidence.
+Independent raw-result review replays the exact committed comparator and its
+field, pointer and padding refusal controls successfully. The final regression
+on `a4830eba` passes 2,727 tests with 189 skips in 573.503 seconds; source hashes
+are unchanged and its owned process group is absent. PR #301 tracks the separate
+exact-head CI gate and stays draft while C3 remains incomplete.
+
+This establishes the same-producer initial constructor boundary only. It does
+not establish consumed-input replay, SSS/VS Entry/Setup parity, GO+2 agreement,
+Stadium idle lifetimes, per-owner RNG or C3. The next bounded experiment is a
+separate first-input/tick/draw diagnostic with exact original ordering; this
+constructor-only owner remains non-continuable.
+
+
+The earlier GO+2 supervised attempt took 15.248 seconds (15.317 seconds including the root
 launcher). Checked native retirement and observation clearing passed, with
 zero cleanup failures. The supervisor's process attribution and a separate
 root scan confirm all 13 recorded owned PIDs absent. All 44 local/HTTP artifacts

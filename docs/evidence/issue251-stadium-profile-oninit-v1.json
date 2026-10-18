@@ -17584,7 +17584,7 @@
       "new_native_or_browser_execution": false
     },
     "fresh_css_constructor_probe": {
-      "state": "SOURCE_AND_FOCUSED_CONTROLS_REVIEWED_RUNTIME_VALIDATION_PENDING",
+      "state": "CONSTRUCTOR_CAPTURE_PASS_VALIDATED_DRAFT_CHECKPOINT",
       "candidate_v1_sha256": "3817a0210077ffbf85c78c4fcd04015398f22939381b7c7179133f2dad44d406",
       "retained_native_v1_review_sha256": "b2e7dd68d83a9667b990a8faf5bbcdb9a5e227cc8a88788508471688075d5115",
       "native_repair_v2_sha256": "5d228e14cc4e889e3bc1ba49a56dd13b2ff83116c82e3e3a68ff37af33053bc7",
@@ -17606,10 +17606,151 @@
         "Saved pointer observation lacked live owner/generation gate; guarded before reads"
       ],
       "scope": "Private original CSS constructor-return terminal only, with no scheduled PAD, source tick/draw or continuation; existing typed context and comparison reused. Source review and extracted controls do not establish whole Emscripten/native integration.",
-      "runtime_builds": "PENDING",
-      "full_regression": "PENDING",
-      "browser": "UNRUN",
-      "C3": false
+      "runtime_builds": {
+        "initial_source": "299cfd061637e3f0eef533db75384ea04b6bdc59",
+        "prepared_launch_source": "a4830eba28f03f0891d6eb57173e02855b1f8c62",
+        "diagnostic": {
+          "evidence": "validation-v1/prepared-diagnostic-release/result.json",
+          "bytes": 979,
+          "sha256": "38b708b26a2a709e67bcd794b7f3582bbc1a36f3265fa5e651f00a1853571d2a"
+        },
+        "ordinary": {
+          "evidence": "validation-v1/prepared-ordinary-release/result.json",
+          "bytes": 945,
+          "sha256": "f38c869fbd4ec5332a5bfa40d47fd987cb4dd514fd6882541184c4c2ecb10303"
+        }
+      },
+      "full_regression": {
+        "initial_failure": {
+          "evidence": "validation-v1/regression/result.json",
+          "bytes": 912,
+          "sha256": "37f2fdddc87250b232a2c1095aab8eda22067d981a219829f8d5ed5986b5202e"
+        },
+        "fixture_repair_pass": {
+          "evidence": "validation-v1/regression-repaired/result.json",
+          "bytes": 921,
+          "sha256": "a71c02c26690c41ef773b207fe5ea7ea25600417db9066650c4f15204fcf4cdf"
+        },
+        "current_a4830eba": {
+          "result": "PASS",
+          "tests": 2727,
+          "skips": 189,
+          "seconds": 573.503,
+          "evidence": "validation-v1/prepared-regression-repaired/result.json",
+          "bytes": 930,
+          "sha256": "55095cfdbb257a451cf0277e2b3df2fd5bd64446680976cb2f32e6f848d96a74"
+        }
+      },
+      "browser": {
+        "result": "PASS_CONSTRUCTOR_ONLY",
+        "source_revision": "a4830eba28f03f0891d6eb57173e02855b1f8c62",
+        "packet": {
+          "evidence": "capture-v4/packet-v4.json",
+          "bytes": 2933,
+          "sha256": "a5b61331a198bfd828a8631af3a50a1e3516c79244983b4a8ba2f97f2dfc281d"
+        },
+        "report": {
+          "evidence": "capture-v4/browser-run/report.json",
+          "bytes": 60937,
+          "sha256": "10358ec12b20b17ffe13c68895145d942b64d5248d283603d8e23b0237e1eb2f"
+        },
+        "supervisor": {
+          "evidence": "capture-v4/owner.json",
+          "bytes": 93610,
+          "sha256": "27253fe7bfa187284d924f0f51e0f84e83383f875918776d2af092215bc5c494"
+        },
+        "root_result": {
+          "evidence": "capture-v4/root-result.json",
+          "bytes": 2738,
+          "sha256": "fb10b6ebc5f7dca28975e8a812bbdb99cf1691c903aae0a5a620b09a73f2226b"
+        },
+        "independent_owned_absence": {
+          "evidence": "capture-v4/root-owned-absence.json",
+          "bytes": 289,
+          "sha256": "924232008e7a1359ed13c21c6c61d56f9191b50c09393da61462433cf958ee1a"
+        },
+        "comparison_fields": [
+          "source_scene (local enum 1)",
+          "scene_kind",
+          "random_seed_hex",
+          "pad_state_hex",
+          "ko_counts_hex",
+          "css"
+        ],
+        "source_ticks": 0,
+        "source_draws": 0,
+        "source_free_callbacks": 3,
+        "unload_and_observation_clear": true,
+        "http_local_artifacts_before_after": 44,
+        "independent_result_review": {
+          "evidence": "capture-v4/result-review-v1.json",
+          "bytes": 11998,
+          "sha256": "c1c67645c569c80978b568a3e2b04f05f14a5fd930f79f9412ae5151a33c33f8"
+        }
+      },
+      "C3": false,
+      "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+      "prepared_launch_repair": {
+        "candidate": {
+          "evidence": "validation-v1/prepared-launch-candidate-v1/manifest.json",
+          "bytes": 2028,
+          "sha256": "ad8ea28c994ebbec9736fe0c4d4839a23b2f432ae3fc02c33e96f051883a0be4"
+        },
+        "review": {
+          "evidence": "validation-v1/prepared-launch-candidate-v1/independent-source-fixture-review-v1.json",
+          "bytes": 5024,
+          "sha256": "a79f4fcf3cecf535adc4b693c5d44b7b2d4e8ff1e19119f916b8818fea6be065"
+        },
+        "focused_cases": 64,
+        "applied_log": {
+          "evidence": "validation-v1/prepared-launch-candidate-v1/applied-focused.log",
+          "bytes": 459,
+          "sha256": "40f83da57f3e45f09e5c46822489630086359972a4fc63778a5035dfcf9c5517"
+        },
+        "scope": "Development-only queued prepared-owner launch; ordinary UI and native guards unchanged"
+      },
+      "retained_capture_failures": [
+        {
+          "evidence": "capture-v2/retained-failure.json",
+          "bytes": 1939,
+          "sha256": "38e554d1a8e61eb947987f92085f77ec34913105154f19d1124bce284cf550bc"
+        },
+        {
+          "evidence": "capture-v3/retention-v1.json",
+          "bytes": 2721,
+          "sha256": "2c3a3c1d3b9857d49559b09d173ec34d26ee31560c7e02621d2d6843a3d92197"
+        }
+      ],
+      "audio_activation_control": {
+        "review": {
+          "evidence": "audio-activation-control-v1/review-v1.json",
+          "bytes": 3378,
+          "sha256": "ed04e4ff2e3a4be165db04bfe7aa9d5d44ce9a64a2887d0869be1554409b53d5"
+        },
+        "report": {
+          "evidence": "audio-activation-control-v1/browser-run/report.json",
+          "bytes": 23521,
+          "sha256": "64e92c1c668493bf0ef425b8163b4c50fef237be9757a3791083560b38ffabe9"
+        },
+        "superseded_review": {
+          "evidence": "capture-v4/independent-review-v1.json",
+          "bytes": 3575,
+          "sha256": "77e3b3f6cf3374cf640e836ad9d4b7522bef1d75f720ffeb081805e167223517"
+        },
+        "amended_review": {
+          "evidence": "capture-v4/independent-review-v2.json",
+          "bytes": 5996,
+          "sha256": "aafbed9975fd57fb53c12475e0f56b9ce4648ccc90c7138668c0a3cdef3790ce"
+        },
+        "scope": "Exact helper and real audio/worklet, explicit native/owner doubles; no game or audible acceptance"
+      },
+      "retained_root_readback_adapter_errors": {
+        "evidence": "capture-v4/root-readback-adapter-failures.json",
+        "bytes": 778,
+        "sha256": "f93b98d12d4910570ed57dc7ca4e3fe68754b8b7a3dfda31507ccdefeacc760e"
+      },
+      "next": "Separate same-producer first four-port input/tick/draw boundary; no continuation of constructor-only owner and no longer lifetime released",
+      "publication_gate": "PR #301 remains draft. Complete current-head CI is required before integration; C3 remains open."
     }
   }
 }
