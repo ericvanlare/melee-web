@@ -48,12 +48,15 @@ class FirstCssStreamInputDecoderTests(OwnedWorkspaceTests):
                          (self.scratch / "control.log").read_text())
         self.assertIn("PASS exact decoder 148 batches/592 ports; 6573 envelope refusals; 2 index refusals",
                       (self.scratch / "control.log").read_text())
+        self.assertIn("PASS CSS context v1/v2 separation; ordered dynamic v2 source envelope refusals",
+                      (self.scratch / "control.log").read_text())
 
 
 CONTROL = r'''
 #include <cassert>
 #include <cstring>
 #include <iostream>
+#include <utility>
 #include <vector>
 using namespace melee_web::stadium_first_css_diagnostic;
 int main() {
@@ -168,5 +171,65 @@ int main() {
     assert(prefix_refused==7620&&prefix==prefix_saved);
     std::cout<<"PASS SSS prefix exact7488/124rows/496ports;7620 envelope/order refusals;input unchanged\n";
     std::cout << "PASS exact decoder 148 batches/592 ports; 6573 envelope refusals; 2 index refusals\n";
+
+    auto put_be32=[](std::vector<uint8_t>& bytes,size_t offset,uint32_t value){
+      bytes[offset]=uint8_t(value>>24);bytes[offset+1]=uint8_t(value>>16);
+      bytes[offset+2]=uint8_t(value>>8);bytes[offset+3]=uint8_t(value);
+    };
+    std::vector<uint8_t> context(kContextBytes,0);
+    std::memcpy(context.data(),"STC2CSSR",8);put_be32(context,8,2);
+    for(unsigned i=0;i<32;++i)context[12+i]=uint8_t(0xa0+i);
+    put_be32(context,44,728);put_be32(context,48,859);
+    put_be32(context,kContextHeaderBytes,0x12345678);
+    const size_t css_offset=kContextHeaderBytes+4+kPadBytes;
+    put_be32(context,css_offset+4,kKoAddress);
+    const auto context_before=context;
+    const auto context_v2=decode_constructor_return_context_v2(
+        context.data(),context.size());
+    assert(context_v2.envelope_version==2&&context_v2.seed==0x12345678&&
+           context_v2.source_entry_sequence==728&&
+           context_v2.source_return_sequence==859&&
+           context_v2.source_sha256==hex(context.data()+12,32));
+    auto reject_context_v2=[&](const uint8_t* p,size_t n){
+      bool caught=false;
+      try{(void)decode_constructor_return_context_v2(p,n);}
+      catch(const std::runtime_error&){caught=true;}
+      assert(caught);
+    };
+    reject_context_v2(nullptr,context.size());
+    reject_context_v2(context.data(),context.size()-1);
+    auto too_long_context=context;too_long_context.push_back(0);
+    reject_context_v2(too_long_context.data(),too_long_context.size());
+    for(unsigned offset:{0u,11u}){auto bad=context;bad[offset]^=1;
+      reject_context_v2(bad.data(),bad.size());}
+    auto zero_identity=context;std::fill_n(zero_identity.begin()+12,32,0);
+    reject_context_v2(zero_identity.data(),zero_identity.size());
+    for(const auto [entry,returned]:{
+        std::pair<uint32_t,uint32_t>{0,859},{728,0},{859,728},{728,728}}){
+      auto bad=context;put_be32(bad,44,entry);put_be32(bad,48,returned);
+      reject_context_v2(bad.data(),bad.size());}
+    for(size_t offset:{css_offset+2,css_offset+4,css_offset+0x48}){
+      auto bad=context;bad[offset]=1;reject_context_v2(bad.data(),bad.size());}
+    bool v2_rejected_by_v1=false;
+    try{(void)decode_context(context.data(),context.size());}
+    catch(const std::runtime_error&){v2_rejected_by_v1=true;}
+    assert(v2_rejected_by_v1&&context==context_before);
+
+    std::vector<uint8_t> legacy(kContextBytes,0);
+    std::memcpy(legacy.data(),"STC1INPT",8);put_be32(legacy,8,1);
+    std::memcpy(legacy.data()+12,source,32);
+    put_be32(legacy,44,kEntrySequence);put_be32(legacy,48,kReturnSequence);
+    put_be32(legacy,kContextHeaderBytes,0x12345678);
+    const size_t legacy_css_offset=kContextHeaderBytes+4+kPadBytes;
+    put_be32(legacy,legacy_css_offset+4,kKoAddress);
+    const auto context_v1=decode_context(legacy.data(),legacy.size());
+    assert(context_v1.envelope_version==1&&
+           context_v1.source_entry_sequence==kEntrySequence&&
+           context_v1.source_return_sequence==kReturnSequence);
+    bool v1_rejected_by_v2=false;
+    try{(void)decode_constructor_return_context_v2(legacy.data(),legacy.size());}
+    catch(const std::runtime_error&){v1_rejected_by_v2=true;}
+    assert(v1_rejected_by_v2);
+    std::cout<<"PASS CSS context v1/v2 separation; ordered dynamic v2 source envelope refusals\n";
 }
 '''

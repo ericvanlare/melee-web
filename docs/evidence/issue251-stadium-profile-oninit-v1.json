@@ -17289,7 +17289,7 @@
   },
   "fresh_go2_comparison_2026_10_18": {
     "state": "ORIGINAL_GO2_REFERENCE_PASS_BROWSER_FIRST_C_COMPARISON_FAIL",
-    "next": "Offline producer-bound initial CSS extraction and representability, followed by a reviewed v2 codec and constructor-return comparison before advancing ticks. The mandatory Entry/Setup guard is implemented and reviewed; no new capture or long lifetime released.",
+    "next": "Reviewed constructor-only v2 source is ready for affected builds and full regression, then one bounded browser initialization comparison. No new capture or long lifetime released.",
     "native": {
       "binary_sha256": "4bebd3a21cf48da558c7380f45b73e394fe46f47cef774d939cd4659051918fa",
       "producer_manifest_sha256": "2da988e27c334b4530935ea32af3edc319707482e276b064e9b08c132d4cedbd",
@@ -17438,7 +17438,7 @@
       "success": 12,
       "expected_skips": 2,
       "receipt_sha256": "4da490f629d4865b08fb717a4dddd83908b321d96891ac93903c54db10e45797",
-      "scope": "Historical published documentation head only; subsequent guard source review and regression have separate identities and published exact-head CI remains pending."
+      "scope": "Historical documentation head; later f2648748 start-guard validation is separately recorded."
     },
     "run2_reuse_reduction": {
       "state": "REFUSE_RUN2_AS_HISTORICAL_BROWSER_MENU_SCHEDULE",
@@ -17462,7 +17462,7 @@
       "independent_review_sha256": "2ef05ab2eb66f8f521170461a5412a8c7fec79e9803ac0a43fdb3d003fd3cf59"
     },
     "start_context_guard": {
-      "state": "REVIEWED_FULL_REGRESSION_PASS_PUBLICATION_CI_PENDING",
+      "state": "REVIEWED_FULL_REGRESSION_AND_EXACT_HEAD_CI_PASS",
       "base_head": "5ad6f35f68b2727ef3e1b3289c80acbd5bd8d3c9",
       "candidate_freeze_sha256": "e45e0dea8e8a9db3094e2270fdc092514ca2636ac018a5a05d2a8a512df98360",
       "patch_sha256": "c43f7377bf503e8c90b172487ee3c6ccc28dd728f3552e0f0b211150ab4656d3",
@@ -17501,7 +17501,115 @@
         "owned_process_group_absent": true,
         "owned_disposable_scratch_removed": true
       },
-      "new_runtime_build": false
+      "new_runtime_build": false,
+      "published_head": "f26487480701b165b55be37bc88fe8a59c6968fc",
+      "ci": {
+        "run": 39161310774,
+        "complete": 14,
+        "success": 12,
+        "expected_skips": 2,
+        "receipt_sha256": "7ee916e0cc3ab18c5f5877babed2eb49c5e2c3cb94710b089faa15ae88bc6426"
+      }
+    },
+    "fresh_css_initial_context": {
+      "state": "PASS_SCOPED_OFFLINE_REPRESENTABILITY_AND_ENVELOPE_REVIEW",
+      "source_css_entry": {
+        "sequence": 728,
+        "source_tick": 114,
+        "draw_ordinal": 0,
+        "pc": "8026688c",
+        "word": "7c0802a6"
+      },
+      "source_css_return": {
+        "sequence": 859,
+        "source_tick": 114,
+        "draw_ordinal": 0,
+        "pc": "802669f0",
+        "word": "4e800020"
+      },
+      "original_observer_sha256": "4fd54b4aa9537292295ad83fbb75655f8213a475a876fdd1468affb68d3d211f",
+      "failed_adapter_attempts": {
+        "count": 2,
+        "retained": true,
+        "stop_review_sha256": "d590d2ff3ab56f8dec32bfeaf03f6e520feecd64f0c8fb5b34d77b5bcb8371e7",
+        "causes": [
+          "Confused immutable packet inputs with runtime-generated output config/recipe copies.",
+          "Passed unnamed raw payload to a helper requiring a copied named-slice view."
+        ]
+      },
+      "reduced_helper_result_sha256": "6e579253e7c94166a338e4200dfc5388b69e6b4f87c0d2cb85c7bf4fe4375a12",
+      "reviewed_reducer_sha256": "687b648217b2d49157ad8dac03d4d1dae549dfddb94c2b6580e7ee4a6c51b56b",
+      "candidate_review_freeze_sha256": "2822c3e254d2680ca30f846e2b1a045232ab0f55779b14cd144a289ba8eb16da",
+      "result_sha256": "83c785a8f84e0e9681985de294a96e3975755f549f8f271f0651c9d70d35488a",
+      "independent_raw_review_sha256": "316a5c13857bdeb33209113b59a22317cafb0227688e43d3e441d0c02763d3a8",
+      "payload_bytes": 23176,
+      "payload_sha256": "b9807ee726d763dc8b2d6e5ed6a69997bf1eb02c2f9b989de4b49542f4d04a8d",
+      "finite_css_endpoint_floats": 42,
+      "initial_slots": 6,
+      "initial_slot_state": "inactive 3/33",
+      "cycles": {
+        "css": 142,
+        "sss": 133,
+        "order": "consume, tick, draw enter, draw return, poll; actual sequence gaps retained"
+      },
+      "negative_controls": [
+        "wrong dynamic RNG target",
+        "nonnull callback",
+        "first-player attack ratio NaN",
+        "missing poll"
+      ],
+      "historical_v1_byte_identical": true,
+      "historical_v1_sha256": "dee4305dd5cc65f35d6a48f21f4e176129efdc3d00f26b2dc31f6e666c04c6be",
+      "constructor_envelope": {
+        "magic": "STC2CSSR",
+        "version": 2,
+        "bytes": 23228,
+        "producer_freeze_sha256": "d76e97cd3ee8b760cb7a01e256da10a7db1c4309cc0833c4884881f376a28436",
+        "manifest_sha256": "73d5f940bb19005705961e2eb6225c1b910fa4f792d1dc653c15418cfc10ed7a",
+        "context_sha256": "0329a0b0c24487f560f0bcae0b971c0f0ffb91d3b847e66bedb9ee2b738d9b31",
+        "expected_return_sha256": "61b7712ee1a6e30df9ef8d25dc277923d2981dec78ea6d178189249c9659c474",
+        "independent_review_sha256": "af8f88e7333196d063ec7661366ba8c87018977f20e82a69e878dedec3dc8944",
+        "producer_pins": 13,
+        "comparison_fields": [
+          "source_scene",
+          "scene_kind",
+          "random_seed_hex",
+          "pad_state_hex",
+          "ko_counts_hex",
+          "css"
+        ],
+        "source_scene": "Local CSS enum 1; not an invented original raw enum."
+      },
+      "scope": "Offline representation and producer binding only. No native initialization, consumed-input mapping, browser equality, lifetime or C3 result.",
+      "new_native_or_browser_execution": false
+    },
+    "fresh_css_constructor_probe": {
+      "state": "SOURCE_AND_FOCUSED_CONTROLS_REVIEWED_RUNTIME_VALIDATION_PENDING",
+      "candidate_v1_sha256": "3817a0210077ffbf85c78c4fcd04015398f22939381b7c7179133f2dad44d406",
+      "retained_native_v1_review_sha256": "b2e7dd68d83a9667b990a8faf5bbcdb9a5e227cc8a88788508471688075d5115",
+      "native_repair_v2_sha256": "5d228e14cc4e889e3bc1ba49a56dd13b2ff83116c82e3e3a68ff37af33053bc7",
+      "native_repair_review_sha256": "86f88fd6ed692c9e9ffa45e99446e0d39e5d19453c1704d627fb3a24969c50f3",
+      "runner_review_sha256": "6bd5dda67a27cc8ae9b946aad5c5de5e08c74582a3335ca6f23cdf7160ad2cd0",
+      "focused": {
+        "native_owner_tests": 2,
+        "decoder_tests": 1,
+        "runner_syntax": "PASS",
+        "offline_actual_loader": "PASS real producer plus stale-preflight/narrowed-field refusals",
+        "incompatible_route": "Refused before main, no server/browser"
+      },
+      "retained_compile_fixture_failures": [
+        "Duplicate extracted enum in initial owner fixture",
+        "Missing local state binding in repair read-gate fixture"
+      ],
+      "retained_source_findings": [
+        "Re-prepare refusal ran destructive catch; moved before try",
+        "Saved pointer observation lacked live owner/generation gate; guarded before reads"
+      ],
+      "scope": "Private original CSS constructor-return terminal only, with no scheduled PAD, source tick/draw or continuation; existing typed context and comparison reused. Source review and extracted controls do not establish whole Emscripten/native integration.",
+      "runtime_builds": "PENDING",
+      "full_regression": "PENDING",
+      "browser": "UNRUN",
+      "C3": false
     }
   }
 }

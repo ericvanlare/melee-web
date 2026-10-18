@@ -147,6 +147,9 @@ bool scoped_assets=false,asset_committed=false;
 bool stadium_c1a_armed=false;
 std::string stadium_c1a_observation;
 int stadium_c1a_raw_stkind=-1;
+enum class FirstCssBrowserMode : unsigned {
+ None=0, LegacyTickDrawV1=1, ConstructorReturnOnlyV2=2
+};
 struct FirstCssDrawSample {
  std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> pad{};
  uint32_t seed=0,scene_frame=0;
@@ -156,8 +159,13 @@ struct FirstCssDrawSample {
  bool seed_owner_stable=false,scene_owner_stable=false,world_generation_stable=false;
 };
 struct FirstCssBrowserDrawState {
+ FirstCssBrowserMode mode=FirstCssBrowserMode::None;
  bool armed=false,kicked=false,entry_captured=false,tick_captured=false;
  bool draw_captured=false,frame_end_returned=false,complete=false,failed=false;
+ bool constructor_arm_ready=false,constructor_launch_consumed=false;
+ bool constructor_entry_attempted=false,constructor_return_terminal=false;
+ bool arm_source_session_owned=false;
+ unsigned constructor_source_free_callbacks=0;
  std::string error;
  melee_web::stadium_first_css_diagnostic::ContextInput context{};
  melee_web::stadium_first_css_diagnostic::ConsumedPadInput consumed{};
@@ -169,6 +177,9 @@ struct FirstCssBrowserDrawState {
  uint64_t world_generation=0;
  uint32_t frame_before=0,frame_after_tick=0;
  int tick_result=0;
+ MeleeWebMenuHost* armed_host_owner=nullptr;
+ melee_web::GameplayMenuWorld* armed_world_owner=nullptr;
+ uint64_t armed_world_generation=0;
  unsigned source_callbacks_before_kick=0,host_tick_calls=0,host_draw_calls=0;
  unsigned source_steps=0,source_draws=0,aurora_begin_calls=0,aurora_end_calls=0;
  unsigned draw_source_tick=0,draw_ordinal=0;
@@ -292,6 +303,8 @@ FirstSssConsumedTickState first_sss_consumed_tick;
 extern bool running;
 extern bool first_use_draw_pending;
 extern melee_web::FixedTickClock menu_clock;
+extern melee_web::FixedTickClock audio_clock;
+extern unsigned audio_phase;
 extern std::string message;
 extern uint64_t diagnostic_audio_render_calls,diagnostic_audio_render_frames;
 std::string first_css_browser_draw_json_quote(const std::string& value){
@@ -898,6 +911,12 @@ void first_css_browser_draw_fail(const std::string& error){
  if(!first_css_browser_draw.failed){
   first_css_browser_draw.failed=true;first_css_browser_draw.error=error;
  }
+ if(first_css_browser_draw.mode==FirstCssBrowserMode::ConstructorReturnOnlyV2){
+  first_css_browser_draw.constructor_return_terminal=true;
+  first_css_browser_draw.constructor_arm_ready=false;
+  pending=false;first_use_draw_pending=false;audio_phase=0;
+  menu_clock.reset();audio_clock.reset();
+ }
  running=false;menu_clock.reset();message=first_css_browser_draw.error;
 }
 void first_css_browser_draw_check_live(const char* boundary){
@@ -1134,8 +1153,96 @@ bool first_css_browser_postdraw_stream_compare(const char* phase,
   }catch(_){return 0;}
  },phase,actual_json.c_str())==1;
 }
+bool first_css_constructor_return_seed_pointer_stable(bool owner_live){
+ const auto& state=first_css_browser_draw;
+ return owner_live&&state.entry_captured&&state.seed_owner&&
+        seed_ptr==state.seed_owner&&*state.seed_owner==state.entry.random_seed;
+}
+bool first_css_constructor_return_scene_pointer_stable(bool owner_live,
+ const GameModeState::GameSceneInfo* current_scene){
+ const auto& state=first_css_browser_draw;
+ return owner_live&&state.entry_captured&&state.scene_owner&&current_scene&&
+        current_scene==state.scene_owner&&current_scene->scene_kind==8;
+}
 void first_css_browser_draw_refresh_observation(){
  auto& state=first_css_browser_draw;
+ if(state.mode==FirstCssBrowserMode::ConstructorReturnOnlyV2){
+  const auto* current_scene=static_cast<const GameModeState::GameSceneInfo*>(
+      melee_web_current_scene_info());
+  const bool generation_stable=state.world_generation!=0&&
+      melee_web_gameplay_generation()==state.world_generation&&
+      melee_web_gameplay_world_exists()&&melee_web_source_memory_healthy();
+  const bool armed_owner_stable=host&&host==state.armed_host_owner&&world&&
+      world.get()==state.armed_world_owner&&state.armed_world_generation!=0&&
+      melee_web_gameplay_generation()==state.armed_world_generation&&
+      source_session_owned==state.arm_source_session_owned&&
+      state.arm_source_session_owned;
+  // Pointer equality alone cannot establish liveness after owner loss. Keep
+  // failure observations on retained values until both generations and the
+  // entered armed owners have passed before reading either saved pointer.
+  const bool pointer_owner_live=generation_stable&&armed_owner_stable&&
+      state.entry_captured&&host_entered&&world_exposed;
+  const bool seed_owner_stable=
+      first_css_constructor_return_seed_pointer_stable(pointer_owner_live);
+  const bool scene_owner_stable=
+      first_css_constructor_return_scene_pointer_stable(pointer_owner_live,current_scene);
+  const char* status=state.failed?"failed":
+      state.constructor_return_terminal?"css-return-stopped":
+      state.entry_captured?"css-return-captured":state.armed?"armed":"idle";
+  std::ostringstream out;
+  out<<"{\"schema\":\"melee-web-stadium-first-css-constructor-return-observation-v2\""
+     <<",\"scope\":\"original_css_constructor_return_only_before_any_source_tick_or_draw\""
+     <<",\"state\":\""<<status<<"\",\"mode\":\"constructor_return_only_v2\""
+     <<",\"error\":"<<(state.error.empty()?"null":
+          first_css_browser_draw_json_quote(state.error))
+     <<",\"source_provenance\":{\"stream_sha256\":"
+     <<first_css_browser_draw_json_quote(state.context.source_sha256)
+     <<",\"context_version\":"<<state.context.envelope_version
+     <<",\"css_entry_sequence\":"<<state.context.source_entry_sequence
+     <<",\"css_return_sequence\":"<<state.context.source_return_sequence<<'}'
+     <<",\"native_phase\":"<<(host?melee_web_menu_host_phase(host):0)
+     <<",\"running\":"<<(running?"true":"false")
+     <<",\"host_entered\":"<<(host_entered?"true":"false")
+     <<",\"world_generation\":"<<state.world_generation
+     <<",\"world_generation_stable\":"<<(generation_stable?"true":"false")
+     <<",\"armed_world_generation\":"<<state.armed_world_generation
+     <<",\"armed_owner_stable\":"<<(armed_owner_stable?"true":"false")
+     <<",\"seed_owner_stable\":"<<(seed_owner_stable?"true":"false")
+     <<",\"scene_owner_stable\":"<<(scene_owner_stable?"true":"false")
+     <<",\"constructor_return_terminal\":"
+     <<(state.constructor_return_terminal?"true":"false")
+     <<",\"constructor_source_free_callbacks\":"
+     <<state.constructor_source_free_callbacks
+     <<",\"first_use_draw_pending\":"<<(first_use_draw_pending?"true":"false")
+     <<",\"continuation_supported\":false,\"complete\":false"
+     <<",\"legacy_draw_complete\":"<<(state.complete?"true":"false")
+     <<",\"source_callbacks_before_kick\":"<<state.source_callbacks_before_kick
+     <<",\"source_steps\":"<<state.source_steps
+     <<",\"source_draws\":"<<state.source_draws
+     <<",\"host_tick_calls\":"<<state.host_tick_calls
+     <<",\"host_draw_calls\":"<<state.host_draw_calls
+     <<",\"aurora_begin_calls\":"<<state.aurora_begin_calls
+     <<",\"aurora_end_calls\":"<<state.aurora_end_calls;
+  if(state.entry_captured){
+   out<<",\"entry\":{\"source_scene\":"<<state.entry.source_scene
+      <<",\"scene_kind\":"<<state.entry.source_scene_kind
+      <<",\"random_seed_hex\":\""
+      <<melee_web::stadium_first_css_diagnostic::hex32(state.entry.random_seed)
+      <<"\",\"pad_state_hex\":\""
+      <<melee_web::stadium_first_css_diagnostic::hex(
+          state.entry.pad_state,sizeof(state.entry.pad_state))
+      <<"\",\"ko_counts_hex\":\""
+      <<melee_web::stadium_first_css_diagnostic::hex(
+          state.entry.ko_counts,sizeof(state.entry.ko_counts))
+      <<"\",\"css\":";
+   melee_web::stadium_first_css_diagnostic::write_css(
+       out,state.entry.css,"source_vs_owned");
+   out<<",\"abi_padding_excluded\":[\"pad_x5C\"]}";
+  }
+  out<<",\"full_session_comparison\":false}";
+  state.observation=out.str();
+  return;
+ }
  if(!first_sss_vs_setup.history.empty()){
   state.observation=first_sss_vs_setup.history.substr(0,first_sss_vs_setup.history.size()-1)+
       ",\"first_sss_vs_setup\":"+first_sss_vs_setup_json()+"}";
@@ -1305,6 +1412,63 @@ void first_css_browser_draw_refresh_observation(){
  out<<'}';state.observation=out.str();
 }
 #endif
+bool stadium_first_css_constructor_return_active(){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ return first_css_browser_draw.mode==FirstCssBrowserMode::ConstructorReturnOnlyV2;
+#else
+ return false;
+#endif
+}
+bool stadium_first_css_constructor_return_consume_launch(){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ auto& state=first_css_browser_draw;
+ if(state.mode!=FirstCssBrowserMode::ConstructorReturnOnlyV2)return true;
+ if(!state.armed||!state.constructor_arm_ready||state.failed||faulted||
+    state.constructor_launch_consumed||state.constructor_entry_attempted||host_entered)
+  return false;
+ if(!host||host!=state.armed_host_owner||!world||
+    world.get()!=state.armed_world_owner||!state.armed_world_generation||
+    melee_web_gameplay_generation()!=state.armed_world_generation||
+    source_session_owned!=state.arm_source_session_owned||
+    !state.arm_source_session_owned||
+    melee_web_menu_host_phase(host)!=MELEE_WEB_MENU_CREATED||
+    melee_web_menu_host_mode_kind(host)!=GM_VS)
+  return false;
+ state.constructor_launch_consumed=true;
+ return true;
+#else
+ return true;
+#endif
+}
+bool stadium_first_css_constructor_return_entry_succeeded(){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ const auto& state=first_css_browser_draw;
+ return state.mode==FirstCssBrowserMode::ConstructorReturnOnlyV2&&
+        state.entry_captured&&state.constructor_return_terminal&&!state.failed&&
+        host_entered&&!running&&host&&host==state.armed_host_owner&&world&&
+        world.get()==state.armed_world_owner&&state.world_generation!=0&&
+        state.world_generation==state.armed_world_generation&&
+        melee_web_gameplay_generation()==state.armed_world_generation&&
+        source_session_owned==state.arm_source_session_owned&&
+        state.arm_source_session_owned&&world_exposed&&
+        !faulted&&melee_web_menu_host_source_scene(host)==MELEE_WEB_MENU_HOST_SCENE_CSS&&
+        melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CSS&&
+        melee_web_menu_host_mode_kind(host)==GM_VS;
+#else
+ return false;
+#endif
+}
+void stadium_first_css_constructor_return_fail(const char* error){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(first_css_browser_draw.mode==FirstCssBrowserMode::ConstructorReturnOnlyV2){
+  first_css_browser_draw_fail(error&&*error?error:
+      "CSS constructor-return owner operation failed");
+  first_css_browser_draw_refresh_observation();
+ }
+#else
+ (void)error;
+#endif
+}
 uint32_t asset_generation=0;
 std::vector<std::string> requested_assets;
 MeleeWebMenuMatchSelection asset_selection{};
@@ -1894,6 +2058,35 @@ void request_assets(AssetDestination destination,
   EM_ASM({window.menuAssetsRequested?.($0);},asset_generation);
 }
 void enter_world(){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(first_css_browser_draw.mode==FirstCssBrowserMode::ConstructorReturnOnlyV2){
+  auto& state=first_css_browser_draw;
+  const bool admitted=state.armed&&state.constructor_arm_ready&&
+        state.constructor_launch_consumed&&!state.constructor_entry_attempted&&
+        !state.failed&&!faulted&&!state.entry_captured&&host&&
+        host==state.armed_host_owner&&!host_entered&&world&&
+        world.get()==state.armed_world_owner&&state.armed_world_generation!=0&&
+        melee_web_gameplay_generation()==state.armed_world_generation&&
+        source_session_owned==state.arm_source_session_owned&&
+        state.arm_source_session_owned&&!world_exposed&&
+        melee_web_menu_host_mode_kind(host)==GM_VS&&
+        melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CREATED&&
+        !replay&&!melee_web_net_active()&&!match&&!results&&!prize&&!pending&&
+        !stadium_c1a_armed&&!preparation.busy()&&
+        !first_sss_constructor_pair.armed&&!first_sss_consumed_tick.armed&&
+        !first_sss_draw_sequence.armed&&!first_sss_prefix_sequence.armed&&
+        !first_sss_vs_entry.attempted&&!first_sss_vs_setup.attempted&&
+        !matched_setup_cf.opted_in&&!matched_setup_cf.armed&&
+        !first_css_browser_postdraw_stream.armed&&!first_css_final_pending_draw.armed;
+  if(!admitted){
+   first_css_browser_draw_fail(
+       "CSS constructor-return entry requires its one checked fresh owner launch");
+   first_css_browser_draw_refresh_observation();
+   throw std::runtime_error(first_css_browser_draw.error);
+  }
+  state.constructor_entry_attempted=true;
+ }
+#endif
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
  const melee_web::provenance::Scope provenance(pipeline_context(MELEE_WEB_PIPELINE_PHASE_PREPARATION));
  provenance_return_draw=completed_matches!=0;
@@ -1960,6 +2153,19 @@ void enter_world(){
  host_entered=true;world_exposed=true;
  const double entered=emscripten_get_now();
  report_construction("scene-enter",started,constructed,entered,before,aurora_stats_snapshot());
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(first_css_browser_draw.mode==FirstCssBrowserMode::ConstructorReturnOnlyV2){
+  auto& state=first_css_browser_draw;
+  pending=false;first_use_draw_pending=false;audio_phase=0;
+  menu_clock.reset();audio_clock.reset();running=false;
+  if(!state.failed&&state.entry_captured){
+   state.constructor_return_terminal=true;
+   message="Original CSS constructor return captured; source continuation stopped.";
+  }
+  first_css_browser_draw_refresh_observation();
+  return;
+ }
+#endif
  first_use_draw_pending=true;
  menu_clock.reset();audio_phase=0;audio_clock.reset();running=true;
  message=melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select";
@@ -3732,6 +3938,10 @@ void tick(){
  const int owner_action=EM_ASM_INT({return window.menuServiceCommands?.() || 0;});
  if(owner_action<0){
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(first_css_browser_draw.mode==FirstCssBrowserMode::ConstructorReturnOnlyV2){
+   first_css_browser_draw_fail("CSS constructor-return owner stopped before unload");
+   first_css_browser_draw_refresh_observation();
+  }
   if(first_sss_vs_setup.attempted&&!first_sss_vs_setup.complete)
    first_sss_vs_setup_fail("VS Setup owner stopped during asynchronous preparation");
   if(matched_setup_cf.armed&&!matched_setup_cf.complete&&!matched_setup_cf.failed)
@@ -3749,6 +3959,54 @@ void tick(){
   menu_clock.reset();audio_clock.reset();
  }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(first_css_browser_draw.mode==FirstCssBrowserMode::ConstructorReturnOnlyV2){
+  auto& state=first_css_browser_draw;
+  if(state.constructor_return_terminal&&!state.failed){
+   const auto* current_scene=static_cast<const GameModeState::GameSceneInfo*>(
+       melee_web_current_scene_info());
+   const bool source_flags_clear=!running&&!pending&&!first_use_draw_pending&&
+       !faulted&&audio_phase==0;
+   const bool same_armed_owner=host&&host==state.armed_host_owner&&world&&
+       world.get()==state.armed_world_owner&&state.armed_world_generation!=0&&
+       melee_web_gameplay_generation()==state.armed_world_generation&&
+       source_session_owned==state.arm_source_session_owned&&
+       state.arm_source_session_owned&&
+       melee_web_menu_host_mode_kind(host)==GM_VS;
+   const bool no_foreign_owners=!replay&&!melee_web_net_active()&&!match&&!results&&
+       !prize&&!stadium_c1a_armed&&!preparation.busy()&&
+       !first_sss_constructor_pair.armed&&!first_sss_consumed_tick.armed&&
+       !first_sss_draw_sequence.armed&&!first_sss_prefix_sequence.armed&&
+       !first_sss_vs_entry.attempted&&!first_sss_vs_setup.attempted&&
+       !matched_setup_cf.opted_in&&!matched_setup_cf.armed&&
+       !first_css_browser_postdraw_stream.armed&&!first_css_final_pending_draw.armed;
+   const bool safe_owner=source_flags_clear&&!faulted&&same_armed_owner&&no_foreign_owners&&
+       state.entry_captured&&host&&world&&host_entered&&
+       world_exposed&&melee_web_menu_host_source_scene(host)==
+           MELEE_WEB_MENU_HOST_SCENE_CSS&&
+       melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CSS&&
+       melee_web_gameplay_generation()==
+           state.world_generation&&melee_web_gameplay_world_exists()&&
+       melee_web_source_memory_healthy()&&seed_ptr==state.seed_owner&&
+       state.seed_owner&&*state.seed_owner==state.entry.random_seed&&
+       current_scene==state.scene_owner&&current_scene&&
+       current_scene->scene_kind==8&&state.source_steps==0&&
+       state.source_draws==0&&state.host_tick_calls==0&&
+       state.host_draw_calls==0&&state.aurora_begin_calls==0&&
+       state.aurora_end_calls==0;
+   if(!safe_owner){
+    first_css_browser_draw_fail(
+        "CSS constructor-return source-free owner changed before unload");
+    first_css_browser_draw_refresh_observation();
+   }else{
+    ++state.constructor_source_free_callbacks;
+    first_css_browser_draw_refresh_observation();
+   }
+  }
+  menu_clock.reset();audio_clock.reset();audio_phase=0;
+  running=false;pending=false;first_use_draw_pending=false;
+  EM_ASM({window.menuFrame?.(false);});
+  return;
+ }
  if(first_sss_vs_setup_service())return;
  if(first_sss_sequence_service())return;
 #endif
@@ -5155,6 +5413,10 @@ int melee_web_native_menu_unload(){try{close();message="Native menus unloaded.";
 #endif
  message=e.what();return 0;}}
 void melee_web_native_menu_pause(int paused){
+ if(stadium_first_css_constructor_return_active()){
+  running=false;menu_clock.reset();audio_clock.reset();audio_phase=0;
+  return;
+ }
  if(faulted||replay_final_draw||preparation.busy()||pending||(!host_entered&&!match&&!results&&!prize))return;
  diagnostic_incident(paused?5:6);
  running=(world||match||results||prize)&&!paused;menu_clock.reset();
@@ -5385,14 +5647,66 @@ int melee_web_native_menu_stadium_first_css_draw_arm(
  state.consumed=std::move(consumed);
  melee_web::stadium_first_css_diagnostic::decode_consumed_pad_statuses(
      state.consumed,state.consumed_status);
+ state.mode=FirstCssBrowserMode::LegacyTickDrawV1;
  state.armed=true;
  first_css_browser_draw_refresh_observation();
  message="Private first-CSS browser draw diagnostic armed.";
  return 1;
 }catch(const std::exception& error){message=error.what();return 0;}}
+int melee_web_native_menu_stadium_first_css_constructor_return_v2_arm(
+    const uint8_t* context_bytes,unsigned context_size){try{
+ auto& state=first_css_browser_draw;
+ check(state.mode==FirstCssBrowserMode::None&&!state.armed&&
+       !stadium_c1a_armed&&scoped_assets&&scoped_disc_import&&
+       asset_destination==AssetDestination::None&&!asset_committed&&
+       asset_scope.pending_generation()==0&&world&&host&&!host_entered&&
+       !world_exposed&&!match&&!results&&!prize&&!pending&&!running&&!replay&&
+       !melee_web_net_active()&&diagnostic_start_ticks==0&&
+       diagnostic_pad_remaining==0&&source_session_owned&&!faulted&&!preparation.busy()&&
+       melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CREATED&&
+       melee_web_menu_host_mode_kind(host)==GM_VS&&
+       !first_sss_constructor_pair.armed&&!first_sss_consumed_tick.armed&&
+       !first_sss_draw_sequence.armed&&!first_sss_prefix_sequence.armed&&
+       !first_sss_vs_entry.attempted&&!first_sss_vs_setup.attempted&&
+       !matched_setup_cf.opted_in&&!matched_setup_cf.armed&&
+       !first_css_browser_postdraw_stream.armed&&!first_css_final_pending_draw.armed,
+       "CSS constructor-return arm requires one prepared, unentered imported-disc VS host");
+ auto context=
+     melee_web::stadium_first_css_diagnostic::decode_constructor_return_context_v2(
+         context_bytes,context_size);
+ state.mode=FirstCssBrowserMode::ConstructorReturnOnlyV2;
+ state.armed=true;
+ state.context=std::move(context);
+ state.armed_host_owner=host;
+ state.armed_world_owner=world.get();
+ state.armed_world_generation=melee_web_gameplay_generation();
+ state.arm_source_session_owned=source_session_owned;
+ check(state.armed_world_owner!=nullptr&&state.armed_world_generation!=0&&
+       state.arm_source_session_owned,
+       "CSS constructor-return arm could not retain its prepared source owners");
+ first_css_browser_draw_refresh_observation();
+ char error[256]{};
+ check(melee_web_menu_host_apply_replay_context(
+       host,state.context.seed,state.context.pad.data(),state.context.css.data(),
+       state.context.ko.data(),state.context.rules.data(),state.context.save.data(),
+       error,sizeof(error)),error);
+ check(melee_web_menu_host_enable_stadium_c1a(host,error,sizeof(error)),error);
+ check(melee_web_menu_host_arm_first_css_return(host,error,sizeof(error)),error);
+ state.constructor_arm_ready=true;
+ first_css_browser_draw_refresh_observation();
+ message="Private CSS constructor-return diagnostic armed.";
+ return 1;
+}catch(const std::exception& error){
+ auto& state=first_css_browser_draw;
+ if(state.mode==FirstCssBrowserMode::ConstructorReturnOnlyV2){
+  first_css_browser_draw_fail(error.what());
+  first_css_browser_draw_refresh_observation();
+ }
+ message=error.what();return 0;}}
 int melee_web_native_menu_stadium_first_css_draw_kick(){try{
  auto& state=first_css_browser_draw;
- check(state.armed&&state.entry_captured&&!state.kicked&&!state.complete&&!state.failed&&
+ check(state.mode==FirstCssBrowserMode::LegacyTickDrawV1&&state.armed&&
+       state.entry_captured&&!state.kicked&&!state.complete&&!state.failed&&
        host&&world&&host_entered&&state.source_steps==0&&state.host_tick_calls==0&&
        state.host_draw_calls==0&&state.aurora_begin_calls==0&&state.aurora_end_calls==0,
        "First-CSS draw kick requires its captured return before any source tick or draw");
@@ -5417,7 +5731,8 @@ int melee_web_native_menu_stadium_first_css_postdraw_stream_arm(
     const uint8_t* input_bytes,unsigned input_size){try{
  auto& baseline=first_css_browser_draw;
  auto& stream=first_css_browser_postdraw_stream;
- check(!stream.armed&&baseline.armed&&baseline.complete&&!baseline.failed&&
+ check(baseline.mode==FirstCssBrowserMode::LegacyTickDrawV1&&
+       !stream.armed&&baseline.armed&&baseline.complete&&!baseline.failed&&
        baseline.entry_captured&&baseline.tick_captured&&baseline.draw_captured&&
        baseline.frame_end_returned&&baseline.source_steps==1&&baseline.source_draws==1&&
        baseline.host_tick_calls==1&&baseline.host_draw_calls==1&&
@@ -5448,7 +5763,8 @@ int melee_web_native_menu_stadium_first_css_postdraw_stream_arm(
 int melee_web_native_menu_stadium_first_css_postdraw_stream_kick(){try{
  auto& baseline=first_css_browser_draw;
  auto& stream=first_css_browser_postdraw_stream;
- check(stream.armed&&!stream.kicked&&!stream.terminal&&!stream.failed&&
+ check(baseline.mode==FirstCssBrowserMode::LegacyTickDrawV1&&
+       stream.armed&&!stream.kicked&&!stream.terminal&&!stream.failed&&
        baseline.armed&&baseline.complete&&!baseline.failed&&
        baseline.frame_end_returned&&!running&&host&&world&&host_entered&&
        stream.next_input_index==0&&stream.consumed_inputs==0&&
@@ -5469,7 +5785,8 @@ int melee_web_native_menu_stadium_first_css_postdraw_stream_kick(){try{
  first_css_browser_draw_refresh_observation();return 0;}}
 int melee_web_native_menu_stadium_first_css_final_draw_arm(){try{
  auto& final_draw=first_css_final_pending_draw;
- check(!final_draw.armed&&!final_draw.failed&&!final_draw.complete&&
+ check(first_css_browser_draw.mode==FirstCssBrowserMode::LegacyTickDrawV1&&
+       !final_draw.armed&&!final_draw.failed&&!final_draw.complete&&
        !running&&!pending&&!faulted&&!replay&&!melee_web_net_active()&&
        host&&world&&host_entered&&!match&&!results&&!prize&&
        preparation.phase()==melee_web::MenuPreparationState::Phase::Idle&&
@@ -5492,7 +5809,8 @@ int melee_web_native_menu_stadium_first_css_final_draw_arm(){try{
  first_css_browser_draw_refresh_observation();return 0;}}
 int melee_web_native_menu_stadium_first_css_final_draw_kick(){try{
  auto& final_draw=first_css_final_pending_draw;
- check(final_draw.armed&&!final_draw.kicked&&!final_draw.attempted&&
+ check(first_css_browser_draw.mode==FirstCssBrowserMode::LegacyTickDrawV1&&
+       final_draw.armed&&!final_draw.kicked&&!final_draw.attempted&&
        !final_draw.failed&&!final_draw.complete&&!running&&!pending&&
        first_css_browser_postdraw_stream.terminal&&
        first_css_browser_postdraw_stream.outcome=="stop_after_last_input_request",

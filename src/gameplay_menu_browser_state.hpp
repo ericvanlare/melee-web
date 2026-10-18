@@ -173,6 +173,10 @@ extern melee_web::ResultsSourceFramePauseSchedule scheduled_results_pauses;
 inline void check(int value,const char* error){if(!value)throw std::runtime_error(error);}
 void begin_source_session();
 void close();
+bool stadium_first_css_constructor_return_active();
+bool stadium_first_css_constructor_return_consume_launch();
+bool stadium_first_css_constructor_return_entry_succeeded();
+void stadium_first_css_constructor_return_fail(const char* error);
 void request_assets(AssetDestination destination,
                     const MeleeWebMenuMatchSelection* selection=nullptr,
                     const MeleeWebOpeningPreview* opening_preview=nullptr,

@@ -69,6 +69,9 @@ struct ContextInput {
     std::array<uint8_t, kSaveBytes> save{};
     uint32_t seed = 0;
     std::string source_sha256;
+    uint32_t source_entry_sequence = 0;
+    uint32_t source_return_sequence = 0;
+    uint32_t envelope_version = 0;
 };
 
 struct ConsumedPadInput {
@@ -142,6 +145,9 @@ inline ContextInput decode_context(const uint8_t* bytes, size_t size) {
 
     ContextInput result{};
     result.source_sha256 = hex(bytes + 12, kSourceSha256.size());
+    result.source_entry_sequence = kEntrySequence;
+    result.source_return_sequence = kReturnSequence;
+    result.envelope_version = 1;
     size_t offset = kContextHeaderBytes;
     result.seed = read_be32(bytes + offset);
     offset += 4;
@@ -163,6 +169,55 @@ inline ContextInput decode_context(const uint8_t* bytes, size_t size) {
                      [](uint8_t value) { return value == 0; }))
         throw std::runtime_error(
             "Stadium diagnostic input has an invalid initial owner or callback region");
+    return result;
+}
+
+inline ContextInput decode_constructor_return_context_v2(
+    const uint8_t* bytes, size_t size) {
+    if (!bytes || size != kContextBytes)
+        throw std::runtime_error(
+            "CSS constructor-return context has an unexpected exact length");
+    if (std::string(reinterpret_cast<const char*>(bytes), 8) != "STC2CSSR" ||
+        read_be32(bytes + 8) != 2)
+        throw std::runtime_error(
+            "CSS constructor-return context magic/version differs");
+    if (std::all_of(bytes + 12, bytes + 44,
+                    [](uint8_t value) { return value == 0; }))
+        throw std::runtime_error(
+            "CSS constructor-return context has an empty source identity");
+    const uint32_t entry_sequence = read_be32(bytes + 44);
+    const uint32_t return_sequence = read_be32(bytes + 48);
+    if (!entry_sequence || !return_sequence || entry_sequence >= return_sequence)
+        throw std::runtime_error(
+            "CSS constructor-return source phase references are not ordered");
+
+    ContextInput result{};
+    result.source_sha256 = hex(bytes + 12, 32);
+    result.source_entry_sequence = entry_sequence;
+    result.source_return_sequence = return_sequence;
+    result.envelope_version = 2;
+    size_t offset = kContextHeaderBytes;
+    result.seed = read_be32(bytes + offset);
+    offset += 4;
+    std::copy_n(bytes + offset, result.pad.size(), result.pad.begin());
+    offset += result.pad.size();
+    std::copy_n(bytes + offset, result.css.size(), result.css.begin());
+    offset += result.css.size();
+    std::copy_n(bytes + offset, result.ko.size(), result.ko.begin());
+    offset += result.ko.size();
+    std::copy_n(bytes + offset, result.rules.size(), result.rules.begin());
+    offset += result.rules.size();
+    std::copy_n(bytes + offset, result.save.size(), result.save.begin());
+    offset += result.save.size();
+    if (offset != size)
+        throw std::runtime_error(
+            "CSS constructor-return context has trailing bytes");
+    if (result.css[2] != 0 || result.css[3] != 0 ||
+        read_be32(result.css.data() + 4) != kKoAddress ||
+        !std::all_of(result.css.begin() + 0x48, result.css.begin() + 0x6C,
+                     [](uint8_t value) { return value == 0; }))
+        throw std::runtime_error(
+            "CSS constructor-return context has an invalid initial owner or callback region");
     return result;
 }
 

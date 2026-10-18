@@ -31,6 +31,7 @@ import {createStadiumC3ReportCheckpoint} from './stadium_c3_report_checkpoint.mj
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const {values} = parseArgs({options: Object.fromEntries(
   ['build', 'disc', 'disc-sha256', 'out', 'playwright', 'preflight', 'source-revision',
+    'first-css-constructor-manifest',
     'first-css-context', 'first-css-consumed-pad', 'first-css-return-expected',
     'first-css-tick-expected', 'first-css-draw-expected',
     'first-css-postdraw-input', 'first-css-postdraw-expected',
@@ -43,6 +44,7 @@ const {values} = parseArgs({options: Object.fromEntries(
       ['first-css-browser-draw', {type: 'boolean', default: false}],
       ['first-css-browser-stream', {type: 'boolean', default: false}],
       ['first-css-browser-final-draw', {type: 'boolean', default: false}],
+      ['first-css-constructor-return', {type: 'boolean', default: false}],
       ['first-sss-constructor-pair', {type: 'boolean', default: false}],
       ['first-sss-consumed-pad-tick', {type: 'boolean', default: false}],
       ['first-sss-draw', {type: 'boolean', default: false}],
@@ -71,6 +73,8 @@ const recreationPassDecision = recreationFullPair
   : 'PASS_SAME_INSTANCE_174_ACTION_RECREATION_COMPONENT_ONLY';
 let recreationLifetime = null;
 const firstSssVsSetup = values['first-sss-vs-setup'];
+const firstCssConstructorReturn = values['first-css-constructor-return'];
+const firstCssConstructorManifest = values['first-css-constructor-manifest'];
 const firstSssVsSetupTextTail = values['first-sss-vs-setup-text-tail'];
 const firstSssVsSetupCfExplicitStep = values['first-sss-vs-setup-cf-explicit-step'];
 const firstSssVsSetupCfFullSchedule = values['first-sss-vs-setup-cf-full-schedule'] || recreationFullPair;
@@ -91,6 +95,15 @@ const firstSssConstructorPair = values['first-sss-constructor-pair'] || firstSss
 const firstCssBrowserFinalDraw = values['first-css-browser-final-draw'] || firstSssConstructorPair;
 const firstCssBrowserStream = values['first-css-browser-stream'] || firstCssBrowserFinalDraw;
 const firstCssBrowserDraw = values['first-css-browser-draw'] || firstCssBrowserStream;
+if (firstCssConstructorReturn !== !!firstCssConstructorManifest ||
+    (firstCssConstructorReturn && (cssSssReducer || firstCssBrowserDraw ||
+      firstSssConstructorPair || firstSssConsumedPadTick || firstSssDraw ||
+      firstSssPrefix || firstSssVsEntry || firstSssVsSetup || firstSssVsSetupTextTail ||
+      firstSssVsSetupCf || recreationCanary || values['first-css-context'] ||
+      values['first-css-consumed-pad'] || values['first-css-return-expected'] ||
+      values['first-css-tick-expected'] || values['first-css-draw-expected'] ||
+      values['first-css-postdraw-input'] || values['first-css-postdraw-expected'])))
+  throw Error('Choose the constructor-return route alone with its exact manifest');
 if (recreationFullPair && values['recreation-canary-full-b'])
   throw Error('Full pair requires its distinct opt-in, not the short A/full B option');
 if (recreationFullB && !recreationCanary)
@@ -332,6 +345,7 @@ let report = {
     route_mode: recreationCanary ? (recreationFullB
       ? (recreationFullPair ? 'same-instance-recreation-A7167-B7167-common-fields-seed' : 'same-instance-recreation-A174-B7167-common-fields-seed')
       : 'same-instance-recreation-canary-174') : firstSssVsSetup ? 'first-sss-vs-setup' : firstSssVsEntry ? 'first-sss-vs-entry' : firstSssPrefix ? 'first-sss-prefix' : firstSssDraw ? 'first-sss-draw' :
+      firstCssConstructorReturn ? 'first-css-constructor-return-v2' :
       firstSssConsumedPadTick ? 'first-sss-consumed-pad-tick' :
       firstSssConstructorPair ? 'first-sss-constructor-pair' :
       firstCssBrowserFinalDraw ? 'first-css-browser-final-pending-draw' :
@@ -345,6 +359,7 @@ let report = {
     original_sss_phase: null,
     raw_pad_stage_drive_frames: 0,
     source_selection: null,
+    first_css_constructor_return: null,
     css_sss_reducer: values['css-sss-reducer'] ? createCssSssTransitionCapture(
       'Original CSS -> original SSS only; one ordinary B0XX Start chord after observed source and input readiness. No SSS selection, stage, match, or source archive request.') : null,
     css_sss_transition: null,
@@ -521,6 +536,7 @@ async function waitForServer(baseUrl) {
 }
 
 let firstCssBrowserDrawInputs = null;
+let firstCssConstructorReturnInputs = null;
 let firstSssConstructorPairInputs = null;
 let firstSssConsumedPadTickInputs = null;
 let firstSssDrawInputs = null;
@@ -591,6 +607,157 @@ async function loadFirstCssBrowserDrawInputs() {
   return {bytes, contextExpected, tickExpected, drawExpected,
     bundle_hashes: Object.fromEntries(Object.entries(bytes).map(([name, data]) =>
       [name, {bytes: data.byteLength, sha256: digest(data)}]))};
+}
+
+async function loadFirstCssConstructorReturnInputs() {
+  if (!firstCssConstructorReturn) return null;
+  const manifestPath = path.resolve(firstCssConstructorManifest);
+  const frozen = preflight.first_css_constructor_return?.manifest;
+  assert.ok(frozen && typeof frozen === 'object',
+    'Constructor-return preflight omitted its exact producer manifest identity');
+  assert.equal(path.resolve(frozen.path), manifestPath,
+    'Constructor-return manifest path differs from preflight');
+  const manifestBytes = await fs.readFile(manifestPath);
+  assert.equal(manifestBytes.byteLength, frozen.bytes,
+    'Constructor-return manifest byte count differs from preflight');
+  assert.equal(digest(manifestBytes), frozen.sha256,
+    'Constructor-return manifest hash differs from preflight');
+  const manifest = JSON.parse(manifestBytes.toString('utf8'));
+  const exactKeys = (value, keys, label) => {
+    assert.ok(value && typeof value === 'object' && !Array.isArray(value),
+      `${label} must be an object`);
+    assert.deepEqual(Object.keys(value).sort(), [...keys].sort(),
+      `${label} fields differ from the fixed v2 contract`);
+  };
+  const roles = ['observer_stream', 'observer_status', 'capture_report', 'capture_packet',
+    'mwri', 'input_status', 'input_intentions', 'menu_recipe', 'profile_gci',
+    'profile_dolphin_ini', 'profile_gcpad_ini', 'offline_reducer', 'offline_result'];
+  const comparisonFields = ['source_scene', 'scene_kind', 'random_seed_hex',
+    'pad_state_hex', 'ko_counts_hex', 'css'];
+  exactKeys(manifest, ['schema', 'version', 'scope', 'producer_pins',
+    'source_boundaries', 'context_input', 'expected_return'], 'Constructor-return manifest');
+  assert.equal(manifest.schema, 'melee-web-stadium-first-css-constructor-return-v2');
+  assert.equal(manifest.version, 2);
+  assert.equal(manifest.scope,
+    'Recorded original CSS context and immediate constructor return only. source_scene is the fixed local CSS-owner assertion, not a raw original enum observation. No tick, draw, input schedule, continuation, whole-session or C3 claim. Runtime-generated config copies remain separately bound in offline_result.');
+  exactKeys(manifest.producer_pins, roles, 'Constructor-return producer pins');
+  const pinBytes = {};
+  for (const role of roles) {
+    const pin = manifest.producer_pins[role];
+    exactKeys(pin, ['path', 'bytes', 'sha256'], `Producer pin ${role}`);
+    assert.equal(typeof pin.path, 'string');
+    assert.ok(Number.isSafeInteger(pin.bytes) && pin.bytes > 0,
+      `Producer pin ${role} has an invalid byte count`);
+    assert.match(pin.sha256, /^[0-9a-f]{64}$/,
+      `Producer pin ${role} has an invalid SHA-256`);
+    const data = await fs.readFile(pin.path);
+    assert.equal(data.byteLength, pin.bytes, `Producer pin ${role} byte count changed`);
+    assert.equal(digest(data), pin.sha256, `Producer pin ${role} hash changed`);
+    pinBytes[role] = data;
+  }
+  const offline = JSON.parse(pinBytes.offline_result.toString('utf8'));
+  assert.equal(offline.schema, 'melee-web-stadium-fresh-css-context-reduction-v1');
+  assert.equal(offline.result,
+    'PASS_OFFLINE_INITIAL_CSS_PAYLOAD_REPRESENTABILITY_AND_DYNAMIC_TOPOLOGY_ONLY');
+  const sourceRoleMap = {
+    observer_stream: offline.producer?.observer,
+    observer_status: offline.producer?.status,
+    capture_report: offline.producer?.capture_report,
+    capture_packet: offline.producer?.packet,
+    mwri: offline.producer?.mwri,
+    input_status: offline.producer?.mwri_status,
+    input_intentions: offline.producer?.input_intentions,
+    menu_recipe: offline.producer?.menu_recipe,
+    profile_gci: offline.producer?.profile_gci,
+    profile_dolphin_ini: offline.producer?.profile_files?.['Config/Dolphin.ini'],
+    profile_gcpad_ini: offline.producer?.profile_files?.['Config/GCPadNew.ini'],
+  };
+  for (const [role, observed] of Object.entries(sourceRoleMap)) {
+    exactKeys(observed, ['path', 'bytes', 'sha256'],
+      `Offline result source identity ${role}`);
+    assert.deepEqual(observed, manifest.producer_pins[role],
+      `Offline result source identity differs for ${role}`);
+  }
+  const entry = manifest.source_boundaries?.css_entry;
+  const returned = manifest.source_boundaries?.css_return;
+  const boundaryKeys = ['phase', 'event', 'sequence', 'pc', 'word', 'source_tick', 'draw_ordinal'];
+  exactKeys(manifest.source_boundaries, ['css_entry', 'css_return'],
+    'Constructor-return source boundaries');
+  exactKeys(entry, boundaryKeys, 'CSS entry source boundary');
+  exactKeys(returned, boundaryKeys, 'CSS return source boundary');
+  assert.equal(entry.phase, 'css_entry');
+  assert.equal(returned.phase, 'css_return');
+  assert.equal(entry.event, 'progress');
+  assert.equal(returned.event, 'progress');
+  for (const boundary of [entry, returned]) {
+    assert.ok(Number.isSafeInteger(boundary.sequence) && boundary.sequence > 0);
+    assert.match(boundary.pc, /^0x[0-9a-f]{8}$/);
+    assert.match(boundary.word, /^0x[0-9a-f]{8}$/);
+    assert.ok(Number.isSafeInteger(boundary.source_tick) && boundary.source_tick >= 0);
+    assert.equal(boundary.draw_ordinal, 0);
+  }
+  assert.ok(entry.sequence < returned.sequence,
+    'CSS source entry and return references are not ordered');
+  assert.equal(entry.source_tick, returned.source_tick,
+    'CSS source entry and return references do not name the same retained tick');
+
+  const contextBinding = manifest.context_input;
+  exactKeys(contextBinding, ['path', 'bytes', 'sha256', 'magic', 'version',
+    'source_sha256', 'entry_sequence', 'return_sequence', 'payload_bytes'],
+  'Constructor context input identity');
+  const contextBytes = await fs.readFile(contextBinding.path);
+  assert.equal(contextBytes.byteLength, contextBinding.bytes);
+  assert.equal(digest(contextBytes), contextBinding.sha256);
+  assert.equal(contextBinding.magic, 'STC2CSSR');
+  assert.equal(contextBinding.version, 2);
+  assert.equal(contextBytes.subarray(0, 8).toString('ascii'), contextBinding.magic);
+  assert.equal(contextBytes.readUInt32BE(8), 2);
+  assert.equal(contextBytes.subarray(12, 44).toString('hex'), contextBinding.source_sha256);
+  assert.equal(contextBinding.source_sha256, manifest.producer_pins.observer_stream.sha256);
+  assert.equal(contextBytes.readUInt32BE(44), contextBinding.entry_sequence);
+  assert.equal(contextBytes.readUInt32BE(48), contextBinding.return_sequence);
+  assert.equal(contextBinding.entry_sequence, entry.sequence);
+  assert.equal(contextBinding.return_sequence, returned.sequence);
+  assert.equal(contextBinding.payload_bytes, contextBytes.byteLength - 52);
+  assert.equal(offline.loader_payload_contract?.candidate_payload?.bytes,
+    contextBinding.payload_bytes);
+  assert.equal(digest(contextBytes.subarray(52)),
+    offline.loader_payload_contract.candidate_payload.sha256,
+    'Versioned native context payload differs from the offline-reduced source payload');
+
+  const expectedBinding = manifest.expected_return;
+  exactKeys(expectedBinding, ['path', 'bytes', 'sha256', 'schema', 'version',
+    'source_sha256', 'entry_sequence', 'return_sequence', 'comparison_fields'],
+  'Expected return identity');
+  const expectedBytes = await fs.readFile(expectedBinding.path);
+  assert.equal(expectedBytes.byteLength, expectedBinding.bytes);
+  assert.equal(digest(expectedBytes), expectedBinding.sha256);
+  const expected = JSON.parse(expectedBytes.toString('utf8'));
+  exactKeys(expected, ['schema', 'version', 'source_sha256', 'entry_sequence',
+    'return_sequence', 'comparison_fields', 'expected_return'], 'Expected return JSON');
+  assert.equal(expected.schema, 'melee-web-stadium-first-css-constructor-return-expected-v2');
+  assert.equal(expected.version, 2);
+  for (const field of ['schema', 'version', 'source_sha256', 'entry_sequence',
+    'return_sequence', 'comparison_fields'])
+    assert.deepEqual(expected[field], expectedBinding[field],
+      `Expected return metadata differs at ${field}`);
+  assert.deepEqual(expected.comparison_fields, comparisonFields,
+    'Constructor-return comparator field inventory is fixed and cannot be narrowed');
+  exactKeys(expected.expected_return, ['scene_kind', 'random_seed_hex',
+    'pad_state_hex', 'ko_counts_hex', 'css'], 'Host-only expected CSS return');
+  assert.equal(expected.source_sha256, contextBinding.source_sha256);
+  assert.equal(expected.entry_sequence, entry.sequence);
+  assert.equal(expected.return_sequence, returned.sequence);
+  assert.equal(expected.expected_return.scene_kind, 8);
+  assert.equal(offline.source_semantics?.no_claims?.includes(
+    'full raw 312-byte or whole-session equivalence'), true);
+  return {manifest, manifestIdentity: {path: manifestPath,
+    bytes: manifestBytes.byteLength, sha256: digest(manifestBytes)}, contextBytes,
+    expectedForComparison: {provenance: {stream_sha256: contextBinding.source_sha256},
+      expected_return: expected.expected_return}, expected, contextBinding,
+    pinIdentities: Object.fromEntries(roles.map(role => [role,
+      {path: manifest.producer_pins[role].path, bytes: pinBytes[role].byteLength,
+        sha256: digest(pinBytes[role])}]))};
 }
 
 let firstCssBrowserStreamInputs = null;
@@ -4108,6 +4275,210 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
   recreationSummary.A_archived_bytes_unchanged_after_B = true;
 }
 
+async function runFirstCssConstructorReturn({baseUrl, artifacts, before}) {
+  const inputs = firstCssConstructorReturnInputs;
+  assert.ok(inputs, 'Constructor-return manifest inputs were not admitted');
+  const prearm = await timeout(page.evaluate(() => {
+    const module = globalThis.Module;
+    const pointer = module?._melee_web_native_menu_memory?.();
+    if (!pointer) throw Error('Constructor-return preparation owner observation is absent');
+    return {phase: module._melee_web_native_menu_phase(),
+      running: module._melee_web_native_menu_running(),
+      memory: JSON.parse(module.UTF8ToString(pointer))};
+  }), Math.min(5000, remaining()), 'Prepared constructor-return imported-disc owner');
+  assert.equal(prearm.phase, 0);
+  assert.equal(prearm.running, 0);
+  assert.equal(prearm.memory.scoped_assets, true);
+  assert.equal(prearm.memory.source_session_owned, true);
+  assert.equal(prearm.memory.menu_present, true);
+  assert.equal(prearm.memory.menu_host_entered, false);
+  assert.equal(prearm.memory.menu_phase, 0);
+  assert.equal(prearm.memory.staged_asset_files, 0);
+  assert.equal(prearm.memory.asset_generation, 0);
+  assert.ok(prearm.memory.asset_files > 0);
+  report.scenario.first_css_constructor_return = {
+    manifest: inputs.manifestIdentity,
+    producers: inputs.pinIdentities,
+    source_boundaries: inputs.manifest.source_boundaries,
+    expected_return_sha256: inputs.manifest.expected_return.sha256,
+    prearm,
+    arm: null,
+    observation: null,
+    scope: 'same producer-bound CSS entry/return context; native CSS constructor return only; no tick, draw, continuation, Setup or C3 claim',
+  };
+  await persistReport();
+
+  const armed = await timeout(page.evaluate(contextBytes => {
+    const module = globalThis.Module;
+    const arm = module?._melee_web_native_menu_stadium_first_css_constructor_return_v2_arm;
+    const observe = module?._melee_web_native_menu_stadium_first_css_draw_observe;
+    if (typeof arm !== 'function' || typeof observe !== 'function')
+      throw Error('Private CSS constructor-return v2 exports are absent');
+    if (module._melee_web_native_menu_phase() !== 0 ||
+        module._melee_web_native_menu_running() !== 0)
+      throw Error('CSS constructor context must be applied to the fresh CREATED owner');
+    const pointer = module._malloc(contextBytes.length);
+    if (!pointer) throw Error('CSS constructor context allocation failed');
+    try {
+      module.HEAPU8.set(contextBytes, pointer);
+      const result = arm(pointer, contextBytes.length);
+      if (result !== 1) {
+        const error = module._melee_web_native_menu_message?.();
+        throw Error(error ? module.UTF8ToString(error) : 'CSS constructor-return arm was refused');
+      }
+      const observationPointer = observe();
+      const observation = observationPointer
+        ? JSON.parse(module.UTF8ToString(observationPointer)) : null;
+      return {result, phase: module._melee_web_native_menu_phase(),
+        running: module._melee_web_native_menu_running(), observation};
+    } finally { module._free(pointer); }
+  }, [...inputs.contextBytes]), Math.min(10000, remaining()),
+  'Arm same-producer CSS constructor-return context');
+  assert.equal(armed.result, 1);
+  assert.equal(armed.phase, 0);
+  assert.equal(armed.running, 0);
+  assert.equal(armed.observation?.schema,
+    'melee-web-stadium-first-css-constructor-return-observation-v2');
+  assert.equal(armed.observation?.state, 'armed');
+  assert.deepEqual(armed.observation.source_provenance, {
+    stream_sha256: inputs.manifest.context_input.source_sha256,
+    context_version: 2,
+    css_entry_sequence: inputs.manifest.context_input.entry_sequence,
+    css_return_sequence: inputs.manifest.context_input.return_sequence,
+  });
+  report.scenario.first_css_constructor_return.arm = armed.observation;
+  report.scenario.armed_before_css_entry = true;
+  await persistReport();
+
+  await timeout(page.locator('#launch').click({timeout: remaining()}),
+    Math.min(LIMITS.sourceTransitionMs, remaining()),
+    'Original CSS constructor entry through the existing launch control');
+  await timeout(page.waitForFunction(() => {
+    const module = globalThis.Module;
+    const pointer = module?._melee_web_native_menu_stadium_first_css_draw_observe?.();
+    if (!pointer) return false;
+    const state = JSON.parse(module.UTF8ToString(pointer)).state;
+    return state === 'css-return-stopped' || state === 'failed';
+  }, null, {timeout: Math.min(LIMITS.sourceTransitionMs, remaining())}),
+  Math.min(LIMITS.sourceTransitionMs, remaining()),
+  'Source-free CSS constructor-return terminal');
+  const terminalObservation = await timeout(readFirstCssBrowserDrawObservation(),
+    Math.min(5000, remaining()), 'Read CSS constructor-return terminal observation');
+  report.scenario.first_css_constructor_return.terminal_observation = terminalObservation;
+  await persistReport();
+  const requiredCallbacks = terminalObservation.constructor_source_free_callbacks + 2;
+  await timeout(page.waitForFunction(target => {
+    const module = globalThis.Module;
+    const pointer = module?._melee_web_native_menu_stadium_first_css_draw_observe?.();
+    if (!pointer) return false;
+    const current = JSON.parse(module.UTF8ToString(pointer));
+    return current.state === 'failed' ||
+      (current.state === 'css-return-stopped' &&
+       Number.isSafeInteger(current.constructor_source_free_callbacks) &&
+       current.constructor_source_free_callbacks >= target);
+  }, requiredCallbacks, {timeout: Math.min(LIMITS.sourceTransitionMs, remaining())}),
+  Math.min(LIMITS.sourceTransitionMs, remaining()),
+  'Two further source-free owner callbacks after CSS constructor return');
+  const observation = await timeout(readFirstCssBrowserDrawObservation(),
+    Math.min(5000, remaining()), 'Read CSS constructor-return stable observation');
+  report.scenario.first_css_constructor_return.observation = observation;
+  report.scenario.native_observation = observation;
+  report.scenario.final_phase = observation.native_phase;
+  report.scenario.final_running = observation.running;
+  await persistReport();
+  assert.equal(observation?.schema,
+    'melee-web-stadium-first-css-constructor-return-observation-v2');
+  assert.equal(observation.state, 'css-return-stopped',
+    `CSS constructor return stopped at ${observation.state}: ${observation.error || 'no detail'}`);
+  assert.equal(observation.scope,
+    'original_css_constructor_return_only_before_any_source_tick_or_draw');
+  assert.equal(observation.native_phase, 1);
+  assert.equal(observation.running, 0);
+  assert.equal(observation.host_entered, true);
+  assert.equal(observation.first_use_draw_pending, false);
+  assert.equal(observation.constructor_return_terminal, true);
+  assert.equal(observation.continuation_supported, false);
+  assert.equal(observation.complete, false);
+  assert.equal(observation.full_session_comparison, false);
+  assert.ok(observation.world_generation > 0);
+  assert.equal(observation.world_generation_stable, true);
+  assert.equal(observation.armed_owner_stable, true);
+  assert.equal(observation.seed_owner_stable, true);
+  assert.equal(observation.scene_owner_stable, true);
+  assert.equal(observation.source_steps, 0);
+  assert.equal(observation.source_draws, 0);
+  assert.equal(observation.host_tick_calls, 0);
+  assert.equal(observation.host_draw_calls, 0);
+  assert.equal(observation.aurora_begin_calls, 0);
+  assert.equal(observation.aurora_end_calls, 0);
+  assert.ok(Number.isSafeInteger(observation.constructor_source_free_callbacks) &&
+    observation.constructor_source_free_callbacks >= requiredCallbacks,
+    'Two further source-free owner callbacks were not observed after the constructor return');
+  for (const field of ['schema', 'scope', 'state', 'source_provenance', 'native_phase',
+    'running', 'host_entered', 'world_generation', 'world_generation_stable',
+    'armed_world_generation', 'armed_owner_stable', 'seed_owner_stable',
+    'scene_owner_stable', 'constructor_return_terminal', 'first_use_draw_pending',
+    'continuation_supported', 'complete', 'legacy_draw_complete', 'source_steps',
+    'source_draws', 'host_tick_calls', 'host_draw_calls', 'aurora_begin_calls',
+    'aurora_end_calls', 'entry', 'full_session_comparison'])
+    assert.deepEqual(observation[field], terminalObservation[field],
+      `CSS constructor-return owner changed after its terminal observation at ${field}`);
+  assert.deepEqual(observation.source_provenance, {
+    stream_sha256: inputs.manifest.context_input.source_sha256,
+    context_version: 2,
+    css_entry_sequence: inputs.manifest.context_input.entry_sequence,
+    css_return_sequence: inputs.manifest.context_input.return_sequence,
+  });
+  assertFirstCssBrowserEntry({...observation,
+    source_stream_sha256: observation.source_provenance.stream_sha256},
+  inputs.expectedForComparison);
+  report.scenario.original_css_phase = {
+    phase: observation.native_phase, running: observation.running,
+    message: 'Original CSS constructor returned; source continuation is fenced.'};
+  report.scenario.native_message = report.scenario.original_css_phase.message;
+  report.scenario.gpu = await timeout(page.evaluate(async () => {
+    let adapter = null, failure = null;
+    try { adapter = await navigator.gpu?.requestAdapter(); }
+    catch (error) { failure = String(error); }
+    const info = adapter?.info ? {vendor: adapter.info.vendor || null,
+      architecture: adapter.info.architecture || null, device: adapter.info.device || null,
+      description: adapter.info.description || null} : null;
+    return {cross_origin_isolated: crossOriginIsolated === true, webgpu_api: !!navigator.gpu,
+      adapter_available: !!adapter, adapter_info: info, failure,
+      canvas: [Module.canvas?.width ?? null, Module.canvas?.height ?? null]};
+  }), Math.min(10000, remaining()), 'Constructor-return WebGPU snapshot');
+  assert.equal(report.scenario.gpu.cross_origin_isolated, true);
+  assert.equal(report.scenario.gpu.adapter_available, true);
+  await saveScreenshot('stadium-first-css-constructor-return');
+  report.scenario.page_errors = pageErrors;
+  report.scenario.console_errors = consoleErrors;
+  report.scenario.external_http_requests = externalRequests;
+  assert.deepEqual(pageErrors, []);
+  assert.deepEqual(externalRequests, []);
+
+  await unloadFirstCssDiagnosticOwner();
+  const afterUnload = await readFirstCssDiagnosticPostUnloadSnapshot();
+  assert.equal(afterUnload.phase, 0);
+  assert.equal(afterUnload.running, 0);
+  assert.equal(afterUnload.observation, null);
+  assert.equal(afterUnload.error, null);
+  assert.equal(afterUnload.import_enabled, true);
+  report.cleanup.native_after_unload = afterUnload;
+  report.cleanup.observation_cleared = true;
+  await saveScreenshot('stadium-first-css-constructor-return-after-unload');
+  report.profile.after = summarizeStorage(await timeout(context.storageState(),
+    Math.min(5000, remaining()), 'Constructor-return post-run browser profile snapshot'));
+  const after = await buildArtifactInventory(baseUrl, artifacts);
+  report.local_http_artifacts.after = after;
+  report.local_http_artifacts.unchanged = JSON.stringify(before) === JSON.stringify(after);
+  assert.equal(report.local_http_artifacts.unchanged, true,
+    'Served runtime artifacts changed during the constructor-return run');
+  assert.deepEqual(consoleErrors, []);
+  report.scenario.http_requests = [...requestRows, ...responseRows];
+  assert.deepEqual(externalRequests, []);
+  report.result = 'pass';
+}
+
 async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
   const prearm = await timeout(page.evaluate(() => {
     const module = globalThis.Module;
@@ -4580,7 +4951,15 @@ async function cleanupServer() {
 async function main() {
   assert.equal(build, expectedBuild, 'Only the isolated C1a diagnostic runtime may be served');
   assert.equal(preflight.schema, 'melee-web-stadium-c1a-browser-preflight-v1');
-  if (firstSssVsSetup) {
+  if (firstCssConstructorReturn) {
+    assert.equal(preflight.route_mode, 'first-css-constructor-return-v2',
+      'Constructor-return command requires its exact frozen route');
+    const manifestBinding = preflight.first_css_constructor_return?.manifest;
+    assert.ok(manifestBinding && typeof manifestBinding === 'object',
+      'Constructor-return preflight omitted its manifest identity');
+    assert.equal(path.resolve(manifestBinding.path),
+      path.resolve(firstCssConstructorManifest));
+  } else if (firstSssVsSetup) {
     assert.equal(preflight.route_mode, 'first-sss-vs-setup');
     const textTailBinding = preflight.first_sss_vs_setup?.text_tail_probe;
     assert.ok(textTailBinding === undefined || typeof textTailBinding === 'boolean',
@@ -4639,6 +5018,7 @@ async function main() {
       'Reducer acceptance helper bytes differ from the frozen preflight');
   }
   firstCssBrowserDrawInputs = await loadFirstCssBrowserDrawInputs();
+  firstCssConstructorReturnInputs = await loadFirstCssConstructorReturnInputs();
   firstCssBrowserStreamInputs = await loadFirstCssBrowserStreamInputs();
   firstSssConstructorPairInputs = await loadFirstSssConstructorPairInputs();
   firstSssConsumedPadTickInputs = await loadFirstSssConsumedPadTickInputs();
@@ -4684,6 +5064,9 @@ async function main() {
   assert.match(defaultCache, /^MELEE_WEB_STADIUM_C1A_DIAGNOSTIC:BOOL=OFF$/m);
   const privateJs = await fs.readFile(path.join(build, 'gameplay_menu_browser.js'), 'utf8');
   const defaultJs = await fs.readFile(path.join(defaultBuild, 'gameplay_menu_browser.js'), 'utf8');
+  if (firstCssConstructorReturn)
+    assert.ok(privateJs.includes('_melee_web_native_menu_stadium_first_css_constructor_return_v2_arm'),
+      'Private CSS constructor-return v2 export is absent from the diagnostic runtime');
   if (recreationCanary) {
     assert.equal(matchedSetupCfPreflight.scope, recreationFullPair ? FULL_COMMON_FIELDS_SEED_V1_SCOPE : PREFIX_V2_SCOPE,
       'Recreation canary A scope differs from its explicit prefix/full-pair mode');
@@ -4719,6 +5102,8 @@ async function main() {
     'Ordinary default runtime unexpectedly exports the private C1a arm gate');
   assert.equal(defaultJs.includes('_melee_web_native_menu_stadium_first_css_draw_arm'), false,
     'Ordinary default runtime unexpectedly exports the private first-CSS diagnostic gate');
+  assert.equal(defaultJs.includes('_melee_web_native_menu_stadium_first_css_constructor_return_v2_arm'), false,
+    'Ordinary default runtime unexpectedly exports the private CSS constructor-return v2 gate');
 
   assert.equal(defaultJs.includes('_melee_web_native_menu_stadium_first_css_postdraw_stream_arm'), false,
     'Ordinary default runtime unexpectedly exports the private CSS stream gate');
@@ -4890,6 +5275,10 @@ async function main() {
     const aImportMs = elapsedMs(aImportStartedNs);
     await recordRecreationPreparationAttribution('A',
       {import_total_ms: aImportMs, select_disc_ms: aSelectDiscMs});
+  }
+  if (firstCssConstructorReturn) {
+    await runFirstCssConstructorReturn({baseUrl, artifacts, before});
+    return;
   }
   if (firstCssBrowserDraw) {
     if (recreationCanary)

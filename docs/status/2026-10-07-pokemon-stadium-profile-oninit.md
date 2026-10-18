@@ -8,8 +8,10 @@ The countdown and seed differ; the other 14 declared fields match. Independent
 raw reduction now locates different seeds at VS Entry and completed Setup,
 with the countdown difference already present at constructor initialization.
 The recordings also contain different CSS/SSS input schedules. A same-producer
-start guard is implemented and independently reviewed; its full regression
-passes. No new browser comparison has run.
+start guard passes independent review, full regression and all 14 exact-head CI
+checks. The fresh initial CSS context now passes offline representation and
+producer-binding checks. Its private constructor-only browser probe passes
+source and focused-control review; build and runtime validation remain pending.
 The [structured receipt](../evidence/issue251-stadium-profile-oninit-v1.json),
 under `fresh_go2_comparison_2026_10_18`, records the failure, passing component
 validation and cleanup. C3 and public Stadium admission remain open.
@@ -1721,9 +1723,9 @@ respectively. This is an offline inventory, not proof of initial CSS equivalence
 or a replay. Fixed historical menu interfaces cannot accept the fresh recording
 by changing a seed or relabeling its identity. The reviewed mandatory
 same-producer Entry/Setup guard is now implemented. The next bounded step is
-offline producer-bound initial CSS extraction and representability, followed
-by a versioned codec and constructor-return comparison before any ticks.
-No new capture or long lifetime is released.
+a private versioned constructor-only comparison before any ticks. Offline
+producer-bound extraction and representation now pass after the reduced repairs
+below. No new capture or long lifetime is released.
 
 A smaller replay alternative was checked offline before implementation. The
 retained long run2 reference reaches the same Entry/Setup seeds as the browser,
@@ -1756,12 +1758,43 @@ the complete log and result are retained, the owned process group is absent,
 and only its disposable temporary test directories were removed. The guard
 changes host tooling and tests, with no runtime C/C++ change or fresh runtime
 build. Neither it nor its offline rejection establishes a new browser or C3
-result. Published exact-head CI for this candidate is still pending.
+result. Published guard head `f2648748` completed all 14 exact-head checks
+(12 successes and two expected skips) in run `39161310774`.
 
 The documentation checkpoint `5ad6f35f` completed all 14 exact-head CI checks
 (12 successes and two expected skips) in run `39158266054`. This does not validate
 subsequent guard changes; their separate source review and regression are
-recorded above, and their published exact-head CI remains pending.
+recorded above with their completed exact-head CI.
+
+The fresh recording's initial CSS context now passes the offline prerequisite.
+Two adapter failures were retained before a smaller helper control and independent
+review: the first confused immutable input files with generated output copies;
+the second supplied the wrong shape to the existing profile decoder. The reviewed
+v3 adapter keeps those identities separate, checks all 42 endpoint floats, and
+rejects the four intended corruptions. Independent raw replay confirms the
+23,176-byte payload and the actual entry/return sequences 728/859 at original
+source tick 114. All six initial player slots are inactive. The historical v1
+context remains byte-identical. This establishes representability, not native
+constructor equivalence or a consumed-input mapping.
+
+The reviewed constructor-only envelope binds 13 producer inputs and keeps the
+expected return fields on the host. Its local CSS scene enum is distinct from
+the five raw-derived expected fields. The private native probe now passes source
+review and focused controls. It applies this initial context to a fresh owner,
+runs only the original CSS constructor, compares the return, and remains stopped
+through later callbacks before checked unload. Review caught destructive cleanup
+on a refused re-prepare and missing liveness gates before observation pointer
+reads; the narrow repair preserves owners on refusal and checks liveness before
+reading. Both initial and repair fixture compile failures are retained.
+
+Two compiled owner-control tests and the existing v1/v2 decoder test pass. The
+actual host loader accepts the frozen producer and rejects stale identity and
+narrowed comparison fields; incompatible route flags refuse before browser
+startup. Independent review verifies these scopes, the fixed comparison inventory,
+and unchanged v1 source pins outside the repair. Original source coordinates stay
+provenance; native counters describe actual execution. No affected build, full
+regression or browser result for the probe is claimed yet. The previous runtime's
+50 products are retained with verified hashes before any rebuild.
 
 The supervised attempt took 15.248 seconds (15.317 seconds including the root
 launcher). Checked native retirement and observation clearing passed, with

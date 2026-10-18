@@ -149,6 +149,8 @@ constexpr std::array<std::string_view,278> route_asset_keys={
 }
 extern "C" {
 unsigned melee_web_native_asset_begin(){try{
+ check(!stadium_first_css_constructor_return_active(),
+       "CSS constructor-return diagnostic refuses a second asset import");
  close();scoped_disc_import=true;scoped_assets=true;
  request_assets(AssetDestination::InitialMenu);
  return asset_generation;
@@ -272,7 +274,12 @@ int melee_web_native_source_files_external_clear(){try{
  scoped_disc_import=false;
  return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
-int melee_web_native_menu_prepare(){try{
+int melee_web_native_menu_prepare(){
+ if(stadium_first_css_constructor_return_active()){
+  message="CSS constructor-return diagnostic refuses menu re-preparation";
+  return 0;
+ }
+ try{
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
  const melee_web::provenance::Scope provenance(pipeline_context(MELEE_WEB_PIPELINE_PHASE_PREPARATION));
 #endif
@@ -313,6 +320,10 @@ int melee_web_native_menu_prepare(){try{
  message=e.what();return 0;
 }}
 int melee_web_native_menu_launch(){try{
+ const bool constructor_return=stadium_first_css_constructor_return_active();
+ if(constructor_return)
+  check(stadium_first_css_constructor_return_consume_launch(),
+        "CSS constructor-return diagnostic permits exactly one prepared owner launch");
  if(preparation.busy()||pending)
   throw std::runtime_error("Native menu transition is still preparing");
  if(match||results||prize||host_entered||(host&&!world))close();
@@ -322,17 +333,24 @@ int melee_web_native_menu_launch(){try{
      configured_save_mode,configured_save_profile.empty()?nullptr:configured_save_profile.data(),
      configured_save_profile.size(),error,sizeof(error));check(host!=nullptr,error);}
  VISetFrameBufferScale(1);enter_world();
+ if(constructor_return)
+  check(stadium_first_css_constructor_return_entry_succeeded(),
+        "CSS constructor-return entry did not produce its checked source-free terminal");
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
  // The initial owner has entered but has not advanced a source tick. Settle
  // its certified union through the same draw/submission gate as transitions.
- check(preparation.request_render_settle(),"Initial pipeline preparation is already active");
- preparation_profile.begin(true,emscripten_get_now());
- running=false;menu_clock.reset();
- message="Preparing original character select...";
- EM_ASM({window.menuPreparation?.(UTF8ToString($0),false);},message.c_str());
+ if(!constructor_return){
+  check(preparation.request_render_settle(),"Initial pipeline preparation is already active");
+  preparation_profile.begin(true,emscripten_get_now());
+  running=false;menu_clock.reset();
+  message="Preparing original character select...";
+  EM_ASM({window.menuPreparation?.(UTF8ToString($0),false);},message.c_str());
+ }
 #endif
  return 1;
-}catch(const std::exception& e){diagnostic_incident(4);message=e.what();running=false;return 0;}}
+}catch(const std::exception& e){
+ stadium_first_css_constructor_return_fail(e.what());
+ diagnostic_incident(4);message=e.what();running=false;return 0;}}
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 int melee_web_native_menu_stadium_c1a_arm(){try{
  check(!stadium_c1a_armed&&scoped_assets&&
