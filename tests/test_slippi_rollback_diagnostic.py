@@ -19,6 +19,7 @@ from slippi_rollback_diagnostic import (  # noqa: E402
     InputProfile,
     InputOverlay,
     TransportAction,
+    UCF_HISTORY_COMPOSITION,
     load_config,
     parse_config,
     write_config,
@@ -39,6 +40,50 @@ def _config() -> dict:
 
 
 class SlippiRollbackDiagnosticConfigTests(unittest.TestCase):
+    def test_history_absent_or_null_preserves_legacy_serialization(self):
+        baseline = _config()
+        for extension in ({}, {"ucf_history_composition": None}):
+            value = dict(baseline, **extension)
+            parsed = parse_config(value)
+            self.assertIsNone(parsed.ucf_history_composition)
+            self.assertEqual(parsed.as_dict(), baseline)
+
+    def test_history_observer_round_trip_preserves_exact_composition(self):
+        value = dict(_config(), ucf_history_composition=UCF_HISTORY_COMPOSITION)
+        parsed = parse_config(value)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "history-config.json"
+            write_config(path, parsed)
+            self.assertEqual(json.loads(path.read_text()), value)
+            self.assertEqual(load_config(path), parsed)
+
+    def test_history_extension_rejects_other_layouts_and_types(self):
+        for composition in ("", "other", UCF_HISTORY_COMPOSITION + " ",
+                            True, 1, [], {}, [UCF_HISTORY_COMPOSITION]):
+            with self.subTest(composition=composition), self.assertRaisesRegex(
+                    DiagnosticConfigError, "reviewed composition"):
+                parse_config(dict(_config(), ucf_history_composition=composition))
+
+    def test_history_extension_does_not_relax_required_or_unknown_keys(self):
+        for key in _config():
+            value = dict(_config(), ucf_history_composition=UCF_HISTORY_COMPOSITION)
+            del value[key]
+            with self.subTest(missing=key), self.assertRaisesRegex(
+                    DiagnosticConfigError, "missing keys"):
+                parse_config(value)
+        value = dict(_config(), ucf_history_composition=UCF_HISTORY_COMPOSITION,
+                     ucf_history_address=0x8065d4dc)
+        with self.assertRaisesRegex(DiagnosticConfigError, "unknown keys"):
+            parse_config(value)
+
+    def test_disabled_history_observer_is_rejected_but_null_is_inert(self):
+        value = dict(_config(), enabled=False, stage_id=None, input_profile=None,
+                     overlay=None, transport={"action": "none", "frame": None,
+                                              "release_frame": None})
+        self.assertFalse(parse_config(dict(value, ucf_history_composition=None)).enabled)
+        with self.assertRaisesRegex(DiagnosticConfigError, "active diagnostics"):
+            parse_config(dict(value, ucf_history_composition=UCF_HISTORY_COMPOSITION))
+
     def test_parses_fixed_rng_overlay_and_bounded_hold(self):
         parsed = parse_config(_config())
         self.assertEqual(parsed.rng_offset, 0x1234)

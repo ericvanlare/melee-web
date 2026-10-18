@@ -23,16 +23,18 @@ MAX_HOLD_FRAMES = 8
 PAD_DATA_BYTES = 8
 FINAL_DESTINATION_STAGE_ID = 0x20
 PROFILE_NAME = "mario-fd-rollback-v1"
+UCF_HISTORY_COMPOSITION = "gale01r2-required-general-codes-pad-buffer-c206b460-gctrel-085c-48-v1"
 
 
 class DiagnosticConfigError(ValueError):
     """Raised when a diagnostic configuration is malformed or unsafe."""
 
 
-def _strict_object(value: Any, name: str, keys: set[str]) -> dict[str, Any]:
+def _strict_object(value: Any, name: str, keys: set[str], *,
+                   optional: frozenset[str] = frozenset()) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise DiagnosticConfigError(f"{name} must be an object")
-    unknown = set(value) - keys
+    unknown = set(value) - keys - optional
     missing = keys - set(value)
     if unknown:
         raise DiagnosticConfigError(f"{name} has unknown keys: {sorted(unknown)}")
@@ -91,9 +93,10 @@ class DiagnosticConfig:
     input_profile: InputProfile | None
     overlay: InputOverlay | None
     transport: TransportAction
+    ucf_history_composition: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "schema": SCHEMA,
             "enabled": self.enabled,
             "rng_offset": self.rng_offset,
@@ -113,16 +116,25 @@ class DiagnosticConfig:
                 "release_frame": self.transport.release_frame,
             },
         }
+        # Omit the inactive extension so existing configurations keep their
+        # canonical bytes and remain readable by the original diagnostic.
+        if self.ucf_history_composition is not None:
+            result["ucf_history_composition"] = self.ucf_history_composition
+        return result
 
 
 def parse_config(value: Any) -> DiagnosticConfig:
     root = _strict_object(value, "config", {
         "schema", "enabled", "rng_offset", "log_path", "stage_id", "input_profile",
         "overlay", "transport",
-    })
+    }, optional=frozenset({"ucf_history_composition"}))
     if root["schema"] != SCHEMA:
         raise DiagnosticConfigError(f"schema must be {SCHEMA!r}")
     enabled = _bool(root["enabled"], "enabled")
+    composition = root.get("ucf_history_composition")
+    if composition is not None and (
+            not isinstance(composition, str) or composition != UCF_HISTORY_COMPOSITION):
+        raise DiagnosticConfigError("ucf_history_composition must name the reviewed composition")
     rng_offset = _integer(root["rng_offset"], "rng_offset", minimum=0, maximum=0xFFFF)
     log_path = root["log_path"]
     if not isinstance(log_path, str) or not log_path or "\x00" in log_path:
@@ -198,7 +210,8 @@ def parse_config(value: Any) -> DiagnosticConfig:
 
     if not enabled:
         # Disabled files remain structurally valid but carry no active controls.
-        if stage_id is not None or input_profile is not None or overlay is not None or action != "none":
+        if (stage_id is not None or input_profile is not None or overlay is not None
+                or composition is not None or action != "none"):
             raise DiagnosticConfigError("disabled config cannot contain active diagnostics")
 
     return DiagnosticConfig(
@@ -209,6 +222,7 @@ def parse_config(value: Any) -> DiagnosticConfig:
         input_profile=input_profile,
         overlay=overlay,
         transport=TransportAction(action, frame, release_frame),
+        ucf_history_composition=composition,
     )
 
 

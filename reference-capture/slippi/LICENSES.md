@@ -43,6 +43,13 @@ Their changed Dolphin files retain GPL-2.0-or-later. The authored
 `transport_fault_recipes.py` validator and its focused tests remain under the
 root MIT project-file scope; they do not grant rights to the combined client.
 
+`patches/0007-ucf-history-snapshot.native.patch` adds project-authored bounded
+history observations and focused tests to the same pinned Dolphin client.
+Its new and modified client files retain GPL-2.0-or-later. The separately
+authored Python config writer/tests remain within their existing MIT scope.
+This native reference diagnostic is separate from the browser profile
+implementation under `src/slippi_profile/`.
+
 The project-authored `generate_service_lineage.py` helper and the sanitized
 desktop transport evidence under `docs/evidence/` are also MIT-scoped project
 files. They record identities and bounded observations; they do not relicense
