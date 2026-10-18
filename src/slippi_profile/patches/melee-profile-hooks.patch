@@ -1,0 +1,64 @@
+diff --git a/src/melee/ft/ftdynamics.c b/src/melee/ft/ftdynamics.c
+--- a/src/melee/ft/ftdynamics.c
++++ b/src/melee/ft/ftdynamics.c
+@@ -15,6 +15,10 @@
+ #include <melee/lb/lb_00F9.h>
+ #include <sysdolphin/baselib/debug.h>
+ #include <sysdolphin/baselib/jobj.h>
++
++#ifdef MELEE_WEB_SLIPPI_PROFILE
++#include <slippi_profile/dynamics_fix.h>
++#endif
+ 
+ /* 09CB40 */ static void ftCo_8009CB40(Fighter* fp, ssize_t bone_idx, melee_source_bool,
+                                        FigaTree*);
+@@ -429,6 +433,9 @@
+             dyn++;
+         }
+     }
++#ifdef MELEE_WEB_SLIPPI_PROFILE
++    slippi_profile_refresh_fighter_matrices(GET_JOBJ(gobj));
++#endif
+ }
+ 
+ void ftCo_8009E0A8(Fighter_GObj* gobj)
+diff --git a/src/melee/ft/fighter.c b/src/melee/ft/fighter.c
+--- a/src/melee/ft/fighter.c
++++ b/src/melee/ft/fighter.c
+@@ -64,6 +64,10 @@
+ #include <melee/gr/ground.h>
+ #include <melee/gr/stage.h>
+ #include <melee/if/ifmagnify.h>
++
++#ifdef MELEE_WEB_SLIPPI_PROFILE
++#include <slippi_profile/offscreen_damage.h>
++#endif
+ #include <melee/it/it_26B1.h>
+ #include <melee/it/it_279C.h>
+ #include <melee/it/item.h>
+@@ -1594,8 +1598,25 @@
+ 
+         if (!fp->x221F_b4 && Camera_80031144() == 1.0f) {
+             if (fp->dmg.x1830_percent < p_ftCommonData->x7B0) {
++#ifdef MELEE_WEB_SLIPPI_PROFILE
++                SlippiOffscreenDamageInput zone = {
++                    gm_GetCurrentGameMode() == GM_HOME_RUN_CONTEST &&
++                        gm_GetCurrentSceneIndex() == 1,
++                    fp->x221F_b1,
++                    fp->motion_id,
++                    fp->cur_pos.x,
++                    fp->cur_pos.y,
++                    Stage_GetCamBoundsLeftOffset(),
++                    Stage_GetCamBoundsRightOffset(),
++                    Stage_GetCamBoundsTopOffset(),
++                    Stage_GetCamBoundsBottomOffset(),
++                };
++                if (slippi_profile_offscreen_damage_zone(&zone) &&
++                    (Player_GetMoreFlagsBit3(fp->player_id) != 0))
++#else
+                 if (ifMagnify_802FC998(fp->player_id) &&
+                     (Player_GetMoreFlagsBit3(fp->player_id) != 0))
++#endif
+                 {
+                     fp->dmg.x1910++;
+                 } else {

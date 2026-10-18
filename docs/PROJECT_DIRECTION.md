@@ -1,7 +1,8 @@
 # Project direction: accurate Melee in the browser, then compatible online play
 
-Current direction includes the owner’s 2026-10-12 match-only rollback decision. This document connects the overall product
-goal with the accuracy, compatibility, rollback and infrastructure projects
+Current direction includes the owner’s October 12 match-only rollback and
+October 17 no-draw profile, licensing and own-relay decisions. This document
+connects the overall product goal with the accuracy, compatibility, rollback and infrastructure projects
 needed to reach it. It records direction and hypotheses; it does not admit a
 feature or replace the execution order in the [roadmap](ROADMAP.md).
 
@@ -14,12 +15,12 @@ original game logic, menus, graphics, audio, input behavior and scene lifecycle
 are the reference. A convenient browser entry point and a reliable local game
 are useful products in their own right.
 
-The longer-term ambition is to extend that foundation into compatible rollback
-play: between browser players, and eventually between a browser player and a
-player using Slippi's desktop client. Using Slippi's existing services is a
-potential route. Operating an independent service is a credible alternative if
-needed. These routes share substantial client work but have different account,
-matchmaking, transport and community requirements.
+The active online target is match-scoped rollback between browsers on our own
+relay, using **Slippi-compatible rules (unofficial)**. Correction ticks omit
+source draw after isolated profile fixes remove render-to-simulation dependencies;
+only the present frame draws. Official Slippi-user cross-play is parked
+indefinitely. No official matchmaking, accounts or replay-upload traffic is
+authorized, and reopening A5 requires a separate explicit owner decision.
 
 The public alpha has limited playable integration. The
 [recorded-session comparison](RECORDED_SESSION_STATE.md) establishes agreement
@@ -38,7 +39,7 @@ changing completion claims belong there and in its scoped receipts.
 | Slippi compatibility profile | A versioned game profile reproduces the behavior of a selected Slippi release and its modifications. | Vanilla foundation plus an audited set of game patches, settings and emulator-facing behavior. |
 | Rollback in the source runtime | Predict, restore and re-simulate without losing correctness or responsiveness. | Complete state ownership, repeatable restore and enough measured execution headroom. |
 | Browser networking and cross-play | Inputs reach browser or desktop peers with correct protocol semantics and acceptable latency. | Transport adaptation, synchronization and loss testing; actual play also needs the compatible rollback runtime. |
-| Matchmaking and service integration | Players discover opponents, authenticate and establish compatible sessions. | Either a supported integration with official services or our own identities, pairing and infrastructure. |
+| Matchmaking and service integration | Browser players establish compatible sessions on our own relay. | Official Slippi services and A5 cross-play are parked; prior research below does not authorize traffic. |
 | Public online operations | An online community can rely on the service over time. | Proven private play first; deployment, diagnostics, abuse handling, updates and optional ranked systems follow. |
 
 The [full-game workflow](FULL_GAME_PORT.md) owns offline feature scope. The
@@ -154,8 +155,8 @@ October 12 update makes the sequence:
    and patch licenses; keep competitive-rules source work in parallel.
 3. Deliver the versioned Slippi rules profile and match-scoped browser rollback
    with local original menus, confirmed outcomes and explicit mode identity.
-4. Broaden competitive coverage and later whole-game scope; pursue pinned Slippi
-   desktop cross-play after browser rollback and profile correctness.
+4. Broaden competitive coverage and later whole-game scope. A5 official Slippi-user
+   cross-play remains indefinitely parked until a separate owner decision.
 
 Browser-to-browser online play requires the Slippi rules profile by product
 decision, even when desktop interoperability is not involved. The settings
@@ -228,7 +229,8 @@ rollback. Neither a successful pairing nor matching checksums alone proves
 general game accuracy.
 
 The decisions still open are the exact Slippi release target, snapshot design,
-transport choice, acceptable measured latency, official-service integration,
-supported launch regions and whether ranked belongs in the first public online
+transport choice and acceptable measured latency. Official-service integration
+is indefinitely parked and requires a separate owner decision. Other open topics
+are supported launch regions and whether ranked belongs in the first public online
 release. This document records those questions and the proposed experiments; it
 does not start those implementations or change current accuracy requirements.

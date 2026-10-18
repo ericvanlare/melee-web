@@ -98,6 +98,12 @@ or skip RNG calls merely to align a replay. An incomplete capture remains invali
 a structurally validated prefix may report the first divergence only as diagnostic
 evidence, without shortening the reference or admitting the run.
 
+The October 17 owner-approved Slippi profile is a separate mode: correction
+ticks omit source draw, and isolated profile behavior must remove every relied-on
+render-to-simulation dependency. Require a strict drawn-versus-no-draw synctest
+for that profile before rollback admission; this exception does not alter vanilla
+replay, drawing, arithmetic or reference requirements below.
+
 Require source-drawn comparison before admitting a replay workload. Headless
 traces omit camera callbacks that can affect later gameplay: the original
 magnifier sets an offscreen flag used by fighter damage. A draw audit that

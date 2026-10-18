@@ -76,6 +76,7 @@ TRACE_TARGETS = (
     "gameplay_content_match_trace",
     "gameplay_snapshot_probe_browser",
     "gameplay_snapshot_probe",
+    "gameplay_slippi_synctest",
     "gameplay_stage_battlefield_trace",
     "gameplay_stage_temple_trace",
     "gameplay_stage_fountain_trace",
@@ -130,6 +131,12 @@ def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
     root = Path(root)
     if target not in BUILD_TARGETS and target not in TRACE_TARGETS:
         raise ValueError(f"Unsupported build target: {target}")
+    if target == "gameplay_slippi_synctest":
+        if (pipeline_provenance or selective_pipelines or stadium_c1a_diagnostic or
+                fma_collision_diagnostic or fma_velocity_y_diagnostic):
+            raise ValueError("gameplay-slippi-synctest requires its isolated private build profile")
+        suffix = "-release" if configuration == "Release" else ""
+        return root / f"build/slippi-synctest{suffix}"
     fma_requested = fma_collision_diagnostic or fma_velocity_y_diagnostic
     if target == FMA_DIAGNOSTIC_TARGET:
         if not fma_requested:
@@ -951,8 +958,23 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
           pipeline_provenance=False, selective_pipelines=False, configure_only=False,
           trace_targets=None, gameplay_bootstrap_state=False,
           stadium_c1a_diagnostic=False, fma_collision_diagnostic=False,
-          fma_velocity_y_diagnostic=False):
+          fma_velocity_y_diagnostic=False, slippi_synctest_assets=None):
     trace_targets = tuple(trace_targets or ())
+    if ("gameplay_slippi_synctest" in trace_targets and
+            trace_targets != ("gameplay_slippi_synctest",)):
+        raise ValueError("gameplay_slippi_synctest must be the only --trace-target")
+    slippi_synctest = trace_targets == ("gameplay_slippi_synctest",)
+    if slippi_synctest:
+        if (pipeline_provenance or selective_pipelines or stadium_c1a_diagnostic or
+                fma_collision_diagnostic or fma_velocity_y_diagnostic or
+                gameplay_bootstrap_state):
+            raise ValueError("gameplay-slippi-synctest requires its isolated private build profile")
+        assets_root = Path(slippi_synctest_assets or
+                           Path(root) / "assets-local/snapshot-mario").resolve()
+        if not assets_root.is_dir():
+            raise ValueError(f"Slippi synctest fixture assets are missing: {assets_root}")
+    elif slippi_synctest_assets is not None:
+        raise ValueError("--slippi-synctest-assets requires --trace-target gameplay_slippi_synctest")
     if gameplay_bootstrap_state and (
         tuple(trace_targets or ()) != ("gameplay_snapshot_probe",)):
         raise ValueError("--gameplay-bootstrap-state requires --trace-target gameplay_snapshot_probe")
@@ -999,7 +1021,10 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         # bytes. Fail on source drift before compiling an outdated binding table.
         subprocess.run([sys.executable, str(root / "scripts/generate_fighter_registry.py"), "--check"],
                        cwd=root, check=True)
-        gameplay_source = prepare_sources(root, lock)
+        if slippi_synctest:
+            gameplay_source = prepare_sources(root, lock, slippi_profile=True)
+        else:
+            gameplay_source = prepare_sources(root, lock)
         subprocess.run([sys.executable, str(root / "scripts/generate_common_schema.py"), "--check"],
                        cwd=root, check=True)
         if (root / ".venv").is_symlink():
@@ -1071,6 +1096,9 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         configure.append(
             f"-DMELEE_WEB_SLIPPI_PROFILE_BROWSER={'ON' if 'gameplay_snapshot_probe_browser' in trace_targets else 'OFF'}"
         )
+        configure.append(f"-DMELEE_WEB_SLIPPI_SYNCTEST={'ON' if slippi_synctest else 'OFF'}")
+        if slippi_synctest:
+            configure.append(f"-DMELEE_WEB_SLIPPI_SYNCTEST_ASSET_ROOT={assets_root}")
         record_build(root, build_dir, False)
         subprocess.run(configure, cwd=root, env=env, check=True)
         if configure_only:
@@ -1127,6 +1155,8 @@ def main():
                         help="Enable the independent common velocity-Y interpolation FMA diagnostic")
     parser.add_argument("--gameplay-bootstrap-state", action="store_true",
                         help="Enable the typed bootstrap-state diagnostic on gameplay_snapshot_probe")
+    parser.add_argument("--slippi-synctest-assets", type=Path,
+                        help="Use this ignored local fixture for gameplay_slippi_synctest")
     parser.add_argument("--stadium-c1a-diagnostic", action="store_true",
                         help="Build the opt-in development-only Stadium selection/preparation checkpoint")
     args = parser.parse_args()
@@ -1141,7 +1171,8 @@ def main():
               gameplay_bootstrap_state=args.gameplay_bootstrap_state,
               stadium_c1a_diagnostic=args.stadium_c1a_diagnostic,
               fma_collision_diagnostic=args.fma_collision_diagnostic,
-              fma_velocity_y_diagnostic=args.fma_velocity_y_diagnostic)
+              fma_velocity_y_diagnostic=args.fma_velocity_y_diagnostic,
+              slippi_synctest_assets=args.slippi_synctest_assets)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         raise SystemExit(f"build: {error}") from error
 

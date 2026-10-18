@@ -20,7 +20,9 @@ Set by the owner on 2026-10-05, with the owner-adopted
 [2026-10-08 architect check-in](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6069469010)
 and [execution response](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6069737799)
 setting the milestone process. The owner’s October 12 match-only rollback
-decision supersedes the earlier online sequence (see the [architects’ log](ARCHITECTS.md)).
+decision supersedes the earlier online sequence. The October 17 decision adds
+no-draw Slippi-profile correction ticks, authorizes the isolated GPL profile,
+and parks official-service cross-play (see the [architects’ log](ARCHITECTS.md)).
 Two tracks run in parallel. When they compete
 for the same scarce resource, such as the single browser-timing lane on the test
 machine or a reviewer's attention, take the lowest-numbered unblocked item and
@@ -44,8 +46,10 @@ retained failures are recorded in the [scoped H1 status entry](status/2026-10-13
 **Target.** Two people on different machines play the **Slippi rules** profile
 in the browser with rollback confined to the match. **Vanilla is offline-only**
 and remains the accuracy reference. Both profiles use the player's unmodified
-USA revision 1.02 disc. A settings toggle selects Vanilla or Slippi rules; that
-profile implementation is planned, not already available.
+USA revision 1.02 disc. The planned settings toggle selects Vanilla or **Slippi-compatible rules
+(unofficial)**, with a short notice that this project is not affiliated with or
+endorsed by Project Slippi. No Slippi logos or branding. Profile implementation
+is in progress; the toggle and complete profile are not yet available.
 
 Original CSS and SSS run locally. Peers exchange selections and a versioned
 match-start context: seed, characters/costumes, stage, rules, ports, content and
@@ -63,9 +67,9 @@ supersedes decision 016 for future online work.
 | --- | --- |
 | **A1. Determinism** | Preserve scoped shared-input/checksum evidence; extend browser/architecture coverage only through bounded experiments. It does not establish complete state ownership. |
 | **A2. Interim local lockstep** | Retain the original CSS → SSS → match → Results → CSS functional baseline. No new menu/Results/rematch lockstep campaign. |
-| **A3. Rollback feasibility and rules inventory** | [#318](https://github.com/ericvanlare/melee-web/issues/318), continuing [#115](https://github.com/ericvanlare/melee-web/issues/115): measure match-state size and snapshot/restore cost, full source tick/draw with GPU submission suppressed, and host-side effects. Add a match-only restored-snapshot repeat-tick checksum test after safe host ownership; report its exercised coverage alongside whether up to seven corrective ticks fit the declared budget. In parallel inventory Slippi gameplay changes and patch licenses. |
-| **A4. Match-scoped online play** | After the feasibility decision, implement restore/prediction and an agreed match-start barrier. Deliver the Vanilla/Slippi rules settings toggle and versioned Slippi rules profile under [#9](https://github.com/ericvanlare/melee-web/issues/9), checked against a pinned Slippi Dolphin release bundle. Complete matches with controlled corrections, confirmed outcomes, local Results/rematch, exact state checks and clean disconnect. |
-| **A5. Slippi desktop cross-play** | Extend the pinned profile and transport only after browser rollback correctness; demonstrate actual desktop interoperability. Browser networking or a profile name alone cannot establish cross-play. |
+| **A3. No-draw rollback and profile dependencies** | [#318](https://github.com/ericvanlare/melee-web/issues/318) / [#115](https://github.com/ericvanlare/melee-web/issues/115), with [#9](https://github.com/ericvanlare/melee-web/issues/9): inventory draw-to-simulation writes and implement their isolated Slippi-profile equivalents. Prove drawn source execution versus no-draw restored-interval checksum agreement with falsification controls. Only the present frame draws. Then implement UCF 0.84 and the remaining versioned online-profile behaviors under #9, checked against a pinned Slippi Dolphin reference. Historical drawn measurements remain distinct. |
+| **A4. Match-scoped online play on our relay** | After A3, measure state capture/restore, up to seven no-draw corrections plus one present draw, and remaining audio/file/host effects under #318/#115. With an explicit go decision, deliver the unofficial profile toggle, negotiated match start, restore/prediction and one complete two-browser match on our own relay, with corrections, confirmed outcome, local Results and clean disconnect. No official Slippi service traffic. |
+| **A5. Official Slippi-user cross-play — parked indefinitely** | Requires a separate explicit owner decision. No official matchmaking, accounts or replay-upload traffic, and no contact on the project’s behalf. Retain prior source research; it authorizes no service use. |
 
 Every online session carries an explicit mode identity under #9. Slippi rules
 may also be selected offline, with its own evidence. Source gameplay changes
@@ -87,7 +91,11 @@ under the owner's Workers Free/$0 limit; no paid, billing, account/security,
 DNS or production changes are authorized. Do not repeat successful captures
 without a new hypothesis.
 
-**Owner-directed manual alpha (pending):** The owner selected a live hosted
+**Owner-directed manual alpha (pending):** On October 14 the owner deferred the
+human PvP trial and directed the next autonomous sprint. Continue the no-draw
+profile rollback and Stadium milestones below without waiting for human testing; keep
+physical-input, audible-output, foreground-timing and two-machine gates unrun.
+The owner selected a live hosted
 room page on the existing isolated staging Worker and declined local-package
 setup as the user-facing path. The proposed two-Mac trial uses the existing
 interim lockstep route: keyboard P1 on the host and controller P2 / Port 2 on
@@ -106,10 +114,11 @@ recommendation is no-go for naive browser-heap rewind or a combined seven-tick
 budget claim: renderer content/cache ownership, audio clocks and asynchronous
 file destinations are not closed. This is not a rejection of rollback or proof
 that it is too slow. The next ownership design belongs under #115; A4 needs an
-explicit go decision after those gates. A later multi-frame diagnostic must first
-prove useful safe renderer reuse, preserving original draw callbacks. The
-Slippi semantic/license/reference inventory continues under #9; no profile is
-ready to port. Keep component measurements separate from browser acceptance.
+explicit go decision after those gates. The October 17 pivot replaces drawn corrective ticks with simulation-only
+corrections in the Slippi profile; presentation and remaining host effects still
+need explicit ownership. The owner has authorized profile implementation in the
+isolated GPL scope; complete semantics and reference coverage remain open under
+#9. Keep component measurements separate from browser acceptance.
 
 After this bounded measurement checkpoint, investigate first-use respawn-platform
 and common-effect pipeline preparation under H1/#116. Preparation must not consume
@@ -134,13 +143,40 @@ activation remains unobserved. Preserve exact bits and original arithmetic:
 no blanket contraction, fast-math, widened comparisons or deadline changes.
 Any later adopted arithmetic change reopens exact-receipt validation. The
 [architect response](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6147291073)
-records the parallel Slippi behavior mapping, pending owner licensing decision,
-and deferred A5 gateway/cadence research. Copy no related-project code, and send
+records the historical Slippi behavior mapping and licensing question. The
+October 17 owner decision now permits the isolated profile implementation and
+parks A5 official-service cross-play indefinitely. Copy no related-project code, and send
 no automated traffic to Slippi production services or real accounts.
+
+The October 16 [execution sprint](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6227720936)
+is checkpointed. **Items 2–9 are paused**: texture-cache generations, selected
+renderer ownership and drawn corrective ticks are no longer the active path.
+Resume them only for a demonstrated dependency the no-draw model cannot remove,
+with the evidence and reasoning posted on #158 before implementation.
+
+The next coherent milestone combines render-to-simulation dependency fixes with
+a no-draw synctest. Start with the actual fighter dynamics/matrix producer and
+the offscreen/magnifier damage path; inventory other draw writes and consumers.
+Implement the profile behavior in our own C under `src/slippi_profile/`, alongside
+its tests and per-behavior patch mapping, under GPL-3.0-or-later. The separate
+[license scope](../LICENSE_SCOPE.md) and [notices](../THIRD_PARTY.md) preserve the
+rest of the repository's existing terms. Builds including the profile follow
+GPL terms with public corresponding source and reproducible build instructions.
+
+Compare the drawn forward interval against restored no-draw re-simulation under
+the same profile, setup and literal inputs. Preserve strict simulation checksums,
+first-divergence reporting and negative controls; render-only bytes do not become
+simulation coverage. Fail on unknown simulation owners or unsafe external effects
+before restoration. Never claim a source-only repeat proves draw independence.
+After two failed experiments reduce the reproducer or obtain bounded review.
+Only a reviewed pass opens a longer correction-budget measurement. The existing
+[rollback boundary](status/2026-10-12-match-only-rollback-feasibility.md) owns all
+historical measurements and the current scope; no whole-session claim follows.
 
 Pokémon Stadium C3 [#251](https://github.com/ericvanlare/melee-web/issues/251) /
 [draft #301](https://github.com/ericvanlare/melee-web/pull/301) remains the next
-Track B milestone. Reuse the retained PadPoll/draw-order reduction and original
+Track B milestone. Ranked/Unranked use unfrozen Stadium, so transformations
+remain in scope. Reuse the retained PadPoll/draw-order reduction and original
 owner evidence; no duplicate capture. Track A has first claim on the shared
 capture lane. Physical controllers, foreground timing, audible output and a
 two-machine human session remain separate unrun gates.
