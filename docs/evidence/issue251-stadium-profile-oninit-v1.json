@@ -16779,7 +16779,7 @@
           },
           "integration_validation": {
             "source_commit": "02a7b72f66db2b62cd3d24b9773088b04b659e47",
-            "state": "failed_run_retained_context_repair_reviewed_pending_current_main_full_validation",
+            "state": "failed_run_retained_context_repair_reviewed_and_current_main_revalidation_passed",
             "result_sha256": "3e306f1df50aa623e939d537bc070367d69a8dce4352ceb3a7893ff3b73c5fa3",
             "builds": [
               {
@@ -16801,7 +16801,7 @@
               "log_sha256": "0c4cb9e494eab72592089fc15d627787d94110074972bcd88e79536fdee7be6b",
               "failure": "Profile include hunk no longer applies after ordinary base adds ground.h in grpstadium.c. Actual production composition and two reducer tests affected; no behavior executed in these failed cases."
             },
-            "next": "Integrate current main, then full regression and affected builds. No capture.",
+            "next": "Superseded by the separately identified current_main_validation_v2; this failed run and its build products remain retained.",
             "context_repair": {
               "source_commit": "5e38096f",
               "freeze_sha256": "6b44aaf70be60b4292edca3b957bb309311c633422c6e8a852a0a8e141aba040",
@@ -16866,6 +16866,56 @@
               "C3 admission"
             ],
             "historical_report_unchanged": true
+          },
+          "current_main_validation_v2": {
+            "source_commit": "4eabfc9b3bc011fe3e6360fe89a8e893866298f6",
+            "integrated_main": "130438fd2b86d00cfec98cd2ba0a5f66084ae15c",
+            "state": "local_validation_and_independent_docs_review_passed_exact_head_ci_pending",
+            "source_freeze_sha256": "17b8096caeb1a233a4aaed40754ae2c664b6749dd70eb10465610390ee6c5be4",
+            "tracked_non_docs_source_pins": 1769,
+            "result_sha256": "ed25c58c10a68143784fb11563fb4227c77dd7b6edeeecf94fd97782da875e5f",
+            "phases": [
+              {
+                "name": "focused-composition",
+                "returncode": 0,
+                "seconds": 14.925261458847672,
+                "log_sha256": "88032befac3de4208a0cb1c618d636faf10c484626cfa5ad3a94cb22109f5da5"
+              },
+              {
+                "name": "profile-release-build",
+                "returncode": 0,
+                "seconds": 111.60125833377242,
+                "log_sha256": "bbb7110dbc04ade0d581738af44655a6f6e192e07f73f4ec245288ef56000eef"
+              },
+              {
+                "name": "diagnostic-release-build",
+                "returncode": 0,
+                "seconds": 22.62902354123071,
+                "log_sha256": "0523b2d9a73421e13aeb10d8dbb543c4bb3b2d4d78e08cdf265adb2b75f02b3d"
+              },
+              {
+                "name": "ordinary-release-build",
+                "returncode": 0,
+                "seconds": 21.17679875018075,
+                "log_sha256": "c2e980b56ed32a557217980ef4887b48584dc74438ed7834398ef9ef0b739b81"
+              },
+              {
+                "name": "full-regression",
+                "returncode": 0,
+                "seconds": 669.8562852093019,
+                "log_sha256": "d4955bc79bce0a76edfd7ceee60eadfe8cd34f597dd15d08b1746c50e67e3f59"
+              }
+            ],
+            "full_regression": {
+              "tests": 2711,
+              "seconds": 669.439,
+              "skips": 189,
+              "log_sha256": "d4955bc79bce0a76edfd7ceee60eadfe8cd34f597dd15d08b1746c50e67e3f59"
+            },
+            "retained_runtime_manifest_sha256": "f826e63cb1514ded9f093fe8b3461f452ec026011c397cdf46c68b69540149f2",
+            "retained_runtime_products": 62,
+            "scope": "Focused profile composition, private profile plus diagnostic/ordinary Release builds and regression only. No new gameplay capture. Older capture/harness/native producers remain distinct; C3 stays open and PR301 stays draft.",
+            "independent_final_review_sha256": "6698a79c88b68ba33e408f911665ac119dc8f1bf8dfc8b66ee2cf95fdac6bee4"
           }
         }
       }
