@@ -1642,7 +1642,7 @@
       "result_sha256": "aedf80e459a7c2c643bab6598028fd9770e41bc9a04ef263ccec07c139015aba"
     },
     "mainline_extraction": {
-      "status": "BOUNDED_COMPARISON_AND_LOCAL_VALIDATION_PASS_CI_PENDING",
+      "status": "BOUNDED_COMPARISON_PASS_CI_DISCOVERY_REPAIRED_FINAL_VALIDATION_PENDING",
       "base_commit": "95113326ecf81379879c43e0a725a3962286b4de",
       "dirty_candidate": true,
       "freeze": {
@@ -1753,8 +1753,36 @@
           "log": "mainline-validation-v2/full-regression.log",
           "log_sha256": "12411619a3689a8133858d27cfbdcbff3c9549d52538dc1f7e0945c91e1544f7"
         },
-        "current_head_CI": "pending",
-        "default_trace_prerequisites": "Normal default configure plus bootstrap, collision and fighter-assets focused checks passed; same frozen executable source."
+        "current_head_CI": "fresh head pending; strict CI audit unchanged",
+        "default_trace_prerequisites": "Normal default configure plus bootstrap, collision and fighter-assets focused checks passed; same frozen executable source.",
+        "current_head_CI_v1": {
+          "head": "97a806fcc4cc660893e34b7bac3d2edbc3fddc03",
+          "run_id": 39102311304,
+          "result": "failed strict aggregate module-shard inventory; all test/build partitions passed",
+          "successes": 11,
+          "expected_skips": 2,
+          "failures": 1,
+          "misplaced_test_ids": [
+            "src.slippi_profile.tests.test_profile_controls.ProfileControlsTests.test_profile_policy_and_dependency_controls",
+            "src.slippi_profile.tests.test_runner_contract.SlippiSynctestRunnerContractTests.test_draw_frame_cleanup_and_owned_process_controls"
+          ],
+          "log": "pr328-ci-39102311304-failed.log",
+          "log_sha256": "acfc8bd1fb6c76e7e000cc4cf76829965167ef92a8d1b3c69de2640fa8cd60c6"
+        },
+        "ci_discovery_repair": {
+          "files_sha256": {
+            "tests/test_slippi_profile_controls_discovery.py": "e590df4ae832ad51d3cf1c55afcd9d762e80504f5e977d0907aaf58ca9d7d6ce",
+            "src/slippi_profile/tests/test_ci_discovery.py": "7e5988e2fd620c06fa03598a63cc58a367317687364578ada2a54df801fc3677"
+          },
+          "review": "independent-ci-discovery-review-v1.json",
+          "review_sha256": "675f658844fcdce5fa1519c8890b3706c199e8dd3e05327eb3e51865d61d86ac",
+          "focused_tests": 11,
+          "original_methods_run_once": 10,
+          "strict_CI_scripts_unchanged": true,
+          "result": "independently reviewed pass; behavior-free forwarding classes keep normal flat test IDs; actual discovery/shard/aggregate positive and misassignment negative controls pass",
+          "runtime_and_capture_sources_unchanged": true
+        },
+        "full_regression_v3": "pending on repaired test-discovery source; prior successful runtime builds and bounded capture remain distinct"
       },
       "limits": "Same bounded declared-state/PCM/PAD component limits as historical precursor; no combat path witnesses, whole hidden-state/host closure, original Slippi reference, live rollback or frame-budget acceptance."
     },

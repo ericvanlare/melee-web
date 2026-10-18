@@ -265,8 +265,15 @@ define. The first fresh-checkout full regression retained three missing-default-
 trace-build failures (two test failures and one setup error). The normal default
 configuration and focused trace checks then passed, followed by the complete
 2,412-test regression with 166 skips and no failures. This supplied the missing
-environment prerequisite without source or assertion changes. Current-head CI
-and integration remain pending. The structured receipt keeps
+environment prerequisite without source or assertion changes. The first exact-head
+CI run passed every test/build partition but the aggregate rejected two imported
+profile test identities as belonging to another shard. The strict audit remains
+unchanged. Empty forwarding classes in the behavior-free discovery shim retain
+all ten original profile test methods exactly once; an eleventh GPL control
+checks actual discovery, shard assignment and aggregate acceptance/rejection.
+Independent review and focused controls pass. Final full regression and complete
+new-head CI remain pending at this source checkpoint. Runtime/harness files and
+the retained capture identities are unchanged. Integration remains pending. The structured receipt keeps
 this result under `mainline_extraction`, separately from the historical capture.
 
 ## Slippi profile source checkpoint

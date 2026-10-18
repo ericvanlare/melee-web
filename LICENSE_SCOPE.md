@@ -147,7 +147,7 @@ this grant does not extend to recovered game/SDK declarations or implementations
 that they include or call, nor to the compiled runtime, assets or generated
 evidence.
 
-The profile test discovery shim listed above only imports isolated test classes;
+The profile test discovery shim listed above only exposes isolated test classes;
 all profile behavior and controls remain in the GPL directory below.
 
 ## Separate Slippi-compatible profile scope

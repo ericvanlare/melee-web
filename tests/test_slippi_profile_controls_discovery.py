@@ -1,11 +1,28 @@
 # SPDX-License-Identifier: MIT
-"""Expose the isolated profile controls to the repository's normal discovery."""
+"""Expose isolated GPL profile controls to the repository's flat test discovery."""
 
-from src.slippi_profile.tests.test_profile_controls import ProfileControlsTests
-from src.slippi_profile.tests.test_build_contract import SlippiSynctestBuildContractTests
-from src.slippi_profile.tests.test_source_composition import SlippiSourceCompositionTests
-from src.slippi_profile.tests.test_runner_contract import SlippiSynctestRunnerContractTests
+from src.slippi_profile.tests import test_build_contract as _build_contract
+from src.slippi_profile.tests import test_ci_discovery as _ci_discovery
+from src.slippi_profile.tests import test_profile_controls as _profile_controls
+from src.slippi_profile.tests import test_runner_contract as _runner_contract
+from src.slippi_profile.tests import test_source_composition as _source_composition
 
 
-__all__ = ["ProfileControlsTests", "SlippiSynctestBuildContractTests",
-           "SlippiSourceCompositionTests", "SlippiSynctestRunnerContractTests"]
+class SlippiBuildContractTests(_build_contract.SlippiSynctestBuildContractTests):
+    pass
+
+
+class SlippiDiscoveryContractTests(_ci_discovery.SlippiDiscoveryContractTests):
+    pass
+
+
+class SlippiProfileControlsTests(_profile_controls.ProfileControlsTests):
+    pass
+
+
+class SlippiRunnerContractTests(_runner_contract.SlippiSynctestRunnerContractTests):
+    pass
+
+
+class SlippiSourceCompositionTests(_source_composition.SlippiSourceCompositionTests):
+    pass
