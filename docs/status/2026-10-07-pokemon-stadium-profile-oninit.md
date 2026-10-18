@@ -1632,3 +1632,32 @@ passes 2,713 tests with 189 skips in 568.376 seconds, and all owned validation
 process groups are absent. Fifty new build products are retained separately
 from `f4c44f8e`. These are component checks; the next browser attempt still needs
 a fresh reviewed packet, and native unload/C3 remain open.
+
+
+The separately released same-v6 continuation now passes independent replay at
+harness `4c8b4693`, with runtime and regression producer `d4aca36c`. It completes
+the unchanged 171-action schedule (86 ticks and 85 draws), ending at tick85
+before draw85. Both C and F compare all 15 declared map/display fields plus
+the match seed exactly. These 32 comparisons are counted from the retained
+`host_comparisons` entries; the older report's aggregate count fields are null.
+The run took 25.420 seconds, including checked native unload and observation
+clearing. All 11 recorded browser descendants, the capture/server groups and
+all 14 root-recorded owned PIDs are absent. Independent replay recomputes the
+Entry/Setup comparisons, all 171 action receipts and both C/F comparisons.
+The runtime required-queue gate covers bundle 0 only; a separate offline audit
+compares all 86 captured four-port records with their corresponding original
+bundles (3,784 literal semantic bytes). This does not claim 86 runtime gates.
+The actual GO trace records local callback sequence 1/2/3 at world tick84; the
+original GO event sequence 2,925 remains a separate source coordinate.
+
+The first two independent-review attempts stopped before action replay on an
+incorrect PID field and packet path. Both failures remain retained. A bounded
+source/API/path review preceded the corrected passing replay; no browser run
+was repeated.
+
+The failed action-0 result and its unexplained post-tick unload refusal remain
+retained. The successful later terminal path does not identify that earlier
+clause. The same input bytes, source schedule, RNG and strict C/F expectations
+were preserved; this is not a full idle lifetime, per-owner RNG, recreation,
+pixel/audio/timing or C3 acceptance result. Exact new identities are under
+`same_v6_queue_cf_v2_browser_pass` in the existing evidence receipt.

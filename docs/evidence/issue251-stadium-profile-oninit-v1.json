@@ -17212,6 +17212,76 @@
               ],
               "scope": "Observation/diagnostic component only; no new browser comparison or native unload result."
             }
+          },
+          "same_v6_queue_cf_v2_browser_pass": {
+            "schema": "melee-web-stadium-same-v6-queue-cf-v2-browser-result-v1",
+            "status": "PASS_DECLARED_PREFIX_AND_INDEPENDENT_REPLAY",
+            "runtime_source_commit": "d4aca36c9ef588cf2d38dbb6036c69a45e1518c3",
+            "harness_source_commit": "4c8b46939b3fa366846e7718cae891bfe1a34830",
+            "full_regression_source_commit": "d4aca36c9ef588cf2d38dbb6036c69a45e1518c3",
+            "retained_runtime_manifest_sha256": "5e3c2bd677d80edb893a5ab476fa60f10b9421e42a3ba2539a866738fe059b47",
+            "freeze_sha256": "3989ec772277e0132b3229b71ea64e684a66a33eaf15e2fab4c5a74a3c0be825",
+            "release_sha256": "f2f99ba9fbed02d9c8615f3c6bf70e955024c4ce571201ad3c1fdfc46d950613",
+            "preflight_sha256": "2957fce2d92c5775ff632c0ccd437cf405cffa7b7bef16220df4220b83acb8a3",
+            "offline_preflight_result_sha256": "ced9bf0e5d945c9c136a2bf78c70d2265e7fe3b4c840786a2cc9d17719b1921b",
+            "raw_report_sha256": "9563dd5d7fd0e0db4a414cb31750824f16b47655cbc30b5121a3ffb5241003cf",
+            "owner_report_sha256": "1f8aee8642816bac937f46b481432bfb3f82745a6e6cd4209ce774bdbe07cc30",
+            "root_retention_sha256": "2605323044773823564ae439ed9ad583b22053951fbf1c05534819839f8f73a2",
+            "owner_elapsed_ms": 25340,
+            "root_elapsed_seconds": 25.41960975015536,
+            "schedule": {
+              "completed_actions": 171,
+              "tick_actions": 86,
+              "draw_actions": 85,
+              "terminal": "tick85 before draw85",
+              "expected_packet_unchanged_sha256": "371c56291d5fb175562eb3781d514af3d56ed28198b89a2753b97f7a8adcc528",
+              "expected_requirement_version": 1,
+              "actual_queue_observation_version": 2
+            },
+            "declared_C_F": {
+              "C": {
+                "fields": 15,
+                "seed": "868d77be",
+                "matched": 16
+              },
+              "F": {
+                "fields": 15,
+                "seed": "b50f624b",
+                "matched": 16
+              },
+              "aggregate_count_fields_in_raw_legacy_report": null,
+              "count_basis": "Actual host_comparisons entries; top-level legacy-v1 aggregate counters are null."
+            },
+            "cleanup": {
+              "native_unload_completed": true,
+              "observation_cleared": true,
+              "owned_process_cleanup_passed": true,
+              "fresh_root_owned_pid_absence_count": 14,
+              "owner_browser_descendants_absent": 11
+            },
+            "prior_failure_preserved": "same_v6_first_consumed_tick_attempt_v1 remains FAIL; its unknown unload clause is not retrospectively explained by this later terminal pass.",
+            "scope": "Same-reference input prefix and declared C/F comparison only. Full lifetimes, retirement/recreation A/B, per-owner RNG, raw timer/title/object identity, pixels/PCM, foreground timing and C3 remain open.",
+            "next": "Plan a source-bound longer matched idle lifetime with actual four-port inputs, GO-relative counting and checked retirement/recreation; no additional capture released.",
+            "independent_replay": {
+              "review_sha256": "965900f7f3064b7142df9e1f1a0c4330dea6415058659a91c0d38f8789aa32b3",
+              "result_sha256": "ef7f89d115be269f4f48f232fb3a5479c55a743d2924872e947dbb21c2ccf514",
+              "driver_actions": 171,
+              "entry_setup_comparators_recomputed": true,
+              "strict_runtime_queue_gate": "Only bundle0/source event2504; actualv2 observation against unchanged requiredv1 bytes/map/Setup generation.",
+              "separate_offline_queue_audit": {
+                "records": 86,
+                "bytes_per_record": 44,
+                "bytes_compared": 3784,
+                "all_source_bundles_equal": true
+              },
+              "C_F_exact_cached_comparator_receipts_reproduced": true,
+              "prior_review_failures_retained": [
+                "Incorrect owner PID field assertion before action replay.",
+                "Incorrect packet path before action replay."
+              ],
+              "reduction": "Reviewed actual consumer API and immutable file paths before one corrected offline replay.",
+              "GO_scope": "Original event2925 and runtime-local callback sequences1/2/3 stay distinct; actual runtime trace observed world tick84, not an independently fixed GO expectation."
+            }
           }
         }
       }
