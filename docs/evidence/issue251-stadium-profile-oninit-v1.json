@@ -15471,6 +15471,751 @@
           }
         ],
         "reviews": "Root and independent retained-raw reviews PASS for exact component scope; no full replay or C3 acceptance."
+      },
+      "prepared_start_guard_repair_v2": {
+        "schema": "melee-web-stadium-prepared-entry-guard-repair-evidence-v2",
+        "state": "FAIL_RETAINED_FIRST_PREPARED_START_GUARD; ONE CAPTURE; LANE RETIRED",
+        "scope": "One default-off prepared-Start candidate comparison after the retained stock4/ItemsNone SSS stop; not Entry/Setup/C3 or full replay acceptance.",
+        "run_locator": "stadium-prepared-entry-source-repair-validation-v2-20261017-221307-ab08a450",
+        "source": {
+          "branch": "codex/stadium-c3-lifetime",
+          "head": "ae1b5bf9db2c7dcc4c83fb7f0270e7fc951a7fc4",
+          "tree": "7eecaf08e5cae4d8ce06c2f245b96c31be590709",
+          "base_commit": "ae1b5bf9db2c7dcc4c83fb7f0270e7fc951a7fc4",
+          "uncommitted_diff_sha256": "292279070e47444da9924a5b9c794d1e5e62bde7d59a9527ac1444c09efac22f",
+          "source_candidate_manifest": {
+            "path": "packet-v2/source-candidate-manifest-v2.json",
+            "sha256": "851b63fad5d28a0e936674186bb61d51fd440de4a6908daeadeecb8eb4159962"
+          },
+          "source_repair_review": {
+            "path": "packet-v2/root-source-repair-review.json",
+            "sha256": "9d32463575b453ddea4fd823b8ed49637c3b0f9a9cc777320634889d3ef045e8",
+            "result": "PASS"
+          },
+          "changed_source_files": {
+            "cmake/FighterRuntime.cmake": "4a2de061eae4e72f3f3c73a7a0b7394b8aba3bc97f8441610e8a771ba41b8454",
+            "scripts/capture_whole_session_browser.mjs": "bce503b48d6ec66c6cca77c51a1de588baa9544ea692d92f9411836153e09f26",
+            "scripts/stadium_current_sss_exit_observation.mjs": "a38999e8a920e16eec75151a10b56bf57e628838929f38e7e55bae6743b087ab",
+            "scripts/stadium_stock4_sss_exit_observation.mjs": "1aee2cdfd989f36e53029b691858012a8b294fc3c4f3e5c0ae98507e45d51ac3",
+            "src/gameplay_menu_browser.cpp": "7adaccada44f13957a87207a3815f9f9ceb5effdf9e3de5d253e69782ee93cb4",
+            "tests/stadium_stock4_sss_exit_observation.test.mjs": "37e3db51ef667f0e5d41cb91b21224c71f5232e1899f52cfb7fc09fe2b1b51df",
+            "tests/test_stadium_stock4_sss_exit.py": "131d47174624d561d449aadadf66fb0f0975ed71816710c67eb1557eb580450a",
+            "tools/stadium_current_sss_exit_expected.py": "8f2abc31d8ff8d0a5e8afd71611979375e3610928d2e94d3343e9d98c037c035"
+          },
+          "dirty_candidate": true
+        },
+        "validation": {
+          "diagnostic_release": {
+            "command": "python3 scripts/build.py --target runtime --configuration Release --stadium-c1a-diagnostic",
+            "exit_code": 0,
+            "build_dir": "build/browser-stadium-c1a-release",
+            "artifact_count": 45,
+            "profile_cache_sha256": "f10c590e1c220957070f4a98009a4b9a20500171cbec461417cb644e8e9a1033",
+            "build_log": {
+              "path": "diagnostic-release-build.log",
+              "bytes": 206222,
+              "sha256": "28a36e390a0d46e45af893f8265205d8456ff4ad760b9ed4dd1aa6021d59b891"
+            }
+          },
+          "ordinary_release_control": {
+            "command": "python3 scripts/build.py --target runtime --configuration Release",
+            "exit_code": 0,
+            "build_dir": "build/browser-release",
+            "artifact_count": 5,
+            "profile_cache_sha256": "daeada35c5d26cfe2ea573fb561650c97803378ac63beda6fe31187cfd5ffaa1",
+            "build_log": {
+              "path": "ordinary-release-build.log",
+              "bytes": 206199,
+              "sha256": "2816ff20ecdb3cf2998d3219c52fe88c2b6b361b0c07021619186435334a92db"
+            }
+          },
+          "full_regression": {
+            "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+            "exit_code": 0,
+            "tests": 2680,
+            "skips": 189,
+            "failures": 0,
+            "seconds": 560.147,
+            "log": {
+              "path": "full-regression.log",
+              "bytes": 508779,
+              "sha256": "3e2d2c6dcca4461d3a5587c8a2dca7b0808c824f66f7b04a5841fc1b132f33c9"
+            }
+          }
+        },
+        "packet": {
+          "manifest": {
+            "path": "packet-v2/manifest-v2.json",
+            "sha256": "b07b589937cdb4968de0ecc164e782c2e3446af6c3b8564776ee7bc31dd3f159"
+          },
+          "root_packet_review": {
+            "path": "packet-v2/root-packet-review-v2.json",
+            "sha256": "9dc47c9c4d3394f62aad191318c6d332d138f337debd34d7e730afc7bfd8a6a3",
+            "root_review_sha256": "9dc47c9c4d3394f62aad191318c6d332d138f337debd34d7e730afc7bfd8a6a3"
+          },
+          "launcher": {
+            "path": "packet-v2/launch_prepared_entry_once.py",
+            "sha256": "b063f32ba86b57b01b1cf28268ef4e75393ccf27fa7d14fd7da6b0d82438a599"
+          },
+          "release": {
+            "path": "packet-v2/root-one-launch-release-v2.json",
+            "sha256": "7b0b916582c02e7c9d94cb987eb61205a3d1f0d63d6be633f99d95da957ae18c",
+            "capture_lane": "stadium-prepared-entry-guard-repair-v2",
+            "capture_count": 1
+          },
+          "unchanged_inputs": {
+            "current_recipe": {
+              "bytes": 111922,
+              "path": "stadium-prepared-entry-source-repair-validation-v2-20261017-221307-ab08a450/packet-v2/current.mwrc",
+              "sha256": "41ac043ca7d869a08f86cf81fc7d4ce6f05aba4394243f4aabf6f57aa1c94e36"
+            },
+            "derived_source_binding": {
+              "bytes": 9628,
+              "path": "stadium-prepared-entry-source-repair-validation-v2-20261017-221307-ab08a450/packet-v2/source-binding.json",
+              "sha256": "7d954aec2b7409fde75dbd3f396d566f5efa52300543908b1305020f0585d2ff"
+            },
+            "new_prepared_expected": {
+              "bytes": 82187,
+              "path": "stadium-prepared-entry-source-repair-validation-v2-20261017-221307-ab08a450/packet-v2/expected.json",
+              "sha256": "69f4fc6434f85f0db1e5eb449fb026e1d91a7c5db7b40d5949424c6a67e63f8f"
+            },
+            "legacy_control_expected": {
+              "bytes": 81843,
+              "path": "stadium-prepared-entry-source-repair-validation-v2-20261017-221307-ab08a450/packet-v2/legacy-control-expected.json",
+              "sha256": "2e2653d717a6e1335240695dde4439f31b1eadd76d7492ad8d499fb2a8fb3ca5"
+            },
+            "original_primary": {
+              "capture_harness": "db52ff305c11eb40713f92f5afa588e03878bbb5",
+              "native_producer": "9494fc69526db469dd969ab0832eae24200260e0",
+              "path": "rollback-sprint-resume-20261014-085704-6fe33b74/original-stadium-stock4-none-personal-whole3-capture-db52ff30-v1/native-primary.mwro",
+              "sha256": "982e6c2022efe270be1e973b68e663392423c858b8bc6b8ff3ddbdb49e8c4fc9"
+            },
+            "prior_sss_report": {
+              "bytes": 415771,
+              "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-current-sss-exit-observation-capture-v1/browser-run/report.json",
+              "sha256": "f2a0ed3081a022507dc62f2dfa8edb90245bf0a966beb81d21e2bb845eee16b6"
+            },
+            "prior_sss_observation": {
+              "bytes": 10582,
+              "path": "rollback-sprint-resume-20261014-085704-6fe33b74/stadium-stock4-current-sss-exit-observation-capture-v1/browser-run/current-sss-exit-observation.json",
+              "sha256": "3cb0b2b8980488b6bfc956e46386b5835b93b63223e764787b68eee320ef26cb"
+            }
+          },
+          "v1_failure_preservation": {
+            "path": "stadium-prepared-entry-source-repair-validation-v2-20261017-221307-ab08a450/prior-v1-failed-runtime-preservation.json",
+            "sha256": "f2f29cbc6174f02375637f1875260498769840f4f3e36e9e5138b95f3bd99774"
+          }
+        },
+        "capture": {
+          "result": "FAIL",
+          "attempts": 1,
+          "elapsed_seconds": 15.635942792054266,
+          "capture_exit_code": 1,
+          "capture_output": "capture-output",
+          "first_error": "Prepared Start candidate is missing its separately enabled exact-boundary comparison",
+          "first_prepared_start_guard": "completed_sss_leave_observation",
+          "prepared_start_observation": {
+            "bytes": 272,
+            "sha256": "62de31efbe674c7d62949cec77ae9f966647ad46d6ff18e1fd06e88089c39438"
+          },
+          "source_guard_reduction": {
+            "observed_notified": true,
+            "observed_state": 2,
+            "note_world_generation": 2,
+            "analysis": "The guard saves world_generation at arm and requires the SSS OnExit note generation to equal it. Source ordering shows the saved arm generation is not updated across the source CSS-to-SSS world rebuild. The raw note reports generation 2; the saved arm value is not serialized, so it is not reported numerically. The failure is the stale-generation equality term, not a missing notification/note."
+          },
+          "stock4_sss_comparison": {
+            "pass": true,
+            "scope": "retained_first_sss_exit_common_fields_only",
+            "original_coordinate": {
+              "draw_ordinal": 0,
+              "sequence": 1599,
+              "source_tick": 125
+            },
+            "replay_cursor": 270,
+            "order_rows": 543,
+            "callback_source_steps": 0,
+            "callback_source_draws": 0,
+            "menu_draw_reference": "UNKNOWN"
+          },
+          "prepared_start_comparison": null,
+          "candidate_component_pass": false,
+          "full_replay_result": "fail",
+          "runtime_replay": "FAIL_INCOMPLETE_EXPLICIT_SSS_STOP",
+          "raw_artifacts": {
+            "capture-output/browser-run/cpu-item-events.jsonl": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "capture-output/browser-run/current-sss-exit-observation.json": {
+              "bytes": 10582,
+              "sha256": "3cb0b2b8980488b6bfc956e46386b5835b93b63223e764787b68eee320ef26cb"
+            },
+            "capture-output/browser-run/current-sss-exit-unloaded-observation.json": {
+              "bytes": 11223,
+              "sha256": "c76091704680b3da23e3a37458e850d79820dcd8f27d64436dbdaa0ddf1828e4"
+            },
+            "capture-output/browser-run/current-sss-prepared-start-observation.json": {
+              "bytes": 272,
+              "sha256": "62de31efbe674c7d62949cec77ae9f966647ad46d6ff18e1fd06e88089c39438"
+            },
+            "capture-output/browser-run/final.png": {
+              "bytes": 106238,
+              "sha256": "d99e05b43840db64d6fce8e1cb1377b19f56b1dc449cfd23fbbdb33335ef37f4"
+            },
+            "capture-output/browser-run/page.txt": {
+              "bytes": 39030,
+              "sha256": "cdcef14ea7dc889ac04040c7083c05e6006108fd7c724bac2bd53125f0947286"
+            },
+            "capture-output/browser-run/report.json": {
+              "bytes": 412601,
+              "sha256": "277ea94a5b2d8b938738f0b463c46817db0c71e82b2424b7cd7755c0cbb696f2"
+            },
+            "capture-output/browser-run/retail-browser-report.json": {
+              "bytes": 18920,
+              "sha256": "e95b60a8ce2f0951f9951a2753f5c91c1048a037384fd9122a570f12fe0a17b6"
+            },
+            "capture-output/browser-run/retail-port.jsonl": {
+              "bytes": 584924,
+              "sha256": "941e5258736796a9ae46672944d0d3dbc9e821a0a4bb83adf2f0bb6743088107"
+            },
+            "capture-output/browser-run/source-main-allocation-trace.json": {
+              "bytes": 33,
+              "sha256": "4678d2badb17d3c8fda30bea9dbde5d7375d48bf5c06410c5d408455ae896672"
+            },
+            "capture-output/browser-run/source-owner-trace.json": {
+              "bytes": 3,
+              "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+            },
+            "capture-output/capture.log": {
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "capture-output/command.json": {
+              "bytes": 6121,
+              "sha256": "8d25781614f53f6be9306c5f7e21751c268c6b1009da07b9c42069fce058e311"
+            },
+            "capture-output/launcher-summary.json": {
+              "bytes": 41883,
+              "sha256": "e805bbf8df75544cea9cfd66e5e5e2a801bf7db6e5a4da8942ef50d57eeca46d"
+            },
+            "capture-output/owner.json": {
+              "bytes": 114271,
+              "sha256": "3f210b330f4e3a335162e20e11d11f1858472e2ad64aa8b3055133ea277f401e"
+            },
+            "capture-output/processes.jsonl": {
+              "bytes": 92684,
+              "sha256": "27bedc9e285d6339ea03287de0af938005034da5dbe0324a571a42214da4fa35"
+            },
+            "capture-output/release-consumed.json": {
+              "bytes": 534,
+              "sha256": "dd82251cfc14802fbcaab80d7da15943eacd25429d1877dc01bf36c2902cc5ac"
+            },
+            "capture-output/server-spec.json": {
+              "bytes": 643,
+              "sha256": "120c40eca79a4e01754c925e593d67100e141fd7a2285d6c871c90d6cd35b201"
+            },
+            "capture-output/server.log": {
+              "bytes": 10690,
+              "sha256": "0b046733bd2735ee580a0659ae8a0ab3a0d431106af6907f3fbdf5b5dd16d51b"
+            }
+          },
+          "postreview": {
+            "path": "prepared-entry-capture-postreview-v2.json",
+            "sha256": "001a220b1fee778ec3fa8746f39ae59640eeb71bdc2151d347ebeaeec86dd758"
+          },
+          "lane_retirement": {
+            "path": "capture-lane-retired-v2.json",
+            "sha256": "e314062989fcde6ad652e9e2d3a80dac4ac6111330a0f9318730a5ec6c12ae25",
+            "state": "RETIRED_AFTER_ONE_FAILED_CAPTURE"
+          }
+        },
+        "cleanup": {
+          "owner_result": "fail",
+          "owner_cleanup_passed": true,
+          "process_observation_passed": true,
+          "capture_process_group": 5570,
+          "capture_process_group_absent": true,
+          "server_process_group": 5569,
+          "server_process_group_absent": true,
+          "browser_pids_absent": true,
+          "browser_pids": [
+            5585,
+            5589,
+            5591,
+            5594,
+            5598,
+            5600,
+            5602,
+            5603,
+            5611,
+            5613,
+            5614,
+            5618,
+            5659
+          ],
+          "browser_close_returned": true,
+          "normal_unload_requested": true,
+          "native_unloaded_after_unload": true,
+          "loopback_port": 64188,
+          "loopback_port_absent": true,
+          "launcher_aggregate_postflight_cleanup_passed": false,
+          "aggregate_note": "This launcher aggregate also requires owner_result==pass; it is false because capture_result failed even though each process/server/port cleanup observation passed."
+        },
+        "postflight_frozen_pins": {
+          "frozen_identity_count_after": 96,
+          "manifest_sha256_after": "b07b589937cdb4968de0ecc164e782c2e3446af6c3b8564776ee7bc31dd3f159",
+          "manifest_sha256_unchanged": true,
+          "root_review_sha256_after": "9dc47c9c4d3394f62aad191318c6d332d138f337debd34d7e730afc7bfd8a6a3",
+          "root_review_sha256_unchanged": true
+        },
+        "acceptance": {
+          "Entry": false,
+          "Setup": false,
+          "C3": false,
+          "runtime_admission": false,
+          "full_replay_completion": false,
+          "original_menu_draw_parity": "UNKNOWN",
+          "raw_StartMeleeData_byte_parity": false,
+          "retry_authorized": false
+        },
+        "source_guard_review": {
+          "path": "root-second-failure-review.json",
+          "bytes": 9254,
+          "sha256": "3b8635e1222799b38c4eba149bd0a789f7d944bbd75531ae0c3d93fb650b16f0",
+          "result": "INVALID_CROSS_PHASE_GENERATION_GUARD_IDENTIFIED_REPRODUCER_REQUIRED",
+          "finding": "The completed SSS note is valid for live world generation 2, but the prepared getter compares it to the initial CSS arm generation. That stale generation anchor is also reused by a later getter guard. A callback-chain reproducer is required before a phase-correct repair."
+        },
+        "evidence_path_base": "Verified external melee-web runs directory; absolute machine paths remain in retained private manifests."
+      },
+      "prepared_start_guard_repair_v3": {
+        "schema": "melee-web-stadium-prepared-entry-guard-repair-evidence-v3",
+        "state": "V3_BOUNDED_PREPARED_START_COMMON_FIELD_COMPONENT_PASS; FULL_REPLAY_INCOMPLETE; ENTRY_SETUP_C3_FALSE; LANE_RETIRED",
+        "scope": "Phase-correct default-off prepared-Start getter source repair and callback-chain reducer, followed by one bounded stopped stock4/ItemsNone SSS plus pre-assets prepared-Start common-field comparison; not Entry/Setup/C3 or full replay acceptance.",
+        "run_locator": "stadium-prepared-entry-v3-validation-20261017-224647-a97c68b5",
+        "repository": {
+          "branch": "codex/stadium-c3-lifetime",
+          "head": "ae1b5bf9db2c7dcc4c83fb7f0270e7fc951a7fc4",
+          "tree": "7eecaf08e5cae4d8ce06c2f245b96c31be590709",
+          "base_commit": "ae1b5bf9db2c7dcc4c83fb7f0270e7fc951a7fc4",
+          "dirty_candidate": true,
+          "source_candidate_files": {
+            "cmake/FighterRuntime.cmake": "4a2de061eae4e72f3f3c73a7a0b7394b8aba3bc97f8441610e8a771ba41b8454",
+            "scripts/capture_whole_session_browser.mjs": "bce503b48d6ec66c6cca77c51a1de588baa9544ea692d92f9411836153e09f26",
+            "scripts/stadium_current_sss_exit_observation.mjs": "a38999e8a920e16eec75151a10b56bf57e628838929f38e7e55bae6743b087ab",
+            "scripts/stadium_stock4_sss_exit_observation.mjs": "1aee2cdfd989f36e53029b691858012a8b294fc3c4f3e5c0ae98507e45d51ac3",
+            "src/gameplay_menu_browser.cpp": "b5eaee076e9db5cce9064b36d66a56805192b51d3d4e593c9e1242debe35202e",
+            "tests/stadium_stock4_sss_exit_observation.test.mjs": "37e3db51ef667f0e5d41cb91b21224c71f5232e1899f52cfb7fc09fe2b1b51df",
+            "tests/test_stadium_stock4_sss_exit.py": "27937eea7c87c0079945435608bd299b051361a336e978d470d5488e939adddb",
+            "tools/stadium_current_sss_exit_expected.py": "8f2abc31d8ff8d0a5e8afd71611979375e3610928d2e94d3343e9d98c037c035"
+          },
+          "source_candidate_manifest_path": "packet-v3/source-candidate-manifest-v3.json",
+          "packet_note": "V3 packet pins the final dirty worktree state, including the existing evidence docs and harness support files; no source reset or commit was made."
+        },
+        "phase_correct_source_reducer": {
+          "result": "PASS_ROOT_PHASE_CORRECT_REPAIR_REVIEW",
+          "freeze": {
+            "path": "stadium-prepared-entry-source-repair-validation-v2-20261017-221307-ab08a450/guard-lifecycle-reduction-v3/freeze.json",
+            "sha256": "3417eda3e898bb52ab983f1ebcf95431aba0be6c0b46f878588e4fc3406f15ac"
+          },
+          "root_review": {
+            "path": "stadium-prepared-entry-source-repair-validation-v2-20261017-221307-ab08a450/guard-lifecycle-reduction-v3/root-review-v3.json",
+            "sha256": "0b6f90c8b2701b5554db7a84daa1c5fcfb759f37836cbb5525bce9e22e2c5dc2"
+          },
+          "focused_controls": {
+            "path": "stadium-prepared-entry-source-repair-validation-v2-20261017-221307-ab08a450/guard-lifecycle-reduction-v3/focused-results.json",
+            "sha256": "11b699a99c865a9d38370876e92e9be2179d3b19dcea6c21f476accd53f1221d"
+          },
+          "prior_read_only_review": {
+            "path": "stadium-prepared-entry-source-repair-validation-v2-20261017-221307-ab08a450/root-second-failure-review.json",
+            "sha256": "3b8635e1222799b38c4eba149bd0a789f7d944bbd75531ae0c3d93fb650b16f0"
+          },
+          "reduction": "Actual extracted callback chain reproduces old getter refusal with arm generation 7 and SSS leave generation 8. Repair captures the leave generation at the SSS boundary and requires note==leave==live, retaining same-live-world and existing route guards. This proves the reduced guard mechanism only.",
+          "reviewed_result": {
+            "state": "PASS_ROOT_PHASE_CORRECT_REPAIR_REVIEW",
+            "actual_callback_chain_red_reproduction": "Initial CSS arm generation 7; SSS leave generation 8; old getter refuses.",
+            "repair": "Capture leave generation at SSS boundary; require note==leave==live same-world identity and retain existing phase, host-left, no-work, no-assets, finalization, input and source-order guards.",
+            "scope_limit": "Reduced callback lifecycle only; no browser or Entry/C3 claim."
+          }
+        },
+        "preserved_v2_failure": {
+          "manifest": {
+            "path": "stadium-prepared-entry-source-repair-validation-v2-20261017-221307-ab08a450/packet-v2/manifest-v2.json",
+            "sha256": "b07b589937cdb4968de0ecc164e782c2e3446af6c3b8564776ee7bc31dd3f159"
+          },
+          "raw_postreview": {
+            "path": "stadium-prepared-entry-source-repair-validation-v2-20261017-221307-ab08a450/prepared-entry-capture-postreview-v2.json",
+            "sha256": "001a220b1fee778ec3fa8746f39ae59640eeb71bdc2151d347ebeaeec86dd758"
+          },
+          "retention_receipt": {
+            "path": "stadium-prepared-entry-v3-validation-20261017-224647-a97c68b5/prior-v2-preservation-v1.json",
+            "sha256": "43da4a4a0841824a58794decf279666378179dc79904880450414dd856a45fdb"
+          },
+          "retained_source_files": 8,
+          "retained_diagnostic_artifacts_including_cache": 45,
+          "retained_ordinary_release_artifacts_including_cache": 5,
+          "retained_build_logs": 2,
+          "result": "Failed first prepared getter guard; lane retired, no retry. Remains distinct from v1 archive and v3 build."
+        },
+        "validation": {
+          "receipt": {
+            "path": "validation-v3.json",
+            "sha256": "961a7099545931eb3bce1a8853377a1d928c0935abce81888137c8b68bc42c6d"
+          },
+          "diagnostic_release": {
+            "command": "python3 scripts/build.py --target runtime --configuration Release --stadium-c1a-diagnostic",
+            "exit_code": 0,
+            "artifact_count": 45,
+            "profile_cache_sha256": "f10c590e1c220957070f4a98009a4b9a20500171cbec461417cb644e8e9a1033",
+            "log": {
+              "path": "stadium-prepared-entry-v3-validation-20261017-224647-a97c68b5/diagnostic-release-build.log",
+              "bytes": 206222,
+              "sha256": "cb253fd5bad7e8eae3c9855422850f3baf275484a4936d4d1fd1e5ccf91fc8e4"
+            }
+          },
+          "ordinary_release_control": {
+            "command": "python3 scripts/build.py --target runtime --configuration Release",
+            "exit_code": 0,
+            "artifact_count": 5,
+            "profile_cache_sha256": "daeada35c5d26cfe2ea573fb561650c97803378ac63beda6fe31187cfd5ffaa1",
+            "log": {
+              "path": "stadium-prepared-entry-v3-validation-20261017-224647-a97c68b5/ordinary-release-build.log",
+              "bytes": 206199,
+              "sha256": "78379124f714919dd82516c07c1999728a82061ef15975a716d92523ed5d7ea1"
+            }
+          },
+          "full_regression": {
+            "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+            "exit_code": 0,
+            "tests": 2681,
+            "skips": 189,
+            "failures": 0,
+            "seconds": 539.097,
+            "log": {
+              "path": "stadium-prepared-entry-v3-validation-20261017-224647-a97c68b5/full-regression.log",
+              "bytes": 509010,
+              "sha256": "68658d51774f9a71b52e658c913a79b1e51631cb51f37e252099d30cc3339719"
+            },
+            "result": "PASS",
+            "log_sha256": "68658d51774f9a71b52e658c913a79b1e51631cb51f37e252099d30cc3339719"
+          },
+          "failed_v2_build_and_test_evidence_preserved": true
+        },
+        "capture_packet": {
+          "manifest_path": "packet-v3/manifest-v3.json",
+          "manifest_sha256": "c896b0c2072b693071ae50e6aff1975a0d7b64352c4c0113f1e4772eb4627474",
+          "source_candidate_manifest_sha256": "f418beea64de89ff0e248264070760af75f09f15a095a2cafbb808b876b17751",
+          "root_packet_review": {
+            "path": "packet-v3/root-packet-review-v3.json",
+            "sha256": "6837a289493f45dc1304cb67fdec245e6d10bdb950e9c412c283d87e126f71a5",
+            "result": "PASS_PACKET_REVIEW_PENDING_CAPTURE_LANE"
+          },
+          "one_launch_release": {
+            "path": "packet-v3/root-one-launch-release-v3.json",
+            "sha256": "f5325f778392c93585209d3d173985348ed17f60525b56183c4229c103883f48",
+            "capture_count": 1,
+            "capture_lane": "stadium-prepared-entry-v3-once"
+          },
+          "launcher": {
+            "path": "packet-v3/launch_prepared_entry_once.py",
+            "sha256": "d7cc0da93c9966a0a7a87fcecbc73ac73150fac03104221604737e1c81b0cbfa"
+          },
+          "state": "ONE_CAPTURE_COMPLETED; RESULT INDEPENDENTLY REVIEWED; LANE RETIRED",
+          "overall_timeout_ms": 180000,
+          "cleanup_reserve_ms": 30000,
+          "recipe_and_expectations": "Byte-identical to v2; original primary and legacy expected remain pinned; prepared expected is separate and additive."
+        },
+        "limits": {
+          "entry_execution": false,
+          "setup_parity": false,
+          "c3": false,
+          "runtime_admission": false,
+          "full_replay_completion": false,
+          "raw_start_bytes_parity": false,
+          "original_menu_draw_parity": "UNKNOWN",
+          "Entry": false,
+          "raw_StartMeleeData_312_bytes_compared": false
+        },
+        "prior_v1_failed_capture": {
+          "state": "FAIL_RETAINED; NO_RETRY",
+          "capture_result": "fail",
+          "stock4_sss_component_pass": false,
+          "prepared_observation": {
+            "captured": false,
+            "error": "Prepared Start observation requires the exact stopped stock4 SSS pre-assets owner",
+            "failure": "Prepared Start receipt escaped the exact stopped stock4 SSS pre-assets boundary or Entry seed",
+            "interpretation": "The retained message names the exact stopped-owner boundary and Entry-seed predicate; the raw observation does not isolate which term failed."
+          },
+          "runtime_replay": "FAIL_INCOMPLETE_EXPLICIT_SSS_STOP",
+          "owner_result": "fail",
+          "owner_cleanup_passed": true,
+          "retained_artifacts": {
+            "run_locator": "rollback-sprint-resume-20261014-085704-6fe33b74",
+            "raw_report": {
+              "path": "stadium-prepared-entry-start-candidate-capture-v1/capture-output/browser-run/report.json",
+              "sha256": "140954eeb3afddd658a4b2ee58c35b5b51fb1408e7a3532a9244a9e2fc3269db"
+            },
+            "launcher_summary": {
+              "path": "stadium-prepared-entry-start-candidate-capture-v1/capture-output/launcher-summary.json",
+              "sha256": "4ffb290260f319304b0cce7a77020bc949fa20cba6936673605c3a8551d1ee89"
+            },
+            "packet_manifest": {
+              "path": "stadium-prepared-entry-start-candidate-capture-review-v1/packet/manifest.json",
+              "sha256": "6dd00a15d19c8a3b9546abc427e7ced054cd4762fec0331fe2e884235360a059"
+            },
+            "release_consumed": {
+              "path": "stadium-prepared-entry-start-candidate-capture-v1/capture-output/release-consumed.json",
+              "sha256": "a96939c41ec78c238b850172a108adf911d8efcb076f2a5e3b153465744245de"
+            },
+            "runtime_preservation_receipt": {
+              "run_locator": "stadium-prepared-entry-source-repair-validation-v2-20261017-221307-ab08a450",
+              "path": "prior-v1-failed-runtime-preservation.json",
+              "sha256": "f2f29cbc6174f02375637f1875260498769840f4f3e36e9e5138b95f3bd99774"
+            }
+          }
+        },
+        "prior_v2_failed_capture": {
+          "state": "FAIL_RETAINED; LANE RETIRED; NO_RETRY",
+          "first_guard": "completed_sss_leave_observation",
+          "stock4_sss_common_field_comparison_pass": true,
+          "prepared_observation_captured": false,
+          "observed_leave_world_generation": 2,
+          "arm_generation_serialized_in_raw_report": false,
+          "source_finding": "The source review identified a stale CSS-arm generation reused by the prepared getter; subsequent callback-chain reduction reproduced arm generation 7 versus SSS-leave generation 8. The repair records phase-correct leave generation and requires note==leave==live while preserving same-world and existing phase/work/input/draw guards.",
+          "runtime_replay": "FAIL_INCOMPLETE_EXPLICIT_SSS_STOP",
+          "retained_artifacts": {
+            "run_locator": "stadium-prepared-entry-source-repair-validation-v2-20261017-221307-ab08a450",
+            "manifest": {
+              "path": "packet-v2/manifest-v2.json",
+              "sha256": "b07b589937cdb4968de0ecc164e782c2e3446af6c3b8564776ee7bc31dd3f159"
+            },
+            "raw_report": {
+              "path": "capture-output/browser-run/report.json",
+              "sha256": "277ea94a5b2d8b938738f0b463c46817db0c71e82b2424b7cd7755c0cbb696f2"
+            },
+            "prepared_observation": {
+              "path": "capture-output/browser-run/current-sss-prepared-start-observation.json",
+              "sha256": "62de31efbe674c7d62949cec77ae9f966647ad46d6ff18e1fd06e88089c39438"
+            },
+            "postreview": {
+              "path": "prepared-entry-capture-postreview-v2.json",
+              "sha256": "001a220b1fee778ec3fa8746f39ae59640eeb71bdc2151d347ebeaeec86dd758"
+            },
+            "source_failure_review": {
+              "path": "root-second-failure-review.json",
+              "sha256": "3b8635e1222799b38c4eba149bd0a789f7d944bbd75531ae0c3d93fb650b16f0"
+            },
+            "runtime_preservation_receipt": {
+              "run_locator": "stadium-prepared-entry-v3-validation-20261017-224647-a97c68b5",
+              "path": "prior-v2-preservation-v1.json",
+              "sha256": "43da4a4a0841824a58794decf279666378179dc79904880450414dd856a45fdb"
+            }
+          }
+        },
+        "producer_identities": {
+          "dirty_capture_base": {
+            "branch": "codex/stadium-c3-lifetime",
+            "head": "ae1b5bf9db2c7dcc4c83fb7f0270e7fc951a7fc4",
+            "tree": "7eecaf08e5cae4d8ce06c2f245b96c31be590709",
+            "uncommitted_diff_sha256": "bfc2ff783bfd3cc43aad51e13c2cc3d2d2de3c42ff01ee3219ad97ac60b85f47",
+            "dirty_candidate": true,
+            "diff_matches_capture_freeze": true,
+            "source_candidate_files": {
+              "cmake/FighterRuntime.cmake": "4a2de061eae4e72f3f3c73a7a0b7394b8aba3bc97f8441610e8a771ba41b8454",
+              "scripts/capture_whole_session_browser.mjs": "bce503b48d6ec66c6cca77c51a1de588baa9544ea692d92f9411836153e09f26",
+              "scripts/stadium_current_sss_exit_observation.mjs": "a38999e8a920e16eec75151a10b56bf57e628838929f38e7e55bae6743b087ab",
+              "scripts/stadium_stock4_sss_exit_observation.mjs": "1aee2cdfd989f36e53029b691858012a8b294fc3c4f3e5c0ae98507e45d51ac3",
+              "src/gameplay_menu_browser.cpp": "b5eaee076e9db5cce9064b36d66a56805192b51d3d4e593c9e1242debe35202e",
+              "tests/stadium_stock4_sss_exit_observation.test.mjs": "37e3db51ef667f0e5d41cb91b21224c71f5232e1899f52cfb7fc09fe2b1b51df",
+              "tests/test_stadium_stock4_sss_exit.py": "27937eea7c87c0079945435608bd299b051361a336e978d470d5488e939adddb",
+              "tools/stadium_current_sss_exit_expected.py": "8f2abc31d8ff8d0a5e8afd71611979375e3610928d2e94d3343e9d98c037c035"
+            }
+          },
+          "runtime_producer": {
+            "source_head": "ae1b5bf9db2c7dcc4c83fb7f0270e7fc951a7fc4",
+            "source_tree": "7eecaf08e5cae4d8ce06c2f245b96c31be590709",
+            "configuration": "Release; MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=ON",
+            "cache_sha256": "f10c590e1c220957070f4a98009a4b9a20500171cbec461417cb644e8e9a1033",
+            "artifacts": {
+              "gameplay_menu_browser.js": "9aea4fcb3ba9f7b5f33e578c3e30f3c9c099dcdfe0900e124f5ca771c9b7ff87",
+              "gameplay_menu_browser.wasm": "2d6d04fcb3a356982e59cd0a68658211e073a8aa8ddbe4e73541b8a10366c054",
+              "gameplay_menu_browser.data": "1eb094d18d16f0894840e297d975f52bb97ead994e723fa13887b6ecda0a17a6",
+              "runtime.html": "09a839f97cff91c308b0fae4926ab6cebcd54415dd37d826122a7ca5f29b8238"
+            }
+          },
+          "ordinary_release_control": {
+            "source_head": "ae1b5bf9db2c7dcc4c83fb7f0270e7fc951a7fc4",
+            "configuration": "Release; MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=OFF",
+            "cache_sha256": "daeada35c5d26cfe2ea573fb561650c97803378ac63beda6fe31187cfd5ffaa1",
+            "gameplay_menu_browser.js": "0befa55ea2fcd97f8e316a3f94d52e3acd2b5275884e528caa45e1bc175f64e9",
+            "gameplay_menu_browser.wasm": "8022383863b7f6d51c6cc2b1d458f1ca372d33f2f4d2edb3b9da252923940b50",
+            "gameplay_menu_browser.data": "1eb094d18d16f0894840e297d975f52bb97ead994e723fa13887b6ecda0a17a6"
+          },
+          "capture_harness_sources": {
+            "scripts/capture_whole_session_browser.mjs": "bce503b48d6ec66c6cca77c51a1de588baa9544ea692d92f9411836153e09f26",
+            "scripts/stadium_current_sss_exit_observation.mjs": "a38999e8a920e16eec75151a10b56bf57e628838929f38e7e55bae6743b087ab",
+            "scripts/stadium_stock4_sss_exit_observation.mjs": "1aee2cdfd989f36e53029b691858012a8b294fc3c4f3e5c0ae98507e45d51ac3",
+            "tools/stadium_current_sss_exit_expected.py": "8f2abc31d8ff8d0a5e8afd71611979375e3610928d2e94d3343e9d98c037c035"
+          },
+          "original_primary": {
+            "native_producer": "9494fc69526db469dd969ab0832eae24200260e0",
+            "capture_harness": "db52ff305c11eb40713f92f5afa588e03878bbb5",
+            "primary_sha256": "982e6c2022efe270be1e973b68e663392423c858b8bc6b8ff3ddbdb49e8c4fc9",
+            "original_entry": {
+              "sequence": 1640,
+              "source_tick": 125,
+              "draw_ordinal": 0,
+              "raw_start_melee_bytes": 312,
+              "raw_start_melee_sha256": "918a23d68a3b5024f94baf1f5e26e6c0db56c5fbbbffdc79c5e620e82af3b728",
+              "rng_pointer_hex": "804d5f90",
+              "seed_hex": "e2624ac3"
+            }
+          },
+          "previous_sss_component_runtime": "e6f0f1b49e3f9f581aa68166cb7928605e86f38b",
+          "documentation_pins_at_capture": {
+            "note": "These are the pre-update versions included in the 103 capture-time pins. This v3 result documentation was written after capture and independent review.",
+            "docs/status/2026-10-07-pokemon-stadium-profile-oninit.md": "c13534db7a51b6d2b8594fda1a13358c3b296fda75157954193ecb982d162e3d",
+            "docs/evidence/issue251-stadium-profile-oninit-v1.json": "55328a09ade58ce4fd36af9caca37d1309eb6ce9c3a76b762ec15c98c601a5f1"
+          }
+        },
+        "capture_result": {
+          "state": "PASS_BOUNDED_PREPARED_START_COMMON_FIELD_COMPONENT",
+          "launcher_result": "prepared_start_candidate_pass_replay_stopped",
+          "elapsed_seconds": 11.036927666980773,
+          "stock4_sss_component_pass": true,
+          "stock4_sss_comparison": {
+            "pass": true,
+            "scope": "retained_first_sss_exit_common_fields_only",
+            "replay_cursor": 270,
+            "order": 543,
+            "callback_source_steps": 0,
+            "callback_source_draws": 0,
+            "original_coordinate": {
+              "sequence": 1599,
+              "source_tick": 125,
+              "draw_ordinal": 0
+            },
+            "menu_draw_reference": "UNKNOWN"
+          },
+          "prepared_start_observation": {
+            "captured": true,
+            "scope": "source_prepared_start_after_sss_leave_before_assets",
+            "phase": "prepared_entry",
+            "source_scene": 0,
+            "host_entered": false,
+            "replay_cursor": 270,
+            "local_order_rows": 543,
+            "callback_source_steps": 0,
+            "callback_source_draws": 0,
+            "asset_requests_after_leave_boundary": 0,
+            "world_generation": 2,
+            "random_seed_hex": "e2624ac3"
+          },
+          "prepared_start_comparison": {
+            "pass": true,
+            "scope": "prepared_start_common_fields_against_original_entry_profile",
+            "original_entry": {
+              "sequence": 1640,
+              "source_tick": 125,
+              "draw_ordinal": 0,
+              "rng_pointer_hex": "804d5f90",
+              "rng_value_hex": "e2624ac3",
+              "start_melee_sha256": "918a23d68a3b5024f94baf1f5e26e6c0db56c5fbbbffdc79c5e620e82af3b728"
+            },
+            "projection_scope": "declared_source_common_fields_only",
+            "raw_start_melee_bytes": "not_compared",
+            "runtime_admission": false,
+            "Entry": false,
+            "C3": false
+          },
+          "component_finalization": {
+            "stock4_sss_pass": true,
+            "prepared_start_pass": true,
+            "scope": "bounded component only"
+          },
+          "unload_observation": {
+            "normal_unload_requested": true,
+            "passive_sss_onexit_observation_received": true,
+            "error": null,
+            "failed": false,
+            "native_bytes_scope": "native_ABI_only_not_original_raw_equivalence",
+            "browser_close_returned": true
+          },
+          "runtime_replay": "FAIL_INCOMPLETE_EXPLICIT_SSS_STOP",
+          "original_replay_capture_result": "fail",
+          "first_error": null,
+          "first_mismatch": null,
+          "browser_errors": 0,
+          "unexpected_requests": 0,
+          "Entry": false,
+          "Setup": false,
+          "C3": false,
+          "runtime_admission": false,
+          "raw_StartMeleeData_312_bytes_compared": false,
+          "original_menu_draw_parity": "UNKNOWN",
+          "evidence": {
+            "launcher_summary": {
+              "path": "capture-output-v3/launcher-summary.json",
+              "sha256": "be17b3a84725143247d387735cd793610598d63b1bd8f222b19abd61fb986f49"
+            },
+            "browser_report": {
+              "path": "capture-output-v3/browser-run/report.json",
+              "sha256": "fa6f602497368254f8239bbcf75309f8068729d148099a8967d443341f6a0ba2"
+            },
+            "prepared_observation": {
+              "path": "capture-output-v3/browser-run/current-sss-prepared-start-observation.json",
+              "sha256": "535ba87abad8cac2a18dcce9456c7fdcea547495ec91a6b7210803223dfc88bc"
+            },
+            "sss_observation": {
+              "path": "capture-output-v3/browser-run/current-sss-exit-observation.json",
+              "sha256": "3cb0b2b8980488b6bfc956e46386b5835b93b63223e764787b68eee320ef26cb"
+            },
+            "unloaded_observation": {
+              "path": "capture-output-v3/browser-run/current-sss-exit-unloaded-observation.json",
+              "sha256": "c76091704680b3da23e3a37458e850d79820dcd8f27d64436dbdaa0ddf1828e4"
+            },
+            "owner": {
+              "path": "capture-output-v3/owner.json",
+              "sha256": "cd7770122628c739d89195fcfbeda433ddad17cc0be16ed343562d4dff33df12"
+            }
+          }
+        },
+        "independent_result_review": {
+          "path": "independent-result-review-v3.json",
+          "sha256": "4f6b7b74d6efb8ed08d587401c64c5575d5633fa052c9a11db0a0bd2f6d60b9c",
+          "result": "PASS_BOUNDED_PREPARED_START_COMMON_FIELD_COMPONENT",
+          "frozen_identity_count_rehashed": 103,
+          "frozen_identity_mismatches": 0,
+          "basis": "Independent read-only raw report, trace, expected/profile identities, pinned code and built artifacts; no new runtime execution."
+        },
+        "frozen_pins": {
+          "count": 103,
+          "preflight_root_review_and_postflight_identity_sets_match": true,
+          "canonical_sorted_inventory_sha256": "d26f79e3b451ea9c3be86212d720bd78265034d65771d9f303c639f3cf33ce38",
+          "postflight_receipt": {
+            "path": "prepared-entry-capture-postreview-v3.json",
+            "sha256": "8722cfd5aba38dc5abf5c12f95708d3983c5528524370df8333005ab933dcf48"
+          },
+          "independent_review_verified_identity_list": "independent-result-review-v3.json:verified_frozen_identities"
+        },
+        "capture_lane_retirement": {
+          "path": "capture-lane-retired-v3.json",
+          "sha256": "7d60badb304a66e7937e3932b945aeff92adc6a1e10a70568ea2a85efd9ac2e2",
+          "result": "OWNED_LANE_RETIRED",
+          "capture_process_group_absent": true,
+          "server_process_group_absent": true,
+          "browser_pids_absent": 13,
+          "port": 52258,
+          "port_absent": true,
+          "attempts": 1
+        },
+        "claims_excluded": [
+          "This is a stopped pre-assets prepared-Start component comparison; it is not original Entry execution or Setup parity.",
+          "The 312-byte original StartMeleeData blob is identified by its source hash but raw bytes were not compared.",
+          "The full replay remains FAIL_INCOMPLETE_EXPLICIT_SSS_STOP and original replay capture result remains fail.",
+          "Entry, Setup, runtime admission and C3 remain false; original menu-draw parity is UNKNOWN."
+        ],
+        "evidence_path_base": "Verified external melee-web runs directory; absolute machine paths remain in retained private manifests."
       }
     }
   }

@@ -136,6 +136,7 @@ struct CurrentSssExitState {
  bool leave_started=false,terminal_pending=false,terminal=false;
  size_t terminal_cursor=0,terminal_steps=0,terminal_draws=0;
  uint64_t leave_asset_requests=0,terminal_asset_requests=0;
+ uint64_t leave_world_generation=0;
  uint32_t leave_asset_generation=0;
  const void* leave_world=nullptr;
  const void* leave_cache=nullptr;
@@ -150,6 +151,8 @@ struct CurrentSssExitState {
  uint64_t world_generation=0,order=0;
  MeleeWebMenuCurrentSssExitObservation observation{};
  std::string error,json;
+ bool prepared_start_attempted=false,prepared_start_captured=false;
+ std::string prepared_start_error,prepared_start_json;
 };
 CurrentSssExitState current_sss_exit;
 void current_sss_exit_notify(void* data,const MeleeWebMenuCurrentSssExitObservation* o){
@@ -3297,9 +3300,11 @@ void current_sss_exit_before_leave(){
  check(!s.leave_started&&!s.terminal_pending&&!s.terminal&&!s.notified&&!s.failed&&
        replay&&replay.get()==s.recipe&&host==s.host_owner&&host_entered&&world&&
        !match&&!results&&!prize&&pending&&!preparation.busy()&&
+       melee_web_gameplay_generation()!=0&&
        replay_source_frames.steps()==0&&replay_source_frames.draws()==0&&!replay_source_frames.pending(),
        "Stock4 SSS leave stop requires its original pending SSS owner");
  s.leave_started=true;s.leave_world=world.get();s.leave_cache=archive_cache.get();
+ s.leave_world_generation=melee_web_gameplay_generation();
  s.leave_asset_generation=asset_generation;s.leave_asset_requests=current_sss_asset_request_calls;
 }
 void current_sss_exit_after_preparation(){
@@ -3322,7 +3327,9 @@ void current_sss_exit_finish_stock4(size_t steps,size_t draws,bool source_pendin
        host==s.host_owner&&world&&world.get()==s.leave_world&&archive_cache.get()==s.leave_cache&&
        !match&&!results&&!prize&&!faulted&&!host_entered&&
        melee_web_menu_host_phase(host)==MELEE_WEB_MENU_READY&&
-       s.observation.note.world_generation==melee_web_gameplay_generation()&&
+       s.leave_world_generation!=0&&
+       s.observation.note.world_generation==s.leave_world_generation&&
+       s.leave_world_generation==melee_web_gameplay_generation()&&
        !pending&&!running&&preparation.waiting_for_audio()&&!menu_scene_rebuild_pending&&
        asset_destination==AssetDestination::None&&asset_scope.pending_generation()==0&&
        asset_generation==s.leave_asset_generation&&current_sss_asset_request_calls==s.leave_asset_requests,
@@ -4869,6 +4876,85 @@ const char* melee_web_native_menu_stadium_current_sss_exit_observe(){
      <<",\"native_unloaded\":"<<(!world&&!host&&!match&&!results&&!prize&&!pending&&!running&&!preparation.busy()&&asset_destination==AssetDestination::None&&asset_scope.pending_generation()==0?"true":"false")<<'}';
  }
  out<<'}';s.json=out.str();return s.json.c_str();
+}
+const char* melee_web_native_menu_stadium_current_sss_prepared_start_observe(){
+ auto& s=current_sss_exit;
+ if(s.prepared_start_attempted)return s.prepared_start_json.c_str();
+ s.prepared_start_attempted=true;
+ try{
+  const auto require_guard=[](bool passed,const char* name){
+   if(!passed)throw std::runtime_error(std::string("Prepared Start guard failed: ")+name);
+  };
+  require_guard(s.armed&&s.profile==CurrentSssExitProfile::Stock4None&&s.terminal&&
+                !s.failed&&!faulted,"stock4_terminal_owner");
+  require_guard(s.notified&&s.observation.state==2&&s.observation.note.captured&&
+                s.leave_world_generation!=0&&
+                s.observation.note.world_generation==s.leave_world_generation,
+                "completed_sss_leave_observation");
+  require_guard(replay&&replay.get()==s.recipe&&replay->initial_css.get()==s.context,
+                "replay_and_css_context_identity");
+  require_guard(host&&host==s.host_owner,"host_identity");
+  require_guard(world&&world.get()==s.leave_world&&world_exposed,
+                "live_exposed_world_identity");
+  require_guard(archive_cache&&archive_cache.get()==s.leave_cache,
+                "archive_cache_identity");
+  require_guard(melee_web_gameplay_generation()==s.leave_world_generation,
+                "world_generation");
+  require_guard(melee_web_menu_host_phase(host)==MELEE_WEB_MENU_READY,
+                "host_ready_phase");
+  require_guard(melee_web_menu_host_source_scene(host)==0,"host_source_scene_none");
+  require_guard(!host_entered,"host_left");
+  require_guard(!match&&!results&&!prize,"no_active_gameplay_scene");
+  require_guard(!pending&&!running&&!menu_scene_rebuild_pending,
+                "no_pending_or_running_work");
+  require_guard(preparation.waiting_for_audio(),"waiting_for_audio");
+  require_guard(asset_destination==AssetDestination::None&&
+                asset_scope.pending_generation()==0,"no_pending_asset_work");
+  require_guard(asset_generation==s.leave_asset_generation&&
+                current_sss_asset_request_calls==s.leave_asset_requests,
+                "unchanged_asset_owner");
+  require_guard(s.terminal_cursor==270&&s.notification_cursor==270&&
+                s.notification_order==543,"exact_stock4_stop_cursor_and_order");
+  require_guard(s.terminal_steps==0&&s.terminal_draws==0&&
+                s.notification_steps==0&&s.notification_draws==0,
+                "zero_source_steps_and_draws");
+  require_guard(s.terminal_asset_requests==0,"no_terminal_asset_requests");
+  require_guard(s.last_host_tick_returned&&!s.host_tick_in_flight,
+                "returned_host_tick");
+  MeleeWebMenuMatchSelection selection{};
+  char error[256]{};
+  check(melee_web_menu_host_stadium_c1a_selection(host,&selection,error,sizeof(error)),error);
+  check(selection.start.rules.stkind==St_Kind_PStadium,
+        "Prepared Start observation lost its source Stadium StKind");
+  std::ostringstream out;
+  out<<"{\"schema\":\"melee-web-stadium-prepared-start-before-assets-v1\""
+     <<",\"scope\":\"source_prepared_start_after_sss_leave_before_assets\""
+     <<",\"phase\":\"prepared_entry\",\"observation_profile\":1"
+     <<",\"captured\":true,\"source_scene\":0,\"host_entered\":false"
+     <<",\"waiting_for_audio_retained_until_unload\":true"
+     <<",\"replay_cursor\":"<<s.terminal_cursor
+     <<",\"local_order_rows\":"<<s.notification_order
+     <<",\"callback_source_steps\":"<<s.terminal_steps
+     <<",\"callback_source_draws\":"<<s.terminal_draws
+     <<",\"asset_requests_after_leave_boundary\":"<<s.terminal_asset_requests
+     <<",\"world_generation\":"<<s.leave_world_generation
+     <<",\"random_seed_hex\":"
+     <<first_css_browser_draw_json_quote(melee_web::stadium_first_css_diagnostic::hex32(selection.random_seed))
+     <<",\"start\":";
+  melee_web::stadium_first_css_diagnostic::write_start(out,selection.start);
+  out<<",\"menu_draw_reference\":\"UNKNOWN\",\"runtime_admission\":false"
+     <<",\"Entry\":false,\"C3\":false}";
+  s.prepared_start_json=out.str();s.prepared_start_captured=true;
+ }catch(const std::exception& error){
+  s.prepared_start_error=error.what();
+  std::ostringstream out;
+  out<<"{\"schema\":\"melee-web-stadium-prepared-start-before-assets-v1\""
+     <<",\"scope\":\"source_prepared_start_after_sss_leave_before_assets\""
+     <<",\"captured\":false,\"error\":"
+     <<first_css_browser_draw_json_quote(s.prepared_start_error)<<'}';
+  s.prepared_start_json=out.str();
+ }
+ return s.prepared_start_json.c_str();
 }
 int melee_web_native_menu_stadium_first_css_draw_arm(
     const uint8_t* context_bytes,unsigned context_size,

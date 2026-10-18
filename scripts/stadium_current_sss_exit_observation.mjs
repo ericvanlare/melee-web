@@ -8,7 +8,7 @@ const requireValue = (v, message) => { if (!v) throw Error(message); };
 
 // Passed as the actual page function; deliberately has no module-scope closure.
 // Controls use a synthetic Module solely for call ordering/ownership semantics.
-export function installCurrentSssExitReplayArm({recipeBytes, observationProfile = 0}) {
+export function installCurrentSssExitReplayArm({recipeBytes, observationProfile = 0, preparedStartProbe = false}) {
   const module = globalThis.Module;
   const key = '_melee_web_native_menu_replay';
   const original = Object.getOwnPropertyDescriptor(module || {}, key);
@@ -16,10 +16,13 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
   const armKey = observationProfile === 1 ? '_melee_web_native_menu_stadium_current_sss_exit_arm_profile' : '_melee_web_native_menu_stadium_current_sss_exit_arm';
   const arm = module?.[armKey];
   const observe = module?._melee_web_native_menu_stadium_current_sss_exit_observe;
+  const preparedStartObserve = observationProfile === 1 && preparedStartProbe
+    ? module?._melee_web_native_menu_stadium_current_sss_prepared_start_observe : null;
   const idle = module?.stadiumMatchedSetupNativeIdle;
   if (!original || !Object.hasOwn(original, 'value') ||
       typeof original.value !== 'function' || !original.writable ||
       typeof arm !== 'function' || typeof observe !== 'function' ||
+      (preparedStartProbe && (observationProfile !== 1 || typeof preparedStartObserve !== 'function')) ||
       typeof idle !== 'function' || typeof module.UTF8ToString !== 'function' ||
       !Array.isArray(recipeBytes) || recipeBytes.length < 328 ||
       recipeBytes.length > 128 * 1024 * 1024 ||
@@ -35,6 +38,8 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
       now.configurable === installed.configurable &&
       module[armKey] === arm &&
       module._melee_web_native_menu_stadium_current_sss_exit_observe === observe &&
+      (!preparedStartProbe ||
+        module._melee_web_native_menu_stadium_current_sss_prepared_start_observe === preparedStartObserve) &&
       module.stadiumMatchedSetupNativeIdle === idle;
   };
   function wrapped(...args) {
@@ -69,6 +74,16 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
       if (idle() !== true) return {busy: true};
       const pointer = Reflect.apply(observe, module, []);
       if (!pointer) throw Error('Current SSS native observation pointer is absent');
+      return {busy: false, value: JSON.parse(module.UTF8ToString(pointer))};
+    },
+    observePreparedStart() {
+      if (!preparedStartProbe || observationProfile !== 1 || !preparedStartObserve)
+        throw Error('Prepared Start observation is available only to the explicit stock4/None profile');
+      if (!state.armed || state.disposed || !owns())
+        throw Error('Prepared Start observation lost its armed retained Module/callback');
+      if (idle() !== true) return {busy: true};
+      const pointer = Reflect.apply(preparedStartObserve, module, []);
+      if (!pointer) throw Error('Prepared Start native observation pointer is absent');
       return {busy: false, value: JSON.parse(module.UTF8ToString(pointer))};
     },
     dispose() {

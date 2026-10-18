@@ -90,7 +90,7 @@ def build_stock4_expected(binding):
                    value['source']['sequence'] < entry['sequence'] < setup['sequence'],
                    'Recorded prepared Entry/Setup stock4/None profile differs')
     keys = ('sequence', 'source_tick', 'draw_ordinal', 'match_index', 'boundary', 'pc',
-            'start_melee_hex', 'start_melee_sha256', 'declared_setup')
+            'start_melee_hex', 'start_melee_sha256', 'declared_setup', 'rng')
     value['prepared_profile'] = {
         'scope': 'original_prepared_Entry_Setup_profile_not_SSS_payload',
         'source_primary_sha256': value['primary_sha256'],
