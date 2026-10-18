@@ -17289,7 +17289,7 @@
   },
   "fresh_go2_comparison_2026_10_18": {
     "state": "ORIGINAL_GO2_REFERENCE_PASS_BROWSER_FIRST_C_COMPARISON_FAIL",
-    "next": "Reviewed constructor-only v2 source is ready for affected builds and full regression, then one bounded browser initialization comparison. No new capture or long lifetime released.",
+    "next": "Next is a bounded native finite-CSS capability and focused controls after independent review. No fresh browser capture or SSS/VS/GO continuation is released; C3 remains open.",
     "native": {
       "binary_sha256": "4bebd3a21cf48da558c7380f45b73e394fe46f47cef774d939cd4659051918fa",
       "producer_manifest_sha256": "2da988e27c334b4530935ea32af3edc319707482e276b064e9b08c132d4cedbd",
@@ -17749,8 +17749,425 @@
         "bytes": 778,
         "sha256": "f93b98d12d4910570ed57dc7ca4e3fe68754b8b7a3dfda31507ccdefeacc760e"
       },
-      "next": "Separate same-producer first four-port input/tick/draw boundary; no continuation of constructor-only owner and no longer lifetime released",
+      "next": "Constructor-only owner remains non-continuable. Separate fresh first-row result is recorded under fresh_css_first_row; no longer lifetime released.",
       "publication_gate": "PR #301 remains draft. Complete current-head CI is required before integration; C3 remains open."
+    },
+    "fresh_css_first_row": {
+      "state": "PASS_SCOPED_FIRST_CONSUMED_ROW_ENTRY_TICK_DRAW_FIELDS",
+      "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+      "runtime_producer_revision": "171818fda0456a7321b0fef58adb9c0b61841130",
+      "harness_revision": "171818fda0456a7321b0fef58adb9c0b61841130",
+      "test_only_fixture_commit": "1e96b2a93c72e3d726b47877324b652c9bc3307c",
+      "scope": "Recreated fresh owner/context, original CSS constructor plus exactly one literal consumed four-port row/source tick/draw/Aurora pair, then stop and unload. ConstructorReturnOnlyV2 remains non-continuable; FreshConsumedTickDrawV3 is one-row only.",
+      "producer": {
+        "unchanged_roles": 13,
+        "manifest": {
+          "evidence": "producer-v1/manifest.json",
+          "bytes": 5793,
+          "sha256": "73d5f940bb19005705961e2eb6225c1b910fa4f792d1dc653c15418cfc10ed7a"
+        },
+        "observer_stream_sha256": "4fd54b4aa9537292295ad83fbb75655f8213a475a876fdd1468affb68d3d211f",
+        "row_receipt": {
+          "evidence": "validation-v1/first-css-row-preparation-v1/receipt.json",
+          "bytes": 10371,
+          "sha256": "776207fb97bcb2088de23feced15f4f4640e668656fe1ddda060c8ac6260b7d4"
+        },
+        "row_independent_review": {
+          "evidence": "validation-v1/first-css-row-preparation-v1/independent-review-v1.json",
+          "bytes": 5906,
+          "sha256": "87f0b1e02215fda19d2c7ea0dcae4c0c4596de53482ba33cf4fcd7747cdc1fe0"
+        }
+      },
+      "validation": {
+        "receipt": {
+          "evidence": "validation-v1/fresh-row-validation-receipt-v1.json",
+          "bytes": 3958,
+          "sha256": "369ee3200852be330b7226cef4f647146bea9f47d6350ade0329c5c5d3a97385"
+        },
+        "source_review": {
+          "evidence": "validation-v1/first-css-row-candidate-v1/source-review-v2.json",
+          "bytes": 5554,
+          "sha256": "91f5369565f7cee0580f8eaf8c980d31c0590353c09ebebad9b6f7a1e58dc6b3"
+        },
+        "focused": {
+          "result": "PASS",
+          "tests": 4,
+          "receipt": {
+            "evidence": "validation-v1/fresh-row-focused-applied/result.json",
+            "bytes": 980,
+            "sha256": "c0d42042cad0323f732a6b05b88e3b1b838fe90dbd7fed3f0542f95119b325a7"
+          },
+          "controls": "Actual decoder/arm reservation/callback ownership;9 receipt refusals/28 JavaScript cases; existing v2 controls retained."
+        },
+        "diagnostic_release": {
+          "evidence": "validation-v1/fresh-row-diagnostic-release/result.json",
+          "bytes": 982,
+          "sha256": "7edae7c57fd4b654fa1f215f761da5a437e4462f1363df82fa1266ed282dea8f"
+        },
+        "ordinary_release": {
+          "evidence": "validation-v1/fresh-row-ordinary-release/result.json",
+          "bytes": 947,
+          "sha256": "e6e8bcf701aba42775b105818a89a27390ffce228f235792335903ad6917cdc5"
+        }
+      },
+      "browser": {
+        "result": "PASS",
+        "packet": {
+          "evidence": "first-row-capture-v1/packet-v1.json",
+          "bytes": 5768,
+          "sha256": "ec3d1d7b5fabb438ca1a520ac26b5eeaf702becb6724cbd5c6a1339f856f9f58"
+        },
+        "report": {
+          "evidence": "first-row-capture-v1/browser-run/report.json",
+          "bytes": 59637,
+          "sha256": "d8cdd8aea444684c39eac9e71bf2fe2fbb44eafba8862d67f31c480c5824f530"
+        },
+        "supervisor": {
+          "evidence": "first-row-capture-v1/owner.json",
+          "bytes": 104685,
+          "sha256": "6cd03e65615a4a6d9b5ab8907b7e5a90d405e40203322d452b3ab554574b24bb"
+        },
+        "root_result": {
+          "evidence": "first-row-capture-v1/root-result.json",
+          "bytes": 2972,
+          "sha256": "4c62b52717842c174a5a78a1885c304cdf2ee4732bb86d2a6c9fd647ec664f70"
+        },
+        "independent_owned_absence": {
+          "evidence": "first-row-capture-v1/root-owned-absence-v1.json",
+          "bytes": 512,
+          "sha256": "f1873bf80fca9b0d0d9b0a91e0e10c5a97ac0352ba844b4bac12710eddc8dddd"
+        },
+        "independent_result_review": {
+          "evidence": "first-row-capture-v1/result-review-v4.json",
+          "bytes": 11208,
+          "sha256": "078a432efacbda555b6e1091fbd530ef0476c93f6bebed7fc58438d571c84760"
+        },
+        "literal_input_bytes": 44,
+        "provenance_sequences": {
+          "consumed_pad": 860,
+          "css_entry": 728,
+          "css_return": 859,
+          "draw_enter": 862,
+          "draw_return": 863,
+          "pad_poll": 864,
+          "source_tick": 861
+        },
+        "source_steps": 1,
+        "source_draws": 1,
+        "host_tick_calls": 1,
+        "host_draw_calls": 1,
+        "aurora_begin_calls": 1,
+        "aurora_end_calls": 1,
+        "terminal_source_free_callbacks": 3,
+        "unload_and_observation_clear": true,
+        "native_after_unload": {
+          "phase": 0,
+          "running": 0,
+          "observation": null
+        },
+        "http_local_artifacts_before_after": 44,
+        "ordinary_build_crosschecks": 4,
+        "gpu": "PASS headless WebGPU Apple Metal-3 at640x480; operational only",
+        "page_console_errors_warnings_external_requests": 0,
+        "recorded_owned_identifiers_absent": 15,
+        "recorded_owned_groups_absent": 4,
+        "screenshots_visually_inspected": true,
+        "pixel_parity": false
+      },
+      "exact_comparator_replay": {
+        "result": "PASS_EXACT_COMMITTED_ENTRY_TICK_DRAW_COMPARATORS",
+        "comparison_fields": {
+          "constructor": [
+            "source_scene",
+            "scene_kind",
+            "random_seed_hex",
+            "pad_state_hex",
+            "ko_counts_hex",
+            "css"
+          ],
+          "draw": [
+            "source_tick",
+            "draw_ordinal",
+            "pad_state_hex",
+            "random_seed_hex",
+            "scene_frame",
+            "scene_kind",
+            "scene_routing_getters"
+          ],
+          "tick": [
+            "source_stream_sha256",
+            "consumed_pad_sequence",
+            "source_tick_sequence",
+            "source_tick_value",
+            "source_draw_ordinal",
+            "original_source_frame",
+            "phase_relation",
+            "source_scene_kind",
+            "host_source_scene",
+            "host_menu_phase",
+            "native_post_host_tick_frame",
+            "random_seed_hex",
+            "pad_state_hex",
+            "scene_routing_getters"
+          ]
+        },
+        "constructor_css_pointer_null_and_pad_x5C_rules": "PASS unchanged committed rules",
+        "negative_mutations_refused": [
+          "constructor_random_seed",
+          "tick_value",
+          "draw_frame"
+        ],
+        "script": {
+          "evidence": "first-row-capture-v1/result-review-exact-comparator-v2.mjs",
+          "bytes": 12590,
+          "sha256": "3c16c591bb0a5d325049b988f45ea715b7023d1fde98e5d0d29afeea6be8d20e"
+        },
+        "stdout": {
+          "evidence": "first-row-capture-v1/result-review-exact-comparator-v2.stdout.log",
+          "bytes": 1556,
+          "sha256": "b26224246df840eaf9bae26fc5fdfda960e790f0bff99bc934535ef5149a4993"
+        },
+        "stderr": {
+          "evidence": "first-row-capture-v1/result-review-exact-comparator-v2.stderr.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "scope": "Exact committed entry/tick/draw comparators replayed against raw observation and original host-only expectations; no native writes or recapture."
+      },
+      "offline_pre_server_contract": {
+        "result": "PASS",
+        "receipt": {
+          "evidence": "first-row-capture-v1/offline-contract-result.json",
+          "bytes": 9972,
+          "sha256": "752fbfae14adb6baf3d238d09cf6a256ff5c50743983e5081d328ceda3a32310"
+        },
+        "input_only_envelope_bytes": 136,
+        "literal_payload_bytes": 44,
+        "expected_state_passed_to_native": false,
+        "native_or_browser_executed": false,
+        "diagnostic_artifacts": 44,
+        "ordinary_crosschecks": 4,
+        "producer_roles": 13
+      },
+      "full_regression": {
+        "initial_171818_failure": {
+          "result": "FAIL",
+          "source_revision": "171818fda0456a7321b0fef58adb9c0b61841130",
+          "tests": 2731,
+          "skips": 189,
+          "failures": 1,
+          "errors": 0,
+          "receipt": {
+            "evidence": "validation-v1/fresh-row-regression/result.json",
+            "bytes": 922,
+            "sha256": "8fbcae52c7d230b70a9946644d5bc9d79f5332d27ce67ac1ffe09d306c67f1e5"
+          },
+          "log": {
+            "evidence": "validation-v1/fresh-row-regression/output.log",
+            "bytes": 526526,
+            "sha256": "841d845d144e008a91546b382bd9ad194e17e542b251bd72f1be79990170cebc"
+          },
+          "cause": "Extracted scoped-import fixture omitted stadium_first_css_prepared_diagnostic_active declaration; compiler failed before fixture execution. Production guard and capture unchanged.",
+          "owned_process_group_absent": true
+        },
+        "fixture_repair": {
+          "production_changes": false,
+          "changed_files": [
+            "tests/test_replay_scoped_import_lifecycle.py"
+          ],
+          "review": {
+            "evidence": "validation-v1/fresh-row-import-fixture-repair-v1/independent-source-review-v1.json",
+            "bytes": 3287,
+            "sha256": "62a93a1e63aff2f34b6f5ca6a5b0ffaaa676635701ce5cc7b47343f39b9da8cb"
+          },
+          "application": {
+            "evidence": "validation-v1/fresh-row-import-fixture-repair-v1/application-receipt.json",
+            "bytes": 353,
+            "sha256": "37a4cfd71280d09303218833c8d427fe89a1f8b00cebdb9753128f01e8731b92"
+          },
+          "focused": {
+            "result": "PASS",
+            "tests": 1,
+            "seconds": 0.785,
+            "receipt": {
+              "evidence": "validation-v1/fresh-row-fixture-focused/result.json",
+              "bytes": 981,
+              "sha256": "9dcd8c2db10e7520416d4b192058585e23a20983f88f0791ffe58a4746924a14"
+            }
+          },
+          "retained_compile_failure": {
+            "evidence": "validation-v1/fresh-row-import-fixture-repair-v1/retained-failure/compile.stderr",
+            "bytes": 364,
+            "sha256": "a45c4dc0490fe3d9b579a164a9bcd965ff359fe5f17189ca5ec1b7c4315a020b"
+          },
+          "scope": "Actual shared predicate extracted with explicit constructor/fresh-mode state; positive scoped-import checks and same refusal side-effect assertions preserved for both owners."
+        },
+        "repaired_current_head": {
+          "result": "PASS",
+          "source_revision": "1e96b2a93c72e3d726b47877324b652c9bc3307c",
+          "tests": 2731,
+          "skips": 189,
+          "failures": 0,
+          "errors": 0,
+          "unittest_seconds": 578.127,
+          "runner_seconds": 578.5400195419788,
+          "receipt": {
+            "evidence": "validation-v1/fresh-row-repaired-regression/result.json",
+            "bytes": 931,
+            "sha256": "f9b6746fd384a34641593f5691ffa7d40dd04f189927cbd3dc47e3f7cfb04590"
+          },
+          "log": {
+            "evidence": "validation-v1/fresh-row-repaired-regression/output.log",
+            "bytes": 525515,
+            "sha256": "72c7c481ac0884702cfc07dfaf9037a34918d92c8318f038b489bf264dc96bda"
+          },
+          "source_unchanged": true,
+          "owned_process_group_absent": true,
+          "runtime_harness_remain": "171818fda0456a7321b0fef58adb9c0b61841130",
+          "integration_gate": "Exact published-head CI remains required before integration; PR remains draft while C3 is open."
+        }
+      },
+      "retained_reviewer_harness_failures": [
+        {
+          "evidence": "first-row-capture-v1/result-review-generation-failure-v1.log",
+          "bytes": 88,
+          "sha256": "e0d9d3195371114369f8765b5def811d8f14635e9ccee87f725914291e6d6b51"
+        },
+        {
+          "evidence": "first-row-capture-v1/result-review-stale-script-failure-v1.stderr.log",
+          "bytes": 879,
+          "sha256": "70096c1ac4284b0bf7794556e80ba934f35ec158386c6f3afadf9627be9baa5c"
+        },
+        {
+          "evidence": "first-row-capture-v1/result-review-exact-comparator-v1.mjs",
+          "bytes": 8105,
+          "sha256": "1b4cc49a90cf76992af240c76cd83222f19017e931ab49f7df9f6628ad4811b2"
+        },
+        {
+          "evidence": "first-row-capture-v1/result-review-exact-comparator-v1.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "next": "Next is a bounded native finite-CSS capability and focused controls after independent review. No fresh browser capture or SSS/VS/GO continuation is released; C3 remains open.",
+      "C3": false,
+      "exclusions": [
+        "Remaining CSS prefix and terminal transition/final draw",
+        "SSS/VS Entry/Setup/GO/GO+2 parity from this fresh start",
+        "Stadium idle lifetimes, registration/generation or per-owner RNG parity",
+        "Live/physical input, uninterrupted audio/PCM, pixels, timing or performance acceptance",
+        "Whole-session equivalence and public Stadium admission"
+      ]
+    },
+    "fresh_css_finite_original_preparation": {
+      "state": "PASS_ORIGINAL_ONLY_FINITE_CSS_PREPARATION",
+      "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+      "execution_source_revision": "1e96b2a93c72e3d726b47877324b652c9bc3307c",
+      "derivation_revision": "f7fc174772cd0124a6a8d0977aca74ad80d6e9b1",
+      "scope": "Offline strict decoding of unchanged13-role original producer, dynamic CSS-only input/phase topology, literal raw rows and host-only typed expectations. No new native or browser execution.",
+      "result_freeze": {
+        "evidence": "validation-v1/first-css-finite-preparation-v1/result-freeze-v1.json",
+        "bytes": 5160,
+        "sha256": "54ed14e2ae34abdd071bac39c82badd1b394d4e0a53b7bfab464d8eacde0b294"
+      },
+      "receipt": {
+        "evidence": "validation-v1/first-css-finite-preparation-v1/extraction-v1/receipt.json",
+        "bytes": 6733,
+        "sha256": "5052af6e667270e2782a9d3cc52d6a149a1ed3e40235fd97b3993914c0f62548"
+      },
+      "input_only_descriptor": {
+        "evidence": "validation-v1/first-css-finite-preparation-v1/extraction-v1/input-only-descriptor.json",
+        "bytes": 96598,
+        "sha256": "913b02b5312cdd3608db418a8faf07ad25403e2c90ba1169c08abb7fb9b3d147"
+      },
+      "literal_rows": {
+        "evidence": "validation-v1/first-css-finite-preparation-v1/extraction-v1/literal-input-rows.raw",
+        "bytes": 6248,
+        "sha256": "58ad1f136f96573c78e875c769b568f23323d105f39d6887e29439b04b6fefbf"
+      },
+      "host_expected_only": {
+        "evidence": "validation-v1/first-css-finite-preparation-v1/extraction-v1/host-expected-prefix.json",
+        "bytes": 1485191,
+        "sha256": "ffad510575455253ae0e2a7af5a946a9f5dc76b7b88ad189702820d9a4a28955"
+      },
+      "source_pairings": {
+        "evidence": "validation-v1/first-css-finite-preparation-v1/extraction-v1/source-pairings.json",
+        "bytes": 146893,
+        "sha256": "3be9c4958049a5f04d5aee765387ca07b6aca2c87609d0f77d27753bfe9bd430"
+      },
+      "counts": {
+        "actual_source_rows": 142,
+        "remainder_rows": 141,
+        "normal_tick_comparisons_proposed": 141,
+        "draw_comparisons_proposed": 142
+      },
+      "literal_row_bytes": 44,
+      "row0_bytes_metadata_and_expectations_equal_reviewed_ROW": true,
+      "terminal_tick": "EXPLICITLY_UNPAIRED",
+      "all_draw_equality": "PROPOSED_ONLY_NOT_EXECUTED",
+      "malformed_controls": {
+        "result": "PASS_FOCUSED_OFFLINE_CONTROLS",
+        "refusals": 22,
+        "receipt": {
+          "evidence": "validation-v1/first-css-finite-preparation-v1/controls-v1/controls-result.json",
+          "bytes": 2728,
+          "sha256": "09e1aa633d58cb973c185d6db1d11ba29ad855f21b9b378a58082bd826212e24"
+        },
+        "reviewed_row0_oracle_immutable": true
+      },
+      "execution": {
+        "extraction": {
+          "evidence": "validation-v1/finite-css-original-extraction/result.json",
+          "bytes": 1196,
+          "sha256": "0f9e8ce49f7700c2eaa02eab7d8b1c6f3a3fbaca9f3aaef3efd8a0469fce699f"
+        },
+        "controls": {
+          "evidence": "validation-v1/finite-css-malformed-controls/result.json",
+          "bytes": 1191,
+          "sha256": "293251f63737cc1540e930db96a429b03830697e7a4aafb9d51b3e9d49d1df44"
+        },
+        "source_unchanged": true,
+        "owned_groups_absent": [
+          46875,
+          46891
+        ]
+      },
+      "reviews": {
+        "initial_source_review": {
+          "evidence": "validation-v1/first-css-finite-preparation-v1/independent-source-review-v1.json",
+          "bytes": 5356,
+          "sha256": "503c911d8cb95bc1225292fb54bc86b259fad91d5ed2344c6444994e794a5f81"
+        },
+        "command_only_review": {
+          "evidence": "validation-v1/first-css-finite-preparation-v1/independent-source-review-v2.json",
+          "bytes": 3091,
+          "sha256": "cffbf17a033ea86226232918f57371f853a1c2ce4eae887fea8e17555dc07545"
+        },
+        "result_review": {
+          "evidence": "validation-v1/first-css-finite-preparation-v1/independent-result-review-v1.json",
+          "bytes": 11167,
+          "sha256": "5ed0f1dfd7af1bbe8cb71222c1a503cd21f10b7b3f5db6c44c03088a4d6ce5e5"
+        }
+      },
+      "bytecode_prevention": {
+        "change": "Reviewed command-only -B added to both Python invocations; extractor/control source bytes unchanged. Initial static-review finding retained.",
+        "execution_proposal": {
+          "evidence": "validation-v1/first-css-finite-preparation-v1/execution-proposal-v2.json",
+          "bytes": 3142,
+          "sha256": "d65d200ef2853d4b1574ae835a17dc4a142cfca58eb9e4a60ea732d2ec18583e"
+        },
+        "no_pycache_in_extractor_or_retained_derivation_tree_after_runs": true
+      },
+      "native_or_browser_executed": false,
+      "native_codec_implemented": false,
+      "C3": false,
+      "next": "Next is a bounded native finite-CSS capability and focused controls after independent review. No fresh browser capture or SSS/VS/GO continuation is released; C3 remains open.",
+      "exclusions": [
+        "Finite native source/input/tick/draw parity",
+        "Terminal scheduler tick equality",
+        "CSS leave/SSS/VS Entry/Setup/GO/GO+2 continuation",
+        "Pixel/PCM, live input, timing/performance, full-session and C3 acceptance"
+      ]
     }
   }
 }

@@ -10,8 +10,11 @@ with the countdown difference already present at constructor initialization.
 The recordings also contain different CSS/SSS input schedules. A same-producer
 start guard passes independent review, full regression and all 14 exact-head CI
 checks. The fresh initial CSS context now passes offline representation and
-producer-binding checks. Its private constructor-only browser probe passes
-source and focused-control review; build and runtime validation remain pending.
+producer-binding checks. Its private constructor-only browser probe and a separate fresh first-row
+browser diagnostic now pass their declared comparisons. The first-row capture
+and runtime/harness use `171818fd`; a test-only scoped-import fixture repair
+then passed its focused check and full regression on `1e96b2a9`. The initial
+`171818fd` suite failed in that extracted fixture and remains retained.
 The [structured receipt](../evidence/issue251-stadium-profile-oninit-v1.json),
 under `fresh_go2_comparison_2026_10_18`, records the failure, passing component
 validation and cleanup. C3 and public Stadium admission remain open.
@@ -1847,6 +1850,57 @@ not establish consumed-input replay, SSS/VS Entry/Setup parity, GO+2 agreement,
 Stadium idle lifetimes, per-owner RNG or C3. The next bounded experiment is a
 separate first-input/tick/draw diagnostic with exact original ordering; this
 constructor-only owner remains non-continuable.
+
+
+**Fresh first consumed CSS row (October 18):** A separate fresh-owner diagnostic
+on runtime and harness `171818fd` passes the original constructor comparisons,
+then consumes exactly the first literal four-port PAD row and performs one source
+tick, one draw and one Aurora begin/end pair. The unchanged 13-role original
+producer and typed initial context bind this result to the reviewed row receipt.
+Expected state remains host-only. Independent raw-result review replays the exact
+committed constructor, tick and draw comparators, preserving their full declared
+inventories and constructor pointer/padding rules. Deliberate constructor seed,
+tick-coordinate and draw-frame mutations all refuse.
+
+Later callbacks leave the terminal source state unchanged. Checked unload clears
+the observation and restores phase 0/running 0. All 44 HTTP/local artifacts match
+before and after; four ordinary-build crosschecks match. Headless WebGPU passes,
+and page/console errors, warnings and external requests are absent. Supervisor
+ownership and an independent scan confirm all 15 recorded identifiers and four
+process groups absent. The rendered CSS screenshot was visually inspected; this
+establishes no pixel or audible-output equivalence. Diagnostic and ordinary
+Release builds pass on the capture source.
+
+The initial full regression on `171818fd` ran 2,731 tests with 189 skips and one
+failure: the extracted replay scoped-import fixture lacked the shared admission
+predicate. Its compiler failure and failed suite remain retained. The reviewed
+test-only repair at `1e96b2a9` extracts the actual predicate and checks unchanged
+import-refusal side effects for both constructor-only and fresh-row owners.
+Its focused test passes; production runtime and capture harness remain
+`171818fd`. The reviewer's earlier generation and stale-script failures remain
+retained.
+
+**First-row regression validation:** The repaired full regression on
+`1e96b2a9` passes all 2,731 tests with 189 skips in 578.127 seconds. Source hashes
+are unchanged and its owned process group is absent. Capture runtime and harness
+remain `171818fd`; the later commit changes only the reviewed import fixture.
+Exact published-head CI is a separate integration gate. The prior `a4830eba`
+full-suite pass remains historical.
+
+This establishes only the fresh constructor and first consumed CSS row's declared
+state/input/order boundary. It does not establish the remaining CSS prefix,
+terminal transition or final draw, SSS/VS Entry/Setup/GO+2 parity from this start,
+Stadium idle lifetimes, per-owner RNG or C3. Constructor-only V2 remains
+non-continuable and the successful V3 capability remains one-row only. Finite-CSS
+original-only receipt extraction and malformed controls now pass independent
+result review. They derive the actual finite CSS input topology and literal rows,
+preserve row-0 byte/metadata/expectation equality, and reject all 22 malformed
+controls. The reviewed command-only `-B` fix prevents bytecode output outside the
+owned result directories; no extractor or retained-derivation bytecode cache is
+present after the runs. This prepares 141 ordinary tick comparisons and 142 draw
+comparisons; it does not execute or pass them. The terminal tick stays explicitly
+unpaired. Next is a bounded native finite-CSS capability and focused controls
+after independent review; no further native/browser run or capture is released.
 
 
 The earlier GO+2 supervised attempt took 15.248 seconds (15.317 seconds including the root
