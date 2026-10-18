@@ -1,7 +1,7 @@
 # Desktop rollback diagnostic
 
 The optional downstream client patches `patches/0003-desktop-rollback-diagnostic.patch`
-through `patches/0006-jitter-reorder-native.patch` are enabled only when
+through `patches/0007-ucf-history-snapshot.native.patch` are enabled only when
 `SLIPPI_ROLLBACK_DIAGNOSTIC_CONFIG` names a valid JSON file. The ordered patch
 list and target tree are pinned by `client.lock.json`.
 The process writes JSONL observations to the config's `log_path`; both paths are
@@ -76,6 +76,24 @@ later DMA observation; they cannot establish callback-time rollback flags.
 The B2 load and completion events surround the actual native savestate load.
 The current no-pause profile maps B2 online frames to the recording scene clock.
 A pause-enabled profile must account for the pinned recording pause adjustment.
+
+## Optional UCF history observation
+
+Patch 0007 adds the optional `ucf_history_composition` config field. Omission
+or null preserves the existing config behavior; the canonical Python writer
+omits null. An enabled diagnostic may select exactly
+`gale01r2-required-general-codes-pad-buffer-c206b460-gctrel-085c-48-v1`.
+Unknown compositions and an active composition in a disabled config fail.
+The ordinary `run_local.py` scenarios do not opt in automatically.
+
+The native observer validates the dynamic installed GCT pointer, bounded MEM1
+span, header, branch target and selected layout fingerprint, then reads all 48
+authored bytes (including reserved bytes) synchronously at capture/load pre/post
+boundaries. It writes no guest state and changes no capture/load ordering.
+This binds the selected layout, not the entire GCT payload. An observation is
+not proof of reset, nonzero updates or restoration: a real run must show a
+saved value, a different current value, and exact restoration after the actual
+load, accounting for guest preservation blocks. Those remain separate gates.
 
 ## Run the bounded fixture
 

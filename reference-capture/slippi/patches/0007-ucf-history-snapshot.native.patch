@@ -1,0 +1,498 @@
+diff --git a/Source/Core/Core/HW/EXI/EXI_DeviceSlippi.cpp b/Source/Core/Core/HW/EXI/EXI_DeviceSlippi.cpp
+index f391377..ef34dcf 100644
+--- a/Source/Core/Core/HW/EXI/EXI_DeviceSlippi.cpp
++++ b/Source/Core/Core/HW/EXI/EXI_DeviceSlippi.cpp
+@@ -3,10 +3,12 @@
+ // Refer to the license.txt file included.
+ 
+ #include <algorithm>
++#include <array>
+ #include <cstdlib>
+ #include <fstream>
+ #include <limits>
+ #include <semver/include/semver200.h>
++#include <string_view>
+ #include <utility>  // std::move
+ 
+ #include "Common/CommonPaths.h"
+@@ -39,6 +41,7 @@
+ 
+ #include "Core/Slippi/SlippiPremadeText.h"
+ #include "Core/Slippi/SlippiPad.h"
++#include "Core/Slippi/SlippiUcfHistory.h"
+ #include "Core/Slippi/SlippiReplayComm.h"
+ #include "Core/State.h"
+ #include "Core/System.h"
+@@ -143,7 +146,8 @@ u32 DiagnosticAddress(SlippiRollbackDiagnostic& diagnostic, u32 address, u32 siz
+ }
+ 
+ void AddRollbackSnapshot(SlippiRollbackDiagnostic& diagnostic, nlohmann::json& event,
+-                         Core::System& system, const DiagnosticPreservation& values)
++                         Core::System& system, const DiagnosticPreservation& values,
++                         bool include_ucf_history = false)
+ {
+   auto& memory = system.GetMemory();
+   if (memory.GetPointerForRange(values.odb_address, values.odb_size) == nullptr ||
+@@ -191,6 +195,49 @@ void AddRollbackSnapshot(SlippiRollbackDiagnostic& diagnostic, nlohmann::json& e
+                             {"rxb_size", values.rxb_size},
+                             {"sscb_address", values.sscb_address},
+                             {"sscb_size", values.sscb_size}};
++
++  if (!include_ucf_history || !diagnostic.GetConfig().ucf_history_composition)
++    return;
++
++  auto checked_word = [&](u32 address, std::string_view description) {
++    if (memory.GetPointerForRange(address, sizeof(u32)) == nullptr)
++      diagnostic.Fail(description);
++    return memory.Read_U32(address);
++  };
++
++  const u32 gct_pointer = checked_word(SlippiUcfHistory::GCT_POINTER_SLOT,
++                                       "UCF history GCT pointer slot is outside emulated memory");
++  if (!SlippiUcfHistory::IsMem1Span(gct_pointer, SlippiUcfHistory::GCT_BYTES) ||
++      memory.GetPointerForRange(gct_pointer, SlippiUcfHistory::GCT_BYTES) == nullptr)
++  {
++    diagnostic.Fail("UCF history GCT pointer does not identify the supported bounded MEM1 span");
++  }
++
++  const u32 hook_word = checked_word(SlippiUcfHistory::HOOK_ADDRESS,
++                                     "UCF history hook site is outside emulated memory");
++  std::array<u32, SlippiUcfHistory::LAYOUT_WORD_OFFSETS.size()> layout_words{};
++  for (std::size_t index = 0; index < layout_words.size(); ++index)
++  {
++    const u32 address = gct_pointer + SlippiUcfHistory::LAYOUT_WORD_OFFSETS[index];
++    layout_words[index] =
++        checked_word(address, "UCF history layout word is outside emulated memory");
++  }
++  const auto layout = SlippiUcfHistory::Resolve(gct_pointer, hook_word, layout_words);
++  if (!layout)
++    diagnostic.Fail("installed UCF history pointer, hook, header, or fingerprint is unsupported");
++
++  if (memory.GetPointerForRange(layout->table_address, SlippiUcfHistory::AUTHORED_BYTES) == nullptr)
++    diagnostic.Fail("authored UCF history table span is outside emulated memory");
++  std::array<u8, SlippiUcfHistory::AUTHORED_BYTES> bytes{};
++  for (std::size_t index = 0; index < bytes.size(); ++index)
++    bytes[index] = memory.Read_U8(layout->table_address + static_cast<u32>(index));
++
++  if (!SlippiUcfHistory::TryAddSnapshotField(
++          event, *diagnostic.GetConfig().ucf_history_composition, gct_pointer, hook_word,
++          layout_words, bytes))
++  {
++    diagnostic.Fail("UCF history snapshot field did not match the opted-in composition");
++  }
+ }
+ 
+ void ObserveLocalOnlinePad(s32 frame, const u8* inputs)
+@@ -2010,7 +2057,8 @@ void CEXISlippi::handleCaptureSavestate(u8* payload)
+     m_diagnostic_rxb_address = preservation->rxb_address;
+     m_diagnostic_rxb_size = preservation->rxb_size;
+     nlohmann::json event = {{"event", "savestate_capture"}, {"frame", frame}};
+-    AddRollbackSnapshot(m_rollback_diagnostic, event, Core::System::GetInstance(), *preservation);
++    AddRollbackSnapshot(m_rollback_diagnostic, event, Core::System::GetInstance(), *preservation,
++                        true);
+     m_rollback_diagnostic.Record(event, SlippiRollbackDiagnostic::ObserverContext::EXI);
+   }
+ 
+@@ -2044,7 +2092,8 @@ void CEXISlippi::handleCaptureSavestate(u8* payload)
+   if (preservation)
+   {
+     nlohmann::json event = {{"event", "savestate_capture_complete"}, {"frame", frame}};
+-    AddRollbackSnapshot(m_rollback_diagnostic, event, Core::System::GetInstance(), *preservation);
++    AddRollbackSnapshot(m_rollback_diagnostic, event, Core::System::GetInstance(), *preservation,
++                        true);
+     m_rollback_diagnostic.Record(event, SlippiRollbackDiagnostic::ObserverContext::EXI);
+   }
+ 
+@@ -2067,7 +2116,8 @@ void CEXISlippi::handleLoadSavestate(u8* payload)
+     m_diagnostic_rxb_address = preservation->rxb_address;
+     m_diagnostic_rxb_size = preservation->rxb_size;
+     nlohmann::json event = {{"event", "savestate_load"}, {"frame", frame}};
+-    AddRollbackSnapshot(m_rollback_diagnostic, event, Core::System::GetInstance(), *preservation);
++    AddRollbackSnapshot(m_rollback_diagnostic, event, Core::System::GetInstance(), *preservation,
++                        true);
+     m_rollback_diagnostic.Record(event, SlippiRollbackDiagnostic::ObserverContext::EXI);
+   }
+ 
+@@ -2107,7 +2157,8 @@ void CEXISlippi::handleLoadSavestate(u8* payload)
+   if (preservation)
+   {
+     nlohmann::json event = {{"event", "savestate_load_complete"}, {"frame", frame}};
+-    AddRollbackSnapshot(m_rollback_diagnostic, event, Core::System::GetInstance(), *preservation);
++    AddRollbackSnapshot(m_rollback_diagnostic, event, Core::System::GetInstance(), *preservation,
++                        true);
+     m_rollback_diagnostic.Record(event, SlippiRollbackDiagnostic::ObserverContext::EXI);
+   }
+ 
+diff --git a/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.cpp b/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.cpp
+index 375d517..06a4ef8 100644
+--- a/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.cpp
++++ b/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.cpp
+@@ -3,6 +3,7 @@
+ // Refer to the license.txt file included.
+ 
+ #include "Core/Slippi/SlippiRollbackDiagnostic.h"
++#include "Core/Slippi/SlippiUcfHistory.h"
+ 
+ #include <algorithm>
+ #include <cstdint>
+@@ -46,7 +47,8 @@ const json& Member(const json& object, std::string_view key)
+ }
+ 
+ void CheckObjectKeys(const json& object, std::initializer_list<std::string_view> required,
+-                     std::string_view name)
++                     std::string_view name,
++                     std::initializer_list<std::string_view> optional = {})
+ {
+   if (!object.is_object())
+     Fatal(std::string(name) + " must be an object");
+@@ -54,11 +56,12 @@ void CheckObjectKeys(const json& object, std::initializer_list<std::string_view>
+   for (auto iterator = object.begin(); iterator != object.end(); ++iterator)
+   {
+     const std::string& key = iterator.key();
+-    const auto known = std::find_if(required.begin(), required.end(),
+-                                    [&key](std::string_view required_key) {
+-                                      return required_key == key;
+-                                    });
+-    if (known == required.end())
++    const auto is_known = [&key](const auto& keys) {
++      return std::find_if(keys.begin(), keys.end(), [&key](std::string_view candidate) {
++               return candidate == key;
++             }) != keys.end();
++    };
++    if (!is_known(required) && !is_known(optional))
+       Fatal(std::string(name) + " has an unknown key");
+   }
+   for (const std::string_view key : required)
+@@ -142,7 +145,7 @@ SlippiRollbackDiagnostic::Config ParseConfig(const json& root)
+ {
+   CheckObjectKeys(root, {"schema", "enabled", "rng_offset", "log_path", "stage_id",
+                          "input_profile", "overlay", "transport"},
+-                  "config");
++                  "config", {"ucf_history_composition"});
+   const json& schema = Member(root, "schema");
+   if (!schema.is_string() || schema.get<std::string>() != SCHEMA)
+     Fatal("diagnostic config has an unsupported schema");
+@@ -156,6 +159,16 @@ SlippiRollbackDiagnostic::Config ParseConfig(const json& root)
+   config.log_path = log_path.get<std::string>();
+   if (config.log_path.empty() || config.log_path.find('\0') != std::string::npos)
+     Fatal("log_path must be nonempty and contain no NUL");
++  const auto composition = root.find("ucf_history_composition");
++  if (composition != root.end() && !composition->is_null())
++  {
++    if (!composition->is_string() ||
++        composition->get<std::string>() != SlippiUcfHistory::COMPOSITION_ID)
++    {
++      Fatal("ucf_history_composition is not the reviewed supported composition");
++    }
++    config.ucf_history_composition = std::string(SlippiUcfHistory::COMPOSITION_ID);
++  }
+   if (!Member(root, "stage_id").is_null())
+   {
+     const u32 stage_id = ReadU32(root, "stage_id", 0xffff);
+@@ -250,8 +263,8 @@ SlippiRollbackDiagnostic::Config ParseConfig(const json& root)
+ 
+   if (!config.enabled &&
+       (config.stage_id.has_value() || config.input_profile.has_value() ||
+-       config.overlay_frame.has_value() || config.transport_action !=
+-                                                 SlippiRollbackDiagnostic::TransportAction::NONE))
++       config.overlay_frame.has_value() || config.ucf_history_composition.has_value() ||
++       config.transport_action != SlippiRollbackDiagnostic::TransportAction::NONE))
+   {
+     Fatal("disabled diagnostic config contains active controls");
+   }
+diff --git a/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.h b/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.h
+index d7ed6df..544732b 100644
+--- a/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.h
++++ b/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.h
+@@ -46,6 +46,7 @@ public:
+     std::string log_path;
+     std::optional<u16> stage_id;
+     std::optional<InputProfile> input_profile;
++    std::optional<std::string> ucf_history_composition;
+     std::optional<s32> overlay_frame;
+     std::array<u8, 8> overlay_pad{};
+     TransportAction transport_action = TransportAction::NONE;
+diff --git a/Source/Core/Core/Slippi/SlippiUcfHistory.h b/Source/Core/Core/Slippi/SlippiUcfHistory.h
+new file mode 100644
+index 0000000..5be6c29
+--- /dev/null
++++ b/Source/Core/Core/Slippi/SlippiUcfHistory.h
+@@ -0,0 +1,131 @@
++// Copyright 2026 Melee Web contributors
++// Licensed under GPLv2+.
++// Refer to the license.txt file included.
++
++#pragma once
++
++#include <array>
++#include <cstdint>
++#include <limits>
++#include <optional>
++#include <string>
++#include <string_view>
++
++#include <nlohmann/json.hpp>
++
++#include "Common/CommonTypes.h"
++
++// This intentionally supports one source-reviewed installed Pad Buffer composition only.
++// The caller must explicitly opt in with this identity; other winning C2 layouts are rejected.
++namespace SlippiUcfHistory
++{
++inline constexpr std::string_view COMPOSITION_ID =
++    "gale01r2-required-general-codes-pad-buffer-c206b460-gctrel-085c-48-v1";
++
++inline constexpr u32 MEM1_START = 0x80000000;
++inline constexpr u32 MEM1_END = 0x81800000;
++inline constexpr u32 GCT_POINTER_SLOT = 0x80005600;
++inline constexpr u32 HOOK_ADDRESS = 0x8006b460;
++inline constexpr u32 GCT_BYTES = 58064;
++inline constexpr u32 PAYLOAD_OFFSET = 0x858;
++inline constexpr u32 TABLE_OFFSET = 0x85c;
++inline constexpr std::size_t AUTHORED_BYTES = 48;
++
++inline constexpr std::array<u32, 8> EXPECTED_LAYOUT_WORDS = {
++    0x00d0c0de, 0x00d0c0de, 0xc206b460, 0x00000054,
++    0x480000b1, 0xbf1c0000, 0x38d1b717, 0x42a00000};
++inline constexpr std::array<u32, 8> LAYOUT_WORD_OFFSETS = {
++    0x000, 0x004, 0x850, 0x854, 0x858, 0x88c, 0x890, 0x894};
++
++struct ResolvedLayout
++{
++  u32 gct_pointer;
++  u32 payload_address;
++  u32 table_address;
++};
++
++constexpr bool IsMem1Span(u32 address, std::uint64_t size)
++{
++  return (address & 3) == 0 && address >= MEM1_START && address < MEM1_END &&
++         static_cast<std::uint64_t>(address) + size <= MEM1_END;
++}
++
++inline std::optional<u32> DecodeHookBranchTarget(u32 word)
++{
++  // PPC relative b (opcode 18), with AA and LK both clear.
++  if ((word >> 26) != 18 || (word & 3) != 0)
++    return std::nullopt;
++
++  std::int64_t displacement = static_cast<std::int64_t>(word & 0x03fffffc);
++  if ((displacement & 0x02000000) != 0)
++    displacement -= 0x04000000;
++  const std::int64_t target = static_cast<std::int64_t>(HOOK_ADDRESS) + displacement;
++  if (target < MEM1_START || target >= MEM1_END || (target & 3) != 0)
++    return std::nullopt;
++  return static_cast<u32>(target);
++}
++
++inline std::optional<ResolvedLayout> Resolve(const u32 gct_pointer, const u32 hook_word,
++                                             const std::array<u32, 8>& layout_words)
++{
++  if (!IsMem1Span(gct_pointer, GCT_BYTES) || !IsMem1Span(HOOK_ADDRESS, sizeof(u32)))
++    return std::nullopt;
++
++  const auto branch_target = DecodeHookBranchTarget(hook_word);
++  const std::uint64_t payload_address = static_cast<std::uint64_t>(gct_pointer) + PAYLOAD_OFFSET;
++  if (!branch_target || payload_address > std::numeric_limits<u32>::max() ||
++      *branch_target != payload_address)
++    return std::nullopt;
++  if (layout_words != EXPECTED_LAYOUT_WORDS)
++    return std::nullopt;
++
++  const std::uint64_t table_address = static_cast<std::uint64_t>(gct_pointer) + TABLE_OFFSET;
++  if (table_address > std::numeric_limits<u32>::max() ||
++      !IsMem1Span(static_cast<u32>(table_address), AUTHORED_BYTES) ||
++      table_address + AUTHORED_BYTES != static_cast<std::uint64_t>(gct_pointer) + 0x88c)
++  {
++    return std::nullopt;
++  }
++
++  return ResolvedLayout{gct_pointer, static_cast<u32>(payload_address),
++                        static_cast<u32>(table_address)};
++}
++
++inline std::string BytesToHex(const std::array<u8, AUTHORED_BYTES>& bytes)
++{
++  static constexpr char HEX[] = "0123456789abcdef";
++  std::string result;
++  result.reserve(AUTHORED_BYTES * 2);
++  for (const u8 byte : bytes)
++  {
++    result.push_back(HEX[byte >> 4]);
++    result.push_back(HEX[byte & 0x0f]);
++  }
++  return result;
++}
++
++inline bool TryAddSnapshotField(nlohmann::json& event, std::string_view composition_id,
++                                u32 gct_pointer, u32 hook_word,
++                                const std::array<u32, 8>& layout_words,
++                                const std::array<u8, AUTHORED_BYTES>& bytes)
++{
++  if (composition_id != COMPOSITION_ID)
++    return false;
++  const auto layout = Resolve(gct_pointer, hook_word, layout_words);
++  if (!layout)
++    return false;
++
++  // Build the complete field before mutating the containing event. Failure emits no partial data.
++  const nlohmann::json snapshot = {
++      {"composition_id", std::string(composition_id)},
++      {"gct_pointer", layout->gct_pointer},
++      {"hook_address", HOOK_ADDRESS},
++      {"hook_word", hook_word},
++      {"payload_address", layout->payload_address},
++      {"authored_table_address", layout->table_address},
++      {"authored_byte_count", AUTHORED_BYTES},
++      {"bytes_hex", BytesToHex(bytes)}};
++  event["ucf_history"] = snapshot;
++  return true;
++}
++}  // namespace SlippiUcfHistory
+diff --git a/Source/UnitTests/Core/CMakeLists.txt b/Source/UnitTests/Core/CMakeLists.txt
+index 865064e..d71a62f 100644
+--- a/Source/UnitTests/Core/CMakeLists.txt
++++ b/Source/UnitTests/Core/CMakeLists.txt
+@@ -2,6 +2,7 @@ add_dolphin_test(MMIOTest MMIOTest.cpp)
+ add_dolphin_test(PageFaultTest PageFaultTest.cpp)
+ add_dolphin_test(CoreTimingTest CoreTimingTest.cpp)
+ add_dolphin_test(PatchAllowlistTest PatchAllowlistTest.cpp)
++add_dolphin_test(SlippiUcfHistoryTest SlippiUcfHistoryTest.cpp)
+ 
+ add_dolphin_test(DSPAcceleratorTest DSP/DSPAcceleratorTest.cpp)
+ add_dolphin_test(DSPAssemblyTest
+diff --git a/Source/UnitTests/Core/SlippiUcfHistoryTest.cpp b/Source/UnitTests/Core/SlippiUcfHistoryTest.cpp
+new file mode 100644
+index 0000000..fbd82cb
+--- /dev/null
++++ b/Source/UnitTests/Core/SlippiUcfHistoryTest.cpp
+@@ -0,0 +1,129 @@
++// Copyright 2026 Melee Web contributors
++// SPDX-License-Identifier: GPL-2.0-or-later
++
++#include <array>
++#include <string>
++#include <string_view>
++
++#include <gtest/gtest.h>
++#include <nlohmann/json.hpp>
++
++#include "Core/Slippi/SlippiUcfHistory.h"
++
++namespace
++{
++using namespace SlippiUcfHistory;
++
++constexpr u32 TEST_POINTER = 0x81000000;  // Synthetic in-range fixture; never a runtime address.
++constexpr u32 TEST_PAYLOAD = TEST_POINTER + PAYLOAD_OFFSET;
++constexpr u32 TEST_BRANCH =
++    0x48000000 | ((TEST_PAYLOAD - HOOK_ADDRESS) & 0x03fffffc);
++constexpr std::array<u32, 8> VALID_WORDS = EXPECTED_LAYOUT_WORDS;
++
++constexpr u32 RelativeBranchToPointer(u32 pointer)
++{
++  return 0x48000000 | ((pointer + PAYLOAD_OFFSET - HOOK_ADDRESS) & 0x03fffffc);
++}
++}  // namespace
++
++TEST(SlippiUcfHistory, ResolvesOneSupportedDynamicLayout)
++{
++  const auto resolved = Resolve(TEST_POINTER, TEST_BRANCH, VALID_WORDS);
++  ASSERT_TRUE(resolved.has_value());
++  EXPECT_EQ(resolved->gct_pointer, TEST_POINTER);
++  EXPECT_EQ(resolved->payload_address, TEST_POINTER + PAYLOAD_OFFSET);
++  EXPECT_EQ(resolved->table_address, TEST_POINTER + TABLE_OFFSET);
++  EXPECT_EQ(resolved->table_address + AUTHORED_BYTES, TEST_POINTER + 0x88c);
++}
++
++TEST(SlippiUcfHistory, RejectsInvalidPointerRanges)
++{
++  // Matching hook targets isolate GCT span validation instead of failing on
++  // an unrelated TEST_BRANCH target. These payload/table addresses still fit.
++  constexpr u32 below = MEM1_START - 4;
++  constexpr u32 overrun = MEM1_END - GCT_BYTES + 4;
++  ASSERT_EQ(DecodeHookBranchTarget(RelativeBranchToPointer(below)), below + PAYLOAD_OFFSET);
++  ASSERT_EQ(DecodeHookBranchTarget(RelativeBranchToPointer(overrun)), overrun + PAYLOAD_OFFSET);
++  EXPECT_FALSE(Resolve(below, RelativeBranchToPointer(below), VALID_WORDS));
++  EXPECT_FALSE(Resolve(overrun, RelativeBranchToPointer(overrun), VALID_WORDS));
++  // Unaligned/outside pointers cannot have an aligned in-MEM1 matching target;
++  // test their span guard directly as well as the complete resolver.
++  EXPECT_FALSE(IsMem1Span(TEST_POINTER + 1, GCT_BYTES));
++  EXPECT_FALSE(Resolve(TEST_POINTER + 1, RelativeBranchToPointer(TEST_POINTER + 1), VALID_WORDS));
++  EXPECT_FALSE(IsMem1Span(MEM1_END, GCT_BYTES));
++  EXPECT_FALSE(Resolve(MEM1_END, RelativeBranchToPointer(MEM1_END), VALID_WORDS));
++}
++
++TEST(SlippiUcfHistory, AcceptsFullSpanEndingExactlyAtMem1End)
++{
++  constexpr u32 last = MEM1_END - GCT_BYTES;
++  EXPECT_TRUE(IsMem1Span(last, GCT_BYTES));
++  const auto resolved = Resolve(last, RelativeBranchToPointer(last), VALID_WORDS);
++  ASSERT_TRUE(resolved.has_value());
++  EXPECT_EQ(resolved->gct_pointer, last);
++  EXPECT_FALSE(IsMem1Span(last + 4, GCT_BYTES));
++}
++
++TEST(SlippiUcfHistory, RejectsNonRelativeOrMismatchedHookBranches)
++{
++  EXPECT_FALSE(Resolve(TEST_POINTER, TEST_BRANCH | 1, VALID_WORDS));  // LK set.
++  EXPECT_FALSE(Resolve(TEST_POINTER, TEST_BRANCH | 2, VALID_WORDS));  // AA set.
++  EXPECT_FALSE(Resolve(TEST_POINTER, TEST_BRANCH + 4, VALID_WORDS));  // Wrong target.
++  // Change opcode only, leaving the exact target displacement and AA/LK intact.
++  EXPECT_FALSE(Resolve(TEST_POINTER, TEST_BRANCH ^ 0x04000000, VALID_WORDS));
++}
++
++TEST(SlippiUcfHistory, SignExtendsRelativeBranchDisplacement)
++{
++  // Synthetic relative branch word targets MEM1 start from 0x8006b460.
++  EXPECT_EQ(DecodeHookBranchTarget(0x4bf94ba0), MEM1_START);
++}
++
++TEST(SlippiUcfHistory, RejectsChangedHeaderAndFingerprintWords)
++{
++  for (std::size_t index = 0; index < VALID_WORDS.size(); ++index)
++  {
++    auto changed = VALID_WORDS;
++    changed[index] ^= 1;
++    EXPECT_FALSE(Resolve(TEST_POINTER, TEST_BRANCH, changed)) << "word index " << index;
++  }
++}
++
++TEST(SlippiUcfHistory, AddsCompleteFieldWithAllAuthoredBytesIncludingReservedBytes)
++{
++  std::array<u8, AUTHORED_BYTES> bytes{};
++  for (std::size_t index = 0; index < bytes.size(); ++index)
++    bytes[index] = static_cast<u8>(index);
++
++  nlohmann::json event = {{"event", "savestate_capture_complete"}, {"frame", 77}};
++  ASSERT_TRUE(TryAddSnapshotField(event, COMPOSITION_ID, TEST_POINTER, TEST_BRANCH, VALID_WORDS,
++                                 bytes));
++  ASSERT_TRUE(event.find("ucf_history") != event.end());
++  EXPECT_EQ(event["ucf_history"]["authored_byte_count"], AUTHORED_BYTES);
++  EXPECT_EQ(event["ucf_history"]["bytes_hex"].get<std::string>().size(), AUTHORED_BYTES * 2);
++  EXPECT_EQ(event["ucf_history"]["bytes_hex"],
++            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
++            "202122232425262728292a2b2c2d2e2f");
++}
++
++TEST(SlippiUcfHistory, RefusesMismatchWithoutMutatingEvent)
++{
++  std::array<u8, AUTHORED_BYTES> bytes{};
++  for (std::size_t index = 0; index < bytes.size(); ++index)
++    bytes[index] = static_cast<u8>(index + 0x80);
++
++  const auto check_unchanged = [&](std::string_view composition, u32 pointer, u32 branch,
++                                   std::array<u32, 8> words) {
++    nlohmann::json event = {{"event", "savestate_load_complete"}, {"frame", 77}};
++    const auto before = event;
++    EXPECT_FALSE(TryAddSnapshotField(event, composition, pointer, branch, words, bytes));
++    EXPECT_EQ(event, before);
++  };
++
++  check_unchanged("other-composition", TEST_POINTER, TEST_BRANCH, VALID_WORDS);
++  check_unchanged(COMPOSITION_ID, MEM1_END - GCT_BYTES + 4, TEST_BRANCH, VALID_WORDS);
++  check_unchanged(COMPOSITION_ID, TEST_POINTER, TEST_BRANCH + 4, VALID_WORDS);
++  auto changed_header = VALID_WORDS;
++  changed_header[0] ^= 1;
++  check_unchanged(COMPOSITION_ID, TEST_POINTER, TEST_BRANCH, changed_header);
++}

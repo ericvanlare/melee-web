@@ -47,7 +47,9 @@ Root review found three missing scalar assertions in the initial fixture; all
 unchanged. On implementation commit `9ae4d794`, both the private-profile and
 ordinary-runtime Release builds pass. Full regression passes 2,426 tests with
 166 skips; 18 affected runtime/build artifacts are retained by hash. Exact-head
-CI and integration remain separate. No new browser or reference capture was run.
+CI completed with 12 successful checks and two expected skips on `266e3b21`;
+PR #338 merged as `130438fd` with the reviewed tree unchanged. No new browser
+or reference capture was run.
 
 ## Reference configuration and remaining gates
 
@@ -61,9 +63,11 @@ review pass; this does not imply the reference client has executed.
 The process-local default-deny fixture passes its declared synthetic network,
 IPC, file and execution controls. It is a prerequisite only: no Slippi client
 has been admitted or launched, and no official service has been contacted.
-A known prior client artifact differs from the current pinned binary/resource
-identity and is not accepted as the reference. Exact client lineage and its
-restricted offline initialization remain separate work.
+The known prior executable differs from the locked binary and lacks a matching
+build receipt. Its resource mismatch was a hash-method error: source, staged and
+locked Sys resources agree under the actual verifier. A new source-bound build
+and the remaining offline initialization work are tracked in the
+[input-history boundary](2026-10-18-ucf-input-history-ownership.md).
 
 Shared Pad Buffer/Cardinals history, its snapshot/reset ownership, extended
 shield drop, other UCF behaviors, live profile activation, matched patched-game

@@ -29,6 +29,7 @@ PROFILE_TEST_CLASSES = (
     ("src.slippi_profile.tests.test_dbooc_binary32_oracle", "DboocBinary32OracleTests"),
     ("src.slippi_profile.tests.test_dbooc_scalar_helper", "DboocScalarHelperTests"),
     ("src.slippi_profile.tests.test_ucf_shield_drop", "UcfShieldDropTests"),
+    ("src.slippi_profile.tests.test_ucf_input_history", "UcfInputHistoryTests"),
 )
 
 

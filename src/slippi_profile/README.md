@@ -29,6 +29,12 @@ and behavior. The profile fixtures compile this checkout with
 `MELEE_WEB_SLIPPI_PROFILE=1`; the source-hook code is absent when that define is
 unset.
 
+The separate [`ucf_input_history.c`](ucf_input_history.c) storage component is
+not referenced by the overlay and does not change the v5 identity. It copies
+the exact 48-byte, four-row payload and provides owner-scoped byte snapshots;
+it adds no live producer or consumer, match-reset behavior, or rollback
+snapshot integration. Its focused native/Wasm controls validate storage only.
+
 ## Source behavior in the v4 candidate
 
 | Pinned Slippi source and injection | Downstream patch site and source path | Behavior and dependency classification | Evidence limit |

@@ -12,6 +12,7 @@ from src.slippi_profile.tests import test_runner_contract as _runner_contract
 from src.slippi_profile.tests import test_source_composition as _source_composition
 from src.slippi_profile.tests import test_stage_render_reductions as _stage_render_reductions
 from src.slippi_profile.tests import test_ucf_shield_drop as _ucf_shield_drop
+from src.slippi_profile.tests import test_ucf_input_history as _ucf_input_history
 
 
 class SlippiBuildContractTests(_build_contract.SlippiSynctestBuildContractTests):
@@ -55,4 +56,8 @@ class SlippiDboocScalarTests(_dbooc_scalar.DboocScalarHelperTests):
 
 
 class SlippiUcfShieldDropTests(_ucf_shield_drop.UcfShieldDropTests):
+    pass
+
+
+class SlippiUcfInputHistoryTests(_ucf_input_history.UcfInputHistoryTests):
     pass
