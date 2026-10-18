@@ -73,6 +73,8 @@ public:
     bool construction_complete() const;
     void close();
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    bool diagnostic_stadium_pad_queue_observation(
+        MeleeWebStadiumPadQueueObservation*,char*,size_t) const;
     // Test-only access to the world's pure Toy owner/scope preflight. It does
     // not mutate state or execute original cleanup.
     bool diagnostic_toy_owner_preflight() const;

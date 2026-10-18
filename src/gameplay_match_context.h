@@ -4,6 +4,7 @@
 #include "gameplay_collision.h"
 #include "gameplay_pad_state.h"
 #include <dolphin/pad.h>
+#include <stdint.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -90,6 +91,18 @@ int melee_web_match_create_fighter(MeleeWebMatchContext*, char*, size_t);
 int melee_web_match_step(MeleeWebMatchContext*, uint32_t ticks, char*, size_t);
 int melee_web_match_stats(MeleeWebMatchContext*, MeleeWebMatchStats*, char*, size_t);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+/* Read-only copy of the four source PAD queue slots at the HSD renewal
+ * boundary. This diagnostic is published only after its enclosing phased
+ * source tick succeeds; it never owns or rewrites the queue. */
+typedef struct MeleeWebStadiumPadQueueObservation {
+    uint64_t source_generation, source_tick_before, source_tick_after;
+    uint32_t qnum_before, qread_before, qcount_before, qcount_after_hsd;
+    uint32_t player_count, slots[MELEE_WEB_MATCH_MAX_PLAYERS];
+    uint32_t controllers[MELEE_WEB_MATCH_MAX_PLAYERS];
+    PADStatus queue_slots[4];
+} MeleeWebStadiumPadQueueObservation;
+int melee_web_match_stadium_pad_queue_observation(
+    MeleeWebMatchContext*, MeleeWebStadiumPadQueueObservation*, char*, size_t);
 /* Stadium borrows one subject from this existing pool. These checks traverse
  * the authored pool bound before original Camera allocation/return runs. */
 int melee_web_match_camera_available(MeleeWebMatchContext*,char*,size_t);

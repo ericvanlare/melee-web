@@ -45,6 +45,53 @@ extern "C" int melee_web_net_publish_local_input(
 extern "C" void melee_web_native_menu_pause(int paused);
 #endif
 namespace melee_web_menu_browser {
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+std::string matched_setup_cf_pad_queue_observation_json(
+    const MeleeWebStadiumPadQueueObservation& observation,const StartMeleeData& setup)
+{
+ static constexpr char digits[]="0123456789abcdef";
+ auto append_byte=[&](std::ostringstream& out,uint8_t value){
+  out<<digits[value>>4]<<digits[value&0x0f];
+ };
+ auto status_hex=[&](const PADStatus& status){
+  std::ostringstream out;
+  append_byte(out,static_cast<uint8_t>(status.button>>8));
+  append_byte(out,static_cast<uint8_t>(status.button));
+  append_byte(out,static_cast<uint8_t>(status.stickX));
+  append_byte(out,static_cast<uint8_t>(status.stickY));
+  append_byte(out,static_cast<uint8_t>(status.substickX));
+  append_byte(out,static_cast<uint8_t>(status.substickY));
+  append_byte(out,status.triggerLeft);append_byte(out,status.triggerRight);
+  append_byte(out,status.analogA);append_byte(out,status.analogB);
+  append_byte(out,static_cast<uint8_t>(status.err));
+  return out.str();
+ };
+ std::ostringstream out;
+ out<<"{\"schema\":\"melee-web-stadium-hsd-pad-queue-observation\",\"version\":1"
+    <<",\"source_generation\":"<<observation.source_generation
+    <<",\"source_tick_before\":"<<observation.source_tick_before
+    <<",\"source_tick_after\":"<<observation.source_tick_after
+    <<",\"qnum_before\":"<<observation.qnum_before
+    <<",\"qread_before\":"<<observation.qread_before
+    <<",\"qcount_before\":"<<observation.qcount_before
+    <<",\"qcount_after_hsd\":"<<observation.qcount_after_hsd
+    <<",\"player_count\":"<<observation.player_count<<",\"players\":[";
+ for(uint32_t i=0;i<observation.player_count;i++){
+  if(i)out<<',';
+  out<<"{\"player_index\":"<<i
+     <<",\"setup_port_1based\":"<<static_cast<unsigned>(setup.players[i].slot)
+     <<",\"source_slot_index\":"<<observation.slots[i]
+     <<",\"controller_index\":"<<observation.controllers[i]<<'}';
+ }
+ out<<"],\"queue_slot_status_hex\":[";
+ for(unsigned slot=0;slot<4;slot++){
+  if(slot)out<<',';
+  out<<'\"'<<status_hex(observation.queue_slots[slot])<<'\"';
+ }
+ out<<"],\"tick_complete\":true}";
+ return out.str();
+}
+#endif
 // Startup observations only. These do not service the renderer or change its
 // cache gate; samples stop at the existing getter's first terminal idle state.
 double graphics_startup_started_ms=-1;
@@ -3019,6 +3066,7 @@ bool matched_setup_cf_service(){
   const uint64_t audio_frames_before=diagnostic_audio_render_frames;
   const unsigned phase_before=audio_phase;
   char error[256]{};
+  std::string pad_queue_observation_json="null";
   {
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
    const melee_web::provenance::Scope provenance(pipeline_context());
@@ -3031,6 +3079,21 @@ bool matched_setup_cf_service(){
    match->tick(raw);
    check(melee_web_gameplay_stats().ticks==ordinal+1&&!match->paused()&&!match->ending()&&
          !match->complete(),"Matched Setup C/F source tick left its exact live sequence");
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+   MeleeWebStadiumPadQueueObservation pad_queue_observation{};
+   char pad_queue_error[256]{};
+   const StartMeleeData* selected_start=match->diagnostic_start_data();
+   check(selected_start&&match->diagnostic_stadium_pad_queue_observation(
+         &pad_queue_observation,pad_queue_error,sizeof(pad_queue_error)),
+         pad_queue_error[0]?pad_queue_error:"Matched Setup C/F HSD queue snapshot refused");
+   check(pad_queue_observation.source_generation==state.world_generation&&
+         pad_queue_observation.source_tick_before==ordinal&&
+         pad_queue_observation.source_tick_after==ordinal+1&&
+         pad_queue_observation.player_count==2,
+         "Matched Setup C/F HSD queue snapshot lost its exact world/tick/profile boundary");
+   pad_queue_observation_json=matched_setup_cf_pad_queue_observation_json(
+       pad_queue_observation,*selected_start);
+#endif
    if(state.version2)state.source_ticks=melee_web_gameplay_stats().ticks;
    render_audio_tick(match->audio(),error,sizeof(error));
    check(diagnostic_audio_render_calls==calls_before+1,
@@ -3142,6 +3205,7 @@ bool matched_setup_cf_service(){
       (tick_action?std::to_string(state.last_bundle):"null")+
       ",\"complete\":true,\"source_frames\":"+std::to_string(match->source_frames())
       +",\"world_ticks\":"+std::to_string(melee_web_gameplay_stats().ticks)
+      +(tick_action?",\"world_generation\":"+std::to_string(state.world_generation):"")
       +v2_counter_json
       +",\"audio_render_calls_before\":"+std::to_string(state.audio_calls_before)
       +",\"audio_render_calls_after\":"+std::to_string(state.audio_calls_after)
@@ -3152,6 +3216,7 @@ bool matched_setup_cf_service(){
       +",\"aurora_begin_calls\":"+std::to_string(state.aurora_begin_calls)
       +",\"aurora_end_calls\":"+std::to_string(state.aurora_end_calls)
       +",\"observation\":"+actual.str()+
+      (tick_action?",\"pad_hsd_queue_observation\":"+pad_queue_observation_json:"")+
       (state.common_fields?",\"common_fields_sample\":"+common_sample_json:"")+"}";
   state.awaiting_approval=true;
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)

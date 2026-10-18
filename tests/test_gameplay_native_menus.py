@@ -519,6 +519,165 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
     def setUpClass(cls):
         cls.scratch = cls.new_workspace(ROOT, "stadium-c1a-native-menu-")
 
+    def test_stadium_hsd_queue_observation_executes_actual_phased_step(self):
+        """Exercise the production queue fill and snapshot lifecycle with named HSD services."""
+        import shutil
+        compiler = shutil.which("clang") or shutil.which("cc")
+        if not compiler or not (ROOT / "build/gameplay-source/src/melee/gm/types.h").is_file():
+            self.skipTest("Prepared source headers and C compiler are required")
+        source = r"""
+#define MELEE_WEB_STADIUM_C1A_DIAGNOSTIC 1
+#include "gameplay_match_context.c"
+static uint64_t fixture_generation=1;
+static MeleeWebMatchContext match;
+static StaticPlayer players[4];
+static CmSubject pool[70];
+static int consume_queue=1,gameplay_ok=1,hsd_calls=0,rumble_calls=0;
+static int copy_calls=0,game_calls=0,renew_calls=0,event_count=0,event_order[5];
+PadLibData HSD_PadLibData;
+u32* seed_ptr;
+CmSubject *cm_804D6458,*cm_804D645C,*cm_804D6460;
+uint64_t melee_web_gameplay_generation(void){return fixture_generation;}
+int melee_web_collision_readiness(MeleeWebCollision* collision,
+    MeleeWebCollisionReadiness* readiness,char* error,size_t size)
+{
+ (void)readiness;(void)error;(void)size;return collision!=NULL;
+}
+StaticPlayer* Player_GetPtrForSlot(int slot){return slot>=0&&slot<4?&players[slot]:NULL;}
+void HSD_PadRumbleInterpret(void){++rumble_calls;event_order[event_count++]=1;}
+void HSD_PadRenewMasterStatus(void)
+{
+ ++hsd_calls;event_order[event_count++]=2;
+ if(consume_queue){HSD_PadLibData.qread=(HSD_PadLibData.qread+1)%HSD_PadLibData.qnum;--HSD_PadLibData.qcount;}
+}
+void HSD_PadRenewCopyStatus(void){++copy_calls;event_order[event_count++]=3;}
+void HSD_PadRenewGameStatus(void){++game_calls;event_order[event_count++]=4;}
+int melee_web_gameplay_step(char* error,size_t size)
+{(void)error;(void)size;event_order[event_count++]=5;return gameplay_ok;}
+static int phase_ok(void* context,char* error,size_t size)
+{(void)error;(void)size;return *(const int*)context;}
+static int invalidate_owner(void* context,char* error,size_t size)
+{(void)context;(void)error;(void)size;owner=NULL;return 1;}
+static int renew_ok(void* context,char* error,size_t size)
+{(void)error;(void)size;++renew_calls;event_order[event_count++]=6;return *(const int*)context;}
+static void initialize(void)
+{
+ memset(&match,0,sizeof(match));memset(players,0,sizeof(players));
+ match.player_count=2;match.slots[0]=0;match.slots[1]=1;
+ match.controllers[0]=0;match.controllers[1]=1;match.generation=1;match.seed=17;
+ match.pool=pool;match.collision=(MeleeWebCollision*)pool;
+ owner=&match;fixture_generation=1;seed_ptr=&match.seed;cm_804D645C=pool;
+ players[0].player_entity[0]=(HSD_GObj*)1;players[1].player_entity[0]=(HSD_GObj*)1;
+ HSD_PadLibData=(PadLibData){.qnum=1,.queue=&match.input_queue};
+ consume_queue=1;gameplay_ok=1;hsd_calls=0;rumble_calls=0;
+ copy_calls=0;game_calls=0;renew_calls=0;event_count=0;memset(event_order,0,sizeof(event_order));
+}
+static PADStatus sample(unsigned value)
+{
+ PADStatus result={0};result.button=(uint16_t)value;
+ result.stickX=(int8_t)(value+1);result.stickY=(int8_t)(value+2);
+ result.substickX=(int8_t)(value+3);result.substickY=(int8_t)(value+4);
+ result.triggerLeft=(uint8_t)(value+5);result.triggerRight=(uint8_t)(value+6);
+ result.analogA=(uint8_t)(value+7);result.analogB=(uint8_t)(value+8);result.err=0;
+ return result;
+}
+static int refuses_snapshot(void)
+{
+ MeleeWebStadiumPadQueueObservation observed;char error[128]={0};
+ return !melee_web_match_stadium_pad_queue_observation(&match,&observed,error,sizeof(error));
+}
+int main(void)
+{
+ char error[256]={0};PADStatus raw[4]={sample(1),sample(21),sample(41),sample(61)};
+ MeleeWebStadiumPadQueueObservation observed;
+ initialize();
+ if(!melee_web_match_step_raw_phased(&match,raw,NULL,NULL,NULL,NULL,error,sizeof(error)))return 1;
+ if(hsd_calls!=1||rumble_calls!=1||copy_calls!=1||game_calls!=1||renew_calls||
+    HSD_PadLibData.qcount!=0||match.ticks!=1||event_count!=5||
+    event_order[0]!=1||event_order[1]!=2||event_order[2]!=3||event_order[3]!=4||event_order[4]!=5)return 2;
+ if(!melee_web_match_stadium_pad_queue_observation(&match,&observed,error,sizeof(error)))return 3;
+ if(observed.source_generation!=1||observed.source_tick_before!=0||observed.source_tick_after!=1||
+    observed.qnum_before!=1||observed.qread_before!=0||observed.qcount_before!=1||
+    observed.qcount_after_hsd!=0||observed.player_count!=2||
+    observed.slots[0]!=0||observed.controllers[0]!=0||
+    observed.slots[1]!=1||observed.controllers[1]!=1)return 4;
+ if(memcmp(&observed.queue_slots[0],&raw[0],sizeof(PADStatus))||
+    memcmp(&observed.queue_slots[1],&raw[1],sizeof(PADStatus))||
+    observed.queue_slots[2].err!=-1||observed.queue_slots[3].err!=-1)return 5;
+
+ initialize();match.slots[0]=1;match.controllers[0]=2;
+ match.slots[1]=2;match.controllers[1]=3;
+ players[2].player_entity[0]=(HSD_GObj*)1;
+ if(!melee_web_match_step_raw_phased(&match,raw,NULL,NULL,NULL,NULL,error,sizeof(error))||
+    !melee_web_match_stadium_pad_queue_observation(&match,&observed,error,sizeof(error))||
+    observed.slots[0]!=1||observed.controllers[0]!=2||
+    observed.slots[1]!=2||observed.controllers[1]!=3||
+    observed.queue_slots[0].err!=-1||observed.queue_slots[1].button!=raw[2].button||
+    observed.queue_slots[2].button!=raw[3].button||observed.queue_slots[3].err!=-1)return 14;
+
+ initialize();int renew_phase=1;
+ if(!melee_web_match_step_raw_phased(&match,raw,renew_ok,NULL,NULL,&renew_phase,error,sizeof(error))||
+    renew_calls!=1||copy_calls||game_calls||event_count!=4||
+    event_order[0]!=1||event_order[1]!=2||event_order[2]!=6||event_order[3]!=5||
+    !melee_web_match_stadium_pad_queue_observation(&match,&observed,error,sizeof(error)))return 13;
+
+ initialize();consume_queue=0;
+ if(melee_web_match_step_raw_phased(&match,raw,NULL,NULL,NULL,NULL,error,sizeof(error))||
+    !refuses_snapshot())return 6;
+ initialize();int fail_after=0;
+ if(melee_web_match_step_raw_phased(&match,raw,NULL,NULL,phase_ok,&fail_after,error,sizeof(error))||
+    match.ticks!=1||!refuses_snapshot())return 7;
+ initialize();gameplay_ok=0;
+ if(melee_web_match_step_raw_phased(&match,raw,NULL,NULL,NULL,NULL,error,sizeof(error))||
+    !refuses_snapshot())return 8;
+ initialize();
+ if(!melee_web_match_step_raw_phased(&match,raw,NULL,NULL,NULL,NULL,error,sizeof(error)))return 9;
+ match.generation=2;fixture_generation=2;
+ if(!refuses_snapshot())return 10;
+ initialize();
+ if(!melee_web_match_step_raw_phased(&match,raw,NULL,NULL,NULL,NULL,error,sizeof(error)))return 11;
+ if(melee_web_match_step_raw_phased(&match,NULL,NULL,NULL,NULL,NULL,error,sizeof(error))||
+    !refuses_snapshot())return 12;
+ initialize();
+ if(!melee_web_match_step_raw_phased(&match,raw,NULL,NULL,NULL,NULL,error,sizeof(error)))return 15;
+ MeleeWebMatchContext foreign={0};
+ foreign.pad_queue_observation_candidate=1;foreign.pad_queue_observation_complete=1;
+ if(melee_web_match_step_raw_phased(&foreign,raw,NULL,NULL,NULL,NULL,error,sizeof(error))||
+    !melee_web_match_stadium_pad_queue_observation(&match,&observed,error,sizeof(error))||
+    foreign.pad_queue_observation_candidate!=1||foreign.pad_queue_observation_complete!=1)return 16;
+ initialize();
+ if(!melee_web_match_step_raw_phased(&match,raw,NULL,NULL,invalidate_owner,NULL,error,sizeof(error))||
+    !refuses_snapshot())return 17;
+ puts("Stadium HSD queue observation: production phased fill/order, literal four slots and map pass; unconsumed, failed-phase, failed-tick, stale-owner, failed-retry and post-callback owner invalidation refused");
+ return 0;
+}
+"""
+        input_path = self.scratch / "stadium-hsd-queue-observation.c"
+        output_path = self.scratch / "stadium-hsd-queue-observation"
+        input_path.write_text(source, encoding="utf-8")
+        command = [compiler, "-std=gnu11", "-Wall", "-Wextra", "-Werror",
+                   "-Wno-unused-function", "-Wno-unused-variable", "-DAURORA", "-DTARGET_PC",
+                   "-DMELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1", "-O1", "-ffunction-sections",
+                   "-fdata-sections", "-ffp-contract=off", "-include",
+                   str(ROOT / "src/gameplay_compat.h")]
+        for directory in ("src", "tests", "build/gameplay-source/src",
+                          ".deps/aurora/include", ".deps/melee/extern/dolphin/include"):
+            command += ["-I", str(ROOT / directory)]
+        command += [str(input_path), "-Wl,-dead_strip" if sys.platform == "darwin"
+                    else "-Wl,--gc-sections", "-o", str(output_path)]
+        (self.scratch / "stadium-hsd-queue-observation-command.json").write_text(
+            json.dumps(command), encoding="utf-8")
+        build = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=60)
+        (self.scratch / "stadium-hsd-queue-observation-build.log").write_text(
+            build.stdout + build.stderr, encoding="utf-8")
+        self.assertEqual(build.returncode, 0, build.stdout + build.stderr)
+        run = subprocess.run([str(output_path)], cwd=ROOT, capture_output=True,
+                             text=True, timeout=10)
+        (self.scratch / "stadium-hsd-queue-observation-run.log").write_text(
+            run.stdout + run.stderr, encoding="utf-8")
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertIn("production phased fill/order", run.stdout)
+
     def test_stadium_first_css_context_return_one_shot(self):
         if os.environ.get("MELEE_RUN_STADIUM_FIRST_CSS_CONTEXT") != "1":
             self.skipTest("Original immediate first-CSS return comparison requires its reviewed run gate")

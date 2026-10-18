@@ -3052,7 +3052,9 @@ async function runMatchedSetupCfContinuation(setupNative) {
   const driver = new helper.StadiumSetupCfActionDriver({
     runtimePayload: hostEvidence.runtimePayload, native: nativeAdapter,
     commonFields: commonFieldsMode,
-    admittedWorldGeneration: commonFieldsMode ? admittedWorldGeneration : null,
+    admittedWorldGeneration: (commonFieldsMode || hostEvidence.requiredQueueObservation)
+      ? admittedWorldGeneration : null,
+    requiredQueueObservation: hostEvidence.requiredQueueObservation,
     commonRowsByAction: commonFieldsMode ? hostEvidence.commonRowsByAction : null});
   await page.evaluate(() => {
     if (globalThis.__meleeWebStadiumFirstSssVsSetupCfApproved)

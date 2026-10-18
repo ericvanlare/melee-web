@@ -64,6 +64,43 @@ function run2Packet() {
       bundles, schedule}, host_only};
 }
 
+function sameV6QueueObservationPacket() {
+  const packet = {schema: 'melee-web-stadium-setup-cf-input-schedule', version: 1,
+    runtime_payload: runtimePayload(), host_only: {
+      expected_original_state: {summary: {decision: 'PASS_ORIGINAL_STATE_ONLY_COUNTERPART',
+        schema: 'melee-web-original-stadium-idle-state', guest_pointer_numeric_comparison: false,
+        source: {dol_sha256: 'dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646',
+          dol_sha1: '08e0bf20134dfcb260699671004527b2d6bb1a45'},
+        snapshots: [expected('GO'), expected('C'), expected('F')]}},
+      boundary_rng_observations: [
+        {sequence: 2925, pc: '0x8016b824', pointer_slot_address: 0x804D5F94,
+          pointer_raw_hex: '804d5f90', seed_address: 0x804D5F90, label: 'GO', event: 'progress', source_tick: 84, draw_ordinal: 84,
+          pointer_equals_seed_address: true, seed_hex: 'f228f136', seed_raw_hex: 'f228f136'},
+        {sequence: 2926, pc: '0x80390eb4', pointer_slot_address: 0x804D5F94,
+          pointer_raw_hex: '804d5f90', seed_address: 0x804D5F90, label: 'C', event: 'boundary', source_tick: 84, draw_ordinal: 84,
+          pointer_equals_seed_address: true, seed_hex: '868d77be', seed_raw_hex: '868d77be'},
+        {sequence: 2931, pc: '0x80390eb4', pointer_slot_address: 0x804D5F94,
+          pointer_raw_hex: '804d5f90', seed_address: 0x804D5F90, label: 'F', event: 'boundary', source_tick: 85, draw_ordinal: 85,
+          pointer_equals_seed_address: true, seed_hex: 'b50f624b', seed_raw_hex: 'b50f624b'},
+      ],
+      source_event_provenance: {events: [{ordinal: 0,
+        consumed_pad: {sequence: 2504, event: 'boundary', source_tick: 0, draw_ordinal: 0}}]},
+    }};
+  const rows = ['0000000000000000000000', '0000000000000000000000',
+    '00000000000000000000ff', '00000000000000000000ff'];
+  packet.runtime_payload.bundles[0].ports.forEach((port, index) => {
+    port.status_hex = rows[index];
+  });
+  packet.host_only.required_queue_observation = {schema: 'melee-web-stadium-hsd-pad-queue-observation',
+    version: 1, bundle: 0, source_tick: 0, source_sequence: 2504,
+    expected_queue_slot_status_hex: rows,
+    expected_players: [
+      {player_index: 0, setup_port_1based: 1, source_slot_index: 0, controller_index: 0},
+      {player_index: 1, setup_port_1based: 2, source_slot_index: 1, controller_index: 1},
+    ]};
+  return packet;
+}
+
 function expected(label) {
   const ordinal = label === 'C' ? 84 : label === 'F' ? 85 : 84;
   return {label, sequence: label === 'GO' ? 2925 : label === 'C' ? 2926 : 2931,
@@ -222,7 +259,7 @@ test('encodes and gates each v2 manifest action with independent counters and C/
     source_frames_after: 1, source_frames: 1, world_ticks: 1,
     source_tick_input_pad_hex: 'ff'.repeat(44)}};
   assert.equal(await rejected.accept(badReceipt), false);
-  assert.match(rejected.status().first_error, /receipt counters or literal consumed PAD/);
+  assert.match(rejected.status().first_error, /scheduled raw-argument PAD differ/);
 });
 
 test('compares only the declared C/F scalars, named PPC flag masks, and owned source RNG', async () => {
@@ -414,6 +451,113 @@ test('binds packet schema and exact DOL identity before constructing host expect
   const wrong = structuredClone(packet);
   wrong.host_only.expected_original_state.summary.source.dol_sha256 = '00'.repeat(32);
   assert.throws(() => hostEvidenceFromPacket(wrong), /host-only original evidence differs/);
+});
+
+test('strict same-v6 HSD queue gate binds the literal native rows and Setup map', async () => {
+  const packet = sameV6QueueObservationPacket();
+  const evidence = hostEvidenceFromPacket(packet);
+  assert.equal(evidence.requiredQueueObservation.source_sequence, 2504);
+  assert.deepEqual(evidence.requiredQueueObservation.expected_queue_slot_status_hex,
+    packet.runtime_payload.bundles[0].ports.map(port => port.status_hex));
+
+  const native = {approvals: [], arm: () => 1, queue: () => 1,
+    approve(index, accepted) { this.approvals.push([index, accepted]); return 1; }};
+  const accepted = new StadiumSetupCfActionDriver({runtimePayload: evidence.runtimePayload,
+    admittedWorldGeneration: 7, requiredQueueObservation: evidence.requiredQueueObservation, native});
+  assert.throws(() => new StadiumSetupCfActionDriver({runtimePayload: evidence.runtimePayload,
+    requiredQueueObservation: evidence.requiredQueueObservation, native}),
+  /positive safe generation from checked Setup/);
+  assert.equal(await accepted.arm(true), true);
+  assert.equal(await accepted.submit(evidence.runtimePayload.schedule[0]), true);
+  const queueObservation = {schema: 'melee-web-stadium-hsd-pad-queue-observation', version: 1,
+    source_generation: 7, source_tick_before: 0, source_tick_after: 1,
+    qnum_before: 1, qread_before: 0, qcount_before: 1, qcount_after_hsd: 0,
+    player_count: 2, players: structuredClone(packet.host_only.required_queue_observation.expected_players),
+    queue_slot_status_hex: [...packet.host_only.required_queue_observation.expected_queue_slot_status_hex],
+    tick_complete: true};
+  const good = {last_action: {complete: true, schedule_index: 0, action: 'tick',
+    ordinal: 0, bundle: 0, world_generation: 7, pad_hsd_queue_observation: queueObservation}};
+  assert.equal(await accepted.accept(good), true, accepted.status().first_error || 'strict queue receipt refused');
+  assert.deepEqual(native.approvals, [[0, true]]);
+
+  const badReceipts = [
+    ['missing observation', receipt => { delete receipt.last_action.pad_hsd_queue_observation; }],
+    ['schema', receipt => { receipt.last_action.pad_hsd_queue_observation.schema = 'wrong'; }],
+    ['version', receipt => { receipt.last_action.pad_hsd_queue_observation.version = 2; }],
+    ['generation', receipt => { receipt.last_action.pad_hsd_queue_observation.source_generation++; }],
+    ['self-consistent but unadmitted generation', receipt => {
+      receipt.last_action.world_generation = 8;
+      receipt.last_action.pad_hsd_queue_observation.source_generation = 8;
+    }],
+    ['tick completion', receipt => { receipt.last_action.pad_hsd_queue_observation.tick_complete = false; }],
+    ['HSD count', receipt => { receipt.last_action.pad_hsd_queue_observation.qcount_after_hsd = 1; }],
+    ['queue number', receipt => { receipt.last_action.pad_hsd_queue_observation.qnum_before = 2; }],
+    ['queue read index', receipt => { receipt.last_action.pad_hsd_queue_observation.qread_before = 1; }],
+    ['queue count before HSD', receipt => { receipt.last_action.pad_hsd_queue_observation.qcount_before = 0; }],
+    ['source tick before', receipt => { receipt.last_action.pad_hsd_queue_observation.source_tick_before = 1; }],
+    ['source tick after', receipt => { receipt.last_action.pad_hsd_queue_observation.source_tick_after = 0; }],
+    ['Setup map', receipt => { receipt.last_action.pad_hsd_queue_observation.players[1].controller_index = 0; }],
+    ['duplicate player map', receipt => { receipt.last_action.pad_hsd_queue_observation.players[1].player_index = 0; }],
+    ['reordered player map', receipt => {
+      receipt.last_action.pad_hsd_queue_observation.players.reverse();
+    }],
+    ['inactive queue byte', receipt => {
+      receipt.last_action.pad_hsd_queue_observation.queue_slot_status_hex[3] =
+        '0000000000000000000000';
+    }],
+  ];
+  for (let slot = 0; slot < 4; ++slot) {
+    for (let byteIndex = 0; byteIndex < 11; ++byteIndex) {
+      badReceipts.push([`queue slot ${slot} semantic byte ${byteIndex}`, receipt => {
+        const queue = receipt.last_action.pad_hsd_queue_observation;
+        const hex = queue.queue_slot_status_hex[slot];
+        const offset = byteIndex * 2;
+        const changed = (Number.parseInt(hex.slice(offset, offset + 2), 16) ^ 1)
+          .toString(16).padStart(2, '0');
+        queue.queue_slot_status_hex[slot] = hex.slice(0, offset) + changed + hex.slice(offset + 2);
+      }]);
+    }
+  }
+  for (const [label, mutate] of badReceipts) {
+    const rejectNative = {approvals: [], arm: () => 1, queue: () => 1,
+      approve(index, approved) { this.approvals.push([index, approved]); return 1; }};
+    const driver = new StadiumSetupCfActionDriver({runtimePayload: evidence.runtimePayload,
+      admittedWorldGeneration: 7, requiredQueueObservation: evidence.requiredQueueObservation,
+      native: rejectNative});
+    assert.equal(await driver.arm(true), true);
+    assert.equal(await driver.submit(evidence.runtimePayload.schedule[0]), true);
+    const receipt = structuredClone(good);
+    mutate(receipt);
+    assert.equal(await driver.accept(receipt), false, label);
+    assert.match(driver.status().first_error, /HSD queue-slot observation/);
+    assert.deepEqual(rejectNative.approvals, [[0, false]], label);
+  }
+
+  for (const mutate of [
+    value => { value.host_only.required_queue_observation.version = 2; },
+    value => { value.host_only.required_queue_observation.expected_players[1].controller_index = 0; },
+    value => { value.host_only.required_queue_observation.expected_queue_slot_status_hex[3] = '00'.repeat(11); },
+    value => { value.host_only.source_event_provenance.events[0].consumed_pad.sequence++; },
+    value => { delete value.host_only.source_event_provenance; },
+  ]) {
+    const malformed = sameV6QueueObservationPacket();
+    mutate(malformed);
+    assert.throws(() => hostEvidenceFromPacket(malformed), /required HSD queue observation/);
+  }
+
+  const unsupportedRun2 = run2Packet();
+  unsupportedRun2.host_only.required_queue_observation = {};
+  assert.throws(() => hostEvidenceFromPacket(unsupportedRun2), /unsupported for run2 action packets/);
+});
+
+test('browser caller forwards the strict queue gate and checked Setup generation', () => {
+  const source = readFileSync(new URL('./stadium_c1a_browser_test.mjs', import.meta.url), 'utf8');
+  const driverCall = source.match(/const driver = new helper\.StadiumSetupCfActionDriver\(\{([\s\S]*?)\n\s*\}\);/)?.[1];
+  assert.ok(driverCall, 'actual browser harness driver construction is present');
+  assert.match(driverCall, /requiredQueueObservation:\s*hostEvidence\.requiredQueueObservation/);
+  assert.match(driverCall,
+    /admittedWorldGeneration:\s*\(commonFieldsMode \|\| hostEvidence\.requiredQueueObservation\)\s*\?\s*admittedWorldGeneration\s*:\s*null/);
+  assert.match(source, /const admittedWorldGeneration = setupNative\.first_sss_vs_setup\.match_world_generation/);
 });
 
 

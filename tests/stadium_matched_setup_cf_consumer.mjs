@@ -821,14 +821,68 @@ export function createHostCallbacks({setupApproved, originalSnapshots, originalS
   };
 }
 
+const HSD_QUEUE_OBSERVATION_SCHEMA = 'melee-web-stadium-hsd-pad-queue-observation';
+const HSD_QUEUE_EXPECTED_PLAYERS = Object.freeze([
+  {player_index: 0, setup_port_1based: 1, source_slot_index: 0, controller_index: 0},
+  {player_index: 1, setup_port_1based: 2, source_slot_index: 1, controller_index: 1},
+]);
+function queueObservationPlayersMatch(players, expectedPlayers) {
+  if (!Array.isArray(players) || players.length !== expectedPlayers.length) return false;
+  return players.every((row, index) => {
+    const expected = expectedPlayers[index];
+    if (!row || typeof row !== 'object' || Array.isArray(row) ||
+        Object.keys(row).sort().join(',') !== Object.keys(expected).sort().join(',')) return false;
+    return row.player_index === expected.player_index &&
+      row.setup_port_1based === expected.setup_port_1based &&
+      row.source_slot_index === expected.source_slot_index &&
+      row.controller_index === expected.controller_index;
+  });
+}
+function validateRequiredQueueObservation(requirement, runtimePayload) {
+  exactKeys(requirement, ['bundle', 'expected_players', 'expected_queue_slot_status_hex',
+    'schema', 'source_sequence', 'source_tick', 'version'], 'required HSD queue observation');
+  if (requirement.schema !== HSD_QUEUE_OBSERVATION_SCHEMA || requirement.version !== 1 ||
+      requirement.bundle !== 0 || requirement.source_tick !== 0 ||
+      requirement.source_sequence !== 2504)
+    throw new TypeError('required HSD queue observation identity differs');
+  if (!Array.isArray(requirement.expected_queue_slot_status_hex) ||
+      requirement.expected_queue_slot_status_hex.length !== 4 ||
+      requirement.expected_queue_slot_status_hex.some(value =>
+        typeof value !== 'string' || !/^[0-9a-f]{22}$/.test(value)))
+    throw new TypeError('required HSD queue observation expected rows are malformed');
+  if (!queueObservationPlayersMatch(requirement.expected_players, HSD_QUEUE_EXPECTED_PLAYERS))
+    throw new TypeError('required HSD queue observation Setup-derived player map differs');
+  if (runtimePayload?.schedule?.[0]?.action !== 'tick' ||
+      runtimePayload.schedule[0].ordinal !== 0 || runtimePayload.schedule[0].bundle !== 0 ||
+      runtimePayload.bundles?.[0]?.bundle !== 0 ||
+      runtimePayload.bundles[0].ports.map(row => row.status_hex).join(',') !==
+        requirement.expected_queue_slot_status_hex.join(','))
+    throw new TypeError('required HSD queue observation does not bind runtime bundle zero literally');
+  return structuredClone(requirement);
+}
+function validateRequiredQueueSourceEvent(requirement, sourceEvents) {
+  const event = sourceEvents?.[0];
+  if (!Array.isArray(sourceEvents) || !event || event.ordinal !== 0 ||
+      event.consumed_pad?.sequence !== requirement.source_sequence ||
+      event.consumed_pad?.source_tick !== requirement.source_tick ||
+      event.consumed_pad?.draw_ordinal !== requirement.source_tick ||
+      event.consumed_pad?.event !== 'boundary')
+    throw new TypeError('required HSD queue observation does not bind same-v6 consumed sequence 2504');
+  return true;
+}
+
 export function hostEvidenceFromPacket(packet, {fullSchedule = false, commonFields = false,
   seedSidecar = null, seedIdentity = null} = {}) {
   if (typeof fullSchedule !== 'boolean' || typeof commonFields !== 'boolean')
     throw new TypeError('fullSchedule and commonFields must be boolean');
   if (commonFields && !fullSchedule)
     throw new TypeError('Per-tick common fields require the explicit full schedule');
-  if (packet?.schema === 'melee-web-stadium-source-action-replay-packet' && packet.version === 2)
+  if (packet?.schema === 'melee-web-stadium-source-action-replay-packet' && packet.version === 2) {
+    if (packet.host_only && typeof packet.host_only === 'object' &&
+        Object.hasOwn(packet.host_only, 'required_queue_observation'))
+      throw new TypeError('required HSD queue observation is unsupported for run2 action packets');
     return hostEvidenceFromRun2Packet(packet, {fullSchedule, commonFields, seedSidecar, seedIdentity});
+  }
   if (fullSchedule || commonFields) throw new TypeError('Full schedule requires original run2 packet');
   exactKeys(packet, ['schema', 'version', 'host_only', 'runtime_payload'], 'matched Setup packet');
   if (packet.schema !== 'melee-web-stadium-setup-cf-input-schedule' ||
@@ -865,8 +919,15 @@ export function hostEvidenceFromPacket(packet, {fullSchedule = false, commonFiel
       throw new TypeError(`original ${row.label} RNG observation is malformed`);
     if (row.label === 'C' || row.label === 'F') seeds[row.label] = row.seed_hex;
   }
+  const requiredQueueObservation = Object.hasOwn(packet.host_only, 'required_queue_observation')
+    ? validateRequiredQueueObservation(packet.host_only.required_queue_observation,
+        packet.runtime_payload)
+    : null;
+  if (requiredQueueObservation)
+    validateRequiredQueueSourceEvent(requiredQueueObservation,
+      packet.host_only.source_event_provenance?.events);
   return {runtimePayload: packet.runtime_payload, originalSnapshots: snapshots,
-    originalSeeds: seeds};
+    originalSeeds: seeds, requiredQueueObservation};
 }
 
 export function hostEvidenceFromRun2Packet(packet, {fullSchedule = false, commonFields = false,
@@ -937,7 +998,7 @@ function bundleBytes(bundle) {
 
 export class StadiumSetupCfActionDriver {
   constructor({runtimePayload, native, commonFields = false, commonRowsByAction = null,
-    admittedWorldGeneration = null}) {
+    admittedWorldGeneration = null, requiredQueueObservation = null}) {
     if (typeof commonFields !== 'boolean' || (commonFields &&
         runtimePayload?.schema !== 'melee-web-stadium-run2-full-schedule-v3'))
       throw new TypeError('Per-tick common fields require an explicit full-schedule manifest');
@@ -947,9 +1008,10 @@ export class StadiumSetupCfActionDriver {
       ? 'run2-proper-prefix-v2' : 'legacy-v1';
     this.commonFields = commonFields;
     this.commonRowsByAction = commonFields ? commonRowsByAction : null;
-    if (commonFields && (!Number.isSafeInteger(admittedWorldGeneration) || admittedWorldGeneration <= 0))
-      throw new TypeError('Per-tick common fields require the positive safe generation from checked Setup');
-    this.admittedWorldGeneration = commonFields ? admittedWorldGeneration : null;
+    const generationBound = commonFields || requiredQueueObservation !== null;
+    if (generationBound && (!Number.isSafeInteger(admittedWorldGeneration) || admittedWorldGeneration <= 0))
+      throw new TypeError('Per-tick common fields or queue observation require the positive safe generation from checked Setup');
+    this.admittedWorldGeneration = generationBound ? admittedWorldGeneration : null;
     if (commonFields && (!(commonRowsByAction instanceof Map) || commonRowsByAction.size !== 3501))
       throw new TypeError('Per-tick common source expectations must contain exactly3501 mapped rows');
     if (commonFields) {
@@ -977,6 +1039,8 @@ export class StadiumSetupCfActionDriver {
         : this.mode === 'run2-full-schedule-v3'
           ? encodeRun2FullNativeManifest(runtimePayload) : encodeRun2NativeManifest(runtimePayload);
     }
+    this.requiredQueueObservation = requiredQueueObservation === null ? null
+      : validateRequiredQueueObservation(requiredQueueObservation, this.payload);
     if (!native || typeof native.arm !== 'function' || typeof native.queue !== 'function' ||
         typeof native.approve !== 'function')
       throw new TypeError('bounded native arm/queue/approval API is required');
@@ -1059,7 +1123,7 @@ export class StadiumSetupCfActionDriver {
           result?.source_draws_before !== drawsBefore || result?.source_draws_after !== drawsAfter ||
           result?.world_ticks !== ticksAfter ||
           result?.source_tick_input_pad_hex !== consumed)
-        return this._fail('native v2 receipt counters or literal consumed PAD differ from the manifest');
+        return this._fail('native v2 receipt counters or scheduled raw-argument PAD differ from the manifest');
       const before = result.source_frames_before, after = result.source_frames_after;
       // Original fn_8016CD98 may keep the match clock still during a tick
       // (notably HUD0 Ready); draw/pending/ack intervals cannot advance it.
@@ -1078,6 +1142,24 @@ export class StadiumSetupCfActionDriver {
     const fIndex = this.mode === 'legacy-v1' ? 170 : this.payload.checkpoints.f_action_index;
     const isBoundary = action.action === 'tick' && (this.cursor === cIndex || this.cursor === fIndex);
     let refusal = null;
+    if (this.requiredQueueObservation && action.action === 'tick' &&
+        action.bundle === this.requiredQueueObservation.bundle) {
+      const queue = result.pad_hsd_queue_observation;
+      const expectedPlayers = this.requiredQueueObservation.expected_players;
+      if (queue?.schema !== HSD_QUEUE_OBSERVATION_SCHEMA || queue.version !== 1 ||
+          result.world_generation !== this.admittedWorldGeneration ||
+          queue.source_generation !== this.admittedWorldGeneration ||
+          queue.source_tick_before !== this.requiredQueueObservation.source_tick ||
+          queue.source_tick_after !== this.requiredQueueObservation.source_tick + 1 ||
+          queue.qnum_before !== 1 || queue.qread_before !== 0 || queue.qcount_before !== 1 ||
+          queue.qcount_after_hsd !== 0 || queue.player_count !== expectedPlayers.length ||
+          queue.tick_complete !== true ||
+          !queueObservationPlayersMatch(queue.players, expectedPlayers) ||
+          !Array.isArray(queue.queue_slot_status_hex) || queue.queue_slot_status_hex.length !== 4 ||
+          queue.queue_slot_status_hex.some((status, index) =>
+            status !== this.requiredQueueObservation.expected_queue_slot_status_hex[index]))
+        refusal = 'HSD queue-slot observation, Setup map, world generation, or completed tick differs';
+    }
     if (isBoundary) {
       const expectedLabel = this.cursor === cIndex ? 'C' : 'F';
       if (this.mode !== 'legacy-v1' &&

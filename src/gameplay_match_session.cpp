@@ -629,6 +629,11 @@ MeleeWebAudio* GameplayMatchSession::audio()const{return storage_&&storage_->ban
 bool GameplayMatchSession::advance_construction(){return storage_&&storage_->advance_construction();}
 bool GameplayMatchSession::construction_complete()const{return storage_&&storage_->construction_phase==5;}
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+bool GameplayMatchSession::diagnostic_stadium_pad_queue_observation(
+    MeleeWebStadiumPadQueueObservation* out,char* error,size_t size)const{
+    return storage_&&construction_complete()&&storage_->match&&
+        melee_web_match_stadium_pad_queue_observation(storage_->match,out,error,size);
+}
 bool GameplayMatchSession::diagnostic_toy_owner_preflight()const{
     return storage_&&storage_->world&&storage_->world->diagnostic_toy_owner_preflight();
 }

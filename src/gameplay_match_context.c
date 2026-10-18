@@ -58,6 +58,8 @@ struct MeleeWebMatchContext {
     CmSubject* pool;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     MeleeWebSourceMemoryAllocation camera_lease;
+    MeleeWebStadiumPadQueueObservation pad_queue_observation;
+    int pad_queue_observation_candidate, pad_queue_observation_complete;
 #endif
     uint8_t start_published[MELEE_WEB_MATCH_MAX_PLAYERS];
     int crowd_started,input_restored;
@@ -91,6 +93,26 @@ int melee_web_match_rng_seed_owner_read(uint32_t* seed)
     if(!seed||!owned(owner,error,sizeof(error)))return 0;
     *seed=owner->seed;
     return 1;
+}
+int melee_web_match_stadium_pad_queue_observation(
+    MeleeWebMatchContext* h,MeleeWebStadiumPadQueueObservation* out,char* e,size_t n)
+{
+    if(!out)return fail(e,n,"Stadium PAD queue observation output is required");
+    if(!owned(h,e,n))return 0;
+    if(!h->pad_queue_observation_complete||
+       h->pad_queue_observation.source_generation!=h->generation||
+       h->pad_queue_observation.source_tick_after!=h->ticks||
+       h->pad_queue_observation.source_tick_after!=
+           h->pad_queue_observation.source_tick_before+1||
+       h->pad_queue_observation.qnum_before!=1||
+       h->pad_queue_observation.qread_before!=0||
+       h->pad_queue_observation.qcount_before!=1||
+       h->pad_queue_observation.qcount_after_hsd!=0||
+       !h->pad_queue_observation.player_count||
+       h->pad_queue_observation.player_count>MELEE_WEB_MATCH_MAX_PLAYERS)
+        return fail(e,n,"Stadium PAD queue observation is stale or incomplete");
+    *out=h->pad_queue_observation;
+    return ok(e,n);
 }
 static int camera_index(MeleeWebMatchContext* h,const CmSubject* p)
 {
@@ -336,6 +358,9 @@ int melee_web_match_step_raw_phased(MeleeWebMatchContext* h,const PADStatus raw[
     MeleeWebMatchTickPhase renew,MeleeWebMatchTickPhase before,
     MeleeWebMatchTickPhase after,void* context,char* e,size_t n)
 {
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(h&&h==owner){h->pad_queue_observation_candidate=0;h->pad_queue_observation_complete=0;}
+#endif
     if(!live(h,e,n))return 0;
     if(!raw)return fail(e,n,"Four raw controller samples are required");
     if(HSD_PadLibData.queue!=&h->input_queue||HSD_PadLibData.qnum!=1||HSD_PadLibData.qcount)
@@ -349,7 +374,30 @@ int melee_web_match_step_raw_phased(MeleeWebMatchContext* h,const PADStatus raw[
     /* Raw replay samples replace PADRead, not the source rumble interpreter
      * that precedes it in HSD_PadRenewRawStatus. One sample is supplied per tick. */
     HSD_PadRumbleInterpret();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    memset(&h->pad_queue_observation,0,sizeof(h->pad_queue_observation));
+    h->pad_queue_observation.source_generation=h->generation;
+    h->pad_queue_observation.source_tick_before=h->ticks;
+    h->pad_queue_observation.qnum_before=HSD_PadLibData.qnum;
+    h->pad_queue_observation.qread_before=HSD_PadLibData.qread;
+    h->pad_queue_observation.qcount_before=HSD_PadLibData.qcount;
+    h->pad_queue_observation.player_count=h->player_count;
+    for(uint32_t i=0;i<h->player_count&&i<MELEE_WEB_MATCH_MAX_PLAYERS;i++){
+        h->pad_queue_observation.slots[i]=h->slots[i];
+        h->pad_queue_observation.controllers[i]=h->controllers[i];
+    }
+    if(HSD_PadLibData.queue==&h->input_queue&&HSD_PadLibData.qnum==1&&
+       HSD_PadLibData.qread==0&&HSD_PadLibData.qcount==1){
+        memcpy(h->pad_queue_observation.queue_slots,h->input_queue.stat,
+               sizeof(h->pad_queue_observation.queue_slots));
+        h->pad_queue_observation_candidate=1;
+    }
+#endif
     HSD_PadRenewMasterStatus();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    h->pad_queue_observation.qcount_after_hsd=HSD_PadLibData.qcount;
+    if(h->pad_queue_observation.qcount_after_hsd!=0)h->pad_queue_observation_candidate=0;
+#endif
     if(renew){if(!renew(context,e,n))return 0;}
     else{HSD_PadRenewCopyStatus();HSD_PadRenewGameStatus();}
     if(HSD_PadLibData.qcount)return fail(e,n,"Original controller processing did not consume raw sample");
@@ -357,6 +405,14 @@ int melee_web_match_step_raw_phased(MeleeWebMatchContext* h,const PADStatus raw[
     if(!melee_web_gameplay_step(e,n))return 0;
     h->ticks++;
     if(after&&!after(context,e,n))return 0;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(h==owner&&h->pad_queue_observation_candidate&&h->generation==melee_web_gameplay_generation()&&
+       h->pad_queue_observation.source_generation==h->generation&&
+       h->ticks==h->pad_queue_observation.source_tick_before+1){
+        h->pad_queue_observation.source_tick_after=h->ticks;
+        h->pad_queue_observation_complete=1;
+    }
+#endif
     return ok(e,n);
 }
 int melee_web_match_step_inputs(MeleeWebMatchContext* h,const MeleeWebControllerSample samples[4],char* e,size_t n)
