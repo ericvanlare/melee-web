@@ -2,6 +2,15 @@
 
 **Compiled / Synthetic controls / Source identified / Native traced / Retail compared (first-CSS, SSS constructor, first scheduler and first draw fields, plus declared matched-Setup C/F fields) / Browser exercised (bounded SSS prefix, VS Entry, first SSS draw and Setup/C/F with checked unload) / two same-process functional lifetimes passed**
 
+**Current boundary (October 18):** The fresh original GO+2 recording is retained,
+but the first browser comparison against it failed at C, before F or GO+2.
+The countdown and seed differ; the other 14 declared fields match. The browser
+still starts from the older checked Setup context, so fresh-producer start
+identity must be resolved before attributing the mismatch to simulation.
+The [structured receipt](../evidence/issue251-stadium-profile-oninit-v1.json),
+under `fresh_go2_comparison_2026_10_18`, records the failure, passing component
+validation and cleanup. C3 and public Stadium admission remain open.
+
 **Original constructor prerequisite:** A separately built original observer on `1f5994a8` (`f4c74cbe` binary) replayed the complete retained input and observed the map2 constructor owner, authored parameters and dynamic RNG pointer. The strict sequence-mapped comparator preserved every common wire field while admitting only the fully validated constructor rows. Both streams completed and owned processes retired. Exact original observations and identities are in the [existing evidence receipt](../evidence/issue251-stadium-profile-oninit-v1.json), under `original_constructor_recorded_replay_1f5994_v1`. This establishes an original constructor observation, not constructor parity, registration/generation or a lifetime. The separate first fresh original attempt failed; its repaired reader and fresh reference are recorded below. The prior constructor pass remains unchanged.
 
 **Fresh original reference attempt:** Source `3d4ee3d3` built a separate original observer (`c0c51f4f` binary), then one fresh recording stopped on `idle3500 boundary nested in source draw`. Production replay locates the first refusal at PadPoll row 13,356 between DrawEnter and DrawReturn; the validated partial interval ends at relative ordinal 2,070. The writer is interrupted, incomplete and noninvalid; the new input recording is incomplete. Owned native, collector and supervisor processes retired and the logger drained. Independent review confirms the same first reader refusal and the DrawEnter/PadPoll/DrawReturn interleave; the reader rejects a PadPoll admitted by the producer inventory. Broader original callback, interrupt and lifecycle semantics remain unproved. Exact raw, producer, review and cleanup bindings are in `original_idle3500_fresh_recording_3d4ee3d_v1` in the [existing receipt](../evidence/issue251-stadium-profile-oninit-v1.json). That historical reference remains incomplete. The reviewed reduction and separate fresh result below do not relabel it as passing. Native parity and C3 remain incomplete.
@@ -1661,3 +1670,50 @@ clause. The same input bytes, source schedule, RNG and strict C/F expectations
 were preserved; this is not a full idle lifetime, per-owner RNG, recreation,
 pixel/audio/timing or C3 acceptance result. Exact new identities are under
 `same_v6_queue_cf_v2_browser_pass` in the existing evidence receipt.
+
+
+## Fresh GO+2 reference and first comparison (October 18)
+
+The new original observer binary `4bebd3a2` records a complete, separately
+identified short prefix. Its strict raw replay observes actual GO at source
+tick/draw 84, C at 84, F at 85 and GO+2 at 86. All 87 literal four-port bundles
+and the 174 tick/draw actions are retained, including the terminal after draw
+86. The observer and input streams complete and the two owned processes are
+absent. This is original-reference evidence; its setup-profile equivalence to
+the browser remains unproved.
+
+A reviewed optional consumer compares the new declared GO+2 snapshot and seed
+without changing source tick/draw/input/RNG order or the existing v1/full-schedule
+paths. Six Python and 29 JavaScript focused controls pass. Runtime producer
+`6f255ab0` passes both diagnostic and ordinary Release builds. The final full
+regression on harness/test source `7ea39d49` passes 2,720 tests, with 189 skips,
+in 566.691 seconds. Earlier regression failures remain retained: generated
+fixture membership, intentional TCP close handling and a missing extracted
+full-schedule fixture binding. Their reduced, independently reviewed test
+repairs do not relax production checks. The second failed suite has only a
+partial captured log; the final passing suite has a complete retained log.
+
+The one released browser comparison stops at C/action 168. Original countdown
+3,665 differs from browser 3,628; original seed `bc2cb82f` differs from browser
+`868d77be`. The other 14 declared fields match. Actual consumed bundle 84 is
+identical to the scheduled four-port row and the tick dequeues it. F and GO+2
+are unobserved in this attempt. The comparator refuses the difference and no
+retry is released.
+
+The browser's earlier Setup gate passed against the retained older Setup
+expectation (`423b73c4`, seed `35a455b9`). The new C/GO+2 expectation comes from
+a different fresh producer. No same-producer fresh start comparison establishes
+that the two executions began with equivalent context, so the first measured
+C mismatch does not locate a simulation defect. The next bounded work is an
+offline comparison of those actual start contexts and their constructor/RNG
+provenance, followed by independent review before another capture.
+
+The supervised attempt took 15.248 seconds (15.317 seconds including the root
+launcher). Checked native retirement and observation clearing passed, with
+zero cleanup failures. The supervisor's process attribution and a separate
+root scan confirm all 13 recorded owned PIDs absent. All 44 local/HTTP artifacts
+matched before the run; the failure prevented the HTTP-after and explicit GPU
+checks, which remain unverified. The retained screenshot shows the Ready phase
+on Stadium; it is not a pixel comparison. All 29 retained packet/result file
+pins match; failed scratch is preserved. This remains a failed scoped comparison,
+not GO+2 browser agreement, lifetime parity, per-owner RNG, C3 or acceptance.

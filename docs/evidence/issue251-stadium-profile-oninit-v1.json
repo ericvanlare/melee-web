@@ -17286,5 +17286,115 @@
         }
       }
     }
+  },
+  "fresh_go2_comparison_2026_10_18": {
+    "state": "ORIGINAL_GO2_REFERENCE_PASS_BROWSER_FIRST_C_COMPARISON_FAIL",
+    "next": "Offline fresh-versus-retained Entry/Setup and constructor/RNG context reduction, independently reviewed before any new capture. No retry or long lifetime released.",
+    "native": {
+      "binary_sha256": "4bebd3a21cf48da558c7380f45b73e394fe46f47cef774d939cd4659051918fa",
+      "producer_manifest_sha256": "2da988e27c334b4530935ea32af3edc319707482e276b064e9b08c132d4cedbd",
+      "packet_sha256": "c63be2e195346f7fb4db40901b9cca8602b25e183e3bae017e528a7fe899f9be",
+      "report_sha256": "bcb4598604e7b31471aa38f06677fdde3d64acdc7b2596e39031caeb6e151535",
+      "raw_observer_sha256": "4fd54b4aa9537292295ad83fbb75655f8213a475a876fdd1468affb68d3d211f",
+      "raw_input_sha256": "0b64823a3ff888f735fbb9c1137ada562ee32bc916cc3f756640311bd057bf9b",
+      "strict_replay_sha256": "7f3cdd54d0ba327606ceb6bd66df0a634fbe5f8cdf8985f64971966232ac754b",
+      "bundles": 87,
+      "actions": 174,
+      "source_tick_draw_ordinals": {
+        "GO": 84,
+        "C": 84,
+        "F": 85,
+        "GO2": 86
+      },
+      "setup_profile_equivalence_proven": false
+    },
+    "implementation": {
+      "runtime_source": "6f255ab07f165fcda38f2701f00f9b0eb8c6c12f",
+      "harness_test_source": "7ea39d493494a7c008ed4c2be1d1db808693e41a",
+      "candidate_review_sha256": "8db3fe7f26d6ccf3c547e6127d0120cb26d79f964eab0f6349887400fccbc633",
+      "python_controls": 6,
+      "javascript_controls": 29,
+      "builds": "diagnostic and ordinary Release PASS",
+      "build_receipt_sha256": "ad82e2119fc6ed6de1c45b3fab7f25780dd18ed13f26cdcc8113d89502746842",
+      "regression": {
+        "tests": 2720,
+        "skips": 189,
+        "seconds": 566.691,
+        "result_sha256": "a51aca8ebfda8611ba87b720a6200f186f99195a07917df312e33ed923530896",
+        "complete_log_sha256": "3830b777da7e9819df53a6817737940460a146528383d4334d7ab76fc8dc2348",
+        "retention_sha256": "6327442a7b85abf7ee4004d06e9a41729c2959385d5b535f27d8785caea67843"
+      },
+      "failed_regressions": [
+        {
+          "source": "318b9dab",
+          "tests": 2718,
+          "skips": 189,
+          "failures": 2,
+          "log_sha256": "74bcb93f8b8327640ce9714e8795d72be8a2169e77f5344e3d25a28be1a9cfb1",
+          "repair": "b7818774",
+          "review_sha256": "9b2bef886c5ec2f06ec5501eef60af1cce502ae7dea3363786dab19b9c4e8453"
+        },
+        {
+          "source": "6f255ab0",
+          "tests": 2720,
+          "skips": 189,
+          "failures": 1,
+          "complete_log_retained": false,
+          "receipt_sha256": "6502bd670d0f20deb58c094b959baaade54dbf96e8cf33862fb51229e7373afe",
+          "repair": "7ea39d49",
+          "review_sha256": "b3a397b71034b146c0253294cdd2bfa6745e1e2dcc5987acc042a2a440c8aef6"
+        }
+      ]
+    },
+    "browser": {
+      "packet_freeze_sha256": "0532232a006f7df5d80f6b4782f1bd60f91739aeb220abaad84951c5e03ae2f0",
+      "packet_review_sha256": "0414ce602572b777ed6fb7a6b6d4ca025901a153cdbaa950b4e503e079def509",
+      "release_sha256": "ef0cd2b1e3ef28bd8e44c8ba3adea4b7079405e3b81faa7a0049857373c6416f",
+      "report_sha256": "06dd3cb8c064269f812e9f9cc9cf9df0c47a13dc446ae5fd4dbef6e1a685376c",
+      "owner_sha256": "007f81f1581816f47333387402cf4e0c214c25317160bb5f0647b8098036f742",
+      "retention_sha256": "87ee63def7017447466704b8431935a4566b7365f1573b52177023d3970f8ac2",
+      "root_process_supplement_sha256": "f12e88b5d69f5e3335446cba32ef177b551ffb255c42a9b187f52d09c707091e",
+      "result": "fail",
+      "first_failed_action": 168,
+      "checkpoint": "C",
+      "differences": [
+        {
+          "path": "map2.countdown_s32",
+          "expected": 3665,
+          "actual": 3628
+        },
+        {
+          "path": "seed.raw32",
+          "expected": "bc2cb82f",
+          "actual": "868d77be"
+        }
+      ],
+      "other_declared_fields_equal": 14,
+      "F_reached": false,
+      "GO2_reached": false,
+      "actual_bundle84_matches": true,
+      "starting_setup_expectation_sha256": "423b73c4923aed243df71a9dc9ad39cd427d9b6a0bed9c9a4426b4abd03fe5e8",
+      "starting_setup_seed": "35a455b9",
+      "fresh_same_producer_start_compared": false,
+      "supervisor_seconds": 15.248,
+      "root_seconds": 15.317155166063458,
+      "unload_completed": true,
+      "observation_cleared": true,
+      "cleanup_failures": 0,
+      "owned_pids_absent": 13,
+      "before_http_artifacts": 44,
+      "http_after_verified": false,
+      "explicit_gpu_probe_pass": false,
+      "retained_files": 29,
+      "independent_result_review_sha256": "a4e795a84e3111eae70610366abce07f0eb8ea6bc50fdf22ca7a5166fe2fbe5f"
+    },
+    "exclusions": [
+      "GO2 browser parity",
+      "same-start equivalence",
+      "full idle lifetime",
+      "per-owner RNG",
+      "C3",
+      "pixels/PCM/live timing/human acceptance"
+    ]
   }
 }
