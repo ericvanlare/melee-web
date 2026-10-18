@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
+#include <math.h>
+
 #include "slippi_profile/dynamics_fix.h"
 #include "slippi_profile/deadupfall_fix.h"
 #include "slippi_profile/offscreen_damage.h"
@@ -7,7 +9,6 @@
 #include <melee/ft/kinds/ftCommon/types.h>
 
 #include <assert.h>
-#include <math.h>
 #include <stddef.h>
 #include <string.h>
 

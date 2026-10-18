@@ -1935,7 +1935,19 @@
       },
       "source_and_runtime_equality": "17 changed non-root-doc files and 13 runtime/build artifacts unchanged across build/regression; retained v1 bytes verified before overwrite",
       "browser_capture": "not run for v2; reduced source controls are scoped separately",
-      "ci": "pending exact PR head"
+      "ci": "Initial PR330 head8ddb68e2 failed Linux fixture compilation; reviewed header-order repair requires new exact-head CI.",
+      "test_portability_repair": {
+        "initial_ci_run": 39108303631,
+        "failed_head": "8ddb68e2966176553bce299af841844de6bbc2c4",
+        "failed_job_log": "pr330-unit1-job.log",
+        "failed_job_log_sha256": "df5e11ff13d12fca8c3a764cc567d8893878853f001c04d9478c6ad61d40b30b",
+        "receipt": "pr330-linux-fixture-repair-v1/review-receipt.json",
+        "receipt_sha256": "0796dd181cc82315b654877ea1017aa04b692bb0a4bcbc91fb6f8f8898db3827",
+        "patch_sha256": "2a64d9e058906e98867acfab1b89b37e35fefbaa87318e5077648a140738318d",
+        "scope": "Two native test translation units include libc math.h before upstream placeholder macros; no runtime arithmetic, assertions, compiler warning flags or production source change. Two affected controls pass on Darwin; Linux CI remains required.",
+        "independent_review": "pr330-linux-fixture-repair-v1/independent-review-v1.json",
+        "independent_review_sha256": "7fa56aaae6fe3fb46690cc8c3624a9fbecd48ccc72cb401daee4e34fcff42b49"
+      }
     }
   }
 }

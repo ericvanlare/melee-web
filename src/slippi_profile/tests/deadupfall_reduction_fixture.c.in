@@ -4,12 +4,13 @@
  * the actual pinned declaration from ft/forward.h and baselib/gobj.h. Service
  * implementations are synthetic bounded observers; unexpected render calls
  * abort. */
+#include <math.h>
+
 #include <slippi_profile/deadupfall_fix.h>
 #include <slippi_profile/profile.h>
 #include <melee/ft/kinds/ftCommon/types.h>
 
 #include <assert.h>
-#include <math.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>

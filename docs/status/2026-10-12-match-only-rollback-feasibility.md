@@ -307,6 +307,12 @@ specific invariant. The focused cohort passes 13 Python and nine nested Node
 controls. Both the opt-in profile and ordinary Release builds pass. The full
 regression passes 2,415 tests with 166 skips; exact-head CI and integration remain
 pending. Source and runtime identities are preserved in the validation freeze.
+The first PR #330 CI run exposed a Linux-only compilation failure in two native
+test fixtures: the upstream `__fabs` macro was active before glibc declared its
+math functions. Moving `<math.h>` before upstream headers fixes the include
+boundary without changing arithmetic, controls or warning flags. Both affected
+controls pass locally; the repaired head still requires complete CI. The failed
+job log and its test report are retained.
 
 Review also caught an incorrect extra X-velocity update despite an earlier green
 fixture. Retained retail instructions show that the reference hook replaces the
