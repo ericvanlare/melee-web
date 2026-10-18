@@ -77,7 +77,9 @@ class ReferenceEntityProfileTests(unittest.TestCase):
         input_methods = input_source[input_start:input_source.index('void InputStream::Record', input_start)]
         stadium_owner_fields = '\n'.join(
             source[source.index(marker):source.index(';', source.index(marker)) + 1]
-            for marker in ('  bool stadium_idle_3500 = false;', '  bool stadium_constructor_enabled = false;'))
+            for marker in ('  bool stadium_idle_3500 = false;',
+                           '  bool stadium_constructor_enabled = false;',
+                           '  bool stadium_go_ordinal2 = false;'))
         gate = source[source.index('    whole_session_matches = WholeSessionMatchCount();'):
                       source.index('    capture_id = Env("MWRC_CAPTURE_ID");')]
         stadium_receipt_start = source.index('constexpr char STADIUM_SETUP_RECEIPT_SHA256[]')

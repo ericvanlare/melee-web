@@ -270,8 +270,13 @@ function attachLockstep(pair, sourceTicks, {disconnects, frames, sent, received,
 test('room adapter reports a close-handshake timeout instead of claiming closure', async () => {
   const server = createServer();
   const sockets = [];
+  const socketClosures = [];
+  const fixtureErrors = [];
+  let tearingDown = false;
   const ready = Buffer.from(JSON.stringify({relay: 1, event: 'ready'}));
   server.on('upgrade', (request, socket) => {
+    socketClosures.push(new Promise(resolve => socket.once('close', resolve)));
+    socket.on('error', error => fixtureErrors.push({error, tearingDown}));
     const accept = createHash('sha1')
       .update(`${request.headers['sec-websocket-key']}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`)
       .digest('base64');
@@ -293,11 +298,17 @@ test('room adapter reports a close-handshake timeout instead of claiming closure
     await assert.rejects(pair.close(), error => error instanceof AggregateError &&
       error.errors.some(row => /did not close within 100 ms/.test(String(row?.message || row))));
   } finally {
+    tearingDown = true;
     for (const socket of sockets) socket.destroy();
+    await Promise.all(socketClosures);
     const deadline = Date.now() + 1000;
     while (pair && (!pair.alpha.closed || !pair.beta.closed) && Date.now() < deadline) await wait(5);
     await new Promise(resolve => server.close(resolve));
   }
+  // Destroying this deliberately nonresponsive server can reset a connection
+  // with unread Close bytes. Earlier resets and other errors still fail.
+  assert.deepEqual(fixtureErrors.filter(({error, tearingDown}) =>
+    !tearingDown || error.code !== 'ECONNRESET'), []);
   assert(pair.alpha.closed && pair.beta.closed, 'owned client sockets closed after the deliberately failed close gate');
 });
 
