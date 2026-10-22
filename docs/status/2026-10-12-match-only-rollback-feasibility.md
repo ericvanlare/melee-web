@@ -42,7 +42,9 @@ after it, and after the actual draw and Aurora completion. Independent review
 caught and corrected a decoder that incorrectly assumed audio and effects used
 the same lifetime counter. Positive controls now use different counters and
 negative controls detect a changed effects lifetime. Earlier fixture/export and
-cross-realm assertion failures remain retained.
+cross-realm assertion failures remain retained. The preserved source review has a
+transcription-only hash correction addendum; all ten committed source blobs were
+rehashed, and the corrected pin matches the original application and capture.
 
 In this capture the source step changes 100,211 byte values: 15,806 are attributed
 to audio owners, 2,939 to diagnostic PCM output, 19,299 to the gameplay arena,

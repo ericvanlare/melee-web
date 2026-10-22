@@ -25,7 +25,9 @@ three boundaries. Every range remains unadmitted. Its exact runtime, manifest,
 map, inputs, raw result and process cleanup are retained separately from the
 previous census. Do not repeat either successful capture without a new hypothesis.
 The private and ordinary Release builds pass; the extension's full regression
-passes in `full-regression-v3.log`.
+passes in `full-regression-v3.log`. The source-review hash correction is retained
+in `audio-range-adapter-source-review-v2-pin-correction-v1.json`; it changes no
+source or result, and the original review remains untouched.
 
 Next: implement the bounded one-row match-context range read specified in
 `dynamic-owner-bounded-design-v1.json`. Source proves that this owner changes

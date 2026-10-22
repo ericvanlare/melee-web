@@ -2726,7 +2726,12 @@
       },
       "source_review": {
         "retained_artifact": "audio-range-adapter-source-review-v2.json",
-        "sha256": "c97656234bfec989188099d714707d1615120c18d39c0f41d47b43ab468fc7cf"
+        "sha256": "c97656234bfec989188099d714707d1615120c18d39c0f41d47b43ab468fc7cf",
+        "pin_correction_addendum": {
+          "retained_artifact": "audio-range-adapter-source-review-v2-pin-correction-v1.json",
+          "sha256": "f6462d874d95b4a27a56c14eb50f3eeece38a9026364cf07240a2f42bb58b981",
+          "scope": "Transcription-only: the original review remains preserved. All ten committed source blobs rehashed; corrected gameplay_audio_fx.c pin matches original application and v3 preflight/raw capture. No new execution or restore claim."
+        }
       },
       "prior_blocker_review": {
         "retained_artifact": "audio-range-adapter-source-review-v1.json",
