@@ -561,9 +561,11 @@ window.meleeStadiumFirstCssFreshFiniteStage=async stage=>{
      boundary!==lease.boundary||check!==lease.check)
    throw Error('Fresh finite CSS queued owner changed.');
   const state=lease.handle.getState();
-  if(state.state!=='css'||state.busy||state.loading||state.requiresReload||
-     state.phase!==1||state.running!==(stage==='first'))
-   throw Error('Fresh finite CSS stage requires its exact idle CSS owner.');
+  const first=stage==='first';
+  if(state.scene!=='css'||state.state!==(first?'css':'paused')||
+     state.paused!==!first||state.busy||state.loading||state.requiresReload||
+     state.phase!==1||state.running!==first)
+   throw Error('Fresh finite CSS stage requires its exact CSS owner state.');
   const pointer=Module._melee_web_native_menu_stadium_first_css_draw_observe?.();
   const observed=pointer?JSON.parse(Module.UTF8ToString(pointer)):null;
   if(observed?.schema!=='melee-web-stadium-first-css-finite-observation-v4'||

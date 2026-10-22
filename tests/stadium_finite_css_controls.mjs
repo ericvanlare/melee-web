@@ -137,16 +137,29 @@ const run=new Function('assert','helperSource','options','input',`return(async()
       'on_frame_start','on_frame_end','on_match_end','x54_pointer','x58_pointer'])observed.entry.css.vs.start.rules[key]='null';}
    return 1;}};
  let Module=initialModule;
- let owner={handle:{getState(){assert(inside);return {state:phase?'css':'prepared',busy:false,loading:false,
-  requiresReload:false,ready:true,canStart:!phase,phase,running};}}};
+ let busyName='',loadingState=null,preparationLabel='',stateFault=null;const ownerStates=[];
+ const ownerSnapshot=()=>{
+  const scene=phase===1?'css':phase===3?'sss':'idle',active=['css','sss'].includes(scene);
+  const paused=active&&!running&&!preparationLabel&&!busyName;
+  const state=busyName||(preparationLabel?'preparing':paused?'paused':active?scene:phase===0?'prepared':'idle');
+  const normal={state,scene,phase,running,paused,busy:!!busyName,loading:loadingState,
+   requiresReload:false,ready:true,canStart:!active&&!busyName};
+  const value=stateFault?{...normal,...stateFault}:normal;ownerStates.push(value);return value;
+ };
+ let owner={handle:{getState(){assert(inside);return ownerSnapshot();}}};
  const originalOwner=owner;
  let boundary=fn=>new Promise((resolve,reject)=>queue.push({fn,resolve,reject}));
  const check=result=>{assert.equal(result,1);return result;};
  const resetTiming=()=>events.push('reset'),syncAudio=()=>{};let inputDirty=false;const $=()=>({focus(){}});
- const mutate=kind=>{if(kind==='owner')owner={handle:owner.handle};else if(kind==='module')Module={...Module};
+ const mutate=kind=>{if(kind==='owner')owner={handle:owner.handle};else if(kind==='owner-handle')owner.handle={getState:()=>ownerSnapshot()};
+  else if(kind==='module')Module={...Module};
   else if(kind==='generation')observed.armed_world_generation++;
   else if(kind==='unload'){phase=0;running=false;observed.state='idle';}
-  else if(kind==='busy')owner.handle={getState:()=>({state:'css',busy:true,phase:1,running:false})};
+  else if(kind==='busy')busyName='another-operation';
+  else if(kind==='loading')loadingState={phase:'native'};
+  else if(kind==='preparing')preparationLabel='Preparing original scene';
+  else if(kind==='paused-non-css'){phase=3;running=false;observed.native_phase=3;}
+  else if(kind==='paused-css-not-paused')stateFault={state:'paused',scene:'css',phase:1,running:false,paused:false};
   else if(kind==='failed')observed.error='failed';};
  const prepareAudio=async()=>{events.push('audio');if(options.audioMutation)mutate(options.audioMutation);};
  const pauseAudioForPreparation=async()=>events.push('pause'),waitForAudioRender=async()=>events.push('render');
@@ -181,7 +194,7 @@ const run=new Function('assert','helperSource','options','input',`return(async()
    globalThis.meleeStadiumFirstCssFreshFiniteLaunch=window.meleeStadiumFirstCssFreshFiniteLaunch;
    globalThis.meleeStadiumFirstCssFreshFiniteStage=window.meleeStadiumFirstCssFreshFiniteStage;
    await flush((async()=>{${driverPrefix}})());
-   return {events,sourceCalls,error:null};
+   return {events,sourceCalls,error:null,ownerStates};
   }
   await flush(window.meleeStadiumFirstCssFreshFiniteLaunch(17));
   for(const stage of ['first','stream_arm','stream_kick','final_arm','final_kick']){
@@ -191,12 +204,17 @@ const run=new Function('assert','helperSource','options','input',`return(async()
   }
   await assert.rejects(window.meleeStadiumFirstCssFreshFiniteStage('first'),/already attempted/);
   await assert.rejects(flush(window.meleeStadiumFirstCssFreshRowKick()),/Fresh CSS row/);
-  return {events,sourceCalls,error:null};
- }catch(error){return {events,sourceCalls,error:error.message};}
+  return {events,sourceCalls,error:null,ownerStates};
+ }catch(error){return {events,sourceCalls,error:error.message,ownerStates};}
  finally{for(const key of ['Module','meleeStadiumFirstCssFreshFiniteLaunch','meleeStadiumFirstCssFreshFiniteStage'])delete globalThis[key];}
 })()`);
 const baseline=await run(assert,helperSource,{},input);assert.equal(baseline.error,null,JSON.stringify(baseline));
 assert.deepEqual(baseline.events,['reset','audio','pause','render','launch','first','stream_arm','stream_kick','final_arm','final_kick']);
+assert.deepEqual(baseline.ownerStates[2],{state:'css',scene:'css',phase:1,running:true,paused:false,busy:false,loading:null,
+ requiresReload:false,ready:true,canStart:false},'First stage must retain the running CSS owner.');
+for(const value of baseline.ownerStates.slice(3,7))assert.deepEqual(value,
+ {state:'paused',scene:'css',phase:1,running:false,paused:true,busy:false,loading:null,
+  requiresReload:false,ready:true,canStart:false},'Post-first stages must retain the paused CSS owner.');
 const actualPrefix=await run(assert,helperSource,{useDriverPrefix:true},input);
 assert.equal(actualPrefix.error,null,JSON.stringify(actualPrefix));
 assert(actualPrefix.events.includes('launch')&&actualPrefix.events.includes('first'));
@@ -210,7 +228,12 @@ for(const beforeStage of ['first','stream_arm','stream_kick','final_arm','final_
 for(const audioMutation of ['owner','module','generation','unload','busy','failed']){
  const result=await run(assert,helperSource,{audioMutation},input);assert(result.error);assert.equal(result.events.includes('launch'),false);queuedCases++;
 }
+let stateRefusals=0;
+for(const mutation of ['paused-non-css','paused-css-not-paused','busy','loading','preparing','owner-handle']){
+ const result=await run(assert,helperSource,{beforeStage:'stream_arm',mutation},input);
+ assert(result.error,JSON.stringify({mutation,result}));assert.equal(result.events.includes('stream_arm'),false,mutation);stateRefusals++;
+}
 assert.equal(JSON.stringify(wanted),oracle,'comparator mutated reviewed expected oracle');
 console.log(JSON.stringify({schema:'stadium-fresh-finite-css-js-controls-v1',result:'PASS',receiptRefusals,
- comparatorRefusals,queuedCases,fixtureKind,actualLiteralRows:desc.row_count,expectedStateExcludedFromNative:true,
+ comparatorRefusals,queuedCases,stateRefusals,fixtureKind,actualLiteralRows:desc.row_count,expectedStateExcludedFromNative:true,
  scope:'Actual extracted loader and queued helper plus real comparator module over explicitly labeled fixture expectations; explicit native/owner/audio/queue doubles, no game/browser/native source.'}));
