@@ -18406,13 +18406,98 @@
           },
           "scope": "Applied reviewed FC4 plus test-only portable fixtures; no browser capture"
         },
-        "capture": "UNRUN",
+        "capture": {
+          "result": "FAIL_BEFORE_DISC_IMPORT",
+          "source_revision": "a1bcad29f74dc4e6256bd3cb38371f6e7230441b",
+          "report": {
+            "evidence": "validation-v1/first-css-finite-candidate-v4/capture-v1/browser-run/report.json",
+            "bytes": 30611,
+            "sha256": "6f11ef73603e9604d6bd96ced0bcde5aa839ca294010e75954fd44b7c0bfbaea"
+          },
+          "owner": {
+            "evidence": "validation-v1/first-css-finite-candidate-v4/capture-v1/owner.json",
+            "bytes": 103772,
+            "sha256": "0111dcd395fa75a6a34372fb4acb3aa10059cee6cdcd7df56372fbf040f96b8f"
+          },
+          "log": {
+            "evidence": "validation-v1/first-css-finite-candidate-v4/capture-v1/capture.log",
+            "bytes": 736,
+            "sha256": "3ca79e51ee04e47e22781e48f570b148577af8771ef19bbb6eb8b08bef7575c4"
+          },
+          "screenshot": {
+            "evidence": "validation-v1/first-css-finite-candidate-v4/capture-v1/browser-run/failure-state.png",
+            "bytes": 120547,
+            "sha256": "d98a8650a1a9c9ba715d94213a58563a0116229362a36e75d279bf9144d0ed89"
+          },
+          "first_failure": "development/wait-for-import exceeded unchanged15000ms page-readiness bound; renderer logs show long staging-slot waits, exact false readiness gate unobserved",
+          "phase": 0,
+          "running": 0,
+          "source_ticks_observed": 0,
+          "disc_import_started": false,
+          "css_comparisons_performed": false,
+          "native_unload": {
+            "attempted": true,
+            "passed": false,
+            "error": "Failure-path unload exceeded5000ms; observation clearing not established"
+          },
+          "process_cleanup": {
+            "owner_pass": true,
+            "root_all_12_recorded_pids_absent": true,
+            "root_receipt": {
+              "evidence": "validation-v1/first-css-finite-candidate-v4/capture-v1/root-cleanup-v1.json",
+              "bytes": 2376,
+              "sha256": "f10fb00de2aabbaced01bc759fb4ee89c6dc82e8479d68f914c569a8858b84b8"
+            },
+            "screenshot_description_correction": {
+              "evidence": "validation-v1/first-css-finite-candidate-v4/capture-v1/root-screenshot-description-correction-v1.json",
+              "bytes": 858,
+              "sha256": "18b66b1dbb428627ed269bfe05db73eee021ea5551ad0aa75d77ec8add69dc31"
+            },
+            "failed_scratch_retained": true
+          },
+          "independent_result_review": {
+            "evidence": "validation-v1/first-css-finite-candidate-v4/capture-v1/failure-review-v1.json",
+            "bytes": 12725,
+            "sha256": "d7490c6e8c34ddf56713ce7435a5fe1f231d913a5c1c35bb6f91cd67bd95ed07",
+            "result": "CONFIRMED_PRE_IMPORT_FAILURE_NO_CSS_COMPARISON"
+          },
+          "C3": false,
+          "remaining_cause_unknown": "Retained startup render/staging waits are observed; which canImport subgate was false was not recorded."
+        },
         "finite_source_state_parity": false,
         "terminal_tick_equality": false,
         "C3": false,
-        "clean_implementation_commit": "PENDING",
-        "refreshed_capture_preflight": "PENDING",
-        "next": "Commit reviewed implementation checkpoint, refresh exact source/build preflight and admit one finite-CSS capture after packet review. No SSS/VS/GO continuation or C3 release.",
+        "clean_implementation_commit": "a1bcad29f74dc4e6256bd3cb38371f6e7230441b",
+        "refreshed_capture_preflight": {
+          "result": "REVIEWED_AND_ROOT_ADMITTED_EXACTLY_ONCE",
+          "packet": {
+            "evidence": "validation-v1/first-css-finite-candidate-v4/capture-v1/packet-v1.json",
+            "bytes": 6731,
+            "sha256": "7453da278138a8b2d02ce55d74c7088dffc60f56486e549a09a53a76317047de"
+          },
+          "source_review": {
+            "evidence": "validation-v1/first-css-finite-candidate-v4/preflight-finalizer-v2/independent-review-v2.json",
+            "bytes": 10074,
+            "sha256": "39f0a99fecff198ddd8d628fc768aa2abdaf38f7fb6785a704cb57cf2249a77e"
+          },
+          "packet_review": {
+            "evidence": "validation-v1/first-css-finite-candidate-v4/preflight-finalizer-v2/actual-packet-review-v1.json",
+            "bytes": 8791,
+            "sha256": "c17ee0ea7bd3be8e049e2030023931801c98ece69a7e702d39d1422c2e3c1c8e"
+          },
+          "root_admission": {
+            "evidence": "validation-v1/first-css-finite-candidate-v4/capture-v1/root-admission-v1.json",
+            "bytes": 1845,
+            "sha256": "ff789ce5f6eeb2968f2b6dff4ac44977cdd0980df8b2f1ade4eb199d3c096b0d"
+          },
+          "prior_finalizer_refusal": {
+            "evidence": "validation-v1/first-css-finite-candidate-v4/preflight-finalizer-v1/independent-review-v1.json",
+            "bytes": 4737,
+            "sha256": "af891a23e1c26e7439586f7c4929853c85e3624d690e5be1fd05a7b972c23c5b"
+          },
+          "scope": "Exact frozen source set and launch-time Chrome executable/plist checks added externally; production harness and deadlines unchanged."
+        },
+        "next": "Reduce the pre-import startup/readiness failure before another browser attempt; no deadline extension or unchanged retry. Finite-CSS comparison, terminal draw and C3 are still open.",
         "exclusions": [
           "Finite browser/original tick and draw agreement",
           "Terminal scheduler tick equality",

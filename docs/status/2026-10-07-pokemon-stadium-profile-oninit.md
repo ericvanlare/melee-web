@@ -16,7 +16,10 @@ and runtime/harness use `171818fd`; a test-only scoped-import fixture repair
 then passed its focused check and full regression on `1e96b2a9`. The initial
 `171818fd` suite failed in that extracted fixture and remains retained.
 The later finite-CSS implementation, focused controls and post-repair full
-regression pass; clean commit and capture preflight remain pending.
+regression pass at checkpoint `a1bcad29`. Its finite-CSS browser attempt fails
+before disc import because startup readiness had not completed; renderer logs
+show long staging-slot waits, and no new CSS comparison occurred. Native unload timed out, while owned-process cleanup
+and independent PID absence checks passed.
 The [structured receipt](../evidence/issue251-stadium-profile-oninit-v1.json),
 under `fresh_go2_comparison_2026_10_18`, records the failure, passing component
 validation and cleanup. C3 and public Stadium admission remain open.
@@ -1928,14 +1931,25 @@ seven controls, including the 142-row retained-original inputs. These are
 schema/codec/orchestration controls with explicit source and service doubles.
 
 The post-repair full regression passes 2,739 tests with 191 skips in 558.620
-seconds. The clean implementation commit and refreshed exact source/build
-preflight remain pending.
+seconds. Checkpoint `a1bcad29` freezes the reviewed implementation. The refreshed
+preflight binds the exact source set, runtime, retained original inputs and current
+Chrome executable. Independent review required exact source-list coverage and
+launch-time browser hashing; both repairs and their negative controls are retained.
 The [structured receipt](../evidence/issue251-stadium-profile-oninit-v1.json), at
 `fresh_go2_comparison_2026_10_18.fresh_css_finite_original_preparation.implementation_checkpoint_2026_10_22`,
 binds the source freeze, reviews, exact application, cleanup, build outputs,
 failed regression and fixture repair by artifact-relative names and exact hashes.
-Finite browser/original capture is unrun; terminal scheduler equality,
-SSS/VS/GO continuation, whole-session acceptance and C3 remain open.
+One finite-CSS browser attempt then failed before disc import: the unchanged
+15-second page-readiness deadline expired before startup readiness completed.
+Renderer logs show long staging-slot waits. Phase 0 and zero source ticks were observed; none of the planned CSS
+comparisons ran. Failure-path native unload also exceeded its five-second bound.
+The browser and server closed, and all 12 recorded owned PIDs were independently
+absent. Failed scratch and the screenshot remain retained. Process cleanup does
+not establish native unload success. Independent review confirms this pre-import
+failure; the precise false readiness gate was not recorded. The next step is a smaller startup/readiness
+reduction, without increasing deadlines or retrying this route unchanged. Finite
+comparison, terminal scheduler equality, SSS/VS/GO continuation, whole-session
+acceptance and C3 remain open.
 
 
 The earlier GO+2 supervised attempt took 15.248 seconds (15.317 seconds including the root
