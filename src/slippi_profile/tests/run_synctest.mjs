@@ -210,7 +210,8 @@ export function diffHeapRanges(before, after) {
 }
 
 export function classifyHeapRanges(rawRanges, manifestRows, arenaRange,
-  audioInventoryTransition = null, nativeOutputRange = null) {
+  audioInventoryTransition = null, nativeOutputRange = null,
+  matchContextInventoryTransition = null) {
   if (!Array.isArray(rawRanges) || !Array.isArray(manifestRows) ||
       !arenaRange || !Number.isSafeInteger(arenaRange.base) ||
       !Number.isSafeInteger(arenaRange.bytes)) {
@@ -244,8 +245,36 @@ export function classifyHeapRanges(rawRanges, manifestRows, arenaRange,
     prefixMaxEnd.push(maximum);
   }
   const ownedRanges = audioRows.map(row => ({
-    start: row.address, end: row.address + row.extent, row,
+    start: row.address, end: row.address + row.extent, row, ownerType: 'audio',
   })).sort((a, b) => a.start - b.start || a.end - b.end);
+  let matchContextRows = [];
+  if (matchContextInventoryTransition !== null) {
+    const {before, after} = matchContextInventoryTransition || {};
+    if (!before || !after || !Array.isArray(before.rows) || !Array.isArray(after.rows) ||
+        before.count !== 1 || after.count !== 1 || before.rows.length !== 1 ||
+        after.rows.length !== 1 ||
+        before.owner !== after.owner ||
+        before.worldGenerationLow !== after.worldGenerationLow ||
+        before.worldGenerationHigh !== after.worldGenerationHigh ||
+        before.ownerEpochLow !== after.ownerEpochLow ||
+        before.ownerEpochHigh !== after.ownerEpochHigh ||
+        before.rows.some((row, index) => {
+          const other = after.rows[index];
+          return row.kind !== other.kind || row.address !== other.address ||
+            row.extent !== other.extent || row.owner !== other.owner ||
+            row.worldGenerationLow !== other.worldGenerationLow ||
+            row.worldGenerationHigh !== other.worldGenerationHigh ||
+            row.ownerEpochLow !== other.ownerEpochLow ||
+            row.ownerEpochHigh !== other.ownerEpochHigh;
+        })) {
+      throw new Error('Match-context owner attribution requires same-range, same-owner, same-lifetime rows at both boundaries');
+    }
+    matchContextRows = before.rows;
+    ownedRanges.push(...matchContextRows.map(row => ({
+      start: row.address, end: row.address + row.extent, row, ownerType: 'match-context',
+    })));
+    ownedRanges.sort((a, b) => a.start - b.start || a.end - b.end);
+  }
   let nativeOutput = null;
   if (nativeOutputRange !== null) {
     if (!nativeOutputRange || !Number.isSafeInteger(nativeOutputRange.base) ||
@@ -308,14 +337,23 @@ export function classifyHeapRanges(rawRanges, manifestRows, arenaRange,
           (matches.length && inArena) || (ownerMatches.length && inArena)) {
         provenance = 'ambiguous-overlap';
       } else if (ownerMatches.length === 1) {
-        const {row} = ownerMatches[0];
-        provenance = 'audio-owner-range';
-        details = {
-          audioRangeKind: row.kindName,
-          audioRangeKindValue: row.kind,
-          ownerAddress: row.owner,
-          ownerLifetimeTag: `${row.generationHigh.toString(16).padStart(8, '0')}${row.generationLow.toString(16).padStart(8, '0')}`,
-        };
+        const {row, ownerType} = ownerMatches[0];
+        if (ownerType === 'match-context') {
+          provenance = 'match-context-owner-range';
+          details = {
+            matchContextOwnerAddress: row.owner,
+            matchContextWorldGenerationTag: `${row.worldGenerationHigh.toString(16).padStart(8, '0')}${row.worldGenerationLow.toString(16).padStart(8, '0')}`,
+            matchContextOwnerEpoch: `${row.ownerEpochHigh.toString(16).padStart(8, '0')}${row.ownerEpochLow.toString(16).padStart(8, '0')}`,
+          };
+        } else {
+          provenance = 'audio-owner-range';
+          details = {
+            audioRangeKind: row.kindName,
+            audioRangeKindValue: row.kind,
+            ownerAddress: row.owner,
+            ownerLifetimeTag: `${row.generationHigh.toString(16).padStart(8, '0')}${row.generationLow.toString(16).padStart(8, '0')}`,
+          };
+        }
       } else if (matches.length === 1) {
         const {row} = matches[0];
         provenance = row.decision === 'source-c-static-candidate' ?
@@ -585,6 +623,134 @@ export function requireStableAudioOwnerInventory(inventories) {
   return first.rows.map(row => ({...row}));
 }
 
+// One fixed record describes only the live MeleeWebMatchContext allocation.
+// Both 64-bit identities remain split into words so JS never rounds them.
+export function decodeMatchContextRangeInventory(heap, pointer) {
+  const wireVersion = 1, wireHeaderBytes = 24, wireRowBytes = 32,
+    wireCapacity = 1, wireBytes = wireHeaderBytes + wireRowBytes;
+  const limit = 0x100000000;
+  if (!(heap instanceof Uint8Array) || heap.byteLength > limit ||
+      !Number.isSafeInteger(pointer) || pointer <= 0 || pointer % 4 !== 0 ||
+      pointer > heap.byteLength || wireBytes > heap.byteLength - pointer) {
+    throw new Error('Match-context range inventory wire pointer or wasm bounds are invalid');
+  }
+  const view = new DataView(heap.buffer, heap.byteOffset + pointer, wireBytes);
+  const version = view.getUint32(0, true), size = view.getUint32(4, true);
+  const count = view.getUint32(8, true), rowSize = view.getUint32(12, true);
+  const capacity = view.getUint32(16, true), status = view.getInt32(20, true);
+  if (version !== wireVersion || size !== wireBytes || count !== 1 ||
+      rowSize !== wireRowBytes || capacity !== wireCapacity || status !== 1) {
+    throw new Error(`Match-context range inventory wire layout/status is invalid: version=${version}, size=${size}, count=${count}, rowSize=${rowSize}, capacity=${capacity}, status=${status}`);
+  }
+  const offset = wireHeaderBytes;
+  const row = {
+    kind: view.getUint32(offset, true),
+    address: view.getUint32(offset + 4, true),
+    extent: view.getUint32(offset + 8, true),
+    owner: view.getUint32(offset + 12, true),
+    worldGenerationLow: view.getUint32(offset + 16, true),
+    worldGenerationHigh: view.getUint32(offset + 20, true),
+    ownerEpochLow: view.getUint32(offset + 24, true),
+    ownerEpochHigh: view.getUint32(offset + 28, true),
+  };
+  const worldGenerationIsZero = row.worldGenerationLow === 0 && row.worldGenerationHigh === 0;
+  const ownerEpochIsZero = row.ownerEpochLow === 0 && row.ownerEpochHigh === 0;
+  if (row.kind !== 1 || !row.address || !row.extent || row.owner !== row.address ||
+      row.address > limit || row.extent > limit - row.address ||
+      row.address + row.extent > heap.byteLength || worldGenerationIsZero || ownerEpochIsZero) {
+    throw new Error('Match-context range inventory row has invalid kind, owner, extent, lifetime, or wasm bounds');
+  }
+  row.kindName = 'match-context-owner';
+  return {version, size, count, rowSize, capacity, status,
+    owner: row.owner,
+    worldGenerationLow: row.worldGenerationLow,
+    worldGenerationHigh: row.worldGenerationHigh,
+    ownerEpochLow: row.ownerEpochLow,
+    ownerEpochHigh: row.ownerEpochHigh,
+    rows: [row], ownerRestoreAdmission: false};
+}
+
+export function validateMatchContextRangeDisjointness(inventory, manifestRows,
+  arenaRange, nativeOutputRange, heapBytes, audioInventory) {
+  const limit = 0x100000000;
+  if (!inventory || !Array.isArray(inventory.rows) || inventory.rows.length !== 1 ||
+      inventory.count !== 1 || !Array.isArray(manifestRows) ||
+      !Number.isSafeInteger(heapBytes) || heapBytes < 0 || heapBytes > limit ||
+      !Number.isSafeInteger(arenaRange?.base) || !Number.isSafeInteger(arenaRange?.bytes) ||
+      arenaRange.base < 0 || arenaRange.bytes <= 0 || arenaRange.base > limit ||
+      arenaRange.bytes > limit - arenaRange.base || arenaRange.base + arenaRange.bytes > heapBytes ||
+      !Number.isSafeInteger(nativeOutputRange?.base) || !Number.isSafeInteger(nativeOutputRange?.bytes) ||
+      nativeOutputRange.base <= 0 || nativeOutputRange.bytes <= 0 ||
+      nativeOutputRange.base > limit || nativeOutputRange.bytes > limit - nativeOutputRange.base ||
+      nativeOutputRange.base + nativeOutputRange.bytes > heapBytes ||
+      !audioInventory || !Array.isArray(audioInventory.rows)) {
+    throw new Error('Match-context owner, arena, or native output inventory bounds are invalid');
+  }
+  const [row] = inventory.rows;
+  const end = row.address + row.extent;
+  const arenaEnd = arenaRange.base + arenaRange.bytes;
+  const outputEnd = nativeOutputRange.base + nativeOutputRange.bytes;
+  if (row.address < arenaEnd && arenaRange.base < end) {
+    throw new Error('Match-context owner range overlaps the gameplay arena');
+  }
+  if (row.address < outputEnd && nativeOutputRange.base < end) {
+    throw new Error('Match-context owner range overlaps native PCM output storage');
+  }
+  for (const section of manifestRows) {
+    if (section.size > 0 && row.address < section.address + section.size &&
+        section.address < end) {
+      throw new Error('Match-context owner range overlaps a static manifest range');
+    }
+  }
+  for (const audioRow of audioInventory.rows) {
+    const audioEnd = audioRow.address + audioRow.extent;
+    if (row.address < audioEnd && audioRow.address < end) {
+      throw new Error('Match-context owner range overlaps an audio owner range');
+    }
+  }
+  return {base: row.address, bytes: row.extent, owner: row.owner,
+    diagnosticOnly: true, ownerRestoreAdmission: false};
+}
+
+export function requireStableMatchContextRangeInventory(inventories) {
+  const boundaryOrder = ['before-source-step', 'after-source-step',
+    'after-actual-draw-and-Aurora-quiescence'];
+  if (!Array.isArray(inventories) || inventories.length !== boundaryOrder.length ||
+      inventories.some((item, index) => !item || !Array.isArray(item.rows) ||
+        item.rows.length !== 1 || item.count !== 1 || item.boundary !== boundaryOrder[index])) {
+    throw new Error('Match-context owner inventory requires all three ordered census boundaries');
+  }
+  const first = inventories[0];
+  for (const inventory of inventories.slice(1)) {
+    if (inventory.owner !== first.owner || inventory.rows[0].owner !== first.rows[0].owner) {
+      throw new Error('Match-context owner address changed across census boundaries');
+    }
+    if (inventory.worldGenerationLow !== first.worldGenerationLow ||
+        inventory.worldGenerationHigh !== first.worldGenerationHigh) {
+      throw new Error('Match-context world generation changed across census boundaries');
+    }
+    if (inventory.ownerEpochLow !== first.ownerEpochLow ||
+        inventory.ownerEpochHigh !== first.ownerEpochHigh) {
+      throw new Error('Match-context owner epoch changed across census boundaries');
+    }
+    if (inventory.version !== first.version || inventory.size !== first.size ||
+        inventory.rowSize !== first.rowSize || inventory.capacity !== first.capacity ||
+        inventory.status !== first.status ||
+        inventory.rows.some((row, index) => {
+          const prior = first.rows[index];
+          return row.kind !== prior.kind || row.address !== prior.address ||
+            row.extent !== prior.extent || row.owner !== prior.owner ||
+            row.worldGenerationLow !== prior.worldGenerationLow ||
+            row.worldGenerationHigh !== prior.worldGenerationHigh ||
+            row.ownerEpochLow !== prior.ownerEpochLow ||
+            row.ownerEpochHigh !== prior.ownerEpochHigh;
+        })) {
+      throw new Error('Match-context owner inventory topology changed across census boundaries');
+    }
+  }
+  return {...first.rows[0]};
+}
+
 function initializerBytes(module) {
   const size = module._melee_web_snapshot_initializer_diagnostic_size();
   return copyBytes(module, module._melee_web_snapshot_initializer_diagnostic(), size);
@@ -760,7 +926,9 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
   return page.evaluate(async ({sample, expectedInputMapping, expectedStocks, checkedSource, inspectSource,
     inputMappingSource, diagnosticSizeSource, drawDiagnosticBytes, writeCensus,
     diffHeapRangesSource, classifyHeapRangesSource, decodeAudioInventorySource,
-    validateAudioOwnerRangesSource, requireStableAudioInventorySource, maxHeapBytes}) => {
+    validateAudioOwnerRangesSource, requireStableAudioInventorySource,
+    decodeMatchContextRangeInventorySource, validateMatchContextRangeDisjointnessSource,
+    requireStableMatchContextRangeInventorySource, maxHeapBytes}) => {
     const {module} = window.__slippiSynctest;
     const checkedAsyncCcall = new Function(`return (${checkedSource})`)();
     const checked = (label, identifier, argumentTypes = [], args = []) =>
@@ -772,8 +940,10 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     let censusStepDiff = null, censusDrawDiff = null;
     let censusStepRaw = null, censusDrawRaw = null;
     const audioInventoryBoundaries = writeCensus ? [] : null;
+    const matchContextInventoryBoundaries = writeCensus ? [] : null;
     let nativeOutputRange = null;
-    let queryAudioInventory = null, requireStableInventory = null;
+    let queryOwnerInventories = null, requireStableInventory = null,
+      requireStableMatchContextInventory = null;
     const censusNativeTransferQuiescence = writeCensus ? {
       beforeStep: null, afterStep: null, afterActualDraw: null,
     } : null;
@@ -781,11 +951,17 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
       if (writeCensus.requireAudioInventory !== true) {
         throw new Error('Write census runner must require the audio owner inventory');
       }
+      if (writeCensus.requireMatchContextInventory !== true) {
+        throw new Error('Write census runner must require the match-context owner inventory');
+      }
       for (const name of ['_melee_web_synctest_audio_range_inventory_query',
-        '_melee_web_synctest_audio_range_inventory', '_melee_web_snapshot_pcm',
-        '_melee_web_snapshot_pcm_size']) {
+        '_melee_web_synctest_audio_range_inventory',
+        '_melee_web_synctest_match_context_range_inventory_query',
+        '_melee_web_synctest_match_context_range_inventory',
+        '_melee_web_snapshot_pcm', '_melee_web_snapshot_pcm_size']) {
         if (typeof module[name] !== 'function') {
-          throw new Error(`Required audio owner inventory export is unavailable: ${name}`);
+          const ownerLabel = name.includes('match_context') ? 'match-context owner' : 'audio owner';
+          throw new Error(`Required ${ownerLabel} inventory export is unavailable: ${name}`);
         }
       }
       const arenaBase = module._melee_web_synctest_gameplay_arena_base();
@@ -801,9 +977,16 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
       const validateOwnerRanges = new Function('inventory', 'manifestRows', 'arenaRange',
         'nativeOutputRange', 'heapBytes',
         `return (${validateAudioOwnerRangesSource})(inventory, manifestRows, arenaRange, nativeOutputRange, heapBytes)`);
+      const decodeMatchContextInventory = new Function('heap', 'pointer',
+        `return (${decodeMatchContextRangeInventorySource})(heap, pointer)`);
+      const validateMatchContextDisjointness = new Function('inventory', 'manifestRows',
+        'arenaRange', 'nativeOutputRange', 'heapBytes', 'audioInventory',
+        `return (${validateMatchContextRangeDisjointnessSource})(inventory, manifestRows, arenaRange, nativeOutputRange, heapBytes, audioInventory)`);
       requireStableInventory = new Function('inventories',
         `return (${requireStableAudioInventorySource})(inventories)`);
-      queryAudioInventory = async boundary => {
+      requireStableMatchContextInventory = new Function('inventories',
+        `return (${requireStableMatchContextRangeInventorySource})(inventories)`);
+      queryOwnerInventories = async boundary => {
         await checked(`audio owner inventory ${boundary}`,
           'melee_web_synctest_audio_range_inventory_query');
         const pointer = module._melee_web_synctest_audio_range_inventory();
@@ -817,11 +1000,20 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
           throw new Error('Native PCM diagnostic storage changed across census boundaries');
         }
         nativeOutputRange ||= currentNativeOutput;
-        validateOwnerRanges(inventory, writeCensus.manifestRows,
+        const nativeOutput = validateOwnerRanges(inventory, writeCensus.manifestRows,
           writeCensus.arenaRange, nativeOutputRange, module.HEAPU8.byteLength);
         audioInventoryBoundaries.push({boundary, ...inventory});
+        await checked(`match-context owner inventory ${boundary}`,
+          'melee_web_synctest_match_context_range_inventory_query');
+        const matchContextPointer = module._melee_web_synctest_match_context_range_inventory();
+        const matchContextInventory = decodeMatchContextInventory(module.HEAPU8,
+          matchContextPointer);
+        validateMatchContextDisjointness(matchContextInventory, writeCensus.manifestRows,
+          writeCensus.arenaRange, nativeOutputRange, module.HEAPU8.byteLength, inventory);
+        matchContextInventoryBoundaries.push({boundary, ...matchContextInventory,
+          nativeOutputStorage: nativeOutput});
       };
-      await queryAudioInventory('before-source-step');
+      await queryOwnerInventories('before-source-step');
       const heap = module.HEAPU8;
       if (!(heap instanceof Uint8Array) || heap.byteLength > maxHeapBytes) {
         throw new Error(`Unsupported census heap size: ${heap?.byteLength}`);
@@ -835,7 +1027,7 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     if (writeCensus) {
       await checked('native transfer quiescence after census source step', 'melee_web_snapshot_quiescent');
       censusNativeTransferQuiescence.afterStep = 'passed';
-      await queryAudioInventory('after-source-step');
+      await queryOwnerInventories('after-source-step');
       heapAfterStep = module.HEAPU8.slice();
       if (heapAfterStep.byteLength > maxHeapBytes) {
         throw new Error(`Census heap grew beyond its bound: ${heapAfterStep.byteLength}`);
@@ -876,7 +1068,7 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     if (writeCensus) {
       await checked('native transfer quiescence after census actual draw', 'melee_web_snapshot_quiescent');
       censusNativeTransferQuiescence.afterActualDraw = 'passed';
-      await queryAudioInventory('after-actual-draw-and-Aurora-quiescence');
+      await queryOwnerInventories('after-actual-draw-and-Aurora-quiescence');
       const heapAfterDraw = module.HEAPU8.slice();
       if (heapAfterDraw.byteLength > maxHeapBytes) {
         throw new Error(`Census heap grew beyond its bound: ${heapAfterDraw.byteLength}`);
@@ -885,6 +1077,7 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
       censusAfterDrawSha256 = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
       const makeDiff = new Function(`return (${diffHeapRangesSource})`)();
       requireStableInventory(audioInventoryBoundaries);
+      requireStableMatchContextInventory(matchContextInventoryBoundaries);
       const raw = makeDiff(heapAfterStep, heapAfterDraw);
       censusDrawRaw = {
         beforeHeapBytes: heapAfterStep.byteLength,
@@ -895,16 +1088,20 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
         ranges: raw.ranges,
       };
       const makeClassify = new Function('ranges', 'manifestRows', 'arenaRange',
-        'audioInventoryTransition', 'nativeOutputRange',
-        `return (${classifyHeapRangesSource})(ranges, manifestRows, arenaRange, audioInventoryTransition, nativeOutputRange)`);
+        'audioInventoryTransition', 'nativeOutputRange', 'matchContextInventoryTransition',
+        `return (${classifyHeapRangesSource})(ranges, manifestRows, arenaRange, audioInventoryTransition, nativeOutputRange, matchContextInventoryTransition)`);
       censusStepDiff = {...censusStepRaw,
         changedRanges: makeClassify(censusStepRaw.ranges, writeCensus.manifestRows,
           writeCensus.arenaRange, {before: audioInventoryBoundaries[0],
-            after: audioInventoryBoundaries[1]}, nativeOutputRange)};
+            after: audioInventoryBoundaries[1]}, nativeOutputRange,
+          {before: matchContextInventoryBoundaries[0],
+            after: matchContextInventoryBoundaries[1]})};
       censusDrawDiff = {...censusDrawRaw,
         changedRanges: makeClassify(censusDrawRaw.ranges, writeCensus.manifestRows,
           writeCensus.arenaRange, {before: audioInventoryBoundaries[1],
-            after: audioInventoryBoundaries[2]}, nativeOutputRange)};
+            after: audioInventoryBoundaries[2]}, nativeOutputRange,
+          {before: matchContextInventoryBoundaries[1],
+            after: matchContextInventoryBoundaries[2]})};
       heapAfterStep = null;
     }
     const read = (pointer, size) => module.HEAPU8.slice(pointer, pointer + size);
@@ -953,6 +1150,15 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
         effectsEnabled: audioInventoryBoundaries[0].effectsEnabled,
         ownerRestoreAdmission: false,
       },
+      matchContextOwnerInventory: {
+        version: matchContextInventoryBoundaries[0].version,
+        wireSize: matchContextInventoryBoundaries[0].size,
+        rowSize: matchContextInventoryBoundaries[0].rowSize,
+        boundaryOrder: matchContextInventoryBoundaries.map(item => item.boundary),
+        boundaries: matchContextInventoryBoundaries,
+        stableOwnerLifetimeValidated: true,
+        ownerRestoreAdmission: false,
+      },
       nativeOutputStorage: {
         kind: 'fixture-native-pcm-output', ...nativeOutputRange,
         diagnosticOnly: true, ownerRestoreAdmission: false,
@@ -976,6 +1182,9 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     decodeAudioInventorySource: decodeAudioOwnerInventory.toString(),
     validateAudioOwnerRangesSource: validateAudioOwnerRangeDisjointness.toString(),
     requireStableAudioInventorySource: requireStableAudioOwnerInventory.toString(),
+    decodeMatchContextRangeInventorySource: decodeMatchContextRangeInventory.toString(),
+    validateMatchContextRangeDisjointnessSource: validateMatchContextRangeDisjointness.toString(),
+    requireStableMatchContextRangeInventorySource: requireStableMatchContextRangeInventory.toString(),
     maxHeapBytes: MAX_HEAP_BYTES});
 }
 

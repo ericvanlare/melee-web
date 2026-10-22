@@ -64,10 +64,29 @@ builds, the real-asset fighter/context trace, 2,445 regression tests with 165
 skips, and all 14 exact-head CI checks (12 successes, two expected skips). The
 later audio-range extension passes focused owner/runner controls, independent
 source/result review and its private and ordinary Release builds. Its full regression passes
-2,445 tests with 165 skips in 549.587 seconds. The PR remains draft. No same-instance browser restore
-or rollback performance result is claimed. Next, attribute the single match-context allocation, whose input queue and
-tick counter change in this exact source step. Reuse its existing epoch/world
-guards before considering broader asset traversal.
+2,445 tests with 165 skips in 549.587 seconds. Audio checkpoint `a8fa9af1`
+completes all 14 exact-head checks: 12 successes and two expected skips. The PR remains draft. No same-instance browser restore
+or rollback performance result is claimed.
+
+The subsequent match-context census identifies one exact 2,488-byte allocation
+with a stable world and owner epoch at all three boundaries. Eight byte values
+change inside it during the source step; none change during draw/completion.
+The source step has 89,827 net changed byte values, including 47,785 still
+unmapped. These totals belong to this producer; the difference from the prior
+census is not a reduction attributable to the eight-byte classification. The
+existing PAD, four-stock, selected-draw and Aurora-completion checks pass, and
+all nine recorded process IDs are independently absent after cleanup. No memory
+is restored.
+
+Independent source review found and repaired an output-alias gap: descriptor or
+error buffers overlapping the live owner now refuse before any write. Actual
+source controls compare every owner byte after refusal, then perform a healthy
+step. The focused fighter trace, 17 runner controls, both Release builds and
+independent raw-result review pass. Full regression passes 2,445 tests with
+165 skips in 530.297 seconds. Existing failed controls and the rejected candidate remain retained. Next, design a pure
+observation accessor for the existing Aurora staging-shadow ownership descriptor;
+its current implementation pumps events and cannot be reused unchanged. This is
+host-state attribution for no-draw rollback, not a resumption of drawn corrections.
 
 ## First current-source copy/restore result
 

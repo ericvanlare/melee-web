@@ -584,6 +584,14 @@ MeleeWebMatchStats GameplayMatchSession::player_stats(unsigned index)const{
     check(melee_web_match_player_stats(storage_->match,index,&stats,error,sizeof(error)),error);return stats;
 }
 MeleeWebAudio* GameplayMatchSession::audio()const{return storage_&&storage_->bank?storage_->bank->get():nullptr;}
+MeleeWebMatchContextRangeResult GameplayMatchSession::diagnostic_match_context_range(
+    MeleeWebMatchContextRange* range,char* error,size_t size)const{
+    if(!storage_||!storage_->match){
+        if(error&&size)std::snprintf(error,size,"Match context range requires an open source match session");
+        return MELEE_WEB_MATCH_CONTEXT_RANGE_INVALID_OWNER;
+    }
+    return melee_web_match_context_range_read(storage_->match,range,error,size);
+}
 bool GameplayMatchSession::advance_construction(){return storage_&&storage_->advance_construction();}
 bool GameplayMatchSession::construction_complete()const{return storage_&&storage_->construction_phase==5;}
 }

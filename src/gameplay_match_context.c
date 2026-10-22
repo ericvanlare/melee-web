@@ -60,6 +60,18 @@ static MeleeWebMatchContext* owner;
 static uint64_t owner_epoch;
 static int fail(char* e,size_t n,const char* m){if(e&&n)snprintf(e,n,"%s",m);return 0;}
 static int ok(char* e,size_t n){if(e&&n)*e=0;return 1;}
+static int byte_interval(const void* pointer,size_t bytes,uintptr_t* begin,uintptr_t* end)
+{
+    const uintptr_t start=(uintptr_t)pointer;
+    if(bytes&&!pointer)return 0;
+    if((uintmax_t)bytes>(uintmax_t)(UINTPTR_MAX-start))return 0;
+    *begin=start;*end=start+(uintptr_t)bytes;return 1;
+}
+static int byte_intervals_overlap(uintptr_t a_begin,uintptr_t a_end,
+    uintptr_t b_begin,uintptr_t b_end)
+{
+    return a_begin<a_end&&b_begin<b_end&&a_begin<b_end&&b_begin<a_end;
+}
 static int live(MeleeWebMatchContext* h,char* e,size_t n)
 {
     if(!h||h!=owner||h->generation!=melee_web_gameplay_generation())
@@ -612,6 +624,50 @@ static int match_snapshot_boundary(MeleeWebMatchContext* h, char* e, size_t n)
     if (HSD_GObj_804D781C || HSD_GObj_804D7818 || HSD_GObj_804D7814)
         return fail(e,n,"Match snapshot cannot run inside a source callback");
     return 1;
+}
+MeleeWebMatchContextRangeResult melee_web_match_context_range_read(
+    MeleeWebMatchContext* h, MeleeWebMatchContextRange* range,
+    char* e, size_t n)
+{
+    uintptr_t owner_begin=0,owner_end=0,range_begin=0,range_end=0;
+    uintptr_t error_begin=0,error_end=0;
+    const size_t owner_bytes=owner?sizeof(*owner):0;
+    const size_t range_bytes=range?sizeof(*range):0;
+    const size_t error_bytes=e&&n?n:0;
+    /* Check every destination using integer half-open intervals before any
+     * failure or success helper can write through it. A bad alias is refused
+     * without trying to report through a buffer that may be the live owner. */
+    if(!byte_interval(owner,owner_bytes,&owner_begin,&owner_end))
+        return MELEE_WEB_MATCH_CONTEXT_RANGE_INVALID_OWNER;
+    if(!byte_interval(range,range_bytes,&range_begin,&range_end)||
+       !byte_interval(e,error_bytes,&error_begin,&error_end))
+        return MELEE_WEB_MATCH_CONTEXT_RANGE_INVALID_ARGUMENT;
+    if((owner_bytes&&
+        (byte_intervals_overlap(range_begin,range_end,owner_begin,owner_end)||
+         byte_intervals_overlap(error_begin,error_end,owner_begin,owner_end)))||
+       byte_intervals_overlap(range_begin,range_end,error_begin,error_end))
+        return MELEE_WEB_MATCH_CONTEXT_RANGE_INVALID_ARGUMENT;
+    if (!range) {
+        fail(e,n,"Match context range output is required");
+        return MELEE_WEB_MATCH_CONTEXT_RANGE_INVALID_ARGUMENT;
+    }
+    /* owned() compares the opaque handle to the active owner before reading
+     * through it, so an inactive or retired pointer is never dereferenced. */
+    if (!owned(h,e,n)) return MELEE_WEB_MATCH_CONTEXT_RANGE_INVALID_OWNER;
+    if (HSD_GObj_804D781C || HSD_GObj_804D7818 || HSD_GObj_804D7814) {
+        fail(e,n,"Match context range is unavailable inside a source callback");
+        return MELEE_WEB_MATCH_CONTEXT_RANGE_UNSAFE_BOUNDARY;
+    }
+    const MeleeWebMatchContextRange current = {
+        h, sizeof(*h), h->generation, owner_epoch,
+    };
+    if (!current.byte_extent || !current.world_generation || !current.owner_epoch) {
+        fail(e,n,"Match context range owner identity is incomplete");
+        return MELEE_WEB_MATCH_CONTEXT_RANGE_INVALID_OWNER;
+    }
+    *range = current;
+    ok(e,n);
+    return MELEE_WEB_MATCH_CONTEXT_RANGE_COMPLETE;
 }
 MeleeWebMatchContextSnapshot* melee_web_match_context_snapshot_capture(
     MeleeWebMatchContext* h, char* e, size_t n)

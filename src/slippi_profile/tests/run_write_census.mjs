@@ -59,6 +59,11 @@ function sourceHashes() {
     'src/slippi_profile/tests/synctest_browser.cpp',
     'src/slippi_profile/tests/test_write_census_contract.mjs',
     'tests/gameplay_snapshot_probe.cpp',
+    'tests/gameplay_match_context_trace.c',
+    'src/gameplay_match_context.h',
+    'src/gameplay_match_context.c',
+    'src/gameplay_match_session.hpp',
+    'src/gameplay_match_session.cpp',
     'src/gameplay_audio.h',
     'src/gameplay_audio.c',
     'src/gameplay_audio_fx.h',
@@ -107,6 +112,13 @@ export function validateCensusDrawSample(result, sample, beforeDiagnostics,
           ![6, 9].includes(boundary.count) || boundary.rows?.length !== boundary.count) ||
         result.heapCensus.audioOwnerInventory?.stableTopologyValidated !== true ||
         result.heapCensus.audioOwnerInventory?.ownerRestoreAdmission !== false ||
+        result.heapCensus.matchContextOwnerInventory?.boundaryOrder?.join('|') !==
+          'before-source-step|after-source-step|after-actual-draw-and-Aurora-quiescence' ||
+        result.heapCensus.matchContextOwnerInventory?.boundaries?.length !== 3 ||
+        result.heapCensus.matchContextOwnerInventory.boundaries.some(boundary =>
+          boundary.count !== 1 || boundary.rows?.length !== 1) ||
+        result.heapCensus.matchContextOwnerInventory?.stableOwnerLifetimeValidated !== true ||
+        result.heapCensus.matchContextOwnerInventory?.ownerRestoreAdmission !== false ||
         result.heapCensus.nativeOutputStorage?.diagnosticOnly !== true ||
         result.heapCensus.nativeOutputStorage?.ownerRestoreAdmission !== false) {
       throw new Error('The requested three-boundary audio owner inventory did not return');
@@ -168,10 +180,10 @@ async function main() {
   const report = {
     schema: 'melee-web-slippi-browser-write-census-v1',
     result: 'incomplete',
-    statement: 'One warmed actual browser sample net-byte-delta census with read-only audio owner-range provenance at three boundaries; same-value stores and transient changes that return to their prior value before a boundary are not observable. The audio ranges and native PCM output storage are diagnostic provenance only, not complete game-state ownership or restore admission; every changed range remains unadmitted and no memory is restored.',
+    statement: 'One warmed actual browser sample net-byte-delta census with read-only audio and match-context owner-range provenance at three boundaries; same-value stores and transient changes that return to their prior value before a boundary are not observable. These owner ranges and native PCM output storage are diagnostic provenance only, not complete game-state ownership or restore admission; every changed range remains unadmitted and no memory is restored.',
     execution: {status: 'incomplete', prefixSamples: PREFIX_SAMPLES, censusSample: SAMPLE,
       sourceStep: 'existing deterministic snapshot_step input at sample 300',
-      captureHypothesis: 'Attribute source-step audio changes from exact live audio allocation ranges; no same-browser restore is attempted.',
+      captureHypothesis: 'Attribute source-step changes from exact live audio and match-context owner ranges; no same-browser restore is attempted.',
       draw: 'existing actual source draw followed by the existing Aurora pending-packet/staging/worker quiescence wait'},
     inventory: {status: 'incomplete', completeGameState: manifestInventory.completeGameState,
       sourceStateManifestComplete: false,
@@ -181,6 +193,7 @@ async function main() {
         excludedMutableInputSections: manifestInventory.excludedMutableInputSections},
       ownerRestoreAdmission: false, arenaInternalOwnershipProven: false,
       audioOwnerRangeInventory: null, nativeOutputStorage: null,
+      matchContextOwnerRangeInventory: null,
       outsideArenaBytes: null, unadmittedChangedBytes: null,
       unclassifiedChanges: [], classificationSummary: {}},
     profile: {identity: null, sourceIdentity: null, rngHelper: null, stageBridge: null,
@@ -345,6 +358,7 @@ async function main() {
       arenaRange,
       manifestRows: manifest.mutable_input_sections,
       requireAudioInventory: true,
+      requireMatchContextInventory: true,
     };
     const sample = await runBrowserSample(page, SAMPLE, expectedInputMapping, expectedStocks, censusPlan);
     const censusDraw = validateCensusDrawSample(sample, SAMPLE, previousDiagnostics,
@@ -395,6 +409,7 @@ async function main() {
       ownerRestoreAdmission: false,
       arenaInternalOwnershipProven: false,
       audioOwnerRangeInventory: sample.heapCensus.audioOwnerInventory,
+      matchContextOwnerRangeInventory: sample.heapCensus.matchContextOwnerInventory,
       nativeOutputStorage: sample.heapCensus.nativeOutputStorage,
       outsideArenaBytes,
       unadmittedChangedBytes,
@@ -406,6 +421,7 @@ async function main() {
         'Source-static candidates, excluded sections and unmapped writes have no owner restore contract established by this census.',
         'The live gameplay arena export proves only its address extent; its internal object/state ownership and restore admission remain unproven.',
         'The audio owner-range inventory attributes exact allocations to one live audio lifetime; it is provenance only and does not establish complete audio or game-state restore admission.',
+        'The match-context owner range attributes one exact live allocation within its world generation and owner epoch; it is provenance only and does not establish complete game-state restore admission.',
         'Native PCM output storage is retained as an explicitly diagnostic and excluded range.',
         'Native DVD STATE_END checks passed at each sampled boundary but cannot exclude a transfer that completed between boundaries.',
       ],
@@ -413,7 +429,7 @@ async function main() {
     report.execution = {status: 'completed', prefixSamples: PREFIX_SAMPLES,
       censusSample: SAMPLE, sampleInteractive: true,
       sourceStep: 'existing deterministic snapshot_step input at sample 300',
-      captureHypothesis: 'Attribute source-step audio changes from exact live audio allocation ranges; no same-browser restore is attempted.',
+      captureHypothesis: 'Attribute source-step changes from exact live audio and match-context owner ranges; no same-browser restore is attempted.',
       draw: 'existing actual source draw followed by the existing Aurora pending-packet/staging/worker quiescence wait',
       restorePerformed: false};
     report.result = 'incomplete';

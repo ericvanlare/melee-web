@@ -59,6 +59,27 @@ struct AudioRangeWireInventory {
     AudioRangeWireRow rows[MELEE_WEB_AUDIO_OWNED_RANGE_MAX];
 };
 
+struct MatchContextRangeWireRow {
+    uint32_t kind;
+    uint32_t address;
+    uint32_t extent;
+    uint32_t owner;
+    uint32_t world_generation_low;
+    uint32_t world_generation_high;
+    uint32_t owner_epoch_low;
+    uint32_t owner_epoch_high;
+};
+
+struct MatchContextRangeWireInventory {
+    uint32_t version;
+    uint32_t size;
+    uint32_t count;
+    uint32_t row_size;
+    uint32_t capacity;
+    uint32_t status;
+    MatchContextRangeWireRow rows[1];
+};
+
 static_assert(sizeof(void *) == 4 && sizeof(size_t) == 4,
               "Browser audio inventory requires wasm32 pointers and size_t");
 static_assert(sizeof(AudioRangeWireRow) == 24 &&
@@ -82,9 +103,35 @@ static_assert(offsetof(AudioRangeWireInventory, version) == 0 &&
                   sizeof(AudioRangeWireInventory) == 252,
               "Audio range wire inventory layout changed");
 
+static_assert(sizeof(MatchContextRangeWireRow) == 32 &&
+                  offsetof(MatchContextRangeWireRow, kind) == 0 &&
+                  offsetof(MatchContextRangeWireRow, address) == 4 &&
+                  offsetof(MatchContextRangeWireRow, extent) == 8 &&
+                  offsetof(MatchContextRangeWireRow, owner) == 12 &&
+                  offsetof(MatchContextRangeWireRow, world_generation_low) == 16 &&
+                  offsetof(MatchContextRangeWireRow, world_generation_high) == 20 &&
+                  offsetof(MatchContextRangeWireRow, owner_epoch_low) == 24 &&
+                  offsetof(MatchContextRangeWireRow, owner_epoch_high) == 28,
+              "Match-context range wire row layout changed");
+static_assert(offsetof(MatchContextRangeWireInventory, version) == 0 &&
+                  offsetof(MatchContextRangeWireInventory, size) == 4 &&
+                  offsetof(MatchContextRangeWireInventory, count) == 8 &&
+                  offsetof(MatchContextRangeWireInventory, row_size) == 12 &&
+                  offsetof(MatchContextRangeWireInventory, capacity) == 16 &&
+                  offsetof(MatchContextRangeWireInventory, status) == 20 &&
+                  offsetof(MatchContextRangeWireInventory, rows) == 24 &&
+                  sizeof(MatchContextRangeWireInventory) == 56,
+              "Match-context range wire inventory layout changed");
+
 AudioRangeWireInventory audio_range_wire{};
 MeleeWebAudio *audio_range_anchor = nullptr;
 uint64_t audio_range_generation_anchor = 0;
+MatchContextRangeWireInventory match_context_range_wire{};
+uint32_t match_context_range_anchor_address = 0;
+uint32_t match_context_range_anchor_extent = 0;
+uint64_t match_context_range_anchor_world_generation = 0;
+uint64_t match_context_range_anchor_owner_epoch = 0;
+bool match_context_range_anchor_set = false;
 
 struct AudioRangeCapture {
     AudioRangeWireRow rows[MELEE_WEB_AUDIO_OWNED_RANGE_MAX]{};
@@ -213,6 +260,72 @@ EMSCRIPTEN_KEEPALIVE int melee_web_synctest_audio_range_inventory_query(void)
     if (!audio_range_anchor) {
         audio_range_anchor = current_audio;
         audio_range_generation_anchor = expected_generation;
+    }
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE const void *melee_web_synctest_match_context_range_inventory(void)
+{
+    return &match_context_range_wire;
+}
+
+EMSCRIPTEN_KEEPALIVE int melee_web_synctest_match_context_range_inventory_query(void)
+{
+    std::memset(&match_context_range_wire, 0, sizeof(match_context_range_wire));
+    match_context_range_wire.version = 1;
+    match_context_range_wire.size = sizeof(match_context_range_wire);
+    match_context_range_wire.row_size = sizeof(MatchContextRangeWireRow);
+    match_context_range_wire.capacity = 1;
+    if (!match) {
+        match_context_range_wire.status = MELEE_WEB_MATCH_CONTEXT_RANGE_INVALID_OWNER;
+        return 0;
+    }
+
+    char error[256]{};
+    MeleeWebMatchContextRange current{};
+    const MeleeWebMatchContextRangeResult result =
+        match->diagnostic_match_context_range(&current, error, sizeof(error));
+    match_context_range_wire.status = static_cast<uint32_t>(result);
+    if (result != MELEE_WEB_MATCH_CONTEXT_RANGE_COMPLETE ||
+        !current.address ||
+        current.byte_extent == 0 || current.byte_extent > UINT32_MAX ||
+        current.world_generation == 0 || current.owner_epoch == 0) {
+        if (result == MELEE_WEB_MATCH_CONTEXT_RANGE_COMPLETE) {
+            match_context_range_wire.status = MELEE_WEB_MATCH_CONTEXT_RANGE_INVALID_OWNER;
+        }
+        return 0;
+    }
+
+    MatchContextRangeWireRow row{};
+    if (!wire_u32(current.address, row.address) ||
+        !wire_u32(current.address, row.owner) ||
+        static_cast<uint64_t>(current.byte_extent) + row.address >
+            static_cast<uint64_t>(UINT32_MAX) + 1u) {
+        match_context_range_wire.status = MELEE_WEB_MATCH_CONTEXT_RANGE_INVALID_ARGUMENT;
+        return 0;
+    }
+    row.kind = 1;
+    row.extent = static_cast<uint32_t>(current.byte_extent);
+    if (match_context_range_anchor_set &&
+        (row.address != match_context_range_anchor_address ||
+         row.extent != match_context_range_anchor_extent ||
+         current.world_generation != match_context_range_anchor_world_generation ||
+         current.owner_epoch != match_context_range_anchor_owner_epoch)) {
+        match_context_range_wire.status = MELEE_WEB_MATCH_CONTEXT_RANGE_INVALID_OWNER;
+        return 0;
+    }
+    row.world_generation_low = static_cast<uint32_t>(current.world_generation);
+    row.world_generation_high = static_cast<uint32_t>(current.world_generation >> 32);
+    row.owner_epoch_low = static_cast<uint32_t>(current.owner_epoch);
+    row.owner_epoch_high = static_cast<uint32_t>(current.owner_epoch >> 32);
+    match_context_range_wire.rows[0] = row;
+    match_context_range_wire.count = 1;
+    if (!match_context_range_anchor_set) {
+        match_context_range_anchor_address = row.address;
+        match_context_range_anchor_extent = row.extent;
+        match_context_range_anchor_world_generation = current.world_generation;
+        match_context_range_anchor_owner_epoch = current.owner_epoch;
+        match_context_range_anchor_set = true;
     }
     return 1;
 }

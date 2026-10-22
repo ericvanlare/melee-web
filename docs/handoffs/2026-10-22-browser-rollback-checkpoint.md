@@ -29,14 +29,21 @@ passes in `full-regression-v3.log`. The source-review hash correction is retaine
 in `audio-range-adapter-source-review-v2-pin-correction-v1.json`; it changes no
 source or result, and the original review remains untouched.
 
-Next: implement the bounded one-row match-context range read specified in
-`dynamic-owner-bounded-design-v1.json`. Source proves that this owner changes
-during the measured step, and its existing epoch/world/callback guards can be
-reused. Defer broad NativeDat wrapper traversal; direct arenas are a fallback,
-not the current implementation. No libc traversal or inferred address ownership. Keep restoration disabled until the
-owner contract closes. Existing Aurora descriptors remain a later, separate
-draw-range diagnostic. The earlier decoder and test-fixture failures remain
-retained alongside the independent review that found them.
+The match-context range query now has independent source and raw-result review.
+Its descriptor and error outputs refuse aliases into the live owner before any
+write, with actual-source nonmutation and subsequent healthy-step controls. The
+one read-only browser census completed; it is not an aggregate restore. The
+existing status receipt retains all exact producer, validation and remaining-gap
+identities. Do not repeat this successful capture without a new hypothesis.
+
+Full regression also passes; exact-head CI for this extension is still pending.
+Next: checkpoint this result and review the bounded design for
+a pure observation accessor reusing Aurora's existing staging-shadow descriptor.
+The existing descriptor pumps events, so it cannot be called unchanged as a
+read-only census. This work identifies host-owned bytes for the no-draw boundary;
+paused drawn-correction work remains paused. Keep all memory unadmitted until
+the owner contract closes. Broad NativeDat traversal and libc/heap rewind remain
+deferred or refused; preserve all prior decoder, fixture and review failures.
 
 The machine-local packet is named
 `browser-rollback-sprint-20261022-115029-d89e262b`, discoverable through the

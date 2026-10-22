@@ -61,6 +61,8 @@ public:
     const StartMeleeData* diagnostic_start_data() const noexcept;
     MeleeWebMatchStats player_stats(unsigned index) const;
     MeleeWebAudio* audio() const;
+    MeleeWebMatchContextRangeResult diagnostic_match_context_range(
+        MeleeWebMatchContextRange*,char*,size_t) const;
     bool advance_construction();
     bool construction_complete() const;
     void close();

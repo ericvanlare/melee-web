@@ -3,12 +3,31 @@
 #include "gameplay_player_context.h"
 #include "gameplay_collision.h"
 #include "gameplay_pad_state.h"
+#include <stddef.h>
+#include <stdint.h>
 #include <dolphin/pad.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
 typedef struct MeleeWebMatchContext MeleeWebMatchContext;
 int melee_web_match_restore_input(MeleeWebMatchContext*,const MeleeWebPadState*,char*,size_t);
+/* Current live-context allocation provenance only. This descriptor contains
+ * the allocation identity/extent and its world/lifetime tags; it is not a
+ * snapshot and does not authorize memory restoration. */
+typedef struct MeleeWebMatchContextRange {
+    const void* address;
+    size_t byte_extent;
+    uint64_t world_generation;
+    uint64_t owner_epoch;
+} MeleeWebMatchContextRange;
+typedef enum MeleeWebMatchContextRangeResult {
+    MELEE_WEB_MATCH_CONTEXT_RANGE_COMPLETE=1,
+    MELEE_WEB_MATCH_CONTEXT_RANGE_INVALID_OWNER=-1,
+    MELEE_WEB_MATCH_CONTEXT_RANGE_INVALID_ARGUMENT=-2,
+    MELEE_WEB_MATCH_CONTEXT_RANGE_UNSAFE_BOUNDARY=-3
+} MeleeWebMatchContextRangeResult;
+MeleeWebMatchContextRangeResult melee_web_match_context_range_read(
+    MeleeWebMatchContext*,MeleeWebMatchContextRange*,char*,size_t);
 /* Exact C owner value snapshot; it excludes every pointed-to source/player,
  * camera, collision and SDK allocation. These require companion snapshots.
  * Pointer fields are retained as typed identities and never serialized. */

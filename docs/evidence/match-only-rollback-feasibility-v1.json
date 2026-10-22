@@ -2596,7 +2596,7 @@
       "retained_artifact": "census-owner-gap-analysis-v1.json",
       "sha256": "9908b8d2ebb8aeeb64d8df4dcdeb24ea0f16f55bab3d17e1f847c679f90ba370"
     },
-    "next_experiment": "One read-only MeleeWebMatchContext allocation row with existing owner epoch/world/callback guards; source proves input/tick mutation. Keep full NativeDat wrapper traversal deferred.",
+    "next_experiment": "Design a pure observer reusing existing Aurora staging-shadow descriptor ownership; existing descriptor pumps events and cannot be used unchanged. No capture or restore follows from this result.",
     "owner_components": {
       "scope": "Private owner components only; no browser restore exposure or complete-world claim",
       "current_files_sha256": {
@@ -2854,12 +2854,215 @@
           "retained_artifact": "audio-fx-generation-repair-v1/focused-node-v1.log",
           "sha256": "24234187c66cb5d814e202c129e575e0d3b7f6502daada9498dc9e84a18101d6"
         }
-      ]
+      ],
+      "checkpoint_ci": {
+        "head": "a8fa9af17bce1726dcf2e7e17c3cacbd75112c3a",
+        "run": 39850054390,
+        "checks": 14,
+        "success": 12,
+        "expected_skips": 2,
+        "retained_artifact": "audio-checkpoint-ci-v1.json",
+        "sha256": "da636e593995ec29158444491a59a4468b5ff92aecac6fdfebf04b86ac2b2faf",
+        "scope": "Audio census checkpoint only; later match-context changes require separate validation"
+      }
     },
     "bounded_next_design": {
       "retained_artifact": "dynamic-owner-bounded-design-v1.json",
       "sha256": "c878499c2d61edc0f74dffe51905baa5022b5db9859f3ad28f75d14d716e5b5a",
       "scope": "Source-only design, not implementation or capture admission"
+    },
+    "remaining_stack_hypothesis_review": {
+      "retained_artifact": "remaining-source-step-boundary-design-v1.json",
+      "sha256": "b0c4bdb9583857a2983566f2a5b05a9508ad0d42dd2ac81e81fb09f9af2642c1",
+      "source": "Exact retained v3 Wasm globals and stack initialization code",
+      "unmapped_source_step_stack_intersection_bytes": 796,
+      "unmapped_source_step_outside_stack_bytes": 57319,
+      "decision": "No stack-only probe/capture. Missing SP/Asyncify observations prevent safe exclusion; no restore admission. Continue exact match-context owner."
+    },
+    "match_context_owner_census_v4": {
+      "status": "MEASUREMENT_COMPLETED_INVENTORY_INCOMPLETE",
+      "scope": "One exact match-context allocation added to read-only three-boundary provenance; no restoration or timing acceptance",
+      "producer_base_commit": "546d58394bd83310df904379cd3082d1224b76bf",
+      "producer_worktree": "Uncommitted ten executable files pinned by candidate freeze and capture harness hashes; not a later committed producer",
+      "runtime_sha256": {
+        "gameplay_slippi_synctest_browser.mjs": "41a6ec691bf54948497c75dc074267a8457bba0d521e52038b92793a36802912",
+        "gameplay_slippi_synctest_browser.wasm": "c7ca7bfa9b79bcda485fc0737adcf10f2dd1c63a4643c4b0c07db2a3914d12b8",
+        "gameplay_slippi_synctest_browser.data": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c"
+      },
+      "harness_sha256": {
+        "src/slippi_profile/tests/run_write_census.mjs": "d92cfc439ba630ccae70df9ce01adf9930797acb3be57a1c82cfa4eab7d8c057",
+        "src/slippi_profile/tests/run_synctest.mjs": "9056f47614a6be583f7cb547fbf03dfd74892bd46c047147ae4efb5add5261c0",
+        "src/slippi_profile/tests/runner_contract.mjs": "1040d4c0104fd27eb8df2b7fa9e568d9da3b3cef721d4e553b4dc0c67c44ed9b",
+        "src/slippi_profile/tests/synctest_browser.cpp": "ed56ec545f3110753e268fe267944266767f543c84fb8f8106f9075a312f7edd",
+        "src/slippi_profile/tests/test_write_census_contract.mjs": "8cfece981f4952d7c935533b53f8ee4891a6ea4ba7055039f0ab919a4387c427",
+        "tests/gameplay_snapshot_probe.cpp": "5489bff017d0d92bf5345321feab641b222923514218b626e534bcf6f1ef6911",
+        "tests/gameplay_match_context_trace.c": "595dccecd4c4c8f35dc22e7f85454311f6de0d97380b701563f5298f61da893f",
+        "src/gameplay_match_context.h": "33d378f87e96aef45d2d78b8d894a052176a0c9268604ebfbff48d6252e4259a",
+        "src/gameplay_match_context.c": "0797f2b19a32ba3ac4211c8d6fa13c1fe0def99bcb361018aaa7d8dc3b5cc29e",
+        "src/gameplay_match_session.hpp": "8172728d2c24c121f4fa45e92b6daaa4f1e417c613b0b53e405f01ea0c4158d2",
+        "src/gameplay_match_session.cpp": "aee11e48b7247de9d41dd1c40e56d709256f9ce6f5b52f0aa34d2e95370bf572",
+        "src/gameplay_audio.h": "a41f7daaeadf041b07de6c6a70a78e0590804a01e35981be631866a4defbd642",
+        "src/gameplay_audio.c": "8404950944fd51f183da426d8bcbcd3fb4b3dc4e0df2e66994f4161010fe1d75",
+        "src/gameplay_audio_fx.h": "202b01270291f9523dc2a2e927efb72cdc5e73a7e04023ead2c6c17f5e639398",
+        "src/gameplay_audio_fx.c": "99f9996faf37a069a500cc19d24ed6748dab1a8e6b90834445f3bb4efba84255",
+        "src/gameplay_bootstrap.c": "a0af3794b7b9dfc92dcddde86553a17107c8717fd98d920301a3cc9cb5b7190c",
+        "src/gameplay_bootstrap.h": "f8eaba1ff107dba9f35bf7744840c22d48a7d5a57c64979102c0a7ddc530eac4",
+        "cmake/FighterRuntime.cmake": "f390a9e69270708a33f4d9b116a74370de59046433bb7759bbd85421ddf0ce39",
+        "scripts/browser_tools.mjs": "737a8ef5807edba0009487877e1b65badc3a8bb4d07ff9fcd445a7b8bef40c81",
+        "scripts/source_state_manifest.py": "c337c54b60205197d6cc130e00a1aad3fd53bb5f40a37a15d7429e41f4e9fd74"
+      },
+      "source_state_manifest": {
+        "path": "gameplay_slippi_synctest_browser.source-state.json",
+        "sha256": "caa977c6eaed1af0118c677814b6687f9943991ade557f433bc3076ab1698733",
+        "configurationIdentitySha256": "279ad70db3891716553c7f77b95f0d8fc1b288881a3fcae3d71e045f4519c6ed",
+        "wasmSha256": "c7ca7bfa9b79bcda485fc0737adcf10f2dd1c63a4643c4b0c07db2a3914d12b8",
+        "rowCount": 3128,
+        "sourceCStaticCandidates": 2051,
+        "excludedMutableInputSections": 1077,
+        "completeGameState": false
+      },
+      "all_ranges_unadmitted": true,
+      "restore_performed": false,
+      "candidate_freeze": {
+        "retained_artifact": "match-context-range-candidate-v2/freeze.json",
+        "sha256": "c8330882dbfa70c753dd83a9c38adf6119041fe570598c84c77ddfe984325332"
+      },
+      "capture": {
+        "retained_artifact": "browser-write-census-v4/runner/evidence.json",
+        "sha256": "226e23403e9a593a10fbdbfb2e827ec0ee5ed43c3b43a974bb7403aa4ad92511"
+      },
+      "preflight": {
+        "retained_artifact": "browser-write-census-v4/preflight.json",
+        "sha256": "d27f0fe63c7f51b127733a055ad4b97b395954b3898b281f2910194697ba0c52"
+      },
+      "source_review": {
+        "retained_artifact": "match-context-range-source-review-v2.json",
+        "sha256": "4d2ee67962828b432bd35e21fbd1cf40cc30a463426bc78612af7c8c6adbb19b"
+      },
+      "prior_alias_blocker": {
+        "retained_artifact": "match-context-range-source-review-v1.json",
+        "sha256": "6dbf82e8ada11346de7b937b4fda075db5a740d8c2d738a8ea5f3610c3a31d84"
+      },
+      "result_review": {
+        "retained_artifact": "match-context-range-census-result-review-v1.json",
+        "sha256": "a439f8531384c9f8fe18b553960e08d04bd3058d50aa59d0a06ee09ef4959913"
+      },
+      "owner": {
+        "retained_artifact": "browser-write-census-v4/owner.json",
+        "sha256": "fd2a30bfbbacb25ca21bbb762935e27584f343ad82ecfc79dad1ee188b2737a5"
+      },
+      "independent_cleanup": {
+        "retained_artifact": "browser-write-census-v4/independent-cleanup.json",
+        "sha256": "d3fbfd3c469296d50acda4a3c06bd728c32e1a635ed488b7a74a35d750dd172a"
+      },
+      "visual_observation": {
+        "retained_artifact": "browser-write-census-v4/root-visual-observation.json",
+        "sha256": "75e08304c64954520020ae516544f60a89004b1b363909b2ff1dece6489b7e6f"
+      },
+      "focused_controls": {
+        "fighter_build": {
+          "retained_artifact": "match-context-range-candidate-v2/fighter-target-build-final.log",
+          "sha256": "1e8b78a104b3bf11277dbf73b4f95c1392c89f38facb5ff6fb2c68489bc9adcd",
+          "outcome": "passed; the existing fighter target compiled the changed source query and actual trace controls."
+        },
+        "actual_context_trace": {
+          "retained_artifact": "match-context-range-candidate-v2/actual-context-trace-final.log",
+          "sha256": "43b0fdf2a49fc5af7fe7db4b7e022d4ac39b0a727b9d00b34567a2c54d6d0c7d",
+          "outcome": "passed; existing actual fighter probe exercised alias refusals, healthy read/step, restart cycles and two worlds."
+        },
+        "write_census_contract": {
+          "retained_artifact": "match-context-range-candidate-v2/node-focused-final.log",
+          "sha256": "e22b68244d298e9831c0fab89e084f967871ad72935a2031e765dc427974f342",
+          "outcome": "passed; 17 tests, 0 failures."
+        }
+      },
+      "observed": {
+        "sample": 300,
+        "prefix_samples": 300,
+        "source_frame": 177,
+        "match_owner_extent": 2488,
+        "stable_boundary_count": 3,
+        "match_context_source_step_changed_bytes": 8,
+        "match_context_draw_changed_bytes": 0,
+        "transitions": {
+          "sourceStep": {
+            "net_changed_bytes": 89827,
+            "provenance_bytes": {
+              "source-c-static-candidate": 3716,
+              "excluded-mutable-input-section": 335,
+              "native-output-storage-diagnostic-excluded": 2939,
+              "unmapped": 47785,
+              "gameplay-arena": 19238,
+              "match-context-owner-range": 8,
+              "audio-owner-range": 15806
+            }
+          },
+          "actualDrawAndQuiescence": {
+            "net_changed_bytes": 735751,
+            "provenance_bytes": {
+              "source-c-static-candidate": 21,
+              "excluded-mutable-input-section": 1063,
+              "unmapped": 734021,
+              "gameplay-arena": 646
+            }
+          }
+        },
+        "count_basis": "Net differences per transition, not unique state size or performance comparison",
+        "gpu": {
+          "initialized": true,
+          "backend": 7,
+          "pendingFramePackets": 0,
+          "pendingStagingBuffers": 0,
+          "workerBusy": 0,
+          "rendererErrorCount": 0,
+          "drawCallCount": 237,
+          "lastBeginFrameId": 301,
+          "lastEndFrameId": 301,
+          "createdPipelines": 57,
+          "queuedPipelines": 0
+        },
+        "input_sha256": "46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288"
+      },
+      "validation": {
+        "affected_release_builds": {
+          "retained_artifact": "match-context-range-integration-v1/build-results.json",
+          "sha256": "1f9221b14d956765abca21580dfa3cbad38fe88e31709dbc8159e78b55f7333c"
+        },
+        "full_regression": {
+          "status": "PASS",
+          "tests": 2445,
+          "skips": 165,
+          "seconds": 530.297,
+          "retained_artifact": "full-regression-v4.log",
+          "sha256": "d22b93206ffb2b9921b2eb5ab79cea8b95162966741c5e8cb0c01acaa4b3bf10",
+          "scope": "Match-context provenance extension plus existing regression; no browser restore"
+        }
+      },
+      "limits": [
+        "Other source/project, descriptor and host ownership remains; no aggregate browser restore",
+        "No same-value/transient store coverage; boundary quiescence does not rule out completed transient transfers",
+        "V3/V4 have distinct producers; their total difference is not explained by eight newly attributed bytes",
+        "Known magenta/texture artifacts; no pixel-accuracy claim"
+      ],
+      "retained_failures": [
+        {
+          "retained_artifact": "match-context-range-candidate-v1/attempts/fighter-runtime-probe-focused-build.log",
+          "sha256": "a0591c760be629ba438165e963fc258a55714fe7706b70679e49d478d3399711"
+        },
+        {
+          "retained_artifact": "match-context-range-candidate-v1/attempts/node-focused-1.log",
+          "sha256": "659f73fe782add042f6ca4ec17b79a7c39522efa94cc26ae005045d35d7566ab"
+        }
+      ],
+      "retained_current_runtime": {
+        "retained_artifact": "retained-census-v4-producer/retention.json",
+        "sha256": "20521cb2beaf8699e6094927c758d3d37c8786985874cb5185fdec17f97b25a3"
+      }
+    },
+    "aurora_range_next_design": {
+      "retained_artifact": "aurora-range-bounded-design-v1.json",
+      "sha256": "eddd825feef357be8357fde4f1757a5b8d66cf60259e3e603b9d3a50dbd12c34",
+      "scope": "Pure host-provenance observer design only; no renderer restoration, drawn correction or automatic exclusion admission"
     }
   }
 }
