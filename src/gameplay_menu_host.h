@@ -274,6 +274,11 @@ int melee_web_menu_host_first_sss_pair(
 /* One-shot diagnostic draw after the exact last retained CSS input requested
  * a transition. The ordinal/sequence and PAD must match the retained result-3
  * host tick; the authorization does not clear or rewrite that request. */
+int melee_web_menu_host_reserve_fresh_finite_css_v4(MeleeWebMenuHost*,
+    unsigned terminal_ordinal,unsigned terminal_sequence,char*,size_t);
+int melee_web_menu_host_arm_fresh_final_pending_css_draw_v4(MeleeWebMenuHost*,
+    unsigned input_ordinal,unsigned consumed_pad_sequence,const PADStatus raw[4],char*,size_t);
+int melee_web_menu_host_draw_fresh_final_pending_css_v4(MeleeWebMenuHost*,char*,size_t);
 int melee_web_menu_host_arm_final_pending_css_draw(MeleeWebMenuHost*,
     unsigned input_ordinal, unsigned consumed_pad_sequence,
     const PADStatus raw[4], char*, size_t);

@@ -15,6 +15,8 @@ browser diagnostic now pass their declared comparisons. The first-row capture
 and runtime/harness use `171818fd`; a test-only scoped-import fixture repair
 then passed its focused check and full regression on `1e96b2a9`. The initial
 `171818fd` suite failed in that extracted fixture and remains retained.
+The later finite-CSS implementation, focused controls and post-repair full
+regression pass; clean commit and capture preflight remain pending.
 The [structured receipt](../evidence/issue251-stadium-profile-oninit-v1.json),
 under `fresh_go2_comparison_2026_10_18`, records the failure, passing component
 validation and cleanup. C3 and public Stadium admission remain open.
@@ -1899,8 +1901,41 @@ controls. The reviewed command-only `-B` fix prevents bytecode output outside th
 owned result directories; no extractor or retained-derivation bytecode cache is
 present after the runs. This prepares 141 ordinary tick comparisons and 142 draw
 comparisons; it does not execute or pass them. The terminal tick stays explicitly
-unpaired. Next is a bounded native finite-CSS capability and focused controls
-after independent review; no further native/browser run or capture is released.
+unpaired. The implementation checkpoint below adds source/codec controls and
+build evidence; the finite browser/original comparisons remain unrun.
+
+**Finite-CSS implementation checkpoint (October 22):** The independently reviewed
+FC4 private capability is applied on `879e23d1`, with source base `1e96b2a9`.
+Its frozen patch is retained exactly; the subsequent applied-test cleanup removes
+only two trailing spaces. The complete enclosing source-step-loop control corrects
+the earlier partial-control-flow finding: terminal result 3 breaks before the
+shared pending-preparation handler. The final authorization succeeds with pending
+false; a forced shared-tail mutation refuses, while ordinary result 3 still enters
+preparation. This is extracted source-control evidence with explicit services,
+not scene or restore parity.
+
+The source-bound consolidated controls pass 16 tests with no skips in 7.435
+seconds. Diagnostic and ordinary Release builds both pass. The first integration
+regression fails with two errors among 2,737 tests and 189 skips in 570.596 seconds:
+two finite controls required a machine-local evidence-root variable during ordinary
+discovery. That failure remains retained. The independently approved test-only
+repair supplies a deterministic seven-row synthetic receipt graph to the actual
+loaders and real SDK decoder, preserving 13 receipt refusals, eight comparator
+refusals, 38 queued cases and 46 native-decoder refusals. Signed PAD fields are
+also checked. Default focused controls pass five tests with two explicitly
+optional retained-original tests skipped; the separate opt-in run passes all
+seven controls, including the 142-row retained-original inputs. These are
+schema/codec/orchestration controls with explicit source and service doubles.
+
+The post-repair full regression passes 2,739 tests with 191 skips in 558.620
+seconds. The clean implementation commit and refreshed exact source/build
+preflight remain pending.
+The [structured receipt](../evidence/issue251-stadium-profile-oninit-v1.json), at
+`fresh_go2_comparison_2026_10_18.fresh_css_finite_original_preparation.implementation_checkpoint_2026_10_22`,
+binds the source freeze, reviews, exact application, cleanup, build outputs,
+failed regression and fixture repair by artifact-relative names and exact hashes.
+Finite browser/original capture is unrun; terminal scheduler equality,
+SSS/VS/GO continuation, whole-session acceptance and C3 remain open.
 
 
 The earlier GO+2 supervised attempt took 15.248 seconds (15.317 seconds including the root

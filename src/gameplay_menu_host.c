@@ -159,6 +159,12 @@ struct MeleeWebMenuHost {
      * authorization. The witness records only native owner identities and
      * the exact raw PAD values consumed by the immediately preceding tick. */
     int final_pending_css_draw_witness;
+    uint64_t fresh_finite_css_v4_generation;
+    MeleeWebMenuSession* fresh_finite_css_v4_session;
+    unsigned fresh_finite_css_v4_reserved;
+    unsigned fresh_finite_css_v4_terminal_ordinal;
+    unsigned fresh_finite_css_v4_terminal_sequence;
+    unsigned final_pending_css_draw_permit_version;
     int final_pending_css_draw_state; /* 0 unused, 1 armed, 2 consumed/invalid */
     int final_pending_css_draw_returned;
     int final_pending_css_draw_tick_result;
@@ -2899,14 +2905,36 @@ int melee_web_menu_host_draw(MeleeWebMenuHost* h,char* e,size_t n){
     return host_draw_render(h,e,n);
 }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-int melee_web_menu_host_arm_final_pending_css_draw(MeleeWebMenuHost* h,
+int melee_web_menu_host_reserve_fresh_finite_css_v4(MeleeWebMenuHost* h,
+    unsigned terminal_ordinal,unsigned terminal_sequence,char* e,size_t n){
+    if(!h || h!=owner || h->fresh_finite_css_v4_reserved || h->entered ||
+       h->drawing || !h->session || melee_web_gameplay_stats().generation==0 ||
+       melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_CREATED ||
+       !terminal_ordinal || !terminal_sequence)
+        return fail(e,n,"Fresh finite CSS requires an unused prepared host reservation");
+    h->fresh_finite_css_v4_generation=melee_web_gameplay_stats().generation;
+    h->fresh_finite_css_v4_session=h->session;
+    h->fresh_finite_css_v4_terminal_ordinal=terminal_ordinal;
+    h->fresh_finite_css_v4_terminal_sequence=terminal_sequence;
+    h->fresh_finite_css_v4_reserved=1;
+    return ok(e,n);
+}
+static int arm_final_pending_css_draw(MeleeWebMenuHost* h, unsigned version,
     unsigned input_ordinal, unsigned consumed_pad_sequence,
     const PADStatus raw[4], char* e, size_t n)
 {
     unsigned port;
+    if (h && h == owner && version == 1 && h->fresh_finite_css_v4_reserved)
+        return fail(e, n, "Legacy final CSS draw arm refuses a finite-reserved host");
     if (!h || h != owner || h->final_pending_css_draw_state != 0 ||
         h->final_pending_css_draw_witness != 1 || raw == NULL ||
-        input_ordinal != 148 || consumed_pad_sequence != 1574 ||
+        (version != 1 && version != 4) ||
+        (version == 1 && (input_ordinal != 148 || consumed_pad_sequence != 1574)) ||
+        (version == 4 && (!h->fresh_finite_css_v4_reserved ||
+         h->session!=h->fresh_finite_css_v4_session ||
+         h->generation!=h->fresh_finite_css_v4_generation ||
+         input_ordinal!=h->fresh_finite_css_v4_terminal_ordinal ||
+         consumed_pad_sequence!=h->fresh_finite_css_v4_terminal_sequence)) ||
         h->final_pending_css_draw_tick_result !=
             MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED) {
         if (h && h == owner) h->final_pending_css_draw_state = 2;
@@ -2928,17 +2956,27 @@ int melee_web_menu_host_arm_final_pending_css_draw(MeleeWebMenuHost* h,
     h->final_pending_css_draw_returned = 0;
     h->final_pending_css_draw_input_ordinal = input_ordinal;
     h->final_pending_css_draw_pad_sequence = consumed_pad_sequence;
+    h->final_pending_css_draw_permit_version = version;
     h->final_pending_css_draw_state = 1;
     return ok(e, n);
 }
 
-int melee_web_menu_host_draw_final_pending_css(MeleeWebMenuHost* h,
+static int draw_final_pending_css(MeleeWebMenuHost* h, unsigned version,
                                                 char* e, size_t n)
 {
+    if (h && h == owner && version == 1 && h->fresh_finite_css_v4_reserved)
+        return fail(e, n, "Legacy final CSS draw refuses a finite-reserved host");
     if (!h || h != owner || h->final_pending_css_draw_state != 1 ||
         h->final_pending_css_draw_witness != 1 ||
-        h->final_pending_css_draw_input_ordinal != 148 ||
-        h->final_pending_css_draw_pad_sequence != 1574) {
+        h->final_pending_css_draw_permit_version != version ||
+        (version != 1 && version != 4) ||
+        (version == 1 && (h->final_pending_css_draw_input_ordinal != 148 ||
+         h->final_pending_css_draw_pad_sequence != 1574)) ||
+        (version == 4 && (!h->fresh_finite_css_v4_reserved ||
+         h->session!=h->fresh_finite_css_v4_session ||
+         h->generation!=h->fresh_finite_css_v4_generation ||
+         h->final_pending_css_draw_input_ordinal!=h->fresh_finite_css_v4_terminal_ordinal ||
+         h->final_pending_css_draw_pad_sequence!=h->fresh_finite_css_v4_terminal_sequence))) {
         if (h && h == owner) h->final_pending_css_draw_state = 2;
         return fail(e, n,
                     "Final CSS draw requires its one-use retained host authorization");
@@ -2951,6 +2989,21 @@ int melee_web_menu_host_draw_final_pending_css(MeleeWebMenuHost* h,
     h->final_pending_css_draw_returned = 1;
     return ok(e,n);
 }
+int melee_web_menu_host_arm_final_pending_css_draw(MeleeWebMenuHost* h,
+    unsigned ordinal,unsigned sequence,const PADStatus raw[4],char* e,size_t n){
+    return arm_final_pending_css_draw(h,1,ordinal,sequence,raw,e,n);
+}
+int melee_web_menu_host_draw_final_pending_css(MeleeWebMenuHost* h,char* e,size_t n){
+    return draw_final_pending_css(h,1,e,n);
+}
+int melee_web_menu_host_arm_fresh_final_pending_css_draw_v4(MeleeWebMenuHost* h,
+    unsigned ordinal,unsigned sequence,const PADStatus raw[4],char* e,size_t n){
+    return arm_final_pending_css_draw(h,4,ordinal,sequence,raw,e,n);
+}
+int melee_web_menu_host_draw_fresh_final_pending_css_v4(MeleeWebMenuHost* h,char* e,size_t n){
+    return draw_final_pending_css(h,4,e,n);
+}
+
 #endif
 
 static int host_leave_source_scene(MeleeWebMenuHost* h, char* e, size_t n)

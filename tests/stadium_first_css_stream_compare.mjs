@@ -75,8 +75,7 @@ function validHex(value, byteLength) {
 
 // This callback receives actual native snapshots only. Expected rows remain in
 // the browser page and are never passed into WASM or native source memory.
-export function createFirstCssStreamComparator(expectedPairs) {
-  validateExpectedPairs(expectedPairs);
+function createCssStreamComparator(expectedPairs, policy) {
   let nextIndex = 0;
   let pendingDraw = false;
   let terminal = false;
@@ -102,8 +101,8 @@ export function createFirstCssStreamComparator(expectedPairs) {
       return false;
     }
     if (phase === 'tick') {
-      if (pendingDraw || nextIndex >= BATCH_COUNT ||
-          !compareTick(actual, expectedPairs[nextIndex].expected_post_tick, nextIndex)) {
+      if (pendingDraw || nextIndex >= policy.count ||
+          !policy.tick(actual, expectedPairs[nextIndex].expected_post_tick, nextIndex)) {
         failed = true;
         return false;
       }
@@ -111,14 +110,14 @@ export function createFirstCssStreamComparator(expectedPairs) {
       return true;
     }
     if (phase === 'draw') {
-      if (!pendingDraw || nextIndex >= BATCH_COUNT ||
+      if (!pendingDraw || nextIndex >= policy.count ||
           !compareDraw(actual, expectedPairs[nextIndex].expected_draw_return)) {
         failed = true;
         return false;
       }
       pendingDraw = false;
       nextIndex += 1;
-      if (nextIndex === BATCH_COUNT) {
+      if (nextIndex === policy.count) {
         terminal = true;
         outcome = 'bounded_pair_cap';
       }
@@ -128,7 +127,7 @@ export function createFirstCssStreamComparator(expectedPairs) {
       if (pendingDraw || actual.tick_result !== 3 ||
           actual.executed_host_ticks !== nextIndex + 2 ||
           actual.stream_input_ordinal !== nextIndex + 1 ||
-          actual.consumed_pad_sequence !== FIRST_CONSUME_SEQUENCE + nextIndex * 5 ||
+          actual.consumed_pad_sequence !== policy.consume(nextIndex) ||
           actual.source_tick !== nextIndex + 1 ||
           actual.draw_ordinal !== nextIndex + 1 ||
           !Number.isInteger(actual.scene_frame) || actual.scene_frame < 0 ||
@@ -144,7 +143,7 @@ export function createFirstCssStreamComparator(expectedPairs) {
       }
       terminalObservation = actual;
       terminal = true;
-      if (nextIndex === BATCH_COUNT - 1) {
+      if (nextIndex === policy.count - 1) {
         // A native transition request on the last retained additional input is
         // a bounded stop before any native draw. It follows 147 approved
         // pairs and is neither a terminal-tick comparison nor completion
@@ -165,6 +164,12 @@ export function createFirstCssStreamComparator(expectedPairs) {
     status: () => Object.freeze({next_index: nextIndex, pending_draw: pendingDraw,
       terminal, failed, outcome, terminal_observation: terminalObservation}),
   });
+}
+
+export function createFirstCssStreamComparator(expectedPairs) {
+  validateExpectedPairs(expectedPairs);
+  return createCssStreamComparator(expectedPairs, {count:BATCH_COUNT,
+    tick:compareTick,consume:index=>FIRST_CONSUME_SEQUENCE+index*5});
 }
 
 export function requestSynchronousApproval(callback, phase, actualJson) {
@@ -218,6 +223,123 @@ export function createFirstCssFinalDrawComparator(expectedPair, terminal) {
   };
   return Object.freeze({compare,
     status: () => Object.freeze({attempted, approved, failed})});
+}
+
+// Fresh finite factories require a separately versioned input-only descriptor.
+// The public legacy factories above retain their exact historical contract.
+const FRESH_TICK_FIELDS=Object.freeze(['source_stream_sha256','consumed_pad_sequence',
+ 'source_tick_sequence','source_tick_value','source_draw_ordinal','original_source_frame',
+ 'phase_relation','source_scene_kind','host_source_scene','host_menu_phase',
+ 'native_post_host_tick_frame','random_seed_hex','pad_state_hex']);
+const FRESH_DRAW_FIELDS=Object.freeze(['source_tick','draw_ordinal','pad_state_hex',
+ 'random_seed_hex','scene_frame','scene_kind','scene_routing_getters']);
+const u32=value=>Number.isInteger(value)&&value>=0&&value<=0xffffffff;
+export function validateFreshFiniteCssExpected(descriptor, expected) {
+ if(!exactOwnKeys(descriptor,['schema','version','source_sha256','context_entry_sequence',
+    'context_return_sequence','exclusive_phase_end_sequence','row_count','raw_rows',
+    'baseline_index','terminal_index','rows','native_codec_implemented','contains_expected_state'])||descriptor.schema!=='stadium-fresh-css-finite-input-metadata-v1'||
+    descriptor.version!==1||!validHex(descriptor.source_sha256,32)||/^0+$/.test(descriptor.source_sha256)||
+    !u32(descriptor.context_entry_sequence)||!u32(descriptor.context_return_sequence)||
+    !u32(descriptor.exclusive_phase_end_sequence)||
+    !(descriptor.context_entry_sequence<descriptor.context_return_sequence&&
+      descriptor.context_return_sequence<descriptor.exclusive_phase_end_sequence)||
+    !u32(descriptor.row_count)||descriptor.row_count<2||
+    !Array.isArray(descriptor.rows)||descriptor.rows.length!==descriptor.row_count||
+    descriptor.baseline_index!==0||descriptor.terminal_index!==descriptor.row_count-1||
+    descriptor.native_codec_implemented!==false||descriptor.contains_expected_state!==false||
+    !plainObject(expected)||expected.schema!=='stadium-fresh-css-finite-host-expected-v1'||
+    expected.version!==1||expected.terminal_tick!=='EXPLICITLY_UNPAIRED'||
+    expected.all_draw_equality!=='PROPOSED_ONLY_NOT_EXECUTED'||expected.source_admission!==false||
+    !Array.isArray(expected.rows)||expected.rows.length!==descriptor.row_count||
+    JSON.stringify(expected.tick_scalar_comparison_fields)!==JSON.stringify(FRESH_TICK_FIELDS)||
+    JSON.stringify(expected.tick_deep_comparison_fields)!=='["scene_routing_getters"]'||
+    JSON.stringify(expected.draw_comparison_fields)!==JSON.stringify(FRESH_DRAW_FIELDS))
+  throw Error('Fresh finite CSS descriptor/host inventory differs');
+ let previous=descriptor.context_return_sequence;
+ descriptor.rows.forEach((row,index)=>{
+  const refs=[row.consumed_pad_sequence,row.source_tick_sequence,row.draw_enter_sequence,
+   row.draw_return_sequence,row.pad_poll_sequence];
+  const pair=expected.rows[index];
+  if(!exactOwnKeys(row,['ordinal','consumed_pad_sequence','source_tick_sequence','draw_enter_sequence',
+      'draw_return_sequence','pad_poll_sequence','consume_source_tick','consume_draw_ordinal',
+      'tick_source_tick','tick_draw_ordinal','draw_source_tick','draw_ordinal','poll_source_tick',
+      'poll_draw_ordinal','raw_four_port_hex','intervening_non_target_record_counts'])||row.ordinal!==index||!refs.every(u32)||
+     !refs.every((value,i)=>value===(i?refs[i-1]:previous)+1)||
+     refs.at(-1)>=descriptor.exclusive_phase_end_sequence||
+     row.consume_source_tick!==index||row.tick_source_tick!==index||
+     row.consume_draw_ordinal!==index||row.tick_draw_ordinal!==index||
+     row.draw_source_tick!==index+1||row.draw_ordinal!==index||
+     row.poll_source_tick!==index+1||row.poll_draw_ordinal!==index+1||
+     JSON.stringify(row.intervening_non_target_record_counts)!=='[0,0,0,0]'||
+     !validHex(row.raw_four_port_hex,44)||!plainObject(pair)||
+     JSON.stringify(pair.metadata)!==JSON.stringify(row)||
+     !Array.isArray(pair.input_port_status_hex)||pair.input_port_status_hex.length!==4||
+     pair.input_port_status_hex.join('')!==row.raw_four_port_hex||
+     !pair.input_port_status_hex.every(value=>validHex(value,11)))
+   throw Error(`Fresh finite CSS row ${index} source pairing/input differs`);
+  const terminal=index===descriptor.row_count-1;
+  if(!exactOwnKeys(pair,['metadata','input_port_status_hex','expected_draw_enter','expected_draw_return',
+      ...(terminal?['original_scheduler_end_unpaired','terminal_tick_equality_proposed','native_result3_required_but_unrun']:['expected_post_tick'])]))
+   throw Error(`Fresh finite CSS row ${index} host expectation keys differ`);
+  const tick=terminal?pair.original_scheduler_end_unpaired:pair.expected_post_tick;
+  const wantedPhase=`native host post-tick sample at frame ${index+1} versus original scheduler-end SourceTick ${refs[1]} before frame increment at frame ${index}`;
+  if(!plainObject(tick)||FRESH_TICK_FIELDS.some(key=>!Object.hasOwn(tick,key))||
+     tick.source_stream_sha256!==descriptor.source_sha256||
+     tick.consumed_pad_sequence!==refs[0]||tick.source_tick_sequence!==refs[1]||
+     tick.source_tick_value!==index||tick.source_draw_ordinal!==index||
+     tick.original_source_frame!==index||tick.native_post_host_tick_frame!==index+1||tick.phase_relation!==wantedPhase||
+     tick.source_scene_kind!==8||tick.host_source_scene!==1||tick.host_menu_phase!==1||
+     !validHex(tick.random_seed_hex,4)||!validHex(tick.pad_state_hex,822)||
+     !exactRoute(tick.scene_routing_getters,tick.scene_routing_getters)||
+     (terminal&&(Object.hasOwn(pair,'expected_post_tick')||
+      pair.terminal_tick_equality_proposed!==false||pair.native_result3_required_but_unrun!==true)))
+   throw Error(`Fresh finite CSS row ${index} scheduler expectation differs`);
+  for(const [name,seq,boundary] of [['expected_draw_enter',refs[2],'draw_enter'],
+       ['expected_draw_return',refs[3],'draw_return']]){
+   const draw=pair[name];
+   if(!plainObject(draw)||draw.sequence!==seq||draw.boundary!==boundary||
+      draw.source_tick!==index+1||draw.draw_ordinal!==index||draw.scene_frame!==index+1||
+      draw.scene_kind!==8||!validHex(draw.random_seed_hex,4)||!validHex(draw.pad_state_hex,822)||
+      !exactRoute(draw.scene_routing_getters,draw.scene_routing_getters))
+    throw Error(`Fresh finite CSS row ${index} draw expectation differs`);
+  }
+  if(FRESH_DRAW_FIELDS.some(key=>JSON.stringify(pair.expected_draw_enter[key])!==
+       JSON.stringify(pair.expected_draw_return[key])))
+   throw Error(`Fresh finite CSS row ${index} draw tracked state changed`);
+  previous=refs.at(-1);
+ });
+ if(previous+1!==descriptor.exclusive_phase_end_sequence)
+  throw Error('Fresh finite CSS omitted phase-end rows');
+}
+export function createFreshFiniteCssStreamComparator(descriptor, expected) {
+ validateFreshFiniteCssExpected(descriptor,expected);
+ const pairs=structuredClone(expected.rows.slice(1));
+ const rows=structuredClone(descriptor.rows.slice(1));
+ return createCssStreamComparator(pairs,{count:pairs.length,
+  consume:index=>rows[index].consumed_pad_sequence,
+  tick:(actual,wanted)=>plainObject(actual)&&plainObject(wanted)&&stableCssOwner(actual)&&
+   FRESH_TICK_FIELDS.every(key=>actual[key]===wanted[key])&&
+   exactRoute(actual.scene_routing_getters,wanted.scene_routing_getters)});
+}
+export function createFreshFiniteCssFinalDrawComparator(descriptor, expected, terminal) {
+ validateFreshFiniteCssExpected(descriptor,expected);
+ const last=descriptor.rows.at(-1),wanted=structuredClone(expected.rows.at(-1).expected_draw_return);
+ if(!plainObject(terminal)||!stableCssOwner(terminal)||
+    !Number.isInteger(terminal.world_generation)||terminal.world_generation<=0||
+    terminal.source_tick!==last.tick_source_tick||terminal.draw_ordinal!==last.tick_draw_ordinal||
+    terminal.consumed_pad_sequence!==last.consumed_pad_sequence||
+    terminal.stream_input_ordinal!==last.ordinal||terminal.executed_host_ticks!==descriptor.row_count||
+    terminal.tick_result!==3||terminal.terminal_transition!==true)
+  throw Error('Fresh final CSS draw requires its last literal-input result3 owner');
+ const generation=terminal.world_generation;
+ let attempted=false,approved=false,failed=false;
+ const compare=(phase,json)=>{
+  if(attempted){failed=true;return false;}attempted=true;
+  let actual;try{actual=JSON.parse(json);}catch{failed=true;return false;}
+  approved=phase==='final_draw'&&compareDraw(actual,wanted)&&actual.world_generation===generation;
+  failed=!approved;return approved===true;
+ };
+ return Object.freeze({compare,status:()=>Object.freeze({attempted,approved,failed})});
 }
 
 const FIRST_SSS_STREAM_SHA256 = '361e8c1108cc2d02ba94d1f3b3be9612a80d0227672445cd4a2b0e2119917778';

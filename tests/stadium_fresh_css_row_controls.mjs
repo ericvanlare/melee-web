@@ -9,7 +9,7 @@ const root=path.resolve(process.argv[2]);
 const driver=await fsReal.readFile(path.join(root,'tests/stadium_c1a_browser_test.mjs'),'utf8');
 const development=await fsReal.readFile(path.join(root,'web/runtime-development.mjs'),'utf8');
 const digest=b=>createHash('sha256').update(b).digest('hex');
-const loader=driver.slice(driver.indexOf('async function loadFirstCssFreshRowInputs()'),driver.indexOf('let firstCssBrowserStreamInputs ='));
+const loader=driver.slice(driver.indexOf('async function loadFirstCssFreshRowInputs('),driver.indexOf('async function loadFirstCssFreshFiniteInputs()'));
 const entryComparator=driver.slice(driver.indexOf('function assertFirstCssBrowserEntry('),driver.indexOf('function assertFirstCssBrowserTick('));
 const begin=driver.indexOf('async function runFirstCssBrowserDraw(');
 const prefix=driver.slice(driver.indexOf('  const arm = await timeout(page.evaluate(',begin),driver.indexOf('  await timeout(page.waitForFunction(',driver.indexOf('  const kick = await timeout(',begin)));
@@ -84,7 +84,7 @@ const run=new Function('assert','input','options',`'use strict';return (async()=
  const $=()=>({focus:()=>{}});
  ${helper}
  globalThis.Module=Module;globalThis.meleeStadiumFirstCssFreshRowLaunch=window.meleeStadiumFirstCssFreshRowLaunch;globalThis.meleeStadiumFirstCssFreshRowKick=window.meleeStadiumFirstCssFreshRowKick;
- const firstCssFreshRow=true,firstCssBrowserDrawInputs=input;
+ const firstCssFreshRow=true,firstCssFreshFinite=false,firstCssBrowserDrawInputs=input;
  const page={evaluate:async(fn,arg)=>fn(arg)};
  const timeout=p=>p,remaining=()=>5000,LIMITS={sourceTransitionMs:20000};
  const report={scenario:{}},persistReport=async()=>{persisted++;if(persisted===1&&options.beforeKick)mutate(options.beforeKick);};

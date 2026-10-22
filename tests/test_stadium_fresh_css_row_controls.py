@@ -108,12 +108,13 @@ int main(){
             return source[source.index(a):source.index(b)]
         enum = cut('enum class FirstCssBrowserMode : unsigned {','struct FirstCssDrawSample {')
         failure = cut('void first_css_browser_draw_fail(const std::string& error){','void first_css_browser_draw_check_live(')
-        arm = cut('int melee_web_native_menu_stadium_first_css_fresh_row_v3_arm(',
+        arm = cut('int first_css_fresh_input_arm(',
                   'int melee_web_native_menu_stadium_first_css_draw_kick()')
         state = OWNER_STATE.replace(' int tick_result=0;std::string error;',
             ' melee_web::stadium_first_css_diagnostic::ContextInput context{};\n'
             ' melee_web::stadium_first_css_diagnostic::ConsumedPadInput consumed{};\n'
             ' melee_web::stadium_first_css_diagnostic::FreshRowInput fresh_row{};\n'
+            ' melee_web::stadium_first_css_diagnostic::FreshFiniteCssInput finite_css{};\n'
             ' PADStatus consumed_status[4]{};\n int tick_result=0;std::string error;')
         fixture = '\n'.join(line for line in OWNER_FIXTURE.splitlines() if not line.startswith('#include'))
         cpp = self.scratch/'arm.cpp'
@@ -121,7 +122,7 @@ int main(){
             '#include <cassert>\n#include <cstring>\n#include <iostream>\n#include <memory>\n#include <vector>\n'
             'namespace control {\n'+fixture+
             '\nnamespace melee_web { namespace stadium_first_css_diagnostic = ::melee_web::stadium_first_css_diagnostic; }\n'
-            +enum+state+ARM_SERVICES+failure+arm+ARM_MAIN+'\n}\nint main(){return control::run();}\n')
+            +enum+state+ARM_SERVICES+failure+arm+ARM_MAIN.replace(' std::cout<<"PASS actual fresh arm;',FINITE_ARM_MAIN+'\n std::cout<<"PASS actual fresh arm;')+'\n}\nint main(){return control::run();}\n')
         js = self.scratch/'arm.js'
         self.command([str(compiler),str(cpp),'-o',str(js),'-std=gnu++20','-O0','-fexceptions',
                       '-DAURORA','-DAURORA_ENABLE_GX','-DTARGET_PC','-sEXIT_RUNTIME=1',
@@ -136,7 +137,11 @@ int main(){
         self.assertIn('"result":"PASS"', output)
         print(output.strip())
 
-    def test_extracted_owner_kick_and_source_free_callback_fences(self):
+    def test_finite_owner_kick_and_source_free_callback_fences(self):
+        self.scratch=self.scratch/'finite-owner';self.scratch.mkdir()
+        self.test_extracted_owner_kick_and_source_free_callback_fences(finite=True)
+
+    def test_extracted_owner_kick_and_source_free_callback_fences(self, finite=False):
         compiler = shutil.which('clang++')
         if not compiler:
             self.skipTest('clang++ required for owner control')
@@ -163,7 +168,23 @@ int main(){
         launch_admission=menu[menu.index('int melee_web_native_menu_launch(){try{'):
             menu.index(' if(preparation.busy()||pending)', menu.index('int melee_web_native_menu_launch(){try{'))]
         fixture+='\n'+launch_admission+'++constructor_entries;return 1;}catch(...){return 0;}}\n'
-        fixture+='\nvoid callback(){'+command_line+'\nif(owner_action<0)return;\n'+fences+'\n++poll_or_audio_or_preparation_calls;}\n'+OWNER_MAIN
+        main=OWNER_MAIN
+        if finite:
+            main=main.replace('FreshConsumedTickDrawV3','FreshFiniteCssPrefixV4').replace('melee_web_native_menu_stadium_first_css_fresh_row_v3_kick','melee_web_native_menu_stadium_first_css_fresh_finite_v4_first_kick')
+            main=main.replace('for(int mode:{1,2})','for(int mode:{1,2,3})')
+            main=main.replace(' reset();enter();s.mode=FirstCssBrowserMode::LegacyTickDrawV1;',r'''
+ for(bool final_failed:{false,true}){reset();enter();auto& b=first_css_browser_draw;
+  b.kicked=true;b.complete=true;b.tick_captured=true;b.draw_captured=true;b.frame_end_returned=true;b.tick_result=1;
+  b.source_steps=b.source_draws=b.host_tick_calls=b.host_draw_calls=b.aurora_begin_calls=b.aurora_end_calls=1;
+  running=false;first_use_draw_pending=false;
+  first_css_browser_postdraw_stream.armed=first_css_browser_postdraw_stream.kicked=first_css_browser_postdraw_stream.terminal=true;
+  first_css_final_pending_draw.kicked=true;first_css_final_pending_draw.failed=final_failed;first_css_final_pending_draw.complete=!final_failed;
+  callback();callback();assert(commands==2&&b.fresh_terminal_callbacks==2&&!b.failed&&poll_or_audio_or_preparation_calls==0);
+  queued_unload=true;callback();assert(!host&&!world&&commands==3&&poll_or_audio_or_preparation_calls==1);
+ }
+ reset();enter();s.mode=FirstCssBrowserMode::LegacyTickDrawV1;''')
+
+        fixture+='\nvoid callback(){'+command_line+'\nif(owner_action<0)return;\n'+fences+'\n++poll_or_audio_or_preparation_calls;}\n'+main
         cpp=self.scratch/'owners.cpp';cpp.write_text(fixture)
         binary=self.scratch/'owners'
         self.command([compiler,'-std=c++20','-Wall','-Wextra','-Werror',str(cpp),'-o',str(binary)],'owners-compile')
@@ -199,6 +220,7 @@ struct State{
  const uint32_t* seed_owner=nullptr;const GameModeState::GameSceneInfo* scene_owner=nullptr;
  struct{uint32_t random_seed=0;}entry;
 }first_css_browser_draw;
+struct Stage{bool armed=false,kicked=false,terminal=false,failed=false,complete=false;}first_css_browser_postdraw_stream,first_css_final_pending_draw;
 MeleeWebMenuHost host_storage,other_host;MeleeWebMenuHost* host=nullptr;
 std::unique_ptr<melee_web::GameplayMenuWorld> world;
 GameModeState::GameSceneInfo scene;
@@ -275,24 +297,25 @@ ARM_SERVICES=r'''
 bool scoped_assets=true,scoped_disc_import=true,asset_committed=false,stadium_c1a_armed=false;
 enum class AssetDestination{None};AssetDestination asset_destination=AssetDestination::None;
 struct Scope{unsigned pending_generation(){return 0;}}asset_scope;
-struct Armed{bool armed=false;}first_sss_constructor_pair,first_sss_consumed_tick,first_sss_draw_sequence,first_sss_prefix_sequence,first_css_browser_postdraw_stream,first_css_final_pending_draw;
+struct Armed{bool armed=false;}first_sss_constructor_pair,first_sss_consumed_tick,first_sss_draw_sequence,first_sss_prefix_sequence;
 struct Attempt{bool attempted=false;}first_sss_vs_entry,first_sss_vs_setup;
 struct Matched{bool opted_in=false,armed=false;}matched_setup_cf;
-unsigned context_applications=0,host_enable_calls=0,host_return_arm_calls=0;
+unsigned context_applications=0,host_enable_calls=0,host_return_arm_calls=0,finite_reservations=0,reserved_ordinal=0,reserved_sequence=0;
 bool apply_ok=true;
 int melee_web_menu_host_apply_replay_context(MeleeWebMenuHost*,uint32_t,const uint8_t*,const uint8_t*,const uint8_t*,const uint8_t*,const uint8_t*,char* error,size_t){
  ++context_applications;if(!apply_ok){error[0]='x';error[1]=0;return 0;}return 1;
 }
 int melee_web_menu_host_enable_stadium_c1a(MeleeWebMenuHost*,char*,size_t){++host_enable_calls;return 1;}
 int melee_web_menu_host_arm_first_css_return(MeleeWebMenuHost*,char*,size_t){++host_return_arm_calls;return 1;}
+int melee_web_menu_host_reserve_fresh_finite_css_v4(MeleeWebMenuHost*,unsigned ordinal,unsigned sequence,char*,size_t){++finite_reservations;reserved_ordinal=ordinal;reserved_sequence=sequence;return 1;}
 '''
 ARM_MAIN=r'''
 using namespace ::melee_web::stadium_first_css_diagnostic;
 void be(std::vector<uint8_t>& b,size_t o,uint32_t v){for(unsigned i=0;i<4;i++)b[o+i]=uint8_t(v>>(24-i*8));}
-void reset_arm(){first_css_browser_draw={};world=std::make_unique<melee_web::GameplayMenuWorld>();host=&host_storage;
+void reset_arm(){first_css_browser_draw={};first_css_browser_postdraw_stream={};first_css_final_pending_draw={};world=std::make_unique<melee_web::GameplayMenuWorld>();host=&host_storage;
  host_entered=false;world_exposed=false;source_session_owned=true;generation=7;phase=MELEE_WEB_MENU_CREATED;kind=GM_VS;
  running=false;pending=false;first_use_draw_pending=false;faulted=false;match=false;results=false;prize=false;replay=false;net_active=false;
- context_applications=0;host_enable_calls=0;host_return_arm_calls=0;diagnostic_start_ticks=0;diagnostic_pad_remaining=0;apply_ok=true;}
+ context_applications=0;host_enable_calls=0;host_return_arm_calls=0;finite_reservations=0;reserved_ordinal=0;reserved_sequence=0;diagnostic_start_ticks=0;diagnostic_pad_remaining=0;apply_ok=true;}
 int run(){
  std::vector<uint8_t> context(kContextBytes);std::memcpy(context.data(),"STC2CSSR",8);be(context,8,2);std::fill_n(context.data()+12,32,0x11);be(context,44,10);be(context,48,20);be(context,52,17);
  be(context,kContextHeaderBytes+4+kPadBytes+4,kKoAddress);
@@ -316,4 +339,41 @@ int run(){
  std::cout<<"PASS actual fresh arm; codecs precede reservation/mutation; partial failure retains reserved owner; v1/v2 refuse replacement\n";
  return 0;
 }
+'''
+
+# Synthetic input-only rows exercise the real shared arm and real codecs. Their
+# count and source references differ from the retained original; no expected
+# game state is supplied to native code by this control.
+FINITE_ARM_MAIN=r'''
+ std::vector<uint8_t> finite(60+3*84);std::memcpy(finite.data(),"STC4PFX1",8);
+ be(finite,8,4);std::fill_n(finite.data()+12,32,0x11);
+ be(finite,44,10);be(finite,48,20);be(finite,52,36);be(finite,56,3);
+ for(unsigned i=0;i<3;i++){size_t o=60+i*84;
+  uint32_t fields[]={21+i*5,22+i*5,23+i*5,24+i*5,25+i*5,i,i,i+1,i+1,i+1};
+  for(unsigned j=0;j<10;j++)be(finite,o+j*4,fields[j]);
+  finite[o+40+32]=finite[o+40+43]=0xff;
+ }
+ auto arm4=[&](const auto& c,const auto& r){return melee_web_native_menu_stadium_first_css_fresh_finite_v4_arm(c.data(),c.size(),r.data(),r.size());};
+ for(int bad=0;bad<12;bad++){reset_arm();auto c=context;auto r=finite;
+  switch(bad){case 0:c[0]^=1;break;case 1:r.pop_back();break;case 2:r.push_back(0);break;
+   case 3:be(r,56,0xffffffff);break;case 4:r[12]^=1;break;case 5:be(r,60+84,99);break;
+   case 6:be(r,60+84+20,99);break;case 7:r[60+84+50]=0xff;break;
+   case 8:diagnostic_start_ticks=1;break;case 9:diagnostic_pad_remaining=1;break;
+   case 10:source_session_owned=false;break;case 11:host_entered=true;break;}
+  auto* before=world.get();assert(arm4(c,r)==0);
+  assert(first_css_browser_draw.mode==FirstCssBrowserMode::None&&!first_css_browser_draw.armed&&!first_css_browser_draw.failed);
+  assert(context_applications==0&&host_enable_calls==0&&host_return_arm_calls==0&&finite_reservations==0&&world.get()==before);
+ }
+ for(auto mode:{FirstCssBrowserMode::LegacyTickDrawV1,FirstCssBrowserMode::ConstructorReturnOnlyV2,FirstCssBrowserMode::FreshConsumedTickDrawV3,FirstCssBrowserMode::FreshFiniteCssPrefixV4}){
+  reset_arm();first_css_browser_draw.mode=mode;first_css_browser_draw.armed=true;
+  assert(arm4(context,finite)==0&&first_css_browser_draw.mode==mode&&!first_css_browser_draw.failed&&context_applications==0&&finite_reservations==0);
+ }
+ reset_arm();apply_ok=false;assert(arm4(context,finite)==0);
+ assert(first_css_browser_draw.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4&&first_css_browser_draw.failed&&!first_css_browser_draw.constructor_arm_ready&&context_applications==1&&finite_reservations==0);
+ reset_arm();assert(arm4(context,finite)==1);
+ assert(first_css_browser_draw.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4&&first_css_browser_draw.constructor_arm_ready&&first_css_browser_draw.finite_css.rows.size()==3);
+ assert(finite_reservations==1&&reserved_ordinal==2&&reserved_sequence==31);
+ assert(first_css_browser_draw.consumed_status[2].err==-1&&first_css_browser_draw.consumed_status[3].err==-1);
+ assert(arm4(context,finite)==0&&arm(context,row)==0&&!first_css_browser_draw.failed&&context_applications==1&&finite_reservations==1);
+ std::cout<<"PASS actual V4 arm: 12 pre-mutation refusals, foreign/reused owners, partial reservation retained, dynamic terminal reservation\n";
 '''

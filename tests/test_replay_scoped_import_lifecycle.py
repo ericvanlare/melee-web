@@ -1,12 +1,14 @@
 """Execute the native scoped-import boundaries used by single-match replay."""
 from pathlib import Path
 import shutil
+import os
 import json
 import subprocess
 import unittest
 from owned_test_workspace import OwnedWorkspaceTests
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(os.environ.get("MELEE_FINITE_CSS_SOURCE_ROOT",Path(__file__).resolve().parents[1]))
+CANDIDATE = Path(__file__).resolve().parents[1]
 
 
 def block(source, marker):
@@ -29,12 +31,13 @@ class ReplayScopedImportLifecycleTests(OwnedWorkspaceTests):
         compiler = shutil.which('c++')
         if not compiler:
             self.skipTest('C++ compiler unavailable')
-        core = (ROOT / 'src/gameplay_menu_browser.cpp').read_text()
-        menu = (ROOT / 'src/gameplay_menu_browser_menu.cpp').read_text()
-        replay = (ROOT / 'src/gameplay_menu_browser_match.cpp').read_text()
+        core = (CANDIDATE / 'src/gameplay_menu_browser.cpp').read_text()
+        menu = (CANDIDATE / 'src/gameplay_menu_browser_menu.cpp').read_text()
+        replay = (CANDIDATE / 'src/gameplay_menu_browser_match.cpp').read_text()
         close_assets = block(block(core, 'void close()'), 'if(scoped_assets)')
         replay_close = block(replay, 'if(!candidate->whole_session())')
         advance_replay = block(core, 'if(scoped_assets){request_assets(AssetDestination::Replay')
+        diagnostic_enum = core[core.index('enum class FirstCssBrowserMode : unsigned {'):core.index('struct FirstCssDrawSample {')]
         prepared_active = block(core, 'bool stadium_first_css_prepared_diagnostic_active()')
         begin = block(menu, 'unsigned melee_web_native_asset_begin()')
         clear = block(menu, 'int melee_web_native_source_files_external_clear()')
@@ -55,7 +58,7 @@ class ReplayScopedImportLifecycleTests(OwnedWorkspaceTests):
 // actual shared diagnostic predicate extracted below.
 bool constructor_owned=false;
 bool stadium_first_css_constructor_return_active(){return constructor_owned;}
-enum class FirstCssBrowserMode {None=0,FreshConsumedTickDrawV3=3};
+''' + diagnostic_enum + r'''
 struct {FirstCssBrowserMode mode=FirstCssBrowserMode::None;} first_css_browser_draw;
 ''' + prepared_active + r'''
 bool scoped_disc_import=false, scoped_assets=false, asset_committed=false;
@@ -128,10 +131,11 @@ int main(){
  // The actual shared predicate rejects both private diagnostic owners before
  // close(), request_assets(), or any protected owner/scope mutation.
  assert(!stadium_first_css_prepared_diagnostic_active());
- for(unsigned diagnostic_owner:{0u,1u}){
+ for(unsigned diagnostic_owner:{0u,1u,2u}){
  constructor_owned=diagnostic_owner==0;
  first_css_browser_draw.mode=diagnostic_owner==1?
-     FirstCssBrowserMode::FreshConsumedTickDrawV3:FirstCssBrowserMode::None;
+     FirstCssBrowserMode::FreshConsumedTickDrawV3:diagnostic_owner==2?
+     FirstCssBrowserMode::FreshFiniteCssPrefixV4:FirstCssBrowserMode::None;
  const bool protected_constructor_owned=constructor_owned;
  const auto protected_diagnostic_mode=first_css_browser_draw.mode;
  assert(stadium_first_css_prepared_diagnostic_active());

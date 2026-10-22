@@ -46,6 +46,8 @@ const {values} = parseArgs({options: Object.fromEntries(
       ['first-css-browser-final-draw', {type: 'boolean', default: false}],
       ['first-css-constructor-return', {type: 'boolean', default: false}],
       ['first-css-fresh-row', {type: 'boolean', default: false}],
+      ['first-css-fresh-finite', {type: 'boolean', default: false}],
+      ['first-css-finite-receipt', {type: 'string'}],
       ['first-css-row-receipt', {type: 'string'}],
       ['first-sss-constructor-pair', {type: 'boolean', default: false}],
       ['first-sss-consumed-pad-tick', {type: 'boolean', default: false}],
@@ -77,6 +79,7 @@ let recreationLifetime = null;
 const firstSssVsSetup = values['first-sss-vs-setup'];
 const firstCssConstructorReturn = values['first-css-constructor-return'];
 const firstCssFreshRow = values['first-css-fresh-row'];
+const firstCssFreshFinite = values['first-css-fresh-finite'];
 const firstCssConstructorManifest = values['first-css-constructor-manifest'];
 const firstSssVsSetupTextTail = values['first-sss-vs-setup-text-tail'];
 const firstSssVsSetupCfExplicitStep = values['first-sss-vs-setup-cf-explicit-step'];
@@ -95,16 +98,24 @@ const firstSssPrefix = values['first-sss-prefix'] || firstSssVsEntry;
 const firstSssDraw = values['first-sss-draw'] || firstSssPrefix;
 const firstSssConsumedPadTick = values['first-sss-consumed-pad-tick'] || firstSssDraw || firstSssPrefix;
 const firstSssConstructorPair = values['first-sss-constructor-pair'] || firstSssConsumedPadTick;
-const firstCssBrowserFinalDraw = values['first-css-browser-final-draw'] || firstSssConstructorPair;
+const firstCssBrowserFinalDraw = values['first-css-browser-final-draw'] || firstSssConstructorPair || firstCssFreshFinite;
 const firstCssBrowserStream = values['first-css-browser-stream'] || firstCssBrowserFinalDraw;
 const firstCssBrowserDraw = values['first-css-browser-draw'] || firstCssBrowserStream || firstCssFreshRow;
+if (firstCssFreshFinite !== !!values['first-css-finite-receipt'] ||
+    (firstCssFreshFinite && (firstCssFreshRow || firstCssConstructorReturn || cssSssReducer ||
+      firstSssConstructorPair || firstSssVsSetupCf || recreationCanary ||
+      ['first-css-browser-draw','first-css-browser-stream','first-css-browser-final-draw',
+       'first-css-context','first-css-consumed-pad','first-css-return-expected',
+       'first-css-tick-expected','first-css-draw-expected','first-css-postdraw-input',
+       'first-css-postdraw-expected','first-css-row-receipt'].some(key=>values[key]))))
+  throw Error('Choose only the fresh finite CSS route and exact receipt/context manifest');
 if (firstCssFreshRow !== !!values['first-css-row-receipt'] ||
     (firstCssFreshRow && (firstCssConstructorReturn || firstCssBrowserStream ||
       values['first-css-browser-draw'] || cssSssReducer ||
       ['first-css-context', 'first-css-consumed-pad', 'first-css-return-expected',
        'first-css-tick-expected', 'first-css-draw-expected', 'first-css-postdraw-input',
        'first-css-postdraw-expected'].some(key => values[key]))) ||
-    (firstCssConstructorReturn || firstCssFreshRow) !== !!firstCssConstructorManifest ||
+    (firstCssConstructorReturn || firstCssFreshRow || firstCssFreshFinite) !== !!firstCssConstructorManifest ||
     (firstCssConstructorReturn && (cssSssReducer || firstCssBrowserDraw ||
       firstSssConstructorPair || firstSssConsumedPadTick || firstSssDraw ||
       firstSssPrefix || firstSssVsEntry || firstSssVsSetup || firstSssVsSetupTextTail ||
@@ -354,6 +365,7 @@ let report = {
     route_mode: recreationCanary ? (recreationFullB
       ? (recreationFullPair ? 'same-instance-recreation-A7167-B7167-common-fields-seed' : 'same-instance-recreation-A174-B7167-common-fields-seed')
       : 'same-instance-recreation-canary-174') : firstSssVsSetup ? 'first-sss-vs-setup' : firstSssVsEntry ? 'first-sss-vs-entry' : firstSssPrefix ? 'first-sss-prefix' : firstSssDraw ? 'first-sss-draw' :
+      firstCssFreshFinite ? 'first-css-fresh-finite-v4' :
       firstCssFreshRow ? 'first-css-fresh-row-v3' :
       firstCssConstructorReturn ? 'first-css-constructor-return-v2' :
       firstSssConsumedPadTick ? 'first-sss-consumed-pad-tick' :
@@ -556,6 +568,7 @@ let firstSssVsSetupInputs = null;
 let matchedSetupCfInputs = null;
 async function loadFirstCssBrowserDrawInputs() {
   if (!firstCssBrowserDraw) return null;
+  if (firstCssFreshFinite) return loadFirstCssFreshFiniteInputs();
   if (firstCssFreshRow) return loadFirstCssFreshRowInputs();
   const specs = {
     context_bundle: values['first-css-context'],
@@ -621,7 +634,7 @@ async function loadFirstCssBrowserDrawInputs() {
 }
 
 async function loadFirstCssConstructorReturnInputs() {
-  if (!firstCssConstructorReturn && !firstCssFreshRow) return null;
+  if (!firstCssConstructorReturn && !firstCssFreshRow && !firstCssFreshFinite) return null;
   const manifestPath = path.resolve(firstCssConstructorManifest);
   const frozen = preflight.first_css_constructor_return?.manifest;
   assert.ok(frozen && typeof frozen === 'object',
@@ -771,10 +784,10 @@ async function loadFirstCssConstructorReturnInputs() {
         sha256: digest(pinBytes[role])}]))};
 }
 
-async function loadFirstCssFreshRowInputs() {
+async function loadFirstCssFreshRowInputs(reviewedBinding = null) {
   const context = await loadFirstCssConstructorReturnInputs();
   const frozen = preflight.first_css_fresh_row?.receipt;
-  const receiptPath = path.resolve(values['first-css-row-receipt']);
+  const receiptPath = path.resolve(reviewedBinding?.path || values['first-css-row-receipt']);
   assert.ok(frozen && typeof frozen === 'object', 'Fresh CSS row receipt is not frozen');
   assert.equal(path.resolve(frozen.path), receiptPath);
   const receiptBytes = await fs.readFile(receiptPath);
@@ -852,9 +865,87 @@ async function loadFirstCssFreshRowInputs() {
       [name, {bytes: data.byteLength, sha256: digest(data)}]))};
 }
 
+
+async function loadFirstCssFreshFiniteInputs() {
+  const receiptPath=path.resolve(values['first-css-finite-receipt']);
+  const binding=preflight.first_css_fresh_finite?.receipt;
+  const readPinned=async pin=>{
+    assert.ok(pin && typeof pin.path==='string' && Number.isSafeInteger(pin.bytes) && pin.bytes>=0);
+    const bytes=await fs.readFile(pin.path);
+    assert.equal(bytes.byteLength,pin.bytes);assert.equal(digest(bytes),pin.sha256);return bytes;
+  };
+  assert.ok(binding);assert.equal(path.resolve(binding.path),receiptPath);
+  const receipt=JSON.parse((await readPinned(binding)).toString('utf8'));
+  assert.equal(receipt.schema,'stadium-fresh-css-finite-original-only-receipt-v1');
+  assert.equal(receipt.result,'PASS_ORIGINAL_ONLY_FINITE_CSS_PREPARATION');
+  assert.equal(receipt.native_or_browser_executed,false);
+  assert.equal(receipt.terminal_tick,'EXPLICITLY_UNPAIRED');
+  const contextInputs=await loadFirstCssConstructorReturnInputs();
+  const baseline=await loadFirstCssFreshRowInputs(receipt.reviewed_row_receipt);
+  assert.deepEqual(receipt.reviewed_row_receipt,preflight.first_css_fresh_row.receipt);
+  assert.deepEqual(receipt.constructor_manifest,contextInputs.manifestIdentity);
+  assert.deepEqual(receipt.producer_pins,contextInputs.pinIdentities);
+  assert.deepEqual(receipt.topology,JSON.parse((await readPinned(receipt.reviewed_row_receipt)).toString('utf8')).topology);
+  const descriptor=JSON.parse((await readPinned(receipt.input_only_descriptor)).toString('utf8'));
+  const expected=JSON.parse((await readPinned(receipt.expected_host_only)).toString('utf8'));
+  const pairings=JSON.parse((await readPinned(receipt.source_pairings)).toString('utf8'));
+  await readPinned(receipt.derivation_lock);await readPinned(receipt.topology);
+  const raw=await readPinned(receipt.literal_rows);
+  assert.deepEqual(descriptor.raw_rows,receipt.literal_rows);
+  const helperPath=path.join(ROOT,'tests/stadium_first_css_stream_compare.mjs');
+  const frozen=preflight.first_css_fresh_finite.comparator;
+  assert.equal(path.resolve(frozen.path),helperPath);
+  const helperBytes=await readPinned(frozen);
+  const helper=await import(pathToFileURL(helperPath).href);
+  helper.validateFreshFiniteCssExpected(descriptor,expected);
+  const context=contextInputs.contextBinding;
+  assert.equal(descriptor.source_sha256,context.source_sha256);
+  assert.equal(descriptor.context_entry_sequence,context.entry_sequence);
+  assert.equal(descriptor.context_return_sequence,context.return_sequence);
+  assert.equal(descriptor.row_count,receipt.counts.actual_source_rows);
+  assert.equal(descriptor.row_count-1,receipt.counts.remainder_rows);
+  assert.equal(descriptor.row_count-1,receipt.counts.normal_tick_comparisons_proposed);
+  assert.equal(descriptor.row_count,receipt.counts.draw_comparisons_proposed);
+  assert.equal(raw.byteLength,descriptor.row_count*44);
+  assert.equal(raw.toString('hex'),descriptor.rows.map(row=>row.raw_four_port_hex).join(''));
+  assert.deepEqual(expected.baseline_reviewed_expected,baseline.drawExpected);
+  for(const key of ['expected_post_tick','expected_draw_enter','expected_draw_return'])
+    assert.deepEqual(expected.rows[0][key],expected.baseline_reviewed_expected[key]);
+  assert.deepEqual(expected.rows[0].metadata,expected.baseline_reviewed_expected.provenance.row);
+  assert.equal(pairings.rows.length,descriptor.row_count);
+  const keys=['consumed_pad_sequence','source_tick_sequence','draw_enter_sequence','draw_return_sequence','pad_poll_sequence'];
+  const names=['pad_consume','source_tick','draw_enter','draw_return','pad_poll'];
+  pairings.rows.forEach((group,index)=>{
+    assert.equal(group.length,5);
+    group.forEach((ref,j)=>{assert.equal(ref.event,'boundary');assert.equal(ref.seq,descriptor.rows[index][keys[j]]);assert.equal(ref.boundary,names[j]);});
+  });
+  // The one native transport contains only this input-only schedule and rawPAD.
+  // Its count is checked from byte length again by the real native decoder.
+  const size=60+descriptor.row_count*84;
+  assert.ok(Number.isSafeInteger(size)&&size<=0xffffffff);
+  const input=Buffer.alloc(size);input.write('STC4PFX1',0,8,'ascii');input.writeUInt32BE(4,8);
+  Buffer.from(context.source_sha256,'hex').copy(input,12);
+  [context.entry_sequence,context.return_sequence,descriptor.exclusive_phase_end_sequence,
+    descriptor.row_count].forEach((value,i)=>input.writeUInt32BE(value,44+i*4));
+  descriptor.rows.forEach((row,index)=>{
+    const values=[...keys.map(key=>row[key]),row.tick_source_tick,row.tick_draw_ordinal,
+      row.draw_source_tick,row.poll_source_tick,row.poll_draw_ordinal];
+    values.forEach((value,i)=>input.writeUInt32BE(value,60+index*84+i*4));
+    raw.subarray(index*44,(index+1)*44).copy(input,60+index*84+40);
+  });
+  baseline.bytes.consumed_pad_bundle=input;
+  baseline.bundle_hashes.consumed_pad_bundle={bytes:input.byteLength,sha256:digest(input)};
+  baseline.finite={descriptor,fullExpected:expected,
+    expected:{expected_pairs:expected.rows.slice(1),provenance:{stream_sha256:context.source_sha256}},
+    bytes:{postdraw_input:Buffer.alloc(0)},helperSource:helperBytes.toString('utf8'),
+    comparator:frozen,bundle_hashes:{finite_input:{bytes:input.byteLength,sha256:digest(input)}},receiptIdentity:binding};
+  return baseline;
+}
+
 let firstCssBrowserStreamInputs = null;
 async function loadFirstCssBrowserStreamInputs() {
   if (!firstCssBrowserStream) return null;
+  if (firstCssFreshFinite) return firstCssBrowserDrawInputs.finite;
   const frozen = preflight.first_css_browser_stream;
   assert.ok(frozen?.inputs && frozen.comparator,
     'CSS stream preflight omitted exact input and host-comparator identities');
@@ -1444,7 +1535,42 @@ async function readFirstCssBrowserStreamObservation() {
   });
 }
 
+
+function assertFreshFiniteCssStreamTerminal(evidence) {
+  const observation=evidence?.native,stream=observation?.postdraw_stream,host=evidence?.host;
+  const rows=firstCssBrowserStreamInputs.descriptor.rows,count=rows.length-1,last=rows.at(-1);
+  assert.ok(stream&&host);assert.equal(observation.native_phase,1);assert.equal(observation.running,0);
+  assert.equal(stream.failed,false,stream.error);assert.equal(stream.error,null);
+  assert.equal(stream.terminal,true);assert.equal(stream.complete,false);
+  assert.equal(stream.outcome,'stop_after_last_input_request');assert.equal(stream.tick_result,3);
+  assert.equal(stream.frame_end_returned,false);
+  assert.equal(stream.input_source_stream_sha256,firstCssBrowserStreamInputs.descriptor.source_sha256);
+  assert.equal(stream.consumed_inputs,count);assert.equal(stream.host_tick_calls,count);
+  assert.equal(stream.executed_host_ticks,rows.length);
+  assert.equal(stream.current_input_index,count-1);assert.equal(stream.input_index,count-1);
+  assert.equal(stream.current_input_ordinal,last.ordinal);
+  assert.equal(stream.current_consumed_pad_sequence,last.consumed_pad_sequence);
+  for(const key of ['matched_ticks','matched_draws','host_draw_calls','aurora_begin_calls','aurora_end_calls'])
+    assert.equal(stream[key],count-1,key);
+  assert.equal(host.hook_error,null);assert.equal(host.status.failed,false);
+  assert.equal(host.status.terminal,true);assert.equal(host.status.pending_draw,false);
+  assert.equal(host.status.outcome,'stop_after_last_input_request');assert.equal(host.status.next_index,count-1);
+  assert.equal(host.rows.length,2*(count-1)+1);
+  for(let i=0;i<count-1;i++){
+    assert.equal(host.rows[2*i].phase,'tick');assert.equal(host.rows[2*i+1].phase,'draw');
+    assert.equal(host.rows[2*i].approved,true);assert.equal(host.rows[2*i+1].approved,true);
+  }
+  const terminal=host.rows.at(-1);assert.equal(terminal.phase,'transition');assert.equal(terminal.approved,false);
+  assert.deepEqual(terminal.actual,stream.transition_snapshot);
+  assert.deepEqual(host.status.terminal_observation,stream.transition_snapshot);
+  assert.equal(terminal.actual.consumed_pad_sequence,last.consumed_pad_sequence);
+  assert.equal(terminal.actual.stream_input_ordinal,last.ordinal);
+  assert.equal(terminal.actual.executed_host_ticks,rows.length);
+  assert.equal(terminal.actual.terminal_transition,true);
+}
+
 function assertFirstCssBrowserStreamTerminal(evidence) {
+  if(firstCssFreshFinite)return assertFreshFiniteCssStreamTerminal(evidence);
   const observation = evidence?.native;
   const native = observation?.postdraw_stream;
   const host = evidence?.host;
@@ -1528,19 +1654,19 @@ async function runFirstCssBrowserPostdrawStream(baseline) {
   report.scenario.first_css_postdraw_inputs = firstCssBrowserStreamInputs.bundle_hashes;
   report.scenario.first_css_stream_comparator = firstCssBrowserStreamInputs.comparator;
   await persistReport();
-  await timeout(page.evaluate(async ({moduleUrl, expectedPairs}) => {
+  await timeout(page.evaluate(async ({moduleUrl, expectedPairs, finite, descriptor, fullExpected, maxCallbacks}) => {
     if (globalThis.__meleeWebStadiumFirstCssStreamCompare ||
         globalThis.__meleeWebStadiumFirstCssStreamRead)
       throw Error('CSS stream host comparator was already registered');
-    const {createFirstCssStreamComparator, requestSynchronousApproval} = await import(moduleUrl);
-    const comparator = createFirstCssStreamComparator(expectedPairs);
+    const {createFirstCssStreamComparator, createFreshFiniteCssStreamComparator, requestSynchronousApproval} = await import(moduleUrl);
+    const comparator = finite?createFreshFiniteCssStreamComparator(descriptor,fullExpected):createFirstCssStreamComparator(expectedPairs);
     const rows = [];
     let hookError = null;
     globalThis.__meleeWebStadiumFirstCssStreamRead = () => ({
       status: comparator.status(), rows, hook_error: hookError});
     globalThis.__meleeWebStadiumRecreationCallbackScopeV1?.claimInstalled('__meleeWebStadiumFirstCssStreamRead', globalThis.__meleeWebStadiumFirstCssStreamRead);
     globalThis.__meleeWebStadiumFirstCssStreamCompare = (phase, actualJson) => {
-      if (rows.length >= 297) {
+      if (rows.length >= maxCallbacks) {
         hookError = 'CSS stream callback count exceeded the bound';
         return false;
       }
@@ -1555,9 +1681,11 @@ async function runFirstCssBrowserPostdrawStream(baseline) {
     globalThis.__meleeWebStadiumRecreationCallbackScopeV1?.claimInstalled('__meleeWebStadiumFirstCssStreamCompare', globalThis.__meleeWebStadiumFirstCssStreamCompare);
   }, {moduleUrl: 'data:text/javascript;base64,' +
         Buffer.from(firstCssBrowserStreamInputs.helperSource).toString('base64'),
-      expectedPairs: firstCssBrowserStreamInputs.expected.expected_pairs}),
+      expectedPairs: firstCssBrowserStreamInputs.expected.expected_pairs,finite:firstCssFreshFinite,
+      descriptor:firstCssBrowserStreamInputs.descriptor,fullExpected:firstCssBrowserStreamInputs.fullExpected,
+      maxCallbacks:firstCssFreshFinite?2*(firstCssBrowserStreamInputs.descriptor.row_count-2)+1:297}),
   Math.min(5000, remaining()), 'Register host-only synchronous CSS stream comparison');
-  const arm = await timeout(page.evaluate(inputBytes => {
+  const arm = await timeout(firstCssFreshFinite?page.evaluate(async()=>await globalThis.meleeStadiumFirstCssFreshFiniteStage('stream_arm')):page.evaluate(inputBytes => {
     const module = globalThis.Module;
     const armFunction = module?._melee_web_native_menu_stadium_first_css_postdraw_stream_arm;
     if (typeof armFunction !== 'function' ||
@@ -1585,7 +1713,7 @@ async function runFirstCssBrowserPostdrawStream(baseline) {
   assert.equal(armed.native?.postdraw_stream?.status, 'armed');
   assert.equal(armed.native.running, 0);
   assert.equal(armed.host.rows.length, 0);
-  const kick = await timeout(page.evaluate(() => {
+  const kick = await timeout(firstCssFreshFinite?page.evaluate(async()=>await globalThis.meleeStadiumFirstCssFreshFiniteStage('stream_kick')):page.evaluate(() => {
     const module = globalThis.Module;
     const kickFunction = module?._melee_web_native_menu_stadium_first_css_postdraw_stream_kick;
     if (typeof kickFunction !== 'function') throw Error('CSS stream kick export is absent');
@@ -1610,7 +1738,8 @@ async function runFirstCssBrowserPostdrawStream(baseline) {
   report.scenario.first_css_browser_stream = evidence;
   await persistReport();
   assertFirstCssBrowserStreamTerminal(evidence);
-  report.scenario.css_stream_claim = evidence.native.postdraw_stream.outcome ===
+  report.scenario.css_stream_claim = firstCssFreshFinite ?
+    'All reserved nonterminal CSS remainder tick/draw fields matched in order; actual final input requested result3, terminal scheduler snapshot remains unpaired. No SSS admission.' : evidence.native.postdraw_stream.outcome ===
     'stop_after_last_input_request'
     ? '147 additional tick/draw pairs compared; last additional input consumed and native transition retained unpaired; original final draw1577 unpaired. No SSS admission or transition-state equivalence.'
     : '148 additional tick/draw pairs compared; bounded pair cap reached without native transition. No SSS admission or transition equivalence.';
@@ -1700,6 +1829,10 @@ async function readFirstSssPairPostUnloadState() {
 
 function assertFirstCssBrowserFinalDraw(evidence, stoppedStream,
     {expectedNativePhase = 1} = {}) {
+  const count=firstCssFreshFinite?firstCssBrowserStreamInputs.descriptor.row_count-1:148;
+  const row=firstCssFreshFinite?firstCssBrowserStreamInputs.descriptor.rows.at(-1):null;
+  const consume=row?.consumed_pad_sequence??1574,tick=row?.source_tick_sequence??1575;
+  const enter=row?.draw_enter_sequence??1576,returned=row?.draw_return_sequence??1577;
   const observation = evidence?.native;
   const final = observation?.final_pending_css_draw;
   const host = evidence?.host;
@@ -1712,11 +1845,11 @@ function assertFirstCssBrowserFinalDraw(evidence, stoppedStream,
     'complete', 'frame_end_returned']) assert.equal(final[key], true, key);
   assert.equal(final.failed, false, final.error || 'Final CSS draw failed');
   assert.equal(final.error, null);
-  assert.equal(final.input_ordinal, 148);
-  assert.equal(final.consumed_pad_sequence, 1574);
-  assert.equal(final.terminal_tick_sequence, 1575);
-  assert.equal(final.draw_enter_sequence, 1576);
-  assert.equal(final.draw_return_sequence, 1577);
+  assert.equal(final.input_ordinal, count);
+  assert.equal(final.consumed_pad_sequence, consume);
+  assert.equal(final.terminal_tick_sequence, tick);
+  assert.equal(final.draw_enter_sequence, enter);
+  assert.equal(final.draw_return_sequence, returned);
   assert.equal(final.source_steps, 0);
   assert.equal(final.source_draws, 0);
   assert.equal(final.source_pending, false);
@@ -1729,7 +1862,7 @@ function assertFirstCssBrowserFinalDraw(evidence, stoppedStream,
   assert.equal(host.rows[0].phase, 'final_draw');
   assert.equal(host.rows[0].approved, true);
   assert.deepEqual(host.rows[0].actual, final.actual_draw);
-  const wanted = firstCssBrowserStreamInputs.expected.expected_pairs[147].expected_draw_return;
+  const wanted = firstCssBrowserStreamInputs.expected.expected_pairs[count-1].expected_draw_return;
   for (const key of firstCssBrowserDrawInputs.drawExpected.comparison_fields)
     assert.deepEqual(final.actual_draw[key], wanted[key], `Final CSS draw differs at ${key}`);
   assert.equal(final.actual_draw.world_generation, stoppedStream.transition_snapshot.world_generation);
@@ -1748,12 +1881,12 @@ async function runFirstCssBrowserFinalPendingDraw() {
     'Final pending draw requires the retained result3 boundary, not the pair cap');
   const stoppedStream = structuredClone(stopped.native.postdraw_stream);
   await persistReport();
-  await timeout(page.evaluate(async ({moduleUrl, expectedPair, terminal}) => {
+  await timeout(page.evaluate(async ({moduleUrl, expectedPair, terminal, finite, descriptor, fullExpected}) => {
     if (globalThis.__meleeWebStadiumFirstCssFinalDrawCompare ||
         globalThis.__meleeWebStadiumFirstCssFinalDrawRead)
       throw Error('Final CSS draw host comparator was already registered');
-    const {createFirstCssFinalDrawComparator, requestSynchronousApproval} = await import(moduleUrl);
-    const comparator = createFirstCssFinalDrawComparator(expectedPair, terminal);
+    const {createFirstCssFinalDrawComparator, createFreshFiniteCssFinalDrawComparator, requestSynchronousApproval} = await import(moduleUrl);
+    const comparator = finite?createFreshFiniteCssFinalDrawComparator(descriptor,fullExpected,terminal):createFirstCssFinalDrawComparator(expectedPair,terminal);
     const rows = [];
     let hookError = null;
     globalThis.__meleeWebStadiumFirstCssFinalDrawRead = () => ({
@@ -1771,11 +1904,12 @@ async function runFirstCssBrowserFinalPendingDraw() {
     globalThis.__meleeWebStadiumRecreationCallbackScopeV1?.claimInstalled('__meleeWebStadiumFirstCssFinalDrawCompare', globalThis.__meleeWebStadiumFirstCssFinalDrawCompare);
   }, {moduleUrl: 'data:text/javascript;base64,' +
       Buffer.from(firstCssBrowserStreamInputs.helperSource).toString('base64'),
-    expectedPair: firstCssBrowserStreamInputs.expected.expected_pairs[147],
+    expectedPair: firstCssBrowserStreamInputs.expected.expected_pairs.at(-1),
+    finite:firstCssFreshFinite,descriptor:firstCssBrowserStreamInputs.descriptor,fullExpected:firstCssBrowserStreamInputs.fullExpected,
     terminal: stoppedStream.transition_snapshot}), Math.min(5000, remaining()),
   'Register separate host-only final CSS draw comparison');
   // No input or expected state is allocated/copied into WASM here.
-  const arm = await timeout(page.evaluate(() => {
+  const arm = await timeout(firstCssFreshFinite?page.evaluate(async()=>await globalThis.meleeStadiumFirstCssFreshFiniteStage('final_arm')):page.evaluate(() => {
     const module = globalThis.Module;
     const fn = module?._melee_web_native_menu_stadium_first_css_final_draw_arm;
     if (typeof fn !== 'function') throw Error('Final CSS draw arm export is absent');
@@ -1795,7 +1929,7 @@ async function runFirstCssBrowserFinalPendingDraw() {
   assert.equal(report.scenario.first_css_final_draw_armed.native.running, 0);
   assert.equal(report.scenario.first_css_final_draw_armed.native.final_pending_css_draw.armed, true);
   assert.equal(report.scenario.first_css_final_draw_armed.host.rows.length, 0);
-  const kick = await timeout(page.evaluate(() => {
+  const kick = await timeout(firstCssFreshFinite?page.evaluate(async()=>await globalThis.meleeStadiumFirstCssFreshFiniteStage('final_kick')):page.evaluate(() => {
     const module = globalThis.Module;
     const fn = module?._melee_web_native_menu_stadium_first_css_final_draw_kick;
     if (typeof fn !== 'function') throw Error('Final CSS draw kick export is absent');
@@ -1821,6 +1955,7 @@ async function runFirstCssBrowserFinalPendingDraw() {
   await persistReport();
   assertFirstCssBrowserFinalDraw(evidence, stoppedStream);
   report.scenario.css_final_draw_claim =
+    firstCssFreshFinite?'Fresh original final CSS draw seven fields compared; terminal scheduler snapshot and raw pending/next remain unpaired. No SSS admission.':
     'Original final CSS DrawReturn1577 seven fields compared after147 additional pairs; terminal scheduler snapshot and raw pending/next remain unpaired. No SSS admission.';
   return evidence.native;
 }
@@ -4601,9 +4736,9 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
   assert.equal(prearm.memory.asset_generation, 0);
   assert.ok(prearm.memory.asset_files > 0,
     'First-CSS diagnostic requires the committed menu assets');
-  const arm = await timeout(page.evaluate(({contextBytes, consumedBytes, fresh}) => {
+  const arm = await timeout(page.evaluate(({contextBytes, consumedBytes, fresh, finite}) => {
     const module = globalThis.Module;
-    const armFunction = fresh ? module?._melee_web_native_menu_stadium_first_css_fresh_row_v3_arm :
+    const armFunction = finite ? module?._melee_web_native_menu_stadium_first_css_fresh_finite_v4_arm : fresh ? module?._melee_web_native_menu_stadium_first_css_fresh_row_v3_arm :
       module?._melee_web_native_menu_stadium_first_css_draw_arm;
     const observe = module?._melee_web_native_menu_stadium_first_css_draw_observe;
     if (typeof armFunction !== 'function' || typeof observe !== 'function')
@@ -4633,15 +4768,21 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
       module._free(consumed);
     }
   }, {contextBytes: [...firstCssBrowserDrawInputs.bytes.context_bundle],
-      consumedBytes: [...firstCssBrowserDrawInputs.bytes.consumed_pad_bundle], fresh: firstCssFreshRow}),
+      consumedBytes: [...firstCssBrowserDrawInputs.bytes.consumed_pad_bundle], fresh: firstCssFreshRow, finite:firstCssFreshFinite}),
   Math.min(10000, remaining()), 'Arm retained first-CSS browser draw inputs');
+  if(firstCssFreshFinite)assert.deepEqual(arm.observation.finite_input_provenance,{
+    source_sha256:firstCssBrowserDrawInputs.finite.descriptor.source_sha256,
+    row_count:firstCssBrowserDrawInputs.finite.descriptor.row_count,
+    phase_end_sequence:firstCssBrowserDrawInputs.finite.descriptor.exclusive_phase_end_sequence});
   assert.equal(arm.result, 1);
   assert.equal(arm.phase, 0);
   assert.equal(arm.running, 0);
   report.scenario.armed_before_css_entry = true;
   report.scenario.first_css_input_bundles = firstCssBrowserDrawInputs.bundle_hashes;
 
-  const launch = firstCssFreshRow ? page.evaluate(async generation => {
+  const launch = firstCssFreshFinite ? page.evaluate(async generation => {
+    return await globalThis.meleeStadiumFirstCssFreshFiniteLaunch(generation);
+  },arm.observation.armed_world_generation) : firstCssFreshRow ? page.evaluate(async generation => {
     if (typeof globalThis.meleeStadiumFirstCssFreshRowLaunch !== 'function')
       throw Error('Queued fresh CSS prepared launch is absent');
     await globalThis.meleeStadiumFirstCssFreshRowLaunch(generation);
@@ -4665,7 +4806,8 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
   report.scenario.first_css_browser_draw = observation;
   await persistReport();
 
-  const kick = await timeout(page.evaluate(async fresh => {
+  const kick = await timeout(page.evaluate(async ({fresh,finite}) => {
+    if(finite)return await globalThis.meleeStadiumFirstCssFreshFiniteStage('first');
     if (fresh) {
       if (typeof globalThis.meleeStadiumFirstCssFreshRowKick !== 'function')
         throw Error('Queued fresh CSS row kick is absent');
@@ -4680,7 +4822,7 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
       throw Error(pointer ? module.UTF8ToString(pointer) : 'First-CSS one-shot kick was rejected');
     }
     return result;
-  }, firstCssFreshRow), Math.min(5000, remaining()), 'Release one retained CSS source tick');
+  }, {fresh:firstCssFreshRow,finite:firstCssFreshFinite}), Math.min(5000, remaining()), 'Release one retained CSS source tick');
   assert.equal(kick, 1);
   await timeout(page.waitForFunction(() => {
     const module = globalThis.Module;
@@ -4692,8 +4834,8 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
   Math.min(60000, remaining()), 'One native CSS tick and one browser source draw');
   observation = await timeout(readFirstCssBrowserDrawObservation(),
     Math.min(5000, remaining()), 'Final first-CSS browser draw observation');
-  if (firstCssFreshRow) {
-    assert.equal(observation.schema, 'melee-web-stadium-first-css-fresh-row-observation-v3');
+  if (firstCssFreshRow || firstCssFreshFinite) {
+    assert.equal(observation.schema, firstCssFreshFinite?'melee-web-stadium-first-css-finite-observation-v4':'melee-web-stadium-first-css-fresh-row-observation-v3');
     const target = observation.terminal_source_free_callbacks + 2;
     await timeout(page.waitForFunction(target => {
       const module = globalThis.Module;
@@ -4709,7 +4851,7 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
       'frame_end_returned', 'input_row_provenance'])
       assert.deepEqual(stopped[field], observation[field], `Fresh terminal changed at ${field}`);
     observation = stopped;
-    assert.equal(observation.mode, 'fresh_consumed_tick_draw_v3');
+    assert.equal(observation.mode,firstCssFreshFinite?'fresh_finite_css_prefix_v4':'fresh_consumed_tick_draw_v3');
     assert.equal(observation.armed_owner_stable, true);
     report.scenario.first_css_fresh_row_receipt = firstCssBrowserDrawInputs.receiptIdentity;
   }
@@ -4739,6 +4881,23 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
     observation = await runFirstCssBrowserPostdrawStream(observation);
     if (firstCssBrowserFinalDraw) {
       observation = await runFirstCssBrowserFinalPendingDraw();
+      if(firstCssFreshFinite){
+        const before=await readFirstCssBrowserDrawObservation();
+        const target=before.terminal_source_free_callbacks+2;
+        await timeout(page.waitForFunction(target=>{
+          const m=globalThis.Module,p=m?._melee_web_native_menu_stadium_first_css_draw_observe?.();
+          const value=p?JSON.parse(m.UTF8ToString(p)):null;
+          return value?.state==='failed'||value?.terminal_source_free_callbacks>=target;
+        },target,{timeout:Math.min(LIMITS.sourceTransitionMs,remaining())}),
+        Math.min(LIMITS.sourceTransitionMs,remaining()),'Fresh finite terminal source-free callbacks');
+        const after=await readFirstCssBrowserDrawObservation();
+        assert.equal(after.error,null);
+        for(const key of ['entry','tick','draw','postdraw_stream','final_pending_css_draw',
+            'host_tick_calls','host_draw_calls','source_steps','source_draws','aurora_begin_calls','aurora_end_calls'])
+          assert.deepEqual(after[key],before[key],`Fresh finite terminal changed at ${key}`);
+        report.scenario.first_css_fresh_finite_receipt=firstCssBrowserStreamInputs.receiptIdentity;
+        report.scenario.first_css_fresh_finite_terminal=after;
+      }
       if (firstSssConstructorPair) {
         observation = await runFirstSssConstructorPair();
         if (firstSssConsumedPadTick) {
@@ -5080,7 +5239,10 @@ async function cleanupServer() {
 async function main() {
   assert.equal(build, expectedBuild, 'Only the isolated C1a diagnostic runtime may be served');
   assert.equal(preflight.schema, 'melee-web-stadium-c1a-browser-preflight-v1');
-  if (firstCssFreshRow) {
+  if(firstCssFreshFinite){
+    assert.equal(preflight.route_mode,'first-css-fresh-finite-v4');
+    assert.ok(preflight.first_css_fresh_finite?.receipt);
+  } else if (firstCssFreshRow) {
     assert.equal(preflight.route_mode, 'first-css-fresh-row-v3');
     assert.ok(preflight.first_css_fresh_row?.receipt);
   } else if (firstCssConstructorReturn) {
@@ -5196,6 +5358,12 @@ async function main() {
   assert.match(defaultCache, /^MELEE_WEB_STADIUM_C1A_DIAGNOSTIC:BOOL=OFF$/m);
   const privateJs = await fs.readFile(path.join(build, 'gameplay_menu_browser.js'), 'utf8');
   const defaultJs = await fs.readFile(path.join(defaultBuild, 'gameplay_menu_browser.js'), 'utf8');
+  if(firstCssFreshFinite){
+    for(const suffix of ['arm','first_kick','stream_arm','stream_kick','final_arm','final_kick']){
+      const name='_melee_web_native_menu_stadium_first_css_fresh_finite_v4_'+suffix;
+      assert.ok(privateJs.includes(name));assert.equal(defaultJs.includes(name),false);
+    }
+  }
   if (firstCssFreshRow) {
     assert.ok(privateJs.includes('_melee_web_native_menu_stadium_first_css_fresh_row_v3_arm'));
     assert.ok(privateJs.includes('_melee_web_native_menu_stadium_first_css_fresh_row_v3_kick'));

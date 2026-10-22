@@ -14,8 +14,9 @@ import unittest
 from owned_test_workspace import OwnedWorkspaceTests
 
 
-ROOT = Path(__file__).resolve().parents[1]
-HOST_SOURCE = ROOT / "src" / "gameplay_menu_host.c"
+ROOT = Path(os.environ.get("MELEE_FINITE_CSS_SOURCE_ROOT",Path(__file__).resolve().parents[1]))
+CANDIDATE = Path(__file__).resolve().parents[1]
+HOST_SOURCE = CANDIDATE / "src" / "gameplay_menu_host.c"
 
 
 def _function(source: str, signature: str) -> str:
@@ -81,6 +82,7 @@ PRELUDE = r"""
 #define MELEE_WEB_SAVE_PROFILE_CARD_BYTES 8
 #define MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED 3
 #define MELEE_WEB_MENU_CSS 1
+#define MELEE_WEB_MENU_CREATED 0
 #define MELEE_WEB_MENU_SSS 3
 #define MELEE_WEB_MENU_RESULT_TICKED 1
 #define GM_VS 7
@@ -112,6 +114,9 @@ struct MeleeWebMenuHost {
   GameSceneInfo source_scene_info; int source_scene,source_mode_kind,vs_mode_owned;
   int entered,drawing,transition;
   int first_css_return_state;
+  uint64_t fresh_finite_css_v4_generation;MeleeWebMenuSession* fresh_finite_css_v4_session;
+  unsigned fresh_finite_css_v4_reserved,fresh_finite_css_v4_terminal_ordinal,fresh_finite_css_v4_terminal_sequence;
+  unsigned final_pending_css_draw_permit_version;
   int final_pending_css_draw_witness,final_pending_css_draw_state;
   int final_pending_css_draw_returned;
   /* SSS_TICK_FIXTURE_BEGIN */
@@ -370,8 +375,67 @@ static void test_active_source_callback_refuses_arm_and_draw(void)
   assert(h.final_pending_css_draw_returned==0);
 }
 
+
+static void test_fresh_permit_reservation_and_one_use(void){
+ for(unsigned ordinal=2;ordinal<=4;++ordinal){
+  const unsigned sequence=200+ordinal;
+  MeleeWebMenuHost h;MeleeWebMenuSession s;MeleeWebAudio a;
+  MeleeWebSaveProfileOwner p;PADStatus raw[4];char error[160]={0};
+  setup(&h,&s,&a,&p);make_raw(raw);h.entered=0;s.phase=MELEE_WEB_MENU_CREATED;
+  assert(melee_web_menu_host_reserve_fresh_finite_css_v4(&h,ordinal,sequence,error,sizeof error)==1);
+  assert(melee_web_menu_host_reserve_fresh_finite_css_v4(&h,ordinal,sequence,error,sizeof error)==0);
+  h.entered=1;s.phase=MELEE_WEB_MENU_CSS;assert(produce_transition(&h,raw)==3);
+  assert(melee_web_menu_host_arm_fresh_final_pending_css_draw_v4(&h,ordinal,sequence,raw,error,sizeof error)==1);
+  assert(melee_web_menu_host_draw_fresh_final_pending_css_v4(&h,error,sizeof error)==1);
+  assert(gobj_draws==1&&clock_presents==1&&h.final_pending_css_draw_returned);
+  assert(melee_web_menu_host_draw_fresh_final_pending_css_v4(&h,error,sizeof error)==0);
+  assert(gobj_draws==1&&clock_presents==1);
+  setup(&h,&s,&a,&p);make_raw(raw);assert(produce_transition(&h,raw)==3);
+  assert(melee_web_menu_host_arm_fresh_final_pending_css_draw_v4(&h,ordinal,sequence,raw,error,sizeof error)==0);
+  assert(gobj_draws==0&&clock_presents==0);
+  setup(&h,&s,&a,&p);make_raw(raw);h.entered=0;s.phase=MELEE_WEB_MENU_CREATED;
+  assert(melee_web_menu_host_reserve_fresh_finite_css_v4(&h,ordinal,sequence,error,sizeof error)==1);
+  h.entered=1;s.phase=MELEE_WEB_MENU_CSS;assert(produce_transition(&h,raw)==3);
+  assert(melee_web_menu_host_arm_fresh_final_pending_css_draw_v4(&h,ordinal+1,sequence,raw,error,sizeof error)==0);
+  assert(gobj_draws==0&&clock_presents==0);
+ }
+}
+
+
+static void test_finite_reserved_refuses_legacy_permit_without_mutation(void){
+ MeleeWebMenuHost h,before;MeleeWebMenuSession s;MeleeWebAudio a;
+ MeleeWebSaveProfileOwner p;PADStatus raw[4];char error[160]={0};
+ setup(&h,&s,&a,&p);make_raw(raw);h.entered=0;s.phase=MELEE_WEB_MENU_CREATED;
+ assert(melee_web_menu_host_reserve_fresh_finite_css_v4(&h,2,90,error,sizeof error)==1);
+ h.entered=1;s.phase=MELEE_WEB_MENU_CSS;assert(produce_transition(&h,raw)==3);
+ memcpy(&before,&h,sizeof h);
+ assert(melee_web_menu_host_arm_final_pending_css_draw(&h,148,1574,raw,error,sizeof error)==0);
+ assert(memcmp(&h,&before,sizeof h)==0&&gobj_draws==0&&clock_presents==0);
+ assert(h.final_pending_css_draw_state==0&&h.final_pending_css_draw_permit_version==0);
+ // A finite arm remains available: the refused V1 call consumed no authority.
+ assert(melee_web_menu_host_arm_fresh_final_pending_css_draw_v4(&h,2,90,raw,error,sizeof error)==1);
+ memcpy(&before,&h,sizeof h);
+ assert(melee_web_menu_host_draw_final_pending_css(&h,error,sizeof error)==0);
+ assert(memcmp(&h,&before,sizeof h)==0&&gobj_draws==0&&clock_presents==0);
+ assert(melee_web_menu_host_draw_fresh_final_pending_css_v4(&h,error,sizeof error)==1);
+ assert(gobj_draws==1&&clock_presents==1);
+ // Independently exercise the direct V1 draw under otherwise matching legacy
+ // IDs/version. This explicit corrupted-state double must still stop at the
+ // finite-reservation exclusion before permit mutation or any renderer work.
+ setup(&h,&s,&a,&p);make_raw(raw);h.entered=0;s.phase=MELEE_WEB_MENU_CREATED;
+ assert(melee_web_menu_host_reserve_fresh_finite_css_v4(&h,2,90,error,sizeof error)==1);
+ h.entered=1;s.phase=MELEE_WEB_MENU_CSS;assert(produce_transition(&h,raw)==3);
+ h.final_pending_css_draw_state=1;h.final_pending_css_draw_permit_version=1;
+ h.final_pending_css_draw_input_ordinal=148;h.final_pending_css_draw_pad_sequence=1574;
+ memcpy(&before,&h,sizeof h);
+ assert(melee_web_menu_host_draw_final_pending_css(&h,error,sizeof error)==0);
+ assert(memcmp(&h,&before,sizeof h)==0&&gobj_draws==0&&clock_presents==0);
+}
+
 int main(void)
 {
+  test_finite_reserved_refuses_legacy_permit_without_mutation();
+  test_fresh_permit_reservation_and_one_use();
   test_one_use_success_and_normal_pending_noop();
   test_wrong_input_and_semantic_pad_fail_closed();
   test_live_owner_changes_and_later_tick_invalidate();
@@ -399,11 +463,20 @@ struct FirstCssDrawSample {
  bool seed_owner_stable=false,scene_owner_stable=false,world_generation_stable=false;
 };
 struct FirstCssBrowserDrawState {
+ FirstCssBrowserMode mode=FirstCssBrowserMode::LegacyTickDrawV1;
+ void* armed_host_owner=nullptr;void* armed_world_owner=nullptr;
+ bool arm_source_session_owned=true;uint64_t armed_world_generation=0;
  uint64_t world_generation=0; const uint32_t* seed_owner=nullptr;
  const GameModeState::GameSceneInfo* scene_owner=nullptr;
 };
 static FirstCssBrowserDrawState first_css_browser_draw;
-static void* host; static void* world; static bool host_entered;
+static void* host;
+struct FixtureWorld{void* p=nullptr;FixtureWorld& operator=(void* value){p=value;return *this;}
+ explicit operator bool()const{return p!=nullptr;}void* get()const{return p;}};
+static FixtureWorld world;static bool host_entered;
+static bool source_session_owned=true,faulted=false,replay=false;
+static unsigned diagnostic_start_ticks=0,diagnostic_pad_remaining=0;
+static bool melee_web_net_active(){return false;}
 static const uint32_t* seed_ptr;
 static const GameModeState::GameSceneInfo* scene_ptr;
 static uint64_t generation_value; static int source_scene_value,phase_value,frame_value;
@@ -443,6 +516,11 @@ int main(void){
  assert(sample.scene_frame==149&&sample.seed==0x87654321&&sample.pad[0]==0x5a);
  assert(sample.world_generation_stable&&sample.seed_owner_stable&&sample.scene_owner_stable);
 
+ first_css_browser_draw.mode=FirstCssBrowserMode::FreshFiniteCssPrefixV4;
+ first_css_browser_draw.armed_host_owner=host;first_css_browser_draw.armed_world_owner=world.get();
+ first_css_browser_draw.armed_world_generation=generation_value;
+ auto finite=first_css_final_pending_draw_capture("fresh same-owner scalar mutation control");
+ assert(finite.scene_kind==9&&finite.source_scene==2&&finite.menu_phase==2);
  scene_ptr=reinterpret_cast<const GameModeState::GameSceneInfo*>(uintptr_t(1));
  bool refused=false;
  try{(void)first_css_final_pending_draw_capture("foreign scene pointer control");}
@@ -476,8 +554,13 @@ class FinalPendingCssDrawHostTests(OwnedWorkspaceTests):
             _function(source, "int melee_web_menu_host_tick("),
             _function(source, "static int host_draw_render("),
             _function(source, "int melee_web_menu_host_draw("),
+            _function(source, "int melee_web_menu_host_reserve_fresh_finite_css_v4("),
+            _function(source, "static int arm_final_pending_css_draw("),
+            _function(source, "static int draw_final_pending_css("),
             _function(source, "int melee_web_menu_host_arm_final_pending_css_draw("),
             _function(source, "int melee_web_menu_host_draw_final_pending_css("),
+            _function(source, "int melee_web_menu_host_arm_fresh_final_pending_css_draw_v4("),
+            _function(source, "int melee_web_menu_host_draw_fresh_final_pending_css_v4("),
         ]
         # These SSS branches are unreachable in this CSS-only fixture. Keep
         # their declarations local so composed SSS fixtures can reuse PRELUDE
@@ -525,14 +608,16 @@ static int sss_sequence_capture(MeleeWebMenuHost* h,int prefix,int phase,void* s
         self.assertIn("actual-source final pending CSS host controls passed", run_result.stdout)
 
     def test_actual_final_capture_retains_same_owner_scalar_changes(self) -> None:
-        source = (ROOT / "src" / "gameplay_menu_browser.cpp").read_text(encoding="utf-8")
+        source = (CANDIDATE / "src" / "gameplay_menu_browser.cpp").read_text(encoding="utf-8")
         function = _function(source,
             "FirstCssDrawSample first_css_final_pending_draw_capture(")
         cxx = shlex.split(os.environ.get("CXX", "c++"))
         workspace = self.new_workspace(ROOT, "first-css-final-capture-")
         cpp_path = workspace / "capture_control.cpp"
         binary = workspace / "capture_control"
-        cpp_path.write_text(CPP_CAPTURE_PRELUDE + function + CPP_CAPTURE_TEST,
+        enum=source[source.index("enum class FirstCssBrowserMode : unsigned {"):source.index("struct FirstCssDrawSample {")]
+        prelude=CPP_CAPTURE_PRELUDE.replace("struct FirstCssDrawSample {",enum+"struct FirstCssDrawSample {",1)
+        cpp_path.write_text(prelude + function + CPP_CAPTURE_TEST,
                             encoding="utf-8")
         compile_result = subprocess.run(
             cxx + ["-std=c++17", "-Wall", "-Wextra", "-Werror", str(cpp_path), "-o", str(binary)],

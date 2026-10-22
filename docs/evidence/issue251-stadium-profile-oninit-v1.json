@@ -17289,7 +17289,7 @@
   },
   "fresh_go2_comparison_2026_10_18": {
     "state": "ORIGINAL_GO2_REFERENCE_PASS_BROWSER_FIRST_C_COMPARISON_FAIL",
-    "next": "Next is a bounded native finite-CSS capability and focused controls after independent review. No fresh browser capture or SSS/VS/GO continuation is released; C3 remains open.",
+    "next": "Finite-CSS implementation and focused controls pass; post-repair full regression is running. Clean implementation commit, refreshed preflight and separately admitted finite-CSS capture remain pending. No SSS/VS/GO continuation or C3 release.",
     "native": {
       "binary_sha256": "4bebd3a21cf48da558c7380f45b73e394fe46f47cef774d939cd4659051918fa",
       "producer_manifest_sha256": "2da988e27c334b4530935ea32af3edc319707482e276b064e9b08c132d4cedbd",
@@ -18161,13 +18161,266 @@
       "native_or_browser_executed": false,
       "native_codec_implemented": false,
       "C3": false,
-      "next": "Next is a bounded native finite-CSS capability and focused controls after independent review. No fresh browser capture or SSS/VS/GO continuation is released; C3 remains open.",
+      "next": "Finite-CSS implementation and focused controls pass; post-repair full regression is running. Clean implementation commit, refreshed preflight and separately admitted finite-CSS capture remain pending. No SSS/VS/GO continuation or C3 release.",
       "exclusions": [
         "Finite native source/input/tick/draw parity",
         "Terminal scheduler tick equality",
         "CSS leave/SSS/VS Entry/Setup/GO/GO+2 continuation",
         "Pixel/PCM, live input, timing/performance, full-session and C3 acceptance"
-      ]
+      ],
+      "implementation_checkpoint_2026_10_22": {
+        "state": "IMPLEMENTATION_AND_FOCUSED_CONTROLS_PASS_POST_REPAIR_FULL_REGRESSION_RUNNING",
+        "evidence_labels": [
+          "Source identified",
+          "Compiled",
+          "Synthetic controls"
+        ],
+        "source_base": "1e96b2a93c72e3d726b47877324b652c9bc3307c",
+        "application_head": "879e23d1f5f45f466d7128e01a1d18b75ca6e7c0",
+        "scope": "Private V4 finite-CSS input-only codec, source-stage ownership and queued launch/comparison capability. Extracted actual source and real SDK codec controls use explicit services; no finite original-game/browser comparison has run.",
+        "source_freeze": {
+          "evidence": "validation-v1/first-css-finite-candidate-v4/source-freeze-v4.json",
+          "bytes": 7000,
+          "sha256": "037b594ef4bcb021fb223d35f7c9e3cd9c41d5bcbcded60a96a1fdf3361639ca"
+        },
+        "candidate_manifest": {
+          "evidence": "validation-v1/first-css-finite-candidate-v4/manifest.json",
+          "bytes": 17385,
+          "sha256": "19eba1231ac96b4251aaadb1baedda49196ecba79e76167133149d759ed50c16"
+        },
+        "frozen_candidate_patch": {
+          "evidence": "validation-v1/first-css-finite-candidate-v4/candidate.patch",
+          "bytes": 178744,
+          "sha256": "2de5654d7e33088b5c4c3086cac8d9115be2adb1605acc81ec73e759b6ac2828"
+        },
+        "independent_whole_loop_review": {
+          "evidence": "validation-v1/first-css-finite-candidate-v4-independent-review-v1.json",
+          "bytes": 1683,
+          "sha256": "9be373a713be2e8a31eb50e4515b75839d24f7f001602ce1078150907926242c"
+        },
+        "whole_loop_review_correction": {
+          "finding": "finite-terminal-result3-leaves-pending-set-before-final-draw",
+          "disposition": "PASS_BOUNDED_REVIEW_CORRECTION",
+          "observation": "Complete enclosing source-step loop exits on terminal result3 before the shared pending=true handler. The unchanged final arm succeeds with pending=false. A test-only forced shared-tail mutation is refused. Ordinary result3 still enters actual preparation. The earlier partial-control-flow review finding remains retained.",
+          "prior_review": {
+            "evidence": "validation-v1/first-css-finite-candidate-v3-independent-review-v1.json",
+            "bytes": 12472,
+            "sha256": "534935c3147aae0990f09f1b2013a7e699c4b9fc206257edf6f68a27f113d3bf"
+          },
+          "control_result": {
+            "evidence": "validation-v1/first-css-finite-candidate-v4/result.json",
+            "bytes": 5719,
+            "sha256": "e20b82da2ed5390c0b0ee44a1a82a15eadeab60142955df5eb57eba6c3592054"
+          }
+        },
+        "consolidated_focused_controls": {
+          "result": "PASS",
+          "tests": 16,
+          "skips": 0,
+          "seconds": 7.435,
+          "receipt": {
+            "evidence": "validation-v1/first-css-finite-candidate-v4/consolidated-result-v1.json",
+            "bytes": 2958,
+            "sha256": "4f8e144dc2f7c6152b0a473f1f22108726ce73099f985f1036feeb0d4aa3df3f"
+          },
+          "scope": "Real host fixture and SDK decoder, extracted constructor/arm/lifecycle/callback/whole-loop controls, actual JS loaders/comparators/queued helpers with explicit source/owner/audio/comparator services. No scene parity or finite source-state equality claim."
+        },
+        "exact_application": {
+          "receipt": {
+            "evidence": "validation-v1/first-css-finite-candidate-v4/integration-v1/integration-result-v1.json",
+            "bytes": 12848,
+            "sha256": "decb0745ada38649a368c132d70e1298651f95db2e0b146b87e93bc697fb1d45"
+          },
+          "frozen_candidate_patch_applied_exactly": true,
+          "candidate_patch_sha256": "2de5654d7e33088b5c4c3086cac8d9115be2adb1605acc81ec73e759b6ac2828",
+          "subsequent_test_whitespace_correction": {
+            "receipt": {
+              "evidence": "validation-v1/first-css-finite-candidate-v4/cleanup-v1/cleanup-result-v1.json",
+              "bytes": 4094,
+              "sha256": "bf236b1674ff4cccfc56de7d7e351ed0d65b71ed3c6c7583c24b1c8a6109ca38"
+            },
+            "diff": {
+              "evidence": "validation-v1/first-css-finite-candidate-v4/cleanup-v1/two-line-trailing-whitespace-cleanup.diff",
+              "bytes": 240,
+              "sha256": "ba7a3128afb8653599c5bb552542aa621764604be40385e72127caaddc1bff73"
+            },
+            "change": "Exactly two trailing single spaces removed from the applied test fixture opening lines; external source freeze and patch preserved unchanged.",
+            "before_sha256": "be3c32f1c05f9220d32427487f106cde7d288d979d4a08254e22d9a32318f4e5",
+            "after_sha256": "9dfc0ac1201c0b877902dfa65f3f39874a50bd64c10ee3401a2b5fa35851b0d5"
+          }
+        },
+        "release_builds": [
+          {
+            "profile": "stadium-c1a-diagnostic",
+            "result": "PASS",
+            "command": "python3 scripts/build.py --target runtime --configuration Release --stadium-c1a-diagnostic",
+            "exit_code": 0,
+            "elapsed_seconds_observed": 27.309,
+            "error_lines": 0,
+            "warning_lines": 960,
+            "log": {
+              "evidence": "validation-v1/first-css-finite-candidate-v4/integration-v1/diagnostic-release-build.log",
+              "bytes": 1184109,
+              "sha256": "cb20fdc52e9e75514c87ea133f6e2c7ef9519497d639f1200356bb0694d25023"
+            }
+          },
+          {
+            "profile": "ordinary",
+            "result": "PASS",
+            "command": "python3 scripts/build.py --target runtime --configuration Release",
+            "exit_code": 0,
+            "elapsed_seconds_observed": 24.659,
+            "error_lines": 0,
+            "warning_lines": 960,
+            "log": {
+              "evidence": "validation-v1/first-css-finite-candidate-v4/integration-v1/ordinary-release-build.log",
+              "bytes": 1184086,
+              "sha256": "3b599567f6bbae3b42960851dbbec93719b59946ac88fc42b861572c5d025c0b"
+            }
+          }
+        ],
+        "build_outputs": [
+          {
+            "profile": "stadium-c1a-diagnostic",
+            "artifact": "browser-stadium-c1a-release/gameplay_menu_browser.js",
+            "bytes": 319207,
+            "sha256": "ac58f017d10f9ec46144984c598d21a16b3dd282e1585de66a335424d63ad001"
+          },
+          {
+            "profile": "stadium-c1a-diagnostic",
+            "artifact": "browser-stadium-c1a-release/gameplay_menu_browser.wasm",
+            "bytes": 16626674,
+            "sha256": "b1837a26d8930ea096b4c7ced67a86285a52339b10668bff4247d8bd5f23da7b"
+          },
+          {
+            "profile": "ordinary",
+            "artifact": "browser-release/gameplay_menu_browser.js",
+            "bytes": 301190,
+            "sha256": "3e86b072b4aaf2186a3228e9c775740fcf274fb0c4efadd412f69cb1289d643a"
+          },
+          {
+            "profile": "ordinary",
+            "artifact": "browser-release/gameplay_menu_browser.wasm",
+            "bytes": 15858308,
+            "sha256": "6e2e00a48cfc6618d0efc433dbe34ca61ab51ae28369a568da7f0155f84ed1a2"
+          }
+        ],
+        "full_regression_v1": {
+          "state": "FAILED",
+          "tests": 2737,
+          "errors": 2,
+          "skips": 189,
+          "seconds": 570.596,
+          "failure": "Two finite-CSS controls required absent MELEE_FINITE_CSS_EVIDENCE_ROOT during ordinary discovery; not a production runtime failure.",
+          "receipt": {
+            "evidence": "validation-v1/first-css-finite-candidate-v4/integration-v1/full-regression-v1-receipt.json",
+            "bytes": 446,
+            "sha256": "566b59c7cebb15a9d45bdf3448ec102b512b09e95dfd24d12ac96f258147f42f"
+          },
+          "log": {
+            "evidence": "validation-v1/first-css-finite-candidate-v4/integration-v1/full-regression-v1.log",
+            "bytes": 528397,
+            "sha256": "483ad22e692aed3d22cff365f7b60b48d6a62f61be65f11768d95b168c5c12af"
+          }
+        },
+        "regression_fixture_repair": {
+          "production_changed": false,
+          "scope": "Deterministic seven-row synthetic complete constructor/row/finite hash-bound fixture graph in owned test scratch. All actual loaders, comparators and real SDK decoder remain exercised; retained-original controls are separate optional tests.",
+          "diff": {
+            "evidence": "validation-v1/first-css-finite-candidate-v4/regression-fixture-repair-v1/repair.diff",
+            "bytes": 18715,
+            "sha256": "94443d68664bea0544cd77a053fc46669380d9eaa4e9afeda6b73129016ac4f4"
+          },
+          "before_hashes": {
+            "evidence": "validation-v1/first-css-finite-candidate-v4/regression-fixture-repair-v1/before-hashes.json",
+            "bytes": 309,
+            "sha256": "1d7f958cc76280b2b7ce435951f82fe35da300cd139f2aabb2fd78ba807d0e45"
+          },
+          "after_hashes": {
+            "evidence": "validation-v1/first-css-finite-candidate-v4/regression-fixture-repair-v1/after-hashes.json",
+            "bytes": 458,
+            "sha256": "2f147b774866a75f994115c06e3c1209a5f961defd1ff71505038a946c4d46c7"
+          },
+          "source_files": {
+            "tests/test_stadium_finite_css_controls.py": {
+              "bytes": 31711,
+              "sha256": "b5cdb2fc5be878d3f93ec0a3fd70e434a10806787a2fa020f2f632271418670b"
+            },
+            "tests/stadium_finite_css_controls.mjs": {
+              "bytes": 16718,
+              "sha256": "4dc32e3e489702ba1b9cc480af82a82d420887a4aca681deee34c41503be5d14"
+            },
+            "tests/stadium_finite_css_fixture.py": {
+              "bytes": 11315,
+              "sha256": "de0da519b6a92c462edcb3cceb9dadafc7f9f010784532133a4c546ca3a94623"
+            }
+          },
+          "focused_default": {
+            "result": "PASS",
+            "tests": 7,
+            "skips": 2,
+            "seconds": 2.011,
+            "skips_scope": "Only optional retained-original tests; default synthetic loader and native decoder controls passed.",
+            "log": {
+              "evidence": "validation-v1/first-css-finite-candidate-v4/regression-fixture-repair-v1/focused-default-v3.log",
+              "bytes": 2283,
+              "sha256": "d78a9265cf711f0f46468039010e4255d865f36c884ea891fd07eaeb347cef43"
+            }
+          },
+          "focused_with_retained_original": {
+            "result": "PASS",
+            "tests": 7,
+            "skips": 0,
+            "seconds": 6.914,
+            "log": {
+              "evidence": "validation-v1/first-css-finite-candidate-v4/regression-fixture-repair-v1/focused-with-retained-v2.log",
+              "bytes": 2647,
+              "sha256": "484a5b9248f24f1bcf936bb7b62e246ac67182044de0d4fb0669c940a79ad0a3"
+            }
+          },
+          "preserved_controls": {
+            "receipt_refusals": 13,
+            "comparator_refusals": 8,
+            "queued_cases": 38,
+            "native_decoder_refusals": 46,
+            "typed_PAD_fields": "All four ports: buttons, signed main/substick axes, triggers, analog A/B and signed errors."
+          },
+          "independent_review": {
+            "evidence": "validation-v1/first-css-finite-candidate-v4/regression-fixture-repair-v1/independent-review-v1.json",
+            "bytes": 4981,
+            "sha256": "abab157fdce42490830d64028b26b5d8e4284927769ce34dece5131f067ad46a"
+          },
+          "independent_review_result": "PASS_WITH_SCOPE_LIMITS"
+        },
+        "full_regression_v2": {
+          "state": "PASS",
+          "tests": 2739,
+          "seconds": 558.62,
+          "skips": 191,
+          "errors": 0,
+          "failures": 0,
+          "log": {
+            "evidence": "validation-v1/first-css-finite-candidate-v4/integration-v1/full-regression-v2.log",
+            "bytes": 528300,
+            "sha256": "dc16d3dca42862f61e23f5b7136d20b44d39e0df6e5aa4ef90a2b3e09b6b7666"
+          },
+          "scope": "Applied reviewed FC4 plus test-only portable fixtures; no browser capture"
+        },
+        "capture": "UNRUN",
+        "finite_source_state_parity": false,
+        "terminal_tick_equality": false,
+        "C3": false,
+        "clean_implementation_commit": "PENDING",
+        "refreshed_capture_preflight": "PENDING",
+        "next": "Commit reviewed implementation checkpoint, refresh exact source/build preflight and admit one finite-CSS capture after packet review. No SSS/VS/GO continuation or C3 release.",
+        "exclusions": [
+          "Finite browser/original tick and draw agreement",
+          "Terminal scheduler tick equality",
+          "Restore or scene parity",
+          "CSS leave/SSS/VS Entry/Setup/GO/GO+2 continuation",
+          "Pixel/PCM, physical input, timing/performance, whole-session and C3 acceptance"
+        ]
+      }
     }
   }
 }

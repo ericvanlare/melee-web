@@ -148,8 +148,12 @@ bool stadium_c1a_armed=false;
 std::string stadium_c1a_observation;
 int stadium_c1a_raw_stkind=-1;
 enum class FirstCssBrowserMode : unsigned {
- None=0, LegacyTickDrawV1=1, ConstructorReturnOnlyV2=2, FreshConsumedTickDrawV3=3
+ None=0, LegacyTickDrawV1=1, ConstructorReturnOnlyV2=2, FreshConsumedTickDrawV3=3, FreshFiniteCssPrefixV4=4
 };
+bool first_css_fresh_input_mode(FirstCssBrowserMode mode){
+ return mode==FirstCssBrowserMode::FreshConsumedTickDrawV3||
+        mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4;
+}
 struct FirstCssDrawSample {
  std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> pad{};
  uint32_t seed=0,scene_frame=0;
@@ -170,6 +174,7 @@ struct FirstCssBrowserDrawState {
  melee_web::stadium_first_css_diagnostic::ContextInput context{};
  melee_web::stadium_first_css_diagnostic::ConsumedPadInput consumed{};
  melee_web::stadium_first_css_diagnostic::FreshRowInput fresh_row{};
+ melee_web::stadium_first_css_diagnostic::FreshFiniteCssInput finite_css{};
  unsigned fresh_terminal_callbacks=0;
  PADStatus consumed_status[4]{};
  MeleeWebMenuCssReturnSnapshot entry{};
@@ -914,7 +919,7 @@ void first_css_browser_draw_fail(const std::string& error){
   first_css_browser_draw.failed=true;first_css_browser_draw.error=error;
  }
  if(first_css_browser_draw.mode==FirstCssBrowserMode::ConstructorReturnOnlyV2||
-    first_css_browser_draw.mode==FirstCssBrowserMode::FreshConsumedTickDrawV3){
+    first_css_fresh_input_mode(first_css_browser_draw.mode)){
   if(first_css_browser_draw.mode==FirstCssBrowserMode::ConstructorReturnOnlyV2)
    first_css_browser_draw.constructor_return_terminal=true;
   first_css_browser_draw.constructor_arm_ready=false;
@@ -925,7 +930,7 @@ void first_css_browser_draw_fail(const std::string& error){
 }
 void first_css_browser_draw_check_live(const char* boundary){
  auto& state=first_css_browser_draw;
- if(state.mode==FirstCssBrowserMode::FreshConsumedTickDrawV3)
+ if(first_css_fresh_input_mode(state.mode))
   check(host&&host==state.armed_host_owner&&world&&
         world.get()==state.armed_world_owner&&state.armed_world_generation!=0&&
         melee_web_gameplay_generation()==state.armed_world_generation&&
@@ -996,6 +1001,25 @@ void first_css_browser_draw_write_sample(std::ostream& out,const FirstCssDrawSam
  first_css_browser_draw_write_route(out,sample);
  out<<'}';
 }
+unsigned first_css_postdraw_count(){
+ if(first_css_browser_draw.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4){
+  check(first_css_browser_draw.finite_css.rows.size()>=2,
+        "Fresh finite CSS has no reserved finite rows");
+  return static_cast<unsigned>(first_css_browser_draw.finite_css.rows.size()-1);
+ }
+ return melee_web::stadium_first_css_diagnostic::kPostdrawBatchCount;
+}
+const melee_web::stadium_first_css_diagnostic::FreshRowInput& first_css_finite_row(unsigned index){
+ const auto& state=first_css_browser_draw;
+ check(state.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4&&
+       index<state.finite_css.rows.size(),"Fresh finite CSS row index escaped its reservation");
+ return state.finite_css.rows[index];
+}
+uint32_t first_css_postdraw_consume(unsigned index){
+ if(first_css_browser_draw.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4)
+  return first_css_finite_row(index+1).consume_sequence;
+ return melee_web::stadium_first_css_diagnostic::kPostdrawFirstConsumeSequence+index*5;
+}
 std::string first_css_browser_postdraw_stream_actual_json(
  const FirstCssDrawSample& sample,unsigned input_index,unsigned source_tick,
  int tick_result,
@@ -1003,8 +1027,7 @@ std::string first_css_browser_postdraw_stream_actual_json(
  std::ostringstream out;
  const unsigned ordinal=input_index+1;
  const uint32_t consume_sequence=
-     melee_web::stadium_first_css_diagnostic::kPostdrawFirstConsumeSequence+
-     input_index*5;
+     first_css_postdraw_consume(input_index);
  out<<"{\"source_tick\":"<<source_tick<<",\"draw_ordinal\":"<<ordinal
     <<",\"scene_frame\":"<<sample.scene_frame
     <<",\"tick_result\":"<<tick_result
@@ -1013,6 +1036,21 @@ std::string first_css_browser_postdraw_stream_actual_json(
     <<",\"stream_input_ordinal\":"<<ordinal
     <<",\"consumed_pad_sequence\":"<<consume_sequence
     <<",\"terminal_transition\":"<<(terminal_transition?"true":"false");
+ if(first_css_browser_draw.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4){
+  const auto& row=first_css_finite_row(input_index+1);
+  out<<",\"source_stream_sha256\":\""<<row.consumed.source_sha256<<"\""
+     <<",\"source_tick_sequence\":"<<row.tick_sequence
+     <<",\"source_tick_value\":"<<row.source_tick
+     <<",\"source_draw_ordinal\":"<<row.draw_ordinal
+     <<",\"original_source_frame\":"<<row.source_tick
+     <<",\"native_post_host_tick_frame\":"<<sample.scene_frame
+     <<",\"phase_relation\":\"native host post-tick sample at frame "<<row.draw_source_tick
+     <<" versus original scheduler-end SourceTick "<<row.tick_sequence
+     <<" before frame increment at frame "<<row.source_tick<<"\""
+     <<",\"source_scene_kind\":"<<sample.scene_kind
+     <<",\"host_source_scene\":"<<sample.source_scene
+     <<",\"host_menu_phase\":"<<sample.menu_phase;
+ }
  out<<",\"source_scene\":"<<sample.source_scene
     <<",\"menu_phase\":"<<sample.menu_phase
     <<",\"scene_kind\":"<<sample.scene_kind
@@ -1055,9 +1093,10 @@ std::string first_css_final_pending_draw_actual_json(
  const auto& baseline=first_css_browser_draw;
  const unsigned source_tick=stream.executed_host_ticks;
  const unsigned draw_ordinal=baseline.host_draw_calls+stream.host_draw_calls;
- check(source_tick==149&&draw_ordinal==148&&stream.matched_ticks==147&&
-       stream.matched_draws==147&&stream.consumed_inputs==148&&
-       baseline.host_draw_calls==1&&stream.host_draw_calls==147&&
+ check(source_tick==first_css_postdraw_count()+1&&draw_ordinal==first_css_postdraw_count()&&
+       stream.matched_ticks==first_css_postdraw_count()-1&&
+       stream.matched_draws==first_css_postdraw_count()-1&&stream.consumed_inputs==first_css_postdraw_count()&&
+       baseline.host_draw_calls==1&&stream.host_draw_calls==first_css_postdraw_count()-1&&
        stream.tick_result==3&&stream.transition_captured,
        "Final CSS draw actual coordinates lost the retained stream boundary");
  std::ostringstream out;
@@ -1087,11 +1126,11 @@ void first_css_final_pending_draw_check_live(const char* boundary){
  check(state.armed&&!state.failed&&!state.complete&&
        stream.armed&&stream.kicked&&stream.terminal&&!stream.failed&&
        !stream.complete&&stream.outcome=="stop_after_last_input_request"&&
-       stream.current_input_index==147&&stream.next_input_index==147&&
-       stream.consumed_inputs==148&&stream.executed_host_ticks==149&&
-       stream.matched_ticks==147&&stream.matched_draws==147&&
+       stream.current_input_index==first_css_postdraw_count()-1&&stream.next_input_index==first_css_postdraw_count()-1&&
+       stream.consumed_inputs==first_css_postdraw_count()&&stream.executed_host_ticks==first_css_postdraw_count()+1&&
+       stream.matched_ticks==first_css_postdraw_count()-1&&stream.matched_draws==first_css_postdraw_count()-1&&
        stream.transition_captured&&stream.tick_result==3&&
-       !stream.frame_end_returned&&stream.host_draw_calls==147&&
+       !stream.frame_end_returned&&stream.host_draw_calls==first_css_postdraw_count()-1&&
        stream.aurora_begin_calls==stream.aurora_end_calls&&
        baseline.armed&&baseline.complete&&!baseline.failed&&
        baseline.frame_end_returned&&host&&world&&host_entered&&!pending&&!replay,
@@ -1109,6 +1148,12 @@ void first_css_final_pending_draw_check_live(const char* boundary){
 }
 FirstCssDrawSample first_css_final_pending_draw_capture(const char* boundary){
  auto& baseline=first_css_browser_draw;
+ if(baseline.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4)
+  check(host&&host==baseline.armed_host_owner&&world&&world.get()==baseline.armed_world_owner&&
+        source_session_owned&&source_session_owned==baseline.arm_source_session_owned&&
+        baseline.armed_world_generation!=0&&melee_web_gameplay_generation()==baseline.armed_world_generation&&
+        diagnostic_start_ticks==0&&diagnostic_pad_remaining==0&&!faulted&&!replay&&!melee_web_net_active(),
+        "Fresh final CSS draw lost its reserved owners before pointer access");
  check(host&&world&&host_entered&&
        melee_web_gameplay_world_exists()&&melee_web_source_memory_healthy()&&
        melee_web_gameplay_generation()==baseline.world_generation&&
@@ -1146,8 +1191,7 @@ void first_css_browser_postdraw_stream_check_live(const char* boundary,
        "First-CSS post-draw stream lost its completed one-shot baseline owners");
  first_css_browser_draw_check_live(boundary);
  check(stream.input.source_sha256==baseline.context.source_sha256&&
-       stream.input.first_consume_sequence==
-           melee_web::stadium_first_css_diagnostic::kPostdrawFirstConsumeSequence&&
+       stream.input.first_consume_sequence==first_css_postdraw_consume(0)&&
        melee_web_gameplay_generation()==baseline.world_generation&&
        gm_801A4BA8()==expected_frame&&
        seed_ptr==baseline.seed_owner&&
@@ -1265,7 +1309,8 @@ void first_css_browser_draw_refresh_observation(){
  const char* status=state.failed?"failed":state.complete?"complete":
      state.draw_captured?"draw-captured":state.tick_captured?"tick-captured":
      state.kicked?"kicked":state.entry_captured?"entered":state.armed?"armed":"idle";
- out<<"{\"schema\":\""<<(state.mode==FirstCssBrowserMode::FreshConsumedTickDrawV3?
+ out<<"{\"schema\":\""<<(state.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4?
+     "melee-web-stadium-first-css-finite-observation-v4":first_css_fresh_input_mode(state.mode)?
      "melee-web-stadium-first-css-fresh-row-observation-v3":
      "melee-web-stadium-first-css-browser-draw-v1")<<"\",\"state\":\""
     <<status<<"\",\"source_stream_sha256\":\""
@@ -1280,12 +1325,13 @@ void first_css_browser_draw_refresh_observation(){
     <<",\"frame_end_returned\":"<<(state.frame_end_returned?"true":"false")
     <<",\"preparation_source_callbacks\":"<<state.preparation_source_callbacks
     <<",\"full_session_comparison\":false";
- if(state.mode==FirstCssBrowserMode::FreshConsumedTickDrawV3){
+ if(first_css_fresh_input_mode(state.mode)){
   const bool arm_live=host&&host==state.armed_host_owner&&world&&
       world.get()==state.armed_world_owner&&state.armed_world_generation!=0&&
       melee_web_gameplay_generation()==state.armed_world_generation&&
       source_session_owned&&source_session_owned==state.arm_source_session_owned;
-  out<<",\"mode\":\"fresh_consumed_tick_draw_v3\""
+  out<<",\"mode\":\""<<(state.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4?
+      "fresh_finite_css_prefix_v4":"fresh_consumed_tick_draw_v3")<<"\""
      <<",\"native_phase\":"<<(host?melee_web_menu_host_phase(host):0)
      <<",\"running\":"<<(running?"true":"false")
      <<",\"host_entered\":"<<(host_entered?"true":"false")
@@ -1299,6 +1345,10 @@ void first_css_browser_draw_refresh_observation(){
      <<",\"draw_enter_sequence\":"<<state.fresh_row.draw_enter_sequence
      <<",\"draw_return_sequence\":"<<state.fresh_row.draw_return_sequence
      <<",\"pad_poll_sequence\":"<<state.fresh_row.poll_sequence<<'}';
+  if(state.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4)
+   out<<",\"finite_input_provenance\":{\"source_sha256\":\""<<state.finite_css.source_sha256
+      <<"\",\"row_count\":"<<state.finite_css.rows.size()
+      <<",\"phase_end_sequence\":"<<state.finite_css.phase_end_sequence<<'}';
  }
  if(state.entry_captured){
   out<<",\"entry\":{\"source_scene\":"<<state.entry.source_scene
@@ -1316,13 +1366,13 @@ void first_css_browser_draw_refresh_observation(){
  if(state.tick_captured){
   out<<",\"tick\":{\"source_stream_sha256\":\""
      <<state.context.source_sha256<<"\",\"consumed_pad_sequence\":"
-     <<(state.mode==FirstCssBrowserMode::FreshConsumedTickDrawV3?state.fresh_row.consume_sequence:834)
+     <<(first_css_fresh_input_mode(state.mode)?state.fresh_row.consume_sequence:834)
      <<",\"source_tick_sequence\":"
-     <<(state.mode==FirstCssBrowserMode::FreshConsumedTickDrawV3?state.fresh_row.tick_sequence:835)
+     <<(first_css_fresh_input_mode(state.mode)?state.fresh_row.tick_sequence:835)
      <<",\"source_tick_value\":0,\"source_draw_ordinal\":0,\"original_source_frame\":"
      <<state.frame_before
      <<",\"phase_relation\":\"native host post-tick sample at frame 1 versus original scheduler-end SourceTick "
-     <<(state.mode==FirstCssBrowserMode::FreshConsumedTickDrawV3?state.fresh_row.tick_sequence:835)
+     <<(first_css_fresh_input_mode(state.mode)?state.fresh_row.tick_sequence:835)
      <<" before frame increment at frame 0\""
      <<",\"host_tick_calls\":"<<state.host_tick_calls<<",\"host_tick_result\":"<<state.tick_result
      <<",\"source_scene_kind\":"<<state.tick.scene_kind
@@ -1376,8 +1426,7 @@ void first_css_browser_draw_refresh_observation(){
      <<",\"current_input_index\":"<<stream.current_input_index
      <<",\"current_input_ordinal\":"<<(stream.current_input_index+1)
      <<",\"current_consumed_pad_sequence\":"
-     <<(melee_web::stadium_first_css_diagnostic::kPostdrawFirstConsumeSequence+
-        stream.current_input_index*5)
+     <<first_css_postdraw_consume(stream.current_input_index)
      <<",\"consumed_inputs\":"<<stream.consumed_inputs
      <<",\"host_tick_calls\":"<<stream.host_tick_calls
      <<",\"executed_host_ticks\":"<<stream.executed_host_ticks
@@ -1421,9 +1470,12 @@ void first_css_browser_draw_refresh_observation(){
      <<",\"frame_end_returned\":"<<(final_draw.frame_end_returned?"true":"false")
      <<",\"error\":"<<(final_draw.error.empty()?"null":
           first_css_browser_draw_json_quote(final_draw.error))
-     <<",\"input_ordinal\":148,\"consumed_pad_sequence\":1574"
-     <<",\"terminal_tick_sequence\":1575,\"draw_enter_sequence\":1576"
-     <<",\"draw_return_sequence\":1577,\"source_steps\":0"
+     <<",\"input_ordinal\":"<<first_css_postdraw_count()
+     <<",\"consumed_pad_sequence\":"<<first_css_postdraw_consume(first_css_postdraw_count()-1)
+     <<",\"terminal_tick_sequence\":"<<(state.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4?first_css_finite_row(first_css_postdraw_count()).tick_sequence:1575)
+     <<",\"draw_enter_sequence\":"<<(state.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4?first_css_finite_row(first_css_postdraw_count()).draw_enter_sequence:1576)
+     <<",\"draw_return_sequence\":"<<(state.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4?first_css_finite_row(first_css_postdraw_count()).draw_return_sequence:1577)
+     <<",\"source_steps\":0"
      <<",\"source_draws\":0,\"source_pending\":false"
      <<",\"host_draw_calls\":"<<final_draw.host_draw_calls
      <<",\"aurora_begin_calls\":"<<final_draw.aurora_begin_calls
@@ -1515,7 +1567,7 @@ uint32_t asset_generation=0;
 bool stadium_first_css_prepared_diagnostic_active(){
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  return stadium_first_css_constructor_return_active()||
-        first_css_browser_draw.mode==FirstCssBrowserMode::FreshConsumedTickDrawV3;
+        first_css_fresh_input_mode(first_css_browser_draw.mode);
 #else
  return false;
 #endif
@@ -1525,7 +1577,7 @@ bool stadium_first_css_prepared_diagnostic_consume_launch(){
   return stadium_first_css_constructor_return_consume_launch();
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  auto& state=first_css_browser_draw;
- if(state.mode!=FirstCssBrowserMode::FreshConsumedTickDrawV3)return true;
+ if(!first_css_fresh_input_mode(state.mode))return true;
  if(diagnostic_start_ticks!=0||diagnostic_pad_remaining!=0||
     !state.armed||!state.constructor_arm_ready||state.failed||faulted||
     state.constructor_launch_consumed||state.constructor_entry_attempted||host_entered)
@@ -1547,7 +1599,7 @@ bool stadium_first_css_prepared_diagnostic_entry_succeeded(){
   return stadium_first_css_constructor_return_entry_succeeded();
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  const auto& state=first_css_browser_draw;
- return state.mode==FirstCssBrowserMode::FreshConsumedTickDrawV3&&
+ return first_css_fresh_input_mode(state.mode)&&
         state.constructor_entry_attempted&&state.constructor_launch_consumed&&
         state.entry_captured&&!state.failed&&!state.kicked&&!state.tick_captured&&
         diagnostic_start_ticks==0&&diagnostic_pad_remaining==0&&
@@ -1571,7 +1623,7 @@ void stadium_first_css_prepared_diagnostic_fail(const char* error){
   stadium_first_css_constructor_return_fail(error);return;
  }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
- if(first_css_browser_draw.mode==FirstCssBrowserMode::FreshConsumedTickDrawV3){
+ if(first_css_fresh_input_mode(first_css_browser_draw.mode)){
   first_css_browser_draw_fail(error&&*error?error:"Fresh CSS one-row owner operation failed");
   first_css_browser_draw_refresh_observation();
  }
@@ -2172,7 +2224,7 @@ void enter_world(){
   auto& state=first_css_browser_draw;
   const bool admitted=state.armed&&state.constructor_arm_ready&&
         state.constructor_launch_consumed&&!state.constructor_entry_attempted&&
-        (state.mode!=FirstCssBrowserMode::FreshConsumedTickDrawV3||
+        (!first_css_fresh_input_mode(state.mode)||
           (diagnostic_start_ticks==0&&diagnostic_pad_remaining==0))&&
         !state.failed&&!faulted&&!state.entry_captured&&host&&
         host==state.armed_host_owner&&!host_entered&&world&&
@@ -4120,13 +4172,13 @@ void tick(){
  }
  // Diagnostic input must never override the producer-bound literal row.
  // Reject it before input polling/audio/preparation, including after kick.
- if(first_css_browser_draw.mode==FirstCssBrowserMode::FreshConsumedTickDrawV3&&
+ if(first_css_fresh_input_mode(first_css_browser_draw.mode)&&
     (diagnostic_start_ticks!=0||diagnostic_pad_remaining!=0)){
   first_css_browser_draw_fail("Fresh CSS row refuses queued diagnostic input");
   first_css_browser_draw_refresh_observation();
   EM_ASM({window.menuFrame?.(false);});return;
  }
- if(first_css_browser_draw.mode==FirstCssBrowserMode::FreshConsumedTickDrawV3&&
+ if(first_css_fresh_input_mode(first_css_browser_draw.mode)&&
     !first_css_browser_draw.kicked&&!first_css_browser_draw.complete&&
     !first_css_browser_draw.failed){
   auto& state=first_css_browser_draw;
@@ -4155,8 +4207,14 @@ void tick(){
   first_css_browser_draw_refresh_observation();
   EM_ASM({window.menuFrame?.(false);});return;
  }
- if(first_css_browser_draw.mode==FirstCssBrowserMode::FreshConsumedTickDrawV3&&
-    (first_css_browser_draw.complete||first_css_browser_draw.failed)){
+ if(first_css_fresh_input_mode(first_css_browser_draw.mode)&&
+    (first_css_browser_draw.failed||first_css_browser_draw.complete)&&
+    (first_css_browser_draw.mode!=FirstCssBrowserMode::FreshFiniteCssPrefixV4||
+     first_css_browser_draw.failed||!first_css_browser_postdraw_stream.armed||
+     !first_css_browser_postdraw_stream.kicked||
+     (first_css_browser_postdraw_stream.terminal&&
+      (!first_css_final_pending_draw.kicked||first_css_final_pending_draw.complete||
+       first_css_final_pending_draw.failed)))){
   auto& state=first_css_browser_draw;
   if(!state.failed){try{
    first_css_browser_draw_check_live("terminal fresh row callback");
@@ -4344,7 +4402,9 @@ void tick(){
        }
        if(owners_valid){
         ++final_draw.host_draw_calls;
-        drawn=melee_web_menu_host_draw_final_pending_css(host,error,sizeof(error));
+        drawn=(first_css_browser_draw.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4?
+          melee_web_menu_host_draw_fresh_final_pending_css_v4(host,error,sizeof(error)):
+          melee_web_menu_host_draw_final_pending_css(host,error,sizeof(error)));
         if(drawn==1){
          try{
           /* After renderer return, retain changed compared values as the
@@ -4484,7 +4544,7 @@ void tick(){
      ++stream.matched_draws;
      ++stream.next_input_index;
      if(stream.next_input_index==
-        melee_web::stadium_first_css_diagnostic::kPostdrawBatchCount){
+        first_css_postdraw_count()){
       stream.complete=true;stream.terminal=true;stream.outcome="bounded_pair_cap";
       running=false;menu_clock.reset();
      }
@@ -4770,7 +4830,7 @@ void tick(){
    if(first_css_browser_postdraw_stream.armed){
     auto& stream=first_css_browser_postdraw_stream;
     check(stream.kicked&&!stream.failed&&!stream.terminal&&!stream.complete&&
-          stream.next_input_index<melee_web::stadium_first_css_diagnostic::kPostdrawBatchCount&&
+          stream.next_input_index<first_css_postdraw_count()&&
           stream.host_tick_calls==stream.matched_ticks&&
           stream.executed_host_ticks==stream.matched_ticks+1&&
           stream.consumed_inputs==stream.matched_ticks&&
@@ -4788,7 +4848,10 @@ void tick(){
     stream.draw_captured=false;stream.draw_approved=false;
     stream.transition_captured=false;stream.frame_end_returned=false;
     stream.tick_result=0;
-    melee_web::stadium_first_css_diagnostic::decode_postdraw_pad_statuses(
+    if(first_css_browser_draw.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4)
+     melee_web::stadium_first_css_diagnostic::decode_consumed_pad_statuses(
+         first_css_finite_row(stream.current_input_index+1).consumed,stream.input_status);
+    else melee_web::stadium_first_css_diagnostic::decode_postdraw_pad_statuses(
         stream.input,stream.current_input_index,stream.input_status);
     check(stream.input_status[0].err==PAD_ERR_NONE,
           "Retained post-draw stream PAD is not connected on P1");
@@ -4969,7 +5032,7 @@ void tick(){
     if(first_css_browser_postdraw_stream.armed){
      auto& stream=first_css_browser_postdraw_stream;
      check(stream.current_input_index==stream.next_input_index&&
-           stream.current_input_index<melee_web::stadium_first_css_diagnostic::kPostdrawBatchCount&&
+           stream.current_input_index<first_css_postdraw_count()&&
            stream.consumed_inputs==stream.current_input_index&&
            stream.host_tick_calls==stream.matched_ticks&&
            stream.host_draw_calls==stream.matched_draws&&
@@ -5006,7 +5069,7 @@ void tick(){
             "First-CSS stream transition comparator unexpectedly approved a draw boundary");
       stream.terminal=true;
       if(stream.current_input_index==
-         melee_web::stadium_first_css_diagnostic::kPostdrawBatchCount-1){
+         first_css_postdraw_count()-1){
        stream.outcome="stop_after_last_input_request";
        message="First-CSS stream stopped at its retained final transition input; final draw is unpaired.";
       }else{
@@ -5019,6 +5082,9 @@ void tick(){
       first_css_browser_draw_refresh_observation();
       break;
      }
+     check(first_css_browser_draw.mode!=FirstCssBrowserMode::FreshFiniteCssPrefixV4||
+           stream.current_input_index+1<first_css_postdraw_count(),
+           "Fresh finite CSS last literal input did not request its terminal transition");
      const uint32_t expected_frame=first_css_browser_draw.draw.scene_frame+
          stream.matched_ticks+1;
      first_css_browser_postdraw_stream_check_live(
@@ -5216,11 +5282,11 @@ void tick(){
             postdraw_stream.frame_end_returned&&postdraw_stream.complete&&
             postdraw_stream.outcome=="bounded_pair_cap"&&
             postdraw_stream.next_input_index==
-                melee_web::stadium_first_css_diagnostic::kPostdrawBatchCount&&
+                first_css_postdraw_count()&&
             postdraw_stream.matched_ticks==
-                melee_web::stadium_first_css_diagnostic::kPostdrawBatchCount&&
+                first_css_postdraw_count()&&
             postdraw_stream.matched_draws==
-                melee_web::stadium_first_css_diagnostic::kPostdrawBatchCount,
+                first_css_postdraw_count(),
             "Terminal CSS stream cap did not retire all 148 actual Aurora frames exactly once");
      }
      first_css_draw_terminal=true;
@@ -5228,7 +5294,7 @@ void tick(){
      first_css_browser_draw_refresh_observation();
     }else if(postdraw_stream.kicked&&source_frames.steps()!=0&&
              postdraw_stream.current_input_index<
-             melee_web::stadium_first_css_diagnostic::kPostdrawBatchCount){
+             first_css_postdraw_count()){
      check(source_frames.steps()==1&&source_frames.draws()==1&&
            !source_frames.pending()&&postdraw_stream.tick_captured&&
            postdraw_stream.tick_approved&&postdraw_stream.draw_captured&&
@@ -5867,10 +5933,11 @@ int melee_web_native_menu_stadium_first_css_constructor_return_v2_arm(
   first_css_browser_draw_refresh_observation();
  }
  message=error.what();return 0;}}
-int melee_web_native_menu_stadium_first_css_fresh_row_v3_arm(
+int first_css_fresh_input_arm(
     const uint8_t* context_bytes,unsigned context_size,
-    const uint8_t* row_bytes,unsigned row_size){try{
+    const uint8_t* row_bytes,unsigned row_size,FirstCssBrowserMode mode){try{
  auto& state=first_css_browser_draw;
+ check(first_css_fresh_input_mode(mode),"Unsupported fresh CSS arm mode");
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
  check(false,"Fresh CSS row requires the reviewed complete-draw pipeline build");
 #endif
@@ -5892,13 +5959,19 @@ int melee_web_native_menu_stadium_first_css_fresh_row_v3_arm(
  auto context=
      melee_web::stadium_first_css_diagnostic::decode_constructor_return_context_v2(
          context_bytes,context_size);
- auto row=melee_web::stadium_first_css_diagnostic::decode_fresh_row_v3(
+ melee_web::stadium_first_css_diagnostic::FreshFiniteCssInput finite{};
+ melee_web::stadium_first_css_diagnostic::FreshRowInput row{};
+ if(mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4){
+  finite=melee_web::stadium_first_css_diagnostic::decode_fresh_finite_css_v4(
+      row_bytes,row_size,context);
+  row=finite.rows.front();
+ }else row=melee_web::stadium_first_css_diagnostic::decode_fresh_row_v3(
      row_bytes,row_size,context);
  PADStatus statuses[4]{};
  melee_web::stadium_first_css_diagnostic::decode_consumed_pad_statuses(row.consumed,statuses);
  check(statuses[0].err==PAD_ERR_NONE,"Fresh CSS consumed P1 is not connected");
  // Reservation is irreversible until checked unload, including partial arm failure.
- state.mode=FirstCssBrowserMode::FreshConsumedTickDrawV3;
+ state.mode=mode;state.finite_css=std::move(finite);
  state.fresh_row=std::move(row);state.consumed=state.fresh_row.consumed;
  std::copy_n(statuses,4,state.consumed_status);
  state.armed=true;
@@ -5918,17 +5991,38 @@ int melee_web_native_menu_stadium_first_css_fresh_row_v3_arm(
        error,sizeof(error)),error);
  check(melee_web_menu_host_enable_stadium_c1a(host,error,sizeof(error)),error);
  check(melee_web_menu_host_arm_first_css_return(host,error,sizeof(error)),error);
+ if(mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4){
+  const auto& last=state.finite_css.rows.back();
+  check(melee_web_menu_host_reserve_fresh_finite_css_v4(
+       host,last.draw_ordinal,last.consume_sequence,error,sizeof(error)),error);
+ }
  state.constructor_arm_ready=true;
  first_css_browser_draw_refresh_observation();
  message="Private Fresh CSS one-row diagnostic armed.";
  return 1;
 }catch(const std::exception& error){
  auto& state=first_css_browser_draw;
- if(state.mode==FirstCssBrowserMode::FreshConsumedTickDrawV3){
+ if(first_css_fresh_input_mode(state.mode)){
   first_css_browser_draw_fail(error.what());
   first_css_browser_draw_refresh_observation();
  }
  message=error.what();return 0;}}
+int melee_web_native_menu_stadium_first_css_fresh_row_v3_arm(
+ const uint8_t* context,unsigned context_size,const uint8_t* row,unsigned row_size){
+ if(first_css_browser_draw.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4){
+  message="One-row arm refuses a finite CSS owner";return 0;
+ }
+ return first_css_fresh_input_arm(context,context_size,row,row_size,
+     FirstCssBrowserMode::FreshConsumedTickDrawV3);
+}
+int melee_web_native_menu_stadium_first_css_fresh_finite_v4_arm(
+ const uint8_t* context,unsigned context_size,const uint8_t* rows,unsigned rows_size){
+ if(first_css_browser_draw.mode!=FirstCssBrowserMode::None){
+  message="Fresh finite CSS arm refuses an existing diagnostic owner";return 0;
+ }
+ return first_css_fresh_input_arm(context,context_size,rows,rows_size,
+     FirstCssBrowserMode::FreshFiniteCssPrefixV4);
+}
 int melee_web_native_menu_stadium_first_css_draw_kick(){try{
  auto& state=first_css_browser_draw;
  check(state.mode==FirstCssBrowserMode::LegacyTickDrawV1&&state.armed&&
@@ -5946,9 +6040,9 @@ int melee_web_native_menu_stadium_first_css_draw_kick(){try{
  return 1;
 }catch(const std::exception& error){first_css_browser_draw_fail(error.what());
  first_css_browser_draw_refresh_observation();return 0;}}
-int melee_web_native_menu_stadium_first_css_fresh_row_v3_kick(){try{
+int first_css_fresh_input_kick(FirstCssBrowserMode mode){try{
  auto& state=first_css_browser_draw;
- check(state.mode==FirstCssBrowserMode::FreshConsumedTickDrawV3&&state.armed&&
+ check(first_css_fresh_input_mode(mode)&&state.mode==mode&&state.armed&&
        state.entry_captured&&!state.kicked&&!state.complete&&!state.failed&&
        host&&world&&host_entered&&state.source_steps==0&&state.host_tick_calls==0&&
        state.host_draw_calls==0&&state.aurora_begin_calls==0&&state.aurora_end_calls==0,
@@ -5963,6 +6057,18 @@ int melee_web_native_menu_stadium_first_css_fresh_row_v3_kick(){try{
  return 1;
 }catch(const std::exception& error){first_css_browser_draw_fail(error.what());
  first_css_browser_draw_refresh_observation();return 0;}}
+int melee_web_native_menu_stadium_first_css_fresh_row_v3_kick(){
+ if(first_css_browser_draw.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4){
+  message="One-row kick cannot consume a finite CSS owner";return 0;
+ }
+ return first_css_fresh_input_kick(FirstCssBrowserMode::FreshConsumedTickDrawV3);
+}
+int melee_web_native_menu_stadium_first_css_fresh_finite_v4_first_kick(){
+ if(first_css_browser_draw.mode!=FirstCssBrowserMode::FreshFiniteCssPrefixV4){
+  message="Finite kick requires its finite CSS owner";return 0;
+ }
+ return first_css_fresh_input_kick(FirstCssBrowserMode::FreshFiniteCssPrefixV4);
+}
 const char* melee_web_native_menu_stadium_first_css_draw_observe(){
  if(!first_css_browser_draw.armed)
   return first_sss_text_tail_retained_json.empty()
@@ -5970,6 +6076,30 @@ const char* melee_web_native_menu_stadium_first_css_draw_observe(){
  first_css_browser_draw_refresh_observation();
  return first_css_browser_draw.observation.c_str();
 }
+int melee_web_native_menu_stadium_first_css_fresh_finite_v4_stream_arm(){try{
+ auto& baseline=first_css_browser_draw;auto& stream=first_css_browser_postdraw_stream;
+ check(baseline.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4&&
+       !stream.armed&&baseline.armed&&baseline.complete&&!baseline.failed&&
+       baseline.entry_captured&&baseline.tick_captured&&baseline.draw_captured&&
+       baseline.frame_end_returned&&baseline.source_steps==1&&baseline.source_draws==1&&
+       baseline.host_tick_calls==1&&baseline.host_draw_calls==1&&
+       baseline.aurora_begin_calls==1&&baseline.aurora_end_calls==1&&baseline.tick_result==1&&
+       !running&&!faulted&&!pending&&!replay&&!melee_web_net_active()&&
+       preparation.phase()==melee_web::MenuPreparationState::Phase::Idle&&!preparation.busy()&&
+       asset_destination==AssetDestination::None&&!match&&!results&&!prize&&
+       baseline.finite_css.rows.size()>=2,
+       "Fresh finite CSS stream requires its unchanged completed baseline");
+ first_css_browser_draw_check_live("fresh finite stream arm");
+ check(gm_801A4BA8()==baseline.draw.scene_frame&&*seed_ptr==baseline.draw.seed,
+       "Fresh finite CSS baseline seed/frame changed");
+ check(EM_ASM_INT({return typeof globalThis.__meleeWebStadiumFirstCssStreamCompare===
+       'function'?1:0;})==1,"Fresh finite CSS comparator absent");
+ stream=FirstCssBrowserPostdrawStreamState{};
+ stream.input.source_sha256=baseline.finite_css.source_sha256;
+ stream.input.first_consume_sequence=first_css_finite_row(1).consume_sequence;
+ stream.armed=true;stream.executed_host_ticks=1;
+ first_css_browser_draw_refresh_observation();return 1;
+}catch(const std::exception& error){message=error.what();return 0;}}
 int melee_web_native_menu_stadium_first_css_postdraw_stream_arm(
     const uint8_t* input_bytes,unsigned input_size){try{
  auto& baseline=first_css_browser_draw;
@@ -6003,10 +6133,10 @@ int melee_web_native_menu_stadium_first_css_postdraw_stream_arm(
  message="Private first-CSS post-draw stream armed after the matched one-shot baseline.";
  return 1;
 }catch(const std::exception& error){message=error.what();return 0;}}
-int melee_web_native_menu_stadium_first_css_postdraw_stream_kick(){try{
+int first_css_postdraw_kick(FirstCssBrowserMode mode){try{
  auto& baseline=first_css_browser_draw;
  auto& stream=first_css_browser_postdraw_stream;
- check(baseline.mode==FirstCssBrowserMode::LegacyTickDrawV1&&
+ check(baseline.mode==mode&&(mode==FirstCssBrowserMode::LegacyTickDrawV1||mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4)&&
        stream.armed&&!stream.kicked&&!stream.terminal&&!stream.failed&&
        baseline.armed&&baseline.complete&&!baseline.failed&&
        baseline.frame_end_returned&&!running&&host&&world&&host_entered&&
@@ -6026,9 +6156,15 @@ int melee_web_native_menu_stadium_first_css_postdraw_stream_kick(){try{
 }catch(const std::exception& error){
  first_css_browser_postdraw_stream_fail(error.what(),"kick-refused");
  first_css_browser_draw_refresh_observation();return 0;}}
-int melee_web_native_menu_stadium_first_css_final_draw_arm(){try{
+int melee_web_native_menu_stadium_first_css_postdraw_stream_kick(){
+ if(first_css_browser_draw.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4){message="Legacy stage refuses a finite CSS owner";return 0;}
+ return first_css_postdraw_kick(FirstCssBrowserMode::LegacyTickDrawV1);}
+int melee_web_native_menu_stadium_first_css_fresh_finite_v4_stream_kick(){
+ if(first_css_browser_draw.mode!=FirstCssBrowserMode::FreshFiniteCssPrefixV4){message="Finite stage refuses a different diagnostic owner";return 0;}
+ return first_css_postdraw_kick(FirstCssBrowserMode::FreshFiniteCssPrefixV4);}
+int first_css_final_draw_arm(FirstCssBrowserMode mode){try{
  auto& final_draw=first_css_final_pending_draw;
- check(first_css_browser_draw.mode==FirstCssBrowserMode::LegacyTickDrawV1&&
+ check(first_css_browser_draw.mode==mode&&(mode==FirstCssBrowserMode::LegacyTickDrawV1||mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4)&&
        !final_draw.armed&&!final_draw.failed&&!final_draw.complete&&
        !running&&!pending&&!faulted&&!replay&&!melee_web_net_active()&&
        host&&world&&host_entered&&!match&&!results&&!prize&&
@@ -6042,7 +6178,11 @@ int melee_web_native_menu_stadium_first_css_final_draw_arm(){try{
        "Final CSS draw host comparator is absent");
  auto& stream=first_css_browser_postdraw_stream;
  char error[256]{};
- check(melee_web_menu_host_arm_final_pending_css_draw(
+ if(mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4){
+  const auto& last=first_css_finite_row(first_css_postdraw_count());
+  check(melee_web_menu_host_arm_fresh_final_pending_css_draw_v4(
+       host,last.draw_ordinal,last.consume_sequence,stream.input_status,error,sizeof(error)),error);
+ }else check(melee_web_menu_host_arm_final_pending_css_draw(
        host,148,1574,stream.input_status,error,sizeof(error)),error);
  first_css_browser_draw_refresh_observation();
  message="One final pending CSS draw armed after the retained terminal stream.";
@@ -6050,9 +6190,15 @@ int melee_web_native_menu_stadium_first_css_final_draw_arm(){try{
 }catch(const std::exception& error){
  first_css_final_pending_draw_fail(error.what());
  first_css_browser_draw_refresh_observation();return 0;}}
-int melee_web_native_menu_stadium_first_css_final_draw_kick(){try{
+int melee_web_native_menu_stadium_first_css_final_draw_arm(){
+ if(first_css_browser_draw.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4){message="Legacy stage refuses a finite CSS owner";return 0;}
+ return first_css_final_draw_arm(FirstCssBrowserMode::LegacyTickDrawV1);}
+int melee_web_native_menu_stadium_first_css_fresh_finite_v4_final_arm(){
+ if(first_css_browser_draw.mode!=FirstCssBrowserMode::FreshFiniteCssPrefixV4){message="Finite stage refuses a different diagnostic owner";return 0;}
+ return first_css_final_draw_arm(FirstCssBrowserMode::FreshFiniteCssPrefixV4);}
+int first_css_final_draw_kick(FirstCssBrowserMode mode){try{
  auto& final_draw=first_css_final_pending_draw;
- check(first_css_browser_draw.mode==FirstCssBrowserMode::LegacyTickDrawV1&&
+ check(first_css_browser_draw.mode==mode&&(mode==FirstCssBrowserMode::LegacyTickDrawV1||mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4)&&
        final_draw.armed&&!final_draw.kicked&&!final_draw.attempted&&
        !final_draw.failed&&!final_draw.complete&&!running&&!pending&&
        first_css_browser_postdraw_stream.terminal&&
@@ -6067,6 +6213,12 @@ int melee_web_native_menu_stadium_first_css_final_draw_kick(){try{
  first_css_final_pending_draw_fail(error.what());
  first_css_browser_draw_refresh_observation();return 0;}}
 
+int melee_web_native_menu_stadium_first_css_final_draw_kick(){
+ if(first_css_browser_draw.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4){message="Legacy stage refuses a finite CSS owner";return 0;}
+ return first_css_final_draw_kick(FirstCssBrowserMode::LegacyTickDrawV1);}
+int melee_web_native_menu_stadium_first_css_fresh_finite_v4_final_kick(){
+ if(first_css_browser_draw.mode!=FirstCssBrowserMode::FreshFiniteCssPrefixV4){message="Finite stage refuses a different diagnostic owner";return 0;}
+ return first_css_final_draw_kick(FirstCssBrowserMode::FreshFiniteCssPrefixV4);}
 int melee_web_native_menu_stadium_first_sss_draw_arm(){try{
  auto& s=first_sss_draw_sequence;
  check(!s.armed&&!s.failed&&!s.attempted&&!running&&!pending&&!faulted&&host&&world&&host_entered&&
@@ -6919,6 +7071,8 @@ int melee_web_native_menu_stadium_first_sss_tick_kick(){try{
  first_css_browser_draw_refresh_observation();return 1;
 }catch(const std::exception& error){first_sss_tick_browser_fail(error.what());first_sss_tick_sync_native();first_css_browser_draw_refresh_observation();return 0;}}
 int melee_web_native_menu_stadium_first_sss_pair_arm(){try{
+ check(first_css_browser_draw.mode==FirstCssBrowserMode::LegacyTickDrawV1,
+       "SSS constructor admission requires its historical legacy CSS capability");
  auto& pair=first_sss_constructor_pair;
  check(!pair.armed&&!pair.failed&&!pair.attempted&&!running&&!pending&&!faulted&&
        !replay&&!melee_web_net_active()&&host&&world&&host_entered&&
@@ -6943,6 +7097,8 @@ int melee_web_native_menu_stadium_first_sss_pair_arm(){try{
 }catch(const std::exception& error){
  first_sss_pair_fail(error.what());first_css_browser_draw_refresh_observation();return 0;}}
 int melee_web_native_menu_stadium_first_sss_pair_kick(){try{
+ check(first_css_browser_draw.mode==FirstCssBrowserMode::LegacyTickDrawV1,
+       "SSS constructor admission requires its historical legacy CSS capability");
  auto& pair=first_sss_constructor_pair;
  check(pair.armed&&!pair.kicked&&!pair.attempted&&!pair.failed&&!running&&!pending&&
        host&&world&&host_entered&&!preparation.busy()&&!menu_scene_rebuild_pending&&

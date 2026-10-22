@@ -458,7 +458,7 @@ window.menuReplayPoll=()=>{
 // Private constructor-only diagnostic entry. The ordinary Play control still prepares.
 let firstCssConstructorLaunchAttempted=false;
 let freshFirstCssLaunchLease=null,freshFirstCssKickAttempted=false;
-const launchPreparedFirstCss=async(expectedGeneration,fresh)=>{
+const launchPreparedFirstCss=async(expectedGeneration,fresh,finite=false)=>{
  if(firstCssConstructorLaunchAttempted)throw Error('CSS constructor launch was already attempted.');
  firstCssConstructorLaunchAttempted=true;
  const launchOwner=owner,launchModule=Module,launchHandle=owner?.handle;
@@ -478,15 +478,15 @@ const launchPreparedFirstCss=async(expectedGeneration,fresh)=>{
  const assertArmed=()=>{
   assertOwner();
   if(!Number.isSafeInteger(expectedGeneration)||expectedGeneration<=0||
-     typeof launchModule[fresh?'_melee_web_native_menu_stadium_first_css_fresh_row_v3_arm':
+     typeof launchModule[finite?'_melee_web_native_menu_stadium_first_css_fresh_finite_v4_arm':fresh?'_melee_web_native_menu_stadium_first_css_fresh_row_v3_arm':
        '_melee_web_native_menu_stadium_first_css_constructor_return_v2_arm']!=='function'||
      typeof launchModule._melee_web_native_menu_stadium_first_css_draw_observe!=='function')
    throw Error('Private CSS constructor launch capability is absent.');
   const pointer=launchModule._melee_web_native_menu_stadium_first_css_draw_observe();
   const observation=pointer?JSON.parse(launchModule.UTF8ToString(pointer)):null;
-  if(observation?.schema!==(fresh?'melee-web-stadium-first-css-fresh-row-observation-v3':
+  if(observation?.schema!==(finite?'melee-web-stadium-first-css-finite-observation-v4':fresh?'melee-web-stadium-first-css-fresh-row-observation-v3':
        'melee-web-stadium-first-css-constructor-return-observation-v2')||
-     observation.mode!==(fresh?'fresh_consumed_tick_draw_v3':'constructor_return_only_v2')||observation.state!=='armed'||
+     observation.mode!==(finite?'fresh_finite_css_prefix_v4':fresh?'fresh_consumed_tick_draw_v3':'constructor_return_only_v2')||observation.state!=='armed'||
      observation.error!==null||observation.native_phase!==0||observation.running!==false||
      observation.host_entered!==false||observation.armed_owner_stable!==true||
      observation.armed_world_generation!==expectedGeneration||
@@ -506,7 +506,7 @@ const launchPreparedFirstCss=async(expectedGeneration,fresh)=>{
  await prepareAudio();await pauseAudioForPreparation();await waitForAudioRender();
  await launchBoundary(()=>{assertArmed();launchCheck(launchModule._melee_web_native_menu_launch());});
  if(fresh)freshFirstCssLaunchLease={owner:launchOwner,Module:launchModule,handle:launchHandle,
-   boundary:launchBoundary,check:launchCheck,generation:expectedGeneration};
+   boundary:launchBoundary,check:launchCheck,generation:expectedGeneration,finite};
  $('canvas').focus();inputDirty=true;syncAudio();
 };
 
@@ -538,6 +538,56 @@ window.meleeStadiumFirstCssFreshRowKick=async()=>{
      typeof Module._melee_web_native_menu_stadium_first_css_fresh_row_v3_kick!=='function')
    throw Error('Fresh CSS row kick lost its unchanged one-use CSS entry.');
   return lease.check(Module._melee_web_native_menu_stadium_first_css_fresh_row_v3_kick());
+ });
+};
+
+// Finite mode uses the same prepared launch and owner command queue. Each
+// stage reserves its one-use attempt before enqueueing and rechecks after wait.
+window.meleeStadiumFirstCssFreshFiniteLaunch=generation=>launchPreparedFirstCss(generation,true,true);
+const freshFiniteCssAttempts=new Set();
+window.meleeStadiumFirstCssFreshFiniteStage=async stage=>{
+ const exports={first:'_melee_web_native_menu_stadium_first_css_fresh_finite_v4_first_kick',
+  stream_arm:'_melee_web_native_menu_stadium_first_css_fresh_finite_v4_stream_arm',
+  stream_kick:'_melee_web_native_menu_stadium_first_css_fresh_finite_v4_stream_kick',
+  final_arm:'_melee_web_native_menu_stadium_first_css_fresh_finite_v4_final_arm',
+  final_kick:'_melee_web_native_menu_stadium_first_css_fresh_finite_v4_final_kick'};
+ if(!Object.hasOwn(exports,stage)||freshFiniteCssAttempts.has(stage))
+  throw Error('Fresh finite CSS stage is unknown or already attempted.');
+ freshFiniteCssAttempts.add(stage);
+ const lease=freshFirstCssLaunchLease;
+ if(!lease?.finite)throw Error('Fresh finite CSS has no prepared finite-owner lease.');
+ return await lease.boundary(()=>{
+  if(owner!==lease.owner||Module!==lease.Module||owner?.handle!==lease.handle||
+     boundary!==lease.boundary||check!==lease.check)
+   throw Error('Fresh finite CSS queued owner changed.');
+  const state=lease.handle.getState();
+  if(state.state!=='css'||state.busy||state.loading||state.requiresReload||
+     state.phase!==1||state.running!==(stage==='first'))
+   throw Error('Fresh finite CSS stage requires its exact idle CSS owner.');
+  const pointer=Module._melee_web_native_menu_stadium_first_css_draw_observe?.();
+  const observed=pointer?JSON.parse(Module.UTF8ToString(pointer)):null;
+  if(observed?.schema!=='melee-web-stadium-first-css-finite-observation-v4'||
+     observed.mode!=='fresh_finite_css_prefix_v4'||observed.error!==null||
+     observed.armed_owner_stable!==true||observed.armed_world_generation!==lease.generation||
+     typeof Module[exports[stage]]!=='function')
+   throw Error('Fresh finite CSS stage lost its native capability.');
+  const stream=observed.postdraw_stream,final=observed.final_pending_css_draw;
+  const baseline=observed.state==='complete'&&observed.host_tick_calls===1&&
+   observed.host_draw_calls===1&&observed.source_steps===1&&observed.source_draws===1&&
+   observed.aurora_begin_calls===1&&observed.aurora_end_calls===1&&observed.frame_end_returned===true;
+  const terminal=stream?.terminal===true&&stream.failed===false&&
+   stream.outcome==='stop_after_last_input_request'&&stream.tick_result===3;
+  const allowed=stage==='first'?observed.state==='entered'&&
+   observed.host_tick_calls===0&&observed.host_draw_calls===0&&
+   observed.source_steps===0&&observed.source_draws===0&&
+   observed.aurora_begin_calls===0&&observed.aurora_end_calls===0:
+   stage==='stream_arm'?baseline&&!stream:
+   stage==='stream_kick'?baseline&&stream?.status==='armed'&&stream.failed===false&&
+    stream.consumed_inputs===0&&stream.matched_ticks===0&&stream.matched_draws===0:
+   stage==='final_arm'?baseline&&terminal&&!final:
+   baseline&&terminal&&final?.status==='armed'&&final.failed===false&&final.attempted===false;
+  if(!allowed)throw Error('Fresh finite CSS queued stage boundary changed.');
+  return lease.check(Module[exports[stage]]());
  });
 };
 

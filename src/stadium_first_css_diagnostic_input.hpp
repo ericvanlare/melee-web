@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <stdexcept>
 #include <string>
+#include <vector>
+#include <utility>
 
 namespace melee_web::stadium_first_css_diagnostic {
 
@@ -175,6 +177,71 @@ inline void decode_consumed_pad_statuses(const ConsumedPadInput& input,
         ports[index].analogB = raw[9];
         ports[index].err = static_cast<int8_t>(raw[10]);
     }
+}
+
+
+// Version4 finite CSS input: phase-local source schedule plus literal PAD only.
+// Count is checked against exact transport length before any allocation/mutation.
+inline constexpr size_t kFreshFiniteHeaderBytes = 60;
+inline constexpr size_t kFreshFiniteRowBytes = 10 * 4 + 4 * 11;
+struct FreshFiniteCssInput {
+    std::string source_sha256;
+    uint32_t entry_sequence=0,return_sequence=0,phase_end_sequence=0;
+    std::vector<FreshRowInput> rows;
+};
+inline FreshFiniteCssInput decode_fresh_finite_css_v4(
+    const uint8_t* bytes,size_t size,const ContextInput& context) {
+    if(!bytes || size<kFreshFiniteHeaderBytes ||
+       std::string(reinterpret_cast<const char*>(bytes),8)!="STC4PFX1" ||
+       read_be32(bytes+8)!=4 || (size-kFreshFiniteHeaderBytes)%kFreshFiniteRowBytes)
+        throw std::runtime_error("Fresh finite CSS input size/magic/version differs");
+    const uint32_t count=read_be32(bytes+56);
+    if(count<2 || count!=(size-kFreshFiniteHeaderBytes)/kFreshFiniteRowBytes ||
+       context.envelope_version!=2 || context.source_sha256.empty() ||
+       std::all_of(bytes+12,bytes+44,[](uint8_t v){return v==0;}) ||
+       hex(bytes+12,32)!=context.source_sha256)
+        throw std::runtime_error("Fresh finite CSS input count/source differs");
+    FreshFiniteCssInput input{};
+    input.source_sha256=context.source_sha256;
+    input.entry_sequence=read_be32(bytes+44);
+    input.return_sequence=read_be32(bytes+48);
+    input.phase_end_sequence=read_be32(bytes+52);
+    if(input.entry_sequence!=context.source_entry_sequence ||
+       input.return_sequence!=context.source_return_sequence ||
+       !(input.entry_sequence<input.return_sequence &&
+         input.return_sequence<input.phase_end_sequence))
+        throw std::runtime_error("Fresh finite CSS input context/phase references differ");
+    input.rows.reserve(count);
+    uint64_t previous_poll=input.return_sequence;
+    size_t offset=kFreshFiniteHeaderBytes;
+    for(uint32_t index=0;index<count;++index){
+        FreshRowInput row{};
+        row.consumed.source_sha256=input.source_sha256;
+        row.entry_sequence=input.entry_sequence;row.return_sequence=input.return_sequence;
+        uint32_t* fields[]={&row.consume_sequence,&row.tick_sequence,&row.draw_enter_sequence,
+            &row.draw_return_sequence,&row.poll_sequence,&row.source_tick,&row.draw_ordinal,
+            &row.draw_source_tick,&row.poll_source_tick,&row.poll_draw_ordinal};
+        for(auto* field:fields){*field=read_be32(bytes+offset);offset+=4;}
+        const uint64_t sequence[]={row.consume_sequence,row.tick_sequence,
+            row.draw_enter_sequence,row.draw_return_sequence,row.poll_sequence};
+        bool ordered=sequence[0]==previous_poll+1;
+        for(size_t i=1;i<5;++i)ordered=ordered&&sequence[i]==sequence[i-1]+1;
+        if(!ordered || row.poll_sequence>=input.phase_end_sequence ||
+           row.source_tick!=index || row.draw_ordinal!=index ||
+           uint64_t(row.draw_source_tick)!=uint64_t(index)+1 ||
+           uint64_t(row.poll_source_tick)!=uint64_t(index)+1 ||
+           uint64_t(row.poll_draw_ordinal)!=uint64_t(index)+1)
+            throw std::runtime_error("Fresh finite CSS input source gap/order/local clock differs");
+        std::copy_n(bytes+offset,row.consumed.ports.size(),row.consumed.ports.begin());
+        offset+=row.consumed.ports.size();
+        if(row.consumed.ports[10]!=PAD_ERR_NONE)
+            throw std::runtime_error("Fresh finite CSS literal P1 is not connected");
+        previous_poll=row.poll_sequence;
+        input.rows.push_back(std::move(row));
+    }
+    if(offset!=size || previous_poll+1!=input.phase_end_sequence)
+        throw std::runtime_error("Fresh finite CSS input does not end at its exact phase boundary");
+    return input;
 }
 
 inline ContextInput decode_context(const uint8_t* bytes, size_t size) {
