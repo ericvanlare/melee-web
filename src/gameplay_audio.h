@@ -24,6 +24,33 @@ typedef struct MeleeWebAudioInput {
 } MeleeWebAudioInput;
 typedef struct MeleeWebAudio MeleeWebAudio;
 typedef struct MeleeWebAudioSnapshot MeleeWebAudioSnapshot;
+typedef enum MeleeWebAudioOwnedRangeKind {
+ MELEE_WEB_AUDIO_RANGE_AUDIO_OWNER=1,
+ MELEE_WEB_AUDIO_RANGE_AUDIO_ENTRIES,
+ MELEE_WEB_AUDIO_RANGE_AUDIO_BINDINGS,
+ MELEE_WEB_AUDIO_RANGE_AUDIO_PROGRAMS,
+ MELEE_WEB_AUDIO_RANGE_AUDIO_WORDS,
+ MELEE_WEB_AUDIO_RANGE_AUDIO_STARTS,
+ MELEE_WEB_AUDIO_RANGE_EFFECTS_OWNER,
+ MELEE_WEB_AUDIO_RANGE_EFFECTS_REVERB_HEAP,
+ MELEE_WEB_AUDIO_RANGE_EFFECTS_DELAY_HEAP
+} MeleeWebAudioOwnedRangeKind;
+typedef struct MeleeWebAudioOwnedRange {
+ MeleeWebAudioOwnedRangeKind kind;
+ const void* address;
+ size_t byte_extent;
+ const void* owner_identity;
+ uint64_t generation;
+} MeleeWebAudioOwnedRange;
+typedef int (*MeleeWebAudioOwnedRangeVisitor)(const MeleeWebAudioOwnedRange*,void*);
+typedef enum MeleeWebAudioRangeVisitResult {
+ MELEE_WEB_AUDIO_RANGE_VISIT_COMPLETE=1,
+ MELEE_WEB_AUDIO_RANGE_VISIT_INVALID_OWNER=-1,
+ MELEE_WEB_AUDIO_RANGE_VISIT_INVALID_ARGUMENT=-2,
+ MELEE_WEB_AUDIO_RANGE_VISIT_INSUFFICIENT_CAPACITY=-3,
+ MELEE_WEB_AUDIO_RANGE_VISIT_STOPPED=-4
+} MeleeWebAudioRangeVisitResult;
+enum { MELEE_WEB_AUDIO_OWNED_RANGE_MAX=9 };
 /* Borrow decoded PCM and SEM data through end; setup publishes owned native
  * banks/programs to original synth/SEM code. This is a single stereo32kHz
  * provider; output calls advance the actual160-sample original audio clock. */
@@ -46,6 +73,20 @@ MeleeWebAudioSnapshot* melee_web_audio_snapshot_capture(MeleeWebAudio*);
 int melee_web_audio_snapshot_admit(MeleeWebAudio*,const MeleeWebAudioSnapshot*);
 int melee_web_audio_snapshot_restore(MeleeWebAudio*,const MeleeWebAudioSnapshot*);
 void melee_web_audio_snapshot_destroy(MeleeWebAudioSnapshot*);
+/* Read-only provenance inventory for the live owner. Pass the generation
+ * captured when retaining this handle so an address reused by a later owner
+ * cannot admit a retired handle. Capacity is the maximum number of rows the
+ * visitor may receive; MELEE_WEB_AUDIO_OWNED_RANGE_MAX fits every build and
+ * capacity is checked before the first callback. A callback
+ * returns nonzero to continue. If it returns zero, the result is STOPPED and
+ * any delivered prefix must be discarded. Rows describe provenance only and
+ * do not admit snapshot restore. Borrowed input PCM/SEM and FX aux ring
+ * pointees are excluded. A row pointer is valid only during its callback;
+ * copy the row by value to retain it. The callback must not end or mutate
+ * this owner. */
+MeleeWebAudioRangeVisitResult melee_web_audio_visit_owned_ranges(
+ MeleeWebAudio*,uint64_t generation,size_t capacity,
+ MeleeWebAudioOwnedRangeVisitor,void* context);
 #ifdef __cplusplus
 }
 #endif

@@ -176,9 +176,9 @@ export function compareLane(sample, domain, expected, actual) {
   }
 }
 
-// Byte-level census helpers are pure: they classify observed writes by the
-// manifest's VMA provenance and the exact arena extent, without implying that
-// any classified range has a restorable owner.
+// Byte-level census helpers classify observed writes by static provenance,
+// arena extent, and validated live audio ranges. These labels never admit a
+// range for restore.
 export function diffHeapRanges(before, after) {
   if (!(before instanceof Uint8Array) || !(after instanceof Uint8Array)) {
     throw new TypeError('Heap census snapshots must be Uint8Array values');
@@ -209,11 +209,30 @@ export function diffHeapRanges(before, after) {
   return {ranges, changedBytes};
 }
 
-export function classifyHeapRanges(rawRanges, manifestRows, arenaRange) {
+export function classifyHeapRanges(rawRanges, manifestRows, arenaRange,
+  audioInventoryTransition = null, nativeOutputRange = null) {
   if (!Array.isArray(rawRanges) || !Array.isArray(manifestRows) ||
       !arenaRange || !Number.isSafeInteger(arenaRange.base) ||
       !Number.isSafeInteger(arenaRange.bytes)) {
     throw new TypeError('Heap census classification inputs are malformed');
+  }
+  let audioRows = [];
+  if (audioInventoryTransition !== null) {
+    const {before, after} = audioInventoryTransition || {};
+    if (!before || !after || !Array.isArray(before.rows) || !Array.isArray(after.rows) ||
+        before.audioOwner !== after.audioOwner ||
+        before.generationLow !== after.generationLow ||
+        before.generationHigh !== after.generationHigh || before.count !== after.count ||
+        before.effectsEnabled !== after.effectsEnabled || before.rows.length !== after.rows.length ||
+        before.rows.some((row, index) => {
+          const other = after.rows[index];
+          return row.kind !== other.kind || row.address !== other.address ||
+            row.extent !== other.extent || row.owner !== other.owner ||
+            row.generationLow !== other.generationLow || row.generationHigh !== other.generationHigh;
+        })) {
+      throw new Error('Audio owner attribution requires same-range, same-owner rows at both boundaries');
+    }
+    audioRows = before.rows;
   }
   const arenaEnd = arenaRange.base + arenaRange.bytes;
   const rows = manifestRows.filter(row => row.size > 0).map(row => ({
@@ -223,6 +242,20 @@ export function classifyHeapRanges(rawRanges, manifestRows, arenaRange) {
   for (let index = 0, maximum = 0; index < rows.length; index++) {
     maximum = Math.max(maximum, rows[index].end);
     prefixMaxEnd.push(maximum);
+  }
+  const ownedRanges = audioRows.map(row => ({
+    start: row.address, end: row.address + row.extent, row,
+  })).sort((a, b) => a.start - b.start || a.end - b.end);
+  let nativeOutput = null;
+  if (nativeOutputRange !== null) {
+    if (!nativeOutputRange || !Number.isSafeInteger(nativeOutputRange.base) ||
+        !Number.isSafeInteger(nativeOutputRange.bytes) || nativeOutputRange.base < 0 ||
+        nativeOutputRange.bytes <= 0 || nativeOutputRange.base > 0x100000000 ||
+        nativeOutputRange.bytes > 0x100000000 - nativeOutputRange.base) {
+      throw new TypeError('Native PCM diagnostic range is malformed');
+    }
+    nativeOutput = {start: nativeOutputRange.base,
+      end: nativeOutputRange.base + nativeOutputRange.bytes};
   }
   const classified = [];
   for (const range of rawRanges) {
@@ -245,6 +278,16 @@ export function classifyHeapRanges(rawRanges, manifestRows, arenaRange) {
       boundaries.add(Math.max(range.start, item.start));
       boundaries.add(Math.min(range.end, item.end));
     }
+    const overlappingOwners = ownedRanges.filter(item =>
+      range.start < item.end && item.start < range.end);
+    for (const item of overlappingOwners) {
+      boundaries.add(Math.max(range.start, item.start));
+      boundaries.add(Math.min(range.end, item.end));
+    }
+    if (nativeOutput && nativeOutput.start < range.end && range.start < nativeOutput.end) {
+      boundaries.add(Math.max(range.start, nativeOutput.start));
+      boundaries.add(Math.min(range.end, nativeOutput.end));
+    }
     if (arenaRange.base < range.end && range.start < arenaEnd) {
       boundaries.add(Math.max(range.start, arenaRange.base));
       boundaries.add(Math.min(range.end, arenaEnd));
@@ -254,10 +297,25 @@ export function classifyHeapRanges(rawRanges, manifestRows, arenaRange) {
       const start = ordered[index], end = ordered[index + 1];
       if (start === end) continue;
       const matches = overlapping.filter(item => item.start <= start && end <= item.end);
+      const ownerMatches = overlappingOwners.filter(item => item.start <= start && end <= item.end);
       const inArena = arenaRange.base <= start && end <= arenaEnd;
+      const inNativeOutput = nativeOutput && nativeOutput.start <= start && end <= nativeOutput.end;
       let provenance, details = {};
-      if (matches.length > 1 || (matches.length && inArena)) {
+      if (inNativeOutput) {
+        provenance = 'native-output-storage-diagnostic-excluded';
+      } else if (matches.length > 1 || ownerMatches.length > 1 ||
+          (matches.length && ownerMatches.length) ||
+          (matches.length && inArena) || (ownerMatches.length && inArena)) {
         provenance = 'ambiguous-overlap';
+      } else if (ownerMatches.length === 1) {
+        const {row} = ownerMatches[0];
+        provenance = 'audio-owner-range';
+        details = {
+          audioRangeKind: row.kindName,
+          audioRangeKindValue: row.kind,
+          ownerAddress: row.owner,
+          ownerLifetimeTag: `${row.generationHigh.toString(16).padStart(8, '0')}${row.generationLow.toString(16).padStart(8, '0')}`,
+        };
       } else if (matches.length === 1) {
         const {row} = matches[0];
         provenance = row.decision === 'source-c-static-candidate' ?
@@ -364,6 +422,167 @@ export function validateCensusInventory(manifest, arenaRange) {
     excludedMutableInputSections: validated.excludedMutableInputSections,
     completeGameState: validated.completeGameState,
   };
+}
+
+// The browser adapter exposes a fixed wasm32 record. Decode each integer as a
+// word; generation stays as two words so the full uint64 lifetime tag is never
+// rounded through JavaScript Number.
+export function decodeAudioOwnerInventory(heap, pointer) {
+  const wireVersion = 1, wireHeaderBytes = 36, wireRowBytes = 24, wireCapacity = 9;
+  const wireBytes = wireHeaderBytes + wireRowBytes * wireCapacity;
+  const kindNames = {
+    1: 'audio-owner', 2: 'audio-entries', 3: 'audio-bindings',
+    4: 'audio-programs', 5: 'audio-words', 6: 'audio-starts',
+    7: 'effects-owner', 8: 'effects-reverb-heap', 9: 'effects-delay-heap',
+  };
+  const limit = 0x100000000;
+  if (!(heap instanceof Uint8Array) || heap.byteLength > limit ||
+      !Number.isSafeInteger(pointer) || pointer <= 0 || pointer % 4 !== 0 ||
+      pointer > heap.byteLength || wireBytes > heap.byteLength - pointer) {
+    throw new Error('Audio owner inventory wire pointer or wasm bounds are invalid');
+  }
+  const view = new DataView(heap.buffer, heap.byteOffset + pointer, wireBytes);
+  const version = view.getUint32(0, true);
+  const size = view.getUint32(4, true);
+  const count = view.getUint32(8, true);
+  const rowSize = view.getUint32(12, true);
+  const capacity = view.getUint32(16, true);
+  const status = view.getInt32(20, true);
+  const audioOwner = view.getUint32(24, true);
+  const generationLow = view.getUint32(28, true);
+  const generationHigh = view.getUint32(32, true);
+  if (version !== wireVersion || size !== wireBytes ||
+      rowSize !== wireRowBytes || capacity !== wireCapacity ||
+      (count !== 6 && count !== 9) || status !== 1) {
+    throw new Error(`Audio owner inventory wire layout/status is invalid: version=${version}, size=${size}, rowSize=${rowSize}, count=${count}, capacity=${capacity}, status=${status}`);
+  }
+  if (!audioOwner || (generationLow === 0 && generationHigh === 0)) {
+    throw new Error('Audio owner inventory has an invalid owner or zero lifetime tag');
+  }
+  const rows = [];
+  const intervals = [];
+  for (let index = 0; index < count; index++) {
+    const offset = wireHeaderBytes + index * wireRowBytes;
+    const row = {
+      kind: view.getUint32(offset, true),
+      address: view.getUint32(offset + 4, true),
+      extent: view.getUint32(offset + 8, true),
+      owner: view.getUint32(offset + 12, true),
+      generationLow: view.getUint32(offset + 16, true),
+      generationHigh: view.getUint32(offset + 20, true),
+    };
+    const expectedKind = index + 1;
+    const audioLifetimeMismatch = index < 6 &&
+      (row.generationLow !== generationLow || row.generationHigh !== generationHigh);
+    if (row.kind !== expectedKind || !kindNames[row.kind] ||
+        !row.address || !row.extent || !row.owner ||
+        row.address > limit || row.extent > limit - row.address ||
+        row.address + row.extent > heap.byteLength ||
+        audioLifetimeMismatch) {
+      throw new Error(`Audio owner inventory row ${index} has an invalid kind, extent, owner, lifetime, or wasm bound`);
+    }
+    if (index >= 6 && row.generationLow === 0 && row.generationHigh === 0) {
+      throw new Error(`FX owner inventory row ${index} has a zero lifetime tag`);
+    }
+    if (index < 6 && row.owner !== audioOwner) {
+      throw new Error(`Audio owner inventory row ${index} has the wrong owner identity`);
+    }
+    if (index === 0 && row.address !== audioOwner) {
+      throw new Error('Audio owner inventory does not identify its owner allocation');
+    }
+    if (index === 6 && (row.address !== row.owner || row.owner === audioOwner)) {
+      throw new Error('FX owner inventory does not identify a delegated effects allocation');
+    }
+    if (index > 6 && (row.owner !== rows[6].owner ||
+        row.generationLow !== rows[6].generationLow ||
+        row.generationHigh !== rows[6].generationHigh)) {
+      throw new Error('FX audio ranges disagree on their delegated owner identity or lifetime tag');
+    }
+    row.kindName = kindNames[row.kind];
+    intervals.push({start: row.address, end: row.address + row.extent});
+    rows.push(row);
+  }
+  intervals.sort((a, b) => a.start - b.start || a.end - b.end);
+  for (let index = 1; index < intervals.length; index++) {
+    if (intervals[index].start < intervals[index - 1].end) {
+      throw new Error('Audio owner inventory ranges overlap each other');
+    }
+  }
+  return {version, size, rowSize, capacity, count, status, audioOwner,
+    generationLow, generationHigh, effectsEnabled: count === 9,
+    rows, ownerRestoreAdmission: false};
+}
+
+export function validateAudioOwnerRangeDisjointness(inventory, manifestRows,
+  arenaRange, nativeOutputRange, heapBytes) {
+  const limit = 0x100000000;
+  if (!inventory || !Array.isArray(inventory.rows) || !Array.isArray(manifestRows) ||
+      !Number.isSafeInteger(heapBytes) || heapBytes < 0 || heapBytes > limit ||
+      !Number.isSafeInteger(arenaRange?.base) || !Number.isSafeInteger(arenaRange?.bytes) ||
+      arenaRange.base < 0 || arenaRange.bytes <= 0 || arenaRange.base > limit ||
+      arenaRange.bytes > limit - arenaRange.base ||
+      arenaRange.base + arenaRange.bytes > heapBytes ||
+      !Number.isSafeInteger(nativeOutputRange?.base) || !Number.isSafeInteger(nativeOutputRange?.bytes) ||
+      nativeOutputRange.base <= 0 || nativeOutputRange.bytes <= 0 ||
+      nativeOutputRange.base > limit || nativeOutputRange.bytes > limit - nativeOutputRange.base ||
+      nativeOutputRange.base + nativeOutputRange.bytes > heapBytes) {
+    throw new Error('Audio owner, arena, or native output inventory bounds are invalid');
+  }
+  const arenaEnd = arenaRange.base + arenaRange.bytes;
+  const outputEnd = nativeOutputRange.base + nativeOutputRange.bytes;
+  const staticIntervals = manifestRows.filter(row => row.size > 0).map(row => ({
+    start: row.address, end: row.address + row.size,
+  }));
+  for (const row of inventory.rows) {
+    const end = row.address + row.extent;
+    if (staticIntervals.some(item => row.address < item.end && item.start < end)) {
+      throw new Error(`Audio owner range ${row.kindName} overlaps a static manifest range`);
+    }
+    if (row.address < arenaEnd && arenaRange.base < end) {
+      throw new Error(`Audio owner range ${row.kindName} overlaps the gameplay arena`);
+    }
+    if (row.address < outputEnd && nativeOutputRange.base < end) {
+      throw new Error(`Audio owner range ${row.kindName} overlaps native PCM output storage`);
+    }
+  }
+  if (nativeOutputRange.base < arenaEnd && arenaRange.base < outputEnd) {
+    throw new Error('Native PCM output storage overlaps the gameplay arena');
+  }
+  return {base: nativeOutputRange.base, bytes: nativeOutputRange.bytes,
+    diagnosticOnly: true, ownerRestoreAdmission: false};
+}
+
+export function requireStableAudioOwnerInventory(inventories) {
+  if (!Array.isArray(inventories) || inventories.length !== 3 ||
+      inventories.some(item => !item || !Array.isArray(item.rows))) {
+    throw new Error('Audio owner inventory requires all three census boundaries');
+  }
+  const first = inventories[0];
+  for (const inventory of inventories.slice(1)) {
+    if (inventory.audioOwner !== first.audioOwner) {
+      throw new Error('Audio owner address changed across census boundaries');
+    }
+    if (inventory.generationLow !== first.generationLow ||
+        inventory.generationHigh !== first.generationHigh) {
+      throw new Error('Audio owner lifetime generation changed across census boundaries');
+    }
+    if (first.count === 9 && inventory.count === 9 &&
+        (inventory.rows[6].generationLow !== first.rows[6].generationLow ||
+         inventory.rows[6].generationHigh !== first.rows[6].generationHigh)) {
+      throw new Error('FX owner lifetime generation changed across census boundaries');
+    }
+    if (inventory.count !== first.count || inventory.effectsEnabled !== first.effectsEnabled ||
+        inventory.rows.length !== first.rows.length ||
+        inventory.rows.some((row, index) => {
+          const prior = first.rows[index];
+          return row.kind !== prior.kind || row.address !== prior.address ||
+            row.extent !== prior.extent || row.owner !== prior.owner ||
+            row.generationLow !== prior.generationLow || row.generationHigh !== prior.generationHigh;
+        })) {
+      throw new Error('Audio owner inventory topology changed across census boundaries');
+    }
+  }
+  return first.rows.map(row => ({...row}));
 }
 
 function initializerBytes(module) {
@@ -540,7 +759,8 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
   writeCensus = null) {
   return page.evaluate(async ({sample, expectedInputMapping, expectedStocks, checkedSource, inspectSource,
     inputMappingSource, diagnosticSizeSource, drawDiagnosticBytes, writeCensus,
-    diffHeapRangesSource, classifyHeapRangesSource, maxHeapBytes}) => {
+    diffHeapRangesSource, classifyHeapRangesSource, decodeAudioInventorySource,
+    validateAudioOwnerRangesSource, requireStableAudioInventorySource, maxHeapBytes}) => {
     const {module} = window.__slippiSynctest;
     const checkedAsyncCcall = new Function(`return (${checkedSource})`)();
     const checked = (label, identifier, argumentTypes = [], args = []) =>
@@ -550,10 +770,24 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     let heapBefore = null, heapAfterStep = null, censusBeforeSha256 = null;
     let censusAfterStepSha256 = null, censusAfterDrawSha256 = null;
     let censusStepDiff = null, censusDrawDiff = null;
+    let censusStepRaw = null, censusDrawRaw = null;
+    const audioInventoryBoundaries = writeCensus ? [] : null;
+    let nativeOutputRange = null;
+    let queryAudioInventory = null, requireStableInventory = null;
     const censusNativeTransferQuiescence = writeCensus ? {
       beforeStep: null, afterStep: null, afterActualDraw: null,
     } : null;
     if (writeCensus) {
+      if (writeCensus.requireAudioInventory !== true) {
+        throw new Error('Write census runner must require the audio owner inventory');
+      }
+      for (const name of ['_melee_web_synctest_audio_range_inventory_query',
+        '_melee_web_synctest_audio_range_inventory', '_melee_web_snapshot_pcm',
+        '_melee_web_snapshot_pcm_size']) {
+        if (typeof module[name] !== 'function') {
+          throw new Error(`Required audio owner inventory export is unavailable: ${name}`);
+        }
+      }
       const arenaBase = module._melee_web_synctest_gameplay_arena_base();
       const arenaBytes = module._melee_web_synctest_gameplay_arena_bytes();
       if (arenaBase !== writeCensus.arenaRange.base || arenaBytes !== writeCensus.arenaRange.bytes) {
@@ -562,6 +796,32 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
       if (!globalThis.crypto?.subtle) throw new Error('Browser Web Crypto is unavailable for census hashes');
       await checked('native transfer quiescence before census source step', 'melee_web_snapshot_quiescent');
       censusNativeTransferQuiescence.beforeStep = 'passed';
+      const decodeInventory = new Function('heap', 'pointer',
+        `return (${decodeAudioInventorySource})(heap, pointer)`);
+      const validateOwnerRanges = new Function('inventory', 'manifestRows', 'arenaRange',
+        'nativeOutputRange', 'heapBytes',
+        `return (${validateAudioOwnerRangesSource})(inventory, manifestRows, arenaRange, nativeOutputRange, heapBytes)`);
+      requireStableInventory = new Function('inventories',
+        `return (${requireStableAudioInventorySource})(inventories)`);
+      queryAudioInventory = async boundary => {
+        await checked(`audio owner inventory ${boundary}`,
+          'melee_web_synctest_audio_range_inventory_query');
+        const pointer = module._melee_web_synctest_audio_range_inventory();
+        const inventory = decodeInventory(module.HEAPU8, pointer);
+        const currentNativeOutput = {
+          base: module._melee_web_snapshot_pcm(),
+          bytes: module._melee_web_snapshot_pcm_size(),
+        };
+        if (nativeOutputRange && (nativeOutputRange.base !== currentNativeOutput.base ||
+            nativeOutputRange.bytes !== currentNativeOutput.bytes)) {
+          throw new Error('Native PCM diagnostic storage changed across census boundaries');
+        }
+        nativeOutputRange ||= currentNativeOutput;
+        validateOwnerRanges(inventory, writeCensus.manifestRows,
+          writeCensus.arenaRange, nativeOutputRange, module.HEAPU8.byteLength);
+        audioInventoryBoundaries.push({boundary, ...inventory});
+      };
+      await queryAudioInventory('before-source-step');
       const heap = module.HEAPU8;
       if (!(heap instanceof Uint8Array) || heap.byteLength > maxHeapBytes) {
         throw new Error(`Unsupported census heap size: ${heap?.byteLength}`);
@@ -575,6 +835,7 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     if (writeCensus) {
       await checked('native transfer quiescence after census source step', 'melee_web_snapshot_quiescent');
       censusNativeTransferQuiescence.afterStep = 'passed';
+      await queryAudioInventory('after-source-step');
       heapAfterStep = module.HEAPU8.slice();
       if (heapAfterStep.byteLength > maxHeapBytes) {
         throw new Error(`Census heap grew beyond its bound: ${heapAfterStep.byteLength}`);
@@ -582,15 +843,14 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
       const digest = await globalThis.crypto.subtle.digest('SHA-256', heapAfterStep);
       censusAfterStepSha256 = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
       const makeDiff = new Function(`return (${diffHeapRangesSource})`)();
-      const makeClassify = new Function(`return (${classifyHeapRangesSource})`)();
       const raw = makeDiff(heapBefore, heapAfterStep);
-      censusStepDiff = {
+      censusStepRaw = {
         beforeHeapBytes: heapBefore.byteLength,
         afterHeapBytes: heapAfterStep.byteLength,
         beforeHeapSha256: censusBeforeSha256,
         afterHeapSha256: censusAfterStepSha256,
         changedBytes: raw.changedBytes,
-        changedRanges: makeClassify(raw.ranges, writeCensus.manifestRows, writeCensus.arenaRange),
+        ranges: raw.ranges,
       };
       heapBefore = null;
     }
@@ -616,6 +876,7 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     if (writeCensus) {
       await checked('native transfer quiescence after census actual draw', 'melee_web_snapshot_quiescent');
       censusNativeTransferQuiescence.afterActualDraw = 'passed';
+      await queryAudioInventory('after-actual-draw-and-Aurora-quiescence');
       const heapAfterDraw = module.HEAPU8.slice();
       if (heapAfterDraw.byteLength > maxHeapBytes) {
         throw new Error(`Census heap grew beyond its bound: ${heapAfterDraw.byteLength}`);
@@ -623,16 +884,27 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
       const digest = await globalThis.crypto.subtle.digest('SHA-256', heapAfterDraw);
       censusAfterDrawSha256 = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
       const makeDiff = new Function(`return (${diffHeapRangesSource})`)();
-      const makeClassify = new Function(`return (${classifyHeapRangesSource})`)();
+      requireStableInventory(audioInventoryBoundaries);
       const raw = makeDiff(heapAfterStep, heapAfterDraw);
-      censusDrawDiff = {
+      censusDrawRaw = {
         beforeHeapBytes: heapAfterStep.byteLength,
         afterHeapBytes: heapAfterDraw.byteLength,
         beforeHeapSha256: censusAfterStepSha256,
         afterHeapSha256: censusAfterDrawSha256,
         changedBytes: raw.changedBytes,
-        changedRanges: makeClassify(raw.ranges, writeCensus.manifestRows, writeCensus.arenaRange),
+        ranges: raw.ranges,
       };
+      const makeClassify = new Function('ranges', 'manifestRows', 'arenaRange',
+        'audioInventoryTransition', 'nativeOutputRange',
+        `return (${classifyHeapRangesSource})(ranges, manifestRows, arenaRange, audioInventoryTransition, nativeOutputRange)`);
+      censusStepDiff = {...censusStepRaw,
+        changedRanges: makeClassify(censusStepRaw.ranges, writeCensus.manifestRows,
+          writeCensus.arenaRange, {before: audioInventoryBoundaries[0],
+            after: audioInventoryBoundaries[1]}, nativeOutputRange)};
+      censusDrawDiff = {...censusDrawRaw,
+        changedRanges: makeClassify(censusDrawRaw.ranges, writeCensus.manifestRows,
+          writeCensus.arenaRange, {before: audioInventoryBoundaries[1],
+            after: audioInventoryBoundaries[2]}, nativeOutputRange)};
       heapAfterStep = null;
     }
     const read = (pointer, size) => module.HEAPU8.slice(pointer, pointer + size);
@@ -671,6 +943,20 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     const heapCensus = writeCensus ? {
       sample,
       arenaRange: writeCensus.arenaRange,
+      audioOwnerInventory: {
+        version: audioInventoryBoundaries[0].version,
+        wireSize: audioInventoryBoundaries[0].size,
+        rowSize: audioInventoryBoundaries[0].rowSize,
+        boundaryOrder: audioInventoryBoundaries.map(item => item.boundary),
+        boundaries: audioInventoryBoundaries,
+        stableTopologyValidated: true,
+        effectsEnabled: audioInventoryBoundaries[0].effectsEnabled,
+        ownerRestoreAdmission: false,
+      },
+      nativeOutputStorage: {
+        kind: 'fixture-native-pcm-output', ...nativeOutputRange,
+        diagnosticOnly: true, ownerRestoreAdmission: false,
+      },
       beforeStepSha256: censusBeforeSha256,
       afterStepSha256: censusAfterStepSha256,
       afterDrawSha256: censusAfterDrawSha256,
@@ -687,6 +973,9 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     drawDiagnosticBytes: DRAW_DIAGNOSTIC_BYTES, writeCensus,
     diffHeapRangesSource: diffHeapRanges.toString(),
     classifyHeapRangesSource: classifyHeapRanges.toString(),
+    decodeAudioInventorySource: decodeAudioOwnerInventory.toString(),
+    validateAudioOwnerRangesSource: validateAudioOwnerRangeDisjointness.toString(),
+    requireStableAudioInventorySource: requireStableAudioOwnerInventory.toString(),
     maxHeapBytes: MAX_HEAP_BYTES});
 }
 

@@ -36,24 +36,36 @@ draw dispatches, native PCM, actual Aurora frame completion and owned cleanup.
 The earlier sample-zero failure was a harness assertion intended for the
 no-draw lane; the reviewed repair retains the strict interactive draw checks.
 
-Across the sampled boundaries, the source step changes 89,539 byte values and
-the draw/completion interval changes 762,423. These are sums of net differences
-per transition, **not unique mutable state size or a snapshot budget**. Of their
-combined 851,962 byte observations, 19,902 fall in the gameplay arena, 3,736 in
-candidate source statics, 4,361 in explicitly excluded sections and 823,963
-remain unmapped by that inventory. Same-value stores and transient changes are
-unobserved. Boundary DVD-idle checks do not exclude transfers that completed
-between them. Every range remains unadmitted for restore. The screenshot shows
-the Mario pair and FD with existing magenta/texture artifacts; it is not a pixel
-accuracy pass. No same-instance browser restore or rollback performance result
-is claimed. The next experiment maps dynamic buffers through their actual
-owners before any restoration is enabled.
+The next read-only capture adds exact audio/FX allocation ranges with separate
+owner lifetime tags. All nine ranges remain stable before the source step,
+after it, and after the actual draw and Aurora completion. Independent review
+caught and corrected a decoder that incorrectly assumed audio and effects used
+the same lifetime counter. Positive controls now use different counters and
+negative controls detect a changed effects lifetime. Earlier fixture/export and
+cross-realm assertion failures remain retained.
 
-The checkpoint passes independent source/result review, the affected private
-and ordinary Release builds, the real-asset fighter target and its context
-trace, and the final 2,445-test regression with 165 skips. Current-head CI and
-the remaining milestone gates are still pending. The receipt distinguishes
-the exact census runtime from its harness and later fixture-only repairs.
+In this capture the source step changes 100,211 byte values: 15,806 are attributed
+to audio owners, 2,939 to diagnostic PCM output, 19,299 to the gameplay arena,
+3,715 to candidate source statics and 337 to excluded sections; 58,115 remain
+unmapped. The later draw/completion transition changes 738,066 byte values.
+These are net differences per transition, **not unique mutable state size or a
+snapshot budget**. The preceding census and both exact runtime producers remain
+retained separately; changes in these totals are not a performance comparison.
+Same-value stores and transient changes remain unobserved. Boundary DVD-idle
+checks do not exclude transfers that completed between them. Every range remains
+unadmitted for restore. The screenshot retains the known magenta/texture
+artifacts and establishes no pixel accuracy. Owned browser, server and capture
+processes closed, with independent checks of recorded PIDs.
+
+Checkpoint `12f1008e` passes independent source/result review, affected Release
+builds, the real-asset fighter/context trace, 2,445 regression tests with 165
+skips, and all 14 exact-head CI checks (12 successes, two expected skips). The
+later audio-range extension passes focused owner/runner controls, independent
+source/result review and its private and ordinary Release builds. Its full regression passes
+2,445 tests with 165 skips in 549.587 seconds. The PR remains draft. No same-instance browser restore
+or rollback performance result is claimed. Next, attribute the single match-context allocation, whose input queue and
+tick counter change in this exact source step. Reuse its existing epoch/world
+guards before considering broader asset traversal.
 
 ## First current-source copy/restore result
 

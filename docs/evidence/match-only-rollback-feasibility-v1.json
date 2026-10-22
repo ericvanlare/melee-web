@@ -2596,7 +2596,7 @@
       "retained_artifact": "census-owner-gap-analysis-v1.json",
       "sha256": "9908b8d2ebb8aeeb64d8df4dcdeb24ea0f16f55bab3d17e1f847c679f90ba370"
     },
-    "next_experiment": "Read-only audio/FX region visitor from actual live owners; classify source-step dynamic ranges before restoration. Existing Aurora staging descriptors remain a separate reusable draw-range diagnostic.",
+    "next_experiment": "One read-only MeleeWebMatchContext allocation row with existing owner epoch/world/callback guards; source proves input/tick mutation. Keep full NativeDat wrapper traversal deferred.",
     "owner_components": {
       "scope": "Private owner components only; no browser restore exposure or complete-world claim",
       "current_files_sha256": {
@@ -2662,6 +2662,199 @@
       "retained_artifact": "full-regression-v2.log",
       "sha256": "0eee7b9a88e2ff1d8386e06af673c132a19f1c98b032421700bf54be64da35c5",
       "scope": "Reviewed owner components, census runner controls and repaired real-asset probe source; no browser restore acceptance"
+    },
+    "checkpoint_ci": {
+      "commit": "12f1008e136cba500dc143ac6da7258442bd5022",
+      "run": 39845437231,
+      "checks": 14,
+      "successes": 12,
+      "expected_skips": 2,
+      "draft": true
+    },
+    "audio_owner_census_v3": {
+      "status": "MEASUREMENT_COMPLETED_INVENTORY_INCOMPLETE",
+      "scope": "Read-only attribution of live audio/FX allocation ranges and diagnostic PCM output at three boundaries; no restoration or timing acceptance",
+      "producer_base_commit": "12f1008e136cba500dc143ac6da7258442bd5022",
+      "producer_worktree": "uncommitted source pinned by harnessSha256; not a committed producer identity",
+      "runtime_sha256": {
+        "gameplay_slippi_synctest_browser.mjs": "5d8ea1b03bb668bcf4c2f6a3e5df4a3fbf638219bb8c9bb6986d833b7ef22e30",
+        "gameplay_slippi_synctest_browser.wasm": "dab980e7c71860c33d4f67164ad1676a64710a3234f9c0f6a61516f21f0fb590",
+        "gameplay_slippi_synctest_browser.data": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c"
+      },
+      "harness_sha256": {
+        "src/slippi_profile/tests/run_write_census.mjs": "5e60ccf47f686feb8ad1c588db4cbbe2aa4d6cd703d2461bbd52ae42d0978ff6",
+        "src/slippi_profile/tests/run_synctest.mjs": "ee6d41eb21480c3b4afac4b10f45af40e1c520a110f74f1fc624170430c0d0dd",
+        "src/slippi_profile/tests/runner_contract.mjs": "1040d4c0104fd27eb8df2b7fa9e568d9da3b3cef721d4e553b4dc0c67c44ed9b",
+        "src/slippi_profile/tests/synctest_browser.cpp": "311749a58c97de3e2b5972f8de45ed91291259cdf1673829b6f01636a08c5bfb",
+        "src/slippi_profile/tests/test_write_census_contract.mjs": "1a99d9078b84e64ef7826053c0a1b4dc89e85dcd126f58f8552d375e22e2e7aa",
+        "tests/gameplay_snapshot_probe.cpp": "5489bff017d0d92bf5345321feab641b222923514218b626e534bcf6f1ef6911",
+        "src/gameplay_audio.h": "a41f7daaeadf041b07de6c6a70a78e0590804a01e35981be631866a4defbd642",
+        "src/gameplay_audio.c": "8404950944fd51f183da426d8bcbcd3fb4b3dc4e0df2e66994f4161010fe1d75",
+        "src/gameplay_audio_fx.h": "202b01270291f9523dc2a2e927efb72cdc5e73a7e04023ead2c6c17f5e639398",
+        "src/gameplay_audio_fx.c": "99f9996faf37a069a500cc19d24ed6748dab1a8e6b90834445f3bb4efba84255",
+        "src/gameplay_bootstrap.c": "a0af3794b7b9dfc92dcddde86553a17107c8717fd98d920301a3cc9cb5b7190c",
+        "src/gameplay_bootstrap.h": "f8eaba1ff107dba9f35bf7744840c22d48a7d5a57c64979102c0a7ddc530eac4",
+        "cmake/FighterRuntime.cmake": "0b1f76cd67ca3f3e6916ce70ef00f4b66a4557e4a36a29239b06d097f399beea",
+        "scripts/browser_tools.mjs": "737a8ef5807edba0009487877e1b65badc3a8bb4d07ff9fcd445a7b8bef40c81",
+        "scripts/source_state_manifest.py": "c337c54b60205197d6cc130e00a1aad3fd53bb5f40a37a15d7429e41f4e9fd74"
+      },
+      "source_state_manifest": {
+        "path": "gameplay_slippi_synctest_browser.source-state.json",
+        "sha256": "76dcf10c45fc6842c77be8d4800bf486f7a8da43df99547ee2fc09882e21fbb2",
+        "configurationIdentitySha256": "e602a54b0ca70026a40369ae2a0000c4c1d0d79cbff35be08690453c411fb036",
+        "wasmSha256": "dab980e7c71860c33d4f67164ad1676a64710a3234f9c0f6a61516f21f0fb590",
+        "rowCount": 3122,
+        "sourceCStaticCandidates": 2051,
+        "excludedMutableInputSections": 1071,
+        "completeGameState": false
+      },
+      "capture": {
+        "retained_artifact": "browser-write-census-v3/runner/evidence.json",
+        "sha256": "4853275335efe166decae24ff3d68af1ece6fa528526c2a3f07a566b840627c5"
+      },
+      "preflight": {
+        "retained_artifact": "browser-write-census-v3/preflight.json",
+        "sha256": "abd58a3a357f9da6dddf11b28e7b7b30574c4b5978eebe007b7fa1912a3919c3"
+      },
+      "owner": {
+        "retained_artifact": "browser-write-census-v3/owner.json",
+        "sha256": "6ed0910c46717c8810db11d22d5f9e9a17fd533d09d6e5ed8e6899e0da3f06cc"
+      },
+      "independent_cleanup": {
+        "retained_artifact": "browser-write-census-v3/independent-cleanup.json",
+        "sha256": "1b8f69af3509adbbb229c649885f0787a9e883c5f4b95f2247529173482b598d"
+      },
+      "source_review": {
+        "retained_artifact": "audio-range-adapter-source-review-v2.json",
+        "sha256": "c97656234bfec989188099d714707d1615120c18d39c0f41d47b43ab468fc7cf"
+      },
+      "prior_blocker_review": {
+        "retained_artifact": "audio-range-adapter-source-review-v1.json",
+        "sha256": "d304b3c83eb33078cfd201a4f5bdd2a2fabe731df2d8c367d539e4bb359cc14c"
+      },
+      "focused_controls": {
+        "retained_artifact": "audio-fx-generation-repair-v1/focused-node-v2.log",
+        "sha256": "348c7522fe7ecb5e6d166ebfbb90ef5c373d704d67f5101afe77b8d5a8942fd8"
+      },
+      "actual_owner_control": {
+        "retained_artifact": "audio-range-controls-v2.log",
+        "sha256": "ac0455730d5f6af2048f876f7f907ab6cc567d334ad1b569dcd5900f65cce69b"
+      },
+      "observed": {
+        "sample": 300,
+        "prefix_samples": 300,
+        "audio_rows": 9,
+        "stable_boundary_count": 3,
+        "source_step_net_changed_bytes": 100211,
+        "draw_completion_net_changed_bytes": 738066,
+        "classification": {
+          "source-c-static-candidate": {
+            "ranges": 629,
+            "bytes": 3736
+          },
+          "excluded-mutable-input-section": {
+            "ranges": 440,
+            "bytes": 1415
+          },
+          "native-output-storage-diagnostic-excluded": {
+            "ranges": 1070,
+            "bytes": 2939
+          },
+          "unmapped": {
+            "ranges": 100406,
+            "bytes": 794436
+          },
+          "gameplay-arena": {
+            "ranges": 6133,
+            "bytes": 19945
+          },
+          "audio-owner-range": {
+            "ranges": 1875,
+            "bytes": 15806
+          }
+        },
+        "count_basis": "sum of net changed bytes per transition; not unique snapshot size",
+        "audio_source_step_changed_bytes": 15806,
+        "native_pcm_diagnostic_changed_bytes": 2939,
+        "gpu": {
+          "initialized": true,
+          "backend": 7,
+          "pendingFramePackets": 0,
+          "pendingStagingBuffers": 0,
+          "workerBusy": 0,
+          "rendererErrorCount": 0,
+          "drawCallCount": 237,
+          "lastBeginFrameId": 301,
+          "lastEndFrameId": 301,
+          "createdPipelines": 57,
+          "queuedPipelines": 0
+        },
+        "screenshot": {
+          "path": "browser-census-sample-300.png",
+          "sha256": "2de16105c8521d93604db39ab9296bc224995b3f645c19d8a238e98ba24bb88e",
+          "bytes": 307134
+        }
+      },
+      "all_ranges_unadmitted": true,
+      "restore_performed": false,
+      "limits": [
+        "Net byte differences cannot observe same-value stores or changes undone between sampled boundaries",
+        "Audio owner/FX lifetime identities and extents are provenance, not complete game-state ownership",
+        "Other dynamic allocation owners remain unexplained",
+        "Screenshot retains known texture/magenta artifacts; no pixel acceptance"
+      ],
+      "result_review": {
+        "retained_artifact": "audio-range-census-result-review-v1.json",
+        "sha256": "9ca1ffbe24118efba6a5e9da7d91714bbe57909e1ca76ae1e2492cf80b26eb8b"
+      },
+      "validation": {
+        "private_release": {
+          "status": "PASS",
+          "retained_artifact": "slippi-release-build-v4.log",
+          "sha256": "66d1e849c4da345964b02dade8759007774feb67b069d5b28fd9ec5e22a68b18"
+        },
+        "ordinary_release": {
+          "status": "PASS",
+          "retained_artifact": "runtime-release-build-v3.log",
+          "sha256": "a99a3bcc0b7f55c5e132e35ad12bb9084404ce283d34be3d43444cf17738ef95"
+        },
+        "full_regression": {
+          "status": "PASS",
+          "tests": 2445,
+          "seconds": 549.587,
+          "skips": 165,
+          "retained_artifact": "full-regression-v3.log",
+          "sha256": "76421aba28b3872a9dbdb02e8386d63d66d263ad97656b1c717d4372907e0e9a",
+          "scope": "Audio range extension and existing regression; no browser restoration"
+        }
+      },
+      "retained_prior_runtime": {
+        "retained_artifact": "retained-census-v2-producer/retention.json",
+        "sha256": "ffb150ecb02f7a745152cae23511b004fe992d433be1976fafc1d15dbe6cf764"
+      },
+      "retained_current_runtime": {
+        "retained_artifact": "retained-census-v3-producer/retention.json",
+        "sha256": "5b1b3352ada800bae08a93c320f39a06b64c3dc16296dc8afa1187c6f2befe93"
+      },
+      "retained_failures": [
+        {
+          "retained_artifact": "audio-range-adapter-controls-v1.log",
+          "sha256": "fb3acc402f73585e030fa6453b0e3b7936f5c8d5395df16340af074ad30754ce"
+        },
+        {
+          "retained_artifact": "audio-range-adapter-controls-v2.log",
+          "sha256": "7ca705246bca2ce40add3c61a47107055f26598b345338fdc425520d8028664b"
+        },
+        {
+          "retained_artifact": "audio-fx-generation-repair-v1/focused-node-v1.log",
+          "sha256": "24234187c66cb5d814e202c129e575e0d3b7f6502daada9498dc9e84a18101d6"
+        }
+      ]
+    },
+    "bounded_next_design": {
+      "retained_artifact": "dynamic-owner-bounded-design-v1.json",
+      "sha256": "c878499c2d61edc0f74dffe51905baa5022b5db9859f3ad28f75d14d716e5b5a",
+      "scope": "Source-only design, not implementation or capture admission"
     }
   }
 }

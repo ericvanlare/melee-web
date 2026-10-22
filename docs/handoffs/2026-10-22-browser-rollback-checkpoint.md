@@ -12,20 +12,29 @@ Use their hashes for producer identity; the capture preceded this commit and
 must not be relabeled as produced by the later checkpoint commit.
 
 The current checkpoint has independent source/result review, full regression,
-affected Release builds and an actual constructor/context trace. CI remains a
-separate current-head gate. The original sample-zero census failure, missing
+affected Release builds and an actual constructor/context trace. Checkpoint `12f1008e` also has all 14 exact-head CI checks complete: 12
+successes and two expected skips. New uncommitted work needs its own validation. The original sample-zero census failure, missing
 legacy fixture initialization and source-header compile failure are retained.
 The successful census is incomplete ownership evidence, not rollback or timing
 acceptance. Do not repeat it without a new hypothesis.
 
-Next: review the prepared read-only audio/FX range visitor, apply its five-file
-patch only against the pinned base files, and run the focused owner control.
-Then add a private census adapter for those live ranges with explicit lifetime,
-extent and topology checks. Sample the same source-step and completed-draw
-boundaries once after independent review. Preserve every unresolved range and
-keep restoration disabled. NativeDat allocation ledgers and existing Aurora
-buffer descriptors are subsequent reusable boundaries; neither establishes
-ownership of the previous capture's unmapped addresses retrospectively.
+The read-only audio/FX range visitor and browser adapter now pass focused
+controls and independent source/result review. The completed third census
+attributes live audio/effects allocations with separate lifetime tags at all
+three boundaries. Every range remains unadmitted. Its exact runtime, manifest,
+map, inputs, raw result and process cleanup are retained separately from the
+previous census. Do not repeat either successful capture without a new hypothesis.
+The private and ordinary Release builds pass; the extension's full regression
+passes in `full-regression-v3.log`.
+
+Next: implement the bounded one-row match-context range read specified in
+`dynamic-owner-bounded-design-v1.json`. Source proves that this owner changes
+during the measured step, and its existing epoch/world/callback guards can be
+reused. Defer broad NativeDat wrapper traversal; direct arenas are a fallback,
+not the current implementation. No libc traversal or inferred address ownership. Keep restoration disabled until the
+owner contract closes. Existing Aurora descriptors remain a later, separate
+draw-range diagnostic. The earlier decoder and test-fixture failures remain
+retained alongside the independent review that found them.
 
 The machine-local packet is named
 `browser-rollback-sprint-20261022-115029-d89e262b`, discoverable through the

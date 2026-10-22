@@ -400,3 +400,50 @@ int melee_web_audio_snapshot_restore(MeleeWebAudio* audio,const MeleeWebAudioSna
  *audio=snapshot->state;command_budget=snapshot->command_budget;source_sound_mode=snapshot->sound_mode;
  return 1;
 }
+
+
+MeleeWebAudioRangeVisitResult melee_web_audio_visit_owned_ranges(
+ MeleeWebAudio* audio,uint64_t generation,size_t capacity,
+ MeleeWebAudioOwnedRangeVisitor visitor,void* context){
+ /* live() compares the opaque handle with the active owner before any
+  * dereference, so wrong and retired handles are rejected safely. */
+ if(!live(audio))return MELEE_WEB_AUDIO_RANGE_VISIT_INVALID_OWNER;
+ if(!generation||audio->generation!=generation)
+  return MELEE_WEB_AUDIO_RANGE_VISIT_INVALID_OWNER;
+ if(!visitor)return MELEE_WEB_AUDIO_RANGE_VISIT_INVALID_ARGUMENT;
+ size_t required=6;
+#if defined(MELEE_WEB_AUDIO_FX) && !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+ if(audio->effects)required+=3;
+#endif
+ if(capacity<required)return MELEE_WEB_AUDIO_RANGE_VISIT_INSUFFICIENT_CAPACITY;
+ MeleeWebAudioOwnedRange ranges[MELEE_WEB_AUDIO_OWNED_RANGE_MAX];size_t count=0;
+ ranges[count++]=(MeleeWebAudioOwnedRange){MELEE_WEB_AUDIO_RANGE_AUDIO_OWNER,
+  audio,sizeof(*audio),audio,audio->generation};
+ ranges[count++]=(MeleeWebAudioOwnedRange){MELEE_WEB_AUDIO_RANGE_AUDIO_ENTRIES,
+  audio->entries,(size_t)audio->input->sample_count*sizeof(*audio->entries),
+  audio,audio->generation};
+ ranges[count++]=(MeleeWebAudioOwnedRange){MELEE_WEB_AUDIO_RANGE_AUDIO_BINDINGS,
+  audio->bindings,(size_t)audio->binding_count*sizeof(*audio->bindings),
+  audio,audio->generation};
+ ranges[count++]=(MeleeWebAudioOwnedRange){MELEE_WEB_AUDIO_RANGE_AUDIO_PROGRAMS,
+  audio->programs,(size_t)audio->input->program_count*sizeof(*audio->programs),
+  audio,audio->generation};
+ ranges[count++]=(MeleeWebAudioOwnedRange){MELEE_WEB_AUDIO_RANGE_AUDIO_WORDS,
+  audio->words,(size_t)audio->input->word_count*sizeof(*audio->words),
+  audio,audio->generation};
+ ranges[count++]=(MeleeWebAudioOwnedRange){MELEE_WEB_AUDIO_RANGE_AUDIO_STARTS,
+  audio->starts,(size_t)audio->input->bank_count*sizeof(*audio->starts),
+  audio,audio->generation};
+#if defined(MELEE_WEB_AUDIO_FX) && !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+ if(audio->effects){
+  size_t fx_count=0;
+  if(!melee_web_audio_fx_fill_owned_ranges(audio->effects,&ranges[count],
+                                            capacity-count,&fx_count))
+   return MELEE_WEB_AUDIO_RANGE_VISIT_INVALID_OWNER;
+  count+=fx_count;
+ }
+#endif
+ for(size_t i=0;i<count;i++)if(!visitor(&ranges[i],context))
+  return MELEE_WEB_AUDIO_RANGE_VISIT_STOPPED;
+ return MELEE_WEB_AUDIO_RANGE_VISIT_COMPLETE;
+}

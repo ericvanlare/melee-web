@@ -65,3 +65,16 @@ int melee_web_audio_fx_snapshot_restore(MeleeWebAudioEffects* effects,const Mele
  *effects=snapshot->state;return 1;
 }
 void melee_web_audio_fx_snapshot_destroy(MeleeWebAudioEffectsSnapshot* snapshot){free(snapshot);}
+
+
+int melee_web_audio_fx_fill_owned_ranges(const MeleeWebAudioEffects* effects,
+ MeleeWebAudioOwnedRange* ranges,size_t capacity,size_t* written){
+ if(!effects||!ranges||!written||capacity<3||!effects->generation||
+    !effects->reverb_heap||!effects->delay_heap)return 0;
+ MeleeWebAudioOwnedRange rows[3]={
+  {MELEE_WEB_AUDIO_RANGE_EFFECTS_OWNER,effects,sizeof(*effects),effects,effects->generation},
+  {MELEE_WEB_AUDIO_RANGE_EFFECTS_REVERB_HEAP,effects->reverb_heap,REVERB_HEAP_BYTES,effects,effects->generation},
+  {MELEE_WEB_AUDIO_RANGE_EFFECTS_DELAY_HEAP,effects->delay_heap,DELAY_HEAP_BYTES,effects,effects->generation}
+ };
+ memcpy(ranges,rows,sizeof(rows));*written=3;return 1;
+}

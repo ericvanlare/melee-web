@@ -59,6 +59,10 @@ function sourceHashes() {
     'src/slippi_profile/tests/synctest_browser.cpp',
     'src/slippi_profile/tests/test_write_census_contract.mjs',
     'tests/gameplay_snapshot_probe.cpp',
+    'src/gameplay_audio.h',
+    'src/gameplay_audio.c',
+    'src/gameplay_audio_fx.h',
+    'src/gameplay_audio_fx.c',
     'src/gameplay_bootstrap.c',
     'src/gameplay_bootstrap.h',
     'cmake/FighterRuntime.cmake',
@@ -95,8 +99,17 @@ export function validateCensusDrawSample(result, sample, beforeDiagnostics,
     if (!result.boundary?.interactive) {
       throw new Error(`Existing sample ${sample} did not reach the interactive boundary: ${JSON.stringify(result.boundary)}`);
     }
-    if (!result.heapCensus || result.heapCensus.sample !== sample) {
-      throw new Error('The requested three-boundary heap census did not return');
+    if (!result.heapCensus || result.heapCensus.sample !== sample ||
+        result.heapCensus.audioOwnerInventory?.boundaryOrder?.join('|') !==
+          'before-source-step|after-source-step|after-actual-draw-and-Aurora-quiescence' ||
+        result.heapCensus.audioOwnerInventory?.boundaries?.length !== 3 ||
+        result.heapCensus.audioOwnerInventory.boundaries.some(boundary =>
+          ![6, 9].includes(boundary.count) || boundary.rows?.length !== boundary.count) ||
+        result.heapCensus.audioOwnerInventory?.stableTopologyValidated !== true ||
+        result.heapCensus.audioOwnerInventory?.ownerRestoreAdmission !== false ||
+        result.heapCensus.nativeOutputStorage?.diagnosticOnly !== true ||
+        result.heapCensus.nativeOutputStorage?.ownerRestoreAdmission !== false) {
+      throw new Error('The requested three-boundary audio owner inventory did not return');
     }
     const checks = result.heapCensus.nativeTransferQuiescence;
     if (!checks || checks.beforeStep !== 'passed' || checks.afterStep !== 'passed' ||
@@ -155,9 +168,10 @@ async function main() {
   const report = {
     schema: 'melee-web-slippi-browser-write-census-v1',
     result: 'incomplete',
-    statement: 'One warmed actual browser sample net-byte-delta census; Same-value stores and transient changes that return to their prior value before a boundary are not observable. Byte provenance, including the exact gameplay arena extent, is not a complete game-state owner inventory or restore admission; every changed range remains unadmitted and no memory is restored.',
+    statement: 'One warmed actual browser sample net-byte-delta census with read-only audio owner-range provenance at three boundaries; same-value stores and transient changes that return to their prior value before a boundary are not observable. The audio ranges and native PCM output storage are diagnostic provenance only, not complete game-state ownership or restore admission; every changed range remains unadmitted and no memory is restored.',
     execution: {status: 'incomplete', prefixSamples: PREFIX_SAMPLES, censusSample: SAMPLE,
       sourceStep: 'existing deterministic snapshot_step input at sample 300',
+      captureHypothesis: 'Attribute source-step audio changes from exact live audio allocation ranges; no same-browser restore is attempted.',
       draw: 'existing actual source draw followed by the existing Aurora pending-packet/staging/worker quiescence wait'},
     inventory: {status: 'incomplete', completeGameState: manifestInventory.completeGameState,
       sourceStateManifestComplete: false,
@@ -166,6 +180,7 @@ async function main() {
         sourceCStaticCandidates: manifestInventory.sourceCStaticCandidates,
         excludedMutableInputSections: manifestInventory.excludedMutableInputSections},
       ownerRestoreAdmission: false, arenaInternalOwnershipProven: false,
+      audioOwnerRangeInventory: null, nativeOutputStorage: null,
       outsideArenaBytes: null, unadmittedChangedBytes: null,
       unclassifiedChanges: [], classificationSummary: {}},
     profile: {identity: null, sourceIdentity: null, rngHelper: null, stageBridge: null,
@@ -329,6 +344,7 @@ async function main() {
     const censusPlan = {
       arenaRange,
       manifestRows: manifest.mutable_input_sections,
+      requireAudioInventory: true,
     };
     const sample = await runBrowserSample(page, SAMPLE, expectedInputMapping, expectedStocks, censusPlan);
     const censusDraw = validateCensusDrawSample(sample, SAMPLE, previousDiagnostics,
@@ -378,6 +394,8 @@ async function main() {
       sourceStateManifestComplete: false,
       ownerRestoreAdmission: false,
       arenaInternalOwnershipProven: false,
+      audioOwnerRangeInventory: sample.heapCensus.audioOwnerInventory,
+      nativeOutputStorage: sample.heapCensus.nativeOutputStorage,
       outsideArenaBytes,
       unadmittedChangedBytes,
       unclassifiedBytes: unclassified.reduce((sum, range) => sum + range.bytes, 0),
@@ -387,12 +405,15 @@ async function main() {
         'The source-state manifest covers generated source C static candidates only.',
         'Source-static candidates, excluded sections and unmapped writes have no owner restore contract established by this census.',
         'The live gameplay arena export proves only its address extent; its internal object/state ownership and restore admission remain unproven.',
+        'The audio owner-range inventory attributes exact allocations to one live audio lifetime; it is provenance only and does not establish complete audio or game-state restore admission.',
+        'Native PCM output storage is retained as an explicitly diagnostic and excluded range.',
         'Native DVD STATE_END checks passed at each sampled boundary but cannot exclude a transfer that completed between boundaries.',
       ],
     };
     report.execution = {status: 'completed', prefixSamples: PREFIX_SAMPLES,
       censusSample: SAMPLE, sampleInteractive: true,
       sourceStep: 'existing deterministic snapshot_step input at sample 300',
+      captureHypothesis: 'Attribute source-step audio changes from exact live audio allocation ranges; no same-browser restore is attempted.',
       draw: 'existing actual source draw followed by the existing Aurora pending-packet/staging/worker quiescence wait',
       restorePerformed: false};
     report.result = 'incomplete';
