@@ -369,10 +369,15 @@ struct Preparation { bool busy_value=false,source_draw=false;
  bool busy()const{return busy_value;}
  bool preparation_draws_source()const{return source_draw;}
 } preparation;
+enum AuroraPipelineCacheStatus {
+ AURORA_PIPELINE_CACHE_READY, AURORA_PIPELINE_CACHE_PENDING, AURORA_PIPELINE_CACHE_ERROR
+};
+AuroraPipelineCacheStatus pipeline_cache_status=AURORA_PIPELINE_CACHE_PENDING;
 struct AuroraStats { unsigned queuedPipelines=0; } stats;
 bool stats_available=true,graphics_startup_terminal=false;
 bool startup_pipeline_service_failed=false,startup_ownerless_present_submitted=false;
 const AuroraStats* aurora_get_stats(){return stats_available?&stats:nullptr;}
+AuroraPipelineCacheStatus aurora_pipeline_cache_status(){return pipeline_cache_status;}
 @ALLOWED@
 @SCOPE@
 @RECORD@
@@ -388,7 +393,7 @@ void reset_scope(){
  asset_committed=faulted=source_session_owned=false;files.nonempty=false;
  asset_destination=AssetDestination::None;asset_scope.generation=0;
  preparation.busy_value=false;preparation.source_draw=false;
- stats_available=true;stats.queuedPipelines=12;
+ stats_available=true;stats.queuedPipelines=12;pipeline_cache_status=AURORA_PIPELINE_CACHE_PENDING;
  graphics_startup_terminal=false;startup_pipeline_service_failed=false;
 }
 int main(){
@@ -409,15 +414,35 @@ int main(){
  REQUIRE(!should_hold_startup_idle_fallback(false,true,0,1,false),"source draw keeps presentation");
  REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,true),"pending source frame keeps presentation");
  stats.queuedPipelines=0;
- REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,false),"empty queue restores original fallback");
- stats.queuedPipelines=12;stats_available=false;
- REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,false),"missing stats refuse suppression");
+ pipeline_cache_status=AURORA_PIPELINE_CACHE_PENDING;
+ for(int terminal=0;terminal<2;++terminal){
+  graphics_startup_terminal=terminal!=0;
+  REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,false),"zero-queue pending cache decision ignores diagnostic terminal flag");
+ }
+ pipeline_cache_status=AURORA_PIPELINE_CACHE_ERROR;
+ for(int terminal=0;terminal<2;++terminal){
+  graphics_startup_terminal=terminal!=0;
+  REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,false),"zero-queue error cache decision ignores diagnostic terminal flag");
+ }
+ pipeline_cache_status=AURORA_PIPELINE_CACHE_READY;
+ stats_available=false;
+ REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,false),"missing stats refuse suppression even when cache is ready");
  stats_available=true;
+ graphics_startup_terminal=false;
+ REQUIRE(should_hold_startup_idle_fallback(false,true,0,0,false),"actual ready cache holds after queue drains while diagnostic is nonterminal");
  graphics_startup_terminal=true;
- REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,false),"terminal cache state restores fallback");
- graphics_startup_terminal=false;startup_pipeline_service_failed=true;
- REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,false),"failed service refuses suppression");
- startup_pipeline_service_failed=false;
+ REQUIRE(should_hold_startup_idle_fallback(false,true,0,0,false),"diagnostic terminal observation cannot change ready-cache decision");
+ stats.queuedPipelines=12;pipeline_cache_status=AURORA_PIPELINE_CACHE_PENDING;
+ graphics_startup_terminal=false;
+ REQUIRE(should_hold_startup_idle_fallback(false,true,0,0,false),"queued seeds remain held before diagnostic poll");
+ graphics_startup_terminal=true;
+ REQUIRE(should_hold_startup_idle_fallback(false,true,0,0,false),"queued-seed decision is independent of diagnostic poll");
+ startup_pipeline_service_failed=true;
+ for(int terminal=0;terminal<2;++terminal){
+  graphics_startup_terminal=terminal!=0;
+  REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,false),"service failure overrides queued-positive hold regardless of diagnostic flag");
+ }
+ startup_pipeline_service_failed=false;pipeline_cache_status=AURORA_PIPELINE_CACHE_READY;
  bool* exclusions[]={&world,&match,&results,&prize,&host,&source_session_owned,&running,&pending,&scoped_assets,&faulted};
  const char* names[]={"world","match","results","prize","host","source session","running","pending","scoped assets","fault"};
  for(unsigned i=0;i<sizeof(exclusions)/sizeof(exclusions[0]);++i){
@@ -529,6 +554,10 @@ struct Preparation {
  bool busy()const{return busy_value;}
  bool preparation_draws_source()const{return source_draw;}
 } preparation;
+enum AuroraPipelineCacheStatus {
+ AURORA_PIPELINE_CACHE_READY, AURORA_PIPELINE_CACHE_PENDING, AURORA_PIPELINE_CACHE_ERROR
+};
+AuroraPipelineCacheStatus pipeline_cache_status=AURORA_PIPELINE_CACHE_PENDING;
 struct AuroraStats { unsigned queuedPipelines=0; } stats;
 bool stats_available=true,graphics_startup_terminal=false,first_css_draw_terminal=false;
 bool startup_ownerless_present_submitted=false;
@@ -540,6 +569,7 @@ unsigned service_calls=0,present_calls=0,begin_calls=0,clear_calls=0,end_calls=0
 bool begin_succeeds=true,next_present_draws_source=false;
 melee_web::SourceFrameSequence source_frames;
 const AuroraStats* aurora_get_stats(){return stats_available?&stats:nullptr;}
+AuroraPipelineCacheStatus aurora_pipeline_cache_status(){return pipeline_cache_status;}
 struct Timer { void (*callback)(void*);void* argument;int delay_ms; };
 std::vector<Timer> timers;
 void emscripten_async_call(void(*callback)(void*),void* argument,int delay_ms){
@@ -554,6 +584,7 @@ bool aurora_pipeline_service_preparation(){
   serviced_rows.push_back(seed_rows.front());seed_rows.pop_front();
  }
  stats.queuedPipelines=static_cast<unsigned>(seed_rows.size());
+ pipeline_cache_status=stats.queuedPipelines==0?AURORA_PIPELINE_CACHE_READY:AURORA_PIPELINE_CACHE_PENDING;
  if(stop_after_service)owner_stopped=true;
  return true;
 }
@@ -591,7 +622,7 @@ void reset_ownerless(){
  faulted=source_session_owned=asset_committed=false;files.nonempty=false;
  asset_destination=AssetDestination::None;asset_scope.generation=0;
  preparation.busy_value=preparation.source_draw=false;
- graphics_startup_terminal=false;stats_available=true;startup_pipeline_service_failed=false;
+ graphics_startup_terminal=false;stats_available=true;pipeline_cache_status=AURORA_PIPELINE_CACHE_PENDING;startup_pipeline_service_failed=false;
  startup_pipeline_service_scheduled=false;startup_ownerless_present_submitted=false;
  owner_stopped=false;service_ok=true;service_reenter=false;stop_after_service=false;
  timers.clear();seed_rows.clear();serviced_rows.clear();service_calls=present_calls=0;
@@ -617,9 +648,25 @@ int main(){
  REQUIRE(present_calls==1&&timers.size()==1,"last pending-seed callback holds only empty fallback");
  REQUIRE(run_timer()&&service_calls==3&&stats.queuedPipelines==0&&timers.empty(),
          "existing timer drains the original queue to its empty tail");
- tick_dispatch();
- REQUIRE(present_calls==2&&clear_calls==2&&end_calls==2,
-         "queue-empty transition restores original fallback submission");
+ graphics_startup_terminal=false;tick_dispatch();
+ REQUIRE(present_calls==1&&clear_calls==1&&end_calls==1&&timers.empty(),
+         "actual ready state after queue drain holds repeated fallback");
+ graphics_startup_terminal=true;tick_dispatch();
+ REQUIRE(present_calls==1&&clear_calls==1&&end_calls==1,
+         "diagnostic terminal flag does not alter the same ready-state decision");
+ scoped_disc_import=true;tick_dispatch();
+ REQUIRE(present_calls==2&&begin_calls==2&&clear_calls==2&&end_calls==2&&
+         source_frames.steps()==0&&source_frames.draws()==0&&!source_frames.pending(),
+         "actual disc-import scope resumes exactly one empty presentation without source work");
+ scoped_disc_import=false;tick_dispatch();
+ REQUIRE(present_calls==2&&begin_calls==2&&clear_calls==2&&end_calls==2,
+         "returning to eligible ownerless ready state restores the hold");
+ graphics_startup_terminal=false;pipeline_cache_status=AURORA_PIPELINE_CACHE_PENDING;tick_dispatch();
+ REQUIRE(present_calls==3&&clear_calls==3&&end_calls==3,
+         "pending cache after queue drain resumes original fallback");
+ graphics_startup_terminal=true;pipeline_cache_status=AURORA_PIPELINE_CACHE_ERROR;tick_dispatch();
+ REQUIRE(present_calls==4&&clear_calls==4&&end_calls==4,
+         "cache error after queue drain resumes original fallback");
  REQUIRE(serviced_rows.size()==12,"all bounded batches were serviced");
  for(unsigned i=0;i<serviced_rows.size();++i)
   REQUIRE(serviced_rows[i]==i,"seed service preserves original queue order");
@@ -627,13 +674,13 @@ int main(){
  // Host ownership (CSS/SSS) makes the exact guard refuse suppression. This
  // proves fallback routing only; it does not execute either source menu.
  reset_ownerless();startup_ownerless_present_submitted=true;
- stats.queuedPipelines=3;host=true;tick_dispatch();
+ stats.queuedPipelines=3;pipeline_cache_status=AURORA_PIPELINE_CACHE_READY;host=true;tick_dispatch();
  REQUIRE(present_calls==1&&begin_calls==1,"CSS/SSS host ownership keeps fallback dispatch");
  REQUIRE(timers.empty(),"existing scheduler remains stopped for CSS/SSS ownership");
 
  // Source preparation keeps its existing presentation route with queued seeds.
  reset_ownerless();startup_ownerless_present_submitted=true;
- stats.queuedPipelines=3;startup_ownerless_present_submitted=false;
+ stats.queuedPipelines=3;pipeline_cache_status=AURORA_PIPELINE_CACHE_READY;startup_ownerless_present_submitted=false;
  preparation.busy_value=true;preparation.source_draw=true;
  next_present_draws_source=true;tick_dispatch();
  REQUIRE(present_calls==1&&end_calls==1,"source-preparation draw keeps original callback");
@@ -643,7 +690,7 @@ int main(){
  // Real SourceFrameSequence::finish runs before the exact fallback. Match
  // ownership with one source tick keeps that source callback and no duplicate.
  reset_ownerless();startup_ownerless_present_submitted=true;
- stats.queuedPipelines=3;world=true;match=true;
+ stats.queuedPipelines=3;pipeline_cache_status=AURORA_PIPELINE_CACHE_READY;world=true;match=true;
  next_present_draws_source=true;tick_dispatch(true);
  REQUIRE(present_calls==1&&source_frames.steps()==1&&source_frames.draws()==1&&
          !source_frames.pending(),"match source-frame callback remains paired and ordered");

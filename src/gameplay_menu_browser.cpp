@@ -3139,18 +3139,20 @@ void record_startup_ownerless_present(bool frame_began,bool drew_source){
     !startup_ownerless_present_scope())return;
  startup_ownerless_present_submitted=true;
 }
-// Let the existing bounded startup service drain queued seeds without
-// repeatedly acquiring staging slots for an empty ownerless submission. This
-// does not change readiness or claim that GPU work has completed.
+// Let the existing bounded startup service drain queued seeds and wait for
+// the real cache-ready state without repeatedly submitting an empty ownerless
+// fallback. This does not depend on the diagnostic poll or claim GPU completion.
 bool should_hold_ownerless_startup_present(unsigned source_steps,
                                             unsigned source_draws,
                                             bool source_frame_pending){
- if(!startup_ownerless_present_submitted||graphics_startup_terminal||
-    startup_pipeline_service_failed||source_steps!=0||source_draws!=0||
-    source_frame_pending||!startup_pipeline_service_allowed()||
-    !startup_ownerless_present_scope())return false;
+ if(!startup_ownerless_present_submitted||startup_pipeline_service_failed||
+    source_steps!=0||source_draws!=0||source_frame_pending||
+    !startup_pipeline_service_allowed()||!startup_ownerless_present_scope())return false;
  const AuroraStats* stats=aurora_get_stats();
- return stats&&stats->queuedPipelines>0;
+ if(!stats)return false;
+ if(stats->queuedPipelines>0)return true;
+ return stats->queuedPipelines==0&&
+        aurora_pipeline_cache_status()==AURORA_PIPELINE_CACHE_READY;
 }
 bool should_hold_startup_idle_fallback(bool preparation_draws_source,
                                        bool ownerless_idle_fallback,
