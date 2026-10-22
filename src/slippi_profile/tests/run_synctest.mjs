@@ -211,7 +211,8 @@ export function diffHeapRanges(before, after) {
 
 export function classifyHeapRanges(rawRanges, manifestRows, arenaRange,
   audioInventoryTransition = null, nativeOutputRange = null,
-  matchContextInventoryTransition = null, auroraInventoryTransition = null) {
+  matchContextInventoryTransition = null, auroraInventoryTransition = null,
+  stageArenaInventoryTransition = null) {
   if (!Array.isArray(rawRanges) || !Array.isArray(manifestRows) ||
       !arenaRange || !Number.isSafeInteger(arenaRange.base) ||
       !Number.isSafeInteger(arenaRange.bytes)) {
@@ -307,6 +308,45 @@ export function classifyHeapRanges(rawRanges, manifestRows, arenaRange,
     })));
     ownedRanges.sort((a, b) => a.start - b.start || a.end - b.end);
   }
+  let stageArenaRows = [];
+  let stageArenaDiagnosticOutput = null;
+  if (stageArenaInventoryTransition !== null) {
+    const {before, after} = stageArenaInventoryTransition || {};
+    const sameInventory = before && after &&
+      sameStageArenaMetadata(before.metadata, after.metadata) &&
+      before.rows?.length === before.metadata.allocationCount &&
+      after.rows?.length === after.metadata.allocationCount &&
+      before.diagnosticOutputStorage?.base === after.diagnosticOutputStorage?.base &&
+      before.diagnosticOutputStorage?.bytes === after.diagnosticOutputStorage?.bytes &&
+      before.rows.length === after.rows.length &&
+      before.rows.every((row, index) => {
+        const other = after.rows[index];
+        return row.ordinal === other.ordinal && row.address === other.address &&
+          row.extent === other.extent &&
+          row.worldGenerationLow === before.metadata.worldGenerationLow &&
+          row.worldGenerationHigh === before.metadata.worldGenerationHigh &&
+          row.worldStorage === before.metadata.worldStorage &&
+          row.arenaStorage === before.metadata.arenaStorage &&
+          row.identityToken === before.metadata.identityToken &&
+          row.allocationCount === before.metadata.allocationCount &&
+          row.totalBytes === before.metadata.totalBytes &&
+          row.worldGenerationLow === other.worldGenerationLow &&
+          row.worldGenerationHigh === other.worldGenerationHigh &&
+          row.worldStorage === other.worldStorage && row.arenaStorage === other.arenaStorage &&
+          row.identityToken === other.identityToken &&
+          row.allocationCount === other.allocationCount && row.totalBytes === other.totalBytes;
+      });
+    if (!sameInventory) {
+      throw new Error('Stage-arena attribution requires the same complete owner and ordered ranges at both boundaries');
+    }
+    stageArenaRows = before.rows;
+    stageArenaDiagnosticOutput = {start: before.diagnosticOutputStorage.base,
+      end: before.diagnosticOutputStorage.base + before.diagnosticOutputStorage.bytes};
+    ownedRanges.push(...stageArenaRows.map(row => ({
+      start: row.address, end: row.address + row.extent, row, ownerType: 'stage-arena',
+    })));
+    ownedRanges.sort((a, b) => a.start - b.start || a.end - b.end);
+  }
   let nativeOutput = null;
   if (nativeOutputRange !== null) {
     if (!nativeOutputRange || !Number.isSafeInteger(nativeOutputRange.base) ||
@@ -354,6 +394,11 @@ export function classifyHeapRanges(rawRanges, manifestRows, arenaRange,
       boundaries.add(Math.max(range.start, auroraDiagnosticOutput.start));
       boundaries.add(Math.min(range.end, auroraDiagnosticOutput.end));
     }
+    if (stageArenaDiagnosticOutput && stageArenaDiagnosticOutput.start < range.end &&
+        range.start < stageArenaDiagnosticOutput.end) {
+      boundaries.add(Math.max(range.start, stageArenaDiagnosticOutput.start));
+      boundaries.add(Math.min(range.end, stageArenaDiagnosticOutput.end));
+    }
     if (arenaRange.base < range.end && range.start < arenaEnd) {
       boundaries.add(Math.max(range.start, arenaRange.base));
       boundaries.add(Math.min(range.end, arenaEnd));
@@ -368,18 +413,29 @@ export function classifyHeapRanges(rawRanges, manifestRows, arenaRange,
       const inNativeOutput = nativeOutput && nativeOutput.start <= start && end <= nativeOutput.end;
       const inAuroraDiagnosticOutput = auroraDiagnosticOutput &&
         auroraDiagnosticOutput.start <= start && end <= auroraDiagnosticOutput.end;
+      const inStageArenaDiagnosticOutput = stageArenaDiagnosticOutput &&
+        stageArenaDiagnosticOutput.start <= start && end <= stageArenaDiagnosticOutput.end;
       let provenance, details = {};
       if (inNativeOutput) {
         provenance = 'native-output-storage-diagnostic-excluded';
       } else if (inAuroraDiagnosticOutput) {
         provenance = 'aurora-staging-shadow-descriptor-diagnostic-excluded';
+      } else if (inStageArenaDiagnosticOutput) {
+        provenance = 'stage-arena-descriptor-diagnostic-excluded';
       } else if (matches.length > 1 || ownerMatches.length > 1 ||
           (matches.length && ownerMatches.length) ||
           (matches.length && inArena) || (ownerMatches.length && inArena)) {
         provenance = 'ambiguous-overlap';
       } else if (ownerMatches.length === 1) {
         const {row, ownerType} = ownerMatches[0];
-        if (ownerType === 'match-context') {
+        if (ownerType === 'stage-arena') {
+          provenance = 'stage-arena-owner-range';
+          details = {stageArenaOrdinal: row.ordinal,
+            stageArenaWorldGenerationTag: `${row.worldGenerationHigh.toString(16).padStart(8, '0')}${row.worldGenerationLow.toString(16).padStart(8, '0')}`,
+            stageArenaWorldStorage: row.worldStorage,
+            stageArenaStorage: row.arenaStorage,
+            stageArenaIdentityToken: row.identityToken};
+        } else if (ownerType === 'match-context') {
           provenance = 'match-context-owner-range';
           details = {
             matchContextOwnerAddress: row.owner,
@@ -803,6 +859,187 @@ export function requireStableMatchContextRangeInventory(inventories) {
   return {...first.rows[0]};
 }
 
+const STAGE_ARENA_WIRE_VERSION = 1;
+const STAGE_ARENA_WIRE_BYTES = 64;
+const STAGE_ARENA_WIRE_OWNER_KIND = 1;
+const STAGE_ARENA_MAX_ALLOCATIONS = 65536;
+const STAGE_ARENA_MAX_BYTES = 32 * 1024 * 1024;
+
+export function decodeStageArenaOwnerWire(bytes, pointer = 0) {
+  if (!(bytes instanceof Uint8Array) || bytes.byteLength !== STAGE_ARENA_WIRE_BYTES ||
+      !Number.isSafeInteger(pointer) || pointer < 0 || pointer % 4 !== 0) {
+    throw new Error('Stage-arena owner wire bytes or pointer are invalid');
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const values = Array.from({length: 16}, (_, index) => view.getUint32(index * 4, true));
+  const [version, size, status, ownerKind, worldGenerationLow, worldGenerationHigh,
+    worldStorage, arenaStorage, identityToken, allocationCount, totalBytes,
+    ordinal, address, extent, flags, reserved] = values;
+  if (version !== STAGE_ARENA_WIRE_VERSION || size !== STAGE_ARENA_WIRE_BYTES ||
+      status !== 1 || ownerKind !== STAGE_ARENA_WIRE_OWNER_KIND ||
+      (worldGenerationLow === 0 && worldGenerationHigh === 0) ||
+      !worldStorage || !arenaStorage || !identityToken ||
+      allocationCount > STAGE_ARENA_MAX_ALLOCATIONS || totalBytes > STAGE_ARENA_MAX_BYTES ||
+      flags !== 0 || reserved !== 0) {
+    throw new Error('Stage-arena owner wire header or bounded owner metadata is invalid');
+  }
+  const metadata = ordinal === 0xffffffff;
+  if ((metadata && (address !== 0 || extent !== 0)) ||
+      (!metadata && (!address || !extent || extent > WASM32_LIMIT - address))) {
+    throw new Error('Stage-arena owner wire row ordinal or extent is invalid');
+  }
+  return {version, size, status, ownerKind, worldGenerationLow, worldGenerationHigh,
+    worldStorage, arenaStorage, identityToken, allocationCount, totalBytes,
+    ordinal, address, extent, flags, reserved, metadata};
+}
+
+function sameStageArenaMetadata(left, right) {
+  return left && right && left.version === right.version && left.size === right.size &&
+    left.status === right.status && left.ownerKind === right.ownerKind &&
+    left.worldGenerationLow === right.worldGenerationLow &&
+    left.worldGenerationHigh === right.worldGenerationHigh &&
+    left.worldStorage === right.worldStorage && left.arenaStorage === right.arenaStorage &&
+    left.identityToken === right.identityToken &&
+    left.allocationCount === right.allocationCount && left.totalBytes === right.totalBytes &&
+    left.flags === right.flags && left.reserved === right.reserved;
+}
+
+export function validateStageArenaOwnerCatalog(metadata, rows, finalMetadata, wirePointer,
+  manifestRows, arenaRange, nativeOutputRange, heapBytes, audioInventory,
+  matchContextInventory, auroraInventory = null) {
+  if (!metadata?.metadata || !finalMetadata?.metadata ||
+      !sameStageArenaMetadata(metadata, finalMetadata) ||
+      !Array.isArray(rows) || rows.length !== metadata.allocationCount ||
+      !Array.isArray(manifestRows) || !Number.isSafeInteger(heapBytes) ||
+      heapBytes < 0 || heapBytes > WASM32_LIMIT || !Number.isSafeInteger(wirePointer) ||
+      wirePointer <= 0 || wirePointer % 4 !== 0 ||
+      !Number.isSafeInteger(arenaRange?.base) || !Number.isSafeInteger(arenaRange?.bytes) ||
+      !Number.isSafeInteger(nativeOutputRange?.base) || !Number.isSafeInteger(nativeOutputRange?.bytes)) {
+    throw new Error('Stage-arena catalog metadata, count, wire pointer, or bounds are invalid');
+  }
+  if (arenaRange.base < 0 || arenaRange.bytes <= 0 || arenaRange.base > WASM32_LIMIT ||
+      arenaRange.bytes > WASM32_LIMIT - arenaRange.base || arenaRange.base + arenaRange.bytes > heapBytes ||
+      nativeOutputRange.base <= 0 || nativeOutputRange.bytes <= 0 ||
+      nativeOutputRange.base > WASM32_LIMIT || nativeOutputRange.bytes > WASM32_LIMIT - nativeOutputRange.base ||
+      nativeOutputRange.base + nativeOutputRange.bytes > heapBytes) {
+    throw new Error('Stage-arena cross-owner bounds are invalid');
+  }
+  const diagnosticMatches = manifestRows.filter(row =>
+    row?.input_object === 'CMakeFiles/gameplay_slippi_synctest_browser.dir/src/slippi_profile/tests/synctest_browser.cpp.o' &&
+    row?.input_section === '.bss.melee_web_synctest_stage_arena_diagnostic_storage');
+  if (diagnosticMatches.length !== 1) {
+    throw new Error('Stage-arena observer requires one exact diagnostic manifest identity');
+  }
+  const diagnostic = diagnosticMatches[0];
+  if (diagnostic.decision !== 'excluded' ||
+      diagnostic.exclusion_reason !== 'not-a-known-source-archive-member' ||
+      diagnostic.size !== 96 || diagnostic.address + 32 !== wirePointer ||
+      diagnostic.address < 0 || diagnostic.address > WASM32_LIMIT - 96 ||
+      diagnostic.address + 96 > heapBytes) {
+    throw new Error('Stage-arena observer diagnostic manifest identity or returned wire offset is invalid');
+  }
+  const intervals = [];
+  let total = 0;
+  for (let index = 0; index < rows.length; index++) {
+    const row = rows[index];
+    if (!row || row.metadata || row.ordinal !== index || row.ordinal >= metadata.allocationCount ||
+        row.version !== metadata.version || row.worldGenerationLow !== metadata.worldGenerationLow ||
+        row.worldGenerationHigh !== metadata.worldGenerationHigh || row.worldStorage !== metadata.worldStorage ||
+        row.arenaStorage !== metadata.arenaStorage || row.identityToken !== metadata.identityToken ||
+        row.allocationCount !== metadata.allocationCount || row.totalBytes !== metadata.totalBytes ||
+        !row.address || !row.extent || row.address > WASM32_LIMIT ||
+        row.extent > WASM32_LIMIT - row.address || row.address + row.extent > heapBytes ||
+        row.extent > STAGE_ARENA_MAX_BYTES - total) {
+      throw new Error(`Stage-arena catalog row ${index} has invalid identity, order, extent, or wasm bounds`);
+    }
+    total += row.extent;
+    intervals.push({start: row.address, end: row.address + row.extent, row, label: 'stage-arena owner range'});
+  }
+  if (total !== metadata.totalBytes || total > STAGE_ARENA_MAX_BYTES) {
+    throw new Error('Stage-arena catalog extents do not equal the full reported byte total');
+  }
+  const byAddress = values => values.slice().sort((left, right) => left.start - right.start || left.end - right.end);
+  const requireDisjoint = (leftValues, rightValues, description) => {
+    const left = byAddress(leftValues), right = byAddress(rightValues);
+    let leftIndex = 0, rightIndex = 0;
+    while (leftIndex < left.length && rightIndex < right.length) {
+      const a = left[leftIndex], b = right[rightIndex];
+      if (a.start < b.end && b.start < a.end) {
+        throw new Error(`${description}: ${a.label} overlaps ${b.label}`);
+      }
+      if (a.end <= b.end) leftIndex++;
+      else rightIndex++;
+    }
+  };
+  const diagnosticInterval = {start: diagnostic.address, end: diagnostic.address + diagnostic.size,
+    label: 'stage-arena diagnostic storage'};
+  const otherOwners = [
+    ...manifestRows.filter(row => row !== diagnostic && row.size > 0).map(row => ({
+      start: row.address, end: row.address + row.size, label: 'static manifest range'})),
+    {start: arenaRange.base, end: arenaRange.base + arenaRange.bytes, label: 'gameplay arena'},
+    {start: nativeOutputRange.base, end: nativeOutputRange.base + nativeOutputRange.bytes,
+      label: 'native PCM diagnostic storage'},
+  ];
+  for (const row of audioInventory?.rows || []) otherOwners.push({
+    start: row.address, end: row.address + row.extent, label: 'audio owner range'});
+  for (const row of matchContextInventory?.rows || []) otherOwners.push({
+    start: row.address, end: row.address + row.extent, label: 'match-context owner range'});
+  for (const row of auroraInventory?.ranges || []) otherOwners.push({
+    start: row.address, end: row.address + row.extent, label: 'Aurora staging-shadow range'});
+  // Existing owner descriptions may alias one another (for example, PCM's
+  // static section and its explicit diagnostic range). Check every new stage
+  // and observer interval against every description below without requiring
+  // unrelated existing descriptions to be mutually disjoint.
+  const sortedIntervals = byAddress(intervals);
+  for (let index = 1; index < sortedIntervals.length; index++) {
+    if (sortedIntervals[index].start < sortedIntervals[index - 1].end) {
+      throw new Error('Stage-arena allocation intervals overlap each other');
+    }
+  }
+  requireDisjoint(intervals, [diagnosticInterval], 'Stage-arena owner range overlaps the diagnostic storage');
+  requireDisjoint(intervals, otherOwners, 'Stage-arena owner range overlaps another owner');
+  requireDisjoint([diagnosticInterval], otherOwners, 'Stage-arena diagnostic storage overlaps another owner');
+  return {metadata, rows, diagnosticOutputStorage: {base: diagnostic.address, bytes: diagnostic.size,
+    wirePointer, diagnosticOnly: true, ownerRestoreAdmission: false},
+    ownerRestoreAdmission: false, completeGameState: false};
+}
+
+export function requireStableStageArenaOwnerInventory(inventories) {
+  const order = ['before-source-step', 'after-source-step',
+    'after-actual-draw-and-Aurora-quiescence'];
+  if (!Array.isArray(inventories) || inventories.length !== order.length ||
+      inventories.some((item, index) => !item || item.boundary !== order[index] ||
+        !Array.isArray(item.rows) || item.rows.length !== item.metadata?.allocationCount)) {
+    throw new Error('Stage-arena owner inventory requires three complete ordered census boundaries');
+  }
+  const first = inventories[0];
+  for (const current of inventories.slice(1)) {
+    if (!sameStageArenaMetadata(first.metadata, current.metadata) ||
+        first.diagnosticOutputStorage?.base !== current.diagnosticOutputStorage?.base ||
+        first.diagnosticOutputStorage?.bytes !== current.diagnosticOutputStorage?.bytes ||
+        first.rows.length !== current.rows.length ||
+        first.rows.some((row, index) => row.ordinal !== current.rows[index].ordinal ||
+          row.address !== current.rows[index].address || row.extent !== current.rows[index].extent ||
+          row.worldGenerationLow !== current.rows[index].worldGenerationLow ||
+          row.worldGenerationHigh !== current.rows[index].worldGenerationHigh ||
+          row.worldStorage !== current.rows[index].worldStorage ||
+          row.arenaStorage !== current.rows[index].arenaStorage ||
+          row.identityToken !== current.rows[index].identityToken ||
+          row.allocationCount !== current.rows[index].allocationCount ||
+          row.totalBytes !== current.rows[index].totalBytes ||
+          row.worldGenerationLow !== first.metadata.worldGenerationLow ||
+          row.worldGenerationHigh !== first.metadata.worldGenerationHigh ||
+          row.worldStorage !== first.metadata.worldStorage ||
+          row.arenaStorage !== first.metadata.arenaStorage ||
+          row.identityToken !== first.metadata.identityToken ||
+          row.allocationCount !== first.metadata.allocationCount ||
+          row.totalBytes !== first.metadata.totalBytes)) {
+      throw new Error('Stage-arena owner lifetime or complete ordered topology changed across census boundaries');
+    }
+  }
+  return first.rows.map(row => ({...row}));
+}
+
 const AURORA_QUIESCENCE_SCHEMA_VERSION = 5;
 const AURORA_FRAME_DESCRIPTOR_BYTES = 464;
 const AURORA_SUBMISSION_DESCRIPTOR_BYTES = 56;
@@ -1172,6 +1409,12 @@ export function reportSourceHashes() {
     'src/slippi_profile/patches/melee-profile-hooks.patch',
     'src/slippi_profile/tests/synctest_node.cpp',
     'src/slippi_profile/tests/synctest_browser.cpp',
+    'src/native_dat.hpp',
+    'src/native_dat.cpp',
+    'src/gameplay_world.hpp',
+    'src/gameplay_world.cpp',
+    'src/gameplay_match_session.hpp',
+    'src/gameplay_match_session.cpp',
     'src/slippi_profile/tests/run_synctest.mjs',
     'src/slippi_profile/tests/runner_contract.mjs',
     'cmake/FighterRuntime.cmake',
@@ -1300,7 +1543,9 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     decodeMatchContextRangeInventorySource, validateMatchContextRangeDisjointnessSource,
     requireStableMatchContextRangeInventorySource, decodeAuroraStagingShadowInventorySource,
     validateAuroraStagingShadowRangeDisjointnessSource,
-    requireStableAuroraStagingShadowInventorySource, maxHeapBytes}) => {
+    requireStableAuroraStagingShadowInventorySource, decodeStageArenaOwnerWireSource,
+    validateStageArenaOwnerCatalogSource, requireStableStageArenaOwnerInventorySource,
+    sameStageArenaMetadataSource, maxHeapBytes}) => {
     const {module} = window.__slippiSynctest;
     const checkedAsyncCcall = new Function(`return (${checkedSource})`)();
     const checked = (label, identifier, argumentTypes = [], args = []) =>
@@ -1315,9 +1560,13 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     const matchContextInventoryBoundaries = writeCensus ? [] : null;
     const auroraStagingShadowInventoryBoundaries =
       writeCensus?.requireAuroraStagingShadowInventory === true ? [] : null;
+    const stageArenaOwnerInventoryBoundaries =
+      writeCensus?.requireStageArenaOwnerInventory === true ? [] : null;
     let nativeOutputRange = null;
     let queryOwnerInventories = null, requireStableInventory = null,
-      requireStableMatchContextInventory = null, requireStableAuroraInventory = null;
+      requireStableMatchContextInventory = null, requireStableAuroraInventory = null,
+      decodeStageArenaWire = null, validateStageArenaCatalog = null,
+      requireStableStageArenaInventory = null;
     const censusNativeTransferQuiescence = writeCensus ? {
       beforeStep: null, afterStep: null, afterActualDraw: null,
     } : null;
@@ -1341,6 +1590,10 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
       if (writeCensus.requireAuroraStagingShadowInventory &&
           typeof module._melee_web_synctest_aurora_staging_shadow_inventory_query !== 'function') {
         throw new Error('Required Aurora staging-shadow inventory export is unavailable: _melee_web_synctest_aurora_staging_shadow_inventory_query');
+      }
+      if (writeCensus.requireStageArenaOwnerInventory &&
+          typeof module._melee_web_synctest_stage_arena_inventory_query !== 'function') {
+        throw new Error('Required stage-arena owner inventory export is unavailable: _melee_web_synctest_stage_arena_inventory_query');
       }
       const arenaBase = module._melee_web_synctest_gameplay_arena_base();
       const arenaBytes = module._melee_web_synctest_gameplay_arena_bytes();
@@ -1396,6 +1649,42 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
       requireStableAuroraInventory = writeCensus.requireAuroraStagingShadowInventory ?
         new Function('inventories',
           `return (${requireStableAuroraStagingShadowInventorySource})(inventories)`) : null;
+      if (writeCensus.requireStageArenaOwnerInventory) {
+        decodeStageArenaWire = new Function('bytes', 'pointer',
+          `const STAGE_ARENA_WIRE_VERSION = 1;
+` +
+          `const STAGE_ARENA_WIRE_BYTES = 64;
+` +
+          `const STAGE_ARENA_WIRE_OWNER_KIND = 1;
+` +
+          `const STAGE_ARENA_MAX_ALLOCATIONS = 65536;
+` +
+          `const STAGE_ARENA_MAX_BYTES = 32 * 1024 * 1024;
+` +
+          `const WASM32_LIMIT = 0x100000000;
+` +
+          `return (${decodeStageArenaOwnerWireSource})(bytes, pointer);`);
+        const sameStageMetadataSource = `const sameStageArenaMetadata = ${sameStageArenaMetadataSource};\n`;
+        validateStageArenaCatalog = new Function('metadata','rows','finalMetadata','wirePointer',
+          'manifestRows','arenaRange','nativeOutputRange','heapBytes','audioInventory',
+          'matchContextInventory','auroraInventory',
+          `const STAGE_ARENA_WIRE_VERSION = 1;
+` +
+          `const STAGE_ARENA_WIRE_BYTES = 64;
+` +
+          `const STAGE_ARENA_WIRE_OWNER_KIND = 1;
+` +
+          `const STAGE_ARENA_MAX_ALLOCATIONS = 65536;
+` +
+          `const STAGE_ARENA_MAX_BYTES = 32 * 1024 * 1024;
+` +
+          `const WASM32_LIMIT = 0x100000000;
+` + sameStageMetadataSource +
+          `return (${validateStageArenaOwnerCatalogSource})(metadata, rows, finalMetadata, wirePointer, manifestRows, arenaRange, nativeOutputRange, heapBytes, audioInventory, matchContextInventory, auroraInventory);`);
+        requireStableStageArenaInventory = new Function('inventories',
+          sameStageMetadataSource +
+          `return (${requireStableStageArenaOwnerInventorySource})(inventories);`);
+      }
       queryOwnerInventories = async boundary => {
         await checked(`audio owner inventory ${boundary}`,
           'melee_web_synctest_audio_range_inventory_query');
@@ -1437,6 +1726,39 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
           auroraStagingShadowInventoryBoundaries.push({boundary, ...auroraInventory,
             diagnosticOutputRange: diagnosticOutput.diagnosticOutputStorage,
             diagnosticOutputStorage: diagnosticOutput});
+        }
+        if (writeCensus.requireStageArenaOwnerInventory) {
+          const stageArenaWireBytes = 64;
+          const queryStageWire = (ordinal, label) => {
+            const pointer = module._melee_web_synctest_stage_arena_inventory_query(ordinal);
+            if (!Number.isSafeInteger(pointer) || pointer <= 0 || pointer % 4 !== 0 ||
+                pointer > module.HEAPU8.byteLength || stageArenaWireBytes > module.HEAPU8.byteLength - pointer) {
+              throw new Error(`Stage-arena owner inventory ${boundary} ${label} refused or returned an invalid wire pointer`);
+            }
+            const copied = module.HEAPU8.slice(pointer, pointer + stageArenaWireBytes);
+            return {pointer, wire: decodeStageArenaWire(copied, pointer)};
+          };
+          const firstMetadata = queryStageWire(0xffffffff, 'metadata');
+          if (!firstMetadata.wire.metadata) throw new Error(`Stage-arena owner inventory ${boundary} metadata row is malformed`);
+          const rows = [];
+          for (let ordinal = 0; ordinal < firstMetadata.wire.allocationCount; ordinal++) {
+            const queried = queryStageWire(ordinal, `row ${ordinal}`);
+            if (queried.pointer !== firstMetadata.pointer) {
+              throw new Error(`Stage-arena owner inventory ${boundary} changed diagnostic wire address`);
+            }
+            rows.push(queried.wire);
+          }
+          const finalMetadata = queryStageWire(0xffffffff, 'final metadata');
+          if (finalMetadata.pointer !== firstMetadata.pointer || !finalMetadata.wire.metadata) {
+            throw new Error(`Stage-arena owner inventory ${boundary} final metadata identity changed`);
+          }
+          const validated = validateStageArenaCatalog(firstMetadata.wire, rows,
+            finalMetadata.wire, firstMetadata.pointer, writeCensus.manifestRows,
+            writeCensus.arenaRange, nativeOutputRange, module.HEAPU8.byteLength,
+            inventory, matchContextInventory, auroraStagingShadowInventoryBoundaries ?
+              auroraStagingShadowInventoryBoundaries.at(-1) : null);
+          stageArenaOwnerInventoryBoundaries.push({boundary,
+            metadata: firstMetadata.wire, ...validated});
         }
       };
       await queryOwnerInventories('before-source-step');
@@ -1507,6 +1829,9 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
       if (requireStableAuroraInventory) {
         requireStableAuroraInventory(auroraStagingShadowInventoryBoundaries);
       }
+      if (requireStableStageArenaInventory) {
+        requireStableStageArenaInventory(stageArenaOwnerInventoryBoundaries);
+      }
       const raw = makeDiff(heapAfterStep, heapAfterDraw);
       censusDrawRaw = {
         beforeHeapBytes: heapAfterStep.byteLength,
@@ -1518,8 +1843,9 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
       };
       const makeClassify = new Function('ranges', 'manifestRows', 'arenaRange',
         'audioInventoryTransition', 'nativeOutputRange', 'matchContextInventoryTransition',
-        'auroraInventoryTransition',
-        `return (${classifyHeapRangesSource})(ranges, manifestRows, arenaRange, audioInventoryTransition, nativeOutputRange, matchContextInventoryTransition, auroraInventoryTransition)`);
+        'auroraInventoryTransition', 'stageArenaInventoryTransition',
+        `const sameStageArenaMetadata = ${sameStageArenaMetadataSource};\n` +
+        `return (${classifyHeapRangesSource})(ranges, manifestRows, arenaRange, audioInventoryTransition, nativeOutputRange, matchContextInventoryTransition, auroraInventoryTransition, stageArenaInventoryTransition)`);
       censusStepDiff = {...censusStepRaw,
         changedRanges: makeClassify(censusStepRaw.ranges, writeCensus.manifestRows,
           writeCensus.arenaRange, {before: audioInventoryBoundaries[0],
@@ -1529,6 +1855,10 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
           auroraStagingShadowInventoryBoundaries ? {
             before: auroraStagingShadowInventoryBoundaries[0],
             after: auroraStagingShadowInventoryBoundaries[1],
+          } : null,
+          stageArenaOwnerInventoryBoundaries ? {
+            before: stageArenaOwnerInventoryBoundaries[0],
+            after: stageArenaOwnerInventoryBoundaries[1],
           } : null)};
       censusDrawDiff = {...censusDrawRaw,
         changedRanges: makeClassify(censusDrawRaw.ranges, writeCensus.manifestRows,
@@ -1539,6 +1869,10 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
           auroraStagingShadowInventoryBoundaries ? {
             before: auroraStagingShadowInventoryBoundaries[1],
             after: auroraStagingShadowInventoryBoundaries[2],
+          } : null,
+          stageArenaOwnerInventoryBoundaries ? {
+            before: stageArenaOwnerInventoryBoundaries[1],
+            after: stageArenaOwnerInventoryBoundaries[2],
           } : null)};
       heapAfterStep = null;
     }
@@ -1598,6 +1932,15 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
         ownerRestoreAdmission: false,
       },
       requireAuroraStagingShadowInventory: Boolean(auroraStagingShadowInventoryBoundaries),
+      requireStageArenaOwnerInventory: Boolean(stageArenaOwnerInventoryBoundaries),
+      stageArenaOwnerInventory: stageArenaOwnerInventoryBoundaries ? {
+        wireSize: stageArenaOwnerInventoryBoundaries[0].metadata.size,
+        boundaryOrder: stageArenaOwnerInventoryBoundaries.map(item => item.boundary),
+        boundaries: stageArenaOwnerInventoryBoundaries,
+        stableOwnerLifetimeValidated: true,
+        ownerRestoreAdmission: false,
+        completeGameState: false,
+      } : null,
       auroraStagingShadowOwnerInventory: auroraStagingShadowInventoryBoundaries ? {
         version: auroraStagingShadowInventoryBoundaries[0].version,
         wireSize: auroraStagingShadowInventoryBoundaries[0].size,
@@ -1639,6 +1982,10 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     decodeAuroraStagingShadowInventorySource: decodeAuroraStagingShadowInventory.toString(),
     validateAuroraStagingShadowRangeDisjointnessSource: validateAuroraStagingShadowRangeDisjointness.toString(),
     requireStableAuroraStagingShadowInventorySource: requireStableAuroraStagingShadowInventory.toString(),
+    decodeStageArenaOwnerWireSource: decodeStageArenaOwnerWire.toString(),
+    validateStageArenaOwnerCatalogSource: validateStageArenaOwnerCatalog.toString(),
+    requireStableStageArenaOwnerInventorySource: requireStableStageArenaOwnerInventory.toString(),
+    sameStageArenaMetadataSource: sameStageArenaMetadata.toString(),
     maxHeapBytes: MAX_HEAP_BYTES});
 }
 

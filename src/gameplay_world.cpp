@@ -918,6 +918,31 @@ uint32_t GameplayWorld::unresolved_fighter_fields()const{
     uint32_t result=0;for(const auto& [kind,fighter]:storage_->fighters)result|=fighter->unresolved_fields();return result;
 }
 void GameplayWorld::verify_immutable_archives()const{storage_->verify();}
+GameplayWorldStageArenaInventory GameplayWorld::diagnostic_stage_arena_allocations(
+    std::size_t first, std::size_t count,
+    bool (*visitor)(const NativeDatAllocationRange&, void*) noexcept,
+    void* context) const noexcept {
+    GameplayWorldStageArenaInventory result{};
+    const auto* const storage = storage_.get();
+    if (!storage || !storage->started || storage->construction_phase != 4 ||
+        !storage->stage || !storage->stage_arena || !storage->ground_published) return result;
+    const std::uint64_t generation = melee_web_gameplay_generation();
+    if (!generation) return result;
+    auto arena = storage->stage_arena->visit_owned_allocations(first, count, visitor, context);
+    if (storage_.get() != storage || !storage->started ||
+        storage->construction_phase != 4 || !storage->stage || !storage->stage_arena ||
+        !storage->ground_published || melee_web_gameplay_generation() != generation ||
+        arena.status != NativeDatAllocationVisitStatus::Complete) {
+        result.arena = arena;
+        result.arena.status = NativeDatAllocationVisitStatus::InvalidOwner;
+        return result;
+    }
+    result.status = NativeDatAllocationVisitStatus::Complete;
+    result.world_storage = storage;
+    result.world_generation = generation;
+    result.arena = arena;
+    return result;
+}
 bool GameplayWorld::advance_construction(){return storage_->advance_construction();}
 bool GameplayWorld::construction_complete()const{return storage_->construction_phase==4;}
 void GameplayWorld::initialize_match(const StartMeleeData& start) {

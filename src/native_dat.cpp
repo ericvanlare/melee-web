@@ -1,6 +1,7 @@
 #include "native_dat.hpp"
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <utility>
 #include <vector>
 namespace melee_web {
@@ -94,8 +95,8 @@ NativeDatArena::NativeDatArena(std::shared_ptr<const DatArchive> archive,
     };
     s.api.allocate = [](void* c,size_t n,size_t width)->void* {
         auto& a = *static_cast<Storage*>(c);
-        constexpr size_t limit = 32U*1024U*1024U;
-        if (!width || n > (limit-a.bytes)/width || a.allocations.size() >= 65536)
+        constexpr size_t limit = native_dat_allocation_bytes_max;
+        if (!width || n > (limit-a.bytes)/width || a.allocations.size() >= native_dat_allocation_count_max)
             throw DatError("Native descriptor allocation budget exceeded");
         if (!n) return nullptr;
         void* p = std::calloc(n,width);
@@ -107,6 +108,63 @@ NativeDatArena::NativeDatArena(std::shared_ptr<const DatArchive> archive,
 }
 NativeDatArena::~NativeDatArena() = default;
 const MeleeWebNativeDat* NativeDatArena::reader() const noexcept { return &storage_->api; }
+
+NativeDatAllocationInventory NativeDatArena::visit_owned_allocations(
+    std::size_t first, std::size_t count,
+    bool (*visitor)(const NativeDatAllocationRange&, void*) noexcept,
+    void* context) const noexcept {
+    NativeDatAllocationInventory result{};
+    const Storage* const storage = storage_.get();
+    if (!storage || !storage->identity) return result;
+
+    const auto identity = storage->identity.get();
+    const auto allocation_count = storage->allocations.size();
+    const auto total_bytes = storage->bytes;
+    result.arena_storage = storage;
+    result.identity_token = identity;
+    result.allocation_count = allocation_count;
+    result.total_bytes = total_bytes;
+
+    if (allocation_count > native_dat_allocation_count_max ||
+        total_bytes > native_dat_allocation_bytes_max ||
+        first > allocation_count || count > allocation_count - first ||
+        (count == 0 && visitor != nullptr) || (count != 0 && visitor == nullptr)) {
+        result.status = NativeDatAllocationVisitStatus::InvalidArgument;
+        return result;
+    }
+
+    std::size_t sum = 0;
+    const bool full_traversal = first == 0 && count == allocation_count;
+    const auto maximum = std::numeric_limits<std::uintptr_t>::max();
+    for (std::size_t offset = 0; offset < count; ++offset) {
+        const std::size_t ordinal = first + offset;
+        const auto& allocation = storage->allocations[ordinal];
+        const auto address = reinterpret_cast<std::uintptr_t>(allocation.pointer);
+        if (!allocation.pointer || allocation.bytes == 0 ||
+            allocation.bytes > maximum - address ||
+            (full_traversal && (allocation.bytes > native_dat_allocation_bytes_max - sum))) {
+            result.status = NativeDatAllocationVisitStatus::InvalidOwner;
+            return result;
+        }
+        if (full_traversal) sum += allocation.bytes;
+        const NativeDatAllocationRange row{ordinal, allocation.pointer, allocation.bytes};
+        if (!visitor(row, context)) {
+            result.visited_count = offset;
+            result.status = NativeDatAllocationVisitStatus::Aborted;
+            return result;
+        }
+        result.visited_count = offset + 1;
+    }
+
+    if (storage_.get() != storage || storage->identity.get() != identity ||
+        storage->allocations.size() != allocation_count || storage->bytes != total_bytes ||
+        (full_traversal && sum != total_bytes)) {
+        result.status = NativeDatAllocationVisitStatus::InvalidOwner;
+        return result;
+    }
+    result.status = NativeDatAllocationVisitStatus::Complete;
+    return result;
+}
 
 struct NativeDatArena::Checkpoint::Data {
     struct Region {

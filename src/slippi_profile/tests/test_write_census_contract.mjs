@@ -11,6 +11,8 @@ import {
   requireStableMatchContextRangeInventory, requireStableAuroraStagingShadowInventory,
   validateAudioOwnerRangeDisjointness, validateAuroraStagingShadowRangeDisjointness,
   validateMatchContextRangeDisjointness,
+  decodeStageArenaOwnerWire, validateStageArenaOwnerCatalog,
+  requireStableStageArenaOwnerInventory,
   validateCensusInventory, validateSourceStateManifest, runBrowserSample,
 } from './run_synctest.mjs';
 
@@ -95,6 +97,50 @@ function auroraStorageRow(address = 6800) {
     exclusion_reason: 'archive-outside-generated-source-producers',
     input_object: '.deps/aurora/libaurora_gx.a(frame.cpp.o)',
     input_section: '.bss.aurora_browser_quiescence_observer_storage'};
+}
+
+function stageArenaDiagnosticRow(address = 11800) {
+  return {address, size: 96, decision: 'excluded',
+    exclusion_reason: 'not-a-known-source-archive-member',
+    input_object: 'CMakeFiles/gameplay_slippi_synctest_browser.dir/src/slippi_profile/tests/synctest_browser.cpp.o',
+    input_section: '.bss.melee_web_synctest_stage_arena_diagnostic_storage'};
+}
+
+function pcmStaticManifestRow(address = 854624) {
+  return {address, size: 4272, decision: 'excluded',
+    exclusion_reason: 'not-a-known-source-archive-member',
+    input_object: 'CMakeFiles/gameplay_slippi_synctest_browser.dir/src/slippi_profile/tests/synctest_browser.cpp.o',
+    input_section: '.bss._ZN12_GLOBAL__N_13pcmE'};
+}
+
+function stageArenaWire({pointer = 11832, ordinal = 0xffffffff, address = 0,
+  extent = 0, worldGenerationLow = 0x33445566, worldGenerationHigh = 0x12345678,
+  worldStorage = 800, arenaStorage = 900, identityToken = 1000,
+  allocationCount = 2, totalBytes = 40, mutation = null} = {}) {
+  const bytes = new Uint8Array(64), view = new DataView(bytes.buffer);
+  const values = [1, 64, 1, 1, worldGenerationLow, worldGenerationHigh,
+    worldStorage, arenaStorage, identityToken, allocationCount, totalBytes,
+    ordinal, address, extent, 0, 0];
+  if (mutation === 'version') values[0]++;
+  if (mutation === 'size') values[1]++;
+  if (mutation === 'status') values[2] = 0;
+  if (mutation === 'kind') values[3] = 2;
+  if (mutation === 'zero-generation') values[4] = values[5] = 0;
+  if (mutation === 'zero-identity') values[8] = 0;
+  if (mutation === 'max-count') values[9] = 65537;
+  if (mutation === 'max-total') values[10] = 33554433;
+  if (mutation === 'flags') values[14] = 1;
+  if (mutation === 'reserved') values[15] = 1;
+  if (mutation === 'metadata-row') values[12] = 1;
+  if (mutation === 'row-zero-extent' && ordinal !== 0xffffffff) values[13] = 0;
+  if (mutation === 'row-overflow' && ordinal !== 0xffffffff) { values[12] = 0xfffffff0; values[13] = 32; }
+  for (let index = 0; index < values.length; index++) view.setUint32(index * 4, values[index] >>> 0, true);
+  return {bytes, pointer};
+}
+
+function decodedStageWire(options) {
+  const wire = stageArenaWire(options);
+  return decodeStageArenaOwnerWire(wire.bytes, wire.pointer);
 }
 
 function writeU64(view, offset, low, high = 0) {
@@ -591,7 +637,9 @@ async function censusServiceFixture({failedQuiescence = 0, rendererError = 0,
   matchContextInventoryFailureAt = 0, matchContextInventoryMutation = null,
   missingMatchContextInventoryExport = false, requireAuroraStagingShadowInventory = false,
   auroraInventoryFailureAt = 0, auroraInventoryMutation = null,
-  missingAuroraStagingShadowExport = false} = {}) {
+  missingAuroraStagingShadowExport = false,
+  requireStageArenaOwnerInventory = false, stageArenaInventoryFailureAt = 0,
+  stageArenaInventoryMutation = null, missingStageArenaInventoryExport = false} = {}) {
   const context = vm.createContext({crypto: webcrypto, setTimeout, performance,
     btoa: value => Buffer.from(value, 'binary').toString('base64')});
   vm.runInContext(`
@@ -601,6 +649,8 @@ async function censusServiceFixture({failedQuiescence = 0, rendererError = 0,
     const inventoryPointer = 8000;
     const matchContextInventoryPointer = 11000;
     const auroraInventoryPointer = 6800;
+    const stageArenaWirePointer = 11832;
+    let stageArenaInventoryQueryCount = 0;
     let inventoryQueryCount = 0;
     let matchContextInventoryQueryCount = 0;
     let auroraInventoryQueryCount = 0;
@@ -694,6 +744,36 @@ async function censusServiceFixture({failedQuiescence = 0, rendererError = 0,
       view.setUint32(offset + 24, ownerEpochLow, true);
       view.setUint32(offset + 28, ownerEpochHigh, true);
     }
+    function publishStageArenaWire(ordinal) {
+      const queryCount = stageArenaInventoryQueryCount;
+      let worldGenerationLow = 0x33445566, worldStorage = 800, arenaStorage = 900,
+        identityToken = 1000, allocationCount = 2, totalBytes = 40;
+      let address = ordinal === 0 ? 13000 : 13200;
+      let extent = ordinal === 0 ? 16 : 24;
+      if ('${stageArenaInventoryMutation || ''}' === 'generation' && queryCount >= 5) worldGenerationLow++;
+      if ('${stageArenaInventoryMutation || ''}' === 'world' && queryCount >= 5) worldStorage++;
+      if ('${stageArenaInventoryMutation || ''}' === 'arena' && queryCount >= 5) arenaStorage++;
+      if ('${stageArenaInventoryMutation || ''}' === 'token' && queryCount >= 5) identityToken++;
+      if ('${stageArenaInventoryMutation || ''}' === 'count' && queryCount >= 5) allocationCount++;
+      if ('${stageArenaInventoryMutation || ''}' === 'total' && queryCount >= 5) totalBytes++;
+      if ('${stageArenaInventoryMutation || ''}' === 'row-topology' && queryCount >= 5 && ordinal === 1) address++;
+      if ('${stageArenaInventoryMutation || ''}' === 'row-overlap' && ordinal === 1) address = 13008;
+      if ('${stageArenaInventoryMutation || ''}' === 'static-overlap' && ordinal === 0) address = 15000;
+      if ('${stageArenaInventoryMutation || ''}' === 'arena-overlap' && ordinal === 0) address = 14000;
+      if ('${stageArenaInventoryMutation || ''}' === 'audio-overlap' && ordinal === 0) address = 9000;
+      if ('${stageArenaInventoryMutation || ''}' === 'context-overlap' && ordinal === 0) address = 12000;
+      if ('${stageArenaInventoryMutation || ''}' === 'observer-overlap' && ordinal === 0) address = 11832;
+      if ('${stageArenaInventoryMutation || ''}' === 'output-overlap' && ordinal === 0) address = 2048;
+      if (ordinal === 0xffffffff) { address = 0; extent = 0; }
+      const values = [1, 64, 1, 1, worldGenerationLow, 0x12345678,
+        worldStorage, arenaStorage, identityToken, allocationCount, totalBytes,
+        ordinal, address, extent, 0, 0];
+      if ('${stageArenaInventoryMutation || ''}' === 'malformed' && queryCount === 1) values[0] = 2;
+      const view = new DataView(heap.buffer);
+      for (let index = 0; index < values.length; index++) {
+        view.setUint32(stageArenaWirePointer + index * 4, values[index] >>> 0, true);
+      }
+    }
     view.setUint32(8, 1, true);
     for (let slot = 0; slot < 2; slot++) {
       const base = 72 + 192 * slot;
@@ -712,6 +792,13 @@ async function censusServiceFixture({failedQuiescence = 0, rendererError = 0,
       _melee_web_synctest_match_context_range_inventory_query: () => 1,
       _melee_web_synctest_match_context_range_inventory: () => matchContextInventoryPointer,
       _melee_web_synctest_aurora_staging_shadow_inventory_query: () => auroraInventoryPointer,
+      _melee_web_synctest_stage_arena_inventory_query(ordinal) {
+        stageArenaInventoryQueryCount++;
+        calls.push({identifier: 'stage-arena-query:' + ordinal});
+        if (stageArenaInventoryQueryCount === ${stageArenaInventoryFailureAt}) return 0;
+        publishStageArenaWire(ordinal);
+        return stageArenaWirePointer;
+      },
       _melee_web_synctest_draw_decision: () => 1,
       _melee_web_snapshot_observation_size: () => 1280,
       _melee_web_snapshot_pcm_size: () => 4272,
@@ -759,6 +846,8 @@ async function censusServiceFixture({failedQuiescence = 0, rendererError = 0,
           heap[6400] = 9;
           heap[9004] = 11;
           heap[12004] = 15;
+          if (${requireStageArenaOwnerInventory ? 'true' : 'false'} &&
+              '${stageArenaInventoryMutation || ''}' !== 'zero-source-step') heap[13004] = 17;
           heap[2050] = 13;
           return 1;
         }
@@ -788,6 +877,9 @@ async function censusServiceFixture({failedQuiescence = 0, rendererError = 0,
   if (missingAuroraStagingShadowExport) {
     vm.runInContext('delete window.__slippiSynctest.module._melee_web_synctest_aurora_staging_shadow_inventory_query', context);
   }
+  if (missingStageArenaInventoryExport) {
+    vm.runInContext('delete window.__slippiSynctest.module._melee_web_synctest_stage_arena_inventory_query', context);
+  }
   context.__writeAuroraInventory = ordinal => {
     const wire = auroraWire({ordinal, mutation: auroraInventoryMutation});
     const target = vm.runInContext('heap', context);
@@ -800,10 +892,11 @@ async function censusServiceFixture({failedQuiescence = 0, rendererError = 0,
   }};
   const result = await runBrowserSample(page, 300, censusMapping, [4, 4], {
     arenaRange: {base: 14000, bytes: 100},
-    manifestRows: [auroraStorageRow(), row(15000, 1, 'source-c-static-candidate', 'service-fixture')],
+    manifestRows: [auroraStorageRow(), stageArenaDiagnosticRow(), row(15000, 1, 'source-c-static-candidate', 'service-fixture')],
     requireAudioInventory: true,
     requireMatchContextInventory: true,
     requireAuroraStagingShadowInventory,
+    requireStageArenaOwnerInventory,
   });
   return {result, baseline, calls: JSON.parse(vm.runInContext('JSON.stringify(calls)', context))};
 }
@@ -821,6 +914,230 @@ function mutateDiagnostics(result, mutate) {
   mutate(new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength));
   return {...result, drawDiagnostics: bytes.toString('base64')};
 }
+
+function validStageArenaCatalog({mutateRow = null, mutateFinal = null, manifestRows = null,
+  rowAddresses = [13000, 13200], audioRows = [], matchRows = [], auroraRanges = [],
+  nativeOutputRange = {base: 2048, bytes: 4272}, heapBytes = 16384} = {}) {
+  const metadata = decodedStageWire({ordinal: 0xffffffff});
+  const rows = rowAddresses.map((address, ordinal) => decodedStageWire({ordinal, address,
+    extent: ordinal === 0 ? 16 : 24,
+    ...(mutateRow === ordinal ? {identityToken: 1001} : {})}));
+  const finalMetadata = decodedStageWire({ordinal: 0xffffffff,
+    ...(mutateFinal ? {worldGenerationLow: 0x33445567} : {})});
+  const catalog = validateStageArenaOwnerCatalog(metadata, rows, finalMetadata, 11832,
+    manifestRows || [stageArenaDiagnosticRow(), row(15000, 1, 'source-c-static-candidate', 'fixture')],
+    {base: 14000, bytes: 100}, nativeOutputRange, heapBytes,
+    {rows: audioRows}, {rows: matchRows}, {ranges: auroraRanges});
+  return {metadata, rows, finalMetadata, catalog};
+}
+
+test('stage-arena owner wire validates a complete zero-row catalog and one exact-owner fixture catalog', () => {
+  const emptyMetadata = decodedStageWire({ordinal: 0xffffffff, allocationCount: 0,
+    totalBytes: 0});
+  const empty = validateStageArenaOwnerCatalog(emptyMetadata, [], emptyMetadata, 11832,
+    [stageArenaDiagnosticRow()], {base: 14000, bytes: 100}, {base: 2048, bytes: 4272},
+    16384, {rows: []}, {rows: []});
+  assert.equal(empty.rows.length, 0);
+  assert.equal(empty.ownerRestoreAdmission, false);
+  assert.equal(empty.completeGameState, false);
+
+  const {metadata, rows, finalMetadata, catalog} = validStageArenaCatalog();
+  assert.equal(metadata.metadata, true);
+  assert.deepEqual(rows.map(item => [item.ordinal, item.address, item.extent]),
+    [[0, 13000, 16], [1, 13200, 24]]);
+  assert.equal(finalMetadata.metadata, true);
+  assert.equal(catalog.diagnosticOutputStorage.wirePointer, 11832);
+  assert.equal(catalog.diagnosticOutputStorage.bytes, 96);
+  assert.equal(catalog.ownerRestoreAdmission, false);
+});
+
+test('stage-arena catalog permits PCM provenance alias but rejects stage and observer overlap with either view', () => {
+  const pcmManifest = pcmStaticManifestRow();
+  const manifestRows = [stageArenaDiagnosticRow(), pcmManifest,
+    row(15000, 1, 'source-c-static-candidate', 'fixture')];
+  const descriptor = {base: 854624, bytes: 4272};
+  const accepted = validStageArenaCatalog({manifestRows, nativeOutputRange: descriptor,
+    heapBytes: 1000000});
+  assert.equal(accepted.catalog.rows.length, 2);
+  assert.equal(accepted.catalog.diagnosticOutputStorage.bytes, 96);
+  assert.equal(accepted.catalog.ownerRestoreAdmission, false);
+  assert.equal(accepted.catalog.completeGameState, false);
+
+  // Keep each negative isolated so it proves the new stage/observer range is
+  // still checked against both independent PCM provenance descriptions.
+  assert.throws(() => validStageArenaCatalog({
+    manifestRows: [stageArenaDiagnosticRow(), pcmStaticManifestRow(13000)],
+    nativeOutputRange: descriptor, heapBytes: 1000000,
+  }), /overlaps static manifest range/);
+  assert.throws(() => validStageArenaCatalog({
+    manifestRows: [stageArenaDiagnosticRow(), pcmManifest],
+    nativeOutputRange: {base: 13000, bytes: 4272}, heapBytes: 1000000,
+  }), /overlaps native PCM diagnostic storage/);
+  assert.throws(() => validStageArenaCatalog({
+    manifestRows: [stageArenaDiagnosticRow(), pcmStaticManifestRow(8000)],
+    nativeOutputRange: descriptor, heapBytes: 1000000,
+  }), /diagnostic storage overlaps another owner: stage-arena diagnostic storage overlaps static manifest range/);
+  assert.throws(() => validStageArenaCatalog({
+    manifestRows: [stageArenaDiagnosticRow(), pcmManifest],
+    nativeOutputRange: {base: 8000, bytes: 4272}, heapBytes: 1000000,
+  }), /diagnostic storage overlaps another owner: stage-arena diagnostic storage overlaps native PCM diagnostic storage/);
+});
+
+test('stage-arena owner wire and catalog refuse malformed, partial, overlapping, or aliased rows', () => {
+  for (const mutation of ['version','size','status','kind','zero-generation','zero-identity',
+    'max-count','max-total','flags','reserved','metadata-row']) {
+    assert.throws(() => decodedStageWire({ordinal: 0xffffffff, mutation}), /Stage-arena owner wire/,
+      mutation);
+  }
+  assert.throws(() => decodedStageWire({ordinal: 0, address: 12000, extent: 16,
+    mutation: 'row-zero-extent'}), /ordinal or extent/);
+  assert.throws(() => decodedStageWire({ordinal: 0, address: 0xfffffff0, extent: 32,
+    mutation: 'row-overflow'}), /ordinal or extent/);
+  assert.throws(() => validateStageArenaOwnerCatalog(
+    decodedStageWire({ordinal: 0xffffffff}), [], decodedStageWire({ordinal: 0xffffffff}),
+    11832, [stageArenaDiagnosticRow()], {base: 14000, bytes: 100},
+    {base: 2048, bytes: 4272}, 16384, {rows: []}, {rows: []}), /catalog metadata, count/);
+  assert.throws(() => validStageArenaCatalog({mutateRow: 0}), /catalog row 0/);
+  assert.throws(() => validStageArenaCatalog({mutateFinal: true}), /catalog metadata/);
+  assert.throws(() => validStageArenaCatalog({rowAddresses: [13000]}), /catalog metadata, count/);
+  assert.throws(() => validStageArenaCatalog({rowAddresses: [13000, 13008]}), /overlap each other/);
+
+  for (const [manifestRows, message] of [
+    [[{...stageArenaDiagnosticRow(), input_section: '.bss.other'}], /one exact diagnostic manifest identity/],
+    [[{...stageArenaDiagnosticRow(), input_object: 'wrong.o'}], /one exact diagnostic manifest identity/],
+    [[stageArenaDiagnosticRow(), stageArenaDiagnosticRow(11900)], /one exact diagnostic manifest identity/],
+    [[{...stageArenaDiagnosticRow(), size: 95}], /diagnostic manifest identity/],
+    [[{...stageArenaDiagnosticRow(), address: 11801}], /diagnostic manifest identity/],
+    [[{...stageArenaDiagnosticRow(), decision: 'source-c-static-candidate'}], /diagnostic manifest identity/],
+    [[{...stageArenaDiagnosticRow(), exclusion_reason: 'wrong'}], /diagnostic manifest identity/],
+  ]) {
+    assert.throws(() => validStageArenaCatalog({manifestRows}), message);
+  }
+  for (const [rowAddresses, message] of [
+    [[15000, 13200], /overlaps static manifest range/],
+    [[14000, 13200], /overlaps gameplay arena/],
+    [[11832, 13200], /overlaps the diagnostic storage/],
+    [[2048, 13200], /overlaps native PCM diagnostic storage/],
+  ]) {
+    assert.throws(() => validStageArenaCatalog({rowAddresses}), message,
+      `row-address overlap control failed for ${JSON.stringify(rowAddresses)}`);
+  }
+  assert.throws(() => validStageArenaCatalog({rowAddresses: [9000, 13200],
+    audioRows: [{address: 9000, extent: 64}]}), /overlaps audio owner range/);
+  assert.throws(() => validStageArenaCatalog({rowAddresses: [12000, 13200],
+    matchRows: [{address: 12000, extent: 64}]}), /overlaps match-context owner range/);
+  assert.throws(() => validStageArenaCatalog({rowAddresses: [13200, 13300],
+    auroraRanges: [{address: 13200, extent: 64}]}), /overlaps Aurora staging-shadow range/);
+  assert.doesNotThrow(() => validStageArenaCatalog({rowAddresses: [13000, 13200],
+    audioRows: [{address: 9000, extent: 128}],
+    matchRows: [{address: 12000, extent: 64}]}));
+});
+
+test('stage-arena attribution requires all three identical catalogs and leaves every range unadmitted', () => {
+  const valid = validStageArenaCatalog();
+  const order = ['before-source-step','after-source-step','after-actual-draw-and-Aurora-quiescence'];
+  const boundaries = order.map(boundary => ({boundary, metadata: valid.metadata,
+    rows: valid.catalog.rows, diagnosticOutputStorage: valid.catalog.diagnosticOutputStorage}));
+  assert.deepEqual(requireStableStageArenaOwnerInventory(boundaries).map(row => row.ordinal), [0, 1]);
+  for (const mutation of ['generation','world','arena','token','extent','ordinal']) {
+    const changed = boundaries.map((item, index) => index === 2 ? {...item,
+      metadata: mutation === 'generation' ? {...item.metadata, worldGenerationLow: item.metadata.worldGenerationLow + 1} : item.metadata,
+      rows: mutation === 'world' ? item.rows.map((row, rowIndex) => rowIndex === 0 ? {...row, worldStorage: row.worldStorage + 1} : row) :
+        mutation === 'arena' ? item.rows.map((row, rowIndex) => rowIndex === 0 ? {...row, arenaStorage: row.arenaStorage + 1} : row) :
+        mutation === 'token' ? item.rows.map((row, rowIndex) => rowIndex === 0 ? {...row, identityToken: row.identityToken + 1} : row) :
+        mutation === 'extent' ? item.rows.map((row, rowIndex) => rowIndex === 0 ? {...row, extent: row.extent + 1} : row) :
+        mutation === 'ordinal' ? item.rows.map((row, rowIndex) => rowIndex === 0 ? {...row, ordinal: row.ordinal + 1} : row) : item.rows,
+    } : item);
+    assert.throws(() => requireStableStageArenaOwnerInventory(changed), /lifetime or complete ordered topology/,
+      mutation);
+  }
+  assert.throws(() => requireStableStageArenaOwnerInventory(boundaries.slice(0, 2)), /three complete ordered/);
+  const before = boundaries[0], after = boundaries[1];
+  const changedStage = classifyHeapRanges([{start: 13004, end: 13005}], [],
+    {base: 14000, bytes: 100}, null, null, null, null, {before, after});
+  assert.equal(changedStage[0].provenance, 'stage-arena-owner-range');
+  assert.equal(changedStage[0].ownerRestoreAdmission, false);
+  const changedDiagnostic = classifyHeapRanges([{start: 11835, end: 11836}],
+    [stageArenaDiagnosticRow()], {base: 14000, bytes: 100}, null, null, null, null,
+    {before, after});
+  assert.equal(changedDiagnostic[0].provenance, 'stage-arena-descriptor-diagnostic-excluded');
+  assert.equal(changedDiagnostic[0].ownerRestoreAdmission, false);
+  assert.throws(() => classifyHeapRanges([{start: 13004, end: 13005}], [],
+    {base: 14000, bytes: 100}, null, null, null, null, {before,
+      after: {...after, metadata: {...after.metadata, worldGenerationLow: 77}}}),
+  /same complete owner/);
+  assert.throws(() => classifyHeapRanges([{start: 13004, end: 13005}], [],
+    {base: 14000, bytes: 100}, null, null, null, null, {before,
+      after: {...after, rows: after.rows.map((item, index) => index === 0 ?
+        {...item, arenaStorage: item.arenaStorage + 1} : item)}}), /same complete owner/);
+});
+
+test('opt-in stage-arena census uses synchronous full catalogs at all three boundaries', async () => {
+  await assert.rejects(censusServiceFixture({requireStageArenaOwnerInventory: true,
+    missingStageArenaInventoryExport: true}), /Required stage-arena owner inventory export is unavailable/);
+  for (const [stageArenaInventoryFailureAt, boundary] of [[1, 'metadata'], [2, 'row 0'],
+    [5, 'metadata'], [9, 'metadata']]) {
+    await assert.rejects(censusServiceFixture({requireStageArenaOwnerInventory: true,
+      stageArenaInventoryFailureAt}), new RegExp(`Stage-arena owner inventory .* ${boundary} refused`));
+  }
+  const fixture = await censusServiceFixture({requireStageArenaOwnerInventory: true});
+  const census = fixture.result.heapCensus;
+  assert.equal(census.requireStageArenaOwnerInventory, true);
+  assert.equal(census.stageArenaOwnerInventory.ownerRestoreAdmission, false);
+  assert.equal(census.stageArenaOwnerInventory.completeGameState, false);
+  assert.equal(census.stageArenaOwnerInventory.stableOwnerLifetimeValidated, true);
+  assert.deepEqual([...census.stageArenaOwnerInventory.boundaryOrder], [
+    'before-source-step','after-source-step','after-actual-draw-and-Aurora-quiescence']);
+  assert.ok(census.stageArenaOwnerInventory.boundaries.every(boundary =>
+    boundary.rows.length === 2 && boundary.metadata.allocationCount === 2 &&
+    boundary.metadata.totalBytes === 40 && boundary.diagnosticOutputStorage.bytes === 96 &&
+    boundary.ownerRestoreAdmission === false && boundary.completeGameState === false));
+  assert.ok(census.sourceStep.changedRanges.some(range =>
+    range.start === 13004 && range.provenance === 'stage-arena-owner-range' &&
+    range.ownerRestoreAdmission === false));
+  assert.ok([...census.sourceStep.changedRanges, ...census.actualDrawAndQuiescence.changedRanges]
+    .every(range => range.ownerRestoreAdmission === false));
+  const calls = fixture.calls.map(call => call.identifier);
+  const firstQuery = calls.indexOf('stage-arena-query:4294967295');
+  assert.deepEqual(calls.slice(firstQuery, firstQuery + 4), [
+    'stage-arena-query:4294967295','stage-arena-query:0','stage-arena-query:1',
+    'stage-arena-query:4294967295']);
+  assert.equal(calls.filter(name => name === 'stage-arena-query:4294967295').length, 6);
+  assert.equal(calls.filter(name => name === 'stage-arena-query:0').length, 3);
+  assert.equal(calls.filter(name => name === 'stage-arena-query:1').length, 3);
+});
+
+test('stage-arena census rejects malformed rows, changed lifetime/topology, and cross-owner overlaps', async () => {
+  for (const stageArenaInventoryMutation of ['malformed','generation','world','arena','token',
+    'count','total','row-topology']) {
+    await assert.rejects(censusServiceFixture({requireStageArenaOwnerInventory: true,
+      stageArenaInventoryMutation}), /Stage-arena/);
+  }
+  for (const stageArenaInventoryMutation of ['row-overlap','static-overlap','arena-overlap',
+    'audio-overlap','context-overlap','observer-overlap','output-overlap']) {
+    await assert.rejects(censusServiceFixture({requireStageArenaOwnerInventory: true,
+      stageArenaInventoryMutation}), /Stage-arena/, stageArenaInventoryMutation);
+  }
+  const ordinary = await censusServiceFixture({missingStageArenaInventoryExport: true});
+  assert.equal(ordinary.calls.some(call => call.identifier.startsWith('stage-arena-query:')), false);
+  assert.equal(ordinary.result.heapCensus.requireStageArenaOwnerInventory, false);
+});
+
+test('stable stage-arena inventory with zero source-step intersection is a valid provenance measurement', async () => {
+  const fixture = await censusServiceFixture({requireStageArenaOwnerInventory: true,
+    stageArenaInventoryMutation: 'zero-source-step'});
+  const inventory = fixture.result.heapCensus.stageArenaOwnerInventory;
+  assert.equal(inventory.stableOwnerLifetimeValidated, true);
+  assert.equal(inventory.ownerRestoreAdmission, false);
+  assert.equal(inventory.boundaries.length, 3);
+  assert.ok(inventory.boundaries.every(boundary =>
+    boundary.rows.length === boundary.metadata.allocationCount));
+  assert.equal(fixture.result.heapCensus.sourceStep.changedRanges.some(range =>
+    range.provenance === 'stage-arena-owner-range'), false);
+  assert.ok(fixture.result.heapCensus.sourceStep.changedRanges.length > 0);
+  assert.equal(fixture.result.heapCensus.actualDrawAndQuiescence.changedRanges.some(range =>
+    range.provenance === 'stage-arena-owner-range'), false);
+});
 
 test('actual census evaluate branch retains three boundaries and positive sample-300 draw paths', async () => {
   const fixture = await censusServiceFixture();

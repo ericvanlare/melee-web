@@ -1,9 +1,34 @@
 #pragma once
 #include "native_dat.h"
 #include "dat_archive.hpp"
+#include <cstdint>
 #include <memory>
 #include <vector>
 namespace melee_web {
+inline constexpr std::size_t native_dat_allocation_count_max = 65536;
+inline constexpr std::size_t native_dat_allocation_bytes_max = 32U * 1024U * 1024U;
+
+enum class NativeDatAllocationVisitStatus : std::uint32_t {
+    InvalidOwner = 0,
+    Complete = 1,
+    InvalidArgument = 2,
+    Aborted = 3,
+};
+
+struct NativeDatAllocationRange {
+    std::size_t ordinal = 0;
+    const void* address = nullptr;
+    std::size_t bytes = 0;
+};
+
+struct NativeDatAllocationInventory {
+    NativeDatAllocationVisitStatus status = NativeDatAllocationVisitStatus::InvalidOwner;
+    const void* arena_storage = nullptr;
+    const void* identity_token = nullptr;
+    std::size_t allocation_count = 0;
+    std::size_t total_bytes = 0;
+    std::size_t visited_count = 0;
+};
 struct NativeDatSourceRegion {
     std::uint32_t source_data_address = 0;
     std::shared_ptr<const DatArchive> archive;
@@ -41,6 +66,10 @@ public:
     NativeDatArena(const NativeDatArena&) = delete;
     NativeDatArena& operator=(const NativeDatArena&) = delete;
     const MeleeWebNativeDat* reader() const noexcept;
+    [[nodiscard]] NativeDatAllocationInventory visit_owned_allocations(
+        std::size_t first, std::size_t count,
+        bool (*visitor)(const NativeDatAllocationRange&, void*) noexcept,
+        void* context) const noexcept;
     [[nodiscard]] Checkpoint checkpoint() const;
     [[nodiscard]] bool can_restore(const Checkpoint&) const noexcept;
     // Validates every region before writing any bytes. No allocation occurs on

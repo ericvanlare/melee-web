@@ -21,6 +21,16 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <limits>
+
+#if defined(MELEE_WEB_STAGE_ARENA_OWNER_INVENTORY)
+extern "C" {
+__attribute__((used, section(".bss.melee_web_synctest_stage_arena_diagnostic_storage"), aligned(4)))
+uint32_t melee_web_synctest_stage_arena_diagnostic_storage[24]{};
+}
+static_assert(sizeof(melee_web_synctest_stage_arena_diagnostic_storage) == 96,
+              "Stage-arena diagnostic storage must remain exactly 96 bytes");
+#endif
 
 static_assert(offsetof(MeleeWebMatchStats, player_slot) == 136,
               "v2 observation player-slot decoder offset changed");
@@ -158,6 +168,54 @@ bool wire_u32(const void *pointer, uint32_t &value)
     value = static_cast<uint32_t>(address);
     return true;
 }
+
+#if defined(MELEE_WEB_STAGE_ARENA_OWNER_INVENTORY)
+struct StageArenaPreflight {
+    uint32_t next_ordinal = 0;
+    uint64_t total_bytes = 0;
+    uint64_t diagnostic_begin = 0;
+    uint64_t diagnostic_end = 0;
+    bool valid = true;
+};
+
+bool stage_arena_preflight_row(const melee_web::NativeDatAllocationRange& row,
+                               void* context) noexcept
+{
+    auto* const preflight = static_cast<StageArenaPreflight*>(context);
+    if (!preflight || !preflight->valid || row.ordinal != preflight->next_ordinal ||
+        !row.address || !row.bytes || row.bytes > UINT32_MAX) {
+        if (preflight) preflight->valid = false;
+        return false;
+    }
+    uint32_t address = 0;
+    if (!wire_u32(row.address, address) ||
+        static_cast<uint64_t>(row.bytes) > (uint64_t{1} << 32) - address ||
+        row.bytes > melee_web::native_dat_allocation_bytes_max - preflight->total_bytes) {
+        preflight->valid = false;
+        return false;
+    }
+    const uint64_t end = static_cast<uint64_t>(address) + row.bytes;
+    if (address < preflight->diagnostic_end && preflight->diagnostic_begin < end) {
+        preflight->valid = false;
+        return false;
+    }
+    preflight->total_bytes += row.bytes;
+    ++preflight->next_ordinal;
+    return true;
+}
+
+bool stage_arena_wire_anchor_matches(const uint32_t* anchor,
+                                    const melee_web::GameplayWorldStageArenaInventory& owner,
+                                    uint32_t world_address, uint32_t arena_address,
+                                    uint32_t token_address) noexcept
+{
+    return anchor[0] == 1 && anchor[1] == static_cast<uint32_t>(owner.world_generation) &&
+        anchor[2] == static_cast<uint32_t>(owner.world_generation >> 32) &&
+        anchor[3] == world_address && anchor[4] == arena_address &&
+        anchor[5] == token_address && anchor[6] == owner.arena.allocation_count &&
+        anchor[7] == owner.arena.total_bytes;
+}
+#endif
 
 int capture_audio_range(const MeleeWebAudioOwnedRange *range, void *context)
 {
@@ -350,6 +408,123 @@ EMSCRIPTEN_KEEPALIVE int melee_web_synctest_match_context_range_inventory_query(
     }
     return 1;
 }
+
+#if defined(MELEE_WEB_STAGE_ARENA_OWNER_INVENTORY)
+EMSCRIPTEN_KEEPALIVE const void *melee_web_synctest_stage_arena_inventory_query(
+    uint32_t index)
+{
+#if defined(__EMSCRIPTEN_PTHREADS__)
+    (void)index;
+    return nullptr;
+#else
+    constexpr uint32_t metadata_index = UINT32_MAX;
+    constexpr uint32_t wire_words = 16;
+    constexpr uint32_t anchor_words = 8;
+    constexpr uint32_t owner_kind_stage_arena = 1;
+    constexpr size_t diagnostic_bytes = 96;
+    auto* const storage = melee_web_synctest_stage_arena_diagnostic_storage;
+    auto* const anchor = storage;
+    auto* const wire = storage + anchor_words;
+    uint32_t wire_address = 0, storage_address = 0, anchor_end = 0;
+    if (!wire_u32(storage, storage_address) ||
+        static_cast<uint64_t>(storage_address) + diagnostic_bytes >= (uint64_t{1} << 32) ||
+        !wire_u32(wire, wire_address) || wire_address != storage_address + 32u)
+        return nullptr;
+    anchor_end = static_cast<uint32_t>(static_cast<uint64_t>(storage_address) + diagnostic_bytes);
+
+    if (!match) return nullptr;
+    if (index == metadata_index) {
+        StageArenaPreflight preflight{};
+        preflight.diagnostic_begin = storage_address;
+        preflight.diagnostic_end = anchor_end;
+        auto owner = match->diagnostic_stage_arena_allocations(
+            0, 0, nullptr, nullptr);
+        if (owner.status != melee_web::NativeDatAllocationVisitStatus::Complete ||
+            !owner.world_generation || !owner.world_storage ||
+            !owner.arena.arena_storage || !owner.arena.identity_token ||
+            owner.arena.allocation_count > melee_web::native_dat_allocation_count_max ||
+            owner.arena.total_bytes > melee_web::native_dat_allocation_bytes_max)
+            return nullptr;
+        uint32_t world_address = 0, arena_address = 0, token_address = 0;
+        if (!wire_u32(owner.world_storage, world_address) ||
+            !wire_u32(owner.arena.arena_storage, arena_address) ||
+            !wire_u32(owner.arena.identity_token, token_address)) return nullptr;
+        preflight.next_ordinal = 0;
+        if (owner.arena.allocation_count != 0) {
+            owner = match->diagnostic_stage_arena_allocations(
+                0, owner.arena.allocation_count, stage_arena_preflight_row, &preflight);
+            if (owner.status != melee_web::NativeDatAllocationVisitStatus::Complete ||
+                !preflight.valid || preflight.next_ordinal != owner.arena.allocation_count ||
+                preflight.total_bytes != owner.arena.total_bytes) return nullptr;
+        }
+        auto verify = match->diagnostic_stage_arena_allocations(0, 0, nullptr, nullptr);
+        if (verify.status != melee_web::NativeDatAllocationVisitStatus::Complete ||
+            verify.world_generation != owner.world_generation ||
+            verify.world_storage != owner.world_storage ||
+            verify.arena.arena_storage != owner.arena.arena_storage ||
+            verify.arena.identity_token != owner.arena.identity_token ||
+            verify.arena.allocation_count != owner.arena.allocation_count ||
+            verify.arena.total_bytes != owner.arena.total_bytes) return nullptr;
+        bool empty_anchor = anchor[0] == 0;
+        if (empty_anchor) {
+            for (uint32_t index = 1; index < anchor_words; ++index) {
+                if (anchor[index] != 0) return nullptr;
+            }
+        } else if (!stage_arena_wire_anchor_matches(
+                       anchor, owner, world_address, arena_address, token_address)) {
+            return nullptr;
+        }
+        uint32_t next_anchor[anchor_words] = {
+            1u, static_cast<uint32_t>(owner.world_generation),
+            static_cast<uint32_t>(owner.world_generation >> 32), world_address,
+            arena_address, token_address,
+            static_cast<uint32_t>(owner.arena.allocation_count),
+            static_cast<uint32_t>(owner.arena.total_bytes)};
+        uint32_t next_wire[wire_words] = {
+            1u, 64u, 1u, owner_kind_stage_arena,
+            next_anchor[1], next_anchor[2], world_address, arena_address,
+            token_address, next_anchor[6], next_anchor[7], metadata_index, 0u, 0u, 0u, 0u};
+        if (empty_anchor) std::memcpy(anchor, next_anchor, sizeof(next_anchor));
+        std::memcpy(wire, next_wire, sizeof(next_wire));
+        return wire;
+    }
+
+    if (anchor[0] != 1 || index >= anchor[6]) return nullptr;
+    struct OneRow { melee_web::NativeDatAllocationRange value{}; bool seen = false; };
+    OneRow observed{};
+    const auto one_row = [](const melee_web::NativeDatAllocationRange& row,
+                            void* context) noexcept -> bool {
+        auto* const captured = static_cast<OneRow*>(context);
+        if (!captured || captured->seen) return false;
+        captured->value = row;
+        captured->seen = true;
+        return true;
+    };
+    auto owner = match->diagnostic_stage_arena_allocations(index, 1, one_row, &observed);
+    if (owner.status != melee_web::NativeDatAllocationVisitStatus::Complete ||
+        !observed.seen || owner.world_generation == 0 || !owner.world_storage ||
+        !owner.arena.arena_storage || !owner.arena.identity_token) return nullptr;
+    uint32_t world_address = 0, arena_address = 0, token_address = 0, allocation_address = 0;
+    if (!wire_u32(owner.world_storage, world_address) ||
+        !wire_u32(owner.arena.arena_storage, arena_address) ||
+        !wire_u32(owner.arena.identity_token, token_address) ||
+        !wire_u32(observed.value.address, allocation_address) || !observed.value.bytes ||
+        observed.value.bytes > UINT32_MAX ||
+        static_cast<uint64_t>(observed.value.bytes) > (uint64_t{1} << 32) - allocation_address ||
+        (allocation_address < anchor_end && storage_address <
+         static_cast<uint64_t>(allocation_address) + observed.value.bytes) ||
+        !stage_arena_wire_anchor_matches(anchor, owner, world_address, arena_address, token_address) ||
+        observed.value.ordinal != index) return nullptr;
+    uint32_t next_wire[wire_words] = {
+        1u, 64u, 1u, owner_kind_stage_arena,
+        anchor[1], anchor[2], world_address, arena_address, token_address,
+        anchor[6], anchor[7], index, allocation_address,
+        static_cast<uint32_t>(observed.value.bytes), 0u, 0u};
+    std::memcpy(wire, next_wire, sizeof(next_wire));
+    return wire;
+#endif
+}
+#endif
 
 EMSCRIPTEN_KEEPALIVE const void *melee_web_synctest_draw_diagnostics(void)
 {

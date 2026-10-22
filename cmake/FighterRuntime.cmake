@@ -524,6 +524,8 @@ endif()
 # Isolated two-lane profile synctest: the Node module snapshots/restores only a
 # no-draw source heap; the browser module runs the same source profile with a
 # real Aurora WebGPU draw reference and never restores renderer state.
+option(MELEE_WEB_STAGE_ARENA_OWNER_INVENTORY
+  "Expose the private read-only stage-arena allocation inventory in the Slippi synctest" OFF)
 set(MELEE_WEB_SLIPPI_SYNCTEST_ASSET_ROOT
   "${CMAKE_CURRENT_SOURCE_DIR}/assets-local/snapshot-mario" CACHE PATH
   "Ignored local source fixture for the drawn-reference/no-draw Slippi synctest")
@@ -608,6 +610,13 @@ if(MELEE_WEB_SLIPPI_SYNCTEST)
     MELEE_WEB_SNAPSHOT_PROBE_SHA256="${GAMEPLAY_SNAPSHOT_PROBE_SHA256}"
     MELEE_WEB_SNAPSHOT_RNG_PROFILE_SHA256="${MELEE_WEB_SNAPSHOT_RNG_PROFILE_SHA256}"
     MELEE_WEB_SNAPSHOT_STAGE_KIND_BRIDGE_SHA256="${MELEE_WEB_SNAPSHOT_STAGE_KIND_BRIDGE_SHA256}")
+  if(MELEE_WEB_STAGE_ARENA_OWNER_INVENTORY)
+    if(NOT MELEE_WEB_SLIPPI_SYNCTEST OR NOT CMAKE_BUILD_TYPE STREQUAL "Release")
+      message(FATAL_ERROR "Stage-arena owner inventory requires the private Release Slippi synctest diagnostic")
+    endif()
+    target_compile_definitions(gameplay_slippi_synctest_browser PRIVATE
+      MELEE_WEB_STAGE_ARENA_OWNER_INVENTORY=1)
+  endif()
   if(MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY)
     if(NOT MELEE_WEB_SLIPPI_SYNCTEST OR NOT MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC OR
         NOT CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -624,6 +633,10 @@ if(MELEE_WEB_SLIPPI_SYNCTEST)
   if(MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY)
     string(APPEND _synctest_browser_exports
       ",_melee_web_synctest_aurora_staging_shadow_inventory_query")
+  endif()
+  if(MELEE_WEB_STAGE_ARENA_OWNER_INVENTORY)
+    string(APPEND _synctest_browser_exports
+      ",_melee_web_synctest_stage_arena_inventory_query")
   endif()
   # SDL3 replaces Module.requestFullscreen when creating/destroying its window.
   # Export the real helper so ASSERTIONS=2 does not install a getter-only trap.

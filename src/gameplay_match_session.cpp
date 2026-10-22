@@ -592,6 +592,21 @@ MeleeWebMatchContextRangeResult GameplayMatchSession::diagnostic_match_context_r
     }
     return melee_web_match_context_range_read(storage_->match,range,error,size);
 }
+GameplayWorldStageArenaInventory GameplayMatchSession::diagnostic_stage_arena_allocations(
+    std::size_t first, std::size_t count,
+    bool (*visitor)(const NativeDatAllocationRange&, void*) noexcept,
+    void* context) const noexcept {
+    if (!storage_ || !storage_->match || !storage_->world ||
+        storage_->construction_phase != 5) return {};
+    GameplayWorld* const world = storage_->world.get();
+    auto result = world->diagnostic_stage_arena_allocations(first, count, visitor, context);
+    if (storage_.get() == nullptr || !storage_->match ||
+        storage_->construction_phase != 5 || storage_->world.get() != world ||
+        result.status != NativeDatAllocationVisitStatus::Complete) {
+        result.status = NativeDatAllocationVisitStatus::InvalidOwner;
+    }
+    return result;
+}
 bool GameplayMatchSession::advance_construction(){return storage_&&storage_->advance_construction();}
 bool GameplayMatchSession::construction_complete()const{return storage_&&storage_->construction_phase==5;}
 }

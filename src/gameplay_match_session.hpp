@@ -63,6 +63,10 @@ public:
     MeleeWebAudio* audio() const;
     MeleeWebMatchContextRangeResult diagnostic_match_context_range(
         MeleeWebMatchContextRange*,char*,size_t) const;
+    [[nodiscard]] GameplayWorldStageArenaInventory diagnostic_stage_arena_allocations(
+        std::size_t first, std::size_t count,
+        bool (*visitor)(const NativeDatAllocationRange&, void*) noexcept,
+        void* context) const noexcept;
     bool advance_construction();
     bool construction_complete() const;
     void close();
