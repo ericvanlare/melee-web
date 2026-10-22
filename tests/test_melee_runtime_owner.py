@@ -310,6 +310,379 @@ int main() {{
                              executed.stdout + executed.stderr)
             self.assertIn("native lifecycle handoff fixture passed", executed.stdout)
 
+    def test_startup_ownerless_idle_present_requires_completed_clear_and_exact_guard(self):
+        source = menu_browser_source()
+        present_begin = source.index("const auto present_source_impl=[&](){")
+        present_end = source.index("const auto present_source=[&](){", present_begin)
+        presenter = source[present_begin:present_end]
+        self.assertEqual(presenter.count("record_startup_ownerless_present(frame_began,drew_source);"), 1)
+        self.assertLess(presenter.index("const bool frame_began=aurora_begin_frame();"),
+                        presenter.index("GXSetCopyClear(GXColor{0,0,0,255},GX_MAX_Z24);"))
+        self.assertLess(presenter.index("aurora_end_frame();"),
+                        presenter.index("record_startup_ownerless_present(frame_began,drew_source);"))
+        self.assertLess(presenter.index("check(drawn,error);"),
+                        presenter.index("record_startup_ownerless_present(frame_began,drew_source);"))
+
+        main = source[source.index("int main(int argc,char** argv){"):]
+        self.assertLess(main.index("startup_ownerless_present_submitted=false;"),
+                        main.index("aurora_initialize(argc,argv,&config);"))
+        fallback_begin = source.index("const bool startup_fallback_preparation_draws_source=")
+        fallback_end = source.index("if(!first_css_draw_terminal&&preparation.warming()", fallback_begin)
+        fallback = source[fallback_begin:fallback_end]
+        self.assertIn("source_frames.steps()==0", fallback)
+        self.assertIn("source_frames.draws(),source_frames.pending()", fallback)
+        self.assertIn("if(!hold_startup_ownerless_present)present_source();", fallback)
+        self.assertLess(source.index("source_frames.finish(present_source);"), fallback_begin,
+                        "source-frame-owned presentations stay on their original path")
+
+        allowed_begin = source.index("bool startup_pipeline_service_allowed(){")
+        forward = source.index("void schedule_startup_pipeline_service();", allowed_begin)
+        allowed = source[allowed_begin:forward]
+        scope_begin = source.index("bool startup_ownerless_present_scope(){", forward)
+        record_begin = source.index("void record_startup_ownerless_present(", scope_begin)
+        scope = source[scope_begin:record_begin]
+        hold_begin = source.index("bool should_hold_ownerless_startup_present(", record_begin)
+        record = source[record_begin:hold_begin]
+        idle_begin = source.index("bool should_hold_startup_idle_fallback(", hold_begin)
+        hold = source[hold_begin:idle_begin]
+        idle_end = source.index("#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)", idle_begin)
+        idle = source[idle_begin:idle_end]
+
+        compiler_name = os.environ.get("CXX", "clang++")
+        compiler_words = shlex.split(compiler_name)
+        compiler = shutil.which(compiler_words[0]) if compiler_words else None
+        if compiler is None:
+            compiler = shutil.which("clang++") or shutil.which("g++")
+        if compiler is None:
+            self.skipTest("no C++ compiler is available for the native startup guard fixture")
+        fixture = r'''#include <cstdint>
+#include <iostream>
+
+bool world=false,match=false,results=false,prize=false,host=false;
+bool running=false,pending=false,scoped_assets=false,scoped_disc_import=false;
+bool asset_committed=false,faulted=false,source_session_owned=false;
+struct RuntimeFiles { bool nonempty=false; bool empty()const{return !nonempty;} } files;
+enum class AssetDestination { None, Other };
+AssetDestination asset_destination=AssetDestination::None;
+struct AssetScope { uint32_t generation=0; uint32_t pending_generation()const{return generation;} } asset_scope;
+struct Preparation { bool busy_value=false,source_draw=false;
+ bool busy()const{return busy_value;}
+ bool preparation_draws_source()const{return source_draw;}
+} preparation;
+struct AuroraStats { unsigned queuedPipelines=0; } stats;
+bool stats_available=true,graphics_startup_terminal=false;
+bool startup_pipeline_service_failed=false,startup_ownerless_present_submitted=false;
+const AuroraStats* aurora_get_stats(){return stats_available?&stats:nullptr;}
+@ALLOWED@
+@SCOPE@
+@RECORD@
+@HOLD@
+@IDLE@
+bool require(bool value,const char* label){
+ if(value)return true;
+ std::cerr<<"failed control: "<<label<<"\n";return false;
+}
+#define REQUIRE(value,label) do{if(!require((value),(label)))return 1;}while(false)
+void reset_scope(){
+ world=match=results=prize=host=running=pending=scoped_assets=scoped_disc_import=false;
+ asset_committed=faulted=source_session_owned=false;files.nonempty=false;
+ asset_destination=AssetDestination::None;asset_scope.generation=0;
+ preparation.busy_value=false;preparation.source_draw=false;
+ stats_available=true;stats.queuedPipelines=12;
+ graphics_startup_terminal=false;startup_pipeline_service_failed=false;
+}
+int main(){
+ reset_scope();
+ REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,false),"no initial clear means no hold");
+ record_startup_ownerless_present(false,false);
+ REQUIRE(!startup_ownerless_present_submitted,"a failed begin does not satisfy initial present");
+ record_startup_ownerless_present(true,true);
+ REQUIRE(!startup_ownerless_present_submitted,"a source-owned draw does not satisfy initial present");
+ scoped_disc_import=true;record_startup_ownerless_present(true,false);
+ REQUIRE(!startup_ownerless_present_submitted,"disc-scoped clear does not satisfy pre-disc initial present");
+ scoped_disc_import=false;record_startup_ownerless_present(true,false);
+ REQUIRE(startup_ownerless_present_submitted,"successful ownerless clear is recorded");
+ REQUIRE(should_hold_startup_idle_fallback(false,true,0,0,false),"only repeated empty idle fallback is held");
+ REQUIRE(!should_hold_startup_idle_fallback(true,true,0,0,false),"source-preparation draw keeps original presentation");
+ REQUIRE(!should_hold_startup_idle_fallback(false,false,0,0,false),"non-ownerless path keeps original presentation");
+ REQUIRE(!should_hold_startup_idle_fallback(false,true,1,0,false),"source step keeps presentation");
+ REQUIRE(!should_hold_startup_idle_fallback(false,true,0,1,false),"source draw keeps presentation");
+ REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,true),"pending source frame keeps presentation");
+ stats.queuedPipelines=0;
+ REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,false),"empty queue restores original fallback");
+ stats.queuedPipelines=12;stats_available=false;
+ REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,false),"missing stats refuse suppression");
+ stats_available=true;
+ graphics_startup_terminal=true;
+ REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,false),"terminal cache state restores fallback");
+ graphics_startup_terminal=false;startup_pipeline_service_failed=true;
+ REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,false),"failed service refuses suppression");
+ startup_pipeline_service_failed=false;
+ bool* exclusions[]={&world,&match,&results,&prize,&host,&source_session_owned,&running,&pending,&scoped_assets,&faulted};
+ const char* names[]={"world","match","results","prize","host","source session","running","pending","scoped assets","fault"};
+ for(unsigned i=0;i<sizeof(exclusions)/sizeof(exclusions[0]);++i){
+  *exclusions[i]=true;
+  REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,false),names[i]);
+  *exclusions[i]=false;
+ }
+ preparation.busy_value=true;
+ REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,false),"preparation busy refuses suppression");
+ preparation.busy_value=false;
+ scoped_disc_import=true;
+ REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,false),"scoped disc import refuses suppression");
+ scoped_disc_import=false;files.nonempty=true;
+ REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,false),"active files refuse suppression");
+ files.nonempty=false;asset_destination=AssetDestination::Other;
+ REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,false),"asset destination refuses suppression");
+ asset_destination=AssetDestination::None;asset_scope.generation=1;
+ REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,false),"pending asset generation refuses suppression");
+ asset_scope.generation=0;asset_committed=true;
+ REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,false),"committed asset scope refuses suppression");
+ startup_ownerless_present_submitted=false;
+ REQUIRE(!should_hold_startup_idle_fallback(false,true,0,0,false),"renderer reset requires a new initial present");
+ std::cout<<"ownerless startup presentation controls passed\n";
+}
+'''
+        fixture = (fixture.replace("@ALLOWED@", allowed)
+                          .replace("@SCOPE@", scope)
+                          .replace("@RECORD@", record)
+                          .replace("@HOLD@", hold)
+                          .replace("@IDLE@", idle))
+        with tempfile.TemporaryDirectory(prefix="melee-startup-idle-present-") as directory:
+            directory = Path(directory)
+            fixture_path = directory / "startup_idle_present_fixture.cpp"
+            binary_path = directory / "startup_idle_present_fixture"
+            fixture_path.write_text(fixture)
+            command = [compiler, *compiler_words[1:], "-std=c++17", "-Wall", "-Wextra",
+                       "-Werror", str(fixture_path), "-o", str(binary_path)]
+            compiled = subprocess.run(command, capture_output=True, text=True, timeout=30)
+            self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+            executed = subprocess.run([str(binary_path)], capture_output=True, text=True,
+                                      timeout=10)
+            self.assertEqual(executed.returncode, 0, executed.stdout + executed.stderr)
+            self.assertIn("ownerless startup presentation controls passed", executed.stdout)
+
+    def test_startup_ownerless_fallback_dispatch_composes_with_seed_service(self):
+        source = menu_browser_source()
+        allowed_begin = source.index("bool startup_pipeline_service_allowed(){")
+        forward = source.index("void schedule_startup_pipeline_service();", allowed_begin)
+        allowed = source[allowed_begin:forward]
+        service_end = source.index("void service_render_cache_writes(){", forward)
+        service = source[forward:service_end]
+        service, replacements = re.subn(
+            r"dispatch_startup_pipeline_service_at_asyncify_idle\(\s*"
+            r"reinterpret_cast<uintptr_t>\(startup_pipeline_service_callback\),\s*"
+            r"kStartupPipelineServiceDelayMs\);",
+            "emscripten_async_call(startup_pipeline_service_callback,nullptr,"
+            "kStartupPipelineServiceDelayMs);",
+            service)
+        self.assertEqual(replacements, 1)
+        stop_query = "EM_ASM_INT({return window.menuOwnerStopped?.()?1:0;})"
+        self.assertEqual(service.count(stop_query), 2)
+        service = service.replace(stop_query, "owner_stopped")
+
+        fallback_begin = source.index("const bool startup_fallback_preparation_draws_source=")
+        fallback_end = source.index("if(!first_css_draw_terminal&&preparation.warming()", fallback_begin)
+        fallback = source[fallback_begin:fallback_end]
+        finish_line = "  source_frames.finish(present_source);"
+        finish_pos = source.rfind(finish_line, 0, fallback_begin)
+        self.assertGreater(finish_pos, source.index("#else", source.index("source_frames_finish_begin")))
+        begin_line = " source_frames.begin_callback();"
+        begin_pos = source.rfind(begin_line, 0, finish_pos)
+        self.assertGreater(begin_pos, 0)
+        schedule_pos = source.index(" schedule_startup_pipeline_service();", fallback_end)
+        schedule_line = source[schedule_pos:schedule_pos + len(" schedule_startup_pipeline_service();")]
+        self.assertLess(fallback_end, schedule_pos)
+        self.assertNotRegex(fallback, r"\breturn\s*;")
+        self.assertIn("if(!hold_startup_ownerless_present)present_source();", fallback)
+        self.assertIn("source_frames.steps()==0", fallback)
+        self.assertIn("source_frames.draws(),source_frames.pending()", fallback)
+
+        scope_begin = source.index("bool startup_ownerless_present_scope(){", forward)
+        scope_end = source.index("#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)",
+                                 source.index("bool should_hold_startup_idle_fallback(", scope_begin))
+        scope_helpers = source[scope_begin:scope_end]
+        compiler_name = os.environ.get("CXX", "clang++")
+        compiler_words = shlex.split(compiler_name)
+        compiler = shutil.which(compiler_words[0]) if compiler_words else None
+        if compiler is None:
+            compiler = shutil.which("clang++") or shutil.which("g++")
+        if compiler is None:
+            self.skipTest("no C++ compiler is available for the fallback dispatch fixture")
+        delay_line = next(line for line in source.splitlines()
+                          if "constexpr int kStartupPipelineServiceDelayMs=" in line)
+        fixture = r"""#include <algorithm>
+#include <cstdint>
+#include <deque>
+#include <iostream>
+#include <vector>
+#include "source_frame_sequence.hpp"
+bool world=false,match=false,results=false,prize=false,host=false;
+bool running=false,pending=false,scoped_assets=false,scoped_disc_import=false;
+bool faulted=false,source_session_owned=false,asset_committed=false;
+struct RuntimeFiles { bool nonempty=false; bool empty()const{return !nonempty;} } files;
+enum class AssetDestination { None, Other };
+AssetDestination asset_destination=AssetDestination::None;
+struct AssetScope { uint32_t generation=0;uint32_t pending_generation()const{return generation;} } asset_scope;
+struct Preparation {
+ bool busy_value=false,source_draw=false;
+ bool busy()const{return busy_value;}
+ bool preparation_draws_source()const{return source_draw;}
+} preparation;
+struct AuroraStats { unsigned queuedPipelines=0; } stats;
+bool stats_available=true,graphics_startup_terminal=false,first_css_draw_terminal=false;
+bool startup_ownerless_present_submitted=false;
+bool startup_pipeline_service_scheduled=false,startup_pipeline_service_failed=false;
+bool owner_stopped=false,service_ok=true,service_reenter=false,stop_after_service=false;
+std::deque<unsigned> seed_rows;
+std::vector<unsigned> serviced_rows;
+unsigned service_calls=0,present_calls=0,begin_calls=0,clear_calls=0,end_calls=0,checked_calls=0;
+bool begin_succeeds=true,next_present_draws_source=false;
+melee_web::SourceFrameSequence source_frames;
+const AuroraStats* aurora_get_stats(){return stats_available?&stats:nullptr;}
+struct Timer { void (*callback)(void*);void* argument;int delay_ms; };
+std::vector<Timer> timers;
+void emscripten_async_call(void(*callback)(void*),void* argument,int delay_ms){
+ timers.push_back({callback,argument,delay_ms});
+}
+void schedule_startup_pipeline_service();
+bool aurora_pipeline_service_preparation(){
+ ++service_calls;
+ if(service_reenter)schedule_startup_pipeline_service();
+ if(!service_ok)return false;
+ for(unsigned i=0;i<5&&!seed_rows.empty();++i){
+  serviced_rows.push_back(seed_rows.front());seed_rows.pop_front();
+ }
+ stats.queuedPipelines=static_cast<unsigned>(seed_rows.size());
+ if(stop_after_service)owner_stopped=true;
+ return true;
+}
+@DELAY@
+@ALLOWED@
+@SERVICE@
+@SCOPE_HELPERS@
+bool present_source(){
+ ++present_calls;
+ if(!begin_succeeds)return false; // failed begin never reaches production's record call
+ ++begin_calls;++clear_calls;
+ const bool drew_source=next_present_draws_source;next_present_draws_source=false;
+ ++end_calls;++checked_calls;
+ record_startup_ownerless_present(true,drew_source); // production calls this after end/check
+ return drew_source;
+}
+void tick_dispatch(bool source_tick=false){
+ @BEGIN_LINE@
+ if(source_tick)source_frames.did_step(); // represents the actual source step before finish
+ @FINISH_LINE@
+ @FALLBACK@
+ @SCHEDULE_LINE@
+}
+bool run_timer(){
+ if(timers.size()!=1)return false;
+ const Timer timer=timers.front();timers.erase(timers.begin());
+ timer.callback(timer.argument);return true;
+}
+bool require(bool value,const char* label){
+ if(value)return true;std::cerr<<"failed dispatch control: "<<label<<"\n";return false;
+}
+#define REQUIRE(value,label) do{if(!require((value),(label)))return 1;}while(false)
+void reset_ownerless(){
+ world=match=results=prize=host=running=pending=scoped_assets=scoped_disc_import=false;
+ faulted=source_session_owned=asset_committed=false;files.nonempty=false;
+ asset_destination=AssetDestination::None;asset_scope.generation=0;
+ preparation.busy_value=preparation.source_draw=false;
+ graphics_startup_terminal=false;stats_available=true;startup_pipeline_service_failed=false;
+ startup_pipeline_service_scheduled=false;startup_ownerless_present_submitted=false;
+ owner_stopped=false;service_ok=true;service_reenter=false;stop_after_service=false;
+ timers.clear();seed_rows.clear();serviced_rows.clear();service_calls=present_calls=0;
+ begin_calls=clear_calls=end_calls=checked_calls=0;begin_succeeds=true;
+ next_present_draws_source=false;stats.queuedPipelines=0;
+}
+int main(){
+ reset_ownerless();
+ for(unsigned i=0;i<12;++i)seed_rows.push_back(i);
+ stats.queuedPipelines=static_cast<unsigned>(seed_rows.size());
+ tick_dispatch();
+ REQUIRE(present_calls==1&&begin_calls==1&&clear_calls==1&&end_calls==1&&checked_calls==1,
+         "first original ownerless clear/end submission remains exactly once");
+ REQUIRE(startup_ownerless_present_submitted,"only successful original clear is recorded");
+ REQUIRE(timers.size()==1,"tick still reaches the original independent seed scheduler");
+ REQUIRE(run_timer()&&service_calls==1&&stats.queuedPipelines==7,
+         "existing timer drains one bounded batch after initial submission");
+ tick_dispatch();
+ REQUIRE(present_calls==1&&timers.size()==1,"repeated ownerless present is held without early-returning scheduler");
+ REQUIRE(run_timer()&&service_calls==2&&stats.queuedPipelines==2,
+         "next timer drains the second ordered batch while empty presentation stays held");
+ tick_dispatch();
+ REQUIRE(present_calls==1&&timers.size()==1,"last pending-seed callback holds only empty fallback");
+ REQUIRE(run_timer()&&service_calls==3&&stats.queuedPipelines==0&&timers.empty(),
+         "existing timer drains the original queue to its empty tail");
+ tick_dispatch();
+ REQUIRE(present_calls==2&&clear_calls==2&&end_calls==2,
+         "queue-empty transition restores original fallback submission");
+ REQUIRE(serviced_rows.size()==12,"all bounded batches were serviced");
+ for(unsigned i=0;i<serviced_rows.size();++i)
+  REQUIRE(serviced_rows[i]==i,"seed service preserves original queue order");
+
+ // Host ownership (CSS/SSS) makes the exact guard refuse suppression. This
+ // proves fallback routing only; it does not execute either source menu.
+ reset_ownerless();startup_ownerless_present_submitted=true;
+ stats.queuedPipelines=3;host=true;tick_dispatch();
+ REQUIRE(present_calls==1&&begin_calls==1,"CSS/SSS host ownership keeps fallback dispatch");
+ REQUIRE(timers.empty(),"existing scheduler remains stopped for CSS/SSS ownership");
+
+ // Source preparation keeps its existing presentation route with queued seeds.
+ reset_ownerless();startup_ownerless_present_submitted=true;
+ stats.queuedPipelines=3;startup_ownerless_present_submitted=false;
+ preparation.busy_value=true;preparation.source_draw=true;
+ next_present_draws_source=true;tick_dispatch();
+ REQUIRE(present_calls==1&&end_calls==1,"source-preparation draw keeps original callback");
+ REQUIRE(!startup_ownerless_present_submitted,"source draw cannot masquerade as initial ownerless clear");
+ REQUIRE(timers.empty(),"source preparation stays outside ownerless seed scheduling");
+
+ // Real SourceFrameSequence::finish runs before the exact fallback. Match
+ // ownership with one source tick keeps that source callback and no duplicate.
+ reset_ownerless();startup_ownerless_present_submitted=true;
+ stats.queuedPipelines=3;world=true;match=true;
+ next_present_draws_source=true;tick_dispatch(true);
+ REQUIRE(present_calls==1&&source_frames.steps()==1&&source_frames.draws()==1&&
+         !source_frames.pending(),"match source-frame callback remains paired and ordered");
+ REQUIRE(timers.empty(),"match ownership remains outside ownerless seed scheduling");
+
+ // Failed begin cannot satisfy the first-presentation flag; a later success can.
+ reset_ownerless();stats.queuedPipelines=3;begin_succeeds=false;tick_dispatch();
+ REQUIRE(present_calls==1&&begin_calls==0&&clear_calls==0&&end_calls==0&&
+         !startup_ownerless_present_submitted,"failed begin cannot mark submission");
+ begin_succeeds=true;tick_dispatch();
+ REQUIRE(present_calls==2&&startup_ownerless_present_submitted,
+         "later successful original begin records the initial presentation");
+ std::cout<<"fallback dispatch and seed-service composition controls passed\n";
+}
+"""
+        fixture = (fixture.replace("@DELAY@", delay_line)
+                          .replace("@ALLOWED@", allowed)
+                          .replace("@SERVICE@", service)
+                          .replace("@SCOPE_HELPERS@", scope_helpers)
+                          .replace("@BEGIN_LINE@", begin_line)
+                          .replace("@FINISH_LINE@", finish_line)
+                          .replace("@FALLBACK@", fallback)
+                          .replace("@SCHEDULE_LINE@", schedule_line))
+        with tempfile.TemporaryDirectory(prefix="melee-startup-fallback-dispatch-") as directory:
+            directory = Path(directory)
+            fixture_path = directory / "startup_fallback_dispatch.cpp"
+            binary_path = directory / "startup_fallback_dispatch"
+            fixture_path.write_text(fixture)
+            command = [compiler, *compiler_words[1:], "-std=c++17", "-Wall", "-Wextra",
+                       "-Werror", "-I", str(ROOT / "src"), str(fixture_path), "-o",
+                       str(binary_path)]
+            compiled = subprocess.run(command, capture_output=True, text=True, timeout=30)
+            self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+            executed = subprocess.run([str(binary_path)], capture_output=True, text=True,
+                                      timeout=10)
+            self.assertEqual(executed.returncode, 0, executed.stdout + executed.stderr)
+            self.assertIn("fallback dispatch and seed-service composition controls passed",
+                          executed.stdout)
+
     def test_startup_pipeline_service_chains_bounded_timer_batches(self):
         source = menu_browser_source()
         allowed_begin = source.index("bool startup_pipeline_service_allowed(){")

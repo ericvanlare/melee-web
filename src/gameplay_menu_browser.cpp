@@ -1795,6 +1795,9 @@ std::string match_message="Original source match";
 bool running=false,pending=false,host_entered=false,world_exposed=false,faulted=false;
 bool startup_pipeline_service_scheduled=false;
 bool startup_pipeline_service_failed=false;
+// Set only after the original ownerless black-clear end/submission returns;
+// this does not claim GPU completion. It belongs to one renderer lifetime.
+bool startup_ownerless_present_submitted=false;
 constexpr int kStartupPipelineServiceDelayMs=8;
 EM_JS_DEPS(startup_pipeline_service_asyncify_deps,
            "$safeSetTimeout,$dynCall,$Asyncify");
@@ -3123,6 +3126,40 @@ void service_render_cache_writes(){
  if(!ok)failure_reported=true;
  EM_ASM({window.menuCacheWritesFlushed?.({ok:!!$0,flushed:!!$1,duration_ms:$2});},
         ok,flushed,duration);
+}
+bool startup_ownerless_present_scope(){
+ return !world&&!match&&!results&&!prize&&!host&&!source_session_owned&&
+        !running&&!pending&&!scoped_disc_import&&!scoped_assets&&files.empty()&&
+        asset_destination==AssetDestination::None&&
+        asset_scope.pending_generation()==0&&!asset_committed&&
+        !preparation.busy()&&!faulted;
+}
+void record_startup_ownerless_present(bool frame_began,bool drew_source){
+ if(startup_ownerless_present_submitted||!frame_began||drew_source||
+    !startup_ownerless_present_scope())return;
+ startup_ownerless_present_submitted=true;
+}
+// Let the existing bounded startup service drain queued seeds without
+// repeatedly acquiring staging slots for an empty ownerless submission. This
+// does not change readiness or claim that GPU work has completed.
+bool should_hold_ownerless_startup_present(unsigned source_steps,
+                                            unsigned source_draws,
+                                            bool source_frame_pending){
+ if(!startup_ownerless_present_submitted||graphics_startup_terminal||
+    startup_pipeline_service_failed||source_steps!=0||source_draws!=0||
+    source_frame_pending||!startup_pipeline_service_allowed()||
+    !startup_ownerless_present_scope())return false;
+ const AuroraStats* stats=aurora_get_stats();
+ return stats&&stats->queuedPipelines>0;
+}
+bool should_hold_startup_idle_fallback(bool preparation_draws_source,
+                                       bool ownerless_idle_fallback,
+                                       unsigned source_steps,
+                                       unsigned source_draws,
+                                       bool source_frame_pending){
+ if(preparation_draws_source||!ownerless_idle_fallback)return false;
+ return should_hold_ownerless_startup_present(
+     source_steps,source_draws,source_frame_pending);
 }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 // A private callback owns exactly one presentation; the ordinary simulation loop
@@ -4563,6 +4600,7 @@ void tick(){
    if(tag_staging_byte_draw)EM_ASM({window.__meleeWebStagingByteCapture?.clearSourceDrawTag();});
    if(collect_staging_diagnostics)aurora_browser_staging_set_diagnostic_source_frame(-1);
    end_done=emscripten_get_now();check(drawn,error);
+   record_startup_ownerless_present(frame_began,drew_source);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
    if(drew_source)current_sss_exit_trace("draw_aurora_return",source_frames.steps(),source_frames.draws());
 #endif
@@ -5345,8 +5383,16 @@ void tick(){
   // Camera callbacks mutate source state (including magnifier damage flags).
   // A callback without a source tick retains the last match image when the
   // renderer guarantees complete draws. Menu priming retains its existing path.
+  const bool startup_fallback_preparation_draws_source=
+      preparation.preparation_draws_source();
+  const bool ownerless_idle_fallback=!world&&!match&&!results&&!prize;
   if(!first_css_draw_terminal&&source_frames.steps()==0&&
-     (preparation.preparation_draws_source()||(!world&&!match&&!results&&!prize)))present_source();
+     (startup_fallback_preparation_draws_source||ownerless_idle_fallback)){
+   const bool hold_startup_ownerless_present=should_hold_startup_idle_fallback(
+       startup_fallback_preparation_draws_source,ownerless_idle_fallback,
+       source_frames.steps(),source_frames.draws(),source_frames.pending());
+   if(!hold_startup_ownerless_present)present_source();
+  }
   if(!first_css_draw_terminal&&preparation.warming()&&!preparation.preparation_draws_source()){
    const double service_started=emscripten_get_now();
    check(aurora_pipeline_service_preparation(),"Renderer preparation overlapped an active frame");
@@ -7146,6 +7192,8 @@ int main(int argc,char** argv){
 #endif
  graphics_startup_started_ms=emscripten_get_now();
  publish_graphics_startup(0,false);
+ // A new renderer lifetime must perform its original initial clear/present.
+ startup_ownerless_present_submitted=false;
  aurora_initialize(argc,argv,&config);
  graphics_startup_renderer_init_ms=emscripten_get_now()-graphics_startup_started_ms;
  publish_graphics_startup(0,true);
