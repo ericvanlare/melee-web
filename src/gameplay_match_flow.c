@@ -4,6 +4,7 @@
 #include <melee/lb/lbaudio_ax.h>
 #include <melee/gm/gm_1A45.h>
 #include <melee/gm/forward.h>
+#include <sysdolphin/baselib/gobj.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -17,6 +18,7 @@ struct MeleeWebMatchFlow {
     int opening_demo;
 };
 static MeleeWebMatchFlow* owner;
+static uint64_t owner_epoch;
 static int fail(char* error, size_t size, const char* message)
 {
     if (error && size) snprintf(error, size, "%s", message);
@@ -57,6 +59,7 @@ MeleeWebMatchFlow* melee_web_match_flow_begin(int opening_demo,
     }
     flow->generation = generation;
     flow->opening_demo = opening_demo != 0;
+    if (++owner_epoch == 0) ++owner_epoch;
     owner = flow;
     return flow;
 }
@@ -149,4 +152,50 @@ uint32_t melee_web_match_flow_frames(const MeleeWebMatchFlow* flow)
 int melee_web_match_flow_result(const MeleeWebMatchFlow* flow)
 {
     return live(flow) ? melee_web_match_source_result() : OUTCOME_NONE;
+}
+
+
+struct MeleeWebMatchFlowSnapshot {
+    MeleeWebMatchFlow* identity;
+    uint64_t epoch;
+    MeleeWebMatchFlow value;
+};
+static int flow_snapshot_boundary(MeleeWebMatchFlow* flow,char* e,size_t n)
+{
+    if (!live(flow) || HSD_GObj_804D781C || HSD_GObj_804D7818 || HSD_GObj_804D7814)
+        return fail(e,n,"Flow snapshot requires a quiescent live owner");
+    return 1;
+}
+MeleeWebMatchFlowSnapshot* melee_web_match_flow_snapshot_capture(
+    MeleeWebMatchFlow* flow,char* e,size_t n)
+{
+    if (!flow_snapshot_boundary(flow,e,n)) return NULL;
+    MeleeWebMatchFlowSnapshot* snapshot=malloc(sizeof(*snapshot));
+    if (!snapshot) {fail(e,n,"Cannot allocate match-flow snapshot");return NULL;}
+    snapshot->identity=flow;snapshot->epoch=owner_epoch;snapshot->value=*flow;
+    if(e&&n)*e=0;
+    return snapshot;
+}
+int melee_web_match_flow_snapshot_admit(MeleeWebMatchFlow* flow,
+    const MeleeWebMatchFlowSnapshot* snapshot,char* e,size_t n)
+{
+    if (!snapshot) return fail(e,n,"Match-flow snapshot is missing");
+    if (!flow_snapshot_boundary(flow,e,n)) return 0;
+    if (snapshot->identity!=flow || snapshot->epoch!=owner_epoch ||
+        snapshot->value.generation!=flow->generation ||
+        snapshot->value.opening_demo!=flow->opening_demo)
+        return fail(e,n,"Match-flow lifetime or scene identity changed");
+    if(e&&n)*e=0;
+    return 1;
+}
+int melee_web_match_flow_snapshot_restore(MeleeWebMatchFlow* flow,
+    const MeleeWebMatchFlowSnapshot* snapshot,char* e,size_t n)
+{
+    if (!melee_web_match_flow_snapshot_admit(flow,snapshot,e,n)) return 0;
+    *flow=snapshot->value;
+    return 1;
+}
+void melee_web_match_flow_snapshot_destroy(MeleeWebMatchFlowSnapshot* snapshot)
+{
+    free(snapshot);
 }

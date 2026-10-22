@@ -2,7 +2,7 @@
   "schema": "match-only-rollback-feasibility-v1",
   "issue": 318,
   "pr": 319,
-  "status": "no_draw_profile_declared_interval_component_pass_broader_closure_open",
+  "status": "same_browser_read_only_census_complete_restore_ownership_incomplete",
   "source_only_baseline": {
     "boundary": "synchronous-source-only-exported-call-return",
     "sourceDrawing": false,
@@ -2425,6 +2425,243 @@
       "reviewed_merged_tree_equal": true,
       "receipt": "pr334-integration-receipt.json",
       "receipt_sha256": "4c6cb66bddebd40201749a4de7c9412432d06eec8eba2683f1fceea809802d40"
+    }
+  },
+  "same_instance_browser_restore_341": {
+    "issue": 341,
+    "status": "in_progress_not_restore_admitted",
+    "producer_base_commit": "130438fd2b86d00cfec98cd2ba0a5f66084ae15c",
+    "producer_worktree": "uncommitted source; census runtime/harness and separate owner component sources pinned below; not a commit identity",
+    "runtime_sha256": {
+      "gameplay_slippi_synctest_browser.mjs": "a4cad9eee94ecf81c18e4144a3118be8707b668d7cad25ef46f73512bc8cc0ea",
+      "gameplay_slippi_synctest_browser.wasm": "9e98e1ae6f0f545ac59bb5e16b5ac08265ab023c922a3662f1d307dda80f4a74",
+      "gameplay_slippi_synctest_browser.data": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c"
+    },
+    "source_sha256": {
+      "src/slippi_profile/tests/run_write_census.mjs": "51ef15430b6690912cd9f4fc47b84d966ba9053f601cbfeca9014c656ffb7d00",
+      "src/slippi_profile/tests/run_synctest.mjs": "a172ba7996850ae550e2dae2fdc16f5f58bc875f4b81837e71ee36e26adc14fe",
+      "src/slippi_profile/tests/runner_contract.mjs": "1040d4c0104fd27eb8df2b7fa9e568d9da3b3cef721d4e553b4dc0c67c44ed9b",
+      "src/slippi_profile/tests/synctest_browser.cpp": "170c7e9e48606997f535926958ad2404fe87f2e482b79b4d85f70d34d13ea93e",
+      "src/slippi_profile/tests/test_write_census_contract.mjs": "3779e41c3190b212fb6755a3b439d5756fab4eac46151d15731e6e11de737acc",
+      "tests/gameplay_snapshot_probe.cpp": "5489bff017d0d92bf5345321feab641b222923514218b626e534bcf6f1ef6911",
+      "src/gameplay_bootstrap.c": "a0af3794b7b9dfc92dcddde86553a17107c8717fd98d920301a3cc9cb5b7190c",
+      "src/gameplay_bootstrap.h": "f8eaba1ff107dba9f35bf7744840c22d48a7d5a57c64979102c0a7ddc530eac4",
+      "cmake/FighterRuntime.cmake": "eae2e793efce52636d9d1bfd06576b2d1698e132418920c1b5acaa20f5341b5a",
+      "scripts/browser_tools.mjs": "737a8ef5807edba0009487877e1b65badc3a8bb4d07ff9fcd445a7b8bef40c81",
+      "scripts/source_state_manifest.py": "c337c54b60205197d6cc130e00a1aad3fd53bb5f40a37a15d7429e41f4e9fd74"
+    },
+    "source_state_manifest": {
+      "path": "gameplay_slippi_synctest_browser.source-state.json",
+      "sha256": "2c78e915c7a57af641a2459b689232a52fa7c1ed01b2d415a7ce478d370d352d",
+      "configurationIdentitySha256": "21a216e9baad64a88bb7fc323cdad2d61ed95985ea68dd0a1f2be4a7787782a6",
+      "wasmSha256": "9e98e1ae6f0f545ac59bb5e16b5ac08265ab023c922a3662f1d307dda80f4a74",
+      "rowCount": 3119,
+      "sourceCStaticCandidates": 2051,
+      "excludedMutableInputSections": 1068,
+      "completeGameState": false
+    },
+    "scope": "One actual drawn-browser sample net-byte-delta census; no restore performed; all ranges unadmitted; owner components have separate scoped controls",
+    "capture": {
+      "retained_artifact": "browser-write-census-v2/runner/evidence.json",
+      "sha256": "d73e5b6c2a00bf64b09a9e343578a7a29e8469eb532cba563f80426ed43e23e9"
+    },
+    "supervisor": {
+      "retained_artifact": "browser-write-census-v2/owner.json",
+      "sha256": "0ae9b4ac5f01456ff86a867dbd5ae23f48f981363ad058b597c8ffc1614c4897"
+    },
+    "independent_cleanup": {
+      "retained_artifact": "browser-write-census-v2/independent-cleanup.json",
+      "sha256": "d8eb6bbe8bb773834098ab313751d465500693cae7f3672499ea779032ef6afa"
+    },
+    "source_review": {
+      "retained_artifact": "browser-write-census-source-review-v3.json",
+      "sha256": "9b0fdb136a58e13137d377bed28dafc7147f0fa5fd917bdb4de5d77f30f5db63"
+    },
+    "focused_controls": {
+      "retained_artifact": "census-runner-controls-v3.log",
+      "sha256": "5bcd1ef35eec721d8f14bb3bf25b9af8053ddcf3c7e4bdb473431ddb555cb7d3"
+    },
+    "actual_context_controls": {
+      "retained_artifact": "actual-match-context-controls-v2-receipt.json",
+      "sha256": "9320c66bfdb73970b245b8295033446c042dd6978eb84eb682837cbb09bc6398"
+    },
+    "observed": {
+      "prefix_samples": 300,
+      "census_sample": 300,
+      "source_frame_after_step": 177,
+      "source_step_net_changed_bytes": 89539,
+      "draw_completion_net_changed_bytes": 762423,
+      "classification": {
+        "source-c-static-candidate": {
+          "ranges": 629,
+          "bytes": 3736
+        },
+        "excluded-mutable-input-section": {
+          "ranges": 1516,
+          "bytes": 4361
+        },
+        "unmapped": {
+          "ranges": 66643,
+          "bytes": 823963
+        },
+        "gameplay-arena": {
+          "ranges": 6136,
+          "bytes": 19902
+        }
+      },
+      "count_basis": "sum of net-changed bytes per transition; the same address can count in both transitions",
+      "selected_fighter_paths": [
+        {
+          "sourceSlot": 0,
+          "processedPadSlot": 0,
+          "rawController": 0,
+          "initializerPort": 0,
+          "fighterKind": 0,
+          "callbackDelta": 5,
+          "normalModelDispatchDelta": 3,
+          "modelTransformDelta": 0
+        },
+        {
+          "sourceSlot": 1,
+          "processedPadSlot": 1,
+          "rawController": 1,
+          "initializerPort": 0,
+          "fighterKind": 0,
+          "callbackDelta": 5,
+          "normalModelDispatchDelta": 3,
+          "modelTransformDelta": 0
+        }
+      ],
+      "gpu": {
+        "initialized": true,
+        "backend": 7,
+        "pendingFramePackets": 0,
+        "pendingStagingBuffers": 0,
+        "workerBusy": 0,
+        "rendererErrorCount": 0,
+        "drawCallCount": 237,
+        "lastBeginFrameId": 301,
+        "lastEndFrameId": 301,
+        "createdPipelines": 57,
+        "queuedPipelines": 0
+      },
+      "native_transfer_boundary_checks": {
+        "beforeStep": "passed",
+        "afterStep": "passed",
+        "afterActualDraw": "passed"
+      },
+      "screenshot": {
+        "path": "browser-census-sample-300.png",
+        "sha256": "2de16105c8521d93604db39ab9296bc224995b3f645c19d8a238e98ba24bb88e",
+        "bytes": 307134
+      }
+    },
+    "remaining": [
+      "complete source/project mutable static coverage",
+      "dynamic source/asset/stream/file ownership",
+      "renderer source-state interactions and host-effect closure",
+      "same-instance browser restore and one-tick synctest",
+      "seven-tick/combat/present-frame/audio lifecycle and combined cost"
+    ],
+    "limitations": [
+      "same-value stores and transient values unobserved",
+      "idle DVD boundaries do not exclude completed-between-boundary transfers",
+      "gameplay arena extent does not prove internal ownership",
+      "screenshot retains existing magenta/texture artifacts; no pixel acceptance",
+      "no local or Internet rollback gameplay acceptance"
+    ],
+    "retained_failures": [
+      {
+        "retained_artifact": "browser-write-census-v1/runner/evidence.json",
+        "sha256": "fb753c4d9cb645b3b0ff31a19fa350821dda189900d6af74d565d522ea142c89"
+      },
+      {
+        "retained_artifact": "actual-match-context-controls-v1.log",
+        "sha256": "973ec9adbcd8aac15fa2c87439f7febf5192f538557b5f9cafb8bfc0557b31ea"
+      },
+      {
+        "retained_artifact": "fighter-controls-build-v2.log",
+        "sha256": "902294c73548807829840068b18a7cbe6ad6053a94e78b7199c6629a6cc6fc30"
+      },
+      {
+        "retained_artifact": "census-runner-controls-v1.log",
+        "sha256": "89e4b0481ede13faf4e5adc43e14a90c183fdec8bf54beaae05717024a39c33c"
+      }
+    ],
+    "result_review": {
+      "retained_artifact": "browser-write-census-result-review-v1.json",
+      "sha256": "4c74aeac5151c7bf26de7522062bab2dac284804a2c51db9ca2761d98cfcd45e"
+    },
+    "owner_gap_source_analysis": {
+      "retained_artifact": "census-owner-gap-analysis-v1.json",
+      "sha256": "9908b8d2ebb8aeeb64d8df4dcdeb24ea0f16f55bab3d17e1f847c679f90ba370"
+    },
+    "next_experiment": "Read-only audio/FX region visitor from actual live owners; classify source-step dynamic ranges before restoration. Existing Aurora staging descriptors remain a separate reusable draw-range diagnostic.",
+    "owner_components": {
+      "scope": "Private owner components only; no browser restore exposure or complete-world claim",
+      "current_files_sha256": {
+        "src/gameplay_audio.c": "ecb9b410d5dbe7f4df652c1818d8eb88616dff4172f5740a9b7ad9d94ca05159",
+        "src/gameplay_audio.h": "ae513492304a8d0d417561c4aeea58bdc19e966294ac16f4aacfcebf04bde140",
+        "src/gameplay_audio_fx.c": "46ed444376664475e94296e3147244025f76edfefd30b7c62cfa339ea6df79b7",
+        "src/gameplay_audio_fx.h": "aeb5b651ff46fc57e90f539b155b2a314a5ff2d16ff1df0b14fd528c171cca6a",
+        "src/gameplay_bootstrap.c": "a0af3794b7b9dfc92dcddde86553a17107c8717fd98d920301a3cc9cb5b7190c",
+        "src/gameplay_bootstrap.h": "f8eaba1ff107dba9f35bf7744840c22d48a7d5a57c64979102c0a7ddc530eac4",
+        "src/gameplay_heap.cpp": "0d377f2f9428e2d119f6a134cfd546beef522c1c386782d8c01fff0f651c3cb8",
+        "src/gameplay_heap.h": "a48624d24a51684b196cd26c2eb52abfb3b2eb73b532ce9660853be771544d0e",
+        "src/gameplay_match_context.c": "96b990250a923d5444a804ddf40c6f921de28d022c6f1d70e73f5809bda43c50",
+        "src/gameplay_match_context.h": "19aa92f714242e5caad188cd85260dbc36763b574b814d823650961e9005eca5",
+        "src/gameplay_match_flow.c": "b4a4d7d822066f001cdb16504ae48a2e6e32a56e69156b89a97f789ed2817197",
+        "src/gameplay_match_flow.h": "14a2cc06e383862d71dac2b9b92f5610bedab5d72e963eaa8cdffdd00dd7db84",
+        "src/gameplay_player_context.c": "f15a2ec0626cb8732f373392a5f4ef6f1793b250e6ad023e244429aae0e0ba87",
+        "src/gameplay_player_context.h": "a27be2f072fdbd46e8b67d6a53287afe75ab62d2aa7676a89a9f3c976f12029c",
+        "src/gameplay_source_memory_runtime.cpp": "2766abade1b76fc2c1e6842498698d665da9038ba14c7eceadc906fad1d24062",
+        "src/gameplay_source_memory_runtime.h": "9b8f7623ae3255f9debee2dc628f3ed1d296fd96bd6415c85c36d0e74b8ef61e",
+        "src/native_dat.cpp": "be6013ecb0acdd6366aa4224204be432dde582398ecaf707b03bb12f9d20a56e",
+        "src/native_dat.hpp": "e8ba52bef2a49619ee5f61cccea1efc0723e499c03c467bfc9ad1eda635f1c3f",
+        "tests/audio_checkpoint_owner_control.c": "9eb29b12052168b8e1961d2504e0205cb283577c4f6582a55a667da0763aa645",
+        "tests/flow_checkpoint_owner_control.c": "4b0cbe2c9a8b06f5b8ff2bee917029ec207d0b5152b96f419d92fc8b8662ac90",
+        "tests/gameplay_bootstrap_trace.c": "6f265ac7e9cceca245430fcca976c90b73c0544dc4388c04f6e5d7dfa4fd188f",
+        "tests/gameplay_heap_trace.cpp": "685545c23afa97aad4c312a86e485e0b7148a049f12e6ba9a004334887141ec2",
+        "tests/gameplay_match_context_trace.c": "580d54ff76aea4607aefbdf5c01ead5798064ddb2189f8549387cddb05c40b08",
+        "tests/native_dat_checkpoint_test.cpp": "c950683c25b705174d8adf28baa563900fbb1219a1973c055614411a11d39947",
+        "tests/source_memory_snapshot_trace.cpp": "e262a7d317deecc937d0b25d6a2108649a98ec55773962620c01fc4178fbf496",
+        "tests/test_gameplay_audio_checkpoint.py": "9cb9edf8699926ee09d267497d5bb6e356da88f6f10fd72d7952be3026950748",
+        "tests/test_gameplay_flow_checkpoint.py": "e66edc929e18252fa199e4cc0dd0205e9583868939dfcbef542d4ce45372527b",
+        "tests/test_native_dat_checkpoint.py": "592ea32268e8eb852cd1b577a84c9b9a86cc1df846d93c455c88f29d962d4f04",
+        "tests/test_source_memory_snapshot.py": "2c9d0a845a503545165b0f91916b5f53b3bf0e8b97ce1b4a75511e7233d600af"
+      },
+      "source_review": {
+        "retained_artifact": "owner-components-review-v2.json",
+        "sha256": "cbd31a795658f590a979935cc428883b013ec804d066b383840a8eb74161b437"
+      },
+      "earlier_findings_retained": {
+        "retained_artifact": "owner-components-review-v1.json",
+        "sha256": "7f1411e9390d035ef7900adb28b714822e49c742837fc51156c494e3e63b8403"
+      },
+      "later_bootstrap_readonly_arena_export_review": {
+        "retained_artifact": "browser-write-census-source-review-v3.json",
+        "sha256": "9b0fdb136a58e13137d377bed28dafc7147f0fa5fd917bdb4de5d77f30f5db63"
+      },
+      "actual_match_context_execution": {
+        "retained_artifact": "actual-match-context-controls-v2-receipt.json",
+        "sha256": "9320c66bfdb73970b245b8295033446c042dd6978eb84eb682837cbb09bc6398"
+      },
+      "validation_baseline": {
+        "retained_artifact": "full-regression-v1.log",
+        "sha256": "da192888298894854b82c4176b4d9182f92f71b2b0c23f77725bf4ea0acca875",
+        "tests": 2439,
+        "skips": 166,
+        "scope": "preceded final census controls and legacy probe repair; final regression v2 pending"
+      }
+    },
+    "checkpoint_validation": {
+      "status": "PASS",
+      "tests": 2445,
+      "seconds": 515.383,
+      "skips": 165,
+      "retained_artifact": "full-regression-v2.log",
+      "sha256": "0eee7b9a88e2ff1d8386e06af673c132a19f1c98b032421700bf54be64da35c5",
+      "scope": "Reviewed owner components, census runner controls and repaired real-asset probe source; no browser restore acceptance"
     }
   }
 }

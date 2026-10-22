@@ -9,6 +9,18 @@ extern "C" {
 #endif
 typedef struct MeleeWebMatchContext MeleeWebMatchContext;
 int melee_web_match_restore_input(MeleeWebMatchContext*,const MeleeWebPadState*,char*,size_t);
+/* Exact C owner value snapshot; it excludes every pointed-to source/player,
+ * camera, collision and SDK allocation. These require companion snapshots.
+ * Pointer fields are retained as typed identities and never serialized. */
+typedef struct MeleeWebMatchContextSnapshot MeleeWebMatchContextSnapshot;
+MeleeWebMatchContextSnapshot* melee_web_match_context_snapshot_capture(
+    MeleeWebMatchContext*, char*, size_t);
+int melee_web_match_context_snapshot_admit(
+    MeleeWebMatchContext*, const MeleeWebMatchContextSnapshot*, char*, size_t);
+int melee_web_match_context_snapshot_restore(
+    MeleeWebMatchContext*, const MeleeWebMatchContextSnapshot*, char*, size_t);
+void melee_web_match_context_snapshot_destroy(MeleeWebMatchContextSnapshot*);
+
 /* Source scene phases run after PAD renewal and around the original scheduler. */
 typedef int (*MeleeWebMatchTickPhase)(void*, char*, size_t);
 int melee_web_match_step_raw_phased(MeleeWebMatchContext*, const PADStatus[4],

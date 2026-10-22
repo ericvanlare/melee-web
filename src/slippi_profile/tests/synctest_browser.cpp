@@ -5,6 +5,7 @@
 
 #include "slippi_profile/profile.h"
 #include "slippi_profile/draw_diagnostics.h"
+#include "gameplay_bootstrap.h"
 
 #include <aurora/aurora.h>
 #include <aurora/gfx.h>
@@ -42,6 +43,26 @@ void renderer_log(AuroraLogLevel level, const char *module,
 }
 
 extern "C" {
+EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_gameplay_arena_base(void)
+{
+    const void *base = nullptr;
+    size_t bytes = 0;
+    if (!melee_web_gameplay_active_arena_view(&base, &bytes) || !bytes)
+        return 0;
+    const uintptr_t address = reinterpret_cast<uintptr_t>(base);
+    return address <= UINT32_MAX ? static_cast<uint32_t>(address) : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_gameplay_arena_bytes(void)
+{
+    const void *base = nullptr;
+    size_t bytes = 0;
+    if (!melee_web_gameplay_active_arena_view(&base, &bytes) ||
+        !base || !bytes || bytes > UINT32_MAX)
+        return 0;
+    return static_cast<uint32_t>(bytes);
+}
+
 EMSCRIPTEN_KEEPALIVE const void *melee_web_synctest_draw_diagnostics(void)
 {
     return slippi_profile_draw_diagnostics_snapshot();

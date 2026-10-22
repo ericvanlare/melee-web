@@ -1,6 +1,8 @@
 /* Integration helper for the real common/stage/effect/fighter-assets harness.
  * No source consumer is replaced. The caller keeps all asset owners alive. */
 #include "gameplay_match_context.h"
+#include "gameplay_match_flow.h"
+#include <sysdolphin/baselib/gobj.h>
 #include <melee/pl/player.h>
 #include <melee/ft/kinds/ftCommon/forward.h>
 #include <sysdolphin/baselib/controller.h>
@@ -108,6 +110,7 @@ int melee_web_match_two_player_trace(MeleeWebCollision* collision,
     const PADStatus* movement,char* error,size_t size)
 {
     MeleeWebMatchContext* context=NULL;
+    MeleeWebMatchContextSnapshot* snapshot=NULL;
     StaticPlayer previous[2]={*Player_GetPtrForSlot(players[0].slot),*Player_GetPtrForSlot(players[1].slot)};
     HSD_PadStatus saved_pads[4],saved_master[4],saved_copy[4];
     memcpy(saved_pads,HSD_PadGameStatus,sizeof(saved_pads));
@@ -124,6 +127,16 @@ int melee_web_match_two_player_trace(MeleeWebCollision* collision,
     for(unsigned cycle=0;cycle<2;cycle++){
         context=melee_web_match_begin_players(players,2,70,1,cycle?collision:NULL,error,size);
         if(!context)goto cleanup;
+        if(snapshot){
+            if(melee_web_match_context_snapshot_admit(context,snapshot,error,size)){
+                snprintf(error,size,"Retired context snapshot admitted a replacement owner");goto cleanup;
+            }
+            melee_web_match_context_snapshot_destroy(snapshot);snapshot=NULL;
+        }
+        snapshot=melee_web_match_context_snapshot_capture(context,error,size);
+        if(!snapshot || !melee_web_match_context_snapshot_admit(context,snapshot,error,size) ||
+           !melee_web_match_context_snapshot_restore(context,snapshot,error,size))goto cleanup;
+
         if(cycle==0){
             MeleeWebMatchStats pending;
             if(melee_web_match_player_stats(context,0,&pending,error,size)){
@@ -135,6 +148,28 @@ int melee_web_match_two_player_trace(MeleeWebCollision* collision,
             }
         }
         if(!melee_web_match_create_fighters(context,error,size))goto cleanup;
+        melee_web_match_context_snapshot_destroy(snapshot);
+        snapshot=melee_web_match_context_snapshot_capture(context,error,size);
+        if(!snapshot)goto cleanup;
+        HSD_GObj marker={0};
+        HSD_GObj** callback_slots[]={&HSD_GObj_804D781C,&HSD_GObj_804D7818,&HSD_GObj_804D7814};
+        for(unsigned callback=0;callback<3;++callback){
+            MeleeWebMatchStats owner_before,owner_after;
+            if(!melee_web_match_player_stats(context,0,&owner_before,error,size))goto cleanup;
+            *callback_slots[callback]=&marker;
+            MeleeWebMatchContextSnapshot* refused=melee_web_match_context_snapshot_capture(context,error,size);
+            int admitted=melee_web_match_context_snapshot_admit(context,snapshot,error,size);
+            int restored=melee_web_match_context_snapshot_restore(context,snapshot,error,size);
+            int pointer_unchanged=*callback_slots[callback]==&marker;
+            *callback_slots[callback]=NULL;
+            melee_web_match_context_snapshot_destroy(refused);
+            if(refused||admitted||restored||!pointer_unchanged||
+               !melee_web_match_player_stats(context,0,&owner_after,error,size)||
+               memcmp(&owner_before,&owner_after,sizeof(owner_before))){
+                snprintf(error,size,"Active process/GX callback did not refuse context snapshot atomically");goto cleanup;
+            }
+        }
+
         MeleeWebMatchStats stats[2];uint32_t settle=0;
         for(;;){
             int ready=1;
@@ -223,8 +258,10 @@ int melee_web_match_two_player_trace(MeleeWebCollision* collision,
         if(!melee_web_match_end(context,error,size))goto cleanup;
         context=NULL;
     }
+    melee_web_match_context_snapshot_destroy(snapshot);
     return 1;
 cleanup:
+    melee_web_match_context_snapshot_destroy(snapshot);
     if(context){
         char cleanup_error[256];
         if(!melee_web_match_end(context,cleanup_error,sizeof(cleanup_error)))

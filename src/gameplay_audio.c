@@ -327,3 +327,76 @@ void AISetStreamVolLeft(u8 volume){if(!active)abort();active->ai_stream_volume[0
 void AISetStreamVolRight(u8 volume){if(!active)abort();active->ai_stream_volume[1]=volume;}
 u8 AIGetStreamVolLeft(void){if(!active)abort();return active->ai_stream_volume[0];}
 u8 AIGetStreamVolRight(void){if(!active)abort();return active->ai_stream_volume[1];}
+
+struct MeleeWebAudioSnapshot {
+ const MeleeWebAudio* owner;
+ MeleeWebAudio state;
+ MeleeWebAudioInput input;
+ SampleEntry* entries;Binding* bindings;u32** programs;u32* words;u32* starts;
+ uint32_t command_budget,sound_mode;
+#if defined(MELEE_WEB_AUDIO_FX) && !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+ MeleeWebAudioEffectsSnapshot* effects;
+#endif
+};
+void melee_web_audio_snapshot_destroy(MeleeWebAudioSnapshot* snapshot){
+ if(!snapshot)return;
+#if defined(MELEE_WEB_AUDIO_FX) && !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+ melee_web_audio_fx_snapshot_destroy(snapshot->effects);
+#endif
+ free(snapshot->entries);free(snapshot->bindings);free(snapshot->programs);
+ free(snapshot->words);free(snapshot->starts);free(snapshot);
+}
+MeleeWebAudioSnapshot* melee_web_audio_snapshot_capture(MeleeWebAudio* audio){
+ if(!live(audio)||audio->source_closed)return NULL;
+ MeleeWebAudioSnapshot* snapshot=calloc(1,sizeof(*snapshot));if(!snapshot)return NULL;
+ snapshot->owner=audio;snapshot->state=*audio;snapshot->input=*audio->input;
+ snapshot->command_budget=command_budget;snapshot->sound_mode=source_sound_mode;
+ snapshot->entries=malloc(audio->input->sample_count*sizeof(*audio->entries));
+ snapshot->bindings=malloc(audio->binding_count*sizeof(*audio->bindings));
+ snapshot->programs=malloc(audio->input->program_count*sizeof(*audio->programs));
+ snapshot->words=malloc(audio->input->word_count*sizeof(*audio->words));
+ snapshot->starts=malloc(audio->input->bank_count*sizeof(*audio->starts));
+ if(!snapshot->entries||!snapshot->bindings||!snapshot->programs||!snapshot->words||!snapshot->starts)goto failed;
+ memcpy(snapshot->entries,audio->entries,audio->input->sample_count*sizeof(*audio->entries));
+ memcpy(snapshot->bindings,audio->bindings,audio->binding_count*sizeof(*audio->bindings));
+ memcpy(snapshot->programs,audio->programs,audio->input->program_count*sizeof(*audio->programs));
+ memcpy(snapshot->words,audio->words,audio->input->word_count*sizeof(*audio->words));
+ memcpy(snapshot->starts,audio->starts,audio->input->bank_count*sizeof(*audio->starts));
+#if defined(MELEE_WEB_AUDIO_FX) && !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+ if(audio->effects){snapshot->effects=melee_web_audio_fx_snapshot_capture(audio->effects);if(!snapshot->effects)goto failed;}
+#endif
+ return snapshot;
+failed:
+ melee_web_audio_snapshot_destroy(snapshot);return NULL;
+}
+int melee_web_audio_snapshot_admit(MeleeWebAudio* audio,const MeleeWebAudioSnapshot* snapshot){
+ if(!live(audio)||!snapshot||snapshot->owner!=audio||audio->source_closed||
+    audio->generation!=snapshot->state.generation||audio->input!=snapshot->state.input||
+    audio->source_sem!=snapshot->state.source_sem||
+    audio->entries!=snapshot->state.entries||audio->bindings!=snapshot->state.bindings||
+    audio->binding_count!=snapshot->state.binding_count||audio->programs!=snapshot->state.programs||
+    audio->words!=snapshot->state.words||audio->starts!=snapshot->state.starts)return 0;
+ const MeleeWebAudioInput* a=audio->input;const MeleeWebAudioInput* b=&snapshot->input;
+ if(a->samples!=b->samples||a->sample_count!=b->sample_count||a->words!=b->words||a->word_count!=b->word_count||
+    a->bank_starts!=b->bank_starts||a->bank_count!=b->bank_count||
+    a->program_offsets!=b->program_offsets||a->program_count!=b->program_count||
+    a->resample_coefficients!=b->resample_coefficients||a->resample_coefficient_count!=b->resample_coefficient_count)return 0;
+#if defined(MELEE_WEB_AUDIO_FX) && !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+ if(audio->effects!=snapshot->state.effects||
+    (audio->effects&&!melee_web_audio_fx_snapshot_admit(audio->effects,snapshot->effects)))return 0;
+#endif
+ return 1;
+}
+int melee_web_audio_snapshot_restore(MeleeWebAudio* audio,const MeleeWebAudioSnapshot* snapshot){
+ if(!melee_web_audio_snapshot_admit(audio,snapshot))return 0;
+#if defined(MELEE_WEB_AUDIO_FX) && !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+ if(audio->effects&&!melee_web_audio_fx_snapshot_restore(audio->effects,snapshot->effects))return 0;
+#endif
+ memcpy(audio->entries,snapshot->entries,snapshot->input.sample_count*sizeof(*audio->entries));
+ memcpy(audio->bindings,snapshot->bindings,snapshot->state.binding_count*sizeof(*audio->bindings));
+ memcpy(audio->programs,snapshot->programs,snapshot->input.program_count*sizeof(*audio->programs));
+ memcpy(audio->words,snapshot->words,snapshot->input.word_count*sizeof(*audio->words));
+ memcpy(audio->starts,snapshot->starts,snapshot->input.bank_count*sizeof(*audio->starts));
+ *audio=snapshot->state;command_budget=snapshot->command_budget;source_sound_mode=snapshot->sound_mode;
+ return 1;
+}

@@ -52,6 +52,23 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
+### 2026-10-22 — Owner: proceed with the browser rollback sprint
+
+**Ask:** Execute the next sprint toward working browser rollback and Stadium.
+
+**Status:** In progress. The primary milestone is safe restoration of the same
+rendered browser instance, followed by no-draw comparison and present-frame
+recovery, combat boundaries and the combined seven-correction budget. Keep the
+existing source-only comparison as scoped evidence. The relay match remains
+conditional on the state, host-effect and profile gates. Stadium's finite-CSS
+prerequisite is a bounded parallel lane; the rejected reference follow-up stays
+frozen. This changes execution order, not the October 17 architecture or mode
+and service restrictions.
+
+**Links:** [Milestone #341](https://github.com/ericvanlare/melee-web/issues/341),
+[replanned queue](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6348798545),
+[existing rollback evidence](status/2026-10-12-match-only-rollback-feasibility.md).
+
 ### 2026-10-17 — Owner and Claude: no-draw rollback and isolated profile
 
 **Ask:** Use Slippi's match-only fast-forward model: correction ticks execute

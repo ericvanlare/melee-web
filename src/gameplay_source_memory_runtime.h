@@ -50,6 +50,34 @@ MeleeWebSourceMemoryReadStatus melee_web_source_memory_context_read(
 MeleeWebSourceMemoryReadStatus melee_web_source_memory_allocation_read(
     const void* exact_host_payload, MeleeWebSourceMemoryAllocation* out);
 
+/* Private source-memory mirror checkpoint, NOT a game/arena checkpoint.
+ * Captures address-heap cells, live allocation identities, fighter leases and
+ * allocation watermark by value. Host payloads and every other owner must be
+ * captured/restored by their own proven contract. Calling this API alone does
+ * not authorize restoring a rendered match. Caller serializes these operations
+ * at a quiescent source boundary and admits all companion owners before writes.
+ * A restart invalidates snapshots even if the caller reuses a world number.
+ * Admission/refusal never modifies the owner. Restore stages all allocations
+ * before committing; refused/failed restores preserve the complete live mirror.
+ * Snapshots remain reusable until destroy; destroy accepts NULL. */
+typedef struct MeleeWebSourceMemorySnapshot MeleeWebSourceMemorySnapshot;
+typedef enum MeleeWebSourceMemorySnapshotStatus {
+    MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_OK = 0,
+    MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_INVALID_ARGUMENT = 1,
+    MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_INACTIVE = 2,
+    MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_UNHEALTHY = 3,
+    MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_STALE_OWNER = 4,
+    MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_ALLOCATION_FAILED = 5,
+    MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_INVALID_STATE = 6,
+} MeleeWebSourceMemorySnapshotStatus;
+MeleeWebSourceMemorySnapshotStatus melee_web_source_memory_snapshot_capture(
+    MeleeWebSourceMemorySnapshot** out);
+MeleeWebSourceMemorySnapshotStatus melee_web_source_memory_snapshot_admit(
+    const MeleeWebSourceMemorySnapshot* snapshot);
+MeleeWebSourceMemorySnapshotStatus melee_web_source_memory_snapshot_restore(
+    const MeleeWebSourceMemorySnapshot* snapshot);
+void melee_web_source_memory_snapshot_destroy(MeleeWebSourceMemorySnapshot* snapshot);
+
 /* Fighter_Create / ftDemo_CreateFighter and Fighter_Unload bind the allocation to its
  * live host owner. Reuse advances allocation_generation even if an HSD free
  * chain returns the same object address. */

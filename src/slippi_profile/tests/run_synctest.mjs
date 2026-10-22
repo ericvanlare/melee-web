@@ -21,12 +21,13 @@ import {
 } from './runner_contract.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-const OBSERVATION_BYTES = 1280;
-const PCM_BYTES = 1068 * 4;
-const PAD_BYTES = 44;
-const DRAW_DIAGNOSTIC_BYTES = 132;
-const SOURCE_SEED = 0x13579bdf;
-const PREFIX_SAMPLES = 300;
+export const OBSERVATION_BYTES = 1280;
+export const PCM_BYTES = 1068 * 4;
+export const PAD_BYTES = 44;
+export const DRAW_DIAGNOSTIC_BYTES = 132;
+export const SOURCE_SEED = 0x13579bdf;
+export const PREFIX_SAMPLES = 300;
+export const SYNCTEST_PROFILE = 'slippi-render-dependencies-dbooc-shield-drop-v5';
 const INTERVAL_SAMPLES = Object.freeze([300, 301]);
 const SUBMISSION_TIMEOUT_MS = 5000;
 const POLL_MS = 10;
@@ -175,6 +176,196 @@ export function compareLane(sample, domain, expected, actual) {
   }
 }
 
+// Byte-level census helpers are pure: they classify observed writes by the
+// manifest's VMA provenance and the exact arena extent, without implying that
+// any classified range has a restorable owner.
+export function diffHeapRanges(before, after) {
+  if (!(before instanceof Uint8Array) || !(after instanceof Uint8Array)) {
+    throw new TypeError('Heap census snapshots must be Uint8Array values');
+  }
+  const shared = Math.min(before.length, after.length);
+  const ranges = [];
+  let start = -1;
+  let changedBytes = 0;
+  for (let offset = 0; offset < shared; offset++) {
+    if (before[offset] !== after[offset]) {
+      changedBytes++;
+      if (start < 0) start = offset;
+    } else if (start >= 0) {
+      ranges.push({start, end: offset, bytes: offset - start});
+      start = -1;
+    }
+  }
+  if (start >= 0) ranges.push({start, end: shared, bytes: shared - start});
+  if (after.length > shared) {
+    ranges.push({start: shared, end: after.length, bytes: after.length - shared,
+      kind: 'memory-growth'});
+    changedBytes += after.length - shared;
+  } else if (before.length > shared) {
+    ranges.push({start: shared, end: before.length, bytes: before.length - shared,
+      kind: 'memory-shrink'});
+    changedBytes += before.length - shared;
+  }
+  return {ranges, changedBytes};
+}
+
+export function classifyHeapRanges(rawRanges, manifestRows, arenaRange) {
+  if (!Array.isArray(rawRanges) || !Array.isArray(manifestRows) ||
+      !arenaRange || !Number.isSafeInteger(arenaRange.base) ||
+      !Number.isSafeInteger(arenaRange.bytes)) {
+    throw new TypeError('Heap census classification inputs are malformed');
+  }
+  const arenaEnd = arenaRange.base + arenaRange.bytes;
+  const rows = manifestRows.filter(row => row.size > 0).map(row => ({
+    start: row.address, end: row.address + row.size, row,
+  })).sort((a, b) => a.start - b.start || a.end - b.end);
+  const prefixMaxEnd = [];
+  for (let index = 0, maximum = 0; index < rows.length; index++) {
+    maximum = Math.max(maximum, rows[index].end);
+    prefixMaxEnd.push(maximum);
+  }
+  const classified = [];
+  for (const range of rawRanges) {
+    if (!range || !Number.isSafeInteger(range.start) || !Number.isSafeInteger(range.end) ||
+        range.start < 0 || range.end <= range.start) {
+      throw new TypeError('Heap census contains an invalid changed range');
+    }
+    let low = 0, high = prefixMaxEnd.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (prefixMaxEnd[middle] <= range.start) low = middle + 1;
+      else high = middle;
+    }
+    const overlapping = [];
+    for (let index = low; index < rows.length && rows[index].start < range.end; index++) {
+      if (range.start < rows[index].end) overlapping.push(rows[index]);
+    }
+    const boundaries = new Set([range.start, range.end]);
+    for (const item of overlapping) {
+      boundaries.add(Math.max(range.start, item.start));
+      boundaries.add(Math.min(range.end, item.end));
+    }
+    if (arenaRange.base < range.end && range.start < arenaEnd) {
+      boundaries.add(Math.max(range.start, arenaRange.base));
+      boundaries.add(Math.min(range.end, arenaEnd));
+    }
+    const ordered = [...boundaries].sort((a, b) => a - b);
+    for (let index = 0; index + 1 < ordered.length; index++) {
+      const start = ordered[index], end = ordered[index + 1];
+      if (start === end) continue;
+      const matches = overlapping.filter(item => item.start <= start && end <= item.end);
+      const inArena = arenaRange.base <= start && end <= arenaEnd;
+      let provenance, details = {};
+      if (matches.length > 1 || (matches.length && inArena)) {
+        provenance = 'ambiguous-overlap';
+      } else if (matches.length === 1) {
+        const {row} = matches[0];
+        provenance = row.decision === 'source-c-static-candidate' ?
+          'source-c-static-candidate' : 'excluded-mutable-input-section';
+        details = {
+          source: row.source,
+          inputObject: row.input_object,
+          inputSection: row.input_section,
+          exclusionReason: row.exclusion_reason,
+        };
+      } else if (inArena) {
+        provenance = 'gameplay-arena';
+      } else {
+        provenance = 'unmapped';
+      }
+      classified.push({start, end, bytes: end - start,
+        ...(range.kind ? {kind: range.kind} : {}), provenance,
+        ownerRestoreAdmission: false, ...details});
+    }
+  }
+  return classified;
+}
+
+export function validateSourceStateManifest(manifest) {
+  const limit = 0x100000000;
+  if (!manifest || manifest.schema !== 'melee-web-source-state-manifest-v1' ||
+      manifest.target !== 'gameplay_slippi_synctest_browser' ||
+      manifest.complete_game_state !== false ||
+      !/^[0-9a-f]{64}$/.test(manifest.configuration_identity_sha256 || '') ||
+      !manifest.configuration_identity ||
+      manifest.configuration_identity.target !== 'gameplay_slippi_synctest_browser' ||
+      !/^[0-9a-f]{64}$/.test(manifest.configuration_identity.wasm_sha256 || '') ||
+      !Array.isArray(manifest.mutable_input_sections)) {
+    throw new Error('Source-state manifest is malformed');
+  }
+  const rows = manifest.mutable_input_sections;
+  if (!manifest.counts || !Number.isSafeInteger(manifest.counts.mutable_input_sections) ||
+      !Number.isSafeInteger(manifest.counts.source_c_candidates) ||
+      !Number.isSafeInteger(manifest.counts.excluded_mutable_input_sections) ||
+      manifest.counts.mutable_input_sections !== rows.length || rows.length === 0) {
+    throw new Error('Source-state manifest row count is inconsistent');
+  }
+  const intervals = [];
+  for (const row of rows) {
+    if (!row || !Number.isSafeInteger(row.address) || !Number.isSafeInteger(row.size) ||
+        row.address < 0 || row.size < 0 || row.address > limit || row.size > limit - row.address ||
+        !['source-c-static-candidate', 'excluded'].includes(row.decision) ||
+        typeof row.input_object !== 'string' || row.input_object.length === 0 ||
+        typeof row.input_section !== 'string' || row.input_section.length === 0 ||
+        !('source' in row) || !(row.source === null || typeof row.source === 'string') ||
+        !('exclusion_reason' in row) ||
+        (row.decision === 'source-c-static-candidate' ? row.exclusion_reason !== null :
+          typeof row.exclusion_reason !== 'string' || row.exclusion_reason.length === 0)) {
+      throw new Error('Source-state manifest contains an invalid mutable input section');
+    }
+    if (row.size) intervals.push({start: row.address, end: row.address + row.size});
+  }
+  const sourceCStaticCandidates = rows.filter(row => row.decision === 'source-c-static-candidate').length;
+  const excludedMutableInputSections = rows.filter(row => row.decision === 'excluded').length;
+  if (sourceCStaticCandidates !== manifest.counts?.source_c_candidates ||
+      excludedMutableInputSections !== manifest.counts?.excluded_mutable_input_sections) {
+    throw new Error('Source-state manifest decision counts are inconsistent');
+  }
+  intervals.sort((a, b) => a.start - b.start || a.end - b.end);
+  for (let i = 1; i < intervals.length; i++) {
+    if (intervals[i].start < intervals[i - 1].end) {
+      throw new Error('Source-state manifest mutable sections overlap');
+    }
+  }
+  return {
+    target: manifest.target,
+    completeGameState: manifest.complete_game_state,
+    configurationIdentitySha256: manifest.configuration_identity_sha256,
+    wasmSha256: manifest.configuration_identity.wasm_sha256,
+    mutableInputSections: rows.length,
+    sourceCStaticCandidates,
+    excludedMutableInputSections,
+  };
+}
+
+export function validateCensusArenaDisjointness(manifestRows, arenaRange) {
+  const limit = 0x100000000;
+  if (!Array.isArray(manifestRows) ||
+      !Number.isSafeInteger(arenaRange?.base) || !Number.isSafeInteger(arenaRange?.bytes) ||
+      arenaRange.base < 0 || arenaRange.bytes <= 0 ||
+      arenaRange.base > limit || arenaRange.bytes > limit - arenaRange.base) {
+    throw new Error('Live gameplay arena range is malformed');
+  }
+  const intervals = manifestRows.filter(row => row.size > 0).map(row => ({
+    start: row.address, end: row.address + row.size,
+  }));
+  const arenaEnd = arenaRange.base + arenaRange.bytes;
+  if (intervals.some(row => row.start < arenaEnd && arenaRange.base < row.end)) {
+    throw new Error('Live gameplay arena overlaps a manifest input section');
+  }
+}
+
+export function validateCensusInventory(manifest, arenaRange) {
+  const validated = validateSourceStateManifest(manifest);
+  validateCensusArenaDisjointness(manifest.mutable_input_sections, arenaRange);
+  return {
+    mutableInputSections: validated.mutableInputSections,
+    sourceCStaticCandidates: validated.sourceCStaticCandidates,
+    excludedMutableInputSections: validated.excludedMutableInputSections,
+    completeGameState: validated.completeGameState,
+  };
+}
+
 function initializerBytes(module) {
   const size = module._melee_web_snapshot_initializer_diagnostic_size();
   return copyBytes(module, module._melee_web_snapshot_initializer_diagnostic(), size);
@@ -191,14 +382,14 @@ function machine() {
   };
 }
 
-function flatAssetHashes(root) {
+export function flatAssetHashes(root) {
   return Object.fromEntries(fs.readdirSync(root).sort().flatMap(name => {
     const full = path.join(root, name);
     return fs.statSync(full).isFile() ? [[name, fileSha(full)]] : [];
   }));
 }
 
-function reportSourceHashes() {
+export function reportSourceHashes() {
   const files = [
     'tests/gameplay_snapshot_probe.cpp',
     'tests/quiescent_wasm_snapshot.mjs',
@@ -236,7 +427,7 @@ function reportSourceHashes() {
   return Object.fromEntries(files.map(name => [name, fileSha(path.join(ROOT, name))]));
 }
 
-function serveBuild(buildRoot, fileNames) {
+export function serveBuild(buildRoot, fileNames) {
   const page = `<!doctype html><html><head><meta charset="utf-8"><link rel="icon" href="data:,"><title>Slippi-compatible rules (unofficial) — dependency diagnostic</title></head><body><p>Slippi-compatible rules (unofficial) — private dependency diagnostic only; no player settings or service connection. Not affiliated with or endorsed by Project Slippi.</p><canvas id="canvas" width="640" height="480"></canvas></body></html>`;
   const allowed = new Map(fileNames.map(name => [`/${name}`, path.join(buildRoot, name)]));
   const server = http.createServer((request, response) => {
@@ -345,17 +536,64 @@ export async function runBrowserInit(page, origin, runtimeName) {
     drawDiagnosticBytes: DRAW_DIAGNOSTIC_BYTES});
 }
 
-export async function runBrowserSample(page, sample, expectedInputMapping, expectedStocks) {
+export async function runBrowserSample(page, sample, expectedInputMapping, expectedStocks,
+  writeCensus = null) {
   return page.evaluate(async ({sample, expectedInputMapping, expectedStocks, checkedSource, inspectSource,
-    inputMappingSource, diagnosticSizeSource, drawDiagnosticBytes}) => {
+    inputMappingSource, diagnosticSizeSource, drawDiagnosticBytes, writeCensus,
+    diffHeapRangesSource, classifyHeapRangesSource, maxHeapBytes}) => {
     const {module} = window.__slippiSynctest;
     const checkedAsyncCcall = new Function(`return (${checkedSource})`)();
     const checked = (label, identifier, argumentTypes = [], args = []) =>
       checkedAsyncCcall(module, label, identifier, argumentTypes, args);
     const decision = module._melee_web_synctest_draw_decision(0);
     if (decision !== 1) throw new Error(`present tick draw policy returned ${decision}`);
+    let heapBefore = null, heapAfterStep = null, censusBeforeSha256 = null;
+    let censusAfterStepSha256 = null, censusAfterDrawSha256 = null;
+    let censusStepDiff = null, censusDrawDiff = null;
+    const censusNativeTransferQuiescence = writeCensus ? {
+      beforeStep: null, afterStep: null, afterActualDraw: null,
+    } : null;
+    if (writeCensus) {
+      const arenaBase = module._melee_web_synctest_gameplay_arena_base();
+      const arenaBytes = module._melee_web_synctest_gameplay_arena_bytes();
+      if (arenaBase !== writeCensus.arenaRange.base || arenaBytes !== writeCensus.arenaRange.bytes) {
+        throw new Error(`Live gameplay arena changed before census: ${arenaBase}/${arenaBytes}`);
+      }
+      if (!globalThis.crypto?.subtle) throw new Error('Browser Web Crypto is unavailable for census hashes');
+      await checked('native transfer quiescence before census source step', 'melee_web_snapshot_quiescent');
+      censusNativeTransferQuiescence.beforeStep = 'passed';
+      const heap = module.HEAPU8;
+      if (!(heap instanceof Uint8Array) || heap.byteLength > maxHeapBytes) {
+        throw new Error(`Unsupported census heap size: ${heap?.byteLength}`);
+      }
+      heapBefore = heap.slice();
+      const digest = await globalThis.crypto.subtle.digest('SHA-256', heapBefore);
+      censusBeforeSha256 = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+    }
     await checked(`draw-reference source tick ${sample}`,
       'melee_web_snapshot_step', ['number'], [sample]);
+    if (writeCensus) {
+      await checked('native transfer quiescence after census source step', 'melee_web_snapshot_quiescent');
+      censusNativeTransferQuiescence.afterStep = 'passed';
+      heapAfterStep = module.HEAPU8.slice();
+      if (heapAfterStep.byteLength > maxHeapBytes) {
+        throw new Error(`Census heap grew beyond its bound: ${heapAfterStep.byteLength}`);
+      }
+      const digest = await globalThis.crypto.subtle.digest('SHA-256', heapAfterStep);
+      censusAfterStepSha256 = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+      const makeDiff = new Function(`return (${diffHeapRangesSource})`)();
+      const makeClassify = new Function(`return (${classifyHeapRangesSource})`)();
+      const raw = makeDiff(heapBefore, heapAfterStep);
+      censusStepDiff = {
+        beforeHeapBytes: heapBefore.byteLength,
+        afterHeapBytes: heapAfterStep.byteLength,
+        beforeHeapSha256: censusBeforeSha256,
+        afterHeapSha256: censusAfterStepSha256,
+        changedBytes: raw.changedBytes,
+        changedRanges: makeClassify(raw.ranges, writeCensus.manifestRows, writeCensus.arenaRange),
+      };
+      heapBefore = null;
+    }
     await checked(`actual source draw ${sample}`,
       'melee_web_synctest_draw_present');
     if (sample === 0) {
@@ -374,6 +612,28 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
         throw new Error(`Aurora submission did not quiesce for sample ${sample}: ${JSON.stringify(status)}`);
       }
       await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    if (writeCensus) {
+      await checked('native transfer quiescence after census actual draw', 'melee_web_snapshot_quiescent');
+      censusNativeTransferQuiescence.afterActualDraw = 'passed';
+      const heapAfterDraw = module.HEAPU8.slice();
+      if (heapAfterDraw.byteLength > maxHeapBytes) {
+        throw new Error(`Census heap grew beyond its bound: ${heapAfterDraw.byteLength}`);
+      }
+      const digest = await globalThis.crypto.subtle.digest('SHA-256', heapAfterDraw);
+      censusAfterDrawSha256 = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+      const makeDiff = new Function(`return (${diffHeapRangesSource})`)();
+      const makeClassify = new Function(`return (${classifyHeapRangesSource})`)();
+      const raw = makeDiff(heapAfterStep, heapAfterDraw);
+      censusDrawDiff = {
+        beforeHeapBytes: heapAfterStep.byteLength,
+        afterHeapBytes: heapAfterDraw.byteLength,
+        beforeHeapSha256: censusAfterStepSha256,
+        afterHeapSha256: censusAfterDrawSha256,
+        changedBytes: raw.changedBytes,
+        changedRanges: makeClassify(raw.ranges, writeCensus.manifestRows, writeCensus.arenaRange),
+      };
+      heapAfterStep = null;
     }
     const read = (pointer, size) => module.HEAPU8.slice(pointer, pointer + size);
     const observationSize = module._melee_web_snapshot_observation_size();
@@ -408,16 +668,29 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
       }
       return btoa(binary);
     };
+    const heapCensus = writeCensus ? {
+      sample,
+      arenaRange: writeCensus.arenaRange,
+      beforeStepSha256: censusBeforeSha256,
+      afterStepSha256: censusAfterStepSha256,
+      afterDrawSha256: censusAfterDrawSha256,
+      nativeTransferQuiescence: censusNativeTransferQuiescence,
+      sourceStep: censusStepDiff,
+      actualDrawAndQuiescence: censusDrawDiff,
+    } : null;
     return {observation: encode(observation), pcm: encode(pcm), pad: encode(pad),
-      drawDiagnostics: encode(diagnostics), boundary, status};
+      drawDiagnostics: encode(diagnostics), boundary, status, heapCensus};
   }, {sample, expectedInputMapping, expectedStocks, checkedSource: checkedAsyncCcall.toString(),
     inputMappingSource: validateSourceInputMapping.toString(),
     diagnosticSizeSource: requireDrawDiagnosticSize.toString(),
     inspectSource: inspectInteractiveObservation.toString(),
-    drawDiagnosticBytes: DRAW_DIAGNOSTIC_BYTES});
+    drawDiagnosticBytes: DRAW_DIAGNOSTIC_BYTES, writeCensus,
+    diffHeapRangesSource: diffHeapRanges.toString(),
+    classifyHeapRangesSource: classifyHeapRanges.toString(),
+    maxHeapBytes: MAX_HEAP_BYTES});
 }
 
-async function closeBrowser(page) {
+export async function closeBrowser(page) {
   if (!page) return null;
   return page.evaluate(async checkedSource => {
     const state = window.__slippiSynctest;

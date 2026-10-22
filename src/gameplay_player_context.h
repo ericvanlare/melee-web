@@ -29,6 +29,16 @@ typedef struct MeleeWebPlayerStats {
  * Existing entity/state or overlapping context ownership rejects. */
 MeleeWebPlayerContext* melee_web_player_context_begin(const MeleeWebPlayerSettings*, char*, size_t);
 int melee_web_player_context_stats(const MeleeWebPlayerContext*, MeleeWebPlayerStats*, char*, size_t);
+/* Immutable host-owner guard only. Original StaticPlayer globals and Fighter
+ * allocations are separate owners; this guard neither captures nor restores
+ * their live simulation values. A new owner invalidates the guard even when
+ * malloc reuses its address. */
+typedef struct MeleeWebPlayerContextGuard MeleeWebPlayerContextGuard;
+MeleeWebPlayerContextGuard* melee_web_player_context_guard_capture(
+    const MeleeWebPlayerContext*,char*,size_t);
+int melee_web_player_context_guard_admit(const MeleeWebPlayerContextGuard*,char*,size_t);
+void melee_web_player_context_guard_destroy(MeleeWebPlayerContextGuard*);
+
 /* Requires original Fighter unload to clear both player entities first; restores
  * the complete prior StaticPlayer record, including statistics and flags. */
 int melee_web_player_context_end(MeleeWebPlayerContext*, char*, size_t);

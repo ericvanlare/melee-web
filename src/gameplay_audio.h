@@ -23,6 +23,7 @@ typedef struct MeleeWebAudioInput {
  const int16_t* resample_coefficients;uint32_t resample_coefficient_count;
 } MeleeWebAudioInput;
 typedef struct MeleeWebAudio MeleeWebAudio;
+typedef struct MeleeWebAudioSnapshot MeleeWebAudioSnapshot;
 /* Borrow decoded PCM and SEM data through end; setup publishes owned native
  * banks/programs to original synth/SEM code. This is a single stereo32kHz
  * provider; output calls advance the actual160-sample original audio clock. */
@@ -37,6 +38,14 @@ int melee_web_audio_active_samples(MeleeWebAudio*,uint32_t* ids,uint32_t capacit
  * address without exposing or interpreting that address. */
 uint64_t melee_web_audio_generation(MeleeWebAudio*);
 int melee_web_audio_end(MeleeWebAudio*,char*,size_t);
+/* This component captures owned mixer/SEM descriptor bytes and effect heaps.
+ * It does not capture original source globals, streamed PCM/transfer owners,
+ * immutable input assets or consumed Web Audio output. Caller must be at an
+ * exported-call boundary and close those other owners before world restore. */
+MeleeWebAudioSnapshot* melee_web_audio_snapshot_capture(MeleeWebAudio*);
+int melee_web_audio_snapshot_admit(MeleeWebAudio*,const MeleeWebAudioSnapshot*);
+int melee_web_audio_snapshot_restore(MeleeWebAudio*,const MeleeWebAudioSnapshot*);
+void melee_web_audio_snapshot_destroy(MeleeWebAudioSnapshot*);
 #ifdef __cplusplus
 }
 #endif

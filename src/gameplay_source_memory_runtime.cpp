@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <iterator>
 #include <limits>
+#include <memory>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -49,7 +51,8 @@ struct FighterLease {
     bool live = false;
 };
 
-Heap source_address_heap;
+std::unique_ptr<Heap> source_address_heap = std::make_unique<Heap>();
+uint64_t owner_epoch = 0;
 int source_heap_handle = -1;
 uint64_t world_generation = 0;
 uint64_t next_generation = 0;
@@ -119,8 +122,9 @@ extern "C" int melee_web_source_memory_begin(uint64_t generation,
     uint32_t begin = 0, end = 0;
     if (!derive_vs_main_heap(&begin, &end))
         return fail("GALE01r2 VS main heap bounds could not be derived");
-    if (source_address_heap.create_empty(Address(begin), Address(end)) != Status::ok)
+    if (source_address_heap->create_empty(Address(begin), Address(end)) != Status::ok)
         return fail("GALE01r2 VS main heap rejected its derived bounds");
+    if (++owner_epoch == 0) ++owner_epoch;
     source_heap_handle = heap_handle;
     world_generation = generation;
     active = true;
@@ -140,7 +144,7 @@ extern "C" int melee_web_source_memory_end(uint64_t generation)
     world_generation = 0;
     allocations.clear();
     fighters.clear();
-    source_address_heap.clear();
+    source_address_heap->clear();
     return healthy ? 1 : 0;
 }
 
@@ -159,7 +163,7 @@ extern "C" int melee_web_source_memory_alloc(int heap, void* host_payload,
         if (host < existing_end && existing.host < requested_end)
             return fail("source main heap reused an overlapping live host allocation");
     }
-    const auto result = source_address_heap.allocate(static_cast<uint32_t>(requested_bytes));
+    const auto result = source_address_heap->allocate(static_cast<uint32_t>(requested_bytes));
     if (result.status != Status::ok)
         return fail("source main heap rejected a live OSAllocFromHeap request");
     allocations.push_back({host, static_cast<uint32_t>(requested_bytes),
@@ -177,7 +181,7 @@ extern "C" int melee_web_source_memory_free(int heap, void* host_payload)
         [host](const HostAllocation& allocation) { return allocation.host == host; });
     if (found == allocations.end())
         return fail("source main heap free has no matching live allocation");
-    if (source_address_heap.release(found->source) != Status::ok)
+    if (source_address_heap->release(found->source) != Status::ok)
         return fail("source main heap rejected a live OSFreeToHeap request");
     allocations.erase(found);
     return 1;
@@ -286,4 +290,79 @@ extern "C" int melee_web_source_memory_fighter_release(void* host_fighter)
         return fail("source Fighter release has no matching live allocation lease");
     lease->live = false;
     return 1;
+}
+
+
+/* This owns mirror values only. No host allocation payload, SDK arena, source
+ * global, or renderer object is copied or authorized by this interface. */
+struct MeleeWebSourceMemorySnapshot {
+    uint64_t epoch;
+    int heap_handle;
+    uint64_t world, watermark;
+    melee_web::source::HeapState heap;
+    std::vector<HostAllocation> allocations;
+    std::vector<FighterLease> fighters;
+};
+
+extern "C" MeleeWebSourceMemorySnapshotStatus
+melee_web_source_memory_snapshot_capture(MeleeWebSourceMemorySnapshot** out)
+{
+    if (!out) return MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_INVALID_ARGUMENT;
+    *out = nullptr;
+    if (!active) return MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_INACTIVE;
+    if (!healthy) return MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_UNHEALTHY;
+    try {
+        auto snapshot = std::make_unique<MeleeWebSourceMemorySnapshot>(
+            MeleeWebSourceMemorySnapshot{owner_epoch, source_heap_handle,
+                world_generation, next_generation, source_address_heap->state(),
+                allocations, fighters});
+        *out = snapshot.release();
+        return MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_OK;
+    } catch (const std::bad_alloc&) {
+        return MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_ALLOCATION_FAILED;
+    }
+}
+
+extern "C" MeleeWebSourceMemorySnapshotStatus
+melee_web_source_memory_snapshot_admit(const MeleeWebSourceMemorySnapshot* snapshot)
+{
+    if (!snapshot) return MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_INVALID_ARGUMENT;
+    if (!active) return MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_INACTIVE;
+    if (!healthy) return MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_UNHEALTHY;
+    if (snapshot->epoch != owner_epoch ||
+        snapshot->heap_handle != source_heap_handle ||
+        snapshot->world != world_generation)
+        return MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_STALE_OWNER;
+    return MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_OK;
+}
+
+extern "C" MeleeWebSourceMemorySnapshotStatus
+melee_web_source_memory_snapshot_restore(const MeleeWebSourceMemorySnapshot* snapshot)
+{
+    const auto admission = melee_web_source_memory_snapshot_admit(snapshot);
+    if (admission != MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_OK) return admission;
+    try {
+        // All validation and allocation precedes the first live-owner write.
+        // This private Heap has no ObjectPool users: its internal generation is
+        // not an externally retained identity. World/allocation IDs are restored
+        // explicitly below, with the lifetime epoch deliberately unchanged.
+        auto heap = std::make_unique<Heap>();
+        if (heap->restore(snapshot->heap) != Status::ok)
+            return MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_INVALID_STATE;
+        auto candidate_allocations = snapshot->allocations;
+        auto candidate_fighters = snapshot->fighters;
+        source_address_heap.swap(heap);
+        allocations.swap(candidate_allocations);
+        fighters.swap(candidate_fighters);
+        next_generation = snapshot->watermark;
+        return MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_OK;
+    } catch (const std::bad_alloc&) {
+        return MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_ALLOCATION_FAILED;
+    }
+}
+
+extern "C" void melee_web_source_memory_snapshot_destroy(
+    MeleeWebSourceMemorySnapshot* snapshot)
+{
+    delete snapshot;
 }

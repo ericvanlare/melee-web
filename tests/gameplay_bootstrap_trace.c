@@ -581,6 +581,34 @@ int main(int argc, char** argv)
           "live generation matches full bootstrap statistics");
     check(stats.objects == 3 && stats.processes == 7 && stats.heap_free_bytes > 0,
           "original pool counts and real SDK heap validation");
+    MeleeWebGameplayBootstrapSnapshot* owner_snapshot=
+        melee_web_gameplay_bootstrap_snapshot_capture(error,sizeof(error));
+    check(owner_snapshot != NULL,"capture actual bootstrap owner");
+    check(melee_web_gameplay_bootstrap_snapshot_admit(owner_snapshot,error,sizeof(error)),
+          "admit same quiescent bootstrap owner");
+    const void* checkpoint_arena=NULL;size_t checkpoint_bytes=0;
+    check(melee_web_gameplay_bootstrap_snapshot_arena(owner_snapshot,&checkpoint_arena,
+          &checkpoint_bytes,error,sizeof(error)) && checkpoint_arena && checkpoint_bytes==1024*1024,
+          "snapshot exposes exact owned arena extent");
+    check(melee_web_gameplay_bootstrap_snapshot_restore(owner_snapshot,error,sizeof(error)),
+          "unchanged bootstrap owner value restore");
+    HSD_GObj** callback_slots[]={&HSD_GObj_804D781C,&HSD_GObj_804D7818,&HSD_GObj_804D7814};
+    for(unsigned callback=0;callback<3;++callback){
+        MeleeWebGameplayBootstrapState owner_before,owner_after;
+        check(melee_web_gameplay_bootstrap_state(&owner_before,sizeof(owner_before)),
+              "capture owner before callback refusal");
+        *callback_slots[callback]=ga;
+        check(!melee_web_gameplay_bootstrap_snapshot_capture(error,sizeof(error)),
+              "active process/GX callback rejects bootstrap capture");
+        check(!melee_web_gameplay_bootstrap_snapshot_admit(owner_snapshot,error,sizeof(error)) &&
+              !melee_web_gameplay_bootstrap_snapshot_restore(owner_snapshot,error,sizeof(error)),
+              "active process/GX callback rejects bootstrap admission/restore");
+        check(*callback_slots[callback]==ga,"refusal preserves active callback pointer");
+        *callback_slots[callback]=NULL;
+        check(melee_web_gameplay_bootstrap_state(&owner_after,sizeof(owner_after)) &&
+              !memcmp(&owner_before,&owner_after,sizeof(owner_before)),
+              "callback refusals preserve complete bootstrap owner state");
+    }
     step(); EXPECT(200, 300, 104, 204, 304, 206, 306);
     step(); EXPECT(200, 300, 104, 204, 304, 206, 306);
 
@@ -632,6 +660,12 @@ int main(int argc, char** argv)
           melee_web_gameplay_stats().generation == melee_web_gameplay_generation() &&
           melee_web_gameplay_stats().ticks == 0 && melee_web_gameplay_stats().objects == 0,
           "restart does not inherit old pool counters or process lists");
+    const uint64_t restarted_ticks=melee_web_gameplay_stats().ticks;
+    check(!melee_web_gameplay_bootstrap_snapshot_restore(owner_snapshot,error,sizeof(error)),
+          "retired bootstrap snapshot rejects replacement world");
+    check(melee_web_gameplay_stats().ticks==restarted_ticks,
+          "refused bootstrap restore preserves replacement ticks");
+    melee_web_gameplay_bootstrap_snapshot_destroy(owner_snapshot);
     step(); check(trace_size == 0, "empty restarted world has no stale callbacks");
     check(melee_web_gameplay_shutdown(error, sizeof(error)), "restarted shutdown");
     puts("Original HSD gameplay-bootstrap scheduler trace: passed");

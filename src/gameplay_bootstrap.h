@@ -100,9 +100,31 @@ int melee_web_gameplay_session_end(char* error, size_t error_size);
 int melee_web_gameplay_session_arena(const void** base, size_t* bytes);
 int melee_web_gameplay_session_active(void);
 MeleeWebGameplayAllocation melee_web_gameplay_allocation(void);
+/* Read-only extent of the live game arena. This succeeds only at a quiescent
+ * boundary with balanced HSD callback markers, a live owned SDK heap, and the
+ * matching healthy source-memory owner. It does not grant restore permission. */
+int melee_web_gameplay_active_arena_view(const void** base, size_t* bytes);
 /* Public prototype for the typed read-only owner producer. */
 int melee_web_gameplay_bootstrap_state(MeleeWebGameplayBootstrapState* out,
                                        uint32_t out_size);
+
+/* Owner-only checkpoint. Captures private bootstrap values; restoring it does
+ * not restore SDK/source globals or arena contents. All lifecycle fields must
+ * remain invariant; only ticks and the process-link mask may rewind. Caller
+ * must serialize at a quiescent boundary and admit companion owners first. */
+typedef struct MeleeWebGameplayBootstrapSnapshot MeleeWebGameplayBootstrapSnapshot;
+MeleeWebGameplayBootstrapSnapshot* melee_web_gameplay_bootstrap_snapshot_capture(
+    char* error, size_t error_size);
+int melee_web_gameplay_bootstrap_snapshot_admit(
+    const MeleeWebGameplayBootstrapSnapshot*, char* error, size_t error_size);
+int melee_web_gameplay_bootstrap_snapshot_restore(
+    const MeleeWebGameplayBootstrapSnapshot*, char* error, size_t error_size);
+/* Actual arena extent, never an inferred span from allocations. Valid only
+ * while this snapshot admits; exposing it does not authorize an arena restore. */
+int melee_web_gameplay_bootstrap_snapshot_arena(
+    const MeleeWebGameplayBootstrapSnapshot*, const void** base, size_t* bytes,
+    char* error, size_t error_size);
+void melee_web_gameplay_bootstrap_snapshot_destroy(MeleeWebGameplayBootstrapSnapshot*);
 
 /* Owns a single isolated SDK heap and the HSD process tables. This nonrendering
  * bootstrap executes original allocation, object lifecycle and scheduling;

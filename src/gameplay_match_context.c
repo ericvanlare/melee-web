@@ -57,6 +57,7 @@ struct MeleeWebMatchContext {
     int crowd_started,input_restored;
 };
 static MeleeWebMatchContext* owner;
+static uint64_t owner_epoch;
 static int fail(char* e,size_t n,const char* m){if(e&&n)snprintf(e,n,"%s",m);return 0;}
 static int ok(char* e,size_t n){if(e&&n)*e=0;return 1;}
 static int live(MeleeWebMatchContext* h,char* e,size_t n)
@@ -153,6 +154,7 @@ MeleeWebMatchContext* melee_web_match_begin_players(const MeleeWebPlayerSettings
      * event field. No prior fighters may survive into this exclusive context. */
     mpColl_80041C78();
     Camera_80028B9C(camera_subjects);h->pool=cm_804D645C;
+    if (++owner_epoch == 0) ++owner_epoch;
     owner=h;ok(e,n);return h;
 }
 int melee_web_match_attach_collision(MeleeWebMatchContext* h,MeleeWebCollision* collision,char* e,size_t n)
@@ -595,4 +597,69 @@ int melee_web_match_end(MeleeWebMatchContext* h,char* e,size_t n)
     for(unsigned i=0;i<4;i++)PADControlMotor(i,PAD_MOTOR_STOP_HARD);
     memcpy(HSD_Rumble_804C22E0,h->saved_rumble,sizeof(h->saved_rumble));
     owner=NULL;free(h);return ok(e,n);
+}
+
+
+struct MeleeWebMatchContextSnapshot {
+    MeleeWebMatchContext* identity;
+    uint64_t epoch;
+    MeleeWebMatchContext value;
+    MeleeWebPlayerContextGuard* players[MELEE_WEB_MATCH_MAX_PLAYERS];
+};
+static int match_snapshot_boundary(MeleeWebMatchContext* h, char* e, size_t n)
+{
+    if (!owned(h,e,n)) return 0;
+    if (HSD_GObj_804D781C || HSD_GObj_804D7818 || HSD_GObj_804D7814)
+        return fail(e,n,"Match snapshot cannot run inside a source callback");
+    return 1;
+}
+MeleeWebMatchContextSnapshot* melee_web_match_context_snapshot_capture(
+    MeleeWebMatchContext* h, char* e, size_t n)
+{
+    if (!match_snapshot_boundary(h,e,n)) return NULL;
+    MeleeWebMatchContextSnapshot* snapshot=calloc(1,sizeof(*snapshot));
+    if (!snapshot) {fail(e,n,"Cannot allocate match-context snapshot");return NULL;}
+    snapshot->identity=h;
+    snapshot->epoch=owner_epoch;
+    snapshot->value=*h;
+    for (unsigned i=0;i<h->player_count;++i) {
+        snapshot->players[i]=melee_web_player_context_guard_capture(h->players[i],e,n);
+        if (!snapshot->players[i]) {
+            melee_web_match_context_snapshot_destroy(snapshot);return NULL;
+        }
+    }
+    ok(e,n);
+    return snapshot;
+}
+int melee_web_match_context_snapshot_admit(MeleeWebMatchContext* h,
+    const MeleeWebMatchContextSnapshot* snapshot,char* e,size_t n)
+{
+    if (!snapshot) return fail(e,n,"Match-context snapshot is missing");
+    if (!match_snapshot_boundary(h,e,n)) return 0;
+    const MeleeWebMatchContext* old=&snapshot->value;
+    if (snapshot->identity!=h || snapshot->epoch!=owner_epoch ||
+        old->generation!=h->generation || old->collision!=h->collision ||
+        old->player_count!=h->player_count || old->camera_count!=h->camera_count ||
+        old->pool!=h->pool || old->saved_seed!=h->saved_seed ||
+        memcmp(old->players,h->players,sizeof(h->players)) ||
+        memcmp(old->slots,h->slots,sizeof(h->slots)) ||
+        memcmp(old->controllers,h->controllers,sizeof(h->controllers)))
+        return fail(e,n,"Match-context identity or external owner topology changed");
+    for (unsigned i=0;i<h->player_count;++i)
+        if (!melee_web_player_context_guard_admit(snapshot->players[i],e,n)) return 0;
+    return ok(e,n);
+}
+int melee_web_match_context_snapshot_restore(MeleeWebMatchContext* h,
+    const MeleeWebMatchContextSnapshot* snapshot,char* e,size_t n)
+{
+    if (!melee_web_match_context_snapshot_admit(h,snapshot,e,n)) return 0;
+    *h=snapshot->value;
+    return ok(e,n);
+}
+void melee_web_match_context_snapshot_destroy(MeleeWebMatchContextSnapshot* snapshot)
+{
+    if (!snapshot) return;
+    for (unsigned i=0;i<MELEE_WEB_MATCH_MAX_PLAYERS;++i)
+        melee_web_player_context_guard_destroy(snapshot->players[i]);
+    free(snapshot);
 }

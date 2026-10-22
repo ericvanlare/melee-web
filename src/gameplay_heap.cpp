@@ -12,8 +12,10 @@
 
 #include <cstdio>
 #include <limits>
+#include <new>
 
 namespace {
+uint64_t gameplay_owner_epoch = 0;
 void* gameplay_owned_arena = nullptr;
 u8* gameplay_owned_start = nullptr;
 u8* gameplay_owned_end = nullptr;
@@ -85,6 +87,7 @@ extern "C" void* melee_web_gameplay_heap_initialize(void* arena, size_t bytes,
         heap_failure(error, error_size, "Original SDK allocator could not initialize the arena");
         return nullptr;
     }
+    if (++gameplay_owner_epoch == 0) ++gameplay_owner_epoch;
     gameplay_owned_arena = arena;
     gameplay_owned_start = sArenaStart;
     gameplay_owned_end = sArenaEnd;
@@ -141,7 +144,50 @@ extern "C" int melee_web_gameplay_heap_recreate(void* expected_arena,
     const OSHeapHandle recreated = OSCreateHeap(sArenaStart, sArenaEnd);
     if (recreated < 0)
         return heap_failure(error, error_size, "Original SDK allocator could not recreate the arena heap");
+    if (++gameplay_owner_epoch == 0) ++gameplay_owner_epoch;
     *out_heap = recreated;
     clear_error(error, error_size);
     return 1;
+}
+
+
+struct MeleeWebGameplayHeapGuard {
+    uint64_t epoch;
+    const void* owned_arena;
+    u8 *owned_start, *owned_end;
+    HeapDesc* heaps;
+    int count;
+    u8 *arena_start, *arena_end;
+    OSHeapHandle selected;
+};
+extern "C" MeleeWebGameplayHeapGuard* melee_web_gameplay_heap_guard_capture(
+    const void* expected_arena,char* error,size_t size)
+{
+    if (!melee_web_gameplay_heap_owns(expected_arena)) {
+        heap_failure(error,size,"Heap guard requires the exact live owned arena");
+        return nullptr;
+    }
+    auto* guard=new(std::nothrow) MeleeWebGameplayHeapGuard{
+        gameplay_owner_epoch,gameplay_owned_arena,gameplay_owned_start,gameplay_owned_end,
+        sHeapArray,sNumHeaps,sArenaStart,sArenaEnd,__OSCurrHeap};
+    if (!guard) {heap_failure(error,size,"Cannot allocate SDK heap-root guard");return nullptr;}
+    clear_error(error,size);
+    return guard;
+}
+extern "C" int melee_web_gameplay_heap_guard_admit(
+    const MeleeWebGameplayHeapGuard* guard,char* error,size_t size)
+{
+    if (!guard || guard->epoch!=gameplay_owner_epoch ||
+        !melee_web_gameplay_heap_owns(guard->owned_arena) ||
+        gameplay_owned_start!=guard->owned_start || gameplay_owned_end!=guard->owned_end ||
+        sHeapArray!=guard->heaps || sNumHeaps!=guard->count ||
+        sArenaStart!=guard->arena_start || sArenaEnd!=guard->arena_end ||
+        __OSCurrHeap!=guard->selected)
+        return heap_failure(error,size,"SDK heap roots or selected heap changed after checkpoint");
+    clear_error(error,size);
+    return 1;
+}
+extern "C" void melee_web_gameplay_heap_guard_destroy(MeleeWebGameplayHeapGuard* guard)
+{
+    delete guard;
 }

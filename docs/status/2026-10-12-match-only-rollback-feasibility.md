@@ -10,6 +10,51 @@ offline/online, with distinct pinned references; the toggle/profile are not yet
 implemented. The [structured receipt](../evidence/match-only-rollback-feasibility-v1.json)
 binds current producer and retained failure identities.
 
+## Same-instance browser restore, issue #341 (in progress)
+
+[Issue #341](https://github.com/ericvanlare/melee-web/issues/341) owns the next
+browser boundary. Private components now capture the source allocation mirror,
+bootstrap/context/flow values, decoded DAT allocations, and native audio/effect
+buffers under explicit owner and lifetime guards. They are not composed into a
+browser restore. Independent review caught a missing GX callback marker in three
+snapshot admission checks; the repaired checks refuse simulation and draw
+callbacks separately. The actual production flow control passes with synthetic
+lifecycle prerequisites. The original single/two-player constructor, neutral
+ticks, context checkpoint controls and unload/restart also pass in two Node
+worlds after repairing the older fixture's missing match initialization and
+source-header prerequisites. Both failed prerequisites remain retained. These
+component checks do not establish browser restoration.
+
+A private linker-map inventory records original/generated C static regions and
+explicitly excluded host/runtime sections against the final Wasm and producer
+graph. It is a candidate range inventory, not complete simulation state. Source
+included through project wrappers, dynamic descriptors, stream/file owners and
+renderer interactions still need closure. A read-only census now completes
+samples 0–299 and the first non-neutral sample 300 in installed headless Chrome.
+It preserves all literal PAD records, both selected fighters' positive source
+draw dispatches, native PCM, actual Aurora frame completion and owned cleanup.
+The earlier sample-zero failure was a harness assertion intended for the
+no-draw lane; the reviewed repair retains the strict interactive draw checks.
+
+Across the sampled boundaries, the source step changes 89,539 byte values and
+the draw/completion interval changes 762,423. These are sums of net differences
+per transition, **not unique mutable state size or a snapshot budget**. Of their
+combined 851,962 byte observations, 19,902 fall in the gameplay arena, 3,736 in
+candidate source statics, 4,361 in explicitly excluded sections and 823,963
+remain unmapped by that inventory. Same-value stores and transient changes are
+unobserved. Boundary DVD-idle checks do not exclude transfers that completed
+between them. Every range remains unadmitted for restore. The screenshot shows
+the Mario pair and FD with existing magenta/texture artifacts; it is not a pixel
+accuracy pass. No same-instance browser restore or rollback performance result
+is claimed. The next experiment maps dynamic buffers through their actual
+owners before any restoration is enabled.
+
+The checkpoint passes independent source/result review, the affected private
+and ordinary Release builds, the real-asset fighter target and its context
+trace, and the final 2,445-test regression with 165 skips. Current-head CI and
+the remaining milestone gates are still pending. The receipt distinguishes
+the exact census runtime from its harness and later fixture-only repairs.
+
 ## First current-source copy/restore result
 
 The existing synchronous source-only Mario/FD fixture passes one selected
