@@ -2,7 +2,7 @@
 
 **Compiled / Synthetic controls / Source identified / Native traced / Retail compared (first-CSS, SSS constructor, first scheduler and first draw fields, plus declared matched-Setup C/F fields) / Browser exercised (bounded SSS prefix, VS Entry, first SSS draw and Setup/C/F with checked unload) / two same-process functional lifetimes passed**
 
-**Current boundary (October 18):** The fresh original GO+2 recording is retained,
+**Current boundary (October 22):** The fresh original GO+2 recording is retained,
 but the first browser comparison against it failed at C, before F or GO+2.
 The countdown and seed differ; the other 14 declared fields match. Independent
 raw reduction now locates different seeds at VS Entry and completed Setup,
@@ -16,10 +16,18 @@ and runtime/harness use `171818fd`; a test-only scoped-import fixture repair
 then passed its focused check and full regression on `1e96b2a9`. The initial
 `171818fd` suite failed in that extracted fixture and remains retained.
 The later finite-CSS implementation, focused controls and post-repair full
-regression pass at checkpoint `a1bcad29`. Its finite-CSS browser attempt fails
-before disc import because startup readiness had not completed; renderer logs
-show long staging-slot waits, and no new CSS comparison occurred. Native unload timed out, while owned-process cleanup
-and independent PID absence checks passed.
+regression pass at checkpoint `a1bcad29`. Its finite-CSS browser attempt failed
+before disc import; no CSS comparison occurred, and failure-path native unload
+timed out while owned-process cleanup and independent PID absence checks passed.
+A source-backed startup presentation repair on `bee850fc` passes four focused
+controls, both affected Release builds and the 2,741-test regression (191 skips,
+578.275 seconds).
+One subsequent no-disc readiness observation reached the enabled disc picker
+after all 890 startup pipelines were created, with zero queued and cache idle;
+its overall result is still `PROBE_ERROR` because the unchanged 5-second
+screenshot timed out. No source input, CSS comparison or screenshot was
+produced. The next step is a bounded screenshot/presentation reduction; finite
+CSS comparisons, Draft #301 and C3 remain open.
 The [structured receipt](../evidence/issue251-stadium-profile-oninit-v1.json),
 under `fresh_go2_comparison_2026_10_18`, records the failure, passing component
 validation and cleanup. C3 and public Stadium admission remain open.
@@ -1946,10 +1954,40 @@ comparisons ran. Failure-path native unload also exceeded its five-second bound.
 The browser and server closed, and all 12 recorded owned PIDs were independently
 absent. Failed scratch and the screenshot remain retained. Process cleanup does
 not establish native unload success. Independent review confirms this pre-import
-failure; the precise false readiness gate was not recorded. The next step is a smaller startup/readiness
-reduction, without increasing deadlines or retrying this route unchanged. Finite
-comparison, terminal scheduler equality, SSS/VS/GO continuation, whole-session
-acceptance and C3 remain open.
+failure; the precise false readiness gate was not recorded. A separate no-disc
+startup reduction follows below. Finite comparison, terminal scheduler equality,
+SSS/VS/GO continuation, whole-session acceptance and C3 remain open.
+
+**No-disc startup-readiness follow-up (October 22):** The retained v3 reduction
+records 61 startup samples, with storage ready but native cache idle still 0;
+the final graphics snapshot had 345 of 890 queued pipelines remaining, while
+source ticks, draws and disc import stayed at zero. Partial renderer logs include
+7,437.51 ms of staging-slot waits; their full contribution to the delay remains
+unmeasured. The native pipeline-cache readiness prerequisite remained false. The reviewed source repair on `bee850fc` records one successful
+ownerless empty presentation submission, then holds only later empty fallback
+presentations while startup seeds remain queued and the original pre-disc owner
+guard passes. It leaves the seed service, timer and readiness gates unchanged;
+the first empty-submission diagnostic is not a GPU-completion claim. Four
+source-bound focused controls, diagnostic and ordinary Release builds, and the
+full regression pass (2,741 tests, 191 skips, 578.275 seconds) on that source.
+The historical `cb0d8ba2` PR #301 runtime
+CI partition was cancelled with a 10-minute maximum-execution-time annotation;
+the retained diagnosis cannot distinguish configure from compile/link. Exact-head
+CI for `bee850fc` has not run.
+
+The changed-hypothesis v5 no-disc run samples the original page at 250 ms
+intervals. The original disc picker becomes enabled at observer time 2,354.5 ms;
+the final sample at 2,359.145 ms records all 890 pipelines created, queue 0,
+cache idle 1 and terminal true. The retained first-frame log has zero source
+steps and draws, and no source input was sent. Overall status is
+`PROBE_ERROR`: Playwright's unchanged 5-second screenshot call timed out after
+fonts loaded, so there is no screenshot or pixel result. The observation stopped
+before that timeout, and neither resumed staging blockage nor a screenshot-only
+failure is established. The runner closed its browser/server, all 12 recorded
+PIDs were independently absent, and failed scratch remains retained; native
+unload was not attempted. A bounded source/evidence design for the screenshot
+boundary is recorded in the receipt. Do not retry this route unchanged, extend
+timeouts or release finite-CSS comparisons from this partial result.
 
 
 The earlier GO+2 supervised attempt took 15.248 seconds (15.317 seconds including the root
