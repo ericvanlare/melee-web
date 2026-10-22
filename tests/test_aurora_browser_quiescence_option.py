@@ -34,6 +34,129 @@ BUILD = importlib.util.module_from_spec(BUILD_SPEC)
 BUILD_SPEC.loader.exec_module(BUILD)
 
 
+def staging_observer_fixture(frame_source, header_source):
+    status_end = header_source.index("} AuroraBrowserSubmissionStatus;") + len("} AuroraBrowserSubmissionStatus;")
+    status_start = header_source.rfind("typedef struct {", 0, status_end)
+    types = header_source[status_start:status_end] + "\n" + header_source[
+        header_source.index("/* Diagnostic-only browser ownership view."):
+        header_source.index("size_t aurora_browser_quiescence_descriptor_bytes();")]
+    lease = frame_source[frame_source.index("AuroraBrowserQuiescenceLease quiescence_lease("):
+                         frame_source.index("AuroraBrowserByteBufferDescriptor describe_buffer(")]
+    actual = frame_source[frame_source.index("// BEGIN PURE STAGING OBSERVER"):
+                          frame_source.index("// END PURE STAGING OBSERVER")]
+    return r"""
+#include <array>
+#include <atomic>
+#include <cassert>
+#include <cstdint>
+#include <cstddef>
+#include <cstdlib>
+#include <cstring>
+#include <limits>
+#include <new>
+static size_t allocationCalls = 0;
+void* operator new(std::size_t size) { ++allocationCalls; if (void* p=std::malloc(size)) return p; throw std::bad_alloc(); }
+void operator delete(void* p) noexcept { std::free(p); }
+""" + types + r"""
+constexpr size_t FrameSlotCount=4, StagingBufferCount=4;
+struct TestStats { uint32_t queuedPipelines=0,createdPipelines=7,drawCallCount=8; uint64_t lastBeginFrameId=9,lastEndFrameId=9; };
+struct { TestStats stats; } g_resources;
+struct Pool { size_t free=4; size_t free_count() const {return free;} } g_frameSlots,g_stagingSlots;
+uint32_t g_frameIndex=0, cacheStatus=0;
+std::atomic_uint64_t g_browserStagingGeneration{1},g_browserSubmissionSequence{2},g_browserCallbackSequence{2},g_browserStaleCallbackCount{0};
+size_t frameCount=4, stagingCount=4;
+size_t active_frame_slot_count(){return frameCount;}
+size_t active_staging_buffer_count(){return stagingCount;}
+namespace render_worker { bool idle=true; bool is_idle(){return idle;} }
+uint32_t browser_pipeline_cache_status(){return cacheStatus;}
+std::array<AuroraBrowserFrameStagingDescriptor,4> ownedFrames{};
+std::array<AuroraBrowserSubmissionDescriptor,4> ownedSubmissions{};
+std::array<unsigned char,64> payload{};
+bool corruptHeader=false, advanceGeneration=false;
+void fill_quiescence_header(AuroraBrowserQuiescenceDescriptor& out,const AuroraBrowserSubmissionStatus& status){
+  out={}; out.schemaVersion=corruptHeader?4:5; out.frameSlotCount=frameCount;out.stagingSlotCount=stagingCount;
+  out.frameDescriptorOffset=sizeof(out);out.frameDescriptorStride=sizeof(ownedFrames[0]);out.frameDescriptorCount=frameCount;
+  out.submissionDescriptorOffset=sizeof(out)+frameCount*sizeof(ownedFrames[0]);
+  out.submissionDescriptorStride=sizeof(ownedSubmissions[0]);out.submissionDescriptorCount=stagingCount;
+  out.byteSize=out.submissionDescriptorOffset+stagingCount*sizeof(ownedSubmissions[0]);
+  out.pendingFramePackets=status.pendingFramePackets;out.pendingStagingBuffers=status.pendingStagingBuffers;out.workerBusy=status.workerBusy;
+  out.pipelineCacheStatus=cacheStatus;out.queuedPipelines=g_resources.stats.queuedPipelines;
+  out.createdPipelines=g_resources.stats.createdPipelines;out.drawCallCount=g_resources.stats.drawCallCount;
+  out.currentFrameIndex=g_frameIndex;out.stagingGeneration=g_browserStagingGeneration.load();
+}
+void fill_staging_descriptor(AuroraBrowserFrameStagingDescriptor& out,size_t slot){out=ownedFrames[slot];if(advanceGeneration){++g_browserStagingGeneration;advanceGeneration=false;}}
+void fill_submission_descriptor(AuroraBrowserSubmissionDescriptor& out,size_t slot){out=ownedSubmissions[slot];}
+static unsigned pumps=0;
+void enqueue_process_events(){++pumps;assert(false);}
+void process_events(){++pumps;assert(false);}
+""" + lease + actual + r"""
+void reset(){
+ g_frameIndex=0;cacheStatus=0;frameCount=stagingCount=4;g_frameSlots.free=g_stagingSlots.free=4;
+ render_worker::idle=true;g_resources.stats=TestStats{};g_browserStagingGeneration=1;
+ corruptHeader=advanceGeneration=false;ownedFrames={};ownedSubmissions={};payload.fill(0x6A);
+ for(size_t i=0;i<4;++i){auto& f=ownedFrames[i];f.frameSlot=i;f.packetStagingBuffer=UINT32_MAX;
+  for(size_t j=0;j<5;++j){f.packetBuffers[j].owned=1;f.packetBuffers[j].maxCapacity=UINT32_MAX;
+    f.shadowBuffers[j].owned=1;f.shadowBuffers[j].maxCapacity=UINT32_MAX;}
+  ownedSubmissions[i].stagingSlot=i;}
+ auto& b=ownedFrames[0].shadowBuffers[0];b.dataAddress=reinterpret_cast<uintptr_t>(payload.data());
+ b.capacity=64;b.length=4;b.maxCapacity=64;ownedFrames[0].shadowPreviousUsed[0]=4;
+}
+struct Observed {
+ decltype(ownedFrames) frames;decltype(ownedSubmissions) submissions;decltype(payload) bytes;
+ TestStats stats;size_t freeFrames,freeStaging,framesN,stagingN;uint32_t frame,cache;bool idle;
+ uint64_t generation,registration,callback,stale;
+};
+Observed read_owners(){Observed x{};x.frames=ownedFrames;x.submissions=ownedSubmissions;x.bytes=payload;
+ x.stats=g_resources.stats;x.freeFrames=g_frameSlots.free;x.freeStaging=g_stagingSlots.free;x.framesN=frameCount;x.stagingN=stagingCount;
+ x.frame=g_frameIndex;x.cache=cacheStatus;x.idle=render_worker::idle;x.generation=g_browserStagingGeneration;
+ x.registration=g_browserSubmissionSequence;x.callback=g_browserCallbackSequence;x.stale=g_browserStaleCallbackCount;return x;}
+void refusal(bool injectedMutation=false){
+ std::array<unsigned char,BrowserObserverStorageBytes> before{};
+ std::memcpy(before.data(),aurora_browser_quiescence_observer_storage,before.size());
+ const auto owners=read_owners();const auto allocations=allocationCalls;
+ assert(browser_quiescence_observe_descriptor_impl()==nullptr);
+ assert(std::memcmp(before.data(),aurora_browser_quiescence_observer_storage,before.size())==0);
+ const auto after=read_owners();if(!injectedMutation)assert(std::memcmp(&owners,&after,sizeof(owners))==0);
+ assert(allocationCalls==allocations&&pumps==0);
+}
+int main(){
+ reset();std::memset(aurora_browser_quiescence_observer_storage,0xA5,BrowserObserverStorageBytes);
+#ifdef __EMSCRIPTEN_PTHREADS__
+ refusal();return 0;
+#else
+ const auto before=read_owners();const auto allocations=allocationCalls;
+ assert(browser_quiescence_observe_descriptor_impl()==aurora_browser_quiescence_observer_storage);
+ const auto after=read_owners();assert(std::memcmp(&before,&after,sizeof(before))==0);assert(allocationCalls==allocations&&pumps==0);
+ std::array<unsigned char,BrowserObserverStorageBytes> saved{};std::memcpy(saved.data(),aurora_browser_quiescence_observer_storage,saved.size());
+ assert(browser_quiescence_observe_descriptor_impl()!=nullptr);assert(std::memcmp(saved.data(),aurora_browser_quiescence_observer_storage,saved.size())==0);
+ for(int failure=0;failure<23;++failure){reset();
+  auto& f=ownedFrames[0];auto& b=f.shadowBuffers[0];
+  switch(failure){
+  case 0:g_frameSlots.free=3;break;case 1:g_stagingSlots.free=3;break;
+  case 2:render_worker::idle=false;break;case 3:cacheStatus=1;break;case 4:g_resources.stats.queuedPipelines=1;break;
+  case 5:g_frameIndex=UINT32_MAX;break;case 6:g_browserStagingGeneration=0;break;
+  case 7:frameCount=0;break;case 8:frameCount=5;break;case 9:stagingCount=5;break;
+  case 10:f.packetActive=1;break;case 11:f.packetFrameId=1;break;
+  case 12:f.packetBuffers[0].dataAddress=reinterpret_cast<uintptr_t>(payload.data());break;
+  case 13:b.owned=0;break;case 14:b.length=65;break;case 15:b.maxCapacity=63;break;
+  case 16:f.shadowPreviousUsed[0]=65;break;case 17:b.capacity=0;b.length=0;break;
+  case 18:ownedFrames[1].shadowBuffers[0]=b;break;
+  case 19:b.dataAddress=reinterpret_cast<uintptr_t>(aurora_browser_quiescence_observer_storage);break;
+  case 20:ownedSubmissions[0].state=AURORA_BROWSER_SUBMISSION_REGISTERED;break;
+  case 21:corruptHeader=true;break;case 22:b.dataAddress=UINTPTR_MAX-16;b.capacity=32;b.length=0;b.maxCapacity=64;break;
+  }refusal();
+ }
+ reset();advanceGeneration=true;refusal(true);
+ // Full header/rows are the actual source ABI, not a handwritten wire.
+ reset();assert(browser_quiescence_observe_descriptor_impl()!=nullptr);
+ const auto* header=reinterpret_cast<const AuroraBrowserQuiescenceDescriptor*>(aurora_browser_quiescence_observer_storage);
+ assert(header->schemaVersion==5&&header->byteSize==BrowserObserverStorageBytes);
+ return 0;
+#endif
+}
+"""
+
+
 class AuroraBrowserQuiescenceOptionTests(OwnedWorkspaceTests):
     @classmethod
     def setUpClass(cls):
@@ -55,7 +178,11 @@ class AuroraBrowserQuiescenceOptionTests(OwnedWorkspaceTests):
         )
         self.assertIn('AURORA_QUIESCENCE_DIAGNOSTIC_TARGET = "aurora-browser-quiescence"', build)
         self.assertIn(
-            "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC={'ON' if target == AURORA_QUIESCENCE_DIAGNOSTIC_TARGET else 'OFF'}",
+            "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC={'ON' if target == AURORA_QUIESCENCE_DIAGNOSTIC_TARGET or aurora_staging_shadow_diagnostic else 'OFF'}",
+            build,
+        )
+        self.assertIn(
+            "MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY={'ON' if aurora_staging_shadow_diagnostic else 'OFF'}",
             build,
         )
         self.assertEqual(
@@ -275,13 +402,14 @@ class AuroraBrowserQuiescenceOptionTests(OwnedWorkspaceTests):
             self.assertNotIn("Browser staging owner mismatch", off_preprocessed)
 
     def test_build_profile_controls_reach_the_real_configure_graph(self):
-        for target, expected_profile, expected_directory in (
+        for target, expected_profile, expected_shadow_profile, expected_directory in (
             (
                 BUILD.AURORA_QUIESCENCE_DIAGNOSTIC_TARGET,
                 "ON",
+                "OFF",
                 "build/browser-quiescence-release",
             ),
-            ("graphics", "OFF", "build/browser-release"),
+            ("graphics", "OFF", "OFF", "build/browser-release"),
         ):
             with self.subTest(target=target):
                 root = self.scratch / f"build-graph-{target}"
@@ -308,6 +436,10 @@ class AuroraBrowserQuiescenceOptionTests(OwnedWorkspaceTests):
                     f"-DMELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC={expected_profile}",
                     configure,
                 )
+                self.assertIn(
+                    f"-DMELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY={expected_shadow_profile}",
+                    configure,
+                )
                 build_calls = [call for call in run.call_args_list if "--build" in call.args[0]]
                 self.assertEqual(len(build_calls), 1)
                 self.assertEqual(build_calls[0].args[0][2], str(root / expected_directory))
@@ -315,6 +447,98 @@ class AuroraBrowserQuiescenceOptionTests(OwnedWorkspaceTests):
                     build_calls[0].args[0][build_calls[0].args[0].index("--target") + 1],
                     "gx_probe",
                 )
+
+    def test_staging_shadow_build_flag_reaches_only_the_private_trace(self):
+        root = self.scratch / "aurora-shadow-build-graph"
+        root.mkdir()
+        bins = root / ".venv/bin"
+        emscripten = root / ".deps/emsdk/upstream/emscripten"
+        bins.mkdir(parents=True)
+        emscripten.mkdir(parents=True)
+        for path in (bins / "cmake", bins / "ninja", emscripten / "emcmake"):
+            path.write_text("fixture\n", encoding="utf-8")
+        (root / ".deps/emsdk/.emscripten").write_text("fixture\n", encoding="utf-8")
+        (emscripten / "emscripten-version.txt").write_text("6.0.9\n", encoding="utf-8")
+        (root / "assets-local/snapshot-mario").mkdir(parents=True)
+        generated = root / "build/gameplay-source/src"
+        with patch.object(BUILD, "read_lock", return_value={"repositories": {}, "emscripten": "6.0.9"}), \
+                patch.object(BUILD, "verify_sources"), \
+                patch.object(BUILD, "prepare_sources", return_value=generated), \
+                patch.object(BUILD.subprocess, "run") as run:
+            BUILD.build(2, root=root, configuration="Release",
+                        trace_targets=("gameplay_slippi_synctest",),
+                        aurora_staging_shadow_diagnostic=True)
+        configure_calls = [call for call in run.call_args_list if "-S" in call.args[0]]
+        self.assertEqual(len(configure_calls), 1)
+        configure = configure_calls[0].args[0]
+        self.assertIn("-DMELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC=ON", configure)
+        self.assertIn("-DMELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY=ON", configure)
+        build_calls = [call for call in run.call_args_list if "--build" in call.args[0]]
+        self.assertEqual(len(build_calls), 1)
+        self.assertEqual(build_calls[0].args[0][2],
+                         str(root / "build/slippi-synctest-aurora-staging-release"))
+
+    def test_staging_shadow_opt_in_is_private_and_release_only(self):
+        root = Path("/fixture/repo")
+        self.assertEqual(
+            BUILD.build_directory(root, target="gameplay_slippi_synctest", configuration="Release"),
+            root / "build/slippi-synctest-release",
+        )
+        self.assertEqual(
+            BUILD.build_directory(root, target="gameplay_slippi_synctest", configuration="Release",
+                                  aurora_staging_shadow_diagnostic=True),
+            root / "build/slippi-synctest-aurora-staging-release",
+        )
+        with self.assertRaisesRegex(ValueError, "Release Slippi synctest"):
+            BUILD.build_directory(root, target="runtime", configuration="Release",
+                                  aurora_staging_shadow_diagnostic=True)
+        with self.assertRaisesRegex(ValueError, "Release Slippi synctest"):
+            BUILD.build_directory(root, target="gameplay_slippi_synctest", configuration="Debug",
+                                  aurora_staging_shadow_diagnostic=True)
+        build = (ROOT / "scripts/build.py").read_text(encoding="utf-8")
+        cmake = (ROOT / "cmake/FighterRuntime.cmake").read_text(encoding="utf-8")
+        self.assertIn('"--aurora-staging-shadow-diagnostic"', build)
+        self.assertIn('build/slippi-synctest-aurora-staging-release', build)
+        self.assertIn('if(MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY)', cmake)
+        self.assertIn('NOT MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC', cmake)
+        self.assertIn('MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY=1', cmake)
+        self.assertIn('_melee_web_synctest_aurora_staging_shadow_inventory_query', cmake)
+
+    def test_staging_shadow_observer_is_pure_and_rejects_unsafe_output(self):
+        with self._patched_frame() as frame:
+            source = frame.read_text(encoding="utf-8")
+            start = source.index("// BEGIN PURE STAGING OBSERVER")
+            end = source.index("// END PURE STAGING OBSERVER", start)
+            observer = source[start:end]
+            for forbidden in (
+                "browser_submission_status(", "enqueue_process_events(", "process_events(",
+                "browser_quiescence_descriptor(", "browser_quiescence_validate_descriptor(",
+                "browser_quiescence_capture_lease(", "browser_quiescence_validate_lease(",
+                "synchronize(", "malloc(", "calloc(", "realloc(", ".exchange(", "queue.submit(",
+            ):
+                self.assertNotIn(forbidden, observer)
+            self.assertIn("const void* browser_quiescence_observe_descriptor_impl()", observer)
+            self.assertIn("quiescence_lease_equal(before, after)", observer)
+            self.assertIn("aurora_browser_quiescence_observer_storage", observer)
+            compiler = shutil.which("clang++") or shutil.which("g++")
+            if compiler is None:
+                self.skipTest("C++ compiler unavailable")
+            header = (frame.parents[2] / "include/aurora/gfx.h").read_text(encoding="utf-8")
+            fixture_source = staging_observer_fixture(source, header)
+            for threaded in (False, True):
+                directory = self.scratch / ("pure-observer-threaded" if threaded else "pure-observer-inline")
+                directory.mkdir()
+                fixture = directory / "control.cpp"
+                fixture.write_text(fixture_source, encoding="utf-8")
+                command = [compiler, "-std=c++20", "-O0", str(fixture), "-o", str(directory / "control")]
+                if threaded:
+                    command.append("-D__EMSCRIPTEN_PTHREADS__=1")
+                (directory / "command.json").write_text(json.dumps(command) + "\n", encoding="utf-8")
+                for ordinal, arguments in enumerate((command, [str(directory / "control")])):
+                    result = subprocess.run(arguments, capture_output=True, text=True, timeout=30)
+                    (directory / f"{ordinal}.stdout").write_text(result.stdout, encoding="utf-8")
+                    (directory / f"{ordinal}.stderr").write_text(result.stderr, encoding="utf-8")
+                    self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_disabled_public_api_is_explicit_zero_write(self):
         current = PATCH.read_text(encoding="utf-8")
@@ -340,6 +564,7 @@ class AuroraBrowserQuiescenceOptionTests(OwnedWorkspaceTests):
                 "size_t browser_quiescence_descriptor_bytes() noexcept { return 0; }",
                 "size_t browser_quiescence_lease_bytes() noexcept { return 0; }",
                 "int browser_quiescence_descriptor(void*, size_t) noexcept { return 0; }",
+                "const void* browser_quiescence_observe_descriptor() noexcept { return nullptr; }",
                 "int browser_quiescence_validate_descriptor(const void*, size_t) noexcept { return 0; }",
                 "int browser_quiescence_capture_lease(AuroraBrowserQuiescenceLease*) noexcept { return 0; }",
                 "int browser_quiescence_validate_lease(const AuroraBrowserQuiescenceLease*) noexcept { return 0; }",

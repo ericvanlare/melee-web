@@ -78,6 +78,42 @@ MeleeWebSourceMemorySnapshotStatus melee_web_source_memory_snapshot_restore(
     const MeleeWebSourceMemorySnapshot* snapshot);
 void melee_web_source_memory_snapshot_destroy(MeleeWebSourceMemorySnapshot* snapshot);
 
+/* Payload-only checkpoint for the exact live OSAllocFromHeap payloads tracked
+ * by the active source-main-heap owner. This is distinct from the mirror
+ * snapshot above: it copies bytes, never rewinds allocator cells or identities,
+ * and restores only while the complete live topology and lifetime watermark
+ * are unchanged. Callers serialize it at a quiescent source boundary and still
+ * admit every other owner before any broader operation. Capture returns its
+ * result by value so the caller cannot supply an output pointer that aliases a
+ * live payload. */
+typedef struct MeleeWebSourceMemoryPayloadSnapshot
+    MeleeWebSourceMemoryPayloadSnapshot;
+typedef enum MeleeWebSourceMemoryPayloadSnapshotStatus {
+    MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK = 0,
+    MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_ARGUMENT = 1,
+    MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INACTIVE = 2,
+    MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_UNHEALTHY = 3,
+    MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_STALE_OWNER = 4,
+    MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED = 5,
+    MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE = 6,
+    MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_ALLOCATION_FAILED = 7,
+    MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OVERLAPPING_STORAGE = 8,
+} MeleeWebSourceMemoryPayloadSnapshotStatus;
+typedef struct MeleeWebSourceMemoryPayloadSnapshotCaptureResult {
+    MeleeWebSourceMemoryPayloadSnapshotStatus status;
+    MeleeWebSourceMemoryPayloadSnapshot* snapshot;
+} MeleeWebSourceMemoryPayloadSnapshotCaptureResult;
+MeleeWebSourceMemoryPayloadSnapshotCaptureResult
+melee_web_source_memory_payload_snapshot_capture(void);
+MeleeWebSourceMemoryPayloadSnapshotStatus
+melee_web_source_memory_payload_snapshot_admit(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot);
+MeleeWebSourceMemoryPayloadSnapshotStatus
+melee_web_source_memory_payload_snapshot_restore(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot);
+void melee_web_source_memory_payload_snapshot_destroy(
+    MeleeWebSourceMemoryPayloadSnapshot* snapshot);
+
 /* Fighter_Create / ftDemo_CreateFighter and Fighter_Unload bind the allocation to its
  * live host owner. Reuse advances allocation_generation even if an HSD free
  * chain returns the same object address. */

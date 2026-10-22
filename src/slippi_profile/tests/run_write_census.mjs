@@ -25,12 +25,21 @@ const SAMPLE = PREFIX_SAMPLES;
 function parseArgs(argv) {
   const values = {};
   const allowed = new Set(['--browser-runtime', '--assets', '--manifest', '--out', '--playwright']);
-  for (let i = 0; i < argv.length; i += 2) {
-    const key = argv[i], value = argv[i + 1];
+  const flags = new Set(['--aurora-staging-shadow-inventory']);
+  for (let i = 0; i < argv.length;) {
+    const key = argv[i];
+    if (flags.has(key)) {
+      if (values[key]) throw new Error(`Duplicate ${key}`);
+      values[key] = true;
+      i++;
+      continue;
+    }
+    const value = argv[i + 1];
     if (!allowed.has(key) || !value || values[key]) {
-      throw new Error('Usage: run_write_census.mjs --browser-runtime FILE --assets DIR --manifest FILE --out NEW_DIR [--playwright PACKAGE_DIR]');
+      throw new Error('Usage: run_write_census.mjs --browser-runtime FILE --assets DIR --manifest FILE --out NEW_DIR [--playwright PACKAGE_DIR] [--aurora-staging-shadow-inventory]');
     }
     values[key] = value;
+    i += 2;
   }
   for (const key of ['--browser-runtime', '--assets', '--manifest', '--out']) {
     if (!values[key]) throw new Error(`Missing ${key}`);
@@ -71,6 +80,8 @@ function sourceHashes() {
     'src/gameplay_bootstrap.c',
     'src/gameplay_bootstrap.h',
     'cmake/FighterRuntime.cmake',
+    'patches/aurora-browser.patch',
+    'scripts/build.py',
     'scripts/browser_tools.mjs',
     'scripts/source_state_manifest.py',
   ];
@@ -123,6 +134,24 @@ export function validateCensusDrawSample(result, sample, beforeDiagnostics,
         result.heapCensus.nativeOutputStorage?.ownerRestoreAdmission !== false) {
       throw new Error('The requested three-boundary audio owner inventory did not return');
     }
+    if (result.heapCensus.requireAuroraStagingShadowInventory === true &&
+        (result.heapCensus.auroraStagingShadowOwnerInventory?.boundaryOrder?.join('|') !==
+          'before-source-step|after-source-step|after-actual-draw-and-Aurora-quiescence' ||
+         result.heapCensus.auroraStagingShadowOwnerInventory?.boundaries?.length !== 3 ||
+         result.heapCensus.auroraStagingShadowOwnerInventory?.version !== 5 ||
+         result.heapCensus.auroraStagingShadowOwnerInventory?.stableOwnerLifetimeValidated !== true ||
+         result.heapCensus.auroraStagingShadowOwnerInventory?.ownerRestoreAdmission !== false ||
+         result.heapCensus.auroraStagingShadowOwnerInventory.boundaries.some(boundary =>
+           boundary.version !== 5 || !Array.isArray(boundary.rows) ||
+           boundary.rows.length !== boundary.frameSlotCount * 5 ||
+           !Array.isArray(boundary.ranges) ||
+           boundary.rows.some((row, index) => row.frameSlot !== Math.floor(index / 5) ||
+             row.streamIndex !== index % 5 || row.kind !== index % 5 + 1 || row.owned !== 1) ||
+           boundary.ownerRestoreAdmission !== false ||
+           boundary.diagnosticOutputStorage?.diagnosticOnly !== true ||
+           boundary.diagnosticOutputStorage?.ownerRestoreAdmission !== false))) {
+      throw new Error('The requested three-boundary Aurora staging-shadow inventory did not return');
+    }
     const checks = result.heapCensus.nativeTransferQuiescence;
     if (!checks || checks.beforeStep !== 'passed' || checks.afterStep !== 'passed' ||
         checks.afterActualDraw !== 'passed') {
@@ -162,6 +191,8 @@ function changedSummary(transitions) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  const requireAuroraStagingShadowInventory =
+    options['--aurora-staging-shadow-inventory'] === true;
   const runtime = options['--browser-runtime'];
   const wasm = runtime.replace(/\.mjs$/, '.wasm');
   const data = runtime.replace(/\.mjs$/, '.data');
@@ -180,10 +211,14 @@ async function main() {
   const report = {
     schema: 'melee-web-slippi-browser-write-census-v1',
     result: 'incomplete',
-    statement: 'One warmed actual browser sample net-byte-delta census with read-only audio and match-context owner-range provenance at three boundaries; same-value stores and transient changes that return to their prior value before a boundary are not observable. These owner ranges and native PCM output storage are diagnostic provenance only, not complete game-state ownership or restore admission; every changed range remains unadmitted and no memory is restored.',
+    statement: requireAuroraStagingShadowInventory ?
+      'One warmed actual browser sample net-byte-delta census with read-only audio, match-context, and Aurora CPU staging-shadow provenance at three boundaries; same-value stores and transient changes that return to their prior value before a boundary are not observable. These ranges and diagnostic output storage are provenance only, not complete game-state ownership or restore admission; every changed range remains unadmitted and no memory is restored.' :
+      'One warmed actual browser sample net-byte-delta census with read-only audio and match-context owner-range provenance at three boundaries; same-value stores and transient changes that return to their prior value before a boundary are not observable. These owner ranges and native PCM output storage are diagnostic provenance only, not complete game-state ownership or restore admission; every changed range remains unadmitted and no memory is restored.',
     execution: {status: 'incomplete', prefixSamples: PREFIX_SAMPLES, censusSample: SAMPLE,
       sourceStep: 'existing deterministic snapshot_step input at sample 300',
-      captureHypothesis: 'Attribute source-step changes from exact live audio and match-context owner ranges; no same-browser restore is attempted.',
+      captureHypothesis: requireAuroraStagingShadowInventory ?
+        'Attribute source-step changes from exact live audio, match-context, and Aurora staging-shadow owner ranges, and source-draw changes from the staging-shadow capacities; no same-browser restore is attempted.' :
+        'Attribute source-step changes from exact live audio and match-context owner ranges; no same-browser restore is attempted.',
       draw: 'existing actual source draw followed by the existing Aurora pending-packet/staging/worker quiescence wait'},
     inventory: {status: 'incomplete', completeGameState: manifestInventory.completeGameState,
       sourceStateManifestComplete: false,
@@ -194,6 +229,7 @@ async function main() {
       ownerRestoreAdmission: false, arenaInternalOwnershipProven: false,
       audioOwnerRangeInventory: null, nativeOutputStorage: null,
       matchContextOwnerRangeInventory: null,
+      auroraStagingShadowOwnerRangeInventory: null,
       outsideArenaBytes: null, unadmittedChangedBytes: null,
       unclassifiedChanges: [], classificationSummary: {}},
     profile: {identity: null, sourceIdentity: null, rngHelper: null, stageBridge: null,
@@ -359,6 +395,7 @@ async function main() {
       manifestRows: manifest.mutable_input_sections,
       requireAudioInventory: true,
       requireMatchContextInventory: true,
+      requireAuroraStagingShadowInventory,
     };
     const sample = await runBrowserSample(page, SAMPLE, expectedInputMapping, expectedStocks, censusPlan);
     const censusDraw = validateCensusDrawSample(sample, SAMPLE, previousDiagnostics,
@@ -410,6 +447,8 @@ async function main() {
       arenaInternalOwnershipProven: false,
       audioOwnerRangeInventory: sample.heapCensus.audioOwnerInventory,
       matchContextOwnerRangeInventory: sample.heapCensus.matchContextOwnerInventory,
+      auroraStagingShadowOwnerRangeInventory:
+        sample.heapCensus.auroraStagingShadowOwnerInventory,
       nativeOutputStorage: sample.heapCensus.nativeOutputStorage,
       outsideArenaBytes,
       unadmittedChangedBytes,
@@ -422,6 +461,10 @@ async function main() {
         'The live gameplay arena export proves only its address extent; its internal object/state ownership and restore admission remain unproven.',
         'The audio owner-range inventory attributes exact allocations to one live audio lifetime; it is provenance only and does not establish complete audio or game-state restore admission.',
         'The match-context owner range attributes one exact live allocation within its world generation and owner epoch; it is provenance only and does not establish complete game-state restore admission.',
+        ...(requireAuroraStagingShadowInventory ? [
+          'Aurora staging-shadow ranges attribute exact CPU backing capacities across one unchanged renderer generation; this does not establish source-read independence or restore admission.',
+          'Aurora descriptor output storage is retained as a diagnostic and excluded range.',
+        ] : []),
         'Native PCM output storage is retained as an explicitly diagnostic and excluded range.',
         'Native DVD STATE_END checks passed at each sampled boundary but cannot exclude a transfer that completed between boundaries.',
       ],
@@ -429,7 +472,9 @@ async function main() {
     report.execution = {status: 'completed', prefixSamples: PREFIX_SAMPLES,
       censusSample: SAMPLE, sampleInteractive: true,
       sourceStep: 'existing deterministic snapshot_step input at sample 300',
-      captureHypothesis: 'Attribute source-step changes from exact live audio and match-context owner ranges; no same-browser restore is attempted.',
+      captureHypothesis: requireAuroraStagingShadowInventory ?
+        'Attribute source-step changes from exact live audio, match-context, and Aurora staging-shadow owner ranges, and source-draw changes from the staging-shadow capacities; no same-browser restore is attempted.' :
+        'Attribute source-step changes from exact live audio and match-context owner ranges; no same-browser restore is attempted.',
       draw: 'existing actual source draw followed by the existing Aurora pending-packet/staging/worker quiescence wait',
       restorePerformed: false};
     report.result = 'incomplete';

@@ -118,6 +118,7 @@ BUILD_TARGETS = {
 
 def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
                     pipeline_provenance=False, selective_pipelines=False,
+                    aurora_staging_shadow_diagnostic=False,
                     stadium_c1a_diagnostic=False,
                     fma_collision_diagnostic=False,
                     fma_velocity_y_diagnostic=False):
@@ -131,10 +132,15 @@ def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
     root = Path(root)
     if target not in BUILD_TARGETS and target not in TRACE_TARGETS:
         raise ValueError(f"Unsupported build target: {target}")
+    if aurora_staging_shadow_diagnostic and (
+            target != "gameplay_slippi_synctest" or configuration != "Release"):
+        raise ValueError("Aurora staging-shadow diagnostics require the Release Slippi synctest")
     if target == "gameplay_slippi_synctest":
         if (pipeline_provenance or selective_pipelines or stadium_c1a_diagnostic or
                 fma_collision_diagnostic or fma_velocity_y_diagnostic):
             raise ValueError("gameplay-slippi-synctest requires its isolated private build profile")
+        if aurora_staging_shadow_diagnostic:
+            return root / "build/slippi-synctest-aurora-staging-release"
         suffix = "-release" if configuration == "Release" else ""
         return root / f"build/slippi-synctest{suffix}"
     fma_requested = fma_collision_diagnostic or fma_velocity_y_diagnostic
@@ -958,12 +964,17 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
           pipeline_provenance=False, selective_pipelines=False, configure_only=False,
           trace_targets=None, gameplay_bootstrap_state=False,
           stadium_c1a_diagnostic=False, fma_collision_diagnostic=False,
-          fma_velocity_y_diagnostic=False, slippi_synctest_assets=None):
+          fma_velocity_y_diagnostic=False, slippi_synctest_assets=None,
+          aurora_staging_shadow_diagnostic=False):
     trace_targets = tuple(trace_targets or ())
     if ("gameplay_slippi_synctest" in trace_targets and
             trace_targets != ("gameplay_slippi_synctest",)):
         raise ValueError("gameplay_slippi_synctest must be the only --trace-target")
     slippi_synctest = trace_targets == ("gameplay_slippi_synctest",)
+    if aurora_staging_shadow_diagnostic and not slippi_synctest:
+        raise ValueError("--aurora-staging-shadow-diagnostic requires --trace-target gameplay_slippi_synctest")
+    if aurora_staging_shadow_diagnostic and configuration != "Release":
+        raise ValueError("Aurora staging-shadow diagnostics are Release-only")
     if slippi_synctest:
         if (pipeline_provenance or selective_pipelines or stadium_c1a_diagnostic or
                 fma_collision_diagnostic or fma_velocity_y_diagnostic or
@@ -1051,6 +1062,7 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         build_dir = build_directory(root, target=build_target, configuration=configuration,
                                     pipeline_provenance=pipeline_provenance,
                                     selective_pipelines=selective_pipelines,
+                                    aurora_staging_shadow_diagnostic=aurora_staging_shadow_diagnostic,
                                     stadium_c1a_diagnostic=stadium_c1a_diagnostic,
                                     fma_collision_diagnostic=fma_collision_diagnostic,
                                     fma_velocity_y_diagnostic=fma_velocity_y_diagnostic)
@@ -1082,7 +1094,10 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
             f"-DMELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC={'ON' if 'aurora_future_owner_probe' in trace_targets else 'OFF'}"
         )
         configure.append(
-            f"-DMELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC={'ON' if target == AURORA_QUIESCENCE_DIAGNOSTIC_TARGET else 'OFF'}"
+            f"-DMELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC={'ON' if target == AURORA_QUIESCENCE_DIAGNOSTIC_TARGET or aurora_staging_shadow_diagnostic else 'OFF'}"
+        )
+        configure.append(
+            f"-DMELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY={'ON' if aurora_staging_shadow_diagnostic else 'OFF'}"
         )
         configure.append(
             f"-DMELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC={'ON' if target == MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET else 'OFF'}"
@@ -1159,6 +1174,8 @@ def main():
                         help="Use this ignored local fixture for gameplay_slippi_synctest")
     parser.add_argument("--stadium-c1a-diagnostic", action="store_true",
                         help="Build the opt-in development-only Stadium selection/preparation checkpoint")
+    parser.add_argument("--aurora-staging-shadow-diagnostic", action="store_true",
+                        help="Build the private Release Slippi census with read-only Aurora staging-shadow provenance")
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error("--jobs must be positive")
@@ -1172,7 +1189,8 @@ def main():
               stadium_c1a_diagnostic=args.stadium_c1a_diagnostic,
               fma_collision_diagnostic=args.fma_collision_diagnostic,
               fma_velocity_y_diagnostic=args.fma_velocity_y_diagnostic,
-              slippi_synctest_assets=args.slippi_synctest_assets)
+              slippi_synctest_assets=args.slippi_synctest_assets,
+              aurora_staging_shadow_diagnostic=args.aurora_staging_shadow_diagnostic)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         raise SystemExit(f"build: {error}") from error
 

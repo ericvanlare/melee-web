@@ -11,39 +11,29 @@ bind the owner controls, source manifest and completed read-only browser census.
 Use their hashes for producer identity; the capture preceded this commit and
 must not be relabeled as produced by the later checkpoint commit.
 
-The current checkpoint has independent source/result review, full regression,
-affected Release builds and an actual constructor/context trace. Checkpoint `12f1008e` also has all 14 exact-head CI checks complete: 12
-successes and two expected skips. New uncommitted work needs its own validation. The original sample-zero census failure, missing
-legacy fixture initialization and source-header compile failure are retained.
-The successful census is incomplete ownership evidence, not rollback or timing
-acceptance. Do not repeat it without a new hypothesis.
+The existing status receipt retains earlier #341 source, control and census
+results with their exact producer identities and failures. The Aurora v2 census
+remains tied to the clean `4c95db9d` base and its original noncanonical frozen
+nine-file patch. Full regression v5 found a single canonical-patch serialization
+failure. The separately reviewed repair changed only patch serialization; both
+byte sequences produce the same prepared Aurora source tree, and the v5 capture
+has not been relabeled. The Aurora v1 refusal also included missing arbitrary-
+output alias closure. The structured receipt pins the failure, repair and
+independent review.
 
-The read-only audio/FX range visitor and browser adapter now pass focused
-controls and independent source/result review. The completed third census
-attributes live audio/effects allocations with separate lifetime tags at all
-three boundaries. Every range remains unadmitted. Its exact runtime, manifest,
-map, inputs, raw result and process cleanup are retained separately from the
-previous census. Do not repeat either successful capture without a new hypothesis.
-The private and ordinary Release builds pass; the extension's full regression
-passes in `full-regression-v3.log`. The source-review hash correction is retained
-in `audio-range-adapter-source-review-v2-pin-correction-v1.json`; it changes no
-source or result, and the original review remains untouched.
+The exact three-file source-main-heap payload component has passed independent
+review, focused controls, both Release builds and full regression v6. Its
+freeze, control, integration and application receipts are recorded in the status
+evidence. The component covers only exact live payload bytes inside the gameplay
+arena; other source state and host effects remain unadmitted. Final exact-head CI
+is pending at this cutoff. The corrected read-only plan v2 is pinned in the
+receipt, and plan v1 remains preserved. No browser restore or aggregate
+admission is claimed.
 
-The match-context range query now has independent source and raw-result review.
-Its descriptor and error outputs refuse aliases into the live owner before any
-write, with actual-source nonmutation and subsequent healthy-step controls. The
-one read-only browser census completed; it is not an aggregate restore. The
-existing status receipt retains all exact producer, validation and remaining-gap
-identities. Do not repeat this successful capture without a new hypothesis.
-
-Full regression also passes; exact-head CI for this extension is still pending.
-Next: checkpoint this result and review the bounded design for
-a pure observation accessor reusing Aurora's existing staging-shadow descriptor.
-The existing descriptor pumps events, so it cannot be called unchanged as a
-read-only census. This work identifies host-owned bytes for the no-draw boundary;
-paused drawn-correction work remains paused. Keep all memory unadmitted until
-the owner contract closes. Broad NativeDat traversal and libc/heap rewind remain
-deferred or refused; preserve all prior decoder, fixture and review failures.
+Base-commit CI run `39856673269` applies to `4c95db9d` only. Earlier sample-zero,
+fixture, source-header, Aurora v1 and initial v2 control failures remain
+retained. Do not repeat a successful capture without a changed hypothesis.
+Keep paused drawn-correction work paused and all observed memory unadmitted.
 
 The machine-local packet is named
 `browser-rollback-sprint-20261022-115029-d89e262b`, discoverable through the

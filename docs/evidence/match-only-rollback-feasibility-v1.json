@@ -2596,7 +2596,7 @@
       "retained_artifact": "census-owner-gap-analysis-v1.json",
       "sha256": "9908b8d2ebb8aeeb64d8df4dcdeb24ea0f16f55bab3d17e1f847c679f90ba370"
     },
-    "next_experiment": "Design a pure observer reusing existing Aurora staging-shadow descriptor ownership; existing descriptor pumps events and cannot be used unchanged. No capture or restore follows from this result.",
+    "next_experiment": "The exact live source-main-heap payload component has passed focused controls, both Release builds, and full regression v6. Wait for final exact-head CI, then select another narrowly bounded owner under one-tick-admission-plan-v2.json (e551360520b99054508046b9bdeb679ad6103c2ec6e13ede0c90fb3fdd16616c). The plan remains read-only; this payload component does not close the 46,400 source-step bytes outside the arena or authorize browser restore.",
     "owner_components": {
       "scope": "Private owner components only; no browser restore exposure or complete-world claim",
       "current_files_sha256": {
@@ -3063,6 +3063,580 @@
       "retained_artifact": "aurora-range-bounded-design-v1.json",
       "sha256": "eddd825feef357be8357fde4f1757a5b8d66cf60259e3e603b9d3a50dbd12c34",
       "scope": "Pure host-provenance observer design only; no renderer restoration, drawn correction or automatic exclusion admission"
+    },
+    "aurora_staging_shadow_census_v5": {
+      "status": "MEASUREMENT_COMPLETED_INVENTORY_INCOMPLETE",
+      "scope": "One actual headless-Chrome sample-300 read-only census with exact audio, match-context and Aurora staging-shadow provenance at three boundaries; no browser restore, no timing acceptance.",
+      "producer": {
+        "base_commit": "4c95db9d2f04b6b3e78f7cacc82d4e354fd0392e",
+        "worktree_state": "Clean 4c95db9d plus the separately frozen nine-file Aurora v2 candidate; this uncommitted candidate is the producer and must not be relabeled as a later commit. The capture used the original noncanonical frozen v2 patch bytes; later canonicalization changed serialization only and retained the same prepared Aurora source tree.",
+        "candidate_freeze": {
+          "retained_artifact": "aurora-range-candidate-v2/freeze-v2.json",
+          "sha256": "418ffebd8227b739247ae8d635d798fd59775fc05d0cb1b5e5ced8edff34c877"
+        },
+        "candidate_patch": {
+          "retained_artifact": "aurora-range-candidate-v2/aurora-range-candidate-v2.diff",
+          "sha256": "46d31924ff7a253564f7b8e91ea7c12bb47315478299ddee9b2ba31528303add",
+          "changed_file_count": 9,
+          "patch_bytes_sha256_at_capture": "d4390585d7b87de5f328a186983cb5505cb6809d7402f82fff8defe013692399",
+          "serialization_at_capture": "Original noncanonical frozen v2 patch bytes; preserve this producer identity for the v5 census."
+        },
+        "source_review": {
+          "retained_artifact": "aurora-range-source-review-v2.json",
+          "sha256": "dbcda81148ccb3f2bb99ce05b468206c79c7ec9cf21e0d83d4bb10bdfcc0ca11",
+          "status": "APPROVED_FOR_GUARDED_APPLICATION_AND_FOCUSED_VALIDATION"
+        },
+        "candidate_v1_refusal": {
+          "freeze": {
+            "retained_artifact": "aurora-range-candidate-v1/freeze-v1.json",
+            "sha256": "b2f5b8740955a8cfc82370ab4b9d81f88b6cd859498ec6ffb4479dc0ffcf1253"
+          },
+          "review": {
+            "retained_artifact": "aurora-range-source-review-v1.json",
+            "sha256": "56eb088efe8936c05e50fbed1170750004862badbb51ccf60d0a11f8b6bfb1d8",
+            "status": "BLOCKED_EXTERNAL_CANDIDATE_REPAIR_REQUIRED"
+          },
+          "findings": "V1 was blocked for malformed Python syntax; the diagnostic output could overlap its generated-source manifest row; it lacked arbitrary-output alias closure for caller-provided buffers; and its tests did not execute the production observer/refusal path. V1 remains preserved."
+        },
+        "amended_contract": {
+          "retained_artifact": "aurora-range-amended-contract-v2.json",
+          "sha256": "c9b936efd64e5d7073a7911b0f7b29ce6d8e302fdc3d9e8d129114697a2ccda0",
+          "summary": "Pure no-argument producer returns fixed private descriptor storage/null. The JavaScript exclusion binds the exact 2200-byte private diagnostic allocation and does not broadly exempt other manifest/owner overlaps."
+        }
+      },
+      "capture": {
+        "raw_report": {
+          "retained_artifact": "browser-write-census-v5/runner/evidence.json",
+          "sha256": "46b6edc2233d05b527f4585df058dc02e1f7795f961f3e44d48e61157dfa2a18",
+          "bytes": 144243523,
+          "report_result": "incomplete"
+        },
+        "preflight": {
+          "retained_artifact": "browser-write-census-v5/preflight.json",
+          "sha256": "df3c571fe0e3516359be205cef3275c08c639fe1198ba444812746ee69862fc7",
+          "freeze_sha256": "418ffebd8227b739247ae8d635d798fd59775fc05d0cb1b5e5ced8edff34c877",
+          "status": "APPROVED_ONE_READ_ONLY_CAPTURE",
+          "source_review_sha256": "dbcda81148ccb3f2bb99ce05b468206c79c7ec9cf21e0d83d4bb10bdfcc0ca11"
+        },
+        "owner": {
+          "retained_artifact": "browser-write-census-v5/owner.json",
+          "sha256": "5ff86302a845e4ccb931262dba38f3c149dc70ec816bb030f7ac8ffb67e7a80a",
+          "sha256_bound_by_root_check": "5ff86302a845e4ccb931262dba38f3c149dc70ec816bb030f7ac8ffb67e7a80a",
+          "result": "pass",
+          "capture_exit_code": 0,
+          "cleanup_passed": true,
+          "process_observation_passed": true,
+          "cdp_attribution_complete": true
+        },
+        "root_result_check": {
+          "retained_artifact": "browser-write-census-v5/root-result-check-v1.json",
+          "sha256": "b500701d696414d9010c8703a2c50654fb3acd33bdcb7e1d4e783b69aaa8f54f",
+          "state": "MEASUREMENT_COMPLETED_INVENTORY_INCOMPLETE"
+        },
+        "independent_result_review": {
+          "retained_artifact": "browser-write-census-v5/independent-result-review-v1.json",
+          "sha256": "f3c1fd4f5cf6f5bffdf437fa5300f174e0974ed4bee298e0714de4991fab4c6a",
+          "status": "PASS_SCOPED_MEASUREMENT_ONLY"
+        },
+        "producer_retention": {
+          "retained_artifact": "retained-census-v5-producer/retention.json",
+          "sha256": "068bc5523d82ae186cedf2cd7339eae6cbeada74c962af220da93f0df85f66d2",
+          "all_five_runtime_map_manifest_files_verified": true
+        },
+        "process_trace": {
+          "retained_artifact": "browser-write-census-v5/processes.jsonl",
+          "sha256": "401df63b65fdd71dce4e9ad816afa834808f53aefaa7f214bb9a913b584d1a25"
+        },
+        "visual": {
+          "screenshot": "browser-write-census-v5/runner/browser-census-sample-300.png",
+          "sha256": "2de16105c8521d93604db39ab9296bc224995b3f645c19d8a238e98ba24bb88e",
+          "bytes": 307134,
+          "reviewed": "Two Mario fighters and Final Destination; historical magenta geometry/texture artifacts remain. No pixel-accuracy claim."
+        }
+      },
+      "inputs": {
+        "profile": {
+          "identity": "slippi-render-dependencies-dbooc-shield-drop-v5",
+          "sourceIdentity": "5489bff017d0d92bf5345321feab641b222923514218b626e534bcf6f1ef6911",
+          "rngHelper": "2b9f7398e09cb8ca8c2d53474739b313ce565bae77411cd29b4d2f4087a4812e",
+          "stageBridge": "1d0ff4c480828886de06f61acf1874625490604bff26e47f528aa3bef844ca41",
+          "seed": 324508639,
+          "name": "slippi-render-dependencies-dbooc-shield-drop-v5"
+        },
+        "sample": 300,
+        "warm_prefix_samples": 300,
+        "warm_prefix_inputs": "300 neutral original 44-byte PAD inputs; sample 300 is the first non-neutral deterministic input.",
+        "raw_pad44_sha256": "46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288",
+        "initializer": {
+          "valid": 1,
+          "profile": 0,
+          "seed": 324508639,
+          "stage_kind": 37,
+          "player_count": 2,
+          "players": [
+            {
+              "port": 0,
+              "controller": 0,
+              "fighter": 8,
+              "color": 0,
+              "stocks": 4
+            },
+            {
+              "port": 0,
+              "controller": 1,
+              "fighter": 8,
+              "color": 1,
+              "stocks": 4
+            }
+          ]
+        },
+        "source_input_mapping": [
+          {
+            "sourceSlot": 0,
+            "initializerPort": 0,
+            "rawController": 0
+          },
+          {
+            "sourceSlot": 1,
+            "initializerPort": 0,
+            "rawController": 1
+          }
+        ],
+        "manifest": {
+          "path": "gameplay_slippi_synctest_browser.source-state.json",
+          "sha256": "d0cdf0f57a8f14a67b0b17f92f608f17fefa9b984e485a5d23dc6e1b6f4b693f",
+          "configurationIdentitySha256": "e5c5df69dbd7a7c422a06bdfa1b739c017d65508a7e38e92d6a6f20173cca4b6",
+          "wasmSha256": "c4f0e37ddc2bc0f971a85611c359a0284f6536463b8c7385471bedbecf2af27c",
+          "rowCount": 3133,
+          "sourceCStaticCandidates": 2051,
+          "excludedMutableInputSections": 1082,
+          "completeGameState": false
+        },
+        "runtime_sha256": {
+          "gameplay_slippi_synctest_browser.mjs": "ac9abd7e8c90cd9d1a4e507f573f65f2d2cf2380d33ac6b061d6d29543f71ffe",
+          "gameplay_slippi_synctest_browser.wasm": "c4f0e37ddc2bc0f971a85611c359a0284f6536463b8c7385471bedbecf2af27c",
+          "gameplay_slippi_synctest_browser.data": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c"
+        },
+        "harness_sha256": {
+          "src/slippi_profile/tests/run_write_census.mjs": "999344e8f2f1596f4413bdcaada11c0391bbea0786d93375eb6019592d0b2036",
+          "src/slippi_profile/tests/run_synctest.mjs": "cc961716ad782ded3608832540fea2f5299bd187a4fadffe94fa08187771462c",
+          "src/slippi_profile/tests/runner_contract.mjs": "1040d4c0104fd27eb8df2b7fa9e568d9da3b3cef721d4e553b4dc0c67c44ed9b",
+          "src/slippi_profile/tests/synctest_browser.cpp": "5372b91c5adec213a2cd4db2cd6d13634eb0f3fdb0807dd013d4d0d6036b7905",
+          "src/slippi_profile/tests/test_write_census_contract.mjs": "86468e6d8c14943b097e09037174030fc33660284a256b1b5a07b3487d28f16c",
+          "tests/gameplay_snapshot_probe.cpp": "5489bff017d0d92bf5345321feab641b222923514218b626e534bcf6f1ef6911",
+          "tests/gameplay_match_context_trace.c": "595dccecd4c4c8f35dc22e7f85454311f6de0d97380b701563f5298f61da893f",
+          "src/gameplay_match_context.h": "33d378f87e96aef45d2d78b8d894a052176a0c9268604ebfbff48d6252e4259a",
+          "src/gameplay_match_context.c": "0797f2b19a32ba3ac4211c8d6fa13c1fe0def99bcb361018aaa7d8dc3b5cc29e",
+          "src/gameplay_match_session.hpp": "8172728d2c24c121f4fa45e92b6daaa4f1e417c613b0b53e405f01ea0c4158d2",
+          "src/gameplay_match_session.cpp": "aee11e48b7247de9d41dd1c40e56d709256f9ce6f5b52f0aa34d2e95370bf572",
+          "src/gameplay_audio.h": "a41f7daaeadf041b07de6c6a70a78e0590804a01e35981be631866a4defbd642",
+          "src/gameplay_audio.c": "8404950944fd51f183da426d8bcbcd3fb4b3dc4e0df2e66994f4161010fe1d75",
+          "src/gameplay_audio_fx.h": "202b01270291f9523dc2a2e927efb72cdc5e73a7e04023ead2c6c17f5e639398",
+          "src/gameplay_audio_fx.c": "99f9996faf37a069a500cc19d24ed6748dab1a8e6b90834445f3bb4efba84255",
+          "src/gameplay_bootstrap.c": "a0af3794b7b9dfc92dcddde86553a17107c8717fd98d920301a3cc9cb5b7190c",
+          "src/gameplay_bootstrap.h": "f8eaba1ff107dba9f35bf7744840c22d48a7d5a57c64979102c0a7ddc530eac4",
+          "cmake/FighterRuntime.cmake": "95f794446efbd9117ce0865de135e8eac8ad73f9a9c451a3801606393282b850",
+          "patches/aurora-browser.patch": "d4390585d7b87de5f328a186983cb5505cb6809d7402f82fff8defe013692399",
+          "scripts/build.py": "c7319ef21c13b0d7b9d40edc45801262060b6512c86a034bd3f23a92bd55e5f3",
+          "scripts/browser_tools.mjs": "737a8ef5807edba0009487877e1b65badc3a8bb4d07ff9fcd445a7b8bef40c81",
+          "scripts/source_state_manifest.py": "c337c54b60205197d6cc130e00a1aad3fd53bb5f40a37a15d7429e41f4e9fd74"
+        },
+        "asset_sha256": {
+          "EfCoData.dat": "996d78e2c0f4f550f968e2bd8f5e0d18fb8a7525f7e1cb7849a0c836bd7691c0",
+          "EfMrData.dat": "39ccac18137b108b31bb4d832475ba60dc45e381dce9005e14116848e465c669",
+          "GmPause.usd": "3e8490299edf670af0aebb7f27117e0c61297d6b9e2af7ab5c443091e554907f",
+          "GrNLa.dat": "2a295a733414fb65a7061a5c092144fb197570682562b87ba5567ff3f08abb02",
+          "IfAll.usd": "cd957f032b09cf3b80ff725f177525a387efddc264d76cb28581b5da69723929",
+          "IfCoGet.dat": "00f4518c27372eec7a841e20c3adb1ff22041cc5c0257886640954f5c185f599",
+          "ItCo.usd": "5d62efd6437149335b9eef87624ae1253ba7bb260fb08cbae04a3d9215eacd11",
+          "LbBf.dat": "ed0ee6059791bbd7aea4075a039fecdda24698d8baf58052dec91b4d9a364255",
+          "LbRb.dat": "b4d2241deb42f29ffda94dc421641cd58afe290dc49740fcaf5cd7d4c4ce7936",
+          "LbRf.dat": "e8c275128fd0ff3c16f29e672b6df014eefc286c842950e86771175795df5ba8",
+          "MnSlChr.usd": "c9823393ece291429251cb3fc9fd508d59248733ee2667d846d2a5c3434329db",
+          "PdPm.dat": "240fc477461bcc20707be84c9cf82a465ed03cd080c6781cd5de6288102d94ea",
+          "PlCo.dat": "63841336337eb5a7366b06ccc60ea4bd37c3604ab56e19939d78b9aa9cdd234c",
+          "PlMr.dat": "929cdf08c31bc75156ccef05238f2b16dc4d0b187ed1bb4f0a628a2466fb7f7a",
+          "PlMrAJ.dat": "4bd9593e6f0d980b4441891b62ea84a08c099471d695a614974c67223ab5872f",
+          "PlMrBk.dat": "deeb3bc478d720ba432f15c731638629e132269922dd03f05b7f2a9fd07d8c4c",
+          "PlMrBu.dat": "6888f68e434817d336b13d29bbb3d79544941f9748a0aa84355ae22640d9d960",
+          "PlMrGr.dat": "cdb2ea9b7dac639d7aa602e48a4296fdace23ce9c64a4bb35df20fc8a2a019c5",
+          "PlMrNr.dat": "518df5b1d1ce6775a636f4ca8e8e62fb24be65013cd586451c21a181824903ae",
+          "PlMrYe.dat": "c6047de9aaa5f136f72e47cc4e12d2dd606fd1dba36ef773dd3f89007dc669f2",
+          "SdIntro.dat": "21432e0fc6186a67b3522d878846fa46db9171999be93421a88cfc10477a422d",
+          "TyDatai.dat": "1bd632a1f50027f8844e008f4d45e9c20987ce4b8c1e5aa1690a83b3f063c0f4",
+          "TyDatai.usd": "7e0eaf267000c2734d1ef47e718c923995dfb6cf8ab32ec4e4babc0a84fcca11",
+          "dsp_coef.bin": "d7741279c2e8ec5c5fb318f8fbdd6de6bf583520d288e836a5383233a4238179",
+          "end.ssm": "17381aa2d9a04f7c09ac52abf24eee1abc4686cb08f6c9d2733fab0b40b6fd2f",
+          "main.ssm": "949c005709bae3fc72480e76dd1700afa5ec07d0d417fea30cd5524cf55fff20",
+          "mario.ssm": "b9bb209caf8bdc372c077fd877c8bba975f3a8e3ba5062f2c4ec73b7ac1eafa9",
+          "nr_name.ssm": "9190ec1e1aef5e5934151faa6a7b66e44a7ab05de5052048ea60d4bf40dc4bd0",
+          "nr_select.ssm": "94e97f57cd6fbd3ae1b0a7ebc6d9d97648daa16d32386d0f379eebecbbf67a11",
+          "nr_title.ssm": "a055011291f9b7f7f8d30e07ba453d8106735761f1db10d0c789359381326406",
+          "pokemon.ssm": "2f793eee4d05654758bd4a03ec066d9857cb0e549884acf0a72e5fa4be4515de",
+          "sislib_font.bin": "e8d43d10b000e59a64653e8a1b7726bdf95f9102d3ee3307ed56d7c53cde05c1",
+          "smash2.sem": "e844649df8127553f53d2c422375b20f0b814b2f6cc60333028b398dae4854f8",
+          "sp_end.hps": "f0430a9a87ab0c0dae3c4b1644587ff0a92fdb91e21329d429af9f7f0dea6f42"
+        },
+        "browser": {
+          "version": "156.0.8078.47",
+          "headless_installed_chrome": true,
+          "webgpu_available": true,
+          "backend": 7,
+          "canvas": "640x480 browser surface",
+          "host_audio": "muted; native PCM is not connected to Web Audio"
+        }
+      },
+      "observed": {
+        "boundary_order": [
+          "before-source-step",
+          "after-source-step",
+          "after-actual-draw-and-Aurora-quiescence"
+        ],
+        "owner_provenance": {
+          "audio": {
+            "wire_size": 252,
+            "rows": 9,
+            "stable_owner_generation_and_rows": true,
+            "all_three_boundaries": true
+          },
+          "match_context": {
+            "wire_size": 56,
+            "rows": 1,
+            "stable_owner_generation_epoch_and_row": true,
+            "all_three_boundaries": true
+          },
+          "aurora_staging_shadow": {
+            "wire_size": 1160,
+            "logical_bytes": 1160,
+            "allocation_bytes": 2200,
+            "allocation_base": 1619088,
+            "frame_slots": 2,
+            "staging_slots": 2,
+            "descriptor_rows_per_boundary": [
+              10,
+              10,
+              10
+            ],
+            "same_descriptor_identity_and_capacity_all_boundaries": true,
+            "nonempty_rows_after_draw": 5,
+            "observer_topology_stable": true
+          }
+        },
+        "source_step": {
+          "net_changed_bytes": 88436,
+          "provenance_bytes": {
+            "source-c-static-candidate": 3714,
+            "excluded-mutable-input-section": 335,
+            "native-output-storage-diagnostic-excluded": 2939,
+            "unmapped": 46400,
+            "gameplay-arena": 19234,
+            "match-context-owner-range": 8,
+            "audio-owner-range": 15806
+          },
+          "aurora_staging_shadow_bytes": 0,
+          "summed_classes": 88436
+        },
+        "actual_draw_and_quiescence": {
+          "net_changed_bytes": 735547,
+          "provenance_bytes": {
+            "source-c-static-candidate": 21,
+            "excluded-mutable-input-section": 1073,
+            "aurora-staging-shadow-descriptor-diagnostic-excluded": 31,
+            "unmapped": 272470,
+            "gameplay-arena": 646,
+            "aurora-staging-shadow-owner-range": 461306
+          },
+          "summed_classes": 735547,
+          "aurora_staging_shadow_bytes": 461306
+        },
+        "gpu_completion": {
+          "begin_frame_id": 301,
+          "end_frame_id": 301,
+          "draw_calls": 237,
+          "pending_frame_packets": 0,
+          "pending_staging_buffers": 0,
+          "worker_busy": 0,
+          "renderer_errors": 0,
+          "native_transfer_checks": {
+            "beforeStep": "passed",
+            "afterStep": "passed",
+            "afterActualDraw": "passed"
+          }
+        },
+        "per_transition_observation_total": 823983,
+        "count_basis": "sum of net-changed bytes per transition; the same address can count in both transitions",
+        "restore_performed": false,
+        "owner_restore_admission": false,
+        "arena_internal_ownership_proven": false,
+        "complete_game_state": false,
+        "all_observed_ranges_unadmitted": true,
+        "source_draw_diagnostics": {
+          "slotCount": 6,
+          "status": 0,
+          "callbacks": [
+            1505,
+            1505,
+            0,
+            0,
+            0,
+            0
+          ],
+          "modelTransforms": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "normalModelDispatches": [
+            888,
+            873,
+            0,
+            0,
+            0,
+            0
+          ],
+          "processedPadSlots": [
+            0,
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          "fighterKinds": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "metadataSeenMask": 3
+        },
+        "selected_fighter_paths": [
+          {
+            "sourceSlot": 0,
+            "processedPadSlot": 0,
+            "rawController": 0,
+            "initializerPort": 0,
+            "fighterKind": 0,
+            "callbackDelta": 5,
+            "normalModelDispatchDelta": 3,
+            "modelTransformDelta": 0
+          },
+          {
+            "sourceSlot": 1,
+            "processedPadSlot": 1,
+            "rawController": 1,
+            "initializerPort": 0,
+            "fighterKind": 0,
+            "callbackDelta": 5,
+            "normalModelDispatchDelta": 3,
+            "modelTransformDelta": 0
+          }
+        ],
+        "source_state_manifest_complete": false
+      },
+      "validation": {
+        "static_controls": {
+          "retained_artifact": "aurora-range-candidate-v2/static-controls-v2.json",
+          "sha256": "078219d06168fbf20f0c0a9fda1fa16e9499bf0126814c3fdd2bd255c2eaab79",
+          "status": "PASS"
+        },
+        "offline_controls": {
+          "retained_artifact": "aurora-range-candidate-v2/offline-controls-v2.json",
+          "sha256": "68ab243260ac2e138edf7f9a16a39de9401f97e28d8a77527e3b278e8b904984",
+          "status": "PASS_SCOPED_OFFLINE_ONLY",
+          "native": "These standalone controls exercised the extracted production observer inline and on pthread, checking full output/owner snapshots and no-allocation/no-pump behavior. That controls-only result did not establish linked browser integration; the separate v5 sample-300 census subsequently ran the linked observer in headless Chrome.",
+          "node": "21/21 passed; initial compile and Node fixture failures retained."
+        },
+        "focused_integration": [
+          {
+            "retained_artifact": "aurora-range-integration-v2/quiescence-focused.log",
+            "sha256": "fa60f74b2f26c9328a6f5b30534a31be5bd69e63e5ec431dbc6fc2153f8d5831",
+            "status": "PASS"
+          },
+          {
+            "retained_artifact": "aurora-range-integration-v2/bounded-shadow-focused.log",
+            "sha256": "8631a7b7867f97a45b6e9793efa3d9f14edc83f833b09938a421a4766fd680e0",
+            "status": "PASS"
+          },
+          {
+            "retained_artifact": "aurora-range-integration-v2/node-census-focused.log",
+            "sha256": "b7713404a6c25f0ffb0b00dfc16d14ba061cdaef8cb3bf63b0c43183956d1176",
+            "status": "PASS; 21 tests"
+          }
+        ],
+        "affected_private_release": {
+          "retained_artifact": "aurora-range-integration-v2/private-release.log",
+          "sha256": "07b07b5418fa80119a996dd869177e506e626835e93f775aa2cadc98cf6c0aaf",
+          "status": "PASS"
+        },
+        "ordinary_release": {
+          "retained_artifact": "aurora-range-integration-v2/ordinary-release.log",
+          "sha256": "dfc96c199c872302339b39aea5041b64819cb277fc2a5f76e14a5847e77117be",
+          "status": "PASS"
+        },
+        "base_commit_ci": {
+          "commit": "4c95db9d2f04b6b3e78f7cacc82d4e354fd0392e",
+          "run": 39856673269,
+          "checks": 14,
+          "status": "PASS_FOR_BASE_COMMIT_ONLY",
+          "note": "Does not validate the uncommitted nine-file Aurora candidate."
+        },
+        "candidate_full_regression": {
+          "status": "FAILED_ONE_CANONICAL_PATCH_SERIALIZATION_TEST",
+          "retained_artifact": "full-regression-v5.log",
+          "sha256": "7c82fb1ae063dbd71466ce0d163f2095f66ae6d63c089acf98ca0f87ea105b08",
+          "tests": 2448,
+          "skips": 165,
+          "reported_seconds": 551.267,
+          "failure": "test_reviewed_aurora_patch_is_canonical",
+          "scope": "The failure was patch serialization; it did not invalidate or change the historical v5 census producer identity."
+        },
+        "candidate_exact_head_ci": {
+          "status": "PENDING",
+          "note": "Full regression v6 passed; final exact-head CI has not completed at this documentation cutoff."
+        },
+        "canonicalization_repair": {
+          "status": "PASS_CANONICALIZATION_PRESERVES_PREPARED_AURORA_TREE",
+          "receipt": {
+            "retained_artifact": "aurora-canonical-repair-v1/receipt.json",
+            "sha256": "203a1931923ca9c691ef3be7f4f21bd788918d4a66dd0b542aa326afa1b38f3f"
+          },
+          "independent_review": {
+            "retained_artifact": "aurora-canonical-repair-v1/independent-review-v1.json",
+            "sha256": "2015207f3166ddf142a857d54b00124fe3868d4efb44c52028a14c1433052f00"
+          },
+          "before_patch_sha256": "d4390585d7b87de5f328a186983cb5505cb6809d7402f82fff8defe013692399",
+          "after_patch_sha256": "e1a5c9f078197129ee046983df36fa97a1c753457bf8e3835d514c47d1ca3418",
+          "prepared_tree_before_and_after": "c065b38cf0d1ba1d9ad1e6717cc79ee1b38eb11e",
+          "source_content_changed": false,
+          "v5_capture_reidentified": false,
+          "full_regression_v6": "PENDING_ROOT_COMPLETION"
+        },
+        "candidate_full_regression_v6": {
+          "status": "PASS",
+          "retained_artifact": "full-regression-v6.log",
+          "sha256": "b48caa832e7b3f4065eb62e2116da70ba582eebf43fb439228793c524e69963c",
+          "exit_code": 0,
+          "tests": 2448,
+          "skips": 165,
+          "reported_seconds": 562.58,
+          "outer_elapsed_seconds": 562.891811,
+          "summary_copy": {
+            "retained_artifact": "checkpoint-docs-v6-final-prep-v1/retained/full-regression-v6-result.json",
+            "sha256": "46f7e5a9ee17846d096a3177696f1de60845bb3a53bfaec1176ad8767463c3bc"
+          },
+          "scope": "Full repository regression after exact payload-component application and Aurora patch canonicalization repair; same-browser restore remains untested."
+        }
+      },
+      "limitations": [
+        "The 3133-row source-state manifest remains incomplete (2051 source C static candidates, 1082 excluded mutable input sections; completeGameState=false).",
+        "All 823983 byte observations are sums of net-changed bytes per transition, not unique mutable-state size. The same address may count in both transitions.",
+        "Same-value stores and changes that return to their prior value before a sampled boundary are not observable; passing DVD idle checks do not exclude a transfer that begins and ends between boundaries.",
+        "No source-read independence, full source/renderer/audio/file ownership, complete game state, rollback admission, restore safety, gameplay acceptance, timing acceptance or pixel accuracy is established.",
+        "The v5 screenshot retains historical magenta geometry/texture artifacts; do not make visual-accuracy claims.",
+        "The root-only initial summarizer encountered a read-only nested-schema KeyError; the raw census was untouched and the corrected offline summary is retained in root-result-check-v1.json."
+      ],
+      "next_candidate": {
+        "retained_artifact": "one-tick-admission-plan-v2.json",
+        "sha256": "e551360520b99054508046b9bdeb679ad6103c2ec6e13ede0c90fb3fdd16616c",
+        "status": "READ_ONLY_PLAN_WITH_BOUNDED_SOURCE_HEAP_PAYLOAD_CANDIDATE",
+        "preserved_prior_plan": {
+          "retained_artifact": "one-tick-admission-plan-v1.json",
+          "sha256": "eb2f1579608eaf045d7aac7c19fc7ba7dd7cabb36bf2eadd99222f50e642f1e3",
+          "preserved_unchanged": true
+        },
+        "scope": "Exact tracked live OSAllocFromHeap payload bytes inside the 32 MiB gameplay arena only; no aggregate admission or browser restore. Does not attribute the 46,400 v5 source-step bytes outside the arena."
+      }
+    },
+    "source_main_heap_payload_checkpoint_v1": {
+      "status": "FOCUSED_AND_BOTH_RELEASE_BUILDS_PASS_FULL_REGRESSION_PASS_CI_PENDING",
+      "scope": "Exact live source-main-heap OSAllocFromHeap payload bytes within the observed 32 MiB gameplay arena. The candidate does not explain the v5 46,400 unmapped source-step bytes outside the arena, does not restore allocation topology, and does not admit browser or aggregate restore.",
+      "contract": {
+        "retained_artifact": "source-main-heap-payload-contract-v2.json",
+        "sha256": "50642657e4663de0d45ad64472ab91fca22052d3f35c7ad8f78937e0e7c414da"
+      },
+      "plan_v2": {
+        "retained_artifact": "one-tick-admission-plan-v2.json",
+        "sha256": "e551360520b99054508046b9bdeb679ad6103c2ec6e13ede0c90fb3fdd16616c",
+        "preserved_plan_v1_sha256": "eb2f1579608eaf045d7aac7c19fc7ba7dd7cabb36bf2eadd99222f50e642f1e3"
+      },
+      "candidate": {
+        "retained_artifact": "source-main-heap-payload-candidate-v1/freeze-v1.json",
+        "sha256": "4258539d2eba7668e9c217ffa77d8d4ce8e571ea37e27dadec48be91eec6ad45",
+        "changed_file_count": 3,
+        "patch_sha256": "8cb261bfc32b92bae1e63cef1fc6f49e7ce04f809d7e2660a290435e3baa4fad"
+      },
+      "independent_source_review": {
+        "retained_artifact": "source-main-heap-payload-source-review-v1.json",
+        "sha256": "fe5af942b1448dc871eb28448cf85510cf339a76905e3b90ef8b5d8e06963758",
+        "status": "APPROVED_SCOPED_APPLICATION_AND_FOCUSED_INTEGRATION_NO_BROWSER_RESTORE"
+      },
+      "application": {
+        "retained_artifact": "source-main-heap-payload-integration-v1/application.json",
+        "sha256": "c2d1d73a698eeaa77788bd3ff7f5de39ec13f9f86665fea6ca6e387124316551",
+        "status": "EXACT_THREE_FILE_APPLICATION"
+      },
+      "focused_controls": {
+        "retained_artifact": "source-main-heap-payload-integration-v1/focused.log",
+        "sha256": "6e54a43f2c84a6ffaa82f6804e768bab0eb2661831d5116c59c3407cfb841d40",
+        "status": "PASS"
+      },
+      "integration_results": {
+        "retained_artifact": "source-main-heap-payload-integration-v1/results.json",
+        "sha256": "9743ec43c5e5ede28a8aa0ce619f9702411d863b623f01e2ff0c4a28d7153d5f",
+        "focused_component": {
+          "status": "PASS",
+          "log_sha256": "6e54a43f2c84a6ffaa82f6804e768bab0eb2661831d5116c59c3407cfb841d40"
+        },
+        "private_release": {
+          "status": "PASS",
+          "elapsed_seconds": 53.985552,
+          "log_sha256": "6bd8d576f287cc1ad7142159f9ba797faa0cc76c2d467bd7b2ddb584a27d589a"
+        },
+        "ordinary_release": {
+          "status": "PASS",
+          "elapsed_seconds": 62.529617,
+          "log_sha256": "90ed03f49a60bac708f77ec4fabe5777e99664b4bdc03033eb415e8c3b3e4abf"
+        },
+        "full_regression_v6": {
+          "status": "PASS",
+          "exit_code": 0,
+          "elapsed_seconds": 562.891811,
+          "log_sha256": "b48caa832e7b3f4065eb62e2116da70ba582eebf43fb439228793c524e69963c",
+          "reported_tests": 2448,
+          "reported_skips": 165,
+          "reported_unittest_seconds": 562.58
+        },
+        "final_exact_head_ci": "PENDING"
+      },
+      "retained_failed_attempts": [
+        {
+          "attempt": "controls-v1",
+          "status": "FAILED_RETAINED",
+          "result_artifact": "source-main-heap-payload-candidate-v1/controls-v1/compile.result.json",
+          "sha256": "105917f38f3116b108016152cd4e860a4acf006f365ec94f05a38f8a86e06646"
+        },
+        {
+          "attempt": "controls-sanitized-v1",
+          "status": "FAILED_RETAINED",
+          "result_artifact": "source-main-heap-payload-candidate-v1/controls-sanitized-v1/run.result.json",
+          "sha256": "19c8df40643325d4d4a3b1fafbd370205795f652de89a07475c05642a4b01d3d"
+        }
+      ],
+      "successful_standard_controls": {
+        "result_artifact": "source-main-heap-payload-candidate-v1/controls-v5/run.result.json",
+        "sha256": "e0f1948e59c911fee3e4b7c26c2db79ba8350db736dfcf8c63064cf5cf8fd01f"
+      },
+      "successful_asan_ubsan_controls": {
+        "result_artifact": "source-main-heap-payload-candidate-v1/controls-sanitized-v3/run.result.json",
+        "sha256": "e0f1948e59c911fee3e4b7c26c2db79ba8350db736dfcf8c63064cf5cf8fd01f"
+      },
+      "next_gate": "Focused component controls, private and ordinary Release builds, and full regression v6 pass. Final exact-head CI remains pending. No browser restore or aggregate admission is authorized by this component."
     }
   }
 }

@@ -211,7 +211,7 @@ export function diffHeapRanges(before, after) {
 
 export function classifyHeapRanges(rawRanges, manifestRows, arenaRange,
   audioInventoryTransition = null, nativeOutputRange = null,
-  matchContextInventoryTransition = null) {
+  matchContextInventoryTransition = null, auroraInventoryTransition = null) {
   if (!Array.isArray(rawRanges) || !Array.isArray(manifestRows) ||
       !arenaRange || !Number.isSafeInteger(arenaRange.base) ||
       !Number.isSafeInteger(arenaRange.bytes)) {
@@ -275,6 +275,38 @@ export function classifyHeapRanges(rawRanges, manifestRows, arenaRange,
     })));
     ownedRanges.sort((a, b) => a.start - b.start || a.end - b.end);
   }
+  let auroraShadowRows = [];
+  let auroraDiagnosticOutput = null;
+  if (auroraInventoryTransition !== null) {
+    const {before, after} = auroraInventoryTransition || {};
+    const sameIdentity = before && after &&
+      before.version === after.version && before.size === after.size &&
+      before.frameSlotCount === after.frameSlotCount && before.stagingSlotCount === after.stagingSlotCount &&
+      before.stagingGenerationLow === after.stagingGenerationLow &&
+      before.stagingGenerationHigh === after.stagingGenerationHigh &&
+      before.diagnosticOutputRange?.base === after.diagnosticOutputRange?.base &&
+      before.diagnosticOutputRange?.bytes === after.diagnosticOutputRange?.bytes &&
+      before.rows?.length === after.rows?.length && before.ranges?.length === after.ranges?.length &&
+      before.rows.every((row, index) => {
+        const other = after.rows[index];
+        return row.kind === other.kind && row.frameSlot === other.frameSlot &&
+          row.streamIndex === other.streamIndex && row.address === other.address &&
+          row.extent === other.extent && row.maxCapacity === other.maxCapacity &&
+          row.owned === other.owned && row.ownerAddress === other.ownerAddress &&
+          row.generationLow === other.generationLow && row.generationHigh === other.generationHigh;
+      });
+    if (!sameIdentity) {
+      throw new Error('Aurora staging-shadow attribution requires same owner address, capacity, topology, and lifetime');
+    }
+    auroraShadowRows = before.ranges;
+    auroraDiagnosticOutput = {start: before.diagnosticOutputRange.base,
+      end: before.diagnosticOutputRange.base + before.diagnosticOutputRange.bytes};
+    ownedRanges.push(...auroraShadowRows.map(row => ({
+      start: row.address, end: row.address + row.extent, row,
+      ownerType: 'aurora-staging-shadow',
+    })));
+    ownedRanges.sort((a, b) => a.start - b.start || a.end - b.end);
+  }
   let nativeOutput = null;
   if (nativeOutputRange !== null) {
     if (!nativeOutputRange || !Number.isSafeInteger(nativeOutputRange.base) ||
@@ -317,6 +349,11 @@ export function classifyHeapRanges(rawRanges, manifestRows, arenaRange,
       boundaries.add(Math.max(range.start, nativeOutput.start));
       boundaries.add(Math.min(range.end, nativeOutput.end));
     }
+    if (auroraDiagnosticOutput && auroraDiagnosticOutput.start < range.end &&
+        range.start < auroraDiagnosticOutput.end) {
+      boundaries.add(Math.max(range.start, auroraDiagnosticOutput.start));
+      boundaries.add(Math.min(range.end, auroraDiagnosticOutput.end));
+    }
     if (arenaRange.base < range.end && range.start < arenaEnd) {
       boundaries.add(Math.max(range.start, arenaRange.base));
       boundaries.add(Math.min(range.end, arenaEnd));
@@ -329,9 +366,13 @@ export function classifyHeapRanges(rawRanges, manifestRows, arenaRange,
       const ownerMatches = overlappingOwners.filter(item => item.start <= start && end <= item.end);
       const inArena = arenaRange.base <= start && end <= arenaEnd;
       const inNativeOutput = nativeOutput && nativeOutput.start <= start && end <= nativeOutput.end;
+      const inAuroraDiagnosticOutput = auroraDiagnosticOutput &&
+        auroraDiagnosticOutput.start <= start && end <= auroraDiagnosticOutput.end;
       let provenance, details = {};
       if (inNativeOutput) {
         provenance = 'native-output-storage-diagnostic-excluded';
+      } else if (inAuroraDiagnosticOutput) {
+        provenance = 'aurora-staging-shadow-descriptor-diagnostic-excluded';
       } else if (matches.length > 1 || ownerMatches.length > 1 ||
           (matches.length && ownerMatches.length) ||
           (matches.length && inArena) || (ownerMatches.length && inArena)) {
@@ -344,6 +385,17 @@ export function classifyHeapRanges(rawRanges, manifestRows, arenaRange,
             matchContextOwnerAddress: row.owner,
             matchContextWorldGenerationTag: `${row.worldGenerationHigh.toString(16).padStart(8, '0')}${row.worldGenerationLow.toString(16).padStart(8, '0')}`,
             matchContextOwnerEpoch: `${row.ownerEpochHigh.toString(16).padStart(8, '0')}${row.ownerEpochLow.toString(16).padStart(8, '0')}`,
+          };
+        } else if (ownerType === 'aurora-staging-shadow') {
+          provenance = 'aurora-staging-shadow-owner-range';
+          details = {
+            auroraStagingShadowKind: row.kindName,
+            auroraFrameSlot: row.frameSlot,
+            auroraStreamIndex: row.streamIndex,
+            ownerAddress: row.ownerAddress,
+            ownerLifetimeTag: `${row.generationHigh.toString(16).padStart(8, '0')}${row.generationLow.toString(16).padStart(8, '0')}`,
+            ownerCapacity: row.capacity,
+            ownerMaxCapacity: row.maxCapacity,
           };
         } else {
           provenance = 'audio-owner-range';
@@ -751,6 +803,324 @@ export function requireStableMatchContextRangeInventory(inventories) {
   return {...first.rows[0]};
 }
 
+const AURORA_QUIESCENCE_SCHEMA_VERSION = 5;
+const AURORA_FRAME_DESCRIPTOR_BYTES = 464;
+const AURORA_SUBMISSION_DESCRIPTOR_BYTES = 56;
+const AURORA_HEADER_BYTES = 120;
+const AURORA_STREAM_NAMES = ['verts', 'uniforms', 'indices', 'storage', 'textureUpload'];
+const WASM32_LIMIT = 0x100000000;
+
+function u64Words(view, offset) {
+  return {low: view.getUint32(offset, true), high: view.getUint32(offset + 4, true)};
+}
+
+function isZeroU64(value) {
+  return value.low === 0 && value.high === 0;
+}
+
+export function decodeAuroraStagingShadowInventory(heap, pointer) {
+  if (!(heap instanceof Uint8Array) || heap.byteLength > WASM32_LIMIT ||
+      !Number.isSafeInteger(pointer) || pointer <= 0 || pointer % 8 !== 0 ||
+      pointer > heap.byteLength || AURORA_HEADER_BYTES > heap.byteLength - pointer) {
+    throw new Error('Aurora staging-shadow inventory wire pointer or wasm bounds are invalid');
+  }
+  const header = new DataView(heap.buffer, heap.byteOffset + pointer, AURORA_HEADER_BYTES);
+  const version = header.getUint32(0, true), size = header.getUint32(4, true);
+  const frameSlotCount = header.getUint32(8, true), stagingSlotCount = header.getUint32(12, true);
+  const frameOffset = header.getUint32(16, true), frameStride = header.getUint32(20, true);
+  const frameCount = header.getUint32(24, true), submissionOffset = header.getUint32(28, true);
+  const submissionStride = header.getUint32(32, true), submissionCount = header.getUint32(36, true);
+  const pendingFramePackets = header.getUint32(40, true);
+  const pendingStagingBuffers = header.getUint32(44, true);
+  const workerBusy = header.getUint32(48, true);
+  const pipelineCacheStatus = header.getUint32(52, true);
+  const queuedPipelines = header.getUint32(56, true);
+  const createdPipelines = header.getUint32(60, true);
+  const drawCallCount = header.getUint32(64, true);
+  const currentFrameIndex = header.getUint32(68, true);
+  const stagingGeneration = u64Words(header, 72);
+  const lastBeginFrameId = u64Words(header, 80);
+  const lastEndFrameId = u64Words(header, 88);
+  const lastRegistrationSequence = u64Words(header, 96);
+  const lastCallbackSequence = u64Words(header, 104);
+  const staleCallbackCount = u64Words(header, 112);
+  if (version !== AURORA_QUIESCENCE_SCHEMA_VERSION || frameSlotCount === 0 ||
+      frameSlotCount > 4 || stagingSlotCount === 0 || stagingSlotCount > 4 ||
+      frameCount !== frameSlotCount || submissionCount !== stagingSlotCount ||
+      frameOffset !== AURORA_HEADER_BYTES || frameStride !== AURORA_FRAME_DESCRIPTOR_BYTES ||
+      submissionStride !== AURORA_SUBMISSION_DESCRIPTOR_BYTES ||
+      submissionOffset !== frameOffset + frameCount * frameStride ||
+      size !== submissionOffset + submissionCount * submissionStride ||
+      size > heap.byteLength - pointer || pendingFramePackets !== 0 ||
+      pendingStagingBuffers !== 0 || workerBusy !== 0 || pipelineCacheStatus !== 0 ||
+      queuedPipelines !== 0 || currentFrameIndex === 0xffffffff ||
+      isZeroU64(stagingGeneration)) {
+    throw new Error('Aurora staging-shadow inventory schema, count, offset, stride, or idle status is invalid');
+  }
+  const view = new DataView(heap.buffer, heap.byteOffset + pointer, size);
+  const rows = [], ranges = [];
+  const frameOwners = [];
+  for (let frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+    const base = frameOffset + frameIndex * frameStride;
+    const frameSlot = view.getUint32(base, true);
+    const packetActive = view.getUint32(base + 4, true);
+    const packetStagingBuffer = view.getUint32(base + 8, true);
+    const reserved = view.getUint32(base + 12, true);
+    const packetFrameId = u64Words(view, base + 16);
+    if (frameSlot !== frameIndex || packetActive !== 0 || packetStagingBuffer !== 0xffffffff ||
+        reserved !== 0 || !isZeroU64(packetFrameId)) {
+      throw new Error('Aurora staging-shadow frame row is active or has invalid identity');
+    }
+    const previousUsed = AURORA_STREAM_NAMES.map((_, streamIndex) => {
+      const value = u64Words(view, base + 24 + streamIndex * 8);
+      if (value.high !== 0) throw new Error('Aurora staging-shadow previousUsed exceeds wasm32');
+      return value.low;
+    });
+    const packetBuffers = [], shadowBuffers = [];
+    const packetStart = base + 64;
+    const shadowStart = packetStart + AURORA_STREAM_NAMES.length * 40;
+    for (let streamIndex = 0; streamIndex < AURORA_STREAM_NAMES.length; streamIndex++) {
+      const packetOffset = packetStart + streamIndex * 40;
+      const packet = {
+        dataAddress: u64Words(view, packetOffset), length: u64Words(view, packetOffset + 8),
+        capacity: u64Words(view, packetOffset + 16), maxCapacity: u64Words(view, packetOffset + 24),
+        owned: view.getUint32(packetOffset + 32, true), reserved: view.getUint32(packetOffset + 36, true),
+      };
+      if (!isZeroU64(packet.dataAddress) || !isZeroU64(packet.length) ||
+          !isZeroU64(packet.capacity) || packet.maxCapacity.high !== 0 ||
+          packet.maxCapacity.low >= WASM32_LIMIT || packet.owned !== 1 || packet.reserved !== 0) {
+        throw new Error('Aurora staging-shadow packet buffer is not empty at the idle boundary');
+      }
+      packetBuffers.push(packet);
+
+      const shadowOffset = shadowStart + streamIndex * 40;
+      const address = u64Words(view, shadowOffset);
+      const length = u64Words(view, shadowOffset + 8);
+      const capacity = u64Words(view, shadowOffset + 16);
+      const maxCapacity = u64Words(view, shadowOffset + 24);
+      const owned = view.getUint32(shadowOffset + 32, true);
+      const shadowReserved = view.getUint32(shadowOffset + 36, true);
+      if (address.high !== 0 || length.high !== 0 || capacity.high !== 0 || maxCapacity.high !== 0 ||
+          owned !== 1 || shadowReserved !== 0 || length.low > capacity.low ||
+          capacity.low > maxCapacity.low || maxCapacity.low >= WASM32_LIMIT ||
+          previousUsed[streamIndex] > capacity.low) {
+        throw new Error('Aurora staging-shadow owner row has invalid kind, lifetime extent, or wasm32 bounds');
+      }
+      if (capacity.low === 0) {
+        if (address.low !== 0 || length.low !== 0) {
+          throw new Error('Aurora empty staging-shadow row has a nonempty address or length');
+        }
+      } else if (address.low === 0 || address.low > WASM32_LIMIT ||
+                 capacity.low > WASM32_LIMIT - address.low ||
+                 address.low + capacity.low > heap.byteLength) {
+        throw new Error('Aurora staging-shadow capacity lies outside wasm32 memory');
+      }
+      const row = {
+        kind: streamIndex + 1,
+        kindName: `aurora-staging-shadow-${AURORA_STREAM_NAMES[streamIndex]}`,
+        frameSlot, streamIndex, streamName: AURORA_STREAM_NAMES[streamIndex],
+        address: address.low, owner: address.low, ownerAddress: address.low,
+        length: length.low, extent: capacity.low, capacity: capacity.low,
+        maxCapacity: maxCapacity.low, previousUsed: previousUsed[streamIndex],
+        owned, generationLow: stagingGeneration.low, generationHigh: stagingGeneration.high,
+      };
+      shadowBuffers.push(row);
+      if (row.extent > 0) {
+        const end = row.address + row.extent;
+        for (const prior of frameOwners) {
+          if (row.address < prior.end && prior.start < end) {
+            throw new Error('Aurora staging-shadow capacity ranges overlap each other');
+          }
+        }
+        frameOwners.push({start: row.address, end});
+        ranges.push(row);
+      }
+      rows.push(row);
+    }
+  }
+  const submissionRows = [];
+  for (let slot = 0; slot < submissionCount; slot++) {
+    const base = submissionOffset + slot * submissionStride;
+    const row = {
+      stagingSlot: view.getUint32(base, true), state: view.getUint32(base + 4, true),
+      futureId: u64Words(view, base + 8),
+      registrationSequence: u64Words(view, base + 16),
+      callbackSequence: u64Words(view, base + 24),
+      capturedGeneration: u64Words(view, base + 32),
+      queueHandle: u64Words(view, base + 40),
+      encoderHandle: u64Words(view, base + 48),
+    };
+    if (row.stagingSlot !== slot || row.state > 5 || row.state === 1) {
+      throw new Error('Aurora staging-shadow submission row has invalid slot or pending callback state');
+    }
+    submissionRows.push(row);
+  }
+  return {
+    version, size, frameSlotCount, stagingSlotCount, frameDescriptorCount: frameCount,
+    submissionDescriptorCount: submissionCount, frameStride, submissionStride,
+    pendingFramePackets, pendingStagingBuffers, workerBusy, pipelineCacheStatus,
+    queuedPipelines, createdPipelines, drawCallCount, currentFrameIndex,
+    stagingGenerationLow: stagingGeneration.low, stagingGenerationHigh: stagingGeneration.high,
+    lastBeginFrameId, lastEndFrameId, lastRegistrationSequence, lastCallbackSequence,
+    staleCallbackCount, rows, ranges, submissionRows,
+    diagnosticOutputRange: {base: pointer, bytes: size}, ownerRestoreAdmission: false,
+  };
+}
+
+export function validateAuroraStagingShadowRangeDisjointness(inventory, manifestRows,
+  arenaRange, nativeOutputRange, heapBytes, audioInventory, matchContextInventory) {
+  if (!inventory || inventory.version !== AURORA_QUIESCENCE_SCHEMA_VERSION ||
+      !Array.isArray(inventory.rows) || !Array.isArray(inventory.ranges) ||
+      inventory.rows.length !== inventory.frameSlotCount * AURORA_STREAM_NAMES.length ||
+      !Array.isArray(manifestRows) || !audioInventory || !Array.isArray(audioInventory.rows) ||
+      !matchContextInventory || !Array.isArray(matchContextInventory.rows) ||
+      !Number.isSafeInteger(heapBytes) || heapBytes < 0 || heapBytes > WASM32_LIMIT ||
+      !Number.isSafeInteger(arenaRange?.base) || !Number.isSafeInteger(arenaRange?.bytes) ||
+      arenaRange.base < 0 || arenaRange.bytes <= 0 || arenaRange.base > WASM32_LIMIT ||
+      arenaRange.bytes > WASM32_LIMIT - arenaRange.base ||
+      arenaRange.base + arenaRange.bytes > heapBytes ||
+      !Number.isSafeInteger(nativeOutputRange?.base) || !Number.isSafeInteger(nativeOutputRange?.bytes) ||
+      nativeOutputRange.base <= 0 || nativeOutputRange.bytes <= 0 ||
+      nativeOutputRange.base > WASM32_LIMIT || nativeOutputRange.bytes > WASM32_LIMIT - nativeOutputRange.base ||
+      nativeOutputRange.base + nativeOutputRange.bytes > heapBytes ||
+      !Number.isSafeInteger(inventory.diagnosticOutputRange?.base) ||
+      !Number.isSafeInteger(inventory.diagnosticOutputRange?.bytes) ||
+      inventory.diagnosticOutputRange.base <= 0 || inventory.diagnosticOutputRange.bytes <= 0 ||
+      inventory.diagnosticOutputRange.base > WASM32_LIMIT ||
+      inventory.diagnosticOutputRange.bytes > WASM32_LIMIT - inventory.diagnosticOutputRange.base ||
+      inventory.diagnosticOutputRange.base + inventory.diagnosticOutputRange.bytes > heapBytes) {
+    throw new Error('Aurora staging-shadow, arena, or diagnostic output inventory bounds are invalid');
+  }
+  const overlaps = (leftBase, leftBytes, rightBase, rightBytes) =>
+    leftBytes > 0 && rightBytes > 0 && leftBase < rightBase + rightBytes && rightBase < leftBase + leftBytes;
+  // Bind precisely the one private producer-owned diagnostic allocation.
+  // These maxima are the authored wasm32 FrameSlotCount/StagingBufferCount (4/4).
+  const storageBytes = 120 + 4 * 464 + 4 * 56;
+  const storageRows = manifestRows.filter(section =>
+    section.input_object === '.deps/aurora/libaurora_gx.a(frame.cpp.o)' &&
+    section.input_section === '.bss.aurora_browser_quiescence_observer_storage');
+  if (storageRows.length !== 1 || storageRows[0].decision !== 'excluded' ||
+      storageRows[0].exclusion_reason !== 'archive-outside-generated-source-producers' ||
+      storageRows[0].address !== inventory.diagnosticOutputRange.base ||
+      storageRows[0].size !== storageBytes || inventory.diagnosticOutputRange.bytes > storageBytes ||
+      storageBytes > heapBytes - storageRows[0].address) {
+    throw new Error('Aurora diagnostic storage lacks its exact excluded manifest identity');
+  }
+  const storageRow = storageRows[0];
+  const diagnosticOutput = {base: storageRow.address, bytes: storageRow.size};
+  const knownRanges = [
+    {label: 'gameplay arena', base: arenaRange.base, bytes: arenaRange.bytes},
+    {label: 'native PCM output storage', base: nativeOutputRange.base, bytes: nativeOutputRange.bytes},
+  ];
+  for (const section of manifestRows) {
+    if (!Number.isSafeInteger(section.address) || !Number.isSafeInteger(section.size) ||
+        section.address < 0 || section.size < 0 || section.address > WASM32_LIMIT ||
+        section.size > WASM32_LIMIT - section.address || section.address + section.size > heapBytes) {
+      throw new Error('Aurora staging-shadow static manifest range is malformed');
+    }
+    if (section !== storageRow && section.size > 0) knownRanges.push({label: 'static manifest range',
+      base: section.address, bytes: section.size});
+  }
+  for (const row of audioInventory.rows) {
+    if (!Number.isSafeInteger(row.address) || !Number.isSafeInteger(row.extent) ||
+        row.address < 0 || row.extent <= 0 || row.address > WASM32_LIMIT ||
+        row.extent > WASM32_LIMIT - row.address || row.address + row.extent > heapBytes) {
+      throw new Error('Aurora staging-shadow audio owner range is malformed');
+    }
+    knownRanges.push({label: 'audio owner range', base: row.address, bytes: row.extent});
+  }
+  for (const row of matchContextInventory.rows) {
+    if (!Number.isSafeInteger(row.address) || !Number.isSafeInteger(row.extent) ||
+        row.address < 0 || row.extent <= 0 || row.address > WASM32_LIMIT ||
+        row.extent > WASM32_LIMIT - row.address || row.address + row.extent > heapBytes) {
+      throw new Error('Aurora staging-shadow match-context range is malformed');
+    }
+    knownRanges.push({label: 'match-context owner range', base: row.address, bytes: row.extent});
+  }
+  for (const known of knownRanges) {
+    if (overlaps(diagnosticOutput.base, diagnosticOutput.bytes, known.base, known.bytes)) {
+      throw new Error(`Aurora staging-shadow diagnostic output overlaps ${known.label}`);
+    }
+  }
+  for (const section of manifestRows) {
+    if (section !== storageRow && section.size > 0 && overlaps(diagnosticOutput.base, diagnosticOutput.bytes,
+        section.address, section.size)) {
+      throw new Error('Aurora staging-shadow diagnostic output overlaps static manifest range');
+    }
+  }
+  for (const row of [...audioInventory.rows, ...matchContextInventory.rows]) {
+    if (overlaps(diagnosticOutput.base, diagnosticOutput.bytes, row.address, row.extent)) {
+      throw new Error('Aurora staging-shadow diagnostic output overlaps an existing owner range');
+    }
+  }
+  for (let index = 0; index < inventory.ranges.length; index++) {
+    const row = inventory.ranges[index];
+    if (!row || !Number.isSafeInteger(row.address) || !Number.isSafeInteger(row.extent) ||
+        row.address <= 0 || row.extent <= 0 || row.address > WASM32_LIMIT ||
+        row.extent > WASM32_LIMIT - row.address || row.address + row.extent > heapBytes ||
+        row.ownerAddress !== row.address || row.owned !== 1 ||
+        row.generationLow !== inventory.stagingGenerationLow ||
+        row.generationHigh !== inventory.stagingGenerationHigh) {
+      throw new Error('Aurora staging-shadow owner range is malformed');
+    }
+    if (overlaps(row.address, row.extent, diagnosticOutput.base, diagnosticOutput.bytes)) {
+      throw new Error('Aurora staging-shadow owner range overlaps its diagnostic output');
+    }
+    for (let prior = 0; prior < index; prior++) {
+      if (overlaps(row.address, row.extent, inventory.ranges[prior].address,
+          inventory.ranges[prior].extent)) {
+        throw new Error('Aurora staging-shadow capacity ranges overlap each other');
+      }
+    }
+    for (const known of knownRanges) {
+      if (overlaps(row.address, row.extent, known.base, known.bytes)) {
+        throw new Error(`Aurora staging-shadow owner range overlaps ${known.label}`);
+      }
+    }
+  }
+  return {rangeCount: inventory.ranges.length, diagnosticOnly: true,
+    diagnosticOutputStorage: {...diagnosticOutput}, ownerRestoreAdmission: false};
+}
+
+export function requireStableAuroraStagingShadowInventory(inventories) {
+  const boundaryOrder = ['before-source-step', 'after-source-step',
+    'after-actual-draw-and-Aurora-quiescence'];
+  if (!Array.isArray(inventories) || inventories.length !== boundaryOrder.length ||
+      inventories.some((item, index) => !item || !Array.isArray(item.rows) ||
+        !Array.isArray(item.ranges) || item.boundary !== boundaryOrder[index])) {
+    throw new Error('Aurora staging-shadow inventory requires all three ordered census boundaries');
+  }
+  const first = inventories[0];
+  for (const inventory of inventories.slice(1)) {
+    if (inventory.stagingGenerationLow !== first.stagingGenerationLow ||
+        inventory.stagingGenerationHigh !== first.stagingGenerationHigh) {
+      throw new Error('Aurora staging-shadow lifetime generation changed across census boundaries');
+    }
+    const sameIdentity = first.version === inventory.version && first.size === inventory.size &&
+      first.frameSlotCount === inventory.frameSlotCount &&
+      first.stagingSlotCount === inventory.stagingSlotCount &&
+      first.frameDescriptorCount === inventory.frameDescriptorCount &&
+      first.submissionDescriptorCount === inventory.submissionDescriptorCount &&
+      first.stagingGenerationLow === inventory.stagingGenerationLow &&
+      first.stagingGenerationHigh === inventory.stagingGenerationHigh &&
+      first.diagnosticOutputRange?.base === inventory.diagnosticOutputRange?.base &&
+      first.diagnosticOutputRange?.bytes === inventory.diagnosticOutputRange?.bytes &&
+      first.rows.length === inventory.rows.length && first.ranges.length === inventory.ranges.length &&
+      first.rows.every((row, index) => {
+        const other = inventory.rows[index];
+        return row.kind === other.kind && row.frameSlot === other.frameSlot &&
+          row.streamIndex === other.streamIndex && row.address === other.address &&
+          row.extent === other.extent && row.maxCapacity === other.maxCapacity &&
+          row.owned === other.owned && row.ownerAddress === other.ownerAddress &&
+          row.generationLow === other.generationLow && row.generationHigh === other.generationHigh;
+      });
+    if (!sameIdentity) {
+      throw new Error('Aurora staging-shadow owner topology or capacity changed across census boundaries');
+    }
+  }
+  return first.ranges.map(row => ({...row}));
+}
+
 function initializerBytes(module) {
   const size = module._melee_web_snapshot_initializer_diagnostic_size();
   return copyBytes(module, module._melee_web_snapshot_initializer_diagnostic(), size);
@@ -928,7 +1298,9 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     diffHeapRangesSource, classifyHeapRangesSource, decodeAudioInventorySource,
     validateAudioOwnerRangesSource, requireStableAudioInventorySource,
     decodeMatchContextRangeInventorySource, validateMatchContextRangeDisjointnessSource,
-    requireStableMatchContextRangeInventorySource, maxHeapBytes}) => {
+    requireStableMatchContextRangeInventorySource, decodeAuroraStagingShadowInventorySource,
+    validateAuroraStagingShadowRangeDisjointnessSource,
+    requireStableAuroraStagingShadowInventorySource, maxHeapBytes}) => {
     const {module} = window.__slippiSynctest;
     const checkedAsyncCcall = new Function(`return (${checkedSource})`)();
     const checked = (label, identifier, argumentTypes = [], args = []) =>
@@ -941,9 +1313,11 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     let censusStepRaw = null, censusDrawRaw = null;
     const audioInventoryBoundaries = writeCensus ? [] : null;
     const matchContextInventoryBoundaries = writeCensus ? [] : null;
+    const auroraStagingShadowInventoryBoundaries =
+      writeCensus?.requireAuroraStagingShadowInventory === true ? [] : null;
     let nativeOutputRange = null;
     let queryOwnerInventories = null, requireStableInventory = null,
-      requireStableMatchContextInventory = null;
+      requireStableMatchContextInventory = null, requireStableAuroraInventory = null;
     const censusNativeTransferQuiescence = writeCensus ? {
       beforeStep: null, afterStep: null, afterActualDraw: null,
     } : null;
@@ -963,6 +1337,10 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
           const ownerLabel = name.includes('match_context') ? 'match-context owner' : 'audio owner';
           throw new Error(`Required ${ownerLabel} inventory export is unavailable: ${name}`);
         }
+      }
+      if (writeCensus.requireAuroraStagingShadowInventory &&
+          typeof module._melee_web_synctest_aurora_staging_shadow_inventory_query !== 'function') {
+        throw new Error('Required Aurora staging-shadow inventory export is unavailable: _melee_web_synctest_aurora_staging_shadow_inventory_query');
       }
       const arenaBase = module._melee_web_synctest_gameplay_arena_base();
       const arenaBytes = module._melee_web_synctest_gameplay_arena_bytes();
@@ -986,6 +1364,38 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
         `return (${requireStableAudioInventorySource})(inventories)`);
       requireStableMatchContextInventory = new Function('inventories',
         `return (${requireStableMatchContextRangeInventorySource})(inventories)`);
+      const decodeAuroraInventory = writeCensus.requireAuroraStagingShadowInventory ?
+        new Function('heap', 'pointer',
+          `const AURORA_QUIESCENCE_SCHEMA_VERSION = 5;
+` +
+          `const AURORA_FRAME_DESCRIPTOR_BYTES = 464;
+` +
+          `const AURORA_SUBMISSION_DESCRIPTOR_BYTES = 56;
+` +
+          `const AURORA_HEADER_BYTES = 120;
+` +
+          `const AURORA_STREAM_NAMES = ['verts','uniforms','indices','storage','textureUpload'];
+` +
+          `const WASM32_LIMIT = 0x100000000;
+` +
+          `const u64Words = (view, offset) => ({low:view.getUint32(offset,true),high:view.getUint32(offset+4,true)});
+` +
+          `const isZeroU64 = value => value.low === 0 && value.high === 0;
+` +
+          `return (${decodeAuroraStagingShadowInventorySource})(heap, pointer);`) : null;
+      const validateAuroraOwnerRanges = writeCensus.requireAuroraStagingShadowInventory ?
+        new Function('inventory', 'manifestRows', 'arenaRange', 'nativeOutputRange',
+          'heapBytes', 'audioInventory', 'matchContextInventory',
+          `const AURORA_QUIESCENCE_SCHEMA_VERSION = 5;
+` +
+          `const AURORA_STREAM_NAMES = ['verts','uniforms','indices','storage','textureUpload'];
+` +
+          `const WASM32_LIMIT = 0x100000000;
+` +
+          `return (${validateAuroraStagingShadowRangeDisjointnessSource})(inventory, manifestRows, arenaRange, nativeOutputRange, heapBytes, audioInventory, matchContextInventory);`) : null;
+      requireStableAuroraInventory = writeCensus.requireAuroraStagingShadowInventory ?
+        new Function('inventories',
+          `return (${requireStableAuroraStagingShadowInventorySource})(inventories)`) : null;
       queryOwnerInventories = async boundary => {
         await checked(`audio owner inventory ${boundary}`,
           'melee_web_synctest_audio_range_inventory_query');
@@ -1010,8 +1420,24 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
           matchContextPointer);
         validateMatchContextDisjointness(matchContextInventory, writeCensus.manifestRows,
           writeCensus.arenaRange, nativeOutputRange, module.HEAPU8.byteLength, inventory);
-        matchContextInventoryBoundaries.push({boundary, ...matchContextInventory,
-          nativeOutputStorage: nativeOutput});
+        const matchContextBoundary = {boundary, ...matchContextInventory,
+          nativeOutputStorage: nativeOutput};
+        matchContextInventoryBoundaries.push(matchContextBoundary);
+        if (writeCensus.requireAuroraStagingShadowInventory) {
+          const pointer = await module.ccall(
+            'melee_web_synctest_aurora_staging_shadow_inventory_query',
+            'number', [], [], {async: true});
+          if (!Number.isSafeInteger(pointer) || pointer <= 0 || pointer >= 0x100000000) {
+            throw new Error(`Aurora staging-shadow inventory ${boundary} refused or returned an invalid wire pointer`);
+          }
+          const auroraInventory = decodeAuroraInventory(module.HEAPU8, pointer);
+          const diagnosticOutput = validateAuroraOwnerRanges(auroraInventory,
+            writeCensus.manifestRows, writeCensus.arenaRange, nativeOutputRange,
+            module.HEAPU8.byteLength, inventory, matchContextInventory);
+          auroraStagingShadowInventoryBoundaries.push({boundary, ...auroraInventory,
+            diagnosticOutputRange: diagnosticOutput.diagnosticOutputStorage,
+            diagnosticOutputStorage: diagnosticOutput});
+        }
       };
       await queryOwnerInventories('before-source-step');
       const heap = module.HEAPU8;
@@ -1078,6 +1504,9 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
       const makeDiff = new Function(`return (${diffHeapRangesSource})`)();
       requireStableInventory(audioInventoryBoundaries);
       requireStableMatchContextInventory(matchContextInventoryBoundaries);
+      if (requireStableAuroraInventory) {
+        requireStableAuroraInventory(auroraStagingShadowInventoryBoundaries);
+      }
       const raw = makeDiff(heapAfterStep, heapAfterDraw);
       censusDrawRaw = {
         beforeHeapBytes: heapAfterStep.byteLength,
@@ -1089,19 +1518,28 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
       };
       const makeClassify = new Function('ranges', 'manifestRows', 'arenaRange',
         'audioInventoryTransition', 'nativeOutputRange', 'matchContextInventoryTransition',
-        `return (${classifyHeapRangesSource})(ranges, manifestRows, arenaRange, audioInventoryTransition, nativeOutputRange, matchContextInventoryTransition)`);
+        'auroraInventoryTransition',
+        `return (${classifyHeapRangesSource})(ranges, manifestRows, arenaRange, audioInventoryTransition, nativeOutputRange, matchContextInventoryTransition, auroraInventoryTransition)`);
       censusStepDiff = {...censusStepRaw,
         changedRanges: makeClassify(censusStepRaw.ranges, writeCensus.manifestRows,
           writeCensus.arenaRange, {before: audioInventoryBoundaries[0],
             after: audioInventoryBoundaries[1]}, nativeOutputRange,
           {before: matchContextInventoryBoundaries[0],
-            after: matchContextInventoryBoundaries[1]})};
+            after: matchContextInventoryBoundaries[1]},
+          auroraStagingShadowInventoryBoundaries ? {
+            before: auroraStagingShadowInventoryBoundaries[0],
+            after: auroraStagingShadowInventoryBoundaries[1],
+          } : null)};
       censusDrawDiff = {...censusDrawRaw,
         changedRanges: makeClassify(censusDrawRaw.ranges, writeCensus.manifestRows,
           writeCensus.arenaRange, {before: audioInventoryBoundaries[1],
             after: audioInventoryBoundaries[2]}, nativeOutputRange,
           {before: matchContextInventoryBoundaries[1],
-            after: matchContextInventoryBoundaries[2]})};
+            after: matchContextInventoryBoundaries[2]},
+          auroraStagingShadowInventoryBoundaries ? {
+            before: auroraStagingShadowInventoryBoundaries[1],
+            after: auroraStagingShadowInventoryBoundaries[2],
+          } : null)};
       heapAfterStep = null;
     }
     const read = (pointer, size) => module.HEAPU8.slice(pointer, pointer + size);
@@ -1159,6 +1597,19 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
         stableOwnerLifetimeValidated: true,
         ownerRestoreAdmission: false,
       },
+      requireAuroraStagingShadowInventory: Boolean(auroraStagingShadowInventoryBoundaries),
+      auroraStagingShadowOwnerInventory: auroraStagingShadowInventoryBoundaries ? {
+        version: auroraStagingShadowInventoryBoundaries[0].version,
+        wireSize: auroraStagingShadowInventoryBoundaries[0].size,
+        frameSlotCount: auroraStagingShadowInventoryBoundaries[0].frameSlotCount,
+        stagingSlotCount: auroraStagingShadowInventoryBoundaries[0].stagingSlotCount,
+        frameDescriptorStride: auroraStagingShadowInventoryBoundaries[0].frameStride,
+        submissionDescriptorStride: auroraStagingShadowInventoryBoundaries[0].submissionStride,
+        boundaryOrder: auroraStagingShadowInventoryBoundaries.map(item => item.boundary),
+        boundaries: auroraStagingShadowInventoryBoundaries,
+        stableOwnerLifetimeValidated: true,
+        ownerRestoreAdmission: false,
+      } : null,
       nativeOutputStorage: {
         kind: 'fixture-native-pcm-output', ...nativeOutputRange,
         diagnosticOnly: true, ownerRestoreAdmission: false,
@@ -1185,6 +1636,9 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     decodeMatchContextRangeInventorySource: decodeMatchContextRangeInventory.toString(),
     validateMatchContextRangeDisjointnessSource: validateMatchContextRangeDisjointness.toString(),
     requireStableMatchContextRangeInventorySource: requireStableMatchContextRangeInventory.toString(),
+    decodeAuroraStagingShadowInventorySource: decodeAuroraStagingShadowInventory.toString(),
+    validateAuroraStagingShadowRangeDisjointnessSource: validateAuroraStagingShadowRangeDisjointness.toString(),
+    requireStableAuroraStagingShadowInventorySource: requireStableAuroraStagingShadowInventory.toString(),
     maxHeapBytes: MAX_HEAP_BYTES});
 }
 

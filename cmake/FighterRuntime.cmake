@@ -608,9 +608,23 @@ if(MELEE_WEB_SLIPPI_SYNCTEST)
     MELEE_WEB_SNAPSHOT_PROBE_SHA256="${GAMEPLAY_SNAPSHOT_PROBE_SHA256}"
     MELEE_WEB_SNAPSHOT_RNG_PROFILE_SHA256="${MELEE_WEB_SNAPSHOT_RNG_PROFILE_SHA256}"
     MELEE_WEB_SNAPSHOT_STAGE_KIND_BRIDGE_SHA256="${MELEE_WEB_SNAPSHOT_STAGE_KIND_BRIDGE_SHA256}")
+  if(MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY)
+    if(NOT MELEE_WEB_SLIPPI_SYNCTEST OR NOT MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC OR
+        NOT CMAKE_BUILD_TYPE STREQUAL "Release")
+      message(FATAL_ERROR "Aurora staging-shadow inventory requires the private Release Slippi synctest diagnostic")
+    endif()
+    target_compile_definitions(gameplay_slippi_synctest_browser PRIVATE
+      MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY=1)
+  endif()
   target_compile_options(gameplay_slippi_synctest_browser PRIVATE -ffp-contract=off
     "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
   target_link_libraries(gameplay_slippi_synctest_browser PRIVATE fighter_asset_runtime)
+  set(_synctest_browser_exports
+    "_malloc,_free,_melee_web_snapshot_configure_seed,_melee_web_snapshot_init,_melee_web_snapshot_step,_melee_web_snapshot_error,_melee_web_snapshot_observation,_melee_web_snapshot_observation_size,_melee_web_snapshot_initializer_diagnostic,_melee_web_snapshot_initializer_diagnostic_size,_melee_web_snapshot_initializer_json,_melee_web_snapshot_pcm,_melee_web_snapshot_pcm_size,_melee_web_snapshot_input,_melee_web_snapshot_quiescent,_melee_web_snapshot_source_identity,_melee_web_snapshot_stage_kind_bridge_identity,_melee_web_snapshot_rng_profile_identity,_melee_web_snapshot_close,_melee_web_synctest_profile_identity,_melee_web_synctest_draw_decision,_melee_web_synctest_gameplay_arena_base,_melee_web_synctest_gameplay_arena_bytes,_melee_web_synctest_audio_range_inventory,_melee_web_synctest_audio_range_inventory_query,_melee_web_synctest_match_context_range_inventory,_melee_web_synctest_match_context_range_inventory_query,_melee_web_synctest_renderer_initialize,_melee_web_synctest_draw_present,_melee_web_synctest_submission_json,_melee_web_synctest_renderer_shutdown")
+  if(MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY)
+    string(APPEND _synctest_browser_exports
+      ",_melee_web_synctest_aurora_staging_shadow_inventory_query")
+  endif()
   # SDL3 replaces Module.requestFullscreen when creating/destroying its window.
   # Export the real helper so ASSERTIONS=2 does not install a getter-only trap.
   target_link_options(gameplay_slippi_synctest_browser PRIVATE --no-entry --profiling-funcs
@@ -620,7 +634,7 @@ if(MELEE_WEB_SLIPPI_SYNCTEST)
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=${MELEE_WEB_SNAPSHOT_INITIAL_MEMORY}
     -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0 -sASSERTIONS=2 -sSAFE_HEAP=1
     -sEXPORTED_RUNTIME_METHODS=ccall,FS,HEAPU8,UTF8ToString,stackSave,stackRestore,requestFullscreen
-    -sEXPORTED_FUNCTIONS=_malloc,_free,_melee_web_snapshot_configure_seed,_melee_web_snapshot_init,_melee_web_snapshot_step,_melee_web_snapshot_error,_melee_web_snapshot_observation,_melee_web_snapshot_observation_size,_melee_web_snapshot_initializer_diagnostic,_melee_web_snapshot_initializer_diagnostic_size,_melee_web_snapshot_initializer_json,_melee_web_snapshot_pcm,_melee_web_snapshot_pcm_size,_melee_web_snapshot_input,_melee_web_snapshot_quiescent,_melee_web_snapshot_source_identity,_melee_web_snapshot_stage_kind_bridge_identity,_melee_web_snapshot_rng_profile_identity,_melee_web_snapshot_close,_melee_web_synctest_profile_identity,_melee_web_synctest_draw_decision,_melee_web_synctest_gameplay_arena_base,_melee_web_synctest_gameplay_arena_bytes,_melee_web_synctest_audio_range_inventory,_melee_web_synctest_audio_range_inventory_query,_melee_web_synctest_match_context_range_inventory,_melee_web_synctest_match_context_range_inventory_query,_melee_web_synctest_renderer_initialize,_melee_web_synctest_draw_present,_melee_web_synctest_submission_json,_melee_web_synctest_renderer_shutdown
+    -sEXPORTED_FUNCTIONS=${_synctest_browser_exports}
     --preload-file "${MELEE_WEB_SLIPPI_SYNCTEST_ASSET_ROOT}@/assets")
   set_target_properties(gameplay_slippi_synctest_browser PROPERTIES SUFFIX ".mjs")
   add_custom_target(gameplay_slippi_synctest_browser_source_manifest

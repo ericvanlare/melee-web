@@ -83,10 +83,48 @@ error buffers overlapping the live owner now refuse before any write. Actual
 source controls compare every owner byte after refusal, then perform a healthy
 step. The focused fighter trace, 17 runner controls, both Release builds and
 independent raw-result review pass. Full regression passes 2,445 tests with
-165 skips in 530.297 seconds. Existing failed controls and the rejected candidate remain retained. Next, design a pure
-observation accessor for the existing Aurora staging-shadow ownership descriptor;
-its current implementation pumps events and cannot be reused unchanged. This is
-host-state attribution for no-draw rollback, not a resumption of drawn corrections.
+165 skips in 530.297 seconds. Existing failed controls and the rejected candidate
+remain retained. At that checkpoint the next proposal was a pure observation
+accessor for the existing Aurora staging-shadow descriptor, whose current
+implementation pumps events. The later Aurora v2 candidate implemented that
+accessor; its separate v5 headless-Chrome census ran the linked observer. The
+older offline controls alone did not establish linked integration. This remains
+host-state provenance for no-draw rollback, not a resumption of drawn corrections.
+
+The latest read-only Aurora v2 census adds exact staging-shadow provenance to
+the same sample-300 source-step and actual-draw boundaries. Its producer remains
+the clean `4c95db9d` base plus the original frozen nine-file Aurora v2 patch;
+the census used its noncanonical patch bytes and keeps that original identity.
+The completed capture and independent result review are indexed in the
+structured receipt. The source-state manifest remains incomplete, every
+observation remains unadmitted, and no memory was restored.
+
+Full regression v5 recorded one failure in `test_reviewed_aurora_patch_is_canonical`
+(2,448 tests, 165 skips; 551.267 seconds; log SHA-256
+`7c82fb1ae063dbd71466ce0d163f2095f66ae6d63c089acf98ca0f87ea105b08`). The
+canonicalization repair changed patch bytes only: before and after serialization
+produce the same prepared Aurora tree `c065b38cf0d1ba1d9ad1e6717cc79ee1b38eb11e`.
+The repair receipt and independent review are pinned in the structured evidence.
+This does not reidentify the v5 census producer. Full regression v6 passes
+2,448 tests with 165 skips (log SHA-256
+`b48caa832e7b3f4065eb62e2116da70ba582eebf43fb439228793c524e69963c`); final
+exact-head CI remains pending. The earlier Aurora v1 refusal also included a
+missing arbitrary-output alias closure, alongside its syntax, manifest-alias
+and production-path-control findings; all failed controls remain retained.
+
+### Source-main-heap live-payload component
+
+The reviewed three-file source-main-heap candidate has been applied and its
+focused component controls pass. It snapshots exact live `OSAllocFromHeap`
+payload bytes tracked by the existing owner ledger, inside the observed 32 MiB
+gameplay arena. The candidate review, exact application, focused controls and both Release
+builds pass. Full regression v6 also passes; its exact log and result summary are
+pinned in the structured receipt. Final exact-head CI remains pending. Earlier
+failed compile and sanitizer-control attempts remain retained with the candidate
+freeze. This component does not restore allocation topology, explain the
+source-step bytes outside the arena, admit aggregate state, or authorize a
+same-browser restore. Plan v2 (`e551360520b99054508046b9bdeb679ad6103c2ec6e13ede0c90fb3fdd16616c`)
+is the current read-only plan; plan v1 (`eb2f1579608eaf045d7aac7c19fc7ba7dd7cabb36bf2eadd99222f50e642f1e3`) remains preserved.
 
 ## First current-source copy/restore result
 

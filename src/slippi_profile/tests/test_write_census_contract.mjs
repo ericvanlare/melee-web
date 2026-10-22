@@ -7,8 +7,9 @@ import {decodeDrawDiagnostics} from './runner_contract.mjs';
 import {validateCensusDrawSample} from './run_write_census.mjs';
 import {
   classifyHeapRanges, decodeAudioOwnerInventory, decodeMatchContextRangeInventory,
-  diffHeapRanges, requireStableAudioOwnerInventory,
-  requireStableMatchContextRangeInventory, validateAudioOwnerRangeDisjointness,
+  decodeAuroraStagingShadowInventory, diffHeapRanges, requireStableAudioOwnerInventory,
+  requireStableMatchContextRangeInventory, requireStableAuroraStagingShadowInventory,
+  validateAudioOwnerRangeDisjointness, validateAuroraStagingShadowRangeDisjointness,
   validateMatchContextRangeDisjointness,
   validateCensusInventory, validateSourceStateManifest, runBrowserSample,
 } from './run_synctest.mjs';
@@ -87,6 +88,132 @@ function matchContextWire({address = 12000, owner = address, extent = 64,
     view.setUint32(pointer + offset, value, true);
   }
   return {heap, pointer};
+}
+
+function auroraStorageRow(address = 6800) {
+  return {address, size: 2200, decision: 'excluded',
+    exclusion_reason: 'archive-outside-generated-source-producers',
+    input_object: '.deps/aurora/libaurora_gx.a(frame.cpp.o)',
+    input_section: '.bss.aurora_browser_quiescence_observer_storage'};
+}
+
+function writeU64(view, offset, low, high = 0) {
+  view.setUint32(offset, low >>> 0, true);
+  view.setUint32(offset + 4, high >>> 0, true);
+}
+
+function auroraWire({pointer = 6800, ordinal = 0, mutation = null} = {}) {
+  const heap = new Uint8Array(16384);
+  const view = new DataView(heap.buffer);
+  const frameCount = 2, stagingCount = 2;
+  const frameOffset = 120, frameStride = 464;
+  const submissionOffset = frameOffset + frameCount * frameStride, submissionStride = 56;
+  const byteSize = submissionOffset + stagingCount * submissionStride;
+  const drawn = ordinal >= 2;
+  let generationLow = 0x89abcdef, generationHigh = 0x12345678;
+  if (mutation === 'generation' && drawn) generationLow++;
+  if (mutation === 'generation-high' && drawn) generationHigh++;
+  const writeHeader = (offset, value) => view.setUint32(pointer + offset, value >>> 0, true);
+  writeHeader(0, mutation === 'version' ? 4 : 5);
+  writeHeader(4, byteSize);
+  writeHeader(8, frameCount);
+  writeHeader(12, stagingCount);
+  writeHeader(16, mutation === 'offset' ? frameOffset + 4 : frameOffset);
+  writeHeader(20, mutation === 'stride' ? frameStride - 1 : frameStride);
+  writeHeader(24, mutation === 'frame-count' ? frameCount - 1 : frameCount);
+  writeHeader(28, submissionOffset);
+  writeHeader(32, submissionStride);
+  writeHeader(36, mutation === 'submission-count' ? stagingCount - 1 : stagingCount);
+  for (const [offset, value] of [[40, mutation === 'pending-frame' ? 1 : 0],
+    [44, mutation === 'pending-staging' ? 1 : 0],
+    [48, mutation === 'worker-busy' ? 1 : 0],
+    [52, mutation === 'pipeline-not-ready' ? 1 : 0],
+    [56, mutation === 'queued-pipeline' ? 1 : 0], [60, 0], [64, 0]]) {
+    writeHeader(offset, value);
+  }
+  writeHeader(68, mutation === 'current-frame-invalid' ? 0xffffffff : 1);
+  writeU64(view, pointer + 72,
+    mutation === 'zero-generation' ? 0 : generationLow,
+    mutation === 'zero-generation' ? 0 : generationHigh);
+  writeU64(view, pointer + 80, 300 + Number(drawn), 0);
+  writeU64(view, pointer + 88, 300 + Number(drawn), 0);
+  writeU64(view, pointer + 96, Number(drawn), 0);
+  writeU64(view, pointer + 104, Number(drawn), 0);
+  writeU64(view, pointer + 112, 0, 0);
+
+  for (let slot = 0; slot < frameCount; slot++) {
+    const base = pointer + frameOffset + slot * frameStride;
+    view.setUint32(base, slot, true);
+    view.setUint32(base + 4, mutation === 'packet-active' ? 1 : 0, true);
+    view.setUint32(base + 8, 0xffffffff, true);
+    view.setUint32(base + 12, 0, true);
+    writeU64(view, base + 16, mutation === 'packet-active' ? 1 : 0, 0);
+    for (let stream = 0; stream < 5; stream++) {
+      const prior = slot === 0 && stream === 0 ?
+        (mutation === 'row-topology' && drawn ? 0 : (drawn ? 32 : 16)) : 0;
+      writeU64(view, base + 24 + stream * 8, prior, 0);
+      const packet = base + 64 + stream * 40;
+      writeU64(view, packet, 0, 0);
+      writeU64(view, packet + 8, 0, 0);
+      writeU64(view, packet + 16, 0, 0);
+      writeU64(view, packet + 24, 0xffffffff, 0);
+      view.setUint32(packet + 32, 1, true);
+      view.setUint32(packet + 36, 0, true);
+
+      const shadow = base + 264 + stream * 40;
+      let address = slot === 0 && stream === 0 ? 13000 : 0;
+      let length = slot === 0 && stream === 0 ? (drawn ? 32 : 16) : 0;
+      let capacity = slot === 0 && stream === 0 ? 64 : 0;
+      let maxCapacity = stream === 4 ? 0xffffffff : 128;
+      let owned = 1;
+      if (slot === 0 && stream === 0 && mutation === 'static-overlap') address = 15000;
+      if (slot === 0 && stream === 0 && mutation === 'arena-overlap') address = 14000;
+      if (slot === 0 && stream === 0 && mutation === 'native-overlap') address = 3000;
+      if (slot === 0 && stream === 0 && mutation === 'audio-overlap') address = 9000;
+      if (slot === 0 && stream === 0 && mutation === 'context-overlap') address = 12000;
+      if (slot === 0 && stream === 0 && mutation === 'output-overlap') address = pointer + 16;
+      if (slot === 0 && stream === 0 && mutation === 'overflow') address = 0xfffffff0;
+      if (slot === 0 && stream === 0 && mutation === 'pointer' && drawn) address = 13008;
+      if (slot === 0 && stream === 0 && mutation === 'capacity' && drawn) capacity = 96;
+      if (slot === 0 && stream === 0 && mutation === 'max-capacity' && drawn) maxCapacity = 192;
+      if (slot === 0 && stream === 0 && mutation === 'owned' && drawn) owned = 0;
+      if (slot === 0 && stream === 0 && mutation === 'row-topology' && drawn) {
+        address = 0; length = 0; capacity = 0;
+      }
+      if (slot === 0 && stream === 0 && mutation === 'high-word') {
+        writeU64(view, shadow, address, 1);
+      } else {
+        writeU64(view, shadow, address, 0);
+      }
+      writeU64(view, shadow + 8, length, 0);
+      writeU64(view, shadow + 16, capacity, 0);
+      writeU64(view, shadow + 24, maxCapacity,
+        mutation === 'max-high-word' && slot === 0 && stream === 0 ? 1 : 0);
+      view.setUint32(shadow + 32, owned, true);
+      view.setUint32(shadow + 36, 0, true);
+      if (mutation === 'overlap' && slot === 0 && stream === 1) {
+        writeU64(view, shadow, 13032, 0);
+        writeU64(view, shadow + 16, 64, 0);
+        writeU64(view, shadow + 24, 128, 0);
+      }
+      if (mutation === 'empty-pointer' && slot === 0 && stream === 1) {
+        writeU64(view, shadow, 13100, 0);
+      }
+      if (mutation === 'packet-alias' && slot === 0 && stream === 0) {
+        const packet = base + 64;
+        writeU64(view, packet, 13000, 0);
+        writeU64(view, packet + 16, 64, 0);
+      }
+    }
+  }
+  for (let slot = 0; slot < stagingCount; slot++) {
+    const base = pointer + submissionOffset + slot * submissionStride;
+    view.setUint32(base, slot, true);
+    view.setUint32(base + 4, mutation === 'submission-state' ? 6 :
+      mutation === 'pending-callback' ? 1 : 0, true);
+    for (let offset = 8; offset < submissionStride; offset += 8) writeU64(view, base + offset, 0, 0);
+  }
+  return {heap, pointer, byteSize};
 }
 
 test('heap diff reports exact contiguous changed bytes and memory growth', () => {
@@ -322,12 +449,149 @@ test('match-context decoder and owner intervals reject malformed layout, lifetim
   /topology changed/);
 });
 
+test('Aurora staging-shadow wire validates schema5 rows, full generation and exact capacities', () => {
+  const {heap, pointer} = auroraWire();
+  const inventory = decodeAuroraStagingShadowInventory(heap, pointer);
+  assert.deepEqual([inventory.version, inventory.size, inventory.frameSlotCount,
+    inventory.stagingSlotCount, inventory.frameDescriptorCount,
+    inventory.submissionDescriptorCount], [5, 1160, 2, 2, 2, 2]);
+  assert.deepEqual([inventory.stagingGenerationHigh, inventory.stagingGenerationLow],
+    [0x12345678, 0x89abcdef]);
+  assert.equal(inventory.rows.length, 10);
+  assert.deepEqual(inventory.rows.map(row => [row.frameSlot, row.streamIndex, row.kindName]), [
+    [0, 0, 'aurora-staging-shadow-verts'],
+    [0, 1, 'aurora-staging-shadow-uniforms'],
+    [0, 2, 'aurora-staging-shadow-indices'],
+    [0, 3, 'aurora-staging-shadow-storage'],
+    [0, 4, 'aurora-staging-shadow-textureUpload'],
+    [1, 0, 'aurora-staging-shadow-verts'],
+    [1, 1, 'aurora-staging-shadow-uniforms'],
+    [1, 2, 'aurora-staging-shadow-indices'],
+    [1, 3, 'aurora-staging-shadow-storage'],
+    [1, 4, 'aurora-staging-shadow-textureUpload'],
+  ]);
+  assert.equal(inventory.ranges.length, 1);
+  assert.deepEqual(inventory.ranges[0], {
+    kind: 1, kindName: 'aurora-staging-shadow-verts', frameSlot: 0,
+    streamIndex: 0, streamName: 'verts', address: 13000, owner: 13000,
+    ownerAddress: 13000, length: 16, extent: 64, capacity: 64,
+    maxCapacity: 128, previousUsed: 16, owned: 1,
+    generationLow: 0x89abcdef, generationHigh: 0x12345678,
+  });
+  const emptyTextureStream = inventory.rows.find(row => row.frameSlot === 0 && row.streamIndex === 4);
+  assert.deepEqual([emptyTextureStream.address, emptyTextureStream.length,
+    emptyTextureStream.capacity, emptyTextureStream.maxCapacity, emptyTextureStream.owned],
+  [0, 0, 0, 0xffffffff, 1]);
+  assert.deepEqual(inventory.diagnosticOutputRange, {base: pointer, bytes: 1160});
+  assert.equal(inventory.ownerRestoreAdmission, false);
+  assert.throws(() => decodeAuroraStagingShadowInventory(heap, pointer + 4),
+    /wire pointer or wasm bounds/);
+  assert.throws(() => decodeAuroraStagingShadowInventory(heap, heap.byteLength - 4),
+    /wire pointer or wasm bounds/);
+  for (const mutation of ['version', 'offset', 'stride', 'current-frame-invalid', 'frame-count',
+    'submission-count', 'pending-frame', 'pending-staging', 'worker-busy',
+    'pipeline-not-ready', 'queued-pipeline', 'zero-generation', 'packet-active',
+    'packet-alias', 'submission-state', 'pending-callback', 'high-word',
+    'max-high-word', 'overflow', 'owned', 'empty-pointer', 'overlap']) {
+    const malformed = auroraWire({mutation, ordinal: 2});
+    assert.throws(() => decodeAuroraStagingShadowInventory(malformed.heap, malformed.pointer),
+      /Aurora (?:empty )?staging-shadow/, mutation);
+  }
+});
+
+test('Aurora staging-shadow provenance rejects aliases and validates stable owner identity only', () => {
+  const aurora = auroraWire();
+  const inventory = decodeAuroraStagingShadowInventory(aurora.heap, aurora.pointer);
+  const audioFixture = audioWire();
+  const audio = decodeAudioOwnerInventory(audioFixture.heap, audioFixture.pointer);
+  const contextFixture = matchContextWire();
+  const matchContext = decodeMatchContextRangeInventory(contextFixture.heap,
+    contextFixture.pointer);
+  const manifestRows = [auroraStorageRow(), row(15000, 1, 'source-c-static-candidate', 'aurora-disjointness')];
+  const nativeOutput = {base: 2048, bytes: 4272};
+  const arena = {base: 14000, bytes: 100};
+  assert.deepEqual(validateAuroraStagingShadowRangeDisjointness(inventory,
+    manifestRows, arena, nativeOutput, aurora.heap.byteLength, audio, matchContext), {
+    rangeCount: 1, diagnosticOnly: true,
+    diagnosticOutputStorage: {base: 6800, bytes: 2200}, ownerRestoreAdmission: false,
+  });
+  for (const broken of [
+    {...auroraStorageRow(), input_section: '.bss.other'},
+    {...auroraStorageRow(), input_object: 'wrong(frame.cpp.o)'},
+    {...auroraStorageRow(), decision: 'source-c-static-candidate'},
+    {...auroraStorageRow(), exclusion_reason: 'wrong'},
+    {...auroraStorageRow(), address: 6808},
+    {...auroraStorageRow(), size: 1160},
+  ]) assert.throws(() => validateAuroraStagingShadowRangeDisjointness(inventory,
+    [broken], arena, nativeOutput, aurora.heap.byteLength, audio, matchContext), /exact excluded manifest identity/);
+  assert.throws(() => validateAuroraStagingShadowRangeDisjointness(inventory,
+    [auroraStorageRow(), auroraStorageRow()], arena, nativeOutput, aurora.heap.byteLength, audio, matchContext),
+  /exact excluded manifest identity/);
+  assert.throws(() => validateAuroraStagingShadowRangeDisjointness(inventory,
+    [...manifestRows, row(6804, 4, 'source-c-static-candidate', 'alien-overlap')],
+    arena, nativeOutput, aurora.heap.byteLength, audio, matchContext), /diagnostic output overlaps static manifest range/);
+  for (const [mutation, message] of [
+    ['static-overlap', /static manifest range/],
+    ['arena-overlap', /gameplay arena/],
+    ['native-overlap', /native PCM output storage/],
+    ['audio-overlap', /audio owner range/],
+    ['context-overlap', /match-context owner range/],
+    ['output-overlap', /overlaps its diagnostic output/],
+  ]) {
+    const alias = auroraWire({mutation});
+    const decoded = decodeAuroraStagingShadowInventory(alias.heap, alias.pointer);
+    assert.throws(() => validateAuroraStagingShadowRangeDisjointness(decoded,
+      manifestRows, arena, nativeOutput, alias.heap.byteLength, audio, matchContext), message);
+  }
+  const outputAlias = auroraWire({pointer: 9000});
+  const outputInventory = decodeAuroraStagingShadowInventory(outputAlias.heap,
+    outputAlias.pointer);
+  assert.throws(() => validateAuroraStagingShadowRangeDisjointness(outputInventory,
+    [auroraStorageRow(outputAlias.pointer)], arena, nativeOutput, outputAlias.heap.byteLength, audio, matchContext),
+  /diagnostic output overlaps audio owner range/);
+
+  const boundaries = ['before-source-step', 'after-source-step',
+    'after-actual-draw-and-Aurora-quiescence'].map((boundary, ordinal) => {
+    const sample = auroraWire({ordinal});
+    return {...decodeAuroraStagingShadowInventory(sample.heap, sample.pointer), boundary};
+  });
+  assert.equal(requireStableAuroraStagingShadowInventory(boundaries)[0].address, 13000);
+  assert.throws(() => requireStableAuroraStagingShadowInventory(boundaries.map((item, index) =>
+    index === 2 ? {...item, stagingGenerationLow: item.stagingGenerationLow + 1} : item)),
+  /lifetime generation changed/);
+  assert.throws(() => requireStableAuroraStagingShadowInventory(boundaries.map((item, index) =>
+    index === 2 ? {...item, stagingGenerationHigh: item.stagingGenerationHigh + 1} : item)),
+  /lifetime generation changed/);
+  for (const field of ['address', 'extent', 'maxCapacity', 'owned', 'kind', 'streamIndex']) {
+    const changed = boundaries.map((item, index) => index === 2 ? {
+      ...item, rows: item.rows.map((row, rowIndex) => rowIndex === 0 ? {
+        ...row,
+        [field]: field === 'owned' ? 0 : field === 'address' ? row.address + 4 :
+          field === 'extent' ? row.extent + 4 : field === 'maxCapacity' ? row.maxCapacity + 4 : row[field] + 1,
+      } : row),
+      ranges: item.ranges.map((row, rowIndex) => rowIndex === 0 ? {
+        ...row,
+        [field]: field === 'owned' ? 0 : field === 'address' ? row.address + 4 :
+          field === 'extent' ? row.extent + 4 : field === 'maxCapacity' ? row.maxCapacity + 4 : row[field] + 1,
+      } : row),
+    } : item);
+    assert.throws(() => requireStableAuroraStagingShadowInventory(changed),
+      /owner topology or capacity changed/, field);
+  }
+  const changedRangeCount = boundaries.map((item, index) => index === 2 ?
+    {...item, ranges: []} : item);
+  assert.throws(() => requireStableAuroraStagingShadowInventory(changedRangeCount),
+    /owner topology or capacity changed/);
+});
+
 // Execute the real page.evaluate census branch against a small service fixture.
 // This exercises orchestration/guards only; it is not GPU or gameplay evidence.
 async function censusServiceFixture({failedQuiescence = 0, rendererError = 0,
   inventoryFailureAt = 0, inventoryMutation = null, missingInventoryExport = false,
   matchContextInventoryFailureAt = 0, matchContextInventoryMutation = null,
-  missingMatchContextInventoryExport = false} = {}) {
+  missingMatchContextInventoryExport = false, requireAuroraStagingShadowInventory = false,
+  auroraInventoryFailureAt = 0, auroraInventoryMutation = null,
+  missingAuroraStagingShadowExport = false} = {}) {
   const context = vm.createContext({crypto: webcrypto, setTimeout, performance,
     btoa: value => Buffer.from(value, 'binary').toString('base64')});
   vm.runInContext(`
@@ -336,8 +600,10 @@ async function censusServiceFixture({failedQuiescence = 0, rendererError = 0,
     const calls = [];
     const inventoryPointer = 8000;
     const matchContextInventoryPointer = 11000;
+    const auroraInventoryPointer = 6800;
     let inventoryQueryCount = 0;
     let matchContextInventoryQueryCount = 0;
+    let auroraInventoryQueryCount = 0;
     function publishAudioInventory() {
       const ordinal = inventoryQueryCount;
       let owner = 9000;
@@ -445,6 +711,7 @@ async function censusServiceFixture({failedQuiescence = 0, rendererError = 0,
       _melee_web_synctest_audio_range_inventory: () => inventoryPointer,
       _melee_web_synctest_match_context_range_inventory_query: () => 1,
       _melee_web_synctest_match_context_range_inventory: () => matchContextInventoryPointer,
+      _melee_web_synctest_aurora_staging_shadow_inventory_query: () => auroraInventoryPointer,
       _melee_web_synctest_draw_decision: () => 1,
       _melee_web_snapshot_observation_size: () => 1280,
       _melee_web_snapshot_pcm_size: () => 4272,
@@ -480,6 +747,12 @@ async function censusServiceFixture({failedQuiescence = 0, rendererError = 0,
           publishMatchContextInventory();
           return 1;
         }
+        if (identifier === 'melee_web_synctest_aurora_staging_shadow_inventory_query') {
+          auroraInventoryQueryCount++;
+          if (auroraInventoryQueryCount === ${auroraInventoryFailureAt}) return 0;
+          globalThis.__writeAuroraInventory(auroraInventoryQueryCount - 1);
+          return auroraInventoryPointer;
+        }
         if (identifier === 'melee_web_snapshot_step') {
           if (args.length !== 1 || args[0] !== 300) throw new Error('wrong census input sample');
           heap[15000] = 7;
@@ -491,6 +764,7 @@ async function censusServiceFixture({failedQuiescence = 0, rendererError = 0,
         }
         if (identifier === 'melee_web_synctest_draw_present') {
           heap[14000] = 8;
+          if (${requireAuroraStagingShadowInventory ? 'true' : 'false'}) heap[13004] = 19;
           for (let slot = 0; slot < 2; slot++) {
             view.setUint32(6508 + 4 * slot, 5, true);
             view.setUint32(6556 + 4 * slot, 1, true);
@@ -511,6 +785,14 @@ async function censusServiceFixture({failedQuiescence = 0, rendererError = 0,
   if (missingMatchContextInventoryExport) {
     vm.runInContext('delete window.__slippiSynctest.module._melee_web_synctest_match_context_range_inventory_query', context);
   }
+  if (missingAuroraStagingShadowExport) {
+    vm.runInContext('delete window.__slippiSynctest.module._melee_web_synctest_aurora_staging_shadow_inventory_query', context);
+  }
+  context.__writeAuroraInventory = ordinal => {
+    const wire = auroraWire({ordinal, mutation: auroraInventoryMutation});
+    const target = vm.runInContext('heap', context);
+    target.set(wire.heap.subarray(wire.pointer, wire.pointer + wire.byteSize), wire.pointer);
+  };
   const baseline = decodeDrawDiagnostics(Buffer.from(vm.runInContext('heap.slice(6500, 6632)', context)));
   const page = {evaluate: (callback, arguments_) => {
     context.arguments_ = arguments_;
@@ -518,9 +800,10 @@ async function censusServiceFixture({failedQuiescence = 0, rendererError = 0,
   }};
   const result = await runBrowserSample(page, 300, censusMapping, [4, 4], {
     arenaRange: {base: 14000, bytes: 100},
-    manifestRows: [row(15000, 1, 'source-c-static-candidate', 'service-fixture')],
+    manifestRows: [auroraStorageRow(), row(15000, 1, 'source-c-static-candidate', 'service-fixture')],
     requireAudioInventory: true,
     requireMatchContextInventory: true,
+    requireAuroraStagingShadowInventory,
   });
   return {result, baseline, calls: JSON.parse(vm.runInContext('JSON.stringify(calls)', context))};
 }
@@ -707,6 +990,114 @@ test('match-context census requires its export and refuses stale owner, lifetime
     ['output-overlap', /native PCM output storage/],
   ]) {
     await assert.rejects(censusServiceFixture({matchContextInventoryMutation}), message);
+  }
+});
+
+test('opt-in Aurora census samples three ordered owner boundaries and keeps all rows unadmitted', async () => {
+  await assert.rejects(censusServiceFixture({requireAuroraStagingShadowInventory: true,
+    missingAuroraStagingShadowExport: true}),
+  /Required Aurora staging-shadow inventory export is unavailable/);
+  for (const [auroraInventoryFailureAt, boundary] of [[1, 'before-source-step'],
+    [2, 'after-source-step'], [3, 'after-actual-draw-and-Aurora-quiescence']]) {
+    await assert.rejects(censusServiceFixture({requireAuroraStagingShadowInventory: true,
+      auroraInventoryFailureAt}), new RegExp(`Aurora staging-shadow inventory ${boundary}`));
+  }
+  const fixture = await censusServiceFixture({requireAuroraStagingShadowInventory: true});
+  const validated = validate300(fixture);
+  assert.equal(validated.fighters.length, 2);
+  const expectedCalls = [
+    'melee_web_snapshot_quiescent',
+    'melee_web_synctest_audio_range_inventory_query',
+    'melee_web_synctest_match_context_range_inventory_query',
+    'melee_web_synctest_aurora_staging_shadow_inventory_query',
+    'melee_web_snapshot_step',
+    'melee_web_snapshot_quiescent',
+    'melee_web_synctest_audio_range_inventory_query',
+    'melee_web_synctest_match_context_range_inventory_query',
+    'melee_web_synctest_aurora_staging_shadow_inventory_query',
+    'melee_web_synctest_draw_present',
+    'melee_web_snapshot_quiescent',
+    'melee_web_synctest_audio_range_inventory_query',
+    'melee_web_synctest_match_context_range_inventory_query',
+    'melee_web_synctest_aurora_staging_shadow_inventory_query',
+  ];
+  assert.deepEqual(fixture.calls.map(call => call.identifier), expectedCalls);
+  const census = fixture.result.heapCensus;
+  assert.equal(census.requireAuroraStagingShadowInventory, true);
+  assert.equal(census.auroraStagingShadowOwnerInventory.version, 5);
+  assert.equal(census.auroraStagingShadowOwnerInventory.ownerRestoreAdmission, false);
+  assert.equal(census.auroraStagingShadowOwnerInventory.stableOwnerLifetimeValidated, true);
+  assert.deepEqual([...census.auroraStagingShadowOwnerInventory.boundaryOrder], [
+    'before-source-step', 'after-source-step',
+    'after-actual-draw-and-Aurora-quiescence',
+  ]);
+  assert.equal(census.auroraStagingShadowOwnerInventory.boundaries.length, 3);
+  assert.ok(census.auroraStagingShadowOwnerInventory.boundaries.every(boundary =>
+    boundary.rows.length === 10 && boundary.ranges.length === 1 &&
+    boundary.ownerRestoreAdmission === false &&
+    boundary.diagnosticOutputStorage.ownerRestoreAdmission === false));
+  assert.equal(census.sourceStep.changedRanges.some(range =>
+    range.provenance === 'aurora-staging-shadow-owner-range'), false);
+  assert.ok(census.actualDrawAndQuiescence.changedRanges.some(range =>
+    range.start === 13004 && range.provenance === 'aurora-staging-shadow-owner-range' &&
+    range.ownerRestoreAdmission === false &&
+    range.auroraStagingShadowKind === 'aurora-staging-shadow-verts'));
+  assert.ok(census.actualDrawAndQuiescence.changedRanges.some(range =>
+    range.provenance === 'aurora-staging-shadow-descriptor-diagnostic-excluded'));
+  assert.ok([...census.sourceStep.changedRanges, ...census.actualDrawAndQuiescence.changedRanges]
+    .every(range => range.ownerRestoreAdmission === false));
+  const missing = {...fixture.result, heapCensus: {...census,
+    auroraStagingShadowOwnerInventory: null}};
+  assert.throws(() => validate300({...fixture, result: missing}),
+    /three-boundary Aurora staging-shadow inventory/);
+});
+
+test('Aurora census keeps normal mode compatible and refuses changed lifetime or topology', async () => {
+  const ordinary = await censusServiceFixture({missingAuroraStagingShadowExport: true});
+  assert.equal(validate300(ordinary).fighters.length, 2);
+  assert.equal(ordinary.calls.some(call => call.identifier ===
+    'melee_web_synctest_aurora_staging_shadow_inventory_query'), false);
+
+  for (const auroraInventoryMutation of ['generation', 'generation-high']) {
+    await assert.rejects(censusServiceFixture({requireAuroraStagingShadowInventory: true,
+      auroraInventoryMutation}), /lifetime generation changed/);
+  }
+  for (const auroraInventoryMutation of ['pointer', 'capacity', 'max-capacity', 'row-topology']) {
+    await assert.rejects(censusServiceFixture({requireAuroraStagingShadowInventory: true,
+      auroraInventoryMutation}), /owner topology or capacity changed/);
+  }
+  for (const [auroraInventoryMutation, message] of [
+    ['version', /schema, count, offset, stride, or idle status/],
+    ['offset', /schema, count, offset, stride, or idle status/],
+    ['stride', /schema, count, offset, stride, or idle status/],
+    ['current-frame-invalid', /schema, count, offset, stride, or idle status/],
+    ['frame-count', /schema, count, offset, stride, or idle status/],
+    ['submission-count', /schema, count, offset, stride, or idle status/],
+    ['pending-frame', /schema, count, offset, stride, or idle status/],
+    ['pending-staging', /schema, count, offset, stride, or idle status/],
+    ['worker-busy', /schema, count, offset, stride, or idle status/],
+    ['pipeline-not-ready', /schema, count, offset, stride, or idle status/],
+    ['queued-pipeline', /schema, count, offset, stride, or idle status/],
+    ['zero-generation', /schema, count, offset, stride, or idle status/],
+    ['packet-active', /frame row is active/],
+    ['packet-alias', /packet buffer is not empty/],
+    ['submission-state', /submission row has invalid slot or pending callback state/],
+    ['pending-callback', /submission row has invalid slot or pending callback state/],
+    ['high-word', /owner row has invalid kind, lifetime extent, or wasm32 bounds/],
+    ['max-high-word', /owner row has invalid kind, lifetime extent, or wasm32 bounds/],
+    ['overflow', /capacity lies outside wasm32 memory/],
+    ['owned', /owner row has invalid kind, lifetime extent, or wasm32 bounds/],
+    ['empty-pointer', /empty staging-shadow row has a nonempty address or length/],
+    ['overlap', /capacity ranges overlap each other/],
+    ['static-overlap', /overlaps static manifest range/],
+    ['arena-overlap', /overlaps gameplay arena/],
+    ['native-overlap', /overlaps native PCM output storage/],
+    ['audio-overlap', /overlaps audio owner range/],
+    ['context-overlap', /overlaps match-context owner range/],
+    ['output-overlap', /overlaps its diagnostic output/],
+  ]) {
+    await assert.rejects(censusServiceFixture({requireAuroraStagingShadowInventory: true,
+      auroraInventoryMutation}), message);
   }
 });
 

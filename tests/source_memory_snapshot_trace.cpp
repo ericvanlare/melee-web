@@ -2,10 +2,19 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <new>
 
-namespace { long allocation_budget = -1; }
+namespace {
+long allocation_budget = -1;
+void* allocation_alias = nullptr;
+}
 void* operator new(std::size_t bytes) {
+    if (allocation_alias) {
+        void* p = allocation_alias;
+        allocation_alias = nullptr;
+        return p;
+    }
     if (allocation_budget == 0) throw std::bad_alloc();
     if (allocation_budget > 0) --allocation_budget;
     if (void* p=std::malloc(bytes ? bytes : 1)) return p;
@@ -34,9 +43,329 @@ void same_fighter(const MeleeWebSourceFighterAddress& a,
           a.allocation_generation == b.allocation_generation && a.live == b.live,
           "exact fighter lease restored");
 }
+MeleeWebSourceMemoryAllocation allocation(void* host) {
+    MeleeWebSourceMemoryAllocation value{};
+    check(melee_web_source_memory_allocation_read(host, &value) ==
+          MELEE_WEB_SOURCE_MEMORY_READ_OK && value.live,
+          "live payload allocation read");
+    return value;
+}
+void same_allocation(void* host, const MeleeWebSourceMemoryAllocation& expected) {
+    const auto actual = allocation(host);
+    check(actual.source_heap_handle == expected.source_heap_handle &&
+          actual.requested_bytes == expected.requested_bytes &&
+          actual.world_generation == expected.world_generation &&
+          actual.allocation_generation == expected.allocation_generation &&
+          actual.live == expected.live,
+          "payload refusal preserves allocation ledger");
+}
+void same_context(const MeleeWebSourceMemoryContext& expected) {
+    const auto actual = context();
+    check(actual.source_heap_handle == expected.source_heap_handle &&
+          actual.world_generation == expected.world_generation &&
+          actual.allocation_generation_watermark ==
+              expected.allocation_generation_watermark,
+          "payload operation preserves source-memory context");
+}
+void fill(unsigned char* bytes, size_t count, unsigned char seed) {
+    for (size_t i = 0; i < count; ++i)
+        bytes[i] = static_cast<unsigned char>(seed + i * 13u);
+}
+void same_bytes(const unsigned char* actual, const unsigned char* expected,
+                size_t count, const char* message) {
+    check(std::memcmp(actual, expected, count) == 0, message);
+}
+
+void source_memory_payload_controls() {
+    unsigned char a[128]{}, b[73]{}, c[41]{};
+    unsigned char expected_a[sizeof(a)]{}, expected_b[sizeof(b)]{};
+    unsigned char before_a[sizeof(a)]{}, before_b[sizeof(b)]{}, before_c[sizeof(c)]{};
+    check(melee_web_source_memory_begin(701, 3), "payload owner begin");
+    fill(a, sizeof(a), 3);
+    fill(b, sizeof(b), 41);
+    std::memcpy(expected_a, a, sizeof(a));
+    std::memcpy(expected_b, b, sizeof(b));
+    check(melee_web_source_memory_alloc(3, a, sizeof(a)), "payload allocation A");
+    check(melee_web_source_memory_alloc(3, b, sizeof(b)), "payload allocation B");
+    const auto before_bad_extent = context();
+    const auto before_bad_extent_a = allocation(a);
+    const auto before_bad_extent_b = allocation(b);
+    void* wrapped_payload = reinterpret_cast<void*>(
+        std::numeric_limits<uintptr_t>::max() - 1u);
+    check(melee_web_source_memory_alloc(3, wrapped_payload, 4),
+          "record malformed wrapped host extent for refusal control");
+    const auto malformed = melee_web_source_memory_payload_snapshot_capture();
+    check(malformed.status ==
+              MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE &&
+          !malformed.snapshot, "wrapped live extent is refused before reading");
+    same_bytes(a, expected_a, sizeof(a), "bad-extent refusal preserves A");
+    same_bytes(b, expected_b, sizeof(b), "bad-extent refusal preserves B");
+    same_allocation(a, before_bad_extent_a);
+    same_allocation(b, before_bad_extent_b);
+    check(melee_web_source_memory_free(3, wrapped_payload),
+          "remove malformed test allocation");
+    const auto after_bad_extent = context();
+    check(after_bad_extent.source_heap_handle == before_bad_extent.source_heap_handle &&
+          after_bad_extent.world_generation == before_bad_extent.world_generation &&
+          after_bad_extent.allocation_generation_watermark >
+              before_bad_extent.allocation_generation_watermark,
+          "malformed-range control leaves a healthy owner after cleanup");
+    const auto initial_context = context();
+    const auto initial_a = allocation(a);
+    const auto initial_b = allocation(b);
+    MeleeWebSourceMemorySnapshot* mirror_checkpoint = nullptr;
+    check(melee_web_source_memory_snapshot_capture(&mirror_checkpoint) ==
+          MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_OK && mirror_checkpoint,
+          "capture unchanged mirror checkpoint beside payload checkpoint");
+
+    // The candidate uses one allocation for its complete private block. Its
+    // only capture allocation failure must not touch payloads, ledger or owner.
+    allocation_budget = 0;
+    const auto failed = melee_web_source_memory_payload_snapshot_capture();
+    allocation_budget = -1;
+    check(failed.status == MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_ALLOCATION_FAILED &&
+          !failed.snapshot, "payload capture allocation failure is explicit");
+    same_bytes(a, expected_a, sizeof(a), "failed payload capture preserves A");
+    same_bytes(b, expected_b, sizeof(b), "failed payload capture preserves B");
+    same_context(initial_context);
+    same_allocation(a, initial_a);
+    same_allocation(b, initial_b);
+
+    // Simulate an allocator alias into the live owner. The producer must spot
+    // the full snapshot-block overlap before constructing or writing anything.
+    allocation_alias = a;
+    const auto aliased = melee_web_source_memory_payload_snapshot_capture();
+    check(!allocation_alias &&
+          aliased.status ==
+              MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OVERLAPPING_STORAGE &&
+          !aliased.snapshot, "payload snapshot owner overlap is refused");
+    same_bytes(a, expected_a, sizeof(a), "overlap refusal preserves A");
+    same_bytes(b, expected_b, sizeof(b), "overlap refusal preserves B");
+    same_context(initial_context);
+    same_allocation(a, initial_a);
+    same_allocation(b, initial_b);
+
+    allocation_budget = 1;
+    const auto captured = melee_web_source_memory_payload_snapshot_capture();
+    check(allocation_budget == 0,
+          "payload capture has one checked storage-allocation point");
+    allocation_budget = -1;
+    check(captured.status == MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK &&
+          captured.snapshot, "payload capture succeeds after injected failure");
+    auto* snapshot = captured.snapshot;
+    check(melee_web_source_memory_payload_snapshot_admit(snapshot) ==
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK,
+          "unchanged payload topology admits");
+    fill(a, sizeof(a), 99);
+    fill(b, sizeof(b), 171);
+    allocation_budget = 0;
+    const auto restored =
+        melee_web_source_memory_payload_snapshot_restore(snapshot);
+    allocation_budget = -1;
+    check(restored == MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK,
+          "payload restore succeeds without allocating");
+    same_bytes(a, expected_a, sizeof(a), "payload A restored exactly");
+    same_bytes(b, expected_b, sizeof(b), "payload B restored exactly");
+    same_context(initial_context);
+    same_allocation(a, initial_a);
+    same_allocation(b, initial_b);
+
+    // A new allocation invalidates the complete set. Refusal must preserve all
+    // bytes, including the newly live payload, and must not rewrite the ledger.
+    fill(a, sizeof(a), 11);
+    fill(b, sizeof(b), 21);
+    fill(c, sizeof(c), 31);
+    std::memcpy(before_a, a, sizeof(a));
+    std::memcpy(before_b, b, sizeof(b));
+    std::memcpy(before_c, c, sizeof(c));
+    check(melee_web_source_memory_alloc(3, c, sizeof(c)),
+          "post-snapshot payload allocation");
+    const auto changed_context = context();
+    const auto changed_a = allocation(a);
+    const auto changed_b = allocation(b);
+    const auto changed_c = allocation(c);
+    check(melee_web_source_memory_payload_snapshot_restore(snapshot) ==
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED,
+          "new allocation refuses payload restore");
+    same_bytes(a, before_a, sizeof(a), "topology refusal preserves A");
+    same_bytes(b, before_b, sizeof(b), "topology refusal preserves B");
+    same_bytes(c, before_c, sizeof(c), "topology refusal preserves C");
+    same_context(changed_context);
+    same_allocation(a, changed_a);
+    same_allocation(b, changed_b);
+    same_allocation(c, changed_c);
+    check(melee_web_source_memory_free(3, c), "free post-snapshot payload");
+    check(melee_web_source_memory_payload_snapshot_restore(snapshot) ==
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED,
+          "free after snapshot remains rejected");
+    same_bytes(a, before_a, sizeof(a), "free refusal preserves A");
+    same_bytes(b, before_b, sizeof(b), "free refusal preserves B");
+    fill(a, sizeof(a), 13);
+    fill(b, sizeof(b), 23);
+    std::memcpy(before_a, a, sizeof(a));
+    std::memcpy(before_b, b, sizeof(b));
+    check(melee_web_source_memory_snapshot_restore(mirror_checkpoint) ==
+          MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_OK,
+          "existing mirror-only restore keeps its behavior");
+    check(melee_web_source_memory_payload_snapshot_restore(snapshot) ==
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED,
+          "mirror rewind cannot revive older payload snapshot");
+    same_bytes(a, before_a, sizeof(a), "mirror-only restore preserves payload A");
+    same_bytes(b, before_b, sizeof(b), "mirror-only restore preserves payload B");
+    check(context().allocation_generation_watermark ==
+          initial_context.allocation_generation_watermark,
+          "mirror-only restore still restores its existing watermark");
+    melee_web_source_memory_snapshot_destroy(mirror_checkpoint);
+    melee_web_source_memory_payload_snapshot_destroy(snapshot);
+
+    // Reusing the same host pointer creates a new allocation lifetime. The
+    // older payload snapshot cannot regain admission even when address and size
+    // are equal.
+    const auto reuse_capture = melee_web_source_memory_payload_snapshot_capture();
+    check(reuse_capture.status == MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK &&
+          reuse_capture.snapshot, "capture before host-pointer reuse");
+    const auto old_b = allocation(b);
+    fill(a, sizeof(a), 51);
+    fill(b, sizeof(b), 61);
+    std::memcpy(before_a, a, sizeof(a));
+    std::memcpy(before_b, b, sizeof(b));
+    check(melee_web_source_memory_free(3, b), "free before host-pointer reuse");
+    check(melee_web_source_memory_alloc(3, b, sizeof(b)),
+          "reuse same host pointer");
+    const auto new_b = allocation(b);
+    check(new_b.allocation_generation != old_b.allocation_generation,
+          "host-pointer reuse advances generation");
+    const auto reused_context = context();
+    const auto reused_a = allocation(a);
+    const auto reused_b = allocation(b);
+    check(melee_web_source_memory_payload_snapshot_restore(reuse_capture.snapshot) ==
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED,
+          "reused host pointer refuses old payload restore");
+    same_bytes(a, before_a, sizeof(a), "reuse refusal preserves A");
+    same_bytes(b, before_b, sizeof(b), "reuse refusal preserves B");
+    same_context(reused_context);
+    same_allocation(a, reused_a);
+    same_allocation(b, reused_b);
+    melee_web_source_memory_payload_snapshot_destroy(reuse_capture.snapshot);
+
+    const auto old_world = melee_web_source_memory_payload_snapshot_capture();
+    check(old_world.status == MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK &&
+          old_world.snapshot, "capture before world change");
+    check(melee_web_source_memory_end(701), "end payload owner before world change");
+    check(melee_web_source_memory_begin(702, 3), "begin changed world");
+    fill(a, sizeof(a), 71);
+    fill(b, sizeof(b), 81);
+    check(melee_web_source_memory_alloc(3, a, sizeof(a)),
+          "changed-world allocation A");
+    check(melee_web_source_memory_alloc(3, b, sizeof(b)),
+          "changed-world allocation B");
+    std::memcpy(before_a, a, sizeof(a));
+    std::memcpy(before_b, b, sizeof(b));
+    const auto world_context = context();
+    const auto world_a = allocation(a);
+    const auto world_b = allocation(b);
+    check(melee_web_source_memory_payload_snapshot_restore(old_world.snapshot) ==
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_STALE_OWNER,
+          "changed world refuses old payload snapshot");
+    same_bytes(a, before_a, sizeof(a), "world refusal preserves A");
+    same_bytes(b, before_b, sizeof(b), "world refusal preserves B");
+    same_context(world_context);
+    same_allocation(a, world_a);
+    same_allocation(b, world_b);
+    melee_web_source_memory_payload_snapshot_destroy(old_world.snapshot);
+
+    const auto old_heap = melee_web_source_memory_payload_snapshot_capture();
+    check(old_heap.status == MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK &&
+          old_heap.snapshot, "capture before heap change");
+    check(melee_web_source_memory_end(702), "end before heap change");
+    check(melee_web_source_memory_begin(702, 4), "begin changed source heap");
+    check(melee_web_source_memory_alloc(4, a, sizeof(a)),
+          "changed-heap allocation A");
+    check(melee_web_source_memory_alloc(4, b, sizeof(b)),
+          "changed-heap allocation B");
+    fill(a, sizeof(a), 91);
+    fill(b, sizeof(b), 101);
+    std::memcpy(before_a, a, sizeof(a));
+    std::memcpy(before_b, b, sizeof(b));
+    const auto heap_context = context();
+    const auto heap_a = allocation(a);
+    const auto heap_b = allocation(b);
+    check(melee_web_source_memory_payload_snapshot_restore(old_heap.snapshot) ==
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_STALE_OWNER,
+          "changed heap refuses old payload snapshot");
+    same_bytes(a, before_a, sizeof(a), "heap refusal preserves A");
+    same_bytes(b, before_b, sizeof(b), "heap refusal preserves B");
+    same_context(heap_context);
+    same_allocation(a, heap_a);
+    same_allocation(b, heap_b);
+    melee_web_source_memory_payload_snapshot_destroy(old_heap.snapshot);
+
+    const auto old_epoch = melee_web_source_memory_payload_snapshot_capture();
+    check(old_epoch.status == MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK &&
+          old_epoch.snapshot, "capture before same-ID owner restart");
+    check(melee_web_source_memory_end(702), "end before same-ID owner restart");
+    check(melee_web_source_memory_begin(702, 4), "restart same world and heap IDs");
+    check(melee_web_source_memory_alloc(4, a, sizeof(a)),
+          "same-ID restart allocation A");
+    check(melee_web_source_memory_alloc(4, b, sizeof(b)),
+          "same-ID restart allocation B");
+    fill(a, sizeof(a), 107);
+    fill(b, sizeof(b), 117);
+    std::memcpy(before_a, a, sizeof(a));
+    std::memcpy(before_b, b, sizeof(b));
+    const auto epoch_context = context();
+    const auto epoch_a = allocation(a);
+    const auto epoch_b = allocation(b);
+    check(melee_web_source_memory_payload_snapshot_restore(old_epoch.snapshot) ==
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_STALE_OWNER,
+          "owner epoch rejects recycled world and heap IDs");
+    same_bytes(a, before_a, sizeof(a), "epoch refusal preserves A");
+    same_bytes(b, before_b, sizeof(b), "epoch refusal preserves B");
+    same_context(epoch_context);
+    same_allocation(a, epoch_a);
+    same_allocation(b, epoch_b);
+    melee_web_source_memory_payload_snapshot_destroy(old_epoch.snapshot);
+
+    const auto unhealthy_snapshot =
+        melee_web_source_memory_payload_snapshot_capture();
+    check(unhealthy_snapshot.status == MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK &&
+          unhealthy_snapshot.snapshot, "capture before unhealthy owner");
+    fill(a, sizeof(a), 111);
+    fill(b, sizeof(b), 121);
+    std::memcpy(before_a, a, sizeof(a));
+    std::memcpy(before_b, b, sizeof(b));
+    check(!melee_web_source_memory_free(4, c), "induce unhealthy payload owner");
+    const auto unhealthy_capture =
+        melee_web_source_memory_payload_snapshot_capture();
+    check(unhealthy_capture.status ==
+              MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_UNHEALTHY &&
+          !unhealthy_capture.snapshot,
+          "unhealthy owner refuses payload capture");
+    check(melee_web_source_memory_payload_snapshot_restore(
+              unhealthy_snapshot.snapshot) ==
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_UNHEALTHY,
+          "unhealthy owner refuses payload restore");
+    same_bytes(a, before_a, sizeof(a), "unhealthy refusal preserves A");
+    same_bytes(b, before_b, sizeof(b), "unhealthy refusal preserves B");
+    melee_web_source_memory_payload_snapshot_destroy(unhealthy_snapshot.snapshot);
+    check(!melee_web_source_memory_end(702), "unhealthy payload owner teardown");
+}
 }
 int main() {
     using Snapshot = MeleeWebSourceMemorySnapshot;
+    source_memory_payload_controls();
+    const auto inactive_payload =
+        melee_web_source_memory_payload_snapshot_capture();
+    check(inactive_payload.status ==
+              MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INACTIVE &&
+          !inactive_payload.snapshot, "inactive payload capture refusal");
+    check(melee_web_source_memory_payload_snapshot_admit(nullptr) ==
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_ARGUMENT,
+          "null payload admission refusal");
+    check(melee_web_source_memory_payload_snapshot_restore(nullptr) ==
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_ARGUMENT,
+          "null payload restore refusal");
+    melee_web_source_memory_payload_snapshot_destroy(nullptr);
     Snapshot *first=nullptr, *second=nullptr;
     check(melee_web_source_memory_snapshot_capture(&first) ==
           MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_INACTIVE && !first, "inactive capture refusal");
@@ -136,4 +465,5 @@ int main() {
     melee_web_source_memory_snapshot_destroy(second);
     melee_web_source_memory_snapshot_destroy(nullptr);
     std::puts("Source-memory mirror snapshot controls: passed");
+    std::puts("Source-memory payload snapshot controls: passed");
 }

@@ -79,6 +79,20 @@ struct Packet {
   ByteBuffer bytes;
 };
 
+struct ShadowProvenance {
+  uintptr_t address;
+  size_t length;
+  size_t capacity;
+  size_t maximum;
+  size_t previousUsed;
+  bool owned;
+};
+
+static ShadowProvenance observe_shadow(const ByteBuffer& bytes, size_t previousUsed) {
+  return {reinterpret_cast<uintptr_t>(bytes.data()), bytes.size(), bytes.capacity(),
+          bytes.max_capacity(), previousUsed, bytes.owned()};
+}
+
 static void prepare_slot(Slot& slot) {
   if (slot.previous_used != 0) {
     std::memset(slot.bytes.data(), 0, slot.previous_used);
@@ -206,6 +220,40 @@ static void run_texture_padding() {
   }
 }
 
+static void run_read_only_shadow_provenance() {
+  Slot slot;
+  const uint8_t payload[] = {0x11, 0x22, 0x33, 0x44};
+  slot.bytes.append(payload, sizeof(payload));
+  slot.previous_used = slot.bytes.size();
+  const auto* const originalAddress = slot.bytes.data();
+  const size_t originalCapacity = slot.bytes.capacity();
+  const std::array<uint8_t, sizeof(payload)> originalBytes = {0x11, 0x22, 0x33, 0x44};
+  const ShadowProvenance expected{reinterpret_cast<uintptr_t>(originalAddress),
+      sizeof(payload), originalCapacity, 64, sizeof(payload), true};
+  aurora::fail_allocation = true;
+  for (int sample = 0; sample < 3; ++sample) {
+    const ShadowProvenance observed = observe_shadow(slot.bytes, slot.previous_used);
+    expect(observed.address == expected.address && observed.length == expected.length &&
+           observed.capacity == expected.capacity && observed.maximum == expected.maximum &&
+           observed.previousUsed == expected.previousUsed && observed.owned,
+           "read-only shadow observation changed the exact owner range");
+    expect(std::memcmp(slot.bytes.data(), originalBytes.data(), originalBytes.size()) == 0,
+           "read-only shadow observation changed owner bytes");
+  }
+  aurora::fail_allocation = false;
+  Packet packet{.bytes = std::move(slot.bytes)};
+  slot.bytes = std::move(packet.bytes);
+  const ShadowProvenance returned = observe_shadow(slot.bytes, slot.previous_used);
+  expect(returned.address == expected.address && returned.capacity == expected.capacity &&
+         returned.maximum == expected.maximum,
+         "move-out/return changed a stable shadow owner identity");
+  const uint8_t growth[5]{};
+  slot.bytes.append(growth, sizeof(growth));
+  const ShadowProvenance grown = observe_shadow(slot.bytes, slot.previous_used);
+  expect(grown.capacity > returned.capacity,
+         "bounded source growth did not invalidate the observed owner capacity");
+}
+
 static void run_authoritative_maxima() {
   // These are the existing Aurora per-stream ceilings, not newly guessed
   // lower limits. The refusal checks pass max+1 before any allocation.
@@ -262,6 +310,7 @@ int main() {
   run_poisoned_slack_and_alignment();
   run_bounded_growth_and_clone();
   run_texture_padding();
+  run_read_only_shadow_provenance();
   run_authoritative_maxima();
   run_size_addition_overflow();
   run_allocation_failures();

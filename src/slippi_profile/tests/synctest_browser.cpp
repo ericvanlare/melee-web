@@ -123,6 +123,18 @@ static_assert(offsetof(MatchContextRangeWireInventory, version) == 0 &&
                   sizeof(MatchContextRangeWireInventory) == 56,
               "Match-context range wire inventory layout changed");
 
+#if defined(MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY)
+static_assert(sizeof(void *) == 4 && sizeof(size_t) == 4,
+              "Aurora staging-shadow inventory requires wasm32");
+static_assert(AURORA_BROWSER_QUIESCENCE_SCHEMA_VERSION == 5 &&
+                  AURORA_BROWSER_STAGING_STREAM_COUNT == 5 &&
+                  sizeof(AuroraBrowserQuiescenceDescriptor) == 120 &&
+                  offsetof(AuroraBrowserQuiescenceDescriptor, stagingGeneration) == 72 &&
+                  sizeof(AuroraBrowserFrameStagingDescriptor) == 464 &&
+                  sizeof(AuroraBrowserSubmissionDescriptor) == 56,
+              "Aurora staging-shadow schema 5 layout changed");
+#endif
+
 AudioRangeWireInventory audio_range_wire{};
 MeleeWebAudio *audio_range_anchor = nullptr;
 uint64_t audio_range_generation_anchor = 0;
@@ -204,6 +216,15 @@ EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_gameplay_arena_bytes(void)
         return 0;
     return static_cast<uint32_t>(bytes);
 }
+
+#if defined(MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY)
+EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_aurora_staging_shadow_inventory_query(void)
+{
+    const void* observed = aurora_browser_quiescence_observe_descriptor();
+    uint32_t address = 0;
+    return observed && wire_u32(observed, address) ? address : 0;
+}
+#endif
 
 EMSCRIPTEN_KEEPALIVE const void *melee_web_synctest_audio_range_inventory(void)
 {
