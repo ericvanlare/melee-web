@@ -50,6 +50,7 @@ const {values} = parseArgs({options: Object.fromEntries(
       ['first-css-finite-receipt', {type: 'string'}],
       ['first-css-row-receipt', {type: 'string'}],
       ['first-sss-constructor-pair', {type: 'boolean', default: false}],
+      ['first-sss-constructor-pair-fresh', {type: 'boolean', default: false}],
       ['first-sss-consumed-pad-tick', {type: 'boolean', default: false}],
       ['first-sss-draw', {type: 'boolean', default: false}],
       ['first-sss-prefix', {type: 'boolean', default: false}],
@@ -97,18 +98,29 @@ const firstSssVsEntry = values['first-sss-vs-entry'] || firstSssVsSetup;
 const firstSssPrefix = values['first-sss-prefix'] || firstSssVsEntry;
 const firstSssDraw = values['first-sss-draw'] || firstSssPrefix;
 const firstSssConsumedPadTick = values['first-sss-consumed-pad-tick'] || firstSssDraw || firstSssPrefix;
-const firstSssConstructorPair = values['first-sss-constructor-pair'] || firstSssConsumedPadTick;
+const firstSssConstructorPairFresh = values['first-sss-constructor-pair-fresh'];
+const firstSssConstructorPair = values['first-sss-constructor-pair'] || firstSssConsumedPadTick || firstSssConstructorPairFresh;
 const firstCssBrowserFinalDraw = values['first-css-browser-final-draw'] || firstSssConstructorPair || firstCssFreshFinite;
 const firstCssBrowserStream = values['first-css-browser-stream'] || firstCssBrowserFinalDraw;
 const firstCssBrowserDraw = values['first-css-browser-draw'] || firstCssBrowserStream || firstCssFreshRow;
 if (firstCssFreshFinite !== !!values['first-css-finite-receipt'] ||
     (firstCssFreshFinite && (firstCssFreshRow || firstCssConstructorReturn || cssSssReducer ||
-      firstSssConstructorPair || firstSssVsSetupCf || recreationCanary ||
+      (firstSssConstructorPair && !firstSssConstructorPairFresh) || firstSssVsSetupCf || recreationCanary ||
       ['first-css-browser-draw','first-css-browser-stream','first-css-browser-final-draw',
        'first-css-context','first-css-consumed-pad','first-css-return-expected',
        'first-css-tick-expected','first-css-draw-expected','first-css-postdraw-input',
        'first-css-postdraw-expected','first-css-row-receipt'].some(key=>values[key]))))
   throw Error('Choose only the fresh finite CSS route and exact receipt/context manifest');
+if (firstSssConstructorPairFresh &&
+    (!firstCssFreshFinite || values['first-sss-constructor-pair'] ||
+     firstSssConsumedPadTick || firstSssDraw || firstSssPrefix ||
+     firstSssVsEntry || firstSssVsSetup || firstSssVsSetupCf ||
+     firstCssFreshRow || firstCssConstructorReturn || cssSssReducer ||
+     firstCssBrowserDraw === false || !values['first-sss-pair-expected'] ||
+     ['first-sss-tick-expected','first-sss-tick-input','first-sss-draw-expected',
+      'first-sss-prefix-expected','first-sss-prefix-input','first-sss-vs-entry-expected',
+      'first-sss-vs-setup-expected'].some(key=>values[key])))
+  throw Error('Fresh SSS pair is an explicit finite-CSS constructor-only continuation; no SSS input/tick/draw/VS options');
 if (firstCssFreshRow !== !!values['first-css-row-receipt'] ||
     (firstCssFreshRow && (firstCssConstructorReturn || firstCssBrowserStream ||
       values['first-css-browser-draw'] || cssSssReducer ||
@@ -365,6 +377,7 @@ let report = {
     route_mode: recreationCanary ? (recreationFullB
       ? (recreationFullPair ? 'same-instance-recreation-A7167-B7167-common-fields-seed' : 'same-instance-recreation-A174-B7167-common-fields-seed')
       : 'same-instance-recreation-canary-174') : firstSssVsSetup ? 'first-sss-vs-setup' : firstSssVsEntry ? 'first-sss-vs-entry' : firstSssPrefix ? 'first-sss-prefix' : firstSssDraw ? 'first-sss-draw' :
+      firstSssConstructorPairFresh ? 'first-css-fresh-finite-sss-constructor-pair-v1' :
       firstCssFreshFinite ? 'first-css-fresh-finite-v4' :
       firstCssFreshRow ? 'first-css-fresh-row-v3' :
       firstCssConstructorReturn ? 'first-css-constructor-return-v2' :
@@ -438,7 +451,9 @@ let report = {
     : firstSssConsumedPadTick
     ? 'Original CSS final draw, original SSS constructor pair, and one consumed SSS PAD/scheduler-end comparison. The run stops before any SSS draw or further input; no whole-session acceptance.'
     : firstSssConstructorPair
-    ? 'Original SSS constructor entry1579/return1603 pair after the approved first-CSS boundary. Stops before any SSS host tick/draw; no SSS selection, VS/GO equality or whole-session acceptance.'
+    ? (firstSssConstructorPairFresh
+      ? 'Original SSS constructor entry1570/return1594 pair after the exact finite CSS prefix. Stops before any SSS input, host tick or draw; CSS exit remains unobserved.'
+      : 'Original SSS constructor entry1579/return1603 pair after the approved first-CSS boundary. Stops before any SSS host tick/draw; no SSS selection, VS/GO equality or whole-session acceptance.')
     : firstCssBrowserStream
     ? 'CSS-only source-consumed input/tick/draw comparison; terminal transition snapshot and final original draw remain unpaired. No SSS admission, VS/GO equality or whole-session acceptance.'
     : 'C1a stops after exact local-disc preparation. It does not instrument or prove a runtime source archive file-service request; full C1 remains open.',
@@ -1033,6 +1048,8 @@ async function loadFirstSssConstructorPairInputs() {
   const helper = await import(pathToFileURL(helperPath).href);
   helper.createFirstSssConstructorPairComparator(expected);
   assert.equal(expected.schema, 'melee-web-stadium-first-sss-constructor-pair-diagnostic');
+  assert.equal(expected.profile, firstSssConstructorPairFresh ? 'fresh_finite_css_prefix_v4' : undefined,
+    'SSS constructor expected profile differs from the explicit route');
   assert.equal(expected.provenance.observer_sha256,
     firstCssBrowserDrawInputs.contextExpected.provenance.stream_sha256);
   assert.equal(expected.source_entry.argument, '0x80480668');
@@ -2034,9 +2051,10 @@ async function runFirstSssConstructorPair() {
     expectedPair: firstSssConstructorPairInputs.expected}),
   Math.min(5000, remaining()), 'Register host-only original SSS constructor-pair comparison');
 
-  const arm = await timeout(page.evaluate(() => {
+  const arm = await timeout(page.evaluate(fresh => {
     const module = globalThis.Module;
-    const fn = module?._melee_web_native_menu_stadium_first_sss_pair_arm;
+    const fn = fresh ? module?._melee_web_native_menu_stadium_first_sss_pair_fresh_v4_arm
+      : module?._melee_web_native_menu_stadium_first_sss_pair_arm;
     if (typeof fn !== 'function') throw Error('Original SSS pair arm export is absent');
     const result = fn();
     if (result !== 1) {
@@ -2044,7 +2062,7 @@ async function runFirstSssConstructorPair() {
       throw Error(pointer ? module.UTF8ToString(pointer) : 'Original SSS pair arm refused');
     }
     return result;
-  }), Math.min(5000, remaining()), 'Arm checked pending CSS-to-SSS pair route');
+  }, firstSssConstructorPairFresh), Math.min(5000, remaining()), 'Arm checked pending CSS-to-SSS pair route');
   assert.equal(arm, 1);
   const beforeKick = await timeout(readFirstSssConstructorPairObservation(),
     Math.min(5000, remaining()), 'Retain armed SSS constructor-pair state');
@@ -2061,9 +2079,10 @@ async function runFirstSssConstructorPair() {
     'SSS arm changed the approved final CSS draw observation');
   assert.equal(beforeKick.host?.rows?.length, 0);
 
-  const kick = await timeout(page.evaluate(() => {
+  const kick = await timeout(page.evaluate(fresh => {
     const module = globalThis.Module;
-    const fn = module?._melee_web_native_menu_stadium_first_sss_pair_kick;
+    const fn = fresh ? module?._melee_web_native_menu_stadium_first_sss_pair_fresh_v4_kick
+      : module?._melee_web_native_menu_stadium_first_sss_pair_kick;
     if (typeof fn !== 'function') throw Error('Original SSS pair kick export is absent');
     const result = fn();
     if (result !== 1) {
@@ -2071,7 +2090,7 @@ async function runFirstSssConstructorPair() {
       throw Error(pointer ? module.UTF8ToString(pointer) : 'Original SSS pair kick refused');
     }
     return result;
-  }), Math.min(5000, remaining()),
+  }, firstSssConstructorPairFresh), Math.min(5000, remaining()),
   'Complete pending CSS leave/rebuild and enter SSS without another input or tick');
   report.scenario.first_sss_constructor_pair.kick_result = kick;
   await persistReport();
@@ -2137,8 +2156,9 @@ async function runFirstSssConstructorPair() {
   assert.equal(nativePair.entry.host_entered, false);
   assert.equal(nativePair.returned.host_entered, false);
   assert.equal(nativePair.entry.session_ticks, nativePair.returned.session_ticks);
-  report.scenario.first_sss_constructor_pair.claim =
-    'Original SSS OnEnter entry1579/return1603 approved with both passive notes retained; zero SSS host ticks/draws, before SSS input or progression. No whole-session acceptance.';
+  report.scenario.first_sss_constructor_pair.claim = firstSssConstructorPairFresh
+    ? 'Original SSS OnEnter entry1570/return1594 approved with both passive notes retained; zero SSS inputs, host ticks and draws. CSS exit remains unobserved; no C3 or whole-session acceptance.'
+    : 'Original SSS OnEnter entry1579/return1603 approved with both passive notes retained; zero SSS host ticks/draws, before SSS input or progression. No whole-session acceptance.';
   await persistReport();
   await saveScreenshot('stadium-first-sss-constructor-pair');
   return evidence.native;
@@ -5239,7 +5259,11 @@ async function cleanupServer() {
 async function main() {
   assert.equal(build, expectedBuild, 'Only the isolated C1a diagnostic runtime may be served');
   assert.equal(preflight.schema, 'melee-web-stadium-c1a-browser-preflight-v1');
-  if(firstCssFreshFinite){
+  if(firstSssConstructorPairFresh){
+    assert.equal(preflight.route_mode,'first-css-fresh-finite-sss-constructor-pair-v1');
+    assert.ok(preflight.first_css_fresh_finite?.receipt);
+    assert.ok(preflight.first_sss_constructor_pair?.expected_json);
+  } else if(firstCssFreshFinite){
     assert.equal(preflight.route_mode,'first-css-fresh-finite-v4');
     assert.ok(preflight.first_css_fresh_finite?.receipt);
   } else if (firstCssFreshRow) {

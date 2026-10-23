@@ -286,6 +286,7 @@ struct FirstCssFinalPendingDrawState {
 };
 FirstCssFinalPendingDrawState first_css_final_pending_draw;
 struct FirstSssConstructorPairState {
+ FirstCssBrowserMode profile=FirstCssBrowserMode::None;
  bool armed=false,kicked=false,attempted=false,captured=false,compared=false;
  bool complete=false,failed=false,frame_terminal=false;
  bool callback_attempted=false,audio_before_rebuild_captured=false;
@@ -7118,41 +7119,92 @@ int melee_web_native_menu_stadium_first_sss_tick_kick(){try{
  state.complete=true;running=false;pending=false;menu_clock.reset();
  first_css_browser_draw_refresh_observation();return 1;
 }catch(const std::exception& error){first_sss_tick_browser_fail(error.what());first_sss_tick_sync_native();first_css_browser_draw_refresh_observation();return 0;}}
-int melee_web_native_menu_stadium_first_sss_pair_arm(){try{
- check(first_css_browser_draw.mode==FirstCssBrowserMode::LegacyTickDrawV1,
-       "SSS constructor admission requires its historical legacy CSS capability");
- auto& pair=first_sss_constructor_pair;
- check(!pair.armed&&!pair.failed&&!pair.attempted&&!running&&!pending&&!faulted&&
-       !replay&&!melee_web_net_active()&&host&&world&&host_entered&&
-       !match&&!results&&!prize&&!menu_scene_rebuild_pending&&
-       asset_destination==AssetDestination::None&&!preparation.busy()&&
+void first_sss_pair_check_css_boundary(FirstCssBrowserMode profile){
+ const bool legacy=profile==FirstCssBrowserMode::LegacyTickDrawV1;
+ const bool fresh=profile==FirstCssBrowserMode::FreshFiniteCssPrefixV4;
+ check((legacy||fresh)&&first_css_browser_draw.mode==profile,
+       "SSS constructor pair requires its exact frozen CSS profile");
+ check(!running&&!pending&&!faulted&&!replay&&!melee_web_net_active()&&
+       host&&world&&host_entered&&!match&&!results&&!prize&&
+       !menu_scene_rebuild_pending&&asset_destination==AssetDestination::None&&
+       !preparation.busy()&&
        preparation.phase()==melee_web::MenuPreparationState::Phase::Idle&&
        first_css_final_pending_draw.complete&&first_css_final_pending_draw.compared&&
        first_css_final_pending_draw.approved&&first_css_final_pending_draw.frame_end_returned&&
-       !first_css_final_pending_draw.failed&&first_css_final_pending_draw.error.empty()&&
-       first_css_browser_postdraw_stream.terminal&&!first_css_browser_postdraw_stream.failed&&
-       first_css_browser_postdraw_stream.outcome=="stop_after_last_input_request"&&
-       first_css_browser_postdraw_stream.matched_ticks==147&&
-       first_css_browser_postdraw_stream.matched_draws==147&&
-       first_css_browser_postdraw_stream.consumed_inputs==148,
-       "First SSS pair arm requires the unchanged completed final CSS draw");
+       !first_css_final_pending_draw.failed&&first_css_final_pending_draw.error.empty(),
+       "SSS constructor pair requires its unchanged approved final CSS draw");
+ const auto& stream=first_css_browser_postdraw_stream;
+ check(stream.terminal&&!stream.failed&&
+       stream.outcome=="stop_after_last_input_request",
+       "SSS constructor pair requires its stopped final CSS stream");
+ if(legacy){
+  check(stream.matched_ticks==147&&stream.matched_draws==147&&
+        stream.consumed_inputs==148,
+        "Legacy SSS pair requires its exact historical 147/148 CSS boundary");
+ }else{
+  const auto& baseline=first_css_browser_draw;
+  check(baseline.finite_css.source_sha256==baseline.context.source_sha256&&
+        baseline.finite_css.rows.size()==142&&first_css_postdraw_count()==141&&
+        baseline.finite_css.phase_end_sequence==1570&&
+        stream.input.source_sha256==baseline.context.source_sha256&&
+        !stream.complete&&stream.current_input_index==140&&stream.next_input_index==140&&
+        stream.consumed_inputs==141&&stream.host_tick_calls==141&&
+        stream.executed_host_ticks==142&&stream.matched_ticks==140&&
+        stream.matched_draws==140&&stream.host_draw_calls==140&&
+        stream.aurora_begin_calls==140&&stream.aurora_end_calls==140&&
+        stream.tick_result==3&&stream.transition_captured&&
+        !stream.tick_captured&&!stream.frame_end_returned,
+        "Fresh SSS pair requires the exact finite CSS 140/141/142 terminal chain");
+  const auto& last=first_css_finite_row(141);
+  check(last.consume_sequence==1565&&last.tick_sequence==1566&&
+        last.draw_enter_sequence==1567&&last.draw_return_sequence==1568&&
+        last.poll_sequence==1569&&last.source_tick==141&&last.draw_ordinal==141&&
+        last.draw_source_tick==142&&last.poll_source_tick==142&&
+        last.poll_draw_ordinal==142&&stream.transition.scene_frame==142&&
+        first_css_final_pending_draw.actual.scene_frame==142&&
+        stream.transition.world_generation==baseline.world_generation,
+        "Fresh SSS pair finite terminal row or final draw differs from its source profile");
+ }
+ const auto& baseline=first_css_browser_draw;
+ check(baseline.armed&&baseline.complete&&!baseline.failed&&
+       baseline.entry_captured&&baseline.tick_captured&&baseline.draw_captured&&
+       baseline.frame_end_returned&&baseline.source_steps==1&&baseline.source_draws==1&&
+       baseline.host_tick_calls==1&&baseline.host_draw_calls==1&&
+       baseline.aurora_begin_calls==1&&baseline.aurora_end_calls==1&&
+       baseline.tick_result==1,
+       // The callback-local SourceFrameSequence is checked where the final
+       // draw and terminal callbacks execute. Arm/kick run after it retires;
+       // use their persisted completion plus stopped/live-owner guards here.
+       "SSS pair CSS source baseline changed before constructor admission");
+ first_css_browser_draw_check_live(legacy?
+       "legacy SSS pair CSS boundary":"fresh finite SSS pair CSS boundary");
+ if(fresh){
+  check(gm_801A4BA8()==142&&seed_ptr==baseline.seed_owner&&
+        *baseline.seed_owner==stream.transition.seed&&
+        melee_web_current_scene_info()==baseline.scene_owner&&
+        first_css_final_pending_draw.actual.seed==stream.transition.seed,
+        "Fresh SSS pair lost its exact finite CSS frame/RNG/scene owner");
+ }
+}
+int first_sss_pair_arm(FirstCssBrowserMode profile){try{
+ first_sss_pair_check_css_boundary(profile);
+ auto& pair=first_sss_constructor_pair;
+ check(!pair.armed&&!pair.failed&&!pair.attempted,
+       "SSS constructor pair is a stopped one-use capability");
  check(EM_ASM_INT({return typeof globalThis.__meleeWebStadiumFirstSssPairCompare===
-                    'function'?1:0;})==1,"First SSS pair host comparator is absent");
+                    'function'?1:0;})==1,"SSS pair host comparator is absent");
  char error[256]{};
  check(melee_web_menu_host_arm_first_sss_pair(host,error,sizeof(error)),error);
- pair.armed=true;
+ pair.profile=profile;pair.armed=true;
  first_css_browser_draw_refresh_observation();return 1;
 }catch(const std::exception& error){
  first_sss_pair_fail(error.what());first_css_browser_draw_refresh_observation();return 0;}}
-int melee_web_native_menu_stadium_first_sss_pair_kick(){try{
- check(first_css_browser_draw.mode==FirstCssBrowserMode::LegacyTickDrawV1,
-       "SSS constructor admission requires its historical legacy CSS capability");
+int first_sss_pair_kick(FirstCssBrowserMode profile){try{
  auto& pair=first_sss_constructor_pair;
- check(pair.armed&&!pair.kicked&&!pair.attempted&&!pair.failed&&!running&&!pending&&
-       host&&world&&host_entered&&!preparation.busy()&&!menu_scene_rebuild_pending&&
-       first_css_final_pending_draw.complete&&first_css_final_pending_draw.frame_end_returned&&
-       !first_css_final_pending_draw.failed,
-       "First SSS pair kick requires its unchanged armed CSS boundary");
+ check(pair.armed&&!pair.kicked&&!pair.attempted&&!pair.failed&&
+       pair.profile==profile,
+       "SSS pair kick requires its unchanged one-use profile arm");
+ first_sss_pair_check_css_boundary(profile);
  pair.kicked=true;
  pair.audio_render_calls_before_rebuild=diagnostic_audio_render_calls;
  pair.audio_render_frames_before_rebuild=diagnostic_audio_render_frames;
@@ -7163,6 +7215,15 @@ int melee_web_native_menu_stadium_first_sss_pair_kick(){try{
  first_css_browser_draw_refresh_observation();return 1;
 }catch(const std::exception& error){
  first_sss_pair_fail(error.what());first_css_browser_draw_refresh_observation();return 0;}}
+int melee_web_native_menu_stadium_first_sss_pair_arm(){
+ return first_sss_pair_arm(FirstCssBrowserMode::LegacyTickDrawV1);}
+int melee_web_native_menu_stadium_first_sss_pair_kick(){
+ return first_sss_pair_kick(FirstCssBrowserMode::LegacyTickDrawV1);}
+int melee_web_native_menu_stadium_first_sss_pair_fresh_v4_arm(){
+ return first_sss_pair_arm(FirstCssBrowserMode::FreshFiniteCssPrefixV4);}
+int melee_web_native_menu_stadium_first_sss_pair_fresh_v4_kick(){
+ return first_sss_pair_kick(FirstCssBrowserMode::FreshFiniteCssPrefixV4);}
+
 #endif
 }
 int main(int argc,char** argv){

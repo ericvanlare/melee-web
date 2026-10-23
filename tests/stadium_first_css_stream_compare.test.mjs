@@ -17,7 +17,11 @@ import {createFirstCssStreamComparator, createFirstCssFinalDrawComparator,
 const COUNT = 148;
 const route = Object.freeze({current_game_mode: 2, previous_game_mode: 1,
   current_scene_index: 0, previous_scene_index: 0});
-const candidateRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const testDirectory = path.dirname(fileURLToPath(import.meta.url));
+const candidateRoot = path.resolve(testDirectory, '..');
+const freshSssExpectedPair = JSON.parse(await fs.readFile(
+  path.join(testDirectory, 'fixtures/fresh-sss-expected-pair.json'), 'utf8'));
+
 
 function firstSssDrawExpectedFixture() {
   const inventory = [
@@ -429,7 +433,28 @@ test('the actual browser runner recognizes SSS modes and rejects conflicting/orp
     {encoding: 'utf8', timeout: 10000});
   assert.notEqual(accepted.status, 0);
   assert.match(accepted.stderr, /Missing --build/,
-    'All SSS options parsed and route validation passed before required runtime setup');
+    'All legacy SSS options parsed and route validation passed before required runtime setup');
+
+  const freshArgs = ['--first-css-fresh-finite', '--first-css-finite-receipt', 'receipt.json',
+    '--first-css-constructor-manifest', 'manifest.json', '--first-sss-constructor-pair-fresh',
+    '--first-sss-pair-expected', 'pair.json'];
+  const fresh = spawnSync(process.execPath, [runner, ...freshArgs],
+    {encoding: 'utf8', timeout: 10000});
+  assert.notEqual(fresh.status, 0);
+  assert.match(fresh.stderr, /Missing --build/,
+    'The explicit fresh finite-CSS pair route passes option validation before runtime setup');
+  for (const values of [
+    ['--first-sss-constructor-pair-fresh', '--first-sss-pair-expected', 'pair.json'],
+    [...freshArgs, '--first-sss-constructor-pair'],
+    [...freshArgs, '--first-sss-tick-expected', 'tick.json', '--first-sss-tick-input', 'tick.mwst'],
+    [...freshArgs, '--first-sss-draw-expected', 'draw.json'],
+    [...freshArgs, '--first-sss-prefix-expected', 'prefix.json', '--first-sss-prefix-input', 'prefix.mwst'],
+  ]) {
+    const refused = spawnSync(process.execPath, [runner, ...values],
+      {encoding: 'utf8', timeout: 10000});
+    assert.notEqual(refused.status, 0);
+    assert.match(refused.stderr, /Fresh SSS pair is an explicit finite-CSS constructor-only continuation/);
+  }
 });
 
 test('the actual first-SSS expected loader checks the exact expected and comparator bindings', async () => {
@@ -1358,5 +1383,59 @@ test('VS Setup requires strict prefix, same-run Entry approval and exact source 
     const changed = structuredClone(expected); change(changed);
     assert.throws(() => createFirstSssVsSetupComparator(
       changed, prefix, vsSetupEntryStatus()), /exact retained row2503/);
+  }
+});
+
+
+test('fresh finite-CSS profile compares only its original SSS entry/return pair', () => {
+  const actual = actualSssPair(freshSssExpectedPair);
+  actual.entry.session_ticks = 142;
+  actual.returned.session_ticks = 142;
+  const comparator = createFirstSssConstructorPairComparator(freshSssExpectedPair);
+  assert.equal(requestSynchronousApproval(comparator.compare, 'sss_pair',
+    JSON.stringify(actual)), true);
+  assert.equal(comparator.status().approved, true);
+  assert.equal(comparator.status().failed, false);
+  assert.deepEqual(comparator.status().actual_pair, actual);
+});
+
+test('fresh profile rejects source identity, raw slice and projected-field mutations', () => {
+  const mutations = [
+    value => { value.profile = 'legacy_tick_draw_v1'; },
+    value => { value.provenance.observer_sha256 = '361e8c1108cc2d02ba94d1f3b3be9612a80d0227672445cd4a2b0e2119917778'; },
+    value => { value.provenance.entry_sequence += 1; },
+    value => { value.source_entry.source_tick -= 1; },
+    value => { value.source_entry.source_slice_inventory[0].size -= 1; },
+    value => { value.source_entry.source_slices_hex['21:0'] = '01' + value.source_entry.source_slices_hex['21:0'].slice(2); },
+    value => { value.source_return.source_slices_hex['32:0'] = '00' + value.source_return.source_slices_hex['32:0'].slice(2); },
+    value => { value.expected_entry.scene_frame += 1; },
+    value => { value.expected_return.sss.vs.start.rules.is_stock = true; },
+    value => { value.expected_entry.sss.vs.start.players[0].attack_ratio_bits = '00000000'; },
+  ];
+  for (const mutate of mutations) {
+    const expected = structuredClone(freshSssExpectedPair);
+    mutate(expected);
+    assert.throws(() => createFirstSssConstructorPairComparator(expected), TypeError);
+  }
+});
+
+test('fresh expected projection refuses legacy-frame and altered actual constructor values', () => {
+  const mutations = [
+    pair => { pair.entry.scene_frame = 149; },
+    pair => { pair.returned.random_seed_hex = 'e2624ac2'; },
+    pair => { pair.entry.sss.vs.start.rules.is_stock = 1; },
+    pair => { pair.returned.sss.vs.start.players[0].attack_ratio_bits = '00000000'; },
+    pair => { pair.sss_host_tick_calls = 1; },
+    pair => { pair.sss_host_draw_calls = 1; },
+  ];
+  for (const mutate of mutations) {
+    const actual = actualSssPair(freshSssExpectedPair);
+    actual.entry.session_ticks = actual.returned.session_ticks = 142;
+    mutate(actual);
+    const comparator = createFirstSssConstructorPairComparator(freshSssExpectedPair);
+    assert.equal(requestSynchronousApproval(comparator.compare, 'sss_pair',
+      JSON.stringify(actual)), false);
+    assert.equal(comparator.status().failed, true);
+    assert.ok(comparator.status().first_mismatch);
   }
 });

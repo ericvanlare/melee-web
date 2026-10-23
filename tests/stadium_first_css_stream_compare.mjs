@@ -352,6 +352,33 @@ const FIRST_SSS_ENTRY_PC = '0x8025a998';
 const FIRST_SSS_ENTRY_WORD = '0x7c0802a6';
 const FIRST_SSS_RETURN_PC = '0x8025b84c';
 const FIRST_SSS_RETURN_WORD = '0x4e800020';
+const FRESH_SSS_STREAM_SHA256 = '4fd54b4aa9537292295ad83fbb75655f8213a475a876fdd1468affb68d3d211f';
+const FRESH_SSS_STATUS_SHA256 = 'dfb3b6b4dbf5135be918dfd21d44c650c09da777f69aa2dfc244ed2c00896f6a';
+const FRESH_SSS_PROFILE = Object.freeze({
+  id: 'fresh_finite_css_prefix_v4', observer_bytes: 4479614,
+  observer_sha256: FRESH_SSS_STREAM_SHA256, observer_status_bytes: 551,
+  observer_status_sha256: FRESH_SSS_STATUS_SHA256, entry_sequence: 1570,
+  return_sequence: 1594, entry_pc: '0x8025a998',
+  entry_word: '0x7c0802a6', return_pc: '0x8025b84c',
+  return_word: '0x4e800020', entry_argument: '0x80480668',
+  return_argument: '0x00000000', lr: '0x801a40e8',
+  source_tick: 142, draw_ordinal: 142,
+  scene_frame: 142, scene_kind: 9,
+});
+const FRESH_SSS_SOURCE_SLICES_HEX = Object.freeze({
+  '17:0': '020201010000',
+  '19:0': '804d5f90',
+  '20:0': 'e2624ac3',
+  '21:0': '0000002d00000008001e00000000000000015000018c0000ff00508cff000000000c00008046b23800001000000010000000000000000000000000000000002c000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000001f00000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000fffffee80000000000000000000000000000000000000000000000000000000000000000000000000000000001ff00000000000000000000000000000000000000000000fffffee80000000000000000000000000000000000000000000000000000000000000000000000000000000001ff000000001000000010000000000000000000000000000000002c000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000001f00000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000fffffee80000000000000000000000000000000000000000000000000000000000000000000000000000000001ff00000000000000000000000000000000000000000000fffffee80000000000000000000000000000000000000000000000000000000000000000000000000000000001ff000000001000000010000000000000000000000000000000002c000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000001f00000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000fffffee80000000000000000000000000000000000000000000000000000000000000000000000000000000001ff00000000000000000000000000000000000000000000fffffee80000000000000000000000000000000000000000000000000000000000000000000000000000000001ff0000',
+  '30:0': '0000008e',
+  '32:0': '1000064c8300000000000002006e000000000000000000000000000000000000ffffffffffffffff000000003f8000003f8000003f800000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000100ff0000090078004000040100000000000000003f8000003f8000003f8000000800000000ff0000090078004000040100000000000000003f8000003f8000003f8000001a03000000ff0000090078004000040100000000000000003f8000003f8000003f8000001a03000000ff0000090078004000040100000000000000003f8000003f8000003f800000',
+  '33:0': '2f617564696f2f6d656e75332e687073007300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+  '34:0': '0000013c',
+  '35:0': '00',
+  '36:0': '07ff',
+  '37:0': '07ff',
+  '40:0': '09'
+});
 const FIRST_SSS_LR = '0x801a40e8';
 const FIRST_SSS_SOURCE_INVENTORY = Object.freeze([
   {tag: 32, flags: 0, address: 0x80480678, size: 0xF0},
@@ -422,9 +449,103 @@ function exactOwnKeys(value, wanted) {
   return plainObject(value) && Object.keys(value).sort().join('|') === [...wanted].sort().join('|');
 }
 
-function expectedSssNoteIsValid(note, phase) {
-  if (!plainObject(note) || note.phase !== phase || note.scene_frame !== 149 ||
-      note.scene_kind !== 9 || !validHex(note.random_seed_hex, 4) ||
+function firstSssProfile(expected) {
+  const sha = expected?.provenance?.observer_sha256;
+  if (sha === FIRST_SSS_STREAM_SHA256)
+    return {id: 'legacy_tick_draw_v1', observer_bytes: 4397889,
+      observer_sha256: FIRST_SSS_STREAM_SHA256, observer_status_bytes: 515,
+      observer_status_sha256: FIRST_SSS_STATUS_SHA256, entry_sequence: FIRST_SSS_ENTRY_SEQUENCE,
+      return_sequence: FIRST_SSS_RETURN_SEQUENCE, entry_pc: FIRST_SSS_ENTRY_PC,
+      entry_word: FIRST_SSS_ENTRY_WORD, return_pc: FIRST_SSS_RETURN_PC,
+      return_word: FIRST_SSS_RETURN_WORD, entry_argument: FIRST_SSS_ENTRY_ARGUMENT,
+      return_argument: FIRST_SSS_RETURN_ARGUMENT, lr: FIRST_SSS_LR,
+      source_tick: 149, draw_ordinal: 149, scene_frame: 149, scene_kind: 9};
+  if (sha === FRESH_SSS_STREAM_SHA256) return FRESH_SSS_PROFILE;
+  return null;
+}
+function sameValue(actual, expected) {
+  if (Object.is(actual, expected)) return true;
+  if (Array.isArray(actual) || Array.isArray(expected))
+    return Array.isArray(actual) && Array.isArray(expected) && actual.length === expected.length &&
+      actual.every((value, index) => sameValue(value, expected[index]));
+  if (!plainObject(actual) || !plainObject(expected)) return false;
+  const actualKeys = Object.keys(actual).sort(), expectedKeys = Object.keys(expected).sort();
+  return actualKeys.length === expectedKeys.length &&
+    actualKeys.every((key, index) => key === expectedKeys[index] &&
+      sameValue(actual[key], expected[key]));
+}
+function bytesFromHex(value, byteLength) {
+  if (!validHex(value, byteLength)) return null;
+  const bytes = new Uint8Array(byteLength);
+  for (let index=0; index<byteLength; index+=1)
+    bytes[index] = Number.parseInt(value.slice(index*2,index*2+2),16);
+  return bytes;
+}
+function be16(bytes, offset) { return bytes[offset]*256+bytes[offset+1]; }
+function be32(bytes, offset) {
+  return bytes[offset]*0x1000000+bytes[offset+1]*0x10000+
+    bytes[offset+2]*0x100+bytes[offset+3];
+}
+function be64Hex(bytes, offset) {
+  return Array.from(bytes.slice(offset,offset+8),v=>v.toString(16).padStart(2,'0')).join('');
+}
+function hex32(bytes, offset) {
+  return Array.from(bytes.slice(offset,offset+4),v=>v.toString(16).padStart(2,'0')).join('');
+}
+function signedByte(value) { return value >= 128 ? value-256 : value; }
+function decodeFreshSssStart(rawHex) {
+  const data=bytesFromHex(rawHex,0xf0);
+  if(!data)return null;
+  const rules={
+    match_kind:data[0]>>5,hud_layout:(data[0]>>2)&7,
+    timer_enabled:!!(data[0]&2),timer_counts_up:!!(data[0]&1),
+    friendly_fire:!!(data[1]&1),is_stock:!!(data[2]&0x80),
+    single_button:!!(data[2]&0x10),disable_pausing:!!(data[2]&8),
+    is_vs:!!(data[4]&0x40),is_teams:data[8],item_frequency:signedByte(data[0xb]),
+    stage_kind:be16(data,0xe),time_limit:be32(data,0x10),
+    item_mask:be64Hex(data,0x20),damage_ratio_bits:hex32(data,0x30),
+    game_speed_bits:hex32(data,0x34),
+  };
+  const players=[];
+  for(let index=0;index<4;index+=1){
+    const offset=0x60+index*0x24;
+    players.push({ckind:signedByte(data[offset]),slot_type:data[offset+1],
+      stocks:signedByte(data[offset+2]),color:data[offset+3],slot:data[offset+4],
+      spawn:signedByte(data[offset+5]),spawn_direction:signedByte(data[offset+6]),
+      sub_color:data[offset+7],handicap:signedByte(data[offset+8]),team:data[offset+9],
+      nametag:data[offset+10],flags_c:data[offset+12],flags_d:data[offset+13],
+      cpu_kind:data[offset+14],cpu_level:data[offset+15],damage_10:be16(data,offset+0x10),
+      damage_12:be16(data,offset+0x12),hp:be16(data,offset+0x14),
+      attack_ratio_bits:hex32(data,offset+0x18),defense_ratio_bits:hex32(data,offset+0x1c),
+      model_scale_bits:hex32(data,offset+0x20)});
+  }
+  return {rules,players};
+}
+function padSnapshotHex(rawHex) {
+  const raw=bytesFromHex(rawHex,0x358);
+  if(!raw)return null;
+  const bytes=[...raw.slice(0,10),...raw.slice(12,0x20)];
+  for(const offset of [0x28,0x138,0x248])
+    for(let index=0;index<0x110;index+=68)
+      bytes.push(...raw.slice(offset+index,offset+index+66));
+  return bytes.map(value=>value.toString(16).padStart(2,'0')).join('');
+}
+function freshExpectedNote(source, phase) {
+  const raw=source.source_slices_hex;
+  const routing=bytesFromHex(raw?.['17:0'],6);
+  const start=decodeFreshSssStart(raw?.['32:0']);
+  const pad=padSnapshotHex(raw?.['21:0']);
+  if(!routing||!start||!pad)return null;
+  return {phase,scene_frame:be32(bytesFromHex(raw['30:0'],4),0),
+    scene_kind:Number.parseInt(raw['40:0'],16),random_seed_hex:raw['20:0'],
+    pad_state_hex:pad,scene_routing_getters:{current_game_mode:routing[0],
+      previous_game_mode:routing[2],current_scene_index:routing[3],
+      previous_scene_index:routing[4]},
+    sss:{header:{start_game:Number.parseInt(raw['35:0'],16)},vs:{start}}};
+}
+function expectedSssNoteIsValid(note, phase, profile, source) {
+  if (!plainObject(note) || note.phase !== phase || note.scene_frame !== profile.scene_frame ||
+      note.scene_kind !== profile.scene_kind || !validHex(note.random_seed_hex, 4) ||
       !validHex(note.pad_state_hex, 822) || !exactRoute(note.scene_routing_getters,
         note.scene_routing_getters) || note.scene_routing_getters.current_game_mode !== 2 ||
       !plainObject(note.sss) || !plainObject(note.sss.header) ||
@@ -442,41 +563,58 @@ function expectedSssNoteIsValid(note, phase) {
       if (!validHex(value, SSS_HEX_RULE_LENGTHS[key] / 2)) return false;
     } else if (!Number.isSafeInteger(value)) return false;
   }
-  return note.sss.vs.start.players.every(player => exactOwnKeys(player, SSS_PLAYER_KEYS) &&
+  const playersValid=note.sss.vs.start.players.every(player => exactOwnKeys(player, SSS_PLAYER_KEYS) &&
     SSS_PLAYER_KEYS.every(key => {
       const value = player[key];
       if (['attack_ratio_bits', 'defense_ratio_bits', 'model_scale_bits'].includes(key))
         return validHex(value, 4);
       return Number.isSafeInteger(value);
     }));
+  if(!playersValid)return false;
+  if(profile.id==='fresh_finite_css_prefix_v4'){
+    if(!exactOwnKeys(note,['phase','scene_frame','scene_kind','random_seed_hex','pad_state_hex',
+        'scene_routing_getters','sss'])||
+       !exactOwnKeys(note.sss,['header','vs'])||
+       !exactOwnKeys(note.sss.header,['start_game'])||
+       !exactOwnKeys(note.sss.vs,['start']))return false;
+    const derived=freshExpectedNote(source,phase);
+    return derived!==null&&sameValue(note,derived);
+  }
+  return true;
 }
-
-function expectedSssSourceRowIsValid(source, expectedNote, phase) {
+function expectedSssSourceRowIsValid(source, expectedNote, phase, profile) {
   const entry = phase === 'sss_entry';
-  const expectedSequence = entry ? FIRST_SSS_ENTRY_SEQUENCE : FIRST_SSS_RETURN_SEQUENCE;
-  const expectedPc = entry ? FIRST_SSS_ENTRY_PC : FIRST_SSS_RETURN_PC;
-  const expectedWord = entry ? FIRST_SSS_ENTRY_WORD : FIRST_SSS_RETURN_WORD;
-  const expectedArgument = entry ? FIRST_SSS_ENTRY_ARGUMENT : FIRST_SSS_RETURN_ARGUMENT;
+  const expectedSequence = entry ? profile.entry_sequence : profile.return_sequence;
+  const expectedPc = entry ? profile.entry_pc : profile.return_pc;
+  const expectedWord = entry ? profile.entry_word : profile.return_word;
+  const expectedArgument = entry ? profile.entry_argument : profile.return_argument;
   if (!plainObject(source) || source.sequence !== expectedSequence || source.pc !== expectedPc ||
-      source.word !== expectedWord || source.lr !== FIRST_SSS_LR ||
-      source.argument !== expectedArgument || source.source_tick !== 149 ||
-      source.draw_ordinal !== 149 || !Array.isArray(source.source_slice_inventory) ||
+      source.word !== expectedWord || source.lr !== profile.lr ||
+      source.argument !== expectedArgument || source.source_tick !== profile.source_tick ||
+      source.draw_ordinal !== profile.draw_ordinal || !Array.isArray(source.source_slice_inventory) ||
       source.setup_profile_verified_by_observer !== false ||
       source.setup_receipt_sha256 !== 'e6b15cececf103efeb9b7df2dd18908e9a66d37ebde68622ecd304f8eabcfcda' ||
       source.source_slice_inventory.length !== FIRST_SSS_SOURCE_INVENTORY.length ||
       !plainObject(source.source_slices_hex)) return false;
+  if(profile.id==='fresh_finite_css_prefix_v4'&&
+     (!exactOwnKeys(source,['sequence','source_tick','draw_ordinal','pc','word','lr','argument',
+       'source_slice_inventory','source_slices_hex','setup_receipt_sha256',
+       'setup_profile_verified_by_observer','scene_routing_raw_hex','rng_pointer_hex'])))
+    return false;
   const inventory = [...source.source_slice_inventory].sort((a, b) => a.tag - b.tag || a.flags - b.flags);
   const expectedInventory = [...FIRST_SSS_SOURCE_INVENTORY].sort((a, b) => a.tag - b.tag || a.flags - b.flags);
   if (inventory.some((item, index) => !plainObject(item) ||
       item.tag !== expectedInventory[index].tag || item.flags !== expectedInventory[index].flags ||
       item.address !== expectedInventory[index].address || item.size !== expectedInventory[index].size))
     return false;
-  const expectedRawKeys = FIRST_SSS_SOURCE_INVENTORY.map(item => `${item.tag}:${item.flags}`).sort();
+  const expectedRawKeys = FIRST_SSS_SOURCE_INVENTORY.map(item => String(item.tag)+':'+String(item.flags)).sort();
   if (!exactOwnKeys(source.source_slices_hex, expectedRawKeys)) return false;
   for (const slice of FIRST_SSS_SOURCE_INVENTORY) {
-    const raw = source.source_slices_hex[`${slice.tag}:${slice.flags}`];
+    const raw = source.source_slices_hex[String(slice.tag)+':'+String(slice.flags)];
     if (typeof raw !== 'string' || raw.length !== slice.size * 2 || !/^(?:[0-9a-f]{2})+$/.test(raw))
       return false;
+    if(profile.id==='fresh_finite_css_prefix_v4'&&
+       raw!==FRESH_SSS_SOURCE_SLICES_HEX[String(slice.tag)+':'+String(slice.flags)])return false;
   }
   const raw = source.source_slices_hex;
   const expectedGetters = {
@@ -487,48 +625,61 @@ function expectedSssSourceRowIsValid(source, expectedNote, phase) {
   };
   return plainObject(expectedNote) &&
     Number.parseInt(raw['35:0'], 16) === expectedNote.sss.header.start_game &&
-    raw['30:0'] === '00000095' && raw['40:0'] === '09' &&
-    raw['19:0'] === '804d5f90' && raw['20:0'] === expectedNote.random_seed_hex &&
+    raw['30:0'] === profile.scene_frame.toString(16).padStart(8,'0') &&
+    raw['40:0'] === profile.scene_kind.toString(16).padStart(2,'0') &&
+    raw['19:0'] === source.rng_pointer_hex && raw['20:0'] === expectedNote.random_seed_hex &&
     raw['17:0'].length === 12 && expectedGetters.current_game_mode === 2 &&
     exactRoute(expectedGetters, expectedNote.scene_routing_getters) &&
     source.scene_routing_raw_hex === raw['17:0'] &&
     source.rng_pointer_hex === '804d5f90';
 }
-
 function validateFirstSssExpected(expected) {
-  if (!plainObject(expected) ||
+  const profile=firstSssProfile(expected);
+  if (!profile || !plainObject(expected) ||
       expected.schema !== 'melee-web-stadium-first-sss-constructor-pair-diagnostic' ||
       expected.version !== 1 || expected.source_admission !== false ||
-      expected.whole_session_equivalent !== false || !plainObject(expected.provenance) ||
-      expected.provenance.observer_sha256 !== FIRST_SSS_STREAM_SHA256 ||
-      expected.provenance.observer_bytes !== 4397889 ||
-      expected.provenance.observer_status_sha256 !== FIRST_SSS_STATUS_SHA256 ||
-      expected.provenance.observer_status_bytes !== 515 ||
-      expected.provenance.entry_sequence !== FIRST_SSS_ENTRY_SEQUENCE ||
-      expected.provenance.return_sequence !== FIRST_SSS_RETURN_SEQUENCE ||
-      expected.provenance.entry_pc !== FIRST_SSS_ENTRY_PC ||
-      expected.provenance.entry_word !== FIRST_SSS_ENTRY_WORD ||
-      expected.provenance.return_pc !== FIRST_SSS_RETURN_PC ||
-      expected.provenance.return_word !== FIRST_SSS_RETURN_WORD ||
-      expected.provenance.entry_lr !== FIRST_SSS_LR ||
-      expected.provenance.return_lr !== FIRST_SSS_LR ||
-      expected.provenance.source_tick !== 149 || expected.provenance.draw_ordinal !== 149 ||
-      expected.provenance.scene_frame !== 149 || expected.provenance.source_scene_kind !== 9 ||
+      expected.whole_session_equivalent !== false ||
+      (profile.id==='fresh_finite_css_prefix_v4'&&
+       (expected.profile!==profile.id||expected.provenance.profile!==profile.id)) ||
+      (profile.id==='legacy_tick_draw_v1'&&expected.profile!==undefined&&
+       expected.profile!==profile.id) ||
+      !plainObject(expected.provenance) ||
+      expected.provenance.observer_sha256 !== profile.observer_sha256 ||
+      expected.provenance.observer_bytes !== profile.observer_bytes ||
+      expected.provenance.observer_status_sha256 !== profile.observer_status_sha256 ||
+      expected.provenance.observer_status_bytes !== profile.observer_status_bytes ||
+      expected.provenance.entry_sequence !== profile.entry_sequence ||
+      expected.provenance.return_sequence !== profile.return_sequence ||
+      expected.provenance.entry_pc !== profile.entry_pc ||
+      expected.provenance.entry_word !== profile.entry_word ||
+      expected.provenance.return_pc !== profile.return_pc ||
+      expected.provenance.return_word !== profile.return_word ||
+      expected.provenance.entry_lr !== profile.lr ||
+      expected.provenance.return_lr !== profile.lr ||
+      expected.provenance.source_tick !== profile.source_tick ||
+      expected.provenance.draw_ordinal !== profile.draw_ordinal ||
+      expected.provenance.scene_frame !== profile.scene_frame ||
+      expected.provenance.source_scene_kind !== profile.scene_kind ||
+      (profile.id==='fresh_finite_css_prefix_v4'&&
+       (expected.provenance.entry_argument!==profile.entry_argument||
+        expected.provenance.return_argument!==profile.return_argument)) ||
       !plainObject(expected.source_entry) ||
-      expected.source_entry.argument !== FIRST_SSS_ENTRY_ARGUMENT ||
-      expected.source_entry.sequence !== FIRST_SSS_ENTRY_SEQUENCE ||
-      expected.source_entry.pc !== FIRST_SSS_ENTRY_PC ||
-      expected.source_entry.word !== FIRST_SSS_ENTRY_WORD ||
-      !expectedSssSourceRowIsValid(expected.source_entry, expected.expected_entry, 'sss_entry') ||
+      expected.source_entry.argument !== profile.entry_argument ||
+      expected.source_entry.sequence !== profile.entry_sequence ||
+      expected.source_entry.pc !== profile.entry_pc ||
+      expected.source_entry.word !== profile.entry_word ||
+      !expectedSssSourceRowIsValid(expected.source_entry, expected.expected_entry, 'sss_entry', profile) ||
       !plainObject(expected.source_return) ||
-      expected.source_return.argument !== FIRST_SSS_RETURN_ARGUMENT ||
-      expected.source_return.sequence !== FIRST_SSS_RETURN_SEQUENCE ||
-      expected.source_return.pc !== FIRST_SSS_RETURN_PC ||
-      expected.source_return.word !== FIRST_SSS_RETURN_WORD ||
-      !expectedSssSourceRowIsValid(expected.source_return, expected.expected_return, 'sss_return') ||
-      !expectedSssNoteIsValid(expected.expected_entry, 'sss_entry') ||
-      !expectedSssNoteIsValid(expected.expected_return, 'sss_return'))
-    throw new TypeError('SSS comparison requires the exact retained source constructor pair');
+      expected.source_return.argument !== profile.return_argument ||
+      expected.source_return.sequence !== profile.return_sequence ||
+      expected.source_return.pc !== profile.return_pc ||
+      expected.source_return.word !== profile.return_word ||
+      !expectedSssSourceRowIsValid(expected.source_return, expected.expected_return, 'sss_return', profile) ||
+      !expectedSssNoteIsValid(expected.expected_entry, 'sss_entry', profile, expected.source_entry) ||
+      !expectedSssNoteIsValid(expected.expected_return, 'sss_return', profile, expected.source_return))
+    throw new TypeError(expected?.profile === undefined
+      ? 'SSS comparison requires the exact retained source constructor pair'
+      : 'SSS comparison requires one exact frozen original constructor-pair profile');
   return expected;
 }
 
