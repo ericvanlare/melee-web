@@ -38,12 +38,12 @@ remains retained. The exact guard was reviewed and repaired in the two-file
 normal tick comparisons, 142 draw comparisons and all seven final-draw fields;
 the terminal scheduler snapshot remains unpaired. The source correction,
 50-file runtime identity and full regression are recorded below. The root-approved
-next boundary is limited to an external original-only fresh SSS constructor-entry/
-return receipt and minimal shared-pair candidate with focused controls. It compares
-only that pair and stops before consumed SSS input, tick or draw. CSS exit has no
-original observation and remains unpaired. Independent source review is required
-before source application, build or capture; no SSS admission or C3 release is
-implied.
+fresh SSS constructor-pair boundary has since completed: one root-admitted browser
+comparison against the original-derived expected pair passes the strict comparator.
+It stops before consumed SSS input, tick or draw. CSS exit has no original
+observation and remains unpaired. The next proposed boundary derives the first
+original consumed PAD and tick/draw rows after return from the same pinned observer;
+no follow-up run is authorized here. C3 remains open.
 The [structured receipt](../evidence/issue251-stadium-profile-oninit-v1.json),
 under `fresh_go2_comparison_2026_10_18`, records the failure, passing component
 validation and cleanup. C3 and public Stadium admission remain open.
@@ -2078,6 +2078,46 @@ while preserving the old
 9f28 records. Exact-head CI for 0c39 remains pending; the completed 14-check
 run belongs to predecessor c8a1. The structured receipt records these pins and
 limits. No SSS, VS/GO continuation, whole-session or C3 acceptance follows.
+
+
+**Fresh SSS constructor pair (October 22):** One root-admitted headless run on
+source checkpoint `422cf066` compared the original SSS constructor entry at
+sequence 1570 and return at 1594 against the pinned expected pair, and the exact
+comparator passed. It followed the 142-row, 6,248-byte original CSS prefix: one
+initial tick/draw row plus 140 subsequent matched tick/draw pairs (141 normal
+ticks total), and a separate final pending draw (142 draws total). The result3
+terminal scheduler transition remains unpaired. At SSS entry and return, the
+scene frame remained 142, the seed remained `e2624ac3`, and the session tick
+count matched. The run sent no SSS input and performed no SSS host tick or draw.
+Native unload completed, the observation cleared, 44 local HTTP artifacts stayed
+unchanged, all 12 recorded process IDs were absent, and the only cleanup removal
+was the owned empty scratch directory. The screenshots are retained without a
+pixel-accuracy claim. Both Release builds and 15 focused controls passed; the
+full regression passed 2,743 tests with 189 skips in 563.434 seconds. The clean
+source commit is `422cf066`; the binaries were built at `b8d0c49e` with the exact
+reviewed four-file patch applied in a dirty worktree. The final source commit
+added two test-extraction files after those builds, and it does not relabel the
+binary build identity. Exact-head CI was not run for `422cf066`; the final documentation checkpoint
+still requires its applicable CI gate.
+
+Retained failure trail: the first constructor-pair capture (v1) failed after the
+CSS prefix when the post-kick terminal callback re-entered the strict CSS live-owner
+guard; its raw report and source diagnosis remain linked in the evidence receipt.
+The reviewed guard repair preserves the armed/kicked handoff and reports the first
+native failure to the existing wait. The first full regression on that repair had
+three fixture-only selector-extraction failures; the reviewed two-test extraction
+fix passed the later full regression. The failed integration receipt and log,
+the packet-metadata path hold and its reviewed correction, and an offline reviewer
+assertion error are all retained as distinct records below; the reviewer error
+was not a runtime or capture failure.
+
+The next source-only candidate uses the same original observer (`4fd54b4a…`):
+PAD consume 1595, SourceTick 1599, DrawEnter 1600 and DrawReturn 1601, then stops
+before the next PAD poll at 1602. Reuse the existing one-shot consumed-PAD/tick
+and draw adapters with expectations derived from these fresh records. Legacy
+extractor rows 1604/1608 belong to a different observer profile and are not
+interchangeable. A focused source comparison and separate review are needed before
+any input/tick/draw continuation is admitted.
 
 
 
