@@ -188,7 +188,7 @@ int main(){
             def wrap(name,body):
                 return '\nvoid '+name+'(){char error[256]{};bool first_css_draw_terminal=false;struct{unsigned steps=1;}elapsed;auto present_source=[](){return false;};\n'+body+'\n(void)first_css_draw_terminal;}\n'
             callback=wrap('source_callback',loop)+wrap('source_callback_mutated_fallthrough',mutant)
-            fences=cut(' // Diagnostic input must never override the producer-bound literal row.',' if(first_sss_vs_setup_service())return;')
+            fences=cut(' // Diagnostic input must never override the producer-bound literal row.',' if(first_sss_sequence_service())return;')
             preparation=cut('void begin_preparation(){','bool preparation_uses_source_draws(){')
             extra=preparation+'\nvoid next_command_callback(){\n const int owner_action=EM_ASM_INT({return window.menuServiceCommands?.() || 0;});\n if(owner_action<0)return;\n'+fences+'\n if(pending)begin_preparation();\n}\n'
             main=NATIVE_MAIN[:NATIVE_MAIN.index('int run(){')]+WRAPPER_MAIN

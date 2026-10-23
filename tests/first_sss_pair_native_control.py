@@ -26,14 +26,16 @@ assert "s.callback_world_generation=melee_web_gameplay_generation();" in draw_ar
 assert "first_sss_sequence_service();return;" in draw_dispatch
 queue_guard=source.index("// Diagnostic input must never override the producer-bound literal row.")
 selector=source.index("const auto fresh_pair_callback=first_sss_fresh_pair_callback_action();")
-services=source.index("if(first_sss_vs_setup_service())return;",selector)
+setup_service=source.index("if(first_sss_vs_setup_service())return;",queue_guard)
+services=source.index("if(first_sss_sequence_service())return;",selector)
 branch=source[selector:services]
 assert queue_guard<selector, "queued-input refusal must remain ahead of the pair exception"
 assert "fresh_pair_callback==FirstSssFreshPairCallbackAction::StopAfterPair" in branch
 assert "fresh_pair_callback!=FirstSssFreshPairCallbackAction::ContinueTransition" in branch
 assert "running=false;pending=false;first_use_draw_pending=false;audio_phase=0;" in branch
 assert 'first_css_browser_draw_check_live("terminal fresh row callback")' in branch
-assert services>selector, "ordinary service dispatch must remain after the callback selection"
+assert queue_guard<setup_service<selector, "requested Setup service must follow input guards and precede historical terminal selection"
+assert services>selector, "ordinary sequence service dispatch must remain after the callback selection"
 start=source.index("void first_sss_pair_check_css_boundary(")
 end=source.index("\n#endif\n}",start)
 actual=source[start:end]

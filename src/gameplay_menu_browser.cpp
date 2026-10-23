@@ -4361,6 +4361,10 @@ void tick(){
   first_css_browser_draw_refresh_observation();
   EM_ASM({window.menuFrame?.(false);});return;
  }
+ // A requested Setup owns these stopped callbacks after the completed Fresh prefix.
+ // Keep command/input guards above; consume its committed asset scope before
+ // historical Fresh terminal branches can return.
+ if(first_sss_vs_setup_service())return;
  const auto fresh_pair_callback=first_sss_fresh_pair_callback_action();
  if(fresh_pair_callback==FirstSssFreshPairCallbackAction::ServiceFreshPrefix){
   first_sss_sequence_service();return;
@@ -4398,7 +4402,6 @@ void tick(){
   menu_clock.reset();audio_clock.reset();first_css_browser_draw_refresh_observation();
   EM_ASM({window.menuFrame?.(false);});return;
  }
- if(first_sss_vs_setup_service())return;
  if(first_sss_sequence_service())return;
 #endif
  service_render_cache_writes();

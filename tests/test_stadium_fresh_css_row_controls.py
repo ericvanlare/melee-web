@@ -36,6 +36,8 @@ struct PairCallbackState {
 bool first_sss_fresh_draw_callback_ready(){return false;}
 bool first_sss_fresh_prefix_callback_ready(){return false;}
 bool first_sss_sequence_service(){return false;}
+// These CSS-only controls never request Setup; its actual first guard returns false.
+bool first_sss_vs_setup_service(){return false;}
 '''
 
 
@@ -178,7 +180,7 @@ int main(){
         constructor=cut('bool stadium_first_css_constructor_return_active(){','uint32_t asset_generation=0;')
         shared=cut('// Shared private prepared-launch admission.','std::vector<std::string> requested_assets;')
         kicks=cut('int melee_web_native_menu_stadium_first_css_draw_kick(){','const char* melee_web_native_menu_stadium_first_css_draw_observe()')
-        fences=cut(' // Diagnostic input must never override the producer-bound literal row.',' if(first_sss_vs_setup_service())return;')
+        fences=cut(' // Diagnostic input must never override the producer-bound literal row.',' if(first_sss_sequence_service())return;')
         command_line=' const int owner_action=EM_ASM_INT({return window.menuServiceCommands?.() || 0;});'
         self.assertIn(command_line,source)
         self.assertLess(source.index(command_line),source.index(fences))
