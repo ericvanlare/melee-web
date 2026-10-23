@@ -17289,7 +17289,7 @@
   },
   "fresh_go2_comparison_2026_10_18": {
     "state": "ORIGINAL_GO2_REFERENCE_PASS_BROWSER_FIRST_C_COMPARISON_FAIL",
-    "next": "Finite-CSS implementation and focused controls pass; post-repair full regression is running. Clean implementation commit, refreshed preflight and separately admitted finite-CSS capture remain pending. No SSS/VS/GO continuation or C3 release.",
+    "next": "The bounded finite-CSS v3 comparison now passes on source0c39; the earlier guard refusal and original GO+2 first-C failure remain retained. Prepare the approved external original-only fresh SSS constructor entry/return receipt and shared candidate; CSS exit remains unobserved. No new browser capture or SSS input/tick/draw is released before independent review and integration validation. C3 remains open.",
     "native": {
       "binary_sha256": "4bebd3a21cf48da558c7380f45b73e394fe46f47cef774d939cd4659051918fa",
       "producer_manifest_sha256": "2da988e27c334b4530935ea32af3edc319707482e276b064e9b08c132d4cedbd",
@@ -18161,24 +18161,24 @@
       "native_or_browser_executed": false,
       "native_codec_implemented": false,
       "C3": false,
-      "next": "The finite-CSS implementation and focused controls are applied and the full regression passes on bee850fc. The a1bcad29 finite-CSS browser attempt remains a pre-import failure. A separate no-disc v5 readiness observation on bee850fc reached READY_TO_IMPORT_NOT_IMPORTED but failed at the unchanged screenshot bound. Reduce that screenshot/presentation boundary before any further browser work; no SSS/VS/GO continuation or C3 release.",
+      "next": "Root approved an external original-only fresh SSS constructor-entry/return receipt, a minimal shared-pair candidate, and focused controls. Compare only that pair and stop before consumed SSS input, tick or draw. CSS exit has no original observation and remains unpaired. Independent source review is required before source application, build, or capture; no SSS admission or C3 claim follows.",
       "exclusions": [
-        "Finite native source/input/tick/draw parity",
-        "Terminal scheduler tick equality",
+        "Full native source/input/tick/draw parity beyond the bounded v3 finite-CSS prefix",
+        "Terminal scheduler snapshot and raw pending/next equality",
         "CSS leave/SSS/VS Entry/Setup/GO/GO+2 continuation",
         "Pixel/PCM, live input, timing/performance, full-session and C3 acceptance"
       ],
       "implementation_checkpoint_2026_10_22": {
-        "state": "SOURCE_REPAIR_AND_FULL_REGRESSION_PASS; V5_PARTIAL_READINESS_OBSERVED_PROBE_ERROR_SCREENSHOT",
+        "state": "FINITE_CSS_V3_PREFIX_PASS; TERMINAL_SCHEDULER_SNAPSHOT_UNPAIRED; NO_SSS_ADMISSION; EXACT_HEAD_CI_PENDING",
         "evidence_labels": [
           "Source identified",
           "Compiled",
           "Synthetic controls",
-          "Browser exercised (partial no-disc startup readiness; screenshot failed)"
+          "Browser exercised (bounded original-CSS prefix; no SSS continuation)"
         ],
         "source_base": "1e96b2a93c72e3d726b47877324b652c9bc3307c",
         "application_head": "879e23d1f5f45f466d7128e01a1d18b75ca6e7c0",
-        "scope": "Private V4 finite-CSS input-only codec, source-stage ownership and queued launch/comparison capability. Extracted actual source and real SDK codec controls use explicit services; no finite original-game/browser comparison has run.",
+        "scope": "The reviewed V4 input-only finite-CSS capability and exact stage-owner guard now support one bounded original-CSS browser prefix after a two-file state-guard repair. The prefix passes declared input/tick/draw comparisons through final draw; the result3 scheduler snapshot remains unpaired. No CSS exit, SSS, VS, GO, whole-session, or C3 acceptance.",
         "source_freeze": {
           "evidence": "validation-v1/first-css-finite-candidate-v4/source-freeze-v4.json",
           "bytes": 7000,
@@ -18756,14 +18756,792 @@
             "Whole-session acceptance, public Stadium admission and C3"
           ]
         },
-        "next": "V5 reached the enabled disc picker after observing all 890 startup pipelines created, but the overall no-disc probe failed on the unchanged 5-second screenshot. Reduce the screenshot/presentation boundary from retained evidence; do not retry unchanged or release finite-CSS comparisons. Exact-head CI, finite-CSS source comparisons, terminal scheduler equality, continuation and C3 remain open.",
+        "next": "The latest no-disc result remains READY_TO_IMPORT_NOT_IMPORTED. The 9f28 finite-CSS guard refusal is preserved with its passing row-zero comparisons; the reviewed two-file repair on 0c39 enables the separate v3 bounded CSS-prefix pass, whose terminal scheduler snapshot remains unpaired. Root approved an external original-only fresh SSS constructor-entry/return receipt, a minimal shared-pair candidate, and focused controls. Compare only that pair and stop before consumed SSS input, tick or draw. CSS exit has no original observation and remains unpaired. Independent source review is required before source application, build, or capture; no SSS admission is authorized.",
         "exclusions": [
-          "Finite browser/original tick and draw agreement",
+          "Browser/original tick and draw agreement beyond the declared bounded finite-CSS v3 comparisons",
           "Terminal scheduler tick equality",
           "Restore or scene parity",
           "CSS leave/SSS/VS Entry/Setup/GO/GO+2 continuation",
           "Pixel/PCM, physical input, timing/performance, whole-session and C3 acceptance"
-        ]
+        ],
+        "c8a1_predecessor_ci": {
+          "head": "c8a1c452a6610162a4ed13fe1691281bda0c696e",
+          "summary": {
+            "checks": 14,
+            "successes": 12,
+            "expected_skips": 2,
+            "other": 0
+          },
+          "receipt": {
+            "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+            "evidence": "validation-v1/first-css-finite-candidate-v4/checkpoint-ci-c8a1-v1.json",
+            "bytes": 5280,
+            "sha256": "7d686b09d6d89255d10c7c7140dba66e4304763b3ecd763a8082f4ccd631cd74"
+          },
+          "scope": "This completed 14-check run is on the c8a1 predecessor checkout. It is not exact-head CI for the later 9f28 source commit."
+        },
+        "exact_head_ci_9f28": {
+          "status": "PENDING",
+          "source_revision": "9f28c0b1687400d2022c50b88287fff13034ba01",
+          "note": "The c8a1 result above does not substitute for exact-head CI on 9f28."
+        },
+        "startup_readiness_v7_2026_10_22": {
+          "status": "PASS_SCOPED_NO_DISC_STARTUP_AND_SCREENSHOT; READY_TO_IMPORT_NOT_IMPORTED",
+          "source_revision": "9f28c0b1687400d2022c50b88287fff13034ba01",
+          "source_tree": "f3dccbd6b187006296004afe13c7bc2502fadba2",
+          "commit": "9f28c0b1687400d2022c50b88287fff13034ba01",
+          "changed_files": [
+            "src/gameplay_menu_browser.cpp",
+            "tests/test_melee_runtime_owner.py"
+          ],
+          "source_change": "The reviewed hold predicate preserves the original empty presentation and holds only repeated ownerless fallback presents while startup pipelines remain queued or, at queue zero, the native cache still reports ready; the existing owner/import/source guards remain. The observation below does not establish that this repair caused the screenshot result.",
+          "candidate": {
+            "freeze": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v6/startup-idle-import-hold-candidate-v2/source-freeze-v2.json",
+              "bytes": 9677,
+              "sha256": "bccaf9cf66db127157399fe7d6354447a131b16de4b9a07713c0a0b84b31b5cb"
+            },
+            "patch": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v6/startup-idle-import-hold-candidate-v2/candidate.patch",
+              "bytes": 12067,
+              "sha256": "f3104db8b363b729b13ef3ffffea497811a2a51761fbe35cfc798f3e613fc27e"
+            },
+            "independent_source_review": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v6/startup-idle-import-hold-source-review-v2.json",
+              "bytes": 6491,
+              "sha256": "6cfdebfd74b1f403fea37ffb299a0fc0c288697afdf60a426d9035f9e16314a1"
+            },
+            "focused_controls": {
+              "result": "PASS",
+              "tests": 2,
+              "passed": 2,
+              "skips": 0,
+              "seconds": 0.873,
+              "receipt": {
+                "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+                "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v6/applied-focused-controls-v1/result.json",
+                "bytes": 990,
+                "sha256": "cdf78b1d2b213bb63510c0536a313a562819393233007132f77b0ab7ea7443ed"
+              },
+              "log": {
+                "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+                "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v6/applied-focused-controls-v1/combined.log",
+                "bytes": 818,
+                "sha256": "cf75d448f73c175de027813c71671fbfea750f4c67fd9339af57e6d83a01d570"
+              }
+            }
+          },
+          "builds": {
+            "diagnostic_release": {
+              "result": "PASS",
+              "command": "python3 scripts/build.py --target runtime --configuration Release --stadium-c1a-diagnostic",
+              "exit_code": 0,
+              "log": {
+                "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+                "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v6/applied-builds-v1/diagnostic.log",
+                "bytes": 206730,
+                "sha256": "2e916497b3c64b1d5bb9945c2136246435fbb52867bbb8e299e4be31a00a1dd1"
+              },
+              "result_receipt": {
+                "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+                "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v6/applied-builds-v1/diagnostic-result.json",
+                "bytes": 999,
+                "sha256": "a9c35cf79266609b31f1d0f0b75d7f4f74cfdfdde0facb85324a5b48bf7305b2"
+              }
+            },
+            "ordinary_release": {
+              "result": "PASS",
+              "command": "python3 scripts/build.py --target runtime --configuration Release",
+              "exit_code": 0,
+              "log": {
+                "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+                "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v6/applied-builds-v1/ordinary.log",
+                "bytes": 206679,
+                "sha256": "2cdfdebe811c1207de84f855fba55fbe114f8a71b80ff9f4ebba8b99779b9e89"
+              },
+              "result_receipt": {
+                "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+                "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v6/applied-builds-v1/ordinary-result.json",
+                "bytes": 963,
+                "sha256": "0064cdea3c1502ab3728ad55ffa8ec04b8a42f4d440bcf7e8ba49cb8b50439ac"
+              }
+            },
+            "runtime_pins": {
+              "status": "PASS_ALL50_CURRENT_9F28_ARTIFACTS",
+              "diagnostic_served_outputs": 44,
+              "ordinary_crosschecks": 4,
+              "receipt": {
+                "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+                "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v7/runtime-pins-v7-reviewed-v2.json",
+                "bytes": 16522,
+                "sha256": "c97f506fbe25951c6a78d0a722d9df7b15b15e66c781f2992015e0178328ad1c"
+              }
+            },
+            "integration_receipt": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v7/integration-results-v7.json",
+              "bytes": 4959,
+              "sha256": "7e1bfd2d35e2a4c94557398319cd31bde33f229f53eba1df02671df301cda198"
+            }
+          },
+          "full_regression": {
+            "result": "PASS",
+            "tests": 2741,
+            "skips": 191,
+            "unittest_seconds": 581.178,
+            "wrapper_elapsed_seconds": 581.56,
+            "log": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v6/applied-builds-v1/full-regression-v1/full-regression.log",
+              "bytes": 528690,
+              "sha256": "9c348af6869875d2426bb049eb138784e044146172f922b0bee2466770c1cd64"
+            },
+            "corrected_result": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v6/applied-builds-v1/full-regression-v1/result-v2.json",
+              "bytes": 1997,
+              "sha256": "13579a2ab77067ee66cce1ec4a9256dbe1fe1d1156fe3c512e4eb238cbd6f5e6"
+            },
+            "original_parser_result_preserved": {
+              "incorrect_summary": {
+                "tests": 0,
+                "skips": 195,
+                "reported_seconds": 0.0
+              },
+              "receipt": {
+                "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+                "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v6/applied-builds-v1/full-regression-v1/result.json",
+                "bytes": 1050,
+                "sha256": "34341a178a2b4ce1b4d3511b8ccf5a482627600cb52a189e5fce3982ebf9fe9a"
+              },
+              "note": "The initial parser did not match the capitalized outer unittest summary; v2 is based on the retained log lines and no suite was rerun."
+            }
+          },
+          "ci": {
+            "c8a1_predecessor": {
+              "head": "c8a1c452a6610162a4ed13fe1691281bda0c696e",
+              "checks": 14,
+              "successes": 12,
+              "expected_skips": 2,
+              "receipt": {
+                "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+                "evidence": "validation-v1/first-css-finite-candidate-v4/checkpoint-ci-c8a1-v1.json",
+                "bytes": 5280,
+                "sha256": "7d686b09d6d89255d10c7c7140dba66e4304763b3ecd763a8082f4ccd631cd74"
+              }
+            },
+            "exact_9f28_head": "PENDING"
+          },
+          "historical_v6_screenshot_failure": {
+            "checkout_head": "c8a1c452a6610162a4ed13fe1691281bda0c696e",
+            "runtime_source_revision": "bee850fcef503a7108dbac0da92f998aada7c69d",
+            "runtime_source_tree": "443c7e0dda89b6cde705c1a5b77851c83a61c8e2",
+            "result": "PROBE_ERROR",
+            "readiness_outcome": "ready-to-import",
+            "screenshot": "FAILED_UNCHANGED_5000MS_BOUND",
+            "pending_boundary": "Page.captureScreenshot",
+            "pending_elapsed_ms": 5004.585083,
+            "causality": "The last observed protocol boundary is recorded; it does not establish why the screenshot command did not return.",
+            "report": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v6/run-v6/browser-run/report.json",
+              "bytes": 160983,
+              "sha256": "f5e201140f48b0fdafb2838474960d5826c6e88150c0d827ac9b0b1f2521a6a2"
+            },
+            "raw_result_review": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v6/v6-raw-result-review-v1.json",
+              "bytes": 11404,
+              "sha256": "a7ecf902a3d169aa7c0016670e5762ab7451227d591294897424702114ae93dd"
+            },
+            "root_result_check": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v6/run-v6/root-result-check-v1.json",
+              "bytes": 7175,
+              "sha256": "6ad82b032314037772f457c5243a03428a07fe7559044f902d0e5734b8a2266f"
+            },
+            "source_runtime_identity_is_historical_bee850": true
+          },
+          "v7_initial_packet_refusal": {
+            "status": "REFUSED_PRELAUNCH_NOT_EXECUTED",
+            "review": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v7/independent-packet-review-v7.json",
+              "bytes": 5898,
+              "sha256": "3c996a32c9499ff7a2766e3323ac6a61bb5964f658385174c097d25e13c5dbb6"
+            },
+            "original_freeze": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v7/freeze-v7.json",
+              "bytes": 3939,
+              "sha256": "9846b6ca1fc58f6e8ef91aa7d41f28fb3a38d600dd124e4993db66f22409cd4f"
+            },
+            "original_manifest": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v7/manifest-v7.json",
+              "bytes": 33592,
+              "sha256": "a689de38cd52c9bb371e2633fb4d5478c48b2abf716c06d566324957b885a574"
+            },
+            "original_command": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v7/startup-command-v7.json",
+              "bytes": 10047,
+              "sha256": "d1aa51be5ecc17492e153bcb34f24b0d90e0defe9ad2ab8c7d87393eb85b2b64"
+            },
+            "original_runtime_pins": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v7/runtime-pins-v7.json",
+              "bytes": 16536,
+              "sha256": "50057b203d258ce1e1bb56ab715819fbb1e427b1e9d5992aa138c90a69e24e2f"
+            },
+            "reasons": [
+              "Runtime pin schema did not match the unchanged runner schema stadium-finite-css-runtime-pins-v1.",
+              "The candidate_source/proposal metadata identified the historical bee850 patch as current even though the new source was 9f28."
+            ],
+            "no_launch_occurred": true,
+            "original_files_preserved": true
+          },
+          "v7_metadata_repair": {
+            "status": "REVIEWED_METADATA_ONLY_REPAIR; ROOT_ADMITTED_ONE_RUN",
+            "receipt": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v7/metadata-repair-v7-reviewed-v2.json",
+              "bytes": 3824,
+              "sha256": "4e9abc676acdf5ffbf129854dd2b59535c28ee3e0f0f44cda90814856b0358ef"
+            },
+            "diff": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v7/metadata-repair-v7-reviewed-v2.diff",
+              "bytes": 21969,
+              "sha256": "2b69c9dcbf251dbfb21ff50a57b608025eb12007f8a79e45d27ef71d42ae17e4"
+            },
+            "freeze": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v7/freeze-v7-reviewed-v2.json",
+              "bytes": 4830,
+              "sha256": "fd24699a27e70a23167df1c6f66f8319a05026068dd961d69a638c25adcb85b7"
+            },
+            "manifest": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v7/manifest-v7-reviewed-v2.json",
+              "bytes": 38565,
+              "sha256": "5e985ba3020ec535bdf9c3c57898f62d7418afd0c046968654a4e2b73b5eb642"
+            },
+            "command": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v7/startup-command-v7-reviewed-v2.json",
+              "bytes": 10059,
+              "sha256": "d31fd1602d4c199fe39bdf42bbb684ea1e5be075ce1ac7906a0bf40d6a7bb01c"
+            },
+            "runtime_pins": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v7/runtime-pins-v7-reviewed-v2.json",
+              "bytes": 16522,
+              "sha256": "c97f506fbe25951c6a78d0a722d9df7b15b15e66c781f2992015e0178328ad1c"
+            },
+            "runtime_continuity": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v7/runtime-continuity-v7-reviewed-v2.json",
+              "bytes": 16969,
+              "sha256": "5ae104636bf982d38a525e93f2bb0bfc278ca6198377ed130c17bec8b859def0"
+            },
+            "root_admission": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v7/root-admission-v7-reviewed-v2.json",
+              "bytes": 28776,
+              "sha256": "a6d9c58017e3825fe36f5a2dc254f495e382ff862bfc6e9ceba4b7cc4745fb93"
+            },
+            "repair": "Restored the exact schema required by the unchanged v6 runner and attributed current source to the approved v2 candidate. The original v7 refusal and packet remain unchanged; no runtime bytes or build outputs changed."
+          },
+          "v7_observation": {
+            "result": "READY_TO_IMPORT_NOT_IMPORTED",
+            "scope": "Headless development no-disc startup readiness only; no gameplay/source comparison.",
+            "raw_report": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v7/run-v7/browser-run/report.json",
+              "bytes": 138211,
+              "sha256": "262e645d87d5a9019b491e5df31c292d8381e319940d2d98e0e3ec5c243edb49"
+            },
+            "owner": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v7/run-v7/owner.json",
+              "bytes": 99036,
+              "sha256": "75406fc590c4cbb2e8a17bf685fe190e4fa382bf57b1704705582d1bbdd85a6d"
+            },
+            "root_result_review": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v7/run-v7/root-result-check-v1.json",
+              "bytes": 1596,
+              "sha256": "e1d97d4bd98f09bccd31ddd17464c1aab045a4924c945b618fc24aca9db7ab3b"
+            },
+            "screenshot": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v7/run-v7/browser-run/startup-state.png",
+              "bytes": 118827,
+              "sha256": "95737ac9aa919a5e0f196f0ab7d7b323099adb1cfc21d968a2f1fcaf7dcd51c1"
+            },
+            "runtime_pins_sha256": "c97f506fbe25951c6a78d0a722d9df7b15b15e66c781f2992015e0178328ad1c",
+            "observed": {
+              "samples": 22,
+              "sample_interval_ms": 250,
+              "graphics_preparation_ms": 2506.1900000572205,
+              "disc_control_enabled_observer_ms": 2667.8799996376038,
+              "created_pipelines": 890,
+              "queued_pipelines": 0,
+              "cache_idle": 1,
+              "terminal": true,
+              "last_sample_phase": "0",
+              "source_steps": 0,
+              "source_draws": 0,
+              "source_inputs_sent": 0,
+              "disc_import_started": false,
+              "native_exports_called_by_probe": 0
+            },
+            "screenshot_protocol": {
+              "window_ms": 2422.557875,
+              "rows": 20,
+              "truncated": false,
+              "complete": true,
+              "pending_commands": 0,
+              "screenshot_timeout_ms": 5000
+            },
+            "browser_errors": {
+              "page": 0,
+              "console": 0,
+              "failed_requests": [
+                {
+                  "path": "/gameplay_menu_browser.data",
+                  "error": "net::ERR_ABORTED",
+                  "cause": "unknown; no cause inferred"
+                }
+              ]
+            },
+            "visual_observation": "Root inspected the retained image: development page still showed Choose File enabled, no file selected, black canvas, no modal, and no CSS entry. This is not a pixel-accuracy result.",
+            "cleanup": {
+              "owner_result": "pass",
+              "owner_elapsed_ms": 6665,
+              "cleanup_elapsed_ms": 143,
+              "recorded_pids_independently_absent": [
+                194,
+                195,
+                231,
+                241,
+                242,
+                244,
+                259,
+                260,
+                262,
+                278
+              ],
+              "owned_tmp_removed": true,
+              "native_unload": "NOT_ATTEMPTED_NO_DISC_SCOPE"
+            },
+            "limitations": [
+              "No disc upload or native import; no native unload attempted.",
+              "No CSS source parity, SSS/VS continuation, GPU-completion, pixel/PCM, foreground, timing/performance, whole-session or C3 result.",
+              "The v6 screenshot failure and v7 screenshot success do not identify a single cause; the v6 result is on the historical bee850 producer.",
+              "Exact-head CI for 9f28 remains pending; the c8a1 predecessor run is separate."
+            ],
+            "C3": false,
+            "finite_css_comparisons_performed": false,
+            "independent_result_review": {
+              "status": "PASS_SCOPED_NO_DISC_READINESS_SCREENSHOT_AND_CLEANUP",
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/startup-readiness-probe-v7/run-v7/independent-result-review-v1.json",
+              "bytes": 6564,
+              "sha256": "3eaac2e09c1663417385996233660a99e779ece86cafaac68ffe3ee51a63b3cd",
+              "scope": "Confirms report, owner, cleanup check, screenshot and runtime/packet pins. Does not release disc import or finite-CSS continuation."
+            },
+            "clock_origin_note": "graphics_preparation_ms is the native preparation duration; disc_control_enabled_observer_ms is a timestamp on the JS observer clock. Their origins differ, so they do not define a shared elapsed interval or a performance comparison."
+          },
+          "next": "The no-disc v7 observation reached the import gate and captured the current development page. Any finite-CSS comparison remains a separately reviewed and explicitly admitted experiment; v7 does not authorize disc import, CSS/SSS continuation or C3 acceptance."
+        },
+        "finite_css_idle_owner_guard_attempt_2026_10_22": {
+          "status": "FAIL_IDLE_CSS_OWNER_GUARD_BEFORE_STREAM_ARM",
+          "scope": "One admitted finite-CSS browser attempt on the 9f28 runtime. The first CSS input row and its entry, tick, and draw comparisons passed. The attempt then stopped at the exact idle CSS owner guard before the later finite stream was armed; no subsequent rows or stream comparators ran. This remains a guard-refusal result, not a completed finite CSS prefix.",
+          "source_revision": "9f28c0b1687400d2022c50b88287fff13034ba01",
+          "source_tree": "f3dccbd6b187006296004afe13c7bc2502fadba2",
+          "preflight": {
+            "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+            "evidence": "validation-v1/first-css-finite-candidate-v4/next-finite-css-packet-v2/preflight.json",
+            "bytes": 34956,
+            "sha256": "b4127792dd5f2816c5c17559c38fcf214fb6e97ef1770578245150d0da76721f"
+          },
+          "frozen_packet": {
+            "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+            "evidence": "validation-v1/first-css-finite-candidate-v4/next-finite-css-packet-v2/packet-v1.json",
+            "bytes": 12380,
+            "sha256": "f3ddf27932cc1a4ae7657120b9488ca836638c9a873c40cab3f08214b613e679"
+          },
+          "root_admission": {
+            "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+            "evidence": "validation-v1/first-css-finite-candidate-v4/next-finite-css-packet-v2/root-admission-v1.json",
+            "bytes": 930,
+            "sha256": "da2222fa2d8091bd43e0824a5f8898d682bea66df6af2eb67c1d47f35903a0a4"
+          },
+          "raw_report": {
+            "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+            "evidence": "validation-v1/first-css-finite-candidate-v4/next-finite-css-packet-v2/browser-run/report.json",
+            "bytes": 61756,
+            "sha256": "d5a4d4268897ab6e9c3df4e3be9bf195f5497c6ff5a259594b4d6c2f2e068e61"
+          },
+          "owner_record": {
+            "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+            "evidence": "validation-v1/first-css-finite-candidate-v4/next-finite-css-packet-v2/owner.json",
+            "bytes": 103261,
+            "sha256": "51ca25f78d4e9893cd147fa77a916f9de1fd99c8f4d9bd25062057ac5670e123"
+          },
+          "root_result_check": {
+            "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+            "evidence": "validation-v1/first-css-finite-candidate-v4/next-finite-css-packet-v2/root-result-check-v1.json",
+            "bytes": 2468,
+            "sha256": "a4280c5abb4aefe86e743533f9050dcf92cca7bfc0899b7f30ea9df70f341c6e"
+          },
+          "observed": {
+            "owner_elapsed_ms": 11609,
+            "owner_cleanup_elapsed_ms": 80,
+            "first_failure": "Fresh finite CSS stage requires its exact idle CSS owner.",
+            "source_stream_armed": false,
+            "css_comparison_performed": true,
+            "first_css_row_comparison_performed": true,
+            "finite_remainder_stream_armed": false,
+            "finite_remainder_stream_comparison_performed": false,
+            "native_unload_completed": true,
+            "observation_cleared": false,
+            "cleanup_passed": true,
+            "all_11_recorded_pids_independently_absent": [
+              2642,
+              2669,
+              2671,
+              2678,
+              2679,
+              2682,
+              2688,
+              2689,
+              2690,
+              2692,
+              2744
+            ],
+            "failed_scratch_retained": true
+          },
+          "runtime_identity_and_retention": {
+            "runtime_pins": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/next-finite-css-packet-v2/runtime-pins-v1.json",
+              "bytes": 16522,
+              "sha256": "c97f506fbe25951c6a78d0a722d9df7b15b15e66c781f2992015e0178328ad1c"
+            },
+            "retained_runtime": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/retained-startup-9f28-v1/retention.json",
+              "bytes": 24741,
+              "sha256": "fa3a4b2347a0a57d3a01f8af967637aa2a9ec05caa2d01d8bcbfc69a2e9946a3",
+              "verified_files": 50,
+              "verified_bytes": 41383187,
+              "source_revision": "9f28c0b1687400d2022c50b88287fff13034ba01"
+            }
+          },
+          "claim_limits": [
+            "The first CSS input row entry, tick, and draw fields were compared and passed; the later finite remainder stream was not armed or compared.",
+            "Native unload completion does not imply that the diagnostic observation was cleared.",
+            "The independent process-absence and cleanup pass does not convert the failed route into a successful CSS run.",
+            "No complete original/CSS row-count or full-prefix parity claim is included here; only the first-row comparisons are bound above.",
+            "No SSS, VS, GO, whole-session, performance, pixel/PCM or C3 acceptance."
+          ],
+          "next": "The exact idle-owner refusal was reviewed and repaired in the later 0c39 source checkpoint. The later bounded v3 run is recorded separately; this historical attempt and its failed scratch remain unchanged.",
+          "row_zero_result": {
+            "result": "PASS_FIRST_CSS_ENTRY_TICK_DRAW",
+            "input_row_index": 0,
+            "source_stream_sha256": "4fd54b4aa9537292295ad83fbb75655f8213a475a876fdd1468affb68d3d211f",
+            "source_steps": 1,
+            "source_draws": 1,
+            "host_tick_calls": 1,
+            "host_draw_calls": 1,
+            "checks": [
+              "CSS entry fields",
+              "CSS tick fields",
+              "CSS draw fields"
+            ],
+            "raw_source_reduction": {
+              "evidence_directory": "finite-css-stage-state-repair-v1",
+              "evidence": "raw-source-reduction-v1.json",
+              "bytes": 9819,
+              "sha256": "e0d64e612a47b62b2f48a79440bf4aaa3ebe8526db13545295b1a70e8b5fe4a6"
+            },
+            "raw_browser_report": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/next-finite-css-packet-v2/browser-run/report.json",
+              "bytes": 61756,
+              "sha256": "d5a4d4268897ab6e9c3df4e3be9bf195f5497c6ff5a259594b4d6c2f2e068e61"
+            },
+            "scope": "This is the first retained row only. The finite remainder stream was not armed in this attempt."
+          }
+        },
+        "finite_css_stage_state_repair_2026_10_22": {
+          "state": "SOURCE_REPAIR_AND_INTEGRATION_PASS; ONE_BOUNDED_FINITE_CSS_V3_PREFIX_PASS",
+          "source": {
+            "commit": "0c39b6dd1abb9102943f8d439296b9a4fa3225ae",
+            "tree": "8299cdfd14a90e5b484111b4db5ecc9ca550abe7",
+            "parent": "9f28c0b1687400d2022c50b88287fff13034ba01",
+            "clean_worktree": true,
+            "changed_files": [
+              "web/runtime-development.mjs",
+              "tests/stadium_finite_css_controls.mjs"
+            ],
+            "file_sha256": {
+              "web/runtime-development.mjs": "0f9c7d21a57ce7b949a4a4a06f642a1b79c5bb8a09e432a7f87fc040d2b16787",
+              "tests/stadium_finite_css_controls.mjs": "b3e360f9482d60b9ca661924dec4465e5ed2b4fd0558cacf61162745a1189e06"
+            }
+          },
+          "source_review": {
+            "result": "APPROVED_FOR_APPLICATION_AND_INTEGRATION_CHECKS",
+            "freeze": {
+              "evidence_directory": "finite-css-stage-state-repair-v1",
+              "evidence": "freeze-v1.json",
+              "bytes": 4841,
+              "sha256": "ddbda58bae530b8011dac024d117766298e6f47e7fbb6d76f5314689841fe5a8"
+            },
+            "independent_review": {
+              "evidence_directory": "finite-css-stage-state-repair-v1",
+              "evidence": "independent-source-review-v1.json",
+              "bytes": 4896,
+              "sha256": "f9a0a8809e9929fe048748d3d2b33162a6cad8155fac704824b8fa3f6e1b720e"
+            },
+            "patch": {
+              "evidence_directory": "finite-css-stage-state-repair-v1",
+              "evidence": "candidate.patch",
+              "bytes": 7090,
+              "sha256": "84dab6d5e366ccf5ebd3be17407e6822927c0dc403fe0695aa46ec37c6365275"
+            }
+          },
+          "focused_controls": {
+            "result": "PASS",
+            "fixture_kinds": [
+              "synthetic",
+              "retained-original"
+            ],
+            "syntax_checks": 4,
+            "receipt_refusals": 13,
+            "comparator_refusals": 8,
+            "queued_owner_cases": 38,
+            "state_refusals": 6,
+            "log": {
+              "evidence_directory": "integration-v1",
+              "evidence": "focused-controls-v2.log",
+              "bytes": 3229,
+              "sha256": "95b874ab8518ba2b6c05cd68a13738f0d0bcf99f14cb555d61af8e133294d1d2"
+            }
+          },
+          "release_builds": [
+            {
+              "profile": "private Stadium C1a diagnostic Release",
+              "command": "python3 scripts/build.py --target runtime --configuration Release --stadium-c1a-diagnostic",
+              "exit_code": 0,
+              "log": {
+                "evidence_directory": "integration-v1",
+                "evidence": "diagnostic-release-v1.log",
+                "bytes": 12404,
+                "sha256": "228b60ffe31272b2c7928f811c0a94535dfe6cd455e13c9e6f2331ff9bbbd247"
+              }
+            },
+            {
+              "profile": "ordinary private runtime Release",
+              "command": "python3 scripts/build.py --target runtime --configuration Release",
+              "exit_code": 0,
+              "log": {
+                "evidence_directory": "integration-v1",
+                "evidence": "ordinary-release-v1.log",
+                "bytes": 12381,
+                "sha256": "c2fbdc6b4c833198e61e6f3a17def9bdb1e5263e75fda84817eb29d6654e2e0d"
+              }
+            }
+          ],
+          "full_regression": {
+            "result": "PASS",
+            "outer_tests": 2741,
+            "passed": 2552,
+            "skipped": 189,
+            "errors": 0,
+            "duration_seconds": 610.554,
+            "command": "MELEE_FINITE_CSS_EVIDENCE_ROOT=/Volumes/AgentStorage/melee-web/runs/stadium-css-constructor-v2-20261018-131529-0044ed56 python3 -m unittest discover -s tests -v",
+            "wrapper": "python3 scripts/agent_workspace.py run --",
+            "log": {
+              "evidence_directory": "integration-v1",
+              "evidence": "full-regression-v1.log",
+              "bytes": 529107,
+              "sha256": "552dd100455ea45b2bbae9713df8574fb8a798ff76173f8add58ffad17dae054"
+            },
+            "scope": "This integration run is tied to source commit 0c39; the earlier 9f28 full-regression receipt remains historical."
+          },
+          "runtime_identity_and_label_correction": {
+            "current_runtime_inventory": {
+              "evidence_directory": "integration-v1",
+              "evidence": "runtime-inventory-v1.json",
+              "bytes": 27405,
+              "sha256": "8b95af68f09a3b94610fb2d8d8ba8ccb6ff03637903afe180c1003e1aca13bab"
+            },
+            "current_runtime_correction_supplement": {
+              "evidence_directory": "integration-v1",
+              "evidence": "runtime-inventory-source-correction-v1.json",
+              "bytes": 19636,
+              "sha256": "d06fc7e141f196235eaeb01185b80c25f74f6c5603e1854c6a82728a2cb38cbf"
+            },
+            "retained_0c39_runtime": {
+              "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
+              "evidence": "validation-v1/first-css-finite-candidate-v4/retained-finite-0c39-v1/retention.json",
+              "bytes": 30316,
+              "sha256": "14b5e8d306d2387b768624746b354641f01a639117abf1072f8a27cdfc8e0988",
+              "count": 50,
+              "bytes_total": 41383274,
+              "source_tree": "8299cdfd14a90e5b484111b4db5ecc9ca550abe7",
+              "source_revision_field_as_written": "9f28c0b1687400d2022c50b88287fff13034ba01"
+            },
+            "correction_summary": "The inventory generator copied source_revision from the retained 9f28 comparison receipt while hashing the 50 current outputs. The 9f28 label is retained-baseline provenance only. The supplement binds the current 0c39 commit/tree and all 50 current file hashes; no historical inventory or retention record was relabeled.",
+            "independent_source_label_review": {
+              "result": "APPROVED_METADATA_CORRECTION",
+              "evidence_directory": "browser-rollback-sprint-20261022-115029-d89e262b",
+              "evidence": "finite-css-stage-state-repair-v1/integration-v1/root-source-label-correction-review-v1.json",
+              "bytes": 674,
+              "sha256": "255db3053a7945ae84e706d0a24a961492beb6c26e0b18ce329f7bf5c4177853"
+            }
+          },
+          "finite_css_v3_browser_prefix": {
+            "state": "PASS_SCOPED_CSS_PREFIX; TERMINAL_SCHEDULER_SNAPSHOT_UNPAIRED; NO_SSS_ADMISSION",
+            "packet": {
+              "evidence_directory": "next-finite-css-packet-v3",
+              "evidence": "packet-v1.json",
+              "bytes": 12697,
+              "sha256": "6a2aa01786abd25a9300b5eccc16c22cdc07431dc3d0e66bb9ef23ed909de1dc"
+            },
+            "preflight": {
+              "evidence_directory": "next-finite-css-packet-v3",
+              "evidence": "preflight.json",
+              "bytes": 34916,
+              "sha256": "c080a812cc886e2cc287dfd85553fe3e551018e36e8e6df5d7e03ff04e701073"
+            },
+            "root_admission": {
+              "evidence_directory": "next-finite-css-packet-v3",
+              "evidence": "root-admission-v1.json",
+              "bytes": 1163,
+              "sha256": "9698c07e8baf5e8f9a1dbc927067639cd24d703f3d90360635d2b8d99eb91da4"
+            },
+            "raw_report": {
+              "evidence_directory": "next-finite-css-packet-v3",
+              "evidence": "browser-run/report.json",
+              "bytes": 878580,
+              "sha256": "3b400a2571d484d1049a2da01e9894ded3fc34223e34de0ea73a6303428d6b8d"
+            },
+            "owner": {
+              "evidence_directory": "next-finite-css-packet-v3",
+              "evidence": "owner.json",
+              "bytes": 90521,
+              "sha256": "7f21ca75555d95aa04ef769a674611f7baa1766da93c913222d6e594f13ef61d"
+            },
+            "operative_root_result_check": {
+              "evidence_directory": "next-finite-css-packet-v3",
+              "evidence": "root-result-check-v2.json",
+              "bytes": 3450,
+              "sha256": "1048a03fd88ed501f826fdfa292761f202848d75c24b95db2547ad942d154e3e"
+            },
+            "independent_result_review": {
+              "evidence_directory": "next-finite-css-packet-v3",
+              "evidence": "independent-result-review-v1.json",
+              "bytes": 8960,
+              "sha256": "29fc06163cbbf3981bd99684a0f04cc9fd8996be7838bfda448374ab02e07d8e"
+            },
+            "offline_comparator_replay": {
+              "evidence_directory": "next-finite-css-packet-v3",
+              "evidence": "independent-review-v1/replay-result-v1.json",
+              "bytes": 4734,
+              "sha256": "91c1960ff9a8a622d95a2a53fc23f570bae37e15afe7b8548d48b9e33df4954f"
+            },
+            "runtime_pins": {
+              "evidence_directory": "next-finite-css-packet-v3",
+              "evidence": "runtime-pins-v1.json",
+              "bytes": 17416,
+              "sha256": "53ea57664b9183c6bade8fb207664c531bc8707fba1caca0b832f1e5b5b8844a"
+            },
+            "input_provenance": {
+              "route": "first-css-fresh-finite-v4",
+              "literal_source_rows": 142,
+              "literal_input_bytes": 6248,
+              "literal_input_sha256": "58ad1f136f96573c78e875c769b568f23323d105f39d6887e29439b04b6fefbf",
+              "source_stream_sha256": "4fd54b4aa9537292295ad83fbb75655f8213a475a876fdd1468affb68d3d211f",
+              "browser_input_bundle_bytes": 11988,
+              "browser_input_bundle_sha256": "e1b5ec3e48654fb2af6e40ccd2ab81dff04e6088eacaf5373d33360edbe0d09c",
+              "host_expected_values_separate_from_literal_input": true
+            },
+            "comparison_result": {
+              "normal_tick_comparisons": 141,
+              "draw_comparisons": 142,
+              "stream_callbacks": 281,
+              "approved_stream_tick_callbacks": 140,
+              "approved_stream_draw_callbacks": 140,
+              "terminal_result3_transition_callbacks_unpaired": 1,
+              "final_draw_fields": 7,
+              "terminal_scheduler_snapshot": "explicitly unpaired",
+              "raw_pending_next": "unpaired"
+            },
+            "offline_replay": {
+              "result": "PASS",
+              "checks": 11,
+              "recorded_actual_rows_replayed": true
+            },
+            "browser_checks": {
+              "engine": "headless installed Google Chrome 156.0.8078.47",
+              "WebGPU": true,
+              "speaker_muted": true,
+              "audio_processing_disabled": false,
+              "page_console_external_request_errors": 0
+            },
+            "cleanup": {
+              "report_result": "pass",
+              "native_unload_completed": true,
+              "observation_cleared": true,
+              "owner_result": "pass",
+              "all_11_recorded_pids_independently_absent": true,
+              "owned_capture_and_server_groups_absent": true,
+              "screenshots_hash_verified": true,
+              "screenshot_description_correction": "Two Mario selections were visible; the \u201c4-man survival\u201d text is not evidence of four-stock settings.",
+              "root_correction": {
+                "prior_sha256": "1feb2f5f719412fec7b61aca1bf5c9cace5650ea5d1aa6eba80ccaf59b4ceed7",
+                "operative_result_check": {
+                  "evidence_directory": "next-finite-css-packet-v3",
+                  "evidence": "root-result-check-v2.json",
+                  "bytes": 3450,
+                  "sha256": "1048a03fd88ed501f826fdfa292761f202848d75c24b95db2547ad942d154e3e"
+                }
+              }
+            },
+            "claim_limits": [
+              "No terminal scheduler snapshot or raw pending/next comparison.",
+              "No SSS admission, CSS exit, VS/GO continuation, whole-session acceptance, or C3.",
+              "Offline replay validates recorded comparator decisions; it is not a second source execution."
+            ]
+          },
+          "continuous_integration": {
+            "predecessor_c8a1": {
+              "status": "HISTORICAL_PASS_NOT_EXACT_HEAD",
+              "checks": 14,
+              "successes": 12,
+              "expected_skips": 2,
+              "head": "c8a1c452a6610162a4ed13fe1691281bda0c696e"
+            },
+            "exact_head_0c39": {
+              "status": "PENDING",
+              "source_revision": "0c39b6dd1abb9102943f8d439296b9a4fa3225ae",
+              "note": "No exact-head CI completion is recorded here."
+            }
+          },
+          "next": "Root approved an external original-only fresh SSS constructor-entry/return receipt, a minimal shared-pair candidate, and focused controls. Compare only that pair and stop before consumed SSS input, tick or draw. CSS exit has no original observation and remains unpaired. Independent source review is required before source application, build, or capture; no SSS admission or C3 claim follows.",
+          "claim_limits": [
+            "The v3 result is limited to its bounded original-CSS prefix.",
+            "No complete CSS/session parity, terminal scheduler equality, SSS/VS/GO continuation, C3, foreground timing, pixels/PCM, or performance acceptance."
+          ]
+        }
       }
     }
   }

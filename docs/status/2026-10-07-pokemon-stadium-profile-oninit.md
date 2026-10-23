@@ -22,12 +22,28 @@ timed out while owned-process cleanup and independent PID absence checks passed.
 A source-backed startup presentation repair on `bee850fc` passes four focused
 controls, both affected Release builds and the 2,741-test regression (191 skips,
 578.275 seconds).
-One subsequent no-disc readiness observation reached the enabled disc picker
-after all 890 startup pipelines were created, with zero queued and cache idle;
-its overall result is still `PROBE_ERROR` because the unchanged 5-second
-screenshot timed out. No source input, CSS comparison or screenshot was
-produced. The next step is a bounded screenshot/presentation reduction; finite
-CSS comparisons, Draft #301 and C3 remain open.
+The earlier v5 no-disc readiness sample reached the enabled disc picker but
+its overall result was `PROBE_ERROR` after the unchanged 5-second screenshot
+bound; that failure is retained. A later v7 no-disc sample on `9f28c0b1`
+passed the declared readiness and screenshot checks with all 890 startup
+pipelines created, zero queued and cache idle. It remained
+`READY_TO_IMPORT_NOT_IMPORTED`. One separately admitted finite-CSS attempt on
+that runtime stopped after 11.6 seconds at the exact idle-CSS owner guard,
+before the later finite stream was armed. Its first CSS input row and entry,
+tick and draw comparisons passed; no subsequent stream rows were compared.
+Native unload completed but observation clearing did not; cleanup passed and
+the independent check found all 11 recorded process IDs absent. Failed scratch
+remains retained. The exact guard was reviewed and repaired in the two-file
+`0c39b6dd` source checkpoint. One later bounded v3 run passed 141 declared
+normal tick comparisons, 142 draw comparisons and all seven final-draw fields;
+the terminal scheduler snapshot remains unpaired. The source correction,
+50-file runtime identity and full regression are recorded below. The root-approved
+next boundary is limited to an external original-only fresh SSS constructor-entry/
+return receipt and minimal shared-pair candidate with focused controls. It compares
+only that pair and stops before consumed SSS input, tick or draw. CSS exit has no
+original observation and remains unpaired. Independent source review is required
+before source application, build or capture; no SSS admission or C3 release is
+implied.
 The [structured receipt](../evidence/issue251-stadium-profile-oninit-v1.json),
 under `fresh_go2_comparison_2026_10_18`, records the failure, passing component
 validation and cleanup. C3 and public Stadium admission remain open.
@@ -1910,10 +1926,10 @@ result review. They derive the actual finite CSS input topology and literal rows
 preserve row-0 byte/metadata/expectation equality, and reject all 22 malformed
 controls. The reviewed command-only `-B` fix prevents bytecode output outside the
 owned result directories; no extractor or retained-derivation bytecode cache is
-present after the runs. This prepares 141 ordinary tick comparisons and 142 draw
-comparisons; it does not execute or pass them. The terminal tick stays explicitly
-unpaired. The implementation checkpoint below adds source/codec controls and
-build evidence; the finite browser/original comparisons remain unrun.
+present after the runs. This preparation established the input topology for 141 ordinary tick
+comparisons and 142 draw comparisons; at that stage they had not run. The terminal tick stays
+explicitly unpaired. The later v3 finite-CSS result below records the bounded
+browser comparisons.
 
 **Finite-CSS implementation checkpoint (October 22):** The independently reviewed
 FC4 private capability is applied on `879e23d1`, with source base `1e96b2a9`.
@@ -1988,6 +2004,81 @@ PIDs were independently absent, and failed scratch remains retained; native
 unload was not attempted. A bounded source/evidence design for the screenshot
 boundary is recorded in the receipt. Do not retry this route unchanged, extend
 timeouts or release finite-CSS comparisons from this partial result.
+
+A v6 changed-hypothesis probe on the retained historical `bee850fc` runtime also
+reached `ready-to-import`, but its unchanged 5-second screenshot call failed. The
+bounded protocol trace records `Page.captureScreenshot` as the sole pending
+boundary after 5,004.6 ms; that identifies the last observed operation and does
+not establish why it did not return. Its report and raw-result review remain
+retained separately and are not evidence from the later `9f28c0b` runtime.
+
+The first v7 packet was refused before launch because its runtime-pin schema did
+not match the unchanged runner and its source metadata still labeled the
+historical `bee850fc` candidate as current. The original refusal and packet are
+preserved. A reviewed metadata-only v2 correction restored the required schema
+and bound the current source to the approved two-file candidate; root then
+admitted one no-disc observation. The correction changed no runtime or build
+bytes.
+
+The approved hold repair is committed as `9f28c0b` (tree `f3dccbd6`), changing
+only `src/gameplay_menu_browser.cpp` and its focused test. Two focused controls,
+diagnostic and ordinary Release builds, and the full regression pass on that
+source. The corrected full-regression receipt records 2,741 tests, 191 skips,
+and 581.178 seconds of unittest time; the original parser sidecar that failed
+to recognize the capitalized summary remains preserved. The all-14-check CI run
+on predecessor `c8a1c452` had 12 successes and two expected skips; it does not
+cover the later `9f28c0b` head, whose exact-head CI remains pending.
+
+One v7 no-disc observation on exact source/runtime `9f28c0b` reached
+`READY_TO_IMPORT_NOT_IMPORTED` within the unchanged 15-second readiness bound.
+The 22 samples recorded graphics preparation at 2,506.19 ms and the disc control
+enabling at 2,667.88 ms. The final sample had 890 pipelines created, queue zero,
+cache idle one and terminal true; source ticks, source draws, disc import and
+native exports remained at zero. The 5-second screenshot succeeded. Its bounded
+protocol window was 2,422.56 ms, with 20 complete rows and no pending command.
+The root-inspected image shows the development page with Choose File enabled,
+no file selected and a black canvas; CSS was not entered, and no pixel-accuracy
+claim follows. One `gameplay_menu_browser.data` request reported
+`net::ERR_ABORTED`; its cause is unknown. All ten recorded PIDs were independently
+absent, the owned temporary directory was removed, and native unload was not
+attempted because no disc was selected.
+
+Sol's independent raw-result review passes only the no-disc readiness, screenshot
+and cleanup claims (receipt `startup-readiness-probe-v7/run-v7/independent-result-review-v1.json`,
+SHA-256 `3eaac2e09c1663417385996233660a99e779ece86cafaac68ffe3ee51a63b3cd`).
+The 2,506.19 ms native preparation duration and 2,667.88 ms disc-enable timestamp
+come from different clock origins; they are not a shared interval and must not
+be subtracted or read as a performance comparison. At this document's authorship,
+exact-head CI for `9f28c0b` remains pending. The completed 14-check run is only
+for predecessor `c8a1c452` (12 successes, two expected skips).
+
+This v7 observation is scoped no-disc startup evidence only. It does not establish
+finite-CSS source parity, GPU completion, SSS/VS continuation, pixels/PCM,
+foreground or performance acceptance, whole-session acceptance, or C3. The
+later bounded finite-CSS v3 run is a separate reviewed result recorded below;
+it does not continue into SSS. The raw report, owner, screenshot, cleanup/readback
+and packet versions are bound in the [structured evidence receipt](../evidence/issue251-stadium-profile-oninit-v1.json).
+
+**Finite-CSS prefix after the stage-state repair (October 22):** The preserved
+9f28 attempt did compare CSS entry and its first input/tick/draw row before the
+stream-arm guard refused the later remainder. A narrowly reviewed two-file guard
+repair on source `0c39b6dd` (`8299cdfd` tree) passed the actual-source controls,
+both diagnostic and ordinary Release builds, and full regression (2,741 tests,
+189 skips, no errors). One admitted headless v3 run then replayed the literal
+142-row original CSS schedule: 141 normal tick comparisons, 142 draw comparisons,
+and seven final-draw fields passed. The result3 terminal scheduler snapshot and
+raw pending/next fields remain explicitly unpaired. Independent review and an
+offline replay of the pinned comparator confirm the recorded decisions; cleanup
+and all 11 PID-absence checks passed. The screenshot correction records two
+Mario selections and does not treat “4-man survival” text as four-stock evidence.
+The runtime inventory’s `source_revision` field was copied from its historical
+9f28 comparison receipt; an independently approved immutable correction
+supplement binds the current 0c39 source/tree and all 50 current artifact hashes
+while preserving the old
+9f28 records. Exact-head CI for 0c39 remains pending; the completed 14-check
+run belongs to predecessor c8a1. The structured receipt records these pins and
+limits. No SSS, VS/GO continuation, whole-session or C3 acceptance follows.
+
 
 
 The earlier GO+2 supervised attempt took 15.248 seconds (15.317 seconds including the root
