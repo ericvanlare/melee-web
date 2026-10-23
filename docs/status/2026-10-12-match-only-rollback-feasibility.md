@@ -16,11 +16,13 @@ binds current producer and retained failure identities.
 browser boundary. Private components capture the source allocation mirror,
 bootstrap/context/flow values, decoded DAT allocations, native audio/effect
 buffers, match clock/cadence, and the bounded active-action closure under owner
-and lifetime guards. The current same-browser CPU checkpoint completes one
-sample-300 capture, restore, replay and source present. The native comparison
-matches all checked CPU domains, but this proves only that bounded CPU snapshot
-path for this fixture. Renderer/GPU/cache state is not restored, full game-state
-ownership is incomplete, and the drawn-original, seven-tick and whole-session
+and lifetime guards. The latest same-browser result completes a fixed sample-300
+drawn-reference comparison: it records a baseline source draw, restores and
+replays the CPU tick without a corrective draw, then checks one final source
+present. The strict CPU
+endpoint and phase-matched postdraw comparisons pass. This remains bounded
+component evidence: renderer/GPU/cache state is not restored, full game-state
+ownership is incomplete, and original-game parity, multi-tick and whole-session
 gates remain open. Earlier capture refusals and the post-present harness assertion
 failure remain retained and are explained below. Component controls and this one
 browser result do not establish full browser rollback. Earlier owner controls
@@ -253,11 +255,36 @@ incomplete ownership inventory and does not
 admit all observed ranges. This bounded CPU baseline/restore/replay and one-present
 result is not a drawn-original comparison, renderer rollback, full-state closure,
 continuous PCM, pixel parity, timing acceptance, or #341 seven-tick acceptance.
-The next bounded drawn-reference experiment should record the baseline source draw
-before restore, require strict CPU endpoint equality, and separately compare the
-post-replay present including its source-present counter. Keep the current owner
-set fixed; GPU/cache state is outside the rewind scope. Exact-head CI and PR342
-integration tracking remain separate from this raw capture result.
+A later root-released drawn-reference capture records the baseline draw before
+restore, matches the same CPU endpoint after no-draw replay, performs one final
+source present, and then passes the strict phase-matched postdraw comparison.
+The 132-byte snapshots at `before-cpu-baseline-and-replay`,
+`after-cpu-capture-before-step`, and `after-cpu-reference-before-baseline-draw`
+are byte-identical. The baseline draw then advances the selected source counters;
+`after-baseline-draw-and-quiescence` and
+`after-correction-before-final-present` are byte-identical. The final source
+present advances the counters again, adding five callbacks and three normal model
+dispatches for each selected Mario. Baseline and final GPU boundaries are idle,
+but renderer/GPU/cache state is not rewound and the screenshot retains the known
+magenta/texture artifacts.
+The capture used a dirty16 build on 4f9a603e; the later clean 9c3293ef source
+checkpoint contains the same bytes across those 16 source files and does not
+relabel the runtime.
+Private and ordinary Release builds, focused controls and full regression pass;
+exact-head CI for the successor remains pending, while earlier 4f9a603e CI is
+historical.
+
+The actual-source two-tick clock reducer now passes as a rejection test: one tick
+matches, while two modeled source ticks with one replay present strictly reject
+the one-count clock delta. Saturation, missing/duplicate present, callback-inflight
+and retired/recreated owner controls also pass. The reducer does not execute the
+HSD fighter scheduler, literal PAD/PCM or a gameplay replay, and is not a two-tick
+rollback pass. The profile-only logical-frame contract is now root-reviewed and
+preserves strict clock checks and vanilla behavior; pending housekeeping may
+complete only after the source-pre predicate succeeds and before callbacks begin.
+A bounded external source implementation and focused actual-source controls are
+authorized. The frozen seven-tick browser plan remains unreleased; no
+implementation result, build, or browser capture is claimed.
 
 ## First current-source copy/restore result
 

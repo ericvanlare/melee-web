@@ -2,7 +2,7 @@
   "schema": "match-only-rollback-feasibility-v1",
   "issue": 318,
   "pr": 319,
-  "status": "same_browser_read_only_census_complete_restore_ownership_incomplete",
+  "status": "same_browser_drawn_reference_one_tick_pass_census_incomplete_full_browser_restore_not_established",
   "source_only_baseline": {
     "boundary": "synchronous-source-only-exported-call-return",
     "sourceDrawing": false,
@@ -2429,7 +2429,7 @@
   },
   "same_instance_browser_restore_341": {
     "issue": 341,
-    "status": "CPU_BASELINE_RESTORE_REPLAY_AND_ONE_PRESENT_PASS; COMPLETE_GAME_STATE_AND_FULL_BROWSER_RESTORE_INCOMPLETE",
+    "status": "PASS_DRAWN_REFERENCE_CPU_REPLAY_AND_ONE_PRESENT; CENSUS_INCOMPLETE; FULL_BROWSER_RESTORE_NOT_ESTABLISHED",
     "producer_base_commit": "130438fd2b86d00cfec98cd2ba0a5f66084ae15c",
     "producer_worktree": "uncommitted source; census runtime/harness and separate owner component sources pinned below; not a commit identity",
     "runtime_sha256": {
@@ -2460,7 +2460,7 @@
       "excludedMutableInputSections": 1068,
       "completeGameState": false
     },
-    "scope": "One actual drawn-browser sample net-byte-delta census; no restore performed; all ranges unadmitted; owner components have separate scoped controls",
+    "scope": "Cumulative record of the source/draw ownership census and a separate bounded same-instance sample-300 drawn-reference CPU baseline/restore/replay comparison: the original baseline source draw, no-draw CPU replay, and final source present are compared at declared phase-matched endpoints. The raw census remains incomplete; renderer/GPU/cache state is not restored and full game-state ownership is not established.",
     "capture": {
       "retained_artifact": "browser-write-census-v2/runner/evidence.json",
       "sha256": "d73e5b6c2a00bf64b09a9e343578a7a29e8469eb532cba563f80426ed43e23e9"
@@ -2557,20 +2557,21 @@
       }
     },
     "remaining": [
-      "complete source/project mutable static coverage and dynamic source/asset/stream/file ownership",
-      "render-to-simulation dependencies and safe host effects across no-draw correction; GPU/cache state remains outside rewind scope",
-      "a drawn-reference comparison with a baseline draw before restore, strict CPU endpoint equality, and a separately checked post-replay present/source-present counter; keep the current owner set fixed",
-      "whole-session, pixel/PCM and foreground timing acceptance"
+      "complete source/project mutable-static coverage and dynamic source/asset/stream/file ownership",
+      "profile-only logical-frame semantics across multiple source ticks while preserving the typed source-present clock and vanilla behavior; no multi-tick browser replay is accepted",
+      "render-to-simulation dependencies and safe host effects across no-draw correction; renderer/GPU/cache state remains outside rewind scope",
+      "whole-session, original-game parity, continuous PCM, pixel parity and foreground timing acceptance"
     ],
     "limitations": [
       "same-value stores and transient values unobserved",
       "idle DVD boundaries do not exclude completed-between-boundary transfers",
       "gameplay arena extent does not prove internal ownership",
-      "screenshot retains existing magenta/texture artifacts; no pixel acceptance",
+      "screenshot retains known magenta/texture artifacts; no pixel acceptance",
       "no local or Internet rollback gameplay acceptance",
-      "The CP5 comparison is limited to bounded CPU state at sample 300, replay through source frame 177, and one source present; no renderer/GPU/cache state was restored.",
+      "The drawn-reference comparison covers one bounded CPU sample300 transition and one source present; no renderer/GPU/cache state is rewound.",
       "The raw census remains incomplete and ownerRestoreAdmission is false; observed ranges outside this CPU checkpoint remain unadmitted.",
-      "No original drawn-state comparison, continuous PCM, pixel parity, foreground timing, full browser rollback, or seven-tick acceptance follows."
+      "The separate two-tick reducer demonstrates strict clock-mismatch rejection with modeled gameplay leaves; it is not two-tick gameplay rollback evidence.",
+      "No original-game parity, multi-tick or seven-tick acceptance, continuous PCM, pixel parity, foreground timing or whole-session acceptance follows."
     ],
     "retained_failures": [
       {
@@ -2598,7 +2599,7 @@
       "retained_artifact": "census-owner-gap-analysis-v1.json",
       "sha256": "9908b8d2ebb8aeeb64d8df4dcdeb24ea0f16f55bab3d17e1f847c679f90ba370"
     },
-    "next_experiment": "Next bounded drawn-reference experiment: record the baseline source draw before restore, require strict equality for the captured CPU endpoint after replay, and separately compare the post-replay source present including its source-present counter. Keep the current owner set and ranges fixed; GPU/cache state is outside rewind scope. PR342 publication and exact-head CI are tracked separately.",
+    "next_experiment": "Proceed with the root-authorized external source candidate and focused actual-source controls. The root-reviewed profile-only logical-frame contract requires pending housekeeping to complete only after the source-pre predicate succeeds and before callbacks begin. No build or browser capture is released.",
     "owner_components": {
       "scope": "Private owner components only; no browser restore exposure or complete-world claim",
       "current_files_sha256": {
@@ -4906,6 +4907,527 @@
         "The raw inventory remains incomplete and ownerRestoreAdmission is false; net-change attribution and all ranges outside the admitted CPU subset remain unadmitted.",
         "No full browser/renderer/host rollback, original drawn-state comparison, seven-tick acceptance, continuous PCM, pixel parity, foreground timing or whole-session acceptance."
       ]
+    },
+    "drawn_reference_one_tick_capture_v1": {
+      "status": "PASS_DRAWN_REFERENCE_CPU_REPLAY_AND_ONE_PRESENT; CENSUS_INCOMPLETE; FULL_BROWSER_RESTORE_NOT_ESTABLISHED",
+      "scope": "One root-released same-browser sample-300 drawn-reference comparison: retain a baseline source draw, restore and replay the same CPU tick without a corrective draw, then perform one final source present and compare the phase-matched postdraw endpoint. This is bounded CPU component evidence; no renderer/GPU/cache rewind or complete game-state claim.",
+      "capture_evidence_directory": "browser-rollback-sprint-20261022-115029-d89e262b/drawn-reference-one-tick-capture-v1",
+      "validation_evidence_directory": "drawn-reference-validation-20261023-110539-191839a8/validation-v1",
+      "producer": {
+        "capture_build_and_execution_source": {
+          "head": "4f9a603e33f0a3c1926c5766d147012f7149d77e",
+          "tree": "eaf7736c4d2ee1c568948fb5284731c499a77f06",
+          "clean": false,
+          "dirty_source_files": 16,
+          "source_file_sha256": {
+            "src/gameplay_action_store.cpp": "3779258d363fa23e072d5d3e42e42d4cc857cd3826d8c7adc5a22674ce16d813",
+            "src/gameplay_action_store.h": "bee330eb756b223c19422d58f13b168d144d30a9fb37e91aaf17715f2cc4e1b1",
+            "src/gameplay_cpu_checkpoint.cpp": "b8b6424d9c092a956ee3678a5c15d8397fba7ac82f92a20b43e16d7adf732c98",
+            "src/gameplay_cpu_checkpoint.hpp": "ca9f18f36cf150c02f2f0c9096c0f254a7ea2d62a4a75d852d4300e7a5a29bda",
+            "src/gameplay_cpu_statics.cpp": "cbed8104704377c2e9c023323de1b2acc037903eed9ab4c7019707ed4c0f85cf",
+            "src/gameplay_cpu_statics.hpp": "5bc267fb1f301cf4e96ca1a165d1c49ca33944860717164316599f2bb2a3b783",
+            "src/slippi_profile/tests/cpu_restore_adapter.inc": "b3bc9832827ee68d62b8119eaa175887b390e62a28077da0197a34c8485ddbf6",
+            "src/slippi_profile/tests/cpu_restore_runner.mjs": "9f4d7271cb10d190ba4c5241d332f02974de9ec69dc6a311adbe0b539f0acd0e",
+            "src/slippi_profile/tests/run_write_census.mjs": "836ac8e501d2ff1864d0050700475c808f3842a68da903de08260710c3bf70b0",
+            "src/slippi_profile/tests/test_cpu_restore_runner.mjs": "c3b3f7e5787757c00ab86dcb4e7c3b0ae75262d8a82c3605402e67fc7f5bd13d",
+            "tests/action_store_interval_control.cpp": "c300f55fd3efbd1ca4136dfa77e2d1a8ebad461d19a5ccbf7d061b82431c69e7",
+            "tests/cpu_capture_refusal_control.cpp.in": "3651ed30f822ed37eead6af8fe7545c9350300d047f9c4dba71f11ec9fa492f4",
+            "tests/cpu_restore_adapter_control.cpp.in": "ee952d5447eefca9cb5d9c37c51c61b4db92101b410bad4dd1e54bcd4a58fa2b",
+            "tests/flow_cpu_checkpoint_control.c": "f064e755b435a992599e30c104b6741eceb4e9418fc8c9214e1fc52a872a3011",
+            "tests/test_gameplay_cpu_capture.py": "8b5197926599ab0ff46ac56ba1fbe98fea88c7eaf29104900e911af2c73cb7fe",
+            "tests/test_gameplay_cpu_restore_adapter.py": "405c059ad4800c6ad5a4c28b631ffce8c2e36a34e3a3c61bd7380cad3882a2ce"
+          },
+          "runtime_file_count": 17,
+          "runtime_files_relative_to_retained_runtime_after": [
+            {
+              "relative_path": "slippi-synctest-stage-arena-aurora-staging-release/CMakeCache.txt",
+              "bytes": 62650,
+              "sha256": "3feaf37f1aa5ebdea9fe3ab0ff673fabb80619bef6cd6b19f1760179192672ba"
+            },
+            {
+              "relative_path": "slippi-synctest-stage-arena-aurora-staging-release/compile_commands.json",
+              "bytes": 4828020,
+              "sha256": "e1d7ce943b747ab9722f195c6d64b0a4b7f748bab187c325e11e28cf5d4a8ba9"
+            },
+            {
+              "relative_path": "slippi-synctest-stage-arena-aurora-staging-release/build.ninja",
+              "bytes": 6193436,
+              "sha256": "6ba9c92a9bc9f04abe1391bdf84298f7e2e1b7614fa1a08a297fa4da3b1538a7"
+            },
+            {
+              "relative_path": "slippi-synctest-stage-arena-aurora-staging-release/gameplay_slippi_synctest_browser.data",
+              "bytes": 20994321,
+              "sha256": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c"
+            },
+            {
+              "relative_path": "slippi-synctest-stage-arena-aurora-staging-release/gameplay_slippi_synctest_browser.map",
+              "bytes": 7710544,
+              "sha256": "b05afe61bb94be27b352c59bd46b808ebb01e2f09acc972c29c04a97405b80f4"
+            },
+            {
+              "relative_path": "slippi-synctest-stage-arena-aurora-staging-release/gameplay_slippi_synctest_browser.mjs",
+              "bytes": 420682,
+              "sha256": "9852463d5260a895523100cfc6b7e25c3b88aeb4fc3a5c0f0a9aa878048f0b5d"
+            },
+            {
+              "relative_path": "slippi-synctest-stage-arena-aurora-staging-release/gameplay_slippi_synctest_browser.source-state.json",
+              "bytes": 1392223,
+              "sha256": "58aba121871f7a02d058e90ed56d5d3ad9cb2b280e682d6fbe7a46d53b09b1a6"
+            },
+            {
+              "relative_path": "slippi-synctest-stage-arena-aurora-staging-release/gameplay_slippi_synctest_browser.wasm",
+              "bytes": 15501931,
+              "sha256": "5ded23dabaf083fedf14a9b4a8bee4d0011e448382a39f46a647d6078bdcf7ea"
+            },
+            {
+              "relative_path": "slippi-synctest-stage-arena-aurora-staging-release/gameplay_slippi_synctest_node.js",
+              "bytes": 229397,
+              "sha256": "ca84f5d1d5a4f7d47e9dcf0eebb4141cfbed16d9ddb13186454495892d940478"
+            },
+            {
+              "relative_path": "slippi-synctest-stage-arena-aurora-staging-release/gameplay_slippi_synctest_node.wasm",
+              "bytes": 7800782,
+              "sha256": "aec86738f2a6d7551e3f2e047f6436e694f3216c834a23ac9e08742bcf468720"
+            },
+            {
+              "relative_path": "browser-release/CMakeCache.txt",
+              "bytes": 61847,
+              "sha256": "b0ba4b73fe99b04c32c49ce527dfe99def8e97c2017ee34dbf9a5929911a3d2a"
+            },
+            {
+              "relative_path": "browser-release/compile_commands.json",
+              "bytes": 4215118,
+              "sha256": "41cf9cc9c71b637a8c69001ad041fb7be66b9e3d04e2f44191dc05d83e7697d9"
+            },
+            {
+              "relative_path": "browser-release/build.ninja",
+              "bytes": 5594412,
+              "sha256": "7c70f26019b34d513042c177f4c93b05a8ce427324987faa9b1d170e501fd2f9"
+            },
+            {
+              "relative_path": "browser-release/gameplay_menu_browser.wasm",
+              "bytes": 15841396,
+              "sha256": "47c88a2759b9bbedd35d9b0a92b90b361b09bb81f75f8705a43cdcadccaf7f8b"
+            },
+            {
+              "relative_path": "browser-release/melee-runtime.mjs",
+              "bytes": 58421,
+              "sha256": "1e0dae3a2864758b0192c04e4a35fec000549ca6fbb669d7a3ff5d134662b03d"
+            },
+            {
+              "relative_path": "slippi-synctest-stage-arena-aurora-staging-release/slippi_synctest_source_state_producers.tsv",
+              "bytes": 194407,
+              "sha256": "da03f79cb0549b983bfdd80de6aba6fff264f4d1d78cf7b692f533d8774308a0"
+            },
+            {
+              "relative_path": "browser-release/gameplay_menu_browser.js",
+              "bytes": 301190,
+              "sha256": "1307ce05acff3c4c760124916624892015e30d6448c0b34a2e43ec7812c7420a"
+            }
+          ],
+          "runtime_source_manifest": {
+            "sha256": "58aba121871f7a02d058e90ed56d5d3ad9cb2b280e682d6fbe7a46d53b09b1a6",
+            "configuration_identity_sha256": "0e6551e09b804e374d490665b4c45110fc8fe709989703340dbe5808acb7730b",
+            "row_count": 3142,
+            "complete_game_state": false
+          },
+          "runtime_product_sha256": {
+            "gameplay_slippi_synctest_browser.mjs": "9852463d5260a895523100cfc6b7e25c3b88aeb4fc3a5c0f0a9aa878048f0b5d",
+            "gameplay_slippi_synctest_browser.wasm": "5ded23dabaf083fedf14a9b4a8bee4d0011e448382a39f46a647d6078bdcf7ea",
+            "gameplay_slippi_synctest_browser.data": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c",
+            "gameplay_slippi_synctest_browser.map": "b05afe61bb94be27b352c59bd46b808ebb01e2f09acc972c29c04a97405b80f4"
+          },
+          "harness_sha256": {
+            "src/slippi_profile/tests/run_write_census.mjs": "836ac8e501d2ff1864d0050700475c808f3842a68da903de08260710c3bf70b0",
+            "src/slippi_profile/tests/run_synctest.mjs": "748d331e97ec3026c3837860433d9b48cedc4b92287e0948893030f38313257d",
+            "src/slippi_profile/tests/runner_contract.mjs": "1040d4c0104fd27eb8df2b7fa9e568d9da3b3cef721d4e553b4dc0c67c44ed9b",
+            "src/slippi_profile/tests/synctest_browser.cpp": "241a906b37019b18c66190b0bb15fc98ef0656159965225d722e2f0d21058f12",
+            "src/native_dat.hpp": "91948d59a02e89c54a949c7a34622c16086223aedf388da7a68141a3a915c36d",
+            "src/native_dat.cpp": "c595ca59f993587e20b0b8b65b7fb4d930e4618d0a60c83760259d105bc2e10d",
+            "src/gameplay_world.hpp": "80a08549238b6d4da34aeb4222e0363da8f90021d3aea7aee08fe1ba7dd7c48e",
+            "src/gameplay_world.cpp": "87853d263d61e29e0c1f4a834bc61d3eebf5712d4c17503615084a57e56cf2be",
+            "src/gameplay_match_session.hpp": "7addedc99e6e2067893bb613be1cae7bbdbccf968fdb8c1a0c16636a444e8cb1",
+            "src/gameplay_match_session.cpp": "236720f8cd72a13abccbf742fb6211f80f08b3afa14b5aeb2870987760fef05f",
+            "src/slippi_profile/tests/test_write_census_contract.mjs": "18d4a235a9fedb94f61886c1b8ebe46ce6deb047719306c3becc2743732a45e2",
+            "tests/native_dat_checkpoint_test.cpp": "1c8c744757df11f658910b0160ec9c1b9d84cc3b22baa1edbcd1a8a8be5255d2",
+            "tests/test_native_dat_checkpoint.py": "bdbcd497fcd52b99bf09328a5617648fa0cc8d121db5d7bd1ccbf11b108e45a2",
+            "tests/gameplay_snapshot_probe.cpp": "af952c7c386af85630136e63cad8d3322f3bb58fa550c6899e10e3f5814f963f",
+            "tests/gameplay_match_context_trace.c": "595dccecd4c4c8f35dc22e7f85454311f6de0d97380b701563f5298f61da893f",
+            "src/gameplay_match_context.h": "33d378f87e96aef45d2d78b8d894a052176a0c9268604ebfbff48d6252e4259a",
+            "src/gameplay_match_context.c": "0797f2b19a32ba3ac4211c8d6fa13c1fe0def99bcb361018aaa7d8dc3b5cc29e",
+            "src/gameplay_audio.h": "9b1d28f7ba6e990893d7ea15b504635d22dae4de6e59874ed13f04117a506a0d",
+            "src/gameplay_audio.c": "49a7161c6520cb5554f07a450cedd04c0853488ed3174226df4e8c54a9b6dafb",
+            "src/gameplay_audio_fx.h": "202b01270291f9523dc2a2e927efb72cdc5e73a7e04023ead2c6c17f5e639398",
+            "src/gameplay_audio_fx.c": "99f9996faf37a069a500cc19d24ed6748dab1a8e6b90834445f3bb4efba84255",
+            "src/gameplay_bootstrap.c": "7807bcf898652026accff1a3943c99f265af7bc789ea1744f769ce567c591c1d",
+            "src/gameplay_bootstrap.h": "9583ed0d13d08773d4b8e4fde1716c69f97f786b99153e69df2a0a4df011082d",
+            "cmake/FighterRuntime.cmake": "d5b9262f455024e5f744724ddc45d5f77a7489e41b8aa37b3ea71fb1f85a09be",
+            "patches/aurora-browser.patch": "e1a5c9f078197129ee046983df36fa97a1c753457bf8e3835d514c47d1ca3418",
+            "scripts/build.py": "fff71bc835db70f52c10387f039250d588a5d7014dfa74118a4954465f665f20",
+            "scripts/browser_tools.mjs": "737a8ef5807edba0009487877e1b65badc3a8bb4d07ff9fcd445a7b8bef40c81",
+            "scripts/source_state_manifest.py": "c337c54b60205197d6cc130e00a1aad3fd53bb5f40a37a15d7429e41f4e9fd74",
+            "src/slippi_profile/tests/cpu_restore_runner.mjs": "9f4d7271cb10d190ba4c5241d332f02974de9ec69dc6a311adbe0b539f0acd0e",
+            "src/slippi_profile/tests/cpu_restore_adapter.inc": "b3bc9832827ee68d62b8119eaa175887b390e62a28077da0197a34c8485ddbf6",
+            "src/gameplay_cpu_checkpoint.cpp": "b8b6424d9c092a956ee3678a5c15d8397fba7ac82f92a20b43e16d7adf732c98",
+            "src/gameplay_cpu_commit.cpp": "fccb0b4dbc599513cb81687271a740f0ce5e77850f3fd54fd24dd05d1bd15e41",
+            "src/gameplay_cpu_statics.cpp": "cbed8104704377c2e9c023323de1b2acc037903eed9ab4c7019707ed4c0f85cf",
+            "src/gameplay_cpu_interval.c": "fc173e6266d7143667decfbc2851413d0b6835b513da13001f273db346b42652"
+          },
+          "harness_source_hashes_match_capture": true,
+          "candidate_freeze": {
+            "path": "freeze-v1.json",
+            "sha256": "e0097bb715752f01eded38ad951da24ab43f85be2bca22202c4c746735e7e1a6"
+          }
+        },
+        "later_clean_source_checkpoint": {
+          "head": "9c3293efd681e1982e096c827e58bdc015fb7b96",
+          "tree": "79d24f29f88f53dd2fb739005aa1dc73ffa8d546",
+          "clean": true,
+          "receipt": {
+            "path": "root-source-checkpoint-v1.json",
+            "sha256": "446db194e57f4053405fde895f126ec2de769c6eb2578534c7f324a104cbb1f2"
+          },
+          "all_16_source_bytes_match_capture_identity": true,
+          "runtime_identity_note": "The capture and builds remain identified as dirty16 on 4f9a603e; the later clean source checkpoint contains the same bytes across the 16 source files and does not relabel the retained runtime."
+        },
+        "packet": {
+          "path": "packet-candidate-v1.json",
+          "sha256": "afd0fd1f709a8a3b67a8553c3045f46627561a66a63c8b6e2922fd0924d6651e",
+          "preflight": {
+            "path": "preflight.json",
+            "sha256": "d5576a86f053d9b1543055de950fdbb3f7f42e42a1b584a552781211ae038587"
+          },
+          "root_release": {
+            "path": "root-release-v1.json",
+            "sha256": "0d0b95c3270f863f90e67b165846a40461b42467c32f1fc7bb76a9a141b3e03e"
+          },
+          "independent_packet_review": {
+            "path": "independent-packet-review-v1.json",
+            "sha256": "9bc9d902cd540f45b844ce3b68c839efac28338493b453b8308b865e7d236298"
+          },
+          "ordering_correction": {
+            "path": "independent-packet-review-order-correction-v1.json",
+            "sha256": "5edffc07f0e3d77a2bf5befe59d2214a1de411e2ff3bbf6ee396ec849b27040f"
+          }
+        },
+        "configuration": {
+          "configuration_sha256": "692fbdc552251fa3e95af3b8f4573af96867dfae41dc98c8fc1738bb4b20b87f",
+          "policy_sha256": "c1ccd2bf755d4ea3049f05597797ccb2aa262ae413e7684376ef1e8ec159bc77",
+          "root_review_sha256": "cf791162a6e66fd5576d729620ff7a0aad4882f217833e88dac41bfd58236206",
+          "freeze_sha256": "b6be4e067dbafa74f28271cb9578b656c5b67093d08d1392eb1485e4b4891b04",
+          "wire_rows": 2165,
+          "asset_count": 34,
+          "asset_verification": {
+            "path": "aggregate-cpu-restore-present-capture-v2/asset-verification-v1.json",
+            "sha256": "6a4bfbdbc6cef2a65dc499561035533caaebee178dcef3b5966dcf74188ba3e0"
+          },
+          "node_version": "v22.23.2",
+          "chrome_version": "Google Chrome 156.0.8078.47",
+          "playwright_package_sha256": "ca170ec143a88ed3043ac953eb3b2377b2b97304104f4e1e23316684ce2c35af"
+        },
+        "source_checkpoint_receipt": {
+          "path": "root-source-checkpoint-v1.json",
+          "sha256": "446db194e57f4053405fde895f126ec2de769c6eb2578534c7f324a104cbb1f2"
+        }
+      },
+      "validation": {
+        "integration_receipt": {
+          "path": "integration-result-v1.json",
+          "bytes": 18925,
+          "sha256": "cbc7d5353e5cf6bdca282612ef6a1f982da0df4af234cd81bd168cfc72cdcb47"
+        },
+        "private_release": {
+          "status": "PASS",
+          "seconds": 29.126071291975677,
+          "log": {
+            "path": "private-release.log",
+            "sha256": "7a57b69961fa20fb00b289529e2af80f4b37c0d2fb0526f9e299c0d353ebdbc9"
+          }
+        },
+        "ordinary_release": {
+          "status": "PASS",
+          "seconds": 21.98273791745305,
+          "log": {
+            "path": "ordinary-release.log",
+            "sha256": "1297ba2272ee289711818507b0d7401ddae325854da1a189c1ab6cbb416eaf0c"
+          }
+        },
+        "focused_controls": [
+          {
+            "name": "focused-cpu-owners-adapter-capture-clock",
+            "status": "PASS",
+            "seconds": 7.02659216709435,
+            "log": {
+              "path": "focused-cpu-owners-adapter-capture-clock.log",
+              "sha256": "3d00b5447ef442f218c523272c56d6d1680994c3654f39f8307d13b8c77a2ce2"
+            }
+          },
+          {
+            "name": "focused-action-store",
+            "status": "PASS",
+            "seconds": 8.841653125360608,
+            "log": {
+              "path": "focused-action-store.log",
+              "sha256": "9cbc824a94dce696498809c3c58b078af18fbd77bbacb995e975d732b3fe7fea"
+            }
+          },
+          {
+            "name": "focused-node50",
+            "status": "PASS",
+            "checks": "50/50",
+            "log": {
+              "path": "focused-node50.log",
+              "sha256": "aefb462533c82eb8977c15c88a008b0767e3739b0920b18b888813c28bb7ee0c"
+            }
+          }
+        ],
+        "full_regression": {
+          "status": "PASS",
+          "tests": 2466,
+          "passed": 2301,
+          "skipped": 165,
+          "seconds": 555.62,
+          "log": {
+            "path": "full-regression.log",
+            "sha256": "dcb0aeead59ba0784b709322df4fd3e61c914328c063a219fe37e0646025e7f5"
+          }
+        },
+        "exact_head_ci": {
+          "status": "PENDING_FOR_SUCCESSOR_HEAD",
+          "note": "The earlier 4f9a603e CI result is historical; it does not validate this successor documentation head."
+        }
+      },
+      "capture": {
+        "raw_report": {
+          "path": "runner/evidence.json",
+          "bytes": 1001836,
+          "sha256": "14d692860501ad1c1a3f8bf18e74c050ff36d9779f46d3771f1cd7ecd50b14ab"
+        },
+        "owner": {
+          "path": "owner.json",
+          "bytes": 88112,
+          "sha256": "815daaee56567c1ee7b48decde865d83cbe1f5b15a134f4c523765ea38ae38c3"
+        },
+        "root_observation": {
+          "path": "root-observed-v1.json",
+          "sha256": "e99d4b26c154f9efe2d175b9b4f4062df765c6c71a4da496340273f4e2accae0"
+        },
+        "independent_raw_review": {
+          "path": "independent-raw-review-v1.json",
+          "sha256": "fa1b57a33198a363eca49f001bfae61c21be8cba6b256d0a83b4f9ed72a8b83b"
+        },
+        "native_cpu_evidence": {
+          "path": "root-native-cpu-evidence.bin",
+          "bytes": 11416,
+          "sha256": "dfd719f7558b3eabde5e39b1732995b28a4188c5a7efed2626bfcfa970abed91"
+        },
+        "native_drawn_evidence": {
+          "path": "root-native-drawn-evidence.bin",
+          "bytes": 11832,
+          "sha256": "c0cb23238640cfa93a4be1aa77b3cbe21e56c0f8f257d934b37b02face0cb3b9"
+        },
+        "screenshot": {
+          "path": "runner/browser-cpu-restore-sample-300.png",
+          "bytes": 307134,
+          "sha256": "2de16105c8521d93604db39ab9296bc224995b3f645c19d8a238e98ba24bb88e"
+        }
+      },
+      "protocol": {
+        "prefix_samples": 300,
+        "input_sample": 300,
+        "source_frame_before_after": [
+          176,
+          177
+        ],
+        "native_commands": [
+          1,
+          6,
+          7,
+          3,
+          4,
+          5
+        ],
+        "semantics": [
+          "Command 6 records the baseline CPU reference, completes one actual source draw, and waits for quiescence before restore.",
+          "Command 7 captures the postdraw expected endpoint, admits owners, restores CPU state, and replays literal sample300 without a corrective draw.",
+          "CPU baseline/replay equality is checked before command 3; command 3 performs one final present and waits for GPU/native idle; command 4 checks phase-matched postdraw equality after that present; command 5 closes the CPU snapshot path."
+        ],
+        "attempts": 1,
+        "automatic_retry": false,
+        "overall_timeout_ms": 180000,
+        "cleanup_reserve_ms": 30000,
+        "source_order_or_input_changes": false
+      },
+      "observed": {
+        "raw_result": "passed",
+        "commands_all_zero": true,
+        "cpu_endpoint": {
+          "terminal_state": "Complete",
+          "first_failure": 0,
+          "commit_result": 0,
+          "equality": 1,
+          "pre_frame": 176,
+          "post_frame": 177,
+          "checked_domains": "0x3fe",
+          "matched_domains": "0x3fe",
+          "declared_domain_count": 9,
+          "comparison_status": 0,
+          "paired_observation_pcm_pad_profile_transfer_equal": true
+        },
+        "drawn_reference": {
+          "mode": 1,
+          "stage": 4,
+          "draw_mask": 7,
+          "phase_matched_postdraw_equal": true,
+          "pair_state_word_is_unused_default_zero": true
+        },
+        "draw_diagnostics": {
+          "record_bytes": 132,
+          "capture_and_cpu_reference_snapshots_unchanged": true,
+          "baseline_draw_equals_no_draw_replay": true,
+          "final_present_changes_counters": true,
+          "each_selected_fighter_callback_delta": 5,
+          "each_selected_fighter_normal_model_dispatch_delta": 3,
+          "baseline_draw_changes_counters": true,
+          "boundary_labels": [
+            "before-cpu-baseline-and-replay",
+            "after-cpu-capture-before-step",
+            "after-cpu-reference-before-baseline-draw",
+            "after-baseline-draw-and-quiescence",
+            "after-correction-before-final-present",
+            "after-final-source-present-and-quiescence"
+          ],
+          "boundary_sha256": [
+            "8cca678f0f1294d01c0bd65bacea7e5d54c4eb2bfe67b95eef14cec52653369b",
+            "8cca678f0f1294d01c0bd65bacea7e5d54c4eb2bfe67b95eef14cec52653369b",
+            "8cca678f0f1294d01c0bd65bacea7e5d54c4eb2bfe67b95eef14cec52653369b",
+            "6062e5f4faaa15f1aae3eba44b886094e9c86fa9f48b7c2be8f2c95d86ab487f",
+            "6062e5f4faaa15f1aae3eba44b886094e9c86fa9f48b7c2be8f2c95d86ab487f",
+            "7e51ea3c4b5a214b2ac265f4f50f08b6cd9880f523c6395819362300b1376413"
+          ]
+        },
+        "sample300": {
+          "pad_bytes": 44,
+          "pad_sha256": "46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288",
+          "players": [
+            {
+              "slot": 0,
+              "kind": 0,
+              "stocks": 4
+            },
+            {
+              "slot": 1,
+              "kind": 0,
+              "stocks": 4
+            }
+          ],
+          "interactive": true
+        },
+        "gpu_quiescence": {
+          "baseline": {
+            "frame": 301,
+            "begin_frame_id": 301,
+            "end_frame_id": 301,
+            "pending_packets": 0,
+            "pending_staging": 0,
+            "worker_busy": 0,
+            "renderer_errors": 0
+          },
+          "final": {
+            "frame": 302,
+            "begin_frame_id": 302,
+            "end_frame_id": 302,
+            "pending_packets": 0,
+            "pending_staging": 0,
+            "worker_busy": 0,
+            "renderer_errors": 0
+          }
+        },
+        "cleanup": {
+          "owner_result": "pass",
+          "cpu_close_result": 0,
+          "snapshot_close_checked_result": 1,
+          "renderer_shutdown_checked_result": 1,
+          "owner_cleanup_rows": 10,
+          "unique_recorded_and_parent_pids_absent": 9,
+          "successful_empty_scratch_removed": true
+        },
+        "screenshot_visual_limit": "Four-stock Mario versus Mario sample; known magenta/texture artifacts remain. No pixel-parity claim."
+      },
+      "limits": [
+        "This is one fixed sample300 CPU baseline/restore/replay plus one source present; it does not establish complete game-state ownership or full browser rollback.",
+        "The captured baseline source draw and post-replay present compare declared endpoints only; renderer/GPU/cache state is not restored and no original-game drawn parity follows.",
+        "The raw source census remains incomplete; ranges outside this bounded CPU checkpoint remain unadmitted. No seven-tick, continuous PCM, pixel parity, foreground timing, or whole-session acceptance follows."
+      ],
+      "next_source_plan": {
+        "path": "browser-rollback-sprint-20261022-115029-d89e262b/drawn-reference-seven-tick-source-plan-v1/source-plan-v1.json",
+        "sha256": "16d5779ccdc495f784edca23dbfeb77bb1fdcb1feda86b2905b93f748f36930a",
+        "freeze_path": "browser-rollback-sprint-20261022-115029-d89e262b/drawn-reference-seven-tick-source-plan-v1/freeze-v1.json",
+        "freeze_sha256": "9b25d6878ee2e0c0966831b861199eb43384cfb2857c435c30d5db13ce880e41",
+        "next_experiment": "Proceed with the root-authorized external source candidate and focused actual-source controls. The reviewed profile-only logical-frame contract requires pending housekeeping to complete only after the source-pre predicate succeeds and before callbacks begin. No build or browser capture is released.",
+        "current_state_after_reducer": "The two-tick strict-clock rejection reducer is reviewed and passed. The profile-only logical-frame contract is root-reviewed; pending housekeeping may complete only after the source-pre predicate succeeds and before callbacks begin. Bounded external implementation and focused actual-source controls are authorized; the frozen seven-tick browser plan remains unreleased.",
+        "status_at_plan_freeze": "BLOCKED_FOR_SEVEN_TICK_IMPLEMENTATION_PENDING_TWO_TICK_REDUCER_AND_PROFILE_SEMANTICS_REVIEW",
+        "current_status": "READY_FOR_BOUNDED_EXTERNAL_IMPLEMENTATION_AND_FOCUSED_ACTUAL_SOURCE_CONTROLS; NO_BUILD_OR_BROWSER_CAPTURE_RELEASE"
+      },
+      "source_clock_two_tick_reducer_v1": {
+        "status": "PASS_REDUCED_EXPECTED_REJECTION_NO_GAMEPLAY_ACCEPTANCE",
+        "evidence_directory": "browser-rollback-sprint-20261022-115029-d89e262b/drawn-reference-two-tick-clock-reducer-v1",
+        "freeze": {
+          "path": "freeze-v1.json",
+          "bytes": 3187,
+          "sha256": "b7c62063987b2dec140f7c46819e8510861b0d815c3e82dc6605ac792eb21980"
+        },
+        "results": {
+          "path": "results-v1.json",
+          "bytes": 4504,
+          "sha256": "4ed5d995b9dbfc198ef54ee5ff3910ecdff4cc3b8521c195063a138c17b4c61b"
+        },
+        "root_review": {
+          "path": "root-review-v1.json",
+          "bytes": 790,
+          "sha256": "7fe289991fd10e48f0774da1150d77cd49a3c2654b565c4c04d05ded79e4dda1"
+        },
+        "review_status": "ACCEPT_SCOPED_ACTUAL_SOURCE_REJECTION",
+        "cases": [
+          {
+            "case": "one_tick_positive",
+            "ticks": 1,
+            "reference_presents": 1,
+            "replay_presents": 1,
+            "expected_clock": 21,
+            "actual_clock": 21,
+            "strict_match": 1,
+            "other_clock_fields_equal": true,
+            "cadence_and_flow_equal": true
+          },
+          {
+            "case": "two_tick_strict_counter_rejection",
+            "ticks": 2,
+            "reference_presents": 2,
+            "replay_presents": 1,
+            "expected_clock": 22,
+            "actual_clock": 21,
+            "strict_match": 0,
+            "other_clock_fields_equal": true,
+            "cadence_and_flow_equal": true
+          },
+          {
+            "case": "saturation_no_increment",
+            "strict_match": 1
+          },
+          {
+            "case": "missing_and_duplicate_present",
+            "strict_match": 0
+          },
+          {
+            "case": "callback_inflight_and_retired_recreated_owner",
+            "refuse_without_writes": true
+          }
+        ],
+        "actual_source_scope": "Actual typed clock and flow bodies, cadence body and production bootstrap ownership predicate; inherited SDK/frame/service leaves are modeled. No HSD fighter scheduler, literal sample300 PAD/PCM, or actual gameplay replay.",
+        "interpretation_limit": "This proves the strict comparator rejects the specified two-tick present-clock mismatch. It is a reduced expected-rejection result, not a two-tick rollback or gameplay pass.",
+        "next_review": "Implementation-ready profile-only logical-frame contract review, preserving vanilla andstrictclock comparisons; noimplementation/capture release."
+      }
     }
   }
 }
