@@ -114,38 +114,95 @@ and production-path-control findings; all failed controls remain retained.
 
 ### Source-main-heap live-payload component
 
-The reviewed three-file source-main-heap candidate has been applied and its
-focused component controls pass. It snapshots exact live `OSAllocFromHeap`
-payload bytes tracked by the existing owner ledger, inside the observed 32 MiB
-gameplay arena. The candidate review, exact application, focused controls and both Release
-builds pass. Full regression v6 also passes; its exact log and result summary are
-pinned in the structured receipt. Final exact-head CI remains pending. Earlier
-failed compile and sanitizer-control attempts remain retained with the candidate
-freeze. This component does not restore allocation topology, explain the
-source-step bytes outside the arena, admit aggregate state, or authorize a
-same-browser restore. Plan v2 (`e551360520b99054508046b9bdeb679ad6103c2ec6e13ede0c90fb3fdd16616c`)
-was the prior read-only plan; plan v1 (`eb2f1579608eaf045d7aac7c19fc7ba7dd7cabb36bf2eadd99222f50e642f1e3`) remains preserved.
+The reviewed three-file source-main-heap candidate is applied. It snapshots exact
+live `OSAllocFromHeap` payload bytes tracked by the existing owner ledger, inside
+the observed 32 MiB gameplay arena. The candidate, focused controls, both
+Release builds and full regression v6 passed. It does not restore allocation
+topology, explain the source-step bytes outside the arena, admit aggregate state,
+or authorize a same-browser restore. Plan v2
+(`e551360520b99054508046b9bdeb679ad6103c2ec6e13ede0c90fb3fdd16616c`) remains
+the current read-only plan; plan v1
+(`eb2f1579608eaf045d7aac7c19fc7ba7dd7cabb36bf2eadd99222f50e642f1e3`) remains
+preserved.
 
-The default-off single-stage arena owner diagnostic is now linked only into its
-private combined Release profile; ordinary Release confirms that its query and
-storage are absent. Focused selected-trace controls and both builds pass on local
-source checkpoint `853aae6f` (tree `35a2fe2f`). In the separately reviewed,
-read-only sample-300 browser census, the exact stage owner remained stable across
-three boundaries with 25 allocations totaling 5,028 bytes. None overlapped the
-90,875 source-step or 765,912 actual-draw/quiescence net changed-byte observations.
-The 96-byte diagnostic storage row is excluded metadata, not stage payload. The
-source-state manifest is incomplete, all observed ranges remain unadmitted, and
-no state was restored. Full unittest discovery on this exact commit passes 2,455
-tests with 165 skips (552.243 seconds); exact-head CI is pending. Raw capture,
-independent review, runtime retention and validation hashes are in the structured
-receipt under `same_instance_browser_restore_341.single_stage_arena_owner_census_v6`
-and the named run `browser-write-census-v6/`. The zero-overlap result stops
-further allocation-owner expansion. The next reviewed design permits only an
-external, opt-in source-payload admission dry run across the actual tick and
-draw, using existing capture/admit/destroy APIs and never restoring. Unknown
-simulation dependencies and external effects remain blockers. Earlier
-`bd7a393d` CI completed all 14 checks (12 successes, two expected skips); it
-does not certify this later source or documentation head.
+The V4 payload-admission runner/report integration is a historical pre-repair
+result: it passed 38 Node controls and the full 2,456-test regression with 165
+skips in 549.465 seconds on clean head ef95e9b1 / tree 481b68ab. It reused the
+native Release outputs built at f101c8c7 with the reviewed V3 candidate. The
+later descriptor repair changes that producer identity and must not inherit
+those runtime hashes or the V4 pass.
+
+The first released payload-admission dry run (V1) warmed 300 rendered samples
+and stopped at sample 299/source frame 176 when CAPTURE returned 517. It did not
+run the sample-300 step or actual draw, enumerate owner rows, allocate the
+payload snapshot or restore memory. The V4 consumer expected byteSize ==
+sizeof(header) (120 bytes), while the valid schema-5 producer extent includes
+frame and submission rows and is 2,200 bytes at active counts 4/4. This was a
+consumer size-check defect; the raw 517 does not show whether the runtime
+descriptor pointer was null. Root reviewed and applied the minimal three-file
+correction: canonical uint64 extent arithmetic and the producer's pure size
+query now check offsets, strides, counts, zero and overflow before snapshot
+work. The actual-producer controls passed 40 scenarios plus pthread. The old
+five-file runtime producer, failed evidence, screenshot and scratch remain
+retained; all ten recorded owned PIDs are independently absent. That V1
+attempt's CLOSE returned 517; snapshotClose and rendererShutdown separately
+returned 1. The V1 refusal has no sample-300 result; its producer and failure
+remain historical.
+
+The first integration of the descriptor repair passed its focused native
+controls and both Release builds, then full regression stopped at 2,456 tests
+and 165 skips with one unrelated diagnostics quota assertion: the second valid
+report returned 201 where the test expected 429 (log SHA-256
+b77723d55104537e1557e65ec113d44c78cabb33cda02434ab59deaeae5e9f2b). The
+worker uses a Date.now() minute bucket, but the retained failure has no call
+timestamps, so a minute-boundary crossing remains a hypothesis. Root approved
+a one-file test-only candidate that pins the clock in both quota tests and
+asserts same-minute 201/429 plus the next-minute 201. Its focused real-worker,
+SQLite-backed controls pass 2/2, and focused checked-out diagnostics discovery
+passed one test in 5.193 seconds (log SHA-256 8a5ebb42fe69e78222c76332c25335d806d59f569b53e6d13f913848330d597a).
+The exact test file SHA-256 7284201f6d6bb167e3d6cb935f6e776b0e4e7acfe08322fb22812d37be65fefa matches both the approved frozen candidate
+and the clean source commit. Final integration passed both Release builds and
+full regression: 2,456 tests, 165 skips, 540.336 seconds (log SHA-256
+92ff9bbe348693553649737e792cb8629da5248bcfade2c93923346e6d4c3e98). The clean source is
+7e4fe7817966e3f094cd573dfa9d8541cba1a815 / tree 05f4462bbe4d0ad720429539ded5f35be0d378c2. The native binaries were
+built at ef95 plus the exact reviewed three-file descriptor repair; the final
+commit adds only the quota-test change after builds. The current runtime
+inventory binds 15 files; the old V3 output hashes were verified against the
+V3 checkpoint, with 11 identical and four changed outputs (private browser
+Wasm/map/source-state manifest and ordinary runtime Wasm).
+
+Root released one V2 attempt against the repaired descriptor-size producer.
+It completed the 300-drawn-sample prefix, retained sample-299/source-frame-176
+checkpoint, then ran the exact literal sample-300 PAD and one source step to
+frame 177. Runner commands 1, 2 and 4 performed the three payload admissions:
+CAPTURE plus immediate admission, sample-300 STEP_AND_ADMIT, and POSTDRAW_ADMIT
+after the actual draw and GPU/transfer quiescence. Command 3 was DRAW_ONCE and
+shutdown command 5 was CLOSE. All command results were zero; CLOSE returned 0,
+snapshotClose and rendererShutdown returned 1. Root independently verified all
+12 recorded PIDs absent. No restore was called.
+
+The raw report remains `incomplete`: the source-state manifest does not cover
+complete game state, `ownerRestoreAdmission` is false, and all changed ranges
+remain unadmitted. The payload snapshot capture explicitly allocates diagnostic
+storage, so this run's heap deltas are not natural source/draw attribution and
+are not compared as progress. A bounded comparison to the earlier census-v6
+run finds exact equality in initial and sample-300 observation/PCM hashes, the
+sample-300 PAD, boundary, draw diagnostics, selected fighter paths and GPU
+status. Their source trees, generated JavaScript/Wasm and manifests differ, so
+this is fixture-output equality only; it proves neither source neutrality nor
+original-game parity. The sample screenshot retains the known magenta/texture
+artifacts. The raw report, independent review, root release, asset-hash review
+and exact five-file runtime retention are indexed in the structured receipt.
+After independent review, root rechecked the 12 recorded PIDs and removed only the
+empty successful V2 scratch directory. The cleanup receipt is pinned in the
+structured evidence; failed evidence and retained artifacts remain preserved.
+There is no aggregate restore, C3 or whole-session claim.
+
+The next bounded source boundary is a source-clock capture/admit/destroy companion
+attached to the existing flow checkpoint. It is limited to the named source-clock
+owner and focused actual-source controls; source tick/draw behavior is unchanged,
+and no owner census, restore, export or browser run is included. Stop if source-clock ownership or its
+exact capture extent cannot be confirmed without widening the boundary.
 
 ## First current-source copy/restore result
 

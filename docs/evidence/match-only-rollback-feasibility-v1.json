@@ -2596,7 +2596,7 @@
       "retained_artifact": "census-owner-gap-analysis-v1.json",
       "sha256": "9908b8d2ebb8aeeb64d8df4dcdeb24ea0f16f55bab3d17e1f847c679f90ba370"
     },
-    "next_experiment": "Stop allocation-owner expansion after the stage-owner hypothesis was falsified. The accepted source-only design v2 permits only an external candidate and focused controls for one typed source-payload admission dry run across actual sample300 and draw. It never restores, admits other owners or closes unknown simulation dependencies. Application and capture need separate review; preserve every unknown/unadmitted census observation.",
+    "next_experiment": "The next bounded source boundary is one source-clock capture/admit/destroy companion attached to the existing flow checkpoint. It is limited to the named source clock owner and its focused actual-source controls. It changes no source tick/draw behavior and adds no owner census, restore, export, browser run, build, or full regression; stop if the clock ownership or exact capture extent cannot be confirmed without broadening scope.",
     "owner_components": {
       "scope": "Private owner components only; no browser restore exposure or complete-world claim",
       "current_files_sha256": {
@@ -3554,7 +3554,7 @@
       }
     },
     "source_main_heap_payload_checkpoint_v1": {
-      "status": "FOCUSED_AND_BOTH_RELEASE_BUILDS_PASS_FULL_REGRESSION_PASS_CI_PENDING",
+      "status": "V4_RUNNER_INTEGRATION_PASS; V1_CAPTURE_REFUSED; V2_OWNER_LOCAL_ADMISSION_PASS; AGGREGATE_CENSUS_INCOMPLETE; RESTORE_NOT_ADMITTED",
       "scope": "Exact live source-main-heap OSAllocFromHeap payload bytes within the observed 32 MiB gameplay arena. The candidate does not explain the v5 46,400 unmapped source-step bytes outside the arena, does not restore allocation topology, and does not admit browser or aggregate restore.",
       "contract": {
         "retained_artifact": "source-main-heap-payload-contract-v2.json",
@@ -3636,183 +3636,780 @@
         "result_artifact": "source-main-heap-payload-candidate-v1/controls-sanitized-v3/run.result.json",
         "sha256": "e0f1948e59c911fee3e4b7c26c2db79ba8350db736dfcf8c63064cf5cf8fd01f"
       },
-      "next_gate": "Focused component controls, private and ordinary Release builds, and full regression v6 pass. Final exact-head CI remains pending. No browser restore or aggregate admission is authorized by this component."
+      "next_gate": "The root-released V2 dry run completed the owner-local payload snapshot capture/admission sequence through the exact sample-300 source step and post-draw check. The report remains aggregate-incomplete: source-state coverage and owner restore admission are false, and all changed ranges remain unadmitted. The capture allocates diagnostic snapshot storage, so its heap-change totals are not natural census attribution. No restore or aggregate admission follows.",
+      "integration_v4": {
+        "candidate_freeze": {
+          "retained_artifact": "source-payload-admission-candidate-v4/freeze-v4-final.json",
+          "bytes": 1784,
+          "sha256": "dbddf57f2d13d1aad3e8655578bd9ed80a54b536fde5ff82e01ce18f7cf1816e"
+        },
+        "independent_review": {
+          "retained_artifact": "source-payload-admission-independent-review-v4.json",
+          "bytes": 2115,
+          "sha256": "ce235a82b97d694c9c79dfa04f8004b6498e207bf8af83da95a2733bca6d7465"
+        },
+        "application_receipt": {
+          "retained_artifact": "source-payload-admission-integration-v4/application-v1.json",
+          "bytes": 1209,
+          "sha256": "31cb690c465133d9bff433562e78a4d001ab8350b0a6c151ff0282c8fc1a0246"
+        },
+        "final_integration": {
+          "retained_artifact": "source-payload-admission-integration-v4/final-integration-v1.json",
+          "bytes": 12231,
+          "sha256": "00b6005dd66e91fad01c937d2b60381e5573f1cfc568f3bed840a086414b8b67"
+        },
+        "source": {
+          "head": "ef95e9b15887013866b567a5a2b8de0a6dcaa2d5",
+          "tree": "481b68ab859a4d3bdfbe7f7ec7fe91dccf8f98aa",
+          "clean_worktree": true,
+          "pushed": false,
+          "exact_head_ci": "NOT_RUN"
+        },
+        "focused_node_contract": {
+          "result": "PASS",
+          "tests": 38,
+          "log": {
+            "retained_artifact": "source-payload-admission-integration-v4/logs/node-contract-checkout-v4.log",
+            "bytes": 9341,
+            "sha256": "7df62bc96fc999d3934104a36450b5bf9aa424ed167f840af1b6e86fe0f26fed"
+          }
+        },
+        "full_regression": {
+          "result": "PASS",
+          "tests": 2456,
+          "skipped": 165,
+          "duration_seconds": 549.465,
+          "log": {
+            "retained_artifact": "source-payload-admission-integration-v4/logs/full-unittest-v4.log",
+            "bytes": 465093,
+            "sha256": "e2b13e38c4aaf3256938b29d82158468d956983ca3dcbb2f67cab3afc33b5f76"
+          }
+        },
+        "native_release_builds": {
+          "status": "INHERITED_V3_OUTPUTS_REVERIFIED_BYTE_IDENTICAL_IN_V4",
+          "build_base": "f101c8c744a1834c96371894feac33f46aa7368e",
+          "v3_build_checkpoint": {
+            "retained_artifact": "source-payload-admission-integration-v3/integration-artifact-checkpoint-v2.json",
+            "bytes": 11988,
+            "sha256": "b7d9d49763392d499d6922b74a75ea257be6438ce54bd6f8f295c9191fd24227"
+          },
+          "v4_reverification_receipt": {
+            "retained_artifact": "source-payload-admission-integration-v4/final-integration-v1.json",
+            "bytes": 12231,
+            "sha256": "00b6005dd66e91fad01c937d2b60381e5573f1cfc568f3bed840a086414b8b67"
+          },
+          "scope": "V4 changed runner/report/test JavaScript only; native Release outputs were reused and verified against the V3 checkpoint, with no native rebuild."
+        },
+        "current_exact_head_ci": {
+          "head": "ef95e9b15887013866b567a5a2b8de0a6dcaa2d5",
+          "tree": "481b68ab859a4d3bdfbe7f7ec7fe91dccf8f98aa",
+          "pushed": false,
+          "run_status": "NOT_RUN"
+        },
+        "prior_exact_head_ci": [
+          {
+            "head": "f101c8c744a1834c96371894feac33f46aa7368e",
+            "checks": 14,
+            "successes": 12,
+            "expected_skips": 2,
+            "retained_receipt": {
+              "retained_artifact": "checkpoint-ci-f101-v1.json",
+              "bytes": 50408,
+              "sha256": "7d762616cc28900106b3bf0d21d7174e9cefb4a4d1acbfb7dd7d55a00149de8e"
+            }
+          },
+          {
+            "head": "c28bbe5f20e501961a28f2562c05f12887e6e77c",
+            "checks": 14,
+            "successes": 12,
+            "expected_skips": 2,
+            "retained_receipt": {
+              "retained_artifact": "checkpoint-ci-c28-v1.json",
+              "bytes": 50407,
+              "sha256": "0aefb3f8a1fe9b5b4b0d7477207eedfbd20884bffb421115c4e9a75a1eb1a5a8"
+            }
+          },
+          {
+            "head": "bd7a393d853b6f2359256a8366e303e1061d0d53",
+            "checks": 14,
+            "successes": 12,
+            "expected_skips": 2,
+            "retained_receipt": {
+              "retained_artifact": "checkpoint-ci-bd7a-v1.json",
+              "bytes": 5889,
+              "sha256": "d930748134362f59d241f17620372c1e5a8df85b9a4eb6199618ea9953107305"
+            }
+          }
+        ]
+      }
     },
-    "single_stage_arena_owner_census_v6": {
-      "status": "CAPTURE_COMPLETED_STAGE_OWNER_ZERO_OVERLAP_INVENTORY_INCOMPLETE",
-      "scope": "One read-only sample-300 drawn-browser census of the exact stage-arena allocation owner; no memory restore and no range admitted.",
+    "source_payload_admission_dry_run_v1": {
+      "status": "FAILED_V1_CAPTURE_517; DESCRIPTOR_AND_QUOTA_REPAIRS_INTEGRATED; V2_CANDIDATE_PENDING_REVIEW_AND_RELEASE",
+      "scope": "One released rendered-browser payload-admission dry run. It stopped at the first CAPTURE refusal; it did not reach the sample-300 source step or actual draw, and did not capture payload bytes or restore memory.",
       "producer": {
-        "commit": "853aae6f36608bd62a4eeb1d2594985178625a38",
-        "tree": "35a2fe2fcc8f231d9ea94d5efca37559b3feda66",
+        "source_head": "ef95e9b15887013866b567a5a2b8de0a6dcaa2d5",
+        "source_tree": "481b68ab859a4d3bdfbe7f7ec7fe91dccf8f98aa",
+        "clean_worktree": true,
+        "pushed": false,
         "integration_receipt": {
-          "retained_artifact": "single-stage-arena-build-opt-in-integration-v1/integration-receipt-v1.json",
-          "sha256": "0b7b9f48f77e8ad9a32bd670ed2773bc34b34637ded84f822421d9fdd63cea6c"
+          "retained_artifact": "source-payload-admission-integration-v4/final-integration-v1.json",
+          "bytes": 12231,
+          "sha256": "00b6005dd66e91fad01c937d2b60381e5573f1cfc568f3bed840a086414b8b67"
         },
-        "retained_runtime": {
-          "retained_artifact": "retained-census-v6-producer/retention.json",
-          "sha256": "092ae2d7888da6f65e20b944ae10a214105ade4244f7f9e8d8047895f1c691bc"
+        "runtime_sha256": {
+          "gameplay_slippi_synctest_browser.mjs": "fe169a23833506622c6b830f570a9ea8d3ca24d407ccd2b6c68b2a60c19974f8",
+          "gameplay_slippi_synctest_browser.wasm": "ce9c9c3881903252125bc0e780e83b942a475fa8fae9ed9ee991cc5c8011e6c7",
+          "gameplay_slippi_synctest_browser.data": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c"
+        },
+        "source_state_manifest_sha256": "1b6d34328688b45034b843ea57b982689a953fde3de4771b2382553e732e3513",
+        "harness_sha256": {
+          "run_write_census.mjs": "c0e1c078272d92292e83cfe76227b200bb01a8fb131ba42ceeb239068e33423a",
+          "run_synctest.mjs": "55ef094203b33e0b98697cb424fc00562a9a58e5bd2089b4786656e69b2c55a5",
+          "synctest_browser.cpp": "82350ffd39f23fe7c2fa2c2ff54f11026f05b6f7ae9521b31fc21dae8b34081e",
+          "test_write_census_contract.mjs": "18d4a235a9fedb94f61886c1b8ebe46ce6deb047719306c3becc2743732a45e2"
+        },
+        "native_build_lineage": {
+          "base_head": "f101c8c744a1834c96371894feac33f46aa7368e",
+          "builds": "V3 native Release outputs; V4 final integration reverified these exact outputs unchanged.",
+          "v3_artifact_checkpoint": {
+            "retained_artifact": "source-payload-admission-integration-v3/integration-artifact-checkpoint-v2.json",
+            "bytes": 11988,
+            "sha256": "b7d9d49763392d499d6922b74a75ea257be6438ce54bd6f8f295c9191fd24227"
+          },
+          "v4_integration_receipt": {
+            "retained_artifact": "source-payload-admission-integration-v4/final-integration-v1.json",
+            "bytes": 12231,
+            "sha256": "00b6005dd66e91fad01c937d2b60381e5573f1cfc568f3bed840a086414b8b67"
+          }
         }
-      },
-      "runtime_sha256": {
-        "gameplay_slippi_synctest_browser.mjs": "597831def04d62de1639413cda1094a61955edee9410bf9da932514a9449e28c",
-        "gameplay_slippi_synctest_browser.wasm": "35c44c4f0fd8998c2b1cb51d6c13716c30cab492a5a94f0ef3c3aa121a3e197f",
-        "gameplay_slippi_synctest_browser.data": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c",
-        "source_state_manifest_sha256": "1731268b4043a704506397d0c2a79cff7a8f9a4a79c7b7141da81f453dbc9d22",
-        "link_map_sha256": "21713698e463c85a7f925af916045f6757a9a346d31cadf27128fd7c64fd30de"
-      },
-      "source_state_manifest": {
-        "retained_artifact": "retained-census-v6-producer/gameplay_slippi_synctest_browser.source-state.json",
-        "complete_game_state": false,
-        "counts": {
-          "mutable_input_sections": 3135,
-          "source_c_candidates": 2051,
-          "excluded_mutable_input_sections": 1084
-        }
-      },
-      "diagnostic_build": {
-        "focused_controls": {
-          "status": "PASS",
-          "tests": 20,
-          "retained_artifact": "single-stage-arena-build-opt-in-integration-v1/focused.log",
-          "sha256": "18c7346acd534eca63ab690a6f5b7b051c2fd45e4725d061317e5cd585cbe53d"
-        },
-        "combined_private_release": {
-          "status": "PASS",
-          "command": "build.py --trace-target gameplay_slippi_synctest --configuration Release --aurora-staging-shadow-diagnostic --stage-arena-owner-diagnostic",
-          "browser_wasm_sha256": "35c44c4f0fd8998c2b1cb51d6c13716c30cab492a5a94f0ef3c3aa121a3e197f",
-          "query_export": "melee_web_synctest_stage_arena_inventory_query"
-        },
-        "diagnostic_storage": {
-          "symbol": "melee_web_synctest_stage_arena_diagnostic_storage",
-          "bytes": 96,
-          "manifest_decision": "excluded",
-          "reason": "not-a-known-source-archive-member"
-        },
-        "ordinary_release": {
-          "status": "PASS",
-          "stage_option": "OFF",
-          "query_and_storage_absent": true
-        }
-      },
-      "capture": {
-        "retained_artifact": "browser-write-census-v6/runner/evidence.json",
-        "sha256": "5faf0e790a7df3a94110c267040422121d36dcfa1166cda1ab4036a2adf3e1c5",
-        "preflight": {
-          "retained_artifact": "browser-write-census-v6/preflight.json",
-          "sha256": "f88efcb547433c6557a28bd6ebb940689785c04956ba8cf76ce10fd9c316b1c7"
-        },
-        "owner": {
-          "retained_artifact": "browser-write-census-v6/owner.json",
-          "sha256": "38e84a22998b33f389c2b6f20be2f7812ca1b2dd42a82cb4469c869a94f22104"
-        },
-        "source_review": {
-          "retained_artifact": "single-stage-arena-observer-source-review-v2.json",
-          "sha256": "7899436b2bc78c6be0901b0a0d57ab31b23dabe26ffeb6656ba60048e2daf553"
-        },
-        "independent_result_review": {
-          "retained_artifact": "browser-write-census-v6/independent-result-review-v1.json",
-          "sha256": "433c6b96e02fd826b33cb03dd44ab2f389f619835cdf7a51e3fa5fd6acc25528"
-        },
-        "root_result_review": {
-          "retained_artifact": "browser-write-census-v6/root-result-review-v1.json",
-          "sha256": "df0001dd204b7fbd8e77f7184dd6bebf9803e963100e0073ec2748dd24b16ccf"
-        }
-      },
-      "input": {
-        "sample": 300,
-        "raw_pad_bytes": 44,
-        "raw_pad_sha256": "46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288",
-        "warm_prefix_samples": 300
-      },
-      "stage_arena_owner": {
-        "boundaries": [
-          "before-source-step",
-          "after-source-step",
-          "after-actual-draw-and-Aurora-quiescence"
-        ],
-        "stable_allocation_count": 25,
-        "stable_extent_bytes": 5028,
-        "identity_and_lifetime_stable": true,
-        "source_step_changed_range_overlap_bytes": 0,
-        "actual_draw_changed_range_overlap_bytes": 0
       },
       "observed": {
-        "source_step_net_changed_byte_observations": 90875,
-        "actual_draw_and_quiescence_net_changed_byte_observations": 765912,
-        "unmapped_source_step_byte_observations": 48854,
-        "unmapped_actual_draw_byte_observations": 302822,
-        "count_basis": "Net changed bytes per transition; this is not a unique state size, and the same address may count in both transitions.",
+        "warm_prefix_samples": 300,
+        "checkpoint_sample": 299,
+        "checkpoint_source_frame": 176,
+        "native_transfer_quiescence_before_step": "PASS",
+        "first_command": {
+          "ordinal": 1,
+          "name": "CAPTURE",
+          "result": "RETURNED_NONZERO",
+          "code": 517
+        },
+        "root_observation": "The run stopped at the Aurora descriptor gate with CAPTURE return 517. It did not record whether the runtime observer returned a null or nonnull pointer; source inspection later identified the pinned consumer size-check mismatch.",
+        "source_step_300_reached": false,
+        "actual_draw_after_step_reached": false,
+        "sample300_observation_present": false,
+        "audio_owner_rows_returned": 0,
+        "match_context_owner_rows_returned": 0,
+        "aurora_staging_shadow_owner_rows_returned": 0,
+        "stage_arena_owner_rows_returned": 0,
+        "payload_storage_allocated": false,
+        "restore_called": false,
+        "complete_game_state": false
+      },
+      "cleanup": {
+        "owner_result": "FAIL_CAPTURE_AND_CLOSE; process cleanup passed",
+        "capture_exit_code": 1,
+        "owner_process_observation_passed": true,
+        "recorded_owned_pid_count": 10,
+        "all_recorded_owned_pids_independently_absent": true,
+        "payload_admission_close": {
+          "status": "FAILED_RETURNED_NONZERO",
+          "code": 517
+        },
+        "snapshot_close": {
+          "status": "CHECKED_RETURN_ONE",
+          "code": 1
+        },
+        "renderer_shutdown": {
+          "status": "CHECKED_RETURN_ONE",
+          "code": 1
+        },
+        "renderer_closed": false,
+        "screenshot": {
+          "retained_artifact": "source-payload-admission-dry-run-v1/runner/browser-warm-prefix-sample-299.png",
+          "bytes": 306885,
+          "sha256": "820502e46a32f1bb68e8463872aeabd17de34dd1295d408157e62a3780798e86",
+          "visual": "Known magenta/texture artifacts remain; no pixel-accuracy acceptance."
+        },
+        "failed_scratch_and_logs_retained": true
+      },
+      "retained_artifacts": {
+        "raw_runner_evidence": {
+          "retained_artifact": "source-payload-admission-dry-run-v1/runner/evidence.json",
+          "bytes": 381693,
+          "sha256": "212bc5bda23a04aec10f9a73ef90cfd32b0be8a1949a8dd591e017b815a510f4"
+        },
+        "owner_report": {
+          "retained_artifact": "source-payload-admission-dry-run-v1/owner.json",
+          "bytes": 88978,
+          "sha256": "acd84e64ff7957a9009fa357f73155baf9156d687addfc76e6135f43c4802164"
+        },
+        "preflight": {
+          "retained_artifact": "source-payload-admission-dry-run-v1/preflight.json",
+          "bytes": 24546,
+          "sha256": "d47124c987727a65def65ebdd8550b773cdf2bbc328b53c4737bdbfa658448c3"
+        },
+        "root_result_observation": {
+          "retained_artifact": "source-payload-admission-dry-run-v1/root-result-observation-v1.json",
+          "bytes": 290819,
+          "sha256": "949c9677c6573e3424fa54213ab1c9496baf08bc7fb488972f7e1a40f5be3195"
+        },
+        "runner_log": {
+          "retained_artifact": "source-payload-admission-dry-run-v1/runner.log",
+          "bytes": 606,
+          "sha256": "9c48b4eae5250fe4b0a31cb7d152f7f7574eddbc927ebeaeea07da9a2b844bda"
+        },
+        "process_trace": {
+          "retained_artifact": "source-payload-admission-dry-run-v1/processes.jsonl",
+          "bytes": 66748,
+          "sha256": "1f96aa248fac3d5a99977ca26743999a2bb1738a88f58485deea46e4048c6455"
+        },
+        "screenshot": {
+          "retained_artifact": "source-payload-admission-dry-run-v1/runner/browser-warm-prefix-sample-299.png",
+          "bytes": 306885,
+          "sha256": "820502e46a32f1bb68e8463872aeabd17de34dd1295d408157e62a3780798e86"
+        },
+        "failed_runtime_producer_retention": {
+          "retained_artifact": "source-payload-admission-dry-run-v1/retained-runtime-producer/retention.json",
+          "bytes": 5275,
+          "sha256": "2b6a2e911ac84315a3db1c7253e405ac2049bb4f5efec565e9a09690d3648014"
+        }
+      },
+      "next": "The V1 CAPTURE refusal and producer remain historical. The separate root-released V2 attempt is recorded in source_payload_admission_dry_run_v2 below: its owner-local capture/admission sequence completed, while the aggregate census remains incomplete and no restore is admitted.",
+      "source_diagnosis": {
+        "status": "REVIEWED_THREE_FILE_REPAIR_APPLIED; FOCUSED_CONTROLS_AND_RELEASE_BUILDS_PASS; FULL_REGRESSION_PASS",
+        "finding": "The V4 consumer required byteSize to equal the 120-byte header. The schema-5 producer extent includes header and active frame/submission rows; counts 4/4 produce a valid 2,200-byte extent. The old equality rejected valid nonempty descriptors.",
+        "repair": "Use the producer's total extent with canonical uint64 arithmetic and a pure size query; validate offsets, strides, count agreement, zero and overflow before snapshot work. Source/input/draw/order, Asyncify, GPU completion, latch and cleanup behavior remain unchanged; no restore export was added.",
+        "raw_result_limit": "The retained CAPTURE 517 does not prove whether the runtime descriptor pointer was null or nonnull.",
+        "review": {
+          "artifact": "payload-aurora-descriptor-repair-root-review-v1.json",
+          "sha256": "8b4b4aed43d344bde4a4a887f1c4ed0c25facdb1a1f094d238166d9c0d2278db",
+          "verdict": "APPROVE_BOUNDED_APPLICATION_AND_VALIDATION"
+        },
+        "candidate_freeze": {
+          "artifact": "payload-aurora-descriptor-repair-candidate-v1/freeze-v1.json",
+          "sha256": "b0aa386367e4c3f5fbd740d646e7170a8cfdd3b8801aa25413f29926c493946e"
+        },
+        "application": {
+          "artifact": "payload-aurora-descriptor-repair-integration-v2/final-integration-v1.json",
+          "sha256": "f092802b6c21a643e0e5a5b1feb24c6e1a05c6d366efb54574e7d5a3d3298a65",
+          "source_head": "7e4fe7817966e3f094cd573dfa9d8541cba1a815",
+          "source_tree": "05f4462bbe4d0ad720429539ded5f35be0d378c2",
+          "native_build_base": "ef95e9b15887013866b567a5a2b8de0a6dcaa2d5",
+          "native_build_worktree": "ef95 plus exact reviewed three-file repair, uncommitted",
+          "quota_test_file_sha256": "7284201f6d6bb167e3d6cb935f6e776b0e4e7acfe08322fb22812d37be65fefa",
+          "build_identity_note": "Native builds ran once at ef95 plus three reviewed dirty ABI/control files. The later fourth file changes diagnostics tests only; no native rebuild occurred. Final commit contains identical native/CMake source bytes plus test-only quota repair. Embedded/generated build git metadata remains untouched."
+        }
+      },
+      "failed_integration": {
+        "artifact": "payload-aurora-descriptor-repair-integration-v1/integration-result-v1.json",
+        "sha256": "9e14aeae2e2e42a70dd2c0c71968384ea2592c8227133facd07c6086f8e12ea8",
+        "builds": "Private and ordinary Release builds passed; focused native controls passed.",
+        "full_regression": {
+          "result": "FAIL",
+          "tests": 2456,
+          "skipped": 165,
+          "failures": 1,
+          "duration_seconds": 545.706,
+          "log_sha256": "b77723d55104537e1557e65ec113d44c78cabb33cda02434ab59deaeae5e9f2b",
+          "failure": "diagnostics/tests/worker_test.mjs expected 429 from the second valid report, observed 201."
+        },
+        "quota_failure_cause": "Not established; the log contains no timestamp evidence."
+      },
+      "quota_test_repair": {
+        "status": "EXACT_ROOT_APPROVED_PATCH_APPLIED; FOCUSED_CHECKOUT_PASS; FULL_REGRESSION_PASS",
+        "freeze": "diagnostics-quota-boundary-reduction-v1/freeze.json",
+        "freeze_sha256": "5f15f511a0dec157f94bc0d9f957287ed0231274d8bb05dc43ef13d9da90bf31",
+        "patch": "diagnostics-quota-boundary-reduction-v1/candidate.patch",
+        "patch_sha256": "a0a68823ded3e5da39d5e300244c991407c2552f2776024cfb880e9a9dbd15a8",
+        "focused_log": "diagnostics-quota-boundary-reduction-v1/reduced-focused.log",
+        "focused_log_sha256": "30efd9f58a550a88bd22ee9b534869545145d4de8fb08105249f229dfaab28d9",
+        "focused_result": "2/2 PASS against the unchanged worker and real SQLite.",
+        "change": "The two rate-cap tests mock Date.now through node:test t.mock.method, automatically restoring it at test completion. The first asserts a same-minute 201 then 429 and a 201 at the exact next-minute boundary. No production quota logic or 429 assertion changes.",
+        "historical_cause_limit": "Minute-boundary crossing is plausible from the worker's Date.now bucket calculation but is not proven to have caused the retained failure.",
+        "checkout_application": {
+          "checkout_head_before_final_integration": "ef95e9b15887013866b567a5a2b8de0a6dcaa2d5",
+          "path": "diagnostics/tests/worker_test.mjs",
+          "sha256": "7284201f6d6bb167e3d6cb935f6e776b0e4e7acfe08322fb22812d37be65fefa",
+          "matches_frozen_candidate": true,
+          "commit_assigned": false,
+          "validation_pending": [],
+          "final_integration": {
+            "path": "payload-aurora-descriptor-repair-integration-v2/final-integration-v1.json",
+            "sha256": "f092802b6c21a643e0e5a5b1feb24c6e1a05c6d366efb54574e7d5a3d3298a65",
+            "full_regression": "PASS",
+            "focused_diagnostics_log_sha256": "8a5ebb42fe69e78222c76332c25335d806d59f569b53e6d13f913848330d597a"
+          }
+        }
+      },
+      "next_packet_refresh": {
+        "draft": "source-payload-admission-dry-run-v2/packet-candidate-v1.json",
+        "preflight_candidate": "source-payload-admission-dry-run-v2/preflight-candidate-v1.json",
+        "status": "ROOT_RELEASED_SINGLE_ATTEMPT_COMPLETED; OWNER_LOCAL_PASS; AGGREGATE_CENSUS_INCOMPLETE; NO_RETRY",
+        "preflight_candidate_sha256": "8c85427cc0e41014e6be6e51f3facb5eebccff9e6277bbc9404646b1e40bf073",
+        "protocol": "One exact 300-drawn-sample prefix; command 1 CAPTURE plus immediate admission; command 2 sample-300 source step plus admission; command 3 actual draw; command 4 post-draw admission after GPU/transfer quiescence; command 5 CLOSE. The three admissions are commands 1, 2 and 4. 180,000 ms overall with 30,000 ms cleanup reserve. No restore or owner expansion.",
+        "producer_identity": "Current clean source is 7e4fe781/tree 05f4462b. Native products were built at ef95 plus the exact three reviewed descriptor files; final commit adds only the separate quota-test file after builds. The current runtime inventory is pinned independently; old V3 and failed V1 artifacts remain historical.",
+        "launch_authorized": true,
+        "capture_attempts_allowed": 1,
+        "capture_attempts_completed": 1,
+        "root_release_sha256": "5610643ae9b6c63c2881ccb99a476f77ba976b7f4c8fc0bf0971f52ee48a8446",
+        "raw_result_sha256": "929f0496285d87224fd2f68cb24b1cfec6f5410e71bc662673fc074497456f3a"
+      },
+      "current_integration": {
+        "receipt": "payload-aurora-descriptor-repair-integration-v2/final-integration-v1.json",
+        "receipt_sha256": "f092802b6c21a643e0e5a5b1feb24c6e1a05c6d366efb54574e7d5a3d3298a65",
+        "source_head": "7e4fe7817966e3f094cd573dfa9d8541cba1a815",
+        "source_tree": "05f4462bbe4d0ad720429539ded5f35be0d378c2",
+        "clean": true,
+        "build_source_identity": {
+          "base_head": "ef95e9b15887013866b567a5a2b8de0a6dcaa2d5",
+          "worktree_at_build": "ef95 plus exact reviewed three-file repair, uncommitted",
+          "files": {
+            "src/slippi_profile/tests/synctest_browser.cpp": {
+              "sha256": "3c4b4230f2348d207eafaab7375633e944582b999cb0c253b4ad7ae9ce1c46e3",
+              "bytes": 50820
+            },
+            "tests/payload_admission_adapter_control.cpp.in": {
+              "sha256": "84f7c7488746f2b4cb1f5dc49b80d04c6177ea1e073ec0f738de886a21a8e0d8",
+              "bytes": 27973
+            },
+            "tests/test_source_memory_snapshot.py": {
+              "sha256": "c4ad7894c0773851a5d729e8ad4ae41a571c54e645d8d7c715a94ca8b4f3e0b4",
+              "bytes": 5938
+            }
+          },
+          "native_and_CMake_mode": "Same combined private flags/assets and ordinaryRelease; no mode/timeout/input/JS changes",
+          "final_committed_source": "7e4fe7817966e3f094cd573dfa9d8541cba1a815",
+          "final_committed_tree": "05f4462bbe4d0ad720429539ded5f35be0d378c2",
+          "note": "Native builds ran once at ef95 plus three reviewed dirty ABI/control files. The later fourth file changes diagnostics tests only; no native rebuild occurred. Final commit contains identical native/CMake source bytes plus test-only quota repair. Embedded/generated build git metadata remains untouched."
+        },
+        "full_regression": {
+          "result": "PASS",
+          "tests": 2456,
+          "skipped": 165,
+          "duration_seconds": 540.336,
+          "log_sha256": "92ff9bbe348693553649737e792cb8629da5248bcfade2c93923346e6d4c3e98"
+        },
+        "runtime_inventory": {
+          "path": "payload-aurora-descriptor-repair-integration-v2/runtime-inventory-v1.json",
+          "sha256": "6b5aca38f2bf81ab898e31c16304fe9c9a564d6b48036d550c17ec50e5ae48a9",
+          "files": 15
+        },
+        "quota_test": {
+          "checkout_sha256": "7284201f6d6bb167e3d6cb935f6e776b0e4e7acfe08322fb22812d37be65fefa",
+          "focused_result": "PASS",
+          "full_regression_result": "PASS"
+        },
+        "runtime_comparison": {
+          "v3_output_hashes_verified_against_v3_checkpoint": 15,
+          "same": 11,
+          "changed": [
+            {
+              "group": "private_combined_release",
+              "name": "gameplay_slippi_synctest_browser.map",
+              "v3_sha256": "3ff8b816d8434bb7c8903173665375f6d37a512d63fac611207b44613f3f0bc7",
+              "current_sha256": "61f9733c54f0daa7d9eaad5d56acde33c7639e90f33e1b2a0b55388eb2b462c9"
+            },
+            {
+              "group": "private_combined_release",
+              "name": "gameplay_slippi_synctest_browser.source-state.json",
+              "v3_sha256": "1b6d34328688b45034b843ea57b982689a953fde3de4771b2382553e732e3513",
+              "current_sha256": "abd7d26751c0c5860fc8a61876c013c3b22c7d96bc3cf07f5e15e47c35dd74b3"
+            },
+            {
+              "group": "private_combined_release",
+              "name": "gameplay_slippi_synctest_browser.wasm",
+              "v3_sha256": "ce9c9c3881903252125bc0e780e83b942a475fa8fae9ed9ee991cc5c8011e6c7",
+              "current_sha256": "08f35c48fca59e67c226ad4d06d21be7e4805459036e101b363407f6ae3dfd2d"
+            },
+            {
+              "group": "ordinary_release",
+              "name": "gameplay_menu_browser.wasm",
+              "v3_sha256": "cb0c6a1009344455e8b737a4e71e7e4ac7bcca5ad6de1fee41d9946a36ec50b4",
+              "current_sha256": "2195612a6942734ad06879c1ecf82a3d3e0138cd7e1f8ee8b64e0343483f344e"
+            }
+          ]
+        }
+      }
+    },
+    "source_payload_admission_dry_run_v2": {
+      "status": "OWNER_LOCAL_ADMISSION_CONFIRMED; AGGREGATE_CENSUS_INCOMPLETE; RESTORE_NOT_ADMITTED",
+      "scope": "One root-released source-main-heap payload snapshot capture/admission experiment followed by one original sample-300 source step, one actual draw and post-draw admission. It is owner-local evidence only.",
+      "producer": {
+        "source_head": "7e4fe7817966e3f094cd573dfa9d8541cba1a815",
+        "source_tree": "05f4462bbe4d0ad720429539ded5f35be0d378c2",
+        "clean_worktree": true,
+        "integration_receipt": {
+          "path": "payload-aurora-descriptor-repair-integration-v2/final-integration-v1.json",
+          "bytes": 15923,
+          "sha256": "f092802b6c21a643e0e5a5b1feb24c6e1a05c6d366efb54574e7d5a3d3298a65"
+        },
+        "runtime_inventory": {
+          "path": "payload-aurora-descriptor-repair-integration-v2/runtime-inventory-v1.json",
+          "bytes": 7299,
+          "sha256": "6b5aca38f2bf81ab898e31c16304fe9c9a564d6b48036d550c17ec50e5ae48a9"
+        },
+        "build_source_base_head": "ef95e9b15887013866b567a5a2b8de0a6dcaa2d5",
+        "build_source_worktree": "ef95 plus exact reviewed three-file repair, uncommitted",
+        "build_changed_source_files": {
+          "src/slippi_profile/tests/synctest_browser.cpp": {
+            "sha256": "3c4b4230f2348d207eafaab7375633e944582b999cb0c253b4ad7ae9ce1c46e3",
+            "bytes": 50820
+          },
+          "tests/payload_admission_adapter_control.cpp.in": {
+            "sha256": "84f7c7488746f2b4cb1f5dc49b80d04c6177ea1e073ec0f738de886a21a8e0d8",
+            "bytes": 27973
+          },
+          "tests/test_source_memory_snapshot.py": {
+            "sha256": "c4ad7894c0773851a5d729e8ad4ae41a571c54e645d8d7c715a94ca8b4f3e0b4",
+            "bytes": 5938
+          }
+        },
+        "build_source_identity_note": "The native products were built at ef95 plus the exact reviewed three-file descriptor repair. The clean 7e4fe commit has those same native/CMake bytes and adds only the reviewed diagnostics quota test file after the builds. Artifact hashes below are from the immutable current inventory; the older V3 product hashes remain verified only against the V3 checkpoint.",
+        "runtime_retention": {
+          "path": "source-payload-admission-dry-run-v2/retained-runtime-producer/retention.json",
+          "bytes": 4941,
+          "sha256": "ec625372a5fb2e725fa2286e691f8a1d7cb0991e7af1605684f877552ec25eda"
+        },
+        "retained_runtime_files": [
+          {
+            "name": "gameplay_slippi_synctest_browser.mjs",
+            "bytes": 417312,
+            "sha256": "fe169a23833506622c6b830f570a9ea8d3ca24d407ccd2b6c68b2a60c19974f8"
+          },
+          {
+            "name": "gameplay_slippi_synctest_browser.wasm",
+            "bytes": 15370812,
+            "sha256": "08f35c48fca59e67c226ad4d06d21be7e4805459036e101b363407f6ae3dfd2d"
+          },
+          {
+            "name": "gameplay_slippi_synctest_browser.data",
+            "bytes": 20994321,
+            "sha256": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c"
+          },
+          {
+            "name": "gameplay_slippi_synctest_browser.map",
+            "bytes": 7663344,
+            "sha256": "61f9733c54f0daa7d9eaad5d56acde33c7639e90f33e1b2a0b55388eb2b462c9"
+          },
+          {
+            "name": "gameplay_slippi_synctest_browser.source-state.json",
+            "bytes": 1393850,
+            "sha256": "abd7d26751c0c5860fc8a61876c013c3b22c7d96bc3cf07f5e15e47c35dd74b3"
+          }
+        ],
+        "raw_runtime_sha256": {
+          "gameplay_slippi_synctest_browser.mjs": "fe169a23833506622c6b830f570a9ea8d3ca24d407ccd2b6c68b2a60c19974f8",
+          "gameplay_slippi_synctest_browser.wasm": "08f35c48fca59e67c226ad4d06d21be7e4805459036e101b363407f6ae3dfd2d",
+          "gameplay_slippi_synctest_browser.data": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c"
+        },
+        "source_state_manifest": {
+          "path": "gameplay_slippi_synctest_browser.source-state.json",
+          "sha256": "abd7d26751c0c5860fc8a61876c013c3b22c7d96bc3cf07f5e15e47c35dd74b3",
+          "configurationIdentitySha256": "f8c3a84d3913577967e9494932426da27826a5e2132e4a9558b4b6cbd990be68",
+          "wasmSha256": "08f35c48fca59e67c226ad4d06d21be7e4805459036e101b363407f6ae3dfd2d",
+          "rowCount": 3146,
+          "sourceCStaticCandidates": 2051,
+          "excludedMutableInputSections": 1095,
+          "completeGameState": false
+        }
+      },
+      "supporting_artifacts": {
+        "raw_report": {
+          "path": "source-payload-admission-dry-run-v2/runner/evidence.json",
+          "bytes": 105409506,
+          "sha256": "929f0496285d87224fd2f68cb24b1cfec6f5410e71bc662673fc074497456f3a"
+        },
+        "independent_result_review": {
+          "path": "source-payload-admission-dry-run-v2/independent-result-review-v1.json",
+          "bytes": 10255,
+          "sha256": "d62521f18617db4f8fb1047d4c20d407731fe1d695fb4bec18944fc04f243d2c"
+        },
+        "root_result_review": {
+          "path": "source-payload-admission-dry-run-v2/root-result-review-v1.json",
+          "bytes": 4286,
+          "sha256": "f60f4ccc24890acff9389f0cae825736bff7f9e979745b34f02fde88d21c6165"
+        },
+        "frozen_packet": {
+          "path": "source-payload-admission-dry-run-v2/packet-candidate-v1.json",
+          "bytes": 6671,
+          "sha256": "45fb952f73c371d787d0bd55720d141ae250a7f73b6b3a714b784ce9a1bf9c7b"
+        },
+        "released_preflight": {
+          "path": "source-payload-admission-dry-run-v2/preflight.json",
+          "bytes": 28898,
+          "sha256": "8c85427cc0e41014e6be6e51f3facb5eebccff9e6277bbc9404646b1e40bf073"
+        },
+        "root_release": {
+          "path": "source-payload-admission-dry-run-v2/root-release-v1.json",
+          "bytes": 782,
+          "sha256": "5610643ae9b6c63c2881ccb99a476f77ba976b7f4c8fc0bf0971f52ee48a8446"
+        },
+        "independent_packet_review": {
+          "path": "source-payload-admission-dry-run-v2/independent-root-review-v1.json",
+          "bytes": 1299,
+          "sha256": "b0c3925f5e3b864cc8e954bcd4c0b5877a33aa9d795f9999ee58fa97ce20a9f1"
+        },
+        "owner_report": {
+          "path": "source-payload-admission-dry-run-v2/owner.json",
+          "bytes": 91868,
+          "sha256": "4afafb1e13b7c2ae99f475b666e4787bb428a686334554819fc42e6aa8cfea08"
+        },
+        "root_command_result": {
+          "path": "source-payload-admission-dry-run-v2/root-command-result-v1.json",
+          "bytes": 173,
+          "sha256": "c65ac98644ac6b3ab9a6a9f0c2f0f202a1a2c88f5661026cb54435fd283bd752"
+        },
+        "root_pid_check": {
+          "path": "source-payload-admission-dry-run-v2/root-owned-process-check-v1.json",
+          "bytes": 1008,
+          "sha256": "b732e1fd16bf2667750f1ce70a57997831105a4827a70a0dca4b58c4530585b0"
+        },
+        "asset_verification_addendum": {
+          "path": "source-payload-admission-dry-run-v2/asset-verification-v1.json",
+          "bytes": 11884,
+          "sha256": "007821c16e54447d4b403dad607c4f5ef95ce08fb260c2ade9a545e5fc41bade"
+        },
+        "prior_failed_v1_raw_sha256": "212bc5bda23a04aec10f9a73ef90cfd32b0be8a1949a8dd591e017b815a510f4"
+      },
+      "source_call_sequence": {
+        "runner_source_files": {
+          "src/slippi_profile/tests/run_write_census.mjs": "c0e1c078272d92292e83cfe76227b200bb01a8fb131ba42ceeb239068e33423a",
+          "src/slippi_profile/tests/run_synctest.mjs": "55ef094203b33e0b98697cb424fc00562a9a58e5bd2089b4786656e69b2c55a5",
+          "src/slippi_profile/tests/synctest_browser.cpp": "3c4b4230f2348d207eafaab7375633e944582b999cb0c253b4ad7ae9ce1c46e3"
+        },
+        "commands": [
+          {
+            "command": 1,
+            "label": "CAPTURE",
+            "result": 0,
+            "admission": "payload snapshot captured and immediately admitted",
+            "runner": "run_synctest.mjs:1884",
+            "native": "synctest_browser.cpp:918-965"
+          },
+          {
+            "command": 2,
+            "label": "STEP_AND_ADMIT(sample 300)",
+            "result": 0,
+            "admission": "literal sample-300 source step followed by snapshot admission",
+            "runner": "run_synctest.mjs:1895",
+            "native": "synctest_browser.cpp:967-998"
+          },
+          {
+            "command": 3,
+            "label": "DRAW_ONCE",
+            "result": 0,
+            "admission": false,
+            "runner": "run_synctest.mjs:1924",
+            "native": "synctest_browser.cpp:1000-1028"
+          },
+          {
+            "command": 4,
+            "label": "POSTDRAW_ADMIT",
+            "result": 0,
+            "admission": "snapshot admitted after actual draw and host quiescence wait",
+            "runner": "run_synctest.mjs:1950",
+            "native": "synctest_browser.cpp:1030-1049"
+          },
+          {
+            "command": 5,
+            "label": "CLOSE",
+            "result": 0,
+            "admission": false,
+            "runner": "run_synctest.mjs:2189-2195",
+            "native": "synctest_browser.cpp:1057-1079"
+          }
+        ],
+        "admission_calls": [
+          1,
+          2,
+          4
+        ],
+        "packet_wording_correction": "The frozen packet shorthand saying “second admission” is incomplete; source performs three admissions, at commands 1, 2 and 4. The command sequence is authoritative."
+      },
+      "observed": {
+        "profile": {
+          "identity": "slippi-render-dependencies-dbooc-shield-drop-v5",
+          "sourceIdentity": "5489bff017d0d92bf5345321feab641b222923514218b626e534bcf6f1ef6911",
+          "rngHelper": "2b9f7398e09cb8ca8c2d53474739b313ce565bae77411cd29b4d2f4087a4812e",
+          "stageBridge": "1d0ff4c480828886de06f61acf1874625490604bff26e47f528aa3bef844ca41",
+          "seed": 324508639,
+          "name": "slippi-render-dependencies-dbooc-shield-drop-v5"
+        },
+        "warm_prefix_samples": 300,
+        "warm_sample_indices_exact_0_to_299": true,
+        "warm_prefix_all_neutral_PAD": true,
+        "checkpoint_sample": 299,
+        "checkpoint_source_frame": 176,
+        "checkpoint_PAD44_base64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=",
+        "literal_sample300_PAD44_base64": "AgAAAAAAAAAAAAABALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=",
+        "literal_sample300_PAD44_sha256": "46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288",
+        "source_frame_after_step": 177,
+        "sample300_interactive": true,
+        "sample300_observation_sha256": "a97c03e66301419bcba8aba75cba1ed88ee3aed3b3a6fc80d9f0fd0f9de8f967",
+        "sample300_pcm_sha256": "462733f725a874052aba5c73b03dd4b8799b78bb1f973b097768548b16d9833c",
+        "sample300_pcm_frames": 533,
+        "sample300_audio_phase": 20,
+        "draw_diagnostics": {
+          "slotCount": 6,
+          "status": 0,
+          "callbacks": [
+            1505,
+            1505,
+            0,
+            0,
+            0,
+            0
+          ],
+          "normalModelDispatches": [
+            888,
+            873,
+            0,
+            0,
+            0,
+            0
+          ],
+          "modelTransforms": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "processedPadSlots": [
+            0,
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          "metadataSeenMask": 3
+        },
+        "selected_fighter_paths": [
+          {
+            "sourceSlot": 0,
+            "processedPadSlot": 0,
+            "rawController": 0,
+            "initializerPort": 0,
+            "fighterKind": 0,
+            "callbackDelta": 5,
+            "normalModelDispatchDelta": 3,
+            "modelTransformDelta": 0
+          },
+          {
+            "sourceSlot": 1,
+            "processedPadSlot": 1,
+            "rawController": 1,
+            "initializerPort": 0,
+            "fighterKind": 0,
+            "callbackDelta": 5,
+            "normalModelDispatchDelta": 3,
+            "modelTransformDelta": 0
+          }
+        ],
         "gpu": {
           "initialized": true,
           "backend": 7,
-          "pending_frame_packets": 0,
-          "pending_staging_buffers": 0,
-          "worker_busy": 0,
-          "renderer_errors": 0,
-          "draw_calls": 237,
-          "begin_frame_id": 301,
-          "end_frame_id": 301
-        }
-      },
-      "independent_calculation": {
-        "source_step_changed_ranges": 13843,
-        "source_step_sum_bytes": 90875,
-        "actual_draw_changed_ranges": 61412,
-        "actual_draw_sum_bytes": 765912,
-        "stage_overlap_pairs_source_step": 0,
-        "stage_overlap_pairs_actual_draw": 0
-      },
-      "validation": {
-        "full_regression": {
-          "status": "PASS",
-          "tests": 2455,
-          "skips": 165,
-          "unittest_seconds": 552.243,
-          "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
-          "log_retained_artifact": "single-stage-arena-build-opt-in-integration-v1/full-regression-v1/full-regression.log",
-          "log_sha256": "9ae0b8ed2744ee27c2ed9072fcc2f954931b0e173ec5d2570068e895cb6bedf5",
-          "receipt_retained_artifact": "single-stage-arena-build-opt-in-integration-v1/docs-prep-v1/full-regression-receipt-v1.json"
+          "pendingFramePackets": 0,
+          "pendingStagingBuffers": 0,
+          "workerBusy": 0,
+          "rendererErrorCount": 0,
+          "drawCallCount": 237,
+          "lastBeginFrameId": 301,
+          "lastEndFrameId": 301,
+          "createdPipelines": 57,
+          "queuedPipelines": 0
         },
-        "exact_head_ci": "PENDING"
+        "native_transfer_quiescence": {
+          "beforeStep": "passed",
+          "afterStep": "passed",
+          "afterActualDraw": "passed"
+        },
+        "screenshot": {
+          "path": "browser-census-sample-300.png",
+          "sha256": "2de16105c8521d93604db39ab9296bc224995b3f645c19d8a238e98ba24bb88e",
+          "bytes": 307134
+        },
+        "restore_performed": false,
+        "restore_called": false
+      },
+      "comparison_to_prior_census_v6": {
+        "prior_raw_report": {
+          "path": "browser-write-census-v6/runner/evidence.json",
+          "sha256": "5faf0e790a7df3a94110c267040422121d36dcfa1166cda1ab4036a2adf3e1c5"
+        },
+        "prior_source_head": "853aae6f36608bd62a4eeb1d2594985178625a38",
+        "prior_source_tree": "35a2fe2fcc8f231d9ea94d5efca37559b3feda66",
+        "prior_runtime_sha256": {
+          "gameplay_slippi_synctest_browser.mjs": "597831def04d62de1639413cda1094a61955edee9410bf9da932514a9449e28c",
+          "gameplay_slippi_synctest_browser.wasm": "35c44c4f0fd8998c2b1cb51d6c13716c30cab492a5a94f0ef3c3aa121a3e197f",
+          "gameplay_slippi_synctest_browser.data": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c"
+        },
+        "prior_source_state_manifest_sha256": "1731268b4043a704506397d0c2a79cff7a8f9a4a79c7b7141da81f453dbc9d22",
+        "equal_fields": [
+          "initial observation SHA",
+          "initial PCM SHA",
+          "sample-300 observation SHA",
+          "sample-300 PCM SHA",
+          "sample-300 PAD SHA",
+          "sample-300 boundary",
+          "draw diagnostics",
+          "selected fighter paths",
+          "GPU status"
+        ],
+        "current_observation_sha256": "a97c03e66301419bcba8aba75cba1ed88ee3aed3b3a6fc80d9f0fd0f9de8f967",
+        "current_pcm_sha256": "462733f725a874052aba5c73b03dd4b8799b78bb1f973b097768548b16d9833c",
+        "current_PAD_sha256": "46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288",
+        "producer_comparison": "Source head/tree, generated JavaScript/Wasm, and source-state manifest differ; the .data bundle and 34 source asset hashes match. This is recorded fixture-output equality only, not evidence of source neutrality, retail parity, or a restore guarantee."
       },
       "cleanup": {
-        "all_recorded_process_ids_independently_absent": true,
-        "capture_and_server_process_groups_absent": true,
-        "owned_successful_scratch_removed": true
-      },
-      "all_observed_ranges_unadmitted": true,
-      "restore_performed": false,
-      "limitations": [
-        "The precise tracked stage-arena owner had zero overlap with these two observed transition change sets; this does not establish complete stage or world-state ownership.",
-        "The full mutable-state inventory is incomplete; all changed observations remain unadmitted and no state was restored.",
-        "The screenshot retains known magenta/texture artifacts and establishes no pixel acceptance.",
-        "This result does not establish restore correctness, gameplay acceptance, or rollback performance."
-      ],
-      "next_boundary": {
-        "design": {
-          "retained_artifact": "restore-boundary-design-after-stage-falsification-v2.json",
-          "sha256": "688a2d8a84ca02534797120429a5b5d8847a27e364cb8048a8251c17054c4066"
+        "owner_report_result": "pass",
+        "capture_exit_code": 0,
+        "root_command_returncode": 0,
+        "attempt": 1,
+        "payload_admission_close": {
+          "status": "returned-zero",
+          "result": 0
         },
-        "root_design_review": {
-          "retained_artifact": "root-payload-admission-design-review-v1.json",
-          "sha256": "3d409b6f253c0dc398cea175107193c8c5bf3ec8c47ff4170f6845a2ab250942"
+        "snapshot_close": {
+          "status": "checked-return-one",
+          "result": 1
         },
-        "state": "External candidate and focused controls only; no new capture or restore authorized"
+        "renderer_shutdown": {
+          "status": "checked-return-one",
+          "result": 1
+        },
+        "root_confirmed_all_12_recorded_PIDs_absent": true,
+        "successful_scratch": "Removed after independent review; root removed only the empty owned scratch directory. Failed evidence and retained artifacts were preserved.",
+        "scratch_cleanup_receipt": {
+          "path": "source-payload-admission-dry-run-v2/successful-scratch-cleanup-v1.json",
+          "bytes": 1151,
+          "sha256": "d7b2e5833124b1026b671d6ce7664ce393050dc8bda48f12e9353bf5034288d4",
+          "result": "PASS",
+          "empty_owned_scratch_removed": true,
+          "recorded_pids_absent": 12,
+          "failed_evidence_preserved": true
+        }
       },
-      "prior_checkpoint_ci": {
-        "head": "bd7a393d853b6f2359256a8366e303e1061d0d53",
-        "run": 39867358012,
-        "checks": 14,
-        "success": 12,
-        "expected_skips": 2,
-        "retained_artifact": "checkpoint-ci-bd7a-v1.json",
-        "sha256": "d930748134362f59d241f17620372c1e5a8df85b9a4eb6199618ea9953107305",
-        "scope": "Earlier head only; new documentation-head CI pending"
-      },
-      "retained_source_review_refusal_v1": {
-        "retained_artifact": "single-stage-arena-observer-source-review-v1.json",
-        "sha256": "9152124d1ac34d46304fc4c57a15db19cec8e3af28c19ffe8f2fa80d39915826",
-        "scope": "Known PCM/static alias false refusal and missing explicit pthread refusal; repaired in reviewed v2"
+      "aggregate_limits": {
+        "raw_result": "incomplete",
+        "execution_status": "completed",
+        "inventory_status": "incomplete",
+        "complete_game_state": false,
+        "source_state_manifest_complete": false,
+        "owner_restore_admission": false,
+        "all_changed_ranges_unadmitted": true,
+        "restore_allowed": false,
+        "diagnostic_allocation_caveat": "The payload snapshot capture explicitly allocates diagnostic storage. V2 heap changes are therefore not natural-census attribution and must not be compared as ownership or progress.",
+        "claim_limits": [
+          "No same-browser restore",
+          "No aggregate snapshot admission",
+          "No original-game parity claim",
+          "No C3 claim",
+          "Known magenta/texture screenshot artifacts remain"
+        ]
       }
     }
   }
