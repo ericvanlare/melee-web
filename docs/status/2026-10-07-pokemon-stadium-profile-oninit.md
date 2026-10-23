@@ -2143,6 +2143,41 @@ inputs toward SSS exit at sequence 2481; the count is inventory, not an admitted
 
 
 
+**Fresh132 remaining original SSS prefix (October 23):** One admitted headless run on clean
+source `8154d4f2` (tree `c76848fb`) passed the declared comparisons for all 132 remaining
+original inputs. Strict independent replay passed all 398 actual callbacks: 132 scheduler-end,
+132 draw-enter and 132 draw-return callbacks, then passive SSS epilogue 2481 and the separate
+selected-stage witness 2482. The first remaining group is 1603/1607/1608/1609; the last is
+2475/2477/2478/2479. The exact 7,968-byte input wire and every expected source-state envelope
+were independently re-derived from the pinned original stream. Sparse P0 activity occupies 38
+rows; the other 94 are neutral, excluding disconnected-port error bytes. The original epilogue
+has source frame 133 and draw ordinal 275. Native lifetime ticks are 275 and the observed draw
+components sum to 275; native records do not expose a separate draw-ordinal field. The actual
+selected tuple is index 18/kind 3, matching the full original tag-41/tag-42 witnesses before and
+after exit. The run stops at phase 5/running 0, source scene 0 with the host no longer entered,
+before ordinary VS Entry.
+
+Both diagnostic and ordinary Release builds passed, and full discovery passed 2,747 tests
+(2,555 passed, 192 skipped) in 583.212 seconds. These builds and tests used dirty pre-commit
+`9f4dfbae` plus the exact 17 reviewed files; clean `8154d4f2` records those same bytes and does
+not relabel the embedded producer. The separate original-wire/comparator controls passed without
+relabeling full-suite skips. All 50 current runtime identities and retained copies were independently
+verified. The owner completed in 12.619 seconds with 92 ms cleanup; native unload readback was
+phase 0/running 0/observation null, and an independent OS scan found all 12 recorded
+runner/server/browser PIDs absent. These are functional and cleanup observations, not performance
+acceptance. The [existing structured receipt](../evidence/issue251-stadium-profile-oninit-v1.json)
+binds the raw report, replay, original inputs, exact source/build identities and retention.
+
+Original source-side conditional flags and pending-next remain unpaired, so this is not blanket
+whole-prefix equivalence. CSS exit and terminal CSS scheduler equality remain unobserved/unpaired;
+prepared VS output remains unpaired. No current-run VS/GO, lifetime/RNG, C3, pixels, PCM,
+audio-continuity, live-timing or physical-input acceptance follows. Next is one bounded source-only
+review of the fixed Fresh132-to-original VS Entry 2523 seed/common Start-field prerequisite,
+preserving legacy124 unchanged. Setup 2563 and GO-after 2985 remain separate later original
+prerequisites; no follow-up capture is released. Complete exact-head CI is required on the
+published successor; the green `9f4dfbae` documentation predecessor remains historical.
+
+
 The earlier GO+2 supervised attempt took 15.248 seconds (15.317 seconds including the root
 launcher). Checked native retirement and observation clearing passed, with
 zero cleanup failures. The supervisor's process attribution and a separate

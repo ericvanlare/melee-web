@@ -18169,7 +18169,7 @@
         "Pixel/PCM, live input, timing/performance, full-session and C3 acceptance"
       ],
       "implementation_checkpoint_2026_10_22": {
-        "state": "FINITE_CSS_V3_PREFIX_PASS; FRESH_SSS_CONSTRUCTOR_PAIR_PASS; FRESH_SSS_INPUT_TICK_FIRST_DRAW_PASS_THROUGH_1601; CSS_EXIT_UNOBSERVED; PUBLISHED_SUCCESSOR_CI_REQUIRED; C3_OPEN",
+        "state": "FINITE_CSS_V3_PREFIX_PASS; FRESH_SSS_INPUT_TICK_FIRST_DRAW_AND_REMAINING132_EXIT_SELECTED_TUPLE_PASS; SOURCE_FLAGS_PENDING_NEXT_UNPAIRED; VS_GO_C3_OPEN; PUBLISHED_SUCCESSOR_CI_REQUIRED",
         "evidence_labels": [
           "Source identified",
           "Compiled",
@@ -18756,12 +18756,12 @@
             "Whole-session acceptance, public Stadium admission and C3"
           ]
         },
-        "next": "Next is a bounded source-only review of the remaining original-SSS prefix toward actual CSS exit. The 132 observed remaining consumes are an inventory, not an admitted cap; no follow-up capture is released.",
+        "next": "Review one fixed Fresh132-to-original VS Entry2523 seed/common Start-field endpoint, reusing existing checked selection/Entry interfaces while preserving legacy124 unchanged. Stop at first field/owner uncertainty. No follow-up capture is released.",
         "exclusions": [
-          "SSS source sequences 1602 onward, including the remaining input prefix and CSS exit",
-          "CSS exit and terminal CSS scheduler equality",
-          "VS Entry, Setup, GO/GO+2, restore or scene parity",
-          "Pixel/PCM, physical input, timing/performance, whole-session and C3 acceptance"
+          "CSS exit and terminal CSS scheduler equality remain unobserved/unpaired",
+          "Original source-side conditional flags and pending-next, and prepared VS output remain unpaired",
+          "VS Entry, Setup, GO/GO+2, restore or scene parity remain unpaired/unrun for this Fresh132 continuation",
+          "Pixel/PCM, audio-continuity, physical input, timing/performance, whole-session and C3 acceptance"
         ],
         "c8a1_predecessor_ci": {
           "head": "c8a1c452a6610162a4ed13fe1691281bda0c696e",
@@ -20298,6 +20298,330 @@
           "next": {
             "classification": "SOURCE_ONLY_REVIEW_PENDING; NO_FOLLOWUP_CAPTURE_AUTHORIZED",
             "summary": "Next is a bounded source-only review of the remaining original-SSS prefix toward SSS exit at sequence 2481. The 132 observed remaining consumes are an inventory, not an admitted cap; no follow-up capture is released."
+          }
+        },
+        "fresh_sss_remaining_prefix_capture_v1_2026_10_23": {
+          "state": "BROWSER_SCOPED_REMAINING132_INPUT_TICK_DRAW_EXIT_AND_SELECTED_TUPLE_PASS; NO_VS_OR_C3",
+          "evidence_directory": "browser-rollback-sprint-20261022-115029-d89e262b/fresh-sss-132-prefix-capture-v1",
+          "scope": "After unchanged CSS and P2 constructor/first-input/tick/draw prerequisites,132 exact remaining original consumed-PAD/tick/draw groups, passive epilogue2481 and separate selected-stage witness2482. Declared common fields only; source flags/pending-next and prepared VS output unpaired.",
+          "capture": {
+            "report": {
+              "path": "browser-rollback-sprint-20261022-115029-d89e262b/fresh-sss-132-prefix-capture-v1/browser-run/report.json",
+              "bytes": 2994278,
+              "sha256": "cee1c253b8b60645421b62df37728ec81efea42dc8c53c5c000919fd86ed9cd5"
+            },
+            "owner": {
+              "path": "browser-rollback-sprint-20261022-115029-d89e262b/fresh-sss-132-prefix-capture-v1/owner.json",
+              "bytes": 104293,
+              "sha256": "c638b204b0ef86f5d5f8b6bf1c3675593aca0f9acd01608e976e418912469951"
+            },
+            "packet": {
+              "path": "browser-rollback-sprint-20261022-115029-d89e262b/fresh-sss-132-prefix-capture-v1/packet-v1.json",
+              "bytes": 32536,
+              "sha256": "9e0ba1ee20cb77183ba2895a8aa2a6b73c3b765acaec373d91b81a52f5df8e40"
+            },
+            "preflight": {
+              "path": "browser-rollback-sprint-20261022-115029-d89e262b/fresh-sss-132-prefix-capture-v1/preflight.json",
+              "bytes": 48161,
+              "sha256": "b1536ebdd45d9aa7b986f9d76702ad69aed4396114a2aea23c0b1e6aa1d92e55"
+            },
+            "root_compact_observation": {
+              "path": "browser-rollback-sprint-20261022-115029-d89e262b/fresh-sss-132-prefix-capture-v1/root-observed-v2.json",
+              "bytes": 4617,
+              "sha256": "286a43609de2fdd77d898387e0a8f3d41d42b245c8cca5db78e6a98fc78e9e92"
+            },
+            "result": "pass",
+            "source_commit": "8154d4f2e95f17c381a2c79f5e82c72bbf946b54",
+            "source_tree": "c76848fb33b0a67ad5d94e39fc5fd97a188ea422",
+            "elapsed_ms": 12619,
+            "cleanup_ms": 92
+          },
+          "observed_boundaries": {
+            "remaining_input_count": 132,
+            "literal_wire_bytes": 7968,
+            "literal_wire": {
+              "path": "browser-rollback-sprint-20261022-115029-d89e262b/fresh-sss-132-prefix-capture-v1/input/fresh-sss-prefix-132-v2.bin",
+              "bytes": 7968,
+              "sha256": "f568192072378923fc5806252554ab735e1be5d75a0a9098643edaea1b41fd83"
+            },
+            "expected_host_only": {
+              "path": "browser-rollback-sprint-20261022-115029-d89e262b/fresh-sss-132-implementation-candidate-v1/data/fresh-sss-132-expected-v2.json",
+              "bytes": 2380863,
+              "sha256": "7892914d90b7fc93a9d95441721bb8dcdc4b1559d4f41d245fafbd9250bd70a8"
+            },
+            "strict_callbacks": 398,
+            "phase_counts": {
+              "scheduler_end": 132,
+              "draw_enter": 132,
+              "draw_return": 132,
+              "sss_exit": 1,
+              "selected_stage": 1
+            },
+            "first_group": [
+              1603,
+              1607,
+              1608,
+              1609
+            ],
+            "last_group": [
+              2475,
+              2477,
+              2478,
+              2479
+            ],
+            "preceding_original_passive_poll": 1602,
+            "terminal_original_passive_poll": 2480,
+            "original_passive_exit": {
+              "sequence": 2481,
+              "source_frame": 133,
+              "source_tick": 133,
+              "draw_ordinal": 275
+            },
+            "separate_selected_stage_witness": {
+              "sequence": 2482,
+              "index": 18,
+              "kind": 3
+            },
+            "native_session_lifetime_ticks": 275,
+            "native_draw_component_count": 275,
+            "native_draw_ordinal_field": "NOT_EXPOSED; do not relabel session_ticks as native draw_ordinal",
+            "source_input_sparsity": {
+              "active_P0_rows": 38,
+              "neutral_rows": 94,
+              "stick_X_70_indices": [
+                4,
+                13
+              ],
+              "stick_X_35_indices": [
+                14,
+                15
+              ],
+              "stick_Y_70_indices": [
+                16,
+                25
+              ],
+              "stick_Y_35_indices": [
+                26,
+                39
+              ],
+              "A_button_0100_indices": [
+                43,
+                44
+              ],
+              "disconnected_err_bytes_excluded_from_activity": true
+            },
+            "terminal": {
+              "phase": 5,
+              "running": 0,
+              "source_scene": 0,
+              "host_entered": false
+            },
+            "no_native_VS_Entry_Setup_or_GO_comparison": true
+          },
+          "strict_independent_replay": {
+            "freeze": {
+              "path": "browser-rollback-sprint-20261022-115029-d89e262b/fresh-sss-132-prefix-capture-v1/independent-replay-v1/freeze-v1.json",
+              "bytes": 3975,
+              "sha256": "569da9639cf31edfb03f7a16e3323ff723d688854d3996632fa9e223e9f99a2e"
+            },
+            "review": {
+              "path": "browser-rollback-sprint-20261022-115029-d89e262b/fresh-sss-132-prefix-capture-v1/independent-replay-v1/review-v1.json",
+              "bytes": 4844,
+              "sha256": "06fae5040fb75e3b083dc6fd524b402f812dfa50fcf9339ffe8d480dd46119fc"
+            },
+            "result": {
+              "path": "browser-rollback-sprint-20261022-115029-d89e262b/fresh-sss-132-prefix-capture-v1/independent-replay-v1/result.json",
+              "bytes": 2768,
+              "sha256": "7689f445e211144b0226ee34987f0441e7dfd295739b558943922bc99caf8afb"
+            },
+            "original_source_audit": {
+              "path": "browser-rollback-sprint-20261022-115029-d89e262b/fresh-sss-132-prefix-capture-v1/independent-replay-v1/original-source-audit-v1.json",
+              "bytes": 38016,
+              "sha256": "02d85aad76b4c51e852379b7adf6e958b3dacc6933d384718254deb82775fed8"
+            },
+            "actual_callbacks": 398,
+            "first_mismatch": null,
+            "prior_CSS_replay_scope": "140 postinitial tick/draw pairs plus separate final draw; initial one-shot retained separately; terminal CSS scheduler explicitly unpaired."
+          },
+          "source_and_build_identity": {
+            "current_source_commit": "8154d4f2e95f17c381a2c79f5e82c72bbf946b54",
+            "current_source_tree": "c76848fb33b0a67ad5d94e39fc5fd97a188ea422",
+            "actual_build_producer_head": "9f4dfbae338617c5c147f3efaf1efd1541a13cc3",
+            "actual_build_producer_dirty": true,
+            "reviewed_build_source_files": 17,
+            "producer_then_tracked_files": 16,
+            "producer_then_untracked_file": "tests/test_fresh_sss_132_candidate.py",
+            "source_checkpoint": {
+              "path": "stadium-fresh132-validation-20261022-224427-9cf8fbd8/root-source-checkpoint-v1.json",
+              "bytes": 7089,
+              "sha256": "1cce31785a32dfce268976db7b526be500c93f0b8fb1cb6db9672e21e98ed06d"
+            },
+            "exact_build_source_inventory": {
+              "path": "stadium-fresh132-validation-20261022-224427-9cf8fbd8/source-inventory-v2.json",
+              "bytes": 6978,
+              "sha256": "a454a00c51c3b36919c52823d0ca4bf7b49a4715ca42f5336209c66963f63631"
+            },
+            "runtime_inventory": {
+              "path": "stadium-fresh132-validation-20261022-224427-9cf8fbd8/runtime-inventory-v2.json",
+              "bytes": 26698,
+              "sha256": "49bc113e916e0ad77540bb806b159818781cf36c24d23f50dbde8e2bb2ca2be4"
+            },
+            "runtime_retention": {
+              "path": "browser-rollback-sprint-20261022-115029-d89e262b/fresh-sss-132-prefix-capture-v1/runtime-retention-v1.json",
+              "bytes": 39055,
+              "sha256": "a04a7a1d0041027ce5b6606d5b19ba6b0eb3e2c5bc4ee10b7875d6744af981c4"
+            },
+            "independent_all50_retention": {
+              "path": "browser-rollback-sprint-20261022-115029-d89e262b/fresh-sss-132-prefix-capture-v1/independent-replay-v1/independent-runtime-retention-v1.json",
+              "bytes": 1041,
+              "sha256": "65798c816e6d82ab744fd924fca32dfcf37cdc5047fc12ae4c27507be0ed8ba3"
+            },
+            "runtime_files": 50,
+            "runtime_groups": {
+              "diagnostic-cache": 1,
+              "build-artifact-registry": 1,
+              "diagnostic-runtime": 44,
+              "ordinary-runtime": 3,
+              "ordinary-cache": 1
+            },
+            "note": "Both Release builds/full regression ran at dirty9f4dfbae plus exact17 reviewed files; clean8154d4f2 records those same bytes. Embedded build/producer identity is unchanged."
+          },
+          "integration": {
+            "validation_freeze": {
+              "path": "stadium-fresh132-validation-20261022-224427-9cf8fbd8/validation-freeze-v2.json",
+              "bytes": 7769,
+              "sha256": "bc8bcd5bd15e8882f05ec589dcccafb869fe1a693c6e1dd2ce2f18d272e27d15"
+            },
+            "diagnostic_release": {
+              "result": "PASS",
+              "log": {
+                "path": "stadium-fresh132-validation-20261022-224427-9cf8fbd8/diagnostic-release.log",
+                "bytes": 1190419,
+                "sha256": "36320506200879f6fb83648e98f8e9e7beaca834d1f42deca87dbd7a77bc1b89"
+              }
+            },
+            "ordinary_release": {
+              "result": "PASS",
+              "log": {
+                "path": "stadium-fresh132-validation-20261022-224427-9cf8fbd8/ordinary-release.log",
+                "bytes": 1190396,
+                "sha256": "debca0a1721e26206e4dddc0e46347093eeead0903e24d42a4d32dbec8ff5d65"
+              }
+            },
+            "full_regression": {
+              "result": "PASS",
+              "outer_tests": 2747,
+              "passed": 2555,
+              "skipped": 192,
+              "duration_seconds": 583.212,
+              "log": {
+                "path": "stadium-fresh132-validation-20261022-224427-9cf8fbd8/full-regression.log",
+                "bytes": 528220,
+                "sha256": "e4615af5a566ddd277b6ccecbea4d6cf75b76a452202507129336276f3de42b4"
+              },
+              "skip_classification": {
+                "path": "stadium-fresh132-validation-20261022-224427-9cf8fbd8/skip-classification-v1.json",
+                "bytes": 47041,
+                "sha256": "1c96a845127d359fb66eb5d2702d5a61eb5259f7bfd875358969d53135ae26bc"
+              }
+            },
+            "optional_original_controls": {
+              "SDK_wire_and_selector": {
+                "checks": 3,
+                "result": "PASS",
+                "log": {
+                  "path": "stadium-fresh132-validation-20261022-224427-9cf8fbd8/optional-original-wire.log",
+                  "bytes": 554,
+                  "sha256": "55b48976791005f8bf0ded3a4913fc82044686419f8d1c3386b88d08205fb572"
+                }
+              },
+              "JS_callbacks_and_bindings": {
+                "tests": 51,
+                "passed": 48,
+                "skipped_legacy_optional": 3,
+                "log": {
+                  "path": "stadium-fresh132-validation-20261022-224427-9cf8fbd8/optional-original-js-detail.log",
+                  "bytes": 5078,
+                  "sha256": "54c5afe6631028baccc83ab2ac53a3dd3d9af9e2022465e24b3f9d4bfd0d4532"
+                }
+              },
+              "full_suite_skips_not_relabelled": true
+            },
+            "exact_head_ci": {
+              "status": "NOT_RUN_ON_8154_CHECKPOINT; COMPLETE_PUBLISHED_SUCCESSOR_CI_REQUIRED",
+              "historical_9f4_run": "39903753583"
+            },
+            "repository_content": {
+              "initial_guard": "FAIL: predecessor exact comparator file hash became stale after Fresh132 code changes; original long fixture unchanged",
+              "retained_failure": {
+                "path": "browser-rollback-sprint-20261022-115029-d89e262b/fresh-sss-132-prefix-capture-v1/docs-content-check.log",
+                "bytes": 136,
+                "sha256": "d39cbbd551c697bfc09b5db830872f9c41dc56e175e48ecdca3c14975c81f25f"
+              },
+              "independent_review": {
+                "path": "browser-rollback-sprint-20261022-115029-d89e262b/fresh-sss-132-prefix-capture-v1/content-policy-candidate-v1/review-v1.json",
+                "bytes": 1310,
+                "sha256": "aa8684c08dac682b8e49a779e61817b9b1f378342a16201e9b4e5b27bffe97b8"
+              },
+              "policy_change": "Only existing exact comparator file SHA refreshed to ed4e6748f9325865af8aaf219df2bbc0daee36f4acce8b6c4c5d9225790d93a6; guard, rule, rationale and observed literal unchanged",
+              "focused_controls": {
+                "path": "browser-rollback-sprint-20261022-115029-d89e262b/fresh-sss-132-prefix-capture-v1/content-controls.log",
+                "bytes": 3313,
+                "sha256": "717d445260fc592d6a517da2624c9afede83c2c68535cc58f73c681b8e00d84a"
+              },
+              "runtime_source_unchanged": true
+            }
+          },
+          "cleanup": {
+            "independent_process_and_unload": {
+              "path": "browser-rollback-sprint-20261022-115029-d89e262b/fresh-sss-132-prefix-capture-v1/independent-replay-v1/independent-process-and-unload-v1.json",
+              "bytes": 2554,
+              "sha256": "c63c348755aa7b9e9536fd5889adfa4b433c1aa6aef3344f47055acdc48c5724"
+            },
+            "recorded_owned_pids_absent": 12,
+            "browser_pids": 10,
+            "runner_pids": 1,
+            "server_pids": 1,
+            "native_unload_phase": 0,
+            "native_unload_running": 0,
+            "native_unload_observation": null,
+            "reported_failures": [],
+            "page_errors": [],
+            "console_errors": [],
+            "external_http_requests": []
+          },
+          "audio_counter_observation_only": {
+            "render_calls_delta": 132,
+            "render_frames_delta": 70400,
+            "phase_before": 0,
+            "phase_after": 0,
+            "PCM_or_continuity_acceptance": false
+          },
+          "visual_observation": {
+            "reviewer": "root",
+            "receipt": {
+              "path": "browser-rollback-sprint-20261022-115029-d89e262b/fresh-sss-132-prefix-capture-v1/root-observed-v2.json",
+              "bytes": 4617,
+              "sha256": "286a43609de2fdd77d898387e0a8f3d41d42b245c8cca5db78e6a98fc78e9e92"
+            },
+            "scope": "Original grid with Pokemon Stadium selected and Now Loading; not a pixel comparison or in-match observation."
+          },
+          "claim_limits": [
+            "Source-side conditional flags and pending-next remain unpaired; no blanket whole-prefix equivalence.",
+            "CSS exit and terminal CSS scheduler equality remain unobserved/unpaired.",
+            "Prepared VS output remains unpaired. No current-run VS Entry, Setup, GO, whole-session, lifecycle/RNG, C3 or public Stadium admission.",
+            "No pixels,PCM,audio-continuity,live-timing,foreground,physical-input or performance acceptance.",
+            "Full-suite192 skips remain distinct from the separately passing original controls; predecessor CI does not satisfy successor CI."
+          ],
+          "next": {
+            "classification": "SOURCE_ONLY_FIXED_FRESH_VS_ENTRY_PREREQUISITE_REVIEW; NO_FOLLOWUP_CAPTURE_AUTHORIZED",
+            "summary": "Review one fixed Fresh132-to-original VS Entry2523 seed/common Start-field endpoint, reusing existing checked selection/Entry interfaces while preserving legacy124 unchanged. Stop at first field/owner uncertainty.",
+            "original_only_later_prerequisites": {
+              "VS_Entry": 2523,
+              "Setup": 2563,
+              "GO_after": 2985
+            },
+            "not_a_runtime_or_capture_release": true
           }
         }
       }
