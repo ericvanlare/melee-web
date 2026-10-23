@@ -1775,6 +1775,22 @@ async function readFirstCssBrowserFinalDrawObservation() {
   });
 }
 
+function firstSssConstructorPairWaitResolved() {
+  const module = globalThis.Module;
+  const pointer = module?._melee_web_native_menu_stadium_first_css_draw_observe?.();
+  if (!pointer) return false;
+  const observation = JSON.parse(module.UTF8ToString(pointer));
+  const pair = observation?.first_sss_constructor_pair;
+  return pair?.complete === true || pair?.failed === true || observation?.state === 'failed';
+}
+
+function firstSssPairCssFailure(observation) {
+  if (observation?.state !== 'failed') return null;
+  return {kind: 'top_level_css_failure',
+    error: typeof observation.error === 'string' && observation.error.length
+      ? observation.error : 'Fresh CSS observation failed without an error string'};
+}
+
 async function readFirstSssConstructorPairObservation() {
   return page.evaluate(() => {
     const module = globalThis.Module;
@@ -2094,15 +2110,10 @@ async function runFirstSssConstructorPair() {
   'Complete pending CSS leave/rebuild and enter SSS without another input or tick');
   report.scenario.first_sss_constructor_pair.kick_result = kick;
   await persistReport();
-  await timeout(page.waitForFunction(() => {
-    const module = globalThis.Module;
-    const pointer = module?._melee_web_native_menu_stadium_first_css_draw_observe?.();
-    if (!pointer) return false;
-    const pair = JSON.parse(module.UTF8ToString(pointer)).first_sss_constructor_pair;
-    return pair?.complete === true || pair?.failed === true;
-  }, null, {timeout: Math.min(LIMITS.sourceTransitionMs, remaining())}),
+  await timeout(page.waitForFunction(firstSssConstructorPairWaitResolved, null,
+    {timeout: Math.min(LIMITS.sourceTransitionMs, remaining())}),
   Math.min(LIMITS.sourceTransitionMs, remaining()),
-  'Original SSS host-enter constructor pair and first mismatch');
+  'Original SSS host-enter constructor pair or first native CSS failure');
 
   const evidence = await timeout(readFirstSssConstructorPairObservation(),
     Math.min(5000, remaining()), 'Retain both original SSS constructor notes before cleanup');
@@ -2110,6 +2121,14 @@ async function runFirstSssConstructorPair() {
   report.scenario.first_sss_constructor_pair.claim =
     'SSS constructor observation attempt retained; capture, stop guarantees and semantic comparison have not yet passed their checks. No equivalence or acceptance claim.';
   await persistReport();
+  const cssFailure = firstSssPairCssFailure(evidence.native);
+  if (cssFailure) {
+    report.scenario.first_sss_constructor_pair.failure = {
+      ...cssFailure, pair_terminal: evidence.native?.first_sss_constructor_pair?.complete === true ||
+        evidence.native?.first_sss_constructor_pair?.failed === true, snapshot: evidence};
+    await persistReport();
+    throw new Error(`${cssFailure.kind}: ${cssFailure.error}`);
+  }
 
   const postcaptureCssBaseline = await timeout(readFirstCssBrowserFinalDrawObservation(),
     Math.min(5000, remaining()), 'Retain the current CSS baseline after SSS capture');

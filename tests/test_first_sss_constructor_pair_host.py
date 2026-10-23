@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import shlex
+import shutil
 import sys
 import subprocess
 import unittest
@@ -43,9 +44,74 @@ class FirstSssConstructorPairHostTests(OwnedWorkspaceTests):
         result = subprocess.run([sys.executable, str(control), str(work)], cwd=ROOT,
             text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("PASS extracted shared native SSS pair arm/kick", result.stdout)
+        self.assertIn("PASS extracted native arm/kick plus fresh-pair callback selector", result.stdout)
+        self.assertIn("legacy 147/148 retained", result.stdout)
         self.assertIn("distinct first/terminal seeds", result.stdout)
-        self.assertIn("seed-owner/current/final-seed", result.stdout)
+
+
+    def test_browser_pair_wait_surfaces_css_failure_and_persists_snapshot(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node required for source-extracted browser wait control")
+        runner = ROOT / "tests/stadium_c1a_browser_test.mjs"
+        work = self.new_workspace(ROOT, "first-sss-pair-js-")
+        script = r"""
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+const source = await fs.readFile(process.argv[2], 'utf8');
+function extractFunction(text, name) {
+  const start = text.indexOf(`function ${name}(`);
+  assert.notEqual(start, -1, `missing actual function ${name}`);
+  const open = text.indexOf('{', start); let depth = 0;
+  for (let i = open; i < text.length; i += 1) {
+    if (text[i] === '{') depth += 1;
+    else if (text[i] === '}' && --depth === 0) return text.slice(start, i + 1);
+  }
+  throw Error(`unterminated actual function ${name}`);
+}
+const compileFunction = name => new Function(`return (${extractFunction(source, name)});`)();
+const waitResolved = compileFunction('firstSssConstructorPairWaitResolved');
+const cssFailure = compileFunction('firstSssPairCssFailure');
+const invoke = observation => {
+  globalThis.Module = {
+    _melee_web_native_menu_stadium_first_css_draw_observe: () => observation ? 1 : 0,
+    UTF8ToString: () => JSON.stringify(observation),
+  };
+  return waitResolved();
+};
+assert.equal(invoke(null), false);
+assert.equal(invoke({state:'entered', first_sss_constructor_pair:{complete:false,failed:false}}), false);
+assert.equal(invoke({state:'complete', first_sss_constructor_pair:{complete:true,failed:false}}), true);
+assert.equal(invoke({state:'failed', first_sss_constructor_pair:{complete:false,failed:true}}), true);
+const error = 'Fresh CSS row lost its reserved host/world/session before source access';
+const failed = {state:'failed', error, first_sss_constructor_pair:{complete:false,failed:false,kicked:true}};
+assert.equal(invoke(failed), true, 'top-level CSS failure wakes pair wait');
+assert.deepEqual(cssFailure(failed), {kind:'top_level_css_failure',error});
+assert.equal(cssFailure({state:'complete'}), null);
+assert.equal(cssFailure({state:'failed',error:null}).error,
+  'Fresh CSS observation failed without an error string');
+assert.equal(cssFailure({state:'failed',error,first_sss_constructor_pair:{complete:true}}).error, error);
+const start = source.indexOf('async function runFirstSssConstructorPair()');
+const wait = source.indexOf('page.waitForFunction(firstSssConstructorPairWaitResolved', start);
+const observation = source.indexOf('report.scenario.first_sss_constructor_pair.observation = evidence;', wait);
+const classify = source.indexOf('const cssFailure = firstSssPairCssFailure(evidence.native);', observation);
+const persistFailure = source.indexOf('await persistReport();', classify);
+const throwFailure = source.indexOf('throw new Error(`${cssFailure.kind}: ${cssFailure.error}`);', persistFailure);
+assert(start >= 0 && wait > start && observation > wait && classify > observation &&
+  persistFailure > classify && throwFailure > persistFailure,
+  'actual driver must persist the failure snapshot before surfacing the raw error');
+assert(source.slice(classify, persistFailure).includes('snapshot: evidence'));
+assert(source.slice(wait, observation).includes('LIMITS.sourceTransitionMs'));
+assert.match(source, /sourceTransitionMs:\s*CSS_SSS_TRANSITION_LIMITS\.transitionMs/);
+delete globalThis.Module;
+console.log('PASS source-extracted CSS failure wakeup/classification and actual driver persistence order; 5 wait states, 5 failure cases; original 20s bound retained');
+"""
+        js = work / "control.mjs"
+        js.write_text(script)
+        result = subprocess.run([node, str(js), str(runner)], cwd=ROOT,
+            text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("PASS source-extracted CSS failure wakeup", result.stdout)
 
 if __name__ == "__main__":
     unittest.main()

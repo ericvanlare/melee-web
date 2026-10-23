@@ -17,6 +17,23 @@ from owned_test_workspace import OwnedWorkspaceTests
 from check_gameplay import node_runtime
 
 
+def fresh_sss_pair_callback_selector(source):
+    start = 'enum class FirstSssFreshPairCallbackAction : unsigned {'
+    end = 'struct FirstSssConsumedTickState {'
+    assert source.count(start) == 1 and source.count(end) == 1
+    return source[source.index(start):source.index(end)]
+
+
+# Only the actual selector's global pair-state fields are doubled here.
+# The enum and selector implementation are extracted verbatim above.
+FRESH_SSS_PAIR_CALLBACK_STATE = r'''
+struct PairCallbackState {
+ FirstCssBrowserMode profile=FirstCssBrowserMode::None;
+ bool armed=false,kicked=false,attempted=false,complete=false,failed=false,frame_terminal=false;
+}first_sss_constructor_pair;
+'''
+
+
 class FreshCssRowControls(OwnedWorkspaceTests):
     @classmethod
     def setUpClass(cls):
@@ -163,7 +180,7 @@ int main(){
         menu=(CANDIDATE/'src/gameplay_menu_browser_menu.cpp').read_text()
         admission=menu[menu.index('int melee_web_native_menu_prepare(){'):]
         admission=admission[:admission.index('#if defined(MELEE_WEB_PIPELINE_PROVENANCE)')]
-        fixture=OWNER_FIXTURE+enum+OWNER_STATE+failure+live+constructor+shared+kicks
+        fixture=OWNER_FIXTURE+enum+OWNER_STATE+fresh_sss_pair_callback_selector(source)+failure+live+constructor+shared+kicks
         fixture+='\n'+admission+'++prepare_mutations;return 1;}catch(...){return 0;}}\n'
         launch_admission=menu[menu.index('int melee_web_native_menu_launch(){try{'):
             menu.index(' if(preparation.busy()||pending)', menu.index('int melee_web_native_menu_launch(){try{'))]
@@ -220,7 +237,8 @@ struct State{
  const uint32_t* seed_owner=nullptr;const GameModeState::GameSceneInfo* scene_owner=nullptr;
  struct{uint32_t random_seed=0;}entry;
 }first_css_browser_draw;
-struct Stage{bool armed=false,kicked=false,terminal=false,failed=false,complete=false;}first_css_browser_postdraw_stream,first_css_final_pending_draw;
+struct Stage{bool armed=false,kicked=false,terminal=false,failed=false,complete=false,compared=false,approved=false,frame_end_returned=false;std::string outcome;}first_css_browser_postdraw_stream,first_css_final_pending_draw;
+'''+FRESH_SSS_PAIR_CALLBACK_STATE+r'''
 MeleeWebMenuHost host_storage,other_host;MeleeWebMenuHost* host=nullptr;
 std::unique_ptr<melee_web::GameplayMenuWorld> world;
 GameModeState::GameSceneInfo scene;
@@ -247,7 +265,7 @@ void first_css_browser_draw_refresh_observation(){++refreshes;}
 int service_commands(){++commands;if(queued_unload){first_css_browser_draw={};host=nullptr;world.reset();host_entered=false;world_exposed=false;source_session_owned=false;running=false;first_use_draw_pending=false;queued_unload=false;}return 0;}
 '''
 OWNER_MAIN=r'''
-void reset(){first_css_browser_draw={};host=&host_storage;world=std::make_unique<melee_web::GameplayMenuWorld>();generation=7;phase=0;kind=GM_VS;source_scene=1;frame=0;seed=17;seed_ptr=&seed;scene.scene_kind=8;
+void reset(){first_sss_constructor_pair={};first_css_browser_draw={};host=&host_storage;world=std::make_unique<melee_web::GameplayMenuWorld>();generation=7;phase=0;kind=GM_VS;source_scene=1;frame=0;seed=17;seed_ptr=&seed;scene.scene_kind=8;
  host_entered=false;world_exposed=false;source_session_owned=true;running=false;pending=false;first_use_draw_pending=false;faulted=false;match=false;results=false;prize=false;replay=false;net_active=false;healthy=true;world_exists=true;preparation.active=false;diagnostic_start_ticks=0;diagnostic_pad_remaining=0;constructor_entries=0;audio_phase=0;refreshes=0;scene_reads=0;frame_reads=0;prepare_mutations=0;commands=0;poll_or_audio_or_preparation_calls=0;queued_unload=false;
  auto& s=first_css_browser_draw;s.mode=FirstCssBrowserMode::FreshConsumedTickDrawV3;s.armed=true;s.constructor_arm_ready=true;s.arm_source_session_owned=true;s.armed_host_owner=host;s.armed_world_owner=world.get();s.armed_world_generation=7;}
 void enter(){auto& s=first_css_browser_draw;s.constructor_launch_consumed=true;s.constructor_entry_attempted=true;s.entry_captured=true;s.world_generation=7;s.seed_owner=&seed;s.scene_owner=&scene;s.entry.random_seed=seed;host_entered=true;world_exposed=true;phase=1;running=true;first_use_draw_pending=true;}
@@ -288,6 +306,20 @@ int main(){
  callback();callback();assert(s.fresh_terminal_callbacks==2&&commands==2&&poll_or_audio_or_preparation_calls==0&&!s.failed);
  s.source_steps=2;callback();assert(s.failed&&poll_or_audio_or_preparation_calls==0);
  callback();assert(poll_or_audio_or_preparation_calls==0);queued_unload=true;callback();assert(!world&&!host&&commands==5&&poll_or_audio_or_preparation_calls==1);
+ // Exercise every real selector action; default-unarmed state is not a constant Strict stub.
+ reset();enter();s.mode=FirstCssBrowserMode::FreshFiniteCssPrefixV4;s.kicked=s.complete=true;
+ auto& pair=first_sss_constructor_pair;pair.profile=FirstCssBrowserMode::FreshFiniteCssPrefixV4;
+ pair.armed=pair.kicked=true;
+ auto& stream=first_css_browser_postdraw_stream;stream.armed=stream.kicked=stream.terminal=true;
+ stream.failed=false;stream.outcome="stop_after_last_input_request";
+ auto& final_draw=first_css_final_pending_draw;final_draw.complete=final_draw.compared=final_draw.approved=final_draw.frame_end_returned=true;final_draw.failed=false;
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::ContinueTransition);
+ pair.frame_terminal=pair.complete=true;
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StopAfterPair);
+ pair.complete=false;
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StrictCssTerminal);
+ pair.frame_terminal=false;pair.profile=FirstCssBrowserMode::LegacyTickDrawV1;
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StrictCssTerminal);
  reset();enter();s.mode=FirstCssBrowserMode::LegacyTickDrawV1;assert(melee_web_native_menu_stadium_first_css_draw_kick()==1);
  std::cout<<"PASS actual private owner/kick and command-first source-free fences; v1/v2 refusal regressions\n";
 }
@@ -297,7 +329,7 @@ ARM_SERVICES=r'''
 bool scoped_assets=true,scoped_disc_import=true,asset_committed=false,stadium_c1a_armed=false;
 enum class AssetDestination{None};AssetDestination asset_destination=AssetDestination::None;
 struct Scope{unsigned pending_generation(){return 0;}}asset_scope;
-struct Armed{bool armed=false;}first_sss_constructor_pair,first_sss_consumed_tick,first_sss_draw_sequence,first_sss_prefix_sequence;
+struct Armed{bool armed=false;}first_sss_consumed_tick,first_sss_draw_sequence,first_sss_prefix_sequence;
 struct Attempt{bool attempted=false;}first_sss_vs_entry,first_sss_vs_setup;
 struct Matched{bool opted_in=false,armed=false;}matched_setup_cf;
 unsigned context_applications=0,host_enable_calls=0,host_return_arm_calls=0,finite_reservations=0,reserved_ordinal=0,reserved_sequence=0;
@@ -312,7 +344,7 @@ int melee_web_menu_host_reserve_fresh_finite_css_v4(MeleeWebMenuHost*,unsigned o
 ARM_MAIN=r'''
 using namespace ::melee_web::stadium_first_css_diagnostic;
 void be(std::vector<uint8_t>& b,size_t o,uint32_t v){for(unsigned i=0;i<4;i++)b[o+i]=uint8_t(v>>(24-i*8));}
-void reset_arm(){first_css_browser_draw={};first_css_browser_postdraw_stream={};first_css_final_pending_draw={};world=std::make_unique<melee_web::GameplayMenuWorld>();host=&host_storage;
+void reset_arm(){first_sss_constructor_pair={};first_css_browser_draw={};first_css_browser_postdraw_stream={};first_css_final_pending_draw={};world=std::make_unique<melee_web::GameplayMenuWorld>();host=&host_storage;
  host_entered=false;world_exposed=false;source_session_owned=true;generation=7;phase=MELEE_WEB_MENU_CREATED;kind=GM_VS;
  running=false;pending=false;first_use_draw_pending=false;faulted=false;match=false;results=false;prize=false;replay=false;net_active=false;
  context_applications=0;host_enable_calls=0;host_return_arm_calls=0;finite_reservations=0;reserved_ordinal=0;reserved_sequence=0;diagnostic_start_ticks=0;diagnostic_pad_remaining=0;apply_ok=true;}

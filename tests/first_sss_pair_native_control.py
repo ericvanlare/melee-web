@@ -3,6 +3,28 @@ import shutil, subprocess, sys
 root=Path(__file__).resolve().parents[1]
 source=(root/"src/gameplay_menu_browser.cpp").read_text()
 enum=source[source.index("enum class FirstCssBrowserMode : unsigned {"):source.index("struct FirstCssDrawSample {")]
+def function_slice(text, marker):
+    start=text.index(marker)
+    opening=text.index("{", start)
+    depth=0
+    for index in range(opening, len(text)):
+        if text[index]=="{": depth+=1
+        elif text[index]=="}":
+            depth-=1
+            if depth==0: return text[start:index+1]
+    raise AssertionError(f"unterminated function {marker}")
+action_enum=source[source.index("enum class FirstSssFreshPairCallbackAction : unsigned {"):source.index("FirstSssFreshPairCallbackAction first_sss_fresh_pair_callback_action(){")]
+action=function_slice(source,"FirstSssFreshPairCallbackAction first_sss_fresh_pair_callback_action(){")
+queue_guard=source.index("// Diagnostic input must never override the producer-bound literal row.")
+selector=source.index("const auto fresh_pair_callback=first_sss_fresh_pair_callback_action();")
+services=source.index("if(first_sss_vs_setup_service())return;",selector)
+branch=source[selector:services]
+assert queue_guard<selector, "queued-input refusal must remain ahead of the pair exception"
+assert "fresh_pair_callback==FirstSssFreshPairCallbackAction::StopAfterPair" in branch
+assert "fresh_pair_callback!=FirstSssFreshPairCallbackAction::ContinueTransition" in branch
+assert "running=false;pending=false;first_use_draw_pending=false;audio_phase=0;" in branch
+assert 'first_css_browser_draw_check_live("terminal fresh row callback")' in branch
+assert services>selector, "ordinary service dispatch must remain after the callback selection"
 start=source.index("void first_sss_pair_check_css_boundary(")
 end=source.index("\n#endif\n}",start)
 actual=source[start:end]
@@ -37,7 +59,7 @@ struct FiniteInput {std::string source_sha256;std::vector<Row> rows;uint32_t pha
 struct Sample {uint32_t scene_frame=0,seed=0;uint64_t world_generation=0;};
 struct DrawState {
  FirstCssBrowserMode mode=FirstCssBrowserMode::None;
- bool armed=false,complete=false,failed=false,entry_captured=false,tick_captured=false,
+ bool armed=false,kicked=false,complete=false,failed=false,entry_captured=false,tick_captured=false,
    draw_captured=false,frame_end_returned=false;
  unsigned source_steps=0,source_draws=0,host_tick_calls=0,host_draw_calls=0,
    aurora_begin_calls=0,aurora_end_calls=0;
@@ -50,7 +72,7 @@ struct DrawState {
  const void* scene_owner=nullptr;
 } first_css_browser_draw;
 struct Stream {
- bool terminal=false,failed=false,complete=false,transition_captured=false,
+ bool armed=false,kicked=false,terminal=false,failed=false,complete=false,transition_captured=false,
    tick_captured=false,frame_end_returned=false;
  std::string outcome;
  struct {std::string source_sha256;} input;
@@ -67,7 +89,7 @@ struct FinalDraw {
 } first_css_final_pending_draw;
 struct Pair {
  FirstCssBrowserMode profile=FirstCssBrowserMode::None;
- bool armed=false,kicked=false,attempted=false,failed=false,audio_before_rebuild_captured=false;
+ bool armed=false,kicked=false,attempted=false,failed=false,complete=false,frame_terminal=false,audio_before_rebuild_captured=false;
  uint64_t audio_render_calls_before_rebuild=0,audio_render_frames_before_rebuild=0;
 } first_sss_constructor_pair;
 struct FixedTickClock {void reset(){}} menu_clock,audio_clock;
@@ -99,6 +121,8 @@ const Row& first_css_finite_row(unsigned index){
  check(index<first_css_browser_draw.finite_css.rows.size(),"bad finite row");
  return first_css_browser_draw.finite_css.rows[index];
 }
+'''+action_enum+r'''
+'''+action+r'''
 '''+actual+r'''
 void reset_common(){
  first_sss_constructor_pair=Pair{};first_css_browser_postdraw_stream=Stream{};
@@ -112,7 +136,7 @@ void reset_common(){
 void setup_fresh(){
  reset_common();first_css_browser_draw=DrawState{};
  auto& b=first_css_browser_draw;b.mode=FirstCssBrowserMode::FreshFiniteCssPrefixV4;
- b.armed=b.complete=b.entry_captured=b.tick_captured=b.draw_captured=b.frame_end_returned=true;
+ b.armed=b.kicked=b.complete=b.entry_captured=b.tick_captured=b.draw_captured=b.frame_end_returned=true;
  b.source_steps=b.source_draws=b.host_tick_calls=b.host_draw_calls=b.aurora_begin_calls=b.aurora_end_calls=1;
  b.tick_result=1;b.world_generation=7;b.context.source_sha256=std::string(64,'4');
  b.finite_css.source_sha256=b.context.source_sha256;b.finite_css.phase_end_sequence=1570;
@@ -120,7 +144,7 @@ void setup_fresh(){
  auto& r=b.finite_css.rows[141];r.consume_sequence=1565;r.tick_sequence=1566;
  r.draw_enter_sequence=1567;r.draw_return_sequence=1568;r.poll_sequence=1569;
  r.source_tick=141;r.draw_ordinal=141;r.draw_source_tick=142;r.poll_source_tick=142;r.poll_draw_ordinal=142;
- auto& s=first_css_browser_postdraw_stream;s.terminal=true;s.outcome="stop_after_last_input_request";
+ auto& s=first_css_browser_postdraw_stream;s.armed=s.kicked=s.terminal=true;s.outcome="stop_after_last_input_request";
  s.input.source_sha256=b.context.source_sha256;s.current_input_index=140;s.next_input_index=140;
  s.consumed_inputs=141;s.host_tick_calls=141;s.executed_host_ticks=142;s.matched_ticks=140;
  s.matched_draws=140;s.host_draw_calls=140;s.aurora_begin_calls=s.aurora_end_calls=140;
@@ -134,12 +158,55 @@ void setup_legacy(){
   b.tick_captured=b.draw_captured=b.frame_end_returned=true;
  b.source_steps=b.source_draws=b.host_tick_calls=b.host_draw_calls=b.aurora_begin_calls=b.aurora_end_calls=1;
  b.tick_result=1;b.world_generation=7;b.seed_owner=&seed;b.scene_owner=current_scene;b.draw={149,seed,7};
- auto& s=first_css_browser_postdraw_stream;s.terminal=true;s.outcome="stop_after_last_input_request";
+ auto& s=first_css_browser_postdraw_stream;s.armed=s.kicked=s.terminal=true;s.outcome="stop_after_last_input_request";
  s.matched_ticks=s.matched_draws=147;s.consumed_inputs=148;
  auto& f=first_css_final_pending_draw;f.complete=f.compared=f.approved=f.frame_end_returned=true;
  f.actual={149,seed,7};
 }
+void setup_fresh_pair_kicked(){
+ setup_fresh();auto& pair=first_sss_constructor_pair;
+ pair.profile=FirstCssBrowserMode::FreshFiniteCssPrefixV4;pair.armed=pair.kicked=true;
+}
+void callback_action_controls(){
+ setup_fresh();
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StrictCssTerminal);
+ setup_fresh_pair_kicked();auto& pair=first_sss_constructor_pair;
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::ContinueTransition);
+ // Selection must preserve the already queued transition and source observations.
+ pending=true;const auto source_ticks=first_css_browser_draw.host_tick_calls;
+ const auto source_draws=first_css_browser_draw.host_draw_calls;
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::ContinueTransition);
+ assert(pending&&first_css_browser_draw.host_tick_calls==source_ticks&&
+        first_css_browser_draw.host_draw_calls==source_draws);
+ pair.frame_terminal=pair.complete=true;
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StopAfterPair);
+ first_css_browser_draw.failed=true;
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StrictCssTerminal);
+ first_css_browser_draw.failed=false;
+ pair.complete=false;pair.failed=true;
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StopAfterPair);
+ pair.failed=false;pair.frame_terminal=false;
+ pair.profile=FirstCssBrowserMode::LegacyTickDrawV1;
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StrictCssTerminal);
+ pair.profile=FirstCssBrowserMode::FreshFiniteCssPrefixV4;
+ pair.kicked=false;assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StrictCssTerminal);
+ pair.kicked=true;
+ first_css_browser_draw.failed=true;
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StrictCssTerminal);
+ first_css_browser_draw.failed=false;
+ first_css_browser_draw.complete=false;
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StrictCssTerminal);
+ setup_fresh_pair_kicked();first_css_browser_postdraw_stream.failed=true;
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StrictCssTerminal);
+ setup_fresh_pair_kicked();first_css_final_pending_draw.approved=false;
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StrictCssTerminal);
+ setup_fresh_pair_kicked();pair.frame_terminal=true;
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StrictCssTerminal);
+ setup_fresh_pair_kicked();first_css_browser_draw.mode=FirstCssBrowserMode::FreshConsumedTickDrawV3;
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StrictCssTerminal);
+}
 int run_control(){
+ callback_action_controls();
  setup_fresh();assert(first_css_browser_draw.draw.seed==0x312151c3);
  assert(first_css_browser_postdraw_stream.transition.seed==0xe2624ac3);
  assert(first_css_final_pending_draw.actual.seed==0xe2624ac3);
@@ -147,6 +214,9 @@ int run_control(){
  assert(first_sss_constructor_pair.armed&&first_sss_constructor_pair.profile==FirstCssBrowserMode::FreshFiniteCssPrefixV4&&host_arm_calls==1);
  assert(melee_web_native_menu_stadium_first_sss_pair_fresh_v4_kick()==1);
  assert(first_sss_constructor_pair.kicked&&pending&&!running&&first_sss_constructor_pair.audio_before_rebuild_captured);
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::ContinueTransition);
+ first_sss_constructor_pair.complete=first_sss_constructor_pair.frame_terminal=true;
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StopAfterPair);
 
  setup_legacy();assert(melee_web_native_menu_stadium_first_sss_pair_arm()==1);
  assert(first_sss_constructor_pair.profile==FirstCssBrowserMode::LegacyTickDrawV1);
@@ -201,7 +271,7 @@ int run_control(){
  first_css_browser_postdraw_stream.matched_ticks=139;
  assert(melee_web_native_menu_stadium_first_sss_pair_fresh_v4_kick()==0);
  assert(!first_sss_constructor_pair.kicked&&!pending);
- std::cout<<"PASS extracted shared native SSS pair arm/kick; legacy 147/148 retained; fresh 140/141/142 exact with distinct first/terminal seeds; cross-profile, seed-owner/current/final-seed and chain refusals before mutation\n";
+ std::cout<<"PASS extracted native arm/kick plus fresh-pair callback selector; legacy 147/148 retained; fresh 140/141/142 exact with distinct first/terminal seeds; handoff, terminal, wrong-profile, failed-CSS/stream/draw refusal matrix\n";
  return 0;
 }
 }

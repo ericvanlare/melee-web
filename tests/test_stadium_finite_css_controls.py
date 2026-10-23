@@ -130,7 +130,8 @@ int main(){
     def test_actual_native_finite_stages_and_terminal_tick_branch(self, whole_wrapper=False):
         # Reuse the established explicit source-owner service fixture. Native
         # arm/codec and command-first callback fences are separate controls.
-        from test_stadium_fresh_css_row_controls import OWNER_FIXTURE,OWNER_STATE,OWNER_MAIN,ARM_SERVICES
+        from test_stadium_fresh_css_row_controls import (OWNER_FIXTURE,OWNER_STATE,OWNER_MAIN,ARM_SERVICES,
+            FRESH_SSS_PAIR_CALLBACK_STATE,fresh_sss_pair_callback_selector)
         source=(CANDIDATE/'src/gameplay_menu_browser.cpp').read_text()
         def cut(a,b):
             self.assertEqual(source.count(a),1,a);self.assertEqual(source.count(b),1,b)
@@ -142,7 +143,7 @@ int main(){
             'struct Preparation{bool active=false;bool busy(){return active;} melee_web::MenuPreparationState::Phase phase(){return melee_web::MenuPreparationState::Phase::Idle;}}')
         fixture='\n'.join(line for line in OWNER_FIXTURE.splitlines() if not line.startswith('#include'))
         fixture=fixture.replace('#define EM_ASM_INT(...) service_commands()','#define EM_ASM_INT(...) 1')
-        states='struct MeleeWebMenuCssReturnSnapshot{uint32_t random_seed=0;};\n'+enums_and_states+'FirstCssBrowserPostdrawStreamState first_css_browser_postdraw_stream;\n'+final_state
+        states='struct MeleeWebMenuCssReturnSnapshot{uint32_t random_seed=0;};\n'+enums_and_states+'FirstCssBrowserPostdrawStreamState first_css_browser_postdraw_stream;\n'+final_state+FRESH_SSS_PAIR_CALLBACK_STATE+fresh_sss_pair_callback_selector(source)
         actual_failure=cut('void first_css_browser_draw_fail(const std::string& error){','void first_css_browser_draw_check_live(')
         actual_live_and_capture=cut('void first_css_browser_draw_check_live(const char* boundary){','void first_css_browser_draw_write_route(')
         helpers=cut('unsigned first_css_postdraw_count(){','std::string first_css_browser_postdraw_stream_actual_json(')

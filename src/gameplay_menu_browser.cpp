@@ -298,6 +298,32 @@ struct FirstSssConstructorPairState {
  MeleeWebMenuFirstSssPairObservation native{};
 };
 FirstSssConstructorPairState first_sss_constructor_pair;
+enum class FirstSssFreshPairCallbackAction : unsigned {
+ StrictCssTerminal, ContinueTransition, StopAfterPair
+};
+FirstSssFreshPairCallbackAction first_sss_fresh_pair_callback_action(){
+ const auto& css=first_css_browser_draw;
+ const auto& pair=first_sss_constructor_pair;
+ const bool exact_fresh_pair=
+     css.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4&&
+     pair.profile==FirstCssBrowserMode::FreshFiniteCssPrefixV4&&
+     pair.armed&&pair.kicked;
+ if(!exact_fresh_pair||css.failed)
+  return FirstSssFreshPairCallbackAction::StrictCssTerminal;
+ if(pair.frame_terminal)
+  return pair.complete||pair.failed?
+      FirstSssFreshPairCallbackAction::StopAfterPair:
+      FirstSssFreshPairCallbackAction::StrictCssTerminal;
+ const auto& stream=first_css_browser_postdraw_stream;
+ const auto& final_draw=first_css_final_pending_draw;
+ if(css.failed||!css.armed||!css.kicked||!css.complete||pair.failed||pair.attempted||
+    !stream.armed||!stream.kicked||!stream.terminal||stream.failed||
+    stream.outcome!="stop_after_last_input_request"||
+    !final_draw.complete||!final_draw.compared||!final_draw.approved||
+    !final_draw.frame_end_returned||final_draw.failed)
+  return FirstSssFreshPairCallbackAction::StrictCssTerminal;
+ return FirstSssFreshPairCallbackAction::ContinueTransition;
+}
 struct FirstSssConsumedTickState {
  bool armed=false,kicked=false,attempted=false,captured=false,compared=false;
  bool complete=false,failed=false;
@@ -4247,7 +4273,16 @@ void tick(){
   first_css_browser_draw_refresh_observation();
   EM_ASM({window.menuFrame?.(false);});return;
  }
- if(first_css_fresh_input_mode(first_css_browser_draw.mode)&&
+ const auto fresh_pair_callback=first_sss_fresh_pair_callback_action();
+ if(fresh_pair_callback==FirstSssFreshPairCallbackAction::StopAfterPair){
+  // Keep the completed or failed constructor observation terminal. No later
+  // CSS callback may resume source clocks or replace the first failure.
+  running=false;pending=false;first_use_draw_pending=false;audio_phase=0;
+  menu_clock.reset();audio_clock.reset();first_css_browser_draw_refresh_observation();
+  EM_ASM({window.menuFrame?.(false);});return;
+ }
+ if(fresh_pair_callback!=FirstSssFreshPairCallbackAction::ContinueTransition&&
+    first_css_fresh_input_mode(first_css_browser_draw.mode)&&
     (first_css_browser_draw.failed||first_css_browser_draw.complete)&&
     (first_css_browser_draw.mode!=FirstCssBrowserMode::FreshFiniteCssPrefixV4||
      first_css_browser_draw.failed||!first_css_browser_postdraw_stream.armed||
