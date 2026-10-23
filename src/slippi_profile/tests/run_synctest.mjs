@@ -1535,9 +1535,11 @@ export async function runBrowserInit(page, origin, runtimeName) {
 }
 
 export async function runBrowserSample(page, sample, expectedInputMapping, expectedStocks,
-  writeCensus = null) {
-  return page.evaluate(async ({sample, expectedInputMapping, expectedStocks, checkedSource, inspectSource,
-    inputMappingSource, diagnosticSizeSource, drawDiagnosticBytes, writeCensus,
+  writeCensus = null, payloadAdmissionPlan = null) {
+  let evaluation;
+  try {
+    evaluation = await page.evaluate(async ({sample, expectedInputMapping, expectedStocks, checkedSource, inspectSource,
+    inputMappingSource, diagnosticSizeSource, drawDiagnosticBytes, writeCensus, payloadAdmissionPlan,
     diffHeapRangesSource, classifyHeapRangesSource, decodeAudioInventorySource,
     validateAudioOwnerRangesSource, requireStableAudioInventorySource,
     decodeMatchContextRangeInventorySource, validateMatchContextRangeDisjointnessSource,
@@ -1546,10 +1548,119 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     requireStableAuroraStagingShadowInventorySource, decodeStageArenaOwnerWireSource,
     validateStageArenaOwnerCatalogSource, requireStableStageArenaOwnerInventorySource,
     sameStageArenaMetadataSource, maxHeapBytes}) => {
+    const PAYLOAD_DRY_RUN_SAMPLE300_PAD44_BASE64 =
+      'AgAAAAAAAAAAAAABALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=';
+    const PAYLOAD_DRY_RUN_SAMPLE300_PAD44_SHA256 =
+      '46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288';
     const {module} = window.__slippiSynctest;
+    const payloadAdmissionProgress = payloadAdmissionPlan === null ? null : {
+      status: 'running', checkpoint: null, payloadAdmission: null,
+      commandSequence: [], boundaries: null, sourceStep: null,
+      actualDraw: null, sample300: null, failure: null,
+    };
+    if (payloadAdmissionProgress) {
+      window.__slippiSynctest.payloadAdmissionProgress = payloadAdmissionProgress;
+    }
     const checkedAsyncCcall = new Function(`return (${checkedSource})`)();
     const checked = (label, identifier, argumentTypes = [], args = []) =>
       checkedAsyncCcall(module, label, identifier, argumentTypes, args);
+    const payloadAdmissionCommands = payloadAdmissionProgress?.commandSequence || [];
+    let payloadAdmissionResult = null;
+    const payloadAdmissionCommand = async (command, label) => {
+      const commandRecord = {command, label, outcome: 'pending'};
+      payloadAdmissionCommands.push(commandRecord);
+      try {
+        const result = await module.ccall('melee_web_synctest_payload_admission_command',
+          'number', ['number'], [command], {async: true});
+        commandRecord.result = result;
+        commandRecord.outcome = result === 0 ? 'returned-zero' : 'returned-nonzero';
+        if (payloadAdmissionResult) {
+          payloadAdmissionResult.sequence = payloadAdmissionCommands.map(item => ({...item}));
+        }
+        if (result !== 0) {
+          const failure = {command, label, result};
+          if (payloadAdmissionResult) {
+            payloadAdmissionResult.status = 'refused';
+            payloadAdmissionResult.failure = failure;
+          }
+          if (payloadAdmissionProgress) {
+            payloadAdmissionProgress.status = 'refused';
+            payloadAdmissionProgress.failure = failure;
+          }
+          throw new Error(`${label}: source-payload command returned ${String(result)}`);
+        }
+        return result;
+      } catch (error) {
+        if (commandRecord.outcome === 'pending') {
+          commandRecord.outcome = 'threw';
+          commandRecord.error = String(error);
+          const failure = {command, label, error: String(error)};
+          if (payloadAdmissionResult) {
+            payloadAdmissionResult.status = 'command-error';
+            payloadAdmissionResult.failure = failure;
+            payloadAdmissionResult.sequence = payloadAdmissionCommands.map(item => ({...item}));
+          }
+          if (payloadAdmissionProgress) {
+            payloadAdmissionProgress.status = 'command-error';
+            payloadAdmissionProgress.failure = failure;
+          }
+        }
+        throw error;
+      }
+    };
+    if (payloadAdmissionPlan !== null) {
+      if (sample !== 300 || !writeCensus || payloadAdmissionPlan.checkpointSample !== 299 ||
+          !Number.isSafeInteger(payloadAdmissionPlan.checkpointSourceFrame) ||
+          payloadAdmissionPlan.expectedSample300Pad44Base64 !== PAYLOAD_DRY_RUN_SAMPLE300_PAD44_BASE64 ||
+          payloadAdmissionPlan.expectedSample300Pad44Sha256 !== PAYLOAD_DRY_RUN_SAMPLE300_PAD44_SHA256 ||
+          writeCensus.requireAuroraStagingShadowInventory !== true ||
+          writeCensus.requireStageArenaOwnerInventory !== true) {
+        throw new Error('Source-payload dry run requires the exact warmed sample-299 checkpoint and combined private owner diagnostics');
+      }
+      if (typeof SharedArrayBuffer !== 'undefined' &&
+          module.HEAPU8.buffer instanceof SharedArrayBuffer) {
+        throw new Error('Source-payload dry run refuses shared WebAssembly memory');
+      }
+      if (typeof module._melee_web_synctest_payload_admission_command !== 'function') {
+        throw new Error('Source-payload admission command export is unavailable');
+      }
+      const observationPointer = module._melee_web_snapshot_observation();
+      const observationSize = module._melee_web_snapshot_observation_size();
+      const inputPointer = module._melee_web_snapshot_input();
+      if (observationSize !== 1280 || observationPointer < 0 ||
+          observationPointer + observationSize > module.HEAPU8.byteLength || inputPointer < 0 ||
+          inputPointer + 44 > module.HEAPU8.byteLength) {
+        throw new Error('Source-payload dry-run checkpoint observation or PAD range is invalid');
+      }
+      const currentObservation = new DataView(module.HEAPU8.buffer,
+        observationPointer, observationSize);
+      if (currentObservation.getUint32(0, true) !== payloadAdmissionPlan.checkpointSourceFrame ||
+          currentObservation.getUint32(8, true) !== 1 || currentObservation.getUint32(16, true) !== 0 ||
+          currentObservation.getUint32(20, true) !== 0) {
+        throw new Error('Live sample-299 observation no longer matches its recorded ready source boundary');
+      }
+      const currentPad = module.HEAPU8.slice(inputPointer, inputPointer + 44);
+      const currentPadBase64 = btoa(String.fromCharCode(...currentPad));
+      if (currentPadBase64 !== payloadAdmissionPlan.checkpointRawPad44Base64) {
+        throw new Error('Live source PAD no longer matches the actual sample-299 warm checkpoint');
+      }
+      payloadAdmissionResult = {status: 'running', checkpointSample: 299,
+        checkpointSourceFrame: payloadAdmissionPlan.checkpointSourceFrame,
+        checkpointRawPad44Base64: currentPadBase64,
+        expectedSample300Pad44Base64: PAYLOAD_DRY_RUN_SAMPLE300_PAD44_BASE64,
+        expectedSample300Pad44Sha256: PAYLOAD_DRY_RUN_SAMPLE300_PAD44_SHA256,
+        sequence: [], restoreCalled: false, completeGameState: false,
+        perturbation: 'payload snapshot capture explicitly allocates diagnostic storage; heap deltas are not natural-census attribution'};
+      payloadAdmissionProgress.payloadAdmission = payloadAdmissionResult;
+      payloadAdmissionProgress.checkpoint = {
+        sample: 299,
+        sourceFrame: currentObservation.getUint32(0, true),
+        ready: currentObservation.getUint32(8, true) === 1,
+        complete: currentObservation.getUint32(16, true) !== 0,
+        paused: currentObservation.getUint32(20, true) !== 0,
+        rawPad44Base64: currentPadBase64,
+      };
+    }
     const decision = module._melee_web_synctest_draw_decision(0);
     if (decision !== 1) throw new Error(`present tick draw policy returned ${decision}`);
     let heapBefore = null, heapAfterStep = null, censusBeforeSha256 = null;
@@ -1570,6 +1681,15 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     const censusNativeTransferQuiescence = writeCensus ? {
       beforeStep: null, afterStep: null, afterActualDraw: null,
     } : null;
+    if (payloadAdmissionProgress) {
+      payloadAdmissionProgress.boundaries = {
+        nativeTransferQuiescence: censusNativeTransferQuiescence,
+        audioOwnerInventory: audioInventoryBoundaries,
+        matchContextOwnerInventory: matchContextInventoryBoundaries,
+        auroraStagingShadowOwnerInventory: auroraStagingShadowInventoryBoundaries,
+        stageArenaOwnerInventory: stageArenaOwnerInventoryBoundaries,
+      };
+    }
     if (writeCensus) {
       if (writeCensus.requireAudioInventory !== true) {
         throw new Error('Write census runner must require the audio owner inventory');
@@ -1761,6 +1881,7 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
             metadata: firstMetadata.wire, ...validated});
         }
       };
+      if (payloadAdmissionPlan !== null) await payloadAdmissionCommand(1, 'CAPTURE');
       await queryOwnerInventories('before-source-step');
       const heap = module.HEAPU8;
       if (!(heap instanceof Uint8Array) || heap.byteLength > maxHeapBytes) {
@@ -1770,8 +1891,12 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
       const digest = await globalThis.crypto.subtle.digest('SHA-256', heapBefore);
       censusBeforeSha256 = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
     }
-    await checked(`draw-reference source tick ${sample}`,
-      'melee_web_snapshot_step', ['number'], [sample]);
+    if (payloadAdmissionPlan !== null) {
+      await payloadAdmissionCommand(2, 'STEP_AND_ADMIT(sample 300)');
+    } else {
+      await checked(`draw-reference source tick ${sample}`,
+        'melee_web_snapshot_step', ['number'], [sample]);
+    }
     if (writeCensus) {
       await checked('native transfer quiescence after census source step', 'melee_web_snapshot_quiescent');
       censusNativeTransferQuiescence.afterStep = 'passed';
@@ -1792,10 +1917,15 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
         changedBytes: raw.changedBytes,
         ranges: raw.ranges,
       };
+      if (payloadAdmissionProgress) payloadAdmissionProgress.sourceStep = censusStepRaw;
       heapBefore = null;
     }
-    await checked(`actual source draw ${sample}`,
-      'melee_web_synctest_draw_present');
+    if (payloadAdmissionPlan !== null) {
+      await payloadAdmissionCommand(3, 'DRAW_ONCE');
+    } else {
+      await checked(`actual source draw ${sample}`,
+        'melee_web_synctest_draw_present');
+    }
     if (sample === 0) {
       await checked('draw-reference native quiescence', 'melee_web_snapshot_quiescent');
     }
@@ -1816,6 +1946,12 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     if (writeCensus) {
       await checked('native transfer quiescence after census actual draw', 'melee_web_snapshot_quiescent');
       censusNativeTransferQuiescence.afterActualDraw = 'passed';
+      if (payloadAdmissionPlan !== null) {
+        await payloadAdmissionCommand(4, 'POSTDRAW_ADMIT');
+        payloadAdmissionResult.status = 'owner-local-payload-admission-complete';
+        payloadAdmissionResult.sequence = payloadAdmissionCommands.map(item => ({...item}));
+        payloadAdmissionProgress.status = 'owner-local-payload-admission-complete';
+      }
       await queryOwnerInventories('after-actual-draw-and-Aurora-quiescence');
       const heapAfterDraw = module.HEAPU8.slice();
       if (heapAfterDraw.byteLength > maxHeapBytes) {
@@ -1841,6 +1977,7 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
         changedBytes: raw.changedBytes,
         ranges: raw.ranges,
       };
+      if (payloadAdmissionProgress) payloadAdmissionProgress.actualDraw = censusDrawRaw;
       const makeClassify = new Function('ranges', 'manifestRows', 'arenaRange',
         'audioInventoryTransition', 'nativeOutputRange', 'matchContextInventoryTransition',
         'auroraInventoryTransition', 'stageArenaInventoryTransition',
@@ -1909,6 +2046,12 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
       }
       return btoa(binary);
     };
+    if (payloadAdmissionProgress) {
+      payloadAdmissionProgress.sample300 = {
+        observation: encode(observation), pcm: encode(pcm), pad44Base64: encode(pad),
+        drawDiagnostics: encode(diagnostics), boundary, submissionStatus: status,
+      };
+    }
     const heapCensus = writeCensus ? {
       sample,
       arenaRange: writeCensus.arenaRange,
@@ -1964,9 +2107,15 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
       sourceStep: censusStepDiff,
       actualDrawAndQuiescence: censusDrawDiff,
     } : null;
+    if (payloadAdmissionProgress) payloadAdmissionProgress.heapCensus = heapCensus;
+    if (payloadAdmissionPlan !== null && encode(pad) !== PAYLOAD_DRY_RUN_SAMPLE300_PAD44_BASE64) {
+      throw new Error('Actual sample-300 raw PAD differs from the pinned deterministic input');
+    }
     return {observation: encode(observation), pcm: encode(pcm), pad: encode(pad),
-      drawDiagnostics: encode(diagnostics), boundary, status, heapCensus};
-  }, {sample, expectedInputMapping, expectedStocks, checkedSource: checkedAsyncCcall.toString(),
+      drawDiagnostics: encode(diagnostics), boundary, status, heapCensus,
+      payloadAdmission: payloadAdmissionResult};
+  }, {sample, expectedInputMapping, expectedStocks, payloadAdmissionPlan,
+    checkedSource: checkedAsyncCcall.toString(),
     inputMappingSource: validateSourceInputMapping.toString(),
     diagnosticSizeSource: requireDrawDiagnosticSize.toString(),
     inspectSource: inspectInteractiveObservation.toString(),
@@ -1987,16 +2136,47 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     requireStableStageArenaOwnerInventorySource: requireStableStageArenaOwnerInventory.toString(),
     sameStageArenaMetadataSource: sameStageArenaMetadata.toString(),
     maxHeapBytes: MAX_HEAP_BYTES});
+  } catch (error) {
+    const sampleError = error instanceof Error ? error : new Error(String(error));
+    if (payloadAdmissionPlan !== null) {
+      try {
+        const serialized = await page.evaluate(() => {
+          const progress = window.__slippiSynctest?.payloadAdmissionProgress;
+          return progress ? JSON.stringify(progress) : null;
+        });
+        if (typeof serialized === 'string') {
+          const partial = JSON.parse(serialized);
+          if (partial.status === 'running') {
+            const failure = {kind: 'runner-error', message: String(sampleError)};
+            partial.status = 'interrupted';
+            partial.failure ||= failure;
+            if (partial.payloadAdmission?.status === 'running') {
+              partial.payloadAdmission.status = 'interrupted';
+              partial.payloadAdmission.failure ||= failure;
+            }
+          }
+          sampleError.payloadAdmissionPartial = partial;
+        }
+      } catch (readError) {
+        sampleError.payloadAdmissionPartialReadError = String(readError);
+      }
+    }
+    throw sampleError;
+  }
+  return evaluation;
 }
 
-export async function closeBrowser(page) {
+export async function closeBrowser(page, payloadAdmissionEnabled = false) {
   if (!page) return null;
-  return page.evaluate(async checkedSource => {
+  return page.evaluate(async ({checkedSource, payloadAdmissionEnabled}) => {
     const state = window.__slippiSynctest;
     if (!state) return {closed: true, renderer: false};
     const {module} = state;
     const checkedAsyncCcall = new Function(`return (${checkedSource})`)();
     const errors = [];
+    const payloadAdmissionClose = {status: 'not-attempted'};
+    const snapshotClose = {status: 'not-attempted'};
+    const rendererShutdown = {status: 'not-attempted'};
     try {
       const status = JSON.parse(module.UTF8ToString(module._melee_web_synctest_submission_json()));
       if (status.pendingFramePackets !== 0 || status.pendingStagingBuffers !== 0 || status.workerBusy !== 0) {
@@ -2006,14 +2186,40 @@ export async function closeBrowser(page) {
         errors.push(`renderer logged errors before shutdown: ${JSON.stringify(status)}`);
       }
     } catch (error) { errors.push(`renderer quiescence check failed: ${String(error)}`); }
+    if (payloadAdmissionEnabled) {
+      try {
+        const result = await module.ccall('melee_web_synctest_payload_admission_command',
+          'number', ['number'], [5], {async: true});
+        payloadAdmissionClose.result = result;
+        payloadAdmissionClose.status = result === 0 ? 'returned-zero' : 'returned-nonzero';
+        if (result !== 0) errors.push(`source-payload CLOSE returned ${String(result)}`);
+      } catch (error) {
+        payloadAdmissionClose.status = 'threw';
+        payloadAdmissionClose.error = String(error);
+        errors.push(`source-payload CLOSE failed: ${String(error)}`);
+      }
+    }
     try {
-      await checkedAsyncCcall(module, 'snapshot close', 'melee_web_snapshot_close');
-    } catch (error) { errors.push(String(error)); }
+      const result = await checkedAsyncCcall(module, 'snapshot close', 'melee_web_snapshot_close');
+      snapshotClose.status = 'checked-return-one';
+      snapshotClose.result = result;
+    } catch (error) {
+      snapshotClose.status = 'checked-call-failed';
+      snapshotClose.error = String(error);
+      errors.push(String(error));
+    }
     try {
-      await checkedAsyncCcall(module, 'renderer shutdown', 'melee_web_synctest_renderer_shutdown');
-    } catch (error) { errors.push(String(error)); }
-    return {closed: errors.length === 0, renderer: true, errors};
-  }, checkedAsyncCcall.toString());
+      const result = await checkedAsyncCcall(module, 'renderer shutdown', 'melee_web_synctest_renderer_shutdown');
+      rendererShutdown.status = 'checked-return-one';
+      rendererShutdown.result = result;
+    } catch (error) {
+      rendererShutdown.status = 'checked-call-failed';
+      rendererShutdown.error = String(error);
+      errors.push(String(error));
+    }
+    return {closed: errors.length === 0, renderer: true, errors,
+      ...(payloadAdmissionEnabled ? {payloadAdmissionClose, snapshotClose, rendererShutdown} : {})};
+  }, {checkedSource: checkedAsyncCcall.toString(), payloadAdmissionEnabled});
 }
 
 async function main() {

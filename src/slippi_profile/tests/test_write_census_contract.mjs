@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
+import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import {webcrypto} from 'node:crypto';
 import {decodeDrawDiagnostics} from './runner_contract.mjs';
-import {validateCensusDrawSample} from './run_write_census.mjs';
+import {assembleCompletedCensusExecution, recordFailedCensusExecution,
+  validateCensusDrawSample} from './run_write_census.mjs';
 import {
   classifyHeapRanges, decodeAudioOwnerInventory, decodeMatchContextRangeInventory,
   decodeAuroraStagingShadowInventory, diffHeapRanges, requireStableAudioOwnerInventory,
@@ -13,7 +15,7 @@ import {
   validateMatchContextRangeDisjointness,
   decodeStageArenaOwnerWire, validateStageArenaOwnerCatalog,
   requireStableStageArenaOwnerInventory,
-  validateCensusInventory, validateSourceStateManifest, runBrowserSample,
+  validateCensusInventory, validateSourceStateManifest, runBrowserSample, closeBrowser,
 } from './run_synctest.mjs';
 
 function manifest(rows) {
@@ -633,23 +635,33 @@ test('Aurora staging-shadow provenance rejects aliases and validates stable owne
 // Execute the real page.evaluate census branch against a small service fixture.
 // This exercises orchestration/guards only; it is not GPU or gameplay evidence.
 async function censusServiceFixture({failedQuiescence = 0, rendererError = 0,
+  payloadAdmissionPlan = null, payloadCommandFailure = 0,
+  sharedMemory = false, returnFailure = false,
   inventoryFailureAt = 0, inventoryMutation = null, missingInventoryExport = false,
   matchContextInventoryFailureAt = 0, matchContextInventoryMutation = null,
   missingMatchContextInventoryExport = false, requireAuroraStagingShadowInventory = false,
   auroraInventoryFailureAt = 0, auroraInventoryMutation = null,
   missingAuroraStagingShadowExport = false,
+  submissionStatuses = null,
   requireStageArenaOwnerInventory = false, stageArenaInventoryFailureAt = 0,
   stageArenaInventoryMutation = null, missingStageArenaInventoryExport = false} = {}) {
-  const context = vm.createContext({crypto: webcrypto, setTimeout, performance,
+  const context = vm.createContext({crypto: webcrypto, setTimeout, performance, SharedArrayBuffer,
     btoa: value => Buffer.from(value, 'binary').toString('base64')});
+  context.__checkpointPad = Uint8Array.from(Buffer.from(
+    'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=', 'base64'));
+  context.__sample300Pad = Uint8Array.from(Buffer.from(
+    'AgAAAAAAAAAAAAABALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=', 'base64'));
   vm.runInContext(`
-    const heap = new Uint8Array(16384);
+    const heap = new Uint8Array(${sharedMemory ? 'new SharedArrayBuffer(16384)' : '16384'});
     const view = new DataView(heap.buffer);
     const calls = [];
+    let directNativeReadCount = 0;
     const inventoryPointer = 8000;
     const matchContextInventoryPointer = 11000;
     const auroraInventoryPointer = 6800;
     const stageArenaWirePointer = 11832;
+    const submissionStatuses = ${JSON.stringify(submissionStatuses)};
+    let submissionStatusQueryCount = 0;
     let stageArenaInventoryQueryCount = 0;
     let inventoryQueryCount = 0;
     let matchContextInventoryQueryCount = 0;
@@ -748,7 +760,8 @@ async function censusServiceFixture({failedQuiescence = 0, rendererError = 0,
       const queryCount = stageArenaInventoryQueryCount;
       let worldGenerationLow = 0x33445566, worldStorage = 800, arenaStorage = 900,
         identityToken = 1000, allocationCount = 2, totalBytes = 40;
-      let address = ordinal === 0 ? 13000 : 13200;
+      let address = ordinal === 0 ? ${requireAuroraStagingShadowInventory ? 13400 : 13000} :
+        ${requireAuroraStagingShadowInventory ? 13600 : 13200};
       let extent = ordinal === 0 ? 16 : 24;
       if ('${stageArenaInventoryMutation || ''}' === 'generation' && queryCount >= 5) worldGenerationLow++;
       if ('${stageArenaInventoryMutation || ''}' === 'world' && queryCount >= 5) worldStorage++;
@@ -785,37 +798,48 @@ async function censusServiceFixture({failedQuiescence = 0, rendererError = 0,
     let quiescenceCount = 0;
     const module = {
       HEAPU8: heap,
-      _melee_web_synctest_gameplay_arena_base: () => 14000,
-      _melee_web_synctest_gameplay_arena_bytes: () => 100,
-      _melee_web_synctest_audio_range_inventory_query: () => 1,
-      _melee_web_synctest_audio_range_inventory: () => inventoryPointer,
-      _melee_web_synctest_match_context_range_inventory_query: () => 1,
-      _melee_web_synctest_match_context_range_inventory: () => matchContextInventoryPointer,
-      _melee_web_synctest_aurora_staging_shadow_inventory_query: () => auroraInventoryPointer,
+      _melee_web_synctest_gameplay_arena_base: () => { directNativeReadCount++; return 14000; },
+      _melee_web_synctest_gameplay_arena_bytes: () => { directNativeReadCount++; return 100; },
+      _melee_web_synctest_audio_range_inventory_query: () => { directNativeReadCount++; return 1; },
+      _melee_web_synctest_audio_range_inventory: () => { directNativeReadCount++; return inventoryPointer; },
+      _melee_web_synctest_match_context_range_inventory_query: () => { directNativeReadCount++; return 1; },
+      _melee_web_synctest_match_context_range_inventory: () => { directNativeReadCount++; return matchContextInventoryPointer; },
+      _melee_web_synctest_aurora_staging_shadow_inventory_query: () => { directNativeReadCount++; return auroraInventoryPointer; },
       _melee_web_synctest_stage_arena_inventory_query(ordinal) {
+        directNativeReadCount++;
         stageArenaInventoryQueryCount++;
         calls.push({identifier: 'stage-arena-query:' + ordinal});
         if (stageArenaInventoryQueryCount === ${stageArenaInventoryFailureAt}) return 0;
         publishStageArenaWire(ordinal);
         return stageArenaWirePointer;
       },
-      _melee_web_synctest_draw_decision: () => 1,
-      _melee_web_snapshot_observation_size: () => 1280,
-      _melee_web_snapshot_pcm_size: () => 4272,
-      _melee_web_snapshot_observation: () => 0,
-      _melee_web_snapshot_pcm: () => 2048,
-      _melee_web_snapshot_input: () => 6400,
-      _melee_web_synctest_draw_diagnostics_size: () => 132,
-      _melee_web_synctest_draw_diagnostics: () => 6500,
-      _melee_web_synctest_motion_boundary: () => 0,
-      _melee_web_synctest_is_mario_kind: kind => kind === 42 ? 1 : 0,
-      _melee_web_synctest_submission_json: () => 1,
-      _melee_web_snapshot_error: () => 2,
+      _melee_web_synctest_draw_decision: () => { directNativeReadCount++; return 1; },
+      _melee_web_snapshot_observation_size: () => { directNativeReadCount++; return 1280; },
+      _melee_web_snapshot_pcm_size: () => { directNativeReadCount++; return 4272; },
+      _melee_web_snapshot_observation: () => { directNativeReadCount++; return 0; },
+      _melee_web_synctest_payload_admission_command: () => { directNativeReadCount++; return 1; },
+      _melee_web_snapshot_pcm: () => { directNativeReadCount++; return 2048; },
+      _melee_web_snapshot_input: () => { directNativeReadCount++; return 6400; },
+      _melee_web_synctest_draw_diagnostics_size: () => { directNativeReadCount++; return 132; },
+      _melee_web_synctest_draw_diagnostics: () => { directNativeReadCount++; return 6500; },
+      _melee_web_synctest_motion_boundary: () => { directNativeReadCount++; return 0; },
+      _melee_web_synctest_is_mario_kind: kind => { directNativeReadCount++; return kind === 42 ? 1 : 0; },
+      _melee_web_synctest_submission_json: () => {
+        directNativeReadCount++;
+        const ordinal = submissionStatusQueryCount++;
+        if (submissionStatuses) calls.push({identifier: 'submission-status-poll', ordinal: ordinal + 1});
+        return 1;
+      },
+      _melee_web_snapshot_error: () => { directNativeReadCount++; return 2; },
       UTF8ToString: pointer => pointer === 2 ? 'synthetic native transfer failure' :
-        JSON.stringify({rendererErrorCount: ${rendererError}, pendingFramePackets: 0,
-          pendingStagingBuffers: 0, workerBusy: 0, drawCallCount: 4,
-          lastBeginFrameId: 301, lastEndFrameId: 301}),
+        submissionStatuses ?
+          JSON.stringify(submissionStatuses[Math.min(submissionStatusQueryCount - 1,
+            submissionStatuses.length - 1)]) :
+          JSON.stringify({initialized: true, backend: 7, rendererErrorCount: ${rendererError},
+            pendingFramePackets: 0, pendingStagingBuffers: 0, workerBusy: 0, drawCallCount: 4,
+            lastBeginFrameId: 301, lastEndFrameId: 301}),
       async ccall(identifier, returnType, argumentTypes, args, options) {
+        directNativeReadCount++;
         if (returnType !== 'number' || options.async !== true) throw new Error('incorrect native call');
         calls.push({identifier, args});
         if (identifier === 'melee_web_snapshot_quiescent') {
@@ -839,6 +863,29 @@ async function censusServiceFixture({failedQuiescence = 0, rendererError = 0,
           if (auroraInventoryQueryCount === ${auroraInventoryFailureAt}) return 0;
           globalThis.__writeAuroraInventory(auroraInventoryQueryCount - 1);
           return auroraInventoryPointer;
+        }
+        if (identifier === 'melee_web_synctest_payload_admission_command') {
+          if (args.length !== 1 || ![1, 2, 3, 4, 5].includes(args[0])) {
+            throw new Error('wrong source-payload command ABI');
+          }
+          if (args[0] === 2) {
+            if (args[0] !== 2) throw new Error('wrong payload step command');
+            heap.set(globalThis.__sample300Pad, 6400);
+            view.setUint32(0, 1, true);
+            heap[15000] = 7; heap[9004] = 11;
+            heap[12004] = 15; heap[13004] = 17; heap[2050] = 13;
+          }
+          if (args[0] === 3) {
+            heap[14000] = 8; heap[13004] = 19;
+            for (let slot = 0; slot < 2; slot++) {
+              view.setUint32(6508 + 4 * slot, 5, true);
+              view.setUint32(6556 + 4 * slot, 1, true);
+              view.setInt32(6580 + 4 * slot, slot, true);
+              view.setInt32(6604 + 4 * slot, 42, true);
+            }
+            view.setUint32(6628, 3, true);
+          }
+          return args[0] === ${payloadCommandFailure} ? 1 : 0;
         }
         if (identifier === 'melee_web_snapshot_step') {
           if (args.length !== 1 || args[0] !== 300) throw new Error('wrong census input sample');
@@ -885,19 +932,27 @@ async function censusServiceFixture({failedQuiescence = 0, rendererError = 0,
     const target = vm.runInContext('heap', context);
     target.set(wire.heap.subarray(wire.pointer, wire.pointer + wire.byteSize), wire.pointer);
   };
+  vm.runInContext('heap.set(__checkpointPad, 6400)', context);
   const baseline = decodeDrawDiagnostics(Buffer.from(vm.runInContext('heap.slice(6500, 6632)', context)));
   const page = {evaluate: (callback, arguments_) => {
     context.arguments_ = arguments_;
     return vm.runInContext(`(${callback.toString()})(arguments_)`, context);
   }};
-  const result = await runBrowserSample(page, 300, censusMapping, [4, 4], {
-    arenaRange: {base: 14000, bytes: 100},
-    manifestRows: [auroraStorageRow(), stageArenaDiagnosticRow(), row(15000, 1, 'source-c-static-candidate', 'service-fixture')],
-    requireAudioInventory: true,
-    requireMatchContextInventory: true,
-    requireAuroraStagingShadowInventory,
-    requireStageArenaOwnerInventory,
-  });
+  let result;
+  try {
+    result = await runBrowserSample(page, 300, censusMapping, [4, 4], {
+      arenaRange: {base: 14000, bytes: 100},
+      manifestRows: [auroraStorageRow(), stageArenaDiagnosticRow(), row(15000, 1, 'source-c-static-candidate', 'service-fixture')],
+      requireAudioInventory: true,
+      requireMatchContextInventory: true,
+      requireAuroraStagingShadowInventory,
+      requireStageArenaOwnerInventory,
+    }, payloadAdmissionPlan);
+  } catch (error) {
+    if (!returnFailure) throw error;
+    return {error, calls: JSON.parse(vm.runInContext('JSON.stringify(calls)', context)),
+      directNativeReadCount: vm.runInContext('directNativeReadCount', context)};
+  }
   return {result, baseline, calls: JSON.parse(vm.runInContext('JSON.stringify(calls)', context))};
 }
 
@@ -905,6 +960,216 @@ const censusMapping = [
   {sourceSlot: 0, initializerPort: 0, rawController: 0},
   {sourceSlot: 1, initializerPort: 2, rawController: 1},
 ];
+
+const payloadAdmissionPlan = {
+  checkpointSample: 299, checkpointSourceFrame: 0,
+  checkpointRawPad44Base64: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=',
+  expectedSample300Pad44Base64: 'AgAAAAAAAAAAAAABALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=',
+  expectedSample300Pad44Sha256: '46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288',
+};
+
+test('source-payload Asyncify predicate admits only a normal empty runtime state', () => {
+  const source = readFileSync(new URL('./synctest_browser.cpp', import.meta.url), 'utf8');
+  const marker = 'EM_JS(int, melee_web_payload_admission_asyncify_idle, (), {';
+  const start = source.indexOf(marker);
+  assert.notEqual(start, -1, 'the production predicate must exist once in the adapter');
+  assert.equal(source.indexOf(marker, start + marker.length), -1, 'the predicate must have one source');
+  const bodyStart = start + marker.length;
+  const bodyEnd = source.indexOf('\n});', bodyStart);
+  assert.ok(bodyEnd > bodyStart, 'the complete production EM_JS body must be extractable');
+  const idle = new Function('Asyncify', source.slice(bodyStart, bodyEnd));
+  assert.equal(idle(undefined), 0, 'missing Asyncify fails closed');
+  assert.equal(idle(null), 0, 'null Asyncify fails closed');
+  const normal = Object.freeze({State: {Normal: 0, Unwinding: 1, Rewinding: 2, Disabled: 3},
+    state: 0, currData: null});
+  assert.equal(idle(normal), 1);
+  assert.deepEqual(normal, {State: {Normal: 0, Unwinding: 1, Rewinding: 2, Disabled: 3},
+    state: 0, currData: null}, 'predicate does not mutate Asyncify state');
+  assert.equal(idle({State: normal.State, state: 1, currData: {}}), 0, 'Unwinding refuses');
+  assert.equal(idle({State: normal.State, state: 2, currData: {}}), 0, 'Rewinding refuses');
+  assert.equal(idle({State: normal.State, state: 3, currData: null}), 0, 'Disabled refuses');
+  assert.equal(idle({State: normal.State, state: 0, currData: {}}), 0, 'normal with live continuation refuses');
+  assert.equal(idle({State: null, state: 0, currData: null}), 0, 'malformed state refuses');
+  assert.equal(idle(new Proxy({}, {get() { throw new Error('unavailable'); }})), 0);
+});
+
+test('source-payload runner preserves the exact capture/tick/draw/post-draw command order', async () => {
+  const {result, calls} = await censusServiceFixture({payloadAdmissionPlan,
+    requireAuroraStagingShadowInventory: true, requireStageArenaOwnerInventory: true});
+  const commands = calls.filter(item => item.identifier === 'melee_web_synctest_payload_admission_command');
+  assert.deepEqual(commands.map(item => item.args[0]), [1, 2, 3, 4]);
+  assert.equal(calls.some(item => item.identifier === 'melee_web_snapshot_step'), false);
+  assert.equal(calls.some(item => item.identifier === 'melee_web_synctest_draw_present'), false);
+  const firstOwnerQuery = calls.findIndex(item => item.identifier === 'melee_web_synctest_audio_range_inventory_query');
+  assert.ok(calls.findIndex(item => item.identifier === 'melee_web_synctest_payload_admission_command') < firstOwnerQuery);
+  assert.equal(result.payloadAdmission.status, 'owner-local-payload-admission-complete');
+  assert.equal(result.payloadAdmission.restoreCalled, false);
+  assert.deepEqual(Array.from(result.payloadAdmission.sequence, item => item.command), [1, 2, 3, 4]);
+  assert.deepEqual(Array.from(result.payloadAdmission.sequence, item => item.result), [0, 0, 0, 0]);
+  const report = {result: 'incomplete', execution: {payloadAdmissionDryRun: {
+    ...result.payloadAdmission, enabled: true, restoreCalled: false, completeGameState: false,
+  }}};
+  assembleCompletedCensusExecution(report, {prefixSamples: 300, censusSample: 300,
+    captureHypothesis: 'fixture hypothesis'});
+  assert.equal(report.execution.payloadAdmissionDryRun.status,
+    'owner-local-payload-admission-complete');
+  assert.deepEqual(Array.from(report.execution.payloadAdmissionDryRun.sequence,
+    item => item.result), [0, 0, 0, 0], 'final report assembly retains all command statuses');
+  assert.equal(result.pad, payloadAdmissionPlan.expectedSample300Pad44Base64);
+});
+
+test('completed report assembly leaves the disabled payload path unchanged', () => {
+  const report = {result: 'incomplete', execution: {payloadAdmissionDryRun: {
+    enabled: false, status: 'not-started', restoreCalled: false, completeGameState: false,
+  }}};
+  assembleCompletedCensusExecution(report, {prefixSamples: 300, censusSample: 300,
+    captureHypothesis: 'fixture hypothesis'});
+  assert.equal(Object.hasOwn(report.execution, 'payloadAdmissionDryRun'), false);
+  assert.equal(report.execution.restorePerformed, false);
+});
+
+test('source-payload draw submits while busy and admits only after the existing idle poll', async () => {
+  const busy = {rendererErrorCount: 0, pendingFramePackets: 1, pendingStagingBuffers: 1,
+    workerBusy: 1, drawCallCount: 4, lastBeginFrameId: 301, lastEndFrameId: 300};
+  const idle = {...busy, pendingFramePackets: 0, pendingStagingBuffers: 0,
+    workerBusy: 0, lastEndFrameId: 301};
+  const {result, calls} = await censusServiceFixture({payloadAdmissionPlan,
+    submissionStatuses: [busy, idle], requireAuroraStagingShadowInventory: true,
+    requireStageArenaOwnerInventory: true});
+  const commands = calls.filter(item => item.identifier === 'melee_web_synctest_payload_admission_command');
+  assert.deepEqual(commands.map(item => item.args[0]), [1, 2, 3, 4]);
+  const polls = calls.filter(item => item.identifier === 'submission-status-poll');
+  assert.deepEqual(polls.map(item => item.ordinal), [1, 2], 'the runner observed busy then idle status');
+  const command4 = calls.findIndex(item => item.identifier === 'melee_web_synctest_payload_admission_command' &&
+    item.args[0] === 4);
+  const idlePoll = calls.findIndex(item => item.identifier === 'submission-status-poll' && item.ordinal === 2);
+  const postDrawTransfer = calls.findLastIndex(item => item.identifier === 'melee_web_snapshot_quiescent');
+  assert.ok(idlePoll < postDrawTransfer && postDrawTransfer < command4,
+    'POSTDRAW_ADMIT follows the observed idle status and post-draw transfer check');
+  assert.equal(result.payloadAdmission.status, 'owner-local-payload-admission-complete');
+});
+
+test('source-payload runner rejects a nonzero command status instead of using the checked-1 convention', async () => {
+  await assert.rejects(censusServiceFixture({payloadAdmissionPlan, payloadCommandFailure: 1,
+    requireAuroraStagingShadowInventory: true, requireStageArenaOwnerInventory: true}),
+  /source-payload command returned 1/);
+});
+
+test('first payload refusal keeps completed prefix, command sequence, and observed pre-step boundary in failed report', async () => {
+  const {error, calls} = await censusServiceFixture({payloadAdmissionPlan,
+    payloadCommandFailure: 2, returnFailure: true,
+    requireAuroraStagingShadowInventory: true, requireStageArenaOwnerInventory: true});
+  assert.match(error.message, /STEP_AND_ADMIT\(sample 300\): source-payload command returned 1/);
+  const partial = error.payloadAdmissionPartial;
+  assert.ok(partial, 'the page-local sequence was read back after the refused command');
+  assert.equal(partial.status, 'refused');
+  assert.equal(partial.checkpoint.sample, 299);
+  assert.equal(partial.checkpoint.rawPad44Base64, payloadAdmissionPlan.checkpointRawPad44Base64);
+  assert.deepEqual(Array.from(partial.commandSequence, item => item.command), [1, 2]);
+  assert.deepEqual(Array.from(partial.commandSequence, item => item.result), [0, 1]);
+  assert.equal(partial.commandSequence[1].outcome, 'returned-nonzero');
+  assert.equal(partial.boundaries.audioOwnerInventory.length, 1);
+  assert.equal(partial.boundaries.audioOwnerInventory[0].boundary, 'before-source-step');
+  assert.equal(partial.sourceStep, null, 'the refused tick is not reported as a completed boundary');
+  assert.equal(partial.sample300, null, 'no sample-300 observation is fabricated after refusal');
+  assert.deepEqual(calls.filter(item => item.identifier === 'melee_web_synctest_payload_admission_command')
+    .map(item => item.args[0]), [1, 2]);
+  const report = {result: 'incomplete', execution: {status: 'incomplete',
+    payloadAdmissionDryRun: {enabled: true, status: 'not-started', restoreCalled: false,
+      completeGameState: false}}};
+  recordFailedCensusExecution(report, error);
+  assert.equal(report.result, 'failed');
+  assert.equal(report.execution.status, 'failed');
+  assert.equal(report.execution.payloadAdmissionDryRun.status, 'refused');
+  assert.deepEqual(Array.from(report.execution.payloadAdmissionDryRun.sequence,
+    item => item.result), [0, 1]);
+  assert.equal(report.execution.payloadAdmissionPartial.boundaries.audioOwnerInventory.length, 1);
+});
+
+test('unexpected boundary failure preserves partial commands as interrupted and remains failed', async () => {
+  const {error, calls} = await censusServiceFixture({payloadAdmissionPlan,
+    inventoryFailureAt: 1, returnFailure: true,
+    requireAuroraStagingShadowInventory: true, requireStageArenaOwnerInventory: true});
+  assert.match(error.message, /audio owner inventory before-source-step: synthetic native transfer failure/);
+  const report = {result: 'incomplete', execution: {status: 'incomplete',
+    payloadAdmissionDryRun: {enabled: true, status: 'not-started', restoreCalled: false,
+      completeGameState: false}}};
+  recordFailedCensusExecution(report, error);
+  assert.equal(report.result, 'failed');
+  assert.equal(report.execution.payloadAdmissionDryRun.status, 'interrupted');
+  assert.deepEqual(Array.from(report.execution.payloadAdmissionDryRun.sequence,
+    item => item.result), [0]);
+  assert.equal(report.execution.payloadAdmissionPartial.status, 'interrupted');
+  assert.equal(report.execution.payloadAdmissionPartial.failure.kind, 'runner-error');
+  assert.deepEqual(calls.filter(item => item.identifier === 'melee_web_synctest_payload_admission_command')
+    .map(item => item.args[0]), [1]);
+});
+
+test('source-payload runner binds the live sample-299 PAD before calling native', async () => {
+  await assert.rejects(censusServiceFixture({payloadAdmissionPlan: {...payloadAdmissionPlan,
+    checkpointRawPad44Base64: 'A'.repeat(60)}, requireAuroraStagingShadowInventory: true,
+    requireStageArenaOwnerInventory: true}), /sample-299 warm checkpoint/);
+});
+
+test('source-payload runner refuses shared WebAssembly memory before native reads', async () => {
+  const {error, calls, directNativeReadCount} = await censusServiceFixture({payloadAdmissionPlan,
+    sharedMemory: true, returnFailure: true, requireAuroraStagingShadowInventory: true,
+    requireStageArenaOwnerInventory: true});
+  assert.match(error.message, /refuses shared WebAssembly memory/);
+  assert.deepEqual(calls, [], 'no native ccall was attempted');
+  assert.equal(directNativeReadCount, 0, 'no direct native owner or source export was read');
+});
+async function closeBrowserFixture({payloadClose = 7, snapshotClose = 0,
+  rendererShutdown = 1} = {}) {
+  const calls = [];
+  const module = {
+    _melee_web_synctest_submission_json: () => 1,
+    _melee_web_snapshot_error: () => 2,
+    UTF8ToString: pointer => pointer === 1 ? JSON.stringify({pendingFramePackets: 0,
+      pendingStagingBuffers: 0, workerBusy: 0, rendererErrorCount: 0}) : 'synthetic close refusal',
+    async ccall(identifier, returnType, argumentTypes, args, options) {
+      calls.push({identifier, args, options});
+      if (identifier === 'melee_web_synctest_payload_admission_command') return payloadClose;
+      if (identifier === 'melee_web_snapshot_close') return snapshotClose;
+      if (identifier === 'melee_web_synctest_renderer_shutdown') return rendererShutdown;
+      throw new Error(`unexpected close service ${identifier}`);
+    },
+  };
+  const context = vm.createContext({window: {__slippiSynctest: {module}}});
+  const page = {evaluate: (callback, arguments_) => {
+    context.arguments_ = arguments_;
+    return vm.runInContext(`(${callback.toString()})(arguments_)`, context);
+  }};
+  return {result: await closeBrowser(page, true), calls};
+}
+
+test('failed payload CLOSE stays failed while snapshot and renderer shutdown outcomes remain separate', async () => {
+  const {result, calls} = await closeBrowserFixture({payloadClose: 7,
+    snapshotClose: 0, rendererShutdown: 1});
+  assert.equal(result.closed, false);
+  assert.equal(result.payloadAdmissionClose.status, 'returned-nonzero');
+  assert.equal(result.payloadAdmissionClose.result, 7);
+  assert.equal(result.snapshotClose.status, 'checked-call-failed');
+  assert.match(result.snapshotClose.error, /snapshot close: synthetic close refusal/);
+  assert.equal(result.rendererShutdown.status, 'checked-return-one');
+  assert.equal(result.rendererShutdown.result, 1);
+  assert.equal(Object.hasOwn(result, 'snapshotDestroyed'), false,
+    'return outcomes do not claim snapshot destruction');
+  assert.deepEqual(calls.map(item => item.identifier), [
+    'melee_web_synctest_payload_admission_command',
+    'melee_web_snapshot_close',
+    'melee_web_synctest_renderer_shutdown',
+  ]);
+  const successful = await closeBrowserFixture({payloadClose: 0,
+    snapshotClose: 1, rendererShutdown: 1});
+  assert.equal(successful.result.closed, true);
+  assert.equal(successful.result.payloadAdmissionClose.status, 'returned-zero');
+  assert.equal(successful.result.snapshotClose.status, 'checked-return-one');
+  assert.equal(successful.result.rendererShutdown.status, 'checked-return-one');
+  assert.equal(Object.hasOwn(successful.result, 'snapshotDestroyed'), false,
+    'even successful return codes report outcomes, not inferred destruction');
+});
+
 const previousFrame = {beginFrameId: 300, endFrameId: 300};
 const validate300 = ({result, baseline}) =>
   validateCensusDrawSample(result, 300, baseline, previousFrame, censusMapping);

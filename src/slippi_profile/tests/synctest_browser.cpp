@@ -12,6 +12,7 @@
 #include <aurora/gfx.h>
 #include <dolphin/gx.h>
 #include <emscripten.h>
+#include <emscripten/threading.h>
 
 #include <array>
 #include <cstddef>
@@ -649,8 +650,445 @@ EMSCRIPTEN_KEEPALIVE const char *melee_web_synctest_submission_json(void)
     return submission_json.c_str();
 }
 
+// BEGIN MELEE_WEB_SOURCE_PAYLOAD_ADMISSION_ADAPTER
+extern "C" int melee_web_synctest_renderer_shutdown(void);
+
+EM_JS_DEPS(melee_web_payload_admission_asyncify_deps, "$Asyncify");
+EM_JS(int, melee_web_payload_admission_asyncify_idle, (), {
+  try {
+    return typeof Asyncify === "object" && Asyncify !== null &&
+      typeof Asyncify.State === "object" && Asyncify.State !== null &&
+      typeof Asyncify.State.Normal === "number" &&
+      Asyncify.state === Asyncify.State.Normal && Asyncify.currData === null ? 1 : 0;
+  } catch (_) {
+    return 0;
+  }
+});
+
+namespace {
+enum class PayloadAdmissionState : uint8_t {
+    Idle, Captured, Stepped, DrawSubmitted, Complete, Failed, Closed
+};
+enum PayloadAdmissionFailure : uint32_t {
+    PayloadBadOrder = 1,
+    PayloadUnsafeCallBoundary = 2,
+    PayloadOwnerUnavailable = 3,
+    PayloadTransferBusy = 4,
+    PayloadAuroraUnavailable = 5,
+    PayloadAuroraBusy = 6,
+    PayloadFrameMismatch = 7,
+    PayloadCaptureFailure = 8,
+    PayloadStepFailure = 9,
+    PayloadDrawFailure = 10,
+    PayloadAdmissionFailureCode = 11,
+    PayloadCleanupFailure = 12,
+    PayloadUnknownCommand = 13,
+};
+constexpr uint32_t kPayloadPrimitiveFailureBase = 0x100;
+constexpr uint32_t kPayloadAdapterFailureBase = 0x200;
+MeleeWebSourceMemoryPayloadSnapshot *payload_admission_snapshot = nullptr;
+PayloadAdmissionState payload_admission_state = PayloadAdmissionState::Idle;
+uint32_t payload_admission_first_failure = 0;
+char payload_admission_first_message[256]{};
+uint32_t payload_admission_capture_source_frame = 0;
+uint64_t payload_admission_capture_begin_frame = 0;
+uint64_t payload_admission_capture_end_frame = 0;
+bool payload_admission_cleanup_done = false;
+bool payload_admission_inflight = false;
+bool payload_admission_close_requested = false;
+bool payload_admission_shutdown_requested = false;
+
+uint32_t payload_admission_latch(uint32_t status, const char *message)
+{
+    if (!payload_admission_first_failure) {
+        payload_admission_first_failure = status;
+        std::snprintf(payload_admission_first_message,
+                      sizeof(payload_admission_first_message), "%s", message);
+        std::snprintf(error, sizeof(error), "%s", payload_admission_first_message);
+        payload_admission_state = PayloadAdmissionState::Failed;
+    }
+    return payload_admission_first_failure;
+}
+
+uint32_t payload_admission_fail_adapter(PayloadAdmissionFailure failure,
+                                        const char *message)
+{
+    return payload_admission_latch(kPayloadAdapterFailureBase + failure, message);
+}
+
+uint32_t payload_admission_fail_primitive(
+    MeleeWebSourceMemoryPayloadSnapshotStatus status, const char *operation)
+{
+    char message[256]{};
+    std::snprintf(message, sizeof(message), "%s returned source-payload status %u",
+                  operation, static_cast<unsigned>(status));
+    return payload_admission_latch(kPayloadPrimitiveFailureBase +
+                                       static_cast<uint32_t>(status), message);
+}
+
+uint32_t payload_admission_runtime_boundary()
+{
+#if defined(__EMSCRIPTEN_PTHREADS__)
+    return PayloadUnsafeCallBoundary;
+#else
+    if (emscripten_has_asyncify() != 1 ||
+        !emscripten_is_main_runtime_thread() ||
+        !emscripten_is_main_browser_thread() ||
+        melee_web_payload_admission_asyncify_idle() != 1) {
+        return PayloadUnsafeCallBoundary;
+    }
+    return 0;
+#endif
+}
+
+uint32_t payload_admission_source_boundary()
+{
+    if (payload_admission_runtime_boundary() != 0) return PayloadUnsafeCallBoundary;
+    if (!renderer_ready || renderer_error_count != 0 || !match ||
+        !match->ready() || match->complete() || match->paused() ||
+        !melee_web_source_memory_healthy()) {
+        return PayloadOwnerUnavailable;
+    }
+    if (melee_web_snapshot_quiescent() != 1) return PayloadTransferBusy;
+    if (match->source_frames() != observation.frame || observation.ready != 1 ||
+        observation.complete != 0 || observation.paused != 0) {
+        return PayloadFrameMismatch;
+    }
+    return 0;
+}
+
+uint32_t payload_admission_boundary(bool require_new_completed_draw)
+{
+    if (const uint32_t failure = payload_admission_source_boundary()) return failure;
+#if defined(MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY)
+    const auto *descriptor = static_cast<const AuroraBrowserQuiescenceDescriptor *>(
+        aurora_browser_quiescence_observe_descriptor());
+    if (!descriptor ||
+        descriptor->schemaVersion != AURORA_BROWSER_QUIESCENCE_SCHEMA_VERSION ||
+        descriptor->byteSize != sizeof(AuroraBrowserQuiescenceDescriptor)) {
+        return PayloadAuroraUnavailable;
+    }
+    if (descriptor->pendingFramePackets != 0 ||
+        descriptor->pendingStagingBuffers != 0 || descriptor->workerBusy != 0 ||
+        descriptor->lastBeginFrameId != descriptor->lastEndFrameId ||
+        descriptor->lastEndFrameId != last_completed_frame_id) {
+        return PayloadAuroraBusy;
+    }
+    if (require_new_completed_draw &&
+        (descriptor->lastBeginFrameId <= payload_admission_capture_begin_frame ||
+         descriptor->lastEndFrameId <= payload_admission_capture_end_frame)) {
+        return PayloadAuroraBusy;
+    }
+    return 0;
+#else
+    (void)require_new_completed_draw;
+    return PayloadAuroraUnavailable;
+#endif
+}
+
+uint32_t payload_admission_submission_boundary()
+{
+    if (const uint32_t failure = payload_admission_source_boundary()) return failure;
+    if (last_completed_frame_id <= payload_admission_capture_end_frame) {
+        return PayloadFrameMismatch;
+    }
+    return 0;
+}
+
+uint32_t payload_admission_check_boundary_failure(uint32_t failure)
+{
+    if (!failure) return 0;
+    switch (failure) {
+    case PayloadUnsafeCallBoundary:
+        return payload_admission_fail_adapter(PayloadUnsafeCallBoundary,
+            "Payload command requires the configured synchronous main-thread target");
+    case PayloadOwnerUnavailable:
+        return payload_admission_fail_adapter(PayloadOwnerUnavailable,
+            "Payload command requires a live ready source match and renderer");
+    case PayloadTransferBusy:
+        return payload_admission_fail_adapter(PayloadTransferBusy,
+            "Payload command requires source transfer quiescence");
+    case PayloadAuroraUnavailable:
+        return payload_admission_fail_adapter(PayloadAuroraUnavailable,
+            "Payload command requires the exact Aurora quiescence descriptor");
+    case PayloadAuroraBusy:
+        return payload_admission_fail_adapter(PayloadAuroraBusy,
+            "Payload command requires an idle completed Aurora frame boundary");
+    default:
+        return payload_admission_fail_adapter(PayloadFrameMismatch,
+            "Payload command source-frame observation is inconsistent");
+    }
+}
+
+uint32_t payload_admission_check_boundary(bool require_new_completed_draw)
+{
+    return payload_admission_check_boundary_failure(
+        payload_admission_boundary(require_new_completed_draw));
+}
+
+uint32_t payload_admission_check_submission_boundary()
+{
+    return payload_admission_check_boundary_failure(payload_admission_submission_boundary());
+}
+
+uint32_t payload_admission_close()
+{
+    if (payload_admission_state == PayloadAdmissionState::Idle) {
+        payload_admission_cleanup_done = true;
+        payload_admission_state = PayloadAdmissionState::Closed;
+        return 0;
+    }
+    if (payload_admission_state == PayloadAdmissionState::Closed) {
+        if (payload_admission_first_failure) {
+            std::snprintf(error, sizeof(error), "%s", payload_admission_first_message);
+        }
+        return payload_admission_first_failure;
+    }
+    if (payload_admission_state != PayloadAdmissionState::Complete &&
+        payload_admission_state != PayloadAdmissionState::Failed) {
+        payload_admission_fail_adapter(PayloadBadOrder,
+            "Payload admission closed before the complete dry-run sequence");
+    }
+    if (payload_admission_snapshot && !payload_admission_cleanup_done) {
+        melee_web_source_memory_payload_snapshot_destroy(payload_admission_snapshot);
+        payload_admission_snapshot = nullptr;
+        payload_admission_cleanup_done = true;
+    }
+    payload_admission_state = PayloadAdmissionState::Closed;
+    if (payload_admission_first_failure) {
+        std::snprintf(error, sizeof(error), "%s", payload_admission_first_message);
+    }
+    return payload_admission_first_failure;
+}
+
+bool payload_admission_shutdown_fallback()
+{
+    if (payload_admission_inflight) {
+        payload_admission_close_requested = true;
+        payload_admission_shutdown_requested = true;
+        payload_admission_fail_adapter(PayloadUnsafeCallBoundary,
+            "Renderer shutdown reentered an active payload command");
+        return false;
+    }
+    if (payload_admission_state == PayloadAdmissionState::Idle ||
+        payload_admission_state == PayloadAdmissionState::Closed) return true;
+    if (payload_admission_runtime_boundary() != 0) {
+        payload_admission_fail_adapter(PayloadUnsafeCallBoundary,
+            "Renderer shutdown requires a normal main-thread Asyncify boundary");
+        return false;
+    }
+    if (payload_admission_state != PayloadAdmissionState::Complete &&
+        payload_admission_state != PayloadAdmissionState::Failed) {
+        payload_admission_fail_adapter(PayloadCleanupFailure,
+            "Renderer shutdown interrupted the payload admission sequence");
+    }
+    if (payload_admission_snapshot && !payload_admission_cleanup_done) {
+        melee_web_source_memory_payload_snapshot_destroy(payload_admission_snapshot);
+        payload_admission_snapshot = nullptr;
+        payload_admission_cleanup_done = true;
+    }
+    payload_admission_state = PayloadAdmissionState::Closed;
+    if (payload_admission_first_failure) {
+        std::snprintf(error, sizeof(error), "%s", payload_admission_first_message);
+    }
+    return true;
+}
+
+uint32_t payload_admission_execute(uint32_t command)
+{
+    switch (command) {
+    case 1: { // CAPTURE
+        if (payload_admission_state != PayloadAdmissionState::Idle) {
+            return payload_admission_fail_adapter(PayloadBadOrder,
+                "Payload CAPTURE is valid only once at IDLE");
+        }
+        if (const uint32_t failure = payload_admission_check_boundary(false)) return failure;
+        payload_admission_capture_source_frame = match->source_frames();
+#if defined(MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY)
+        const auto *descriptor = static_cast<const AuroraBrowserQuiescenceDescriptor *>(
+            aurora_browser_quiescence_observe_descriptor());
+        if (!descriptor) return payload_admission_fail_adapter(PayloadAuroraUnavailable,
+            "Aurora quiescence descriptor disappeared before payload capture");
+        payload_admission_capture_begin_frame = descriptor->lastBeginFrameId;
+        payload_admission_capture_end_frame = descriptor->lastEndFrameId;
+#else
+        return payload_admission_fail_adapter(PayloadAuroraUnavailable,
+            "Aurora quiescence descriptor is not enabled for payload capture");
+#endif
+        const auto captured = melee_web_source_memory_payload_snapshot_capture();
+        payload_admission_snapshot = captured.snapshot;
+        if (payload_admission_first_failure) return payload_admission_first_failure;
+        if (const uint32_t failure = payload_admission_check_boundary(false)) return failure;
+        if (captured.status != MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK) {
+            if (payload_admission_snapshot) {
+                melee_web_source_memory_payload_snapshot_destroy(payload_admission_snapshot);
+                payload_admission_snapshot = nullptr;
+                payload_admission_cleanup_done = true;
+            }
+            return payload_admission_fail_primitive(captured.status, "payload capture");
+        }
+        if (!payload_admission_snapshot) {
+            return payload_admission_fail_adapter(PayloadCaptureFailure,
+                "Payload capture reported success without a snapshot");
+        }
+        const auto admitted = melee_web_source_memory_payload_snapshot_admit(
+            payload_admission_snapshot);
+        if (payload_admission_first_failure) return payload_admission_first_failure;
+        if (admitted != MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK) {
+            return payload_admission_fail_primitive(admitted, "payload admission after capture");
+        }
+        if (const uint32_t failure = payload_admission_check_boundary(false)) return failure;
+        if (!match || match->source_frames() != payload_admission_capture_source_frame ||
+            observation.frame != payload_admission_capture_source_frame) {
+            return payload_admission_fail_adapter(PayloadFrameMismatch,
+                "Source frame changed during payload capture");
+        }
+        payload_admission_state = PayloadAdmissionState::Captured;
+        return 0;
+    }
+    case 2: { // STEP_AND_ADMIT
+        if (payload_admission_state != PayloadAdmissionState::Captured ||
+            !payload_admission_snapshot) {
+            return payload_admission_fail_adapter(PayloadBadOrder,
+                "Payload STEP_AND_ADMIT requires CAPTURED state");
+        }
+        if (const uint32_t failure = payload_admission_check_boundary(false)) return failure;
+        if (match->source_frames() != payload_admission_capture_source_frame ||
+            payload_admission_capture_source_frame == UINT32_MAX) {
+            return payload_admission_fail_adapter(PayloadFrameMismatch,
+                "Source frame no longer matches the captured payload boundary");
+        }
+        if (melee_web_snapshot_step(300) != 1) {
+            return payload_admission_fail_adapter(PayloadStepFailure,
+                error[0] ? error : "The actual sample-300 source step failed");
+        }
+        if (payload_admission_first_failure) return payload_admission_first_failure;
+        if (const uint32_t failure = payload_admission_check_boundary(false)) return failure;
+        if (match->source_frames() != payload_admission_capture_source_frame + 1u ||
+            observation.frame != payload_admission_capture_source_frame + 1u) {
+            return payload_admission_fail_adapter(PayloadFrameMismatch,
+                "Actual sample-300 step did not advance the observed source frame exactly once");
+        }
+        const auto admitted = melee_web_source_memory_payload_snapshot_admit(
+            payload_admission_snapshot);
+        if (payload_admission_first_failure) return payload_admission_first_failure;
+        if (admitted != MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK) {
+            return payload_admission_fail_primitive(admitted, "payload admission after source step");
+        }
+        if (const uint32_t failure = payload_admission_check_boundary(false)) return failure;
+        payload_admission_state = PayloadAdmissionState::Stepped;
+        return 0;
+    }
+    case 3: { // DRAW_ONCE
+        if (payload_admission_state != PayloadAdmissionState::Stepped ||
+            !payload_admission_snapshot) {
+            return payload_admission_fail_adapter(PayloadBadOrder,
+                "Payload DRAW_ONCE requires STEPPED state");
+        }
+        if (const uint32_t failure = payload_admission_check_boundary(false)) return failure;
+        if (match->source_frames() != payload_admission_capture_source_frame + 1u) {
+            return payload_admission_fail_adapter(PayloadFrameMismatch,
+                "Source frame changed before the single actual draw");
+        }
+        if (melee_web_synctest_draw_present() != 1) {
+            return payload_admission_fail_adapter(PayloadDrawFailure,
+                error[0] ? error : "The actual source draw failed");
+        }
+        if (payload_admission_first_failure) return payload_admission_first_failure;
+        // The draw has returned with a newer submitted frame, but Aurora may
+        // still own packets or staging buffers. Check the completed native
+        // call/source boundary now; the runner's existing wait owns idle
+        // admission, which command 4 verifies with the full descriptor.
+        if (const uint32_t failure = payload_admission_check_submission_boundary()) return failure;
+        if (match->source_frames() != payload_admission_capture_source_frame + 1u ||
+            observation.frame != payload_admission_capture_source_frame + 1u ||
+            last_completed_frame_id <= payload_admission_capture_end_frame) {
+            return payload_admission_fail_adapter(PayloadFrameMismatch,
+                "Actual draw changed the source frame or failed to submit a newer frame");
+        }
+        payload_admission_state = PayloadAdmissionState::DrawSubmitted;
+        return 0;
+    }
+    case 4: { // POSTDRAW_ADMIT, only after the host's existing idle wait
+        if (payload_admission_state != PayloadAdmissionState::DrawSubmitted ||
+            !payload_admission_snapshot) {
+            return payload_admission_fail_adapter(PayloadBadOrder,
+                "Payload POSTDRAW_ADMIT requires DRAW_SUBMITTED state");
+        }
+        if (const uint32_t failure = payload_admission_check_boundary(true)) return failure;
+        if (match->source_frames() != payload_admission_capture_source_frame + 1u) {
+            return payload_admission_fail_adapter(PayloadFrameMismatch,
+                "Source frame changed while awaiting post-draw admission");
+        }
+        const auto admitted = melee_web_source_memory_payload_snapshot_admit(
+            payload_admission_snapshot);
+        if (payload_admission_first_failure) return payload_admission_first_failure;
+        if (admitted != MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK) {
+            return payload_admission_fail_primitive(admitted, "payload admission after draw");
+        }
+        if (const uint32_t failure = payload_admission_check_boundary(true)) return failure;
+        payload_admission_state = PayloadAdmissionState::Complete;
+        return 0;
+    }
+    default:
+        return payload_admission_fail_adapter(PayloadUnknownCommand,
+            "Unknown source-payload admission command");
+    }
+}
+
+uint32_t payload_admission_run(uint32_t command)
+{
+    if (payload_admission_state == PayloadAdmissionState::Closed) {
+        if (payload_admission_first_failure) {
+            std::snprintf(error, sizeof(error), "%s", payload_admission_first_message);
+            return payload_admission_first_failure;
+        }
+        return command == 5 ? 0 : kPayloadAdapterFailureBase + PayloadBadOrder;
+    }
+    if (payload_admission_inflight) {
+        if (command == 5) payload_admission_close_requested = true;
+        return payload_admission_fail_adapter(PayloadUnsafeCallBoundary,
+            "Reentrant source-payload command refused while an Asyncify call is active");
+    }
+    if (command != 5 && payload_admission_first_failure) {
+        std::snprintf(error, sizeof(error), "%s", payload_admission_first_message);
+        return payload_admission_first_failure;
+    }
+    if (payload_admission_runtime_boundary() != 0) {
+        return payload_admission_fail_adapter(PayloadUnsafeCallBoundary,
+            "Payload command requires a normal Asyncify main-runtime browser boundary");
+    }
+    if (command == 5) return payload_admission_close();
+    payload_admission_inflight = true;
+    const uint32_t result = payload_admission_execute(command);
+    payload_admission_inflight = false;
+    const bool close_requested = payload_admission_close_requested;
+    const bool shutdown_requested = payload_admission_shutdown_requested;
+    if (close_requested || shutdown_requested) {
+        payload_admission_close_requested = false;
+        (void)payload_admission_close();
+    }
+    if (shutdown_requested) {
+        payload_admission_shutdown_requested = false;
+        (void)melee_web_synctest_renderer_shutdown();
+        if (payload_admission_first_failure) {
+            std::snprintf(error, sizeof(error), "%s", payload_admission_first_message);
+        }
+    }
+    return payload_admission_first_failure ? payload_admission_first_failure : result;
+}
+} // namespace
+
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t
+melee_web_synctest_payload_admission_command(uint32_t command)
+{
+    return payload_admission_run(command);
+}
+// END MELEE_WEB_SOURCE_PAYLOAD_ADMISSION_ADAPTER
+
 EMSCRIPTEN_KEEPALIVE int melee_web_synctest_renderer_shutdown(void)
 {
+    if (!payload_admission_shutdown_fallback()) return 0;
     return checked([] {
         if (!renderer_ready) return;
         const AuroraBrowserSubmissionStatus status =

@@ -14,6 +14,47 @@ class SourceMemorySnapshotTests(OwnedWorkspaceTests):
     def setUpClass(cls):
         cls.directory = cls.new_workspace(ROOT, "source-memory-snapshot-")
 
+    def test_extracted_browser_payload_admission_adapter_lifecycle(self):
+        compiler = shutil.which("c++")
+        if not compiler:
+            self.skipTest("native C++ compiler unavailable")
+        browser_source = (ROOT / "src/slippi_profile/tests/synctest_browser.cpp").read_text()
+        start = "// BEGIN MELEE_WEB_SOURCE_PAYLOAD_ADMISSION_ADAPTER"
+        end = "// END MELEE_WEB_SOURCE_PAYLOAD_ADMISSION_ADAPTER"
+        self.assertEqual(browser_source.count(start), 1)
+        self.assertEqual(browser_source.count(end), 1)
+        adapter = browser_source.split(start, 1)[1].split(end, 1)[0]
+        template = (ROOT / "tests/payload_admission_adapter_control.cpp.in").read_text()
+        self.assertEqual(template.count("// ADAPTER_BLOCK"), 1)
+        source = self.directory / "payload-admission-control.cpp"
+        source.write_text(template.replace("// ADAPTER_BLOCK", adapter))
+        binary = self.directory / "payload-admission-control"
+        built = subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror",
+                                str(source), "-o", str(binary)],
+                               capture_output=True, text=True, timeout=60)
+        self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
+        for scenario in ["success", "draw-pending-then-idle", "postdraw-admit-early-latches", "close-before-capture", "shutdown-fallback", "reentrant-shutdown", "order", "duplicate-capture", "capture-failure",
+                         "capture-failure-pointer", "capture-admission-failure",
+                         "step-admission-failure", "postdraw-admission-failure",
+                         "step-failure", "draw-failure", "transfer-busy",
+                         "aurora-missing", "aurora-busy", "owner-unhealthy",
+                         "frame-mismatch", "not-main-thread", "asyncify-disabled", "asyncify-jspi",
+                         "asyncify-busy", "asyncify-entry-not-idle", "asyncify-boundary-after-step",
+                         "not-runtime-thread",
+                         "reentrant-close", "unknown"]:
+            run = subprocess.run([str(binary), scenario], capture_output=True, text=True, timeout=10)
+            self.assertEqual(run.returncode, 0, f"{scenario}: {run.stdout}{run.stderr}")
+        pthread_binary = self.directory / "payload-admission-pthread-control"
+        pthread_built = subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror",
+                                        "-D__EMSCRIPTEN_PTHREADS__=1", "-Wno-unused-function",
+                                        "-Wno-unused-variable", "-Wno-unused-const-variable",
+                                        str(source), "-o", str(pthread_binary)],
+                                       capture_output=True, text=True, timeout=60)
+        self.assertEqual(pthread_built.returncode, 0, pthread_built.stdout + pthread_built.stderr)
+        pthread_run = subprocess.run([str(pthread_binary), "pthread"],
+                                     capture_output=True, text=True, timeout=10)
+        self.assertEqual(pthread_run.returncode, 0, pthread_run.stdout + pthread_run.stderr)
+
     def test_value_capture_restore_replay_and_owner_refusal(self):
         compiler = shutil.which("c++")
         if not compiler:

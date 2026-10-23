@@ -22,10 +22,54 @@ import {
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const SAMPLE = PREFIX_SAMPLES;
 
+export function assembleCompletedCensusExecution(report, {prefixSamples, censusSample,
+  captureHypothesis}) {
+  const admittedPayload = report.execution?.payloadAdmissionDryRun;
+  const execution = {status: 'completed', prefixSamples, censusSample,
+    sampleInteractive: true,
+    sourceStep: 'existing deterministic snapshot_step input at sample 300',
+    captureHypothesis,
+    draw: 'existing actual source draw followed by the existing Aurora pending-packet/staging/worker quiescence wait',
+    restorePerformed: false};
+  if (admittedPayload?.enabled === true) execution.payloadAdmissionDryRun = admittedPayload;
+  report.execution = execution;
+  report.result = 'incomplete';
+  return report;
+}
+
+export function recordFailedCensusExecution(report, error) {
+  const partial = error?.payloadAdmissionPartial;
+  if (partial) {
+    if (partial.payloadAdmission) {
+      report.execution.payloadAdmissionDryRun = {...partial.payloadAdmission,
+        enabled: true, restoreCalled: false, completeGameState: false};
+    }
+    report.execution.payloadAdmissionPartial = {
+      status: partial.status,
+      checkpoint: partial.checkpoint,
+      commandSequence: partial.commandSequence,
+      boundaries: partial.boundaries,
+      sourceStep: partial.sourceStep,
+      actualDraw: partial.actualDraw,
+      sample300: partial.sample300,
+      heapCensus: partial.heapCensus,
+      failure: partial.failure,
+    };
+  }
+  if (error?.payloadAdmissionPartialReadError) {
+    report.execution.payloadAdmissionPartialReadError = error.payloadAdmissionPartialReadError;
+  }
+  report.result = 'failed';
+  report.execution.status = 'failed';
+  report.failure = {message: String(error), stack: error?.stack || null};
+  return report;
+}
+
 function parseArgs(argv) {
   const values = {};
   const allowed = new Set(['--browser-runtime', '--assets', '--manifest', '--out', '--playwright']);
-  const flags = new Set(['--aurora-staging-shadow-inventory', '--stage-arena-owner-inventory']);
+  const flags = new Set(['--aurora-staging-shadow-inventory', '--stage-arena-owner-inventory',
+    '--source-payload-admission-dry-run']);
   for (let i = 0; i < argv.length;) {
     const key = argv[i];
     if (flags.has(key)) {
@@ -46,6 +90,10 @@ function parseArgs(argv) {
     values[key] = path.resolve(values[key]);
   }
   if (values['--playwright']) values['--playwright'] = path.resolve(values['--playwright']);
+  if (values['--source-payload-admission-dry-run'] &&
+      (!values['--aurora-staging-shadow-inventory'] || !values['--stage-arena-owner-inventory'])) {
+    throw new Error('Source-payload admission dry run requires both exact private Aurora and stage owner diagnostics');
+  }
   if (!fs.statSync(values['--assets']).isDirectory()) throw new Error('Assets path is not a directory');
   for (const key of ['--browser-runtime', '--manifest']) {
     if (!fs.statSync(values[key]).isFile()) throw new Error(`Input is not a file: ${values[key]}`);
@@ -248,6 +296,9 @@ async function main() {
     execution: {status: 'incomplete', prefixSamples: PREFIX_SAMPLES, censusSample: SAMPLE,
       sourceStep: 'existing deterministic snapshot_step input at sample 300',
       captureHypothesis,
+      payloadAdmissionDryRun: {enabled: Boolean(options['--source-payload-admission-dry-run']),
+        status: 'not-started', restoreCalled: false, completeGameState: false,
+        scope: 'one existing source-main-heap payload capture/admit across actual sample-300 tick and draw; never a browser restore'},
       draw: 'existing actual source draw followed by the existing Aurora pending-packet/staging/worker quiescence wait'},
     inventory: {status: 'incomplete', completeGameState: manifestInventory.completeGameState,
       sourceStateManifestComplete: false,
@@ -428,7 +479,19 @@ async function main() {
       requireAuroraStagingShadowInventory,
       requireStageArenaOwnerInventory,
     };
-    const sample = await runBrowserSample(page, SAMPLE, expectedInputMapping, expectedStocks, censusPlan);
+    const payloadAdmissionPlan = options['--source-payload-admission-dry-run'] ? {
+      checkpointSample: PREFIX_SAMPLES - 1,
+      checkpointSourceFrame: checkpoint.boundary.sourceFrame,
+      checkpointRawPad44Base64: checkpoint.pad,
+      expectedSample300Pad44Base64: 'AgAAAAAAAAAAAAABALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=',
+      expectedSample300Pad44Sha256: '46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288',
+    } : null;
+    const sample = await runBrowserSample(page, SAMPLE, expectedInputMapping, expectedStocks,
+      censusPlan, payloadAdmissionPlan);
+    if (payloadAdmissionPlan) {
+      report.execution.payloadAdmissionDryRun = {...sample.payloadAdmission,
+        enabled: true, restoreCalled: false, completeGameState: false};
+    }
     const censusDraw = validateCensusDrawSample(sample, SAMPLE, previousDiagnostics,
       previousFrame, expectedInputMapping);
     report.input = {sample: SAMPLE,
@@ -505,27 +568,21 @@ async function main() {
         'Native DVD STATE_END checks passed at each sampled boundary but cannot exclude a transfer that completed between boundaries.',
       ],
     };
-    report.execution = {status: 'completed', prefixSamples: PREFIX_SAMPLES,
-      censusSample: SAMPLE, sampleInteractive: true,
-      sourceStep: 'existing deterministic snapshot_step input at sample 300',
-      captureHypothesis,
-      draw: 'existing actual source draw followed by the existing Aurora pending-packet/staging/worker quiescence wait',
-      restorePerformed: false};
-    report.result = 'incomplete';
+    assembleCompletedCensusExecution(report, {prefixSamples: PREFIX_SAMPLES,
+      censusSample: SAMPLE, captureHypothesis});
     if (pageErrors.length) throw new Error(`Browser reported an error: ${pageErrors[0]}`);
     report.browser.pageErrors = pageErrors;
     writeReport();
   } catch (error) {
-    report.result = 'failed';
-    report.execution.status = 'failed';
-    report.failure = {message: String(error), stack: error?.stack || null};
+    recordFailedCensusExecution(report, error);
     writeReport();
     throw error;
   } finally {
     const cleanupFailures = [];
     if (page) {
       try {
-        const closed = await closeBrowser(page);
+        const closed = await closeBrowser(page,
+          Boolean(options['--source-payload-admission-dry-run']));
         if (!closed?.closed) cleanupFailures.push({step: 'renderer-close', error: JSON.stringify(closed)});
         report.cleanup = {...(report.cleanup || {}), renderer: closed};
       } catch (error) { cleanupFailures.push({step: 'renderer-close', error: String(error)}); }
