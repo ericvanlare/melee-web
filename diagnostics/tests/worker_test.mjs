@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
 
-import { fetch as diagnosticsFetch } from '../worker.mjs';
+import { fetch as diagnosticsFetch, RATE_WINDOW_MS } from '../worker.mjs';
 import {
   DIAGNOSTICS_SCHEMA,
   DIAGNOSTICS_VERSION,
@@ -208,7 +208,9 @@ test('body deadline remains bounded when a client keeps sending fragments', asyn
   assert.equal(cancelled, true);
 });
 
-test('invalid reports do not consume the shared valid-report quota', async () => {
+test('invalid reports do not consume the shared valid-report quota', async t => {
+  let now = 1_800_000_000_000 + RATE_WINDOW_MS - 1;
+  t.mock.method(Date, 'now', () => now);
   const env = environment();
   env.DIAGNOSTICS_RATE_LIMIT = '1';
   const valid = baseReport();
@@ -225,10 +227,14 @@ test('invalid reports do not consume the shared valid-report quota', async () =>
   assert.equal((await diagnosticsFetch(requestFor(valid), env)).status, 201,
     'a legitimate report still gets the one available quota slot');
   assert.equal((await diagnosticsFetch(requestFor(baseReport({session_id: 'session-second'})), env)).status, 429,
-    'validated reports still share the configured transactional rate cap');
+    'validated reports still share the configured transactional rate cap within one minute');
+  now += 1;
+  assert.equal((await diagnosticsFetch(requestFor(baseReport({session_id: 'session-rollover'})), env)).status, 201,
+    'the quota opens again when the next minute starts');
 });
 
-test('rate caps are transactional and admin reads remain private', async () => {
+test('rate caps are transactional and admin reads remain private', async t => {
+  t.mock.method(Date, 'now', () => 1_800_000_000_000);
   const env = environment();
   env.DIAGNOSTICS_RATE_LIMIT = '2';
   const first = baseReport();

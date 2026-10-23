@@ -1,11 +1,15 @@
 #include <cstdint>
+#include <atomic>
+// Select the actual browser-only declarations while compiling this asset-free native control.
+#define __EMSCRIPTEN__ 1
+#include <aurora/gfx.h>
+#undef __EMSCRIPTEN__
 #include <cstdio>
 #include <cstring>
 #include <string>
 
 #define EMSCRIPTEN_KEEPALIVE
 #define MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY 1
-#define AURORA_BROWSER_QUIESCENCE_SCHEMA_VERSION 5
 #define EM_JS_DEPS(name, ...) static_assert(true, "fixture EM_JS_DEPS")
 #define EM_JS(result, name, arguments, ...) \
     result name arguments { ++asyncify_idle_queries; return asyncify_state_idle ? 1 : 0; }
@@ -76,21 +80,31 @@ struct MeleeWebSourceMemoryPayloadSnapshotCaptureResult {
     MeleeWebSourceMemoryPayloadSnapshotStatus status;
     MeleeWebSourceMemoryPayloadSnapshot *snapshot;
 };
-struct AuroraBrowserQuiescenceDescriptor {
-    uint32_t schemaVersion, byteSize, frameSlotCount, stagingSlotCount;
-    uint32_t frameDescriptorOffset, frameDescriptorStride, frameDescriptorCount;
-    uint32_t submissionDescriptorOffset, submissionDescriptorStride, submissionDescriptorCount;
-    uint32_t pendingFramePackets, pendingStagingBuffers, workerBusy, pipelineCacheStatus;
-    uint32_t queuedPipelines, createdPipelines, drawCallCount, currentFrameIndex;
-    uint64_t stagingGeneration, lastBeginFrameId, lastEndFrameId;
-    uint64_t lastRegistrationSequence, lastCallbackSequence, staleCallbackCount;
+// Use actual Aurora types and production header/extent producers; no invented ABI.
+static size_t fixture_frame_count = 4, fixture_staging_count = 4;
+static bool descriptor_size_unavailable = false;
+struct FixtureStats {
+    uint32_t queuedPipelines = 0, createdPipelines = 0, drawCallCount = 1;
+    uint64_t lastBeginFrameId = 20, lastEndFrameId = 20;
 };
-static AuroraBrowserQuiescenceDescriptor descriptor{
-    5, 120, 4, 4,
-    120, 464, 4,
-    0, 56, 0,
-    0, 0, 0, 0, 0, 0, 1, 0,
-    1, 20, 20, 0, 0, 0};
+static struct { FixtureStats stats; } g_resources;
+static uint32_t g_frameIndex = 0;
+static std::atomic_uint64_t g_browserStagingGeneration{1}, g_browserSubmissionSequence{0},
+    g_browserCallbackSequence{0}, g_browserStaleCallbackCount{0};
+static size_t active_frame_slot_count() { return fixture_frame_count; }
+static size_t active_staging_buffer_count() { return fixture_staging_count; }
+static uint32_t browser_pipeline_cache_status() { return 0; }
+static bool browser_quiescence_supported() { return !descriptor_size_unavailable; }
+// AURORA_HEADER_PRODUCER
+size_t aurora_browser_quiescence_descriptor_bytes() {
+    return browser_quiescence_descriptor_bytes();
+}
+static AuroraBrowserQuiescenceDescriptor make_fixture_descriptor() {
+    AuroraBrowserQuiescenceDescriptor result{};
+    fill_quiescence_header(result, AuroraBrowserSubmissionStatus{});
+    return result;
+}
+static AuroraBrowserQuiescenceDescriptor descriptor = make_fixture_descriptor();
 static MeleeWebSourceMemoryPayloadSnapshot fake_snapshot;
 
 uint32_t melee_web_source_memory_healthy() { ++owner_reads; return owner_unhealthy ? 0 : 1; }
@@ -202,6 +216,15 @@ int main(int argc, char **argv) {
             return fail("cleanup before capture was not a harmless, idempotent close");
         }
         return 0;
+    }
+    if (scenario == "producer-layout") {
+        const uint32_t captured = melee_web_synctest_payload_admission_command(1);
+        std::printf("actual Aurora producer: header=%zu total=%u frames=%u submissions=%u CAPTURE=%u\n",
+            sizeof(descriptor), descriptor.byteSize, descriptor.frameDescriptorCount,
+            descriptor.submissionDescriptorCount, captured);
+        if (captured != 0 || capture_calls != 1 || admit_calls != 1 || source_step_calls || source_draw_calls || restore_calls)
+            return fail("actual producer layout was refused or snapshot work changed");
+        return melee_web_synctest_payload_admission_command(5) == 0x201 && destroy_calls == 1 ? 0 : fail("producer layout incomplete-close refusal or cleanup changed");
     }
     if (scenario == "success") {
         if (melee_web_synctest_payload_admission_command(1) != 0 ||
@@ -426,6 +449,32 @@ int main(int argc, char **argv) {
         if (melee_web_synctest_payload_admission_command(5) != refused || destroy_calls != 1) {
             return fail("deferred reentrant CLOSE did not preserve failure and one-shot cleanup");
         }
+        return 0;
+    }
+    if (scenario == "aurora-one-slot") {
+        fixture_frame_count = fixture_staging_count = 1;
+        descriptor = make_fixture_descriptor();
+        if (descriptor.byteSize != sizeof(descriptor) + sizeof(AuroraBrowserFrameStagingDescriptor) +
+            sizeof(AuroraBrowserSubmissionDescriptor)) return fail("one-slot producer extent differs");
+        if (melee_web_synctest_payload_admission_command(1) != 0 || capture_calls != 1) return fail("valid one-slot descriptor refused");
+        return melee_web_synctest_payload_admission_command(5) == 0x201 && destroy_calls == 1 ? 0 : fail("one-slot incomplete-close refusal or cleanup changed");
+    }
+    if (scenario.rfind("aurora-layout-", 0) == 0) {
+        if (scenario == "aurora-layout-schema") descriptor.schemaVersion--;
+        else if (scenario == "aurora-layout-header-only") descriptor.byteSize = sizeof(descriptor);
+        else if (scenario == "aurora-layout-truncated") descriptor.byteSize--;
+        else if (scenario == "aurora-layout-offset") descriptor.submissionDescriptorOffset++;
+        else if (scenario == "aurora-layout-stride") descriptor.frameDescriptorStride++;
+        else if (scenario == "aurora-layout-count") descriptor.frameDescriptorCount--;
+        else if (scenario == "aurora-layout-zero-count") descriptor.frameSlotCount = descriptor.frameDescriptorCount = 0;
+        else if (scenario == "aurora-layout-overflow") descriptor.frameSlotCount = descriptor.frameDescriptorCount = UINT32_MAX;
+        else if (scenario == "aurora-layout-size-unavailable") descriptor_size_unavailable = true;
+        else return fail("unknown layout scenario");
+        const uint32_t refused = melee_web_synctest_payload_admission_command(1);
+        if (refused != 0x205 || capture_calls || admit_calls || source_step_calls || source_draw_calls || destroy_calls)
+            return fail("malformed layout was not refused before snapshot work");
+        if (melee_web_synctest_payload_admission_command(5) != refused || destroy_calls)
+            return fail("layout refusal lost sticky status or invented a snapshot");
         return 0;
     }
     if (scenario == "transfer-busy" || scenario == "aurora-missing" ||

@@ -26,18 +26,30 @@ class SourceMemorySnapshotTests(OwnedWorkspaceTests):
         adapter = browser_source.split(start, 1)[1].split(end, 1)[0]
         template = (ROOT / "tests/payload_admission_adapter_control.cpp.in").read_text()
         self.assertEqual(template.count("// ADAPTER_BLOCK"), 1)
+        frame_source = (ROOT / ".deps/aurora/lib/gfx/frame.cpp").read_text()
+        header_producer = frame_source[frame_source.index("void fill_quiescence_header("):
+            frame_source.index("AuroraBrowserQuiescenceLease quiescence_lease(")]
+        size_producer = frame_source[frame_source.index("size_t browser_quiescence_descriptor_bytes() noexcept {"):
+            frame_source.index("size_t browser_quiescence_lease_bytes() noexcept {")]
+        self.assertEqual(template.count("// AURORA_HEADER_PRODUCER"), 1)
+        template = template.replace("// AURORA_HEADER_PRODUCER", header_producer + size_producer)
         source = self.directory / "payload-admission-control.cpp"
         source.write_text(template.replace("// ADAPTER_BLOCK", adapter))
         binary = self.directory / "payload-admission-control"
         built = subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror",
+                                "-I" + str(ROOT / ".deps/aurora/include"),
                                 str(source), "-o", str(binary)],
                                capture_output=True, text=True, timeout=60)
         self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
-        for scenario in ["success", "draw-pending-then-idle", "postdraw-admit-early-latches", "close-before-capture", "shutdown-fallback", "reentrant-shutdown", "order", "duplicate-capture", "capture-failure",
+        for scenario in ["producer-layout", "success", "draw-pending-then-idle", "postdraw-admit-early-latches", "close-before-capture", "shutdown-fallback", "reentrant-shutdown", "order", "duplicate-capture", "capture-failure",
                          "capture-failure-pointer", "capture-admission-failure",
                          "step-admission-failure", "postdraw-admission-failure",
                          "step-failure", "draw-failure", "transfer-busy",
-                         "aurora-missing", "aurora-busy", "owner-unhealthy",
+                         "aurora-missing", "aurora-busy", "aurora-one-slot",
+                         "aurora-layout-schema", "aurora-layout-header-only", "aurora-layout-truncated",
+                         "aurora-layout-offset", "aurora-layout-stride", "aurora-layout-count",
+                         "aurora-layout-zero-count", "aurora-layout-overflow", "aurora-layout-size-unavailable",
+                         "owner-unhealthy",
                          "frame-mismatch", "not-main-thread", "asyncify-disabled", "asyncify-jspi",
                          "asyncify-busy", "asyncify-entry-not-idle", "asyncify-boundary-after-step",
                          "not-runtime-thread",
@@ -46,6 +58,7 @@ class SourceMemorySnapshotTests(OwnedWorkspaceTests):
             self.assertEqual(run.returncode, 0, f"{scenario}: {run.stdout}{run.stderr}")
         pthread_binary = self.directory / "payload-admission-pthread-control"
         pthread_built = subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror",
+                                "-I" + str(ROOT / ".deps/aurora/include"),
                                         "-D__EMSCRIPTEN_PTHREADS__=1", "-Wno-unused-function",
                                         "-Wno-unused-variable", "-Wno-unused-const-variable",
                                         str(source), "-o", str(pthread_binary)],
@@ -64,6 +77,7 @@ class SourceMemorySnapshotTests(OwnedWorkspaceTests):
                    "src/gameplay_source_memory_runtime.cpp",
                    "src/source_address_context.cpp", "src/source_game_heap_context.cpp"]
         built = subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror",
+                                "-I" + str(ROOT / ".deps/aurora/include"),
                                 "-I", str(ROOT / "src"),
                                 *[str(ROOT / path) for path in sources], "-o", str(binary)],
                                capture_output=True, text=True, timeout=60)

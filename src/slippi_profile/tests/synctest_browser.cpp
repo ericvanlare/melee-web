@@ -763,9 +763,27 @@ uint32_t payload_admission_boundary(bool require_new_completed_draw)
 #if defined(MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY)
     const auto *descriptor = static_cast<const AuroraBrowserQuiescenceDescriptor *>(
         aurora_browser_quiescence_observe_descriptor());
-    if (!descriptor ||
-        descriptor->schemaVersion != AURORA_BROWSER_QUIESCENCE_SCHEMA_VERSION ||
-        descriptor->byteSize != sizeof(AuroraBrowserQuiescenceDescriptor)) {
+    if (!descriptor) return PayloadAuroraUnavailable;
+    const size_t descriptor_bytes = aurora_browser_quiescence_descriptor_bytes();
+    if (descriptor->schemaVersion != AURORA_BROWSER_QUIESCENCE_SCHEMA_VERSION ||
+        descriptor_bytes < sizeof(AuroraBrowserQuiescenceDescriptor) ||
+        descriptor_bytes > UINT32_MAX || descriptor->frameSlotCount == 0 ||
+        descriptor->stagingSlotCount == 0 ||
+        descriptor->frameDescriptorCount != descriptor->frameSlotCount ||
+        descriptor->submissionDescriptorCount != descriptor->stagingSlotCount ||
+        descriptor->frameDescriptorOffset != sizeof(AuroraBrowserQuiescenceDescriptor) ||
+        descriptor->frameDescriptorStride != sizeof(AuroraBrowserFrameStagingDescriptor) ||
+        descriptor->submissionDescriptorStride != sizeof(AuroraBrowserSubmissionDescriptor)) {
+        return PayloadAuroraUnavailable;
+    }
+    // byteSize covers the header and both authored row arrays, not just the header.
+    // uint32 counts times these fixed row sizes fit uint64; refuse a wasm32 extent overflow.
+    const uint64_t submission_offset = sizeof(AuroraBrowserQuiescenceDescriptor) +
+        uint64_t{descriptor->frameDescriptorCount} * sizeof(AuroraBrowserFrameStagingDescriptor);
+    const uint64_t total_bytes = submission_offset +
+        uint64_t{descriptor->submissionDescriptorCount} * sizeof(AuroraBrowserSubmissionDescriptor);
+    if (total_bytes > UINT32_MAX || descriptor->submissionDescriptorOffset != submission_offset ||
+        descriptor->byteSize != total_bytes || descriptor_bytes != total_bytes) {
         return PayloadAuroraUnavailable;
     }
     if (descriptor->pendingFramePackets != 0 ||
