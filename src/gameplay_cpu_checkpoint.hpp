@@ -33,6 +33,8 @@ public:
     bool seal_post(const GameplayMatchSession&) noexcept;
     GameplayCpuCommitResult restore(const GameplayMatchSession&) noexcept;
     bool finish_replay(const GameplayMatchSession&) noexcept;
+    bool seal_drawn_reference(const GameplayMatchSession&) noexcept;
+    bool matches_drawn_reference(const GameplayMatchSession&) noexcept;
     void disarm() noexcept;
     const CpuComparison& comparison() const noexcept {return comparison_;}
     std::uint32_t checked_domains() const noexcept {return checked_domains_;}
@@ -43,8 +45,9 @@ private:
     struct PostBytes {const void* address{};std::vector<std::byte> bytes;CpuComparisonDomain domain{};std::uint32_t kind{};};
     GameplayCpuCheckpoint()=default;
     bool same_owner(const GameplayMatchSession&) const noexcept;
-    bool capture_post_bytes(const GameplayMatchSession&);
-    bool matches_post_bytes(const GameplayMatchSession&) noexcept;
+    using AudioRanges=std::array<MeleeWebAudioOwnedRange,MELEE_WEB_AUDIO_OWNED_RANGE_MAX>;
+    bool capture_post_bytes(const GameplayMatchSession&,std::vector<PostBytes>&,AudioRanges&,std::size_t&);
+    bool matches_post_bytes(const GameplayMatchSession&,const std::vector<PostBytes>&,const AudioRanges&,std::size_t) noexcept;
     void release() noexcept;
     GameplayMatchCpuOwners owner_{};
     GameplayCpuCommitOwners commit_{};
@@ -54,6 +57,14 @@ private:
     std::vector<PostBytes> post_bytes_;
     std::array<MeleeWebAudioOwnedRange,MELEE_WEB_AUDIO_OWNED_RANGE_MAX> audio_ranges_{};
     std::size_t audio_range_count_{};
+    // Read-only expected endpoint; only commit_ owns restore authority.
+    MeleeWebSourceMemoryPayloadSnapshot* drawn_payload_{};
+    MeleeWebMatchFlowCpuSnapshot* drawn_flow_{};
+    std::vector<PostBytes> drawn_bytes_;
+    AudioRanges drawn_audio_ranges_{};
+    std::size_t drawn_audio_range_count_{};
+    std::vector<std::byte> drawn_statics_;
+    bool drawn_sealed_=false;
     std::uint64_t audio_generation_{};
     std::uint32_t post_frame_{};
     Phase phase_=Phase::Captured;

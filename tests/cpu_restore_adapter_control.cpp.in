@@ -103,6 +103,9 @@ extern "C" int melee_web_snapshot_step(unsigned sample);
 extern "C" int melee_web_synctest_draw_present();
 
 #define MELEE_WEB_SYNCTEST_CPU_RESTORE 1
+std::array<uint8_t,132> fixture_draw_diagnostics{};
+extern "C" const void* melee_web_synctest_draw_diagnostics(){return fixture_draw_diagnostics.data();}
+extern "C" unsigned melee_web_synctest_draw_diagnostics_size(){return 132;}
 #include "cpu_restore_adapter.inc"
 
 namespace {
@@ -243,6 +246,19 @@ bool GameplayCpuCheckpoint::finish_replay(const GameplayMatchSession& session) n
     if(okay)matched_domains_|=1u<<9;
     phase_=okay?Phase::Finished:Phase::Failed;return okay;
 }
+bool GameplayCpuCheckpoint::seal_drawn_reference(const GameplayMatchSession& session) noexcept {
+    if(phase_!=Phase::Sealed||pending_submission||session.source_frames()!=post_frame_||
+       !melee_web_cpu_interval_admit(effect_token_)||melee_web_action_interval_admit(actions_)!=1)return false;
+    drawn_=melee_web_cpu_restore_model_snapshot();comparison_=statics_->capture_expected(drawn_statics_);return comparison_.status==0;
+}
+bool GameplayCpuCheckpoint::matches_drawn_reference(const GameplayMatchSession& session) noexcept {
+    checked_domains_=matched_domains_=0;comparison_={};
+    if(phase_!=Phase::Finished||session.source_frames()!=post_frame_||!melee_web_cpu_interval_admit(effect_token_)||
+       !melee_web_cpu_restore_model_equal(drawn_))return false;
+    checked_domains_=0x3fe;comparison_=statics_->compare_expected(drawn_statics_);
+    if(comparison_.status)return false;
+    matched_domains_=0x3fe;return true;
+}
 void GameplayCpuCheckpoint::disarm() noexcept {
     if(actions_) melee_web_action_interval_disarm(actions_);
     if(effect_token_){melee_web_cpu_interval_end(effect_token_);effect_token_=0;}
@@ -273,7 +289,7 @@ std::uint32_t payload_admission_boundary(bool require_idle) {
 }
 std::uint32_t payload_admission_runtime_boundary() { return 0; }
 std::uint32_t payload_admission_submission_boundary() {
-    ++submission_boundary_calls; return pending_submission&&draw_calls==1?0u:1u;
+    ++submission_boundary_calls; return pending_submission&&draw_calls>=1?0u:1u;
 }
 
 extern "C" {
@@ -344,6 +360,7 @@ std::uint32_t ptr32(const void* p) {
 }
 void reset_fixture() {
     fail_capture=false;
+    fixture_draw_diagnostics={};
     fail_static_replay=false;
     cpu_restore=CpuRestoreControl{};
     match=std::make_unique<melee_web::GameplayMatchSession>(176);
@@ -407,6 +424,57 @@ void verify_successful_interval() {
     close_and_retire();
     check(capsule_disarms>0&&capsule_destroys==1&&action_destroys==1,
           "Disarm/retire/destroy sequence did not retain then release the capsule");
+}
+void verify_drawn_reference_interval() {
+    reset_fixture();check(configure_valid(),"Drawn configure failed");
+    check(melee_web_synctest_cpu_restore_command(1)==0,"Drawn capture failed");
+    check(melee_web_synctest_cpu_restore_command(6)==0,"Drawn CPU/baseline submit failed");
+    check(draw_calls==1&&pending_submission&&tick_sample_count==1&&commit_trace_count==0,
+          "Baseline did not draw before any restore/replay");
+    pending_submission=false;
+    check(melee_web_synctest_cpu_restore_command(7)==0,"Drawn quiescent restore/replay failed");
+    check(draw_calls==1&&tick_sample_count==2&&cpu_restore.evidence.equality==1&&cpu_restore.drawn.stage==3,
+          "Correction unexpectedly drew or equality missing");
+    check(melee_web_synctest_cpu_restore_command(3)==0&&draw_calls==2,"Final present missing");
+    pending_submission=false;check(melee_web_synctest_cpu_restore_command(4)==0,"Postdraw owner equality failed");
+    check(cpu_restore.drawn.pair.equality==1&&cpu_restore.drawn.pair.checked_domains==0x3fe&&
+          cpu_restore.drawn.pair.matched_domains==0x3fe&&cpu_restore.drawn.draw_mask==7,
+          "Independent drawn raw/typed evidence missing");
+    check(cpu_restore.evidence.bytes==11416&&melee_web_synctest_cpu_drawn_evidence_bytes()==11832,
+          "Legacy/new evidence ABI drift");close_and_retire();
+}
+void verify_drawn_refusal_and_postdraw_mismatch() {
+    reset_fixture();check(configure_valid(),"Configure failed");
+    check(!melee_web_synctest_cpu_restore_command(1)&&!melee_web_synctest_cpu_restore_command(6),"Baseline failed");
+    const auto busy=melee_web_synctest_cpu_restore_command(7);
+    check(busy&&commit_trace_count==0&&tick_sample_count==1,"Busy baseline wrote restore state");
+    pending_submission=false;check(melee_web_synctest_cpu_restore_command(7)==busy,"Busy refusal not latched");close_and_retire();
+    for(unsigned leaf=1;leaf<=6;++leaf){
+        reset_fixture();check(configure_valid(),"Configure failed");
+        check(!melee_web_synctest_cpu_restore_command(1)&&!melee_web_synctest_cpu_restore_command(6),"Baseline failed");
+        pending_submission=false;fail_admission_leaf=leaf;
+        check(melee_web_synctest_cpu_restore_command(7)!=0&&commit_trace_count==0&&tick_sample_count==1,
+              "Drawn admission refusal wrote source or replayed");close_and_retire();
+    }
+    reset_fixture();check(configure_valid(),"Configure failed");
+    check(!melee_web_synctest_cpu_restore_command(1)&&!melee_web_synctest_cpu_restore_command(6),"Baseline failed");
+    pending_submission=false;source_invariant^=1;
+    check(melee_web_synctest_cpu_restore_command(7)==0x4a4&&commit_trace_count==0&&tick_sample_count==1&&
+          cpu_restore.drawn.pair.comparison.domain==9&&cpu_restore.drawn.pair.comparison.status==2&&
+          cpu_restore.drawn.pair.comparison.address==ptr32(&source_invariant),
+          "Baseline draw invariant refusal lost exact row/byte evidence or wrote restore state");close_and_retire();
+    reset_fixture();check(configure_valid(),"Configure failed");
+    check(!melee_web_synctest_cpu_restore_command(1)&&!melee_web_synctest_cpu_restore_command(6),"Baseline failed");
+    pending_submission=false;check(!melee_web_synctest_cpu_restore_command(7)&&!melee_web_synctest_cpu_restore_command(3),"Replay/final failed");
+    pending_submission=false;++source_state.flow;
+    check(melee_web_synctest_cpu_restore_command(4)!=0&&cpu_restore.drawn.pair.equality==0,
+          "Actual adapter accepted changed postdraw modeled clock leaf");close_and_retire();
+    reset_fixture();check(configure_valid(),"Configure failed");
+    check(!melee_web_synctest_cpu_restore_command(1)&&!melee_web_synctest_cpu_restore_command(6),"Baseline failed");
+    pending_submission=false;check(!melee_web_synctest_cpu_restore_command(7)&&!melee_web_synctest_cpu_restore_command(3),"Replay/final failed");
+    pending_submission=false;++source_static_counter;
+    check(melee_web_synctest_cpu_restore_command(4)!=0&&cpu_restore.drawn.pair.comparison.domain==9&&
+          cpu_restore.drawn.pair.comparison.status==2,"Actual read-only static endpoint mismatch was lost");close_and_retire();
 }
 void verify_capture_refusal_retains_typed_reason_through_close() {
     reset_fixture();check(configure_valid(),"Configuration failed");fail_capture=true;
@@ -558,13 +626,17 @@ extern "C" int melee_web_snapshot_step(unsigned sample) {
     return 1;
 }
 extern "C" int melee_web_synctest_draw_present() {
-    if(!match||draw_calls) return 0;
+    if(!match||draw_calls>=2) return 0;
+    if(cpu_restore.drawn.mode)++source_state.flow; // Explicit modeled presentation-clock leaf.
+    ++fixture_draw_diagnostics[8];++fixture_draw_diagnostics[12];
     ++draw_calls;pending_submission=true;return 1;
 }
 
 int main() {
     try {
         verify_successful_interval();
+        verify_drawn_reference_interval();
+        verify_drawn_refusal_and_postdraw_mismatch();
         verify_capture_refusal_retains_typed_reason_through_close();
         verify_admission_refusal_blocks_draw_and_retains_failure();
         verify_replay_refusal_blocks_draw();

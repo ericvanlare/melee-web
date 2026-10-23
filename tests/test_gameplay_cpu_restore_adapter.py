@@ -52,6 +52,8 @@ public:
     bool seal_post(const GameplayMatchSession&) noexcept;
     GameplayCpuCommitResult restore(const GameplayMatchSession&) noexcept;
     bool finish_replay(const GameplayMatchSession&) noexcept;
+    bool seal_drawn_reference(const GameplayMatchSession&) noexcept;
+    bool matches_drawn_reference(const GameplayMatchSession&) noexcept;
     void disarm() noexcept;
     const CpuComparison& comparison() const noexcept {return comparison_;}
     std::uint32_t checked_domains() const noexcept {return checked_domains_;}
@@ -63,7 +65,8 @@ private:
     std::unique_ptr<GameplayCpuStatics> statics_;
     GameplayCpuCommitOwners commit_{};
     MeleeWebActionInterval* actions_{};
-    CpuRestoreFixtureSnapshot pre_{},post_{};
+    CpuRestoreFixtureSnapshot pre_{},post_{},drawn_{};
+    std::vector<std::byte> drawn_statics_;
     std::uint64_t effect_token_{};
     std::uint32_t pre_frame_{},post_frame_{};
     Phase phase_=Phase::Captured;
@@ -198,6 +201,14 @@ class GameplayCpuRestoreAdapterTests(OwnedWorkspaceTests):
             common.extend(["-I", str(directory)])
         common.extend(["-include", str(REPO_ROOT / "src/gameplay_compat.h")])
 
+        actual_includes=[directory for directory in include_dirs if directory!=stubs]
+        syntax=[sys.executable,str(compiler/'em++.py'),'-std=c++20','-fsyntax-only',
+                '-DTARGET_PC','-DMELEE_WEB_CPU_INTERVAL_ENABLED=1','-ffp-contract=off']
+        for directory in actual_includes:syntax.extend(['-I',str(directory)])
+        syntax.extend(['-include',str(REPO_ROOT/'src/gameplay_compat.h'),str(overlay_src/'gameplay_cpu_checkpoint.cpp')])
+        result=subprocess.run(syntax,cwd=output_dir,env=env,capture_output=True,text=True,timeout=120)
+        write_record(output_dir/'actual-checkpoint-syntax.json',syntax,result)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         commands = []
         cpp_sources = [overlay_src / "gameplay_cpu_commit.cpp",
                        overlay_src / "gameplay_cpu_statics.cpp", control_source]

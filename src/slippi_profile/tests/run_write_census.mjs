@@ -70,7 +70,7 @@ function parseArgs(argv) {
   const values = {};
   const allowed = new Set(['--browser-runtime', '--assets', '--manifest', '--out', '--playwright','--aggregate-cpu-restore-config']);
   const flags = new Set(['--aurora-staging-shadow-inventory', '--stage-arena-owner-inventory',
-    '--source-payload-admission-dry-run']);
+    '--source-payload-admission-dry-run','--aggregate-cpu-drawn-reference']);
   for (let i = 0; i < argv.length;) {
     const key = argv[i];
     if (flags.has(key)) {
@@ -91,6 +91,7 @@ function parseArgs(argv) {
     values[key] = path.resolve(values[key]);
   }
   if (values['--playwright']) values['--playwright'] = path.resolve(values['--playwright']);
+  if(values['--aggregate-cpu-drawn-reference']&&!values['--aggregate-cpu-restore-config'])throw new Error('Drawn reference requires CPU configuration');
   if(values['--aggregate-cpu-restore-config']){
     values['--aggregate-cpu-restore-config']=path.resolve(values['--aggregate-cpu-restore-config']);
     if(values['--source-payload-admission-dry-run']||!values['--aurora-staging-shadow-inventory'])
@@ -251,7 +252,7 @@ export function retainCpuRestoreSample(report,sample) {
   report.cpuRawSample=sample;
   report.execution.cpuRestore=sample.cpuRestore;
   report.execution.restorePerformed=sample.cpuRestore?.nativeEvidence?.equality===1 &&
-    sample.cpuRestore?.commands?.find(record=>record.command===2)?.result===0 ? true : 'not-proven';
+    sample.cpuRestore?.commands?.find(record=>record.command===(sample.cpuRestore?.mode==='drawn-reference-one-tick-v1'?7:2))?.result===0 ? true : 'not-proven';
   report.execution.cpuOuterValidation='pending';
   return report;
 }
@@ -263,6 +264,7 @@ export function recordCpuRestoreFailure(report,error) {
   return report;
 }
 export function validateCpuRestoreDrawSample(sample,beforeDiagnostics,previousFrame,expectedInputMapping) {
+  if(sample.cpuRestore?.mode==='drawn-reference-one-tick-v1')return validateDrawnRestoreSample(sample,beforeDiagnostics,previousFrame,expectedInputMapping);
   const labels=['before-cpu-baseline-and-replay','after-cpu-capture-before-step',
     'after-cpu-replay-before-final-present','after-final-source-present-and-quiescence'];
   const boundaries=sample.cpuRestore?.drawBoundaries;
@@ -278,6 +280,28 @@ export function validateCpuRestoreDrawSample(sample,beforeDiagnostics,previousFr
   if(!sample.boundary?.interactive)throw new Error('CPU final present interactive boundary refused');
   if(sample.pad!=='AgAAAAAAAAAAAAABALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=')throw new Error('CPU sample300 literal PAD drift');
   return {frame,diagnostics,fighters};
+}
+
+export function validateDrawnRestoreSample(sample,beforeDiagnostics,previousFrame,expectedInputMapping) {
+  const labels=['before-cpu-baseline-and-replay','after-cpu-capture-before-step','after-cpu-reference-before-baseline-draw',
+    'after-baseline-draw-and-quiescence','after-correction-before-final-present','after-final-source-present-and-quiescence'];
+  const rows=sample.cpuRestore.drawBoundaries;
+  if(!Array.isArray(rows)||rows.length!==6||rows.some((r,i)=>r.label!==labels[i]||r.bytes!==132||Buffer.from(r.base64||'','base64').length!==132))
+    throw new Error('Drawn reference boundary evidence missing');
+  const raw=rows.map(r=>Buffer.from(r.base64,'base64'));
+  if(!raw[0].equals(raw[1])||!raw[0].equals(raw[2])||!raw[3].equals(raw[4]))throw new Error('Drawn correction interval unexpectedly drew');
+  if(JSON.stringify(decodeDrawDiagnostics(raw[0]))!==JSON.stringify(beforeDiagnostics)||!raw[5].equals(Buffer.from(sample.drawDiagnostics,'base64')))
+    throw new Error('Drawn boundary raw evidence drift');
+  const baseline={...sample,status:sample.cpuRestore.baselineGpuStatus,drawDiagnostics:rows[3].base64};
+  const baselineFrame=validateDrawSampleBoundary(baseline,SAMPLE,beforeDiagnostics,previousFrame).frame;
+  const referenceFighters=validateSelectedDrawPath(beforeDiagnostics,decodeDrawDiagnostics(raw[3]),sample.boundary?.players,expectedInputMapping);
+  const {frame,diagnostics}=validateDrawSampleBoundary(sample,SAMPLE,decodeDrawDiagnostics(raw[4]),baselineFrame);
+  const fighters=validateSelectedDrawPath(decodeDrawDiagnostics(raw[4]),diagnostics,sample.boundary?.players,expectedInputMapping);
+  if(!sample.boundary?.interactive||sample.pad!=='AgAAAAAAAAAAAAABALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=')throw new Error('Drawn interactive/PAD guard refused');
+  const d=sample.cpuRestore.drawnEvidence;
+  if(d?.stage!==4||d.mode!==1||d.pair?.equality!==1||d.pair.firstFailure!==0||d.pair.checkedDomains!==0x3fe||
+     d.pair.matchedDomains!==0x3fe||d.pair.comparison?.status!==0)throw new Error('Drawn typed endpoint evidence missing');
+  return {frame,diagnostics,fighters,baselineFrame,referenceFighters};
 }
 
 function browserSampleLane(sample) {
@@ -401,8 +425,12 @@ async function main() {
     report.schema='melee-web-same-browser-cpu-restore-replay-present-component-v1';
     report.statement='One fixed sample300 baseline CPU+PCM without draw, typed CPU restore, exact no-draw replay, then one source present. Component evidence only; no renderer rewind or whole-Wasm restore.';
     report.execution={status:'incomplete',prefixSamples:300,sample:300,cpuRestore:{enabled:true,status:'not-started'},restorePerformed:'not-yet-observed'};
+    if(options['--aggregate-cpu-drawn-reference']){
+      report.schema='melee-web-same-browser-drawn-reference-no-draw-one-tick-component-v1';
+      report.statement='Fixed sample300 drawn-reference, typed CPU restore, same no-draw correction and phase-matched finalpresent. Incomplete private profile only; no renderer rewind.';
+    }
     report.cpuConfiguration=cpuConfiguration;
-    report.exclusions=['No #341 milestone closure','No drawn-original versus no-draw coverage claim','No seven-tick/H1/whole-session acceptance','No renderer/host allocator rewind','No #339 nonzero-history/drop workaround'];
+    report.exclusions=['No #341 milestone closure',...(options['--aggregate-cpu-drawn-reference']?['No whole-profile or vanilla original acceptance']:['No drawn-original versus no-draw coverage claim']),'No seven-tick/H1/whole-session acceptance','No renderer/host allocator rewind','No #339 nonzero-history/drop workaround'];
   }
   const writeReport = () => fs.writeFileSync(outFile, `${JSON.stringify(report, null, 2)}\n`);
   writeReport();
@@ -529,11 +557,11 @@ async function main() {
 
     if(cpuWire){
       const sample=await runBrowserCpuRestore(page,cpuWire,checkpoint,expectedInputMapping,expectedStocks,{
-        checkedSource:checkedAsyncCcall.toString(),inputMappingSource:validateSourceInputMapping.toString(),inspectSource:inspectInteractiveObservation.toString()});
+        drawnReference:Boolean(options['--aggregate-cpu-drawn-reference']),checkedSource:checkedAsyncCcall.toString(),inputMappingSource:validateSourceInputMapping.toString(),inspectSource:inspectInteractiveObservation.toString()});
       retainCpuRestoreSample(report,sample);writeReport();
       const {frame,diagnostics,fighters}=validateCpuRestoreDrawSample(sample,previousDiagnostics,previousFrame,expectedInputMapping);
       report.execution={status:'completed',prefixSamples:300,sample:300,cpuRestore:sample.cpuRestore,restorePerformed:true,
-        scope:'same-browser CPU restore/replay + one present COMPONENT only',cpuOuterValidation:'passed'};
+        scope:options['--aggregate-cpu-drawn-reference']?'same-browser drawn-reference/no-draw-one-tick COMPONENT only':'same-browser CPU restore/replay + one present COMPONENT only',cpuOuterValidation:'passed'};
       report.cpuResult={observation:rawLaneRecord(browserSampleLane(sample)),boundary:sample.boundary,gpuStatus:sample.status,
         finalFrame:frame,drawDiagnostics:diagnostics,selectedFighterPaths:fighters,
         screenshot:await screenshotRecord(page,options['--out'],'browser-cpu-restore-sample-300.png')};

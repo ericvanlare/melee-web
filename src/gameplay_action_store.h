@@ -69,6 +69,8 @@ int melee_web_action_interval_admit(const MeleeWebActionInterval*);
  * later source-payload owner restores Fighter x590/x598/x5A4/x5A8 fields. */
 int melee_web_action_interval_restore(MeleeWebActionInterval*);
 int melee_web_action_interval_finish_replay(MeleeWebActionInterval*);
+/* Read-only phase-matched postpresent proof; no status/lifetime mutation. */
+int melee_web_action_interval_matches_finished(const MeleeWebActionInterval*);
 uint32_t melee_web_action_interval_failure_code(const MeleeWebActionInterval*);
 /* Stops interval callbacks without releasing retained Clip/animation leases.
  * Retire source owners after disarm; destroy the capsule only afterward. */

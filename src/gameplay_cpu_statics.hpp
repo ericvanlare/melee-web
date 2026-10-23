@@ -33,6 +33,10 @@ public:
     /* Caller has admitted ALL aggregate owners. This is bounded copies only;
      * no checks, allocation, callback or failure branch after its first write. */
     bool commit_prevalidated() noexcept;
+    /* Read-only second endpoint over the same immutable reviewed table.
+     * This grants no new ranges and has no restore entry point. */
+    CpuComparison capture_expected(std::vector<std::byte>&) const noexcept;
+    CpuComparison compare_expected(std::span<const std::byte>) const noexcept;
     bool matches_post() const noexcept;
     CpuComparison compare_post() const noexcept;
     std::uint64_t table_identity() const noexcept { return table_identity_; }

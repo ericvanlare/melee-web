@@ -50,6 +50,8 @@ class GameplayCpuCaptureControls(OwnedWorkspaceTests):
             '@ACTUAL_COMPARISON@':comparison,'@ACTUAL_CAPTURE_DIAGNOSTIC@':diag,
             '@ACTUAL_PAYLOAD_RESULT@':payload,
             '@ACTUAL_CAPTURE_FUNCTION@':function(src,'std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture('),
+            '@ACTUAL_DRAWN_SEAL@':function(src,'bool GameplayCpuCheckpoint::seal_drawn_reference('),
+            '@ACTUAL_DRAWN_MATCH@':function(src,'bool GameplayCpuCheckpoint::matches_drawn_reference('),
             '@ACTUAL_RELEASE_FUNCTION@':function(src,'void GameplayCpuCheckpoint::release()'),
             '@ACTUAL_DISARM_FUNCTION@':function(src,'void GameplayCpuCheckpoint::disarm()'),
             '@ACTUAL_DESTRUCTOR@':function(src,'GameplayCpuCheckpoint::~GameplayCpuCheckpoint()'),

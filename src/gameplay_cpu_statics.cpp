@@ -142,6 +142,43 @@ CpuComparison GameplayCpuStatics::compare_post() const noexcept
     }
     return {};
 }
+CpuComparison GameplayCpuStatics::capture_expected(std::vector<std::byte>& out) const noexcept
+{
+    const auto domain=static_cast<std::uint32_t>(CpuComparisonDomain::Statics);
+    if(phase_!=Phase::Sealed||!layout_valid())return {domain,1,UINT32_MAX,UINT32_MAX,0,0,0,0,2};
+    std::size_t before_offset=0;
+    for(std::size_t i=0;i<rows_.size();++i){
+        const auto& row=rows_[i];
+        if(row.policy==CpuStaticPolicy::Invariant){
+            const auto* actual=reinterpret_cast<const unsigned char*>(std::uintptr_t(row.address));
+            for(std::uint32_t j=0;j<row.bytes;++j)if(static_cast<unsigned char>(before_[before_offset+j])!=actual[j])
+                return {domain,2,static_cast<std::uint32_t>(i),j,static_cast<unsigned char>(before_[before_offset+j]),actual[j],row.address,row.bytes,0};
+        }
+        before_offset+=row.bytes;
+    }
+    try {
+        out.resize(before_.size());std::size_t offset=0;
+        for(const auto& row:rows_){
+            std::memcpy(out.data()+offset,reinterpret_cast<const void*>(std::uintptr_t(row.address)),row.bytes);
+            offset+=row.bytes;
+        }
+        return {};
+    }catch(...){return {domain,1,UINT32_MAX,UINT32_MAX,0,0,0,0,3};}
+}
+CpuComparison GameplayCpuStatics::compare_expected(std::span<const std::byte> expected) const noexcept
+{
+    const auto domain=static_cast<std::uint32_t>(CpuComparisonDomain::Statics);
+    if(phase_!=Phase::Restored||!layout_valid()||expected.size()!=before_.size())
+        return {domain,1,UINT32_MAX,UINT32_MAX,0,0,0,0,2};
+    std::size_t offset=0;
+    for(std::size_t i=0;i<rows_.size();++i){
+        const auto& row=rows_[i];const auto* actual=reinterpret_cast<const unsigned char*>(std::uintptr_t(row.address));
+        for(std::uint32_t j=0;j<row.bytes;++j)if(static_cast<unsigned char>(expected[offset+j])!=actual[j])
+            return {domain,2,static_cast<std::uint32_t>(i),j,static_cast<unsigned char>(expected[offset+j]),actual[j],row.address,row.bytes,0};
+        offset+=row.bytes;
+    }
+    return {};
+}
 bool GameplayCpuStatics::matches_post() const noexcept
 {return compare_post().status==0;}
 

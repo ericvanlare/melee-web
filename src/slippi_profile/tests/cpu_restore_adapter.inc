@@ -16,8 +16,16 @@ struct CpuRestoreEvidence {
     melee_web::CpuComparison comparison{};
 };
 static_assert(offsetof(CpuRestoreEvidence,baseline)==32&&sizeof(CpuRestoreEvidence)==11416);
+// Independent read-only evidence: the original CPU pair ABI remains unchanged.
+struct CpuDrawnEvidence {
+    uint32_t schema=1,bytes=sizeof(CpuDrawnEvidence),mode=0,stage=0;
+    CpuRestoreEvidence pair{};
+    std::array<std::array<uint8_t,132>,3> draw_diagnostics{};
+    uint32_t draw_mask=0;
+};
+static_assert(offsetof(CpuDrawnEvidence,pair)==16&&sizeof(CpuDrawnEvidence)==11832);
 struct CpuRestoreControl {
-    enum State:uint32_t {Idle,Configured,Captured,Equal,DrawSubmitted,Complete,Failed,Closed};
+    enum State:uint32_t {Idle,Configured,Captured,Equal,DrawSubmitted,Complete,Failed,Closed,BaselineSubmitted};
     State state=Idle;
     uint32_t first_failure=0,pre_phase=0,pre_expected_frame=0;
     RngProfileObservation pre_profile{};
@@ -28,7 +36,15 @@ struct CpuRestoreControl {
     std::unique_ptr<melee_web::GameplayCpuStatics> configured_statics;
     std::unique_ptr<melee_web::GameplayCpuCheckpoint> capsule;
     CpuRestoreEvidence evidence{};
+    CpuDrawnEvidence drawn{};
 } cpu_restore;
+bool cpu_drawn_diagnostics(unsigned index){
+    if(index>=cpu_restore.drawn.draw_diagnostics.size()||melee_web_synctest_draw_diagnostics_size()!=132)return false;
+    const auto* bytes=static_cast<const uint8_t*>(melee_web_synctest_draw_diagnostics());
+    if(!bytes)return false;
+    std::memcpy(cpu_restore.drawn.draw_diagnostics[index].data(),bytes,132);
+    cpu_restore.drawn.draw_mask|=1u<<index;return true;
+}
 uint32_t cpu_fail(uint32_t code,const char* message){
     if(!cpu_restore.first_failure){
         cpu_restore.first_failure=code?code:0x400u;
@@ -36,7 +52,9 @@ uint32_t cpu_fail(uint32_t code,const char* message){
         std::snprintf(error,sizeof(error),"CPU restore: %s",message);
     }
     cpu_restore.evidence.first_failure=cpu_restore.first_failure;
-    cpu_restore.evidence.state=cpu_restore.state;return cpu_restore.first_failure;
+    cpu_restore.evidence.state=cpu_restore.state;
+    if(cpu_restore.drawn.mode)cpu_restore.drawn.pair.first_failure=cpu_restore.first_failure;
+    return cpu_restore.first_failure;
 }
 bool cpu_tuple_unchanged(){return match&&cpu_restore.profile_owner==rng_profile_gobj&&
     cpu_restore.configured_seed==configured_source_seed&&cpu_restore.initializer==native_initializer_enabled&&
@@ -87,7 +105,7 @@ uint32_t cpu_execute(uint32_t command){
         if(cpu_boundary())return cpu_restore.first_failure;
         cpu_restore.state=C::Captured;return 0;
     }
-    if(command==2){
+    if(command==2||command==6){
         if(cpu_restore.state!=C::Captured||!cpu_restore.capsule||!cpu_tuple_unchanged())
             return cpu_fail(0x435u,"RESTORE_REPLAY requires unchanged captured owner");
         if(cpu_boundary())return cpu_restore.first_failure;
@@ -99,6 +117,33 @@ uint32_t cpu_execute(uint32_t command){
         e.baseline_profile=rng_profile_observation;e.baseline_transfer=transfer_diagnostic;e.post_frame=observation.frame;
         if(e.post_frame!=e.pre_frame+1u||observation.stocks[0]!=4||observation.stocks[1]!=4||observation.ending||
            !cpu_restore.capsule->seal_post(*match))return cpu_fail(0x439u,"post baseline admission/seal refused");
+        if(command==6){
+            cpu_restore.drawn.mode=1;
+            if(!cpu_drawn_diagnostics(0))return cpu_fail(0x4a8u,"CPU reference diagnostics unavailable");
+            if(melee_web_synctest_draw_present()!=1)return cpu_fail(0x4a0u,"baseline source draw failed");
+            if(cpu_restore.first_failure||payload_admission_submission_boundary()!=0)
+                return cpu_fail(0x4a1u,"baseline source draw submission refused");
+            cpu_restore.drawn.stage=1;cpu_restore.state=C::BaselineSubmitted;return 0;
+        }
+    }
+    if(command==2||command==7){
+        auto& e=cpu_restore.evidence;
+        if(command==7){
+            if(cpu_restore.state!=C::BaselineSubmitted||cpu_restore.drawn.mode!=1||!cpu_tuple_unchanged())
+                return cpu_fail(0x4a2u,"drawn replay requires submitted baseline");
+            // Actual native observer must prove idle after the unchanged host wait.
+            if(payload_admission_boundary(true)!=0||observation.frame!=e.post_frame)
+                return cpu_fail(0x4a3u,"baseline native idle/source boundary refused");
+            if(!cpu_restore.capsule->seal_drawn_reference(*match)){
+                cpu_restore.drawn.pair.comparison=cpu_restore.capsule->comparison();
+                return cpu_fail(0x4a4u,"read-only drawn endpoint capture refused; inspect typed comparison (None/detail1 is opaque grouped helper)");
+            }
+            auto& d=cpu_restore.drawn.pair;d.pre_frame=e.pre_frame;d.post_frame=e.post_frame;
+            d.baseline=observation;d.baseline_pcm=pcm;d.baseline_pad=input_bytes;
+            d.baseline_profile=rng_profile_observation;d.baseline_transfer=transfer_diagnostic;
+            if(!cpu_drawn_diagnostics(1))return cpu_fail(0x4a9u,"baseline idle diagnostics unavailable");
+            cpu_restore.drawn.stage=2;
+        }
         if(cpu_boundary()||!cpu_tuple_unchanged())return cpu_fail(0x43au,"precommit boundary failed");
         const auto result=cpu_restore.capsule->restore(*match);e.commit_result=static_cast<uint32_t>(result);
         if(result!=melee_web::GameplayCpuCommitResult::Ok)return cpu_fail(0x450u+e.commit_result,"aggregate admission/commit refused");
@@ -121,7 +166,18 @@ uint32_t cpu_execute(uint32_t command){
            e.baseline_pad!=e.replay_pad||std::memcmp(&e.baseline_profile,&e.replay_profile,sizeof(RngProfileObservation))||
            std::memcmp(&e.baseline_transfer,&e.replay_transfer,sizeof(TransferDiagnostic)))
             return cpu_fail(0x471u,"exact CPU/PAD/native PCM/observation replay equality failed");
-        e.equality=1;cpu_restore.capsule->disarm();cpu_restore.state=C::Equal;return 0;
+        if(cpu_restore.drawn.mode){
+            const auto& d=cpu_restore.drawn.pair;
+            if(std::memcmp(&d.baseline,&e.replay,sizeof(Observation))||
+               std::memcmp(d.baseline_pcm.data(),e.replay_pcm.data(),sizeof(pcm))||d.baseline_pad!=e.replay_pad||
+               std::memcmp(&d.baseline_profile,&e.replay_profile,sizeof(RngProfileObservation))||
+               std::memcmp(&d.baseline_transfer,&e.replay_transfer,sizeof(TransferDiagnostic)))
+                return cpu_fail(0x4a5u,"drawn-reference versus correction raw evidence differs");
+            if(!cpu_drawn_diagnostics(2)||cpu_restore.drawn.draw_diagnostics[1]!=cpu_restore.drawn.draw_diagnostics[2])
+                return cpu_fail(0x4aau,"correction changed draw diagnostics");
+            cpu_restore.drawn.stage=3;
+        }else cpu_restore.capsule->disarm();
+        e.equality=1;cpu_restore.state=C::Equal;return 0;
     }
     if(command==3){
         if(cpu_restore.state!=C::Equal||!cpu_restore.evidence.equality)
@@ -136,6 +192,21 @@ uint32_t cpu_execute(uint32_t command){
         if(cpu_restore.state!=C::DrawSubmitted||payload_admission_boundary(true)!=0||
            !cpu_tuple_unchanged()||observation.frame!=cpu_restore.evidence.post_frame)
             return cpu_fail(0x483u,"postdraw idle/source boundary refused");
+        if(cpu_restore.drawn.mode){
+            auto& d=cpu_restore.drawn.pair;
+            d.replay=observation;d.replay_pcm=pcm;d.replay_pad=input_bytes;
+            d.replay_profile=rng_profile_observation;d.replay_transfer=transfer_diagnostic;
+            const bool matched=cpu_restore.capsule->matches_drawn_reference(*match);
+            d.checked_domains=cpu_restore.capsule->checked_domains();d.matched_domains=cpu_restore.capsule->matched_domains();
+            d.comparison=cpu_restore.capsule->comparison();d.commit_result=cpu_restore.evidence.commit_result;
+            if(!matched)return cpu_fail(0x4a6u,"postdraw typed owner equality refused");
+            if(std::memcmp(&d.baseline,&d.replay,sizeof(Observation))||
+               std::memcmp(d.baseline_pcm.data(),d.replay_pcm.data(),sizeof(pcm))||d.baseline_pad!=d.replay_pad||
+               std::memcmp(&d.baseline_profile,&d.replay_profile,sizeof(RngProfileObservation))||
+               std::memcmp(&d.baseline_transfer,&d.replay_transfer,sizeof(TransferDiagnostic)))
+                return cpu_fail(0x4a7u,"postdraw raw evidence differs");
+            d.equality=1;cpu_restore.drawn.stage=4;cpu_restore.capsule->disarm();
+        }
         cpu_restore.state=C::Complete;return 0;
     }
     return cpu_fail(0x484u,"unknown command");
@@ -197,6 +268,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_restore_command(
 }
 extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_restore_evidence(){return &cpu_restore.evidence;}
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_restore_evidence_bytes(){return sizeof(cpu_restore.evidence);}
+extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_drawn_evidence(){return &cpu_restore.drawn;}
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_drawn_evidence_bytes(){return sizeof(cpu_restore.drawn);}
 extern "C" int melee_web_synctest_cpu_before_source_close(){
     if(cpu_restore.inflight){cpu_restore.close_requested=true;cpu_fail(0x497u,"source close reentered command");return 0;}
     if(cpu_restore.capsule&&payload_admission_runtime_boundary()!=0){cpu_fail(0x49au,"source close requires normal runtime boundary");return 0;}

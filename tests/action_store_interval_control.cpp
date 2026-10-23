@@ -180,11 +180,34 @@ void verify_round_trip()
     check(same(state(h), final), "Replay did not restore exact FigaTree and source-row pointer identities");
     check(melee_web_action_interval_test_clip_destroy_count() == before_replay_destroy,
           "A retained pre-interval native Clip was destroyed during replay");
+    check(melee_web_action_interval_matches_finished(interval)==1,"Finished live endpoint refused");
+    h.store1.interval_test_disable_cache_hooks();
+    check(melee_web_action_interval_matches_finished(interval)==0 &&
+          melee_web_action_interval_failure_code(interval)==MELEE_WEB_ACTION_INTERVAL_OK,
+          "Finished hook drift was accepted or changed legacy status");
+    h.store1.interval_test_restore_cache_hooks();
+    h.store1.interval_test_change_cache_owner();
+    check(melee_web_action_interval_matches_finished(interval)==0,"Finished cache owner drift accepted");
+    h.store1.interval_test_restore_cache_owner();
+    check(melee_web_action_interval_matches_finished(interval)==1,"Restored finished identity refused");
+    MeleeWebActionFighterClipState finished_clip{};
+    check(melee_web_action_fighter_clip_state(h.p1,&finished_clip),"Finished Fighter clip state unavailable");
+    auto changed_clip=finished_clip;changed_clip.trees[0]=nullptr;
+    melee_web_action_interval_test_set_fighter_clip_state(h.p1,&changed_clip);
+    check(melee_web_action_interval_matches_finished(interval)==0,"Finished Fighter clip drift accepted");
+    melee_web_action_interval_test_set_fighter_clip_state(h.p1,&finished_clip);
+    check(melee_web_action_interval_matches_finished(interval)==1,"Restored Finished Fighter identity refused");
     const auto before_finished_disarm = melee_web_action_interval_test_clip_destroy_count();
     melee_web_action_interval_disarm(interval);
     check(melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_OK &&
           melee_web_action_interval_test_clip_destroy_count() == before_finished_disarm,
           "Disarming a finished interval changed its successful result or released a lease");
+    h.store1.unbind();
+    check(melee_web_action_interval_matches_finished(interval)==0,"Retired Finished binding accepted");
+    h.store1.bind(h.p1);
+    check(melee_web_action_interval_matches_finished(interval)==0&&
+          melee_web_action_interval_failure_code(interval)==MELEE_WEB_ACTION_INTERVAL_OK,
+          "Recreated Finished binding admitted or legacy status changed");
     melee_web_action_interval_destroy(interval);
     check(melee_web_action_interval_test_clip_destroy_count() > before_replay_destroy,
           "The pre-interval native Clip lease did not release during capsule cleanup");

@@ -1067,6 +1067,12 @@ extern "C" int melee_web_action_interval_finish_replay(MeleeWebActionInterval* i
 {
     return interval && interval->finish() == 1;
 }
+extern "C" int melee_web_action_interval_matches_finished(const MeleeWebActionInterval* interval)
+{
+    return interval && interval->phase == MeleeWebActionInterval::Phase::Finished &&
+        !interval->failure && !active_interval &&
+        interval->validation_failure() == MELEE_WEB_ACTION_INTERVAL_OK;
+}
 extern "C" uint32_t melee_web_action_interval_failure_code(const MeleeWebActionInterval* interval)
 {
     if (!interval) return MELEE_WEB_ACTION_INTERVAL_CAPTURE_REFUSED;

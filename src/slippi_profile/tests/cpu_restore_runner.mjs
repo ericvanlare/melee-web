@@ -55,28 +55,40 @@ export async function runBrowserCpuRestore(page,wire,checkpoint,expectedInputMap
   try {
     return await page.evaluate(async plan=>{
       const {module}=window.__slippiSynctest;
-      const progress={status:'running',commands:[],nativeEvidence:null};window.__slippiSynctest.cpuRestoreProgress=progress;
+      const progress={status:'running',mode:plan.drawnReference?'drawn-reference-one-tick-v1':'cpu-only-v1',commands:[],nativeEvidence:null};window.__slippiSynctest.cpuRestoreProgress=progress;
       if(typeof SharedArrayBuffer!=='undefined'&&module.HEAPU8.buffer instanceof SharedArrayBuffer)throw new Error('Shared Wasm heap refused before direct native reads');
       const read=(pointer,size)=>{
         if(!Number.isSafeInteger(pointer)||pointer<=0||!Number.isSafeInteger(size)||size<=0||pointer+size>module.HEAPU8.length)throw new Error('CPU evidence extent');
         return module.HEAPU8.slice(pointer,pointer+size);
       };
       const encode=bytes=>{let s='';for(let i=0;i<bytes.length;i+=0x6000)s+=String.fromCharCode(...bytes.subarray(i,i+0x6000));return btoa(s);};
-      const evidence=()=>{
-        const size=module._melee_web_synctest_cpu_restore_evidence_bytes();if(size!==plan.evidenceBytes)throw new Error('CPU evidence ABI');
-        const bytes=read(module._melee_web_synctest_cpu_restore_evidence(),size);const view=new DataView(bytes.buffer);
+      const decodeEvidence=bytes=>{
+        const size=plan.evidenceBytes,view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
         if(view.getUint32(0,true)!==1||view.getUint32(4,true)!==size)throw new Error('CPU evidence header');
         const value={bytes:size,base64:encode(bytes),state:view.getUint32(8,true),firstFailure:view.getUint32(12,true),
           preFrame:view.getUint32(16,true),postFrame:view.getUint32(20,true),commitResult:view.getUint32(24,true),equality:view.getUint32(28,true),
           checkedDomains:view.getUint32(11368,true),matchedDomains:view.getUint32(11372,true),
           comparison:Object.fromEntries(['domain','status','row','offset','expected','actual','address','extent','detail']
             .map((name,index)=>[name,view.getUint32(11376+index*4,true)]))};
-        progress.nativeEvidence=value;return value;
+        return value;
+      };
+      const evidence=()=>{
+        const size=module._melee_web_synctest_cpu_restore_evidence_bytes();if(size!==plan.evidenceBytes)throw new Error('CPU evidence ABI');
+        const value=decodeEvidence(read(module._melee_web_synctest_cpu_restore_evidence(),size));progress.nativeEvidence=value;return value;
+      };
+      const drawnEvidence=()=>{
+        const size=module._melee_web_synctest_cpu_drawn_evidence_bytes();if(size!==11832)throw new Error('Drawn evidence ABI');
+        const bytes=read(module._melee_web_synctest_cpu_drawn_evidence(),size),view=new DataView(bytes.buffer);
+        if(view.getUint32(0,true)!==1||view.getUint32(4,true)!==size)throw new Error('Drawn evidence header');
+        const value={schema:1,bytes:size,base64:encode(bytes),mode:view.getUint32(8,true),stage:view.getUint32(12,true),
+          pair:decodeEvidence(bytes.slice(16,11432)),drawMask:view.getUint32(11828,true),
+          drawDiagnostics:[0,1,2].map(index=>encode(bytes.slice(11432+index*132,11432+(index+1)*132)))};
+        progress.drawnEvidence=value;return value;
       };
       const command=async number=>{
         const record={command:number,outcome:'pending'};progress.commands.push(record);
         try{record.result=await module.ccall('melee_web_synctest_cpu_restore_command','number',['number'],[number],{async:true});record.outcome='returned';
-          record.nativeEvidence=evidence();if(record.result!==0)throw new Error(`CPU command ${number} refused ${record.result}: ${module.UTF8ToString(module._melee_web_snapshot_error())}`);
+          record.nativeEvidence=evidence();if(plan.drawnReference)record.drawnEvidence=drawnEvidence();if(record.result!==0)throw new Error(`CPU command ${number} refused ${record.result}: ${module.UTF8ToString(module._melee_web_snapshot_error())}`);
         }catch(error){record.error=String(error);record.outcome=record.outcome==='pending'?'threw':record.result!==0?'returned-nonzero':'evidence-error';throw error;}
       };
       if(module._melee_web_snapshot_observation_size()!==1280||module._melee_web_snapshot_pcm_size()!==4272||
@@ -102,9 +114,25 @@ export async function runBrowserCpuRestore(page,wire,checkpoint,expectedInputMap
       await command(1);
       const afterCapture=drawBoundary('after-cpu-capture-before-step');
       for(let i=0;i<beforeCpu.length;++i)if(beforeCpu[i]!==afterCapture[i])throw new Error(`CPU capture changed draw diagnostics at byte ${i}`);
-      await command(2);
-      const afterCpu=drawBoundary('after-cpu-replay-before-final-present');
-      for(let i=0;i<beforeCpu.length;++i)if(beforeCpu[i]!==afterCpu[i])throw new Error(`CPU baseline/replay changed draw diagnostics at byte ${i}`);
+      let cpuDrawBaseline=beforeCpu;
+      if(plan.drawnReference){
+        await command(6);
+        const reference=drawnEvidence();
+        const cpuReference=Uint8Array.from(atob(reference.drawDiagnostics[0]),c=>c.charCodeAt(0));
+        progress.drawBoundaries.push({label:'after-cpu-reference-before-baseline-draw',bytes:132,base64:reference.drawDiagnostics[0]});
+        if((reference.drawMask&1)!==1||cpuReference.some((byte,i)=>byte!==beforeCpu[i]))throw new Error('Baseline CPU unexpectedly drew');
+        progress.baselineGpuStatus=await new Function(`return (${plan.waitSource})`)()(module,300);
+        const checked=new Function(`return (${plan.checkedSource})`)();await checked(module,'baseline native quiescence','melee_web_snapshot_quiescent');
+        cpuDrawBaseline=drawBoundary('after-baseline-draw-and-quiescence');
+        await command(7);
+      }else await command(2);
+      const afterCpu=drawBoundary(plan.drawnReference?'after-correction-before-final-present':'after-cpu-replay-before-final-present');
+      for(let i=0;i<cpuDrawBaseline.length;++i)if(cpuDrawBaseline[i]!==afterCpu[i])throw new Error(`CPU baseline/replay changed draw diagnostics at byte ${i}`);
+      if(plan.drawnReference){
+        const d=drawnEvidence();
+        if(d.drawMask!==7||d.stage!==3||d.mode!==1||d.drawDiagnostics[1]!==encode(cpuDrawBaseline)||d.drawDiagnostics[2]!==encode(afterCpu))
+          throw new Error('Native drawn diagnostics/state drift');
+      }
       const current=evidence();if(current.equality!==1||current.commitResult!==0||current.postFrame!==current.preFrame+1||
          current.checkedDomains!==0x3fe||current.matchedDomains!==0x3fe||current.comparison.status!==0)throw new Error('CPU equality contract missing');
       const native=read(module._melee_web_synctest_cpu_restore_evidence(),plan.evidenceBytes);
@@ -114,10 +142,21 @@ export async function runBrowserCpuRestore(page,wire,checkpoint,expectedInputMap
       await command(3);
       const status=await new Function(`return (${plan.waitSource})`)()(module,300);
       const checked=new Function(`return (${plan.checkedSource})`)();await checked(module,'native postdraw quiescence','melee_web_snapshot_quiescent');
-      await command(4);
-      const observation=read(module._melee_web_snapshot_observation(),1280),pcm=read(module._melee_web_snapshot_pcm(),4272),pad=read(module._melee_web_snapshot_input(),44);
       const diagnostics=drawBoundary('after-final-source-present-and-quiescence');
-      progress.rawSample={observation:encode(observation),pcm:encode(pcm),pad:encode(pad),drawDiagnostics:encode(diagnostics),status};
+      const finalObservation=read(module._melee_web_snapshot_observation(),1280),finalPcm=read(module._melee_web_snapshot_pcm(),4272),finalPad=read(module._melee_web_snapshot_input(),44);
+      progress.rawSample={observation:encode(finalObservation),pcm:encode(finalPcm),pad:encode(finalPad),drawDiagnostics:encode(diagnostics),status};
+      await command(4);
+      if(plan.drawnReference){
+        const d=drawnEvidence();
+        if(d.mode!==1||d.stage!==4||d.pair.equality!==1||d.pair.firstFailure!==0||d.pair.commitResult!==0||
+           d.pair.checkedDomains!==0x3fe||d.pair.matchedDomains!==0x3fe||d.pair.comparison.status!==0)
+          throw new Error('Postdraw typed equality contract missing');
+        const raw=Uint8Array.from(atob(d.pair.base64),c=>c.charCodeAt(0));
+        for(const[a,b,n]of [[32,1312,1280],[2592,6864,4272],[11136,11180,44],[11224,11256,32],[11288,11328,40]])
+          for(let i=0;i<n;++i)if(raw[a+i]!==raw[b+i])throw new Error(`Drawn paired evidence differs at ${a+i}`);
+      }
+      const observation=read(module._melee_web_snapshot_observation(),1280),pcm=read(module._melee_web_snapshot_pcm(),4272),pad=read(module._melee_web_snapshot_input(),44);
+      if(encode(read(module._melee_web_synctest_draw_diagnostics(),132))!==encode(diagnostics))throw new Error('Postdraw admission changed draw diagnostics');
       const mapping=new Function(`return (${plan.inputMappingSource})`)();
       const inspect=new Function('DRAW_MOTION_BOUNDARY','validateSourceInputMapping',`return (${plan.inspectSource})`)({interactive:0,entry:1,death:2,respawn:3,unknown:4},mapping);
       const boundary=inspect(observation,{classifyMotion:motion=>module._melee_web_synctest_motion_boundary(motion),
@@ -125,7 +164,7 @@ export async function runBrowserCpuRestore(page,wire,checkpoint,expectedInputMap
         expectedInputMapping:plan.expectedInputMapping,expectedStocks:plan.expectedStocks});
       progress.rawSample.boundary=boundary;
       if(!boundary.interactive)throw new Error('Final present interactive guard refused');
-      progress.status='cpu-restore-replay-and-one-present-component-complete';evidence();
+      progress.status=plan.drawnReference?'drawn-reference-no-draw-one-tick-component-complete':'cpu-restore-replay-and-one-present-component-complete';evidence();
       return {observation:encode(observation),pcm:encode(pcm),pad:encode(pad),drawDiagnostics:encode(diagnostics),boundary,status,cpuRestore:progress};
     },plan);
   }catch(error){

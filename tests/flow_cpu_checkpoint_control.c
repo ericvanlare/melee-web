@@ -162,6 +162,19 @@ int main(void)
  assert(a==allocations&&f==releases&&cl==melee_source_clock_lifetime&&dl==melee_source_cadence_lifetime);
  assert(melee_web_match_flow_cpu_snapshot_matches(&flow,pre,error,sizeof(error)));
  tick(&flow);assert(melee_web_match_flow_cpu_snapshot_matches(&flow,post,error,sizeof(error)));
+ /* Phase-matched drawn endpoint: presentation advances the original typed
+  * counter, while a correction tick must not fake that source operation. */
+ u32 present_before=gm_80479D58.unk_4;
+ assert(melee_web_match_flow_present(&flow,error,sizeof(error)));
+ assert(gm_80479D58.unk_4==present_before+1);
+ MeleeWebMatchFlowCpuSnapshot* drawn=melee_web_match_flow_cpu_snapshot_capture(&flow,error,sizeof(error));assert(drawn);
+ assert(!melee_web_match_flow_cpu_snapshot_matches(&flow,post,error,sizeof(error)));
+ assert(melee_web_match_flow_cpu_snapshot_restore(&flow,pre,error,sizeof(error)));
+ tick(&flow);assert(melee_web_match_flow_cpu_snapshot_matches(&flow,post,error,sizeof(error)));
+ assert(!melee_web_match_flow_cpu_snapshot_matches(&flow,drawn,error,sizeof(error)));
+ assert(melee_web_match_flow_present(&flow,error,sizeof(error)));
+ assert(gm_80479D58.unk_4==present_before+1&&melee_web_match_flow_cpu_snapshot_matches(&flow,drawn,error,sizeof(error)));
+ melee_web_match_flow_cpu_snapshot_destroy(drawn);
  /* Independent owner/lifetime/callback/alarm refusals precede every write. */
  HSD_GObj marker={0};HSD_GObj_804D781C=&marker;refused(&flow,pre);HSD_GObj_804D781C=NULL;
  lb_804329F0.x48=1;refused(&flow,pre);lb_804329F0.x48=0;
