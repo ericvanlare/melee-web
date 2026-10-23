@@ -15,6 +15,14 @@ def function_slice(text, marker):
     raise AssertionError(f"unterminated function {marker}")
 action_enum=source[source.index("enum class FirstSssFreshPairCallbackAction : unsigned {"):source.index("FirstSssFreshPairCallbackAction first_sss_fresh_pair_callback_action(){")]
 action=function_slice(source,"FirstSssFreshPairCallbackAction first_sss_fresh_pair_callback_action(){")
+ready=function_slice(source,"bool first_sss_fresh_draw_callback_ready(){")
+dispatch_start=source.index(" if(fresh_pair_callback==FirstSssFreshPairCallbackAction::ServiceFirstDraw){")
+dispatch_end=source.index(" if(fresh_pair_callback==FirstSssFreshPairCallbackAction::StopAfterPair){",dispatch_start)
+draw_dispatch=source[dispatch_start:dispatch_end]
+draw_arm=function_slice(source,"int melee_web_native_menu_stadium_first_sss_draw_arm(){")
+assert draw_arm.index("check(melee_web_menu_host_arm_first_sss_draw(")<draw_arm.index("s.callback_host_owner=host;s.callback_world_owner=world.get();")
+assert "s.callback_world_generation=melee_web_gameplay_generation();" in draw_arm
+assert "first_sss_sequence_service();return;" in draw_dispatch
 queue_guard=source.index("// Diagnostic input must never override the producer-bound literal row.")
 selector=source.index("const auto fresh_pair_callback=first_sss_fresh_pair_callback_action();")
 services=source.index("if(first_sss_vs_setup_service())return;",selector)
@@ -89,15 +97,20 @@ struct FinalDraw {
 } first_css_final_pending_draw;
 struct Pair {
  FirstCssBrowserMode profile=FirstCssBrowserMode::None;
- bool armed=false,kicked=false,attempted=false,failed=false,complete=false,frame_terminal=false,audio_before_rebuild_captured=false;
+ bool armed=false,kicked=false,attempted=false,failed=false,complete=false,frame_terminal=false,audio_before_rebuild_captured=false,compared=false,captured=false;
+ struct {int state=0;} native;
  uint64_t audio_render_calls_before_rebuild=0,audio_render_frames_before_rebuild=0;
 } first_sss_constructor_pair;
 struct FixedTickClock {void reset(){}} menu_clock,audio_clock;
 struct Preparation {bool busy()const{return false;} melee_web::MenuPreparationState::Phase phase()const{return melee_web::MenuPreparationState::Phase::Idle;}} preparation;
-struct Host{} host_storage; Host* host=&host_storage; int world_storage=1; int* world=&world_storage;
+struct Host{} host_storage; Host* host=&host_storage; int world_storage=1;
+struct WorldHandle {int* p;int* get()const{return p;}operator bool()const{return p!=nullptr;}WorldHandle& operator=(int* v){p=v;return *this;}} world{&world_storage};
 int scene_storage=1; const void* current_scene=&scene_storage;
 const void* melee_web_current_scene_info(){return current_scene;}
 int source_frame=142; uint32_t seed=0xe2624ac3; uint32_t* seed_ptr=&seed;
+bool first_use_draw_pending=false;
+uint64_t generation=8;
+uint64_t melee_web_gameplay_generation(){return generation;}
 bool live_owner=true,running=false,pending=false,faulted=false,replay=false,host_entered=true,
   match=false,results=false,prize=false,menu_scene_rebuild_pending=false,net_active=false;
 uint64_t diagnostic_audio_render_calls=21,diagnostic_audio_render_frames=32000;
@@ -121,11 +134,24 @@ const Row& first_css_finite_row(unsigned index){
  check(index<first_css_browser_draw.finite_css.rows.size(),"bad finite row");
  return first_css_browser_draw.finite_css.rows[index];
 }
+struct TickState {
+ bool armed=false,kicked=false,attempted=false,captured=false,complete=false,compared=false,failed=false;
+ struct {unsigned host_tick_calls=0,host_draw_calls=0;int tick_result=0;bool clock_post_succeeded=false,post_host_frame_captured=false,transition_requested=false;unsigned post_host_frame=0;struct{uint64_t world_generation=0;}scheduler_end;}native;
+}first_sss_consumed_tick;
+struct SequenceState {
+ Host* callback_host_owner=nullptr;const void* callback_world_owner=nullptr;uint64_t callback_world_generation=0;
+ bool armed=false,kicked=false,attempted=false,complete=false,failed=false,frame_end_returned=false;
+ unsigned aurora_begin_calls=0,aurora_end_calls=0;
+ struct {int state=0;unsigned host_tick_calls=0,host_draw_calls=0;}native;
+}first_sss_draw_sequence,first_sss_prefix_sequence;
+'''+ready+r'''
 '''+action_enum+r'''
 '''+action+r'''
 '''+actual+r'''
 void reset_common(){
  first_sss_constructor_pair=Pair{};first_css_browser_postdraw_stream=Stream{};
+ first_sss_consumed_tick=TickState{};first_sss_draw_sequence=SequenceState{};first_sss_prefix_sequence=SequenceState{};
+ generation=8;first_use_draw_pending=false;
  first_css_final_pending_draw=FinalDraw{};
  running=pending=faulted=replay=match=results=prize=menu_scene_rebuild_pending=net_active=false;
  host_entered=true;asset_destination=AssetDestination::None;preparation=Preparation{};
@@ -167,6 +193,68 @@ void setup_fresh_pair_kicked(){
  setup_fresh();auto& pair=first_sss_constructor_pair;
  pair.profile=FirstCssBrowserMode::FreshFiniteCssPrefixV4;pair.armed=pair.kicked=true;
 }
+unsigned draw_service_calls=0,ordinary_loop_calls=0,input_calls=0,audio_calls=0,second_tick_calls=0;
+bool first_sss_sequence_service(){
+ ++draw_service_calls;auto& draw=first_sss_draw_sequence;
+ draw.attempted=true;draw.complete=true;draw.frame_end_returned=true;
+ draw.aurora_begin_calls=draw.aurora_end_calls=1;draw.native.state=2;draw.native.host_draw_calls=1;
+ return true;
+}
+void extracted_dispatch(){
+ const auto fresh_pair_callback=first_sss_fresh_pair_callback_action();
+'''+draw_dispatch+r'''
+ if(fresh_pair_callback==FirstSssFreshPairCallbackAction::StopAfterPair)return;
+ ++ordinary_loop_calls;
+}
+void setup_ready_draw(){
+ setup_fresh_pair_kicked();auto& pair=first_sss_constructor_pair;
+ pair.complete=pair.frame_terminal=pair.compared=pair.captured=true;pair.native.state=2;
+ auto& tick=first_sss_consumed_tick;
+ tick.armed=tick.kicked=tick.attempted=tick.captured=tick.complete=tick.compared=true;
+ tick.native.host_tick_calls=1;tick.native.tick_result=1;
+ tick.native.clock_post_succeeded=tick.native.post_host_frame_captured=true;tick.native.post_host_frame=1;
+ tick.native.scheduler_end.world_generation=8;
+ auto& draw=first_sss_draw_sequence;draw.armed=draw.kicked=true;draw.native.state=1;
+ draw.callback_host_owner=host;draw.callback_world_owner=world.get();draw.callback_world_generation=8;
+ draw_service_calls=ordinary_loop_calls=input_calls=audio_calls=second_tick_calls=0;
+}
+void fresh_draw_dispatch_controls(){
+ setup_ready_draw();assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::ServiceFirstDraw);
+ extracted_dispatch();extracted_dispatch();
+ assert(draw_service_calls==1&&ordinary_loop_calls==0&&input_calls==0&&audio_calls==0&&second_tick_calls==0);
+ assert(first_sss_draw_sequence.complete&&first_sss_draw_sequence.frame_end_returned&&first_sss_draw_sequence.native.host_draw_calls==1);
+ assert(first_sss_constructor_pair.complete&&first_sss_constructor_pair.frame_terminal);
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StopAfterPair);
+ for(int bad=0;bad<40;++bad){
+  setup_ready_draw();Host foreign_host;int foreign_world=2;
+  auto& pair=first_sss_constructor_pair;auto& tick=first_sss_consumed_tick;auto& draw=first_sss_draw_sequence;
+  switch(bad){
+   case 0:pair.failed=true;break;case 1:pair.compared=false;break;case 2:pair.captured=false;break;
+   case 3:pair.native.state=3;break;case 4:tick.complete=false;break;case 5:tick.compared=false;break;
+   case 6:tick.failed=true;break;case 7:tick.native.host_tick_calls=2;break;case 8:tick.native.host_draw_calls=1;break;
+   case 9:tick.native.post_host_frame=2;break;case 10:tick.native.transition_requested=true;break;
+   case 11:draw.armed=false;break;case 12:draw.kicked=false;break;case 13:draw.attempted=true;break;
+   case 14:draw.complete=true;break;case 15:draw.failed=true;break;case 16:draw.native.state=3;break;
+   case 17:draw.native.host_tick_calls=1;break;case 18:draw.native.host_draw_calls=1;break;
+   case 19:draw.aurora_begin_calls=1;break;case 20:draw.aurora_end_calls=1;break;
+   case 21:draw.frame_end_returned=true;break;case 22:first_sss_prefix_sequence.armed=true;break;
+   case 23:running=true;break;case 24:pending=true;break;case 25:faulted=true;break;
+   case 26:host=&foreign_host;break;case 27:world=&foreign_world;break;case 28:generation=9;break;
+   case 29:tick.native.scheduler_end.world_generation=9;break;case 30:host_entered=false;break;
+   case 31:replay=true;break;case 32:net_active=true;break;case 33:match=true;break;
+   case 34:menu_scene_rebuild_pending=true;break;case 35:asset_destination=AssetDestination::Other;break;
+   case 36:first_use_draw_pending=true;break;
+   case 37:first_css_browser_draw.armed=false;break;case 38:first_css_browser_draw.kicked=false;break;case 39:first_css_browser_draw.complete=false;break;
+  }
+  assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StopAfterPair);
+  extracted_dispatch();assert(draw_service_calls==0&&ordinary_loop_calls==0);
+ }
+ setup_ready_draw();first_sss_constructor_pair.profile=FirstCssBrowserMode::LegacyTickDrawV1;
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StrictCssTerminal);
+ setup_ready_draw();first_css_browser_draw.mode=FirstCssBrowserMode::LegacyTickDrawV1;
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StrictCssTerminal);
+ std::cout<<"PASS exact fresh draw dispatch: one service; pair terminal retained; 40 invalid continuation states refused; legacy refused; no ordinary loop/input/audio/second tick\n";
+}
 void callback_action_controls(){
  setup_fresh();
  assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StrictCssTerminal);
@@ -206,6 +294,7 @@ void callback_action_controls(){
  assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StrictCssTerminal);
 }
 int run_control(){
+ fresh_draw_dispatch_controls();
  callback_action_controls();
  setup_fresh();assert(first_css_browser_draw.draw.seed==0x312151c3);
  assert(first_css_browser_postdraw_stream.transition.seed==0xe2624ac3);

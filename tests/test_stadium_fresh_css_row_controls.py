@@ -31,6 +31,10 @@ struct PairCallbackState {
  FirstCssBrowserMode profile=FirstCssBrowserMode::None;
  bool armed=false,kicked=false,attempted=false,complete=false,failed=false,frame_terminal=false;
 }first_sss_constructor_pair;
+// These CSS-only controls never arm an SSS draw. The actual readiness helper
+// and first-draw dispatch are extracted by first_sss_pair_native_control.py.
+bool first_sss_fresh_draw_callback_ready(){return false;}
+bool first_sss_sequence_service(){return false;}
 '''
 
 

@@ -299,8 +299,9 @@ struct FirstSssConstructorPairState {
 };
 FirstSssConstructorPairState first_sss_constructor_pair;
 enum class FirstSssFreshPairCallbackAction : unsigned {
- StrictCssTerminal, ContinueTransition, StopAfterPair
+ StrictCssTerminal, ContinueTransition, StopAfterPair, ServiceFirstDraw
 };
+bool first_sss_fresh_draw_callback_ready();
 FirstSssFreshPairCallbackAction first_sss_fresh_pair_callback_action(){
  const auto& css=first_css_browser_draw;
  const auto& pair=first_sss_constructor_pair;
@@ -310,10 +311,13 @@ FirstSssFreshPairCallbackAction first_sss_fresh_pair_callback_action(){
      pair.armed&&pair.kicked;
  if(!exact_fresh_pair||css.failed)
   return FirstSssFreshPairCallbackAction::StrictCssTerminal;
- if(pair.frame_terminal)
+ if(pair.frame_terminal){
+  if(pair.complete&&!pair.failed&&first_sss_fresh_draw_callback_ready())
+   return FirstSssFreshPairCallbackAction::ServiceFirstDraw;
   return pair.complete||pair.failed?
       FirstSssFreshPairCallbackAction::StopAfterPair:
       FirstSssFreshPairCallbackAction::StrictCssTerminal;
+ }
  const auto& stream=first_css_browser_postdraw_stream;
  const auto& final_draw=first_css_final_pending_draw;
  if(css.failed||!css.armed||!css.kicked||!css.complete||pair.failed||pair.attempted||
@@ -475,6 +479,9 @@ void first_sss_pair_write_note(std::ostream& out,
 extern unsigned audio_phase;
 std::string first_sss_frozen_pair_json;
 struct FirstSssSequenceBrowserState {
+ MeleeWebMenuHost* callback_host_owner=nullptr;
+ const void* callback_world_owner=nullptr;
+ uint64_t callback_world_generation=0;
  bool armed=false,kicked=false,attempted=false,complete=false,failed=false;
  bool frame_end_returned=false;
  unsigned aurora_begin_calls=0,aurora_end_calls=0,current_index=0;
@@ -3256,6 +3263,34 @@ bool first_sss_sequence_service(){
  first_css_browser_draw_refresh_observation();return true;
 }
 
+// A checked draw arm leases only one private presentation. The completed pair
+// stays frozen; this dispatch cannot resume the ordinary loop or source ticks.
+bool first_sss_fresh_draw_callback_ready(){
+ const auto& css=first_css_browser_draw;
+ const auto& pair=first_sss_constructor_pair;
+ const auto& tick=first_sss_consumed_tick;
+ const auto& draw=first_sss_draw_sequence;
+ return css.armed&&css.kicked&&css.complete&&!css.failed&&pair.compared&&pair.captured&&pair.native.state==2&&
+     tick.armed&&tick.kicked&&tick.attempted&&tick.captured&&tick.complete&&
+     tick.compared&&!tick.failed&&tick.native.host_tick_calls==1&&
+     tick.native.host_draw_calls==0&&tick.native.tick_result==1&&
+     tick.native.clock_post_succeeded&&tick.native.post_host_frame_captured&&
+     tick.native.post_host_frame==1&&!tick.native.transition_requested&&
+     draw.armed&&draw.kicked&&!draw.attempted&&!draw.complete&&!draw.failed&&
+     draw.native.state==1&&draw.native.host_tick_calls==0&&draw.native.host_draw_calls==0&&
+     !draw.aurora_begin_calls&&!draw.aurora_end_calls&&!draw.frame_end_returned&&
+     !first_sss_prefix_sequence.armed&&!first_sss_prefix_sequence.failed&&
+     !running&&!pending&&!faulted&&!first_use_draw_pending&&host&&world&&host_entered&&
+     host==draw.callback_host_owner&&world.get()==draw.callback_world_owner&&
+     draw.callback_world_generation!=0&&
+     melee_web_gameplay_generation()==draw.callback_world_generation&&
+     tick.native.scheduler_end.world_generation==draw.callback_world_generation&&
+     !match&&!results&&!prize&&!replay&&!melee_web_net_active()&&
+     !menu_scene_rebuild_pending&&!preparation.busy()&&
+     preparation.phase()==melee_web::MenuPreparationState::Phase::Idle&&
+     asset_destination==AssetDestination::None;
+}
+
 bool matched_setup_cf_setup_equal(const MeleeWebStadiumSetupSnapshot& a,
                                  const MeleeWebStadiumSetupSnapshot& b){
  return a.version==b.version&&a.world_generation==b.world_generation&&
@@ -4274,6 +4309,9 @@ void tick(){
   EM_ASM({window.menuFrame?.(false);});return;
  }
  const auto fresh_pair_callback=first_sss_fresh_pair_callback_action();
+ if(fresh_pair_callback==FirstSssFreshPairCallbackAction::ServiceFirstDraw){
+  first_sss_sequence_service();return;
+ }
  if(fresh_pair_callback==FirstSssFreshPairCallbackAction::StopAfterPair){
   // Keep the completed or failed constructor observation terminal. No later
   // CSS callback may resume source clocks or replace the first failure.
@@ -6319,6 +6357,8 @@ int melee_web_native_menu_stadium_first_sss_draw_arm(){try{
  check(EM_ASM_INT({return typeof globalThis.__meleeWebStadiumFirstSssDrawCompare==='function'?1:0;})==1,"SSS first-draw comparator absent");
  char error[256]{};
  check(melee_web_menu_host_arm_first_sss_draw(host,first_sss_sequence_compare,nullptr,error,sizeof error),error);
+ s.callback_host_owner=host;s.callback_world_owner=world.get();
+ s.callback_world_generation=melee_web_gameplay_generation();
  first_sss_sequence_sync(false);first_css_browser_draw_refresh_observation();return 1;
 }catch(const std::exception& error){first_sss_sequence_fail(false,error.what());first_css_browser_draw_refresh_observation();return 0;}}
 int melee_web_native_menu_stadium_first_sss_draw_kick(){try{

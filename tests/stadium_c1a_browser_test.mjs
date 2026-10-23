@@ -2380,7 +2380,9 @@ async function runFirstSssConsumedPadTick(constructorNative) {
   assertFirstSssConsumedTickStopState(evidence, cssBaseline, constructorPair);
   assertFirstSssConsumedTickCompared(evidence, kickResult);
   report.scenario.first_sss_consumed_tick.claim =
-    'Original SSS consumed PAD row1604 and frame-zero scheduler-end row1608 matched; exactly one normal host tick completed to frame1 with no draw or transition. This is one bounded boundary comparison, not whole-session acceptance.';
+    firstSssFreshInputTickDraw
+      ? 'Fresh-profile original SSS consumed PAD row1595 and frame-zero scheduler-end row1599 matched; exactly one normal host tick completed to frame1 with no draw or transition. This is one bounded boundary comparison, not whole-session acceptance.'
+      : 'Original SSS consumed PAD row1604 and frame-zero scheduler-end row1608 matched; exactly one normal host tick completed to frame1 with no draw or transition. This is one bounded boundary comparison, not whole-session acceptance.';
   await persistReport();
   await saveScreenshot('stadium-first-sss-consumed-pad-tick');
   return evidence.native;
