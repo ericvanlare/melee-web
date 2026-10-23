@@ -17,7 +17,7 @@ import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.m
 import {firstSssAudioAccounting} from './stadium_first_css_stream_compare.mjs';
 import {createCssSssTransitionCapture, CSS_SSS_TRANSITION_LIMITS,
   cssReadinessEvidence, cssSssOutcome, hasCssMenuReadiness} from './stadium_c1a_css_sss_reducer.mjs';
-import {validateMatchedSetupCfRequest, validateMatchedSetupCfPreflight,
+import {FRESH_SETUP_GO2_ROUTE, validateFreshSetupGo2RunnerSource, validateMatchedSetupCfRequest, validateMatchedSetupCfPreflight,
   validateMatchedSetupCfIdentities, matchedSetupCfRuntimeFailure, PREFIX_V2_SCOPE, FULL_V3_SCOPE,
   trackMatchedSetupCfExplicitStep, matchedSetupCfNativeAccessAllowed,
   dispatchMatchedSetupCfNativeEvaluation, guardMatchedSetupCfNativeCleanup,
@@ -57,6 +57,7 @@ const {values} = parseArgs({options: Object.fromEntries(
       ['first-sss-prefix', {type: 'boolean', default: false}],
       ['first-sss-fresh-prefix-132', {type: 'boolean', default: false}],
       ['first-sss-fresh-ready-start', {type: 'boolean', default: false}],
+      ['first-sss-fresh-setup-go2', {type: 'boolean', default: false}],
       ['first-sss-vs-entry', {type: 'boolean', default: false}],
       ['first-sss-vs-setup', {type: 'boolean', default: false}],
       ['first-sss-vs-setup-cf', {type: 'boolean', default: false}],
@@ -86,20 +87,22 @@ const firstCssFreshRow = values['first-css-fresh-row'];
 const firstCssFreshFinite = values['first-css-fresh-finite'];
 const firstCssConstructorManifest = values['first-css-constructor-manifest'];
 const firstSssVsSetupTextTail = values['first-sss-vs-setup-text-tail'];
+const firstSssFreshSetupGo2 = values['first-sss-fresh-setup-go2'];
 const firstSssVsSetupCfExplicitStep = values['first-sss-vs-setup-cf-explicit-step'];
 const firstSssVsSetupCfFullSchedule = values['first-sss-vs-setup-cf-full-schedule'] || recreationFullPair;
 const firstSssVsSetupCfCommonFields = values['first-sss-vs-setup-cf-common-fields'] || recreationFullPair;
 const firstSssVsSetupCf = validateMatchedSetupCfRequest({
   enabled: values['first-sss-vs-setup-cf'], explicitStep: firstSssVsSetupCfExplicitStep,
   fullSchedule: firstSssVsSetupCfFullSchedule, commonFields: firstSssVsSetupCfCommonFields,
-  setup: firstSssVsSetup,
+  setup: firstSssVsSetup || firstSssFreshSetupGo2,
   textTail: firstSssVsSetupTextTail,
   packetPath: values['first-sss-vs-setup-cf-packet'] || null,
   assemblyPath: values['first-sss-vs-setup-cf-assembly'] || null,
 });
 const firstSssVsEntry = values['first-sss-vs-entry'] || firstSssVsSetup;
-const firstSssFreshReadyStart=values['first-sss-fresh-ready-start'];
+const firstSssFreshReadyStart=values['first-sss-fresh-ready-start']||firstSssFreshSetupGo2;
 const firstSssFreshPrefix132=values['first-sss-fresh-prefix-132']||firstSssFreshReadyStart;
+const firstSssSetupEndpoint=firstSssVsSetup||firstSssFreshSetupGo2;
 if(firstSssFreshReadyStart!==!!values['first-sss-fresh-ready-start-expected']||
    (firstSssFreshReadyStart&&values['first-sss-fresh-prefix-132']))
  throw Error('Fresh132 ready Start is one separate exact route with its host-only expected input');
@@ -115,9 +118,18 @@ const firstCssBrowserDraw = values['first-css-browser-draw'] || firstCssBrowserS
 if(firstSssFreshPrefix132 && (values['first-sss-prefix'] || values['first-sss-fresh-input-tick-draw'] ||
     firstSssVsEntry || firstSssVsSetup || !values['first-sss-prefix-expected'] || !values['first-sss-prefix-input']))
   throw Error('Fresh132 is one explicit fixed prefix route, separate from legacy prefix and VS');
+if (firstSssFreshSetupGo2 && (!firstSssFreshReadyStart || !values['first-sss-fresh-ready-start-expected'] ||
+    !values['first-sss-vs-setup-cf'] || !firstSssVsSetupCfExplicitStep ||
+    values['first-sss-vs-setup'] || values['first-sss-vs-setup-expected'] ||
+    values['first-sss-vs-entry'] || values['first-sss-vs-entry-expected'] ||
+    firstSssVsSetupTextTail || firstSssVsSetupCfFullSchedule || firstSssVsSetupCfCommonFields ||
+    recreationCanary || !values['first-sss-vs-setup-cf-packet'] ||
+    !values['first-sss-vs-setup-cf-assembly']))
+  throw Error('Fresh Setup→GO+2 requires Fresh132 prepared Start, a bounded run2 packet/assembly, and explicit steps only');
 if (firstCssFreshFinite !== !!values['first-css-finite-receipt'] ||
     (firstCssFreshFinite && (firstCssFreshRow || firstCssConstructorReturn || cssSssReducer ||
-      (firstSssConstructorPair && !firstSssConstructorPairFresh) || firstSssVsSetupCf || recreationCanary ||
+      (firstSssConstructorPair && !firstSssConstructorPairFresh) ||
+      (firstSssVsSetupCf && !firstSssFreshSetupGo2) || recreationCanary ||
       ['first-css-browser-draw','first-css-browser-stream','first-css-browser-final-draw',
        'first-css-context','first-css-consumed-pad','first-css-return-expected',
        'first-css-tick-expected','first-css-draw-expected','first-css-postdraw-input',
@@ -132,7 +144,7 @@ if (firstSssConstructorPairFresh &&
       values['first-sss-tick-expected'] || values['first-sss-tick-input'] || values['first-sss-draw-expected'])) ||
      (firstSssFreshInputTickDraw && (!firstSssConsumedPadTick || !firstSssDraw || (firstSssPrefix&&!firstSssFreshPrefix132) ||
       firstSssVsEntry || firstSssVsSetup || values['first-sss-consumed-pad-tick'] || values['first-sss-draw'])) ||
-     firstSssVsEntry || firstSssVsSetup || firstSssVsSetupCf ||
+     firstSssVsEntry || firstSssVsSetup || (firstSssVsSetupCf&&!firstSssFreshSetupGo2) ||
      firstCssFreshRow || firstCssConstructorReturn || cssSssReducer ||
      firstCssBrowserDraw === false || !values['first-sss-pair-expected'] ||
      ['first-sss-vs-entry-expected','first-sss-vs-setup-expected',
@@ -215,6 +227,7 @@ const preflightBytes = await fs.readFile(preflightPath);
 const preflight = JSON.parse(preflightBytes.toString('utf8'));
 const matchedSetupCfPreflight = validateMatchedSetupCfPreflight(preflight, {
   enabled: firstSssVsSetupCf,
+  freshSetupGo2: firstSssFreshSetupGo2,
   explicitStep: firstSssVsSetupCfExplicitStep,
   fullSchedule: firstSssVsSetupCfFullSchedule,
   commonFields: firstSssVsSetupCfCommonFields,
@@ -395,7 +408,7 @@ let report = {
   scenario: {
     route_mode: recreationCanary ? (recreationFullB
       ? (recreationFullPair ? 'same-instance-recreation-A7167-B7167-common-fields-seed' : 'same-instance-recreation-A174-B7167-common-fields-seed')
-      : 'same-instance-recreation-canary-174') : firstSssVsSetup ? 'first-sss-vs-setup' : firstSssVsEntry ? 'first-sss-vs-entry' : firstSssFreshReadyStart ? 'first-css-fresh-finite-sss-132-ready-start-v1' : firstSssFreshPrefix132 ? 'first-css-fresh-finite-sss-prefix-132-v2' : firstSssPrefix ? 'first-sss-prefix' : firstSssFreshInputTickDraw ? 'first-css-fresh-finite-sss-input-tick-draw-v1' : firstSssDraw ? 'first-sss-draw' :
+      : 'same-instance-recreation-canary-174') : firstSssFreshSetupGo2 ? 'first-sss-fresh-setup-go2' : firstSssVsSetup ? 'first-sss-vs-setup' : firstSssVsEntry ? 'first-sss-vs-entry' : firstSssFreshReadyStart ? 'first-css-fresh-finite-sss-132-ready-start-v1' : firstSssFreshPrefix132 ? 'first-css-fresh-finite-sss-prefix-132-v2' : firstSssPrefix ? 'first-sss-prefix' : firstSssFreshInputTickDraw ? 'first-css-fresh-finite-sss-input-tick-draw-v1' : firstSssDraw ? 'first-sss-draw' :
       firstSssConstructorPairFresh ? 'first-css-fresh-finite-sss-constructor-pair-v1' :
       firstCssFreshFinite ? 'first-css-fresh-finite-v4' :
       firstCssFreshRow ? 'first-css-fresh-row-v3' :
@@ -452,13 +465,17 @@ let report = {
         : 'Same-instance A174 checked close/restart then exact original full7167 B with3501 common+seed rows; no complete per-owner RNG ledger or C3 acceptance.')
       : 'Two separately reported same-instance original-route 174-action lifetimes with checked A close/restart; no whole-session or recreation acceptance.')
     : firstSssVsSetupCf
-    ? firstSssVsSetupCfV2
+    ? firstSssFreshSetupGo2
+      ? 'Fresh132 prepared Start, same-producer original Setup2563 and constructor scalar, then exact four-port 174-action proper prefix through original GO+2 final draw; Entry callback, Setup-predicated Start acceptance, C3 and broader gameplay remain unclaimed.'
+      : firstSssVsSetupCfV2
       ? firstSssVsSetupCfCommonFields
         ? 'Strict same-run original Setup then all7167 source-ordered actions, exact consumed PAD and C/F/GO checks plus 3501 declared post-tick common-field comparisons; no full-state or C3 acceptance.'
         : firstSssVsSetupCfFullSchedule
         ? 'Strict same-run original Setup then all7167 source-ordered actions, exact consumed PAD and C/F fields; measured functionalA probe, no C3 acceptance.'
         : 'Strict same-run Entry and completed Setup comparison, then the extracted run2 proper prefix from action0 through the next draw/tick/draw after dynamically mapped C/F; compare C/F before their following draws, then stop.'
       : 'Strict same-run Entry and completed Setup comparison, then the exact original 86-tick/85-draw schedule; compare C after tick84 before draw84 and F after tick85 before draw85, then stop.'
+    : firstSssFreshSetupGo2
+    ? 'Fresh132 prepared Start then checked async Stadium asset handoff and zero-frame Setup; explicit same-producer GO/C/F/GO+2 comparison stops at the first draw after GO+2. Original Entry callback is not executed.'
     : firstSssVsSetup
     ? `Strict Entry then checked async exact Stadium asset handoff and existing deferred Session Setup endpoint; stop before gameplay tick/draw/GO${firstSssVsSetupTextTail?'; opt-in bounded SIS text-tail diagnostics only':''}`
     : firstSssVsEntry
@@ -3090,11 +3107,17 @@ function assertFirstSssVsSetupOwners(setup) {
 
 async function runFirstSssVsSetup(entryNative) {
   const inputs = firstSssVsSetupInputs;
-  const helper = await import(pathToFileURL(inputs.helperPath).href);
+  const sourceHelperPath = firstSssFreshSetupGo2
+    ? firstSssVsEntryInputs.helperPath : inputs.helperPath;
+  const helper = await import(pathToFileURL(sourceHelperPath).href);
   const entryStatus = report.scenario.first_sss_vs_entry.comparison;
-  const comparator = helper.createFirstSssVsSetupComparator(inputs.expected,
-    entryNative.first_sss_prefix, entryStatus);
-  report.scenario.first_sss_vs_setup = {expected_json: inputs.identity,
+  const comparator = firstSssFreshSetupGo2
+    ? helper.createFreshSetupGo2Comparator(matchedSetupCfInputs.hostEvidence.go2StartContext,
+      firstSssVsEntryInputs.expected, entryNative.first_sss_prefix, entryStatus)
+    : helper.createFirstSssVsSetupComparator(inputs.expected,
+      entryNative.first_sss_prefix, entryStatus);
+  report.scenario.first_sss_vs_setup = {expected_json: firstSssFreshSetupGo2
+    ? matchedSetupCfInputs.packetIdentity : inputs.identity,
     before: structuredClone(entryNative), begin: null, observation: null, comparison: null,
     text_tail_probe: firstSssVsSetupTextTail
       ? {requested: true, log_before_unload: null, after_unload: null,
@@ -3461,13 +3484,23 @@ async function runMatchedSetupCfContinuation(setupNative) {
     'Matched Setup C/F arm requires the completed strict Setup comparison');
   assertFirstSssVsSetupOwners(setupNative.first_sss_vs_setup);
   if (hostEvidence.go2StartContext) {
-    assert.equal(inputs.go2StartContextAdmission?.schema,
-      'melee-web-stadium-go2-same-producer-start-context-v1',
-      'GO+2 arm requires preflight admission of this producer\'s Entry/Setup context');
-    assert.equal(inputs.go2StartContextAdmission?.decision,
-      'PASS_SELECTED_ENTRY_SETUP_MATCH_SAME_PRODUCER');
-    assert.equal(report.scenario.first_sss_vs_entry?.comparison?.approved, true,
-      'GO+2 arm requires the actual declared Entry Start/seed comparison');
+    if (firstSssFreshSetupGo2) {
+      assert.equal(inputs.go2StartContextAdmission?.schema,
+        'melee-web-stadium-fresh-setup-go2-source-context-v1',
+        'Fresh GO+2 arm requires admission of this producer\'s prepared Start/Setup context');
+      assert.equal(inputs.go2StartContextAdmission?.decision,
+        'PASS_FRESH_PREPARED_START_AND_SAME_PRODUCER_SETUP_CONTEXT');
+      assert.equal(report.scenario.first_sss_vs_entry?.comparison?.approved, true,
+        'Fresh GO+2 arm requires the prepared Start snapshot comparison');
+    } else {
+      assert.equal(inputs.go2StartContextAdmission?.schema,
+        'melee-web-stadium-go2-same-producer-start-context-v1',
+        'GO+2 arm requires preflight admission of this producer\'s Entry/Setup context');
+      assert.equal(inputs.go2StartContextAdmission?.decision,
+        'PASS_SELECTED_ENTRY_SETUP_MATCH_SAME_PRODUCER');
+      assert.equal(report.scenario.first_sss_vs_entry?.comparison?.approved, true,
+        'GO+2 arm requires the actual declared Entry Start/seed comparison');
+    }
     assert.equal(report.scenario.first_sss_vs_setup?.comparison?.approved, true,
       'GO+2 arm requires the actual completed Setup Start/seed comparison');
   }
@@ -5016,7 +5049,7 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
             if (firstSssPrefix) {
               observation = await runFirstSssPrefix(constructorAndTick, firstDraw);
               if (firstSssVsEntry||firstSssFreshReadyStart) observation = await runFirstSssVsEntry(observation,firstSssFreshReadyStart);
-              if (firstSssVsSetup) observation = await runFirstSssVsSetup(observation);
+              if (firstSssSetupEndpoint) observation = await runFirstSssVsSetup(observation);
             }
           }
         }
@@ -5089,7 +5122,7 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
   if (firstSssPrefix)
     assert.equal(afterUnload.first_sss_prefix, null,
       'SSS prefix diagnostic ownership survived teardown');
-  if (firstSssVsSetup) assert.equal(afterUnload.first_sss_vs_setup, null);
+  if (firstSssSetupEndpoint) assert.equal(afterUnload.first_sss_vs_setup, null);
   assertFirstCssDiagnosticMatchedSetupCfPostUnload(afterUnload);
   if (firstSssVsSetupTextTail) {
     assert.equal(afterUnload.retained_text_tail_wrapper, true,
@@ -5347,7 +5380,7 @@ async function main() {
   assert.equal(build, expectedBuild, 'Only the isolated C1a diagnostic runtime may be served');
   assert.equal(preflight.schema, 'melee-web-stadium-c1a-browser-preflight-v1');
   if(firstSssConstructorPairFresh){
-    assert.equal(preflight.route_mode, firstSssFreshReadyStart ? 'first-css-fresh-finite-sss-132-ready-start-v1' : firstSssFreshPrefix132 ? 'first-css-fresh-finite-sss-prefix-132-v2' : firstSssFreshInputTickDraw
+    assert.equal(preflight.route_mode, firstSssFreshSetupGo2 ? FRESH_SETUP_GO2_ROUTE : firstSssFreshReadyStart ? 'first-css-fresh-finite-sss-132-ready-start-v1' : firstSssFreshPrefix132 ? 'first-css-fresh-finite-sss-prefix-132-v2' : firstSssFreshInputTickDraw
       ? 'first-css-fresh-finite-sss-input-tick-draw-v1'
       : 'first-css-fresh-finite-sss-constructor-pair-v1');
     assert.ok(preflight.first_css_fresh_finite?.receipt);
@@ -5366,6 +5399,8 @@ async function main() {
       'Constructor-return preflight omitted its manifest identity');
     assert.equal(path.resolve(manifestBinding.path),
       path.resolve(firstCssConstructorManifest));
+  } else if (firstSssFreshSetupGo2) {
+    assert.equal(preflight.route_mode, FRESH_SETUP_GO2_ROUTE);
   } else if (firstSssVsSetup) {
     assert.equal(preflight.route_mode, 'first-sss-vs-setup');
     const textTailBinding = preflight.first_sss_vs_setup?.text_tail_probe;
@@ -5434,16 +5469,29 @@ async function main() {
   firstSssVsEntryInputs = firstSssFreshReadyStart?await loadFreshSss132ReadyStartInputs():await loadFirstSssVsEntryInputs();
   firstSssVsSetupInputs = await loadFirstSssVsSetupInputs();
   if (matchedSetupCfInputs?.hostEvidence.go2StartContext) {
-    assert.equal(firstSssVsEntry, true,
-      'GO+2 same-producer start context requires the checked VS Entry endpoint');
-    assert.equal(firstSssVsSetup, true,
-      'GO+2 same-producer start context requires the checked completed VS Setup endpoint');
-    assert.ok(firstSssVsEntryInputs?.expected && firstSssVsSetupInputs?.expected,
-      'GO+2 same-producer start context requires both host-only phase expectations');
-    matchedSetupCfInputs.go2StartContextAdmission =
-      matchedSetupCfInputs.helper.validateGo2StartContextExpectations(
-        matchedSetupCfInputs.hostEvidence.go2StartContext,
-        firstSssVsEntryInputs.expected, firstSssVsSetupInputs.expected);
+    if (firstSssFreshSetupGo2) {
+      assert.equal(firstSssFreshReadyStart, true,
+        'Fresh Setup/GO+2 source context requires the completed Fresh132 prepared Start check');
+      assert.equal(firstSssSetupEndpoint, true,
+        'Fresh Setup/GO+2 source context requires the checked completed Setup endpoint');
+      assert.ok(firstSssVsEntryInputs?.expected,
+        'Fresh Setup/GO+2 source context requires the host-only Fresh132 source descriptor');
+      matchedSetupCfInputs.go2StartContextAdmission =
+        await validateFreshSetupGo2RunnerSource({helperPath: firstSssVsEntryInputs.helperPath,
+          context: matchedSetupCfInputs.hostEvidence.go2StartContext,
+          readyExpected: firstSssVsEntryInputs.expected});
+    } else {
+      assert.equal(firstSssVsEntry, true,
+        'GO+2 same-producer start context requires the checked VS Entry endpoint');
+      assert.equal(firstSssVsSetup, true,
+        'GO+2 same-producer start context requires the checked completed VS Setup endpoint');
+      assert.ok(firstSssVsEntryInputs?.expected && firstSssVsSetupInputs?.expected,
+        'GO+2 same-producer start context requires both host-only phase expectations');
+      matchedSetupCfInputs.go2StartContextAdmission =
+        matchedSetupCfInputs.helper.validateGo2StartContextExpectations(
+          matchedSetupCfInputs.hostEvidence.go2StartContext,
+          firstSssVsEntryInputs.expected, firstSssVsSetupInputs.expected);
+    }
   }
   assert.deepEqual(preflight.limits_ms, LIMITS, 'Runtime bounds differ from frozen preflight');
   assert.equal(LIMITS.captureWorkMs,
@@ -6013,7 +6061,7 @@ async function cleanupOwnedProcesses() {
         cleanupFailures.push({step: 'sss-prefix-failure-snapshot', error: errorText(error)});
       }
     }
-    if (firstSssVsSetup) {
+    if (firstSssSetupEndpoint) {
       try {
         report.scenario.first_sss_vs_setup_failure_snapshot = await timeout(
           readFirstSssVsEntryObservation(), Math.min(3000, cleanupRemaining()),
@@ -6130,7 +6178,7 @@ async function cleanupOwnedProcesses() {
       if (firstSssPrefix)
         assert.equal(afterUnload.first_sss_prefix, null);
       if (firstSssVsEntry||firstSssFreshReadyStart) assert.equal(afterUnload.first_sss_vs_entry, null);
-      if (firstSssVsSetup) assert.equal(afterUnload.first_sss_vs_setup, null);
+      if (firstSssSetupEndpoint) assert.equal(afterUnload.first_sss_vs_setup, null);
       assert.equal(afterUnload.error, null);
       assert.equal(afterUnload.import_enabled, true);
       report.cleanup.observation_cleared = true;

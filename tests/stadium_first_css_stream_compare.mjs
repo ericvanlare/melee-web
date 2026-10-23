@@ -1939,6 +1939,112 @@ export function createFirstSssVsEntryComparator(expected,prefix){
 export function createFreshSss132ReadyStartComparator(expected,prefix){
  return createReadyStartComparator(validateFreshSss132ReadyStartExpectedSource(expected).expected,prefix,FRESH132_READY_START);}
 
+const FRESH_SETUP_GO2_SCOPE =
+  'fresh prepared Start followed by same-producer original VS Setup2563 typed Start, RNG and constructor scalar only';
+export function validateFreshSetupGo2SourceContext(context, readyExpected) {
+  const fail = () => { throw new TypeError('Fresh Setup/GO+2 route requires the pinned same-producer Entry/Setup source context'); };
+  const entry = context?.entry, setup = context?.setup, ctor = context?.constructor_observation;
+  if (!plainObject(context) || context.schema !== 'melee-web-stadium-go2-same-producer-start-context-v2' ||
+      context.version !== 2 || !plainObject(entry) || !plainObject(setup) || !plainObject(ctor) ||
+      entry.sequence !== 2523 || entry.event !== 'boundary' || entry.boundary !== 'entry' ||
+      entry.phase !== 'vs_entry' || entry.pc !== '0x8016e934' || entry.source_tick !== 133 ||
+      entry.draw_ordinal !== 0 || entry.seed_hex !== 'e2624ac3' ||
+      setup.sequence !== 2563 || setup.event !== 'boundary' || setup.boundary !== 'setup' ||
+      setup.phase !== 'vs_setup' || setup.pc !== '0x8016e9c4' || setup.source_tick !== 133 ||
+      setup.draw_ordinal !== 0 || setup.seed_hex !== '083a62a9' ||
+      !sameJsonValue(entry.typed_start, setup.typed_start) ||
+      !exactOwnKeys(ctor, ['schema', 'source_sequences', 'seed_before_hex', 'seed_after_hex',
+        'parameter_x0', 'parameter_x4', 'random_call_observed', 'random_bound_valid',
+        'random_bound', 'random_result_valid', 'random_result']) ||
+      ctor.schema !== 'melee-web-original-stadium-constructor-state-projection-v1' ||
+      !sameJsonValue(ctor.source_sequences, [2545, 2546, 2547, 2548, 2549]) ||
+      ctor.seed_before_hex !== 'e2624ac3' || ctor.seed_after_hex !== '55248a7a' ||
+      typeof ctor.parameter_x0 !== 'number' || !Number.isSafeInteger(ctor.parameter_x0) ||
+      typeof ctor.parameter_x4 !== 'number' || !Number.isSafeInteger(ctor.parameter_x4) ||
+      typeof ctor.random_call_observed !== 'boolean' ||
+      ctor.random_bound_valid !== ctor.random_call_observed ||
+      ctor.random_result_valid !== ctor.random_call_observed ||
+      !Number.isSafeInteger(ctor.random_bound) || !Number.isSafeInteger(ctor.random_result)) fail();
+  const fresh = validateFreshSss132ReadyStartExpectedSource(readyExpected).expected;
+  if (!sameJsonValue(fresh.start, setup.typed_start))
+    throw new TypeError('Fresh prepared Start differs from the pinned same-producer Setup Start');
+  return context;
+}
+
+export function validateFreshSetupGo2Expectations(context, readyExpected) {
+  validateFreshSetupGo2SourceContext(context, readyExpected);
+  return Object.freeze({schema: 'melee-web-stadium-fresh-setup-go2-source-context-v1',
+    decision: 'PASS_FRESH_PREPARED_START_AND_SAME_PRODUCER_SETUP_CONTEXT',
+    entry_sequence: context.entry.sequence, setup_sequence: context.setup.sequence,
+    constructor_sequences: [...context.constructor_observation.source_sequences],
+    scope: FRESH_SETUP_GO2_SCOPE});
+}
+
+export function createFreshSetupGo2Comparator(context, readyExpected, prefix, readyStartStatus) {
+  validateFreshSetupGo2SourceContext(context, readyExpected);
+  if (!plainObject(prefix) || prefix.complete !== true || prefix.failed !== false ||
+      prefix.current_host_entered !== false || prefix.current_source_scene !== 0 ||
+      prefix.current_session_phase !== 5 || prefix.host_tick_calls !== 132 ||
+      prefix.host_draw_calls !== 132 || prefix.matched_ticks !== 132 ||
+      prefix.matched_draw_enters !== 132 || prefix.matched_draw_returns !== 132 ||
+      !firstSssAudioAccounting(prefix, 132).valid)
+    throw new TypeError('Fresh Setup comparison requires the completed checked Fresh132 prefix');
+  if (!plainObject(readyStartStatus) || readyStartStatus.attempted !== true ||
+      readyStartStatus.approved !== true || readyStartStatus.failed !== false ||
+      readyStartStatus.first_mismatch !== null)
+    throw new TypeError('Fresh Setup comparison requires the approved prepared Start check');
+  let attempted = false, failed = false, firstMismatch = null, approved = false;
+  const compare = endpoint => {
+    const refuse = difference => { failed = true; approved = false; firstMismatch ||= difference; return false; };
+    if (attempted) return refuse(mismatch('fresh_setup.callback', 'one use', 'duplicate'));
+    attempted = true;
+    if (!plainObject(endpoint) || endpoint.attempted !== true || endpoint.captured !== true ||
+        endpoint.complete !== true || endpoint.failed !== false || endpoint.error !== null ||
+        endpoint.construction_complete !== true || endpoint.source_frames !== 0 ||
+        endpoint.host_tick_calls !== 0 || endpoint.host_draw_calls !== 0 ||
+        endpoint.actual?.phase !== 'vs_setup')
+      return refuse(mismatch('fresh_setup.capture',
+        'completed Setup with zero frames and no continuation ticks/draws', endpoint));
+    const actual = endpoint.actual, source = context.setup, constructor = context.constructor_observation;
+    const state = endpoint.stadium_setup_state;
+    if (actual.random_seed_hex !== source.seed_hex)
+      return refuse(mismatch('fresh_setup.random_seed_hex', source.seed_hex, actual.random_seed_hex));
+    const wrap = start => ({sss: {vs: {start}}});
+    const startDifference = actualRulesMismatch(wrap(actual.start), wrap(source.typed_start), 'fresh_setup') ||
+      actualPlayersMismatch(wrap(actual.start), wrap(source.typed_start), 'fresh_setup');
+    if (startDifference) return refuse({...startDifference,
+      path: startDifference.path.replace('.sss.vs.start', '.start')});
+    if (!plainObject(state) || state.schema !== 'melee-web-stadium-zero-tick-setup-state-v1')
+      return refuse(mismatch('fresh_setup.constructor_receipt', 'checked zero-tick Setup receipt', state));
+    const checks = [
+      ['constructor_callback_count', constructor.source_sequences.length, state.constructor_callback_count],
+      ['constructor_randi_call_count', Number(constructor.random_call_observed), state.constructor_randi_call_count],
+      ['parameter_x0', constructor.parameter_x0, state.parameter_x0],
+      ['parameter_x4', constructor.parameter_x4, state.parameter_x4],
+      ['source_seed_before_hex', constructor.seed_before_hex, state.source_seed_before_hex],
+      ['source_seed_after_hex', constructor.seed_after_hex, state.source_seed_after_hex],
+    ];
+    if (constructor.random_bound_valid) {
+      checks.push(['constructor_randi_bound', constructor.random_bound, state.constructor_randi_bound]);
+      checks.push(['constructor_randi_result', constructor.random_result, state.constructor_randi_result]);
+    } else {
+      checks.push(['constructor_randi_bound', null, state.constructor_randi_bound]);
+      checks.push(['constructor_randi_result', null, state.constructor_randi_result]);
+    }
+    for (const [field, expected, actualValue] of checks) {
+      if (expected !== actualValue)
+        return refuse(mismatch(`fresh_setup.stadium_setup_state.${field}`, expected, actualValue));
+    }
+    if (state.source_parameter_roots_agree !== true)
+      return refuse(mismatch('fresh_setup.stadium_setup_state.source_parameter_roots_agree', true,
+        state.source_parameter_roots_agree));
+    approved = true;
+    return true;
+  };
+  return Object.freeze({compare, status: () => Object.freeze({attempted, approved, failed,
+    first_mismatch: firstMismatch, scope: FRESH_SETUP_GO2_SCOPE})});
+}
+
 const FIRST_SSS_VS_SETUP_SCOPE =
   'original ordinary VS Setup row2503 StartMeleeData and RNG scalar only';
 const FIRST_SSS_VS_SETUP_INVENTORY = Object.freeze([

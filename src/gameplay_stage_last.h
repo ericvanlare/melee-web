@@ -26,6 +26,8 @@ typedef struct MeleeWebStadiumGoAlignmentEvent {
     int32_t remap_branch;
     int32_t callback_identity;
     int32_t hud_enabled;
+    uint32_t source_seed;
+    uint32_t source_seed_valid;
 } MeleeWebStadiumGoAlignmentEvent;
 typedef struct MeleeWebStadiumGoAlignmentSnapshot {
     uint64_t generation;

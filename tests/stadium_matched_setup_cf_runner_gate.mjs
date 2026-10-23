@@ -1,3 +1,7 @@
+import {pathToFileURL} from 'node:url';
+
+export const FRESH_SETUP_GO2_ROUTE = 'first-sss-fresh-setup-go2';
+
 const FILE_ID_KEYS = ['path', 'basename', 'bytes', 'sha256'];
 const EXPORTS = Object.freeze({
   arm: '_melee_web_native_menu_stadium_first_sss_vs_setup_cf_arm',
@@ -59,7 +63,7 @@ export function validateMatchedSetupCfRequest({enabled, explicitStep = false, fu
   return active;
 }
 
-export function validateMatchedSetupCfPreflight(preflight, {enabled, explicitStep = false, fullSchedule = false,
+export function validateMatchedSetupCfPreflight(preflight, {enabled, freshSetupGo2 = false, explicitStep = false, fullSchedule = false,
   commonFields = false, packetPath, assemblyPath, helperPath}) {
   if (typeof commonFields !== 'boolean' || (commonFields &&
       (enabled !== true || fullSchedule !== true || explicitStep !== true)))
@@ -67,8 +71,12 @@ export function validateMatchedSetupCfPreflight(preflight, {enabled, explicitSte
   if (typeof fullSchedule !== 'boolean' || (fullSchedule && (enabled !== true || explicitStep !== true)))
     throw new TypeError('Full schedule preflight requires explicit service opt-in');
   if (enabled !== true) return null;
-  if (preflight?.route_mode !== 'first-sss-vs-setup')
-    throw new TypeError('Matched Setup C/F requires the frozen first-sss-vs-setup preflight route');
+  if (typeof freshSetupGo2 !== 'boolean' ||
+      (freshSetupGo2 && (explicitStep !== true || fullSchedule || commonFields)))
+    throw new TypeError('Fresh Setup GO+2 preflight requires bounded explicit steps');
+  const expectedRoute = freshSetupGo2 ? FRESH_SETUP_GO2_ROUTE : 'first-sss-vs-setup';
+  if (preflight?.route_mode !== expectedRoute)
+    throw new TypeError(`Matched Setup C/F requires the frozen ${expectedRoute} preflight route`);
   const frozen = preflight.matched_setup_cf;
   exactKeys(frozen, explicitStep === true
     ? ['scope', 'packet', 'assembly_manifest', 'helper', 'diagnostic_exports',
@@ -107,7 +115,7 @@ export function validateMatchedSetupCfPreflight(preflight, {enabled, explicitSte
     'Matched Setup C/F diagnostic exports');
   const expectedExports = explicitStep === true ? (fullSchedule ? FULL_V3_EXPLICIT_STEP_EXPORTS : PREFIX_V2_EXPLICIT_STEP_EXPORTS)
     : frozen.scope === PREFIX_V2_SCOPE ? PREFIX_V2_EXPORTS : EXPORTS;
-  if (JSON.stringify(frozen.diagnostic_exports) !== JSON.stringify(expectedExports))
+  if (Object.keys(expectedExports).some(key => frozen.diagnostic_exports[key] !== expectedExports[key]))
     throw new TypeError('Matched Setup C/F native exports differ from the reviewed contract');
   return frozen;
 }
@@ -192,4 +200,9 @@ export function matchedSetupCfRuntimeFailure({native, pageErrors = [],
   if (messages.some(message => /(?:WebGPU|WebGL|GPU).*(?:uncaptured error|validation error|device lost|context lost)|(?:uncaptured error|validation error|device lost|context lost).*(?:WebGPU|WebGL|GPU)/i.test(message)))
     return 'GPU reported an error during the matched continuation';
   return null;
+}
+
+export async function validateFreshSetupGo2RunnerSource({helperPath, context, readyExpected}) {
+  const helper = await import(pathToFileURL(helperPath).href);
+  return helper.validateFreshSetupGo2Expectations(context, readyExpected);
 }

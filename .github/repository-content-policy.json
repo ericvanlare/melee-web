@@ -34,8 +34,8 @@
     {
       "path": "tests/stadium_first_css_stream_compare.mjs",
       "rule": "encoded_payload",
-      "sha256": "ba6ae131483f849a2c64fd91104944da5c99c56fa005199202e95ff6063bb24e",
-      "reason": "Exact comparator constants duplicate the fixture\u2019s independently hash-pinned source runtime slices at original observer sequences 1570 and 1594. The long values are PAD state, the 0xf0 CSSData.vs.start prefix (not the unobserved slots 4\u20135), and the cur_hps_stem path buffer, not game media or executable bytes. Keep strict byte comparisons; see the independent content review for observer, decoder, and source-layout pins. Provenance and the retained CI failure are recorded in docs/evidence/issue251-stadium-profile-oninit-v1.json."
+      "sha256": "55065707812de0a28bb52e5476eb0e23877ca45f0e5e0b3106e27050f441b89e",
+      "reason": "Exact comparator constants duplicate the fixture\u2019s independently hash-pinned source runtime slices at original observer sequences 1570 and 1594. The long values are PAD state, the 0xf0 CSSData.vs.start prefix (not the unobserved slots 4\u20135), and the cur_hps_stem path buffer, not game media or executable bytes. Keep strict byte comparisons; see the independent content review for observer, decoder, and source-layout pins. Provenance and the retained CI failure are recorded in docs/evidence/issue251-stadium-profile-oninit-v1.json. Reviewed 2026-10-23 for Fresh132 Setup-to-GO+2: only validation/comparison code was added; every pre-existing encoded literal is byte-identical to the prior reviewed file and fixture, with no new encoded payload, credential, media or executable bytes."
     },
     {
       "path": "tests/fixtures/fresh-sss-initial-input-tick-expected.json",

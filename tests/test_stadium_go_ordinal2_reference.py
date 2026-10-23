@@ -26,6 +26,19 @@ def go2_fixture(*, end_ordinal: int = 2, tail: int = 0, rng_target: int = 0x804D
     for h, b in idle.literal_frames(raw):
         row = wire._decode_record(h, b, "GO+2 fixture")
         payload = row["payload"]
+        if row["event"] == "progress" and payload.get("phase") == "go_after":
+            # The historical idle fixture uses generic menu pointers. Give
+            # this explicit typed-reference fixture the real tag-19/20 owner
+            # shape so the candidate exercises the same checked scalar decoder.
+            for item in payload["slices"]:
+                if item.get("tag") == 19 and item.get("flags") == 0:
+                    item.update(address=0x804D5F94, hex="804d5f90")
+                elif item.get("tag") == 20 and item.get("flags") == 0:
+                    item.update(address=0x804D5F90)
+            rebuilt = idle.route._frame(
+                4, row["seq"], json.dumps(payload, separators=(",", ":")).encode(),
+                pc=int(payload["pc"], 16), source_tick=row["source_tick"])
+            h, b = idle.literal_frames(rebuilt)[0]
         if row["event"] == "boundary" and payload.get("boundary") in ("entry", "setup"):
             seed = "e2624ac3" if payload["boundary"] == "entry" else "083a62a9"
             pointer_target = rng_target if rng_pointer_target is None else rng_pointer_target
@@ -123,6 +136,43 @@ def remove_go2_seed_slices(data: bytes) -> bytes:
                     for index, (h, b) in enumerate(output))
 
 
+def alter_go_marker_pointer(data: bytes, pointer_value: int) -> bytes:
+    output = []
+    changed = 0
+    for h, b in idle.literal_frames(data):
+        row = wire._decode_record(h, b, "GO marker RNG ownership fixture")
+        payload = row.get("payload", {})
+        if row.get("event") == "progress" and payload.get("phase") == "go_after":
+            for item in payload.get("slices", []):
+                if item.get("tag") == 19 and item.get("flags") == 0:
+                    item["hex"] = f"{pointer_value:08x}"
+                    changed += 1
+            rebuilt = idle.route._frame(
+                4, row["seq"], json.dumps(payload, separators=(",", ":")).encode(),
+                pc=int(payload["pc"], 16), source_tick=row["source_tick"])
+            h, b = idle.literal_frames(rebuilt)[0]
+        output.append((h, b))
+    if changed != 1:
+        raise AssertionError(f"expected one GO marker pointer slice, changed {changed}")
+    return b"".join(idle.stored_frame(h, b, sequence=index, replacement_payload=b)
+                    for index, (h, b) in enumerate(output))
+
+
+def source_phase_record(data: bytes, phase: str):
+    for h, b in idle.literal_frames(data):
+        row = wire._decode_record(h, b, "source scalar projection fixture")
+        payload = row.get("payload", {})
+        if row.get("event") == "progress" and payload.get("phase") == phase:
+            slices = {(item.get("tag"), item.get("flags")): item
+                      for item in payload.get("slices", [])}
+            return row, slices
+    raise AssertionError(f"missing source phase {phase}")
+
+
+def source_seed_observation(data: bytes, phase: str):
+    return source_phase_record(data, phase)
+
+
 class StadiumGoOrdinal2ReferenceTests(unittest.TestCase):
     PRODUCER_IDENTITY = {"menu_recipe_sha256": "a" * 64,
                          "input_plan_sha256": None,
@@ -148,6 +198,7 @@ class StadiumGoOrdinal2ReferenceTests(unittest.TestCase):
                 expected_setup_receipt_sha256=EXPECTED_SETUP_RECEIPT_SHA256,
                 status_path=observer_status,
                 include_go2_state=include_go2_state,
+                include_constructor_state=include_go2_state,
                 producer_identity=(self.PRODUCER_IDENTITY.copy()
                                    if include_go2_state else None)), observer
 
@@ -193,6 +244,30 @@ class StadiumGoOrdinal2ReferenceTests(unittest.TestCase):
         self.assertEqual(go2["typed_fields"]["label"], "GO2")
         expected_tick = result["consumed_queue_state"]["go_source_tick_C"] + 2
         self.assertEqual(go2["typed_fields"]["source_tick"], expected_tick)
+        self.assertEqual(go2["version"], 2)
+        go_row, go_slices = source_seed_observation(data, "go_after")
+        go_seed = go2["go_seed_observation"]
+        self.assertEqual(go_seed["sequence"], go_row["seq"])
+        self.assertEqual(go_seed["event"], "progress")
+        self.assertEqual(go_seed["phase"], "go_after")
+        self.assertEqual(go_seed["source_tick"], go_row["source_tick"])
+        self.assertEqual(go_seed["draw_ordinal"], go_row["draw_ordinal"])
+        self.assertEqual(go_seed["pointer_raw_hex"], go_slices[(19, 0)]["hex"])
+        self.assertEqual(go_seed["seed_hex"], go_slices[(20, 0)]["hex"])
+        self.assertEqual(go_seed["seed_address"], go_slices[(20, 0)]["address"])
+        self.assertTrue(go_seed["pointer_equals_seed_address"])
+        constructor = go2["start_context"]["constructor_observation"]
+        parameter_row, parameter_slices = source_phase_record(data, "constructor_parameters")
+        commit_row, commit_slices = source_phase_record(data, "constructor_commit")
+        self.assertEqual(constructor["source_sequences"], [
+            row["seq"] for row, _ in (source_phase_record(data, phase) for phase in (
+                "constructor_entry", "constructor_parameters", "constructor_up_call",
+                "constructor_up_return", "constructor_commit"))])
+        self.assertEqual(constructor["seed_before_hex"], parameter_slices[(20, 0)]["hex"])
+        self.assertEqual(constructor["seed_after_hex"], commit_slices[(20, 0)]["hex"])
+        self.assertEqual((constructor["parameter_x0"], constructor["parameter_x4"]),
+                         struct.unpack(">ii", bytes.fromhex(parameter_slices[(94, 0)]["hex"])))
+        self.assertLess(parameter_row["seq"], commit_row["seq"])
         self.assertEqual(go2["seed_observation"]["source_tick"], expected_tick)
         self.assertEqual(go2["source_queue"]["source_tick"], expected_tick)
         self.assertEqual(go2["source_queue"]["queue_slot_status_hex"], [
@@ -203,12 +278,21 @@ class StadiumGoOrdinal2ReferenceTests(unittest.TestCase):
         self.assertEqual(go2["provenance"]["input_stream_sha256"],
                          result["input_stream"]["sha256"])
 
+    def test_go_marker_seed_projection_fails_closed_on_detached_pointer(self):
+        data, status = go2_fixture()
+        row, slices = source_seed_observation(data, "go_after")
+        seed_address = slices[(20, 0)]["address"]
+        altered = alter_go_marker_pointer(data, seed_address + 4)
+        with self.assertRaisesRegex(StadiumGoPrefixError,
+                                    r"GO marker RNG pointer does not own its aligned in-range seed bytes"):
+            self.validate(altered, status, include_go2_state=True)
+
     def test_explicit_go2_context_binds_actual_ordered_entry_setup_start_and_seed(self):
         data, status = go2_fixture()
         result, _ = self.validate(data, status, include_go2_state=True)
         context = result["consumed_queue_state"]["go2_declared_state"]["start_context"]
         self.assertEqual(context["schema"],
-                         "melee-web-stadium-go2-same-producer-start-context-v1")
+                         "melee-web-stadium-go2-same-producer-start-context-v2")
         self.assertLess(context["entry"]["sequence"], context["setup"]["sequence"])
         self.assertEqual(context["entry"]["phase"], "vs_entry")
         self.assertEqual(context["entry"]["pc"], "0x8016e934")

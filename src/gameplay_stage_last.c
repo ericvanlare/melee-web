@@ -777,7 +777,7 @@ int melee_web_stage_last_stadium_go_alignment_snapshot(
   static const char* const failures[]={"none","Stage Ready callback identity changed",
    "map-2 gate phase changed","GO owner/display/mode changed","GO branch differed from the selected rules",
    "HUD callback branch differed from GO","HUD owner/callback identity changed",
-   "HUD did not enable its original display"};
+   "HUD did not enable its original display","GO source RNG owner could not be copied"};
   unsigned code=h->stadium_go_alignment.failure;
   return fail(e,n,code<sizeof(failures)/sizeof(failures[0])?failures[code]:"Stadium GO trace failed");
  }
@@ -786,6 +786,7 @@ int melee_web_stage_last_stadium_go_alignment_snapshot(
 void melee_web_stage_last_stadium_go_alignment_note_go(int source_branch)
 {
  MeleeWebStageLast* h=active;
+ uint32_t source_seed=0;
  if(!h||!h->stadium_go_alignment.armed)return;
  MeleeWebStadiumGoAlignmentEvent* event=&h->stadium_go_alignment.go_after;
  void* object=HSD_GObj_804D781C;void* proc=HSD_GObj_804D7838;
@@ -805,7 +806,13 @@ void melee_web_stage_last_stadium_go_alignment_note_go(int source_branch)
  if(gate!=0||mode!=0xB||remap!=0){
   stadium_go_alignment_fail(h,3);return;
  }
+ /* The original GO marker has its own tag-19/20 scalar. Copy it only through
+  * the live generation-checked RNG owner; this read does not advance RNG. */
+ if(!melee_web_match_rng_seed_owner_read(&source_seed)){
+  stadium_go_alignment_fail(h,8);return;
+ }
  stadium_go_alignment_stamp(h,event,3,source_branch,gate,mode,remap,1,-1,object,proc);
+ event->source_seed=source_seed;event->source_seed_valid=1;
 }
 void melee_web_stage_last_stadium_go_alignment_note_hud(
         int callback_index,MeleeWebStadiumGoAlignmentHudCallback callback,

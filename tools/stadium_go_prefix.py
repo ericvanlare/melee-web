@@ -1953,6 +1953,8 @@ class StadiumConstructorObservations:
         self.rows = []
         self.owner = self.parameters = self.rng_pointer = None
         self.seed = self.call_seed = self.result = self.branch = None
+        self.constructor_seed_before = self.constructor_seed_after = None
+        self.parameter_x0 = self.parameter_x4 = None
         self.complete = False
 
     def accept(self, row: dict[str, Any], *, route_ready: bool) -> None:
@@ -2028,6 +2030,8 @@ class StadiumConstructorObservations:
                 x0, x4 = struct.unpack('>ii', param['raw'])
                 self.branch = 'up' if x4 > x0 else 'down' if x4 < x0 else 'equal'
                 self.bound = abs(x4-x0) & 0xffffffff
+                self.constructor_seed_before = seed
+                self.parameter_x0, self.parameter_x4 = x0, x4
             else:
                 _require(value == self.parameters and rv['address'] == self.rng_pointer,
                          'constructor parameter or RNG pointer changed')
@@ -2055,6 +2059,7 @@ class StadiumConstructorObservations:
                     _require(store['address'] == 0x801d14c4 and store['raw'] == bytes.fromhex('937f00d8') and
                              final['address'] == owner[1]+0xd8 and u32(final['raw']) == g[2] == expected,
                              'constructor final countdown/store mismatch')
+                    self.constructor_seed_after = seed
                     self.complete = True
         allowed = {(67,2),(68,2),(90,0),(91,0),(92,0),(95,0),(98,0),(17,0),(30,0),(19,0),(20,0)}
         allowed |= {(96,i) for i in range(len(nodes))}
@@ -2066,13 +2071,34 @@ class StadiumConstructorObservations:
         _require(not self.rows or row['seq'] > self.rows[-1]['seq'], 'constructor source sequence reordered')
         self.rows.append(row)
 
-    def finish(self) -> dict[str, Any]:
+    def finish(self, *, include_state_projection: bool = False) -> dict[str, Any]:
         _require(self.complete, 'constructor adjunct incomplete')
-        return {'decision':'PASS_ORIGINAL_CONSTRUCTOR_OBSERVATIONS_ONLY',
-                'source_sequences':[r['seq'] for r in self.rows], 'branch':self.branch,
-                'owner_addresses':list(self.owner), 'rng_pointer':self.rng_pointer,
-                'registration_event_observed':False, 'allocation_generation_observed':False,
-                'lifetime_pairing_observed':False}
+        result = {'decision':'PASS_ORIGINAL_CONSTRUCTOR_OBSERVATIONS_ONLY',
+                  'source_sequences':[r['seq'] for r in self.rows], 'branch':self.branch,
+                  'owner_addresses':list(self.owner), 'rng_pointer':self.rng_pointer,
+                  'registration_event_observed':False, 'allocation_generation_observed':False,
+                  'lifetime_pairing_observed':False}
+        if include_state_projection:
+            _require(type(include_state_projection) is bool and
+                     self.constructor_seed_before is not None and
+                     self.constructor_seed_after is not None and
+                     self.parameter_x0 is not None and self.parameter_x4 is not None,
+                     'constructor state projection lacks its checked parameter/seed rows')
+            random_call = self.branch != 'equal'
+            result['state_projection'] = {
+                'schema': 'melee-web-original-stadium-constructor-state-projection-v1',
+                'source_sequences': [r['seq'] for r in self.rows],
+                'seed_before_hex': f'{self.constructor_seed_before:08x}',
+                'seed_after_hex': f'{self.constructor_seed_after:08x}',
+                'parameter_x0': self.parameter_x0,
+                'parameter_x4': self.parameter_x4,
+                'random_call_observed': random_call,
+                'random_bound_valid': random_call,
+                'random_bound': self.bound if random_call else 0,
+                'random_result_valid': random_call,
+                'random_result': self.result if random_call else 0,
+            }
+        return result
 
 
 def _validate_progress_constructor(row: dict[str, Any]) -> dict[str, Any]:
@@ -2103,7 +2129,8 @@ def _validate_stadium_go_prefix_scope(stream_path: str | Path,
                                       status_path: str | Path | None = None, *,
                                       constructor_observations: bool = False,
                                       original_idle_3500: bool = False,
-                                      post_go_target_ordinal: int | None = None) -> dict[str, Any]:
+                                      post_go_target_ordinal: int | None = None,
+                                      include_constructor_state: bool = False) -> dict[str, Any]:
     """Shared parser for separately named, explicitly scoped Stadium terminals."""
 
     _require(type(original_idle_3500) is bool and
@@ -2114,6 +2141,11 @@ def _validate_stadium_go_prefix_scope(stream_path: str | Path,
              (post_go_target_ordinal is None or
               (constructor_observations is True and not original_idle_3500)),
              "GO+2 requires explicit constructor observations and is exclusive of idle3500")
+    _require(type(include_constructor_state) is bool and
+             (not include_constructor_state or
+              (post_go_target_ordinal == 2 and constructor_observations and
+               not original_idle_3500)),
+             "constructor state projection is reserved for explicit GO+2 typed validation")
     natural_batch_tail_limit = (MAX_SOURCE_TICK_BATCH if post_go_target_ordinal is not None
                                 else MAX_TAIL_AFTER_F)
     _require(type(constructor_observations) is bool, "constructor option must be boolean")
@@ -2458,7 +2490,8 @@ def _validate_stadium_go_prefix_scope(stream_path: str | Path,
     return {
         "schema": SCHEMA,
         "version": VERSION,
-        **({"constructor_observations": constructor.finish()} if constructor_observations else {}),
+        **({"constructor_observations": constructor.finish(
+            include_state_projection=include_constructor_state)} if constructor_observations else {}),
         "decision": ("PASS_ORIGINAL_RAW_GO_ORDINAL2_ONLY" if post_go_target_ordinal is not None else
                      "PASS_ORIGINAL_RAW_3500_ROUTE_ONLY" if original_idle_3500 else
                      "PASS_ORIGINAL_RAW_GO_PREFIX_ONLY"),
@@ -2636,7 +2669,7 @@ class StadiumGoOrdinal2Observations:
             if self.go is not None and self.target_seen and self.final_draw_sequence is None:
                 self.final_draw_sequence = row["seq"]
 
-    def finish(self, route: dict[str, Any], *, include_go2_state: bool = False) -> dict[str, Any]:
+    def finish(self, route: dict[str, Any], *, include_go2_state: bool = False, include_constructor_state: bool = False) -> dict[str, Any]:
         _require(type(include_go2_state) is bool,
                  "GO+2 typed-state opt-in must be boolean")
         _require(self.setup_seen and self.go is not None and self.pending is None and
@@ -2669,7 +2702,7 @@ class StadiumGoOrdinal2Observations:
                      "GO+2 same-producer Entry/Setup context is not one ordered Start handoff")
             result["go2_declared_state"] = {
                 "schema": "melee-web-original-stadium-go2-declared-state",
-                "version": 1,
+                "version": 2 if include_constructor_state else 1,
                 "decision": "PASS_SOURCE_TYPED_FIELDS_ONLY",
                 "raw_identity": {
                     "sequence": self.go2_typed_state["sequence"],
@@ -2678,6 +2711,8 @@ class StadiumGoOrdinal2Observations:
                     "draw_ordinal": self.go2_typed_state["draw_ordinal"],
                 },
                 "typed_fields": self.go2_typed_state,
+                **({"go_seed_observation": _go_marker_seed_observation(self.go)}
+                   if include_constructor_state else {}),
                 "seed_observation": _go2_seed_observation(self.go2_seed_row),
                 "source_queue": {
                     "consume_sequence": self.rows[2]["consume_sequence"],
@@ -2687,8 +2722,10 @@ class StadiumGoOrdinal2Observations:
                 },
                 "scope": "One actual GO-relative ordinal-2 SourceTick typed snapshot and direct seed bytes; no pointer comparison or whole-state parity.",
                 "start_context": {
-                    "schema": "melee-web-stadium-go2-same-producer-start-context-v1",
-                    "version": 1,
+                    "schema": f"melee-web-stadium-go2-same-producer-start-context-v{2 if include_constructor_state else 1}",
+                    "version": 2 if include_constructor_state else 1,
+                    **({"constructor_observation": route["constructor_observations"]["state_projection"]}
+                       if include_constructor_state else {}),
                     "entry": entry_context,
                     "setup": setup_context,
                     "scope": "Same retained fresh producer's actual ordered Entry and completed Setup StartMeleeData plus pointer-owned RNG scalar; no browser or whole-session parity.",
@@ -2774,16 +2811,43 @@ def _go2_seed_observation(row: dict[str, Any]) -> dict[str, Any]:
             "pointer_equals_seed_address": True}
 
 
+def _go_marker_seed_observation(row: dict[str, Any]) -> dict[str, Any]:
+    payload = row.get("payload")
+    _require(row.get("event") == "progress" and isinstance(payload, dict) and
+             payload.get("phase") == "go_after" and
+             type(row.get("source_tick")) is int and
+             type(row.get("draw_ordinal")) is int,
+             "original GO seed does not belong to the checked GO marker")
+    pointer = _slice(payload, RNG_POINTER_TAG, "GO marker RNG pointer", 4)
+    seed = _slice(payload, RNG_VALUE_TAG, "GO marker RNG seed", 4)
+    pointer_value = int.from_bytes(pointer["raw"], "big")
+    _require(pointer["address"] == 0x804D5F94 and
+             seed["address"] % 4 == 0 and
+             0x80000000 <= seed["address"] < 0x81800000 and
+             pointer_value == seed["address"],
+             "GO marker RNG pointer does not own its aligned in-range seed bytes")
+    return {"sequence": row["seq"], "event": "progress", "phase": "go_after",
+            "source_tick": row["source_tick"], "draw_ordinal": row["draw_ordinal"],
+            "pointer_slot_address": pointer["address"],
+            "pointer_raw_hex": pointer["raw"].hex(),
+            "seed_address": seed["address"], "seed_hex": seed["raw"].hex(),
+            "pointer_equals_seed_address": True}
+
+
 def validate_stadium_go_ordinal2_reference(observer_path: str | Path, *,
                                             input_path: str | Path,
                                             input_status_path: str | Path,
                                             expected_setup_receipt_sha256: str = EXPECTED_SETUP_RECEIPT_SHA256,
                                             status_path: str | Path | None = None,
                                             include_go2_state: bool = False,
+                                            include_constructor_state: bool = False,
                                             producer_identity: dict[str, Any] | None = None) -> dict[str, Any]:
     """Validate one fresh-record C/F/GO+2 natural source reference, not a replay."""
     _require(type(include_go2_state) is bool,
              "GO+2 typed-state opt-in must be boolean")
+    _require(type(include_constructor_state) is bool and
+             (not include_constructor_state or include_go2_state),
+             "constructor state requires explicit typed GO+2 scope")
     if include_go2_state:
         _require(isinstance(producer_identity, dict) and
                  set(producer_identity) == {"menu_recipe_sha256", "input_plan_sha256",
@@ -2804,7 +2868,8 @@ def validate_stadium_go_ordinal2_reference(observer_path: str | Path, *,
 
     route = _validate_stadium_go_prefix_scope(
         observer_path, expected_setup_receipt_sha256, status_path,
-        constructor_observations=True, post_go_target_ordinal=2)
+        constructor_observations=True, post_go_target_ordinal=2,
+        include_constructor_state=include_constructor_state)
     observations = StadiumGoOrdinal2Observations()
     stats = ObserverStreamStats()
     for row in iter_records(observer_path, max_bytes=MAX_STREAM_BYTES,
@@ -2812,7 +2877,8 @@ def validate_stadium_go_ordinal2_reference(observer_path: str | Path, *,
         observations.accept(row)
     _require(stats.prefix_sha256 == route["stream_sha256"],
              "GO+2 source changed during consumed-queue validation")
-    consumed = observations.finish(route, include_go2_state=include_go2_state)
+    consumed = observations.finish(route, include_go2_state=include_go2_state,
+                                   include_constructor_state=include_constructor_state)
     try:
         input_summary = validate_input_stream(input_path)
         input_status = validate_input_status(input_status_path, mode="record",

@@ -69,12 +69,13 @@ function validateGo2StartContextRecord(record, phase) {
 }
 
 function validateGo2StartContext(context, go2, reference, source) {
-  exactKeys(context, ['schema', 'version', 'entry', 'setup', 'scope', 'provenance'],
+  const fresh = context?.version === 2;
+  exactKeys(context, ['schema', 'version', 'entry', 'setup', ...(fresh ? ['constructor_observation'] : []), 'scope', 'provenance'],
     'GO+2 same-producer Entry/Setup context');
   exactKeys(context.provenance, GO2_START_CONTEXT_PROVENANCE_KEYS,
     'GO+2 same-producer context provenance');
   const provenance = context.provenance;
-  if (context.schema !== GO2_START_CONTEXT_SCHEMA || context.version !== 1 ||
+  if (context.schema !== `melee-web-stadium-go2-same-producer-start-context-v${fresh ? 2 : 1}` || context.version !== (fresh ? 2 : 1) ||
       context.scope !== GO2_START_CONTEXT_SCOPE ||
       !validSha(provenance.source_stream_sha256) ||
       !Number.isSafeInteger(provenance.source_stream_bytes) || provenance.source_stream_bytes <= 0 ||
@@ -87,12 +88,15 @@ function validateGo2StartContext(context, go2, reference, source) {
       !validSha(provenance.input_intentions_sha256) || !validSha(provenance.dol_sha1, 40) ||
       !validSha(provenance.dol_sha256) || !validSha(provenance.dolphin_commit, 40))
     throw new TypeError('GO+2 same-producer Entry/Setup context provenance is malformed');
+  if (fresh) validateFreshConstructorObservation(context.constructor_observation);
   validateGo2StartContextRecord(context.entry, 'vs_entry');
   validateGo2StartContextRecord(context.setup, 'vs_setup');
   exactKeys(reference, ['schema', ...GO2_START_CONTEXT_PROVENANCE_KEYS],
     'GO+2 source reference');
   if (context.entry.sequence >= context.setup.sequence ||
       context.setup.sequence >= go2.raw_identity.sequence ||
+      (fresh && (context.entry.sequence >= context.constructor_observation.source_sequences[0] ||
+      context.constructor_observation.source_sequences.at(-1) >= context.setup.sequence)) ||
       context.entry.source_tick !== context.setup.source_tick ||
       context.entry.draw_ordinal !== context.setup.draw_ordinal ||
       context.entry.start_sha256 !== context.setup.start_sha256 ||
@@ -107,6 +111,32 @@ function validateGo2StartContext(context, go2, reference, source) {
       source?.dol_sha1 !== provenance.dol_sha1 || source?.dol_sha256 !== provenance.dol_sha256)
     throw new TypeError('GO+2 same-producer Entry/Setup order or provenance differs');
   return context;
+}
+
+function validateFreshConstructorObservation(observation) {
+  exactKeys(observation, ['schema', 'source_sequences', 'seed_before_hex', 'seed_after_hex',
+    'parameter_x0', 'parameter_x4', 'random_call_observed', 'random_bound_valid',
+    'random_bound', 'random_result_valid', 'random_result'],
+  'GO+2 original constructor state projection');
+  if (observation.schema !== 'melee-web-original-stadium-constructor-state-projection-v1' ||
+      !Array.isArray(observation.source_sequences) || observation.source_sequences.length !== 5 ||
+      observation.source_sequences.some((value, index) => !Number.isSafeInteger(value) || value < 0 ||
+        (index > 0 && value <= observation.source_sequences[index - 1])) ||
+      !/^[0-9a-f]{8}$/.test(observation.seed_before_hex ?? '') ||
+      !/^[0-9a-f]{8}$/.test(observation.seed_after_hex ?? '') ||
+      !Number.isSafeInteger(observation.parameter_x0) ||
+      !Number.isSafeInteger(observation.parameter_x4) ||
+      typeof observation.random_call_observed !== 'boolean' ||
+      typeof observation.random_bound_valid !== 'boolean' ||
+      typeof observation.random_result_valid !== 'boolean' ||
+      observation.random_bound_valid !== observation.random_call_observed ||
+      observation.random_result_valid !== observation.random_call_observed ||
+      (observation.random_call_observed
+        ? (!Number.isSafeInteger(observation.random_bound) || observation.random_bound < 0 ||
+          !Number.isSafeInteger(observation.random_result) || observation.random_result < 0)
+        : (observation.random_bound !== 0 || observation.random_result !== 0)))
+    throw new TypeError('GO+2 original constructor state projection is malformed or detached from Setup');
+  return observation;
 }
 
 function compareGo2StartPhaseToExpected(record, expected, phase, provenance) {
@@ -276,7 +306,7 @@ export function deriveRun2ProperPrefix(runtimePayload, hostOnly) {
     const sourceQueue = go2.source_queue;
     const reference = hostOnly.source_identity?.go2_reference;
     if (go2.schema !== 'melee-web-original-stadium-go2-declared-state' ||
-        go2.version !== 1 || go2.decision !== 'PASS_SOURCE_TYPED_FIELDS_ONLY' ||
+        ![1, 2].includes(go2.version) || go2.decision !== 'PASS_SOURCE_TYPED_FIELDS_ONLY' ||
         go2.scope !== 'One actual GO-relative ordinal-2 SourceTick typed snapshot and direct seed bytes; no pointer comparison or whole-state parity.' ||
         !raw || raw.event !== 'boundary' || raw.boundary !== 'source_tick' ||
         !Number.isSafeInteger(raw.sequence) || raw.source_tick !== f.source_tick + 1 ||
@@ -296,6 +326,18 @@ export function deriveRun2ProperPrefix(runtimePayload, hostOnly) {
       throw new TypeError('run2 GO+2 typed state or same-producer provenance is malformed');
     go2StartContext = validateGo2StartContext(go2.start_context, go2, reference,
       hostOnly.source_identity.strict_route.source);
+    if (go2.start_context?.version !== go2.version)
+      throw new TypeError('GO+2 context version differs from declared state');
+
+    const goSeed = go2.go_seed_observation;
+    if (go2.version === 2 && (!goSeed || goSeed.event !== 'progress' || goSeed.phase !== 'go_after' ||
+        goSeed.sequence !== go.sequence || goSeed.source_tick !== go.source_tick ||
+        goSeed.draw_ordinal !== go.draw_ordinal || goSeed.pointer_slot_address !== 0x804D5F94 ||
+        !/^[0-9a-f]{8}$/.test(goSeed.pointer_raw_hex ?? '') ||
+        Number.parseInt(goSeed.pointer_raw_hex, 16) !== goSeed.seed_address ||
+        !/^[0-9a-f]{8}$/.test(goSeed.seed_hex ?? '') ||
+        goSeed.pointer_equals_seed_address !== true))
+      throw new TypeError('run2 original GO seed is malformed or detached from its GO marker');
     const seed = go2.seed_observation;
     if (!seed || seed.sequence !== raw.sequence || seed.event !== 'boundary' ||
         seed.boundary !== 'source_tick' || seed.source_tick !== raw.source_tick ||
@@ -344,7 +386,8 @@ export function deriveRun2ProperPrefix(runtimePayload, hostOnly) {
       terminal_action_index: terminalIndex, terminal_draw_ordinal: terminal.draw}};
   return {prefix, c, f, go, expectedState: state,
     expectedSeeds: {C: seedRows[0].seed_hex, F: seedRows[1].seed_hex,
-      ...(go2 ? {GO2: go2.seed_observation.seed_hex} : {})},
+      ...(go2 ? {GO2: go2.seed_observation.seed_hex,
+        ...(go2.version === 2 ? {GO: go2.go_seed_observation.seed_hex} : {})} : {})},
     go2Expected, go2StartContext, go2ActionIndex};
 }
 
@@ -940,6 +983,14 @@ export function compareOriginalIdleSnapshot({label, expected, expectedGo, expect
     requiredHex32(actual.seed_hex, `${label} native seed`));
 
   const go = actual.go_trace;
+  if (expectedGo.source_seed_hex !== undefined) {
+    add('go.source_seed.raw32', requiredHex32(expectedGo.source_seed_hex,
+      'original GO marker seed'), requiredHex32(go?.go_after?.source_seed_hex,
+      'native GO marker seed'));
+    if (go?.go_after?.source_seed_valid !== 1)
+      mismatch ??= {path: 'go.source_seed.valid', expected: 1,
+        actual: go?.go_after?.source_seed_valid ?? null};
+  }
   if (!go || go.failure !== 0 || go.armed !== 1 || actual.expected_branch !== 0 ||
       !Number.isSafeInteger(idle.world_generation) || idle.world_generation <= 0 ||
       go.generation !== idle.world_generation ||
@@ -998,13 +1049,18 @@ export function createHostCallbacks({setupApproved, originalSnapshots, originalS
   const byLabel = new Map(structuredClone(originalSnapshots).map(snapshot => [snapshot.label, snapshot]));
   const seeds = new Map(Object.entries(originalSeeds ?? {}));
   const hasGo2 = go2Snapshot !== null;
+  const requiredGoSeed = byLabel.get('GO')?.source_seed_hex;
+  if (requiredGoSeed !== undefined && (!/^[0-9a-f]{8}$/.test(requiredGoSeed) ||
+      seeds.get('GO') !== requiredGoSeed))
+    throw new TypeError('explicit fresh GO marker seed is missing or differs');
   if (hasGo2 && (!go2Snapshot || go2Snapshot.label !== 'GO2' ||
       !Number.isSafeInteger(go2Snapshot.sequence) ||
       !Number.isSafeInteger(go2Snapshot.source_tick) ||
       !Number.isSafeInteger(go2Snapshot.draw_ordinal) || !seeds.has('GO2')))
     throw new TypeError('explicit GO+2 checkpoint and seed are malformed');
   if (byLabel.size !== 3 || !['C', 'F'].every(label => seeds.has(label)) ||
-      [...seeds.keys()].some(label => !['C', 'F', ...(hasGo2 ? ['GO2'] : [])].includes(label)))
+      [...seeds.keys()].some(label => !['C', 'F', ...(seeds.has('GO') ? ['GO'] : []),
+        ...(hasGo2 ? ['GO2'] : [])].includes(label)))
     throw new TypeError('host-only original GO/C/F state and observed C/F RNG evidence are required');
   const receipts = [];
   let nextBoundary = 'C';
@@ -1025,8 +1081,10 @@ export function createHostCallbacks({setupApproved, originalSnapshots, originalS
       try {
         const actual = JSON.parse(actualJson);
         const expected = phase === 'GO2' ? go2Snapshot : byLabel.get(phase);
+        const expectedGo = byLabel.get('GO');
+        if (seeds.has('GO')) expectedGo.source_seed_hex = seeds.get('GO');
         const receipt = compareOriginalIdleSnapshot({label: phase,
-          expected, expectedGo: byLabel.get('GO'),
+          expected, expectedGo,
           expectedSeedHex: seeds.get(phase), actual, coordinates});
         receipts.push(receipt);
         const accepted = receipt.decision === (phase === 'GO2'
@@ -1174,7 +1232,8 @@ export function hostEvidenceFromPacket(packet, {fullSchedule = false, commonFiel
   if (requiredQueueObservation)
     validateRequiredQueueSourceEvent(requiredQueueObservation,
       packet.host_only.source_event_provenance?.events);
-  return {runtimePayload: packet.runtime_payload, originalSnapshots: snapshots,
+  return {runtimePayload: packet.runtime_payload,
+    originalSnapshots: snapshots,
     originalSeeds: seeds, requiredQueueObservation};
 }
 
@@ -1223,7 +1282,8 @@ export function hostEvidenceFromRun2Packet(packet, {fullSchedule = false, common
       goFields.draw_ordinal !== goRaw.draw_ordinal || goRaw.phase !== 'go_after')
     throw new TypeError('run2 GO expected source row is malformed');
   const go = {label: 'GO', sequence: goRaw.sequence, source_tick: goRaw.source_tick,
-    draw_ordinal: goRaw.draw_ordinal};
+    draw_ordinal: goRaw.draw_ordinal,
+    ...(derived.expectedSeeds.GO ? {source_seed_hex: derived.expectedSeeds.GO} : {})};
   const snapshots = [go, normalize('C'), normalize('F')];
   let go2Snapshot = null, go2QueueExpectation = null, go2StartContext = null;
   if (derived.go2Expected) {

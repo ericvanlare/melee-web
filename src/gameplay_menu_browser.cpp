@@ -3369,7 +3369,8 @@ bool matched_setup_cf_go_event_equal(const MeleeWebStadiumGoAlignmentEvent& a,
   a.callback_index==b.callback_index&&a.source_branch==b.source_branch&&
   a.map2_gate==b.map2_gate&&a.display_mode==b.display_mode&&
   a.remap_branch==b.remap_branch&&a.callback_identity==b.callback_identity&&
-  a.hud_enabled==b.hud_enabled;
+  a.hud_enabled==b.hud_enabled&&a.source_seed==b.source_seed&&
+  a.source_seed_valid==b.source_seed_valid;
 }
 bool matched_setup_cf_go_equal(const MeleeWebStadiumGoAlignmentSnapshot& a,
                                const MeleeWebStadiumGoAlignmentSnapshot& b){
@@ -3416,7 +3417,10 @@ std::string matched_setup_cf_go_event_json(const MeleeWebStadiumGoAlignmentEvent
     <<",\"source_branch\":"<<event.source_branch<<",\"map2_gate\":"<<event.map2_gate
     <<",\"display_mode\":"<<event.display_mode<<",\"remap_branch\":"<<event.remap_branch
     <<",\"callback_identity\":"<<event.callback_identity
-    <<",\"hud_enabled\":"<<event.hud_enabled<<'}';
+    <<",\"hud_enabled\":"<<event.hud_enabled
+    <<",\"source_seed_valid\":"<<event.source_seed_valid
+    <<",\"source_seed_hex\":\""
+    <<melee_web::stadium_first_css_diagnostic::hex32(event.source_seed)<<"\"}";
  return out.str();
 }
 std::string matched_setup_cf_go_json(const MeleeWebStadiumGoAlignmentSnapshot& go){

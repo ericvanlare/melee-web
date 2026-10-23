@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 import test from 'node:test';
 import vm from 'node:vm';
 import {monotonicNowNs, elapsedMs} from './stadium_c3_timing.mjs';
-import {validateMatchedSetupCfRequest, validateMatchedSetupCfPreflight,
+import {FRESH_SETUP_GO2_ROUTE, validateMatchedSetupCfRequest, validateMatchedSetupCfPreflight,
   validateMatchedSetupCfIdentities, matchedSetupCfRuntimeFailure, PREFIX_V2_SCOPE,
   trackMatchedSetupCfExplicitStep, matchedSetupCfNativeAccessAllowed,
   dispatchMatchedSetupCfNativeEvaluation, guardMatchedSetupCfNativeCleanup,
@@ -46,10 +46,13 @@ test('the matched Setup C/F opt-in and preflight gate fail before server/browser
   const scratch = process.env.MELEE_STADIUM_CF_RUNNER_TEST_ROOT;
   assert.ok(scratch, 'Python OwnedWorkspaceTests scratch path is required');
   const runnerSource = await fs.readFile(RUNNER, 'utf8');
+  const freshPreflight = runnerSource.indexOf('await validateFreshSetupGo2RunnerSource(');
   const contextPreflight = runnerSource.indexOf('validateGo2StartContextExpectations(');
   const serverStartup = runnerSource.indexOf('serverProcess = spawn(');
   assert.ok(contextPreflight >= 0 && contextPreflight < serverStartup,
     'same-producer Entry/Setup rejection must happen before the local server/browser can start');
+  assert.ok(freshPreflight >= 0 && freshPreflight < serverStartup,
+    'Fresh source helper admission must happen before server/browser startup');
   const continuationStart = runnerSource.indexOf('async function runMatchedSetupCfContinuation(');
   const continuationEnd = runnerSource.indexOf('\nfunction ', continuationStart + 1);
   const continuation = runnerSource.slice(continuationStart, continuationEnd);
@@ -164,14 +167,14 @@ test('the matched Setup C/F opt-in and preflight gate fail before server/browser
     /if \(matchedSetupCfExplicitArmed\) \{[\s\S]*?retireMatchedSetupCfExplicitNative\(\)/,
     'the armed explicit path must use one-shot retire instead of the queued ordinary unload');
   assert.match(runnerSource,
-    /source_request_scope: recreationCanary[\s\S]*?: firstSssVsSetupCf\s*\? firstSssVsSetupCfV2\s*\?/,
+    /source_request_scope: recreationCanary[\s\S]*?: firstSssVsSetupCf\s*\? firstSssFreshSetupGo2[\s\S]*?: firstSssVsSetupCfV2\s*\?/,
     'the v2 proper-prefix scope must be separately labeled');
   const scopeStart = runnerSource.indexOf('source_request_scope: ');
   const scopeEnd = runnerSource.indexOf(',\n  error: null,', scopeStart);
   assert.ok(scopeStart >= 0 && scopeEnd > scopeStart, 'actual scope expression markers exist');
   const scopeExpression = runnerSource.slice(scopeStart + 'source_request_scope: '.length, scopeEnd);
   const scope = flags => vm.runInNewContext(`(${scopeExpression})`, {
-    recreationCanary: false, recreationFullPair: false, recreationFullB: false, firstSssVsSetupCf: true, firstSssVsSetupCfV2: true,
+    recreationCanary: false, recreationFullPair: false, recreationFullB: false, firstSssFreshSetupGo2: false, firstSssVsSetupCf: true, firstSssVsSetupCfV2: true,
     firstSssVsSetupCfCommonFields: false, firstSssVsSetupCfFullSchedule: false, ...flags});
   assert.equal(scope({recreationCanary: true}),
     'Two separately reported same-instance original-route 174-action lifetimes with checked A close/restart; no whole-session or recreation acceptance.');
@@ -761,4 +764,24 @@ test('actual runner finally retains unsafe arm timeout and closes owned browser 
     assert(calls.includes(required), `${required} must run after unsafe admission refusal`);
   assert.equal(calls.includes('native-unload'), false);
   assert.equal(calls.includes('native-getter'), false);
+});
+
+
+test('Fresh Setup GO2 route is explicit and preserves legacy preflight admission', () => {
+  const id = file => ({path: file, basename: file.split('/').at(-1), bytes: 1, sha256: 'a'.repeat(64)});
+  const binding = {scope: PREFIX_V2_SCOPE, packet: id('/packet.json'),
+    assembly_manifest: id('/assembly.json'), helper: id('/helper.mjs'),
+    diagnostic_exports: PREFIX_V2_EXPLICIT_STEP_EXPORTS, asyncify_idle_predicate: ASYNCIFY_IDLE_PREDICATE};
+  const options = {enabled: true, explicitStep: true, packetPath: '/packet.json',
+    assemblyPath: '/assembly.json', helperPath: '/helper.mjs'};
+  const legacy = {route_mode: 'first-sss-vs-setup', matched_setup_cf: binding};
+  const fresh = {...legacy, route_mode: FRESH_SETUP_GO2_ROUTE};
+  assert.equal(validateMatchedSetupCfPreflight(legacy, options), binding);
+  assert.equal(validateMatchedSetupCfPreflight(fresh, {...options, freshSetupGo2: true}), binding);
+  assert.throws(() => validateMatchedSetupCfPreflight(fresh, options), /preflight route/);
+  assert.throws(() => validateMatchedSetupCfPreflight(legacy, {...options, freshSetupGo2: true}), /preflight route/);
+  assert.throws(() => validateMatchedSetupCfPreflight(fresh, {...options, freshSetupGo2: true,
+    explicitStep: false}), /bounded explicit steps/);
+  assert.throws(() => validateMatchedSetupCfPreflight(fresh, {...options, freshSetupGo2: true,
+    fullSchedule: true}), /bounded explicit steps/);
 });

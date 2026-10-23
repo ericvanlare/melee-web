@@ -10,6 +10,7 @@ import {createFirstCssStreamComparator, createFirstCssFinalDrawComparator,
   createFirstSssConstructorPairComparator, createFirstSssConsumedPadTickComparator,
   createFirstSssDrawComparator, createFirstSssPrefixComparator, createFirstSssVsEntryComparator,
   createFirstSssVsSetupComparator, createFreshSss132ReadyStartComparator, validateFreshSss132ReadyStartExpectedSource,
+  createFreshSetupGo2Comparator, validateFreshSetupGo2SourceContext,
   decodeFirstSssPrefixInputBundle, decodeFreshSssPrefix132InputBundle,
   createFreshSssPrefix132Comparator, validateFreshSssPrefix132ExpectedSource, firstSssAudioAccounting,
   requestSynchronousApproval, validateFirstSssConsumedTickExpectedSource,
@@ -1726,6 +1727,39 @@ function fresh132ReadyActualFixture(e=fresh132ReadyExpectedFixture(),p=fresh132R
  const a=vsEntryActualFixture(e);a.actual.random_seed_hex=e.expected.random_seed_hex;
  for(const key of ['audio_render_calls','audio_render_frames','audio_phase'])a[key+'_before']=a[key+'_after']=p[key+'_after'];return a;
 }
+function freshSetupGo2ContextFixture(e=fresh132ReadyExpectedFixture()) {
+ const typedStart=structuredClone(e.expected.start);
+ const contextRow=(phase,sequence,source_tick,seed)=>({phase,sequence,event:'boundary',
+   boundary:phase==='vs_entry'?'entry':'setup',pc:phase==='vs_entry'?'0x8016e934':'0x8016e9c4',
+   source_tick,draw_ordinal:0,start_slice_address:0x80480530,start_sha256:'0'.repeat(64),
+   typed_start:structuredClone(typedStart),rng_pointer_address:0x804d5f94,
+   rng_pointer_hex:'804d5f90',seed_address:0x804d5f90,seed_hex:seed,
+   source_slices_hex:{'4:0':'00'.repeat(0x138),'19:0':'804d5f90','20:0':seed},
+   source_slice_inventory:[{tag:4,flags:0,address:0x80480530,size:0x138},
+     {tag:19,flags:0,address:0x804d5f94,size:4},{tag:20,flags:0,address:0x804d5f90,size:4}]});
+ return {schema:'melee-web-stadium-go2-same-producer-start-context-v2',version:2,
+   entry:contextRow('vs_entry',2523,133,'e2624ac3'),
+   setup:contextRow('vs_setup',2563,133,'083a62a9'),
+   constructor_observation:{schema:'melee-web-original-stadium-constructor-state-projection-v1',
+     source_sequences:[2545,2546,2547,2548,2549],seed_before_hex:'e2624ac3',
+     seed_after_hex:'55248a7a',parameter_x0:10,parameter_x4:100,
+     random_call_observed:true,random_bound_valid:true,random_bound:90,
+     random_result_valid:true,random_result:35},
+   scope:'Same retained fresh producer\'s actual ordered Entry and completed Setup StartMeleeData plus pointer-owned RNG scalar; no browser or whole-session parity.',
+   provenance:{}};
+}
+function freshSetupGo2ActualFixture(e=fresh132ReadyExpectedFixture(),p=fresh132ReadyPrefixFixture()) {
+ const actual=fresh132ReadyActualFixture(e,p);
+ Object.assign(actual,{construction_complete:true,source_frames:0,host_tick_calls:0,host_draw_calls:0});
+ actual.actual.phase='vs_setup';actual.actual.random_seed_hex='083a62a9';
+ actual.stadium_setup_state={schema:'melee-web-stadium-zero-tick-setup-state-v1',
+   constructor_callback_count:5,constructor_randi_call_count:1,
+   constructor_randi_bound:90,constructor_randi_result:35,parameter_x0:10,parameter_x4:100,
+   source_seed_before_hex:'e2624ac3',source_seed_after_hex:'55248a7a',
+   source_parameter_roots_agree:true,object_allocation_generation:22,
+   ground_allocation_generation:23};
+ return actual;
+}
 test('portable fresh132 prepared Start snapshot shares strict mapper and remains one-use',()=>{
  const e=fresh132ReadyExpectedFixture(),p=fresh132ReadyPrefixFixture(),a=fresh132ReadyActualFixture(e,p);
  const c=createFreshSss132ReadyStartComparator(e,p);assert.equal(c.compare(a),true);assert.equal(c.compare(a),false);
@@ -1740,6 +1774,23 @@ test('portable fresh132 prepared Start snapshot shares strict mapper and remains
  }
  assert.throws(()=>createFirstSssVsEntryComparator(e,p));assert.throws(()=>createFreshSss132ReadyStartComparator(vsEntryExpectedFixture(),p));
 });
+test('portable Fresh Setup comparator binds original Setup and constructor scalar to the prepared Start',()=>{
+ const e=fresh132ReadyExpectedFixture(),p=fresh132ReadyPrefixFixture(),context=freshSetupGo2ContextFixture(e);
+ const ready=createFreshSss132ReadyStartComparator(e,p);assert.equal(ready.compare(fresh132ReadyActualFixture(e,p)),true);
+ const setup=createFreshSetupGo2Comparator(context,e,p,ready.status());
+ assert.equal(setup.compare(freshSetupGo2ActualFixture(e,p)),true);
+ assert.equal(setup.status().scope,'fresh prepared Start followed by same-producer original VS Setup2563 typed Start, RNG and constructor scalar only');
+ for(const change of [a=>a.actual.random_seed_hex='00000000',a=>a.actual.start.rules.stage_kind++,
+   a=>a.stadium_setup_state.constructor_randi_result++,a=>a.stadium_setup_state.source_seed_after_hex='00000000',
+   a=>a.stadium_setup_state.parameter_x4++,a=>a.construction_complete=false]){
+   const a=freshSetupGo2ActualFixture(e,p);change(a);
+   const c=createFreshSetupGo2Comparator(context,e,p,ready.status());assert.equal(c.compare(a),false);
+ }
+ const wrongContext=structuredClone(context);wrongContext.setup.sequence=2503;
+ assert.throws(()=>validateFreshSetupGo2SourceContext(wrongContext,e));
+ const wrongConstructor=structuredClone(context);wrongConstructor.constructor_observation.seed_after_hex='00000000';
+ assert.throws(()=>validateFreshSetupGo2SourceContext(wrongConstructor,e));
+});
 test('portable fresh132 ready Start exact original identity refuses legacy and altered source',()=>{
  for(const mutate of [e=>e.provenance.sequence=2468,e=>e.provenance.source_tick=125,e=>e.source_entry.source_tick=125,e=>e.provenance.observer_bytes++,e=>e.expected.random_seed_hex='3bb84c53',e=>e.source_entry.source_slices_hex['19:0']='804d5f94']){
   const e=fresh132ReadyExpectedFixture();mutate(e);assert.throws(()=>validateFreshSss132ReadyStartExpectedSource(e));
@@ -1751,6 +1802,23 @@ test('portable fresh132 ready Start CLI is a separate fixed route, legacy VS sta
  assert.match(run(args).stderr,/Missing --build/);
  for(const conflict of ['--first-sss-fresh-prefix-132','--first-sss-prefix','--first-sss-vs-entry','--first-sss-vs-setup'])assert.match(run([...args,conflict]).stderr,/Fresh132/);
  assert.match(run(args.filter(x=>!['--first-sss-fresh-ready-start-expected','entry.json'].includes(x))).stderr,/separate exact route/);
+});
+test('fresh Setup to GO+2 CLI is explicit and stays on its bounded proper prefix',()=>{
+ const args=['--first-css-fresh-finite','--first-css-finite-receipt','receipt.json',
+  '--first-css-constructor-manifest','manifest.json','--first-sss-fresh-ready-start',
+  '--first-sss-fresh-ready-start-expected','entry.json','--first-sss-pair-expected','pair.json',
+  '--first-sss-tick-expected','tick.json','--first-sss-tick-input','tick.bin',
+  '--first-sss-draw-expected','draw.json','--first-sss-prefix-expected','prefix.json',
+  '--first-sss-prefix-input','prefix.bin','--first-sss-fresh-setup-go2',
+  '--first-sss-vs-setup-cf','--first-sss-vs-setup-cf-explicit-step',
+  '--first-sss-vs-setup-cf-packet','packet.json','--first-sss-vs-setup-cf-assembly','assembly.json'];
+ const run=a=>spawnSync(process.execPath,[path.join(testDirectory,'stadium_c1a_browser_test.mjs'),...a],{encoding:'utf8',timeout:10000});
+ assert.match(run(args).stderr,/Missing --build/);
+ for(const conflict of ['--first-sss-vs-setup','--first-sss-vs-entry',
+   '--first-sss-vs-setup-cf-full-schedule','--first-sss-vs-setup-cf-common-fields'])
+  assert.match(run([...args,conflict]).stderr,/Fresh132 is one explicit fixed prefix route|Fresh Setup→GO\+2 requires Fresh132 prepared Start|Per-tick common fields and seed require explicit full-schedule one-action service/);
+ assert.match(run(args.filter(x=>!['--first-sss-fresh-ready-start-expected','entry.json'].includes(x))).stderr,
+   /Fresh132 ready Start is one separate exact route|Fresh Setup→GO\+2 requires Fresh132 prepared Start/);
 });
 const freshReadyOriginalPath=process.env.MELEE_WEB_STADIUM_FRESH_READY_START_EXPECTED;
 test('optional original2523 prepared Start expected descriptor is exact fresh source', {skip:!freshReadyOriginalPath?'optional original2523 descriptor not supplied; portable field/guard controls still run':false},async()=>{
