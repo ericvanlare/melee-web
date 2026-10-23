@@ -19865,6 +19865,34 @@
               "sha256": "2f5c9895a421c34cb045dda4966040eae5e0dc052c2f023787b60130536be04e",
               "classification": "Offline reviewer assertion mismatch only; not a runtime, capture or comparator failure. The corrected exact comparator replay is separately pinned."
             }
+          },
+          "repository_content_review": {
+            "failed_head": "f25e630e71a8f1d14098fde257dbf3f417709f11",
+            "failed_ci_run": 39892429243,
+            "retained_log": {
+              "evidence_directory": "fresh-sss-constructor-pair-capture-v2",
+              "evidence": "ci-f25e630e-failure.log",
+              "sha256": "24a57fa4cde257de06e76d836c4aab983fbbeac46ae0b3d6f20854ad7aef093d"
+            },
+            "independent_review": {
+              "evidence": "fresh-sss-constructor-pair-content-review-v1.json",
+              "sha256": "4b9fe6494ec75489e9d5522a4ff4860ffaf846be22dd450591332e2bf817219b"
+            },
+            "classification": "Observed controller/runtime state and current music-path buffer, not media, disc/archive or executable bytes. The StartMeleeData slice covers only rules and first four players; players4/5 remain unobserved.",
+            "repair": "Exact-path/full-file-hash encoded_payload policy exceptions after content/provenance review. No scanner, comparator, fixture, runtime or expected value changed. Other content checks remain active.",
+            "targets": [
+              {
+                "path": "tests/fixtures/fresh-sss-expected-pair.json",
+                "sha256": "d6949ad5577d2b594e5d098f030d763f36da761f2171b2b1b629e35ab75cf451",
+                "rule": "encoded_payload"
+              },
+              {
+                "path": "tests/stadium_first_css_stream_compare.mjs",
+                "sha256": "ab26a290218625f011d63854601e8e4e40f0bf08c519e1cf96dda8f6dd95c990",
+                "rule": "encoded_payload"
+              }
+            ],
+            "ci": "Replacement-head CI remains required; failed head is retained, not relabeled."
           }
         }
       }

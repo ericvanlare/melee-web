@@ -2111,6 +2111,14 @@ the packet-metadata path hold and its reviewed correction, and an offline review
 assertion error are all retained as distinct records below; the reviewer error
 was not a runtime or capture failure.
 
+The first published checkpoint (`f25e630e`) stopped in CI repository-content on
+two long PAD-state hex fixtures. Independent content review traced every blob to
+the pinned observer and source layout: controller state, the rules/four-player
+prefix, and a current music-path buffer. Exact-file-hash policy exceptions retain
+the unchanged byte comparisons; no checker or runtime behavior changes. The failed
+CI log and content review remain in the same structured receipt. Replacement-head
+CI is required before integration.
+
 The next source-only candidate uses the same original observer (`4fd54b4a…`):
 PAD consume 1595, SourceTick 1599, DrawEnter 1600 and DrawReturn 1601, then stops
 before the next PAD poll at 1602. Reuse the existing one-shot consumed-PAD/tick
