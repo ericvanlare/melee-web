@@ -1953,10 +1953,11 @@ export function validateFreshSetupGo2SourceContext(context, readyExpected) {
       setup.phase !== 'vs_setup' || setup.pc !== '0x8016e9c4' || setup.source_tick !== 133 ||
       setup.draw_ordinal !== 0 || setup.seed_hex !== '083a62a9' ||
       !sameJsonValue(entry.typed_start, setup.typed_start) ||
-      !exactOwnKeys(ctor, ['schema', 'source_sequences', 'seed_before_hex', 'seed_after_hex',
+      !exactOwnKeys(ctor, ['schema', 'constructor_entry_count', 'source_sequences', 'seed_before_hex', 'seed_after_hex',
         'parameter_x0', 'parameter_x4', 'random_call_observed', 'random_bound_valid',
         'random_bound', 'random_result_valid', 'random_result']) ||
-      ctor.schema !== 'melee-web-original-stadium-constructor-state-projection-v1' ||
+      ctor.schema !== 'melee-web-original-stadium-constructor-state-projection-v2' ||
+      ctor.constructor_entry_count !== 1 ||
       !sameJsonValue(ctor.source_sequences, [2545, 2546, 2547, 2548, 2549]) ||
       ctor.seed_before_hex !== 'e2624ac3' || ctor.seed_after_hex !== '55248a7a' ||
       typeof ctor.parameter_x0 !== 'number' || !Number.isSafeInteger(ctor.parameter_x0) ||
@@ -2017,7 +2018,8 @@ export function createFreshSetupGo2Comparator(context, readyExpected, prefix, re
     if (!plainObject(state) || state.schema !== 'melee-web-stadium-zero-tick-setup-state-v1')
       return refuse(mismatch('fresh_setup.constructor_receipt', 'checked zero-tick Setup receipt', state));
     const checks = [
-      ['constructor_callback_count', constructor.source_sequences.length, state.constructor_callback_count],
+      // Native callbacks count entries; the retained five rows are interior PC witnesses.
+      ['constructor_callback_count', constructor.constructor_entry_count, state.constructor_callback_count],
       ['constructor_randi_call_count', Number(constructor.random_call_observed), state.constructor_randi_call_count],
       ['parameter_x0', constructor.parameter_x0, state.parameter_x0],
       ['parameter_x4', constructor.parameter_x4, state.parameter_x4],

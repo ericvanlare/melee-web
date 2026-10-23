@@ -114,11 +114,12 @@ function validateGo2StartContext(context, go2, reference, source) {
 }
 
 function validateFreshConstructorObservation(observation) {
-  exactKeys(observation, ['schema', 'source_sequences', 'seed_before_hex', 'seed_after_hex',
+  exactKeys(observation, ['schema', 'constructor_entry_count', 'source_sequences', 'seed_before_hex', 'seed_after_hex',
     'parameter_x0', 'parameter_x4', 'random_call_observed', 'random_bound_valid',
     'random_bound', 'random_result_valid', 'random_result'],
   'GO+2 original constructor state projection');
-  if (observation.schema !== 'melee-web-original-stadium-constructor-state-projection-v1' ||
+  if (observation.schema !== 'melee-web-original-stadium-constructor-state-projection-v2' ||
+      observation.constructor_entry_count !== 1 ||
       !Array.isArray(observation.source_sequences) || observation.source_sequences.length !== 5 ||
       observation.source_sequences.some((value, index) => !Number.isSafeInteger(value) || value < 0 ||
         (index > 0 && value <= observation.source_sequences[index - 1])) ||

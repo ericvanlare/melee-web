@@ -257,6 +257,11 @@ class StadiumGoOrdinal2ReferenceTests(unittest.TestCase):
         self.assertEqual(go_seed["seed_address"], go_slices[(20, 0)]["address"])
         self.assertTrue(go_seed["pointer_equals_seed_address"])
         constructor = go2["start_context"]["constructor_observation"]
+        self.assertEqual(constructor["schema"], "melee-web-original-stadium-constructor-state-projection-v2")
+        self.assertEqual(constructor["constructor_entry_count"], sum(
+            row["payload"].get("phase") == "constructor_entry"
+            for header, body in idle.literal_frames(data)
+            for row in [wire._decode_record(header, body, "entry-count assertion")]))
         parameter_row, parameter_slices = source_phase_record(data, "constructor_parameters")
         commit_row, commit_slices = source_phase_record(data, "constructor_commit")
         self.assertEqual(constructor["source_sequences"], [

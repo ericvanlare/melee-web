@@ -1740,7 +1740,7 @@ function freshSetupGo2ContextFixture(e=fresh132ReadyExpectedFixture()) {
  return {schema:'melee-web-stadium-go2-same-producer-start-context-v2',version:2,
    entry:contextRow('vs_entry',2523,133,'e2624ac3'),
    setup:contextRow('vs_setup',2563,133,'083a62a9'),
-   constructor_observation:{schema:'melee-web-original-stadium-constructor-state-projection-v1',
+   constructor_observation:{schema:'melee-web-original-stadium-constructor-state-projection-v2',constructor_entry_count:1,
      source_sequences:[2545,2546,2547,2548,2549],seed_before_hex:'e2624ac3',
      seed_after_hex:'55248a7a',parameter_x0:10,parameter_x4:100,
      random_call_observed:true,random_bound_valid:true,random_bound:90,
@@ -1753,7 +1753,7 @@ function freshSetupGo2ActualFixture(e=fresh132ReadyExpectedFixture(),p=fresh132R
  Object.assign(actual,{construction_complete:true,source_frames:0,host_tick_calls:0,host_draw_calls:0});
  actual.actual.phase='vs_setup';actual.actual.random_seed_hex='083a62a9';
  actual.stadium_setup_state={schema:'melee-web-stadium-zero-tick-setup-state-v1',
-   constructor_callback_count:5,constructor_randi_call_count:1,
+   constructor_callback_count:1,constructor_randi_call_count:1,
    constructor_randi_bound:90,constructor_randi_result:35,parameter_x0:10,parameter_x4:100,
    source_seed_before_hex:'e2624ac3',source_seed_after_hex:'55248a7a',
    source_parameter_roots_agree:true,object_allocation_generation:22,
@@ -1781,6 +1781,7 @@ test('portable Fresh Setup comparator binds original Setup and constructor scala
  assert.equal(setup.compare(freshSetupGo2ActualFixture(e,p)),true);
  assert.equal(setup.status().scope,'fresh prepared Start followed by same-producer original VS Setup2563 typed Start, RNG and constructor scalar only');
  for(const change of [a=>a.actual.random_seed_hex='00000000',a=>a.actual.start.rules.stage_kind++,
+   ...[0,2,5].map(count=>a=>a.stadium_setup_state.constructor_callback_count=count),
    a=>a.stadium_setup_state.constructor_randi_result++,a=>a.stadium_setup_state.source_seed_after_hex='00000000',
    a=>a.stadium_setup_state.parameter_x4++,a=>a.construction_complete=false]){
    const a=freshSetupGo2ActualFixture(e,p);change(a);
@@ -1788,6 +1789,7 @@ test('portable Fresh Setup comparator binds original Setup and constructor scala
  }
  const wrongContext=structuredClone(context);wrongContext.setup.sequence=2503;
  assert.throws(()=>validateFreshSetupGo2SourceContext(wrongContext,e));
+ for(const count of [undefined,0,2,5]){const x=structuredClone(context);x.constructor_observation.constructor_entry_count=count;assert.throws(()=>validateFreshSetupGo2SourceContext(x,e));}
  const wrongConstructor=structuredClone(context);wrongConstructor.constructor_observation.seed_after_hex='00000000';
  assert.throws(()=>validateFreshSetupGo2SourceContext(wrongConstructor,e));
 });

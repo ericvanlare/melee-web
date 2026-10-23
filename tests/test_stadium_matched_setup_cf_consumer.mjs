@@ -98,7 +98,7 @@ function run2Packet({go2 = false} = {}) {
     const start_context = {schema: 'melee-web-stadium-go2-same-producer-start-context-v2',
       version: 2, entry: phaseContext('vs_entry', 80, '01234567'),
       setup: phaseContext('vs_setup', 90, '89abcdef'),
-      constructor_observation: {schema: 'melee-web-original-stadium-constructor-state-projection-v1',
+      constructor_observation: {schema: 'melee-web-original-stadium-constructor-state-projection-v2', constructor_entry_count: 1,
         source_sequences: [82, 84, 85, 87, 88], seed_before_hex: 'e2624ac3',
         seed_after_hex: '55248a7a', parameter_x0: 40, parameter_x4: 100,
         random_call_observed: true, random_bound_valid: true, random_bound: 60,

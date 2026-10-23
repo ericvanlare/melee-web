@@ -2086,7 +2086,10 @@ class StadiumConstructorObservations:
                      'constructor state projection lacks its checked parameter/seed rows')
             random_call = self.branch != 'equal'
             result['state_projection'] = {
-                'schema': 'melee-web-original-stadium-constructor-state-projection-v1',
+                'schema': 'melee-web-original-stadium-constructor-state-projection-v2',
+                # PC witnesses describe one checked constructor entry/commit chain.
+                'constructor_entry_count': sum(
+                    r['payload']['phase'] == 'constructor_entry' for r in self.rows),
                 'source_sequences': [r['seq'] for r in self.rows],
                 'seed_before_hex': f'{self.constructor_seed_before:08x}',
                 'seed_after_hex': f'{self.constructor_seed_after:08x}',
