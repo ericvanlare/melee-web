@@ -6,7 +6,7 @@ import vm from 'node:vm';
 import {webcrypto} from 'node:crypto';
 import {decodeDrawDiagnostics} from './runner_contract.mjs';
 import {assembleCompletedCensusExecution, recordFailedCensusExecution,
-  validateCensusDrawSample} from './run_write_census.mjs';
+  validateCensusDrawSample, validateCpuRestoreRouteSelection, validateBrowserProfileForRoute} from './run_write_census.mjs';
 import {
   classifyHeapRanges, decodeAudioOwnerInventory, decodeMatchContextRangeInventory,
   decodeAuroraStagingShadowInventory, diffHeapRanges, requireStableAudioOwnerInventory,
@@ -1699,4 +1699,32 @@ test('browser census records all delegated FX rows when the provider enables eff
     [effectsOwner.generationHigh, effectsOwner.generationLow]);
   assert.deepEqual([delayHeap.generationHigh, delayHeap.generationLow],
     [effectsOwner.generationHigh, effectsOwner.generationLow]);
+});
+
+
+test('two-tick route is explicit, mutually exclusive, and preserves existing defaults', () => {
+  assert.equal(validateCpuRestoreRouteSelection({}), 'census-v1');
+  assert.equal(validateCpuRestoreRouteSelection({'--aggregate-cpu-restore-config':'config.json'}), 'cpu-only-v1');
+  assert.equal(validateCpuRestoreRouteSelection({'--aggregate-cpu-drawn-reference':true,
+    '--aggregate-cpu-restore-config':'config.json'}), 'drawn-reference-one-tick-v1');
+  assert.equal(validateCpuRestoreRouteSelection({'--aggregate-cpu-drawn-reference-two-tick':true,
+    '--aggregate-cpu-restore-config':'config.json'}), 'drawn-reference-no-draw-two-tick-v1');
+  assert.throws(()=>validateCpuRestoreRouteSelection({'--aggregate-cpu-drawn-reference-two-tick':true}),
+    /requires CPU configuration/);
+  assert.throws(()=>validateCpuRestoreRouteSelection({'--aggregate-cpu-drawn-reference':true,
+    '--aggregate-cpu-drawn-reference-two-tick':true,'--aggregate-cpu-restore-config':'config.json'}),
+    /mutually exclusive/);
+});
+
+
+test('two-tick route checks exact linked v6 runtime identity and both new getters before the prefix', () => {
+  const v6={profile:'slippi-render-dependencies-logical-frame-v6'};
+  assert.equal(validateBrowserProfileForRoute(v6,true,{evidence:true,evidenceBytes:true}),
+    'slippi-render-dependencies-logical-frame-v6');
+  assert.throws(()=>validateBrowserProfileForRoute({profile:'slippi-render-dependencies-dbooc-shield-drop-v5'},true,
+    {evidence:true,evidenceBytes:true}),/Unexpected profile identity/);
+  assert.throws(()=>validateBrowserProfileForRoute(v6,true,{evidence:true,evidenceBytes:false}),
+    /evidence exports are unavailable/);
+  assert.equal(validateBrowserProfileForRoute({profile:'slippi-render-dependencies-dbooc-shield-drop-v5'},false),
+    'slippi-render-dependencies-dbooc-shield-drop-v5');
 });

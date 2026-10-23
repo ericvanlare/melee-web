@@ -135,7 +135,8 @@ int main(void){
     def test_actual_cpu_runner_and_existing_census_node_contracts(self):
         mirror=self.work/'node-source';mirror.mkdir()
         files=['src/slippi_profile/tests/'+name for name in [
-            'cpu_restore_runner.mjs','test_cpu_restore_runner.mjs','run_synctest.mjs',
+            'cpu_restore_runner.mjs','test_cpu_restore_runner.mjs','cpu_two_tick_runner.mjs',
+            'test_cpu_two_tick_runner.mjs','run_synctest.mjs',
             'run_write_census.mjs','runner_contract.mjs','test_write_census_contract.mjs','synctest_browser.cpp']]
         files+=['scripts/browser_tools.mjs','tests/quiescent_wasm_snapshot.mjs']
         for relative in files:
@@ -144,12 +145,12 @@ int main(void){
             destination=mirror/relative;destination.parent.mkdir(parents=True,exist_ok=True)
             shutil.copyfile(source,destination)
         directory=mirror/'src/slippi_profile/tests'
-        for module in ['cpu_restore_runner.mjs','run_synctest.mjs','run_write_census.mjs']:
+        for module in ['cpu_restore_runner.mjs','cpu_two_tick_runner.mjs','run_synctest.mjs','run_write_census.mjs']:
             result=subprocess.run([str(node_runtime()),'--check',str(directory/module)],capture_output=True,text=True,timeout=30)
             (mirror/(module+'.syntax.log')).write_text(result.stdout+result.stderr)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         result=subprocess.run([str(node_runtime()),'--test',str(directory/'test_cpu_restore_runner.mjs'),
-                               str(directory/'test_write_census_contract.mjs')],cwd=mirror,
+                               str(directory/'test_cpu_two_tick_runner.mjs'),str(directory/'test_write_census_contract.mjs')],cwd=mirror,
                               capture_output=True,text=True,timeout=60)
         (mirror/'node-contracts.log').write_text(result.stdout+result.stderr)
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)

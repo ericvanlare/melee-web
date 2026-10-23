@@ -3,6 +3,7 @@
 // fixture sample. This records net byte-value deltas, not stores or a restore.
 import crypto from 'node:crypto';
 import {validateCpuRestoreConfiguration,runBrowserCpuRestore} from './cpu_restore_runner.mjs';
+import {runBrowserCpuTwoTick,validateCpuTwoTickFinalEvidence} from './cpu_two_tick_runner.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -22,6 +23,7 @@ import {
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const SAMPLE = PREFIX_SAMPLES;
+const LOGICAL_FRAME_V6_PROFILE = 'slippi-render-dependencies-logical-frame-v6';
 
 export function assembleCompletedCensusExecution(report, {prefixSamples, censusSample,
   captureHypothesis}) {
@@ -66,11 +68,33 @@ export function recordFailedCensusExecution(report, error) {
   return report;
 }
 
-function parseArgs(argv) {
+export function validateCpuRestoreRouteSelection(values) {
+  const oneTick = values['--aggregate-cpu-drawn-reference'] === true;
+  const twoTick = values['--aggregate-cpu-drawn-reference-two-tick'] === true;
+  if (oneTick && twoTick) throw new Error('One-tick and two-tick drawn-reference routes are mutually exclusive');
+  if ((oneTick || twoTick) && !values['--aggregate-cpu-restore-config']) {
+    throw new Error('Drawn reference requires CPU configuration');
+  }
+  return twoTick ? 'drawn-reference-no-draw-two-tick-v1' : oneTick ? 'drawn-reference-one-tick-v1' :
+    values['--aggregate-cpu-restore-config'] ? 'cpu-only-v1' : 'census-v1';
+}
+
+export function validateBrowserProfileForRoute(init, twoTickDrawnReference, twoTickExports = null) {
+  const expectedProfile = twoTickDrawnReference ? LOGICAL_FRAME_V6_PROFILE : SYNCTEST_PROFILE;
+  if (init?.profile !== expectedProfile) throw new Error(`Unexpected profile identity: ${init?.profile}`);
+  if (twoTickDrawnReference && (!twoTickExports ||
+      twoTickExports.evidence !== true || twoTickExports.evidenceBytes !== true)) {
+    throw new Error('Two-tick evidence exports are unavailable for the linked v6 profile');
+  }
+  return expectedProfile;
+}
+
+export function parseArgs(argv) {
   const values = {};
   const allowed = new Set(['--browser-runtime', '--assets', '--manifest', '--out', '--playwright','--aggregate-cpu-restore-config']);
   const flags = new Set(['--aurora-staging-shadow-inventory', '--stage-arena-owner-inventory',
-    '--source-payload-admission-dry-run','--aggregate-cpu-drawn-reference']);
+    '--source-payload-admission-dry-run','--aggregate-cpu-drawn-reference',
+    '--aggregate-cpu-drawn-reference-two-tick']);
   for (let i = 0; i < argv.length;) {
     const key = argv[i];
     if (flags.has(key)) {
@@ -81,7 +105,7 @@ function parseArgs(argv) {
     }
     const value = argv[i + 1];
     if (!allowed.has(key) || !value || values[key]) {
-      throw new Error('Usage: run_write_census.mjs --browser-runtime FILE --assets DIR --manifest FILE --out NEW_DIR [--playwright PACKAGE_DIR] [--aurora-staging-shadow-inventory] [--stage-arena-owner-inventory]');
+      throw new Error('Usage: run_write_census.mjs --browser-runtime FILE --assets DIR --manifest FILE --out NEW_DIR [--playwright PACKAGE_DIR] [--aurora-staging-shadow-inventory] [--stage-arena-owner-inventory] [--aggregate-cpu-drawn-reference-two-tick]');
     }
     values[key] = value;
     i += 2;
@@ -91,7 +115,7 @@ function parseArgs(argv) {
     values[key] = path.resolve(values[key]);
   }
   if (values['--playwright']) values['--playwright'] = path.resolve(values['--playwright']);
-  if(values['--aggregate-cpu-drawn-reference']&&!values['--aggregate-cpu-restore-config'])throw new Error('Drawn reference requires CPU configuration');
+  validateCpuRestoreRouteSelection(values);
   if(values['--aggregate-cpu-restore-config']){
     values['--aggregate-cpu-restore-config']=path.resolve(values['--aggregate-cpu-restore-config']);
     if(values['--source-payload-admission-dry-run']||!values['--aurora-staging-shadow-inventory'])
@@ -149,6 +173,8 @@ function sourceHashes() {
     'scripts/browser_tools.mjs',
     'scripts/source_state_manifest.py',
     'src/slippi_profile/tests/cpu_restore_runner.mjs',
+    'src/slippi_profile/tests/cpu_two_tick_runner.mjs',
+    'src/slippi_profile/tests/test_cpu_two_tick_runner.mjs',
     'src/slippi_profile/tests/cpu_restore_adapter.inc',
     'src/gameplay_cpu_checkpoint.cpp','src/gameplay_cpu_commit.cpp','src/gameplay_cpu_statics.cpp','src/gameplay_cpu_interval.c',
   ];
@@ -251,8 +277,12 @@ export function validateCensusDrawSample(result, sample, beforeDiagnostics,
 export function retainCpuRestoreSample(report,sample) {
   report.cpuRawSample=sample;
   report.execution.cpuRestore=sample.cpuRestore;
-  report.execution.restorePerformed=sample.cpuRestore?.nativeEvidence?.equality===1 &&
-    sample.cpuRestore?.commands?.find(record=>record.command===(sample.cpuRestore?.mode==='drawn-reference-one-tick-v1'?7:2))?.result===0 ? true : 'not-proven';
+  const twoTick=sample.cpuRestore?.mode==='drawn-reference-no-draw-two-tick-v1';
+  const completeEvidence=twoTick ? sample.cpuRestore?.nativeEvidence?.cpuEquality===1&&sample.cpuRestore?.nativeEvidence?.drawnEquality===1 :
+    sample.cpuRestore?.nativeEvidence?.equality===1;
+  const completionCommand=sample.cpuRestore?.mode==='drawn-reference-one-tick-v1'?7:twoTick?13:2;
+  report.execution.restorePerformed=completeEvidence&&
+    sample.cpuRestore?.commands?.find(record=>record.command===completionCommand)?.result===0 ? true : 'not-proven';
   report.execution.cpuOuterValidation='pending';
   return report;
 }
@@ -280,6 +310,47 @@ export function validateCpuRestoreDrawSample(sample,beforeDiagnostics,previousFr
   if(!sample.boundary?.interactive)throw new Error('CPU final present interactive boundary refused');
   if(sample.pad!=='AgAAAAAAAAAAAAABALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=')throw new Error('CPU sample300 literal PAD drift');
   return {frame,diagnostics,fighters};
+}
+
+export function validateCpuTwoTickDrawSample(sample,beforeDiagnostics,previousFrame,expectedInputMapping) {
+  const labels=['capture-before-baseline','after-reference-cpu300-before-draw',
+    'after-baseline-draw300-native-idle','after-reference-cpu301-before-draw',
+    'after-baseline-draw301-native-idle','after-correction-cpu300','after-correction-cpu301',
+    'after-final-present-native-idle'];
+  const rows=sample.cpuRestore?.drawBoundaries;
+  if(!Array.isArray(rows)||rows.length!==labels.length||rows.some((row,index)=>row.label!==labels[index]||
+     row.bytes!==132||Buffer.from(row.base64||'','base64').length!==132))
+    throw new Error('Two-tick draw boundary evidence missing or malformed');
+  const raw=rows.map(row=>Buffer.from(row.base64,'base64'));
+  if(!raw[0].equals(raw[1])||!raw[2].equals(raw[3])||!raw[4].equals(raw[5])||!raw[4].equals(raw[6]))
+    throw new Error('A CPU tick or no-draw correction changed the wrong draw boundary');
+  if(JSON.stringify(decodeDrawDiagnostics(raw[0]))!==JSON.stringify(beforeDiagnostics))
+    throw new Error('Two-tick capture/pre-draw diagnostic identity drift');
+  const checkpointSourceFrame=sample.cpuRestore.checkpointSourceFrame;
+  validateCpuTwoTickFinalEvidence(sample.cpuRestore.nativeEvidence,checkpointSourceFrame);
+  const pair300=sample.cpuRestore.nativeEvidence.pair300;
+  const pair301=sample.cpuRestore.nativeEvidence.pair301;
+  const baseline300={status:sample.cpuRestore.baselineGpuStatus300,drawDiagnostics:raw[2].toString('base64'),
+    pad:pair300.baselinePad,boundary:rows[2].boundary};
+  const first=validateDrawSampleBoundary(baseline300,300,beforeDiagnostics,previousFrame);
+  const fighters300=validateSelectedDrawPath(beforeDiagnostics,first.diagnostics,rows[2].boundary?.players,expectedInputMapping);
+  const baseline301={status:sample.cpuRestore.baselineGpuStatus301,drawDiagnostics:raw[4].toString('base64'),
+    pad:pair301.baselinePad,boundary:rows[4].boundary};
+  const second=validateDrawSampleBoundary(baseline301,301,first.diagnostics,first.frame);
+  const fighters301=validateSelectedDrawPath(first.diagnostics,second.diagnostics,rows[4].boundary?.players,expectedInputMapping);
+  const final={...sample,drawDiagnostics:raw[7].toString('base64')};
+  const completed=validateDrawSampleBoundary(final,301,second.diagnostics,second.frame);
+  const fightersFinal=validateSelectedDrawPath(second.diagnostics,completed.diagnostics,sample.boundary?.players,expectedInputMapping);
+  for(const boundary of [rows[2].boundary,rows[4].boundary,sample.boundary])
+    if(!boundary?.interactive)throw new Error('Two-tick source draw interactive boundary refused');
+  if(rows[2].boundary.sourceFrame!==checkpointSourceFrame+1||rows[4].boundary.sourceFrame!==checkpointSourceFrame+2||
+     sample.boundary.sourceFrame!==checkpointSourceFrame+2||sample.pad!=='AABQAAAAAAAAAAAAALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=')
+    throw new Error('Two-tick source frame or literal sample301 PAD drift');
+  if(pair300.baselinePad!=='AgAAAAAAAAAAAAABALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8='||
+     pair301.baselinePad!=='AABQAAAAAAAAAAAAALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=')
+    throw new Error('Two-tick literal source PAD sequence drift');
+  return {frame:completed.frame,diagnostics:completed.diagnostics,fighters:fightersFinal,
+    baselineFrames:[first.frame,second.frame],baselineFighters:[fighters300,fighters301]};
 }
 
 export function validateDrawnRestoreSample(sample,beforeDiagnostics,previousFrame,expectedInputMapping) {
@@ -334,6 +405,7 @@ function changedSummary(transitions) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  const twoTickDrawnReference=options['--aggregate-cpu-drawn-reference-two-tick']===true;
   const requireAuroraStagingShadowInventory =
     options['--aurora-staging-shadow-inventory'] === true;
   const requireStageArenaOwnerInventory =
@@ -425,12 +497,16 @@ async function main() {
     report.schema='melee-web-same-browser-cpu-restore-replay-present-component-v1';
     report.statement='One fixed sample300 baseline CPU+PCM without draw, typed CPU restore, exact no-draw replay, then one source present. Component evidence only; no renderer rewind or whole-Wasm restore.';
     report.execution={status:'incomplete',prefixSamples:300,sample:300,cpuRestore:{enabled:true,status:'not-started'},restorePerformed:'not-yet-observed'};
-    if(options['--aggregate-cpu-drawn-reference']){
+    if(twoTickDrawnReference){
+      report.schema='melee-web-same-browser-drawn-reference-no-draw-two-tick-component-v1';
+      report.statement='Fixed source samples300/301 drawn-reference, one typed CPU restore, two no-draw correction ticks and one phase-matched final present. Private component evidence only; no renderer rewind.';
+      report.execution={status:'incomplete',prefixSamples:300,samples:[300,301],cpuRestore:{enabled:true,status:'not-started'},restorePerformed:'not-yet-observed'};
+    }else if(options['--aggregate-cpu-drawn-reference']){
       report.schema='melee-web-same-browser-drawn-reference-no-draw-one-tick-component-v1';
       report.statement='Fixed sample300 drawn-reference, typed CPU restore, same no-draw correction and phase-matched finalpresent. Incomplete private profile only; no renderer rewind.';
     }
     report.cpuConfiguration=cpuConfiguration;
-    report.exclusions=['No #341 milestone closure',...(options['--aggregate-cpu-drawn-reference']?['No whole-profile or vanilla original acceptance']:['No drawn-original versus no-draw coverage claim']),'No seven-tick/H1/whole-session acceptance','No renderer/host allocator rewind','No #339 nonzero-history/drop workaround'];
+    report.exclusions=['No #341 milestone closure',...((twoTickDrawnReference||options['--aggregate-cpu-drawn-reference'])?['No whole-profile or vanilla original acceptance']:['No drawn-original versus no-draw coverage claim']),'No seven-tick/H1/whole-session acceptance','No renderer/host allocator rewind','No #339 nonzero-history/drop workaround'];
   }
   const writeReport = () => fs.writeFileSync(outFile, `${JSON.stringify(report, null, 2)}\n`);
   writeReport();
@@ -497,8 +573,14 @@ async function main() {
     assertDrawDiagnosticsClear(drawDiagnostics, 'browser initialization');
     report.profile = {identity: init.profile, sourceIdentity: init.source,
       rngHelper: init.rngHelper, stageBridge: init.stageBridge, seed: SOURCE_SEED,
-      name: SYNCTEST_PROFILE};
-    if (init.profile !== SYNCTEST_PROFILE) throw new Error(`Unexpected profile identity: ${init.profile}`);
+      name: twoTickDrawnReference ? LOGICAL_FRAME_V6_PROFILE : SYNCTEST_PROFILE};
+    const twoTickExports = twoTickDrawnReference ? await page.evaluate(() => {
+      const {module} = window.__slippiSynctest;
+      return {evidence: typeof module._melee_web_synctest_cpu_two_tick_evidence === 'function',
+        evidenceBytes: typeof module._melee_web_synctest_cpu_two_tick_evidence_bytes === 'function'};
+    }) : null;
+    validateBrowserProfileForRoute(init, twoTickDrawnReference, twoTickExports);
+    if (twoTickDrawnReference) report.profile.twoTickEvidenceExports = twoTickExports;
     if (init.source !== fileSha(path.join(ROOT, 'tests/gameplay_snapshot_probe.cpp'))) {
       throw new Error('Runtime fixture identity differs from current gameplay_snapshot_probe.cpp');
     }
@@ -556,15 +638,38 @@ async function main() {
     if (!checkpoint) throw new Error('The existing 300-sample browser warm prefix did not complete');
 
     if(cpuWire){
-      const sample=await runBrowserCpuRestore(page,cpuWire,checkpoint,expectedInputMapping,expectedStocks,{
-        drawnReference:Boolean(options['--aggregate-cpu-drawn-reference']),checkedSource:checkedAsyncCcall.toString(),inputMappingSource:validateSourceInputMapping.toString(),inspectSource:inspectInteractiveObservation.toString()});
+      const helpers={checkedSource:checkedAsyncCcall.toString(),inputMappingSource:validateSourceInputMapping.toString(),
+        inspectSource:inspectInteractiveObservation.toString(),selectedDrawSource:validateSelectedDrawPath.toString(),
+        decodeDrawSource:decodeDrawDiagnostics.toString()};
+      const sample=twoTickDrawnReference?
+        await runBrowserCpuTwoTick(page,cpuWire,checkpoint,expectedInputMapping,expectedStocks,helpers):
+        await runBrowserCpuRestore(page,cpuWire,checkpoint,expectedInputMapping,expectedStocks,{
+          drawnReference:Boolean(options['--aggregate-cpu-drawn-reference']),checkedSource:helpers.checkedSource,
+          inputMappingSource:helpers.inputMappingSource,inspectSource:helpers.inspectSource});
       retainCpuRestoreSample(report,sample);writeReport();
-      const {frame,diagnostics,fighters}=validateCpuRestoreDrawSample(sample,previousDiagnostics,previousFrame,expectedInputMapping);
-      report.execution={status:'completed',prefixSamples:300,sample:300,cpuRestore:sample.cpuRestore,restorePerformed:true,
-        scope:options['--aggregate-cpu-drawn-reference']?'same-browser drawn-reference/no-draw-one-tick COMPONENT only':'same-browser CPU restore/replay + one present COMPONENT only',cpuOuterValidation:'passed'};
+      const validated=twoTickDrawnReference?
+        validateCpuTwoTickDrawSample(sample,previousDiagnostics,previousFrame,expectedInputMapping):
+        validateCpuRestoreDrawSample(sample,previousDiagnostics,previousFrame,expectedInputMapping);
+      const {frame,diagnostics,fighters}=validated;
+      if(twoTickDrawnReference){
+        report.execution={status:'completed',prefixSamples:300,samples:[300,301],sample:301,cpuRestore:sample.cpuRestore,
+          restorePerformed:true,scope:'same-browser drawn-reference/no-draw-two-tick COMPONENT only',cpuOuterValidation:'passed'};
+        report.input={samples:[300,301].map(sampleNumber=>{
+          const raw=Buffer.from(sample.cpuRestore.rawSamples[`sample${sampleNumber}`].pad,'base64');
+          return {sample:sampleNumber,rawPad44Base64:raw.toString('base64'),rawPad44Sha256:sha256(raw)};
+        }),sourceSchedule:'two fixed literal inputs at source samples300 and301; no synthetic PAD or additional source step'};
+      }else{
+        report.execution={status:'completed',prefixSamples:300,sample:300,cpuRestore:sample.cpuRestore,restorePerformed:true,
+          scope:options['--aggregate-cpu-drawn-reference']?'same-browser drawn-reference/no-draw-one-tick COMPONENT only':'same-browser CPU restore/replay + one present COMPONENT only',cpuOuterValidation:'passed'};
+      }
       report.cpuResult={observation:rawLaneRecord(browserSampleLane(sample)),boundary:sample.boundary,gpuStatus:sample.status,
         finalFrame:frame,drawDiagnostics:diagnostics,selectedFighterPaths:fighters,
-        screenshot:await screenshotRecord(page,options['--out'],'browser-cpu-restore-sample-300.png')};
+        ...(twoTickDrawnReference?{baselineFrames:validated.baselineFrames,baselineFighterPaths:validated.baselineFighters,
+          tickSamples:Object.fromEntries([300,301].map(sampleNumber=>{
+            const row=sample.cpuRestore.rawSamples[`sample${sampleNumber}`];
+            return [sampleNumber,rawLaneRecord({observation:Buffer.from(row.observation,'base64'),pcm:Buffer.from(row.pcm,'base64'),pad:Buffer.from(row.pad,'base64')})];
+          }))}:{}),
+        screenshot:await screenshotRecord(page,options['--out'],twoTickDrawnReference?'browser-cpu-two-tick-sample-301.png':'browser-cpu-restore-sample-300.png')};
       report.inventory={status:'fixed-reviewed-domains-only',completeGameState:false,sourceStateManifestComplete:false,
         wasmAndMapBound:true,staticRows:cpuWire.length};
       if(pageErrors.length)throw new Error(`Browser reported an error: ${pageErrors[0]}`);

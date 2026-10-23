@@ -2,7 +2,7 @@
   "schema": "match-only-rollback-feasibility-v1",
   "issue": 318,
   "pr": 319,
-  "status": "same_browser_drawn_reference_one_tick_pass_census_incomplete_full_browser_restore_not_established",
+  "status": "same_browser_one_tick_drawn_reference_pass_two_tick_command11_payload_failure_census_incomplete_full_browser_restore_not_established",
   "source_only_baseline": {
     "boundary": "synchronous-source-only-exported-call-return",
     "sourceDrawing": false,
@@ -2429,7 +2429,7 @@
   },
   "same_instance_browser_restore_341": {
     "issue": 341,
-    "status": "PASS_DRAWN_REFERENCE_CPU_REPLAY_AND_ONE_PRESENT; CENSUS_INCOMPLETE; FULL_BROWSER_RESTORE_NOT_ESTABLISHED",
+    "status": "ONE_TICK_DRAWN_REFERENCE_PASS; TWO_TICK_COMMAND11_CPU_PAYLOAD_FAILURE; CENSUS_INCOMPLETE; FULL_BROWSER_RESTORE_NOT_ESTABLISHED",
     "producer_base_commit": "130438fd2b86d00cfec98cd2ba0a5f66084ae15c",
     "producer_worktree": "uncommitted source; census runtime/harness and separate owner component sources pinned below; not a commit identity",
     "runtime_sha256": {
@@ -2460,7 +2460,7 @@
       "excludedMutableInputSections": 1068,
       "completeGameState": false
     },
-    "scope": "Cumulative record of the source/draw ownership census and a separate bounded same-instance sample-300 drawn-reference CPU baseline/restore/replay comparison: the original baseline source draw, no-draw CPU replay, and final source present are compared at declared phase-matched endpoints. The raw census remains incomplete; renderer/GPU/cache state is not restored and full game-state ownership is not established.",
+    "scope": "Cumulative source/draw ownership census plus two distinct same-browser CPU restore records: the bounded sample-300 one-tick drawn-reference comparison passed, while the separate sample-300/301 two-tick attempt stopped at command 11 on strict final CPU payload equality. The raw census remains incomplete; renderer/GPU/cache state is not restored and full game-state ownership is not established.",
     "capture": {
       "retained_artifact": "browser-write-census-v2/runner/evidence.json",
       "sha256": "d73e5b6c2a00bf64b09a9e343578a7a29e8469eb532cba563f80426ed43e23e9"
@@ -2558,7 +2558,7 @@
     },
     "remaining": [
       "complete source/project mutable-static coverage and dynamic source/asset/stream/file ownership",
-      "profile-only logical-frame semantics across multiple source ticks while preserving the typed source-present clock and vanilla behavior; no multi-tick browser replay is accepted",
+      "reduce the retained command-11 final CPU payload mismatch before selecting another bounded hypothesis; the two-tick comparison stopped before later domains and final present",
       "render-to-simulation dependencies and safe host effects across no-draw correction; renderer/GPU/cache state remains outside rewind scope",
       "whole-session, original-game parity, continuous PCM, pixel parity and foreground timing acceptance"
     ],
@@ -2571,6 +2571,7 @@
       "The drawn-reference comparison covers one bounded CPU sample300 transition and one source present; no renderer/GPU/cache state is rewound.",
       "The raw census remains incomplete and ownerRestoreAdmission is false; observed ranges outside this CPU checkpoint remain unadmitted.",
       "The separate two-tick reducer demonstrates strict clock-mismatch rejection with modeled gameplay leaves; it is not two-tick gameplay rollback evidence.",
+      "The actual two-tick browser attempt failed at command 11 on strict CPU payload equality; later domains and final present were not reached.",
       "No original-game parity, multi-tick or seven-tick acceptance, continuous PCM, pixel parity, foreground timing or whole-session acceptance follows."
     ],
     "retained_failures": [
@@ -2599,7 +2600,7 @@
       "retained_artifact": "census-owner-gap-analysis-v1.json",
       "sha256": "9908b8d2ebb8aeeb64d8df4dcdeb24ea0f16f55bab3d17e1f847c679f90ba370"
     },
-    "next_experiment": "Proceed with the root-authorized external source candidate and focused actual-source controls. The root-reviewed profile-only logical-frame contract requires pending housekeeping to complete only after the source-pre predicate succeeds and before callbacks begin. No build or browser capture is released.",
+    "next_experiment": "Read-only reduction of the first command-11 payload mismatch, followed by one bounded owner-range diagnostic selected from that evidence. No recapture or two-tick pass is claimed.",
     "owner_components": {
       "scope": "Private owner components only; no browser restore exposure or complete-world claim",
       "current_files_sha256": {
@@ -5428,6 +5429,370 @@
         "interpretation_limit": "This proves the strict comparator rejects the specified two-tick present-clock mismatch. It is a reduced expected-rejection result, not a two-tick rollback or gameplay pass.",
         "next_review": "Implementation-ready profile-only logical-frame contract review, preserving vanilla andstrictclock comparisons; noimplementation/capture release."
       }
+    },
+    "drawn_reference_two_tick_capture_v1": {
+      "status": "FAILED_COMMAND11_FINAL_CPU_PAYLOAD_EQUALITY; NO_FINAL_PRESENT; OWNED_PROCESS_CLEANUP_PASS",
+      "scope": "One root-released same-browser two-tick drawn-reference attempt after the successful one-tick sample-300 capture. The attempt used drawn-reference baselines at samples 300 and 301, one typed CPU restore and two no-draw correction ticks, then stopped at the final strict CPU payload comparison. This is a retained failed attempt: no final present, no complete nine-domain final comparison, and no two-tick acceptance.",
+      "producer": {
+        "source_base_commit": "62a717fcb5414fb717216b846f3b5a0d5377efff",
+        "source_base_tree": "e4d17f8d310c461f28ee2b539dd5e9a06ab7323e",
+        "dirty_source_files": 18,
+        "source_identity_note": "Exact62a717dirty18 validated source; native runtime producer62a717dirty12 retained separately.",
+        "validation_receipt": {
+          "path": "drawn-reference-two-tick-validation-v1/integration-result-v2.json",
+          "bytes": 24857,
+          "sha256": "3ff9a21fcf02e440002f41c47ae96725ae1b2b5e2a118382e42ed105d03222dc"
+        },
+        "native_build_source_identity": {
+          "base_commit": "62a717fcb5414fb717216b846f3b5a0d5377efff",
+          "base_tree": "e4d17f8d310c461f28ee2b539dd5e9a06ab7323e",
+          "dirty_source_files": 12,
+          "identity": "62a717 plus exact12 reviewed native files; build producer distinct from later JS join/checkpoint",
+          "candidate": {
+            "path": "drawn-reference-two-tick-native-candidate-v2/freeze-v2.json",
+            "sha256": "8ed630479566bf85671d5591f8ce41399a301b45306986e0b18a8762156240e5"
+          }
+        },
+        "full_regression": {
+          "status": "PASS",
+          "tests": 2470,
+          "passed": 2305,
+          "skipped": 165,
+          "seconds": 543.152,
+          "exit_code": 0,
+          "log": {
+            "path": "drawn-reference-two-tick-validation-v1/test-fixture-validation-v2/full-regression.log",
+            "bytes": 470621,
+            "sha256": "144503647ea05cfd627177984abc6814073acc3f6a8a1289110ed40e23416ad8"
+          }
+        },
+        "release_builds": [
+          {
+            "name": "private-v5-release",
+            "status": "PASS",
+            "seconds": 31.050933916587383,
+            "log": {
+              "path": "drawn-reference-two-tick-validation-v1/private-v5-release.log",
+              "bytes": 22859,
+              "sha256": "28b4510fb8f8793c1e827fd7c39cb8994eae3fdb07ce0086d6b716dfea77ad2d"
+            }
+          },
+          {
+            "name": "private-v6-release",
+            "status": "PASS",
+            "seconds": 31.044914374593645,
+            "log": {
+              "path": "drawn-reference-two-tick-validation-v1/private-v6-release.log",
+              "bytes": 22998,
+              "sha256": "d5fd255737480eaa713a7c09cfdbb7984838a5ed0e58b2bf1e73202dfdb2a325"
+            }
+          },
+          {
+            "name": "ordinary-release",
+            "status": "PASS",
+            "seconds": 22.58152679167688,
+            "log": {
+              "path": "drawn-reference-two-tick-validation-v1/ordinary-release.log",
+              "bytes": 19859,
+              "sha256": "8cc7785063affaaf451b5df3f87912af448ba75d0e0b1a857a7c07ef2c98e777"
+            }
+          }
+        ]
+      },
+      "runtime": {
+        "profile_identity": "slippi-render-dependencies-logical-frame-v6",
+        "configuration_sha256": "dbf4c80fa7d768c2ebc75a4332e08ecab1233092522adde57371b0d097bc5eb3",
+        "source_state_manifest_sha256": "bd837f4aa78f9f0bd4575dd9d990611f5453f4509ef6da945300f43050555c00",
+        "source_state_manifest_rows": 3143,
+        "source_state_manifest_complete_game_state": false,
+        "runtime_file_count": 24,
+        "runtime_24_current_and_retained_unchanged": true,
+        "primary_runtime_sha256": {
+          "gameplay_slippi_synctest_browser.mjs": "fe986947c7fbac58f85f700d1bafd727b772a9ac5998d1d0bd980dfedff46ed4",
+          "gameplay_slippi_synctest_browser.wasm": "dbbbf645626eb4f7cd2004149e0074aa4c24914d81c25e0e4e2f88e3355d0e38",
+          "gameplay_slippi_synctest_browser.data": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c"
+        },
+        "raw_profile_source_identity_sha256": "af952c7c386af85630136e63cad8d3322f3bb58fa550c6899e10e3f5814f963f",
+        "linked_configuration": {
+          "configuration_sha256": "dbf4c80fa7d768c2ebc75a4332e08ecab1233092522adde57371b0d097bc5eb3",
+          "manifest_sha256": "bd837f4aa78f9f0bd4575dd9d990611f5453f4509ef6da945300f43050555c00",
+          "map_sha256": "311fe4b1aba1ca0a8d9968f1aab896e2fb8ecbb2acc0ce4864724a6885c6d7d7",
+          "policy_sha256": "9aae33a626c7db877209cced4139918bf6280c39e559531d3177c30f8cc9ea3f",
+          "wire_rows": 2165
+        }
+      },
+      "capture": {
+        "evidence_directory": "drawn-reference-two-tick-capture-v1",
+        "packet": {
+          "path": "drawn-reference-two-tick-capture-v1/packet-candidate-v1.json",
+          "bytes": 57430,
+          "sha256": "7f4310ea1724a2c92dddd6c90435b1b1c51e58839890940cdd58b493e3601e19"
+        },
+        "preflight": {
+          "path": "drawn-reference-two-tick-capture-v1/preflight.json",
+          "bytes": 57986,
+          "sha256": "e50a51e524bb57d4fd23b3ebf8df4f29e3729ffd43642149630dfddc67e8a549"
+        },
+        "command": {
+          "path": "drawn-reference-two-tick-capture-v1/command-v1.json",
+          "bytes": 2803,
+          "sha256": "d9ecbc0494f02b9e131991f47b9e5b2f00d96cdd578cefc62395e8ebad8ce24c"
+        },
+        "reviewed_launcher": {
+          "path": "drawn-reference-two-tick-capture-v1/launch_once.py",
+          "sha256": "c4b9253fd30b45bec09567332a50ad4f294ed1dfec16ea67a6f7b3ee6f659fef"
+        },
+        "release": {
+          "path": "drawn-reference-two-tick-capture-v1/root-release-v1.json",
+          "bytes": 733,
+          "sha256": "f7586238cf65dfd606df0216756b1c9f2862ecd439b1d0e2458b768867306b41"
+        },
+        "launch_result": {
+          "path": "drawn-reference-two-tick-capture-v1/launch-result-v1.json",
+          "bytes": 2772,
+          "sha256": "913d7aac28eef23fbfb37bf5b854c6fce638cab2409654ad6d4208c921c2373a"
+        },
+        "raw_report": {
+          "path": "drawn-reference-two-tick-capture-v1/runner/evidence.json",
+          "bytes": 1108416,
+          "sha256": "7274117c01f19cafd5bbb8348128f0ceb862241a8485cb765113e9501e6d0348"
+        },
+        "owner": {
+          "path": "drawn-reference-two-tick-capture-v1/owner.json",
+          "bytes": 88495,
+          "sha256": "63d58c959d308a22bc91c55f88c7882574ddbf55816464d59c42d1daaab97c1d"
+        },
+        "root_observation": {
+          "path": "drawn-reference-two-tick-capture-v1/root-observed-v1.json",
+          "bytes": 3219,
+          "sha256": "989b2f4d5893959055d6f88ebb9393e4a97e68a398411a50114bc1c2617da751"
+        },
+        "independent_raw_inspection": {
+          "path": "drawn-reference-two-tick-capture-v1/root-raw-inspection-v1.json",
+          "bytes": 2538,
+          "sha256": "9d4859bda1599b42276d44b5dbcfea003757e82f1ea7a61ece0d927a31717064"
+        },
+        "runner_log": {
+          "path": "drawn-reference-two-tick-capture-v1/runner.log",
+          "bytes": 647,
+          "sha256": "6f2b3a4125bdf9f3d09d545856eb248503bf2b3f5f9f4e66f878bca89d114314"
+        },
+        "process_trace": {
+          "path": "drawn-reference-two-tick-capture-v1/processes.jsonl",
+          "bytes": 65872,
+          "sha256": "7d47642a14349d243d5e11cf0976a96ae51643e501fa69c1822f450c951337a4"
+        }
+      },
+      "observed": {
+        "capture_result": "FAIL_FIRST_STRICT_CPU_EQUALITY_1216",
+        "prefix_samples_completed": 300,
+        "baseline_samples": [
+          300,
+          301
+        ],
+        "raw_five_field_pairs_equal": true,
+        "raw_pair_hashes": {
+          "sample300": {
+            "Observation": {
+              "bytes": 1280,
+              "sha256": "a97c03e66301419bcba8aba75cba1ed88ee3aed3b3a6fc80d9f0fd0f9de8f967",
+              "equal": true
+            },
+            "Pcm": {
+              "bytes": 4272,
+              "sha256": "462733f725a874052aba5c73b03dd4b8799b78bb1f973b097768548b16d9833c",
+              "equal": true
+            },
+            "Pad": {
+              "bytes": 44,
+              "sha256": "46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288",
+              "equal": true
+            },
+            "RngProfile": {
+              "bytes": 32,
+              "sha256": "3d6e376f9a6fccd6906c0464e1d26993d12f922d64b0aa6dda4f3f2f1db07b0a",
+              "equal": true
+            },
+            "Transfer": {
+              "bytes": 40,
+              "sha256": "7cd1b6ae9606e1e05c29ce009ef00d6644be61f9ab1f29b098e4b1b5aede644c",
+              "equal": true
+            }
+          },
+          "sample301": {
+            "Observation": {
+              "bytes": 1280,
+              "sha256": "695dcf7e144dc8fcd8c79e03cdd68da5c9b560aa57aec7d5023bacb73cd6a61a",
+              "equal": true
+            },
+            "Pcm": {
+              "bytes": 4272,
+              "sha256": "74ab5495dd17a98755b76bd9c5bd7bb4cfa1b5075cde75c9a904a7a138fd0d8c",
+              "equal": true
+            },
+            "Pad": {
+              "bytes": 44,
+              "sha256": "c1be1a004e9e0fafa868a1f51540cef6f2fa3d6104e7b503c3b9eb5f79cbe63d",
+              "equal": true
+            },
+            "RngProfile": {
+              "bytes": 32,
+              "sha256": "3d6e376f9a6fccd6906c0464e1d26993d12f922d64b0aa6dda4f3f2f1db07b0a",
+              "equal": true
+            },
+            "Transfer": {
+              "bytes": 40,
+              "sha256": "f43157ae61bd00daa75379bb0e7a8974c1ff682dfdabeac4ec5120821c7ef4fc",
+              "equal": true
+            }
+          }
+        },
+        "native_last_command": 11,
+        "failure": {
+          "command": 11,
+          "code": 1216,
+          "reason": "two-tick final CPU typed equality refused",
+          "first_mismatch": {
+            "domain": 4,
+            "status": 2,
+            "row": 62,
+            "offset": 284,
+            "expected": 106,
+            "actual": 189,
+            "address": 50971136,
+            "extent": 1024,
+            "detail": 2160236800
+          },
+          "owner_effects_actions_passed": true,
+          "later_domains_checked": false,
+          "final_present_reached": false,
+          "command_12_and_13_reached": false
+        },
+        "native_cleanup": {
+          "cpu_restore_close": {
+            "status": "returned-nonzero",
+            "result": 1216
+          },
+          "snapshot_close": {
+            "status": "checked-return-one",
+            "result": 1
+          },
+          "renderer_shutdown": {
+            "status": "checked-return-one",
+            "result": 1
+          },
+          "native_path_closed": false
+        },
+        "owned_process_cleanup": {
+          "status": "PASS",
+          "recorded_pids_absent": 10,
+          "owner_elapsed_ms": 9816,
+          "cleanup_elapsed_ms": 80,
+          "process_trace": {
+            "path": "drawn-reference-two-tick-capture-v1/processes.jsonl",
+            "bytes": 65872,
+            "sha256": "7d47642a14349d243d5e11cf0976a96ae51643e501fa69c1822f450c951337a4"
+          }
+        }
+      },
+      "next_experiment": "A read-only first-payload-difference reduction is pending; use its result to select one bounded owner-range diagnostic. Do not interpret this attempt as a pass or as evidence for domains that did not execute.",
+      "limits": [
+        "One attempt only; no automatic retry.",
+        "The final strict comparison stopped on the first payload mismatch; later declared domains were not checked.",
+        "No final source present or final-present image was produced.",
+        "Native close reported the latched 1216 even though snapshot close and renderer shutdown returned 1; OS owned-process cleanup independently passed.",
+        "The earlier sample-300 one-tick drawn-reference pass and the reduced strict-clock rejection remain separate producer records."
+      ],
+      "evidence_run_root": "browser-rollback-sprint-20261022-115029-d89e262b"
+    },
+    "one_tick_pr342_ci_followup_v1": {
+      "status": "PASS_EXACT_HEAD_CI; PR_REMAINS_DRAFT",
+      "head": "bc7c566acb6f73e9146acc8884766814443efb35",
+      "run_id": 40006477590,
+      "checks": 14,
+      "successes": 12,
+      "expected_skips": 2,
+      "receipt": {
+        "path": "drawn-reference-one-tick-capture-v1/exact-head-ci-v1.json",
+        "bytes": 50362,
+        "sha256": "7cfffff6241a033281187a584a10d1fd205fd1ebc51c062d61bc7849a2f496d1"
+      },
+      "scope": "Exact-head CI only; this does not alter the one-tick capture build or runtime producer identity."
+    },
+    "profile_logical_frame_v6_source_checkpoint_v1": {
+      "status": "SOURCE_COMPONENT_VALIDATED; NO_BROWSER_CAPTURE_OR_ROLLBACK_ACCEPTANCE",
+      "source_identity": {
+        "head": "62a717fcb5414fb717216b846f3b5a0d5377efff",
+        "tree": "e4d17f8d310c461f28ee2b539dd5e9a06ab7323e",
+        "parent": "bc7c566acb6f73e9146acc8884766814443efb35",
+        "source_file_count": 16,
+        "receipt": {
+          "path": "profile-logical-frame-housekeeping-validation-v2/root-source-checkpoint-v1.json",
+          "bytes": 14082,
+          "sha256": "374760643e76aa2ae50ad586a4e0e8a2697dbc92eb2b114ac2f5539dd4eb6525"
+        }
+      },
+      "implementation": {
+        "behavior": "Strict logical-clock checks and vanilla behavior are preserved; pending housekeeping completes only after the accepted source-pre predicate and before callbacks.",
+        "key_source_pins": {
+          "src/gameplay_match_clock.h": "effeafd4f6a4e341eaefc74bc7440c6fa78f985d42376e2b94e100278da1b9b9",
+          "src/slippi_profile/logical_frame_clock.c": "5fb445b52b93c40d3b18b076c20a771dfab41012558103a5d05fb882f844439d",
+          "src/slippi_profile/logical_frame_clock.h": "b1ee512b9e0a519fc39e1537d5541accdee0755f201fa373fbd5db3d9684c9bb",
+          "src/slippi_profile/patches/melee-profile-hooks.patch": "c27a053b7fa808cdfd42acb0e3423cbc14de713dcc57b7b482db49332cf299ab"
+        }
+      },
+      "validation": {
+        "status": "PASS",
+        "focused_controls": "PASS",
+        "tests": 2470,
+        "passed": 2305,
+        "skipped": 165,
+        "seconds": 528.317,
+        "exit_code": 0,
+        "receipt": {
+          "path": "profile-logical-frame-housekeeping-validation-v2/integration-result-v2.json",
+          "bytes": 16074,
+          "sha256": "e7fa7fe13def48d4b131a1828928c3c2f82829d9329e802601e027eefe250426"
+        },
+        "source_manifest": {
+          "path": "profile-logical-frame-housekeeping-validation-v2/source-manifest-v1.json",
+          "bytes": 11258,
+          "sha256": "3fb471fd01e4d5a72f7f4cf0ba6c4559cfe28b1bc7ee5aea41715a6de38df117"
+        },
+        "full_regression_log": {
+          "path": "profile-logical-frame-housekeeping-validation-v2/full-regression.log",
+          "bytes": 469666,
+          "sha256": "dfd0670d6f6146e00f3a7d6348bedd0699051e010c5cc81c2226e0a6a2446d6a"
+        },
+        "source_review": {
+          "path": "profile-logical-frame-housekeeping-candidate-v1/independent-source-review-v1.json",
+          "bytes": 7885,
+          "sha256": "62df832917427ce38df843c7be8fbac9b48fb11e5eaf2ee51622b3310a4c1b25"
+        }
+      },
+      "release_build_identity": {
+        "head": "bc7c566acb6f73e9146acc8884766814443efb35",
+        "source_file_count": 15,
+        "scope": "The three retained Release builds were produced by bc7c566 plus the exact 15 reviewed logical-frame files. Checkpoint 62a717 includes 16 source files after two Python-only test repairs; these build records are not relabeled as 62a717 builds.",
+        "build_receipts": [
+          {
+            "name": "private-v5-release",
+            "path": "profile-logical-frame-housekeeping-validation-v1/step-03-private-v5-release.json",
+            "sha256": "8c9a9366943fd0139b838bbc2c6372840f842d3a1fe333aedac5f95f53d62aae"
+          },
+          {
+            "name": "private-v6-release",
+            "path": "profile-logical-frame-housekeeping-validation-v1/step-04-private-v6-release.json",
+            "sha256": "d2048f7405470e1699c4d9fad0889ec986e418d13757e896c4e373ae46c85df5"
+          },
+          {
+            "name": "ordinary-release",
+            "path": "profile-logical-frame-housekeeping-validation-v1/step-05-ordinary-release.json",
+            "sha256": "8c09cd9d8457d3666451b7c0d66650b7019b062c4d7b7b3f84678ac8d4c90c25"
+          }
+        ]
+      },
+      "scope": "Source-component implementation and regression validation only. This record is distinct from the later two-tick capture source identity (62a717 plus 18 dirty files), native build producer (62a717 plus 12 reviewed native files), and its unchanged 24-file runtime. It does not establish a successful two-tick browser replay."
     }
   }
 }

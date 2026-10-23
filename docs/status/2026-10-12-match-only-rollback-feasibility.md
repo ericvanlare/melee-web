@@ -1,6 +1,6 @@
 # Match-only rollback feasibility
 
-**Compiled / Source-only snapshot diagnostic / Terminal browser tick-and-draw diagnostic / Bounded CPU restore-replay-and-present component / Full browser rollback and frame-budget feasibility unproven**
+**Compiled / Source-only snapshot diagnostic / Terminal browser tick-and-draw diagnostic / One-tick CPU restore-replay-and-present passed; two-tick attempt failed at CPU payload comparison / Full browser rollback and frame-budget feasibility unproven**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
 [merged #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
@@ -16,7 +16,7 @@ binds current producer and retained failure identities.
 browser boundary. Private components capture the source allocation mirror,
 bootstrap/context/flow values, decoded DAT allocations, native audio/effect
 buffers, match clock/cadence, and the bounded active-action closure under owner
-and lifetime guards. The latest same-browser result completes a fixed sample-300
+and lifetime guards. The latest successful same-browser result completes a fixed sample-300
 drawn-reference comparison: it records a baseline source draw, restores and
 replays the CPU tick without a corrective draw, then checks one final source
 present. The strict CPU
@@ -24,8 +24,10 @@ endpoint and phase-matched postdraw comparisons pass. This remains bounded
 component evidence: renderer/GPU/cache state is not restored, full game-state
 ownership is incomplete, and original-game parity, multi-tick and whole-session
 gates remain open. Earlier capture refusals and the post-present harness assertion
-failure remain retained and are explained below. Component controls and this one
-browser result do not establish full browser rollback. Earlier owner controls
+failure remain retained and are explained below. A subsequent two-tick attempt
+failed at the strict final CPU payload comparison; its retained result is recorded
+below. Component controls and the one-tick browser result do not establish full
+browser rollback. Earlier owner controls
 also repaired callback guards so simulation and draw callbacks refuse separately;
 the production flow control passes with synthetic lifecycle prerequisites. The
 original single/two-player constructor, neutral ticks, context checkpoint controls
@@ -269,22 +271,54 @@ but renderer/GPU/cache state is not rewound and the screenshot retains the known
 magenta/texture artifacts.
 The capture used a dirty16 build on 4f9a603e; the later clean 9c3293ef source
 checkpoint contains the same bytes across those 16 source files and does not
-relabel the runtime.
-Private and ordinary Release builds, focused controls and full regression pass;
-exact-head CI for the successor remains pending, while earlier 4f9a603e CI is
-historical.
+relabel the runtime. Private and ordinary Release builds, focused controls and
+full regression pass. The one-tick PR342 successor at exact head
+`bc7c566acb6f73e9146acc8884766814443efb35` completed all 14 checks: 12
+successes and two expected skips. Its PR remained draft; this CI result does not
+change the capture producer identity.
 
-The actual-source two-tick clock reducer now passes as a rejection test: one tick
+The actual-source two-tick clock reducer passes as a rejection test: one tick
 matches, while two modeled source ticks with one replay present strictly reject
 the one-count clock delta. Saturation, missing/duplicate present, callback-inflight
 and retired/recreated owner controls also pass. The reducer does not execute the
 HSD fighter scheduler, literal PAD/PCM or a gameplay replay, and is not a two-tick
-rollback pass. The profile-only logical-frame contract is now root-reviewed and
-preserves strict clock checks and vanilla behavior; pending housekeeping may
-complete only after the source-pre predicate succeeds and before callbacks begin.
-A bounded external source implementation and focused actual-source controls are
-authorized. The frozen seven-tick browser plan remains unreleased; no
-implementation result, build, or browser capture is claimed.
+rollback pass.
+
+The profile-only logical-frame implementation is now validated at source
+checkpoint `62a717fcb5414fb717216b846f3b5a0d5377efff` (tree
+`e4d17f8d310c461f28ee2b539dd5e9a06ab7323e`), with 16 source files. It preserves
+strict clock checks and vanilla behavior; pending housekeeping completes only
+after the source-pre predicate succeeds and before callbacks begin. Focused
+actual-source controls and the full regression pass (2,470 tests, 165 skips).
+The three retained Release builds were produced by `bc7c566` plus the exact 15
+reviewed logical-frame files; the two Python-only test repairs in checkpoint
+`62a717f` do not relabel those build producers. This source validation is
+separate from the two-tick capture source identity (`62a717f` plus 18 dirty
+source files), its native build producer (`62a717f` plus the exact 12 reviewed
+native files), and the unchanged 24-file retained runtime. The capture's raw
+profile identity is `slippi-render-dependencies-logical-frame-v6`. The frozen
+seven-tick browser plan remains unreleased. A later root-released two-tick
+browser attempt ran once and failed at command 11 on the strict final CPU
+payload comparison; it did not reach final present. The detailed receipt below
+keeps this attempt separate from the one-tick pass and from the reduced clock
+rejection. No multi-tick acceptance is claimed.
+
+The root-released two-tick capture warmed source samples 0–299, then took
+drawn-reference baselines at samples 300 and 301. Both captured/replayed raw
+five-field pairs (observation, PCM, PAD, RNG profile and transfer) matched. The
+strict final CPU typed comparison refused command 11 with code 1216: domain 4,
+row 62, offset 284, expected 106 and actual 189 in a 1,024-byte allocation.
+Owner, effects and actions had passed; the payload mismatch stopped the
+comparison, so later domains were not checked. Commands 12/13 and final present
+were not reached. CPU restore CLOSE returned the latched 1216; snapshot close
+and renderer shutdown returned 1. The process owner and independent root check
+recorded all ten owned PIDs absent; the run took 9.816 seconds and cleanup
+80 ms. This retained failed attempt does not change the earlier one-tick pass or
+the separate reduced clock rejection result. See
+`drawn_reference_two_tick_capture_v1` in the structured evidence receipt for
+artifact hashes and exact scope. Next, reduce the first mismatch read-only and
+select one bounded owner-range diagnostic from that evidence; no recapture is
+claimed.
 
 ## First current-source copy/restore result
 

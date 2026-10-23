@@ -44,7 +44,8 @@ def make_source_overlay(output_dir):
             destination.mkdir(parents=True, exist_ok=True)
             continue
         destination.parent.mkdir(parents=True, exist_ok=True)
-        target = candidate_src / relative if relative.as_posix() in candidate_names else source
+        candidate = candidate_src / relative
+        target = candidate if relative.as_posix() in candidate_names and candidate.is_file() else source
         destination.symlink_to(target)
     return overlay
 
@@ -93,9 +94,14 @@ class GameplayActionStoreIntervalTests(unittest.TestCase):
         self.assertEqual((compiler / "emscripten-version.txt").read_text().strip().strip('"'), lock["emscripten"])
         env = dict(os.environ, EMSDK=str(sdk), EM_CONFIG=str(config),
                    EM_CACHE=str(compiler / "cache"), EMSDK_PYTHON=sys.executable)
-        sys.path.insert(0, str(REPO_ROOT / "scripts"))
-        from gameplay_sources import prepare_sources
-        source = prepare_sources(REPO_ROOT)
+        # Unit controls use existing prepared dependencies read-only. Source
+        # preparation belongs to the supported build entry point, never a test.
+        source = REPO_ROOT / "build/gameplay-source/src"
+        if not (source / "melee/ft/forward.h").is_file():
+            self.skipTest("Existing generated source headers unavailable; prepare through the supported build entry point")
+        generated_head=subprocess.run(["git","rev-parse","HEAD"],cwd=source,
+            text=True,capture_output=True,check=True).stdout.strip()
+        self.assertEqual(generated_head,lock["repositories"]["melee"]["commit"])
 
         TEST_OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
         output_dir = Path(tempfile.mkdtemp(prefix="action-store-interval-", dir=TEST_OUTPUT_ROOT))

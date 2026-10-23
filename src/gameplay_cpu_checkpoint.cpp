@@ -14,7 +14,7 @@ bool same_range(const MeleeWebAudioOwnedRange& a,const MeleeWebAudioOwnedRange& 
 }
 std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
     const GameplayMatchSession& session,std::unique_ptr<GameplayCpuStatics> statics,
-    CpuCaptureDiagnostic& diagnostic) noexcept {
+    CpuCaptureDiagnostic& diagnostic,CpuCheckpointSpan span) noexcept {
     /* Internal caller supplies fresh private stack storage. No diagnostic
      * pointer is exported and no source owner is written by this attribution. */
     diagnostic={};
@@ -24,7 +24,11 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
         std::snprintf(diagnostic.message.data(),diagnostic.message.size(),"%s",text);
     };
     auto code=[](CpuCaptureRefusal value){return static_cast<std::uint32_t>(value);};
-    std::unique_ptr<GameplayCpuCheckpoint> c(new(std::nothrow) GameplayCpuCheckpoint());
+    const auto ticks=static_cast<std::uint32_t>(span);
+    if(span!=CpuCheckpointSpan::OneTick&&span!=CpuCheckpointSpan::TwoTicks){
+        refused(stage,code(CpuCaptureRefusal::InvalidSpan),"CPU capsule interval is not one or two ticks");return {};
+    }
+    std::unique_ptr<GameplayCpuCheckpoint> c(new(std::nothrow) GameplayCpuCheckpoint(span));
     if(!c){refused(stage,code(CpuCaptureRefusal::CapsuleAllocation),"CPU capsule allocation returned null");return {};}
     if(!statics){refused(CpuComparisonDomain::Statics,code(CpuCaptureRefusal::MissingStatics),"Configured static owner is missing");return {};}
     try {
@@ -32,7 +36,7 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
         if(!c->owner_.storage||!c->owner_.world){
             refused(stage,code(CpuCaptureRefusal::OwnerTuple),"Live session CPU owner tuple is unavailable");return {};
         }
-        if(c->owner_.frame==std::numeric_limits<std::uint32_t>::max()){
+        if(c->owner_.frame>std::numeric_limits<std::uint32_t>::max()-ticks){
             refused(stage,code(CpuCaptureRefusal::SourceFrameWrap),"Source frame cannot advance without wrapping");return {};
         }
         c->statics_=std::move(statics);c->commit_.statics=c->statics_.get();
@@ -87,6 +91,21 @@ bool GameplayCpuCheckpoint::begin_record(const GameplayMatchSession& session) no
      * here on cleanup retains both pre and first-pass leases until teardown. */
     source_step_possible_=true;return true;
 }
+bool GameplayCpuCheckpoint::interval_boundary(const GameplayMatchSession& session) noexcept {
+    comparison_={};
+    auto refuse=[this](CpuComparisonDomain domain,std::uint32_t detail=0){
+        comparison_={static_cast<std::uint32_t>(domain),1,UINT32_MAX,UINT32_MAX,0,0,0,0,detail};return false;
+    };
+    if((phase_!=Phase::Recording&&phase_!=Phase::Replaying)||!same_owner(session))
+        return refuse(CpuComparisonDomain::Owner);
+    if(!melee_web_cpu_interval_admit(commit_.effect_token))
+        return refuse(CpuComparisonDomain::Effects,melee_web_cpu_interval_failure());
+    // Unlike failure_code, this pure active guard does not require the final
+    // replay slots/cache or complete event cursor at an intermediate tick.
+    const auto failure=melee_web_action_interval_active_failure(commit_.actions);
+    if(failure)return refuse(CpuComparisonDomain::Actions,failure);
+    return true;
+}
 bool GameplayCpuCheckpoint::capture_post_bytes(const GameplayMatchSession&,std::vector<PostBytes>& bytes,AudioRanges& ranges,std::size_t& count) {
     MeleeWebMatchContextRange context{};
     if(melee_web_match_context_range_read(owner_.context,&context,nullptr,0)!=
@@ -124,7 +143,7 @@ bool GameplayCpuCheckpoint::capture_post_bytes(const GameplayMatchSession&,std::
 bool GameplayCpuCheckpoint::seal_post(const GameplayMatchSession& session) noexcept {
     if(phase_!=Phase::Recording)return false;
     try {
-        if(!same_owner(session)||session.source_frames()!=owner_.frame+1||
+        if(!same_owner(session)||session.source_frames()!=owner_.frame+static_cast<std::uint32_t>(span_)||
            !melee_web_cpu_interval_admit(commit_.effect_token)||
            melee_web_action_interval_seal_record(commit_.actions)!=1){disarm();phase_=Phase::Failed;return false;}
         auto payload=melee_web_source_memory_payload_snapshot_capture();post_payload_=payload.snapshot;

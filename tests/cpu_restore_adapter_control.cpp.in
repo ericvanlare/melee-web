@@ -106,6 +106,8 @@ extern "C" int melee_web_synctest_draw_present();
 std::array<uint8_t,132> fixture_draw_diagnostics{};
 extern "C" const void* melee_web_synctest_draw_diagnostics(){return fixture_draw_diagnostics.data();}
 extern "C" unsigned melee_web_synctest_draw_diagnostics_size(){return 132;}
+extern "C" unsigned melee_web_synctest_motion_boundary(unsigned){return 0;}
+extern "C" int melee_web_synctest_is_mario_kind(unsigned kind){return kind==0;}
 #include "cpu_restore_adapter.inc"
 
 namespace {
@@ -134,6 +136,7 @@ std::uint32_t fail_admission_leaf=0;
 bool fail_capture=false;
 bool fail_replay=false;
 bool fail_static_replay=false;
+unsigned journal_failure_tick=0,unexpected_draw_tick=0;
 bool pending_submission=false;
 bool world_exists=true;
 unsigned draw_calls=0;
@@ -184,13 +187,13 @@ GameplayCpuCheckpoint::~GameplayCpuCheckpoint() {
 }
 std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
     const GameplayMatchSession& session,
-    std::unique_ptr<GameplayCpuStatics> statics,CpuCaptureDiagnostic& diagnostic) noexcept {
+    std::unique_ptr<GameplayCpuStatics> statics,CpuCaptureDiagnostic& diagnostic,CpuCheckpointSpan span) noexcept {
     diagnostic={};
     if(fail_capture){diagnostic.comparison={7,1,UINT32_MAX,UINT32_MAX,0,0,0,0,5};
         std::snprintf(diagnostic.message.data(),diagnostic.message.size(),"fixture bootstrap capture refusal");return {};}
     if(!statics||!statics->capture()) return {};
     try {
-        auto value=std::unique_ptr<GameplayCpuCheckpoint>(new GameplayCpuCheckpoint);
+        auto value=std::unique_ptr<GameplayCpuCheckpoint>(new GameplayCpuCheckpoint(span));
         value->statics_=std::move(statics);
         value->pre_frame_=session.source_frames();
         value->pre_=melee_web_cpu_restore_model_snapshot();
@@ -219,8 +222,15 @@ bool GameplayCpuCheckpoint::begin_record(const GameplayMatchSession& session) no
     if(!effect_token_||melee_web_action_interval_begin_record(actions_)!=1) return false;
     phase_=Phase::Recording;source_step_possible_=true;return true;
 }
+bool GameplayCpuCheckpoint::interval_boundary(const GameplayMatchSession& session) noexcept {
+    // Explicit model of typed owner/effect/action leaves; production method is
+    // separately compiled and exercised by the actual capture-body control.
+    return (phase_==Phase::Recording||phase_==Phase::Replaying)&&
+        session.source_frames()>=pre_frame_&&session.source_frames()<=pre_frame_+static_cast<std::uint32_t>(span_)&&
+        !fail_replay&&melee_web_cpu_interval_admit(effect_token_);
+}
 bool GameplayCpuCheckpoint::seal_post(const GameplayMatchSession& session) noexcept {
-    if(phase_!=Phase::Recording||session.source_frames()!=pre_frame_+1u||
+    if(phase_!=Phase::Recording||session.source_frames()!=pre_frame_+static_cast<std::uint32_t>(span_)||
        !melee_web_cpu_interval_admit(effect_token_)||
        melee_web_action_interval_seal_record(actions_)!=1||!statics_->seal_post()) return false;
     post_frame_=session.source_frames();post_=melee_web_cpu_restore_model_snapshot();
@@ -362,12 +372,12 @@ std::uint32_t ptr32(const void* p) {
 void reset_fixture() {
     fail_capture=false;
     fixture_draw_diagnostics={};
-    fail_static_replay=false;
+    fail_static_replay=false;journal_failure_tick=unexpected_draw_tick=0;
     cpu_restore=CpuRestoreControl{};
     match=std::make_unique<melee_web::GameplayMatchSession>(176);
     source_state=FixtureSourceState{};source_static_counter=0;source_invariant=0x51a7u;
     std::memset(error,0,sizeof(error));observation={};observation.frame=176;
-    observation.stocks[0]=observation.stocks[1]=4;observation.ending=0;
+    observation.stocks[0]=observation.stocks[1]=4;observation.ready=1;observation.ending=0;
     rng_profile_observation={1,0x1234u,0,UINT32_MAX,0,176,0,0};transfer_diagnostic={};
     pcm.fill(0);input_bytes.fill(0);audio_phase=7;
     draw_calls=0;pending_submission=false;world_exists=true;fail_admission_leaf=0;fail_replay=false;
@@ -443,6 +453,62 @@ void verify_drawn_reference_interval() {
           "Independent drawn raw/typed evidence missing");
     check(cpu_restore.evidence.bytes==11416&&melee_web_synctest_cpu_drawn_evidence_bytes()==11832,
           "Legacy/new evidence ABI drift");close_and_retire();
+}
+void verify_two_tick_interval() {
+    reset_fixture();check(configure_valid(),"Two configure refused");
+    check(melee_web_synctest_cpu_two_tick_evidence_bytes()==35368,"Two ABI size drift");
+    check(melee_web_synctest_cpu_restore_command(8)==0,"Two capture refused");
+    check(melee_web_synctest_cpu_restore_command(9)==0&&draw_calls==1&&tick_calls==1,"First baseline order");
+    pending_submission=false;
+    check(melee_web_synctest_cpu_restore_command(10)==0&&draw_calls==2&&tick_calls==2,"Second baseline order");
+    pending_submission=false;
+    check(melee_web_synctest_cpu_restore_command(11)==0&&tick_calls==4&&draw_calls==2,"Two replay refused or drew");
+    check(tick_samples==std::array<unsigned,4>{300,301,300,301},"Two literal sample order");
+    const auto& e=cpu_restore.two;
+    check(e.cpu_equality==1&&e.checked_cpu==0x3fe&&e.matched_cpu==0x3fe&&
+          e.tick_pairs[0].equality==1&&e.tick_pairs[0].checked_domains==0&&e.tick_pairs[1].equality==1,
+          "Two raw/typed CPU evidence missing");
+    check(melee_web_synctest_cpu_restore_command(12)==0&&draw_calls==3,"Two final draw refused");
+    pending_submission=false;check(melee_web_synctest_cpu_restore_command(13)==0,"Two final completion refused");
+    check(e.diagnostic_mask==255&&e.drawn_equality==1&&e.checked_drawn==0x3fe&&e.matched_drawn==0x3fe&&
+          e.diagnostics[0]==e.diagnostics[1]&&e.diagnostics[2]==e.diagnostics[3]&&
+          e.diagnostics[4]==e.diagnostics[5]&&e.diagnostics[4]==e.diagnostics[6],"Two diagnostic boundaries");
+    check(e.drawn_pair.pre_frame==e.post_frame&&e.drawn_pair.post_frame==e.post_frame,
+          "New two-tick drawn pair must label the same source endpoint");
+    // Actual Wasm ABI bytes, not a handwritten JS success buffer. Source-world
+    // leaves are still the explicit fixture models described at file start.
+    EM_ASM({console.log("CPU_TWO_ACTUAL_WASM_EVIDENCE_BASE64="+
+        Buffer.from(HEAPU8.subarray($0,$0+$1)).toString("base64"));},&cpu_restore.two,sizeof(cpu_restore.two));
+    close_and_retire();
+}
+void verify_two_tick_refusals() {
+    reset_fixture();check(configure_valid(),"Two refusal configure");
+    check(melee_web_synctest_cpu_restore_command(8)==0&&melee_web_synctest_cpu_restore_command(9)==0,"Two refusal setup");
+    const auto busy=melee_web_synctest_cpu_restore_command(10);
+    check(busy!=0&&tick_calls==1&&draw_calls==1,"Busy baseline advanced second source tick");
+    pending_submission=false;
+    check(melee_web_synctest_cpu_restore_command(10)==busy&&tick_calls==1,"Busy failure was not latched");
+    close_and_retire();
+    reset_fixture();check(configure_valid(),"Two interval configure");
+    check(melee_web_synctest_cpu_restore_command(8)==0&&melee_web_synctest_cpu_restore_command(9)==0,"Two interval setup");
+    pending_submission=false;fail_replay=true;
+    check(melee_web_synctest_cpu_restore_command(10)!=0&&tick_calls==1,"Latched interval failure stepped301");
+    close_and_retire();
+    for(bool unexpected_draw:{false,true}) {
+        reset_fixture();check(configure_valid(),"Two replay interruption configure");
+        check(melee_web_synctest_cpu_restore_command(8)==0&&melee_web_synctest_cpu_restore_command(9)==0,"Two replay interruption setup");
+        pending_submission=false;check(melee_web_synctest_cpu_restore_command(10)==0,"Two replay interruption baseline301");
+        pending_submission=false;
+        if(unexpected_draw)unexpected_draw_tick=3;else journal_failure_tick=3;
+        const auto refusal=melee_web_synctest_cpu_restore_command(11);
+        check(refusal!=0&&tick_calls==3&&draw_calls==2,"First replay failure did not stop before sample301/present");
+        check(melee_web_synctest_cpu_restore_command(12)==refusal&&draw_calls==2,"Failure permitted final draw");
+        close_and_retire();
+    }
+    reset_fixture();check(configure_valid(),"Two mixed configure");
+    check(melee_web_synctest_cpu_restore_command(8)==0,"Two mixed capture");
+    check(melee_web_synctest_cpu_restore_command(2)!=0&&tick_calls==0,"Legacy command entered two route");
+    close_and_retire();
 }
 void verify_drawn_refusal_and_postdraw_mismatch() {
     reset_fixture();check(configure_valid(),"Configure failed");
@@ -587,21 +653,27 @@ void verify_invalid_configuration_guards() {
 }
 
 extern "C" int melee_web_snapshot_step(unsigned sample) {
-    if(!match||sample!=300||tick_sample_count>=tick_samples.size()) return 0;
+    if(!match||(sample!=300&&!(cpu_restore.two_active&&sample==301))||tick_sample_count>=tick_samples.size()) return 0;
     tick_samples[tick_sample_count++]=sample;++tick_calls;
     if(!interruption_done&&interruption==StepInterruption::ReenterCommand) {
         interruption_done=true;(void)melee_web_synctest_cpu_restore_command(5);
     } else if(!interruption_done&&interruption==StepInterruption::ReenterSourceClose) {
         interruption_done=true;(void)melee_web_synctest_cpu_before_source_close();
     }
+    if(cpu_restore.two_active&&sample==301&&draw_calls==2)++source_state.flow; // modeled deferred completion
     match->increment_source_frames();
     ++source_state.action;++source_state.audio;++source_state.flow;
     ++source_state.bootstrap;++source_state.context;++source_state.payload;++source_state.rng;
     for(std::size_t i=0;i<source_state.pad.size();++i) source_state.pad[i]=std::uint8_t(sample+i+source_state.payload);
+    const std::array<uint8_t,44> literal0{2,0,0,0,0,0,0,0,0,0,0,1,0,176,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,255,0,0,0,0,0,0,0,0,0,0,255};
+    const std::array<uint8_t,44> literal1{0,0,80,0,0,0,0,0,0,0,0,0,0,176,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,255,0,0,0,0,0,0,0,0,0,0,255};
+    if(cpu_restore.two_active)source_state.pad=sample==300?literal0:literal1;
     for(std::size_t i=0;i<source_state.transfer.size();++i) source_state.transfer[i]=int(source_state.payload+i);
+    if(tick_calls==journal_failure_tick)fail_replay=true;
+    if(tick_calls==unexpected_draw_tick)++fixture_draw_diagnostics[21];
     ++source_static_counter;
     if(fail_static_replay&&tick_calls==2)++source_static_counter;
-    observation={};observation.frame=match->source_frames();observation.rng=source_state.rng;
+    observation={};observation.ready=1;observation.frame=match->source_frames();observation.rng=source_state.rng;
     observation.stocks[0]=observation.stocks[1]=4;observation.motion[0]=14;observation.motion[1]=14;
     observation.pcm_frames=533;observation.audio_phase=audio_phase;
     observation.players[0].stocks=observation.players[1].stocks=4;
@@ -631,14 +703,23 @@ extern "C" int melee_web_snapshot_step(unsigned sample) {
     return 1;
 }
 extern "C" int melee_web_synctest_draw_present() {
-    if(!match||draw_calls>=2) return 0;
-    if(cpu_restore.drawn.mode)++source_state.flow; // Explicit modeled presentation-clock leaf.
+    if(!match||draw_calls>=(cpu_restore.two_active?3u:2u)) return 0;
+    if(cpu_restore.drawn.mode||cpu_restore.two_active)++source_state.flow; // Explicit modeled presentation-clock leaf.
     ++fixture_draw_diagnostics[8];++fixture_draw_diagnostics[12];
     ++draw_calls;pending_submission=true;return 1;
 }
 
 int main() {
     try {
+#if MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
+        verify_two_tick_interval();
+        verify_two_tick_refusals();
+#else
+        reset_fixture();check(configure_valid(),"V5 configure");
+        check(melee_web_synctest_cpu_restore_command(8)==0x4b0u&&tick_calls==0&&draw_calls==0,
+              "Default V5 admitted two-tick route or executed source work");
+        close_and_retire();
+#endif
         verify_successful_interval();
         verify_drawn_reference_interval();
         verify_drawn_refusal_and_postdraw_mismatch();

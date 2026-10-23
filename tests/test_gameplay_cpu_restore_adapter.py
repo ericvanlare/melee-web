@@ -38,6 +38,7 @@ void melee_web_cpu_restore_mark_disarm();
 void melee_web_cpu_restore_mark_destroy();
 
 namespace melee_web {
+enum class CpuCheckpointSpan : std::uint32_t {OneTick=1,TwoTicks=2};
 class GameplayMatchSession;
 struct CpuCaptureDiagnostic {
     CpuComparison comparison{};
@@ -46,9 +47,10 @@ struct CpuCaptureDiagnostic {
 class GameplayCpuCheckpoint final {
 public:
     static std::unique_ptr<GameplayCpuCheckpoint> capture(
-        const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,CpuCaptureDiagnostic&) noexcept;
+        const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,CpuCaptureDiagnostic&,CpuCheckpointSpan=CpuCheckpointSpan::OneTick) noexcept;
     ~GameplayCpuCheckpoint();
     bool begin_record(const GameplayMatchSession&) noexcept;
+    bool interval_boundary(const GameplayMatchSession&) noexcept;
     bool seal_post(const GameplayMatchSession&) noexcept;
     GameplayCpuCommitResult restore(const GameplayMatchSession&) noexcept;
     bool finish_replay(const GameplayMatchSession&) noexcept;
@@ -61,7 +63,8 @@ public:
     bool source_owners_retired(const GameplayMatchSession*) noexcept;
 private:
     enum class Phase { Captured, Recording, Sealed, Replaying, Finished, Failed, Retired };
-    GameplayCpuCheckpoint()=default;
+    explicit GameplayCpuCheckpoint(CpuCheckpointSpan span):span_(span) {}
+    const CpuCheckpointSpan span_;
     std::unique_ptr<GameplayCpuStatics> statics_;
     GameplayCpuCommitOwners commit_{};
     MeleeWebActionInterval* actions_{};
@@ -185,6 +188,7 @@ class GameplayCpuRestoreAdapterTests(OwnedWorkspaceTests):
         overlay_src = source_overlay(output_dir)
         template = (CANDIDATE_ROOT / "tests/cpu_restore_adapter_control.cpp.in").read_text()
         fixture_probe = CANDIDATE_ROOT / "tests/gameplay_snapshot_probe.cpp"
+        if not fixture_probe.is_file():fixture_probe=REPO_ROOT / "tests/gameplay_snapshot_probe.cpp"
         if not fixture_probe.is_file(): fixture_probe = REPO_ROOT / "tests/gameplay_snapshot_probe.cpp"
         actual_fixture = extract_fixture_observations(fixture_probe)
         generated = template.replace("@ACTUAL_FIXTURE_OBSERVATIONS@", actual_fixture)
@@ -195,7 +199,7 @@ class GameplayCpuRestoreAdapterTests(OwnedWorkspaceTests):
         include_dirs = [stubs, overlay_src, overlay_src / "slippi_profile/tests",
                         REPO_ROOT / ".deps/aurora/include", source,
                         REPO_ROOT / "tests"]
-        common = ["-O1", "-fexceptions", "-DTARGET_PC", "-DMELEE_WEB_CPU_INTERVAL_ENABLED=1",
+        common = ["-O1", "-fexceptions", "-DTARGET_PC", "-DMELEE_WEB_CPU_INTERVAL_ENABLED=1", "-DMELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK=1",
                   "-ffunction-sections", "-fdata-sections", "-ffp-contract=off"]
         for directory in include_dirs:
             common.extend(["-I", str(directory)])
@@ -235,6 +239,50 @@ class GameplayCpuRestoreAdapterTests(OwnedWorkspaceTests):
         write_record(output_dir / "run.json", run, result)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("Actual CPU adapter control passed", result.stdout)
+        # Decode actual Wasm-emitted evidence through the real JS consumer.
+        # The native source/session/component leaves remain modeled; this is
+        # an ABI bridge, not a real browser/source-world replay claim.
+        marker="CPU_TWO_ACTUAL_WASM_EVIDENCE_BASE64="
+        emitted=[line[len(marker):] for line in result.stdout.splitlines() if line.startswith(marker)]
+        self.assertEqual(len(emitted),1,"Actual adapter did not emit exactly one ABI record")
+        import base64
+        raw=base64.b64decode(emitted[0],validate=True)
+        self.assertEqual(len(raw),35368)
+        native_bytes=output_dir/"actual-two-tick-evidence.bin";native_bytes.write_bytes(raw)
+        helper=Path(os.environ.get("MELEE_CPU_TWO_TICK_JS_HELPER",
+            REPO_ROOT/"src/slippi_profile/tests/cpu_two_tick_runner.mjs")).resolve()
+        self.assertTrue(helper.is_file(),"Actual joined two-tick JS consumer is unavailable")
+        js="""const fs=await import('node:fs');const {pathToFileURL}=await import('node:url');
+const {decodeCpuTwoTickEvidence,validateCpuTwoTickFinalEvidence}=await import(pathToFileURL(process.argv[1]));
+const raw=new Uint8Array(fs.readFileSync(process.argv[2]));const decoded=decodeCpuTwoTickEvidence(raw);
+validateCpuTwoTickFinalEvidence(decoded,176);
+console.log(JSON.stringify({status:'PASS',bytes:raw.length,preFrame:decoded.preFrame,postFrame:decoded.postFrame,
+ drawnPreFrame:decoded.drawnPair301.preFrame,drawnPostFrame:decoded.drawnPair301.postFrame}));"""
+        bridge=[str(node),"--input-type=module","-e",js,str(helper),str(native_bytes)]
+        bridged=subprocess.run(bridge,cwd=output_dir,env=env,capture_output=True,text=True,timeout=30)
+        write_record(output_dir/"actual-js-bridge.json",bridge,bridged)
+        self.assertEqual(bridged.returncode,0,bridged.stdout+bridged.stderr)
+        # Recompile only the actual adapter fixture in default-v5 mode; real
+        # coordinator/statics objects and compiler settings stay identical.
+        v5_object=output_dir / "control-v5.o"
+        v5_common=[part for part in common if part!="-DMELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK=1"]
+        v5_compile=[sys.executable,str(compiler/"em++.py"),*v5_common,
+                    "-DMELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK=0","-std=c++20","-c",
+                    str(control_source),"-o",str(v5_object)]
+        result=subprocess.run(v5_compile,cwd=output_dir,env=env,capture_output=True,text=True,timeout=120)
+        write_record(output_dir/"compile-v5.json",v5_compile,result)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        v5_output=output_dir/"control-v5.js"
+        v5_link=[sys.executable,str(compiler/"em++.py"),"-O1","-fexceptions",
+                 str(output_dir/"cpp-0.o"),str(output_dir/"cpp-1.o"),str(v5_object),
+                 "-sENVIRONMENT=node","-sEXIT_RUNTIME=1","-sASSERTIONS=2","-sSAFE_HEAP=1",
+                 "-sALLOW_MEMORY_GROWTH=1","-o",str(v5_output)]
+        result=subprocess.run(v5_link,cwd=output_dir,env=env,capture_output=True,text=True,timeout=120)
+        write_record(output_dir/"link-v5.json",v5_link,result)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        result=subprocess.run([str(node),str(v5_output)],cwd=output_dir,env=env,capture_output=True,text=True,timeout=30)
+        write_record(output_dir/"run-v5.json",[str(node),str(v5_output)],result)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         receipt = {
             "schema": "actual-cpu-restore-adapter-focused-control-v1",
             "result": "PASS",
@@ -242,10 +290,14 @@ class GameplayCpuRestoreAdapterTests(OwnedWorkspaceTests):
             "adapter_sha256": sha256(CANDIDATE_ROOT / "src/slippi_profile/tests/cpu_restore_adapter.inc"),
             "control_template_sha256": sha256(CANDIDATE_ROOT / "tests/cpu_restore_adapter_control.cpp.in"),
             "fixture_probe_sha256": sha256(fixture_probe),
+            "js_consumer": {"path":str(helper),"sha256":sha256(helper)},
+            "actual_wasm_evidence_sha256":sha256(native_bytes),
             "generated_control_sha256": sha256(control_source),
             "receipt_path": str(output_dir),
-            "commands": [f"compile-{index}.json" for index in range(len(commands))] + ["link.json", "run.json"],
+            "commands": [f"compile-{index}.json" for index in range(len(commands))] + ["link.json", "run.json", "actual-js-bridge.json", "compile-v5.json", "link-v5.json", "run-v5.json"],
             "checks": [
+                "actual two-tick adapter 300/301 baseline and replay; idle waits, raw/typed evidence and first replay refusal stop before next tick",
+                "default-v5 compile rejects new route before source work while legacy routes still pass",
                 "sample300 fixed while modeled source frame resets 176→177→176→177",
                 "actual fixed coordinator admissions and writes execute in named order",
                 "exact fixture observation/PCM/PAD/profile/transfer equality gates one draw",

@@ -1073,6 +1073,17 @@ extern "C" int melee_web_action_interval_matches_finished(const MeleeWebActionIn
         !interval->failure && !active_interval &&
         interval->validation_failure() == MELEE_WEB_ACTION_INTERVAL_OK;
 }
+extern "C" uint32_t melee_web_action_interval_active_failure(const MeleeWebActionInterval* interval)
+{
+    if (!interval) return MELEE_WEB_ACTION_INTERVAL_CAPTURE_REFUSED;
+    if (interval->failure) return interval->failure;
+    if ((interval->phase != MeleeWebActionInterval::Phase::Recording &&
+         interval->phase != MeleeWebActionInterval::Phase::Replaying) ||
+        active_interval != interval) return MELEE_WEB_ACTION_INTERVAL_BAD_PHASE;
+    if (!interval->live_bindings()) return MELEE_WEB_ACTION_INTERVAL_BINDING_CHANGED;
+    if (!interval->live_cache_owners()) return MELEE_WEB_ACTION_INTERVAL_OWNER_STATE_CHANGED;
+    return MELEE_WEB_ACTION_INTERVAL_OK;
+}
 extern "C" uint32_t melee_web_action_interval_failure_code(const MeleeWebActionInterval* interval)
 {
     if (!interval) return MELEE_WEB_ACTION_INTERVAL_CAPTURE_REFUSED;

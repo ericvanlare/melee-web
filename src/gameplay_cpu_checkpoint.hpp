@@ -5,7 +5,7 @@
 #include <memory>
 #include <vector>
 namespace melee_web {
-/* Private fixed-one-tick CPU capsule. It owns pre/post evidence and typed
+/* Private fixed one/two-tick CPU capsule. It owns pre/post evidence and typed
  * snapshots, never a renderer or arbitrary Wasm-memory snapshot. The fixture
  * owns input/PCM/phase comparison and enforces runtime/Asyncify/GPU boundaries.
  * After begin_record, disarm BEFORE ordinary source teardown; retain this
@@ -17,20 +17,23 @@ namespace melee_web {
 enum class CpuCaptureRefusal : std::uint32_t {
     CapsuleAllocation=1, MissingStatics=2, OwnerTuple=3, SourceFrameWrap=4,
     NullSnapshot=5, StaticCapture=6, AudioGeneration=7, AllocationException=8,
-    UnexpectedException=9
+    UnexpectedException=9, InvalidSpan=10
 };
 struct CpuCaptureDiagnostic {
     CpuComparison comparison{};
     std::array<char,160> message{};
 };
+enum class CpuCheckpointSpan : std::uint32_t { OneTick=1, TwoTicks=2 };
 class GameplayCpuCheckpoint final {
 public:
     static std::unique_ptr<GameplayCpuCheckpoint> capture(
         const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,
-        CpuCaptureDiagnostic&) noexcept;
+        CpuCaptureDiagnostic&,CpuCheckpointSpan=CpuCheckpointSpan::OneTick) noexcept;
     ~GameplayCpuCheckpoint();
     bool begin_record(const GameplayMatchSession&) noexcept;
     bool seal_post(const GameplayMatchSession&) noexcept;
+    /* Intermediate boundary only: no final slot/cache or typed-byte claim. */
+    bool interval_boundary(const GameplayMatchSession&) noexcept;
     GameplayCpuCommitResult restore(const GameplayMatchSession&) noexcept;
     bool finish_replay(const GameplayMatchSession&) noexcept;
     bool seal_drawn_reference(const GameplayMatchSession&) noexcept;
@@ -43,7 +46,8 @@ public:
 private:
     enum class Phase { Captured, Recording, Sealed, Replaying, Finished, Failed, Retired };
     struct PostBytes {const void* address{};std::vector<std::byte> bytes;CpuComparisonDomain domain{};std::uint32_t kind{};};
-    GameplayCpuCheckpoint()=default;
+    explicit GameplayCpuCheckpoint(CpuCheckpointSpan span):span_(span){}
+    const CpuCheckpointSpan span_;
     bool same_owner(const GameplayMatchSession&) const noexcept;
     using AudioRanges=std::array<MeleeWebAudioOwnedRange,MELEE_WEB_AUDIO_OWNED_RANGE_MAX>;
     bool capture_post_bytes(const GameplayMatchSession&,std::vector<PostBytes>&,AudioRanges&,std::size_t&);

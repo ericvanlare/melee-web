@@ -127,10 +127,18 @@ void verify_round_trip()
     h.prepare();
     const State before = state(h);
     auto* interval = melee_web_action_interval_capture();
+    check(melee_web_action_interval_active_failure(nullptr)==MELEE_WEB_ACTION_INTERVAL_CAPTURE_REFUSED,"Null active guard accepted");
+    check(interval&&melee_web_action_interval_active_failure(interval)==MELEE_WEB_ACTION_INTERVAL_BAD_PHASE,"Captured nonactive phase accepted");
     check(interval != nullptr, "Capture rejected the healthy two-store source fixture");
     check(melee_web_action_interval_begin_record(interval) == 1,
           "Recording phase did not begin on the captured owner state");
     h.load(h.p1, ftMr_SM_SpecialN, 0);
+    check(melee_web_action_interval_active_failure(interval)==MELEE_WEB_ACTION_INTERVAL_OK,
+          "Healthy intermediate recording/replay was treated as a final endpoint");
+    h.store1.interval_test_change_cache_owner();
+    check(melee_web_action_interval_active_failure(interval)==MELEE_WEB_ACTION_INTERVAL_OWNER_STATE_CHANGED,
+          "Intermediate guard accepted changed cache owner");
+    h.store1.interval_test_restore_cache_owner();
     h.load(h.p2, ftCo_SM_AttackS4, 1);
     check(melee_web_action_interval_seal_record(interval) == 1,
           "The exact two-row source selection sequence did not seal");
@@ -172,11 +180,18 @@ void verify_round_trip()
           "Later source-payload owner did not restore exact baseline Fighter clip fields");
     const auto before_replay_destroy = melee_web_action_interval_test_clip_destroy_count();
     h.load(h.p1, ftMr_SM_SpecialN, 0);
+    check(melee_web_action_interval_active_failure(interval)==MELEE_WEB_ACTION_INTERVAL_OK,
+          "Healthy intermediate recording/replay was treated as a final endpoint");
+    h.store1.interval_test_change_cache_owner();
+    check(melee_web_action_interval_active_failure(interval)==MELEE_WEB_ACTION_INTERVAL_OWNER_STATE_CHANGED,
+          "Intermediate guard accepted changed cache owner");
+    h.store1.interval_test_restore_cache_owner();
     h.load(h.p2, ftCo_SM_AttackS4, 1);
     if (melee_web_action_interval_finish_replay(interval) != 1) {
         throw std::runtime_error("Same-row replay refused with interval failure " +
             std::to_string(melee_web_action_interval_failure_code(interval)));
     }
+    check(melee_web_action_interval_active_failure(interval)==MELEE_WEB_ACTION_INTERVAL_BAD_PHASE,"Finished interval accepted as active");
     check(same(state(h), final), "Replay did not restore exact FigaTree and source-row pointer identities");
     check(melee_web_action_interval_test_clip_destroy_count() == before_replay_destroy,
           "A retained pre-interval native Clip was destroyed during replay");
@@ -213,6 +228,18 @@ void verify_round_trip()
           "The pre-interval native Clip lease did not release during capsule cleanup");
 }
 
+void verify_active_binding_guard()
+{
+    Harness h;h.prepare();auto* interval=melee_web_action_interval_capture();
+    check(interval&&melee_web_action_interval_begin_record(interval)==1,"Active binding guard setup");
+    h.store1.unbind();
+    check(melee_web_action_interval_active_failure(interval)==MELEE_WEB_ACTION_INTERVAL_BINDING_CHANGED,
+          "Active interval accepted retired live binding");
+    h.store1.bind(h.p1);
+    check(melee_web_action_interval_active_failure(interval)==MELEE_WEB_ACTION_INTERVAL_BINDING_CHANGED,
+          "Active interval accepted reused binding address after generation change");
+    melee_web_action_interval_disarm(interval);melee_web_action_interval_destroy(interval);
+}
 void verify_capture_failure_is_read_only()
 {
     Harness h;
@@ -237,7 +264,8 @@ void verify_event_allocation_failure_refuses_admission()
     h.load(h.p2, ftCo_SM_AttackS4, 1);
     check(melee_web_action_interval_seal_record(interval) == 0,
           "A failed baseline event allocation was accepted");
-    check(melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_RECORD_FAILED,
+    check(melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_RECORD_FAILED &&
+          melee_web_action_interval_active_failure(interval)==MELEE_WEB_ACTION_INTERVAL_RECORD_FAILED,
           "Event-storage allocation failure was not reported");
     check(melee_web_action_interval_admit(interval) == 0,
           "An incomplete selection trace reached restore admission");
@@ -257,7 +285,8 @@ void verify_seal_allocation_failure_refuses_admission()
     melee_web_action_interval_test_fail_next_seal_capture();
     check(melee_web_action_interval_seal_record(interval) == 0,
           "A failed final-state capture was accepted");
-    check(melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_RECORD_FAILED,
+    check(melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_RECORD_FAILED &&
+          melee_web_action_interval_active_failure(interval)==MELEE_WEB_ACTION_INTERVAL_RECORD_FAILED,
           "Seal allocation failure was not reported as an incomplete record");
     check(melee_web_action_interval_admit(interval) == 0 && same(state(h), baseline),
           "Failed seal capture changed the source owner or reached restore admission");
@@ -410,10 +439,12 @@ void verify_unexpected_replay_selection_fails_the_experiment()
     h.load(h.p2, ftCo_SM_AttackS4, 1);
     check(melee_web_action_interval_finish_replay(interval) == 0,
           "Unexpected source row sequence was accepted as a completed replay");
-    check(melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_SELECTION_MISMATCH,
+    check(melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_SELECTION_MISMATCH &&
+          melee_web_action_interval_active_failure(interval)==MELEE_WEB_ACTION_INTERVAL_SELECTION_MISMATCH,
           "Unexpected replay selection did not latch the mismatch reason");
     melee_web_action_interval_disarm(interval);
-    check(melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_SELECTION_MISMATCH,
+    check(melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_SELECTION_MISMATCH &&
+          melee_web_action_interval_active_failure(interval)==MELEE_WEB_ACTION_INTERVAL_SELECTION_MISMATCH,
           "Disarm replaced the original replay mismatch with cleanup status");
     melee_web_action_interval_destroy(interval);
 }
@@ -447,6 +478,7 @@ int main()
     try {
         static_assert(ftMr_SM_SpecialN < 303 && ftCo_SM_AttackS4 < 303);
         verify_round_trip();
+        verify_active_binding_guard();
         verify_capture_failure_is_read_only();
         verify_event_allocation_failure_refuses_admission();
         verify_seal_allocation_failure_refuses_admission();

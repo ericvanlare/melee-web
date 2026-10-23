@@ -72,6 +72,8 @@ int melee_web_action_interval_finish_replay(MeleeWebActionInterval*);
 /* Read-only phase-matched postpresent proof; no status/lifetime mutation. */
 int melee_web_action_interval_matches_finished(const MeleeWebActionInterval*);
 uint32_t melee_web_action_interval_failure_code(const MeleeWebActionInterval*);
+/* Read-only active journal guard; excludes final slot/cache and cursor checks. */
+uint32_t melee_web_action_interval_active_failure(const MeleeWebActionInterval*);
 /* Stops interval callbacks without releasing retained Clip/animation leases.
  * Retire source owners after disarm; destroy the capsule only afterward. */
 void melee_web_action_interval_disarm(MeleeWebActionInterval*);
