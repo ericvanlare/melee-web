@@ -11,7 +11,8 @@ import {createFirstCssStreamComparator, createFirstCssFinalDrawComparator,
   createFirstSssDrawComparator, createFirstSssPrefixComparator, createFirstSssVsEntryComparator,
   createFirstSssVsSetupComparator,
   decodeFirstSssPrefixInputBundle, firstSssAudioAccounting,
-  requestSynchronousApproval}
+  requestSynchronousApproval, validateFirstSssConsumedTickExpectedSource,
+  validateFirstSssDrawExpectedSource}
   from './stadium_first_css_stream_compare.mjs';
 
 const COUNT = 148;
@@ -77,6 +78,126 @@ function firstSssPrerequisites({worldGeneration = 7, audioGeneration = 3} = {}) 
       post_host_frame: 1},
   };
 }
+
+const freshSssTickExpected = JSON.parse(await fs.readFile(
+  path.join(testDirectory, 'fixtures/fresh-sss-initial-input-tick-expected.json'), 'utf8'));
+const freshSssDrawExpected = JSON.parse(await fs.readFile(
+  path.join(testDirectory, 'fixtures/fresh-sss-initial-draw-expected.json'), 'utf8'));
+const freshSssInputWire = JSON.parse(await fs.readFile(
+  path.join(testDirectory, 'fixtures/fresh-sss-initial-input-v2-wire.json'), 'utf8'));
+const freshSssInputBundle = Buffer.from(freshSssInputWire.wire_hex, 'hex');
+
+function freshSssNativeSnapshot(phase, expected, pair, extra = {}) {
+  return {phase, source_scene: 2, scene_kind: expected.scene_kind,
+    scene_frame: expected.scene_frame, random_seed_hex: expected.random_seed_hex,
+    pad_state_hex: expected.pad_state_hex,
+    scene_routing_getters: {...expected.scene_routing_getters},
+    owners: {host: true, session: true, world: true, audio: true, vs_mode: true,
+      scene_info: true, payload: true, seed: true},
+    world_generation: pair.world_generation, audio_generation: pair.audio_generation,
+    ...extra};
+}
+
+test('fresh original SSS input, first tick, and paired draw use their separate pinned source profile',
+  async () => {
+    validateFirstSssConsumedTickExpectedSource(freshSssTickExpected);
+    validateFirstSssDrawExpectedSource(freshSssDrawExpected);
+    assert.equal(freshSssInputBundle.byteLength, 96);
+    assert.equal(freshSssInputWire.schema, 'melee-web-stadium-first-sss-input-wire-fixture-v1');
+    assert.equal(freshSssInputWire.bytes, 96);
+    assert.equal(freshSssInputWire.contains_expected_state, false);
+    assert.equal(Buffer.from(freshSssInputBundle.subarray(0, 8)).toString('ascii'), 'STC1SSS2');
+    assert.equal(Buffer.from(freshSssInputBundle.subarray(12, 44)).toString('hex'),
+      freshSssTickExpected.provenance.observer_sha256);
+    assert.equal(new DataView(freshSssInputBundle.buffer,
+      freshSssInputBundle.byteOffset, freshSssInputBundle.byteLength).getUint32(44, false), 1595);
+    assert.equal(new DataView(freshSssInputBundle.buffer,
+      freshSssInputBundle.byteOffset, freshSssInputBundle.byteLength).getUint32(48, false), 1599);
+    assert.equal(createHash('sha256').update(freshSssInputBundle).digest('hex'),
+      freshSssTickExpected.input_bundle.sha256);
+
+    const {pair, tick} = firstSssPrerequisites();
+    const tickComparator = createFirstSssConsumedPadTickComparator(freshSssTickExpected, pair);
+    const tickActual = freshSssNativeSnapshot('scheduler_end',
+      freshSssTickExpected.source_scheduler_end.expected, pair, {
+        consumed_pad_hex: freshSssTickExpected.source_scheduler_end.expected.consumed_pad_status_hex.join(''),
+      });
+    assert.equal(tickComparator.compare('scheduler_end', JSON.stringify(tickActual)), true);
+    assert.equal(tickComparator.status().approved, true);
+    const changedTick = {...tickActual, random_seed_hex: '3bb84c53'};
+    const refusedTick = createFirstSssConsumedPadTickComparator(freshSssTickExpected, pair);
+    assert.equal(refusedTick.compare('scheduler_end', JSON.stringify(changedTick)), false);
+    assert.equal(refusedTick.status().failed, true);
+    assert.throws(() => validateFirstSssConsumedTickExpectedSource({...freshSssTickExpected,
+      provenance: {...freshSssTickExpected.provenance, scheduler_end_sequence: 1608}}),
+    /exact pinned 1595\/1599/);
+    const forgedTickProjection = structuredClone(freshSssTickExpected);
+    forgedTickProjection.source_scheduler_end.expected.pad_state_hex = 'ff'.repeat(822);
+    assert.throws(() => validateFirstSssConsumedTickExpectedSource(forgedTickProjection),
+      /exact pinned 1595\/1599/);
+
+    const drawComparator = createFirstSssDrawComparator(freshSssDrawExpected, pair, tick);
+    for (const phase of ['draw_enter', 'draw_return']) {
+      const expected = freshSssDrawExpected[`expected_${phase}`];
+      assert.equal(drawComparator.compare(phase,
+        JSON.stringify(freshSssNativeSnapshot(phase, expected, pair))), true);
+    }
+    assert.equal(drawComparator.status().approved, true);
+    const changedDraw = {...freshSssDrawExpected,
+      provenance: {...freshSssDrawExpected.provenance, draw_return_sequence: 1602}};
+    assert.throws(() => validateFirstSssDrawExpectedSource(changedDraw),
+      /exact pinned rows1600\/1601/);
+    const forgedDrawProjection = structuredClone(freshSssDrawExpected);
+    forgedDrawProjection.expected_draw_enter.pad_state_hex = 'ff'.repeat(822);
+    assert.throws(() => validateFirstSssDrawExpectedSource(forgedDrawProjection),
+      /exact pinned rows1600\/1601/);
+    const wrongOrder = createFirstSssDrawComparator(freshSssDrawExpected, pair, tick);
+    assert.equal(wrongOrder.compare('draw_return', JSON.stringify(freshSssNativeSnapshot(
+      'draw_return', freshSssDrawExpected.expected_draw_return, pair))), false);
+    assert.equal(wrongOrder.status().failed, true);
+  });
+
+test('fresh SSS tick loader binds the exact v2 wire, expected file, and preflight identities',
+  async () => {
+    const runnerPath = path.join(testDirectory, 'stadium_c1a_browser_test.mjs');
+    const runnerSource = await fs.readFile(runnerPath, 'utf8');
+    const start = runnerSource.indexOf('async function loadFirstSssConsumedPadTickInputs()');
+    const end = runnerSource.indexOf('\nasync function loadBoundFirstSssExpected', start);
+    assert.ok(start >= 0 && end > start, 'Actual pre-server consumed-tick loader is present');
+    const loaderSource = runnerSource.slice(start, end);
+    const makeLoader = new Function('firstSssConsumedPadTick', 'values', 'preflight',
+      'fs', 'path', 'digest', 'assert', 'ROOT', 'pathToFileURL',
+      `${loaderSource}; return loadFirstSssConsumedPadTickInputs;`);
+    const scratch = await fs.mkdtemp(path.join(os.tmpdir(), 'melee-fresh-sss-loader-'));
+    try {
+      const expectedPath = path.join(testDirectory,
+        'fixtures/fresh-sss-initial-input-tick-expected.json');
+      const bundlePath = path.join(scratch, 'fresh-sss-initial-input-v2.bin');
+      await fs.writeFile(bundlePath, freshSssInputBundle);
+      const digest = bytes => createHash('sha256').update(bytes).digest('hex');
+      const identity = async file => {
+        const bytes = await fs.readFile(file);
+        return {path: file, basename: path.basename(file), bytes: bytes.byteLength,
+          sha256: digest(bytes)};
+      };
+      const frozen = {expected_json: await identity(expectedPath),
+        input_bundle: await identity(bundlePath)};
+      const values = {'first-sss-tick-expected': expectedPath,
+        'first-sss-tick-input': bundlePath};
+      const load = makeLoader(true, values, {first_sss_consumed_tick: frozen},
+        fs, path, digest, assert, candidateRoot, pathToFileURL);
+      const loaded = await load();
+      assert.equal(loaded.expected.profile, 'fresh_finite_sss_initial_input_v1');
+      assert.equal(loaded.bytes.input_bundle.readUInt32BE(44), 1595);
+      assert.equal(loaded.bytes.input_bundle.readUInt32BE(48), 1599);
+      const wrongFreeze = makeLoader(true, values, {first_sss_consumed_tick: {
+        ...frozen, input_bundle: {...frozen.input_bundle, sha256: '00'.repeat(32)}}},
+      fs, path, digest, assert, candidateRoot, pathToFileURL);
+      await assert.rejects(wrongFreeze(), /input_bundle hash differs from the frozen preflight/);
+    } finally {
+      await fs.rm(scratch, {recursive: true, force: true});
+    }
+  });
 
 function expectedPairs() {
   return Array.from({length: COUNT}, (_, index) => {
@@ -443,6 +564,27 @@ test('the actual browser runner recognizes SSS modes and rejects conflicting/orp
   assert.notEqual(fresh.status, 0);
   assert.match(fresh.stderr, /Missing --build/,
     'The explicit fresh finite-CSS pair route passes option validation before runtime setup');
+  const freshInputArgs = ['--first-css-fresh-finite', '--first-css-finite-receipt', 'receipt.json',
+    '--first-css-constructor-manifest', 'manifest.json', '--first-sss-fresh-input-tick-draw',
+    '--first-sss-pair-expected', 'pair.json', '--first-sss-tick-expected', 'tick.json',
+    '--first-sss-tick-input', 'tick-v2.bin', '--first-sss-draw-expected', 'draw.json'];
+  const freshInput = spawnSync(process.execPath, [runner, ...freshInputArgs],
+    {encoding: 'utf8', timeout: 10000});
+  assert.notEqual(freshInput.status, 0);
+  assert.match(freshInput.stderr, /Missing --build/,
+    'The explicit fresh input/tick/draw profile passes route validation before runtime setup');
+  for (const values of [
+    ['--first-sss-fresh-input-tick-draw'],
+    [...freshInputArgs, '--first-sss-draw'],
+    [...freshInputArgs, '--first-sss-consumed-pad-tick'],
+    [...freshInputArgs, '--first-sss-prefix-expected', 'prefix.json',
+      '--first-sss-prefix-input', 'prefix.bin'],
+  ]) {
+    const refused = spawnSync(process.execPath, [runner, ...values],
+      {encoding: 'utf8', timeout: 10000});
+    assert.notEqual(refused.status, 0);
+    assert.match(refused.stderr, /Choose only the fresh finite CSS route|Fresh SSS input\/tick\/draw profile/);
+  }
   for (const values of [
     ['--first-sss-constructor-pair-fresh', '--first-sss-pair-expected', 'pair.json'],
     [...freshArgs, '--first-sss-constructor-pair'],

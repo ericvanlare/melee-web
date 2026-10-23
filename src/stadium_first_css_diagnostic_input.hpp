@@ -27,6 +27,8 @@ inline constexpr size_t kFirstSssTickInputHeaderBytes = 52;
 inline constexpr size_t kFirstSssTickInputBytes = kFirstSssTickInputHeaderBytes + 4 * 11;
 inline constexpr uint32_t kFirstSssConsumedPadSequence = 1604;
 inline constexpr uint32_t kFirstSssSchedulerEndSequence = 1608;
+inline constexpr uint32_t kFreshFirstSssConsumedPadSequence = 1595;
+inline constexpr uint32_t kFreshFirstSssSchedulerEndSequence = 1599;
 inline constexpr uint32_t kPostdrawFirstConsumeSequence = 839;
 inline constexpr uint32_t kPostdrawBatchCount = 148;
 inline constexpr size_t kPostdrawInputHeaderBytes = 52;
@@ -45,6 +47,12 @@ inline constexpr std::array<uint8_t, 32> kSourceSha256 = {
     0xba,0x94,0xd1,0xf3,0xb3,0xbe,0x96,0x12,
     0xa8,0x0d,0x02,0x27,0x67,0x24,0x45,0xcd,
     0x4a,0x2b,0x0e,0x21,0x19,0x91,0x77,0x78
+};
+inline constexpr std::array<uint8_t, 32> kFreshFirstSssSourceSha256 = {
+    0x4f,0xd5,0x4b,0x4a,0xa9,0x53,0x72,0x92,
+    0x29,0x5a,0xd8,0x3f,0xbb,0x75,0x65,0x5f,
+    0x82,0x13,0xa4,0x75,0xa8,0x76,0xfd,0xd1,
+    0x46,0x8a,0xff,0xb6,0x8d,0x3d,0x21,0x1f
 };
 
 inline uint32_t read_be32(const uint8_t* bytes) {
@@ -360,18 +368,28 @@ inline FirstSssTickInput decode_first_sss_tick_input(
     if (!bytes || size != kFirstSssTickInputBytes)
         throw std::runtime_error(
             "First-SSS consumed PAD bundle has an unexpected exact length");
-    if (std::string(reinterpret_cast<const char*>(bytes), 8) != "STC1SSS1" ||
-        read_be32(bytes + 8) != 1)
+    const std::string magic(reinterpret_cast<const char*>(bytes), 8);
+    const uint32_t version = read_be32(bytes + 8);
+    const bool legacy_v1 = magic == "STC1SSS1" && version == 1;
+    const bool fresh_v2 = magic == "STC1SSS2" && version == 2;
+    if (!legacy_v1 && !fresh_v2)
         throw std::runtime_error(
             "First-SSS consumed PAD bundle magic/version differs");
     FirstSssTickInput result{};
     result.source_sha256 = hex(bytes + 12, kSourceSha256.size());
-    if (result.source_sha256 != expected_source_sha256 ||
-        !std::equal(kSourceSha256.begin(), kSourceSha256.end(), bytes + 12))
+    const std::string version_source_sha256 = fresh_v2
+        ? hex(kFreshFirstSssSourceSha256.data(), kFreshFirstSssSourceSha256.size())
+        : hex(kSourceSha256.data(), kSourceSha256.size());
+    if (result.source_sha256 != version_source_sha256 ||
+        result.source_sha256 != expected_source_sha256)
         throw std::runtime_error(
-            "First-SSS consumed PAD source identity differs from retained v6");
-    if (read_be32(bytes + 44) != kFirstSssConsumedPadSequence ||
-        read_be32(bytes + 48) != kFirstSssSchedulerEndSequence)
+            "First-SSS consumed PAD source identity differs from its exact profile/context");
+    const uint32_t expected_consume = fresh_v2 ? kFreshFirstSssConsumedPadSequence
+                                                : kFirstSssConsumedPadSequence;
+    const uint32_t expected_tick = fresh_v2 ? kFreshFirstSssSchedulerEndSequence
+                                             : kFirstSssSchedulerEndSequence;
+    if (read_be32(bytes + 44) != expected_consume ||
+        read_be32(bytes + 48) != expected_tick)
         throw std::runtime_error(
             "First-SSS consumed PAD sequence identities differ");
     std::copy_n(bytes + kFirstSssTickInputHeaderBytes, result.ports.size(),

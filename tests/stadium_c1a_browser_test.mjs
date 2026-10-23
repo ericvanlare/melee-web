@@ -51,6 +51,7 @@ const {values} = parseArgs({options: Object.fromEntries(
       ['first-css-row-receipt', {type: 'string'}],
       ['first-sss-constructor-pair', {type: 'boolean', default: false}],
       ['first-sss-constructor-pair-fresh', {type: 'boolean', default: false}],
+      ['first-sss-fresh-input-tick-draw', {type: 'boolean', default: false}],
       ['first-sss-consumed-pad-tick', {type: 'boolean', default: false}],
       ['first-sss-draw', {type: 'boolean', default: false}],
       ['first-sss-prefix', {type: 'boolean', default: false}],
@@ -96,9 +97,10 @@ const firstSssVsSetupCf = validateMatchedSetupCfRequest({
 });
 const firstSssVsEntry = values['first-sss-vs-entry'] || firstSssVsSetup;
 const firstSssPrefix = values['first-sss-prefix'] || firstSssVsEntry;
-const firstSssDraw = values['first-sss-draw'] || firstSssPrefix;
+const firstSssFreshInputTickDraw = values['first-sss-fresh-input-tick-draw'];
+const firstSssDraw = values['first-sss-draw'] || firstSssPrefix || firstSssFreshInputTickDraw;
 const firstSssConsumedPadTick = values['first-sss-consumed-pad-tick'] || firstSssDraw || firstSssPrefix;
-const firstSssConstructorPairFresh = values['first-sss-constructor-pair-fresh'];
+const firstSssConstructorPairFresh = values['first-sss-constructor-pair-fresh'] || firstSssFreshInputTickDraw;
 const firstSssConstructorPair = values['first-sss-constructor-pair'] || firstSssConsumedPadTick || firstSssConstructorPairFresh;
 const firstCssBrowserFinalDraw = values['first-css-browser-final-draw'] || firstSssConstructorPair || firstCssFreshFinite;
 const firstCssBrowserStream = values['first-css-browser-stream'] || firstCssBrowserFinalDraw;
@@ -109,18 +111,25 @@ if (firstCssFreshFinite !== !!values['first-css-finite-receipt'] ||
       ['first-css-browser-draw','first-css-browser-stream','first-css-browser-final-draw',
        'first-css-context','first-css-consumed-pad','first-css-return-expected',
        'first-css-tick-expected','first-css-draw-expected','first-css-postdraw-input',
-       'first-css-postdraw-expected','first-css-row-receipt'].some(key=>values[key]))))
-  throw Error('Choose only the fresh finite CSS route and exact receipt/context manifest');
+       'first-css-postdraw-expected','first-css-row-receipt'].some(key=>values[key]) ||
+      (firstSssFreshInputTickDraw && (!firstSssConstructorPairFresh || !values['first-sss-pair-expected'] ||
+       !values['first-sss-tick-expected'] || !values['first-sss-tick-input'] ||
+       !values['first-sss-draw-expected'])))))
+  throw Error('Choose the fresh finite CSS route and only its declared SSS boundary inputs');
 if (firstSssConstructorPairFresh &&
     (!firstCssFreshFinite || values['first-sss-constructor-pair'] ||
-     firstSssConsumedPadTick || firstSssDraw || firstSssPrefix ||
+     (!firstSssFreshInputTickDraw && (firstSssConsumedPadTick || firstSssDraw || firstSssPrefix ||
+      values['first-sss-tick-expected'] || values['first-sss-tick-input'] || values['first-sss-draw-expected'])) ||
+     (firstSssFreshInputTickDraw && (!firstSssConsumedPadTick || !firstSssDraw || firstSssPrefix ||
+      firstSssVsEntry || firstSssVsSetup || values['first-sss-consumed-pad-tick'] || values['first-sss-draw'])) ||
      firstSssVsEntry || firstSssVsSetup || firstSssVsSetupCf ||
      firstCssFreshRow || firstCssConstructorReturn || cssSssReducer ||
      firstCssBrowserDraw === false || !values['first-sss-pair-expected'] ||
-     ['first-sss-tick-expected','first-sss-tick-input','first-sss-draw-expected',
-      'first-sss-prefix-expected','first-sss-prefix-input','first-sss-vs-entry-expected',
+     ['first-sss-prefix-expected','first-sss-prefix-input','first-sss-vs-entry-expected',
       'first-sss-vs-setup-expected'].some(key=>values[key])))
-  throw Error('Fresh SSS pair is an explicit finite-CSS constructor-only continuation; no SSS input/tick/draw/VS options');
+  throw Error(firstSssFreshInputTickDraw
+    ? 'Fresh SSS input/tick/draw profile requires its exact constructor pair and declared source-bound inputs'
+    : 'Fresh SSS pair is an explicit finite-CSS constructor-only continuation; no SSS input/tick/draw/VS options');
 if (firstCssFreshRow !== !!values['first-css-row-receipt'] ||
     (firstCssFreshRow && (firstCssConstructorReturn || firstCssBrowserStream ||
       values['first-css-browser-draw'] || cssSssReducer ||
@@ -376,7 +385,7 @@ let report = {
   scenario: {
     route_mode: recreationCanary ? (recreationFullB
       ? (recreationFullPair ? 'same-instance-recreation-A7167-B7167-common-fields-seed' : 'same-instance-recreation-A174-B7167-common-fields-seed')
-      : 'same-instance-recreation-canary-174') : firstSssVsSetup ? 'first-sss-vs-setup' : firstSssVsEntry ? 'first-sss-vs-entry' : firstSssPrefix ? 'first-sss-prefix' : firstSssDraw ? 'first-sss-draw' :
+      : 'same-instance-recreation-canary-174') : firstSssVsSetup ? 'first-sss-vs-setup' : firstSssVsEntry ? 'first-sss-vs-entry' : firstSssPrefix ? 'first-sss-prefix' : firstSssFreshInputTickDraw ? 'first-css-fresh-finite-sss-input-tick-draw-v1' : firstSssDraw ? 'first-sss-draw' :
       firstSssConstructorPairFresh ? 'first-css-fresh-finite-sss-constructor-pair-v1' :
       firstCssFreshFinite ? 'first-css-fresh-finite-v4' :
       firstCssFreshRow ? 'first-css-fresh-row-v3' :
@@ -446,6 +455,8 @@ let report = {
     ? 'Strict SSS prefix then read-only actual match Start/seed Entry endpoint; no match construction'
     : firstSssPrefix
     ? 'Original CSS final draw, SSS constructor and frame-zero consumed PAD prerequisites, first original SSS draw, then a finite 124-record SSS input/tick/draw prefix through passive SSS exit and later selected-stage tuple. Prepared VS output remains unpaired; stops before ordinary VS scene entry/setup.'
+    : firstSssFreshInputTickDraw
+    ? 'Original CSS final draw, fresh SSS constructor entry/return, exact original PAD consume1595/source tick1599 and draw1600/1601. Stops before source row1602; no VS/GO or whole-session acceptance.'
     : firstSssDraw
     ? 'Original CSS final draw, SSS constructor and frame-zero consumed PAD prerequisites, then exact original first SSS DrawEnter1609/DrawReturn1610. Stops before the finite SSS continuation; no whole-session acceptance.'
     : firstSssConsumedPadTick
@@ -1095,11 +1106,19 @@ async function loadFirstSssConsumedPadTickInputs() {
   const input = bytes.input_bundle;
   assert.equal(input.byteLength, expected.input_bundle.bytes);
   assert.equal(digest(input), expected.input_bundle.sha256);
-  assert.equal(input.subarray(0, 8).toString('ascii'), 'STC1SSS1');
-  assert.equal(input.readUInt32BE(8), 1);
-  assert.equal(input.subarray(12, 44).toString('hex'), expected.provenance.observer_sha256);
-  assert.equal(input.readUInt32BE(44), 1604);
-  assert.equal(input.readUInt32BE(48), 1608);
+  if (expected.profile === 'fresh_finite_sss_initial_input_v1') {
+    assert.equal(input.subarray(0, 8).toString('hex'), expected.input_bundle.magic_hex);
+    assert.equal(input.readUInt32BE(8), expected.input_bundle.version);
+    assert.equal(input.subarray(12, 44).toString('hex'), expected.provenance.observer_sha256);
+    assert.equal(input.readUInt32BE(44), expected.provenance.consumed_pad_sequence);
+    assert.equal(input.readUInt32BE(48), expected.provenance.scheduler_end_sequence);
+  } else {
+    assert.equal(input.subarray(0, 8).toString('ascii'), 'STC1SSS1');
+    assert.equal(input.readUInt32BE(8), 1);
+    assert.equal(input.subarray(12, 44).toString('hex'), expected.provenance.observer_sha256);
+    assert.equal(input.readUInt32BE(44), 1604);
+    assert.equal(input.readUInt32BE(48), 1608);
+  }
   assert.equal(input.subarray(52).toString('hex'),
     expected.source_scheduler_end.expected.consumed_pad_status_hex.join(''),
     'SSS tick bundle differs from the exact four original PAD statuses');
@@ -2176,7 +2195,9 @@ async function runFirstSssConstructorPair() {
   assert.equal(nativePair.returned.host_entered, false);
   assert.equal(nativePair.entry.session_ticks, nativePair.returned.session_ticks);
   report.scenario.first_sss_constructor_pair.claim = firstSssConstructorPairFresh
-    ? 'Original SSS OnEnter entry1570/return1594 approved with both passive notes retained; zero SSS inputs, host ticks and draws. CSS exit remains unobserved; no C3 or whole-session acceptance.'
+    ? (firstSssFreshInputTickDraw
+      ? 'Original SSS OnEnter entry1570/return1594 approved with both passive notes retained before the separately compared first PAD/tick/draw; CSS exit remains unobserved and later SSS rows are out of scope.'
+      : 'Original SSS OnEnter entry1570/return1594 approved with both passive notes retained; zero SSS inputs, host ticks and draws. CSS exit remains unobserved; no C3 or whole-session acceptance.')
     : 'Original SSS OnEnter entry1579/return1603 approved with both passive notes retained; zero SSS host ticks/draws, before SSS input or progression. No whole-session acceptance.';
   await persistReport();
   await saveScreenshot('stadium-first-sss-constructor-pair');
@@ -2209,10 +2230,12 @@ function assertFirstSssConsumedTickStopState(evidence, cssBaseline, constructorP
     'Original final CSS draw changed during SSS tick capture');
 }
 
-function retainFirstSssConsumedTickEvidence(scenario, evidence, kickResult) {
+function retainFirstSssConsumedTickEvidence(scenario, evidence, kickResult, freshProfile = false) {
   scenario.kick_result = kickResult;
   scenario.observation = evidence;
-  scenario.claim = 'One-shot SSS scheduler-end sample attempt retained; comparison and protocol gates are pending.';
+  scenario.claim = freshProfile
+    ? 'One-shot fresh-profile SSS PAD consume1595/source tick1599 attempt retained; comparison and protocol gates are pending.'
+    : 'One-shot legacy SSS scheduler-end sample attempt retained; comparison and protocol gates are pending.';
 }
 
 function assertFirstSssConsumedTickCompared(evidence, kickResult) {
@@ -2261,7 +2284,9 @@ async function runFirstSssConsumedPadTick(constructorNative) {
     arm_snapshot: null,
     kick_result: null,
     observation: null,
-    claim: 'One-shot SSS scheduler-end sample attempt retained; comparison and protocol gates are pending.',
+    claim: firstSssFreshInputTickDraw
+      ? 'One-shot fresh-profile SSS PAD consume1595/source tick1599 attempt retained; comparison and protocol gates are pending.'
+      : 'One-shot legacy SSS scheduler-end sample attempt retained; comparison and protocol gates are pending.',
   };
   await persistReport();
 
@@ -2346,7 +2371,8 @@ async function runFirstSssConsumedPadTick(constructorNative) {
 
   const evidence = await timeout(readFirstSssConsumedTickObservation(),
     Math.min(5000, remaining()), 'Retain scheduler-end sample before success checks');
-  retainFirstSssConsumedTickEvidence(report.scenario.first_sss_consumed_tick, evidence, kickResult);
+  retainFirstSssConsumedTickEvidence(report.scenario.first_sss_consumed_tick, evidence,
+    kickResult, firstSssFreshInputTickDraw);
   await persistReport();
 
   // Keep stop, counter and old-boundary checks independent from a source-state
@@ -2387,7 +2413,9 @@ async function runFirstSssDraw(constructorNative) {
   report.scenario.first_sss_draw = {
     expected_json: firstSssDrawInputs.identity,
     arm_snapshot: null, kick_result: null, observation: null,
-    claim: 'First SSS draw attempt retained; actual snapshots and comparison are pending.',
+    claim: firstSssFreshInputTickDraw
+      ? 'Fresh-profile SSS DrawEnter1600/DrawReturn1601 attempt retained; actual snapshots and comparison are pending.'
+      : 'Legacy first SSS draw attempt retained; actual snapshots and comparison are pending.',
   };
   await persistReport();
   await timeout(page.evaluate(async ({moduleUrl, expectedDraw, pair, tick}) => {
@@ -2493,7 +2521,9 @@ async function runFirstSssDraw(constructorNative) {
   assert.deepEqual(draw.draw_enter, evidence.host.rows[0].actual);
   assert.deepEqual(draw.draw_return, evidence.host.rows[1].actual);
   report.scenario.first_sss_draw.claim =
-    'Original SSS DrawEnter1609 and DrawReturn1610 matched after the approved constructor and consumed-PAD prerequisites. No additional SSS tick or continuation is included.';
+    firstSssFreshInputTickDraw
+      ? 'Fresh-profile original SSS DrawEnter1600 and DrawReturn1601 matched after the approved constructor and consumed-PAD/tick prerequisites; source row1602 and all later route evidence remain unpaired.'
+      : 'Original SSS DrawEnter1609 and DrawReturn1610 matched after the approved constructor and consumed-PAD prerequisites. No additional SSS tick or continuation is included.';
   await persistReport();
   await saveScreenshot('stadium-first-sss-draw');
   return evidence.native;
@@ -5279,7 +5309,9 @@ async function main() {
   assert.equal(build, expectedBuild, 'Only the isolated C1a diagnostic runtime may be served');
   assert.equal(preflight.schema, 'melee-web-stadium-c1a-browser-preflight-v1');
   if(firstSssConstructorPairFresh){
-    assert.equal(preflight.route_mode,'first-css-fresh-finite-sss-constructor-pair-v1');
+    assert.equal(preflight.route_mode, firstSssFreshInputTickDraw
+      ? 'first-css-fresh-finite-sss-input-tick-draw-v1'
+      : 'first-css-fresh-finite-sss-constructor-pair-v1');
     assert.ok(preflight.first_css_fresh_finite?.receipt);
     assert.ok(preflight.first_sss_constructor_pair?.expected_json);
   } else if(firstCssFreshFinite){

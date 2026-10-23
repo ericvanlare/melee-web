@@ -934,6 +934,36 @@ const FIRST_SSS_TICK_PROTOCOL = Object.freeze({
   clock_post_succeeded: true, tick_result: 1, transition_requested: false,
   host_tick_calls: 1, host_draw_calls: 0, all_owners_true: true,
 });
+const FRESH_FIRST_SSS_PROFILE = 'fresh_finite_sss_initial_input_v1';
+const FRESH_FIRST_SSS_STREAM_SHA256 = '4fd54b4aa9537292295ad83fbb75655f8213a475a876fdd1468affb68d3d211f';
+const FRESH_FIRST_SSS_STREAM_BYTES = 4479614;
+const FRESH_FIRST_SSS_STATUS_SHA256 = 'dfb3b6b4dbf5135be918dfd21d44c650c09da777f69aa2dfc244ed2c00896f6a';
+const FRESH_FIRST_SSS_STATUS_BYTES = 551;
+const FRESH_FIRST_SSS_CONSUME_SEQUENCE = 1595;
+const FRESH_FIRST_SSS_TICK_SEQUENCE = 1599;
+const FRESH_FIRST_SSS_DRAW_ENTER_SEQUENCE = 1600;
+const FRESH_FIRST_SSS_DRAW_RETURN_SEQUENCE = 1601;
+const FRESH_FIRST_SSS_STOP_SEQUENCE = 1602;
+const FRESH_FIRST_SSS_SEED = 'e2624ac3';
+const FRESH_FIRST_SSS_DRAW_ORDINAL = 142;
+const FRESH_FIRST_SSS_ROUTE = Object.freeze({current_game_mode: 2,
+  previous_game_mode: 1, current_scene_index: 1, previous_scene_index: 0});
+const FRESH_FIRST_SSS_PORT_STATUS = Object.freeze([
+  '0000000000000000000000', '0000000000000000000000',
+  '00000000000000000000ff', '00000000000000000000ff',
+]);
+const FRESH_FIRST_SSS_TICK_SOURCE_INVENTORY = Object.freeze([
+  {tag: 36, flags: 0, address: 0x8045bf28, size: 2},
+  {tag: 37, flags: 0, address: 0x8045bf2a, size: 2},
+  {tag: 21, flags: 0, address: 0x804c1f84, size: 0x358},
+  {tag: 17, flags: 0, address: 0x80479d30, size: 6},
+  {tag: 30, flags: 0, address: 0x80479d58, size: 4},
+  {tag: 40, flags: 0, address: 0x803dd9c4, size: 1},
+  {tag: 19, flags: 0, address: 0x804d5f94, size: 4},
+  {tag: 20, flags: 0, address: 0x804d5f90, size: 4},
+  {tag: 2, flags: 0, address: 0x804c1f78, size: 0x0c},
+]);
+const FRESH_FIRST_SSS_DRAW_SOURCE_INVENTORY = FRESH_FIRST_SSS_TICK_SOURCE_INVENTORY;
 
 function sameJsonValue(actual, expected) {
   if (actual === expected) return true;
@@ -948,7 +978,64 @@ function sameJsonValue(actual, expected) {
     actualKeys.every(key => sameJsonValue(actual[key], expected[key]));
 }
 
+function validateFreshFirstSssConsumedTickExpected(expected) {
+  const fail = () => { throw new TypeError('Fresh SSS tick requires the exact pinned 1595/1599 source input'); };
+  const keys = [...FIRST_SSS_TICK_EXPECTED_KEYS, 'profile'].sort();
+  if (!plainObject(expected) || Object.keys(expected).sort().join('|') !== keys.join('|') ||
+      expected.schema !== 'melee-web-stadium-first-sss-consumed-pad-tick-diagnostic' ||
+      expected.version !== 2 || expected.profile !== FRESH_FIRST_SSS_PROFILE ||
+      expected.scope !== 'one exact fresh SSS PAD consume and scheduler-end SourceTick; the paired first draw is separately compared; stop before source row1602' ||
+      expected.whole_session_equivalent !== false || expected.source_admission !== false ||
+      !plainObject(expected.provenance) || !plainObject(expected.source_scheduler_end) ||
+      !plainObject(expected.source_scheduler_end.expected) || !plainObject(expected.input_bundle)) fail();
+  const p = expected.provenance;
+  if (!sameJsonValue(p, {
+    observer_bytes: FRESH_FIRST_SSS_STREAM_BYTES, observer_sha256: FRESH_FIRST_SSS_STREAM_SHA256,
+    observer_status_bytes: FRESH_FIRST_SSS_STATUS_BYTES, observer_status_sha256: FRESH_FIRST_SSS_STATUS_SHA256,
+    consumed_pad_sequence: FRESH_FIRST_SSS_CONSUME_SEQUENCE,
+    scheduler_end_sequence: FRESH_FIRST_SSS_TICK_SEQUENCE, scheduler_end_pc: '0x80390eb4',
+    source_tick: 0, draw_ordinal: FRESH_FIRST_SSS_DRAW_ORDINAL, original_source_frame: 0,
+    draw_enter_sequence: FRESH_FIRST_SSS_DRAW_ENTER_SEQUENCE,
+    draw_return_sequence: FRESH_FIRST_SSS_DRAW_RETURN_SEQUENCE,
+    exclusive_stop_sequence: FRESH_FIRST_SSS_STOP_SEQUENCE, setup_profile_verified_by_observer: false,
+  })) fail();
+  const source = expected.source_scheduler_end;
+  if (!sameJsonValue(source.source_slice_inventory, FRESH_FIRST_SSS_TICK_SOURCE_INVENTORY) ||
+      !exactOwnKeys(source.source_slices_hex, FRESH_FIRST_SSS_TICK_SOURCE_INVENTORY.map(item => `${item.tag}:${item.flags}`)) ||
+      source.scene_routing_raw_hex !== '020201010000' || source.rng_pointer_hex !== '804d5f90' ||
+      source.setup_profile_verified_by_observer !== false) fail();
+  const raw = source.source_slices_hex, wanted = source.expected;
+  if (raw['17:0'] !== source.scene_routing_raw_hex || raw['30:0'] !== '00000000' ||
+      raw['40:0'] !== '09' || raw['19:0'] !== source.rng_pointer_hex ||
+      raw['20:0'] !== FRESH_FIRST_SSS_SEED || wanted.random_seed_hex !== FRESH_FIRST_SSS_SEED ||
+      wanted.scene_frame !== 0 || wanted.scene_kind !== 9 ||
+      padSnapshotHex(raw['21:0']) !== wanted.pad_state_hex ||
+      !exactRoute(wanted.scene_routing_getters, FRESH_FIRST_SSS_ROUTE) ||
+      !sameJsonValue(wanted.consumed_pad_status_hex, FRESH_FIRST_SSS_PORT_STATUS) ||
+      !sameJsonValue(wanted.required_owners, Object.fromEntries(FIRST_SSS_TICK_OWNER_KEYS.map(k => [k, true])))) fail();
+  for (const item of FRESH_FIRST_SSS_TICK_SOURCE_INVENTORY)
+    if (!validHex(raw[`${item.tag}:${item.flags}`], item.size)) fail();
+  const input = expected.input_bundle;
+  if (!sameJsonValue(input, {
+    magic_hex: '5354433153535332', version: 2, bytes: 96,
+    sha256: input.sha256, contains_expected_state: false,
+    port_status_hex: FRESH_FIRST_SSS_PORT_STATUS,
+    consumed_pad_sequence: FRESH_FIRST_SSS_CONSUME_SEQUENCE,
+    scheduler_end_sequence: FRESH_FIRST_SSS_TICK_SEQUENCE,
+  }) || !/^[0-9a-f]{64}$/.test(input.sha256) ||
+      !sameJsonValue(expected.comparison_fields, FIRST_SSS_TICK_COMPARISON_FIELDS) ||
+      !sameJsonValue(expected.native_protocol_requirements, FIRST_SSS_TICK_PROTOCOL)) fail();
+  const route = {current_game_mode: Number.parseInt(raw['17:0'].slice(0, 2), 16),
+    previous_game_mode: Number.parseInt(raw['17:0'].slice(4, 6), 16),
+    current_scene_index: Number.parseInt(raw['17:0'].slice(6, 8), 16),
+    previous_scene_index: Number.parseInt(raw['17:0'].slice(8, 10), 16)};
+  if (!exactRoute(route, wanted.scene_routing_getters)) fail();
+  return expected;
+}
+
 function validateFirstSssConsumedTickExpected(expected) {
+  if (expected?.profile === FRESH_FIRST_SSS_PROFILE)
+    return validateFreshFirstSssConsumedTickExpected(expected);
   const fail = () => { throw new TypeError('SSS tick comparison requires the exact retained row1604/1608 bundle'); };
   if (!exactOwnKeys(expected, FIRST_SSS_TICK_EXPECTED_KEYS) ||
       expected.schema !== 'melee-web-stadium-first-sss-consumed-pad-tick-diagnostic' ||
@@ -1227,7 +1314,8 @@ export function firstSssAudioAccounting(actual, renderedTicks) {
 }
 
 function firstSssSourceRowIsPinned(source, sequence, boundary, pc, word, drawOrdinal,
-    sourceTick, expectedSceneFrame = 1, lr = 0x801a5048) {
+    sourceTick, expectedSceneFrame = 1, lr = 0x801a5048, expectedSeed = '3bb84c53',
+    expectedInventory = FIRST_SSS_DRAW_SOURCE_INVENTORY) {
   if (!exactOwnKeys(source, FIRST_SSS_BOUNDARY_SOURCE_KEYS) || source.sequence !== sequence ||
       source.event !== 'boundary' || source.phase !== null || source.boundary !== boundary ||
       source.pc !== pc || source.word !== word || source.lr !== lr ||
@@ -1235,11 +1323,11 @@ function firstSssSourceRowIsPinned(source, sequence, boundary, pc, word, drawOrd
       source.argument !== null ||
       !Array.isArray(source.source_slice_inventory) || !plainObject(source.source_slices_hex))
     return false;
-  if (!sourceInventoryMatches(source.source_slice_inventory, FIRST_SSS_DRAW_SOURCE_INVENTORY) ||
-      !sourceSlicesMatch(source.source_slices_hex, FIRST_SSS_DRAW_SOURCE_INVENTORY)) return false;
+  if (!sourceInventoryMatches(source.source_slice_inventory, expectedInventory) ||
+      !sourceSlicesMatch(source.source_slices_hex, expectedInventory)) return false;
   const raw = source.source_slices_hex;
   return raw['17:0'] === '020201010000' && raw['19:0'] === '804d5f90' &&
-    raw['20:0'] === '3bb84c53' && raw['30:0'] === expectedSceneFrame.toString(16).padStart(8, '0') &&
+    raw['20:0'] === expectedSeed && raw['30:0'] === expectedSceneFrame.toString(16).padStart(8, '0') &&
     raw['40:0'] === '09' && source.scene_routing_raw_hex === raw['17:0'] &&
     source.rng_pointer_hex === raw['19:0'];
 }
@@ -1259,7 +1347,47 @@ function sourceSlicesMatch(actual, expected) {
   return expected.every(item => validHex(actual[`${item.tag}:0`], item.size));
 }
 
+function validateFreshFirstSssDrawExpectedSource(expected) {
+  const fail = () => { throw new TypeError('Fresh SSS draw requires exact pinned rows1600/1601'); };
+  const keys = ['schema','version','profile','scope','source_admission','whole_session_equivalent',
+    'provenance','expected_draw_enter','expected_draw_return','source_draw_enter','source_draw_return',
+    'comparison_fields','native_protocol_requirements'].sort();
+  if (!plainObject(expected) || Object.keys(expected).sort().join('|') !== keys.join('|') ||
+      expected.schema !== 'melee-web-stadium-first-sss-draw-diagnostic' || expected.version !== 2 ||
+      expected.profile !== FRESH_FIRST_SSS_PROFILE ||
+      expected.scope !== 'original fresh SSS DrawEnter1600 through DrawReturn1601 after the one approved input/tick only; stop before row1602' ||
+      expected.source_admission !== false || expected.whole_session_equivalent !== false) fail();
+  if (!sameJsonValue(expected.provenance, {
+    observer_bytes: FRESH_FIRST_SSS_STREAM_BYTES, observer_sha256: FRESH_FIRST_SSS_STREAM_SHA256,
+    observer_status_bytes: FRESH_FIRST_SSS_STATUS_BYTES, observer_status_sha256: FRESH_FIRST_SSS_STATUS_SHA256,
+    draw_enter_sequence: FRESH_FIRST_SSS_DRAW_ENTER_SEQUENCE,
+    draw_return_sequence: FRESH_FIRST_SSS_DRAW_RETURN_SEQUENCE, source_tick: 1,
+    draw_ordinal: FRESH_FIRST_SSS_DRAW_ORDINAL, scene_frame: 1, scene_kind: 9,
+    setup_profile_verified_by_observer: false,
+  }) || !sameJsonValue(expected.comparison_fields, FIRST_SSS_DRAW_FIELDS) ||
+      !sameJsonValue(expected.native_protocol_requirements, FIRST_SSS_DRAW_NATIVE_PROTOCOL)) fail();
+  for (const [note, sequence, boundary, pc] of [
+    [expected.expected_draw_enter, FRESH_FIRST_SSS_DRAW_ENTER_SEQUENCE, 'draw_enter', 0x80390fc0],
+    [expected.expected_draw_return, FRESH_FIRST_SSS_DRAW_RETURN_SEQUENCE, 'draw_return', 0x80391040],
+  ]) {
+    if (!exactOwnKeys(note, ['phase','scene_frame','scene_kind','pad_state_hex','random_seed_hex','scene_routing_getters']) ||
+        note.phase !== boundary || note.scene_frame !== 1 || note.scene_kind !== 9 ||
+        note.random_seed_hex !== FRESH_FIRST_SSS_SEED ||
+        !exactRoute(note.scene_routing_getters, FRESH_FIRST_SSS_ROUTE)) fail();
+    const source = boundary === 'draw_enter' ? expected.source_draw_enter : expected.source_draw_return;
+    if (!firstSssSourceRowIsPinned(source, sequence, boundary, pc, null,
+          FRESH_FIRST_SSS_DRAW_ORDINAL, 1, 1, 0x801a5048, FRESH_FIRST_SSS_SEED,
+          FRESH_FIRST_SSS_DRAW_SOURCE_INVENTORY) ||
+        padSnapshotHex(source.source_slices_hex?.['21:0']) !== note.pad_state_hex) fail();
+  }
+  for (const key of FIRST_SSS_DRAW_FIELDS)
+    if (!sameJsonValue(expected.expected_draw_enter[key], expected.expected_draw_return[key])) fail();
+  return expected;
+}
+
 export function validateFirstSssDrawExpectedSource(expected) {
+  if (expected?.profile === FRESH_FIRST_SSS_PROFILE)
+    return validateFreshFirstSssDrawExpectedSource(expected);
   const fail = () => { throw new TypeError('first SSS draw requires exact retained rows1609/1610'); };
   if (!plainObject(expected) || expected.schema !== 'melee-web-stadium-first-sss-draw-diagnostic' ||
       expected.version !== 1 || expected.scope !== 'original first SSS DrawEnter1609 through DrawReturn1610 only' ||

@@ -29,13 +29,25 @@
       "path": "tests/fixtures/fresh-sss-expected-pair.json",
       "rule": "encoded_payload",
       "sha256": "d6949ad5577d2b594e5d098f030d763f36da761f2171b2b1b629e35ab75cf451",
-      "reason": "Exact observer-derived runtime state only. The 822-byte PAD projection and raw source slices are from original observer records 1570 and 1594 in the pinned 4,479,614-byte stream; tag 21 is source PAD state, tag 32 is the observed 0xf0 prefix of CSSData.vs.start (rules and four player rows; slots 4–5 excluded), and tag 33 is the 64-byte cur_hps_stem path buffer, not HPS media. The pinned strict decoder and layout sources are recorded in the independent content review. No disc, archive, audio, image, or executable bytes. Provenance and the retained CI failure are recorded in docs/evidence/issue251-stadium-profile-oninit-v1.json."
+      "reason": "Exact observer-derived runtime state only. The 822-byte PAD projection and raw source slices are from original observer records 1570 and 1594 in the pinned 4,479,614-byte stream; tag 21 is source PAD state, tag 32 is the observed 0xf0 prefix of CSSData.vs.start (rules and four player rows; slots 4\u20135 excluded), and tag 33 is the 64-byte cur_hps_stem path buffer, not HPS media. The pinned strict decoder and layout sources are recorded in the independent content review. No disc, archive, audio, image, or executable bytes. Provenance and the retained CI failure are recorded in docs/evidence/issue251-stadium-profile-oninit-v1.json."
     },
     {
       "path": "tests/stadium_first_css_stream_compare.mjs",
       "rule": "encoded_payload",
-      "sha256": "ab26a290218625f011d63854601e8e4e40f0bf08c519e1cf96dda8f6dd95c990",
-      "reason": "Exact comparator constants duplicate the fixture’s independently hash-pinned source runtime slices at original observer sequences 1570 and 1594. The long values are PAD state, the 0xf0 CSSData.vs.start prefix (not the unobserved slots 4–5), and the cur_hps_stem path buffer, not game media or executable bytes. Keep strict byte comparisons; see the independent content review for observer, decoder, and source-layout pins. Provenance and the retained CI failure are recorded in docs/evidence/issue251-stadium-profile-oninit-v1.json."
+      "sha256": "a15a60eaabb69a69d4956241b046a838d6370d1f4a191c4b565a1eadb780dab1",
+      "reason": "Exact comparator constants duplicate the fixture\u2019s independently hash-pinned source runtime slices at original observer sequences 1570 and 1594. The long values are PAD state, the 0xf0 CSSData.vs.start prefix (not the unobserved slots 4\u20135), and the cur_hps_stem path buffer, not game media or executable bytes. Keep strict byte comparisons; see the independent content review for observer, decoder, and source-layout pins. Provenance and the retained CI failure are recorded in docs/evidence/issue251-stadium-profile-oninit-v1.json."
+    },
+    {
+      "path": "tests/fixtures/fresh-sss-initial-input-tick-expected.json",
+      "rule": "encoded_payload",
+      "sha256": "15e49d5a9f6d810936faef6f6ae7ff6aa1603362516f13624ce460d089c21259",
+      "reason": "Exact observer-derived runtime state from original sequence(s) 1599 in the pinned 4fd54b4a stream. Long values are the 856-byte source PAD state and its established 822-byte projection; the remaining source slices are poll counts, scene routing/frame/kind, RNG pointer/value and input-call counters. Root independently replayed the strict original decoder derivation and compared the complete fixture. No disc, archive, audio, image or executable bytes. Preserve strict byte comparisons and source identities; see docs/evidence/issue251-stadium-profile-oninit-v1.json."
+    },
+    {
+      "path": "tests/fixtures/fresh-sss-initial-draw-expected.json",
+      "rule": "encoded_payload",
+      "sha256": "94e64043c4d62bddb6060568efbaeead703a9b06db87214967ba44d5c1af5d28",
+      "reason": "Exact observer-derived runtime state from original sequence(s) 1600 and 1601 in the pinned 4fd54b4a stream. Long values are the 856-byte source PAD state and its established 822-byte projection; the remaining source slices are poll counts, scene routing/frame/kind, RNG pointer/value and input-call counters. Root independently replayed the strict original decoder derivation and compared the complete fixture. No disc, archive, audio, image or executable bytes. Preserve strict byte comparisons and source identities; see docs/evidence/issue251-stadium-profile-oninit-v1.json."
     }
   ],
   "synthetic_secrets": [
