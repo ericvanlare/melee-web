@@ -1,0 +1,766 @@
+/* Executes the actual private CPU adapter include with the fixture's actual
+ * observation ABI. Typed component/session/provider leaves below are explicit
+ * models; this control does not claim a complete source-world restore. */
+#define MELEE_WEB_CPU_INTERVAL_ENABLED 1
+#include "gameplay_cpu_commit.hpp"
+#include "gameplay_cpu_statics.hpp"
+#include "gameplay_cpu_interval.h"
+#include "gameplay_match_context.h"
+#include "gameplay_match_clock.h"
+#include "gameplay_pad_state.h"
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <cstdlib>
+#include <memory>
+#include <string>
+#include <vector>
+#include <stdexcept>
+#include <emscripten.h>
+#include <emscripten/heap.h>
+
+extern "C" {
+#include <sysdolphin/baselib/gobj.h>
+#include <melee/ft/forward.h>
+}
+/* This block is copied byte-for-byte from gameplay_snapshot_probe.cpp by the
+ * Python runner, so the adapter evidence layout follows the checked-in fixture. */
+@ACTUAL_FIXTURE_OBSERVATIONS@
+
+namespace melee_web {
+class GameplayMatchSession {
+public:
+    explicit GameplayMatchSession(std::uint32_t frame) : frame_(frame) {}
+    std::uint32_t source_frames() const noexcept { return frame_; }
+    void set_source_frames(std::uint32_t value) noexcept { frame_=value; }
+    void increment_source_frames() noexcept { ++frame_; }
+    struct CpuOwners {MeleeWebAudio* audio;};
+    CpuOwners diagnostic_cpu_owners() const noexcept {return {reinterpret_cast<MeleeWebAudio*>(std::uintptr_t(0x102))};}
+private:
+    std::uint32_t frame_;
+};
+}
+
+/* The Python runner supplies this header in the temporary include root. It
+ * uses the real commit/statics interfaces while modeling only their named
+ * component leaves and source-session frame boundary. */
+#include "gameplay_cpu_checkpoint.hpp"
+
+enum class PayloadAdmissionState : std::uint32_t { Idle=0, Active=1, Failed=2 };
+struct FixtureRange { void* address; std::size_t bytes; };
+struct FixtureDiagnostic { std::uint32_t words[8]{}; };
+enum class FixtureRendererBackend : std::uint32_t { None=0 };
+
+std::array<std::uint8_t,128> files{};
+std::unique_ptr<melee_web::GameplayMatchSession> match;
+std::array<std::uint8_t,32> archive_cache{};
+bool attempted=false;
+char error[256]{};
+unsigned audio_phase=7;
+std::array<float,1068> pcm{};
+std::array<std::uint8_t,44> input_bytes{};
+std::uint32_t configured_source_seed=0x13579bdfu;
+bool native_initializer_enabled=false;
+FixtureDiagnostic initializer_diagnostic{}, ending_mask_diagnostic{};
+std::string initializer_json, ending_mask_json;
+bool renderer_ready=false;
+FixtureRendererBackend renderer_backend=FixtureRendererBackend::None;
+std::uint64_t last_completed_frame_id=0;
+std::uint32_t renderer_error_count=0;
+std::array<std::uint8_t,64*1024> fifo_buffer{};
+std::string submission_json;
+struct FixtureAudioRangeWire { std::uint32_t words[64]{}; } audio_range_wire{};
+void* audio_range_anchor=nullptr;
+std::uint64_t audio_range_generation_anchor=0;
+struct FixtureContextRangeWire { std::uint32_t words[16]{}; } match_context_range_wire{};
+std::uint32_t match_context_range_anchor_address=0;
+std::uint32_t match_context_range_anchor_extent=0;
+std::uint64_t match_context_range_anchor_world_generation=0;
+std::uint64_t match_context_range_anchor_owner_epoch=0;
+bool match_context_range_anchor_set=false;
+void* payload_admission_snapshot=nullptr;
+PayloadAdmissionState payload_admission_state=PayloadAdmissionState::Idle;
+std::uint32_t payload_admission_first_failure=0;
+std::array<char,128> payload_admission_first_message{};
+std::uint32_t payload_admission_capture_source_frame=0;
+std::uint64_t payload_admission_capture_begin_frame=0;
+std::uint64_t payload_admission_capture_end_frame=0;
+bool payload_admission_cleanup_done=false;
+bool payload_admission_inflight=false;
+bool payload_admission_close_requested=false;
+bool payload_admission_shutdown_requested=false;
+
+std::uint32_t payload_admission_boundary(bool require_idle);
+std::uint32_t payload_admission_runtime_boundary();
+std::uint32_t payload_admission_submission_boundary();
+MeleeWebClockCpuStorage melee_web_source_clock_cpu_storage(void);
+MeleeWebCadenceCpuStorage melee_web_source_cadence_cpu_storage(void);
+MeleeWebBootstrapCpuStorage melee_web_gameplay_bootstrap_cpu_storage(void);
+extern "C" int melee_web_snapshot_step(unsigned sample);
+extern "C" int melee_web_synctest_draw_present();
+
+#define MELEE_WEB_SYNCTEST_CPU_RESTORE 1
+std::array<uint8_t,132> fixture_draw_diagnostics{};
+extern "C" const void* melee_web_synctest_draw_diagnostics(){return fixture_draw_diagnostics.data();}
+extern "C" unsigned melee_web_synctest_draw_diagnostics_size(){return 132;}
+extern "C" unsigned melee_web_synctest_motion_boundary(unsigned){return 0;}
+extern "C" int melee_web_synctest_is_mario_kind(unsigned kind){return kind==0;}
+#include "cpu_restore_adapter.inc"
+
+namespace {
+enum class StepInterruption { None, ReenterCommand, ReenterSourceClose };
+struct FixtureSourceState {
+    std::uint32_t action=3, audio=5, flow=7, bootstrap=11, context=13, payload=17;
+    std::uint32_t rng=0x13579bdfu;
+    std::array<std::uint8_t,44> pad{};
+    std::array<std::int32_t,9> transfer{};
+};
+FixtureSourceState source_state{};
+std::uint32_t source_static_counter=0;
+std::uint32_t source_invariant=0x51a7u;
+std::array<std::uint32_t,16> storage_clock{};
+std::array<std::uint32_t,16> storage_process_mask{};
+std::uint32_t storage_profile_phase=0;
+std::array<std::uint32_t,16> storage_cadence{};
+std::array<std::uint32_t,16> storage_boot_ticks{};
+std::array<std::uint32_t,16> storage_disabled_links{};
+std::uint32_t model_command_budget=0,model_sound_mode=1;
+std::array<std::uint32_t,12> commit_trace{};
+std::size_t commit_trace_count=0;
+std::array<std::uint32_t,8> admission_trace{};
+std::size_t admission_trace_count=0;
+std::uint32_t fail_admission_leaf=0;
+bool fail_capture=false;
+bool fail_replay=false;
+bool modeled_payload_byte_failure=false;
+bool fail_static_replay=false;
+unsigned journal_failure_tick=0,unexpected_draw_tick=0;
+bool pending_submission=false;
+bool world_exists=true;
+unsigned draw_calls=0;
+unsigned idle_boundary_calls=0;
+unsigned submission_boundary_calls=0;
+unsigned capsule_disarms=0;
+unsigned capsule_destroys=0;
+unsigned action_disarms=0;
+unsigned action_destroys=0;
+unsigned tick_calls=0;
+std::array<unsigned,4> tick_samples{};
+std::size_t tick_sample_count=0;
+StepInterruption interruption=StepInterruption::None;
+bool interruption_done=false;
+std::uint32_t pre_action=0,pre_audio=0,pre_flow=0,pre_bootstrap=0,pre_context=0,pre_payload=0,pre_rng=0;
+std::uint32_t pre_source_frame=176;
+std::uint32_t post_action=0;
+std::array<std::uint8_t,44> pre_pad{};
+std::array<std::int32_t,9> pre_transfer{};
+}
+
+CpuRestoreFixtureSnapshot melee_web_cpu_restore_model_snapshot() {
+    CpuRestoreFixtureSnapshot out{};
+    out.action=source_state.action; out.audio=source_state.audio;
+    out.flow=source_state.flow; out.bootstrap=source_state.bootstrap;
+    out.context=source_state.context; out.payload=source_state.payload;
+    out.rng=source_state.rng; out.pad=source_state.pad; out.transfer=source_state.transfer;
+    return out;
+}
+void melee_web_cpu_restore_model_apply(const CpuRestoreFixtureSnapshot& in) {
+    source_state.action=in.action; source_state.audio=in.audio;
+    source_state.flow=in.flow; source_state.bootstrap=in.bootstrap;
+    source_state.context=in.context; source_state.payload=in.payload;
+    source_state.rng=in.rng; source_state.pad=in.pad; source_state.transfer=in.transfer;
+}
+bool melee_web_cpu_restore_model_equal(const CpuRestoreFixtureSnapshot& in) {
+    const auto live=melee_web_cpu_restore_model_snapshot();
+    return std::memcmp(&live,&in,sizeof(in))==0;
+}
+void melee_web_cpu_restore_mark_disarm() { ++capsule_disarms; }
+void melee_web_cpu_restore_mark_destroy() { ++capsule_destroys; }
+
+namespace melee_web {
+GameplayCpuCheckpoint::~GameplayCpuCheckpoint() {
+    if(source_step_possible_&&!retired_) std::abort();
+    if(actions_) melee_web_action_interval_destroy(actions_);
+    melee_web_cpu_restore_mark_destroy();
+}
+std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
+    const GameplayMatchSession& session,
+    std::unique_ptr<GameplayCpuStatics> statics,CpuCaptureDiagnostic& diagnostic,CpuCheckpointSpan span) noexcept {
+    diagnostic={};
+    if(fail_capture){diagnostic.comparison={7,1,UINT32_MAX,UINT32_MAX,0,0,0,0,5};
+        std::snprintf(diagnostic.message.data(),diagnostic.message.size(),"fixture bootstrap capture refusal");return {};}
+    if(!statics||!statics->capture()) return {};
+    try {
+        auto value=std::unique_ptr<GameplayCpuCheckpoint>(new GameplayCpuCheckpoint(span));
+        value->statics_=std::move(statics);
+        value->pre_frame_=session.source_frames();
+        value->pre_=melee_web_cpu_restore_model_snapshot();
+        pre_action=value->pre_.action;pre_audio=value->pre_.audio;pre_flow=value->pre_.flow;
+        pre_bootstrap=value->pre_.bootstrap;pre_context=value->pre_.context;pre_payload=value->pre_.payload;
+        pre_rng=value->pre_.rng;pre_pad=value->pre_.pad;pre_transfer=value->pre_.transfer;
+        pre_source_frame=value->pre_frame_;
+        value->actions_=reinterpret_cast<MeleeWebActionInterval*>(std::uintptr_t(0x101));
+        value->commit_.actions=value->actions_;
+        value->commit_.audio=reinterpret_cast<MeleeWebAudio*>(std::uintptr_t(0x102));
+        value->commit_.audio_snapshot=reinterpret_cast<MeleeWebAudioSnapshot*>(std::uintptr_t(0x103));
+        value->commit_.flow=reinterpret_cast<MeleeWebMatchFlow*>(std::uintptr_t(0x104));
+        value->commit_.flow_snapshot=reinterpret_cast<MeleeWebMatchFlowCpuSnapshot*>(std::uintptr_t(0x105));
+        value->commit_.bootstrap=reinterpret_cast<MeleeWebGameplayBootstrapSnapshot*>(std::uintptr_t(0x106));
+        value->commit_.context=reinterpret_cast<MeleeWebMatchContext*>(std::uintptr_t(0x107));
+        value->commit_.context_snapshot=reinterpret_cast<MeleeWebMatchContextSnapshot*>(std::uintptr_t(0x108));
+        value->commit_.payload=reinterpret_cast<MeleeWebSourceMemoryPayloadSnapshot*>(std::uintptr_t(0x109));
+        value->commit_.statics=value->statics_.get();
+        return value;
+    } catch(...) { return {}; }
+}
+bool GameplayCpuCheckpoint::begin_record(const GameplayMatchSession& session) noexcept {
+    if(phase_!=Phase::Captured||session.source_frames()!=pre_frame_) return false;
+    effect_token_=melee_web_cpu_interval_begin();
+    commit_.effect_token=effect_token_;
+    if(!effect_token_||melee_web_action_interval_begin_record(actions_)!=1) return false;
+    phase_=Phase::Recording;source_step_possible_=true;return true;
+}
+bool GameplayCpuCheckpoint::interval_boundary(const GameplayMatchSession& session) noexcept {
+    // Explicit model of typed owner/effect/action leaves; production method is
+    // separately compiled and exercised by the actual capture-body control.
+    return (phase_==Phase::Recording||phase_==Phase::Replaying)&&
+        session.source_frames()>=pre_frame_&&session.source_frames()<=pre_frame_+static_cast<std::uint32_t>(span_)&&
+        !fail_replay&&melee_web_cpu_interval_admit(effect_token_);
+}
+bool GameplayCpuCheckpoint::seal_post(const GameplayMatchSession& session) noexcept {
+    if(phase_!=Phase::Recording||session.source_frames()!=pre_frame_+static_cast<std::uint32_t>(span_)||
+       !melee_web_cpu_interval_admit(effect_token_)||
+       melee_web_action_interval_seal_record(actions_)!=1||!statics_->seal_post()) return false;
+    post_frame_=session.source_frames();post_=melee_web_cpu_restore_model_snapshot();
+    post_action=post_.action;
+    phase_=Phase::Sealed;return true;
+}
+GameplayCpuCommitResult GameplayCpuCheckpoint::restore(const GameplayMatchSession& session) noexcept {
+    if(phase_!=Phase::Sealed||session.source_frames()!=post_frame_) return GameplayCpuCommitResult::MissingOwner;
+    const auto result=gameplay_cpu_commit(commit_);
+    if(result==GameplayCpuCommitResult::Ok) phase_=Phase::Replaying;
+    else phase_=Phase::Failed;
+    return result;
+}
+bool GameplayCpuCheckpoint::finish_replay(const GameplayMatchSession& session) noexcept {
+    checked_domains_=matched_domains_=0;comparison_={};
+    const bool modeled=phase_==Phase::Replaying&&session.source_frames()==post_frame_&&
+        melee_web_cpu_interval_admit(effect_token_)&&melee_web_action_interval_finish_replay(actions_)==1&&
+        melee_web_cpu_restore_model_equal(post_)&&!fail_replay;
+    checked_domains_=0x1fe;
+    if(modeled_payload_byte_failure){
+        // Explicit payload leaf model; actual byte producer tested separately.
+        comparison_={4,2,7,5,9,8,0x10000,64,0x80010000};checked_domains_=30;matched_domains_=14;
+        payload_failure_witness_={};auto& w=payload_failure_witness_;
+        w.schema=1;w.bytes=256;w.original_status=2;w.first_difference_matches=1;
+        w.window.schema=1;w.window.bytes=168;w.window.status=2;w.window.row=7;w.window.offset=5;
+        w.window.requested_bytes=64;w.window.window_count=32;w.window.expected[5]=9;w.window.actual[5]=8;
+        w.hook_active=1;w.attribution=0;w.reason=2;phase_=Phase::Failed;return false;
+    }
+    if(!modeled){comparison_={4,1,UINT32_MAX,UINT32_MAX,0,0,0,0,77};phase_=Phase::Failed;return false;}
+    matched_domains_=checked_domains_;checked_domains_|=1u<<9;
+    comparison_=statics_->compare_post();
+    const bool okay=comparison_.status==0;
+    if(okay)matched_domains_|=1u<<9;
+    phase_=okay?Phase::Finished:Phase::Failed;return okay;
+}
+bool GameplayCpuCheckpoint::seal_drawn_reference(const GameplayMatchSession& session) noexcept {
+    if(phase_!=Phase::Sealed||pending_submission||session.source_frames()!=post_frame_||
+       !melee_web_cpu_interval_admit(effect_token_)||melee_web_action_interval_admit(actions_)!=1)return false;
+    drawn_=melee_web_cpu_restore_model_snapshot();comparison_=statics_->capture_expected(drawn_statics_);return comparison_.status==0;
+}
+bool GameplayCpuCheckpoint::matches_drawn_reference(const GameplayMatchSession& session) noexcept {
+    checked_domains_=matched_domains_=0;comparison_={};
+    if(phase_!=Phase::Finished||session.source_frames()!=post_frame_||!melee_web_cpu_interval_admit(effect_token_)||
+       !melee_web_cpu_restore_model_equal(drawn_))return false;
+    checked_domains_=0x3fe;comparison_=statics_->compare_expected(drawn_statics_);
+    if(comparison_.status)return false;
+    matched_domains_=0x3fe;return true;
+}
+void GameplayCpuCheckpoint::disarm() noexcept {
+    if(actions_) melee_web_action_interval_disarm(actions_);
+    if(effect_token_){melee_web_cpu_interval_end(effect_token_);effect_token_=0;}
+    melee_web_cpu_restore_mark_disarm();
+}
+bool GameplayCpuCheckpoint::source_owners_retired(const GameplayMatchSession* session) noexcept {
+    if(session||world_exists) return false;
+    disarm();phase_=Phase::Retired;retired_=true;source_step_possible_=false;return true;
+}
+}
+
+uint64_t melee_web_audio_generation(MeleeWebAudio*) {return 1;}
+MeleeWebAudioCpuStorage melee_web_audio_cpu_storage(MeleeWebAudio*,uint64_t) {
+    return {&model_command_budget,&model_sound_mode};
+}
+MeleeWebClockCpuStorage melee_web_source_clock_cpu_storage(void) {
+    return {storage_clock.data(),sizeof(storage_clock),storage_process_mask.data(),sizeof(storage_process_mask),&storage_profile_phase,sizeof(storage_profile_phase)};
+}
+MeleeWebCadenceCpuStorage melee_web_source_cadence_cpu_storage(void) {
+    return {storage_cadence.data(),sizeof(storage_cadence)};
+}
+MeleeWebBootstrapCpuStorage melee_web_gameplay_bootstrap_cpu_storage(void) {
+    return {storage_boot_ticks.data(),sizeof(storage_boot_ticks),storage_disabled_links.data(),sizeof(storage_disabled_links)};
+}
+std::uint32_t payload_admission_boundary(bool require_idle) {
+    if(require_idle) { ++idle_boundary_calls; if(pending_submission) return 1; }
+    return 0;
+}
+std::uint32_t payload_admission_runtime_boundary() { return 0; }
+std::uint32_t payload_admission_submission_boundary() {
+    ++submission_boundary_calls; return pending_submission&&draw_calls>=1?0u:1u;
+}
+
+extern "C" {
+int melee_web_action_interval_admit(const MeleeWebActionInterval* value) {
+    admission_trace[admission_trace_count++]=1; return value&&fail_admission_leaf!=1;
+}
+int melee_web_audio_snapshot_admit(MeleeWebAudio*,const MeleeWebAudioSnapshot*) {
+    admission_trace[admission_trace_count++]=2; return fail_admission_leaf!=2;
+}
+int melee_web_match_flow_cpu_snapshot_admit(MeleeWebMatchFlow*,const MeleeWebMatchFlowCpuSnapshot*,char*,size_t) {
+    admission_trace[admission_trace_count++]=3; return fail_admission_leaf!=3;
+}
+int melee_web_gameplay_bootstrap_snapshot_admit(const MeleeWebGameplayBootstrapSnapshot*,char*,size_t) {
+    admission_trace[admission_trace_count++]=4; return fail_admission_leaf!=4;
+}
+int melee_web_match_context_snapshot_admit(MeleeWebMatchContext*,const MeleeWebMatchContextSnapshot*,char*,size_t) {
+    admission_trace[admission_trace_count++]=5; return fail_admission_leaf!=5;
+}
+MeleeWebSourceMemoryPayloadSnapshotStatus melee_web_source_memory_payload_snapshot_admit(
+    const MeleeWebSourceMemoryPayloadSnapshot*) {
+    admission_trace[admission_trace_count++]=6;
+    return fail_admission_leaf==6?MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED:
+        MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK;
+}
+int melee_web_action_interval_restore(MeleeWebActionInterval*) {
+    commit_trace[commit_trace_count++]=1; source_state.action=pre_action; return 1;
+}
+int melee_web_audio_snapshot_restore(MeleeWebAudio*,const MeleeWebAudioSnapshot*) {
+    commit_trace[commit_trace_count++]=2; source_state.audio=pre_audio; return 1;
+}
+int melee_web_match_flow_cpu_snapshot_restore(MeleeWebMatchFlow*,const MeleeWebMatchFlowCpuSnapshot*,char*,size_t) {
+    commit_trace[commit_trace_count++]=3; source_state.flow=pre_flow; return 1;
+}
+int melee_web_gameplay_bootstrap_snapshot_restore(const MeleeWebGameplayBootstrapSnapshot*,char*,size_t) {
+    commit_trace[commit_trace_count++]=4; source_state.bootstrap=pre_bootstrap; return 1;
+}
+int melee_web_match_context_snapshot_restore(MeleeWebMatchContext*,const MeleeWebMatchContextSnapshot*,char*,size_t) {
+    commit_trace[commit_trace_count++]=5; source_state.context=pre_context;
+    if(match) match->set_source_frames(pre_source_frame); return 1;
+}
+MeleeWebSourceMemoryPayloadSnapshotStatus melee_web_source_memory_payload_snapshot_restore(
+    const MeleeWebSourceMemoryPayloadSnapshot*) {
+    commit_trace[commit_trace_count++]=6; source_state.payload=pre_payload;
+    source_state.rng=pre_rng; source_state.pad=pre_pad; source_state.transfer=pre_transfer;
+    return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK;
+}
+std::uint64_t melee_web_cpu_interval_begin(void) { return 0x77u; }
+int melee_web_cpu_interval_admit(std::uint64_t token) { return token==0x77u; }
+int melee_web_cpu_interval_attempt(enum MeleeWebCpuIntervalEffect) { return 1; }
+unsigned melee_web_cpu_interval_failure(void) { return 0; }
+int melee_web_cpu_interval_active_failure(void) { return 0; }
+int melee_web_cpu_interval_end(std::uint64_t token) { return token==0x77u; }
+int melee_web_action_interval_begin_record(MeleeWebActionInterval*) { return 1; }
+int melee_web_action_interval_seal_record(MeleeWebActionInterval*) { return 1; }
+int melee_web_action_interval_finish_replay(MeleeWebActionInterval* value) {
+    return value&&source_state.action==post_action;
+}
+void melee_web_action_interval_disarm(MeleeWebActionInterval*) { ++action_disarms; }
+void melee_web_action_interval_destroy(MeleeWebActionInterval*) { ++action_destroys; }
+}
+
+namespace {
+void check(bool value,const char* message) { if(!value) throw std::runtime_error(message); }
+std::uint32_t ptr32(const void* p) {
+    const auto value=reinterpret_cast<std::uintptr_t>(p);
+    check(value<=UINT32_MAX,"Fixture pointer is outside Wasm32 address space");
+    return static_cast<std::uint32_t>(value);
+}
+void reset_fixture() {
+    fail_capture=false;
+    fixture_draw_diagnostics={};
+    fail_static_replay=false;journal_failure_tick=unexpected_draw_tick=0;
+    cpu_restore=CpuRestoreControl{};
+    match=std::make_unique<melee_web::GameplayMatchSession>(176);
+    source_state=FixtureSourceState{};source_static_counter=0;source_invariant=0x51a7u;
+    std::memset(error,0,sizeof(error));observation={};observation.frame=176;
+    observation.stocks[0]=observation.stocks[1]=4;observation.ready=1;observation.ending=0;
+    rng_profile_observation={1,0x1234u,0,UINT32_MAX,0,176,0,0};transfer_diagnostic={};
+    pcm.fill(0);input_bytes.fill(0);audio_phase=7;
+    draw_calls=0;pending_submission=false;world_exists=true;fail_admission_leaf=0;fail_replay=false;modeled_payload_byte_failure=false;
+    idle_boundary_calls=submission_boundary_calls=0;capsule_disarms=capsule_destroys=0;
+    action_disarms=action_destroys=0;tick_calls=0;tick_samples={};tick_sample_count=0;
+    interruption=StepInterruption::None;interruption_done=false;
+    commit_trace={};commit_trace_count=0;admission_trace={};admission_trace_count=0;
+    pre_action=pre_audio=pre_flow=pre_bootstrap=pre_context=pre_payload=pre_rng=0;
+    pre_pad={};pre_transfer={};post_action=0;payload_admission_state=PayloadAdmissionState::Idle;
+}
+bool configure_valid() {
+    std::array<melee_web::CpuStaticRow,2> rows{{
+        {ptr32(&source_static_counter),sizeof(source_static_counter),
+         melee_web::CpuStaticPolicy::Restore,melee_web::CpuStaticDomain::OriginalSourceC},
+        {ptr32(&source_invariant),sizeof(source_invariant),
+         melee_web::CpuStaticPolicy::Invariant,melee_web::CpuStaticDomain::OriginalSourceC}}};
+    std::sort(rows.begin(),rows.end(),[](const auto& a,const auto& b){return a.address<b.address;});
+    return melee_web_synctest_cpu_restore_configure(ptr32(rows.data()),rows.size())==0;
+}
+void close_and_retire() {
+    (void)melee_web_synctest_cpu_restore_command(5);
+    check(capsule_destroys==0,"CLOSE released the capsule before source retirement");
+    check(melee_web_synctest_cpu_before_source_close()==1,"Source close was not admitted after disarm");
+    match.reset();world_exists=false;
+    check(melee_web_synctest_cpu_after_source_close()==1,"Retired source owners did not release the capsule");
+}
+void verify_successful_interval() {
+    reset_fixture();
+    check(melee_web_synctest_cpu_restore_evidence_bytes()==11416,"Adapter evidence ABI byte size changed");
+    auto* evidence=static_cast<const CpuRestoreEvidence*>(melee_web_synctest_cpu_restore_evidence());
+    check(evidence&&evidence->schema==1&&evidence->bytes==11416,"Adapter evidence schema/size invalid");
+    check(configure_valid(),"Valid source static configuration refused");
+    check(melee_web_synctest_cpu_restore_command(1)==0,"CAPTURE failed");
+    check(melee_web_synctest_cpu_restore_command(2)==0,"Baseline/restore/replay failed");
+    evidence=static_cast<const CpuRestoreEvidence*>(melee_web_synctest_cpu_restore_evidence());
+    check(evidence->pre_frame==176&&evidence->post_frame==177,"Source frame did not reset 176→177 around replay");
+    check(tick_sample_count==2&&tick_samples[0]==300&&tick_samples[1]==300,
+          "Original adapter did not repeat the fixed sample300 input");
+    check(evidence->checked_domains==0x3fe&&evidence->matched_domains==0x3fe&&evidence->comparison.status==0,
+          "Adapter did not preserve successful per-domain evidence");
+    check(source_state.action==post_action&&source_static_counter==1&&evidence->equality==1,
+          "Replay did not reproduce exact modeled source-owned post-state");
+    const std::array<std::uint32_t,7> expected_admit{1,2,3,4,5,6,0};
+    const std::array<std::uint32_t,7> expected_write{1,2,3,4,5,6,0};
+    check(admission_trace_count==6&&std::equal(admission_trace.begin(),admission_trace.begin()+6,expected_admit.begin()),
+          "Actual fixed commit admission leaf ordering changed");
+    check(commit_trace_count==6&&std::equal(commit_trace.begin(),commit_trace.begin()+6,expected_write.begin()),
+          "Actual fixed commit writer ordering changed");
+    check(melee_web_synctest_cpu_restore_command(3)==0,"Single post-equality draw/present failed");
+    check(draw_calls==1&&pending_submission,"Adapter did not present exactly one pending draw");
+    check(idle_boundary_calls==0,"Adapter prematurely required idle submission at draw return");
+    pending_submission=false;
+    check(melee_web_synctest_cpu_restore_command(4)==0,"Later idle postdraw boundary failed");
+    check(idle_boundary_calls==1,"Adapter omitted the required later idle boundary");
+    close_and_retire();
+    check(capsule_disarms>0&&capsule_destroys==1&&action_destroys==1,
+          "Disarm/retire/destroy sequence did not retain then release the capsule");
+}
+void verify_drawn_reference_interval() {
+    reset_fixture();check(configure_valid(),"Drawn configure failed");
+    check(melee_web_synctest_cpu_restore_command(1)==0,"Drawn capture failed");
+    check(melee_web_synctest_cpu_restore_command(6)==0,"Drawn CPU/baseline submit failed");
+    check(draw_calls==1&&pending_submission&&tick_sample_count==1&&commit_trace_count==0,
+          "Baseline did not draw before any restore/replay");
+    pending_submission=false;
+    check(melee_web_synctest_cpu_restore_command(7)==0,"Drawn quiescent restore/replay failed");
+    check(draw_calls==1&&tick_sample_count==2&&cpu_restore.evidence.equality==1&&cpu_restore.drawn.stage==3,
+          "Correction unexpectedly drew or equality missing");
+    check(melee_web_synctest_cpu_restore_command(3)==0&&draw_calls==2,"Final present missing");
+    pending_submission=false;check(melee_web_synctest_cpu_restore_command(4)==0,"Postdraw owner equality failed");
+    check(cpu_restore.drawn.pair.equality==1&&cpu_restore.drawn.pair.checked_domains==0x3fe&&
+          cpu_restore.drawn.pair.matched_domains==0x3fe&&cpu_restore.drawn.draw_mask==7,
+          "Independent drawn raw/typed evidence missing");
+    check(cpu_restore.evidence.bytes==11416&&melee_web_synctest_cpu_drawn_evidence_bytes()==11832,
+          "Legacy/new evidence ABI drift");close_and_retire();
+}
+void verify_two_tick_interval() {
+    reset_fixture();check(configure_valid(),"Two configure refused");
+    check(melee_web_synctest_cpu_two_tick_evidence_bytes()==35368,"Two ABI size drift");
+    check(melee_web_synctest_cpu_restore_command(8)==0,"Two capture refused");
+    check(melee_web_synctest_cpu_restore_command(9)==0&&draw_calls==1&&tick_calls==1,"First baseline order");
+    pending_submission=false;
+    check(melee_web_synctest_cpu_restore_command(10)==0&&draw_calls==2&&tick_calls==2,"Second baseline order");
+    pending_submission=false;
+    check(melee_web_synctest_cpu_restore_command(11)==0&&tick_calls==4&&draw_calls==2,"Two replay refused or drew");
+    check(tick_samples==std::array<unsigned,4>{300,301,300,301},"Two literal sample order");
+    const auto& e=cpu_restore.two;
+    check(e.cpu_equality==1&&e.checked_cpu==0x3fe&&e.matched_cpu==0x3fe&&
+          e.tick_pairs[0].equality==1&&e.tick_pairs[0].checked_domains==0&&e.tick_pairs[1].equality==1,
+          "Two raw/typed CPU evidence missing");
+    check(melee_web_synctest_cpu_restore_command(12)==0&&draw_calls==3,"Two final draw refused");
+    pending_submission=false;check(melee_web_synctest_cpu_restore_command(13)==0,"Two final completion refused");
+    check(e.diagnostic_mask==255&&e.drawn_equality==1&&e.checked_drawn==0x3fe&&e.matched_drawn==0x3fe&&
+          e.diagnostics[0]==e.diagnostics[1]&&e.diagnostics[2]==e.diagnostics[3]&&
+          e.diagnostics[4]==e.diagnostics[5]&&e.diagnostics[4]==e.diagnostics[6],"Two diagnostic boundaries");
+    check(e.drawn_pair.pre_frame==e.post_frame&&e.drawn_pair.post_frame==e.post_frame,
+          "New two-tick drawn pair must label the same source endpoint");
+    // Actual Wasm ABI bytes, not a handwritten JS success buffer. Source-world
+    // leaves are still the explicit fixture models described at file start.
+    EM_ASM({console.log("CPU_TWO_ACTUAL_WASM_EVIDENCE_BASE64="+
+        Buffer.from(HEAPU8.subarray($0,$0+$1)).toString("base64"));},&cpu_restore.two,sizeof(cpu_restore.two));
+    close_and_retire();
+}
+void verify_payload_failure_retention() {
+    reset_fixture();check(configure_valid(),"Witness configure");
+    check(!melee_web_synctest_cpu_restore_command(8)&&!melee_web_synctest_cpu_restore_command(9),"Witness baseline300");
+    pending_submission=false;check(!melee_web_synctest_cpu_restore_command(10),"Witness baseline301");
+    pending_submission=false;modeled_payload_byte_failure=true;
+    check(melee_web_synctest_cpu_restore_command(11)==1216&&draw_calls==2,"Witness must preserve1216/no final present");
+    check(melee_web_synctest_cpu_payload_failure_witness_bytes()==256,"Witness fixed ABI");
+    const auto saved=*static_cast<const MeleeWebSourcePayloadFailureWitness*>(melee_web_synctest_cpu_payload_failure_witness());
+    check(saved.schema==1&&saved.first_difference_matches==1&&saved.window.row==7&&saved.window.offset==5,
+          "Actual adapter retained modeled leaf witness before refusal");
+    EM_ASM({console.log("CPU_PAYLOAD_ACTUAL_WASM_WITNESS_BASE64="+
+        Buffer.from(HEAPU8.subarray($0,$0+$1)).toString("base64"));},melee_web_synctest_cpu_payload_failure_witness(),256);
+    check(melee_web_synctest_cpu_restore_command(5)==1216,"CLOSE preserves original1216");
+    check(!std::memcmp(&saved,melee_web_synctest_cpu_payload_failure_witness(),256),"CLOSE preserves witness bytes");
+    close_and_retire();
+}
+void verify_two_tick_refusals() {
+    reset_fixture();check(configure_valid(),"Two refusal configure");
+    check(melee_web_synctest_cpu_restore_command(8)==0&&melee_web_synctest_cpu_restore_command(9)==0,"Two refusal setup");
+    const auto busy=melee_web_synctest_cpu_restore_command(10);
+    check(busy!=0&&tick_calls==1&&draw_calls==1,"Busy baseline advanced second source tick");
+    pending_submission=false;
+    check(melee_web_synctest_cpu_restore_command(10)==busy&&tick_calls==1,"Busy failure was not latched");
+    close_and_retire();
+    reset_fixture();check(configure_valid(),"Two interval configure");
+    check(melee_web_synctest_cpu_restore_command(8)==0&&melee_web_synctest_cpu_restore_command(9)==0,"Two interval setup");
+    pending_submission=false;fail_replay=true;
+    check(melee_web_synctest_cpu_restore_command(10)!=0&&tick_calls==1,"Latched interval failure stepped301");
+    close_and_retire();
+    for(bool unexpected_draw:{false,true}) {
+        reset_fixture();check(configure_valid(),"Two replay interruption configure");
+        check(melee_web_synctest_cpu_restore_command(8)==0&&melee_web_synctest_cpu_restore_command(9)==0,"Two replay interruption setup");
+        pending_submission=false;check(melee_web_synctest_cpu_restore_command(10)==0,"Two replay interruption baseline301");
+        pending_submission=false;
+        if(unexpected_draw)unexpected_draw_tick=3;else journal_failure_tick=3;
+        const auto refusal=melee_web_synctest_cpu_restore_command(11);
+        check(refusal!=0&&tick_calls==3&&draw_calls==2,"First replay failure did not stop before sample301/present");
+        check(melee_web_synctest_cpu_restore_command(12)==refusal&&draw_calls==2,"Failure permitted final draw");
+        close_and_retire();
+    }
+    reset_fixture();check(configure_valid(),"Two mixed configure");
+    check(melee_web_synctest_cpu_restore_command(8)==0,"Two mixed capture");
+    check(melee_web_synctest_cpu_restore_command(2)!=0&&tick_calls==0,"Legacy command entered two route");
+    close_and_retire();
+}
+void verify_drawn_refusal_and_postdraw_mismatch() {
+    reset_fixture();check(configure_valid(),"Configure failed");
+    check(!melee_web_synctest_cpu_restore_command(1)&&!melee_web_synctest_cpu_restore_command(6),"Baseline failed");
+    const auto busy=melee_web_synctest_cpu_restore_command(7);
+    check(busy&&commit_trace_count==0&&tick_sample_count==1,"Busy baseline wrote restore state");
+    pending_submission=false;check(melee_web_synctest_cpu_restore_command(7)==busy,"Busy refusal not latched");close_and_retire();
+    for(unsigned leaf=1;leaf<=6;++leaf){
+        reset_fixture();check(configure_valid(),"Configure failed");
+        check(!melee_web_synctest_cpu_restore_command(1)&&!melee_web_synctest_cpu_restore_command(6),"Baseline failed");
+        pending_submission=false;fail_admission_leaf=leaf;
+        check(melee_web_synctest_cpu_restore_command(7)!=0&&commit_trace_count==0&&tick_sample_count==1,
+              "Drawn admission refusal wrote source or replayed");close_and_retire();
+    }
+    reset_fixture();check(configure_valid(),"Configure failed");
+    check(!melee_web_synctest_cpu_restore_command(1)&&!melee_web_synctest_cpu_restore_command(6),"Baseline failed");
+    pending_submission=false;source_invariant^=1;
+    check(melee_web_synctest_cpu_restore_command(7)==0x4a4&&commit_trace_count==0&&tick_sample_count==1&&
+          cpu_restore.drawn.pair.comparison.domain==9&&cpu_restore.drawn.pair.comparison.status==2&&
+          cpu_restore.drawn.pair.comparison.address==ptr32(&source_invariant),
+          "Baseline draw invariant refusal lost exact row/byte evidence or wrote restore state");close_and_retire();
+    reset_fixture();check(configure_valid(),"Configure failed");
+    check(!melee_web_synctest_cpu_restore_command(1)&&!melee_web_synctest_cpu_restore_command(6),"Baseline failed");
+    pending_submission=false;check(!melee_web_synctest_cpu_restore_command(7)&&!melee_web_synctest_cpu_restore_command(3),"Replay/final failed");
+    pending_submission=false;++source_state.flow;
+    check(melee_web_synctest_cpu_restore_command(4)!=0&&cpu_restore.drawn.pair.equality==0,
+          "Actual adapter accepted changed postdraw modeled clock leaf");close_and_retire();
+    reset_fixture();check(configure_valid(),"Configure failed");
+    check(!melee_web_synctest_cpu_restore_command(1)&&!melee_web_synctest_cpu_restore_command(6),"Baseline failed");
+    pending_submission=false;check(!melee_web_synctest_cpu_restore_command(7)&&!melee_web_synctest_cpu_restore_command(3),"Replay/final failed");
+    pending_submission=false;++source_static_counter;
+    check(melee_web_synctest_cpu_restore_command(4)!=0&&cpu_restore.drawn.pair.comparison.domain==9&&
+          cpu_restore.drawn.pair.comparison.status==2,"Actual read-only static endpoint mismatch was lost");close_and_retire();
+}
+void verify_capture_refusal_retains_typed_reason_through_close() {
+    reset_fixture();check(configure_valid(),"Configuration failed");fail_capture=true;
+    const auto result=melee_web_synctest_cpu_restore_command(1);
+    check(result==0x434&&tick_sample_count==0&&draw_calls==0,"Capture refusal ran source work");
+    const auto* e=static_cast<const CpuRestoreEvidence*>(melee_web_synctest_cpu_restore_evidence());
+    check(e->comparison.domain==7&&e->comparison.status==1&&e->comparison.detail==5&&
+          e->comparison.row==UINT32_MAX&&e->comparison.offset==UINT32_MAX&&e->commit_result==UINT32_MAX,
+          "Structured capture refusal lost or invented byte evidence");
+    const std::string message(error);check(message.find("fixture bootstrap capture refusal")!=std::string::npos,"Leaf reason lost");
+    check(melee_web_synctest_cpu_restore_command(5)==result&&std::string(error)==message,
+          "CLOSE lost first capture refusal");
+    check(e->comparison.domain==7&&e->comparison.detail==5&&tick_sample_count==0&&draw_calls==0,
+          "CLOSE cleared native capture refusal or ran source work");
+    check(melee_web_synctest_cpu_before_source_close()==1,"Source close refused");
+    match.reset();world_exists=false;check(melee_web_synctest_cpu_after_source_close()==1,"Source retirement refused");
+}
+void verify_admission_refusal_blocks_draw_and_retains_failure() {
+    reset_fixture();
+    check(configure_valid(),"Valid source static configuration refused");
+    check(melee_web_synctest_cpu_restore_command(1)==0,"CAPTURE failed");
+    fail_admission_leaf=2;
+    const auto first=melee_web_synctest_cpu_restore_command(2);
+    check(first!=0&&draw_calls==0,"Admission refusal reached draw");
+    const std::string first_message(error);
+    check(melee_web_synctest_cpu_restore_command(3)==first&&draw_calls==0&&
+          std::string(error)==first_message,"First admission failure was not latched");
+    check(commit_trace_count==0,"A component admission refusal wrote CPU owner state");
+    close_and_retire();
+}
+void verify_replay_refusal_blocks_draw() {
+    reset_fixture();
+    check(configure_valid(),"Valid source static configuration refused");
+    check(melee_web_synctest_cpu_restore_command(1)==0,"CAPTURE failed");
+    fail_replay=true;
+    const auto first=melee_web_synctest_cpu_restore_command(2);
+    check(first!=0&&draw_calls==0,"Replay mismatch reached draw/present");
+    check(melee_web_synctest_cpu_restore_command(3)==first&&draw_calls==0,
+          "Replay failure did not block later draw/present");
+    close_and_retire();
+}
+void verify_actual_static_byte_diff_is_retained() {
+    reset_fixture();check(configure_valid(),"Configuration failed");
+    check(melee_web_synctest_cpu_restore_command(1)==0,"CAPTURE failed");
+    fail_static_replay=true;
+    check(melee_web_synctest_cpu_restore_command(2)!=0&&draw_calls==0,"Actual static mismatch reached draw");
+    const auto* e=static_cast<const CpuRestoreEvidence*>(melee_web_synctest_cpu_restore_evidence());
+    check(e->comparison.domain==9&&e->comparison.status==2&&e->comparison.offset==0&&
+          e->comparison.expected==1&&e->comparison.actual==2&&e->comparison.extent==4&&
+          e->checked_domains==0x3fe&&e->matched_domains==0x1fe,
+          "First actual static row/offset/bytes or masks missing from failure evidence");
+    close_and_retire();
+}
+void verify_source_close_reentry_disarms_before_retirement() {
+    reset_fixture();
+    check(configure_valid(),"Valid source static configuration refused");
+    check(melee_web_synctest_cpu_restore_command(1)==0,"CAPTURE failed");
+    interruption=StepInterruption::ReenterSourceClose;
+    const auto first=melee_web_synctest_cpu_restore_command(2);
+    check(first!=0&&capsule_disarms>0&&capsule_destroys==0,
+          "Reentrant source close did not fail and disarm while retaining capsule leases");
+    const std::string first_message(error);
+    check(melee_web_synctest_cpu_restore_command(3)==first&&std::string(error)==first_message&&draw_calls==0,
+          "Source-close first failure was not retained or later draw was not blocked");
+    check(melee_web_synctest_cpu_before_source_close()==1,"Retried source close after unwind was not admitted");
+    check(capsule_destroys==0,"Source close hook released capsule before owner retirement");
+    match.reset();world_exists=false;
+    check(melee_web_synctest_cpu_after_source_close()==1&&capsule_destroys==1,
+          "Capsule was not released after source owner retirement");
+}
+void verify_command_reentry() {
+    reset_fixture();
+    check(configure_valid(),"Valid source static configuration refused");
+    check(melee_web_synctest_cpu_restore_command(1)==0,"CAPTURE failed");
+    interruption=StepInterruption::ReenterCommand;
+    const auto first=melee_web_synctest_cpu_restore_command(2);
+    check(first!=0&&capsule_disarms>0&&capsule_destroys==0,
+          "Reentrant command was accepted or released capsule too early");
+    const std::string first_message(error);
+    check(melee_web_synctest_cpu_restore_command(3)==first&&std::string(error)==first_message&&draw_calls==0,
+          "Reentrant-command first failure was not retained");
+    close_and_retire();
+}
+void verify_invalid_configuration_guards() {
+    const auto check_bad=[&](std::uint32_t address,std::uint32_t count,const char* label) {
+        reset_fixture();
+        const auto result=melee_web_synctest_cpu_restore_configure(address,count);
+        check(result!=0,label);
+        auto* evidence=static_cast<const CpuRestoreEvidence*>(melee_web_synctest_cpu_restore_evidence());
+        check(evidence&&evidence->first_failure==result&&evidence->state==CpuRestoreControl::Failed,
+              "Invalid configuration did not publish a stable first failure");
+    };
+    check_bad(0,1,"Null config address was accepted");
+    check_bad(1,1,"Misaligned config address was accepted");
+    check_bad(static_cast<std::uint32_t>(emscripten_get_heap_size()-4),1,
+              "Out-of-bounds config extent was accepted");
+    check_bad(ptr32(&source_static_counter),UINT32_MAX,"Overflowing config row count was accepted");
+    reset_fixture();
+    std::array<melee_web::CpuStaticRow,1> forbidden{{
+        {ptr32(&audio_phase),sizeof(audio_phase),melee_web::CpuStaticPolicy::Restore,
+         melee_web::CpuStaticDomain::OriginalSourceC}}};
+    check(melee_web_synctest_cpu_restore_configure(ptr32(forbidden.data()),1)!=0,
+          "Forbidden live adapter range was accepted as a restore row");
+    reset_fixture();
+    forbidden[0].address=ptr32(&storage_profile_phase);forbidden[0].bytes=sizeof(storage_profile_phase);
+    check(melee_web_synctest_cpu_restore_configure(ptr32(forbidden.data()),1)!=0,
+          "Typed profile phase was accepted by static writer");
+}
+}
+
+extern "C" int melee_web_snapshot_step(unsigned sample) {
+    if(!match||(sample!=300&&!(cpu_restore.two_active&&sample==301))||tick_sample_count>=tick_samples.size()) return 0;
+    tick_samples[tick_sample_count++]=sample;++tick_calls;
+    if(!interruption_done&&interruption==StepInterruption::ReenterCommand) {
+        interruption_done=true;(void)melee_web_synctest_cpu_restore_command(5);
+    } else if(!interruption_done&&interruption==StepInterruption::ReenterSourceClose) {
+        interruption_done=true;(void)melee_web_synctest_cpu_before_source_close();
+    }
+    if(cpu_restore.two_active&&sample==301&&draw_calls==2)++source_state.flow; // modeled deferred completion
+    match->increment_source_frames();
+    ++source_state.action;++source_state.audio;++source_state.flow;
+    ++source_state.bootstrap;++source_state.context;++source_state.payload;++source_state.rng;
+    for(std::size_t i=0;i<source_state.pad.size();++i) source_state.pad[i]=std::uint8_t(sample+i+source_state.payload);
+    const std::array<uint8_t,44> literal0{2,0,0,0,0,0,0,0,0,0,0,1,0,176,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,255,0,0,0,0,0,0,0,0,0,0,255};
+    const std::array<uint8_t,44> literal1{0,0,80,0,0,0,0,0,0,0,0,0,0,176,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,255,0,0,0,0,0,0,0,0,0,0,255};
+    if(cpu_restore.two_active)source_state.pad=sample==300?literal0:literal1;
+    for(std::size_t i=0;i<source_state.transfer.size();++i) source_state.transfer[i]=int(source_state.payload+i);
+    if(tick_calls==journal_failure_tick)fail_replay=true;
+    if(tick_calls==unexpected_draw_tick)++fixture_draw_diagnostics[21];
+    ++source_static_counter;
+    if(fail_static_replay&&tick_calls==2)++source_static_counter;
+    observation={};observation.ready=1;observation.frame=match->source_frames();observation.rng=source_state.rng;
+    observation.stocks[0]=observation.stocks[1]=4;observation.motion[0]=14;observation.motion[1]=14;
+    observation.pcm_frames=533;observation.audio_phase=audio_phase;
+    observation.players[0].stocks=observation.players[1].stocks=4;
+    observation.players[0].motion_id=observation.players[1].motion_id=14;
+    std::copy(source_state.pad.begin(),source_state.pad.end(),observation.pad_history);
+    input_bytes=source_state.pad;
+    audio_phase+=32000;
+    const unsigned frames=audio_phase/60;
+    audio_phase%=60;
+    observation.audio_phase=audio_phase;
+    observation.pcm_frames=frames;
+    for(std::size_t i=0;i<pcm.size();++i) pcm[i]=float((source_state.audio+i)%31)/31.0f;
+    transfer_diagnostic={};transfer_diagnostic.sample=sample;
+    transfer_diagnostic.before_tick_drive=source_state.transfer[0];
+    transfer_diagnostic.before_tick_source=source_state.transfer[1];
+    transfer_diagnostic.before_tick_bank=source_state.transfer[2];
+    transfer_diagnostic.after_tick_drive=source_state.transfer[3];
+    transfer_diagnostic.after_tick_source=source_state.transfer[4];
+    transfer_diagnostic.after_tick_bank=source_state.transfer[5];
+    transfer_diagnostic.after_audio_drive=source_state.transfer[6];
+    transfer_diagnostic.after_audio_source=source_state.transfer[7];
+    transfer_diagnostic.after_audio_bank=source_state.transfer[8];
+    rng_profile_observation.callback_count++;
+    rng_profile_observation.callback_frame=observation.frame;
+    rng_profile_observation.callback_seed=source_state.rng;
+    rng_profile_observation.source_global_frame=observation.frame;
+    return 1;
+}
+extern "C" int melee_web_synctest_draw_present() {
+    if(!match||draw_calls>=(cpu_restore.two_active?3u:2u)) return 0;
+    if(cpu_restore.drawn.mode||cpu_restore.two_active)++source_state.flow; // Explicit modeled presentation-clock leaf.
+    ++fixture_draw_diagnostics[8];++fixture_draw_diagnostics[12];
+    ++draw_calls;pending_submission=true;return 1;
+}
+
+int main() {
+    try {
+#if MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
+        verify_two_tick_interval();
+        verify_two_tick_refusals();
+        verify_payload_failure_retention();
+#else
+        reset_fixture();check(configure_valid(),"V5 configure");
+        check(melee_web_synctest_cpu_restore_command(8)==0x4b0u&&tick_calls==0&&draw_calls==0,
+              "Default V5 admitted two-tick route or executed source work");
+        close_and_retire();
+#endif
+        verify_successful_interval();
+        verify_drawn_reference_interval();
+        verify_drawn_refusal_and_postdraw_mismatch();
+        verify_capture_refusal_retains_typed_reason_through_close();
+        verify_admission_refusal_blocks_draw_and_retains_failure();
+        verify_replay_refusal_blocks_draw();
+        verify_actual_static_byte_diff_is_retained();
+        verify_source_close_reentry_disarms_before_retirement();
+        verify_command_reentry();
+        verify_invalid_configuration_guards();
+        std::puts("Actual CPU adapter control passed: frame-reset/replay, strict equality, ordered leaves, draw gating, busy→idle, first-failure and close lifetime.");
+        return 0;
+    } catch(const std::exception& failure) {
+        std::fprintf(stderr,"CPU adapter control failure: %s\n",failure.what());
+        return 1;
+    }
+}

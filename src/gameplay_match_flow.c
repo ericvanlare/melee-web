@@ -4,6 +4,7 @@
 #include <melee/lb/lbaudio_ax.h>
 #include <melee/gm/gm_1A45.h>
 #include <melee/gm/forward.h>
+#include <sysdolphin/baselib/gobj.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -17,6 +18,7 @@ struct MeleeWebMatchFlow {
     int opening_demo;
 };
 static MeleeWebMatchFlow* owner;
+static uint64_t owner_epoch;
 static int fail(char* error, size_t size, const char* message)
 {
     if (error && size) snprintf(error, size, "%s", message);
@@ -57,6 +59,7 @@ MeleeWebMatchFlow* melee_web_match_flow_begin(int opening_demo,
     }
     flow->generation = generation;
     flow->opening_demo = opening_demo != 0;
+    if (++owner_epoch == 0) ++owner_epoch;
     owner = flow;
     return flow;
 }
@@ -149,4 +152,140 @@ uint32_t melee_web_match_flow_frames(const MeleeWebMatchFlow* flow)
 int melee_web_match_flow_result(const MeleeWebMatchFlow* flow)
 {
     return live(flow) ? melee_web_match_source_result() : OUTCOME_NONE;
+}
+
+
+struct MeleeWebMatchFlowSnapshot {
+    MeleeWebMatchFlow* identity;
+    uint64_t epoch;
+    MeleeWebMatchFlow value;
+    MeleeWebSourceClockSnapshot* source_clock;
+};
+static int flow_snapshot_boundary(MeleeWebMatchFlow* flow,char* e,size_t n)
+{
+    if (!live(flow) || HSD_GObj_804D781C || HSD_GObj_804D7818 || HSD_GObj_804D7814)
+        return fail(e,n,"Flow snapshot requires a quiescent live owner");
+    return 1;
+}
+MeleeWebMatchFlowSnapshot* melee_web_match_flow_snapshot_capture(
+    MeleeWebMatchFlow* flow,char* e,size_t n)
+{
+    if (!flow_snapshot_boundary(flow,e,n)) return NULL;
+    MeleeWebMatchFlowSnapshot* snapshot=malloc(sizeof(*snapshot));
+    if (!snapshot) {fail(e,n,"Cannot allocate match-flow snapshot");return NULL;}
+    snapshot->identity=flow;snapshot->epoch=owner_epoch;snapshot->value=*flow;
+    snapshot->source_clock=melee_web_source_clock_snapshot_capture(
+        flow,owner_epoch,flow->generation);
+    if (!snapshot->source_clock) {
+        free(snapshot);
+        fail(e,n,"Cannot capture the source-owned match clock");
+        return NULL;
+    }
+    if(e&&n)*e=0;
+    return snapshot;
+}
+int melee_web_match_flow_snapshot_admit(MeleeWebMatchFlow* flow,
+    const MeleeWebMatchFlowSnapshot* snapshot,char* e,size_t n)
+{
+    if (!snapshot) return fail(e,n,"Match-flow snapshot is missing");
+    if (!flow_snapshot_boundary(flow,e,n)) return 0;
+    if (snapshot->identity!=flow || snapshot->epoch!=owner_epoch ||
+        snapshot->value.generation!=flow->generation ||
+        snapshot->value.opening_demo!=flow->opening_demo)
+        return fail(e,n,"Match-flow lifetime or scene identity changed");
+    if (!melee_web_source_clock_snapshot_admit(snapshot->source_clock,
+            flow,snapshot->epoch,flow->generation))
+        return fail(e,n,"Source-owned match clock lifetime or topology changed");
+    if(e&&n)*e=0;
+    return 1;
+}
+int melee_web_match_flow_snapshot_restore(MeleeWebMatchFlow* flow,
+    const MeleeWebMatchFlowSnapshot* snapshot,char* e,size_t n)
+{
+    if (!melee_web_match_flow_snapshot_admit(flow,snapshot,e,n)) return 0;
+    /* This legacy operation restores only flow values. The source-clock
+     * companion is read-only and source cadence is a separate owner. */
+    *flow=snapshot->value;
+    return 1;
+}
+void melee_web_match_flow_snapshot_destroy(MeleeWebMatchFlowSnapshot* snapshot)
+{
+    if (snapshot) melee_web_source_clock_snapshot_destroy(snapshot->source_clock);
+    free(snapshot);
+}
+
+
+struct MeleeWebMatchFlowCpuSnapshot {
+    MeleeWebMatchFlowSnapshot* flow;
+    MeleeWebSourceCadenceSnapshot* cadence;
+};
+MeleeWebMatchFlowCpuSnapshot* melee_web_match_flow_cpu_snapshot_capture(
+    MeleeWebMatchFlow* flow,char* e,size_t n)
+{
+    MeleeWebMatchFlowCpuSnapshot* snapshot=calloc(1,sizeof(*snapshot));
+    if (!snapshot) {fail(e,n,"Cannot allocate flow CPU companion");return NULL;}
+    snapshot->flow=melee_web_match_flow_snapshot_capture(flow,e,n);
+    if (!snapshot->flow) {
+        /* Preserve the actual flow/source-clock error, rather than replacing
+         * it with an ambiguous aggregate message. */
+        melee_web_match_flow_cpu_snapshot_destroy(snapshot);return NULL;
+    }
+    snapshot->cadence=melee_web_source_cadence_snapshot_capture(
+        flow,snapshot->flow->epoch,flow->generation);
+    if (!snapshot->cadence) {
+        melee_web_match_flow_cpu_snapshot_destroy(snapshot);
+        fail(e,n,"Source cadence snapshot capture returned null");return NULL;
+    }
+    if (!melee_web_source_clock_snapshot_cpu_mask_admit(
+            snapshot->flow->source_clock,flow,owner_epoch,flow->generation)) {
+        melee_web_match_flow_cpu_snapshot_destroy(snapshot);
+        fail(e,n,"Clock saved mask has no supported CPU snapshot owner");return NULL;
+    }
+    return snapshot;
+}
+int melee_web_match_flow_cpu_snapshot_admit(MeleeWebMatchFlow* flow,
+    const MeleeWebMatchFlowCpuSnapshot* snapshot,char* e,size_t n)
+{
+    if (!snapshot || !snapshot->flow || !snapshot->cadence)
+        return fail(e,n,"Flow CPU companion is incomplete");
+    if (!melee_web_match_flow_snapshot_admit(flow,snapshot->flow,e,n))return 0;
+    if (!melee_web_source_clock_snapshot_cpu_mask_admit(
+            snapshot->flow->source_clock,flow,owner_epoch,flow->generation))
+        return fail(e,n,"Clock saved mask has no supported CPU snapshot owner");
+    if (!melee_web_source_cadence_snapshot_admit(snapshot->cadence,
+            flow,snapshot->flow->epoch,flow->generation))
+        return fail(e,n,"Source cadence owner or lifetime changed");
+    return 1;
+}
+int melee_web_match_flow_cpu_snapshot_restore(MeleeWebMatchFlow* flow,
+    const MeleeWebMatchFlowCpuSnapshot* snapshot,char* e,size_t n)
+{
+    if (!melee_web_match_flow_cpu_snapshot_admit(flow,snapshot,e,n))return 0;
+    /* All checks precede the first write. These source-local writers cannot
+     * invalidate each other's checked owner/lifetime/callback predicates. */
+    if (!melee_web_source_clock_snapshot_restore(snapshot->flow->source_clock,
+            flow,snapshot->flow->epoch,flow->generation))return 0;
+    if (!melee_web_source_cadence_snapshot_restore(snapshot->cadence,
+            flow,snapshot->flow->epoch,flow->generation))return 0;
+    *flow=snapshot->flow->value;
+    return 1;
+}
+int melee_web_match_flow_cpu_snapshot_matches(MeleeWebMatchFlow* flow,
+    const MeleeWebMatchFlowCpuSnapshot* snapshot,char* e,size_t n)
+{
+    if (!melee_web_match_flow_cpu_snapshot_admit(flow,snapshot,e,n))return 0;
+    const MeleeWebMatchFlow* old=&snapshot->flow->value;
+    return old->generation==flow->generation && old->source_valid==flow->source_valid &&
+        old->complete==flow->complete && old->opening_demo==flow->opening_demo &&
+        melee_web_source_clock_snapshot_matches(snapshot->flow->source_clock,
+            flow,snapshot->flow->epoch,flow->generation) &&
+        melee_web_source_cadence_snapshot_matches(snapshot->cadence,
+            flow,snapshot->flow->epoch,flow->generation);
+}
+void melee_web_match_flow_cpu_snapshot_destroy(MeleeWebMatchFlowCpuSnapshot* snapshot)
+{
+    if (!snapshot)return;
+    melee_web_match_flow_snapshot_destroy(snapshot->flow);
+    melee_web_source_cadence_snapshot_destroy(snapshot->cadence);
+    free(snapshot);
 }

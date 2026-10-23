@@ -50,6 +50,121 @@ MeleeWebSourceMemoryReadStatus melee_web_source_memory_context_read(
 MeleeWebSourceMemoryReadStatus melee_web_source_memory_allocation_read(
     const void* exact_host_payload, MeleeWebSourceMemoryAllocation* out);
 
+/* Private source-memory mirror checkpoint, NOT a game/arena checkpoint.
+ * Captures address-heap cells, live allocation identities, fighter leases and
+ * allocation watermark by value. Host payloads and every other owner must be
+ * captured/restored by their own proven contract. Calling this API alone does
+ * not authorize restoring a rendered match. Caller serializes these operations
+ * at a quiescent source boundary and admits all companion owners before writes.
+ * A restart invalidates snapshots even if the caller reuses a world number.
+ * Admission/refusal never modifies the owner. Restore stages all allocations
+ * before committing; refused/failed restores preserve the complete live mirror.
+ * Snapshots remain reusable until destroy; destroy accepts NULL. */
+typedef struct MeleeWebSourceMemorySnapshot MeleeWebSourceMemorySnapshot;
+typedef enum MeleeWebSourceMemorySnapshotStatus {
+    MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_OK = 0,
+    MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_INVALID_ARGUMENT = 1,
+    MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_INACTIVE = 2,
+    MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_UNHEALTHY = 3,
+    MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_STALE_OWNER = 4,
+    MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_ALLOCATION_FAILED = 5,
+    MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_INVALID_STATE = 6,
+} MeleeWebSourceMemorySnapshotStatus;
+MeleeWebSourceMemorySnapshotStatus melee_web_source_memory_snapshot_capture(
+    MeleeWebSourceMemorySnapshot** out);
+MeleeWebSourceMemorySnapshotStatus melee_web_source_memory_snapshot_admit(
+    const MeleeWebSourceMemorySnapshot* snapshot);
+MeleeWebSourceMemorySnapshotStatus melee_web_source_memory_snapshot_restore(
+    const MeleeWebSourceMemorySnapshot* snapshot);
+void melee_web_source_memory_snapshot_destroy(MeleeWebSourceMemorySnapshot* snapshot);
+
+/* Payload-only checkpoint for the exact live OSAllocFromHeap payloads tracked
+ * by the active source-main-heap owner. This is distinct from the mirror
+ * snapshot above: it copies bytes, never rewinds allocator cells or identities,
+ * and restores only while the complete live topology and lifetime watermark
+ * are unchanged. Callers serialize it at a quiescent source boundary and still
+ * admit every other owner before any broader operation. Capture returns its
+ * result by value so the caller cannot supply an output pointer that aliases a
+ * live payload. */
+typedef struct MeleeWebSourceMemoryPayloadSnapshot
+    MeleeWebSourceMemoryPayloadSnapshot;
+typedef enum MeleeWebSourceMemoryPayloadSnapshotStatus {
+    MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK = 0,
+    MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_ARGUMENT = 1,
+    MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INACTIVE = 2,
+    MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_UNHEALTHY = 3,
+    MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_STALE_OWNER = 4,
+    MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED = 5,
+    MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE = 6,
+    MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_ALLOCATION_FAILED = 7,
+    MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OVERLAPPING_STORAGE = 8,
+} MeleeWebSourceMemoryPayloadSnapshotStatus;
+typedef struct MeleeWebSourceMemoryPayloadSnapshotCaptureResult {
+    MeleeWebSourceMemoryPayloadSnapshotStatus status;
+    MeleeWebSourceMemoryPayloadSnapshot* snapshot;
+} MeleeWebSourceMemoryPayloadSnapshotCaptureResult;
+MeleeWebSourceMemoryPayloadSnapshotCaptureResult
+melee_web_source_memory_payload_snapshot_capture(void);
+MeleeWebSourceMemoryPayloadSnapshotStatus
+melee_web_source_memory_payload_snapshot_admit(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot);
+MeleeWebSourceMemoryPayloadSnapshotStatus
+melee_web_source_memory_payload_snapshot_restore(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot);
+/* Exact live payload equality, after normal owner/topology admission. No copy
+ * or pointer/mirror restoration is performed. Returns exactly 1 or 0. */
+/* status: 0 equal, 1 owner/admission refusal, 2 first actual byte difference.
+ * Index/offset name the exact admitted ledger row, never an inferred owner. */
+typedef struct MeleeWebSourcePayloadComparison {
+    uint32_t status, admission_status;
+    size_t allocation_index, byte_offset;
+    uintptr_t host_address;
+    uint32_t source_address, requested_bytes, expected_byte, actual_byte;
+} MeleeWebSourcePayloadComparison;
+MeleeWebSourcePayloadComparison melee_web_source_memory_payload_snapshot_compare_live(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot);
+/* Private read-only failure witness. The snapshot is an existing internal live
+ * snapshot handle, as for compare_live; there is no caller-selected address,
+ * row, offset or output pointer. status 0=equal, 1=admission/refusal, 2=actual
+ * byte difference. Refusal/equal carry no payload/identity data. root_kind
+ * is always 0=UNKNOWN; root_count/root_host/root_generation are reserved zero.
+ * FighterLease is not allocation-generation-linked and is not provenance.
+ * All restore and ownership admission rules are unchanged. */
+typedef struct MeleeWebSourcePayloadWitness {
+    uint32_t schema, bytes, status, admission_status;
+    uint32_t row, offset, source_address, requested_bytes;
+    uint32_t window_offset, window_count, root_kind, root_count;
+    uint64_t host_address, allocation_generation, owner_epoch, world_generation;
+    uint64_t topology_revision, root_host, root_generation;
+    uint8_t expected[32], actual[32];
+} MeleeWebSourcePayloadWitness;
+MeleeWebSourcePayloadWitness melee_web_source_memory_payload_snapshot_witness(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot);
+/* Diagnostic-only actual-source pool event; not exported to JavaScript.
+ * alignment_mask is original HSD_ObjAllocData.align (alignment minus one).
+ * Runtime never dereferences descriptor or an untracked/interior pool pointer.
+ * Inactive builds preserve generic allocator linkage (source call is guarded). */
+void melee_web_source_memory_objalloc_event(const void* pool, const void* descriptor,
+    uint32_t stride, uint32_t count, uint32_t alignment_mask,
+    uint32_t pool_bytes, uint32_t internal_heap);
+/* Fixed failure evidence. attribution 0=UNKNOWN, 1=observed pool association
+ * requiring offline exact named source-symbol join, 2=REFUSED. It is never
+ * ownership/type/restore admission. Original comparison remains authoritative. */
+typedef struct MeleeWebSourcePayloadFailureWitness {
+    uint32_t schema, bytes, original_status, first_difference_matches;
+    MeleeWebSourcePayloadWitness window;
+    uint32_t hook_active, attribution, reason, association_state;
+    uint64_t descriptor, allocation_generation, owner_epoch, world_generation;
+    uint32_t stride, count, alignment_mask, pool_bytes, cell_index, cell_offset;
+} MeleeWebSourcePayloadFailureWitness;
+MeleeWebSourcePayloadFailureWitness melee_web_source_memory_payload_failure_witness(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot,
+    MeleeWebSourcePayloadComparison original);
+int melee_web_source_memory_payload_snapshot_matches_live(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot);
+void melee_web_source_memory_payload_snapshot_destroy(
+    MeleeWebSourceMemoryPayloadSnapshot* snapshot);
+
 /* Fighter_Create / ftDemo_CreateFighter and Fighter_Unload bind the allocation to its
  * live host owner. Reuse advances allocation_generation even if an HSD free
  * chain returns the same object address. */

@@ -114,7 +114,7 @@ add_library(fighter_asset_runtime STATIC EXCLUDE_FROM_ALL
   src/gameplay_replay_transport.cpp src/gameplay_replay_session.cpp
   src/runtime_archive_cache.cpp
   src/gameplay_audio_bank.cpp src/gameplay_audio_stream_asset.cpp src/dat_audio_stream.cpp src/dat_audio.cpp src/dat_audio_programs.cpp
-  src/gameplay_hud_assets.cpp src/gameplay_asset_manifest.cpp src/dat_scene.cpp src/gameplay_menu_world.cpp src/gameplay_match_session.cpp src/dat_menu_support.cpp src/dat_event_menu.cpp src/dat_audio_load_data.cpp src/dat_shape_animation.cpp src/dat_sis.cpp src/dat_native_menu.cpp src/dat_item_article.cpp src/dat_stage_items.cpp src/dat_stage_yaku.cpp src/gameplay_world.cpp src/dat_color_animation.cpp src/dat_native_stage.cpp src/dat_archive.cpp src/dat_common.cpp src/dat_native_joint.cpp src/rigid_model.cpp
+  src/gameplay_hud_assets.cpp src/gameplay_asset_manifest.cpp src/dat_scene.cpp src/gameplay_menu_world.cpp src/gameplay_match_session.cpp src/gameplay_cpu_statics.cpp src/gameplay_cpu_commit.cpp src/gameplay_cpu_checkpoint.cpp src/dat_menu_support.cpp src/dat_event_menu.cpp src/dat_audio_load_data.cpp src/dat_shape_animation.cpp src/dat_sis.cpp src/dat_native_menu.cpp src/dat_item_article.cpp src/dat_stage_items.cpp src/dat_stage_yaku.cpp src/gameplay_world.cpp src/dat_color_animation.cpp src/dat_native_stage.cpp src/dat_archive.cpp src/dat_common.cpp src/dat_native_joint.cpp src/rigid_model.cpp
   src/dat_texture.cpp src/dat_material.cpp src/dat_material_animation.cpp
   src/native_dat.cpp src/gameplay_fighter_assets.cpp src/gameplay_kirby_copy_assets.cpp src/gameplay_action_store.cpp
   src/dat_commands.cpp src/dat_fighter_runtime.cpp src/dat_fighter.cpp
@@ -524,10 +524,13 @@ endif()
 # Isolated two-lane profile synctest: the Node module snapshots/restores only a
 # no-draw source heap; the browser module runs the same source profile with a
 # real Aurora WebGPU draw reference and never restores renderer state.
+option(MELEE_WEB_STAGE_ARENA_OWNER_INVENTORY
+  "Expose the private read-only stage-arena allocation inventory in the Slippi synctest" OFF)
 set(MELEE_WEB_SLIPPI_SYNCTEST_ASSET_ROOT
   "${CMAKE_CURRENT_SOURCE_DIR}/assets-local/snapshot-mario" CACHE PATH
   "Ignored local source fixture for the drawn-reference/no-draw Slippi synctest")
 if(MELEE_WEB_SLIPPI_SYNCTEST)
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
   if(NOT EMSCRIPTEN)
     message(FATAL_ERROR "Slippi drawn-reference synctest requires Emscripten")
   endif()
@@ -566,6 +569,39 @@ if(MELEE_WEB_SLIPPI_SYNCTEST)
     -sEXPORTED_FUNCTIONS=_malloc,_free,_melee_web_snapshot_configure_seed,_melee_web_snapshot_init,_melee_web_snapshot_step,_melee_web_snapshot_step_raw,_melee_web_snapshot_error,_melee_web_snapshot_observation,_melee_web_snapshot_observation_size,_melee_web_snapshot_initializer_diagnostic,_melee_web_snapshot_initializer_diagnostic_size,_melee_web_snapshot_initializer_json,_melee_web_snapshot_pcm,_melee_web_snapshot_pcm_size,_melee_web_snapshot_input,_melee_web_snapshot_quiescent,_melee_web_snapshot_rng_address,_melee_web_snapshot_source_identity,_melee_web_snapshot_stage_kind_bridge_identity,_melee_web_snapshot_rng_profile_identity,_melee_web_snapshot_close,_melee_web_synctest_profile_identity,_melee_web_synctest_draw_decision)
   set_target_properties(gameplay_slippi_synctest_node PROPERTIES SUFFIX ".js")
 
+  # Keep the producer's actual source list beside the private browser map. The
+  # manifest joins these CMake-owned source paths with compile_commands.json
+  # and LLD archive-member rows; it does not guess source ownership from an
+  # object-directory prefix.
+  set(_source_state_producer_targets gameplay_runtime hsd_native_runtime fighter_source_runtime)
+  set(_source_state_producer_sources "${CMAKE_CURRENT_BINARY_DIR}/slippi_synctest_source_state_producers.tsv")
+  string(ASCII 9 _source_state_tab)
+  file(WRITE "${_source_state_producer_sources}" "")
+  foreach(_source_state_target IN LISTS _source_state_producer_targets)
+    get_target_property(_source_state_sources "${_source_state_target}" SOURCES)
+    if(NOT _source_state_sources)
+      message(FATAL_ERROR "Source-state producer target has no sources: ${_source_state_target}")
+    endif()
+    foreach(_source_state_source IN LISTS _source_state_sources)
+      if(_source_state_source MATCHES "\\$<")
+        message(FATAL_ERROR "Source-state producer has a generated-expression source: ${_source_state_target}:${_source_state_source}")
+      endif()
+      if(IS_ABSOLUTE "${_source_state_source}")
+        set(_source_state_source_absolute "${_source_state_source}")
+      else()
+        get_filename_component(_source_state_source_absolute "${_source_state_source}" ABSOLUTE
+          BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+      endif()
+      if(_source_state_source_absolute MATCHES "[\t\n]")
+        message(FATAL_ERROR "Source path cannot be represented in source-state producer list: ${_source_state_source_absolute}")
+      endif()
+      file(APPEND "${_source_state_producer_sources}"
+        "${_source_state_target}${_source_state_tab}${_source_state_source_absolute}\n")
+    endforeach()
+  endforeach()
+
+  set(_synctest_browser_map "${CMAKE_CURRENT_BINARY_DIR}/gameplay_slippi_synctest_browser.map")
+  set(_synctest_browser_manifest "${CMAKE_CURRENT_BINARY_DIR}/gameplay_slippi_synctest_browser.source-state.json")
   add_executable(gameplay_slippi_synctest_browser EXCLUDE_FROM_ALL
     src/slippi_profile/tests/synctest_browser.cpp
     ${MELEE_WEB_SNAPSHOT_RNG_PROFILE_SOURCE}
@@ -574,22 +610,70 @@ if(MELEE_WEB_SLIPPI_SYNCTEST)
     MELEE_WEB_SNAPSHOT_PROBE_SHA256="${GAMEPLAY_SNAPSHOT_PROBE_SHA256}"
     MELEE_WEB_SNAPSHOT_RNG_PROFILE_SHA256="${MELEE_WEB_SNAPSHOT_RNG_PROFILE_SHA256}"
     MELEE_WEB_SNAPSHOT_STAGE_KIND_BRIDGE_SHA256="${MELEE_WEB_SNAPSHOT_STAGE_KIND_BRIDGE_SHA256}")
+  if(MELEE_WEB_STAGE_ARENA_OWNER_INVENTORY)
+    if(NOT MELEE_WEB_SLIPPI_SYNCTEST OR NOT CMAKE_BUILD_TYPE STREQUAL "Release")
+      message(FATAL_ERROR "Stage-arena owner inventory requires the private Release Slippi synctest diagnostic")
+    endif()
+    target_compile_definitions(gameplay_slippi_synctest_browser PRIVATE
+      MELEE_WEB_STAGE_ARENA_OWNER_INVENTORY=1)
+  endif()
+  if(MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY)
+    if(NOT MELEE_WEB_SLIPPI_SYNCTEST OR NOT MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC OR
+        NOT CMAKE_BUILD_TYPE STREQUAL "Release")
+      message(FATAL_ERROR "Aurora staging-shadow inventory requires the private Release Slippi synctest diagnostic")
+    endif()
+    target_compile_definitions(gameplay_slippi_synctest_browser PRIVATE
+      MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY=1)
+  endif()
   target_compile_options(gameplay_slippi_synctest_browser PRIVATE -ffp-contract=off
     "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
   target_link_libraries(gameplay_slippi_synctest_browser PRIVATE fighter_asset_runtime)
+  set(_synctest_browser_exports
+    "_malloc,_free,_melee_web_snapshot_configure_seed,_melee_web_snapshot_init,_melee_web_snapshot_step,_melee_web_snapshot_error,_melee_web_snapshot_observation,_melee_web_snapshot_observation_size,_melee_web_snapshot_initializer_diagnostic,_melee_web_snapshot_initializer_diagnostic_size,_melee_web_snapshot_initializer_json,_melee_web_snapshot_pcm,_melee_web_snapshot_pcm_size,_melee_web_snapshot_input,_melee_web_snapshot_quiescent,_melee_web_snapshot_source_identity,_melee_web_snapshot_stage_kind_bridge_identity,_melee_web_snapshot_rng_profile_identity,_melee_web_snapshot_close,_melee_web_synctest_profile_identity,_melee_web_synctest_draw_decision,_melee_web_synctest_gameplay_arena_base,_melee_web_synctest_gameplay_arena_bytes,_melee_web_synctest_audio_range_inventory,_melee_web_synctest_audio_range_inventory_query,_melee_web_synctest_match_context_range_inventory,_melee_web_synctest_match_context_range_inventory_query,_melee_web_synctest_renderer_initialize,_melee_web_synctest_draw_present,_melee_web_synctest_submission_json,_melee_web_synctest_renderer_shutdown")
+  if(MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY)
+    string(APPEND _synctest_browser_exports
+      ",_melee_web_synctest_payload_admission_command,_melee_web_synctest_cpu_restore_configure,_melee_web_synctest_cpu_restore_command,_melee_web_synctest_cpu_restore_evidence,_melee_web_synctest_cpu_restore_evidence_bytes,_melee_web_synctest_cpu_two_tick_evidence,_melee_web_synctest_cpu_two_tick_evidence_bytes,_melee_web_synctest_cpu_payload_failure_witness,_melee_web_synctest_cpu_payload_failure_witness_bytes")
+  endif()
+  if(MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY)
+    string(APPEND _synctest_browser_exports
+      ",_melee_web_synctest_aurora_staging_shadow_inventory_query")
+  endif()
+  if(MELEE_WEB_STAGE_ARENA_OWNER_INVENTORY)
+    string(APPEND _synctest_browser_exports
+      ",_melee_web_synctest_stage_arena_inventory_query")
+  endif()
   # SDL3 replaces Module.requestFullscreen when creating/destroying its window.
   # Export the real helper so ASSERTIONS=2 does not install a getter-only trap.
   target_link_options(gameplay_slippi_synctest_browser PRIVATE --no-entry --profiling-funcs
+    "-Wl,--Map=${_synctest_browser_map}"
     -sENVIRONMENT=web -sMODULARIZE=1 -sEXPORT_ES6=1
     -sEXPORT_NAME=createGameplaySlippiSynctestBrowser
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=${MELEE_WEB_SNAPSHOT_INITIAL_MEMORY}
     -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0 -sASSERTIONS=2 -sSAFE_HEAP=1
     -sEXPORTED_RUNTIME_METHODS=ccall,FS,HEAPU8,UTF8ToString,stackSave,stackRestore,requestFullscreen
-    -sEXPORTED_FUNCTIONS=_malloc,_free,_melee_web_snapshot_configure_seed,_melee_web_snapshot_init,_melee_web_snapshot_step,_melee_web_snapshot_error,_melee_web_snapshot_observation,_melee_web_snapshot_observation_size,_melee_web_snapshot_initializer_diagnostic,_melee_web_snapshot_initializer_diagnostic_size,_melee_web_snapshot_initializer_json,_melee_web_snapshot_pcm,_melee_web_snapshot_pcm_size,_melee_web_snapshot_input,_melee_web_snapshot_quiescent,_melee_web_snapshot_source_identity,_melee_web_snapshot_stage_kind_bridge_identity,_melee_web_snapshot_rng_profile_identity,_melee_web_snapshot_close,_melee_web_synctest_profile_identity,_melee_web_synctest_draw_decision,_melee_web_synctest_renderer_initialize,_melee_web_synctest_draw_present,_melee_web_synctest_submission_json,_melee_web_synctest_renderer_shutdown
+    -sEXPORTED_FUNCTIONS=${_synctest_browser_exports}
     --preload-file "${MELEE_WEB_SLIPPI_SYNCTEST_ASSET_ROOT}@/assets")
   set_target_properties(gameplay_slippi_synctest_browser PROPERTIES SUFFIX ".mjs")
+  add_custom_target(gameplay_slippi_synctest_browser_source_manifest
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/source_state_manifest.py"
+      --target gameplay_slippi_synctest_browser
+      --link-map "${_synctest_browser_map}"
+      --wasm "$<TARGET_FILE_DIR:gameplay_slippi_synctest_browser>/gameplay_slippi_synctest_browser.wasm"
+      --compile-commands "${CMAKE_BINARY_DIR}/compile_commands.json"
+      --producer-sources "${_source_state_producer_sources}"
+      --source-root "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/.."
+      --repository-root "${CMAKE_CURRENT_SOURCE_DIR}"
+      --cmake-cache "${CMAKE_BINARY_DIR}/CMakeCache.txt"
+      --build-graph "${CMAKE_BINARY_DIR}/build.ninja"
+      --emscripten-version-file "${CMAKE_CURRENT_SOURCE_DIR}/.deps/emsdk/upstream/emscripten/emscripten-version.txt"
+      --build-type "${CMAKE_BUILD_TYPE}"
+      --output "${_synctest_browser_manifest}"
+    DEPENDS gameplay_slippi_synctest_browser "${CMAKE_CURRENT_SOURCE_DIR}/scripts/source_state_manifest.py"
+      "${_source_state_producer_sources}"
+    VERBATIM)
   add_custom_target(gameplay_slippi_synctest DEPENDS
-    gameplay_slippi_synctest_node gameplay_slippi_synctest_browser)
+    gameplay_slippi_synctest_node gameplay_slippi_synctest_browser
+    gameplay_slippi_synctest_browser_source_manifest)
 endif()
 
 add_executable(gameplay_music_profile_trace EXCLUDE_FROM_ALL tests/gameplay_music_profile_trace.cpp)

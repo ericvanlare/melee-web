@@ -316,3 +316,200 @@ index 0000000..0000000 100644
          ftCo_80099894(gobj);
          return true;
      }
+diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
+--- a/src/melee/gm/gm_1A45.c
++++ b/src/melee/gm/gm_1A45.c
+@@ -1,4 +1,7 @@
+ #include "gm_1A45.h"
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++#include "slippi_profile/logical_frame_clock.h"
++#endif
+ 
+ #include "gm_1A36.h"
+ #include "gm_1A45.static.h"
+@@ -398,6 +401,20 @@
+ #include <stdlib.h>
+ extern int melee_web_controller_map_begin(void);
+ extern int melee_web_controller_map_end(void);
++/* Own-C v6 profile state; not an original clock field or renderer owner. */
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++static u32 melee_source_clock_logical_phase;
++static int melee_source_clock_logical_valid(void)
++{return melee_source_clock_logical_phase<=SLIPPI_CLOCK_COMPLETED;}
++static int melee_source_clock_logical_event(unsigned event)
++{
++    SlippiLogicalClockTransition next;
++    if(!slippi_logical_clock_transition(melee_source_clock_logical_phase,event,&next))return 0;
++    if(next.advance && gm_80479D58.unk_4!=(u32)-2)gm_80479D58.unk_4++;
++    melee_source_clock_logical_phase=next.phase;
++    return 1;
++}
++#endif
+ static struct gm_80479D58_t melee_source_clock_saved;
+ static int melee_source_clock_owner;
+ static int melee_source_clock_prepared;
+@@ -416,6 +433,9 @@
+     int owner;
+     struct gm_80479D58_t value;
+     struct gm_80479D58_t saved_value;
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    u32 logical_phase, logical_identity;
++#endif
+     u64 process_mask;
+     u64* active_mask_owner;
+     u64* saved_mask_ptr;
+@@ -467,6 +487,11 @@
+ {
+     MeleeWebClockCpuStorage result = {0};
+     if (!melee_source_clock_snapshot_boundary()) return result;
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    if(!melee_source_clock_logical_valid())return result;
++    result.profile_phase=&melee_source_clock_logical_phase;
++    result.profile_phase_bytes=sizeof(melee_source_clock_logical_phase);
++#endif
+     result.record = &gm_80479D58;
+     result.record_bytes = sizeof(gm_80479D58);
+     result.process_mask = &melee_source_clock_process_mask;
+@@ -481,6 +506,9 @@
+     if (!flow_identity || !flow_epoch || !world_generation ||
+         !melee_source_clock_lifetime || !melee_source_clock_snapshot_boundary())
+         return NULL;
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    if(!melee_source_clock_logical_valid())return NULL;
++#endif
+     snapshot = malloc(sizeof(*snapshot));
+     if (!snapshot) return NULL;
+     snapshot->flow_identity = flow_identity;
+@@ -488,6 +516,9 @@
+     snapshot->world_generation = world_generation;
+     snapshot->clock_lifetime = melee_source_clock_lifetime;
+     snapshot->owner = melee_source_clock_owner;
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    snapshot->logical_phase=melee_source_clock_logical_phase;snapshot->logical_identity=6;
++#endif
+     snapshot->value = gm_80479D58;
+     snapshot->saved_value = melee_source_clock_saved;
+     snapshot->process_mask = melee_source_clock_process_mask;
+@@ -510,6 +541,10 @@
+         snapshot->active_mask_owner != HSD_GObjLibInitData.unk_2 ||
+         !melee_source_clock_snapshot_boundary())
+         return 0;
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    if(snapshot->logical_identity!=6 || snapshot->logical_phase>SLIPPI_CLOCK_COMPLETED ||
++       !melee_source_clock_logical_valid())return 0;
++#endif
+     /* The typed record is copied as a read-only candidate. Admission checks
+      * stable callback/port topology and the saved baseline owner, while the
+      * live counters and process mask may advance through source pre/post and
+@@ -538,6 +573,9 @@
+         return 0;
+     gm_80479D58 = snapshot->value;
+     melee_source_clock_process_mask = snapshot->process_mask;
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    melee_source_clock_logical_phase=snapshot->logical_phase;
++#endif
+     return 1;
+ }
+ 
+@@ -548,7 +586,11 @@
+     return melee_web_source_clock_snapshot_admit(snapshot, flow_identity,
+              flow_epoch, world_generation) &&
+         melee_source_clock_record_equal(&snapshot->value, &gm_80479D58) &&
+-        snapshot->process_mask == melee_source_clock_process_mask;
++        snapshot->process_mask == melee_source_clock_process_mask
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++        && snapshot->logical_phase==melee_source_clock_logical_phase
++#endif
++        ;
+ }
+ 
+ int melee_web_source_clock_snapshot_bootstrap_mask_admit(
+@@ -630,6 +672,9 @@
+     melee_source_clock_in_callback = 0;
+     melee_source_clock_end_failure = MELEE_WEB_SOURCE_CLOCK_END_FAILURE_NONE;
+     melee_source_clock_owner = owner;
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    melee_source_clock_logical_phase=SLIPPI_CLOCK_COLD;
++#endif
+     HSD_GObjLibInitData.unk_2 = &melee_source_clock_process_mask;
+     return 1;
+ }
+@@ -642,6 +687,11 @@
+         (melee_source_clock_owner == MELEE_WEB_SOURCE_CLOCK_MATCH &&
+          on_frame == NULL))
+         return 0;
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    if(melee_source_clock_owner==MELEE_WEB_SOURCE_CLOCK_MATCH &&
++       (melee_source_clock_in_callback || gm_80479D58.unk_C!=0 ||
++        !melee_source_clock_logical_valid()))return 0;
++#endif
+     if (!melee_source_clock_state_supported()) return 0;
+ 
+     /* lb_80019A30(0) is the source frame/PAD cadence edge set by
+@@ -653,9 +703,21 @@
+         !lb_80019A30(0))
+         return 0;
+ 
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    if(melee_source_clock_owner==MELEE_WEB_SOURCE_CLOCK_MATCH){
++        const int runnable=gm_801A46B8(0) || !gm_801A45E8(0);
++        if(!runnable)return 0;
++        /* All source gates precede completion; callbacks see the same value
++         * as the prior real draw would have published. */
++        if(!melee_source_clock_logical_event(SLIPPI_CLOCK_NEXT_PRE))return 0;
++        gm_80479D58.unk_10.unk_38_0=runnable;
++    }else
++#endif
++    {
+     gm_80479D58.unk_10.unk_38_0 =
+         gm_801A46B8(0) || !gm_801A45E8(0);
+     if (!gm_80479D58.unk_10.unk_38_0) return 0;
++    }
+     if (melee_source_clock_owner == MELEE_WEB_SOURCE_CLOCK_MATCH)
+         gm_EvaluateAllControllerInputs();
+     if (on_frame != NULL) {
+@@ -702,12 +764,20 @@
+     } else if (!melee_source_clock_prepared) {
+         return 0;
+     }
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    if(melee_source_clock_owner==MELEE_WEB_SOURCE_CLOCK_MATCH &&
++       (melee_source_clock_in_callback || !melee_source_clock_logical_valid()))return 0;
++#endif
+     if (gm_80479D58.unk_0 != (u32) -2) gm_80479D58.unk_0++;
+     if (gm_80479D58.unk_8 != (u32) -2 &&
+         gm_80479D58.unk_10.unk_38_0 &&
+         (melee_source_clock_owner == MELEE_WEB_SOURCE_CLOCK_MENU ||
+          lb_80019A30(0)))
+         gm_80479D58.unk_8++;
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    if(melee_source_clock_owner==MELEE_WEB_SOURCE_CLOCK_MATCH)
++        melee_source_clock_logical_phase=SLIPPI_CLOCK_PENDING; /* valid phase proven before source writes */
++#endif
+     melee_source_clock_prepared = 0;
+     return 1;
+ }
+@@ -715,6 +785,13 @@
+ int melee_web_source_clock_present(void)
+ {
+     if (!melee_source_clock_owned()) return 0;
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    if(melee_source_clock_owner==MELEE_WEB_SOURCE_CLOCK_MATCH){
++        if(melee_source_clock_prepared || melee_source_clock_in_callback ||
++           gm_80479D58.unk_C!=0 || !melee_source_clock_state_supported())return 0;
++        return melee_source_clock_logical_event(SLIPPI_CLOCK_PRESENT);
++    }
++#endif
+     if (gm_80479D58.unk_4 != (u32) -2) gm_80479D58.unk_4++;
+     return 1;
+ }
+@@ -767,6 +844,9 @@
+     melee_source_clock_prepared = 0;
+     melee_source_clock_in_callback = 0;
+     melee_source_clock_owner = 0;
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    melee_source_clock_logical_phase=SLIPPI_CLOCK_COLD;
++#endif
+     return 1;
+ }
+ 

@@ -1,4 +1,5 @@
 #pragma once
+#include "gameplay_action_store.h"
 #include "dat_commands.hpp"
 #include <array>
 #include <map>
@@ -25,11 +26,19 @@ public:
     void* wait_choices() const;
     const DatFighterRuntime& runtime() const noexcept { return *runtime_; }
     uint32_t selected_motion(unsigned slot) const;
+#if defined(MELEE_WEB_ACTION_INTERVAL_TEST)
+    void interval_test_disable_cache_hooks();
+    void interval_test_change_cache_hooks();
+    void interval_test_restore_cache_hooks();
+    void interval_test_change_cache_owner();
+    void interval_test_restore_cache_owner();
+#endif
     // Operand/graph readiness only; original effects and sound still require
     // their actual world providers when the source executor reaches them.
     bool command_ready(uint32_t motion) const noexcept { return command_motions_.contains(motion); }
     const std::set<uint32_t>& command_motions() const noexcept { return command_motions_; }
 private:
+    friend struct ::MeleeWebActionInterval;
     struct Clip;
     static int select(void*, int, unsigned, FigaTree**, void**, char*, size_t);
     static int transfer(void*, void*, Fighter*, Fighter*, int, unsigned,
@@ -53,6 +62,8 @@ private:
     std::array<std::shared_ptr<Clip>, 2> active_;
     std::array<uint32_t, 2> motions_{UINT32_MAX, UINT32_MAX};
     Fighter* fighter_ = nullptr;
+    uint64_t binding_generation_ = 0;
+    uint32_t binding_slot_ = UINT32_MAX;
 
     [[nodiscard]] DatSelectedAction select_source_action(uint32_t motion, bool result_domain,
         std::shared_ptr<MeleeWebNativeActionRows>* identity_rows,

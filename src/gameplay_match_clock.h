@@ -1,6 +1,9 @@
 #ifndef MELEE_WEB_GAMEPLAY_MATCH_CLOCK_H
 #define MELEE_WEB_GAMEPLAY_MATCH_CLOCK_H
 
+#include <stdint.h>
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -37,6 +40,40 @@ int melee_web_source_clock_request(int* request);
 int melee_web_source_clock_end(void);
 int melee_web_source_clock_end_failure(void);
 
+/* A source-owned observation attached to one live match-flow lifetime.
+ * The explicit CPU writer below restores simulation values only; legacy
+ * flow-only restore does not invoke it. The flow identity, epoch, and world generation are
+ * supplied by the existing flow owner and are checked again at admission.
+ * Saved external mask pointers are borrowed identities, never dereferenced or
+ * admitted as pointee state by this observation. */
+typedef struct MeleeWebSourceClockSnapshot MeleeWebSourceClockSnapshot;
+/* Fixed storage written by the typed CPU writer; by-value, pure and bounded. */
+typedef struct MeleeWebClockCpuStorage {
+    const void* record; size_t record_bytes;
+    const void* process_mask; size_t process_mask_bytes;
+    /* Optional v6 typed phase; NULL/0 for ordinary/v5 source. */
+    const void* profile_phase; size_t profile_phase_bytes;
+} MeleeWebClockCpuStorage;
+MeleeWebClockCpuStorage melee_web_source_clock_cpu_storage(void);
+
+MeleeWebSourceClockSnapshot* melee_web_source_clock_snapshot_capture(
+    const void* flow_identity, uint64_t flow_epoch, uint64_t world_generation);
+int melee_web_source_clock_snapshot_admit(
+    const MeleeWebSourceClockSnapshot* snapshot, const void* flow_identity,
+    uint64_t flow_epoch, uint64_t world_generation);
+int melee_web_source_clock_snapshot_restore(
+    const MeleeWebSourceClockSnapshot*, const void*, uint64_t, uint64_t);
+int melee_web_source_clock_snapshot_matches(
+    const MeleeWebSourceClockSnapshot*, const void*, uint64_t, uint64_t);
+int melee_web_source_clock_snapshot_bootstrap_mask_admit(
+    const MeleeWebSourceClockSnapshot*);
+/* CPU-only closure for the two exact source-supported saved-mask owners.
+ * Caller supplies current flow identity/epoch/world, never captured stand-ins. */
+int melee_web_source_clock_snapshot_cpu_mask_admit(
+    const MeleeWebSourceClockSnapshot*, const void*, uint64_t, uint64_t);
+void melee_web_source_clock_snapshot_destroy(
+    MeleeWebSourceClockSnapshot* snapshot);
+
 /* Compatibility entry points used by the current native menu host. They
  * retain the existing MENU ordering: scene OnFrame is called by the menu
  * session, then the scheduler runs, then menu_clock_tick updates counters. */
@@ -54,6 +91,24 @@ int melee_web_menu_clock_end(void);
 int melee_web_source_cadence_begin(void);
 int melee_web_source_cadence_tick(void);
 int melee_web_source_cadence_end(void);
+/* Opaque typed values and lifetime guards for the original lb_0195 cadence.
+ * The capsule owns these snapshots; no caller-provided destination aliases. */
+typedef struct MeleeWebSourceCadenceSnapshot MeleeWebSourceCadenceSnapshot;
+typedef struct MeleeWebCadenceCpuStorage {
+    const void* record; size_t record_bytes;
+} MeleeWebCadenceCpuStorage;
+MeleeWebCadenceCpuStorage melee_web_source_cadence_cpu_storage(void);
+
+MeleeWebSourceCadenceSnapshot* melee_web_source_cadence_snapshot_capture(
+    const void*, uint64_t, uint64_t);
+int melee_web_source_cadence_snapshot_admit(
+    const MeleeWebSourceCadenceSnapshot*, const void*, uint64_t, uint64_t);
+int melee_web_source_cadence_snapshot_restore(
+    const MeleeWebSourceCadenceSnapshot*, const void*, uint64_t, uint64_t);
+int melee_web_source_cadence_snapshot_matches(
+    const MeleeWebSourceCadenceSnapshot*, const void*, uint64_t, uint64_t);
+void melee_web_source_cadence_snapshot_destroy(MeleeWebSourceCadenceSnapshot*);
+
 
 #ifdef __cplusplus
 }

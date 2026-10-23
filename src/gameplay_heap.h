@@ -15,6 +15,16 @@ int melee_web_gameplay_heap_available(void);
  * before operating on stored SDK heap handles; another arena may reuse them. */
 int melee_web_gameplay_heap_owns(const void* expected_arena);
 
+/* Immutable singleton-root guard. Covers SDK roots (including the selected
+ * heap) and wrapper roots, never HeapDesc/cell bytes inside the owned arena.
+ * It refuses a retired/reinitialized wrapper owner even at a reused address.
+ * Caller serializes with allocation/lifecycle operations. */
+typedef struct MeleeWebGameplayHeapGuard MeleeWebGameplayHeapGuard;
+MeleeWebGameplayHeapGuard* melee_web_gameplay_heap_guard_capture(
+    const void* expected_arena,char*,size_t);
+int melee_web_gameplay_heap_guard_admit(const MeleeWebGameplayHeapGuard*,char*,size_t);
+void melee_web_gameplay_heap_guard_destroy(MeleeWebGameplayHeapGuard*);
+
 /* Claim caller-owned memory for the isolated runtime and call original
  * OSInitAlloc with one heap slot. Returns the usable start for OSCreateHeap;
  * accepts 128 bytes through 64 MiB and does not select/create a heap or transfer

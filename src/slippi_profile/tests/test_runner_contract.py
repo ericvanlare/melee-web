@@ -20,6 +20,14 @@ class SlippiSynctestRunnerContractTests(unittest.TestCase):
         subprocess.run(command, cwd=ROOT, check=True,
                        env=dict(os.environ, FORCE_COLOR="0"))
 
+    def test_browser_write_census_contract_controls(self):
+        command = [
+            sys.executable, str(ROOT / "scripts/agent_workspace.py"), "run", "--",
+            "node", "--test", str(ROOT / "src/slippi_profile/tests/test_write_census_contract.mjs"),
+        ]
+        subprocess.run(command, cwd=ROOT, check=True,
+                       env=dict(os.environ, FORCE_COLOR="0"))
+
 
 if __name__ == "__main__":
     unittest.main()

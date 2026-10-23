@@ -32,6 +32,11 @@ class SelectedTraceBuildTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         return root
 
+    def _configured_slippi_root(self):
+        root = self._configured_root()
+        (root / "assets-local/snapshot-mario").mkdir(parents=True)
+        return root
+
     def test_build_directory_reuses_private_and_existing_graph_conventions(self):
         root = Path("/fixture/repo")
         self.assertEqual(
@@ -61,6 +66,170 @@ class SelectedTraceBuildTests(unittest.TestCase):
             BUILD.build_directory(root, target="native_menu_host_trace",
                                   configuration="Release"),
             root / "build/browser-release",
+        )
+
+    def test_stage_arena_directory_modes_are_private_distinct_and_release_only(self):
+        root = Path("/fixture/repo")
+        default = BUILD.build_directory(
+            root, target="gameplay_slippi_synctest", configuration="Release")
+        aurora = BUILD.build_directory(
+            root, target="gameplay_slippi_synctest", configuration="Release",
+            aurora_staging_shadow_diagnostic=True)
+        stage = BUILD.build_directory(
+            root, target="gameplay_slippi_synctest", configuration="Release",
+            stage_arena_owner_diagnostic=True)
+        combined = BUILD.build_directory(
+            root, target="gameplay_slippi_synctest", configuration="Release",
+            aurora_staging_shadow_diagnostic=True,
+            stage_arena_owner_diagnostic=True)
+        self.assertEqual(default, root / "build/slippi-synctest-release")
+        self.assertEqual(aurora, root / "build/slippi-synctest-aurora-staging-release")
+        self.assertEqual(stage, root / "build/slippi-synctest-stage-arena-release")
+        self.assertEqual(
+            combined, root / "build/slippi-synctest-stage-arena-aurora-staging-release")
+        self.assertEqual(len({default, aurora, stage, combined}), 4)
+
+        for target, configuration, kwargs in (
+            ("runtime", "Release", {"stage_arena_owner_diagnostic": True}),
+            ("gameplay_slippi_synctest", "Debug", {"stage_arena_owner_diagnostic": True}),
+            ("gameplay_slippi_synctest", "RelWithDebInfo",
+             {"stage_arena_owner_diagnostic": True}),
+            ("gameplay_slippi_synctest", "Release",
+             {"stage_arena_owner_diagnostic": True, "pipeline_provenance": True}),
+        ):
+            with self.subTest(target=target, configuration=configuration, kwargs=kwargs), \
+                    self.assertRaises(ValueError):
+                BUILD.build_directory(root, target=target, configuration=configuration, **kwargs)
+
+    def test_stage_arena_and_combined_configure_only_forward_exact_private_options(self):
+        lock = {"repositories": {}, "emscripten": "6.0.9"}
+        for aurora, expected_dir in (
+            (False, "build/slippi-synctest-stage-arena-release"),
+            (True, "build/slippi-synctest-stage-arena-aurora-staging-release"),
+        ):
+            with self.subTest(aurora=aurora):
+                root = self._configured_slippi_root()
+                generated = root / "build/gameplay-source/src"
+                options = {
+                    "stage_arena_owner_diagnostic": True,
+                    "configure_only": True,
+                }
+                if aurora:
+                    options["aurora_staging_shadow_diagnostic"] = True
+                with patch.object(BUILD, "read_lock", return_value=lock), \
+                        patch.object(BUILD, "verify_sources"), \
+                        patch.object(BUILD, "prepare_sources", return_value=generated), \
+                        patch.object(BUILD.subprocess, "run") as run:
+                    BUILD.build(1, root=root, configuration="Release",
+                                trace_targets=("gameplay_slippi_synctest",), **options)
+                configure_calls = [call for call in run.call_args_list
+                                   if "-S" in call.args[0]]
+                self.assertEqual(len(configure_calls), 1)
+                configure = configure_calls[0].args[0]
+                stage_options = [arg for arg in configure
+                                 if arg.startswith("-DMELEE_WEB_STAGE_ARENA_OWNER_INVENTORY=")]
+                self.assertEqual(stage_options, ["-DMELEE_WEB_STAGE_ARENA_OWNER_INVENTORY=ON"])
+                self.assertEqual(configure[configure.index("-B") + 1],
+                                 str(root / expected_dir))
+                self.assertIn(
+                    f"-DMELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY={'ON' if aurora else 'OFF'}",
+                    configure)
+                self.assertIn(
+                    f"-DMELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC={'ON' if aurora else 'OFF'}",
+                    configure)
+                self.assertFalse([call for call in run.call_args_list
+                                  if "--build" in call.args[0]])
+
+    def test_existing_slippi_aurora_and_ordinary_profiles_explicitly_keep_stage_option_off(self):
+        lock = {"repositories": {}, "emscripten": "6.0.9"}
+        cases = (
+            ("slippi-default", "gameplay_slippi_synctest", False,
+             "build/slippi-synctest-release"),
+            ("aurora-only", "gameplay_slippi_synctest", True,
+             "build/slippi-synctest-aurora-staging-release"),
+            ("ordinary", "runtime", False, "build/browser"),
+        )
+        for name, target, aurora, expected_dir in cases:
+            with self.subTest(name=name):
+                root = self._configured_slippi_root() if target == "gameplay_slippi_synctest" else self._configured_root()
+                generated = root / "build/gameplay-source/src"
+                kwargs = {}
+                if target == "gameplay_slippi_synctest":
+                    kwargs["trace_targets"] = (target,)
+                    kwargs["configuration"] = "Release"
+                if aurora:
+                    kwargs["aurora_staging_shadow_diagnostic"] = True
+                with patch.object(BUILD, "read_lock", return_value=lock), \
+                        patch.object(BUILD, "verify_sources"), \
+                        patch.object(BUILD, "prepare_sources", return_value=generated), \
+                        patch.object(BUILD.subprocess, "run") as run:
+                    BUILD.build(1, root=root, target="runtime" if target == "runtime" else "all",
+                                **kwargs)
+                configure = next(call.args[0] for call in run.call_args_list
+                                 if "-S" in call.args[0])
+                stage_options = [arg for arg in configure
+                                 if arg.startswith("-DMELEE_WEB_STAGE_ARENA_OWNER_INVENTORY=")]
+                self.assertEqual(stage_options, ["-DMELEE_WEB_STAGE_ARENA_OWNER_INVENTORY=OFF"])
+                self.assertEqual(configure[configure.index("-B") + 1], str(root / expected_dir))
+
+    def test_stage_arena_rejects_invalid_selection_before_source_work(self):
+        cases = (
+            {"stage_arena_owner_diagnostic": True},
+            {"stage_arena_owner_diagnostic": True,
+             "trace_targets": ("gameplay_content_match_trace",)},
+            {"stage_arena_owner_diagnostic": True,
+             "trace_targets": ("gameplay_slippi_synctest", "gameplay_content_match_trace")},
+            {"stage_arena_owner_diagnostic": True,
+             "trace_targets": ("gameplay_slippi_synctest",), "configuration": "Debug"},
+            {"stage_arena_owner_diagnostic": True,
+             "trace_targets": ("gameplay_slippi_synctest",),
+             "configuration": "RelWithDebInfo"},
+            {"stage_arena_owner_diagnostic": True,
+             "trace_targets": ("gameplay_slippi_synctest",), "pipeline_provenance": True},
+            {"stage_arena_owner_diagnostic": True,
+             "trace_targets": ("gameplay_slippi_synctest",), "selective_pipelines": True},
+            {"stage_arena_owner_diagnostic": True,
+             "trace_targets": ("gameplay_slippi_synctest",), "stadium_c1a_diagnostic": True},
+            {"stage_arena_owner_diagnostic": True,
+             "trace_targets": ("gameplay_slippi_synctest",), "fma_collision_diagnostic": True},
+            {"stage_arena_owner_diagnostic": True,
+             "trace_targets": ("gameplay_slippi_synctest",), "gameplay_bootstrap_state": True},
+            {"stage_arena_owner_diagnostic": True, "target": "fighter"},
+            {"stage_arena_owner_diagnostic": True, "target": "runtime",
+             "trace_targets": ("gameplay_slippi_synctest",)},
+        )
+        for case in cases:
+            with self.subTest(case=case), \
+                    patch.object(BUILD, "read_lock") as read_lock, \
+                    patch.object(BUILD, "prepare_sources") as prepare_sources, \
+                    patch.object(BUILD.subprocess, "run") as run:
+                with self.assertRaises(ValueError):
+                    BUILD.build(1, root=Path("/missing/repo"), **case)
+                read_lock.assert_not_called()
+                prepare_sources.assert_not_called()
+                run.assert_not_called()
+
+    def test_stage_arena_cli_passes_new_opt_in_keyword(self):
+        with patch.object(BUILD.sys, "argv", [
+            "build.py", "--trace-target", "gameplay_slippi_synctest",
+            "--configuration", "Release", "--stage-arena-owner-diagnostic",
+            "--configure-only",
+        ]), patch.object(BUILD, "build") as build:
+            BUILD.main()
+        self.assertTrue(build.call_args.kwargs["stage_arena_owner_diagnostic"])
+        self.assertEqual(build.call_args.kwargs["trace_targets"], ["gameplay_slippi_synctest"])
+        self.assertTrue(build.call_args.kwargs["configure_only"])
+
+    def test_stage_arena_cmake_option_remains_default_off_and_release_slippi_guarded(self):
+        cmake = (ROOT / "cmake/FighterRuntime.cmake").read_text(encoding="utf-8")
+        self.assertIn(
+            'option(MELEE_WEB_STAGE_ARENA_OWNER_INVENTORY\n'
+            '  "Expose the private read-only stage-arena allocation inventory in the Slippi synctest" OFF)',
+            cmake,
+        )
+        self.assertIn(
+            'if(NOT MELEE_WEB_SLIPPI_SYNCTEST OR NOT CMAKE_BUILD_TYPE STREQUAL "Release")',
+            cmake,
         )
 
     def test_repeated_trace_targets_build_only_reviewed_targets_with_pinned_environment(self):

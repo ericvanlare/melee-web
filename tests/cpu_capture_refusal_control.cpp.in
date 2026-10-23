@@ -1,0 +1,189 @@
+/* Actual production capture body below, explicitly modeled owner/factory
+ * leaves. This proves attribution/order/temporary cleanup, not live source
+ * owner admission or a complete game checkpoint. */
+#include <array>
+#include <algorithm>
+#include <cstdlib>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <limits>
+#include <memory>
+#include <new>
+#include <stdexcept>
+#include <vector>
+#include <span>
+@ACTUAL_COMPARISON@
+namespace melee_web {
+@ACTUAL_CAPTURE_DIAGNOSTIC@
+}
+struct MeleeWebAudio{};struct MeleeWebMatchFlow{};struct MeleeWebMatchContext{};
+struct Snapshot{unsigned leaf;};
+using MeleeWebSourceMemoryPayloadSnapshot=Snapshot;
+using MeleeWebAudioSnapshot=Snapshot;using MeleeWebMatchFlowCpuSnapshot=Snapshot;
+using MeleeWebMatchContextSnapshot=Snapshot;using MeleeWebGameplayBootstrapSnapshot=Snapshot;
+using MeleeWebActionInterval=Snapshot;
+@ACTUAL_PAYLOAD_RESULT@
+namespace {
+unsigned refuse_leaf=0,throw_leaf=0,created=0,destroyed=0,static_destroys=0;
+bool capsule_alloc_failure=false,owner_missing=false,frame_wrap=false;
+std::uint32_t live_frame=176;
+bool effect_ok=true,action_ok=true,payload_ok=true,flow_ok=true,bytes_ok=true;
+std::array<unsigned,16> trace{};unsigned count=0;
+std::array<unsigned char,64> source_bytes{};
+void visit(unsigned leaf){trace[count++]=leaf;if(throw_leaf==leaf)throw std::bad_alloc();}
+Snapshot* snapshot(unsigned leaf){visit(leaf);if(refuse_leaf==leaf)return nullptr;++created;return new Snapshot{leaf};}
+void destroy(Snapshot* p){if(p){++destroyed;delete p;}}
+void leaf_error(char* p,std::size_t n,unsigned leaf){if(refuse_leaf==leaf)std::snprintf(p,n,"actual fixture leaf%u refused",leaf);}
+}
+Snapshot* melee_web_gameplay_bootstrap_snapshot_capture(char* p,std::size_t n){leaf_error(p,n,1);return snapshot(1);}
+Snapshot* melee_web_match_flow_cpu_snapshot_capture(MeleeWebMatchFlow*,char* p,std::size_t n){leaf_error(p,n,2);return snapshot(2);}
+Snapshot* melee_web_match_context_snapshot_capture(MeleeWebMatchContext*,char* p,std::size_t n){leaf_error(p,n,3);return snapshot(3);}
+Snapshot* melee_web_audio_snapshot_capture(MeleeWebAudio*){return snapshot(4);}
+MeleeWebSourceMemoryPayloadSnapshotCaptureResult melee_web_source_memory_payload_snapshot_capture(){
+ auto* p=snapshot(5);return {p?MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK:MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_ALLOCATION_FAILED,p};
+}
+Snapshot* melee_web_action_interval_capture(){return snapshot(6);}
+std::uint64_t melee_web_audio_generation(MeleeWebAudio*){visit(8);return refuse_leaf==8?0:17;}
+void melee_web_action_interval_destroy(Snapshot* p){destroy(p);}
+void melee_web_audio_snapshot_destroy(Snapshot* p){destroy(p);}
+void melee_web_match_flow_cpu_snapshot_destroy(Snapshot* p){destroy(p);}
+void melee_web_match_context_snapshot_destroy(Snapshot* p){destroy(p);}
+void melee_web_gameplay_bootstrap_snapshot_destroy(Snapshot* p){destroy(p);}
+void melee_web_source_memory_payload_snapshot_destroy(Snapshot* p){destroy(p);}
+void melee_web_action_interval_disarm(Snapshot*){}
+int melee_web_cpu_interval_admit(std::uint64_t){return effect_ok;}
+std::uint32_t melee_web_cpu_interval_failure(){return effect_ok?0:99;}
+int melee_web_action_interval_admit(Snapshot*){return action_ok;}
+int melee_web_action_interval_matches_finished(Snapshot*){return action_ok;}
+int melee_web_action_interval_seal_record(Snapshot*){return action_ok;}
+std::uint32_t melee_web_action_interval_active_failure(Snapshot*){return action_ok?0:99;}
+std::uint32_t melee_web_action_interval_failure_code(Snapshot*){return action_ok?0:99;}
+MeleeWebSourceMemoryPayloadSnapshotStatus melee_web_source_memory_payload_snapshot_admit(const Snapshot*){return payload_ok?MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK:MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED;}
+struct Compare{std::uint32_t status=0,allocation_index=0,byte_offset=0,expected_byte=0,actual_byte=0;std::uintptr_t host_address=0;std::uint32_t requested_bytes=0,admission_status=0,source_address=0;};
+Compare melee_web_source_memory_payload_snapshot_compare_live(Snapshot*){Compare c;c.status=payload_ok?0:2;return c;}
+int melee_web_match_flow_cpu_snapshot_matches(MeleeWebMatchFlow*,Snapshot*,char*,std::size_t){return flow_ok;}
+int melee_web_cpu_interval_end(std::uint64_t){return 1;}
+namespace melee_web {
+struct GameplayMatchCpuOwners{const void* storage;MeleeWebMatchContext* context;MeleeWebMatchFlow* flow;MeleeWebAudio* audio;std::uint64_t world;std::uint64_t context_epoch;std::uint32_t frame;};
+class GameplayMatchSession{public:std::uint32_t source_frames()const{return live_frame;}GameplayMatchCpuOwners diagnostic_cpu_owners() const noexcept{
+ return {owner_missing?nullptr:this,nullptr,nullptr,nullptr,1,1,frame_wrap?UINT32_MAX:live_frame};}};
+class GameplayCpuStatics{public:~GameplayCpuStatics(){++static_destroys;}bool capture(){visit(7);return refuse_leaf!=7;}bool seal_post(){return bytes_ok;}
+ CpuComparison capture_expected(std::vector<std::byte>& out)const{out.assign(1,std::byte{0x5a});CpuComparison c;if(!bytes_ok)c.status=2;return c;}
+ CpuComparison compare_expected(std::span<const std::byte> out)const{CpuComparison c;if(!bytes_ok||out.size()!=1)c.status=2;return c;}};
+struct Commit{GameplayCpuStatics* statics{};MeleeWebAudio* audio{};MeleeWebMatchFlow* flow{};MeleeWebMatchContext* context{};
+ const Snapshot *bootstrap{},*flow_snapshot{},*context_snapshot{},*audio_snapshot{},*payload{};Snapshot* actions{};std::uint64_t effect_token{};};
+class GameplayCpuCheckpoint{public:
+ static void* operator new(std::size_t n,const std::nothrow_t&) noexcept {return capsule_alloc_failure?nullptr:std::malloc(n);}
+ static void operator delete(void* p) noexcept {std::free(p);}
+ static std::unique_ptr<GameplayCpuCheckpoint> capture(const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,CpuCaptureDiagnostic&,CpuCheckpointSpan=CpuCheckpointSpan::OneTick) noexcept;
+ ~GameplayCpuCheckpoint();
+ const CpuComparison& comparison()const{return comparison_;}
+ bool interval_boundary(const GameplayMatchSession&) noexcept;
+ bool seal_post(const GameplayMatchSession&) noexcept;
+ bool seal_drawn_reference(const GameplayMatchSession&) noexcept;
+ bool matches_drawn_reference(const GameplayMatchSession&) noexcept;
+ void fixture_sealed(){phase_=Phase::Sealed;post_frame_=176;commit_.effect_token=1;}
+ void fixture_recording(){phase_=Phase::Recording;commit_.effect_token=1;}
+ void fixture_replaying(){phase_=Phase::Replaying;}
+ void fixture_finished(){phase_=Phase::Finished;}
+ void disarm() noexcept;
+ void release() noexcept;
+private:
+ explicit GameplayCpuCheckpoint(CpuCheckpointSpan span):span_(span){}
+ const CpuCheckpointSpan span_;
+ enum class Phase{Captured,Recording,Sealed,Replaying,Finished,Failed};Phase phase_=Phase::Captured;
+ bool same_owner(const GameplayMatchSession&)const{return !owner_missing;}
+ using AudioRanges=std::array<int,16>;
+ bool capture_post_bytes(const GameplayMatchSession&,std::vector<std::byte>& b,AudioRanges&,std::size_t& n){b.assign(1,std::byte{0x5a});n=1;return bytes_ok;}
+ bool matches_post_bytes(const GameplayMatchSession&,const std::vector<std::byte>&,const AudioRanges&,std::size_t){return bytes_ok;}
+ Snapshot *drawn_payload_{},*drawn_flow_{};std::vector<std::byte> drawn_bytes_,drawn_statics_;
+ std::vector<std::byte> post_bytes_;AudioRanges audio_ranges_{};std::size_t audio_range_count_{};
+ AudioRanges drawn_audio_ranges_{};std::size_t drawn_audio_range_count_{};bool drawn_sealed_=false;
+ std::uint32_t post_frame_{},checked_domains_{},matched_domains_{};CpuComparison comparison_{};
+ GameplayMatchCpuOwners owner_{};std::unique_ptr<GameplayCpuStatics> statics_;Commit commit_{};std::uint64_t audio_generation_{};bool source_step_possible_=false;Snapshot *post_payload_{},*post_flow_{};
+};
+@ACTUAL_CAPTURE_FUNCTION@
+@ACTUAL_INTERVAL_BOUNDARY@
+@ACTUAL_SEAL_POST@
+@ACTUAL_DRAWN_SEAL@
+@ACTUAL_DRAWN_MATCH@
+@ACTUAL_RELEASE_FUNCTION@
+@ACTUAL_DISARM_FUNCTION@
+@ACTUAL_DESTRUCTOR@
+}
+int main(){
+ using namespace melee_web;
+ const std::array<unsigned,8> order{1,2,3,4,5,6,7,8};
+ const std::array<unsigned,8> domains{7,5,6,8,4,3,9,8};
+ GameplayMatchSession session;
+ auto reset=[](){live_frame=176;effect_ok=action_ok=payload_ok=flow_ok=bytes_ok=true;refuse_leaf=throw_leaf=created=destroyed=static_destroys=count=0;trace={};capsule_alloc_failure=owner_missing=frame_wrap=false;source_bytes.fill(0x5a);};
+ const auto unchanged=[](){for(auto b:source_bytes)assert(b==0x5a);};
+ for(unsigned failure=1;failure<=8;++failure){reset();refuse_leaf=failure;CpuCaptureDiagnostic d;
+  auto c=GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),d);assert(!c);
+  assert(d.comparison.domain==domains[failure-1]&&d.comparison.status==1&&d.comparison.row==UINT32_MAX&&d.comparison.offset==UINT32_MAX);
+  assert(count==failure&&std::equal(trace.begin(),trace.begin()+count,order.begin()));
+  assert(created==destroyed&&static_destroys==1);unchanged();
+  if(failure<=3){char exact[80];std::snprintf(exact,sizeof(exact),"actual fixture leaf%u refused",failure);assert(std::strcmp(d.message.data(),exact)==0);}
+  if(failure==5)assert(d.comparison.detail==MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_ALLOCATION_FAILED);
+  if(failure==4||failure==6)assert(std::strstr(d.message.data(),"opaque capture API"));
+ }
+ for(unsigned failure=1;failure<=8;++failure){reset();throw_leaf=failure;CpuCaptureDiagnostic d;
+  auto c=GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),d);assert(!c);
+  assert(d.comparison.domain==domains[failure-1]&&d.comparison.detail==static_cast<unsigned>(CpuCaptureRefusal::AllocationException));
+  assert(created==destroyed&&static_destroys==1&&count==failure);unchanged();
+ }
+ reset();owner_missing=true;CpuCaptureDiagnostic owner;
+ assert(!GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),owner));
+ assert(owner.comparison.domain==1&&owner.comparison.detail==3&&count==0&&static_destroys==1);unchanged();
+ reset();frame_wrap=true;CpuCaptureDiagnostic frame;
+ assert(!GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),frame));assert(frame.comparison.domain==1&&frame.comparison.detail==4&&count==0);unchanged();
+ reset();capsule_alloc_failure=true;CpuCaptureDiagnostic allocation;
+ assert(!GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),allocation));assert(allocation.comparison.domain==1&&allocation.comparison.detail==1&&count==0&&static_destroys==1);
+ reset();CpuCaptureDiagnostic missing;
+ assert(!GameplayCpuCheckpoint::capture(session,nullptr,missing));assert(missing.comparison.domain==9&&missing.comparison.detail==2&&count==0);
+ reset();CpuCaptureDiagnostic success;success.comparison.status=9;
+ auto c=GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),success);
+ assert(c&&success.comparison.domain==0&&success.comparison.status==0&&success.message[0]==0&&count==8&&created==6&&destroyed==0);
+ assert(std::equal(trace.begin(),trace.begin()+count,order.begin()));unchanged();c.reset();assert(destroyed==6&&static_destroys==1);
+ reset();CpuCaptureDiagnostic endpoint;
+ auto e=GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),endpoint);assert(e);e->fixture_sealed();
+ effect_ok=false;assert(!e->seal_drawn_reference(session));effect_ok=true;
+ action_ok=false;assert(!e->seal_drawn_reference(session));action_ok=true;
+ payload_ok=false;assert(!e->seal_drawn_reference(session));payload_ok=true;
+ count=0;assert(e->seal_drawn_reference(session));assert(count==2&&trace[0]==5&&trace[1]==2);unchanged();
+ assert(!e->seal_drawn_reference(session));e->fixture_finished();
+ assert(e->matches_drawn_reference(session));
+ for(bool* failure:{&effect_ok,&action_ok,&payload_ok,&flow_ok,&bytes_ok}){*failure=false;assert(!e->matches_drawn_reference(session));*failure=true;unchanged();}
+ owner_missing=true;assert(!e->matches_drawn_reference(session));owner_missing=false;
+ e.reset();assert(created==destroyed);
+ // Execute actual capture/span, interval guard, and seal methods. Owner,
+ // effect, journal and capture leaves remain explicitly modeled above.
+ reset();CpuCaptureDiagnostic invalid;
+ assert(!GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),invalid,static_cast<CpuCheckpointSpan>(3)));
+ assert(invalid.comparison.detail==static_cast<unsigned>(CpuCaptureRefusal::InvalidSpan)&&count==0);unchanged();
+ reset();live_frame=UINT32_MAX-1u;CpuCaptureDiagnostic overflow;
+ assert(!GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),overflow,CpuCheckpointSpan::TwoTicks));
+ assert(overflow.comparison.detail==static_cast<unsigned>(CpuCaptureRefusal::SourceFrameWrap)&&count==0);unchanged();
+ reset();live_frame=UINT32_MAX-2u;CpuCaptureDiagnostic exact;
+ auto max=GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),exact,CpuCheckpointSpan::TwoTicks);assert(max);max.reset();
+ for(auto span:{CpuCheckpointSpan::OneTick,CpuCheckpointSpan::TwoTicks}){
+   reset();CpuCaptureDiagnostic d;auto interval=GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),d,span);assert(interval);
+   assert(!interval->interval_boundary(session)&&interval->comparison().domain==1);
+   interval->fixture_recording();assert(interval->interval_boundary(session));
+   owner_missing=true;assert(!interval->interval_boundary(session)&&interval->comparison().domain==1);owner_missing=false;
+   effect_ok=false;assert(!interval->interval_boundary(session)&&interval->comparison().domain==2);effect_ok=true;
+   action_ok=false;assert(!interval->interval_boundary(session)&&interval->comparison().domain==3);action_ok=true;
+   ++live_frame;assert(interval->interval_boundary(session));
+   if(span==CpuCheckpointSpan::TwoTicks){++live_frame;assert(interval->interval_boundary(session));}
+   assert(interval->seal_post(session));assert(!interval->interval_boundary(session));
+   interval->fixture_replaying();assert(interval->interval_boundary(session));interval.reset();assert(created==destroyed);unchanged();
+ }
+ reset();CpuCaptureDiagnostic early;auto t=GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),early,CpuCheckpointSpan::TwoTicks);assert(t);
+ t->fixture_recording();++live_frame;assert(!t->seal_post(session));t.reset();unchanged();
+ std::puts("Actual one/two span bounds, interval owner/effect/journal refusals and exact seal endpoints passed (named leaves modeled)");
+ std::puts("Actual read-only drawn endpoint seal/match predicates, factory order, domain refusals and source nonmutation passed (named owner leaves modeled)");
+ std::puts("Actual capture body: eight first-leaf refusals and exceptions, Owner/alloc/missing guards, exact text/status, order, cleanup and source nonmutation passed (factory leaves modeled)");
+}

@@ -10,6 +10,7 @@
 #include <string.h>
 struct MeleeWebPlayerContext { uint32_t slot,controller; StaticPlayer saved; };
 static MeleeWebPlayerContext* owners[Gm_Player_NumMax];
+static uint64_t owner_epochs[Gm_Player_NumMax];
 static int fail(char* e,size_t n,const char* message){if(e&&n)snprintf(e,n,"%s",message);return 0;}
 static int ok(char* e,size_t n){if(e&&n)*e=0;return 1;}
 MeleeWebPlayerContext* melee_web_player_context_begin(const MeleeWebPlayerSettings* s,char* e,size_t n)
@@ -52,6 +53,7 @@ MeleeWebPlayerContext* melee_web_player_context_begin(const MeleeWebPlayerSettin
     Player_SetFacingDirection(s->slot,s->facing);
     Vec3 pos={s->position[0],s->position[1],s->position[2]};
     Player_80032768(s->slot,&pos);
+    if (++owner_epochs[s->slot] == 0) ++owner_epochs[s->slot];
     owners[s->slot]=h;ok(e,n);return h;
 }
 int melee_web_player_context_stats(const MeleeWebPlayerContext* h,MeleeWebPlayerStats* out,char* e,size_t n)
@@ -79,4 +81,38 @@ int melee_web_player_context_end(MeleeWebPlayerContext* h,char* e,size_t n)
     StaticPlayer* p=Player_GetPtrForSlot(h->slot);
     if(p->player_entity[0]||p->player_entity[1])return fail(e,n,"Unload original player fighters before restoring source context");
     memcpy(p,&h->saved,sizeof(*p));owners[h->slot]=NULL;free(h);return ok(e,n);
+}
+
+
+struct MeleeWebPlayerContextGuard {
+    const MeleeWebPlayerContext* identity;
+    uint64_t epoch;
+    MeleeWebPlayerContext value;
+};
+MeleeWebPlayerContextGuard* melee_web_player_context_guard_capture(
+    const MeleeWebPlayerContext* h,char* e,size_t n)
+{
+    if (!h || h->slot>=Gm_Player_NumMax || owners[h->slot]!=h) {
+        fail(e,n,"Player guard requires a live context owner");return NULL;
+    }
+    MeleeWebPlayerContextGuard* guard=malloc(sizeof(*guard));
+    if (!guard) {fail(e,n,"Cannot allocate immutable player guard");return NULL;}
+    guard->identity=h;
+    guard->epoch=owner_epochs[h->slot];
+    memcpy(&guard->value,h,sizeof(*h));
+    ok(e,n);return guard;
+}
+int melee_web_player_context_guard_admit(const MeleeWebPlayerContextGuard* guard,char* e,size_t n)
+{
+    if (!guard || guard->value.slot>=Gm_Player_NumMax)
+        return fail(e,n,"Player context guard is missing or invalid");
+    const uint32_t slot=guard->value.slot;
+    if (owners[slot]!=guard->identity || owner_epochs[slot]!=guard->epoch ||
+        memcmp(guard->identity,&guard->value,sizeof(guard->value)))
+        return fail(e,n,"Player saved-context owner changed after checkpoint");
+    return ok(e,n);
+}
+void melee_web_player_context_guard_destroy(MeleeWebPlayerContextGuard* guard)
+{
+    free(guard);
 }

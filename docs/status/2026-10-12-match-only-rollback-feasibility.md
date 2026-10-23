@@ -1,6 +1,6 @@
 # Match-only rollback feasibility
 
-**Compiled / Source-only snapshot diagnostic / Terminal browser tick-and-draw diagnostic / No-draw declared-state component / Browser rollback and frame-budget feasibility unproven**
+**Compiled / Source-only snapshot diagnostic / Terminal browser tick-and-draw diagnostic / One-tick CPU restore-replay-and-present passed; two-tick attempt failed at CPU payload comparison / Full browser rollback and frame-budget feasibility unproven**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
 [merged #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
@@ -9,6 +9,356 @@ remain local. The planned mode choice is Vanilla offline-only or Slippi rules
 offline/online, with distinct pinned references; the toggle/profile are not yet
 implemented. The [structured receipt](../evidence/match-only-rollback-feasibility-v1.json)
 binds current producer and retained failure identities.
+
+## Same-instance browser restore, issue #341 (in progress)
+
+[Issue #341](https://github.com/ericvanlare/melee-web/issues/341) owns the next
+browser boundary. Private components capture the source allocation mirror,
+bootstrap/context/flow values, decoded DAT allocations, native audio/effect
+buffers, match clock/cadence, and the bounded active-action closure under owner
+and lifetime guards. The latest successful same-browser result completes a fixed sample-300
+drawn-reference comparison: it records a baseline source draw, restores and
+replays the CPU tick without a corrective draw, then checks one final source
+present. The strict CPU
+endpoint and phase-matched postdraw comparisons pass. This remains bounded
+component evidence: renderer/GPU/cache state is not restored, full game-state
+ownership is incomplete, and original-game parity, multi-tick and whole-session
+gates remain open. Earlier capture refusals and the post-present harness assertion
+failure remain retained and are explained below. A subsequent two-tick attempt
+failed at the strict final CPU payload comparison; its retained result is recorded
+below. The new allocation-provenance diagnostic also stops at strict code1216:
+its valid fixed witness reports an active hook but no current recorded pool
+event, with no type or pool attribution. Later typed domains and final present
+remain unrun. Component controls and the one-tick browser result do not establish
+full browser rollback. Earlier owner controls
+also repaired callback guards so simulation and draw callbacks refuse separately;
+the production flow control passes with synthetic lifecycle prerequisites. The
+original single/two-player constructor, neutral ticks, context checkpoint controls
+and unload/restart pass in two Node worlds after fixing missing match-initialization
+and source-header fixture prerequisites. Those failed prerequisites remain
+retained, and these checks remain component evidence.
+
+A private linker-map inventory records original/generated C static regions and
+explicitly excluded host/runtime sections against the final Wasm and producer
+graph. It is a candidate range inventory, not complete simulation state. Source
+included through project wrappers, dynamic descriptors, stream/file owners and
+renderer interactions still need closure. A read-only census now completes
+samples 0–299 and the first non-neutral sample 300 in installed headless Chrome.
+It preserves all literal PAD records, both selected fighters' positive source
+draw dispatches, native PCM, actual Aurora frame completion and owned cleanup.
+The earlier sample-zero failure was a harness assertion intended for the
+no-draw lane; the reviewed repair retains the strict interactive draw checks.
+
+The next read-only capture adds exact audio/FX allocation ranges with separate
+owner lifetime tags. All nine ranges remain stable before the source step,
+after it, and after the actual draw and Aurora completion. Independent review
+caught and corrected a decoder that incorrectly assumed audio and effects used
+the same lifetime counter. Positive controls now use different counters and
+negative controls detect a changed effects lifetime. Earlier fixture/export and
+cross-realm assertion failures remain retained. The preserved source review has a
+transcription-only hash correction addendum; all ten committed source blobs were
+rehashed, and the corrected pin matches the original application and capture.
+
+In this capture the source step changes 100,211 byte values: 15,806 are attributed
+to audio owners, 2,939 to diagnostic PCM output, 19,299 to the gameplay arena,
+3,715 to candidate source statics and 337 to excluded sections; 58,115 remain
+unmapped. The later draw/completion transition changes 738,066 byte values.
+These are net differences per transition, **not unique mutable state size or a
+snapshot budget**. The preceding census and both exact runtime producers remain
+retained separately; changes in these totals are not a performance comparison.
+Same-value stores and transient changes remain unobserved. Boundary DVD-idle
+checks do not exclude transfers that completed between them. Every range remains
+unadmitted for restore. The screenshot retains the known magenta/texture
+artifacts and establishes no pixel accuracy. Owned browser, server and capture
+processes closed, with independent checks of recorded PIDs.
+
+Checkpoint `12f1008e` passes independent source/result review, affected Release
+builds, the real-asset fighter/context trace, 2,445 regression tests with 165
+skips, and all 14 exact-head CI checks (12 successes, two expected skips). The
+later audio-range extension passes focused owner/runner controls, independent
+source/result review and its private and ordinary Release builds. Its full regression passes
+2,445 tests with 165 skips in 549.587 seconds. Audio checkpoint `a8fa9af1`
+completes all 14 exact-head checks: 12 successes and two expected skips. At that checkpoint the PR remained draft, and no same-instance aggregate CPU restore
+or rollback performance result was claimed.
+
+The subsequent match-context census identifies one exact 2,488-byte allocation
+with a stable world and owner epoch at all three boundaries. Eight byte values
+change inside it during the source step; none change during draw/completion.
+The source step has 89,827 net changed byte values, including 47,785 still
+unmapped. These totals belong to this producer; the difference from the prior
+census is not a reduction attributable to the eight-byte classification. The
+existing PAD, four-stock, selected-draw and Aurora-completion checks pass, and
+all nine recorded process IDs are independently absent after cleanup. No memory
+is restored.
+
+Independent source review found and repaired an output-alias gap: descriptor or
+error buffers overlapping the live owner now refuse before any write. Actual
+source controls compare every owner byte after refusal, then perform a healthy
+step. The focused fighter trace, 17 runner controls, both Release builds and
+independent raw-result review pass. Full regression passes 2,445 tests with
+165 skips in 530.297 seconds. Existing failed controls and the rejected candidate
+remain retained. At that checkpoint the next proposal was a pure observation
+accessor for the existing Aurora staging-shadow descriptor, whose current
+implementation pumps events. The later Aurora v2 candidate implemented that
+accessor; its separate v5 headless-Chrome census ran the linked observer. The
+older offline controls alone did not establish linked integration. This remains
+host-state provenance for no-draw rollback, not a resumption of drawn corrections.
+
+The latest read-only Aurora v2 census adds exact staging-shadow provenance to
+the same sample-300 source-step and actual-draw boundaries. Its producer remains
+the clean `4c95db9d` base plus the original frozen nine-file Aurora v2 patch;
+the census used its noncanonical patch bytes and keeps that original identity.
+The completed capture and independent result review are indexed in the
+structured receipt. The source-state manifest remains incomplete, every
+observation remains unadmitted, and no memory was restored.
+
+Full regression v5 recorded one failure in `test_reviewed_aurora_patch_is_canonical`
+(2,448 tests, 165 skips; 551.267 seconds; log SHA-256
+`7c82fb1ae063dbd71466ce0d163f2095f66ae6d63c089acf98ca0f87ea105b08`). The
+canonicalization repair changed patch bytes only: before and after serialization
+produce the same prepared Aurora tree `c065b38cf0d1ba1d9ad1e6717cc79ee1b38eb11e`.
+The repair receipt and independent review are pinned in the structured evidence.
+This does not reidentify the v5 census producer. Full regression v6 passes
+2,448 tests with 165 skips (log SHA-256
+`b48caa832e7b3f4065eb62e2116da70ba582eebf43fb439228793c524e69963c`); final
+exact-head CI remains pending. The earlier Aurora v1 refusal also included a
+missing arbitrary-output alias closure, alongside its syntax, manifest-alias
+and production-path-control findings; all failed controls remain retained.
+
+### Source-main-heap live-payload component
+
+The reviewed three-file source-main-heap candidate is applied. It snapshots exact
+live `OSAllocFromHeap` payload bytes tracked by the existing owner ledger, inside
+the observed 32 MiB gameplay arena. The candidate, focused controls, both
+Release builds and full regression v6 passed. It does not restore allocation
+topology, explain the source-step bytes outside the arena, admit aggregate state,
+or authorize a same-browser restore. Plan v2
+(`e551360520b99054508046b9bdeb679ad6103c2ec6e13ede0c90fb3fdd16616c`) remains
+the current read-only plan; plan v1
+(`eb2f1579608eaf045d7aac7c19fc7ba7dd7cabb36bf2eadd99222f50e642f1e3`) remains
+preserved.
+
+The V4 payload-admission runner/report integration is a historical pre-repair
+result: it passed 38 Node controls and the full 2,456-test regression with 165
+skips in 549.465 seconds on clean head ef95e9b1 / tree 481b68ab. It reused the
+native Release outputs built at f101c8c7 with the reviewed V3 candidate. The
+later descriptor repair changes that producer identity and must not inherit
+those runtime hashes or the V4 pass.
+
+The first released payload-admission dry run (V1) warmed 300 rendered samples
+and stopped at sample 299/source frame 176 when CAPTURE returned 517. It did not
+run the sample-300 step or actual draw, enumerate owner rows, allocate the
+payload snapshot or restore memory. The V4 consumer expected byteSize ==
+sizeof(header) (120 bytes), while the valid schema-5 producer extent includes
+frame and submission rows and is 2,200 bytes at active counts 4/4. This was a
+consumer size-check defect; the raw 517 does not show whether the runtime
+descriptor pointer was null. Root reviewed and applied the minimal three-file
+correction: canonical uint64 extent arithmetic and the producer's pure size
+query now check offsets, strides, counts, zero and overflow before snapshot
+work. The actual-producer controls passed 40 scenarios plus pthread. The old
+five-file runtime producer, failed evidence, screenshot and scratch remain
+retained; all ten recorded owned PIDs are independently absent. That V1
+attempt's CLOSE returned 517; snapshotClose and rendererShutdown separately
+returned 1. The V1 refusal has no sample-300 result; its producer and failure
+remain historical.
+
+The first integration of the descriptor repair passed its focused native
+controls and both Release builds, then full regression stopped at 2,456 tests
+and 165 skips with one unrelated diagnostics quota assertion: the second valid
+report returned 201 where the test expected 429 (log SHA-256
+b77723d55104537e1557e65ec113d44c78cabb33cda02434ab59deaeae5e9f2b). The
+worker uses a Date.now() minute bucket, but the retained failure has no call
+timestamps, so a minute-boundary crossing remains a hypothesis. Root approved
+a one-file test-only candidate that pins the clock in both quota tests and
+asserts same-minute 201/429 plus the next-minute 201. Its focused real-worker,
+SQLite-backed controls pass 2/2, and focused checked-out diagnostics discovery
+passed one test in 5.193 seconds (log SHA-256 8a5ebb42fe69e78222c76332c25335d806d59f569b53e6d13f913848330d597a).
+The exact test file SHA-256 7284201f6d6bb167e3d6cb935f6e776b0e4e7acfe08322fb22812d37be65fefa matches both the approved frozen candidate
+and the clean source commit. Final integration passed both Release builds and
+full regression: 2,456 tests, 165 skips, 540.336 seconds (log SHA-256
+92ff9bbe348693553649737e792cb8629da5248bcfade2c93923346e6d4c3e98). The clean source is
+7e4fe7817966e3f094cd573dfa9d8541cba1a815 / tree 05f4462bbe4d0ad720429539ded5f35be0d378c2. The native binaries were
+built at ef95 plus the exact reviewed three-file descriptor repair; the final
+commit adds only the quota-test change after builds. The current runtime
+inventory binds 15 files; the old V3 output hashes were verified against the
+V3 checkpoint, with 11 identical and four changed outputs (private browser
+Wasm/map/source-state manifest and ordinary runtime Wasm).
+
+Root released one V2 attempt against the repaired descriptor-size producer.
+It completed the 300-drawn-sample prefix, retained sample-299/source-frame-176
+checkpoint, then ran the exact literal sample-300 PAD and one source step to
+frame 177. Runner commands 1, 2 and 4 performed the three payload admissions:
+CAPTURE plus immediate admission, sample-300 STEP_AND_ADMIT, and POSTDRAW_ADMIT
+after the actual draw and GPU/transfer quiescence. Command 3 was DRAW_ONCE and
+shutdown command 5 was CLOSE. All command results were zero; CLOSE returned 0,
+snapshotClose and rendererShutdown returned 1. Root independently verified all
+12 recorded PIDs absent. No restore was called in that payload-admission experiment.
+
+The raw report remains `incomplete`: the source-state manifest does not cover
+complete game state, `ownerRestoreAdmission` is false, and all changed ranges
+remain unadmitted. The payload snapshot capture explicitly allocates diagnostic
+storage, so this run's heap deltas are not natural source/draw attribution and
+are not compared as progress. A bounded comparison to the earlier census-v6
+run finds exact equality in initial and sample-300 observation/PCM hashes, the
+sample-300 PAD, boundary, draw diagnostics, selected fighter paths and GPU
+status. Their source trees, generated JavaScript/Wasm and manifests differ, so
+this is fixture-output equality only; it proves neither source neutrality nor
+original-game parity. The sample screenshot retains the known magenta/texture
+artifacts. The raw report, independent review, root release, asset-hash review
+and exact five-file runtime retention are indexed in the structured receipt.
+After independent review, root rechecked the 12 recorded PIDs and removed only the
+empty successful V2 scratch directory. The cleanup receipt is pinned in the
+structured evidence; failed evidence and retained artifacts remain preserved.
+That source-payload admission run performed no restore. It did not establish C3
+or whole-session acceptance.
+
+The first aggregate CPU attempt (CP2) completed the 300 actually drawn prefix
+(samples 0–299) and reached source frame 176, but command 1 CAPTURE returned
+1076 (`0x434`) before the literal sample-300 step; command 2 and restore were not
+run. CP3 repeated that refusal. Its raw native record reported a null Flow-domain
+CPU companion, but the reduced actual-source controls later showed flow snapshot
+and cadence admission passing; the bootstrap-only mask helper refused the exact
+original VS mask alias. That reduction identifies the narrower control-path
+blocker, not a successful browser capture. The reviewed mask/flow repair preserved
+the existing bootstrap guard and restored actual owner admission controls.
+
+CP4 then completed the 300-sample prefix and reached the post-draw outer check.
+The runner's `assertDrawDiagnosticsClear` rejected the legitimate cumulative
+source-draw counters (1,505 callbacks per selected fighter and 888/873 normal
+model dispatches). The pinned source order shows the CPU routine had returned
+through command 3, quiescence and command 4, but that run did not preserve its
+native result bytes; it is not independent equality/restore proof. Cleanup and
+all ten recorded process identities were checked, and the failed report remains
+retained.
+
+The current CP5 attempt completed the same 300 actually drawn samples, consumed
+the literal sample-300 PAD, and advanced the source frame from 176 to 177. The
+11,416-byte terminal record reports state `Complete`, no failure, commit result 0,
+equality 1, checked and matched domains `0x3fe`, and comparison status 0; all five
+paired observation, PCM, PAD, profile and transfer ranges match exactly. The
+three draw-diagnostic snapshots before the final present are byte-identical. One
+source present then advances each selected Mario's callback count by five and
+normal model dispatch count by three. Aurora reports frame 301/301 with no pending
+packets or staging buffers, no busy worker and no renderer errors. CPU close returns
+0; snapshot close and renderer shutdown each return 1. The independent review
+redecoded the native bytes, checked all four command results and raw sample-300
+PAD, and confirmed all nine recorded runner/Chrome process IDs absent. The retained
+screenshot still shows the known magenta/texture artifacts and carries no pixel
+comparison claim.
+
+The native Release producer is 11 reviewed dirty files on base `23496dcb` / tree
+`46255c71`; its nine runtime artifacts, configuration and policy are unchanged
+from CP4. The CP5 harness and full-regression producer are a separate 14-file dirty
+set on that same base. Focused harness checks pass 47/47; private and ordinary
+Release builds pass. Full regression then passed 2,466 tests (2,301 passed, 165
+skipped) in 553.675 seconds (outer duration 553.968 seconds; log SHA-256
+`c005d5f26befa62827b8bf823c4e9fab34d6b628dfb4625718e27be6ca70660b`). The 14
+source files were committed unchanged as `16c418ea` / tree `79276979`, pinned by
+the source-checkpoint receipt. At receipt creation the commit was unpublished;
+publication and exact-head CI are tracked on PR342. The raw report remains an
+incomplete ownership inventory and does not
+admit all observed ranges. This bounded CPU baseline/restore/replay and one-present
+result is not a drawn-original comparison, renderer rollback, full-state closure,
+continuous PCM, pixel parity, timing acceptance, or #341 seven-tick acceptance.
+A later root-released drawn-reference capture records the baseline draw before
+restore, matches the same CPU endpoint after no-draw replay, performs one final
+source present, and then passes the strict phase-matched postdraw comparison.
+The 132-byte snapshots at `before-cpu-baseline-and-replay`,
+`after-cpu-capture-before-step`, and `after-cpu-reference-before-baseline-draw`
+are byte-identical. The baseline draw then advances the selected source counters;
+`after-baseline-draw-and-quiescence` and
+`after-correction-before-final-present` are byte-identical. The final source
+present advances the counters again, adding five callbacks and three normal model
+dispatches for each selected Mario. Baseline and final GPU boundaries are idle,
+but renderer/GPU/cache state is not rewound and the screenshot retains the known
+magenta/texture artifacts.
+The capture used a dirty16 build on 4f9a603e; the later clean 9c3293ef source
+checkpoint contains the same bytes across those 16 source files and does not
+relabel the runtime. Private and ordinary Release builds, focused controls and
+full regression pass. The one-tick PR342 successor at exact head
+`bc7c566acb6f73e9146acc8884766814443efb35` completed all 14 checks: 12
+successes and two expected skips. Its PR remained draft; this CI result does not
+change the capture producer identity.
+
+The actual-source two-tick clock reducer passes as a rejection test: one tick
+matches, while two modeled source ticks with one replay present strictly reject
+the one-count clock delta. Saturation, missing/duplicate present, callback-inflight
+and retired/recreated owner controls also pass. The reducer does not execute the
+HSD fighter scheduler, literal PAD/PCM or a gameplay replay, and is not a two-tick
+rollback pass.
+
+The profile-only logical-frame implementation is now validated at source
+checkpoint `62a717fcb5414fb717216b846f3b5a0d5377efff` (tree
+`e4d17f8d310c461f28ee2b539dd5e9a06ab7323e`), with 16 source files. It preserves
+strict clock checks and vanilla behavior; pending housekeeping completes only
+after the source-pre predicate succeeds and before callbacks begin. Focused
+actual-source controls and the full regression pass (2,470 tests, 165 skips).
+The three retained Release builds were produced by `bc7c566` plus the exact 15
+reviewed logical-frame files; the two Python-only test repairs in checkpoint
+`62a717f` do not relabel those build producers. This source validation is
+separate from the two-tick capture source identity (`62a717f` plus 18 dirty
+source files), its native build producer (`62a717f` plus the exact 12 reviewed
+native files), and the unchanged 24-file retained runtime. The capture's raw
+profile identity is `slippi-render-dependencies-logical-frame-v6`. The frozen
+seven-tick browser plan remains unreleased. A later root-released two-tick
+browser attempt ran once and failed at command 11 on the strict final CPU
+payload comparison; it did not reach final present. The detailed receipt below
+keeps this attempt separate from the one-tick pass and from the reduced clock
+rejection. No multi-tick acceptance is claimed.
+
+The root-released two-tick capture warmed source samples 0–299, then took
+drawn-reference baselines at samples 300 and 301. Both captured/replayed raw
+five-field pairs (observation, PCM, PAD, RNG profile and transfer) matched. The
+strict final CPU typed comparison refused command 11 with code 1216: domain 4,
+row 62, offset 284, expected 106 and actual 189 in a 1,024-byte allocation.
+Owner, effects and actions had passed; the payload mismatch stopped the
+comparison, so later domains were not checked. Commands 12/13 and final present
+were not reached. CPU restore CLOSE returned the latched 1216; snapshot close
+and renderer shutdown returned 1. The process owner and independent root check
+recorded all ten owned PIDs absent; the run took 9.816 seconds and cleanup
+80 ms. This retained failed attempt does not change the earlier one-tick pass or
+the separate reduced clock rejection result. See
+`drawn_reference_two_tick_capture_v1` in the structured evidence receipt for
+artifact hashes and exact scope. That first failed attempt remains unchanged.
+
+The subsequently released provenance diagnostic uses clean source `11233c8f`
+(tree `91006a48`), distinct from the runtime built at `6b3b7aa5` plus the exact
+16 reviewed files. Private v5, private logical-frame v6 and ordinary Release
+builds pass; full discovery passes 2,471 tests with 165 skips in 595.086 seconds.
+The source checkpoint records the tested bytes and was unpushed at capture
+time. Publication CI is separate from this local validation. The fresh linked review accepts only the exact new
+4-byte private refusal latch and 256-byte growth of the excluded private
+`cpu_restore` buffer; all 2,169 source-policy rows retain their prior sizes,
+flags and admission decisions after fresh-address binding. Neither diagnostic
+region is admitted for restore, and no restore exemption is widened.
+
+This one diagnostic capture still **fails command11 with strict1216**. Both
+samples300/301 have exact raw observation, PCM, PAD, RNG-profile and transfer
+pairs. The native evidence remains 35,368 bytes; checked CPU mask `0x1e` and
+matched mask `0x0e` stop at payload domain4, row62/offset284, expected `0x6a`
+and actual `0xbd` in the 1,024-byte allocation. The separate 256-byte witness
+passes its synchronous first-difference cross-check and reports `hookActive=1`,
+`attribution=0`, `reason=2`, `associationState=0` and a zero descriptor. This
+means **no current recorded AddFree event for the target allocation**, not
+proof that it is outside ObjAlloc. There is no pool, fighter/class, member or
+float-type attribution. Mirror restore clears association metadata in general,
+but the independent source reduction found no production mirror-restore caller
+in this route; its actual payload restore copies requested source bytes only.
+Later CPU domains, commands12/13 and the final present were not reached.
+
+CPU restore CLOSE retains1216; snapshot close and renderer shutdown separately
+return1. The native close report therefore remains failed, while the owner/root
+OS checks independently find all ten recorded PIDs absent. All 24 runtime pins
+remain unchanged. The 10.128-second attempt is diagnostic elapsed time, not a
+rollback budget result. The structured receipt under
+`two_tick_payload_provenance_diagnostic_v1` binds raw evidence `b480a165…`,
+owner, validation, fresh linked configuration, source/build identities and
+independent raw/source review. Existing failures and the earlier one-tick pass
+are preserved. The remaining step is a bounded offline source-callsite reduction
+of the missing current event; it is a proposal, not implemented attribution or
+a new capture release. No byte masking, restore-policy exception, whole-state,
+multi-tick rollback, original Slippi parity, performance or completion claim
+follows.
 
 ## First current-source copy/restore result
 

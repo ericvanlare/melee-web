@@ -1,4 +1,5 @@
 #include "gameplay_source_files.h"
+#include "gameplay_cpu_interval.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -252,6 +253,8 @@ MeleeWebSourceFileScope* melee_web_source_files_begin(
 int melee_web_source_files_end(MeleeWebSourceFileScope* scope, char* error,
                                size_t error_size)
 {
+    if(!melee_web_cpu_interval_attempt(MELEE_WEB_CPU_EFFECT_SOURCE_FILE))return fail(error,error_size,"CPU interval forbids source file scope retirement");
+
     if (!scope || active_scope != scope)
         return fail(error, error_size,
                     "Source RuntimeFiles scope is not the active owner");
@@ -295,6 +298,8 @@ int melee_web_source_file_size(const char* name, size_t* size)
 int melee_web_source_file_copy(const char* name, void* destination,
                                size_t* size)
 {
+    if(!melee_web_cpu_interval_attempt(MELEE_WEB_CPU_EFFECT_SOURCE_FILE))return 0;
+
     const SourceFile* file = find_file(name);
     if (!file || file->external || !size || (file->size && !destination)) return 0;
     SourceFileCopy* copy = active_scope->copies;
@@ -314,6 +319,8 @@ int melee_web_source_file_copy(const char* name, void* destination,
 
 const char* melee_web_source_file_take_name(const void* copied_buffer)
 {
+    if(!melee_web_cpu_interval_attempt(MELEE_WEB_CPU_EFFECT_SOURCE_FILE))return NULL;
+
     if (!active_scope || !copied_buffer) return NULL;
     SourceFileCopy** link = &active_scope->copies;
     while (*link && (*link)->destination != copied_buffer) link = &(*link)->next;
@@ -358,6 +365,8 @@ int melee_web_source_file_drive_busy(void)
 int melee_web_source_files_external_set(const char* name, size_t size,
                                         char* error, size_t error_size)
 {
+    if(!melee_web_cpu_interval_attempt(MELEE_WEB_CPU_EFFECT_SOURCE_FILE))return fail(error,error_size,"CPU interval forbids external file catalog mutation");
+
     if (active_scope)
         return fail(error, error_size,
                     "Cannot change external files while a source scope is active");
@@ -388,6 +397,8 @@ int melee_web_source_files_external_set(const char* name, size_t size,
 
 int melee_web_source_files_external_clear(char* error, size_t error_size)
 {
+    if(!melee_web_cpu_interval_attempt(MELEE_WEB_CPU_EFFECT_SOURCE_FILE))return fail(error,error_size,"CPU interval forbids external file catalog mutation");
+
     if (active_scope)
         return fail(error, error_size,
                     "Cannot clear external files while a source scope is active");
@@ -407,6 +418,8 @@ int melee_web_source_files_external_clear(char* error, size_t error_size)
 int melee_web_source_file_region_register(void* base, size_t size,
                                           char* error, size_t error_size)
 {
+    if(!melee_web_cpu_interval_attempt(MELEE_WEB_CPU_EFFECT_SOURCE_FILE))return fail(error,error_size,"CPU interval forbids source DMA region mutation");
+
     if (!active_scope || !base || !size ||
         (uintptr_t)base > UINTPTR_MAX - size) {
         return fail(error, error_size,
@@ -437,6 +450,8 @@ int melee_web_source_file_region_register(void* base, size_t size,
 int melee_web_source_file_region_unregister(void* base, size_t size,
                                             char* error, size_t error_size)
 {
+    if(!melee_web_cpu_interval_attempt(MELEE_WEB_CPU_EFFECT_SOURCE_FILE))return fail(error,error_size,"CPU interval forbids source DMA region mutation");
+
     if (!active_scope || !base || !size ||
         (uintptr_t)base > UINTPTR_MAX - size) {
         return fail(error, error_size,
@@ -487,6 +502,8 @@ int melee_web_source_file_request(int entry, uintptr_t offset,
                                   void* args, int* request_id,
                                   char* error, size_t error_size)
 {
+    if(!melee_web_cpu_interval_attempt(MELEE_WEB_CPU_EFFECT_SOURCE_FILE))return fail(error,error_size,"CPU interval forbids source DVD request");
+
     const SourceFile* file = file_for_entry(entry);
     if (!file || !callback || !request_id || args != NULL || type != 0x21 ||
         priority != 1 || offset % 32 != 0 || size == 0 || size % 32 != 0 ||
@@ -524,6 +541,8 @@ int melee_web_source_file_cancel(int request_id, uint32_t flags,
                                  MeleeWebSourceFileCallback callback,
                                  void* args)
 {
+    if(!melee_web_cpu_interval_attempt(MELEE_WEB_CPU_EFFECT_SOURCE_FILE))return 0;
+
     if (!active_scope || (flags & ~3u) || args != NULL) return 0;
     for (SourceFileRequest* request = active_scope->requests; request;
          request = request->next) {
@@ -541,6 +560,8 @@ int melee_web_source_file_cancel(int request_id, uint32_t flags,
 int melee_web_source_file_supply(int request_id, const void* bytes, size_t size,
                                  char* error, size_t error_size)
 {
+    if(!melee_web_cpu_interval_attempt(MELEE_WEB_CPU_EFFECT_SOURCE_FILE))return fail(error,error_size,"CPU interval forbids source DVD supply");
+
     if (!active_scope || (!bytes && size))
         return fail(error, error_size,
                     "Invalid external source file transfer result");
@@ -560,6 +581,8 @@ int melee_web_source_file_supply(int request_id, const void* bytes, size_t size,
 
 int melee_web_source_files_pump(char* error, size_t error_size)
 {
+    if(active_scope&&active_scope->request_count&&!melee_web_cpu_interval_attempt(MELEE_WEB_CPU_EFFECT_SOURCE_FILE))return fail(error,error_size,"CPU interval forbids queued source DVD work");
+
     if (!active_scope) {
         if (error && error_size) error[0] = '\0';
         return 1;

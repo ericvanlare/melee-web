@@ -173,6 +173,19 @@ Only a reviewed pass opens a longer correction-budget measurement. The existing
 [rollback boundary](status/2026-10-12-match-only-rollback-feasibility.md) owns all
 historical measurements and the current scope; no whole-session claim follows.
 
+**October 22 execution sprint — [#341](https://github.com/ericvanlare/melee-web/issues/341).**
+The next boundary is restoration of the same browser instance that owns the
+rendered match. The existing restored Node comparison does not satisfy it.
+First close source globals, arena and non-arena owners, then compare a drawn
+interval with identical no-draw corrections and a real present frame. Extend a
+proved boundary to movement, hit, KO and respawn cases and measure capture,
+restore, up to seven corrections and presentation together. Keep all work in
+one milestone; partial owner helpers do not authorize a browser restore. The
+own-relay rollback match follows only after the profile and host-effect gates
+pass. Stadium gets its bounded finite-CSS prerequisite in parallel and does not
+delay the Mario/FD milestone. The rejected #339 reference follow-up stays
+checkpointed; it is not retried or substituted for browser-state engineering.
+
 Pokémon Stadium C3 [#251](https://github.com/ericvanlare/melee-web/issues/251) /
 [draft #301](https://github.com/ericvanlare/melee-web/pull/301) remains the next
 Track B milestone. Ranked/Unranked use unfrozen Stadium, so transformations
