@@ -2,12 +2,13 @@
 // Read-only Wasm-memory write census for one warmed, actually drawn Slippi
 // fixture sample. This records net byte-value deltas, not stores or a restore.
 import crypto from 'node:crypto';
+import {validateCpuRestoreConfiguration,runBrowserCpuRestore} from './cpu_restore_runner.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {browserLaunchOptions, loadBrowserTools} from '../../../scripts/browser_tools.mjs';
 import {
-  applyCleanupVerdict, assertDrawDiagnosticsClear,
+  applyCleanupVerdict, assertDrawDiagnosticsClear, checkedAsyncCcall, inspectInteractiveObservation,
   chromeUserDataDirectoryFromSpawnArgs, launchOwnedChromeServer,
   ownedProcessPresent, recordBrowserProcessInfo,
   validateAuroraFrame, validateSelectedDrawPath, validateSourceInputMapping, decodeDrawDiagnostics,
@@ -67,7 +68,7 @@ export function recordFailedCensusExecution(report, error) {
 
 function parseArgs(argv) {
   const values = {};
-  const allowed = new Set(['--browser-runtime', '--assets', '--manifest', '--out', '--playwright']);
+  const allowed = new Set(['--browser-runtime', '--assets', '--manifest', '--out', '--playwright','--aggregate-cpu-restore-config']);
   const flags = new Set(['--aurora-staging-shadow-inventory', '--stage-arena-owner-inventory',
     '--source-payload-admission-dry-run']);
   for (let i = 0; i < argv.length;) {
@@ -90,6 +91,12 @@ function parseArgs(argv) {
     values[key] = path.resolve(values[key]);
   }
   if (values['--playwright']) values['--playwright'] = path.resolve(values['--playwright']);
+  if(values['--aggregate-cpu-restore-config']){
+    values['--aggregate-cpu-restore-config']=path.resolve(values['--aggregate-cpu-restore-config']);
+    if(values['--source-payload-admission-dry-run']||!values['--aurora-staging-shadow-inventory'])
+      throw new Error('CPU restore is mutually exclusive with payload dry run and requires the private Aurora diagnostic');
+    if(!fs.statSync(values['--aggregate-cpu-restore-config']).isFile())throw new Error('CPU configuration file required');
+  }
   if (values['--source-payload-admission-dry-run'] &&
       (!values['--aurora-staging-shadow-inventory'] || !values['--stage-arena-owner-inventory'])) {
     throw new Error('Source-payload admission dry run requires both exact private Aurora and stage owner diagnostics');
@@ -140,6 +147,9 @@ function sourceHashes() {
     'scripts/build.py',
     'scripts/browser_tools.mjs',
     'scripts/source_state_manifest.py',
+    'src/slippi_profile/tests/cpu_restore_runner.mjs',
+    'src/slippi_profile/tests/cpu_restore_adapter.inc',
+    'src/gameplay_cpu_checkpoint.cpp','src/gameplay_cpu_commit.cpp','src/gameplay_cpu_statics.cpp','src/gameplay_cpu_interval.c',
   ];
   return Object.fromEntries(files.map(name => [name, fileSha(path.join(ROOT, name))]));
 }
@@ -283,6 +293,17 @@ async function main() {
     throw new Error('Source-state manifest does not describe the supplied final browser Wasm');
   }
 
+  let cpuConfiguration=null,cpuWire=null;
+  if(options['--aggregate-cpu-restore-config']){
+    const file=options['--aggregate-cpu-restore-config'];cpuConfiguration=JSON.parse(fs.readFileSync(file,'utf8'));
+    const policyFile=path.resolve(path.dirname(file),cpuConfiguration.policyFile);
+    const policy=JSON.parse(fs.readFileSync(policyFile,'utf8'));
+    const identities={wasmSha256:fileSha(wasm),mapSha256:fileSha(wasm.replace(/\.wasm$/,'.map')),
+      manifestSha256:fileSha(options['--manifest']),policySha256:fileSha(policyFile)};
+    if(manifest.configuration_identity?.link_map_sha256!==identities.mapSha256)throw new Error('CPU map does not match final source-state manifest');
+    cpuWire=validateCpuRestoreConfiguration(cpuConfiguration,policy,manifest,identities);
+    cpuConfiguration={...identities,configurationSha256:fileSha(file),wireRows:cpuWire.length,policyFile};
+  }
   fs.mkdirSync(options['--out']);
   const outFile = path.join(options['--out'], 'evidence.json');
   const report = {
@@ -337,6 +358,13 @@ async function main() {
     cleanup: null,
     failure: null,
   };
+  if(cpuWire){
+    report.schema='melee-web-same-browser-cpu-restore-replay-present-component-v1';
+    report.statement='One fixed sample300 baseline CPU+PCM without draw, typed CPU restore, exact no-draw replay, then one source present. Component evidence only; no renderer rewind or whole-Wasm restore.';
+    report.execution={status:'incomplete',prefixSamples:300,sample:300,cpuRestore:{enabled:true,status:'not-started'},restorePerformed:'not-yet-observed'};
+    report.cpuConfiguration=cpuConfiguration;
+    report.exclusions=['No #341 milestone closure','No drawn-original versus no-draw coverage claim','No seven-tick/H1/whole-session acceptance','No renderer/host allocator rewind','No #339 nonzero-history/drop workaround'];
+  }
   const writeReport = () => fs.writeFileSync(outFile, `${JSON.stringify(report, null, 2)}\n`);
   writeReport();
 
@@ -460,6 +488,25 @@ async function main() {
     }
     if (!checkpoint) throw new Error('The existing 300-sample browser warm prefix did not complete');
 
+    if(cpuWire){
+      const sample=await runBrowserCpuRestore(page,cpuWire,checkpoint,expectedInputMapping,expectedStocks,{
+        checkedSource:checkedAsyncCcall.toString(),inputMappingSource:validateSourceInputMapping.toString(),inspectSource:inspectInteractiveObservation.toString()});
+      const frame=validateAuroraFrame(sample.status,previousFrame.beginFrameId,previousFrame.endFrameId);
+      const diagnostics=decodeDrawDiagnostics(Buffer.from(sample.drawDiagnostics,'base64'));
+      assertDrawDiagnosticsClear(diagnostics);
+      const fighters=validateSelectedDrawPath(previousDiagnostics,diagnostics,sample.boundary?.players,expectedInputMapping);
+      if(!sample.boundary?.interactive)throw new Error('CPU final present interactive boundary refused');
+      if(sample.pad!=='AgAAAAAAAAAAAAABALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=')throw new Error('CPU sample300 literal PAD drift');
+      report.execution={status:'completed',prefixSamples:300,sample:300,cpuRestore:sample.cpuRestore,restorePerformed:true,
+        scope:'same-browser CPU restore/replay + one present COMPONENT only'};
+      report.cpuResult={observation:rawLaneRecord(browserSampleLane(sample)),boundary:sample.boundary,gpuStatus:sample.status,
+        finalFrame:frame,drawDiagnostics:diagnostics,selectedFighterPaths:fighters,
+        screenshot:await screenshotRecord(page,options['--out'],'browser-cpu-restore-sample-300.png')};
+      report.inventory={status:'fixed-reviewed-domains-only',completeGameState:false,sourceStateManifestComplete:false,
+        wasmAndMapBound:true,staticRows:cpuWire.length};
+      if(pageErrors.length)throw new Error(`Browser reported an error: ${pageErrors[0]}`);
+      report.result='passed';writeReport();return;
+    }
     const arenaRange = await page.evaluate(() => {
       const {module} = window.__slippiSynctest;
       return {base: module._melee_web_synctest_gameplay_arena_base(),
@@ -575,6 +622,11 @@ async function main() {
     writeReport();
   } catch (error) {
     recordFailedCensusExecution(report, error);
+    if(cpuWire){
+      report.execution.cpuRestore=error.cpuRestorePartial||report.execution.cpuRestore;
+      if(error.cpuRestorePartialReadError)report.execution.cpuRestorePartialReadError=error.cpuRestorePartialReadError;
+      report.execution.restorePerformed='unknown-on-failure; inspect native evidence and command records';
+    }
     writeReport();
     throw error;
   } finally {
@@ -582,7 +634,7 @@ async function main() {
     if (page) {
       try {
         const closed = await closeBrowser(page,
-          Boolean(options['--source-payload-admission-dry-run']));
+          Boolean(options['--source-payload-admission-dry-run']),Boolean(cpuWire));
         if (!closed?.closed) cleanupFailures.push({step: 'renderer-close', error: JSON.stringify(closed)});
         report.cleanup = {...(report.cleanup || {}), renderer: closed};
       } catch (error) { cleanupFailures.push({step: 'renderer-close', error: String(error)}); }

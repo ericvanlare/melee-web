@@ -715,3 +715,20 @@ void melee_web_gameplay_bootstrap_snapshot_destroy(MeleeWebGameplayBootstrapSnap
     melee_web_gameplay_heap_guard_destroy(snapshot->heap_guard);
     free(snapshot);
 }
+
+
+int melee_web_gameplay_clock_mask_admit(const void* saved_pointer,uint64_t saved_value)
+{
+    return arena && tables_live && generation && !stepping && !shutting_down &&
+        saved_pointer == &disabled_links && saved_value == disabled_links;
+}
+
+MeleeWebBootstrapCpuStorage melee_web_gameplay_bootstrap_cpu_storage(void)
+{
+    MeleeWebBootstrapCpuStorage result={0};
+    if (!snapshot_boundary(NULL,0))return result;
+    result.ticks=&ticks;result.ticks_bytes=sizeof(ticks);
+    result.disabled_links=&disabled_links;
+    result.disabled_links_bytes=sizeof(disabled_links);
+    return result;
+}

@@ -114,7 +114,7 @@ add_library(fighter_asset_runtime STATIC EXCLUDE_FROM_ALL
   src/gameplay_replay_transport.cpp src/gameplay_replay_session.cpp
   src/runtime_archive_cache.cpp
   src/gameplay_audio_bank.cpp src/gameplay_audio_stream_asset.cpp src/dat_audio_stream.cpp src/dat_audio.cpp src/dat_audio_programs.cpp
-  src/gameplay_hud_assets.cpp src/gameplay_asset_manifest.cpp src/dat_scene.cpp src/gameplay_menu_world.cpp src/gameplay_match_session.cpp src/dat_menu_support.cpp src/dat_event_menu.cpp src/dat_audio_load_data.cpp src/dat_shape_animation.cpp src/dat_sis.cpp src/dat_native_menu.cpp src/dat_item_article.cpp src/dat_stage_items.cpp src/dat_stage_yaku.cpp src/gameplay_world.cpp src/dat_color_animation.cpp src/dat_native_stage.cpp src/dat_archive.cpp src/dat_common.cpp src/dat_native_joint.cpp src/rigid_model.cpp
+  src/gameplay_hud_assets.cpp src/gameplay_asset_manifest.cpp src/dat_scene.cpp src/gameplay_menu_world.cpp src/gameplay_match_session.cpp src/gameplay_cpu_statics.cpp src/gameplay_cpu_commit.cpp src/gameplay_cpu_checkpoint.cpp src/dat_menu_support.cpp src/dat_event_menu.cpp src/dat_audio_load_data.cpp src/dat_shape_animation.cpp src/dat_sis.cpp src/dat_native_menu.cpp src/dat_item_article.cpp src/dat_stage_items.cpp src/dat_stage_yaku.cpp src/gameplay_world.cpp src/dat_color_animation.cpp src/dat_native_stage.cpp src/dat_archive.cpp src/dat_common.cpp src/dat_native_joint.cpp src/rigid_model.cpp
   src/dat_texture.cpp src/dat_material.cpp src/dat_material_animation.cpp
   src/native_dat.cpp src/gameplay_fighter_assets.cpp src/gameplay_kirby_copy_assets.cpp src/gameplay_action_store.cpp
   src/dat_commands.cpp src/dat_fighter_runtime.cpp src/dat_fighter.cpp
@@ -632,7 +632,7 @@ if(MELEE_WEB_SLIPPI_SYNCTEST)
     "_malloc,_free,_melee_web_snapshot_configure_seed,_melee_web_snapshot_init,_melee_web_snapshot_step,_melee_web_snapshot_error,_melee_web_snapshot_observation,_melee_web_snapshot_observation_size,_melee_web_snapshot_initializer_diagnostic,_melee_web_snapshot_initializer_diagnostic_size,_melee_web_snapshot_initializer_json,_melee_web_snapshot_pcm,_melee_web_snapshot_pcm_size,_melee_web_snapshot_input,_melee_web_snapshot_quiescent,_melee_web_snapshot_source_identity,_melee_web_snapshot_stage_kind_bridge_identity,_melee_web_snapshot_rng_profile_identity,_melee_web_snapshot_close,_melee_web_synctest_profile_identity,_melee_web_synctest_draw_decision,_melee_web_synctest_gameplay_arena_base,_melee_web_synctest_gameplay_arena_bytes,_melee_web_synctest_audio_range_inventory,_melee_web_synctest_audio_range_inventory_query,_melee_web_synctest_match_context_range_inventory,_melee_web_synctest_match_context_range_inventory_query,_melee_web_synctest_renderer_initialize,_melee_web_synctest_draw_present,_melee_web_synctest_submission_json,_melee_web_synctest_renderer_shutdown")
   if(MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY)
     string(APPEND _synctest_browser_exports
-      ",_melee_web_synctest_payload_admission_command")
+      ",_melee_web_synctest_payload_admission_command,_melee_web_synctest_cpu_restore_configure,_melee_web_synctest_cpu_restore_command,_melee_web_synctest_cpu_restore_evidence,_melee_web_synctest_cpu_restore_evidence_bytes")
   endif()
   if(MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY)
     string(APPEND _synctest_browser_exports

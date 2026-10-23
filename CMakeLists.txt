@@ -110,7 +110,7 @@ if(EMSCRIPTEN)
     message(FATAL_ERROR "Generated gameplay source missing; use scripts/build.py")
   endif()
   add_library(gameplay_runtime STATIC src/gameplay_bootstrap.c src/gameplay_abi.c
-    src/gameplay_source_context.c src/gameplay_source_files.c
+    src/gameplay_source_context.c src/gameplay_source_files.c src/gameplay_cpu_interval.c
     src/gameplay_source_memory_runtime.cpp
     src/source_address_context.cpp src/source_game_heap_context.cpp
     src/gameplay_ps_math.c
@@ -138,6 +138,9 @@ if(EMSCRIPTEN)
   endforeach()
   target_include_directories(gameplay_runtime PUBLIC src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}")
   target_compile_definitions(gameplay_runtime PUBLIC TARGET_PC)
+  if(MELEE_WEB_SLIPPI_SYNCTEST AND MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY)
+    target_compile_definitions(gameplay_runtime PUBLIC MELEE_WEB_CPU_INTERVAL_ENABLED=1)
+  endif()
   if(MELEE_WEB_SLIPPI_SYNCTEST)
     target_sources(gameplay_runtime PRIVATE
       src/slippi_profile/profile.c src/slippi_profile/offscreen_damage.c)

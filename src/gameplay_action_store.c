@@ -10,6 +10,11 @@
 #include <emscripten.h>
 #endif
 struct MeleeWebNativeClip { FigaTree tree; };
+#if defined(MELEE_WEB_ACTION_INTERVAL_TEST)
+static uint64_t interval_test_clip_creates, interval_test_clip_destroys;
+uint64_t melee_web_action_interval_test_clip_create_count(void) { return interval_test_clip_creates; }
+uint64_t melee_web_action_interval_test_clip_destroy_count(void) { return interval_test_clip_destroys; }
+#endif
 MeleeWebNativeClip* melee_web_native_clip_create(uint32_t type, uint32_t flags, float frames,
     const uint8_t* nodes, size_t node_count, const MeleeWebAnimationTrack* tracks, size_t track_count)
 {
@@ -31,24 +36,44 @@ MeleeWebNativeClip* melee_web_native_clip_create(uint32_t type, uint32_t flags, 
         /* Streams remain owned by the retained DatAnimation selection. */
         clip->tree.tracks[i].ad_head = (uint8_t*)t->bytes;
     }
+#if defined(MELEE_WEB_ACTION_INTERVAL_TEST)
+    ++interval_test_clip_creates;
+#endif
     return clip;
 }
 void melee_web_native_clip_destroy(MeleeWebNativeClip* p)
-{ if (p) { free(p->tree.nodes); free(p->tree.tracks); free(p); } }
+{ if (p) {
+#if defined(MELEE_WEB_ACTION_INTERVAL_TEST)
+    ++interval_test_clip_destroys;
+#endif
+    free(p->tree.nodes); free(p->tree.tracks); free(p);
+} }
 FigaTree* melee_web_native_clip_tree(MeleeWebNativeClip* p) { return p ? &p->tree : NULL; }
 struct MeleeWebActionBinding {
     Fighter* fighter;
     void* context;
     MeleeWebActionSelect select;
     MeleeWebActionTransfer transfer;
+    uint64_t generation;
+    int retired;
 };
 static struct MeleeWebActionBinding bindings[6];
+static int binding_advance(struct MeleeWebActionBinding* binding)
+{
+    if (binding->generation == UINT64_MAX) {
+        binding->retired = 1;
+        return 0;
+    }
+    ++binding->generation;
+    return 1;
+}
 int melee_web_action_bind(Fighter* fighter, void* context, MeleeWebActionSelect select,
     MeleeWebActionTransfer transfer)
 {
     if (!fighter || !context || !select || !transfer) return 0;
     for (unsigned i = 0; i < 6; ++i) if (bindings[i].fighter == fighter) return 0;
-    for (unsigned i = 0; i < 6; ++i) if (!bindings[i].fighter) {
+    for (unsigned i = 0; i < 6; ++i) if (!bindings[i].fighter && !bindings[i].retired) {
+        if (!binding_advance(&bindings[i])) continue;
         bindings[i].fighter = fighter; bindings[i].context = context;
         bindings[i].select = select; bindings[i].transfer = transfer; return 1;
     }
@@ -57,9 +82,45 @@ int melee_web_action_bind(Fighter* fighter, void* context, MeleeWebActionSelect 
 void melee_web_action_unbind(Fighter* fighter)
 {
     for (unsigned i = 0; i < 6; ++i) if (bindings[i].fighter == fighter) {
+        const uint64_t previous_generation = bindings[i].generation;
+        const int previously_retired = bindings[i].retired;
         memset(&bindings[i], 0, sizeof(bindings[i]));
+        bindings[i].generation = previous_generation;
+        bindings[i].retired = previously_retired;
+        if (!binding_advance(&bindings[i])) bindings[i].retired = 1;
         fighter->x590 = fighter->x598 = NULL; fighter->x5A4 = fighter->x5A8 = NULL;
     }
+}
+uint32_t melee_web_action_binding_count(void) { return 6; }
+int melee_web_action_binding_snapshot(uint32_t slot, MeleeWebActionBindingSnapshot* out)
+{
+    if (!out || slot >= 6) return 0;
+    const struct MeleeWebActionBinding* source = &bindings[slot];
+    MeleeWebActionBindingSnapshot value = {
+        slot, 0, source->generation, source->fighter, source->context,
+        source->select, source->transfer
+    };
+    *out = value;
+    return 1;
+}
+int melee_web_action_binding_matches(const MeleeWebActionBindingSnapshot* expected)
+{
+    if (!expected || expected->slot >= 6 || !expected->fighter || !expected->context ||
+        !expected->generation) return 0;
+    const struct MeleeWebActionBinding* current = &bindings[expected->slot];
+    return !current->retired && current->generation == expected->generation &&
+        current->fighter == expected->fighter && current->context == expected->context &&
+        current->select == expected->select && current->transfer == expected->transfer;
+}
+int melee_web_action_binding_for_context(void* context, MeleeWebActionBindingSnapshot* out)
+{
+    if (!context || !out) return 0;
+    for (uint32_t i = 0; i < 6; ++i) {
+        if (bindings[i].context == context && bindings[i].fighter && !bindings[i].retired) {
+            return melee_web_action_binding_snapshot(i, out);
+        }
+    }
+    return 0;
 }
 void melee_web_action_load(Fighter* destination, Fighter* source, int motion, unsigned slot)
 {
@@ -97,6 +158,27 @@ void melee_web_action_load(Fighter* destination, Fighter* source, int motion, un
 }
 void* melee_web_action_fighter_table(Fighter* fighter)
 { return fighter ? fighter->x24 : NULL; }
+int melee_web_action_fighter_clip_state(const Fighter* fighter, MeleeWebActionFighterClipState* out)
+{
+    if (!fighter || !out) return 0;
+    MeleeWebActionFighterClipState value = {
+        {fighter->x590, fighter->x598},
+        {fighter->x5A4, fighter->x5A8}
+    };
+    *out = value;
+    return 1;
+}
+#if defined(MELEE_WEB_ACTION_INTERVAL_TEST)
+void melee_web_action_interval_test_set_fighter_table(Fighter* fighter, void* table)
+{ if (fighter) fighter->x24 = (struct Fighter_WaitAnimData*)table; }
+void melee_web_action_interval_test_set_fighter_clip_state(
+    Fighter* fighter, const MeleeWebActionFighterClipState* state)
+{
+    if (!fighter || !state) return;
+    fighter->x590 = state->trees[0]; fighter->x598 = state->trees[1];
+    fighter->x5A4 = state->identities[0]; fighter->x5A8 = state->identities[1];
+}
+#endif
 struct NativeCommandAllocation {
     union CmdUnion* native;
     uint32_t* canonical;

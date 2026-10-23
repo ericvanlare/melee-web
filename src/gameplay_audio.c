@@ -447,3 +447,9 @@ MeleeWebAudioRangeVisitResult melee_web_audio_visit_owned_ranges(
   return MELEE_WEB_AUDIO_RANGE_VISIT_STOPPED;
  return MELEE_WEB_AUDIO_RANGE_VISIT_COMPLETE;
 }
+
+MeleeWebAudioCpuStorage melee_web_audio_cpu_storage(MeleeWebAudio* audio,uint64_t generation){
+ if(!live(audio)||!generation||audio->generation!=generation||audio->source_closed)
+  return (MeleeWebAudioCpuStorage){0};
+ return (MeleeWebAudioCpuStorage){&command_budget,&source_sound_mode};
+}

@@ -35,6 +35,10 @@ extern "C" {
 #include <stdexcept>
 #include <string>
 
+#if defined(MELEE_WEB_SYNCTEST_CPU_RESTORE)
+extern "C" int melee_web_synctest_cpu_before_source_close();
+extern "C" int melee_web_synctest_cpu_after_source_close();
+#endif
 extern "C" uint32_t slippi_rng_profile_reset_seed(uint32_t offset);
 extern "C" uint32_t slippi_rng_profile_sync_seed(uint32_t frame, uint32_t offset);
 extern "C" uint32_t melee_web_snapshot_actual_stage_ground_kind(void);
@@ -479,8 +483,14 @@ EMSCRIPTEN_KEEPALIVE unsigned melee_web_snapshot_pcm_size(){return sizeof(pcm);}
 EMSCRIPTEN_KEEPALIVE const uint8_t* melee_web_snapshot_input(){return input_bytes.data();}
 EMSCRIPTEN_KEEPALIVE uint32_t* melee_web_snapshot_rng_address(){return seed_ptr;}
 EMSCRIPTEN_KEEPALIVE int melee_web_snapshot_close(){return checked([&]{
+#if defined(MELEE_WEB_SYNCTEST_CPU_RESTORE)
+    require(melee_web_synctest_cpu_before_source_close()==1,"CPU command still owns the source-close boundary");
+#endif
     release_rng_profile_gobj();
     if(match){match->close();match.reset();}
+#if defined(MELEE_WEB_SYNCTEST_CPU_RESTORE)
+    require(melee_web_synctest_cpu_after_source_close()==1,"CPU capsule source owners did not retire");
+#endif
     archive_cache.reset();
     files.clear();
 });}

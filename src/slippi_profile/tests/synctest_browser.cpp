@@ -1,7 +1,16 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Draw-reference adapter for the same source-only observation fixture. The
  * adapter owns a real Aurora WebGPU context and never restores renderer state. */
+#if defined(MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY)
+#define MELEE_WEB_SYNCTEST_CPU_RESTORE 1
+#endif
 #include "../../../tests/gameplay_snapshot_probe.cpp"
+#if defined(MELEE_WEB_SYNCTEST_CPU_RESTORE)
+#include "gameplay_cpu_checkpoint.hpp"
+#include "gameplay_match_clock.h"
+#include <emscripten/heap.h>
+namespace { bool cpu_native_active(); }
+#endif
 
 #include "slippi_profile/profile.h"
 #include "slippi_profile/draw_diagnostics.h"
@@ -1056,6 +1065,10 @@ uint32_t payload_admission_execute(uint32_t command)
 
 uint32_t payload_admission_run(uint32_t command)
 {
+#if defined(MELEE_WEB_SYNCTEST_CPU_RESTORE)
+    if(cpu_native_active())return payload_admission_fail_adapter(PayloadBadOrder,
+        "CPU restore and payload dry run are mutually exclusive");
+#endif
     if (payload_admission_state == PayloadAdmissionState::Closed) {
         if (payload_admission_first_failure) {
             std::snprintf(error, sizeof(error), "%s", payload_admission_first_message);
@@ -1104,8 +1117,15 @@ melee_web_synctest_payload_admission_command(uint32_t command)
 }
 // END MELEE_WEB_SOURCE_PAYLOAD_ADMISSION_ADAPTER
 
+#include "cpu_restore_adapter.inc"
+
 EMSCRIPTEN_KEEPALIVE int melee_web_synctest_renderer_shutdown(void)
 {
+#if defined(MELEE_WEB_SYNCTEST_CPU_RESTORE)
+    if(cpu_restore.inflight){cpu_restore.close_requested=true;
+        cpu_fail(0x498u,"renderer shutdown reentered CPU command");return 0;}
+    if(cpu_restore.capsule){cpu_fail(0x49bu,"retire source owners before renderer shutdown");return 0;}
+#endif
     if (!payload_admission_shutdown_fallback()) return 0;
     return checked([] {
         if (!renderer_ready) return;

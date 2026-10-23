@@ -189,6 +189,17 @@ int melee_web_gameplay_world_exists(void);
 int melee_web_gameplay_enable_hsd_objects(void (*after_objects)(void),
                                          char* error, size_t error_size);
 
+/* Private CPU aggregate: this exact source mask is bootstrap-owned. Compare
+ * pointer identity before reading only the known local scalar, never a foreign
+ * pointee. The ordinary clock companion deliberately does not own this value. */
+int melee_web_gameplay_clock_mask_admit(const void* saved_pointer,uint64_t saved_value);
+typedef struct MeleeWebBootstrapCpuStorage {
+    const void* ticks; size_t ticks_bytes;
+    const void* disabled_links; size_t disabled_links_bytes;
+} MeleeWebBootstrapCpuStorage;
+MeleeWebBootstrapCpuStorage melee_web_gameplay_bootstrap_cpu_storage(void);
+
+
 #ifdef __cplusplus
 }
 #endif

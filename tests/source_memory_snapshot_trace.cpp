@@ -156,11 +156,22 @@ void source_memory_payload_controls() {
     check(melee_web_source_memory_payload_snapshot_admit(snapshot) ==
           MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK,
           "unchanged payload topology admits");
+    check(melee_web_source_memory_payload_snapshot_matches_live(snapshot)==1,
+          "captured payload matches exact live bytes");
     fill(a, sizeof(a), 99);
     fill(b, sizeof(b), 171);
     allocation_budget = 0;
+    check(melee_web_source_memory_payload_snapshot_matches_live(snapshot)==0,
+          "changed payload bytes fail pure equality without allocating");
+    const auto differing=melee_web_source_memory_payload_snapshot_compare_live(snapshot);
+    check(differing.status==2&&differing.allocation_index==0&&differing.byte_offset==0&&
+          differing.host_address==reinterpret_cast<uintptr_t>(a)&&differing.requested_bytes==sizeof(a)&&
+          differing.expected_byte==expected_a[0]&&differing.actual_byte==a[0],
+          "pure payload evidence identifies exact first admitted allocation/offset/bytes");
     const auto restored =
         melee_web_source_memory_payload_snapshot_restore(snapshot);
+    check(melee_web_source_memory_payload_snapshot_matches_live(snapshot)==1,
+          "restored payload matches without allocating");
     allocation_budget = -1;
     check(restored == MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK,
           "payload restore succeeds without allocating");
@@ -187,6 +198,8 @@ void source_memory_payload_controls() {
     check(melee_web_source_memory_payload_snapshot_restore(snapshot) ==
           MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED,
           "new allocation refuses payload restore");
+    check(melee_web_source_memory_payload_snapshot_matches_live(snapshot)==0,
+          "equality refuses changed allocation topology");
     same_bytes(a, before_a, sizeof(a), "topology refusal preserves A");
     same_bytes(b, before_b, sizeof(b), "topology refusal preserves B");
     same_bytes(c, before_c, sizeof(c), "topology refusal preserves C");

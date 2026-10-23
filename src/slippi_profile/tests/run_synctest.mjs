@@ -10,6 +10,7 @@ import path from 'node:path';
 import {createRequire} from 'node:module';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {browserLaunchOptions, loadBrowserTools} from '../../../scripts/browser_tools.mjs';
+import {waitForAuroraSubmission} from './cpu_restore_runner.mjs';
 import {QuiescentWasmSnapshot} from '../../../tests/quiescent_wasm_snapshot.mjs';
 import {
   applyCleanupVerdict, assertDrawDiagnosticsClear, checkedAsyncCcall,
@@ -1547,7 +1548,7 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     validateAuroraStagingShadowRangeDisjointnessSource,
     requireStableAuroraStagingShadowInventorySource, decodeStageArenaOwnerWireSource,
     validateStageArenaOwnerCatalogSource, requireStableStageArenaOwnerInventorySource,
-    sameStageArenaMetadataSource, maxHeapBytes}) => {
+    sameStageArenaMetadataSource, maxHeapBytes, waitSubmissionSource}) => {
     const PAYLOAD_DRY_RUN_SAMPLE300_PAD44_BASE64 =
       'AgAAAAAAAAAAAAABALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=';
     const PAYLOAD_DRY_RUN_SAMPLE300_PAD44_SHA256 =
@@ -1929,20 +1930,8 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     if (sample === 0) {
       await checked('draw-reference native quiescence', 'melee_web_snapshot_quiescent');
     }
-    const deadline = performance.now() + 5000;
-    let status;
-    for (;;) {
-      status = JSON.parse(module.UTF8ToString(module._melee_web_synctest_submission_json()));
-      if (status.rendererErrorCount !== 0) {
-        throw new Error(`Aurora renderer logged native errors at sample ${sample}: ${JSON.stringify(status)}`);
-      }
-      if (status.pendingFramePackets === 0 && status.pendingStagingBuffers === 0 &&
-          status.workerBusy === 0) break;
-      if (performance.now() >= deadline) {
-        throw new Error(`Aurora submission did not quiesce for sample ${sample}: ${JSON.stringify(status)}`);
-      }
-      await new Promise(resolve => setTimeout(resolve, 10));
-    }
+    const waitForAuroraSubmission = new Function(`return (${waitSubmissionSource})`)();
+    const status = await waitForAuroraSubmission(module,sample);
     if (writeCensus) {
       await checked('native transfer quiescence after census actual draw', 'melee_web_snapshot_quiescent');
       censusNativeTransferQuiescence.afterActualDraw = 'passed';
@@ -2135,7 +2124,7 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     validateStageArenaOwnerCatalogSource: validateStageArenaOwnerCatalog.toString(),
     requireStableStageArenaOwnerInventorySource: requireStableStageArenaOwnerInventory.toString(),
     sameStageArenaMetadataSource: sameStageArenaMetadata.toString(),
-    maxHeapBytes: MAX_HEAP_BYTES});
+    maxHeapBytes: MAX_HEAP_BYTES, waitSubmissionSource: waitForAuroraSubmission.toString()});
   } catch (error) {
     const sampleError = error instanceof Error ? error : new Error(String(error));
     if (payloadAdmissionPlan !== null) {
@@ -2166,15 +2155,16 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
   return evaluation;
 }
 
-export async function closeBrowser(page, payloadAdmissionEnabled = false) {
+export async function closeBrowser(page, payloadAdmissionEnabled = false, cpuRestoreEnabled = false) {
   if (!page) return null;
-  return page.evaluate(async ({checkedSource, payloadAdmissionEnabled}) => {
+  return page.evaluate(async ({checkedSource, payloadAdmissionEnabled, cpuRestoreEnabled}) => {
     const state = window.__slippiSynctest;
     if (!state) return {closed: true, renderer: false};
     const {module} = state;
     const checkedAsyncCcall = new Function(`return (${checkedSource})`)();
     const errors = [];
     const payloadAdmissionClose = {status: 'not-attempted'};
+    const cpuRestoreClose = {status: 'not-attempted'};
     const snapshotClose = {status: 'not-attempted'};
     const rendererShutdown = {status: 'not-attempted'};
     try {
@@ -2186,6 +2176,13 @@ export async function closeBrowser(page, payloadAdmissionEnabled = false) {
         errors.push(`renderer logged errors before shutdown: ${JSON.stringify(status)}`);
       }
     } catch (error) { errors.push(`renderer quiescence check failed: ${String(error)}`); }
+    if(cpuRestoreEnabled){
+      try{
+        const result=await module.ccall('melee_web_synctest_cpu_restore_command','number',['number'],[5],{async:true});
+        cpuRestoreClose.result=result;cpuRestoreClose.status=result===0?'returned-zero':'returned-nonzero';
+        if(result!==0)errors.push(`CPU restore CLOSE returned ${result}`);
+      }catch(error){cpuRestoreClose.status='threw';cpuRestoreClose.error=String(error);errors.push(`CPU restore CLOSE failed: ${error}`);}
+    }
     if (payloadAdmissionEnabled) {
       try {
         const result = await module.ccall('melee_web_synctest_payload_admission_command',
@@ -2218,8 +2215,9 @@ export async function closeBrowser(page, payloadAdmissionEnabled = false) {
       errors.push(String(error));
     }
     return {closed: errors.length === 0, renderer: true, errors,
-      ...(payloadAdmissionEnabled ? {payloadAdmissionClose, snapshotClose, rendererShutdown} : {})};
-  }, {checkedSource: checkedAsyncCcall.toString(), payloadAdmissionEnabled});
+      ...(payloadAdmissionEnabled ? {payloadAdmissionClose, snapshotClose, rendererShutdown} : {}),
+      ...(cpuRestoreEnabled ? {cpuRestoreClose, snapshotClose, rendererShutdown} : {})};
+  }, {checkedSource: checkedAsyncCcall.toString(), payloadAdmissionEnabled, cpuRestoreEnabled});
 }
 
 async function main() {

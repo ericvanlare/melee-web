@@ -73,6 +73,13 @@ MeleeWebAudioSnapshot* melee_web_audio_snapshot_capture(MeleeWebAudio*);
 int melee_web_audio_snapshot_admit(MeleeWebAudio*,const MeleeWebAudioSnapshot*);
 int melee_web_audio_snapshot_restore(MeleeWebAudio*,const MeleeWebAudioSnapshot*);
 void melee_web_audio_snapshot_destroy(MeleeWebAudioSnapshot*);
+/* Exact existing snapshot-owned scalars, borrowed only while this live owner
+ * and generation remain unchanged. Pure: no pump, allocation or counter reset. */
+typedef struct MeleeWebAudioCpuStorage {
+ const uint32_t* command_budget;
+ const uint32_t* sound_mode;
+} MeleeWebAudioCpuStorage;
+MeleeWebAudioCpuStorage melee_web_audio_cpu_storage(MeleeWebAudio*,uint64_t generation);
 /* Read-only provenance inventory for the live owner. Pass the generation
  * captured when retaining this handle so an address reused by a later owner
  * cannot admit a retired handle. Capacity is the maximum number of rows the

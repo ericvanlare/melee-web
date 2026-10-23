@@ -764,6 +764,35 @@ melee_web_source_memory_payload_snapshot_restore(
     return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK;
 }
 
+extern "C" MeleeWebSourcePayloadComparison
+melee_web_source_memory_payload_snapshot_compare_live(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot)
+{
+    const auto status = payload_snapshot_check(snapshot);
+    if (status != MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK)
+        return {1,static_cast<uint32_t>(status),SIZE_MAX,SIZE_MAX,0,0,0,0,0};
+    const auto* saved_rows = payload_rows(snapshot);
+    const auto* saved_bytes = payload_bytes(snapshot);
+    size_t offset = 0;
+    for (size_t i = 0; i < allocations.size(); ++i) {
+        const auto& allocation = allocations[i];
+        const auto* actual = reinterpret_cast<const unsigned char*>(allocation.host);
+        for (size_t j = 0; j < saved_rows[i].requested; ++j) {
+            const auto expected = static_cast<unsigned char>(saved_bytes[offset+j]);
+            if (actual[j] != expected)
+                return {2,0,i,j,allocation.host,allocation.source.value(),
+                        allocation.requested,expected,actual[j]};
+        }
+        offset += saved_rows[i].requested;
+    }
+    return {0,0,SIZE_MAX,SIZE_MAX,0,0,0,0,0};
+}
+extern "C" int melee_web_source_memory_payload_snapshot_matches_live(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot)
+{
+    return melee_web_source_memory_payload_snapshot_compare_live(snapshot).status==0;
+}
+
 extern "C" void melee_web_source_memory_payload_snapshot_destroy(
     MeleeWebSourceMemoryPayloadSnapshot* snapshot)
 {

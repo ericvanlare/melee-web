@@ -111,6 +111,20 @@ melee_web_source_memory_payload_snapshot_admit(
 MeleeWebSourceMemoryPayloadSnapshotStatus
 melee_web_source_memory_payload_snapshot_restore(
     const MeleeWebSourceMemoryPayloadSnapshot* snapshot);
+/* Exact live payload equality, after normal owner/topology admission. No copy
+ * or pointer/mirror restoration is performed. Returns exactly 1 or 0. */
+/* status: 0 equal, 1 owner/admission refusal, 2 first actual byte difference.
+ * Index/offset name the exact admitted ledger row, never an inferred owner. */
+typedef struct MeleeWebSourcePayloadComparison {
+    uint32_t status, admission_status;
+    size_t allocation_index, byte_offset;
+    uintptr_t host_address;
+    uint32_t source_address, requested_bytes, expected_byte, actual_byte;
+} MeleeWebSourcePayloadComparison;
+MeleeWebSourcePayloadComparison melee_web_source_memory_payload_snapshot_compare_live(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot);
+int melee_web_source_memory_payload_snapshot_matches_live(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot);
 void melee_web_source_memory_payload_snapshot_destroy(
     MeleeWebSourceMemoryPayloadSnapshot* snapshot);
 

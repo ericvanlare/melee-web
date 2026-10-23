@@ -584,6 +584,15 @@ MeleeWebMatchStats GameplayMatchSession::player_stats(unsigned index)const{
     check(melee_web_match_player_stats(storage_->match,index,&stats,error,sizeof(error)),error);return stats;
 }
 MeleeWebAudio* GameplayMatchSession::audio()const{return storage_&&storage_->bank?storage_->bank->get():nullptr;}
+GameplayMatchCpuOwners GameplayMatchSession::diagnostic_cpu_owners() const noexcept {
+    if (!storage_ || !storage_->world || !storage_->match || !storage_->flow ||
+        !storage_->bank || !construction_complete()) return {};
+    MeleeWebMatchContextRange range{};
+    if (melee_web_match_context_range_read(storage_->match,&range,nullptr,0) !=
+        MELEE_WEB_MATCH_CONTEXT_RANGE_COMPLETE) return {};
+    return {storage_.get(),storage_->match,storage_->flow,storage_->bank->get(),
+            range.world_generation,range.owner_epoch,source_frames()};
+}
 MeleeWebMatchContextRangeResult GameplayMatchSession::diagnostic_match_context_range(
     MeleeWebMatchContextRange* range,char* error,size_t size)const{
     if(!storage_||!storage_->match){
