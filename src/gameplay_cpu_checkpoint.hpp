@@ -40,6 +40,7 @@ public:
     bool matches_drawn_reference(const GameplayMatchSession&) noexcept;
     void disarm() noexcept;
     const CpuComparison& comparison() const noexcept {return comparison_;}
+    const MeleeWebSourcePayloadFailureWitness& payload_failure_witness() const noexcept {return payload_failure_witness_;}
     std::uint32_t checked_domains() const noexcept {return checked_domains_;}
     std::uint32_t matched_domains() const noexcept {return matched_domains_;}
     bool source_owners_retired(const GameplayMatchSession*) noexcept;
@@ -74,6 +75,7 @@ private:
     Phase phase_=Phase::Captured;
     bool source_step_possible_=false;
     CpuComparison comparison_{};
+    MeleeWebSourcePayloadFailureWitness payload_failure_witness_{};
     std::uint32_t checked_domains_=0,matched_domains_=0;
 };
 }

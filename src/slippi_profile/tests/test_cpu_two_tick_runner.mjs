@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {runBrowserCpuTwoTick,decodeCpuTwoTickEvidence,validateCpuTwoTickFinalEvidence,
+import {runBrowserCpuTwoTick,decodeCpuTwoTickEvidence,decodeCpuPayloadFailureWitness,validateCpuTwoTickFinalEvidence,
   CPU_TWO_TICK_EVIDENCE_BYTES,TWO_TICK_PAD_300,TWO_TICK_PAD_301} from './cpu_two_tick_runner.mjs';
 import {validateCpuTwoTickDrawSample,retainCpuRestoreSample,recordCpuRestoreFailure} from './run_write_census.mjs';
 import {inspectInteractiveObservation,validateSelectedDrawPath,validateSourceInputMapping,decodeDrawDiagnostics} from './runner_contract.mjs';
@@ -49,11 +49,21 @@ function makeEvidence({state=5,mask=255,lastCommand=13}={}) {
   return bytes;
 }
 
+function makeWitness(failed=false) {
+  const bytes=new Uint8Array(256),v=new DataView(bytes.buffer),u=(o,n)=>v.setUint32(o,n,true);
+  u(0,1);u(4,256);if(!failed)return bytes;
+  for(const[o,n]of [[8,2],[12,1],[16,1],[20,168],[24,2],[32,7],[36,5],[40,0x80010000],[44,64],[48,0],[52,32],
+      [184,1],[188,1],[196,1],[232,32],[236,2],[240,3],[244,64],[248,0],[252,5]])u(o,n);
+  for(const[o,n]of [[64,0x10000n],[72,0xfffffffffffffff1n],[80,9n],[88,1n],[96,12n],
+      [200,0x12340n],[208,0xfffffffffffffff1n],[216,9n],[224,1n]])v.setBigUint64(o,n,true);
+  bytes.fill(9,120,152);bytes.fill(9,152,184);bytes[157]=8;return bytes;
+}
 function makeRunner({fault=null}={}) {
   const memory=new Uint8Array(70000),heap=new Uint8Array(memory.buffer);
   const ptr={evidence:1000,observation:40000,input:42000,pcm:43000,draw:50000};
   const checkpointPad=b64(new Uint8Array(44).fill(1));
   memory.set(observation(300),ptr.observation);memory.set(Buffer.from(checkpointPad,'base64'),ptr.input);memory.set(diag(0),ptr.draw);
+  let witness=makeWitness();
   const commandSequence=[];let drawCount=0,frameId=10,current=makeEvidence({state:9,mask:1,lastCommand:8}),lastCommand=8;
   const synctest={};
   const writeLivePair=(decoded,pairName)=>{
@@ -72,6 +82,8 @@ function makeRunner({fault=null}={}) {
       memory.set(Buffer.from(p.replayPcm,'base64'),ptr.pcm);memory.set(Buffer.from(p.replayPad,'base64'),ptr.input);}
   };
   const module={HEAPU8:heap,
+    _melee_web_synctest_cpu_payload_failure_witness_bytes:()=>fault==='bad-witness-size'?255:256,
+    _melee_web_synctest_cpu_payload_failure_witness:()=>{heap.set(witness,65000);return 65000;},
     _melee_web_synctest_cpu_two_tick_evidence_bytes:()=>totalBytes,
     _melee_web_synctest_cpu_two_tick_evidence:()=>{
       if(fault==='throw-and-refresh-error'&&lastCommand===9)throw new Error('injected evidence refresh failure');
@@ -100,7 +112,14 @@ function makeRunner({fault=null}={}) {
         if(fault==='bad-sample300-pad'&&cmd===9)raw[64+11136]^=1;
         if(fault==='bad-sample301-pad'&&cmd===10)raw[11480+11136]^=1;
         if(fault==='late-validation'&&cmd===13)new DataView(raw.buffer).setUint32(40,0,true);
+        if((fault==='payload-refused-11'||fault==='payload-throw-11')&&cmd===11){
+          const v=new DataView(raw.buffer);v.setUint32(12,6,true);v.setUint32(16,1216,true);
+          v.setUint32(40,30,true);v.setUint32(44,14,true);v.setUint32(11480+11376,4,true);v.setUint32(11480+11380,2,true);
+          witness=makeWitness(true);
+        }
         setLive(raw,drawIndex,cmd);
+        if(fault==='payload-throw-11'&&cmd===11)throw new Error('after-witness injected throw');
+        if(fault==='payload-refused-11'&&cmd===11)return 1216;
         return fault==='nonzero-command-9'&&cmd===9?7:0;
       }
       if(name==='melee_web_snapshot_quiescent')return 1;
@@ -226,4 +245,32 @@ test('evidence refresh failure is recorded separately without replacing the thro
   assert.equal(command.outcome,'threw');
   assert.equal(command.error,'Error: injected ccall throw');
   assert.equal(command.evidenceRefreshError,'Error: injected evidence refresh failure');
+});
+
+test('payload witness decoder preserves exact64-bit identity and refuses malformed bounds/lifetimes',()=>{
+  const raw=makeWitness(true),d=decodeCpuPayloadFailureWitness(raw);
+  assert.equal(d.window.generation,'fffffffffffffff1');assert.equal(d.allocationGeneration,d.window.generation);
+  assert.equal(d.window.row,7);assert.equal(d.window.offset,5);assert.equal(d.attribution,1);
+  for(const[offset,value]of [[4,255],[52,33],[232,0],[240,2],[244,65],[248,2]]){
+    const bad=raw.slice();new DataView(bad.buffer).setUint32(offset,value,true);
+    assert.throws(()=>decodeCpuPayloadFailureWitness(bad),/witness/);
+  }
+  const bad=raw.slice();bad[208]^=1;assert.throws(()=>decodeCpuPayloadFailureWitness(bad),/lifetime/);
+});
+test('actual runner retains fixed witness and original failure before outer validation or ccall exception',async()=>{
+  for(const fault of ['payload-refused-11','payload-throw-11']){
+    const f=makeRunner({fault});let caught;try{await f.run();}catch(e){caught=e;}
+    assert.ok(caught);assert.deepEqual(f.commandSequence,[8,9,10,11]);
+    const p=caught.cpuRestorePartial;
+    assert.equal(p.nativeEvidence.firstFailure,1216);assert.equal(p.nativeEvidence.checkedCpu,30);
+    assert.equal(p.payloadFailureWitness.window.row,7);assert.equal(p.payloadFailureWitness.window.generation,'fffffffffffffff1');
+    assert.equal(Buffer.from(p.payloadFailureWitnessRaw,'base64').length,256);
+    if(fault==='payload-refused-11')assert.equal(p.commands.at(-1).payloadFailureWitness.window.offset,5);
+    else assert.equal(p.commands.at(-1).refreshedNativeEvidence.firstFailure,1216);
+  }
+});
+test('new observer failure cannot erase already-retained original native evidence',async()=>{
+  const f=makeRunner({fault:'bad-witness-size'});let caught;try{await f.run();}catch(e){caught=e;}
+  assert.match(String(caught),/witness ABI/);assert.equal(caught.cpuRestorePartial.nativeEvidence.lastCommand,8);
+  assert.deepEqual(f.commandSequence,[8]);
 });

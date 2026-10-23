@@ -135,6 +135,7 @@ std::size_t admission_trace_count=0;
 std::uint32_t fail_admission_leaf=0;
 bool fail_capture=false;
 bool fail_replay=false;
+bool modeled_payload_byte_failure=false;
 bool fail_static_replay=false;
 unsigned journal_failure_tick=0,unexpected_draw_tick=0;
 bool pending_submission=false;
@@ -250,6 +251,15 @@ bool GameplayCpuCheckpoint::finish_replay(const GameplayMatchSession& session) n
         melee_web_cpu_interval_admit(effect_token_)&&melee_web_action_interval_finish_replay(actions_)==1&&
         melee_web_cpu_restore_model_equal(post_)&&!fail_replay;
     checked_domains_=0x1fe;
+    if(modeled_payload_byte_failure){
+        // Explicit payload leaf model; actual byte producer tested separately.
+        comparison_={4,2,7,5,9,8,0x10000,64,0x80010000};checked_domains_=30;matched_domains_=14;
+        payload_failure_witness_={};auto& w=payload_failure_witness_;
+        w.schema=1;w.bytes=256;w.original_status=2;w.first_difference_matches=1;
+        w.window.schema=1;w.window.bytes=168;w.window.status=2;w.window.row=7;w.window.offset=5;
+        w.window.requested_bytes=64;w.window.window_count=32;w.window.expected[5]=9;w.window.actual[5]=8;
+        w.hook_active=1;w.attribution=0;w.reason=2;phase_=Phase::Failed;return false;
+    }
     if(!modeled){comparison_={4,1,UINT32_MAX,UINT32_MAX,0,0,0,0,77};phase_=Phase::Failed;return false;}
     matched_domains_=checked_domains_;checked_domains_|=1u<<9;
     comparison_=statics_->compare_post();
@@ -380,7 +390,7 @@ void reset_fixture() {
     observation.stocks[0]=observation.stocks[1]=4;observation.ready=1;observation.ending=0;
     rng_profile_observation={1,0x1234u,0,UINT32_MAX,0,176,0,0};transfer_diagnostic={};
     pcm.fill(0);input_bytes.fill(0);audio_phase=7;
-    draw_calls=0;pending_submission=false;world_exists=true;fail_admission_leaf=0;fail_replay=false;
+    draw_calls=0;pending_submission=false;world_exists=true;fail_admission_leaf=0;fail_replay=false;modeled_payload_byte_failure=false;
     idle_boundary_calls=submission_boundary_calls=0;capsule_disarms=capsule_destroys=0;
     action_disarms=action_destroys=0;tick_calls=0;tick_samples={};tick_sample_count=0;
     interruption=StepInterruption::None;interruption_done=false;
@@ -479,6 +489,22 @@ void verify_two_tick_interval() {
     // leaves are still the explicit fixture models described at file start.
     EM_ASM({console.log("CPU_TWO_ACTUAL_WASM_EVIDENCE_BASE64="+
         Buffer.from(HEAPU8.subarray($0,$0+$1)).toString("base64"));},&cpu_restore.two,sizeof(cpu_restore.two));
+    close_and_retire();
+}
+void verify_payload_failure_retention() {
+    reset_fixture();check(configure_valid(),"Witness configure");
+    check(!melee_web_synctest_cpu_restore_command(8)&&!melee_web_synctest_cpu_restore_command(9),"Witness baseline300");
+    pending_submission=false;check(!melee_web_synctest_cpu_restore_command(10),"Witness baseline301");
+    pending_submission=false;modeled_payload_byte_failure=true;
+    check(melee_web_synctest_cpu_restore_command(11)==1216&&draw_calls==2,"Witness must preserve1216/no final present");
+    check(melee_web_synctest_cpu_payload_failure_witness_bytes()==256,"Witness fixed ABI");
+    const auto saved=*static_cast<const MeleeWebSourcePayloadFailureWitness*>(melee_web_synctest_cpu_payload_failure_witness());
+    check(saved.schema==1&&saved.first_difference_matches==1&&saved.window.row==7&&saved.window.offset==5,
+          "Actual adapter retained modeled leaf witness before refusal");
+    EM_ASM({console.log("CPU_PAYLOAD_ACTUAL_WASM_WITNESS_BASE64="+
+        Buffer.from(HEAPU8.subarray($0,$0+$1)).toString("base64"));},melee_web_synctest_cpu_payload_failure_witness(),256);
+    check(melee_web_synctest_cpu_restore_command(5)==1216,"CLOSE preserves original1216");
+    check(!std::memcmp(&saved,melee_web_synctest_cpu_payload_failure_witness(),256),"CLOSE preserves witness bytes");
     close_and_retire();
 }
 void verify_two_tick_refusals() {
@@ -714,6 +740,7 @@ int main() {
 #if MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
         verify_two_tick_interval();
         verify_two_tick_refusals();
+        verify_payload_failure_retention();
 #else
         reset_fixture();check(configure_valid(),"V5 configure");
         check(melee_web_synctest_cpu_restore_command(8)==0x4b0u&&tick_calls==0&&draw_calls==0,

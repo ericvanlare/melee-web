@@ -7,6 +7,47 @@ export const CPU_TWO_TICK_MODE = 2;
 export const TWO_TICK_PAD_300 = 'AgAAAAAAAAAAAAABALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=';
 export const TWO_TICK_PAD_301 = 'AABQAAAAAAAAAAAAALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=';
 
+// Independent fixed diagnostic ABI; all 64-bit identities remain exact hex
+// strings in JSON. This observer never grants state/type/restore authority.
+export function decodeCpuPayloadFailureWitness(bytes) {
+  if (!(bytes instanceof Uint8Array) || bytes.byteLength !== 256) throw new Error('Payload witness extent');
+  const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const u = o => v.getUint32(o, true), hex = o => v.getBigUint64(o, true).toString(16).padStart(16, '0');
+  if (u(0) !== 1 || u(4) !== 256) throw new Error('Payload witness schema');
+  const originalStatus = u(8), firstDifferenceMatches = u(12), windowStatus = u(24);
+  if (originalStatus > 2 || firstDifferenceMatches > 1 || u(184) > 1 || u(188) > 2 || u(192) > 9 || u(196) > 2) throw new Error('Payload witness status');
+  const encode = raw => { let s = ''; for (const b of raw) s += String.fromCharCode(b); return btoa(s); };
+  const window = {schema: u(16), bytes: u(20), status: windowStatus, admission: u(28), row: u(32), offset: u(36),
+    source: u(40), requested: u(44), start: u(48), count: u(52), host: hex(64), generation: hex(72),
+    epoch: hex(80), world: hex(88), revision: hex(96), expected: encode(bytes.slice(120, 152)), actual: encode(bytes.slice(152, 184))};
+  if (u(56) || u(60) || v.getBigUint64(104, true) || v.getBigUint64(112, true)) throw new Error('Payload witness unsupported root attribution');
+  if (originalStatus === 0) {
+    if (firstDifferenceMatches || bytes.slice(16).some(b => b !== 0)) throw new Error('Payload witness unexpected empty data');
+  } else {
+    if (window.schema !== 1 || window.bytes !== 168 || window.status > 2 || window.count > 32 ||
+        window.start + window.count > window.requested) throw new Error('Payload witness window bounds');
+    if (window.status === 2 && (window.offset < window.start || window.offset - window.start >= window.count)) throw new Error('Payload witness first-byte bounds');
+    if (firstDifferenceMatches && (originalStatus !== 2 || window.status !== 2)) throw new Error('Payload witness crosscheck');
+    if (u(188) && !firstDifferenceMatches) throw new Error('Payload witness unpaired attribution');
+    if (window.status !== 2 && bytes.slice(32, 184).some(b => b !== 0)) throw new Error('Payload witness refused window data');
+    if (bytes.slice(120 + window.count, 152).some(b => b !== 0) || bytes.slice(152 + window.count, 184).some(b => b !== 0)) throw new Error('Payload witness window tail');
+  }
+  if (u(188) && !u(184)) throw new Error('Payload witness inactive attribution');
+  if (u(188) === 1) {
+    const stride = u(232), count = u(236), mask = u(240), product = stride * count;
+    if (!u(184) || !firstDifferenceMatches || u(192) || u(196) !== 1 || !v.getBigUint64(200, true) ||
+        !stride || !count || mask === 0xffffffff || (mask & ((mask + 1) >>> 0)) || (stride & mask) ||
+        !Number.isSafeInteger(product) || product > 0xffffffff || product !== u(244) || product !== window.requested ||
+        hex(208) !== window.generation || hex(216) !== window.epoch || hex(224) !== window.world ||
+        u(248) !== Math.floor(window.offset / stride) || u(252) !== window.offset % stride) throw new Error('Payload witness association bounds/lifetime');
+  }
+  if (u(188) === 2 && (!u(192) || bytes.slice(200).some(b => b !== 0))) throw new Error('Payload witness refused identity');
+  return {schema: 1, bytes: 256, originalStatus, firstDifferenceMatches, window, hookActive: u(184),
+    attribution: u(188), reason: u(192), associationState: u(196), descriptor: hex(200),
+    allocationGeneration: hex(208), epoch: hex(216), world: hex(224), stride: u(232), count: u(236),
+    alignmentMask: u(240), poolBytes: u(244), cellIndex: u(248), cellOffset: u(252), base64: encode(bytes)};
+}
+
 export function decodeCpuTwoTickEvidence(bytes) {
   const size = 35368, pairSize = 11416, diagnosticsOffset = 34312, diagnosticStride = 132;
   if (!(bytes instanceof Uint8Array) || bytes.byteLength !== size) throw new Error('Two-tick evidence extent');
@@ -99,7 +140,7 @@ export function validateCpuTwoTickFinalEvidence(evidence, checkpointSourceFrame)
 export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInputMapping, expectedStocks, helpers) {
   const plan = {wire, checkpointSourceFrame: checkpoint.boundary.sourceFrame, checkpointPad: checkpoint.pad,
     expectedInputMapping, expectedStocks, evidenceBytes: CPU_TWO_TICK_EVIDENCE_BYTES,
-    decodeSource: decodeCpuTwoTickEvidence.toString(), validateFinalSource: validateCpuTwoTickFinalEvidence.toString(),
+    witnessDecodeSource: decodeCpuPayloadFailureWitness.toString(), decodeSource: decodeCpuTwoTickEvidence.toString(), validateFinalSource: validateCpuTwoTickFinalEvidence.toString(),
     waitSource: waitForAuroraSubmission.toString(), ...helpers,
     literalPad300: TWO_TICK_PAD_300, literalPad301: TWO_TICK_PAD_301};
   try {
@@ -113,7 +154,9 @@ export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInput
         throw new Error('Shared Wasm heap refused before direct native reads');
       }
       if (typeof module._melee_web_synctest_cpu_two_tick_evidence !== 'function' ||
-          typeof module._melee_web_synctest_cpu_two_tick_evidence_bytes !== 'function') {
+          typeof module._melee_web_synctest_cpu_two_tick_evidence_bytes !== 'function' ||
+          typeof module._melee_web_synctest_cpu_payload_failure_witness !== 'function' ||
+          typeof module._melee_web_synctest_cpu_payload_failure_witness_bytes !== 'function') {
         throw new Error('Two-tick evidence exports are unavailable for the linked v6 profile');
       }
       const read = (pointer, size) => {
@@ -128,11 +171,17 @@ export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInput
       };
       const decode = new Function(`return (${plan.decodeSource})`)();
       const validateFinal = new Function(`return (${plan.validateFinalSource})`)();
+      const decodeWitness = new Function(`return (${plan.witnessDecodeSource})`)();
       const evidence = () => {
         const size = module._melee_web_synctest_cpu_two_tick_evidence_bytes();
         if (size !== plan.evidenceBytes) throw new Error('CPU two-tick evidence ABI');
         const result = decode(read(module._melee_web_synctest_cpu_two_tick_evidence(), size));
-        progress.nativeEvidence = result;
+        progress.nativeEvidence = result; // keep original evidence even if new observer refuses
+        const witnessSize = module._melee_web_synctest_cpu_payload_failure_witness_bytes();
+        if (witnessSize !== 256) throw new Error('CPU payload witness ABI');
+        const witnessBytes = read(module._melee_web_synctest_cpu_payload_failure_witness(), witnessSize);
+        progress.payloadFailureWitnessRaw = encode(witnessBytes);
+        progress.payloadFailureWitness = decodeWitness(witnessBytes);
         return result;
       };
       const command = async number => {
@@ -142,6 +191,7 @@ export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInput
           record.result = await module.ccall('melee_web_synctest_cpu_restore_command', 'number', ['number'], [number], {async: true});
           record.outcome = 'returned';
           record.nativeEvidence = evidence();
+          record.payloadFailureWitness = progress.payloadFailureWitness;
           if (record.result !== 0) throw new Error(`CPU two-tick command ${number} refused ${record.result}: ${module.UTF8ToString(module._melee_web_snapshot_error())}`);
         } catch (error) {
           const ccallThrew = record.outcome === 'pending';

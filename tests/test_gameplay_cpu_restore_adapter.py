@@ -3,6 +3,7 @@ import ast
 import hashlib
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -58,6 +59,7 @@ public:
     bool matches_drawn_reference(const GameplayMatchSession&) noexcept;
     void disarm() noexcept;
     const CpuComparison& comparison() const noexcept {return comparison_;}
+    const MeleeWebSourcePayloadFailureWitness& payload_failure_witness() const noexcept {return payload_failure_witness_;}
     std::uint32_t checked_domains() const noexcept {return checked_domains_;}
     std::uint32_t matched_domains() const noexcept {return matched_domains_;}
     bool source_owners_retired(const GameplayMatchSession*) noexcept;
@@ -75,6 +77,7 @@ private:
     Phase phase_=Phase::Captured;
     bool source_step_possible_=false,retired_=false;
     CpuComparison comparison_{};
+    MeleeWebSourcePayloadFailureWitness payload_failure_witness_{};
     std::uint32_t checked_domains_=0,matched_domains_=0;
 };
 }
@@ -111,7 +114,10 @@ def source_overlay(output_dir):
         destination.parent.mkdir(parents=True, exist_ok=True)
         candidate = candidate_src / relative
         target = candidate if relative.as_posix() in candidate_paths else source
-        destination.symlink_to(target)
+        if target.suffix in (".h", ".hpp"):
+            shutil.copy2(target,destination)
+        else:
+            destination.symlink_to(target)
     # Candidate-only files may not exist in the frozen checkout yet. Add those
     # exact candidate paths to the overlay without changing the checkout or
     # broadening the compile input set.
@@ -122,7 +128,10 @@ def source_overlay(output_dir):
         destination = overlay / relative_name
         if not destination.exists() and not destination.is_symlink():
             destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.symlink_to(candidate)
+            if candidate.suffix in (".h", ".hpp"):
+                shutil.copy2(candidate,destination)
+            else:
+                destination.symlink_to(candidate)
     return overlay
 
 
@@ -203,13 +212,13 @@ class GameplayCpuRestoreAdapterTests(OwnedWorkspaceTests):
                   "-ffunction-sections", "-fdata-sections", "-ffp-contract=off"]
         for directory in include_dirs:
             common.extend(["-I", str(directory)])
-        common.extend(["-include", str(REPO_ROOT / "src/gameplay_compat.h")])
+        common.extend(["-include", str(overlay_src / "gameplay_compat.h")])
 
         actual_includes=[directory for directory in include_dirs if directory!=stubs]
         syntax=[sys.executable,str(compiler/'em++.py'),'-std=c++20','-fsyntax-only',
                 '-DTARGET_PC','-DMELEE_WEB_CPU_INTERVAL_ENABLED=1','-ffp-contract=off']
         for directory in actual_includes:syntax.extend(['-I',str(directory)])
-        syntax.extend(['-include',str(REPO_ROOT/'src/gameplay_compat.h'),str(overlay_src/'gameplay_cpu_checkpoint.cpp')])
+        syntax.extend(['-include',str(overlay_src/'gameplay_compat.h'),str(overlay_src/'gameplay_cpu_checkpoint.cpp')])
         result=subprocess.run(syntax,cwd=output_dir,env=env,capture_output=True,text=True,timeout=120)
         write_record(output_dir/'actual-checkpoint-syntax.json',syntax,result)
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
@@ -262,6 +271,21 @@ console.log(JSON.stringify({status:'PASS',bytes:raw.length,preFrame:decoded.preF
         bridged=subprocess.run(bridge,cwd=output_dir,env=env,capture_output=True,text=True,timeout=30)
         write_record(output_dir/"actual-js-bridge.json",bridge,bridged)
         self.assertEqual(bridged.returncode,0,bridged.stdout+bridged.stderr)
+        witness_marker="CPU_PAYLOAD_ACTUAL_WASM_WITNESS_BASE64="
+        witness_rows=[line[len(witness_marker):] for line in result.stdout.splitlines() if line.startswith(witness_marker)]
+        self.assertEqual(len(witness_rows),1,"Actual adapter omitted fixed failure witness")
+        witness_raw=base64.b64decode(witness_rows[0],validate=True)
+        self.assertEqual(len(witness_raw),256)
+        witness_bytes=output_dir/"actual-payload-failure-witness.bin";witness_bytes.write_bytes(witness_raw)
+        witness_js="""const fs=await import('node:fs');const {pathToFileURL}=await import('node:url');
+const {decodeCpuPayloadFailureWitness}=await import(pathToFileURL(process.argv[1]));
+const d=decodeCpuPayloadFailureWitness(new Uint8Array(fs.readFileSync(process.argv[2])));
+if(d.originalStatus!==2||d.firstDifferenceMatches!==1||d.window.row!==7||d.window.offset!==5||d.attribution!==0||d.reason!==2)throw Error('actual adapter witness drift');
+console.log(JSON.stringify({status:'PASS',bytes:256,scope:'actual adapter; modeled payload leaf',row:d.window.row,offset:d.window.offset}));"""
+        witness_bridge=[str(node),"--input-type=module","-e",witness_js,str(helper),str(witness_bytes)]
+        witness_result=subprocess.run(witness_bridge,cwd=output_dir,env=env,capture_output=True,text=True,timeout=30)
+        write_record(output_dir/"actual-witness-js-bridge.json",witness_bridge,witness_result)
+        self.assertEqual(witness_result.returncode,0,witness_result.stdout+witness_result.stderr)
         # Recompile only the actual adapter fixture in default-v5 mode; real
         # coordinator/statics objects and compiler settings stay identical.
         v5_object=output_dir / "control-v5.o"
@@ -292,9 +316,10 @@ console.log(JSON.stringify({status:'PASS',bytes:raw.length,preFrame:decoded.preF
             "fixture_probe_sha256": sha256(fixture_probe),
             "js_consumer": {"path":str(helper),"sha256":sha256(helper)},
             "actual_wasm_evidence_sha256":sha256(native_bytes),
+            "actual_witness_sha256":sha256(witness_bytes),
             "generated_control_sha256": sha256(control_source),
             "receipt_path": str(output_dir),
-            "commands": [f"compile-{index}.json" for index in range(len(commands))] + ["link.json", "run.json", "actual-js-bridge.json", "compile-v5.json", "link-v5.json", "run-v5.json"],
+            "commands": [f"compile-{index}.json" for index in range(len(commands))] + ["link.json", "run.json", "actual-js-bridge.json", "actual-witness-js-bridge.json", "compile-v5.json", "link-v5.json", "run-v5.json"],
             "checks": [
                 "actual two-tick adapter 300/301 baseline and replay; idle waits, raw/typed evidence and first replay refusal stop before next tick",
                 "default-v5 compile rejects new route before source work while legacy routes still pass",

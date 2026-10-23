@@ -1719,12 +1719,16 @@ test('two-tick route is explicit, mutually exclusive, and preserves existing def
 
 test('two-tick route checks exact linked v6 runtime identity and both new getters before the prefix', () => {
   const v6={profile:'slippi-render-dependencies-logical-frame-v6'};
-  assert.equal(validateBrowserProfileForRoute(v6,true,{evidence:true,evidenceBytes:true}),
+  assert.equal(validateBrowserProfileForRoute(v6,true,{evidence:true,evidenceBytes:true,payloadWitness:true,payloadWitnessBytes:true}),
     'slippi-render-dependencies-logical-frame-v6');
   assert.throws(()=>validateBrowserProfileForRoute({profile:'slippi-render-dependencies-dbooc-shield-drop-v5'},true,
-    {evidence:true,evidenceBytes:true}),/Unexpected profile identity/);
+    {evidence:true,evidenceBytes:true,payloadWitness:true,payloadWitnessBytes:true}),/Unexpected profile identity/);
   assert.throws(()=>validateBrowserProfileForRoute(v6,true,{evidence:true,evidenceBytes:false}),
     /evidence exports are unavailable/);
+  for(const field of ['payloadWitness','payloadWitnessBytes']) {
+    const exports={evidence:true,evidenceBytes:true,payloadWitness:true,payloadWitnessBytes:true};exports[field]=false;
+    assert.throws(()=>validateBrowserProfileForRoute(v6,true,exports),/evidence exports are unavailable/);
+  }
   assert.equal(validateBrowserProfileForRoute({profile:'slippi-render-dependencies-dbooc-shield-drop-v5'},false),
     'slippi-render-dependencies-dbooc-shield-drop-v5');
 });

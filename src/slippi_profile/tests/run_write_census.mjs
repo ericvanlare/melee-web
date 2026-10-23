@@ -83,7 +83,8 @@ export function validateBrowserProfileForRoute(init, twoTickDrawnReference, twoT
   const expectedProfile = twoTickDrawnReference ? LOGICAL_FRAME_V6_PROFILE : SYNCTEST_PROFILE;
   if (init?.profile !== expectedProfile) throw new Error(`Unexpected profile identity: ${init?.profile}`);
   if (twoTickDrawnReference && (!twoTickExports ||
-      twoTickExports.evidence !== true || twoTickExports.evidenceBytes !== true)) {
+      twoTickExports.evidence !== true || twoTickExports.evidenceBytes !== true ||
+      twoTickExports.payloadWitness !== true || twoTickExports.payloadWitnessBytes !== true)) {
     throw new Error('Two-tick evidence exports are unavailable for the linked v6 profile');
   }
   return expectedProfile;
@@ -577,7 +578,9 @@ async function main() {
     const twoTickExports = twoTickDrawnReference ? await page.evaluate(() => {
       const {module} = window.__slippiSynctest;
       return {evidence: typeof module._melee_web_synctest_cpu_two_tick_evidence === 'function',
-        evidenceBytes: typeof module._melee_web_synctest_cpu_two_tick_evidence_bytes === 'function'};
+        evidenceBytes: typeof module._melee_web_synctest_cpu_two_tick_evidence_bytes === 'function',
+        payloadWitness: typeof module._melee_web_synctest_cpu_payload_failure_witness === 'function',
+        payloadWitnessBytes: typeof module._melee_web_synctest_cpu_payload_failure_witness_bytes === 'function'};
     }) : null;
     validateBrowserProfileForRoute(init, twoTickDrawnReference, twoTickExports);
     if (twoTickDrawnReference) report.profile.twoTickEvidenceExports = twoTickExports;

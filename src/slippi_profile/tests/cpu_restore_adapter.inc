@@ -51,6 +51,7 @@ struct CpuRestoreControl {
     CpuRestoreEvidence evidence{};
     CpuDrawnEvidence drawn{};
     CpuTwoTickEvidence two{};
+    MeleeWebSourcePayloadFailureWitness failure_witness{1,sizeof(MeleeWebSourcePayloadFailureWitness)};
     bool two_active=false;
 } cpu_restore;
 bool cpu_drawn_diagnostics(unsigned index){
@@ -217,6 +218,9 @@ uint32_t cpu_execute_two(uint32_t command){
         e.checked_cpu=cpu_restore.capsule->checked_domains();e.matched_cpu=cpu_restore.capsule->matched_domains();
         auto& final=e.tick_pairs[1];final.checked_domains=e.checked_cpu;final.matched_domains=e.matched_cpu;
         final.comparison=cpu_restore.capsule->comparison();
+        if(!matched&&final.comparison.domain==static_cast<uint32_t>(melee_web::CpuComparisonDomain::Payload)&&
+           final.comparison.status==2)
+            cpu_restore.failure_witness=cpu_restore.capsule->payload_failure_witness();
         if(!matched)return cpu_fail(0x4c0u,"two-tick final CPU typed equality refused");
         e.cpu_equality=1;cpu_restore.state=C::TwoEqual;return 0;
     }
@@ -443,6 +447,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_drawn_evidenc
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_drawn_evidence_bytes(){return sizeof(cpu_restore.drawn);}
 extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_two_tick_evidence(){return &cpu_restore.two;}
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_two_tick_evidence_bytes(){return sizeof(cpu_restore.two);}
+// Private fixed owned buffer; never export a C sret function or caller pointer.
+extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_payload_failure_witness(){return &cpu_restore.failure_witness;}
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_payload_failure_witness_bytes(){return sizeof(cpu_restore.failure_witness);}
 extern "C" int melee_web_synctest_cpu_before_source_close(){
     if(cpu_restore.inflight){cpu_restore.close_requested=true;cpu_fail(0x497u,"source close reentered command");return 0;}
     if(cpu_restore.capsule&&payload_admission_runtime_boundary()!=0){cpu_fail(0x49au,"source close requires normal runtime boundary");return 0;}

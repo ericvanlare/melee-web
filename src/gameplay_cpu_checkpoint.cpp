@@ -210,6 +210,10 @@ bool GameplayCpuCheckpoint::finish_replay(const GameplayMatchSession& session) n
     checked_domains_|=1u<<static_cast<unsigned>(CpuComparisonDomain::Payload);
     const auto payload=melee_web_source_memory_payload_snapshot_compare_live(post_payload_);
     if(payload.status){
+        // Read-only, synchronous cross-check of THIS original comparison.
+        // Diagnostic refusal never changes the original comparison/1216.
+        if(payload.status==2)payload_failure_witness_=
+            melee_web_source_memory_payload_failure_witness(post_payload_,payload);
         comparison_={static_cast<std::uint32_t>(CpuComparisonDomain::Payload),payload.status,
             static_cast<std::uint32_t>(payload.allocation_index),static_cast<std::uint32_t>(payload.byte_offset),
             payload.expected_byte,payload.actual_byte,static_cast<std::uint32_t>(payload.host_address),

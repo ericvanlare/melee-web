@@ -76,6 +76,105 @@ void same_bytes(const unsigned char* actual, const unsigned char* expected,
     check(std::memcmp(actual, expected, count) == 0, message);
 }
 
+void witness_refused(const MeleeWebSourceMemoryPayloadSnapshot* snapshot,
+                     MeleeWebSourceMemoryPayloadSnapshotStatus admission) {
+    const auto value=melee_web_source_memory_payload_snapshot_witness(snapshot);
+    MeleeWebSourcePayloadWitness expected{};
+    expected.schema=1;expected.bytes=sizeof(expected);expected.status=1;
+    expected.admission_status=admission;
+    check(std::memcmp(&value,&expected,sizeof(value))==0,
+          "witness refusal returns no partial metadata or payload bytes");
+}
+void source_memory_witness_controls() {
+    // These byte arrays model a live acquired Fighter root only for the lease
+    // API control. They do not claim a real Fighter/member or browser owner.
+    unsigned char tiny[1]={17}, a[80]{};
+    fill(a,sizeof(a),11);unsigned char saved[sizeof(a)];std::memcpy(saved,a,sizeof(a));
+    check(melee_web_source_memory_begin(901,7),"witness begin");
+    check(melee_web_source_memory_alloc(7,tiny,sizeof(tiny)),"witness tiny allocation");
+    check(melee_web_source_memory_alloc(7,a,sizeof(a)),"witness allocation");
+    MeleeWebSourceFighterAddress root{};
+    check(melee_web_source_memory_fighter_acquire(a,sizeof(a),&root),"witness modeled root lease");
+    auto captured=melee_web_source_memory_payload_snapshot_capture();
+    check(captured.snapshot,"witness capture");
+    const auto before=context();const auto row=allocation(a);
+    const auto equal=melee_web_source_memory_payload_snapshot_witness(captured.snapshot);
+    MeleeWebSourcePayloadWitness empty{};empty.schema=1;empty.bytes=sizeof(empty);
+    check(std::memcmp(&equal,&empty,sizeof(equal))==0,"equal witness has no invented difference");
+    a[33]^=0x5a;
+    allocation_budget=0;
+    const auto value=melee_web_source_memory_payload_snapshot_witness(captured.snapshot);
+    const auto again=melee_web_source_memory_payload_snapshot_witness(captured.snapshot);
+    allocation_budget=-1;
+    check(value.schema==1&&value.bytes==168&&value.status==2&&!value.admission_status&&
+          value.row==1&&value.offset==33&&value.host_address==reinterpret_cast<uintptr_t>(a)&&
+          value.source_address==root.source_address&&value.requested_bytes==sizeof(a)&&
+          value.allocation_generation==row.allocation_generation&&value.owner_epoch&&
+          value.world_generation==901&&value.topology_revision&&
+          value.window_offset==25&&value.window_count==32,
+          "actual witness exact row identity/generation and middle window");
+    check(!value.root_kind&&!value.root_count&&!value.root_host&&!value.root_generation,
+          "live Fighter lease is not allocation provenance; UNKNOWN");
+    check(!std::memcmp(value.expected,saved+25,32)&&!std::memcmp(value.actual,a+25,32),
+          "actual saved/live window, not fabricated scalar evidence");
+    check(!std::memcmp(&value,&again,sizeof(value)),"pure deterministic noalloc witness");
+    same_context(before);same_allocation(a,row);
+    check(a[33]==static_cast<unsigned char>(saved[33]^0x5a),"witness does not restore source bytes");
+    // Reproduce the missed case: the lease remains live across a free/reuse,
+    // then a NEW snapshot admits the replacement allocation. Lease lifetime
+    // is not the allocation lifetime, even with identical host/source/world.
+    a[33]=saved[33];
+    check(melee_web_source_memory_free(7,a)&&melee_web_source_memory_alloc(7,a,sizeof(a)),
+          "free/reuse leaves historical Fighter lease alive");
+    const auto replacement=allocation(a);const auto stale_lease=fighter(a);
+    check(stale_lease.live&&stale_lease.allocation_generation==root.allocation_generation&&
+          replacement.allocation_generation!=row.allocation_generation,
+          "actual API exposes stale live lease beside new allocation generation");
+    witness_refused(captured.snapshot,MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED);
+    melee_web_source_memory_payload_snapshot_destroy(captured.snapshot);
+    captured=melee_web_source_memory_payload_snapshot_capture();check(captured.snapshot,"fresh reused-allocation snapshot");
+    a[33]^=0x5a;
+    const auto fresh=melee_web_source_memory_payload_snapshot_witness(captured.snapshot);
+    check(fresh.status==2&&fresh.host_address==reinterpret_cast<uintptr_t>(a)&&
+          fresh.source_address==stale_lease.source_address&&fresh.world_generation==stale_lease.world_generation&&
+          fresh.allocation_generation==replacement.allocation_generation&&
+          !fresh.root_kind&&!fresh.root_count&&!fresh.root_host&&!fresh.root_generation,
+          "fresh admitted snapshot cannot misattribute stale same-host/source/world Fighter lease");
+    check(melee_web_source_memory_fighter_release(a),"retire typed root without allocation reuse");
+    const auto retired=melee_web_source_memory_payload_snapshot_witness(captured.snapshot);
+    check(retired.status==2&&retired.root_kind==0&&!retired.root_count&&!retired.root_host&&
+          !retired.root_generation,"retired root is UNKNOWN before any dereference");
+    a[33]=saved[33];a[79]^=1;
+    const auto tail=melee_web_source_memory_payload_snapshot_witness(captured.snapshot);
+    check(tail.status==2&&tail.offset==79&&tail.window_offset==71&&tail.window_count==9&&
+          !std::memcmp(tail.expected,saved+71,9)&&!std::memcmp(tail.actual,a+71,9),
+          "last-byte bounds clamp without wrapping");
+    for(unsigned i=9;i<32;++i)check(!tail.expected[i]&&!tail.actual[i],"window tail stays zero");
+    a[79]=saved[79];tiny[0]^=1;
+    const auto small=melee_web_source_memory_payload_snapshot_witness(captured.snapshot);
+    check(small.status==2&&small.row==0&&!small.offset&&!small.window_offset&&small.window_count==1&&
+          small.expected[0]==17&&small.actual[0]==16&&small.root_kind==0,
+          "one-byte allocation bounds and UNKNOWN provenance");
+    for(unsigned i=1;i<32;++i)check(!small.expected[i]&&!small.actual[i],"tiny tail stays zero");
+    check(melee_web_source_memory_free(7,a),"witness free before extent change");
+    check(melee_web_source_memory_alloc(7,a,sizeof(a)-1),"witness reused pointer different extent");
+    witness_refused(captured.snapshot,MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED);
+    melee_web_source_memory_payload_snapshot_destroy(captured.snapshot);
+    captured=melee_web_source_memory_payload_snapshot_capture();check(captured.snapshot,"capture new extent");
+    check(melee_web_source_memory_free(7,a)&&melee_web_source_memory_alloc(7,a,sizeof(a)-1),
+          "same-address same-extent allocation reuse");
+    witness_refused(captured.snapshot,MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED);
+    melee_web_source_memory_payload_snapshot_destroy(captured.snapshot);
+    captured=melee_web_source_memory_payload_snapshot_capture();check(captured.snapshot,"capture before owner retirement");
+    check(melee_web_source_memory_end(901),"witness retire owner");
+    witness_refused(captured.snapshot,MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INACTIVE);
+    check(melee_web_source_memory_begin(901,7),"witness recreate same public IDs");
+    witness_refused(captured.snapshot,MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_STALE_OWNER);
+    witness_refused(nullptr,MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_ARGUMENT);
+    check(melee_web_source_memory_end(901),"witness final retirement");
+    melee_web_source_memory_payload_snapshot_destroy(captured.snapshot);
+    std::puts("Actual payload witness: pure windows, UNKNOWN including fresh-snapshot stale lease, bounds, extent/reuse/owner refusals passed");
+}
 void source_memory_payload_controls() {
     unsigned char a[128]{}, b[73]{}, c[41]{};
     unsigned char expected_a[sizeof(a)]{}, expected_b[sizeof(b)]{};
@@ -168,6 +267,13 @@ void source_memory_payload_controls() {
           differing.host_address==reinterpret_cast<uintptr_t>(a)&&differing.requested_bytes==sizeof(a)&&
           differing.expected_byte==expected_a[0]&&differing.actual_byte==a[0],
           "pure payload evidence identifies exact first admitted allocation/offset/bytes");
+    const auto diagnostic=melee_web_source_memory_payload_failure_witness(snapshot,differing);
+    check(diagnostic.bytes==256&&diagnostic.first_difference_matches==1&&diagnostic.window.row==differing.allocation_index,
+          "fixed failure witness crosschecks original execution without allocating");
+#if !defined(MELEE_WEB_CPU_INTERVAL_ENABLED) || !MELEE_WEB_CPU_INTERVAL_ENABLED
+    check(!diagnostic.hook_active&&!diagnostic.attribution&&diagnostic.reason==1,
+          "inactive runtime truthfully qualifies missing hook without pool storage");
+#endif
     const auto restored =
         melee_web_source_memory_payload_snapshot_restore(snapshot);
     check(melee_web_source_memory_payload_snapshot_matches_live(snapshot)==1,
@@ -366,6 +472,7 @@ void source_memory_payload_controls() {
 }
 int main() {
     using Snapshot = MeleeWebSourceMemorySnapshot;
+    source_memory_witness_controls();
     source_memory_payload_controls();
     const auto inactive_payload =
         melee_web_source_memory_payload_snapshot_capture();
