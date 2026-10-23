@@ -223,6 +223,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_restore_configur
     const auto owners=match->diagnostic_cpu_owners();
     const auto audio=melee_web_audio_cpu_storage(owners.audio,melee_web_audio_generation(owners.audio));
     if(!audio.command_budget||!audio.sound_mode)return cpu_fail(0x492u,"typed audio storage unavailable");
+    if((clock.profile_phase && clock.profile_phase_bytes!=sizeof(uint32_t)) ||
+       (!clock.profile_phase && clock.profile_phase_bytes))return cpu_fail(0x492u,"typed profile clock extent unavailable");
     if(!clock.record||!clock.process_mask||!cadence.record||!boot.ticks||!boot.disabled_links)
         return cpu_fail(0x492u,"typed source storage unavailable");
     std::vector<melee_web::CpuIntervalSpan> forbidden={
@@ -230,6 +232,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_restore_configur
         {boot.ticks,boot.ticks_bytes},{boot.disabled_links,boot.disabled_links_bytes},
         {audio.command_budget,sizeof(uint32_t)},{audio.sound_mode,sizeof(uint32_t)}};
 #define CPU_FORBID(value) forbidden.push_back({&(value),sizeof(value)})
+    if(clock.profile_phase)forbidden.push_back({clock.profile_phase,clock.profile_phase_bytes});
     CPU_FORBID(cpu_restore);CPU_FORBID(files);CPU_FORBID(match);CPU_FORBID(archive_cache);CPU_FORBID(attempted);CPU_FORBID(error);
     CPU_FORBID(audio_phase);CPU_FORBID(pcm);CPU_FORBID(input_bytes);CPU_FORBID(configured_source_seed);CPU_FORBID(native_initializer_enabled);
     CPU_FORBID(rng_profile_enabled);CPU_FORBID(rng_profile_gobj);CPU_FORBID(rng_profile_observation);CPU_FORBID(rng_profile_expected_callback_frame);

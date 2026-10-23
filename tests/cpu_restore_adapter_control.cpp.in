@@ -121,6 +121,7 @@ std::uint32_t source_static_counter=0;
 std::uint32_t source_invariant=0x51a7u;
 std::array<std::uint32_t,16> storage_clock{};
 std::array<std::uint32_t,16> storage_process_mask{};
+std::uint32_t storage_profile_phase=0;
 std::array<std::uint32_t,16> storage_cadence{};
 std::array<std::uint32_t,16> storage_boot_ticks{};
 std::array<std::uint32_t,16> storage_disabled_links{};
@@ -275,7 +276,7 @@ MeleeWebAudioCpuStorage melee_web_audio_cpu_storage(MeleeWebAudio*,uint64_t) {
     return {&model_command_budget,&model_sound_mode};
 }
 MeleeWebClockCpuStorage melee_web_source_clock_cpu_storage(void) {
-    return {storage_clock.data(),sizeof(storage_clock),storage_process_mask.data(),sizeof(storage_process_mask)};
+    return {storage_clock.data(),sizeof(storage_clock),storage_process_mask.data(),sizeof(storage_process_mask),&storage_profile_phase,sizeof(storage_profile_phase)};
 }
 MeleeWebCadenceCpuStorage melee_web_source_cadence_cpu_storage(void) {
     return {storage_cadence.data(),sizeof(storage_cadence)};
@@ -578,6 +579,10 @@ void verify_invalid_configuration_guards() {
          melee_web::CpuStaticDomain::OriginalSourceC}}};
     check(melee_web_synctest_cpu_restore_configure(ptr32(forbidden.data()),1)!=0,
           "Forbidden live adapter range was accepted as a restore row");
+    reset_fixture();
+    forbidden[0].address=ptr32(&storage_profile_phase);forbidden[0].bytes=sizeof(storage_profile_phase);
+    check(melee_web_synctest_cpu_restore_configure(ptr32(forbidden.data()),1)!=0,
+          "Typed profile phase was accepted by static writer");
 }
 }
 

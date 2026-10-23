@@ -51,6 +51,8 @@ typedef struct MeleeWebSourceClockSnapshot MeleeWebSourceClockSnapshot;
 typedef struct MeleeWebClockCpuStorage {
     const void* record; size_t record_bytes;
     const void* process_mask; size_t process_mask_bytes;
+    /* Optional v6 typed phase; NULL/0 for ordinary/v5 source. */
+    const void* profile_phase; size_t profile_phase_bytes;
 } MeleeWebClockCpuStorage;
 MeleeWebClockCpuStorage melee_web_source_clock_cpu_storage(void);
 

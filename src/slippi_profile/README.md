@@ -176,3 +176,21 @@ adds `tempY + storedPrivateY` and `privateZ + tempZ` in that order, then retains
 the original early-break, position update and clear. Focused native controls are
 synthetic source reductions; they do not establish PPC NaN payload/FPSCR parity
 or browser gameplay acceptance.
+
+## Logical-frame clock v6 (explicit diagnostic opt-in)
+
+`--slippi-logical-frame-clock` selects the separate private Release identity
+`slippi-render-dependencies-logical-frame-v6`. Default v5 and ordinary source
+behavior remain unchanged. This is own-C profile behavior, not a matched ASM or
+complete Slippi identity. The GPL-3.0-or-later pure helper is
+`logical_frame_clock.c`; the overlay stores one typed COLD/PENDING/COMPLETED phase.
+A successful source post marks PENDING. A successful real draw return completes
+it once; an accepted next source pre completes a skipped prior frame only after
+all source gates pass and before controller evaluation/OnFrame. Repeated draws
+do not double this logical housekeeping. No renderer resource or original clock
+counter is assigned a synthetic target. Full clock and phase equality remain
+mandatory, and the new phase is restored only by the existing typed CPU writer.
+MENU, legacy flow-only restore, ordinary and default v5 paths are unchanged.
+Reduced clock controls with modeled service leaves do not establish gameplay,
+seven-tick, whole-profile or rollback milestone acceptance. No browser interval
+is enabled by this option alone.
