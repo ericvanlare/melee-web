@@ -26,8 +26,11 @@ ownership is incomplete, and original-game parity, multi-tick and whole-session
 gates remain open. Earlier capture refusals and the post-present harness assertion
 failure remain retained and are explained below. A subsequent two-tick attempt
 failed at the strict final CPU payload comparison; its retained result is recorded
-below. Component controls and the one-tick browser result do not establish full
-browser rollback. Earlier owner controls
+below. The new allocation-provenance diagnostic also stops at strict code1216:
+its valid fixed witness reports an active hook but no current recorded pool
+event, with no type or pool attribution. Later typed domains and final present
+remain unrun. Component controls and the one-tick browser result do not establish
+full browser rollback. Earlier owner controls
 also repaired callback guards so simulation and draw callbacks refuse separately;
 the production flow control passes with synthetic lifecycle prerequisites. The
 original single/two-player constructor, neutral ticks, context checkpoint controls
@@ -316,9 +319,46 @@ recorded all ten owned PIDs absent; the run took 9.816 seconds and cleanup
 80 ms. This retained failed attempt does not change the earlier one-tick pass or
 the separate reduced clock rejection result. See
 `drawn_reference_two_tick_capture_v1` in the structured evidence receipt for
-artifact hashes and exact scope. Next, reduce the first mismatch read-only and
-select one bounded owner-range diagnostic from that evidence; no recapture is
-claimed.
+artifact hashes and exact scope. That first failed attempt remains unchanged.
+
+The subsequently released provenance diagnostic uses clean source `11233c8f`
+(tree `91006a48`), distinct from the runtime built at `6b3b7aa5` plus the exact
+16 reviewed files. Private v5, private logical-frame v6 and ordinary Release
+builds pass; full discovery passes 2,471 tests with 165 skips in 595.086 seconds.
+The source checkpoint records the tested bytes and was unpushed at capture
+time. Publication CI is separate from this local validation. The fresh linked review accepts only the exact new
+4-byte private refusal latch and 256-byte growth of the excluded private
+`cpu_restore` buffer; all 2,169 source-policy rows retain their prior sizes,
+flags and admission decisions after fresh-address binding. Neither diagnostic
+region is admitted for restore, and no restore exemption is widened.
+
+This one diagnostic capture still **fails command11 with strict1216**. Both
+samples300/301 have exact raw observation, PCM, PAD, RNG-profile and transfer
+pairs. The native evidence remains 35,368 bytes; checked CPU mask `0x1e` and
+matched mask `0x0e` stop at payload domain4, row62/offset284, expected `0x6a`
+and actual `0xbd` in the 1,024-byte allocation. The separate 256-byte witness
+passes its synchronous first-difference cross-check and reports `hookActive=1`,
+`attribution=0`, `reason=2`, `associationState=0` and a zero descriptor. This
+means **no current recorded AddFree event for the target allocation**, not
+proof that it is outside ObjAlloc. There is no pool, fighter/class, member or
+float-type attribution. Mirror restore clears association metadata in general,
+but the independent source reduction found no production mirror-restore caller
+in this route; its actual payload restore copies requested source bytes only.
+Later CPU domains, commands12/13 and the final present were not reached.
+
+CPU restore CLOSE retains1216; snapshot close and renderer shutdown separately
+return1. The native close report therefore remains failed, while the owner/root
+OS checks independently find all ten recorded PIDs absent. All 24 runtime pins
+remain unchanged. The 10.128-second attempt is diagnostic elapsed time, not a
+rollback budget result. The structured receipt under
+`two_tick_payload_provenance_diagnostic_v1` binds raw evidence `b480a165…`,
+owner, validation, fresh linked configuration, source/build identities and
+independent raw/source review. Existing failures and the earlier one-tick pass
+are preserved. The remaining step is a bounded offline source-callsite reduction
+of the missing current event; it is a proposal, not implemented attribution or
+a new capture release. No byte masking, restore-policy exception, whole-state,
+multi-tick rollback, original Slippi parity, performance or completion claim
+follows.
 
 ## First current-source copy/restore result
 

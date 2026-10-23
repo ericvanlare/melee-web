@@ -2,7 +2,7 @@
   "schema": "match-only-rollback-feasibility-v1",
   "issue": 318,
   "pr": 319,
-  "status": "same_browser_one_tick_drawn_reference_pass_two_tick_command11_payload_failure_census_incomplete_full_browser_restore_not_established",
+  "status": "same_browser_one_tick_drawn_reference_pass_two_tick_strict1216_missing_pool_event_witness_full_browser_restore_not_established",
   "source_only_baseline": {
     "boundary": "synchronous-source-only-exported-call-return",
     "sourceDrawing": false,
@@ -5793,6 +5793,364 @@
         ]
       },
       "scope": "Source-component implementation and regression validation only. This record is distinct from the later two-tick capture source identity (62a717 plus 18 dirty files), native build producer (62a717 plus 12 reviewed native files), and its unchanged 24-file runtime. It does not establish a successful two-tick browser replay."
+    },
+    "two_tick_payload_provenance_diagnostic_v1": {
+      "status": "FAIL_STRICT_CPU_PAYLOAD_1216_VALID_DIAGNOSTIC_MISSING_CURRENT_POOL_EVENT_NO_ATTRIBUTION",
+      "evidence_run_root": "browser-rollback-sprint-20261022-115029-d89e262b",
+      "artifact_paths_relative_to_run": true,
+      "scope": "One changed-hypothesis diagnostic capture; strict payload mismatch remains failure. No type/owner/member attribution, restoration-policy expansion, final present or multi-tick acceptance.",
+      "source_and_validation": {
+        "clean_head": "11233c8f922868bbc2b3e72d9520d4f1d9f2e641",
+        "tree": "91006a48c38d30fb0aefc8f7b4333463357a3586",
+        "parent": "6b3b7aa598ae9af04ee4d76c351f672e1604af1d",
+        "runtime_build_producer": {
+          "base_head": "6b3b7aa598ae9af04ee4d76c351f672e1604af1d",
+          "base_tree": "e49010ef07daa291c04087dd59decbbaaa9a31e3",
+          "clean": false,
+          "dirty_files": 16,
+          "files": {
+            "cmake/FighterRuntime.cmake": {
+              "bytes": 78349,
+              "sha256": "e5759cdaa39e63626746d16e4c49bacda788c0b19b316ed91d6957d800549c38"
+            },
+            "patches/melee-gameplay.patch": {
+              "bytes": 500670,
+              "sha256": "4e405f4212c94297a3506c54320c362b5f9b15ac9f83d1d34bbf8c08f214b1c0"
+            },
+            "src/gameplay_cpu_checkpoint.cpp": {
+              "bytes": 22627,
+              "sha256": "a3e46c307574e610ae16f2819b5ac975ef826ccc8ff56fe6fdbb525be2a07b0a"
+            },
+            "src/gameplay_cpu_checkpoint.hpp": {
+              "bytes": 4390,
+              "sha256": "fed6757ccf7a1fd093aaec4d0020825190c7db616e02fd34404da85a1be34989"
+            },
+            "src/gameplay_source_memory_runtime.cpp": {
+              "bytes": 39758,
+              "sha256": "8c6c511b300535d7dcd42663f07060ac2c63ea26eed8a2687b39286c43b71c6d"
+            },
+            "src/gameplay_source_memory_runtime.h": {
+              "bytes": 10086,
+              "sha256": "2e2c1bf848875ee0c76ef1da3553c5087cefbe6c3ce205ee2e7257693b979db8"
+            },
+            "src/slippi_profile/tests/cpu_restore_adapter.inc": {
+              "bytes": 32964,
+              "sha256": "88e00dd1775a66ff9049e2cd2ed414fb8583764cac81199ef1e51c223b77dd2d"
+            },
+            "src/slippi_profile/tests/cpu_two_tick_runner.mjs": {
+              "bytes": 27929,
+              "sha256": "116091f577575f0a55e008f6a240140d324dc7c7a1198bf9deb38c93e2f8f397"
+            },
+            "src/slippi_profile/tests/run_write_census.mjs": {
+              "bytes": 54692,
+              "sha256": "01e9543b7a533ea28004ba2abc26f290c01d89e777ffdc5aa7624e69ea7debcb"
+            },
+            "src/slippi_profile/tests/test_cpu_two_tick_runner.mjs": {
+              "bytes": 18180,
+              "sha256": "50adbb9493241e4c5739944efa0ea391800715d26c3744b380dbc20dfcf14353"
+            },
+            "src/slippi_profile/tests/test_write_census_contract.mjs": {
+              "bytes": 101715,
+              "sha256": "0573d699e4e19aff7f06f208f60d76c261c21babe768994c8bbbae75f31e3853"
+            },
+            "tests/cpu_restore_adapter_control.cpp.in": {
+              "bytes": 46104,
+              "sha256": "4661545df28525957b1551a41a81fbfe0250e4b191b52d3a4489884197b64d1e"
+            },
+            "tests/source_memory_snapshot_trace.cpp": {
+              "bytes": 34361,
+              "sha256": "db84e6f692a092b24ae284c0be01c4981b1a101f95a32bc663220161149abbf6"
+            },
+            "tests/source_pool_provenance_control.cpp": {
+              "bytes": 8222,
+              "sha256": "584040ac51a9bfba30163b1118fad5a37289f54d15c9ab166cea66d13ecaf018"
+            },
+            "tests/test_gameplay_cpu_restore_adapter.py": {
+              "bytes": 20006,
+              "sha256": "3a4cf688a96c8af99e185fd56aefa2cc1dc96a1409835f03056f196ec3fd41af"
+            },
+            "tests/test_source_pool_provenance.py": {
+              "bytes": 6469,
+              "sha256": "e1409247e8c47b56c95abca1434843a1fd561c3e8de8ca1b4cbd34a9039d2a13"
+            }
+          },
+          "candidate": {
+            "path": "two-tick-payload-provenance-candidate-v1/freeze-v1.json",
+            "bytes": 12811,
+            "sha256": "6ecc1e0310f1ac7a8dcf3d5946b8b559a0973e54e3136de1d976702e23846f80"
+          },
+          "patch": {
+            "path": "two-tick-payload-provenance-candidate-v1/candidate.patch",
+            "bytes": 71519,
+            "sha256": "1366fb6aebbd14c4a8d0a8c4f825f77571ee4e4eb94e31b5338e024bf0de2885"
+          },
+          "independent_review": {
+            "path": "two-tick-payload-provenance-independent-review-v1/review-v1.json",
+            "bytes": 4733,
+            "sha256": "bd8f15239521a7bbf1ea097b023e9f4c4f97144e3737670f6a7a64ddfb6bcc9e"
+          },
+          "identity": "6b3b7aa5 plus exact16 reviewed integrated diagnostic files; build producer distinct from later checkpoint"
+        },
+        "builds": [
+          {
+            "name": "private-v5-release",
+            "exit_code": 0
+          },
+          {
+            "name": "private-v6-release",
+            "exit_code": 0
+          },
+          {
+            "name": "ordinary-release",
+            "exit_code": 0
+          }
+        ],
+        "full_regression": {
+          "tests": 2471,
+          "skips": 165,
+          "seconds": 595.086,
+          "result": "PASS",
+          "outer_footer": "Ran 2471 tests in 595.086s; OK (skipped=165)",
+          "phase_wall_seconds": 595.7589276670478
+        },
+        "runtime24_unchanged": true,
+        "publication": "11233c8f unpushed; current11233c8f CI not run. Any subsequent docs head also unvalidated by current-head CI."
+      },
+      "fresh_linked_configuration": {
+        "root_decision": "ACCEPT_EXACT_CONFIG_FOR_THIS_RUNTIME_ONLY_NO_CAPTURE_RELEASE at review time; later capture has its own release",
+        "configuration_sha256": "1d752a346c5535502057ba31f47bac8af3d60058042d1afba7060ddc6c5e756c",
+        "policy_sha256": "3e1c1bd135fa2306ed7b3c6cb1ed5e0e3425cfa36eb34d03f7a8a17784719151",
+        "map_joins": 3144,
+        "source_policy_rows": 2169,
+        "wire_intervals": 2165,
+        "wire_nonwire_overlaps": 0,
+        "new_private_latch_bytes": 4,
+        "private_cpu_restore_growth_bytes": 256,
+        "new_diagnostic_regions_restore_admission": false,
+        "existing_source_classification_or_admission_changes": 0,
+        "descriptor_lookup_candidates": 28,
+        "descriptor_lookup_is_actual_target_attribution": false
+      },
+      "actual_capture": {
+        "commands": [
+          {
+            "command": 8,
+            "outcome": "returned",
+            "result": 0
+          },
+          {
+            "command": 9,
+            "outcome": "returned",
+            "result": 0
+          },
+          {
+            "command": 10,
+            "outcome": "returned",
+            "result": 0
+          },
+          {
+            "command": 11,
+            "outcome": "returned-nonzero",
+            "result": 1216
+          }
+        ],
+        "native_header": {
+          "schema": 1,
+          "bytes": 35368,
+          "mode": 2,
+          "state": 6,
+          "firstFailure": 1216,
+          "preFrame": 176,
+          "postFrame": 178,
+          "commitResult": 0,
+          "cpuEquality": 0,
+          "drawnEquality": 0,
+          "checkedCpu": 30,
+          "matchedCpu": 14,
+          "checkedDrawn": 0,
+          "matchedDrawn": 0,
+          "diagnosticMask": 127,
+          "lastCommand": 11
+        },
+        "raw_five_domain_samples": {
+          "sample300": true,
+          "sample301": true,
+          "domains": [
+            "observation",
+            "PCM",
+            "PAD",
+            "RNG profile",
+            "transfer"
+          ],
+          "comparison": "exact bytes; not full typed CPU state"
+        },
+        "first_payload_difference": {
+          "domain": 4,
+          "row": 62,
+          "offset": 284,
+          "expected_byte": 106,
+          "actual_byte": 189,
+          "allocation_bytes": 1024
+        },
+        "final_present": false,
+        "commands12_13": "UNRUN",
+        "later_CPU_domains": "UNRUN",
+        "elapsed_ms": 10128
+      },
+      "fixed_witness": {
+        "schema": 1,
+        "bytes": 256,
+        "original_status": 2,
+        "first_difference_matches": 1,
+        "hookActive": 1,
+        "attribution": 0,
+        "reason": 2,
+        "associationState": 0,
+        "descriptor_hex": "0000000000000000",
+        "window_offset": 276,
+        "window_count": 32,
+        "meaning": "No current recorded allocation-time AddFree event for this target. Does not prove non-ObjAlloc allocation or identify a pool/type/member.",
+        "no_type_pool_class_fighter_or_float_attribution": true,
+        "window_allocation_generation_hex": "000000000000003f",
+        "window_owner_epoch_hex": "0000000000000001",
+        "window_world_generation_hex": "0000000000000001",
+        "window_topology_revision_hex": "0000000000000d62",
+        "association_identity_fields": "All zero: descriptor, association allocationGeneration/epoch/world, stride/count/mask/poolBytes/cellIndex/cellOffset. Tracked window identities above are separate."
+      },
+      "independent_source_reduction": {
+        "review_sha256": "be5f1050521e41eec2595664d5620c1347b107685b9b516d4bebd465e85fc0b0",
+        "mirror_restore": "Association invalidation exists generally, but no production mirror-restore caller found in this route. Actual aggregate payload restore copies requested source bytes, not provenance metadata.",
+        "proposed_next": "Bounded offline source-callsite/allocation reduction; not an implemented owner explanation, source repair or capture release."
+      },
+      "cleanup": {
+        "CPU_restore_CLOSE": {
+          "result": 1216,
+          "status": "returned-nonzero",
+          "native_closed": false
+        },
+        "snapshot_close": 1,
+        "renderer_shutdown": 1,
+        "OS_owned_cleanup_PASS": true,
+        "recorded_PID_absence_count": 10,
+        "recorded_PIDs": [
+          91836,
+          91839,
+          91846,
+          91850,
+          91851,
+          91852,
+          91853,
+          91868,
+          91870,
+          91872
+        ],
+        "runtime24_unchanged": true,
+        "distinction": "Native CLOSE1216 remains failed even though actual owned process absence passes."
+      },
+      "limits": [
+        "Strict1216 and all previous failures unchanged; one-tick passing component remains distinct.",
+        "Valid missing-event diagnostic is not payload repair, pool/type/member/float proof or non-ObjAlloc proof.",
+        "Later CPU comparisons and final present unrun; no full state, two-tick acceptance, seven-tick budget, gameplay, original Slippi parity or whole-session acceptance.",
+        "No restore policy widening or fresh browser/capture release from this record."
+      ],
+      "pins": {
+        "root_observed": {
+          "path": "two-tick-payload-provenance-capture-v1/root-observed-v1.json",
+          "bytes": 5041,
+          "sha256": "0ccf6bd004edfe9988c69f3c83729e91e20a4636fda8ce20d16a77a73ff8b0bf"
+        },
+        "raw_evidence": {
+          "path": "two-tick-payload-provenance-capture-v1/runner/evidence.json",
+          "bytes": 1117050,
+          "sha256": "b480a165bcc25d143b3c8872d2b805cbc6aa2dbc782f9add179ff41cc072fa32"
+        },
+        "owner": {
+          "path": "two-tick-payload-provenance-capture-v1/owner.json",
+          "bytes": 88221,
+          "sha256": "ddf9fa003b2f8cfc7b2e34c2139dafe10bdc93f30a66576546c851c4d19b7b8d"
+        },
+        "packet": {
+          "path": "two-tick-payload-provenance-capture-v1/packet-candidate-v1.json",
+          "bytes": 60761,
+          "sha256": "799e0221bad0f59e5310b45bdb510daf62a6b8639fd42eb33bde653f586218ed"
+        },
+        "preflight": {
+          "path": "two-tick-payload-provenance-capture-v1/preflight.json",
+          "bytes": 61324,
+          "sha256": "04cad468486250c7721b2755b0b5d3991e5b22821af7ebdb8c6113bb92d749dd"
+        },
+        "source_checkpoint": {
+          "path": "two-tick-payload-provenance-validation-v1/source-checkpoint-v1.json",
+          "bytes": 7511,
+          "sha256": "2608976c3c1af5b0080bd0d8fa4fc0bf3cff919e83eef2ee9cdd42b58182ca6d"
+        },
+        "native_builds": {
+          "path": "two-tick-payload-provenance-validation-v1/native-build-result-v1.json",
+          "bytes": 9810,
+          "sha256": "6d1bd25a1345757bd55bf6afa7d4bb71f807d786f1272fb786231306c0049f32"
+        },
+        "full_regression_result": {
+          "path": "two-tick-payload-provenance-validation-v1/full-regression-result-v1.json",
+          "bytes": 6773,
+          "sha256": "7456b0b76cc067963050579cf46d822c4b85dabd58a293d1b2b662446ddd14d7"
+        },
+        "full_regression_log": {
+          "path": "two-tick-payload-provenance-validation-v1/full-regression.log",
+          "bytes": 470154,
+          "sha256": "982157a67c9cf7a5d092c9adc46c5e6ad2910e2e23d76ded6450cfc6f4fdff7d"
+        },
+        "linked_freeze": {
+          "path": "two-tick-payload-provenance-linked-config-candidate-v1/freeze-v1.json",
+          "bytes": 24885,
+          "sha256": "7ba739945960b4c00166937a09c356a3bf5fc630e9549c814c98393c0c8e0978"
+        },
+        "root_linked_review": {
+          "path": "two-tick-payload-provenance-linked-config-candidate-v1/root-independent-review-v1.json",
+          "bytes": 1429,
+          "sha256": "abb92c78fdd2ead8ae7b45926b4aa644a0691ee16a59a409108b105a14f6b985"
+        },
+        "linked_review": {
+          "path": "two-tick-payload-provenance-linked-config-candidate-v1/linked-review-v1.json",
+          "bytes": 11713,
+          "sha256": "1904d558e40ebd622232fcbc6d878add92c676013c1d5108840ffaa21702008e"
+        },
+        "linked_configuration": {
+          "path": "two-tick-payload-provenance-linked-config-candidate-v1/final-linked-configuration-v1.json",
+          "bytes": 915122,
+          "sha256": "1d752a346c5535502057ba31f47bac8af3d60058042d1afba7060ddc6c5e756c"
+        },
+        "source_candidate": {
+          "path": "two-tick-payload-provenance-candidate-v1/freeze-v1.json",
+          "bytes": 12811,
+          "sha256": "6ecc1e0310f1ac7a8dcf3d5946b8b559a0973e54e3136de1d976702e23846f80"
+        },
+        "source_independent_review": {
+          "path": "two-tick-payload-provenance-independent-review-v1/review-v1.json",
+          "bytes": 4733,
+          "sha256": "bd8f15239521a7bbf1ea097b023e9f4c4f97144e3737670f6a7a64ddfb6bcc9e"
+        },
+        "independent_raw_source_reduction": {
+          "path": "two-tick-missing-pool-event-source-reduction-v1.json",
+          "bytes": 15924,
+          "sha256": "be5f1050521e41eec2595664d5620c1347b107685b9b516d4bebd465e85fc0b0"
+        },
+        "build_log_private-v5-release": {
+          "path": "two-tick-payload-provenance-validation-v1/private-v5-release.log",
+          "bytes": 266239,
+          "sha256": "872e445458d4112dd67eb19f66d39884555c19badfcecc8dd5c4dd59b86515a0"
+        },
+        "build_log_private-v6-release": {
+          "path": "two-tick-payload-provenance-validation-v1/private-v6-release.log",
+          "bytes": 266483,
+          "sha256": "39df1ca413e37ff0af91121b29e9e3e43da6da286660b892c334b585e4da3e12"
+        },
+        "build_log_ordinary-release": {
+          "path": "two-tick-payload-provenance-validation-v1/ordinary-release.log",
+          "bytes": 1436696,
+          "sha256": "199ffe7b267b152cd709d3cb1f420ae4afacaf130cad4fa42c6443b770213718"
+        }
+      },
+      "preserved_prior_top_level_status": "same_browser_one_tick_drawn_reference_pass_two_tick_command11_payload_failure_census_incomplete_full_browser_restore_not_established"
     }
   }
 }
