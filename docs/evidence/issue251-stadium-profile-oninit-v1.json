@@ -17288,8 +17288,8 @@
     }
   },
   "fresh_go2_comparison_2026_10_18": {
-    "state": "ORIGINAL_GO2_REFERENCE_PASS_BROWSER_FIRST_C_COMPARISON_FAIL",
-    "next": "The fresh SSS constructor, consumed-PAD/tick and first-draw comparison passes as recorded under fresh_css_finite_original_preparation.implementation_checkpoint_2026_10_22.fresh_sss_first_input_tick_draw_capture_v2_2026_10_22. It stops before observer sequence 1602. CSS exit and the terminal CSS scheduler remain unpaired; SSS exit and C3 remain open. Next is a bounded source-only review of the remaining original-SSS prefix toward SSS exit at sequence 2481. The 132 observed consumes are inventory, not a cap; no follow-up run is authorized.",
+    "state": "ORIGINAL_GO2_REFERENCE_PASS_BROWSER_FIRST_C_COMPARISON_FAIL; FRESH132_PREFIX_AND_PREPARED_READY_START_DECLARED_FIELDS_PASS; ENTRY_CALLBACK_SETUP_GO2_C3_OPEN",
+    "next": "The latest Fresh132 continuation passes 132 original consumed-PAD/tick/draw groups through the SSS exit and a read-only prepared VS ReadyStart/seed comparison against original VS Entry 2523, as recorded under fresh_css_finite_original_preparation.implementation_checkpoint_2026_10_22.fresh_sss_ready_start_capture_v1_2026_10_23. It did not execute the original Entry callback. Root has authorized an external source candidate and focused controls for the reviewed Setup-through-GO+2 plan; checkout mutation, repository builds and browser capture remain unreleased.",
     "native": {
       "binary_sha256": "4bebd3a21cf48da558c7380f45b73e394fe46f47cef774d939cd4659051918fa",
       "producer_manifest_sha256": "2da988e27c334b4530935ea32af3edc319707482e276b064e9b08c132d4cedbd",
@@ -18060,7 +18060,7 @@
       ]
     },
     "fresh_css_finite_original_preparation": {
-      "state": "PASS_ORIGINAL_ONLY_FINITE_CSS_PREPARATION",
+      "state": "PASS_ORIGINAL_ONLY_FINITE_CSS_PREPARATION; FRESH132_PREFIX_AND_PREPARED_READY_START_DECLARED_FIELDS_PASS; SETUP_GO2_C3_OPEN",
       "evidence_directory": "stadium-css-constructor-v2-20261018-131529-0044ed56",
       "execution_source_revision": "1e96b2a93c72e3d726b47877324b652c9bc3307c",
       "derivation_revision": "f7fc174772cd0124a6a8d0977aca74ad80d6e9b1",
@@ -18161,7 +18161,7 @@
       "native_or_browser_executed": false,
       "native_codec_implemented": false,
       "C3": false,
-      "next": "The fresh SSS constructor-entry/return, consumed-PAD/tick and first-draw comparison passes as recorded in implementation_checkpoint_2026_10_22.fresh_sss_first_input_tick_draw_capture_v2_2026_10_22. It stops before observer sequence 1602. Next is a bounded source-only review of the remaining original-SSS prefix toward SSS exit at sequence 2481; the 132 observed remaining consumes are inventory, not an admitted cap, and no follow-up capture is authorized.",
+      "next": "The Fresh132 prefix and prepared VS ReadyStart/seed declared-field comparison pass as recorded under implementation_checkpoint_2026_10_22.fresh_sss_ready_start_capture_v1_2026_10_23. The original Entry callback remains unexecuted. Root has authorized external source-candidate work and focused controls for the reviewed Setup-through-GO+2 plan; checkout mutation, repository builds and browser capture remain unreleased.",
       "exclusions": [
         "Full native source/input/tick/draw parity beyond the bounded v3 finite-CSS prefix",
         "Terminal scheduler snapshot and raw pending/next equality",
@@ -18169,7 +18169,7 @@
         "Pixel/PCM, live input, timing/performance, full-session and C3 acceptance"
       ],
       "implementation_checkpoint_2026_10_22": {
-        "state": "FINITE_CSS_V3_PREFIX_PASS; FRESH_SSS_INPUT_TICK_FIRST_DRAW_AND_REMAINING132_EXIT_SELECTED_TUPLE_PASS; SOURCE_FLAGS_PENDING_NEXT_UNPAIRED; VS_GO_C3_OPEN; PUBLISHED_SUCCESSOR_CI_REQUIRED",
+        "state": "FRESH_SSS_132_INPUT_TICK_DRAW_EXIT_AND_SELECTED_STAGE_PASS; PREPARED_VS_READY_START_DECLARED_FIELDS_PASS; ENTRY_CALLBACK_SETUP_GO2_C3_OPEN; PUBLISHED_SUCCESSOR_CI_REQUIRED",
         "evidence_labels": [
           "Source identified",
           "Compiled",
@@ -18756,11 +18756,11 @@
             "Whole-session acceptance, public Stadium admission and C3"
           ]
         },
-        "next": "Review one fixed Fresh132-to-original VS Entry2523 seed/common Start-field endpoint, reusing existing checked selection/Entry interfaces while preserving legacy124 unchanged. Stop at first field/owner uncertainty. No follow-up capture is released.",
+        "next": "Continue with the externally prepared source candidate and focused controls for the reviewed Fresh132 Setup-through-GO+2 plan: bind Setup 2563, the 174 recorded actions with 87 tick/draw pairs, the actual GO callback seed, C/F/GO+2 fields, final draw and teardown. Preserve legacy124; stop at the first source divergence. Checkout mutation, repository builds and follow-up browser capture remain unreleased.",
         "exclusions": [
           "CSS exit and terminal CSS scheduler equality remain unobserved/unpaired",
           "Original source-side conditional flags and pending-next, and prepared VS output remain unpaired",
-          "VS Entry, Setup, GO/GO+2, restore or scene parity remain unpaired/unrun for this Fresh132 continuation",
+          "The original VS Entry callback, Setup, GO/C/F/GO+2, restore, and scene parity remain unexecuted/unpaired for this Fresh132 continuation",
           "Pixel/PCM, audio-continuity, physical input, timing/performance, whole-session and C3 acceptance"
         ],
         "c8a1_predecessor_ci": {
@@ -20623,6 +20623,162 @@
             },
             "not_a_runtime_or_capture_release": true
           }
+        },
+        "fresh_sss_ready_start_capture_v1_2026_10_23": {
+          "state": "PASS_SCOPED_FRESH132_SSS_EXIT_AND_PREPARED_VS_READY_START_SEED; ENTRY_CALLBACK_SETUP_GO2_C3_OPEN",
+          "evidence_directory": "browser-rollback-sprint-20261022-115029-d89e262b/fresh-sss-ready-start-capture-v1",
+          "scope": "One bounded continuation passes 132 captured original consumed-PAD/tick/draw groups through the SSS exit and one selected-stage witness. A single read-only getter then compares the prepared VS ReadyStart seed and declared Start fields against original VS Entry 2523. The original Entry callback is not executed.",
+          "capture": {
+            "packet": {
+              "path": "packet-v1.json",
+              "bytes": 34114,
+              "sha256": "d281dac22c9ca18de11d3d2e124527b584bc3d8d6f5fd98b0e908758b88415b6"
+            },
+            "preflight": {
+              "path": "preflight.json",
+              "bytes": 45829,
+              "sha256": "370f9132d19597b0cc0854703c67aafc317f6856b243c22ef808903eeca6379a"
+            },
+            "raw_report": {
+              "path": "browser-run/report.json",
+              "bytes": 3102493,
+              "sha256": "ff3d73e33eb086c74e8dd0d4e4a94bcabfe4a6a6e1a9eeed5c15933414f3081e"
+            },
+            "owner": {
+              "path": "owner.json",
+              "bytes": 106775,
+              "sha256": "97766be070619c01656840d445c1e6eb45d1f7772417d983dd1ab5cff045f855"
+            },
+            "root_observation": {
+              "path": "root-observed-v1.json",
+              "bytes": 10492,
+              "sha256": "87c65521f6d0f6e5376ae03ac62d21d4fb05b552bb76f55f4c038ffbe83c509b"
+            },
+            "independent_comparator_replay": {
+              "path": "independent-replay-v1/receipt-v1.json",
+              "bytes": 111161,
+              "sha256": "ed18e27f47bcf6cb6c10eec3391a3aded0c5837d429e5118c7ce5dfd9fce631e"
+            },
+            "runtime_retention": {
+              "path": "runtime-retention-v1.json",
+              "bytes": 33554,
+              "sha256": "3f803adcbb68aca73f1ff7000873e0fd2e7136020cfe42eee2d3e28a309448f6"
+            },
+            "root_visual_and_scratch_cleanup": {
+              "path": "root-visual-cleanup-v1.json",
+              "bytes": 799,
+              "sha256": "1df6ed1eaba7b72a78ffe30a9858a52e14490564bcf29c5f6d39714e9b228171"
+            }
+          },
+          "observed_boundaries": {
+            "original_sss_prefix": {
+              "consumed_pad_tick_draw_groups": 132,
+              "strict_callback_rows": 398,
+              "matched_ticks": 132,
+              "matched_draw_enters": 132,
+              "matched_draw_returns": 132,
+              "frame_end_returned": true,
+              "selected_stage_witness_captured": true,
+              "strict_host_status_callbacks": 398
+            },
+            "prepared_vs_ready_start": {
+              "original_vs_entry_sequence": 2523,
+              "seed_hex": "e2624ac3",
+              "typed_rule_fields_compared": 16,
+              "typed_player_fields_per_player": 21,
+              "players_compared": 4,
+              "original_entry_callback_executed": false,
+              "strict_comparator": "PASS; one attempt; no first mismatch"
+            }
+          },
+          "read_only_getter": {
+            "calls": 1,
+            "full_observation_equal_after_removing_only_returned_result": true,
+            "host_tick_calls_unchanged": true,
+            "host_draw_calls_unchanged": true,
+            "audio_render_calls_before_after": [
+              274,
+              274
+            ],
+            "audio_render_frames_before_after": [
+              146132,
+              146132
+            ],
+            "audio_phase_before_after": [
+              0,
+              0
+            ]
+          },
+          "source_and_runtime_identity": {
+            "capture_source_commit": "1d16d5f273b6104c954457f1dcf960e8cd546903",
+            "capture_source_tree": "13dea18bae406a81556da6b03578c0fddd22fdc1",
+            "capture_source_clean": true,
+            "runtime_producer_commit": "853123e30a7d941c1c367f0fa2165adfa584e131",
+            "runtime_producer_tree": "faf7a48a828040a40919735a4a32b1c42b030396",
+            "runtime_producer_dirty": true,
+            "runtime_file_count": 50,
+            "runtime_retention_manifest": {
+              "path": "runtime-retention-v1.json",
+              "bytes": 33554,
+              "sha256": "3f803adcbb68aca73f1ff7000873e0fd2e7136020cfe42eee2d3e28a309448f6"
+            },
+            "runtime_producer_note": "Diagnostic and ordinary Release artifacts came from the 853123e producer with seven dirty files. Full regression used the same native source bytes plus two fixture-only repairs; producer identities are not relabeled."
+          },
+          "validation": {
+            "diagnostic_release": "PASS",
+            "ordinary_release": "PASS",
+            "full_regression": {
+              "result": "PASS",
+              "tests": 2747,
+              "skipped": 192,
+              "seconds": 560.909,
+              "source_producer": "853123e30a7d941c1c367f0fa2165adfa584e131 with two fixture-only repairs",
+              "source_checkpoint": {
+                "path": "root-source-checkpoint-v1.json",
+                "bytes": 3155,
+                "sha256": "8aaeec317847f62adb0014d9e05ceaccaa140899a4c0f8ddeed72868da683f4b"
+              },
+              "log": {
+                "path": "full-regression-repaired-v1.log",
+                "bytes": 528783,
+                "sha256": "3f8bdeb118d47cab1366fc7c961d8f2f011670c007b37bbe40731cb956465ea0"
+              },
+              "fixture_repairs": "Two fixture-only fixes were applied after three initial fixture failures; failure and repair evidence remain retained."
+            },
+            "exact_head_ci": {
+              "status": "NOT_RUN",
+              "note": "Capture source 1d16d5f was unpublished when this receipt was prepared. Complete exact-head CI is required on the published successor before integration; older green heads remain historical."
+            },
+            "evidence_directory": "browser-rollback-sprint-20261022-115029-d89e262b/fresh-ready-start-validation-v1"
+          },
+          "cleanup": {
+            "native_unload_completed": true,
+            "observation_cleared": true,
+            "post_unload_phase": 0,
+            "post_unload_running": 0,
+            "post_unload_observation": null,
+            "checked_process_ids": 12,
+            "checked_process_ids_absent": 12,
+            "owner_elapsed_ms": 13271,
+            "cleanup_elapsed_ms": 92,
+            "successful_owned_scratch_removed": "The owned temporary directory was empty and removed after independent cleanup review; retained runtime and raw evidence remain."
+          },
+          "claim_limits": [
+            "The prepared VS Start snapshot matches only the declared fields; it does not execute the original VS Entry callback or prove source admission.",
+            "Prepared mode, source conditional flags and pending-next remain unpaired.",
+            "Setup, GO, C, F, GO+2, and later source behavior remain unexecuted for this continuation.",
+            "No pixel, PCM, live timing/performance, whole-session, or C3 acceptance is claimed."
+          ],
+          "next_source_plan": {
+            "path": "plan-v1.md",
+            "plan_sha256": "33a5ad36c98f98d5787bfe6cafdacbcc4e262df9ef448adf26891a36b726b843",
+            "freeze_path": "freeze-v1.json",
+            "freeze_sha256": "cdf046ddd302540a6ca1659d5c330d37aac66ea7b9f155658358a4f8bf120e1b",
+            "scope": "Source-only plan for one Fresh132 Setup-through-GO+2 milestone: bind Setup 2563; all 174 recorded actions and their 87 tick/draw pairs; the actual GO callback seed; C/F/GO+2 declared comparisons; final draw; and teardown. Preserve legacy124 and stop at the first source divergence.",
+            "authorization": "Root has authorized external source-candidate preparation and focused controls only. This does not release checkout mutation, repository builds or browser capture; a later capture requires separate review and release.",
+            "evidence_directory": "browser-rollback-sprint-20261022-115029-d89e262b/fresh-ready-start-to-go2-source-plan-v1"
+          },
+          "next": "Continue with the externally prepared source candidate and focused controls for the reviewed Fresh132 Setup-through-GO+2 plan. Checkout mutation, repository builds and follow-up browser capture remain unreleased."
         }
       }
     }

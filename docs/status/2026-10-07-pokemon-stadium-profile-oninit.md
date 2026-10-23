@@ -2,51 +2,8 @@
 
 **Compiled / Synthetic controls / Source identified / Native traced / Retail compared (first-CSS, SSS constructor, first scheduler and first draw fields, plus declared matched-Setup C/F fields) / Browser exercised (bounded SSS prefix, VS Entry, first SSS draw and Setup/C/F with checked unload) / two same-process functional lifetimes passed**
 
-**Current boundary (October 22):** The fresh original GO+2 recording is retained,
-but the first browser comparison against it failed at C, before F or GO+2.
-The countdown and seed differ; the other 14 declared fields match. Independent
-raw reduction now locates different seeds at VS Entry and completed Setup,
-with the countdown difference already present at constructor initialization.
-The recordings also contain different CSS/SSS input schedules. A same-producer
-start guard passes independent review, full regression and all 14 exact-head CI
-checks. The fresh initial CSS context now passes offline representation and
-producer-binding checks. Its private constructor-only browser probe and a separate fresh first-row
-browser diagnostic now pass their declared comparisons. The first-row capture
-and runtime/harness use `171818fd`; a test-only scoped-import fixture repair
-then passed its focused check and full regression on `1e96b2a9`. The initial
-`171818fd` suite failed in that extracted fixture and remains retained.
-The later finite-CSS implementation, focused controls and post-repair full
-regression pass at checkpoint `a1bcad29`. Its finite-CSS browser attempt failed
-before disc import; no CSS comparison occurred, and failure-path native unload
-timed out while owned-process cleanup and independent PID absence checks passed.
-A source-backed startup presentation repair on `bee850fc` passes four focused
-controls, both affected Release builds and the 2,741-test regression (191 skips,
-578.275 seconds).
-The earlier v5 no-disc readiness sample reached the enabled disc picker but
-its overall result was `PROBE_ERROR` after the unchanged 5-second screenshot
-bound; that failure is retained. A later v7 no-disc sample on `9f28c0b1`
-passed the declared readiness and screenshot checks with all 890 startup
-pipelines created, zero queued and cache idle. It remained
-`READY_TO_IMPORT_NOT_IMPORTED`. One separately admitted finite-CSS attempt on
-that runtime stopped after 11.6 seconds at the exact idle-CSS owner guard,
-before the later finite stream was armed. Its first CSS input row and entry,
-tick and draw comparisons passed; no subsequent stream rows were compared.
-Native unload completed but observation clearing did not; cleanup passed and
-the independent check found all 11 recorded process IDs absent. Failed scratch
-remains retained. The exact guard was reviewed and repaired in the two-file
-`0c39b6dd` source checkpoint. One later bounded v3 run passed 141 declared
-normal tick comparisons, 142 draw comparisons and all seven final-draw fields;
-the terminal scheduler snapshot remains unpaired. The source correction,
-50-file runtime identity and full regression are recorded below. The root-approved
-fresh SSS constructor-pair boundary has since completed: one root-admitted browser
-comparison against the original-derived expected pair passes the strict comparator.
-It stops before consumed SSS input, tick or draw. CSS exit has no original
-observation and remains unpaired. The next proposed boundary derives the first
-original consumed PAD and tick/draw rows after return from the same pinned observer;
-no follow-up run is authorized here. C3 remains open.
-The [structured receipt](../evidence/issue251-stadium-profile-oninit-v1.json),
-under `fresh_go2_comparison_2026_10_18`, records the failure, passing component
-validation and cleanup. C3 and public Stadium admission remain open.
+**Current boundary (October 23):** The earlier browser comparison against the original GO+2 recording still fails at C. A separate Fresh132 continuation now passes 132 original consumed-PAD/tick/draw groups through the SSS exit and selected-stage witness, then a read-only prepared-Start/seed comparison against original VS Entry 2523. It matches the declared 16 rule fields, 21 fields for each of four players, and seed `e2624ac3`. The single getter left ticks, draws, audio counters and the rest of the native observation unchanged; it did not execute the original Entry callback. Native unload and observation clearing passed, and all 12 checked process IDs were absent. This fresh continuation has not executed the original VS Entry callback, Setup, GO, C, F or GO+2; prepared mode, source conditional flags and pending-next remain unpaired. The screenshot showed the original Stadium Now Loading/SSS screen; no pixel comparison was made. C3, whole-session, PCM and timing/performance acceptance remain open. Diagnostic and ordinary Release builds passed. The full regression completed with 2,747 tests and 192 skips (560.909 seconds); it used the same native source bytes with two fixture-only repairs. The browser runtime came from producer `853123e` with seven dirty files; the full-regression tree had nine dirty files after those fixture-only repairs. The capture source is clean `1d16d5f`; exact-head CI remains required on the published successor. Next is external source-candidate work and focused controls for the reviewed Fresh132 Setup-through-GO+2 plan, now authorized by root. Checkout mutation, repository builds and follow-up browser capture remain unreleased.
+The [structured receipt](../evidence/issue251-stadium-profile-oninit-v1.json), under `fresh_go2_comparison_2026_10_18`, records this boundary and retains earlier failures and producer identities. C3 and public Stadium admission remain open.
 
 **Original constructor prerequisite:** A separately built original observer on `1f5994a8` (`f4c74cbe` binary) replayed the complete retained input and observed the map2 constructor owner, authored parameters and dynamic RNG pointer. The strict sequence-mapped comparator preserved every common wire field while admitting only the fully validated constructor rows. Both streams completed and owned processes retired. Exact original observations and identities are in the [existing evidence receipt](../evidence/issue251-stadium-profile-oninit-v1.json), under `original_constructor_recorded_replay_1f5994_v1`. This establishes an original constructor observation, not constructor parity, registration/generation or a lifetime. The separate first fresh original attempt failed; its repaired reader and fresh reference are recorded below. The prior constructor pass remains unchanged.
 
