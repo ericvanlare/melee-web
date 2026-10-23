@@ -17289,7 +17289,7 @@
   },
   "fresh_go2_comparison_2026_10_18": {
     "state": "ORIGINAL_GO2_REFERENCE_PASS_BROWSER_FIRST_C_COMPARISON_FAIL",
-    "next": "The bounded finite-CSS v3 comparison passes on source 0c39; the earlier idle-owner refusal and original GO+2 first-C failure remain retained. A separate fresh SSS constructor entry/return comparison now passes as recorded under fresh_css_finite_original_preparation.implementation_checkpoint_2026_10_22.fresh_sss_constructor_pair_capture_v2_2026_10_22. It stops before SSS input, tick or draw. CSS exit remains unobserved; C3 remains open.",
+    "next": "The fresh SSS constructor, consumed-PAD/tick and first-draw comparison passes as recorded under fresh_css_finite_original_preparation.implementation_checkpoint_2026_10_22.fresh_sss_first_input_tick_draw_capture_v2_2026_10_22. It stops before observer sequence 1602. CSS exit and the terminal CSS scheduler remain unpaired; SSS exit and C3 remain open. Next is a bounded source-only review of the remaining original-SSS prefix toward SSS exit at sequence 2481. The 132 observed consumes are inventory, not a cap; no follow-up run is authorized.",
     "native": {
       "binary_sha256": "4bebd3a21cf48da558c7380f45b73e394fe46f47cef774d939cd4659051918fa",
       "producer_manifest_sha256": "2da988e27c334b4530935ea32af3edc319707482e276b064e9b08c132d4cedbd",
@@ -18161,7 +18161,7 @@
       "native_or_browser_executed": false,
       "native_codec_implemented": false,
       "C3": false,
-      "next": "The fresh SSS constructor entry/return pair has one independently reviewed browser comparison recorded in implementation_checkpoint_2026_10_22.fresh_sss_constructor_pair_capture_v2_2026_10_22. The next source-only candidate is the original first post-return PAD consume and one matching SourceTick/draw, derived from the same pinned observer; no continuation is authorized by this receipt.",
+      "next": "The fresh SSS constructor-entry/return, consumed-PAD/tick and first-draw comparison passes as recorded in implementation_checkpoint_2026_10_22.fresh_sss_first_input_tick_draw_capture_v2_2026_10_22. It stops before observer sequence 1602. Next is a bounded source-only review of the remaining original-SSS prefix toward SSS exit at sequence 2481; the 132 observed remaining consumes are inventory, not an admitted cap, and no follow-up capture is authorized.",
       "exclusions": [
         "Full native source/input/tick/draw parity beyond the bounded v3 finite-CSS prefix",
         "Terminal scheduler snapshot and raw pending/next equality",
@@ -18169,7 +18169,7 @@
         "Pixel/PCM, live input, timing/performance, full-session and C3 acceptance"
       ],
       "implementation_checkpoint_2026_10_22": {
-        "state": "FINITE_CSS_V3_PREFIX_PASS; FRESH_SSS_CONSTRUCTOR_PAIR_PASS; NO_SSS_INPUT_TICK_DRAW; CSS_TERMINAL_UNPAIRED; CI_NOT_RUN_FOR_422CF",
+        "state": "FINITE_CSS_V3_PREFIX_PASS; FRESH_SSS_CONSTRUCTOR_PAIR_PASS; FRESH_SSS_INPUT_TICK_FIRST_DRAW_PASS_THROUGH_1601; CSS_EXIT_UNOBSERVED; PUBLISHED_SUCCESSOR_CI_REQUIRED; C3_OPEN",
         "evidence_labels": [
           "Source identified",
           "Compiled",
@@ -18178,7 +18178,7 @@
         ],
         "source_base": "1e96b2a93c72e3d726b47877324b652c9bc3307c",
         "application_head": "879e23d1f5f45f466d7128e01a1d18b75ca6e7c0",
-        "scope": "The reviewed finite-CSS capability passes the bounded original-CSS prefix, with the result3 terminal scheduler transition left unpaired. One separate root-admitted fresh SSS constructor entry/return pair passes its exact original comparator. It stops before SSS input, host tick or draw. Neither result establishes CSS exit, SSS continuation, whole-session, or C3 acceptance.",
+        "scope": "The current bounded evidence comprises the 142-row original CSS prefix, the fresh SSS constructor pair, one fresh consumed-PAD/source-tick pair, and the first SSS draw. The current capture stops before observer sequence 1602; CSS exit, the remaining SSS prefix, VS/GO, whole-session and C3 acceptance remain open.",
         "source_freeze": {
           "evidence": "validation-v1/first-css-finite-candidate-v4/source-freeze-v4.json",
           "bytes": 7000,
@@ -18756,11 +18756,11 @@
             "Whole-session acceptance, public Stadium admission and C3"
           ]
         },
-        "next": "Derive the first fresh post-return original PAD consume and matching tick/draw from the same pinned observer, using the existing one-shot consumed-input/tick and draw adapters. The observed original rows are PAD consume 1595, SourceTick 1599, DrawEnter 1600, DrawReturn 1601; stop before PAD poll 1602 unless a separately reviewed plan expands the boundary. Do not use legacy rows 1604/1608 from the different observer/profile. This is a source-only recommendation, not continuation or capture authorization.",
+        "next": "Next is a bounded source-only review of the remaining original-SSS prefix toward actual CSS exit. The 132 observed remaining consumes are an inventory, not an admitted cap; no follow-up capture is released.",
         "exclusions": [
-          "SSS consumed input, host tick or draw; VS/GO/GO+2 continuation",
+          "SSS source sequences 1602 onward, including the remaining input prefix and CSS exit",
           "CSS exit and terminal CSS scheduler equality",
-          "Restore or scene parity",
+          "VS Entry, Setup, GO/GO+2, restore or scene parity",
           "Pixel/PCM, physical input, timing/performance, whole-session and C3 acceptance"
         ],
         "c8a1_predecessor_ci": {
@@ -19544,7 +19544,7 @@
         "exact_head_ci_422cf": {
           "status": "NOT_RUN",
           "source_revision": "422cf0661fb30400afe9f3cdd6f7e5459b12a70d",
-          "note": "No exact-head CI result is recorded for this source revision. The final documentation checkpoint still requires its applicable CI gate."
+          "note": "No exact-head CI result is recorded for source 422cf066; this is a historical checkpoint. Current source 53630036 has its own separate CI status."
         },
         "fresh_sss_constructor_pair_capture_v2_2026_10_22": {
           "state": "PASS_SCOPED_FRESH_SSS_CONSTRUCTOR_PAIR; NO_SSS_INPUT_TICK_DRAW; CSS_EXIT_UNOBSERVED",
@@ -19893,6 +19893,411 @@
               }
             ],
             "ci": "Replacement-head CI remains required; failed head is retained, not relabeled."
+          },
+          "followup_capture": {
+            "evidence_key": "fresh_sss_first_input_tick_draw_capture_v2_2026_10_22",
+            "source_revision": "53630036b3a89425df8d966092812df39f35e163",
+            "scope": "The later capture passed one consumed PAD/tick and the first draw; it does not retroactively expand the 422 constructor-only run."
+          }
+        },
+        "latest_source_checkpoint_536": {
+          "commit": "53630036b3a89425df8d966092812df39f35e163",
+          "tree": "dd690edaca8c5d4a2a724392dadfd0038c95918a",
+          "clean_worktree": true,
+          "exact_head_ci": "NOT_RUN_FOR_UNPUBLISHED_536_CHECKPOINT",
+          "source_commit_and_tree_verified_against_live_checkout": true
+        },
+        "exact_head_ci_536": {
+          "status": "NOT_RUN",
+          "source_revision": "53630036b3a89425df8d966092812df39f35e163",
+          "note": "This 536 source checkpoint was not published; complete exact-head CI is required on the published successor before integration."
+        },
+        "fresh_sss_first_input_tick_draw_capture_v2_2026_10_22": {
+          "state": "PASS_SCOPED_FRESH_SSS_INPUT_TICK_AND_FIRST_DRAW; STOP_BEFORE_1602; CSS_EXIT_UNOBSERVED",
+          "evidence_directory": "fresh-sss-first-input-tick-draw-capture-v2",
+          "scope": "One root-admitted headless continuation from the passing fresh SSS constructor pair through one consumed original PAD input, its scheduler tick and the first SSS draw. The committed strict comparators pass the CSS prefix, constructor pair, consumed tick and draw callbacks. Stops before original observer sequence 1602; no CSS exit, VS/GO or C3 claim.",
+          "prior_failed_capture_v1": {
+            "state": "RETAINED_FAILED_FIRST_DRAW_ATTEMPT; NO_DRAW_BOUNDARY_OBSERVED",
+            "evidence_directory": "fresh-sss-first-input-tick-draw-capture-v1",
+            "source_revision": "706198cdf7472f27b2ecad9a682eee63c56e2782",
+            "source_tree": "baefa86e430cf4f68376a355ee298af3a8603dde",
+            "raw_report": {
+              "path": "fresh-sss-first-input-tick-draw-capture-v1/browser-run/report.json",
+              "bytes": 1962628,
+              "sha256": "2c4879b89094ffa45a2b9e1c6a621a3833ec29665eb411ae5f12df8f35d4f1c2"
+            },
+            "packet": {
+              "path": "fresh-sss-first-input-tick-draw-capture-v1/packet-v1.json",
+              "bytes": 22830,
+              "sha256": "cf0043c178ac8a52678225b5e4ace0a8af0e48ded6002f996cb2f6d07a76417d"
+            },
+            "preflight": {
+              "path": "fresh-sss-first-input-tick-draw-capture-v1/preflight.json",
+              "bytes": 39733,
+              "sha256": "77d6f7f75ace033ce0b4bc163e131c48ffdebf9a9abcdf2b9136a912f478bbe0"
+            },
+            "runtime_retention": {
+              "path": "fresh-sss-first-input-tick-draw-capture-v1/runtime-retention-v1.json",
+              "bytes": 40282,
+              "sha256": "f68530f8db0cecdf643edbe51305b86db02ded5016b9d01901584b16d57c1026"
+            },
+            "failed_wait": "Error: First SSS draw result or retained mismatch exceeded 10000 ms",
+            "independent_replay": {
+              "result": "PASS_STRICT_COMPARATORS_REPLAYED_UP_TO_CONSUMED_TICK; DRAW_BOUNDARY_UNOBSERVED",
+              "artifact": {
+                "path": "fresh-sss-first-input-tick-draw-capture-v1/independent-replay-v2/result.json",
+                "bytes": 4351,
+                "sha256": "88399c90b493af52fae2b6fbb1f5dc7aa9ab5f16569e07f427b688f5ae2c7d59"
+              },
+              "replay_log": {
+                "path": "fresh-sss-first-input-tick-draw-capture-v1/independent-replay-v2/run-v2.log",
+                "bytes": 3626,
+                "sha256": "adb0a353f7c717a915c791cd3d1bdae685c8f426b0a07e02c67e4d68b54ca124"
+              },
+              "scope": "CSS prefix, SSS constructor pair and consumed-PAD tick comparisons passed; first-draw boundary remained unobserved."
+            },
+            "owned_process_check": {
+              "path": "fresh-sss-first-input-tick-draw-capture-v1/root-owned-process-check-v1.json",
+              "bytes": 1231,
+              "sha256": "ce1c364c9c5ded3e1a62238051752d50093c5d0a19d0b5bae918e77d0981fe22"
+            },
+            "owned_processes_absent": true,
+            "limitation": "This failure is retained as a separate producer and does not establish a failed source draw or pixel result."
+          },
+          "capture": {
+            "packet": {
+              "path": "fresh-sss-first-input-tick-draw-capture-v2/packet-v1.json",
+              "bytes": 26615,
+              "sha256": "25a1c6b05f9ded1dfc5d9cb7c093f9e015d61ec5b1caa774c20111c1eaf2eefe"
+            },
+            "preflight": {
+              "path": "fresh-sss-first-input-tick-draw-capture-v2/preflight.json",
+              "bytes": 39187,
+              "sha256": "2bdb53c1bd0621897a4f3bd7779ed28ed17c124c97a0f372e280a42d63621bad"
+            },
+            "capture_command": {
+              "path": "fresh-sss-first-input-tick-draw-capture-v2/capture-command-proposal-v1.json",
+              "bytes": 5143,
+              "sha256": "dc7ccbc7a9f59f5e1b598151b56bac1b12c51a0ffe534d2214f2ab5e36b8b207"
+            },
+            "raw_report": {
+              "path": "fresh-sss-first-input-tick-draw-capture-v2/browser-run/report.json",
+              "bytes": 1131732,
+              "sha256": "8c270c3fcc6947f352570f11fa6a3b7ab9c1eca862ff13800654a4522b53cb99"
+            },
+            "owner": {
+              "path": "fresh-sss-first-input-tick-draw-capture-v2/owner.json",
+              "bytes": 91170,
+              "sha256": "4b341b12f738c44754fc679885eb7fe92420eff34140fa7dfe3fe578d886600f"
+            },
+            "root_observation": {
+              "path": "fresh-sss-first-input-tick-draw-capture-v2/root-observed-v1.json",
+              "bytes": 1843,
+              "sha256": "62bb2693f1afba06f424a83b2659a096982dff521c1e435293fa40ff69d10da5"
+            },
+            "root_release": {
+              "path": "fresh-sss-first-input-tick-draw-capture-v2/root-release-v1.json",
+              "bytes": 1110,
+              "sha256": "1c5d9198650ea7e6708b1a8612a34037a77e28c270ec1a5f3242648e7749dcac"
+            },
+            "root_process_absence": {
+              "path": "fresh-sss-first-input-tick-draw-capture-v2/root-owned-process-check-v1.json",
+              "bytes": 1540,
+              "sha256": "c94f022ec271b52824cda4112fea5d0e8ad8f18f03d61cf11d0b5ec1514ef77a"
+            },
+            "runtime_input_inventory": {
+              "path": "fresh-sss-first-input-tick-draw-capture-v2/runtime-input-v1.json",
+              "bytes": 21611,
+              "sha256": "83e5bfa33944df79578d67214107d0c5a7ad647011c31822a1bc8257f1a1e3e9"
+            },
+            "runtime_retention": {
+              "path": "fresh-sss-first-input-tick-draw-capture-v2/runtime-retention-v1.json",
+              "bytes": 39456,
+              "sha256": "b89b1ca75ecc4388c0764007d012bd951800acec96628829e8a16b85e57dd055"
+            },
+            "final_screenshot": {
+              "path": "fresh-sss-first-input-tick-draw-capture-v2/browser-run/stadium-first-sss-draw-final.png",
+              "bytes": 383100,
+              "sha256": "5496dc7438155b63da9f4c72acc24d6db55c126615a5f772ba7a2159357d9e3e"
+            },
+            "expected_pair_fixture_sha256": "d6949ad5577d2b594e5d098f030d763f36da761f2171b2b1b629e35ab75cf451",
+            "expected_tick_fixture_sha256": "15e49d5a9f6d810936faef6f6ae7ff6aa1603362516f13624ce460d089c21259",
+            "expected_draw_fixture_sha256": "94e64043c4d62bddb6060568efbaeead703a9b06db87214967ba44d5c1af5d28",
+            "input_bundle_sha256": "12a41afcbddbe06633ad07c3a925b747fa69032b03c34c1bad531d0a59ccf80a"
+          },
+          "observed_boundaries": {
+            "css_prefix": {
+              "literal_rows": 142,
+              "literal_input_bytes": 6248,
+              "normal_tick_comparisons": 140,
+              "normal_draw_comparisons": 140,
+              "separate_final_pending_draw": "PASS",
+              "terminal_result3_transition": "UNPAIRED"
+            },
+            "constructor_pair": {
+              "entry_sequence": 1570,
+              "return_sequence": 1594,
+              "strict_comparator": "PASS",
+              "sss_host_ticks": 0,
+              "sss_host_draws": 0
+            },
+            "consumed_input_and_tick": {
+              "pad_consume_sequence": 1595,
+              "scheduler_end_sequence": 1599,
+              "strict_comparator": "PASS",
+              "one_host_tick": true,
+              "post_host_frame": 1
+            },
+            "first_draw": {
+              "draw_enter_sequence": 1600,
+              "draw_return_sequence": 1601,
+              "strict_callbacks": 2,
+              "strict_comparator": "PASS",
+              "host_draw_calls": 1,
+              "host_ticks_during_draw": 0,
+              "inputs_during_draw": 0,
+              "aurora_begin_calls": 1,
+              "aurora_end_calls": 1,
+              "frame_end_returned": true
+            },
+            "terminal": {
+              "exclusive_stop_before_sequence": 1602,
+              "native_phase": 3,
+              "running": 0,
+              "no_source_sequence_1602_or_later": true
+            }
+          },
+          "strict_independent_replay": {
+            "result": "PASS_STRICT_FINITE_CSS_CONSTRUCTOR_CONSUMED_TICK_AND_FIRST_DRAW_ONLY",
+            "review_result": "PASS_SCOPED_COMMITTED_COMPARATOR_REPLAY_ONLY",
+            "artifacts": {
+              "review": {
+                "path": "fresh-sss-first-input-tick-draw-capture-v2/independent-replay-v1/review-v1.json",
+                "bytes": 3910,
+                "sha256": "f81bd546a13a7ef8859efee37fa5a2fd25a428fe93b896f4f011a53c8fd075f2"
+              },
+              "result": {
+                "path": "fresh-sss-first-input-tick-draw-capture-v2/independent-replay-v1/result.json",
+                "bytes": 3038,
+                "sha256": "f00e3087210aa1651ae7cda2d997793859e9263b7c8b81deeed06a925bf8c9e2"
+              },
+              "script": {
+                "path": "fresh-sss-first-input-tick-draw-capture-v2/independent-replay-v1/replay.mjs",
+                "bytes": 19754,
+                "sha256": "9f35347a139f61d41eeb980d58988dc9cdef54dbeb648ccff223a325ba25e8b3"
+              },
+              "raw_scope": {
+                "path": "fresh-sss-first-input-tick-draw-capture-v2/independent-replay-v1/raw-scope.json",
+                "bytes": 45963,
+                "sha256": "7a9e44e714617a38b6e4335bebf2ea249281aa6b7e3051edf070f2c24ce8bbb3"
+              },
+              "freeze": {
+                "path": "fresh-sss-first-input-tick-draw-capture-v2/independent-replay-v1/freeze-v1.json",
+                "bytes": 3506,
+                "sha256": "4c44843f6a3866660e55e34d0b370de5fe04f98f8322b1ae6685d5e35722f8fe"
+              },
+              "replay_log": {
+                "path": "fresh-sss-first-input-tick-draw-capture-v2/independent-replay-v1/replay.log",
+                "bytes": 2510,
+                "sha256": "50acee5a0aec79e48af053446cc583320231d90706b5a06d7f27291f1fb68643"
+              },
+              "strict_comparator_sha256": "a15a60eaabb69a69d4956241b046a838d6370d1f4a191c4b565a1eadb780dab1",
+              "finite_receipt_sha256": "5052af6e667270e2782a9d3cc52d6a149a1ed3e40235fd97b3993914c0f62548",
+              "finite_descriptor_sha256": "913b02b5312cdd3608db418a8faf07ad25403e2c90ba1169c08abb7fb9b3d147",
+              "literal_rows_sha256": "58ad1f136f96573c78e875c769b568f23323d105f39d6887e29439b04b6fefbf",
+              "finite_expected_host_sha256": "ffad510575455253ae0e2a7af5a946a9f5dc76b7b88ad189702820d9a4a28955"
+            },
+            "post_initial_css_tick_draw_pairs": 140,
+            "separate_final_css_draw": "PASS",
+            "audio_render_counter_delta": 0,
+            "audio_frame_counter_delta": 0,
+            "audio_phase_unchanged": true
+          },
+          "source_and_build_identity": {
+            "commit": "53630036b3a89425df8d966092812df39f35e163",
+            "tree": "dd690edaca8c5d4a2a724392dadfd0038c95918a",
+            "clean_worktree": true,
+            "changed_files": [
+              "src/gameplay_menu_browser.cpp",
+              "tests/first_sss_pair_native_control.py",
+              "tests/stadium_c1a_browser_test.mjs",
+              "tests/test_stadium_fresh_css_row_controls.py"
+            ],
+            "file_pins": [
+              {
+                "path": "src/gameplay_menu_browser.cpp",
+                "bytes": 410815,
+                "sha256": "25d55bbd0dda6f3bd13c7262652f18046e7973518d34d2257082f506c382a2e4"
+              },
+              {
+                "path": "tests/first_sss_pair_native_control.py",
+                "bytes": 23627,
+                "sha256": "0b6ece0de92239b6369cce5c840a3db40c67a1cfb1e9de2f80b98e8c61689de3"
+              },
+              {
+                "path": "tests/stadium_c1a_browser_test.mjs",
+                "bytes": 361828,
+                "sha256": "221e4956ecb8d8357bc9d547c6a320ba3d9751e33e692753646469ebc8861326"
+              },
+              {
+                "path": "tests/test_stadium_fresh_css_row_controls.py",
+                "bytes": 31492,
+                "sha256": "7af2795701fb9eeb8db4314839eea95dc71405ca02f31741b791d8cb09a6a780"
+              }
+            ],
+            "build_head": "706198cdf7472f27b2ecad9a682eee63c56e2782",
+            "build_worktree_dirty": true,
+            "reviewed_dirty_patch_sha256": "58b6430c2fbf7ba5bdd83f331068c9c9ff0e2ca069a1c5e679464ba3136cc106",
+            "build_file_pins": [
+              {
+                "path": "src/gameplay_menu_browser.cpp",
+                "bytes": 410815,
+                "sha256": "25d55bbd0dda6f3bd13c7262652f18046e7973518d34d2257082f506c382a2e4"
+              },
+              {
+                "path": "tests/first_sss_pair_native_control.py",
+                "bytes": 23627,
+                "sha256": "0b6ece0de92239b6369cce5c840a3db40c67a1cfb1e9de2f80b98e8c61689de3"
+              },
+              {
+                "path": "tests/stadium_c1a_browser_test.mjs",
+                "bytes": 361828,
+                "sha256": "221e4956ecb8d8357bc9d547c6a320ba3d9751e33e692753646469ebc8861326"
+              },
+              {
+                "path": "tests/test_stadium_fresh_css_row_controls.py",
+                "bytes": 31492,
+                "sha256": "7af2795701fb9eeb8db4314839eea95dc71405ca02f31741b791d8cb09a6a780"
+              }
+            ],
+            "identity_note": "Both Release builds and the full regression ran at dirty pre-commit 706198cdf7472f27b2ecad9a682eee63c56e2782 with the exact four reviewed dispatch files; clean commit 53630036 records those same bytes, while build metadata retains the dirty source identity.",
+            "runtime_inventory": {
+              "path": "fresh-sss-draw-dispatch-integration-v1/runtime-inventory-v1.json",
+              "bytes": 21611,
+              "sha256": "83e5bfa33944df79578d67214107d0c5a7ad647011c31822a1bc8257f1a1e3e9"
+            },
+            "runtime_files": 50
+          },
+          "integration": {
+            "receipt": {
+              "path": "fresh-sss-draw-dispatch-integration-v1/integration-result-v1.json",
+              "bytes": 10551,
+              "sha256": "11f83f6d79d9c5759e1158177ed8e5a339421ff405b50b394af925534aade712"
+            },
+            "diagnostic_release": {
+              "exit_code": 0,
+              "log": {
+                "path": "stadium-draw-dispatch-validation-20261022-212535-a3dc9990/diagnostic-release.log",
+                "bytes": 206390,
+                "sha256": "9cdcbc2734f80bf24882f878c7625b4de1f9eed52c04485cd52032da6881cfba"
+              },
+              "started": "2026-10-23T04:26:12.698791+00:00",
+              "finished": "2026-10-23T04:26:35.409482+00:00"
+            },
+            "ordinary_release": {
+              "exit_code": 0,
+              "log": {
+                "path": "stadium-draw-dispatch-validation-20261022-212535-a3dc9990/ordinary-release.log",
+                "bytes": 206367,
+                "sha256": "e39e558b5a79cdf7b4b765f5dbcb5457c64098136e0f2a8e40e5895da3956fd7"
+              },
+              "started": "2026-10-23T04:26:35.409937+00:00",
+              "finished": "2026-10-23T04:26:55.686812+00:00"
+            },
+            "full_regression": {
+              "result": "PASS",
+              "exit_code": 0,
+              "outer_tests": 2743,
+              "passed": 2552,
+              "skipped": 191,
+              "duration_seconds": 578.554,
+              "log": {
+                "path": "stadium-draw-dispatch-validation-20261022-212535-a3dc9990/full-regression.log",
+                "bytes": 527763,
+                "sha256": "3bccaed6379fc65b46ba58ffa0818eadf248cf305a7018d0338ad0f913fef569"
+              }
+            },
+            "optional_original_controls": {
+              "receipt": {
+                "path": "stadium-draw-dispatch-validation-20261022-212535-a3dc9990/retained-original-focused-result.json",
+                "bytes": 934,
+                "sha256": "6c7e8f07dcafa1f92b976df10b92461243610539f5a85108664549b7b6eca2fe"
+              },
+              "result": {
+                "schema": "stadium-retained-original-dispatch-focused-v1",
+                "exit_code": 0,
+                "command": [
+                  "python3",
+                  "-m",
+                  "unittest",
+                  "-v",
+                  "test_stadium_finite_css_controls.FiniteCssControls.test_retained_original_loader_comparator_and_queued_stages",
+                  "test_stadium_finite_css_controls.FiniteCssControls.test_retained_original_real_sdk_finite_decoder"
+                ],
+                "at": "2026-10-23T04:37:55.356009+00:00",
+                "owned_empty_tmp_removed": true
+              },
+              "checks": 2,
+              "duration_seconds": 1.064,
+              "log": {
+                "path": "stadium-draw-dispatch-validation-20261022-212535-a3dc9990/retained-original-focused.log",
+                "bytes": 950,
+                "sha256": "9cf06d2ca9ba566dcf078aef32a4d462f764aabfa5f126af37de55fac3bd6c38"
+              },
+              "scope": "Two optional retained-original checks; separate from unittest discovery and its 191 skipped tests."
+            },
+            "exact_head_ci": {
+              "status": "NOT_RUN_ON_536_CHECKPOINT",
+              "source_revision": "53630036b3a89425df8d966092812df39f35e163",
+              "required_gate": "Complete exact-head CI on the published successor before integration; older green heads remain historical."
+            }
+          },
+          "cleanup": {
+            "capture_result": "pass",
+            "elapsed_ms": 9861,
+            "cleanup_ms": 86,
+            "native_unload_completed": true,
+            "observation_cleared": true,
+            "post_unload_phase": 0,
+            "post_unload_running": 0,
+            "post_unload_observation": null,
+            "owned_recorded_pids_absent": 12,
+            "process_check": {
+              "path": "fresh-sss-first-input-tick-draw-capture-v2/root-owned-process-check-v1.json",
+              "bytes": 1540,
+              "sha256": "c94f022ec271b52824cda4112fea5d0e8ad8f18f03d61cf11d0b5ec1514ef77a"
+            },
+            "successful_owned_tmp_removed": [],
+            "page_errors": [],
+            "console_errors": [],
+            "external_http_requests": []
+          },
+          "visual_observation": "The retained final screenshot shows the initial SSS background. It is retained as diagnostic evidence and is not a pixel comparison.",
+          "browser_diagnostics": {
+            "gpu": {
+              "cross_origin_isolated": true,
+              "webgpu_api": true,
+              "adapter_available": true,
+              "failure": null,
+              "canvas": [
+                640,
+                480
+              ]
+            },
+            "external_http_requests": [],
+            "page_errors": [],
+            "console_errors": []
+          },
+          "claim_limits": [
+            "CSS exit and the terminal scheduler transition remain unobserved or unpaired.",
+            "No source sequence 1602 onward, remaining SSS input prefix through SSS exit at sequence 2481, VS Entry, Setup, GO, whole-session comparison, or C3 acceptance.",
+            "No pixel, PCM, audio-continuity, live-timing, physical-input or performance acceptance.",
+            "The zero audio-counter delta is a counter observation only.",
+            "The full regression and both Release builds are pinned to the exact reviewed four-file bytes, built before clean commit 53630036; complete exact-head CI is required on the published successor before integration."
+          ],
+          "next": {
+            "classification": "SOURCE_ONLY_REVIEW_PENDING; NO_FOLLOWUP_CAPTURE_AUTHORIZED",
+            "summary": "Next is a bounded source-only review of the remaining original-SSS prefix toward SSS exit at sequence 2481. The 132 observed remaining consumes are an inventory, not an admitted cap; no follow-up capture is released."
           }
         }
       }

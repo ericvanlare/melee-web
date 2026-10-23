@@ -2080,7 +2080,9 @@ run belongs to predecessor c8a1. The structured receipt records these pins and
 limits. No SSS, VS/GO continuation, whole-session or C3 acceptance follows.
 
 
-**Fresh SSS constructor pair (October 22):** One root-admitted headless run on
+**Fresh SSS constructor, input, tick and first draw (October 22):**
+
+The earlier root-admitted run on
 source checkpoint `422cf066` compared the original SSS constructor entry at
 sequence 1570 and return at 1594 against the pinned expected pair, and the exact
 comparator passed. It followed the 142-row, 6,248-byte original CSS prefix: one
@@ -2097,8 +2099,7 @@ full regression passed 2,743 tests with 189 skips in 563.434 seconds. The clean
 source commit is `422cf066`; the binaries were built at `b8d0c49e` with the exact
 reviewed four-file patch applied in a dirty worktree. The final source commit
 added two test-extraction files after those builds, and it does not relabel the
-binary build identity. Exact-head CI was not run for `422cf066`; the final documentation checkpoint
-still requires its applicable CI gate.
+binary build identity. Exact-head CI was not run for `422cf066`.
 
 Retained failure trail: the first constructor-pair capture (v1) failed after the
 CSS prefix when the post-kick terminal callback re-entered the strict CSS live-owner
@@ -2116,16 +2117,29 @@ two long PAD-state hex fixtures. Independent content review traced every blob to
 the pinned observer and source layout: controller state, the rules/four-player
 prefix, and a current music-path buffer. Exact-file-hash policy exceptions retain
 the unchanged byte comparisons; no checker or runtime behavior changes. The failed
-CI log and content review remain in the same structured receipt. Replacement-head
-CI is required before integration.
+CI log and content review remain in the same structured receipt.
 
-The next source-only candidate uses the same original observer (`4fd54b4a…`):
-PAD consume 1595, SourceTick 1599, DrawEnter 1600 and DrawReturn 1601, then stops
-before the next PAD poll at 1602. Reuse the existing one-shot consumed-PAD/tick
-and draw adapters with expectations derived from these fresh records. Legacy
-extractor rows 1604/1608 belong to a different observer profile and are not
-interchangeable. A focused source comparison and separate review are needed before
-any input/tick/draw continuation is admitted.
+The first input/tick/draw attempt used source producer `706198cd` and timed out at its first-draw
+wait. Independent replay passed the CSS prefix, constructor pair and consumed-PAD tick only; it did
+not observe the draw boundary. That failed report and its distinct producer/runtime pins remain
+retained. The later run on clean source `53630036` passed the same CSS prefix, constructor pair, PAD
+consume 1595, scheduler tick 1599 and DrawEnter/DrawReturn 1600/1601 against the pinned original
+records. It stopped before observer sequence 1602. The two runs remain separate evidence; the later
+pass does not relabel the earlier failure.
+
+Both Release builds and the full regression passed for the exact four reviewed source-file bytes
+later committed at `53630036` (tree `dd690ed`). The builds and regression ran at dirty pre-commit
+`706198cd` with the reviewed patch; the clean commit records those same four files. The full suite
+reported 2,743 tests: 2,552 passed and 191 skipped in 578.554 seconds. Two optional retained-
+original controls passed separately (2 tests, 1.064 seconds); their result is separate from the
+full-suite skips. Runtime output hashes and the dirty-build identity are in the structured receipt.
+Complete exact-head CI is required on the published successor before integration; older green heads
+remain historical.
+
+The retained first-draw screenshot shows the initial SSS background and is not a pixel comparison.
+CSS exit, the remaining SSS prefix, VS/GO, whole-session agreement, C3, PCM, live timing and
+physical-input acceptance remain open. Next: source-only review of the remaining 132 observed SSS
+inputs toward SSS exit at sequence 2481; the count is inventory, not an admitted cap, and no capture is released.
 
 
 
