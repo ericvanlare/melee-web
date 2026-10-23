@@ -9,7 +9,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {createFirstCssStreamComparator, createFirstCssFinalDrawComparator,
   createFirstSssConstructorPairComparator, createFirstSssConsumedPadTickComparator,
   createFirstSssDrawComparator, createFirstSssPrefixComparator, createFirstSssVsEntryComparator,
-  createFirstSssVsSetupComparator,
+  createFirstSssVsSetupComparator, createFreshSss132ReadyStartComparator, validateFreshSss132ReadyStartExpectedSource,
   decodeFirstSssPrefixInputBundle, decodeFreshSssPrefix132InputBundle,
   createFreshSssPrefix132Comparator, validateFreshSssPrefix132ExpectedSource, firstSssAudioAccounting,
   requestSynchronousApproval, validateFirstSssConsumedTickExpectedSource,
@@ -1707,4 +1707,81 @@ test('portable synthetic fresh132 codec enforces fixed envelope/order and legacy
  }
  const badOrder=new Uint8Array(wire);new DataView(badOrder.buffer).setUint32(48+60,1600,false);
  assert.throws(()=>decodeFreshSssPrefix132InputBundle(badOrder));
+});
+
+// Portable synthetic expectations test field mapping and refusal paths only.
+function fresh132ReadyExpectedFixture(){
+ const e=vsEntryExpectedFixture();
+ e.schema='melee-web-stadium-fresh-sss-132-ready-start-endpoint';
+ e.scope='prepared match Start and seed compared to original Entry2523 declared fields only; Entry callback not executed';
+ Object.assign(e.provenance,{observer_bytes:4479614,observer_sha256:'4fd54b4aa9537292295ad83fbb75655f8213a475a876fdd1468affb68d3d211f',observer_status_bytes:551,observer_status_sha256:'dfb3b6b4dbf5135be918dfd21d44c650c09da777f69aa2dfc244ed2c00896f6a',sequence:2523,source_tick:133});
+ Object.assign(e.source_entry,{sequence:2523,source_tick:133,random_seed_hex:'e2624ac3'});
+ e.source_entry.source_slices_hex['20:0']='e2624ac3';e.expected.random_seed_hex='e2624ac3';return e;
+}
+function fresh132ReadyPrefixFixture(){
+ const p=vsEntryPrefixFixture();
+ Object.assign(p,{armed:true,kicked:true,attempted:true,captured:true,compared:true,selected_stage_captured:true,input_index:132,consumed_inputs:132,host_tick_calls:132,host_draw_calls:132,matched_ticks:132,matched_draw_enters:132,matched_draw_returns:132,aurora_begin_calls:132,aurora_end_calls:132,frame_end_returned:true,audio_render_calls_after:282,audio_render_frames_after:150400,audio_phase_after:0});return p;
+}
+function fresh132ReadyActualFixture(e=fresh132ReadyExpectedFixture(),p=fresh132ReadyPrefixFixture()){
+ const a=vsEntryActualFixture(e);a.actual.random_seed_hex=e.expected.random_seed_hex;
+ for(const key of ['audio_render_calls','audio_render_frames','audio_phase'])a[key+'_before']=a[key+'_after']=p[key+'_after'];return a;
+}
+test('portable fresh132 prepared Start snapshot shares strict mapper and remains one-use',()=>{
+ const e=fresh132ReadyExpectedFixture(),p=fresh132ReadyPrefixFixture(),a=fresh132ReadyActualFixture(e,p);
+ const c=createFreshSss132ReadyStartComparator(e,p);assert.equal(c.compare(a),true);assert.equal(c.compare(a),false);
+ for(const mutate of [x=>x.actual.random_seed_hex='00000000',x=>x.actual.start.rules.stage_kind++,x=>x.actual.start.players[0].stocks++,x=>x.getter_calls=2,x=>x.audio_render_calls_after++,x=>x.captured=false]){
+  const x=structuredClone(a);mutate(x);const c=createFreshSss132ReadyStartComparator(e,p);assert.equal(c.compare(x),false);assert.equal(c.compare(a),false);
+ }
+ for(const key of ['armed','kicked','attempted','captured','compared','complete','frame_end_returned','selected_stage_captured']){
+  const x=structuredClone(p);x[key]=false;assert.throws(()=>createFreshSss132ReadyStartComparator(e,x));
+ }
+ for(const key of ['input_index','consumed_inputs','host_tick_calls','host_draw_calls','matched_ticks','matched_draw_enters','matched_draw_returns','aurora_begin_calls','aurora_end_calls']){
+  const x=structuredClone(p);x[key]=131;assert.throws(()=>createFreshSss132ReadyStartComparator(e,x));
+ }
+ assert.throws(()=>createFirstSssVsEntryComparator(e,p));assert.throws(()=>createFreshSss132ReadyStartComparator(vsEntryExpectedFixture(),p));
+});
+test('portable fresh132 ready Start exact original identity refuses legacy and altered source',()=>{
+ for(const mutate of [e=>e.provenance.sequence=2468,e=>e.provenance.source_tick=125,e=>e.source_entry.source_tick=125,e=>e.provenance.observer_bytes++,e=>e.expected.random_seed_hex='3bb84c53',e=>e.source_entry.source_slices_hex['19:0']='804d5f94']){
+  const e=fresh132ReadyExpectedFixture();mutate(e);assert.throws(()=>validateFreshSss132ReadyStartExpectedSource(e));
+ }
+});
+test('portable fresh132 ready Start CLI is a separate fixed route, legacy VS stays refused',()=>{
+ const args=['--first-css-fresh-finite','--first-css-finite-receipt','receipt.json','--first-css-constructor-manifest','manifest.json','--first-sss-fresh-ready-start','--first-sss-fresh-ready-start-expected','entry.json','--first-sss-pair-expected','pair.json','--first-sss-tick-expected','tick.json','--first-sss-tick-input','tick.bin','--first-sss-draw-expected','draw.json','--first-sss-prefix-expected','prefix.json','--first-sss-prefix-input','prefix.bin'];
+ const run=a=>spawnSync(process.execPath,[path.join(testDirectory,'stadium_c1a_browser_test.mjs'),...a],{encoding:'utf8',timeout:10000});
+ assert.match(run(args).stderr,/Missing --build/);
+ for(const conflict of ['--first-sss-fresh-prefix-132','--first-sss-prefix','--first-sss-vs-entry','--first-sss-vs-setup'])assert.match(run([...args,conflict]).stderr,/Fresh132/);
+ assert.match(run(args.filter(x=>!['--first-sss-fresh-ready-start-expected','entry.json'].includes(x))).stderr,/separate exact route/);
+});
+const freshReadyOriginalPath=process.env.MELEE_WEB_STADIUM_FRESH_READY_START_EXPECTED;
+test('optional original2523 prepared Start expected descriptor is exact fresh source', {skip:!freshReadyOriginalPath?'optional original2523 descriptor not supplied; portable field/guard controls still run':false},async()=>{
+ const e=JSON.parse(await fs.readFile(freshReadyOriginalPath,'utf8'));validateFreshSss132ReadyStartExpectedSource(e);
+ const p=fresh132ReadyPrefixFixture(),c=createFreshSss132ReadyStartComparator(e,p);assert.equal(c.compare(fresh132ReadyActualFixture(e,p)),true);
+ assert.equal(e.expected.start.rules.stage_kind,3);assert.equal(e.expected.start.players[0].ckind,8);assert.equal(e.expected.start.players[1].ckind,8);
+});
+
+test('actual fresh132 approval hook requires exactly398 compared rows',async()=>{
+ const source=await fs.readFile(path.join(testDirectory,'stadium_c1a_browser_test.mjs'),'utf8');
+ const start=source.indexOf('globalThis[name] = () => {',source.indexOf('async function runFirstSssVsEntry('));
+ const hook=source.slice(start,source.indexOf('\n    };',start)+7);
+ const name='__freshApprovalControl',old=globalThis.__meleeWebStadiumFirstSssPrefixRead;
+ const install=new Function('fresh','name',hook);
+ try{
+  let status={hook_error:null,status:{approved:true,failed:false,attempted:398,first_mismatch:null},rows:Array.from({length:398},()=>({approved:true}))};
+  globalThis.__meleeWebStadiumFirstSssPrefixRead=()=>status;install(true,name);assert.equal(globalThis[name](),true);
+  for(const mutate of [x=>x.status.attempted=397,x=>x.status.attempted=399,x=>x.rows.pop(),x=>x.rows.push({approved:true}),x=>x.rows[131].approved=false,x=>x.hook_error='failure',x=>x.status.first_mismatch={},x=>x.status.failed=true]){
+   const save=status;status=structuredClone(save);mutate(status);assert.equal(globalThis[name](),false);status=save;
+  }
+  install(false,name);assert.equal(globalThis[name](),false);
+ }finally{delete globalThis[name];globalThis.__meleeWebStadiumFirstSssPrefixRead=old;}
+});
+test('actual fresh132 loader requires exact fresh export and paired original source/status',async()=>{
+ const source=await fs.readFile(path.join(testDirectory,'stadium_c1a_browser_test.mjs'),'utf8');
+ const declaration=source.match(/async function loadFreshSss132ReadyStartInputs\(\) \{[\s\S]*?\n\}/)[0];
+ const e=fresh132ReadyExpectedFixture(),helperPath=new URL('./stadium_first_css_stream_compare.mjs',import.meta.url).pathname;
+ const binding={diagnostic_export:'_melee_web_native_menu_stadium_fresh_sss_132_ready_start_kick',expected_state_host_only:true};
+ const run=async(b=binding,p=e.provenance)=>new Function('assert','loadBoundFirstSssExpected','pathToFileURL','preflight','firstSssPrefixInputs','firstSssConstructorPairInputs',`${declaration};return loadFreshSss132ReadyStartInputs;`)(assert,async()=>({expected:e,helperPath}),pathToFileURL,{first_sss_fresh_ready_start:b},{expected:{observer:{sha256:e.provenance.observer_sha256,bytes:e.provenance.observer_bytes}}},{expected:{provenance:p}})();
+ assert.equal((await run()).expected,e);
+ await assert.rejects(run({...binding,diagnostic_export:'_melee_web_native_menu_stadium_first_sss_vs_entry_kick'}));
+ await assert.rejects(run({...binding,expected_state_host_only:false}));
+ await assert.rejects(run(binding,{...e.provenance,observer_status_sha256:'00'.repeat(32)}));
 });

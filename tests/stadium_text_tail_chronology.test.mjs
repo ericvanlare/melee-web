@@ -66,6 +66,7 @@ async function exerciseCleanup({unloadAttemptedInitially, unloadCompletedInitial
     firstSssDraw: false,
     firstSssPrefix: false,
     firstSssVsEntry: false,
+    firstSssFreshReadyStart: false,
     firstSssVsSetup: true,
     firstSssVsSetupCf: false,
     firstSssVsSetupTextTail: true,

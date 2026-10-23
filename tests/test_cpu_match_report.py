@@ -225,14 +225,14 @@ def _checker_fakes(captures, *, winner_b=1, winners_b=None,
         return value
 
     def load_observation(_path, _capture=None):
-        if "browser" in str(_path):
+        if Path(_path).parent.name == "browser":
             return types.SimpleNamespace(
                 sha256="p" * 64,
                 draws=[{} for _ in range(browser_draws)],
                 end={"result": {"outcome": 2, "winners": [1]},
                      "remaining_fighter_slots": []},
             )
-        if published_winners_b == [1] or "run-b" not in str(_path):
+        if published_winners_b == [1] or Path(_path).parent.parent.name != "run-b":
             return observation
         return types.SimpleNamespace(
             sha256="q" * 64,
@@ -381,7 +381,7 @@ class CpuMatchReportTests(unittest.TestCase):
         for declared_draws, observed_draws in ((1, 1), (2, 1)):
             with self.subTest(declared_draws=declared_draws,
                               observed_draws=observed_draws), tempfile.TemporaryDirectory(
-                                  prefix="cpu-source-clock-draws-") as directory:
+                                  prefix="browser-run-b-cpu-source-clock-draws-") as directory:
                 root = Path(directory)
                 manifest, plan_sha, _ = _write_manifest(root)
                 browser_report = root / 'browser' / 'retail-browser-report.json'
@@ -534,7 +534,7 @@ class CpuMatchReportTests(unittest.TestCase):
         self.assertIn("disc identities differ", result["checks"]["disc_identity"]["error"])
 
     def test_tied_published_winners_are_incomplete_reference_evidence(self):
-        with tempfile.TemporaryDirectory(prefix="cpu-match-report-") as directory:
+        with tempfile.TemporaryDirectory(prefix="browser-run-b-cpu-match-report-") as directory:
             root = Path(directory)
             manifest, plan_sha, _ = _write_manifest(root)
             captures = _fake_captures(root, plan_sha)

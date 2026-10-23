@@ -34,7 +34,7 @@
     {
       "path": "tests/stadium_first_css_stream_compare.mjs",
       "rule": "encoded_payload",
-      "sha256": "ed4e6748f9325865af8aaf219df2bbc0daee36f4acce8b6c4c5d9225790d93a6",
+      "sha256": "ba6ae131483f849a2c64fd91104944da5c99c56fa005199202e95ff6063bb24e",
       "reason": "Exact comparator constants duplicate the fixture\u2019s independently hash-pinned source runtime slices at original observer sequences 1570 and 1594. The long values are PAD state, the 0xf0 CSSData.vs.start prefix (not the unobserved slots 4\u20135), and the cur_hps_stem path buffer, not game media or executable bytes. Keep strict byte comparisons; see the independent content review for observer, decoder, and source-layout pins. Provenance and the retained CI failure are recorded in docs/evidence/issue251-stadium-profile-oninit-v1.json."
     },
     {

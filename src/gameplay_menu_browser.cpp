@@ -7120,7 +7120,9 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_cf_approve(
  matched_setup_cf_fail(error.what());return 0;
 }}
 
-int melee_web_native_menu_stadium_first_sss_vs_entry_kick(){try{
+static int first_sss_ready_start_kick(MeleeWebMenuSssPrefixProfile profile){try{
+ const bool fresh=profile==MELEE_WEB_MENU_SSS_PREFIX_FRESH_132;
+ const unsigned count=fresh?132:124;
  auto& s=first_sss_vs_entry;const auto& prefix=first_sss_prefix_sequence;
  check(!s.attempted&&!s.failed&&!s.complete,"VS Entry endpoint is one-use");
  s.attempted=true; // Retain every subsequent gate/getter refusal in this sibling.
@@ -7130,18 +7132,23 @@ int melee_web_native_menu_stadium_first_sss_vs_entry_kick(){try{
  const auto eligible=[&](){return !running&&!pending&&!faulted&&host&&!host_entered&&
    !match&&!results&&!prize&&!replay&&!melee_web_net_active()&&!menu_scene_rebuild_pending&&
    !preparation.busy()&&preparation.phase()==melee_web::MenuPreparationState::Phase::Idle&&
-   asset_destination==AssetDestination::None&&prefix.prefix_profile==MELEE_WEB_MENU_SSS_PREFIX_LEGACY_124&&prefix.complete&&!prefix.failed&&
-   prefix.native.state==2&&prefix.native.input_index==124&&prefix.native.consumed_inputs==124&&
-   prefix.native.host_tick_calls==124&&prefix.native.host_draw_calls==124&&
-   prefix.native.matched_ticks==124&&prefix.native.matched_draw_enters==124&&
-   prefix.native.matched_draw_returns==124&&prefix.native.last_tick_result==3&&
+   asset_destination==AssetDestination::None&&prefix.prefix_profile==profile&&prefix.complete&&!prefix.failed&&
+   (!fresh||(prefix.armed&&prefix.kicked&&prefix.attempted&&
+     prefix.aurora_begin_calls==132&&prefix.aurora_end_calls==132&&
+     prefix.native.exit_captured&&prefix.native.selected_stage_captured&&world&&
+     host==prefix.callback_host_owner&&world.get()==prefix.callback_world_owner&&
+     prefix.callback_world_generation!=0&&melee_web_gameplay_generation()==prefix.callback_world_generation))&&
+   prefix.native.state==2&&prefix.native.input_index==count&&prefix.native.consumed_inputs==count&&
+   prefix.native.host_tick_calls==count&&prefix.native.host_draw_calls==count&&
+   prefix.native.matched_ticks==count&&prefix.native.matched_draw_enters==count&&
+   prefix.native.matched_draw_returns==count&&prefix.native.last_tick_result==3&&
    prefix.native.transition_requested&&prefix.frame_end_returned&&
    melee_web_menu_host_source_scene(host)==0&&melee_web_menu_host_phase(host)==MELEE_WEB_MENU_READY;};
  check(eligible(),"VS Entry endpoint requires the stopped completed SSS prefix");
  check(EM_ASM_INT({try{
-   const f=globalThis.__meleeWebStadiumFirstSssPrefixApproved;
+   const f=$0?globalThis.__meleeWebStadiumFreshSss132PrefixApproved:globalThis.__meleeWebStadiumFirstSssPrefixApproved;
    return typeof f==='function'&&f()===true?1:0;
-  }catch(_){return 0;}})==1,"VS Entry endpoint requires strict host prefix approval");
+  }catch(_){return 0;}},fresh?1:0)==1,"VS Entry endpoint requires strict host prefix approval");
  check(!s.failed&&eligible(),"VS Entry endpoint prefix changed during approval");
  MeleeWebMenuMatchSelection selection{};char error[256]{};
  ++s.getter_calls;
@@ -7165,6 +7172,12 @@ int melee_web_native_menu_stadium_first_sss_vs_entry_kick(){try{
  if(s.error.empty())s.error=error.what();
  first_css_browser_draw_refresh_observation();return 0;
 }}
+
+int melee_web_native_menu_stadium_first_sss_vs_entry_kick(){
+ return first_sss_ready_start_kick(MELEE_WEB_MENU_SSS_PREFIX_LEGACY_124);}
+// Snapshot prepared match Start/seed only; does not execute the original Entry callback.
+int melee_web_native_menu_stadium_fresh_sss_132_ready_start_kick(){
+ return first_sss_ready_start_kick(MELEE_WEB_MENU_SSS_PREFIX_FRESH_132);}
 
 static int first_sss_prefix_arm_profile(const uint8_t* bytes,unsigned size,MeleeWebMenuSssPrefixProfile profile){try{
  auto& s=first_sss_prefix_sequence;

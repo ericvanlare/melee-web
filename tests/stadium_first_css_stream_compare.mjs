@@ -1836,8 +1836,14 @@ export function createFreshSssPrefix132Comparator(expected,inputRows,pair,tick,d
 
 // The closed-host prepared match Start is distinct from persistent prepared_mode.
 // This endpoint compares only the existing source decoder's declared fields.
-export function validateFirstSssVsEntryExpectedSource(expected) {
-  const fail = () => { throw new TypeError('VS Entry endpoint requires exact retained row2468'); };
+const LEGACY_READY_START = Object.freeze({count:124,sequence:2468,tick:125,bytes:4397889,
+ sha:FIRST_SSS_STREAM_SHA256,statusBytes:515,statusSha:FIRST_SSS_STATUS_SHA256,seed:'3bb84c53',
+ schema:'melee-web-stadium-first-sss-vs-entry-endpoint',scope:'original ordinary VS Entry row2468 StartMeleeData and RNG scalar only'});
+const FRESH132_READY_START = Object.freeze({count:132,sequence:2523,tick:133,bytes:4479614,
+ sha:FRESH_SSS_STREAM_SHA256,statusBytes:551,statusSha:FRESH_SSS_STATUS_SHA256,seed:'e2624ac3',
+ schema:'melee-web-stadium-fresh-sss-132-ready-start-endpoint',scope:'prepared match Start and seed compared to original Entry2523 declared fields only; Entry callback not executed'});
+function validateReadyStartExpectedSource(expected, profile) {
+  const fail = () => { throw new TypeError(`VS Entry endpoint requires exact retained row${profile.sequence}`); };
   const p = expected?.provenance, source = expected?.source_entry;
   const inventory = [
     {tag: 4, flags: 0, address: 0x80480530, size: 0x138},
@@ -1847,27 +1853,27 @@ export function validateFirstSssVsEntryExpectedSource(expected) {
     {tag: 36, flags: 0, address: 0x8045bf28, size: 2},
     {tag: 37, flags: 0, address: 0x8045bf2a, size: 2},
   ];
-  if (!plainObject(expected) || expected.schema !== 'melee-web-stadium-first-sss-vs-entry-endpoint' ||
+  if (!plainObject(expected) || expected.schema !== profile.schema ||
       expected.version !== 1 || expected.source_admission !== false ||
       expected.whole_session_equivalent !== false ||
-      expected.scope !== 'original ordinary VS Entry row2468 StartMeleeData and RNG scalar only' ||
-      !plainObject(p) || p.observer_bytes !== 4397889 ||
-      p.observer_sha256 !== FIRST_SSS_STREAM_SHA256 || p.observer_status_bytes !== 515 ||
-      p.observer_status_sha256 !== FIRST_SSS_STATUS_SHA256 || p.sequence !== 2468 ||
-      p.pc !== '0x8016e934' || p.source_tick !== 125 || p.draw_ordinal !== 0 ||
+      expected.scope !== profile.scope ||
+      !plainObject(p) || p.observer_bytes !== profile.bytes ||
+      p.observer_sha256 !== profile.sha || p.observer_status_bytes !== profile.statusBytes ||
+      p.observer_status_sha256 !== profile.statusSha || p.sequence !== profile.sequence ||
+      p.pc !== '0x8016e934' || p.source_tick !== profile.tick || p.draw_ordinal !== 0 ||
       p.setup_profile_verified_by_observer !== false ||
       !sameJsonValue(expected.comparison_fields,
         ['random_seed_hex', 'start.rules', 'start.players[0:4]']) ||
-      !plainObject(source) || source.sequence !== 2468 || source.pc !== 0x8016e934 ||
-      source.event !== 'boundary' || source.boundary !== 'entry' || source.source_tick !== 125 ||
+      !plainObject(source) || source.sequence !== profile.sequence || source.pc !== 0x8016e934 ||
+      source.event !== 'boundary' || source.boundary !== 'entry' || source.source_tick !== profile.tick ||
       source.draw_ordinal !== 0 || source.start_slice_address !== 0x80480530 ||
       source.setup_profile_verified_by_observer !== false ||
       !sourceInventoryMatches(source.source_slice_inventory, inventory) ||
       !sourceSlicesMatch(source.source_slices_hex, inventory) ||
       source.source_slices_hex['19:0'] !== '804d5f90' ||
-      source.source_slices_hex['20:0'] !== '3bb84c53' ||
-      source.random_seed_hex !== '3bb84c53' || source.rng_pointer_hex !== '804d5f90' ||
-      expected.expected?.random_seed_hex !== '3bb84c53') fail();
+      source.source_slices_hex['20:0'] !== profile.seed ||
+      source.random_seed_hex !== profile.seed || source.rng_pointer_hex !== '804d5f90' ||
+      expected.expected?.random_seed_hex !== profile.seed) fail();
   const start = expected.expected.start;
   if (!exactOwnKeys(start, ['rules', 'players']) || !exactOwnKeys(start.rules, SSS_RULE_KEYS) ||
       !Array.isArray(start.players) || start.players.length !== 4) fail();
@@ -1883,15 +1889,20 @@ export function validateFirstSssVsEntryExpectedSource(expected) {
   return expected;
 }
 
-export function createFirstSssVsEntryComparator(expectedEntry, prefix) {
-  const expected = validateFirstSssVsEntryExpectedSource(expectedEntry).expected;
+export function validateFirstSssVsEntryExpectedSource(expected){return validateReadyStartExpectedSource(expected,LEGACY_READY_START);}
+export function validateFreshSss132ReadyStartExpectedSource(expected){return validateReadyStartExpectedSource(expected,FRESH132_READY_START);}
+function createReadyStartComparator(expected, prefix, profile) {
   if (!plainObject(prefix) || prefix.complete !== true || prefix.failed !== false ||
       prefix.current_host_entered !== false || prefix.current_source_scene !== 0 ||
-      prefix.current_session_phase !== 5 || prefix.host_tick_calls !== 124 ||
-      prefix.host_draw_calls !== 124 || prefix.matched_ticks !== 124 ||
-      prefix.matched_draw_enters !== 124 || prefix.matched_draw_returns !== 124 ||
+      prefix.current_session_phase !== 5 || prefix.host_tick_calls !== profile.count ||
+      prefix.host_draw_calls !== profile.count || prefix.matched_ticks !== profile.count ||
+      prefix.matched_draw_enters !== profile.count || prefix.matched_draw_returns !== profile.count ||
+      (profile===FRESH132_READY_START&&(prefix.armed!==true||prefix.kicked!==true||prefix.attempted!==true||
+       prefix.captured!==true||prefix.compared!==true||prefix.selected_stage_captured!==true||
+       prefix.input_index!==132||prefix.consumed_inputs!==132||prefix.frame_end_returned!==true||
+       prefix.aurora_begin_calls!==132||prefix.aurora_end_calls!==132))||
       prefix.last_tick_result !== 3 || prefix.transition_requested !== true ||
-      !firstSssAudioAccounting(prefix, 124).valid)
+      !firstSssAudioAccounting(prefix, profile.count).valid)
     throw new TypeError('VS Entry comparison requires the completed checked SSS prefix');
   let attempted = false, failed = false, firstMismatch = null, approved = false;
   const compare = endpoint => {
@@ -1922,6 +1933,11 @@ export function createFirstSssVsEntryComparator(expectedEntry, prefix) {
   return Object.freeze({compare, status: () => Object.freeze({attempted, approved, failed,
     first_mismatch: firstMismatch})});
 }
+
+export function createFirstSssVsEntryComparator(expected,prefix){
+ return createReadyStartComparator(validateFirstSssVsEntryExpectedSource(expected).expected,prefix,LEGACY_READY_START);}
+export function createFreshSss132ReadyStartComparator(expected,prefix){
+ return createReadyStartComparator(validateFreshSss132ReadyStartExpectedSource(expected).expected,prefix,FRESH132_READY_START);}
 
 const FIRST_SSS_VS_SETUP_SCOPE =
   'original ordinary VS Setup row2503 StartMeleeData and RNG scalar only';

@@ -15,10 +15,13 @@ PRELUDE = r"""
 #include <string>
 #include <stdexcept>
 #include <cstdio>
-struct PrefixNative {int state=2,input_index=124,consumed_inputs=124,host_tick_calls=124,host_draw_calls=124,matched_ticks=124,matched_draw_enters=124,matched_draw_returns=124,last_tick_result=3;bool transition_requested=true;};
+struct PrefixNative {int state=2,last_tick_result=3,exit_captured=1,selected_stage_captured=1;unsigned input_index=124,consumed_inputs=124,host_tick_calls=124,host_draw_calls=124,matched_ticks=124,matched_draw_enters=124,matched_draw_returns=124;bool transition_requested=true;};
+using MeleeWebMenuSssPrefixProfile=int;
 enum{MELEE_WEB_MENU_SSS_PREFIX_LEGACY_124=1,MELEE_WEB_MENU_SSS_PREFIX_FRESH_132=2};
-struct Prefix {int prefix_profile=MELEE_WEB_MENU_SSS_PREFIX_LEGACY_124;bool complete=true,failed=false,frame_end_returned=true;PrefixNative native;};
+struct Prefix {unsigned aurora_begin_calls=132,aurora_end_calls=132;bool armed=true,kicked=true,attempted=true;void* callback_host_owner=(void*)1;const void* callback_world_owner=(void*)2;uint64_t callback_world_generation=7;int prefix_profile=MELEE_WEB_MENU_SSS_PREFIX_LEGACY_124;bool complete=true,failed=false,frame_end_returned=true;PrefixNative native;};
 static Prefix first_sss_prefix_sequence;
+struct World {void* get(){return (void*)2;} explicit operator bool()const{return true;}};static World world;
+static uint64_t melee_web_gameplay_generation(){return 7;}
 static bool running=false,pending=false,faulted=false,host_entered=false,menu_scene_rebuild_pending=false;
 static void *host=(void*)1,*match=nullptr,*results=nullptr,*prize=nullptr,*replay=nullptr;
 namespace melee_web { struct MenuPreparationState {enum class Phase{Idle};}; }
@@ -55,6 +58,25 @@ int main(){
  reset();extra_audio=true;assert(melee_web_native_menu_stadium_first_sss_vs_entry_kick()==0);assert(getter_calls==1&&first_sss_vs_entry.captured&&!first_sss_vs_entry.actual.empty());assert(first_sss_vs_entry.error=="VS Entry endpoint performed unexpected audio work");
  reset();first_sss_prefix_sequence.native.consumed_inputs=123;assert(melee_web_native_menu_stadium_first_sss_vs_entry_kick()==0);assert(getter_calls==0&&first_sss_vs_entry.failed);
  reset();first_sss_prefix_sequence.prefix_profile=MELEE_WEB_MENU_SSS_PREFIX_FRESH_132;assert(melee_web_native_menu_stadium_first_sss_vs_entry_kick()==0);assert(getter_calls==0);
+ // Fixed fresh wrapper: same getter, exact profile/count and retained callback ownership.
+ auto fresh=[](){reset();first_sss_prefix_sequence.prefix_profile=MELEE_WEB_MENU_SSS_PREFIX_FRESH_132;auto& n=first_sss_prefix_sequence.native;
+ n.input_index=n.consumed_inputs=n.host_tick_calls=n.host_draw_calls=n.matched_ticks=n.matched_draw_enters=n.matched_draw_returns=132;};
+ fresh();assert(melee_web_native_menu_stadium_fresh_sss_132_ready_start_kick()==1&&getter_calls==1);assert(melee_web_native_menu_stadium_fresh_sss_132_ready_start_kick()==0&&getter_calls==1);
+ reset();assert(melee_web_native_menu_stadium_fresh_sss_132_ready_start_kick()==0&&getter_calls==0);
+ for(int i=0;i<7;i++){fresh();unsigned* counts[]={&first_sss_prefix_sequence.native.input_index,&first_sss_prefix_sequence.native.consumed_inputs,&first_sss_prefix_sequence.native.host_tick_calls,&first_sss_prefix_sequence.native.host_draw_calls,&first_sss_prefix_sequence.native.matched_ticks,&first_sss_prefix_sequence.native.matched_draw_enters,&first_sss_prefix_sequence.native.matched_draw_returns};*counts[i]=131;assert(melee_web_native_menu_stadium_fresh_sss_132_ready_start_kick()==0&&getter_calls==0);}
+ fresh();first_sss_prefix_sequence.callback_host_owner=(void*)3;assert(melee_web_native_menu_stadium_fresh_sss_132_ready_start_kick()==0&&getter_calls==0);
+ fresh();first_sss_prefix_sequence.callback_world_owner=(void*)3;assert(melee_web_native_menu_stadium_fresh_sss_132_ready_start_kick()==0&&getter_calls==0);
+ fresh();first_sss_prefix_sequence.callback_world_generation=8;assert(melee_web_native_menu_stadium_fresh_sss_132_ready_start_kick()==0&&getter_calls==0);
+ for(int i=0;i<8;i++){fresh();bool* flags[]={&first_sss_prefix_sequence.armed,&first_sss_prefix_sequence.kicked,&first_sss_prefix_sequence.attempted,&first_sss_prefix_sequence.frame_end_returned,&first_sss_prefix_sequence.complete,&running,&pending,&faulted};*flags[i]=i<5?false:true;assert(melee_web_native_menu_stadium_fresh_sss_132_ready_start_kick()==0&&getter_calls==0);running=pending=faulted=false;}
+ fresh();first_sss_prefix_sequence.failed=true;assert(melee_web_native_menu_stadium_fresh_sss_132_ready_start_kick()==0&&getter_calls==0);
+ fresh();first_sss_prefix_sequence.aurora_begin_calls=131;assert(melee_web_native_menu_stadium_fresh_sss_132_ready_start_kick()==0&&getter_calls==0);
+ fresh();first_sss_prefix_sequence.aurora_end_calls=133;assert(melee_web_native_menu_stadium_fresh_sss_132_ready_start_kick()==0&&getter_calls==0);
+ fresh();first_sss_prefix_sequence.native.selected_stage_captured=0;assert(melee_web_native_menu_stadium_fresh_sss_132_ready_start_kick()==0&&getter_calls==0);
+ fresh();first_sss_prefix_sequence.native.exit_captured=0;assert(melee_web_native_menu_stadium_fresh_sss_132_ready_start_kick()==0&&getter_calls==0);
+ fresh();host_entered=true;assert(melee_web_native_menu_stadium_fresh_sss_132_ready_start_kick()==0&&getter_calls==0);host_entered=false;
+ fresh();approval=0;assert(melee_web_native_menu_stadium_fresh_sss_132_ready_start_kick()==0&&getter_calls==0);
+ fresh();getter_ok=false;assert(melee_web_native_menu_stadium_fresh_sss_132_ready_start_kick()==0&&getter_calls==1&&!first_sss_vs_entry.captured);
+ fresh();extra_audio=true;assert(melee_web_native_menu_stadium_fresh_sss_132_ready_start_kick()==0&&first_sss_vs_entry.captured);
  puts("PASS actual endpoint one-use, approval/refusal, reentrancy and capture-before-failure controls");
 }
 """
@@ -64,7 +86,7 @@ class FirstSssVsEntryEndpointTests(OwnedWorkspaceTests):
         start=source.index('struct FirstSssVsEntryState {')
         end=source.index('std::string first_sss_vs_entry_json()', start)
         state=source[start:end]
-        function=_function(source, 'int melee_web_native_menu_stadium_first_sss_vs_entry_kick()')
+        function='\n'.join(_function(source, signature) for signature in ['static int first_sss_ready_start_kick(MeleeWebMenuSssPrefixProfile profile)', 'int melee_web_native_menu_stadium_first_sss_vs_entry_kick()', 'int melee_web_native_menu_stadium_fresh_sss_132_ready_start_kick()'])
         workspace=self.new_workspace(ROOT,'first-sss-vs-entry-')
         cpp=workspace/'endpoint.cpp';binary=workspace/'endpoint'
         cpp.write_text(PRELUDE+state+function+TEST)
