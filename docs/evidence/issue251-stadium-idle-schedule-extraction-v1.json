@@ -1,0 +1,163 @@
+{
+  "schema": "melee-web-issue251-stadium-idle-schedule-extraction-v1",
+  "issue": 251,
+  "result": "INDEPENDENTLY_REVIEWED_PASS_SAME_RUN_OFFLINE_SCHEDULE_AND_TYPED_EXPECTATIONS",
+  "scope": "One retained original Stadium Setup-to-GO-to-3,500-post-GO run, extracted offline. This receipt does not describe browser execution or acceptance.",
+  "base": {
+    "source_commit": "0302f3f584004c7567e652244e2e6c3ffc50ae5d",
+    "documentation_only_candidate": true,
+    "pull_request_301": "draft"
+  },
+  "original_reference": {
+    "existing_evidence_receipt": "issue251-stadium-profile-oninit-v1.json",
+    "existing_evidence_key": "original_idle3500_fresh_recording_run2_2026_10_13",
+    "original_capture_run_id": "original-stadium-idle3500-reference-run2",
+    "producer_source_commit": "3d4ee3d388877249b994543d93db788ed542e2a0",
+    "producer_binary_sha256": "c0c51f4f4cd9b2e26bde1c759e0de809a5fb26a42bf146a9652f652861c9f488",
+    "capture_reader_source_commit": "9e721b130168f863edb0e0839da72f14b49076c0",
+    "capture_reader_sha256": "c8f4c9685936208fb06ee7d11884fef32f4eb851c5b2b5c18f611ebeda4cbe88",
+    "dolphin_commit": "c77bbaa0f372c3f72281602a8b087206706542cb",
+    "dolphin_build_manifest_sha256": "686d8d64ebca6f72ba20953098d55070dc167d875fb901423adf3a60178686f4",
+    "dol_sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+    "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+    "input_mode": "record",
+    "menu_recipe_sha256": "85d64433715ba61db429b0c15de70f7c48b6689c877e061c5111f58bd7c2957f",
+    "input_intentions_sha256": "6e0f09c0ed54125e36920099aa225a22a71797f6d2c85e598e91881315547cbb",
+    "profile_gci_sha256": "5184f7f9bfcbd35ea7cc07904cbed557b8a7fc9e624a05aa02c8d1d308d4d729",
+    "profile_files_sha256": {
+      "Config/Dolphin.ini": "b3fcbec8f030041f591e106d5967ddca9cdf1eaadf9f5d88da1dbf8e199b6dd5",
+      "Config/GCPadNew.ini": "8b52a9dbb212fa091ceebf19eedcb83a1ac7bbc1f7a6b9226f4675d45ef086de"
+    },
+    "artifacts": {
+      "report.json": {
+        "artifact": "original-stadium-idle3500-reference-run2/report.json",
+        "bytes": 1379922,
+        "sha256": "be8dba769e0436e91435bc96014594015efe7646ddbf53a99da79c996cd53e22"
+      },
+      "idle3500-reference.json": {
+        "artifact": "original-stadium-idle3500-reference-run2/idle3500-reference.json",
+        "bytes": 2033197,
+        "sha256": "562969a7e6a6e7fd43457821f84464852a38da2a83c9dc20672ad713cd6010bc"
+      },
+      "observer_stream": {
+        "artifact": "original-stadium-idle3500-reference-run2/observer.bin",
+        "bytes": 58562839,
+        "sha256": "45de31f20751b87414fe5ca5d3569940ce706bb029e30beb142f33fac546ff3a"
+      },
+      "input_stream": {
+        "artifact": "original-stadium-idle3500-reference-run2/inputs.mwri",
+        "bytes": 753496,
+        "sha256": "75e28ea0eba9f31e3e772e981b19eb27f3601ffc26580c5eed107c6ab1460690"
+      }
+    },
+    "existing_evidence_receipt_sha256": "2a4e0133bbe535c98c6568be7e5805dfa806261734cc40c269bd2f39af5de36d"
+  },
+  "offline_extraction": {
+    "extractor_source_sha256": "3f3e4729f63bb9dc25643d93bbb6c2f846bdccef01965e3c1811ceac5e60a49e",
+    "focused_test_source_sha256": "501c672e0d4460452897a6fe7fbe99d6fc07751c9afb30dbbdf7669c134e9810",
+    "review_decision": "PASS_SCOPED_OFFLINE_EXTRACTOR_AND_RETAINED_OUTPUT",
+    "review_receipt_sha256": "b46291978401d4cf1a3a556115221e1bf0d1155fba556568996b7138a982679d",
+    "reviewed_freeze_manifest_sha256": "050737ca000ad561c02b887dbf91dc5d71074679ed263bc7bce87415ae32aa12",
+    "reviewed_checkpoint_sha256": "81f33018e8e8f2185f4fc684d3ea61d5ca578314d20d03ad0ea3911030892ef6",
+    "extraction_decision": "PASS_SAME_RUN_OFFLINE_SCHEDULE_AND_TYPED_EXPECTATIONS",
+    "browser_execution": false,
+    "native_parity": false,
+    "whole_session_equivalent": false,
+    "setup_profile_verified_by_observer": false,
+    "boundaries": {
+      "C_source_tick": 84,
+      "F_source_tick": 85,
+      "comparison_end_source_tick": 3584,
+      "go_sequence": 2983,
+      "setup_sequence": 2561
+    },
+    "counts": {
+      "ticks": 3585,
+      "draws": 3582,
+      "combined_driver_actions": 7167,
+      "post_go_driver_actions": 6999,
+      "post_go_raw_rows": 10497,
+      "post_go_raw_row_counts": {
+        "source_tick": 3501,
+        "draw_enter": 3498,
+        "draw_return": 3498
+      },
+      "typed_post_go_rows": 3501,
+      "typed_post_go_source_tick_range": [
+        84,
+        3584
+      ],
+      "final_draw_return_sequence": 20480,
+      "final_draw_ordinal": 3581,
+      "final_source_tick": 3585
+    },
+    "schedule_semantics": [
+      "Pairs literal source-consumed PAD rows to SourceTick and exact DrawEnter/DrawReturn in original raw order.",
+      "Tick and draw counters are independent; adjacent ticks are retained. No alternating tick/draw schedule or synthetic tail is added.",
+      "Runtime payload contains indexed tick/draw actions and exact four-port 11-byte input bundles only. Typed expected state and source provenance are host-only.",
+      "Expected typed state starts at observed GO/C; pre-GO source ticks 0 through 83 retain literal inputs/actions without a typed Stadium idle-state comparison.",
+      "Typed state uses the retained strict decoder/digest. Guest numeric pointers are not cross-runtime fields. Semantic decoding covers StartMeleeData offsets 0x00 through 0xef; the remaining 0x48 bytes are bound by hash and not interpreted."
+    ],
+    "artifacts": {
+      "manifest": {
+        "artifact": "stadium-idle-extractor-repair-v2/extraction/manifest.json",
+        "bytes": 1186,
+        "sha256": "24bd81ba460877bce4ef481d0f1e31f363a1e03e770f8cc1570ff36ca77eacc5"
+      },
+      "report": {
+        "artifact": "stadium-idle-extractor-repair-v2/extraction/report.json",
+        "bytes": 1685,
+        "sha256": "4ccf3233878d36904056fccd8ce0ae75ed43f65a2d0e1285a719472ca44d7c87"
+      },
+      "runtime_payload": {
+        "artifact": "stadium-idle-extractor-repair-v2/extraction/runtime-payload.json",
+        "bytes": 2121320,
+        "sha256": "6b544fe8ef82fed8d4c563dd666ba873c5fff46efe0d2996a016d7c7675300f8"
+      },
+      "host_only_expectations": {
+        "artifact": "stadium-idle-extractor-repair-v2/extraction/host-only-expectations.json",
+        "bytes": 12169840,
+        "sha256": "e92d1737dcaa20e588dc20ac4c96090555a29c8d0f6805c8751d2865fccb60bb"
+      },
+      "artifact_check": {
+        "artifact": "stadium-idle-extractor-repair-v2/artifact-check.json",
+        "bytes": 2048,
+        "sha256": "2ed6a00c34d25fd3a4529bd2a2de3125c924cdc3ac7b9d876f23c4eec9a9737d"
+      },
+      "extraction_log": {
+        "artifact": "stadium-idle-extractor-repair-v2/extraction.log",
+        "bytes": 786,
+        "sha256": "ac34dca3123361cfcdaec0c7ca1c2330acd0443720731361701042d8ac5c9700"
+      },
+      "focused_tests_log": {
+        "artifact": "stadium-idle-extractor-repair-v2/focused-tests.log",
+        "bytes": 1768,
+        "sha256": "c97780675d915338d2ca0d57f929b6bc19ab419ad405d3c6812e50babe4bf551",
+        "independent_reviewer_reran": false
+      }
+    },
+    "extractor_run_source_head": "3a0338a9c2eafeee74fe9bea1fad905ef159c210",
+    "integrated_source_commit": "0302f3f584004c7567e652244e2e6c3ffc50ae5d",
+    "rollback_comparison": false
+  },
+  "review_limits": [
+    "Independent review inspected retained focused controls and frozen output; it did not rerun tests, extraction, or runtime.",
+    "This is one sealed same-run source-only extraction, not a browser schedule execution.",
+    "No browser A, lifetime B, allocation-generation, registration-event, or cross-owner RNG ledger is established.",
+    "Profile setup equivalence, pixels, PCM, live timing, performance, whole-session, C3, and tournament acceptance are not established.",
+    "The fixed 171-action C/F consumer cannot execute the full extracted schedule; protocol extension remains separately unimplemented and unreviewed."
+  ],
+  "integration_validation": {
+    "source_commit": "0302f3f584004c7567e652244e2e6c3ffc50ae5d",
+    "full_regression": {
+      "tests": 2602,
+      "skips": 180,
+      "exit_code": 0,
+      "log_sha256": "5203b616f99d2d2cb684b57a0d09f7964480aa39cd2dcb5ca9c5db789da6e7ed",
+      "elapsed_seconds": 552.7297629998066,
+      "receipt_sha256": "6dfdb9efcf128837eb9db009a42c637bba00fd51dbac009f762b9316ed215be6"
+    },
+    "affected_runtime_build": "No runtime source changed in this offline tool commit. Existing diagnostic and ordinary Release validation remains separately at9e721b13; no new build implied.",
+    "exact_head_ci": "pending"
+  }
+}

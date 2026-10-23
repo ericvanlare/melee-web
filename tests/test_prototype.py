@@ -37,6 +37,11 @@ class PrototypeTests(unittest.TestCase):
         source = (ROOT / 'src/gameplay_content.h').read_text()
         with self.assertRaisesRegex(ValueError, 'row'):
             content_manifest(source.replace('{ CKIND_MARIO,', '{ UNSUPPORTED_MACRO(),'))
+        malformed_diagnostic_stage = source.replace(
+            '"pstadium.ssm", 1 },', '"pstadium.ssm", 2 },', 1)
+        self.assertNotEqual(malformed_diagnostic_stage, source)
+        with self.assertRaisesRegex(ValueError, 'Stage row'):
+            content_manifest(malformed_diagnostic_stage)
         with self.assertRaisesRegex(ValueError, 'not found'):
             content_manifest('')
 

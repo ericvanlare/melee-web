@@ -130,6 +130,9 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   let keyboard = [true, true], layout = 'two';
   const commands = [], listeners = [];
   let terminalDrawDiscardRetirementConsumed = false;
+  let terminalMatchedSetupCfRetirementObserved = false;
+  let terminalMatchedSetupCfRetirementConsumed = false;
+  let stadiumRecreationCloseSettled = false;
   let diagnostics = null, diagnosticActive = true, longtaskObserver = null, diagnosticPreparationAt = null;
   let diagnosticDelivery = null, diagnosticDeliveryTimer = null, diagnosticRetainedLoaded = false;
   let diagnosticMatureDeliveryPromise = null;
@@ -348,7 +351,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       ready = true; publish(); resolveStartup();
     },
   };
-  const status = () => ready ? Module.UTF8ToString(Module._melee_web_native_menu_message()) : 'Starting WebGPU…';
+  const status = () => terminalMatchedSetupCfRetirementObserved ? 'Native diagnostic owner retired.' : ready ? Module.UTF8ToString(Module._melee_web_native_menu_message()) : 'Starting WebGPU…';
   const check = result => { if (!result) throw Error(status()); return result; };
   const numericProgress = (value, fallback = 0) => Number.isFinite(Number(value)) ? Math.max(0, Math.floor(Number(value))) : fallback;
   function readNativeCacheIdle() {
@@ -424,8 +427,10 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   }
   function snapshot() {
     refreshCatalogLoading();
-    const phase = ready && !fatal && !destroyed ? Module._melee_web_native_menu_phase() : 0;
-    const running = ready && !fatal && !destroyed && !!Module._melee_web_native_menu_running();
+    const phase = ready && !fatal && !destroyed && !terminalMatchedSetupCfRetirementObserved
+      ? Module._melee_web_native_menu_phase() : 0;
+    const running = ready && !fatal && !destroyed && !terminalMatchedSetupCfRetirementObserved &&
+      !!Module._melee_web_native_menu_running();
     const scene = SCENES[phase] || 'idle';
     const active = ['css', 'sss', 'title', 'main', 'opening', 'opening-vs',
       'match', 'results', 'prize'].includes(scene);
@@ -686,6 +691,79 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       diagnosticLifecycle('scene_exit');
       publish(); // Derive diagnostic activity from the actual inactive owner.
       return diagnosticActive === false;
+    },
+    // The explicit-step Stadium path supplies its immutable C/F receipt from
+    // native retirement. This callback deliberately reads no native exports:
+    // the awaited ccall owns teardown and the host checks Asyncify idle after it settles.
+    menuMatchedSetupCfRetired(receipt) {
+      if (!ready || fatal || destroyed || terminalMatchedSetupCfRetirementConsumed ||
+          receipt?.schema !== 'melee-web-stadium-matched-setup-cf-retirement-v1' ||
+          receipt.native_retired !== true || receipt.terminal !== true || receipt.error !== null ||
+          receipt.phase_after_close !== 0 || receipt.running_after_close !== 0) return false;
+      const state = receipt.matched_setup_cf;
+      if (!state || state.queued === true ||
+          (state.complete === true && state.error !== null) ||
+          (state.failed === true && typeof state.error !== 'string') ||
+          !(state.complete === true || state.failed === true ||
+            (state.awaiting_approval === true && state.last_action?.complete === true)) ||
+          !['complete', 'failed', 'awaiting-approval'].includes(state.state)) return false;
+      const firstRetirementObservation = !terminalMatchedSetupCfRetirementObserved;
+      terminalMatchedSetupCfRetirementObserved = true;
+      if (firstRetirementObservation) diagnosticLifecycle('scene_exit');
+      // Native retirement closes the source owner, but it does not run the
+      // ordinary unload callback that cancels a preparation label. Do not
+      // consume host retirement while a host operation or unrelated loading
+      // phase still owns the player; a later retry can settle it after unwind.
+      const hasActiveOwner = !!busy || !!assetTransfer || commands.length !== 0;
+      if (hasActiveOwner || (loading && loading.phase !== 'native')) {
+        publish();
+        return false;
+      }
+      const canCancelStaleNativePreparation = !!preparationLabel || loading?.phase === 'native';
+      if (canCancelStaleNativePreparation) callbacks.menuPreparationCanceled();
+      else publish();
+      if (diagnosticActive !== false) return false;
+      terminalMatchedSetupCfRetirementConsumed = true;
+      return true;
+    },
+    // Private nonterminal canary boundary. Read native state only after the
+    // generated Asyncify idle predicate; never consume terminal retirement or
+    // hide B's native state. Ordinary unload/terminal paths stay unchanged.
+    menuStadiumRecreationClosed(receipt) {
+      if (!ready || fatal || destroyed || stadiumRecreationCloseSettled ||
+          terminalMatchedSetupCfRetirementObserved || terminalMatchedSetupCfRetirementConsumed ||
+          busy || assetTransfer || commands.length || (loading && loading.phase !== 'native')) return false;
+      try {
+        if (Module.stadiumMatchedSetupNativeIdle?.() !== true ||
+            typeof Module._melee_web_native_menu_stadium_recreation_status !== 'function' ||
+            typeof Module._melee_web_native_menu_phase !== 'function' ||
+            typeof Module._melee_web_native_menu_running !== 'function' ||
+            typeof Module.UTF8ToString !== 'function') return false;
+        const state = receipt?.matched_setup_cf;
+        const prefixComplete = state?.schema === 'melee-web-stadium-source-action-native-v2' &&
+          state.scope === 'proper-prefix-next-draw-tick-draw' && state.action_count === 174 && state.cursor === 174;
+        const fullPairComplete = state?.schema === 'melee-web-stadium-source-action-native-v5' &&
+          state.scope === 'original-full7167-common-fields-seed-observation-only' &&
+          state.action_count === 7167 && state.cursor === 7167 &&
+          state.common_field_count === 15 && state.seed_value_count === 1 &&
+          state.source_ticks === 3585 && state.source_draws === 3582;
+        if (receipt?.schema !== 'melee-web-stadium-recreation-boundary-v1' ||
+            receipt.attempted !== true || receipt.closed !== true || receipt.restarted !== false || receipt.error !== null ||
+            receipt.match_to_host_restored !== true || receipt.host_to_parent_restored !== true ||
+            !Number.isSafeInteger(receipt.prior_world_generation) || receipt.prior_world_generation <= 0 ||
+            ['match_seed', 'host_seed', 'parent_seed'].some(key => !Number.isInteger(receipt[key]) || receipt[key] < 0 || receipt[key] > 0xffffffff) ||
+            (!prefixComplete && !fullPairComplete) ||
+            state.state !== 'complete' || state.complete !== true || state.failed !== false || state.error !== null ||
+            state.queued !== false || state.awaiting_approval !== false) return false;
+        const pointer = Module._melee_web_native_menu_stadium_recreation_status();
+        if (!pointer || JSON.stringify(JSON.parse(Module.UTF8ToString(pointer))) !== JSON.stringify(receipt) ||
+            Module._melee_web_native_menu_phase() !== 0 || Module._melee_web_native_menu_running() !== 0) return false;
+      } catch { return false; }
+      if (preparationLabel || loading?.phase === 'native') callbacks.menuPreparationCanceled();
+      else publish();
+      if (diagnosticActive !== false) return false;
+      stadiumRecreationCloseSettled = true;
+      return true;
     },
     menuFrame(wasRunning) {
       if (!ready || fatal || destroyed) return;

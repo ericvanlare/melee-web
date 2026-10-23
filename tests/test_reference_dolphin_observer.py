@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -11,6 +14,42 @@ import unittest
 ROOT = Path(__file__).parents[1]
 PATCH = ROOT / "reference-capture" / "dolphin" / "patches" / "0001-jitarm64-reference-observer.patch"
 SOURCE = ROOT / "reference-capture" / "dolphin" / "source" / "Core" / "PowerPC" / "ReferenceCaptureObserver.cpp"
+
+
+def _extract_braced_declaration(source: str, marker: str) -> str:
+    start = source.index(marker)
+    opening = source.index("{", start)
+    depth = 0
+    for index in range(opening, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                end = index + 1
+                if source[end:].lstrip().startswith(";"):
+                    end = source.index(";", end) + 1
+                return source[start:end]
+    raise AssertionError(f"unterminated C++ block after {marker!r}")
+
+
+@contextmanager
+def _retained_scratch(prefix: str, env_name: str):
+    parent = Path(os.environ.get(env_name, ROOT / "work"))
+    parent.mkdir(parents=True, exist_ok=True)
+    if parent.is_symlink() or parent.resolve() != parent:
+        raise ValueError("test scratch parent must be a real directory")
+    scratch = Path(tempfile.mkdtemp(prefix=prefix, dir=parent))
+    inode = scratch.stat().st_ino
+    try:
+        yield scratch
+    except BaseException:
+        print(f"Retained failed test scratch: {scratch}")
+        raise
+    else:
+        if scratch.is_symlink() or scratch.resolve() != scratch or scratch.stat().st_ino != inode:
+            raise ValueError("test scratch ownership changed; refusing cleanup")
+        shutil.rmtree(scratch)
 
 
 class ReferenceDolphinObserverTests(unittest.TestCase):
@@ -116,8 +155,10 @@ int main() {
         if compiler is None:
             self.skipTest("A native C++ compiler is not installed")
         source = SOURCE.read_text(encoding="utf-8")
-        classifier = source[source.index("  enum class SceneResetAction"):
-                            source.index("  void Observe(Core::System*")]
+        classifier = "\n".join((
+            _extract_braced_declaration(source, "  enum class SceneResetAction"),
+            _extract_braced_declaration(source, "  SceneResetAction ClassifyWholeSceneReset() const"),
+        ))
         harness = r"""
 #include <cassert>
 struct ObserverState {
@@ -158,14 +199,18 @@ int main() {
 }
 """
         harness = "#include <initializer_list>\n" + harness
-        with tempfile.TemporaryDirectory() as temporary:
-            path = Path(temporary)
-            (path / "reset.cpp").write_text(harness)
-            built = subprocess.run([compiler, "-std=c++17", "-Wall", "-Werror",
-                                    str(path / "reset.cpp"), "-o", str(path / "reset")],
-                                   capture_output=True, text=True)
+        with _retained_scratch("dolphin-reset-", "MELEE_DOLPHIN_TEST_OUTPUT") as path:
+            source_path = path / "reset.cpp"
+            binary_path = path / "reset"
+            command = [compiler, "-std=c++17", "-Wall", "-Werror",
+                       str(source_path), "-o", str(binary_path)]
+            source_path.write_text(harness, encoding="utf-8")
+            (path / "compiler-command.json").write_text(json.dumps(command), encoding="utf-8")
+            built = subprocess.run(command, capture_output=True, text=True)
+            (path / "compiler.log").write_text(built.stdout + built.stderr, encoding="utf-8")
             self.assertEqual(built.returncode, 0, built.stderr)
-            checked = subprocess.run([str(path / "reset")], capture_output=True, text=True)
+            checked = subprocess.run([str(binary_path)], capture_output=True, text=True)
+            (path / "execution.log").write_text(checked.stdout + checked.stderr, encoding="utf-8")
             self.assertEqual(checked.returncode, 0, checked.stderr)
 
     def test_css_joint_reader_preserves_source_traversal_and_rejects_cycles(self) -> None:
@@ -306,8 +351,7 @@ int main() {
 
     def test_entry_arms_only_original_vs_setups(self) -> None:
         source = SOURCE.read_text(encoding="utf-8")
-        entry = source[source.index("if (boundary == Boundary::Entry)") :
-                       source.index("else\n      {\n        if (!match_active", source.index("if (boundary == Boundary::Entry)"))]
+        entry = _extract_braced_declaration(source, "if (boundary == Boundary::Entry)")
         self.assertIn("match_active = (setup[4] & 0x40) != 0", entry)
         self.assertIn("if (match_active)", entry)
         self.assertIn("!match_active || !setup_pointer", source)

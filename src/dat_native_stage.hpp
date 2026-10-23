@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <span>
 #include <string_view>
+#include <vector>
 namespace melee_web {
 struct DatNativeMapExternalReference {
     uint32_t entry_index;
@@ -72,7 +73,13 @@ public:
      * DatNativeMap. Decoded lazily because marker-only maps need no collision
      * archive; the pointer is valid only through this owner's lifetime. */
     void* collision();
+    /* Borrows exact source light descriptors and override flags owned by this
+     * map. The view remains valid only for this DatNativeMap's lifetime. */
+    const std::vector<MeleeWebMapLightOverride>& light_overrides()const noexcept;
     std::span<const uint32_t> source_light_counts()const noexcept;
+    /* Borrow the exact cached checked animation table used by map LightLists.
+     * Repeated access preserves identity; storage ends with this map owner. */
+    void* light_animation_table(uint32_t source_offset);
 private:
     struct Storage;
     std::unique_ptr<Storage> storage_;
@@ -82,11 +89,14 @@ private:
 // animation. Does not publish them or imply particle execution is initialized.
 class DatNativeStage {
 public:
+    enum class ProfileMode { Complete, DiagnosticOnly };
     /* Retain the one-argument form for stage inspection tools; it selects the
      * existing Final Destination profile. Match startup should pass its
      * selected StKind to the profile-aware overload. */
     explicit DatNativeStage(std::shared_ptr<const DatArchive>);
     DatNativeStage(std::shared_ptr<const DatArchive>, int stage_kind);
+    DatNativeStage(std::shared_ptr<const DatArchive>, int stage_kind,
+                   ProfileMode profile_mode);
     ~DatNativeStage();
     DatNativeStage(const DatNativeStage&)=delete;
     DatNativeStage& operator=(const DatNativeStage&)=delete;

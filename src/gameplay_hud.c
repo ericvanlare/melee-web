@@ -8,6 +8,14 @@
 #include <melee/if/iftime.h>
 #include <melee/pl/player.h>
 #include <melee/lb/lblanguage.h>
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+#include <melee/if/if_2F72.h>
+#include <sysdolphin/baselib/gobj.h>
+#include <sysdolphin/baselib/gobjproc.h>
+#endif
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+extern int HSD_SisLib_C1TextProbeActive(void);
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -17,6 +25,10 @@ extern int melee_web_bg_flash_begin(void);
 extern int melee_web_bg_flash_end(void);
 struct MeleeWebHud {
     uint64_t generation;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    HSD_GObj* ready_object;
+    HSD_GObjProc* ready_proc;
+#endif
     HSD_Archive* previous_archive;
     int previous_language, previous_saved_language, pause_owned, flash_owned;
 };
@@ -33,6 +45,26 @@ static void intro_finished(int unused)
     (void) unused;
     fn_8016B7F8();
 }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+int melee_web_hud_stadium_ready_context(void* object,void* proc)
+{
+    const Element_803F9628* row=&ifStatus_803F9628[3];
+    return owner && owner->generation==melee_web_gameplay_stats().generation &&
+        owner->ready_object && owner->ready_proc && !HSD_GObj_804D7814 &&
+        row->x0==owner->ready_object && row->x8==if_802F73C4 &&
+        row->x1C==intro_finished && HSD_GObj_804D781C==owner->ready_object &&
+        HSD_GObj_804D7838==owner->ready_proc &&
+        owner->ready_object->proc==owner->ready_proc && !owner->ready_proc->child &&
+        owner->ready_proc->gobj==owner->ready_object &&
+        owner->ready_proc->on_invoke==if_802F73C4 &&
+        (!object || object==owner->ready_object) && (!proc || proc==owner->ready_proc);
+}
+int melee_web_hud_stadium_ready_snapshot(void** object,void** proc)
+{
+    if(!object || !proc || !melee_web_hud_stadium_ready_context(NULL,NULL))return 0;
+    *object=owner->ready_object;*proc=owner->ready_proc;return 1;
+}
+#endif
 static MeleeWebHud* melee_web_hud_begin_source_status(unsigned,
     int (*)(void*, char*, size_t), void*, int, int, char*, size_t);
 MeleeWebHud* melee_web_hud_begin(unsigned layout, char* error, size_t size)
@@ -82,7 +114,19 @@ static MeleeWebHud* melee_web_hud_begin_source_status(unsigned layout,
     lbLang_SetLanguageSetting(LANG_US);
     lbLang_SetSavedLanguage(LANG_US);
     owner = hud;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (HSD_SisLib_C1TextProbeActive()) {
+        fprintf(stderr,"C1_HUD_TEXT_PHASE phase=begin-before-ifAll\n");
+        fflush(stderr);
+    }
+#endif
     ifAll_802F390C();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (HSD_SisLib_C1TextProbeActive()) {
+        fprintf(stderr,"C1_HUD_TEXT_PHASE phase=begin-after-ifAll\n");
+        fflush(stderr);
+    }
+#endif
     /* fn_8016E730 creates the authored screen-flash system after ifAll. */
     if (!melee_web_bg_flash_begin()) {
         fail(error, size, "Original screen-flash ownership is unavailable");
@@ -96,6 +140,12 @@ static MeleeWebHud* melee_web_hud_begin_source_status(unsigned layout,
     }
     ifStatus_802F6EA4(source_status, -1, -1, 0, (Event) fn_8016B7B4,
                     (Event) intro_finished);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(source_status==3){
+        hud->ready_object=ifStatus_803F9628[3].x0;
+        hud->ready_proc=hud->ready_object?hud->ready_object->proc:NULL;
+    }
+#endif
     ifTime_CreateTimers();
     if (!melee_web_pause_screen_begin()) {
         fail(error, size, "Original pause-screen ownership is unavailable");
@@ -133,7 +183,19 @@ int melee_web_hud_end(MeleeWebHud* hud, char* error, size_t size)
     if (hud->flash_owned && !melee_web_bg_flash_end())
         return fail(error, size, "Original screen-flash ownership changed");
     hud->flash_owned = 0;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (HSD_SisLib_C1TextProbeActive()) {
+        fprintf(stderr,"C1_HUD_TEXT_PHASE phase=end-before-ifAll\n");
+        fflush(stderr);
+    }
+#endif
     ifAll_802F3A64();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (HSD_SisLib_C1TextProbeActive()) {
+        fprintf(stderr,"C1_HUD_TEXT_PHASE phase=end-after-ifAll\n");
+        fflush(stderr);
+    }
+#endif
     *ifAll_GetArchive() = hud->previous_archive;
     lbLang_SetLanguageSetting(hud->previous_language);
     lbLang_SetSavedLanguage(hud->previous_saved_language);

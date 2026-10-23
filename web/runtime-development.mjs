@@ -201,6 +201,41 @@ function beginReplayPaintControl(){
   }catch(error){restore();throw error;}
 }
 const log=text=>$('log').textContent=($('log').textContent+'\n'+text).slice(-16000);
+const STADIUM_TEXT_TAIL_MAX_RECORDS=8192;
+const STADIUM_TEXT_TAIL_MAX_BYTES=1024*1024;
+const STADIUM_TEXT_TAIL_PREFIXES=[
+  'C1_SIS_TEXT_EVENT ',
+  'C1_HUD_TEXT_PHASE ',
+  'C1_NAMETAG_TEXT ',
+  'STADIUM_TEXT_MEMBERSHIP_OBSERVATION ',
+];
+const stadiumTextTailProbe={
+  enabled:false,records:[],bytes:0,totalRecords:0,totalBytes:0,
+  droppedRecords:0,droppedBytes:0,overflow:false,
+  reset(){this.enabled=false;this.records=[];this.bytes=0;this.totalRecords=0;
+    this.totalBytes=0;this.droppedRecords=0;this.droppedBytes=0;this.overflow=false;},
+  enable(){this.reset();this.enabled=true;return true;},
+  disable(){this.enabled=false;return this.snapshot();},
+  observe(text){
+    if(!this.enabled||typeof text!=='string'||
+       !STADIUM_TEXT_TAIL_PREFIXES.some(prefix=>text.startsWith(prefix)))return;
+    const bytes=new TextEncoder().encode(text).byteLength;
+    this.totalRecords++;this.totalBytes+=bytes;
+    if(this.records.length>=STADIUM_TEXT_TAIL_MAX_RECORDS||
+       this.bytes+bytes>STADIUM_TEXT_TAIL_MAX_BYTES){
+      this.droppedRecords++;this.droppedBytes+=bytes;this.overflow=true;return;
+    }
+    // Addresses are opaque event identities for append/remove correlation;
+    // this log grants no dereference or ownership authority.
+    this.records.push(text);this.bytes+=bytes;
+  },
+  snapshot(){return{schema:'melee-web-stadium-first-sss-text-tail-log-v1',
+    enabled:this.enabled,records:this.records.slice(),retained_records:this.records.length,
+    retained_bytes:this.bytes,total_records:this.totalRecords,total_bytes:this.totalBytes,
+    dropped_records:this.droppedRecords,dropped_bytes:this.droppedBytes,overflow:this.overflow,
+    limits:{records:STADIUM_TEXT_TAIL_MAX_RECORDS,bytes:STADIUM_TEXT_TAIL_MAX_BYTES}};},
+};
+window.__meleeWebStadiumTextTailProbe=stadiumTextTailProbe;
 if(typeof PerformanceObserver==='function'&&PerformanceObserver.supportedEntryTypes?.includes('longtask'))new PerformanceObserver(list=>{for(const entry of list.getEntries()){browserLongTasks++;browserLongTaskWorst=Math.max(browserLongTaskWorst,entry.duration);log(`Browser long task ${JSON.stringify({started:entry.startTime,duration_ms:entry.duration,name:entry.name})}`);}}).observe({type:'longtask',buffered:true});
 function resetTiming(clearConstruction=true){frameLast=0;perfLastReport=0;activeFrames=0;worstFrame=0;worstBrowserCallback=null;longFrames=0;browserLongTasks=0;browserLongTaskWorst=0;nativeTimingFrames=0;nativeTimingWorst=0;nativeLongFrames=0;nativeOverBudgetFrames=0;nativeSourceSteps=0;nativeSourceDraws=0;nativeWorstTiming=null;nativeFirstUse=0;nativeFirstUseWorst=0;nativePreviousTiming=null;nativeLastTiming=null;livePipelineQueued=0;livePipelineCreated=0;liveTextureUploads=0;liveStagingUsedBytes=0;peakStagingUsedBytes=0;diagnosticCaptureInvalid=false;window.meleeHitchCapture?.reset?.();if(clearConstruction){constructionCounts={};constructionWorst=0;constructionFirstUseWorst=0;preparationCount=0;preparationWorst=0;preparationSince=0;preparationLabel='';preparationSequence=0;activePreparation=null;pendingEntryProfile=null;settlingEntryProfile=null;entryProfiles=[];latestNativePreparation=null;}$('render-metrics').textContent='Native timing diagnostics are waiting for the native player.';if(clearConstruction)$('construction-metrics').textContent='Scene construction diagnostics are waiting for the native player.';}
 function renderConstructionMetrics(){const construction=Object.entries(constructionCounts).map(([name,count])=>`${name} ${count}`).join(' · ')||'none';const latest=entryProfiles.length?entryProfiles[entryProfiles.length-1]:null;const settle=latest&&latest.pipeline_settle_ms!==undefined?` · pipeline settle ${latest.pipeline_settle_ms.toFixed(2)} ms/${latest.pipeline_settle_frames} callbacks`:latest&&settlingEntryProfile===latest?` · pipelines settling (${latest.queued_total} initially queued)`:'';const profile=latest?` · latest ${latest.kind} prep ${latest.preparation_wall_ms.toFixed(2)} ms (construct ${latest.construction_ms.toFixed(2)}, wait/schedule ${latest.wait_schedule_ms.toFixed(2)}) · first draw ${latest.first_draw_ms.toFixed(2)} ms after ${latest.first_draw_delay_ms.toFixed(2)} ms · uploads ${latest.texture_upload_bytes} B · pipelines q${latest.queued_delta}/c${latest.created_delta}${settle}`:'';const p=latestNativePreparation,detail=p?` · native prep a${Number(p.audio_wait_ms).toFixed(2)} c${Number(p.construction_ms).toFixed(2)} r${Number(p.render_wait_ms).toFixed(2)} ms/${p.callbacks} callbacks (CPU ${Number(p.render_cpu_ms).toFixed(2)}, max ${Number(p.max_callback_ms).toFixed(2)}, uploads ${p.texture_upload_bytes} B, pipelines q${p.queued_delta}/c${p.created_delta})`:'';$('construction-metrics').textContent=`Construction ${construction} · worst ${constructionWorst.toFixed(2)} ms · construct ${constructionFirstUseWorst.toFixed(2)} ms · preparations ${preparationCount} (worst ${preparationWorst.toFixed(2)} ms; source entry/teardown separate)${profile}${detail}`;}
@@ -420,6 +455,144 @@ window.menuReplayPoll=()=>{
 // whole-session replay entry: the canonical freshly prepared CSS owner receives
 // one agreed seed, then the ordinary native launch enters it. Per-tick PAD
 // frames and checksum records cross only the _melee_web_net_* exports.
+// Private constructor-only diagnostic entry. The ordinary Play control still prepares.
+let firstCssConstructorLaunchAttempted=false;
+let freshFirstCssLaunchLease=null,freshFirstCssKickAttempted=false;
+const launchPreparedFirstCss=async(expectedGeneration,fresh,finite=false)=>{
+ if(firstCssConstructorLaunchAttempted)throw Error('CSS constructor launch was already attempted.');
+ firstCssConstructorLaunchAttempted=true;
+ const launchOwner=owner,launchModule=Module,launchHandle=owner?.handle;
+ const launchBoundary=boundary,launchCheck=check;
+ const assertIdentity=()=>{
+  if(!launchOwner||owner!==launchOwner||Module!==launchModule||
+     owner.handle!==launchHandle||boundary!==launchBoundary||check!==launchCheck)
+   throw Error('CSS constructor launch owner changed.');
+ };
+ const assertOwner=()=>{
+  assertIdentity();
+  const state=launchHandle.getState();
+  if(state.state!=='prepared'||state.busy||state.loading||state.requiresReload||
+     state.ready!==true||state.canStart!==true||state.phase!==0||state.running)
+   throw Error('CSS constructor launch requires an idle prepared owner.');
+ };
+ const assertArmed=()=>{
+  assertOwner();
+  if(!Number.isSafeInteger(expectedGeneration)||expectedGeneration<=0||
+     typeof launchModule[finite?'_melee_web_native_menu_stadium_first_css_fresh_finite_v4_arm':fresh?'_melee_web_native_menu_stadium_first_css_fresh_row_v3_arm':
+       '_melee_web_native_menu_stadium_first_css_constructor_return_v2_arm']!=='function'||
+     typeof launchModule._melee_web_native_menu_stadium_first_css_draw_observe!=='function')
+   throw Error('Private CSS constructor launch capability is absent.');
+  const pointer=launchModule._melee_web_native_menu_stadium_first_css_draw_observe();
+  const observation=pointer?JSON.parse(launchModule.UTF8ToString(pointer)):null;
+  if(observation?.schema!==(finite?'melee-web-stadium-first-css-finite-observation-v4':fresh?'melee-web-stadium-first-css-fresh-row-observation-v3':
+       'melee-web-stadium-first-css-constructor-return-observation-v2')||
+     observation.mode!==(finite?'fresh_finite_css_prefix_v4':fresh?'fresh_consumed_tick_draw_v3':'constructor_return_only_v2')||observation.state!=='armed'||
+     observation.error!==null||observation.native_phase!==0||observation.running!==false||
+     observation.host_entered!==false||observation.armed_owner_stable!==true||
+     observation.armed_world_generation!==expectedGeneration||
+     (!fresh&&observation.constructor_return_terminal!==false)||
+     (fresh&&(observation.host_tick_calls!==0||observation.host_draw_calls!==0||
+       observation.aurora_begin_calls!==0||observation.aurora_end_calls!==0))||
+     observation.source_steps!==0||observation.source_draws!==0||
+     launchModule._melee_web_native_menu_phase()!==0||
+     launchModule._melee_web_native_menu_running()!==0)
+   throw Error('CSS constructor launch requires the unchanged armed CREATED owner.');
+ };
+ // All native observations and entry use the existing owner command boundary.
+ assertIdentity();
+ if(typeof launchBoundary!=='function')throw Error('CSS constructor launch boundary is absent.');
+ await launchBoundary(assertArmed);
+ resetTiming(false);
+ await prepareAudio();await pauseAudioForPreparation();await waitForAudioRender();
+ await launchBoundary(()=>{assertArmed();launchCheck(launchModule._melee_web_native_menu_launch());});
+ if(fresh)freshFirstCssLaunchLease={owner:launchOwner,Module:launchModule,handle:launchHandle,
+   boundary:launchBoundary,check:launchCheck,generation:expectedGeneration,finite};
+ $('canvas').focus();inputDirty=true;syncAudio();
+};
+
+window.meleeStadiumFirstCssConstructorReturnLaunch=generation=>launchPreparedFirstCss(generation,false);
+window.meleeStadiumFirstCssFreshRowLaunch=generation=>launchPreparedFirstCss(generation,true);
+
+window.meleeStadiumFirstCssFreshRowKick=async()=>{
+ if(freshFirstCssKickAttempted)throw Error('Fresh CSS row kick was already attempted.');
+ freshFirstCssKickAttempted=true;
+ const lease=freshFirstCssLaunchLease;
+ if(!lease)throw Error('Fresh CSS row has no successful prepared-launch lease.');
+ return await lease.boundary(()=>{
+  if(owner!==lease.owner||Module!==lease.Module||owner.handle!==lease.handle||
+     boundary!==lease.boundary||check!==lease.check)
+   throw Error('Fresh CSS row kick owner changed.');
+  const state=lease.handle.getState();
+  if(state.state!=='css'||state.busy||state.loading||state.requiresReload||
+     state.phase!==1||state.running!==true)
+   throw Error('Fresh CSS row requires its held CSS owner before kick.');
+  const pointer=Module._melee_web_native_menu_stadium_first_css_draw_observe?.();
+  const observed=pointer?JSON.parse(Module.UTF8ToString(pointer)):null;
+  if(observed?.schema!=='melee-web-stadium-first-css-fresh-row-observation-v3'||
+     observed.mode!=='fresh_consumed_tick_draw_v3'||observed.state!=='entered'||
+     observed.error!==null||observed.armed_owner_stable!==true||
+     observed.armed_world_generation!==lease.generation||
+     observed.source_steps!==0||observed.source_draws!==0||
+     observed.host_tick_calls!==0||observed.host_draw_calls!==0||
+     observed.aurora_begin_calls!==0||observed.aurora_end_calls!==0||
+     typeof Module._melee_web_native_menu_stadium_first_css_fresh_row_v3_kick!=='function')
+   throw Error('Fresh CSS row kick lost its unchanged one-use CSS entry.');
+  return lease.check(Module._melee_web_native_menu_stadium_first_css_fresh_row_v3_kick());
+ });
+};
+
+// Finite mode uses the same prepared launch and owner command queue. Each
+// stage reserves its one-use attempt before enqueueing and rechecks after wait.
+window.meleeStadiumFirstCssFreshFiniteLaunch=generation=>launchPreparedFirstCss(generation,true,true);
+const freshFiniteCssAttempts=new Set();
+window.meleeStadiumFirstCssFreshFiniteStage=async stage=>{
+ const exports={first:'_melee_web_native_menu_stadium_first_css_fresh_finite_v4_first_kick',
+  stream_arm:'_melee_web_native_menu_stadium_first_css_fresh_finite_v4_stream_arm',
+  stream_kick:'_melee_web_native_menu_stadium_first_css_fresh_finite_v4_stream_kick',
+  final_arm:'_melee_web_native_menu_stadium_first_css_fresh_finite_v4_final_arm',
+  final_kick:'_melee_web_native_menu_stadium_first_css_fresh_finite_v4_final_kick'};
+ if(!Object.hasOwn(exports,stage)||freshFiniteCssAttempts.has(stage))
+  throw Error('Fresh finite CSS stage is unknown or already attempted.');
+ freshFiniteCssAttempts.add(stage);
+ const lease=freshFirstCssLaunchLease;
+ if(!lease?.finite)throw Error('Fresh finite CSS has no prepared finite-owner lease.');
+ return await lease.boundary(()=>{
+  if(owner!==lease.owner||Module!==lease.Module||owner?.handle!==lease.handle||
+     boundary!==lease.boundary||check!==lease.check)
+   throw Error('Fresh finite CSS queued owner changed.');
+  const state=lease.handle.getState();
+  const first=stage==='first';
+  if(state.scene!=='css'||state.state!==(first?'css':'paused')||
+     state.paused!==!first||state.busy||state.loading||state.requiresReload||
+     state.phase!==1||state.running!==first)
+   throw Error('Fresh finite CSS stage requires its exact CSS owner state.');
+  const pointer=Module._melee_web_native_menu_stadium_first_css_draw_observe?.();
+  const observed=pointer?JSON.parse(Module.UTF8ToString(pointer)):null;
+  if(observed?.schema!=='melee-web-stadium-first-css-finite-observation-v4'||
+     observed.mode!=='fresh_finite_css_prefix_v4'||observed.error!==null||
+     observed.armed_owner_stable!==true||observed.armed_world_generation!==lease.generation||
+     typeof Module[exports[stage]]!=='function')
+   throw Error('Fresh finite CSS stage lost its native capability.');
+  const stream=observed.postdraw_stream,final=observed.final_pending_css_draw;
+  const baseline=observed.state==='complete'&&observed.host_tick_calls===1&&
+   observed.host_draw_calls===1&&observed.source_steps===1&&observed.source_draws===1&&
+   observed.aurora_begin_calls===1&&observed.aurora_end_calls===1&&observed.frame_end_returned===true;
+  const terminal=stream?.terminal===true&&stream.failed===false&&
+   stream.outcome==='stop_after_last_input_request'&&stream.tick_result===3;
+  const allowed=stage==='first'?observed.state==='entered'&&
+   observed.host_tick_calls===0&&observed.host_draw_calls===0&&
+   observed.source_steps===0&&observed.source_draws===0&&
+   observed.aurora_begin_calls===0&&observed.aurora_end_calls===0:
+   stage==='stream_arm'?baseline&&!stream:
+   stage==='stream_kick'?baseline&&stream?.status==='armed'&&stream.failed===false&&
+    stream.consumed_inputs===0&&stream.matched_ticks===0&&stream.matched_draws===0:
+   stage==='final_arm'?baseline&&terminal&&!final:
+   baseline&&terminal&&final?.status==='armed'&&final.failed===false&&final.attempted===false;
+  if(!allowed)throw Error('Fresh finite CSS queued stage boundary changed.');
+  return lease.check(Module[exports[stage]]());
+ });
+};
+
 window.meleeNetTimingPauseEligibilitySnapshot=()=>{
  if(!owner?.handle||typeof Module._melee_web_net_status!=='function')
   return {eligible:false,reasons:['owner-unavailable'],network_status:null,native_running:null,native_message:null,owner_state:null};
@@ -603,6 +776,7 @@ try {
     },
     onError(error){log(error.message);$('status').dataset.runtimeError=error.message;},
     onLog(text,isError){
+      window.__meleeWebStadiumTextTailProbe?.observe?.(text);
       const boundaryProbe=globalThis.__meleeReplayBoundaryProbe;
       const probeEnabled=boundaryProbe?.enabled===true;
       let replayHeader=false,sessionFrame=false,frameIndex=-1;

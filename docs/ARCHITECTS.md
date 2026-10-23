@@ -136,7 +136,7 @@ and resolve the profile's licensing policy before behavior implementation.
 Add a match-only restore/repeat/checksum synctest to rollback feasibility.
 
 **Status:** Accepted. The Stadium observation projection is checkpointed in the
-[draft Stadium boundary](https://github.com/ericvanlare/melee-web/blob/d977f777156148d97f07bf03366efd3b2909cfa2/docs/status/2026-10-07-pokemon-stadium-profile-oninit.md).
+[existing boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md).
 The [original-site arithmetic diagnostic](status/2026-10-08-b4-inner-geometry-boundary.md)
 leaves the first Bowser divergence unchanged and has reached its stopping rule.
 It remains default-off; the Falcon candidate's activation is unobserved.
@@ -178,6 +178,12 @@ ownership. The settings toggle and rollback runtime remain implementation goals.
   A separate self-KO prefix now records a source-bound respawn preparation
   event. Its complete diagnostic remains refused at the input-witness boundary. Continue under [#320](https://github.com/ericvanlare/melee-web/issues/320);
   current evidence does not justify descriptor prewarming.
+
+- 2026-10-13, Codex: the preparation component has since merged in
+  [#322](https://github.com/ericvanlare/melee-web/pull/322); the earlier refusal
+  stays historical. The [same H1 boundary](status/2026-10-13-h1-first-use-respawn.md)
+  owns the updated evidence and limits. Work returns to Stadium C3 in draft
+  #301. Broader H1, rollback ownership and the rules profile remain open.
 
 **Links:** [Feasibility #318](https://github.com/ericvanlare/melee-web/issues/318),
 [state ownership #115](https://github.com/ericvanlare/melee-web/issues/115),
@@ -311,6 +317,23 @@ the existing weaker-fighter status entry.
   under [#251](https://github.com/ericvanlare/melee-web/issues/251); existing
   [Stadium CSS/SSS status](status/2026-10-06-pokemon-stadium-c1a-css-sss-preparation.md)
   records the route boundary. No human or physical-input result is inferred.
+
+- **2026-10-11, Codex:** The smaller local room milestones and original Sheik
+  prefix are integrated. Continue the existing Stadium C3 milestone with an
+  original idle-reference prerequisite, followed by two matched lifetimes and
+  retirement/recreation. Keep its earlier no-draw functional result separate
+  from original-schedule agreement. Preserve the deployed relay blocker and
+  resume Track A when service facts change; do not repeat unavailable provider
+  queries or request unavailable owner testing.
+
+- **2026-10-11, owner return:** The owner resumed oversight and requested removal
+  of the recurring automation; it is deleted. The next instruction authorized
+  one bounded original Stadium reference attempt, with a first-failure stop.
+  The attempted recording failed and is checkpointed in the
+  [same Stadium boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md)
+  after independent review. No retry or broader autonomous campaign is running.
+  The next proposed step is a small retained-fragment/source-authority reduction,
+  keeping the lifetime reference and C3 acceptance open.
 
 **Links:** [Owner-requested execution change](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6112686789),
 [A3 #288](https://github.com/ericvanlare/melee-web/issues/288),

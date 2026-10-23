@@ -219,6 +219,7 @@ async function actualCollection(failure, runtimeIncidentRecording = false) {
     screenshot: () => {calls.push('screenshot'); return Promise.resolve();},
   };
   const scope = vm.createContext({report, page, diagnostic: false, pageObservationTimedOut: false,
+    currentSssExit: false, currentSssArm: undefined, // Actual default-OFF optional observation scope.
     observationTimeoutMs: 5, currentPhase: 'finally', boundedCaptureOperation,
     runtimeIncidentRecording, summarizeRuntimeIncidents,
     firstError: (kind, message) => {report.first_error ||= {kind, message};},
@@ -236,6 +237,7 @@ async function actualCollection(failure, runtimeIncidentRecording = false) {
   else if (failure === 'runtime incidents success')
     assert.equal(report.first_error, null, 'successful runtime incident retention must not create an error');
   assert.equal(calls.at(-1), 'close', 'actual final collection must close its browser last');
+  assert.equal(report.current_sss_exit, undefined, 'default-OFF final collection cannot claim an SSS component');
   if (failure === 'artifacts stall') {
     assert.deepEqual(calls, ['artifacts', 'dispose', 'close']);
     assert.equal(scope.pageObservationTimedOut, true);

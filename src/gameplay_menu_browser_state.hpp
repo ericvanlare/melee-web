@@ -87,7 +87,7 @@ extern melee_web::RuntimeAssetScope asset_scope;
 enum class AssetDestination {
  None, InitialMenu, Match, ReturnMenu, Replay, Results, Prize, SuddenDeath,
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
- StadiumC1a,
+ StadiumC1a, FirstSssVsSetup,
 #endif
  OpeningScene, OpeningMatch, TitleReturn
 };
@@ -96,6 +96,7 @@ extern bool scoped_disc_import;
 extern bool scoped_assets,asset_committed;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 extern bool stadium_c1a_armed;
+bool first_sss_vs_setup_asset_pending(unsigned generation);
 extern std::string stadium_c1a_observation;
 extern bool asset_selection_valid;
 extern MeleeWebMenuMatchSelection asset_selection;
@@ -172,6 +173,14 @@ extern melee_web::ResultsSourceFramePauseSchedule scheduled_results_pauses;
 inline void check(int value,const char* error){if(!value)throw std::runtime_error(error);}
 void begin_source_session();
 void close();
+bool stadium_first_css_prepared_diagnostic_active();
+bool stadium_first_css_prepared_diagnostic_consume_launch();
+bool stadium_first_css_prepared_diagnostic_entry_succeeded();
+void stadium_first_css_prepared_diagnostic_fail(const char* error);
+bool stadium_first_css_constructor_return_active();
+bool stadium_first_css_constructor_return_consume_launch();
+bool stadium_first_css_constructor_return_entry_succeeded();
+void stadium_first_css_constructor_return_fail(const char* error);
 void request_assets(AssetDestination destination,
                     const MeleeWebMenuMatchSelection* selection=nullptr,
                     const MeleeWebOpeningPreview* opening_preview=nullptr,

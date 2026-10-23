@@ -551,7 +551,7 @@ public:
     }
     std::string header =
         "{\"record\":\"header\",\"schema\":\"melee-web-original-allocation-history\","
-        "\"version\":1,\"start\":\"original_dol_entry\",\"scope\":\"vs_ownership\","
+        "\"version\":1,\"original_rng_scene_boundaries_v1\":true,\"start\":\"original_dol_entry\",\"scope\":\"vs_ownership\","
         "\"vs_target\":";
     if (!AppendNumber(&header, state_.vs_target) || !Append(&header, ",\"stop_at\":\"") ||
         !Append(&header, state_.stop_at_exit ? "exit" : "entry") ||
@@ -1292,6 +1292,36 @@ private:
       return body();
     };
     const std::string_view function(name ? name : "");
+    if (function == "gm_Scene_Vs_OnEnter" || function == "gm_Scene_Vs_OnExit")
+    {
+      const GlobalIdentity* slot = FindGlobal(state_.profile, "seed_ptr");
+      std::array<u8, 4> pointer_bytes{}, value_bytes{};
+      if (!slot || slot->size < 4 || slot->address % 4 ||
+          !ReadBytes(system, slot->address, pointer_bytes.size(), pointer_bytes.data()))
+        return false;
+      const auto word = [](const std::array<u8, 4>& bytes) {
+        return (static_cast<u32>(bytes[0]) << 24) | (static_cast<u32>(bytes[1]) << 16) |
+               (static_cast<u32>(bytes[2]) << 8) | static_cast<u32>(bytes[3]);
+      };
+      const u32 pointer = word(pointer_bytes);
+      if (pointer % 4 || !IsMem1Range(pointer, value_bytes.size()) ||
+          !ReadBytes(system, pointer, value_bytes.size(), value_bytes.data()))
+        return false;
+      const auto raw = [&](const std::array<u8, 4>& bytes) {
+        if (!Append(output, "[")) return false;
+        for (size_t i = 0; i < bytes.size(); ++i)
+          if ((i && !Append(output, ",")) || !AppendNumber(output, bytes[i])) return false;
+        return Append(output, "]");
+      };
+      if (!add("original_rng", [&] {
+            return Append(output, "{\"pointer_slot_address\":") && AppendNumber(output, slot->address) &&
+                   Append(output, ",\"pointer_value\":") && AppendNumber(output, pointer) &&
+                   Append(output, ",\"value_address\":") && AppendNumber(output, pointer) &&
+                   Append(output, ",\"value\":") && AppendNumber(output, word(value_bytes)) &&
+                   Append(output, ",\"pointer_bytes\":") && raw(pointer_bytes) &&
+                   Append(output, ",\"value_bytes\":") && raw(value_bytes) && Append(output, "}");
+          })) return false;
+    }
     if (function == "lbMemory_8001529C" || function == "lbMemory_80015320" ||
         function == "fn_80015184" || function == "lbDvd_80017A80")
     {
@@ -1700,7 +1730,7 @@ private:
             end += "null";
           else
             end += "\"" + JsonEscape(error) + "\"";
-          end += ",\"scope\":\"vs_ownership\",\"vs_target\":" +
+          end += ",\"original_rng_scene_boundaries_v1\":true,\"scope\":\"vs_ownership\",\"vs_target\":" +
                  std::to_string(state_.vs_target) + ",\"stop_at\":\"" +
                  (state_.stop_at_exit ? "exit" : "entry") + "\",\"max_events\":" +
                  std::to_string(state_.max_events) + ",\"compression\":\"" +

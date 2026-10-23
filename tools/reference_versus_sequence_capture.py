@@ -710,7 +710,7 @@ class SequenceRunner:
             record["fighter_state"] = state
         self.boundaries.append(record)
 
-    def _confirm_results(self, index: int, deadline: float) -> None:
+    def _confirm_results(self, index: int, deadline: float, *, input_ready=None) -> None:
         # Source Results can remain in its statistics page after the first
         # Start.  Pulses are sent only while passive boundaries show that the
         # source is still in the Results/Prize chain.  A missing return-CSS is
@@ -719,6 +719,47 @@ class SequenceRunner:
                    "prize_mode_enter", "prize_scene_enter", "prize_scene_exit",
                    "prize_mode_exit", "return_css"}
         observed: set[str] = set()
+        def observe(row):
+            value = self.observer.boundary(row)
+            if value is None:
+                return False
+            name, row_index = value
+            if row_index != index:
+                raise CaptureError(f"Results boundary {name} has match index {row_index}, expected {index}")
+            if name in IGNORE_BOUNDARIES:
+                return False
+            if name not in allowed:
+                raise CaptureError(f"observer boundary {name} arrived during Results confirmation")
+            observed.add(name)
+            self.boundaries.append({"name": name, "match_index": index,
+                                    "seq": row["seq"], "source_tick": row["source_tick"],
+                                    "draw_ordinal": row["draw_ordinal"],
+                                    "audio_owner_epoch": row["payload"].get("audio_owner_epoch")})
+            if name == "return_css":
+                required = {"results_gobj", "results_exit", "results_mode_exit",
+                            "scene_teardown"}
+                missing = sorted(required - observed)
+                if missing:
+                    raise CaptureError(
+                        "Results returned to CSS before required source boundaries: " +
+                        ", ".join(missing))
+                if "prize_mode_enter" in observed:
+                    prize_required = {"prize_mode_enter", "prize_scene_enter",
+                                      "prize_scene_exit", "prize_mode_exit"}
+                    missing = sorted(prize_required - observed)
+                    if missing:
+                        raise CaptureError(
+                            "Prize returned to CSS before required source boundaries: " +
+                            ", ".join(missing))
+                return True
+            return False
+        if input_ready is not None:
+            phase_deadline = min(deadline, time.monotonic() + 1.5)
+            while not input_ready():
+                if time.monotonic() >= phase_deadline:
+                    raise CaptureError("Results input readiness did not arrive before deadline")
+                if observe(self.observer.next(phase_deadline)):
+                    raise CaptureError("Results returned to CSS before input readiness")
         pulse_count = 0
         while pulse_count < 8:
             self.controller.hold(raw_pad(buttons=["START"]), raw_pad(buttons=["START"]),
@@ -735,37 +776,7 @@ class SequenceRunner:
                     if "did not arrive before deadline" in str(exc):
                         break
                     raise
-                value = self.observer.boundary(row)
-                if value is None:
-                    continue
-                name, row_index = value
-                if row_index != index:
-                    raise CaptureError(f"Results boundary {name} has match index {row_index}, expected {index}")
-                if name in IGNORE_BOUNDARIES:
-                    continue
-                if name not in allowed:
-                    raise CaptureError(f"observer boundary {name} arrived during Results confirmation")
-                observed.add(name)
-                self.boundaries.append({"name": name, "match_index": index,
-                                        "seq": row["seq"], "source_tick": row["source_tick"],
-                                        "draw_ordinal": row["draw_ordinal"],
-                                        "audio_owner_epoch": row["payload"].get("audio_owner_epoch")})
-                if name == "return_css":
-                    required = {"results_gobj", "results_exit", "results_mode_exit",
-                                "scene_teardown"}
-                    missing = sorted(required - observed)
-                    if missing:
-                        raise CaptureError(
-                            "Results returned to CSS before required source boundaries: " +
-                            ", ".join(missing))
-                    if "prize_mode_enter" in observed:
-                        prize_required = {"prize_mode_enter", "prize_scene_enter",
-                                          "prize_scene_exit", "prize_mode_exit"}
-                        missing = sorted(prize_required - observed)
-                        if missing:
-                            raise CaptureError(
-                                "Prize returned to CSS before required source boundaries: " +
-                                ", ".join(missing))
+                if observe(row):
                     return
         missing = "return_css"
         raise CaptureError(f"Results confirmation exhausted {pulse_count} ordinary Start pulses before {missing}")
