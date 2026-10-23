@@ -42,3 +42,21 @@ captures, reviews, failed producers, source hashes and the external candidate.
 Owned capture processes are closed and successful Chrome scratch is removed.
 Keep incremental builds for the active sprint. The rejected #339 reference
 follow-up stays frozen; no service/network workaround is authorized here.
+
+The local source checkpoint `853aae6f36608bd62a4eeb1d2594985178625a38`
+(tree `35a2fe2fcc8f231d9ea94d5efca37559b3feda66`) adds an opt-in stage-arena
+owner diagnostic. Its sample-300 census is linked from the canonical receipt;
+the owner had zero overlap with the observed transition changes, and every range
+remains unadmitted. Focused controls, private and ordinary Release builds, and
+full unittest discovery pass on that exact source commit. Exact-head CI remains
+pending. This does not establish browser restore, complete mutable-state
+ownership or rollback performance; the draft stays open and no merge is claimed.
+
+Stop further allocation-owner expansion after this negative result. The accepted
+`restore-boundary-design-after-stage-falsification-v2.json` and root review permit
+only an external candidate and focused controls for a one-shot source-payload
+admission dry run. Capture, admit before/after the existing sample-300 tick and
+after actual draw, then destroy; no restore. Any topology/lifetime refusal stops
+the experiment. Unknown source globals, dependencies and host effects remain
+closed gates. The earlier `bd7a393d` CI is complete (12 successes, two expected
+skips); the new checkpoint needs its own exact-head CI.

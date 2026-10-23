@@ -124,7 +124,28 @@ failed compile and sanitizer-control attempts remain retained with the candidate
 freeze. This component does not restore allocation topology, explain the
 source-step bytes outside the arena, admit aggregate state, or authorize a
 same-browser restore. Plan v2 (`e551360520b99054508046b9bdeb679ad6103c2ec6e13ede0c90fb3fdd16616c`)
-is the current read-only plan; plan v1 (`eb2f1579608eaf045d7aac7c19fc7ba7dd7cabb36bf2eadd99222f50e642f1e3`) remains preserved.
+was the prior read-only plan; plan v1 (`eb2f1579608eaf045d7aac7c19fc7ba7dd7cabb36bf2eadd99222f50e642f1e3`) remains preserved.
+
+The default-off single-stage arena owner diagnostic is now linked only into its
+private combined Release profile; ordinary Release confirms that its query and
+storage are absent. Focused selected-trace controls and both builds pass on local
+source checkpoint `853aae6f` (tree `35a2fe2f`). In the separately reviewed,
+read-only sample-300 browser census, the exact stage owner remained stable across
+three boundaries with 25 allocations totaling 5,028 bytes. None overlapped the
+90,875 source-step or 765,912 actual-draw/quiescence net changed-byte observations.
+The 96-byte diagnostic storage row is excluded metadata, not stage payload. The
+source-state manifest is incomplete, all observed ranges remain unadmitted, and
+no state was restored. Full unittest discovery on this exact commit passes 2,455
+tests with 165 skips (552.243 seconds); exact-head CI is pending. Raw capture,
+independent review, runtime retention and validation hashes are in the structured
+receipt under `same_instance_browser_restore_341.single_stage_arena_owner_census_v6`
+and the named run `browser-write-census-v6/`. The zero-overlap result stops
+further allocation-owner expansion. The next reviewed design permits only an
+external, opt-in source-payload admission dry run across the actual tick and
+draw, using existing capture/admit/destroy APIs and never restoring. Unknown
+simulation dependencies and external effects remain blockers. Earlier
+`bd7a393d` CI completed all 14 checks (12 successes, two expected skips); it
+does not certify this later source or documentation head.
 
 ## First current-source copy/restore result
 

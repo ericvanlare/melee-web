@@ -2596,7 +2596,7 @@
       "retained_artifact": "census-owner-gap-analysis-v1.json",
       "sha256": "9908b8d2ebb8aeeb64d8df4dcdeb24ea0f16f55bab3d17e1f847c679f90ba370"
     },
-    "next_experiment": "The exact live source-main-heap payload component has passed focused controls, both Release builds, and full regression v6. Wait for final exact-head CI, then select another narrowly bounded owner under one-tick-admission-plan-v2.json (e551360520b99054508046b9bdeb679ad6103c2ec6e13ede0c90fb3fdd16616c). The plan remains read-only; this payload component does not close the 46,400 source-step bytes outside the arena or authorize browser restore.",
+    "next_experiment": "Stop allocation-owner expansion after the stage-owner hypothesis was falsified. The accepted source-only design v2 permits only an external candidate and focused controls for one typed source-payload admission dry run across actual sample300 and draw. It never restores, admits other owners or closes unknown simulation dependencies. Application and capture need separate review; preserve every unknown/unadmitted census observation.",
     "owner_components": {
       "scope": "Private owner components only; no browser restore exposure or complete-world claim",
       "current_files_sha256": {
@@ -3637,6 +3637,183 @@
         "sha256": "e0f1948e59c911fee3e4b7c26c2db79ba8350db736dfcf8c63064cf5cf8fd01f"
       },
       "next_gate": "Focused component controls, private and ordinary Release builds, and full regression v6 pass. Final exact-head CI remains pending. No browser restore or aggregate admission is authorized by this component."
+    },
+    "single_stage_arena_owner_census_v6": {
+      "status": "CAPTURE_COMPLETED_STAGE_OWNER_ZERO_OVERLAP_INVENTORY_INCOMPLETE",
+      "scope": "One read-only sample-300 drawn-browser census of the exact stage-arena allocation owner; no memory restore and no range admitted.",
+      "producer": {
+        "commit": "853aae6f36608bd62a4eeb1d2594985178625a38",
+        "tree": "35a2fe2fcc8f231d9ea94d5efca37559b3feda66",
+        "integration_receipt": {
+          "retained_artifact": "single-stage-arena-build-opt-in-integration-v1/integration-receipt-v1.json",
+          "sha256": "0b7b9f48f77e8ad9a32bd670ed2773bc34b34637ded84f822421d9fdd63cea6c"
+        },
+        "retained_runtime": {
+          "retained_artifact": "retained-census-v6-producer/retention.json",
+          "sha256": "092ae2d7888da6f65e20b944ae10a214105ade4244f7f9e8d8047895f1c691bc"
+        }
+      },
+      "runtime_sha256": {
+        "gameplay_slippi_synctest_browser.mjs": "597831def04d62de1639413cda1094a61955edee9410bf9da932514a9449e28c",
+        "gameplay_slippi_synctest_browser.wasm": "35c44c4f0fd8998c2b1cb51d6c13716c30cab492a5a94f0ef3c3aa121a3e197f",
+        "gameplay_slippi_synctest_browser.data": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c",
+        "source_state_manifest_sha256": "1731268b4043a704506397d0c2a79cff7a8f9a4a79c7b7141da81f453dbc9d22",
+        "link_map_sha256": "21713698e463c85a7f925af916045f6757a9a346d31cadf27128fd7c64fd30de"
+      },
+      "source_state_manifest": {
+        "retained_artifact": "retained-census-v6-producer/gameplay_slippi_synctest_browser.source-state.json",
+        "complete_game_state": false,
+        "counts": {
+          "mutable_input_sections": 3135,
+          "source_c_candidates": 2051,
+          "excluded_mutable_input_sections": 1084
+        }
+      },
+      "diagnostic_build": {
+        "focused_controls": {
+          "status": "PASS",
+          "tests": 20,
+          "retained_artifact": "single-stage-arena-build-opt-in-integration-v1/focused.log",
+          "sha256": "18c7346acd534eca63ab690a6f5b7b051c2fd45e4725d061317e5cd585cbe53d"
+        },
+        "combined_private_release": {
+          "status": "PASS",
+          "command": "build.py --trace-target gameplay_slippi_synctest --configuration Release --aurora-staging-shadow-diagnostic --stage-arena-owner-diagnostic",
+          "browser_wasm_sha256": "35c44c4f0fd8998c2b1cb51d6c13716c30cab492a5a94f0ef3c3aa121a3e197f",
+          "query_export": "melee_web_synctest_stage_arena_inventory_query"
+        },
+        "diagnostic_storage": {
+          "symbol": "melee_web_synctest_stage_arena_diagnostic_storage",
+          "bytes": 96,
+          "manifest_decision": "excluded",
+          "reason": "not-a-known-source-archive-member"
+        },
+        "ordinary_release": {
+          "status": "PASS",
+          "stage_option": "OFF",
+          "query_and_storage_absent": true
+        }
+      },
+      "capture": {
+        "retained_artifact": "browser-write-census-v6/runner/evidence.json",
+        "sha256": "5faf0e790a7df3a94110c267040422121d36dcfa1166cda1ab4036a2adf3e1c5",
+        "preflight": {
+          "retained_artifact": "browser-write-census-v6/preflight.json",
+          "sha256": "f88efcb547433c6557a28bd6ebb940689785c04956ba8cf76ce10fd9c316b1c7"
+        },
+        "owner": {
+          "retained_artifact": "browser-write-census-v6/owner.json",
+          "sha256": "38e84a22998b33f389c2b6f20be2f7812ca1b2dd42a82cb4469c869a94f22104"
+        },
+        "source_review": {
+          "retained_artifact": "single-stage-arena-observer-source-review-v2.json",
+          "sha256": "7899436b2bc78c6be0901b0a0d57ab31b23dabe26ffeb6656ba60048e2daf553"
+        },
+        "independent_result_review": {
+          "retained_artifact": "browser-write-census-v6/independent-result-review-v1.json",
+          "sha256": "433c6b96e02fd826b33cb03dd44ab2f389f619835cdf7a51e3fa5fd6acc25528"
+        },
+        "root_result_review": {
+          "retained_artifact": "browser-write-census-v6/root-result-review-v1.json",
+          "sha256": "df0001dd204b7fbd8e77f7184dd6bebf9803e963100e0073ec2748dd24b16ccf"
+        }
+      },
+      "input": {
+        "sample": 300,
+        "raw_pad_bytes": 44,
+        "raw_pad_sha256": "46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288",
+        "warm_prefix_samples": 300
+      },
+      "stage_arena_owner": {
+        "boundaries": [
+          "before-source-step",
+          "after-source-step",
+          "after-actual-draw-and-Aurora-quiescence"
+        ],
+        "stable_allocation_count": 25,
+        "stable_extent_bytes": 5028,
+        "identity_and_lifetime_stable": true,
+        "source_step_changed_range_overlap_bytes": 0,
+        "actual_draw_changed_range_overlap_bytes": 0
+      },
+      "observed": {
+        "source_step_net_changed_byte_observations": 90875,
+        "actual_draw_and_quiescence_net_changed_byte_observations": 765912,
+        "unmapped_source_step_byte_observations": 48854,
+        "unmapped_actual_draw_byte_observations": 302822,
+        "count_basis": "Net changed bytes per transition; this is not a unique state size, and the same address may count in both transitions.",
+        "gpu": {
+          "initialized": true,
+          "backend": 7,
+          "pending_frame_packets": 0,
+          "pending_staging_buffers": 0,
+          "worker_busy": 0,
+          "renderer_errors": 0,
+          "draw_calls": 237,
+          "begin_frame_id": 301,
+          "end_frame_id": 301
+        }
+      },
+      "independent_calculation": {
+        "source_step_changed_ranges": 13843,
+        "source_step_sum_bytes": 90875,
+        "actual_draw_changed_ranges": 61412,
+        "actual_draw_sum_bytes": 765912,
+        "stage_overlap_pairs_source_step": 0,
+        "stage_overlap_pairs_actual_draw": 0
+      },
+      "validation": {
+        "full_regression": {
+          "status": "PASS",
+          "tests": 2455,
+          "skips": 165,
+          "unittest_seconds": 552.243,
+          "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+          "log_retained_artifact": "single-stage-arena-build-opt-in-integration-v1/full-regression-v1/full-regression.log",
+          "log_sha256": "9ae0b8ed2744ee27c2ed9072fcc2f954931b0e173ec5d2570068e895cb6bedf5",
+          "receipt_retained_artifact": "single-stage-arena-build-opt-in-integration-v1/docs-prep-v1/full-regression-receipt-v1.json"
+        },
+        "exact_head_ci": "PENDING"
+      },
+      "cleanup": {
+        "all_recorded_process_ids_independently_absent": true,
+        "capture_and_server_process_groups_absent": true,
+        "owned_successful_scratch_removed": true
+      },
+      "all_observed_ranges_unadmitted": true,
+      "restore_performed": false,
+      "limitations": [
+        "The precise tracked stage-arena owner had zero overlap with these two observed transition change sets; this does not establish complete stage or world-state ownership.",
+        "The full mutable-state inventory is incomplete; all changed observations remain unadmitted and no state was restored.",
+        "The screenshot retains known magenta/texture artifacts and establishes no pixel acceptance.",
+        "This result does not establish restore correctness, gameplay acceptance, or rollback performance."
+      ],
+      "next_boundary": {
+        "design": {
+          "retained_artifact": "restore-boundary-design-after-stage-falsification-v2.json",
+          "sha256": "688a2d8a84ca02534797120429a5b5d8847a27e364cb8048a8251c17054c4066"
+        },
+        "root_design_review": {
+          "retained_artifact": "root-payload-admission-design-review-v1.json",
+          "sha256": "3d409b6f253c0dc398cea175107193c8c5bf3ec8c47ff4170f6845a2ab250942"
+        },
+        "state": "External candidate and focused controls only; no new capture or restore authorized"
+      },
+      "prior_checkpoint_ci": {
+        "head": "bd7a393d853b6f2359256a8366e303e1061d0d53",
+        "run": 39867358012,
+        "checks": 14,
+        "success": 12,
+        "expected_skips": 2,
+        "retained_artifact": "checkpoint-ci-bd7a-v1.json",
+        "sha256": "d930748134362f59d241f17620372c1e5a8df85b9a4eb6199618ea9953107305",
+        "scope": "Earlier head only; new documentation-head CI pending"
+      },
+      "retained_source_review_refusal_v1": {
+        "retained_artifact": "single-stage-arena-observer-source-review-v1.json",
+        "sha256": "9152124d1ac34d46304fc4c57a15db19cec8e3af28c19ffe8f2fa80d39915826",
+        "scope": "Known PCM/static alias false refusal and missing explicit pthread refusal; repaired in reviewed v2"
+      }
     }
   }
 }
