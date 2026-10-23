@@ -102,7 +102,7 @@ reset();scene=1;current_sss_exit_before_leave();assert(!current_sss_exit.leave_s
         # spelling to compile the same callback body in the combined C++ fixture.
         note=note.replace('MeleeWebMenuHost* h=data;',
                           'MeleeWebMenuHost* h=static_cast<MeleeWebMenuHost*>(data);')
-        host_arm=cut(host_text,'int melee_web_menu_host_arm_current_sss_exit(', 'static void first_sss_prefix_exit_note(')
+        host_arm=cut(host_text,'int melee_web_menu_host_arm_current_sss_exit(', 'static unsigned host_first_sss_prefix_count(')
         notify=cut(text,'void current_sss_exit_notify(', 'void current_sss_exit_tick_begin(')
         helpers=(cut(text,'bool current_sss_exit_profile_valid(',
                      'std::string current_sss_selection_difference(')+

@@ -55,6 +55,7 @@ const {values} = parseArgs({options: Object.fromEntries(
       ['first-sss-consumed-pad-tick', {type: 'boolean', default: false}],
       ['first-sss-draw', {type: 'boolean', default: false}],
       ['first-sss-prefix', {type: 'boolean', default: false}],
+      ['first-sss-fresh-prefix-132', {type: 'boolean', default: false}],
       ['first-sss-vs-entry', {type: 'boolean', default: false}],
       ['first-sss-vs-setup', {type: 'boolean', default: false}],
       ['first-sss-vs-setup-cf', {type: 'boolean', default: false}],
@@ -96,8 +97,9 @@ const firstSssVsSetupCf = validateMatchedSetupCfRequest({
   assemblyPath: values['first-sss-vs-setup-cf-assembly'] || null,
 });
 const firstSssVsEntry = values['first-sss-vs-entry'] || firstSssVsSetup;
-const firstSssPrefix = values['first-sss-prefix'] || firstSssVsEntry;
-const firstSssFreshInputTickDraw = values['first-sss-fresh-input-tick-draw'];
+const firstSssFreshPrefix132=values['first-sss-fresh-prefix-132'];
+const firstSssPrefix = values['first-sss-prefix'] || firstSssVsEntry || firstSssFreshPrefix132;
+const firstSssFreshInputTickDraw = values['first-sss-fresh-input-tick-draw'] || firstSssFreshPrefix132;
 const firstSssDraw = values['first-sss-draw'] || firstSssPrefix || firstSssFreshInputTickDraw;
 const firstSssConsumedPadTick = values['first-sss-consumed-pad-tick'] || firstSssDraw || firstSssPrefix;
 const firstSssConstructorPairFresh = values['first-sss-constructor-pair-fresh'] || firstSssFreshInputTickDraw;
@@ -105,6 +107,9 @@ const firstSssConstructorPair = values['first-sss-constructor-pair'] || firstSss
 const firstCssBrowserFinalDraw = values['first-css-browser-final-draw'] || firstSssConstructorPair || firstCssFreshFinite;
 const firstCssBrowserStream = values['first-css-browser-stream'] || firstCssBrowserFinalDraw;
 const firstCssBrowserDraw = values['first-css-browser-draw'] || firstCssBrowserStream || firstCssFreshRow;
+if(firstSssFreshPrefix132 && (values['first-sss-prefix'] || values['first-sss-fresh-input-tick-draw'] ||
+    firstSssVsEntry || firstSssVsSetup || !values['first-sss-prefix-expected'] || !values['first-sss-prefix-input']))
+  throw Error('Fresh132 is one explicit fixed prefix route, separate from legacy prefix and VS');
 if (firstCssFreshFinite !== !!values['first-css-finite-receipt'] ||
     (firstCssFreshFinite && (firstCssFreshRow || firstCssConstructorReturn || cssSssReducer ||
       (firstSssConstructorPair && !firstSssConstructorPairFresh) || firstSssVsSetupCf || recreationCanary ||
@@ -120,13 +125,13 @@ if (firstSssConstructorPairFresh &&
     (!firstCssFreshFinite || values['first-sss-constructor-pair'] ||
      (!firstSssFreshInputTickDraw && (firstSssConsumedPadTick || firstSssDraw || firstSssPrefix ||
       values['first-sss-tick-expected'] || values['first-sss-tick-input'] || values['first-sss-draw-expected'])) ||
-     (firstSssFreshInputTickDraw && (!firstSssConsumedPadTick || !firstSssDraw || firstSssPrefix ||
+     (firstSssFreshInputTickDraw && (!firstSssConsumedPadTick || !firstSssDraw || (firstSssPrefix&&!firstSssFreshPrefix132) ||
       firstSssVsEntry || firstSssVsSetup || values['first-sss-consumed-pad-tick'] || values['first-sss-draw'])) ||
      firstSssVsEntry || firstSssVsSetup || firstSssVsSetupCf ||
      firstCssFreshRow || firstCssConstructorReturn || cssSssReducer ||
      firstCssBrowserDraw === false || !values['first-sss-pair-expected'] ||
-     ['first-sss-prefix-expected','first-sss-prefix-input','first-sss-vs-entry-expected',
-      'first-sss-vs-setup-expected'].some(key=>values[key])))
+     ['first-sss-vs-entry-expected','first-sss-vs-setup-expected',
+      ...(!firstSssFreshPrefix132?['first-sss-prefix-expected','first-sss-prefix-input']:[])].some(key=>values[key])))
   throw Error(firstSssFreshInputTickDraw
     ? 'Fresh SSS input/tick/draw profile requires its exact constructor pair and declared source-bound inputs'
     : 'Fresh SSS pair is an explicit finite-CSS constructor-only continuation; no SSS input/tick/draw/VS options');
@@ -385,7 +390,7 @@ let report = {
   scenario: {
     route_mode: recreationCanary ? (recreationFullB
       ? (recreationFullPair ? 'same-instance-recreation-A7167-B7167-common-fields-seed' : 'same-instance-recreation-A174-B7167-common-fields-seed')
-      : 'same-instance-recreation-canary-174') : firstSssVsSetup ? 'first-sss-vs-setup' : firstSssVsEntry ? 'first-sss-vs-entry' : firstSssPrefix ? 'first-sss-prefix' : firstSssFreshInputTickDraw ? 'first-css-fresh-finite-sss-input-tick-draw-v1' : firstSssDraw ? 'first-sss-draw' :
+      : 'same-instance-recreation-canary-174') : firstSssVsSetup ? 'first-sss-vs-setup' : firstSssVsEntry ? 'first-sss-vs-entry' : firstSssFreshPrefix132 ? 'first-css-fresh-finite-sss-prefix-132-v2' : firstSssPrefix ? 'first-sss-prefix' : firstSssFreshInputTickDraw ? 'first-css-fresh-finite-sss-input-tick-draw-v1' : firstSssDraw ? 'first-sss-draw' :
       firstSssConstructorPairFresh ? 'first-css-fresh-finite-sss-constructor-pair-v1' :
       firstCssFreshFinite ? 'first-css-fresh-finite-v4' :
       firstCssFreshRow ? 'first-css-fresh-row-v3' :
@@ -453,6 +458,8 @@ let report = {
     ? `Strict Entry then checked async exact Stadium asset handoff and existing deferred Session Setup endpoint; stop before gameplay tick/draw/GO${firstSssVsSetupTextTail?'; opt-in bounded SIS text-tail diagnostics only':''}`
     : firstSssVsEntry
     ? 'Strict SSS prefix then read-only actual match Start/seed Entry endpoint; no match construction'
+    : firstSssFreshPrefix132
+    ? 'Fresh original CSS/SSS constructor, first consumed PAD/tick/draw, then 132 exact remaining input/tick/draw records through passive exit2481 and separate selected tuple2482. Conditional source flags/pending-next and prepared VS output remain unpaired; no VS/GO/C3 acceptance.'
     : firstSssPrefix
     ? 'Original CSS final draw, SSS constructor and frame-zero consumed PAD prerequisites, first original SSS draw, then a finite 124-record SSS input/tick/draw prefix through passive SSS exit and later selected-stage tuple. Prepared VS output remains unpaired; stops before ordinary VS scene entry/setup.'
     : firstSssFreshInputTickDraw
@@ -1175,7 +1182,7 @@ async function loadFirstSssPrefixInputs() {
   if (!firstSssPrefix) return null;
   const drawInputs = firstSssDrawInputs;
   const result = await loadBoundFirstSssExpected('first_sss_prefix',
-    'first-sss-prefix-expected', 'melee-web-stadium-first-sss-prefix-diagnostic');
+    'first-sss-prefix-expected', firstSssFreshPrefix132?'melee-web-stadium-fresh-sss-prefix-diagnostic':'melee-web-stadium-first-sss-prefix-diagnostic');
   const inputFile = path.resolve(values['first-sss-prefix-input']);
   const binding = preflight.first_sss_prefix.input_bundle;
   assert.ok(binding && typeof binding === 'object', 'SSS prefix preflight omitted input-bundle identity');
@@ -1188,11 +1195,11 @@ async function loadFirstSssPrefixInputs() {
   assert.equal(digest(inputBytes), result.expected.input_bundle.sha256);
   const inputRows = result.helperBytes.byteLength
     ? (await import(pathToFileURL(result.helperPath).href))
-      .decodeFirstSssPrefixInputBundle(inputBytes)
+      [firstSssFreshPrefix132?'decodeFreshSssPrefix132InputBundle':'decodeFirstSssPrefixInputBundle'](inputBytes)
     : null;
   const helper = await import(pathToFileURL(result.helperPath).href);
-  helper.validateFirstSssPrefixExpectedSource(result.expected, inputRows);
-  assert.equal(result.expected.provenance.observer_sha256,
+  helper[firstSssFreshPrefix132?'validateFreshSssPrefix132ExpectedSource':'validateFirstSssPrefixExpectedSource'](result.expected, inputRows);
+  assert.equal((firstSssFreshPrefix132?result.expected.observer.sha256:result.expected.provenance.observer_sha256),
     drawInputs.expected.provenance.observer_sha256,
     'Prefix and first-draw expectations do not bind the same retained observer');
   assert.equal(result.expected.input_bundle.contains_expected_state, false);
@@ -2539,6 +2546,8 @@ async function runFirstSssPrefix(constructorNative, firstDrawNative) {
     'SSS prefix requires completed constructor, consumed-tick and first-draw prerequisites');
   const baseline = report.scenario.first_sss_constructor_pair.postcapture_css_baseline.native;
   const expected = firstSssPrefixInputs.expected;
+  const sampleCount=firstSssFreshPrefix132?132:124;
+  const callbackCount=firstSssFreshPrefix132?398:374;
   report.scenario.first_sss_prefix = {
     expected_json: firstSssPrefixInputs.identity,
     input_bundle: firstSssPrefixInputs.inputIdentity,
@@ -2546,12 +2555,12 @@ async function runFirstSssPrefix(constructorNative, firstDrawNative) {
     claim: 'Bounded SSS prefix attempt retained; per-boundary comparison and final stop checks are pending.',
   };
   await persistReport();
-  await timeout(page.evaluate(async ({moduleUrl, expectedPrefix, inputRows, pair, tick, draw}) => {
+  await timeout(page.evaluate(async ({moduleUrl, expectedPrefix, inputRows, pair, tick, draw, fresh132}) => {
     if (globalThis.__meleeWebStadiumFirstSssPrefixCompare ||
         globalThis.__meleeWebStadiumFirstSssPrefixRead)
       throw Error('First SSS prefix comparator was already registered');
-    const {createFirstSssPrefixComparator, requestSynchronousApproval} = await import(moduleUrl);
-    const comparator = createFirstSssPrefixComparator(expectedPrefix, inputRows, pair, tick, draw);
+    const {createFirstSssPrefixComparator, createFreshSssPrefix132Comparator, requestSynchronousApproval} = await import(moduleUrl);
+    const comparator = (fresh132?createFreshSssPrefix132Comparator:createFirstSssPrefixComparator)(expectedPrefix, inputRows, pair, tick, draw);
     const rows = [];
     let hookError = null;
     globalThis.__meleeWebStadiumFirstSssPrefixRead = () => ({
@@ -2563,7 +2572,7 @@ async function runFirstSssPrefix(constructorNative, firstDrawNative) {
       catch { actual = {malformed_json: String(actualJson).slice(0, 6000)}; }
       const row = {phase, actual, approved: null};
       rows.push(row);
-      if (rows.length > 374) { hookError = 'First SSS prefix callback exceeded its fixed sample cap'; return false; }
+      if (rows.length > (fresh132?398:374)) { hookError = 'First SSS prefix callback exceeded its fixed sample cap'; return false; }
       const approved = requestSynchronousApproval(comparator.compare, phase, actualJson);
       row.approved = approved === true;
       return approved === true;
@@ -2571,12 +2580,12 @@ async function runFirstSssPrefix(constructorNative, firstDrawNative) {
     globalThis.__meleeWebStadiumRecreationCallbackScopeV1?.claimInstalled('__meleeWebStadiumFirstSssPrefixCompare', globalThis.__meleeWebStadiumFirstSssPrefixCompare);
   }, {moduleUrl: 'data:text/javascript;base64,' + Buffer.from(firstCssBrowserStreamInputs.helperSource).toString('base64'),
     expectedPrefix: expected, inputRows: firstSssPrefixInputs.inputRows,
-    pair, tick: consumedTick, draw: firstDraw}), Math.min(5000, remaining()),
-  'Register exact 124-record SSS prefix and passive exit comparisons');
+    pair, tick: consumedTick, draw: firstDraw, fresh132:firstSssFreshPrefix132}), Math.min(5000, remaining()),
+  'Register exact fixed-profile SSS prefix and passive exit comparisons');
 
-  const arm = await timeout(page.evaluate(bundle => {
+  const arm = await timeout(page.evaluate(({bundle,fresh132}) => {
     const module = globalThis.Module;
-    const fn = module?._melee_web_native_menu_stadium_first_sss_prefix_arm;
+    const fn = fresh132?module?._melee_web_native_menu_stadium_fresh_sss_prefix_132_arm:module?._melee_web_native_menu_stadium_first_sss_prefix_arm;
     if (typeof fn !== 'function') throw Error('First SSS prefix arm export is absent');
     if (module._melee_web_native_menu_running() !== 0)
       throw Error('First SSS prefix arm requires the stopped first-draw host');
@@ -2588,8 +2597,8 @@ async function runFirstSssPrefix(constructorNative, firstDrawNative) {
       const messagePointer = result === 1 ? 0 : module._melee_web_native_menu_message?.();
       return {result, message: messagePointer ? module.UTF8ToString(messagePointer) : null};
     } finally { module._free(pointer); }
-  }, Array.from(firstSssPrefixInputs.inputBytes)),
-  Math.min(5000, remaining()), 'Arm the exact input-only 124-record SSS prefix');
+  }, {bundle:Array.from(firstSssPrefixInputs.inputBytes),fresh132:firstSssFreshPrefix132}),
+  Math.min(5000, remaining()), 'Arm the exact input-only fixed-profile SSS prefix');
   const armSnapshot = await timeout(readFirstSssPrefixObservation(),
     Math.min(5000, remaining()), 'Retain armed SSS prefix state');
   report.scenario.first_sss_prefix.arm_snapshot = armSnapshot;
@@ -2603,14 +2612,14 @@ async function runFirstSssPrefix(constructorNative, firstDrawNative) {
   assert.equal(armSnapshot.native?.first_sss_prefix?.kicked, false);
   assertSssOldBaselineUnchanged(armSnapshot.native, baseline, pair, consumedTick, firstDraw);
 
-  const kickResult = await timeout(page.evaluate(() => {
+  const kickResult = await timeout(page.evaluate(fresh132 => {
     const module = globalThis.Module;
-    const fn = module?._melee_web_native_menu_stadium_first_sss_prefix_kick;
+    const fn = fresh132?module?._melee_web_native_menu_stadium_fresh_sss_prefix_132_kick:module?._melee_web_native_menu_stadium_first_sss_prefix_kick;
     if (typeof fn !== 'function') throw Error('First SSS prefix kick export is absent');
     const result = fn();
     const messagePointer = result === 1 ? 0 : module._melee_web_native_menu_message?.();
     return {result, message: messagePointer ? module.UTF8ToString(messagePointer) : null};
-  }), Math.min(10000, remaining()), 'Start the finite SSS input/tick/draw continuation');
+  }, firstSssFreshPrefix132), Math.min(10000, remaining()), 'Start the finite SSS input/tick/draw continuation');
   report.scenario.first_sss_prefix.kick_result = kickResult;
   await persistReport();
   await timeout(page.waitForFunction(() => {
@@ -2644,13 +2653,13 @@ async function runFirstSssPrefix(constructorNative, firstDrawNative) {
   assert.equal(prefix.host_draw_calls <= prefix.matched_ticks, true,
     'A draw was attempted without a preceding approved tick');
   assert.equal(audio.valid, true, audio.error || 'SSS prefix audio carry differs from approved ticks');
-  assert.equal(prefix.host_tick_calls, 124, 'SSS prefix host tick count differs from fixed bound');
-  assert.equal(prefix.host_draw_calls, 124, 'SSS prefix host draw count differs from fixed bound');
-  assert.equal(prefix.matched_ticks, 124);
-  assert.equal(prefix.matched_draw_enters, 124);
-  assert.equal(prefix.matched_draw_returns, 124);
-  assert.equal(prefix.aurora_begin_calls, 124);
-  assert.equal(prefix.aurora_end_calls, 124);
+  assert.equal(prefix.host_tick_calls, sampleCount, 'SSS prefix host tick count differs from fixed bound');
+  assert.equal(prefix.host_draw_calls, sampleCount, 'SSS prefix host draw count differs from fixed bound');
+  assert.equal(prefix.matched_ticks, sampleCount);
+  assert.equal(prefix.matched_draw_enters, sampleCount);
+  assert.equal(prefix.matched_draw_returns, sampleCount);
+  assert.equal(prefix.aurora_begin_calls, sampleCount);
+  assert.equal(prefix.aurora_end_calls, sampleCount);
   assert.equal(prefix.frame_end_returned, true);
   assert.equal(prefix.last_tick_result, 3);
   assert.equal(prefix.transition_requested, true,
@@ -2674,18 +2683,20 @@ async function runFirstSssPrefix(constructorNative, firstDrawNative) {
   assert.equal(evidence.host?.hook_error, null);
   assert.equal(evidence.host?.status?.approved, true);
   assert.equal(evidence.host?.status?.failed, false);
-  assert.equal(evidence.host?.status?.attempted, 374);
+  assert.equal(evidence.host?.status?.attempted, callbackCount);
   assert.equal(evidence.host?.status?.first_mismatch, null);
-  assert.equal(evidence.host?.rows?.length, 374);
+  assert.equal(evidence.host?.rows?.length, callbackCount);
   assert.ok(evidence.host.rows.every(row => row.approved === true));
   assert.equal(evidence.host.rows[0].phase, 'scheduler_end');
-  assert.equal(evidence.host.rows[371].phase, 'draw_return');
-  assert.equal(evidence.host.rows[372].phase, 'sss_exit');
-  assert.equal(evidence.host.rows[373].phase, 'selected_stage');
-  assert.deepEqual(evidence.host.rows[372].actual, prefix.exit_note);
-  assert.deepEqual(evidence.host.rows[373].actual, prefix.selected_stage_note);
+  assert.equal(evidence.host.rows[callbackCount-3].phase, 'draw_return');
+  assert.equal(evidence.host.rows[callbackCount-2].phase, 'sss_exit');
+  assert.equal(evidence.host.rows[callbackCount-1].phase, 'selected_stage');
+  assert.deepEqual(evidence.host.rows[callbackCount-2].actual, prefix.exit_note);
+  assert.deepEqual(evidence.host.rows[callbackCount-1].actual, prefix.selected_stage_note);
   report.scenario.first_sss_prefix.claim =
-    '124 exact SSS consumed-PAD/tick/draw records matched, including the final retained transition request and checked pending draw; the passive row2426 exit and separate row2427 selected-stage tuple matched. Prepared VS output remains unpaired; no ordinary VS scene entry/setup or whole-session acceptance is claimed.';
+    firstSssFreshPrefix132
+      ? '132 exact fresh SSS consumed-PAD/tick/draw records matched through actual epilogue2481 and separate selected-stage witness2482. Original pending/next and conditional OnFrame flags remain unpaired; prepared VS output is unpaired, and no VS/GO/C3 or whole-session acceptance is claimed.'
+      : '124 exact SSS consumed-PAD/tick/draw records matched, including the final retained transition request and checked pending draw; the passive row2426 exit and separate row2427 selected-stage tuple matched. Prepared VS output remains unpaired; no ordinary VS scene entry/setup or whole-session acceptance is claimed.';
   await persistReport();
   await saveScreenshot('stadium-first-sss-prefix');
   return evidence.native;
@@ -5311,7 +5322,7 @@ async function main() {
   assert.equal(build, expectedBuild, 'Only the isolated C1a diagnostic runtime may be served');
   assert.equal(preflight.schema, 'melee-web-stadium-c1a-browser-preflight-v1');
   if(firstSssConstructorPairFresh){
-    assert.equal(preflight.route_mode, firstSssFreshInputTickDraw
+    assert.equal(preflight.route_mode, firstSssFreshPrefix132 ? 'first-css-fresh-finite-sss-prefix-132-v2' : firstSssFreshInputTickDraw
       ? 'first-css-fresh-finite-sss-input-tick-draw-v1'
       : 'first-css-fresh-finite-sss-constructor-pair-v1');
     assert.ok(preflight.first_css_fresh_finite?.receipt);

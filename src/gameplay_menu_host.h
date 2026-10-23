@@ -246,6 +246,8 @@ int melee_web_menu_host_arm_first_sss_draw(MeleeWebMenuHost*,
 int melee_web_menu_host_draw_first_sss(MeleeWebMenuHost*, char*, size_t);
 int melee_web_menu_host_arm_first_sss_prefix(MeleeWebMenuHost*,
     MeleeWebMenuSssSampleCallback, void*, char*, size_t);
+int melee_web_menu_host_arm_fresh_sss_prefix_132(MeleeWebMenuHost*,
+    MeleeWebMenuSssSampleCallback, void*, char*, size_t);
 int melee_web_menu_host_tick_first_sss_prefix(MeleeWebMenuHost*,
     const PADStatus[4], unsigned index, char*, size_t);
 int melee_web_menu_host_draw_first_sss_prefix(MeleeWebMenuHost*,

@@ -1422,16 +1422,16 @@ export function validateFirstSssDrawExpectedSource(expected) {
   return expected;
 }
 
-function firstSssPrefixExpectedExitSessionTicks(pair) {
+function firstSssPrefixExpectedExitSessionTicks(pair, total=125) {
   if (!plainObject(pair) || !plainObject(pair.entry) || !plainObject(pair.returned)) return null;
   const entry = pair.entry.session_ticks, returned = pair.returned.session_ticks;
   if (!Number.isSafeInteger(entry) || entry < 0 || entry !== returned ||
-      entry > Number.MAX_SAFE_INTEGER - 125) return null;
-  return entry + 125;
+      entry > Number.MAX_SAFE_INTEGER - total) return null;
+  return entry + total;
 }
 
-function firstSssPrefixExitSessionMatches(pair, actualTicks) {
-  const expectedTicks = firstSssPrefixExpectedExitSessionTicks(pair);
+function firstSssPrefixExitSessionMatches(pair, actualTicks, total=125) {
+  const expectedTicks = firstSssPrefixExpectedExitSessionTicks(pair,total);
   return expectedTicks !== null && Number.isSafeInteger(actualTicks) &&
     actualTicks === expectedTicks;
 }
@@ -1509,11 +1509,15 @@ export function createFirstSssDrawComparator(expectedDraw, constructorPair, cons
     first_mismatch: firstMismatch, rows})});
 }
 
-function validatePrefixInputRows(expected, inputRows) {
-  if (!Array.isArray(expected.records) || expected.records.length !== 124 ||
-      !Array.isArray(inputRows) || inputRows.length !== 124) return false;
-  let previous = 1610;
-  for (let index = 0; index < 124; index += 1) {
+const LEGACY_SSS_PREFIX_PROFILE = Object.freeze({count:124,total:125,prior:1610,
+  first:1612,last:2420,lastDraw:2424,drawBase:150,seed:'3bb84c53',selection:2427});
+const FRESH_SSS_PREFIX_132_PROFILE = Object.freeze({count:132,total:133,prior:1601,
+  first:1603,last:2475,lastDraw:2479,drawBase:143,seed:'e2624ac3',selection:2482});
+function validatePrefixInputRows(expected, inputRows, profile=LEGACY_SSS_PREFIX_PROFILE) {
+  if (!Array.isArray(expected.records) || expected.records.length !== profile.count ||
+      !Array.isArray(inputRows) || inputRows.length !== profile.count) return false;
+  let previous = profile.prior;
+  for (let index = 0; index < profile.count; index += 1) {
     const record = expected.records[index], input = inputRows[index];
     if (!plainObject(record) || !plainObject(input) || record.input_index !== index ||
         record.input_ordinal !== index + 1 || input.input_index !== index ||
@@ -1539,8 +1543,8 @@ function validatePrefixInputRows(expected, inputRows) {
         record.draw_return.phase !== 'draw_return' || record.scheduler_end.scene_frame !== index + 1 ||
         record.draw_enter.scene_frame !== index + 2 || record.draw_return.scene_frame !== index + 2 ||
         record.scheduler_end.scene_kind !== 9 || record.draw_enter.scene_kind !== 9 ||
-        record.draw_return.scene_kind !== 9 || record.scheduler_end.random_seed_hex !== '3bb84c53' ||
-        record.draw_enter.random_seed_hex !== '3bb84c53' || record.draw_return.random_seed_hex !== '3bb84c53' ||
+        record.draw_return.scene_kind !== 9 || record.scheduler_end.random_seed_hex !== profile.seed ||
+        record.draw_enter.random_seed_hex !== profile.seed || record.draw_return.random_seed_hex !== profile.seed ||
         !validHex(record.scheduler_end.pad_state_hex, 822) ||
         !validHex(record.draw_enter.pad_state_hex, 822) || !validHex(record.draw_return.pad_state_hex, 822) ||
         !exactRoute(record.scheduler_end.scene_routing_getters,
@@ -1551,18 +1555,18 @@ function validatePrefixInputRows(expected, inputRows) {
     if (!plainObject(record.source_rows) ||
         !firstSssSourceRowIsPinned(record.source_rows.scheduler_end,
           record.scheduler_end_sequence, 'source_tick', 0x80390eb4, null,
-          150 + index, index + 1, index + 1, 0x801a4fa4) ||
+          profile.drawBase + index, index + 1, index + 1, 0x801a4fa4, profile.seed) ||
         !firstSssSourceRowIsPinned(record.source_rows.draw_enter,
           record.draw_enter_sequence, 'draw_enter', 0x80390fc0, null,
-          150 + index, index + 2, index + 2) ||
+          profile.drawBase + index, index + 2, index + 2, 0x801a5048, profile.seed) ||
         !firstSssSourceRowIsPinned(record.source_rows.draw_return,
           record.draw_return_sequence, 'draw_return', 0x80391040, null,
-          150 + index, index + 2, index + 2)) return false;
+          profile.drawBase + index, index + 2, index + 2, 0x801a5048, profile.seed)) return false;
     previous = record.draw_return_sequence;
   }
-  return expected.records[0].consumed_pad_sequence === 1612 &&
-    expected.records[123].consumed_pad_sequence === 2420 &&
-    expected.records[123].draw_return_sequence === 2424;
+  return expected.records[0].consumed_pad_sequence === profile.first &&
+    expected.records[profile.count-1].consumed_pad_sequence === profile.last &&
+    expected.records[profile.count-1].draw_return_sequence === profile.lastDraw;
 }
 
 export function validateFirstSssPrefixExpectedSource(expected, inputRows) {
@@ -1677,17 +1681,70 @@ export function decodeFirstSssPrefixInputBundle(bytes) {
   return Object.freeze(records);
 }
 
-export function createFirstSssPrefixComparator(expectedPrefix, inputRows,
-    constructorPair, consumedTick, firstDrawObservation) {
-  const expected = validateFirstSssPrefixExpectedSource(expectedPrefix, inputRows);
-  if (!approvedFirstSssPrerequisites(constructorPair, consumedTick) ||
+export function decodeFreshSssPrefix132InputBundle(bytes) {
+  const fail=()=>{throw new TypeError('Fresh SSS prefix requires exact7968-byte version2 input');};
+  if(!(bytes instanceof Uint8Array)||bytes.byteLength!==7968)fail();
+  const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  if([...bytes.subarray(0,8)].map(v=>String.fromCharCode(v)).join('')!=='STC1SSSP'||
+     view.getUint32(8,false)!==2||view.getUint32(44,false)!==132||
+     [...bytes.subarray(12,44)].map(v=>v.toString(16).padStart(2,'0')).join('')!==FRESH_FIRST_SSS_STREAM_SHA256)fail();
+  const records=[];let previous=1601;
+  for(let i=0;i<132;i++){
+    const offset=48+i*60;
+    const seq=[0,4,8,12].map(p=>view.getUint32(offset+p,false));
+    for(const value of seq){if(value<=previous)fail();previous=value;}
+    const ports=Array.from({length:4},(_,p)=>[...bytes.subarray(offset+16+p*11,offset+27+p*11)].map(v=>v.toString(16).padStart(2,'0')).join(''));
+    records.push({input_index:i,input_ordinal:i+1,consumed_pad_sequence:seq[0],scheduler_end_sequence:seq[1],draw_enter_sequence:seq[2],draw_return_sequence:seq[3],port_status_hex:ports});
+  }
+  if(!sameJsonValue([records[0].consumed_pad_sequence,records[0].scheduler_end_sequence,records[0].draw_enter_sequence,records[0].draw_return_sequence],[1603,1607,1608,1609])||
+     !sameJsonValue([records[131].consumed_pad_sequence,records[131].scheduler_end_sequence,records[131].draw_enter_sequence,records[131].draw_return_sequence],[2475,2477,2478,2479]))fail();
+  return Object.freeze(records);
+}
+export function validateFreshSssPrefix132ExpectedSource(expected,inputRows) {
+  const fail=()=>{throw new TypeError('Fresh SSS prefix requires exact132 source records through exit2481/witness2482');};
+  if(!plainObject(expected)||expected.schema!=='melee-web-stadium-fresh-sss-prefix-diagnostic'||expected.version!==2||
+     expected.profile!=='fresh_finite_sss_remaining_prefix_v1'||expected.source_admission!==false||
+     expected.whole_session_equivalent!==false||expected.C3!==false||
+     expected.observer?.bytes!==FRESH_FIRST_SSS_STREAM_BYTES||expected.observer?.sha256!==FRESH_FIRST_SSS_STREAM_SHA256||
+     !validatePrefixInputRows(expected,inputRows,FRESH_SSS_PREFIX_132_PROFILE))fail();
+  const wire=expected.input_bundle;
+  if(!sameJsonValue(wire,{magic_hex:'5354433153535350',version:2,bytes:7968,sha256:wire?.sha256,sample_count:132,record_bytes:60,contains_expected_state:false})||!/^[0-9a-f]{64}$/.test(wire?.sha256??''))fail();
+  const exit=expected.exit_note,selection=expected.selected_stage_source_witness;
+  const note=exit?.expected,source=exit?.source;
+  if(exit?.sequence!==2481||note?.phase!=='sss_exit'||note.scene_frame!==133||note.scene_kind!==9||note.random_seed_hex!==FRESH_FIRST_SSS_SEED||
+     !validHex(note.pad_state_hex,822)||!exactRoute(note.scene_routing_getters,FRESH_FIRST_SSS_ROUTE)||
+     note.sss?.header?.start_game!==1||!exactOwnKeys(note.sss.header,['start_game'])||
+     !exactOwnKeys(note.sss?.vs?.start?.rules,SSS_RULE_KEYS)||!Array.isArray(note.sss?.vs?.start?.players)||note.sss.vs.start.players.length!==4||
+     note.sss.vs.start.players.some(p=>!exactOwnKeys(p,SSS_PLAYER_KEYS))||
+     source?.sequence!==2481||source.event!=='progress'||source.phase!=='sss_exit'||source.source_tick!==133||source.draw_ordinal!==275||
+     source.pc!=='0x8025bbd0'||source.word!=='0x4e800020'||source.lr!=='0x801a4124'||source.argument!=='0x00000000'||
+     source.setup_profile_verified_by_observer!==false||source.setup_receipt_sha256!=='e6b15cececf103efeb9b7df2dd18908e9a66d37ebde68622ecd304f8eabcfcda'||
+     !sourceInventoryMatches(source.source_slice_inventory,FIRST_SSS_EXIT_SOURCE_INVENTORY)||!sourceSlicesMatch(source.source_slices_hex,FIRST_SSS_EXIT_SOURCE_INVENTORY)||
+     source.source_slices_hex['35:0']!=='01'||source.source_slices_hex['30:0']!=='00000085'||source.source_slices_hex['40:0']!=='09'||
+     source.source_slices_hex['20:0']!==FRESH_FIRST_SSS_SEED||source.rng_pointer_hex!=='804d5f90'||source.scene_routing_raw_hex!=='020201010000'||
+     padSnapshotHex(source.source_slices_hex['21:0'])!==note.pad_state_hex)fail();
+  const witness=selection?.source;
+  const inventory=FIRST_SSS_SELECTION_SOURCE_INVENTORY.map(row=>row.tag===1?{...row,address:0x804ee754}:row.tag===27?{...row,address:0x804ee72c}:row);
+  if(selection?.sequence!==2482||!sameJsonValue(selection.selected_stage,{index:18,kind:3})||
+     witness?.sequence!==2482||witness.event!=='boundary'||witness.boundary!=='pad_poll'||witness.phase!==null||witness.source_tick!==133||witness.draw_ordinal!==275||
+     witness.pc!==0x8034dd8c||witness.lr!==0x8034db8c||witness.scene_kind!==9||
+     witness.selected_stage_is_a_later_source_witness!==true||witness.not_paired_with_row2481_exit_note!==true||
+     !sourceInventoryMatches(witness.source_slice_inventory,inventory)||!sourceSlicesMatch(witness.source_slices_hex,inventory)||
+     witness.source_slices_hex['41:0']!=='12'||witness.source_slices_hex['42:0']!=='03'||witness.source_slices_hex['40:0']!=='09'||
+     witness.scene_routing_raw_hex!==witness.source_slices_hex['17:0']||witness.scene_routing_raw_hex!=='020201020100')fail();
+  return expected;
+}
+
+function createSssPrefixComparatorCore(expected, inputRows,
+    constructorPair, consumedTick, firstDrawObservation, profile) {
+  if (firstSssPrefixExpectedExitSessionTicks(constructorPair,profile.total)===null || !approvedFirstSssPrerequisites(constructorPair, consumedTick) ||
       firstDrawObservation?.complete !== true || firstDrawObservation?.compared !== true ||
       firstDrawObservation?.failed !== false || firstDrawObservation?.host_draw_calls !== 1 ||
       firstDrawObservation?.host_tick_calls !== 0 || firstDrawObservation?.aurora_begin_calls !== 1 ||
       firstDrawObservation?.aurora_end_calls !== 1 || firstDrawObservation?.frame_end_returned !== true)
     throw new TypeError('SSS prefix requires approved constructor, tick and first-draw prerequisites');
   const required = [];
-  for (let index = 0; index < 124; index += 1)
+  for (let index = 0; index < profile.count; index += 1)
     required.push(['scheduler_end', index], ['draw_enter', index], ['draw_return', index]);
   required.push(['sss_exit', null], ['selected_stage', null]);
   const rows = [];
@@ -1715,7 +1772,7 @@ export function createFirstSssPrefixComparator(expectedPrefix, inputRows,
       if (!exactOwnKeys(row.actual, ['index', 'kind']) || row.actual.index !== wanted.index ||
           row.actual.kind !== wanted.kind)
         firstMismatch = mismatch('selected_stage', wanted, row.actual,
-          'later row2427 selected-stage tuple differs');
+          `later row${profile.selection} selected-stage tuple differs`);
     } else if (phase === 'sss_exit') {
       const actual = row.actual, wanted = expected.exit_note.expected;
       if (!exactOwnKeys(actual, SSS_NOTE_KEYS))
@@ -1732,13 +1789,13 @@ export function createFirstSssPrefixComparator(expectedPrefix, inputRows,
         firstMismatch = common || compareExpectedField(actual.sss?.header?.start_game,
           wanted.sss.header.start_game, 'sss_exit.sss.header.start_game') ||
           actualRulesMismatch(actual, wanted, 'sss_exit') || actualPlayersMismatch(actual, wanted, 'sss_exit');
-        const expectedSessionTicks = firstSssPrefixExpectedExitSessionTicks(constructorPair);
+        const expectedSessionTicks = firstSssPrefixExpectedExitSessionTicks(constructorPair,profile.total);
         if (!firstMismatch && (actual.host_entered !== true || actual.session_phase !== 3 ||
-            !firstSssPrefixExitSessionMatches(constructorPair, actual.session_ticks)))
+            !firstSssPrefixExitSessionMatches(constructorPair, actual.session_ticks,profile.total)))
           firstMismatch = mismatch('sss_exit.session', {host_entered: true, session_phase: 3,
             session_ticks: expectedSessionTicks}, {host_entered: actual.host_entered,
             session_phase: actual.session_phase, session_ticks: actual.session_ticks},
-          'exit note did not retain the constructor-pair lifetime base plus 125 SSS ticks');
+          `exit note did not retain the constructor-pair lifetime base plus ${profile.total} SSS ticks`);
       }
     } else {
       const record = expected.records[recordIndex];
@@ -1768,6 +1825,13 @@ export function createFirstSssPrefixComparator(expectedPrefix, inputRows,
     approved: next === required.length && !failed, failed, next_phase: required[next]?.[0] ?? null,
     next_index: required[next]?.[1] ?? null, first_mismatch: firstMismatch, rows,
     owner_world_generation: ownerWorld, owner_audio_generation: ownerAudio})});
+}
+
+export function createFirstSssPrefixComparator(expected,inputRows,pair,tick,draw){
+ return createSssPrefixComparatorCore(validateFirstSssPrefixExpectedSource(expected,inputRows),inputRows,pair,tick,draw,LEGACY_SSS_PREFIX_PROFILE);
+}
+export function createFreshSssPrefix132Comparator(expected,inputRows,pair,tick,draw){
+ return createSssPrefixComparatorCore(validateFreshSssPrefix132ExpectedSource(expected,inputRows),inputRows,pair,tick,draw,FRESH_SSS_PREFIX_132_PROFILE);
 }
 
 // The closed-host prepared match Start is distinct from persistent prepared_mode.

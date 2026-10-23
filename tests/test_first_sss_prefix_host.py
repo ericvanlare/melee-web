@@ -10,7 +10,11 @@ from test_first_sss_consumed_tick_host import build_first_sss_tick_control
 ROOT=Path(__file__).resolve().parents[1]
 
 class FirstSssPrefixHostTests(OwnedWorkspaceTests):
+ def test_fresh_132_permits_draw_seams_and_refusals(self):
+  self.run_profile(fresh=True)
  def test_actual_finite_permits_draw_seams_and_refusals(self):
+  self.run_profile(fresh=False)
+ def run_profile(self,fresh):
   hs=(ROOT/'src/gameplay_menu_host.c').read_text();ms=(ROOT/'src/gameplay_menu.c').read_text()
   control=build_first_sss_tick_control(ROOT)
   control=control.replace(_function(control,'int main(void)'), '')
@@ -19,7 +23,7 @@ class FirstSssPrefixHostTests(OwnedWorkspaceTests):
   # Keep the typed callback prototype; the session now has its actual tag.
   control=control.replace('typedef int MeleeWebMenuScene;', '#define MELEE_WEB_MENU_SSS_PREFIX_EXIT 3\nstruct MeleeWebMenuSession;\nstruct SSSData;\ntypedef void (*MeleeWebMenuFirstSssPairNote)(void*,struct MeleeWebMenuSession*,const struct SSSData*,uint64_t,int);\ntypedef int MeleeWebMenuScene;')
   old=_function(control,'static int observe_transition(')
-  control=control.replace(old,old.replace('*r=0;', '*r=callbacks==125?1:0;active_host->transition=*r;'))
+  control=control.replace(old,old.replace('*r=0;', '*r=callbacks=='+str(133 if fresh else 125)+'?1:0;active_host->transition=*r;'))
   old=_function(control,'static int run_scheduler(MeleeWebMenuSession*s,')
   control=control.replace(old,old.replace('(void)s;++steps;', '(void)s;++steps;if(active_host->first_sss_sequence_operation==2){sss_sequence_capture(active_host,1,MELEE_WEB_SSS_SAMPLE_TICK,&active_host->first_sss_prefix.scheduler_end);++active_host->first_sss_prefix.consumed_inputs;return melee_web_menu_clock_tick();}'))
   control=control.replace('typedef struct { CSSData css; SSSData sss;', 'typedef struct MeleeWebMenuSession { CSSData css; SSSData sss;')
@@ -30,8 +34,8 @@ class FirstSssPrefixHostTests(OwnedWorkspaceTests):
   proto='static int sss_sequence_capture(MeleeWebMenuHost*,int,int,MeleeWebMenuFirstSssTickSnapshot*);\n'
   control=control.replace(marker,proto+marker,1)
   old=_function(control,'static int host_draw_render(MeleeWebMenuHost*h,')
-  bodies='\n'.join(_function(ms,x) for x in ['int melee_web_menu_arm_first_sss_prefix(', 'int melee_web_menu_authorize_first_sss_prefix_tick('])
-  bodies+='\n'+ '\n'.join(_function(hs,x) for x in ['static int sss_sequence_owner(', 'static int sss_sequence_capture(', 'static void first_sss_prefix_exit_note(', 'int melee_web_menu_host_arm_first_sss_draw(', 'int melee_web_menu_host_arm_first_sss_prefix(', 'static int host_draw_render(', 'int melee_web_menu_host_draw_first_sss(', 'int melee_web_menu_host_tick_first_sss_prefix(', 'int melee_web_menu_host_draw_first_sss_prefix('])
+  bodies='\n'.join(_function(ms,x) for x in ['static unsigned first_sss_prefix_count(', 'static int arm_first_sss_prefix_profile(', 'int melee_web_menu_arm_first_sss_prefix(', 'int melee_web_menu_arm_fresh_sss_prefix_132(', 'int melee_web_menu_authorize_first_sss_prefix_tick('])
+  bodies+='\n'+ '\n'.join(_function(hs,x) for x in ['static int sss_sequence_owner(', 'static int sss_sequence_capture(', 'static unsigned host_first_sss_prefix_count(', 'static void first_sss_prefix_exit_note(', 'int melee_web_menu_host_arm_first_sss_draw(', 'static int host_arm_first_sss_prefix_profile(', 'int melee_web_menu_host_arm_first_sss_prefix(', 'int melee_web_menu_host_arm_fresh_sss_prefix_132(', 'static int host_draw_render(', 'int melee_web_menu_host_draw_first_sss(', 'int melee_web_menu_host_tick_first_sss_prefix(', 'int melee_web_menu_host_draw_first_sss_prefix('])
   # Execute the actual public-entry guard prefix without needing unrelated
   # host preference/heap services. The success tail is a retirement counter,
   # explicitly a fixture rather than a claim about full ordinary leave.
@@ -65,7 +69,7 @@ static int mode_exit_fixture(void*user,int scene,char*e,size_t n){(void)e;(void)
   control=control.replace(old,bodies)
   # setup() remains the original ownership fixture, not a replacement for the
   # production predicates or a claim about actual acquired world/audio IDs.
-  control+=r'''
+  main=r'''
 static int reject_phase, approvals[6],reenter;
 static int compare(void* data,int phase,const MeleeWebMenuFirstSssTickSnapshot* sample,const MeleeWebMenuFirstSssPairNoteSnapshot* exit_note){
  (void)data;char e[160];HSD_PadData before=h.queue;int old_callbacks=callbacks;
@@ -78,7 +82,7 @@ static int compare(void* data,int phase,const MeleeWebMenuFirstSssTickSnapshot* 
  assert(sample&&sample->captured);assert(sample->scene_kind==9);for(int i=0;i<8;i++)assert(sample->owners[i]);++approvals[phase];return phase!=reject_phase;
 }
 static void ready_at(uint64_t base){char e[160];setup_at(base);reject_phase=reenter=retirement_attempts=0;memset(approvals,0,sizeof approvals);assert(melee_web_menu_host_arm_first_sss_tick(&h,raw,e,sizeof e));assert(melee_web_menu_host_tick(&h,raw,e,sizeof e)==1);assert(h.first_sss_tick_state==3);assert(s.ticks==base+1);}static void ready(void){ready_at(0);}
-int main(void){char e[160];int before;ready_at(149);MeleeWebMenuFirstSssTickSnapshot original=h.first_sss_tick_scheduler_end;
+int main(void){char e[160];int before;assert(!host_first_sss_prefix_count((const MeleeWebMenuHost*)(uintptr_t)1));ready_at(149);MeleeWebMenuFirstSssTickSnapshot original=h.first_sss_tick_scheduler_end;
  assert(melee_web_menu_host_arm_first_sss_draw(&h,compare,NULL,e,sizeof e));assert(melee_web_menu_host_draw_first_sss(&h,e,sizeof e));assert(approvals[2]==1&&approvals[3]==1&&h.first_sss_draw.state==2);
  assert(melee_web_menu_host_arm_first_sss_prefix(&h,compare,NULL,e,sizeof e));
  for(unsigned i=0;i<124;i++){assert(melee_web_menu_host_tick_first_sss_prefix(&h,raw,i,e,sizeof e)==(i==123?3:1));assert(h.first_sss_prefix.scheduler_end.scene_frame==i+1);assert(melee_web_menu_host_draw_first_sss_prefix(&h,i,e,sizeof e));assert(h.first_sss_prefix.draw_enter.scene_frame==i+2&&h.first_sss_prefix.draw_return.scene_frame==i+2);}
@@ -101,8 +105,13 @@ int main(void){char e[160];int before;ready_at(149);MeleeWebMenuFirstSssTickSnap
  ready();assert(melee_web_menu_host_arm_first_sss_draw(&h,compare,NULL,e,sizeof e));assert(melee_web_menu_host_draw_first_sss(&h,e,sizeof e));assert(melee_web_menu_host_arm_first_sss_prefix(&h,compare,NULL,e,sizeof e));for(unsigned i=0;i<124;++i){assert(melee_web_menu_host_tick_first_sss_prefix(&h,raw,i,e,sizeof e));assert(melee_web_menu_host_draw_first_sss_prefix(&h,i,e,sizeof e));}reenter=4;assert(!melee_web_menu_host_leave_first_sss_prefix(&h,e,sizeof e));assert(h.first_sss_prefix.state==3&&h.first_sss_prefix.exit_captured&&h.first_sss_prefix.selected_stage_captured&&approvals[4]==1&&!approvals[5]&&!h.first_sss_sequence_operation&&!retirement_attempts);
  puts("PASS actual host/session finite124: first-draw gate, scheduler-before-clock, final pending draw, preserved old snapshots and refused extra/foreign/mismatch work");return 0;}
 '''
+  if fresh:
+   main=main.replace('124','132').replace('125','133').replace('123','131').replace('149','142').replace('274','275')
+   main=main.replace('melee_web_menu_host_arm_first_sss_prefix(', 'melee_web_menu_host_arm_fresh_sss_prefix_132(')
+   main=main.replace('finite132:', 'finite132:')
+  control+=main
   work=self.new_workspace(ROOT,'sss-prefix-host-');c=work/'control.c';binary=work/'control';c.write_text(control)
   argv=shlex.split(os.environ.get('CC','cc'))+['-std=c11','-Wall','-Wextra','-Werror','-Wno-unused-function','-Wno-unused-variable',str(c),'-o',str(binary)]
   result=subprocess.run(argv,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT);(work/'compile.log').write_text(result.stdout);self.assertEqual(result.returncode,0,result.stdout)
-  result=subprocess.run([str(binary)],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT);(work/'run.log').write_text(result.stdout);self.assertEqual(result.returncode,0,result.stdout);self.assertIn('PASS actual host/session finite124',result.stdout)
+  result=subprocess.run([str(binary)],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT);(work/'run.log').write_text(result.stdout);self.assertEqual(result.returncode,0,result.stdout);self.assertIn('PASS actual host/session finite'+('132' if fresh else '124'),result.stdout)
 if __name__=='__main__':unittest.main()

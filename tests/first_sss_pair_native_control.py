@@ -16,7 +16,8 @@ def function_slice(text, marker):
 action_enum=source[source.index("enum class FirstSssFreshPairCallbackAction : unsigned {"):source.index("FirstSssFreshPairCallbackAction first_sss_fresh_pair_callback_action(){")]
 action=function_slice(source,"FirstSssFreshPairCallbackAction first_sss_fresh_pair_callback_action(){")
 ready=function_slice(source,"bool first_sss_fresh_draw_callback_ready(){")
-dispatch_start=source.index(" if(fresh_pair_callback==FirstSssFreshPairCallbackAction::ServiceFirstDraw){")
+prefix_ready=function_slice(source,"bool first_sss_fresh_prefix_callback_ready(){")
+dispatch_start=source.index(" if(fresh_pair_callback==FirstSssFreshPairCallbackAction::ServiceFreshPrefix){")
 dispatch_end=source.index(" if(fresh_pair_callback==FirstSssFreshPairCallbackAction::StopAfterPair){",dispatch_start)
 draw_dispatch=source[dispatch_start:dispatch_end]
 draw_arm=function_slice(source,"int melee_web_native_menu_stadium_first_sss_draw_arm(){")
@@ -138,13 +139,17 @@ struct TickState {
  bool armed=false,kicked=false,attempted=false,captured=false,complete=false,compared=false,failed=false;
  struct {unsigned host_tick_calls=0,host_draw_calls=0;int tick_result=0;bool clock_post_succeeded=false,post_host_frame_captured=false,transition_requested=false;unsigned post_host_frame=0;struct{uint64_t world_generation=0;}scheduler_end;}native;
 }first_sss_consumed_tick;
+enum {MELEE_WEB_MENU_SSS_PREFIX_LEGACY_124=1,MELEE_WEB_MENU_SSS_PREFIX_FRESH_132=2};
 struct SequenceState {
+ int prefix_profile=0;
  Host* callback_host_owner=nullptr;const void* callback_world_owner=nullptr;uint64_t callback_world_generation=0;
  bool armed=false,kicked=false,attempted=false,complete=false,failed=false,frame_end_returned=false;
  unsigned aurora_begin_calls=0,aurora_end_calls=0;
  struct {int state=0;unsigned host_tick_calls=0,host_draw_calls=0;}native;
 }first_sss_draw_sequence,first_sss_prefix_sequence;
 '''+ready+r'''
+'''+prefix_ready+r'''
+
 '''+action_enum+r'''
 '''+action+r'''
 '''+actual+r'''
@@ -193,8 +198,14 @@ void setup_fresh_pair_kicked(){
  setup_fresh();auto& pair=first_sss_constructor_pair;
  pair.profile=FirstCssBrowserMode::FreshFiniteCssPrefixV4;pair.armed=pair.kicked=true;
 }
+unsigned prefix_service_calls=0;
 unsigned draw_service_calls=0,ordinary_loop_calls=0,input_calls=0,audio_calls=0,second_tick_calls=0;
 bool first_sss_sequence_service(){
+ if(first_sss_prefix_sequence.armed){
+  ++prefix_service_calls;
+  if(prefix_service_calls==132){first_sss_prefix_sequence.complete=true;first_sss_prefix_sequence.frame_end_returned=true;}
+  return true;
+ }
  ++draw_service_calls;auto& draw=first_sss_draw_sequence;
  draw.attempted=true;draw.complete=true;draw.frame_end_returned=true;
  draw.aurora_begin_calls=draw.aurora_end_calls=1;draw.native.state=2;draw.native.host_draw_calls=1;
@@ -217,6 +228,34 @@ void setup_ready_draw(){
  auto& draw=first_sss_draw_sequence;draw.armed=draw.kicked=true;draw.native.state=1;
  draw.callback_host_owner=host;draw.callback_world_owner=world.get();draw.callback_world_generation=8;
  draw_service_calls=ordinary_loop_calls=input_calls=audio_calls=second_tick_calls=0;
+}
+void setup_ready_prefix(){
+ setup_ready_draw();auto& draw=first_sss_draw_sequence;draw.complete=true;draw.attempted=true;
+ draw.frame_end_returned=true;draw.native.state=2;draw.native.host_draw_calls=1;
+ auto& p=first_sss_prefix_sequence;p.prefix_profile=MELEE_WEB_MENU_SSS_PREFIX_FRESH_132;
+ p.armed=p.kicked=true;p.callback_host_owner=host;p.callback_world_owner=world.get();p.callback_world_generation=8;
+ prefix_service_calls=0;
+}
+void fresh_prefix_dispatch_controls(){
+ setup_ready_prefix();
+ for(unsigned i=0;i<132;++i){assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::ServiceFreshPrefix);extracted_dispatch();}
+ assert(prefix_service_calls==132&&!draw_service_calls&&!ordinary_loop_calls&&!input_calls&&!audio_calls&&!second_tick_calls);
+ assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::StopAfterPair);extracted_dispatch();assert(prefix_service_calls==132&&!ordinary_loop_calls);
+ for(int failure=0;failure<20;++failure){
+  setup_ready_prefix();auto& p=first_sss_prefix_sequence;auto& tick=first_sss_consumed_tick;Host foreign;int foreign_world;
+  switch(failure){
+   case 0:p.prefix_profile=MELEE_WEB_MENU_SSS_PREFIX_LEGACY_124;break;case 1:p.armed=false;break;case 2:p.kicked=false;break;
+   case 3:p.failed=true;break;case 4:p.complete=true;break;case 5:p.callback_host_owner=&foreign;break;
+   case 6:p.callback_world_owner=&foreign_world;break;case 7:p.callback_world_generation=9;break;
+   case 8:first_sss_constructor_pair.compared=false;break;case 9:first_sss_constructor_pair.failed=true;break;
+   case 10:tick.compared=false;break;case 11:tick.native.host_tick_calls=2;break;case 12:tick.native.transition_requested=true;break;
+   case 13:first_sss_draw_sequence.frame_end_returned=false;break;case 14:first_css_browser_draw.complete=false;break;
+   case 15:pending=true;break;case 16:running=true;break;case 17:host_entered=false;break;
+   case 18:first_sss_constructor_pair.profile=FirstCssBrowserMode::LegacyTickDrawV1;break;
+   case 19:first_css_browser_draw.mode=FirstCssBrowserMode::LegacyTickDrawV1;break;
+  }
+  assert(first_sss_fresh_pair_callback_action()!=FirstSssFreshPairCallbackAction::ServiceFreshPrefix);
+ }
 }
 void fresh_draw_dispatch_controls(){
  setup_ready_draw();assert(first_sss_fresh_pair_callback_action()==FirstSssFreshPairCallbackAction::ServiceFirstDraw);
@@ -295,6 +334,7 @@ void callback_action_controls(){
 }
 int run_control(){
  fresh_draw_dispatch_controls();
+ fresh_prefix_dispatch_controls();
  callback_action_controls();
  setup_fresh();assert(first_css_browser_draw.draw.seed==0x312151c3);
  assert(first_css_browser_postdraw_stream.transition.seed==0xe2624ac3);

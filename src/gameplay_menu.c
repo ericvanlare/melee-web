@@ -46,6 +46,7 @@ struct MeleeWebMenuSession {
     uint64_t first_sss_tick_session_base;
     int first_sss_tick_session_base_captured;
     int first_sss_prefix_state; /* 0 unused, 1 finite lease, 2 exited, 3 invalid */
+    enum MeleeWebMenuSssPrefixProfile first_sss_prefix_profile;
     unsigned first_sss_prefix_remaining;
     int first_sss_prefix_token; /* 1 armed, 2 consumed */
     MeleeWebMenuFirstSssPairNote first_sss_prefix_exit_note;
@@ -1091,34 +1092,59 @@ int melee_web_menu_first_sss_tick_session_base(
     return 1;
 }
 
-int melee_web_menu_arm_first_sss_prefix(MeleeWebMenuSession* session,
-    MeleeWebMenuFirstSssPairNote note, char* error, size_t error_size)
+static unsigned first_sss_prefix_count(enum MeleeWebMenuSssPrefixProfile profile)
 {
+    switch (profile) {
+    case MELEE_WEB_MENU_SSS_PREFIX_LEGACY_124: return 124;
+    case MELEE_WEB_MENU_SSS_PREFIX_FRESH_132: return 132;
+    default: return 0;
+    }
+}
+static int arm_first_sss_prefix_profile(MeleeWebMenuSession* session,
+    MeleeWebMenuFirstSssPairNote note, enum MeleeWebMenuSssPrefixProfile profile,
+    char* error, size_t error_size)
+{
+    const unsigned count = first_sss_prefix_count(profile);
     if (!session_live(session,error,error_size)) return 0;
-    if (!note || session->first_sss_prefix_state ||
+    if (!count || !note || session->first_sss_prefix_state ||
         session->first_sss_pair_state != 4 || session->first_sss_tick_token != 2 ||
         session->phase != MELEE_WEB_MENU_SSS || !session->sss_open ||
         session->transition_failed || session->selection_rejected ||
         session->transition_requested || !session->first_sss_tick_session_base_captured ||
         session->ticks < session->first_sss_tick_session_base ||
         session->ticks - session->first_sss_tick_session_base != 1 ||
-        session->first_sss_tick_session_base > UINT64_MAX - 125) {
+        session->first_sss_tick_session_base > UINT64_MAX - (count + 1)) {
         session->first_sss_prefix_state=3;
         return fail(error,error_size,"SSS prefix requires its completed first tick");
     }
-    session->first_sss_prefix_remaining=124;
+    session->first_sss_prefix_profile=profile;
+    session->first_sss_prefix_remaining=count;
     session->first_sss_prefix_exit_note=note;
     session->first_sss_prefix_state=1;
     return ok(error,error_size);
+}
+
+int melee_web_menu_arm_first_sss_prefix(MeleeWebMenuSession* session,
+    MeleeWebMenuFirstSssPairNote note, char* error, size_t size)
+{
+    return arm_first_sss_prefix_profile(session,note,
+        MELEE_WEB_MENU_SSS_PREFIX_LEGACY_124,error,size);
+}
+int melee_web_menu_arm_fresh_sss_prefix_132(MeleeWebMenuSession* session,
+    MeleeWebMenuFirstSssPairNote note, char* error, size_t size)
+{
+    return arm_first_sss_prefix_profile(session,note,
+        MELEE_WEB_MENU_SSS_PREFIX_FRESH_132,error,size);
 }
 
 int melee_web_menu_authorize_first_sss_prefix_tick(MeleeWebMenuSession* session,
     unsigned index, char* error, size_t error_size)
 {
     if (!session_live(session,error,error_size)) return 0;
-    if (session->first_sss_prefix_state != 1 ||
-        !session->first_sss_prefix_remaining || index >= 124 ||
-        index != 124-session->first_sss_prefix_remaining ||
+    const unsigned count = first_sss_prefix_count(session->first_sss_prefix_profile);
+    if (!count || session->first_sss_prefix_state != 1 ||
+        !session->first_sss_prefix_remaining || index >= count ||
+        index != count-session->first_sss_prefix_remaining ||
         session->first_sss_prefix_token == 1 || session->first_sss_pair_state != 4 ||
         session->phase != MELEE_WEB_MENU_SSS || !session->sss_open ||
         session->transition_failed || session->selection_rejected ||

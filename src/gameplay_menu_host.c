@@ -196,6 +196,7 @@ struct MeleeWebMenuHost {
     MeleeWebMenuSssSampleCallback first_sss_draw_callback, first_sss_prefix_callback;
     void* first_sss_draw_callback_data;
     void* first_sss_prefix_callback_data;
+    enum MeleeWebMenuSssPrefixProfile first_sss_prefix_profile;
     int first_sss_prefix_host_token;
     int first_sss_sequence_operation; /* 1 first draw, 2 prefix tick, 3 prefix draw, 4 leave */
     PADStatus first_sss_prefix_raw[4];
@@ -1124,6 +1125,15 @@ int melee_web_menu_host_arm_current_sss_exit(MeleeWebMenuHost* h,const void* con
     h->current_sss_exit_notify_data=data;h->current_sss_exit.state=1;
     return ok(e,n);
 }
+static unsigned host_first_sss_prefix_count(const MeleeWebMenuHost* h)
+{
+    if (!h || h != owner) return 0;
+    switch (h->first_sss_prefix_profile) {
+    case MELEE_WEB_MENU_SSS_PREFIX_LEGACY_124: return 124;
+    case MELEE_WEB_MENU_SSS_PREFIX_FRESH_132: return 132;
+    default: return 0;
+    }
+}
 static void first_sss_prefix_exit_note(void* data,MeleeWebMenuSession* session,
     const SSSData* sss,uint64_t ticks,int boundary)
 {
@@ -1131,14 +1141,15 @@ static void first_sss_prefix_exit_note(void* data,MeleeWebMenuSession* session,
     if(!h || h!=owner)return;
     MeleeWebMenuSssSequenceObservation* o=&h->first_sss_prefix;
     uint64_t session_base = 0;
-    if(h->first_sss_sequence_operation!=4 || o->state!=1 || o->exit_captured ||
+    const unsigned count = host_first_sss_prefix_count(h);
+    if(!count || h->first_sss_sequence_operation!=4 || o->state!=1 || o->exit_captured ||
        boundary!=MELEE_WEB_MENU_SSS_PREFIX_EXIT || session!=h->session ||
        sss!=h->first_sss_tick_sss ||
        !melee_web_menu_first_sss_tick_session_base(session,&session_base) ||
        session_base != h->first_sss_pair_entry.session_ticks ||
        session_base != h->first_sss_pair_returned.session_ticks ||
-       session_base > UINT64_MAX - 125 || ticks < session_base ||
-       ticks - session_base != 125 ||
+       session_base > UINT64_MAX - (count + 1) || ticks < session_base ||
+       ticks - session_base != count + 1 ||
        !sss_sequence_owner(h,1,o->error,sizeof(o->error))){
         sss_sequence_fail(h,1,"SSS exit note lost its exact passive boundary");return;
     }
@@ -1181,10 +1192,12 @@ int melee_web_menu_host_arm_first_sss_draw(MeleeWebMenuHost* h,
     h->first_sss_draw.state=1;return ok(e,n);
 }
 
-int melee_web_menu_host_arm_first_sss_prefix(MeleeWebMenuHost* h,
-    MeleeWebMenuSssSampleCallback callback,void* data,char* e,size_t n)
+static int host_arm_first_sss_prefix_profile(MeleeWebMenuHost* h,
+    MeleeWebMenuSssSampleCallback callback,void* data,
+    enum MeleeWebMenuSssPrefixProfile profile,char* e,size_t n)
 {
-    if(!h || h!=owner || !callback || h->first_sss_prefix.state ||
+    if((profile!=MELEE_WEB_MENU_SSS_PREFIX_LEGACY_124 &&
+        profile!=MELEE_WEB_MENU_SSS_PREFIX_FRESH_132) || !h || h!=owner || !callback || h->first_sss_prefix.state ||
        h->first_sss_draw.state!=2 || h->first_sss_draw.host_draw_calls!=1 ||
        h->first_sss_draw.matched_draw_enters!=1 || h->first_sss_draw.matched_draw_returns!=1 ||
        h->first_sss_sequence_operation || h->drawing || !sss_sequence_owner(h,0,e,n) ||
@@ -1192,11 +1205,28 @@ int melee_web_menu_host_arm_first_sss_prefix(MeleeWebMenuHost* h,
         sss_sequence_fail(h,1,"SSS prefix requires its completed first draw");
         return fail(e,n,"SSS prefix requires its completed first draw");
     }
-    if(!melee_web_menu_arm_first_sss_prefix(h->session,first_sss_prefix_exit_note,e,n)){
+    const int armed=profile==MELEE_WEB_MENU_SSS_PREFIX_FRESH_132?
+        melee_web_menu_arm_fresh_sss_prefix_132(h->session,first_sss_prefix_exit_note,e,n):
+        melee_web_menu_arm_first_sss_prefix(h->session,first_sss_prefix_exit_note,e,n);
+    if(!armed){
         sss_sequence_fail(h,1,e);return 0;
     }
+    h->first_sss_prefix_profile=profile;
     h->first_sss_prefix_callback=callback;h->first_sss_prefix_callback_data=data;
     h->first_sss_prefix.state=1;return ok(e,n);
+}
+
+int melee_web_menu_host_arm_first_sss_prefix(MeleeWebMenuHost* h,
+    MeleeWebMenuSssSampleCallback callback,void* data,char* e,size_t n)
+{
+    return host_arm_first_sss_prefix_profile(h,callback,data,
+        MELEE_WEB_MENU_SSS_PREFIX_LEGACY_124,e,n);
+}
+int melee_web_menu_host_arm_fresh_sss_prefix_132(MeleeWebMenuHost* h,
+    MeleeWebMenuSssSampleCallback callback,void* data,char* e,size_t n)
+{
+    return host_arm_first_sss_prefix_profile(h,callback,data,
+        MELEE_WEB_MENU_SSS_PREFIX_FRESH_132,e,n);
 }
 
 int melee_web_menu_host_sss_sequence(const MeleeWebMenuHost* h,int prefix,
@@ -2784,8 +2814,9 @@ int melee_web_menu_host_draw_first_sss(MeleeWebMenuHost* h,char* e,size_t n)
 int melee_web_menu_host_tick_first_sss_prefix(MeleeWebMenuHost* h,
     const PADStatus raw[4],unsigned index,char* e,size_t n)
 {
-    if(!h || h!=owner || !raw || h->first_sss_prefix.state!=1 ||
-       h->first_sss_sequence_operation || index>=124 ||
+    const unsigned count = host_first_sss_prefix_count(h);
+    if(!count || !h || h!=owner || !raw || h->first_sss_prefix.state!=1 ||
+       h->first_sss_sequence_operation || index>=count ||
        index!=h->first_sss_prefix.input_index ||
        h->first_sss_prefix.host_tick_calls!=index ||
        h->first_sss_prefix.matched_draw_returns!=index || h->drawing ||
@@ -2809,7 +2840,7 @@ int melee_web_menu_host_tick_first_sss_prefix(MeleeWebMenuHost* h,
         result==MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED;
     if(!h->first_sss_prefix.scheduler_end.captured ||
        h->first_sss_prefix.state==3 || gm_801A4BA8()!=index+2 ||
-       (index<123 ? result!=MELEE_WEB_MENU_RESULT_TICKED || h->transition!=0 :
+       (index<count-1 ? result!=MELEE_WEB_MENU_RESULT_TICKED || h->transition!=0 :
         result!=MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED || h->transition==0)){
         sss_sequence_fail(h,1,e && n && e[0]?e:"SSS prefix tick disposition/clock mismatch");return 0;
     }
@@ -2820,13 +2851,14 @@ int melee_web_menu_host_tick_first_sss_prefix(MeleeWebMenuHost* h,
 int melee_web_menu_host_draw_first_sss_prefix(MeleeWebMenuHost* h,
     unsigned index,char* e,size_t n)
 {
-    if(!h || h!=owner || h->first_sss_prefix.state!=1 ||
-       h->first_sss_sequence_operation || index>=124 ||
+    const unsigned count = host_first_sss_prefix_count(h);
+    if(!count || !h || h!=owner || h->first_sss_prefix.state!=1 ||
+       h->first_sss_sequence_operation || index>=count ||
        index!=h->first_sss_prefix.input_index ||
        h->first_sss_prefix.host_tick_calls!=index+1 ||
        h->first_sss_prefix.matched_ticks!=index+1 ||
        h->first_sss_prefix.host_draw_calls!=index || h->drawing ||
-       !sss_sequence_owner(h,index==123,e,n) || gm_801A4BA8()!=index+2){
+       !sss_sequence_owner(h,index==count-1,e,n) || gm_801A4BA8()!=index+2){
         sss_sequence_fail(h,1,"SSS prefix draw lost its exact approved tick");
         return fail(e,n,"SSS prefix draw lost its exact approved tick");
     }
@@ -2846,11 +2878,12 @@ int melee_web_menu_host_draw_first_sss_prefix(MeleeWebMenuHost* h,
 
 int melee_web_menu_host_leave_first_sss_prefix(MeleeWebMenuHost* h,char* e,size_t n)
 {
-    if(!h || h!=owner || h->first_sss_prefix.state!=1 ||
-       h->first_sss_sequence_operation || h->first_sss_prefix.input_index!=124 ||
-       h->first_sss_prefix.matched_draw_returns!=124 ||
+    const unsigned count = host_first_sss_prefix_count(h);
+    if(!count || !h || h!=owner || h->first_sss_prefix.state!=1 ||
+       h->first_sss_sequence_operation || h->first_sss_prefix.input_index!=count ||
+       h->first_sss_prefix.matched_draw_returns!=count ||
        h->first_sss_prefix.last_tick_result!=MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED ||
-       !sss_sequence_owner(h,1,e,n) || gm_801A4BA8()!=125){
+       !sss_sequence_owner(h,1,e,n) || gm_801A4BA8()!=count+1){
         sss_sequence_fail(h,1,"SSS prefix leave requires its approved final pending draw");
         return fail(e,n,"SSS prefix leave requires its approved final pending draw");
     }

@@ -140,8 +140,14 @@ int melee_web_menu_arm_current_sss_exit(MeleeWebMenuSession*,
  * passive and cannot interrupt either authored SSS constructor boundary. */
 int melee_web_menu_arm_first_sss_tick(MeleeWebMenuSession*, char*, size_t);
 int melee_web_menu_first_sss_tick_session_base(const MeleeWebMenuSession*, uint64_t*);
+enum MeleeWebMenuSssPrefixProfile {
+    MELEE_WEB_MENU_SSS_PREFIX_LEGACY_124 = 1,
+    MELEE_WEB_MENU_SSS_PREFIX_FRESH_132 = 2,
+};
 /* Finite diagnostic permit; expected state remains outside the source session. */
 int melee_web_menu_arm_first_sss_prefix(MeleeWebMenuSession*,
+    MeleeWebMenuFirstSssPairNote, char*, size_t);
+int melee_web_menu_arm_fresh_sss_prefix_132(MeleeWebMenuSession*,
     MeleeWebMenuFirstSssPairNote, char*, size_t);
 int melee_web_menu_authorize_first_sss_prefix_tick(MeleeWebMenuSession*,
     unsigned index, char*, size_t);

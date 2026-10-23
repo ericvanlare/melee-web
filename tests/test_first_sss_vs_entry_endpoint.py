@@ -16,7 +16,8 @@ PRELUDE = r"""
 #include <stdexcept>
 #include <cstdio>
 struct PrefixNative {int state=2,input_index=124,consumed_inputs=124,host_tick_calls=124,host_draw_calls=124,matched_ticks=124,matched_draw_enters=124,matched_draw_returns=124,last_tick_result=3;bool transition_requested=true;};
-struct Prefix {bool complete=true,failed=false,frame_end_returned=true;PrefixNative native;};
+enum{MELEE_WEB_MENU_SSS_PREFIX_LEGACY_124=1,MELEE_WEB_MENU_SSS_PREFIX_FRESH_132=2};
+struct Prefix {int prefix_profile=MELEE_WEB_MENU_SSS_PREFIX_LEGACY_124;bool complete=true,failed=false,frame_end_returned=true;PrefixNative native;};
 static Prefix first_sss_prefix_sequence;
 static bool running=false,pending=false,faulted=false,host_entered=false,menu_scene_rebuild_pending=false;
 static void *host=(void*)1,*match=nullptr,*results=nullptr,*prize=nullptr,*replay=nullptr;
@@ -53,6 +54,7 @@ int main(){
  reset();reenter=true;assert(melee_web_native_menu_stadium_first_sss_vs_entry_kick()==0);assert(getter_calls==0&&first_sss_vs_entry.error=="VS Entry endpoint is one-use");
  reset();extra_audio=true;assert(melee_web_native_menu_stadium_first_sss_vs_entry_kick()==0);assert(getter_calls==1&&first_sss_vs_entry.captured&&!first_sss_vs_entry.actual.empty());assert(first_sss_vs_entry.error=="VS Entry endpoint performed unexpected audio work");
  reset();first_sss_prefix_sequence.native.consumed_inputs=123;assert(melee_web_native_menu_stadium_first_sss_vs_entry_kick()==0);assert(getter_calls==0&&first_sss_vs_entry.failed);
+ reset();first_sss_prefix_sequence.prefix_profile=MELEE_WEB_MENU_SSS_PREFIX_FRESH_132;assert(melee_web_native_menu_stadium_first_sss_vs_entry_kick()==0);assert(getter_calls==0);
  puts("PASS actual endpoint one-use, approval/refusal, reentrancy and capture-before-failure controls");
 }
 """

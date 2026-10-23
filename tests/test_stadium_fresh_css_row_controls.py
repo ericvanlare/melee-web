@@ -34,6 +34,7 @@ struct PairCallbackState {
 // These CSS-only controls never arm an SSS draw. The actual readiness helper
 // and first-draw dispatch are extracted by first_sss_pair_native_control.py.
 bool first_sss_fresh_draw_callback_ready(){return false;}
+bool first_sss_fresh_prefix_callback_ready(){return false;}
 bool first_sss_sequence_service(){return false;}
 '''
 

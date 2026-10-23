@@ -7,7 +7,9 @@ ROOT=Path(__file__).resolve().parents[1]
 def build_first_sss_tick_control(root):
  ROOT=Path(root)
  hs=(ROOT/'src/gameplay_menu_host.c').read_text(); ms=(ROOT/'src/gameplay_menu.c').read_text(); header=(ROOT/'src/gameplay_menu_host.h').read_text()
- pre=PRELUDE
+ menu_header=(ROOT/"src/gameplay_menu.h").read_text()
+ enum_start=menu_header.index("enum MeleeWebMenuSssPrefixProfile {");enum_end=menu_header.index("};",enum_start)+2
+ pre=menu_header[enum_start:enum_end]+"\n"+PRELUDE
  if '/* SSS_TICK_FIXTURE_BEGIN */' in pre:
   a=pre.index('  /* SSS_TICK_FIXTURE_BEGIN */');b=pre.index('  /* SSS_TICK_FIXTURE_END */',a)+len('  /* SSS_TICK_FIXTURE_END */');pre=pre[:a]+pre[b:]
  for sig in ['static void sss_sequence_fail(', 'static void first_sss_tick_fail(', 'static int first_sss_tick_owner_idle(', 'static int melee_web_menu_arm_first_sss_tick(', 'static int melee_web_menu_first_sss_tick_session_base(']:
@@ -24,7 +26,7 @@ typedef struct {Vs vs;} SSSData;
 typedef struct {uint32_t counter_0,counter_4,counter_8;} MeleeWebMenuClockCounters;
 """
  pre=pre.replace('typedef struct { int pending_scene_change; void* ko_counts; } CSSData;',types+'typedef struct { int pending_scene_change; void* ko_counts; Vs vs; } CSSData;')
- pre=pre.replace('typedef struct { CSSData css; int phase,result,request; } MeleeWebMenuSession;', 'typedef struct { CSSData css; SSSData sss; int phase,result,request,first_sss_pair_state,first_sss_tick_token,first_sss_prefix_state,first_sss_prefix_token,first_css_return_armed,sss_open,css_open,transition_failed,selection_rejected,transition_requested,training_mode_scene; unsigned first_sss_prefix_remaining; uint64_t first_sss_tick_session_base; int first_sss_tick_session_base_captured; uint64_t ticks; } MeleeWebMenuSession;')
+ pre=pre.replace('typedef struct { CSSData css; int phase,result,request; } MeleeWebMenuSession;', 'typedef struct { CSSData css; SSSData sss; int phase,result,request,first_sss_pair_state,first_sss_tick_token,first_sss_prefix_state,first_sss_prefix_token,first_css_return_armed,sss_open,css_open,transition_failed,selection_rejected,transition_requested,training_mode_scene; enum MeleeWebMenuSssPrefixProfile first_sss_prefix_profile; unsigned first_sss_prefix_remaining; uint64_t first_sss_tick_session_base; int first_sss_tick_session_base_captured; uint64_t ticks; } MeleeWebMenuSession;')
  pre=pre.replace('typedef struct { int active; } MeleeWebAudio;', 'typedef struct { int active; uint64_t generation; } MeleeWebAudio;')
  a=header.index('typedef struct MeleeWebMenuFirstSssPairNoteSnapshot');b=header.index('/* Private finite SSS continuation.',a)
  pre=pre.replace('typedef struct MeleeWebMenuHost MeleeWebMenuHost;', header[a:b]+'typedef struct MeleeWebMenuHost MeleeWebMenuHost;')

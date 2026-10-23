@@ -10,7 +10,8 @@ import {createFirstCssStreamComparator, createFirstCssFinalDrawComparator,
   createFirstSssConstructorPairComparator, createFirstSssConsumedPadTickComparator,
   createFirstSssDrawComparator, createFirstSssPrefixComparator, createFirstSssVsEntryComparator,
   createFirstSssVsSetupComparator,
-  decodeFirstSssPrefixInputBundle, firstSssAudioAccounting,
+  decodeFirstSssPrefixInputBundle, decodeFreshSssPrefix132InputBundle,
+  createFreshSssPrefix132Comparator, validateFreshSssPrefix132ExpectedSource, firstSssAudioAccounting,
   requestSynchronousApproval, validateFirstSssConsumedTickExpectedSource,
   validateFirstSssDrawExpectedSource}
   from './stadium_first_css_stream_compare.mjs';
@@ -675,7 +676,7 @@ test('the actual prefix loader checks the exact expected, input, and comparator 
       'first-sss-prefix-input': retainedPrefixInputPath};
     const loadBound = boundFactory(values, preflight);
     const prefixFactory = new Function('assert', 'path', 'fs', 'digest',
-      'pathToFileURL', 'ROOT', `return (values, preflight, firstSssPrefix, firstSssDrawInputs, loadBoundFirstSssExpected) => { ${prefixMatch[0]}; return loadFirstSssPrefixInputs; };`)(
+      'pathToFileURL', 'ROOT', `return (values, preflight, firstSssPrefix, firstSssDrawInputs, loadBoundFirstSssExpected, firstSssFreshPrefix132=false) => { ${prefixMatch[0]}; return loadFirstSssPrefixInputs; };`)(
         assert, path, fs, digest, pathToFileURL, candidateRoot);
     const drawInputs = {expected: {provenance: {observer_sha256:
       expected.provenance.observer_sha256}}};
@@ -1580,4 +1581,130 @@ test('fresh expected projection refuses legacy-frame and altered actual construc
     assert.equal(comparator.status().failed, true);
     assert.ok(comparator.status().first_mismatch);
   }
+});
+
+// Optional original controls follow the existing retained-prefix fixture pattern.
+// These source-shaped callbacks exercise the comparator only, not runtime parity.
+const freshPrefixExpectedPath=process.env.MELEE_WEB_STADIUM_FRESH_SSS_PREFIX_132_EXPECTED;
+const freshPrefixInputPath=process.env.MELEE_WEB_STADIUM_FRESH_SSS_PREFIX_132_INPUT;
+if(!!freshPrefixExpectedPath!==!!freshPrefixInputPath)throw Error('Optional original132 controls require both expected and input fixture paths');
+const hasFreshPrefixFixture=!!(freshPrefixExpectedPath&&freshPrefixInputPath);
+const optionalFreshPrefix={skip:hasFreshPrefixFixture?false:
+  'optional original132 expected/input not supplied; portable codec and CLI controls still run'};
+const freshPrefixExpected=hasFreshPrefixFixture?JSON.parse(await fs.readFile(freshPrefixExpectedPath,'utf8')):null;
+const freshPrefixWire=hasFreshPrefixFixture?new Uint8Array(await fs.readFile(freshPrefixInputPath)):null;
+const freshPrefixRows=hasFreshPrefixFixture?decodeFreshSssPrefix132InputBundle(freshPrefixWire):null;
+function freshPrefixPrerequisites(){
+ const {pair,tick}=firstSssPrerequisites();
+ pair.entry.session_ticks=142;pair.returned.session_ticks=142;
+ return {pair,tick,draw:{complete:true,compared:true,failed:false,host_draw_calls:1,
+ host_tick_calls:0,aurora_begin_calls:1,aurora_end_calls:1,frame_end_returned:true}};
+}
+function freshPrefixControl(){
+ const {pair,tick,draw}=freshPrefixPrerequisites();
+ return {pair,comparator:createFreshSssPrefix132Comparator(freshPrefixExpected,freshPrefixRows,pair,tick,draw)};
+}
+test('fixed fresh132 compares 396 ordered samples, passive exit275 then selected18/3',optionalFreshPrefix,()=>{
+ const {pair,comparator}=freshPrefixControl();
+ feedRetainedPrefixSamples(comparator,freshPrefixExpected,pair);
+ const exit=actualPrefixExit(freshPrefixExpected,275,pair);exit.host_entered=true;exit.session_phase=3;
+ assert.equal(exit.scene_frame,133);
+ assert.equal(comparator.compare('sss_exit',JSON.stringify(exit)),true);
+ assert.equal(comparator.compare('selected_stage',JSON.stringify({index:18,kind:3})),true);
+ assert.equal(comparator.status().attempted,398);assert.equal(comparator.status().approved,true);
+ assert.equal(comparator.compare('selected_stage',JSON.stringify({index:18,kind:3})),false);
+ assert.equal(comparator.status().first_mismatch.path,'callback.phase');
+});
+test('fixed fresh132 refuses cross-profile, source/order drift and first semantic divergence',optionalFreshPrefix,()=>{
+ assert.throws(()=>decodeFirstSssPrefixInputBundle(freshPrefixWire));
+ for(const offset of [8,12,44,48,48+60*131+12]){
+  const b=new Uint8Array(freshPrefixWire);b[offset]^=1;
+  assert.throws(()=>decodeFreshSssPrefix132InputBundle(b));
+ }
+ const {pair,tick,draw}=freshPrefixPrerequisites();
+ assert.throws(()=>createFirstSssPrefixComparator(freshPrefixExpected,freshPrefixRows,pair,tick,draw));
+ for(const mutate of [e=>e.records.pop(),e=>e.records[44].scheduler_end.scene_frame++,
+   e=>e.selected_stage_source_witness.source.source_slices_hex['42:0']='02',e=>e.exit_note.sequence=2480]){
+  const e=structuredClone(freshPrefixExpected);mutate(e);assert.throws(()=>validateFreshSssPrefix132ExpectedSource(e,freshPrefixRows));
+ }
+ for(const mutate of [p=>p.pair.compared=false,p=>p.tick.compared=false,p=>p.draw.frame_end_returned=false,
+  p=>p.pair.returned.session_ticks++,p=>{p.pair.entry.session_ticks=p.pair.returned.session_ticks=Number.MAX_SAFE_INTEGER-132;}]){
+  const p=freshPrefixPrerequisites();mutate(p);
+  assert.throws(()=>createFreshSssPrefix132Comparator(freshPrefixExpected,freshPrefixRows,p.pair,p.tick,p.draw));
+ }
+ let c=freshPrefixControl();assert.equal(c.comparator.compare('draw_enter','{}'),false);
+ assert.equal(c.comparator.status().first_mismatch.path,'callback.phase');
+ c=freshPrefixControl();const actual=actualPrefixPhase(freshPrefixExpected.records[0],'scheduler_end',c.pair);
+ actual.scene_frame++;assert.equal(c.comparator.compare('scheduler_end',JSON.stringify(actual)),false);
+ assert.equal(c.comparator.status().first_mismatch.path,'prefix[0].scheduler_end.scene_frame');
+ assert.deepEqual(c.comparator.status().rows[0].actual,actual);
+ for(const ticks of [133,274]){
+  c=freshPrefixControl();feedRetainedPrefixSamples(c.comparator,freshPrefixExpected,c.pair);
+  const exit=actualPrefixExit(freshPrefixExpected,ticks,c.pair);exit.host_entered=true;exit.session_phase=3;
+  assert.equal(c.comparator.compare('sss_exit',JSON.stringify(exit)),false);
+  assert.equal(c.comparator.status().first_mismatch.path,'sss_exit.session');
+ }
+});
+
+test('actual fresh132 prefix loader binds real prepared artifacts and refuses forged bindings',optionalFreshPrefix,async()=>{
+ const runnerSource=await fs.readFile(path.join(testDirectory,'stadium_c1a_browser_test.mjs'),'utf8');
+ const bound=runnerSource.match(/async function loadBoundFirstSssExpected\([^\n]*\) \{[\s\S]*?\n\}/)[0];
+ const prefix=runnerSource.match(/async function loadFirstSssPrefixInputs\([^\n]*\) \{[\s\S]*?\n\}/)[0];
+ const digest=b=>createHash('sha256').update(b).digest('hex');
+ const identity=async file=>{const b=await fs.readFile(file);return {path:file,basename:path.basename(file),bytes:b.length,sha256:digest(b)};};
+ const expectedPath=freshPrefixExpectedPath;
+ const inputPath=freshPrefixInputPath;
+ const values={'first-sss-prefix-expected':expectedPath,'first-sss-prefix-input':inputPath};
+ const bindings={first_sss_prefix:{expected_json:await identity(expectedPath),input_bundle:await identity(inputPath),
+ comparator:await identity(path.join(testDirectory,'stadium_first_css_stream_compare.mjs'))}};
+ const make=new Function('assert','path','fs','digest','errorText','pathToFileURL','ROOT',
+ `return (values,preflight,firstSssPrefix,firstSssDrawInputs,firstSssFreshPrefix132)=>{${bound};${prefix};return loadFirstSssPrefixInputs;};`)
+ (assert,path,fs,digest,String,pathToFileURL,candidateRoot);
+ const draw={expected:{provenance:{observer_sha256:freshPrefixExpected.observer.sha256}}};
+ assert.equal((await make(values,bindings,true,draw,true)()).inputRows.length,132);
+ for(const field of ['expected_json','input_bundle','comparator']){
+  const bad=structuredClone(bindings);bad.first_sss_prefix[field].sha256='00'.repeat(32);
+  await assert.rejects(make(values,bad,true,draw,true)(),/hash differs from preflight/);
+ }
+ await assert.rejects(make(values,bindings,true,draw,false)(),/strictEqual|Expected values|schema/);
+});
+test('actual fresh132 CLI is explicit and cannot widen legacy or VS',()=>{
+ const args=['--first-css-fresh-finite','--first-css-finite-receipt','receipt.json',
+ '--first-css-constructor-manifest','manifest.json','--first-sss-fresh-prefix-132',
+ '--first-sss-pair-expected','pair.json','--first-sss-tick-expected','tick.json',
+ '--first-sss-tick-input','tick.bin','--first-sss-draw-expected','draw.json',
+ '--first-sss-prefix-expected','prefix.json','--first-sss-prefix-input','prefix.bin'];
+ const runner=path.join(testDirectory,'stadium_c1a_browser_test.mjs');
+ const invoke=a=>spawnSync(process.execPath,[runner,...a],{encoding:'utf8',timeout:10000});
+ assert.match(invoke(args).stderr,/Missing --build/);
+ for(const conflict of ['--first-sss-prefix','--first-sss-fresh-input-tick-draw','--first-sss-vs-entry','--first-sss-vs-setup'])
+  assert.match(invoke([...args,conflict]).stderr,/Fresh132 is one explicit fixed prefix route/);
+});
+
+// Portable synthetic wire deliberately differs from the original middle schedule.
+// It cannot establish source comparison or provide a launch admission.
+function syntheticFresh132Wire(){
+ const wire=new Uint8Array(7968),view=new DataView(wire.buffer);
+ wire.set(Buffer.from('STC1SSSP'));view.setUint32(8,2,false);view.setUint32(44,132,false);
+ wire.set(Buffer.from('4fd54b4aa9537292295ad83fbb75655f8213a475a876fdd1468affb68d3d211f','hex'),12);
+ for(let i=0;i<132;i++){
+  const seq=i===0?[1603,1607,1608,1609]:i===131?[2475,2477,2478,2479]:[0,1,2,3].map(j=>1610+i*6+j);
+  seq.forEach((v,j)=>view.setUint32(48+i*60+j*4,v,false));
+  for(let j=0;j<44;j++)wire[48+i*60+16+j]=(128+i+j)%256;
+ }
+ return wire;
+}
+test('portable synthetic fresh132 codec enforces fixed envelope/order and legacy separation',()=>{
+ const wire=syntheticFresh132Wire(),rows=decodeFreshSssPrefix132InputBundle(wire);
+ assert.equal(rows.length,132);assert.equal(rows[0].consumed_pad_sequence,1603);
+ assert.equal(rows[131].draw_return_sequence,2479);assert.equal(rows[44].port_status_hex[0],Buffer.from(wire.slice(48+44*60+16,48+44*60+27)).toString('hex'));
+ assert.throws(()=>decodeFirstSssPrefixInputBundle(wire));
+ for(const length of [0,48,7488,7967,7969]){
+  const bad=new Uint8Array(length);bad.set(wire.slice(0,length));assert.throws(()=>decodeFreshSssPrefix132InputBundle(bad));
+ }
+ for(const offset of [0,8,12,44,48,48+60*131+12]){
+  const bad=new Uint8Array(wire);bad[offset]^=1;assert.throws(()=>decodeFreshSssPrefix132InputBundle(bad));
+ }
+ const badOrder=new Uint8Array(wire);new DataView(badOrder.buffer).setUint32(48+60,1600,false);
+ assert.throws(()=>decodeFreshSssPrefix132InputBundle(badOrder));
 });

@@ -434,6 +434,41 @@ inline FirstSssPrefixInput decode_first_sss_prefix_input(
     return result;
 }
 
+inline constexpr unsigned kFreshSssPrefix132Count = 132;
+struct FreshSssPrefix132Input {
+    std::string source_sha256;
+    std::array<FirstSssPrefixRecord,kFreshSssPrefix132Count> records{};
+};
+inline FreshSssPrefix132Input decode_fresh_sss_prefix_132_input(
+    const uint8_t* bytes,size_t size,const std::string& expected_source_sha256) {
+    if(!bytes || size!=7968 ||
+       std::string(reinterpret_cast<const char*>(bytes),8)!="STC1SSSP" ||
+       read_be32(bytes+8)!=2 || read_be32(bytes+44)!=kFreshSssPrefix132Count)
+        throw std::runtime_error("Fresh SSS prefix requires its exact132 version2 wire");
+    FreshSssPrefix132Input result{};
+    result.source_sha256=hex(bytes+12,32);
+    if(result.source_sha256!=expected_source_sha256 ||
+       !std::equal(kFreshFirstSssSourceSha256.begin(),kFreshFirstSssSourceSha256.end(),bytes+12))
+        throw std::runtime_error("Fresh SSS prefix source identity differs");
+    uint32_t previous=1601;
+    for(unsigned i=0;i<kFreshSssPrefix132Count;++i){
+        auto& row=result.records[i];const auto* p=bytes+48+i*60;
+        for(unsigned j=0;j<4;++j){
+            row.sequences[j]=read_be32(p+j*4);
+            if(row.sequences[j]<=previous)
+                throw std::runtime_error("Fresh SSS prefix sequence order differs");
+            previous=row.sequences[j];
+        }
+        std::copy_n(p+16,44,row.ports.begin());
+        ConsumedPadInput consumed{};consumed.ports=row.ports;
+        PADStatus typed[4]{};decode_consumed_pad_statuses(consumed,typed);
+    }
+    if(result.records.front().sequences!=std::array<uint32_t,4>{1603,1607,1608,1609} ||
+       result.records.back().sequences!=std::array<uint32_t,4>{2475,2477,2478,2479})
+        throw std::runtime_error("Fresh SSS prefix exact endpoints differ");
+    return result;
+}
+
 inline PostdrawInput decode_postdraw_input(
     const uint8_t* bytes, size_t size,
     const std::string& expected_source_sha256) {

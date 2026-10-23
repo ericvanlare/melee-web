@@ -299,9 +299,10 @@ struct FirstSssConstructorPairState {
 };
 FirstSssConstructorPairState first_sss_constructor_pair;
 enum class FirstSssFreshPairCallbackAction : unsigned {
- StrictCssTerminal, ContinueTransition, StopAfterPair, ServiceFirstDraw
+ StrictCssTerminal, ContinueTransition, StopAfterPair, ServiceFirstDraw, ServiceFreshPrefix
 };
 bool first_sss_fresh_draw_callback_ready();
+bool first_sss_fresh_prefix_callback_ready();
 FirstSssFreshPairCallbackAction first_sss_fresh_pair_callback_action(){
  const auto& css=first_css_browser_draw;
  const auto& pair=first_sss_constructor_pair;
@@ -312,6 +313,8 @@ FirstSssFreshPairCallbackAction first_sss_fresh_pair_callback_action(){
  if(!exact_fresh_pair||css.failed)
   return FirstSssFreshPairCallbackAction::StrictCssTerminal;
  if(pair.frame_terminal){
+  if(pair.complete&&!pair.failed&&first_sss_fresh_prefix_callback_ready())
+   return FirstSssFreshPairCallbackAction::ServiceFreshPrefix;
   if(pair.complete&&!pair.failed&&first_sss_fresh_draw_callback_ready())
    return FirstSssFreshPairCallbackAction::ServiceFirstDraw;
   return pair.complete||pair.failed?
@@ -479,6 +482,7 @@ void first_sss_pair_write_note(std::ostream& out,
 extern unsigned audio_phase;
 std::string first_sss_frozen_pair_json;
 struct FirstSssSequenceBrowserState {
+ MeleeWebMenuSssPrefixProfile prefix_profile=static_cast<MeleeWebMenuSssPrefixProfile>(0);
  MeleeWebMenuHost* callback_host_owner=nullptr;
  const void* callback_world_owner=nullptr;
  uint64_t callback_world_generation=0;
@@ -491,8 +495,21 @@ struct FirstSssSequenceBrowserState {
  std::string error,prepared_output_unpaired;
  MeleeWebMenuSssSequenceObservation native{};
  melee_web::stadium_first_css_diagnostic::FirstSssPrefixInput input{};
+ melee_web::stadium_first_css_diagnostic::FreshSssPrefix132Input fresh_input{};
 };
 FirstSssSequenceBrowserState first_sss_draw_sequence,first_sss_prefix_sequence;
+unsigned first_sss_prefix_browser_count(){
+ switch(first_sss_prefix_sequence.prefix_profile){
+ case MELEE_WEB_MENU_SSS_PREFIX_LEGACY_124:return 124;
+ case MELEE_WEB_MENU_SSS_PREFIX_FRESH_132:return 132;
+ default:return 0;
+ }
+}
+const melee_web::stadium_first_css_diagnostic::FirstSssPrefixRecord& first_sss_prefix_record(unsigned i){
+ if(first_sss_prefix_sequence.prefix_profile==MELEE_WEB_MENU_SSS_PREFIX_FRESH_132)
+  return first_sss_prefix_sequence.fresh_input.records.at(i);
+ return first_sss_prefix_sequence.input.records.at(i);
+}
 struct FirstSssVsEntryState {
  bool attempted=false,captured=false,failed=false,complete=false;
  unsigned getter_calls=0;
@@ -781,9 +798,9 @@ std::string first_sss_sequence_sample_json(const MeleeWebMenuFirstSssTickSnapsho
  for(unsigned i=0;i<8;++i){if(i)out<<',';out<<'"'<<names[i]<<"\":"<<(note.owners[i]?"true":"false");}
  out<<"},\"world_generation\":"<<note.world_generation<<",\"audio_generation\":"<<note.audio_generation;
  if(prefix){const unsigned i=first_sss_prefix_sequence.current_index;
-  check(i<124,"SSS prefix snapshot index is outside its input");
+  check(i<first_sss_prefix_browser_count(),"SSS prefix snapshot index is outside its input");
   out<<",\"input_index\":"<<i<<",\"input_ordinal\":"<<i+1
-     <<",\"consumed_pad_sequence\":"<<first_sss_prefix_sequence.input.records[i].sequences[0];}
+     <<",\"consumed_pad_sequence\":"<<first_sss_prefix_record(i).sequences[0];}
  out<<'}';return out.str();
 }
 int first_sss_sequence_compare(void* data,int phase,
@@ -3211,16 +3228,20 @@ bool first_sss_sequence_service(){
   check(!running&&!pending&&!faulted&&world&&host&&host_entered&&
         !match&&!results&&!prize&&!replay&&!menu_scene_rebuild_pending&&
         !preparation.busy(),"SSS private presentation lost its stopped owner");
+  if(prefix&&s.prefix_profile==MELEE_WEB_MENU_SSS_PREFIX_FRESH_132)
+   check(host==s.callback_host_owner&&world.get()==s.callback_world_owner&&
+         s.callback_world_generation!=0&&melee_web_gameplay_generation()==s.callback_world_generation,
+         "Fresh SSS prefix lost its checked arm owner");
   s.attempted=true;s.frame_end_returned=false;
   if(prefix){
    first_sss_sequence_sync(true);s.current_index=s.native.input_index;
-   check(s.current_index<124&&!s.failed,"SSS prefix callback exceeds its finite input lease");
+   check(s.current_index<first_sss_prefix_browser_count()&&first_sss_prefix_browser_count()!=0&&!s.failed,"SSS prefix callback exceeds its finite input lease");
    melee_web::stadium_first_css_diagnostic::ConsumedPadInput input{};
-   input.ports=s.input.records[s.current_index].ports;PADStatus raw[4]{};
+   input.ports=first_sss_prefix_record(s.current_index).ports;PADStatus raw[4]{};
    melee_web::stadium_first_css_diagnostic::decode_consumed_pad_statuses(input,raw);
    const int result=melee_web_menu_host_tick_first_sss_prefix(host,raw,s.current_index,error,sizeof error);
    first_sss_sequence_sync(true);
-   check(!s.failed&&result==(s.current_index==123?MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED:MELEE_WEB_MENU_RESULT_TICKED),
+   check(!s.failed&&result==(s.current_index==first_sss_prefix_browser_count()-1?MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED:MELEE_WEB_MENU_RESULT_TICKED),
          error[0]?error:"SSS prefix scheduler phase refused");
    // Diagnostic policy: one existing audio render per approved source tick;
    // preserve audio_phase carry, no PCM/timing equivalence claim.
@@ -3237,7 +3258,7 @@ bool first_sss_sequence_service(){
   began=false;aurora_end_frame();++s.aurora_end_calls;s.frame_end_returned=true;
   check(result&&!s.failed,error[0]?error:"SSS diagnostic draw comparator refused");
   if(prefix){
-   if(s.native.input_index==124){
+   if(s.native.input_index==first_sss_prefix_browser_count()){
     const int left=melee_web_menu_host_leave_first_sss_prefix(host,error,sizeof error);
     first_sss_sequence_sync(true);
     host_entered=melee_web_menu_host_source_scene(host)!=0 /* existing closed-source sentinel */;
@@ -3285,6 +3306,34 @@ bool first_sss_fresh_draw_callback_ready(){
      draw.callback_world_generation!=0&&
      melee_web_gameplay_generation()==draw.callback_world_generation&&
      tick.native.scheduler_end.world_generation==draw.callback_world_generation&&
+     !match&&!results&&!prize&&!replay&&!melee_web_net_active()&&
+     !menu_scene_rebuild_pending&&!preparation.busy()&&
+     preparation.phase()==melee_web::MenuPreparationState::Phase::Idle&&
+     asset_destination==AssetDestination::None;
+}
+
+// This selector only dispatches the already admitted private fresh prefix.
+// The service performs the live owner checks and retains the first failure.
+bool first_sss_fresh_prefix_callback_ready(){
+ const auto& css=first_css_browser_draw;
+ const auto& pair=first_sss_constructor_pair;
+ const auto& tick=first_sss_consumed_tick;
+ const auto& draw=first_sss_draw_sequence;
+ const auto& p=first_sss_prefix_sequence;
+ return css.armed&&css.kicked&&css.complete&&!css.failed&&
+     pair.captured&&pair.compared&&pair.complete&&!pair.failed&&pair.native.state==2&&
+     tick.armed&&tick.kicked&&tick.attempted&&tick.captured&&tick.complete&&
+     tick.compared&&!tick.failed&&tick.native.host_tick_calls==1&&
+     tick.native.host_draw_calls==0&&tick.native.tick_result==1&&
+     tick.native.clock_post_succeeded&&tick.native.post_host_frame_captured&&
+     tick.native.post_host_frame==1&&!tick.native.transition_requested&&
+     draw.complete&&!draw.failed&&draw.frame_end_returned&&
+     draw.native.state==2&&draw.native.host_tick_calls==0&&draw.native.host_draw_calls==1&&
+     p.prefix_profile==MELEE_WEB_MENU_SSS_PREFIX_FRESH_132&&p.armed&&p.kicked&&
+     !p.complete&&!p.failed&&!running&&!pending&&!faulted&&!first_use_draw_pending&&
+     host&&world&&host_entered&&host==p.callback_host_owner&&world.get()==p.callback_world_owner&&
+     p.callback_world_generation!=0&&melee_web_gameplay_generation()==p.callback_world_generation&&
+     tick.native.scheduler_end.world_generation==p.callback_world_generation&&
      !match&&!results&&!prize&&!replay&&!melee_web_net_active()&&
      !menu_scene_rebuild_pending&&!preparation.busy()&&
      preparation.phase()==melee_web::MenuPreparationState::Phase::Idle&&
@@ -4309,6 +4358,9 @@ void tick(){
   EM_ASM({window.menuFrame?.(false);});return;
  }
  const auto fresh_pair_callback=first_sss_fresh_pair_callback_action();
+ if(fresh_pair_callback==FirstSssFreshPairCallbackAction::ServiceFreshPrefix){
+  first_sss_sequence_service();return;
+ }
  if(fresh_pair_callback==FirstSssFreshPairCallbackAction::ServiceFirstDraw){
   first_sss_sequence_service();return;
  }
@@ -7078,7 +7130,7 @@ int melee_web_native_menu_stadium_first_sss_vs_entry_kick(){try{
  const auto eligible=[&](){return !running&&!pending&&!faulted&&host&&!host_entered&&
    !match&&!results&&!prize&&!replay&&!melee_web_net_active()&&!menu_scene_rebuild_pending&&
    !preparation.busy()&&preparation.phase()==melee_web::MenuPreparationState::Phase::Idle&&
-   asset_destination==AssetDestination::None&&prefix.complete&&!prefix.failed&&
+   asset_destination==AssetDestination::None&&prefix.prefix_profile==MELEE_WEB_MENU_SSS_PREFIX_LEGACY_124&&prefix.complete&&!prefix.failed&&
    prefix.native.state==2&&prefix.native.input_index==124&&prefix.native.consumed_inputs==124&&
    prefix.native.host_tick_calls==124&&prefix.native.host_draw_calls==124&&
    prefix.native.matched_ticks==124&&prefix.native.matched_draw_enters==124&&
@@ -7114,31 +7166,48 @@ int melee_web_native_menu_stadium_first_sss_vs_entry_kick(){try{
  first_css_browser_draw_refresh_observation();return 0;
 }}
 
-int melee_web_native_menu_stadium_first_sss_prefix_arm(const uint8_t* bytes,unsigned size){try{
+static int first_sss_prefix_arm_profile(const uint8_t* bytes,unsigned size,MeleeWebMenuSssPrefixProfile profile){try{
  auto& s=first_sss_prefix_sequence;
+ const bool fresh=profile==MELEE_WEB_MENU_SSS_PREFIX_FRESH_132;
+ check((fresh&&first_css_browser_draw.mode==FirstCssBrowserMode::FreshFiniteCssPrefixV4&&
+        first_sss_constructor_pair.profile==FirstCssBrowserMode::FreshFiniteCssPrefixV4)||
+       (profile==MELEE_WEB_MENU_SSS_PREFIX_LEGACY_124&&first_css_browser_draw.mode==FirstCssBrowserMode::LegacyTickDrawV1),
+       "SSS prefix profile differs from its immutable CSS/pair owner");
  check(!s.armed&&!s.failed&&!s.attempted&&!running&&!pending&&!faulted&&host&&world&&host_entered&&
        !match&&!results&&!prize&&!replay&&!melee_web_net_active()&&!menu_scene_rebuild_pending&&
        !preparation.busy()&&preparation.phase()==melee_web::MenuPreparationState::Phase::Idle&&
        asset_destination==AssetDestination::None&&first_sss_draw_sequence.complete&&
        !first_sss_draw_sequence.failed&&first_sss_draw_sequence.frame_end_returned,
        "SSS prefix arm requires its unchanged same-run approved first draw");
- s.armed=true;s.audio_render_calls_before=s.audio_render_calls_after=diagnostic_audio_render_calls;
+ s.prefix_profile=profile;s.armed=true;s.audio_render_calls_before=s.audio_render_calls_after=diagnostic_audio_render_calls;
  s.audio_render_frames_before=s.audio_render_frames_after=diagnostic_audio_render_frames;
  s.audio_phase_before=s.audio_phase_after=audio_phase;
- s.input=melee_web::stadium_first_css_diagnostic::decode_first_sss_prefix_input(bytes,size,first_css_browser_draw.context.source_sha256);
+ if(fresh)s.fresh_input=melee_web::stadium_first_css_diagnostic::decode_fresh_sss_prefix_132_input(bytes,size,first_css_browser_draw.context.source_sha256);
+ else s.input=melee_web::stadium_first_css_diagnostic::decode_first_sss_prefix_input(bytes,size,first_css_browser_draw.context.source_sha256);
  check(EM_ASM_INT({return typeof globalThis.__meleeWebStadiumFirstSssPrefixCompare==='function'?1:0;})==1,"SSS prefix comparator absent");
  char error[256]{};
- check(melee_web_menu_host_arm_first_sss_prefix(host,first_sss_sequence_compare,&first_sss_prefix_sequence,error,sizeof error),error);
+ check(fresh?melee_web_menu_host_arm_fresh_sss_prefix_132(host,first_sss_sequence_compare,&first_sss_prefix_sequence,error,sizeof error):
+             melee_web_menu_host_arm_first_sss_prefix(host,first_sss_sequence_compare,&first_sss_prefix_sequence,error,sizeof error),error);
+ s.callback_host_owner=host;s.callback_world_owner=world.get();s.callback_world_generation=melee_web_gameplay_generation();
  first_sss_sequence_sync(true);first_css_browser_draw_refresh_observation();return 1;
 }catch(const std::exception& error){first_sss_sequence_fail(true,error.what());first_css_browser_draw_refresh_observation();return 0;}}
-int melee_web_native_menu_stadium_first_sss_prefix_kick(){try{
+static int first_sss_prefix_kick_profile(MeleeWebMenuSssPrefixProfile profile){try{
  auto& s=first_sss_prefix_sequence;
- check(s.armed&&!s.kicked&&!s.attempted&&!s.failed&&!s.complete&&!running&&!pending&&host&&world&&host_entered&&
+ check(s.prefix_profile==profile&&s.armed&&!s.kicked&&!s.attempted&&!s.failed&&!s.complete&&!running&&!pending&&host&&world&&host_entered&&
        first_sss_draw_sequence.complete&&!first_sss_draw_sequence.failed,
        "SSS prefix kick requires its stopped one-use finite arm");
  s.kicked=true;menu_clock.reset();first_use_draw_pending=false;
  first_css_browser_draw_refresh_observation();return 1;
 }catch(const std::exception& error){first_sss_sequence_fail(true,error.what());first_css_browser_draw_refresh_observation();return 0;}}
+
+int melee_web_native_menu_stadium_first_sss_prefix_arm(const uint8_t* bytes,unsigned size){
+ return first_sss_prefix_arm_profile(bytes,size,MELEE_WEB_MENU_SSS_PREFIX_LEGACY_124);}
+int melee_web_native_menu_stadium_fresh_sss_prefix_132_arm(const uint8_t* bytes,unsigned size){
+ return first_sss_prefix_arm_profile(bytes,size,MELEE_WEB_MENU_SSS_PREFIX_FRESH_132);}
+int melee_web_native_menu_stadium_first_sss_prefix_kick(){
+ return first_sss_prefix_kick_profile(MELEE_WEB_MENU_SSS_PREFIX_LEGACY_124);}
+int melee_web_native_menu_stadium_fresh_sss_prefix_132_kick(){
+ return first_sss_prefix_kick_profile(MELEE_WEB_MENU_SSS_PREFIX_FRESH_132);}
 
 int melee_web_native_menu_stadium_first_sss_tick_arm(const uint8_t* bytes,unsigned size){try{
  auto& state=first_sss_consumed_tick;const auto& pair=first_sss_constructor_pair;
