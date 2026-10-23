@@ -2429,7 +2429,7 @@
   },
   "same_instance_browser_restore_341": {
     "issue": 341,
-    "status": "in_progress_not_restore_admitted",
+    "status": "CPU_BASELINE_RESTORE_REPLAY_AND_ONE_PRESENT_PASS; COMPLETE_GAME_STATE_AND_FULL_BROWSER_RESTORE_INCOMPLETE",
     "producer_base_commit": "130438fd2b86d00cfec98cd2ba0a5f66084ae15c",
     "producer_worktree": "uncommitted source; census runtime/harness and separate owner component sources pinned below; not a commit identity",
     "runtime_sha256": {
@@ -2557,18 +2557,20 @@
       }
     },
     "remaining": [
-      "complete source/project mutable static coverage",
-      "dynamic source/asset/stream/file ownership",
-      "renderer source-state interactions and host-effect closure",
-      "same-instance browser restore and one-tick synctest",
-      "seven-tick/combat/present-frame/audio lifecycle and combined cost"
+      "complete source/project mutable static coverage and dynamic source/asset/stream/file ownership",
+      "render-to-simulation dependencies and safe host effects across no-draw correction; GPU/cache state remains outside rewind scope",
+      "a drawn-reference comparison with a baseline draw before restore, strict CPU endpoint equality, and a separately checked post-replay present/source-present counter; keep the current owner set fixed",
+      "whole-session, pixel/PCM and foreground timing acceptance"
     ],
     "limitations": [
       "same-value stores and transient values unobserved",
       "idle DVD boundaries do not exclude completed-between-boundary transfers",
       "gameplay arena extent does not prove internal ownership",
       "screenshot retains existing magenta/texture artifacts; no pixel acceptance",
-      "no local or Internet rollback gameplay acceptance"
+      "no local or Internet rollback gameplay acceptance",
+      "The CP5 comparison is limited to bounded CPU state at sample 300, replay through source frame 177, and one source present; no renderer/GPU/cache state was restored.",
+      "The raw census remains incomplete and ownerRestoreAdmission is false; observed ranges outside this CPU checkpoint remain unadmitted.",
+      "No original drawn-state comparison, continuous PCM, pixel parity, foreground timing, full browser rollback, or seven-tick acceptance follows."
     ],
     "retained_failures": [
       {
@@ -2596,7 +2598,7 @@
       "retained_artifact": "census-owner-gap-analysis-v1.json",
       "sha256": "9908b8d2ebb8aeeb64d8df4dcdeb24ea0f16f55bab3d17e1f847c679f90ba370"
     },
-    "next_experiment": "The next bounded source boundary is one source-clock capture/admit/destroy companion attached to the existing flow checkpoint. It is limited to the named source clock owner and its focused actual-source controls. It changes no source tick/draw behavior and adds no owner census, restore, export, browser run, build, or full regression; stop if the clock ownership or exact capture extent cannot be confirmed without broadening scope.",
+    "next_experiment": "Next bounded drawn-reference experiment: record the baseline source draw before restore, require strict equality for the captured CPU endpoint after replay, and separately compare the post-replay source present including its source-present counter. Keep the current owner set and ranges fixed; GPU/cache state is outside rewind scope. PR342 publication and exact-head CI are tracked separately.",
     "owner_components": {
       "scope": "Private owner components only; no browser restore exposure or complete-world claim",
       "current_files_sha256": {
@@ -4411,6 +4413,499 @@
           "Known magenta/texture screenshot artifacts remain"
         ]
       }
+    },
+    "aggregate_cpu_restore_present_capture_v2": {
+      "status": "FAILED_CAPTURE_ADMISSION_BEFORE_RESTORE",
+      "scope": "One root-released same-browser aggregate CPU attempt after the existing 300 actually drawn prefix; no sample-300 step or restore.",
+      "producer": {
+        "source_head": "23496dcb69577af75f9a13440880492ce6320991",
+        "source_tree": "46255c714f02afacd358f533b0f4fc2115d31420",
+        "clean_worktree": true,
+        "integration_receipt": {
+          "path": "aggregate-cpu-canonical-validation-20261022-222121-36d914b8/integration-result-v1.json",
+          "bytes": 24741,
+          "sha256": "d81ca2e58e090ccaac446bed4f02c884f2ea2da05c2a9064c84d42ca4f4c672c"
+        },
+        "build_source_identity": {
+          "base_head": "7c389acf5f64f938d5ff0f527197889f99df4b74",
+          "worktree": "7c389 plus exact51 reviewed source/control files; blank EOF normalization and source-tree-equivalent canonical patch normalization included before final builds",
+          "final_clean_commit": "23496dcb69577af75f9a13440880492ce6320991",
+          "final_tree": "46255c714f02afacd358f533b0f4fc2115d31420",
+          "note": "Both binaries built before this clean commit. Do not relabel embedded metadata; exactsourcebytes match and fresh runtime hashes identify producers.",
+          "reviewed_source_control_file_count": 51
+        },
+        "runtime_inventory": {
+          "path": "aggregate-cpu-canonical-validation-20261022-222121-36d914b8/runtime-inventory-v1.json",
+          "bytes": 15758,
+          "sha256": "42af71f26a8b426530ecce0116974aa5175ac8682d4155fb57c94d2913013493"
+        },
+        "runtime_file_count": 17,
+        "runtime_sha256": {
+          "gameplay_slippi_synctest_browser.mjs": "17ff7f5bd4486d7379338197f10dbe04365a1d87d9d5a1515a660cc33c5a8aea",
+          "gameplay_slippi_synctest_browser.wasm": "249ba30e70c14498415e829ebf262615629a5cfb0d56cbfc2d43d65e33abe035",
+          "gameplay_slippi_synctest_browser.data": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c"
+        },
+        "configuration": {
+          "configuration_sha256": "ad2bc7caf08ee7718b86672cc4c5bf8171857544ae62bba5205b6bab3f21b8f9",
+          "policy_sha256": "c1ccd2bf755d4ea3049f05597797ccb2aa262ae413e7684376ef1e8ec159bc77",
+          "review_receipt_sha256": "f0f82749900316f4806fa9bcbf94c1bd92769828724349cf45edbf3993ed41a5",
+          "configuration_freeze_sha256": "c70944ad64e2201c4da784c36e1d481cb529419a17e0a3b7ec29e01c436d4d88",
+          "wire_rows": 2165,
+          "review_status": "APPROVED"
+        },
+        "reviewed_source_control_file_count": 51
+      },
+      "validation": {
+        "private_release": {
+          "status": "PASS",
+          "exit_code": 0,
+          "log_sha256": "42ed69b34b31ffe1c7dd5caf5e2518179909398b6b1278ab0ac981631125c772",
+          "seconds": 12.65492329094559
+        },
+        "ordinary_release": {
+          "status": "PASS",
+          "exit_code": 0,
+          "log_sha256": "e9a0498216e17b53c88e2ec23d8387f46e59dc1b8132d310d1790ad63183a2a3",
+          "seconds": 6.61492041638121
+        },
+        "full_regression": {
+          "status": "PASS",
+          "exit_code": 0,
+          "tests": 2465,
+          "passed": 2300,
+          "skipped": 165,
+          "receipt_seconds": 528.638,
+          "process_seconds": 528.9190996252,
+          "log_sha256": "91518865dfb9c2b4ef9759ac4ed6782d4762c06abdfedd2a790a7000bb1f16b5"
+        },
+        "canonical_only_predecessor": {
+          "status": "FAILED_ONLY_CANONICAL_PATCH_ASSERTION",
+          "tests": 2465,
+          "passed": 2299,
+          "skipped": 165,
+          "failed": 1,
+          "log_sha256": "f3542c4bde353e2c5af9727744b8458df8de22cbdbc91bf5364d8e78b1c0c1df",
+          "equivalence_receipt": {
+            "path": "aggregate-cpu-canonical-validation-20261022-222121-36d914b8/canonical-equivalence-v1.json",
+            "bytes": 1329,
+            "sha256": "679cbb0ce574a5dbe360bade31ddb3e43f77a6368af5be8eae229b85429576b0"
+          },
+          "prepared_source_tree_before": "6322b8a8bc333bec037c590839ca57e6d0716fed",
+          "prepared_source_tree_after": "6322b8a8bc333bec037c590839ca57e6d0716fed",
+          "patch_sha256_before": "6cd4a7e33a9368daacb5eec23b8838936969b6392c2653e999b19893971844bb",
+          "patch_sha256_after": "b0552d0267a8de9a39b449fdce5834dab7b89ccc472cff23c80d7f85f286b523",
+          "tree_unchanged": true,
+          "prebuild_whitespace_refusal_sha256": "187721c2dd104e0dabc83afcba94a5444d537949dd59368457195c651c1ebbb0",
+          "prebuild_whitespace_repair_sha256": "e8a531cab32bdb6ce5e57282a281e826087249493fb95efea6a870c2da55ef4e"
+        }
+      },
+      "capture": {
+        "raw_report": {
+          "path": "aggregate-cpu-restore-present-capture-v2/runner/evidence.json",
+          "bytes": 396825,
+          "sha256": "2511db583665b845f2215d3c8fce41da3abd1ce1a5873ef5f2220caabb0f9286"
+        },
+        "root_observation": {
+          "path": "aggregate-cpu-restore-present-capture-v2/root-observed-v1.json",
+          "bytes": 3403,
+          "sha256": "1b9c28300d014d3f5b4955871ac1b175ce1708c3ada9045576ea170dc55fe68a"
+        },
+        "owner_report": {
+          "path": "aggregate-cpu-restore-present-capture-v2/owner.json",
+          "bytes": 79688,
+          "sha256": "c9c9e943ce6887339c3860aa45df35148952cec9135f5b6d7e7a74199a657974"
+        },
+        "used_preflight": {
+          "path": "aggregate-cpu-restore-present-capture-v2/preflight.json",
+          "bytes": 34866,
+          "sha256": "42bcc5b7d19f1cf34f90c9737a7f5999d898685d60328cad627a08655bb3e6df"
+        },
+        "root_release_inputs": {
+          "path": "aggregate-cpu-restore-present-capture-v2/root-release-inputs-v1.json",
+          "bytes": 2949,
+          "sha256": "769593ce8db4df3726348d6b1abc1dc2baa0ff1f3326ec41303f789aca183f6b"
+        },
+        "root_release": {
+          "path": "aggregate-cpu-restore-present-capture-v2/root-release-v1.json",
+          "bytes": 1165,
+          "sha256": "4dd4c5cf6f9ee3bcd6e194b9ce8cd123637256da8d3b5b517c80c9b8d1511b44"
+        },
+        "prefix": {
+          "actual_drawn_samples": 300,
+          "sample_indices": "0..299",
+          "input_record_hashes_verified": true,
+          "checkpoint_sample": 299,
+          "source_frame": 176,
+          "gpu_pending_frame_packets": 0,
+          "gpu_pending_staging_buffers": 0,
+          "worker_busy": 0,
+          "configured_sample": 300,
+          "sample300_PAD_recorded": false,
+          "sample300_source_step_reached": false
+        },
+        "configuration_result": 0,
+        "commands": [
+          {
+            "command": 1,
+            "outcome": "returned-nonzero",
+            "result": 1076,
+            "error": "Error: CPU command 1 refused 1076: CPU restore: typed aggregate capture refused"
+          }
+        ],
+        "first_failure": {
+          "decimal": 1076,
+          "hex": "0x434",
+          "message": "typed aggregate capture refused",
+          "cause": "Capture refuses when aggregate capture returns null or a boundary check fails; the retained run does not narrow that subcondition."
+        },
+        "native_evidence": {
+          "bytes": 11416,
+          "sha256": "d7ba09cde966545ece8e250eb9e2c0ef5fda395be360c31aab6b6fc5e9a57c4c",
+          "matches_retained_binary": true,
+          "state": 6,
+          "pre_frame": 176,
+          "post_frame": 0,
+          "commit_result": 4294967295,
+          "equality": 0,
+          "checked_domains": 0,
+          "matched_domains": 0
+        },
+        "restore_executed": false,
+        "restore_nonexecution_basis": "Only command 1 CAPTURE appears; command 2 was never called. Source confirms command 2 contains sample-300 step and aggregate restore/replay.",
+        "inventory_status": "incomplete",
+        "source_state_manifest_complete": false,
+        "owner_restore_admission": false,
+        "launch_protocol": {
+          "launch_result": {
+            "path": "aggregate-cpu-restore-present-capture-v2/launch-result-v1.json",
+            "bytes": 2708,
+            "sha256": "cdf451b7e82576272ead7a762f7b1bb53f848fda2abac07a1b42b8baa68b9f18",
+            "exit_code": 1
+          },
+          "runner": "src/slippi_profile/tests/run_write_census.mjs",
+          "flags": [
+            "--aurora-staging-shadow-inventory",
+            "--aggregate-cpu-restore-config"
+          ],
+          "owner_timeout_ms": 180000,
+          "cleanup_reserve_ms": 30000,
+          "preflight_attempts": 1,
+          "automatic_retry": false,
+          "browser": {
+            "name": "headless installed Chrome through scripts/browser_tools.mjs",
+            "version": "156.0.8078.47",
+            "backend": 7,
+            "audio": "muted"
+          },
+          "source_files_sha256": {
+            "src/slippi_profile/tests/run_write_census.mjs": "4118b35eb9b6a2c7fde1e14d3bb8dd05e06699aa9da062d34281b6b8c60f6545",
+            "src/slippi_profile/tests/cpu_restore_runner.mjs": "3fd132ca5c7279845063df41d6e2ce11903d264b211626da656f747cdcd062c9",
+            "src/slippi_profile/tests/cpu_restore_adapter.inc": "e466db8342cb30a05a7f637bce33c6bf5ea9f8eca74648cf6d4d96fb31ed7df7"
+          }
+        }
+      },
+      "cleanup": {
+        "cpu_restore_close": {
+          "status": "returned-nonzero",
+          "result": 1076
+        },
+        "snapshot_close": {
+          "status": "checked-return-one",
+          "result": 1
+        },
+        "renderer_shutdown": {
+          "status": "checked-return-one",
+          "result": 1
+        },
+        "renderer_closed": false,
+        "independent_pid_absence": {
+          "path": "aggregate-cpu-restore-present-capture-v2/independent-pid-absence-v1.json",
+          "bytes": 1058,
+          "sha256": "04fe809d400ede336b5279117f17cb1ae07c1d5274d732dedbfa0f8e88af4d46"
+        },
+        "recorded_owned_pid_count": 9,
+        "all_recorded_pids_absent": true
+      },
+      "independent_result_review": {
+        "retained_artifact": "aggregate-cpu-restore-present-capture-v2/independent-result-review-v1.json",
+        "bytes": 12313,
+        "sha256": "554a7a879df8b0e9fc10bde6a29b68c63add646b5dce0e473b4b17c12a731961"
+      },
+      "next_experiment": "This planned attribution step was followed by CP3 and the reviewed flow/mask source reduction; see aggregate_cpu_restore_present_capture_v5.historical_failed_attempts.",
+      "limits": [
+        "No sample-300 step, aggregate restore, replay, final present, complete-state or owner-restore admission.",
+        "No C3, whole-session, pixel/PCM parity, or rollback-performance claim."
+      ]
+    },
+    "aggregate_cpu_restore_present_capture_v5": {
+      "status": "PASS_BOUNDED_CPU_RESTORE_REPLAY_AND_ONE_PRESENT; CENSUS_INCOMPLETE; FULL_BROWSER_RESTORE_NOT_ESTABLISHED",
+      "scope": "One root-released same-browser sample-300 CPU baseline/restore/replay comparison followed by one source present. The CPU snapshot path is component evidence; full game/browser state remains incomplete.",
+      "source_checkpoint": {
+        "head": "16c418ea7ce79c5244c0250a98067e8191f904a9",
+        "tree": "792769794ba07400d9f9018cbbd7eadc65e17542",
+        "parent": "23496dcb69577af75f9a13440880492ce6320991",
+        "source_files": 14,
+        "clean": true,
+        "receipt": {
+          "path": "cpu-present-harness-validation-20261023-100225-66463c49/source-checkpoint-v1.json",
+          "bytes": 5297,
+          "sha256": "c4252de8d58e2accbd221a4147c873fdde59d98bdd41f3ed7077aaf296cb1b92"
+        },
+        "published_at_receipt_creation": false,
+        "publication_follow_up": "PR342 publication and exact-head CI are tracked separately; this historical receipt records the source commit at creation time."
+      },
+      "producers": {
+        "native_runtime_build": {
+          "base_head": "23496dcb69577af75f9a13440880492ce6320991",
+          "base_tree": "46255c714f02afacd358f533b0f4fc2115d31420",
+          "dirty_source_files": 11,
+          "identity": "The CP5 runtime uses the same nine artifact files, configuration and policy as CP4; those products were built from the separately pinned dirty11 source, not from the later harness source commit.",
+          "runtime_hashes": {
+            "gameplay_slippi_synctest_browser.mjs": "7002ac490f23cb64bd7e2e5e38e8996f0ae07e5b4474eb42a435a1fa6eac6d75",
+            "gameplay_slippi_synctest_browser.wasm": "34e083db834560b01b2a011d9e959910cd04d939f6ca2dba33bfd3968a6275ba",
+            "gameplay_slippi_synctest_browser.data": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c",
+            "gameplay_slippi_synctest_browser.map": "c648674dcda6653ba485de5f64fdad1d7f386479434d8ca6ce388a5647b6d6a0",
+            "gameplay_slippi_synctest_browser.source-state.json": "db9f409dce0b44f4e4b2617db533f56d9c1b9ebfd1f64f0563768393b2d7c4e5"
+          },
+          "private_runtime_source_review": {
+            "path": "flow-cpu-mask-validation-20261023-093804-5f1b306a/application-v1.json",
+            "bytes": 3826,
+            "sha256": "69f67484089f09713a655b0fa0cf1f721420d2cdf2fb61e5025974c46ff5852b"
+          },
+          "configuration_sha256": "05352200857183321bcddf2045a3b890d09a87369e2ddfe6d65d98dc1aea3160",
+          "policy_sha256": "c1ccd2bf755d4ea3049f05597797ccb2aa262ae413e7684376ef1e8ec159bc77",
+          "release_builds": {
+            "private": {
+              "status": "PASS",
+              "path": "flow-cpu-mask-validation-20261023-093804-5f1b306a/private-release.log",
+              "sha256": "4aab787e6251be5e52c8fceed86892eccad93a8107d08c9d136c06a820c3deae"
+            },
+            "ordinary": {
+              "status": "PASS",
+              "path": "flow-cpu-mask-validation-20261023-093804-5f1b306a/ordinary-release.log",
+              "sha256": "6d3346b2d6a5f26b3bebf9e0f2686424bf634ec4b0183cc1f6c85b0941b02c40"
+            }
+          }
+        },
+        "capture_harness_and_full_regression": {
+          "base_head": "23496dcb69577af75f9a13440880492ce6320991",
+          "base_tree": "46255c714f02afacd358f533b0f4fc2115d31420",
+          "dirty_source_files": 14,
+          "source_matches_committed_checkpoint": true,
+          "focused_node": {
+            "status": "PASS",
+            "checks": "47/47",
+            "path": "cpu-present-harness-reduction-candidate-v1/focused-node-final-v2.log",
+            "sha256": "8aa70fa8c877b17f99f352f9a133e3c67357a0c43a854985a05e9bfa10f3e801"
+          }
+        }
+      },
+      "capture": {
+        "packet": {
+          "path": "aggregate-cpu-restore-present-capture-v5/packet-candidate-v1.json",
+          "bytes": 32584,
+          "sha256": "a9401a0a5a173358140efa1dd7d187589571ceef705028b8033b9d39997c64a5"
+        },
+        "preflight": {
+          "path": "aggregate-cpu-restore-present-capture-v5/preflight.json",
+          "bytes": 33186,
+          "sha256": "9f49f08f3d340f82d56ca4a568bd7a70f0359601b1fd7eff44ee85733bd4a0d6"
+        },
+        "root_release": {
+          "path": "aggregate-cpu-restore-present-capture-v5/root-release-v1.json",
+          "sha256": "d28ceda2b18edadae6c8a02f8423b05acc7b37be591d0c01d062cf0dc33e336a",
+          "status": "RELEASED_ONE_ATTEMPT"
+        },
+        "raw_report": {
+          "path": "aggregate-cpu-restore-present-capture-v5/runner/evidence.json",
+          "bytes": 578280,
+          "sha256": "43ba12ea1d3983ac5c248df7244a18b893357b15e3b3e5f20a981d9e747329de",
+          "result": "passed"
+        },
+        "owner": {
+          "path": "aggregate-cpu-restore-present-capture-v5/owner.json",
+          "bytes": 87681,
+          "sha256": "4619e2b402f8a3336507d746699f523dfb0483d1e085eb7855ccdd824610dcad"
+        },
+        "root_observation": {
+          "path": "aggregate-cpu-restore-present-capture-v5/root-observed-v1.json",
+          "bytes": 7549,
+          "sha256": "11d8a9f0c551ad08e721a9b44269b4dc00164ff96c26a532643c8084abe0e818"
+        },
+        "independent_review": {
+          "path": "aggregate-cpu-restore-present-capture-v5/independent-raw-review-v1/receipt-v1.json",
+          "bytes": 24498,
+          "sha256": "f439571e2d04192c55df20e28480684c1cf48d5f4dfc898a5327c1b2e20f7588"
+        },
+        "native_result": {
+          "path": "aggregate-cpu-restore-present-capture-v5/independent-raw-review-v1/native.bin",
+          "bytes": 11416,
+          "sha256": "dfd719f7558b3eabde5e39b1732995b28a4188c5a7efed2626bfcfa970abed91",
+          "state": "Complete",
+          "first_failure": 0,
+          "pre_frame": 176,
+          "post_frame": 177,
+          "commit_result": 0,
+          "equality": 1,
+          "checked_domains": "0x3fe",
+          "matched_domains": "0x3fe",
+          "comparison_status": 0
+        },
+        "commands_all_zero": true,
+        "literal_pad": {
+          "sample": 300,
+          "bytes": 44,
+          "sha256": "46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288"
+        },
+        "paired_ranges": {
+          "observation": {
+            "bytes": 1280,
+            "sha256": "a97c03e66301419bcba8aba75cba1ed88ee3aed3b3a6fc80d9f0fd0f9de8f967",
+            "equal": true
+          },
+          "pcm": {
+            "bytes": 4272,
+            "sha256": "462733f725a874052aba5c73b03dd4b8799b78bb1f973b097768548b16d9833c",
+            "equal": true
+          },
+          "pad": {
+            "bytes": 44,
+            "sha256": "46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288",
+            "equal": true
+          },
+          "profile": {
+            "bytes": 32,
+            "sha256": "3d6e376f9a6fccd6906c0464e1d26993d12f922d64b0aa6dda4f3f2f1db07b0a",
+            "equal": true
+          },
+          "transfer": {
+            "bytes": 40,
+            "sha256": "7cd1b6ae9606e1e05c29ce009ef00d6644be61f9ab1f29b098e4b1b5aede644c",
+            "equal": true
+          }
+        },
+        "draw_boundaries": {
+          "three_pre_present_snapshots_identical": true,
+          "before_final_present_sha256": "8cca678f0f1294d01c0bd65bacea7e5d54c4eb2bfe67b95eef14cec52653369b",
+          "after_final_present_sha256": "6062e5f4faaa15f1aae3eba44b886094e9c86fa9f48b7c2be8f2c95d86ab487f",
+          "final_present": {
+            "source_frame": 177,
+            "selected_fighter_callback_delta_each": 5,
+            "normal_model_dispatch_delta_each": 3,
+            "gpu_begin_frame": 301,
+            "gpu_end_frame": 301,
+            "draw_calls": 237,
+            "renderer_errors": 0,
+            "pending_packets": 0,
+            "pending_staging_buffers": 0,
+            "worker_busy": 0
+          }
+        },
+        "screenshot": {
+          "path": "aggregate-cpu-restore-present-capture-v5/runner/browser-cpu-restore-sample-300.png",
+          "bytes": 307134,
+          "sha256": "2de16105c8521d93604db39ab9296bc224995b3f645c19d8a238e98ba24bb88e",
+          "visual_limit": "Known magenta/texture artifacts; no pixel comparison."
+        },
+        "cleanup": {
+          "cpu_close_result": 0,
+          "snapshot_close_result": 1,
+          "renderer_shutdown_result": 1,
+          "unique_runner_and_chrome_pids": 9,
+          "all_pids_absent": true,
+          "owner_and_process_cleanup_passed": true
+        }
+      },
+      "historical_failed_attempts": [
+        {
+          "attempt": "CP2",
+          "raw": {
+            "path": "aggregate-cpu-restore-present-capture-v2/runner/evidence.json",
+            "sha256": "2511db583665b845f2215d3c8fce41da3abd1ce1a5873ef5f2220caabb0f9286"
+          },
+          "first_failure": "1076 / 0x434, command 1 CAPTURE refused before sample 300; command 2 and restore were not called.",
+          "source_checkpoint": "23496dcb69577af75f9a13440880492ce6320991 / 46255c714f02afacd358f533b0f4fc2115d31420"
+        },
+        {
+          "attempt": "CP3",
+          "raw": {
+            "path": "aggregate-cpu-restore-present-capture-v3/runner/evidence.json",
+            "sha256": "2c1fdb24a2e908e719e0e096ab8d4090e6770a7faef22ffaf80a5ea948edb21a"
+          },
+          "independent_review": {
+            "path": "aggregate-cpu-restore-present-capture-v3/independent-raw-review-v1.json",
+            "sha256": "ae50fcec34a16e302ce8207cb0d7c4599fb45456bfc92b8652db0de956c5a031"
+          },
+          "raw_failure": "Command 1 returned 1076 in the Flow domain; the report records a null CPU flow companion but does not identify the inner source predicate.",
+          "later_source_reduction": {
+            "path": "flow-cpu-capture-reduction-candidate-v1/independent-review-v1.json",
+            "sha256": "45d82eba67bfa632ed57fa60b2e9788055a621a6c9c4f7d3fab1a9ffde17159e",
+            "finding": "Actual flow snapshot and cadence admission controls pass. The original VS mask alias was refused by bootstrap-only mask admission; the reviewed repair preserves the existing guard and adds the scoped CPU flow/mask lease."
+          }
+        },
+        {
+          "attempt": "CP4",
+          "raw": {
+            "path": "aggregate-cpu-restore-present-capture-v4/runner/evidence.json",
+            "sha256": "040763dded565541be39924d54e981772ff4581b6f7d5d97f59912a43932c2a1"
+          },
+          "independent_review": {
+            "path": "aggregate-cpu-restore-present-capture-v4/independent-raw-review-v1.json",
+            "sha256": "cb721b7471ccaa301770d69a9a97f71ef48713943916b2e6358c4cbebe98ad73"
+          },
+          "failure": "After the CPU routine returned through source present and post-draw admission, the outer clear-diagnostics assertion rejected legitimate cumulative draw counters. No native 11,416-byte result was retained, so equality/commit is not independently established from CP4. CPU close returned 0; snapshot close and renderer shutdown returned 1; all ten recorded process identities were absent."
+        }
+      ],
+      "validation": {
+        "private_release": {
+          "status": "PASS",
+          "producer": "native runtime dirty11 on23496",
+          "log": {
+            "path": "flow-cpu-mask-validation-20261023-093804-5f1b306a/private-release.log",
+            "bytes": 15563,
+            "sha256": "4aab787e6251be5e52c8fceed86892eccad93a8107d08c9d136c06a820c3deae"
+          }
+        },
+        "ordinary_release": {
+          "status": "PASS",
+          "producer": "native runtime dirty11 on23496",
+          "log": {
+            "path": "flow-cpu-mask-validation-20261023-093804-5f1b306a/ordinary-release.log",
+            "bytes": 13149,
+            "sha256": "6d3346b2d6a5f26b3bebf9e0f2686424bf634ec4b0183cc1f6c85b0941b02c40"
+          }
+        },
+        "full_regression": {
+          "status": "PASS",
+          "tests": 2466,
+          "passed": 2301,
+          "skipped": 165,
+          "unittest_seconds": 553.675,
+          "outer_seconds": 553.9682869166136,
+          "receipt": {
+            "path": "cpu-present-harness-validation-20261023-100225-66463c49/full-regression-result-v1.json",
+            "bytes": 917,
+            "sha256": "2d00ba09915e66e9be23aaea7c21b180a80f2616a12423c52d3edd92e7718487"
+          },
+          "log": {
+            "path": "cpu-present-harness-validation-20261023-100225-66463c49/full-regression.log",
+            "bytes": 465842,
+            "sha256": "c005d5f26befa62827b8bf823c4e9fab34d6b628dfb4625718e27be6ca70660b"
+          },
+          "source_matches_after": true,
+          "producer": "dirty14 harness on23496; source bytes match committed source checkpoint 16c418ea"
+        },
+        "exact_head_ci": {
+          "status": "PENDING_AT_DOCS_CANDIDATE_CREATION",
+          "follow_up": "PR342 publication and exact-head CI tracked separately"
+        }
+      },
+      "limits": [
+        "The CPU comparison covers only the checked bounded domains at sample 300 through the same-browser replay to source frame 177; it does not prove every game-state owner.",
+        "Three no-draw diagnostic snapshots match before the one final source present; this does not restore or compare the drawn-original renderer/GPU state.",
+        "The raw inventory remains incomplete and ownerRestoreAdmission is false; net-change attribution and all ranges outside the admitted CPU subset remain unadmitted.",
+        "No full browser/renderer/host rollback, original drawn-state comparison, seven-tick acceptance, continuous PCM, pixel parity, foreground timing or whole-session acceptance."
+      ]
     }
   }
 }
