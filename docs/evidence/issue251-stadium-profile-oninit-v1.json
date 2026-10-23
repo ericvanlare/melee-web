@@ -17288,8 +17288,8 @@
     }
   },
   "fresh_go2_comparison_2026_10_18": {
-    "state": "ORIGINAL_GO2_REFERENCE_PASS_BROWSER_FIRST_C_COMPARISON_FAIL; FRESH132_PREFIX_AND_PREPARED_READY_START_DECLARED_FIELDS_PASS; ENTRY_CALLBACK_SETUP_GO2_C3_OPEN",
-    "next": "The latest Fresh132 continuation passes 132 original consumed-PAD/tick/draw groups through the SSS exit and a read-only prepared VS ReadyStart/seed comparison against original VS Entry 2523, as recorded under fresh_css_finite_original_preparation.implementation_checkpoint_2026_10_22.fresh_sss_ready_start_capture_v1_2026_10_23. It did not execute the original Entry callback. Root has authorized an external source candidate and focused controls for the reviewed Setup-through-GO+2 plan; checkout mutation, repository builds and browser capture remain unreleased.",
+    "state": "SETUP_TO_GO2_DECLARED_PREFIX_PASS; ENTRY_CALLBACK_AND_C3_OPEN",
+    "next": "Prepare the reviewed, bounded Fresh132 idle-reference constructor projection and narrow extractor with the unchanged original `--stadium-idle-3500` observer/driver, preserving actual four-port consume/tick/draw order, dynamic GO, the existing cap justification, and natural tails. External candidate work is authorized; no new original capture or full browser route is released.",
     "native": {
       "binary_sha256": "4bebd3a21cf48da558c7380f45b73e394fe46f47cef774d939cd4659051918fa",
       "producer_manifest_sha256": "2da988e27c334b4530935ea32af3edc319707482e276b064e9b08c132d4cedbd",
@@ -20780,6 +20780,250 @@
           },
           "next": "Continue with the externally prepared source candidate and focused controls for the reviewed Fresh132 Setup-through-GO+2 plan. Checkout mutation, repository builds and follow-up browser capture remain unreleased."
         }
+      }
+    }
+  },
+  "fresh_setup_go2_capture_2026_10_23": {
+    "state": "PASS_SCOPED_FRESH_SETUP_THROUGH_GO2_PROPER_PREFIX",
+    "run_id": "browser-rollback-sprint-20261022-115029-d89e262b",
+    "artifact_paths_relative_to_run": true,
+    "source_identity": {
+      "clean_commit": "033e3d1bc2825ed2a0c03e1a9657a0fd28c2f58b",
+      "tree": "0d60752c99d991e713591a2558d39c5ca7df3b42",
+      "clean": true,
+      "reviewed_source_files": 17,
+      "required_source_files": 41,
+      "reviewed_source_inventory_sha256": "0635f773a2d61f51fc88a754bcce9b530b6df10d649ab11822fa6724a3095f45"
+    },
+    "runtime_identity": {
+      "release_producer_commit": "e55b49154163bd07e3c105a62a3055b00bad5cd3",
+      "tree": "a3c640af46045e8cd62b67663f555ede9e605b0d",
+      "dirty_files": {
+        "src/gameplay_menu_browser.cpp": "6aa6e6d7685bf5c529f1d5af8a468e5c4e72704e9015a6f84f4953fda465db9c",
+        "tests/first_sss_pair_native_control.py": "95a8761883f6ece74385d42b193984a0c7a9aa594298142f6483d84903ea42b2"
+      },
+      "runtime_file_count": 50,
+      "all_current_and_retained_runtime_hashes_unchanged": true,
+      "runtime_inventory_sha256": "8f4a3696cfa539f255280df93dd0ee24fe9c45bb9c498521303e6b7154f95cf2"
+    },
+    "repair_and_validation": {
+      "prior_v1_setup_dispatch": "FAILED_EXISTING_SETUP_ASSET_CONSTRUCTION_DEADLINE",
+      "reduced_dispatch_repair": {
+        "diagnostic_and_ordinary_release_builds": "PASS",
+        "first_full_suite_failure": {
+          "state": "FAILED_TWO_FIXTURE_TESTS",
+          "tests": [
+            "FreshCssRowControls.test_extracted_owner_kick_and_source_free_callback_fences",
+            "FreshCssRowControls.test_finite_owner_kick_and_source_free_callback_fences"
+          ]
+        },
+        "fixture_corrected_full_suite": {
+          "tests": 2748,
+          "skips": 192,
+          "seconds": 554.319,
+          "result": "PASS"
+        }
+      },
+      "prior_v2_constructor_count": {
+        "expected_entries": 5,
+        "observed_entries": 1,
+        "result": "REFUSED"
+      },
+      "reviewed_count_correction": {
+        "source_files": 7,
+        "validation_head": "41a5bc38d58d03b845eed988ffa2a8a873c2f37d",
+        "clean_commit_with_same_source_bytes": "033e3d1bc2825ed2a0c03e1a9657a0fd28c2f58b",
+        "full_regression": {
+          "tests": 2748,
+          "skips": 192,
+          "seconds": 577.797,
+          "overall_result": "PASS",
+          "outer_footer": "OK (skipped=192)"
+        },
+        "historical_exact_head_ci": "PR #301 predecessor 3d513652 passed exact-head CI (run 40002375549); CI for the final docs successor remains pending"
+      }
+    },
+    "setup_comparison": {
+      "decision": "PASS_DECLARED_SETUP_TYPED_START_RNG_AND_CONSTRUCTOR_SCALAR",
+      "fresh_inputs": 132,
+      "fresh_prefix_callbacks": 398,
+      "original_observer_sha256": "4fd54b4aa9537292295ad83fbb75655f8213a475a876fdd1468affb68d3d211f",
+      "entry_sequence": 2523,
+      "setup_sequence": 2563,
+      "constructor_entry_count": 1,
+      "constructor_witness_sequences": [
+        2545,
+        2546,
+        2547,
+        2548,
+        2549
+      ],
+      "constructor_parameters": [
+        3600,
+        3800
+      ],
+      "random_bound": 200,
+      "random_result": 66,
+      "seed_before": "e2624ac3",
+      "seed_after": "55248a7a",
+      "comparison_scope": "Fresh prepared Start against same-producer original Setup2563 typed Start, RNG, and constructor scalar only.",
+      "original_entry_callback_executed": false,
+      "setup_predicated_start_admission_proven": false
+    },
+    "go2_prefix": {
+      "decision": "PASS_DECLARED_C_F_GO2_STATE_SEED_AND_QUEUE_ONLY",
+      "original_observer_sha256": "4fd54b4aa9537292295ad83fbb75655f8213a475a876fdd1468affb68d3d211f",
+      "input_bundles": 87,
+      "ports_per_bundle": 4,
+      "bytes_per_port": 11,
+      "all_original_four_port_rows_matched": true,
+      "actions": 174,
+      "ticks": 87,
+      "draws": 87,
+      "comparisons_each": 17,
+      "comparison_fields": "15 declared state fields plus seed.raw32 and GO seed.raw32; no whole-state comparison.",
+      "source_sequences": {
+        "GO": 2985,
+        "C": 2986,
+        "F": 2991,
+        "GO2": 2996,
+        "final_draw_return": 2998,
+        "EOF_unconsumed": 2999
+      },
+      "seeds": {
+        "GO": "ff0c2607",
+        "C": "bc2cb82f",
+        "F": "399f0260",
+        "GO2": "ce999b35"
+      },
+      "synthetic_PAD_rows": false,
+      "final_draw_is_proper_prefix_terminal": true
+    },
+    "capture_and_cleanup": {
+      "capture_attempts": 1,
+      "capture_result": "PASS_SCOPED_FRESH_SETUP_THROUGH_GO2",
+      "headless_chromium": true,
+      "speaker_output_muted": true,
+      "audio_processing_disabled": false,
+      "native_unload_and_retirement_passed": true,
+      "native_observation_cleared": true,
+      "recorded_owned_pids_absent": 13,
+      "root_screenshot_inspected": true,
+      "pixel_equivalence_claimed": false,
+      "C3": false
+    },
+    "limits": [
+      "The original VS Entry callback did not run; Setup-predicated Start admission remains unproven.",
+      "No C3 idle lifetime, recreation, or per-owner RNG result.",
+      "No whole-session equivalence, pixels, PCM, performance, physical-input, or human-acceptance result.",
+      "Short proper-prefix capture only; EOF sequence 2999 was not consumed."
+    ],
+    "next": "Prepare the reviewed, bounded Fresh132 idle-reference constructor projection and narrow extractor with the unchanged original `--stadium-idle-3500` observer/driver, preserving actual four-port consume/tick/draw order, dynamic GO, the existing cap justification, and natural tails. External candidate work is authorized; no new original capture or full browser route is released.",
+    "pins": {
+      "v1_setup_dispatch_failure": {
+        "path": "fresh-setup-go2-capture-candidate-v1/root-observed-v1.json",
+        "bytes": 6395,
+        "sha256": "86418a4be2949ce656e86a5dd006186964f65bf9dda594b7b9b132957de1058d"
+      },
+      "v1_setup_dispatch_raw_report": {
+        "path": "fresh-setup-go2-capture-candidate-v1/browser-run/report.json",
+        "bytes": 6126917,
+        "sha256": "779bcc540213a5e9390591bff8aea1be20f9c2ca7eee9da2a217e72e5af06074"
+      },
+      "dispatch_repair_focused_build_validation": {
+        "path": "fresh-setup-go2-dispatch-validation-v1/result-v2.json",
+        "bytes": 4894,
+        "sha256": "c05dec6bf873c9d770ff2683ba1fdc8ad24f0da352d7d1ff7fcbbbb4cb7204f7"
+      },
+      "dispatch_repair_first_failed_full": {
+        "path": "fresh-setup-go2-dispatch-validation-v1/result-v3.json",
+        "bytes": 6894,
+        "sha256": "ec6c20bd20078a35ff257429fc24aa119ef02f5c9951947439c7f11297301245"
+      },
+      "dispatch_repair_corrected_full": {
+        "path": "fresh-setup-go2-dispatch-validation-v1/result-v4.json",
+        "bytes": 5146,
+        "sha256": "32600d1af22422d9ebfbfc59a15c0af55ad1303f366153a2080a691139963755"
+      },
+      "v2_constructor_count_failure": {
+        "path": "fresh-setup-go2-capture-candidate-v2/root-observed-v1.json",
+        "bytes": 5906,
+        "sha256": "f2fdc2153a8d4e7d5e21401f24abd20c988111b9c4ae503a252fe62f842b3d55"
+      },
+      "v2_constructor_count_raw_report": {
+        "path": "fresh-setup-go2-capture-candidate-v2/browser-run/report.json",
+        "bytes": 6160567,
+        "sha256": "bea13b0f4bafd046aae4ceaf086116bf24ea1972977bf770d401feaf4dd2fc0e"
+      },
+      "seven_file_count_correction": {
+        "path": "fresh-setup-go2-constructor-count-reduction-v1/freeze-v1.json",
+        "bytes": 21391,
+        "sha256": "c3155ca1e8e13339a59e4fec75cfcbe41f3244a0f809739ed91d12e0ff0e75e5"
+      },
+      "seven_file_correction_root_review": {
+        "path": "fresh-setup-go2-constructor-count-reduction-v1/root-independent-review-v1.json",
+        "bytes": 1829,
+        "sha256": "ff11ad81ecf59b017daf4440b64c3deb09fa2ed40e2651e1b27acc26f092eb36"
+      },
+      "source_and_full_regression_checkpoint": {
+        "path": "fresh-setup-go2-constructor-count-validation-v1/root-source-checkpoint-v1.json",
+        "bytes": 6043,
+        "sha256": "2ae736d38e4556cf3606af234fc5a5f41461de9278322e94a371f6f92072c4d2"
+      },
+      "full_regression_log": {
+        "path": "fresh-setup-go2-constructor-count-validation-v1/full-regression.log",
+        "bytes": 529726,
+        "sha256": "c5adb5bd17ddf23e2b87016ac98dafbc2adc982271c396e5c47de8f2f452cbaa"
+      },
+      "generator_freeze": {
+        "path": "fresh-setup-go2-packet-generator-candidate-v5/generator-freeze-v5.json",
+        "bytes": 14804,
+        "sha256": "4f2bc8d7bd905184a6749f4e9f8b61d6b7dd8c7de53853a00123fa0c8c2ee1ab"
+      },
+      "capture_freeze": {
+        "path": "fresh-setup-go2-capture-candidate-v3/capture-freeze-v1.json",
+        "bytes": 6140,
+        "sha256": "46b1b269b55b5ff5300864fdc22cc4e28827fdc6969251789db4ecf4af3a2066"
+      },
+      "packet": {
+        "path": "fresh-setup-go2-capture-candidate-v3/packet-candidate-v1.json",
+        "bytes": 39473,
+        "sha256": "d49b19eaa8b960bf24b676e872f0ef7b6e03b78e7c8fbc73f55885908ea5eadb"
+      },
+      "pre_server_control": {
+        "path": "fresh-setup-go2-clean-pre-server-control-v3/result-v1.json",
+        "bytes": 7154,
+        "sha256": "bf9228a59319f2bba1f02f67f4c718e5dc484981cae942dc0128cc913cedfb73"
+      },
+      "runtime_pins": {
+        "path": "fresh-setup-go2-capture-candidate-v3/runtime-pins-v1.json",
+        "bytes": 20757,
+        "sha256": "8f4a3696cfa539f255280df93dd0ee24fe9c45bb9c498521303e6b7154f95cf2"
+      },
+      "raw_report": {
+        "path": "fresh-setup-go2-capture-candidate-v3/browser-run/report.json",
+        "bytes": 3618654,
+        "sha256": "8416aee7bb3da8397e25750b1e80e76e35f87de31f90cb7905cfa9e36b7b647a"
+      },
+      "action_records": {
+        "path": "fresh-setup-go2-capture-candidate-v3/browser-run/report.json.stadium-c3-action-records-v1.jsonl",
+        "bytes": 447003,
+        "sha256": "20704faffee414b7f2ec2912c5417aae366c91d369ef1694a85764bac9c6775b"
+      },
+      "independent_packet_review": {
+        "path": "fresh-setup-go2-capture-candidate-v3/independent-packet-review-v1.json",
+        "bytes": 10845,
+        "sha256": "a9bd53cbf75eb8402b0dc1f2e01509e5dc64dbd4edc162089f5365e956b458d6"
+      },
+      "independent_result_review": {
+        "path": "fresh-setup-go2-capture-candidate-v3/independent-result-review-v1.json",
+        "bytes": 7464,
+        "sha256": "f6ceb621eceb12bf00fef1c89f77e0205ab122b20e6952f2fc990b6ee2393d4a"
+      },
+      "root_observed_result_and_cleanup": {
+        "path": "fresh-setup-go2-capture-candidate-v3/root-observed-v1.json",
+        "bytes": 4198,
+        "sha256": "e3a9fae54a9cfcf8a8d3291571ecec84e2668ffd8c142a74791944b1e61a66f0"
       }
     }
   }
