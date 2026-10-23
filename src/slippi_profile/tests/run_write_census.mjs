@@ -158,8 +158,7 @@ function sourceHashes() {
 // prefix (which includes entry/Ready), then positive selected-fighter callback
 // and normal-model dispatch deltas at interactive sample 300. No exact count is
 // assumed. Status and counter regressions fail at every prefix boundary too.
-export function validateCensusDrawSample(result, sample, beforeDiagnostics,
-  previousFrame, expectedInputMapping) {
+export function validateDrawSampleBoundary(result, sample, beforeDiagnostics, previousFrame) {
   const frame = validateAuroraFrame(result.status,
     previousFrame.beginFrameId, previousFrame.endFrameId);
   const diagnostics = decodeDrawDiagnostics(Buffer.from(result.drawDiagnostics, 'base64'));
@@ -171,10 +170,16 @@ export function validateCensusDrawSample(result, sample, beforeDiagnostics,
       throw new Error(`Draw diagnostic counter regressed: ${field}`);
     }
   }
-  let fighters = null;
   if (Buffer.from(result.pad, 'base64').byteLength !== 44) {
     throw new Error(`Browser sample ${sample} did not return 44 PAD bytes`);
   }
+  return {frame, diagnostics};
+}
+
+export function validateCensusDrawSample(result, sample, beforeDiagnostics,
+  previousFrame, expectedInputMapping) {
+  const {frame, diagnostics}=validateDrawSampleBoundary(result,sample,beforeDiagnostics,previousFrame);
+  let fighters = null;
   if (sample === SAMPLE) {
     fighters = validateSelectedDrawPath(beforeDiagnostics, diagnostics,
       result.boundary?.players, expectedInputMapping);
@@ -239,6 +244,40 @@ export function validateCensusDrawSample(result, sample, beforeDiagnostics,
     }
   }
   return {frame, diagnostics, fighters};
+}
+
+// Save the complete returned native sequence before outer validation or screenshot.
+export function retainCpuRestoreSample(report,sample) {
+  report.cpuRawSample=sample;
+  report.execution.cpuRestore=sample.cpuRestore;
+  report.execution.restorePerformed=sample.cpuRestore?.nativeEvidence?.equality===1 &&
+    sample.cpuRestore?.commands?.find(record=>record.command===2)?.result===0 ? true : 'not-proven';
+  report.execution.cpuOuterValidation='pending';
+  return report;
+}
+export function recordCpuRestoreFailure(report,error) {
+  if(error.cpuRestorePartial)report.execution.cpuRestore=error.cpuRestorePartial;
+  if(error.cpuRestorePartialReadError)report.execution.cpuRestorePartialReadError=error.cpuRestorePartialReadError;
+  if(!report.cpuRawSample)report.execution.restorePerformed='unknown-on-failure; inspect native evidence and command records';
+  report.execution.cpuOuterValidation='failed';
+  return report;
+}
+export function validateCpuRestoreDrawSample(sample,beforeDiagnostics,previousFrame,expectedInputMapping) {
+  const labels=['before-cpu-baseline-and-replay','after-cpu-capture-before-step',
+    'after-cpu-replay-before-final-present','after-final-source-present-and-quiescence'];
+  const boundaries=sample.cpuRestore?.drawBoundaries;
+  if(!Array.isArray(boundaries)||boundaries.length!==labels.length||
+     boundaries.some((row,i)=>row.label!==labels[i]||row.bytes!==132||Buffer.from(row.base64||'','base64').length!==132))
+    throw new Error('CPU draw boundary evidence missing or malformed');
+  const raw=boundaries.map(row=>Buffer.from(row.base64,'base64'));
+  if(!raw[0].equals(raw[1])||!raw[0].equals(raw[2]))throw new Error('CPU capture/baseline/replay unexpectedly changed draw diagnostics');
+  if(JSON.stringify(decodeDrawDiagnostics(raw[0]))!==JSON.stringify(beforeDiagnostics))throw new Error('CPU pre-boundary draw diagnostics drift');
+  if(!raw[3].equals(Buffer.from(sample.drawDiagnostics,'base64')))throw new Error('Final present draw evidence drift');
+  const {frame,diagnostics}=validateDrawSampleBoundary(sample,SAMPLE,decodeDrawDiagnostics(raw[2]),previousFrame);
+  const fighters=validateSelectedDrawPath(decodeDrawDiagnostics(raw[2]),diagnostics,sample.boundary?.players,expectedInputMapping);
+  if(!sample.boundary?.interactive)throw new Error('CPU final present interactive boundary refused');
+  if(sample.pad!=='AgAAAAAAAAAAAAABALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=')throw new Error('CPU sample300 literal PAD drift');
+  return {frame,diagnostics,fighters};
 }
 
 function browserSampleLane(sample) {
@@ -491,14 +530,10 @@ async function main() {
     if(cpuWire){
       const sample=await runBrowserCpuRestore(page,cpuWire,checkpoint,expectedInputMapping,expectedStocks,{
         checkedSource:checkedAsyncCcall.toString(),inputMappingSource:validateSourceInputMapping.toString(),inspectSource:inspectInteractiveObservation.toString()});
-      const frame=validateAuroraFrame(sample.status,previousFrame.beginFrameId,previousFrame.endFrameId);
-      const diagnostics=decodeDrawDiagnostics(Buffer.from(sample.drawDiagnostics,'base64'));
-      assertDrawDiagnosticsClear(diagnostics);
-      const fighters=validateSelectedDrawPath(previousDiagnostics,diagnostics,sample.boundary?.players,expectedInputMapping);
-      if(!sample.boundary?.interactive)throw new Error('CPU final present interactive boundary refused');
-      if(sample.pad!=='AgAAAAAAAAAAAAABALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=')throw new Error('CPU sample300 literal PAD drift');
+      retainCpuRestoreSample(report,sample);writeReport();
+      const {frame,diagnostics,fighters}=validateCpuRestoreDrawSample(sample,previousDiagnostics,previousFrame,expectedInputMapping);
       report.execution={status:'completed',prefixSamples:300,sample:300,cpuRestore:sample.cpuRestore,restorePerformed:true,
-        scope:'same-browser CPU restore/replay + one present COMPONENT only'};
+        scope:'same-browser CPU restore/replay + one present COMPONENT only',cpuOuterValidation:'passed'};
       report.cpuResult={observation:rawLaneRecord(browserSampleLane(sample)),boundary:sample.boundary,gpuStatus:sample.status,
         finalFrame:frame,drawDiagnostics:diagnostics,selectedFighterPaths:fighters,
         screenshot:await screenshotRecord(page,options['--out'],'browser-cpu-restore-sample-300.png')};
@@ -623,9 +658,7 @@ async function main() {
   } catch (error) {
     recordFailedCensusExecution(report, error);
     if(cpuWire){
-      report.execution.cpuRestore=error.cpuRestorePartial||report.execution.cpuRestore;
-      if(error.cpuRestorePartialReadError)report.execution.cpuRestorePartialReadError=error.cpuRestorePartialReadError;
-      report.execution.restorePerformed='unknown-on-failure; inspect native evidence and command records';
+      recordCpuRestoreFailure(report,error);
     }
     writeReport();
     throw error;

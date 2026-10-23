@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {validateCpuRestoreConfiguration,runBrowserCpuRestore,CPU_EVIDENCE_BYTES} from './cpu_restore_runner.mjs';
-import {checkedAsyncCcall} from './runner_contract.mjs';
+import {validateCpuRestoreDrawSample,retainCpuRestoreSample,recordCpuRestoreFailure,recordFailedCensusExecution} from './run_write_census.mjs';
+import {decodeDrawDiagnostics,assertDrawDiagnosticsClear,checkedAsyncCcall} from './runner_contract.mjs';
 const hashes={wasmSha256:'a'.repeat(64),mapSha256:'b'.repeat(64),manifestSha256:'c'.repeat(64),policySha256:'d'.repeat(64)};
 const row={producer_target:'fighter_source_runtime',source:'src/melee/test.c',input_object:'libfighter_source_runtime.a(test.c.o)',
   input_section:'.bss.actual_state',decision:'source-c-static-candidate',exclusion_reason:null,address:4096,size:4,
@@ -20,9 +21,9 @@ test('exact reviewed source identity uses final VMAs, rejects every identity/pol
   f=fixture();f.manifest.mutable_input_sections.push({...row,input_section:'.bss.host',source:null,producer_target:null,decision:'excluded'});
   assert.equal(validateCpuRestoreConfiguration(f.config,f.policy,f.manifest,hashes).length,1);
 });
-function environment({failCommand=0,configurationFailure=false,shared=false}={}){
+function environment({failCommand=0,configurationFailure=false,shared=false,cpuDraw=false,captureDraw=false}={}){
   const heap=new Uint8Array(shared?new SharedArrayBuffer(65536):new ArrayBuffer(65536));let queries=0,nativeReads=0;
-  const obs=128,pad=1536,diag=1600,evidence=32768;const view=new DataView(heap.buffer);view.setUint32(obs,176,true);view.setUint32(diag,2,true);
+  const obs=128,pad=1536,diag=1600,evidence=32768;const view=new DataView(heap.buffer);view.setUint32(obs,176,true);heap.set(drawBytes(),diag);
   const order=[],commands=[];let freed=0;
   const rawPad=Buffer.from('AgAAAAAAAAAAAAABALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=','base64');
   const writeEvidence=()=>{
@@ -45,7 +46,9 @@ function environment({failCommand=0,configurationFailure=false,shared=false}={})
       if(name==='melee_web_snapshot_quiescent'){order.push('transfer-quiescent');return 1;}
       assert.equal(name,'melee_web_synctest_cpu_restore_command');const command=args[0];order.push(command);commands.push(command);
       if(command===failCommand)return 99;
-      if(command===2){view.setUint32(obs,177,true);heap.set(rawPad,pad);}
+      if(command===1&&captureDraw)view.setUint32(diag+8,1501,true);
+      if(command===2){view.setUint32(obs,177,true);heap.set(rawPad,pad);if(cpuDraw)heap[diag+131]=1;}
+      if(command===3)heap.set(drawBytes(true),diag);
       if(command===4)assert.ok(queries>=2&&order.indexOf('transfer-quiescent')<order.indexOf(4));
       return 0;
     }};
@@ -78,5 +81,84 @@ test('SharedArrayBuffer refusal precedes native reads and configuration',async()
   const old=globalThis.window;const e=environment({shared:true});e.install();
   try{await assert.rejects(()=>runBrowserCpuRestore(e.page,[[4096,4,1,1]],checkpoint,[],[4,4],helpers),/Shared Wasm heap/);
     assert.equal(e.reads,0);assert.equal(e.freed,0);assert.deepEqual(e.commands,[]);
+  }finally{globalThis.window=old;}
+});
+
+const mapping=[{sourceSlot:0,initializerPort:0,rawController:0},{sourceSlot:1,initializerPort:2,rawController:1}];
+function drawBytes(final=false) {
+  const raw=Buffer.alloc(132);raw.writeUInt32LE(6,0);
+  for(let slot=0;slot<2;slot++){
+    raw.writeUInt32LE(1500+(final?5:0),8+slot*4);
+    raw.writeUInt32LE(870+(final?3:0),56+slot*4);
+    raw.writeInt32LE(slot,80+slot*4);
+  }
+  raw.writeUInt32LE(3,128);return raw;
+}
+function finalSample() {
+  const before=drawBytes(),after=drawBytes(true);
+  return {observation:Buffer.alloc(1280).toString('base64'),pcm:Buffer.alloc(4272).toString('base64'),
+    pad:'AgAAAAAAAAAAAAABALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=',
+    status:{drawCallCount:10,lastBeginFrameId:301,lastEndFrameId:301},drawDiagnostics:after.toString('base64'),
+    boundary:{interactive:true,players:[{sourceSlot:0,fighterKind:0},{sourceSlot:1,fighterKind:0}]},
+    cpuRestore:{status:'cpu-restore-replay-and-one-present-component-complete',commands:[1,2,3,4].map(command=>({command,result:0,nativeEvidence:{equality:1}})),
+      nativeEvidence:{equality:1},drawBoundaries:[
+        ['before-cpu-baseline-and-replay',before],['after-cpu-capture-before-step',before],
+        ['after-cpu-replay-before-final-present',before],['after-final-source-present-and-quiescence',after]]
+        .map(([label,raw])=>({label,bytes:132,base64:raw.toString('base64')}))}};
+}
+const validateFinal=sample=>validateCpuRestoreDrawSample(sample,decodeDrawDiagnostics(drawBytes()),
+  {beginFrameId:300,endFrameId:300},mapping);
+test('actual outer validator accepts cumulative prefix plus final draw; old zero assertion rejects it',()=>{
+  const sample=finalSample();assert.throws(()=>assertDrawDiagnosticsClear(decodeDrawDiagnostics(Buffer.from(sample.drawDiagnostics,'base64')),'old-final-present'),/source draw/);
+  assert.equal(validateFinal(sample).fighters.length,2);
+});
+test('actual outer validator refuses missing/invalid final draw, CPU writes including unused metadata, PAD/input/interactive/GPU drift',()=>{
+  let caseIndex=0;
+  for(const mutate of [
+    s=>{s.cpuRestore.drawBoundaries.pop();},
+    s=>{const b=drawBytes();b[131]=1;s.cpuRestore.drawBoundaries[2].base64=b.toString('base64');},
+    s=>{s.drawDiagnostics=drawBytes().toString('base64');s.cpuRestore.drawBoundaries[3].base64=s.drawDiagnostics;},
+    s=>{s.status.lastBeginFrameId=300;},s=>{s.status.drawCallCount=0;},
+    s=>{s.boundary.interactive=false;},s=>{s.boundary.players[1].sourceSlot=0;},
+    s=>{s.pad=Buffer.alloc(44).toString('base64');},
+    s=>{const b=drawBytes(true);b.writeUInt32LE(1,4);s.drawDiagnostics=b.toString('base64');s.cpuRestore.drawBoundaries[3].base64=s.drawDiagnostics;},
+    s=>{const b=drawBytes(true);b.writeUInt32LE(1499,8);s.drawDiagnostics=b.toString('base64');s.cpuRestore.drawBoundaries[3].base64=s.drawDiagnostics;},
+  ]){const sample=finalSample();mutate(sample);assert.throws(()=>validateFinal(sample),`refusal case ${caseIndex++}`);}
+});
+test('actual page closure rejects capture or CPU draw changes before final command and retains command evidence',async()=>{
+  const old=globalThis.window;
+  try{for(const options of [{cpuDraw:true},{captureDraw:true}]){
+    const e=environment(options);e.install();let error;
+    try{await runBrowserCpuRestore(e.page,[[4096,4,1,1]],checkpoint,[],[4,4],helpers);}catch(value){error=value;}
+    assert.match(String(error),/changed draw diagnostics/);assert.ok(!e.commands.includes(3));
+    assert.equal(error.cpuRestorePartial.commands.at(-1).nativeEvidence.equality,1);
+    assert.ok(error.cpuRestorePartial.drawBoundaries.length>=2);
+  }}finally{globalThis.window=old;}
+});
+test('actual report assembly retains complete raw/native evidence through later outer failures and partial exceptions',()=>{
+  const sample=finalSample(),report={execution:{status:'incomplete'}};
+  retainCpuRestoreSample(report,sample);
+  sample.boundary.interactive=false;let error;try{validateFinal(sample);}catch(value){error=value;}
+  recordFailedCensusExecution(report,error);recordCpuRestoreFailure(report,error);
+  assert.equal(report.result,'failed');assert.equal(report.execution.cpuOuterValidation,'failed');
+  assert.equal(report.cpuRawSample,sample);assert.equal(report.execution.cpuRestore,sample.cpuRestore);
+  assert.equal(report.execution.restorePerformed,true);assert.equal(report.cpuRawSample.pcm,sample.pcm);
+  assert.equal(report.execution.cpuRestore.commands[3].nativeEvidence.equality,1);
+  const partial={commands:[{command:1,result:1076,nativeEvidence:{firstFailure:1076}}]};
+  const failed={execution:{status:'incomplete'}};const refusal=Object.assign(new Error('refusal'),{cpuRestorePartial:partial});
+  recordFailedCensusExecution(failed,refusal);recordCpuRestoreFailure(failed,refusal);
+  assert.equal(failed.execution.cpuRestore,partial);assert.equal(failed.execution.status,'failed');
+  assert.match(failed.execution.restorePerformed,/unknown/);assert.equal(failed.cpuRawSample,undefined);
+});
+test('actual page exception after final command retains native commands and raw final sample',async()=>{
+  const old=globalThis.window;const e=environment();e.install();let error;
+  try{
+    try{await runBrowserCpuRestore(e.page,[[4096,4,1,1]],checkpoint,[],[4,4],
+      {...helpers,inspectSource:'()=>({interactive:false,players:[]})'});}catch(value){error=value;}
+    assert.match(String(error),/interactive guard/);assert.deepEqual(e.commands,[1,2,3,4]);
+    assert.equal(error.cpuRestorePartial.commands[3].nativeEvidence.equality,1);
+    assert.equal(error.cpuRestorePartial.rawSample.observation.length>0,true);
+    assert.equal(error.cpuRestorePartial.rawSample.boundary.interactive,false);
+    assert.equal(error.cpuRestorePartial.drawBoundaries.at(-1).label,'after-final-source-present-and-quiescence');
   }finally{globalThis.window=old;}
 });

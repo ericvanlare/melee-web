@@ -75,8 +75,16 @@ uint32_t cpu_execute(uint32_t command){
         cpu_restore.evidence.pre_frame=observation.frame;
         payload_admission_capture_begin_frame=last_completed_frame_id;
         payload_admission_capture_end_frame=last_completed_frame_id;
-        cpu_restore.capsule=melee_web::GameplayCpuCheckpoint::capture(*match,std::move(cpu_restore.configured_statics));
-        if(!cpu_restore.capsule||cpu_boundary())return cpu_fail(0x434u,"typed aggregate capture refused");
+        melee_web::CpuCaptureDiagnostic capture_diagnostic{};
+        cpu_restore.capsule=melee_web::GameplayCpuCheckpoint::capture(*match,
+            std::move(cpu_restore.configured_statics),capture_diagnostic);
+        if(!cpu_restore.capsule){
+            cpu_restore.evidence.comparison=capture_diagnostic.comparison;
+            return cpu_fail(0x434u,capture_diagnostic.message.data());
+        }
+        /* Preserve the boundary's own first code/message. A post-capture
+         * boundary refusal is distinct from a null factory result. */
+        if(cpu_boundary())return cpu_restore.first_failure;
         cpu_restore.state=C::Captured;return 0;
     }
     if(command==2){

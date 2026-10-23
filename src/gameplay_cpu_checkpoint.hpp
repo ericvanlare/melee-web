@@ -10,10 +10,24 @@ namespace melee_web {
  * owns input/PCM/phase comparison and enforces runtime/Asyncify/GPU boundaries.
  * After begin_record, disarm BEFORE ordinary source teardown; retain this
  * capsule until source_owners_retired succeeds, then destroy it. */
+/* Private capture-only refusal evidence. status1 is a refusal, not a byte
+ * mismatch. detail is CpuCaptureRefusal except Payload domain, where it is
+ * the actual MeleeWebSourceMemoryPayloadSnapshotStatus. Opaque null results
+ * are named as such; text does not invent an internal owner failure. */
+enum class CpuCaptureRefusal : std::uint32_t {
+    CapsuleAllocation=1, MissingStatics=2, OwnerTuple=3, SourceFrameWrap=4,
+    NullSnapshot=5, StaticCapture=6, AudioGeneration=7, AllocationException=8,
+    UnexpectedException=9
+};
+struct CpuCaptureDiagnostic {
+    CpuComparison comparison{};
+    std::array<char,160> message{};
+};
 class GameplayCpuCheckpoint final {
 public:
     static std::unique_ptr<GameplayCpuCheckpoint> capture(
-        const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>) noexcept;
+        const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,
+        CpuCaptureDiagnostic&) noexcept;
     ~GameplayCpuCheckpoint();
     bool begin_record(const GameplayMatchSession&) noexcept;
     bool seal_post(const GameplayMatchSession&) noexcept;

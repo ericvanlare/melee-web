@@ -4,6 +4,7 @@
 #include <limits>
 #include <new>
 #include <cstdlib>
+#include <cstdio>
 namespace melee_web {
 namespace {
 bool same_range(const MeleeWebAudioOwnedRange& a,const MeleeWebAudioOwnedRange& b) noexcept {
@@ -12,29 +13,60 @@ bool same_range(const MeleeWebAudioOwnedRange& a,const MeleeWebAudioOwnedRange& 
 }
 }
 std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
-    const GameplayMatchSession& session,std::unique_ptr<GameplayCpuStatics> statics) noexcept {
+    const GameplayMatchSession& session,std::unique_ptr<GameplayCpuStatics> statics,
+    CpuCaptureDiagnostic& diagnostic) noexcept {
+    /* Internal caller supplies fresh private stack storage. No diagnostic
+     * pointer is exported and no source owner is written by this attribution. */
+    diagnostic={};
+    CpuComparisonDomain stage=CpuComparisonDomain::Owner;
+    auto refused=[&](CpuComparisonDomain domain,std::uint32_t detail,const char* text){
+        diagnostic.comparison={static_cast<std::uint32_t>(domain),1,UINT32_MAX,UINT32_MAX,0,0,0,0,detail};
+        std::snprintf(diagnostic.message.data(),diagnostic.message.size(),"%s",text);
+    };
+    auto code=[](CpuCaptureRefusal value){return static_cast<std::uint32_t>(value);};
     std::unique_ptr<GameplayCpuCheckpoint> c(new(std::nothrow) GameplayCpuCheckpoint());
-    if(!c||!statics)return {};
+    if(!c){refused(stage,code(CpuCaptureRefusal::CapsuleAllocation),"CPU capsule allocation returned null");return {};}
+    if(!statics){refused(CpuComparisonDomain::Statics,code(CpuCaptureRefusal::MissingStatics),"Configured static owner is missing");return {};}
     try {
         c->owner_=session.diagnostic_cpu_owners();
-        if(!c->owner_.storage||!c->owner_.world||
-           c->owner_.frame==std::numeric_limits<std::uint32_t>::max())return {};
+        if(!c->owner_.storage||!c->owner_.world){
+            refused(stage,code(CpuCaptureRefusal::OwnerTuple),"Live session CPU owner tuple is unavailable");return {};
+        }
+        if(c->owner_.frame==std::numeric_limits<std::uint32_t>::max()){
+            refused(stage,code(CpuCaptureRefusal::SourceFrameWrap),"Source frame cannot advance without wrapping");return {};
+        }
         c->statics_=std::move(statics);c->commit_.statics=c->statics_.get();
         c->commit_.audio=c->owner_.audio;c->commit_.flow=c->owner_.flow;c->commit_.context=c->owner_.context;
-        c->commit_.bootstrap=melee_web_gameplay_bootstrap_snapshot_capture(nullptr,0);
-        c->commit_.flow_snapshot=melee_web_match_flow_cpu_snapshot_capture(c->owner_.flow,nullptr,0);
-        c->commit_.context_snapshot=melee_web_match_context_snapshot_capture(c->owner_.context,nullptr,0);
+        char leaf_error[160]{};
+        stage=CpuComparisonDomain::Bootstrap;
+        c->commit_.bootstrap=melee_web_gameplay_bootstrap_snapshot_capture(leaf_error,sizeof(leaf_error));
+        if(!c->commit_.bootstrap){refused(stage,code(CpuCaptureRefusal::NullSnapshot),leaf_error[0]?leaf_error:"Bootstrap snapshot capture returned null without error text");return {};}
+        stage=CpuComparisonDomain::Flow;leaf_error[0]=0;
+        c->commit_.flow_snapshot=melee_web_match_flow_cpu_snapshot_capture(c->owner_.flow,leaf_error,sizeof(leaf_error));
+        if(!c->commit_.flow_snapshot){refused(stage,code(CpuCaptureRefusal::NullSnapshot),leaf_error[0]?leaf_error:"Flow CPU snapshot capture returned null without error text");return {};}
+        stage=CpuComparisonDomain::Context;leaf_error[0]=0;
+        c->commit_.context_snapshot=melee_web_match_context_snapshot_capture(c->owner_.context,leaf_error,sizeof(leaf_error));
+        if(!c->commit_.context_snapshot){refused(stage,code(CpuCaptureRefusal::NullSnapshot),leaf_error[0]?leaf_error:"Match-context snapshot capture returned null without error text");return {};}
+        stage=CpuComparisonDomain::Audio;
         c->commit_.audio_snapshot=melee_web_audio_snapshot_capture(c->owner_.audio);
+        if(!c->commit_.audio_snapshot){refused(stage,code(CpuCaptureRefusal::NullSnapshot),"Audio snapshot capture returned null (opaque capture API)");return {};}
+        stage=CpuComparisonDomain::Payload;
         auto payload=melee_web_source_memory_payload_snapshot_capture();
         c->commit_.payload=payload.snapshot;
+        if(payload.status!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK||!c->commit_.payload){
+            refused(stage,static_cast<std::uint32_t>(payload.status),"Source payload capture refused; detail is actual payload status (null snapshot if status is OK)");return {};
+        }
+        stage=CpuComparisonDomain::Actions;
         c->commit_.actions=melee_web_action_interval_capture();
-        if(!c->commit_.bootstrap||!c->commit_.flow_snapshot||!c->commit_.context_snapshot||
-           !c->commit_.audio_snapshot||payload.status!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK||
-           !c->commit_.payload||!c->commit_.actions||!c->statics_->capture())return {};
+        if(!c->commit_.actions){refused(stage,code(CpuCaptureRefusal::NullSnapshot),"ActionStore interval capture returned null (opaque capture API)");return {};}
+        stage=CpuComparisonDomain::Statics;
+        if(!c->statics_->capture()){refused(stage,code(CpuCaptureRefusal::StaticCapture),"Configured static snapshot capture returned false");return {};}
+        stage=CpuComparisonDomain::Audio;
         c->audio_generation_=melee_web_audio_generation(c->owner_.audio);
-        if(!c->audio_generation_)return {};
+        if(!c->audio_generation_){refused(stage,code(CpuCaptureRefusal::AudioGeneration),"Captured audio owner generation is zero");return {};}
         return c;
-    }catch(...){return {};}
+    }catch(const std::bad_alloc&){refused(stage,code(CpuCaptureRefusal::AllocationException),"CPU capture leaf threw std::bad_alloc");return {};}
+    catch(...){refused(stage,code(CpuCaptureRefusal::UnexpectedException),"CPU capture leaf threw an unexpected exception");return {};}
 }
 bool GameplayCpuCheckpoint::same_owner(const GameplayMatchSession& session) const noexcept {
     /* Re-read from the current live session before using any captured handle;

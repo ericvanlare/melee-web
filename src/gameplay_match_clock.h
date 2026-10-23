@@ -65,6 +65,10 @@ int melee_web_source_clock_snapshot_matches(
     const MeleeWebSourceClockSnapshot*, const void*, uint64_t, uint64_t);
 int melee_web_source_clock_snapshot_bootstrap_mask_admit(
     const MeleeWebSourceClockSnapshot*);
+/* CPU-only closure for the two exact source-supported saved-mask owners.
+ * Caller supplies current flow identity/epoch/world, never captured stand-ins. */
+int melee_web_source_clock_snapshot_cpu_mask_admit(
+    const MeleeWebSourceClockSnapshot*, const void*, uint64_t, uint64_t);
 void melee_web_source_clock_snapshot_destroy(
     MeleeWebSourceClockSnapshot* snapshot);
 

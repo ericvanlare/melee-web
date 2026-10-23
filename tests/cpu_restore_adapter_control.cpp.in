@@ -127,6 +127,7 @@ std::size_t commit_trace_count=0;
 std::array<std::uint32_t,8> admission_trace{};
 std::size_t admission_trace_count=0;
 std::uint32_t fail_admission_leaf=0;
+bool fail_capture=false;
 bool fail_replay=false;
 bool fail_static_replay=false;
 bool pending_submission=false;
@@ -179,7 +180,10 @@ GameplayCpuCheckpoint::~GameplayCpuCheckpoint() {
 }
 std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
     const GameplayMatchSession& session,
-    std::unique_ptr<GameplayCpuStatics> statics) noexcept {
+    std::unique_ptr<GameplayCpuStatics> statics,CpuCaptureDiagnostic& diagnostic) noexcept {
+    diagnostic={};
+    if(fail_capture){diagnostic.comparison={7,1,UINT32_MAX,UINT32_MAX,0,0,0,0,5};
+        std::snprintf(diagnostic.message.data(),diagnostic.message.size(),"fixture bootstrap capture refusal");return {};}
     if(!statics||!statics->capture()) return {};
     try {
         auto value=std::unique_ptr<GameplayCpuCheckpoint>(new GameplayCpuCheckpoint);
@@ -339,6 +343,7 @@ std::uint32_t ptr32(const void* p) {
     return static_cast<std::uint32_t>(value);
 }
 void reset_fixture() {
+    fail_capture=false;
     fail_static_replay=false;
     cpu_restore=CpuRestoreControl{};
     match=std::make_unique<melee_web::GameplayMatchSession>(176);
@@ -402,6 +407,22 @@ void verify_successful_interval() {
     close_and_retire();
     check(capsule_disarms>0&&capsule_destroys==1&&action_destroys==1,
           "Disarm/retire/destroy sequence did not retain then release the capsule");
+}
+void verify_capture_refusal_retains_typed_reason_through_close() {
+    reset_fixture();check(configure_valid(),"Configuration failed");fail_capture=true;
+    const auto result=melee_web_synctest_cpu_restore_command(1);
+    check(result==0x434&&tick_sample_count==0&&draw_calls==0,"Capture refusal ran source work");
+    const auto* e=static_cast<const CpuRestoreEvidence*>(melee_web_synctest_cpu_restore_evidence());
+    check(e->comparison.domain==7&&e->comparison.status==1&&e->comparison.detail==5&&
+          e->comparison.row==UINT32_MAX&&e->comparison.offset==UINT32_MAX&&e->commit_result==UINT32_MAX,
+          "Structured capture refusal lost or invented byte evidence");
+    const std::string message(error);check(message.find("fixture bootstrap capture refusal")!=std::string::npos,"Leaf reason lost");
+    check(melee_web_synctest_cpu_restore_command(5)==result&&std::string(error)==message,
+          "CLOSE lost first capture refusal");
+    check(e->comparison.domain==7&&e->comparison.detail==5&&tick_sample_count==0&&draw_calls==0,
+          "CLOSE cleared native capture refusal or ran source work");
+    check(melee_web_synctest_cpu_before_source_close()==1,"Source close refused");
+    match.reset();world_exists=false;check(melee_web_synctest_cpu_after_source_close()==1,"Source retirement refused");
 }
 void verify_admission_refusal_blocks_draw_and_retains_failure() {
     reset_fixture();
@@ -544,6 +565,7 @@ extern "C" int melee_web_synctest_draw_present() {
 int main() {
     try {
         verify_successful_interval();
+        verify_capture_refusal_retains_typed_reason_through_close();
         verify_admission_refusal_blocks_draw_and_retains_failure();
         verify_replay_refusal_blocks_draw();
         verify_actual_static_byte_diff_is_retained();

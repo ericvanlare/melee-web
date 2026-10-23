@@ -225,14 +225,21 @@ MeleeWebMatchFlowCpuSnapshot* melee_web_match_flow_cpu_snapshot_capture(
     MeleeWebMatchFlowCpuSnapshot* snapshot=calloc(1,sizeof(*snapshot));
     if (!snapshot) {fail(e,n,"Cannot allocate flow CPU companion");return NULL;}
     snapshot->flow=melee_web_match_flow_snapshot_capture(flow,e,n);
-    if (snapshot->flow)
-        snapshot->cadence=melee_web_source_cadence_snapshot_capture(
-            flow,snapshot->flow->epoch,flow->generation);
-    if (!snapshot->flow || !snapshot->cadence ||
-        !melee_web_source_clock_snapshot_bootstrap_mask_admit(
-            snapshot->flow->source_clock)) {
+    if (!snapshot->flow) {
+        /* Preserve the actual flow/source-clock error, rather than replacing
+         * it with an ambiguous aggregate message. */
+        melee_web_match_flow_cpu_snapshot_destroy(snapshot);return NULL;
+    }
+    snapshot->cadence=melee_web_source_cadence_snapshot_capture(
+        flow,snapshot->flow->epoch,flow->generation);
+    if (!snapshot->cadence) {
         melee_web_match_flow_cpu_snapshot_destroy(snapshot);
-        fail(e,n,"Cannot capture complete flow CPU companion");return NULL;
+        fail(e,n,"Source cadence snapshot capture returned null");return NULL;
+    }
+    if (!melee_web_source_clock_snapshot_cpu_mask_admit(
+            snapshot->flow->source_clock,flow,owner_epoch,flow->generation)) {
+        melee_web_match_flow_cpu_snapshot_destroy(snapshot);
+        fail(e,n,"Clock saved mask has no supported CPU snapshot owner");return NULL;
     }
     return snapshot;
 }
@@ -242,9 +249,9 @@ int melee_web_match_flow_cpu_snapshot_admit(MeleeWebMatchFlow* flow,
     if (!snapshot || !snapshot->flow || !snapshot->cadence)
         return fail(e,n,"Flow CPU companion is incomplete");
     if (!melee_web_match_flow_snapshot_admit(flow,snapshot->flow,e,n))return 0;
-    if (!melee_web_source_clock_snapshot_bootstrap_mask_admit(
-            snapshot->flow->source_clock))
-        return fail(e,n,"Clock saved mask is not the unchanged bootstrap-owned scalar");
+    if (!melee_web_source_clock_snapshot_cpu_mask_admit(
+            snapshot->flow->source_clock,flow,owner_epoch,flow->generation))
+        return fail(e,n,"Clock saved mask has no supported CPU snapshot owner");
     if (!melee_web_source_cadence_snapshot_admit(snapshot->cadence,
             flow,snapshot->flow->epoch,flow->generation))
         return fail(e,n,"Source cadence owner or lifetime changed");

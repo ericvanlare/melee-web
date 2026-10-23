@@ -4509,7 +4509,7 @@ index 9fc7d6b09a3f0881a23881b758adc65103d025b4..c2f7519ad4be10e92f22d53876f3cf9a
 +}
 +#endif
 diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
-index b7e470cfb7ffb2addf957104eb65b2e931996edb..e103e57170d208dcf23f0e7dc63a9758e601d8a9 100644
+index b7e470cfb7ffb2addf957104eb65b2e931996edb..c1e270682917f8acb9c60f0b077cd8c2544e4444 100644
 --- a/src/melee/gm/gm_1A45.c
 +++ b/src/melee/gm/gm_1A45.c
 @@ -15,6 +15,7 @@
@@ -4536,7 +4536,7 @@ index b7e470cfb7ffb2addf957104eb65b2e931996edb..e103e57170d208dcf23f0e7dc63a9758
  /// @brief returns a pointer to the current scenes enter data
  void* gm_GetCurrentSceneEnterData(void)
  {
-@@ -376,3 +386,405 @@ void gm_801A4D34(void (*on_frame)(void), UNUSED GameSceneInfo* info)
+@@ -376,3 +386,421 @@ void gm_801A4D34(void (*on_frame)(void), UNUSED GameSceneInfo* info)
      }
      HSD_VIWaitXFBFlush();
  }
@@ -4710,6 +4710,22 @@ index b7e470cfb7ffb2addf957104eb65b2e931996edb..e103e57170d208dcf23f0e7dc63a9758
 +{
 +    return snapshot && melee_web_gameplay_clock_mask_admit(
 +        snapshot->saved_mask_ptr, snapshot->saved_mask_value);
++}
++
++/* The original VS constructor publishes this exact field; the full
++ * typed record writer owns it, as source_clock_end already recognizes.
++ * All lifetime/callback/saved-baseline checks precede pointer classification.
++ * Foreign pointers never get dereferenced as proof of ownership. */
++int melee_web_source_clock_snapshot_cpu_mask_admit(
++    const MeleeWebSourceClockSnapshot* snapshot, const void* flow_identity,
++    u64 flow_epoch, u64 world_generation)
++{
++    if (!melee_web_source_clock_snapshot_admit(snapshot, flow_identity,
++                                               flow_epoch, world_generation))
++        return 0;
++    if (snapshot->saved_mask_ptr == &gm_80479D58.unk_10.unk_28)
++        return 1;
++    return melee_web_source_clock_snapshot_bootstrap_mask_admit(snapshot);
 +}
 +
 +void melee_web_source_clock_snapshot_destroy(

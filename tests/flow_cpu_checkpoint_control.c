@@ -69,6 +69,72 @@ static void refused(MeleeWebMatchFlow* flow,MeleeWebMatchFlowCpuSnapshot* snapsh
  assert(cadence_lifetime==melee_source_cadence_lifetime);
  assert(a==allocations&&f==releases);
 }
+static void capture_refused(MeleeWebMatchFlow* flow,const char* expected)
+{
+ char error[160];struct gm_80479D58_t clock=gm_80479D58;
+ struct lb_804329F0_t cadence=lb_804329F0;MeleeWebMatchFlow state=*flow;
+ u64 cl=melee_source_clock_lifetime,dl=melee_source_cadence_lifetime;
+ unsigned a=allocations,f=releases;
+ assert(!melee_web_match_flow_cpu_snapshot_capture(flow,error,sizeof(error)));
+ assert(!strcmp(error,expected)&&allocations-a==releases-f);
+ assert(melee_source_clock_record_equal(&clock,&gm_80479D58)&&melee_source_cadence_record_equal(&cadence,&lb_804329F0));
+ assert(!memcmp(&state,flow,sizeof(state))&&cl==melee_source_clock_lifetime&&dl==melee_source_cadence_lifetime);
+}
+static void verify_original_vs_mask_profile(void)
+{
+ char error[160];fixture_bootstrap_owner_begin();owner=NULL;
+ /* Exact source constructor callback and process-mask publication topology.
+  * The remaining VS manager services are outside this focused owner test. */
+ gm_801A4B08(fn_801A46F4,fn_801A47E4);gm_801A4B40(0);gm_801A4B50(0);
+ gm_80479D48.initdata.unk_2=&gm_80479D58.unk_10.unk_28;
+ HSD_GObjLibInitData=gm_80479D48.initdata;
+ MeleeWebMatchFlow* current=melee_web_match_flow_begin(0,error,sizeof(error));assert(current);
+ assert(melee_source_clock_saved_mask_ptr==&gm_80479D58.unk_10.unk_28);
+ MeleeWebMatchFlowCpuSnapshot* pre=melee_web_match_flow_cpu_snapshot_capture(current,error,sizeof(error));assert(pre);
+ const MeleeWebSourceClockSnapshot* clock=pre->flow->source_clock;
+ assert(!melee_web_source_clock_snapshot_cpu_mask_admit(NULL,current,owner_epoch,current->generation));
+ assert(!melee_web_source_clock_snapshot_bootstrap_mask_admit(clock));
+ assert(melee_web_source_clock_snapshot_cpu_mask_admit(clock,current,owner_epoch,current->generation));
+ const MeleeWebClockCpuStorage storage=melee_web_source_clock_cpu_storage();
+ const uintptr_t field=(uintptr_t)&gm_80479D58.unk_10.unk_28;
+ assert(storage.record==&gm_80479D58&&storage.record_bytes==64);
+ assert(field>=(uintptr_t)storage.record&&field+sizeof(gm_80479D58.unk_10.unk_28)<=(uintptr_t)storage.record+storage.record_bytes);
+ /* Real guard inputs, not captured epoch/world values supplied as authority. */
+ assert(!melee_web_source_clock_snapshot_cpu_mask_admit(clock,current,owner_epoch+1,current->generation));
+ assert(!melee_web_source_clock_snapshot_cpu_mask_admit(clock,current,owner_epoch,current->generation+1));
+ HSD_GObj marker={0};HSD_GObj_804D781C=&marker;
+ capture_refused(current,"Flow snapshot requires a quiescent live owner");
+ refused(current,pre);HSD_GObj_804D781C=NULL;
+ melee_source_cadence_active=0;capture_refused(current,"Source cadence snapshot capture returned null");melee_source_cadence_active=1;
+ u64* source_pointer=melee_source_clock_saved_mask_ptr;
+ u64* snapshot_pointer=pre->flow->source_clock->saved_mask_ptr;
+ u64 foreign=melee_source_clock_saved_mask;
+ melee_source_clock_saved_mask_ptr=&foreign;pre->flow->source_clock->saved_mask_ptr=&foreign;
+ capture_refused(current,"Clock saved mask has no supported CPU snapshot owner");
+ assert(!melee_web_source_clock_snapshot_cpu_mask_admit(clock,current,owner_epoch,current->generation));refused(current,pre);
+ melee_source_clock_saved_mask_ptr=NULL;pre->flow->source_clock->saved_mask_ptr=NULL;
+ assert(!melee_web_source_clock_snapshot_cpu_mask_admit(clock,current,owner_epoch,current->generation));refused(current,pre);
+ melee_source_clock_saved_mask_ptr=(u64*)(uintptr_t)1;pre->flow->source_clock->saved_mask_ptr=(u64*)(uintptr_t)1;
+ assert(!melee_web_source_clock_snapshot_cpu_mask_admit(clock,current,owner_epoch,current->generation));refused(current,pre);
+ melee_source_clock_saved_mask_ptr=source_pointer;pre->flow->source_clock->saved_mask_ptr=snapshot_pointer;
+ tick(current);MeleeWebMatchFlowCpuSnapshot* post=melee_web_match_flow_cpu_snapshot_capture(current,error,sizeof(error));assert(post);
+ unsigned a=allocations,f=releases;
+ assert(melee_web_match_flow_cpu_snapshot_restore(current,pre,error,sizeof(error)));
+ assert(allocations==a&&releases==f&&melee_web_match_flow_cpu_snapshot_matches(current,pre,error,sizeof(error)));
+ tick(current);assert(melee_web_match_flow_cpu_snapshot_matches(current,post,error,sizeof(error)));
+ MeleeWebMatchFlow* retired=current;
+ assert(melee_web_match_flow_end(current,error,sizeof(error)));
+ assert(HSD_GObjLibInitData.unk_2==&gm_80479D58.unk_10.unk_28);
+ assert(!melee_web_match_flow_cpu_snapshot_admit(retired,pre,error,sizeof(error)));
+ assert(!melee_web_source_clock_snapshot_cpu_mask_admit(clock,retired,pre->flow->epoch,pre->flow->value.generation));
+ current=melee_web_match_flow_begin(0,error,sizeof(error));assert(current);
+ assert(!melee_web_match_flow_cpu_snapshot_admit(current,pre,error,sizeof(error)));
+ assert(!melee_web_source_clock_snapshot_cpu_mask_admit(clock,current,owner_epoch,current->generation));
+ MeleeWebMatchFlowCpuSnapshot* fresh=melee_web_match_flow_cpu_snapshot_capture(current,error,sizeof(error));assert(fresh);
+ assert(melee_web_match_flow_end(current,error,sizeof(error)));
+ melee_web_match_flow_cpu_snapshot_destroy(fresh);melee_web_match_flow_cpu_snapshot_destroy(post);melee_web_match_flow_cpu_snapshot_destroy(pre);
+ printf("Original VS saved-mask profile: exact typed clock field offset%zu/extent%zu within64B; noalloc restore/replay, foreign/invalid pointer, callback/epoch/world, retired and recreated refusals passed\n",(size_t)(field-(uintptr_t)storage.record),sizeof(gm_80479D58.unk_10.unk_28));
+}
 int main(void)
 {
  char error[160];fixture_bootstrap_owner_begin();
@@ -79,6 +145,9 @@ int main(void)
  assert(melee_web_source_cadence_begin());
  MeleeWebMatchFlowCpuSnapshot* pre=melee_web_match_flow_cpu_snapshot_capture(&flow,error,sizeof(error));
  assert(pre&&melee_web_match_flow_cpu_snapshot_matches(&flow,pre,error,sizeof(error)));
+ u64 immutable_bootstrap_mask=*fixture_bootstrap_mask();*fixture_bootstrap_mask()^=1;
+ refused(&flow,pre);assert(*fixture_bootstrap_mask()==(immutable_bootstrap_mask^1));
+ *fixture_bootstrap_mask()=immutable_bootstrap_mask;
  tick(&flow);assert(frames==1&&game_renewed==1&&copy_renewed==1);
  assert(!melee_web_match_flow_cpu_snapshot_matches(&flow,pre,error,sizeof(error)));
  MeleeWebMatchFlowCpuSnapshot* post=melee_web_match_flow_cpu_snapshot_capture(&flow,error,sizeof(error));assert(post);
@@ -105,6 +174,7 @@ int main(void)
  fixture_bootstrap_owner_rebind();refused(&flow,pre);
  melee_web_match_flow_snapshot_destroy(legacy);
  melee_web_match_flow_cpu_snapshot_destroy(post);melee_web_match_flow_cpu_snapshot_destroy(pre);
+ verify_original_vs_mask_profile();
  puts("Actual flow clock cadence CPU restore and lifetime/refusal controls passed");
  return 0;
 }

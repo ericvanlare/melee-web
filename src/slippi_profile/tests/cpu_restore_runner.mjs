@@ -76,7 +76,7 @@ export async function runBrowserCpuRestore(page,wire,checkpoint,expectedInputMap
       const command=async number=>{
         const record={command:number,outcome:'pending'};progress.commands.push(record);
         try{record.result=await module.ccall('melee_web_synctest_cpu_restore_command','number',['number'],[number],{async:true});record.outcome='returned';
-          evidence();if(record.result!==0)throw new Error(`CPU command ${number} refused ${record.result}: ${module.UTF8ToString(module._melee_web_snapshot_error())}`);
+          record.nativeEvidence=evidence();if(record.result!==0)throw new Error(`CPU command ${number} refused ${record.result}: ${module.UTF8ToString(module._melee_web_snapshot_error())}`);
         }catch(error){record.error=String(error);record.outcome=record.outcome==='pending'?'threw':record.result!==0?'returned-nonzero':'evidence-error';throw error;}
       };
       if(module._melee_web_snapshot_observation_size()!==1280||module._melee_web_snapshot_pcm_size()!==4272||
@@ -93,7 +93,18 @@ export async function runBrowserCpuRestore(page,wire,checkpoint,expectedInputMap
         const status=module._melee_web_synctest_cpu_restore_configure(pointer,plan.wire.length);
         progress.configurationResult=status;if(status!==0)throw new Error(`CPU configuration refused ${status}`);
       }finally{module._free(pointer);}
-      await command(1);await command(2);
+      const drawBoundary=label=>{
+        const bytes=read(module._melee_web_synctest_draw_diagnostics(),132);
+        const record={label,bytes:bytes.length,base64:encode(bytes)};
+        (progress.drawBoundaries??=[]).push(record);return bytes;
+      };
+      const beforeCpu=drawBoundary('before-cpu-baseline-and-replay');
+      await command(1);
+      const afterCapture=drawBoundary('after-cpu-capture-before-step');
+      for(let i=0;i<beforeCpu.length;++i)if(beforeCpu[i]!==afterCapture[i])throw new Error(`CPU capture changed draw diagnostics at byte ${i}`);
+      await command(2);
+      const afterCpu=drawBoundary('after-cpu-replay-before-final-present');
+      for(let i=0;i<beforeCpu.length;++i)if(beforeCpu[i]!==afterCpu[i])throw new Error(`CPU baseline/replay changed draw diagnostics at byte ${i}`);
       const current=evidence();if(current.equality!==1||current.commitResult!==0||current.postFrame!==current.preFrame+1||
          current.checkedDomains!==0x3fe||current.matchedDomains!==0x3fe||current.comparison.status!==0)throw new Error('CPU equality contract missing');
       const native=read(module._melee_web_synctest_cpu_restore_evidence(),plan.evidenceBytes);
@@ -105,12 +116,14 @@ export async function runBrowserCpuRestore(page,wire,checkpoint,expectedInputMap
       const checked=new Function(`return (${plan.checkedSource})`)();await checked(module,'native postdraw quiescence','melee_web_snapshot_quiescent');
       await command(4);
       const observation=read(module._melee_web_snapshot_observation(),1280),pcm=read(module._melee_web_snapshot_pcm(),4272),pad=read(module._melee_web_snapshot_input(),44);
-      const diagnostics=read(module._melee_web_synctest_draw_diagnostics(),132);
+      const diagnostics=drawBoundary('after-final-source-present-and-quiescence');
+      progress.rawSample={observation:encode(observation),pcm:encode(pcm),pad:encode(pad),drawDiagnostics:encode(diagnostics),status};
       const mapping=new Function(`return (${plan.inputMappingSource})`)();
       const inspect=new Function('DRAW_MOTION_BOUNDARY','validateSourceInputMapping',`return (${plan.inspectSource})`)({interactive:0,entry:1,death:2,respawn:3,unknown:4},mapping);
       const boundary=inspect(observation,{classifyMotion:motion=>module._melee_web_synctest_motion_boundary(motion),
         isMarioKind:kind=>module._melee_web_synctest_is_mario_kind(kind)===1,slotCount:new DataView(diagnostics.buffer).getUint32(0,true),
         expectedInputMapping:plan.expectedInputMapping,expectedStocks:plan.expectedStocks});
+      progress.rawSample.boundary=boundary;
       if(!boundary.interactive)throw new Error('Final present interactive guard refused');
       progress.status='cpu-restore-replay-and-one-present-component-complete';evidence();
       return {observation:encode(observation),pcm:encode(pcm),pad:encode(pad),drawDiagnostics:encode(diagnostics),boundary,status,cpuRestore:progress};

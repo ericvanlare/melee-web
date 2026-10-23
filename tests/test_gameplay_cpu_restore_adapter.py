@@ -39,10 +39,14 @@ void melee_web_cpu_restore_mark_destroy();
 
 namespace melee_web {
 class GameplayMatchSession;
+struct CpuCaptureDiagnostic {
+    CpuComparison comparison{};
+    std::array<char,160> message{};
+};
 class GameplayCpuCheckpoint final {
 public:
     static std::unique_ptr<GameplayCpuCheckpoint> capture(
-        const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>) noexcept;
+        const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,CpuCaptureDiagnostic&) noexcept;
     ~GameplayCpuCheckpoint();
     bool begin_record(const GameplayMatchSession&) noexcept;
     bool seal_post(const GameplayMatchSession&) noexcept;
@@ -177,7 +181,9 @@ class GameplayCpuRestoreAdapterTests(OwnedWorkspaceTests):
         (stubs / "gameplay_cpu_checkpoint.hpp").write_text(STUB_CHECKPOINT_HEADER)
         overlay_src = source_overlay(output_dir)
         template = (CANDIDATE_ROOT / "tests/cpu_restore_adapter_control.cpp.in").read_text()
-        actual_fixture = extract_fixture_observations(CANDIDATE_ROOT / "tests/gameplay_snapshot_probe.cpp")
+        fixture_probe = CANDIDATE_ROOT / "tests/gameplay_snapshot_probe.cpp"
+        if not fixture_probe.is_file(): fixture_probe = REPO_ROOT / "tests/gameplay_snapshot_probe.cpp"
+        actual_fixture = extract_fixture_observations(fixture_probe)
         generated = template.replace("@ACTUAL_FIXTURE_OBSERVATIONS@", actual_fixture)
         self.assertNotIn("@ACTUAL_FIXTURE_OBSERVATIONS@", generated)
         control_source = output_dir / "cpu_restore_adapter_control.cpp"
@@ -224,7 +230,7 @@ class GameplayCpuRestoreAdapterTests(OwnedWorkspaceTests):
             "scope": "Actual cpu_restore_adapter.inc and actual fixture observation declarations; modeled named component/session/provider leaves, not a complete source-world restore.",
             "adapter_sha256": sha256(CANDIDATE_ROOT / "src/slippi_profile/tests/cpu_restore_adapter.inc"),
             "control_template_sha256": sha256(CANDIDATE_ROOT / "tests/cpu_restore_adapter_control.cpp.in"),
-            "fixture_probe_sha256": sha256(CANDIDATE_ROOT / "tests/gameplay_snapshot_probe.cpp"),
+            "fixture_probe_sha256": sha256(fixture_probe),
             "generated_control_sha256": sha256(control_source),
             "receipt_path": str(output_dir),
             "commands": [f"compile-{index}.json" for index in range(len(commands))] + ["link.json", "run.json"],
