@@ -2146,9 +2146,9 @@ def _validate_stadium_go_prefix_scope(stream_path: str | Path,
              "GO+2 requires explicit constructor observations and is exclusive of idle3500")
     _require(type(include_constructor_state) is bool and
              (not include_constructor_state or
-              (post_go_target_ordinal == 2 and constructor_observations and
-               not original_idle_3500)),
-             "constructor state projection is reserved for explicit GO+2 typed validation")
+              (constructor_observations and
+               (post_go_target_ordinal == 2 or original_idle_3500))),
+             "constructor state projection requires explicit GO+2 or idle3500 validation")
     natural_batch_tail_limit = (MAX_SOURCE_TICK_BATCH if post_go_target_ordinal is not None
                                 else MAX_TAIL_AFTER_F)
     _require(type(constructor_observations) is bool, "constructor option must be boolean")
@@ -4494,10 +4494,11 @@ class StadiumIdle3500Observations:
 
 
 def validate_stadium_idle_3500_reference(stream_path, *, status_path=None,
-                                         extract_inputs=False):
+                                         extract_inputs=False, include_constructor_state=False):
     """Validate the complete natural recording before exposing its literal schedule."""
-    baseline = validate_stadium_go_prefix(stream_path, status_path=status_path,
-        constructor_observations=True, original_idle_3500=True)
+    baseline = _validate_stadium_go_prefix_scope(stream_path, status_path=status_path,
+        constructor_observations=True, original_idle_3500=True,
+        include_constructor_state=include_constructor_state)
     observations = StadiumIdle3500Observations()
     stats = ObserverStreamStats()
     for row in iter_records(stream_path, max_bytes=64*1024*1024, max_records=77602, stats=stats):
