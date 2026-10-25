@@ -1,7 +1,7 @@
 {
   "schema": "melee-web-issue251-stadium-profile-oninit-v1",
   "issue": "https://github.com/ericvanlare/melee-web/issues/251",
-  "result": "passed_scoped_profile_gating_and_builds",
+  "result": "Fresh132 original idle3500 reference and one full-A browser declared15common-fields+seed comparison PASS; C3 remains open",
   "evidence_labels": [
     "Compiled",
     "Synthetic controls",
@@ -319,7 +319,7 @@
   },
   "subsequent_c3_component_2026_10_09": {
     "claim_boundary": "The latest native checkpoint is the bounded first-full-post-GO C/F state trace on exact runtime source 59f843fd (tree bbe284bf). It records one native tick with no draw and preserves the display timer only as raw object bytes because initialization was not observed; this is not original-state parity. The 59f suite retained one stale Sheik tag-range assertion failure. Test-only descendant 7fb9ceb8 corrected only the authored tag inventory; its full suite passed 2,471 tests with 167 skips and no failures, while runtime and observer producers remain 59f. Exact-head CI is pending after push. The original observer capture passed its bounded route checks but failed the frozen sequence reproduction criterion; the first consumed-PAD content difference is at sequence 260/index 5. The earlier typed-timer diagnostic on 16bc is superseded as a representation, not erased. Original PAD856/profile, persistent VsModeData, title bytes, per-owner RNG, Ready/GO, an original-matched 3,500-tick sequence and C3 acceptance remain open. The two historical functional 3,500-tick lifetimes and ordinary Results regression remain separate completed evidence; public Stadium admission stays closed.",
-    "current_result": "On runtime source 59f843fd/tree bbe284bf, the native-menu trace build and diagnostic/ordinary Release runtime builds passed. The root-reviewed trace captured GO-containing C exit, pre-F85 and post-F86 in generation 3, all at source_frame 0: map-2 countdown 3646→3645 with phase/gate/form 0/0/5; display mode/previous mode 11/10; title entry 19; and no draw. The display timer is raw bytes fffffffe with initialization unobserved, not a typed value. The 59f full suite ran 2,471 tests with 167 skips and one failure in the stale Sheik tag-range test. Test-only descendant 7fb9ceb8 fixed only that expected namespace; its full suite passed 2,471 tests with 167 skips and zero failures. The 7fb9 validation does not change the 59f runtime/observer producers; exact-head CI remains pending. The original observer capture passed C84/F85/zero-tail route validation and shut Dolphin down cleanly, but frozen reproduction failed: 3,050 records versus 2,935 in v6, with DrawReturn sequence IDs 3048 versus 2933. First consumed-PAD content differed at sequence 260/index 5 (port 0), and the cause remains unresolved. The original state companion is valid under its own schema but unpaired to native because inputs/context and draw/no-draw paths differ. No matched original counterpart is claimed.",
+    "current_result": "On runtime source 59f843fd/tree bbe284bf, the native-menu trace build and diagnostic/ordinary Release runtime builds passed. The root-reviewed trace captured GO-containing C exit, pre-F85 and post-F86 in generation 3, all at source_frame 0: map-2 countdown 3646\u21923645 with phase/gate/form 0/0/5; display mode/previous mode 11/10; title entry 19; and no draw. The display timer is raw bytes fffffffe with initialization unobserved, not a typed value. The 59f full suite ran 2,471 tests with 167 skips and one failure in the stale Sheik tag-range test. Test-only descendant 7fb9ceb8 fixed only that expected namespace; its full suite passed 2,471 tests with 167 skips and zero failures. The 7fb9 validation does not change the 59f runtime/observer producers; exact-head CI remains pending. The original observer capture passed C84/F85/zero-tail route validation and shut Dolphin down cleanly, but frozen reproduction failed: 3,050 records versus 2,935 in v6, with DrawReturn sequence IDs 3048 versus 2933. First consumed-PAD content differed at sequence 260/index 5 (port 0), and the cause remains unresolved. The original state companion is valid under its own schema but unpaired to native because inputs/context and draw/no-draw paths differ. No matched original counterpart is claimed.",
     "first_css_browser_draw_4d6c0b37_d949a0b8_v1": {
       "status": "FAIL_BEFORE_ARM; NO_BROWSER_CSS_COMPARISON; NO_TICK; NO_DRAW",
       "scope": "One headless browser attempt with the existing captured first-CSS context and one consumed sample. The diagnostic did not arm; this is not a source draw or Stadium/C3 acceptance result.",
@@ -842,7 +842,7 @@
         "bytes": 5827,
         "sha256": "00aed8ec430c9eee43d7a61315a61d195487a2cf3900516a6c517620cb9e0f72",
         "decision": "PROPOSE_EXISTING_POST_TICK_READ_WITH_DECLARED_PHASE_OFFSET",
-        "interval": "Original CSS return 833 → consumed PAD sample 834 → scheduler-end SourceTick 835; stop before DrawEnter 836.",
+        "interval": "Original CSS return 833 \u2192 consumed PAD sample 834 \u2192 scheduler-end SourceTick 835; stop before DrawEnter 836.",
         "compare": "PAD822, seed, scene kind and four authored routing getters. Original scheduler-return frame0 vs native public post-tick frame1 is explicit; intervening clock/transition code does not write the compared fields. Raw pending-mode and next-state bytes remain unpaired.",
         "stopping_rule": "One tick only; stop on first preparation, owner, input or state mismatch. No draw or retry."
       },
@@ -1547,7 +1547,7 @@
       },
       "remaining": "The scoped browser diagnostic now matches the captured original CSS-return state, one consumed input/tick and one actual first CSS draw. The next proposed experiment is a separately reviewed bounded CSS stream using only the retained raw timeline as preparation; it must stop at the first mismatch or native transition result 3 before any no-op draw, pending-input advancement or rebuild. A later CSS comparison, SSS/history, full setup/per-owner RNG, VS Setup/GO, full match, stock-out/standings and C3 gates remain outstanding. The earlier 6e/8f and 7d evidence retain their scoped identities.",
       "c3_original_ledger_requirement": "Reuse existing RNG draw observer; C3 notes604-608 require per-tick/per-owner original comparison, separately from broader C8 transformation comparison.",
-      "claim_boundary": "The separate 8f785fe5 producer retains two sequential 3,500-post-GO functional lifetimes and the ordinary Results regression within their recorded scopes. The original v6 capture on 7d406f63 passes the bounded CSS→SSS→selected Stadium→VS Setup→GO prefix, with C=84, F=85 and natural DrawReturn; its independent raw review extracted original-only phase-tagged setup/RNG observations. The first-CSS typed return, one consumed input/tick and one browser source draw now match their admitted original fields on the reviewed 8cc72c16 producer. This establishes only the first-CSS browser boundary; no later CSS stream, SSS/history, VS Setup/GO setup, per-owner RNG ledger, full match, gameplay or C3 acceptance is established. Physical-input, audible-output, live-timing and foreground gates remain open; ordinary public Stadium admission remains closed.",
+      "claim_boundary": "The separate 8f785fe5 producer retains two sequential 3,500-post-GO functional lifetimes and the ordinary Results regression within their recorded scopes. The original v6 capture on 7d406f63 passes the bounded CSS\u2192SSS\u2192selected Stadium\u2192VS Setup\u2192GO prefix, with C=84, F=85 and natural DrawReturn; its independent raw review extracted original-only phase-tagged setup/RNG observations. The first-CSS typed return, one consumed input/tick and one browser source draw now match their admitted original fields on the reviewed 8cc72c16 producer. This establishes only the first-CSS browser boundary; no later CSS stream, SSS/history, VS Setup/GO setup, per-owner RNG ledger, full match, gameplay or C3 acceptance is established. Physical-input, audible-output, live-timing and foreground gates remain open; ordinary public Stadium admission remains closed.",
       "pad_input_reducer": {
         "caller_source": "8e087161fcc5a62f6f82cb333a812d0f4eff448f",
         "phase_correction_source": "e2ff861b3f290714d4c6aaa1a19158d4e7f8e59a",
@@ -2679,10 +2679,10 @@
             "draw": false,
             "pcm_processing": true
           },
-          "scope": "One native no-draw neutral-input port-side canary that traversed the original CSS→SSS route. It did not emit the full typed setup receipt or bind the first-CSS seed context to match construction; it is not paired with the separate setup observation, not an original comparison, and not a per-owner RNG result.",
+          "scope": "One native no-draw neutral-input port-side canary that traversed the original CSS\u2192SSS route. It did not emit the full typed setup receipt or bind the first-CSS seed context to match construction; it is not paired with the separate setup observation, not an original comparison, and not a per-owner RNG result.",
           "limitations": [
             "source frame stayed0 across GO-containing and next full tick; no increment inferred",
-            "CSS→SSS navigation occurred, but no same-run typed setup receipt/first-CSS-context binding",
+            "CSS\u2192SSS navigation occurred, but no same-run typed setup receipt/first-CSS-context binding",
             "no long two-world3500tick C3, original draw/RNG equivalence, browser, physical input, foreground timing, audible output or whole-session acceptance"
           ]
         }
@@ -2757,7 +2757,7 @@
           },
           "normalized_equals_post_vs": false
         },
-        "scope": "Original source CSS→SSS Stadium selection and checked menu/world/session retirement only. No OnInit, MatchSession, Ready/GO, draw or gameplay ticks; this is setup provenance, not complete replay context or matched original comparison.",
+        "scope": "Original source CSS\u2192SSS Stadium selection and checked menu/world/session retirement only. No OnInit, MatchSession, Ready/GO, draw or gameplay ticks; this is setup provenance, not complete replay context or matched original comparison.",
         "unobserved": [
           "full 0x55E8 transient SaveData bytes",
           "private PAD queue slots and qcount snapshot",
@@ -3204,7 +3204,7 @@
             "bytes": 4706,
             "sha256": "b51baa7d3d3169d9ab98ac7de043ca88bbc0198b938e78c2b15ec0d447bc94bb",
             "status": "EXTERNAL_CANDIDATE_PREPARATION_ONLY; INTEGRATION_AND_FOCUSED_REVIEW_PENDING; NO_NEW_CAPTURE",
-            "summary": "Use a fresh completed same-call tuple correlated with consumed PAD; invalidate stale/absent target data. Permit at most four already-chosen same-direction callbacks only after a validated earlier-row hit omits the target tuple. Preserve current ownership, movement, input and stream caps, consumed neutral stability, exact index 18/kind 3 success, and CSS→SSS→VS→GO guards. No native observer or binary change is proposed."
+            "summary": "Use a fresh completed same-call tuple correlated with consumed PAD; invalidate stale/absent target data. Permit at most four already-chosen same-direction callbacks only after a validated earlier-row hit omits the target tuple. Preserve current ownership, movement, input and stream caps, consumed neutral stability, exact index 18/kind 3 success, and CSS\u2192SSS\u2192VS\u2192GO guards. No native observer or binary change is proposed."
           },
           "preparation_corrections": [
             {
@@ -3223,7 +3223,7 @@
         },
         "current_feedback_capture": {
           "status": "PASS_ORIGINAL_RAW_STADIUM_GO_PREFIX_ONLY",
-          "scope": "One bounded original source CSS→SSS→Stadium→VS Setup→GO prefix. Driver source is 7d406f63; native observer producer is unchanged 91fc1fb9.",
+          "scope": "One bounded original source CSS\u2192SSS\u2192Stadium\u2192VS Setup\u2192GO prefix. Driver source is 7d406f63; native observer producer is unchanged 91fc1fb9.",
           "source": {
             "driver_head": "7d406f63a0ae9fde60174ff9db2174d482c522fe",
             "driver_tree": "d929b37efdc7362fdd6ddcfb0d85a5a9df4ad710",
@@ -3482,15 +3482,15 @@
         "observed": {
           "world_generation": 3,
           "source_heap": 0,
-          "go_containing_world_tick": "84→85",
-          "first_full_post_go_tick": "85→86",
+          "go_containing_world_tick": "84\u219285",
+          "first_full_post_go_tick": "85\u219286",
           "post_go_ticks": 3500,
           "ready_world_tick": 124,
           "ready_post_go_ordinal": 39,
           "ticks_after_ready": 3461,
-          "last_world_and_session_tick": "3584→3585",
-          "source_frames_through_ready": "0→0",
-          "post_ready_source_frames": "0→3461",
+          "last_world_and_session_tick": "3584\u21923585",
+          "source_frames_through_ready": "0\u21920",
+          "post_ready_source_frames": "0\u21923461",
           "world_and_session_advance_each_step": true,
           "source_frame_advances_each_post_ready_step": true,
           "source_memory_owner_healthy_same_world_heap": true,
@@ -3582,7 +3582,7 @@
             "artifact": "root-ordinary-results-frozen-failure-v1.json",
             "sha256": "0c1e0ca8dddd128959e44f474c419940306e1bb42ef1caf58ad0353edfc84040",
             "first_failure": "Missing source match fixture: LbRf.dat",
-            "boundary": "CSS→SSS and selected Final Destination route; no Match construction, Results or elimination",
+            "boundary": "CSS\u2192SSS and selected Final Destination route; no Match construction, Results or elimination",
             "immutable_bindings_unchanged": 171
           },
           "source_only_fixture_audit": {
@@ -3692,7 +3692,7 @@
                 "sha256": "ed61b1d9f55cf89901bc0d7cd49245d103ab9233f1bd65d0d6cae79c28b882f1"
               }
             ],
-            "scope": "Functional native source route using scripted source PAD and fixture seed: No Contest Match→Results→CSS/SSS, followed by a recreated four-stock Mario/Final Destination Match→source GAME ending→Results→CSS and checked final Session end. No Prize traversal.",
+            "scope": "Functional native source route using scripted source PAD and fixture seed: No Contest Match\u2192Results\u2192CSS/SSS, followed by a recreated four-stock Mario/Final Destination Match\u2192source GAME ending\u2192Results\u2192CSS and checked final Session end. No Prize traversal.",
             "limitations": [
               "No numeric post-close arena snapshot; checked session_end and natural process exit are the retirement evidence emitted by this recipe.",
               "No original-game comparison, browser, rendered-pixel, physical-input, uninterrupted-audio, PCM-equivalence or timing acceptance.",
@@ -4176,7 +4176,7 @@
           "bytes": 4764,
           "sha256": "5a72a8a5ecfa2deed6853ec8974a735e5af72dd29adf431928d387c985a95d06"
         },
-        "interval": "DrawEnter 836 → DrawReturn 837 using existing real browser renderer and same input-only prefix, no second tick or warm-up source draw.",
+        "interval": "DrawEnter 836 \u2192 DrawReturn 837 using existing real browser renderer and same input-only prefix, no second tick or warm-up source draw.",
         "pass_criteria": "Available original PAD/RNG/scene/routing fields agree, one actual source draw with GPU diagnostics and checked cleanup retained.",
         "stopping_rule": "Stop at first preparation/resource/owner/extra callback/state mismatch; retain evidence, no draw skip/reseed or unchanged retry."
       },
@@ -4254,8 +4254,8 @@
         },
         "verified": {
           "first_css_return": "Full typed CSS/VS/rules/six-player state, KO counts, live PAD, seed and scene fields match the captured original CSS-return state at original return sequence 833. The actual nine null pointer strings were checked; only explicit ABI padding pad_x5C was excluded.",
-          "consumed_tick": "One consumed PAD sample and SourceTick match the admitted original fields at sequences 834→835; original frame 0 versus native post-host-tick frame 1 remains explicit. Only the four admitted routing getters are compared.",
-          "draw": "Exactly one actual browser source draw matches the admitted original DrawEnter/DrawReturn 836→837 fields, including source tick 1, draw ordinal 0, PAD, seed, scene frame 1, scene kind 8 and the four routing getters.",
+          "consumed_tick": "One consumed PAD sample and SourceTick match the admitted original fields at sequences 834\u2192835; original frame 0 versus native post-host-tick frame 1 remains explicit. Only the four admitted routing getters are compared.",
+          "draw": "Exactly one actual browser source draw matches the admitted original DrawEnter/DrawReturn 836\u2192837 fields, including source tick 1, draw ordinal 0, PAD, seed, scene frame 1, scene kind 8 and the four routing getters.",
           "counts": "One source tick, one source draw, one host tick and one host draw; no source tick or draw during preparation. Forty local/HTTP artifacts matched before/after/current. All eleven recorded owned PIDs were absent at review.",
           "cleanup": "Unload cleared the observation and returned to phase 0/running 0; browser and server ownership cleanup passed with no reported failure.",
           "visual_scope": "The retained screenshot displays the original CSS view and was visually inspected; no pixel comparison was performed."
@@ -4280,7 +4280,7 @@
         "independent_review": "sol-first-css-postdraw-timeline-review-v2.json",
         "independent_review_sha256": "dc4c8c165c806723f60210b579426d20e96b86aed6a206bd3ce4633adcb0c0ce",
         "decision": "PASS_RAW_TIMELINE_WITH_TRANSITION_LIMIT; this is original-only sequencing and not a port comparison or authorization.",
-        "first_following_chain": "PadConsume 839 → SourceTick 840 → DrawEnter/DrawReturn 841–842.",
+        "first_following_chain": "PadConsume 839 \u2192 SourceTick 840 \u2192 DrawEnter/DrawReturn 841\u2013842.",
         "cap": "At most 148 additional consumed-tick/draw batches before first SSS entry; a stopping limit, not a required completion.",
         "stop_rule": "Stop on first mismatch or native transition result 3 before draw, advance_pending or rebuild. A host_draw success with transition nonzero may be a no-op and is not a source draw.",
         "preservation": "Keep raw DrawReturn 1577 unpaired if the boundary is reached; do not assign a cause to the source-tick reset."
@@ -6393,14 +6393,14 @@
         "original_row": 2468,
         "expected_bytes": 7500,
         "expected_sha256": "281f4dea8491c9a2848e087c43453ef987b397f4590d2a764fb2b69d86853bd1",
-        "compared": "Declared match Start rules and source semantic fields for players 0–3, preserving raw-float fields, plus host seed; this is not a whole-Start comparison.",
+        "compared": "Declared match Start rules and source semantic fields for players 0\u20133, preserving raw-float fields, plus host seed; this is not a whole-Start comparison.",
         "getter_calls": 1,
         "actual_seed": "3bb84c53",
         "first_mismatch": null,
         "persistent_prepared_vs_mode": "Retained as a separate actual object; unpaired.",
         "exclusions": [
           "native xB",
-          "players 4–5",
+          "players 4\u20135",
           "padding",
           "pointer/callback slots"
         ]
@@ -6715,7 +6715,7 @@
         "original_row": 2503,
         "approved": true,
         "first_mismatch": null,
-        "compared": "Declared match Start rules and source-semantic fields for players 0–3, preserving raw-float fields, plus host seed; not a whole-Start comparison.",
+        "compared": "Declared match Start rules and source-semantic fields for players 0\u20133, preserving raw-float fields, plus host seed; not a whole-Start comparison.",
         "actual_seed": "35a455b9",
         "expected_seed": "35a455b9",
         "getter_calls": 1,
@@ -6727,7 +6727,7 @@
         "exclusions": [
           "whole Start blob",
           "native xB",
-          "players 4–5",
+          "players 4\u20135",
           "padding",
           "pointer/callback slots"
         ]
@@ -6762,7 +6762,7 @@
         "decision": "SOURCE_REDUCTION_EXACT_REJECTED_PREDICATE_UNOBSERVED",
         "known": "The observed browser error was the generic display-owner mismatch; source review infers that refusal occurred at the Session/display-owner teardown preflight after flow/HUD end and before destructive display services.",
         "unobserved": "The exact e12 runtime failed predicate/clause/index, pointers and text/context topology were not retained; no post-failure full Session graph was captured, and the reducer does not reproduce the exact browser owner state.",
-        "next_experiment": "One stopped Setup diagnosis retaining the driver’s already-collected error.diagnostics before cleanup, with all owner/preflight predicates unchanged. Inspect the actual rejected clause; if diagnostics still do not expose it, leave it unobserved. Do not relax ownership or proceed to Ready/GO.",
+        "next_experiment": "One stopped Setup diagnosis retaining the driver\u2019s already-collected error.diagnostics before cleanup, with all owner/preflight predicates unchanged. Inspect the actual rejected clause; if diagnostics still do not expose it, leave it unobserved. Do not relax ownership or proceed to Ready/GO.",
         "actual_source_composition_control": {
           "freeze_artifact": "sol-stadium-display-close-reducer-v1/freeze.json",
           "freeze_sha256": "7417c744f6647ee05bea60fefc8d5317c30a04c0a7931bf76fbd1eec9d2883b3",
@@ -6912,7 +6912,7 @@
         "original_row": 2503,
         "approved": true,
         "first_mismatch": null,
-        "compared": "Declared match Start rules and source-semantic fields for players 0–3, preserving raw-float fields, plus host seed; not a whole-Start comparison.",
+        "compared": "Declared match Start rules and source-semantic fields for players 0\u20133, preserving raw-float fields, plus host seed; not a whole-Start comparison.",
         "actual_seed": "35a455b9",
         "expected_seed": "35a455b9",
         "construction_complete": true,
@@ -6923,7 +6923,7 @@
         "exclusions": [
           "whole Start blob",
           "native xB",
-          "players 4–5",
+          "players 4\u20135",
           "padding",
           "pointer/callback slots"
         ]
@@ -7047,7 +7047,7 @@
         "original_row": 2503,
         "approved": true,
         "first_mismatch": null,
-        "compared": "Declared match Start rules and source-semantic fields for players 0–3, preserving raw-float fields, plus host seed; not a whole-Start comparison.",
+        "compared": "Declared match Start rules and source-semantic fields for players 0\u20133, preserving raw-float fields, plus host seed; not a whole-Start comparison.",
         "actual_seed": "35a455b9",
         "expected_seed": "35a455b9",
         "construction_complete": true,
@@ -7058,7 +7058,7 @@
         "exclusions": [
           "whole Start blob",
           "native xB",
-          "players 4–5",
+          "players 4\u20135",
           "padding",
           "pointer/callback slots"
         ]
@@ -7133,7 +7133,7 @@
           "dropped_bytes": 0,
           "overflow": false
         },
-        "chronology": "Ordered source event stream places font2 append/nametag creation before HUD end and membership rejection. log_before_unload was overwritten by runner failure-handler lines3015–3020 after attempted unload; it is not exclusively a pre-unload snapshot.",
+        "chronology": "Ordered source event stream places font2 append/nametag creation before HUD end and membership rejection. log_before_unload was overwritten by runner failure-handler lines3015\u20133020 after attempted unload; it is not exclusively a pre-unload snapshot.",
         "proven": "Observed un_802FD4C8 creation and current allocated160-byte payload membership in captured SIS backing lease world3/allocation2763/epoch5.",
         "not_proven": "Numeric GObj/text addresses and allocation membership do not establish subsystem ownership, lifetime authority, safe deletion or correct teardown ordering."
       },
@@ -7900,7 +7900,7 @@
           "failures": 1,
           "exit_code": 1,
           "failed_test": "test_sheik_transform_prefix.TestSheikTransformPrefixTests.test_entity_identity_and_transform_tags_remain_distinct_in_actual_namespace",
-          "failure_scope": "Stale expected tag namespace ends at 66 while current source explicitly includes 67–89; no production behavior change is implicated."
+          "failure_scope": "Stale expected tag namespace ends at 66 while current source explicitly includes 67\u201389; no production behavior change is implicated."
         },
         "exact_head_ci": {
           "status": "pending_after_push; no current-head CI result is yet bound"
@@ -8667,7 +8667,7 @@
           "bytes": 31920,
           "sha256": "ef038d48eab48db248ddb9a0c790d8d890b9af735a8b1c4151090f77ae560fd5"
         },
-        "hash_note": "Final Sol review frozen at the bound ffafe836…f48f6b hash (15037 bytes); root final review separately binds the scoped result.",
+        "hash_note": "Final Sol review frozen at the bound ffafe836\u2026f48f6b hash (15037 bytes); root final review separately binds the scoped result.",
         "root_recorded_result": {
           "artifact": "root-recorded-replay-result-review-c7a14fd6-v1/review.json",
           "bytes": 1141,
@@ -9650,7 +9650,7 @@
       "profile_setup_equivalence": false,
       "whole_session_equivalent": false
     },
-    "next": "Extract this fresh recording’s Setup-to-GO input/draw schedule and bounded comparison fields; compare browser lifetime A, then checked retirement/recreation and lifetime B with per-owner RNG. Keep historical C/F and no-draw results separate."
+    "next": "Extract this fresh recording\u2019s Setup-to-GO input/draw schedule and bounded comparison fields; compare browser lifetime A, then checked retirement/recreation and lifetime B with per-owner RNG. Keep historical C/F and no-draw results separate."
   },
   "browser_prefix_source056_2026_10_13": {
     "result": "PASS_SCOPED_174_ACTION_SOURCE_PREFIX_ONLY",
@@ -9781,7 +9781,7 @@
         "per_action_runtime_errors": 0
       },
       "hud_clock": {
-        "diagnostic_text": "Completed matches: 0 · stock check: 0 · ticks: 0 · stocks: 4 · respawns: 0 · raw PAD: none · menu audio blocks: 0 · revisits: 0",
+        "diagnostic_text": "Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 0 \u00b7 revisits: 0",
         "source_traversal_ticks": 87,
         "interpretation": "The menu HUD clock and source traversal counter are distinct."
       },
@@ -11964,7 +11964,7 @@
         "startup_elapsed_ms": 2250.0049996376038,
         "terminal": true
       },
-      "interpretation": "The import spans are 44.6–45.1 s, but the one observed scene-prepare constructor callback is 0.25–0.27 s. The arithmetic remainder is outside that callback measurement and is not attributed to disc IO, archive decode, audio decode, or any specific subsystem.",
+      "interpretation": "The import spans are 44.6\u201345.1 s, but the one observed scene-prepare constructor callback is 0.25\u20130.27 s. The arithmetic remainder is outside that callback measurement and is not attributed to disc IO, archive decode, audio decode, or any specific subsystem.",
       "schema": "melee-web-stadium-import-preparation-attribution-v1",
       "scope": "Existing construction publication plus JS-only startup fields/UserTiming; no new native read or IO attribution."
     },
@@ -12741,7 +12741,7 @@
   "stadium_full_A_full_B_v15_2026_10_15": {
     "schema": "stadium-full-A-full-B-common-fields-seed-component-evidence-v1",
     "state": "PASS_COMPONENT_ROOT_AND_INDEPENDENT_FULL_PAIR_REPLAY",
-    "scope": "One unchanged-budget A7167 → checked native close/host settlement/restart → B7167 on the same Module/Wasm instance, with the retained original common-field/seed comparison. Component evidence only.",
+    "scope": "One unchanged-budget A7167 \u2192 checked native close/host settlement/restart \u2192 B7167 on the same Module/Wasm instance, with the retained original common-field/seed comparison. Component evidence only.",
     "source_and_harness": {
       "head": "53eb560d545911235cf937fbacde1b16bd4093e0",
       "tree": "560d70650c21a594c1bc0634600d354c60896eab",
@@ -14237,7 +14237,7 @@
           62902
         ],
         "all37_inputs_unchanged": true,
-        "limits": "Actual first natural no-contest Results→CSS lifetime, not full idle-duration parity or C3. Native7fa unchanged. Historical71a rawcleanupFAIL remains retained separately."
+        "limits": "Actual first natural no-contest Results\u2192CSS lifetime, not full idle-duration parity or C3. Native7fa unchanged. Historical71a rawcleanupFAIL remains retained separately."
       },
       "SSS_global_call_continuity_repair": {
         "state": "COMMITTED_FOCUSED_AND_REQUIRED_REGRESSION_PASS",
@@ -14273,7 +14273,7 @@
           "bytes": 855,
           "sha256": "1f53e92669d8006339a2b9fbcbb67c9e8f6faf8a276490bd9a3a6bc13b4f0e6a"
         },
-        "scope": "Preserve only closed native session-global SSS last_call through checked natural ReturnCSS reset; fresh geometry/active tuple/live owner/token and strict contiguous identity/default decoder unchanged. Actual retained firstleg→secondSSSthrough147 and duplicate/gap/foreign/targetfirst/partialcallback/earlyReturnCSS/default0→1 negatives passed; driver ordering/deadline control also passed. No native rebuild. Its subsequent failed capture is recorded separately below.",
+        "scope": "Preserve only closed native session-global SSS last_call through checked natural ReturnCSS reset; fresh geometry/active tuple/live owner/token and strict contiguous identity/default decoder unchanged. Actual retained firstleg\u2192secondSSSthrough147 and duplicate/gap/foreign/targetfirst/partialcallback/earlyReturnCSS/default0\u21921 negatives passed; driver ordering/deadline control also passed. No native rebuild. Its subsequent failed capture is recorded separately below.",
         "required_regression": {
           "tests": 2660,
           "skips": 182,
@@ -15030,7 +15030,7 @@
       "next_competitive_original_reference": {
         "decision": "Prefer source-observed original stock-four/Items None via existing Rules driver; do not add TIME/items gameplay to match incidental endpoint context.",
         "recipe_reuse": "Existing Main/VS/Rules/Items choreography plus checked same-call Stadium SSS selection; legal costumes[1,0]. New menu inputs require fresh actual context/PAD/seed, not splicing old TIME reference.",
-        "first_experiment": "Prove actual original Rules commit and SSS OnExit→VS Entry→completed Setup competitive profile; exact collector terminal remains planned pending bounded reuse review. Reuse of existing original GO/C/F terminal is being considered instead of a new stop-at-Setup mode; no capture release.",
+        "first_experiment": "Prove actual original Rules commit and SSS OnExit\u2192VS Entry\u2192completed Setup competitive profile; exact collector terminal remains planned pending bounded reuse review. Reuse of existing original GO/C/F terminal is being considered instead of a new stop-at-Setup mode; no capture release.",
         "items_none": "Frequency disabled; item mask need not be zero.",
         "stop": "First unknown owner/lock, profile mismatch, input/seed/context join gap, unsupported observer field, deadline, incomplete stream or cleanup failure. No memory/seed writes, normalization, cap extension or automatic retry.",
         "decision_receipt": {
@@ -16434,7 +16434,7 @@
               "setup_observation": null,
               "runtime_replay": "NOT_RUN"
             },
-            "first_boundary": "The native prepared Setup continuation refused with “Prepared Setup selection differs from the accepted receipt or replay owner”; no Setup constructor or Setup observation was reached. The failed report also records a finalizer error because it applied the Setup-unload state check while validating the SSS stop.",
+            "first_boundary": "The native prepared Setup continuation refused with \u201cPrepared Setup selection differs from the accepted receipt or replay owner\u201d; no Setup constructor or Setup observation was reached. The failed report also records a finalizer error because it applied the Setup-unload state check while validating the SSS stop.",
             "captured_source_pins": {
               "src/gameplay_menu_browser.cpp": "6eaf5ca120b32737925ee443f5bfdc3543a5769df8aac12963801ef7d399d9d7",
               "scripts/stadium_stock4_sss_exit_observation.mjs": "439a93bfdc2d11342a486297f791c89b79fd33126d00fed5599bbc298d18fa64",
@@ -16685,7 +16685,7 @@
         "retained_v6_posthoc_declared_setup_audit_v1": {
           "schema": "melee-web-stadium-v6-posthoc-declared-setup-audit-v1",
           "status": "PASS_POSTHOC_DECLARED_SETUP_FIELDS_ONLY",
-          "scope": "A separate offline audit of the original v6 producer’s own retained Setup tag-4 record against an independently sourced expected object. It is not a browser capture result and does not change either failed prepared-Setup capture.",
+          "scope": "A separate offline audit of the original v6 producer\u2019s own retained Setup tag-4 record against an independently sourced expected object. It is not a browser capture result and does not change either failed prepared-Setup capture.",
           "audit_receipt": {
             "run_directory": "stadium-setup-go-review-repair-20261018-050651-5cfb537c",
             "file": "retained-v6-audit-after-root-review.json",
@@ -19504,7 +19504,7 @@
               "all_11_recorded_pids_independently_absent": true,
               "owned_capture_and_server_groups_absent": true,
               "screenshots_hash_verified": true,
-              "screenshot_description_correction": "Two Mario selections were visible; the “4-man survival” text is not evidence of four-stock settings.",
+              "screenshot_description_correction": "Two Mario selections were visible; the \u201c4-man survival\u201d text is not evidence of four-stock settings.",
               "root_correction": {
                 "prior_sha256": "1feb2f5f719412fec7b61aca1bf5c9cace5650ea5d1aa6eba80ccaf59b4ceed7",
                 "operative_result_check": {
@@ -21338,5 +21338,559 @@
         "run_id": "stadium-go2-reference-cache-freeze-20261018-103914-84b95bb7"
       }
     }
+  },
+  "fresh132_full_a_browser_import_attempt_2026_10_24": {
+    "state": "FAILED_BEFORE_FULL_A_STREAM_MODULE_IMPORT_NO_GAMEPLAY_LIFETIME; HOST_ONLY_REPAIR_FULL_REGRESSION_PENDING",
+    "scope": "One root-released Fresh132 Full-A browser attempt after the full-A source adapter checkpoint. The browser failed while importing the projection module from a data URL, before the Full-A stream module imported. The 7,168-action schedule and gameplay lifetime were not executed or compared.",
+    "source_and_validation": {
+      "source_checkpoint": {
+        "commit": "8a36ecb67c965585d2cc66911911f6107ee069d9",
+        "tree": "f3f464302dbf8fc4eb94e70773c8aaeb4c9fbbf3",
+        "clean_at_adapter_validation": true,
+        "receipt": {
+          "path": "fresh132-full-a-mode-validation-v1/source-checkpoint-v3.json",
+          "bytes": 20633,
+          "sha256": "95f6387a2d39ee89652ea86bbc687a5151fc4994ab6feabe4387903eebc9daee"
+        }
+      },
+      "runtime_build_producer": {
+        "base_commit": "0193efbe3b705f3b0892898f8128076b2607e9a3",
+        "base_tree": "748d7a7990e2cd1dd44c61e0b20232aa587fbcd9",
+        "reviewed_producer_worktree_files": 10,
+        "identity": "0193efbe plus exact10 reviewed producer-worktree files"
+      },
+      "validated_source_harness": {
+        "base_commit": "0193efbe3b705f3b0892898f8128076b2607e9a3",
+        "files": 13,
+        "full_regression": "PASS",
+        "tests": 2756,
+        "skipped": 195,
+        "log": {
+          "path": "fresh132-full-a-mode-validation-v1/full-regression-v3.log",
+          "bytes": 530700,
+          "sha256": "523adf896b088fe0f086f845c054ff8210dce47c36b6741bb56d1c79a40acf6a"
+        },
+        "result": {
+          "path": "fresh132-full-a-mode-validation-v1/result-v3.json",
+          "bytes": 18261,
+          "sha256": "5c7a269d18aa7fa160da440581e163d10f862cec55472869b0752028f953c757"
+        }
+      },
+      "release_builds": [
+        {
+          "name": "diagnostic-release",
+          "status": "PASS",
+          "result": {
+            "path": "fresh132-full-a-mode-validation-v1/diagnostic-release-result-v2.json",
+            "bytes": 525,
+            "sha256": "14564480fe6bfed12853752736e339bb0ca41be4b960f517613def3846bc6397"
+          }
+        },
+        {
+          "name": "ordinary-release",
+          "status": "PASS",
+          "result": {
+            "path": "fresh132-full-a-mode-validation-v1/ordinary-release-result-v2.json",
+            "bytes": 489,
+            "sha256": "c57b484ee05bc84d9e25d929c74c41a898e5a8f6ff1de3ac2e46d2dc796357dc"
+          }
+        }
+      ],
+      "runtime_inventory": {
+        "file_count": 54,
+        "sha256": "1c57757f3a6c87ed04538e0c1ec4d4ecf2c56ff56676ca1b8b70f491b78787ab",
+        "path": "fresh132-full-a-mode-validation-v1/runtime-inventory-v2.json",
+        "bytes": 37482
+      },
+      "runtime_producer_receipt": {
+        "path": "fresh132-full-a-mode-validation-v1/application-v2.json",
+        "bytes": 4616,
+        "sha256": "48782e5a9cd69fde4fe6bcf5f09f5f4b04777ac0e122d4a1a2a6de2151787892"
+      }
+    },
+    "pre_server_controls": {
+      "status": "PASS_METADATA_GUARD_AND_ACTUAL_PRE_SERVER_CONTROLS_ONLY",
+      "path": "fresh132-full-a-final-pre-server-controls-v1/result-v1.json",
+      "bytes": 9453,
+      "sha256": "1dec9788a794887e24d5898c66c2eef5c3f8e9267e4ba4c24d989bb98bac90c0",
+      "scope": "Pre-server positives and refusal controls only; no browser run in these controls."
+    },
+    "browser_attempt": {
+      "packet": {
+        "path": "fresh132-full-a-capture-candidate-v1/packet-candidate-v1.json",
+        "bytes": 42305,
+        "sha256": "5ad5e4a3dcfc44b742e8d7634dc6eb53855cb6101221eae46a1ce853e6d8039c"
+      },
+      "root_observed": {
+        "path": "fresh132-full-a-capture-candidate-v1/root-observed-v1.json",
+        "bytes": 2890,
+        "sha256": "3aad60a2bcfbdd43048a19a7acbc0a332c3c5164f44b8a2fefb29b2eac6ecd92"
+      },
+      "raw_report": {
+        "path": "fresh132-full-a-capture-candidate-v1/browser-run/report.json",
+        "bytes": 133391,
+        "sha256": "02ccc50a05684f5e99aec21794469090ac9a2b580dd346de6f572f94321e9631"
+      },
+      "owner": {
+        "path": "fresh132-full-a-capture-candidate-v1/owner.json",
+        "bytes": 119158,
+        "sha256": "9ff5b6f94681303d59443350a3ed19697978eb1dd92476eade05f117a0eb1be3"
+      },
+      "failure": "Relative specifier ./fresh132_full_a_projection.mjs refused from a non-hierarchical data URL before the stream module import; no gameplay/lifetime result.",
+      "native_after_unload": {
+        "phase": 0,
+        "running": 0,
+        "observation": null,
+        "first_sss_constructor_pair": null,
+        "first_sss_consumed_tick": null,
+        "first_sss_draw": null,
+        "first_sss_prefix": null,
+        "first_sss_vs_entry": null,
+        "first_sss_vs_setup": null,
+        "matched_setup_cf": null,
+        "error": null
+      },
+      "all_13_recorded_pids_absent": true,
+      "runtime_54_unchanged": true,
+      "elapsed_ms": 7780,
+      "cleanup_elapsed_ms": 72
+    },
+    "host_only_import_repair": {
+      "status": "APPLIED_TO_CURRENT_WORKTREE; FULL_REGRESSION_RUNNING; NOT_COMMITTED",
+      "base_commit": "8a36ecb67c965585d2cc66911911f6107ee069d9",
+      "changed_files": 4,
+      "gameplay_source_changes": 0,
+      "freeze": {
+        "path": "fresh132-full-a-browser-module-repair-candidate-v1/freeze-v1.json",
+        "bytes": 1686,
+        "sha256": "b0181bfeae78c5ca1ecee2ac747b8d06e4a892d925e9aac05b4bc7a2ae05c7c2"
+      },
+      "patch": {
+        "path": "fresh132-full-a-browser-module-repair-candidate-v1/candidate.patch",
+        "bytes": 21348,
+        "sha256": "e01e8c90a3904a0f581d7e54fc0d871fe8fb5ac7219df9e9a93c13f735cc3d9a"
+      },
+      "root_review": {
+        "path": "fresh132-browser-module-repair-validation-v1/root-review-v1.json",
+        "bytes": 1535,
+        "sha256": "5fbea1d44656ef0947525c887d39db2926c2685b3bab8225ff96cd8bc90e7206",
+        "decision": "APPROVE_FOUR_HOST_ONLY_MODULE_IMPORT_REPAIR_FILES"
+      },
+      "reduced_controls": {
+        "actual_data_url_control": {
+          "path": "fresh132-full-a-browser-module-repair-candidate-v1/data-url-focused-v1.log",
+          "bytes": 226,
+          "sha256": "91c03e6b02400e69e4c4219aca98b759d6c142b75c8b4809bd59295163f1d6da",
+          "status": "PASS"
+        },
+        "focused_comparator": {
+          "path": "fresh132-browser-module-repair-validation-v1/focused-comparator-result.json",
+          "bytes": 525,
+          "sha256": "46c351f2517bceac0b97868950ccd75f13dd4eb2b0f95baf96c814b04daa37f8",
+          "exit_code": 0
+        },
+        "focused_full_a": {
+          "path": "fresh132-browser-module-repair-validation-v1/focused-full-a-result.json",
+          "bytes": 593,
+          "sha256": "e9cf10cc67cae2e8ede35be56ebc3e0c49207cfb7c0a2bdb0a0fbb261238fe34",
+          "exit_code": 0
+        },
+        "node_public_wrapper": "Original Buffer length and crypto SHA-256 validation are retained; reduced controls only, not full regression."
+      },
+      "full_regression": "RUNNING_NO_COMPLETION_RESULT_PIN",
+      "current_worktree_application": {
+        "path": "fresh132-browser-module-repair-validation-v1/application-v1.json",
+        "bytes": 2573,
+        "sha256": "f69cfba65c9b3535a75353abc06bc3dc31a9f714f7d5214ddb56775f75be8db7"
+      },
+      "current_validation": {
+        "full_regression": "RUNNING_NO_COMPLETION_RESULT_PIN",
+        "log_path": "fresh132-browser-module-repair-validation-v1/full-regression.log",
+        "commit": "UNCOMMITTED"
+      }
+    },
+    "limits": [
+      "The failed browser attempt provides no Full-A gameplay lifetime or comparison.",
+      "Existing 174-action Setup-to-GO+2 browser result remains a separate proper-prefix prerequisite.",
+      "No C3, lifetime-B, recreation, per-owner RNG, pixel/PCM, timing/performance or physical-input acceptance.",
+      "No additional browser attempt is released by this record."
+    ]
+  },
+  "fresh132_full_a_attempt_2026_10_24_v2": {
+    "state": "OWNER_DEADLINE_TIMEOUT_PARTIAL_PREFIX; INDEPENDENT_PREFIX_REPLAY_PASS; FULL_A_AND_NATIVE_UNLOAD_NOT_COMPLETED",
+    "scope": "One root-released Full-A attempt using the separate 7,168-action Fresh132 schedule. The attempt ended at the owner deadline before the full schedule or native unload. Independent review validates only the captured prefix and does not promote it to Full-A completion or an immutable checkpoint.",
+    "source_and_validation": {
+      "clean_source_checkpoint": {
+        "head": "366e182d875ef05e223721ffaa87ac4854a8bf15",
+        "tree": "cf98b1016275ee82f7cd5d4ffc7bde37742f196c",
+        "receipt": {
+          "path": "fresh132-browser-module-repair-validation-v1/source-checkpoint-v1.json",
+          "bytes": 7901,
+          "sha256": "5e06d776b83d4c43ae5ce506391a079ba4e0749e6de0e4b5004f9092cbf0f05d"
+        }
+      },
+      "host_only_import_repair": {
+        "source_changes_to_gameplay": 0,
+        "repair_files": 4,
+        "full_regression": {
+          "status": "PASS",
+          "tests": 2756,
+          "skipped": 195,
+          "test_duration_seconds": 580.125,
+          "overall_result_receipt": {
+            "path": "fresh132-browser-module-repair-validation-v1/result-v1.json",
+            "bytes": 2540,
+            "sha256": "d610d866e359081ceaef28a9564b9774aa140153cf9db75ac06c9a7311f242c4"
+          },
+          "full_regression_result": {
+            "path": "fresh132-browser-module-repair-validation-v1/full-regression-result.json",
+            "bytes": 472,
+            "sha256": "a8128d7e9cb8d37d4dca3ad5062e90c3a0e71398a7c6a55c7fa67ba6be34f824"
+          },
+          "log": {
+            "path": "fresh132-browser-module-repair-validation-v1/full-regression.log",
+            "bytes": 530851,
+            "sha256": "ec7670a1ad1ba85f6d4d6cf28fb702321dfa4e986bb17b3e8eefdc88ba5c3b9e"
+          }
+        },
+        "release_builds": "The already-pinned Diagnostic and ordinary Release builds passed before the host-only repair; no runtime rebuild was performed for this repair.",
+        "actual_chrome_import_only_control": {
+          "state": "PASS_MODULE_IMPORT_AND_NINE_STRICT_REFUSALS_NO_GAME",
+          "root_observed": {
+            "path": "fresh132-full-a-browser-import-only-control-v1/root-observed-v1.json",
+            "bytes": 1556,
+            "sha256": "acf378b45a0f6735b65c804d1d8446f1fcc75d130d080f478891e03e56f3de9c"
+          },
+          "raw_report": {
+            "path": "fresh132-full-a-browser-import-only-control-v1/browser-run/report.json",
+            "bytes": 1881,
+            "sha256": "1b2ce1a17af26557f61c28b4fe62f8b87782ac4e74bc5e1fb063c126d9232cb0"
+          },
+          "native_runtime_initialized": false
+        }
+      },
+      "runtime_producer": {
+        "base_commit": "0193efbe3b705f3b0892898f8128076b2607e9a3",
+        "base_tree": "748d7a7990e2cd1dd44c61e0b20232aa587fbcd9",
+        "reviewed_producer_worktree_files": 10,
+        "inventory_file_count": 54,
+        "inventory": {
+          "path": "fresh132-full-a-mode-validation-v1/runtime-inventory-v2.json",
+          "bytes": 37482,
+          "sha256": "1c57757f3a6c87ed04538e0c1ec4d4ecf2c56ff56676ca1b8b70f491b78787ab"
+        },
+        "unchanged_during_validation_and_capture": true
+      }
+    },
+    "capture": {
+      "packet": {
+        "path": "fresh132-full-a-capture-candidate-v2/packet-candidate-v1.json",
+        "bytes": 45677,
+        "sha256": "bced8ab5f43b5d791417df97e8f13557ff6f98b74a6e06a25546bd2b2a8eb5c1"
+      },
+      "preflight": {
+        "path": "fresh132-full-a-capture-candidate-v2/preflight.json",
+        "bytes": 54587,
+        "sha256": "12309648d9334650403e638405afeff1f356bcf5c93d9103b5d8b559d2099d50"
+      },
+      "root_observed": {
+        "path": "fresh132-full-a-capture-candidate-v2/root-observed-v1.json",
+        "bytes": 3883,
+        "sha256": "86e42457519c461872c7ce60563fe89a5994636879991b416a8df11279c90c43"
+      },
+      "raw_report": {
+        "path": "fresh132-full-a-capture-candidate-v2/browser-run/report.json",
+        "bytes": 10525809,
+        "sha256": "06c802922276bea830f5bca78be35c0070afc59a98f5ede99f0a776354c58d82"
+      },
+      "owner": {
+        "path": "fresh132-full-a-capture-candidate-v2/owner.json",
+        "bytes": 135253,
+        "sha256": "219d18213696d2289f9ef3495bfc950f779fbfe49fad1e0b621f952cef804b21"
+      },
+      "outcome": "Owner deadline expired at 150336 ms. 2943 of 7168 planned actions completed (1472 source ticks, 1471 source draws); attempted next action was draw at schedule index 2943 and its RPC failed after the browser/page closed.",
+      "native_unload": "NOT_COMPLETED; pending async step suppressed unload and observation clearing.",
+      "owned_pid_absence": "Root-observed receipt records all 13 capture PIDs absent.",
+      "runtime_unchanged": "All 54 runtime inventory entries remained unchanged."
+    },
+    "independent_prefix_replay": {
+      "status": "PASS_INDEPENDENT_PARTIAL_PREFIX_REPLAY_ONLY",
+      "review": {
+        "path": "fresh132-full-a-capture-v2-independent-replay-v1/independent-review-v1.json",
+        "bytes": 4106,
+        "sha256": "9a1d270249f7e104c7c4576582847d90291baf7948dba5b5d7c964d1cb9893e4"
+      },
+      "result": {
+        "path": "fresh132-full-a-capture-v2-independent-replay-v1/replay-result-v1.json",
+        "bytes": 842,
+        "sha256": "804c5622c9c2c619d0c74520258775d8188100e9d163b195c71166be56998309"
+      },
+      "actual_four_port_tick_rows": 1472,
+      "tick_range": [
+        84,
+        1471
+      ],
+      "common_state_samples": 1388,
+      "common_scalar_values": 20820,
+      "seed_samples": 1388,
+      "C_F_GO2_boundary_fields": 17,
+      "C_F_GO2_boundaries": "PASS declared fields and seed for the retained prefix",
+      "full_A": false,
+      "native_unload": false,
+      "immutable_checkpoint_eligible": false
+    },
+    "report_persistence": {
+      "attempted_writes": 6072,
+      "completed_writes": 6072,
+      "failed_writes": 0,
+      "serialized_bytes": 41179565405,
+      "total_persistence_ms": 117619.368,
+      "action_loop_ms": 136734.953,
+      "interpretation": "Observed timing/workload only; does not establish this as the sole cause of timeout."
+    },
+    "checkpoint_and_next": {
+      "immutable_checkpoint_eligibility": "The independent replay reports checkpoint_eligible=false for the current 7168-action mode.",
+      "eligibility_proposal": "A bounded source/mode-eligibility proposal is pending review; no change is claimed.",
+      "next": "Reduce reporter persistence offline and resolve immutable checkpoint eligibility before preparing a reviewed successor packet. No unchanged retry and no timeout increase."
+    },
+    "limits": [
+      "The full 7168-action schedule and Full-A terminal were not reached.",
+      "Native unload and observation clearing did not complete.",
+      "Only common fields, seed, four-port tick rows and declared C/F/GO2 prefix boundaries were independently replayed; this does not establish every typed field across Full-A.",
+      "No lifetime B, recreation, per-owner RNG, C3, whole-session, pixels/PCM, timing/performance or physical-input acceptance claim."
+    ]
+  },
+  "fresh132_full_a_pass_2026_10_24_v3": {
+    "state": "PASS_REVIEWED_FULL_A_DECLARED_COMMON_FIELDS_SEED_INPUT_ORDER_AND_CHECKED_RETIREMENT",
+    "scope": "One original7,168-action schedule and3501samples of15declared common fields+one exactseed, plus C/F/GO/GO2 declared checks. No fulltyped, recreatedB, per-owner RNG or C3 acceptance.",
+    "source_and_validation": {
+      "head": "5b5dee019034b395b2886b7cd310985760e00797",
+      "tree": "47a937dac4ba257b4a6e09caa698fcfe6d2d0225",
+      "parent": "366e182d875ef05e223721ffaa87ac4854a8bf15",
+      "checkpoint": {
+        "path": "fresh132-report-checkpoint-validation-v1/source-checkpoint-v1.json",
+        "bytes": 7275,
+        "sha256": "eaa3026ae49d8dc919f82a25826e4ce399e47641c076c603f17795e30ddfb3aa"
+      },
+      "validation": {
+        "path": "fresh132-report-checkpoint-validation-v1/result-v1.json",
+        "bytes": 1879,
+        "sha256": "682dbc98edaad8a860fb9601e181498cc4e432c0ead95b1e748fb907d0a76d01"
+      },
+      "full_regression": {
+        "status": "PASS",
+        "tests": 2756,
+        "skipped": 195,
+        "seconds": 580.471,
+        "log": {
+          "path": "fresh132-report-checkpoint-validation-v1/full-regression.log",
+          "bytes": 530769,
+          "sha256": "ffcc0d6abe145daa73f65ee902a5fa5ea166e33721b0b6bca70099976f978a23"
+        }
+      },
+      "reporter_repair": {
+        "source_delta": "Two eligibility lines plus focused tests; only exact fresh132-full-a-v1/7168/15/1/explicitstep is added. Existing sidecar/hash-linked journal/materializer/recovery, cadence and all game/input/RNG/compare/event guards and deadlines unchanged.",
+        "application": {
+          "path": "fresh132-report-checkpoint-validation-v1/application-v1.json",
+          "bytes": 1946,
+          "sha256": "e69768806f424a2f8a15e018000d5200ce27cadb0b1ce7f0a63d3359842e8727"
+        },
+        "review": {
+          "path": "fresh132-report-checkpoint-validation-v1/root-review-v1.json",
+          "bytes": 1546,
+          "sha256": "91dca383c7b9bfe73ca6f505512b6203aea862addd6a0510b95c0a664f405cbd"
+        },
+        "focused_controls": 10,
+        "focused_result": {
+          "path": "fresh132-report-checkpoint-validation-v1/focused-checkpoint-result.json",
+          "bytes": 517,
+          "sha256": "0f4a67c472624104c34f5efd787941f959e9c21eb2576e76c16d987b374d47bc"
+        },
+        "candidate_freeze": {
+          "path": "fresh132-full-a-report-checkpoint-candidate-v1/freeze-v1.json",
+          "bytes": 5479,
+          "sha256": "49820fec9e871b6d73da232303e55f31b60e691f837addb747b0f367e90182d0"
+        },
+        "offline_file_io": {
+          "path": "fresh132-full-a-report-checkpoint-candidate-v1/controls/file-io-result-v1.json",
+          "bytes": 3725,
+          "sha256": "1cf887daac6c10f5ea2b1c4c08957d078fa69857c1cd0df15a747122aab7b7bf"
+        },
+        "offline_limit": "12 reconstructed checkpoints:77.03% fewer bytes but sparse elapsed time increased; not a capture speed/completion proof."
+      },
+      "current_harness_files": 15,
+      "runtime_producer": {
+        "base_head": "0193efbe3b705f3b0892898f8128076b2607e9a3",
+        "reviewed_producer_worktree_files": 10,
+        "identity_note": "These10 include host tests/policy; this is a producer-worktree identity, not10binary-affecting inputs. Current clean15-file harness is separate.",
+        "inventory_count": 54,
+        "inventory": {
+          "path": "fresh132-full-a-mode-validation-v1/runtime-inventory-v2.json",
+          "bytes": 37482,
+          "sha256": "1c57757f3a6c87ed04538e0c1ec4d4ecf2c56ff56676ca1b8b70f491b78787ab"
+        },
+        "runtime_rebuilt": false,
+        "retained_and_live_unchanged": true
+      }
+    },
+    "capture": {
+      "packet": {
+        "path": "fresh132-full-a-capture-candidate-v3/packet-candidate-v1.json",
+        "bytes": 50755,
+        "sha256": "d12637d3e57a0637cfe2b2f8278589051d6d14bf589a2c74810aaf6f0b5f89a2"
+      },
+      "preflight": {
+        "path": "fresh132-full-a-capture-candidate-v3/preflight.json",
+        "bytes": 55237,
+        "sha256": "29205b0c68e929ed13f1b3b47a9a5b6e512b484705840624e56e919c6c906770"
+      },
+      "raw": {
+        "path": "fresh132-full-a-capture-candidate-v3/browser-run/report.json",
+        "bytes": 21298293,
+        "sha256": "538b54a635d65675379225d957a8cf90971c93419c9ff55d24f3e96188472f5a"
+      },
+      "owner": {
+        "path": "fresh132-full-a-capture-candidate-v3/owner.json",
+        "bytes": 110564,
+        "sha256": "e946b8aa0b10619320df69e44a2a3ca977aa50b03705d2f57e0fe1e111ea3570"
+      },
+      "root_review": {
+        "path": "fresh132-full-a-capture-candidate-v3/root-observed-v1.json",
+        "bytes": 4998,
+        "sha256": "8eff26e78eceea65d734297e6759d4625ef068f07d4c6915c8c17eda4c82461a"
+      },
+      "actual_schedule": {
+        "actions": 7168,
+        "ticks": 3585,
+        "draws": 3583,
+        "literal_four_port_tick_rows": 3585,
+        "natural_tail_ticks": 0,
+        "manifest": {
+          "path": "fresh132-full-a-capture-candidate-v3/full-a-manifest-mwc6.bin",
+          "bytes": 408600,
+          "sha256": "3c4d0efa684f4bed0673d92dc5708e6f50a9419560ef4151bdf3ed81174a7508"
+        },
+        "projection": {
+          "path": "fresh132-full-a-capture-candidate-v3/full-a-source-host-projection-v1.json",
+          "bytes": 11991565,
+          "sha256": "bd7937bcb05404bc953e6f1e3ddae3d631f776fa33d06737e491e14f6fa0f892"
+        }
+      },
+      "owner_elapsed_ms": 62901,
+      "cleanup_ms": 154,
+      "outer_elapsed_seconds": 62.958,
+      "action_loop_ms": 48905.853,
+      "report_persistence": {
+        "attempted_count": 14787,
+        "completed_count": 14787,
+        "failed_count": 0,
+        "serialized_bytes": 2834579731,
+        "timings_ms": {
+          "serialize": {
+            "count": 14787,
+            "total_ms": 4737.254,
+            "mean_ms": 0.32,
+            "p50_ms": 0.314,
+            "p95_ms": 0.375,
+            "max_ms": 2.037
+          },
+          "file_write": {
+            "count": 14787,
+            "total_ms": 4080.094,
+            "mean_ms": 0.276,
+            "p50_ms": 0.263,
+            "p95_ms": 0.328,
+            "max_ms": 5.582
+          },
+          "rename": {
+            "count": 14787,
+            "total_ms": 1415.384,
+            "mean_ms": 0.096,
+            "p50_ms": 0.09,
+            "p95_ms": 0.123,
+            "max_ms": 8.786
+          },
+          "total": {
+            "count": 14787,
+            "total_ms": 12638.911,
+            "mean_ms": 0.855,
+            "p50_ms": 0.812,
+            "p95_ms": 1.056,
+            "max_ms": 9.429
+          }
+        }
+      },
+      "timing_scope": "Observed host workload only; no performance/live-timing acceptance."
+    },
+    "independent_replay": {
+      "review": {
+        "path": "fresh132-full-a-capture-v3-independent-replay-v1/independent-review-v1.json",
+        "bytes": 7525,
+        "sha256": "ff00f08280443746a4c859460513fa82c2b555bdcfb91b42da053d40fe56f6ff"
+      },
+      "result": {
+        "path": "fresh132-full-a-capture-v3-independent-replay-v1/replay-result-v1.json",
+        "bytes": 1291,
+        "sha256": "dce39e0783e04cfb3f807205bb4509e05cac77e8e2a3d327e1a67938fe6d615e"
+      },
+      "freeze": {
+        "path": "fresh132-full-a-capture-v3-independent-replay-v1/freeze-v1.json",
+        "bytes": 1755,
+        "sha256": "d634854e707763505bdf951165fc245d06e980d370be447085fa6dab4d93a2c2"
+      },
+      "samples": 3501,
+      "common_scalar_values": 52515,
+      "seed_values": 3501,
+      "total_declared_values": 56016,
+      "source_tick_range": [
+        84,
+        3584
+      ],
+      "original_GO": {
+        "sequence": 3006,
+        "source_tick": 84,
+        "draw_ordinal": 84,
+        "seed_hex": "ff0c2607"
+      },
+      "C_F_GO2_fields_each": 17,
+      "manifest_encoder_byte_exact": true,
+      "all_action_order_and_four_port_tick_inputs_match": true,
+      "helper_failure": {
+        "path": "fresh132-full-a-capture-v3-independent-replay-v1/review-helper-failure-v1.json",
+        "bytes": 337,
+        "sha256": "88775399368668152e61bdb05d081c3f8bfaea3f53c6b54cb365c3afe79f5541"
+      },
+      "helper_failure_scope": "Optional timeout-only owner field was absent on success; corrected to actual resultpass/exit0 schema, no capture evidence mismatch."
+    },
+    "cleanup": {
+      "native_retirement": "One ready attempt/result1, terminalphase0/running0, observation and all selected callbacks cleared.",
+      "ordinary_unload_cache_parity": false,
+      "javascript_idbfs_persistence": "not_run",
+      "all12_recorded_PIDs_independently_absent": true,
+      "root_and_independent_receipts": "See capture.root_review and independent_replay.review."
+    },
+    "preserved_failures": {
+      "v1": "fresh132_full_a_browser_import_attempt_2026_10_24 remains failed before gameplay.",
+      "v2": "fresh132_full_a_attempt_2026_10_24_v2 remains timed-out partialprefix1388samples with native unload suppressed."
+    },
+    "CI": {
+      "published_0193_head": "0193efbe3b705f3b0892898f8128076b2607e9a3",
+      "published_0193_run": 40030664228,
+      "published_0193_checks": "completed14:12success,2expectedskip",
+      "read_receipt": {
+        "path": "ci40030664228-docs-review-current.json",
+        "bytes": 28703,
+        "sha256": "8dfad38cc16340edcd8d6e82aa9a8f057653e15dbbb179cadce193558aea4bd0"
+      },
+      "current_5b5dee_and_final_docs_successor": "exact-head CI not run/pending; older green results do not cover unpublished current source/docs."
+    },
+    "next": "Review scoped retirement/recreation and a separately compared B against this same actual reference, with missing per-owner lifecycle/RNG and7unpaired typed fields explicitly tracked. Do not repeat passing A or recapture original.",
+    "limits": [
+      "Remaining7typedfields/fulltypedparity unpaired",
+      "Original per-owner lifecycle/registration/RNG unproved",
+      "Fresh132 lifetimeB/checked recreation not run on this reference",
+      "C3/publicStadium/transformations/whole-session not accepted",
+      "pixels/PCM/audio continuity/physical input/foreground timing/performance unrun"
+    ]
   }
 }
