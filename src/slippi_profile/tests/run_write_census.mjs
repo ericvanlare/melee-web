@@ -24,6 +24,7 @@ import {
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const SAMPLE = PREFIX_SAMPLES;
 const LOGICAL_FRAME_V6_PROFILE = 'slippi-render-dependencies-logical-frame-v6';
+const TOBJ_PRESENTATION_V8_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-tobj-v8';
 const LOBJ_PRESENTATION_V7_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-v7';
 
 export function assembleCompletedCensusExecution(report, {prefixSamples, censusSample,
@@ -73,6 +74,10 @@ export function validateCpuRestoreRouteSelection(values) {
   const oneTick = values['--aggregate-cpu-drawn-reference'] === true;
   const twoTick = values['--aggregate-cpu-drawn-reference-two-tick'] === true;
   if (oneTick && twoTick) throw new Error('One-tick and two-tick drawn-reference routes are mutually exclusive');
+  if (values['--slippi-tobj-presentation-cache'] === true &&
+      (values['--slippi-lobj-presentation-cache'] !== true || !twoTick)) {
+    throw new Error('The v8 UV/TOON owner requires v7 and the fixed two-tick route');
+  }
   if (values['--slippi-lobj-presentation-cache'] === true && !twoTick) {
     throw new Error('The v7 light owner requires the fixed two-tick route');
   }
@@ -83,9 +88,10 @@ export function validateCpuRestoreRouteSelection(values) {
     values['--aggregate-cpu-restore-config'] ? 'cpu-only-v1' : 'census-v1';
 }
 
-export function validateBrowserProfileForRoute(init, twoTickDrawnReference, twoTickExports = null, lobjPresentationCache = false) {
+export function validateBrowserProfileForRoute(init, twoTickDrawnReference, twoTickExports = null, lobjPresentationCache = false, tobjPresentationCache = false) {
   if (lobjPresentationCache && !twoTickDrawnReference) throw new Error('The v7 light owner requires two ticks');
-  const expectedProfile = lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
+  if(tobjPresentationCache && (!lobjPresentationCache || !twoTickDrawnReference)) throw new Error('v8 requires v7 and two ticks');
+  const expectedProfile = tobjPresentationCache ? TOBJ_PRESENTATION_V8_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
     twoTickDrawnReference ? LOGICAL_FRAME_V6_PROFILE : SYNCTEST_PROFILE;
   if (init?.profile !== expectedProfile) throw new Error(`Unexpected profile identity: ${init?.profile}`);
   if (twoTickDrawnReference && (!twoTickExports ||
@@ -101,7 +107,7 @@ export function parseArgs(argv) {
   const allowed = new Set(['--browser-runtime', '--assets', '--manifest', '--out', '--playwright','--aggregate-cpu-restore-config']);
   const flags = new Set(['--aurora-staging-shadow-inventory', '--stage-arena-owner-inventory',
     '--source-payload-admission-dry-run','--aggregate-cpu-drawn-reference',
-    '--aggregate-cpu-drawn-reference-two-tick', '--slippi-lobj-presentation-cache']);
+    '--aggregate-cpu-drawn-reference-two-tick', '--slippi-lobj-presentation-cache', '--slippi-tobj-presentation-cache']);
   for (let i = 0; i < argv.length;) {
     const key = argv[i];
     if (flags.has(key)) {
@@ -414,6 +420,7 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   const twoTickDrawnReference=options['--aggregate-cpu-drawn-reference-two-tick']===true;
   const lobjPresentationCache=options['--slippi-lobj-presentation-cache']===true;
+  const tobjPresentationCache=options['--slippi-tobj-presentation-cache']===true;
   const requireAuroraStagingShadowInventory =
     options['--aurora-staging-shadow-inventory'] === true;
   const requireStageArenaOwnerInventory =
@@ -479,6 +486,9 @@ async function main() {
       unclassifiedChanges: [], classificationSummary: {}},
     profile: {identity: null, sourceIdentity: null, rngHelper: null, stageBridge: null,
       seed: SOURCE_SEED, name: SYNCTEST_PROFILE,
+      sourceTextureMatrixWriterDiagnostic: tobjPresentationCache
+        ? 'NOT_APPLICABLE_MANAGED_UV_TOON_CACHE_RELOCATED_V8'
+        : 'SOURCE_WRITE_OCCURRENCE_ONLY_CAPTURE_TIME_JOIN',
       sourceLvecWriterDiagnostic: lobjPresentationCache
         ? 'NOT_APPLICABLE_SOURCE_CACHE_RELOCATED_V7'
         : 'SOURCE_WRITE_OCCURRENCE_ONLY_CAPTURE_TIME_JOIN'},
@@ -582,11 +592,11 @@ async function main() {
     const initializer = JSON.parse(init.initializer);
     const drawDiagnostics = decodeDrawDiagnostics(Buffer.from(init.drawDiagnostics, 'base64'));
     assertDrawDiagnosticsClear(drawDiagnostics, 'browser initialization');
-    report.profile = {identity: init.profile, sourceIdentity: init.source,
+    report.profile = {...report.profile, identity: init.profile, sourceIdentity: init.source,
       rngHelper: init.rngHelper, stageBridge: init.stageBridge, seed: SOURCE_SEED,
-      name: lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
+      name: tobjPresentationCache ? TOBJ_PRESENTATION_V8_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
         twoTickDrawnReference ? LOGICAL_FRAME_V6_PROFILE : SYNCTEST_PROFILE,
-      lobjPresentationCache};
+      lobjPresentationCache, tobjPresentationCache};
     const twoTickExports = twoTickDrawnReference ? await page.evaluate(() => {
       const {module} = window.__slippiSynctest;
       return {evidence: typeof module._melee_web_synctest_cpu_two_tick_evidence === 'function',
@@ -594,7 +604,7 @@ async function main() {
         payloadWitness: typeof module._melee_web_synctest_cpu_payload_failure_witness === 'function',
         payloadWitnessBytes: typeof module._melee_web_synctest_cpu_payload_failure_witness_bytes === 'function'};
     }) : null;
-    validateBrowserProfileForRoute(init, twoTickDrawnReference, twoTickExports, lobjPresentationCache);
+    validateBrowserProfileForRoute(init, twoTickDrawnReference, twoTickExports, lobjPresentationCache, tobjPresentationCache);
     if (twoTickDrawnReference) report.profile.twoTickEvidenceExports = twoTickExports;
     if (init.source !== fileSha(path.join(ROOT, 'tests/gameplay_snapshot_probe.cpp'))) {
       throw new Error('Runtime fixture identity differs from current gameplay_snapshot_probe.cpp');

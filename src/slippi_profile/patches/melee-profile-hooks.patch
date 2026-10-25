@@ -931,15 +931,29 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
 diff --git a/src/sysdolphin/baselib/class.c b/src/sysdolphin/baselib/class.c
 --- a/src/sysdolphin/baselib/class.c
 +++ b/src/sysdolphin/baselib/class.c
-@@ -1,4 +1,7 @@
+@@ -1,4 +1,10 @@
  #include "class.h"
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include <slippi_profile/tobj_presentation_cache.h>
++#endif
 +#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
 +#include <slippi_profile/lobj_presentation_cache.h>
 +#endif
  #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
  #include "gameplay_class_piece_diagnostic.h"
  #endif
-@@ -302,6 +305,9 @@
+@@ -264,6 +270,10 @@
+     HSD_FreeList* piece = (HSD_FreeList*) mem;
+ 
+     if (mem != NULL) {
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++        slippi_tobj_retiring(mem); /* pointer-only, before original free-list writes */
++#endif
++
+         entry = GetMemoryEntry((size + 31) / 32 - 1);
+         piece->next = entry->free_list;
+         entry->free_list = piece;
+@@ -302,6 +312,9 @@
  {
      HSD_ClassInfo* info = cls->class_info;
      info->head.nb_exist -= 1;
@@ -949,17 +963,20 @@ diff --git a/src/sysdolphin/baselib/class.c b/src/sysdolphin/baselib/class.c
      hsdFreeMemPiece(cls, info->head.obj_size);
  }
  
-@@ -354,6 +360,9 @@
+@@ -354,6 +367,12 @@
  #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
      melee_web_class_piece_label(cls, info, info->head.obj_size, 2, NULL);
  #endif
 +#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
 +    slippi_lobj_constructed(cls, info);
 +#endif
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    slippi_tobj_constructed(cls, info);
++#endif
      return cls;
  }
  
-@@ -373,6 +382,9 @@
+@@ -373,6 +392,9 @@
  {
      HSD_ClassInfo* var_r29;
      HSD_ClassInfo* var_r28;
@@ -969,7 +986,7 @@ diff --git a/src/sysdolphin/baselib/class.c b/src/sysdolphin/baselib/class.c
  #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
      HSD_ClassInfo* diagnostic_previous;
  #endif
-@@ -380,6 +392,9 @@
+@@ -380,6 +402,9 @@
      HSD_ASSERT(0x249, object);
      HSD_ASSERT(0x24A, class_info);
      var_r29 = HSD_GetClassInfo(object);
@@ -979,25 +996,29 @@ diff --git a/src/sysdolphin/baselib/class.c b/src/sysdolphin/baselib/class.c
  #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
      diagnostic_previous = var_r29;
  #endif
-@@ -413,6 +428,9 @@
+@@ -413,6 +438,12 @@
      melee_web_class_piece_label(object, class_info, class_info->head.obj_size, 3, diagnostic_previous);
  #endif
  
 +#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
 +        slippi_lobj_rebound(object, presentation_previous, class_info);
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++        slippi_tobj_rebound(object, presentation_previous, class_info);
++#endif
 +#endif
          return true;
      }
      return false;
-
 diff --git a/src/sysdolphin/baselib/tobj.c b/src/sysdolphin/baselib/tobj.c
-index 186b01ab1928a4b1520d02ab8fdb7e4093d75334..961c460f05a943cffa13386d37f8b8f3ca4f6583 100644
 --- a/src/sysdolphin/baselib/tobj.c
 +++ b/src/sysdolphin/baselib/tobj.c
-@@ -1,5 +1,12 @@
+@@ -1,5 +1,15 @@
  #include "hsd_texture_bounds.h"
  #include "tobj.h"
-+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include <slippi_profile/tobj_presentation_cache.h>
++#endif
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE && !(defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)
 +#include "gameplay_tobj_writer_diagnostic.h"
 +#include <stddef.h>
 +_Static_assert(sizeof(HSD_TObj)==172,"TObj diagnostic extent");
@@ -1007,23 +1028,302 @@ index 186b01ab1928a4b1520d02ab8fdb7e4093d75334..961c460f05a943cffa13386d37f8b8f3
  
  #include <placeholder.h>
  #include <string.h>
-@@ -387,6 +394,9 @@
+@@ -195,6 +205,10 @@
+         goto mtxdirty;
+     mtxdirty:
+         tobj->flags |= TEX_MTX_DIRTY;
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++        slippi_tobj_authored_dirty(tobj);
++#endif
++
+         break;
+     case HSD_A_T_LOD_BIAS:
+         tobj->lod->LODBias = val->fv;
+@@ -289,6 +303,9 @@
+     tobj->tlut_no = (u8) -1;
+     tobj->tev = HSD_TObjTevLoadDesc(td->tev);
+ 
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    slippi_tobj_loaded(tobj);
++#endif
+     return 0;
+ }
+ 
+@@ -300,10 +317,19 @@
+ 
+         if (!td->class_name || !(info = hsdSearchClassInfo(td->class_name))) {
+             tobj = HSD_TObjAlloc();
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++            /* Original named lookup fallback still runs, but V8 cannot
++             * silently claim that unresolved selection was attested. */
++            if (td->class_name) slippi_tobj_selected(tobj, NULL);
++#endif
++
+         } else {
+             tobj = hsdNew(info);
+             HSD_ASSERT(468, tobj);
+         }
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++        slippi_tobj_selected(tobj, HSD_CLASS_METHOD(tobj));
++#endif
+         HSD_TOBJ_METHOD(tobj)->load(tobj, td);
+         return tobj;
+     } else {
+@@ -377,7 +403,9 @@
+     return 0;
+ }
+ 
+-static void MakeTextureMtx(HSD_TObj* tobj)
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++static void MakeTextureMtx(HSD_TObj* tobj);
++static void MakeTextureMtxManaged(HSD_TObj* tobj)
+ {
+     Vec3 scale;
+     Mtx m;
+@@ -387,6 +415,7 @@
      melee_source_bool no_assert = false;
  
      PAD_STACK(8);
-+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
-+    const uint64_t tobj_writer_ticket=melee_web_tobj_writer_before(tobj,&tobj->mtx,sizeof(*tobj),&hsdTObj,__FILE__,__LINE__);
-+#endif
++    MtxPtr presentation_matrix = slippi_tobj_matrix_require(tobj);
  
      if (tobj->repeat_s && tobj->repeat_t) {
          no_assert = true;
-@@ -419,6 +429,9 @@
+@@ -414,15 +443,157 @@
+                                    : 0.0F));
+     trans.z = tobj->translate.z;
+ 
++    PSMTXTrans(presentation_matrix, trans.x, trans.y, trans.z);
++    HSD_MkRotationMtx(m, (Vec3*) &rot);
++    MTXConcat(m, presentation_matrix, presentation_matrix);
++    MTXScale(m, scale.x, scale.y, scale.z);
++    MTXConcat(m, presentation_matrix, presentation_matrix);
++}
++static void TObjSetupMtxManaged(HSD_TObj* tobj)
++{
++    int i;
++
++    if (tobj_coord(tobj) == TEX_COORD_TOON) {
++        return;
++    }
++
++    if (slippi_tobj_effective_flags(tobj) & TEX_MTX_DIRTY) {
++        HSD_TOBJ_METHOD(tobj)->make_mtx(tobj);
++        slippi_tobj_consumed(tobj);
++    }
++
++    switch (tobj_coord(tobj)) {
++    case TEX_COORD_REFLECTION: {
++        Mtx mtx;
++
++        for (i = 0; i < 3; i++) {
++            mtx[i][0] = 0.5F * slippi_tobj_matrix_require(tobj)[i][0];
++            mtx[i][1] = -0.5F * slippi_tobj_matrix_require(tobj)[i][1];
++            mtx[i][2] = 0.0F;
++            mtx[i][3] = 0.5F * slippi_tobj_matrix_require(tobj)[i][0] + 0.5F * slippi_tobj_matrix_require(tobj)[i][1] +
++                        slippi_tobj_matrix_require(tobj)[i][2] + slippi_tobj_matrix_require(tobj)[i][3];
++        }
++        GXLoadTexMtxImm(mtx, tobj->mtxid, GX_MTX3x4);
++    } break;
++
++    case TEX_COORD_HILIGHT: {
++        HSD_LObj* lobj;
++
++        if ((lobj = HSD_LObjGetCurrentByType(LOBJ_INFINITE)) != NULL) {
++            HSD_CObj* cobj;
++            Vec3 ldir, half;
++            Mtx mtx;
++            MtxPtr vmtx;
++
++            cobj = HSD_CObjGetCurrent();
++            HSD_ASSERT(0x2A8, cobj);
++            vmtx = HSD_CObjGetViewingMtxPtrDirect(cobj);
++            HSD_LObjGetLightVector(lobj, &ldir);
++            PSMTXMultVecSR(vmtx, &ldir, &ldir);
++            ldir.z += -1.0F;
++
++            PSVECNormalize(&ldir, &half);
++
++            half.x *= -0.5;
++            half.y *= -0.5;
++            half.z *= -0.5;
++
++            mtx[0][0] = slippi_tobj_matrix_require(tobj)[0][0] * half.x;
++            mtx[0][1] = slippi_tobj_matrix_require(tobj)[0][0] * half.y;
++            mtx[0][2] = slippi_tobj_matrix_require(tobj)[0][0] * half.z;
++            mtx[0][3] = slippi_tobj_matrix_require(tobj)[0][0] * 0.5F + slippi_tobj_matrix_require(tobj)[0][3];
++            mtx[1][0] = slippi_tobj_matrix_require(tobj)[1][0] * half.x;
++            mtx[1][1] = slippi_tobj_matrix_require(tobj)[1][0] * half.y;
++            mtx[1][2] = slippi_tobj_matrix_require(tobj)[1][0] * half.z;
++            mtx[1][3] = slippi_tobj_matrix_require(tobj)[1][0] * 0.5F + slippi_tobj_matrix_require(tobj)[1][3];
++            mtx[2][0] = mtx[2][1] = mtx[2][2] = 0.0F;
++            mtx[2][3] = 1.0F;
++
++            GXLoadTexMtxImm(mtx, tobj->mtxid, GX_MTX3x4);
++        } else {
++            static Mtx zero = { 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F,
++                                0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F };
++            GXLoadTexMtxImm(zero, tobj->mtxid, GX_MTX3x4);
++        }
++    } break;
++
++    case TEX_COORD_SHADOW: {
++        HSD_CObj* cobj = HSD_CObjGetCurrent();
++        Mtx mtx;
++
++        PSMTXConcat(slippi_tobj_matrix_require(tobj), HSD_CObjGetInvViewingMtxPtrDirect(cobj), mtx);
++        GXLoadTexMtxImm(mtx, tobj->mtxid, GX_MTX3x4);
++    } break;
++
++    default:
++        if (tobj_bump(tobj)) {
++            GXLoadTexMtxImm(slippi_tobj_matrix_require(tobj), tobj->mtxid, GX_MTX2x4);
++        } else {
++            GXLoadTexMtxImm(slippi_tobj_matrix_require(tobj), tobj->mtxid, GX_MTX3x4);
++        }
++        break;
++    }
++}
++#endif
++
++static void MakeTextureMtx(HSD_TObj* tobj)
++{
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (slippi_tobj_managed_require(tobj)) { MakeTextureMtxManaged(tobj); return; }
++#endif
++    Vec3 scale;
++    Mtx m;
++    Vec3 trans;
++    Quaternion rot;
++
++    melee_source_bool no_assert = false;
++
++    PAD_STACK(8);
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE && !(defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)
++    const uint64_t tobj_writer_ticket=melee_web_tobj_writer_before(tobj,&tobj->mtx,sizeof(*tobj),&hsdTObj,__FILE__,__LINE__);
++#endif
++
++    if (tobj->repeat_s && tobj->repeat_t) {
++        no_assert = true;
++    }
++
++    /// @todo Convert to @c HSD_ASSERT once a byte-matching form is found.
++    if (!no_assert) {
++        __assert(__FILE__, 589, "tobj->repeat_s && tobj->repeat_t");
++    }
++
++    scale.x = fabsf(tobj->scale.x) < FLT_EPSILON
++                  ? 0.0F
++                  : (f32) tobj->repeat_s / tobj->scale.x;
++    scale.y = fabsf(tobj->scale.y) < FLT_EPSILON
++                  ? 0.0F
++                  : (f32) tobj->repeat_t / tobj->scale.y;
++    scale.z = tobj->scale.z;
++    rot.x = tobj->rotate.x;
++    rot.y = tobj->rotate.y;
++    rot.z = -tobj->rotate.z;
++    trans.x = -tobj->translate.x;
++    trans.y =
++        -(tobj->translate.y + (tobj->wrap_t == GX_MIRROR
++                                   ? 1.0F / (tobj->repeat_t / tobj->scale.y)
++                                   : 0.0F));
++    trans.z = tobj->translate.z;
++
+     PSMTXTrans(tobj->mtx, trans.x, trans.y, trans.z);
+     HSD_MkRotationMtx(m, (Vec3*) &rot);
      MTXConcat(m, tobj->mtx, tobj->mtx);
      MTXScale(m, scale.x, scale.y, scale.z);
      MTXConcat(m, tobj->mtx, tobj->mtx);
-+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE && !(defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)
 +    melee_web_tobj_writer_after(tobj_writer_ticket);
 +#endif
  }
  
  static void TObjSetupMtx(HSD_TObj* tobj)
+ {
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (slippi_tobj_managed_require(tobj)) { TObjSetupMtxManaged(tobj); return; }
++#endif
+     int i;
+ 
+     if (tobj_coord(tobj) == TEX_COORD_TOON) {
+@@ -1524,6 +1695,9 @@
+ {
+     HSD_TObj* new = hsdNew((HSD_ClassInfo*) HSD_TObjGetDefaultClass());
+     HSD_ASSERT(2040, new);
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    slippi_tobj_selected(new, HSD_CLASS_METHOD(new));
++#endif
+     return new;
+ }
+ 
+@@ -1628,6 +1802,9 @@
+ 
+ static void TObjAmnesia(HSD_ClassInfo* info)
+ {
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    slippi_tobj_amnesia(info);
++#endif
+     if (info == HSD_CLASS_INFO(default_class)) {
+         default_class = NULL;
+     }
+@@ -1649,4 +1826,8 @@
+     HSD_TOBJ_INFO(&hsdTObj)->make_texp = TObjMakeTExp;
+ 
+     hsdTObj.make_mtx = MakeTextureMtx;
+-}
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    slippi_tobj_descriptor_attest(&hsdTObj);
++#endif
++
++}
+diff --git a/src/sysdolphin/baselib/shadow.c b/src/sysdolphin/baselib/shadow.c
+--- a/src/sysdolphin/baselib/shadow.c
++++ b/src/sysdolphin/baselib/shadow.c
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include <slippi_profile/tobj_presentation_cache.h>
++#endif
+ #include "shadow.h"
+ 
+ #include <math.h>
+@@ -43,6 +46,10 @@
+     shadowTObj->wrap_s = 0;
+     shadowTObj->wrap_t = 0;
+     shadowTObj->flags = 0x540103;
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    slippi_tobj_shadow(shadowTObj);
++#endif
++
+     shadowTObj->imagedesc = HSD_ImageDescAlloc();
+     return shadowTObj;
+ }
+diff --git a/src/melee/gr/grizumi.c b/src/melee/gr/grizumi.c
+--- a/src/melee/gr/grizumi.c
++++ b/src/melee/gr/grizumi.c
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include <slippi_profile/tobj_presentation_cache.h>
++#endif
+ #include "grizumi.h"
+ 
+ #include "granime.h"
+@@ -316,6 +319,9 @@
+         tobj->src = 0;
+         tobj->wrap_s = 0;
+         tobj->wrap_t = 0;
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++        slippi_tobj_unsupported_write(tobj);
++#endif
+         tobj->flags = (tobj->flags & ~0x1FF) | 0x103;
+     } else {
+         OSReport("%s:%d:Warning: not found tobj !\n", __FILE__, 387);
+@@ -854,6 +860,9 @@
+     Ground* gp = GET_GROUND(gobj);
+     IzumiReflection* refl = HSD_GObjGetUserData(gp->u.izumi.xC8);
+     HSD_TObj* tobj = gp->u.izumi.xC4;
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    slippi_tobj_unsupported_write(tobj);
++#endif
+     PSMTXCopy(refl->texture_matrix, tobj->mtx);
+     grDisplay_801C5DB0(gobj, renderpass);
+ }

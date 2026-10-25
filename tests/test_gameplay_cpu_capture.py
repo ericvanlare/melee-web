@@ -61,15 +61,19 @@ class GameplayCpuCaptureControls(OwnedWorkspaceTests):
         for name,value in replacements.items():generated=generated.replace(name,value)
         self.assertNotIn('@ACTUAL_',generated)
         cpp=out/'control.cpp';cpp.write_text(generated)
-        cmd=[compiler,'-std=c++20','-DMELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE=1','-Wall','-Wextra','-Werror','-O1','-UNDEBUG','-I'+str(SOURCE/'src'),str(cpp),'-o',str(out/'control')]
-        result=subprocess.run(cmd,cwd=out,env=env,text=True,capture_output=True,timeout=60)
-        (out/'compile.json').write_text(json.dumps({'argv':cmd,'exit_code':result.returncode,'stdout':result.stdout,'stderr':result.stderr},indent=2)+'\n')
-        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
-        result=subprocess.run([str(out/'control')],cwd=out,env=env,text=True,capture_output=True,timeout=30)
-        (out/'run.json').write_text(json.dumps({'exit_code':result.returncode,'stdout':result.stdout,'stderr':result.stderr},indent=2)+'\n')
-        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
-        self.assertIn('eight first-leaf refusals',result.stdout)
-        print('Actual capture control output:',out)
-        print(result.stdout.strip())
+        # Same actual extracted source in both relevant profiles. The owner
+        # leaves remain modeled; this is not a live TObj/lifecycle control.
+        for profile,tobj_define in [('v7',[]),('v8',['-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1'])]:
+            lane=out/profile;lane.mkdir()
+            cmd=[compiler,'-std=c++20','-DMELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE=1',*tobj_define,'-Wall','-Wextra','-Werror','-O1','-UNDEBUG','-I'+str(SOURCE/'src'),str(cpp),'-o',str(lane/'control')]
+            result=subprocess.run(cmd,cwd=lane,env=env,text=True,capture_output=True,timeout=60)
+            (lane/'compile.json').write_text(json.dumps({'profile':profile,'argv':cmd,'exit_code':result.returncode,'stdout':result.stdout,'stderr':result.stderr},indent=2)+'\n')
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            result=subprocess.run([str(lane/'control')],cwd=lane,env=env,text=True,capture_output=True,timeout=30)
+            (lane/'run.json').write_text(json.dumps({'profile':profile,'exit_code':result.returncode,'stdout':result.stdout,'stderr':result.stderr},indent=2)+'\n')
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertIn('eight first-leaf refusals',result.stdout)
+            print('Actual capture control profile/output:',profile,lane)
+            print(result.stdout.strip())
 
 if __name__=='__main__':unittest.main()

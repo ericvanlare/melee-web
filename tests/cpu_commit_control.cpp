@@ -26,6 +26,9 @@ bool admitted(unsigned n){return fail_admission!=n&&stable_owner&&stable_topolog
 void write(unsigned n){assert(order+1==n);order=n;++writes;}
 }
 extern "C" {
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+int slippi_tobj_anchor_admit(SlippiTObjAnchor){return admitted(10);}
+#endif
 #if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
 int slippi_lobj_anchor_admit(SlippiLObjAnchor){return admitted(9);}
 #endif
@@ -46,7 +49,11 @@ MeleeWebSourceMemoryPayloadSnapshotStatus melee_web_source_memory_payload_snapsh
 int main(){
     using R=GameplayCpuCommitResult;
 #if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
-    const unsigned last_refusal=9;
+    const unsigned last_refusal=9
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+        +1
+#endif
+        ;
 #else
     const unsigned last_refusal=8;
 #endif
@@ -67,7 +74,11 @@ int main(){
     assert(gameplay_cpu_commit(o)==R::Ok);assert(writes==6&&order==6);
     assert(fighter_fields==3&&private_slots==3&&audio_value==3&&flow_value==3&&bootstrap_value==3&&context_value==3&&static_value==3);
 #if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+    puts("Actual fixed commit coordinator: ten admission refusals write zero; light/texture leaves modeled; ordered successful chain");
+#else
     puts("Actual fixed commit coordinator: nine admission refusals write zero; light leaf modeled; ordered successful chain preserves later predicates");
+#endif
 #else
     puts("Actual fixed commit coordinator: eight admission refusals write zero; ordered successful chain preserves later predicates");
 #endif

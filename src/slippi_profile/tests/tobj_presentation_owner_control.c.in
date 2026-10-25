@@ -1,0 +1,245 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+#include <sysdolphin/baselib/tobj.h>
+#include <sysdolphin/baselib/class.h>
+#include <sysdolphin/baselib/object.h>
+#include <sysdolphin/baselib/aobj.h>
+#include <sysdolphin/baselib/texp.h>
+#include <sysdolphin/baselib/hash.h>
+#include <sysdolphin/baselib/memory.h>
+#include <sysdolphin/baselib/cobj.h>
+#include <sysdolphin/baselib/lobj.h>
+#include <sysdolphin/baselib/debug.h>
+#include "gameplay_class_piece_diagnostic.h"
+#include "hsd_texture_bounds.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stddef.h>
+#include <stdalign.h>
+#include "slippi_profile/tobj_presentation_cache.h"
+#if PROPOSED_LANE
+#include "../tobj_presentation_cache.c"
+/* Test-only accessors inspect the ACTUAL module in this TU; no replacement
+ * lineage, callback or cache implementation. Not production exports. */
+static int component_member(const void* p){for(TObjOwner* e=owners;e;e=e->next)if(e->object==p)return !e->poisoned&&e->world==owner_world;return 0;}
+static uint64_t component_token(const void* p){for(TObjOwner* e=owners;e;e=e->next)if(e->object==p)return e->generation;return 0;}
+static int component_token_admit(const void* p,uint64_t g){for(TObjOwner* e=owners;e;e=e->next)if(e->object==p)return e->generation==g&&admissible(e)&&!first_failure;return 0;}
+static uint64_t component_serial(void){return owner_serial;}
+static unsigned component_failure(void){return slippi_tobj_failure();}
+#endif
+u32 fixture_flags(HSD_TObj*);MtxPtr fixture_matrix(HSD_TObj*);int fixture_reload(HSD_TObj*,HSD_TObjDesc*);
+extern HSD_TObjInfo hsdTObj;
+void fixture_tobj_update(HSD_TObj*,float);
+void fixture_tobj_setup(HSD_TObj*);
+void fixture_tobj_amnesia(void);
+HSD_TObj* fixture_actual_shadow(void);
+void fixture_actual_make(HSD_TObj*);
+int fixture_tobj_default_callbacks(void);
+int fixture_tobj_default_is_null(void);
+static _Noreturn void stop(const char* s){fprintf(stderr,"UNSUPPORTED:%s\n",s);exit(91);}
+static void require(int yes,const char* s){if(!yes){fprintf(stderr,"CONTROL_FAIL:%s\n",s);exit(92);}}
+void __assert(char* f,u32 l,char* s){fprintf(stderr,"SOURCE_ASSERT:%s:%u:%s\n",f,l,s);exit(93);}
+void HSD_Panic(char* f,u32 l,char* s){fprintf(stderr,"SOURCE_PANIC:%s:%u:%s\n",f,l,s);exit(94);}
+void OSReport(const char* format,...){(void)format;stop("unexpected source report");}
+alignas(32) static unsigned char arena[1<<20];static size_t used;
+static unsigned constructed,released,freed,sequence,last_release,last_free,descriptors;
+/* Both optimized allocation seams are observed. Actual O3 owner code folds
+ * malloc+memset into calloc(1,88); neither compiler flags nor source owner
+ * implementation are changed. In observation mode calloc is forwarded exactly
+ * as before, while malloc-only injection remains active. */
+static unsigned host_allocs, malloc_calls, calloc_calls, malloc_faults, calloc_faults;
+static int fail_host_alloc, observe_malloc_only;
+void* __real_malloc(size_t);
+void* __real_calloc(size_t,size_t);
+void* __wrap_malloc(size_t n){++host_allocs;++malloc_calls;if(fail_host_alloc){++malloc_faults;return NULL;}return __real_malloc(n);}
+void* __wrap_calloc(size_t n,size_t size){++host_allocs;++calloc_calls;if(fail_host_alloc&&!observe_malloc_only){++calloc_faults;return NULL;}return __real_calloc(n,size);}
+
+/* Explicit low-level source memory model; real class piece split/free-list is unchanged. */
+void* (HSD_MemAlloc)(ssize_t n){require(n>0,"positive source alloc");size_t p=(used+31)&~(size_t)31;require((size_t)n<=sizeof(arena)-p,"arena bound");used=p+(size_t)n;return arena+p;}
+void* melee_web_HSD_MemAllocAt(ssize_t n,const char* f,unsigned l){(void)f;(void)l;return (HSD_MemAlloc)(n);}
+void HSD_Free(void* p){(void)p;stop("source allocation table growth/free outside fixture");}
+void HSD_AObjRemove(HSD_AObj* p){require(p==NULL,"null-only AObj provider");++released;last_release=++sequence;}
+/* Diagnostic leaves only record call occurrence; no table/owner/provenance authority. */
+void melee_web_class_piece_cold(const void* p,int32_t n){(void)p;(void)n;}
+void melee_web_class_piece_descriptor(const void* p){require(p!=NULL,"descriptor callback");++descriptors;}
+void melee_web_class_piece_alloc(void* p,int32_t n,uint32_t z){require(p&&n>0&&z>=(uint32_t)n,"piece event");}
+void melee_web_class_piece_promote(void* p,int32_t n){(void)p;(void)n;stop("unexpected old table promotion");}
+void melee_web_class_piece_free(void* p,int32_t n){require(p&&n>0,"free event");++freed;last_free=++sequence;
+#if PROPOSED_LANE
+ (void)p;
+#endif
+}
+void melee_web_class_piece_label(void* p,const void* i,int32_t n,uint32_t s,const void* old){(void)old;require(p&&i&&n>0,"label event");if(s==2)++constructed;}
+void melee_web_class_piece_amnesia(void){
+#if PROPOSED_LANE
+ /* Actual TObjAmnesia hook, not this generic diagnostic, owns revocation. */
+#endif
+}
+/* Existing class seam adapters: original lane ignores foreign TObj as before;
+ * proposed lane forwards to fixture-only TObj owner, NOT production LObj scope. */
+void slippi_lobj_constructed(void* p,void* i){require(p!=NULL,"foreign-class constructor leaf");(void)i;
+#if PROPOSED_LANE
+ (void)p;(void)i;
+#endif
+}
+void slippi_lobj_retiring(void* p){require(p!=NULL,"retire leaf");
+#if PROPOSED_LANE
+ (void)p;
+#endif
+}
+void slippi_lobj_rebound(void* p,void* a,void* b){require(p&&a&&b,"actual successful rebind leaf");
+#if PROPOSED_LANE
+ (void)p;
+#endif
+}
+_Noreturn HSD_HashClassInfo* HSD_HashSearch(HSD_Hash* p,void* q,int* r){(void)p;(void)q;(void)r;stop("custom class lookup");}
+_Noreturn HSD_LObj* HSD_LObjGetCurrentByType(u16 t){(void)t;stop("highlight provider");}
+_Noreturn void HSD_LObjGetLightVector(HSD_LObj* p,Vec3* q){(void)p;(void)q;stop("light vector provider");}
+_Noreturn HSD_CObj* HSD_CObjGetCurrent(void){stop("camera provider");}
+_Noreturn MtxPtr HSD_CObjGetInvViewingMtxPtrDirect(HSD_CObj* p){(void)p;stop("inverse camera provider");}
+/* The separate TObj TU retains highlight references without cross-TU inlining.
+ * Fixed UV/TOON control never reaches these; no output or success behavior. */
+_Noreturn void C_MTXMultVecSR(const Mtx m,const Vec* src,Vec* dst){(void)m;(void)src;(void)dst;stop("unsupported highlight C_MTXMultVecSR");}
+_Noreturn void PSVECNormalize(const Vec* src,Vec* dst){(void)src;(void)dst;stop("unsupported highlight PSVECNormalize");}
+/* Canonical make_texp stays actual in the source; reaching its providers is unsupported. */
+_Noreturn HSD_TExp* HSD_TExpTev(HSD_TExp** p){(void)p;stop("TExpTev");}
+_Noreturn HSD_TExp* HSD_TExpCnst(void* p,HSD_TEInput a,HSD_TEType b,HSD_TExp** q){(void)p;(void)a;(void)b;(void)q;stop("TExpCnst");}
+_Noreturn void HSD_TExpOrder(HSD_TExp* p,HSD_TObj* q,GXChannelID c){(void)p;(void)q;(void)c;stop("TExpOrder");}
+_Noreturn void HSD_TExpColorOp(HSD_TExp* p,GXTevOp a,GXTevBias b,GXTevScale c,u8 d){(void)p;(void)a;(void)b;(void)c;(void)d;stop("TExpColorOp");}
+_Noreturn void HSD_TExpAlphaOp(HSD_TExp* p,GXTevOp a,GXTevBias b,GXTevScale c,u8 d){(void)p;(void)a;(void)b;(void)c;(void)d;stop("TExpAlphaOp");}
+_Noreturn void HSD_TExpColorIn(HSD_TExp* p,HSD_TEInput a,HSD_TExp* b,HSD_TEInput c,HSD_TExp* d,HSD_TEInput e,HSD_TExp* f,HSD_TEInput g,HSD_TExp* h){(void)p;(void)a;(void)b;(void)c;(void)d;(void)e;(void)f;(void)g;(void)h;stop("TExpColorIn");}
+_Noreturn void HSD_TExpAlphaIn(HSD_TExp* p,HSD_TEInput a,HSD_TExp* b,HSD_TEInput c,HSD_TExp* d,HSD_TEInput e,HSD_TExp* f,HSD_TEInput g,HSD_TExp* h){(void)p;(void)a;(void)b;(void)c;(void)d;(void)e;(void)f;(void)g;(void)h;stop("TExpAlphaIn");}
+struct Submission{u32 id,type;unsigned char matrix[48];};static struct Submission gx[32];static unsigned count;
+void GXLoadTexMtxImm(const void* m,u32 id,GXTexMtxType type){require(count<32&&type==GX_MTX3x4,"GX UV sink");gx[count].id=id;gx[count].type=type;memcpy(gx[count++].matrix,m,48);}
+static HSD_TObj* make(void){
+ HSD_TObjDesc d;memset(&d,0,sizeof(d));d.id=GX_TEXMAP0;d.src=GX_TG_TEX0;d.scale.x=d.scale.y=d.scale.z=1;
+ d.repeat_s=d.repeat_t=1;d.wrap_s=d.wrap_t=GX_CLAMP;d.blend_flags=TEX_COORD_UV;d.translate.y=0.125f;
+ HSD_TObj* p=HSD_TObjLoadDesc(&d);require(p&&p->parent.parent.class_info==(HSD_ClassInfo*)&hsdTObj,"actual canonical new/load");
+ require(fixture_tobj_default_callbacks()&&hsdTObj.parent.head.obj_size==sizeof(HSD_TObj)&&hsdTObj.parent.head.parent==&hsdObj,"actual default methods/ancestry/extent");return p;
+}
+
+static void hex(const void* p,size_t n){const unsigned char* b=p;for(size_t i=0;i<n;i++)printf("%02x",b[i]);}
+static void observe(const char* label,HSD_TObj* p){printf("OBS:%s:%08x:",label,fixture_flags(p));hex(fixture_matrix(p),48);printf(":");hex(&p->rotate,sizeof(p->rotate));hex(&p->scale,sizeof(p->scale));hex(&p->translate,sizeof(p->translate));printf("\n");}
+static void draw(const char* label,HSD_TObj* p){unsigned char before[172];memcpy(before,p,172);size_t allocations=used;unsigned host_before=host_allocs;unsigned start=count;fixture_tobj_setup(p);require(allocations==used&&host_allocs==host_before,"no draw source/host allocation");
+#if PROPOSED_LANE
+ require(!memcmp(before,p,172),"proposed WHOLE172 source draw invariant, no byte exemption");
+#endif
+ observe(label,p);for(unsigned i=start;i<count;i++){printf("GX:%s:",label);hex(&gx[i],sizeof(gx[i]));printf("\n");}}
+static void reload_coord(HSD_TObj* p,u32 coord){HSD_TObjDesc d;memset(&d,0,sizeof(d));d.id=GX_TEXMAP0;d.src=GX_TG_TEX0;d.scale.x=d.scale.y=d.scale.z=1;d.repeat_s=d.repeat_t=1;d.wrap_s=d.wrap_t=GX_CLAMP;d.translate.y=.125f;d.blend_flags=coord;require(fixture_reload(p,&d)==0,"actual admitted canonical Load");p->mtxid=GX_TEXMTX0;}
+static void require_absent(HSD_TObj* p,uint64_t token){
+#if PROPOSED_LANE
+ unsigned failure=component_failure();uint64_t serial=component_serial();require(!component_member(p)&&!component_token_admit(p,token),"retired membership/token refused");require(failure==component_failure()&&serial==component_serial(),"membership/admission read-only");
+#else
+ (void)p;(void)token;
+#endif
+}
+static int finish_world(void){
+#if PROPOSED_LANE
+ slippi_tobj_world_end(1);require(!owners&&!owner_world,"actual world teardown");
+#endif
+ return 0;
+}
+int main(int argc,char** argv){const char* mode=argc>1?argv[1]:"changed";
+ observe_malloc_only=!strcmp(mode,"oom-observe-malloc-only");
+ #if PROPOSED_LANE
+ require(slippi_tobj_world_begin(1),"actual owner world begin");
+ #endif
+ _Static_assert(sizeof(HSD_TObj)==172,"exact extent");_Static_assert(offsetof(HSD_TObj,mtx)==116,"matrix");
+ HSD_TObj* p=make();p->mtxid=GX_TEXMTX0;
+#if PROPOSED_LANE
+ uint64_t token=component_token(p);require(token&&component_token_admit(p,token),"actual ctor+load readiness");
+#else
+ uint64_t token=0;
+#endif
+ if(!strcmp(mode,"bounds-release")){require(melee_web_texture_bounds_live()==0,"initial real bounds table empty");melee_web_texture_bounds_bind(p,2,1);require(melee_web_texture_bounds_live()==1&&melee_web_texture_index_valid(p,1,1.0f)&&melee_web_texture_index_valid(p,10,0.0f),"real pointer-owned animation bounds binding");HSD_TObjRemove(p);require(melee_web_texture_bounds_live()==0&&!melee_web_texture_index_valid(p,1,0.0f)&&!melee_web_texture_index_valid(p,10,0.0f),"actual TObjRelease removed exact real bounds owner");require_absent(p,token);puts("CONTROL:real animation bounds bind then actual Release removal; no provider stub");return finish_world();}
+#if PROPOSED_LANE
+ if(!strcmp(mode,"oom")||!strcmp(mode,"oom-observe-malloc-only")||!strcmp(mode,"oom-dual")){
+  HSD_TObjRemove(p);
+  unsigned m0=malloc_calls,c0=calloc_calls,mf0=malloc_faults,cf0=calloc_faults,ctor0=constructed;
+  uint64_t gen0=owner_generation;
+  fail_host_alloc=1;p=make();fail_host_alloc=0;
+  unsigned source_return=p!=NULL,srt_ok=p&&p->translate.y==.125f,source_bits=0;
+  if(p)memcpy(&source_bits,&p->translate.y,sizeof(source_bits));
+  unsigned failure_before=slippi_tobj_failure(),calls_before_query=host_allocs;
+  SlippiTObjAnchor a=slippi_tobj_anchor_capture();unsigned admitted=slippi_tobj_anchor_admit(a);
+  unsigned member=p?component_member(p):0;
+  unsigned md=malloc_calls-m0,cd=calloc_calls-c0,mfd=malloc_faults-mf0,cfd=calloc_faults-cf0,ctor_delta=constructed-ctor0;
+  unsigned gen_unchanged=owner_generation==gen0,query_no_alloc=host_allocs==calls_before_query;
+  printf("OOM_OBSERVATION={\"malloc_only\":%u,\"source_return\":%u,\"srt_ok\":%u,\"srt_bits\":%u,\"failure_before_query\":%u,\"failure_after_query\":%u,\"anchor_nonzero\":%u,\"admitted\":%u,\"member\":%u,\"malloc_calls_delta\":%u,\"calloc_calls_delta\":%u,\"malloc_faults_delta\":%u,\"calloc_faults_delta\":%u,\"constructed_delta\":%u,\"generation_unchanged\":%u,\"query_no_allocation\":%u}\n",
+   observe_malloc_only,source_return,srt_ok,source_bits,failure_before,slippi_tobj_failure(),a.token!=0,admitted,member,md,cd,mfd,cfd,ctor_delta,gen_unchanged,query_no_alloc);
+  require(source_return&&srt_ok&&source_bits==0x3e000000&&ctor_delta==1,"original source constructor and actual Load return/state preserved");
+  require(cd==1&&md==0,"actual optimized owner uses observed calloc only");
+  require(query_no_alloc,"actual capture/admit query has no malloc/calloc");
+  if(observe_malloc_only){
+   require(!failure_before&&a.token&&admitted&&member&&mfd==0&&cfd==0,"observed malloc-only injection bypass, NOT owner-OOM success");
+   slippi_tobj_anchor_disarm(a);
+   puts("OBSERVED:old malloc-only seam bypasses actual calloc; OOM contract NOT exercised");
+  }else{
+   require(failure_before==OWNER_OOM&&slippi_tobj_failure()==OWNER_OOM&&!a.token&&!admitted&&!member&&gen_unchanged&&cfd==1&&mfd==0,"actual optimized owner OOM strict refusal, no generation mint");
+   puts("OBSERVED:actual calloc OOM preserves source return/state and latches strict owner refusal");
+  }
+  HSD_TObjRemove(p);return finish_world();
+ }
+ if(!strcmp(mode,"shadow-cache")){HSD_TObjRemove(p);p=fixture_actual_shadow();(void)slippi_tobj_matrix_require(p);require(0,"Shadow must never enter managed matrix helper");}
+ if(!strcmp(mode,"unknown-cache")){(void)slippi_tobj_managed_require(arena+sizeof(arena)-32);require(0,"unknown must never fallback");}
+ if(!strcmp(mode,"pending-anchor")){HSD_TObjRemove(p);p=hsdNew((HSD_ClassInfo*)&hsdTObj);require(!slippi_tobj_anchor_capture().token,"pending enumerated, not silently skipped");HSD_TObjFree(p);puts("ACTUAL:pending owner refuses anchor");return finish_world();}
+ if(!strcmp(mode,"shadow")){HSD_TObjRemove(p);p=fixture_actual_shadow();require(p&&find(p)&&find(p)->role==ROLE_SHADOW,"actual makeShadowTObj named role");
+  p->mtxid=GX_TEXMTX0;p->repeat_s=p->repeat_t=1;p->scale.x=p->scale.y=p->scale.z=1;p->flags|=TEX_MTX_DIRTY;
+  fixture_tobj_update(p,.375f);require((p->flags&TEX_MTX_DIRTY)!=0,"original Shadow dirty update");
+  /* Original Shadow Setup requires camera service; this fixture does not
+   * invent it. Actual Make is called directly to check unchanged source path. */
+  fixture_actual_make(p);require(find(p)->role==ROLE_SHADOW,"Make never minted managed cache");
+  SlippiTObjAnchor a=slippi_tobj_anchor_capture();require(a.token&&slippi_tobj_anchor_admit(a),"named Shadow lifecycle classification only");
+  p->mtx[0][0]=2.0f;require(slippi_tobj_anchor_admit(a),"anchor intentionally not byte equality/restore authority");slippi_tobj_anchor_disarm(a);HSD_TObjFree(p);puts("ACTUAL:Shadow original Make/update, no cache authority; full Setup providers unrun");return finish_world();}
+ if(!strcmp(mode,"all-managed")){HSD_TObj* q=make();SlippiTObjAnchor a=slippi_tobj_anchor_capture();require(a.token&&slippi_tobj_anchor_admit(a),"both managed owners admitted");
+  uint64_t before=owner_serial;fixture_tobj_update(p,.375f);fixture_tobj_setup(p);require(owner_serial==before&&slippi_tobj_anchor_admit(a),"lawful dirty/draw does not change lifecycle serial");
+  q->parent.parent.class_info=&hsdObj;require(!slippi_tobj_anchor_admit(a),"second owner drift refuses entire anchor");q->parent.parent.class_info=(HSD_ClassInfo*)&hsdTObj;
+  require(owner_serial==before&&slippi_tobj_anchor_admit(a),"failed admit read-only");slippi_tobj_anchor_disarm(a);HSD_TObjRemove(q);HSD_TObjRemove(p);puts("ACTUAL:all managed owners admitted, no lookup mint/serial mutation");return finish_world();}
+ if(!strcmp(mode,"lifecycle-drift")){SlippiTObjAnchor a=slippi_tobj_anchor_capture();require(a.token,"capture anchor");HSD_TObjFree(p);require(!slippi_tobj_anchor_admit(a)&&slippi_tobj_failure(),"actual direct Free invalidates active interval");slippi_tobj_anchor_disarm(a);puts("ACTUAL:active lifetime drift sticky");return finish_world();}
+ if(!strcmp(mode,"custom-default")){HSD_TObjRemove(p);HSD_TObjInfo child={0};hsdInitClassInfo((HSD_ClassInfo*)&child,(HSD_ClassInfo*)&hsdTObj,"fixture","custom default",sizeof(child),sizeof(HSD_TObj));HSD_TObjSetDefaultClass(&child);p=HSD_TObjAlloc();require(p&&!find(p)&&slippi_tobj_failure()&&!slippi_tobj_anchor_capture().token,"actual custom default selection refuses without canonical Load");HSD_TObjFree(p);HSD_TObjSetDefaultClass(&hsdTObj);puts("ACTUAL:actual custom default Alloc selection enumerated");return finish_world();}
+ if(!strcmp(mode,"unknown-selection")){slippi_tobj_selected(p,&hsdObj);require(slippi_tobj_failure()&&!slippi_tobj_anchor_capture().token,"custom selection visible without canonical Load");HSD_TObjRemove(p);puts("ACTUAL:custom selection sticky refusal");return finish_world();}
+ if(!strcmp(mode,"unsupported-coordinate")){reload_coord(p,TEX_COORD_SHADOW);require(slippi_tobj_failure()&&!slippi_tobj_anchor_capture().token,"canonical Load not coordinate authority");HSD_TObjRemove(p);puts("ACTUAL:unsupported loaded coordinate refused");return finish_world();}
+ if(!strcmp(mode,"world-recreation")){SlippiTObjAnchor a=slippi_tobj_anchor_capture();slippi_tobj_anchor_disarm(a);HSD_TObjRemove(p);slippi_tobj_world_end(1);require(slippi_tobj_world_begin(2),"new world");require(!slippi_tobj_anchor_admit(a),"old world anchor refused");slippi_tobj_world_end(2);puts("ACTUAL:world recreation cannot admit old anchor");return 0;}
+#endif
+ if(!strcmp(mode,"admission")){
+#if PROPOSED_LANE
+  uint64_t serial=component_serial();unsigned failure=component_failure();unsigned host_before=host_allocs;
+  require(!component_token_admit(arena+sizeof(arena)-32,token),"unknown pointer refused before dereference");
+  require(!component_token_admit(p,token+1),"wrong generation refused");
+  void (*saved)(HSD_TObj*)=hsdTObj.make_mtx;hsdTObj.make_mtx=NULL;
+  require(!component_token_admit(p,token),"observed descriptor tuple drift refused");
+  hsdTObj.make_mtx=saved;
+  require(component_serial()==serial&&component_failure()==failure&&component_token_admit(p,token)&&host_allocs==host_before,"admission has no lifecycle/error mutation or allocation");
+#endif
+  HSD_TObjRemove(p);require_absent(p,token);puts("CONTROL:known/unknown/generation/visible tuple admission pure; unobserved direct ABA unsupported");return 0;
+ }
+ if(!strcmp(mode,"missing-load")){HSD_TObjRemove(p);p=hsdNew((HSD_ClassInfo*)&hsdTObj);require(p!=NULL,"actual bare constructor");
+#if PROPOSED_LANE
+  uint64_t pending=component_token(p);require(pending&&!component_token_admit(p,pending),"bare constructor not ready before canonical Load");
+#endif
+  reload_coord(p,TEX_COORD_UV);draw("after-first-actual-Load",p);HSD_TObjRemove(p);puts("CONTROL:constructor alone not cache readiness; actual Load required");return 0;
+ }
+ if(!strcmp(mode,"rebind")){HSD_TObjInfo child={0};hsdInitClassInfo((HSD_ClassInfo*)&child,(HSD_ClassInfo*)&hsdTObj,"fixture","same-size child",sizeof(child),sizeof(HSD_TObj));require(hsdChangeClass((HSD_Obj*)p,(HSD_ClassInfo*)&child),"actual parent to same-size child");require(hsdChangeClass((HSD_Obj*)p,(HSD_ClassInfo*)&hsdTObj),"actual child back to parent");require_absent(p,token);printf("COUNTS:%u:%u\n",hsdTObj.parent.head.nb_exist,child.parent.head.nb_exist);HSD_TObjRemove(p);puts("CONTROL:rebind exact original counters preserved; old owner revoked");return finish_world();}
+ if(!strcmp(mode,"reuse")){HSD_TObj* old=p;unsigned r=released;HSD_TObjFree(p);require(released==r,"actual direct Free bypasses release");require_absent(old,token);p=make();require(p==old,"actual same-address sourcepiece reuse");
+#if PROPOSED_LANE
+ require(component_token(p)!=token&&!component_token_admit(p,token),"new generation not old pointer adoption");
+#endif
+ HSD_TObjRemove(p);require_absent(old,token);puts("CONTROL:reuse direct Free, renewed generation, Remove release-before-free");return finish_world();}
+ if(!strcmp(mode,"amnesia")){HSD_TObj* old=p;HSD_TObjRemove(p);require_absent(old,token);HSD_TObjSetDefaultClass(&hsdTObj);
+#if PROPOSED_LANE
+ require(proof.valid,"retirement alone did not revoke descriptor proof");
+#endif
+ fixture_tobj_amnesia();
+#if PROPOSED_LANE
+ require(!proof.valid,"actual TObjAmnesia revoked descriptor proof");
+#endif
+ require(fixture_tobj_default_is_null()&&HSD_TObjGetDefaultClass()==&hsdTObj,"actual amnesia/default renewal");require_absent(old,token);puts("CONTROL:actual legal TObj amnesia/default renewal; actual owner proof hook exercised in active lane");return finish_world();}
+ if(!strcmp(mode,"toon")||!strcmp(mode,"toon-uv")){reload_coord(p,TEX_COORD_TOON);unsigned before=count;draw("TOON",p);require(count==before&&(fixture_flags(p)&TEX_MTX_DIRTY),"TOON no Make/GX/clear");if(!strcmp(mode,"toon-uv")){reload_coord(p,TEX_COORD_UV);draw("UV-after-actual-Load",p);}HSD_TObjRemove(p);puts("CONTROL:TOON transitions use actual Load only");return finish_world();}
+ /* Same original/proposed real presentation history; corrections are actual
+  * authored updates with no draw. This is NOT aggregate checkpoint restore. */
+ draw("warm",p);if(strcmp(mode,"unchanged"))fixture_tobj_update(p,!strcmp(mode,"same-value")?.125f:.375f);draw("A300",p);
+ if(!strcmp(mode,"changed"))fixture_tobj_update(p,.625f);observe("POST-before-B",p);draw("B301",p);
+ if(strcmp(mode,"unchanged"))fixture_tobj_update(p,!strcmp(mode,"same-value")?.125f:.375f);
+ if(!strcmp(mode,"changed"))fixture_tobj_update(p,.625f);observe("after-noDraw300-301",p);draw("C301",p);
+ HSD_TObjRemove(p);require(last_release<last_free,"actual release-before-free order");require_absent(p,token);puts("CONTROL:canonical same actual A/B/noDraw/C history, no cache reset");return finish_world();
+}

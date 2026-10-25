@@ -56,6 +56,12 @@ class GameplayCpuCheckpointControls(OwnedWorkspaceTests):
                 '-DMELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE=1'])
         self.assertIn('nine admission refusals write zero; light leaf modeled',output)
 
+    def test_actual_fixed_coordinator_texture_anchor_refuses_before_writes(self):
+        output=self.compile_run('coordinator-texture',[SOURCE/'src/gameplay_cpu_statics.cpp',SOURCE/'src/gameplay_cpu_commit.cpp',
+            SOURCE/'tests/cpu_commit_control.cpp'],['-fexceptions','-sDISABLE_EXCEPTION_CATCHING=0',
+                '-DMELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE=1','-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1'])
+        self.assertIn('ten admission refusals write zero; light/texture leaves modeled',output)
+
     def test_actual_effect_barrier_and_inactive_transport_link(self):
         def function(text,needle):
             start=text.index(needle);brace=text.index('{',start);depth=1;end=brace+1

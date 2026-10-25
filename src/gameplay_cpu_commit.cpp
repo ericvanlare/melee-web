@@ -7,6 +7,7 @@ GameplayCpuCommitResult gameplay_cpu_commit(const GameplayCpuCommitOwners& o) no
         !o.bootstrap || !o.context || !o.context_snapshot || !o.payload || !o.statics ||
         !o.effect_token) return R::MissingOwner;
     if (!slippi_lobj_anchor_admit(o.lobj_anchor)) return R::LObj;
+    if (!slippi_tobj_anchor_admit(o.tobj_anchor)) return R::TObj;
     if (!melee_web_cpu_interval_admit(o.effect_token)) return R::Effect;
     if (melee_web_action_interval_admit(o.actions)!=1) return R::Action;
     if (melee_web_audio_snapshot_admit(o.audio,o.audio_snapshot)!=1) return R::Audio;
