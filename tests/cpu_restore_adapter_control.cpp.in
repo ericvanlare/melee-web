@@ -255,6 +255,11 @@ bool GameplayCpuCheckpoint::finish_replay(const GameplayMatchSession& session) n
         // Explicit payload leaf model; actual byte producer tested separately.
         comparison_={4,2,7,5,9,8,0x10000,64,0x80010000};checked_domains_=30;matched_domains_=14;
         payload_failure_witness_={};auto& w=payload_failure_witness_;
+        allocation_origin_witness_={};auto& origin=allocation_origin_witness_;
+        origin.schema=1;origin.bytes=320;origin.hook_active=1;
+        origin.first_difference_matches=1;origin.reason=2; // modeled leaf UNKNOWN
+        origin.row=7;origin.offset=5;origin.host=64;origin.generation=1;origin.epoch=1;origin.world=1;origin.requested=64;
+
         w.schema=1;w.bytes=256;w.original_status=2;w.first_difference_matches=1;
         w.window.schema=1;w.window.bytes=168;w.window.status=2;w.window.row=7;w.window.offset=5;
         w.window.requested_bytes=64;w.window.window_count=32;w.window.expected[5]=9;w.window.actual[5]=8;
@@ -498,13 +503,20 @@ void verify_payload_failure_retention() {
     pending_submission=false;modeled_payload_byte_failure=true;
     check(melee_web_synctest_cpu_restore_command(11)==1216&&draw_calls==2,"Witness must preserve1216/no final present");
     check(melee_web_synctest_cpu_payload_failure_witness_bytes()==256,"Witness fixed ABI");
+    check(melee_web_synctest_cpu_allocation_origin_witness_bytes()==320,"Origin fixed ABI");
+    const auto origin_saved=*static_cast<const MeleeWebSourceAllocationOriginWitness*>(melee_web_synctest_cpu_allocation_origin_witness());
+    check(origin_saved.schema==1&&origin_saved.bytes==320&&origin_saved.reason==2&&origin_saved.first_difference_matches&&
+          !origin_saved.status&&!origin_saved.site_kind,"Actual adapter keeps modeled origin UNKNOWN separately");
     const auto saved=*static_cast<const MeleeWebSourcePayloadFailureWitness*>(melee_web_synctest_cpu_payload_failure_witness());
     check(saved.schema==1&&saved.first_difference_matches==1&&saved.window.row==7&&saved.window.offset==5,
           "Actual adapter retained modeled leaf witness before refusal");
     EM_ASM({console.log("CPU_PAYLOAD_ACTUAL_WASM_WITNESS_BASE64="+
         Buffer.from(HEAPU8.subarray($0,$0+$1)).toString("base64"));},melee_web_synctest_cpu_payload_failure_witness(),256);
+    EM_ASM({console.log("CPU_ORIGIN_ACTUAL_WASM_WITNESS_BASE64="+
+        Buffer.from(HEAPU8.subarray($0,$0+320)).toString("base64"));},melee_web_synctest_cpu_allocation_origin_witness());
     check(melee_web_synctest_cpu_restore_command(5)==1216,"CLOSE preserves original1216");
     check(!std::memcmp(&saved,melee_web_synctest_cpu_payload_failure_witness(),256),"CLOSE preserves witness bytes");
+    check(!std::memcmp(&origin_saved,melee_web_synctest_cpu_allocation_origin_witness(),320),"CLOSE preserves separate origin bytes");
     close_and_retire();
 }
 void verify_two_tick_refusals() {

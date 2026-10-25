@@ -59,6 +59,7 @@ public:
     bool matches_drawn_reference(const GameplayMatchSession&) noexcept;
     void disarm() noexcept;
     const CpuComparison& comparison() const noexcept {return comparison_;}
+    const MeleeWebSourceAllocationOriginWitness& allocation_origin_witness() const noexcept {return allocation_origin_witness_;}
     const MeleeWebSourcePayloadFailureWitness& payload_failure_witness() const noexcept {return payload_failure_witness_;}
     std::uint32_t checked_domains() const noexcept {return checked_domains_;}
     std::uint32_t matched_domains() const noexcept {return matched_domains_;}
@@ -78,6 +79,7 @@ private:
     bool source_step_possible_=false,retired_=false;
     CpuComparison comparison_{};
     MeleeWebSourcePayloadFailureWitness payload_failure_witness_{};
+    MeleeWebSourceAllocationOriginWitness allocation_origin_witness_{};
     std::uint32_t checked_domains_=0,matched_domains_=0;
 };
 }
@@ -288,6 +290,20 @@ console.log(JSON.stringify({status:'PASS',bytes:256,scope:'actual adapter; model
         self.assertEqual(witness_result.returncode,0,witness_result.stdout+witness_result.stderr)
         # Recompile only the actual adapter fixture in default-v5 mode; real
         # coordinator/statics objects and compiler settings stay identical.
+        origin_marker="CPU_ORIGIN_ACTUAL_WASM_WITNESS_BASE64="
+        origin_rows=[line[len(origin_marker):] for line in result.stdout.splitlines() if line.startswith(origin_marker)]
+        self.assertEqual(len(origin_rows),1)
+        origin_raw=base64.b64decode(origin_rows[0],validate=True);self.assertEqual(len(origin_raw),320)
+        origin_bytes=output_dir/"actual-origin-witness.bin";origin_bytes.write_bytes(origin_raw)
+        origin_js="""const fs=await import('node:fs');const {pathToFileURL}=await import('node:url');
+const {decodeCpuAllocationOriginWitness}=await import(pathToFileURL(process.argv[1]));
+const d=decodeCpuAllocationOriginWitness(new Uint8Array(fs.readFileSync(process.argv[2])));
+if(d.status!==0||d.reason!==2||!d.firstDifferenceMatches||d.row!==7||d.offset!==5)throw Error('actual adapter modeled origin drift');
+console.log('PASS actual adapter; modeled origin leaf remains UNKNOWN');"""
+        origin_bridge=[str(node),"--input-type=module","-e",origin_js,str(helper),str(origin_bytes)]
+        bridged=subprocess.run(origin_bridge,cwd=output_dir,env=env,capture_output=True,text=True,timeout=30)
+        write_record(output_dir/"actual-origin-js-bridge.json",origin_bridge,bridged)
+        self.assertEqual(bridged.returncode,0,bridged.stdout+bridged.stderr)
         v5_object=output_dir / "control-v5.o"
         v5_common=[part for part in common if part!="-DMELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK=1"]
         v5_compile=[sys.executable,str(compiler/"em++.py"),*v5_common,

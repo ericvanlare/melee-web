@@ -9,6 +9,22 @@ export const TWO_TICK_PAD_301 = 'AABQAAAAAAAAAAAAALAAAAAAAAAAAAAAAAAAAAAAAAD/AAA
 
 // Independent fixed diagnostic ABI; all 64-bit identities remain exact hex
 // strings in JSON. This observer never grants state/type/restore authority.
+export function decodeCpuAllocationOriginWitness(bytes) {
+  if (!(bytes instanceof Uint8Array) || bytes.length !== 320) throw Error('Allocation origin extent');
+  const v=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength), u=o=>v.getUint32(o,true);
+  const hex=o=>v.getBigUint64(o,true).toString(16).padStart(16,'0');
+  if(u(0)!==1||u(4)!==320||u(8)>2||u(12)>7||u(16)>1||u(20)>1||u(84)!==0) throw Error('Allocation origin schema');
+  const status=u(8), reason=u(12), matched=u(16), kind=u(72), length=u(80);
+  if(length>=232||bytes.slice(88+length).some(x=>x!==0)) throw Error('Allocation origin path bounds');
+  let path='';for(const b of bytes.slice(88,88+length)) {if(b===0)throw Error('Allocation origin embedded null');path+=String.fromCharCode(b);}
+  if(matched&&(!v.getBigUint64(32,true)||!v.getBigUint64(40,true)||!v.getBigUint64(48,true)||!v.getBigUint64(56,true)||!u(68)||u(28)>=u(68))) throw Error('Allocation origin paired bounds');
+  if(status===1&&(!matched||!u(20)||reason||!length||!u(76)||(kind!==1&&kind!==2)||!v.getBigUint64(32,true)||!v.getBigUint64(40,true))) throw Error('Allocation origin observed identity');
+  if(status!==1&&(kind||u(76)||length)) throw Error('Allocation origin unobserved token');
+  if(!matched&&bytes.slice(24).some(x=>x!==0)) throw Error('Allocation origin unpaired identity');
+  return {schema:1,bytes:320,status,reason,firstDifferenceMatches:matched,hookActive:u(20),row:u(24),offset:u(28),
+    host:hex(32),generation:hex(40),epoch:hex(48),world:hex(56),source:u(64),requested:u(68),siteKind:kind,line:u(76),path};
+}
+
 export function decodeCpuPayloadFailureWitness(bytes) {
   if (!(bytes instanceof Uint8Array) || bytes.byteLength !== 256) throw new Error('Payload witness extent');
   const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -140,7 +156,7 @@ export function validateCpuTwoTickFinalEvidence(evidence, checkpointSourceFrame)
 export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInputMapping, expectedStocks, helpers) {
   const plan = {wire, checkpointSourceFrame: checkpoint.boundary.sourceFrame, checkpointPad: checkpoint.pad,
     expectedInputMapping, expectedStocks, evidenceBytes: CPU_TWO_TICK_EVIDENCE_BYTES,
-    witnessDecodeSource: decodeCpuPayloadFailureWitness.toString(), decodeSource: decodeCpuTwoTickEvidence.toString(), validateFinalSource: validateCpuTwoTickFinalEvidence.toString(),
+    originDecodeSource: decodeCpuAllocationOriginWitness.toString(), witnessDecodeSource: decodeCpuPayloadFailureWitness.toString(), decodeSource: decodeCpuTwoTickEvidence.toString(), validateFinalSource: validateCpuTwoTickFinalEvidence.toString(),
     waitSource: waitForAuroraSubmission.toString(), ...helpers,
     literalPad300: TWO_TICK_PAD_300, literalPad301: TWO_TICK_PAD_301};
   try {
@@ -156,7 +172,9 @@ export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInput
       if (typeof module._melee_web_synctest_cpu_two_tick_evidence !== 'function' ||
           typeof module._melee_web_synctest_cpu_two_tick_evidence_bytes !== 'function' ||
           typeof module._melee_web_synctest_cpu_payload_failure_witness !== 'function' ||
-          typeof module._melee_web_synctest_cpu_payload_failure_witness_bytes !== 'function') {
+          typeof module._melee_web_synctest_cpu_payload_failure_witness_bytes !== 'function' ||
+          typeof module._melee_web_synctest_cpu_allocation_origin_witness !== 'function' ||
+          typeof module._melee_web_synctest_cpu_allocation_origin_witness_bytes !== 'function') {
         throw new Error('Two-tick evidence exports are unavailable for the linked v6 profile');
       }
       const read = (pointer, size) => {
@@ -171,6 +189,7 @@ export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInput
       };
       const decode = new Function(`return (${plan.decodeSource})`)();
       const validateFinal = new Function(`return (${plan.validateFinalSource})`)();
+      const decodeOrigin = new Function(`return (${plan.originDecodeSource})`)();
       const decodeWitness = new Function(`return (${plan.witnessDecodeSource})`)();
       const evidence = () => {
         const size = module._melee_web_synctest_cpu_two_tick_evidence_bytes();
@@ -182,6 +201,11 @@ export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInput
         const witnessBytes = read(module._melee_web_synctest_cpu_payload_failure_witness(), witnessSize);
         progress.payloadFailureWitnessRaw = encode(witnessBytes);
         progress.payloadFailureWitness = decodeWitness(witnessBytes);
+        const originSize=module._melee_web_synctest_cpu_allocation_origin_witness_bytes();
+        if(originSize!==320)throw Error('Allocation origin ABI');
+        const originBytes=read(module._melee_web_synctest_cpu_allocation_origin_witness(),originSize);
+        progress.allocationOriginWitnessRaw=encode(originBytes);
+        progress.allocationOriginWitness=decodeOrigin(originBytes);
         return result;
       };
       const command = async number => {
@@ -192,6 +216,7 @@ export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInput
           record.outcome = 'returned';
           record.nativeEvidence = evidence();
           record.payloadFailureWitness = progress.payloadFailureWitness;
+          record.allocationOriginWitness = progress.allocationOriginWitness;
           if (record.result !== 0) throw new Error(`CPU two-tick command ${number} refused ${record.result}: ${module.UTF8ToString(module._melee_web_snapshot_error())}`);
         } catch (error) {
           const ccallThrew = record.outcome === 'pending';

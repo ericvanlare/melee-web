@@ -19,7 +19,11 @@ void operator delete(void* p) noexcept{std::free(p);}
 void operator delete(void* p,std::size_t) noexcept{std::free(p);}
 alignas(32) unsigned char pool[128];
 static unsigned allocation_calls;
-extern "C" void* HSD_MemAlloc(ssize_t bytes){
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+static unsigned wrapper_calls;
+#endif
+// Parenthesized original symbol remains a real callable allocator model.
+extern "C" void* (HSD_MemAlloc)(ssize_t bytes){
     ++allocation_calls;
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
     if(!melee_web_source_memory_alloc(3,pool,bytes))std::abort();
@@ -29,6 +33,16 @@ extern "C" void* HSD_MemAlloc(ssize_t bytes){
     deny_allocation=true; // actual source hook/linking after this return must not allocate
     return pool;
 }
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+/* Model the production memory.c wrapper, not a success stub. The actual
+ * objalloc TU keeps its private callsite macro enabled and supplies its token. */
+extern "C" void* melee_web_HSD_MemAllocAt(ssize_t bytes,const char* file,unsigned line){
+    ++wrapper_calls;
+    void* result=(HSD_MemAlloc)(bytes);
+    if(result)melee_web_source_memory_origin_event(result,static_cast<uint32_t>(bytes),file,line,1);
+    return result;
+}
+#endif
 extern "C" int HSD_GetHeap(){return 3;}
 extern "C" s32 OSCheckHeap(int){return 65536;}
 extern "C" void __assert(char*,u32,char*){std::abort();}
@@ -60,6 +74,10 @@ int main(int argc,char** argv){
        descriptor.freehead->next->next==nullptr,"original allocator call/link/accounting exact");
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
  auto* snapshot=capture();pool[20]^=1;auto first=witness(snapshot);
+ const auto original=melee_web_source_memory_payload_snapshot_compare_live(snapshot);
+ const auto origin=melee_web_source_memory_allocation_origin_witness(snapshot,original);
+ check(wrapper_calls==1&&allocation_calls==1&&origin.status==1&&origin.site_kind==1&&origin.line&&
+       std::strstr(origin.path,"objalloc.c"),"actual ObjAlloc macro invokes modeled production wrapper/original once with source token");
  check(first.bytes==256&&first.schema==1&&first.original_status==2&&first.first_difference_matches&&
        first.window.status==2&&first.window.offset==20&&first.hook_active==1,"actual first-difference crosscheck");
  if(!std::strcmp(mode,"bad-mask")){check(first.attribution==2&&first.reason==4,"actual invalid alignment mask refuses attribution");}

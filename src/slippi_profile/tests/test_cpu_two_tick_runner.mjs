@@ -81,7 +81,10 @@ function makeRunner({fault=null}={}) {
       memory.set(Buffer.from(p.replayObservation,'base64'),ptr.observation);
       memory.set(Buffer.from(p.replayPcm,'base64'),ptr.pcm);memory.set(Buffer.from(p.replayPad,'base64'),ptr.input);}
   };
+  const origin=new Uint8Array(320);new DataView(origin.buffer).setUint32(0,1,true);new DataView(origin.buffer).setUint32(4,320,true);
   const module={HEAPU8:heap,
+    _melee_web_synctest_cpu_allocation_origin_witness_bytes:()=>fault==='bad-origin-size'?319:320,
+    _melee_web_synctest_cpu_allocation_origin_witness:()=>{heap.set(origin,65400);return 65400;},
     _melee_web_synctest_cpu_payload_failure_witness_bytes:()=>fault==='bad-witness-size'?255:256,
     _melee_web_synctest_cpu_payload_failure_witness:()=>{heap.set(witness,65000);return 65000;},
     _melee_web_synctest_cpu_two_tick_evidence_bytes:()=>totalBytes,
@@ -273,4 +276,16 @@ test('new observer failure cannot erase already-retained original native evidenc
   const f=makeRunner({fault:'bad-witness-size'});let caught;try{await f.run();}catch(e){caught=e;}
   assert.match(String(caught),/witness ABI/);assert.equal(caught.cpuRestorePartial.nativeEvidence.lastCommand,8);
   assert.deepEqual(f.commandSequence,[8]);
+});
+
+// Production decoder: fixed origin evidence is separate from legacy ABIs.
+test('allocation origin strict decoder and unknown/refused identities',async()=>{
+ const {decodeCpuAllocationOriginWitness}=await import('./cpu_two_tick_runner.mjs');
+ const b=new Uint8Array(320),v=new DataView(b.buffer);v.setUint32(0,1,true);v.setUint32(4,320,true);
+ assert.equal(decodeCpuAllocationOriginWitness(b).status,0);
+ v.setUint32(8,1,true);assert.throws(()=>decodeCpuAllocationOriginWitness(b));
+ v.setUint32(16,1,true);v.setUint32(20,1,true);v.setBigUint64(32,32n,true);v.setBigUint64(40,1n,true);v.setBigUint64(48,1n,true);v.setBigUint64(56,1n,true);v.setUint32(68,64,true);
+ v.setUint32(72,1,true);v.setUint32(76,22,true);v.setUint32(80,7,true);b.set(Buffer.from('class.c'),88);
+ assert.equal(decodeCpuAllocationOriginWitness(b).path,'class.c');
+ v.setUint32(80,232,true);assert.throws(()=>decodeCpuAllocationOriginWitness(b));
 });

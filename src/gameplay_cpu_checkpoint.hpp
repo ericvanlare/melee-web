@@ -40,6 +40,7 @@ public:
     bool matches_drawn_reference(const GameplayMatchSession&) noexcept;
     void disarm() noexcept;
     const CpuComparison& comparison() const noexcept {return comparison_;}
+    const MeleeWebSourceAllocationOriginWitness& allocation_origin_witness() const noexcept {return allocation_origin_witness_;}
     const MeleeWebSourcePayloadFailureWitness& payload_failure_witness() const noexcept {return payload_failure_witness_;}
     std::uint32_t checked_domains() const noexcept {return checked_domains_;}
     std::uint32_t matched_domains() const noexcept {return matched_domains_;}
@@ -76,6 +77,7 @@ private:
     bool source_step_possible_=false;
     CpuComparison comparison_{};
     MeleeWebSourcePayloadFailureWitness payload_failure_witness_{};
+    MeleeWebSourceAllocationOriginWitness allocation_origin_witness_{};
     std::uint32_t checked_domains_=0,matched_domains_=0;
 };
 }

@@ -160,6 +160,18 @@ typedef struct MeleeWebSourcePayloadFailureWitness {
 MeleeWebSourcePayloadFailureWitness melee_web_source_memory_payload_failure_witness(
     const MeleeWebSourceMemoryPayloadSnapshot* snapshot,
     MeleeWebSourcePayloadComparison original);
+/* Private source allocation callsite, not a type/restore owner. No exported
+ * caller pointer. Source literals have static lifetime; indirect calls unknown. */
+void melee_web_source_memory_origin_event(const void* payload, uint32_t requested,
+    const char* source_file, uint32_t source_line, uint32_t site_kind);
+typedef struct MeleeWebSourceAllocationOriginWitness {
+    uint32_t schema, bytes, status, reason, first_difference_matches, hook_active, row, offset;
+    uint64_t host, generation, epoch, world;
+    uint32_t source, requested, site_kind, line, path_bytes, reserved;
+    char path[232];
+} MeleeWebSourceAllocationOriginWitness;
+MeleeWebSourceAllocationOriginWitness melee_web_source_memory_allocation_origin_witness(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot, MeleeWebSourcePayloadComparison original);
 int melee_web_source_memory_payload_snapshot_matches_live(
     const MeleeWebSourceMemoryPayloadSnapshot* snapshot);
 void melee_web_source_memory_payload_snapshot_destroy(

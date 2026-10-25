@@ -52,6 +52,7 @@ struct CpuRestoreControl {
     CpuDrawnEvidence drawn{};
     CpuTwoTickEvidence two{};
     MeleeWebSourcePayloadFailureWitness failure_witness{1,sizeof(MeleeWebSourcePayloadFailureWitness)};
+    MeleeWebSourceAllocationOriginWitness origin_witness{1,sizeof(MeleeWebSourceAllocationOriginWitness)};
     bool two_active=false;
 } cpu_restore;
 bool cpu_drawn_diagnostics(unsigned index){
@@ -220,7 +221,10 @@ uint32_t cpu_execute_two(uint32_t command){
         final.comparison=cpu_restore.capsule->comparison();
         if(!matched&&final.comparison.domain==static_cast<uint32_t>(melee_web::CpuComparisonDomain::Payload)&&
            final.comparison.status==2)
+        {
             cpu_restore.failure_witness=cpu_restore.capsule->payload_failure_witness();
+            cpu_restore.origin_witness=cpu_restore.capsule->allocation_origin_witness();
+        }
         if(!matched)return cpu_fail(0x4c0u,"two-tick final CPU typed equality refused");
         e.cpu_equality=1;cpu_restore.state=C::TwoEqual;return 0;
     }
@@ -462,3 +466,6 @@ extern "C" int melee_web_synctest_cpu_after_source_close(){
     }return 1;
 }
 #endif
+
+extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_allocation_origin_witness(){return &cpu_restore.origin_witness;}
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_allocation_origin_witness_bytes(){return sizeof(cpu_restore.origin_witness);}

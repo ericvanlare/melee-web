@@ -48,6 +48,9 @@ struct PoolAssociation {
 // reason: 1 hook inactive, 2 missing event, 3 target, 4 mask, 5 extent,
 // 6 duplicate/conflict, 7 internal heap unsupported, 8 stale metadata.
 uint32_t pool_refusal=0;
+struct AllocationOrigin { const char* file=nullptr; uint32_t line=0,kind=0;
+    uint64_t generation=0,epoch=0,world=0; };
+uint32_t origin_refusal=0;
 #endif
 struct HostAllocation {
     uintptr_t host = 0;
@@ -56,6 +59,7 @@ struct HostAllocation {
     uint64_t generation = 0;
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
     PoolAssociation pool{};
+    AllocationOrigin origin{};
 #endif
 };
 
@@ -161,6 +165,7 @@ extern "C" int melee_web_source_memory_begin(uint64_t generation,
     topology_revision = 0;
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
     pool_refusal = 0;
+    origin_refusal = 0;
 #endif
     active = true;
     healthy = true;
@@ -237,6 +242,25 @@ extern "C" void melee_web_source_memory_objalloc_event(
 #else
     (void)pool;(void)descriptor;(void)stride;(void)count;(void)alignment_mask;
     (void)pool_bytes;(void)internal_heap;
+#endif
+}
+
+extern "C" void melee_web_source_memory_origin_event(const void* payload,uint32_t requested,
+    const char* file,uint32_t line,uint32_t kind)
+{
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    if(!active||!payload)return;
+    HostAllocation* row=nullptr;
+    for(auto& a:allocations)if(a.host==reinterpret_cast<uintptr_t>(payload)){row=&a;break;}
+    auto refuse=[&](uint32_t reason){if(!origin_refusal)origin_refusal=reason;if(row)row->origin={};};
+    if(!healthy||!row||row->requested!=requested){refuse(3);return;}
+    size_t length=0;if(file)while(length<232&&file[length])++length;
+    if(!file||!length||length>=232||!line||(kind!=1&&kind!=2)){refuse(4);return;}
+    if(row->origin.file){refuse(5);return;}
+    if(origin_refusal)return;
+    row->origin={file,line,kind,row->generation,owner_epoch,world_generation};
+#else
+    (void)payload;(void)requested;(void)file;(void)line;(void)kind;
 #endif
 }
 
@@ -688,7 +712,7 @@ melee_web_source_memory_snapshot_restore(const MeleeWebSourceMemorySnapshot* sna
         // A mirror copy is not an allocation event. Never revive provenance
         // from copied rows; aggregate poison deliberately remains sticky.
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
-        for(auto& row:candidate_allocations)row.pool={};
+        for(auto& row:candidate_allocations){row.pool={};row.origin={};}
 #endif
         source_address_heap.swap(heap);
         allocations.swap(candidate_allocations);
@@ -927,6 +951,38 @@ melee_web_source_memory_payload_failure_witness(
     result.reason=1;
 #endif
     return result;
+}
+static_assert(sizeof(MeleeWebSourceAllocationOriginWitness)==320);
+extern "C" MeleeWebSourceAllocationOriginWitness melee_web_source_memory_allocation_origin_witness(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot,MeleeWebSourcePayloadComparison original)
+{
+    MeleeWebSourceAllocationOriginWitness r{};r.schema=1;r.bytes=sizeof(r);
+    const auto w=melee_web_source_memory_payload_snapshot_witness(snapshot);
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    r.hook_active=1;
+#endif
+    if(original.status!=2||w.status!=2||original.allocation_index!=w.row||original.byte_offset!=w.offset||
+       original.host_address!=w.host_address||original.source_address!=w.source_address||
+       original.requested_bytes!=w.requested_bytes||w.offset<w.window_offset||w.offset-w.window_offset>=w.window_count||
+       original.expected_byte!=w.expected[w.offset-w.window_offset]||original.actual_byte!=w.actual[w.offset-w.window_offset]){
+        r.reason=7;return r;}
+    r.first_difference_matches=1;r.row=w.row;r.offset=w.offset;r.host=w.host_address;
+    r.generation=w.allocation_generation;r.epoch=w.owner_epoch;r.world=w.world_generation;
+    r.source=w.source_address;r.requested=w.requested_bytes;
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    if(origin_refusal){r.status=2;r.reason=origin_refusal;return r;}
+    const auto& a=allocations[w.row].origin;const auto& b=payload_rows(snapshot)[w.row].origin;
+    if(!a.file){r.reason=2;return r;}
+    if(a.file!=b.file||a.line!=b.line||a.kind!=b.kind||a.generation!=r.generation||a.epoch!=r.epoch||a.world!=r.world||
+       a.generation!=b.generation||a.epoch!=b.epoch||a.world!=b.world){r.status=2;r.reason=6;return r;}
+    size_t length=0;while(length<sizeof(r.path)&&a.file[length])++length;
+    if(!length||length>=sizeof(r.path)){r.status=2;r.reason=4;return r;}
+    r.status=1;r.site_kind=a.kind;r.line=a.line;r.path_bytes=length;
+    std::memcpy(r.path,a.file,length);
+#else
+    r.reason=1;
+#endif
+    return r;
 }
 extern "C" int melee_web_source_memory_payload_snapshot_matches_live(
     const MeleeWebSourceMemoryPayloadSnapshot* snapshot)
