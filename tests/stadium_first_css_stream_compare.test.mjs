@@ -1857,3 +1857,48 @@ test('actual fresh132 loader requires exact fresh export and paired original sou
   await assert.rejects(run(binding,{...e.provenance,observer_status_sha256:'00'.repeat(32)},fullA));
  }
 });
+
+test('actual comparator data-URL module is self-contained and shares exact Full-A context admission',async()=>{
+ const source=await fs.readFile(new URL('./stadium_first_css_stream_compare.mjs',import.meta.url),'utf8');
+ const rawStart=source.match(/const FRESH132_FULL_A_START_HEX = '([0-9a-f]+)';/)?.[1];
+ assert.equal(rawStart?.length,624);
+ assert.equal(createHash('sha256').update(Uint8Array.from(rawStart.match(/../g),x=>parseInt(x,16))).digest('hex'),
+  '918a23d68a3b5024f94baf1f5e26e6c0db56c5fbbbffdc79c5e620e82af3b728');
+ const moduleUrl='data:text/javascript;base64,'+Buffer.from(source).toString('base64');
+ const expected=fresh132ReadyExpectedFixture(),legacy=freshSetupGo2ContextFixture(expected);
+ const context={entry:structuredClone(legacy.entry),setup:structuredClone(legacy.setup),constructor:structuredClone(legacy.constructor_observation)};
+ for(const [key,sequence]of [['entry',2544],['setup',2584]])Object.assign(context[key],{sequence,source_tick:131,
+  start_sha256:'918a23d68a3b5024f94baf1f5e26e6c0db56c5fbbbffdc79c5e620e82af3b728',source_slices_hex:{...context[key].source_slices_hex,'4:0':rawStart}});
+ Object.assign(context.constructor,{source_sequences:[2566,2567,2568,2569,2570],parameter_x0:3600,parameter_x4:3800,random_bound:200,random_result:66});
+ const {validateFresh132FullAContext:nodeValidate}=await import('./fresh132_full_a_projection.mjs');
+ const nodeResult=nodeValidate(context,expected,validateFreshSss132ReadyStartExpectedSource);
+ const savedBuffer=globalThis.Buffer;
+ try{
+  // Actual data-URL import and execution with no Node Buffer global. No source
+  // stripping, import rewriting, injected validator or browser runtime is used.
+  globalThis.Buffer=undefined;
+  const browserModule=await import(moduleUrl);
+  const browserResult=browserModule.validateFresh132FullAContext(context,expected,
+   browserModule.validateFreshSss132ReadyStartExpectedSource);
+  assert.deepEqual(browserResult,nodeResult);
+  const oldComparator=browserModule.createFreshSetupGo2Comparator(legacy,expected,fresh132ReadyPrefixFixture(),
+   {attempted:true,approved:true,failed:false,first_mismatch:null});
+  assert.equal(oldComparator.compare(freshSetupGo2ActualFixture(expected)),true);
+  for(const mutate of [x=>x.entry.source_slices_hex['4:0']='00'+x.entry.source_slices_hex['4:0'].slice(2),
+   x=>x.entry.start_sha256='0'.repeat(64),x=>x.setup.source_slices_hex['4:0']=x.setup.source_slices_hex['4:0'].slice(2),
+   x=>x.entry.sequence=2523,x=>x.setup.source_tick=133,x=>x.entry.draw_ordinal=1,
+   x=>x.setup.seed_hex='00000000',x=>x.setup.typed_start.players[0].stocks++,
+   x=>x.constructor.source_sequences.reverse(),x=>x.constructor.source_sequences.pop(),
+   x=>x.constructor.source_sequences[1]=x.constructor.source_sequences[0],
+   x=>x.constructor.constructor_entry_count=2,x=>x.constructor.random_bound=201,
+   x=>x.constructor.random_result=65,x=>x.extra=true]){
+   const bad=structuredClone(context);mutate(bad);
+   assert.throws(()=>browserModule.validateFresh132FullAContext(bad,expected,
+    browserModule.validateFreshSss132ReadyStartExpectedSource));
+  }
+ }finally{globalThis.Buffer=savedBuffer;}
+ for(const key of ['entry','setup']){
+  const bad=structuredClone(context);bad[key].source_slices_hex['4:0']='00'+rawStart.slice(2);
+  assert.throws(()=>nodeValidate(bad,expected,validateFreshSss132ReadyStartExpectedSource));
+ }
+});

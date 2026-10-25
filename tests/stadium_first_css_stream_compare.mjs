@@ -1,4 +1,3 @@
-import {validateFresh132FullAContext} from './fresh132_full_a_projection.mjs';
 const BATCH_COUNT = 148;
 const FIRST_CONSUME_SEQUENCE = 839;
 const SOURCE_SCENE_CSS = 1;
@@ -1981,6 +1980,99 @@ export function validateFreshSetupGo2Expectations(context, readyExpected) {
     constructor_sequences: [...context.constructor_observation.source_sequences],
     scope: FRESH_SETUP_GO2_SCOPE});
 }
+
+// Exact retained 312-byte Start slice. Node proof pins its SHA-256 to the
+// existing 918a... identity; equality is stronger than admitting a digest match.
+// Keep this module self-contained for its existing data-URL browser imports.
+const FRESH132_FULL_A_START_HEX = '3000864cc3000000000000ffff6e000300000000000000000000000000000000ffffffffffffffff000000003f8000003f8000003f800000000000000000000000000000000000000000000000000000000000000000000000000000000000000800040100ff000009007800c000040100000000000000003f8000003f8000003f8000000800040000ff000009007800c000040100000000000000003f8000003f8000003f8000001a03040000ff0000090078004000040100000000000000003f8000003f8000003f8000001a03040000ff0000090078004000040100000000000000003f8000003f8000003f8000002103040000ff0000090078004000040000000000000000003f8000003f8000003f8000002103040000ff0000090078004000040000000000000000003f8000003f8000003f800000';
+const FRESH132_FULL_A_CONTEXT_SCOPE = 'fresh prepared Start followed by same-producer original VS Setup typed Start, RNG and one-entry constructor scalar projection; no browser, whole-session, lifetime-B or C3 claim.';
+
+function fresh132FullAContextFail(message) { throw new TypeError(message); }
+function fresh132FullAContextExactKeys(value, keys, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) ||
+      Object.keys(value).sort().join(',') !== [...keys].sort().join(','))
+    fresh132FullAContextFail(label + ' has an unexpected shape');
+}
+function fresh132FullAContextCanonical(value) {
+  if (Array.isArray(value)) return '[' + value.map(fresh132FullAContextCanonical).join(',') + ']';
+  if (value && typeof value === 'object')
+    return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + fresh132FullAContextCanonical(value[key])).join(',') + '}';
+  return JSON.stringify(value);
+}
+function fresh132FullAContextSame(left, right) {
+  return fresh132FullAContextCanonical(left) === fresh132FullAContextCanonical(right);
+}
+
+function validateFresh132FullAContextRecord(record, phase, sequence, seed) {
+  const isEntry = phase === 'vs_entry';
+  fresh132FullAContextExactKeys(record, ['phase', 'sequence', 'event', 'boundary', 'pc', 'source_tick',
+    'draw_ordinal', 'start_slice_address', 'start_sha256', 'typed_start',
+    'rng_pointer_address', 'rng_pointer_hex', 'seed_address', 'seed_hex',
+    'source_slices_hex', 'source_slice_inventory'], phase + ' source context');
+  const expectedInventory = [
+    {tag: 4, flags: 0, address: 0x80480530, size: 0x138},
+    {tag: 19, flags: 0, address: 0x804d5f94, size: 4},
+    {tag: 20, flags: 0, address: 0x804d5f90, size: 4},
+  ];
+  fresh132FullAContextExactKeys(record.source_slices_hex, ['19:0', '20:0', '4:0'], phase + ' selected slices');
+  if (record.phase !== phase || record.sequence !== sequence || record.event !== 'boundary' ||
+      record.boundary !== (isEntry ? 'entry' : 'setup') ||
+      record.pc !== (isEntry ? '0x8016e934' : '0x8016e9c4') ||
+      record.source_tick !== 131 || record.draw_ordinal !== 0 ||
+      record.start_slice_address !== 0x80480530 ||
+      record.start_sha256 !== '918a23d68a3b5024f94baf1f5e26e6c0db56c5fbbbffdc79c5e620e82af3b728' ||
+      record.rng_pointer_address !== 0x804d5f94 || record.seed_address !== 0x804d5f90 ||
+      record.rng_pointer_hex !== '804d5f90' || Number.parseInt(record.rng_pointer_hex, 16) !== record.seed_address ||
+      record.seed_hex !== seed ||
+      record.source_slices_hex['19:0'] !== record.rng_pointer_hex ||
+      record.source_slices_hex['20:0'] !== record.seed_hex ||
+      record.source_slices_hex['4:0'] !== FRESH132_FULL_A_START_HEX ||
+      !fresh132FullAContextSame(record.source_slice_inventory, expectedInventory) ||
+      record.source_slices_hex['4:0'].length !== 0x138 * 2 ||
+      !/^[0-9a-f]{8}$/.test(record.seed_hex) ||
+      !/^[0-9a-f]{8}$/.test(record.rng_pointer_hex) ||
+      !record.typed_start || typeof record.typed_start !== 'object' ||
+      !Array.isArray(record.typed_start.players) || record.typed_start.players.length !== 4 ||
+      !record.typed_start.rules)
+    fresh132FullAContextFail(phase + ' raw Entry/Setup context differs from the pinned same producer');
+  return record;
+}
+
+export function validateFresh132FullAContext(startContext, readyExpected,
+  validateReadyExpectedSource) {
+  fresh132FullAContextExactKeys(startContext, ['entry', 'setup', 'constructor'], 'Fresh132 original Entry/Setup/constructor projection');
+  if (typeof validateReadyExpectedSource !== 'function') fresh132FullAContextFail('Fresh132 ready-start decoder is unavailable');
+  const validated = validateReadyExpectedSource(readyExpected);
+  const entry = validateFresh132FullAContextRecord(startContext.entry, 'vs_entry', 2544, 'e2624ac3');
+  const setup = validateFresh132FullAContextRecord(startContext.setup, 'vs_setup', 2584, '083a62a9');
+  fresh132FullAContextExactKeys(startContext.constructor, ['schema', 'constructor_entry_count', 'source_sequences',
+    'seed_before_hex', 'seed_after_hex', 'parameter_x0', 'parameter_x4', 'random_call_observed',
+    'random_bound_valid', 'random_bound', 'random_result_valid', 'random_result'],
+  'Fresh132 constructor observation');
+  const ctor = startContext.constructor;
+  if (entry.sequence >= ctor.source_sequences?.[0] ||
+      !Array.isArray(ctor.source_sequences) || ctor.source_sequences.length !== 5 ||
+      ctor.source_sequences.some((sequence, index) => !Number.isSafeInteger(sequence) ||
+        (index > 0 && sequence <= ctor.source_sequences[index - 1])) ||
+      ctor.source_sequences.at(-1) >= setup.sequence ||
+      !fresh132FullAContextSame(ctor.source_sequences, [2566, 2567, 2568, 2569, 2570]) ||
+      ctor.schema !== 'melee-web-original-stadium-constructor-state-projection-v2' ||
+      ctor.constructor_entry_count !== 1 ||
+      ctor.seed_before_hex !== entry.seed_hex || ctor.seed_before_hex !== 'e2624ac3' ||
+      ctor.seed_after_hex !== '55248a7a' || ctor.parameter_x0 !== 3600 ||
+      ctor.parameter_x4 !== 3800 || ctor.random_call_observed !== true ||
+      ctor.random_bound_valid !== true || ctor.random_bound !== 200 ||
+      ctor.random_result_valid !== true || ctor.random_result !== 66 ||
+      !fresh132FullAContextSame(entry.typed_start, setup.typed_start) ||
+      !fresh132FullAContextSame(setup.typed_start, validated.expected?.start) ||
+      validated.expected?.random_seed_hex !== entry.seed_hex)
+    fresh132FullAContextFail('Fresh132 Entry/Setup or one-entry constructor projection differs');
+  return Object.freeze({entry: structuredClone(entry), setup: structuredClone(setup),
+    constructor_observation: structuredClone(ctor),
+    witnesses: [...ctor.source_sequences],
+    scope: FRESH132_FULL_A_CONTEXT_SCOPE});
+}
+
 
 function createFreshSetupComparatorCore(context, prefix, readyStartStatus, scope) {
   if (!plainObject(prefix) || prefix.complete !== true || prefix.failed !== false ||

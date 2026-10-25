@@ -1,4 +1,6 @@
 import {createHash} from 'node:crypto';
+import {validateFresh132FullAContext as validateFresh132FullAContextPure}
+  from './stadium_first_css_stream_compare.mjs';
 
 export const FRESH132_FULL_A_INPUT_PINS = Object.freeze({
   extract: {sha256: 'c70a1063ac8af4f7a4b00a5f300ab0f4d7cf4359d6ac456f0e10e2b743a31463'},
@@ -20,7 +22,6 @@ const INPUT_SHA256 = 'c401f8598df35d404aae7208f3499b5945fc976e3878bee6517a95a8a9
 const DOL_SHA1 = '08e0bf20134dfcb260699671004527b2d6bb1a45';
 const DOL_SHA256 = 'dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646';
 const DOLPHIN_COMMIT = 'c77bbaa0f372c3f72281602a8b087206706542cb';
-const EXPECTED_SCOPE = 'fresh prepared Start followed by same-producer original VS Setup typed Start, RNG and one-entry constructor scalar projection; no browser, whole-session, lifetime-B or C3 claim.';
 const GUEST_POINTER_POLICY = 'fixed-slot role and pointer equality only; no object-type or allocation-lifetime proof; numeric guest pointers are not cross-runtime comparison fields';
 
 function fail(message) {
@@ -127,75 +128,18 @@ export function validateFresh132FullAProducerJoin(extract, binding, postrun) {
     profile_gci_sha256: binding.producer.profile_gci_sha256});
 }
 
-function validateContextRecord(record, phase, sequence, seed) {
-  const isEntry = phase === 'vs_entry';
-  exactKeys(record, ['phase', 'sequence', 'event', 'boundary', 'pc', 'source_tick',
-    'draw_ordinal', 'start_slice_address', 'start_sha256', 'typed_start',
-    'rng_pointer_address', 'rng_pointer_hex', 'seed_address', 'seed_hex',
-    'source_slices_hex', 'source_slice_inventory'], phase + ' source context');
-  const expectedInventory = [
-    {tag: 4, flags: 0, address: 0x80480530, size: 0x138},
-    {tag: 19, flags: 0, address: 0x804d5f94, size: 4},
-    {tag: 20, flags: 0, address: 0x804d5f90, size: 4},
-  ];
-  exactKeys(record.source_slices_hex, ['19:0', '20:0', '4:0'], phase + ' selected slices');
-  if (record.phase !== phase || record.sequence !== sequence || record.event !== 'boundary' ||
-      record.boundary !== (isEntry ? 'entry' : 'setup') ||
-      record.pc !== (isEntry ? '0x8016e934' : '0x8016e9c4') ||
-      record.source_tick !== 131 || record.draw_ordinal !== 0 ||
-      record.start_slice_address !== 0x80480530 ||
-      record.start_sha256 !== '918a23d68a3b5024f94baf1f5e26e6c0db56c5fbbbffdc79c5e620e82af3b728' ||
-      record.rng_pointer_address !== 0x804d5f94 || record.seed_address !== 0x804d5f90 ||
-      record.rng_pointer_hex !== '804d5f90' || Number.parseInt(record.rng_pointer_hex, 16) !== record.seed_address ||
-      record.seed_hex !== seed ||
-      record.source_slices_hex['19:0'] !== record.rng_pointer_hex ||
-      record.source_slices_hex['20:0'] !== record.seed_hex ||
-      Buffer.from(record.source_slices_hex['4:0'], 'hex').length !== 0x138 ||
-      hash(Buffer.from(record.source_slices_hex['4:0'], 'hex')) !== record.start_sha256 ||
-      !same(record.source_slice_inventory, expectedInventory) ||
-      record.source_slices_hex['4:0'].length !== 0x138 * 2 ||
-      !/^[0-9a-f]{8}$/.test(record.seed_hex) ||
-      !/^[0-9a-f]{8}$/.test(record.rng_pointer_hex) ||
-      !record.typed_start || typeof record.typed_start !== 'object' ||
-      !Array.isArray(record.typed_start.players) || record.typed_start.players.length !== 4 ||
-      !record.typed_start.rules)
-    fail(phase + ' raw Entry/Setup context differs from the pinned same producer');
-  return record;
-}
-
 export function validateFresh132FullAContext(startContext, readyExpected,
   validateReadyExpectedSource) {
-  exactKeys(startContext, ['entry', 'setup', 'constructor'], 'Fresh132 original Entry/Setup/constructor projection');
-  if (typeof validateReadyExpectedSource !== 'function') fail('Fresh132 ready-start decoder is unavailable');
-  const validated = validateReadyExpectedSource(readyExpected);
-  const entry = validateContextRecord(startContext.entry, 'vs_entry', 2544, 'e2624ac3');
-  const setup = validateContextRecord(startContext.setup, 'vs_setup', 2584, '083a62a9');
-  exactKeys(startContext.constructor, ['schema', 'constructor_entry_count', 'source_sequences',
-    'seed_before_hex', 'seed_after_hex', 'parameter_x0', 'parameter_x4', 'random_call_observed',
-    'random_bound_valid', 'random_bound', 'random_result_valid', 'random_result'],
-  'Fresh132 constructor observation');
-  const ctor = startContext.constructor;
-  if (entry.sequence >= ctor.source_sequences?.[0] ||
-      !Array.isArray(ctor.source_sequences) || ctor.source_sequences.length !== 5 ||
-      ctor.source_sequences.some((sequence, index) => !Number.isSafeInteger(sequence) ||
-        (index > 0 && sequence <= ctor.source_sequences[index - 1])) ||
-      ctor.source_sequences.at(-1) >= setup.sequence ||
-      !same(ctor.source_sequences, [2566, 2567, 2568, 2569, 2570]) ||
-      ctor.schema !== 'melee-web-original-stadium-constructor-state-projection-v2' ||
-      ctor.constructor_entry_count !== 1 ||
-      ctor.seed_before_hex !== entry.seed_hex || ctor.seed_before_hex !== 'e2624ac3' ||
-      ctor.seed_after_hex !== '55248a7a' || ctor.parameter_x0 !== 3600 ||
-      ctor.parameter_x4 !== 3800 || ctor.random_call_observed !== true ||
-      ctor.random_bound_valid !== true || ctor.random_bound !== 200 ||
-      ctor.random_result_valid !== true || ctor.random_result !== 66 ||
-      !same(entry.typed_start, setup.typed_start) ||
-      !same(setup.typed_start, validated.expected?.start) ||
-      validated.expected?.random_seed_hex !== entry.seed_hex)
-    fail('Fresh132 Entry/Setup or one-entry constructor projection differs');
-  return Object.freeze({entry: structuredClone(entry), setup: structuredClone(setup),
-    constructor_observation: structuredClone(ctor),
-    witnesses: [...ctor.source_sequences],
-    scope: EXPECTED_SCOPE});
+  const validated = validateFresh132FullAContextPure(startContext, readyExpected,
+    validateReadyExpectedSource);
+  // Retain the public Node projection's original raw Start digest checks in
+  // addition to the shared browser-safe exact-byte admission.
+  for (const record of [startContext.entry, startContext.setup]) {
+    if (Buffer.from(record.source_slices_hex['4:0'], 'hex').length !== 0x138 ||
+        hash(Buffer.from(record.source_slices_hex['4:0'], 'hex')) !== record.start_sha256)
+      fail(record.phase + ' raw Entry/Setup context differs from the pinned same producer');
+  }
+  return validated;
 }
 
 function validateTypedFields(row, expectedOrdinal) {
