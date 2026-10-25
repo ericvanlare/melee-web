@@ -2558,7 +2558,7 @@
     },
     "remaining": [
       "complete source/project mutable-static coverage and dynamic source/asset/stream/file ownership",
-      "establish whether the saved HSD_LObj/lvec.x hypothesis is the live object in the failing browser route and reduce the strict command-11 payload mismatch; the source observer retains a direction only for a fixture-held object across modeled scopes; later CPU domains and final present remain unrun",
+      "The actual lighting writer now joins the strict command11 payload mismatch. Establish light-object lifetime and safe retained render-cache ownership, remove the draw-to-source dependency without changing original GX words, then retry only with a reviewed changed hypothesis; later CPU domains and final present remain unrun.",
       "render-to-simulation dependencies and safe host effects across no-draw correction; renderer/GPU/cache state remains outside rewind scope",
       "whole-session, original-game parity, continuous PCM, pixel parity and foreground timing acceptance"
     ],
@@ -2601,7 +2601,7 @@
       "retained_artifact": "census-owner-gap-analysis-v1.json",
       "sha256": "9908b8d2ebb8aeeb64d8df4dcdeb24ea0f16f55bab3d17e1f847c679f90ba370"
     },
-    "next_experiment": "Prepare and review a bounded source-only causal-writer observation at setup_spec_lightobj (lobj.c:393\u2013399), recording exact before/after 12-byte lvec values around the unchanged getter/math sequence. Join the actual operand span to the current outer ledger and immutable PRE row/piece/header identity, then\u2014after unchanged strict 1216\u2014the SAME execution first-difference span and expected/live bytes. A matching writer proves only a write at that address/value; PRE membership does not prove piece lifetime and reuse uncertainty remains UNKNOWN. Freeze controls and obtain separate release before any browser run. No comparison relaxation or persistent cache implementation is authorized.",
+    "next_experiment": "Design and reduce a Slippi-profile retained lighting cache with real object initialization/retirement ownership. Reuse original GX/math and the failed fresh-cache counterexample; require original ordered GX-word equality, unchanged source fields, valid renewal and explicit stale/missing-owner refusal. No mask/exclusion, per-frame reset or drawn correction.",
     "owner_components": {
       "scope": "Private owner components only; no browser restore exposure or complete-world claim",
       "current_files_sha256": {
@@ -7174,6 +7174,165 @@
       "required_join": "Bind the actual operand span to the current outer allocation ledger and full immutable PRE row/piece/header identities; after unchanged strict 1216, join the same execution first-difference span plus expected/live endpoint bytes. Missing/overflow/phase mismatch or unresolved reuse stays UNKNOWN.",
       "identity_limit": "A matching writer proves a write occurred at that address/value only. PRE table membership is capture-time evidence, not uninterrupted live piece lifetime or class/member ownership.",
       "release_limit": "Freeze the exact diagnostic ABI and controls, then obtain separate review/release before a browser run. No restore admission/comparison change or persistent cache implementation is authorized."
+    },
+    "lobj_causal_writer_capture_v1": {
+      "status": "strict1216_retained_actual_source_write_occurrence_matched",
+      "scope": "One reviewed two-tick diagnostic; no gameplay fix or complete rollback claim.",
+      "producer": {
+        "built_from": "092b4c7e9578eec949b3cca69a950516a535b22c plus exact16 reviewed source files",
+        "clean_source": "cfe96564a5c89ed7fb61329f2f7c780442faed96",
+        "tree": "c600755b21f304ef102524957208d1e6afb81f48",
+        "runtime24_unchanged": true
+      },
+      "validation": {
+        "full_tests": 2474,
+        "skipped": 165,
+        "seconds": 590.264,
+        "three_release_builds": "PASS",
+        "focused_controls": "PASS"
+      },
+      "observed": {
+        "strict_failure": 1216,
+        "row": 62,
+        "offset": 284,
+        "expected": 106,
+        "actual": 189,
+        "events": 52,
+        "pre_post_events": 26,
+        "drawn_events": 52,
+        "overflow": 0,
+        "matching_events": 7,
+        "last_match_sequence": 18,
+        "first_mutating_match_sequence": 4,
+        "before_hex": "bdef6e3fd121b7bebcfaf9bc",
+        "after_hex": "6ace6e3f5b22b8be2bc1b2bc",
+        "prepared_lobj_before_line": 396,
+        "prepared_lobj_after_line": 413,
+        "live_piece_lifetime": "UNKNOWN",
+        "pre_class_join": "CAPTURE_TIME_ONLY",
+        "sample300_301_raw_five_channels_and_literal_pad": "MATCH",
+        "commands12_13_final_present": "UNRUN",
+        "native_close": 1216,
+        "snapshot_close": 1,
+        "renderer_shutdown": 1,
+        "owned_pids_absent": [
+          25273,
+          25275,
+          25288,
+          25289,
+          25295,
+          25296,
+          25312,
+          25313,
+          25314,
+          25317,
+          25333
+        ]
+      },
+      "raw_abi_hashes": {
+        "payloadFailureWitnessRaw": {
+          "bytes": 256,
+          "sha256": "e887c1c67e1cd2af1a3a78e42d27c7c3230ac0d3960336980225ae082a0bb6ea"
+        },
+        "allocationOriginWitnessRaw": {
+          "bytes": 320,
+          "sha256": "a44be27b8364079398ab758366beee328799ea0441879d70e7e0beed1cf07982"
+        },
+        "classPieceWitnessRaw": {
+          "bytes": 208,
+          "sha256": "82a74e438f6beb4227f71d46ae5bb62017bbd8b338674755cbbfc5f1255952a1"
+        },
+        "classPieceCaptureWitnessRaw": {
+          "bytes": 160,
+          "sha256": "2b0ad726b151ab56f803448b20b703f249316778b43d59632d572f64837549ca"
+        },
+        "lobjWriterEvidenceRaw": {
+          "bytes": 16784,
+          "sha256": "90ce19e6493999eabe04e9512805c3dcebb4724d38439719afd52950e26d096e"
+        },
+        "nativeEvidence": {
+          "bytes": 35368,
+          "sha256": "96e5a7e7c433330d240d9dbb7428cf10f27cd96fe31aceccc2d8a15aee87e896"
+        }
+      },
+      "evidence": {
+        "raw": {
+          "path": "lobj-causal-writer-capture-v1/runner/evidence.json",
+          "bytes": 1335460,
+          "sha256": "341ee95f0a39300f6d2764e6f70c90bc65ddeb8c4a29c92976ae5d13313ba554"
+        },
+        "owner": {
+          "path": "lobj-causal-writer-capture-v1/owner.json",
+          "bytes": 109126,
+          "sha256": "13fdbabb4f16045190666de7390dbd2133663a26129214bfa0b543c77cbdb536"
+        },
+        "root_result": {
+          "path": "lobj-causal-writer-capture-v1/root-observed-v1.json",
+          "bytes": 12118,
+          "sha256": "800b424b38dfdbe220f09c577f0fbb9320d7b4bfa395b6451c115cd2f8ad75b3"
+        },
+        "packet": {
+          "path": "lobj-causal-writer-capture-v1/packet-candidate-v1.json",
+          "bytes": 76420,
+          "sha256": "d61e6495ed99c14f071c65792dd68f37c2215c6dffb511b50854817bd80c6104"
+        },
+        "source_checkpoint": {
+          "path": "lobj-causal-writer-validation-v1/source-checkpoint-v1.json",
+          "bytes": 14841,
+          "sha256": "7f2953eb7f874512a59001a62941a9abfd9506c1ded1038e7f97e9d4ddee3f8f"
+        },
+        "runtime_inventory": {
+          "path": "lobj-causal-writer-validation-v1/runtime-inventory-v1.json",
+          "bytes": 19659,
+          "sha256": "6d9e96c4155970c30149c80aab87dca8011081decb11fb18ebff1f0e817524c6"
+        },
+        "full_regression": {
+          "path": "lobj-causal-writer-validation-v1/full-regression-summary-v1.json",
+          "bytes": 13253,
+          "sha256": "d3ab267dac72a04799b2b94ae646b52112ae9131e31f0be6b47cf0106b4e7233"
+        },
+        "builds": {
+          "path": "lobj-causal-writer-validation-v1/native-build-result-v1.json",
+          "bytes": 10032,
+          "sha256": "fce347e9411db42a659c36837f0242f4da930867ad95db311dd64002f31a9636"
+        },
+        "compiled_attribution": {
+          "path": "lobj-causal-writer-validation-v1/compiled-lobj-attribution-v1.json",
+          "bytes": 13089,
+          "sha256": "89c18e6c510c73fb9b6dc6d4759f928e03c1a11e7323a488620615dd66332976"
+        },
+        "source_review": {
+          "path": "lobj-causal-writer-candidate-v3/independent-focused-review-v1.json",
+          "bytes": 7702,
+          "sha256": "48dc3959d0d255bf68ff7772cd90d23c72c5b67a67ddda4d07c8b86ed76b17d5"
+        },
+        "linked_review": {
+          "path": "lobj-causal-writer-linked-config-candidate-v1/independent-review-v1.json",
+          "bytes": 7530,
+          "sha256": "8518b05d3bb2ea3622734064a3f101c338aaf64dda0796c522eee45710d38b91"
+        },
+        "retained_adapter_failure": {
+          "path": "lobj-causal-writer-candidate-v2/focused-execution-v1/first-failure-reduction-v1.json",
+          "bytes": 16963,
+          "sha256": "22dfbdd767711d13ba96e39bcd2ee358e89f33c564af3e109860e72d140149ef"
+        },
+        "fixture_repair": {
+          "path": "lobj-causal-writer-candidate-v3/candidate-freeze-v3.json",
+          "bytes": 1993,
+          "sha256": "0894e4d32b2a639f614d01f8e4b81c31e3fd78a469c4cd3560ca37476b3ced9c"
+        }
+      },
+      "independent_review": {
+        "path": "lobj-causal-writer-capture-v1/independent-review-v2.json",
+        "bytes": 19864,
+        "sha256": "219bd3632991c91454aa60c46ea2a96f6f07db254cdd0938d22d303f92814601"
+      },
+      "limits": [
+        "Seven matching write occurrences are not unique causation or proof of live object continuity.",
+        "No comparison or restore policy was relaxed; strict aggregate CPU equality still fails.",
+        "Original GX parity, complete profile, seven-tick corrections, combat, host-effect closure and online rollback remain open.",
+        "Known magenta Final Destination texture artifacts remain; no pixel equivalence claim."
+      ]
     }
   }
 }

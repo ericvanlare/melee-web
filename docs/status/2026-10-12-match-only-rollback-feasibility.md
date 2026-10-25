@@ -435,7 +435,7 @@ and view-space cache writes in setup (`lobj.c:393–399`); it does not show a
 simulation consumer or restore safety. The native CLOSE returned the latched
 1216; snapshot close and renderer shutdown each returned 1. All 10 recorded
 owned PIDs were independently absent. Later CPU domains, commands 12/13 and
-final present were not reached. The original-only source observation and its limits are recorded separately below. No production implementation or new browser capture is authorized. See
+final present were not reached. The original-only source observation and its limits are recorded separately below; the subsequent browser writer diagnostic is separately scoped. See
 `class_piece_capture_time_v1` in the structured receipt for exact identities and
 scope.
 
@@ -461,17 +461,36 @@ browser traversal or allocator free/reuse. This confirms a source-side submitted
 direction dependency, not live browser ownership, visual effect, or a production
 cache design. Exact reviewed pins and scope are nested in the structured receipt.
 
-The proposed next step is a bounded source-only causal-writer observation at
-setup_spec_lightobj (lobj.c:393–399). It would record exact before/after 12-byte
-lvec values around the unchanged original getter/math sequence, then join the
-actual writer operand to the full outer ledger and immutable PRE row/piece/header
-identity. After unchanged strict 1216, the same execution must join that span
-against the first-difference row and expected/live bytes. A matching write proves
-only a write at that address/value; PRE membership does not prove uninterrupted
-piece lifetime, and reuse uncertainty remains UNKNOWN. This is a proposed
-observation pending frozen controls and separate release, not a persistent cache
-implementation or browser-capture authorization.
+The bounded browser writer diagnostic now records the actual lighting setup
+write at the failing span. Its 52 events contain 26 before the saved POST and
+26 from the later draw, with no overflow. Seven pre-POST calls match the saved
+12-byte endpoint: sequence 4 changes the bytes, while the selected last match,
+sequence 18, writes the same value. The exact compiled `lobj.c:396/413` hooks
+surround the unchanged original getter/transform sequence. The same execution
+still fails strict command 11 / 1216 at row 62, offset 284, expected 106 versus
+actual 189. This is actual source-write occurrence evidence at the differing
+address/value, not unique causation or uninterrupted object lifetime. The PRE
+class join remains CAPTURE_TIME_ONLY and live piece lifetime remains UNKNOWN.
 
+Both samples' five raw channels and literal PADs agree. Native CLOSE retains
+1216, snapshot close and renderer shutdown return 1, and all 11 recorded browser
+and capture PIDs are absent. Commands 12/13 and final present remain unrun.
+The diagnostic was built from `092b4c7e` plus 16 reviewed files, distinct from
+clean source checkpoint `cfe96564` / tree `c600755b`; all 24 retained/live build
+artifacts remain identical. Three Release builds, focused controls and the full
+2,474-test regression pass with 165 skips. The earlier focused adapter stack
+overflow is retained; its reviewed repair resets the test fixture in place,
+without changing production behavior or the stack limit. See
+`lobj_causal_writer_capture_v1` in the structured receipt for raw bytes,
+independent review and exact producer identities.
+
+Next is a bounded source design for preserving the original retained lighting
+cache while removing draw writes from checkpointed simulation state. It must
+establish real light-object creation/retirement ownership and reproduce the
+retained original GX outputs; the failed fresh-cache proposal remains a
+regression case. No byte masking, restore exclusion, per-frame cache reset or
+drawn corrective ticks are justified by this observation. Full rollback remains
+incomplete.
 
 ## First current-source copy/restore result
 
