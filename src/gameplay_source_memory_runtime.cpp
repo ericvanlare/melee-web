@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <cstdlib>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -149,6 +150,8 @@ FighterLease* find_fighter(uintptr_t host)
 }
 }
 
+#include "gameplay_class_piece_diagnostic.inc"
+
 extern "C" int melee_web_source_memory_begin(uint64_t generation,
                                               int heap_handle)
 {
@@ -172,6 +175,9 @@ extern "C" int melee_web_source_memory_begin(uint64_t generation,
     failure.clear();
     allocations.clear();
     fighters.clear();
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    piece_init(begin,end);
+#endif
     return 1;
 }
 
@@ -179,6 +185,9 @@ extern "C" int melee_web_source_memory_end(uint64_t generation)
 {
     if (!active || !generation || generation != world_generation)
         return fail("source address heap world owner changed during teardown");
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    piece_end();
+#endif
     active = false;
     source_heap_handle = -1;
     world_generation = 0;
@@ -210,6 +219,9 @@ extern "C" int melee_web_source_memory_alloc(int heap, void* host_payload,
         return fail("source main heap rejected a live OSAllocFromHeap request");
     allocations.push_back({host, static_cast<uint32_t>(requested_bytes),
                            result.address, next_id()});
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    piece_clear_row(allocations.back());
+#endif
     advance_topology_revision();
     return 1;
 }
@@ -278,6 +290,9 @@ extern "C" int melee_web_source_memory_free(int heap, void* host_payload)
         return fail("source main heap free has no matching live allocation");
     if (source_address_heap->release(found->source) != Status::ok)
         return fail("source main heap rejected a live OSFreeToHeap request");
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    piece_clear_row(*found);
+#endif
     allocations.erase(found);
     advance_topology_revision();
     return 1;
@@ -714,6 +729,9 @@ melee_web_source_memory_snapshot_restore(const MeleeWebSourceMemorySnapshot* sna
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
         for(auto& row:candidate_allocations){row.pool={};row.origin={};}
 #endif
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+        if(piece_topology(10))piece_refuse(8,10);
+#endif
         source_address_heap.swap(heap);
         allocations.swap(candidate_allocations);
         fighters.swap(candidate_fighters);
@@ -1002,4 +1020,55 @@ extern "C" void melee_web_source_memory_snapshot_destroy(
     MeleeWebSourceMemorySnapshot* snapshot)
 {
     delete snapshot;
+}
+
+extern "C" MeleeWebClassPieceWitness melee_web_source_memory_class_piece_witness(
+ const MeleeWebSourceMemoryPayloadSnapshot* snapshot,MeleeWebSourcePayloadComparison original,MeleeWebClassPieceAnchor anchor) {
+ MeleeWebClassPieceWitness r{};r.schema=1;r.bytes=sizeof(r);
+ const auto w=melee_web_source_memory_payload_snapshot_witness(snapshot);
+ if(original.status!=2||w.status!=2||original.allocation_index!=w.row||original.byte_offset!=w.offset||
+    original.host_address!=w.host_address||original.source_address!=w.source_address||
+    original.requested_bytes!=w.requested_bytes||w.offset<w.window_offset||w.offset-w.window_offset>=w.window_count||
+    original.expected_byte!=w.expected[w.offset-w.window_offset]||original.actual_byte!=w.actual[w.offset-w.window_offset]){
+  r.reason=9;return r;}
+ r.first_difference_matches=1;r.row=w.row;r.offset=w.offset;r.host=w.host_address;r.generation=w.allocation_generation;
+ r.epoch=w.owner_epoch;r.world=w.world_generation;r.source=w.source_address;r.requested=w.requested_bytes;
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+ r.hook_active=1;r.instance=piece_owner.instance;r.capture_serial=anchor.serial;r.event_serial=piece_owner.serial;
+ r.coverage_state=piece_owner.state;r.first_event=piece_owner.first;
+ if(piece_owner.reason){r.status=2;r.reason=piece_owner.reason;return r;}
+ if(!anchor.ready){r.reason=anchor.reason?anchor.reason:1;return r;}
+ if(!active||!piece_owner.cells||piece_owner.state!=3||anchor.epoch!=owner_epoch||anchor.world!=world_generation||
+    anchor.instance!=piece_owner.instance||anchor.serial!=piece_owner.capture||anchor.serial!=piece_owner.serial){r.status=2;r.reason=9;return r;}
+ const auto& row=allocations[w.row];
+ if(row.source.value()<piece_owner.begin||uint64_t(row.source.value())+row.requested>piece_owner.end){r.status=2;r.reason=3;return r;}
+ const uint32_t first=(row.source.value()-piece_owner.begin)/32;
+ const uint32_t last=(uint64_t(row.source.value())+row.requested-piece_owner.begin+31)/32;
+ const uint64_t target=uint64_t(row.source.value())+w.offset;
+ uint32_t selected=UINT32_MAX;
+ for(uint32_t i=first;i<last;++i){const auto& c=piece_owner.cells[i];if(!(c.geometry&piece_live))continue;
+  const uint64_t start=uint64_t(piece_owner.begin)+uint64_t(i)*32,extent=piece_extent(c);
+  if(!extent||start<row.source.value()||extent>uint64_t(row.source.value())+row.requested-start){r.status=2;r.reason=3;return r;}
+  if(target>=start&&target-start<extent){if(selected!=UINT32_MAX){r.status=2;r.reason=5;return r;}selected=i;}}
+ if(selected==UINT32_MAX){r.reason=4;return r;}
+ const auto& c=piece_owner.cells[selected];r.piece_source=piece_owner.begin+selected*32;
+ r.piece_offset=target-r.piece_source;r.physical=piece_extent(c);r.original_requested=piece_requested(c);r.piece_generation=c.generation;
+ if(!c.generation){r.status=2;r.reason=6;return r;}
+ r.record_state=c.tag?((c.tag&3)==2?3:2):1;
+ if(!c.tag){r.status=1;return r;} // Observed raw piece; type remains UNKNOWN.
+ if((c.tag&3)!=2){r.reason=4;return r;}
+ r.class_info=c.tag&~3u;r.class_obj_size=r.original_requested;r.confirmed=1;
+ const size_t in_row=r.piece_source-row.source.value();
+ if(r.original_requested<4||in_row>row.requested-4){r.status=2;r.reason=3;return r;}
+ size_t saved=0;const auto* rows=payload_rows(snapshot);
+ for(size_t i=0;i<w.row;++i)if(!add_size(saved,rows[i].requested,&saved)){r.status=2;r.reason=3;return r;}
+ if(!add_size(saved,in_row,&saved)||saved>snapshot->payload_bytes-4){r.status=2;r.reason=3;return r;}
+ std::memcpy(&r.saved_class_info,payload_bytes(snapshot)+saved,4);
+ std::memcpy(&r.live_class_info,reinterpret_cast<const void*>(row.host+in_row),4);
+ if(r.saved_class_info!=r.class_info||r.live_class_info!=r.class_info){r.status=2;r.reason=10;return r;}
+ r.status=1;
+#else
+ (void)anchor;r.reason=1;
+#endif
+ return r;
 }

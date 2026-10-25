@@ -68,6 +68,9 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
         stage=CpuComparisonDomain::Audio;
         c->audio_generation_=melee_web_audio_generation(c->owner_.audio);
         if(!c->audio_generation_){refused(stage,code(CpuCaptureRefusal::AudioGeneration),"Captured audio owner generation is zero");return {};}
+        // Diagnostic arm is not a CPU-admission condition. It owns no source
+        // memory, and its serial/table are never captured or restored.
+        c->class_piece_anchor_=melee_web_class_piece_arm();
         return c;
     }catch(const std::bad_alloc&){refused(stage,code(CpuCaptureRefusal::AllocationException),"CPU capture leaf threw std::bad_alloc");return {};}
     catch(...){refused(stage,code(CpuCaptureRefusal::UnexpectedException),"CPU capture leaf threw an unexpected exception");return {};}
@@ -215,6 +218,7 @@ bool GameplayCpuCheckpoint::finish_replay(const GameplayMatchSession& session) n
         if(payload.status==2){
             payload_failure_witness_=melee_web_source_memory_payload_failure_witness(post_payload_,payload);
             allocation_origin_witness_=melee_web_source_memory_allocation_origin_witness(post_payload_,payload);
+            class_piece_witness_=melee_web_source_memory_class_piece_witness(post_payload_,payload,class_piece_anchor_);
         }
         comparison_={static_cast<std::uint32_t>(CpuComparisonDomain::Payload),payload.status,
             static_cast<std::uint32_t>(payload.allocation_index),static_cast<std::uint32_t>(payload.byte_offset),
@@ -286,6 +290,7 @@ bool GameplayCpuCheckpoint::matches_drawn_reference(const GameplayMatchSession& 
     matched_domains_|=1u<<static_cast<unsigned>(CpuComparisonDomain::Statics);return true;
 }
 void GameplayCpuCheckpoint::disarm() noexcept {
+    melee_web_class_piece_disarm(class_piece_anchor_);
     if(commit_.actions)melee_web_action_interval_disarm(commit_.actions);
     if(commit_.effect_token){melee_web_cpu_interval_end(commit_.effect_token);commit_.effect_token=0;}
 }

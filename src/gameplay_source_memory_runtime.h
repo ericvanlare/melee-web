@@ -1,6 +1,8 @@
 #ifndef MELEE_WEB_GAMEPLAY_SOURCE_MEMORY_RUNTIME_H
 #define MELEE_WEB_GAMEPLAY_SOURCE_MEMORY_RUNTIME_H
 
+#include "gameplay_class_piece_diagnostic.h"
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -194,6 +196,10 @@ int melee_web_source_memory_fighter_acquire(void* host_fighter,
 int melee_web_source_memory_fighter_read(void* host_fighter,
                                          MeleeWebSourceFighterAddress* out);
 int melee_web_source_memory_fighter_release(void* host_fighter);
+
+/* Read-only private diagnostic, paired with the original strict comparison. */
+MeleeWebClassPieceWitness melee_web_source_memory_class_piece_witness(
+ const MeleeWebSourceMemoryPayloadSnapshot*,MeleeWebSourcePayloadComparison,MeleeWebClassPieceAnchor);
 
 #ifdef __cplusplus
 }

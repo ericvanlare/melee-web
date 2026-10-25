@@ -10818,6 +10818,156 @@ index 72776f83322214c6cee06d235e9af762c71b1d3a..2aa1009954979ea4566538cb1bc711a2
 +    melee_fx_active=0;
 +}
 +#endif
+diff --git a/src/sysdolphin/baselib/class.c b/src/sysdolphin/baselib/class.c
+index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..69dfe0131dc24105006be42c00e2017132ce7cd6 100644
+--- a/src/sysdolphin/baselib/class.c
++++ b/src/sysdolphin/baselib/class.c
+@@ -1,4 +1,7 @@
+ #include "class.h"
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++#include "gameplay_class_piece_diagnostic.h"
++#endif
+ 
+ #include <string.h>
+ 
+@@ -55,6 +58,10 @@ void hsdInitClassInfo(HSD_ClassInfo* class_info, HSD_ClassInfo* parent_info,
+         class_info->head.next = parent_info->head.child;
+         parent_info->head.child = class_info;
+     }
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    melee_web_class_piece_descriptor(class_info);
++#endif
+ }
+ 
+ void OSReport_PrintSpaces(s32 count)
+@@ -121,6 +128,10 @@ HSD_MemoryEntry* GetMemoryEntry(s32 idx)
+             memory_list = new_list;
+             nb_memory_list = new_nb;
+ 
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    melee_web_class_piece_promote(old_list, old_nb);
++#endif
+             hsdFreeMemPiece(old_list, old_nb);
+             memory_list[OSRoundUp32B(old_nb) / 32 - 1]->nb_alloc += 1;
+         }
+@@ -176,6 +187,10 @@ void* hsdAllocMemPiece(s32 size)
+     s32 temp_r29;
+     void* temp_r3;
+ 
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    melee_web_class_piece_cold(memory_list, nb_memory_list);
++#endif
+     temp_r29 = (size + 0x1F) / 32 - 1;
+     temp_r3_3 = GetMemoryEntry((size + 0x1F) / 32 - 1);
+     if (temp_r3_3 == NULL) {
+@@ -184,6 +199,10 @@ void* hsdAllocMemPiece(s32 size)
+     if ((temp_r3_2 = temp_r3_3->free_list)) {
+         temp_r3_3->free_list = temp_r3_2->next;
+         temp_r3_3->nb_free -= 1;
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    melee_web_class_piece_alloc(temp_r3_2, size, temp_r3_3->size);
++#endif
+         return temp_r3_2;
+     }
+     var_r28 = temp_r3_3->next;
+@@ -204,6 +223,10 @@ void* hsdAllocMemPiece(s32 size)
+             temp_r3_4->nb_alloc += 1;
+             temp_r3_4->nb_free += 1;
+             temp_r3_3->nb_alloc += 1;
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    melee_web_class_piece_alloc(temp_r5, size, temp_r3_3->size);
++#endif
+             return temp_r5;
+         }
+         var_r28 = var_r28->next;
+@@ -228,6 +251,10 @@ void* hsdAllocMemPiece(s32 size)
+         var_r30->nb_free += 1;
+     }
+     temp_r3_3->nb_alloc += 1;
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    melee_web_class_piece_alloc(temp_r3, size, temp_r3_3->size);
++#endif
+     return temp_r3;
+ }
+ 
+@@ -241,6 +268,9 @@ void hsdFreeMemPiece(void* mem, s32 size)
+         piece->next = entry->free_list;
+         entry->free_list = piece;
+         entry->nb_free += 1;
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    melee_web_class_piece_free(mem, size);
++#endif
+     }
+ }
+ 
+@@ -254,6 +284,10 @@ HSD_Class* _hsdClassAlloc(HSD_ClassInfo* info)
+             info->head.nb_peak = info->head.nb_exist;
+         }
+     }
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    if (mem_piece) melee_web_class_piece_label(mem_piece, info, info->head.obj_size, 1, NULL);
++#endif
+     return mem_piece;
+ }
+ 
+@@ -276,6 +310,10 @@ void _hsdClassAmnesia(HSD_ClassInfo* info)
+     info->head.nb_exist = 0;
+     info->head.nb_peak = 0;
+     if (info == &hsdClass) {
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    melee_web_class_piece_amnesia();
++#endif
+         nb_memory_list = 0;
+         memory_list = NULL;
+         current_hash = NULL;
+@@ -312,6 +350,10 @@ void* hsdNew(HSD_ClassInfo* i)
+         info->destroy(cls);
+         return NULL;
+     }
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    melee_web_class_piece_label(cls, info, info->head.obj_size, 2, NULL);
++#endif
+     return cls;
+ }
+ 
+@@ -331,10 +373,17 @@ static inline bool hsdChangeClass_inline(HSD_Obj* object,
+ {
+     HSD_ClassInfo* var_r29;
+     HSD_ClassInfo* var_r28;
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    HSD_ClassInfo* diagnostic_previous;
++#endif
+ 
+     HSD_ASSERT(0x249, object);
+     HSD_ASSERT(0x24A, class_info);
+     var_r29 = HSD_GetClassInfo(object);
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    diagnostic_previous = var_r29;
++#endif
++
+     !var_r29;
+     var_r28 = HSD_PushClassInfo(class_info);
+     if (!(var_r28->head.flags & 1)) {
+@@ -360,6 +409,10 @@ static inline bool hsdChangeClass_inline(HSD_Obj* object,
+             class_info->head.nb_peak = class_info->head.nb_exist;
+         }
+         object->parent.class_info = class_info;
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    melee_web_class_piece_label(object, class_info, class_info->head.obj_size, 3, diagnostic_previous);
++#endif
++
+         return true;
+     }
+     return false;
 diff --git a/src/sysdolphin/baselib/cobj.c b/src/sysdolphin/baselib/cobj.c
 index ff44dcde84072dcea551c30cdb6582ac3d23a6bd..535e6449e151d8360a596cd47933f3b13c61d103 100644
 --- a/src/sysdolphin/baselib/cobj.c

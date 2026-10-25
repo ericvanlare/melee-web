@@ -255,6 +255,7 @@ bool GameplayCpuCheckpoint::finish_replay(const GameplayMatchSession& session) n
         // Explicit payload leaf model; actual byte producer tested separately.
         comparison_={4,2,7,5,9,8,0x10000,64,0x80010000};checked_domains_=30;matched_domains_=14;
         payload_failure_witness_={};auto& w=payload_failure_witness_;
+        class_piece_witness_={1,sizeof(MeleeWebClassPieceWitness)};class_piece_witness_.reason=4; // modeled leaf UNKNOWN
         allocation_origin_witness_={};auto& origin=allocation_origin_witness_;
         origin.schema=1;origin.bytes=320;origin.hook_active=1;
         origin.first_difference_matches=1;origin.reason=2; // modeled leaf UNKNOWN
@@ -502,6 +503,9 @@ void verify_payload_failure_retention() {
     pending_submission=false;check(!melee_web_synctest_cpu_restore_command(10),"Witness baseline301");
     pending_submission=false;modeled_payload_byte_failure=true;
     check(melee_web_synctest_cpu_restore_command(11)==1216&&draw_calls==2,"Witness must preserve1216/no final present");
+    check(melee_web_synctest_cpu_class_piece_witness_bytes()==208,"Class piece fixed ABI");
+    const auto piece_saved=*static_cast<const MeleeWebClassPieceWitness*>(melee_web_synctest_cpu_class_piece_witness());
+    check(piece_saved.schema==1&&piece_saved.reason==4&&!piece_saved.status,"Actual adapter retains modeled class UNKNOWN");
     check(melee_web_synctest_cpu_payload_failure_witness_bytes()==256,"Witness fixed ABI");
     check(melee_web_synctest_cpu_allocation_origin_witness_bytes()==320,"Origin fixed ABI");
     const auto origin_saved=*static_cast<const MeleeWebSourceAllocationOriginWitness*>(melee_web_synctest_cpu_allocation_origin_witness());
@@ -516,6 +520,7 @@ void verify_payload_failure_retention() {
         Buffer.from(HEAPU8.subarray($0,$0+320)).toString("base64"));},melee_web_synctest_cpu_allocation_origin_witness());
     check(melee_web_synctest_cpu_restore_command(5)==1216,"CLOSE preserves original1216");
     check(!std::memcmp(&saved,melee_web_synctest_cpu_payload_failure_witness(),256),"CLOSE preserves witness bytes");
+    check(!std::memcmp(&piece_saved,melee_web_synctest_cpu_class_piece_witness(),208),"CLOSE retains separate class piece bytes");
     check(!std::memcmp(&origin_saved,melee_web_synctest_cpu_allocation_origin_witness(),320),"CLOSE preserves separate origin bytes");
     close_and_retire();
 }

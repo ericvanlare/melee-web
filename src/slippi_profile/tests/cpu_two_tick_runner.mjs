@@ -7,6 +7,27 @@ export const CPU_TWO_TICK_MODE = 2;
 export const TWO_TICK_PAD_300 = 'AgAAAAAAAAAAAAABALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=';
 export const TWO_TICK_PAD_301 = 'AABQAAAAAAAAAAAAALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=';
 
+// Boundaries/type labels are diagnostic only; UNKNOWN never admits restore.
+export function decodeCpuClassPieceWitness(bytes) {
+  if(!(bytes instanceof Uint8Array)||bytes.length!==208)throw Error('Class piece extent');
+  const v=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength),u=o=>v.getUint32(o,true);
+  const hex=o=>v.getBigUint64(o,true).toString(16).padStart(16,'0');
+  if(u(0)!==1||u(4)!==208||u(8)>2||u(12)>11||u(16)>1||u(20)>1||u(24)>4||u(28)>3||u(132)>1||bytes.slice(192).some(b=>b))throw Error('Class piece schema');
+  if(u(16)&&(!v.getBigUint64(72,true)||!v.getBigUint64(80,true)||!u(100)||u(92)>=u(100)))throw Error('Class piece allocation identity');
+  if(u(8)===1&&(!u(16)||!u(20)||u(12)||!u(112)||(u(112)&31)||!u(116)||u(116)>u(112)||u(112)-u(116)>31||u(108)>=u(112)||!u(120)||!u(28)))throw Error('Class piece live geometry');
+  if(u(8)===1&&(!v.getBigUint64(32,true)||!v.getBigUint64(40,true)||!v.getBigUint64(48,true)||
+      v.getBigUint64(56,true)!==v.getBigUint64(64,true)||!u(96)||u(96)+u(100)>0x100000000||
+      u(104)<u(96)||u(104)+u(112)>u(96)+u(100)||u(104)+u(108)!==u(96)+u(92)))throw Error('Class piece owner/bounds');
+  if(u(8)===1&&u(28)===1&&(u(124)||u(128)||u(132)||u(136)||u(140)))throw Error('Class piece raw type');
+  if(u(8)===1&&u(28)!==1&&u(28)!==3)throw Error('Class piece unsupported live state');
+  if(u(8)===1&&u(132)&&(!u(124)||u(128)!==u(116)||u(136)!==u(124)||u(140)!==u(124)||u(28)!==3))throw Error('Class piece confirmed header');
+  return {schema:1,bytes:208,status:u(8),reason:u(12),firstDifferenceMatches:u(16),hookActive:u(20),coverageState:u(24),recordState:u(28),
+    epoch:hex(32),world:hex(40),instance:hex(48),captureSerial:hex(56),eventSerial:hex(64),host:hex(72),generation:hex(80),
+    row:u(88),offset:u(92),source:u(96),requested:u(100),pieceSource:u(104),pieceOffset:u(108),physical:u(112),originalRequested:u(116),
+    pieceGeneration:u(120),classInfo:u(124),classObjSize:u(128),confirmed:u(132),savedClassInfo:u(136),liveClassInfo:u(140),
+    firstEvent:{serial:hex(144),host:hex(152),generation:hex(160),kind:u(168),source:u(172),requested:u(176),physical:u(180),classBefore:u(184),classAfter:u(188)}};
+}
+
 // Independent fixed diagnostic ABI; all 64-bit identities remain exact hex
 // strings in JSON. This observer never grants state/type/restore authority.
 export function decodeCpuAllocationOriginWitness(bytes) {
@@ -156,7 +177,7 @@ export function validateCpuTwoTickFinalEvidence(evidence, checkpointSourceFrame)
 export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInputMapping, expectedStocks, helpers) {
   const plan = {wire, checkpointSourceFrame: checkpoint.boundary.sourceFrame, checkpointPad: checkpoint.pad,
     expectedInputMapping, expectedStocks, evidenceBytes: CPU_TWO_TICK_EVIDENCE_BYTES,
-    originDecodeSource: decodeCpuAllocationOriginWitness.toString(), witnessDecodeSource: decodeCpuPayloadFailureWitness.toString(), decodeSource: decodeCpuTwoTickEvidence.toString(), validateFinalSource: validateCpuTwoTickFinalEvidence.toString(),
+    pieceDecodeSource: decodeCpuClassPieceWitness.toString(), originDecodeSource: decodeCpuAllocationOriginWitness.toString(), witnessDecodeSource: decodeCpuPayloadFailureWitness.toString(), decodeSource: decodeCpuTwoTickEvidence.toString(), validateFinalSource: validateCpuTwoTickFinalEvidence.toString(),
     waitSource: waitForAuroraSubmission.toString(), ...helpers,
     literalPad300: TWO_TICK_PAD_300, literalPad301: TWO_TICK_PAD_301};
   try {
@@ -174,7 +195,9 @@ export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInput
           typeof module._melee_web_synctest_cpu_payload_failure_witness !== 'function' ||
           typeof module._melee_web_synctest_cpu_payload_failure_witness_bytes !== 'function' ||
           typeof module._melee_web_synctest_cpu_allocation_origin_witness !== 'function' ||
-          typeof module._melee_web_synctest_cpu_allocation_origin_witness_bytes !== 'function') {
+          typeof module._melee_web_synctest_cpu_allocation_origin_witness_bytes !== 'function' ||
+          typeof module._melee_web_synctest_cpu_class_piece_witness !== 'function' ||
+          typeof module._melee_web_synctest_cpu_class_piece_witness_bytes !== 'function') {
         throw new Error('Two-tick evidence exports are unavailable for the linked v6 profile');
       }
       const read = (pointer, size) => {
@@ -189,6 +212,7 @@ export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInput
       };
       const decode = new Function(`return (${plan.decodeSource})`)();
       const validateFinal = new Function(`return (${plan.validateFinalSource})`)();
+      const decodePiece = new Function(`return (${plan.pieceDecodeSource})`)();
       const decodeOrigin = new Function(`return (${plan.originDecodeSource})`)();
       const decodeWitness = new Function(`return (${plan.witnessDecodeSource})`)();
       const evidence = () => {
@@ -206,6 +230,10 @@ export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInput
         const originBytes=read(module._melee_web_synctest_cpu_allocation_origin_witness(),originSize);
         progress.allocationOriginWitnessRaw=encode(originBytes);
         progress.allocationOriginWitness=decodeOrigin(originBytes);
+        const pieceSize=module._melee_web_synctest_cpu_class_piece_witness_bytes();
+        if(pieceSize!==208)throw Error('Class piece ABI');
+        const pieceBytes=read(module._melee_web_synctest_cpu_class_piece_witness(),pieceSize);
+        progress.classPieceWitnessRaw=encode(pieceBytes);progress.classPieceWitness=decodePiece(pieceBytes);
         return result;
       };
       const command = async number => {
@@ -217,13 +245,14 @@ export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInput
           record.nativeEvidence = evidence();
           record.payloadFailureWitness = progress.payloadFailureWitness;
           record.allocationOriginWitness = progress.allocationOriginWitness;
+          record.classPieceWitness = progress.classPieceWitness;
           if (record.result !== 0) throw new Error(`CPU two-tick command ${number} refused ${record.result}: ${module.UTF8ToString(module._melee_web_snapshot_error())}`);
         } catch (error) {
           const ccallThrew = record.outcome === 'pending';
           record.error = String(error);
           record.outcome = ccallThrew ? 'threw' : record.result !== 0 ? 'returned-nonzero' : 'evidence-error';
           if (ccallThrew) {
-            try { record.refreshedNativeEvidence = evidence(); }
+            try { record.refreshedNativeEvidence = evidence(); record.classPieceWitness = progress.classPieceWitness; }
             catch (readError) { record.evidenceRefreshError = String(readError); }
           }
           throw error;

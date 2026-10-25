@@ -40,6 +40,7 @@ public:
     bool matches_drawn_reference(const GameplayMatchSession&) noexcept;
     void disarm() noexcept;
     const CpuComparison& comparison() const noexcept {return comparison_;}
+    const MeleeWebClassPieceWitness& class_piece_witness() const noexcept {return class_piece_witness_;}
     const MeleeWebSourceAllocationOriginWitness& allocation_origin_witness() const noexcept {return allocation_origin_witness_;}
     const MeleeWebSourcePayloadFailureWitness& payload_failure_witness() const noexcept {return payload_failure_witness_;}
     std::uint32_t checked_domains() const noexcept {return checked_domains_;}
@@ -76,6 +77,8 @@ private:
     Phase phase_=Phase::Captured;
     bool source_step_possible_=false;
     CpuComparison comparison_{};
+    MeleeWebClassPieceAnchor class_piece_anchor_{};
+    MeleeWebClassPieceWitness class_piece_witness_{};
     MeleeWebSourcePayloadFailureWitness payload_failure_witness_{};
     MeleeWebSourceAllocationOriginWitness allocation_origin_witness_{};
     std::uint32_t checked_domains_=0,matched_domains_=0;

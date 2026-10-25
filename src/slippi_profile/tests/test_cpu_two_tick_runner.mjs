@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {runBrowserCpuTwoTick,decodeCpuTwoTickEvidence,decodeCpuPayloadFailureWitness,validateCpuTwoTickFinalEvidence,
+import {runBrowserCpuTwoTick,decodeCpuTwoTickEvidence,decodeCpuPayloadFailureWitness,decodeCpuClassPieceWitness,validateCpuTwoTickFinalEvidence,
   CPU_TWO_TICK_EVIDENCE_BYTES,TWO_TICK_PAD_300,TWO_TICK_PAD_301} from './cpu_two_tick_runner.mjs';
 import {validateCpuTwoTickDrawSample,retainCpuRestoreSample,recordCpuRestoreFailure} from './run_write_census.mjs';
 import {inspectInteractiveObservation,validateSelectedDrawPath,validateSourceInputMapping,decodeDrawDiagnostics} from './runner_contract.mjs';
@@ -83,6 +83,8 @@ function makeRunner({fault=null}={}) {
   };
   const origin=new Uint8Array(320);new DataView(origin.buffer).setUint32(0,1,true);new DataView(origin.buffer).setUint32(4,320,true);
   const module={HEAPU8:heap,
+    _melee_web_synctest_cpu_class_piece_witness_bytes:()=>fault==='bad-class-size'?207:208,
+    _melee_web_synctest_cpu_class_piece_witness:()=>{const p=66000;heap.fill(0,p,p+208);const v=new DataView(heap.buffer);v.setUint32(p,1,true);v.setUint32(p+4,208,true);return p;},
     _melee_web_synctest_cpu_allocation_origin_witness_bytes:()=>fault==='bad-origin-size'?319:320,
     _melee_web_synctest_cpu_allocation_origin_witness:()=>{heap.set(origin,65400);return 65400;},
     _melee_web_synctest_cpu_payload_failure_witness_bytes:()=>fault==='bad-witness-size'?255:256,
@@ -268,6 +270,8 @@ test('actual runner retains fixed witness and original failure before outer vali
     assert.equal(p.nativeEvidence.firstFailure,1216);assert.equal(p.nativeEvidence.checkedCpu,30);
     assert.equal(p.payloadFailureWitness.window.row,7);assert.equal(p.payloadFailureWitness.window.generation,'fffffffffffffff1');
     assert.equal(Buffer.from(p.payloadFailureWitnessRaw,'base64').length,256);
+    assert.equal(Buffer.from(p.classPieceWitnessRaw,'base64').length,208);
+    assert.equal(p.classPieceWitness.status,0);assert.equal(p.commands.at(-1).classPieceWitness.status,0);
     if(fault==='payload-refused-11')assert.equal(p.commands.at(-1).payloadFailureWitness.window.offset,5);
     else assert.equal(p.commands.at(-1).refreshedNativeEvidence.firstFailure,1216);
   }
@@ -288,4 +292,23 @@ test('allocation origin strict decoder and unknown/refused identities',async()=>
  v.setUint32(72,1,true);v.setUint32(76,22,true);v.setUint32(80,7,true);b.set(Buffer.from('class.c'),88);
  assert.equal(decodeCpuAllocationOriginWitness(b).path,'class.c');
  v.setUint32(80,232,true);assert.throws(()=>decodeCpuAllocationOriginWitness(b));
+});
+
+test('class piece208 diagnostic rejects malformed geometry and keeps UNKNOWN/refusal explicit',()=>{
+ const b=new Uint8Array(208),v=new DataView(b.buffer),set=(o,n)=>v.setUint32(o,n,true);
+ set(0,1);set(4,208);assert.equal(decodeCpuClassPieceWitness(b).status,0);
+ set(12,4);assert.equal(decodeCpuClassPieceWitness(b).reason,4);
+ set(8,1);assert.throws(()=>decodeCpuClassPieceWitness(b),/geometry/);
+ set(8,2);set(12,7);assert.equal(decodeCpuClassPieceWitness(b).status,2);
+ set(192,1);assert.throws(()=>decodeCpuClassPieceWitness(b),/schema/);set(192,0);
+ set(4,207);assert.throws(()=>decodeCpuClassPieceWitness(b),/schema/);
+ assert.throws(()=>decodeCpuClassPieceWitness(b.slice(0,207)),/extent/);
+});
+
+test('class observer ABI refusal preserves original native and earlier witness evidence',async()=>{
+ const f=makeRunner({fault:'bad-class-size'});let error;try{await f.run();}catch(e){error=e;}
+ assert.match(String(error),/Class piece ABI/);assert.equal(error.cpuRestorePartial.nativeEvidence.lastCommand,8);
+ assert.equal(Buffer.from(error.cpuRestorePartial.payloadFailureWitnessRaw,'base64').length,256);
+ assert.equal(Buffer.from(error.cpuRestorePartial.allocationOriginWitnessRaw,'base64').length,320);
+ assert.deepEqual(f.commandSequence,[8]);
 });
