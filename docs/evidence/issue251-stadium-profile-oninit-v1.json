@@ -22363,16 +22363,16 @@
       "No ordinary unload/cache/IDBFS parity.",
       "No C3 or public admission acceptance."
     ],
-    "next": "a source-only explicit profile2 B Setup handoff using the existing checked preparation/retirement and deferred StadiumReady path. Compare only retained Setup4313 declared fields and seed if that actual boundary becomes reachable; stop at the first owner/context/Start/seed mismatch. Do not force a seed, synthesize inputs or infer constructor/GO/per-owner evidence. No new capture is authorized; full replay, C3, public admission, transformations, pixels/PCM and timing acceptance remain open.",
+    "next": "source-only design for one coherent original-B constructor \u2192 actual GO \u2192 bounded idle comparison. Reuse the retained literal B inputs and existing constructor/map2/title/GO observers, but first supply their missing match1 observations and an explicit checked bridge from retained replay Setup to the existing source-action driver. Do not infer GO from tick84, reuse the original-A schedule, force seeds or repeat successful menu/Setup captures. Original owner registration/retirement and per-owner RNG correspondence remain separate gaps; full replay, transformations, public admission, pixels/PCM, timing and C3 remain open.",
     "original_B_continuation": {
-      "state": "PASS_PROFILE2_PREPARED_START_COMMON_COMPONENT_CURSOR940_NO_B_ASSETS; FULL_REPLAY_AND_C3_OPEN",
+      "state": "PASS_ZERO_ACTION_SETUP_COMMON_FIELDS_SEED_COMPONENT; FULL_REPLAY_AND_C3_OPEN",
       "run_id": "browser-rollback-sprint-20261022-115029-d89e262b",
       "artifact_paths_relative_to_run": true,
       "source": {
-        "current_checkpoint": "cbcf54bbff5a583edba5601f020ea0102fc4a34c",
-        "current_tree": "e6bac84955727eac42ac552d8f6aba318f197851",
-        "prior_checkpoint": "76957cee93b63108589e033ba6b0dce928881e44",
-        "runtime_producer": "76957cee plus 13 reviewed producer-worktree files; fresh54 actual binary producer distinct from clean source and historical35b04+2."
+        "current_checkpoint": "edac54baf06fc3af7b65853764bbdeec62294aed",
+        "current_tree": "f65ec11022de7688ecfa3bd317fad8fe37873e1e",
+        "prior_checkpoint": "4258918a03e979158bf4fea86369a9bb2b584e70",
+        "runtime_producer": "4258918a plus7 reviewed producer-worktree files; final source8 differs only by reviewed legacy fixture repair. Historical preparedStart76957+13 retained separately."
       },
       "validation": {
         "earlier_later_SSS_full": {
@@ -22791,6 +22791,230 @@
           "Whole-session replay incomplete; two expected outer finalization failures retained."
         ],
         "ci": "Published76957cee has14 completed checks:12 success/2 expected skips; cbcf54bb and final docs head CI pending."
+      },
+      "prior_prepared_start_capture_source": {
+        "current_checkpoint": "cbcf54bbff5a583edba5601f020ea0102fc4a34c",
+        "current_tree": "e6bac84955727eac42ac552d8f6aba318f197851",
+        "prior_checkpoint": "76957cee93b63108589e033ba6b0dce928881e44",
+        "runtime_producer": "76957cee plus 13 reviewed producer-worktree files; fresh54 actual binary producer distinct from clean source and historical35b04+2."
+      },
+      "prior_state_before_prepared_setup": "PASS_PROFILE2_PREPARED_START_COMMON_COMPONENT_CURSOR940_NO_B_ASSETS; FULL_REPLAY_AND_C3_OPEN",
+      "prepared_setup_zero_action": {
+        "state": "PASS_INDEPENDENTLY_REVIEWED_COMMON_FIELDS_AND_SEED_COMPONENT_ONLY",
+        "pins": {
+          "clean_checkpoint": {
+            "path": "stadium-later-sss-prepared-setup-validation-v2/clean-checkpoint-v1.json",
+            "bytes": 3471,
+            "sha256": "4bb90b8e59e3324fc3773429c45b6d4328acccda1fd5f51cbb7253bc1ec3d216"
+          },
+          "source_harness8": {
+            "path": "stadium-later-sss-prepared-setup-validation-v2/application-v1.json",
+            "bytes": 4755,
+            "sha256": "84edec48ec06604d084257772cbbd420c0a2cb399f7149435ed5e8a83b2a902b"
+          },
+          "final_full": {
+            "path": "stadium-later-sss-prepared-setup-validation-v2/result-v1.json",
+            "bytes": 12840,
+            "sha256": "91ebbf0a5d3e84d706c3d81ab5c66612e416d9bcf100c4319b3db5ea5e3e9999"
+          },
+          "runtime_producer7": {
+            "path": "stadium-later-sss-prepared-setup-validation-v1/application-v1.json",
+            "bytes": 5892,
+            "sha256": "5e734621aced11f236df1d3bafb431567c7b41916835fdd57137572ae4ae1de0"
+          },
+          "both_builds": {
+            "path": "stadium-later-sss-prepared-setup-validation-v1/native-build-result-v1.json",
+            "bytes": 8120,
+            "sha256": "c0cde6461760e397d61b125695f374a3d45b019f9e7ec5be2c620e57c1c17f5f"
+          },
+          "runtime54": {
+            "path": "stadium-later-sss-prepared-setup-validation-v1/retained-runtime-inventory-v1.json",
+            "bytes": 38935,
+            "sha256": "b0883e7699144e370c68ed758f1586e0e99aac04f854a3837b5cbdb6b5c0d902"
+          },
+          "prior_failed_full": {
+            "path": "stadium-later-sss-prepared-setup-validation-v1/failure-v1.json",
+            "bytes": 9204,
+            "sha256": "f69b961b0d53fbe665f3d1c123954db882dd8d986c25bbe1c353fb0f599f2405"
+          },
+          "fixture_review": {
+            "path": "stadium-later-sss-prepared-setup-regression-fixture-independent-review-v1.json",
+            "bytes": 2235,
+            "sha256": "e41b45d6a2477041949b6f9b752a719e7b581bac119f8e3989b6f4c07ca18945"
+          },
+          "fixture_reduced": {
+            "path": "stadium-later-sss-prepared-setup-regression-fixture-candidate-v1/focused-owned-v1/result-v1.json",
+            "bytes": 1901,
+            "sha256": "2fb3e0336ea28406fd75f2b1eb53f70a6cf207758a60a0c96eb6e1d311d7f78b"
+          },
+          "source_freeze": {
+            "path": "stadium-later-sss-prepared-setup-candidate-v1/freeze-v3.json",
+            "bytes": 1536,
+            "sha256": "6a2641208640f8651bc4b7053eb36e18f3d10028f40ee3d540273ab09c9aa762"
+          },
+          "first_external_preflight_failure": {
+            "path": "stadium-later-sss-prepared-setup-candidate-v1/focused-owned-v1/result-v1.json",
+            "bytes": 2098,
+            "sha256": "43bc51baf6e9b30e62bb21c42ad1dc2c03e8508c4ebaaec8a61d038f5eca6d39"
+          },
+          "second_external_compile_failure": {
+            "path": "stadium-later-sss-prepared-setup-candidate-v1/focused-native-v2/result-v1.json",
+            "bytes": 2101,
+            "sha256": "4fce5fdeaa06721b3c16e2f10174a08e1442b965dda1040c47be109a40091a20"
+          },
+          "native_reduced_pass": {
+            "path": "stadium-later-sss-prepared-setup-candidate-v1/focused-native-v3/result-v1.json",
+            "bytes": 2114,
+            "sha256": "a7f0910d27a995ebb73144e0f73e39bc69765c0638dbb75572bf0865c06589cd"
+          },
+          "remaining_controls": {
+            "path": "stadium-later-sss-prepared-setup-candidate-v1/focused-remaining-v3/result-v1.json",
+            "bytes": 4550,
+            "sha256": "51c5a99387c539f936e424c8ab7a393f87caccab0841aefa7542aa53a6e46990"
+          },
+          "packet": {
+            "path": "stadium-later-sss-prepared-setup-capture-packet-v1/manifest.json",
+            "bytes": 165737,
+            "sha256": "0e2b204fc6b8764d0b4f6c9b4dadb23904e1e48119a6d33834c33782386bf3b7"
+          },
+          "report": {
+            "path": "stadium-later-sss-prepared-setup-capture-v1/browser-run/report.json",
+            "bytes": 687547,
+            "sha256": "7cfc33e818f1faa010cd63fab2ff19be6dc6ef2fdf6bf42eeed01b88cc9b6e2d"
+          },
+          "prepared_start": {
+            "path": "stadium-later-sss-prepared-setup-capture-v1/browser-run/current-sss-prepared-start-observation.json",
+            "bytes": 6286,
+            "sha256": "4e9f1065f19c6429aa8319b64f64703e2555b394dbe9a3ea3284f881817d940c"
+          },
+          "prepared_setup": {
+            "path": "stadium-later-sss-prepared-setup-capture-v1/browser-run/current-sss-prepared-to-setup-observation.json",
+            "bytes": 20121,
+            "sha256": "93f79370628772c1786c856d3634a9d494fa199c87df79cf098e95eb4ab380ab"
+          },
+          "unload": {
+            "path": "stadium-later-sss-prepared-setup-capture-v1/browser-run/current-sss-exit-unloaded-observation.json",
+            "bytes": 11851,
+            "sha256": "027ed986e93afa94cdc0cb6ca1ca4569a60c486f3a12430ccfed42130bc65ebc"
+          },
+          "literal_trace": {
+            "path": "stadium-later-sss-prepared-setup-capture-v1/browser-run/retail-port.jsonl",
+            "bytes": 2277597,
+            "sha256": "ef5e9524b240839b484b547e0b3131e488b042d25617b94ef25c75fa36f585dd"
+          },
+          "owner": {
+            "path": "stadium-later-sss-prepared-setup-capture-v1/owner.json",
+            "bytes": 115036,
+            "sha256": "08a950a00ae464e64ae982499f79b88f7aecc8958e2993cef95411ce7e272392"
+          },
+          "postflight": {
+            "path": "stadium-later-sss-prepared-setup-capture-v1/postflight-inputs-v1.json",
+            "bytes": 39143,
+            "sha256": "b72bf2185eda98b3ccab05fde6a72849bb3513d73bb1c423fe82d494e2405848"
+          },
+          "cleanup_review": {
+            "path": "stadium-later-sss-prepared-setup-capture-v1/root-cleanup-review-v1.json",
+            "bytes": 1797,
+            "sha256": "28223eacd977331611440bc2b87d229a9b0a518b390415037737fbea9c614660"
+          },
+          "independent_raw_review": {
+            "path": "stadium-later-sss-prepared-setup-raw-independent-review-v1.json",
+            "bytes": 6634,
+            "sha256": "46b69f01f776456ec5c6714c4f7398542cbd9a054d1508f142c88b3cc17fe707"
+          }
+        },
+        "independent_raw_review": {
+          "path": "stadium-later-sss-prepared-setup-raw-independent-review-v1.json",
+          "bytes": 6634,
+          "sha256": "46b69f01f776456ec5c6714c4f7398542cbd9a054d1508f142c88b3cc17fe707"
+        },
+        "validation": {
+          "final_tests": 2767,
+          "skips": 195,
+          "seconds": 569.727,
+          "prior_failed_tests": 2767,
+          "prior_failed_skips": 195,
+          "prior_failed_seconds": 581.207,
+          "prior_failures": 2,
+          "fixture_physical_files": 1,
+          "final_source_files": 8,
+          "runtime_producer_files": 7,
+          "release_outputs_reused_after_test_only_repair": true
+        },
+        "actual": {
+          "Entry_sequence": 4235,
+          "Entry_seed": "7fc17cf1",
+          "Setup_sequence": 4313,
+          "Setup_seed": "25d557a7",
+          "literal_four_port_rows": 940,
+          "local_order_rows": 1887,
+          "menu_ticks": 535,
+          "menu_world": 6,
+          "match_world": 7,
+          "asset_request_count": 1,
+          "asset_generation": 5,
+          "construction_steps": 6,
+          "source_frames": 0,
+          "host_ticks": 0,
+          "host_draws": 0,
+          "audio_calls_before_after": [
+            950,
+            950
+          ],
+          "audio_frames_before_after": [
+            506665,
+            506665
+          ],
+          "parent_seed_owner_value_restored": true,
+          "tick_return_distribution": [
+            {
+              "steps": 1,
+              "draws": 0,
+              "count": 921
+            },
+            {
+              "steps": 2,
+              "draws": 1,
+              "count": 19
+            }
+          ],
+          "postflight_pins": 224,
+          "recorded_pids_absent": 14,
+          "recorded_pgids_absent": 4,
+          "unload_phase": 0,
+          "native_constructor_only": {
+            "callback_count": 1,
+            "randi_call_count": 1,
+            "bound": 200,
+            "result": 72,
+            "countdown": 3672,
+            "intermediate_seed_after": "5ce52bf0",
+            "original_constructor_dispatch_or_rng_parity": false
+          }
+        },
+        "scope": [
+          "Declared common fields/source-slot projection plus exact dynamic Setup seed only; no raw Start ABI parity.",
+          "Zero post-Setup source actions; original B constructor/map2/title/GO witnesses missing from retained whole-session reference.",
+          "Constructor RNG profile UNKNOWN; callback dispatch NOT_CLAIMED; per-owner original RNG correspondence not established.",
+          "Original menu draws UNKNOWN; local1887 trace only.",
+          "Whole replay remains FAIL_INCOMPLETE_EXPLICIT_SSS_STOP with two expected outer finalization failures.",
+          "No public admission, transformations, timing, pixels/PCM or C3 acceptance."
+        ],
+        "whole_replay": {
+          "complete": false,
+          "pass": false,
+          "failures": [
+            "whole-session final CSS was not entered",
+            "Manual unload stopped the replay",
+            "incomplete input timeline",
+            "source tick/draw count mismatch"
+          ],
+          "finalization_failures": [
+            "Whole-session replay did not complete successfully",
+            "Browser replay report is incomplete or failed"
+          ],
+          "original_replay_capture_result": "fail"
+        }
       }
     }
   }
