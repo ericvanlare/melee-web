@@ -247,6 +247,10 @@ CurrentSssExitState current_sss_exit;
 struct LaterSssContinuation {
  bool armed=false;
  unsigned stage=0,requested_generation=0;
+ const melee_web::GameplayMatchSession* pause_match_owner=nullptr;
+ uint64_t pause_generation=0;
+ size_t pause_next_cursor=450;
+ bool pause_finished=false;
  const MeleeWebPadState* input=nullptr;
  std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> input_bytes{};
 };
@@ -2572,7 +2576,7 @@ void begin_typed_results(const MeleeWebMenuMatchContinuation& continuation,
  results_route_active=true;results_seed=seed;++completed_matches;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  if(later_sss.armed){
-  check(later_sss.stage==2&&later_sss_context_owned()&&replay_cursor==462&&completed_matches==1,
+  check(later_sss.stage==2&&later_sss_context_owned()&&later_sss.pause_finished&&replay_cursor==462&&completed_matches==1,
         "Later SSS continuation requires the actual first match Results transition");
   later_sss.stage=3;
  }
@@ -3020,6 +3024,7 @@ bool finish_asset_handoff(){
   match=std::make_unique<melee_web::GameplayMatchSession>(files,asset_selection,*archive_cache,
       melee_web::GameplayMatchConstruction::Deferred,*later_sss.input,
       melee_web::GameplayMatchDiagnostic::StadiumReady);
+  later_sss.pause_match_owner=match.get();
   later_sss.stage=2;running=false;pending=false;first_use_draw_pending=false;
   return false;
  }
@@ -4078,6 +4083,53 @@ bool later_sss_recipe_valid(const melee_web::RetailReplayRecipe& recipe){
   if(recipe.spans[i].scene!=scenes[i]||recipe.spans[i].first_frame!=first[i]||
      recipe.spans[i].last_frame!=last[i])return false;
  return true;
+}
+// Only the two recorded chords and ten literal release rows of private A.
+// The source flow performs pause/NoContest; this capability never writes it.
+bool later_sss_pause_pads(const PADStatus* pads,size_t cursor){
+ if(!pads)return false;
+ for(size_t port=0;port<4;++port){
+  const auto& p=pads[port];
+  const bool chord=port==0&&(cursor==450||cursor==461);
+  if(p.button!=(chord?0x1160:0)||p.stickX||p.stickY||p.substickX||p.substickY||
+     p.triggerLeft!=(chord?255:0)||p.triggerRight!=(chord?255:0)||
+     p.analogA||p.analogB||p.err!=(port<2?0:-1))return false;
+ }
+ return true;
+}
+bool later_sss_pause_before(const PADStatus* sample){
+ if(!later_sss.armed||replay_cursor<450||replay_cursor>461)return false;
+ check(later_sss.stage==2&&later_sss_context_owned()&&later_sss_recipe_valid(*replay)&&
+       match&&match.get()==later_sss.pause_match_owner&&completed_matches==0&&
+       !later_sss.pause_finished&&later_sss.pause_next_cursor==replay_cursor&&
+       later_sss_pause_pads(sample,replay_cursor)&&
+       later_sss_pause_pads(replay->frames[replay_cursor].pads.data(),replay_cursor),
+       "Later SSS A pause workload lost its literal recipe/lifecycle/owner");
+ MeleeWebMatchPauseObservation o{};
+ check(match->diagnostic_pause_observation(o)&&o.generation&&o.frame==56&&
+       !o.complete&&o.result==OUTCOME_NONE&&
+       o.paused==(replay_cursor!=450)&&
+       o.pause_timer==(replay_cursor==450?0:461-replay_cursor),
+       "Later SSS A pause workload lost its original pre-tick clock");
+ if(replay_cursor==450)later_sss.pause_generation=o.generation;
+ check(o.generation==later_sss.pause_generation,
+       "Later SSS A pause workload changed source generation");
+ return true;
+}
+void later_sss_pause_after(){
+ if(!later_sss.armed||replay_cursor<450||replay_cursor>461)return;
+ MeleeWebMatchPauseObservation o{};
+ check(match&&match.get()==later_sss.pause_match_owner&&
+       later_sss_context_owned()&&later_sss.stage==2&&
+       later_sss.pause_next_cursor==replay_cursor&&
+       match->diagnostic_pause_observation(o)&&o.generation==later_sss.pause_generation&&
+       o.frame==56&&o.pause_timer==(replay_cursor==461?0:460-replay_cursor)&&
+       o.result==(replay_cursor==461?OUTCOME_NO_CONTEST:OUTCOME_NONE)&&
+       o.complete==(replay_cursor==461)&&
+       (replay_cursor==461||o.paused),
+       "Later SSS A pause workload lost its original post-tick clock/outcome");
+ ++later_sss.pause_next_cursor;
+ if(replay_cursor==461)later_sss.pause_finished=true;
 }
 bool later_sss_selected_leave(){
  if(!later_sss.armed)return true;
@@ -5316,13 +5368,20 @@ void tick(){
      }
      sample=replay->frames[replay_cursor].pads.data();
     }
-    else if(replay_whole)
-     check(!match->paused(),"Whole-session replay reached an unsupported source pause");
+    else if(replay_whole){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+     if(!later_sss_pause_before(sample))
+#endif
+      check(!match->paused(),"Whole-session replay reached an unsupported source pause");
+    }
     if(replay_whole)melee_web_cpu_observation_set_event_cursor(replay_cursor);
     // gm_801A4BA8 is the original scene traversal cursor (MWRO80479d58),
     // not the gameplay timer returned by source_frames()/gm_GetFrameCount.
     const auto prefix_tick_before=replay&&replay->diagnostic_entity_prefix?gm_801A4BA8():0;
     match->tick(sample);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(replay_whole)later_sss_pause_after();
+#endif
     if(replay&&replay->diagnostic_entity_prefix)
      check(replay_prefix_progress.observe(prefix_tick_before,gm_801A4BA8(),replay->diagnostic_active_entity_prefix) &&
            !match->paused()&&!match->complete()&&!match->ending(),

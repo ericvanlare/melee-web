@@ -3,6 +3,9 @@
 #include "gameplay_menu_host.h"
 #include "gameplay_match_context.h"
 #include <memory>
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+#include "gameplay_match_flow.h"
+#endif
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
 #include "pipeline_provenance.h"
 #endif
@@ -55,6 +58,9 @@ public:
     bool opening_demo() const;
     bool sudden_death() const;
     bool paused() const;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    bool diagnostic_pause_observation(MeleeWebMatchPauseObservation&) const;
+#endif
     uint32_t source_frames() const;
     int hud_damage(unsigned player) const;
     uint32_t random_seed() const;

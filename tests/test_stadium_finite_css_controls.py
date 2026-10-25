@@ -329,6 +329,19 @@ struct FakeReplay{
 };
 '''
 WRAPPER_SERVICES=r'''
+// This finite CSS fixture has no match/replay or private later-SSS owner.
+// The real private pause helpers are separately extracted and exercised by
+// test_stadium_later_sss_continuation; reject every context outside this fixture.
+bool finite_later_sss_armed=false;
+unsigned later_pause_before_calls=0,later_pause_after_calls=0;
+void check_finite_pause_scope(){
+ if(finite_later_sss_armed||match||replay)
+  throw std::runtime_error("Finite CSS fixture refuses private match/replay pause scope");
+}
+bool later_sss_pause_before(const PADStatus* sample){
+ (void)sample;++later_pause_before_calls;check_finite_pause_scope();return false;
+}
+void later_sss_pause_after(){++later_pause_after_calls;check_finite_pause_scope();}
 int control_em_asm(const char* code){return std::strstr(code,"menuServiceCommands")?service_commands():1;}
 struct RawInput{PADStatus raw[4]{};unsigned samples=0;}input_storage;RawInput* input=&input_storage;
 namespace melee_web{
@@ -366,6 +379,14 @@ int melee_web_menu_host_leave(MeleeWebMenuHost*,int,char*,size_t){
 '''
 WRAPPER_MAIN=r'''
 int run(){
+ baseline(3);assert(!match&&!replay&&!finite_later_sss_armed);
+ assert(!later_sss_pause_before(nullptr));later_sss_pause_after();
+ auto rejects=[](auto f){bool stopped=false;try{f();}catch(const std::runtime_error&){stopped=true;}assert(stopped);};
+ auto reject_both=[&](){rejects([]{(void)later_sss_pause_before(nullptr);});rejects([]{later_sss_pause_after();});};
+ finite_later_sss_armed=true;reject_both();finite_later_sss_armed=false;
+ FakeSession foreign_match;match=&foreign_match;reject_both();match=nullptr;
+ FakeReplay foreign_replay;replay=&foreign_replay;reject_both();replay=nullptr;
+ later_pause_before_calls=later_pause_after_calls=0;
  for(unsigned count:{3u,7u}){
   baseline(count);clear_diagnostic_calls=source_leave_calls=preparation_profile_calls=0;
   assert(melee_web_native_menu_stadium_first_css_fresh_finite_v4_stream_arm()==1);
@@ -394,6 +415,7 @@ int run(){
  first_css_browser_postdraw_stream={};clear_diagnostic_calls=source_leave_calls=preparation_profile_calls=0;
  native_result=3;source_callback();assert(pending&&clear_diagnostic_calls==1&&native_ticks==1&&!preparation.busy());
  next_command_callback();assert(!pending&&!running&&preparation.waiting_for_audio()&&source_leave_calls==1&&preparation_profile_calls==1&&!host_entered);
+ assert(later_pause_before_calls==0&&later_pause_after_calls==0&&!match&&!replay&&!finite_later_sss_armed);
  std::cout<<"PASS whole native source loop: final result3 breaks before shared pending handler; next command fence and final authorization succeed; forced shared-tail mutation detected; ordinary result3 enters real preparation\n";
  return 0;
 }

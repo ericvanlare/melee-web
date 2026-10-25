@@ -582,6 +582,11 @@ bool GameplayMatchSession::complete()const{return storage_&&melee_web_match_flow
 bool GameplayMatchSession::opening_demo()const{return storage_&&storage_->selected.opening_demo!=0;}
 bool GameplayMatchSession::sudden_death()const{return storage_&&storage_->selected.sudden_death!=0;}
 bool GameplayMatchSession::paused()const{return storage_&&melee_web_match_flow_paused(storage_->flow);}
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+bool GameplayMatchSession::diagnostic_pause_observation(MeleeWebMatchPauseObservation& out)const{
+    return storage_&&melee_web_match_flow_pause_observation(storage_->flow,&out);
+}
+#endif
 uint32_t GameplayMatchSession::source_frames()const{return storage_?melee_web_match_flow_frames(storage_->flow):0;}
 int GameplayMatchSession::hud_damage(unsigned player)const{
     if(!storage_||player>=storage_->content.player_count)return -1;
