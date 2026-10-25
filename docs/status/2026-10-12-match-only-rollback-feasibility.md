@@ -1,6 +1,6 @@
 # Match-only rollback feasibility
 
-**Compiled / Source-only snapshot diagnostic / Terminal browser tick-and-draw diagnostic / One-tick CPU restore-replay-and-present passed; two-tick command 11 remains strict 1216 with class/piece owner unknown; source-only frozen-table reduction in flight, no new capture authorized / Full browser rollback and frame-budget feasibility unproven**
+**Compiled / Source-only snapshot diagnostic / Terminal browser tick-and-draw diagnostic / One-tick CPU restore-replay-and-present passed; two-tick command 11 remains strict 1216; saved PRE descriptor maps to hsdLObj and offset 60 is layout-consistent with lvec.x, while live piece remains unknown (reason 7); source-only reduction in flight, no new capture authorized / Full browser rollback and frame-budget feasibility unproven**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
 [merged #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
@@ -29,10 +29,10 @@ failed at the strict final CPU payload comparison; its retained result is record
 below. The earlier pool-provenance diagnostic also stops at strict code1216: its
 fixed witness reports no current recorded pool event and no type or pool
 attribution. The earlier allocation-origin diagnostic observed generated
-`class.c:219`, without identifying a typed object or member. A newer class/piece
-lifecycle capture again stops at strict 1216 and observes generated `class.c:242`;
-its witness remains UNKNOWN and does not tie its first event to the failing allocation.
-A source-only frozen-table reduction is now in flight; no new capture is authorized.
+`class.c:219`, without identifying a typed object or member. The prior class/piece
+lifecycle capture stopped at strict 1216 and observed generated `class.c:242`;
+its witness remained UNKNOWN and did not tie its first event to the failing allocation.
+The frozen source plan remains proposal-only. A bounded external source-only HSD_LObj/lvec lighting reducer is authorized; no production implementation or browser capture is authorized.
 Later typed domains and final present remain unrun. Component controls and the
 one-tick browser result do not establish full browser rollback. Earlier owner controls
 also repaired callback guards so simulation and draw callbacks refuse separately;
@@ -397,7 +397,7 @@ diagnostics. The live piece and typed class/member remain unknown. The diagnosti
 restore range; no two-tick pass, final present, pixel/PCM acceptance, or full browser
 rollback is established.
 
-The latest root-released class/piece diagnostic used clean source checkpoint
+The prior root-released class/piece diagnostic used clean source checkpoint
 `4c0eaea` / tree `ff7661c1`, distinct from the native runtime producer
 `55779d1e` plus its exact 16 reviewed producer-worktree files (including test-only files);
 all 24 retained/live runtime
@@ -417,6 +417,29 @@ renderer shutdown return 1; all 10 recorded PIDs are absent. Commands 12/13 and
 final present were not reached. Exact validation, configuration, capture and
 independent replay pins are in the structured receipt under
 `class_piece_lifecycle_capture_v1`.
+
+The follow-up capture-time-only witness again stops at strict command 11 / 1216:
+domain 4, row 62, offset 284, expected 106 and actual 189 in the 1,024-byte
+payload. Sample-300 and sample-301 raw observation, PCM, PAD, RNG-profile and
+transfer pairs match, including the literal PADs. The 160-byte CAPTURE_TIME_ONLY
+record joins the first difference to saved PRE header value `class_info=0xce260`;
+the fresh linked map identifies that address as `hsdLObj` in
+`libhsd_native_runtime.a(lobj.c.o):.data.hsdLObj`. A compile using the actual
+production Wasm32 flags and prepared headers reports `sizeof(HSD_LObj)=212`,
+alignment 4, and `lvec` at offset 60 with extent 12. The captured piece offset 60
+is therefore consistent with the saved descriptor's `lvec.x` layout. This is a
+saved-header/layout hypothesis only: the 208-byte live witness remains status 2,
+reason 7, with no confirmed live class/piece or uninterrupted lifetime. The
+source reduction finds named `lvec` reads in specular rendering (`lobj.c:329/335`)
+and view-space cache writes in setup (`lobj.c:393–399`); it does not show a
+simulation consumer or restore safety. The native CLOSE returned the latched
+1216; snapshot close and renderer shutdown each returned 1. All 10 recorded
+owned PIDs were independently absent. Later CPU domains, commands 12/13 and
+final present were not reached. The source-only reduction plan remains a proposal
+with no implementation or new capture authorized. See
+`class_piece_capture_time_v1` in the structured receipt for exact identities and
+scope.
+
 
 ## First current-source copy/restore result
 

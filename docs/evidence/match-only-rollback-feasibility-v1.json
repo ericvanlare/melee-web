@@ -2,7 +2,7 @@
   "schema": "match-only-rollback-feasibility-v1",
   "issue": 318,
   "pr": 319,
-  "status": "same_browser_one_tick_drawn_reference_pass_two_tick_command11_strict1216_class_piece_unknown_source_only_frozen_table_reduction_in_flight_full_browser_restore_not_established",
+  "status": "same_browser_one_tick_drawn_reference_pass_two_tick_command11_strict1216_saved_lobj_lvec_x_layout_hypothesis_capture_time_only_live_piece_unknown_external_lvec_lighting_reducer_authorized_no_production_or_browser_capture_full_browser_restore_not_established",
   "source_only_baseline": {
     "boundary": "synchronous-source-only-exported-call-return",
     "sourceDrawing": false,
@@ -2429,7 +2429,7 @@
   },
   "same_instance_browser_restore_341": {
     "issue": 341,
-    "status": "ONE_TICK_DRAWN_REFERENCE_PASS; TWO_TICK_COMMAND11_STRICT1216; CLASS_PIECE_WITNESS_UNKNOWN_AT_CLASS_C242; SOURCE_ONLY_FROZEN_TABLE_REDUCTION_IN_FLIGHT; CENSUS_INCOMPLETE; FULL_BROWSER_RESTORE_NOT_ESTABLISHED",
+    "status": "ONE_TICK_DRAWN_REFERENCE_PASS; TWO_TICK_COMMAND11_STRICT1216; CAPTURE_TIME_ONLY_SAVED_HSD_LOBJ_LVEC_X_LAYOUT_HYPOTHESIS; LIVE_PIECE_UNKNOWN_REASON7; EXTERNAL_SOURCE_ONLY_LVEC_LIGHTING_REDUCER_AUTHORIZED; NO_PRODUCTION_IMPLEMENTATION_OR_BROWSER_CAPTURE; CENSUS_INCOMPLETE; FULL_BROWSER_RESTORE_NOT_ESTABLISHED",
     "producer_base_commit": "130438fd2b86d00cfec98cd2ba0a5f66084ae15c",
     "producer_worktree": "uncommitted source; census runtime/harness and separate owner component sources pinned below; not a commit identity",
     "runtime_sha256": {
@@ -2558,7 +2558,7 @@
     },
     "remaining": [
       "complete source/project mutable-static coverage and dynamic source/asset/stream/file ownership",
-      "reduce the retained command-11 final CPU payload mismatch before selecting another bounded hypothesis; the two-tick comparison stopped before later domains and final present",
+      "establish live ownership and continuity for the saved HSD_LObj/lvec.x hypothesis and reduce the strict command-11 payload mismatch; later CPU domains and final present remain unrun",
       "render-to-simulation dependencies and safe host effects across no-draw correction; renderer/GPU/cache state remains outside rewind scope",
       "whole-session, original-game parity, continuous PCM, pixel parity and foreground timing acceptance"
     ],
@@ -2600,7 +2600,7 @@
       "retained_artifact": "census-owner-gap-analysis-v1.json",
       "sha256": "9908b8d2ebb8aeeb64d8df4dcdeb24ea0f16f55bab3d17e1f847c679f90ba370"
     },
-    "next_experiment": "Source-only frozen-table reduction is in flight for the unknown class/piece owner at the current generated class.c:242 allocation callsite. No new capture is authorized. Do not guess a type/member, mask bytes, change restore admission, or rerun the failed capture.",
+    "next_experiment": "Run the authorized external source-only HSD_LObj/lvec lighting producer/consumer reduction. The authorization covers only that external reducer; no production implementation or browser capture is authorized. The saved-PRE member/layout match does not establish live ownership or simulation use.",
     "owner_components": {
       "scope": "Private owner components only; no browser restore exposure or complete-world claim",
       "current_files_sha256": {
@@ -6681,6 +6681,349 @@
         "No same-instance whole-browser restore, final-present, full-state closure, seven-tick acceptance, pixel/PCM acceptance, foreground timing or whole-session acceptance is established."
       ],
       "next_experiment": "Source-only frozen-table reduction is in flight. No new capture is authorized; do not guess a type/member, mask bytes, change restore admission, or rerun the failed capture."
+    },
+    "class_piece_capture_time_v1": {
+      "status": "FAILED_COMMAND11_STRICT1216; CAPTURE_TIME_ONLY_SAVED_HSD_LOBJ_LVEC_X_LAYOUT_HYPOTHESIS; LIVE_PIECE_UNKNOWN_REASON7; NO_LATER_DOMAINS_OR_FINAL_PRESENT",
+      "scope": "One root-released two-tick diagnostic with a capture-time-only saved PRE header witness. It confirms the strict command-11 payload difference and saved descriptor/map/layout correlation; it does not establish live HSD_LObj continuity, typed ownership, restore safety, later domains, or final present.",
+      "source_and_validation": {
+        "clean_source_checkpoint": {
+          "head": "d4676a696279a43beeff3442669aee7b58475518",
+          "tree": "5ffa9f8594aded110222c849d027a542fe9eb48d",
+          "clean": true,
+          "verified_source_files": 12,
+          "receipt": {
+            "path": "class-piece-capture-time-validation-v1/source-checkpoint-v1.json",
+            "bytes": 13218,
+            "sha256": "9cc91d3ae72811dda6953a29e4c465a42293eb7154636b9a6bdd6ddd8845bd9d"
+          },
+          "identity_note": "This clean source checkpoint is separate from the native runtime producer."
+        },
+        "native_runtime_producer": {
+          "base_commit": "3c7dcbf7f38e8f16d54fa75528842576a37d5690",
+          "base_tree": "cf1ae81d3c1b00b6b6da08ca380b4ce4a34507e7",
+          "producer_worktree_files": 12,
+          "runtime_file_count": 24,
+          "identity": "The native/runtime producer is 3c7dcbf7 plus the exact 12 reviewed dirty producer-worktree files; do not relabel it as clean source d4676a69.",
+          "inventory": {
+            "path": "class-piece-capture-time-validation-v1/runtime-inventory-v1.json",
+            "bytes": 18909,
+            "sha256": "43709572ad24585eebc930c2714ae50a93d0beed26b91f85bc38e2cde7be59e0"
+          },
+          "retained_private_v6_runtime": {
+            "path": "class-piece-capture-time-validation-v1/private-v6-release-runtime-v1.json",
+            "bytes": 10690,
+            "sha256": "55eac04ac8cd46513a35d1e69f85256ae3a67f34d7cb886bda6800fe2d8d4c28"
+          }
+        },
+        "full_regression": {
+          "status": "PASS",
+          "outer_tests": 2473,
+          "passed": 2308,
+          "skipped": 165,
+          "outer_seconds": 594.579,
+          "outer_footer": "OK (skipped=165)",
+          "no_rerun": true,
+          "command_record": {
+            "path": "class-piece-capture-time-validation-v1/full-regression-command-result-v1.json",
+            "bytes": 497,
+            "sha256": "37cce9d0f400c6318c892e88e46cffe140c977c88848d5bca36d585be35050d7"
+          },
+          "summary_record": {
+            "path": "class-piece-capture-time-validation-v1/full-regression-summary-v1.json",
+            "bytes": 11487,
+            "sha256": "c8ca12cc750002d855cbdf0af59090a65f11bbc4638f69586f90c91d7f5eb3e8"
+          },
+          "log": {
+            "path": "class-piece-capture-time-validation-v1/full-regression.log",
+            "bytes": 470389,
+            "sha256": "5874c7dfb6aa2004025e205a51a3155057ddccb35b2699b34e9da37dd309cd09"
+          },
+          "receipt_note": "This validation used distinct command-result-v1 and summary-v1 records with the same exit-0 log. The older class-piece-lifecycle receipt collision remains confined to its historical subtree."
+        },
+        "release_builds": {
+          "status": "PASS",
+          "count": 3,
+          "integration_receipt": {
+            "path": "class-piece-capture-time-validation-v1/integration-result-v1.json",
+            "bytes": 15102,
+            "sha256": "86469f2656e547136dff43299e91c4c98b05d7608d95213df8b95db91c30eb2d"
+          },
+          "build_receipt": {
+            "path": "class-piece-capture-time-validation-v1/native-build-result-v1.json",
+            "bytes": 9096,
+            "sha256": "d494dd8fe63aea0de935e7a1fbb28bda4ee9cc7f984ee05807c1b89f2c4e1a2e"
+          }
+        }
+      },
+      "runtime": {
+        "profile_identity": "slippi-render-dependencies-logical-frame-v6",
+        "profile_seed": 324508639,
+        "runtime_file_count": 24,
+        "runtime_inventory": {
+          "path": "class-piece-capture-time-validation-v1/runtime-inventory-v1.json",
+          "bytes": 18909,
+          "sha256": "43709572ad24585eebc930c2714ae50a93d0beed26b91f85bc38e2cde7be59e0"
+        },
+        "primary_runtime_sha256": {
+          "gameplay_slippi_synctest_browser.mjs": "bb5a878d4777b0b949e54393efcdb663338dbcd48928166bb781d3d9ddafbc0a",
+          "gameplay_slippi_synctest_browser.wasm": "2273ef476a81c7d910c34576dbaabaf970322e871d1eb24f7745765e9344294e",
+          "gameplay_slippi_synctest_browser.data": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c"
+        },
+        "source_state_manifest_sha256": "4ece50c9c08af05f30dd43d771c53de26cbc3623c5036172d30e7191feba88d0"
+      },
+      "fresh_linked_configuration": {
+        "configuration_sha256": "cc2a0588ae7d4d73e2aa18258a4baf5a8e580417a5ab420c3d4b4c6bcf6d87c9",
+        "policy_sha256": "bc30e668b1c46a62b600202f7c2b8a35c050b8e343d188a22e7606fbd0803080",
+        "configuration": {
+          "path": "class-piece-capture-time-linked-config-candidate-v1/final-linked-configuration-v1.json",
+          "bytes": 915132,
+          "sha256": "cc2a0588ae7d4d73e2aa18258a4baf5a8e580417a5ab420c3d4b4c6bcf6d87c9"
+        },
+        "policy": {
+          "path": "class-piece-capture-time-linked-config-candidate-v1/reviewed-policy-v10.json",
+          "bytes": 1000812,
+          "sha256": "bc30e668b1c46a62b600202f7c2b8a35c050b8e343d188a22e7606fbd0803080"
+        },
+        "independent_review": {
+          "path": "class-piece-capture-time-linked-config-candidate-v1/root-independent-review-v1.json",
+          "bytes": 2226,
+          "sha256": "23fa736a53fc1ecbeb505623a2d854e1404a7ed69f67df529de3737d0f6aea1b"
+        },
+        "map": {
+          "path": "class-piece-capture-time-validation-v1/retained-runtime/private-v6-release/gameplay_slippi_synctest_browser.map",
+          "bytes": 7721756,
+          "sha256": "235c8b5f3348c86923d98dacca8d3e62ae64254733b3ee37f43a11ea54e7954f"
+        },
+        "manifest": {
+          "path": "class-piece-capture-time-validation-v1/retained-runtime/private-v6-release/gameplay_slippi_synctest_browser.source-state.json",
+          "bytes": 1394113,
+          "sha256": "4ece50c9c08af05f30dd43d771c53de26cbc3623c5036172d30e7191feba88d0"
+        },
+        "saved_class_info_map_join": {
+          "address": "0xce260",
+          "symbol": "hsdLObj",
+          "source": "src/sysdolphin/baselib/lobj.c",
+          "object": "libhsd_native_runtime.a(lobj.c.o)",
+          "section": ".data.hsdLObj",
+          "extent": 64,
+          "restore_admitted": false
+        }
+      },
+      "capture_pins": {
+        "capture_packet": {
+          "path": "class-piece-capture-time-capture-v1/packet-candidate-v1.json",
+          "bytes": 69970,
+          "sha256": "3ecb3ca00144b39cef9d9abac5ae8574d6746091de697b09287c7f435397a819"
+        },
+        "capture_preflight": {
+          "path": "class-piece-capture-time-capture-v1/preflight.json",
+          "bytes": 70509,
+          "sha256": "30a0ccadced4bd8a9cc7de1ed8cb29f98b8022a51d1d7a1c9edf080f206c940d"
+        },
+        "capture_root_release": {
+          "path": "class-piece-capture-time-capture-v1/root-release-v1.json",
+          "bytes": 2203,
+          "sha256": "dae9905bceedb5ffbdfcc25f4322ba2d90cb7d3b2d1b43a369bf36209beef2c6"
+        },
+        "capture_launch_result": {
+          "path": "class-piece-capture-time-capture-v1/launch-result-v1.json",
+          "bytes": 2719,
+          "sha256": "9bb1b6a3c1d915aee9c3c69016d31c54accf9e21de92aaed6369548f16159d6a"
+        },
+        "capture_owner": {
+          "path": "class-piece-capture-time-capture-v1/owner.json",
+          "bytes": 88019,
+          "sha256": "da1992a71d015ca7eb0efe20dee4472fb3f500c2970596c63e494f22a7be973d"
+        },
+        "capture_raw_report": {
+          "path": "class-piece-capture-time-capture-v1/runner/evidence.json",
+          "bytes": 1132968,
+          "sha256": "676e9163840b660697355a2c3081bdadb151f7720f9ed01db3a6384a513b6549"
+        },
+        "capture_runner_log": {
+          "path": "class-piece-capture-time-capture-v1/runner.log",
+          "bytes": 647,
+          "sha256": "4bbc139c15b2e63ad7bb65f878f85faa543f8585706f79cbd44e10c804e684a5"
+        },
+        "capture_process_trace": {
+          "path": "class-piece-capture-time-capture-v1/processes.jsonl",
+          "bytes": 65932,
+          "sha256": "3b78ea0a4a8b26449a13138bf7d0de539c8abeb9edbcefd54ace1eeb182bbf41"
+        },
+        "capture_root_observation": {
+          "path": "class-piece-capture-time-capture-v1/root-observed-v1.json",
+          "bytes": 7993,
+          "sha256": "2ce10a9d5a79f3e802cc35dad9acdb0cdc834a4313b09b39720c7c3320bc47a4"
+        },
+        "independent_raw_review": {
+          "path": "class-piece-capture-time-independent-review-v1/independent-replay-v1.json",
+          "bytes": 17988,
+          "sha256": "a99b1ee18db5b2a907ed0f26c587f5684b20e6a9f90dd78b20c2cb47a8ee26bb"
+        }
+      },
+      "observed": {
+        "capture_elapsed_ms": 10490,
+        "cleanup_ms": 68,
+        "overall_timeout_ms": 180000,
+        "cleanup_reserve_ms": 30000,
+        "native_result": {
+          "bytes": 35368,
+          "mode": 2,
+          "state": 6,
+          "first_failure": 1216,
+          "pre_frame": 176,
+          "post_frame": 178,
+          "checked_cpu_mask": "0x1e",
+          "matched_cpu_mask": "0x0e",
+          "last_command": 11,
+          "commands": [
+            {
+              "command": 8,
+              "result": 0
+            },
+            {
+              "command": 9,
+              "result": 0
+            },
+            {
+              "command": 10,
+              "result": 0
+            },
+            {
+              "command": 11,
+              "result": 1216
+            }
+          ]
+        },
+        "first_difference": {
+          "domain": 4,
+          "row": 62,
+          "offset": 284,
+          "expected": 106,
+          "actual": 189,
+          "allocation_bytes": 1024,
+          "requested_bytes": 1024,
+          "later_domains_checked": false,
+          "commands_12_13_executed": false,
+          "final_present_reached": false
+        },
+        "raw_sample_pairs": {
+          "sample300": {
+            "source_frame": 177,
+            "five_channel_pairs_match": true,
+            "literal_pad_44_base64": "AgAAAAAAAAAAAAABALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=",
+            "pad_sha256": "46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288"
+          },
+          "sample301": {
+            "source_frame": 178,
+            "five_channel_pairs_match": true,
+            "literal_pad_44_base64": "AABQAAAAAAAAAAAAALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=",
+            "pad_sha256": "c1be1a004e9e0fafa868a1f51540cef6f2fa3d6104e7b503c3b9eb5f79cbe63d"
+          }
+        },
+        "capture_time_only_160": {
+          "status": 1,
+          "reason": 0,
+          "scope": "CAPTURE_TIME_ONLY",
+          "first_difference_matches": true,
+          "pre_row": 62,
+          "post_row": 62,
+          "offset": 284,
+          "source": 2160236800,
+          "requested": 1024,
+          "capture_serial": "0x4745",
+          "event_serial": "0x4746",
+          "piece_source": 2160237024,
+          "piece_offset": 60,
+          "physical_bytes": 224,
+          "original_requested_bytes": 212,
+          "piece_generation": 18,
+          "saved_class_info": "0xce260",
+          "class_info": "0xce260",
+          "interpretation": "Saved PRE header and source/layout correlation only; not live continuity or restore authority."
+        },
+        "live_witness_208": {
+          "status": 2,
+          "reason": 7,
+          "coverage_state": 4,
+          "record_state": 0,
+          "class_info": 0,
+          "confirmed": false,
+          "interpretation": "Still refuses; no live class/piece confirmation."
+        },
+        "allocation_origin_320": {
+          "status": 1,
+          "reason": 0,
+          "first_difference_matches": true,
+          "site": "generated class.c:242 (hsdAllocMemPiece)",
+          "requested_bytes": 1024,
+          "interpretation": "Outer allocation callsite only; not a typed class/member."
+        },
+        "native_and_process_cleanup": {
+          "recorded_pids": 10,
+          "all_recorded_pids_absent": true,
+          "native_cpu_restore_close_result": 1216,
+          "snapshot_close_result": 1,
+          "renderer_shutdown_result": 1,
+          "renderer_closed": false,
+          "owner_cleanup_passed": true,
+          "note": "Native CPU CLOSE failed with latched 1216; OS process cleanup passed independently."
+        }
+      },
+      "saved_member_layout_hypothesis": {
+        "layout": {
+          "wasm_pointer_bytes": 4,
+          "HSD_LObj_bytes": 212,
+          "alignment": 4,
+          "lvec_offset": 60,
+          "lvec_extent": 12
+        },
+        "proof": {
+          "path": "saved-lobj-draw-cache-source-reduction-v1/layout-proof-v1.json",
+          "bytes": 6038,
+          "sha256": "f1bf2d5deac1da4ed6146ffcb8ae03073a964a980396c612679c3871b72cd6c6"
+        },
+        "compile_result": {
+          "path": "saved-lobj-draw-cache-source-reduction-v1/layout-result-v1.json",
+          "bytes": 7072,
+          "sha256": "ad497ee739e5910787851f97065dd59cde90f9cfaea8a36ea29b04be3445bfe6"
+        },
+        "llvm_ir": {
+          "path": "saved-lobj-draw-cache-source-reduction-v1/layout-control.ll",
+          "bytes": 918,
+          "sha256": "b12f1f825a36e2dd2608d4cee186aff1f9cec0772eef778036e005dd87c3fd84"
+        },
+        "source_dependencies": {
+          "path": "saved-lobj-draw-cache-source-reduction-v1/layout-control.d",
+          "bytes": 14638,
+          "sha256": "71b7296214d8f4ee71da6e0a5fad4f8aa9ea45b0b8785bdc2b0e0a92928e15e3"
+        },
+        "source_reduction_freeze": {
+          "path": "saved-lobj-draw-cache-source-reduction-v1/freeze-v2.json",
+          "bytes": 2707,
+          "sha256": "db48cee62d581afba9687fe86e37fa4fb5a0d5cb2cf392dedc76b6e6c42b146a"
+        },
+        "source_reduction_plan": {
+          "path": "saved-lobj-draw-cache-source-reduction-v1/source-plan-v2.json",
+          "bytes": 14706,
+          "sha256": "6285e5b15d94eeb667d05db7e7fe988684eb953478fd06d930514190fa167ac3"
+        },
+        "lvec_reference_inventory": {
+          "path": "saved-lobj-draw-cache-source-reduction-v1/lvec-references-v1.txt",
+          "bytes": 1704,
+          "sha256": "196b46e8680183fe4206144d46cc17d16772c995d9a74c48c21e03fe53494a3b"
+        },
+        "interpretation": "The saved class descriptor joins to hsdLObj and the observed piece offset 60 is consistent with the saved descriptor layout\u2019s lvec.x byte. This is a saved PRE hypothesis only. The source reduction finds named lvec reads in specular rendering (lobj.c:329/335) and view-space cache writes in setup (lobj.c:393\u2013399); it does not establish a live simulation consumer or uninterrupted HSD_LObj/piece lifetime. The source-plan artifact remains proposal-only."
+      },
+      "limits": [
+        "Strict two-tick command-11 payload mismatch remains; later CPU domains, commands12/13 and final present were not reached.",
+        "The 160-byte record is CAPTURE_TIME_ONLY and binds a saved PRE header value; the live 208-byte witness still refuses with reason7.",
+        "No live object memory was inspected. The layout proof is compile/layout evidence only; it does not establish live ownership, continuity, restore admission, or a two-tick pass.",
+        "Five raw channels match for sample300 and sample301, but this does not override the strict failure or establish PCM, pixel, full-state, timing, or whole-browser acceptance.",
+        "All 10 recorded PIDs are absent; native CPU CLOSE itself returned1216, separately from successful OS cleanup."
+      ],
+      "next_experiment": "Run the authorized external source-only HSD_LObj/lvec lighting producer/consumer reduction. The authorization covers only that external reducer; no production implementation or browser capture is authorized. The saved-PRE member/layout match does not establish live ownership or simulation use.",
+      "run_root_label": "browser-rollback-sprint-20261022-115029-d89e262b"
     }
   }
 }
