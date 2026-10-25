@@ -1849,9 +1849,11 @@ test('actual fresh132 loader requires exact fresh export and paired original sou
  const declaration=source.match(/async function loadFreshSss132ReadyStartInputs\(\) \{[\s\S]*?\n\}/)[0];
  const e=fresh132ReadyExpectedFixture(),helperPath=new URL('./stadium_first_css_stream_compare.mjs',import.meta.url).pathname;
  const binding={diagnostic_export:'_melee_web_native_menu_stadium_fresh_sss_132_ready_start_kick',expected_state_host_only:true};
- const run=async(b=binding,p=e.provenance)=>new Function('assert','loadBoundFirstSssExpected','pathToFileURL','preflight','firstSssPrefixInputs','firstSssConstructorPairInputs',`${declaration};return loadFreshSss132ReadyStartInputs;`)(assert,async()=>({expected:e,helperPath}),pathToFileURL,{first_sss_fresh_ready_start:b},{expected:{observer:{sha256:e.provenance.observer_sha256,bytes:e.provenance.observer_bytes}}},{expected:{provenance:p}})();
- assert.equal((await run()).expected,e);
- await assert.rejects(run({...binding,diagnostic_export:'_melee_web_native_menu_stadium_first_sss_vs_entry_kick'}));
- await assert.rejects(run({...binding,expected_state_host_only:false}));
- await assert.rejects(run(binding,{...e.provenance,observer_status_sha256:'00'.repeat(32)}));
+ const run=async(b=binding,p=e.provenance,fullA=false)=>new Function('assert','loadBoundFirstSssExpected','pathToFileURL','preflight','firstSssPrefixInputs','firstSssConstructorPairInputs','firstSssFresh132FullA',`${declaration};return loadFreshSss132ReadyStartInputs;`)(assert,async(mode,option,schema,options)=>{assert.equal(mode,'first_sss_fresh_ready_start');assert.equal(options.fresh132FullA,fullA);return {expected:e,helperPath};},pathToFileURL,{first_sss_fresh_ready_start:b},{expected:{observer:{sha256:e.provenance.observer_sha256,bytes:e.provenance.observer_bytes}}},{expected:{provenance:p}},fullA)();
+ for(const fullA of [false,true]){
+  assert.equal((await run(binding,e.provenance,fullA)).expected,e);
+  await assert.rejects(run({...binding,diagnostic_export:'_melee_web_native_menu_stadium_first_sss_vs_entry_kick'},e.provenance,fullA));
+  await assert.rejects(run({...binding,expected_state_host_only:false},e.provenance,fullA));
+  await assert.rejects(run(binding,{...e.provenance,observer_status_sha256:'00'.repeat(32)},fullA));
+ }
 });

@@ -111,6 +111,9 @@ test('actual full-route construction has one encoder owner and dispatches full m
   const constructionStart = source.indexOf('  const nativeAdapter = matchedSetupCfNativeAdapter({mode,', adapterEnd);
   const constructionEnd = source.indexOf('  await page.evaluate(', constructionStart);
   assert.ok(adapterStart >= 0 && adapterEnd > adapterStart && constructionStart > adapterEnd && constructionEnd > constructionStart);
+  const modeBindingStart = source.indexOf('  const fresh132FullAMode = ', adapterEnd);
+  const modeBindingEnd = source.indexOf('\n', modeBindingStart);
+  assert.ok(modeBindingStart > adapterEnd && modeBindingEnd > modeBindingStart);
   const calls = [];
   const context = {helper, mode: 'run2-full-schedule-v3', commonFieldsMode: false,
     firstSssVsSetupCfExplicitStep: true,
@@ -121,6 +124,7 @@ test('actual full-route construction has one encoder owner and dispatches full m
     executeMatchedSetupCfNativeCommand: async command => { calls.push(command); return {result: 1}; }};
   vm.createContext(context);
   vm.runInContext(source.slice(adapterStart, adapterEnd) + '\n' +
+    source.slice(modeBindingStart, modeBindingEnd) + '\n' +
     source.slice(constructionStart, constructionEnd) + '\nglobalThis.actualDriver = driver;', context);
   assert.equal(await context.actualDriver.arm(true), true);
   assert.equal(calls.length, 1);

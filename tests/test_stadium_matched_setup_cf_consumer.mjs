@@ -1125,9 +1125,21 @@ test('native source clock predicate and owner wiring preserve separate wait/acti
   assert.doesNotMatch(owner, /match->source_frames\(\)==expected_ticks/);
   assert.match(source, /matched_setup_cf_clock_transition\(tick_action,state.queued_source_frame_before,/);
   assert.match(source, /state.idle.source_frame==state.last_source_frame_after/);
-  assert.match(source,
-    /state\.version2&&!state\.full_schedule&&!state\.common_fields&&tick_action&&\s*ordinal==c_tick\+2/,
-    'GO+2 diagnostic serialization is restricted to its explicit bounded proper-prefix mode');
+  const go2Start = source.indexOf('  if((state.fresh132_full_a||');
+  const go2End = source.indexOf('){', go2Start);
+  assert.ok(go2Start >= 0 && go2End > go2Start, 'actual explicit GO+2 serialization predicate exists');
+  const go2Condition = source.slice(go2Start + '  if('.length, go2End);
+  const serializeGo2 = new Function('state', 'tick_action', 'ordinal', 'c_tick', `return (${go2Condition});`);
+  const prefix = {fresh132_full_a:false,version2:true,full_schedule:false,common_fields:false};
+  assert.equal(serializeGo2(prefix,true,86,84),true);
+  assert.equal(serializeGo2({...prefix,fresh132_full_a:true,full_schedule:true,common_fields:true},true,86,84),true);
+  for (const state of [{...prefix,version2:false},{...prefix,full_schedule:true},
+    {...prefix,full_schedule:true,common_fields:true}])
+    assert.equal(serializeGo2(state,true,86,84),false, 'legacy full/common and non-v2 modes cannot serialize GO+2');
+  for (const state of [prefix,{...prefix,fresh132_full_a:true,full_schedule:true,common_fields:true}]) {
+    assert.equal(serializeGo2(state,false,86,84),false, 'draw cannot serialize GO+2');
+    assert.equal(serializeGo2(state,true,85,84),false, 'wrong relative tick cannot serialize GO+2');
+  }
 });
 
 test('legacy GO+2 v1 keeps strict context v1 without constructor or GO seed adjunct', () => {

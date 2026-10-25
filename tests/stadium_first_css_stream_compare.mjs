@@ -1,3 +1,4 @@
+import {validateFresh132FullAContext} from './fresh132_full_a_projection.mjs';
 const BATCH_COUNT = 148;
 const FIRST_CONSUME_SEQUENCE = 839;
 const SOURCE_SCENE_CSS = 1;
@@ -1981,8 +1982,7 @@ export function validateFreshSetupGo2Expectations(context, readyExpected) {
     scope: FRESH_SETUP_GO2_SCOPE});
 }
 
-export function createFreshSetupGo2Comparator(context, readyExpected, prefix, readyStartStatus) {
-  validateFreshSetupGo2SourceContext(context, readyExpected);
+function createFreshSetupComparatorCore(context, prefix, readyStartStatus, scope) {
   if (!plainObject(prefix) || prefix.complete !== true || prefix.failed !== false ||
       prefix.current_host_entered !== false || prefix.current_source_scene !== 0 ||
       prefix.current_session_phase !== 5 || prefix.host_tick_calls !== 132 ||
@@ -2044,7 +2044,23 @@ export function createFreshSetupGo2Comparator(context, readyExpected, prefix, re
     return true;
   };
   return Object.freeze({compare, status: () => Object.freeze({attempted, approved, failed,
-    first_mismatch: firstMismatch, scope: FRESH_SETUP_GO2_SCOPE})});
+    first_mismatch: firstMismatch, scope: scope})});
+}
+
+export function createFreshSetupGo2Comparator(context, readyExpected, prefix, readyStartStatus) {
+  validateFreshSetupGo2SourceContext(context, readyExpected);
+  return createFreshSetupComparatorCore(context, prefix, readyStartStatus, FRESH_SETUP_GO2_SCOPE);
+}
+
+export function createFresh132FullASetupComparator(projectionContext, readyExpected, prefix, readyStartStatus) {
+  const normalized = validateFresh132FullAContext({
+    entry: projectionContext?.entry,
+    setup: projectionContext?.setup,
+    constructor: projectionContext?.constructor_observation,
+  }, readyExpected, validateFreshSss132ReadyStartExpectedSource);
+  return createFreshSetupComparatorCore({...normalized,
+    constructor_observation: normalized.constructor_observation}, prefix, readyStartStatus,
+  'same Fresh132 prepared Start and completed Setup, original Entry2544/Setup2584 at tick131, one constructor entry; zero-frame Setup only');
 }
 
 const FIRST_SSS_VS_SETUP_SCOPE =

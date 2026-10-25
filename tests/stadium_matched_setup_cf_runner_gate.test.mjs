@@ -167,15 +167,19 @@ test('the matched Setup C/F opt-in and preflight gate fail before server/browser
     /if \(matchedSetupCfExplicitArmed\) \{[\s\S]*?retireMatchedSetupCfExplicitNative\(\)/,
     'the armed explicit path must use one-shot retire instead of the queued ordinary unload');
   assert.match(runnerSource,
-    /source_request_scope: recreationCanary[\s\S]*?: firstSssVsSetupCf\s*\? firstSssFreshSetupGo2[\s\S]*?: firstSssVsSetupCfV2\s*\?/,
+    /source_request_scope: recreationCanary[\s\S]*?: firstSssVsSetupCf\s*\? firstSssFresh132FullA[\s\S]*?: firstSssFreshSetupGo2[\s\S]*?: firstSssVsSetupCfV2\s*\?/,
     'the v2 proper-prefix scope must be separately labeled');
   const scopeStart = runnerSource.indexOf('source_request_scope: ');
   const scopeEnd = runnerSource.indexOf(',\n  error: null,', scopeStart);
   assert.ok(scopeStart >= 0 && scopeEnd > scopeStart, 'actual scope expression markers exist');
   const scopeExpression = runnerSource.slice(scopeStart + 'source_request_scope: '.length, scopeEnd);
   const scope = flags => vm.runInNewContext(`(${scopeExpression})`, {
-    recreationCanary: false, recreationFullPair: false, recreationFullB: false, firstSssFreshSetupGo2: false, firstSssVsSetupCf: true, firstSssVsSetupCfV2: true,
+    recreationCanary: false, recreationFullPair: false, recreationFullB: false, firstSssFresh132FullA: false, firstSssFreshSetupGo2: false, firstSssVsSetupCf: true, firstSssVsSetupCfV2: true,
     firstSssVsSetupCfCommonFields: false, firstSssVsSetupCfFullSchedule: false, ...flags});
+  assert.equal(scope({firstSssFresh132FullA:true}),
+    'Fresh132 prepared Start and strict Setup, then exact original7168-action MWC6 A; compare 3501 paired 15-field-plus-seed rows and declared C/F/observed GO/GO2. No unpaired typed-field promotion, per-owner RNG, B or C3 acceptance.');
+  assert.equal(scope({firstSssFreshSetupGo2:true}),
+    'Fresh132 prepared Start, same-producer original Setup2563 and constructor scalar, then exact four-port 174-action proper prefix through original GO+2 final draw; Entry callback, Setup-predicated Start acceptance, C3 and broader gameplay remain unclaimed.');
   assert.equal(scope({recreationCanary: true}),
     'Two separately reported same-instance original-route 174-action lifetimes with checked A close/restart; no whole-session or recreation acceptance.');
   assert.equal(scope({recreationCanary: true, recreationFullB: true}),

@@ -444,7 +444,7 @@ function signedRange(value, bits, label) {
     throw new TypeError(`${label} is not an exact signed${bits} value`);
   return value;
 }
-function commonOriginalValues(fields, sourceTick) {
+export function commonOriginalValues(fields, sourceTick) {
   exactKeys(fields, ['display', 'draw_ordinal', 'guest_pointer_policy', 'label', 'map2',
     'map_root_allocation_lifetime_proved', 'map_root_object_type_observed', 'map_root_roles',
     'sequence', 'source_tick', 'title'], `original source tick ${sourceTick} typed fields`);
@@ -492,6 +492,141 @@ function commonOriginalValues(fields, sourceTick) {
 
 // One O(n) pass binds all host original action provenance to the already
 // validated native schedule, then binds the 3501 typed source rows to ticks.
+export function deriveFresh132FullAExpectations(projection) {
+  exactKeys(projection, ['claim_scope', 'decision', 'dimensions', 'host_expectations',
+    'runtime_payload', 'schema', 'source_identity', 'version'], 'Fresh132 full-A projection');
+  if (projection.schema !== 'melee-web-stadium-fresh132-full-a-host-projection' ||
+      projection.version !== 1 || projection.decision !== 'PASS_PINNED_ORIGINAL_IDLE_FULL_A_PROJECTION_ONLY' ||
+      !String(projection.claim_scope).startsWith('Original producer schedule/PAD actions and declared host typed rows only;') ||
+      projection.dimensions?.ticks !== 3585 || projection.dimensions?.draws !== 3583 ||
+      projection.dimensions?.actions !== 7168 || projection.dimensions?.comparison_rows !== 3501 ||
+      projection.dimensions?.c_action_index !== 168 || projection.dimensions?.f_action_index !== 170 ||
+      projection.dimensions?.go_action_index !== 168 || projection.dimensions?.go2_action_index !== 172 ||
+      projection.dimensions?.actions_through_go2_draw !== 174 ||
+      projection.dimensions?.terminal_tick !== 3584 ||
+      projection.dimensions?.terminal_action_index !== 7167 ||
+      projection.dimensions?.terminal_draw !== 3582)
+    throw new TypeError('Fresh132 full-A projection identity or fixed dimensions differ');
+  const sourceIdentity = projection.source_identity;
+  exactKeys(sourceIdentity, ['binary_sha256', 'canonical_recipe_sha256', 'dol_sha1', 'dol_sha256',
+    'dolphin_commit', 'input_sha256', 'manifest_sha256', 'original_recipe_sha256',
+    'profile_gci_sha256', 'stream_sha256'], 'Fresh132 full-A producer identity');
+  for (const [name, length] of [['binary_sha256', 64], ['canonical_recipe_sha256', 64],
+    ['dol_sha1', 40], ['dol_sha256', 64], ['dolphin_commit', 40], ['input_sha256', 64],
+    ['manifest_sha256', 64], ['original_recipe_sha256', 64], ['profile_gci_sha256', 64],
+    ['stream_sha256', 64]])
+    if (!validSha(sourceIdentity[name], length)) throw new TypeError(`Fresh132 full-A ${name} is malformed`);
+  const runtime = projection.runtime_payload;
+  validateRun2RuntimePayload(runtime);
+  if (runtime.schedule.length !== 7168 || runtime.bundles.length !== 3585 ||
+      runtime.schedule.filter(action => action.action === 'tick').length !== 3585 ||
+      runtime.schedule.filter(action => action.action === 'draw').length !== 3583 ||
+      runtime.schedule.at(-1)?.action !== 'draw' || runtime.schedule.at(-1)?.draw !== 3582)
+    throw new TypeError('Fresh132 full-A runtime action dimensions or terminal differ');
+  const host = projection.host_expectations;
+  exactKeys(host, ['boundaries', 'go_seed_observation',
+    'same_producer_entry_setup_constructor', 'typed_rows'], 'Fresh132 full-A host expectations');
+  exactKeys(host.same_producer_entry_setup_constructor, ['constructor_observation', 'entry',
+    'scope', 'setup', 'witnesses'], 'Fresh132 full-A Entry/Setup context');
+  const context = host.same_producer_entry_setup_constructor;
+  if (context.entry?.sequence !== 2544 || context.setup?.sequence !== 2584 ||
+      context.entry?.source_tick !== 131 || context.setup?.source_tick !== 131 ||
+      context.entry?.seed_hex !== 'e2624ac3' || context.setup?.seed_hex !== '083a62a9' ||
+      !sameJson(context.entry.typed_start, context.setup.typed_start) ||
+      context.constructor_observation?.constructor_entry_count !== 1 ||
+      context.constructor_observation?.seed_before_hex !== 'e2624ac3' ||
+      !sameJson(context.witnesses, [2566, 2567, 2568, 2569, 2570]))
+    throw new TypeError('Fresh132 full-A source context coordinates or constructor count differ');
+  const go = host.go_seed_observation;
+  exactKeys(go, ['draw_ordinal', 'seed_hex', 'sequence', 'source_tick'], 'Fresh132 full-A GO marker');
+  if (!Number.isSafeInteger(go.sequence) || go.source_tick !== 84 || go.draw_ordinal !== 84 ||
+      !/^[0-9a-f]{8}$/.test(go.seed_hex ?? ''))
+    throw new TypeError('Fresh132 full-A observed GO marker is malformed');
+  const rows = host.typed_rows;
+  if (!Array.isArray(rows) || rows.length !== 3501)
+    throw new TypeError('Fresh132 full-A requires exactly3501 typed source rows');
+  const findTickAction = tick => {
+    const found = [];
+    for (let index = 0; index < runtime.schedule.length; ++index) {
+      const action = runtime.schedule[index];
+      if (action.action === 'tick' && action.bundle === tick) found.push(index);
+    }
+    if (found.length !== 1) throw new TypeError(`Fresh132 source tick ${tick} is not bijective to one action`);
+    return found[0];
+  };
+  const expectedByAction = new Map();
+  const snapshotByTick = new Map();
+  for (let index = 0; index < rows.length; ++index) {
+    const row = rows[index];
+    exactKeys(row, ['boundary_role', 'draw_ordinal', 'ordinal', 'seed_hex',
+      'source_sequence', 'source_tick', 'typed_fields'], `Fresh132 full-A typed row ${index}`);
+    const tick = 84 + index, role = tick === 84 ? 'C' : tick === 85 ? 'F' : 'IDLE';
+    if (row.ordinal !== index || row.source_tick !== tick || row.boundary_role !== role ||
+        !Number.isSafeInteger(row.source_sequence) || row.source_sequence < 0 ||
+        row.typed_fields?.sequence !== row.source_sequence || row.typed_fields?.source_tick !== tick ||
+        row.typed_fields?.draw_ordinal !== row.draw_ordinal || row.typed_fields?.label !== 'IDLE' ||
+        !/^[0-9a-f]{8}$/.test(row.seed_hex ?? ''))
+      throw new TypeError(`Fresh132 full-A typed row ${index} identity differs`);
+    const actionIndex = findTickAction(tick);
+    if (expectedByAction.has(actionIndex)) throw new TypeError('Fresh132 full-A typed row action is duplicated');
+    const values = commonOriginalValues(row.typed_fields, tick);
+    expectedByAction.set(actionIndex, {action_index: actionIndex, boundary_role: role,
+      draw_ordinal: row.draw_ordinal,
+      raw_identity: {sequence: row.source_sequence, source_tick: tick, draw_ordinal: row.draw_ordinal},
+      seed_ordinal: index, seed_hex: row.seed_hex, source_tick: tick, values});
+    snapshotByTick.set(tick, {label: role, sequence: row.source_sequence,
+      source_tick: tick, draw_ordinal: row.draw_ordinal,
+      map2: row.typed_fields.map2, display: row.typed_fields.display,
+      title: row.typed_fields.title,
+      map_root_allocation_lifetime_proved: row.typed_fields.map_root_allocation_lifetime_proved,
+      map_root_object_type_observed: row.typed_fields.map_root_object_type_observed});
+  }
+  if (expectedByAction.size !== 3501 || !expectedByAction.has(168) ||
+      !expectedByAction.has(170) || !expectedByAction.has(7166))
+    throw new TypeError('Fresh132 full-A typed row/action join is incomplete');
+  const cIndex = findTickAction(84), fIndex = findTickAction(85), go2Index = findTickAction(86);
+  if (cIndex !== 168 || fIndex !== 170 || go2Index !== 172 ||
+      go.sequence <= 0 || go.source_tick !== rows[0].source_tick ||
+      go.draw_ordinal !== rows[0].draw_ordinal ||
+      go.sequence >= rows[0].source_sequence)
+    throw new TypeError('Fresh132 GO/C/F/GO2 markers do not follow the dynamically mapped source actions');
+  const boundaryChecks = [
+    ['C', 84, cIndex], ['F', 85, fIndex], ['GO2', 86, go2Index],
+  ];
+  for (const [label, tick, index] of boundaryChecks) {
+    const bound = host.boundaries[label], row = rows[tick - 84];
+    exactKeys(bound, ['draw_ordinal', 'seed_hex', 'sequence', 'source_tick'],
+      `Fresh132 ${label} projection boundary`);
+    if (bound.source_tick !== tick || bound.draw_ordinal !== row.draw_ordinal ||
+        bound.sequence !== row.source_sequence || bound.seed_hex !== row.seed_hex ||
+        runtime.schedule[index]?.action !== 'tick' || runtime.schedule[index]?.bundle !== tick)
+      throw new TypeError(`Fresh132 ${label} boundary differs from its actual typed tick`);
+  }
+  const full = {schema: 'melee-web-stadium-fresh132-full-a-v1', version: 1,
+    bundles: runtime.bundles, schedule: runtime.schedule,
+    checkpoints: {c_action_index: cIndex, c_source_tick: 84,
+      f_action_index: fIndex, f_source_tick: 85,
+      terminal_action_index: 7167, terminal_draw_ordinal: 3582}};
+  return {runtimePayload: full, sourceRuntimePayload: runtime,
+    sourceIdentity: structuredClone(sourceIdentity), sourceContext: structuredClone(context),
+    goSeedObservation: structuredClone(go),
+    originalSnapshots: [{label: 'GO', sequence: go.sequence, source_tick: go.source_tick,
+      draw_ordinal: go.draw_ordinal, source_seed_hex: go.seed_hex},
+      snapshotByTick.get(84), snapshotByTick.get(85)],
+    originalSeeds: {GO: go.seed_hex, C: rows[0].seed_hex,
+      F: rows[1].seed_hex, GO2: rows[2].seed_hex},
+    coordinates: {cTick: 84, fTick: 85, goSequence: go.sequence,
+      cSequence: rows[0].source_sequence, fSequence: rows[1].source_sequence,
+      goDraw: go.draw_ordinal, cDraw: rows[0].draw_ordinal,
+      fDraw: rows[1].draw_ordinal, go2Sequence: rows[2].source_sequence,
+      go2Tick: 86, go2Draw: rows[2].draw_ordinal},
+    go2Snapshot: {...snapshotByTick.get(86), label: 'GO2'},
+    go2QueueExpectation: null, go2ActionIndex: go2Index, goActionIndex: cIndex,
+    checkpoints: {...full.checkpoints, go_action_index: cIndex,
+      go2_action_index: go2Index},
+    commonRowsByAction: expectedByAction, mode: 'fresh132-full-a-v1'};
+}
+
 export function deriveRun2CommonTickExpectations(runtimePayload, hostOnly) {
   const payload = validateRun2RuntimePayload(runtimePayload);
   const route = hostOnly?.source_identity?.strict_route;
@@ -831,6 +966,30 @@ export function encodeRun2FullCommonNativeManifest(full) {
   const bytes = encodeRun2FullNativeManifest(full);
   bytes.set([0x4d, 0x57, 0x43, 0x35]);
   return bytes;
+}
+
+export function encodeFresh132FullANativeManifest(full) {
+  exactKeys(full, ['bundles', 'checkpoints', 'schedule', 'schema', 'version'],
+    'Fresh132 full-A manifest');
+  exactKeys(full.checkpoints, ['c_action_index', 'c_source_tick', 'f_action_index',
+    'f_source_tick', 'terminal_action_index', 'terminal_draw_ordinal'],
+  'Fresh132 full-A manifest checkpoints');
+  validateRun2RuntimePayload({schema: 'melee-web-stadium-pad-action-plan', version: 1,
+    bundles: full.bundles, schedule: full.schedule});
+  const c = full.checkpoints;
+  if (full.schema !== 'melee-web-stadium-fresh132-full-a-v1' || full.version !== 1 ||
+      full.schedule.length !== 7168 || full.bundles.length !== 3585 ||
+      full.schedule.filter(action => action.action === 'tick').length !== 3585 ||
+      full.schedule.filter(action => action.action === 'draw').length !== 3583 ||
+      c.c_action_index !== 168 || c.c_source_tick !== 84 ||
+      c.f_action_index !== 170 || c.f_source_tick !== 85 ||
+      c.terminal_action_index !== 7167 || c.terminal_draw_ordinal !== 3582 ||
+      full.schedule[168]?.action !== 'tick' || full.schedule[168]?.bundle !== 84 ||
+      full.schedule[170]?.action !== 'tick' || full.schedule[170]?.bundle !== 85 ||
+      full.schedule[172]?.action !== 'tick' || full.schedule[172]?.bundle !== 86 ||
+      full.schedule.at(-1)?.action !== 'draw' || full.schedule.at(-1)?.draw !== 3582)
+    throw new TypeError('Fresh132 MWC6 manifest dimensions or terminal differ');
+  return encodeNativeManifestRows(full, [0x4d, 0x57, 0x43, 0x36]);
 }
 
 export function encodeRun2NativeManifest(prefix) {
@@ -1325,31 +1484,39 @@ export function hostEvidenceFromRun2Packet(packet, {fullSchedule = false, common
     ...(commonFields ? {commonRowsByAction} : {})};
 }
 
+export function hostEvidenceFromFresh132FullAProjection(projection) {
+  const derived = deriveFresh132FullAExpectations(projection);
+  return derived;
+}
+
 function bundleBytes(bundle) {
   const hex = bundle.ports.map(port => port.status_hex).join('');
   return Uint8Array.from(hex.match(/.{2}/g), pair => Number.parseInt(pair, 16));
 }
 
 export class StadiumSetupCfActionDriver {
-  constructor({runtimePayload, native, commonFields = false, commonRowsByAction = null,
-    admittedWorldGeneration = null, requiredQueueObservation = null,
-    go2QueueExpectation = null}) {
-    if (typeof commonFields !== 'boolean' || (commonFields &&
-        runtimePayload?.schema !== 'melee-web-stadium-run2-full-schedule-v3'))
-      throw new TypeError('Per-tick common fields require an explicit full-schedule manifest');
-    this.mode = commonFields ? 'run2-full-common-fields-seed-v1'
+  constructor({runtimePayload, native, commonFields = false, fresh132FullA = false,
+    commonRowsByAction = null, admittedWorldGeneration = null,
+    requiredQueueObservation = null, go2QueueExpectation = null, go2ActionIndex = null}) {
+    if (typeof commonFields !== 'boolean' || typeof fresh132FullA !== 'boolean' ||
+        (commonFields && runtimePayload?.schema !== 'melee-web-stadium-run2-full-schedule-v3') ||
+        (fresh132FullA && (commonFields ||
+          runtimePayload?.schema !== 'melee-web-stadium-fresh132-full-a-v1')))
+      throw new TypeError('Per-tick or Fresh132 full-A observations require their explicit manifest mode');
+    this.mode = fresh132FullA ? 'fresh132-full-a-v1'
+      : commonFields ? 'run2-full-common-fields-seed-v1'
       : runtimePayload?.schema === 'melee-web-stadium-run2-full-schedule-v3'
       ? 'run2-full-schedule-v3' : runtimePayload?.schema === 'melee-web-stadium-run2-proper-prefix-v2'
       ? 'run2-proper-prefix-v2' : 'legacy-v1';
-    this.commonFields = commonFields;
-    this.commonRowsByAction = commonFields ? commonRowsByAction : null;
-    const generationBound = commonFields || requiredQueueObservation !== null || go2QueueExpectation !== null;
+    this.commonFields = commonFields || fresh132FullA;
+    this.commonRowsByAction = this.commonFields ? commonRowsByAction : null;
+    const generationBound = this.commonFields || requiredQueueObservation !== null || go2QueueExpectation !== null;
     if (generationBound && (!Number.isSafeInteger(admittedWorldGeneration) || admittedWorldGeneration <= 0))
       throw new TypeError('Per-tick common fields or queue observation require the positive safe generation from checked Setup');
     this.admittedWorldGeneration = generationBound ? admittedWorldGeneration : null;
-    if (commonFields && (!(commonRowsByAction instanceof Map) || commonRowsByAction.size !== 3501))
+    if (this.commonFields && (!(commonRowsByAction instanceof Map) || commonRowsByAction.size !== 3501))
       throw new TypeError('Per-tick common source expectations must contain exactly3501 mapped rows');
-    if (commonFields) {
+    if (this.commonFields) {
       for (let index = 0; index < runtimePayload.schedule.length; ++index) {
         const action = runtimePayload.schedule[index];
         const selected = action.action === 'tick' && action.bundle >= 84 && action.bundle <= 3584;
@@ -1363,16 +1530,20 @@ export class StadiumSetupCfActionDriver {
     else {
       exactKeys(runtimePayload, ['bundles', 'checkpoints', 'schedule', 'schema', 'version'],
         'run2 proper-prefix manifest');
-      if (runtimePayload.version !== (['run2-full-schedule-v3', 'run2-full-common-fields-seed-v1'].includes(this.mode) ? 3 : 2) || !Array.isArray(runtimePayload.bundles) ||
+      const expectedVersion = this.mode === 'fresh132-full-a-v1' ? 1
+        : ['run2-full-schedule-v3', 'run2-full-common-fields-seed-v1'].includes(this.mode) ? 3 : 2;
+      if (runtimePayload.version !== expectedVersion || !Array.isArray(runtimePayload.bundles) ||
           !Array.isArray(runtimePayload.schedule) || !runtimePayload.schedule.length ||
           runtimePayload.schedule.length !== runtimePayload.checkpoints.terminal_action_index + 1 ||
           runtimePayload.schedule.at(-1)?.action !== 'draw')
         throw new TypeError('run2 proper-prefix manifest is malformed');
       this.payload = runtimePayload;
-      this.nativeManifest = this.mode === 'run2-full-common-fields-seed-v1'
-        ? encodeRun2FullCommonNativeManifest(runtimePayload)
-        : this.mode === 'run2-full-schedule-v3'
-          ? encodeRun2FullNativeManifest(runtimePayload) : encodeRun2NativeManifest(runtimePayload);
+      this.nativeManifest = this.mode === 'fresh132-full-a-v1'
+        ? encodeFresh132FullANativeManifest(runtimePayload)
+        : this.mode === 'run2-full-common-fields-seed-v1'
+          ? encodeRun2FullCommonNativeManifest(runtimePayload)
+          : this.mode === 'run2-full-schedule-v3'
+            ? encodeRun2FullNativeManifest(runtimePayload) : encodeRun2NativeManifest(runtimePayload);
     }
     this.requiredQueueObservation = requiredQueueObservation === null ? null
       : validateRequiredQueueObservation(requiredQueueObservation, this.payload);
@@ -1398,6 +1569,12 @@ export class StadiumSetupCfActionDriver {
         throw new TypeError('GO+2 queue expectation is not the exact same-producer scheduled four-port row');
       this.go2QueueExpectation = {...structuredClone(go2QueueExpectation), action_index: actionIndex};
     }
+    this.go2ActionIndex = go2ActionIndex;
+    if (fresh132FullA && (!Number.isSafeInteger(go2ActionIndex) ||
+        runtimePayload.schedule[go2ActionIndex]?.action !== 'tick' ||
+        runtimePayload.schedule[go2ActionIndex - 1]?.action !== 'draw' ||
+        runtimePayload.schedule[go2ActionIndex + 1]?.action !== 'draw'))
+      throw new TypeError('Fresh132 full-A dynamic GO+2 action is not the observed draw/tick/draw boundary');
     if (!native || typeof native.arm !== 'function' || typeof native.queue !== 'function' ||
         typeof native.approve !== 'function')
       throw new TypeError('bounded native arm/queue/approval API is required');
@@ -1455,6 +1632,12 @@ export class StadiumSetupCfActionDriver {
     if (this.inFlight || !this.pending || this.failed || this.complete)
       return this._fail('unexpected or repeated native action receipt');
     const action = this.payload.schedule[this.cursor];
+    if (this.mode === 'fresh132-full-a-v1' &&
+        (observation?.schema !== 'melee-web-stadium-source-action-native-v6' ||
+         observation?.scope !== 'fresh132-full-a-7168-common-fields-seed-observation-only' ||
+         observation?.common_field_count !== 15 || observation?.seed_value_count !== 1 ||
+         observation?.action_count !== 7168))
+      return this._fail('Fresh132 full-A native observation scope differs');
     if (this.mode === 'run2-full-schedule-v3' && (observation?.schema !== 'melee-web-stadium-source-action-native-v3' ||
         observation?.scope !== 'original-full7167-schedule-observation-only' || observation?.action_count !== 7167))
       return this._fail('Full schedule native observation scope differs');
@@ -1498,8 +1681,9 @@ export class StadiumSetupCfActionDriver {
     const cIndex = this.mode === 'legacy-v1' ? 168 : this.payload.checkpoints.c_action_index;
     const fIndex = this.mode === 'legacy-v1' ? 170 : this.payload.checkpoints.f_action_index;
     const isBoundary = action.action === 'tick' && (this.cursor === cIndex || this.cursor === fIndex);
-    const isGo2 = this.go2QueueExpectation !== null &&
-      action.action === 'tick' && this.cursor === this.go2QueueExpectation.action_index;
+    const isGo2 = action.action === 'tick' && (this.mode === 'fresh132-full-a-v1'
+      ? this.cursor === this.go2ActionIndex
+      : this.go2QueueExpectation !== null && this.cursor === this.go2QueueExpectation.action_index);
     let refusal = null;
     if (this.requiredQueueObservation && action.action === 'tick' &&
         action.bundle === this.requiredQueueObservation.bundle) {
@@ -1521,22 +1705,35 @@ export class StadiumSetupCfActionDriver {
         refusal = 'HSD queue-slot observation, Setup map, world generation, or completed tick differs';
     }
     if (isGo2) {
-      const queue = result.pad_hsd_queue_observation;
-      const expected = this.go2QueueExpectation;
-      if (action.bundle !== expected.source_tick || result.world_generation !== this.admittedWorldGeneration ||
-          queue?.schema !== HSD_QUEUE_OBSERVATION_SCHEMA ||
-          queue.version !== HSD_QUEUE_ACTUAL_OBSERVATION_VERSION ||
-          queue.source_generation !== this.admittedWorldGeneration ||
-          queue.source_tick_before !== expected.source_tick ||
-          queue.source_tick_after !== expected.source_tick + 1 ||
-          queue.qnum_before !== 1 || queue.qread_before !== 0 || queue.qcount_before !== 1 ||
-          queue.qcount_after_hsd !== 0 || queue.player_count !== expected.expected_players.length ||
-          queue.tick_complete !== true ||
-          !actualQueueObservationPlayersMatch(queue.players, expected.expected_players) ||
-          !Array.isArray(queue.queue_slot_status_hex) || queue.queue_slot_status_hex.length !== 4 ||
-          queue.queue_slot_status_hex.some((status, index) =>
-            status !== expected.expected_queue_slot_status_hex[index]))
-        refusal ??= 'GO+2 HSD queue, Setup map, admitted generation, or completed tick differs';
+      if (this.mode === 'fresh132-full-a-v1') {
+        const go2 = result.go2_state_observation;
+        if (action.bundle !== 86 || result.world_generation !== this.admittedWorldGeneration ||
+            go2?.schema !== 'melee-web-stadium-go2-declared-state-native-v1' ||
+            go2?.label !== 'GO2' || go2?.ordinal !== action.bundle ||
+            go2?.idle_snapshot?.world_generation !== this.admittedWorldGeneration ||
+            go2?.idle_snapshot?.world_ticks !== action.bundle + 1 ||
+            result.source_frames_after !== go2?.idle_snapshot?.source_frame ||
+            hostComparison?.phase !== 'GO2' ||
+            hostComparison?.decision !== 'PASS_EXACT_DECLARED_GO2_FIELDS_AND_SEED')
+          refusal ??= 'Fresh132 full-A GO+2 declared state/seed or action boundary differs';
+      } else {
+        const queue = result.pad_hsd_queue_observation;
+        const expected = this.go2QueueExpectation;
+        if (action.bundle !== expected.source_tick || result.world_generation !== this.admittedWorldGeneration ||
+            queue?.schema !== HSD_QUEUE_OBSERVATION_SCHEMA ||
+            queue.version !== HSD_QUEUE_ACTUAL_OBSERVATION_VERSION ||
+            queue.source_generation !== this.admittedWorldGeneration ||
+            queue.source_tick_before !== expected.source_tick ||
+            queue.source_tick_after !== expected.source_tick + 1 ||
+            queue.qnum_before !== 1 || queue.qread_before !== 0 || queue.qcount_before !== 1 ||
+            queue.qcount_after_hsd !== 0 || queue.player_count !== expected.expected_players.length ||
+            queue.tick_complete !== true ||
+            !actualQueueObservationPlayersMatch(queue.players, expected.expected_players) ||
+            !Array.isArray(queue.queue_slot_status_hex) || queue.queue_slot_status_hex.length !== 4 ||
+            queue.queue_slot_status_hex.some((status, index) =>
+              status !== expected.expected_queue_slot_status_hex[index]))
+          refusal ??= 'GO+2 HSD queue, Setup map, admitted generation, or completed tick differs';
+      }
     }
     if (isBoundary) {
       const expectedLabel = this.cursor === cIndex ? 'C' : 'F';
@@ -1554,7 +1751,7 @@ export class StadiumSetupCfActionDriver {
     } else if (hostComparison !== null) {
       refusal = 'host comparison was supplied outside C/F/GO2';
     }
-    if (this.mode === 'run2-full-common-fields-seed-v1') {
+    if (this.mode === 'run2-full-common-fields-seed-v1' || this.mode === 'fresh132-full-a-v1') {
       const selectedTick = action.action === 'tick' && action.bundle >= 84 && action.bundle <= 3584;
       const expectedCommon = this.commonRowsByAction.get(this.cursor);
       if (selectedTick) {

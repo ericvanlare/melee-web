@@ -560,7 +560,7 @@ struct MatchedSetupCfState {
  bool opted_in=false,armed=false,queued=false,awaiting_approval=false;
  bool failed=false,complete=false,last_action_complete=false;
  bool explicit_step_mode=false,explicit_step_inflight=false;
- bool version2=false,full_schedule=false,common_fields=false;
+ bool version2=false,full_schedule=false,common_fields=false,fresh132_full_a=false;
  uint32_t cursor=0,last_schedule_index=0,last_ordinal=0,last_bundle=UINT32_MAX;
  uint32_t action_count=171,c_action_index=168,f_action_index=170,c_source_tick=84,f_source_tick=85;
  uint32_t source_ticks=0,source_draws=0,last_ticks_after=0,last_draws_after=0;
@@ -3709,7 +3709,8 @@ bool matched_setup_cf_service(){
    check(match->diagnostic_stadium_go_alignment_snapshot(&state.go,owner_error,sizeof(owner_error)),
          owner_error[0]?owner_error:"Matched Setup C/F v2 GO snapshot refused");
   }
-  if(state.version2&&!state.full_schedule&&!state.common_fields&&tick_action&&
+  if((state.fresh132_full_a||
+     (state.version2&&!state.full_schedule&&!state.common_fields))&&tick_action&&
      ordinal==c_tick+2){
    check(state.idle.world_generation==state.world_generation&&
          state.idle.world_ticks==ordinal+1&&
@@ -3797,7 +3798,10 @@ std::string matched_setup_cf_json(){
      state.awaiting_approval?"awaiting-approval":state.queued?"queued":
      state.armed?"armed":"idle";
  std::ostringstream out;
- if(state.common_fields)out<<"{\"schema\":\"melee-web-stadium-source-action-native-v5\",\"scope\":\"original-full7167-common-fields-seed-observation-only\",\"common_field_count\":15,\"seed_value_count\":1,\"action_count\":"
+ if(state.fresh132_full_a)out<<"{\"schema\":\"melee-web-stadium-source-action-native-v6\",\"scope\":\"fresh132-full-a-7168-common-fields-seed-observation-only\",\"common_field_count\":15,\"seed_value_count\":1,\"action_count\":"
+    <<state.action_count<<",\"source_ticks\":"<<state.source_ticks
+    <<",\"source_draws\":"<<state.source_draws<<",\"state\":\"";
+ else if(state.common_fields)out<<"{\"schema\":\"melee-web-stadium-source-action-native-v5\",\"scope\":\"original-full7167-common-fields-seed-observation-only\",\"common_field_count\":15,\"seed_value_count\":1,\"action_count\":"
     <<state.action_count<<",\"source_ticks\":"<<state.source_ticks
     <<",\"source_draws\":"<<state.source_draws<<",\"state\":\"";
  else if(state.full_schedule)out<<"{\"schema\":\"melee-web-stadium-source-action-native-v3\",\"scope\":\"original-full7167-schedule-observation-only\",\"action_count\":"
@@ -6481,7 +6485,8 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_begin(int text_tail_probe){
 
 int matched_setup_cf_arm_internal(bool version2,unsigned action_count,
     unsigned c_action_index,unsigned f_action_index,unsigned c_source_tick,
-    unsigned f_source_tick,bool full_schedule=false,bool common_fields=false){try{
+    unsigned f_source_tick,bool full_schedule=false,bool common_fields=false,
+    bool fresh132_full_a=false){try{
  auto& state=matched_setup_cf;auto& setup=first_sss_vs_setup;
  stadium_recreation_b_require_arm(version2,full_schedule,common_fields,action_count);
  check(!state.opted_in&&!state.armed&&!state.failed&&!state.complete,
@@ -6490,6 +6495,9 @@ int matched_setup_cf_arm_internal(bool version2,unsigned action_count,
  state.version2=version2;
  state.full_schedule=full_schedule;
  state.common_fields=common_fields;
+ state.fresh132_full_a=fresh132_full_a;
+ check(!fresh132_full_a||(version2&&full_schedule&&common_fields),
+       "Fresh132 full-A requires its explicit full-schedule common-field owner");
  check(!common_fields||(version2&&full_schedule),
        "Per-tick common fields require the explicit full-schedule v2 owner");
  state.action_count=version2?action_count:171U;
@@ -6500,9 +6508,11 @@ int matched_setup_cf_arm_internal(bool version2,unsigned action_count,
  state.source_ticks=state.source_draws=0;
  state.queued_source_frame_before=state.last_source_frame_after=0;
  check(!version2||(action_count==state.version2_actions.size()&&action_count>=5&&
-       action_count<=7167&&c_action_index<f_action_index&&
-       (full_schedule?(action_count==7167&&c_action_index==168&&f_action_index==170&&
-         c_source_tick==84&&f_source_tick==85):f_action_index+3==action_count-1)&&
+       (fresh132_full_a?action_count==7168:action_count<=7167)&&
+       c_action_index<f_action_index&&
+       (full_schedule?((fresh132_full_a?action_count==7168:action_count==7167)&&
+         c_action_index==168&&f_action_index==170&&c_source_tick==84&&f_source_tick==85):
+         f_action_index+3==action_count-1)&&
        c_source_tick+1==f_source_tick),
        "Matched Setup C/F v2 immutable prefix dimensions are invalid");
  check(setup.attempted&&setup.complete&&!setup.failed&&setup.construction_complete&&
@@ -6625,8 +6635,10 @@ int matched_setup_cf_full_manifest_arm(
  check(manifest&&manifest_bytes>=24,"Matched Setup full schedule manifest header is absent");
  const bool common_fields=manifest[0]=='M'&&manifest[1]=='W'&&
        manifest[2]=='C'&&manifest[3]=='5';
+ const bool fresh132_full_a=manifest[0]=='M'&&manifest[1]=='W'&&
+       manifest[2]=='C'&&manifest[3]=='6';
  check((manifest[0]=='M'&&manifest[1]=='W'&&manifest[2]=='F'&&manifest[3]=='3')||
-       common_fields,
+       common_fields||fresh132_full_a,
        "Matched Setup full schedule manifest magic differs");
  const auto read32=[&](size_t offset){
   check(offset+4<=manifest_bytes,"Matched Setup full schedule manifest integer is truncated");
@@ -6638,7 +6650,7 @@ int matched_setup_cf_full_manifest_arm(
  const unsigned action_count=read32(4),c_index=read32(8),f_index=read32(12),
                 c_tick=read32(16),f_tick=read32(20);
  constexpr size_t header_bytes=24,action_bytes=57;
- check(action_count==7167&&
+ check(action_count==(fresh132_full_a?7168U:7167U)&&
        manifest_bytes==header_bytes+static_cast<size_t>(action_count)*action_bytes,
        "Matched Setup full schedule manifest count or length is invalid");
  check(c_index==168&&f_index==170&&c_tick==84&&f_tick==85,
@@ -6663,7 +6675,8 @@ int matched_setup_cf_full_manifest_arm(
   }else throw std::runtime_error("Matched Setup full schedule action kind is unknown");
   actions.push_back(action);
  }
- check(ticks==3585&&draws==3582&&actions.back().kind==2&&actions.back().ordinal==3581,
+ check(ticks==3585&&draws==(fresh132_full_a?3583U:3582U)&&
+       actions.back().kind==2&&actions.back().ordinal==(fresh132_full_a?3582U:3581U),
        "Full schedule tick/draw terminal dimensions differ");
  check(actions[c_index].kind==1&&actions[c_index].ordinal==c_tick&&
        actions[f_index].kind==1&&actions[f_index].ordinal==f_tick,
@@ -6678,7 +6691,7 @@ int matched_setup_cf_full_manifest_arm(
        "Matched Setup full schedule continuation is one-use");
  state.version2_actions=std::move(actions);
  return matched_setup_cf_arm_internal(true,action_count,c_index,f_index,c_tick,f_tick,true,
-                                      common_fields);
+                                      common_fields||fresh132_full_a,fresh132_full_a);
 }catch(const std::exception& error){
  matched_setup_cf_fail(error.what());return 0;
 }}
