@@ -2,7 +2,7 @@
   "schema": "match-only-rollback-feasibility-v1",
   "issue": 318,
   "pr": 319,
-  "status": "same_browser_one_tick_drawn_reference_pass_v7_builds_and_full_regression_pass_two_tick_command11_strict1216_row113_offset272_capture_time_only_live_piece_unknown_actual_source_reduction_next_no_followup_capture_full_browser_restore_not_established",
+  "status": "same_browser_one_tick_pass_v7_two_tick_strict1216_row113_offset272_actual_MakeTextureMtx_occurrence_fullPOST48_native_attestation_capture_time_only_lifetimeUNKNOWN_no_fix_finalpresent_unrun",
   "source_only_baseline": {
     "boundary": "synchronous-source-only-exported-call-return",
     "sourceDrawing": false,
@@ -2429,7 +2429,7 @@
   },
   "same_instance_browser_restore_341": {
     "issue": 341,
-    "status": "V7_FOUR_RELEASE_CONFIGURATIONS_V7_V6_V5_ORDINARY_AND_FULL_REGRESSION_PASS; NEW_TWO_TICK_COMMAND11_STRICT1216_ROW113_OFFSET272; LIVE_PIECE_UNKNOWN; ACTUAL_SOURCE_REDUCTION_NEXT; FULL_RESTORE_NOT_ESTABLISHED",
+    "status": "same_browser_one_tick_pass_v7_two_tick_strict1216_row113_offset272_actual_MakeTextureMtx_occurrence_fullPOST48_native_attestation_capture_time_only_lifetimeUNKNOWN_no_fix_finalpresent_unrun",
     "producer_base_commit": "130438fd2b86d00cfec98cd2ba0a5f66084ae15c",
     "producer_worktree": "uncommitted source; census runtime/harness and separate owner component sources pinned below; not a commit identity",
     "runtime_sha256": {
@@ -2560,9 +2560,9 @@
       "Complete source/project mutable-static coverage and dynamic source/asset/stream/file ownership remain unresolved.",
       "Render-to-simulation dependencies and safe host effects across a no-draw correction remain unresolved; renderer/GPU/cache state is outside rewind scope.",
       "The V7 command-11 strict payload mismatch at row 113/offset 272 remains unresolved; the changed first difference does not establish that the earlier row-62/offset-284 cache mismatch is fixed.",
-      "The V7 capture-time class witness does not establish live object identity, uninterrupted lifetime or a unique source writer; the V7 source-writer witness is unarmed/unavailable.",
-      "The frozen TObj source reducer is design-only and requires a separate release; later CPU domains and final present remain unrun.",
-      "Whole-session, original-game parity, continuous PCM, pixel parity, foreground timing and whole-session acceptance remain open."
+      "The new TObj witness records an actual MakeTextureMtx occurrence with a PRE capture-time join. Live identity and uninterrupted lifetime remain UNKNOWN; uniqueness is only within the retained pre-POST candidate set. The original LObj source-writer remains unarmed/inapplicable on V7.",
+      "The two TObj controls establish only a selected UV source mechanism and canonical component; neither joins a tested instance to the browser capture or proves a retained owner/lifetime.",
+      "Later CPU domains and final present remain unrun; whole-session, original-game parity, continuous PCM, pixel parity, foreground timing and whole-session acceptance remain open."
     ],
     "limitations": [
       "same-value stores and transient values unobserved",
@@ -2603,7 +2603,7 @@
       "retained_artifact": "census-owner-gap-analysis-v1.json",
       "sha256": "9908b8d2ebb8aeeb64d8df4dcdeb24ea0f16f55bab3d17e1f847c679f90ba370"
     },
-    "next_experiment": "The frozen TObj actual-source reducer is design-only and requires a separate release: assert actual Wasm layout, then exercise the original MakeTextureMtx/TObjSetupMtx sequence with exact authored fields, flags, matrix bytes and ordered GX arguments. It can establish a controlled mechanism only; it cannot prove the captured object stayed live or identify a browser writer. No production fix or follow-up browser capture is authorized.",
+    "next_experiment": "External DESIGN ONLY for a canonical UV/TOON same-history matrix48/derived-dirty component control: distinguish draw-unchanged raw source flags from effective full-flags dirty-clear view, bind every reader/RMW setter, constructor+successful-load lineage, direct-Free/release retirement and class/amnesia/world revocation. No PRE adoption, production implementation, control execution or browser retry is authorized.",
     "owner_components": {
       "scope": "Private owner components only; no browser restore exposure or complete-world claim",
       "current_files_sha256": {
@@ -7720,6 +7720,476 @@
         "The 16,784-byte source-writer witness is unarmed/unavailable on V7.",
         "No source/cache behavior, pixels, PCM aggregate, final present or browser rollback is established."
       ]
-    }
+    },
+    "tobj_canonical_lifetime_reducer_v1": {
+      "status": "PASS_CANONICAL_COMPONENT_ONLY; NO_PRODUCTION_OWNER_OR_BROWSER_FIX",
+      "source_runtime_checkpoint": "8ebebd9f9d63743b460440fb6ac6337bbd8d7da5",
+      "freeze": {
+        "path": "tobj-canonical-lifetime-reducer-candidate-v3/freeze-v3.json",
+        "bytes": 4900,
+        "sha256": "b2a67581a4da7fe6cc7ae094c9c8d2e54a1cf5c8181b1e18d69136da6d552671"
+      },
+      "manifest": {
+        "path": "tobj-canonical-lifetime-reducer-candidate-v3/manifest-v3.json",
+        "bytes": 62520,
+        "sha256": "d0be8923beaf447c096180cc5144c8f652236d97cc8ad0c996a911a01b3bfd7d"
+      },
+      "contract": {
+        "path": "tobj-canonical-lifetime-reducer-candidate-v3/contract-v3.json",
+        "bytes": 2723,
+        "sha256": "df45e552316b4507e366dc05bb530d1cc616bcf1837255aa1071f9f2741c6140"
+      },
+      "recipe": {
+        "path": "tobj-canonical-lifetime-reducer-candidate-v3/recipe-v3.json",
+        "bytes": 5728,
+        "sha256": "332267b85c106e1155e50475e09e29285a762f623508498f3d7da26ea94e678f"
+      },
+      "result": {
+        "path": "tobj-canonical-lifetime-reducer-candidate-v3/attempt-v1/result-v1.json",
+        "bytes": 7693,
+        "sha256": "4ecfe6d955d65a5b55931071032f6f75542e64c45fa6aafcfbb692515b1c065d"
+      },
+      "stdout": {
+        "path": "tobj-canonical-lifetime-reducer-candidate-v3/attempt-v1/run.stdout",
+        "sha256": "31e4044d8e9ab74ebfdb5d716225ca97421298b348267d4564e2cab4d5699398"
+      },
+      "independent_review": {
+        "path": "tobj-canonical-lifetime-reducer-candidate-v3/independent-review-v2.json",
+        "bytes": 7824,
+        "sha256": "15cea1fbe3c3e73aa53747a723f689855791de6b2c988e7354aab18771a2b0bd"
+      },
+      "compile_database": {
+        "sha256": "0b63109d001d4e03249d861f02a66c17cc53a51084a12f2de754cba4027d3e37",
+        "profile": "V7 lobj-presentation stage-arena Release compile database; profile define and production compiler flags retained."
+      },
+      "source_provenance": {
+        "class_c": "Exact prepared source, sha256 dd62401dcb3faf96970fa94aa3bf4217abc6af0d035f3518d5e2383809e3b476.",
+        "object_c": "Exact prepared source, sha256 f8f168881bb2f4bceb6e939659fd047d6ffb869cb74cf0b141abb2fdef14631c.",
+        "tobj_c": "External source begins with exact 45,825-byte prepared TObj source (sha256 c8675531bbac68882a7d2002e83e689e29e6a20465c7fb154b9e326167d49c23), followed by 607 bytes of test-only wrappers; combined sha256 715e25fba5778271448b57e724c087a1e35f7b053b7407c13e7222f7dabb7845."
+      },
+      "actual_v7_layout": {
+        "sizeof_HSD_TObj": 172,
+        "alignment": 4,
+        "offsetof_mtx_1_3": 144,
+        "compile_assertions": "PASS under pinned V7 compile flags.",
+        "layout_control": {
+          "freeze": {
+            "path": "tobj-v7-layout-control-v1/layout-freeze-v2.json",
+            "bytes": 19147,
+            "sha256": "fdd2efc59a9d9e155ed6440f1420cf8f036736ab15a84ff37be2f5a5341dc698"
+          },
+          "result": {
+            "path": "tobj-v7-layout-control-v1/layout-result-v2.json",
+            "bytes": 32089,
+            "sha256": "d58efcb36e2483fe191ed21164ab6c280a2b65d7d21019762cbaa2c5d390cc2a"
+          },
+          "root_review": {
+            "path": "tobj-v7-layout-control-v1/root-review-v1.json",
+            "bytes": 607,
+            "sha256": "ee82cde987f27abf71f0534f65c535495231561042755700d0d3e6fc4131ad3c"
+          },
+          "compile_database_sha256": "0b63109d001d4e03249d861f02a66c17cc53a51084a12f2de754cba4027d3e37",
+          "profile_note": "Exact V7 lobj-presentation profile compile database; distinct from historical V6-only layout evidence."
+        },
+        "offsetof_mtx": 116
+      },
+      "observations": {
+        "changed_input": {
+          "flags": "00000000:80000000",
+          "matrix_equal_after_one_setup": false
+        },
+        "unchanged_input": {
+          "flags": "00000000:00000000",
+          "matrix_equal": true
+        },
+        "same_value_setter": {
+          "flags": "00000000:80000000",
+          "matrix_equal_after_one_setup": true
+        },
+        "same_input_final_setup": "Full flags, 48-byte matrix and 56-byte captured GX load submission compare equal.",
+        "lifecycle": "Actual default callbacks/amnesia, TOON dirty/no-GX path, release-before-free, direct-free bypass, pointer reuse; constructed=8, released=7, freed=8, GX submissions=15."
+      },
+      "retained_failures": {
+        "V1": "The actual PAD_STACK macro provider placeholder.h was omitted from the V1 compile; V2 adds that actual header. No stack cap was increased.",
+        "V2": "The separate-TU highlight symbol link failure is retained/diagnosed. V3 adds exact-signature abort-only providers; highlight is not exercised."
+      },
+      "limits": [
+        "Controlled canonical TObj component only; does not prove the capture-time descriptor belongs to the test instance, live writer identity, uninterrupted lifetime, production cache ownership or restore safety.",
+        "1 MiB source arena and 56-byte GX call-argument sink are fixture services; not the 69-byte FIFO/GPU. Null-only AObj removal and diagnostic class-piece hooks are modeled.",
+        "TExp, camera, custom and highlight paths abort if reached; shadow/Fountain and browser runtime are not covered.",
+        "No relation to the V7 row-113/offset-272 browser failure is proven; no browser retry or production implementation is authorized."
+      ]
+    },
+    "tobj_v7_two_tick_mechanism_v2": {
+      "status": "PASS_SCOPED_ACTUAL_UV_MECHANISM_ONLY",
+      "freeze": {
+        "path": "tobj-v7-mechanism-reducer-candidate-v2/freeze-v2.json",
+        "bytes": 5017,
+        "sha256": "7cea90e50cd264304a6b05beeabea86589f03477eb59b054c2137793f321e595"
+      },
+      "result": {
+        "path": "tobj-v7-mechanism-reducer-candidate-v2/attempt-v1/result-v1.json",
+        "bytes": 6972,
+        "sha256": "691367f6094f0521084cd145b794c12b93a41ff423c5edd74a3675ba7474c788"
+      },
+      "raw_stdout": {
+        "path": "tobj-v7-mechanism-reducer-candidate-v2/attempt-v1/run-mechanism.stdout",
+        "bytes": 1653,
+        "sha256": "0f2dae3e6f030e5e47381490de7591a8cc8ca3de25fc5ae5bdbc7742fcd2e437"
+      },
+      "independent_review": {
+        "path": "tobj-v7-mechanism-reducer-candidate-v2/independent-review-v1.json",
+        "bytes": 8892,
+        "sha256": "97f07c839324b05333aa39420b6d3bb3dbac5e7b217ad6facd3f6c6b959d99a7"
+      },
+      "v7_layout_result": {
+        "path": "tobj-v7-layout-control-v1/layout-result-v2.json",
+        "bytes": 32089,
+        "sha256": "d58efcb36e2483fe191ed21164ab6c280a2b65d7d21019762cbaa2c5d390cc2a"
+      },
+      "root_layout_review": {
+        "path": "tobj-v7-layout-control-v1/root-review-v1.json",
+        "bytes": 607,
+        "sha256": "ee82cde987f27abf71f0534f65c535495231561042755700d0d3e6fc4131ad3c"
+      },
+      "source_and_profile": {
+        "compile_database_sha256": "0b63109d001d4e03249d861f02a66c17cc53a51084a12f2de754cba4027d3e37",
+        "source_executable_checkpoint": "8ebebd9f9d63743b460440fb6ac6337bbd8d7da5",
+        "v7_profile_define": true
+      },
+      "observed": {
+        "first_one_tick_baseline": "Exact.",
+        "second_update_post_before_draw": "No-draw replay differs in 7 of the 48 matrix bytes; first difference is object byte 128. Authored SRT fields and full flags match.",
+        "final_same_input_setup": "Fixture state and recorded GX ID/type/48 matrix bytes match exactly.",
+        "raw_scope": "Actual prepared UV update/setup/math; fixture-created object and canonical callback; modeled GX argument sink."
+      },
+      "limitations": [
+        "No canonical constructor or lifetime proof, live browser writer identity, original FIFO/GPU output, pixels/PCM, or browser equivalence.",
+        "UV path only; unsupported non-UV/foreign-writer paths fail closed."
+      ]
+    },
+    "tobj_v7_source_scope_decision_v1": {
+      "decision": {
+        "path": "tobj-presentation-prerequisite-source-decision-v1/decision-v1.json",
+        "bytes": 14055,
+        "sha256": "efe78caec909df5393788174246408234b38f69ac5fadbafc3b88b0b9927c273"
+      },
+      "flags_addendum": {
+        "path": "tobj-presentation-prerequisite-source-decision-v1/flags-addendum-v1.json",
+        "bytes": 2682,
+        "sha256": "11ad840246919c9b4f776e5490b370ec42d05a63955a81a74530b4431d485b7e"
+      },
+      "scope_notes": [
+        "Treat the 48-byte matrix and effective TEX_MTX_DIRTY bit 31 together; preserve full authored flags, actual setter timing, and original update/setup order.",
+        "TOON setup may return before consuming dirty state; do not assume every setup clears it.",
+        "Shadow and Fountain contain direct matrix writers; UV evidence does not prove global render-only behavior or blanket class eligibility.",
+        "Custom/non-UV paths, resource id/coord/mtxid and live object ownership remain explicit unresolved boundaries."
+      ]
+    },
+    "tobj_causal_writer_capture_v1": {
+      "status": "ACTUAL_MAKETEXTUREMTX_OCCURRENCE_CONFIRMED_STRICT1216_FAILURE_RETAINED",
+      "source": {
+        "clean_checkpoint": "efbfe11bfc55faf238d2e5aaa901e373962004ea",
+        "tree": "6e63eed51c7d42089c6032e1e11644b788e5b4bb",
+        "checkpoint": {
+          "path": "tobj-causal-writer-clean-checkpoint-v1/checkpoint-v1.json",
+          "bytes": 9997,
+          "sha256": "a0a24fcef12f0e57d83cad66cc6835371dbe44f77a74dc3e85f5dce3122593ce"
+        },
+        "native_producer_base": "d4f478cd2369cfeb2ac457947104ece2a6d32ab5",
+        "native_producer_dirty_files": 16,
+        "producer": {
+          "path": "tobj-causal-writer-runtime-validation-v3/application-v1.json",
+          "bytes": 7183,
+          "sha256": "01fa6be3b20018b615727beba00363b1639804b9c65db0b5866c29ad818f42ac"
+        },
+        "identity_note": "Dirty producer d4f478cd+16 is not relabeled as clean efbfe11b."
+      },
+      "validation": {
+        "four_builds": "V7/V5/V6/ordinary Release PASS",
+        "native": {
+          "path": "tobj-causal-writer-runtime-validation-v3/native-build-result-v1.json",
+          "bytes": 13368,
+          "sha256": "4cb6687b13a0c701dfc692a2f332c71bbadaf45af074cb390aa4dae5ea02a88d"
+        },
+        "full": {
+          "path": "tobj-causal-writer-runtime-validation-v3/full-regression-summary-v1.json",
+          "bytes": 16008,
+          "sha256": "e5038909cab896bcc7f0d24be4fd29906e027d35caf14cdf3372df2ae3aca2d9"
+        },
+        "outer_tests": 2477,
+        "passed": 2312,
+        "skipped": 165,
+        "outer_seconds": 604.88,
+        "runtime": {
+          "path": "tobj-causal-writer-runtime-validation-v3/runtime-inventory-v1.json",
+          "bytes": 26355,
+          "sha256": "f1d1a8a78d8f43208f32dea5d187adb3c0537c4ef21d2e211a8d1b96fc167f73"
+        },
+        "retained_runtime_files": 33,
+        "config_controls": {
+          "path": "tobj-causal-writer-linked-config-controls-v1/controls-v1.json",
+          "bytes": 3173,
+          "sha256": "8073237f24bfd800c8d3036285bb029e5f1e55e285c592162e7c318816bd467d"
+        },
+        "config_tests": 11,
+        "config_review": {
+          "path": "tobj-causal-writer-linked-config-controls-v1/root-approval-v1.json",
+          "bytes": 1299,
+          "sha256": "0f773c5ef81e645149689089de5330b86d7f3d58e75cd758d1d34f068494dc90"
+        },
+        "config_independent_review": {
+          "path": "tobj-causal-writer-linked-config-independent-review-escalation-v1.json",
+          "bytes": 10247,
+          "sha256": "16d18461dd3e3f1b2623c4e14b7a6b0b3846a0f2eeb1ded19c4c925001ca22a2"
+        },
+        "mutable_map_rows": 3189,
+        "policy_rows": 2169,
+        "wire_rows": 2165,
+        "nonwire_rows": 1024,
+        "source_comparison_or_admission_changes": false
+      },
+      "capture": {
+        "packet": {
+          "path": "tobj-causal-writer-capture-v1/packet-candidate-v1.json",
+          "bytes": 98662,
+          "sha256": "018c6717db1fa8f37accd2dd193d48b098e2246f774a478e0a087d41bc8d253d"
+        },
+        "raw": {
+          "path": "tobj-causal-writer-capture-v1/runner/evidence.json",
+          "bytes": 1255772,
+          "sha256": "aeb14a5d7bfe2a4f92bc392aef09bf8b929e129bed00b0a5d6ec731ee08b4dba"
+        },
+        "launch": {
+          "path": "tobj-causal-writer-capture-v1/launch-result-v1.json",
+          "bytes": 3140,
+          "sha256": "cce3ec391a97f260f1b6bd457e914fe2f91ecd7b1589b7ae85f20b12e575be70"
+        },
+        "owner": {
+          "path": "tobj-causal-writer-capture-v1/owner.json",
+          "bytes": 90484,
+          "sha256": "a6aff0700b5b49b17c2cdd1a1ef75b1de57e13ebe73c30c6f570dfe0825015a2"
+        },
+        "commands": [
+          [
+            8,
+            0
+          ],
+          [
+            9,
+            0
+          ],
+          [
+            10,
+            0
+          ],
+          [
+            11,
+            1216
+          ]
+        ],
+        "unrun_commands": [
+          12,
+          13
+        ],
+        "final_present_run": false,
+        "native_bytes": 35368,
+        "new_writer_bytes": 28048,
+        "writer_raw_sha256": "0bed37db25a6dae0d61eb3f704b9bc589e597f37ff9f59cfaa26d0baf09fca4a",
+        "raw_five_domains_per_sample": {
+          "300": {
+            "Observation": {
+              "bytes": 1280,
+              "sha256": "a97c03e66301419bcba8aba75cba1ed88ee3aed3b3a6fc80d9f0fd0f9de8f967",
+              "equal": true
+            },
+            "Pcm": {
+              "bytes": 4272,
+              "sha256": "462733f725a874052aba5c73b03dd4b8799b78bb1f973b097768548b16d9833c",
+              "equal": true
+            },
+            "Pad": {
+              "bytes": 44,
+              "sha256": "46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288",
+              "equal": true
+            },
+            "RngProfile": {
+              "bytes": 32,
+              "sha256": "3d6e376f9a6fccd6906c0464e1d26993d12f922d64b0aa6dda4f3f2f1db07b0a",
+              "equal": true
+            },
+            "Transfer": {
+              "bytes": 40,
+              "sha256": "7cd1b6ae9606e1e05c29ce009ef00d6644be61f9ab1f29b098e4b1b5aede644c",
+              "equal": true
+            }
+          },
+          "301": {
+            "Observation": {
+              "bytes": 1280,
+              "sha256": "695dcf7e144dc8fcd8c79e03cdd68da5c9b560aa57aec7d5023bacb73cd6a61a",
+              "equal": true
+            },
+            "Pcm": {
+              "bytes": 4272,
+              "sha256": "74ab5495dd17a98755b76bd9c5bd7bb4cfa1b5075cde75c9a904a7a138fd0d8c",
+              "equal": true
+            },
+            "Pad": {
+              "bytes": 44,
+              "sha256": "c1be1a004e9e0fafa868a1f51540cef6f2fa3d6104e7b503c3b9eb5f79cbe63d",
+              "equal": true
+            },
+            "RngProfile": {
+              "bytes": 32,
+              "sha256": "3d6e376f9a6fccd6906c0464e1d26993d12f922d64b0aa6dda4f3f2f1db07b0a",
+              "equal": true
+            },
+            "Transfer": {
+              "bytes": 40,
+              "sha256": "f43157ae61bd00daa75379bb0e7a8974c1ff682dfdabeac4ec5120821c7ef4fc",
+              "equal": true
+            }
+          }
+        },
+        "aggregate_cpu": {
+          "schema": 1,
+          "bytes": 35368,
+          "mode": 2,
+          "state": 6,
+          "firstFailure": 1216,
+          "preFrame": 176,
+          "postFrame": 178,
+          "commitResult": 0,
+          "cpuEquality": 0,
+          "drawnEquality": 0,
+          "checkedCpu": 30,
+          "matchedCpu": 14,
+          "checkedDrawn": 0,
+          "matchedDrawn": 0,
+          "diagnosticMask": 127,
+          "lastCommand": 11
+        }
+      },
+      "writer": {
+        "status": 1,
+        "reason": 0,
+        "count": 11,
+        "post_count": 6,
+        "drawn_count": 11,
+        "overflow": 0,
+        "matched_count": 1,
+        "matched_index_zero_based": 2,
+        "selected_sequence": 3,
+        "selected_command": 9,
+        "outer_frame": 177,
+        "outer_phase": 1,
+        "outer_epoch": 1,
+        "row": 113,
+        "offset": 272,
+        "source": 2160247168,
+        "host": "00000000030b41e0",
+        "allocation_generation": "0000000000000072",
+        "object": "00000000030b4260",
+        "field": "00000000030b42d4",
+        "field_offset_in_object": 116,
+        "difference_offset_in_matrix": 28,
+        "piece_offset_of_difference": 144,
+        "class_symbol": "hsdTObj",
+        "class_address": "0xd8d28",
+        "piece_requested": 172,
+        "physical": 192,
+        "before_word": "00a02e41",
+        "after_word": "bce32e41",
+        "replay_word": "00a02e41",
+        "full_flags_inside_Make_unchanged": true,
+        "later_sequence9_excluded_after_POST": true,
+        "scope": "SOURCE_WRITE_OCCURRENCE_ONLY_CAPTURE_TIME_JOIN",
+        "live_piece_lifetime": "UNKNOWN",
+        "full_POST48": "Native finalize attests full48 memcmp with actual POST; JS/internal candidate consistency is not independent POST reconstruction. Exported failure window independently verifies only28byte matrix overlap.",
+        "compiled_attribution": {
+          "path": "tobj-causal-writer-runtime-validation-v3/compiled-tobj-attribution-v1.json",
+          "bytes": 26058,
+          "sha256": "31d8be01a1c0a163bd841e112f16d17983bb574ba32379b343d3fdbbcd099ff2"
+        }
+      },
+      "independent_reviews": {
+        "raw": {
+          "path": "tobj-causal-writer-raw-independent-review-v1.json",
+          "bytes": 7968,
+          "sha256": "ed3ddb4ae966da75e593b399cceaf6a8cbd0ae6125adb0c6ea615c7489bc25f4"
+        },
+        "source_map_join": {
+          "path": "tobj-causal-writer-capture-independent-source-review-v1/result-v1.json",
+          "bytes": 10352,
+          "sha256": "80c202d3ad87249d5f5b86d5c713d092e474d919210b7b8255227cdf1ea714c6"
+        },
+        "cleanup": {
+          "path": "tobj-causal-writer-capture-v1/root-cleanup-review-v1.json",
+          "bytes": 1749,
+          "sha256": "7794dbb6b3c63e84a55fe1b0d943ff7f61e00a8574e5c1dc4af2fbad95a07077"
+        }
+      },
+      "cleanup": {
+        "cpu_close": 1216,
+        "successful_native_close": false,
+        "renderer_closed_field": false,
+        "snapshot_close": 1,
+        "renderer_shutdown": 1,
+        "owned_process_absence": true
+      },
+      "retained_preparation_failures": {
+        "capture_fixture": {
+          "path": "tobj-causal-writer-runtime-validation-v1/failure-v1.json",
+          "bytes": 7254,
+          "sha256": "3d864cf2eedad4b29c2c558df507d66a93bdbe235c89c371f2a16899085a3f7c"
+        },
+        "profile_composition": {
+          "path": "tobj-causal-writer-runtime-validation-v2/failure-v1.json",
+          "bytes": 8211,
+          "sha256": "3d034b8e90f1064ccae81449c1e004dacdb8397ba958e3e4d740727ad2f5adeb"
+        },
+        "composition_diagnosis": {
+          "path": "tobj-profile-composition-reduction-v1/diagnosis-v1.json",
+          "bytes": 3548,
+          "sha256": "a5e8418191dc57886d0aa93e178c72c7cec42fe8ac716a3d2f2cd544b653352a"
+        },
+        "reduced_composition": {
+          "path": "tobj-profile-composition-repair-candidate-v1/composition-attempt-v1/final-result-v1.json",
+          "bytes": 1405,
+          "sha256": "a676a3e4cc05f12365cc78581b937d8519548b169965f61995dc0c6859c2476f"
+        }
+      },
+      "next_control_only": {
+        "proposal": {
+          "path": "tobj-post-diagnostic-repair-hypothesis-v1/hypothesis-v1.json",
+          "bytes": 4497,
+          "sha256": "354999e9937c281d93a76af70865b4719aa5ba5a9fc4d92f5295798230c54a5b"
+        },
+        "boundary": "External DESIGN ONLY for a canonical UV/TOON same-history matrix48/derived-dirty component control: distinguish draw-unchanged raw source flags from effective full-flags dirty-clear view, bind every reader/RMW setter, constructor+successful-load lineage, direct-Free/release retirement and class/amnesia/world revocation. No PRE adoption, production implementation, control execution or browser retry is authorized.",
+        "implementation_or_browser_retry_authorized": false,
+        "independent_design_review": {
+          "path": "tobj-presentation-component-design-independent-review-v1.json",
+          "bytes": 6709,
+          "sha256": "0771180cc9508ce07dcc42b59e238b094d3547a0939ccc0d1d63519ab52bc95b"
+        },
+        "review_decision": "GO_EXTERNAL_COMPONENT_DESIGN_HOLD_PRODUCTION_IMPLEMENTATION",
+        "initial_scope": [
+          "canonical UV matrix48+derived dirty",
+          "TOON no-op semantics"
+        ],
+        "raw_vs_effective_flags": "Raw source flags must be draw-unchanged; effective full-flags view must preserve original draw-side dirtyclear. Explicit reader and RMWsetter contracts required.",
+        "lineage": "Actual constructor+successfulload mint; no PREadopt; actual directFree/release retire; class/amnesia/world revoke.",
+        "control_execution_authorized": false
+      },
+      "limits": [
+        "Unique matching record only within retained declared prePOST event set, not globally unique writer or uninterrupted lineage.",
+        "Capture-time header/class and source occurrence do not grant live typed ownership/restore authority.",
+        "Make flags sampling does not observe subsequent Setup dirty-clear; matrix and full dirty semantics remain next coherent boundary.",
+        "No masking, payload exclusion, cache rewind, fake CPU source calls, POST copy or relaxed comparisons.",
+        "No claim all earlier LObj bytes passed, no final-present/pixel/whole-session/seven-tick/competitive acceptance."
+      ]
+    },
+    "current_next_boundary": "External DESIGN ONLY for a canonical UV/TOON same-history matrix48/derived-dirty component control: distinguish draw-unchanged raw source flags from effective full-flags dirty-clear view, bind every reader/RMW setter, constructor+successful-load lineage, direct-Free/release retirement and class/amnesia/world revocation. No PRE adoption, production implementation, control execution or browser retry is authorized."
   }
 }

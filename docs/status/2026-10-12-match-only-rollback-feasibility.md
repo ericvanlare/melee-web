@@ -1,6 +1,6 @@
 # Match-only rollback feasibility
 
-**Compiled / Source-only snapshot diagnostic / Terminal browser tick-and-draw diagnostic / One-tick CPU restore-replay-and-present passed; V7 two-tick command 11 remains strict 1216 at row 113 offset 272; four Release configurations (V7, V6, V5 and ordinary) and full regression pass; capture-time class only, live object and full browser rollback remain unproven**
+**Compiled / One-tick drawn-reference CPU restore-replay-and-present passed; V7 two-tick remains strict 1216 at row 113 offset 272; actual MakeTextureMtx write occurrence now recorded; four Release configurations and 2,477-test regression pass; live lifetime, cache repair and full browser rollback remain unproven**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
 [merged #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
@@ -32,7 +32,7 @@ attribution. The earlier allocation-origin diagnostic observed generated
 `class.c:219`, without identifying a typed object or member. The prior class/piece
 lifecycle capture stopped at strict 1216 and observed generated `class.c:242`;
 its witness remained UNKNOWN and did not tie its first event to the failing allocation.
-The reviewed lvec-only reducer is limited: its scenario-9 failure reset is fixture-only, and it does not establish automatic recovery. A subsequent complete-cache source comparison refuses fresh-seed equivalence at scenario 6 on a mismatching GX light direction. A separately reviewed original-source observer retains that direction within and across fixture-marked draw scopes. This is source evidence, not browser object lifetime or restore safety. At that earlier boundary no production cache or browser capture was authorized; the later V7 source work and single capture are recorded below and do not authorize another run.
+The reviewed lvec-only reducer is limited: its scenario-9 failure reset is fixture-only, and it does not establish automatic recovery. A subsequent complete-cache source comparison refuses fresh-seed equivalence at scenario 6 on a mismatching GX light direction. A separately reviewed original-source observer retains that direction within and across fixture-marked draw scopes. This is source evidence, not browser object lifetime or restore safety. At that earlier boundary no production cache or browser capture was authorized; the later V7 source work and retained captures are recorded below and do not authorize another run.
 Later typed domains and final present remain unrun. Component controls and the
 one-tick browser result do not establish full browser rollback. Earlier owner controls
 also repaired callback guards so simulation and draw callbacks refuse separately;
@@ -484,19 +484,20 @@ without changing production behavior or the stack limit. See
 `lobj_causal_writer_capture_v1` in the structured receipt for raw bytes,
 independent review and exact producer identities.
 
-Two distinct V7 component controls now pass. The external source-only owner
-control replays 15 finite lighting scenarios with exact operation traces and
-ordered 69-byte GX FIFO records; it exercises the actual lighting math, setter,
-class-construction and destruction bodies while explicitly modeling allocator,
-free-list, initial-value, WObj/AObj/SList, stage-save and FIFO-sink services. A
-separate actual-module control compares the private V7 profile against inactive
-V6 for one canonical light over two fixture lifetimes: both 170-byte projections,
-138-byte FIFO pairs and both 64-byte GX records match, with source-piece reuse,
-separate owner tokens and no draw-window allocations. Its memory arena, WObj
-position providers, AObj, SList and FIFO backing remain modeled. These are
-component results, not browser or aggregate-restore validation.
+The two V7 profile component controls continue to pass. The external
+source-only owner control replays 15 finite lighting scenarios with exact
+operation traces and ordered 69-byte GX FIFO records; it exercises the actual
+lighting math, setter, class-construction and destruction bodies while
+explicitly modeling allocator, free-list, initial-value, WObj/AObj/SList,
+stage-save and FIFO-sink services. A separate actual-module control compares
+the private V7 profile against inactive V6 for one canonical light over two
+fixture lifetimes: both 170-byte projections, 138-byte FIFO pairs and both
+64-byte GX records match, with source-piece reuse, separate owner tokens and no
+draw-window allocations. Its memory arena, WObj position providers, AObj,
+SList and FIFO backing remain modeled. These remain component results, not
+browser or aggregate-restore validation.
 
-The V7 profile is private, default-off and fixed to Final Destination. Its source
+The V7 profile is private, default-off and fixed to Final Destination. Its original LObj source-
 writer hooks are disabled, so the prior 16,784-byte source-writer witness is
 inapplicable to this profile; no claim about the earlier row-62/offset-284
 strict failure is changed. No source-cache masking, restore exclusion, arithmetic change or GPU
@@ -520,18 +521,56 @@ snapshot close and renderer shutdown returned 1, and all eight recorded owned PI
 processes) are absent. This capture establishes no pixel equivalence,
 aggregate rollback or whole-session acceptance.
 
-A frozen read-only source reduction joins the saved class-info value `0xd1f98`
-to `hsdTObj`. Wasm32 ABI arithmetic makes `HSD_TObj.mtx[1][3]` at offset 144 a
-candidate for the captured piece offset; compiler layout assertions and the
-controlled source reducer remain unrun. This is not live object, lifetime or
-writer attribution.
+A separate actual V7 compiler-layout check, using the pinned V7 compile
+database (not the earlier V6-only layout evidence), verifies
+`sizeof(HSD_TObj) == 172`, 4-byte alignment, `offsetof(mtx) == 116`, and
+`offsetof(mtx[1][3]) == 144`. The layout result and root review are pinned in
+the structured receipt.
 
-The proposed next step is the finite actual-source TObj reducer recorded below:
-assert the layout with the actual compiler, then retain source matrix/flag and
-ordered GX evidence for the controlled original update/setup sequence. It is a
-design-only, root-release-required experiment; it makes no production change and
-authorizes no browser retry. No source-cache masking, restore exclusion,
-arithmetic change or GPU rewind is included.
+The minimal V2 actual-source UV mechanism control matches the first one-tick
+baseline exactly. After the second CPU update and before the second draw, the
+POST matrix retains the prior draw-produced value; the no-draw replay differs
+in seven matrix bytes, beginning at object byte 128, while authored SRT and
+full flags match. A final same-input setup makes the fixture matrix and
+recorded GX arguments exact again. This is a fixture-created object with a
+canonical callback and a modeled GX argument sink; it does not prove actual
+constructor binding, object lifetime, live browser writer identity, FIFO/GPU
+output or browser equivalence. Its independent review and raw result are
+pinned separately.
+
+A V3 actual-source canonical TObj control passes its component check. It
+compiles the actual `class.c` and `object.c` sources and the exact prepared
+`tobj.c` source followed by test-only wrappers; it exercises original
+construction, default callbacks, update/setup, TOON early return, release/free,
+reuse and amnesia. A changed input leaves a differing matrix after only one
+object is set up; an unchanged input matches exactly; a same-value setter
+leaves the original dirty-bit difference while matrix bytes remain equal.
+After both objects receive the same setup, their full flags, 48-byte matrices
+and recorded 56-byte GX load submissions match. The result is
+`PASS_CANONICAL_COMPONENT_ONLY`.
+
+The V1 `PAD_STACK` compile failure was caused by omitting the actual
+`placeholder.h` macro provider; V2 adds that header without increasing a stack
+limit or changing source math. The V2 highlight-link failure remains retained;
+V3 adds only abort-only highlight providers and does not test highlight. These
+controls use a modeled arena and GX sink; TExp, camera, custom/highlight paths
+abort if reached. The pinned source decision and flags addendum keep matrix
+and the effective dirty bit together, retain authored full flags and setter
+order, and call out the TOON early return that preserves dirty state. They also
+record direct shadow/Fountain matrix writers and unsupported paths, so this UV
+control does not establish global render-only behavior or a safe production
+relocation.
+
+That earlier capture-time descriptor `0xd1f98` alone does not identify either
+fixture instance, prove an uninterrupted live lifetime or identify a writer.
+The later diagnostic below adds an actual write occurrence without granting live
+class ownership.
+At that earlier checkpoint, the planned next experiment was an actual
+`MakeTextureMtx` write-occurrence witness joined to the same execution's strict
+row-113/offset-272 mismatch. That witness has now run and is recorded below.
+It establishes a source write occurrence only; lifetime remains UNKNOWN.
+Neither the earlier plan nor the new diagnostic authorizes a production cache
+registry, restore change or browser retry.
 
 ## First current-source copy/restore result
 
@@ -896,6 +935,72 @@ identity is in the structured receipt. PR #332 merged as `706fa1bb` after all
 14 checks on reviewed head `86e00ca2` completed (12 successes, two expected
 skips). The merged tree exactly matches the independently reviewed tree.
 Capture, runtime and harness identities above remain distinct from integration.
+
+
+### TObj matrix writer occurrence; strict two-tick failure remains
+
+The next diagnostic-only source checkpoint is
+`efbfe11bfc55faf238d2e5aaa901e373962004ea`. Its runtime was built from the
+distinct dirty producer `d4f478cd2369cfeb2ac457947104ece2a6d32ab5` plus 16
+reviewed files. V7, V5, V6 and ordinary Release builds pass; the full regression
+passes 2,477 tests with 165 skips in 604.880 seconds. The 11 fresh configuration
+controls pass. All 3,189 mutable rows join the new map, with the unchanged 2,169
+policy rows and 2,165 wire rows. The new 28,120-byte writer owner, 8-byte session
+and 28,048-byte diagnostic-buffer growth remain nonrestoring diagnostic state.
+
+One changed-hypothesis browser run retains strict command-11 result 1216 at
+payload row 113, offset 272. Commands 8/9/10 returned zero; commands 12/13 and
+final present were not run. Both samples' observation, PCM, PAD, RNG-profile and
+transfer byte pairs match, while aggregate CPU equality still fails. The new
+28,048-byte source-writer record reports status 1, reason 0, 11 events, six
+before POST, 11 after the second baseline draw, no overflow, and one matching
+event within that declared pre-POST set.
+
+Command-9 sequence 3 records the actual original `MakeTextureMtx` invocation at
+prepared `tobj.c:398`/`:433`. Its row, source span and allocation generation
+match the strict first difference. The matrix starts at object byte 116; the
+failure is matrix byte 28 (`mtx[1][3]`, piece byte 144). The observed word changes
+from `00a02e41` to `bce32e41`; the no-draw replay retains `00a02e41`. Full flags
+inside this call remain equal. The later command-10 sequence-9 write is excluded
+because POST was sealed before that second baseline draw. This is not attribution
+to the last event globally.
+
+Native status 1 attests its comparison of the complete selected 48-byte after
+matrix against the actual POST payload. Independently, the exported 32-byte
+failure window confirms the 28-byte overlap with that matrix; full POST48 is not
+separately exported and is not independently reconstructed. The exact new map
+binds `0xd8d28` to `hsdTObj`. The PRE piece/header join is capture-time evidence
+only: the existing live witness still refuses with reason 7, and uninterrupted
+piece/class lifetime remains UNKNOWN. Other events lacking PRE qualification
+remain UNKNOWN. No cache fix, blanket writer inventory, original pixel proof or
+full rollback acceptance follows.
+
+CPU CLOSE retained 1216 and was not a successful native close. Snapshot close
+and renderer shutdown returned 1; the root's independent OS cleanup check finds
+all recorded capture/browser/CDP processes and the root process group absent.
+The raw report and both independent reviews are pinned in
+`tobj_causal_writer_capture_v1` in the structured receipt.
+
+The failed capture-fixture compile and the subsequent profile composition failure
+remain retained. The fixture repair adds explicitly modeled unavailable TObj
+observer leaves. The profile repair corrects only bool-lowered patch context and
+makes the source control use the actual bool-before-profile composition APIs;
+the reduced composition check proves the final TObj source byte-exact. Source
+math, inputs, comparison policy and strict failure were not relaxed.
+
+The reviewed next step is external design only for a canonical UV/TOON
+same-history component control. It must distinguish raw source flags, which a
+draw must leave unchanged, from an effective full-flags view that preserves the
+original draw-side dirty clear. Each source reader and read-modify-write setter
+needs an explicit contract, preserving authored SRT, setter timing, unchanged
+reuse and ordered GX output under the same actual presentation history.
+Constructor plus successful load must establish lineage without PRE adoption;
+direct Free as well as release must retire it, and class change, amnesia and
+world retirement must revoke it. Custom, shadow/Fountain and mixed direct-write
+paths remain outside the initial UV/TOON scope. The independent design review
+authorizes no production implementation or control execution. No production
+matrix relocation, cache rewind, byte mask, fake CPU Make/dirty-clear call,
+POST-copy repair or additional browser run is authorized by this receipt.
 
 ## Stage decision dependencies, issue #333
 
