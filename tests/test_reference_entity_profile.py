@@ -6,8 +6,8 @@ import subprocess
 import tempfile
 import unittest
 
-ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / 'reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp'
+ROOT = Path(os.environ.get('MELEE_STADIUM_OBSERVER_REPO_ROOT', Path(__file__).resolve().parents[1]))
+SOURCE = Path(os.environ.get('MELEE_STADIUM_OBSERVER_SOURCE', ROOT / 'reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp'))
 
 
 def _extract_braced_declaration(source, marker):
@@ -85,6 +85,7 @@ class ReferenceEntityProfileTests(unittest.TestCase):
         stadium_receipt_start = source.index('constexpr char STADIUM_SETUP_RECEIPT_SHA256[]')
         stadium_receipt = source[stadium_receipt_start:source.index(';', stadium_receipt_start) + 1]
         stadium_phase = _extract_braced_declaration(source, 'enum class StadiumGoPrefixPhase')
+        whole_b_state = _extract_braced_declaration(source, 'struct StadiumWholeBObservation\n')
         stadium_state_start = source.index('  bool stadium_go_prefix_enabled = false;')
         stadium_state_end = source.index('  bool stadium_go_prefix_css_ready = false;', stadium_state_start)
         stadium_state = source[stadium_state_start:stadium_state_end]
@@ -95,6 +96,7 @@ class ReferenceEntityProfileTests(unittest.TestCase):
         harness = r'''
 #include <cassert>
 #include <cstdint>
+#include <cstddef>
 #include <map>
 #include <string>
 namespace ReferenceCapture {
@@ -111,7 +113,7 @@ std::string Env(const char* name){return environment[name];}
 using u8=std::uint8_t;
 using u32=unsigned;
 constexpr unsigned WHOLE_SESSION_MIN_MATCHES=3,WHOLE_SESSION_MAX_MATCHES=64;
-'''+stadium_receipt+"\n"+stadium_phase+"\n"+count_function+"\n"+allocation_configured+r'''
+'''+stadium_receipt+"\n"+stadium_phase+"\n"+whole_b_state+"\n"+count_function+"\n"+allocation_configured+r'''
 bool SdInitRequested(){return !Env("MWRC_SD_INIT").empty();}
 struct Reader {
  unsigned whole_session_matches=0;bool checked_entity_profile=false,active_entity_profile=false;std::string error;
@@ -125,7 +127,7 @@ std::string identity(){std::string handshake="base";
 return handshake;}
 };
 int main(){
- Reader r;assert(r.configure());assert(!r.checked_entity_profile);assert(!r.stadium_whole_feedback);assert(r.identity()=="base");
+ Reader r;assert(r.configure());assert(!r.stadium_whole_b.enabled);assert(!r.checked_entity_profile);assert(!r.stadium_whole_feedback);assert(r.identity()=="base");
  environment["MWRC_WHOLE_SESSION_MATCHES"]="1";
  r=Reader{};assert(!r.configure()||r.whole_session_matches==0);
  environment["MWRC_ENTITY_PROFILE"]="jiggly-ice-mario-fox-v1";

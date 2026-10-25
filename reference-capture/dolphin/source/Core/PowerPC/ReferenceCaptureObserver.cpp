@@ -185,6 +185,61 @@ enum class Boundary : u16
   StartupPrizeModeExit = 30,
 };
 
+// Optional whole3 adjunct for the already observed second VS lifetime only.
+// Source selectors/writers remain shared; this records no registration generations.
+struct StadiumWholeBObservation
+{
+  enum class Phase { AwaitSssExit, AwaitEntry, AwaitSetup, AwaitGo, PostGo, Closed };
+  bool enabled = false;
+  Phase phase = Phase::AwaitSssExit;
+  u32 setup_owner = 0, go_tick = 0, last_tick = 0, samples = 0;
+  bool Selected(u32 index) const { return enabled && index == 1; }
+  bool SssExit(u32 index, u32 whole, u8 route)
+  {
+    if (!Selected(index)) return true;
+    if (phase != Phase::AwaitSssExit || whole != 3 || !route) return false;
+    phase = Phase::AwaitEntry; return true;
+  }
+  bool Entry(u32 index, u32 whole, u32 owner)
+  {
+    if (!Selected(index)) return true;
+    if (phase != Phase::AwaitEntry || whole != 4 || !owner) return false;
+    setup_owner = owner; phase = Phase::AwaitSetup; return true;
+  }
+  bool Constructor(u32 index, u32 whole, u32 owner) const
+  {
+    return Selected(index) && phase == Phase::AwaitSetup && whole == 5 &&
+           owner != 0 && owner == setup_owner;
+  }
+  bool Setup(u32 index, u32 whole, u32 owner, size_t constructor_step)
+  {
+    if (!Selected(index)) return true;
+    if (!Constructor(index, whole, owner) || constructor_step != 5) return false;
+    phase = Phase::AwaitGo; return true;
+  }
+  bool Go(u32 index, u32 whole, u32 owner, u32 tick)
+  {
+    if (!Selected(index) || phase != Phase::AwaitGo || whole != 5 || owner != setup_owner)
+      return false;
+    go_tick = last_tick = tick; phase = Phase::PostGo; return true;
+  }
+  bool Tick(u32 index, u32 whole, u32 owner, u32 tick)
+  {
+    if (!Selected(index) || phase != Phase::PostGo || whole != 5 || owner != setup_owner ||
+        (samples == 0 ? tick != go_tick : (last_tick == UINT32_MAX || tick != last_tick + 1)) ||
+        samples == UINT32_MAX) return false;
+    last_tick = tick; ++samples; return true;
+  }
+  bool Close(u32 index, u32 whole, u32 owner)
+  {
+    if (!Selected(index)) return true;
+    if (phase != Phase::PostGo || whole != 5 || owner != setup_owner || samples == 0)
+      return false;
+    phase = Phase::Closed; return true;
+  }
+  bool Complete() const { return !enabled || phase == Phase::Closed; }
+};
+
 enum class StadiumGoPrefixPhase : u8
 {
   Disabled,
@@ -1199,6 +1254,11 @@ struct Observer::Impl
       return SetInvalid("Stadium whole feedback requires exclusive whole3/allocation2 recording"), false;
     if (!stadium_whole_feedback && !stadium_whole_setup_receipt.empty())
       return SetInvalid("Stadium whole feedback receipt lacks explicit scope"), false;
+    const std::string whole_b_setting = Env("MWRC_STADIUM_WHOLE_B_STATE");
+    if ((!whole_b_setting.empty() && whole_b_setting != "1") ||
+        (!whole_b_setting.empty() && !stadium_whole_feedback))
+      return SetInvalid("Stadium B state requires explicit whole3 feedback recording"), false;
+    stadium_whole_b.enabled = whole_b_setting == "1";
     const std::string constructor_setting = Env("MWRC_STADIUM_CONSTRUCTOR_OWNER");
     if ((!constructor_setting.empty() && constructor_setting != "1") ||
         (!constructor_setting.empty() && !stadium_go_prefix_enabled))
@@ -1443,6 +1503,8 @@ struct Observer::Impl
       handshake += ",\"entity_profile\":\"" + Env("MWRC_ENTITY_PROFILE") + "\"";
     if (stadium_idle_3500)
       handshake += ",\"original_idle_post_go_ticks\":3500";
+    if (stadium_whole_b.enabled)
+      handshake += ",\"stadium_whole_b_state\":true,\"stadium_observed_match\":1";
     if (stadium_go_ordinal2)
       handshake += ",\"original_post_go_target_ordinal\":2";
     if (stadium_whole_feedback)
@@ -1474,6 +1536,8 @@ struct Observer::Impl
       start += ",\"constructor_owner_observations\":true";
     if (stadium_idle_3500)
       start += ",\"original_idle_post_go_ticks\":3500";
+    if (stadium_whole_b.enabled)
+      start += ",\"stadium_whole_b_state\":true,\"stadium_observed_match\":1";
     if (stadium_go_ordinal2)
       start += ",\"original_post_go_target_ordinal\":2";
     if (stadium_whole_feedback)
@@ -1502,6 +1566,8 @@ struct Observer::Impl
 
   void RequestComplete()
   {
+    if (!stadium_whole_b.Complete())
+      return SetInvalid("Stadium B observations incomplete at unchanged whole-route terminal"), void();
     InputStream::RequestFinish(true);
     natural_completion.store(true);
     finish_requested.store(true);
@@ -3733,12 +3799,14 @@ struct Observer::Impl
   void ObserveStadiumConstructor(Core::System* system, size_t point,
                                   PowerPC::PowerPCState* state)
   {
-    if (!stadium_go_prefix_vs_entry_seen)
-      return;  // Attract constructors cannot arm this adjunct.
+    const bool later = stadium_whole_b.enabled;
+    if (later ? !stadium_whole_b.Selected(match_index) : !stadium_go_prefix_vs_entry_seen)
+      return;  // Attract/A/other-match constructors cannot arm the selected adjunct.
     u32 word = 0, tick = 0;
     u8 mode = 0;
-    if (!stadium_go_prefix_sss_exit_seen ||
-        stadium_go_prefix_phase != StadiumGoPrefixPhase::AwaitSetup ||
+    if ((later ? !stadium_whole_b.Constructor(match_index, whole_phase, setup_pointer)
+               : (!stadium_go_prefix_sss_exit_seen ||
+                  stadium_go_prefix_phase != StadiumGoPrefixPhase::AwaitSetup)) ||
         !ReadBytes(system, 0x80479d30, 1, &mode) || mode != 2 ||
         !ReadU32(system, STADIUM_CONSTRUCTOR_PCS[point], &word) ||
         word != STADIUM_CONSTRUCTOR_WORDS[point] ||
@@ -3919,7 +3987,9 @@ struct Observer::Impl
     if (stadium_whole_feedback)
     {
       json.pop_back();
-      json += ",\"whole_session\":true,\"match_index\":" + std::to_string(match_index) + "}";
+      json += ",\"whole_session\":true,\"match_index\":" + std::to_string(match_index);
+      if (stadium_whole_b.Selected(match_index)) json += ",\"stadium_b_state_observation\":true";
+      json += "}";
     }
     if (json.size() > RING_PAYLOAD)
       return SetInvalid("Stadium named Progress exceeds its bounded payload"), void();
@@ -4148,9 +4218,12 @@ struct Observer::Impl
   {
     // The same callback PC can be reached by the title attract route. Ignore
     // it until the observed CSS/SSS route and ordinary VS owner are accepted.
-    if (!stadium_go_prefix_sss_exit_seen || !stadium_go_prefix_vs_entry_seen)
+    const bool later = stadium_whole_b.enabled;
+    if (later ? !stadium_whole_b.Selected(match_index)
+              : (!stadium_go_prefix_sss_exit_seen || !stadium_go_prefix_vs_entry_seen))
       return;
-    if (stadium_go_prefix_phase != StadiumGoPrefixPhase::AwaitGo)
+    if (later ? stadium_whole_b.phase != StadiumWholeBObservation::Phase::AwaitGo
+              : stadium_go_prefix_phase != StadiumGoPrefixPhase::AwaitGo)
       return SetInvalid("Stadium GO prefix observed a duplicate or out-of-phase GO return"), void();
     u32 call_word = 0, word = 0, source_tick = 0;
     u8 current_mode = 0;
@@ -4177,9 +4250,12 @@ struct Observer::Impl
         !AddStadiumStateSlices(system))
       return SetInvalid("Stadium GO marker did not expose its checked setup/RNG/input/state slices"), void();
 
+    if (later && !stadium_whole_b.Go(match_index, whole_phase, setup_pointer, source_tick))
+      return SetInvalid("Stadium B GO changed selected setup owner/order"), void();
     PublishStadiumProgress("go_after", pc, word, state->gpr[3], state, source_tick);
     if (invalid.load())
       return;
+    if (later) return; // Whole-route completion and global counters remain untouched.
     stadium_go_prefix_go_tick = source_tick;
     stadium_go_prefix_last_tick = source_tick;
     stadium_go_prefix_tail_ticks = 0;
@@ -4191,12 +4267,14 @@ struct Observer::Impl
   {
     if (!Start() || invalid.load() || finish_requested.load())
       return;
-    if (stadium_constructor_enabled)
+    if (stadium_constructor_enabled || stadium_whole_b.enabled)
     {
       const auto point = std::find(STADIUM_CONSTRUCTOR_PCS.begin(), STADIUM_CONSTRUCTOR_PCS.end(), pc);
       if (point != STADIUM_CONSTRUCTOR_PCS.end())
         return ObserveStadiumConstructor(system, static_cast<size_t>(point - STADIUM_CONSTRUCTOR_PCS.begin()), state), void();
     }
+    if (stadium_whole_b.enabled && pc == STADIUM_GO_AFTER_PC)
+      return ObserveStadiumGoAfter(system, pc, state), void();
     if (stadium_go_prefix_enabled)
     {
       if (pc == 0x8025a310 || pc == 0x8025a4c0 || pc == 0x8025a4e8 || pc == 0x8025a548)
@@ -4550,6 +4628,8 @@ struct Observer::Impl
         if (!ReadU32(system, 0x804d6c90, &sss_pointer) || !sss_pointer ||
             sss_pointer > UINT32_MAX - 4 || !ReadBytes(system, sss_pointer + 4, 1, &route))
           return SetInvalid("whole-session SSS exit did not expose its source route"), void();
+        if (!stadium_whole_b.SssExit(match_index, whole_phase, route))
+          return SetInvalid("Stadium B lacks its one selected nonzero SSS exit"), void();
         whole_phase = route ? 4 : 8;
       }
       if (!AddMenuSlices(system, boundary, state->gpr[3]))
@@ -4719,6 +4799,8 @@ struct Observer::Impl
           return SetInvalid("VS entry did not expose its bounded initial state"), void();
         if (!AddProfileSlices(system))
           return SetInvalid("VS entry did not expose its loaded profile masks"), void();
+        if (!stadium_whole_b.Entry(match_index, whole_phase, setup_pointer))
+          return SetInvalid("Stadium B Entry lacks selected SSS route/owner"), void();
         setup_ready = false;
         transform_prefix_active_ticks = 0;
         transform_prefix_down_b_seen = false;
@@ -4831,6 +4913,10 @@ struct Observer::Impl
           return SetInvalid("match setup completed before all bounded fighter slices were ready"),
                  void();
         }
+        if (stadium_whole_b.Selected(match_index) && !StadiumGoPrefixRosterValid(system))
+          return SetInvalid("Stadium B Setup lost its two-human Mario/four-stock kind-3 owner"), void();
+        if (!stadium_whole_b.Setup(match_index, whole_phase, setup_pointer, stadium_constructor_step))
+          return SetInvalid("Stadium B Setup lacks complete selected constructor/owner"), void();
         setup_ready = true;
         if (stadium_go_prefix_enabled)
           stadium_go_prefix_phase = StadiumGoPrefixPhase::AwaitGo;
@@ -4933,10 +5019,19 @@ struct Observer::Impl
       {
         return SetInvalid("match semantic slice escaped the pinned ranges"), void();
       }
-      if (stadium_go_prefix_enabled &&
+      const bool later_state = stadium_whole_b.Selected(match_index) &&
+          stadium_whole_b.phase == StadiumWholeBObservation::Phase::PostGo && !result_seen;
+      if (later_state && (!match_active || !setup_ready || whole_phase != 5 ||
+          setup_pointer != stadium_whole_b.setup_owner || !StadiumGoPrefixRosterValid(system) ||
+          (boundary == Boundary::SourceTick &&
+           !stadium_whole_b.Tick(match_index, whole_phase, setup_pointer, source_tick)) ||
+          (boundary == Boundary::DrawReturn && stadium_whole_b.samples == 0)))
+        return SetInvalid("Stadium B state row lost its actual GO/contiguous tick/setup owner"), void();
+      if ((stadium_go_prefix_enabled || later_state) &&
           !AddSlice(system, SliceTag::PadQueue, 0x804c1f78, 0xc))
         return SetInvalid("Stadium GO prefix queue snapshot escaped its checked source range"), void();
-      if (stadium_state_snapshot_this_tick &&
+      if ((stadium_state_snapshot_this_tick ||
+           (later_state && boundary == Boundary::SourceTick)) &&
           !AddStadiumStateSlices(system))
         return SetInvalid("Stadium C/F boundary did not expose its checked map/display snapshot"),
                void();
@@ -5188,6 +5283,9 @@ struct Observer::Impl
       PutU32(descriptor, raw_offset);
       raw_offset += slice.size;
     }
+    if (boundary == Boundary::VsExit &&
+        !stadium_whole_b.Close(match_index, whole_phase, setup_pointer))
+      return SetInvalid("Stadium B VS exit lacks its observed constructor/GO/state span"), void();
     const size_t metadata_size = whole_session_enabled() ? 12 : 0;
     if (static_cast<size_t>(out - slot->payload.data()) + raw_size + metadata_size >
         slot->payload.size())
@@ -6059,6 +6157,11 @@ struct Observer::Impl
         (completed ? "true" : "false") + ",\"invalid\":" +
         (invalid.load() ? "true" : "false") + ",\"error\":" +
         (error_text.empty() ? "null" : "\"" + error_text + "\"");
+    if (stadium_whole_b.enabled)
+      json += ",\"stadium_whole_b_state\":true,\"stadium_observed_match\":1,\"stadium_b_observations_complete\":" +
+              std::string(stadium_whole_b.Complete() && !invalid.load() ? "true" : "false") +
+              ",\"stadium_b_go_tick\":" + std::to_string(stadium_whole_b.go_tick) +
+              ",\"stadium_b_state_source_ticks\":" + std::to_string(stadium_whole_b.samples);
     if (checked_entity_profile && !active_entity_profile && force && state != "starting")
       json += ",\"diagnostic_prefix_complete\":" + std::string(completed ? "true" : "false") +
               ",\"whole_session_equivalent\":false,\"comparison_source_ticks\":60," +
@@ -6253,6 +6356,7 @@ struct Observer::Impl
   u32 stadium_constructor_parameter_slot = 0, stadium_constructor_parameters = 0;
   bool stadium_go_prefix_enabled = false;
   bool stadium_whole_feedback = false;
+  StadiumWholeBObservation stadium_whole_b;
   bool stadium_whole_sss_ready = false;
   std::string stadium_whole_setup_receipt;
   std::string stadium_go_prefix_setup_receipt_sha256;
@@ -6393,7 +6497,11 @@ static bool IsCaptureBoundary(u32 guest_pc)
     // Diagnostic CPU PCs are JIT boundaries only for the fully validated,
     // opt-in companion configuration.  The normal observer boundary set and
     // its disabled path remain unchanged.
-    return (Env("MWRC_STADIUM_GO_PREFIX") == "1" &&
+    return (Env("MWRC_STADIUM_WHOLE_FEEDBACK") == "1" &&
+            Env("MWRC_STADIUM_WHOLE_B_STATE") == "1" &&
+            (guest_pc == STADIUM_GO_AFTER_PC ||
+             std::find(STADIUM_CONSTRUCTOR_PCS.begin(), STADIUM_CONSTRUCTOR_PCS.end(), guest_pc) != STADIUM_CONSTRUCTOR_PCS.end())) ||
+           (Env("MWRC_STADIUM_GO_PREFIX") == "1" &&
             Env("MWRC_STADIUM_CONSTRUCTOR_OWNER") == "1" &&
             std::find(STADIUM_CONSTRUCTOR_PCS.begin(), STADIUM_CONSTRUCTOR_PCS.end(), guest_pc) != STADIUM_CONSTRUCTOR_PCS.end()) ||
            (Env("MWRC_STADIUM_GO_PREFIX") == "1" &&

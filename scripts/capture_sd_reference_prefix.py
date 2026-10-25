@@ -914,8 +914,9 @@ def prepare_rules_profile(profile, user, *, source_slots=(0, 1)):
 
 
 def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_manifest, timeout=180, gci=None,
-        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False, stadium_go_ordinal2=False, stadium_whole_target=None, stadium_whole_setup=None, stadium_whole_gc=None, stadium_whole_dol=None, stadium_whole_provenance=None):
+        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False, stadium_go_ordinal2=False, stadium_whole_target=None, stadium_whole_setup=None, stadium_whole_gc=None, stadium_whole_dol=None, stadium_whole_provenance=None, stadium_whole_b_state=False):
     """Own fresh output before preparation so failures cannot vanish before launch."""
+    require(type(stadium_whole_b_state) is bool, "Whole Stadium B observation opt-in must be boolean")
     whole_args = (stadium_whole_target, stadium_whole_setup, stadium_whole_gc,
                   stadium_whole_dol, stadium_whole_provenance)
     if any(x is not None for x in whole_args):
@@ -928,7 +929,8 @@ def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_m
             menu_recipe=menu_recipe, output=output, build_manifest=build_manifest,
             target_path=stadium_whole_target, setup_path=stadium_whole_setup,
             checkpoint_gc=stadium_whole_gc, dol=stadium_whole_dol,
-            provenance=stadium_whole_provenance, gci=gci, timeout=timeout)
+            provenance=stadium_whole_provenance, gci=gci, timeout=timeout, stadium_whole_b_state=stadium_whole_b_state)
+    require(not stadium_whole_b_state, "Whole Stadium B observation requires the whole3 input tuple")
     require(type(stadium_go_ordinal2) is bool and
             (not stadium_go_ordinal2 or input_replay is None),
             'Stadium GO+2 requires a fresh recording, never replay or hybrid input')
@@ -1877,8 +1879,16 @@ def drive_stadium_sss_feedback(receiver, menus, controller, next_row, wait_sourc
 
 class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
     """Strict whole-session rows feeding the existing CSS/SSS input policies."""
-    def __init__(self, menus, receipt, expected):
+    def __init__(self, menus, receipt, expected, *, stadium_whole_b_state=False):
         super().__init__(menus)
+        require(type(stadium_whole_b_state) is bool, "Whole Stadium B observation opt-in must be boolean")
+        from stadium_go_prefix import StadiumConstructorObservations
+        self.stadium_whole_b_state = stadium_whole_b_state
+        self.b_constructor = StadiumConstructorObservations()
+        self.b_entry_seen = False
+        self.b_go = None
+        self.b_state_samples = []
+        self.b_observation = None
         require(isinstance(receipt, str) and len(receipt) == 64 and
                 all(c in '0123456789abcdef' for c in receipt) and receipt != '0'*64,
                 'Whole Stadium receipt identity differs')
@@ -1907,10 +1917,31 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
         # Carry only its closed counter; all geometry and owner state is fresh.
         last_sss_call = self.sss_positions.last_call
         seq, boundaries, announcements, index = self.seq, self.boundaries, self.announcements, self.match_index
-        fresh = type(self)(self.menus, self.receipt, self.expected)
+        fresh = type(self)(self.menus, self.receipt, self.expected, stadium_whole_b_state=self.stadium_whole_b_state)
+        fresh.b_observation = self.b_observation
         fresh.sss_positions.last_call = last_sss_call
         self.__dict__.update(fresh.__dict__)
         self.seq, self.boundaries, self.announcements, self.match_index = seq, boundaries, announcements, index+1
+
+    def accept_b_progress(self, row):
+        from stadium_go_prefix import (CONSTRUCTOR_POINTS, _validate_progress,
+                                       _validate_stadium_idle_state_record)
+        p = row['payload']
+        require(self.stadium_whole_b_state and self.match_index == 1 and
+                p.get('stadium_b_state_observation') is True and self.b_entry_seen,
+                'Whole Stadium B Progress lacks explicit selected Entry scope')
+        phase = p.get('phase')
+        if phase in CONSTRUCTOR_POINTS:
+            require(not self.setup_seen and self.b_go is None,
+                    'Whole Stadium B constructor escaped Entry-to-Setup')
+            self.b_constructor.accept(row, route_ready=True,
+                scope='stadium_whole3_feedback_v1', expected_receipt=self.receipt, match_index=1)
+        else:
+            require(phase == 'go_after' and self.setup_seen and self.b_go is None,
+                    'Whole Stadium B GO is duplicate or outside completed Setup')
+            self.b_constructor.finish()
+            _validate_progress(row, phase, self.receipt, scope='stadium_whole3_feedback_v1',match_index=1)
+            self.b_go = _validate_stadium_idle_state_record(row, 'GO', row['source_tick'])
 
     def observe_pause_clock(self, row):
         """Indirect pause evidence from existing source clock, never a pause getter."""
@@ -1967,6 +1998,9 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                     payload.get('stadium_whole_feedback') is True and
                     payload.get('setup_receipt_sha256') == self.receipt,
                     'Whole Stadium source announcement differs')
+            require(payload.get('stadium_whole_b_state', False) is self.stadium_whole_b_state and
+                    (not self.stadium_whole_b_state or type(payload.get('stadium_observed_match')) is int and payload['stadium_observed_match'] == 1),
+                    'Whole Stadium B announcement opt-in differs')
             self.announcements.append(event)
             return
         require(self.announcements == ['handshake', 'start'], 'Whole Stadium row preceded announcements')
@@ -1975,6 +2009,8 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
         if event == 'end':
             require(self.match_index == 2 and self.returned_css and payload.get('natural') is True and
                     payload.get('status') == 'completed', 'Whole Stadium ended before third natural CSS')
+            require(not self.stadium_whole_b_state or self.b_observation is not None,
+                    'Whole Stadium terminal lacks completed B observation span')
             self.ended = True
             return
         require(event in ('progress', 'boundary') and payload.get('whole_session') is True and
@@ -1985,6 +2021,10 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                     payload.get('setup_receipt_sha256') == self.receipt,
                     'Whole Stadium Progress identity differs')
             phase = payload.get('phase')
+            from stadium_go_prefix import CONSTRUCTOR_POINTS
+            if phase in CONSTRUCTOR_POINTS or phase == 'go_after':
+                self.accept_b_progress(row)
+                return
             if phase == 'sss_return':
                 require(not self.sss_position_route_ready and self.sss_live_owner_sequence is None,
                         'Whole Stadium duplicate SSS readiness')
@@ -2062,7 +2102,13 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
             items = [x for x in payload.get('slices', []) if x.get('name') == 'match_setup']
             require(len(items) == 1 and _decode_setup(items[0]['hex']) == self.expected,
                     'Whole Stadium source Setup differs from its exact declaration')
+            if name == 'entry' and self.stadium_whole_b_state and self.match_index == 1:
+                require(not self.b_entry_seen, 'Whole Stadium duplicate B Entry')
+                self.b_entry_seen = True
             if name == 'setup':
+                if self.stadium_whole_b_state and self.match_index == 1:
+                    require(self.b_entry_seen, 'Whole Stadium B Setup lacks Entry')
+                    self.b_constructor.finish()
                 require(not self.setup_seen and self.confirm_release_sequence is not None,
                         'Whole Stadium Setup preceded consumed menu confirmation/release')
                 self.setup_seen = True
@@ -2078,6 +2124,11 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                         'Whole Stadium counted tick lacks its fresh neutral consumed owner')
                 self.pending_neutral_sample = None
                 self.tick_count += 1
+            if self.stadium_whole_b_state and self.match_index == 1 and self.b_go is not None:
+                from stadium_go_prefix import _validate_stadium_idle_state_record
+                require(self.b_state_samples or row['source_tick'] == self.b_go['source_tick'],
+                        'Whole Stadium B first state is not actual GO containing tick')
+                self.b_state_samples.append(_validate_stadium_idle_state_record(row, 'IDLE',row['source_tick']))
             self.previous_tick = row['source_tick']
             self.observe_pause_clock(row)
         elif name == 'vs_exit_return':
@@ -2096,6 +2147,12 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                     result.get('address') == 0x80479da4 and
                     result.get('size') == len(raw) == 0x28 and raw[4] == 7,
                     'Whole Stadium completed MatchEnd header lacks source outcome7')
+            if self.stadium_whole_b_state and self.match_index == 1:
+                require(self.b_go is not None and self.b_state_samples,
+                        'Whole Stadium B exit lacks actual GO/state span')
+                self.b_observation = dict(constructor=self.b_constructor.finish(include_state_projection=True),
+                    go=self.b_go, source_tick_states=self.b_state_samples,
+                    registration_event_observed=False, lifetime_pairing_observed=False)
             self.outcome_seen = True
         elif name == 'return_css':
             require(self.outcome_seen and self.chord_released is not None,
@@ -2286,9 +2343,10 @@ def prepare_stadium_setup_gci_folder(checkpoint_gc, initial_gci, destination, se
 
 
 def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, build_manifest,
-                             target_path, setup_path, checkpoint_gc, dol, provenance, gci, timeout):
+                             target_path, setup_path, checkpoint_gc, dol, provenance, gci, timeout, stadium_whole_b_state=False):
     """Explicit private whole3/sidecar2 diagnostic using the existing passive route."""
     import types
+    require(type(stadium_whole_b_state) is bool, "Whole Stadium B observation opt-in must be boolean")
     from capture_allocation_history import (validate_setup_receipt, stadium_three_target,
                                             validate_stadium_three_native)
     from retail_allocation_profile import build_profile
@@ -2341,9 +2399,11 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             MWRC_ALLOCATION_OUTPUT=str(output/'native-allocations.jsonl'),
             MWRC_ALLOCATION_VS_TARGET='2',MWRC_ALLOCATION_STOP_AT='exit',
             MWRC_STADIUM_WHOLE_FEEDBACK='1',MWRC_STADIUM_WHOLE_SETUP_RECEIPT_SHA256=setup['sha256'])
+        if stadium_whole_b_state:
+            env['MWRC_STADIUM_WHOLE_B_STATE']='1'
         command=rules_dolphin_command(dolphin,user,disc)+['-C','Dolphin.Core.SlotA=8',
             '-C','Dolphin.Core.GCIFolderAPath='+str(output/'gci-folder')]
-        receiver=StadiumWholeFeedbackReceiver(menus,setup['sha256'],expected)
+        receiver=StadiumWholeFeedbackReceiver(menus,setup['sha256'],expected,stadium_whole_b_state=stadium_whole_b_state)
         controller=StadiumIntentController(p1,p2,output/'input-intentions.jsonl')
         launch=dict(command=command,environment_delta={k:v for k,v in env.items() if k.startswith('MWRC_')},manifest=build,setup=setup,expected=expected,
                     profile_inventory=profile_inventory,owned_gci=dict(path=str(owned_gci),bytes=owned_gci.stat().st_size,sha256=hashlib.sha256(owned_gci.read_bytes()).hexdigest()),operation_seconds=180,owner_seconds=210,cleanup_seconds=30)
@@ -2358,6 +2418,9 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
         with ObserverTail(raw,status,wait_check=wait_check) as tail:
             report['actual_inputs']=drive_stadium_whole_three(receiver,tail,controller,menus,deadline)
         wait_transform_terminal_statuses(status,native_status,deadline,wait_check=wait_check)
+        if stadium_whole_b_state:
+            require(receiver.b_observation is not None, 'Whole Stadium B observation incomplete')
+            report['stadium_b_observation']=receiver.b_observation
         report['input_stream']=validate_input_stream(native)
         report['native']=validate_stadium_three_native(output,allocation_profile,expected)
         require(time.monotonic()<deadline,'Whole Stadium operation expired during final validation')
@@ -2413,6 +2476,8 @@ def main(argv=None):
                  'stadium-whole-dol','stadium-whole-provenance'):
         parser.add_argument('--'+name,type=Path,
                             help='Explicit whole3/allocation2 passive source-route input identity')
+    parser.add_argument("--stadium-whole-b-state", action="store_true",
+                        help="Whole3-only selected match1 constructor/actual-GO/state adjunct; terminal unchanged")
     args = parser.parse_args(argv)
     try:
         comparator = None

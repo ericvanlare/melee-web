@@ -561,9 +561,19 @@ def _validate_menu_pad_poll(payload: dict[str, Any], sequence: int,
 
 
 def _validate_progress(row: dict[str, Any], phase: str,
-                       receipt_sha256: str) -> dict[str, Any]:
+                       receipt_sha256: str, *, scope: str = DIAGNOSTIC,
+                       match_index: int | None = None) -> dict[str, Any]:
     payload = row["payload"]
-    _require(payload.get("diagnostic") == DIAGNOSTIC and
+    if scope != DIAGNOSTIC:
+        _require(scope == "stadium_whole3_feedback_v1" and phase == "go_after" and
+                 type(match_index) is int and match_index == 1 and
+                 payload.get("whole_session") is True and
+                 type(payload.get("match_index")) is int and payload["match_index"] == 1 and
+                 payload.get("stadium_b_state_observation") is True,
+                 "GO: whole-B source scope differs")
+    else:
+        _require(match_index is None, "legacy Progress cannot select a whole-session match")
+    _require(payload.get("diagnostic") == scope and
              payload.get("phase") == phase and
              payload.get("setup_receipt_sha256") == receipt_sha256 and
              payload.get("setup_profile_verified_by_observer") is False,
@@ -1957,12 +1967,15 @@ class StadiumConstructorObservations:
         self.parameter_x0 = self.parameter_x4 = None
         self.complete = False
 
-    def accept(self, row: dict[str, Any], *, route_ready: bool) -> None:
+    def accept(self, row: dict[str, Any], *, route_ready: bool,
+               scope: str = DIAGNOSTIC, expected_receipt: str = EXPECTED_SETUP_RECEIPT_SHA256,
+               match_index: int | None = None) -> None:
         p = row['payload']
         phase = p.get('phase')
         _require(route_ready and not self.complete and phase in CONSTRUCTOR_POINTS,
                  'constructor witness outside checked VS setup interval')
-        p = _validate_progress_constructor(row)
+        p = _validate_progress_constructor(row, scope=scope,
+            expected_receipt=expected_receipt, match_index=match_index)
         g = p['constructor_gprs']
         root = _slice(p, 67, phase, 4, 2)
         obj = _slice(p, 90, phase, 0x38)
@@ -2104,11 +2117,24 @@ class StadiumConstructorObservations:
         return result
 
 
-def _validate_progress_constructor(row: dict[str, Any]) -> dict[str, Any]:
+def _validate_progress_constructor(row: dict[str, Any], *, scope: str = DIAGNOSTIC,
+                                   expected_receipt: str = EXPECTED_SETUP_RECEIPT_SHA256,
+                                   match_index: int | None = None) -> dict[str, Any]:
     p = row['payload']; phase = p.get('phase')
+    later = scope == 'stadium_whole3_feedback_v1'
+    if later:
+        _require(type(match_index) is int and match_index == 1 and
+                 p.get('whole_session') is True and type(p.get('match_index')) is int and
+                 p['match_index'] == match_index and p.get('stadium_b_state_observation') is True and
+                 isinstance(expected_receipt, str) and re.fullmatch(r'[0-9a-f]{64}', expected_receipt) and
+                 expected_receipt != '0' * 64, 'constructor whole-B scope/index/receipt differs')
+    else:
+        _require(scope == DIAGNOSTIC and match_index is None and
+                 expected_receipt == EXPECTED_SETUP_RECEIPT_SHA256,
+                 'constructor legacy scope/receipt differs')
     pc, word = CONSTRUCTOR_POINTS[phase]
-    _require(row.get('event') == 'progress' and p.get('diagnostic') == DIAGNOSTIC and
-             p.get('setup_receipt_sha256') == EXPECTED_SETUP_RECEIPT_SHA256 and
+    _require(row.get('event') == 'progress' and p.get('diagnostic') == scope and
+             p.get('setup_receipt_sha256') == expected_receipt and
              p.get('setup_profile_verified_by_observer') is False and
              _hex_address(p.get('pc'), phase) == pc and p.get('word') == word and
              all(type(v) is int and v >= 0 for v in
@@ -2118,7 +2144,8 @@ def _validate_progress_constructor(row: dict[str, Any]) -> dict[str, Any]:
              row['draw_ordinal'] == p['draw_ordinal'], 'constructor progress identity mismatch')
     _require(set(p) == {'diagnostic','phase','setup_receipt_sha256',
                         'setup_profile_verified_by_observer','pc','word','argument','lr',
-                        'source_tick','draw_ordinal','constructor_gprs','slices'},
+                        'source_tick','draw_ordinal','constructor_gprs','slices'} |
+                        ({'whole_session','match_index','stadium_b_state_observation'} if later else set()),
              'constructor progress key inventory mismatch')
     _hex_address(p.get('lr'), phase + '.lr')
     g = p.get('constructor_gprs')

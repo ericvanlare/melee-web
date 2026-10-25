@@ -2,13 +2,14 @@
 from pathlib import Path
 import copy
 import json
+import os
 import shutil
 import struct
 import subprocess
 import sys
 import unittest
 from owned_test_workspace import OwnedWorkspaceTests
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(os.environ.get('MELEE_STADIUM_OBSERVER_REPO_ROOT', Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(ROOT / "tools"))
 from stadium_go_prefix import (StadiumSssPositionObservations, StadiumGoPrefixError,
                                DIAGNOSTIC, EXPECTED_SETUP_RECEIPT_SHA256)
@@ -113,13 +114,16 @@ class StadiumSssPositionTests(OwnedWorkspaceTests):
     def test_exact_cpp_witness_and_serializer_with_fixture_memory(self):
         compiler=shutil.which("c++")
         if not compiler:self.skipTest("C++ compiler unavailable")
-        source=(ROOT/"reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp").read_text()
+        source=Path(os.environ.get("MELEE_STADIUM_OBSERVER_SOURCE",ROOT/"reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp")).read_text()
         methods=source[source.index("  bool StadiumSssPositionOwner"):source.index("  void ObserveStadiumMenuHook")]
         publish=source[source.index("  void PublishStadiumProgress"):source.index("  // Pinned fn_8025A310")]
         fields=source[source.index("  struct StadiumSssPositionCall"):source.index("  bool stadium_go_prefix_enabled = false;")]
+        assert source.count("struct StadiumWholeBObservation\n")==source.count("enum class StadiumGoPrefixPhase : u8")==1
+        whole_b_state=source[source.index("struct StadiumWholeBObservation\n"):source.index("enum class StadiumGoPrefixPhase : u8")]
         whole_fields="\n".join(
             source[source.index(marker):source.index(";",source.index(marker))+1]
-            for marker in ("  bool stadium_whole_feedback = false;",
+            for marker in ("  StadiumWholeBObservation stadium_whole_b;",
+                           "  bool stadium_whole_feedback = false;",
                            "  bool stadium_whole_sss_ready = false;",
                            "  std::string stadium_whole_setup_receipt;",
                            "  u32 match_index = 0;", "  u32 whole_phase = 0;"))
@@ -175,6 +179,7 @@ struct Fixture {
         setup+=''.join('word('+a+','+b+');'for a,b in anchors)+"}\n};\n"
         main=r"""
 int main(){Core::System sys;
+ {Fixture f;assert(!f.stadium_whole_b.enabled);}
  auto entry=[&](Fixture& f,PowerPC::PowerPCState& s){s.gpr[3]=0x80500000;s.gpr[1]=0x81700038;s.gpr[13]=0x804db6a0;s.spr[8]=0x80390e00;f.ObserveStadiumSssPosition(&sys,0x8025a310,&s);s.gpr[1]=0x81700000;s.gpr[31]=0x80500100;};
  auto cursor=[&](Fixture& f,PowerPC::PowerPCState& s){s.spr[8]=0x8025a4c0;f.ObserveStadiumSssPosition(&sys,0x8025a4c0,&s);};
  {Fixture f;f.setup();auto before=f.mem;PowerPC::PowerPCState s;entry(f,s);cursor(f,s);s.gpr[30]=18;s.gpr[31]=0x803f08c8;s.spr[8]=0x8025a4e8;f.ObserveStadiumSssPosition(&sys,0x8025a4e8,&s);f.mem[0x804d6cae]=18;before=f.mem;f.ObserveStadiumSssPosition(&sys,0x8025a548,&s);assert(!f.invalid&&!f.stadium_sss_position.active&&f.mem==before&&f.published.size()==3);for(auto&j:f.published)std::cout<<j<<"\n";}
@@ -189,7 +194,7 @@ int main(){Core::System sys;
 }
 """
         work=self.new_workspace(ROOT,"sss-position-control-");cpp=work/"control.cpp";exe=work/"control"
-        cpp.write_text(prefix+enum+middle+whole_fields+fields+add_slice+publish+methods+setup+main)
+        cpp.write_text(prefix+whole_b_state+enum+middle+whole_fields+fields+add_slice+publish+methods+setup+main)
         build=subprocess.run([compiler,"-std=c++17","-Wall","-Wextra","-Werror",str(cpp),"-o",str(exe)],capture_output=True,text=True,timeout=30)
         (work/"compile.stdout").write_text(build.stdout);(work/"compile.stderr").write_text(build.stderr)
         self.assertEqual(build.returncode,0,build.stderr)

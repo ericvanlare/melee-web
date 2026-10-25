@@ -16,6 +16,12 @@ def load_exact(name,path):
     assert Path(module.__file__).resolve()==path.resolve()
     assert hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest()==digest
     return module
+def whole_b_declaration(source):
+    start='struct StadiumWholeBObservation\n'
+    end='enum class StadiumGoPrefixPhase : u8'
+    assert source.count(start)==source.count(end)==1
+    return source[source.index(start):source.index(end)]
+
 class StadiumWholeFeedbackTests(OwnedWorkspaceTests):
     @classmethod
     def setUpClass(cls):
@@ -114,20 +120,28 @@ class StadiumWholeFeedbackTests(OwnedWorkspaceTests):
         body=source[start:stop]
         fixture=r'''
 #include <cassert>
+#include <cstdint>
+#include <cstddef>
 #include <map>
 #include <string>
+using u32=uint32_t;using u8=uint8_t;
+'''+whole_b_declaration(source)+r'''
 std::map<std::string,std::string> env;
 std::string Env(const char* key){return env[key];}
 bool SdInitRequested(){return !Env("MWRC_SD_INIT").empty();}
 bool AllocationConfigured(){return !Env("MWRC_ALLOCATION_OUTPUT").empty();}
 namespace InputStream { bool recording=true,replaying=false; bool IsRecording(){return recording;} bool IsReplaying(){return replaying;} }
-struct Gate { unsigned whole_session_matches=3;bool stadium_go_prefix_enabled=false,stadium_whole_feedback=false;std::string stadium_whole_setup_receipt,error;void SetInvalid(const char* e){error=e;}
+struct Gate { StadiumWholeBObservation stadium_whole_b;unsigned whole_session_matches=3;bool stadium_go_prefix_enabled=false,stadium_whole_feedback=false;std::string stadium_whole_setup_receipt,error;void SetInvalid(const char* e){error=e;}
 bool Run(){
 ''' + body + r'''
 return true;
 }};
 void reset(){env.clear();InputStream::recording=true;InputStream::replaying=false;env["MWRC_STADIUM_WHOLE_FEEDBACK"]="1";env["MWRC_STADIUM_WHOLE_SETUP_RECEIPT_SHA256"]=std::string(64,'a');env["MWRC_ALLOCATION_OUTPUT"]="owned";env["MWRC_ALLOCATION_VS_TARGET"]="2";env["MWRC_ALLOCATION_STOP_AT"]="exit";}
 int main(){reset();assert(Gate().Run());
+reset();Gate off;assert(off.Run()&&!off.stadium_whole_b.enabled);
+reset();env["MWRC_STADIUM_WHOLE_B_STATE"]="1";Gate on;assert(on.Run()&&on.stadium_whole_b.enabled);
+reset();env["MWRC_STADIUM_WHOLE_B_STATE"]="2";assert(!Gate().Run());
+reset();env["MWRC_STADIUM_WHOLE_B_STATE"]="1";env["MWRC_STADIUM_WHOLE_FEEDBACK"]="";env["MWRC_STADIUM_WHOLE_SETUP_RECEIPT_SHA256"]="";assert(!Gate().Run());
 for(const char* key:{"MWRC_STADIUM_CONSTRUCTOR_OWNER","MWRC_STADIUM_IDLE_3500","MWRC_TRANSFORM_PREFIX","MWRC_ENTITY_PROFILE","MWRC_SD_MENU_PROBE","MWRC_ORDINARY_POLICY_SHA256","MWRC_CPU_PROBE_OUTPUT","MWRC_ITEM_PROBE_OUTPUT","MWRC_SD_INIT"}){reset();env[key]="1";assert(!Gate().Run());}
 reset();env["MWRC_ALLOCATION_VS_TARGET"]="1";assert(!Gate().Run());
 reset();env["MWRC_ALLOCATION_OUTPUT"]="";assert(!Gate().Run());
@@ -175,8 +189,9 @@ using u8=uint8_t;using u16=uint16_t;using u32=uint32_t;using u64=uint64_t;
 namespace PowerPC {struct PowerPCState {std::array<u32,32> gpr{};std::array<u32,1024> spr{};};}
 enum class Event:u16 {Progress=4};enum class SliceTag:u16 {Sample=1};
 struct SliceRef {SliceTag tag;u16 flags;u32 address,size,offset;};
-'''+constants+'\n'+helper
-        fields='''bool stadium_whole_feedback=false;
+'''+constants+'\n'+whole_b_declaration(source)+helper
+        fields='''StadiumWholeBObservation stadium_whole_b;
+bool stadium_whole_feedback=false;
 std::string stadium_whole_setup_receipt=std::string(64,'b');
 std::string stadium_go_prefix_setup_receipt_sha256=std::string(64,'a');
 u32 match_index=2,draw_ordinal=7;size_t slice_count=1;
@@ -196,6 +211,11 @@ b.PublishStadiumProgress(phase,0x8025a548,0x8001003c,0x80001000,&state,40);asser
 After scoped;scoped.stadium_whole_feedback=true;scoped.PublishStadiumProgress("sss_return",1,2,3,&state,4);
 assert(scoped.emitted.find("stadium_whole3_feedback_v1")!=std::string::npos);
 assert(scoped.emitted.find("\\\"whole_session\\\":true,\\\"match_index\\\":2")!=std::string::npos);
+scoped.stadium_whole_b.enabled=true;scoped.match_index=1;
+scoped.PublishStadiumProgress("constructor_commit",1,2,3,&state,4);
+assert(scoped.emitted.find("\\\"stadium_b_state_observation\\\":true")!=std::string::npos);
+scoped.match_index=0;scoped.PublishStadiumProgress("sss_return",1,2,3,&state,4);
+assert(scoped.emitted.find("stadium_b_state_observation")==std::string::npos);
 }
 '''
         cpp=self.workspace/'actual-publisher-off.cpp';binary=self.workspace/'actual-publisher-off'
