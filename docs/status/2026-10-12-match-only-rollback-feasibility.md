@@ -26,11 +26,12 @@ ownership is incomplete, and original-game parity, multi-tick and whole-session
 gates remain open. Earlier capture refusals and the post-present harness assertion
 failure remain retained and are explained below. A subsequent two-tick attempt
 failed at the strict final CPU payload comparison; its retained result is recorded
-below. The new allocation-provenance diagnostic also stops at strict code1216:
-its valid fixed witness reports an active hook but no current recorded pool
-event, with no type or pool attribution. Later typed domains and final present
-remain unrun. Component controls and the one-tick browser result do not establish
-full browser rollback. Earlier owner controls
+below. The earlier pool-provenance diagnostic also stops at strict code1216: its
+fixed witness reports no current recorded pool event and no type or pool
+attribution. A later allocation-origin diagnostic narrows the source callsite to
+generated `class.c:219`, but still does not identify a typed object or member.
+Later typed domains and final present remain unrun. Component controls and the
+one-tick browser result do not establish full browser rollback. Earlier owner controls
 also repaired callback guards so simulation and draw callbacks refuse separately;
 the production flow control passes with synthetic lifecycle prerequisites. The
 original single/two-player constructor, neutral ticks, context checkpoint controls
@@ -354,11 +355,44 @@ rollback budget result. The structured receipt under
 `two_tick_payload_provenance_diagnostic_v1` binds raw evidence `b480a165…`,
 owner, validation, fresh linked configuration, source/build identities and
 independent raw/source review. Existing failures and the earlier one-tick pass
-are preserved. The remaining step is a bounded offline source-callsite reduction
-of the missing current event; it is a proposal, not implemented attribution or
-a new capture release. No byte masking, restore-policy exception, whole-state,
-multi-tick rollback, original Slippi parity, performance or completion claim
-follows.
+are preserved. At the time of this earlier pool-provenance record, the remaining step was a
+bounded offline source-callsite reduction of the missing current event. The later
+allocation-origin diagnostic below narrows the callsite but does not identify the
+allocation's typed owner or pool association. No byte masking, restore-policy
+exception, whole-state, multi-tick rollback, original Slippi parity, performance
+or completion claim follows.
+
+The subsequent root-released allocation-origin diagnostic again stopped at
+command 11 with strict code 1216: domain 4, row 62, offset 284, expected `0x6a`
+and actual `0xbd` in the 1,024-byte payload. The raw five-field pairs for both
+samples 300 and 301 still match exactly across observation, PCM, PAD, RNG profile
+and transfer. The new 320-byte origin witness records status 1, reason 0,
+`firstDifferenceMatches=1`, `hookActive=1`, `siteKind=1`, and a 1,024-byte
+`HSD_MemAlloc` request inside `hsdAllocMemPiece` at generated
+`build/gameplay-source-slippi-profile/src/sysdolphin/baselib/class.c:219`.
+This is a source allocation callsite, not a typed class/member or pool-owner
+attribution; the class/member remains unknown, and the witness does not prove the
+allocation is outside ObjAlloc. The earlier pool-provenance witness remains a
+separate result with no current recorded AddFree event. Later CPU domains, commands
+12/13 and final present were not reached.
+
+CPU restore CLOSE again returned the latched 1216; snapshot close and renderer
+shutdown each returned 1. Owner cleanup passed, and an independent root check found
+all 11 recorded PIDs absent. The capture took 10.518 seconds, with 68 ms cleanup;
+all 24 retained runtime files were unchanged. Its raw report and root observation
+are pinned in the structured receipt.
+
+The clean source checkpoint is `5132997d35c0f9a349aea992b8c0c95c32c05a2c` (tree
+`de99424ced8fbcc782e856fef22fdbc1116e0581`). Full regression completed 2,472
+tests with 165 skipped in 558.569 seconds, overall PASS; private-v5, private-v6
+and ordinary Release builds passed. The runtime producer remains `dac8d02a638835a7b9e3f298a248d7e6eda9078c`
+plus its exact 13 dirty build-source files; it is distinct from the current clean
+source checkpoint and its test-only pool-fixture repair. The earlier fixture
+failure remains retained. Independent raw/source review confirms the exact
+compiled callsite, allocation identity, both raw pairs and unchanged no-draw
+diagnostics. The live piece and typed class/member remain unknown. The diagnostic does not repair the payload mismatch or admit a
+restore range; no two-tick pass, final present, pixel/PCM acceptance, or full browser
+rollback is established.
 
 ## First current-source copy/restore result
 

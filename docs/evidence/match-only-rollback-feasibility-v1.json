@@ -2,7 +2,7 @@
   "schema": "match-only-rollback-feasibility-v1",
   "issue": 318,
   "pr": 319,
-  "status": "same_browser_one_tick_drawn_reference_pass_two_tick_strict1216_missing_pool_event_witness_full_browser_restore_not_established",
+  "status": "same_browser_one_tick_drawn_reference_pass_two_tick_strict1216_allocation_origin_observed_pool_owner_unattributed_full_browser_restore_not_established",
   "source_only_baseline": {
     "boundary": "synchronous-source-only-exported-call-return",
     "sourceDrawing": false,
@@ -2429,7 +2429,7 @@
   },
   "same_instance_browser_restore_341": {
     "issue": 341,
-    "status": "ONE_TICK_DRAWN_REFERENCE_PASS; TWO_TICK_COMMAND11_CPU_PAYLOAD_FAILURE; CENSUS_INCOMPLETE; FULL_BROWSER_RESTORE_NOT_ESTABLISHED",
+    "status": "ONE_TICK_DRAWN_REFERENCE_PASS; TWO_TICK_COMMAND11_CPU_PAYLOAD_FAILURE; ALLOCATION_ORIGIN_CALLSITE_OBSERVED_WITHOUT_TYPED_OWNER; CENSUS_INCOMPLETE; FULL_BROWSER_RESTORE_NOT_ESTABLISHED",
     "producer_base_commit": "130438fd2b86d00cfec98cd2ba0a5f66084ae15c",
     "producer_worktree": "uncommitted source; census runtime/harness and separate owner component sources pinned below; not a commit identity",
     "runtime_sha256": {
@@ -2600,7 +2600,7 @@
       "retained_artifact": "census-owner-gap-analysis-v1.json",
       "sha256": "9908b8d2ebb8aeeb64d8df4dcdeb24ea0f16f55bab3d17e1f847c679f90ba370"
     },
-    "next_experiment": "Read-only reduction of the first command-11 payload mismatch, followed by one bounded owner-range diagnostic selected from that evidence. No recapture or two-tick pass is claimed.",
+    "next_experiment": "Reduce the missing live-piece/class identity at the observed class.c:219 backing allocation with actual-source lifecycle controls. No unchanged recapture, type guess, byte exemption or two-tick pass.",
     "owner_components": {
       "scope": "Private owner components only; no browser restore exposure or complete-world claim",
       "current_files_sha256": {
@@ -4229,7 +4229,7 @@
           2,
           4
         ],
-        "packet_wording_correction": "The frozen packet shorthand saying “second admission” is incomplete; source performs three admissions, at commands 1, 2 and 4. The command sequence is authoritative."
+        "packet_wording_correction": "The frozen packet shorthand saying \u201csecond admission\u201d is incomplete; source performs three admissions, at commands 1, 2 and 4. The command sequence is authoritative."
       },
       "observed": {
         "profile": {
@@ -6151,6 +6151,192 @@
         }
       },
       "preserved_prior_top_level_status": "same_browser_one_tick_drawn_reference_pass_two_tick_command11_payload_failure_census_incomplete_full_browser_restore_not_established"
+    },
+    "two_tick_allocation_origin_capture_v1": {
+      "status": "FAILED_COMMAND11_STRICT_CPU_PAYLOAD_1216; ALLOCATION_CALLSITE_OBSERVED; TYPED_OWNER_UNATTRIBUTED; NO_FINAL_PRESENT",
+      "scope": "One root-released allocation-origin diagnostic after the retained two-tick drawn-reference attempt. It repeated the sample-300/301 raw comparisons, then stopped at strict command 11. It is not a payload repair, later-domain comparison, final-present result or two-tick acceptance.",
+      "source_and_validation": {
+        "source_checkpoint": {
+          "commit": "5132997d35c0f9a349aea992b8c0c95c32c05a2c",
+          "tree": "de99424ced8fbcc782e856fef22fdbc1116e0581",
+          "clean": true,
+          "receipt": {
+            "path": "two-tick-allocation-origin-validation-v1/source-checkpoint-v2.json",
+            "bytes": 12792,
+            "sha256": "ba95e591fab01da42001bd74eb500f68f8beec0f663fa7f4ccd53b697fe59237"
+          }
+        },
+        "full_regression": {
+          "status": "PASS",
+          "tests": 2472,
+          "skipped": 165,
+          "seconds": 558.569,
+          "exit_code": 0,
+          "log": {
+            "path": "two-tick-allocation-origin-validation-v1/full-regression-v2.log",
+            "bytes": 470379,
+            "sha256": "d2c0fab3d748b1f28652d7934f1f9272093c89c1c0d91a6e27ad3f4d270034b6"
+          },
+          "result": {
+            "path": "two-tick-allocation-origin-validation-v1/full-regression-result-v2.json",
+            "bytes": 12400,
+            "sha256": "f6be03f47113afeb1382adb793abb2211ceb900b8684df6c707f87082667c07b"
+          }
+        },
+        "release_builds": [
+          {
+            "name": "private-v5-release",
+            "status": "PASS",
+            "result": {
+              "path": "two-tick-allocation-origin-validation-v1/private-v5-release-result-v1.json",
+              "bytes": 761,
+              "sha256": "bd968f14c9b2164a5a43f850722f517377293bc2fdea3b72d210c9bf062a8fc0"
+            }
+          },
+          {
+            "name": "private-v6-release",
+            "status": "PASS",
+            "result": {
+              "path": "two-tick-allocation-origin-validation-v1/private-v6-release-result-v1.json",
+              "bytes": 796,
+              "sha256": "a2d7092867e66ac4a8a4d94f1cc04daab761e4a19312de99ae84a2ddbe1a8fc2"
+            }
+          },
+          {
+            "name": "ordinary-release",
+            "status": "PASS",
+            "result": {
+              "path": "two-tick-allocation-origin-validation-v1/ordinary-release-result-v1.json",
+              "bytes": 489,
+              "sha256": "dc0d532e437d277227beab1d805d2ab5efdb19f68fa70f8c1cfa7b6204bc4e35"
+            }
+          }
+        ],
+        "prior_fixture_failure_retained": true
+      },
+      "runtime_producer": {
+        "base_commit": "dac8d02a638835a7b9e3f298a248d7e6eda9078c",
+        "base_tree": "a713e91524ec1e8189e3e24fafb4ad63d6b4fb66",
+        "dirty_runtime_source_files": 13,
+        "identity_note": "Original 13-file dirty runtime producer; distinct from the later clean source checkpoint and test-only pool-fixture repair.",
+        "profile_identity": "slippi-render-dependencies-logical-frame-v6",
+        "runtime_file_count": 24,
+        "runtime_24_unchanged": true,
+        "primary_runtime_sha256": {
+          "gameplay_slippi_synctest_browser.mjs": "da17ce702882106cc542f836d277b3cdf32ce0c35e749fc9edc5be9039c99f90",
+          "gameplay_slippi_synctest_browser.wasm": "4c7c6b219855db71591412dc34105f278498cd916c5d37e779465b2ed2dc8bbe",
+          "gameplay_slippi_synctest_browser.data": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c"
+        }
+      },
+      "capture_pins": {
+        "root_observed": {
+          "path": "two-tick-allocation-origin-capture-v1/root-observed-v1.json",
+          "bytes": 4524,
+          "sha256": "88e98c32833dc05028b6a5df37898efb0b94221046f521b91586e33a1677f191"
+        },
+        "packet": {
+          "path": "two-tick-allocation-origin-capture-v1/packet-candidate-v1.json",
+          "bytes": 65650,
+          "sha256": "95e1fb2698cfef699fe32a9f853d3ad016568e90b0e762a6f4d360ef77f304a5"
+        },
+        "raw_report": {
+          "path": "two-tick-allocation-origin-capture-v1/runner/evidence.json",
+          "bytes": 1120604,
+          "sha256": "e2a3e877d8053711c5890b9eb2bf521c16bd7c0985558471c238094bb887d08f"
+        },
+        "owner": {
+          "path": "two-tick-allocation-origin-capture-v1/owner.json",
+          "bytes": 97880,
+          "sha256": "a4e8dcd3bf03649413b1f82685fe89a22ba2aa11a5b12095449be4d9882c231d"
+        },
+        "root_source_join": {
+          "path": "two-tick-allocation-origin-capture-v1/root-source-join-v1.json",
+          "bytes": 517,
+          "sha256": "4cfd49421d007c0ed8415dc5b3aed04f05cf9cb7ecf6e869b7c55eca3ca4f14b"
+        }
+      },
+      "observed": {
+        "prefix_samples": 300,
+        "drawn_reference_samples": [
+          300,
+          301
+        ],
+        "raw_five_field_pairs": {
+          "pair300": {
+            "Observation": true,
+            "Pcm": true,
+            "Pad": true,
+            "RngProfile": true,
+            "Transfer": true
+          },
+          "pair301": {
+            "Observation": true,
+            "Pcm": true,
+            "Pad": true,
+            "RngProfile": true,
+            "Transfer": true
+          }
+        },
+        "first_failure": 1216,
+        "checked_cpu_mask": "0x1e",
+        "matched_cpu_mask": "0x0e",
+        "mismatch": {
+          "domain": 4,
+          "row": 62,
+          "offset": 284,
+          "expected": "0x6a",
+          "actual": "0xbd",
+          "allocation_bytes": 1024
+        },
+        "origin_witness": {
+          "bytes": 320,
+          "status": 1,
+          "reason": 0,
+          "firstDifferenceMatches": 1,
+          "hookActive": 1,
+          "siteKind": 1,
+          "source_location": "build/gameplay-source-slippi-profile/src/sysdolphin/baselib/class.c:219",
+          "requested_bytes": 1024,
+          "interpretation": "A 1,024-byte HSD_MemAlloc request is observed inside hsdAllocMemPiece at class.c:219; typed class/member and pool-owner attribution remain unknown. This does not prove the allocation is outside ObjAlloc.",
+          "enclosing_function": "hsdAllocMemPiece",
+          "allocation_call": "HSD_MemAlloc"
+        },
+        "previous_pool_provenance_result_remains_separate": true,
+        "later_cpu_domains_checked": false,
+        "commands_12_13_reached": false,
+        "final_present": "NOT_REACHED"
+      },
+      "cleanup": {
+        "cpu_restore_close": {
+          "status": "returned-nonzero",
+          "result": 1216,
+          "native_closed": false
+        },
+        "snapshot_close": 1,
+        "renderer_shutdown": 1,
+        "owner_cleanup_passed": true,
+        "root_independently_absent_recorded_pids": 11,
+        "runtime_24_unchanged": true,
+        "elapsed_ms": 10518,
+        "cleanup_elapsed_ms": 68
+      },
+      "independent_raw_source_review": {
+        "status": "COMPLETE_SCOPED_DIAGNOSTIC_REVIEW",
+        "receipt": {
+          "path": "two-tick-allocation-origin-independent-result-v1.json",
+          "bytes": 11383,
+          "sha256": "cb526cc739f57c8018744eae1746385a38e107365fee9cf72152fc0969a28366"
+        },
+        "strict_failure_remains": 1216,
+        "typed_owner": "UNKNOWN",
+        "no_draw_diagnostics": "Independent132-byte comparisons confirm no correction draw; final present not reached."
+      },
+      "limits": [
+        "No payload repair or restore-policy widening.",
+        "No complete later-domain comparison or final present.",
+        "No pixel or PCM acceptance claim.",
+        "No two-tick, multi-tick, seven-tick or full-browser-rollback acceptance."
+      ]
     }
   }
 }
