@@ -9,8 +9,16 @@ const ORIGINAL_ENTRY = Object.freeze({sequence: 1640, source_tick: 125, draw_ord
   rng: Object.freeze({pointer_slot_address: 0x804d5f94, pointer_hex: '804d5f90',
     value_address: 0x804d5f90, value_hex: 'e2624ac3'})});
 export function validateStock4SssExitExpected(v) {
-  requireValue(v?.schema === 'melee-web-stock4-none-sss-exit-host-expectation-v1' &&
-    v.observation_profile === 1 && v.menu_draw_reference === 'UNKNOWN' &&
+  return validateStock4SssExitExpectedMode(v, false);
+}
+// Explicit occurrence1 uses the same prepared-profile checks; first mode is unchanged.
+export function validateLaterStock4SssExitExpectedFields(v) {
+  return validateStock4SssExitExpectedMode(v, true);
+}
+function validateStock4SssExitExpectedMode(v, later) {
+  requireValue(v?.schema === (later ? 'melee-web-stock4-none-later-sss-exit-host-expectation-v1' :
+    'melee-web-stock4-none-sss-exit-host-expectation-v1') &&
+    v.observation_profile === (later ? 2 : 1) && v.menu_draw_reference === 'UNKNOWN' &&
     v.Entry === false && v.C3 === false && !Object.hasOwn(v, 'expected_runtime_refusal') &&
     v.expected_replay_stop === STOCK4_SSS_STOP && v.recipe?.version === 8 &&
     v.recipe.frames === 2006 && Number.isSafeInteger(v.recipe.bytes) && v.recipe.bytes >= 328 &&
@@ -18,9 +26,9 @@ export function validateStock4SssExitExpected(v) {
     Number.isSafeInteger(v.notification_cursor) && v.notification_cursor > 0 &&
     Array.isArray(v.literal_inputs) && v.literal_inputs.length === v.notification_cursor,
   'Stock4 SSS expectation scope/recipe/input differs');
-  validateSssExitExpectedFields(v);
+  validateSssExitExpectedFields(v, later);
   const p = v.prepared_profile, entry = p?.entry, setup = p?.setup;
-  const valid = row => row && row.match_index === 0 &&
+  const valid = row => row && row.match_index === (later ? 1 : 0) &&
     ['sequence', 'source_tick', 'draw_ordinal', 'pc'].every(k => Number.isSafeInteger(row[k]) && row[k] >= 0) &&
     typeof row.start_melee_hex === 'string' && /^[0-9a-f]{624}$/.test(row.start_melee_hex) &&
     createHash('sha256').update(Buffer.from(row.start_melee_hex, 'hex')).digest('hex') === row.start_melee_sha256;

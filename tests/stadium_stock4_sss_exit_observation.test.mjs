@@ -86,7 +86,8 @@ test('synthetic stock4 selector forwards original once and exact profile, refuse
     const invoke=()=>Module._melee_web_native_menu_replay.call(receiver,16,328,1);
     if(armResult)assert.equal(invoke(),1);else assert.throws(invoke,/arm refused/);
     assert.deepEqual(calls,['parse','arm']);scope.dispose();assert.equal(Module._melee_web_native_menu_replay,original);
-    assert.throws(()=>installCurrentSssExitReplayArm({recipeBytes:bytes,observationProfile:2}),/profile/);
+    // Profile2 now names the explicit later-SSS diagnostic;3 remains unsupported.
+    assert.throws(()=>installCurrentSssExitReplayArm({recipeBytes:bytes,observationProfile:3}),/profile/);
   }
 });
 test('prepared Start getter remains opt-in when installing the historical stock4 SSS arm',()=>{

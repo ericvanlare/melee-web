@@ -459,10 +459,9 @@ std::vector<std::string> opening_state_asset_names(unsigned state_id)
     return result;
 }
 
-std::vector<std::string>
-results_asset_names(const MeleeWebMenuMatchSelection& selection)
+static std::vector<std::string>
+results_asset_names_body(const MeleeWebMenuMatchSelection& selection)
 {
-    check_selection(selection);
 
     std::vector<std::string> result;
     result.reserve(64);
@@ -506,6 +505,24 @@ results_asset_names(const MeleeWebMenuMatchSelection& selection)
         add_unique(result, name);
     return result;
 }
+
+std::vector<std::string>
+results_asset_names(const MeleeWebMenuMatchSelection& selection)
+{
+    check_selection(selection);
+    return results_asset_names_body(selection);
+}
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+std::vector<std::string>
+stadium_later_sss_results_asset_names(const MeleeWebMenuMatchSelection& selection)
+{
+    check_selection_common(selection);
+    if (selection.sudden_death || selection.opening_demo ||
+        selection.start.rules.stkind!=St_Kind_PStadium)
+        reject("Later SSS Results require their exact private preceding Stadium match");
+    return results_asset_names_body(selection);
+}
+#endif
 
 std::vector<std::string> prize_asset_names()
 {

@@ -135,6 +135,8 @@ enum {
 /* Separate passive current-context note; does not grant match admission. */
 int melee_web_menu_arm_current_sss_exit(MeleeWebMenuSession*,
     MeleeWebMenuFirstSssPairNote, char*, size_t);
+/* One-use occurrence1 selection before any source menu entry; not rearming. */
+int melee_web_menu_current_sss_exit_select_second(MeleeWebMenuSession*,char*,size_t);
 /* Private diagnostic only: arm during the completed CSS scene and retain the
  * same session through its ordinary CSS -> SSS_READY transition. Notes are
  * passive and cannot interrupt either authored SSS constructor boundary. */

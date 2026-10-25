@@ -1134,6 +1134,18 @@ static unsigned host_first_sss_prefix_count(const MeleeWebMenuHost* h)
     default: return 0;
     }
 }
+int melee_web_menu_host_arm_later_sss_exit(MeleeWebMenuHost* h,const void* context,
+    MeleeWebMenuCurrentSssExitNotify notify,void* data,unsigned occurrence,char* e,size_t n)
+{
+    if (occurrence!=1)
+        return fail(e,n,"Later SSS arm permits only explicit occurrence1");
+    if (!melee_web_menu_host_arm_current_sss_exit(h,context,notify,data,e,n))return 0;
+    if (!melee_web_menu_current_sss_exit_select_second(h->session,e,n)) {
+        h->current_sss_exit.state=3; /* Consumed refusal; never fall back to occurrence0. */
+        return 0;
+    }
+    return ok(e,n);
+}
 static void first_sss_prefix_exit_note(void* data,MeleeWebMenuSession* session,
     const SSSData* sss,uint64_t ticks,int boundary)
 {

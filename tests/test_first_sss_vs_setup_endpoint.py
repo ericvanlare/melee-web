@@ -125,6 +125,7 @@ static void commit(){files={{"stage",{1}},{"fighter",{2}}};asset_scope.active=2;
 std::string first_sss_vs_setup_current_json(){return "{}";}
 static void close(){FirstSssTextTailCloseGuard guard{first_sss_text_tail_probe.opted_in};throw std::runtime_error("controlled close failure");}
 int main(){
+ assert_no_later_route_fixture();
  // The legacy124 owner has completed its prefix; current270 has not entered it.
  reset();assert(first_sss_prefix_sequence.complete);
  first_sss_prefix_sequence.complete=false;
@@ -219,6 +220,7 @@ static void commit_prepared_assets(){
  asset_scope.pending=0;asset_committed=true;
 }
 int main(){
+ assert_no_later_route_fixture();
  reset_prepared();
  assert(current_sss_prepared_setup_begin()==1);
  assert(approval_calls==1&&current_sss_exit.prepared_setup_approved&&
@@ -303,6 +305,26 @@ int main(){
  puts("PASS extracted current 270 prepared Setup source admission, approval rechecks, asset handoff and controlled unload; legacy 124 remains separate");
 }
 """
+def unarmed_later_asset_fixture(source):
+  return r"""
+// Legacy/current Setup only: no later route is armed in these fixtures.
+struct {bool armed=false;unsigned stage=0,requested_generation=0;} later_sss;
+static unsigned later_context_calls=0;
+static bool later_sss_context_owned(){
+ ++later_context_calls;
+ throw std::runtime_error("later owner service is outside this Setup fixture");
+}
+"""+_function(source,'bool later_sss_asset_pending(unsigned generation)')+r"""
+static void assert_no_later_route_fixture(){
+ assert(!later_sss.armed&&!later_sss_asset_pending(0)&&!later_sss_asset_pending(1));
+ assert(later_context_calls==0);
+ later_sss.armed=true;later_sss.stage=1;bool refused=false;
+ try{(void)later_sss_asset_pending(1);}catch(const std::runtime_error&){refused=true;}
+ assert(refused&&later_context_calls==1);later_sss={};
+ assert(!later_sss_asset_pending(1)&&later_context_calls==1);
+}
+"""
+
 class FirstSssVsSetupEndpointTests(OwnedWorkspaceTests):
  # These controls execute extracted native source functions against controlled
  # services; they do not execute the browser runtime.
@@ -314,6 +336,7 @@ class FirstSssVsSetupEndpointTests(OwnedWorkspaceTests):
   body+=_function(source,'bool current_sss_selection_equal(const MeleeWebMenuMatchSelection& a,')
   for name in ['bool first_sss_vs_setup_asset_pending(unsigned generation)','bool first_sss_vs_setup_finish_handoff()']:
    body+=_function(source,name)
+  body+=unarmed_later_asset_fixture(source)
   body+=_function(menu,'int melee_web_native_menu_stadium_c1a_asset_scope(unsigned generation)')
   body+='bool finish_asset_handoff(){asset_destination=AssetDestination::None;asset_committed=false;return first_sss_vs_setup_finish_handoff();}'
   body+=_function(source,'void first_sss_vs_setup_fail(const char* error)')
@@ -330,6 +353,7 @@ class FirstSssVsSetupEndpointTests(OwnedWorkspaceTests):
   body+=_function(source,'bool current_sss_selection_equal(const MeleeWebMenuMatchSelection& a,')
   for name in ['bool first_sss_vs_setup_asset_pending(unsigned generation)','bool first_sss_vs_setup_finish_handoff()']:
    body+=_function(source,name)
+  body+=unarmed_later_asset_fixture(source)
   body+=_function(menu,'int melee_web_native_menu_stadium_c1a_asset_scope(unsigned generation)')
   body+='bool finish_asset_handoff(){asset_destination=AssetDestination::None;asset_committed=false;return first_sss_vs_setup_finish_handoff();}'
   body+=_function(source,'void first_sss_vs_setup_fail(const char* error)')

@@ -54,6 +54,7 @@ struct MeleeWebMenuSession {
     int stadium_c1a_enabled;
     int stadium_c1a_ready;
     int current_sss_exit_state; /* 0 OFF, 1 armed, 2 invoked */
+    unsigned current_sss_exit_occurrence, current_sss_exit_seen;
     MeleeWebMenuFirstSssPairNote current_sss_exit_note;
 #endif
     HSD_GObj** gobj_snapshot;
@@ -1044,6 +1045,19 @@ int melee_web_menu_arm_current_sss_exit(MeleeWebMenuSession* session,
     session->current_sss_exit_note=note;session->current_sss_exit_state=1;
     return ok(error,error_size);
 }
+/* Select only the second exit of an already armed, fresh private session. */
+int melee_web_menu_current_sss_exit_select_second(MeleeWebMenuSession* session,
+    char* error, size_t error_size)
+{
+    if (!session_live(session,error,error_size)) return 0;
+    if (session->phase!=MELEE_WEB_MENU_CREATED || session->ticks ||
+        session->css_open || session->sss_open || !session->stadium_c1a_enabled ||
+        session->current_sss_exit_state!=1 || !session->current_sss_exit_note ||
+        session->current_sss_exit_occurrence || session->current_sss_exit_seen)
+        return fail(error,error_size,"Later SSS selection requires the fresh armed session");
+    session->current_sss_exit_occurrence=1;
+    return ok(error,error_size);
+}
 int melee_web_menu_arm_first_css_return(MeleeWebMenuSession* session,
     MeleeWebMenuFirstCssReturnNote note, char* error, size_t error_size)
 {
@@ -1607,7 +1621,8 @@ int melee_web_menu_leave_sss(MeleeWebMenuSession* session, char* error,
     }
     mnStageSel_Scene_OnExit(NULL);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-    if (session->current_sss_exit_state==1) {
+    if (session->current_sss_exit_state==1 &&
+        session->current_sss_exit_seen++==session->current_sss_exit_occurrence) {
         session->current_sss_exit_state=2; /* Consume before the passive callback. */
         session->current_sss_exit_note(session->runtime.user,session,&session->sss,
             session->ticks,MELEE_WEB_MENU_SSS_PREFIX_EXIT);

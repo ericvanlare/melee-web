@@ -16,8 +16,8 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
   const module = globalThis.Module;
   const key = '_melee_web_native_menu_replay';
   const original = Object.getOwnPropertyDescriptor(module || {}, key);
-  if (observationProfile !== 0 && observationProfile !== 1) throw Error('Unknown private SSS observation profile');
-  const armKey = observationProfile === 1 ? '_melee_web_native_menu_stadium_current_sss_exit_arm_profile' : '_melee_web_native_menu_stadium_current_sss_exit_arm';
+  if (observationProfile !== 0 && observationProfile !== 1 && observationProfile !== 2) throw Error('Unknown private SSS observation profile');
+  const armKey = observationProfile !== 0 ? '_melee_web_native_menu_stadium_current_sss_exit_arm_profile' : '_melee_web_native_menu_stadium_current_sss_exit_arm';
   const arm = module?.[armKey];
   const observe = module?._melee_web_native_menu_stadium_current_sss_exit_observe;
   const preparedStartObserve = observationProfile === 1 && preparedStartProbe
@@ -70,7 +70,7 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
           !(module.HEAPU8 instanceof Uint8Array) || args[0] + bytes.length > module.HEAPU8.length ||
           !bytes.every((v, i) => module.HEAPU8[args[0] + i] === v) || idle() !== true)
         throw Error('Current SSS diagnostic parsed a foreign recipe or lost its returned idle owner');
-      if (Reflect.apply(arm, module, observationProfile === 1 ? [1] : []) !== 1)
+      if (Reflect.apply(arm, module, observationProfile !== 0 ? [observationProfile] : []) !== 1)
         throw Error('Current SSS diagnostic native arm refused; ordinary launch suppressed');
       if (!owns()) throw Error('Current SSS native arm changed replay callback ownership');
       state.armed = true;
@@ -152,13 +152,18 @@ export function validateCurrentSssExitExpected(v) {
   return validateSssExitExpectedFields(v);
 }
 
-export function validateSssExitExpectedFields(v) {
+export function validateSssExitExpectedFields(v, laterOccurrence = false) {
+  // The caller for laterOccurrence is the explicit finite occurrence1 validator.
+  const spans = laterOccurrence ? [[0,144,1],[145,269,2],[270,461,3],[462,674,4],
+    [675,806,1],[807,939,2]] : null;
   for (const [index, row] of v.literal_inputs.entries())
-    requireValue(row.index === index && [1, 2].includes(row.scene) &&
+    requireValue(row.index === index && (laterOccurrence
+      ? spans.some(([first,last,scene]) => index >= first && index <= last && row.scene === scene)
+      : [1, 2].includes(row.scene)) &&
       Array.isArray(row.pads) && row.pads.length === 4 && row.pads.every(p => hex(p, 11)),
     'Current SSS literal four-port input is missing/reordered/malformed');
   requireValue(v.literal_inputs[0].scene === 1 && v.literal_inputs.at(-1).scene === 2 &&
-    v.source?.boundary === 'sss_exit' && v.source.pc === 0x8025bbd0 && v.source.match_index === 0 &&
+    v.source?.boundary === 'sss_exit' && v.source.pc === 0x8025bbd0 && v.source.match_index === (laterOccurrence ? 1 : 0) &&
     hex(v.source.raw_start_melee_hex, 240) && hex(v.primary_sha256, 32) &&
     v.expected?.phase === 'sss_exit' && v.expected.scene_kind === 9 &&
     Number.isSafeInteger(v.expected.scene_frame) && v.expected.scene_frame >= 0 &&
@@ -174,6 +179,8 @@ export function compareCurrentSssExitObservation(actual, expected) {
 }
 
 export function compareSssExitObservationFields(actual, expected) {
+  const later = expected.schema === 'melee-web-stock4-none-later-sss-exit-host-expectation-v1' &&
+    expected.observation_profile === 2;
   requireValue(actual?.scope === 'passive_sss_onexit_return_only' &&
     actual.armed === true && actual.notified === true && actual.failed === false &&
     actual.error === null && actual.notification_received === true && actual.observation_state === 2 &&
@@ -192,7 +199,8 @@ export function compareSssExitObservationFields(actual, expected) {
     note.session_phase === 3 && note.source_scene === 2 &&
     note.scene_kind === want.scene_kind && note.scene_frame === want.scene_frame &&
     note.random_seed_hex === want.random_seed_hex && note.pad_state_hex === want.pad_state_hex &&
-    Number.isSafeInteger(note.session_ticks) && note.session_ticks === expected.notification_cursor &&
+    Number.isSafeInteger(note.session_ticks) && note.session_ticks === (later
+      ? expected.menu_session_ticks : expected.notification_cursor) &&
     ['world_generation', 'audio_generation'].every(k => Number.isSafeInteger(note[k]) && note[k] > 0),
   'Current SSS scalar/PAD/seed/lifetime note differs');
   const ownerKeys = ['host', 'session', 'world', 'audio', 'vs_mode', 'scene_info', 'payload', 'seed'];
@@ -204,7 +212,7 @@ export function compareSssExitObservationFields(actual, expected) {
   'Current SSS start-game/native ABI receipt differs');
   const difference = compareCurrentSssExitCommonFields(note, want);
   requireValue(!difference, `Current SSS source field differs: ${JSON.stringify(difference)}`);
-  return {pass: true, scope: 'retained_first_sss_exit_common_fields_only',
+  return {pass: true, scope: later ? 'retained_occurrence1_sss_exit_common_fields_only' : 'retained_first_sss_exit_common_fields_only',
     original_coordinate: {sequence: expected.source.sequence, source_tick: expected.source.source_tick,
       draw_ordinal: expected.source.draw_ordinal}, notification_coordinates: c,
     menu_draw_reference: 'UNKNOWN', unpaired: expected.unpaired, Entry: false, C3: false};
@@ -216,8 +224,11 @@ export function validateCurrentSssExitTrace(text, expected, actual) {
 }
 
 export function validateSssExitTraceFields(text, expected, actual) {
+  const later = expected.schema === 'melee-web-stock4-none-later-sss-exit-host-expectation-v1' &&
+    expected.observation_profile === 2;
   const rows = text.trim().split('\n').map(line => JSON.parse(line));
-  requireValue(rows.every(r => ['header', 'session_frame', 'current_sss_exit_order'].includes(r.record)),
+  requireValue(rows.every(r => ['header', 'session_frame', 'current_sss_exit_order',
+    ...(later ? ['session_match_enter_complete'] : [])].includes(r.record)),
     'Current SSS trace contains an unexpected native record');
   const headers = rows.filter(r => r.record === 'header');
   requireValue(headers.length === 1 && headers[0].schema === 'melee-web-port-session-diagnostic' &&

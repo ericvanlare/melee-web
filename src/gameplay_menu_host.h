@@ -190,6 +190,8 @@ typedef void (*MeleeWebMenuCurrentSssExitNotify)(void*,
     const MeleeWebMenuCurrentSssExitObservation*);
 int melee_web_menu_host_arm_current_sss_exit(MeleeWebMenuHost*,const void*,
     MeleeWebMenuCurrentSssExitNotify,void*,char*,size_t);
+int melee_web_menu_host_arm_later_sss_exit(MeleeWebMenuHost*,const void*,
+    MeleeWebMenuCurrentSssExitNotify,void*,unsigned occurrence,char*,size_t);
 typedef struct MeleeWebMenuFirstSssPairObservation {
     int state; /* 0 idle, 1 CSS armed, 2 captured, 3 failed */
     unsigned host_tick_calls;
