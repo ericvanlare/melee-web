@@ -13,16 +13,18 @@ export function continuePreparedStartInPage(scope, acceptedReceipt) {
 // Passed as the actual page function; deliberately has no module-scope closure.
 // Controls use a synthetic Module solely for call ordering/ownership semantics.
 export function installCurrentSssExitReplayArm({recipeBytes, observationProfile = 0, preparedStartProbe = false, laterPreparedSetup = false}) {
-  if (laterPreparedSetup && (observationProfile !== 2 || !preparedStartProbe))
+  if (laterPreparedSetup && (![2,3].includes(observationProfile) || !preparedStartProbe))
     throw Error('Later prepared Setup requires its explicit profile2 prepared-Start probe');
+  if (observationProfile === 3 && (!laterPreparedSetup || !preparedStartProbe))
+    throw Error('Private profile3 new later reference requires the checked Setup stop');
   const module = globalThis.Module;
   const key = '_melee_web_native_menu_replay';
   const original = Object.getOwnPropertyDescriptor(module || {}, key);
-  if (observationProfile !== 0 && observationProfile !== 1 && observationProfile !== 2) throw Error('Unknown private SSS observation profile');
+  if (observationProfile !== 0 && observationProfile !== 1 && observationProfile !== 2 && observationProfile !== 3) throw Error('Unknown private SSS observation profile');
   const armKey = observationProfile !== 0 ? '_melee_web_native_menu_stadium_current_sss_exit_arm_profile' : '_melee_web_native_menu_stadium_current_sss_exit_arm';
   const arm = module?.[armKey];
   const observe = module?._melee_web_native_menu_stadium_current_sss_exit_observe;
-  const preparedStartObserve = (observationProfile === 1 || observationProfile === 2) && preparedStartProbe
+  const preparedStartObserve = ([1,2,3].includes(observationProfile)) && preparedStartProbe
     ? module?._melee_web_native_menu_stadium_current_sss_prepared_start_observe : null;
   const preparedSetupBegin = (observationProfile === 1 || laterPreparedSetup) && preparedStartProbe
     ? module?._melee_web_native_menu_stadium_current_sss_prepared_setup_begin : null;
@@ -30,7 +32,7 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
   if (!original || !Object.hasOwn(original, 'value') ||
       typeof original.value !== 'function' || !original.writable ||
       typeof arm !== 'function' || typeof observe !== 'function' ||
-      (preparedStartProbe && (![1,2].includes(observationProfile) || typeof preparedStartObserve !== 'function')) ||
+      (preparedStartProbe && (![1,2,3].includes(observationProfile) || typeof preparedStartObserve !== 'function')) ||
       (laterPreparedSetup && typeof preparedSetupBegin !== 'function') ||
       typeof idle !== 'function' || typeof module.UTF8ToString !== 'function' ||
       !Array.isArray(recipeBytes) || recipeBytes.length < 328 ||
@@ -95,7 +97,7 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
       return {busy: false, value: JSON.parse(module.UTF8ToString(pointer))};
     },
     observePreparedStart() {
-      if (!preparedStartProbe || ![1,2].includes(observationProfile) || !preparedStartObserve)
+      if (!preparedStartProbe || ![1,2,3].includes(observationProfile) || !preparedStartObserve)
         throw Error('Prepared Start observation is available only to an explicit checked prepared-Start profile');
       if (!state.armed || state.disposed || !owns())
         throw Error('Prepared Start observation lost its armed retained Module/callback');
@@ -155,10 +157,10 @@ export function validateCurrentSssExitExpected(v) {
   return validateSssExitExpectedFields(v);
 }
 
-export function validateSssExitExpectedFields(v, laterOccurrence = false) {
+export function validateSssExitExpectedFields(v, laterOccurrence = false, referenceSpans = null) {
   // The caller for laterOccurrence is the explicit finite occurrence1 validator.
-  const spans = laterOccurrence ? [[0,144,1],[145,269,2],[270,461,3],[462,674,4],
-    [675,806,1],[807,939,2]] : null;
+  const spans = laterOccurrence ? (referenceSpans || [[0,144,1],[145,269,2],[270,461,3],[462,674,4],
+    [675,806,1],[807,939,2]]) : null;
   for (const [index, row] of v.literal_inputs.entries())
     requireValue(row.index === index && (laterOccurrence
       ? spans.some(([first,last,scene]) => index >= first && index <= last && row.scene === scene)
@@ -182,8 +184,8 @@ export function compareCurrentSssExitObservation(actual, expected) {
 }
 
 export function compareSssExitObservationFields(actual, expected) {
-  const later = expected.schema === 'melee-web-stock4-none-later-sss-exit-host-expectation-v1' &&
-    expected.observation_profile === 2;
+  const later = (expected.schema === 'melee-web-stock4-none-later-sss-exit-host-expectation-v1' &&
+    expected.observation_profile === 2) || (expected.schema === 'melee-web-stock4-none-later-sss-reference-expectation-v1' && expected.observation_profile === 3);
   requireValue(actual?.scope === 'passive_sss_onexit_return_only' &&
     actual.armed === true && actual.notified === true && actual.failed === false &&
     actual.error === null && actual.notification_received === true && actual.observation_state === 2 &&
@@ -227,8 +229,8 @@ export function validateCurrentSssExitTrace(text, expected, actual) {
 }
 
 export function validateSssExitTraceFields(text, expected, actual) {
-  const later = expected.schema === 'melee-web-stock4-none-later-sss-exit-host-expectation-v1' &&
-    expected.observation_profile === 2;
+  const later = (expected.schema === 'melee-web-stock4-none-later-sss-exit-host-expectation-v1' &&
+    expected.observation_profile === 2) || (expected.schema === 'melee-web-stock4-none-later-sss-reference-expectation-v1' && expected.observation_profile === 3);
   const rows = text.trim().split('\n').map(line => JSON.parse(line));
   requireValue(rows.every(r => ['header', 'session_frame', 'current_sss_exit_order',
     ...(later ? ['session_match_enter_complete'] : [])].includes(r.record)),

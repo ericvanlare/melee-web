@@ -19,7 +19,7 @@ class LaterSssPreparedSetupControls(OwnedWorkspaceTests):
         difference=cut(text,'std::string current_sss_selection_difference(', 'void current_sss_exit_before_leave(')
         begin=cut(text,'int current_sss_prepared_setup_begin(){','\n#endif\n\nvoid tick(){')
         finish=cut(text,'bool first_sss_vs_setup_finish_handoff(){','\n#endif\nbool finish_asset_handoff(){')
-        fixture=r'''
+        fixture='#include "'+str(ROOT/'src/private_sha256.hpp')+'"\n#include "'+str(ROOT/'src/stadium_later_reference.hpp')+'"\n'+r'''
 #include <array>
 #include <cassert>
 #include <cstdint>
@@ -48,7 +48,8 @@ bool world_exists=true,corrupt_retirement=false;uint64_t generation=6;
 std::vector<std::string> events;
 namespace melee_web{
 struct RetailReplayInitialCssContext{};
-struct RetailReplayRecipe{std::unique_ptr<RetailReplayInitialCssContext> initial_css{new RetailReplayInitialCssContext};MeleeWebMenuMatchSelection selection;uint32_t seed=123;};
+struct Span{unsigned scene=0,first_frame=0,last_frame=0;};
+struct RetailReplayRecipe{unsigned version=8;bool diagnostic_entity_prefix=false;std::vector<int> frames=std::vector<int>(2006);std::vector<Span> spans;bool whole_session()const{return version==8;}std::unique_ptr<RetailReplayInitialCssContext> initial_css{new RetailReplayInitialCssContext};MeleeWebMenuMatchSelection selection;uint32_t seed=123;};
 struct RuntimeArchiveCache{explicit RuntimeArchiveCache(const std::map<std::string,std::vector<uint8_t>>&){}};
 enum class GameplayMatchConstruction{Deferred};enum class GameplayMatchDiagnostic{StadiumReady};
 struct GameplayMatchSession{GameplayMatchSession(const std::map<std::string,std::vector<uint8_t>>&,const MeleeWebMenuMatchSelection&,RuntimeArchiveCache&,GameplayMatchConstruction,const MeleeWebPadState&,GameplayMatchDiagnostic){events.push_back("construct-deferred");world_exists=true;++generation;}};

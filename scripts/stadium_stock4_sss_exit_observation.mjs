@@ -1,3 +1,4 @@
+import {OBSERVED_B_REFERENCE, OBSERVED_B_SCHEMA} from './stadium_later_reference_contexts.mjs';
 import {createHash} from 'node:crypto';
 import {validateSssExitExpectedFields, compareSssExitObservationFields,
   validateSssExitTraceFields} from './stadium_current_sss_exit_observation.mjs';
@@ -15,18 +16,21 @@ export function validateStock4SssExitExpected(v) {
 export function validateLaterStock4SssExitExpectedFields(v) {
   return validateStock4SssExitExpectedMode(v, true);
 }
-function validateStock4SssExitExpectedMode(v, later) {
-  requireValue(v?.schema === (later ? 'melee-web-stock4-none-later-sss-exit-host-expectation-v1' :
+export function validateObservedLaterReferenceFields(v) {
+  return validateStock4SssExitExpectedMode(v,true,OBSERVED_B_REFERENCE);
+}
+function validateStock4SssExitExpectedMode(v, later, reference = null) {
+  requireValue(v?.schema === (reference ? OBSERVED_B_SCHEMA : later ? 'melee-web-stock4-none-later-sss-exit-host-expectation-v1' :
     'melee-web-stock4-none-sss-exit-host-expectation-v1') &&
-    v.observation_profile === (later ? 2 : 1) && v.menu_draw_reference === 'UNKNOWN' &&
+    v.observation_profile === (reference ? reference.profile : later ? 2 : 1) && v.menu_draw_reference === 'UNKNOWN' &&
     v.Entry === false && v.C3 === false && !Object.hasOwn(v, 'expected_runtime_refusal') &&
     v.expected_replay_stop === STOCK4_SSS_STOP && v.recipe?.version === 8 &&
-    v.recipe.frames === 2006 && Number.isSafeInteger(v.recipe.bytes) && v.recipe.bytes >= 328 &&
+    v.recipe.frames === (reference ? reference.frames : 2006) && Number.isSafeInteger(v.recipe.bytes) && v.recipe.bytes >= 328 &&
     /^[0-9a-f]{64}$/.test(v.recipe.sha256) &&
     Number.isSafeInteger(v.notification_cursor) && v.notification_cursor > 0 &&
     Array.isArray(v.literal_inputs) && v.literal_inputs.length === v.notification_cursor,
   'Stock4 SSS expectation scope/recipe/input differs');
-  validateSssExitExpectedFields(v, later);
+  validateSssExitExpectedFields(v, later, reference ? reference.first.slice(0,6).map((first,i)=>[first,reference.last[i],[1,2,3,4,1,2][i]]) : null);
   const p = v.prepared_profile, entry = p?.entry, setup = p?.setup;
   const valid = row => row && row.match_index === (later ? 1 : 0) &&
     ['sequence', 'source_tick', 'draw_ordinal', 'pc'].every(k => Number.isSafeInteger(row[k]) && row[k] >= 0) &&
@@ -111,7 +115,9 @@ export function compareStock4PreparedStartReceipt(actual, expectedRng, declaredS
 export function comparePreparedStartReceiptFields(actual, expectedRng, declaredSetup, originalEntryStartHex, boundary) {
   requireValue(boundary && Object.keys(boundary).sort().join('|') === 'cursor|order|profile' &&
     ((boundary.profile === 1 && boundary.cursor === 270 && boundary.order === 543) ||
-     (boundary.profile === 2 && boundary.cursor === 940 && boundary.order === 1887)),
+     (boundary.profile === 2 && boundary.cursor === 940 && boundary.order === 1887) ||
+     (boundary.profile === OBSERVED_B_REFERENCE.profile && boundary.cursor === OBSERVED_B_REFERENCE.first[6] &&
+      Number.isSafeInteger(boundary.order) && boundary.order >= 0)),
   'Prepared Start receipt boundary must be one of the two explicit private routes');
   requireValue(actual && Object.keys(actual).sort().join('|') === [
     'schema','scope','phase','observation_profile','captured','source_scene','host_entered',
@@ -174,7 +180,7 @@ export function compareStock4PreparedSetupObservation(actual, expected) {
 }
 // Callers validate the exact first/later source profile before sharing structural checks.
 export function comparePreparedSetupObservationFields(actual, expected, origin) {
-  requireValue(['current_sss_prepared_stock4_270','current_sss_prepared_later_940'].includes(origin),
+  requireValue(['current_sss_prepared_stock4_270','current_sss_prepared_later_940',OBSERVED_B_REFERENCE.handoff_origin].includes(origin),
     'Prepared Setup origin is unknown');
   const route = actual?.prepared_to_setup, setup = route?.setup;
   const terminal = actual?.terminal;

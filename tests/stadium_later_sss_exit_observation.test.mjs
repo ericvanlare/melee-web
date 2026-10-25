@@ -1,11 +1,12 @@
 import test from 'node:test';
+import {LATER_REFERENCE_CONTEXTS, OBSERVED_B_REFERENCE, OBSERVED_B_SCHEMA} from '../scripts/stadium_later_reference_contexts.mjs';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import vm from 'node:vm';
 import path from 'node:path';
 import {parseArgs} from 'node:util';
-import {validateLaterSssExitExpected, validateLaterSssExitTrace, compareLaterSssExitObservation,
+import {validateLaterReferenceRecipeInputs, validateLaterSssExitExpected, validateLaterSssExitTrace, compareLaterSssExitObservation,
   validateLaterSssExitTerminal, validateLaterSssExitFinalization, compareLaterPreparedStartObservation, compareLaterPreparedSetupObservation} from '../scripts/stadium_later_sss_exit_observation.mjs';
 import {validateStock4SssExitExpected, compareStock4SssExitObservation, validateStock4SssExitTrace,
   validateStock4SssExitTerminal, validateStock4SssExitFinalization} from '../scripts/stadium_stock4_sss_exit_observation.mjs';
@@ -214,7 +215,7 @@ function runnerSlice(first,last) {
 async function runnerAdmission(e,args,overrides={}) {
   const report={inputs:{recipe:{sha256:e.recipe.sha256}},requested_entity_prefix:false};
   e.source_binding={files:{operand:{path:'modeled-source-input',sha256:'c'.repeat(64)}}};
-  const context={path,JSON,parseArgs:options=>parseArgs({...options,args}),
+  const context={path,JSON,OBSERVED_B_REFERENCE,OBSERVED_B_SCHEMA,validateLaterReferenceRecipeInputs,parseArgs:options=>parseArgs({...options,args}),
     validateLaterSssExitExpected,compareLaterSssExitObservation,validateLaterSssExitTrace,
     validateLaterSssExitTerminal,validateLaterSssExitFinalization,compareLaterPreparedStartObservation,compareLaterPreparedSetupObservation,
     validateStock4SssExitExpected,compareStock4SssExitObservation,validateStock4SssExitTerminal,
@@ -521,4 +522,129 @@ test('actual runner Setup branch compares prepared receipt before one handoff th
  assert.equal(report.current_sss_exit.prepared_setup_comparison.pass,true);assert.equal(report.current_sss_exit.terminal.pass,true);
  assert.equal(report.current_sss_exit.runtime_replay,'FAIL_INCOMPLETE_EXPLICIT_SSS_STOP');
  assert.equal(writes.filter(x=>x.name==='current-sss-prepared-to-setup-observation.json').length,1);
+});
+
+// Synthetic new-context mechanism fixtures keep original/native parity unclaimed.
+function observedExpected(){
+  const e=expected(),d=OBSERVED_B_REFERENCE;
+  Object.assign(e,{schema:OBSERVED_B_SCHEMA,observation_profile:d.profile,
+    notification_cursor:d.first[6],menu_session_ticks:d.menu_ticks,
+    original_B_constructor_GO:d.original_B_constructor_GO,
+    reference_context:structuredClone(d),reference_order_contract:d.notification_order_contract,
+    recipe:{version:8,frames:d.frames,bytes:d.recipe_bytes,sha256:d.recipe_sha256}});
+  e.preceding_spans=d.first.slice(0,6).map((first,i)=>({scene:LATER_REFERENCE_CONTEXTS.scenes[i],first_frame:first,last_frame:d.last[i]}));
+  e.literal_inputs=Array.from({length:d.first[6]},(_,index)=>({index,
+    scene:e.preceding_spans.find(s=>index>=s.first_frame&&index<=s.last_frame).scene,
+    pads:[0,1,2,3].map(port=>(port+index%200).toString(16).padStart(2,'0').repeat(11))}));
+  Object.assign(e.source,{sequence:d.sss_sequence,source_tick:d.sss_tick,draw_ordinal:d.sss_draw});
+  e.source.rng.value_hex=d.entry_seed;e.expected.random_seed_hex=d.entry_seed;e.expected.scene_frame=d.sss_tick;
+  for(const [name,sequence,seed] of [['entry',d.entry_sequence,d.entry_seed],['setup',d.setup_sequence,d.setup_seed]]){
+    const row=e.prepared_profile[name];Object.assign(row,{sequence,source_tick:d.sss_tick});row.rng.value_hex=seed;
+  }
+  Object.assign(e.preceding_profile.entry,{sequence:d.a_entry_sequence,source_tick:d.a_tick});
+  Object.assign(e.preceding_profile.setup,{sequence:d.a_setup_sequence,source_tick:d.a_tick});
+  return e;
+}
+function observedTrace(e){
+  const rows=[{record:'header',schema:'melee-web-port-session-diagnostic',version:1,
+    frames_requested:e.recipe.frames,draw_state:'not_captured',comparison:'not_run'}];let order=0;
+  for(const row of e.literal_inputs){
+    if(row.index===OBSERVED_B_REFERENCE.first[2])rows.push({record:'session_match_enter_complete',rng:0x083a62a9,pad_state_hex:'00'.repeat(822)});
+    rows.push({record:'session_frame',index:row.index,scene:row.scene,supplied_inputs:row.pads,rng:0,pad_state_hex:'00'.repeat(822)});
+    rows.push({record:'current_sss_exit_order',order:order++,kind:'tick_return',replay_cursor:row.index,
+      source_steps:1,source_draws:0,menu_draw_reference:'UNKNOWN'});
+    // A real emitted zero-step draw is legal: finish accounting occurs later.
+    if(row.index===7)rows.push({record:'current_sss_exit_order',order:order++,kind:'draw_aurora_return',
+      replay_cursor:row.index+1,source_steps:0,source_draws:0,menu_draw_reference:'UNKNOWN'});
+  }
+  return {rows,actual:{reference_descriptor:OBSERVED_B_REFERENCE.id,notification_coordinates:{order},notification_order_count:order+1}};
+}
+test('new reference identity refuses mixed or mutated contexts and preserves old admission',()=>{
+  const e=observedExpected();assert.equal(validateLaterSssExitExpected(e),e);
+  assert.equal(validateLaterSssExitExpected(expected()).observation_profile,2);
+  for(const mutate of [v=>v.reference_context.first[6]=940,v=>v.reference_context.id='foreign',
+    v=>v.observation_profile=2,v=>v.recipe.sha256='0'.repeat(64),v=>v.recipe.bytes--,
+    v=>v.prepared_profile.setup.rng.value_hex='25d557a7',v=>v.source.sequence=4234,
+    v=>v.preceding_profile.entry.source_tick=125,v=>v.literal_inputs[43].pads.pop()]){
+    const bad=structuredClone(e);mutate(bad);assert.throws(()=>validateLaterSssExitExpected(bad));
+  }
+});
+test('new emitted trace brackets every frame and accepts actual zero-step draw shape',()=>{
+  const e=observedExpected(),{rows,actual}=observedTrace(e);
+  assert.equal(validateLaterSssExitTrace(text(rows),e,actual).literal_supplied_inputs,943);
+  for(const mutate of [r=>{const i=r.findIndex(x=>x.record==='session_frame'&&x.index===1);const next=r.splice(i,1)[0];
+      r.splice(r.findIndex(x=>x.record==='current_sss_exit_order'&&x.kind==='tick_return'&&x.replay_cursor===0),0,next);},
+    r=>r.splice(r.findIndex(x=>x.record==='current_sss_exit_order'&&x.replay_cursor===10),1),
+    r=>{const i=r.findIndex(x=>x.record==='session_frame'&&x.index===10);r.splice(i,0,structuredClone(r[i]));},
+    r=>{const i=r.findIndex(x=>x.record==='current_sss_exit_order'&&x.replay_cursor===10);[r[i],r[i+2]]=[r[i+2],r[i]];},
+    r=>r.find(x=>x.record==='session_frame'&&x.index===43).supplied_inputs[0]='ff'.repeat(11)]){
+    const bad=structuredClone(rows);mutate(bad);assert.throws(()=>validateLaterSssExitTrace(text(bad),e,actual));
+  }
+  for(const mutate of [a=>a.notification_order_count++,a=>a.reference_descriptor='foreign',a=>a.notification_coordinates.order--]){
+    const bad=structuredClone(actual);mutate(bad);assert.throws(()=>validateLaterSssExitTrace(text(rows),e,bad));
+  }
+});
+const gate1Fixture=process.env.MELEE_LATER_B_GATE1_FIXTURE;
+test('retained exact2013 recipe passes actual layout, PAD and CLI admission; corrupt transports refuse',
+  {skip:!gate1Fixture},async()=>{
+    const e=JSON.parse(readFileSync(path.join(gate1Fixture,'expected.json'),'utf8'));
+    const raw=readFileSync(path.join(gate1Fixture,'recipe.mwrc'));
+    assert.equal(validateLaterReferenceRecipeInputs(raw,e),true);
+    const args=[...laterArgs,'--stadium-later-sss-prepared-start','--stadium-later-sss-prepared-setup',
+      '--stadium-later-sss-reference',OBSERVED_B_REFERENCE.id];
+    const admitted=await runnerAdmission(structuredClone(e),args,{recipeBytes:raw});
+    assert.equal(admitted.currentSssExpected.observation_profile,3);
+    assert.equal(admitted.currentSssPolicy.compare,compareLaterSssExitObservation);
+    const trailer=raw.length-(2+12*OBSERVED_B_REFERENCE.first.length);
+    for(const [mutate,reason] of [
+      [b=>b.writeUInt32BE(7,4),/v8 header/],
+      [b=>b.writeUInt32BE(2006,12),/v8 header/],
+      [b=>b.writeUInt32BE(0,24),/v8 header/],
+      [b=>b.writeUInt16BE(11,trailer),/span trailer/],
+      [b=>b[trailer+3]=1,/span flags/],
+      [b=>b.writeUInt32BE(1,trailer+6),/span flags/],
+      [b=>b.writeUInt32BE(2013,raw.length-4),/span flags/],
+      [b=>b[100]^=1,/raw recipe identity/]]){
+      const bad=Buffer.from(raw);mutate(bad);
+      assert.throws(()=>validateLaterReferenceRecipeInputs(bad,e),reason);
+      await assert.rejects(()=>runnerAdmission(structuredClone(e),args,{recipeBytes:bad}));
+    }
+    for(const rawBad of [raw.subarray(0,-1),Buffer.concat([raw,Buffer.from([0])])])
+      assert.throws(()=>validateLaterReferenceRecipeInputs(rawBad,e),/transport size/);
+    const bad=structuredClone(e);bad.literal_inputs[43].pads[0]='ff'.repeat(11);
+    assert.throws(()=>validateLaterReferenceRecipeInputs(raw,bad),/literal four-port prefix/);
+    await assert.rejects(()=>runnerAdmission(structuredClone(e),laterArgs,{recipeBytes:raw}));
+    await assert.rejects(()=>runnerAdmission(expected(),args,{recipeBytes:raw}));
+    const foreign=structuredClone(e);foreign.reference_context.first[6]=940;
+    await assert.rejects(()=>runnerAdmission(foreign,args,{recipeBytes:raw}));
+  });
+
+test('new prepared receipts bind captured parent order and distinct zero-action Setup identity',()=>{
+ const e=observedExpected(),prepared=preparedLaterReceipt(e),parent=laterEndpoint(e);
+ const {actual}=observedTrace(e),d=OBSERVED_B_REFERENCE;
+ Object.assign(parent,{observation_profile:3,reference_descriptor:d.id,notification_order_count:actual.notification_order_count,
+   original_B_constructor_GO:d.original_B_constructor_GO});
+ parent.notification_coordinates={...parent.notification_coordinates,replay_cursor:943,order:actual.notification_coordinates.order};
+ parent.terminal.cursor=943;parent.note.session_ticks=d.menu_ticks;
+ Object.assign(prepared,{observation_profile:3,replay_cursor:943,local_order_rows:parent.notification_coordinates.order,
+   random_seed_hex:d.entry_seed});
+ assert.equal(compareLaterPreparedStartObservation(prepared,e,parent).pass,true);
+ assert.throws(()=>compareLaterPreparedStartObservation(prepared,e),/notification owner/);
+ for(const mutate of [v=>v.local_order_rows++,v=>v.observation_profile=2,v=>v.replay_cursor=940,
+   v=>v.random_seed_hex='7fc17cf1',v=>v.callback_source_steps=1]){
+  const bad=structuredClone(prepared);mutate(bad);assert.throws(()=>compareLaterPreparedStartObservation(bad,e,parent));
+ }
+ const setup=laterSetupReceipt(e);
+ Object.assign(setup,{observation_profile:3,reference_descriptor:d.id,notification_order_count:actual.notification_order_count,
+   original_B_constructor_GO:d.original_B_constructor_GO});
+ Object.assign(setup.notification_coordinates,{replay_cursor:943,order:parent.notification_coordinates.order});
+ setup.terminal.cursor=943;setup.note.session_ticks=d.menu_ticks;
+ setup.prepared_to_setup.setup.handoff_origin=d.handoff_origin;
+ assert.equal(compareLaterPreparedSetupObservation(setup,e).pass,true);
+ for(const mutate of [v=>v.prepared_to_setup.setup.handoff_origin='current_sss_prepared_later_940',
+   v=>v.prepared_to_setup.setup.actual.random_seed_hex=d.entry_seed,
+   v=>v.prepared_to_setup.setup.source_frames=1,v=>v.notification_order_count++,
+   v=>v.prepared_to_setup.setup.parent_seed_owner_value_restored=false]){
+  const bad=structuredClone(setup);mutate(bad);assert.throws(()=>compareLaterPreparedSetupObservation(bad,e));
+ }
 });

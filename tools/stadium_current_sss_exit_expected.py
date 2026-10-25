@@ -15,6 +15,11 @@ def build_expected(binding, *, match_index=0):
     current = packet.build_packet(binding)
     path = Path(binding['files']['primary']['path'])
     rows = list(packet.replay.iter_records(path))
+    return project_sss_expected_from_packet(binding, current, rows, match_index=match_index)
+
+
+def project_sss_expected_from_packet(binding, current, rows, *, match_index=0, later_topology=None):
+    path = Path(binding['files']['primary']['path'])
     selected = [r for r in rows if r['event'] == 'boundary' and
                 r['payload'].get('match_index') == match_index and
                 r['payload'].get('boundary') == 'sss_exit']
@@ -35,10 +40,10 @@ def build_expected(binding, *, match_index=0):
                    'Current route must begin CSS/SSS/Match')
     span_index = 2 if match_index == 0 else 6
     if match_index == 1:
-        packet.require([(s['scene'], s['first_frame'], s['last_frame']) for s in spans] == [
+        packet.require([(s['scene'], s['first_frame'], s['last_frame']) for s in spans] == (later_topology or [
             (1,0,144),(2,145,269),(3,270,461),(4,462,674),
             (1,675,806),(2,807,939),(3,940,1131),(4,1132,1342),
-            (1,1343,1475),(2,1476,1600),(3,1601,1793),(4,1794,2005)],
+            (1,1343,1475),(2,1476,1600),(3,1601,1793),(4,1794,2005)]),
             'Later SSS requires the exact retained global scene topology')
     cursor = spans[span_index]['first_frame']
     packet.require(spans[0]['first_frame'] == 0 and
@@ -82,10 +87,14 @@ def build_stock4_expected(binding, *, match_index=0):
     # left entirely literal; admit the prepared profile from the strict packet's
     # actual later Entry/Setup, never by rewriting earlier source operands.
     current = packet.build_packet(binding)
+    return attach_stock4_prepared_profile(value, current, match_index=match_index)
+
+
+def attach_stock4_prepared_profile(value, current, *, match_index=0, frames=2006):
     first = current['matches'][match_index]
     entry, setup = first['entry'], first['setup']
     want = entry['declared_setup']
-    packet.require(value['recipe']['frames'] == 2006 and
+    packet.require(value['recipe']['frames'] == frames and
                    want['match_kind'] == 1 and want['is_stock'] is True and
                    want['stage'] == 3 and want['time_limit_seconds'] == 0 and
                    want['item_frequency'] == -1 and not want['timer_enabled'] and

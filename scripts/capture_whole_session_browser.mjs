@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {OBSERVED_B_REFERENCE, OBSERVED_B_SCHEMA} from './stadium_later_reference_contexts.mjs';
 /*
  * Headless whole-session MWRC diagnostic.
  *
@@ -14,7 +15,7 @@ import {validateStock4SssExitExpected, compareStock4SssExitObservation, validate
   compareStock4PreparedStartObservation, compareStock4PreparedSetupObservation,
   validateStock4PreparedStartFinalization, validateStock4PreparedSetupFinalization,
   validateStock4SssExitTerminal, validateStock4SssExitFinalization} from './stadium_stock4_sss_exit_observation.mjs';
-import {validateLaterSssExitExpected, compareLaterSssExitObservation, validateLaterSssExitTrace,
+import {validateLaterSssExitExpected, validateLaterReferenceRecipeInputs, compareLaterSssExitObservation, validateLaterSssExitTrace,
   validateLaterSssExitTerminal, validateLaterSssExitFinalization, compareLaterPreparedStartObservation, compareLaterPreparedSetupObservation} from './stadium_later_sss_exit_observation.mjs';
 import fs from 'node:fs/promises';
 import {closeSync, createReadStream, fsyncSync, openSync, writeSync} from 'node:fs';
@@ -73,6 +74,7 @@ const {values, tokens} = parseArgs({tokens: true, options: {
   'stadium-current-sss-prepared-start': {type: 'boolean', default: false},
   'stadium-later-sss-prepared-start': {type: 'boolean', default: false},
   'stadium-later-sss-prepared-setup': {type: 'boolean', default: false},
+  'stadium-later-sss-reference': {type: 'string'},
   'stadium-later-sss-exit': {type: 'boolean', default: false},
   'artifact-root': {type: 'string'},
 }});
@@ -169,6 +171,10 @@ const currentSssPreparedStart = values['stadium-current-sss-prepared-start'];
 const currentSssLater = values['stadium-later-sss-exit'];
 const laterSssPreparedStart = values['stadium-later-sss-prepared-start'];
 const laterSssPreparedSetup = values['stadium-later-sss-prepared-setup'];
+const laterSssReference = values['stadium-later-sss-reference'] ?? null;
+if (laterSssReference !== null && (laterSssReference !== OBSERVED_B_REFERENCE.id ||
+    !currentSssLater || !laterSssPreparedStart || !laterSssPreparedSetup || currentSssPreparedStart))
+  throw Error('New later reference requires its exact explicit descriptor and checked later Setup route');
 if (laterSssPreparedSetup && (!currentSssLater || !laterSssPreparedStart || currentSssPreparedStart))
   throw Error('--stadium-later-sss-prepared-setup requires explicit later prepared Start and forbids the profile1 route');
 const preparedSetupRequested = currentSssPreparedStart || laterSssPreparedSetup;
@@ -823,7 +829,10 @@ try {
       throw Error('Current SSS expectation hash differs');
     const expected = JSON.parse(await fs.readFile(currentSssExitPath, 'utf8'));
     currentSssStock4 = expected?.schema === 'melee-web-stock4-none-sss-exit-host-expectation-v1';
-    const laterSchema = expected?.schema === 'melee-web-stock4-none-later-sss-exit-host-expectation-v1';
+    const newLaterSchema = expected?.schema === OBSERVED_B_SCHEMA;
+    const laterSchema = expected?.schema === 'melee-web-stock4-none-later-sss-exit-host-expectation-v1' || newLaterSchema;
+    if ((laterSssReference !== null) !== newLaterSchema)
+      throw Error('Later reference descriptor/expected schema needs the explicit matching opt-in');
     if (currentSssLater !== laterSchema)
       throw Error('Later SSS expectation requires the explicit matching later-SSS opt-in');
     currentSssExpected = currentSssLater ? validateLaterSssExitExpected(expected) :
@@ -831,13 +840,16 @@ try {
     currentSssStopsBeforeAssets = currentSssStock4 || currentSssLater;
     if (currentSssLater) {
       currentSssPolicy = {compare: compareLaterSssExitObservation, terminal: validateLaterSssExitTerminal,
-        trace: validateLaterSssExitTrace, finalization: validateLaterSssExitFinalization, preparedStart:compareLaterPreparedStartObservation};
+        trace: validateLaterSssExitTrace, finalization: validateLaterSssExitFinalization,
+        preparedStart:newLaterSchema ? (value,expected)=>compareLaterPreparedStartObservation(value,expected,report.current_sss_exit.observation) : compareLaterPreparedStartObservation};
+      if (laterSssReference !== null) report.later_sss_reference = laterSssReference;
       if (laterSssPreparedStart) report.later_sss_prepared_start = true;
       if (laterSssPreparedSetup) {
         report.later_sss_prepared_setup = true;
         currentSssPolicy.preparedSetup = compareLaterPreparedSetupObservation;
       }
-      report.scope = laterSssPreparedSetup ?
+      report.scope = newLaterSchema ?
+        'New-reference occurrence1 zero-action Setup common fields/seed after diagnostic A/Results/CSS; literal inputs0..942, UNKNOWN original menu draw parity and unpaired original constructor/GO; replay incomplete, no C3' : laterSssPreparedSetup ?
         'Retained occurrence1 zero-source-action Setup common fields/seed after diagnostic A/Results/CSS; literal global inputs0..939, UNKNOWN original menu draws/constructor/GO; replay incomplete, no C3' :
         'Retained occurrence1 SSS OnExit common-field component after diagnostic A/Results/CSS; literal global inputs 0..939, pre-B-assets stop; replay incomplete, UNKNOWN menu draw parity, no B Entry/constructor/GO or C3';
     }
@@ -857,6 +869,7 @@ try {
       throw Error('Current SSS literal recipe/profile differs');
     for (const identity of Object.values(currentSssExpected.source_binding.files))
       if (await digest(identity.path) !== identity.sha256) throw Error('Current SSS original source input changed');
+    if (laterSssReference !== null) validateLaterReferenceRecipeInputs(recipeBytes,currentSssExpected);
     currentSssRecipeBytes = Array.from(recipeBytes);
     report.current_sss_exit = {component_pass: false, runtime_replay: 'NOT_RUN',
       original_menu_draw_parity: 'UNKNOWN', Entry: false, C3: false};
@@ -1134,7 +1147,7 @@ try {
   if (currentSssExit) {
     currentSssArm = await observePageOperation('install current SSS returned-parser arm', () =>
       page.evaluateHandle(installCurrentSssExitReplayArm, {recipeBytes: currentSssRecipeBytes,
-        observationProfile: currentSssLater ? 2 : currentSssStock4 ? 1 : 0, preparedStartProbe: currentSssPreparedStart || laterSssPreparedStart, laterPreparedSetup: laterSssPreparedSetup}));
+        observationProfile: currentSssLater ? currentSssExpected.observation_profile : currentSssStock4 ? 1 : 0, preparedStartProbe: currentSssPreparedStart || laterSssPreparedStart, laterPreparedSetup: laterSssPreparedSetup}));
     await phase('current-sss-exit-component', async () => {
       const deadline = Date.now() + replayTimeoutMs;
       await page.locator('#retail-replay-start').click();

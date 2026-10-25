@@ -3,6 +3,7 @@ No source game/graphics/audio/Results service is replaced with a success stub.
 """
 from pathlib import Path
 import subprocess
+import json
 from test_stadium_current_sss_exit import run
 from owned_test_workspace import OwnedWorkspaceTests
 ROOT = Path(__file__).resolve().parents[1]
@@ -91,7 +92,7 @@ def returned_css_control_source(root, menu_source=None):
     timer = function(rules, 'int melee_web_match_timer_supported(')
     browser = (root / 'src/gameplay_menu_browser.cpp').read_text()
     context = function(browser, 'bool later_sss_context_owned(){')
-    marker = '   check(later_sss.stage==3&&later_sss_context_owned()&&replay_cursor==675&&completed_matches==1&&'
+    marker = '   check(later_sss.stage==3&&later_sss_context_owned()&&replay_cursor==later_sss_reference_context().first[4]&&completed_matches==1&&'
     assert browser.count(marker) == 1
     i = browser.index(marker); j = browser.index('   later_sss.stage=4;', i) + len('   later_sss.stage=4;')
     handoff = 'void actual_handoff(){if(later_sss.armed){' + browser[i:j] + '}}'
@@ -100,11 +101,12 @@ namespace browser_control {
 struct Recipe{std::unique_ptr<int> initial_css{new int(1)};};
 std::unique_ptr<Recipe> replay;int native_host,foreign_host;int* host;
 struct {bool armed=true,failed=false;const Recipe* recipe=nullptr;const int* context=nullptr;int* host_owner=nullptr;}current_sss_exit;
-struct {bool armed=true;unsigned stage=3;}later_sss;
+struct {bool armed=true;unsigned stage=3;
+const melee_web::stadium_later_reference::Context* reference=&melee_web::stadium_later_reference::legacy;}later_sss;
 unsigned replay_cursor=675,completed_matches=1;int destination=0;
 void check(bool v,const char* e){if(!v)throw std::runtime_error(e);}
 int melee_web_menu_host_results_destination(int*){return destination;}
-''' + context + handoff + r'''
+''' + function(browser,'const melee_web::stadium_later_reference::Context& later_sss_reference_context(){') + '\nbool later_sss_reference_bound(){return later_sss.reference==&melee_web::stadium_later_reference::legacy;}\n' + context + handoff + r'''
 void reset(){replay=std::make_unique<Recipe>();host=&native_host;
  current_sss_exit={true,false,replay.get(),replay->initial_css.get(),host};later_sss={true,3};
  replay_cursor=675;completed_matches=1;destination=0;}
@@ -142,7 +144,7 @@ extern "C" void mnCharSel_Scene_OnExit(void*){calls.push_back(10);if(poison_exit
 extern "C" void mnStageSel_Scene_OnEnter(void*){calls.push_back(50);}
 extern "C" void mnStageSel_Scene_OnExit(void*){calls.push_back(90);}
 '''
-    return includes + owner_type + codecs + declarations + timer + validators + leaves + css_exit + sss_enter + tick + sss_exit + RETURNED_CSS_RAW + browser_control + r'''
+    return '#include "'+str(root/'src/stadium_later_reference.hpp')+'"\n' + includes + owner_type + codecs + declarations + timer + validators + leaves + css_exit + sss_enter + tick + sss_exit + RETURNED_CSS_RAW + browser_control + r'''
 MeleeWebMenuSession owned{},foreign{};char error[256]{};
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 static void passive(void*,MeleeWebMenuSession* s,const SSSData*,uint64_t,int){
@@ -347,6 +349,23 @@ int main(){
 '''
 
 class LaterSssContinuationControls(OwnedWorkspaceTests):
+    def test_native_context_coordinates_match_canonical_host_descriptor(self):
+        table=json.loads((ROOT/'tools/stadium_later_reference_contexts.json').read_text())
+        source='#include "'+str(ROOT/'src/stadium_later_reference.hpp')+'"\n#include <cassert>\n#include <cstring>\nint main(){\n'
+        for name, expected in zip(('legacy','observed_b'),table['contexts']):
+            prefix='melee_web::stadium_later_reference::'+name
+            source+='assert(std::strcmp('+prefix+'.id,'+json.dumps(expected['id'])+')==0);\n'
+            for field in ('profile','recipe_bytes','frames','pause_first','pause_last','pause_frame','menu_ticks','notification_order'):
+                value=expected[field] if expected[field] is not None else 0
+                source+='assert('+prefix+'.'+field+'=='+str(value)+');\n'
+            for field in ('first','last'):
+                for i,value in enumerate(expected[field]):
+                    source+='assert('+prefix+'.'+field+'['+str(i)+']=='+str(value)+');\n'
+            for i,value in enumerate(bytes.fromhex(expected['recipe_sha256'])):
+                source+='assert('+prefix+'.recipe_sha256['+str(i)+']=='+str(value)+');\n'
+        source+='}\n'
+        run(source,self.new_workspace(ROOT,'later-reference-coordinate-join-'))
+
     def test_actual_full_sss_preparation_and_later_ready_accessor(self):
         from check_gameplay import node_runtime
         workspace=self.new_workspace(ROOT,'later-sss-prepared-owner-')
@@ -370,7 +389,7 @@ class LaterSssContinuationControls(OwnedWorkspaceTests):
                      'bool later_sss_pause_pads(')
         actual += cut('src/gameplay_menu_browser.cpp', 'bool later_sss_selected_leave(){',
                       'bool current_sss_exit_profile_valid(')
-        fixture = r'''
+        fixture = '#include "'+str(ROOT/'src/stadium_later_reference.hpp')+'"\n'+r'''
 #include <array>
 #include <cassert>
 #include <memory>
@@ -384,7 +403,8 @@ struct RetailReplayRecipe {unsigned version=8;bool diagnostic_entity_prefix=fals
  std::vector<int> frames=std::vector<int>(2006);std::vector<Span> spans;
  std::unique_ptr<int> initial_css{new int(1)};bool whole_session()const{return version==8;}};
 }
-struct {bool armed=false;unsigned stage=0,requested_generation=7;}later_sss;
+struct {bool armed=false;unsigned stage=0,requested_generation=7;
+const melee_web::stadium_later_reference::Context* reference=&melee_web::stadium_later_reference::legacy;}later_sss;
 std::unique_ptr<melee_web::RetailReplayRecipe> replay(new melee_web::RetailReplayRecipe);
 int host_object,foreign_host;int* host=&host_object;
 struct {bool armed=true,failed=false,notified=false;const melee_web::RetailReplayRecipe* recipe;
@@ -428,7 +448,9 @@ int main(){
  asset_generation=7;current_sss_exit.failed=true;assert(!later_sss_asset_pending(7));
 }
 '''
-        run(fixture + context + actual + main, self.new_workspace(ROOT, 'later-sss-selectors-'))
+        descriptor = function((ROOT/'src/gameplay_menu_browser.cpp').read_text(), 'const melee_web::stadium_later_reference::Context& later_sss_reference_context(){')
+        descriptor += '\nbool later_sss_reference_bound(){return later_sss.reference==&melee_web::stadium_later_reference::legacy;}\n'
+        run(fixture + descriptor + context + actual + main, self.new_workspace(ROOT, 'later-sss-selectors-'))
 
     def test_actual_private_pause_window_and_ordinary_refusal(self):
         browser=(ROOT/'src/gameplay_menu_browser.cpp').read_text()
@@ -438,12 +460,12 @@ int main(){
         helpers='\n'.join(function(browser,s) for s in ['bool later_sss_pause_pads(','bool later_sss_pause_before(','void later_sss_pause_after('])
         branch=function(browser,'    else if(replay_whole){').replace('else if(replay_whole)','if(replay_whole)',1)
         getter=function(flow,'int melee_web_match_flow_pause_observation(')
-        result_anchor='  check(later_sss.stage==2&&later_sss_context_owned()&&later_sss.pause_finished&&replay_cursor==462&&completed_matches==1,'
+        result_anchor='  check(later_sss.stage==2&&later_sss_context_owned()&&later_sss.pause_finished&&replay_cursor==later_sss_reference_context().first[3]&&completed_matches==1,'
         assert browser.count(result_anchor)==1
         i=browser.index(result_anchor);j=browser.index('  later_sss.stage=3;',i)+len('  later_sss.stage=3;')
         result_gate='void actual_results_gate(){if(later_sss.armed){'+browser[i:j]+'}}'
 
-        prefix=r'''
+        prefix='#include "'+str(ROOT/'src/stadium_later_reference.hpp')+'"\n'+r'''
     #include <array>
     #include <cstdint>
     #include <cstddef>
@@ -476,6 +498,7 @@ int main(){
     bool context_ok=true,topology_ok=true,replay_whole=true;size_t replay_cursor=450;unsigned completed_matches=0;
     bool later_sss_context_owned(){return context_ok&&bool(replay);}
     bool later_sss_recipe_valid(const Recipe&){return topology_ok;}
+    const auto& later_sss_reference_context(){return melee_web::stadium_later_reference::legacy;}
     '''+helpers+'\n'+result_gate+'\nvoid actual_browser_pre_tick(const PADStatus* sample){'+branch+'}\n'+r'''
     PADStatus* sample(){return replay->frames[replay_cursor].pads.data();}
     void reset(){match=std::make_unique<ModelMatch>();replay=std::make_unique<Recipe>();later_sss={};later_sss.armed=true;later_sss.stage=2;later_sss.pause_next_cursor=450;later_sss.pause_match_owner=match.get();context_ok=topology_ok=replay_whole=true;completed_matches=0;replay_cursor=450;

@@ -27,7 +27,11 @@ int melee_web_native_menu_replay(const uint8_t* data,unsigned size,int observe){
   scoped_assets=scoped_disc_import;
  }
  if(!archive_cache)archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
- replay=std::move(candidate);replay_trace=observe;replay_pending=!replay->whole_session();
+ replay=std::move(candidate);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ later_sss_bind_parsed_reference(data,size);
+#endif
+ replay_trace=observe;replay_pending=!replay->whole_session();
  replay_completion={};replay_completion.whole_session=replay->whole_session();
  match_message="Reference replay: "+selected_match_message(replay->selection);
  if(replay->whole_session()){

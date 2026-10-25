@@ -28,7 +28,7 @@ class Stock4SssExitControls(OwnedWorkspaceTests):
                   '#if !defined(MELEE_WEB_PUBLIC_RUNTIME)\n  replay_boundary_mark("ordinary_audio_boundary_returned"')
         includes=''.join('#include "'+str(BASE/'src'/name)+'"\n' for name in
                          ['menu_preparation_state.hpp','source_frame_sequence.hpp'])
-        fixture=r'''
+        fixture='#include "'+str(ROOT/'src/stadium_later_reference.hpp')+'"\n'+r'''
 #define MELEE_WEB_PUBLIC_RUNTIME 1
 #include <array>
 #include <cassert>
@@ -113,7 +113,7 @@ reset();scene=1;current_sss_exit_before_leave();assert(!current_sss_exit.leave_s
         preparation=cut(text,'void begin_preparation(){','bool preparation_uses_source_draws(){')
         getter=cut(text,'const char* melee_web_native_menu_stadium_current_sss_prepared_start_observe(){',
                    'int melee_web_native_menu_stadium_current_sss_prepared_setup_begin(')
-        fixture=r'''
+        fixture='#include "'+str(ROOT/'src/stadium_later_reference.hpp')+'"\n'+r'''
 #define MELEE_WEB_PUBLIC_RUNTIME 1
 #include <array>
 #include <cassert>
@@ -217,14 +217,18 @@ int main(){reset();complete_leave();auto& s=current_sss_exit;
 '''
         includes=''.join('#include "'+str(BASE/'src'/name)+'"\n' for name in
                          ['gameplay_pad_state.h','menu_preparation_state.hpp','source_frame_sequence.hpp'])
-        run(includes+fixture+notify+note+host_arm+helpers+arm+preparation+getter+main,
+        legacy_reference = r'''
+const auto& later_sss_reference_context(){return melee_web::stadium_later_reference::legacy;}
+template<class State>bool later_sss_notification_order_owned(const State& s){return s.notification_order==melee_web::stadium_later_reference::legacy.notification_order;}
+'''
+        run(includes+fixture+legacy_reference+notify+note+host_arm+helpers+arm+preparation+getter+main,
             self.new_workspace(ROOT,'stock4-leave-generation-lifecycle-'))
 
     def test_actual_prepared_start_getter_is_read_only_and_requires_the_exact_stopped_boundary(self):
         text=(ROOT/'src/gameplay_menu_browser.cpp').read_text()
         fn=cut(text,'const char* melee_web_native_menu_stadium_current_sss_prepared_start_observe(){',
                'int melee_web_native_menu_stadium_current_sss_prepared_setup_begin(')
-        fixture=r'''
+        fixture='#include "'+str(ROOT/'src/stadium_later_reference.hpp')+'"\n'+r'''
 #include <array>
 #include <cassert>
 #include <cstdint>
@@ -358,7 +362,12 @@ int melee_web_menu_host_later_sss_prepared_selection(Host*,MeleeWebMenuMatchSele
  assert(refusal.find("\"captured\":false")!=std::string::npos&&later_selection_calls==0&&selection_calls==0);
  assert(refusal==melee_web_native_menu_stadium_current_sss_prepared_start_observe());}
 '''+main[pos:]
-        run(pad_header+fixture+later_fixture+fn+main,self.new_workspace(ROOT,'stock4-prepared-start-getter-'))
+        reference_fixture = r'''
+// This existing getter fixture selects only the retained profile1/profile2 context.
+const auto& later_sss_reference_context(){return melee_web::stadium_later_reference::legacy;}
+template<class State>bool later_sss_notification_order_owned(const State& s){return s.notification_order==melee_web::stadium_later_reference::legacy.notification_order;}
+'''
+        run(pad_header+fixture+later_fixture+reference_fixture+fn+main,self.new_workspace(ROOT,'stock4-prepared-start-getter-'))
 
     def test_prepared_start_export_stays_diagnostic_gated_and_runner_opt_in(self):
         cmake=(ROOT/'cmake/FighterRuntime.cmake').read_text()

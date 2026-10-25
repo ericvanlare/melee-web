@@ -98,6 +98,7 @@ extern bool scoped_assets,asset_committed;
 extern bool stadium_c1a_armed;
 bool first_sss_vs_setup_asset_pending(unsigned generation);
 bool later_sss_asset_pending(unsigned generation);
+void later_sss_bind_parsed_reference(const uint8_t* bytes,unsigned size);
 extern std::string stadium_c1a_observation;
 extern bool asset_selection_valid;
 extern MeleeWebMenuMatchSelection asset_selection;

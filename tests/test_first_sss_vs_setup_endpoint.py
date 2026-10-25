@@ -308,9 +308,17 @@ int main(){
 }
 """
 def unarmed_later_asset_fixture(source):
-  return r"""
+  return '#include "'+str(ROOT/'src/stadium_later_reference.hpp')+'"\n'+r"""
 // Legacy/current Setup only: no later route is armed in these fixtures.
-struct {bool armed=false;unsigned stage=0,requested_generation=0;} later_sss;
+struct {bool armed=false;unsigned stage=0,requested_generation=0;
+const melee_web::stadium_later_reference::Context* reference=&melee_web::stadium_later_reference::legacy;} later_sss;
+static const auto& later_sss_reference_context(){
+ if(later_sss.armed)throw std::runtime_error("later descriptor outside legacy/current fixture");
+ return melee_web::stadium_later_reference::legacy;
+}
+template<class State>static bool later_sss_notification_order_owned(const State&){
+ throw std::runtime_error("later order outside legacy/current fixture");
+}
 static unsigned later_context_calls=0;
 // No later owner exists in Legacy124 or Current270 fixtures. These leaves
 // fail closed if an extracted source branch accidentally selects that route.

@@ -11,6 +11,8 @@ extern "C" int gm_GetCurrentGameMode(void);
 extern "C" int gm_GetPreviousGameMode(void);
 extern "C" int gm_GetCurrentSceneIndex(void);
 extern "C" int gm_GetPreviousSceneIndex(void);
+#include "private_sha256.hpp"
+#include "stadium_later_reference.hpp"
 #include "gameplay_menu.h"
 #include "gameplay_audio_bank_transport.h"
 #include "stadium_first_css_diagnostic_input.hpp"
@@ -245,6 +247,7 @@ CurrentSssExitState current_sss_exit;
 // Private occurrence1 capability, retained after unload as diagnostic evidence.
 // 0 armed prefix, 1 A import, 2 A source match, 3 actual Results, 4 returned CSS.
 struct LaterSssContinuation {
+ const melee_web::stadium_later_reference::Context* reference=&melee_web::stadium_later_reference::legacy;
  bool armed=false;
  unsigned stage=0,requested_generation=0;
  const melee_web::GameplayMatchSession* pause_match_owner=nullptr;
@@ -255,8 +258,43 @@ struct LaterSssContinuation {
  std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> input_bytes{};
 };
 LaterSssContinuation later_sss;
+struct LaterSssReferenceSeal {
+ const melee_web::RetailReplayRecipe* owner=nullptr;
+ std::array<uint8_t,32> sha256{};
+ unsigned bytes=0;
+};
+LaterSssReferenceSeal later_sss_reference_seal;
+void later_sss_bind_parsed_reference(const uint8_t* bytes,unsigned size){
+ later_sss_reference_seal={};
+ if(replay&&replay->version==8&&bytes&&
+    (size==melee_web::stadium_later_reference::legacy.recipe_bytes||
+     size==melee_web::stadium_later_reference::observed_b.recipe_bytes))
+  later_sss_reference_seal={replay.get(),melee_web::private_sha256::digest(bytes,size),size};
+}
+const melee_web::stadium_later_reference::Context& later_sss_reference_context(){
+ check(melee_web::stadium_later_reference::known(later_sss.reference),
+       "Later SSS reference descriptor is foreign");
+ return *later_sss.reference;
+}
+bool later_sss_reference_bound(){
+ if(later_sss.reference==&melee_web::stadium_later_reference::legacy)return true;
+ return later_sss.reference==&melee_web::stadium_later_reference::observed_b&&replay&&
+        later_sss_reference_seal.owner==replay.get()&&
+        later_sss_reference_seal.bytes==later_sss.reference->recipe_bytes&&
+        later_sss_reference_seal.sha256==later_sss.reference->recipe_sha256&&
+        melee_web::stadium_later_reference::topology(*replay,*later_sss.reference);
+}
+bool later_sss_notification_order_owned(const CurrentSssExitState& s){
+ if(later_sss_reference_context().profile==2)
+  return s.notification_order==later_sss_reference_context().notification_order;
+ // The existing trace emits every pre-notification increment; notification is
+ // the one final increment. This is native event accounting, not original draw parity.
+ return s.notification_received&&s.notification_order!=UINT64_MAX&&
+        s.order==s.notification_order+1;
+}
+
 bool later_sss_context_owned(){
- return current_sss_exit.armed&&!current_sss_exit.failed&&replay&&
+ return later_sss_reference_bound()&&current_sss_exit.armed&&!current_sss_exit.failed&&replay&&
         replay.get()==current_sss_exit.recipe&&replay->initial_css&&
         replay->initial_css.get()==current_sss_exit.context&&host&&
         host==current_sss_exit.host_owner;
@@ -557,7 +595,7 @@ std::string first_sss_vs_entry_json(){
     <<",\"error\":"<<(s.error.empty()?"null":first_css_browser_draw_json_quote(s.error))
     <<",\"actual\":"<<(s.actual.empty()?"null":s.actual)<<'}';return out.str();
 }
-enum class FirstSssVsSetupOrigin : unsigned { LegacyEntry124, CurrentPreparedStock4_270, CurrentPreparedLater_940 };
+enum class FirstSssVsSetupOrigin : unsigned { LegacyEntry124, CurrentPreparedStock4_270, CurrentPreparedLater_940, CurrentPreparedLater_943 };
 bool current_sss_selection_equal(const MeleeWebMenuMatchSelection&,
                                  const MeleeWebMenuMatchSelection&);
 struct FirstSssVsSetupState {
@@ -777,6 +815,8 @@ std::string first_sss_vs_setup_json(){
   out<<",\"handoff_origin\":\"current_sss_prepared_stock4_270\"";
  else if(s.origin==FirstSssVsSetupOrigin::CurrentPreparedLater_940)
   out<<",\"handoff_origin\":\"current_sss_prepared_later_940\"";
+ else if(s.origin==FirstSssVsSetupOrigin::CurrentPreparedLater_943)
+  out<<",\"handoff_origin\":\"current_sss_prepared_later_943\"";
  out
     <<",\"current_owners\":"<<first_sss_vs_setup_current_json()
     <<",\"actual\":"<<(s.actual.empty()?"null":s.actual)
@@ -2212,6 +2252,7 @@ if(scoped_assets){
  replay.reset();melee_web_net_reset();replay_completion={};replay_prefix_progress={};replay_cursor=0;replay_trace=replay_pending=replay_started=replay_final_draw=false;
  replay_match_complete=false;replay_outcome=0;replay_winner=-1;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ later_sss_reference_seal={};
  stadium_c1a_armed=false;stadium_c1a_observation.clear();stadium_c1a_raw_stkind=-1;
  first_css_browser_draw=FirstCssBrowserDrawState{};
  first_css_browser_postdraw_stream=FirstCssBrowserPostdrawStreamState{};
@@ -2268,7 +2309,7 @@ void request_assets(AssetDestination destination,
   check(asset_selection_valid,"Results assets require the completed match selection");
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
    if(later_sss.armed){
-    check(later_sss.stage==3&&later_sss_context_owned()&&replay_cursor==462&&completed_matches==1,
+    check(later_sss.stage==3&&later_sss_context_owned()&&replay_cursor==later_sss_reference_context().first[3]&&completed_matches==1,
           "Later SSS Results assets lost their actual preceding-match provenance");
     names=melee_web::stadium_later_sss_results_asset_names(asset_selection);
    }else{
@@ -2578,7 +2619,7 @@ void begin_typed_results(const MeleeWebMenuMatchContinuation& continuation,
  results_route_active=true;results_seed=seed;++completed_matches;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  if(later_sss.armed){
-  check(later_sss.stage==2&&later_sss_context_owned()&&later_sss.pause_finished&&replay_cursor==462&&completed_matches==1,
+  check(later_sss.stage==2&&later_sss_context_owned()&&later_sss.pause_finished&&replay_cursor==later_sss_reference_context().first[3]&&completed_matches==1,
         "Later SSS continuation requires the actual first match Results transition");
   later_sss.stage=3;
  }
@@ -2677,7 +2718,7 @@ void advance(){
  if(results){
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
   if(later_sss.armed)
-   check(later_sss.stage==3&&later_sss_context_owned()&&replay_cursor==675&&completed_matches==1,
+   check(later_sss.stage==3&&later_sss_context_owned()&&replay_cursor==later_sss_reference_context().first[4]&&completed_matches==1,
          "Later SSS Results return lost its captured replay/context/provenance");
 #endif
   report_owner_lifetime("results-before-teardown");
@@ -2694,7 +2735,7 @@ void advance(){
   check(melee_web_menu_host_results_end(host,seed,final_input,error,sizeof(error)),error);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
   if(later_sss.armed){
-   check(later_sss.stage==3&&later_sss_context_owned()&&replay_cursor==675&&completed_matches==1&&
+   check(later_sss.stage==3&&later_sss_context_owned()&&replay_cursor==later_sss_reference_context().first[4]&&completed_matches==1&&
          melee_web_menu_host_results_destination(host)!=192,
          "Later SSS continuation requires the actual recorded Results-to-CSS return");
    later_sss.stage=4;
@@ -2868,7 +2909,7 @@ void advance(){
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
   if(later_sss.armed){
     check(later_sss.stage==0&&later_sss_context_owned()&&!current_sss_exit.notified&&
-          replay_cursor==270&&completed_matches==0&&later_sss_recipe_valid(*replay),
+          replay_cursor==later_sss_reference_context().first[2]&&completed_matches==0&&later_sss_recipe_valid(*replay),
           "Later SSS preceding A lost its first actual SSS return");
     MeleeWebMenuMatchSelection selection{};
     check(melee_web_menu_host_stadium_c1a_selection(host,&selection,error,sizeof(error)),error);
@@ -2964,8 +3005,13 @@ bool first_sss_vs_setup_finish_handoff(){
         s.input&&s.host_input==melee_web_menu_host_input(host),
         "VS Setup handoff lost its exact stopped host/input/generation");
   if(s.origin==FirstSssVsSetupOrigin::CurrentPreparedStock4_270||
-     s.origin==FirstSssVsSetupOrigin::CurrentPreparedLater_940){
-    const bool later=s.origin==FirstSssVsSetupOrigin::CurrentPreparedLater_940;
+     s.origin==FirstSssVsSetupOrigin::CurrentPreparedLater_940||
+     s.origin==FirstSssVsSetupOrigin::CurrentPreparedLater_943){
+    const bool later=s.origin==FirstSssVsSetupOrigin::CurrentPreparedLater_940||
+                     s.origin==FirstSssVsSetupOrigin::CurrentPreparedLater_943;
+    check(!later||((s.origin==FirstSssVsSetupOrigin::CurrentPreparedLater_943)==
+          (later_sss.reference==&melee_web::stadium_later_reference::observed_b)),
+          "Prepared Setup origin/reference descriptor changed");
     check(current_sss_exit.armed&&!current_sss_exit.failed&&!current_sss_exit.prepared_setup_failed&&!faulted&&
           current_sss_exit.profile==CurrentSssExitProfile::Stock4None&&
           current_sss_exit.terminal&&current_sss_exit.terminal_steps==0&&current_sss_exit.terminal_draws==0&&
@@ -2976,10 +3022,10 @@ bool first_sss_vs_setup_finish_handoff(){
           replay->initial_css.get()==current_sss_exit.context&&host==current_sss_exit.host_owner&&
           replay_cursor==current_sss_exit.terminal_cursor&&
           (later ? (later_sss.armed&&later_sss_context_owned()&&later_sss.stage==4&&
-                    completed_matches==1&&replay_cursor==940&&
-                    current_sss_exit.notification_cursor==940&&
-                    current_sss_exit.notification_order==1887&&
-                    current_sss_exit.observation.note.session_ticks==535)
+                    completed_matches==1&&replay_cursor==later_sss_reference_context().first[6]&&
+                    current_sss_exit.notification_cursor==later_sss_reference_context().first[6]&&
+                    later_sss_notification_order_owned(current_sss_exit)&&
+                    current_sss_exit.observation.note.session_ticks==later_sss_reference_context().menu_ticks)
                  : (!later_sss.armed&&replay_cursor==270&&
                     current_sss_exit.notification_cursor==270&&current_sss_exit.notification_order==543)),
           "Prepared Setup import lost its exact retained profile/context boundary");
@@ -3027,7 +3073,7 @@ bool finish_asset_handoff(){
  if(destination==AssetDestination::FirstSssVsSetup)return first_sss_vs_setup_finish_handoff();
  if(destination==AssetDestination::StadiumC1a&&later_sss.armed){
   check(later_sss.stage==1&&asset_selection_valid&&host&&!host_entered&&
-        later_sss_context_owned()&&!current_sss_exit.notified&&replay_cursor==270&&
+        later_sss_context_owned()&&!current_sss_exit.notified&&replay_cursor==later_sss_reference_context().first[2]&&
         asset_generation==later_sss.requested_generation&&completed_matches==0,
         "Later SSS A import lost its one-use source selection/owner/generation");
   MeleeWebMenuMatchSelection live_selection{};char error[256]{};
@@ -3089,7 +3135,7 @@ bool finish_asset_handoff(){
  if(destination==AssetDestination::ReturnMenu){
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
   if(later_sss.armed)
-   check(later_sss.stage==4&&later_sss_context_owned()&&replay_cursor==675&&completed_matches==1,
+   check(later_sss.stage==4&&later_sss_context_owned()&&replay_cursor==later_sss_reference_context().first[4]&&completed_matches==1,
          "Later SSS CSS import lost its captured replay/context/provenance");
 #endif
   enter_world();return true;
@@ -3108,7 +3154,7 @@ bool finish_asset_handoff(){
  if(destination==AssetDestination::Results){
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
   if(later_sss.armed)
-   check(later_sss.stage==3&&later_sss_context_owned()&&replay_cursor==462&&completed_matches==1,
+   check(later_sss.stage==3&&later_sss_context_owned()&&replay_cursor==later_sss_reference_context().first[3]&&completed_matches==1,
          "Later SSS Results import lost its captured replay/context/provenance");
 #endif
   enter_typed_results_world();return true;
@@ -4097,15 +4143,7 @@ bool first_sss_vs_setup_service(){
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 // Exact retained recipe topology, not an arbitrary later-match mode.
 bool later_sss_recipe_valid(const melee_web::RetailReplayRecipe& recipe){
- constexpr std::array<unsigned,12> scenes={1,2,3,4,1,2,3,4,1,2,3,4};
- constexpr std::array<unsigned,12> first={0,145,270,462,675,807,940,1132,1343,1476,1601,1794};
- constexpr std::array<unsigned,12> last={144,269,461,674,806,939,1131,1342,1475,1600,1793,2005};
- if(recipe.version!=8||recipe.frames.size()!=2006||recipe.spans.size()!=scenes.size()||
-    !recipe.whole_session()||recipe.diagnostic_entity_prefix)return false;
- for(size_t i=0;i<scenes.size();++i)
-  if(recipe.spans[i].scene!=scenes[i]||recipe.spans[i].first_frame!=first[i]||
-     recipe.spans[i].last_frame!=last[i])return false;
- return true;
+ return melee_web::stadium_later_reference::topology(recipe,later_sss_reference_context());
 }
 // Only the two recorded chords and ten literal release rows of private A.
 // The source flow performs pause/NoContest; this capability never writes it.
@@ -4113,7 +4151,7 @@ bool later_sss_pause_pads(const PADStatus* pads,size_t cursor){
  if(!pads)return false;
  for(size_t port=0;port<4;++port){
   const auto& p=pads[port];
-  const bool chord=port==0&&(cursor==450||cursor==461);
+  const bool chord=port==0&&(cursor==later_sss_reference_context().pause_first||cursor==later_sss_reference_context().pause_last);
   if(p.button!=(chord?0x1160:0)||p.stickX||p.stickY||p.substickX||p.substickY||
      p.triggerLeft!=(chord?255:0)||p.triggerRight!=(chord?255:0)||
      p.analogA||p.analogB||p.err!=(port<2?0:-1))return false;
@@ -4121,7 +4159,7 @@ bool later_sss_pause_pads(const PADStatus* pads,size_t cursor){
  return true;
 }
 bool later_sss_pause_before(const PADStatus* sample){
- if(!later_sss.armed||replay_cursor<450||replay_cursor>461)return false;
+ if(!later_sss.armed||replay_cursor<later_sss_reference_context().pause_first||replay_cursor>later_sss_reference_context().pause_last)return false;
  check(later_sss.stage==2&&later_sss_context_owned()&&later_sss_recipe_valid(*replay)&&
        match&&match.get()==later_sss.pause_match_owner&&completed_matches==0&&
        !later_sss.pause_finished&&later_sss.pause_next_cursor==replay_cursor&&
@@ -4129,53 +4167,53 @@ bool later_sss_pause_before(const PADStatus* sample){
        later_sss_pause_pads(replay->frames[replay_cursor].pads.data(),replay_cursor),
        "Later SSS A pause workload lost its literal recipe/lifecycle/owner");
  MeleeWebMatchPauseObservation o{};
- check(match->diagnostic_pause_observation(o)&&o.generation&&o.frame==56&&
+ check(match->diagnostic_pause_observation(o)&&o.generation&&o.frame==later_sss_reference_context().pause_frame&&
        !o.complete&&o.result==OUTCOME_NONE&&
-       o.paused==(replay_cursor!=450)&&
-       o.pause_timer==(replay_cursor==450?0:461-replay_cursor),
+       o.paused==(replay_cursor!=later_sss_reference_context().pause_first)&&
+       o.pause_timer==(replay_cursor==later_sss_reference_context().pause_first?0:later_sss_reference_context().pause_last-replay_cursor),
        "Later SSS A pause workload lost its original pre-tick clock");
- if(replay_cursor==450)later_sss.pause_generation=o.generation;
+ if(replay_cursor==later_sss_reference_context().pause_first)later_sss.pause_generation=o.generation;
  check(o.generation==later_sss.pause_generation,
        "Later SSS A pause workload changed source generation");
  return true;
 }
 void later_sss_pause_after(){
- if(!later_sss.armed||replay_cursor<450||replay_cursor>461)return;
+ if(!later_sss.armed||replay_cursor<later_sss_reference_context().pause_first||replay_cursor>later_sss_reference_context().pause_last)return;
  MeleeWebMatchPauseObservation o{};
  check(match&&match.get()==later_sss.pause_match_owner&&
        later_sss_context_owned()&&later_sss.stage==2&&
        later_sss.pause_next_cursor==replay_cursor&&
        match->diagnostic_pause_observation(o)&&o.generation==later_sss.pause_generation&&
-       o.frame==56&&o.pause_timer==(replay_cursor==461?0:460-replay_cursor)&&
-       o.result==(replay_cursor==461?OUTCOME_NO_CONTEST:OUTCOME_NONE)&&
-       o.complete==(replay_cursor==461)&&
-       (replay_cursor==461||o.paused),
+       o.frame==later_sss_reference_context().pause_frame&&o.pause_timer==(replay_cursor==later_sss_reference_context().pause_last?0:later_sss_reference_context().pause_last-1-replay_cursor)&&
+       o.result==(replay_cursor==later_sss_reference_context().pause_last?OUTCOME_NO_CONTEST:OUTCOME_NONE)&&
+       o.complete==(replay_cursor==later_sss_reference_context().pause_last)&&
+       (replay_cursor==later_sss_reference_context().pause_last||o.paused),
        "Later SSS A pause workload lost its original post-tick clock/outcome");
  ++later_sss.pause_next_cursor;
- if(replay_cursor==461)later_sss.pause_finished=true;
+ if(replay_cursor==later_sss_reference_context().pause_last)later_sss.pause_finished=true;
 }
 bool later_sss_selected_leave(){
  if(!later_sss.armed)return true;
  check(later_sss_context_owned(),
        "Later SSS selector lost its replay/context/host");
  if(!host||melee_web_menu_host_source_scene(host)!=MELEE_WEB_MENU_HOST_SCENE_SSS)return false;
- if(replay_cursor==270){
+ if(replay_cursor==later_sss_reference_context().first[2]){
   check(later_sss.stage==0&&completed_matches==0&&!current_sss_exit.notified,
         "Later SSS occurrence0 was repeated or lost its owner");
   return false; // Actual A proceeds; no passive callback or cursor rewrite.
  }
- check(replay_cursor==940&&later_sss.stage==4&&completed_matches==1&&
+ check(replay_cursor==later_sss_reference_context().first[6]&&later_sss.stage==4&&completed_matches==1&&
        !results_route_active&&!match&&!results&&!prize,
        "Later SSS occurrence1 lacks its actual A/Results/CSS prefix");
  return true;
 }
 bool later_sss_asset_pending(unsigned generation){
  return later_sss.armed&&later_sss.stage==1&&later_sss_context_owned()&&
-        replay_cursor==270&&generation!=0&&generation==later_sss.requested_generation&&
+        replay_cursor==later_sss_reference_context().first[2]&&generation!=0&&generation==later_sss.requested_generation&&
         generation==asset_generation&&asset_destination==AssetDestination::StadiumC1a;
 }
 bool current_sss_exit_profile_valid(const melee_web::RetailReplayRecipe& recipe,
-                                    CurrentSssExitProfile profile){
+                                    CurrentSssExitProfile profile,bool observed_reference=false){
  const auto& selection=recipe.selection;const auto& r=selection.start.rules;
  const bool common=selection.save_profile_present&&selection.unlocked_characters==2047&&
      selection.unlocked_stages==2047&&selection.player_count==2&&r.stkind==St_Kind_PStadium&&
@@ -4188,7 +4226,7 @@ bool current_sss_exit_profile_valid(const melee_web::RetailReplayRecipe& recipe,
   return r.match_kind==MatchKind_Time&&!r.is_stock&&r.time_limit==120&&r.xB==2&&
          selection.start.players[0].stocks==3&&selection.start.players[1].stocks==3;
  if(profile==CurrentSssExitProfile::Stock4None)
-  return recipe.frames.size()==2006&&r.match_kind==1&&r.is_stock&&r.time_limit==0&&r.xB==-1&&
+  return recipe.frames.size()==(observed_reference?melee_web::stadium_later_reference::observed_b.frames:2006)&&r.match_kind==1&&r.is_stock&&r.time_limit==0&&r.xB==-1&&
          !r.timer_enabled&&!r.timer_counts_up&&!r.disable_pausing&&!r.is_teams&&
          selection.start.players[0].stocks==4&&selection.start.players[1].stocks==4;
  return false;
@@ -4295,7 +4333,7 @@ void current_sss_exit_finish_stock4(size_t steps,size_t draws,bool source_pendin
  // No state reset, pause, or synthetic completion: this callback already ran
  // its unchanged scheduled audio and source-frame finish/presentation policy.
 }
-int current_sss_exit_arm(CurrentSssExitProfile profile){try{
+int current_sss_exit_arm(CurrentSssExitProfile profile,bool observed_reference=false){try{
  auto& s=current_sss_exit;
  check(!s.armed&&replay&&replay_trace&&replay->version==8&&replay->initial_css&&
        !replay->diagnostic_entity_prefix&&replay_cursor==0&&!replay_started&&
@@ -4308,7 +4346,7 @@ int current_sss_exit_arm(CurrentSssExitProfile profile){try{
        "Current SSS exit arm requires one fresh parsed v8 replay/context owner");
  check(profile==CurrentSssExitProfile::Time120||profile==CurrentSssExitProfile::Stock4None,
        "Current SSS exit observation profile is unknown");
- check(current_sss_exit_profile_valid(*replay,profile),
+ check(current_sss_exit_profile_valid(*replay,profile,observed_reference),
        "Current SSS exit arm refuses a different declared source profile");
  check(melee_web_gameplay_generation()!=0,"Current SSS exit arm has no prepared native world");
  char error[256]{};
@@ -4323,9 +4361,9 @@ int current_sss_prepared_setup_begin(){
  const bool later=later_sss.armed;
  const auto exact_boundary=[&](){
   return later ? (later_sss.armed&&later_sss_context_owned()&&later_sss.stage==4&&
-      completed_matches==1&&replay_cursor==940&&owner.terminal_cursor==940&&
-      owner.notification_cursor==940&&owner.notification_order==1887&&
-      owner.observation.note.session_ticks==535)
+      completed_matches==1&&replay_cursor==later_sss_reference_context().first[6]&&owner.terminal_cursor==later_sss_reference_context().first[6]&&
+      owner.notification_cursor==later_sss_reference_context().first[6]&&later_sss_notification_order_owned(owner)&&
+      owner.observation.note.session_ticks==later_sss_reference_context().menu_ticks)
     : (!later_sss.armed&&owner.terminal_cursor==270&&owner.notification_cursor==270&&
        owner.notification_order==543);
  };
@@ -4466,7 +4504,9 @@ int current_sss_prepared_setup_begin(){
   setup.owned_input=std::move(retained_input);setup.input=setup.owned_input.get();
   setup.prior_world_generation=owner.leave_world_generation;
   setup.parent_seed_owner=seed_ptr;setup.parent_seed=*seed_ptr;
-  setup.origin=later?FirstSssVsSetupOrigin::CurrentPreparedLater_940
+  setup.origin=later?(later_sss.reference==&melee_web::stadium_later_reference::observed_b?
+                       FirstSssVsSetupOrigin::CurrentPreparedLater_943:
+                       FirstSssVsSetupOrigin::CurrentPreparedLater_940)
                     :FirstSssVsSetupOrigin::CurrentPreparedStock4_270;
   owner.prepared_setup_approved=true;
   owner.prepared_setup_consumed=true;
@@ -6132,6 +6172,19 @@ int melee_web_native_menu_stadium_current_sss_exit_arm(){
  return current_sss_exit_arm(CurrentSssExitProfile::Time120);
 }
 int melee_web_native_menu_stadium_current_sss_exit_arm_profile(unsigned profile){
+ if(profile==3){
+  const auto& reference=melee_web::stadium_later_reference::observed_b;
+  if(later_sss.armed||!replay||completed_matches!=0||
+     later_sss_reference_seal.owner!=replay.get()||
+     later_sss_reference_seal.bytes!=reference.recipe_bytes||
+     later_sss_reference_seal.sha256!=reference.recipe_sha256||
+     !melee_web::stadium_later_reference::topology(*replay,reference)){
+   message="Later SSS new reference requires its exact sealed2013 corpus and fresh parsed owner";return 0;
+  }
+  if(current_sss_exit_arm(CurrentSssExitProfile::Stock4None,true)!=1)return 0;
+  later_sss.reference=&reference;later_sss.pause_next_cursor=reference.pause_first;
+  later_sss.armed=true;return 1;
+ }
  if(profile==2){
   if(later_sss.armed||!replay||completed_matches!=0||!later_sss_recipe_valid(*replay)){
    message="Later SSS arm requires the exact untouched 2006-frame three-match recipe";return 0;
@@ -6165,7 +6218,7 @@ const char* melee_web_native_menu_stadium_current_sss_exit_observe(){
      reinterpret_cast<const uint8_t*>(&s.observation.note.sss),sizeof(s.observation.note.sss))<<'"';
  else out<<"null";
  if(s.profile==CurrentSssExitProfile::Stock4None){
-  out<<",\"observation_profile\":"<<(later_sss.armed?2:1)<<",\"terminal\":{\"complete\":"<<(s.terminal&&!s.failed&&!faulted?"true":"false")
+  out<<",\"observation_profile\":"<<(later_sss.armed?later_sss_reference_context().profile:1)<<",\"terminal\":{\"complete\":"<<(s.terminal&&!s.failed&&!faulted?"true":"false")
      <<",\"host_call_returned\":"<<(s.last_host_tick_returned&&!s.host_tick_in_flight?"true":"false")
      <<",\"cursor\":"<<s.terminal_cursor<<",\"callback_source_steps\":"<<s.terminal_steps
      <<",\"callback_source_draws\":"<<s.terminal_draws
@@ -6195,8 +6248,14 @@ const char* melee_web_native_menu_stadium_current_sss_exit_observe(){
      <<",\"setup\":"<<(first_sss_vs_setup.attempted||first_sss_vs_setup.failed?
           first_sss_vs_setup_json():"null")<<'}';
  }
- if(later_sss.armed)out<<",\"selected_occurrence\":1,\"preceding_lifecycle_stage\":"<<later_sss.stage
-     <<",\"original_B_constructor_GO\":\"UNOBSERVED\"";
+ if(later_sss.armed){
+  out<<",\"selected_occurrence\":1,\"preceding_lifecycle_stage\":"<<later_sss.stage
+     <<",\"original_B_constructor_GO\":\""
+     <<(later_sss_reference_context().profile==3?"REFERENCE_OBSERVED_BROWSER_UNPAIRED":"UNOBSERVED")<<'"';
+  if(later_sss_reference_context().profile==3)
+   out<<",\"reference_descriptor\":\""<<later_sss_reference_context().id<<'"'
+      <<",\"notification_order_count\":"<<s.order;
+ }
  out<<'}';s.json=out.str();return s.json.c_str();
 }
 const char* melee_web_native_menu_stadium_current_sss_prepared_start_observe(){
@@ -6237,8 +6296,8 @@ const char* melee_web_native_menu_stadium_current_sss_prepared_start_observe(){
                 "unchanged_asset_owner");
   const bool later=later_sss.armed;
   require_guard(later ? (later_sss_context_owned()&&later_sss.stage==4&&completed_matches==1&&
-                replay_cursor==940&&s.terminal_cursor==940&&s.notification_cursor==940&&
-                s.notification_order==1887&&s.observation.note.session_ticks==535)
+                replay_cursor==later_sss_reference_context().first[6]&&s.terminal_cursor==later_sss_reference_context().first[6]&&s.notification_cursor==later_sss_reference_context().first[6]&&
+                later_sss_notification_order_owned(s)&&s.observation.note.session_ticks==later_sss_reference_context().menu_ticks)
               : (s.terminal_cursor==270&&s.notification_cursor==270&&s.notification_order==543),
                 later?"exact_later_stop_cursor_and_order":"exact_stock4_stop_cursor_and_order");
   require_guard(s.terminal_steps==0&&s.terminal_draws==0&&
@@ -6274,7 +6333,7 @@ const char* melee_web_native_menu_stadium_current_sss_prepared_start_observe(){
   std::ostringstream out;
   out<<"{\"schema\":\"melee-web-stadium-prepared-start-before-assets-v2\""
      <<",\"scope\":\"source_prepared_start_after_sss_leave_before_assets\""
-     <<",\"phase\":\"prepared_entry\",\"observation_profile\":"<<(later?2:1)
+     <<",\"phase\":\"prepared_entry\",\"observation_profile\":"<<(later?later_sss_reference_context().profile:1)
      <<",\"captured\":true,\"source_scene\":0,\"host_entered\":false"
      <<",\"waiting_for_audio_retained_until_unload\":true"
      <<",\"replay_cursor\":"<<s.terminal_cursor
