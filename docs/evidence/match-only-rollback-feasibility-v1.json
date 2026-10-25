@@ -2,7 +2,7 @@
   "schema": "match-only-rollback-feasibility-v1",
   "issue": 318,
   "pr": 319,
-  "status": "same_browser_one_tick_drawn_reference_pass_two_tick_command11_strict1216_saved_lobj_lvec_x_layout_hypothesis_capture_time_only_live_piece_unknown_source_only_complete_cache_fresh_seed_refused_at_scenario6_original_observer_retains_gx_direction_in_fixture_scopes_no_production_cache_or_browser_capture_full_browser_restore_not_established",
+  "status": "same_browser_one_tick_drawn_reference_pass_v7_builds_and_full_regression_pass_two_tick_command11_strict1216_row113_offset272_capture_time_only_live_piece_unknown_actual_source_reduction_next_no_followup_capture_full_browser_restore_not_established",
   "source_only_baseline": {
     "boundary": "synchronous-source-only-exported-call-return",
     "sourceDrawing": false,
@@ -2429,7 +2429,7 @@
   },
   "same_instance_browser_restore_341": {
     "issue": 341,
-    "status": "ONE_TICK_DRAWN_REFERENCE_PASS; TWO_TICK_COMMAND11_STRICT1216; CAPTURE_TIME_ONLY_SAVED_HSD_LOBJ_LVEC_X_LAYOUT_HYPOTHESIS; LIVE_PIECE_UNKNOWN_REASON7; SOURCE-ONLY COMPLETE-CACHE FRESH-SEED EQUIVALENCE REFUSED AT SCENARIO6; ORIGINAL SOURCE OBSERVER RETAINS GX DIRECTION WITHIN/ACROSS FIXTURE-MARKED SCOPES; NO PRODUCTION CACHE OR NEW BROWSER CAPTURE; CENSUS INCOMPLETE; FULL BROWSER RESTORE NOT ESTABLISHED",
+    "status": "V7_FOUR_RELEASE_CONFIGURATIONS_V7_V6_V5_ORDINARY_AND_FULL_REGRESSION_PASS; NEW_TWO_TICK_COMMAND11_STRICT1216_ROW113_OFFSET272; LIVE_PIECE_UNKNOWN; ACTUAL_SOURCE_REDUCTION_NEXT; FULL_RESTORE_NOT_ESTABLISHED",
     "producer_base_commit": "130438fd2b86d00cfec98cd2ba0a5f66084ae15c",
     "producer_worktree": "uncommitted source; census runtime/harness and separate owner component sources pinned below; not a commit identity",
     "runtime_sha256": {
@@ -2460,7 +2460,7 @@
       "excludedMutableInputSections": 1068,
       "completeGameState": false
     },
-    "scope": "Cumulative source/draw ownership census plus two distinct same-browser CPU restore records: the bounded sample-300 one-tick drawn-reference comparison passed, while the separate sample-300/301 two-tick attempt stopped at command 11 on strict final CPU payload equality. The raw census remains incomplete; renderer/GPU/cache state is not restored and full game-state ownership is not established.",
+    "scope": "Cumulative source/draw ownership evidence includes the sample-300 one-tick drawn-reference comparison; the earlier two-tick attempt stopped on strict payload mismatch at row 62/offset 284; and the single V7 two-tick attempt stopped at command 11 on strict payload mismatch at row 113/offset 272. None restores renderer/GPU/cache state or establishes complete game-state ownership.",
     "capture": {
       "retained_artifact": "browser-write-census-v2/runner/evidence.json",
       "sha256": "d73e5b6c2a00bf64b09a9e343578a7a29e8469eb532cba563f80426ed43e23e9"
@@ -2557,10 +2557,12 @@
       }
     },
     "remaining": [
-      "complete source/project mutable-static coverage and dynamic source/asset/stream/file ownership",
-      "The actual lighting writer now joins the strict command11 payload mismatch. Establish light-object lifetime and safe retained render-cache ownership, remove the draw-to-source dependency without changing original GX words, then retry only with a reviewed changed hypothesis; later CPU domains and final present remain unrun.",
-      "render-to-simulation dependencies and safe host effects across no-draw correction; renderer/GPU/cache state remains outside rewind scope",
-      "whole-session, original-game parity, continuous PCM, pixel parity and foreground timing acceptance"
+      "Complete source/project mutable-static coverage and dynamic source/asset/stream/file ownership remain unresolved.",
+      "Render-to-simulation dependencies and safe host effects across a no-draw correction remain unresolved; renderer/GPU/cache state is outside rewind scope.",
+      "The V7 command-11 strict payload mismatch at row 113/offset 272 remains unresolved; the changed first difference does not establish that the earlier row-62/offset-284 cache mismatch is fixed.",
+      "The V7 capture-time class witness does not establish live object identity, uninterrupted lifetime or a unique source writer; the V7 source-writer witness is unarmed/unavailable.",
+      "The frozen TObj source reducer is design-only and requires a separate release; later CPU domains and final present remain unrun.",
+      "Whole-session, original-game parity, continuous PCM, pixel parity, foreground timing and whole-session acceptance remain open."
     ],
     "limitations": [
       "same-value stores and transient values unobserved",
@@ -2601,7 +2603,7 @@
       "retained_artifact": "census-owner-gap-analysis-v1.json",
       "sha256": "9908b8d2ebb8aeeb64d8df4dcdeb24ea0f16f55bab3d17e1f847c679f90ba370"
     },
-    "next_experiment": "Design and reduce a Slippi-profile retained lighting cache with real object initialization/retirement ownership. Reuse original GX/math and the failed fresh-cache counterexample; require original ordered GX-word equality, unchanged source fields, valid renewal and explicit stale/missing-owner refusal. No mask/exclusion, per-frame reset or drawn correction.",
+    "next_experiment": "The frozen TObj actual-source reducer is design-only and requires a separate release: assert actual Wasm layout, then exercise the original MakeTextureMtx/TObjSetupMtx sequence with exact authored fields, flags, matrix bytes and ordered GX arguments. It can establish a controlled mechanism only; it cannot prove the captured object stayed live or identify a browser writer. No production fix or follow-up browser capture is authorized.",
     "owner_components": {
       "scope": "Private owner components only; no browser restore exposure or complete-world claim",
       "current_files_sha256": {
@@ -7332,6 +7334,391 @@
         "No comparison or restore policy was relaxed; strict aggregate CPU equality still fails.",
         "Original GX parity, complete profile, seven-tick corrections, combat, host-effect closure and online rollback remain open.",
         "Known magenta Final Destination texture artifacts remain; no pixel equivalence claim."
+      ]
+    },
+    "previous_boundary_status": "ONE_TICK_DRAWN_REFERENCE_PASS; TWO_TICK_COMMAND11_STRICT1216; CAPTURE_TIME_ONLY_SAVED_HSD_LOBJ_LVEC_X_LAYOUT_HYPOTHESIS; LIVE_PIECE_UNKNOWN_REASON7; SOURCE-ONLY COMPLETE-CACHE FRESH-SEED EQUIVALENCE REFUSED AT SCENARIO6; ORIGINAL SOURCE OBSERVER RETAINS GX DIRECTION WITHIN/ACROSS FIXTURE-MARKED SCOPES; NO PRODUCTION CACHE OR NEW BROWSER CAPTURE; CENSUS INCOMPLETE; FULL BROWSER RESTORE NOT ESTABLISHED",
+    "lobj_coherent_owner_external_scenarios_v7": {
+      "status": "REVIEWED_COMPONENT_PASS; EXTERNAL SOURCE-ONLY CONTROL",
+      "candidate_freeze": {
+        "path": "lobj-coherent-presentation-owner-reducer-candidate-v7/candidate-freeze-v7.json",
+        "sha256": "1d998ee75c07cd9f12dac37a4fe91d986f02b5142f64cdce42acc31bf3770d1d"
+      },
+      "finite_recipe": {
+        "path": "lobj-coherent-presentation-owner-reducer-candidate-v7/finite-test-recipe-v3.json",
+        "sha256": "c22b87c7e5a6b72f540252ca5b5494af300811ca40b5eea78d6cc57c217431aa"
+      },
+      "result": {
+        "path": "lobj-coherent-presentation-owner-full-launcher-v1/attempt-v1/final-result-v1.json",
+        "sha256": "9e510471f209af6ea54493fc42b10bb69cc034758f20ab7dd602684f68c73fd2"
+      },
+      "independent_review": {
+        "path": "lobj-coherent-presentation-owner-full-launcher-v1/root-raw-result-review-v1.json",
+        "sha256": "a783a8a4c2fef49e80989bf178728baa689de8037a36b8e53954cf1ca7d8edab"
+      },
+      "observed": {
+        "scenarios": 15,
+        "scenario_ids": "0..14",
+        "all_exact": true,
+        "ordered_gx_fifo_record_bytes": 69,
+        "actual_source": "lighting math, setter, class construction and destruction bodies",
+        "modeled": "allocator/free-list/initial values, WObj/AObj/SList, stage-save destination and FIFO sink"
+      },
+      "limits": "External source-only component evidence. It does not validate the production module, browser, aggregate restore, PCM, pixels, or complete rollback."
+    },
+    "lobj_v7_production_source_preparation": {
+      "status": "SOURCE_PREPARATION_COMPLETE; CURRENT_RELEASE_BUILDS_AND_FULL_REGRESSION_RECORDED_IN_lobj_v7_presentation_cache_capture_v1.validation",
+      "profile": "slippi-render-dependencies-logical-frame-lobj-v7",
+      "activation": "private default-off; fixed Final Destination diagnostic route",
+      "source_preparation_freeze": {
+        "path": "lobj-v7-production-preparation-freeze-v1/freeze-v1.json",
+        "sha256": "dd074048747ef5137014ada473e04fe903a60e6b95966e59c8f6e25b3168c890"
+      },
+      "source_manifest_23_files": {
+        "path": "lobj-v7-production-preparation-freeze-v1/manifest-v1.json",
+        "sha256": "bcd1a8afcdf1b49ba490cc2d74d3b038f68bc887f07e4ed6615008ad0b535da0"
+      },
+      "source_patch": {
+        "path": "lobj-v7-production-preparation-freeze-v1/production-preparation.patch",
+        "sha256": "31156acff64e9e1acd1ab6a956ce4f5e4455400edb57c54eb03b747b057d3403"
+      },
+      "files": 23,
+      "limits": "The historical 16,784-byte source-writer witness is inapplicable because V7 source-writer hooks are disabled. No source-cache masking or restore exclusion was added.",
+      "status_at_freeze": "FROZEN_SOURCE_PREPARATION; RELEASE_BUILDS_AND_FULL_REGRESSION_PENDING",
+      "current_validation_record": "same_instance_browser_restore_341.lobj_v7_presentation_cache_capture_v1.validation"
+    },
+    "lobj_v7_actual_module_control_v8": {
+      "status": "NARROW_COMPONENT_CONTROL_PASS; SUBSEQUENT_BUILDS_AND_FULL_REGRESSION_PASS; SINGLE_CAPTURE_STRICT1216_RECORDED",
+      "candidate_freeze": {
+        "path": "lobj-v7-actual-module-control-candidate-v8/freeze-v8.json",
+        "sha256": "986a39704c8bbb58fdf245dfe7031c298b91104d11fd1f857a7470be9c11b21a"
+      },
+      "manifest": {
+        "path": "lobj-v7-actual-module-control-candidate-v8/manifest-v8.json",
+        "sha256": "5e26485e3cf52bb16207af254f3557c28c9c1ef4e59e635f4d0d12de87098930"
+      },
+      "focused_result": {
+        "path": "lobj-v7-actual-module-control-candidate-v8/focused-result-v8.json",
+        "sha256": "feaf2787305ed1ee332bf81f9446e454aae15d26d533d90fcf80a2cf64f9f8f2"
+      },
+      "root_raw_review": {
+        "path": "lobj-v7-actual-module-control-candidate-v8/root-raw-review-v1.json",
+        "sha256": "ec1b26dd34c5a7832218d19b8a334abf08a19f3edfb2da23e6c156ef9fde23bd"
+      },
+      "controls": [
+        {
+          "bytes": 15787,
+          "sha256": "0ee5d6a31b589964e2a82fb5f70b625878cbb206daac7da1d7b4638e45b192b0",
+          "workspace_relative_path": "src/slippi_profile/tests/test_lobj_presentation_cache.py"
+        },
+        {
+          "bytes": 13963,
+          "sha256": "299bea760150dd26ac3ebd2a7e2abd6b76c644db916f65ab1ef5fa6bc96e34a5",
+          "workspace_relative_path": "src/slippi_profile/tests/lobj_presentation_owner_control.c.in"
+        },
+        {
+          "bytes": 286,
+          "sha256": "0cbe085a27e916a6d25cb9c94441f77c0283496c8f2761138c4f21c8e0ef7d48",
+          "workspace_relative_path": "tests/test_slippi_lobj_presentation_cache.py"
+        }
+      ],
+      "observed": {
+        "active_profile": "slippi-render-dependencies-logical-frame-lobj-v7",
+        "inactive_profile": "slippi-render-dependencies-logical-frame-v6",
+        "canonical_lights": 1,
+        "fixture_lifetimes": 2,
+        "projection_bytes": 170,
+        "ordered_fifo_pair_bytes": 138,
+        "gx_record_bytes": 64,
+        "source_piece_reused": true,
+        "distinct_active_owner_tokens": true,
+        "draw_window_allocations": 0
+      },
+      "modeled": "HSD_MemAlloc arena, two WObj position providers, null-only AObj, SList and FIFO backing.",
+      "retained_compile_failures": [
+        {
+          "candidate": "lobj-v7-actual-module-control-candidate-v5",
+          "failure": "upstream quoted class.h not found",
+          "artifact": "lobj-v7-actual-module-control-candidate-v5/focused-root-v1/actual-module-control.stderr",
+          "sha256": "27470d3af27aa00f2e841908c1b1357a4fc0c5725073145e4083d2bd8cb3270b"
+        },
+        {
+          "candidate": "lobj-v7-actual-module-control-candidate-v6",
+          "failure": "melee_source_bool undefined after header resolution",
+          "artifact": "lobj-v7-actual-module-control-candidate-v6/focused-root-v1/actual-module-control.stderr",
+          "sha256": "eaa423e2f48be589cb6f3bf696a5e498a75012ae57154971accb0715704068db"
+        },
+        {
+          "candidate": "lobj-v7-actual-module-control-candidate-v7",
+          "failure": "C++ fixture used nonexistent HSD_WObj.ref_count fields",
+          "artifact": "lobj-v7-actual-module-control-candidate-v7/focused-root-v1/actual-module-control.stderr",
+          "sha256": "94ea97c05577e9b0a8e29dbfccf7cf22d62a322370cfe7f26879b0aaffdcbde0"
+        }
+      ],
+      "limits": "The actual-module control is one canonical light across two fixture lifetimes with modeled allocator/WObj/AObj/SList/FIFO leaves. No browser, aggregate restore, C==B, timing, PCM, pixels or full-match acceptance is established.",
+      "status_at_freeze": "PASS_NARROW_COMPONENT_ONLY; RUNTIME_VALIDATION_PENDING",
+      "current_validation_record": "same_instance_browser_restore_341.lobj_v7_presentation_cache_capture_v1"
+    },
+    "pre_v7_runtime_validation_status": "COMPONENT_CONTROLS_PASS_RUNTIME_VALIDATION_PENDING",
+    "pre_v7_capture_scope": "Cumulative source/draw ownership census plus two distinct same-browser CPU restore records: the bounded sample-300 one-tick drawn-reference comparison passed, while the separate sample-300/301 two-tick attempt stopped at command 11 on strict final CPU payload equality. The raw census remains incomplete; renderer/GPU/cache state is not restored and full game-state ownership is not established.",
+    "pre_v7_remaining": [
+      "complete source/project mutable-static coverage and dynamic source/asset/stream/file ownership",
+      "The actual lighting writer now joins the strict command11 payload mismatch. Establish light-object lifetime and safe retained render-cache ownership, remove the draw-to-source dependency without changing original GX words, then retry only with a reviewed changed hypothesis; later CPU domains and final present remain unrun.",
+      "render-to-simulation dependencies and safe host effects across no-draw correction; renderer/GPU/cache state remains outside rewind scope",
+      "whole-session, original-game parity, continuous PCM, pixel parity and foreground timing acceptance"
+    ],
+    "lobj_v7_presentation_cache_capture_v1": {
+      "status": "FAIL_STRICT_COMMAND11_1216; FIRST_TYPED_DIFFERENCE_ROW113_OFFSET272; FULL_RESTORE_NOT_ESTABLISHED",
+      "scope": "One released V7 drawn-reference two-tick browser capture at fixed samples 300/301; command 11 stopped the sequence at the strict final CPU payload comparison. No command 12/13 or final present followed.",
+      "profile": "slippi-render-dependencies-logical-frame-lobj-v7; private default-off; fixed Final Destination diagnostic route.",
+      "source_and_runtime_identity": {
+        "clean_source_checkpoint": {
+          "head": "8ebebd9f9d63743b460440fb6ac6337bbd8d7da5",
+          "tree": "7d7b1b101d7eff44234cd4c9ad28b13ab8f739a2",
+          "reviewed_source_files": 26,
+          "receipt": {
+            "path": "lobj-v7-runtime-validation-v1/clean-checkpoint-v1.json",
+            "sha256": "34b98ee633101a3b5ee974871c762e20c9d0200d228933d809aca749d46c2e29"
+          }
+        },
+        "runtime_producer": {
+          "base_head": "9f91b0c8ef263474582a5a5b42da8547322abfdc",
+          "reviewed_source_files": 26,
+          "identity_is_distinct_from_clean_source_checkpoint": true,
+          "runtime_inventory": {
+            "path": "lobj-v7-runtime-validation-v1/runtime-inventory-v1.json",
+            "sha256": "04db91885ea10379e68b4522208056c6df5754691446ceeb1648495fda5006cf"
+          }
+        },
+        "runtime_unchanged_during_regression": true,
+        "retained_historical_24_runtime_files_unchanged": true
+      },
+      "validation": {
+        "release_builds": {
+          "count": 4,
+          "status": "PASS",
+          "receipt": {
+            "path": "lobj-v7-runtime-validation-v1/native-build-result-v1.json",
+            "sha256": "2114fd77026ed780ccfbc7c84621e08a08c033d830981031bb0a35feb8e006fd"
+          }
+        },
+        "full_regression": {
+          "status": "PASS",
+          "exit_code": 0,
+          "tests": 2476,
+          "passed": 2311,
+          "skipped": 165,
+          "seconds": 609.809,
+          "final_footer": "OK (skipped=165)",
+          "receipt": {
+            "path": "lobj-v7-runtime-validation-v1/full-regression-summary-v1.json",
+            "sha256": "c2aaecf35cca6556deade76a895670604c8c45a2e5daf050230f2decf3e09eaa"
+          }
+        },
+        "runtime_unchanged": true
+      },
+      "capture": {
+        "packet": {
+          "path": "lobj-v7-presentation-cache-capture-v1/packet-candidate-v2.json",
+          "sha256": "eafe9ed2d5c8528cbc555e03a96492a6d49f3d0a8771534f1c02944536e8979a"
+        },
+        "packet_freeze": {
+          "path": "lobj-v7-presentation-cache-capture-v1/freeze-v2.json",
+          "sha256": "ea4b266b62c25d89a9471757b778bcd240cf9f01df71b0d03716a48a92be82f2"
+        },
+        "raw": {
+          "path": "lobj-v7-presentation-cache-capture-v1/runner/evidence.json",
+          "bytes": 1161116,
+          "sha256": "ec2cc99358c275e7bb9723aecba73993e66fec8f83f80d0d6561b62bfd09205b"
+        },
+        "corrected_root_result": {
+          "path": "lobj-v7-presentation-cache-capture-v1/root-result-v2.json",
+          "bytes": 4088,
+          "sha256": "64be6619a0c9b31184981d628ec19daebca4c933e056c0a953c851360ff0fda2"
+        },
+        "launcher_result": {
+          "path": "lobj-v7-presentation-cache-capture-v1/root-capture-v1.result.json",
+          "sha256": "ccf4775e07d84230bed7cc62a3b0ab7f06b44938b519e2904b01a2f13370c472"
+        },
+        "independent_review": {
+          "path": "lobj-v7-presentation-cache-capture-v1/independent-review-v1.json",
+          "sha256": "febc03bd90cefdb11d9b0574c3988be937b354063d0e25ca0291d152bdaad474"
+        },
+        "strict_failure": {
+          "command": 11,
+          "result": 1216,
+          "domain": 4,
+          "row": 113,
+          "offset": 272,
+          "expected": 188,
+          "actual": 0,
+          "payload_address": 51013248,
+          "payload_extent": 1024,
+          "source_pointer": 2160247168
+        },
+        "prior_capture_difference": {
+          "row": 62,
+          "offset": 284,
+          "expected": 106,
+          "actual": 189,
+          "note": "The changed first mismatch does not establish that the earlier mismatch is fixed."
+        },
+        "pairs": {
+          "sample300": {
+            "source_frame": "176\u2192177",
+            "raw_five_channels": "MATCH",
+            "channels": {
+              "observation_bytes": 1280,
+              "pcm_bytes": 4272,
+              "pad_bytes": 44,
+              "rng_profile_bytes": 32,
+              "transfer_bytes": 40
+            },
+            "literal_pad": "MATCH"
+          },
+          "sample301": {
+            "source_frame": "177\u2192178",
+            "raw_five_channels": "MATCH",
+            "channels": {
+              "observation_bytes": 1280,
+              "pcm_bytes": 4272,
+              "pad_bytes": 44,
+              "rng_profile_bytes": 32,
+              "transfer_bytes": 40
+            },
+            "literal_pad": "MATCH"
+          }
+        },
+        "commands_after_failure": [
+          12,
+          13
+        ],
+        "final_present": "NOT_RUN"
+      },
+      "diagnostic_witnesses": {
+        "capture_time_class_piece": {
+          "bytes": 160,
+          "status": 1,
+          "scope": "CAPTURE_TIME_ONLY",
+          "row": 113,
+          "offset": 272,
+          "saved_class_info": "0xd1f98",
+          "live_reason": 7,
+          "live_piece_identity": "UNKNOWN",
+          "lifetime": "UNKNOWN"
+        },
+        "class_piece_live_witness": {
+          "bytes": 208,
+          "status": 2,
+          "reason": 7,
+          "live_identity": "UNKNOWN"
+        },
+        "source_writer_v7": {
+          "bytes": 16784,
+          "status": 0,
+          "hook_active": false,
+          "scope": "SOURCE_WRITE_OCCURRENCE_ONLY_CAPTURE_TIME_JOIN",
+          "meaning": "UNARMED_UNAVAILABLE_FOR_V7; no live-writer attribution"
+        }
+      },
+      "cleanup": {
+        "cpu_restore_close": {
+          "status": "returned-nonzero",
+          "result": 1216
+        },
+        "snapshot_close": {
+          "status": "checked-return-one",
+          "result": 1
+        },
+        "renderer_shutdown": {
+          "status": "checked-return-one",
+          "result": 1
+        },
+        "recorded_owned_pids_absent": [
+          76138,
+          76140,
+          76157,
+          76158,
+          76166,
+          76171,
+          76173,
+          76180
+        ],
+        "independent_current_ps_scan": "No rows for the eight recorded owned PIDs (one capture-side process plus seven browser processes) at review time; no cleanup action was taken.",
+        "owner_cleanup_ms": 80,
+        "capture_process_group_absent": true,
+        "recorded_owned_pid_count": 8,
+        "browser_process_count": 7,
+        "capture_side_process_count": 1
+      },
+      "next_experiment": "A read-only source reduction and finite actual-source TObj reducer contract are frozen but unexecuted. They join the saved class-info to hsdTObj and treat mtx[1][3] at offset 144 as a layout candidate pending compiler assertions; neither establishes live object identity or browser writer causality. No browser retry is authorized.",
+      "limits": [
+        "No complete V7 lighting-cache fix is established by the moved first mismatch.",
+        "No later typed domains or final present were run.",
+        "No pixel equivalence, aggregate rollback, C3, seven-tick or whole-session acceptance is established.",
+        "The capture-time witness does not establish uninterrupted object lifetime or a unique causal writer."
+      ],
+      "source_reduction_design": {
+        "result": {
+          "path": "lobj-v7-texture-matrix-source-reduction-v1/result-v1.json",
+          "sha256": "5afb9e48751331df4137e63ac5d1de929e3c588ef49ba14f668d67462fcb3445"
+        },
+        "freeze": {
+          "path": "lobj-v7-texture-matrix-source-reduction-v1/freeze-v1.json",
+          "sha256": "256854ffb8158b774fe1fbe03d0fa49dc2833eae579365531165561f988f5deb"
+        },
+        "status": "DESIGN_ONLY; ACTUAL LAYOUT ASSERTIONS AND CONTROL UNRUN"
+      }
+    },
+    "lobj_v7_texture_matrix_source_reduction_v1": {
+      "status": "READ_ONLY_SOURCE_REDUCTION; DESIGN_ONLY; NO_COMPILER_OR_CONTROL_EXECUTION",
+      "result": {
+        "path": "lobj-v7-texture-matrix-source-reduction-v1/result-v1.json",
+        "bytes": 14176,
+        "sha256": "5afb9e48751331df4137e63ac5d1de929e3c588ef49ba14f668d67462fcb3445"
+      },
+      "freeze": {
+        "path": "lobj-v7-texture-matrix-source-reduction-v1/freeze-v1.json",
+        "bytes": 664,
+        "sha256": "256854ffb8158b774fe1fbe03d0fa49dc2833eae579365531165561f988f5deb"
+      },
+      "next_contract": {
+        "path": "lobj-v7-texture-matrix-source-reduction-v1/next-contract-v1.json",
+        "bytes": 6968,
+        "sha256": "a9d17b58f097c9b6a179a724516c1e987dbecc4deb87dae98a5a8ddc5808d37f"
+      },
+      "map_join": {
+        "saved_class_info": "0x000d1f98",
+        "symbol": "hsdTObj",
+        "object": "libhsd_native_runtime.a(tobj.c.o)",
+        "descriptor_extent": 72,
+        "map_line": 60968,
+        "map_sha256": "80a1934de65a4be6cec831ab60ef864c8fa3cb83f66078d4b4ee8aeb52c2744f"
+      },
+      "layout_candidate": {
+        "sizeof_HSD_TObj": 172,
+        "alignment": 4,
+        "mtx_offset": 116,
+        "candidate_member": "mtx[1][3]",
+        "candidate_member_offset": 144,
+        "basis": "Wasm32 ABI/header arithmetic; actual compiler offsetof assertions remain required."
+      },
+      "source_hypothesis": "MakeTextureMtx writes the source matrix; TObjSetupMtx uses its dirty gate and clears the dirty bit after the original setup path. This is a mechanism hypothesis for a controlled source fixture, not attribution of the browser capture writer.",
+      "raw_result_join": {
+        "strict_failure": 1216,
+        "domain": 4,
+        "row": 113,
+        "offset": 272,
+        "expected": 188,
+        "actual": 0,
+        "raw_five_channels_both_samples": "MATCH",
+        "current_first_difference_does_not_prove_earlier_lighting_bytes_passed": true
+      },
+      "execution": "UNRUN; no source changes, compiler layout assertion, actual source control, production fix or new capture.",
+      "limits": [
+        "Capture-time map join is not live object or lifetime proof.",
+        "The TObj layout and member offset are candidates pending actual compiler assertions.",
+        "The 16,784-byte source-writer witness is unarmed/unavailable on V7.",
+        "No source/cache behavior, pixels, PCM aggregate, final present or browser rollback is established."
       ]
     }
   }

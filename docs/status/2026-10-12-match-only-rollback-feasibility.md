@@ -1,6 +1,6 @@
 # Match-only rollback feasibility
 
-**Compiled / Source-only snapshot diagnostic / Terminal browser tick-and-draw diagnostic / One-tick CPU restore-replay-and-present passed; two-tick command 11 remains strict 1216; saved PRE descriptor maps to hsdLObj and offset 60 is layout-consistent with lvec.x, while live piece remains unknown (reason 7); complete-cache source comparison refuses fresh-seed equivalence at scenario 6, and original-source observation retains the prior GX direction in fixture-marked scopes; no production cache or browser capture authorized / Full browser rollback and frame-budget feasibility unproven**
+**Compiled / Source-only snapshot diagnostic / Terminal browser tick-and-draw diagnostic / One-tick CPU restore-replay-and-present passed; V7 two-tick command 11 remains strict 1216 at row 113 offset 272; four Release configurations (V7, V6, V5 and ordinary) and full regression pass; capture-time class only, live object and full browser rollback remain unproven**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
 [merged #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
@@ -32,7 +32,7 @@ attribution. The earlier allocation-origin diagnostic observed generated
 `class.c:219`, without identifying a typed object or member. The prior class/piece
 lifecycle capture stopped at strict 1216 and observed generated `class.c:242`;
 its witness remained UNKNOWN and did not tie its first event to the failing allocation.
-The reviewed lvec-only reducer is limited: its scenario-9 failure reset is fixture-only, and it does not establish automatic recovery. A subsequent complete-cache source comparison refuses fresh-seed equivalence at scenario 6 on a mismatching GX light direction. A separately reviewed original-source observer retains that direction within and across fixture-marked draw scopes. This is source evidence, not browser object lifetime or restore safety; no production cache or browser capture is authorized.
+The reviewed lvec-only reducer is limited: its scenario-9 failure reset is fixture-only, and it does not establish automatic recovery. A subsequent complete-cache source comparison refuses fresh-seed equivalence at scenario 6 on a mismatching GX light direction. A separately reviewed original-source observer retains that direction within and across fixture-marked draw scopes. This is source evidence, not browser object lifetime or restore safety. At that earlier boundary no production cache or browser capture was authorized; the later V7 source work and single capture are recorded below and do not authorize another run.
 Later typed domains and final present remain unrun. Component controls and the
 one-tick browser result do not establish full browser rollback. Earlier owner controls
 also repaired callback guards so simulation and draw callbacks refuse separately;
@@ -484,13 +484,54 @@ without changing production behavior or the stack limit. See
 `lobj_causal_writer_capture_v1` in the structured receipt for raw bytes,
 independent review and exact producer identities.
 
-Next is a bounded source design for preserving the original retained lighting
-cache while removing draw writes from checkpointed simulation state. It must
-establish real light-object creation/retirement ownership and reproduce the
-retained original GX outputs; the failed fresh-cache proposal remains a
-regression case. No byte masking, restore exclusion, per-frame cache reset or
-drawn corrective ticks are justified by this observation. Full rollback remains
-incomplete.
+Two distinct V7 component controls now pass. The external source-only owner
+control replays 15 finite lighting scenarios with exact operation traces and
+ordered 69-byte GX FIFO records; it exercises the actual lighting math, setter,
+class-construction and destruction bodies while explicitly modeling allocator,
+free-list, initial-value, WObj/AObj/SList, stage-save and FIFO-sink services. A
+separate actual-module control compares the private V7 profile against inactive
+V6 for one canonical light over two fixture lifetimes: both 170-byte projections,
+138-byte FIFO pairs and both 64-byte GX records match, with source-piece reuse,
+separate owner tokens and no draw-window allocations. Its memory arena, WObj
+position providers, AObj, SList and FIFO backing remain modeled. These are
+component results, not browser or aggregate-restore validation.
+
+The V7 profile is private, default-off and fixed to Final Destination. Its source
+writer hooks are disabled, so the prior 16,784-byte source-writer witness is
+inapplicable to this profile; no claim about the earlier row-62/offset-284
+strict failure is changed. No source-cache masking, restore exclusion, arithmetic change or GPU
+rewind is included. The four Release configurations (V7, V6, V5 and ordinary) pass, and the
+full regression completed 2,476 tests with 165 skipped (overall PASS). The clean source checkpoint is
+`8ebebd9f9d63743b460440fb6ac6337bbd8d7da5`; the captured runtime is a distinct
+producer from `9f91b0c8ef263474582a5a5b42da8547322abfdc` plus 26 reviewed files.
+Full rollback remains incomplete.
+
+One released V7 two-tick browser capture at samples 300/301 stopped at command
+11 with strict result 1216. The first typed CPU difference is domain 4, row 113,
+offset 272 (`expected=188`, `actual=0`) in a 1,024-byte payload. This moved from
+the earlier row-62/offset-284 failure; the changed first difference does not
+establish that the earlier cache mismatch is fixed. At both tick pairs, raw
+observation, PCM, PAD, RNG-profile and transfer bytes match, including literal
+PAD bytes, while aggregate typed CPU equality fails. Commands 12/13 and final
+present were not run. The 160-byte class witness is `CAPTURE_TIME_ONLY`; live
+piece identity and lifetime remain unknown (reason 7), and the 16,784-byte V7
+source-writer witness is unarmed/unavailable. CPU restore CLOSE returned 1216;
+snapshot close and renderer shutdown returned 1, and all eight recorded owned PIDs (the capture process plus seven browser
+processes) are absent. This capture establishes no pixel equivalence,
+aggregate rollback or whole-session acceptance.
+
+A frozen read-only source reduction joins the saved class-info value `0xd1f98`
+to `hsdTObj`. Wasm32 ABI arithmetic makes `HSD_TObj.mtx[1][3]` at offset 144 a
+candidate for the captured piece offset; compiler layout assertions and the
+controlled source reducer remain unrun. This is not live object, lifetime or
+writer attribution.
+
+The proposed next step is the finite actual-source TObj reducer recorded below:
+assert the layout with the actual compiler, then retain source matrix/flag and
+ordered GX evidence for the controlled original update/setup sequence. It is a
+design-only, root-release-required experiment; it makes no production change and
+authorizes no browser retry. No source-cache masking, restore exclusion,
+arithmetic change or GPU rewind is included.
 
 ## First current-source copy/restore result
 
