@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {runBrowserCpuTwoTick,decodeCpuTwoTickEvidence,decodeCpuPayloadFailureWitness,decodeCpuClassPieceWitness,validateCpuTwoTickFinalEvidence,
+import {runBrowserCpuTwoTick,decodeCpuTwoTickEvidence,decodeCpuPayloadFailureWitness,decodeCpuClassPieceWitness,decodeCpuClassPieceCaptureWitness,validateCpuTwoTickFinalEvidence,
   CPU_TWO_TICK_EVIDENCE_BYTES,TWO_TICK_PAD_300,TWO_TICK_PAD_301} from './cpu_two_tick_runner.mjs';
 import {validateCpuTwoTickDrawSample,retainCpuRestoreSample,recordCpuRestoreFailure} from './run_write_census.mjs';
 import {inspectInteractiveObservation,validateSelectedDrawPath,validateSourceInputMapping,decodeDrawDiagnostics} from './runner_contract.mjs';
@@ -83,6 +83,8 @@ function makeRunner({fault=null}={}) {
   };
   const origin=new Uint8Array(320);new DataView(origin.buffer).setUint32(0,1,true);new DataView(origin.buffer).setUint32(4,320,true);
   const module={HEAPU8:heap,
+    _melee_web_synctest_cpu_class_piece_capture_witness_bytes:()=>fault==='bad-capture-piece-size'?159:160,
+    _melee_web_synctest_cpu_class_piece_capture_witness:()=>{const p=66500;heap.fill(0,p,p+160);const v=new DataView(heap.buffer);v.setUint32(p,1,true);v.setUint32(p+4,160,true);v.setUint32(p+16,1,true);return p;},
     _melee_web_synctest_cpu_class_piece_witness_bytes:()=>fault==='bad-class-size'?207:208,
     _melee_web_synctest_cpu_class_piece_witness:()=>{const p=66000;heap.fill(0,p,p+208);const v=new DataView(heap.buffer);v.setUint32(p,1,true);v.setUint32(p+4,208,true);return p;},
     _melee_web_synctest_cpu_allocation_origin_witness_bytes:()=>fault==='bad-origin-size'?319:320,
@@ -271,6 +273,9 @@ test('actual runner retains fixed witness and original failure before outer vali
     assert.equal(p.payloadFailureWitness.window.row,7);assert.equal(p.payloadFailureWitness.window.generation,'fffffffffffffff1');
     assert.equal(Buffer.from(p.payloadFailureWitnessRaw,'base64').length,256);
     assert.equal(Buffer.from(p.classPieceWitnessRaw,'base64').length,208);
+    assert.equal(Buffer.from(p.classPieceCaptureWitnessRaw,'base64').length,160);
+    assert.equal(p.classPieceCaptureWitness.scope,'CAPTURE_TIME_ONLY');
+    assert.equal(p.commands.at(-1).classPieceCaptureWitness.status,0);
     assert.equal(p.classPieceWitness.status,0);assert.equal(p.commands.at(-1).classPieceWitness.status,0);
     if(fault==='payload-refused-11')assert.equal(p.commands.at(-1).payloadFailureWitness.window.offset,5);
     else assert.equal(p.commands.at(-1).refreshedNativeEvidence.firstFailure,1216);
@@ -311,4 +316,28 @@ test('class observer ABI refusal preserves original native and earlier witness e
  assert.equal(Buffer.from(error.cpuRestorePartial.payloadFailureWitnessRaw,'base64').length,256);
  assert.equal(Buffer.from(error.cpuRestorePartial.allocationOriginWitnessRaw,'base64').length,320);
  assert.deepEqual(f.commandSequence,[8]);
+});
+
+test('capture-time160 strict decoder cannot claim live continuity or accept malformed scope',()=>{
+ const b=new Uint8Array(160),v=new DataView(b.buffer),set=(o,n)=>v.setUint32(o,n,true),wide=(o,n)=>v.setBigUint64(o,BigInt(n),true);
+ set(0,1);set(4,160);set(16,1);assert.equal(decodeCpuClassPieceCaptureWitness(b).scope,'CAPTURE_TIME_ONLY');
+ set(8,1);assert.throws(()=>decodeCpuClassPieceCaptureWitness(b),/geometry/);
+ set(20,1);set(24,1);set(28,7);set(32,4);set(36,3);set(48,8);set(52,0x80000000);set(56,1024);
+ for(const o of [64,72,80,104,112])wide(o,1);wide(88,10);wide(96,11);
+ set(120,0x80000000);set(124,8);set(128,64);set(132,48);set(136,1);set(140,4096);set(144,4096);
+ const d=decodeCpuClassPieceCaptureWitness(b);assert.equal(d.status,1);assert.equal(d.liveReason,7);assert.equal(d.liveClassInfo,undefined);
+ set(32,2);assert.throws(()=>decodeCpuClassPieceCaptureWitness(b),/frozen/);set(32,4);
+ wide(96,12);assert.throws(()=>decodeCpuClassPieceCaptureWitness(b),/frozen/);wide(96,11);
+ set(140,0);set(144,0);assert.throws(()=>decodeCpuClassPieceCaptureWitness(b),/saved header/);set(140,4096);set(144,4096);
+ set(144,4097);assert.throws(()=>decodeCpuClassPieceCaptureWitness(b),/header/);set(144,4096);
+ set(148,1);assert.throws(()=>decodeCpuClassPieceCaptureWitness(b),/bounds/);set(148,0);
+ set(152,1);assert.throws(()=>decodeCpuClassPieceCaptureWitness(b),/schema/);set(152,0);
+ set(16,0);assert.throws(()=>decodeCpuClassPieceCaptureWitness(b),/schema/);
+ assert.throws(()=>decodeCpuClassPieceCaptureWitness(b.slice(0,159)),/extent/);
+});
+test('capture-time observer failure preserves native and all earlier diagnostic evidence',async()=>{
+ const f=makeRunner({fault:'bad-capture-piece-size'});let error;try{await f.run();}catch(e){error=e;}
+ assert.match(String(error),/Capture-time piece ABI/);const p=error.cpuRestorePartial;
+ assert.equal(p.nativeEvidence.lastCommand,8);assert.equal(Buffer.from(p.classPieceWitnessRaw,'base64').length,208);
+ assert.equal(Buffer.from(p.allocationOriginWitnessRaw,'base64').length,320);assert.deepEqual(f.commandSequence,[8]);
 });

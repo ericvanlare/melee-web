@@ -7,6 +7,23 @@ export const CPU_TWO_TICK_MODE = 2;
 export const TWO_TICK_PAD_300 = 'AgAAAAAAAAAAAAABALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=';
 export const TWO_TICK_PAD_301 = 'AABQAAAAAAAAAAAAALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=';
 
+// scope=CAPTURE_TIME_ONLY: saved PRE bytes plus frozen table, never live class.
+export function decodeCpuClassPieceCaptureWitness(bytes) {
+ if(!(bytes instanceof Uint8Array)||bytes.length!==160)throw Error('Capture-time piece extent');
+ const v=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength),u=o=>v.getUint32(o,true);
+ const n=o=>v.getBigUint64(o,true),hex=o=>n(o).toString(16).padStart(16,'0');
+ if(u(0)!==1||u(4)!==160||u(8)>2||u(12)>11||u(16)!==1||u(20)>1||u(24)>1||u(28)>11||u(32)>4||u(36)>3||u(60)||u(148)>1||bytes.slice(152).some(x=>x))throw Error('Capture-time piece schema');
+ if(u(20)&&(!n(104)||!n(112)||!n(64)||!n(72)||!u(56)||u(48)>=u(56)))throw Error('Capture-time piece row');
+ if(u(8)===1){
+  if(u(12)||!u(20)||!u(24)||!n(80)||!u(128)||(u(128)&31)||!u(132)||u(132)>u(128)||u(128)-u(132)>31||!u(136)||u(124)>=u(128))throw Error('Capture-time piece geometry');
+  if(!((u(32)===3&&!u(28)&&n(96)===n(88))||(u(32)===4&&u(28)===7&&n(88)<0xffffffffffffffffn&&n(96)===n(88)+1n)))throw Error('Capture-time piece frozen state');
+  if(!u(52)||u(52)+u(56)>0x100000000||u(120)<u(52)||u(120)+u(128)>u(52)+u(56)||u(120)+u(124)!==u(52)+u(48)||u(148)!==Number(u(124)>=u(132)))throw Error('Capture-time piece bounds');
+  if(u(36)===1){if(u(140)||u(144))throw Error('Capture-time raw class');}
+  else if(u(36)!==3||!u(140)||(u(140)&3)||u(144)!==u(140)||u(132)<4)throw Error('Capture-time saved header');
+ }
+ return {schema:1,bytes:160,status:u(8),reason:u(12),scope:'CAPTURE_TIME_ONLY',firstDifferenceMatches:u(20),hookActive:u(24),liveReason:u(28),coverageState:u(32),recordState:u(36),preRow:u(40),postRow:u(44),offset:u(48),source:u(52),requested:u(56),epoch:hex(64),world:hex(72),instance:hex(80),captureSerial:hex(88),eventSerial:hex(96),host:hex(104),generation:hex(112),pieceSource:u(120),pieceOffset:u(124),physical:u(128),originalRequested:u(132),pieceGeneration:u(136),classInfo:u(140),savedClassInfo:u(144),physicalSlack:!!u(148)};
+}
+
 // Boundaries/type labels are diagnostic only; UNKNOWN never admits restore.
 export function decodeCpuClassPieceWitness(bytes) {
   if(!(bytes instanceof Uint8Array)||bytes.length!==208)throw Error('Class piece extent');
@@ -177,7 +194,7 @@ export function validateCpuTwoTickFinalEvidence(evidence, checkpointSourceFrame)
 export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInputMapping, expectedStocks, helpers) {
   const plan = {wire, checkpointSourceFrame: checkpoint.boundary.sourceFrame, checkpointPad: checkpoint.pad,
     expectedInputMapping, expectedStocks, evidenceBytes: CPU_TWO_TICK_EVIDENCE_BYTES,
-    pieceDecodeSource: decodeCpuClassPieceWitness.toString(), originDecodeSource: decodeCpuAllocationOriginWitness.toString(), witnessDecodeSource: decodeCpuPayloadFailureWitness.toString(), decodeSource: decodeCpuTwoTickEvidence.toString(), validateFinalSource: validateCpuTwoTickFinalEvidence.toString(),
+    capturePieceDecodeSource: decodeCpuClassPieceCaptureWitness.toString(), pieceDecodeSource: decodeCpuClassPieceWitness.toString(), originDecodeSource: decodeCpuAllocationOriginWitness.toString(), witnessDecodeSource: decodeCpuPayloadFailureWitness.toString(), decodeSource: decodeCpuTwoTickEvidence.toString(), validateFinalSource: validateCpuTwoTickFinalEvidence.toString(),
     waitSource: waitForAuroraSubmission.toString(), ...helpers,
     literalPad300: TWO_TICK_PAD_300, literalPad301: TWO_TICK_PAD_301};
   try {
@@ -197,7 +214,9 @@ export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInput
           typeof module._melee_web_synctest_cpu_allocation_origin_witness !== 'function' ||
           typeof module._melee_web_synctest_cpu_allocation_origin_witness_bytes !== 'function' ||
           typeof module._melee_web_synctest_cpu_class_piece_witness !== 'function' ||
-          typeof module._melee_web_synctest_cpu_class_piece_witness_bytes !== 'function') {
+          typeof module._melee_web_synctest_cpu_class_piece_witness_bytes !== 'function' ||
+          typeof module._melee_web_synctest_cpu_class_piece_capture_witness !== 'function' ||
+          typeof module._melee_web_synctest_cpu_class_piece_capture_witness_bytes !== 'function') {
         throw new Error('Two-tick evidence exports are unavailable for the linked v6 profile');
       }
       const read = (pointer, size) => {
@@ -212,6 +231,7 @@ export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInput
       };
       const decode = new Function(`return (${plan.decodeSource})`)();
       const validateFinal = new Function(`return (${plan.validateFinalSource})`)();
+      const decodeCapturePiece = new Function(`return (${plan.capturePieceDecodeSource})`)();
       const decodePiece = new Function(`return (${plan.pieceDecodeSource})`)();
       const decodeOrigin = new Function(`return (${plan.originDecodeSource})`)();
       const decodeWitness = new Function(`return (${plan.witnessDecodeSource})`)();
@@ -234,6 +254,11 @@ export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInput
         if(pieceSize!==208)throw Error('Class piece ABI');
         const pieceBytes=read(module._melee_web_synctest_cpu_class_piece_witness(),pieceSize);
         progress.classPieceWitnessRaw=encode(pieceBytes);progress.classPieceWitness=decodePiece(pieceBytes);
+        const capturePieceSize=module._melee_web_synctest_cpu_class_piece_capture_witness_bytes();
+        if(capturePieceSize!==160)throw Error('Capture-time piece ABI');
+        const capturePieceBytes=read(module._melee_web_synctest_cpu_class_piece_capture_witness(),capturePieceSize);
+        progress.classPieceCaptureWitnessRaw=encode(capturePieceBytes);
+        progress.classPieceCaptureWitness=decodeCapturePiece(capturePieceBytes);
         return result;
       };
       const command = async number => {
@@ -246,13 +271,14 @@ export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInput
           record.payloadFailureWitness = progress.payloadFailureWitness;
           record.allocationOriginWitness = progress.allocationOriginWitness;
           record.classPieceWitness = progress.classPieceWitness;
+          record.classPieceCaptureWitness = progress.classPieceCaptureWitness;
           if (record.result !== 0) throw new Error(`CPU two-tick command ${number} refused ${record.result}: ${module.UTF8ToString(module._melee_web_snapshot_error())}`);
         } catch (error) {
           const ccallThrew = record.outcome === 'pending';
           record.error = String(error);
           record.outcome = ccallThrew ? 'threw' : record.result !== 0 ? 'returned-nonzero' : 'evidence-error';
           if (ccallThrew) {
-            try { record.refreshedNativeEvidence = evidence(); record.classPieceWitness = progress.classPieceWitness; }
+            try { record.refreshedNativeEvidence = evidence(); record.classPieceWitness = progress.classPieceWitness; record.classPieceCaptureWitness = progress.classPieceCaptureWitness; }
             catch (readError) { record.evidenceRefreshError = String(readError); }
           }
           throw error;
@@ -299,6 +325,11 @@ export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInput
         }
         const result = inspectAt(pair.baselineObservation, liveDiagBytes, beforeDiagBytes);
         if (result.boundary.sourceFrame !== expectedFrame) throw new Error(`Two-tick sample ${sample} source frame drift`);
+        const capturePieceSize=module._melee_web_synctest_cpu_class_piece_capture_witness_bytes();
+        if(capturePieceSize!==160)throw Error('Capture-time piece ABI');
+        const capturePieceBytes=read(module._melee_web_synctest_cpu_class_piece_capture_witness(),capturePieceSize);
+        progress.classPieceCaptureWitnessRaw=encode(capturePieceBytes);
+        progress.classPieceCaptureWitness=decodeCapturePiece(capturePieceBytes);
         return result;
       };
       if (module._melee_web_snapshot_observation_size() !== 1280 || module._melee_web_snapshot_pcm_size() !== 4272 ||

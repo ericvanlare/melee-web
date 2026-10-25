@@ -55,13 +55,13 @@ class SourceClassPieceTests(OwnedWorkspaceTests):
         for k in ("GIT_DIR","GIT_WORK_TREE","GIT_INDEX_FILE","GIT_COMMON_DIR"):env.pop(k,None)
         ceiling=subprocess.run(["git","rev-parse","--show-toplevel"],cwd=tree,env=env,capture_output=True,text=True)
         self.assertNotEqual(ceiling.returncode,0,"Private apply tree discovered outer checkout")
-        applied=subprocess.run(["git","apply",*["--include="+x for x in rels],str(SOURCE/"patches/melee-gameplay.patch")],cwd=tree,env=env,capture_output=True,text=True)
+        applied=subprocess.run(["git","apply",*["--include="+x for x in rels],str((SOURCE/"patches/melee-gameplay.patch") if (SOURCE/"patches/melee-gameplay.patch").is_file() else ROOT/"patches/melee-gameplay.patch")],cwd=tree,env=env,capture_output=True,text=True)
         self.assertEqual(applied.returncode,0,applied.stdout+applied.stderr)
         # The existing source-preparation bool ABI lowering, applied only to
         # this private patched actual C TU. No source preparation command runs.
         raw=(tree/"src/sysdolphin/baselib/class.c").read_text()
         (tree/"src/sysdolphin/baselib/class.c").write_text(re.sub(r"\bbool\b","melee_source_bool",raw))
-        common=["-DTARGET_PC","-ffp-contract=off","-I"+str(headers),"-I"+str(tree/"src"),"-I"+str(prepared),
+        common=["-DTARGET_PC","-ffp-contract=off","-I"+str(headers),"-I"+str(ROOT/"src"),"-I"+str(tree/"src"),"-I"+str(prepared),
                 "-I"+str(prepared/"sysdolphin/baselib"),"-I"+str(ROOT/".deps/aurora/include"),
                 "-include",str(headers/"gameplay_compat.h")]
         def run(name,command):
@@ -79,8 +79,35 @@ class SourceClassPieceTests(OwnedWorkspaceTests):
             if active:inputs += [ROOT/"src/source_address_context.cpp",ROOT/"src/source_game_heap_context.cpp"]
             run(mode+"-link",[em/"em++","-std=c++17","-O1","-fexceptions",*common,*flags,*inputs,
                               "-Wl,--wrap=calloc","-sDISABLE_EXCEPTION_CATCHING=0","-sENVIRONMENT=node","-sEXIT_RUNTIME=1","-o",js])
-            for case in (["raw","class","drift","missing","mirror","retired","promotion","descriptor","overflow","serial","noncold","extent","oom","topology","disarm"] if active else ["inactive"]):
+            for case in (["raw","class","drift","missing","mirror","retired","promotion","descriptor","overflow","serial","noncold","extent","oom","topology","disarm",*["capture-"+x for x in ["armed","frozen","reuse","disarm","duplicate","topology","descriptor","amnesia","serial","wrong-header","stale-row","extent","anchor","cold","driftserial","bounds","pending","null-class","raw","missing","mirror","retired","recreated"]]] if active else ["inactive"]):
                 result=run(mode+"-"+case,[node_runtime(),js,case])
+                if active and case=="capture-frozen":
+                    marker="ACTUAL_CLASS_CAPTURE_BASE64="
+                    values=[line[len(marker):] for line in result.stdout.splitlines() if line.startswith(marker)]
+                    self.assertEqual(len(values),1);raw=base64.b64decode(values[0],validate=True);self.assertEqual(len(raw),160)
+                    blob=self.work/"actual-class-capture.bin";blob.write_bytes(raw)
+                    helper=Path(os.environ.get("MELEE_CLASS_PIECE_JS_HELPER",ROOT/"src/slippi_profile/tests/cpu_two_tick_runner.mjs"))
+                    bridge="""const fs=await import('node:fs');const {pathToFileURL}=await import('node:url');
+const {decodeCpuClassPieceCaptureWitness}=await import(pathToFileURL(process.argv[1]));
+const d=decodeCpuClassPieceCaptureWitness(new Uint8Array(fs.readFileSync(process.argv[2])));
+if(d.status!==1||d.scope!=='CAPTURE_TIME_ONLY'||d.liveReason!==7||d.recordState!==3||d.originalRequested!==48||d.physical!==64||d.pieceOffset!==8)throw Error('actual historical bridge drift');
+console.log('PASS actual memory/class/runtime160 CAPTURE_TIME_ONLY; modeled OS and descriptor fixture');"""
+                    run("actual-capture-js-bridge",[node_runtime(),"--input-type=module","-e",bridge,helper,blob])
+                if active and case=="capture-null-class":
+                    marker="ACTUAL_CLASS_CAPTURE_NULL_BASE64="
+                    values=[line[len(marker):] for line in result.stdout.splitlines() if line.startswith(marker)]
+                    self.assertEqual(len(values),1);raw=base64.b64decode(values[0],validate=True);self.assertEqual(len(raw),160)
+                    blob=self.work/"actual-class-capture-null.bin";blob.write_bytes(raw)
+                    helper=Path(os.environ.get("MELEE_CLASS_PIECE_JS_HELPER",ROOT/"src/slippi_profile/tests/cpu_two_tick_runner.mjs"))
+                    bridge="""const fs=await import('node:fs');const {pathToFileURL}=await import('node:url');
+const {decodeCpuClassPieceCaptureWitness}=await import(pathToFileURL(process.argv[1]));
+const b=new Uint8Array(fs.readFileSync(process.argv[2]));const d=decodeCpuClassPieceCaptureWitness(b);
+if(d.status!==2||d.reason!==10||d.classInfo!==0||d.savedClassInfo!==0||d.scope!=='CAPTURE_TIME_ONLY')throw Error('null-class native refusal drift');
+const v=new DataView(b.buffer);v.setUint32(8,1,true);v.setUint32(12,0,true);
+let refused=false;try{decodeCpuClassPieceCaptureWitness(b);}catch(e){refused=/saved header/.test(String(e));}
+if(!refused)throw Error('decoder accepted malformed native-v1 success');
+console.log('PASS actual native160 null-class REFUSED and decoder rejects historical malformed success');"""
+                    run("actual-capture-null-js-bridge",[node_runtime(),"--input-type=module","-e",bridge,helper,blob])
                 if active and case=="class":
                     marker="ACTUAL_CLASS_PIECE_BASE64="
                     values=[line[len(marker):] for line in result.stdout.splitlines() if line.startswith(marker)]

@@ -255,6 +255,7 @@ bool GameplayCpuCheckpoint::finish_replay(const GameplayMatchSession& session) n
         // Explicit payload leaf model; actual byte producer tested separately.
         comparison_={4,2,7,5,9,8,0x10000,64,0x80010000};checked_domains_=30;matched_domains_=14;
         payload_failure_witness_={};auto& w=payload_failure_witness_;
+        class_piece_capture_witness_={1,sizeof(MeleeWebClassPieceCaptureWitness),0,4,1};class_piece_capture_witness_.live_reason=7; // modeled capture-time UNKNOWN
         class_piece_witness_={1,sizeof(MeleeWebClassPieceWitness)};class_piece_witness_.reason=4; // modeled leaf UNKNOWN
         allocation_origin_witness_={};auto& origin=allocation_origin_witness_;
         origin.schema=1;origin.bytes=320;origin.hook_active=1;
@@ -503,6 +504,9 @@ void verify_payload_failure_retention() {
     pending_submission=false;check(!melee_web_synctest_cpu_restore_command(10),"Witness baseline301");
     pending_submission=false;modeled_payload_byte_failure=true;
     check(melee_web_synctest_cpu_restore_command(11)==1216&&draw_calls==2,"Witness must preserve1216/no final present");
+    check(melee_web_synctest_cpu_class_piece_capture_witness_bytes()==160,"Capture-only fixed ABI");
+    const auto historical_saved=*static_cast<const MeleeWebClassPieceCaptureWitness*>(melee_web_synctest_cpu_class_piece_capture_witness());
+    check(historical_saved.schema==1&&historical_saved.bytes==160&&historical_saved.scope==1&&historical_saved.reason==4&&historical_saved.live_reason==7&&!historical_saved.status,"Actual adapter retains distinct modeled capture-time UNKNOWN");
     check(melee_web_synctest_cpu_class_piece_witness_bytes()==208,"Class piece fixed ABI");
     const auto piece_saved=*static_cast<const MeleeWebClassPieceWitness*>(melee_web_synctest_cpu_class_piece_witness());
     check(piece_saved.schema==1&&piece_saved.reason==4&&!piece_saved.status,"Actual adapter retains modeled class UNKNOWN");
@@ -520,6 +524,7 @@ void verify_payload_failure_retention() {
         Buffer.from(HEAPU8.subarray($0,$0+320)).toString("base64"));},melee_web_synctest_cpu_allocation_origin_witness());
     check(melee_web_synctest_cpu_restore_command(5)==1216,"CLOSE preserves original1216");
     check(!std::memcmp(&saved,melee_web_synctest_cpu_payload_failure_witness(),256),"CLOSE preserves witness bytes");
+    check(!std::memcmp(&historical_saved,melee_web_synctest_cpu_class_piece_capture_witness(),160),"CLOSE retains capture-only evidence");
     check(!std::memcmp(&piece_saved,melee_web_synctest_cpu_class_piece_witness(),208),"CLOSE retains separate class piece bytes");
     check(!std::memcmp(&origin_saved,melee_web_synctest_cpu_allocation_origin_witness(),320),"CLOSE preserves separate origin bytes");
     close_and_retire();

@@ -219,6 +219,7 @@ bool GameplayCpuCheckpoint::finish_replay(const GameplayMatchSession& session) n
             payload_failure_witness_=melee_web_source_memory_payload_failure_witness(post_payload_,payload);
             allocation_origin_witness_=melee_web_source_memory_allocation_origin_witness(post_payload_,payload);
             class_piece_witness_=melee_web_source_memory_class_piece_witness(post_payload_,payload,class_piece_anchor_);
+            class_piece_capture_witness_=melee_web_source_memory_class_piece_capture_witness(commit_.payload,post_payload_,payload,class_piece_anchor_);
         }
         comparison_={static_cast<std::uint32_t>(CpuComparisonDomain::Payload),payload.status,
             static_cast<std::uint32_t>(payload.allocation_index),static_cast<std::uint32_t>(payload.byte_offset),

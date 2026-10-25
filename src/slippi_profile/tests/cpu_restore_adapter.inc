@@ -53,6 +53,7 @@ struct CpuRestoreControl {
     CpuTwoTickEvidence two{};
     MeleeWebSourcePayloadFailureWitness failure_witness{1,sizeof(MeleeWebSourcePayloadFailureWitness)};
     MeleeWebClassPieceWitness class_piece_witness{1,sizeof(MeleeWebClassPieceWitness)};
+    MeleeWebClassPieceCaptureWitness class_piece_capture_witness{1,sizeof(MeleeWebClassPieceCaptureWitness),0,0,1};
     MeleeWebSourceAllocationOriginWitness origin_witness{1,sizeof(MeleeWebSourceAllocationOriginWitness)};
     bool two_active=false;
 } cpu_restore;
@@ -226,6 +227,7 @@ uint32_t cpu_execute_two(uint32_t command){
             cpu_restore.failure_witness=cpu_restore.capsule->payload_failure_witness();
             cpu_restore.origin_witness=cpu_restore.capsule->allocation_origin_witness();
             cpu_restore.class_piece_witness=cpu_restore.capsule->class_piece_witness();
+            cpu_restore.class_piece_capture_witness=cpu_restore.capsule->class_piece_capture_witness();
         }
         if(!matched)return cpu_fail(0x4c0u,"two-tick final CPU typed equality refused");
         e.cpu_equality=1;cpu_restore.state=C::TwoEqual;return 0;
@@ -474,3 +476,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_allocation_origi
 
 extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_class_piece_witness(){return &cpu_restore.class_piece_witness;}
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_class_piece_witness_bytes(){return sizeof(cpu_restore.class_piece_witness);}
+
+extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_class_piece_capture_witness(){return &cpu_restore.class_piece_capture_witness;}
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_class_piece_capture_witness_bytes(){return sizeof(cpu_restore.class_piece_capture_witness);}

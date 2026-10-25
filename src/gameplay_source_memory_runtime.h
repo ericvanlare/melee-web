@@ -198,6 +198,9 @@ int melee_web_source_memory_fighter_read(void* host_fighter,
 int melee_web_source_memory_fighter_release(void* host_fighter);
 
 /* Read-only private diagnostic, paired with the original strict comparison. */
+MeleeWebClassPieceCaptureWitness melee_web_source_memory_class_piece_capture_witness(
+ const MeleeWebSourceMemoryPayloadSnapshot* pre,const MeleeWebSourceMemoryPayloadSnapshot* post,
+ MeleeWebSourcePayloadComparison,MeleeWebClassPieceAnchor);
 MeleeWebClassPieceWitness melee_web_source_memory_class_piece_witness(
  const MeleeWebSourceMemoryPayloadSnapshot*,MeleeWebSourcePayloadComparison,MeleeWebClassPieceAnchor);
 

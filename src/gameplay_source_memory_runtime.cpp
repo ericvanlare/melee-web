@@ -1072,3 +1072,78 @@ extern "C" MeleeWebClassPieceWitness melee_web_source_memory_class_piece_witness
 #endif
  return r;
 }
+
+// Historical diagnostic only: the source table froze at arm, while the two
+// snapshots preserve distinct PRE and POST bytes. Never read a live header.
+static_assert(sizeof(MeleeWebClassPieceCaptureWitness)==160);
+static_assert(offsetof(MeleeWebClassPieceCaptureWitness,epoch)==64);
+static_assert(offsetof(MeleeWebClassPieceCaptureWitness,piece_source)==120);
+static_assert(offsetof(MeleeWebClassPieceCaptureWitness,reserved)==152);
+extern "C" MeleeWebClassPieceCaptureWitness melee_web_source_memory_class_piece_capture_witness(
+ const MeleeWebSourceMemoryPayloadSnapshot* pre,const MeleeWebSourceMemoryPayloadSnapshot* post,
+ MeleeWebSourcePayloadComparison original,MeleeWebClassPieceAnchor anchor) {
+ MeleeWebClassPieceCaptureWitness r{};r.schema=1;r.bytes=sizeof(r);r.scope=1;
+ const auto w=melee_web_source_memory_payload_snapshot_witness(post);
+ if(original.status!=2||w.status!=2||original.allocation_index!=w.row||original.byte_offset!=w.offset||
+    original.host_address!=w.host_address||original.source_address!=w.source_address||
+    original.requested_bytes!=w.requested_bytes||w.offset<w.window_offset||w.offset-w.window_offset>=w.window_count||
+    original.expected_byte!=w.expected[w.offset-w.window_offset]||original.actual_byte!=w.actual[w.offset-w.window_offset]){
+  r.reason=9;return r;}
+ r.first_difference_matches=1;r.post_row=w.row;r.offset=w.offset;r.source=w.source_address;
+ r.requested=w.requested_bytes;r.host=w.host_address;r.generation=w.allocation_generation;
+ r.epoch=w.owner_epoch;r.world=w.world_generation;
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+ r.hook_active=1;r.live_reason=piece_owner.reason;r.coverage_state=piece_owner.state;
+ r.instance=piece_owner.instance;r.capture_serial=anchor.serial;r.event_serial=piece_owner.serial;
+ // Admission validates lifetime/topology before any saved row/table access.
+ if(payload_snapshot_check(pre)!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK||
+    payload_snapshot_check(post)!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK||
+    !anchor.ready||!active||!healthy||!piece_owner.cells||
+    anchor.epoch!=owner_epoch||anchor.world!=world_generation||
+    anchor.epoch!=piece_owner.epoch||anchor.world!=piece_owner.world||
+    anchor.instance!=piece_owner.instance||anchor.serial!=piece_owner.capture){r.status=2;r.reason=9;return r;}
+ const bool armed=piece_owner.state==3&&!piece_owner.reason&&piece_owner.serial==anchor.serial;
+ const bool frozen=piece_owner.state==4&&piece_owner.reason==7&&anchor.serial!=UINT64_MAX&&
+   piece_owner.first.serial==anchor.serial+1&&piece_owner.serial==piece_owner.first.serial;
+ if(!armed&&!frozen){r.status=2;r.reason=piece_owner.reason?piece_owner.reason:9;return r;}
+ const auto& postrow=payload_rows(post)[w.row];const auto* rows=payload_rows(pre);
+ size_t selected_row=SIZE_MAX,saved=0;
+ for(size_t i=0;i<pre->row_count;++i){const auto& row=rows[i];
+  if(row.host==postrow.host&&row.source==postrow.source&&row.requested==postrow.requested&&row.generation==postrow.generation){
+   if(selected_row!=SIZE_MAX){r.status=2;r.reason=5;return r;}selected_row=i;r.pre_row=static_cast<uint32_t>(i);
+  }
+ }
+ if(selected_row==SIZE_MAX){r.status=2;r.reason=9;return r;}
+ const auto& row=rows[selected_row];const uint64_t begin=row.source.value(),end=begin+row.requested;
+ if(piece_owner.begin>=piece_owner.end||(piece_owner.begin&31)||(piece_owner.end&31)||
+    piece_owner.count!=(piece_owner.end-piece_owner.begin)/32||begin<piece_owner.begin||end>piece_owner.end||w.offset>=row.requested){r.status=2;r.reason=3;return r;}
+ const uint32_t first=(begin-piece_owner.begin)/32,last=(end-piece_owner.begin+31)/32;
+ if(last>piece_owner.count){r.status=2;r.reason=3;return r;}
+ const uint64_t target=begin+w.offset;uint32_t cell=UINT32_MAX;
+ for(uint32_t i=first;i<last;++i){const auto& c=piece_owner.cells[i];if(!(c.geometry&piece_live))continue;
+  const uint64_t start=uint64_t(piece_owner.begin)+uint64_t(i)*32,extent=piece_extent(c);
+  if(!extent||start<begin||start>end||extent>end-start){r.status=2;r.reason=3;return r;}
+  if(target>=start&&target-start<extent){if(cell!=UINT32_MAX){r.status=2;r.reason=5;return r;}cell=i;}
+ }
+ if(cell==UINT32_MAX){r.reason=4;return r;}
+ const auto& c=piece_owner.cells[cell];r.piece_source=piece_owner.begin+cell*32;
+ r.piece_offset=target-r.piece_source;r.physical=piece_extent(c);r.original_requested=piece_requested(c);
+ r.piece_generation=c.generation;r.flags=r.piece_offset>=r.original_requested?1:0;
+ if(!c.generation){r.status=2;r.reason=6;return r;}
+ r.record_state=c.tag?((c.tag&3)==2?3:2):1;
+ if(!c.tag){r.status=1;return r;} // Raw at capture: no class identity.
+ if((c.tag&3)!=2){r.reason=4;return r;}
+ const size_t in_row=r.piece_source-begin;
+ if(r.original_requested<4||row.requested<4||in_row>row.requested-4){r.status=2;r.reason=3;return r;}
+ for(size_t i=0;i<selected_row;++i)if(!add_size(saved,rows[i].requested,&saved)){r.status=2;r.reason=3;return r;}
+ if(!add_size(saved,in_row,&saved)||pre->payload_bytes<4||saved>pre->payload_bytes-4){r.status=2;r.reason=3;return r;}
+ r.class_info=c.tag&~3u;
+ if(!r.class_info){r.status=2;r.reason=10;return r;}
+ std::memcpy(&r.saved_class_info,payload_bytes(pre)+saved,4);
+ if(r.saved_class_info!=r.class_info){r.status=2;r.reason=10;return r;}
+ r.status=1;
+#else
+ (void)pre;(void)anchor;r.reason=1;
+#endif
+ return r;
+}
