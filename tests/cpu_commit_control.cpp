@@ -26,6 +26,9 @@ bool admitted(unsigned n){return fail_admission!=n&&stable_owner&&stable_topolog
 void write(unsigned n){assert(order+1==n);order=n;++writes;}
 }
 extern "C" {
+#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
+int slippi_lobj_anchor_admit(SlippiLObjAnchor){return admitted(9);}
+#endif
 int melee_web_cpu_interval_admit(uint64_t t){return t==4&&admitted(1);}
 int melee_web_action_interval_admit(const MeleeWebActionInterval*){return admitted(2)&&fighter_fields==9&&private_slots==9;}
 int melee_web_audio_snapshot_admit(MeleeWebAudio*,const MeleeWebAudioSnapshot*){return admitted(3);}
@@ -42,7 +45,12 @@ MeleeWebSourceMemoryPayloadSnapshotStatus melee_web_source_memory_payload_snapsh
 }
 int main(){
     using R=GameplayCpuCommitResult;
-    for(unsigned fail=1;fail<=8;++fail){
+#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
+    const unsigned last_refusal=9;
+#else
+    const unsigned last_refusal=8;
+#endif
+    for(unsigned fail=1;fail<=last_refusal;++fail){
         writes=order=0;fighter_fields=private_slots=audio_value=flow_value=bootstrap_value=context_value=9;
         static_value=3;invariant=5;auto s=statics();
         GameplayCpuCommitOwners o{reinterpret_cast<MeleeWebActionInterval*>(1),reinterpret_cast<MeleeWebAudio*>(2),reinterpret_cast<MeleeWebAudioSnapshot*>(3),
@@ -58,5 +66,9 @@ int main(){
         reinterpret_cast<MeleeWebMatchContext*>(7),reinterpret_cast<MeleeWebMatchContextSnapshot*>(8),reinterpret_cast<MeleeWebSourceMemoryPayloadSnapshot*>(9),s.get(),4};
     assert(gameplay_cpu_commit(o)==R::Ok);assert(writes==6&&order==6);
     assert(fighter_fields==3&&private_slots==3&&audio_value==3&&flow_value==3&&bootstrap_value==3&&context_value==3&&static_value==3);
+#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
+    puts("Actual fixed commit coordinator: nine admission refusals write zero; light leaf modeled; ordered successful chain preserves later predicates");
+#else
     puts("Actual fixed commit coordinator: eight admission refusals write zero; ordered successful chain preserves later predicates");
+#endif
 }

@@ -6,6 +6,7 @@
 #include "gameplay_match_flow.h"
 #include "gameplay_source_memory_runtime.h"
 #include "gameplay_cpu_statics.hpp"
+#include "slippi_profile/lobj_presentation_cache.h"
 #include <cstdint>
 namespace melee_web {
 /* Fixed named domains, not a callback registry. All handles are capsule-owned;
@@ -23,10 +24,11 @@ struct GameplayCpuCommitOwners {
     const MeleeWebSourceMemoryPayloadSnapshot* payload{};
     GameplayCpuStatics* statics{};
     std::uint64_t effect_token{};
+    SlippiLObjAnchor lobj_anchor{};
 };
 enum class GameplayCpuCommitResult : std::uint32_t {
     Ok=0, MissingOwner, Effect, Action, Audio, Flow, Bootstrap, Context, Payload,
-    Statics, UnexpectedWriterFailure
+    Statics, UnexpectedWriterFailure, LObj
 };
 /* Caller must perform no callback/await/source work between admit and commit.
  * This method itself repeats every admission, then prepares the statics last.

@@ -513,3 +513,479 @@ diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
      return 1;
  }
  
+diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
+--- a/src/sysdolphin/baselib/lobj.c
++++ b/src/sysdolphin/baselib/lobj.c
+@@ -1,4 +1,12 @@
+ #include "lobj.h"
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++#include <slippi_profile/lobj_presentation_cache.h>
++#define LOBJ_CACHE(p, field) (slippi_lobj_cache_require(p)->field)
++#define LOBJ_DIRTY(p) (slippi_lobj_cache_require(p)->dirty)
++#else
++#define LOBJ_CACHE(p, field) ((p)->field)
++#define LOBJ_DIRTY(p) ((p)->flags)
++#endif
+ #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+ #include "gameplay_lobj_writer_diagnostic.h"
+ #include <stddef.h>
+@@ -35,7 +43,13 @@
+ 
+ u32 HSD_LObjGetFlags(HSD_LObj* lobj)
+ {
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    if (lobj == NULL) return 0;
++    SlippiLObjCache* cache = slippi_lobj_cache_require(lobj);
++    return (lobj->flags & ~0x180u) | cache->dirty;
++#else
+     return lobj ? lobj->flags : 0;
++#endif
+ }
+ 
+ void HSD_LObjSetFlags(HSD_LObj* lobj, u32 flags)
+@@ -43,7 +57,14 @@
+     if (lobj == NULL) {
+         return;
+     }
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    SlippiLObjCache* cache = slippi_lobj_cache_require(lobj);
++    lobj->flags |= (u16) (flags & ~0x180u);
++    cache->dirty |= (u16) (flags & 0x180u);
++    slippi_lobj_dirty_setter(flags);
++#else
+     lobj->flags |= flags;
++#endif
+ }
+ 
+ void HSD_LObjClearFlags(HSD_LObj* lobj, u32 flags)
+@@ -51,7 +72,14 @@
+     if (lobj == NULL) {
+         return;
+     }
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    SlippiLObjCache* cache = slippi_lobj_cache_require(lobj);
++    lobj->flags &= (u16) ~(flags & ~0x180u);
++    cache->dirty &= (u16) ~(flags & 0x180u);
++    slippi_lobj_dirty_setter(flags);
++#else
+     lobj->flags &= ~flags;
++#endif
+ }
+ 
+ GXLightID HSD_LObjGetLightMaskDiffuse(void)
+@@ -81,6 +109,9 @@
+ 
+ void HSD_LObjSetActive(HSD_LObj* lobj)
+ {
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    slippi_lobj_cache_require(lobj);
++#endif
+     int idx;
+ 
+     if (HSD_LObjGetType(lobj) == LOBJ_AMBIENT) {
+@@ -92,7 +123,7 @@
+         idx = nb_active_lights++;
+     }
+     active_lights[idx] = lobj;
+-    lobj->id = HSD_Index2LightID(idx);
++    LOBJ_CACHE(lobj, id) = HSD_Index2LightID(idx);
+ }
+ 
+ s32 HSD_LObjGetNbActive(void)
+@@ -270,6 +301,9 @@
+ 
+ void HSD_LObjSetup(HSD_LObj* lobj, GXColor color, f32 shininess)
+ {
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    slippi_lobj_cache_require(lobj);
++#endif
+     f32 k0 = shininess;
+ 
+     if (lobj->flags & LOBJ_HIDDEN || HSD_LObjGetType(lobj) == LOBJ_AMBIENT) {
+@@ -277,32 +311,32 @@
+     }
+ 
+     if ((lobj->flags & LOBJ_DIFFUSE) != 0) {
+-        if (lobj->hw_color.r != color.r || lobj->hw_color.g != color.g ||
+-            lobj->hw_color.b != color.b || lobj->hw_color.a != color.a)
++        if (LOBJ_CACHE(lobj, hw_color).r != color.r || LOBJ_CACHE(lobj, hw_color).g != color.g ||
++            LOBJ_CACHE(lobj, hw_color).b != color.b || LOBJ_CACHE(lobj, hw_color).a != color.a)
+         {
+-            GXInitLightColor(&lobj->lightobj, color);
+-            lobj->hw_color = color;
+-            lobj->flags |= LOBJ_DIFF_DIRTY;
+-        }
+-
+-        if (lobj->flags & LOBJ_DIFF_DIRTY) {
+-            GXLoadLightObjImm(&lobj->lightobj, lobj->id);
+-            lobj->flags &= ~LOBJ_DIFF_DIRTY;
+-        }
+-    }
+-
+-    if (lobj->spec_id != GX_LIGHT_NULL) {
+-        if (lobj->shininess != shininess) {
+-            lobj->shininess = shininess;
++            GXInitLightColor(&LOBJ_CACHE(lobj, lightobj), color);
++            LOBJ_CACHE(lobj, hw_color) = color;
++            LOBJ_DIRTY(lobj) |= LOBJ_DIFF_DIRTY;
++        }
++
++        if (LOBJ_DIRTY(lobj) & LOBJ_DIFF_DIRTY) {
++            GXLoadLightObjImm(&LOBJ_CACHE(lobj, lightobj), LOBJ_CACHE(lobj, id));
++            LOBJ_DIRTY(lobj) &= ~LOBJ_DIFF_DIRTY;
++        }
++    }
++
++    if (LOBJ_CACHE(lobj, spec_id) != GX_LIGHT_NULL) {
++        if (LOBJ_CACHE(lobj, shininess) != shininess) {
++            LOBJ_CACHE(lobj, shininess) = shininess;
+             k0 *= 0.5F;
+-            GXInitLightAttn(&lobj->spec_lightobj, 0.0F, 0.0F, 1.0F, k0, 0.0F,
++            GXInitLightAttn(&LOBJ_CACHE(lobj, spec_lightobj), 0.0F, 0.0F, 1.0F, k0, 0.0F,
+                             1.0F - k0);
+-            lobj->flags |= LOBJ_SPEC_DIRTY;
+-        }
+-
+-        if (lobj->flags & LOBJ_SPEC_DIRTY) {
+-            GXLoadLightObjImm(&lobj->spec_lightobj, lobj->spec_id);
+-            lobj->flags &= ~LOBJ_SPEC_DIRTY;
++            LOBJ_DIRTY(lobj) |= LOBJ_SPEC_DIRTY;
++        }
++
++        if (LOBJ_DIRTY(lobj) & LOBJ_SPEC_DIRTY) {
++            GXLoadLightObjImm(&LOBJ_CACHE(lobj, spec_lightobj), LOBJ_CACHE(lobj, spec_id));
++            LOBJ_DIRTY(lobj) &= ~LOBJ_SPEC_DIRTY;
+         }
+     }
+ }
+@@ -324,28 +358,28 @@
+         Vec3 half, ldir;
+         HSD_LObj* lobj = HSD_LObjGetActiveByIndex(i);
+ 
+-        if (lobj->spec_id == GX_LIGHT_NULL) {
++        if (LOBJ_CACHE(lobj, spec_id) == GX_LIGHT_NULL) {
+             continue;
+         }
+ 
+         switch (HSD_LObjGetType(lobj)) {
+         case LOBJ_POINT:
+         case LOBJ_SPOT:
+-            PSVECSubtract(&jpos, &lobj->lvec, &ldir);
++            PSVECSubtract(&jpos, &LOBJ_CACHE(lobj, lvec), &ldir);
+             PSVECNormalize(&ldir, &ldir);
+             PSVECAdd(&ldir, &cdir, &half);
+             break;
+ 
+         case LOBJ_INFINITE:
+-            PSVECAdd(&lobj->lvec, &cdir, &half);
++            PSVECAdd(&LOBJ_CACHE(lobj, lvec), &cdir, &half);
+             break;
+ 
+         default:
+             HSD_ASSERT(617, 0);
+         }
+         PSVECNormalize(&half, &half);
+-        GXInitLightDir(&lobj->spec_lightobj, half.x, half.y, half.z);
+-        lobj->flags |= LOBJ_SPEC_DIRTY;
++        GXInitLightDir(&LOBJ_CACHE(lobj, spec_lightobj), half.x, half.y, half.z);
++        LOBJ_DIRTY(lobj) |= LOBJ_SPEC_DIRTY;
+     }
+ }
+ 
+@@ -353,15 +387,15 @@
+ {
+     u32 _ = lobj->flags;
+ 
+-    GXInitLightColor(&lobj->lightobj, lobj->color);
+-    lobj->hw_color = lobj->color;
+-    lobj->flags |= LOBJ_DIFF_DIRTY;
+-    lightmask_diffuse |= lobj->id;
++    GXInitLightColor(&LOBJ_CACHE(lobj, lightobj), lobj->color);
++    LOBJ_CACHE(lobj, hw_color) = lobj->color;
++    LOBJ_DIRTY(lobj) |= LOBJ_DIFF_DIRTY;
++    lightmask_diffuse |= LOBJ_CACHE(lobj, id);
+ 
+     switch (HSD_LObjGetType(lobj)) {
+     case LOBJ_SPOT:
+     case LOBJ_POINT:
+-        lightmask_attnfunc |= lobj->id;
++        lightmask_attnfunc |= LOBJ_CACHE(lobj, id);
+         break;
+     case LOBJ_INFINITE:
+         break;
+@@ -370,7 +404,7 @@
+     }
+ 
+     if (lobj->flags & LOBJ_ALPHA) {
+-        lightmask_alpha |= lobj->id;
++        lightmask_alpha |= LOBJ_CACHE(lobj, id);
+     }
+ }
+ 
+@@ -378,41 +412,41 @@
+ {
+     f32 x;
+ 
+-    lobj->spec_id = spec_id;
++    LOBJ_CACHE(lobj, spec_id) = spec_id;
+     if (spec_id != 0) {
+-        GXInitLightColor(&lobj->spec_lightobj, lobj->color);
+-        lobj->shininess = 50.0F;
++        GXInitLightColor(&LOBJ_CACHE(lobj, spec_lightobj), lobj->color);
++        LOBJ_CACHE(lobj, shininess) = 50.0F;
+ 
+         x =
+ #ifdef MUST_MATCH
+             x =
+ #endif
+-                lobj->shininess;
++                LOBJ_CACHE(lobj, shininess);
+ 
+         x *= 0.5F;
+-        GXInitLightAttn(&lobj->spec_lightobj, 0.0F, 0.0F, 1.0F, x, 0.0F,
++        GXInitLightAttn(&LOBJ_CACHE(lobj, spec_lightobj), 0.0F, 0.0F, 1.0F, x, 0.0F,
+                         1.0F - x);
+-#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+-        const uint64_t lvec_writer_ticket=melee_web_lobj_writer_before(lobj,&lobj->lvec,sizeof(*lobj),__FILE__,__LINE__);
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && !(defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE)
++        const uint64_t lvec_writer_ticket=melee_web_lobj_writer_before(lobj,&LOBJ_CACHE(lobj, lvec),sizeof(*lobj),__FILE__,__LINE__);
+ #endif
+         switch (HSD_LObjGetType(lobj)) {
+         case 2:
+         case 3:
+-            HSD_LObjGetPosition(lobj, &lobj->lvec);
+-            MTXMultVec(mtx, &lobj->lvec, &lobj->lvec);
++            HSD_LObjGetPosition(lobj, &LOBJ_CACHE(lobj, lvec));
++            MTXMultVec(mtx, &LOBJ_CACHE(lobj, lvec), &LOBJ_CACHE(lobj, lvec));
+             break;
+         case 1:
+-            HSD_LObjGetLightVector(lobj, &lobj->lvec);
+-            PSMTXMultVecSR(mtx, &lobj->lvec, &lobj->lvec);
+-            VECNormalize(&lobj->lvec, &lobj->lvec);
++            HSD_LObjGetLightVector(lobj, &LOBJ_CACHE(lobj, lvec));
++            PSMTXMultVecSR(mtx, &LOBJ_CACHE(lobj, lvec), &LOBJ_CACHE(lobj, lvec));
++            VECNormalize(&LOBJ_CACHE(lobj, lvec), &LOBJ_CACHE(lobj, lvec));
+             break;
+         default:
+             HSD_ASSERT(680, 0);
+         }
+-#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && !(defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE)
+         melee_web_lobj_writer_after(lvec_writer_ticket);
+ #endif
+-        lobj->flags |= 0x100;
++        LOBJ_DIRTY(lobj) |= 0x100;
+         lightmask_specular |= spec_id;
+     }
+ }
+@@ -427,11 +461,11 @@
+     lpos.z *= 1048576.0F;
+     MTXMultVec(vmtx, &lpos, &lpos);
+     if (lobj->flags & LOBJ_DIFFUSE) {
+-        GXInitLightPos(&lobj->lightobj, lpos.x, lpos.y, lpos.z);
+-        GXInitLightAttn(&lobj->lightobj, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0);
++        GXInitLightPos(&LOBJ_CACHE(lobj, lightobj), lpos.x, lpos.y, lpos.z);
++        GXInitLightAttn(&LOBJ_CACHE(lobj, lightobj), 1.0, 0.0, 0.0, 1.0, 0.0, 0.0);
+     }
+     if (lobj->flags & LOBJ_SPECULAR) {
+-        GXInitLightPos(&lobj->spec_lightobj, lpos.x, lpos.y, lpos.z);
++        GXInitLightPos(&LOBJ_CACHE(lobj, spec_lightobj), lpos.x, lpos.y, lpos.z);
+     }
+ }
+ 
+@@ -439,22 +473,22 @@
+ {
+     Vec3 lpos;
+ 
+-    GXInitLightColor(&lobj->lightobj, lobj->color);
+-    lobj->hw_color = lobj->color;
++    GXInitLightColor(&LOBJ_CACHE(lobj, lightobj), lobj->color);
++    LOBJ_CACHE(lobj, hw_color) = lobj->color;
+     HSD_LObjGetPosition(lobj, &lpos);
+     MTXMultVec(mtx, &lpos, &lpos);
+-    GXInitLightPos(&lobj->lightobj, lpos.x, lpos.y, lpos.z);
+-    GXInitLightPos(&lobj->spec_lightobj, lpos.x, lpos.y, lpos.z);
++    GXInitLightPos(&LOBJ_CACHE(lobj, lightobj), lpos.x, lpos.y, lpos.z);
++    GXInitLightPos(&LOBJ_CACHE(lobj, spec_lightobj), lpos.x, lpos.y, lpos.z);
+     if (lobj->flags & 0x40) {
+-        GXInitLightAttn(&lobj->lightobj, 1.0F, 0.0F, 0.0F, lobj->u.attn.k0,
++        GXInitLightAttn(&LOBJ_CACHE(lobj, lightobj), 1.0F, 0.0F, 0.0F, lobj->u.attn.k0,
+                         lobj->u.attn.k1, lobj->u.attn.k2);
+     } else {
+         f32 ref_br = lobj->u.spot.ref_br;
+         f32 ref_dist = lobj->u.spot.ref_dist;
+         s32 dist_func = lobj->u.spot.dist_func;
+-        GXInitLightDistAttn(&lobj->lightobj, ref_dist, ref_br, dist_func);
+-        GXInitLightSpot(&lobj->lightobj, 0.0F, 0);
+-        GXInitLightDistAttn(&lobj->spec_lightobj, ref_dist, ref_br, dist_func);
++        GXInitLightDistAttn(&LOBJ_CACHE(lobj, lightobj), ref_dist, ref_br, dist_func);
++        GXInitLightSpot(&LOBJ_CACHE(lobj, lightobj), 0.0F, 0);
++        GXInitLightDistAttn(&LOBJ_CACHE(lobj, spec_lightobj), ref_dist, ref_br, dist_func);
+     }
+ }
+ 
+@@ -468,11 +502,11 @@
+     HSD_LObjGetLightVector(lobj, &ldir);
+     PSMTXMultVecSR(mtx, &ldir, &ldir);
+     PSVECNormalize(&ldir, &ldir);
+-    GXInitLightPos(&lobj->lightobj, lpos.x, lpos.y, lpos.z);
+-    GXInitLightPos(&lobj->spec_lightobj, lpos.x, lpos.y, lpos.z);
+-    GXInitLightDir(&lobj->lightobj, ldir.x, ldir.y, ldir.z);
++    GXInitLightPos(&LOBJ_CACHE(lobj, lightobj), lpos.x, lpos.y, lpos.z);
++    GXInitLightPos(&LOBJ_CACHE(lobj, spec_lightobj), lpos.x, lpos.y, lpos.z);
++    GXInitLightDir(&LOBJ_CACHE(lobj, lightobj), ldir.x, ldir.y, ldir.z);
+     if (lobj->flags & 0x40) {
+-        GXInitLightAttn(&lobj->lightobj, lobj->u.attn.a0, lobj->u.attn.a1,
++        GXInitLightAttn(&LOBJ_CACHE(lobj, lightobj), lobj->u.attn.a0, lobj->u.attn.a1,
+                         lobj->u.attn.a2, lobj->u.attn.k0, lobj->u.attn.k1,
+                         lobj->u.attn.k2);
+     } else {
+@@ -482,14 +516,18 @@
+         s32 spot_func = lobj->u.spot.spot_func;
+         s32 dist_func = lobj->u.spot.dist_func;
+ 
+-        GXInitLightDistAttn(&lobj->lightobj, ref_dist, ref_br, dist_func);
+-        GXInitLightDistAttn(&lobj->spec_lightobj, ref_dist, ref_br, dist_func);
+-        GXInitLightSpot(&lobj->lightobj, cutoff, spot_func);
++        GXInitLightDistAttn(&LOBJ_CACHE(lobj, lightobj), ref_dist, ref_br, dist_func);
++        GXInitLightDistAttn(&LOBJ_CACHE(lobj, spec_lightobj), ref_dist, ref_br, dist_func);
++        GXInitLightSpot(&LOBJ_CACHE(lobj, lightobj), cutoff, spot_func);
+     }
+ }
+ 
+ void HSD_LObjSetupInit(HSD_CObj* cobj)
+ {
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    for (HSD_SList* n = current_lights; n != NULL; n = n->next)
++        slippi_lobj_cache_require(n->data);
++#endif
+     MtxPtr vmtx;
+     int i, num, idx;
+     HSD_SList* list;
+@@ -541,7 +579,7 @@
+         HSD_LObjSetActive(lobj);
+         idx = HSD_LObjGetNbActive();
+ 
+-        lobj->spec_id = GX_LIGHT_NULL;
++        LOBJ_CACHE(lobj, spec_id) = GX_LIGHT_NULL;
+ 
+         switch (type) {
+         case LOBJ_INFINITE:
+@@ -563,7 +601,7 @@
+             setup_diffuse_lightobj(lobj);
+             break;
+         case LOBJ_SPECULAR:
+-            setup_spec_lightobj(lobj, vmtx, lobj->id);
++            setup_spec_lightobj(lobj, vmtx, LOBJ_CACHE(lobj, id));
+             num++;
+             break;
+         }
+@@ -603,7 +641,7 @@
+         if (!(lobj = HSD_LObjGetActiveByIndex(i))) {
+             return;
+         }
+-        HSD_LObjSetup(lobj, lobj->color, lobj->shininess);
++        HSD_LObjSetup(lobj, lobj->color, LOBJ_CACHE(lobj, shininess));
+     }
+ }
+ 
+@@ -909,6 +947,9 @@
+ 
+ void HSD_LObjSetDefaultClass(HSD_LObjInfo* info)
+ {
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    if (info != NULL) slippi_lobj_require_descriptor(info);
++#endif
+     if (info != NULL) {
+         HSD_ASSERT(1420, hsdIsDescendantOf(info, &hsdLObj));
+     }
+@@ -1021,6 +1062,9 @@
+         {
+             *p = HSD_LObjAlloc();
+         } else {
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++            slippi_lobj_require_descriptor(info);
++#endif
+             *p = hsdNew(info);
+             HSD_ASSERT(1644, *p);
+         }
+@@ -1077,6 +1121,9 @@
+ 
+ static void LObjAmnesia(HSD_ClassInfo* info)
+ {
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    slippi_lobj_amnesia(info);
++#endif
+     if (info == HSD_CLASS_INFO(default_class)) {
+         default_class = NULL;
+     }
+@@ -1094,4 +1141,7 @@
+     HSD_CLASS_INFO(&hsdLObj)->release = LObjRelease;
+     HSD_CLASS_INFO(&hsdLObj)->amnesia = LObjAmnesia;
+     HSD_LOBJ_INFO(&hsdLObj)->load = LObjLoad;
+-}
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    slippi_lobj_descriptor_attest(&hsdLObj);
++#endif
++}
+diff --git a/src/sysdolphin/baselib/class.c b/src/sysdolphin/baselib/class.c
+--- a/src/sysdolphin/baselib/class.c
++++ b/src/sysdolphin/baselib/class.c
+@@ -1,4 +1,7 @@
+ #include "class.h"
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++#include <slippi_profile/lobj_presentation_cache.h>
++#endif
+ #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+ #include "gameplay_class_piece_diagnostic.h"
+ #endif
+@@ -302,6 +305,9 @@
+ {
+     HSD_ClassInfo* info = cls->class_info;
+     info->head.nb_exist -= 1;
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    slippi_lobj_retiring(cls);
++#endif
+     hsdFreeMemPiece(cls, info->head.obj_size);
+ }
+ 
+@@ -354,6 +360,9 @@
+ #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+     melee_web_class_piece_label(cls, info, info->head.obj_size, 2, NULL);
+ #endif
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    slippi_lobj_constructed(cls, info);
++#endif
+     return cls;
+ }
+ 
+@@ -373,6 +382,9 @@
+ {
+     HSD_ClassInfo* var_r29;
+     HSD_ClassInfo* var_r28;
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    HSD_ClassInfo* presentation_previous;
++#endif
+ #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+     HSD_ClassInfo* diagnostic_previous;
+ #endif
+@@ -380,6 +392,9 @@
+     HSD_ASSERT(0x249, object);
+     HSD_ASSERT(0x24A, class_info);
+     var_r29 = HSD_GetClassInfo(object);
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    presentation_previous = var_r29;
++#endif
+ #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+     diagnostic_previous = var_r29;
+ #endif
+@@ -413,6 +428,9 @@
+     melee_web_class_piece_label(object, class_info, class_info->head.obj_size, 3, diagnostic_previous);
+ #endif
+ 
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++        slippi_lobj_rebound(object, presentation_previous, class_info);
++#endif
+         return true;
+     }
+     return false;

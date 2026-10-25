@@ -108,7 +108,13 @@ bool cpu_two_diag(unsigned index){
     if(!bytes)return false;
     std::memcpy(e.diagnostics[index].data(),bytes,132);e.diagnostic_mask|=1u<<index;return true;
 }
+#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
+extern "C" int melee_web_snapshot_actual_stage_is_final_destination(void);
+#endif
 bool cpu_two_safe(uint32_t expected){
+#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
+    if(!melee_web_snapshot_actual_stage_is_final_destination())return false;
+#endif
     if(!cpu_tuple_unchanged()||match->source_frames()!=expected||observation.frame!=expected||
        !observation.ready||observation.ending||observation.complete||observation.paused||
        observation.stocks[0]!=4||observation.stocks[1]!=4)return false;

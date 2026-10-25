@@ -1388,6 +1388,8 @@ export function reportSourceHashes() {
     'tests/quiescent_wasm_snapshot.mjs',
     'src/slippi_profile/profile.h',
     'src/slippi_profile/profile.c',
+    'src/slippi_profile/lobj_presentation_cache.h',
+    'src/slippi_profile/lobj_presentation_cache.c',
     'src/slippi_profile/offscreen_damage.h',
     'src/slippi_profile/offscreen_damage.c',
     'src/slippi_profile/dynamics_fix.h',

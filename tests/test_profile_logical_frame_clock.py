@@ -21,7 +21,7 @@ class LogicalClockControl(unittest.TestCase):
   marker='diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c'
   self.assertEqual(patch.count(marker),1)
   tree=out/'source';target=tree/'src/melee/gm/gm_1A45.c';target.parent.mkdir(parents=True);shutil.copyfile(gm,target)
-  new_hunk=patch[patch.index(marker):]
+  new_hunk=patch[patch.index(marker):].split('\ndiff --git ',1)[0]+'\n'
   # Default scratch lives below the checkout. Prevent git apply from finding
   # that outer repository and silently skipping paths outside its cwd prefix.
   patch_env=dict(env,GIT_CEILING_DIRECTORIES=str(tree.parent))
@@ -114,5 +114,16 @@ int main(void){
   # Invalid scope must refuse before bootstrap/tool/configure functions.
   with patch.object(module,'prepare_sources',side_effect=AssertionError('source preparation must not run')):
    with self.assertRaises(ValueError):module.build(1,target='runtime',configuration='Release',slippi_logical_frame_clock=True)
+  owner_seen=set()
+  for aurora in (False,True):
+   for stage in (False,True):
+    owner_seen.add(module.build_directory(root,target='gameplay_slippi_synctest',configuration='Release',slippi_logical_frame_clock=True,slippi_lobj_presentation_cache=True,aurora_staging_shadow_diagnostic=aurora,stage_arena_owner_diagnostic=stage))
+  self.assertEqual(len(owner_seen),4);self.assertTrue(seen.isdisjoint(owner_seen))
+  for target,configuration,clock in [('runtime','Release',True),('gameplay_slippi_synctest','RelWithDebInfo',True),('gameplay_slippi_synctest','Release',False)]:
+   with self.assertRaises(ValueError):module.build_directory(root,target=target,configuration=configuration,slippi_logical_frame_clock=clock,slippi_lobj_presentation_cache=True)
+  with patch.object(module,'build') as build,patch.object(sys,'argv',['build.py','--trace-target','gameplay_slippi_synctest','--configuration','Release','--slippi-logical-frame-clock','--slippi-lobj-presentation-cache']):
+   module.main();self.assertTrue(build.call_args.kwargs['slippi_lobj_presentation_cache'])
+  with patch.object(module,'prepare_sources',side_effect=AssertionError('source preparation must not run')):
+   with self.assertRaises(ValueError):module.build(1,target='runtime',configuration='Release',slippi_logical_frame_clock=True,slippi_lobj_presentation_cache=True)
   print('Actual opt-in directories/defaultOFF/privateRelease/CLI checks passed')
 if __name__=='__main__':unittest.main()

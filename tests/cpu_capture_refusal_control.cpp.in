@@ -1,4 +1,5 @@
 #include "gameplay_class_piece_diagnostic.h"
+#include "slippi_profile/lobj_presentation_cache.h"
 /* Actual production capture body below, explicitly modeled owner/factory
  * leaves. This proves attribution/order/temporary cleanup, not live source
  * owner admission or a complete game checkpoint. */
@@ -19,6 +20,11 @@
 @ACTUAL_COMPARISON@
 static unsigned class_arms=0,class_disarms=0;
 static bool class_unavailable=false;
+static bool lobj_ok=true;static unsigned lobj_disarms=0;
+extern "C" SlippiLObjAnchor slippi_lobj_anchor_capture(){return {1,1,1,1,0};}
+extern "C" int slippi_lobj_anchor_admit(SlippiLObjAnchor){return lobj_ok;}
+extern "C" uint32_t slippi_lobj_failure(){return lobj_ok?0:9;}
+extern "C" void slippi_lobj_anchor_disarm(SlippiLObjAnchor a){if(a.token)++lobj_disarms;}
 MeleeWebClassPieceAnchor melee_web_class_piece_arm(){++class_arms;return {1,1,1,0,class_unavailable?0u:1u,class_unavailable?1u:0u};}
 void melee_web_class_piece_disarm(MeleeWebClassPieceAnchor a){if(a.ready)++class_disarms;}
 namespace melee_web {
@@ -79,7 +85,7 @@ class GameplayCpuStatics{public:~GameplayCpuStatics(){++static_destroys;}bool ca
  CpuComparison capture_expected(std::vector<std::byte>& out)const{out.assign(1,std::byte{0x5a});CpuComparison c;if(!bytes_ok)c.status=2;return c;}
  CpuComparison compare_expected(std::span<const std::byte> out)const{CpuComparison c;if(!bytes_ok||out.size()!=1)c.status=2;return c;}};
 struct Commit{GameplayCpuStatics* statics{};MeleeWebAudio* audio{};MeleeWebMatchFlow* flow{};MeleeWebMatchContext* context{};
- const Snapshot *bootstrap{},*flow_snapshot{},*context_snapshot{},*audio_snapshot{},*payload{};Snapshot* actions{};std::uint64_t effect_token{};};
+ const Snapshot *bootstrap{},*flow_snapshot{},*context_snapshot{},*audio_snapshot{},*payload{};Snapshot* actions{};std::uint64_t effect_token{};SlippiLObjAnchor lobj_anchor{};};
 class GameplayCpuCheckpoint{public:
  static void* operator new(std::size_t n,const std::nothrow_t&) noexcept {return capsule_alloc_failure?nullptr:std::malloc(n);}
  static void operator delete(void* p) noexcept {std::free(p);}
@@ -131,7 +137,7 @@ int main(){
  const std::array<unsigned,8> order{1,2,3,4,5,6,7,8};
  const std::array<unsigned,8> domains{7,5,6,8,4,3,9,8};
  GameplayMatchSession session;
- auto reset=[](){live_frame=176;effect_ok=action_ok=payload_ok=flow_ok=bytes_ok=true;refuse_leaf=throw_leaf=created=destroyed=static_destroys=count=0;trace={};capsule_alloc_failure=owner_missing=frame_wrap=false;class_arms=class_disarms=0;class_unavailable=false;source_bytes.fill(0x5a);};
+ auto reset=[](){live_frame=176;effect_ok=action_ok=payload_ok=flow_ok=bytes_ok=true;refuse_leaf=throw_leaf=created=destroyed=static_destroys=count=0;trace={};capsule_alloc_failure=owner_missing=frame_wrap=false;class_arms=class_disarms=0;class_unavailable=false;lobj_ok=true;lobj_disarms=0;source_bytes.fill(0x5a);};
  const auto unchanged=[](){for(auto b:source_bytes)assert(b==0x5a);};
  for(unsigned failure=1;failure<=8;++failure){reset();refuse_leaf=failure;CpuCaptureDiagnostic d;
   auto c=GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),d);assert(!c);
@@ -156,6 +162,10 @@ int main(){
  assert(!GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),allocation));assert(allocation.comparison.domain==1&&allocation.comparison.detail==1&&count==0&&static_destroys==1);
  reset();CpuCaptureDiagnostic missing;
  assert(!GameplayCpuCheckpoint::capture(session,nullptr,missing));assert(missing.comparison.domain==9&&missing.comparison.detail==2&&count==0);
+ reset();lobj_ok=false;CpuCaptureDiagnostic light;
+ assert(!GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),light));
+ assert(light.comparison.domain==1&&light.comparison.detail==static_cast<unsigned>(CpuCaptureRefusal::LObjOwner));
+ assert(count==8&&created==destroyed&&lobj_disarms==1&&class_arms==0);unchanged();
  reset();CpuCaptureDiagnostic success;success.comparison.status=9;
  auto c=GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),success);
  assert(class_arms==1&&class_disarms==0);
@@ -172,7 +182,7 @@ int main(){
  count=0;assert(e->seal_drawn_reference(session));assert(count==2&&trace[0]==5&&trace[1]==2);unchanged();
  assert(!e->seal_drawn_reference(session));e->fixture_finished();
  assert(e->matches_drawn_reference(session));
- for(bool* failure:{&effect_ok,&action_ok,&payload_ok,&flow_ok,&bytes_ok}){*failure=false;assert(!e->matches_drawn_reference(session));*failure=true;unchanged();}
+ for(bool* failure:{&effect_ok,&action_ok,&payload_ok,&flow_ok,&bytes_ok,&lobj_ok}){*failure=false;assert(!e->matches_drawn_reference(session));*failure=true;unchanged();}
  owner_missing=true;assert(!e->matches_drawn_reference(session));owner_missing=false;
  e.reset();assert(created==destroyed);
  // Execute actual capture/span, interval guard, and seal methods. Owner,

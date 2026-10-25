@@ -1,3 +1,4 @@
+#include "slippi_profile/lobj_presentation_cache.h"
 #include "gameplay_bootstrap.h"
 #include "gameplay_source_context.h"
 #include "gameplay_source_memory_runtime.h"
@@ -258,7 +259,9 @@ int melee_web_gameplay_startup(size_t bytes, char* error, size_t error_size)
     const uint64_t previous_world_generation = generation;
     uint64_t next_world_generation = generation + 1;
     if (next_world_generation == 0) next_world_generation = 1;
-    if (!melee_web_source_memory_begin(next_world_generation, heap)) {
+    const int lobj_world_started = slippi_lobj_world_begin(next_world_generation);
+    if (!lobj_world_started || !melee_web_source_memory_begin(next_world_generation, heap)) {
+        if (lobj_world_started) slippi_lobj_world_end(next_world_generation);
         OSDestroyHeap(heap);
         heap = -1;
         OSSetCurrentHeap(-1);
@@ -298,6 +301,7 @@ int melee_web_gameplay_startup(size_t bytes, char* error, size_t error_size)
             startup_in_progress = 0;
             HSD_ObjSetHeap(0, NULL);
             HSD_SetHeap(-1);
+            slippi_lobj_world_end(generation);
             const int source_memory_ok = melee_web_source_memory_end(generation);
             OSDestroyHeap(heap);
             heap = -1;
@@ -599,6 +603,7 @@ int melee_web_gameplay_shutdown(char* error, size_t error_size)
     _HSD_ObjAllocForgetMemory(NULL, NULL);
     HSD_ObjSetHeap(0, NULL);
     HSD_SetHeap(-1);
+    slippi_lobj_world_end(generation);
     const int source_memory_ok = melee_web_source_memory_end(generation);
     OSDestroyHeap(heap);
     heap = -1;

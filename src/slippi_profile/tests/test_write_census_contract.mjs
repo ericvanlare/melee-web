@@ -1732,3 +1732,16 @@ test('two-tick route checks exact linked v6 runtime identity and both new getter
   assert.equal(validateBrowserProfileForRoute({profile:'slippi-render-dependencies-dbooc-shield-drop-v5'},false),
     'slippi-render-dependencies-dbooc-shield-drop-v5');
 });
+
+
+test('canonical LObj v7 route is explicit and cannot silently accept v6 or other routes', () => {
+  const exports={evidence:true,evidenceBytes:true,payloadWitness:true,payloadWitnessBytes:true};
+  const v7={profile:'slippi-render-dependencies-logical-frame-lobj-v7'};
+  assert.equal(validateBrowserProfileForRoute(v7,true,exports,true),v7.profile);
+  assert.throws(()=>validateBrowserProfileForRoute(v7,true,exports),/Unexpected profile identity/);
+  assert.throws(()=>validateBrowserProfileForRoute({profile:'slippi-render-dependencies-logical-frame-v6'},true,exports,true),/Unexpected profile identity/);
+  assert.throws(()=>validateCpuRestoreRouteSelection({'--slippi-lobj-presentation-cache':true}),/requires.*two-tick/);
+  assert.equal(validateCpuRestoreRouteSelection({'--aggregate-cpu-drawn-reference-two-tick':true,
+    '--aggregate-cpu-restore-config':'config.json','--slippi-lobj-presentation-cache':true}),
+    'drawn-reference-no-draw-two-tick-v1');
+});

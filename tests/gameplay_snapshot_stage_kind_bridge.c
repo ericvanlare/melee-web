@@ -10,3 +10,9 @@ uint32_t melee_web_snapshot_actual_stage_ground_kind(void)
 {
     return (uint32_t)stage_info.grkind;
 }
+
+/* Private v7 eligibility, from the actual source enum rather than a caller ID. */
+int melee_web_snapshot_actual_stage_is_final_destination(void)
+{
+    return stage_info.grkind == Gr_Kind_Last;
+}

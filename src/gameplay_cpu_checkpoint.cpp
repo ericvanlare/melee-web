@@ -68,10 +68,20 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
         stage=CpuComparisonDomain::Audio;
         c->audio_generation_=melee_web_audio_generation(c->owner_.audio);
         if(!c->audio_generation_){refused(stage,code(CpuCaptureRefusal::AudioGeneration),"Captured audio owner generation is zero");return {};}
+        c->commit_.lobj_anchor=slippi_lobj_anchor_capture();
+        if(!slippi_lobj_anchor_admit(c->commit_.lobj_anchor)){
+            std::snprintf(leaf_error,sizeof(leaf_error),"Canonical LObj owner capture refused (%u)",slippi_lobj_failure());
+            refused(CpuComparisonDomain::Owner,code(CpuCaptureRefusal::LObjOwner),leaf_error);return {};
+        }
         // Diagnostic arm is not a CPU-admission condition. It owns no source
         // memory, and its serial/table are never captured or restored.
         c->class_piece_anchor_=melee_web_class_piece_arm();
+#if !(defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE)
         c->lobj_writer_session_=melee_web_lobj_writer_arm(c->commit_.payload,c->class_piece_anchor_,span==CpuCheckpointSpan::TwoTicks?8u:1u);
+#endif
+        // v7 relocates lvec: the historical SOURCE writer diagnostic is
+        // inapplicable, not a successful source-write observation. Session 0
+        // leaves its fixed evidence unavailable; strict payload checks remain.
         return c;
     }catch(const std::bad_alloc&){refused(stage,code(CpuCaptureRefusal::AllocationException),"CPU capture leaf threw std::bad_alloc");return {};}
     catch(...){refused(stage,code(CpuCaptureRefusal::UnexpectedException),"CPU capture leaf threw an unexpected exception");return {};}
@@ -85,6 +95,7 @@ bool GameplayCpuCheckpoint::same_owner(const GameplayMatchSession& session) cons
 }
 bool GameplayCpuCheckpoint::begin_record(const GameplayMatchSession& session) noexcept {
     if(phase_!=Phase::Captured||!same_owner(session)||
+       !slippi_lobj_anchor_admit(commit_.lobj_anchor)||
        session.source_frames()!=owner_.frame)return false;
     commit_.effect_token=melee_web_cpu_interval_begin();
     if(!commit_.effect_token||melee_web_action_interval_begin_record(commit_.actions)!=1){
@@ -102,6 +113,8 @@ bool GameplayCpuCheckpoint::interval_boundary(const GameplayMatchSession& sessio
     };
     if((phase_!=Phase::Recording&&phase_!=Phase::Replaying)||!same_owner(session))
         return refuse(CpuComparisonDomain::Owner);
+    if(!slippi_lobj_anchor_admit(commit_.lobj_anchor))
+        return refuse(CpuComparisonDomain::Owner,slippi_lobj_failure());
     if(!melee_web_cpu_interval_admit(commit_.effect_token))
         return refuse(CpuComparisonDomain::Effects,melee_web_cpu_interval_failure());
     // Unlike failure_code, this pure active guard does not require the final
@@ -147,7 +160,8 @@ bool GameplayCpuCheckpoint::capture_post_bytes(const GameplayMatchSession&,std::
 bool GameplayCpuCheckpoint::seal_post(const GameplayMatchSession& session) noexcept {
     if(phase_!=Phase::Recording)return false;
     try {
-        if(!same_owner(session)||session.source_frames()!=owner_.frame+static_cast<std::uint32_t>(span_)||
+        if(!same_owner(session)||!slippi_lobj_anchor_admit(commit_.lobj_anchor)||
+           session.source_frames()!=owner_.frame+static_cast<std::uint32_t>(span_)||
            !melee_web_cpu_interval_admit(commit_.effect_token)||
            melee_web_action_interval_seal_record(commit_.actions)!=1){disarm();phase_=Phase::Failed;return false;}
         auto payload=melee_web_source_memory_payload_snapshot_capture();post_payload_=payload.snapshot;
@@ -207,7 +221,8 @@ bool GameplayCpuCheckpoint::finish_replay(const GameplayMatchSession& session) n
         if(okay){matched_domains_|=1u<<id;return true;}
         comparison_={id,1,UINT32_MAX,UINT32_MAX,0,0,0,0,detail};phase_=Phase::Failed;return false;
     };
-    if(!check(CpuComparisonDomain::Owner,phase_==Phase::Replaying&&same_owner(session)&&session.source_frames()==post_frame_))return false;
+    if(!check(CpuComparisonDomain::Owner,phase_==Phase::Replaying&&same_owner(session)&&
+        session.source_frames()==post_frame_&&slippi_lobj_anchor_admit(commit_.lobj_anchor)==1,slippi_lobj_failure()))return false;
     if(!check(CpuComparisonDomain::Effects,melee_web_cpu_interval_admit(commit_.effect_token)==1,melee_web_cpu_interval_failure()))return false;
     const int action_result=melee_web_action_interval_finish_replay(commit_.actions);
     if(!check(CpuComparisonDomain::Actions,action_result==1,
@@ -247,6 +262,8 @@ bool GameplayCpuCheckpoint::seal_drawn_reference(const GameplayMatchSession& ses
     try {
         // Capture has no source writes. The original precheckpoint remains the
         // sole restore authority; its full admission is repeated at commit.
+        if(!slippi_lobj_anchor_admit(commit_.lobj_anchor))
+            return refuse(CpuComparisonDomain::Owner,slippi_lobj_failure());
         if(!melee_web_cpu_interval_admit(commit_.effect_token))
             return refuse(CpuComparisonDomain::Effects,melee_web_cpu_interval_failure());
         if(melee_web_action_interval_admit(commit_.actions)!=1)
@@ -276,7 +293,8 @@ bool GameplayCpuCheckpoint::matches_drawn_reference(const GameplayMatchSession& 
         if(okay){matched_domains_|=bit;return true;}
         comparison_={static_cast<std::uint32_t>(domain),1,UINT32_MAX,UINT32_MAX,0,0,0,0,detail};return false;
     };
-    if(!check(CpuComparisonDomain::Owner,phase_==Phase::Finished&&drawn_sealed_&&same_owner(session)&&session.source_frames()==post_frame_))return false;
+    if(!check(CpuComparisonDomain::Owner,phase_==Phase::Finished&&drawn_sealed_&&same_owner(session)&&
+        session.source_frames()==post_frame_&&slippi_lobj_anchor_admit(commit_.lobj_anchor)==1,slippi_lobj_failure()))return false;
     if(!check(CpuComparisonDomain::Effects,melee_web_cpu_interval_admit(commit_.effect_token)==1,melee_web_cpu_interval_failure()))return false;
     // ActionStore full event/private-state equality was accepted by finish_replay
     // before present; no new action event may be accepted afterwards.
@@ -295,6 +313,7 @@ bool GameplayCpuCheckpoint::matches_drawn_reference(const GameplayMatchSession& 
     matched_domains_|=1u<<static_cast<unsigned>(CpuComparisonDomain::Statics);return true;
 }
 void GameplayCpuCheckpoint::disarm() noexcept {
+    slippi_lobj_anchor_disarm(commit_.lobj_anchor);
     melee_web_lobj_writer_disarm(lobj_writer_session_);
     melee_web_class_piece_disarm(class_piece_anchor_);
     if(commit_.actions)melee_web_action_interval_disarm(commit_.actions);

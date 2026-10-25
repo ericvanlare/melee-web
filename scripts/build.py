@@ -120,7 +120,7 @@ def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
                     pipeline_provenance=False, selective_pipelines=False,
                     aurora_staging_shadow_diagnostic=False,
                     stage_arena_owner_diagnostic=False,
-                    slippi_logical_frame_clock=False,
+                    slippi_logical_frame_clock=False, slippi_lobj_presentation_cache=False,
                     stadium_c1a_diagnostic=False,
                     fma_collision_diagnostic=False,
                     fma_velocity_y_diagnostic=False):
@@ -143,6 +143,9 @@ def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
     if slippi_logical_frame_clock and (
             target != "gameplay_slippi_synctest" or configuration != "Release"):
         raise ValueError("Logical-frame clock requires the Release Slippi synctest")
+    if slippi_lobj_presentation_cache and (not slippi_logical_frame_clock or
+            target != "gameplay_slippi_synctest" or configuration != "Release"):
+        raise ValueError("LObj presentation cache requires the private Release logical-frame Slippi synctest")
     if target == "gameplay_slippi_synctest":
         if (pipeline_provenance or selective_pipelines or stadium_c1a_diagnostic or
                 fma_collision_diagnostic or fma_velocity_y_diagnostic):
@@ -150,7 +153,8 @@ def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
         if slippi_logical_frame_clock:
             suffix = "-stage-arena" if stage_arena_owner_diagnostic else ""
             suffix += "-aurora-staging" if aurora_staging_shadow_diagnostic else ""
-            return root / f"build/slippi-synctest-logical-frame{suffix}-release"
+            owner = "-lobj-presentation" if slippi_lobj_presentation_cache else ""
+            return root / f"build/slippi-synctest-logical-frame{owner}{suffix}-release"
         if stage_arena_owner_diagnostic and aurora_staging_shadow_diagnostic:
             return root / "build/slippi-synctest-stage-arena-aurora-staging-release"
         if stage_arena_owner_diagnostic:
@@ -982,12 +986,16 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
           stadium_c1a_diagnostic=False, fma_collision_diagnostic=False,
           fma_velocity_y_diagnostic=False, slippi_synctest_assets=None,
           aurora_staging_shadow_diagnostic=False,
-          stage_arena_owner_diagnostic=False, slippi_logical_frame_clock=False):
+          stage_arena_owner_diagnostic=False, slippi_logical_frame_clock=False,
+          slippi_lobj_presentation_cache=False):
     trace_targets = tuple(trace_targets or ())
     if ("gameplay_slippi_synctest" in trace_targets and
             trace_targets != ("gameplay_slippi_synctest",)):
         raise ValueError("gameplay_slippi_synctest must be the only --trace-target")
     slippi_synctest = trace_targets == ("gameplay_slippi_synctest",)
+    if slippi_lobj_presentation_cache and (not slippi_logical_frame_clock or
+            not slippi_synctest or configuration != "Release"):
+        raise ValueError("--slippi-lobj-presentation-cache requires the private Release logical-frame Slippi synctest")
     if slippi_logical_frame_clock and (not slippi_synctest or configuration != "Release"):
         raise ValueError("--slippi-logical-frame-clock requires the private Release Slippi synctest")
     if aurora_staging_shadow_diagnostic and not slippi_synctest:
@@ -1088,6 +1096,7 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
                                     aurora_staging_shadow_diagnostic=aurora_staging_shadow_diagnostic,
                                     stage_arena_owner_diagnostic=stage_arena_owner_diagnostic,
                                     slippi_logical_frame_clock=slippi_logical_frame_clock,
+                                    slippi_lobj_presentation_cache=slippi_lobj_presentation_cache,
                                     stadium_c1a_diagnostic=stadium_c1a_diagnostic,
                                     fma_collision_diagnostic=fma_collision_diagnostic,
                                     fma_velocity_y_diagnostic=fma_velocity_y_diagnostic)
@@ -1140,6 +1149,7 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
             f"-DMELEE_WEB_SLIPPI_PROFILE_BROWSER={'ON' if 'gameplay_snapshot_probe_browser' in trace_targets else 'OFF'}"
         )
         configure.append(f"-DMELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK={'ON' if slippi_logical_frame_clock else 'OFF'}")
+        configure.append(f"-DMELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE={'ON' if slippi_lobj_presentation_cache else 'OFF'}")
         configure.append(f"-DMELEE_WEB_SLIPPI_SYNCTEST={'ON' if slippi_synctest else 'OFF'}")
         if slippi_synctest:
             configure.append(f"-DMELEE_WEB_SLIPPI_SYNCTEST_ASSET_ROOT={assets_root}")
@@ -1207,6 +1217,8 @@ def main():
                         help="Build the private Release Slippi census with read-only Aurora staging-shadow provenance")
     parser.add_argument("--slippi-logical-frame-clock", action="store_true",
                         help="Enable the isolated private Release v6 logical-frame clock profile")
+    parser.add_argument("--slippi-lobj-presentation-cache", action="store_true",
+                        help="Enable the isolated private Release v7 canonical light presentation owner")
     parser.add_argument("--stage-arena-owner-diagnostic", action="store_true",
                         help="Enable the private Release Slippi stage-arena owner inventory")
     args = parser.parse_args()
@@ -1225,7 +1237,8 @@ def main():
               slippi_synctest_assets=args.slippi_synctest_assets,
               aurora_staging_shadow_diagnostic=args.aurora_staging_shadow_diagnostic,
               stage_arena_owner_diagnostic=args.stage_arena_owner_diagnostic,
-              slippi_logical_frame_clock=args.slippi_logical_frame_clock)
+              slippi_logical_frame_clock=args.slippi_logical_frame_clock,
+              slippi_lobj_presentation_cache=args.slippi_lobj_presentation_cache)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         raise SystemExit(f"build: {error}") from error
 

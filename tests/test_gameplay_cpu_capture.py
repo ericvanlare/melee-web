@@ -61,7 +61,7 @@ class GameplayCpuCaptureControls(OwnedWorkspaceTests):
         for name,value in replacements.items():generated=generated.replace(name,value)
         self.assertNotIn('@ACTUAL_',generated)
         cpp=out/'control.cpp';cpp.write_text(generated)
-        cmd=[compiler,'-std=c++20','-Wall','-Wextra','-Werror','-O1','-UNDEBUG','-I'+str(SOURCE/'src'),str(cpp),'-o',str(out/'control')]
+        cmd=[compiler,'-std=c++20','-DMELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE=1','-Wall','-Wextra','-Werror','-O1','-UNDEBUG','-I'+str(SOURCE/'src'),str(cpp),'-o',str(out/'control')]
         result=subprocess.run(cmd,cwd=out,env=env,text=True,capture_output=True,timeout=60)
         (out/'compile.json').write_text(json.dumps({'argv':cmd,'exit_code':result.returncode,'stdout':result.stdout,'stderr':result.stderr},indent=2)+'\n')
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
