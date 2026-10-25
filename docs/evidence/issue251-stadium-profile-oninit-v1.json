@@ -22363,6 +22363,260 @@
       "No ordinary unload/cache/IDBFS parity.",
       "No C3 or public admission acceptance."
     ],
-    "next": "Prepare a source-only plan identifying the smallest original-side B owner registration, retirement and per-owner RNG observation, together with its actual recorded start/input/source-order context. Original B may naturally use a different seed/menu/start context. Compare with the retained runtime B only if that context and input/order compatibility are proved; otherwise seek a separately reviewed plan. Never force seeds or invent neutral inputs. No new capture is authorized; successful captures remain retained and unrepeated."
+    "next": "The later-SSS prerequisite now passes the limited common-field component at cursor940 after exact original inputs0..939. Next is a source-only B Entry/Setup context handoff and constructor/RNG-observation prerequisite, before separate review/release. Full replay, original-B/per-owner parity and C3 remain open; preserve successful captures without repeating them.",
+    "original_B_continuation": {
+      "state": "PASS_LATER_SSS_ONEXIT_COMMON_COMPONENT_CURSOR940_PRE_B_ASSETS; FULL_REPLAY_AND_C3_OPEN",
+      "run_id": "browser-rollback-sprint-20261022-115029-d89e262b",
+      "artifact_paths_relative_to_run": true,
+      "source": {
+        "current_checkpoint": "f6a114152d70a3d2604f636bf0269c4ba85a3c3a",
+        "current_tree": "795ba5a6f279a6f8570f4ceed3663e2bc85788fb",
+        "prior_checkpoint": "35b04a776422dd4e8796cdacd43b294b602dd3b6",
+        "runtime_producer": "35b04a77 plus two reviewed producer-worktree files; actual fresh54 remains distinct from clean f6a11415 checkpoint. Prior failed675 capture used21087+6 runtime, retained under prior_failed_capture_source."
+      },
+      "validation": {
+        "earlier_later_SSS_full": {
+          "path": "stadium-later-sss-validation-v1/result-v2.json",
+          "bytes": 2848,
+          "sha256": "82336e1da6caddad282df6eff0db71663c360d2266e956521e400f0fb67bbb3d"
+        },
+        "pause_builds": {
+          "path": "stadium-later-sss-pause-validation-v1/native-build-result-v1.json",
+          "bytes": 7014,
+          "sha256": "d11173f7433bc3aa50b42b10b94bb4beb2cf2d3cb89dd30d92e998f4f5de24ee"
+        },
+        "retained_failed_full": {
+          "path": "stadium-later-sss-pause-validation-v1/failure-summary-v1.json",
+          "bytes": 2736,
+          "sha256": "e9ba9f78deaf8088cd080321d21f15fd599172753a3e4ff505d3ce2557ec1fb6"
+        },
+        "repaired_full": {
+          "path": "stadium-later-sss-pause-validation-v2/result-v1.json",
+          "bytes": 8117,
+          "sha256": "495b08666bd8d7e75930d143866f2a5159de1aeaf514316d9a4452921d562fde"
+        },
+        "clean_checkpoint": {
+          "path": "stadium-later-sss-pause-validation-v2/clean-checkpoint-v1.json",
+          "bytes": 1527,
+          "sha256": "5f3e4a58ce29e03a48cb16c69b31a8702ea6982dd9f985067f81610428d61669"
+        },
+        "scope": "Diagnostic and ordinary Release builds pass. Final full regression: 2764 tests, 195 skips, 579.574s. Earlier missing fixture declarations are retained; the fixture repair changes no production runtime. Current and retained 54-artifact runtime inventory and historical output remain exact.",
+        "exact_head_CI": "Not run on unpublished35b04 or this docs candidate; previous d448 CI is historical."
+      },
+      "prior_pause_refusal": {
+        "path": "stadium-later-sss-capture-candidate-v1/root-result-v2.json",
+        "bytes": 2625,
+        "sha256": "04dbdab57c327a247146565fea7afd9ac587161f4d65c4634462c5f1811a6fef"
+      },
+      "pause_repair_review": {
+        "path": "stadium-later-sss-pause-workload-candidate-v1/independent-source-review-v1.json",
+        "bytes": 4252,
+        "sha256": "9fc7d2917b25ddae8b1518fe6f75866e38a4f90bf4a25afc6de6661d630084f3"
+      },
+      "actual_capture": {
+        "root": {
+          "path": "stadium-later-sss-pause-capture-v1/root-result-v1.json",
+          "bytes": 3957,
+          "sha256": "649d19344cf02fb3b670831d7fd3bc842899b1bbc3cb262a847f11832482cc39"
+        },
+        "independent_review": {
+          "path": "stadium-later-sss-pause-capture-v1/independent-review-v1.json",
+          "bytes": 7196,
+          "sha256": "2f2a0d42badcf791bf4c678bedaf622c9dcc99831f34fbf59ba1aa3f95bf5c5a"
+        },
+        "raw_report": {
+          "path": "stadium-later-sss-pause-capture-v1/browser-run/report.json",
+          "bytes": 513466,
+          "sha256": "76f8009459f3e9c8768d644f8fcbff84f7ac1aa8599eb8319c7af57a581683c1"
+        },
+        "actual_prefix": "675 consumed session frames0..674: every scene and four-port literal input matches the pinned original prefix. Original chord450 and461 surround neutral countdown rows451..460; source frame56/RNG410743517 and selected fighter state remain fixed. Results first observed462.",
+        "failure": "Returned CSS poll675 rejects retained stage3. No tick_return675; laterSSS807..939 and target940 not reached. Formal NoContest label and complete original returned-cache parity are not directly observed.",
+        "cleanup": "Native unloaded phase0/running0/cursor0; wrapper restored; all14 recorded owned PIDs independently absent; owner cleanup passed123ms; all215 source/runtime/harness pins exact.",
+        "runtime_replay": "NOT_RUN",
+        "C3": false
+      },
+      "source_reduction": {
+        "freeze": {
+          "path": "stadium-later-sss-returned-css-reduction-v1/freeze-v1.json",
+          "bytes": 1711,
+          "sha256": "329f244c7eb3f62803cac0d56c1eba2da1415a3a9e5ee1382353694b1487f44f"
+        },
+        "proof": {
+          "path": "stadium-later-sss-returned-css-reduction-v1/source-proof-v1.json",
+          "bytes": 9332,
+          "sha256": "c151d741908a0b81040eb4ab9337e3389ce90966dada9b6f8b528434315d50f2"
+        },
+        "contract": {
+          "path": "stadium-later-sss-returned-css-reduction-v1/next-control-contract-v1.md",
+          "bytes": 4130,
+          "sha256": "a1cd2a554ec57d22ca7c3893833e35a6a5f3f99c999695a260140079fb6d5197"
+        },
+        "finding": "Original return_css3362 retains stage3, Stock-kind1 and is_stock0/is_vs0/timer0/xB-1; active player stocks remain4. Native error matches exposed fields but does not report player stocks/full cache. Ordinary stage availability excludes diagnostic-only Stadium, a sufficient rejection. stock=0 in the message is a rule bit, not fighter stocks.",
+        "next": "Source-only smallest B Entry/Setup handoff contract using actual retained4235/4313 and observed cursor940; preserve context/input/order, no seed forcing or original-A substitution. Constructor/GO/per-owner observations remain prerequisites before separate release."
+      },
+      "limits": [
+        "No original lifetime-B/Entry/constructor/GO comparison, broader typed/timer/per-owner RNG parity or transformations.",
+        "No C3, public admission, full-session/pixel/PCM/timing/physical-input acceptance.",
+        "No auto-Resume, source state injection, timing deadline extension or comparison weakening; failed evidence retained."
+      ],
+      "returned_css_repair": {
+        "state": "VALIDATED_AND_ACTUAL_LATER_SSS_COMPONENT_PASS_NO_B_ENTRY",
+        "source_freeze": {
+          "path": "stadium-later-sss-returned-css-candidate-v1/freeze-v2.json",
+          "bytes": 11735,
+          "sha256": "8081a45efa9d8222328e4153ce49cb920fbaebdf1ce2f16f8f4c96b5edd7673f"
+        },
+        "source_delta": {
+          "path": "stadium-later-sss-returned-css-candidate-v1/source-delta-v2.json",
+          "bytes": 2334,
+          "sha256": "b77ae42fefcd9f8e268f7dce015bcc78a613f7bce45c81d5fcaa4d839b86f37d"
+        },
+        "independent_source_review": {
+          "path": "stadium-later-sss-returned-css-candidate-v1/independent-source-review-v1.json",
+          "bytes": 6259,
+          "sha256": "431e17992985d077b71b6a4556fb19fe068692df488079e3962e2c905b1a868c"
+        },
+        "root_focused_review": {
+          "path": "stadium-later-sss-returned-css-candidate-v1/root-focused-review-v1.json",
+          "bytes": 1743,
+          "sha256": "a8de6f8c7a2dd8140a6383f1808df0d607e80a796f9f777c6b47f2f356d7d7fb"
+        },
+        "actual_focused_result": {
+          "path": "stadium-later-sss-returned-css-candidate-v1/private-focused-v2/result-v1.json",
+          "bytes": 9306,
+          "sha256": "f5ea412eee87d6f05deadbdaf0db6cb97103cdb60e0b81eadd23165b1750d6c9"
+        },
+        "scope": "Existing owner/session/occurrence/phase and equal returned-cache/post-VS provenance; stage validation on a copy only; exact rules/player cache bytes and public admission unchanged. State2/seen2 is limited to the closed SSS epilogue. Callback leaves are modeled, not native runtime parity.",
+        "validation_state": "Three focused modules and diagnostic/ordinary Release pass; full2765/195/619.091s PASS; fresh runtime54 remains dirty35b04+2 producer distinct from clean checkpoint.",
+        "source_producer": "35b04a776422dd4e8796cdacd43b294b602dd3b6 plus two reviewed producer-worktree files; includes a test and is not a claim both files affect binaries. Prior capture runtime remains21087+6.",
+        "full_result": {
+          "path": "stadium-later-sss-returned-css-validation-v1/result-v1.json",
+          "bytes": 8841,
+          "sha256": "70badd6c9407b33f3bb44eae2f3d651d8281142db81007d2f287825c980e97a9"
+        },
+        "clean_checkpoint": {
+          "path": "stadium-later-sss-returned-css-validation-v1/clean-checkpoint-v1.json",
+          "bytes": 1207,
+          "sha256": "2da1b4c817961465e7f0b48964843f67a9ab3de3f02741934eb0578822bbae6a"
+        },
+        "actual_capture": {
+          "state": "later_sss_component_pass_replay_stopped",
+          "raw": {
+            "path": "stadium-later-sss-returned-css-capture-v1/browser-run/report.json",
+            "bytes": 665446,
+            "sha256": "a972cc831763554800bb35a99b6300dcd8e8b6054e3f218d5c13ef094678d12b"
+          },
+          "literal_trace": {
+            "path": "stadium-later-sss-returned-css-capture-v1/browser-run/retail-port.jsonl",
+            "bytes": 2277597,
+            "sha256": "72a27974b857de5920de402cdd2ec518e02aad6b8e56b6e58dd52622d729c247"
+          },
+          "downloaded_report": {
+            "path": "stadium-later-sss-returned-css-capture-v1/browser-run/retail-browser-report.json",
+            "bytes": 18765,
+            "sha256": "d2f54736dc5abea8f093cb012cd07908a82f3685aee0977dce45e73f85e5b33f"
+          },
+          "launcher": {
+            "path": "stadium-later-sss-returned-css-capture-v1/launcher-result.json",
+            "bytes": 946,
+            "sha256": "5e5b07486f8bc7874f7eb5c4c137cfb1f4d816a6af803d8b0af227b32f130ca2"
+          },
+          "owner": {
+            "path": "stadium-later-sss-returned-css-capture-v1/owner.json",
+            "bytes": 100007,
+            "sha256": "2b326cbc1d8909c1de206a821bc5495289faec470d07c04e5db9c710c0173a18"
+          },
+          "root_cleanup": {
+            "path": "stadium-later-sss-returned-css-capture-v1/root-cleanup-review-v1.json",
+            "bytes": 1484,
+            "sha256": "caa1408d53384a9b11ffcda8d74b4c87360a39fda95723386f20d556132f575a"
+          },
+          "postflight": {
+            "path": "stadium-later-sss-returned-css-capture-v1/postflight-inputs-v1.json",
+            "bytes": 37501,
+            "sha256": "513e61297783566e9294bbf96d75db0ecbcfca4b81ac5843fa9bb8d1ce8d9f3c"
+          },
+          "packet": {
+            "path": "stadium-later-sss-returned-css-capture-packet-v1/manifest.json",
+            "bytes": 148336,
+            "sha256": "8c6afcd9faee42205321adc0197bfa4032bc31440de40c525104faddb254cdce"
+          },
+          "data_only_analysis": {
+            "path": "stadium-later-sss-returned-css-raw-analysis-v1/analysis-v2.json",
+            "bytes": 5000,
+            "sha256": "d50f941c60654becd1f3ceb973240cecc14d22edfa8bc4a8c164b8f8ba119255"
+          },
+          "review_helper_failure": {
+            "path": "stadium-later-sss-returned-css-raw-analysis-v1/preparation-failure-v1.json",
+            "bytes": 964,
+            "sha256": "ccfceaa2ea6981050251288610512ff24c15491841e1d654c0307472da0b4fa5"
+          },
+          "independent_raw_review": {
+            "path": "stadium-later-sss-returned-css-independent-review-escalation-v2.json",
+            "bytes": 6390,
+            "sha256": "11ba8d1bbd8593e6e72df192dd2aace509b0f364e1d9b309f739164d19acae18"
+          },
+          "literal_consumed": 940,
+          "global_cursor": 940,
+          "menu_ticks": 535,
+          "local_order_rows": 1887,
+          "tick_returns": 940,
+          "draw_returns": 947,
+          "original_coordinate": {
+            "sequence": 4234,
+            "source_tick": 133,
+            "draw_ordinal": 192
+          },
+          "seed": "7fc17cf1",
+          "source_owners": {
+            "world_generation": 6,
+            "audio_generation": 4
+          },
+          "component_comparison": true,
+          "runtime_replay": "FAIL_INCOMPLETE_EXPLICIT_SSS_STOP",
+          "original_replay_capture_result": "fail",
+          "preceding_A_state_comparison": "NOT_RUN",
+          "menu_draw_parity": "UNKNOWN",
+          "B_Entry": false,
+          "B_constructor_GO": "UNOBSERVED",
+          "C3": false,
+          "whole_session_finalization_failures": [
+            "Whole-session replay did not complete successfully",
+            "Browser replay report is incomplete or failed"
+          ],
+          "component_finalization_scope": "Only explicit_later_SSS_stop_component_only passes; whole-session failures remain preserved."
+        },
+        "C3": false,
+        "runtime_inventory": {
+          "path": "stadium-later-sss-returned-css-validation-v1/retained-runtime-inventory-v1.json",
+          "bytes": 38825,
+          "sha256": "80c8316fed57ce9298b98bd61591376bf87800e21be42aac093ffca0770f3a1b"
+        },
+        "prebuild_inventory": {
+          "path": "stadium-later-sss-returned-css-validation-v1/prebuild-runtime-inventory-v1.json",
+          "bytes": 38818,
+          "sha256": "4aa67e0fcc54bea861c561483f766f799e505a146c4c4b5072a84313a2d96e26"
+        },
+        "application": {
+          "path": "stadium-later-sss-returned-css-validation-v1/application-v1.json",
+          "bytes": 3658,
+          "sha256": "66e85c8719c95f1bda6f931f1b4914c90fc4097fbf9b959ae54bb5de2cf102b4"
+        },
+        "build_result": {
+          "path": "stadium-later-sss-returned-css-validation-v1/native-build-result-v1.json",
+          "bytes": 7111,
+          "sha256": "8b99e3edf49219448299954d51a2f8355e5ea7fe558ce656f67703a2f64b8675"
+        },
+        "clean_source": "f6a114152d70a3d2604f636bf0269c4ba85a3c3a",
+        "clean_tree": "795ba5a6f279a6f8570f4ceed3663e2bc85788fb",
+        "exact_head_CI": "No current f6a11415 or unpublished docs-head CI claimed."
+      },
+      "prior_state_before_returned_css_repair": "FAIL_RETURNED_CSS_STAGE_ADMISSION_AT675_AFTER_ORIGINAL_PAUSE_AND_RESULTS; LATER_SSS_AND_C3_OPEN",
+      "prior_failed_capture_source": {
+        "prior_checkpoint": "21087e7d37a9deb74f5c10bafc526de6f67bebd9",
+        "current_checkpoint": "35b04a776422dd4e8796cdacd43b294b602dd3b6",
+        "runtime_producer": "21087e7d plus 6 reviewed source/test files; final source checkpoint adds one fixture-only test repair (7 files total). The checkpoint hash is not the binary build identity."
+      }
+    }
   }
 }
