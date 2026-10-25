@@ -23,7 +23,7 @@ import {FRESH_SETUP_GO2_ROUTE, validateFreshSetupGo2RunnerSource, validateFresh1
   validateMatchedSetupCfIdentities, matchedSetupCfRuntimeFailure, PREFIX_V2_SCOPE, FULL_V3_SCOPE,
   trackMatchedSetupCfExplicitStep, matchedSetupCfNativeAccessAllowed,
   dispatchMatchedSetupCfNativeEvaluation, guardMatchedSetupCfNativeCleanup,
-  FULL_COMMON_FIELDS_SEED_V1_SCOPE, FRESH132_FULL_A_SCOPE, FRESH132_FULL_A_ROUTE}
+  FULL_COMMON_FIELDS_SEED_V1_SCOPE, FRESH132_FULL_A_SCOPE, FRESH132_FULL_A_ROUTE, FRESH132_TYPED22_PAIR_ROUTE, FRESH132_TYPED22_PAIR_SCOPE}
   from './stadium_matched_setup_cf_runner_gate.mjs';
 import {elapsedMs, measureAsync, measureSync, monotonicNowNs, roundMs,
   summarizeFailedActionSamples, summarizeStageEvents, summarizeTimingValues}
@@ -61,6 +61,7 @@ const {values} = parseArgs({options: Object.fromEntries(
       ['first-sss-fresh-ready-start', {type: 'boolean', default: false}],
       ['first-sss-fresh-setup-go2', {type: 'boolean', default: false}],
       ['first-sss-fresh132-full-a', {type: 'boolean', default: false}],
+      ['first-sss-fresh132-full-pair-typed22', {type:'boolean',default:false}],
       ['first-sss-vs-entry', {type: 'boolean', default: false}],
       ['first-sss-vs-setup', {type: 'boolean', default: false}],
       ['first-sss-vs-setup-cf', {type: 'boolean', default: false}],
@@ -73,12 +74,16 @@ const {values} = parseArgs({options: Object.fromEntries(
       ['recreation-canary-full-pair', {type: 'boolean', default: false}],
     ])), strict: true});
 const cssSssReducer = values['css-sss-reducer'];
-const recreationCanary = values['recreation-canary'];
-const recreationFullPair = values['recreation-canary-full-pair'];
+const firstSssFresh132Typed22Pair = values['first-sss-fresh132-full-pair-typed22'];
+const fresh132Mode = firstSssFresh132Typed22Pair ? 'fresh132-full-pair-typed22-v1' : values['first-sss-fresh132-full-a'] ? 'fresh132-full-a-v1' : null;
+if(firstSssFresh132Typed22Pair && ['first-sss-fresh132-full-a','recreation-canary','recreation-canary-full-pair','recreation-canary-full-b'].some(k=>values[k])) throw Error('Fresh132 typed22 pair is one distinct route');
+const recreationCanary = values['recreation-canary'] || firstSssFresh132Typed22Pair;
+const recreationFullPair = values['recreation-canary-full-pair'] || firstSssFresh132Typed22Pair;
 const recreationFullB = values['recreation-canary-full-b'] || recreationFullPair;
-const recreationAActionCount = recreationFullPair ? 7167 : 174;
-const recreationBActionCount = recreationFullB ? 7167 : 174;
-const recreationPassDecision = recreationFullPair
+const recreationAActionCount = firstSssFresh132Typed22Pair ? 7168 : recreationFullPair ? 7167 : 174;
+const recreationBActionCount = firstSssFresh132Typed22Pair ? 7168 : recreationFullB ? 7167 : 174;
+const recreationPassDecision = firstSssFresh132Typed22Pair
+  ? 'PASS_SAME_INSTANCE_FRESH132_A7168_B7168_TYPED22_SEED_COMPONENT_ONLY' : recreationFullPair
   ? 'PASS_SAME_INSTANCE_A7167_B7167_COMMON_FIELDS_SEED_COMPONENT_ONLY'
   : recreationFullB
   ? 'PASS_SAME_INSTANCE_A174_B7167_COMMON_FIELDS_SEED_COMPONENT_ONLY'
@@ -91,10 +96,10 @@ const firstCssFreshFinite = values['first-css-fresh-finite'];
 const firstCssConstructorManifest = values['first-css-constructor-manifest'];
 const firstSssVsSetupTextTail = values['first-sss-vs-setup-text-tail'];
 const firstSssFreshSetupGo2 = values['first-sss-fresh-setup-go2'];
-const firstSssFresh132FullA = values['first-sss-fresh132-full-a'];
+const firstSssFresh132FullA = fresh132Mode !== null;
 const firstSssVsSetupCfExplicitStep = values['first-sss-vs-setup-cf-explicit-step'];
-const firstSssVsSetupCfFullSchedule = values['first-sss-vs-setup-cf-full-schedule'] || recreationFullPair;
-const firstSssVsSetupCfCommonFields = values['first-sss-vs-setup-cf-common-fields'] || recreationFullPair;
+const firstSssVsSetupCfFullSchedule = values['first-sss-vs-setup-cf-full-schedule'] || (recreationFullPair&&!firstSssFresh132Typed22Pair);
+const firstSssVsSetupCfCommonFields = values['first-sss-vs-setup-cf-common-fields'] || (recreationFullPair&&!firstSssFresh132Typed22Pair);
 const firstSssVsSetupCf = validateMatchedSetupCfRequest({
   enabled: values['first-sss-vs-setup-cf'], explicitStep: firstSssVsSetupCfExplicitStep,
   fullSchedule: firstSssVsSetupCfFullSchedule, commonFields: firstSssVsSetupCfCommonFields,
@@ -134,13 +139,13 @@ if (firstSssFreshSetupGo2 && (!firstSssFreshReadyStart || !values['first-sss-fre
 if (firstSssFresh132FullA && (!firstSssFreshReadyStart || !values['first-sss-fresh-ready-start-expected'] ||
     !firstSssVsSetupCf || !firstSssVsSetupCfExplicitStep || firstSssFreshSetupGo2 ||
     firstSssVsSetup || firstSssVsEntry || firstSssVsSetupTextTail ||
-    firstSssVsSetupCfFullSchedule || firstSssVsSetupCfCommonFields || recreationCanary ||
+    firstSssVsSetupCfFullSchedule || firstSssVsSetupCfCommonFields || (recreationCanary&&!firstSssFresh132Typed22Pair) ||
     !values['first-sss-vs-setup-cf-packet'] || !values['first-sss-vs-setup-cf-assembly']))
   throw Error('Fresh132 full-A requires its separate prepared Start→Setup→MWC6 route with explicit steps and exact packet/assembly');
 if (firstCssFreshFinite !== !!values['first-css-finite-receipt'] ||
     (firstCssFreshFinite && (firstCssFreshRow || firstCssConstructorReturn || cssSssReducer ||
       (firstSssConstructorPair && !firstSssConstructorPairFresh) ||
-      (firstSssVsSetupCf && !firstSssFreshSetupGo2 && !firstSssFresh132FullA) || recreationCanary ||
+      (firstSssVsSetupCf && !firstSssFreshSetupGo2 && !firstSssFresh132FullA) || (recreationCanary&&!firstSssFresh132Typed22Pair) ||
       ['first-css-browser-draw','first-css-browser-stream','first-css-browser-final-draw',
        'first-css-context','first-css-consumed-pad','first-css-return-expected',
        'first-css-tick-expected','first-css-draw-expected','first-css-postdraw-input',
@@ -183,7 +188,7 @@ if (recreationFullPair && values['recreation-canary-full-b'])
   throw Error('Full pair requires its distinct opt-in, not the short A/full B option');
 if (recreationFullB && !recreationCanary)
   throw Error('Full B requires the explicit recreation canary');
-if (recreationCanary && (!firstSssVsSetup || !values['first-sss-vs-setup-cf'] ||
+if (recreationCanary && ((!firstSssVsSetup&&!firstSssFresh132Typed22Pair) || !values['first-sss-vs-setup-cf'] ||
     !firstSssVsSetupCfExplicitStep ||
     (!recreationFullPair && (firstSssVsSetupCfFullSchedule || firstSssVsSetupCfCommonFields)) ||
     values['first-sss-vs-setup-cf-full-schedule'] || values['first-sss-vs-setup-cf-common-fields'] ||
@@ -241,6 +246,7 @@ const matchedSetupCfPreflight = validateMatchedSetupCfPreflight(preflight, {
   enabled: firstSssVsSetupCf,
   freshSetupGo2: firstSssFreshSetupGo2,
   fresh132FullA: firstSssFresh132FullA,
+  fresh132FullPair: firstSssFresh132Typed22Pair,
   explicitStep: firstSssVsSetupCfExplicitStep,
   fullSchedule: firstSssVsSetupCfFullSchedule,
   commonFields: firstSssVsSetupCfCommonFields,
@@ -254,7 +260,8 @@ const recreationIdentityLibraryPath = path.join(ROOT, 'src/stadium_recreation_id
 const recreationContextHelperPath = path.join(ROOT, 'tests/stadium_recreation_canary_context.mjs');
 const matchedSetupCfBPreflight = recreationFullB ? validateMatchedSetupCfPreflight(
   {...preflight, matched_setup_cf: preflight.recreation_canary?.full_b_matched_setup_cf}, {
-    enabled: true, explicitStep: true, fullSchedule: true, commonFields: true,
+    enabled: true, explicitStep: true, fullSchedule: !firstSssFresh132Typed22Pair, commonFields: !firstSssFresh132Typed22Pair,
+    fresh132FullA:firstSssFresh132Typed22Pair,fresh132FullPair:firstSssFresh132Typed22Pair,
     packetPath: path.resolve(values['first-sss-vs-setup-cf-packet']),
     assemblyPath: path.resolve(values['first-sss-vs-setup-cf-assembly']),
     helperPath: path.join(ROOT, 'tests/stadium_matched_setup_cf_consumer.mjs'),
@@ -263,7 +270,7 @@ let matchedSetupCfBInputs = null;
 const firstSssVsSetupCfV2 = firstSssVsSetupCf &&
   (matchedSetupCfPreflight.scope === PREFIX_V2_SCOPE || matchedSetupCfPreflight.scope === FULL_V3_SCOPE ||
    matchedSetupCfPreflight.scope === FULL_COMMON_FIELDS_SEED_V1_SCOPE ||
-   firstSssFresh132FullA && matchedSetupCfPreflight.scope === FRESH132_FULL_A_SCOPE);
+   firstSssFresh132FullA && [FRESH132_FULL_A_SCOPE,FRESH132_TYPED22_PAIR_SCOPE].includes(matchedSetupCfPreflight.scope));
 let matchedSetupCfTiming = firstSssVsSetupCfV2 ? {
   actionSamples: [], scheduledActions: null, actionLoopActive: false, actionLoopStartedNs: null,
   actionLoopMs: null, globalCaptureDeadlineRemainingAtActionLoopStartMs: null,
@@ -420,7 +427,7 @@ let report = {
   browser: null,
   local_http_artifacts: {count: 0, before: null, after: null, unchanged: false},
     scenario: {
-    route_mode: recreationCanary ? (recreationFullB
+    route_mode: firstSssFresh132Typed22Pair ? FRESH132_TYPED22_PAIR_ROUTE : recreationCanary ? (recreationFullB
       ? (recreationFullPair ? 'same-instance-recreation-A7167-B7167-common-fields-seed' : 'same-instance-recreation-A174-B7167-common-fields-seed')
       : 'same-instance-recreation-canary-174') : firstSssFresh132FullA ? FRESH132_FULL_A_ROUTE : firstSssFreshSetupGo2 ? 'first-sss-fresh-setup-go2' : firstSssVsSetup ? 'first-sss-vs-setup' : firstSssVsEntry ? 'first-sss-vs-entry' : firstSssFreshReadyStart ? 'first-css-fresh-finite-sss-132-ready-start-v1' : firstSssFreshPrefix132 ? 'first-css-fresh-finite-sss-prefix-132-v2' : firstSssPrefix ? 'first-sss-prefix' : firstSssFreshInputTickDraw ? 'first-css-fresh-finite-sss-input-tick-draw-v1' : firstSssDraw ? 'first-sss-draw' :
       firstSssConstructorPairFresh ? 'first-css-fresh-finite-sss-constructor-pair-v1' :
@@ -472,7 +479,7 @@ let report = {
     context_closed: false, browser_connection_closed: false, browser_process_terminated: false,
     browser_process_pid: null, server_process_terminated: false, server_process_pid: null,
     server_process_exit: null, failures: []},
-  source_request_scope: recreationCanary
+  source_request_scope: firstSssFresh132Typed22Pair ? 'One same-instance Fresh132 MWC6 typed22 A/checked close/restart/fresh B component; no per-owner source ledger or C3 acceptance' : recreationCanary
     ? (recreationFullB
       ? (recreationFullPair
         ? 'Same-instance full7167 A and B with3501 common+seed rows each and checked close/restart; no complete original per-owner RNG ledger or C3 acceptance.'
@@ -1196,14 +1203,14 @@ async function loadBoundFirstSssExpected(mode, optionName, expectedSchema, {fres
   assert.equal(expected.schema, expectedSchema);
   const helperPath = path.join(ROOT, 'tests/stadium_first_css_stream_compare.mjs');
   const comparatorBinding = mode === 'first_sss_fresh_ready_start'
-    ? resolveFreshSssReadyStartComparator(preflight, {fresh132FullA}) : frozen.comparator;
+    ? resolveFreshSssReadyStartComparator(preflight, {fresh132FullA,fresh132FullPair:firstSssFresh132Typed22Pair}) : frozen.comparator;
   assert.equal(path.resolve(comparatorBinding.path), helperPath,
     `${mode} comparator path differs from preflight`);
   const helperBytes = await fs.readFile(helperPath);
   const actualComparator = {path: helperPath, bytes: helperBytes.byteLength,
     sha256: digest(helperBytes)};
   if (mode === 'first_sss_fresh_ready_start') {
-    validateFreshSssReadyStartComparator(preflight, {fresh132FullA, actual: actualComparator});
+    validateFreshSssReadyStartComparator(preflight, {fresh132FullA,fresh132FullPair:firstSssFresh132Typed22Pair, actual: actualComparator});
   } else {
     assert.equal(helperBytes.byteLength, comparatorBinding.bytes,
       `${mode} comparator byte count differs from preflight`);
@@ -1354,13 +1361,13 @@ async function loadMatchedSetupCfInputs({fullSchedule = firstSssVsSetupCfFullSch
     seedReferenceIdentity = {...seedIdentity, hash_source: binding.hash_source};
   }
   const hostEvidence = fresh132FullA
-    ? helper.hostEvidenceFromFresh132FullAProjection(packet)
+    ? helper.hostEvidenceFromFresh132FullAProjection(packet,{typed22:firstSssFresh132Typed22Pair})
     : helper.hostEvidenceFromPacket(packet, {fullSchedule, commonFields, seedSidecar, seedIdentity});
   assert.equal(['run2-proper-prefix-v2', 'run2-full-schedule-v3',
-    'run2-full-common-fields-seed-v1', 'fresh132-full-a-v1'].includes(hostEvidence.mode), firstSssVsSetupCfV2,
+    'run2-full-common-fields-seed-v1', 'fresh132-full-a-v1', 'fresh132-full-pair-typed22-v1'].includes(hostEvidence.mode), firstSssVsSetupCfV2,
     'packet schema differs from the preflight-bound continuation version');
   if (['run2-proper-prefix-v2', 'run2-full-schedule-v3',
-    'run2-full-common-fields-seed-v1', 'fresh132-full-a-v1'].includes(hostEvidence.mode)) {
+    'run2-full-common-fields-seed-v1', 'fresh132-full-a-v1', 'fresh132-full-pair-typed22-v1'].includes(hostEvidence.mode)) {
     assert.deepEqual(Object.keys(assembly).sort(),
       ['host_only_expectations_sha256', 'runtime_payload_sha256', 'schema', 'scope'].sort());
     assert.equal(assembly.schema, 'melee-web-stadium-run2-source-action-assembly-v1');
@@ -1407,7 +1414,7 @@ async function loadFirstSssVsEntryInputs() {
 async function loadFreshSss132ReadyStartInputs() {
   const result=await loadBoundFirstSssExpected('first_sss_fresh_ready_start',
     'first-sss-fresh-ready-start-expected','melee-web-stadium-fresh-sss-132-ready-start-endpoint',
-    {fresh132FullA: firstSssFresh132FullA});
+    {fresh132FullA: firstSssFresh132FullA, fresh132FullPair:firstSssFresh132Typed22Pair});
   assert.equal(preflight.first_sss_fresh_ready_start.diagnostic_export,
     '_melee_web_native_menu_stadium_fresh_sss_132_ready_start_kick');
   assert.equal(preflight.first_sss_fresh_ready_start.expected_state_host_only,true);
@@ -3238,7 +3245,7 @@ async function runFirstSssVsSetup(entryNative) {
   }
   if (firstSssVsSetupCf) native = await runMatchedSetupCfContinuation(native);
   report.scenario.first_sss_vs_setup.claim = firstSssFresh132FullA
-    ? 'Fresh132 same-producer Setup endpoint compares Entry2544/Setup2584 source tick131, constructor count1 and five witnesses; then the separate MWC6 lifetime-A route runs 7168 actions. This is not an Entry callback, recreated B, full typed parity, per-owner RNG or C3 acceptance.'
+    ? (firstSssFresh132Typed22Pair ? 'Fresh132 typed22 full-pair component only; original per-owner lifecycle/RNG and C3 remain unproved.' : 'Fresh132 same-producer Setup endpoint compares Entry2544/Setup2584 source tick131, constructor count1 and five witnesses; then the separate MWC6 lifetime-A route runs 7168 actions. This is not an Entry callback, recreated B, full typed parity, per-owner RNG or C3 acceptance.')
     : recreationFullPair && recreationLifetime === 'A'
     ? 'Same-instance pair A: exact original7167 actions and3501 declared common+seed rows, pending checked close/restart/B; no original per-owner ledger or C3 acceptance.'
     : recreationFullB && recreationLifetime === 'B'
@@ -3278,8 +3285,9 @@ async function executeMatchedSetupCfNativeCommand(command) {
       const result = fn();
       return {result, message: result === 1 ? null : readMessage()};
     }
-    if (kind === 'arm-explicit-v2' || kind === 'arm-explicit-full') {
-      const fn = kind === 'arm-explicit-full'
+    if (kind === 'arm-explicit-v2' || kind === 'arm-explicit-full' || kind === 'arm-explicit-typed22') {
+      const fn = kind === 'arm-explicit-typed22'
+        ? module._melee_web_native_menu_stadium_fresh132_typed22_explicit_arm : kind === 'arm-explicit-full'
         ? module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_full_explicit_arm
         : module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_explicit_arm;
       if (typeof fn !== 'function') return {result: 0, message: 'Matched Setup C/F explicit arm export is absent'};
@@ -3416,7 +3424,7 @@ async function executeMatchedSetupCfNativeCommand(command) {
 
 function matchedSetupCfNativeAdapter({mode, explicitStep = false}) {
   const execute = async (command, label) => {
-    const explicitArm = command.kind === 'arm-explicit-v2' || command.kind === 'arm-explicit-full';
+    const explicitArm = ['arm-explicit-v2','arm-explicit-full','arm-explicit-typed22'].includes(command.kind);
     if (explicitArm) {
       // The native arm may cancel RAF before its page response reaches the host.
       // Until confirmed success, neither a lost response nor native result 0
@@ -3455,8 +3463,8 @@ function matchedSetupCfNativeAdapter({mode, explicitStep = false}) {
   };
   return {
     arm: async suppliedManifest => ['run2-proper-prefix-v2', 'run2-full-schedule-v3',
-      'run2-full-common-fields-seed-v1', 'fresh132-full-a-v1'].includes(mode)
-      ? execute({kind: (mode === 'run2-full-schedule-v3' ||
+      'run2-full-common-fields-seed-v1', 'fresh132-full-a-v1', 'fresh132-full-pair-typed22-v1'].includes(mode)
+      ? execute({kind: mode === 'fresh132-full-pair-typed22-v1' ? 'arm-explicit-typed22' : (mode === 'run2-full-schedule-v3' ||
           mode === 'run2-full-common-fields-seed-v1' || mode === 'fresh132-full-a-v1') ? 'arm-explicit-full'
           : explicitStep ? 'arm-explicit-v2' : 'arm-v2',
         manifestBytes: Array.from(suppliedManifest)},
@@ -3467,7 +3475,7 @@ function matchedSetupCfNativeAdapter({mode, explicitStep = false}) {
     queue: async (scheduleIndex, action, bytes) => {
       const actionSample = matchedSetupCfTiming?.currentActionSample ?? null;
       const queueOperation = () => ['run2-proper-prefix-v2', 'run2-full-schedule-v3',
-        'run2-full-common-fields-seed-v1', 'fresh132-full-a-v1'].includes(mode)
+        'run2-full-common-fields-seed-v1', 'fresh132-full-a-v1', 'fresh132-full-pair-typed22-v1'].includes(mode)
         ? execute({kind: 'queue-v2', scheduleIndex, action: action.action,
           ordinal: action.action === 'tick' ? action.bundle : action.draw,
           bundle: action.bundle ?? -1}, `Queue run2 source action ${scheduleIndex}`)
@@ -3505,9 +3513,11 @@ async function runMatchedSetupCfContinuation(setupNative) {
   const inputs = matchedSetupCfInputs;
   const {helper, hostEvidence} = inputs;
   const mode = hostEvidence.mode ?? 'legacy-v1';
-  const fresh132FullAMode = mode === 'fresh132-full-a-v1';
+  const typed22Mode = mode === 'fresh132-full-pair-typed22-v1';
+  const fieldCount=typed22Mode?22:15;
+  const fresh132FullAMode = mode === 'fresh132-full-a-v1' || typed22Mode;
   const isV2 = ['run2-proper-prefix-v2', 'run2-full-schedule-v3',
-    'run2-full-common-fields-seed-v1', 'fresh132-full-a-v1'].includes(mode);
+    'run2-full-common-fields-seed-v1', 'fresh132-full-a-v1', 'fresh132-full-pair-typed22-v1'].includes(mode);
   const fullScheduleMode = mode === 'run2-full-schedule-v3' || mode === 'run2-full-common-fields-seed-v1' || fresh132FullAMode;
   const commonFieldsMode = mode === 'run2-full-common-fields-seed-v1' || fresh132FullAMode;
   const actualSetup = setupNative?.first_sss_vs_setup?.actual;
@@ -3571,13 +3581,13 @@ async function runMatchedSetupCfContinuation(setupNative) {
     actions: [], host_comparisons: [], runtime_diagnostics: [], last_native_state: null,
     common_field_comparisons_attempted: commonFieldsMode ? 0 : null,
     common_field_comparisons_passed: commonFieldsMode ? 0 : null,
-    common_field_count: commonFieldsMode ? 15 : null,
+    common_field_count: commonFieldsMode ? fieldCount : null,
     seed_value_comparisons_attempted: commonFieldsMode ? 0 : null,
     seed_value_comparisons_passed: commonFieldsMode ? 0 : null,
     seed_value_count: commonFieldsMode ? 1 : null,
     exact_value_comparisons_attempted: commonFieldsMode ? 0 : null,
     exact_value_comparisons_passed: commonFieldsMode ? 0 : null,
-    unpaired: {common_field_scope: commonFieldsMode ? '15 declared integer/bit fields plus one exact 32-bit seed value on each source tick84..3584; all other typed fields stay unpaired' : null,
+    unpaired: {common_field_scope: typed22Mode ? '22 declared scalar/boolean fields plus one exact 32-bit seed each source tick84..3584; other typed state remains unpaired' : commonFieldsMode ? '15 declared integer/bit fields plus one exact 32-bit seed value on each source tick84..3584; all other typed fields stay unpaired' : null,
       rng_scope: commonFieldsMode ? (fresh132FullAMode
         ? '3501 exact source-row seed values are paired with the same producer projection; no RNG call ledger or per-owner pointer pairing'
         : '3501 existing seed_after_action values compared to the exact packet-bound retained original sidecar; no RNG call ledger or cross-owner pointer pairing') : null,
@@ -3585,7 +3595,7 @@ async function runMatchedSetupCfContinuation(setupNative) {
       original_SIS_title_bytes: 'unobserved', original_map_root_allocation_lifetime: 'unproved',
       original_object_type: 'unobserved', native_flow_clock: 'reported separately',
       nested_display_list_provenance: 'not instrumented in the admitted profile; the nested GX_CMD_CALL_DL warning is a stop condition'},
-    claim: fresh132FullAMode
+    claim: typed22Mode ? 'Each lifetime compares 3501 samples of 22 declared address-free fields plus one seed (80523 exact values), C/F/GO/GO2 and unchanged inputs/order; no original per-owner lifecycle/RNG or C3 acceptance.' : fresh132FullAMode
       ? 'One Fresh132 original MWC6 7168-action schedule with 56016 exact values across3501 post-source-tick samples (52515 paired common scalar fields and3501 source seed values), plus declared C/F/GO/GO2 checks; remaining typed fields, RNG call ownership, recreated B and C3 acceptance remain unpaired.'
       : commonFieldsMode
       ? 'One original7167-action schedule with 56016 exact values over3501 post-source-tick samples (52515 common scalar fields and3501 retained RNG seed values), plus C/F and GO checks; no RNG call ledger, cross-owner pointer pairing, complete typed state, lifetime B, restore or C3 acceptance.'
@@ -3650,7 +3660,7 @@ async function runMatchedSetupCfContinuation(setupNative) {
     explicitStep: firstSssVsSetupCfExplicitStep});
   const driver = new helper.StadiumSetupCfActionDriver({
     runtimePayload: hostEvidence.runtimePayload, native: nativeAdapter,
-    commonFields: commonFieldsMode && !fresh132FullAMode, fresh132FullA: fresh132FullAMode,
+    commonFields: commonFieldsMode && !fresh132FullAMode, fresh132FullA: fresh132FullAMode, fresh132Typed22:typed22Mode,
     admittedWorldGeneration: (commonFieldsMode || hostEvidence.requiredQueueObservation ||
       hostEvidence.go2QueueExpectation)
       ? admittedWorldGeneration : null,
@@ -3814,11 +3824,11 @@ async function runMatchedSetupCfContinuation(setupNative) {
             commonComparison = helper.compareOriginalCommonTickFields({
               expected: expectedCommon, actual: actionReceipt.common_fields_sample,
               actionIndex: scheduleIndex, sourceFramesAfter: actionReceipt.source_frames_after,
-              admittedWorldGeneration});
+              admittedWorldGeneration,typed22:typed22Mode});
             ++cf.common_field_comparisons_attempted;
             cf.seed_value_comparisons_attempted += commonComparison.seed_value_count ?? 0;
             cf.exact_value_comparisons_attempted += commonComparison.exact_value_count ?? 0;
-            if (commonComparison.decision === 'PASS_EXACT_15_COMMON_FIELDS_AND_SEED') {
+            if (commonComparison.decision === (typed22Mode?'PASS_EXACT_22_COMMON_FIELDS_AND_SEED':'PASS_EXACT_15_COMMON_FIELDS_AND_SEED')) {
               ++cf.common_field_comparisons_passed;
               cf.seed_value_comparisons_passed += commonComparison.seed_value_count;
               cf.exact_value_comparisons_passed += commonComparison.exact_value_count;
@@ -3912,16 +3922,16 @@ async function runMatchedSetupCfContinuation(setupNative) {
       assert.equal(cf.common_field_comparisons_attempted, 3501,
         'Per-tick common-field scope did not compare exactly3501 selected receipts');
       assert.equal(cf.common_field_comparisons_passed, 3501,
-        'Per-tick common-field scope did not pass all52515 declared scalar comparisons');
-      assert.equal(cf.common_field_count * cf.common_field_comparisons_passed, 52515);
+        `Per-tick common-field scope did not pass all ${fieldCount*3501} declared scalar comparisons`);
+      assert.equal(cf.common_field_count * cf.common_field_comparisons_passed, fieldCount*3501);
       assert.equal(cf.seed_value_comparisons_attempted, 3501,
         'Per-tick seed scope did not compare all3501 selected receipts');
       assert.equal(cf.seed_value_comparisons_passed, 3501,
         'Per-tick seed scope did not pass all3501 exact seed values');
-      assert.equal(cf.exact_value_comparisons_attempted, 56016);
-      assert.equal(cf.exact_value_comparisons_passed, 56016);
+      assert.equal(cf.exact_value_comparisons_attempted, (fieldCount+1)*3501);
+      assert.equal(cf.exact_value_comparisons_passed, (fieldCount+1)*3501);
     }
-    cf.decision = fresh132FullAMode ? 'PASS_FRESH132_FULL_A_7168_3501_TICK_15_COMMON_FIELDS_AND_SEED_C_F_GO_GO2'
+    cf.decision = typed22Mode ? 'PASS_FRESH132_FULL_PAIR_TYPED22_LIFETIME_7168_3501_FIELDS_SEED_C_F_GO_GO2' : fresh132FullAMode ? 'PASS_FRESH132_FULL_A_7168_3501_TICK_15_COMMON_FIELDS_AND_SEED_C_F_GO_GO2'
       : commonFieldsMode ? 'PASS_ORIGINAL_FULL7167_3501_TICK_15_COMMON_FIELDS_AND_SEED_C_F_GO'
       : fullScheduleMode ? 'PASS_ORIGINAL_FULL7167_FUNCTIONAL_A_C_F_ONLY'
       : hostEvidence.go2Snapshot ? 'PASS_RUN2_PROPER_PREFIX_C_F_AND_GO2_DECLARED_STATE_SEED_QUEUE_ONLY'
@@ -4310,17 +4320,17 @@ async function installRecreationCanaryContext(reportA, checkpointFiles) {
     artifacts: Object.freeze(checkpointFiles.map(file => Object.freeze({...file})))});
   const helperSource = await fs.readFile(recreationContextHelperPath, 'utf8');
   const moduleUrl = `data:text/javascript;base64,${Buffer.from(helperSource).toString('base64')}`;
-  return timeout(page.evaluate(async ({moduleUrl, reportA, checkpointA, helperKey, fullPair}) => {
+  return timeout(page.evaluate(async ({moduleUrl, reportA, checkpointA, helperKey, fullPair, fresh132Typed22}) => {
     if (Object.prototype.hasOwnProperty.call(globalThis, helperKey))
       throw Error('Stadium recreation context was already installed');
     const {createStadiumRecreationCanaryContext} = await import(moduleUrl);
-    const context = createStadiumRecreationCanaryContext({reportA, checkpointA, fullPair});
+    const context = createStadiumRecreationCanaryContext({reportA, checkpointA, fullPair, fresh132Typed22});
     Object.defineProperty(globalThis, helperKey, {
       value: context, enumerable: false, writable: false, configurable: true,
     });
     return {schema: 'melee-web-stadium-recreation-context-v1', installed: true};
   }, {moduleUrl, reportA: recreationApprovalProjection(reportA), checkpointA,
-    helperKey: recreationHelperKey, fullPair: recreationFullPair}),
+    helperKey: recreationHelperKey, fullPair: recreationFullPair,fresh132Typed22:firstSssFresh132Typed22Pair}),
   Math.min(5000, remaining()), 'Install immutable same-page A/B canary context');
 }
 
@@ -4332,7 +4342,7 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
   recreationBaseReport = structuredClone(report);
   report.scenario.recreation_canary = {...report.scenario.recreation_canary,
     lifetime: 'A', role: 'source-lifetime-A',
-    status: recreationFullPair ? 'awaiting-7167-action-comparison' : 'awaiting-174-action-comparison'};
+    status: firstSssFresh132Typed22Pair ? 'awaiting-7168-action-typed22-comparison' : recreationFullPair ? 'awaiting-7167-action-comparison' : 'awaiting-174-action-comparison'};
   await page.exposeFunction('__persistStadiumRecreationCanaryA', async projection => {
     if (JSON.stringify(projection) !== JSON.stringify(recreationApprovalProjection(recreationReportAObject)) ||
         report !== recreationReportAObject || stadiumC3ReportCheckpoint !== recreationCheckpointAObject)
@@ -4361,7 +4371,7 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
   await runFirstCssBrowserDraw({baseUrl, artifacts, before});
   const aRouteMs = elapsedMs(aRouteStartedNs);
   assert.equal(report.result, 'pass', 'Lifetime A did not finish its exact admitted original schedule');
-  assert.equal(report.scenario.matched_setup_cf?.decision, recreationFullPair
+  assert.equal(report.scenario.matched_setup_cf?.decision, firstSssFresh132Typed22Pair ? 'PASS_FRESH132_FULL_PAIR_TYPED22_LIFETIME_7168_3501_FIELDS_SEED_C_F_GO_GO2' : recreationFullPair
     ? 'PASS_ORIGINAL_FULL7167_3501_TICK_15_COMMON_FIELDS_AND_SEED_C_F_GO'
     : 'PASS_RUN2_PROPER_PREFIX_C_F_STATE_ONLY');
   assert.equal(report.scenario.matched_setup_cf?.actions_completed, recreationAActionCount);
@@ -4369,7 +4379,7 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
     const cf = report.scenario.matched_setup_cf;
     assert.equal(cf.common_field_comparisons_passed, 3501);
     assert.equal(cf.seed_value_comparisons_passed, 3501);
-    assert.equal(cf.exact_value_comparisons_passed, 56016);
+    assert.equal(cf.exact_value_comparisons_passed, firstSssFresh132Typed22Pair?80523:56016);
   }
   report.scenario.recreation_canary.status = 'complete-awaiting-checked-close';
   report.execution_state = 'completed';
@@ -4567,7 +4577,7 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
   } : null;
   recreationLifetime = 'B';
   if (recreationFullB) {
-    assert.equal(matchedSetupCfBInputs?.hostEvidence?.mode, 'run2-full-common-fields-seed-v1');
+    assert.equal(matchedSetupCfBInputs?.hostEvidence?.mode, firstSssFresh132Typed22Pair?'fresh132-full-pair-typed22-v1':'run2-full-common-fields-seed-v1');
     matchedSetupCfInputs = matchedSetupCfBInputs;
   }
   assert.notEqual(stadiumC3ReportCheckpoint, recreationCheckpointAObject);
@@ -4600,7 +4610,7 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
   await runFirstCssBrowserDraw({baseUrl, artifacts, before});
   const bRouteMs = elapsedMs(bRouteStartedNs);
   assert.equal(report.result, 'pass', 'Lifetime B did not finish its exact admitted original schedule');
-  assert.equal(report.scenario.matched_setup_cf?.decision, recreationFullB
+  assert.equal(report.scenario.matched_setup_cf?.decision, firstSssFresh132Typed22Pair ? 'PASS_FRESH132_FULL_PAIR_TYPED22_LIFETIME_7168_3501_FIELDS_SEED_C_F_GO_GO2' : recreationFullB
     ? 'PASS_ORIGINAL_FULL7167_3501_TICK_15_COMMON_FIELDS_AND_SEED_C_F_GO'
     : 'PASS_RUN2_PROPER_PREFIX_C_F_STATE_ONLY');
   assert.equal(report.scenario.matched_setup_cf?.actions_completed, recreationBActionCount);
@@ -4608,7 +4618,7 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
     const cf = report.scenario.matched_setup_cf;
     assert.equal(cf.common_field_comparisons_passed, 3501);
     assert.equal(cf.seed_value_comparisons_passed, 3501);
-    assert.equal(cf.exact_value_comparisons_passed, 56016);
+    assert.equal(cf.exact_value_comparisons_passed, firstSssFresh132Typed22Pair?80523:56016);
   }
   const bSetupGeneration = report.scenario.first_sss_vs_setup.observation.first_sss_vs_setup.match_world_generation;
   assert.ok(bSetupGeneration > close.receipt.prior_world_generation, 'B generation did not advance after A retirement');
@@ -4620,6 +4630,7 @@ async function runStadiumRecreationCanary({baseUrl, artifacts, before}) {
   assert.equal(bRng.terminal_checked, true);
   assert.equal(bRng.parent_seed, close.receipt.parent_seed);
   if (recreationFullB) assert.equal(bRng.full_common_fields_seed, true);
+  if(firstSssFresh132Typed22Pair) assert.equal(bRng.typed_field_count,22);
   report.scenario.recreation_canary.terminal_B_rng = structuredClone(bRng);
   recreationCheckpointBFiles = Object.freeze(
     (await snapshotRecreationCheckpointFiles(recreationCheckpointBObject))
@@ -5424,7 +5435,7 @@ async function main() {
   assert.equal(build, expectedBuild, 'Only the isolated C1a diagnostic runtime may be served');
   assert.equal(preflight.schema, 'melee-web-stadium-c1a-browser-preflight-v1');
   if (firstSssFresh132FullA) {
-    assert.equal(preflight.route_mode, FRESH132_FULL_A_ROUTE,
+    assert.equal(preflight.route_mode, firstSssFresh132Typed22Pair?FRESH132_TYPED22_PAIR_ROUTE:FRESH132_FULL_A_ROUTE,
       'Fresh132 full-A command requires its exact separate preflight route');
     assert.ok(preflight.first_sss_fresh_ready_start?.expected_json,
       'Fresh132 full-A route must bind the checked prepared Start source expectation');
@@ -5500,7 +5511,7 @@ async function main() {
     'Browser runner bytes differ from frozen preflight');
   matchedSetupCfInputs = await loadMatchedSetupCfInputs();
   if (recreationFullB) matchedSetupCfBInputs = await loadMatchedSetupCfInputs({
-    fullSchedule: true, commonFields: true, frozen: matchedSetupCfBPreflight});
+    fullSchedule: !firstSssFresh132Typed22Pair, commonFields: !firstSssFresh132Typed22Pair, frozen: matchedSetupCfBPreflight});
   if (values['css-sss-reducer']) {
     const helperPath = path.join(ROOT, 'tests/stadium_c1a_css_sss_reducer.mjs');
     assert.equal(path.resolve(preflight.reducer_helper?.path || ''), helperPath,
@@ -5594,10 +5605,14 @@ async function main() {
     assert.ok(privateJs.includes('_melee_web_native_menu_stadium_first_css_constructor_return_v2_arm'),
       'Private CSS constructor-return v2 export is absent from the diagnostic runtime');
   if (recreationCanary) {
-    assert.equal(matchedSetupCfPreflight.scope, recreationFullPair ? FULL_COMMON_FIELDS_SEED_V1_SCOPE : PREFIX_V2_SCOPE,
+    assert.equal(matchedSetupCfPreflight.scope, firstSssFresh132Typed22Pair ? FRESH132_TYPED22_PAIR_SCOPE : recreationFullPair ? FULL_COMMON_FIELDS_SEED_V1_SCOPE : PREFIX_V2_SCOPE,
       'Recreation canary A scope differs from its explicit prefix/full-pair mode');
+    if(firstSssFresh132Typed22Pair) {
+      assert.deepEqual(matchedSetupCfPreflight,matchedSetupCfBPreflight,'Fresh132 pair must bind exactly the same MWC6 projection and assembly for A/B');
+      assert.ok(privateJs.includes('_melee_web_native_menu_stadium_fresh132_typed22_explicit_arm'), 'Typed22 runtime export requires a fresh reviewed build');
+    }
     const bound = preflight.recreation_canary;
-    assert.equal(bound?.schema, 'melee-web-stadium-recreation-canary-preflight-v1');
+    assert.equal(bound?.schema, firstSssFresh132Typed22Pair?'melee-web-stadium-fresh132-typed22-full-pair-preflight-v1':'melee-web-stadium-recreation-canary-preflight-v1');
     assert.equal(bound.full_pair_common_fields_seed ?? false, recreationFullPair,
       'Full pair opt-in differs from its frozen canary scope');
     assert.equal(bound.full_b_common_fields_seed ?? false, recreationFullB,
@@ -5757,12 +5772,12 @@ async function main() {
     remaining(30000), 'Runtime page navigation');
   await driver.waitForImport();
   if (recreationCanary) {
-    const identity = await timeout(page.evaluate(() => {
+    const identity = await timeout(page.evaluate(typed22 => {
       const accessor = globalThis.Module?.__meleeWebStadiumRecreationIdentityV1;
       if (!accessor || accessor.schema !== 'melee-web-stadium-instance-identity-v1')
         throw Error('Private same-instance identity accessor is absent or has an unknown schema');
-      return accessor.capture();
-    }), Math.min(5000, remaining()), 'Capture actual private Emscripten instance identities');
+      return typed22 ? accessor.captureFresh132Typed22Pair() : accessor.capture();
+    }, firstSssFresh132Typed22Pair), Math.min(5000, remaining()), 'Capture actual private Emscripten instance identities');
     assert.equal(identity.captured, true);
     report.scenario.recreation_canary = {identity_capture: identity,
       instance_identity_samples: [], lifetimes: [], close: null, result_scope: 'component-only'};

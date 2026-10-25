@@ -86,6 +86,15 @@ typedef struct MeleeWebStadiumIdleSnapshot {
     uint64_t map2_allocation_generation;
     uint32_t map2_requested_bytes;
     uint32_t map2_buffer_origin;
+    /* Private, versioned address-free relation extension; legacy JSON stays v2. */
+    uint32_t typed_relations_version;
+    uint32_t map2_gate_mask_40;
+    uint32_t map5_root_relation;
+    uint32_t sis_font1_present;
+    uint32_t title_child_present;
+    uint32_t title_wrapper_present;
+    uint32_t title_static_present;
+    uint32_t title_dynamic_present;
 } MeleeWebStadiumIdleSnapshot;
 
 /* Publish a fully checked, address-free diagnostic candidate atomically.

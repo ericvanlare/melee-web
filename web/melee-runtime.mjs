@@ -747,12 +747,19 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
           state.action_count === 7167 && state.cursor === 7167 &&
           state.common_field_count === 15 && state.seed_value_count === 1 &&
           state.source_ticks === 3585 && state.source_draws === 3582;
-        if (receipt?.schema !== 'melee-web-stadium-recreation-boundary-v1' ||
+        const typed22Complete = receipt?.schema === 'melee-web-stadium-recreation-boundary-v2' &&
+          state?.schema === 'melee-web-stadium-source-action-native-v7' &&
+          state.scope === 'fresh132-full-pair-7168-typed22-seed-observation-only' &&
+          state.common_field_count === 22 && state.seed_value_count === 1 &&
+          state.action_count === 7168 && state.cursor === 7168 &&
+          state.source_ticks === 3585 && state.source_draws === 3583;
+        if ((!typed22Complete && receipt?.schema !== 'melee-web-stadium-recreation-boundary-v1') ||
             receipt.attempted !== true || receipt.closed !== true || receipt.restarted !== false || receipt.error !== null ||
             receipt.match_to_host_restored !== true || receipt.host_to_parent_restored !== true ||
             !Number.isSafeInteger(receipt.prior_world_generation) || receipt.prior_world_generation <= 0 ||
             ['match_seed', 'host_seed', 'parent_seed'].some(key => !Number.isInteger(receipt[key]) || receipt[key] < 0 || receipt[key] > 0xffffffff) ||
-            (!prefixComplete && !fullPairComplete) ||
+            (!prefixComplete && !fullPairComplete && !typed22Complete) ||
+            (receipt.schema === 'melee-web-stadium-recreation-boundary-v2' && !typed22Complete) ||
             state.state !== 'complete' || state.complete !== true || state.failed !== false || state.error !== null ||
             state.queued !== false || state.awaiting_approval !== false) return false;
         const pointer = Module._melee_web_native_menu_stadium_recreation_status();

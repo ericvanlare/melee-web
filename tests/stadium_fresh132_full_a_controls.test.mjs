@@ -217,6 +217,9 @@ assert.deepEqual(callbacks.receipts().map(row => row.decision), [
   'PASS_EXACT_DECLARED_GO2_FIELDS_AND_SEED',
 ]);
 
+// Explicit synthetic-native driver control; retained source rows are real, native values are modeled.
+const typed22Driver = process.env.MELEE_STADIUM_TYPED22_DRIVER_CONTROL === '1';
+const driverEvidence = typed22Driver ? consumer.hostEvidenceFromFresh132FullAProjection(projection,{typed22:true}) : evidence;
 let queued = 0, approved = 0;
 const driver = new consumer.StadiumSetupCfActionDriver({
   runtimePayload: evidence.runtimePayload,
@@ -225,8 +228,8 @@ const driver = new consumer.StadiumSetupCfActionDriver({
     queue: async () => { ++queued; return 1; },
     approve: async () => { ++approved; return 1; },
   },
-  fresh132FullA: true, commonFields: false,
-  commonRowsByAction: evidence.commonRowsByAction,
+  fresh132FullA: true, fresh132Typed22:typed22Driver, commonFields: false,
+  commonRowsByAction: driverEvidence.commonRowsByAction,
   admittedWorldGeneration: generation, go2ActionIndex: evidence.go2ActionIndex,
 });
 assert.equal(await driver.arm(callbacks.setupApproved()), true);
@@ -237,10 +240,10 @@ for (let index = 0; index < evidence.runtimePayload.schedule.length; ++index) {
   if (action.action === 'tick') { ++ticks; ++sourceFrame; }
   else ++draws;
   assert.equal(await driver.submit(action), true, `submit ${index}`);
-  const expectedRow = evidence.commonRowsByAction.get(index);
+  const expectedRow = driverEvidence.commonRowsByAction.get(index);
   const selected = action.action === 'tick' && action.bundle >= 84 && action.bundle <= 3584;
   const sample = selected ? {
-    schema: 'melee-web-stadium-per-tick-common-fields-native-v2',
+    schema: typed22Driver?'melee-web-stadium-per-tick-common-fields-native-v3':'melee-web-stadium-per-tick-common-fields-native-v2',
     schedule_index: index, source_tick: action.bundle, world_ticks: ticks,
     source_frame: sourceFrame, world_generation: generation,
     ...expectedRow.values, seed_hex: expectedRow.seed_hex,
@@ -249,8 +252,8 @@ for (let index = 0; index < evidence.runtimePayload.schedule.length; ++index) {
   if (selected) {
     commonComparison = consumer.compareOriginalCommonTickFields({expected: expectedRow,
       actual: sample, actionIndex: index, sourceFramesAfter: sourceFrame,
-      admittedWorldGeneration: generation});
-    assert.equal(commonComparison.decision, 'PASS_EXACT_15_COMMON_FIELDS_AND_SEED', `compare ${index}`);
+      admittedWorldGeneration: generation,typed22:typed22Driver});
+    assert.equal(commonComparison.decision, typed22Driver?'PASS_EXACT_22_COMMON_FIELDS_AND_SEED':'PASS_EXACT_15_COMMON_FIELDS_AND_SEED', `compare ${index}`);
     ++commonPassed;
   }
   const boundaryLabel = index === 168 ? 'C' : index === 170 ? 'F' : index === evidence.go2ActionIndex ? 'GO2' : null;
@@ -277,9 +280,9 @@ for (let index = 0; index < evidence.runtimePayload.schedule.length; ++index) {
     : boundaryLabel === 'F' ? callbacks.receipts()[1]
     : boundaryLabel === 'GO2' ? callbacks.receipts()[2] : null;
   const nativeObservation = {
-    schema: 'melee-web-stadium-source-action-native-v6',
-    scope: 'fresh132-full-a-7168-common-fields-seed-observation-only',
-    common_field_count: 15, seed_value_count: 1, action_count: 7168,
+    schema: typed22Driver?'melee-web-stadium-source-action-native-v7':'melee-web-stadium-source-action-native-v6',
+    scope: typed22Driver?'fresh132-full-pair-7168-typed22-seed-observation-only':'fresh132-full-a-7168-common-fields-seed-observation-only',
+    common_field_count: typed22Driver?22:15, seed_value_count: 1, action_count: 7168,
     failed: false, last_action: lastAction,
   };
   assert.equal(await driver.accept(nativeObservation, hostComparison, commonComparison), true, `accept ${index}`);
@@ -313,11 +316,11 @@ missingRow.host_expectations.typed_rows.pop();
 assert.throws(() => consumer.hostEvidenceFromFresh132FullAProjection(missingRow));
 
 console.log(JSON.stringify({
-  result: 'PASS_FRESH132_FULL_A_MWC6_PROJECTION_SETUP_GATE_HOST_AND_DRIVER_CONTROLS',
+  result: typed22Driver?'PASS_FRESH132_TYPED22_MODELED_DRIVER_ACTUAL_SOURCE_CONTROLS':'PASS_FRESH132_FULL_A_MWC6_PROJECTION_SETUP_GATE_HOST_AND_DRIVER_CONTROLS',
   dimensions: {actions: queued, ticks, draws, comparison_rows: commonPassed},
   setup: {entry_sequence: 2544, setup_sequence: 2584, source_tick: 131, constructor_entries: 1},
   dynamic_boundaries: {GO: evidence.goSeedObservation.sequence, C: 84, F: 85, GO2: 86},
-  exact_common_seed_comparisons: 56016,
+  exact_common_seed_comparisons: typed22Driver?80523:56016,
   negative_controls: ['mixed_mode_request', 'mixed_mode_preflight',
     'fresh132_full_a_comparator_wrong_hash', 'fresh132_full_a_comparator_crossed_with_legacy_pin',
     'fresh132_full_a_old_route_rejected', 'fresh132_full_a_route_cannot_use_legacy_comparator_binding',

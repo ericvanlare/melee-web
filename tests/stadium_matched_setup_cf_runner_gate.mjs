@@ -1,6 +1,8 @@
 import {pathToFileURL} from 'node:url';
 
 export const FRESH_SETUP_GO2_ROUTE = 'first-sss-fresh-setup-go2';
+export const FRESH132_TYPED22_PAIR_ROUTE = 'first-sss-fresh132-full-pair-typed22';
+export const FRESH132_TYPED22_PAIR_SCOPE = 'same retained Fresh132 producer, exact MWC6 full A and freshly recreated full B in one Module; each3501 rows of22 declared address-free fields plus exactseed; no original per-owner lifecycle/RNG or C3 acceptance';
 export const FRESH132_FULL_A_ROUTE = 'first-sss-fresh132-full-a';
 
 const FILE_ID_KEYS = ['path', 'basename', 'bytes', 'sha256'];
@@ -59,15 +61,15 @@ function assertComparatorIdentity(binding, actual, label) {
 
 const FRESH132_FULL_A_CONTEXT_BINDING_SCHEMA = 'melee-web-stadium-fresh132-full-a-context-comparator-v1';
 
-export function resolveFreshSssReadyStartComparator(preflight, {fresh132FullA = false} = {}) {
-  if (typeof fresh132FullA !== 'boolean')
+export function resolveFreshSssReadyStartComparator(preflight, {fresh132FullA = false, fresh132FullPair = false} = {}) {
+  if (typeof fresh132FullA !== 'boolean' || typeof fresh132FullPair !== 'boolean' || (fresh132FullPair && !fresh132FullA))
     throw new TypeError('Fresh132 full-A comparator route must be boolean');
   if (!fresh132FullA) {
-    if (preflight?.route_mode === FRESH132_FULL_A_ROUTE)
+    if ([FRESH132_FULL_A_ROUTE,FRESH132_TYPED22_PAIR_ROUTE].includes(preflight?.route_mode))
       throw new TypeError('Fresh132 full-A comparator cannot be consumed by the legacy ready-start route');
     return preflight?.first_sss_fresh_ready_start?.comparator;
   }
-  if (preflight?.route_mode !== FRESH132_FULL_A_ROUTE)
+  if (preflight?.route_mode !== (fresh132FullPair?FRESH132_TYPED22_PAIR_ROUTE:FRESH132_FULL_A_ROUTE))
     throw new TypeError('Fresh132 full-A comparator requires its distinct frozen route');
   const frozen = preflight.first_sss_fresh132_full_a;
   exactKeys(frozen, ['schema', 'context_comparator'], 'Fresh132 full-A context comparator preflight');
@@ -78,8 +80,8 @@ export function resolveFreshSssReadyStartComparator(preflight, {fresh132FullA = 
   return frozen.context_comparator;
 }
 
-export function validateFreshSssReadyStartComparator(preflight, {fresh132FullA = false, actual} = {}) {
-  const binding = resolveFreshSssReadyStartComparator(preflight, {fresh132FullA});
+export function validateFreshSssReadyStartComparator(preflight, {fresh132FullA = false, fresh132FullPair = false, actual} = {}) {
+  const binding = resolveFreshSssReadyStartComparator(preflight, {fresh132FullA,fresh132FullPair});
   assertComparatorIdentity(binding, actual, fresh132FullA
     ? 'Fresh132 full-A context comparator' : 'Legacy Fresh132 ready-start comparator');
   return binding;
@@ -107,14 +109,14 @@ export function validateMatchedSetupCfRequest({enabled, explicitStep = false, fu
 }
 
 export function validateMatchedSetupCfPreflight(preflight, {enabled, freshSetupGo2 = false,
-  fresh132FullA = false, explicitStep = false, fullSchedule = false, commonFields = false,
+  fresh132FullA = false, fresh132FullPair = false, explicitStep = false, fullSchedule = false, commonFields = false,
   packetPath, assemblyPath, helperPath}) {
   if (typeof commonFields !== 'boolean' || (commonFields &&
       (enabled !== true || fullSchedule !== true || explicitStep !== true)))
     throw new TypeError('Per-tick common-field seed preflight requires explicit full-schedule service opt-in');
   if (typeof fullSchedule !== 'boolean' || (fullSchedule && (enabled !== true || explicitStep !== true)))
     throw new TypeError('Full schedule preflight requires explicit service opt-in');
-  if (typeof fresh132FullA !== 'boolean')
+  if (typeof fresh132FullA !== 'boolean' || typeof fresh132FullPair !== 'boolean' || (fresh132FullPair&&!fresh132FullA))
     throw new TypeError('Fresh132 full-A preflight mode must be boolean');
   if (enabled !== true) {
     if (fresh132FullA) throw new TypeError('Fresh132 full-A requires matched Setup continuation opt-in');
@@ -126,8 +128,8 @@ export function validateMatchedSetupCfPreflight(preflight, {enabled, freshSetupG
   if (fresh132FullA && (explicitStep !== true || freshSetupGo2 || fullSchedule || commonFields))
     throw new TypeError('Fresh132 full-A preflight requires its distinct explicit MWC6 route');
   if (fresh132FullA)
-    resolveFreshSssReadyStartComparator(preflight, {fresh132FullA: true});
-  const expectedRoute = fresh132FullA ? FRESH132_FULL_A_ROUTE
+    resolveFreshSssReadyStartComparator(preflight, {fresh132FullA: true,fresh132FullPair});
+  const expectedRoute = fresh132FullPair ? FRESH132_TYPED22_PAIR_ROUTE : fresh132FullA ? FRESH132_FULL_A_ROUTE
     : freshSetupGo2 ? FRESH_SETUP_GO2_ROUTE : 'first-sss-vs-setup';
   if (preflight?.route_mode !== expectedRoute)
     throw new TypeError(`Matched Setup C/F requires the frozen ${expectedRoute} preflight route`);
@@ -141,7 +143,7 @@ export function validateMatchedSetupCfPreflight(preflight, {enabled, freshSetupG
     throw new TypeError('Matched Setup C/F Asyncify idle predicate differs from its private binding');
   if (frozen.scope !== 'same-run completed Setup, then exact original 86-tick/85-draw prefix; compare C before draw84 and F before draw85' &&
       frozen.scope !== PREFIX_V2_SCOPE && frozen.scope !== FULL_V3_SCOPE &&
-      frozen.scope !== FULL_COMMON_FIELDS_SEED_V1_SCOPE && frozen.scope !== FRESH132_FULL_A_SCOPE)
+      frozen.scope !== FULL_COMMON_FIELDS_SEED_V1_SCOPE && frozen.scope !== FRESH132_FULL_A_SCOPE && frozen.scope !== FRESH132_TYPED22_PAIR_SCOPE)
     throw new TypeError('Matched Setup C/F preflight scope differs');
   const expectedPaths = [
     ['packet', packetPath], ['assembly_manifest', assemblyPath], ['helper', helperPath],
@@ -160,9 +162,11 @@ export function validateMatchedSetupCfPreflight(preflight, {enabled, freshSetupG
     throw new TypeError('Full schedule request differs from exact preflight scope');
   if ((frozen.scope === FULL_COMMON_FIELDS_SEED_V1_SCOPE) !== commonFields)
     throw new TypeError('Per-tick common-field seed request differs from exact preflight scope');
-  if ((frozen.scope === FRESH132_FULL_A_SCOPE) !== fresh132FullA)
+  if (([FRESH132_FULL_A_SCOPE,FRESH132_TYPED22_PAIR_SCOPE].includes(frozen.scope)) !== fresh132FullA)
     throw new TypeError('Fresh132 full-A request differs from exact MWC6 preflight scope');
-  if (explicitStep === true && frozen.scope !== (fresh132FullA ? FRESH132_FULL_A_SCOPE
+  if ((frozen.scope === FRESH132_TYPED22_PAIR_SCOPE) !== fresh132FullPair)
+    throw new TypeError('Typed22 pair requires its exact preflight scope');
+  if (explicitStep === true && frozen.scope !== (fresh132FullPair ? FRESH132_TYPED22_PAIR_SCOPE : fresh132FullA ? FRESH132_FULL_A_SCOPE
       : commonFields ? FULL_COMMON_FIELDS_SEED_V1_SCOPE
       : fullSchedule ? FULL_V3_SCOPE : PREFIX_V2_SCOPE))
     throw new TypeError('Matched Setup C/F explicit stepping differs from its reviewed full/prefix scope');
@@ -170,7 +174,8 @@ export function validateMatchedSetupCfPreflight(preflight, {enabled, freshSetupG
     ? ['arm', 'queue', 'step', 'retire_ready', 'retire', 'retirement_status', 'approve']
     : ['arm', 'queue', 'approve'],
     'Matched Setup C/F diagnostic exports');
-  const expectedExports = explicitStep === true ? (fresh132FullA || fullSchedule
+  const expectedExports = fresh132FullPair ? {...FULL_V3_EXPLICIT_STEP_EXPORTS,
+    arm:'_melee_web_native_menu_stadium_fresh132_typed22_explicit_arm'} : explicitStep === true ? (fresh132FullA || fullSchedule
     ? FULL_V3_EXPLICIT_STEP_EXPORTS : PREFIX_V2_EXPLICIT_STEP_EXPORTS)
     : frozen.scope === PREFIX_V2_SCOPE ? PREFIX_V2_EXPORTS : EXPORTS;
   if (Object.keys(expectedExports).some(key => frozen.diagnostic_exports[key] !== expectedExports[key]))

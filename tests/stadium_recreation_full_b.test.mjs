@@ -29,9 +29,12 @@ test('actual B source switches only after A restart and uses existing full loade
   const switched=source.indexOf('matchedSetupCfInputs = matchedSetupCfBInputs;');
   const imported=source.indexOf('Fresh B disc import after checked same-instance restart');
   assert(accepted>=0&&switched>accepted&&imported>switched);
-  assert(source.includes('fullSchedule: true, commonFields: true, frozen: matchedSetupCfBPreflight'));
+  assert(source.includes('fullSchedule: !firstSssFresh132Typed22Pair, commonFields: !firstSssFresh132Typed22Pair, frozen: matchedSetupCfBPreflight'));
+  const loaderExpression=source.match(/loadMatchedSetupCfInputs\(\{\n    (fullSchedule: !firstSssFresh132Typed22Pair, commonFields: !firstSssFresh132Typed22Pair, frozen: matchedSetupCfBPreflight)\}\)/)[1];
+  for(const typed22 of [false,true]) {const admitted=vm.runInNewContext('({'+loaderExpression+'})',{firstSssFresh132Typed22Pair:typed22,matchedSetupCfBPreflight:{identity:'same-input'}});assert.equal(admitted.fullSchedule,!typed22);assert.equal(admitted.commonFields,!typed22);assert.equal(admitted.frozen.identity,'same-input');}
   assert(source.includes('preflight.recreation_canary?.full_b_matched_setup_cf'));
-  assert(source.includes('cf.exact_value_comparisons_passed, 56016'));
+  const valueExpression=source.match(/cf.exact_value_comparisons_passed, (firstSssFresh132Typed22Pair\?80523:56016)/)[1];
+  assert.equal(vm.runInNewContext(valueExpression,{firstSssFresh132Typed22Pair:false}),56016);assert.equal(vm.runInNewContext(valueExpression,{firstSssFresh132Typed22Pair:true}),80523);
   assert(source.includes('bRng.full_common_fields_seed, true'));
 });
 const packetFile=process.env.MELEE_STADIUM_FULL_B_PACKET;

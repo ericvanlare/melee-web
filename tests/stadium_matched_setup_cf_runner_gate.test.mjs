@@ -167,15 +167,17 @@ test('the matched Setup C/F opt-in and preflight gate fail before server/browser
     /if \(matchedSetupCfExplicitArmed\) \{[\s\S]*?retireMatchedSetupCfExplicitNative\(\)/,
     'the armed explicit path must use one-shot retire instead of the queued ordinary unload');
   assert.match(runnerSource,
-    /source_request_scope: recreationCanary[\s\S]*?: firstSssVsSetupCf\s*\? firstSssFresh132FullA[\s\S]*?: firstSssFreshSetupGo2[\s\S]*?: firstSssVsSetupCfV2\s*\?/,
+    /source_request_scope: firstSssFresh132Typed22Pair\s*\?[\s\S]*?: recreationCanary[\s\S]*?: firstSssVsSetupCf\s*\? firstSssFresh132FullA[\s\S]*?: firstSssFreshSetupGo2[\s\S]*?: firstSssVsSetupCfV2\s*\?/,
     'the v2 proper-prefix scope must be separately labeled');
   const scopeStart = runnerSource.indexOf('source_request_scope: ');
   const scopeEnd = runnerSource.indexOf(',\n  error: null,', scopeStart);
   assert.ok(scopeStart >= 0 && scopeEnd > scopeStart, 'actual scope expression markers exist');
   const scopeExpression = runnerSource.slice(scopeStart + 'source_request_scope: '.length, scopeEnd);
   const scope = flags => vm.runInNewContext(`(${scopeExpression})`, {
-    recreationCanary: false, recreationFullPair: false, recreationFullB: false, firstSssFresh132FullA: false, firstSssFreshSetupGo2: false, firstSssVsSetupCf: true, firstSssVsSetupCfV2: true,
+    firstSssFresh132Typed22Pair: false, recreationCanary: false, recreationFullPair: false, recreationFullB: false, firstSssFresh132FullA: false, firstSssFreshSetupGo2: false, firstSssVsSetupCf: true, firstSssVsSetupCfV2: true,
     firstSssVsSetupCfCommonFields: false, firstSssVsSetupCfFullSchedule: false, ...flags});
+  assert.equal(scope({firstSssFresh132Typed22Pair:true,recreationCanary:true,recreationFullPair:true,recreationFullB:true,firstSssFresh132FullA:true}),
+    'One same-instance Fresh132 MWC6 typed22 A/checked close/restart/fresh B component; no per-owner source ledger or C3 acceptance');
   assert.equal(scope({firstSssFresh132FullA:true}),
     'Fresh132 prepared Start and strict Setup, then exact original7168-action MWC6 A; compare 3501 paired 15-field-plus-seed rows and declared C/F/observed GO/GO2. No unpaired typed-field promotion, per-owner RNG, B or C3 acceptance.');
   assert.equal(scope({firstSssFreshSetupGo2:true}),

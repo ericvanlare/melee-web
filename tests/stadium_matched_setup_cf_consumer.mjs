@@ -407,6 +407,8 @@ export function deriveRun2FullSchedule(runtimePayload, hostOnly) {
       terminal_draw_ordinal: 3581}}};
 }
 
+export const FRESH132_TYPED22_MODE = 'fresh132-full-pair-typed22-v1';
+export const TYPED22_RELATION_KEYS = Object.freeze(["map2_gate_mask_40", "map5_root_relation", "sis_font1_present", "title_child_present", "title_wrapper_present", "title_static_present", "title_dynamic_present"]);
 const COMMON_FIELDS_NATIVE_SAMPLE_SCHEMA = 'melee-web-stadium-per-tick-common-fields-native-v2';
 const COMMON_FIELDS_COMPARISON_SCHEMA = 'melee-web-stadium-source-tick-common-fields-comparison-v2';
 const COMMON_FIELDS_SAMPLE_MAX_BYTES = 1508;
@@ -492,7 +494,8 @@ export function commonOriginalValues(fields, sourceTick) {
 
 // One O(n) pass binds all host original action provenance to the already
 // validated native schedule, then binds the 3501 typed source rows to ticks.
-export function deriveFresh132FullAExpectations(projection) {
+export function deriveFresh132FullAExpectations(projection, {typed22 = false} = {}) {
+  if (typeof typed22 !== 'boolean') throw new TypeError('Typed22 mode must be explicit boolean');
   exactKeys(projection, ['claim_scope', 'decision', 'dimensions', 'host_expectations',
     'runtime_payload', 'schema', 'source_identity', 'version'], 'Fresh132 full-A projection');
   if (projection.schema !== 'melee-web-stadium-fresh132-full-a-host-projection' ||
@@ -570,6 +573,18 @@ export function deriveFresh132FullAExpectations(projection) {
     const actionIndex = findTickAction(tick);
     if (expectedByAction.has(actionIndex)) throw new TypeError('Fresh132 full-A typed row action is duplicated');
     const values = commonOriginalValues(row.typed_fields, tick);
+    if (typed22) {
+      const map=row.typed_fields.map2, title=row.typed_fields.title;
+      Object.assign(values, {
+        map2_gate_mask_40: requiredBoolean(map.gate_mask_40, 'map2.gate_mask_40'),
+        map5_root_relation: requiredBoolean(map.map5_root_pointer_equals_fixed_map5_slot_value, 'map2.map5_root_relation'),
+        sis_font1_present: requiredBoolean(title.font1_slot_pointer_present, 'title.font1_slot_pointer_present'),
+        title_child_present: requiredBoolean(title.title_child_present, 'title.title_child_present'),
+        title_wrapper_present: requiredBoolean(title.text_wrapper_present, 'title.text_wrapper_present'),
+        title_static_present: requiredBoolean(title.static_text_pointer_present, 'title.static_text_pointer_present'),
+        title_dynamic_present: requiredBoolean(title.dynamic_text_pointer_present, 'title.dynamic_text_pointer_present'),
+      });
+    }
     expectedByAction.set(actionIndex, {action_index: actionIndex, boundary_role: role,
       draw_ordinal: row.draw_ordinal,
       raw_identity: {sequence: row.source_sequence, source_tick: tick, draw_ordinal: row.draw_ordinal},
@@ -624,7 +639,7 @@ export function deriveFresh132FullAExpectations(projection) {
     go2QueueExpectation: null, go2ActionIndex: go2Index, goActionIndex: cIndex,
     checkpoints: {...full.checkpoints, go_action_index: cIndex,
       go2_action_index: go2Index},
-    commonRowsByAction: expectedByAction, mode: 'fresh132-full-a-v1'};
+    commonRowsByAction: expectedByAction, mode: typed22 ? FRESH132_TYPED22_MODE : 'fresh132-full-a-v1'};
 }
 
 export function deriveRun2CommonTickExpectations(runtimePayload, hostOnly) {
@@ -839,10 +854,16 @@ export function deriveRun2CommonSeedExpectations(runtimePayload, hostOnly,
 }
 
 export function compareOriginalCommonTickFields({expected, actual, actionIndex, sourceFramesAfter,
-  admittedWorldGeneration}) {
-  const refusal = (path, want, got, count = 0) => ({
-    schema: COMMON_FIELDS_COMPARISON_SCHEMA,
-    scope: 'exact host-original typed source row and hash-bound seed versus one completed post-tick native value-copy',
+  admittedWorldGeneration, typed22 = false}) {
+  if (typeof typed22 !== 'boolean') throw new TypeError('Typed22 comparison scope must be explicit');
+  const fieldCount=typed22?22:15;
+  const nativeSchema=typed22?'melee-web-stadium-per-tick-common-fields-native-v3':COMMON_FIELDS_NATIVE_SAMPLE_SCHEMA;
+  const comparisonSchema=typed22?'melee-web-stadium-source-tick-common-fields-comparison-v3':COMMON_FIELDS_COMPARISON_SCHEMA;
+  const relationKeys=typed22?TYPED22_RELATION_KEYS:[];
+  const refusal = (path, want, got, count = 0) => {
+    const result = {
+    schema: comparisonSchema,
+    scope: typed22 ? 'typed22+seed; full raw retained' : 'exact host-original typed source row and hash-bound seed versus one completed post-tick native value-copy',
     action_index: Number.isSafeInteger(actionIndex) ? actionIndex : null,
     source_tick: Number.isSafeInteger(expected?.source_tick) ? expected.source_tick : null,
     original_sequence: Number.isSafeInteger(expected?.raw_identity?.sequence)
@@ -852,13 +873,28 @@ export function compareOriginalCommonTickFields({expected, actual, actionIndex, 
     exact_value_count: count ? count + 1 : 0,
     decision: 'REFUSE_FIRST_COMMON_FIELD_OR_SEED_MISMATCH',
     first_mismatch: {path, expected: want ?? null, actual: got ?? null},
-  });
+  };
+    if(typed22 && Buffer.byteLength(JSON.stringify(result),'utf8')>COMMON_FIELDS_COMPARISON_MAX_BYTES)
+      result.first_mismatch={path,expected:'strict record (raw retained)',actual:'invalid (raw retained)'};
+    return result;
+  };
+  if (typed22) {
+    const inRange=(value,min,max)=>Number.isSafeInteger(value)&&value>=min&&value<=max;
+    const valid={action_index:inRange(actionIndex,0,7167),source_tick:inRange(expected?.source_tick,84,3584),
+      original_sequence:inRange(expected?.raw_identity?.sequence,0,Number.MAX_SAFE_INTEGER),
+      draw_ordinal:inRange(expected?.draw_ordinal,0,3582)};
+    if(Object.values(valid).some(value=>!value)) {
+      const result=refusal('original.coordinates','declared MWC6 coordinate domains','invalid coordinates; full raw retained');
+      for(const [key,ok] of Object.entries(valid))if(!ok)result[key]=null;
+      return result;
+    }
+  }
   try {
     exactKeys(expected, ['action_index', 'boundary_role', 'draw_ordinal', 'raw_identity',
       'seed_hex', 'seed_ordinal', 'source_tick', 'values'], 'common-field expected source row');
     exactKeys(expected.raw_identity, ['draw_ordinal', 'sequence', 'source_tick'],
       'common-field expected raw identity');
-    exactKeys(expected.values, COMMON_FIELDS_EXPECTED_KEYS, 'common-field expected values');
+    exactKeys(expected.values, [...COMMON_FIELDS_EXPECTED_KEYS,...relationKeys], 'common-field expected values');
     if (!Number.isSafeInteger(actionIndex) || actionIndex !== expected.action_index ||
         !Number.isSafeInteger(expected.source_tick) || expected.source_tick < 84 ||
         expected.source_tick > 3584 || expected.raw_identity.source_tick !== expected.source_tick ||
@@ -878,9 +914,9 @@ export function compareOriginalCommonTickFields({expected, actual, actionIndex, 
     catch { return refusal('native.serialization', 'bounded JSON object', 'unserializable'); }
     if (Buffer.byteLength(serialized, 'utf8') > COMMON_FIELDS_SAMPLE_MAX_BYTES)
       return refusal('native.sample_bytes', `<=${COMMON_FIELDS_SAMPLE_MAX_BYTES}`, Buffer.byteLength(serialized, 'utf8'));
-    try { exactKeys(actual, COMMON_FIELDS_ACTUAL_KEYS, 'native per-tick common sample'); }
+    try { exactKeys(actual, [...COMMON_FIELDS_ACTUAL_KEYS,...relationKeys], 'native per-tick common sample'); }
     catch { return refusal('native.keys', COMMON_FIELDS_ACTUAL_KEYS, Object.keys(actual).sort()); }
-    if (actual.schema !== COMMON_FIELDS_NATIVE_SAMPLE_SCHEMA ||
+    if (actual.schema !== nativeSchema ||
         actual.schedule_index !== actionIndex || actual.source_tick !== expected.source_tick ||
         actual.world_ticks !== expected.source_tick + 1 ||
         !Number.isSafeInteger(actual.world_generation) || actual.world_generation !== admittedWorldGeneration ||
@@ -919,22 +955,27 @@ export function compareOriginalCommonTickFields({expected, actual, actionIndex, 
       pairs.push([`display.packed_flags_raw_hex_bit_${mask.toString(16)}`,
         (expected.values.display_flags & (1 << index)) !== 0 ? 1 : 0,
         (actual.display_flags & (1 << index)) !== 0 ? 1 : 0]);
+    for(const key of relationKeys) {
+      if(typeof expected.values[key] !== 'boolean' || typeof actual[key] !== 'boolean')
+        return refusal(key, 'actual original/native boolean', {original:expected.values[key],native:actual[key]});
+      pairs.push([key,expected.values[key],actual[key]]);
+    }
     pairs.push(['rng.seed_hex', expected.seed_hex, actual.seed_hex]);
     let firstMismatch = null;
     for (const [path, want, got] of pairs) {
       const equal = Object.is(want, got);
       if (!equal && !firstMismatch) firstMismatch = {path, expected: want, actual: got};
     }
-    const result = {schema: COMMON_FIELDS_COMPARISON_SCHEMA,
+    const result = {schema: comparisonSchema,
       scope: 'exact host-original typed source row and hash-bound seed versus one completed post-tick native value-copy',
       action_index: actionIndex, source_tick: expected.source_tick,
       original_sequence: expected.raw_identity.sequence, draw_ordinal: expected.draw_ordinal,
-      compared_field_count: 15, seed_value_count: 1, exact_value_count: 16,
+      compared_field_count: fieldCount, seed_value_count: 1, exact_value_count: fieldCount+1,
       decision: firstMismatch ? 'REFUSE_FIRST_COMMON_FIELD_OR_SEED_MISMATCH'
-        : 'PASS_EXACT_15_COMMON_FIELDS_AND_SEED',
+        : typed22 ? 'PASS_EXACT_22_COMMON_FIELDS_AND_SEED' : 'PASS_EXACT_15_COMMON_FIELDS_AND_SEED',
       first_mismatch: firstMismatch};
     if (Buffer.byteLength(JSON.stringify(result), 'utf8') > COMMON_FIELDS_COMPARISON_MAX_BYTES)
-      return refusal('comparison.summary_bytes', `<=${COMMON_FIELDS_COMPARISON_MAX_BYTES}`, 'overflow', 15);
+      return refusal('comparison.summary_bytes', `<=${COMMON_FIELDS_COMPARISON_MAX_BYTES}`, 'overflow', fieldCount);
     return result;
   } catch (error) {
     return refusal('common_fields.validation', 'strict typed record', String(error?.message ?? error));
@@ -1484,8 +1525,8 @@ export function hostEvidenceFromRun2Packet(packet, {fullSchedule = false, common
     ...(commonFields ? {commonRowsByAction} : {})};
 }
 
-export function hostEvidenceFromFresh132FullAProjection(projection) {
-  const derived = deriveFresh132FullAExpectations(projection);
+export function hostEvidenceFromFresh132FullAProjection(projection, options = {}) {
+  const derived = deriveFresh132FullAExpectations(projection, options);
   return derived;
 }
 
@@ -1495,15 +1536,17 @@ function bundleBytes(bundle) {
 }
 
 export class StadiumSetupCfActionDriver {
-  constructor({runtimePayload, native, commonFields = false, fresh132FullA = false,
+  constructor({runtimePayload, native, commonFields = false, fresh132FullA = false, fresh132Typed22 = false,
     commonRowsByAction = null, admittedWorldGeneration = null,
     requiredQueueObservation = null, go2QueueExpectation = null, go2ActionIndex = null}) {
-    if (typeof commonFields !== 'boolean' || typeof fresh132FullA !== 'boolean' ||
+    if (typeof fresh132Typed22 !== 'boolean' || (fresh132Typed22 && !fresh132FullA) ||
+        typeof commonFields !== 'boolean' || typeof fresh132FullA !== 'boolean' ||
         (commonFields && runtimePayload?.schema !== 'melee-web-stadium-run2-full-schedule-v3') ||
         (fresh132FullA && (commonFields ||
           runtimePayload?.schema !== 'melee-web-stadium-fresh132-full-a-v1')))
       throw new TypeError('Per-tick or Fresh132 full-A observations require their explicit manifest mode');
-    this.mode = fresh132FullA ? 'fresh132-full-a-v1'
+    this.typed22=fresh132Typed22;
+    this.mode = fresh132Typed22 ? FRESH132_TYPED22_MODE : fresh132FullA ? 'fresh132-full-a-v1'
       : commonFields ? 'run2-full-common-fields-seed-v1'
       : runtimePayload?.schema === 'melee-web-stadium-run2-full-schedule-v3'
       ? 'run2-full-schedule-v3' : runtimePayload?.schema === 'melee-web-stadium-run2-proper-prefix-v2'
@@ -1530,7 +1573,7 @@ export class StadiumSetupCfActionDriver {
     else {
       exactKeys(runtimePayload, ['bundles', 'checkpoints', 'schedule', 'schema', 'version'],
         'run2 proper-prefix manifest');
-      const expectedVersion = this.mode === 'fresh132-full-a-v1' ? 1
+      const expectedVersion = ['fresh132-full-a-v1',FRESH132_TYPED22_MODE].includes(this.mode) ? 1
         : ['run2-full-schedule-v3', 'run2-full-common-fields-seed-v1'].includes(this.mode) ? 3 : 2;
       if (runtimePayload.version !== expectedVersion || !Array.isArray(runtimePayload.bundles) ||
           !Array.isArray(runtimePayload.schedule) || !runtimePayload.schedule.length ||
@@ -1538,7 +1581,7 @@ export class StadiumSetupCfActionDriver {
           runtimePayload.schedule.at(-1)?.action !== 'draw')
         throw new TypeError('run2 proper-prefix manifest is malformed');
       this.payload = runtimePayload;
-      this.nativeManifest = this.mode === 'fresh132-full-a-v1'
+      this.nativeManifest = ['fresh132-full-a-v1',FRESH132_TYPED22_MODE].includes(this.mode)
         ? encodeFresh132FullANativeManifest(runtimePayload)
         : this.mode === 'run2-full-common-fields-seed-v1'
           ? encodeRun2FullCommonNativeManifest(runtimePayload)
@@ -1632,10 +1675,10 @@ export class StadiumSetupCfActionDriver {
     if (this.inFlight || !this.pending || this.failed || this.complete)
       return this._fail('unexpected or repeated native action receipt');
     const action = this.payload.schedule[this.cursor];
-    if (this.mode === 'fresh132-full-a-v1' &&
-        (observation?.schema !== 'melee-web-stadium-source-action-native-v6' ||
-         observation?.scope !== 'fresh132-full-a-7168-common-fields-seed-observation-only' ||
-         observation?.common_field_count !== 15 || observation?.seed_value_count !== 1 ||
+    if (['fresh132-full-a-v1',FRESH132_TYPED22_MODE].includes(this.mode) &&
+        (observation?.schema !== (this.typed22?'melee-web-stadium-source-action-native-v7':'melee-web-stadium-source-action-native-v6') ||
+         observation?.scope !== (this.typed22?'fresh132-full-pair-7168-typed22-seed-observation-only':'fresh132-full-a-7168-common-fields-seed-observation-only') ||
+         observation?.common_field_count !== (this.typed22?22:15) || observation?.seed_value_count !== 1 ||
          observation?.action_count !== 7168))
       return this._fail('Fresh132 full-A native observation scope differs');
     if (this.mode === 'run2-full-schedule-v3' && (observation?.schema !== 'melee-web-stadium-source-action-native-v3' ||
@@ -1644,7 +1687,7 @@ export class StadiumSetupCfActionDriver {
     if (this.mode === 'run2-full-common-fields-seed-v1' &&
         (observation?.schema !== 'melee-web-stadium-source-action-native-v5' ||
          observation?.scope !== 'original-full7167-common-fields-seed-observation-only' ||
-         observation?.common_field_count !== 15 || observation?.seed_value_count !== 1 ||
+         observation?.common_field_count !== (this.typed22?22:15) || observation?.seed_value_count !== 1 ||
          observation?.action_count !== 7167))
       return this._fail('Per-tick common-field native observation scope differs');
     const result = observation?.last_action;
@@ -1681,7 +1724,7 @@ export class StadiumSetupCfActionDriver {
     const cIndex = this.mode === 'legacy-v1' ? 168 : this.payload.checkpoints.c_action_index;
     const fIndex = this.mode === 'legacy-v1' ? 170 : this.payload.checkpoints.f_action_index;
     const isBoundary = action.action === 'tick' && (this.cursor === cIndex || this.cursor === fIndex);
-    const isGo2 = action.action === 'tick' && (this.mode === 'fresh132-full-a-v1'
+    const isGo2 = action.action === 'tick' && (['fresh132-full-a-v1',FRESH132_TYPED22_MODE].includes(this.mode)
       ? this.cursor === this.go2ActionIndex
       : this.go2QueueExpectation !== null && this.cursor === this.go2QueueExpectation.action_index);
     let refusal = null;
@@ -1705,7 +1748,7 @@ export class StadiumSetupCfActionDriver {
         refusal = 'HSD queue-slot observation, Setup map, world generation, or completed tick differs';
     }
     if (isGo2) {
-      if (this.mode === 'fresh132-full-a-v1') {
+      if (['fresh132-full-a-v1',FRESH132_TYPED22_MODE].includes(this.mode)) {
         const go2 = result.go2_state_observation;
         if (action.bundle !== 86 || result.world_generation !== this.admittedWorldGeneration ||
             go2?.schema !== 'melee-web-stadium-go2-declared-state-native-v1' ||
@@ -1751,23 +1794,23 @@ export class StadiumSetupCfActionDriver {
     } else if (hostComparison !== null) {
       refusal = 'host comparison was supplied outside C/F/GO2';
     }
-    if (this.mode === 'run2-full-common-fields-seed-v1' || this.mode === 'fresh132-full-a-v1') {
+    if (this.mode === 'run2-full-common-fields-seed-v1' || ['fresh132-full-a-v1',FRESH132_TYPED22_MODE].includes(this.mode)) {
       const selectedTick = action.action === 'tick' && action.bundle >= 84 && action.bundle <= 3584;
       const expectedCommon = this.commonRowsByAction.get(this.cursor);
       if (selectedTick) {
         if (!expectedCommon || expectedCommon.source_tick !== action.bundle ||
             expectedCommon.action_index !== this.cursor ||
-            result.common_fields_sample?.schema !== COMMON_FIELDS_NATIVE_SAMPLE_SCHEMA ||
+            result.common_fields_sample?.schema !== (this.typed22?'melee-web-stadium-per-tick-common-fields-native-v3':COMMON_FIELDS_NATIVE_SAMPLE_SCHEMA) ||
             result.common_fields_sample?.schedule_index !== this.cursor ||
             result.common_fields_sample?.source_tick !== action.bundle ||
             result.common_fields_sample?.world_generation !== this.admittedWorldGeneration ||
-            commonComparison?.schema !== COMMON_FIELDS_COMPARISON_SCHEMA ||
+            commonComparison?.schema !== (this.typed22?'melee-web-stadium-source-tick-common-fields-comparison-v3':COMMON_FIELDS_COMPARISON_SCHEMA) ||
             commonComparison?.action_index !== this.cursor ||
             commonComparison?.source_tick !== action.bundle ||
             commonComparison?.original_sequence !== expectedCommon.raw_identity.sequence ||
-            commonComparison?.compared_field_count !== 15 ||
-            commonComparison?.seed_value_count !== 1 || commonComparison?.exact_value_count !== 16 ||
-            commonComparison?.decision !== 'PASS_EXACT_15_COMMON_FIELDS_AND_SEED')
+            commonComparison?.compared_field_count !== (this.typed22?22:15) ||
+            commonComparison?.seed_value_count !== 1 || commonComparison?.exact_value_count !== (this.typed22?23:16) ||
+            commonComparison?.decision !== (this.typed22?'PASS_EXACT_22_COMMON_FIELDS_AND_SEED':'PASS_EXACT_15_COMMON_FIELDS_AND_SEED'))
           refusal ??= 'per-tick common-field comparison failed or is absent';
       } else if (expectedCommon || result.common_fields_sample !== null || commonComparison !== null) {
         refusal ??= 'per-tick common-field sample/comparison was supplied outside its source-tick scope';

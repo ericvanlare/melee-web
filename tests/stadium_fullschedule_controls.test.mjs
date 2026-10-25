@@ -111,8 +111,8 @@ test('actual full-route construction has one encoder owner and dispatches full m
   const constructionStart = source.indexOf('  const nativeAdapter = matchedSetupCfNativeAdapter({mode,', adapterEnd);
   const constructionEnd = source.indexOf('  await page.evaluate(', constructionStart);
   assert.ok(adapterStart >= 0 && adapterEnd > adapterStart && constructionStart > adapterEnd && constructionEnd > constructionStart);
-  const modeBindingStart = source.indexOf('  const fresh132FullAMode = ', adapterEnd);
-  const modeBindingEnd = source.indexOf('\n', modeBindingStart);
+  const modeBindingStart = source.indexOf('  const typed22Mode = ', adapterEnd);
+  const modeBindingEnd = source.indexOf('\n', source.indexOf('  const fresh132FullAMode = ', modeBindingStart));
   assert.ok(modeBindingStart > adapterEnd && modeBindingEnd > modeBindingStart);
   const calls = [];
   const context = {helper, mode: 'run2-full-schedule-v3', commonFieldsMode: false,

@@ -556,7 +556,9 @@ struct FirstSssVsSetupState {
  std::string error,actual,history,stadium_setup_state;
 };
 FirstSssVsSetupState first_sss_vs_setup;
+enum class StadiumCfObservationScope { Common15, Fresh132Typed22 };
 struct MatchedSetupCfState {
+ StadiumCfObservationScope observation_scope=StadiumCfObservationScope::Common15;
  bool opted_in=false,armed=false,queued=false,awaiting_approval=false;
  bool failed=false,complete=false,last_action_complete=false;
  bool explicit_step_mode=false,explicit_step_inflight=false;
@@ -599,7 +601,7 @@ MatchedSetupCfRetirement matched_setup_cf_retirement;
 std::string matched_setup_cf_json();
 std::string stadium_recreation_b_json();
 void stadium_recreation_b_before_retire();
-void stadium_recreation_b_require_arm(bool version2,bool full_schedule,bool common_fields,unsigned action_count);
+void stadium_recreation_b_require_arm(bool version2,bool full_schedule,bool common_fields,unsigned action_count,bool typed22);
 void stadium_recreation_b_after_close();
 bool matched_setup_cf_service();
 struct FirstSssTextTailProbeState {
@@ -3387,6 +3389,14 @@ bool matched_setup_cf_idle_equal(const MeleeWebStadiumIdleSnapshot& a,
                                  const MeleeWebStadiumIdleSnapshot& b){
  return a.version==b.version&&a.world_generation==b.world_generation&&
   a.world_ticks==b.world_ticks&&a.source_frame==b.source_frame&&
+  a.typed_relations_version==b.typed_relations_version&&
+  a.map2_gate_mask_40==b.map2_gate_mask_40&&
+  a.map5_root_relation==b.map5_root_relation&&
+  a.sis_font1_present==b.sis_font1_present&&
+  a.title_child_present==b.title_child_present&&
+  a.title_wrapper_present==b.title_wrapper_present&&
+  a.title_static_present==b.title_static_present&&
+  a.title_dynamic_present==b.title_dynamic_present&&
   a.map2_gate==b.map2_gate&&a.map2_countdown==b.map2_countdown&&
   a.map2_phase==b.map2_phase&&a.map2_form==b.map2_form&&
   a.map2_history_e0==b.map2_history_e0&&a.map2_history_e2==b.map2_history_e2&&
@@ -3474,11 +3484,12 @@ std::string matched_setup_cf_idle_json(const MeleeWebStadiumIdleSnapshot& idle){
 // action. It adds no owner getter, source call, or retained native history.
 constexpr size_t MATCHED_SETUP_CF_COMMON_SAMPLE_MAX_BYTES=1508;
 std::string matched_setup_cf_common_fields_json(
-    const MeleeWebStadiumIdleSnapshot& idle,uint32_t seed,unsigned schedule_index,unsigned source_tick){
+    const MeleeWebStadiumIdleSnapshot& idle,uint32_t seed,unsigned schedule_index,unsigned source_tick,
+    bool typed22=false){
  check(idle.map2_gate>=0&&idle.map2_gate<=1&&idle.display_flags<=7,
        "Stadium common-field byte values are outside their declared bit ranges");
  std::ostringstream out;
- out<<"{\"schema\":\"melee-web-stadium-per-tick-common-fields-native-v2\",\"schedule_index\":"
+ out<<"{\"schema\":\""<<(typed22?"melee-web-stadium-per-tick-common-fields-native-v3":"melee-web-stadium-per-tick-common-fields-native-v2")<<"\",\"schedule_index\":"
     <<schedule_index<<",\"source_tick\":"<<source_tick
     <<",\"world_ticks\":"<<idle.world_ticks
     <<",\"source_frame\":"<<idle.source_frame
@@ -3496,7 +3507,25 @@ std::string matched_setup_cf_common_fields_json(
     <<",\"display_selected_player\":"<<idle.display_selected_player
     <<",\"display_f2\":"<<idle.display_f2
     <<",\"display_flags\":"<<unsigned(idle.display_flags)
-    <<",\"seed_hex\":\""<<melee_web::stadium_first_css_diagnostic::hex32(seed)<<"\"}";
+    ;
+ if(typed22){
+  check(idle.typed_relations_version==1,"Typed22 relations are absent");
+  check(idle.map2_gate_mask_40<=1,"Typed22 relation is outside boolean range");
+  check(idle.map5_root_relation<=1,"Typed22 relation is outside boolean range");
+  check(idle.sis_font1_present<=1,"Typed22 relation is outside boolean range");
+  check(idle.title_child_present<=1,"Typed22 relation is outside boolean range");
+  check(idle.title_wrapper_present<=1,"Typed22 relation is outside boolean range");
+  check(idle.title_static_present<=1,"Typed22 relation is outside boolean range");
+  check(idle.title_dynamic_present<=1,"Typed22 relation is outside boolean range");
+  out<<",\"map2_gate_mask_40\":"<<(idle.map2_gate_mask_40?"true":"false");
+  out<<",\"map5_root_relation\":"<<(idle.map5_root_relation?"true":"false");
+  out<<",\"sis_font1_present\":"<<(idle.sis_font1_present?"true":"false");
+  out<<",\"title_child_present\":"<<(idle.title_child_present?"true":"false");
+  out<<",\"title_wrapper_present\":"<<(idle.title_wrapper_present?"true":"false");
+  out<<",\"title_static_present\":"<<(idle.title_static_present?"true":"false");
+  out<<",\"title_dynamic_present\":"<<(idle.title_dynamic_present?"true":"false");
+ }
+ out<<",\"seed_hex\":\""<<melee_web::stadium_first_css_diagnostic::hex32(seed)<<"\"}";
  const std::string sample=out.str();
  check(sample.size()<=MATCHED_SETUP_CF_COMMON_SAMPLE_MAX_BYTES,
        "Stadium per-tick common-field sample exceeded its reviewed byte bound");
@@ -3734,7 +3763,8 @@ bool matched_setup_cf_service(){
           state.idle.source_frame==state.last_source_frame_after,
           "Stadium per-tick common sample is not the completed post-tick owner snapshot");
     common_sample_json=matched_setup_cf_common_fields_json(
-        state.idle,state.seed_after_action,index,ordinal);
+        state.idle,state.seed_after_action,index,ordinal,
+        state.observation_scope==StadiumCfObservationScope::Fresh132Typed22);
    }
   }
   std::ostringstream input_hex;
@@ -3798,7 +3828,9 @@ std::string matched_setup_cf_json(){
      state.awaiting_approval?"awaiting-approval":state.queued?"queued":
      state.armed?"armed":"idle";
  std::ostringstream out;
- if(state.fresh132_full_a)out<<"{\"schema\":\"melee-web-stadium-source-action-native-v6\",\"scope\":\"fresh132-full-a-7168-common-fields-seed-observation-only\",\"common_field_count\":15,\"seed_value_count\":1,\"action_count\":"
+ if(state.observation_scope==StadiumCfObservationScope::Fresh132Typed22)out<<"{\"schema\":\"melee-web-stadium-source-action-native-v7\",\"scope\":\"fresh132-full-pair-7168-typed22-seed-observation-only\",\"common_field_count\":22,\"seed_value_count\":1,\"action_count\":"
+    <<state.action_count<<",\"source_ticks\":"<<state.source_ticks<<",\"source_draws\":"<<state.source_draws<<",\"state\":\"";
+ else if(state.fresh132_full_a)out<<"{\"schema\":\"melee-web-stadium-source-action-native-v6\",\"scope\":\"fresh132-full-a-7168-common-fields-seed-observation-only\",\"common_field_count\":15,\"seed_value_count\":1,\"action_count\":"
     <<state.action_count<<",\"source_ticks\":"<<state.source_ticks
     <<",\"source_draws\":"<<state.source_draws<<",\"state\":\"";
  else if(state.common_fields)out<<"{\"schema\":\"melee-web-stadium-source-action-native-v5\",\"scope\":\"original-full7167-common-fields-seed-observation-only\",\"common_field_count\":15,\"seed_value_count\":1,\"action_count\":"
@@ -6488,7 +6520,8 @@ int matched_setup_cf_arm_internal(bool version2,unsigned action_count,
     unsigned f_source_tick,bool full_schedule=false,bool common_fields=false,
     bool fresh132_full_a=false){try{
  auto& state=matched_setup_cf;auto& setup=first_sss_vs_setup;
- stadium_recreation_b_require_arm(version2,full_schedule,common_fields,action_count);
+ stadium_recreation_b_require_arm(version2,full_schedule,common_fields,action_count,
+     state.observation_scope==StadiumCfObservationScope::Fresh132Typed22);
  check(!state.opted_in&&!state.armed&&!state.failed&&!state.complete,
        "Matched Setup C/F continuation is one-use");
  state.opted_in=true;
@@ -6744,6 +6777,19 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_cf_full_explicit_arm(
  matched_setup_cf_fail(error.what());return 0;
 }}
 
+int melee_web_native_menu_stadium_fresh132_typed22_explicit_arm(
+    const uint8_t* manifest,size_t manifest_bytes){try{
+ auto& state=matched_setup_cf;
+ check(!state.opted_in&&!state.armed&&!state.failed&&!state.complete&&
+       state.observation_scope==StadiumCfObservationScope::Common15,
+       "Typed22 scope must be selected before its one-use arm");
+ check(manifest&&manifest_bytes==24U+7168U*57U&&manifest[0]=='M'&&
+       manifest[1]=='W'&&manifest[2]=='C'&&manifest[3]=='6',
+       "Typed22 requires the unchanged Fresh132 MWC6 input manifest");
+ state.observation_scope=StadiumCfObservationScope::Fresh132Typed22;
+ return melee_web_native_menu_stadium_first_sss_vs_setup_cf_full_explicit_arm(manifest,manifest_bytes);
+}catch(const std::exception& error){matched_setup_cf_fail(error.what());return 0;}}
+
 int melee_web_native_menu_stadium_first_sss_vs_setup_cf_step_once(){try{
  auto& state=matched_setup_cf;
  check(state.explicit_step_mode&&state.version2&&state.armed&&!state.failed&&
@@ -6845,7 +6891,9 @@ namespace melee_web_menu_browser {
 // Private recreation prerequisite. This is separate from terminal retirement:
 // its receipt survives close(), and only an acknowledged returned boundary can
 // restart the ordinary ownerless callback needed by the existing import route.
+enum class StadiumRecreationScope { Prefix174, LegacyFull7167, Fresh132Typed22 };
 struct StadiumRecreationCanary {
+ StadiumRecreationScope scope=StadiumRecreationScope::Prefix174;
  bool attempted=false,closed=false,restarted=false;
  const uint32_t* expected_host_owner=nullptr;
  const uint32_t* expected_parent_owner=nullptr;
@@ -6864,11 +6912,13 @@ struct StadiumRecreationCanary {
  std::string action_receipt,error;
 };
 StadiumRecreationCanary stadium_recreation_canary;
-void stadium_recreation_b_require_arm(bool version2,bool full_schedule,bool common_fields,unsigned action_count){
+void stadium_recreation_b_require_arm(bool version2,bool full_schedule,bool common_fields,unsigned action_count,bool typed22){
  const auto& s=stadium_recreation_canary;if(!s.b_admitted)return;
- check(version2&&(s.b_full_common_fields_seed
+ check(version2&&(s.scope==StadiumRecreationScope::Fresh132Typed22
+       ? (full_schedule&&common_fields&&typed22&&action_count==7168)
+       : (!typed22&&(s.b_full_common_fields_seed
        ? (full_schedule&&common_fields&&action_count==7167)
-       : (!full_schedule&&!common_fields&&action_count==174)),
+       : (!full_schedule&&!common_fields&&action_count==174)))),
        "Stadium B arm differs from its explicit admitted lifetime scope");
 }
 
@@ -6886,7 +6936,7 @@ void stadium_recreation_match_retired(){
 }
 std::string stadium_recreation_canary_json(){
  const auto& s=stadium_recreation_canary;std::ostringstream out;
- out<<"{\"schema\":\"melee-web-stadium-recreation-boundary-v1\",\"attempted\":"
+ out<<"{\"schema\":\""<<(s.scope==StadiumRecreationScope::Fresh132Typed22?"melee-web-stadium-recreation-boundary-v2":"melee-web-stadium-recreation-boundary-v1")<<"\",\"attempted\":"
     <<(s.attempted?"true":"false")<<",\"closed\":"<<(s.closed?"true":"false")
     <<",\"restarted\":"<<(s.restarted?"true":"false")
     <<",\"prior_world_generation\":"<<s.prior_generation
@@ -6910,6 +6960,7 @@ std::string stadium_recreation_b_json(){
    <<",\"host_to_parent_restored\":"<<(s.b_parent_restored?"true":"false")
    <<",\"terminal_checked\":"<<(s.b_terminal_checked?"true":"false");
  if(s.b_full_common_fields_seed)out<<",\"full_common_fields_seed\":true";
+ if(s.scope==StadiumRecreationScope::Fresh132Typed22)out<<",\"typed_field_count\":22";
  out<<'}';return out.str();
 }
 } // namespace melee_web_menu_browser
@@ -6952,10 +7003,14 @@ void stadium_recreation_b_before_retire(){
  const auto& cf=matched_setup_cf;MeleeWebMenuHostRngBoundary rng{};
  check(s.closed&&s.restarted&&s.error.empty()&&!s.b_retiring&&!s.b_terminal_checked&&
        cf.complete&&!cf.failed&&!cf.awaiting_approval&&cf.cursor==cf.action_count&&
-       (s.b_full_common_fields_seed
-        ? (cf.version2&&cf.full_schedule&&cf.common_fields&&cf.action_count==7167&&
-           cf.source_ticks==3585&&cf.source_draws==3582)
-        : (cf.cursor==174&&cf.action_count==174&&!cf.full_schedule))&&
+       (s.scope==StadiumRecreationScope::Fresh132Typed22
+        ? (cf.version2&&cf.fresh132_full_a&&cf.full_schedule&&cf.common_fields&&
+           cf.observation_scope==StadiumCfObservationScope::Fresh132Typed22&&cf.action_count==7168&&
+           cf.source_ticks==3585&&cf.source_draws==3583)
+        : (cf.observation_scope==StadiumCfObservationScope::Common15&&s.b_full_common_fields_seed
+          ? (cf.version2&&cf.full_schedule&&cf.common_fields&&cf.action_count==7167&&
+             cf.source_ticks==3585&&cf.source_draws==3582)
+          : (cf.cursor==174&&cf.action_count==174&&!cf.full_schedule)))&&
        match.get()==s.b_match_owner&&archive_cache.get()==s.b_cache_owner&&host==s.b_host_owner&&
        cf.world_generation==s.b_generation&&melee_web_gameplay_generation()==s.b_generation&&
        cf.asset_generation==s.b_asset_generation&&asset_generation==s.b_asset_generation&&
@@ -6983,8 +7038,12 @@ static int stadium_recreation_close_impl(bool full_pair){try{
  check(melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire_ready()==1&&
        cf.complete&&!cf.failed&&!cf.awaiting_approval&&cf.cursor==cf.action_count&&
        cf.version2&&(full_pair
-         ? (cf.full_schedule&&cf.common_fields&&cf.action_count==7167&&
-            cf.source_ticks==3585&&cf.source_draws==3582)
+         ? ((cf.fresh132_full_a&&cf.observation_scope==StadiumCfObservationScope::Fresh132Typed22&&
+             cf.full_schedule&&cf.common_fields&&cf.action_count==7168&&
+             cf.source_ticks==3585&&cf.source_draws==3583)||
+            (!cf.fresh132_full_a&&cf.observation_scope==StadiumCfObservationScope::Common15&&
+             cf.full_schedule&&cf.common_fields&&cf.action_count==7167&&
+             cf.source_ticks==3585&&cf.source_draws==3582))
          : (!cf.full_schedule&&cf.action_count==174))&&
        !matched_setup_cf_retirement.native_retired&&matched_setup_cf_retirement.receipt.empty(),
        "Stadium recreation requires its approved complete prefix or explicit full-pair A schedule");
@@ -7015,6 +7074,9 @@ static int stadium_recreation_close_impl(bool full_pair){try{
  const auto parent=reinterpret_cast<uintptr_t>(rng.parent_owner),base=reinterpret_cast<uintptr_t>(arena);
  check(parent<base||parent-base>=arena_bytes,
        "Stadium recreation parent RNG owner is inside the retiring session arena");
+ s.scope=cf.observation_scope==StadiumCfObservationScope::Fresh132Typed22
+     ? StadiumRecreationScope::Fresh132Typed22
+     : full_pair?StadiumRecreationScope::LegacyFull7167:StadiumRecreationScope::Prefix174;
  s.attempted=true;s.prior_generation=cf.world_generation;s.host_seed=rng.host_value;
  s.parent_seed=rng.parent_value;s.expected_host_owner=rng.host_owner;
  s.expected_parent_owner=rng.parent_owner;

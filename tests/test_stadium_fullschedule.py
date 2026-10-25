@@ -27,7 +27,7 @@ class StadiumFullScheduleTests(OwnedWorkspaceTests):
   source=(SOURCE_ROOT/'src/gameplay_menu_browser.cpp').read_text()
   decoder=(_function(source,'int melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_arm(')+
            _function(source,'int matched_setup_cf_full_manifest_arm(')+
-           _function(source,'void stadium_recreation_b_require_arm(bool version2,bool full_schedule,bool common_fields,unsigned action_count){'))
+           _function(source,'void stadium_recreation_b_require_arm(bool version2,bool full_schedule,bool common_fields,unsigned action_count,bool typed22){'))
   fixture=r'''
 #include <algorithm>
 #include <array>
@@ -40,16 +40,17 @@ class StadiumFullScheduleTests(OwnedWorkspaceTests):
 #include <iostream>
 struct MatchedSetupCfState { struct ManifestAction { uint8_t kind=0; uint32_t ordinal=0,bundle=0,draws_before=0; std::array<uint8_t,44> pad{}; }; bool opted_in=false,armed=false,failed=false,complete=false; std::vector<ManifestAction> version2_actions; };
 MatchedSetupCfState matched_setup_cf;
-struct StadiumRecreationCanary { bool b_admitted=false,b_full_common_fields_seed=false; };
+enum class StadiumRecreationScope {Prefix174,LegacyFull7167,Fresh132Typed22};
+struct StadiumRecreationCanary { bool b_admitted=false,b_full_common_fields_seed=false; StadiumRecreationScope scope=StadiumRecreationScope::LegacyFull7167; };
 StadiumRecreationCanary stadium_recreation_canary;
 std::string error;
 unsigned arms=0;
 void check(bool pass,const char* message){if(!pass)throw std::runtime_error(message);}
 void matched_setup_cf_fail(const char* message){matched_setup_cf.failed=true;error=message;}
-void stadium_recreation_b_require_arm(bool version2,bool full_schedule,bool common_fields,unsigned action_count);
+void stadium_recreation_b_require_arm(bool version2,bool full_schedule,bool common_fields,unsigned action_count,bool typed22);
 bool expected_common_fields=false;
 std::vector<bool> common_fields_flags;
-int matched_setup_cf_arm_internal(bool v2,unsigned count,unsigned c,unsigned f,unsigned ct,unsigned ft,bool full=false,bool common_fields=false,bool fresh132_full_a=false){stadium_recreation_b_require_arm(v2,full,common_fields,count);assert(v2&&count==(fresh132_full_a?7168U:full?7167U:174U)&&c==168&&f==170&&ct==84&&ft==85);assert(common_fields==expected_common_fields);assert(!fresh132_full_a|| (full&&common_fields));common_fields_flags.push_back(common_fields);++arms;return 1;}
+int matched_setup_cf_arm_internal(bool v2,unsigned count,unsigned c,unsigned f,unsigned ct,unsigned ft,bool full=false,bool common_fields=false,bool fresh132_full_a=false){stadium_recreation_b_require_arm(v2,full,common_fields,count,false);assert(v2&&count==(fresh132_full_a?7168U:full?7167U:174U)&&c==168&&f==170&&ct==84&&ft==85);assert(common_fields==expected_common_fields);assert(!fresh132_full_a|| (full&&common_fields));common_fields_flags.push_back(common_fields);++arms;return 1;}
 '''+decoder+r'''
 void put(std::vector<uint8_t>& b,size_t off,uint32_t value){for(unsigned i=0;i<4;++i)b[off+i]=static_cast<uint8_t>(value>>(8*i));}
 std::vector<uint8_t> manifest(unsigned kind=0){const bool common=kind!=0,fresh=kind==2;const unsigned count=fresh?7168:7167;std::vector<uint8_t>b(24+count*57);b[0]='M';b[1]='W';b[2]=fresh?'C':common?'C':'F';b[3]=fresh?'6':common?'5':'3';put(b,4,count);put(b,8,168);put(b,12,170);put(b,16,84);put(b,20,85);unsigned index=0,draws=0;for(unsigned tick=0;tick<3585;++tick){size_t off=24+(index++)*57;b[off]=1;put(b,off+1,tick);put(b,off+5,tick);put(b,off+9,draws);if(fresh?(tick!=2000&&tick!=2500):(tick!=2000&&tick!=2500&&tick!=3000)){off=24+(index++)*57;b[off]=2;put(b,off+1,draws);put(b,off+5,UINT32_MAX);put(b,off+9,draws);++draws;}}assert(index==count&&draws==(fresh?3583U:3582U));return b;}

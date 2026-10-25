@@ -253,8 +253,8 @@ test('actual progress publication persists control before hash and preserves fin
     const progressBody=between('async function persistRecreationProgress() {','\nasync function beginRecreationCallbackScope');
     const finalBody=between('async function persistRecreationSummary() {','\nasync function persistRecreationProgress');
     const decisionExpression=between('const recreationPassDecision =',';\nlet recreationLifetime');
-    for (const recreationFullB of [false,true]) for (const failAt of [null,'control-write','control-rename','summary-write','summary-rename']) {
-      const output=path.join(root,(recreationFullB?'fullB-':'prefix-')+(failAt??'positive'));await fs.mkdir(output);
+    for (const firstSssFresh132Typed22Pair of [false,true]) for (const recreationFullB of [false,true]) for (const failAt of [null,'control-write','control-rename','summary-write','summary-rename']) {
+      const output=path.join(root,(firstSssFresh132Typed22Pair?'typed22-':'')+(recreationFullB?'fullB-':'prefix-')+(failAt??'positive'));await fs.mkdir(output);
       const inventoryOutput=path.join(output,'recreation-control.json');
       const events=[];let reachedRestart=false;
       const controlledFs={...fs,
@@ -263,10 +263,10 @@ test('actual progress publication persists control before hash and preserves fin
       const report={result:'fail',execution_state:'running',cleanup:{failures:[],browser_process_terminated:false,server_process_terminated:false},scenario:{recreation_canary:{lifetime:'A-close-control'}}};
       const summary={schema:'melee-web-stadium-recreation-canary-summary-v1',result:'running',decision:null,close_receipt:{host_settlement:{accepted:true}}};
       const scope={fs:controlledFs,path,assert,output,inventoryOutput,report,recreationSummary:summary,recreationCanary:true,failure:null,matchedSetupCfTiming:null,
-        recreationPassDecision:vm.runInNewContext(`(${decisionExpression})`,{recreationFullB,recreationFullPair:false}),
+        recreationPassDecision:vm.runInNewContext(`(${decisionExpression})`,{recreationFullB,recreationFullPair:false,firstSssFresh132Typed22Pair}),
         stadiumC3ReportCheckpoint:checkpointModule.createStadiumC3ReportCheckpoint({reportPath:inventoryOutput,fileSystem:controlledFs}),
         hashFile:async file=>{events.push('hash:'+path.basename(file));return hash(await fs.readFile(file));}};
-      assert.equal(scope.recreationPassDecision,recreationFullB
+      assert.equal(scope.recreationPassDecision,firstSssFresh132Typed22Pair ? 'PASS_SAME_INSTANCE_FRESH132_A7168_B7168_TYPED22_SEED_COMPONENT_ONLY' : recreationFullB
         ? 'PASS_SAME_INSTANCE_A174_B7167_COMMON_FIELDS_SEED_COMPONENT_ONLY'
         : 'PASS_SAME_INSTANCE_174_ACTION_RECREATION_COMPONENT_ONLY');
       vm.createContext(scope);

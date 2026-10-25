@@ -16,6 +16,7 @@ addToLibrary({
         "_melee_web_native_menu_stadium_recreation_admit_b",
       ]);
       let baseline = null;
+      let selectedExportNames = exportNames;
       function liveBindings() {
         if (typeof Module !== "object" || Module === null || globalThis.Module !== Module ||
             typeof wasmExports !== "object" || wasmExports === null ||
@@ -26,7 +27,7 @@ addToLibrary({
           throw new Error("Stadium same-instance accessor lacks a live Emscripten instance");
         }
         const functions = Object.create(null);
-        for (const name of exportNames) {
+        for (const name of selectedExportNames) {
           if (typeof Module[name] !== "function") {
             throw new Error("Stadium same-instance export is unavailable: " + name);
           }
@@ -46,13 +47,21 @@ addToLibrary({
             memory_bytes: baseline.memoryBytes,
             heap_bytes: baseline.heapBuffer.byteLength});
         },
+        captureFresh132Typed22Pair() {
+          if (baseline) throw new Error("Stadium instance identity was already captured");
+          selectedExportNames = Object.freeze([...exportNames,
+            "_melee_web_native_menu_stadium_fresh132_typed22_explicit_arm",
+            "_melee_web_native_menu_stadium_recreation_close_full_pair",
+            "_melee_web_native_menu_stadium_recreation_admit_full_b"]);
+          return api.capture();
+        },
         compare() {
           if (!baseline) throw new Error("Stadium instance identity has not been captured");
           const current = liveBindings();
           const moduleSame = current.module === baseline.module;
           const exportsSame = current.exports === baseline.exports;
           const memorySame = current.memory === baseline.memory;
-          const wrappersSame = exportNames.every(name =>
+          const wrappersSame = selectedExportNames.every(name =>
             current.functions[name] === baseline.functions[name]);
           const heapBufferSame = current.heapBuffer === baseline.heapBuffer;
           const memoryBufferSame = current.memoryBuffer === baseline.memoryBuffer;
