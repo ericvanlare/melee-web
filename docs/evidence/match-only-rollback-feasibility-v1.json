@@ -8190,6 +8190,132 @@
         "No claim all earlier LObj bytes passed, no final-present/pixel/whole-session/seven-tick/competitive acceptance."
       ]
     },
-    "current_next_boundary": "External DESIGN ONLY for a canonical UV/TOON same-history matrix48/derived-dirty component control: distinguish draw-unchanged raw source flags from effective full-flags dirty-clear view, bind every reader/RMW setter, constructor+successful-load lineage, direct-Free/release retirement and class/amnesia/world revocation. No PRE adoption, production implementation, control execution or browser retry is authorized."
+    "current_next_boundary": "Preserve the reviewed V8 source/component/build/full/config checkpoint and actual initialization failure. Further texture-guard investigation was blocked by an automated security check; no retry, rerouting, production repair or browser capture is released. Independent Stadium work continues.",
+    "tobj_v8_presentation_cache_initialization_v1": {
+      "status": "COMPONENT_BUILD_FULL_CONFIG_PASS_BROWSER_INITIALIZATION_FAILED",
+      "source": {
+        "clean_checkpoint": "019fa3171bbff8dff645a5586d8fb03d2f278940",
+        "tree": "72227468f7be779084f373967726bf96675ce50f",
+        "runtime_producer_base": "66c3771b9554833d980adbbda144e9656cd8138a",
+        "runtime_producer_dirty_files": 21,
+        "checkpoint": {
+          "path": "tobj-v8-runtime-validation-v1/clean-checkpoint-v1.json",
+          "bytes": 1892,
+          "sha256": "6521823cfded9d434f573333e1b023e50108ccf046c6a38a20c482004aebcb6d"
+        },
+        "application": {
+          "path": "tobj-v8-post-application-validation-candidate-v2/application-attempt-v1/application-v1.json",
+          "bytes": 7942,
+          "sha256": "b69879c432ebc89c868c17359479dd1ab5023a57dd93ec025ed928abcb3202d4"
+        }
+      },
+      "validation": {
+        "builds": "V8/V7/V6/V5/ordinary Release PASS",
+        "outer_tests": 2479,
+        "skipped": 165,
+        "passed": 2314,
+        "seconds": 580.962,
+        "integration": {
+          "path": "tobj-v8-runtime-validation-v1/integration-result-v1.json",
+          "bytes": 17512,
+          "sha256": "2d269eec3fbe27d43c51af02297a9592c61bd75ff08a610ae24ff95ab9055f68"
+        },
+        "full": {
+          "path": "tobj-v8-runtime-validation-v1/full-regression-summary-v1.json",
+          "bytes": 16970,
+          "sha256": "dfcd83f1d50f90bce691636519762b975718c16f2d4904e010142dc7d37d1e7e"
+        },
+        "review": {
+          "path": "tobj-v8-runtime-validation-independent-review-v1.json",
+          "bytes": 2271,
+          "sha256": "dca30486e84ad0c82cb4e8081714279292eecd325c796eb70de6a517d1b49d9f"
+        },
+        "runtime": {
+          "path": "tobj-v8-runtime-validation-v1/runtime-inventory-v1.json",
+          "bytes": 32250,
+          "sha256": "c30a16da94bcbb5cb5e9633541761503a033b4303ba35d5d64a004c0f52d1671"
+        }
+      },
+      "configuration": {
+        "controls": 10,
+        "mutable_rows": 3231,
+        "policy_rows": 2170,
+        "wire_rows": 2166,
+        "nonwire_rows": 1065,
+        "result": {
+          "path": "tobj-v8-linked-config-preparation-candidate-v1/controls-attempt-v1/final-result-v1.json",
+          "bytes": 4249,
+          "sha256": "eca5c0b764b661b2d1cf41d876c75cf4d4d18ba8df705765081338849d81c21c"
+        },
+        "review": {
+          "path": "tobj-v8-linked-config-result-independent-review-v1.json",
+          "bytes": 3490,
+          "sha256": "0db004d854a24889e7a942d78930132f52ddee2ce24066a9d3ad77e5e9b3d65d"
+        }
+      },
+      "capture": {
+        "packet": {
+          "path": "tobj-v8-presentation-cache-capture-v1/packet-candidate-v1.json",
+          "bytes": 130595,
+          "sha256": "510f4cbf7a5600ffa91f0e71b774d7b660864267afe9c53d1cd2e736946d6dea"
+        },
+        "packet_review": {
+          "path": "tobj-v8-concrete-packet-independent-review-v1.json",
+          "bytes": 2475,
+          "sha256": "2bf58fb6c8903571a5cb0a8db34b698b436ec1df4a72798402337cd99b8c02d7"
+        },
+        "raw": {
+          "path": "tobj-v8-presentation-cache-capture-v1/runner/evidence.json",
+          "bytes": 16501,
+          "sha256": "195c57e159f27364c43c20e9797be17dbb40cad890f6e50ee7acd64509546770"
+        },
+        "owner": {
+          "path": "tobj-v8-presentation-cache-capture-v1/owner.json",
+          "bytes": 94319,
+          "sha256": "c3e3807fa7d1a68768cce4c08fc3d4e6719fed5f512f09d877abd0c9e419219a"
+        },
+        "log": {
+          "path": "tobj-v8-presentation-cache-capture-v1/runner.log",
+          "bytes": 1755,
+          "sha256": "e8073be011a8552f58f0ea35bf1863cc9f2901f52125cdaf97909a81ffa523b7"
+        },
+        "launch": {
+          "path": "tobj-v8-presentation-cache-capture-v1/launch-result-v1.json",
+          "bytes": 3284,
+          "sha256": "421d43a16d9fb90d68022e65db38adb9b7d9eeb4c0516cadfa27cc52b84934f2"
+        },
+        "postflight": {
+          "path": "tobj-v8-presentation-cache-capture-v1/postflight-source-runtime-v1.json",
+          "bytes": 7489,
+          "sha256": "713e6a90fd8064cdd0eaccb19457ad5638787dcf468edf85da17b8f985c38002"
+        },
+        "independent_review": {
+          "path": "tobj-v8-browser-initialization-failure-independent-review-v1.json",
+          "bytes": 4041,
+          "sha256": "2af104d51630d3bce766f08d417240ad376e8c701ca75d8790109bcf793dd402"
+        },
+        "initialization_completed": false,
+        "warm_prefix_samples": 0,
+        "aggregate_status": "not-started",
+        "elapsed_seconds": 2.79957670904696,
+        "failure": "TObjUpdateFunc -> HSD_Panic -> abort during runBrowserInit; exact first cause not yet established",
+        "source_writer_diagnostic": "NOT_APPLICABLE_MANAGED_UV_TOON_CACHE_RELOCATED_V8"
+      },
+      "cleanup": {
+        "cpu_restore_close": 0,
+        "snapshot_close": 1,
+        "renderer_shutdown": 1,
+        "all_recorded_pids_absent": 12,
+        "all_recorded_pgids_absent": 3,
+        "source_runtime_postflight_exact": true,
+        "failed_scratch_retained": true
+      },
+      "limits": [
+        "No new two-tick CPU comparison, correction or present result.",
+        "Original parity, complete owner coverage, seven-tick budget, relay rollback and acceptance remain open.",
+        "Default-off private incomplete profile; no comparison weakening or renderer rewind."
+      ],
+      "followup_status": "CHECKPOINTED_AUTOMATED_SECURITY_BLOCK_NO_RETRY_OR_REROUTE"
+    }
   }
 }

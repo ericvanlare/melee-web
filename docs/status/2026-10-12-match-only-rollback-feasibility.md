@@ -1,6 +1,6 @@
 # Match-only rollback feasibility
 
-**Compiled / One-tick drawn-reference CPU restore-replay-and-present passed; V7 two-tick remains strict 1216 at row 113 offset 272; actual MakeTextureMtx write occurrence now recorded; four Release configurations and 2,477-test regression pass; live lifetime, cache repair and full browser rollback remain unproven**
+**Compiled / One-tick drawn-reference CPU restore-replay-and-present passed; V7 two-tick remains strict 1216; V8 presentation-cache candidate passes five builds and regression but aborts during browser initialization; full browser rollback remains unproven**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
 [merged #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
@@ -988,19 +988,45 @@ makes the source control use the actual bool-before-profile composition APIs;
 the reduced composition check proves the final TObj source byte-exact. Source
 math, inputs, comparison policy and strict failure were not relaxed.
 
-The reviewed next step is external design only for a canonical UV/TOON
-same-history component control. It must distinguish raw source flags, which a
-draw must leave unchanged, from an effective full-flags view that preserves the
-original draw-side dirty clear. Each source reader and read-modify-write setter
-needs an explicit contract, preserving authored SRT, setter timing, unchanged
-reuse and ordered GX output under the same actual presentation history.
-Constructor plus successful load must establish lineage without PRE adoption;
-direct Free as well as release must retire it, and class change, amnesia and
-world retirement must revoke it. Custom, shadow/Fountain and mixed direct-write
-paths remain outside the initial UV/TOON scope. The independent design review
-authorizes no production implementation or control execution. No production
-matrix relocation, cache rewind, byte mask, fake CPU Make/dirty-clear call,
-POST-copy repair or additional browser run is authorized by this receipt.
+### V8 presentation cache: component validation passes; browser initialization fails
+
+Source checkpoint `019fa3171bbff8dff645a5586d8fb03d2f278940` adds the
+default-off private UV/TOON matrix and derived-dirty presentation cache. Its
+runtime producer is the distinct dirty `66c3771b` plus 21 reviewed files.
+Constructor/load, descriptor, class, world and retirement guards constrain
+cache access; Shadow retains its original matrix path. Other texture fields
+remain strict simulation comparisons. The cache is not a renderer rewind.
+
+The actual-source controls pass their declared component scope. V8, V7, V6, V5
+and ordinary Release builds pass, followed by 2,479 regression tests with 165
+skips. Fresh linked configuration controls pass 10 tests and join all 3,231
+mutable rows: 2,170 policy rows, 2,166 wire rows and 1,065 nonwire rows. The new
+48-byte managed setup zero matrix follows the existing source-C static policy;
+it is not silently excluded. The 42 retained runtime artifacts and live outputs
+remain pinned independently of the later clean source checkpoint.
+
+The one reviewed changed-hypothesis browser run fails in initialization after
+2.800 seconds. Its retained stack reaches `TObjUpdateFunc`, `HSD_Panic` and
+abort through the original animation path. Initialization is incomplete, zero
+warm-prefix samples ran, and aggregate restoration never started. The stack
+identifies the failure boundary; it does not by itself identify the rejected
+owner or first failure code. There is no new two-tick comparison, command-11
+result, corrective interval or final-present result.
+
+Cleanup returns CPU close 0, snapshot close 1 and renderer shutdown 1. The
+independent review confirms all 12 recorded owned PIDs and three process groups
+are absent, and all source/runtime pins are unchanged. Failed evidence and
+scratch are retained. The historical source-writer diagnostic is explicitly
+not applicable to V8's relocated cache; this is not a zero-event success.
+
+The structured receipt records this boundary under
+`tobj_v8_presentation_cache_initialization_v1`, including the exact producer,
+validation, configuration, packet and raw-result review. Further initialization diagnosis is
+checkpointed after an automated tool security block; the blocked investigation
+will not be retried or routed through another executor. No repair or browser
+retry has been released. V7's earlier strict mismatch remains
+unresolved by actual V8 browser evidence. Full owner coverage, seven corrective
+ticks, relay rollback, original parity and acceptance remain open.
 
 ## Stage decision dependencies, issue #333
 
