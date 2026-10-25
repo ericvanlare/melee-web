@@ -22365,14 +22365,15 @@
     ],
     "next": "source-only design for one coherent original-B constructor \u2192 actual GO \u2192 bounded idle comparison. Reuse the retained literal B inputs and existing constructor/map2/title/GO observers, but first supply their missing match1 observations and an explicit checked bridge from retained replay Setup to the existing source-action driver. Do not infer GO from tick84, reuse the original-A schedule, force seeds or repeat successful menu/Setup captures. Original owner registration/retirement and per-owner RNG correspondence remain separate gaps; full replay, transformations, public admission, pixels/PCM, timing and C3 remain open.",
     "original_B_continuation": {
-      "state": "PASS_ZERO_ACTION_SETUP_COMMON_FIELDS_SEED_COMPONENT; FULL_REPLAY_AND_C3_OPEN",
+      "state": "PASS_ORIGINAL_B_CONSTRUCTOR_GO_AND_SHORT_STATE_REFERENCE; BROWSER_REFERENCE_ALIGNMENT_AND_C3_OPEN",
       "run_id": "browser-rollback-sprint-20261022-115029-d89e262b",
       "artifact_paths_relative_to_run": true,
       "source": {
         "current_checkpoint": "edac54baf06fc3af7b65853764bbdeec62294aed",
         "current_tree": "f65ec11022de7688ecfa3bd317fad8fe37873e1e",
         "prior_checkpoint": "4258918a03e979158bf4fea86369a9bb2b584e70",
-        "runtime_producer": "4258918a plus7 reviewed producer-worktree files; final source8 differs only by reviewed legacy fixture repair. Historical preparedStart76957+13 retained separately."
+        "runtime_producer": "4258918a plus7 reviewed producer-worktree files; final source8 differs only by reviewed legacy fixture repair. Historical preparedStart76957+13 retained separately.",
+        "scope": "Historical browser prepared-Setup source; the fresh original-observer producer is recorded separately below."
       },
       "validation": {
         "earlier_later_SSS_full": {
@@ -22455,9 +22456,9 @@
         "next": "Source-only smallest B Entry/Setup handoff contract using actual retained4235/4313 and observed cursor940; preserve context/input/order, no seed forcing or original-A substitution. Constructor/GO/per-owner observations remain prerequisites before separate release."
       },
       "limits": [
-        "No original lifetime-B/Entry/constructor/GO comparison, broader typed/timer/per-owner RNG parity or transformations.",
-        "No C3, public admission, full-session/pixel/PCM/timing/physical-input acceptance.",
-        "No auto-Resume, source state injection, timing deadline extension or comparison weakening; failed evidence retained."
+        "Earlier browser Setup comparison remains scoped to its own retained reference and inputs. Fresh original B observations do not establish browser constructor/GO/state parity.",
+        "Original owner registration, allocation generations/retirement, per-owner/all-writer RNG correspondence, transformations and C3 remain open.",
+        "Human physical-input, foreground timing, audible output, two-machine and whole-session acceptance remain unrun."
       ],
       "returned_css_repair": {
         "state": "VALIDATED_AND_ACTUAL_LATER_SSS_COMPONENT_PASS_NO_B_ENTRY",
@@ -23015,6 +23016,212 @@
           ],
           "original_replay_capture_result": "fail"
         }
+      },
+      "prior_state_before_original_b_observation": "PASS_ZERO_ACTION_SETUP_COMMON_FIELDS_SEED_COMPONENT; FULL_REPLAY_AND_C3_OPEN",
+      "original_b_reference_observation": {
+        "state": "PASS_ORIGINAL_SELECTED_B_OBSERVATIONS_AND_WHOLE3_TERMINAL_ONLY",
+        "scope": "Fresh original same-run observations, not browser comparison. Default-off whole3 match1 adjunct preserves existing inputs, natural terminal, source order and caps.",
+        "source": {
+          "clean_capture_harness": "769886c7e51587302da13d97ed7c3b96431c8f44",
+          "clean_tree": "190a2fb1ed81ff2d17ee988bd982008a9b495a1a",
+          "native_producer": "Dirty e87c3156 plus exact seven reviewed observer/host/test files; distinct from clean capture harness.",
+          "native_binary_sha256": "f7b2dbdab8dd829cd510d30cc0adf364c55b5587fd326169c408286ed24a1885",
+          "native_manifest_sha256": "33b05150497517d6359983ec097900aae8694a6ad4ec5d701a6b4406bddc9f56",
+          "historical_browser_runtime": "4258918a plus seven runtime-source files; not a producer of this original capture."
+        },
+        "validation": {
+          "full_tests": 2770,
+          "full_skips": 197,
+          "full_seconds": 578.946,
+          "full_exit": 0,
+          "separate_retained_data_controls_passed": 2,
+          "fresh_reference_release_build_exit": 0,
+          "source_checkpoint_review": "PASS",
+          "CI": "Required for each published checkpoint; current publication results are recorded on PR301. Historical e87c3156 CI is not inherited."
+        },
+        "observed": {
+          "capture_seconds": 63.48714749980718,
+          "exit_code": 0,
+          "constructor_sequences": [
+            4303,
+            4304,
+            4305,
+            4306,
+            4307
+          ],
+          "constructor_owner_addresses": [
+            2160284288,
+            2160284384
+          ],
+          "constructor_rng_pointer": 2152554384,
+          "constructor_parameters": [
+            3600,
+            3800
+          ],
+          "randi_bound": 200,
+          "randi_result": 142,
+          "seed_before": "ba5dac05",
+          "seed_after": "b6cdeeb4",
+          "countdown_at_go": 3742,
+          "actual_go_sequence": 4753,
+          "actual_go_source_tick": 84,
+          "state_source_ticks": 108,
+          "state_interval": [
+            84,
+            191
+          ],
+          "neutral_post_go_states": 96,
+          "neutral_post_go_interval": [
+            84,
+            179
+          ],
+          "pause_exit_tail_interval": [
+            180,
+            191
+          ],
+          "primary_records": 8629,
+          "primary_last_seq": 8628,
+          "input_events": 13824
+        },
+        "input_and_terminal": {
+          "three_short_matches": true,
+          "original_results_css_terminal": true,
+          "source_queue_slots": 4,
+          "connected_MWRI_ports": [
+            0,
+            1
+          ],
+          "native_input_complete": true,
+          "primary_complete": true,
+          "all_rng_writers_observed": false,
+          "scope": "Whole3 original route and two-lifetime scene endpoints. The 108 selected B states include 96 neutral post-GO states and 12 pause/exit-tail states; not a 108-tick idle acceptance interval."
+        },
+        "cleanup": {
+          "native_pid": 61372,
+          "collector_pid": 61370,
+          "supervisor_pid": 61365,
+          "native_exit": 0,
+          "terminate_sent": true,
+          "kill_sent": false,
+          "owned_processes_absent": true,
+          "admitted_pins_unchanged": 94,
+          "source_clean": true
+        },
+        "pins": {
+          "application": {
+            "path": "stadium-original-b-observation-validation-v2/application-v1.json",
+            "bytes": 3618,
+            "sha256": "0829008207931e690deda8764c4a17531186e6fabf1565318ecd858413c4b285"
+          },
+          "full_regression": {
+            "path": "stadium-original-b-observation-validation-v2/full-regression-result-v1.json",
+            "bytes": 2386,
+            "sha256": "a484879bcb699c2cd609ab111e127ec45ce1d39d5354b8e101b00196f7b6f245"
+          },
+          "fresh_reference_build": {
+            "path": "stadium-original-b-observation-validation-v2/reference-build-result-v1.json",
+            "bytes": 11189,
+            "sha256": "35e04e18939721fa08f31b7db52d1e839935a5168b5e1fd4762bd977ab7beea5"
+          },
+          "fresh_reference_manifest": {
+            "path": "stadium-original-b-observation-validation-v2/artifact/build-manifest.json",
+            "bytes": 4632,
+            "sha256": "33b05150497517d6359983ec097900aae8694a6ad4ec5d701a6b4406bddc9f56"
+          },
+          "integration": {
+            "path": "stadium-original-b-observation-validation-v2/integration-result-v1.json",
+            "bytes": 109089,
+            "sha256": "42fd7e3b95bf2f44c1176f87e339724d7113ef600e0c09fd22be740a8b402579"
+          },
+          "supplemental_controls": {
+            "path": "stadium-original-b-observation-supplemental-controls-v1/result-v1.json",
+            "bytes": 1697,
+            "sha256": "1717ffb957300c1070b46ea6411ba6d1c89f5d14d8a8451b5f2e6ca943c1476c"
+          },
+          "clean_checkpoint": {
+            "path": "stadium-original-b-observation-validation-v2/clean-checkpoint-v1.json",
+            "bytes": 3577,
+            "sha256": "7a99a34c1013d320ab468e1d141b54aea22e7f7c28f357f378e13fbb3eb468c9"
+          },
+          "validation_review": {
+            "path": "stadium-original-b-observation-final-validation-independent-review-v1.json",
+            "bytes": 5393,
+            "sha256": "67e3523b5af6aa4978c8fc4e90beaae4edc483f3f58440c9420db98f3cf4e08c"
+          },
+          "packet_freeze": {
+            "path": "stadium-original-b-observation-capture-packet-candidate-v1/freeze-v1.json",
+            "bytes": 1680,
+            "sha256": "00472f1e6727704c4fc6b2506d7b726aa979c82112a697546d4c538bfb6cd743"
+          },
+          "packet_review": {
+            "path": "stadium-original-b-observation-capture-packet-independent-review-v1.json",
+            "bytes": 3961,
+            "sha256": "b3166deb1d8b3a9deab31c6153016245a1c11de37842fa18401f314aba74115c"
+          },
+          "launch_result": {
+            "path": "stadium-original-b-observation-capture-packet-candidate-v1/launch-result.json",
+            "bytes": 3105,
+            "sha256": "aa6b2d936ba2c44f4ea8cc821121bf7918a22630e574c75e4015715a08aa9b40"
+          },
+          "raw_review": {
+            "path": "stadium-original-b-observation-raw-independent-review-v1.json",
+            "bytes": 6536,
+            "sha256": "5030a9d04da7ee1032b554a174bd82fe906da57b30ea487c2c68b3a8c86214c1"
+          },
+          "raw_report": {
+            "path": "stadium-original-b-observation-capture-v1/report.json",
+            "bytes": 218221,
+            "sha256": "ee3e0998ecf273e8431cd0cd8f196f6c2ef08a325660757c4782651536f52baf"
+          },
+          "primary_stream": {
+            "path": "stadium-original-b-observation-capture-v1/native-primary.mwro",
+            "bytes": 15401995,
+            "sha256": "13a11c05917d78fe681dff42015536c9c8e45c8da3d52fd13d30f019300cac35"
+          },
+          "primary_status": {
+            "path": "stadium-original-b-observation-capture-v1/native-primary-status.json",
+            "bytes": 293,
+            "sha256": "0ec42544a066d56e3d9acee9935f4829900dcec9f93b758a44e4df69bf325c61"
+          },
+          "input_stream": {
+            "path": "stadium-original-b-observation-capture-v1/native-inputs.mwri",
+            "bytes": 553016,
+            "sha256": "9ce0d39c48422010f5f56be18132ed55df8b5dea4565b127f134ae7a16221982"
+          },
+          "input_status": {
+            "path": "stadium-original-b-observation-capture-v1/native-input-status.json",
+            "bytes": 90,
+            "sha256": "673ed45f1e8c20824dcd4924daa8435bf10ec5a78fb98619560c2757bb952a28"
+          },
+          "allocation_stream": {
+            "path": "stadium-original-b-observation-capture-v1/native-allocations.jsonl",
+            "bytes": 224003324,
+            "sha256": "5b623d143d3249328e131e5500dd9034046fc7e6d5c6c3e201b5487d72242d23"
+          },
+          "input_intentions": {
+            "path": "stadium-original-b-observation-capture-v1/input-intentions.jsonl",
+            "bytes": 127896,
+            "sha256": "b7d91b23bbd9714f46e44ca65e4e0a5f0b985586bf39c06a2917fc6109f4060a"
+          },
+          "cleanup": {
+            "path": "stadium-original-b-observation-capture-v1/cleanup.json",
+            "bytes": 164,
+            "sha256": "27a95fff8e68db8eeba2d1532fba6061102447589189eceb090de899502ba973"
+          },
+          "retained_validation_preflight_failure": {
+            "path": "stadium-original-b-observation-validation-v1/integration-result-v1.json",
+            "bytes": 353,
+            "sha256": "dd7838f0ab740e08ed746c1b4a83bbe682cb4bc7db7852431425f022c3583b55"
+          }
+        },
+        "limits": [
+          "Constructor entry is not registration, allocation generation or retirement.",
+          "Actual GO84 is measured only for this run; no fixed GO assumption.",
+          "Randi200 to142 and seeds ba5dac05 to b6cdeeb4 are same-run observations; no correspondence to historical browser result72.",
+          "Title text contents, timer initialization, xF0 and per-owner/all-writer RNG ledger remain unknown.",
+          "No browser parity, transformation, full idle lifetime or C3 acceptance."
+        ],
+        "next": "Offline first-difference check of the new literal four-port input/source-order prefix and Entry/Setup context against the retained browser940 reference, then a checked bridge into the source-action driver. Do not force old seeds or use original-A schedule; no successful capture repeat."
       }
     }
   }
