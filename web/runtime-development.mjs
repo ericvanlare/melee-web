@@ -456,11 +456,27 @@ window.menuReplayPoll=()=>{
 // one agreed seed, then the ordinary native launch enters it. Per-tick PAD
 // frames and checksum records cross only the _melee_web_net_* exports.
 // Private constructor-only diagnostic entry. The ordinary Play control still prepares.
+// Only the shared owner's fully checked, one-use close emits this private event.
+// Retire A's lease immediately; failed B attempts still consume their capability.
+developmentHooks.stadiumRecreationClosed=receipt=>{
+ if(receipt?.schema!=='melee-web-stadium-recreation-boundary-v2'||
+    receipt.matched_setup_cf?.scope!=='fresh132-full-pair-7168-typed22-seed-observation-only')return;
+ const lease=freshFirstCssLaunchLease;
+ if(freshFirstCssRecreationCapability||!firstCssConstructorLaunchAttempted||!lease?.finite||
+    owner!==lease.owner||Module!==lease.Module||owner?.handle!==lease.handle||
+    boundary!==lease.boundary||check!==lease.check)
+  throw Error('Fresh CSS recreation close lost its successful finite-owner lease.');
+ freshFirstCssRecreationCapability=Object.freeze({lease,receipt:structuredClone(receipt)});
+ freshFirstCssLaunchLease=null;
+};
 let firstCssConstructorLaunchAttempted=false;
 let freshFirstCssLaunchLease=null,freshFirstCssKickAttempted=false;
+let freshFirstCssRecreationCapability=null;
 const launchPreparedFirstCss=async(expectedGeneration,fresh,finite=false)=>{
- if(firstCssConstructorLaunchAttempted)throw Error('CSS constructor launch was already attempted.');
+ const renewal=freshFirstCssRecreationCapability;
+ if(firstCssConstructorLaunchAttempted&&!renewal)throw Error('CSS constructor launch was already attempted.');
  firstCssConstructorLaunchAttempted=true;
+ if(renewal)freshFirstCssRecreationCapability=null;
  const launchOwner=owner,launchModule=Module,launchHandle=owner?.handle;
  const launchBoundary=boundary,launchCheck=check;
  const assertIdentity=()=>{
@@ -497,6 +513,19 @@ const launchPreparedFirstCss=async(expectedGeneration,fresh,finite=false)=>{
      launchModule._melee_web_native_menu_phase()!==0||
      launchModule._melee_web_native_menu_running()!==0)
    throw Error('CSS constructor launch requires the unchanged armed CREATED owner.');
+  if(renewal){
+   const prior=renewal.lease;
+   if(!fresh||!finite||launchOwner!==prior.owner||launchModule!==prior.Module||
+      launchHandle!==prior.handle||launchBoundary!==prior.boundary||launchCheck!==prior.check||
+      expectedGeneration<=renewal.receipt.prior_world_generation||
+      launchModule.stadiumMatchedSetupNativeIdle?.()!==true||
+      typeof launchModule._melee_web_native_menu_stadium_recreation_status!=='function')
+    throw Error('Fresh CSS recreation launch requires its same owner and newer CREATED generation.');
+   const pointer=launchModule._melee_web_native_menu_stadium_recreation_status();
+   const restarted=pointer?JSON.parse(launchModule.UTF8ToString(pointer)):null;
+   if(JSON.stringify(restarted)!==JSON.stringify({...renewal.receipt,restarted:true}))
+    throw Error('Fresh CSS recreation launch lost its exact checked restart receipt.');
+  }
  };
  // All native observations and entry use the existing owner command boundary.
  assertIdentity();
@@ -505,6 +534,7 @@ const launchPreparedFirstCss=async(expectedGeneration,fresh,finite=false)=>{
  resetTiming(false);
  await prepareAudio();await pauseAudioForPreparation();await waitForAudioRender();
  await launchBoundary(()=>{assertArmed();launchCheck(launchModule._melee_web_native_menu_launch());});
+ if(renewal){freshFirstCssKickAttempted=false;freshFiniteCssAttempts.clear();}
  if(fresh)freshFirstCssLaunchLease={owner:launchOwner,Module:launchModule,handle:launchHandle,
    boundary:launchBoundary,check:launchCheck,generation:expectedGeneration,finite};
  $('canvas').focus();inputDirty=true;syncAudio();

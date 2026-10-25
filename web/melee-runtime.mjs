@@ -770,6 +770,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       else publish();
       if (diagnosticActive !== false) return false;
       stadiumRecreationCloseSettled = true;
+      emit('stadiumRecreationClosed', receipt);
       return true;
     },
     menuFrame(wasRunning) {
