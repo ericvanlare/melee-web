@@ -1,6 +1,6 @@
 # Match-only rollback feasibility
 
-**Compiled / Source-only snapshot diagnostic / Terminal browser tick-and-draw diagnostic / One-tick CPU restore-replay-and-present passed; two-tick command 11 remains strict 1216; saved PRE descriptor maps to hsdLObj and offset 60 is layout-consistent with lvec.x, while live piece remains unknown (reason 7); source-only reduction in flight, no new capture authorized / Full browser rollback and frame-budget feasibility unproven**
+**Compiled / Source-only snapshot diagnostic / Terminal browser tick-and-draw diagnostic / One-tick CPU restore-replay-and-present passed; two-tick command 11 remains strict 1216; saved PRE descriptor maps to hsdLObj and offset 60 is layout-consistent with lvec.x, while live piece remains unknown (reason 7); complete-cache source comparison refuses fresh-seed equivalence at scenario 6, and original-source observation retains the prior GX direction in fixture-marked scopes; no production cache or browser capture authorized / Full browser rollback and frame-budget feasibility unproven**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
 [merged #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
@@ -32,7 +32,7 @@ attribution. The earlier allocation-origin diagnostic observed generated
 `class.c:219`, without identifying a typed object or member. The prior class/piece
 lifecycle capture stopped at strict 1216 and observed generated `class.c:242`;
 its witness remained UNKNOWN and did not tie its first event to the failing allocation.
-The frozen source plan remains proposal-only. A bounded external source-only HSD_LObj/lvec lighting reducer is authorized; no production implementation or browser capture is authorized.
+The reviewed lvec-only reducer is limited: its scenario-9 failure reset is fixture-only, and it does not establish automatic recovery. A subsequent complete-cache source comparison refuses fresh-seed equivalence at scenario 6 on a mismatching GX light direction. A separately reviewed original-source observer retains that direction within and across fixture-marked draw scopes. This is source evidence, not browser object lifetime or restore safety; no production cache or browser capture is authorized.
 Later typed domains and final present remain unrun. Component controls and the
 one-tick browser result do not establish full browser rollback. Earlier owner controls
 also repaired callback guards so simulation and draw callbacks refuse separately;
@@ -435,10 +435,42 @@ and view-space cache writes in setup (`lobj.c:393–399`); it does not show a
 simulation consumer or restore safety. The native CLOSE returned the latched
 1216; snapshot close and renderer shutdown each returned 1. All 10 recorded
 owned PIDs were independently absent. Later CPU domains, commands 12/13 and
-final present were not reached. The source-only reduction plan remains a proposal
-with no implementation or new capture authorized. See
+final present were not reached. The original-only source observation and its limits are recorded separately below. No production implementation or new browser capture is authorized. See
 `class_piece_capture_time_v1` in the structured receipt for exact identities and
 scope.
+
+
+The reviewed source-only lvec reducer identifies named lvec reads in specular
+rendering and setup writes; its corrected scenario-9 binding refusal is followed
+by a test-only failure-counter reset in the same fixture before valid renewal;
+this is not an automatic recovery contract. The complete-cache reducer then refuses fresh-cache
+equivalence at its first substantive scenario 6: the first post-Setup
+GXLoadLightObjImm 64-byte GXLightObj call arguments differ at direction words
+3d829595/bf430034/bf250eed in the original trace versus
+3f00160a/3f00160b/3f00160c in the fresh-seeded proposal. This reducer compares
+source-level call arguments and ordered operations; it does not emit the 69-byte
+FIFO record captured by the separate original-source observer. Later scenarios
+did not run.
+
+A subsequent original-only observer records the prior direction at the first
+matching specular load both within a draw and across fixture-marked draw scopes.
+It invokes the original setup/math/GX-load code and records the actual 69-byte
+load through a fixed sink, but retains one fixture object reference and models
+draw boundaries around SetCurrentAll; it does not run the FIFO parser, GPU,
+browser traversal or allocator free/reuse. This confirms a source-side submitted
+direction dependency, not live browser ownership, visual effect, or a production
+cache design. Exact reviewed pins and scope are nested in the structured receipt.
+
+The proposed next step is a bounded source-only causal-writer observation at
+setup_spec_lightobj (lobj.c:393–399). It would record exact before/after 12-byte
+lvec values around the unchanged original getter/math sequence, then join the
+actual writer operand to the full outer ledger and immutable PRE row/piece/header
+identity. After unchanged strict 1216, the same execution must join that span
+against the first-difference row and expected/live bytes. A matching write proves
+only a write at that address/value; PRE membership does not prove uninterrupted
+piece lifetime, and reuse uncertainty remains UNKNOWN. This is a proposed
+observation pending frozen controls and separate release, not a persistent cache
+implementation or browser-capture authorization.
 
 
 ## First current-source copy/restore result

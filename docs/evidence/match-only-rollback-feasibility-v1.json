@@ -2,7 +2,7 @@
   "schema": "match-only-rollback-feasibility-v1",
   "issue": 318,
   "pr": 319,
-  "status": "same_browser_one_tick_drawn_reference_pass_two_tick_command11_strict1216_saved_lobj_lvec_x_layout_hypothesis_capture_time_only_live_piece_unknown_external_lvec_lighting_reducer_authorized_no_production_or_browser_capture_full_browser_restore_not_established",
+  "status": "same_browser_one_tick_drawn_reference_pass_two_tick_command11_strict1216_saved_lobj_lvec_x_layout_hypothesis_capture_time_only_live_piece_unknown_source_only_complete_cache_fresh_seed_refused_at_scenario6_original_observer_retains_gx_direction_in_fixture_scopes_no_production_cache_or_browser_capture_full_browser_restore_not_established",
   "source_only_baseline": {
     "boundary": "synchronous-source-only-exported-call-return",
     "sourceDrawing": false,
@@ -2429,7 +2429,7 @@
   },
   "same_instance_browser_restore_341": {
     "issue": 341,
-    "status": "ONE_TICK_DRAWN_REFERENCE_PASS; TWO_TICK_COMMAND11_STRICT1216; CAPTURE_TIME_ONLY_SAVED_HSD_LOBJ_LVEC_X_LAYOUT_HYPOTHESIS; LIVE_PIECE_UNKNOWN_REASON7; EXTERNAL_SOURCE_ONLY_LVEC_LIGHTING_REDUCER_AUTHORIZED; NO_PRODUCTION_IMPLEMENTATION_OR_BROWSER_CAPTURE; CENSUS_INCOMPLETE; FULL_BROWSER_RESTORE_NOT_ESTABLISHED",
+    "status": "ONE_TICK_DRAWN_REFERENCE_PASS; TWO_TICK_COMMAND11_STRICT1216; CAPTURE_TIME_ONLY_SAVED_HSD_LOBJ_LVEC_X_LAYOUT_HYPOTHESIS; LIVE_PIECE_UNKNOWN_REASON7; SOURCE-ONLY COMPLETE-CACHE FRESH-SEED EQUIVALENCE REFUSED AT SCENARIO6; ORIGINAL SOURCE OBSERVER RETAINS GX DIRECTION WITHIN/ACROSS FIXTURE-MARKED SCOPES; NO PRODUCTION CACHE OR NEW BROWSER CAPTURE; CENSUS INCOMPLETE; FULL BROWSER RESTORE NOT ESTABLISHED",
     "producer_base_commit": "130438fd2b86d00cfec98cd2ba0a5f66084ae15c",
     "producer_worktree": "uncommitted source; census runtime/harness and separate owner component sources pinned below; not a commit identity",
     "runtime_sha256": {
@@ -2558,7 +2558,7 @@
     },
     "remaining": [
       "complete source/project mutable-static coverage and dynamic source/asset/stream/file ownership",
-      "establish live ownership and continuity for the saved HSD_LObj/lvec.x hypothesis and reduce the strict command-11 payload mismatch; later CPU domains and final present remain unrun",
+      "establish whether the saved HSD_LObj/lvec.x hypothesis is the live object in the failing browser route and reduce the strict command-11 payload mismatch; the source observer retains a direction only for a fixture-held object across modeled scopes; later CPU domains and final present remain unrun",
       "render-to-simulation dependencies and safe host effects across no-draw correction; renderer/GPU/cache state remains outside rewind scope",
       "whole-session, original-game parity, continuous PCM, pixel parity and foreground timing acceptance"
     ],
@@ -2572,7 +2572,8 @@
       "The raw census remains incomplete and ownerRestoreAdmission is false; observed ranges outside this CPU checkpoint remain unadmitted.",
       "The separate two-tick reducer demonstrates strict clock-mismatch rejection with modeled gameplay leaves; it is not two-tick gameplay rollback evidence.",
       "The actual two-tick browser attempt failed at command 11 on strict CPU payload equality; later domains and final present were not reached.",
-      "No original-game parity, multi-tick or seven-tick acceptance, continuous PCM, pixel parity, foreground timing or whole-session acceptance follows."
+      "No original-game parity, multi-tick or seven-tick acceptance, continuous PCM, pixel parity, foreground timing or whole-session acceptance follows.",
+      "The original-only observer shows the same fixture-held source light direction submitted within and across fixture-marked draw scopes. It models SetCurrentAll boundaries, WObj/SList and a fixed FIFO sink, and does not run browser traversal, the FIFO parser, GPU, geometry/shaders, allocator free/reuse, or pixel-impact checks."
     ],
     "retained_failures": [
       {
@@ -2600,7 +2601,7 @@
       "retained_artifact": "census-owner-gap-analysis-v1.json",
       "sha256": "9908b8d2ebb8aeeb64d8df4dcdeb24ea0f16f55bab3d17e1f847c679f90ba370"
     },
-    "next_experiment": "Run the authorized external source-only HSD_LObj/lvec lighting producer/consumer reduction. The authorization covers only that external reducer; no production implementation or browser capture is authorized. The saved-PRE member/layout match does not establish live ownership or simulation use.",
+    "next_experiment": "Prepare and review a bounded source-only causal-writer observation at setup_spec_lightobj (lobj.c:393\u2013399), recording exact before/after 12-byte lvec values around the unchanged getter/math sequence. Join the actual operand span to the current outer ledger and immutable PRE row/piece/header identity, then\u2014after unchanged strict 1216\u2014the SAME execution first-difference span and expected/live bytes. A matching writer proves only a write at that address/value; PRE membership does not prove piece lifetime and reuse uncertainty remains UNKNOWN. Freeze controls and obtain separate release before any browser run. No comparison relaxation or persistent cache implementation is authorized.",
     "owner_components": {
       "scope": "Private owner components only; no browser restore exposure or complete-world claim",
       "current_files_sha256": {
@@ -7024,6 +7025,155 @@
       ],
       "next_experiment": "Run the authorized external source-only HSD_LObj/lvec lighting producer/consumer reduction. The authorization covers only that external reducer; no production implementation or browser capture is authorized. The saved-PRE member/layout match does not establish live ownership or simulation use.",
       "run_root_label": "browser-rollback-sprint-20261022-115029-d89e262b"
+    },
+    "current_lobj_source_review": {
+      "retained_artifact": "lobj-cache-lifetime-original-observer-independent-review-v1/independent-review-v1.json",
+      "sha256": "5ae3524c06ea2bd79ada167ede0eca2ecf5d51a950d0ca1bab6fbda0641e1e51",
+      "note": "Independent review accepts only the scoped original-source observation for documentation; it does not approve implementation or browser capture."
+    },
+    "lobj_view_vector_source_reducer_v2": {
+      "status": "REVIEWED_NARROW_SOURCE_REDUCER; SCENARIO9 CORRECTED; NO PRODUCTION CACHE APPROVAL",
+      "scope": "Actual extracted HSD_LObj source with selected services modeled; source-use and fixture evidence only.",
+      "freeze": {
+        "path": "lobj-view-vector-actual-source-reducer-v2/freeze-v1.json",
+        "bytes": 650,
+        "sha256": "6af0a6ff4e845e0353b99fbe13bb64509f9002b06d6dec78a5551cfe93f5cc42"
+      },
+      "result": {
+        "path": "lobj-view-vector-actual-source-reducer-v2/attempt-v1/result-v1.json",
+        "bytes": 15713,
+        "sha256": "f9f23a6f4b273cf666f194abcefa52a654e989b64ae998fcf4ca358c5cdc6e4f"
+      },
+      "independent_review": {
+        "path": "lobj-view-vector-actual-source-reducer-v2-independent-review-v1/independent-review-v1.json",
+        "bytes": 4855,
+        "sha256": "e18cf81766972ea968d4697098ace49e43216c232834cef219205131545a0d4e"
+      },
+      "scenario9_correction": {
+        "path": "lobj-view-vector-actual-source-reducer-v2/claim-correction-v1.json",
+        "bytes": 1623,
+        "sha256": "3ff12c6980118c5e7ee684ba5e1d4bd908138ba09a4531e4d424cdfbc2b2b487"
+      },
+      "finding": "Named lvec reads occur in specular rendering and setup writes; the lvec-only proposal omits companion lightobj/spec_lightobj state. After deletion, the corrected scenario 9 checks that the binding helper refuses; the same fixture then performs valid renewal after a test-only reducer failure-counter reset.",
+      "scenario9_limit": "The failure=0 reset is fixture instrumentation between a checked refusal and valid renewal in the same fixture; it is not an automatic game recovery contract. A future recovery claim needs refusal and renewal in separate cases/scopes.",
+      "limitations": "No browser object ownership, live cache continuity, FIFO/GPU execution, rendered pixel effect or production implementation is established."
+    },
+    "lobj_complete_cache_source_reducer_v1": {
+      "status": "REFUSED_FRESH_SEED_EQUIVALENCE_FIRST_SUBSTANTIVE_DIVERGENCE; SCENARIO6; NO_PRODUCTION_CACHE_REGISTRY",
+      "scope": "Read-only actual-source comparison of retained 64-byte GXLightObj call arguments and ordered operations, with selected service leaves modeled. This reducer did not produce the later observer\u2019s 69-byte FIFO record.",
+      "freeze": {
+        "path": "lobj-complete-cache-actual-source-reducer-v1/freeze-v1.json",
+        "bytes": 858,
+        "sha256": "87ab1ad32d3c72abe79550e84b7aea093f5db118435882735fbf26096f070a52"
+      },
+      "result": {
+        "path": "lobj-complete-cache-actual-source-reducer-v1/result-v1.json",
+        "bytes": 7319,
+        "sha256": "1478fbae19fc0409eacd56758b5b2c5568d30a073dd8cb2ebcc583c675723466"
+      },
+      "independent_review": {
+        "path": "lobj-complete-cache-independent-review-v1/review-v1.json",
+        "bytes": 13488,
+        "sha256": "33dd6497402fa982a013181e727daa0e11d8bf2eb2a115e8a502de33526b311c"
+      },
+      "first_divergence": {
+        "scenario": 6,
+        "case": "Repeated INFINITE SetupInit with changed camera/position in the same labeled draw scope.",
+        "operations_compared": 42,
+        "operation_index": 37,
+        "operation": "GXLoadLightObjImm",
+        "id_word": 2,
+        "direction_record_byte_offsets": [
+          40,
+          44,
+          48
+        ],
+        "original_words": [
+          "3d829595",
+          "bf430034",
+          "bf250eed"
+        ],
+        "fresh_seeded_proposal_words": [
+          "3f00160a",
+          "3f00160b",
+          "3f00160c"
+        ]
+      },
+      "scenario_coverage": "Scenarios 0,1,2,3,5 matched and 4 refused as expected. Scenario 6 is the first substantive mismatch; 7\u201313 and the final omitted-hook loop did not run.",
+      "source_causality": "HSD_LObjSetupSpecularInit writes the direction into spec_lightobj; repeated SetupInit clears active slots and the setup helpers refresh other fields but do not rewrite direction before HSD_LObjSetup submits the dirty record. The fresh-seeded proposal replaces this retained direction with its cold seed.",
+      "limits": "The comparison is over 64-byte GXLightObj call arguments and ordered source operations; it did not produce or execute a 69-byte FIFO stream. Selected leaves are modeled. It establishes neither browser object lifetime nor visual impact and does not approve a persistent cache registry."
+    },
+    "lobj_original_lifetime_observer_v1": {
+      "status": "REVIEWED_SCOPED_ORIGINAL_SOURCE_OBSERVATION; PERSISTENT PRESENTATION SEMANTICS NEED REVIEW; NO IMPLEMENTATION/CAPTURE",
+      "scope": "One released original-only run from clean source head 761547d5598a4aec7522a8d85adba2149afc7a30; actual setup/math/GX-load source and actual GXLoad body, with one fixture-held source object reference across scopes.",
+      "result_freeze": {
+        "path": "lobj-cache-lifetime-original-observer-candidate-v1/result-freeze-v1.json",
+        "bytes": 711,
+        "sha256": "c05bd8a68a0d9dd28fe04a5d9976229adab8aee965c1182cdbccfa99d71a31d1"
+      },
+      "observed_result": {
+        "path": "lobj-cache-lifetime-original-observer-candidate-v1/observed-result-v1.json",
+        "bytes": 9382,
+        "sha256": "4002dfb666f39d1ff122c847148de9e542e8e802f4093e1a397ea826eba86380"
+      },
+      "result_manifest": {
+        "path": "lobj-cache-lifetime-original-observer-candidate-v1/result-manifest-v1.json",
+        "bytes": 8549,
+        "sha256": "87f1114900a02a95f0962ccfa081ad2da3d8c584a5886f872bf85f9697790188"
+      },
+      "independent_review": {
+        "path": "lobj-cache-lifetime-original-observer-independent-review-v1/independent-review-v1.json",
+        "bytes": 5573,
+        "sha256": "5ae3524c06ea2bd79ada167ede0eca2ecf5d51a950d0ca1bab6fbda0641e1e51"
+      },
+      "observed": {
+        "WITHIN_REAL_DRAW": {
+          "retains_prior_direction": true,
+          "differs_from_cold": true,
+          "normalized_operation_count": 46
+        },
+        "CROSS_REAL_DRAW": {
+          "retains_prior_direction": true,
+          "differs_from_cold": true,
+          "normalized_operation_count": 48
+        },
+        "retained_direction_words": [
+          "3d829595",
+          "bf430034",
+          "bf250eed"
+        ],
+        "cold_direction_words": [
+          "3f00160a",
+          "3f00160b",
+          "3f00160c"
+        ],
+        "actual_gx_load_record_bytes": 69
+      },
+      "meaning": "The first matching post-Setup specular load contains the prior direction both within a draw and after a fixture-marked return/new draw around actual SetCurrentAll. This is a source-side submitted-state dependency in the tested sequence.",
+      "limits": "The draw markers and FIFO sink are modeled; the fixture retains one source reference and does not traverse an actual browser scene, release/reuse the object, run the FIFO parser/GPU/geometry/shaders, or establish pixel impact, browser lifetime, restore safety or a production cache design. The full normalized math rows were not serialized; totals 46/48 remain.",
+      "next_disposition": "Review how a correct implementation can preserve original presentation semantics and establish actual owner/lifetime before production changes. This result alone authorizes no cache registry or browser capture."
+    },
+    "lobj_causal_writer_next_boundary_design_v1": {
+      "status": "SOURCE_ONLY_DIAGNOSTIC_PROPOSAL; NO_PERSISTENT_CACHE_IMPLEMENTATION OR BROWSER RELEASE",
+      "decision": {
+        "path": "lobj-causal-writer-next-boundary-design-v1/decision-v1.json",
+        "bytes": 2145,
+        "sha256": "94ec2e8a0457b0228eb4f9f92850089f6915bd901fdc1f5a1031365cfa01b2ce"
+      },
+      "source_appendix": {
+        "path": "lobj-causal-writer-next-boundary-design-v1/proposal-v1.json",
+        "bytes": 11616,
+        "sha256": "8cb6067181b8f9b5149bfaed749817bdb8869d9266085973788677e852b82666"
+      },
+      "source_freeze": {
+        "path": "lobj-causal-writer-next-boundary-design-v1/freeze-v1.json",
+        "bytes": 3622,
+        "sha256": "a4949893a6ff57f3958e6d725cb1b8547af517572b40e7630b4f7d3684dade15"
+      },
+      "next": "Instrument only actual setup_spec_lightobj lvec producer at lobj.c:393\u2013399 with one allocation-free exact 12-byte before/after record around the unchanged original getter/math sequence. Preserve original call order and strict comparisons.",
+      "required_join": "Bind the actual operand span to the current outer allocation ledger and full immutable PRE row/piece/header identities; after unchanged strict 1216, join the same execution first-difference span plus expected/live endpoint bytes. Missing/overflow/phase mismatch or unresolved reuse stays UNKNOWN.",
+      "identity_limit": "A matching writer proves a write occurred at that address/value only. PRE table membership is capture-time evidence, not uninterrupted live piece lifetime or class/member ownership.",
+      "release_limit": "Freeze the exact diagnostic ABI and controls, then obtain separate review/release before a browser run. No restore admission/comparison change or persistent cache implementation is authorized."
     }
   }
 }
