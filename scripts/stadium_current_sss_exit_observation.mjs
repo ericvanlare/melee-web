@@ -20,7 +20,7 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
   const armKey = observationProfile !== 0 ? '_melee_web_native_menu_stadium_current_sss_exit_arm_profile' : '_melee_web_native_menu_stadium_current_sss_exit_arm';
   const arm = module?.[armKey];
   const observe = module?._melee_web_native_menu_stadium_current_sss_exit_observe;
-  const preparedStartObserve = observationProfile === 1 && preparedStartProbe
+  const preparedStartObserve = (observationProfile === 1 || observationProfile === 2) && preparedStartProbe
     ? module?._melee_web_native_menu_stadium_current_sss_prepared_start_observe : null;
   const preparedSetupBegin = observationProfile === 1 && preparedStartProbe
     ? module?._melee_web_native_menu_stadium_current_sss_prepared_setup_begin : null;
@@ -28,7 +28,7 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
   if (!original || !Object.hasOwn(original, 'value') ||
       typeof original.value !== 'function' || !original.writable ||
       typeof arm !== 'function' || typeof observe !== 'function' ||
-      (preparedStartProbe && (observationProfile !== 1 || typeof preparedStartObserve !== 'function')) ||
+      (preparedStartProbe && (![1,2].includes(observationProfile) || typeof preparedStartObserve !== 'function')) ||
       typeof idle !== 'function' || typeof module.UTF8ToString !== 'function' ||
       !Array.isArray(recipeBytes) || recipeBytes.length < 328 ||
       recipeBytes.length > 128 * 1024 * 1024 ||
@@ -46,7 +46,7 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
       module._melee_web_native_menu_stadium_current_sss_exit_observe === observe &&
       (!preparedStartProbe ||
         module._melee_web_native_menu_stadium_current_sss_prepared_start_observe === preparedStartObserve) &&
-      (!preparedStartProbe ||
+      (!preparedSetupBegin ||
         module._melee_web_native_menu_stadium_current_sss_prepared_setup_begin === preparedSetupBegin) &&
       module.stadiumMatchedSetupNativeIdle === idle;
   };
@@ -92,8 +92,8 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
       return {busy: false, value: JSON.parse(module.UTF8ToString(pointer))};
     },
     observePreparedStart() {
-      if (!preparedStartProbe || observationProfile !== 1 || !preparedStartObserve)
-        throw Error('Prepared Start observation is available only to the explicit stock4/None profile');
+      if (!preparedStartProbe || ![1,2].includes(observationProfile) || !preparedStartObserve)
+        throw Error('Prepared Start observation is available only to an explicit checked prepared-Start profile');
       if (!state.armed || state.disposed || !owns())
         throw Error('Prepared Start observation lost its armed retained Module/callback');
       if (idle() !== true) return {busy: true};

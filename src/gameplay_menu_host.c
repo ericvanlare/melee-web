@@ -3617,6 +3617,17 @@ int melee_web_menu_host_stadium_c1a_selection(
         return fail(e,n,"Stadium C1a selection lost its original StKind");
     return host_selection_from_vs(h,vs,out,e,n);
 }
+int melee_web_menu_host_later_sss_prepared_selection(
+    const MeleeWebMenuHost* h,MeleeWebMenuMatchSelection* out,char* e,size_t n){
+    if(!h||h!=owner||h->entered||h->audio||!out||seed_ptr!=&h->seed||
+       !h->stadium_c1a_enabled||
+       !melee_web_menu_later_sss_ready_selection_valid(h->session))
+        return fail(e,n,"Later SSS prepared selection requires its closed occurrence1 owner");
+    const VsModeData* vs=melee_web_menu_ready_vs(h->session);
+    if(!vs||vs->start.rules.stkind!=St_Kind_PStadium)
+        return fail(e,n,"Later SSS prepared selection lost source StKind");
+    return host_selection_from_vs(h,vs,out,e,n);
+}
 #endif
 int melee_web_menu_host_raw_selection(const MeleeWebMenuHost* h,StartMeleeData* out,char* e,size_t n){
     if(!h||h!=owner||h->entered||h->audio||!out||seed_ptr!=&h->seed||

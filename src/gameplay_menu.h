@@ -230,6 +230,7 @@ int melee_web_menu_sss_selection_valid(const SSSData*);
  * only the Stadium SSS diagnostic selection and never changes stage admission. */
 int melee_web_menu_enable_stadium_c1a(MeleeWebMenuSession*, char*, size_t);
 int melee_web_menu_stadium_c1a_ready_selection_valid(const MeleeWebMenuSession*);
+int melee_web_menu_later_sss_ready_selection_valid(const MeleeWebMenuSession*);
 #endif
 
 #ifdef __cplusplus

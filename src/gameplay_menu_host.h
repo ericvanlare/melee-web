@@ -336,6 +336,8 @@ int melee_web_menu_host_stadium_c1a_raw_selection(
     const MeleeWebMenuHost*,StartMeleeData*,char*,size_t);
 int melee_web_menu_host_stadium_c1a_selection(const MeleeWebMenuHost*,
     MeleeWebMenuMatchSelection*,char*,size_t);
+int melee_web_menu_host_later_sss_prepared_selection(const MeleeWebMenuHost*,
+    MeleeWebMenuMatchSelection*,char*,size_t);
 #endif
 /* Reads the raw SSS-owned payload after OnExit and before VS-entry
  * normalization. This is a read-only retail-equivalence observation. */

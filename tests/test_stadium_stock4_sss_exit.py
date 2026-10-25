@@ -167,6 +167,15 @@ int melee_web_pad_state_encode(const MeleeWebPadState* input,uint8_t* output,siz
 std::string first_css_browser_draw_json_quote(const std::string& s){return "\""+s+"\"";}
 namespace melee_web{namespace stadium_first_css_diagnostic{std::string hex32(uint32_t){return "e2624ac3";}void write_start(std::ostream& out,const StartMeleeData&){out<<"{}";}}}
 '''
+        fixture+=r'''
+struct {bool armed=false;unsigned stage=4;}later_sss;
+unsigned completed_matches=1;
+bool later_sss_context_owned(){return current_sss_exit.armed&&!current_sss_exit.failed&&replay&&
+ replay.get()==current_sss_exit.recipe&&replay->initial_css&&replay->initial_css.get()==current_sss_exit.context&&
+ host&&host==current_sss_exit.host_owner;}
+int melee_web_menu_host_later_sss_prepared_selection(MeleeWebMenuHost*,MeleeWebMenuMatchSelection*,char*,size_t){
+ assert(false&&"later route unarmed in legacy host lifecycle fixture");return 0;}
+'''
         main=r'''
 int melee_web_menu_host_leave(MeleeWebMenuHost* h,int,char*,size_t){
  assert(preparation.waiting_for_audio()&&!running&&!pending);
@@ -228,7 +237,7 @@ enum class CurrentSssExitProfile{Time120,Stock4None};enum{MELEE_WEB_MENU_READY=1
 enum class AssetDestination{None,Match};struct MeleeWebPadState{uint8_t tag=0x5a;};struct Host{MeleeWebPadState input;};struct Recipe{std::unique_ptr<int> initial_css{new int(1)};};
 struct StartMeleeRules{int stkind=St_Kind_PStadium;};struct StartMeleeData{StartMeleeRules rules;};
 struct MeleeWebMenuMatchSelection{StartMeleeData start;struct{uint32_t controller=0,stocks=0,costume=0,sub_color=0;}players[4];uint32_t player_count=2,random_seed=0xe2624ac3,hud_layout=0;uint16_t unlocked_characters=2047,unlocked_stages=2047;uint8_t save_profile_present=1,opening_demo=0,sudden_death=0;};
-struct Note{bool captured=true;uint64_t world_generation=7;};struct Observation{int state=2;Note note;};
+struct Note{bool captured=true;uint64_t world_generation=7,session_ticks=535;};struct Observation{int state=2;Note note;};
 struct CurrentSssExitState{bool prepared_start_attempted=false,prepared_start_captured=false,prepared_start_selection_captured=false;
  std::string prepared_start_error,prepared_start_json;bool armed=true,terminal=true,failed=false,notified=true;
  CurrentSssExitProfile profile=CurrentSssExitProfile::Stock4None;Observation observation;
@@ -320,7 +329,36 @@ int main(){reset();std::string first=melee_web_native_menu_stadium_current_sss_p
 }
 '''
         pad_header='#include "'+str(BASE/'src'/'gameplay_pad_state.h')+'"\n'
-        run(pad_header+fixture+fn+main,self.new_workspace(ROOT,'stock4-prepared-start-getter-'))
+        later_fixture = r'''
+struct {bool armed=false;unsigned stage=4;}later_sss;
+unsigned completed_matches=1;size_t replay_cursor=940;int later_selection_calls=0;
+bool later_sss_context_owned(){return current_sss_exit.armed&&!current_sss_exit.failed&&replay&&
+ replay.get()==current_sss_exit.recipe&&replay->initial_css&&replay->initial_css.get()==current_sss_exit.context&&
+ host&&host==current_sss_exit.host_owner;}
+// Modeled host getter leaf; actual returned-READY validation is tested by the full source commit control.
+int melee_web_menu_host_later_sss_prepared_selection(Host*,MeleeWebMenuMatchSelection* out,char*,size_t){
+ ++later_selection_calls;out->start.rules.stkind=St_Kind_PStadium;out->random_seed=0x7fc17cf1;return 1;}
+'''
+        main = main.replace('int main(){reset();', 'int main(){reset();', 1)
+        # Keep every legacy positive/negative assertion, then exercise the actual new browser branch.
+        pos=main.rfind('}')
+        main=main[:pos]+r'''
+ auto later_reset=[](){reset();later_sss.armed=true;later_sss.stage=4;completed_matches=1;replay_cursor=940;
+ auto& s=current_sss_exit;s.terminal_cursor=s.notification_cursor=940;s.notification_order=1887;
+ s.observation.note.session_ticks=535;later_selection_calls=0;};
+ later_reset();std::string second=melee_web_native_menu_stadium_current_sss_prepared_start_observe();
+ assert(second.find("\"captured\":true")!=std::string::npos&&second.find("\"observation_profile\":2")!=std::string::npos);
+ assert(later_selection_calls==1&&selection_calls==0&&source_steps==0&&source_draws==0&&asset_calls==0);
+ assert(second==melee_web_native_menu_stadium_current_sss_prepared_start_observe()&&later_selection_calls==1);
+ for(int fault=0;fault<8;++fault){later_reset();
+ if(fault==0)later_sss.stage=3;if(fault==1)completed_matches=0;if(fault==2)replay_cursor=939;
+ if(fault==3)current_sss_exit.notification_order=1886;if(fault==4)current_sss_exit.observation.note.session_ticks=940;
+ if(fault==5)current_sss_exit.context=nullptr;if(fault==6)++gameplay_generation;if(fault==7)host=nullptr;
+ std::string refusal=melee_web_native_menu_stadium_current_sss_prepared_start_observe();
+ assert(refusal.find("\"captured\":false")!=std::string::npos&&later_selection_calls==0&&selection_calls==0);
+ assert(refusal==melee_web_native_menu_stadium_current_sss_prepared_start_observe());}
+'''+main[pos:]
+        run(pad_header+fixture+later_fixture+fn+main,self.new_workspace(ROOT,'stock4-prepared-start-getter-'))
 
     def test_prepared_start_export_stays_diagnostic_gated_and_runner_opt_in(self):
         cmake=(ROOT/'cmake/FighterRuntime.cmake').read_text()

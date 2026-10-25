@@ -15,7 +15,7 @@ import {validateStock4SssExitExpected, compareStock4SssExitObservation, validate
   validateStock4PreparedStartFinalization, validateStock4PreparedSetupFinalization,
   validateStock4SssExitTerminal, validateStock4SssExitFinalization} from './stadium_stock4_sss_exit_observation.mjs';
 import {validateLaterSssExitExpected, compareLaterSssExitObservation, validateLaterSssExitTrace,
-  validateLaterSssExitTerminal, validateLaterSssExitFinalization} from './stadium_later_sss_exit_observation.mjs';
+  validateLaterSssExitTerminal, validateLaterSssExitFinalization, compareLaterPreparedStartObservation} from './stadium_later_sss_exit_observation.mjs';
 import fs from 'node:fs/promises';
 import {closeSync, createReadStream, fsyncSync, openSync, writeSync} from 'node:fs';
 import path from 'node:path';
@@ -71,6 +71,7 @@ const {values, tokens} = parseArgs({tokens: true, options: {
   'stadium-current-sss-exit-expected': {type: 'string'},
   'stadium-current-sss-exit-expected-sha256': {type: 'string'},
   'stadium-current-sss-prepared-start': {type: 'boolean', default: false},
+  'stadium-later-sss-prepared-start': {type: 'boolean', default: false},
   'stadium-later-sss-exit': {type: 'boolean', default: false},
   'artifact-root': {type: 'string'},
 }});
@@ -165,6 +166,9 @@ const currentSssExitPath = values['stadium-current-sss-exit-expected']
 const currentSssExit = currentSssExitPath !== null;
 const currentSssPreparedStart = values['stadium-current-sss-prepared-start'];
 const currentSssLater = values['stadium-later-sss-exit'];
+const laterSssPreparedStart = values['stadium-later-sss-prepared-start'];
+if (laterSssPreparedStart && (!currentSssLater || currentSssPreparedStart))
+  throw Error('--stadium-later-sss-prepared-start requires later SSS and forbids Setup continuation');
 if (currentSssLater && (!currentSssExit || currentSssPreparedStart))
   throw Error('--stadium-later-sss-exit requires its expected packet and forbids prepared Start');
 if (currentSssPreparedStart && !currentSssExit)
@@ -822,7 +826,8 @@ try {
     currentSssStopsBeforeAssets = currentSssStock4 || currentSssLater;
     if (currentSssLater) {
       currentSssPolicy = {compare: compareLaterSssExitObservation, terminal: validateLaterSssExitTerminal,
-        trace: validateLaterSssExitTrace, finalization: validateLaterSssExitFinalization};
+        trace: validateLaterSssExitTrace, finalization: validateLaterSssExitFinalization, preparedStart:compareLaterPreparedStartObservation};
+      if (laterSssPreparedStart) report.later_sss_prepared_start = true;
       report.scope = 'Retained occurrence1 SSS OnExit common-field component after diagnostic A/Results/CSS; literal global inputs 0..939, pre-B-assets stop; replay incomplete, UNKNOWN menu draw parity, no B Entry/constructor/GO or C3';
     }
     if (currentSssStock4) {
@@ -1118,7 +1123,7 @@ try {
   if (currentSssExit) {
     currentSssArm = await observePageOperation('install current SSS returned-parser arm', () =>
       page.evaluateHandle(installCurrentSssExitReplayArm, {recipeBytes: currentSssRecipeBytes,
-        observationProfile: currentSssLater ? 2 : currentSssStock4 ? 1 : 0, preparedStartProbe: currentSssPreparedStart}));
+        observationProfile: currentSssLater ? 2 : currentSssStock4 ? 1 : 0, preparedStartProbe: currentSssPreparedStart || laterSssPreparedStart}));
     await phase('current-sss-exit-component', async () => {
       const deadline = Date.now() + replayTimeoutMs;
       await page.locator('#retail-replay-start').click();
@@ -1144,6 +1149,17 @@ try {
         }
         if (currentSssStopsBeforeAssets && report.current_sss_exit.comparison?.pass &&
             !report.current_sss_exit.unload_requested) {
+          if (laterSssPreparedStart) {
+            try {
+              const prepared=await observePageOperation('later prepared Start before-assets receipt',()=>
+                currentSssArm.evaluate(scope=>scope.observePreparedStart()));
+              report.current_sss_exit.prepared_start_observation=prepared.value??null;
+              await write('current-sss-prepared-start-observation.json',prepared);
+              if(prepared.busy||!prepared.value)throw Error('Later prepared Start was busy or absent');
+              report.current_sss_exit.prepared_start_comparison=
+                currentSssPolicy.preparedStart(prepared.value,currentSssExpected);
+            }catch(error){report.current_sss_exit.prepared_start_failure=String(error.message||error);}
+          }
           if (currentSssPreparedStart) {
             try {
               const prepared = await observePageOperation('prepared Start before-assets receipt', () =>

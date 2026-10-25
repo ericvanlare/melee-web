@@ -99,7 +99,7 @@ test('prepared Start getter remains opt-in when installing the historical stock4
     _melee_web_native_menu_stadium_current_sss_exit_observe:()=>1};
   const historical=installCurrentSssExitReplayArm({recipeBytes:bytes,observationProfile:1});
   assert.equal(Module._melee_web_native_menu_replay.call(receiver,16,328,1),1);
-  assert.throws(()=>historical.observePreparedStart(),/explicit stock4\/None/);
+  assert.throws(()=>historical.observePreparedStart(),/explicit checked prepared-Start profile/);
   historical.dispose();
   Module._melee_web_native_menu_stadium_current_sss_prepared_start_observe=()=>1;
   const candidate=installCurrentSssExitReplayArm({recipeBytes:bytes,observationProfile:1,preparedStartProbe:true});

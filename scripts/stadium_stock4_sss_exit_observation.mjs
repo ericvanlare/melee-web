@@ -105,6 +105,14 @@ export function compareStock4PreparedStartProjection(actualStart, declaredSetup,
     runtime_admission: false, Entry: false, C3: false};
 }
 export function compareStock4PreparedStartReceipt(actual, expectedRng, declaredSetup, originalEntryStartHex) {
+  return comparePreparedStartReceiptFields(actual, expectedRng, declaredSetup, originalEntryStartHex,
+    {profile:1,cursor:270,order:543});
+}
+export function comparePreparedStartReceiptFields(actual, expectedRng, declaredSetup, originalEntryStartHex, boundary) {
+  requireValue(boundary && Object.keys(boundary).sort().join('|') === 'cursor|order|profile' &&
+    ((boundary.profile === 1 && boundary.cursor === 270 && boundary.order === 543) ||
+     (boundary.profile === 2 && boundary.cursor === 940 && boundary.order === 1887)),
+  'Prepared Start receipt boundary must be one of the two explicit private routes');
   requireValue(actual && Object.keys(actual).sort().join('|') === [
     'schema','scope','phase','observation_profile','captured','source_scene','host_entered',
     'waiting_for_audio_retained_until_unload','replay_cursor','local_order_rows',
@@ -115,10 +123,10 @@ export function compareStock4PreparedStartReceipt(actual, expectedRng, declaredS
   ].sort().join('|') &&
     actual.schema === 'melee-web-stadium-prepared-start-before-assets-v2' &&
     actual.scope === 'source_prepared_start_after_sss_leave_before_assets' &&
-    actual.phase === 'prepared_entry' && actual.observation_profile === 1 && actual.captured === true &&
+    actual.phase === 'prepared_entry' && actual.observation_profile === boundary.profile && actual.captured === true &&
     actual.source_scene === 0 && actual.host_entered === false &&
     actual.waiting_for_audio_retained_until_unload === true &&
-    actual.replay_cursor === 270 && actual.local_order_rows === 543 &&
+    actual.replay_cursor === boundary.cursor && actual.local_order_rows === boundary.order &&
     actual.callback_source_steps === 0 && actual.callback_source_draws === 0 &&
     actual.asset_requests_after_leave_boundary === 0 &&
     Number.isSafeInteger(actual.world_generation) && actual.world_generation > 0 &&

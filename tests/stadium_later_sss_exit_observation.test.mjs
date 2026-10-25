@@ -6,7 +6,7 @@ import vm from 'node:vm';
 import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {validateLaterSssExitExpected, validateLaterSssExitTrace, compareLaterSssExitObservation,
-  validateLaterSssExitTerminal, validateLaterSssExitFinalization} from '../scripts/stadium_later_sss_exit_observation.mjs';
+  validateLaterSssExitTerminal, validateLaterSssExitFinalization, compareLaterPreparedStartObservation} from '../scripts/stadium_later_sss_exit_observation.mjs';
 import {validateStock4SssExitExpected, compareStock4SssExitObservation, validateStock4SssExitTrace,
   validateStock4SssExitTerminal, validateStock4SssExitFinalization} from '../scripts/stadium_stock4_sss_exit_observation.mjs';
 import {installCurrentSssExitReplayArm, validateCurrentSssExitExpected, compareCurrentSssExitObservation,
@@ -216,7 +216,7 @@ async function runnerAdmission(e,args,overrides={}) {
   e.source_binding={files:{operand:{path:'modeled-source-input',sha256:'c'.repeat(64)}}};
   const context={path,JSON,parseArgs:options=>parseArgs({...options,args}),
     validateLaterSssExitExpected,compareLaterSssExitObservation,validateLaterSssExitTrace,
-    validateLaterSssExitTerminal,validateLaterSssExitFinalization,
+    validateLaterSssExitTerminal,validateLaterSssExitFinalization,compareLaterPreparedStartObservation,
     validateStock4SssExitExpected,compareStock4SssExitObservation,validateStock4SssExitTerminal,
     validateStock4SssExitTrace,validateStock4SssExitFinalization,
     validateCurrentSssExitExpected,compareCurrentSssExitObservation,validateCurrentSssExitTerminal,
@@ -261,17 +261,19 @@ test('actual runner CLI and admission select later policy only under explicit fi
   }
 });
 test('actual runner loop waits for returned later stop then unloads once and checks actual policy',async()=>{
+ for(const preparedOnly of [false,true]){
   const e=expected(),before=laterEndpoint(e),after=laterEndpoint(e,true),browserReport=laterReplayReport(e);
-  const admitted=await runnerAdmission(e,laterArgs);let unloaded=false,observations=0,starts=0,unloads=0;
+  const prepared=preparedLaterReceipt(e);
+  const admitted=await runnerAdmission(e,preparedOnly?[...laterArgs,'--stadium-later-sss-prepared-start']:laterArgs);let unloaded=false,observations=0,starts=0,unloads=0,preparedCalls=0;
   const report=admitted.report,writes=[];
-  const handle={evaluate:async fn=>fn({state:()=>({owned:true,failure:null}),observe:()=>{
+  const handle={evaluate:async fn=>fn({observePreparedStart:()=>{++preparedCalls;return {busy:false,value:prepared};},state:()=>({owned:true,failure:null}),observe:()=>{
     ++observations;return {busy:false,value:unloaded?after:observations===1?
       {...before,terminal:{...before.terminal,complete:false}}:before};}})};
   const page={evaluateHandle:async(fn,options)=>{
     assert.equal(fn,installCurrentSssExitReplayArm);assert.equal(options.observationProfile,2);
-    assert.equal(options.preparedStartProbe,false);return handle;},locator:selector=>({click:async()=>{
+    assert.equal(options.preparedStartProbe,preparedOnly);return handle;},locator:selector=>({click:async()=>{
       if(selector==='#retail-replay-start')++starts;else{assert.equal(selector,'#unload');++unloads;unloaded=true;}}})};
-  const context={...admitted,currentSssExit:true,currentSssPreparedStart:false,
+  const context={...admitted,currentSssExit:true,currentSssPreparedStart:false,laterSssPreparedStart:preparedOnly,
     currentSssRecipeBytes:Array(328).fill(0),installCurrentSssExitReplayArm,page,
     observePageOperation:async(label,fn)=>fn(),phase:async(label,fn)=>fn(),
     replayTimeoutMs:1000,replayPollMs:0,setTimeout,Date,Promise,
@@ -283,6 +285,9 @@ test('actual runner loop waits for returned later stop then unloads once and che
   assert.equal(report.current_sss_exit.comparison.pass,true);assert.equal(report.current_sss_exit.terminal.pass,true);
   assert.equal(report.current_sss_exit.runtime_replay,'FAIL_INCOMPLETE_EXPLICIT_SSS_STOP');
   assert.equal(writes.filter(x=>x.name==='current-sss-exit-unloaded-observation.json').length,1);
+  assert.equal(preparedCalls,Number(preparedOnly));
+  if(preparedOnly){assert.equal(report.current_sss_exit.prepared_start_comparison.pass,true);assert.equal(report.current_sss_exit.prepared_setup_begin,undefined);}
+ }
 });
 
 test('actual runner admission keeps legacy first stock4 and TIME policies without later opt-in',async()=>{
@@ -319,7 +324,7 @@ test('actual runner finalizer classifies only later component pass after strict 
     const report=structuredClone(base);report.result='fail';report.current_sss_exit.wrapper_restored=true;
     report.browser_errors=[];report.unexpected_requests=[];report.artifact_inventory_pre={equal:true};mutate?.(report);
     const process={exitCode:0},messages=[];
-    const context={currentSssExit:true,currentSssLater:true,currentSssStock4:false,currentSssPreparedStart:false,
+    const context={currentSssExit:true,currentSssLater:true,currentSssStock4:false,currentSssPreparedStart:false,laterSssPreparedStart:false,
       currentSssPolicy:admitted.currentSssPolicy,currentSssExpected:e,currentSssTrace:text(trace(e)),report,
       browserArtifactInventory:async()=>({equal:true}),diagnostic:false,process,console:{log:s=>messages.push(s)}};
     await vm.runInNewContext('(async()=>{'+finalizer+'})()',context);
@@ -329,4 +334,65 @@ test('actual runner finalizer classifies only later component pass after strict 
       assert.equal(report.browser_report.complete,false);assert.match(messages[0],/no B Entry.*C3/);}
     else{assert.equal(report.result,'fail');assert.equal(process.exitCode,1);}
   }
+});
+
+
+// Synthetic receipt controls: source/native observation and ownership are separate C++ controls.
+function preparedLaterReceipt(e){
+ const a=e.prepared_profile.entry.declared_setup;
+ Object.assign(a,{item_mask_hex:'ffffffffffffffff',damage_ratio_bits:'3f800000',game_speed_bits:'3f800000'});
+ a.players.forEach(p=>p.rumble_enabled=true);
+ e.prepared_profile.setup.declared_setup=structuredClone(a);
+ return {schema:'melee-web-stadium-prepared-start-before-assets-v2',
+ scope:'source_prepared_start_after_sss_leave_before_assets',phase:'prepared_entry',observation_profile:2,
+ captured:true,source_scene:0,host_entered:false,waiting_for_audio_retained_until_unload:true,
+ replay_cursor:940,local_order_rows:1887,callback_source_steps:0,callback_source_draws:0,
+ asset_requests_after_leave_boundary:0,world_generation:6,hsd_pending_loads_at_return:0,
+ bank_transport_active_at_return:true,bank_transport_configured_at_return:true,bank_transport_busy_at_return:false,
+ random_seed_hex:'7fc17cf1',start:{rules:{match_kind:1,is_stock:1,is_vs:1,stage_kind:3,xB:-1,
+ time_limit:0,timer_enabled:0,timer_counts_up:0,disable_pausing:0,is_teams:0,item_mask:'ffffffffffffffff',
+ damage_ratio_bits:'3f800000',game_speed_bits:'3f800000',friendly_fire:0,timer_shows_hours:0,x14:0},
+ players:[1,0].map(color=>({slot:0,slot_type:0,ckind:8,color,stocks:4,flags_c:192})).concat(Array.from({length:4},()=>({slot_type:3})))},
+ menu_draw_reference:'UNKNOWN',runtime_admission:false,Entry:false,C3:false};
+}
+test('later prepared Start uses shared strict projection and exact940 pre-assets identity',()=>{
+ const e=expected(),a=preparedLaterReceipt(e);
+ assert.equal(compareLaterPreparedStartObservation(a,e).pass,true);
+ for(const mutate of [x=>x.observation_profile=1,x=>x.replay_cursor=270,x=>x.local_order_rows=543,
+ x=>x.asset_requests_after_leave_boundary=1,x=>x.random_seed_hex='e2624ac3',x=>x.bank_transport_busy_at_return=true,
+ x=>x.start.rules.is_stock=0,x=>x.start.players[0].stocks=0,x=>x.start.rules.stage_kind=32,
+ x=>x.start.players[2].slot_type=0,x=>x.callback_source_steps=1,x=>x.world_generation=0]){
+ const bad=structuredClone(a);mutate(bad);assert.throws(()=>compareLaterPreparedStartObservation(bad,e));}
+ const r=laterFinalReport(e);r.later_sss_prepared_start=true;
+ r.current_sss_exit.prepared_start_comparison=compareLaterPreparedStartObservation(a,e);
+ r.current_sss_exit.prepared_start_observation=a;
+ assert.equal(validateLaterSssExitFinalization(r,e).pass,true);
+ r.current_sss_exit.prepared_setup_begin={result:1};assert.throws(()=>validateLaterSssExitFinalization(r,e));
+});
+test('actual page profile2 prepared observation never exposes Setup continuation',()=>{
+ const recipe=Array(328).fill(37),heap=new Uint8Array(1024);heap.set(recipe,16);
+ let preparedCalls=0,setupCalls=0;
+ const mod={HEAPU8:heap,UTF8ToString:()=>JSON.stringify({captured:true}),stadiumMatchedSetupNativeIdle:()=>true,
+ _melee_web_native_menu_replay:()=>1,_melee_web_native_menu_stadium_current_sss_exit_arm_profile:()=>1,
+ _melee_web_native_menu_stadium_current_sss_exit_observe:()=>1,
+ _melee_web_native_menu_stadium_current_sss_prepared_start_observe:()=>{++preparedCalls;return 1;},
+ _melee_web_native_menu_stadium_current_sss_prepared_setup_begin:()=>{++setupCalls;return 1;}};
+ try{globalThis.Module=mod;
+ const owner=installCurrentSssExitReplayArm({recipeBytes:recipe,observationProfile:2,preparedStartProbe:true});
+ assert.equal(mod._melee_web_native_menu_replay(16,328,1),1);
+ assert.equal(owner.observePreparedStart().value.captured,true);
+ assert.throws(()=>owner.continuePreparedStart({captured:true}),/one-use owner/);
+ assert.equal(setupCalls,0);assert.equal(preparedCalls,1);
+ const kept=mod._melee_web_native_menu_stadium_current_sss_prepared_start_observe;
+ mod._melee_web_native_menu_stadium_current_sss_prepared_start_observe=()=>1;
+ assert.throws(()=>owner.observePreparedStart(),/retained Module/);
+ mod._melee_web_native_menu_stadium_current_sss_prepared_start_observe=kept;owner.dispose();
+ }finally{delete globalThis.Module;}
+});
+test('actual CLI opt-in selects profile2 observation without Setup mode',async()=>{
+ const e=expected(),a=await runnerAdmission(e,[...laterArgs,'--stadium-later-sss-prepared-start']);
+ assert.equal(a.currentSssPolicy.preparedStart,compareLaterPreparedStartObservation);
+ assert.equal(a.report.later_sss_prepared_start,true);
+ await assert.rejects(runnerAdmission(e,laterArgs.slice(1).concat('--stadium-later-sss-prepared-start')));
+ await assert.rejects(runnerAdmission(e,[...laterArgs,'--stadium-current-sss-prepared-start','--stadium-later-sss-prepared-start']));
 });

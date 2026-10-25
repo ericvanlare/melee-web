@@ -6202,8 +6202,12 @@ const char* melee_web_native_menu_stadium_current_sss_prepared_start_observe(){
   require_guard(asset_generation==s.leave_asset_generation&&
                 current_sss_asset_request_calls==s.leave_asset_requests,
                 "unchanged_asset_owner");
-  require_guard(s.terminal_cursor==270&&s.notification_cursor==270&&
-                s.notification_order==543,"exact_stock4_stop_cursor_and_order");
+  const bool later=later_sss.armed;
+  require_guard(later ? (later_sss_context_owned()&&later_sss.stage==4&&completed_matches==1&&
+                replay_cursor==940&&s.terminal_cursor==940&&s.notification_cursor==940&&
+                s.notification_order==1887&&s.observation.note.session_ticks==535)
+              : (s.terminal_cursor==270&&s.notification_cursor==270&&s.notification_order==543),
+                later?"exact_later_stop_cursor_and_order":"exact_stock4_stop_cursor_and_order");
   require_guard(s.terminal_steps==0&&s.terminal_draws==0&&
                 s.notification_steps==0&&s.notification_draws==0,
                 "zero_source_steps_and_draws");
@@ -6225,7 +6229,8 @@ const char* melee_web_native_menu_stadium_current_sss_prepared_start_observe(){
   require_guard(bank_transport_busy==0,"bank_transport_busy_at_return");
   MeleeWebMenuMatchSelection selection{};
   char error[256]{};
-  check(melee_web_menu_host_stadium_c1a_selection(host,&selection,error,sizeof(error)),error);
+  check(later ? melee_web_menu_host_later_sss_prepared_selection(host,&selection,error,sizeof(error))
+              : melee_web_menu_host_stadium_c1a_selection(host,&selection,error,sizeof(error)),error);
   check(selection.start.rules.stkind==St_Kind_PStadium,
         "Prepared Start observation lost its source Stadium StKind");
   const auto* const prepared_input=melee_web_menu_host_input(host);
@@ -6236,7 +6241,7 @@ const char* melee_web_native_menu_stadium_current_sss_prepared_start_observe(){
   std::ostringstream out;
   out<<"{\"schema\":\"melee-web-stadium-prepared-start-before-assets-v2\""
      <<",\"scope\":\"source_prepared_start_after_sss_leave_before_assets\""
-     <<",\"phase\":\"prepared_entry\",\"observation_profile\":1"
+     <<",\"phase\":\"prepared_entry\",\"observation_profile\":"<<(later?2:1)
      <<",\"captured\":true,\"source_scene\":0,\"host_entered\":false"
      <<",\"waiting_for_audio_retained_until_unload\":true"
      <<",\"replay_cursor\":"<<s.terminal_cursor

@@ -258,7 +258,111 @@ int main(){
 '''
 
 
+
+def later_prepared_control_source(root, menu_source=None, host_source=None):
+    """Full actual SSS commit + authored preparation; synthetic persistent data/service leaves."""
+    root=Path(root)
+    menu_source=menu_source if menu_source is not None else (root/'src/gameplay_menu.c').read_text()
+    base=returned_css_control_source(root,menu_source)
+    assert base.count('int main(){')==1
+    base=base[:base.index('int main(){')]
+    gm=root/'build/gameplay-source/src/melee/gm'
+    mainlib=(gm/'gm_1601.c').read_text(); tables=(gm/'gm_1601.static.h').read_text()
+    def table(signature):
+        first=tables.index(signature);last=tables.index('};',first)+2
+        return tables[first:last]
+    prep=function((gm/'gmvsmelee.c').read_text(),'int melee_web_vs_prepare_start_source(')
+    persistent=function(mainlib,'void gm_80167BC8(')
+    subcolors=function((gm/'gm_1B03.c').read_text(),'void gm_SetupSubColors(')
+    rumble_source=(gm/'gm_16AE.c').read_text()
+    rumble=function(rumble_source,'int getPort(')+'\n'+function(rumble_source,'void gm_LoadRumbleEnabled(')
+    full_exit=function(menu_source,'int melee_web_menu_leave_sss(')
+    full_exit=full_exit.replace('int melee_web_menu_leave_sss(', 'int actual_full_sss_exit(',1)
+    base='#include <melee/gm/types.h>\n#include <placeholder.h>\n#include \"gameplay_menu_host.h\"\n'+base
+    leaves=r'''
+// Persistent GameRules/preferences are explicitly SYNTHETIC fixtures using actual source types.
+// Audio preload is a modeled leaf; no HSD draining or genuine game lifecycle is claimed here.
+GameRules synthetic_rules{};gmm_x1CB0 synthetic_prefs{};
+GameRules* gmMainLib_GetGameRules(){return &synthetic_rules;}
+gmm_x1CB0* gmMainLib_8015CC58(){return &synthetic_prefs;}
+s8* gmMainLib_8015CE44(int,int){return nullptr;}
+int gmMainLib_8015ED30(){return 0;}
+int gm_RumbleEnabledForPlayer(int port,int){return port<4?synthetic_prefs.rumble_enabled[port]:0;}
+void gm_LoadAnnouncer(){calls.push_back(110);}
+'''
+    host_source=host_source if host_source is not None else (root/'src/gameplay_menu_host.c').read_text()
+    host_getter=function(host_source,'int melee_web_menu_host_later_sss_prepared_selection(')
+    ready_vs=function(menu_source,'const VsModeData* melee_web_menu_ready_vs(')
+    host_control=r'''
+namespace host_control {
+// Modeled host envelope only; actual menu session/type, source accessor body and predicates below.
+struct MeleeWebMenuHost {MeleeWebMenuSession* session=nullptr;int entered=0;void* audio=nullptr;
+ unsigned seed=0x7fc17cf1;int stadium_c1a_enabled=1;};
+MeleeWebMenuHost h{},foreign{};MeleeWebMenuHost* owner=&h;unsigned* seed_ptr=&h.seed;
+int host_selection_from_vs(const MeleeWebMenuHost* host,const VsModeData* vs,MeleeWebMenuMatchSelection* out,char*,size_t){
+ out->start=vs->start;out->random_seed=host->seed;return 1;}
+''' +host_getter+r'''
+void exercise(MeleeWebMenuSession* s){h={};h.session=s;owner=&h;seed_ptr=&h.seed;
+ MeleeWebMenuMatchSelection out{};char e[160]{};
+ assert(melee_web_menu_host_later_sss_prepared_selection(&h,&out,e,sizeof(e)));
+ assert(out.start.rules.stkind==St_Kind_PStadium&&out.random_seed==0x7fc17cf1);
+ assert(!melee_web_menu_host_later_sss_prepared_selection(&foreign,&out,e,sizeof(e)));
+ h.entered=1;assert(!melee_web_menu_host_later_sss_prepared_selection(&h,&out,e,sizeof(e)));h.entered=0;
+ h.audio=&h;assert(!melee_web_menu_host_later_sss_prepared_selection(&h,&out,e,sizeof(e)));h.audio=nullptr;
+ seed_ptr=&foreign.seed;assert(!melee_web_menu_host_later_sss_prepared_selection(&h,&out,e,sizeof(e)));
+ seed_ptr=&h.seed;assert(!melee_web_menu_host_later_sss_prepared_selection(&h,nullptr,e,sizeof(e)));
+}
+}
+'''
+    return base+leaves+table('static const u8 lbl_803B7844[]')+'\n'+table('static Vec2 const lbl_803B7930[]')+'\n'+persistent+'\n'+subcolors+'\n'+rumble+'\n'+prep+'\n'+full_exit+'\n'+ready_vs+'\n'+host_control+r'''
+int main(){
+ synthetic_rules.mode=1;synthetic_rules.stock_count=4;synthetic_rules.handicap=0;
+ synthetic_rules.damage_ratio=10;synthetic_rules.pause=1;synthetic_prefs.item_freq=255;
+ synthetic_prefs.item_mask=UINT64_MAX;synthetic_prefs.rumble_enabled[0]=synthetic_prefs.rumble_enabled[1]=1;
+ auto commit=[](){reset();owned.transition_requested=1;assert(melee_web_menu_leave_css(&owned,error,sizeof(error)));
+ assert(melee_web_menu_enter_sss(&owned,error,sizeof(error)));owned.sss.start_game=1;owned.transition_requested=1;
+ VsModeData raw=owned.sss.vs;StartMeleeRules retained=owned.returned_cache_rules;
+ calls.clear();assert(actual_full_sss_exit(&owned,error,sizeof(error)));
+ assert((calls==std::vector<int>{90,99,20,25,110}));
+ assert(std::memcmp(&raw,&owned.sss.vs,sizeof(raw))==0&&std::memcmp(&retained,&owned.returned_cache_rules,sizeof(retained))==0);
+ assert(owned.phase==MELEE_WEB_MENU_READY&&owned.stadium_c1a_ready&&owned.post_vs_mode_valid);
+ assert(!owned.sss.vs.start.rules.is_stock&&!owned.sss.vs.start.rules.is_vs);
+ assert(owned.match_vs.start.rules.is_stock&&owned.match_vs.start.rules.is_vs);
+ assert(owned.match_vs.start.players[0].rumble_enabled&&owned.match_vs.start.players[1].rumble_enabled);
+ assert(!owned.match_vs.start.players[2].rumble_enabled&&owned.match_vs.start.players[0].stocks==4);
+ assert(!melee_web_menu_stadium_c1a_ready_selection_valid(&owned));
+ assert(melee_web_menu_later_sss_ready_selection_valid(&owned));};
+ commit();host_control::exercise(&owned);assert(!melee_web_menu_later_sss_ready_selection_valid(&foreign));
+ for(int fault=0;fault<14;++fault){commit();
+ if(fault==0)owned.current_sss_exit_occurrence=0;if(fault==1)owned.current_sss_exit_seen=1;
+ if(fault==2)owned.current_sss_exit_state=1;if(fault==3)owned.sss_open=1;
+ if(fault==4)owned.css_open=1;if(fault==5)owned.phase=MELEE_WEB_MENU_SSS;
+ if(fault==6)owned.returned_cache_valid=0;if(fault==7)owned.post_vs_mode_valid=0;
+ if(fault==8)owned.current_sss_exit_note=nullptr;if(fault==9)owned.selection_rejected=1;
+ if(fault==10)owned.sss.vs.start.players[0].stocks=0;if(fault==11)owned.match_vs.start.rules.is_stock=0;
+ if(fault==12)owned.returned_cache_rules.xB=2;if(fault==13)owned.match_vs.start.players[0].ckind=999;
+ assert(!melee_web_menu_later_sss_ready_selection_valid(&owned));}
+ std::puts("PASS_FULL_SSS_PREPARATION_RETURNED_READY_COMPONENT_ONLY");
+}
+'''
+
 class LaterSssContinuationControls(OwnedWorkspaceTests):
+    def test_actual_full_sss_preparation_and_later_ready_accessor(self):
+        from check_gameplay import node_runtime
+        workspace=self.new_workspace(ROOT,'later-sss-prepared-owner-')
+        cpp=workspace/'full-commit.cpp';cpp.write_text(later_prepared_control_source(ROOT))
+        js=workspace/'full-commit.js'
+        command=[str(ROOT/'.deps/emsdk/upstream/emscripten/em++'),str(cpp),'-o',str(js),
+          '-std=gnu++20','-O0','-fexceptions','-include',str(ROOT/'src/gameplay_compat.h'),
+          '-DAURORA','-DAURORA_ENABLE_GX','-DTARGET_PC','-DMELEE_WEB_STADIUM_C1A_DIAGNOSTIC',
+          '-sENVIRONMENT=node','-sEXIT_RUNTIME=1','-I'+str(ROOT/'src'),
+          '-I'+str(ROOT/'build/gameplay-source/src'),'-I'+str(ROOT/'.deps/aurora/include')]
+        for i,argv in enumerate([command,[str(node_runtime()),str(js)]]):
+            result=subprocess.run(argv,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=60)
+            (workspace/(str(i)+'.log')).write_text(result.stdout)
+            self.assertEqual(result.returncode,0,result.stdout)
+        self.assertIn('COMPONENT_ONLY',result.stdout)
+
     def test_actual_browser_finite_topology_and_occurrence_owner_selectors(self):
         context = cut('src/gameplay_menu_browser.cpp', 'bool later_sss_context_owned(){',
                       'bool later_sss_recipe_valid(const melee_web::RetailReplayRecipe&);')

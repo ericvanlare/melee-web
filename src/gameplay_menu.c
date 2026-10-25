@@ -981,6 +981,31 @@ int melee_web_menu_stadium_c1a_ready_selection_valid(
 }
 #endif
 
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+/* Separate read-only occurrence1 capability; the old/public READY accessor
+ * deliberately keeps its fresh-cache contract. No live SSS byte is changed. */
+int melee_web_menu_later_sss_ready_selection_valid(const MeleeWebMenuSession* session)
+{
+    StartMeleeData validation;
+    if (!session || session != owner || !session->stadium_c1a_enabled ||
+        !session->stadium_c1a_ready || session->training_mode_scene ||
+        session->selection_rejected || session->transition_failed ||
+        session->phase != MELEE_WEB_MENU_READY || session->css_open || session->sss_open ||
+        session->transition_requested || !session->sss.start_game ||
+        !session->current_sss_exit_note || session->current_sss_exit_occurrence != 1 ||
+        session->current_sss_exit_state != 2 || session->current_sss_exit_seen != 2 ||
+        !session->returned_cache_valid || !session->post_vs_mode_valid ||
+        session->returned_cache_rules.stkind != St_Kind_PStadium ||
+        !stadium_c1a_sss_selection_valid(&session->sss, &session->returned_cache_rules) ||
+        session->match_vs.start.rules.stkind != St_Kind_PStadium)
+        return 0;
+    validation = session->match_vs.start;
+    validation.rules.stkind = MELEE_WEB_MENU_FD_ST_KIND;
+    return match_selection_valid(&validation);
+}
+
+#endif
+
 static int sss_selection_valid_for_session(const MeleeWebMenuSession* session)
 {
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
