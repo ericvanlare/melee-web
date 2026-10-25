@@ -560,3 +560,63 @@ test('actual capture owner reader accepts compact checkpoint process attribution
     assert.match(result.stdout, /"readable": true/);
   } finally { await removeTemp(dir); }
 });
+
+function fresh132FullAReport() {
+  const report = representativeReport();
+  Object.assign(report.scenario.matched_setup_cf, {mode: 'fresh132-full-a-v1',
+    schedule_actions: 7168, common_field_count: 15, seed_value_count: 1});
+  return report;
+}
+
+test('Fresh132 full-A checkpoint eligibility is exact and legacy7167 stays separate', () => {
+  const report = fresh132FullAReport();
+  assert.equal(isStadiumC3ReportCheckpointEligible(report), true);
+  for (const [key, value] of [['mode', 'fresh132-full-a-v2'], ['schedule_actions', 7167],
+    ['schedule_actions', 7169], ['common_field_count', 14], ['seed_value_count', 0],
+    ['explicit_step_mode', false]]) {
+    const invalid = structuredClone(report);
+    invalid.scenario.matched_setup_cf[key] = value;
+    assert.equal(isStadiumC3ReportCheckpointEligible(invalid), false, key);
+  }
+  for (const mode of ['run2-full-schedule-v3', 'run2-full-common-fields-seed-v1']) {
+    const legacy = fresh132FullAReport();
+    Object.assign(legacy.scenario.matched_setup_cf, {mode, schedule_actions: 7167});
+    assert.equal(isStadiumC3ReportCheckpointEligible(legacy), true);
+    legacy.scenario.matched_setup_cf.schedule_actions = 7168;
+    assert.equal(isStadiumC3ReportCheckpointEligible(legacy), false);
+  }
+});
+
+test('Fresh132 journal append and checkpoint rename failure stop before acceptance', async () => {
+  const dir = await makeTemp('stadium-c3-fresh132-failure-');
+  try {
+    for (const operation of ['appendFile', 'rename']) {
+      const caseDir = path.join(dir, operation);
+      await fs.mkdir(caseDir);
+      const reportPath = path.join(caseDir, 'report.json');
+      const reportFs = makeControllableFileSystem(fs);
+      const checkpointFs = makeControllableFileSystem(fs);
+      const checkpoint = createStadiumC3ReportCheckpoint({reportPath, fileSystem: checkpointFs});
+      const report = fresh132FullAReport();
+      const persist = await actualPersistReport({report, reportPath, checkpoint, reportFs});
+      await persist();
+      const previousBytes = await fs.readFile(reportPath);
+      const previous = JSON.parse(previousBytes);
+      const frozen = await fs.readFile(checkpoint.sidecarPath);
+      const priorJournal = await fs.readFile(checkpoint.dynamicRecordPath);
+      const lastGood = materializeStadiumC3ReportCheckpoint(previous, frozen, priorJournal);
+      report.scenario.matched_setup_cf.actions.push({schedule_index: 1, accepted: true});
+      const marker = new Error(`Fresh132 injected ${operation}`);
+      (operation === 'appendFile' ? checkpointFs : reportFs).setFailure(operation, marker);
+      let approvals = 0;
+      await assert.rejects((async () => { await persist(); ++approvals; })(), error => error === marker);
+      assert.equal(approvals, 0);
+      assert.deepEqual(await fs.readFile(reportPath), previousBytes);
+      const journal = await fs.readFile(checkpoint.dynamicRecordPath);
+      assert.throws(() => materializeStadiumC3ReportCheckpoint(previous, frozen, journal), /uncommitted tail/);
+      const recovery = recoverStadiumC3ReportCheckpoint(previous, frozen, journal);
+      assert.deepEqual(recovery.report, lastGood);
+      assert.ok(recovery.uncommittedDynamicTail.byte_length > 0);
+    }
+  } finally { await removeTemp(dir); }
+});
