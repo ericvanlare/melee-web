@@ -696,6 +696,63 @@ static int css_selection_valid_internal(const CSSData* css,
     return 1;
 }
 
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+/* The first checked Results cache of the already selected occurrence1 route.
+ * The source owns every rule/player byte. Only the validation copy may use an
+ * ordinary stage while this retained Stadium cache traverses CSS and SSS. */
+static const StartMeleeRules* later_sss_returned_cache_rules(
+    const MeleeWebMenuSession* session, int after_sss_exit)
+{
+    if (!session || session != owner || !session->stadium_c1a_enabled ||
+        session->training_mode_scene || session->selection_rejected ||
+        session->transition_failed || !session->current_sss_exit_note ||
+        session->current_sss_exit_occurrence != 1 ||
+        !session->returned_cache_valid || !session->post_vs_mode_valid ||
+        session->returned_cache_rules.stkind != St_Kind_PStadium ||
+        session->post_vs_mode.start.rules.stkind != St_Kind_PStadium ||
+        memcmp(&session->returned_cache_rules, &session->post_vs_mode.start.rules,
+               sizeof(session->returned_cache_rules)) != 0)
+        return NULL;
+    if (session->current_sss_exit_state == 1 &&
+        session->current_sss_exit_seen == 1 &&
+        (session->phase == MELEE_WEB_MENU_CSS ||
+         session->phase == MELEE_WEB_MENU_SSS_READY ||
+         session->phase == MELEE_WEB_MENU_SSS))
+        return &session->returned_cache_rules;
+    /* The passive OnExit note consumes occurrence1 before the existing final
+     * payload check. Keep read-only validation through that same epilogue,
+     * never reopen CSS or authorize another occurrence from the consumed state. */
+    if (after_sss_exit && session->current_sss_exit_state == 2 &&
+        session->current_sss_exit_seen == 2 &&
+        session->phase == MELEE_WEB_MENU_SSS && !session->sss_open)
+        return &session->returned_cache_rules;
+    return NULL;
+}
+#endif
+
+static int css_selection_valid_for_session(const CSSData* view,
+    const CSSData* source_css, int allow_unselected_stage,
+    int allow_unavailable_progress_character, int allow_same_team,
+    const StartMeleeRules* retained)
+{
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (view && owner && source_css == &owner->css &&
+        (owner->phase == MELEE_WEB_MENU_CSS ||
+         owner->phase == MELEE_WEB_MENU_SSS_READY) &&
+        view->vs.start.rules.stkind == St_Kind_PStadium &&
+        retained && retained == later_sss_returned_cache_rules(owner, 0)) {
+        CSSData validation = *view;
+        validation.vs.start.rules.stkind = MELEE_WEB_MENU_FD_ST_KIND;
+        return css_selection_valid_internal(&validation, allow_unselected_stage,
+            allow_unavailable_progress_character, allow_same_team, retained);
+    }
+#else
+    (void) source_css;
+#endif
+    return css_selection_valid_internal(view, allow_unselected_stage,
+        allow_unavailable_progress_character, allow_same_team, retained);
+}
+
 static int training_css_selection_valid_internal(const CSSData* css,
                                                  int require_character,
                                                  int allow_unselected_stage)
@@ -766,7 +823,7 @@ int melee_web_menu_css_selection_valid(const CSSData* css)
     if (css != NULL && css->match_type == TRAINING_MODE) {
         return training_css_selection_valid_internal(css, 1, 1);
     }
-    return css_selection_valid_internal(css, 1, 0, 0, returned_rules(css));
+    return css_selection_valid_for_session(css, css, 1, 0, 0, returned_rules(css));
 }
 
 static int match_selection_valid(const StartMeleeData* start)
@@ -854,7 +911,7 @@ static int css_progress_valid(const CSSData* css)
      * intermediate CSS state live while still requiring every authored team
      * ID to remain in range. CSS exit and match admission continue to
      * require opposing teams through the strict validator. */
-    return css_selection_valid_internal(&view, 1, 1, 1, returned_rules(css));
+    return css_selection_valid_for_session(&view, css, 1, 1, 1, returned_rules(css));
 }
 
 static int vs_selection_valid(const VsModeData* vs, int allow_unselected_stage,
@@ -881,7 +938,8 @@ int melee_web_menu_sss_selection_valid(const SSSData* sss)
 }
 
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-static int stadium_c1a_sss_selection_valid(const SSSData* sss)
+static int stadium_c1a_sss_selection_valid(const SSSData* sss,
+    const StartMeleeRules* retained)
 {
     VsModeData validation;
     if (sss == NULL || sss->force_stage_id != -1 ||
@@ -891,7 +949,7 @@ static int stadium_c1a_sss_selection_valid(const SSSData* sss)
     /* Validate the ordinary source VS payload without changing the original
      * SSS-owned StKind value being observed by this development checkpoint. */
     validation.start.rules.stkind = MELEE_WEB_MENU_FD_ST_KIND;
-    return vs_selection_valid(&validation, 1, NULL);
+    return vs_selection_valid(&validation, 1, retained);
 }
 
 int melee_web_menu_enable_stadium_c1a(MeleeWebMenuSession* session,
@@ -914,7 +972,7 @@ int melee_web_menu_stadium_c1a_ready_selection_valid(
     if (session == NULL || session != owner || !session->stadium_c1a_enabled ||
         !session->stadium_c1a_ready || session->training_mode_scene ||
         session->phase != MELEE_WEB_MENU_READY || !session->sss.start_game ||
-        !stadium_c1a_sss_selection_valid(&session->sss) ||
+        !stadium_c1a_sss_selection_valid(&session->sss, NULL) ||
         session->match_vs.start.rules.stkind != St_Kind_PStadium)
         return 0;
     validation = session->match_vs.start;
@@ -929,7 +987,12 @@ static int sss_selection_valid_for_session(const MeleeWebMenuSession* session)
     if (session != NULL && session->stadium_c1a_enabled &&
         !session->training_mode_scene &&
         session->sss.vs.start.rules.stkind == St_Kind_PStadium)
-        return stadium_c1a_sss_selection_valid(&session->sss);
+    {
+        const StartMeleeRules* retained =
+            later_sss_returned_cache_rules(session, 1);
+        if (session->returned_cache_valid && !retained) return 0;
+        return stadium_c1a_sss_selection_valid(&session->sss, retained);
+    }
 #endif
     return session != NULL && melee_web_menu_sss_selection_valid(&session->sss);
 }
@@ -1316,7 +1379,7 @@ int melee_web_menu_enter_sss(MeleeWebMenuSession* session, char* error,
     if (session->phase != MELEE_WEB_MENU_SSS_READY ||
         (session->training_mode_scene
              ? !training_css_selection_valid_internal(&session->css, 1, 1)
-             : !css_selection_valid_internal(&session->css, 1, 0, 0, returned_rules(&session->css))))
+             : !css_selection_valid_for_session(&session->css, &session->css, 1, 0, 0, returned_rules(&session->css))))
     {
         return fail(error, error_size,
                     "SSS requires a valid committed Mario CSS selection");
@@ -1533,7 +1596,7 @@ int melee_web_menu_leave_css(MeleeWebMenuSession* session, char* error,
     if (session->training_mode_scene
             ? !training_css_selection_valid_internal(
                   &session->css, parent_route == 0, 1)
-            : !css_selection_valid_internal(&session->css, 1, 0, parent_route, returned_rules(&session->css))) {
+            : !css_selection_valid_for_session(&session->css, &session->css, 1, 0, parent_route, returned_rules(&session->css))) {
         return fail(error, error_size,
                     "Cannot commit an unavailable character selection");
     }
@@ -1576,7 +1639,7 @@ int melee_web_menu_leave_css(MeleeWebMenuSession* session, char* error,
      * payload before making the next scene available to the host. */
     if (session->training_mode_scene
             ? !training_css_selection_valid_internal(&session->css, 1, 1)
-            : !css_selection_valid_internal(&session->css, 1, 0, parent_route, returned_rules(&session->css))) {
+            : !css_selection_valid_for_session(&session->css, &session->css, 1, 0, parent_route, returned_rules(&session->css))) {
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
         if (session->first_sss_pair_state) session->first_sss_pair_state = 5;
 #endif

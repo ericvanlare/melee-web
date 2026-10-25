@@ -25,6 +25,239 @@ def function(text,signature):
     raise ValueError(signature)
 
 
+
+# Retained original return_css3362: translated only by actual source field decoders.
+RETURNED_CSS_RAW = 'const unsigned char raw_css[]={'+','.join(map(str,bytes([
+    0,0,0,1,128,77,103,48,255,255,255,0,0,0,0,0,
+    48,0,6,76,131,0,0,0,0,0,0,255,255,110,0,3,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    255,255,255,255,255,255,255,255,0,0,0,0,63,128,0,0,
+    63,128,0,0,63,128,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    8,0,4,1,0,255,0,0,9,0,120,0,64,0,4,1,
+    0,0,0,0,0,0,0,0,63,128,0,0,63,128,0,0,
+    63,128,0,0,8,0,4,0,0,255,0,0,9,0,120,0,
+    64,0,4,1,0,0,0,0,0,0,0,0,63,128,0,0,
+    63,128,0,0,63,128,0,0,26,3,4,0,0,255,0,0,
+    9,0,120,0,64,0,4,1,0,0,0,0,0,0,0,0,
+    63,128,0,0,63,128,0,0,63,128,0,0,26,3,4,0,
+    0,255,0,0,9,0,120,0,64,0,4,1,0,0,0,0,
+    0,0,0,0,63,128,0,0,63,128,0,0,63,128,0,0,
+    33,3,4,0,0,255,0,0,9,0,120,0,64,0,4,0,
+    0,0,0,0,0,0,0,0,63,128,0,0,63,128,0,0,
+    63,128,0,0,33,3,4,0,0,255,0,0,9,0,120,0,
+    64,0,4,0,0,0,0,0,0,0,0,0,63,128,0,0,
+    63,128,0,0,63,128,0,0,
+])))+'};\n'
+
+def returned_css_control_source(root, menu_source=None):
+    """Actual typed validator/owner fields; lifecycle callbacks are modeled leaves."""
+    root = Path(root)
+    source = menu_source if menu_source is not None else (root / 'src/gameplay_menu.c').read_text()
+    rules = (root / 'src/gameplay_match_rules.c').read_text()
+    includes = r'''
+#include "gameplay_menu.h"
+#include "gameplay_content.h"
+#include "gameplay_player_selection.h"
+#include <sysdolphin/baselib/gobj.h>
+#include <sysdolphin/baselib/gobjplink.h>
+#include <cassert>
+#include <cstring>
+#include <cstdint>
+#include <cstdio>
+#include <stdexcept>
+#include <vector>
+#include <memory>
+#include <iostream>
+'''
+    owner_type = function(source, 'struct MeleeWebMenuSession {') + ';\nstatic MeleeWebMenuSession* owner;\n'
+    codecs = source[source.index('static u16 reference_be16('):source.index('/* The capture is taken at the CSS boundary')]
+    declarations = '\n'.join(function(source, x) for x in [
+        'static int fail(char* error, size_t error_size, const char* message)\n',
+        'static int failf(', 'static int ok(char* error, size_t error_size)\n',
+        'static int session_live(', 'static int check_runtime(',
+        'static int run_scheduler(', 'static int observe_transition('])
+    validators = source[source.index('int melee_web_menu_character_available('):source.index('MeleeWebMenuSession* melee_web_menu_session_create(')]
+    css_exit = function(source, 'int melee_web_menu_leave_css(')
+    sss_enter = function(source, 'int melee_web_menu_enter_sss(')
+    tick = function(source, 'int melee_web_menu_tick(')
+    sss_exit = function(source, 'int melee_web_menu_leave_sss(')
+    stop = '    if (session->sss.start_game) {'
+    assert sss_exit.count(stop) == 1
+    # Deliberately exercise only the real epilogue before any next VS preparation.
+    sss_exit = sss_exit[:sss_exit.index(stop)] + '    return ok(error, error_size);\n}'
+    sss_exit = sss_exit.replace('int melee_web_menu_leave_sss(', 'int actual_sss_exit_prefix(', 1)
+    timer = function(rules, 'int melee_web_match_timer_supported(')
+    browser = (root / 'src/gameplay_menu_browser.cpp').read_text()
+    context = function(browser, 'bool later_sss_context_owned(){')
+    marker = '   check(later_sss.stage==3&&later_sss_context_owned()&&replay_cursor==675&&completed_matches==1&&'
+    assert browser.count(marker) == 1
+    i = browser.index(marker); j = browser.index('   later_sss.stage=4;', i) + len('   later_sss.stage=4;')
+    handoff = 'void actual_handoff(){if(later_sss.armed){' + browser[i:j] + '}}'
+    browser_control = r'''
+namespace browser_control {
+struct Recipe{std::unique_ptr<int> initial_css{new int(1)};};
+std::unique_ptr<Recipe> replay;int native_host,foreign_host;int* host;
+struct {bool armed=true,failed=false;const Recipe* recipe=nullptr;const int* context=nullptr;int* host_owner=nullptr;}current_sss_exit;
+struct {bool armed=true;unsigned stage=3;}later_sss;
+unsigned replay_cursor=675,completed_matches=1;int destination=0;
+void check(bool v,const char* e){if(!v)throw std::runtime_error(e);}
+int melee_web_menu_host_results_destination(int*){return destination;}
+''' + context + handoff + r'''
+void reset(){replay=std::make_unique<Recipe>();host=&native_host;
+ current_sss_exit={true,false,replay.get(),replay->initial_css.get(),host};later_sss={true,3};
+ replay_cursor=675;completed_matches=1;destination=0;}
+void exercise(){
+ reset();actual_handoff();assert(later_sss.stage==4);
+ for(int f=0;f<8;++f){reset();
+  if(f==0)replay_cursor=674;
+  if(f==1)later_sss.stage=2;
+  if(f==2)completed_matches=2;
+  if(f==3)host=&foreign_host;
+  if(f==4)current_sss_exit.failed=true;
+  if(f==5)current_sss_exit.context=nullptr;
+  if(f==6)current_sss_exit.recipe=nullptr;
+  if(f==7)destination=192;
+  bool refused=false;try{actual_handoff();}catch(const std::runtime_error&){refused=true;}assert(refused&&later_sss.stage==3+(f==1?-1:0));
+ }
+}
+}
+'''
+
+    leaves = r'''
+// MODELED LEAVES: no HSD/assets/menu/game callback is executed in this fixture.
+std::vector<int> calls;bool poison_exit=false,leaf_check=true;
+static int runtime_check(void*,MeleeWebMenuScene,char*,size_t){calls.push_back(5);return leaf_check;}
+static int scheduler(void*,char*,size_t){calls.push_back(7);return 1;}
+static int transition(void*,MeleeWebMenuScene,int* request,char*,size_t){calls.push_back(8);*request=0;return 1;}
+static int scene_enter(void*,MeleeWebMenuScene,char*,size_t){calls.push_back(45);return 1;}
+static int scene_exit(void*,MeleeWebMenuScene,char*,size_t){calls.push_back(20);return 1;}
+static int melee_web_menu_gobj_snapshot(MeleeWebMenuSession*,char*,size_t){calls.push_back(40);return 1;}
+static void melee_web_menu_gobj_snapshot_clear(MeleeWebMenuSession*){}
+static int melee_web_menu_gobj_teardown(MeleeWebMenuSession*,char*,size_t){calls.push_back(25);return 1;}
+extern "C" void mnCharSel_Scene_OnFrame(){calls.push_back(6);}
+extern "C" void mnStageSel_Scene_OnFrame(){calls.push_back(16);}
+extern "C" void mnCharSel_Scene_OnExit(void*){calls.push_back(10);if(poison_exit)owner->css.vs.start.rules.is_vs=1;}
+extern "C" void mnStageSel_Scene_OnEnter(void*){calls.push_back(50);}
+extern "C" void mnStageSel_Scene_OnExit(void*){calls.push_back(90);}
+'''
+    return includes + owner_type + codecs + declarations + timer + validators + leaves + css_exit + sss_enter + tick + sss_exit + RETURNED_CSS_RAW + browser_control + r'''
+MeleeWebMenuSession owned{},foreign{};char error[256]{};
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+static void passive(void*,MeleeWebMenuSession* s,const SSSData*,uint64_t,int){
+ assert(s==owner&&s->current_sss_exit_state==2&&s->current_sss_exit_seen==2);calls.push_back(99);
+}
+#endif
+void reset(){
+ owned={};owner=&owned;calls.clear();poison_exit=false;leaf_check=true;
+ owned.css.unk_0x0=reference_be16(raw_css);owned.css.match_type=raw_css[2];owned.css.pending_scene_change=raw_css[3];
+ owned.css.vs.loser=(s8)raw_css[8];owned.css.vs.ordered_stage_index=(s8)raw_css[9];
+ owned.css.vs.winner=(s8)raw_css[10];owned.css.vs.unk_0x3=raw_css[11];owned.css.vs.unk_0x4=raw_css[12];
+ owned.css.vs.unk_0x5=raw_css[13];owned.css.vs.unk_0x6=raw_css[14];owned.css.vs.unk_0x7=raw_css[15];
+ decode_reference_rules(&owned.css.vs.start.rules,raw_css+0x10);
+ for(unsigned i=0;i<6;++i)decode_reference_player(&owned.css.vs.start.players[i],raw_css+0x70+0x24*i);
+ owned.phase=MELEE_WEB_MENU_CSS;owned.css_open=1;
+ owned.runtime={nullptr,runtime_check,scheduler,transition,scene_enter,scene_exit};
+ owned.returned_cache_rules=owned.css.vs.start.rules;owned.returned_cache_valid=1;
+ owned.post_vs_mode=owned.css.vs;owned.post_vs_mode_valid=1;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ owned.stadium_c1a_enabled=1;owned.current_sss_exit_state=1;
+ owned.current_sss_exit_occurrence=owned.current_sss_exit_seen=1;owned.current_sss_exit_note=passive;
+#endif
+}
+int main(){
+ browser_control::exercise();
+ static_assert(sizeof(CSSData)==0x148&&sizeof(StartMeleeRules)==0x60&&sizeof(PlayerInitData)==0x24);
+ reset();const CSSData original=owned.css;const StartMeleeRules retained=owned.returned_cache_rules;
+ assert(!melee_web_menu_stage_available(St_Kind_PStadium));
+ assert(!melee_web_menu_css_cache_selection_valid(&owned.css,&retained));
+ CSSData isolated=owned.css;isolated.vs.start.rules.stkind=MELEE_WEB_MENU_FD_ST_KIND;
+ assert(melee_web_menu_css_cache_selection_valid(&isolated,&retained));
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ assert(css_progress_valid(&owned.css)&&melee_web_menu_css_selection_valid(&owned.css));
+ assert(melee_web_menu_tick(&owned,error,sizeof(error))==MELEE_WEB_MENU_RESULT_TICKED);
+ assert((calls==std::vector<int>{5,6,7,8}));
+ assert(std::memcmp(&owned.css,&original,sizeof(original))==0);
+ calls.clear();owned.transition_requested=1;
+ assert(melee_web_menu_leave_css(&owned,error,sizeof(error)));
+ assert((calls==std::vector<int>{10,20,25}));assert(owned.phase==MELEE_WEB_MENU_SSS_READY&&!owned.css_open);
+ assert(std::memcmp(&owned.css,&original,sizeof(original))==0&&std::memcmp(&owned.returned_cache_rules,&retained,sizeof(retained))==0);
+ calls.clear();assert(melee_web_menu_enter_sss(&owned,error,sizeof(error)));
+ assert((calls==std::vector<int>{5,8,40,45,50}));
+ assert(owned.phase==MELEE_WEB_MENU_SSS&&owned.sss_open&&sss_selection_valid_for_session(&owned));
+ assert(!melee_web_menu_sss_selection_valid(&owned.sss)); // Ordinary Stage3 still closed.
+ assert(std::memcmp(&owned.sss.vs,&original.vs,sizeof(original.vs))==0);
+ owned.sss.start_game=1;owned.transition_requested=1;calls.clear();
+ assert(actual_sss_exit_prefix(&owned,error,sizeof(error)));
+ assert((calls==std::vector<int>{90,99,20,25}));
+ assert(owned.current_sss_exit_state==2&&owned.current_sss_exit_seen==2&&!owned.sss_open);
+ assert(sss_selection_valid_for_session(&owned)); // Consumed closed epilogue only.
+ for(auto phase:{MELEE_WEB_MENU_CSS,MELEE_WEB_MENU_SSS_READY,MELEE_WEB_MENU_READY}){
+  owned.phase=phase;assert(!later_sss_returned_cache_rules(&owned,1));assert(!melee_web_menu_css_selection_valid(&owned.css));}
+ owned.phase=MELEE_WEB_MENU_SSS;owned.sss_open=1;assert(!sss_selection_valid_for_session(&owned));
+ owned.sss_open=0;owned.phase=MELEE_WEB_MENU_READY;owned.stadium_c1a_ready=1;owned.match_vs=owned.sss.vs;
+ assert(!melee_web_menu_stadium_c1a_ready_selection_valid(&owned)); // Existing retained=NULL readiness remains closed.
+ for(int fault=0;fault<15;++fault){reset();
+  if(fault==0)owned.current_sss_exit_state=0;
+  if(fault==1)owned.current_sss_exit_occurrence=0;
+  if(fault==2)owned.current_sss_exit_seen=0;
+  if(fault==3)owned.current_sss_exit_seen=2;
+  if(fault==4)owned.returned_cache_valid=0;
+  if(fault==5)owned.post_vs_mode_valid=0;
+  if(fault==6)owned.stadium_c1a_enabled=0;
+  if(fault==7)owned.selection_rejected=1;
+  if(fault==8)owned.transition_failed=1;
+  if(fault==9)owned.current_sss_exit_note=nullptr;
+  if(fault==10)owned.training_mode_scene=1;
+  if(fault==11)owned.post_vs_mode.start.rules.time_limit=1;
+  if(fault==12)owned.returned_cache_rules.time_limit=1;
+  if(fault==13)owned.phase=MELEE_WEB_MENU_CLOSED;
+  if(fault==14)owner=&foreign;
+  assert(!css_progress_valid(&owned.css)&&!melee_web_menu_css_selection_valid(&owned.css));
+ }
+ reset();owned.phase=MELEE_WEB_MENU_SSS;owned.sss_open=1;owned.sss.vs=owned.css.vs;owned.sss.force_stage_id=-1;
+ foreign=owned;assert(!sss_selection_valid_for_session(&foreign));
+ reset();CSSData copy=owned.css;assert(!css_progress_valid(&copy)&&!melee_web_menu_css_selection_valid(&copy));
+ for(int fault=0;fault<8;++fault){reset();
+  if(fault==0)owned.css.vs.start.rules.is_vs=1;
+  if(fault==1)owned.css.vs.start.rules.is_stock=1;
+  if(fault==2)owned.css.vs.start.rules.xB=2;
+  if(fault==3)owned.css.vs.start.players[0].stocks=0;
+  if(fault==4)owned.css.vs.start.players[1].slot=1;
+  if(fault==5)owned.css.vs.start.rules.is_teams=2;
+  if(fault==6)owned.css.vs.start.rules.time_limit=1;
+  if(fault==7)owned.css.vs.start.rules.stkind=0x7fff;
+  assert(!melee_web_menu_css_selection_valid(&owned.css));
+ }
+ reset();owned.transition_requested=1;poison_exit=true;
+ assert(!melee_web_menu_leave_css(&owned,error,sizeof(error))); // Actual post-OnExit validator refuses mutation.
+ assert((calls==std::vector<int>{10,20,25}));
+ reset();owned.phase=MELEE_WEB_MENU_SSS_READY;owned.css_open=0;leaf_check=false;
+ assert(!melee_web_menu_enter_sss(&owned,error,sizeof(error)));assert((calls==std::vector<int>{5}));
+ // Existing fresh-cache/private-first-A behavior is retained, separate from occurrence1 cache.
+ reset();owned.returned_cache_valid=owned.post_vs_mode_valid=0;owned.current_sss_exit_state=0;
+ owned.sss.vs=owned.css.vs;auto& fresh_start=owned.sss.vs.start;fresh_start.rules.match_kind=MatchKind_Time;fresh_start.rules.xB=2;
+ for(auto& p:fresh_start.players)p.stocks=0;owned.sss.force_stage_id=-1;
+ assert(stadium_c1a_sss_selection_valid(&owned.sss,nullptr));
+#else
+ assert(!css_progress_valid(&owned.css)&&!melee_web_menu_css_selection_valid(&owned.css));
+#endif
+ // Ordinary FD retained-cache route remains valid; no private capability required.
+ reset();owned.css.vs.start.rules.stkind=MELEE_WEB_MENU_FD_ST_KIND;
+ owned.returned_cache_rules=owned.css.vs.start.rules;owned.post_vs_mode=owned.css.vs;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ owned.current_sss_exit_state=0;owned.stadium_c1a_enabled=0;
+#endif
+ assert(css_progress_valid(&owned.css)&&melee_web_menu_css_selection_valid(&owned.css));
+ CSSData fresh=owned.css;fresh.vs.start.rules.match_kind=MatchKind_Time;fresh.vs.start.rules.xB=2;
+ for(auto& p:fresh.vs.start.players)p.stocks=0;
+ assert(melee_web_menu_css_cache_selection_valid(&fresh,nullptr));
+ std::cout<<"PASS actual typed CSS/SSS cache admission COMPONENT_ONLY; private owner/callback seams and public/fresh refusals; no game or browser execution\n";
+}
+'''
+
+
 class LaterSssContinuationControls(OwnedWorkspaceTests):
     def test_actual_browser_finite_topology_and_occurrence_owner_selectors(self):
         context = cut('src/gameplay_menu_browser.cpp', 'bool later_sss_context_owned(){',
@@ -189,6 +422,28 @@ int main(){
     }
     '''
         run(prefix, self.new_workspace(ROOT, 'later-sss-pause-'))
+
+    def test_actual_returned_stadium_css_cache_admission_and_public_refusals(self):
+        from check_gameplay import node_runtime
+        workspace = self.new_workspace(ROOT, 'later-sss-returned-cache-')
+        cpp = workspace / 'actual-returned-cache.cpp'
+        cpp.write_text(returned_css_control_source(ROOT))
+        for mode, defines in [('private', ['-DMELEE_WEB_STADIUM_C1A_DIAGNOSTIC']), ('ordinary', [])]:
+            js = workspace / (mode + '.js')
+            compiler = ROOT / '.deps/emsdk/upstream/emscripten/em++'
+            commands = [
+                [str(compiler), str(cpp), '-o', str(js), '-std=gnu++20', '-O0', '-fexceptions',
+                 '-include', str(ROOT / 'src/gameplay_compat.h'), '-DAURORA', '-DAURORA_ENABLE_GX', '-DTARGET_PC',
+                 '-sENVIRONMENT=node', '-sEXIT_RUNTIME=1', '-I'+str(ROOT/'src'),
+                 '-I'+str(ROOT/'build/gameplay-source/src'), '-I'+str(ROOT/'.deps/aurora/include')] + defines,
+                [str(node_runtime()), str(js)],
+            ]
+            for index, command in enumerate(commands):
+                result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                        text=True, timeout=60)
+                (workspace / (mode + '-' + str(index) + '.log')).write_text(result.stdout)
+                self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertIn('COMPONENT_ONLY', result.stdout)
 
     def test_actual_session_second_selector_and_consumed_callback(self):
         actual = cut('src/gameplay_menu.c', 'int melee_web_menu_current_sss_exit_select_second(',
