@@ -2,6 +2,7 @@
 #define MELEE_WEB_GAMEPLAY_SOURCE_MEMORY_RUNTIME_H
 
 #include "gameplay_class_piece_diagnostic.h"
+#include "gameplay_lobj_writer_diagnostic.h"
 
 #include <stddef.h>
 #include <stdint.h>

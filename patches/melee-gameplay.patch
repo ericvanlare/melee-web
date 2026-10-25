@@ -11372,6 +11372,40 @@ index 692625a18cc2e6f0619cc0695282da803c2474ad..a4973b7e20aafff5ce0168e9b08e2103
  void HSD_GXSetFifoObj(GXFifoObj* fifo);
  void** HSD_AllocateXFB(s32 nbuffer, GXRenderModeObj* rm);
  GXFifoObj* HSD_AllocateFifo(u32 size);
+diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
+index 6fe7b8128b314b61bb10f57cc5a06a2c6134281e..ece95e028447fe13f0eb9faedce78a6809592c4b 100644
+--- a/src/sysdolphin/baselib/lobj.c
++++ b/src/sysdolphin/baselib/lobj.c
+@@ -1,4 +1,9 @@
+ #include "lobj.h"
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++#include "gameplay_lobj_writer_diagnostic.h"
++#include <stddef.h>
++_Static_assert(offsetof(HSD_LObj,lvec)==60 && sizeof(((HSD_LObj*)0)->lvec)==12 && sizeof(HSD_LObj)==212,"Private lvec witness ABI");
++#endif
+ 
+ #include <placeholder.h>
+ 
+@@ -387,6 +392,9 @@ static void setup_spec_lightobj(HSD_LObj* lobj, Mtx mtx, s32 spec_id)
+         x *= 0.5F;
+         GXInitLightAttn(&lobj->spec_lightobj, 0.0F, 0.0F, 1.0F, x, 0.0F,
+                         1.0F - x);
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++        const uint64_t lvec_writer_ticket=melee_web_lobj_writer_before(lobj,&lobj->lvec,sizeof(*lobj),__FILE__,__LINE__);
++#endif
+         switch (HSD_LObjGetType(lobj)) {
+         case 2:
+         case 3:
+@@ -401,6 +409,9 @@ static void setup_spec_lightobj(HSD_LObj* lobj, Mtx mtx, s32 spec_id)
+         default:
+             HSD_ASSERT(680, 0);
+         }
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++        melee_web_lobj_writer_after(lvec_writer_ticket);
++#endif
+         lobj->flags |= 0x100;
+         lightmask_specular |= spec_id;
+     }
 diff --git a/src/sysdolphin/baselib/memory.c b/src/sysdolphin/baselib/memory.c
 index c544a9184c65c51381140625c660a7d128b74053..d19a9ad201447c6827f81bf415ec99dff61e46f1 100644
 --- a/src/sysdolphin/baselib/memory.c

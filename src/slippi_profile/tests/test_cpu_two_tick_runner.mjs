@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {runBrowserCpuTwoTick,decodeCpuTwoTickEvidence,decodeCpuPayloadFailureWitness,decodeCpuClassPieceWitness,decodeCpuClassPieceCaptureWitness,validateCpuTwoTickFinalEvidence,
+import {runBrowserCpuTwoTick,decodeCpuTwoTickEvidence,decodeCpuPayloadFailureWitness,decodeCpuClassPieceWitness,decodeCpuClassPieceCaptureWitness,decodeCpuLObjWriterEvidence,validateCpuTwoTickFinalEvidence,
   CPU_TWO_TICK_EVIDENCE_BYTES,TWO_TICK_PAD_300,TWO_TICK_PAD_301} from './cpu_two_tick_runner.mjs';
 import {validateCpuTwoTickDrawSample,retainCpuRestoreSample,recordCpuRestoreFailure} from './run_write_census.mjs';
 import {inspectInteractiveObservation,validateSelectedDrawPath,validateSourceInputMapping,decodeDrawDiagnostics} from './runner_contract.mjs';
@@ -59,7 +59,7 @@ function makeWitness(failed=false) {
   bytes.fill(9,120,152);bytes.fill(9,152,184);bytes[157]=8;return bytes;
 }
 function makeRunner({fault=null}={}) {
-  const memory=new Uint8Array(70000),heap=new Uint8Array(memory.buffer);
+  const memory=new Uint8Array(100000),heap=new Uint8Array(memory.buffer);
   const ptr={evidence:1000,observation:40000,input:42000,pcm:43000,draw:50000};
   const checkpointPad=b64(new Uint8Array(44).fill(1));
   memory.set(observation(300),ptr.observation);memory.set(Buffer.from(checkpointPad,'base64'),ptr.input);memory.set(diag(0),ptr.draw);
@@ -83,6 +83,8 @@ function makeRunner({fault=null}={}) {
   };
   const origin=new Uint8Array(320);new DataView(origin.buffer).setUint32(0,1,true);new DataView(origin.buffer).setUint32(4,320,true);
   const module={HEAPU8:heap,
+    _melee_web_synctest_cpu_lobj_writer_evidence_bytes:()=>fault==='bad-writer-size'?16783:16784,
+    _melee_web_synctest_cpu_lobj_writer_evidence:()=>{const p=70000;heap.fill(0,p,p+16784);const v=new DataView(heap.buffer);v.setUint32(p,1,true);v.setUint32(p+4,16784,true);if(fault==='malformed-writer-after-11'&&commandSequence.includes(11))v.setUint32(p+140,1,true);return p;},
     _melee_web_synctest_cpu_class_piece_capture_witness_bytes:()=>fault==='bad-capture-piece-size'?159:160,
     _melee_web_synctest_cpu_class_piece_capture_witness:()=>{const p=66500;heap.fill(0,p,p+160);const v=new DataView(heap.buffer);v.setUint32(p,1,true);v.setUint32(p+4,160,true);v.setUint32(p+16,1,true);return p;},
     _melee_web_synctest_cpu_class_piece_witness_bytes:()=>fault==='bad-class-size'?207:208,
@@ -272,6 +274,8 @@ test('actual runner retains fixed witness and original failure before outer vali
     assert.equal(p.nativeEvidence.firstFailure,1216);assert.equal(p.nativeEvidence.checkedCpu,30);
     assert.equal(p.payloadFailureWitness.window.row,7);assert.equal(p.payloadFailureWitness.window.generation,'fffffffffffffff1');
     assert.equal(Buffer.from(p.payloadFailureWitnessRaw,'base64').length,256);
+    assert.equal(Buffer.from(p.lobjWriterEvidenceRaw,'base64').length,16784);
+    assert.equal(p.lobjWriterEvidence.livePieceLifetime,'UNKNOWN');
     assert.equal(Buffer.from(p.classPieceWitnessRaw,'base64').length,208);
     assert.equal(Buffer.from(p.classPieceCaptureWitnessRaw,'base64').length,160);
     assert.equal(p.classPieceCaptureWitness.scope,'CAPTURE_TIME_ONLY');
@@ -340,4 +344,47 @@ test('capture-time observer failure preserves native and all earlier diagnostic 
  assert.match(String(error),/Capture-time piece ABI/);const p=error.cpuRestorePartial;
  assert.equal(p.nativeEvidence.lastCommand,8);assert.equal(Buffer.from(p.classPieceWitnessRaw,'base64').length,208);
  assert.equal(Buffer.from(p.allocationOriginWitnessRaw,'base64').length,320);assert.deepEqual(f.commandSequence,[8]);
+});
+
+// New source-write evidence stays diagnostic; no owner/restore acceptance.
+test('lobj writer unfinalized/refused schema and bounded decoder',()=>{
+ const bytes=new Uint8Array(16784),v=new DataView(bytes.buffer);v.setUint32(0,1,true);v.setUint32(4,16784,true);
+ assert.equal(decodeCpuLObjWriterEvidence(bytes).livePieceLifetime,'UNKNOWN');
+ for(const [offset,value]of [[4,16783],[20,129],[28,2],[140,1],[392,1]]){
+  const bad=bytes.slice();new DataView(bad.buffer).setUint32(offset,value,true);assert.throws(()=>decodeCpuLObjWriterEvidence(bad));
+ }
+ const bad=bytes.slice();bad[16783]=1;assert.throws(()=>decodeCpuLObjWriterEvidence(bad),/unused/);
+});
+
+// Explicit JS shape model, not actual native output or independent POST12 proof.
+function modeledQualifiedWriter(){
+ const bytes=new Uint8Array(16784),v=new DataView(bytes.buffer);
+ const u=(o,x)=>v.setUint32(o,x,true),n=(o,x)=>v.setBigUint64(o,BigInt(x),true);
+ for(const[o,x]of [[0,1],[4,16784],[8,1],[16,1],[20,2],[24,2],[80,1],[84,2],[88,1],[92,77],[100,1],[104,0],[108,1],[112,1],[116,7],[120,93],[124,0x80010000],[128,1024],[132,0x22],[136,0x11]])u(o,x);
+ for(const o of [32,40,48,56,64,72])n(o,1);n(144,0x10000);n(152,7);
+ const path=new TextEncoder().encode('src/sysdolphin/baselib/lobj.c');u(96,path.length);bytes.set(path,160);
+ for(let i=0;i<2;++i){const b=400+i*128;
+  for(const[o,x]of [[0,i+1],[4,9+i],[8,1],[16,7],[20,0x80010000],[24,1024],[28,92],[64,0x80010020],[68,60],[72,224],[76,212],[80,18],[84,0x2000],[88,0x2000],[92,3]])u(b+o,x);
+  for(const[o,x]of [[32,0x10000],[40,7],[48,0x10020],[56,0x1005c]])n(b+o,x);
+  bytes.fill(i?0x22:0x11,b+96,b+108);bytes.fill(i?0x33:0x22,b+108,b+120);
+ }
+ return bytes;
+}
+test('qualified writer model validates PRE row, phase and internal candidate set only',()=>{
+ const raw=modeledQualifiedWriter(),e=decodeCpuLObjWriterEvidence(raw);
+ assert.equal(e.status,1);assert.equal(e.livePieceLifetime,'UNKNOWN');assert.equal(e.matchedIndex,0);assert.equal(e.postCount,1);assert.equal(e.drawnCount,2);
+ const mutations=[[400+16,8],[104,1],[108,2],[132,0x33],[16,0],[28,1],[400+84,0],[400+88,0x2004],[400+80,0],[400+68,59],[400+72,223],[400+92,0],[400+120,1],[140,1],[84,0],[400+8,0],[400+4,0],[132,0x11]];
+ for(const[o,x]of mutations){const bad=raw.slice();new DataView(bad.buffer).setUint32(o,x,true);assert.throws(()=>decodeCpuLObjWriterEvidence(bad),`qualified mutation ${o}=${x}`);}
+ // Two identical qualifying pre-POST events require exact count and last index.
+ const repeated=raw.slice(),v=new DataView(repeated.buffer);repeated.copyWithin(528,400,528);v.setUint32(528,2,true);v.setUint32(80,2,true);v.setUint32(104,1,true);v.setUint32(108,2,true);
+ assert.equal(decodeCpuLObjWriterEvidence(repeated).matchedCount,2);
+ for(const[o,x]of [[104,0],[108,1],[528+16,8]]){const bad=repeated.slice();new DataView(bad.buffer).setUint32(o,x,true);assert.throws(()=>decodeCpuLObjWriterEvidence(bad),/candidate-set|first-difference/);}
+});
+
+test('actual runner retains malformed16784 raw and native partial before diagnostic decode throws',async()=>{
+ const f=makeRunner({fault:'malformed-writer-after-11'});let caught;try{await f.run();}catch(e){caught=e;}
+ assert.ok(caught);assert.deepEqual(f.commandSequence,[8,9,10,11]);
+ const p=caught.cpuRestorePartial,raw=Buffer.from(p.lobjWriterEvidenceRaw,'base64');
+ assert.equal(raw.length,16784);assert.equal(raw.readUInt32LE(140),1);
+ assert.ok(p.nativeEvidence);assert.equal(Buffer.from(p.payloadFailureWitnessRaw,'base64').length,256);
 });

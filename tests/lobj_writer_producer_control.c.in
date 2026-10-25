@@ -1,0 +1,9 @@
+/* Actual original producer body, declarations/layout and FP recipe. Getters
+ * are explicit model services counted independently in the C++ control. */
+#include "gameplay_lobj_writer_diagnostic.h"
+#include <sysdolphin/baselib/lobj.h>
+#include <stddef.h>
+_Static_assert(sizeof(HSD_LObj)==212&&offsetof(HSD_LObj,lvec)==60&&sizeof(((HSD_LObj*)0)->lvec)==12,"actual source witness span");
+static s32 lightmask_specular;
+@ACTUAL_SETUP_SPEC_LIGHTOBJ@
+void writer_actual_producer(HSD_LObj* lobj,Mtx matrix){setup_spec_lightobj(lobj,matrix,1);}

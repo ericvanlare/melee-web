@@ -12,6 +12,10 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <new>
+// Phase is a diagnostic-only modeled unavailable leaf in this adapter control.
+extern "C" void melee_web_lobj_writer_phase(uint32_t){}
+
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
@@ -390,7 +394,9 @@ void reset_fixture() {
     fail_capture=false;
     fixture_draw_diagnostics={};
     fail_static_replay=false;journal_failure_tick=unexpected_draw_tick=0;
-    cpu_restore=CpuRestoreControl{};
+    // Fixture-only in-place reset: avoid a >64KiB automatic aggregate.
+    cpu_restore.~CpuRestoreControl();
+    ::new (static_cast<void*>(&cpu_restore)) CpuRestoreControl{};
     match=std::make_unique<melee_web::GameplayMatchSession>(176);
     source_state=FixtureSourceState{};source_static_counter=0;source_invariant=0x51a7u;
     std::memset(error,0,sizeof(error));observation={};observation.frame=176;
@@ -504,6 +510,9 @@ void verify_payload_failure_retention() {
     pending_submission=false;check(!melee_web_synctest_cpu_restore_command(10),"Witness baseline301");
     pending_submission=false;modeled_payload_byte_failure=true;
     check(melee_web_synctest_cpu_restore_command(11)==1216&&draw_calls==2,"Witness must preserve1216/no final present");
+    check(melee_web_synctest_cpu_lobj_writer_evidence_bytes()==16784,"Writer fixed ABI");
+    const auto writer_saved=*static_cast<const MeleeWebLObjWriterEvidence*>(melee_web_synctest_cpu_lobj_writer_evidence());
+    check(writer_saved.schema==1&&writer_saved.bytes==16784&&writer_saved.status==2&&writer_saved.reason==1&&!writer_saved.hook_active,"Actual adapter retains explicitly modeled unavailable writer leaf before strict failure");
     check(melee_web_synctest_cpu_class_piece_capture_witness_bytes()==160,"Capture-only fixed ABI");
     const auto historical_saved=*static_cast<const MeleeWebClassPieceCaptureWitness*>(melee_web_synctest_cpu_class_piece_capture_witness());
     check(historical_saved.schema==1&&historical_saved.bytes==160&&historical_saved.scope==1&&historical_saved.reason==4&&historical_saved.live_reason==7&&!historical_saved.status,"Actual adapter retains distinct modeled capture-time UNKNOWN");
@@ -524,6 +533,7 @@ void verify_payload_failure_retention() {
         Buffer.from(HEAPU8.subarray($0,$0+320)).toString("base64"));},melee_web_synctest_cpu_allocation_origin_witness());
     check(melee_web_synctest_cpu_restore_command(5)==1216,"CLOSE preserves original1216");
     check(!std::memcmp(&saved,melee_web_synctest_cpu_payload_failure_witness(),256),"CLOSE preserves witness bytes");
+    check(!std::memcmp(&writer_saved,melee_web_synctest_cpu_lobj_writer_evidence(),16784),"CLOSE retains all16784 writer bytes after capsule destruction");
     check(!std::memcmp(&historical_saved,melee_web_synctest_cpu_class_piece_capture_witness(),160),"CLOSE retains capture-only evidence");
     check(!std::memcmp(&piece_saved,melee_web_synctest_cpu_class_piece_witness(),208),"CLOSE retains separate class piece bytes");
     check(!std::memcmp(&origin_saved,melee_web_synctest_cpu_allocation_origin_witness(),320),"CLOSE preserves separate origin bytes");

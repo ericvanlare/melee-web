@@ -55,6 +55,7 @@ struct CpuRestoreControl {
     MeleeWebClassPieceWitness class_piece_witness{1,sizeof(MeleeWebClassPieceWitness)};
     MeleeWebClassPieceCaptureWitness class_piece_capture_witness{1,sizeof(MeleeWebClassPieceCaptureWitness),0,0,1};
     MeleeWebSourceAllocationOriginWitness origin_witness{1,sizeof(MeleeWebSourceAllocationOriginWitness)};
+    MeleeWebLObjWriterEvidence lobj_writer_evidence{1,sizeof(MeleeWebLObjWriterEvidence)};
     bool two_active=false;
 } cpu_restore;
 bool cpu_drawn_diagnostics(unsigned index){
@@ -228,6 +229,7 @@ uint32_t cpu_execute_two(uint32_t command){
             cpu_restore.origin_witness=cpu_restore.capsule->allocation_origin_witness();
             cpu_restore.class_piece_witness=cpu_restore.capsule->class_piece_witness();
             cpu_restore.class_piece_capture_witness=cpu_restore.capsule->class_piece_capture_witness();
+            if(const auto* writer=cpu_restore.capsule->lobj_writer_witness())cpu_restore.lobj_writer_evidence=*writer;
         }
         if(!matched)return cpu_fail(0x4c0u,"two-tick final CPU typed equality refused");
         e.cpu_equality=1;cpu_restore.state=C::TwoEqual;return 0;
@@ -441,6 +443,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_restore_command(
     if(command==5){if(cpu_restore.two_active)cpu_restore.two.last_command=5;return cpu_close();}
     if(cpu_restore.first_failure)return cpu_restore.first_failure;
     if((command>=8&&command<=13)||cpu_restore.two_active)cpu_restore.two.last_command=command;
+    melee_web_lobj_writer_phase(command);
     cpu_restore.inflight=true;uint32_t result=0;
     try{result=cpu_execute(command);}catch(const std::exception& failure){result=cpu_fail(0x496u,failure.what());}
     cpu_restore.inflight=false;
@@ -479,3 +482,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_class_piece_witn
 
 extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_class_piece_capture_witness(){return &cpu_restore.class_piece_capture_witness;}
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_class_piece_capture_witness_bytes(){return sizeof(cpu_restore.class_piece_capture_witness);}
+
+#if defined(MELEE_WEB_SYNCTEST_CPU_RESTORE)
+extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_lobj_writer_evidence(){if(cpu_restore.capsule)if(const auto* writer=cpu_restore.capsule->lobj_writer_witness())cpu_restore.lobj_writer_evidence=*writer;return &cpu_restore.lobj_writer_evidence;}
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_lobj_writer_evidence_bytes(){return sizeof(cpu_restore.lobj_writer_evidence);}
+#endif

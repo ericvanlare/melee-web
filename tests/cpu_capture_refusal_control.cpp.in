@@ -108,9 +108,15 @@ private:
  std::vector<std::byte> post_bytes_;AudioRanges audio_ranges_{};std::size_t audio_range_count_{};
  AudioRanges drawn_audio_ranges_{};std::size_t drawn_audio_range_count_{};bool drawn_sealed_=false;
  std::uint32_t post_frame_{},checked_domains_{},matched_domains_{};CpuComparison comparison_{};
+ std::uint64_t lobj_writer_session_=0;
  MeleeWebClassPieceAnchor class_piece_anchor_{};
  GameplayMatchCpuOwners owner_{};std::unique_ptr<GameplayCpuStatics> statics_;Commit commit_{};std::uint64_t audio_generation_{};bool source_step_possible_=false;Snapshot *post_payload_{},*post_flow_{};
 };
+// These existing capture tests intentionally model diagnostic unavailable.
+// Actual writer lifetime/correlation is tested in source_lobj_writer_control.
+template<class T> uint64_t melee_web_lobj_writer_arm(T*,MeleeWebClassPieceAnchor,uint32_t){return 0;}
+void melee_web_lobj_writer_mark(uint64_t,uint32_t){}
+void melee_web_lobj_writer_disarm(uint64_t){}
 @ACTUAL_CAPTURE_FUNCTION@
 @ACTUAL_INTERVAL_BOUNDARY@
 @ACTUAL_SEAL_POST@
