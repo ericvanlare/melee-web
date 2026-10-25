@@ -1,6 +1,6 @@
 # Match-only rollback feasibility
 
-**Compiled / Source-only snapshot diagnostic / Terminal browser tick-and-draw diagnostic / One-tick CPU restore-replay-and-present passed; two-tick attempt failed at CPU payload comparison / Full browser rollback and frame-budget feasibility unproven**
+**Compiled / Source-only snapshot diagnostic / Terminal browser tick-and-draw diagnostic / One-tick CPU restore-replay-and-present passed; two-tick command 11 remains strict 1216 with class/piece owner unknown; source-only frozen-table reduction in flight, no new capture authorized / Full browser rollback and frame-budget feasibility unproven**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
 [merged #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
@@ -28,8 +28,11 @@ failure remain retained and are explained below. A subsequent two-tick attempt
 failed at the strict final CPU payload comparison; its retained result is recorded
 below. The earlier pool-provenance diagnostic also stops at strict code1216: its
 fixed witness reports no current recorded pool event and no type or pool
-attribution. A later allocation-origin diagnostic narrows the source callsite to
-generated `class.c:219`, but still does not identify a typed object or member.
+attribution. The earlier allocation-origin diagnostic observed generated
+`class.c:219`, without identifying a typed object or member. A newer class/piece
+lifecycle capture again stops at strict 1216 and observes generated `class.c:242`;
+its witness remains UNKNOWN and does not tie its first event to the failing allocation.
+A source-only frozen-table reduction is now in flight; no new capture is authorized.
 Later typed domains and final present remain unrun. Component controls and the
 one-tick browser result do not establish full browser rollback. Earlier owner controls
 also repaired callback guards so simulation and draw callbacks refuse separately;
@@ -393,6 +396,27 @@ compiled callsite, allocation identity, both raw pairs and unchanged no-draw
 diagnostics. The live piece and typed class/member remain unknown. The diagnostic does not repair the payload mismatch or admit a
 restore range; no two-tick pass, final present, pixel/PCM acceptance, or full browser
 rollback is established.
+
+The latest root-released class/piece diagnostic used clean source checkpoint
+`4c0eaea` / tree `ff7661c1`, distinct from the native runtime producer
+`55779d1e` plus its exact 16 reviewed producer-worktree files (including test-only files);
+all 24 retained/live runtime
+files remain unchanged. The full-regression receipt records the pre-checkpoint
+`55779d1e` plus exact-16-file worktree; those 16 source hashes match the later
+clean checkpoint. That regression overall PASS covers 2,473 tests, with 165 skipped
+(2,308 passed). The wrapper failed after the tests when reusing the v1 receipt
+filename; the recovered v2 summary did not rerun them. Three Release builds passed. Both sample-300/301 raw
+five-channel pairs and literal PADs match, but command 11 refuses strict CPU
+equality at domain 4, row 62, offset 284 (expected 106, actual 189 in 1,024 bytes).
+The new 208-byte class/piece witness reports status 2/reason 7 and UNKNOWN; the
+observed first event has a different host/generation from the failing allocation
+and cannot be assigned to a specific tick. Generated `class.c:242` is a source
+allocation callsite, not a class/member identity; the prior `class.c:219` result
+remains historical. Native CPU CLOSE returns 1216, while snapshot close and
+renderer shutdown return 1; all 10 recorded PIDs are absent. Commands 12/13 and
+final present were not reached. Exact validation, configuration, capture and
+independent replay pins are in the structured receipt under
+`class_piece_lifecycle_capture_v1`.
 
 ## First current-source copy/restore result
 

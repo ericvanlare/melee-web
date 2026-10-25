@@ -2,7 +2,7 @@
   "schema": "match-only-rollback-feasibility-v1",
   "issue": 318,
   "pr": 319,
-  "status": "same_browser_one_tick_drawn_reference_pass_two_tick_strict1216_allocation_origin_observed_pool_owner_unattributed_full_browser_restore_not_established",
+  "status": "same_browser_one_tick_drawn_reference_pass_two_tick_command11_strict1216_class_piece_unknown_source_only_frozen_table_reduction_in_flight_full_browser_restore_not_established",
   "source_only_baseline": {
     "boundary": "synchronous-source-only-exported-call-return",
     "sourceDrawing": false,
@@ -2429,7 +2429,7 @@
   },
   "same_instance_browser_restore_341": {
     "issue": 341,
-    "status": "ONE_TICK_DRAWN_REFERENCE_PASS; TWO_TICK_COMMAND11_CPU_PAYLOAD_FAILURE; ALLOCATION_ORIGIN_CALLSITE_OBSERVED_WITHOUT_TYPED_OWNER; CENSUS_INCOMPLETE; FULL_BROWSER_RESTORE_NOT_ESTABLISHED",
+    "status": "ONE_TICK_DRAWN_REFERENCE_PASS; TWO_TICK_COMMAND11_STRICT1216; CLASS_PIECE_WITNESS_UNKNOWN_AT_CLASS_C242; SOURCE_ONLY_FROZEN_TABLE_REDUCTION_IN_FLIGHT; CENSUS_INCOMPLETE; FULL_BROWSER_RESTORE_NOT_ESTABLISHED",
     "producer_base_commit": "130438fd2b86d00cfec98cd2ba0a5f66084ae15c",
     "producer_worktree": "uncommitted source; census runtime/harness and separate owner component sources pinned below; not a commit identity",
     "runtime_sha256": {
@@ -2600,7 +2600,7 @@
       "retained_artifact": "census-owner-gap-analysis-v1.json",
       "sha256": "9908b8d2ebb8aeeb64d8df4dcdeb24ea0f16f55bab3d17e1f847c679f90ba370"
     },
-    "next_experiment": "Reduce the missing live-piece/class identity at the observed class.c:219 backing allocation with actual-source lifecycle controls. No unchanged recapture, type guess, byte exemption or two-tick pass.",
+    "next_experiment": "Source-only frozen-table reduction is in flight for the unknown class/piece owner at the current generated class.c:242 allocation callsite. No new capture is authorized. Do not guess a type/member, mask bytes, change restore admission, or rerun the failed capture.",
     "owner_components": {
       "scope": "Private owner components only; no browser restore exposure or complete-world claim",
       "current_files_sha256": {
@@ -6337,6 +6337,350 @@
         "No pixel or PCM acceptance claim.",
         "No two-tick, multi-tick, seven-tick or full-browser-rollback acceptance."
       ]
+    },
+    "class_piece_lifecycle_capture_v1": {
+      "status": "FAILED_COMMAND11_STRICT1216; CLASS_PIECE_WITNESS_UNKNOWN; SOURCE_ONLY_FROZEN_TABLE_REDUCTION_IN_FLIGHT; NO_FINAL_PRESENT",
+      "scope": "One root-released class/piece lifecycle diagnostic for the same two-tick drawn-reference route. It retained the existing warm prefix and sample-300/301 raw comparisons, then stopped at command 11 on strict CPU typed equality. The new witness does not identify a typed class/member or prove that the observed event belongs to the failing outer allocation. No later-domain or final-present result is claimed.",
+      "source_and_validation": {
+        "clean_source_checkpoint": {
+          "commit": "4c0eaeaed7b7f355d7bb8c7cce255a69cc5d55bf",
+          "tree": "ff7661c1a44e610c461364befa449230a8d99ebb",
+          "clean": true,
+          "receipt": {
+            "path": "class-piece-lifecycle-validation-v1/source-checkpoint-v1.json",
+            "bytes": 15185,
+            "sha256": "1342a0a722e3ee5e0d48ee3dd8f0f3bf97e7ca861baedc3d74e6dd44289e64b1"
+          },
+          "identity_note": "Source checkpoint 4c0eaea is the clean tested source. It is distinct from the original native runtime producer below."
+        },
+        "runtime_producer_identity": {
+          "base_commit": "55779d1e7052a3b227d477c935f9bf8496360ea5",
+          "base_tree": "14a5833c519f3c6979ed8ee2cd04ffb331c57f78",
+          "producer_worktree_files": 16,
+          "candidate": {
+            "path": "class-piece-lifecycle-candidate-v1/freeze-v1.json",
+            "bytes": 11448,
+            "sha256": "123a88ba9217ae9a77a1b8035ec08e8f7a26be35822f63cfb0bbab22e43c362b"
+          },
+          "source_review": {
+            "path": "class-piece-lifecycle-candidate-v1/independent-review-v1.json",
+            "bytes": 4513,
+            "sha256": "dbc4b42c9beffe2ccef7bb9b87aed27850ea2c29c41c7b4acd0e20f8d9411f7f"
+          },
+          "identity": "55779d1e plus the exact 16 reviewed producer-worktree files, including test-only files; build inputs are identified by the retained build receipts. Do not relabel as the clean 4c0eaea source."
+        },
+        "full_regression": {
+          "status": "PASS",
+          "outer_tests": 2473,
+          "passed": 2308,
+          "skipped": 165,
+          "outer_footer": "OK (skipped=165)",
+          "outer_seconds": 591.921,
+          "no_rerun": true,
+          "summary_receipt": {
+            "path": "class-piece-lifecycle-validation-v1/full-regression-result-v2.json",
+            "bytes": 14405,
+            "sha256": "b216b18007b707aaaef642c2787207149963a0dbdb15990a3650f9ec55c5b672"
+          },
+          "log": {
+            "path": "class-piece-lifecycle-validation-v1/full-regression.log",
+            "bytes": 470319,
+            "sha256": "39ead9516e15112ff1cc633b508812888b52c4c4680d254840890e06ec36f380"
+          },
+          "receipt_collision": {
+            "command_record": {
+              "path": "class-piece-lifecycle-validation-v1/full-regression-result-v1.json",
+              "bytes": 494,
+              "sha256": "31361d9ef0dca232b0987e6bb3626bb35116c04db1b1ce429655300c99a4b70a"
+            },
+            "summary_record": {
+              "path": "class-piece-lifecycle-validation-v1/full-regression-result-v2.json",
+              "bytes": 14405,
+              "sha256": "b216b18007b707aaaef642c2787207149963a0dbdb15990a3650f9ec55c5b672"
+            },
+            "assembly_failure": {
+              "path": "class-piece-lifecycle-validation-v1/receipt-assembly-failure-v1.json",
+              "bytes": 1396,
+              "sha256": "b04c610ad04b650e4980a5345d18d58f16c7e5eb87be7a94fd0bb4bc86afb02f"
+            },
+            "note": "The v1 name is the immutable successful command record; the v2 receipt is the footer-derived summary. The first wrapper reported only a postrun FileExistsError. Commands returned 0, the retained log footer is OK (skipped=165), and no test rerun occurred.",
+            "command_exit_code": 0,
+            "command_seconds": 592.2526428326964
+          },
+          "source_identity_at_run": {
+            "base_commit": "55779d1e7052a3b227d477c935f9bf8496360ea5",
+            "base_tree": "14a5833c519f3c6979ed8ee2cd04ffb331c57f78",
+            "dirty_files": 16,
+            "same_16_source_file_hashes_as_clean_checkpoint": true,
+            "note": "The summary records the pre-checkpoint 55779d1e plus exact16 worktree identity; its per-file pins match the later clean4c0eaea checkpoint. The receipt is not relabeled as having run on the later clean commit."
+          }
+        },
+        "release_builds": [
+          {
+            "name": "private-v5-release",
+            "status": "PASS",
+            "result": {
+              "path": "class-piece-lifecycle-validation-v1/private-v5-release-result-v1.json",
+              "bytes": 788,
+              "sha256": "c26a7baa0f02f40323b5c86470c4bdf151ba2649323bff186975b50b7f0dea66"
+            },
+            "log": {
+              "path": "class-piece-lifecycle-validation-v1/private-v5-release.log",
+              "bytes": 266239,
+              "sha256": "d4c0e54e7fb09879272ec9331918e116efa19be2a48a49276b5ddb57455a3108"
+            }
+          },
+          {
+            "name": "private-v6-release",
+            "status": "PASS",
+            "result": {
+              "path": "class-piece-lifecycle-validation-v1/private-v6-release-result-v1.json",
+              "bytes": 823,
+              "sha256": "cebae8c5f88339b8e3c7a1a9dfe59ba3dbc7829a214b795a2422cfd08eb7aac3"
+            },
+            "log": {
+              "path": "class-piece-lifecycle-validation-v1/private-v6-release.log",
+              "bytes": 266483,
+              "sha256": "ed5b266b796e4659b9e6bfb6a91fd7511e9349dde3225fd82724c5b381267ed6"
+            }
+          },
+          {
+            "name": "ordinary-release",
+            "status": "PASS",
+            "result": {
+              "path": "class-piece-lifecycle-validation-v1/ordinary-release-result-v1.json",
+              "bytes": 516,
+              "sha256": "d51b94d5d0de6505d9894074f1092c2f0ed8e1fc7b08eb35707c31c7b3d6de4b"
+            },
+            "log": {
+              "path": "class-piece-lifecycle-validation-v1/ordinary-release.log",
+              "bytes": 1436696,
+              "sha256": "8bf88d68726fe47a0eabe6c641f94007496c0afcc8c4ccc9bcd0d686a84ad224"
+            }
+          }
+        ],
+        "build_and_integration_receipts": {
+          "native_build": {
+            "path": "class-piece-lifecycle-validation-v1/native-build-result-v1.json",
+            "bytes": 10141,
+            "sha256": "769c12823549ba41ad3b21983bb66656f0a8f8e5515b7a1c743353877798d536"
+          },
+          "integration": {
+            "path": "class-piece-lifecycle-validation-v1/integration-result-v1.json",
+            "bytes": 18436,
+            "sha256": "57d81e94b11eabccd5a09323af4a1f1e237735dc6a581c78ce05aec96978f3a5"
+          },
+          "focused_controls": {
+            "path": "class-piece-lifecycle-validation-v1/focused-result-v1.json",
+            "bytes": 11987,
+            "sha256": "c9405f17ef6859c325daf8e70b69a22237c96bc4c12c04efd603cbec7b2446a7"
+          },
+          "compiled_class_attribution": {
+            "path": "class-piece-lifecycle-validation-v1/compiled-class-attribution-v1.json",
+            "bytes": 9481,
+            "sha256": "bc1ac91c0b733db7c5d8570c62fdab4bab5f400939be4ac0f74ca3e54405c600"
+          }
+        }
+      },
+      "runtime": {
+        "profile_identity": "slippi-render-dependencies-logical-frame-v6",
+        "profile_source_identity": "af952c7c386af85630136e63cad8d3322f3bb58fa550c6899e10e3f5814f963f",
+        "profile_seed": 324508639,
+        "runtime_file_count": 24,
+        "runtime_inventory": {
+          "path": "class-piece-lifecycle-validation-v1/runtime-inventory-v1.json",
+          "bytes": 19969,
+          "sha256": "f2bbff79008d1223884bdcce9a2606f909a8a82c988dc6ef7a9d00cf0d2e5512"
+        },
+        "retained_private_v6_runtime": {
+          "path": "class-piece-lifecycle-validation-v1/private-v6-release-runtime-v1.json",
+          "bytes": 11808,
+          "sha256": "3e8f1bc7039de0a59cb6433f6fe86b0f99999864a596f5239c1fb4976c590df5"
+        },
+        "retained_and_live_runtime_unchanged": true,
+        "primary_runtime_sha256": {
+          "gameplay_slippi_synctest_browser.mjs": "4e5dd947e1d4d867ca30fdffd91e08ff01e96a645605a0facefd3fe1e68cbb2d",
+          "gameplay_slippi_synctest_browser.wasm": "008e9f518e4f5b60a0c893fc782ccf1ee7ce2cc9142df02cd30107a62a0e07d6",
+          "gameplay_slippi_synctest_browser.data": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c"
+        }
+      },
+      "fresh_linked_configuration": {
+        "configuration": {
+          "path": "class-piece-lifecycle-linked-config-candidate-v1/final-linked-configuration-v1.json",
+          "bytes": 915130,
+          "sha256": "81cbe7b5899787cecc13cd4e80d692ebb7146e94f0e228635d7a677752578b81"
+        },
+        "policy": {
+          "path": "class-piece-lifecycle-linked-config-candidate-v1/reviewed-policy-v9.json",
+          "bytes": 1001248,
+          "sha256": "ca62f7632467a4e5b23fd7a9b82f8a8dcbdc3afd9a7e7eb1c97ed4dcb515e312"
+        },
+        "fresh_linked_summary": {
+          "path": "class-piece-lifecycle-linked-config-candidate-v1/generation-summary-v1.json",
+          "bytes": 17576,
+          "sha256": "6c690b2aad5fe639b5cd07a4cea07a72d196c7a3bc99b2ffc3879b5f234cd204"
+        },
+        "independent_review": {
+          "path": "class-piece-lifecycle-linked-config-independent-review-v1/review-v1.json",
+          "bytes": 5230,
+          "sha256": "be0de6dd21a46736dda58445f8c8028a56bb86079bcd93cb6ca8768c4d80b6ec"
+        },
+        "fresh_configuration_only": true
+      },
+      "capture_pins": {
+        "root_release": {
+          "path": "class-piece-lifecycle-capture-v1/root-release-v1.json",
+          "bytes": 2291,
+          "sha256": "bf5bddc976da30c07a6ba7f8ab58edaa6c4899878b49ad85e7b6648e7fb13762"
+        },
+        "packet": {
+          "path": "class-piece-lifecycle-capture-v1/packet-candidate-v1.json",
+          "bytes": 73802,
+          "sha256": "b7d313574c09683fa601c03cc588469b949e8a976b9cb91039d7c9daec543f39"
+        },
+        "preflight": {
+          "path": "class-piece-lifecycle-capture-v1/preflight.json",
+          "bytes": 74335,
+          "sha256": "281902cf1bc2b2f0726fb552a7e592125d48faa87b9670e1e17d0504e1a48475"
+        },
+        "owner": {
+          "path": "class-piece-lifecycle-capture-v1/owner.json",
+          "bytes": 87805,
+          "sha256": "1d9876993a6f70ac4a38be17345fbb49cc8edc9e0ccbbbd4cdefe81090571c39"
+        },
+        "launch_result": {
+          "path": "class-piece-lifecycle-capture-v1/launch-result-v1.json",
+          "bytes": 2698,
+          "sha256": "0aa78d63ebbb0eda9dd5b160cf99d440da8c33289a9f6e744e3daaf643705bb4"
+        },
+        "runner_raw_report": {
+          "path": "class-piece-lifecycle-capture-v1/runner/evidence.json",
+          "bytes": 1127505,
+          "sha256": "69c761a232608ea68eb40bbcdb0c065e86baf48a219c0b42eb87669d2cbf32be"
+        },
+        "runner_log": {
+          "path": "class-piece-lifecycle-capture-v1/runner.log",
+          "bytes": 647,
+          "sha256": "d9192e09321aa446f69b9fb264b9211032e91e4886f64c724bb2076edc53c724"
+        },
+        "process_trace": {
+          "path": "class-piece-lifecycle-capture-v1/processes.jsonl",
+          "bytes": 65761,
+          "sha256": "1710342d62f97abf43537bff1f72a181598cc8067a921689a188eb6da065713b"
+        },
+        "root_observation": {
+          "path": "class-piece-lifecycle-capture-v1/root-observed-v1.json",
+          "bytes": 53403,
+          "sha256": "0c64de6cc185373926f04a8c162789f13fe2a7bd651e423080a1b3c9b83fd2e0"
+        }
+      },
+      "observed": {
+        "capture_elapsed_ms": 10265,
+        "cleanup_ms": 73,
+        "owner_budget_ms": 180000,
+        "cleanup_reserve_ms": 30000,
+        "warm_prefix_samples": 300,
+        "drawn_reference_samples": [
+          300,
+          301
+        ],
+        "raw_five_channel_pairs_and_literal_pad": {
+          "sample300": {
+            "source_frame": 177,
+            "five_channel_pair_matches": {
+              "observation": true,
+              "pcm": true,
+              "pad": true,
+              "rng_profile": true,
+              "transfer": true
+            },
+            "literal_pad_44_bytes_base64": "AgAAAAAAAAAAAAABALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=",
+            "literal_pad_sha256": "46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288"
+          },
+          "sample301": {
+            "source_frame": 178,
+            "five_channel_pair_matches": {
+              "observation": true,
+              "pcm": true,
+              "pad": true,
+              "rng_profile": true,
+              "transfer": true
+            },
+            "literal_pad_44_bytes_base64": "AABQAAAAAAAAAAAAALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=",
+            "literal_pad_sha256": "c1be1a004e9e0fafa868a1f51540cef6f2fa3d6104e7b503c3b9eb5f79cbe63d"
+          }
+        },
+        "first_failure": {
+          "native_command": 11,
+          "code": 1216,
+          "domain": 4,
+          "row": 62,
+          "offset": 284,
+          "expected": 106,
+          "actual": 189,
+          "allocation_bytes": 1024,
+          "checked_cpu_mask": "0x1e",
+          "matched_cpu_mask": "0x0e",
+          "later_domains_checked": false,
+          "commands_12_13_executed": false,
+          "final_present_reached": false
+        },
+        "class_piece_witness": {
+          "bytes": 208,
+          "status": 2,
+          "reason": 7,
+          "coverage_state": 4,
+          "record_state": 0,
+          "capture_serial": "0000000000004745",
+          "event_serial": "0000000000004746",
+          "event_kind": 1,
+          "event_requested": 136,
+          "event_physical": 160,
+          "event_host_matches_failing_host": false,
+          "event_generation_matches_failing_generation": false,
+          "class_or_piece_confirmed": false,
+          "event_timing": "The 208-byte event record is first materialized by command 11 after the typed mismatch. Its serial follows the capture serial, but the ABI does not isolate the source tick/command; its host and generation differ from the failing outer allocation."
+        },
+        "allocation_origin": {
+          "site_kind": 1,
+          "line": 242,
+          "path": "build/gameplay-source-slippi-profile/src/sysdolphin/baselib/class.c",
+          "requested_bytes": 1024,
+          "meaning": "Observed generated source allocation callsite class.c:242 (hsdAllocMemPiece); not a typed class/member attribution or proof outside ObjAlloc. The prior allocation-origin capture observed historical class.c:219 and remains unchanged."
+        },
+        "native_and_process_cleanup": {
+          "recorded_pids": 10,
+          "all_recorded_pids_absent": true,
+          "native_cpu_restore_close_result": 1216,
+          "snapshot_close_result": 1,
+          "renderer_shutdown_result": 1,
+          "owner_cleanup_passed": true,
+          "distinction": "Recorded process cleanup passed and the exact recorded PIDs are absent; native CPU CLOSE itself returned latched 1216 (not success).",
+          "native_renderer_closed": false
+        },
+        "census_is_null_actual_execution_branch": "execution.cpuRestore",
+        "profile_scope": "Explicitly incomplete private v6 profile; component diagnostic only, not vanilla or full-state/browser rollback."
+      },
+      "independent_review": {
+        "outcome": "FAILURE_CONFIRMED_DIAGNOSTIC_LIMITED",
+        "receipt": {
+          "path": "class-piece-lifecycle-capture-v1-independent-review-v1/replay-result-v1.json",
+          "bytes": 45249,
+          "sha256": "9f4dbc6a9359231e482bd42f6e194ae69efd24b652c9d716a1402d05c1002d99"
+        },
+        "replayer": {
+          "path": "class-piece-lifecycle-capture-v1-independent-review-v1/replay.py",
+          "bytes": 18901,
+          "sha256": "8bb8236d219b93ec4d86162f2f793b843844d7639d8a5530852d9cb7a2864b09"
+        },
+        "scope": "Independent raw ABIs, sample-300/301 pair joins, failure, witness and recorded-PID review; no rerun, build, browser launch, or source mutation."
+      },
+      "remaining": [
+        "Class/piece witness remains UNKNOWN; the first recorded event is not proven to be the failing allocation and no class/member is named.",
+        "The command-11 payload mismatch remains; later CPU domains and final present were not reached.",
+        "No same-instance whole-browser restore, final-present, full-state closure, seven-tick acceptance, pixel/PCM acceptance, foreground timing or whole-session acceptance is established."
+      ],
+      "next_experiment": "Source-only frozen-table reduction is in flight. No new capture is authorized; do not guess a type/member, mask bytes, change restore admission, or rerun the failed capture."
     }
   }
 }
