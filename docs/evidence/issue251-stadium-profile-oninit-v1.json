@@ -1,7 +1,7 @@
 {
   "schema": "melee-web-issue251-stadium-profile-oninit-v1",
   "issue": "https://github.com/ericvanlare/melee-web/issues/251",
-  "result": "Fresh132 original idle3500 reference and one full-A browser declared15common-fields+seed comparison PASS; C3 remains open",
+  "result": "Fresh132 same-instance full A/checked close-restart/fresh B typed22+seed component PASS; C3 and original per-owner parity remain open",
   "evidence_labels": [
     "Compiled",
     "Synthetic controls",
@@ -21892,5 +21892,477 @@
       "C3/publicStadium/transformations/whole-session not accepted",
       "pixels/PCM/audio continuity/physical input/foreground timing/performance unrun"
     ]
+  },
+  "fresh132_typed22_pair_2026_10_25_v2": {
+    "state": "PASS_INDEPENDENTLY_REPLAYED_SAME_INSTANCE_FRESH132_TYPED22_PAIR_COMPONENT_ONLY",
+    "run_id": "browser-rollback-sprint-20261022-115029-d89e262b",
+    "artifact_paths_relative_to_run": true,
+    "scope": "One same-instance Fresh132 full A, checked close/restart and fresh full B. Each lifetime reuses the exact retained original A schedule and compares22 declared address-free fields plus one seed. This does not establish a new original B/per-owner lifecycle/RNG reference or C3 acceptance.",
+    "source_and_validation": {
+      "clean_source": {
+        "head": "ad94139ce03a3d019610b7a419890a7eff78e5b3",
+        "tree": "69f68b136f5870ef385ffc8ff976bb9328763b9f",
+        "parent": "1f9d3d8fb2b12dada9db4fb17a0ed762aac92de0",
+        "checkpoint": {
+          "path": "fresh132-typed22-shell-recreation-validation-v1/source-checkpoint-v1.json",
+          "bytes": 3183,
+          "sha256": "eb73c30bd8077d5670136d6cad3efd0c03fb219beec55ac0af5fa7475f831d91"
+        }
+      },
+      "actual_binary_and_host_output_producer": {
+        "base_head": "1f9d3d8fb2b12dada9db4fb17a0ed762aac92de0",
+        "base_tree": "7600aa984dbe21606576f3cc86b00a0864f691c3",
+        "dirty": true,
+        "reviewed_host_core_test_files": 3,
+        "application": {
+          "path": "fresh132-typed22-shell-recreation-validation-v1/application-v1.json",
+          "bytes": 1743,
+          "sha256": "5e9e66853a96cd64310ef366b47696da93eee4571fb576e76d35193c316bff10"
+        },
+        "runtime54_inventory": {
+          "path": "fresh132-typed22-shell-recreation-validation-v1/runtime-inventory-v1.json",
+          "bytes": 42081,
+          "sha256": "cd11e4b8f6dd704d29dace64e1c5c4bce73872f8434035657c63865c479ec64a"
+        }
+      },
+      "historical_game_source_lineage": {
+        "base_head": "c7361ab936451c9063afaaa1df1037d7ba0313c8",
+        "reviewed_producer_worktree_files": 18,
+        "not_all_binary_affecting_inputs": true,
+        "application": {
+          "path": "fresh132-typed22-validation-v1/application-v1.json",
+          "bytes": 6310,
+          "sha256": "8d06a109d483c7dc8afc6bf9304e4274ed257f4a1c664caad9f44f90cb38acc3"
+        },
+        "not_current_binary_identity": true
+      },
+      "harness_source_roles": 26,
+      "exact_shell_repair": {
+        "files": [
+          "web/runtime-development.mjs",
+          "web/melee-runtime.mjs",
+          "tests/stadium_fresh132_typed22_pair.test.mjs"
+        ],
+        "freeze": {
+          "path": "fresh132-typed22-shell-recreation-candidate-v1/freeze-v1.json",
+          "bytes": 9947,
+          "sha256": "aa35a674eb956125bb12fa77a46078a78636d4e18076e1e700fc24e9c7b1ff89"
+        },
+        "patch": {
+          "path": "fresh132-typed22-shell-recreation-candidate-v1/candidate.patch",
+          "bytes": 16149,
+          "sha256": "0ffc8140bb90ada2b2c706b58f359f1984d23b71d43ea702b01223a28ef47b42"
+        },
+        "root_review": {
+          "path": "fresh132-typed22-shell-recreation-candidate-v1/root-review-release-v1.json",
+          "bytes": 2554,
+          "sha256": "a03b6fc80fa6ed806f0e7ac6e56224631b764b8d6af63edf6837622a5e1d2866"
+        },
+        "independent_source_review": {
+          "path": "fresh132-typed22-shell-recreation-independent-review-v1/review-v1.json",
+          "bytes": 5843,
+          "sha256": "653ad5721781efb4e4d41a341ef7c898d69e6b788014b5650eec017152f891eb"
+        },
+        "rule": "Only the checked typed22 core close grants a one-use renewal for the same successful finite lease and a newer CREATED generation; exact live restart and queued owner guards required. Failed/duplicate/concurrent attempts stay consumed; successful launch alone resets kick/stage attempts. Legacy/ordinary routes remain one-shot."
+      },
+      "full_regression": {
+        "status": "PASS",
+        "tests": 2759,
+        "skips": 195,
+        "seconds": 579.658,
+        "result": {
+          "path": "fresh132-typed22-shell-recreation-validation-v1/result-v1.json",
+          "bytes": 14850,
+          "sha256": "00ba5d7e9e6cdd52aa99ce1b3f4d9363e3c1abacf78d59e279f52f64be96d934"
+        },
+        "log": {
+          "path": "fresh132-typed22-shell-recreation-validation-v1/full-regression-v1.log",
+          "bytes": 533468,
+          "sha256": "0f0cdeacbcc09604086a5bfac80e72bdc111a9010b1fb851d320f4bd5f275a1d"
+        }
+      },
+      "focused_and_builds": {
+        "result": {
+          "path": "fresh132-typed22-shell-recreation-validation-v1/native-build-result-v1.json",
+          "bytes": 6900,
+          "sha256": "5a6d330be74875265d9ebae7b3c60bf63a8b5177bd912a8a2ae223ac4d03f90f"
+        },
+        "steps": [
+          {
+            "name": "focused",
+            "exit_code": 0,
+            "seconds": 2.404000333044678,
+            "log": {
+              "path": "fresh132-typed22-shell-recreation-validation-v1/focused-v1.log",
+              "bytes": 2589,
+              "sha256": "105c334521a7fc95c3766bfab14769459e304645642b13cbdfe881294c14f642"
+            }
+          },
+          {
+            "name": "focused-test_stadium_finite_css_controls",
+            "exit_code": 0,
+            "seconds": 2.3800882077775896,
+            "log": {
+              "path": "fresh132-typed22-shell-recreation-validation-v1/focused-test_stadium_finite_css_controls-v1.log",
+              "bytes": 2301,
+              "sha256": "afc80dcde917c2f3ea1bd850884046c9d5d415bd71f3c6b65b654cf3af9e702b"
+            }
+          },
+          {
+            "name": "focused-test_stadium_fresh_css_row_controls",
+            "exit_code": 0,
+            "seconds": 2.556011833716184,
+            "log": {
+              "path": "fresh132-typed22-shell-recreation-validation-v1/focused-test_stadium_fresh_css_row_controls-v1.log",
+              "bytes": 1316,
+              "sha256": "0e4c621dfdf6522ba47d68d16802b3195dd085e976fbc563dbc55f567d2409a6"
+            }
+          },
+          {
+            "name": "focused-test_stadium_prepared_constructor_launch",
+            "exit_code": 0,
+            "seconds": 0.0657100840471685,
+            "log": {
+              "path": "fresh132-typed22-shell-recreation-validation-v1/focused-test_stadium_prepared_constructor_launch-v1.log",
+              "bytes": 459,
+              "sha256": "037805bbaa03a0c05562870dcd512c0af11836f85687e79d512fd16735a2093c"
+            }
+          },
+          {
+            "name": "focused-owner-close",
+            "exit_code": 0,
+            "seconds": 0.6116292499937117,
+            "log": {
+              "path": "fresh132-typed22-shell-recreation-validation-v1/focused-owner-close-v1.log",
+              "bytes": 247,
+              "sha256": "9c9e79f997661377490f62bdcada4b5c78995e7de04b805d866ab1b58f1c7e7b"
+            }
+          },
+          {
+            "name": "diagnostic-release",
+            "exit_code": 0,
+            "seconds": 20.91274887509644,
+            "log": {
+              "path": "fresh132-typed22-shell-recreation-validation-v1/diagnostic-release-v1.log",
+              "bytes": 12404,
+              "sha256": "bb34e01bbd6f2aad3249e647c086923d2c3ba929f5357019b62d264844bb6028"
+            }
+          },
+          {
+            "name": "ordinary-release",
+            "exit_code": 0,
+            "seconds": 20.243442040868104,
+            "log": {
+              "path": "fresh132-typed22-shell-recreation-validation-v1/ordinary-release-v1.log",
+              "bytes": 12381,
+              "sha256": "a7bbf785b147a69b80113fc2aa4acd050087150a3602d0bb40baa04dfb1bfdbd"
+            }
+          }
+        ]
+      },
+      "actual_output_delta": {
+        "changed": 4,
+        "unchanged": 50,
+        "receipt": {
+          "path": "fresh132-typed22-shell-recreation-validation-v1/changed-build-outputs-v1.json",
+          "bytes": 9730,
+          "sha256": "685a0ef9c2dae1fdafba750f4127183bb004d69bf70bf192a3cb0b18010f177b"
+        },
+        "prior54_retention": {
+          "path": "fresh132-typed22-shell-recreation-validation-v1/prior-runtime-retention-v1.json",
+          "bytes": 49343,
+          "sha256": "1f141ce76e1223008eb802498d3c873f0974fe7f4ec9fc2d2f45deaab4140208"
+        },
+        "SDL_revision_relink": {
+          "path": "fresh132-typed22-shell-recreation-validation-v1/wasm-relink-provenance-v1.json",
+          "bytes": 2251,
+          "sha256": "2ec94035708c240b1ce175c6404f105f34853fac2108525df547a9770bbed300"
+        },
+        "note": "Both actual Wasms changed with SDL revision c7361ab9 to1f9d3d8f; current binary54 is bound to the new actual build, not relabeled historical18."
+      },
+      "typed22_prerequisite_validation": {
+        "source_checkpoint": {
+          "path": "fresh132-typed22-validation-v1/source-checkpoint-v2.json",
+          "bytes": 24346,
+          "sha256": "622c9736de42fc794f9aaed2b4448a5244970340ed3985382399ada6041a2df8"
+        },
+        "source_head": "1f9d3d8fb2b12dada9db4fb17a0ed762aac92de0",
+        "tested_harness_files": 20,
+        "original_reviewed_producer_files": 18,
+        "full_regression": {
+          "tests": 2759,
+          "skips": 195,
+          "seconds": 572.244,
+          "result": {
+            "path": "fresh132-typed22-validation-v1/result-v2.json",
+            "bytes": 10938,
+            "sha256": "b2be9756c44cf2b05b07caeb3ddcb4c25e237da9997e1a45541401fe49c12fcc"
+          }
+        },
+        "getter_component_scope": {
+          "path": "fresh132-typed22-getter-control-candidate-v1/root-revised-gate-approval-v1.json",
+          "bytes": 977,
+          "sha256": "ac25e0eedd517c93878dad89084492bfeb4ecb727018d227beadc4e95ab26062"
+        }
+      }
+    },
+    "prior_pair_v1_failure": {
+      "state": "A_TYPED22_PASS_B_REFUSED_BEFORE_CSS_LAUNCH_NO_B_MATCH_ACTIONS",
+      "root": {
+        "path": "fresh132-typed22-pair-capture-candidate-v1/root-observed-v1.json",
+        "bytes": 4583,
+        "sha256": "9108ba6bd3f19bc351a6f4d1a76c24356b603093c1fe1808a7a4e2b3e073564d"
+      },
+      "raw_A": {
+        "path": "fresh132-typed22-pair-capture-candidate-v1/browser-run/report-A.json",
+        "bytes": 21967841,
+        "sha256": "117c409f6e863cae85935ec9a2c1c90cde254038d50047510386e2538b9db60f"
+      },
+      "raw_B": {
+        "path": "fresh132-typed22-pair-capture-candidate-v1/browser-run/report-B.json",
+        "bytes": 43215,
+        "sha256": "0458cd0b861999644cb002864c749f8b47737f3dee34c09a3ee4763cac4797fc"
+      },
+      "summary": {
+        "path": "fresh132-typed22-pair-capture-candidate-v1/browser-run/recreation-summary.json",
+        "bytes": 4556,
+        "sha256": "463548885824bcc79aa93c52dcd102337a4fe775736ee64c87a9345227642065"
+      },
+      "owner": {
+        "path": "fresh132-typed22-pair-capture-candidate-v1/owner.json",
+        "bytes": 128209,
+        "sha256": "42b5fafd3416ebe46baedcee2e1abff112d172f9f63ecc4044687b3418177df6"
+      },
+      "independent_replay": {
+        "path": "fresh132-typed22-pair-capture-independent-replay-v1/independent-review-v1.json",
+        "bytes": 5274,
+        "sha256": "296e791c0498ee1f4b34097574781a64674c8b4137a64a27767f1a7962119f99"
+      },
+      "reducer_freeze": {
+        "path": "fresh132-typed22-pair-capture-independent-replay-v1/freeze-v1.json",
+        "bytes": 1867,
+        "sha256": "425438bd1df2b2096795bdb5a449e30ea0609e76737dd1627c4021e3a5207374"
+      },
+      "A_exact_values": 80523,
+      "B_created_generation": 4,
+      "B_match_actions": 0,
+      "failure": "CSS constructor launch was already attempted; shell latches survived accepted core close/restart.",
+      "A_archive_unchanged_after_cleanup": true,
+      "recorded_owned_PID_absence": 14,
+      "B_native_cleanup_phase0_running0_observation_null": true,
+      "unchanged_runtime54": true,
+      "not_a_passing_pair": true
+    },
+    "capture_v2": {
+      "packet": {
+        "path": "fresh132-typed22-pair-capture-candidate-v2/packet-candidate-v1.json",
+        "bytes": 87500,
+        "sha256": "1590880bc47f1cdc25730f7eec909f1006d881a232df382d4df95c5752b8f2e1"
+      },
+      "packet_freeze": {
+        "path": "fresh132-typed22-pair-capture-candidate-v2/freeze-v1.json",
+        "bytes": 4759,
+        "sha256": "149a6990fe056c595ff41918b8290f188d3a9459828198d45d3f4681eb46d5e9"
+      },
+      "preflight": {
+        "path": "fresh132-typed22-pair-capture-candidate-v2/preflight.json",
+        "bytes": 57858,
+        "sha256": "438f9574a3652d2d1b12f6a98fc79a6f615276b5004e2aae40384ec7ac6d49ee"
+      },
+      "release": {
+        "path": "fresh132-typed22-pair-capture-candidate-v2/root-release-v1.json",
+        "bytes": 7173,
+        "sha256": "91b09b9da0eb527425ab8a3f5be2ee0d4ef60c12f1f0272c1e901bbe7ce66f1d"
+      },
+      "raw_A": {
+        "path": "fresh132-typed22-pair-capture-candidate-v2/browser-run/report-A.json",
+        "bytes": 21967837,
+        "sha256": "f389f300edbf15f2d6cb3907d1cc7856b54b2d508dadf5d7ec39f3db95643d3f"
+      },
+      "raw_B": {
+        "path": "fresh132-typed22-pair-capture-candidate-v2/browser-run/report-B.json",
+        "bytes": 21973846,
+        "sha256": "81ad582c378112ffef72d9d7ec588e7d7aae4fcc183a8e49ce1e209c38511fd5"
+      },
+      "summary": {
+        "path": "fresh132-typed22-pair-capture-candidate-v2/browser-run/recreation-summary.json",
+        "bytes": 5627,
+        "sha256": "00946f56a45af8121750be085f7d5ef7bf203ef083024c0dd3daa8a840973b00"
+      },
+      "close_A": {
+        "path": "fresh132-typed22-pair-capture-candidate-v2/browser-run/recreation-close-A.json",
+        "bytes": 1270,
+        "sha256": "97c5309e794ef37fa1346b80d42446edb01e932da9d61a2a8daf37108f9d20ce"
+      },
+      "restart_A": {
+        "path": "fresh132-typed22-pair-capture-candidate-v2/browser-run/recreation-restart-A.json",
+        "bytes": 1616,
+        "sha256": "b9709c6abfb8a3910946a79cb573bdb9ac89c428df05d8ec2a634c27d0ce6545"
+      },
+      "owner": {
+        "path": "fresh132-typed22-pair-capture-candidate-v2/owner.json",
+        "bytes": 118341,
+        "sha256": "41678cdda481811503334c1c522e6a5606d7fe1cf11ae258ef8839ecc14aeab3"
+      },
+      "root_observed": {
+        "path": "fresh132-typed22-pair-capture-candidate-v2/root-observed-v1.json",
+        "bytes": 11478,
+        "sha256": "6be8527cca90a245dfb3afc59c53b5840b41a3f87d8e0f7c479c62a762161cc1"
+      },
+      "pre_port_controls": {
+        "path": "fresh132-typed22-pair-final-controls-v2/final-result-v1.json",
+        "bytes": 4426,
+        "sha256": "c77644b565f2aa6dc12f013bce627023206bed3fa19bb2cc5971e2d5feef134f"
+      },
+      "result": "PASS_SAME_INSTANCE_FRESH132_A7168_B7168_TYPED22_SEED_COMPONENT_ONLY",
+      "per_lifetime": {
+        "actions": 7168,
+        "ticks": 3585,
+        "draws": 3583,
+        "samples": 3501,
+        "declared_fields": 22,
+        "seed_values_per_sample": 1,
+        "scalar_values": 77022,
+        "seed_values": 3501,
+        "exact_values": 80523,
+        "literal_four_port_tick_rows": 3585,
+        "bytes_per_port": 11,
+        "natural_tail_ticks": 0
+      },
+      "pair_exact_values": 161046,
+      "pair_actions": 14336,
+      "original_reference": "fresh132_original_idle3500_2026_10_23; raw2c1b69f6 unchanged, no new original capture",
+      "GO": {
+        "sequence": 3006,
+        "source_tick": 84,
+        "draw_ordinal": 84,
+        "seed_hex": "ff0c2607"
+      },
+      "comparison_source_ticks": [
+        84,
+        3584
+      ],
+      "MWC6_manifest": {
+        "path": "fresh132-typed22-pair-capture-candidate-v2/full-a-manifest-mwc6.bin",
+        "bytes": 408600,
+        "sha256": "3c4d0efa684f4bed0673d92dc5708e6f50a9419560ef4151bdf3ed81174a7508"
+      },
+      "source_projection": {
+        "path": "fresh132-typed22-pair-capture-candidate-v2/full-a-source-host-projection-v1.json",
+        "bytes": 11991565,
+        "sha256": "bd7937bcb05404bc953e6f1e3ddae3d631f776fa33d06737e491e14f6fa0f892"
+      },
+      "source_action_PAD_order": "Each lifetime retains exact original tick/draw order and every four-port input; no synthetic neutral rows or added tails.",
+      "paired_additional_fields": [
+        "map2_gate_mask_40",
+        "map5_root_relation",
+        "sis_font1_present",
+        "title_child_present",
+        "title_wrapper_present",
+        "title_static_present",
+        "title_dynamic_present"
+      ],
+      "comparison_scope": "These seven declared booleans extend prior15 only; valid false values are compared, not forced true. Broader typed/timer/pointer/lifetime state remains unpaired.",
+      "boundary_comparisons": "Declared C/F/GO+2 each17fields including seed and original GOseed; no whole-state equality.",
+      "owner_elapsed_ms": 139004,
+      "cleanup_elapsed_ms": 168,
+      "deadline_ms": {
+        "capture_work": 150000,
+        "cleanup": 15000,
+        "owner_overall": 180000,
+        "owner_cleanup_reserve": 30000
+      },
+      "timing_scope": "Observed headless host workload only; no performance acceptance."
+    },
+    "checked_lifecycle_and_cleanup": {
+      "A_close": "Checked nonterminal close; exact completed A report/sidecars persisted before close and unchanged after B/cleanup.",
+      "A_world_generation": 3,
+      "B_fresh_created_generation": 4,
+      "B_match_world_generation": 6,
+      "same_Module_Wasm_exports_Memory_wrappers": true,
+      "memory_buffer_replacement": "Recorded separately; not treated as instance replacement.",
+      "A_archived_bytes_unchanged_after_B": true,
+      "final_archive_integrity": {
+        "result": "pass",
+        "checked_after_owned_cleanup": true
+      },
+      "terminal_B_RNG_receipt": {
+        "schema": "melee-web-stadium-recreation-b-rng-v1",
+        "admitted": true,
+        "world_generation": 6,
+        "prior_world_generation": 3,
+        "match_seed_before": 138044073,
+        "match_seed_at_retirement": 1458631152,
+        "host_seed": 3798092483,
+        "parent_seed": 1,
+        "match_to_host_restored": true,
+        "host_to_parent_restored": true,
+        "terminal_checked": true,
+        "full_common_fields_seed": true,
+        "typed_field_count": 22
+      },
+      "terminal_B_RNG_scope": "Native parent/host/match chain component checks only; not compared with a new original per-owner event ledger.",
+      "B_native_retirement": {
+        "attempts": 1,
+        "readiness": "ready",
+        "result": 1,
+        "phase_after_close": 0,
+        "running_after_close": 0,
+        "selected_observations_cleared": true,
+        "method": "one-shot-native-retirement"
+      },
+      "ordinary_unload_cache_parity": "NOT_CLAIMED",
+      "javascript_IDBFS_persistence": "NOT_RUN",
+      "recorded_owned_PIDs_absent": 13,
+      "root_cleanup": {
+        "path": "fresh132-typed22-pair-capture-candidate-v2/root-observed-v1.json",
+        "bytes": 11478,
+        "sha256": "6be8527cca90a245dfb3afc59c53b5840b41a3f87d8e0f7c479c62a762161cc1"
+      },
+      "runtime54_current_retained_unchanged": true
+    },
+    "independent_review": {
+      "status": "PASS_INDEPENDENT_A_B_TYPED22_SEED_ORDER_LIFECYCLE_CLEANUP_PARTIAL_COMPONENT_ONLY",
+      "result": {
+        "path": "fresh132-typed22-pair-capture-independent-replay-v2/independent-replay-result-v1.json",
+        "bytes": 7242,
+        "sha256": "3fbd239b280c726d56165bbf3c4ae41474a0338f740a60ce53780751dc612783"
+      },
+      "review": {
+        "path": "fresh132-typed22-pair-capture-independent-replay-v2/independent-review-v1.json",
+        "bytes": 2814,
+        "sha256": "48927838bf9b1066eba785f50b422c694e84b05231444a0a7acad5708f45683f"
+      },
+      "freeze": {
+        "path": "fresh132-typed22-pair-capture-independent-replay-v2/freeze-v1.json",
+        "bytes": 723,
+        "sha256": "33a299cf46709b4a4a285639ba135a0c0c94f39ce1afb7fd593be868dc79fe17"
+      },
+      "required_source_inventory_files": 56,
+      "current_harness_source_roles": 26,
+      "both_existing_comparator_replays": "PASS; A vs retained original A projection, B vs same A projection",
+      "source_runtime_and_PID_joins": "Exact required56 source pins and current54 live/retained runtime pins match; all13 recorded PIDs absent.",
+      "limits": "No new original B/per-owner parity, broader typed/timer state, transformations or C3 acceptance."
+    },
+    "CI": {
+      "published_head": "c7361ab936451c9063afaaa1df1037d7ba0313c8",
+      "published_run": 40160787520,
+      "completed": 14,
+      "success": 12,
+      "expected_skips": 2,
+      "read_receipt": {
+        "path": "fresh132-typed22-pair-docs-candidate-v1/published-ci-read-v1.json",
+        "bytes": 42071,
+        "sha256": "7f0b8d282b2c56487eb0592bd5915344a08346130e0322ddec26f9a622a2f0d5"
+      },
+      "new_ad941_and_final_publication_head": "UNPUBLISHED_EXACT_HEAD_CI_NOT_RUN_PENDING; prior green CI is historical"
+    },
+    "limitations": [
+      "No new original B or per-owner registration/retirement/RNG parity.",
+      "No broader typed/timer/object state, transformation-branch, whole-session, pixels/PCM, physical-input or timing/performance acceptance.",
+      "No ordinary unload/cache/IDBFS parity.",
+      "No C3 or public admission acceptance."
+    ],
+    "next": "Prepare a source-only plan identifying the smallest original-side B owner registration, retirement and per-owner RNG observation, together with its actual recorded start/input/source-order context. Original B may naturally use a different seed/menu/start context. Compare with the retained runtime B only if that context and input/order compatibility are proved; otherwise seek a separately reviewed plan. Never force seeds or invent neutral inputs. No new capture is authorized; successful captures remain retained and unrepeated."
   }
 }
