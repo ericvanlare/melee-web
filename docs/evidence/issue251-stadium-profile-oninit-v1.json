@@ -22363,16 +22363,16 @@
       "No ordinary unload/cache/IDBFS parity.",
       "No C3 or public admission acceptance."
     ],
-    "next": "The later-SSS prerequisite now passes the limited common-field component at cursor940 after exact original inputs0..939. Next is a source-only B Entry/Setup context handoff and constructor/RNG-observation prerequisite, before separate review/release. Full replay, original-B/per-owner parity and C3 remain open; preserve successful captures without repeating them.",
+    "next": "a source-only explicit profile2 B Setup handoff using the existing checked preparation/retirement and deferred StadiumReady path. Compare only retained Setup4313 declared fields and seed if that actual boundary becomes reachable; stop at the first owner/context/Start/seed mismatch. Do not force a seed, synthesize inputs or infer constructor/GO/per-owner evidence. No new capture is authorized; full replay, C3, public admission, transformations, pixels/PCM and timing acceptance remain open.",
     "original_B_continuation": {
-      "state": "PASS_LATER_SSS_ONEXIT_COMMON_COMPONENT_CURSOR940_PRE_B_ASSETS; FULL_REPLAY_AND_C3_OPEN",
+      "state": "PASS_PROFILE2_PREPARED_START_COMMON_COMPONENT_CURSOR940_NO_B_ASSETS; FULL_REPLAY_AND_C3_OPEN",
       "run_id": "browser-rollback-sprint-20261022-115029-d89e262b",
       "artifact_paths_relative_to_run": true,
       "source": {
-        "current_checkpoint": "f6a114152d70a3d2604f636bf0269c4ba85a3c3a",
-        "current_tree": "795ba5a6f279a6f8570f4ceed3663e2bc85788fb",
-        "prior_checkpoint": "35b04a776422dd4e8796cdacd43b294b602dd3b6",
-        "runtime_producer": "35b04a77 plus two reviewed producer-worktree files; actual fresh54 remains distinct from clean f6a11415 checkpoint. Prior failed675 capture used21087+6 runtime, retained under prior_failed_capture_source."
+        "current_checkpoint": "cbcf54bbff5a583edba5601f020ea0102fc4a34c",
+        "current_tree": "e6bac84955727eac42ac552d8f6aba318f197851",
+        "prior_checkpoint": "76957cee93b63108589e033ba6b0dce928881e44",
+        "runtime_producer": "76957cee plus 13 reviewed producer-worktree files; fresh54 actual binary producer distinct from clean source and historical35b04+2."
       },
       "validation": {
         "earlier_later_SSS_full": {
@@ -22616,6 +22616,181 @@
         "prior_checkpoint": "21087e7d37a9deb74f5c10bafc526de6f67bebd9",
         "current_checkpoint": "35b04a776422dd4e8796cdacd43b294b602dd3b6",
         "runtime_producer": "21087e7d plus 6 reviewed source/test files; final source checkpoint adds one fixture-only test repair (7 files total). The checkpoint hash is not the binary build identity."
+      },
+      "prior_returned_css_capture_source": {
+        "current_checkpoint": "f6a114152d70a3d2604f636bf0269c4ba85a3c3a",
+        "current_tree": "795ba5a6f279a6f8570f4ceed3663e2bc85788fb",
+        "prior_checkpoint": "35b04a776422dd4e8796cdacd43b294b602dd3b6",
+        "runtime_producer": "35b04a77 plus two reviewed producer-worktree files; actual fresh54 remains distinct from clean f6a11415 checkpoint. Prior failed675 capture used21087+6 runtime, retained under prior_failed_capture_source."
+      },
+      "prior_state_before_prepared_start": "PASS_LATER_SSS_ONEXIT_COMMON_COMPONENT_CURSOR940_PRE_B_ASSETS; FULL_REPLAY_AND_C3_OPEN",
+      "prepared_start_readonly": {
+        "state": "PASS_COMMON_FIELD_COMPONENT_ONLY",
+        "pins": {
+          "source_checkpoint": {
+            "path": "stadium-later-sss-prepared-start-validation-v1/clean-checkpoint-v1.json",
+            "bytes": 2506,
+            "sha256": "b6d6848b4e856736a0432916d7476e4939909298c56d5d68c6fce94b1d6fc222"
+          },
+          "application": {
+            "path": "stadium-later-sss-prepared-start-validation-v1/application-v1.json",
+            "bytes": 7573,
+            "sha256": "a4af32e8e45cd7ce3ff909e59e57548e3ab88e3a28555c56910146988cc3e1ce"
+          },
+          "validation": {
+            "path": "stadium-later-sss-prepared-start-validation-v1/result-v1.json",
+            "bytes": 12281,
+            "sha256": "8f0383c99178ae51fabb20880b98029de05bed7e1f8190347c2317de40eebd0d"
+          },
+          "builds": {
+            "path": "stadium-later-sss-prepared-start-validation-v1/native-build-result-v1.json",
+            "bytes": 7109,
+            "sha256": "c6f25893bd49edd1c57917a90958204445db7ab8d097bedc3ba2e6f87cfa18f7"
+          },
+          "runtime54": {
+            "path": "stadium-later-sss-prepared-start-validation-v1/retained-runtime-inventory-v1.json",
+            "bytes": 38935,
+            "sha256": "0133a84e29f1c2b868b60f41d5c11454f22e0c53741af89f7e1beeb7ede3e4ee"
+          },
+          "source_review": {
+            "path": "stadium-later-sss-prepared-start-independent-review-v1.json",
+            "bytes": 5329,
+            "sha256": "0a9102796ddf7caa7bd90b36fe0741e068182884396a1b7b4be2255992fc9ea9"
+          },
+          "candidate_freeze": {
+            "path": "stadium-later-sss-prepared-start-candidate-v1/freeze-v3.json",
+            "bytes": 1921,
+            "sha256": "8f7f3addfb24389af0bccb2ed26a714ba5e84a0a770d3166171aac5dcbbefede"
+          },
+          "first_focused_failure": {
+            "path": "stadium-later-sss-prepared-start-candidate-v1/focused-owned-v1/result-v1.json",
+            "bytes": 11283,
+            "sha256": "7a5b39f1e885698b62da823d03dd7c0b7e8feebaa6c5607515063b36af1a4a7b"
+          },
+          "reduced_refusal_pass": {
+            "path": "stadium-later-sss-prepared-start-candidate-v1/reduced-owned-v3/result-v1.json",
+            "bytes": 2137,
+            "sha256": "8e55854124d2c3242eed759ea53c81697664d7ad901d05f3ae4e6a3fbffd9914"
+          },
+          "root_preflight_refusal": {
+            "path": "stadium-later-sss-prepared-start-candidate-v1/root-reduced-preflight-refusal-v1.json",
+            "bytes": 242,
+            "sha256": "404532138289b3f928c79cdf04943c2fdb5ea2b0f5315ab30ac4a7184ff549b2"
+          },
+          "capture_report": {
+            "path": "stadium-later-sss-prepared-start-capture-v1/browser-run/report.json",
+            "bytes": 668605,
+            "sha256": "eb82daa0bb2de5b7ac70651f2b790925ae3a5f92e85b36d3d63363919c6857fc"
+          },
+          "prepared_observation": {
+            "path": "stadium-later-sss-prepared-start-capture-v1/browser-run/current-sss-prepared-start-observation.json",
+            "bytes": 6286,
+            "sha256": "4e9f1065f19c6429aa8319b64f64703e2555b394dbe9a3ea3284f881817d940c"
+          },
+          "exit_observation": {
+            "path": "stadium-later-sss-prepared-start-capture-v1/browser-run/current-sss-exit-observation.json",
+            "bytes": 10811,
+            "sha256": "229196d1f99869ebb19641294d01b694f94c64a37c956685651eef5dae62757c"
+          },
+          "unloaded_observation": {
+            "path": "stadium-later-sss-prepared-start-capture-v1/browser-run/current-sss-exit-unloaded-observation.json",
+            "bytes": 11465,
+            "sha256": "6702f0f9086fe620a231b3a0ab8228bd80040f39df26c020a6bd3f265b9be12f"
+          },
+          "literal_trace": {
+            "path": "stadium-later-sss-prepared-start-capture-v1/browser-run/retail-port.jsonl",
+            "bytes": 2277597,
+            "sha256": "a5fbce8a95572e441099c75a90054ad765efb2f74e1bcd7e32e3dc01febe1762"
+          },
+          "whole_session_report": {
+            "path": "stadium-later-sss-prepared-start-capture-v1/browser-run/retail-browser-report.json",
+            "bytes": 18779,
+            "sha256": "0adedf5941aac5de683097537310cbb239e071e219b7d43979617e0fbb9e6b86"
+          },
+          "owner": {
+            "path": "stadium-later-sss-prepared-start-capture-v1/owner.json",
+            "bytes": 94590,
+            "sha256": "5e030861cdac53309129dabece770b8a3041e03616d784984ebb58b36485304a"
+          },
+          "launcher": {
+            "path": "stadium-later-sss-prepared-start-capture-v1/launcher-result.json",
+            "bytes": 1190,
+            "sha256": "92dcec57545ace9188d905bf41b563a5ca401e43f8c6faa30be6d7d759747a35"
+          },
+          "postflight": {
+            "path": "stadium-later-sss-prepared-start-capture-v1/postflight-inputs-v1.json",
+            "bytes": 38103,
+            "sha256": "41d81856270afe1d44986f57b6b2e61a28ea22eb29565882151d2cb32251c41a"
+          },
+          "cleanup_review": {
+            "path": "stadium-later-sss-prepared-start-capture-v1/root-cleanup-review-v1.json",
+            "bytes": 1511,
+            "sha256": "5e5850f107d277f09b43964fc3014455f07198d9952d86017b942b66c52cc867"
+          },
+          "independent_raw_review": {
+            "path": "stadium-later-sss-prepared-start-raw-independent-review-v1.json",
+            "bytes": 5007,
+            "sha256": "098909d93abc2dda355c171957d6a22f735ddfa1fd2e8872a7c907977af3fc8d"
+          },
+          "author_data_accounting": {
+            "path": "stadium-later-sss-prepared-start-raw-analysis-v1/analysis-v1.json",
+            "bytes": 5085,
+            "sha256": "4a4a36f381417a4e2fd0016ceb0f2fa592563edc5f088a36fc7eb7569c16b220"
+          }
+        },
+        "validation": {
+          "focused_tests": [
+            7,
+            5,
+            3
+          ],
+          "release_builds": [
+            "stadium-c1a-diagnostic",
+            "ordinary"
+          ],
+          "outer_tests": 2766,
+          "skipped": 195,
+          "outer_seconds": 582.352
+        },
+        "observed": {
+          "literal_four_port_rows": 940,
+          "cursor": 940,
+          "menu_session_ticks": 535,
+          "world_generation": 6,
+          "seed": "7fc17cf1",
+          "original_entry_sequence": 4235,
+          "local_order_rows": 1887,
+          "tick_returns": 940,
+          "draw_returns": 947,
+          "tick_return_distribution": [
+            {
+              "source_steps": 1,
+              "source_draws": 0,
+              "count": 923
+            },
+            {
+              "source_steps": 2,
+              "source_draws": 1,
+              "count": 17
+            }
+          ],
+          "post_leave_source_steps": 0,
+          "post_leave_source_draws": 0,
+          "post_leave_asset_requests": 0,
+          "postflight_identity_count": 218,
+          "recorded_pids_absent": 13,
+          "recorded_pgids_absent": 4,
+          "final_phase": 0,
+          "final_running": 0
+        },
+        "limits": [
+          "Common fields and source-slot bytes only; raw Start ABI bytes not compared.",
+          "Original menu draws UNKNOWN; local1887 order is not original draw parity.",
+          "Announcer transfer occurrence UNOBSERVED; real completion service drained.",
+          "No B assets, Setup, constructor or GO; no original per-owner or C3 acceptance.",
+          "Whole-session replay incomplete; two expected outer finalization failures retained."
+        ],
+        "ci": "Published76957cee has14 completed checks:12 success/2 expected skips; cbcf54bb and final docs head CI pending."
       }
     }
   }
