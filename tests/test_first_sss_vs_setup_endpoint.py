@@ -62,7 +62,7 @@ struct Start {int value=7;};struct MeleeWebMenuMatchSelection{uint32_t random_se
 struct Recipe{uint32_t seed=0x312151c3;MeleeWebMenuMatchSelection selection;std::unique_ptr<int> initial_css{new int(1)};};
 static std::unique_ptr<Recipe> replay;
 enum class CurrentSssExitProfile{Time120,Stock4None};
-struct LeaveNote{bool captured=false;uint64_t world_generation=0;};
+struct LeaveNote{bool captured=false;uint64_t world_generation=0,session_ticks=0;};
 struct LeaveObservation{unsigned state=0;LeaveNote note;};
 struct CurrentSssExitState{bool armed=false,terminal=false,failed=false,prepared_start_attempted=false,prepared_start_captured=false,prepared_start_selection_captured=false,prepared_setup_attempted=false,prepared_setup_approved=false,prepared_setup_failed=false,prepared_setup_consumed=false,notified=false,last_host_tick_returned=false,host_tick_in_flight=false;CurrentSssExitProfile profile=CurrentSssExitProfile::Time120;Recipe* recipe=nullptr;const int* context=nullptr;void* host_owner=nullptr;void* leave_world=nullptr;void* leave_cache=nullptr;uint64_t leave_world_generation=0,terminal_cursor=0,notification_cursor=0,notification_order=0,leave_asset_requests=0;unsigned leave_asset_generation=0,terminal_steps=0,terminal_draws=0,notification_steps=0,notification_draws=0,terminal_asset_requests=0;LeaveObservation observation;MeleeWebMenuMatchSelection prepared_start_selection;const MeleeWebPadState* prepared_start_input_owner=nullptr;std::array<uint8_t,822> prepared_start_input_bytes{};std::string prepared_start_json,prepared_setup_error;};
 static CurrentSssExitState current_sss_exit;
@@ -150,6 +150,7 @@ int main(){
  reset();assert(melee_web_native_menu_stadium_first_sss_vs_setup_begin(0)==1);commit();files.erase("stage");assert(first_sss_vs_setup_service()&&first_sss_vs_setup.failed&&!match);
  reset();assert(melee_web_native_menu_stadium_first_sss_vs_setup_begin(0)==1);commit();first_sss_vs_setup_service();match->frames=1;first_sss_vs_setup_service();assert(first_sss_vs_setup.failed&&first_sss_vs_setup.source_frames==1&&!first_sss_vs_setup.captured);
  assert(continuation_service_calls==0);
+ assert(!later_sss.armed&&completed_matches==0&&later_getter_calls==0&&later_context_calls==1);
  puts("PASS extracted legacy Setup source begin/classifier/handoff/service with controlled services; excludes new 270 admission");
 }
 """
@@ -302,6 +303,7 @@ int main(){
  host_pad.bytes[81]=1;commit_prepared_assets();assert(first_sss_vs_setup_service());
  assert(first_sss_vs_setup.failed&&!match&&first_sss_vs_setup.error.find("PAD changed")!=std::string::npos);
 
+ assert(!later_sss.armed&&completed_matches==0&&later_getter_calls==0&&later_context_calls==1);
  puts("PASS extracted current 270 prepared Setup source admission, approval rechecks, asset handoff and controlled unload; legacy 124 remains separate");
 }
 """
@@ -310,13 +312,22 @@ def unarmed_later_asset_fixture(source):
 // Legacy/current Setup only: no later route is armed in these fixtures.
 struct {bool armed=false;unsigned stage=0,requested_generation=0;} later_sss;
 static unsigned later_context_calls=0;
+// No later owner exists in Legacy124 or Current270 fixtures. These leaves
+// fail closed if an extracted source branch accidentally selects that route.
+static unsigned completed_matches=0,later_getter_calls=0;
+static int melee_web_menu_host_later_sss_prepared_selection(
+    void*,MeleeWebMenuMatchSelection*,char*,unsigned){
+ ++later_getter_calls;
+ throw std::runtime_error("later selection is outside this legacy/current Setup fixture");
+}
 static bool later_sss_context_owned(){
  ++later_context_calls;
  throw std::runtime_error("later owner service is outside this Setup fixture");
 }
 """+_function(source,'bool later_sss_asset_pending(unsigned generation)')+r"""
 static void assert_no_later_route_fixture(){
- assert(!later_sss.armed&&!later_sss_asset_pending(0)&&!later_sss_asset_pending(1));
+ assert(!later_sss.armed&&completed_matches==0&&later_getter_calls==0&&
+        !later_sss_asset_pending(0)&&!later_sss_asset_pending(1));
  assert(later_context_calls==0);
  later_sss.armed=true;later_sss.stage=1;bool refused=false;
  try{(void)later_sss_asset_pending(1);}catch(const std::runtime_error&){refused=true;}
@@ -332,11 +343,11 @@ class FirstSssVsSetupEndpointTests(OwnedWorkspaceTests):
   source=(ROOT/'src/gameplay_menu_browser.cpp').read_text();menu=(ROOT/'src/gameplay_menu_browser_menu.cpp').read_text()
   a=source.index('enum class FirstSssVsSetupOrigin : unsigned');b=source.index('std::string first_sss_vs_setup_json(){',a)
   body=PRELUDE+source[a:b]
+  body+=unarmed_later_asset_fixture(source)
   body+=_function(source,'std::string current_sss_selection_difference(const MeleeWebMenuMatchSelection& a,')
   body+=_function(source,'bool current_sss_selection_equal(const MeleeWebMenuMatchSelection& a,')
   for name in ['bool first_sss_vs_setup_asset_pending(unsigned generation)','bool first_sss_vs_setup_finish_handoff()']:
    body+=_function(source,name)
-  body+=unarmed_later_asset_fixture(source)
   body+=_function(menu,'int melee_web_native_menu_stadium_c1a_asset_scope(unsigned generation)')
   body+='bool finish_asset_handoff(){asset_destination=AssetDestination::None;asset_committed=false;return first_sss_vs_setup_finish_handoff();}'
   body+=_function(source,'void first_sss_vs_setup_fail(const char* error)')
@@ -349,11 +360,11 @@ class FirstSssVsSetupEndpointTests(OwnedWorkspaceTests):
   source=(ROOT/'src/gameplay_menu_browser.cpp').read_text();menu=(ROOT/'src/gameplay_menu_browser_menu.cpp').read_text()
   a=source.index('enum class FirstSssVsSetupOrigin : unsigned');b=source.index('std::string first_sss_vs_setup_json(){',a)
   body='#define TEST_CURRENT_PREPARED 1\n'+PRELUDE+source[a:b]
+  body+=unarmed_later_asset_fixture(source)
   body+=_function(source,'std::string current_sss_selection_difference(const MeleeWebMenuMatchSelection& a,')
   body+=_function(source,'bool current_sss_selection_equal(const MeleeWebMenuMatchSelection& a,')
   for name in ['bool first_sss_vs_setup_asset_pending(unsigned generation)','bool first_sss_vs_setup_finish_handoff()']:
    body+=_function(source,name)
-  body+=unarmed_later_asset_fixture(source)
   body+=_function(menu,'int melee_web_native_menu_stadium_c1a_asset_scope(unsigned generation)')
   body+='bool finish_asset_handoff(){asset_destination=AssetDestination::None;asset_committed=false;return first_sss_vs_setup_finish_handoff();}'
   body+=_function(source,'void first_sss_vs_setup_fail(const char* error)')

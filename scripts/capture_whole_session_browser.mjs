@@ -15,7 +15,7 @@ import {validateStock4SssExitExpected, compareStock4SssExitObservation, validate
   validateStock4PreparedStartFinalization, validateStock4PreparedSetupFinalization,
   validateStock4SssExitTerminal, validateStock4SssExitFinalization} from './stadium_stock4_sss_exit_observation.mjs';
 import {validateLaterSssExitExpected, compareLaterSssExitObservation, validateLaterSssExitTrace,
-  validateLaterSssExitTerminal, validateLaterSssExitFinalization, compareLaterPreparedStartObservation} from './stadium_later_sss_exit_observation.mjs';
+  validateLaterSssExitTerminal, validateLaterSssExitFinalization, compareLaterPreparedStartObservation, compareLaterPreparedSetupObservation} from './stadium_later_sss_exit_observation.mjs';
 import fs from 'node:fs/promises';
 import {closeSync, createReadStream, fsyncSync, openSync, writeSync} from 'node:fs';
 import path from 'node:path';
@@ -72,6 +72,7 @@ const {values, tokens} = parseArgs({tokens: true, options: {
   'stadium-current-sss-exit-expected-sha256': {type: 'string'},
   'stadium-current-sss-prepared-start': {type: 'boolean', default: false},
   'stadium-later-sss-prepared-start': {type: 'boolean', default: false},
+  'stadium-later-sss-prepared-setup': {type: 'boolean', default: false},
   'stadium-later-sss-exit': {type: 'boolean', default: false},
   'artifact-root': {type: 'string'},
 }});
@@ -167,6 +168,10 @@ const currentSssExit = currentSssExitPath !== null;
 const currentSssPreparedStart = values['stadium-current-sss-prepared-start'];
 const currentSssLater = values['stadium-later-sss-exit'];
 const laterSssPreparedStart = values['stadium-later-sss-prepared-start'];
+const laterSssPreparedSetup = values['stadium-later-sss-prepared-setup'];
+if (laterSssPreparedSetup && (!currentSssLater || !laterSssPreparedStart || currentSssPreparedStart))
+  throw Error('--stadium-later-sss-prepared-setup requires explicit later prepared Start and forbids the profile1 route');
+const preparedSetupRequested = currentSssPreparedStart || laterSssPreparedSetup;
 if (laterSssPreparedStart && (!currentSssLater || currentSssPreparedStart))
   throw Error('--stadium-later-sss-prepared-start requires later SSS and forbids Setup continuation');
 if (currentSssLater && (!currentSssExit || currentSssPreparedStart))
@@ -828,7 +833,13 @@ try {
       currentSssPolicy = {compare: compareLaterSssExitObservation, terminal: validateLaterSssExitTerminal,
         trace: validateLaterSssExitTrace, finalization: validateLaterSssExitFinalization, preparedStart:compareLaterPreparedStartObservation};
       if (laterSssPreparedStart) report.later_sss_prepared_start = true;
-      report.scope = 'Retained occurrence1 SSS OnExit common-field component after diagnostic A/Results/CSS; literal global inputs 0..939, pre-B-assets stop; replay incomplete, UNKNOWN menu draw parity, no B Entry/constructor/GO or C3';
+      if (laterSssPreparedSetup) {
+        report.later_sss_prepared_setup = true;
+        currentSssPolicy.preparedSetup = compareLaterPreparedSetupObservation;
+      }
+      report.scope = laterSssPreparedSetup ?
+        'Retained occurrence1 zero-source-action Setup common fields/seed after diagnostic A/Results/CSS; literal global inputs0..939, UNKNOWN original menu draws/constructor/GO; replay incomplete, no C3' :
+        'Retained occurrence1 SSS OnExit common-field component after diagnostic A/Results/CSS; literal global inputs 0..939, pre-B-assets stop; replay incomplete, UNKNOWN menu draw parity, no B Entry/constructor/GO or C3';
     }
     if (currentSssStock4) {
       currentSssPolicy = {compare: compareStock4SssExitObservation, terminal: validateStock4SssExitTerminal,
@@ -1123,7 +1134,7 @@ try {
   if (currentSssExit) {
     currentSssArm = await observePageOperation('install current SSS returned-parser arm', () =>
       page.evaluateHandle(installCurrentSssExitReplayArm, {recipeBytes: currentSssRecipeBytes,
-        observationProfile: currentSssLater ? 2 : currentSssStock4 ? 1 : 0, preparedStartProbe: currentSssPreparedStart || laterSssPreparedStart}));
+        observationProfile: currentSssLater ? 2 : currentSssStock4 ? 1 : 0, preparedStartProbe: currentSssPreparedStart || laterSssPreparedStart, laterPreparedSetup: laterSssPreparedSetup}));
     await phase('current-sss-exit-component', async () => {
       const deadline = Date.now() + replayTimeoutMs;
       await page.locator('#retail-replay-start').click();
@@ -1149,7 +1160,7 @@ try {
         }
         if (currentSssStopsBeforeAssets && report.current_sss_exit.comparison?.pass &&
             !report.current_sss_exit.unload_requested) {
-          if (laterSssPreparedStart) {
+          if (laterSssPreparedStart && !laterSssPreparedSetup) {
             try {
               const prepared=await observePageOperation('later prepared Start before-assets receipt',()=>
                 currentSssArm.evaluate(scope=>scope.observePreparedStart()));
@@ -1160,7 +1171,7 @@ try {
                 currentSssPolicy.preparedStart(prepared.value,currentSssExpected);
             }catch(error){report.current_sss_exit.prepared_start_failure=String(error.message||error);}
           }
-          if (currentSssPreparedStart) {
+          if (preparedSetupRequested) {
             try {
               const prepared = await observePageOperation('prepared Start before-assets receipt', () =>
                 currentSssArm.evaluate(scope => scope.observePreparedStart()));
@@ -1225,7 +1236,7 @@ try {
             await write('current-sss-exit-unloaded-observation.json', unloaded);
             if (unloaded.busy || !unloaded.value) throw Error('Current SSS unload is still busy');
           }
-          report.current_sss_exit.terminal = currentSssPreparedStart ?
+          report.current_sss_exit.terminal = preparedSetupRequested ?
             currentSssPolicy.terminal(last.replay_report, last, currentSssExpected,
               report.current_sss_exit.observation, report.current_sss_exit.unloaded_observation) :
             currentSssPolicy.terminal(last.replay_report, last,
@@ -1882,7 +1893,9 @@ if (diagnostic) {
     'prepared_entry_setup_candidate_pass_replay_stopped' : 'component_pass_replay_stopped') : 'component_pass_replay_refused';
   if (report.result !== expectedResult) process.exitCode = 1;
   else console.log(currentSssLater ?
-    'component pass: retained occurrence1 SSS OnExit fields and literal 940-input prefix; checked unload, replay incomplete; no B Entry/constructor/GO or C3' : currentSssStock4 ? (currentSssPreparedStart ?
+    (laterSssPreparedSetup ?
+      'component pass: retained occurrence1 zero-action Setup common fields/seed and literal940 prefix; replay incomplete; no original constructor/GO or C3' :
+      'component pass: retained occurrence1 SSS OnExit fields and literal 940-input prefix; checked unload, replay incomplete; no B Entry/constructor/GO or C3') : currentSssStock4 ? (currentSssPreparedStart ?
     'candidate pass: prepared Start to completed zero-tick Setup common fields and seed; replay explicitly stopped/incomplete; no original Entry dispatch/C3 claim' :
     'component pass: retained stock4 SSS OnExit fields; replay explicitly stopped/incomplete; no Entry/C3') :
     'component pass: retained SSS OnExit fields; original TIME replay refused/incomplete; no Entry/C3');

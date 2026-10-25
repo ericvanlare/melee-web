@@ -557,7 +557,7 @@ std::string first_sss_vs_entry_json(){
     <<",\"error\":"<<(s.error.empty()?"null":first_css_browser_draw_json_quote(s.error))
     <<",\"actual\":"<<(s.actual.empty()?"null":s.actual)<<'}';return out.str();
 }
-enum class FirstSssVsSetupOrigin : unsigned { LegacyEntry124, CurrentPreparedStock4_270 };
+enum class FirstSssVsSetupOrigin : unsigned { LegacyEntry124, CurrentPreparedStock4_270, CurrentPreparedLater_940 };
 bool current_sss_selection_equal(const MeleeWebMenuMatchSelection&,
                                  const MeleeWebMenuMatchSelection&);
 struct FirstSssVsSetupState {
@@ -775,6 +775,8 @@ std::string first_sss_vs_setup_json(){
     ;
  if(s.origin==FirstSssVsSetupOrigin::CurrentPreparedStock4_270)
   out<<",\"handoff_origin\":\"current_sss_prepared_stock4_270\"";
+ else if(s.origin==FirstSssVsSetupOrigin::CurrentPreparedLater_940)
+  out<<",\"handoff_origin\":\"current_sss_prepared_later_940\"";
  out
     <<",\"current_owners\":"<<first_sss_vs_setup_current_json()
     <<",\"actual\":"<<(s.actual.empty()?"null":s.actual)
@@ -2961,12 +2963,33 @@ bool first_sss_vs_setup_finish_handoff(){
         melee_web_menu_host_phase(host)==MELEE_WEB_MENU_READY&&
         s.input&&s.host_input==melee_web_menu_host_input(host),
         "VS Setup handoff lost its exact stopped host/input/generation");
-  if(s.origin==FirstSssVsSetupOrigin::CurrentPreparedStock4_270){
+  if(s.origin==FirstSssVsSetupOrigin::CurrentPreparedStock4_270||
+     s.origin==FirstSssVsSetupOrigin::CurrentPreparedLater_940){
+    const bool later=s.origin==FirstSssVsSetupOrigin::CurrentPreparedLater_940;
+    check(current_sss_exit.armed&&!current_sss_exit.failed&&!current_sss_exit.prepared_setup_failed&&!faulted&&
+          current_sss_exit.profile==CurrentSssExitProfile::Stock4None&&
+          current_sss_exit.terminal&&current_sss_exit.terminal_steps==0&&current_sss_exit.terminal_draws==0&&
+          current_sss_exit.notification_steps==0&&current_sss_exit.notification_draws==0&&
+          !replay_source_frames.pending()&&replay_source_frames.steps()==0&&replay_source_frames.draws()==0&&
+          !world&&!world_exposed&&!running&&!pending&&current_sss_exit.recipe&&replay&&
+          replay.get()==current_sss_exit.recipe&&replay->initial_css&&
+          replay->initial_css.get()==current_sss_exit.context&&host==current_sss_exit.host_owner&&
+          replay_cursor==current_sss_exit.terminal_cursor&&
+          (later ? (later_sss.armed&&later_sss_context_owned()&&later_sss.stage==4&&
+                    completed_matches==1&&replay_cursor==940&&
+                    current_sss_exit.notification_cursor==940&&
+                    current_sss_exit.notification_order==1887&&
+                    current_sss_exit.observation.note.session_ticks==535)
+                 : (!later_sss.armed&&replay_cursor==270&&
+                    current_sss_exit.notification_cursor==270&&current_sss_exit.notification_order==543)),
+          "Prepared Setup import lost its exact retained profile/context boundary");
     MeleeWebMenuMatchSelection live_selection{};char selection_error[256]{};
     check(current_sss_exit.prepared_setup_approved&&current_sss_exit.prepared_setup_consumed&&
           current_sss_exit.prepared_start_selection_captured&&
-          melee_web_menu_host_stadium_c1a_selection(host,&live_selection,
-              selection_error,sizeof(selection_error)),
+          (later ? melee_web_menu_host_later_sss_prepared_selection(host,&live_selection,
+                       selection_error,sizeof(selection_error))
+                 : melee_web_menu_host_stadium_c1a_selection(host,&live_selection,
+                       selection_error,sizeof(selection_error))),
           selection_error[0]?selection_error:
               "Prepared Setup handoff lost its accepted current-SSS approval");
     check(current_sss_selection_equal(live_selection,asset_selection)&&
@@ -4297,6 +4320,15 @@ int current_sss_exit_arm(CurrentSssExitProfile profile){try{
 int current_sss_prepared_setup_begin(){
  auto& owner=current_sss_exit;
  auto& setup=first_sss_vs_setup;
+ const bool later=later_sss.armed;
+ const auto exact_boundary=[&](){
+  return later ? (later_sss.armed&&later_sss_context_owned()&&later_sss.stage==4&&
+      completed_matches==1&&replay_cursor==940&&owner.terminal_cursor==940&&
+      owner.notification_cursor==940&&owner.notification_order==1887&&
+      owner.observation.note.session_ticks==535)
+    : (!later_sss.armed&&owner.terminal_cursor==270&&owner.notification_cursor==270&&
+       owner.notification_order==543);
+ };
  if(owner.prepared_setup_attempted){
   owner.prepared_setup_failed=true;
   if(owner.prepared_setup_error.empty())
@@ -4314,13 +4346,12 @@ int current_sss_prepared_setup_begin(){
   check(owner.prepared_start_attempted&&owner.prepared_start_captured&&
         owner.prepared_start_selection_captured&&!owner.prepared_start_json.empty(),
         "Prepared Setup admission requires the captured prepared-Start receipt");
-  check(owner.terminal_cursor==270&&owner.notification_cursor==270&&
-        owner.notification_order==543&&owner.terminal_steps==0&&owner.terminal_draws==0&&
+  check(exact_boundary()&&owner.terminal_steps==0&&owner.terminal_draws==0&&
         owner.notification_steps==0&&owner.notification_draws==0&&
         owner.terminal_asset_requests==0&&replay_cursor==owner.terminal_cursor&&
         !replay_source_frames.pending()&&replay_source_frames.steps()==0&&
         replay_source_frames.draws()==0,
-        "Prepared Setup admission requires the exact stopped 270/543 SSS boundary");
+        "Prepared Setup admission requires its exact stopped profile boundary");
   check(owner.notified&&owner.observation.state==2&&owner.observation.note.captured&&
         owner.observation.note.world_generation==owner.leave_world_generation&&
         owner.leave_world_generation!=0&&
@@ -4361,7 +4392,7 @@ int current_sss_prepared_setup_begin(){
         archive_cache&&archive_cache.get()==owner.leave_cache&&
         owner.prepared_start_attempted&&owner.prepared_start_captured&&
         owner.prepared_start_selection_captured&&!owner.prepared_start_json.empty()&&
-        owner.terminal_cursor==270&&owner.notification_cursor==270&&owner.notification_order==543&&
+        exact_boundary()&&
         owner.terminal_steps==0&&owner.terminal_draws==0&&owner.notification_steps==0&&
         owner.notification_draws==0&&owner.terminal_asset_requests==0&&
         replay_cursor==owner.terminal_cursor&&!replay_source_frames.pending()&&
@@ -4388,7 +4419,8 @@ int current_sss_prepared_setup_begin(){
         owner.prepared_start_input_owner==melee_web_menu_host_input(host),
         "Prepared Start approval changed its checked live owner or pending transition");
   MeleeWebMenuMatchSelection selection{};char error[256]{};
-  check(melee_web_menu_host_stadium_c1a_selection(host,&selection,error,sizeof(error)),error);
+  check(later ? melee_web_menu_host_later_sss_prepared_selection(host,&selection,error,sizeof(error))
+              : melee_web_menu_host_stadium_c1a_selection(host,&selection,error,sizeof(error)),error);
   const std::string seed_provenance=
       "seed provenance live_current=0x"+
       melee_web::stadium_first_css_diagnostic::hex32(selection.random_seed)+
@@ -4434,12 +4466,13 @@ int current_sss_prepared_setup_begin(){
   setup.owned_input=std::move(retained_input);setup.input=setup.owned_input.get();
   setup.prior_world_generation=owner.leave_world_generation;
   setup.parent_seed_owner=seed_ptr;setup.parent_seed=*seed_ptr;
-  setup.origin=FirstSssVsSetupOrigin::CurrentPreparedStock4_270;
+  setup.origin=later?FirstSssVsSetupOrigin::CurrentPreparedLater_940
+                    :FirstSssVsSetupOrigin::CurrentPreparedStock4_270;
   owner.prepared_setup_approved=true;
   owner.prepared_setup_consumed=true;
 
   // This checked owner is the exact stopped SSS transition retained at the
-  // 270/543 boundary. Retire only its scheduler intent before the existing
+  // profile boundary. Retire only its scheduler intent before the existing
   // world-close/assets/deferred-Setup path; never enter ordinary construction.
   preparation.reset();
   menu_clock.reset();audio_clock.reset();

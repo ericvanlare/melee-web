@@ -12,7 +12,9 @@ export function continuePreparedStartInPage(scope, acceptedReceipt) {
 
 // Passed as the actual page function; deliberately has no module-scope closure.
 // Controls use a synthetic Module solely for call ordering/ownership semantics.
-export function installCurrentSssExitReplayArm({recipeBytes, observationProfile = 0, preparedStartProbe = false}) {
+export function installCurrentSssExitReplayArm({recipeBytes, observationProfile = 0, preparedStartProbe = false, laterPreparedSetup = false}) {
+  if (laterPreparedSetup && (observationProfile !== 2 || !preparedStartProbe))
+    throw Error('Later prepared Setup requires its explicit profile2 prepared-Start probe');
   const module = globalThis.Module;
   const key = '_melee_web_native_menu_replay';
   const original = Object.getOwnPropertyDescriptor(module || {}, key);
@@ -22,13 +24,14 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
   const observe = module?._melee_web_native_menu_stadium_current_sss_exit_observe;
   const preparedStartObserve = (observationProfile === 1 || observationProfile === 2) && preparedStartProbe
     ? module?._melee_web_native_menu_stadium_current_sss_prepared_start_observe : null;
-  const preparedSetupBegin = observationProfile === 1 && preparedStartProbe
+  const preparedSetupBegin = (observationProfile === 1 || laterPreparedSetup) && preparedStartProbe
     ? module?._melee_web_native_menu_stadium_current_sss_prepared_setup_begin : null;
   const idle = module?.stadiumMatchedSetupNativeIdle;
   if (!original || !Object.hasOwn(original, 'value') ||
       typeof original.value !== 'function' || !original.writable ||
       typeof arm !== 'function' || typeof observe !== 'function' ||
       (preparedStartProbe && (![1,2].includes(observationProfile) || typeof preparedStartObserve !== 'function')) ||
+      (laterPreparedSetup && typeof preparedSetupBegin !== 'function') ||
       typeof idle !== 'function' || typeof module.UTF8ToString !== 'function' ||
       !Array.isArray(recipeBytes) || recipeBytes.length < 328 ||
       recipeBytes.length > 128 * 1024 * 1024 ||

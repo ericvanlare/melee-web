@@ -6,10 +6,10 @@ import vm from 'node:vm';
 import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {validateLaterSssExitExpected, validateLaterSssExitTrace, compareLaterSssExitObservation,
-  validateLaterSssExitTerminal, validateLaterSssExitFinalization, compareLaterPreparedStartObservation} from '../scripts/stadium_later_sss_exit_observation.mjs';
+  validateLaterSssExitTerminal, validateLaterSssExitFinalization, compareLaterPreparedStartObservation, compareLaterPreparedSetupObservation} from '../scripts/stadium_later_sss_exit_observation.mjs';
 import {validateStock4SssExitExpected, compareStock4SssExitObservation, validateStock4SssExitTrace,
   validateStock4SssExitTerminal, validateStock4SssExitFinalization} from '../scripts/stadium_stock4_sss_exit_observation.mjs';
-import {installCurrentSssExitReplayArm, validateCurrentSssExitExpected, compareCurrentSssExitObservation,
+import {installCurrentSssExitReplayArm, continuePreparedStartInPage, validateCurrentSssExitExpected, compareCurrentSssExitObservation,
   validateCurrentSssExitTrace, validateCurrentSssExitTerminal, validateCurrentSssExitFinalization} from '../scripts/stadium_current_sss_exit_observation.mjs';
 
 // Synthetic mechanism controls. Reuse the existing public literal solely for
@@ -216,7 +216,7 @@ async function runnerAdmission(e,args,overrides={}) {
   e.source_binding={files:{operand:{path:'modeled-source-input',sha256:'c'.repeat(64)}}};
   const context={path,JSON,parseArgs:options=>parseArgs({...options,args}),
     validateLaterSssExitExpected,compareLaterSssExitObservation,validateLaterSssExitTrace,
-    validateLaterSssExitTerminal,validateLaterSssExitFinalization,compareLaterPreparedStartObservation,
+    validateLaterSssExitTerminal,validateLaterSssExitFinalization,compareLaterPreparedStartObservation,compareLaterPreparedSetupObservation,
     validateStock4SssExitExpected,compareStock4SssExitObservation,validateStock4SssExitTerminal,
     validateStock4SssExitTrace,validateStock4SssExitFinalization,
     validateCurrentSssExitExpected,compareCurrentSssExitObservation,validateCurrentSssExitTerminal,
@@ -274,6 +274,7 @@ test('actual runner loop waits for returned later stop then unloads once and che
     assert.equal(options.preparedStartProbe,preparedOnly);return handle;},locator:selector=>({click:async()=>{
       if(selector==='#retail-replay-start')++starts;else{assert.equal(selector,'#unload');++unloads;unloaded=true;}}})};
   const context={...admitted,currentSssExit:true,currentSssPreparedStart:false,laterSssPreparedStart:preparedOnly,
+    laterSssPreparedSetup:false,preparedSetupRequested:false,
     currentSssRecipeBytes:Array(328).fill(0),installCurrentSssExitReplayArm,page,
     observePageOperation:async(label,fn)=>fn(),phase:async(label,fn)=>fn(),
     replayTimeoutMs:1000,replayPollMs:0,setTimeout,Date,Promise,
@@ -324,7 +325,7 @@ test('actual runner finalizer classifies only later component pass after strict 
     const report=structuredClone(base);report.result='fail';report.current_sss_exit.wrapper_restored=true;
     report.browser_errors=[];report.unexpected_requests=[];report.artifact_inventory_pre={equal:true};mutate?.(report);
     const process={exitCode:0},messages=[];
-    const context={currentSssExit:true,currentSssLater:true,currentSssStock4:false,currentSssPreparedStart:false,laterSssPreparedStart:false,
+    const context={currentSssExit:true,currentSssLater:true,currentSssStock4:false,currentSssPreparedStart:false,laterSssPreparedStart:false,laterSssPreparedSetup:false,
       currentSssPolicy:admitted.currentSssPolicy,currentSssExpected:e,currentSssTrace:text(trace(e)),report,
       browserArtifactInventory:async()=>({equal:true}),diagnostic:false,process,console:{log:s=>messages.push(s)}};
     await vm.runInNewContext('(async()=>{'+finalizer+'})()',context);
@@ -395,4 +396,129 @@ test('actual CLI opt-in selects profile2 observation without Setup mode',async()
  assert.equal(a.report.later_sss_prepared_start,true);
  await assert.rejects(runnerAdmission(e,laterArgs.slice(1).concat('--stadium-later-sss-prepared-start')));
  await assert.rejects(runnerAdmission(e,[...laterArgs,'--stadium-current-sss-prepared-start','--stadium-later-sss-prepared-start']));
+});
+
+// Synthetic zero-action Setup receipt; constructor/RNG source execution is not modeled here.
+function laterSetupReceipt(e) {
+ const prepared=preparedLaterReceipt(e),base=laterEndpoint(e);
+ base.notification_coordinates.order=1887;base.note.world_generation=6;
+ Object.assign(base.terminal,{asset_requests_after_leave_boundary:1,asset_requests_at_terminal:0,
+   waiting_for_audio_retained_until_unload:false,waiting_for_audio_at_terminal:true,waiting_for_audio_current:false});
+ base.prepared_to_setup={attempted:true,approved:true,consumed:true,failed:false,error:null,
+   asset_requests_at_handoff:0,asset_requests_current_after_handoff:1,waiting_for_audio_at_handoff:true,
+   waiting_for_audio_current:false,waiting_for_audio_retired:true,setup:{
+   handoff_origin:'current_sss_prepared_later_940',attempted:true,requested:true,import_committed:true,
+   menu_retired:true,parent_seed_owner_value_restored:true,complete:true,captured:true,failed:false,
+   construction_complete:true,source_frames:0,host_tick_calls:0,host_draw_calls:0,requested_generation:4,
+   committed_generation:4,prior_world_generation:6,match_world_generation:7,
+   current_owners:{host:true,host_entered:false,match:true,cache:true,source_world_exists:true,running:false,
+     pending:false,first_use_draw_pending:false,pending_scope_generation:0,asset_generation:4,active_files:2},
+   actual:{phase:'vs_setup',random_seed_hex:e.prepared_profile.setup.rng.value_hex,start:prepared.start},
+   stadium_setup_state:{schema:'melee-web-stadium-zero-tick-setup-state-v1',world_generation:7,
+     world_ticks:0,source_frame:0,map_id:2,constructor_callback_count:1,source_parameter_roots_agree:true,
+     ground_source_heap_handle:0,ground_requested_bytes:256,ground_allocation_generation:8,
+     object_source_heap_handle:0,object_requested_bytes:128,object_allocation_generation:9}}};
+ return base;
+}
+test('later Setup checks retained Setup seed distinctly from Entry and refuses changed zero-action owners',()=>{
+ const e=expected(),a=laterSetupReceipt(e);
+ assert.equal(e.prepared_profile.entry.rng.value_hex,'7fc17cf1');
+ assert.equal(e.prepared_profile.setup.rng.value_hex,'25d557a7');
+ assert.equal(compareLaterPreparedSetupObservation(a,e).pass,true);
+ assert.throws(()=>compareStock4SssExitObservation(a,e));
+ for(const mutate of [x=>x.observation_profile=1,x=>x.selected_occurrence=0,x=>x.terminal.cursor=270,
+   x=>x.prepared_to_setup.setup.handoff_origin='current_sss_prepared_stock4_270',
+   x=>x.prepared_to_setup.setup.actual.random_seed_hex='7fc17cf1',
+   x=>x.prepared_to_setup.setup.actual.start.rules.is_stock=0,
+   x=>x.prepared_to_setup.setup.source_frames=1,x=>x.prepared_to_setup.setup.host_tick_calls=1,
+   x=>x.prepared_to_setup.setup.parent_seed_owner_value_restored=false,
+   x=>x.prepared_to_setup.setup.committed_generation++,x=>x.prepared_to_setup.setup.match_world_generation=6,
+   x=>x.prepared_to_setup.setup.stadium_setup_state.constructor_callback_count=2]){
+   const bad=structuredClone(a);mutate(bad);assert.throws(()=>compareLaterPreparedSetupObservation(bad,e));}
+ const r=laterFinalReport(e),prepared=preparedLaterReceipt(e),done=laterSetupReceipt(e);
+ r.current_sss_exit.observation.note.world_generation=6;r.current_sss_exit.observation.notification_coordinates.order=1887;
+ r.later_sss_prepared_start=r.later_sss_prepared_setup=true;
+ Object.assign(r.current_sss_exit,{prepared_start_observation:prepared,
+   prepared_start_comparison:compareLaterPreparedStartObservation(prepared,e),
+   prepared_setup_begin:{result:1,accepted_receipt_rechecked:true},prepared_setup_observation:done,
+   prepared_setup_comparison:compareLaterPreparedSetupObservation(done,e)});
+ Object.assign(r.current_sss_exit.observation.terminal,{asset_requests_at_terminal:0,
+   waiting_for_audio_at_terminal:true,waiting_for_audio_current:true});
+ r.current_sss_exit.unloaded_observation=structuredClone(done);
+ r.current_sss_exit.unloaded_observation.terminal.native_unloaded=true;
+ assert.equal(validateLaterSssExitFinalization(r,e).pass,true);
+ for(const mutate of [x=>delete x.later_sss_prepared_setup,x=>x.current_sss_exit.prepared_setup_begin.result=0,
+   x=>x.current_sss_exit.prepared_setup_begin.accepted_receipt_rechecked=false,
+   x=>x.current_sss_exit.unloaded_observation.prepared_to_setup.consumed=false,
+   x=>x.current_sss_exit.unloaded_observation.terminal.native_unloaded=false]){
+   const bad=structuredClone(r);mutate(bad);assert.throws(()=>validateLaterSssExitFinalization(bad,e));}
+});
+test('actual page later Setup capability is explicit immutable and one-use',()=>{
+ const recipe=Array(328).fill(37),heap=new Uint8Array(1024);heap.set(recipe,16);
+ for(const fault of [null,'changed-receipt','getter','setup','module','duplicate-approval','reentrant']){
+  const receipt={captured:true,profile:2},originalReceipt=structuredClone(receipt);let calls=0,owner;
+  const mod={HEAPU8:heap,UTF8ToString:()=>JSON.stringify(receipt),stadiumMatchedSetupNativeIdle:()=>true,
+    _melee_web_native_menu_replay:()=>1,_melee_web_native_menu_stadium_current_sss_exit_arm_profile:()=>1,
+    _melee_web_native_menu_stadium_current_sss_exit_observe:()=>1,
+    _melee_web_native_menu_stadium_current_sss_prepared_start_observe:()=>1,
+    _melee_web_native_menu_stadium_current_sss_prepared_setup_begin:()=>{++calls;
+      if(fault==='reentrant')assert.throws(()=>owner.continuePreparedStart(originalReceipt),/one-use owner/);
+      const approve=globalThis.__meleeWebStadiumCurrentSssPreparedStartApproved;
+      assert.equal(approve(),true);if(fault==='duplicate-approval')return approve()?1:0;return 1;}};
+  try{globalThis.Module=mod;
+   owner=installCurrentSssExitReplayArm({recipeBytes:recipe,observationProfile:2,preparedStartProbe:true,laterPreparedSetup:true});
+   assert.equal(mod._melee_web_native_menu_replay(16,328,1),1);
+   if(fault==='changed-receipt')receipt.captured=false;
+   if(fault==='getter')mod._melee_web_native_menu_stadium_current_sss_prepared_start_observe=()=>1;
+   if(fault==='setup')mod._melee_web_native_menu_stadium_current_sss_prepared_setup_begin=()=>1;
+   if(fault==='module')globalThis.Module={...mod};
+   if(fault&&fault!=='reentrant')assert.throws(()=>owner.continuePreparedStart(originalReceipt));
+   else assert.equal(owner.continuePreparedStart(originalReceipt).accepted_receipt_rechecked,true);
+   assert.equal(calls,(!fault||['reentrant','duplicate-approval'].includes(fault))?1:0);
+   assert.throws(()=>owner.continuePreparedStart(originalReceipt));
+   assert.equal(Object.hasOwn(globalThis,'__meleeWebStadiumCurrentSssPreparedStartApproved'),false);
+  }finally{delete globalThis.Module;delete globalThis.__meleeWebStadiumCurrentSssPreparedStartApproved;}
+ }
+ assert.throws(()=>installCurrentSssExitReplayArm({recipeBytes:recipe,observationProfile:1,preparedStartProbe:true,laterPreparedSetup:true}));
+});
+test('actual CLI requires later Setup plus prepared-Start and keeps readonly mode separate',async()=>{
+ const args=[...laterArgs,'--stadium-later-sss-prepared-start','--stadium-later-sss-prepared-setup'];
+ const a=await runnerAdmission(expected(),args);
+ assert.equal(a.currentSssPolicy.preparedSetup,compareLaterPreparedSetupObservation);
+ assert.equal(a.report.later_sss_prepared_setup,true);
+ const readonly=await runnerAdmission(expected(),[...laterArgs,'--stadium-later-sss-prepared-start']);
+ assert.equal(readonly.currentSssPolicy.preparedSetup,undefined);
+ for(const bad of [[...laterArgs,'--stadium-later-sss-prepared-setup'],
+   args.filter(x=>x!=='--stadium-later-sss-exit'),[...args,'--stadium-current-sss-prepared-start']])
+   await assert.rejects(()=>runnerAdmission(expected(),bad));
+});
+
+test('actual runner Setup branch compares prepared receipt before one handoff then bounded completion and unload',async()=>{
+ const e=expected(),prepared=preparedLaterReceipt(e),before=laterEndpoint(e),done=laterSetupReceipt(e);
+ before.note.world_generation=6;before.notification_coordinates.order=1887;
+ Object.assign(before.terminal,{asset_requests_at_terminal:0,waiting_for_audio_at_terminal:true,waiting_for_audio_current:true});
+ const after=structuredClone(done);after.terminal.native_unloaded=true;
+ const admitted=await runnerAdmission(e,[...laterArgs,'--stadium-later-sss-prepared-start','--stadium-later-sss-prepared-setup']);
+ let unloaded=false,continued=false,observations=0,starts=0,unloads=0,continuations=0;
+ const report=admitted.report,writes=[];
+ const scope={state:()=>({owned:true,failure:null}),observePreparedStart:()=>({busy:false,value:prepared}),
+   continuePreparedStart:receipt=>{assert.deepEqual(receipt,prepared);assert.equal(report.current_sss_exit.prepared_start_comparison.pass,true);
+     assert.equal(continued,false);continued=true;++continuations;return {result:1,accepted_receipt_rechecked:true};},
+   observe:()=>{++observations;return {busy:false,value:unloaded?after:continued?done:before};}};
+ const handle={evaluate:async(fn,arg)=>fn(scope,arg)};
+ const page={evaluateHandle:async(fn,options)=>{assert.equal(options.observationProfile,2);assert.equal(options.laterPreparedSetup,true);return handle;},
+   locator:selector=>({click:async()=>{if(selector==='#retail-replay-start')++starts;else{assert.equal(selector,'#unload');++unloads;unloaded=true;}}})};
+ const context={...admitted,currentSssExit:true,currentSssPreparedStart:false,laterSssPreparedStart:true,laterSssPreparedSetup:true,preparedSetupRequested:true,
+   currentSssRecipeBytes:Array(328).fill(0),installCurrentSssExitReplayArm,page,
+   // Exact production callback, passed through modeled evaluateHandle; no native approval success claim.
+   continuePreparedStartInPage,
+   observePageOperation:async(label,fn)=>fn(),phase:async(label,fn)=>fn(),replayTimeoutMs:1000,replayPollMs:0,setTimeout,Date,Promise,
+   write:async(name,value)=>writes.push({name,value}),pageErrors:[],report,
+   snapshot:async()=>({phase:0,running:0,replay_downloads:unloaded?['retail-browser-report.json']:[],replay_report:laterReplayReport(e)})};
+ const code=runnerSlice('  if (currentSssExit) {\n    currentSssArm =','  } else if (firstReplayCallbackProbe) await firstReplayCallbackPhase();')+'  }';
+ await vm.runInNewContext('(async()=>{let currentSssArm;'+code+'})()',context);
+ assert.equal(starts,1);assert.equal(unloads,1);assert.equal(continuations,1);assert.equal(observations,3);
+ assert.equal(report.current_sss_exit.prepared_setup_comparison.pass,true);assert.equal(report.current_sss_exit.terminal.pass,true);
+ assert.equal(report.current_sss_exit.runtime_replay,'FAIL_INCOMPLETE_EXPLICIT_SSS_STOP');
+ assert.equal(writes.filter(x=>x.name==='current-sss-prepared-to-setup-observation.json').length,1);
 });

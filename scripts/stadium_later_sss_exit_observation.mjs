@@ -1,7 +1,8 @@
 // Node-side finite occurrence1 admission. The page arm remains the shared closure-free helper.
 import {createHash} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
-import {STOCK4_SSS_STOP, validateLaterStock4SssExitExpectedFields, comparePreparedStartReceiptFields} from './stadium_stock4_sss_exit_observation.mjs';
+import {STOCK4_SSS_STOP, validateLaterStock4SssExitExpectedFields, comparePreparedStartReceiptFields,
+  comparePreparedSetupObservationFields, validateStock4PreparedSetupUnload} from './stadium_stock4_sss_exit_observation.mjs';
 import {compareSssExitObservationFields, validateSssExitTraceFields} from './stadium_current_sss_exit_observation.mjs';
 const requireValue = (value, message) => { if (!value) throw Error(message); };
 const spans = [[1,0,144],[2,145,269],[3,270,461],[4,462,674],[1,675,806],[2,807,939]];
@@ -69,9 +70,13 @@ export function validateLaterSssExitTrace(text, expected, actual) {
 }
 
 // Later mode stops before B asset requests; the original 2006-frame replay remains incomplete.
-export function validateLaterSssExitTerminal(report, snapshot, expected, unloaded) {
-  compareLaterSssExitObservation(unloaded, expected, true);
-  requireValue(!Object.hasOwn(unloaded, 'prepared_to_setup') &&
+export function validateLaterSssExitTerminal(report, snapshot, expected, actual, preparedSetupUnload = null) {
+  const unloaded = preparedSetupUnload || actual;
+  if (preparedSetupUnload) {
+    compareLaterSssExitObservation(actual, expected, false);
+    validateStock4PreparedSetupUnload(actual, unloaded);
+  } else compareLaterSssExitObservation(unloaded, expected, true);
+  requireValue((preparedSetupUnload || !Object.hasOwn(unloaded, 'prepared_to_setup')) &&
     report?.pass === false && report.complete === false &&
     report.recipe_sha256 === expected.recipe.sha256 && report.frames === expected.recipe.frames &&
     report.mode === 'state_capture' && report.scheduling_equivalence === 'not_evaluated' &&
@@ -102,15 +107,24 @@ export function validateLaterSssExitFinalization(report, expected) {
     (report.later_sss_prepared_start === true ?
       (exit.prepared_start_comparison?.pass === true && !exit.prepared_start_failure &&
        exit.prepared_start_comparison.scope === 'later_sss_prepared_start_common_fields_only') :
-      !exit.prepared_start_comparison) && !exit.prepared_setup_begin &&
-    !exit.prepared_setup_comparison && report.original_replay_capture_result === 'fail' &&
+      !exit.prepared_start_comparison) &&
+    (report.later_sss_prepared_setup === true ?
+      (report.later_sss_prepared_start === true && exit.prepared_setup_begin?.result === 1 &&
+       exit.prepared_setup_begin.accepted_receipt_rechecked === true &&
+       exit.prepared_setup_comparison?.pass === true && !exit.prepared_setup_failure) :
+      (!exit.prepared_setup_begin && !exit.prepared_setup_comparison)) &&
+    report.original_replay_capture_result === 'fail' &&
     isDeepStrictEqual(report.finalization_failures, [
       'Whole-session replay did not complete successfully','Browser replay report is incomplete or failed']),
   'Later SSS capture contains extra failure, prepared continuation, or lacks its explicit stop');
   if(report.later_sss_prepared_start === true)
     compareLaterPreparedStartObservation(exit.prepared_start_observation,expected);
   compareLaterSssExitObservation(exit.observation,expected,false);
-  validateLaterSssExitTerminal(report.browser_report,report.final_snapshot,expected,exit.unloaded_observation);
+  if(report.later_sss_prepared_setup === true)
+    compareLaterPreparedSetupObservation(exit.prepared_setup_observation,expected);
+  validateLaterSssExitTerminal(report.browser_report,report.final_snapshot,expected,
+    report.later_sss_prepared_setup === true ? exit.observation : exit.unloaded_observation,
+    report.later_sss_prepared_setup === true ? exit.unloaded_observation : null);
   requireValue(isDeepStrictEqual(exit.observation.note,exit.unloaded_observation.note) &&
     isDeepStrictEqual(exit.observation.notification_coordinates,exit.unloaded_observation.notification_coordinates),
   'Later SSS unload changed the retained boundary receipt');
@@ -125,4 +139,20 @@ export function compareLaterPreparedStartObservation(actual, expected) {
     entry.start_melee_hex,{profile:2,cursor:940,order:1887});
   return {...receipt,scope:'later_sss_prepared_start_common_fields_only',
     original_entry_sequence:4235,Setup:false,original_B_constructor_GO:'UNOBSERVED'};
+}
+
+export function compareLaterPreparedSetupObservation(actual, expected) {
+  validateLaterSssExitExpected(expected);
+  compareSssExitObservationFields(actual, expected);
+  requireValue(actual?.observation_profile === 2 && actual.selected_occurrence === 1 &&
+    actual.preceding_lifecycle_stage === 4 && actual.terminal?.cursor === 940 &&
+    actual.notification_coordinates?.replay_cursor === 940 &&
+    actual.notification_coordinates?.order === 1887 && actual.note?.session_ticks === 535 &&
+    actual.note.world_generation === actual.prepared_to_setup?.setup?.prior_world_generation &&
+    actual.notification_coordinates?.callback_source_steps === 0 &&
+    actual.notification_coordinates?.callback_source_draws === 0,
+  'Later prepared Setup lost its occurrence1 source boundary');
+  const result = comparePreparedSetupObservationFields(actual, expected, 'current_sss_prepared_later_940');
+  return {...result, scope:'later_sss_zero_action_setup_common_fields_and_seed_only',
+    original_setup_sequence:4313, original_B_constructor_GO:'UNOBSERVED'};
 }

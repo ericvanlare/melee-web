@@ -170,6 +170,12 @@ export function compareStock4PreparedStartObservation(actual, expected) {
 }
 export function compareStock4PreparedSetupObservation(actual, expected) {
   validateStock4SssExitExpected(expected);
+  return comparePreparedSetupObservationFields(actual, expected, 'current_sss_prepared_stock4_270');
+}
+// Callers validate the exact first/later source profile before sharing structural checks.
+export function comparePreparedSetupObservationFields(actual, expected, origin) {
+  requireValue(['current_sss_prepared_stock4_270','current_sss_prepared_later_940'].includes(origin),
+    'Prepared Setup origin is unknown');
   const route = actual?.prepared_to_setup, setup = route?.setup;
   const terminal = actual?.terminal;
   requireValue(terminal?.complete === true && terminal.native_unloaded === false &&
@@ -182,7 +188,7 @@ export function compareStock4PreparedSetupObservation(actual, expected) {
     route.asset_requests_at_handoff === 0 && route.asset_requests_current_after_handoff === 1 &&
     route.waiting_for_audio_at_handoff === true && route.waiting_for_audio_current === false &&
     route.waiting_for_audio_retired === true &&
-    setup?.handoff_origin === 'current_sss_prepared_stock4_270' && setup.attempted === true &&
+    setup?.handoff_origin === origin && setup.attempted === true &&
     setup.requested === true && setup.import_committed === true && setup.menu_retired === true &&
     setup.parent_seed_owner_value_restored === true && setup.complete === true &&
     setup.captured === true && setup.failed === false && setup.construction_complete === true &&
@@ -230,7 +236,7 @@ export function validateStock4SssExitTrace(text, expected, actual) {
   validateStock4SssExitExpected(expected);
   return validateSssExitTraceFields(text, expected, actual);
 }
-function validateStock4PreparedSetupUnload(handoff, unloaded) {
+export function validateStock4PreparedSetupUnload(handoff, unloaded) {
   const terminal = unloaded?.terminal, route = unloaded?.prepared_to_setup;
   requireValue(terminal?.native_unloaded === true &&
     terminal.asset_requests_after_leave_boundary === 1 &&
