@@ -1149,3 +1149,5 @@ extern "C" MeleeWebClassPieceCaptureWitness melee_web_source_memory_class_piece_
 }
 
 #include "gameplay_lobj_writer_diagnostic.inc"
+
+#include "gameplay_tobj_writer_diagnostic.inc"

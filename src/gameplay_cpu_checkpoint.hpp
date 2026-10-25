@@ -39,6 +39,7 @@ public:
     bool seal_drawn_reference(const GameplayMatchSession&) noexcept;
     bool matches_drawn_reference(const GameplayMatchSession&) noexcept;
     void disarm() noexcept;
+    const MeleeWebTObjWriterEvidence* tobj_writer_witness() const noexcept {return melee_web_tobj_writer_evidence(tobj_writer_session_);}
     const MeleeWebLObjWriterEvidence* lobj_writer_witness() const noexcept {return melee_web_lobj_writer_evidence(lobj_writer_session_);}
     const CpuComparison& comparison() const noexcept {return comparison_;}
     const MeleeWebClassPieceCaptureWitness& class_piece_capture_witness() const noexcept {return class_piece_capture_witness_;}
@@ -79,7 +80,7 @@ private:
     Phase phase_=Phase::Captured;
     bool source_step_possible_=false;
     CpuComparison comparison_{};
-    std::uint64_t lobj_writer_session_=0;
+    std::uint64_t lobj_writer_session_=0,tobj_writer_session_=0;
     MeleeWebClassPieceAnchor class_piece_anchor_{};
     MeleeWebClassPieceWitness class_piece_witness_{};
     MeleeWebClassPieceCaptureWitness class_piece_capture_witness_{};

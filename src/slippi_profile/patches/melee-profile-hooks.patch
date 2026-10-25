@@ -989,3 +989,41 @@ diff --git a/src/sysdolphin/baselib/class.c b/src/sysdolphin/baselib/class.c
          return true;
      }
      return false;
+
+diff --git a/src/sysdolphin/baselib/tobj.c b/src/sysdolphin/baselib/tobj.c
+index 186b01ab1928a4b1520d02ab8fdb7e4093d75334..961c460f05a943cffa13386d37f8b8f3ca4f6583 100644
+--- a/src/sysdolphin/baselib/tobj.c
++++ b/src/sysdolphin/baselib/tobj.c
+@@ -1,5 +1,12 @@
+ #include "hsd_texture_bounds.h"
+ #include "tobj.h"
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++#include "gameplay_tobj_writer_diagnostic.h"
++#include <stddef.h>
++_Static_assert(sizeof(HSD_TObj)==172,"TObj diagnostic extent");
++_Static_assert(offsetof(HSD_TObj,mtx)==116,"TObj matrix field");
++_Static_assert(offsetof(HSD_TObj,flags)==76,"TObj flags field");
++#endif
+ 
+ #include <placeholder.h>
+ #include <string.h>
+@@ -387,6 +394,9 @@
+     melee_source_bool no_assert = false;
+ 
+     PAD_STACK(8);
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    const uint64_t tobj_writer_ticket=melee_web_tobj_writer_before(tobj,&tobj->mtx,sizeof(*tobj),&hsdTObj,__FILE__,__LINE__);
++#endif
+ 
+     if (tobj->repeat_s && tobj->repeat_t) {
+         no_assert = true;
+@@ -419,6 +429,9 @@
+     MTXConcat(m, tobj->mtx, tobj->mtx);
+     MTXScale(m, scale.x, scale.y, scale.z);
+     MTXConcat(m, tobj->mtx, tobj->mtx);
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    melee_web_tobj_writer_after(tobj_writer_ticket);
++#endif
+ }
+ 
+ static void TObjSetupMtx(HSD_TObj* tobj)

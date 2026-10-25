@@ -1,0 +1,85 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later
+ * Actual source-memory runtime and actual original memory/class allocator.
+ * Descriptor and outer-frame boundary are explicit fixture models, not
+ * canonical constructor attestation or live-piece lifetime proof. */
+#define main retained_class_piece_control_main
+#include "source_class_piece_control.cpp"
+#undef main
+extern "C" {
+#include <sysdolphin/baselib/tobj.h>
+void writer_actual_tobj_producer(HSD_TObj*);
+HSD_TObjInfo hsdTObj{};
+}
+extern "C" void slippi_lobj_constructed(void*,void*){}
+extern "C" void slippi_lobj_retiring(void*){}
+extern "C" void slippi_lobj_rebound(void*,void*,void*){}
+static void shape(HSD_TObj* p){p->repeat_s=p->repeat_t=1;p->scale={1,1,1};p->translate={0.25f,0.125f,0};p->flags=TEX_COORD_UV|TEX_MTX_DIRTY;}
+int main(int argc,char** argv){
+ const char* mode=argc>1?argv[1]:"phase";
+#if !defined(MELEE_WEB_CPU_INTERVAL_ENABLED) || !MELEE_WEB_CPU_INTERVAL_ENABLED
+ auto* p=static_cast<HSD_TObj*>(hsdAllocMemPiece(sizeof(HSD_TObj)));check(p,"inactive source allocation");std::memset(p,0,sizeof(*p));shape(p);writer_actual_tobj_producer(p);
+ check(p->mtx[2][2]==1&&p->flags==(TEX_COORD_UV|TEX_MTX_DIRTY),"inactive actual matrix/fullflags behavior");std::puts("INACTIVE actual MakeTextureMtx, no observer link required");return 0;
+#else
+ check(melee_web_source_memory_begin(77,3),"source world begin");check(hsdAllocMemPiece(32),"actual class cold handshake");ClassInfoInit(&hsdClass);
+ hsdInitClassInfo((HSD_ClassInfo*)&hsdTObj,&hsdClass,(char*)"fixture",(char*)"modeled_tobj_descriptor",sizeof(hsdTObj),sizeof(HSD_TObj));
+ auto* p=static_cast<HSD_TObj*>(hsdNew((HSD_ClassInfo*)&hsdTObj));check(p,"actual class allocation with modeled descriptor");shape(p);writer_actual_tobj_producer(p);
+ auto* pre=snapshot();auto a=melee_web_class_piece_arm();check(a.ready,"PRE frozen table arm");if(!std::strcmp(mode,"missing-pre"))a.ready=0;
+ auto session=melee_web_tobj_writer_arm(pre,a,8,176);check(session,"diagnostic borrow PRE");melee_web_tobj_writer_phase(9);melee_web_tobj_writer_boundary(1,177);deny_allocation=true;
+ if(!std::strcmp(mode,"bounds")||!std::strcmp(mode,"extent")||!std::strcmp(mode,"full172")){
+  const void* object=p;const void* field=reinterpret_cast<unsigned char*>(p)+117;uint32_t extent=172;
+  if(!std::strcmp(mode,"extent")){field=&p->mtx;extent=171;}
+  if(!std::strcmp(mode,"full172")){size_t i;const HostAllocation* row=nullptr;check(tobj_writer_row(reinterpret_cast<uintptr_t>(&p->mtx),i,row),"outer row");object=reinterpret_cast<void*>(row->host+row->requested-164);field=reinterpret_cast<const unsigned char*>(object)+116;}
+  check(!melee_web_tobj_writer_before(object,field,extent,&hsdTObj,"bad-span",1),"exact full172/field48 span refused before reads");check(melee_web_tobj_writer_evidence(session)->reason==5,"span reason");return 0;
+ }
+ if(!std::strcmp(mode,"retired")||!std::strcmp(mode,"recreated")){
+  deny_allocation=false;check(melee_web_source_memory_end(77),"source end");if(!std::strcmp(mode,"recreated"))check(melee_web_source_memory_begin(77,3),"source re-create");deny_allocation=true;
+  check(!melee_web_tobj_writer_before(p,&p->mtx,sizeof(*p),&hsdTObj,"retired",1),"old borrowed PRE refuses before read");check(melee_web_tobj_writer_evidence(session)->reason==4,"epoch owner reason");return 0;
+ }
+ if(!std::strcmp(mode,"mirror")){
+  deny_allocation=false;MeleeWebSourceMemorySnapshot* m=nullptr;check(!melee_web_source_memory_snapshot_capture(&m)&&!melee_web_source_memory_snapshot_restore(m),"actual mirror capture/restore");deny_allocation=true;
+  check(!melee_web_tobj_writer_before(p,&p->mtx,sizeof(*p),&hsdTObj,"mirror",1),"mirror not an allocation/lifetime event");check(melee_web_tobj_writer_evidence(session)->reason==4,"mirror drift");return 0;
+ }
+ if(!std::strcmp(mode,"wrong-ticket")||!std::strcmp(mode,"pending")){
+  const auto t=melee_web_tobj_writer_before(p,&p->mtx,sizeof(*p),&hsdTObj,"ticket",1);check(t,"before ticket");
+  if(!std::strcmp(mode,"wrong-ticket"))melee_web_tobj_writer_after(t+256);else melee_web_tobj_writer_mark(session,1);
+  check(melee_web_tobj_writer_evidence(session)->status==2&&!melee_web_tobj_writer_evidence(session)->complete,"incomplete/bad pair UNKNOWN");return 0;
+ }
+ if(!std::strcmp(mode,"unknown")){
+  size_t i;const HostAllocation* row=nullptr;check(tobj_writer_row(reinterpret_cast<uintptr_t>(&p->mtx),i,row),"containing actual row");const auto source=row->source.value()+reinterpret_cast<uintptr_t>(p)-row->host;piece_owner.cells[(source-piece_owner.begin)/32].tag=0; // explicit malformed diagnostic fixture, no source mutation
+ }
+ if(!std::strcmp(mode,"custom")){static HSD_ClassInfo foreign; p->parent.parent.class_info=&foreign;}
+ if(!std::strcmp(mode,"bad-magic")||!std::strcmp(mode,"bad-layout")||!std::strcmp(mode,"bad-epoch")){
+  if(!std::strcmp(mode,"bad-magic"))pre->magic^=1;
+  else if(!std::strcmp(mode,"bad-layout"))++pre->rows_offset;
+  else ++pre->epoch;
+  check(!melee_web_tobj_writer_before(p,&p->mtx,sizeof(*p),&hsdTObj,"bad-pre",1),"invalid real PRE admission refuses before row/header reads");
+  check(melee_web_tobj_writer_evidence(session)->reason==4&&healthy,"diagnostic invalid PRE does not poison source healthy");return 0;
+ }
+ if(!std::strcmp(mode,"wrong-boundary")){melee_web_tobj_writer_boundary(2,178);check(melee_web_tobj_writer_evidence(session)->reason==11,"wrong command/epoch boundary");return 0;}
+ if(!std::strcmp(mode,"overflow")){for(unsigned i=0;i<129;++i)writer_actual_tobj_producer(p);const auto* e=melee_web_tobj_writer_evidence(session);check(e->status==2&&e->reason==3&&e->count==128&&e->seen==129&&e->overflow,"bounded capacity UNKNOWN, not truncation proof");return 0;}
+ if(!std::strcmp(mode,"reuse")){hsdTObj.parent.destroy((HSD_Class*)p);auto* q=static_cast<HSD_TObj*>(hsdNew((HSD_ClassInfo*)&hsdTObj));check(p==q,"actual same-piece reuse");shape(q);writer_actual_tobj_producer(q);const auto* e=melee_web_tobj_writer_evidence(session);check(e->count==1&&(e->events[0].flags&2),"historical PRE never grants live continuity after actual reuse");return 0;}
+ p->translate.y=0.375f; // modeled literal CPU update300; producer/math itself is actual
+ if(!std::strcmp(mode,"late"))melee_web_tobj_writer_mark(session,1); // deliberately wrong early marker excludes following writer
+ if(!std::strcmp(mode,"missing"))p->mtx[1][3]+=1;else writer_actual_tobj_producer(p);
+ if(!std::strcmp(mode,"custom")||!std::strcmp(mode,"unknown")||!std::strcmp(mode,"missing-pre")){
+  const auto* e=melee_web_tobj_writer_evidence(session);check(e->count==1&&e->events[0].status==2&&e->events[0].reason==(!std::strcmp(mode,"custom")?12u:6u),"custom/missing/unknown PRE explicit");return 0;
+ }
+ p->translate.y=0.625f;auto* post=snapshot();if(std::strcmp(mode,"late"))melee_web_tobj_writer_mark(session,1);melee_web_tobj_writer_boundary(0,0);
+ melee_web_tobj_writer_phase(10);melee_web_tobj_writer_boundary(2,178);deny_allocation=true;writer_actual_tobj_producer(p);melee_web_tobj_writer_boundary(0,0);melee_web_tobj_writer_mark(session,2);
+ check(melee_web_source_memory_payload_snapshot_restore(pre)==MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK,"actual PRE payload restore");
+ p->translate.y=0.375f;p->translate.y=0.625f; // modeled same CPU updates, no producer/draw
+ const auto comparison=melee_web_source_memory_payload_snapshot_compare_live(post);check(comparison.status==2,"strict actual source payload difference remains");
+ if(!std::strcmp(mode,"wrong-comparison")){auto bad=comparison;bad.expected_byte^=1;melee_web_tobj_writer_finalize(pre,post,bad,a,session);check(melee_web_tobj_writer_evidence(session)->reason==10,"wrong first-diff rejected");return 0;}
+ if(!std::strcmp(mode,"wrong-row"))++tobj_writer.evidence.events[0].pre_row;
+ if(!std::strcmp(mode,"wrong-epoch"))++tobj_writer.evidence.events[0].outer_epoch;
+ if(!std::strcmp(mode,"full-post48"))tobj_writer.evidence.events[0].after[47]^=1; // mutation outside first-diff byte must prevent a match
+ melee_web_tobj_writer_finalize(pre,post,comparison,a,session);const auto* e=melee_web_tobj_writer_evidence(session);
+ if(std::strcmp(mode,"phase")){check(e->status==2&&e->reason==7&&!e->matched_count,"no-event/late/wrongrow/epoch/fullPOST48 mismatch remains UNKNOWN");return 0;}
+ check(e->status==1&&e->first_difference_matches&&e->complete&&e->post_count==1&&e->drawn_count==2&&e->matched_count==1&&e->matched_index==0,"select exact prePOST phase9, never lastglobal phase10");
+ check(e->events[0].outer_frame==177&&e->events[0].outer_phase==1&&e->events[0].outer_epoch==1&&e->events[1].outer_phase==2,"outer association not source-PC proof");
+ check(e->events[0].flags_before==e->events[0].flags_after&&e->events[0].flags_before==TEX_MTX_DIRTY,"actual Make observes fullflags, not subsequent Setup dirtyclear");
+ deny_allocation=false;EM_ASM({console.log('ACTUAL_TOBJ_WRITER_BASE64='+Buffer.from(HEAPU8.subarray($0,$0+28048)).toString('base64'));},e);
+ melee_web_tobj_writer_disarm(session);melee_web_class_piece_disarm(a);melee_web_source_memory_payload_snapshot_destroy(post);melee_web_source_memory_payload_snapshot_destroy(pre);
+ std::puts("ACTUAL_TOBJ_WRITER_OK strict difference retained; descriptor/boundary modeled; live lifetime UNKNOWN");return 0;
+#endif
+}

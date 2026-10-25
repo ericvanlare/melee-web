@@ -58,6 +58,7 @@ public:
     bool seal_drawn_reference(const GameplayMatchSession&) noexcept;
     bool matches_drawn_reference(const GameplayMatchSession&) noexcept;
     void disarm() noexcept;
+    const MeleeWebTObjWriterEvidence* tobj_writer_witness() const noexcept {return &tobj_writer_witness_;} // explicit modeled UNKNOWN; actual adapter copy retained
     const MeleeWebLObjWriterEvidence* lobj_writer_witness() const noexcept {return &lobj_writer_witness_;} // modeled unavailable leaf; actual adapter copy/retention tested
     const CpuComparison& comparison() const noexcept {return comparison_;}
     const MeleeWebClassPieceCaptureWitness& class_piece_capture_witness() const noexcept { return class_piece_capture_witness_; }
@@ -80,6 +81,7 @@ private:
     std::uint32_t pre_frame_{},post_frame_{};
     Phase phase_=Phase::Captured;
     bool source_step_possible_=false,retired_=false;
+    MeleeWebTObjWriterEvidence tobj_writer_witness_{1,sizeof(MeleeWebTObjWriterEvidence),2,1};
     MeleeWebLObjWriterEvidence lobj_writer_witness_{1,sizeof(MeleeWebLObjWriterEvidence),2,1}; // explicit modeled UNKNOWN/inactive
     CpuComparison comparison_{};
     MeleeWebClassPieceWitness class_piece_witness_{1,sizeof(MeleeWebClassPieceWitness)};

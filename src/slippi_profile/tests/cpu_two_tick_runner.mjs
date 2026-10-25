@@ -40,6 +40,41 @@ export function decodeCpuLObjWriterEvidence(bytes) {
  return {schema:1,bytes:16784,status:u(8),reason:u(12),scope:'SOURCE_WRITE_OCCURRENCE_ONLY_CAPTURE_TIME_JOIN',livePieceLifetime:'UNKNOWN',hookActive:u(16),count,seen:u(24),overflow:u(28),epoch:hex(32),world:hex(40),session:hex(48),pieceInstance:hex(56),captureSerial:hex(64),topologyRevision:hex(72),postCount:post,drawnCount:drawn,siteKind:u(88),line:u(92),path,firstDifferenceMatches:u(100),matchedIndex:u(104),matchedCount:u(108),complete:u(112),row:u(116),offset:u(120),source:u(124),requested:u(128),expected:u(132),actual:u(136),host:hex(144),generation:hex(152),events};
 }
 
+export function decodeCpuTObjWriterEvidence(bytes) {
+ if(!(bytes instanceof Uint8Array)||bytes.length!==28048)throw Error('TObj writer extent');
+ const v=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength),u=o=>v.getUint32(o,true),n=o=>v.getBigUint64(o,true);
+ const hex=o=>n(o).toString(16).padStart(16,'0'),zero=(a,b)=>!bytes.slice(a,b).some(x=>x),words=(a,b)=>Array.from(bytes.slice(a,b),x=>x.toString(16).padStart(2,'0')).join('');
+ if(u(0)!==1||u(4)!==28048||u(8)>2||u(12)>12||u(16)>1||u(20)>128||u(24)<u(20)||u(28)>1||u(100)>1||u(112)>1||u(396)||(u(140)&3))throw Error('TObj writer schema');
+ const count=u(20),post=u(80),drawn=u(84),pathBytes=u(96);
+ if(pathBytes>=232||!zero(160+pathBytes,392)||(pathBytes&&(!u(88)||!u(92)))||(!pathBytes&&u(92)))throw Error('TObj writer source path');
+ let path='';if(pathBytes){path=new TextDecoder('utf-8',{fatal:true}).decode(bytes.slice(160,160+pathBytes));if(path.includes('\0'))throw Error('TObj writer path encoding');}
+ if(post!==0xffffffff&&post>count||drawn!==0xffffffff&&(post===0xffffffff||drawn<post||drawn>count))throw Error('TObj writer endpoint order');
+ const events=[];
+ for(let i=0;i<count;++i){const b=400+i*216;
+  if(u(b)!==i+1||u(b+4)<1||u(b+4)>13||u(b+8)>2||u(b+12)>12||u(b+92)>3||u(b+204)>2||n(b+208)>2n)throw Error('TObj writer event schema');
+  if(!n(b+32)||!n(b+40)||!u(b+20)||!u(b+24)||u(b+20)+u(b+24)>0x100000000||u(b+28)>u(b+24)||48>u(b+24)-u(b+28)||n(b+56)!==n(b+32)+BigInt(u(b+28))||n(b+48)+116n!==n(b+56)||n(b+48)<n(b+32)||n(b+48)+172n>n(b+32)+BigInt(u(b+24)))throw Error('TObj writer row span');
+  if(u(b+92)&1){
+   if(u(b+92)!==3||!u(b+64)||u(b+68)!==116||!u(b+72)||(u(b+72)&31)||u(b+76)!==172||u(b+76)>u(b+72)||u(b+72)-u(b+76)>31||!u(b+80)||!u(b+84)||(u(b+84)&3)||u(b+88)!==u(b+84)||u(b+64)+u(b+68)!==u(b+20)+u(b+28)||u(b+64)<u(b+20)||u(b+64)+u(b+72)>u(b+20)+u(b+24))throw Error('TObj writer PRE historical piece');
+  }else if(!zero(b+64,b+92))throw Error('TObj writer unknown piece fields');
+  if(u(b+8)===1&&(u(b+12)||u(b+92)!==3||!u(140)||u(b+84)!==u(140)||!u(b+204)||u(b+4)!==8+u(b+204)||n(b+208)!==BigInt(u(b+204))||u(392)>0xfffffffd||u(b+200)!==u(392)+u(b+204)))throw Error('TObj writer qualified event');
+  events.push({sequence:u(b),command:u(b+4),status:u(b+8),reason:u(b+12),preRow:u(b+16),source:u(b+20),requested:u(b+24),fieldOffset:u(b+28),host:hex(b+32),generation:hex(b+40),object:hex(b+48),field:hex(b+56),pieceSource:u(b+64),pieceOffset:u(b+68),physical:u(b+72),originalRequested:u(b+76),pieceGeneration:u(b+80),classInfo:u(b+84),savedClassInfo:u(b+88),scope:'CAPTURE_TIME_ONLY',livePieceLifetime:'UNKNOWN',flags:u(b+92),beforeHex:words(b+96,b+144),afterHex:words(b+144,b+192),flagsBefore:u(b+192),flagsAfter:u(b+196),outerFrame:u(b+200),outerPhase:u(b+204),outerEpoch:hex(b+208)});
+ }
+ if(!zero(400+count*216,28048))throw Error('TObj writer unused events');
+ if(u(8)===1){
+  if(u(12)||!u(16)||!n(32)||!n(40)||!n(48)||!u(100)||!u(112)||u(28)||u(24)!==count||post===0xffffffff||drawn===0xffffffff||!u(108)||u(108)>post||u(104)>=post||!pathBytes||u(88)!==1||!n(144)||!n(152)||!u(140)||u(392)>0xfffffffd||u(120)>=u(128)||u(132)>255||u(136)>255||u(132)===u(136))throw Error('TObj writer match header');
+  const b=400+u(104)*216,off=u(120)-u(b+28);
+  if(u(b+8)!==1||u(b+92)!==3||u(b+204)!==1||n(b+208)!==1n||u(b+200)!==u(392)+1||u(b+16)!==u(116)||u(b+20)!==u(124)||u(b+24)!==u(128)||n(b+32)!==n(144)||n(b+40)!==n(152)||off<0||off>=48||bytes[b+144+off]!==u(132))throw Error('TObj writer first-difference event');
+  // Internal record-set consistency only. Native comparison against the actual
+  // full POST matrix remains authoritative; POST48 is not a second wire field.
+  const matches=[];
+  for(let i=0;i<post;++i){const c=400+i*216,delta=u(120)-u(c+28);
+   if(u(c+8)===1&&!u(c+12)&&u(c+92)===3&&u(c+16)===u(116)&&u(c+20)===u(124)&&u(c+24)===u(128)&&n(c+32)===n(144)&&n(c+40)===n(152)&&delta>=0&&delta<48&&u(c+204)===1&&n(c+208)===1n&&u(c+200)===u(392)+1&&words(c+144,c+192)===words(b+144,b+192))matches.push(i);
+  }
+  if(matches.length!==u(108)||matches.at(-1)!==u(104))throw Error('TObj writer candidate-set consistency');
+ }
+ return {schema:1,bytes:28048,status:u(8),reason:u(12),scope:'SOURCE_WRITE_OCCURRENCE_ONLY_CAPTURE_TIME_JOIN',livePieceLifetime:'UNKNOWN',hookActive:u(16),count,seen:u(24),overflow:u(28),epoch:hex(32),world:hex(40),session:hex(48),pieceInstance:hex(56),captureSerial:hex(64),topologyRevision:hex(72),postCount:post,drawnCount:drawn,siteKind:u(88),line:u(92),path,firstDifferenceMatches:u(100),matchedIndex:u(104),matchedCount:u(108),complete:u(112),row:u(116),offset:u(120),source:u(124),requested:u(128),expected:u(132),actual:u(136),canonicalClass:u(140),preFrame:u(392),host:hex(144),generation:hex(152),events};
+}
+
 export const CPU_TWO_TICK_EVIDENCE_BYTES = 35368;
 export const CPU_TWO_TICK_MODE = 2;
 export const TWO_TICK_PAD_300 = 'AgAAAAAAAAAAAAABALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=';
@@ -232,7 +267,7 @@ export function validateCpuTwoTickFinalEvidence(evidence, checkpointSourceFrame)
 export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInputMapping, expectedStocks, helpers) {
   const plan = {wire, checkpointSourceFrame: checkpoint.boundary.sourceFrame, checkpointPad: checkpoint.pad,
     expectedInputMapping, expectedStocks, evidenceBytes: CPU_TWO_TICK_EVIDENCE_BYTES,
-    lobjWriterDecodeSource: decodeCpuLObjWriterEvidence.toString(), capturePieceDecodeSource: decodeCpuClassPieceCaptureWitness.toString(), pieceDecodeSource: decodeCpuClassPieceWitness.toString(), originDecodeSource: decodeCpuAllocationOriginWitness.toString(), witnessDecodeSource: decodeCpuPayloadFailureWitness.toString(), decodeSource: decodeCpuTwoTickEvidence.toString(), validateFinalSource: validateCpuTwoTickFinalEvidence.toString(),
+    tobjWriterDecodeSource: decodeCpuTObjWriterEvidence.toString(), lobjWriterDecodeSource: decodeCpuLObjWriterEvidence.toString(), capturePieceDecodeSource: decodeCpuClassPieceCaptureWitness.toString(), pieceDecodeSource: decodeCpuClassPieceWitness.toString(), originDecodeSource: decodeCpuAllocationOriginWitness.toString(), witnessDecodeSource: decodeCpuPayloadFailureWitness.toString(), decodeSource: decodeCpuTwoTickEvidence.toString(), validateFinalSource: validateCpuTwoTickFinalEvidence.toString(),
     waitSource: waitForAuroraSubmission.toString(), ...helpers,
     literalPad300: TWO_TICK_PAD_300, literalPad301: TWO_TICK_PAD_301};
   try {
@@ -256,7 +291,9 @@ export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInput
           typeof module._melee_web_synctest_cpu_class_piece_capture_witness !== 'function' ||
           typeof module._melee_web_synctest_cpu_class_piece_capture_witness_bytes !== 'function' ||
           typeof module._melee_web_synctest_cpu_lobj_writer_evidence !== 'function' ||
-          typeof module._melee_web_synctest_cpu_lobj_writer_evidence_bytes !== 'function') {
+          typeof module._melee_web_synctest_cpu_lobj_writer_evidence_bytes !== 'function' ||
+          typeof module._melee_web_synctest_cpu_tobj_writer_evidence !== 'function' ||
+          typeof module._melee_web_synctest_cpu_tobj_writer_evidence_bytes !== 'function') {
         throw new Error('Two-tick evidence exports are unavailable for the linked v6 profile');
       }
       const read = (pointer, size) => {
@@ -272,6 +309,7 @@ export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInput
       const decode = new Function(`return (${plan.decodeSource})`)();
       const validateFinal = new Function(`return (${plan.validateFinalSource})`)();
       const decodeLObjWriter = new Function(`return (${plan.lobjWriterDecodeSource})`)();
+      const decodeTObjWriter = new Function(`return (${plan.tobjWriterDecodeSource})`)();
       const decodeCapturePiece = new Function(`return (${plan.capturePieceDecodeSource})`)();
       const decodePiece = new Function(`return (${plan.pieceDecodeSource})`)();
       const decodeOrigin = new Function(`return (${plan.originDecodeSource})`)();
@@ -305,6 +343,11 @@ export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInput
         const writerBytes=read(module._melee_web_synctest_cpu_lobj_writer_evidence(),writerSize);
         progress.lobjWriterEvidenceRaw=encode(writerBytes);
         progress.lobjWriterEvidence=decodeLObjWriter(writerBytes);
+        const tobjSize=module._melee_web_synctest_cpu_tobj_writer_evidence_bytes();
+        if(tobjSize!==28048)throw Error('TObj writer ABI');
+        const tobjBytes=read(module._melee_web_synctest_cpu_tobj_writer_evidence(),tobjSize);
+        progress.tobjWriterEvidenceRaw=encode(tobjBytes);
+        progress.tobjWriterEvidence=decodeTObjWriter(tobjBytes);
         return result;
       };
       const command = async number => {
@@ -318,14 +361,14 @@ export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInput
           record.allocationOriginWitness = progress.allocationOriginWitness;
           record.classPieceWitness = progress.classPieceWitness;
           record.classPieceCaptureWitness = progress.classPieceCaptureWitness;
-          record.lobjWriterEvidence = progress.lobjWriterEvidence;
+          record.lobjWriterEvidence = progress.lobjWriterEvidence; record.tobjWriterEvidence = progress.tobjWriterEvidence;
           if (record.result !== 0) throw new Error(`CPU two-tick command ${number} refused ${record.result}: ${module.UTF8ToString(module._melee_web_snapshot_error())}`);
         } catch (error) {
           const ccallThrew = record.outcome === 'pending';
           record.error = String(error);
           record.outcome = ccallThrew ? 'threw' : record.result !== 0 ? 'returned-nonzero' : 'evidence-error';
           if (ccallThrew) {
-            try { record.refreshedNativeEvidence = evidence(); record.classPieceWitness = progress.classPieceWitness; record.classPieceCaptureWitness = progress.classPieceCaptureWitness; record.lobjWriterEvidence = progress.lobjWriterEvidence; }
+            try { record.refreshedNativeEvidence = evidence(); record.classPieceWitness = progress.classPieceWitness; record.classPieceCaptureWitness = progress.classPieceCaptureWitness; record.lobjWriterEvidence = progress.lobjWriterEvidence; record.tobjWriterEvidence = progress.tobjWriterEvidence; }
             catch (readError) { record.evidenceRefreshError = String(readError); }
           }
           throw error;
@@ -382,6 +425,11 @@ export async function runBrowserCpuTwoTick(page, wire, checkpoint, expectedInput
         const writerBytes=read(module._melee_web_synctest_cpu_lobj_writer_evidence(),writerSize);
         progress.lobjWriterEvidenceRaw=encode(writerBytes);
         progress.lobjWriterEvidence=decodeLObjWriter(writerBytes);
+        const tobjSize=module._melee_web_synctest_cpu_tobj_writer_evidence_bytes();
+        if(tobjSize!==28048)throw Error('TObj writer ABI');
+        const tobjBytes=read(module._melee_web_synctest_cpu_tobj_writer_evidence(),tobjSize);
+        progress.tobjWriterEvidenceRaw=encode(tobjBytes);
+        progress.tobjWriterEvidence=decodeTObjWriter(tobjBytes);
         return result;
       };
       if (module._melee_web_snapshot_observation_size() !== 1280 || module._melee_web_snapshot_pcm_size() !== 4272 ||

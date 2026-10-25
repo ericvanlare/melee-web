@@ -79,6 +79,10 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
 #if !(defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE)
         c->lobj_writer_session_=melee_web_lobj_writer_arm(c->commit_.payload,c->class_piece_anchor_,span==CpuCheckpointSpan::TwoTicks?8u:1u);
 #endif
+#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
+        if(span==CpuCheckpointSpan::TwoTicks)
+            c->tobj_writer_session_=melee_web_tobj_writer_arm(c->commit_.payload,c->class_piece_anchor_,8,c->owner_.frame);
+#endif
         // v7 relocates lvec: the historical SOURCE writer diagnostic is
         // inapplicable, not a successful source-write observation. Session 0
         // leaves its fixed evidence unavailable; strict payload checks remain.
@@ -171,6 +175,7 @@ bool GameplayCpuCheckpoint::seal_post(const GameplayMatchSession& session) noexc
             disarm();phase_=Phase::Failed;return false;
         }
         melee_web_lobj_writer_mark(lobj_writer_session_,1);
+        melee_web_tobj_writer_mark(tobj_writer_session_,1);
         post_frame_=session.source_frames();phase_=Phase::Sealed;return true;
     }catch(...){disarm();phase_=Phase::Failed;return false;}
 }
@@ -234,6 +239,7 @@ bool GameplayCpuCheckpoint::finish_replay(const GameplayMatchSession& session) n
         // Diagnostic refusal never changes the original comparison/1216.
         if(payload.status==2){
             melee_web_lobj_writer_finalize(commit_.payload,post_payload_,payload,class_piece_anchor_,lobj_writer_session_);
+            melee_web_tobj_writer_finalize(commit_.payload,post_payload_,payload,class_piece_anchor_,tobj_writer_session_);
             payload_failure_witness_=melee_web_source_memory_payload_failure_witness(post_payload_,payload);
             allocation_origin_witness_=melee_web_source_memory_allocation_origin_witness(post_payload_,payload);
             class_piece_witness_=melee_web_source_memory_class_piece_witness(post_payload_,payload,class_piece_anchor_);
@@ -282,6 +288,7 @@ bool GameplayCpuCheckpoint::seal_drawn_reference(const GameplayMatchSession& ses
         comparison_=statics_->capture_expected(drawn_statics_);
         if(comparison_.status)return false;
         melee_web_lobj_writer_mark(lobj_writer_session_,2);
+        melee_web_tobj_writer_mark(tobj_writer_session_,2);
         drawn_sealed_=true;return true;
     }catch(const std::bad_alloc&){return refuse(CpuComparisonDomain::None,static_cast<std::uint32_t>(CpuCaptureRefusal::AllocationException));}
     catch(...){return refuse(CpuComparisonDomain::None,static_cast<std::uint32_t>(CpuCaptureRefusal::UnexpectedException));}
@@ -315,6 +322,7 @@ bool GameplayCpuCheckpoint::matches_drawn_reference(const GameplayMatchSession& 
 void GameplayCpuCheckpoint::disarm() noexcept {
     slippi_lobj_anchor_disarm(commit_.lobj_anchor);
     melee_web_lobj_writer_disarm(lobj_writer_session_);
+    melee_web_tobj_writer_disarm(tobj_writer_session_);
     melee_web_class_piece_disarm(class_piece_anchor_);
     if(commit_.actions)melee_web_action_interval_disarm(commit_.actions);
     if(commit_.effect_token){melee_web_cpu_interval_end(commit_.effect_token);commit_.effect_token=0;}

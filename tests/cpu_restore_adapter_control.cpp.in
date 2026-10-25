@@ -15,6 +15,8 @@
 #include <new>
 // Phase is a diagnostic-only modeled unavailable leaf in this adapter control.
 extern "C" void melee_web_lobj_writer_phase(uint32_t){}
+extern "C" void melee_web_tobj_writer_phase(uint32_t){}
+extern "C" void melee_web_tobj_writer_boundary(uint32_t,uint32_t){}
 
 #include <cstdio>
 #include <cstring>
@@ -510,6 +512,9 @@ void verify_payload_failure_retention() {
     pending_submission=false;check(!melee_web_synctest_cpu_restore_command(10),"Witness baseline301");
     pending_submission=false;modeled_payload_byte_failure=true;
     check(melee_web_synctest_cpu_restore_command(11)==1216&&draw_calls==2,"Witness must preserve1216/no final present");
+    check(melee_web_synctest_cpu_tobj_writer_evidence_bytes()==28048,"TObj separate fixed ABI");
+    const auto tobj_saved=*static_cast<const MeleeWebTObjWriterEvidence*>(melee_web_synctest_cpu_tobj_writer_evidence());
+    check(tobj_saved.schema==1&&tobj_saved.bytes==28048&&tobj_saved.status==2&&tobj_saved.reason==1&&!tobj_saved.hook_active,"Actual adapter retains modeled TObj UNKNOWN before1216");
     check(melee_web_synctest_cpu_lobj_writer_evidence_bytes()==16784,"Writer fixed ABI");
     const auto writer_saved=*static_cast<const MeleeWebLObjWriterEvidence*>(melee_web_synctest_cpu_lobj_writer_evidence());
     check(writer_saved.schema==1&&writer_saved.bytes==16784&&writer_saved.status==2&&writer_saved.reason==1&&!writer_saved.hook_active,"Actual adapter retains explicitly modeled unavailable writer leaf before strict failure");
@@ -533,6 +538,7 @@ void verify_payload_failure_retention() {
         Buffer.from(HEAPU8.subarray($0,$0+320)).toString("base64"));},melee_web_synctest_cpu_allocation_origin_witness());
     check(melee_web_synctest_cpu_restore_command(5)==1216,"CLOSE preserves original1216");
     check(!std::memcmp(&saved,melee_web_synctest_cpu_payload_failure_witness(),256),"CLOSE preserves witness bytes");
+    check(!std::memcmp(&tobj_saved,melee_web_synctest_cpu_tobj_writer_evidence(),28048),"CLOSE retains all28048 TObj bytes after capsule destruction");
     check(!std::memcmp(&writer_saved,melee_web_synctest_cpu_lobj_writer_evidence(),16784),"CLOSE retains all16784 writer bytes after capsule destruction");
     check(!std::memcmp(&historical_saved,melee_web_synctest_cpu_class_piece_capture_witness(),160),"CLOSE retains capture-only evidence");
     check(!std::memcmp(&piece_saved,melee_web_synctest_cpu_class_piece_witness(),208),"CLOSE retains separate class piece bytes");

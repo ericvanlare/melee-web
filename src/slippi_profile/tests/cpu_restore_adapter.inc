@@ -56,6 +56,7 @@ struct CpuRestoreControl {
     MeleeWebClassPieceCaptureWitness class_piece_capture_witness{1,sizeof(MeleeWebClassPieceCaptureWitness),0,0,1};
     MeleeWebSourceAllocationOriginWitness origin_witness{1,sizeof(MeleeWebSourceAllocationOriginWitness)};
     MeleeWebLObjWriterEvidence lobj_writer_evidence{1,sizeof(MeleeWebLObjWriterEvidence)};
+    MeleeWebTObjWriterEvidence tobj_writer_evidence{1,sizeof(MeleeWebTObjWriterEvidence)};
     bool two_active=false;
 } cpu_restore;
 bool cpu_drawn_diagnostics(unsigned index){
@@ -183,8 +184,11 @@ uint32_t cpu_execute_two(uint32_t command){
         if(result!=1||cpu_restore.first_failure||cpu_boundary()||!cpu_two_safe(e.pre_frame+1u)||!cpu_two_interval())
             return cpu_fail(0x4b4u,"baseline sample300 refused");
         if(!cpu_two_diag(1)||e.diagnostics[0]!=e.diagnostics[1])return cpu_fail(0x4c4u,"baseline CPU300 drew");
-        if(melee_web_synctest_draw_present()!=1||cpu_restore.first_failure||payload_admission_submission_boundary()!=0||!cpu_two_safe(e.pre_frame+1u))
-            return cpu_fail(0x4b5u,"baseline draw300 submission refused");
+        melee_web_tobj_writer_boundary(1,observation.frame);
+        if(melee_web_synctest_draw_present()!=1||cpu_restore.first_failure||payload_admission_submission_boundary()!=0||!cpu_two_safe(e.pre_frame+1u)){
+            melee_web_tobj_writer_boundary(0,0);return cpu_fail(0x4b5u,"baseline draw300 submission refused");
+        }
+        melee_web_tobj_writer_boundary(0,0);
         cpu_restore.state=C::Baseline0SubmittedTwo;return 0;
     }
     if(command==10){
@@ -196,8 +200,11 @@ uint32_t cpu_execute_two(uint32_t command){
             return cpu_fail(0x4b7u,"baseline sample301 refused");
         if(!cpu_two_diag(3)||e.diagnostics[2]!=e.diagnostics[3])return cpu_fail(0x4c4u,"baseline CPU301 drew");
         if(!cpu_restore.capsule->seal_post(*match))return cpu_fail(0x4b8u,"two-tick final CPU endpoint seal refused");
-        if(melee_web_synctest_draw_present()!=1||cpu_restore.first_failure||payload_admission_submission_boundary()!=0||!cpu_two_safe(e.post_frame))
-            return cpu_fail(0x4b9u,"baseline draw301 submission refused");
+        melee_web_tobj_writer_boundary(2,observation.frame);
+        if(melee_web_synctest_draw_present()!=1||cpu_restore.first_failure||payload_admission_submission_boundary()!=0||!cpu_two_safe(e.post_frame)){
+            melee_web_tobj_writer_boundary(0,0);return cpu_fail(0x4b9u,"baseline draw301 submission refused");
+        }
+        melee_web_tobj_writer_boundary(0,0);
         cpu_restore.state=C::Baseline1SubmittedTwo;return 0;
     }
     if(command==11){
@@ -236,6 +243,7 @@ uint32_t cpu_execute_two(uint32_t command){
             cpu_restore.class_piece_witness=cpu_restore.capsule->class_piece_witness();
             cpu_restore.class_piece_capture_witness=cpu_restore.capsule->class_piece_capture_witness();
             if(const auto* writer=cpu_restore.capsule->lobj_writer_witness())cpu_restore.lobj_writer_evidence=*writer;
+            if(const auto* writer=cpu_restore.capsule->tobj_writer_witness())cpu_restore.tobj_writer_evidence=*writer;
         }
         if(!matched)return cpu_fail(0x4c0u,"two-tick final CPU typed equality refused");
         e.cpu_equality=1;cpu_restore.state=C::TwoEqual;return 0;
@@ -450,6 +458,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_restore_command(
     if(cpu_restore.first_failure)return cpu_restore.first_failure;
     if((command>=8&&command<=13)||cpu_restore.two_active)cpu_restore.two.last_command=command;
     melee_web_lobj_writer_phase(command);
+    melee_web_tobj_writer_phase(command);
     cpu_restore.inflight=true;uint32_t result=0;
     try{result=cpu_execute(command);}catch(const std::exception& failure){result=cpu_fail(0x496u,failure.what());}
     cpu_restore.inflight=false;
@@ -492,4 +501,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_class_piece_capt
 #if defined(MELEE_WEB_SYNCTEST_CPU_RESTORE)
 extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_lobj_writer_evidence(){if(cpu_restore.capsule)if(const auto* writer=cpu_restore.capsule->lobj_writer_witness())cpu_restore.lobj_writer_evidence=*writer;return &cpu_restore.lobj_writer_evidence;}
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_lobj_writer_evidence_bytes(){return sizeof(cpu_restore.lobj_writer_evidence);}
+#endif
+
+#if defined(MELEE_WEB_SYNCTEST_CPU_RESTORE)
+extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_tobj_writer_evidence(){if(cpu_restore.capsule)if(const auto* writer=cpu_restore.capsule->tobj_writer_witness())cpu_restore.tobj_writer_evidence=*writer;return &cpu_restore.tobj_writer_evidence;}
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_tobj_writer_evidence_bytes(){return sizeof(cpu_restore.tobj_writer_evidence);}
+
 #endif
