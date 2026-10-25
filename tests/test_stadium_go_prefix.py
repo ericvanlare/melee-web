@@ -902,7 +902,9 @@ class StadiumBootGateControl(OwnedWorkspaceTests):
         # Execute the exact production filter with a finite boundary-PC seam.
         # No guest memory, Observe implementation or match admission is mocked.
         harness = """#include <cassert>
+#include <cstddef>
 #include <cstdint>
+using std::size_t;
 using u8 = uint8_t; using u16 = uint16_t; using u32 = uint32_t;
 """ + enums + """
 bool BoundaryForPC(u32 pc, bool whole, Boundary* out) {

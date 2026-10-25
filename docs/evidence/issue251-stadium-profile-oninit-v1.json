@@ -23221,7 +23221,101 @@
           "Title text contents, timer initialization, xF0 and per-owner/all-writer RNG ledger remain unknown.",
           "No browser parity, transformation, full idle lifetime or C3 acceptance."
         ],
-        "next": "Offline first-difference check of the new literal four-port input/source-order prefix and Entry/Setup context against the retained browser940 reference, then a checked bridge into the source-action driver. Do not force old seeds or use original-A schedule; no successful capture repeat."
+        "next": "Bind a separate exact new-reference 2013-input/943-cursor variant, preserving the old path. First compare same-run Entry/constructor/Setup; only a checked same-owner bridge may execute the first 180 actual B steps and compare actual GO plus 96 pre-pause states. No seed injection, synthetic neutral rows, fixed GO assumption or successful capture repeat; runtime admission remains unproved.",
+        "ci_fixture_repair": {
+          "status": "PASS_FOCUSED_AND_FULL_LOCAL_REGRESSION_EXACT_HEAD_CI_REQUIRED",
+          "source": "0a9be93e plus only the two standard-size_t fixture prologue declarations; no production source change.",
+          "file": "tests/test_stadium_go_prefix.py",
+          "file_sha256": "a242141a9dd31c50aab1fa9a96857b0813845e7bc145dcd4cfabc246b12a8107",
+          "retained_ci_failure": {
+            "head": "0a9be93e072f6665852ff9d336f1ec1e1a0b09be",
+            "run": 40213792612,
+            "reason": "One Linux extracted Observe gate fixture lacks a standard size_t declaration; browser-build prerequisite gate consequently fails."
+          },
+          "focused_tests": 1,
+          "focused_exit": 0,
+          "full_outer": {
+            "tests": 2770,
+            "seconds": 580.493,
+            "skipped": 197,
+            "text": "Ran 2770 tests in 580.493s\n\nOK (skipped=197)\n"
+          },
+          "native_binary_unchanged": true,
+          "historical_runtime54_unchanged": true,
+          "new_build_or_capture": false,
+          "pins": {
+            "candidate": {
+              "path": "stadium-boot-gate-ci-fixture-candidate-v1/freeze-v1.json",
+              "bytes": 1277,
+              "sha256": "535102355512237464a18d45f8096aef96808f6af51253f1e63b017897d18c9c"
+            },
+            "review": {
+              "path": "stadium-boot-gate-ci-fixture-independent-review-v1.json",
+              "bytes": 1662,
+              "sha256": "c810267daec2b6a4913cd92ff16d19c535da3283a5d63740507dea3b4c547f7a"
+            },
+            "application": {
+              "path": "stadium-boot-gate-ci-fixture-validation-v1/application-v1.json",
+              "bytes": 1205,
+              "sha256": "c906aa4961e17271f895b7b61fbc124181ce513e148b12806844ed4caabab0e7"
+            },
+            "full": {
+              "path": "stadium-boot-gate-ci-fixture-validation-v1/full-regression-result-v1.json",
+              "bytes": 1456,
+              "sha256": "3ddff880d3f71358ab0bfbdef9af15aead4c69d43b83f64555773a1d93f062f9"
+            },
+            "result": {
+              "path": "stadium-boot-gate-ci-fixture-validation-v1/result-v1.json",
+              "bytes": 2831,
+              "sha256": "a98cf9a532ec760125087e605f668bea495dd3ce782b90d85273f0500c19cf73"
+            },
+            "retained_failed_ci": {
+              "path": "stadium-original-b-observation-docs-v1/ci-failed-run-v1.json",
+              "bytes": 28703,
+              "sha256": "5976a63daeef1e1ed00d81f3d4a51ef4785bf9fdddcfa8034c6ec151ccdb1d98"
+            },
+            "retained_failed_log": {
+              "path": "stadium-original-b-observation-docs-v1/ci-failed-log-v1.txt",
+              "bytes": 764793,
+              "sha256": "e0a2fcd3f432231710cea34c725e79cab051300d52361f2e1a2d6b31d3b2df8c"
+            }
+          }
+        },
+        "reference_compatibility": {
+          "status": "OLD_REFERENCE_REUSE_REFUSED_AT_FIRST_INPUT_DIFFERENCE",
+          "first_input": 43,
+          "old_P0": "0000004600000000000000",
+          "new_P0": "0000002300000000000000",
+          "other_three_ports_equal_at_first_difference": true,
+          "old_total_inputs": 2006,
+          "new_total_inputs": 2013,
+          "old_B_cursor": 940,
+          "new_B_cursor": 943,
+          "declared_start_and_sss_payload_match": true,
+          "input_and_rng_context_match": false,
+          "pins": {
+            "freeze": {
+              "path": "stadium-original-b-reference-compatibility-v1/freeze-v1.json",
+              "bytes": 2058,
+              "sha256": "369c9aff0539193caf0dc0fd67d4ff301a9db4c1b25ed13a8d31d73080c10ffd"
+            },
+            "comparison": {
+              "path": "stadium-original-b-reference-compatibility-v1/comparison-v1.json",
+              "bytes": 31634,
+              "sha256": "d2bf4517508af8716872a434f75455a80d7827c093a8a75b8a0944683bf9c189"
+            },
+            "root_review": {
+              "path": "stadium-original-b-reference-compatibility-v1/root-first-difference-review-v1.json",
+              "bytes": 498,
+              "sha256": "5afd71e3c235b80973eecd2614f928f77f07f92f256ca055d651690f65d2244a"
+            },
+            "bridge_review": {
+              "path": "stadium-original-b-next-bridge-architecture-independent-review-v1.json",
+              "bytes": 3383,
+              "sha256": "b5d4f5a98399d16744e210926e4b1420cd83c6b8d3b0e82914235f0c2975ad58"
+            }
+          }
+        }
       }
     }
   }
