@@ -4121,7 +4121,7 @@ bool matched_setup_cf_service(){
          <<",\"idle_snapshot\":"<<matched_setup_cf_idle_json(state.idle)
          <<",\"go_trace\":"<<matched_setup_cf_go_json(state.go)<<'}';
   }else actual<<"null";
-  if(state.version2&&!state.later_b_gate2_mode&&state.source_ticks>c_tick&&
+  if(state.version2&&(!state.later_b_gate2_mode||!tick_action)&&state.source_ticks>c_tick&&
      !(tick_action&&(ordinal==c_tick||ordinal==f_tick))){
    char owner_error[256]{};
    check(match->diagnostic_stadium_idle_snapshot(&state.idle,owner_error,sizeof(owner_error)),

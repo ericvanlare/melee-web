@@ -785,6 +785,160 @@ static std::string actual_action_json_control(bool tick_action) {
         # Preserve actual abort branch. Only the unrelated legacy dispatch remains modeled.
         extracted.append(retirement[:retirement.index(ordinary)] +
                          '\n return "{\\"schema\\":\\"modeled-retirement-dispatch\\"}";\n}')
+
+        # Execute only the actual post-action owner-refresh and awaiting-owner
+        # comparison branches around the retained tick-84/draw-84 boundary.
+        # Snapshot values not present in the retained typed22 row are explicit
+        # modeled leaves; this reducer does not recreate a native match.
+        draw84_refresh = _function(
+            cls.cpp_source,
+            "  if(state.version2&&(!state.later_b_gate2_mode||!tick_action)&&state.source_ticks>c_tick&&")
+        draw84_owner = _function(
+            cls.cpp_source,
+            " if(state.awaiting_approval&&((state.version2&&state.last_ticks_after>state.c_source_tick)||")
+        draw84_probe = r"""
+namespace draw84_source_probe {
+struct MeleeWebStadiumIdleSnapshot {
+  uint32_t version=0; uint64_t world_generation=0, world_ticks=0; uint32_t source_frame=0;
+  int32_t map2_gate=0, map2_countdown=0; int16_t map2_phase=0, map2_form=0;
+  int16_t map2_history_e0=0, map2_history_e2=0, display_mode=0, display_e6=0, display_e8=0;
+  unsigned char display_timer_native_bytes[sizeof(int32_t)]{};
+  uint32_t display_timer_initialization_observed=0;
+  int16_t display_previous_mode=0, display_selected_player=0, display_f2=0;
+  uint32_t display_flags=0, sis_font_slot=0, sis_static_text_role=0, sis_dynamic_text_role=0;
+  uint32_t sis_context_present=0, sis_title_entry_seen=0; int32_t sis_title_entry_index=0;
+  uint32_t title_bytes_captured=0; int32_t sis_source_heap_handle=0;
+  uint64_t sis_world_generation=0, sis_allocation_generation=0, sis_source_epoch=0;
+  uint32_t sis_requested_bytes=0; int32_t map2_source_heap_handle=0;
+  uint64_t map2_world_generation=0, map2_allocation_generation=0;
+  uint32_t map2_requested_bytes=0, map2_buffer_origin=0;
+  uint32_t typed_relations_version=0, map2_gate_mask_40=0, map5_root_relation=0;
+  uint32_t sis_font1_present=0, title_child_present=0, title_wrapper_present=0;
+  uint32_t title_static_present=0, title_dynamic_present=0;
+};
+struct MeleeWebStadiumGoAlignmentEvent {
+  uint64_t generation=0, world_ticks=0; uint32_t source_frame=0, sequence=0;
+  uintptr_t object_identity=0, proc_identity=0; int32_t callback_index=0, source_branch=0;
+  int32_t map2_gate=0, display_mode=0, remap_branch=0, callback_identity=0, hud_enabled=0;
+  uint32_t source_seed=0, source_seed_valid=0;
+};
+struct MeleeWebStadiumGoAlignmentSnapshot {
+  uint64_t generation=0, armed_world_ticks=0; uint32_t armed_source_frame=0, armed=0;
+  uint32_t failure=0, expected_branch=0, next_sequence=0;
+  MeleeWebStadiumGoAlignmentEvent stage_before, stage_after, go_after, hud_after;
+};
+static void check(bool ok, const char* error) {
+  if (!ok) throw std::runtime_error(error ? error : "modeled check refused");
+}
+struct ProbeState {
+  bool version2=true, later_b_gate2_mode=true, awaiting_approval=true;
+  uint32_t source_ticks=85, last_ticks_after=85, c_source_tick=84;
+  int last_action_kind=1; uint32_t last_ordinal=84;
+  MeleeWebStadiumIdleSnapshot idle{}; MeleeWebStadiumGoAlignmentSnapshot go{};
+};
+struct SnapshotService {
+  MeleeWebStadiumIdleSnapshot live_idle{}; MeleeWebStadiumGoAlignmentSnapshot live_go{};
+  unsigned idle_reads=0, go_reads=0;
+  bool diagnostic_stadium_idle_snapshot(MeleeWebStadiumIdleSnapshot* out,char*,size_t) {
+    ++idle_reads; *out=live_idle; return true;
+  }
+  bool diagnostic_stadium_go_alignment_snapshot(MeleeWebStadiumGoAlignmentSnapshot* out,char*,size_t) {
+    ++go_reads; *out=live_go; return true;
+  }
+};
+static ProbeState state;
+static SnapshotService service;
+static SnapshotService* match=&service;
+__GO_EVENT_EQUAL__
+__GO_EQUAL__
+__IDLE_EQUAL__
+static void actual_after_action_refresh(bool tick_action,unsigned ordinal){
+ auto& state=draw84_source_probe::state; const unsigned c_tick=84U,f_tick=85U;
+ __REFRESH__
+}
+static void actual_awaiting_approval_check(){
+ auto& state=draw84_source_probe::state; auto* match=draw84_source_probe::match; char error[256]{};
+ MeleeWebStadiumGoAlignmentSnapshot go{};
+ check(match->diagnostic_stadium_go_alignment_snapshot(&go,error,sizeof(error)),
+       error[0]?error:"modeled GO snapshot refused");
+ __OWNER__
+}
+static void load_retained_tick84_leaf() {
+  state=ProbeState{}; service=SnapshotService{};
+  // These are the observed action-168 typed22 values and actual GO event from
+  // the retained failed capture. Unreported identity/resource fields stay
+  // zero-valued modeled leaves, not claimed observations.
+  state.idle.version=2; state.idle.world_generation=7; state.idle.world_ticks=85;
+  state.idle.source_frame=0; state.idle.map2_countdown=3741; state.idle.map2_form=5;
+  state.idle.map2_history_e0=-1; state.idle.map2_history_e2=-1;
+  state.idle.display_e6=64; state.idle.display_e8=64; state.idle.display_mode=11;
+  state.idle.display_previous_mode=10; state.idle.display_selected_player=99;
+  state.idle.typed_relations_version=1; state.idle.map2_gate_mask_40=0;
+  state.idle.map5_root_relation=1; state.idle.sis_font1_present=1;
+  state.idle.title_child_present=1; state.idle.title_wrapper_present=1;
+  state.idle.title_static_present=1; state.idle.title_dynamic_present=1;
+  state.go.generation=7; state.go.armed=1; state.go.failure=0;
+  state.go.expected_branch=0; state.go.next_sequence=3;
+  state.go.go_after.generation=7; state.go.go_after.world_ticks=84;
+  state.go.go_after.source_frame=0; state.go.go_after.sequence=3;
+  state.go.go_after.callback_index=3; state.go.go_after.source_branch=0;
+  state.go.go_after.map2_gate=0; state.go.go_after.display_mode=11;
+  state.go.go_after.remap_branch=0; state.go.go_after.callback_identity=1;
+  state.go.go_after.hud_enabled=-1; state.go.go_after.source_seed=0x1bc52546U;
+  state.go.go_after.source_seed_valid=1;
+  service.live_idle=state.idle; service.live_go=state.go;
+}
+static void draw84_refresh_and_owner_controls() {
+  load_retained_tick84_leaf();
+  actual_after_action_refresh(true,84); // The retained tick already stored this snapshot.
+  assert(service.idle_reads==0 && service.go_reads==0);
+  actual_after_action_refresh(false,84); // Actual Gate2 draw now captures the completed owner state.
+  assert(service.idle_reads==1 && service.go_reads==1);
+  actual_awaiting_approval_check();
+  assert(service.idle_reads==2 && service.go_reads==2);
+  std::cout << "GATE2_UNCHANGED pass retained_action=168 next_action=169 draw_refresh=1 owner_compare=1\n";
+
+  load_retained_tick84_leaf();
+  service.live_idle.display_e8=65; // Explicit modeled post-draw mutation, not a captured value.
+  actual_after_action_refresh(false,84);
+  assert(service.idle_reads==1 && service.go_reads==1);
+  assert(state.idle.display_e8==65);
+  actual_awaiting_approval_check();
+  assert(service.idle_reads==2 && service.go_reads==2);
+  std::cout << "GATE2_DRAW_REFRESH pass modeled_display_e8=65 refreshed_before_compare=1\n";
+  service.live_idle.display_e8=66; // Between-action mutation must still fail closed.
+  bool refused=false;
+  try { actual_awaiting_approval_check(); }
+  catch (const std::exception& e) {
+    refused=std::string(e.what())=="Matched Setup C/F native owner state changed while awaiting host approval";
+  }
+  assert(refused);
+  std::cout << "BETWEEN_ACTION_CHANGE refused after_refresh=1\n";
+
+  load_retained_tick84_leaf();
+  state.later_b_gate2_mode=false; // Existing version-2 refresh control.
+  service.live_idle.display_e8=65;
+  actual_after_action_refresh(false,84);
+  assert(service.idle_reads==1 && service.go_reads==1);
+  actual_awaiting_approval_check();
+  assert(service.idle_reads==2 && service.go_reads==2);
+  std::cout << "VERSION2_REFRESH_CONTROL pass refreshed_before_compare=1\n";
+}
+} // namespace draw84_source_probe
+"""
+        draw84_probe = (draw84_probe
+                        .replace("__GO_EVENT_EQUAL__", _function(
+                            cls.cpp_source,
+                            "bool matched_setup_cf_go_event_equal(const MeleeWebStadiumGoAlignmentEvent& a,"))
+                        .replace("__GO_EQUAL__", _function(
+                            cls.cpp_source,
+                            "bool matched_setup_cf_go_equal(const MeleeWebStadiumGoAlignmentSnapshot& a,"))
+                        .replace("__IDLE_EQUAL__", _function(
+                            cls.cpp_source,
+                            "bool matched_setup_cf_idle_equal(const MeleeWebStadiumIdleSnapshot& a,"))
+                        .replace("__REFRESH__", draw84_refresh)
+                        .replace("__OWNER__", draw84_owner))
+        extracted.append(draw84_probe)
         pad_rows = []
         for action in cls.projection["actions"]:
             if action["kind"] == "tick":
@@ -792,7 +946,10 @@ static std::string actual_action_json_control(bool tick_action) {
         if len(pad_rows) != 180:
             raise ValueError("actual projection did not yield 180 PAD rows")
         pads = ",\n".join(pad_rows)
-        return (PRELUDE + FIXTURE_BODY
+        fixture_body = FIXTURE_BODY.replace(
+            'else if(mode=="step-error") step_error_controls();',
+            'else if(mode=="step-error") step_error_controls();\n  else if(mode=="draw84") draw84_source_probe::draw84_refresh_and_owner_controls();')
+        return (PRELUDE + fixture_body
                 .replace("__PADS__", pads)
                 .replace("__EXTRACTED_FUNCTIONS__", "\n\n".join(extracted)))
 
@@ -875,6 +1032,13 @@ static std::string actual_action_json_control(bool tick_action) {
         status = json.loads(payload)
         self.assertTrue(status["failed"])
         self.assertEqual(status["error"], "first native service error")
+
+    def test_actual_tick84_draw84_owner_refresh_branches_with_modeled_draw_control(self):
+        output = self._run_fixture("draw84")
+        self.assertIn("GATE2_UNCHANGED pass retained_action=168 next_action=169 draw_refresh=1 owner_compare=1", output)
+        self.assertIn("GATE2_DRAW_REFRESH pass modeled_display_e8=65 refreshed_before_compare=1", output)
+        self.assertIn("BETWEEN_ACTION_CHANGE refused after_refresh=1", output)
+        self.assertIn("VERSION2_REFRESH_CONTROL pass refreshed_before_compare=1", output)
 
 
 if __name__ == "__main__":
