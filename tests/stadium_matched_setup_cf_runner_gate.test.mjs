@@ -46,6 +46,8 @@ test('the matched Setup C/F opt-in and preflight gate fail before server/browser
   const scratch = process.env.MELEE_STADIUM_CF_RUNNER_TEST_ROOT;
   assert.ok(scratch, 'Python OwnedWorkspaceTests scratch path is required');
   const runnerSource = await fs.readFile(RUNNER, 'utf8');
+  const gateSource = await fs.readFile(path.join(CANDIDATE_ROOT,
+    'tests/stadium_matched_setup_cf_runner_gate.mjs'), 'utf8');
   const freshPreflight = runnerSource.indexOf('await validateFreshSetupGo2RunnerSource(');
   const contextPreflight = runnerSource.indexOf('validateGo2StartContextExpectations(');
   const serverStartup = runnerSource.indexOf('serverProcess = spawn(');
@@ -69,18 +71,17 @@ test('the matched Setup C/F opt-in and preflight gate fail before server/browser
   assert.match(runnerSource,
     /\['first-sss-vs-setup-cf-explicit-step', \{type: 'boolean', default: false\}\]/,
     'explicit source stepping must remain a separate opt-in');
-  assert.match(runnerSource,
+  assert.match(gateSource,
     /module\.ccall\(\s*'melee_web_native_menu_stadium_first_sss_vs_setup_cf_step_once'[\s\S]*?\{async: true\}\)/,
     'explicit service must use ccall’s unmangled identifier and await Asyncify');
   assert.match(runnerSource, /stadiumMatchedSetupNativeIdle/,
     'native access must fail closed unless the private Asyncify idle predicate is true');
-  assert.match(runnerSource,
+  assert.match(gateSource,
     /module\.ccall\([\s\S]*?'melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire'[\s\S]*?\{async: true\}/,
     'terminal native retirement must await the generated Asyncify ccall');
-  assert.match(runnerSource, /kind === 'retire-ready'[\s\S]*?kind === 'retire-explicit'/,
+  assert.match(gateSource, /kind === 'retire-ready'[\s\S]*?kind === 'retire-explicit'/,
     'retirement readiness must be a separate preflighted operation before the yielding ccall');
-  const gateSource = await fs.readFile(path.join(CANDIDATE_ROOT,
-    'tests/stadium_matched_setup_cf_runner_gate.mjs'), 'utf8');
+
   assert.match(gateSource, /retire_ready:[\s\S]*?retirement_status:/,
     'retire readiness and archived receipt exports must be separately bound');
   assert.match(runnerSource, /native_cleanup_suppressed_pending_async_step/,
@@ -88,9 +89,14 @@ test('the matched Setup C/F opt-in and preflight gate fail before server/browser
   const commandStart = runnerSource.indexOf('async function executeMatchedSetupCfNativeCommand(');
   const commandEnd = runnerSource.indexOf('\nfunction matchedSetupCfNativeAdapter(', commandStart);
   const commandSource = runnerSource.slice(commandStart, commandEnd);
-  assert.ok(commandSource.indexOf('dispatchMatchedSetupCfNativeEvaluation') <
-    commandSource.indexOf('dispatch: () => page.evaluate('),
-  'the pending-step guard must run before starting page.evaluate');
+  assert.ok(commandSource.indexOf('dispatchMatchedSetupCfNativeEvaluation') >= 0 &&
+    commandSource.indexOf('dispatchMatchedSetupCfNativeEvaluation') <
+      commandSource.indexOf('dispatch: () => page.evaluate(evaluateMatchedSetupCfNativeCommand, command)'),
+  'the pending-step guard must precede dispatch to the actual shared evaluator');
+  assert.match(gateSource, /export function evaluateMatchedSetupCfNativeCommand\(/,
+    'the actual page callback must be exported by the shared guard module');
+  assert.doesNotMatch(commandSource, /module\._melee_web_native_menu_/,
+    'the C1a caller delegates native commands rather than retaining a second evaluator');
   const cleanupStart = runnerSource.indexOf('async function cleanupOwnedProcesses()');
   const cleanupEnd = runnerSource.indexOf('\ntry {\n  await main();', cleanupStart);
   const cleanupSource = runnerSource.slice(cleanupStart, cleanupEnd);
@@ -156,7 +162,7 @@ test('the matched Setup C/F opt-in and preflight gate fail before server/browser
   assert.match(callbackSource,
     /if \(diagnosticActive !== false\) return false;[\s\S]*?terminalMatchedSetupCfRetirementConsumed = true;/,
     'host retirement is consumed only after the published runtime is inactive');
-  assert.match(runnerSource,
+  assert.match(gateSource,
     /kind === 'retire-explicit'[\s\S]*?module\.ccall\([\s\S]*?melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire[\s\S]*?\{async: true\}/,
     'terminal retirement must be an awaited generated-runtime ccall');
   assert.match(runnerSource, /pipeline_cache_status_before_shutdown[\s\S]*?pipeline_cache_status_after_shutdown/,

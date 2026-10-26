@@ -5,6 +5,10 @@ import test from 'node:test';
 const source = fs.readFileSync(new URL('../web/runtime-development.mjs', import.meta.url), 'utf8');
 const helpers = source.split('\n').filter(line => /^window\.menuObserveFighter(?:Port)?=/.test(line)).join('\n');
 assert.equal(helpers.split('\n').length, 2);
+const transferGuards = source.split('\n').filter(line =>
+  /^(?:const laterBReplayNativeSuspended=|function assertLaterBReplayNativeAccess\()/.test(line)).join('\n');
+assert.equal(transferGuards.split('\n').length, 2, 'both actual native access guards are extracted');
+
 // Match melee_web_css_observe_port's ids[14], geometry[8] declaration.
 const nativeCssPortIds = 14;
 const nativeCssGeometry = 8;
@@ -89,13 +93,13 @@ for (const path of ['../scripts/capture_whole_session_browser.mjs', './character
 }
 function fixture({failAllocation = 0, nativeResult = 1, phase = 1} = {}) {
   const heap = new ArrayBuffer(4096), allocations = new Map();
-  let next = 128, allocationCalls = 0, nativeCalls = 0;
+  let next = 128, allocationCalls = 0, nativeCalls = 0, phaseCalls = 0;
   const Module = {
     HEAP32: new Int32Array(heap), HEAPF32: new Float32Array(heap),
     _malloc(size) { if (++allocationCalls === failAllocation) return 0;
       const ptr = next; next += size; allocations.set(ptr, size); return ptr; },
     _free(ptr) { assert.ok(allocations.delete(ptr)); },
-    _melee_web_native_menu_phase: () => phase,
+    _melee_web_native_menu_phase: () => { ++phaseCalls; return phase; },
   };
   const observe = (ids, geometry) => {
     nativeCalls++;
@@ -108,11 +112,20 @@ function fixture({failAllocation = 0, nativeResult = 1, phase = 1} = {}) {
   Module._melee_web_css_observe = (kind, ids, geometry) => observe(ids, geometry);
   Module._melee_web_css_observe_port = (port, kind, ids, geometry) => observe(ids, geometry);
   const window = {};
-  vm.runInNewContext(helpers, {window, Module});
-  return {window, allocations, nativeCalls: () => nativeCalls};
+  const owner = {};
+  vm.runInNewContext(transferGuards + '\n' + helpers, {window, Module, owner});
+  return {window, allocations, nativeCalls: () => nativeCalls,
+    allocationCalls: () => allocationCalls, phaseCalls: () => phaseCalls,
+    suspend() { owner.laterBReplayTransfer = {suspended: () => true}; }};
 }
 for (const name of ['menuObserveFighter', 'menuObserveFighterPort']) {
   const call = f => name.endsWith('Port') ? f.window[name](2, 8) : f.window[name](8);
+  test(`${name} actual access guard refuses before phase reads or allocations while suspended`, () => {
+    const f = fixture(); f.suspend();
+    assert.throws(() => call(f), /Private replay continuation forbids ordinary native diagnostics/);
+    assert.equal(f.phaseCalls(), 0); assert.equal(f.allocationCalls(), 0);
+    assert.equal(f.nativeCalls(), 0); assert.equal(f.allocations.size, 0);
+  });
   test(`${name} actual development source accepts complete native writes and preserves return shape`, () => {
     const f = fixture(), value = call(f);
     assert.deepEqual(Array.from(value.ids), [100, 101, 102, 103]);

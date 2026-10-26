@@ -232,7 +232,7 @@ async function runnerAdmission(e,args,overrides={}) {
     runnerSlice('const currentSssExitPath =','const runtimeDataUrl =')+
     runnerSlice('let currentSssExpected,','let browser;')+
     runnerSlice('  if (currentSssExit) {\n    report.inputs.current_sss_expected','  const cpuObservationRowLimit =')+
-    'return {currentSssExpected,currentSssPolicy,currentSssLater,currentSssStock4,currentSssStopsBeforeAssets,report};';
+    'return {currentSssExpected,currentSssPolicy,currentSssLater,currentSssStock4,currentSssStopsBeforeAssets,laterBGate2,laterBGate2Reserved,report};';
   return vm.runInNewContext('(async()=>{'+source+'})()',context);
 }
 const laterArgs=['--stadium-later-sss-exit','--stadium-current-sss-exit-expected','modeled-expected.json',
@@ -240,6 +240,7 @@ const laterArgs=['--stadium-later-sss-exit','--stadium-current-sss-exit-expected
 test('actual runner CLI and admission select later policy only under explicit finite opt-in',async()=>{
   const admitted=await runnerAdmission(expected(),laterArgs);
   assert.equal(admitted.currentSssLater,true);assert.equal(admitted.currentSssStock4,false);
+  assert.equal(admitted.laterBGate2,false);assert.equal(admitted.laterBGate2Reserved,false);
   assert.equal(admitted.currentSssStopsBeforeAssets,true);
   assert.equal(admitted.currentSssPolicy.compare,compareLaterSssExitObservation);
   assert.equal(admitted.currentSssPolicy.terminal,validateLaterSssExitTerminal);
@@ -327,6 +328,7 @@ test('actual runner finalizer classifies only later component pass after strict 
     report.browser_errors=[];report.unexpected_requests=[];report.artifact_inventory_pre={equal:true};mutate?.(report);
     const process={exitCode:0},messages=[];
     const context={currentSssExit:true,currentSssLater:true,currentSssStock4:false,currentSssPreparedStart:false,laterSssPreparedStart:false,laterSssPreparedSetup:false,
+      laterBGate2:admitted.laterBGate2,laterBGate2Reserved:admitted.laterBGate2Reserved,
       currentSssPolicy:admitted.currentSssPolicy,currentSssExpected:e,currentSssTrace:text(trace(e)),report,
       browserArtifactInventory:async()=>({equal:true}),diagnostic:false,process,console:{log:s=>messages.push(s)}};
     await vm.runInNewContext('(async()=>{'+finalizer+'})()',context);

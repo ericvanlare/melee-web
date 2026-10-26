@@ -22,7 +22,7 @@ import {FRESH_SETUP_GO2_ROUTE, validateFreshSetupGo2RunnerSource, validateFresh1
   validateMatchedSetupCfRequest, validateMatchedSetupCfPreflight,
   validateMatchedSetupCfIdentities, matchedSetupCfRuntimeFailure, PREFIX_V2_SCOPE, FULL_V3_SCOPE,
   trackMatchedSetupCfExplicitStep, matchedSetupCfNativeAccessAllowed,
-  dispatchMatchedSetupCfNativeEvaluation, guardMatchedSetupCfNativeCleanup,
+  dispatchMatchedSetupCfNativeEvaluation, guardMatchedSetupCfNativeCleanup, evaluateMatchedSetupCfNativeCommand,
   FULL_COMMON_FIELDS_SEED_V1_SCOPE, FRESH132_FULL_A_SCOPE, FRESH132_FULL_A_ROUTE, FRESH132_TYPED22_PAIR_ROUTE, FRESH132_TYPED22_PAIR_SCOPE}
   from './stadium_matched_setup_cf_runner_gate.mjs';
 import {elapsedMs, measureAsync, measureSync, monotonicNowNs, roundMs,
@@ -3266,140 +3266,7 @@ async function runFirstSssVsSetup(entryNative) {
 async function executeMatchedSetupCfNativeCommand(command) {
   const evaluatePromise = dispatchMatchedSetupCfNativeEvaluation({
     command, pendingStep: pendingMatchedSetupCfExplicitStep,
-    dispatch: () => page.evaluate(({kind, scheduleIndex, action, ordinal, bundle, bytes,
-    manifestBytes, accepted, requireAsyncifyIdle}) => {
-    const module = globalThis.Module;
-    const asyncifyIdle = () => typeof module?.stadiumMatchedSetupNativeIdle === 'function' &&
-      module.stadiumMatchedSetupNativeIdle() === true;
-    if (requireAsyncifyIdle && !asyncifyIdle())
-      return {result: 0, message: 'Asyncify is not idle; native command was suppressed',
-        asyncify_idle: false};
-    const readMessage = () => {
-      const pointer = module?._melee_web_native_menu_message?.();
-      return pointer ? module.UTF8ToString(pointer) : null;
-    };
-    if (!module) return {result: 0, message: 'Native module is absent'};
-    if (kind === 'arm') {
-      const fn = module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_arm;
-      if (typeof fn !== 'function') return {result: 0, message: 'Matched Setup C/F arm export is absent'};
-      const result = fn();
-      return {result, message: result === 1 ? null : readMessage()};
-    }
-    if (kind === 'arm-explicit-v2' || kind === 'arm-explicit-full' || kind === 'arm-explicit-typed22') {
-      const fn = kind === 'arm-explicit-typed22'
-        ? module._melee_web_native_menu_stadium_fresh132_typed22_explicit_arm : kind === 'arm-explicit-full'
-        ? module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_full_explicit_arm
-        : module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_explicit_arm;
-      if (typeof fn !== 'function') return {result: 0, message: 'Matched Setup C/F explicit arm export is absent'};
-      const pointer = module._malloc(manifestBytes.length);
-      if (!pointer) return {result: 0, message: 'Matched Setup C/F explicit manifest allocation failed'};
-      try {
-        module.HEAPU8.set(manifestBytes, pointer);
-        const result = fn(pointer, manifestBytes.length);
-        return {result, message: result === 1 ? null : readMessage()};
-      } finally { module._free(pointer); }
-    }
-    if (kind === 'arm-v2') {
-      const fn = module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_arm;
-      if (typeof fn !== 'function') return {result: 0, message: 'Matched Setup C/F v2 arm export is absent'};
-      const pointer = module._malloc(manifestBytes.length);
-      if (!pointer) return {result: 0, message: 'Matched Setup C/F v2 manifest allocation failed'};
-      try {
-        module.HEAPU8.set(manifestBytes, pointer);
-        const result = fn(pointer, manifestBytes.length);
-        return {result, message: result === 1 ? null : readMessage()};
-      } finally { module._free(pointer); }
-    }
-    if (kind === 'queue') {
-      const fn = module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_queue;
-      if (typeof fn !== 'function') return {result: 0, message: 'Matched Setup C/F queue export is absent'};
-      const pointer = bytes.length ? module._malloc(bytes.length) : 0;
-      if (bytes.length && !pointer) return {result: 0, message: 'Matched Setup C/F PAD copy allocation failed'};
-      try {
-        if (bytes.length) module.HEAPU8.set(bytes, pointer);
-        const result = fn(scheduleIndex, action === 'tick' ? 1 : 2,
-          ordinal, bundle, pointer, bytes.length);
-        return {result, message: result === 1 ? null : readMessage()};
-      } finally {
-        if (pointer) module._free(pointer);
-      }
-    }
-    if (kind === 'step-explicit') {
-      if (typeof module.ccall !== 'function')
-        throw Error('Matched Setup C/F explicit step requires generated runtime ccall');
-      const call = module.ccall(
-        'melee_web_native_menu_stadium_first_sss_vs_setup_cf_step_once',
-        'number', [], [], {async: true});
-      if (!call || typeof call.then !== 'function')
-        throw Error('Generated explicit native step did not return its Asyncify promise');
-      return Promise.resolve(call).then(result => {
-        const idle = asyncifyIdle();
-        return {result, message: idle ? result === 1 ? null : readMessage() : null,
-          asyncify_idle: idle};
-      }, error => {
-        const idle = asyncifyIdle();
-        const rejection = String(error?.message || error);
-        const nativeMessage = idle ? readMessage() : null;
-        return {result: 0,
-          message: idle ? `${nativeMessage || 'Asyncify native step rejected'}: ${rejection}`
-            : `Asyncify became unsafe after native step rejection: ${rejection}`,
-          asyncify_idle: idle};
-      });
-    }
-    if (kind === 'retire-ready') {
-      if (!asyncifyIdle()) return {ready: -1, asyncify_idle: false};
-      const fn = module?._melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire_ready;
-      if (typeof fn !== 'function')
-        return {ready: -1, asyncify_idle: true, message: 'Matched Setup C/F retire-ready export is absent'};
-      return {ready: fn(), asyncify_idle: true};
-    }
-    if (kind === 'retire-explicit') {
-      if (!asyncifyIdle()) return {result: 0, asyncify_idle: false};
-      if (typeof module.ccall !== 'function')
-        throw Error('Matched Setup C/F retirement requires generated runtime ccall');
-      const call = module.ccall(
-        'melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire',
-        'number', [], [], {async: true});
-      if (!call || typeof call.then !== 'function')
-        throw Error('Generated native retirement did not return its Asyncify promise');
-      const settled = result => {
-        const idle = asyncifyIdle();
-        if (!idle) return {result, asyncify_idle: false};
-        const statusFn = module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_retirement_status;
-        let retirement = null;
-        if (typeof statusFn === 'function') {
-          const pointer = statusFn();
-          retirement = pointer ? JSON.parse(module.UTF8ToString(pointer)) : null;
-        }
-        return {result, asyncify_idle: true, retirement,
-          phase: module._melee_web_native_menu_phase(),
-          running: module._melee_web_native_menu_running(),
-          message: result === 1 ? null : readMessage()};
-      };
-      return Promise.resolve(call).then(settled, error => {
-        const idle = asyncifyIdle();
-        if (!idle) return {result: 0, asyncify_idle: false,
-          rejection: String(error?.message || error)};
-        const response = settled(0);
-        response.rejection = String(error?.message || error);
-        return response;
-      });
-    }
-    if (kind === 'queue-v2') {
-      const fn = module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_queue;
-      if (typeof fn !== 'function') return {result: 0, message: 'Matched Setup C/F v2 queue export is absent'};
-      const result = fn(scheduleIndex, action === 'tick' ? 1 : 2,
-        ordinal, action === 'tick' ? bundle : -1);
-      return {result, message: result === 1 ? null : readMessage()};
-    }
-    if (kind === 'approve') {
-      const fn = module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_approve;
-      if (typeof fn !== 'function') return {result: 0, message: 'Matched Setup C/F approval export is absent'};
-      const result = fn(scheduleIndex, accepted ? 1 : 0);
-      return {result, message: result === 1 ? null : readMessage()};
-    }
-    return {result: 0, message: `Unknown matched Setup C/F native command ${kind}`};
-  }, command)});
+    dispatch: () => page.evaluate(evaluateMatchedSetupCfNativeCommand, command)});
   if (command.kind === 'step-explicit' || command.kind === 'retire-explicit') {
     const tracked = trackMatchedSetupCfExplicitStep(evaluatePromise, state => {
       state.asyncifyIdle = state.value?.asyncify_idle === true;

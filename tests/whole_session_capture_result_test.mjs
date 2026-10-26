@@ -183,6 +183,7 @@ function extractBetween(start, end) {
   assert(a >= 0 && b > a, `${start} production boundary missing`);
   return captureSource.slice(a, b);
 }
+const retainArtifactsSource = extractBetween('async function retainReplayArtifacts() {', 'async function runLaterBGate2FromSetup(');
 const closeSource = extractBetween('async function closeOwnedCaptureBrowser() {', 'const boundaryMarkers = [];');
 const observeSource = extractBetween('async function observePageOperation(label, operation) {', 'async function pauseTraceStatus');
 const collectSource = extractBetween('  try {\n  if (diagnostic) {\n    if (pageObservationTimedOut)', '  for (const candidate of runtimeDataAbortCandidates)');
@@ -231,7 +232,7 @@ async function actualCollection(failure, runtimeIncidentRecording = false) {
     browser: {close: async () => {calls.push('close'); if (failure === 'close failure') throw Error('owned close failed');}},
     browserContext: null, diagnosticCdp: null,
   });
-  vm.runInContext(observeSource + closeSource, scope);
+  vm.runInContext(observeSource + closeSource + retainArtifactsSource, scope);
   await vm.runInContext(`(async () => {${collectSource}})()`, scope);
   if (primary) assert.equal(report.first_error, primary, 'later failures must preserve primary');
   else if (failure === 'runtime incidents success')

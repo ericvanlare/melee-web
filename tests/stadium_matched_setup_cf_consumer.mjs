@@ -407,6 +407,193 @@ export function deriveRun2FullSchedule(runtimePayload, hostOnly) {
       terminal_draw_ordinal: 3581}}};
 }
 
+export const LATER_B_GATE2_MODE = 'original-b-first180-gate2-v1';
+export const LATER_B_GATE2_PROJECTION_IDENTITY=Object.freeze({bytes:2198167,sha256:'c7f44077f44533c4c3904b94538f654492d58f162cd579b1f267db02ac89c8b4'});
+const LATER_B_REFERENCE_ID = 'original-b-2013-943-v1';
+const LATER_B_RECIPE_SHA = '5fb53bdc71b35b800bc3451b1d9117709edef2413a38a8f7311ee352647a6755';
+const laterBDriverSources = new WeakMap();
+function freezeLaterB(value) {
+  if (value && typeof value === 'object') {
+    for (const item of Object.values(value)) freezeLaterB(item);
+    Object.freeze(value);
+  }
+  return value;
+}
+function laterBRequire(value, message) { if (!value) throw new TypeError(`Later B Gate2 ${message}`); }
+function laterBCoordinate(row, {boundary = null, phase = null, tick = null, draw = null} = {}) {
+  exactKeys(row, ['sequence','source_tick','draw_ordinal','match_index',boundary === null ? 'phase' : 'boundary',
+    'pc','lr',...(boundary === null ? [] : ['gprs'])], 'Later B source coordinate');
+  laterBRequire(['sequence','source_tick','draw_ordinal'].every(key => Number.isSafeInteger(row[key]) && row[key]>=0) &&
+    row.match_index === 1 && (boundary===null
+      ? /^0x[0-9a-f]{8}$/.test(row.pc) && /^0x[0-9a-f]{8}$/.test(row.lr)
+      : [row.pc,row.lr].every(value=>Number.isSafeInteger(value)&&value>=0&&value<=0xffffffff)) &&
+    (tick === null || row.source_tick === tick) && (draw === null || row.draw_ordinal === draw), 'source coordinate differs');
+  if (boundary !== null) laterBRequire(row.boundary === boundary && Array.isArray(row.gprs) && row.gprs.length === 32 &&
+    row.gprs.every(value => Number.isSafeInteger(value) && value>=0 && value<=0xffffffff), 'boundary/GPR shape differs');
+  else laterBRequire(row.phase === phase, 'progress phase differs');
+  return row;
+}
+function laterBSeed(row) {
+  exactKeys(row, ['pointer_slot_address','pointer_hex','value_address','value_hex'], 'Later B original seed owner');
+  laterBRequire(row.pointer_slot_address === 0x804d5f94 && /^[0-9a-f]{8}$/.test(row.pointer_hex) &&
+    /^[0-9a-f]{8}$/.test(row.value_hex) && Number.isSafeInteger(row.value_address) &&
+    row.value_address>=0x80000000 && row.value_address<=0x817ffffc && row.value_address%4===0 &&
+    Number.parseInt(row.pointer_hex,16)===row.value_address, 'original seed owner is malformed');
+  return row.value_hex;
+}
+function typedOriginalValues(fields,tick) {
+  const values=commonOriginalValues(fields,tick),map=fields.map2,title=fields.title;
+  Object.assign(values, {
+    map2_gate_mask_40: requiredBoolean(map.gate_mask_40, 'map2.gate_mask_40'),
+    map5_root_relation: requiredBoolean(map.map5_root_pointer_equals_fixed_map5_slot_value, 'map2.map5_root_relation'),
+    sis_font1_present: requiredBoolean(title.font1_slot_pointer_present, 'title.font1_slot_pointer_present'),
+    title_child_present: requiredBoolean(title.title_child_present, 'title.title_child_present'),
+    title_wrapper_present: requiredBoolean(title.text_wrapper_present, 'title.text_wrapper_present'),
+    title_static_present: requiredBoolean(title.static_text_pointer_present, 'title.static_text_pointer_present'),
+    title_dynamic_present: requiredBoolean(title.dynamic_text_pointer_present, 'title.dynamic_text_pointer_present'),
+  });
+  return values;
+}
+export function deriveLaterBGate2Expectations(input) {
+  // This validates/copies host reference data. It grants no native authority;
+  // the actual archived recipe/parent remains independently checked by MWB2.
+  laterBRequire(typeof input==='string'||input instanceof Uint8Array,'requires exact serialized projection bytes, not a mutable operand object');
+  const raw=Buffer.from(input);
+  laterBRequire(raw.length===LATER_B_GATE2_PROJECTION_IDENTITY.bytes &&
+    createHash('sha256').update(raw).digest('hex')===LATER_B_GATE2_PROJECTION_IDENTITY.sha256,'serialized projection identity differs');
+  return inspectLaterBGate2ReferenceFields(JSON.parse(raw.toString('utf8')));
+}
+// Reference-only field validation is exposed for falsification controls, never
+// accepted as a prevalidated driver/native admission object.
+export function inspectLaterBGate2ReferenceFields(input) {
+  const p=structuredClone(input);
+  exactKeys(p,['schema','reference_id','binding_sha256','recipe_sha256','selected_match','setup_global_cursor',
+    'menu_prefix','source_spans','entry','setup','constructor_shared_projection','constructor_original_witnesses',
+    'actions','go','states','stop_before_consume','unpaired','runtime_admission','same_run_provenance_verified',
+    'browser_parity','C3'],'Later B reference projection');
+  laterBRequire(p.schema==='melee-web-stadium-later-b-gate2-reference-projection-v1' &&
+    p.reference_id===LATER_B_REFERENCE_ID && p.recipe_sha256===LATER_B_RECIPE_SHA && validSha(p.binding_sha256) &&
+    p.selected_match===1 && p.setup_global_cursor===943 &&
+    ['runtime_admission','same_run_provenance_verified','browser_parity','C3'].every(key=>p[key]===false) &&
+    sameJson(p.unpaired,['original_constructor_phase_dispatch','per_owner_rng','registration','all_writers','C3']),
+    'reference identity/scope differs');
+  exactKeys(p.menu_prefix,['scope','input_count','inputs'],'Later B menu prefix');
+  laterBRequire(p.menu_prefix.scope==='global literal input prefix; distinct from local B action indices' &&
+    p.menu_prefix.input_count===943 && Array.isArray(p.menu_prefix.inputs) && p.menu_prefix.inputs.length===943 &&
+    p.menu_prefix.inputs.every((row,index)=>row.index===index && row.source_seq===row.sequence &&
+      Array.isArray(row.pads) && row.pads.length===4 && row.pads.every(pad=>/^[0-9a-f]{22}$/.test(pad))),
+    'literal menu prefix differs');
+  const first=[0,150,283,476,690,818,943,1135,1347,1484,1609,1802];
+  const last=[149,282,475,689,817,942,1134,1346,1483,1608,1801,2012];
+  laterBRequire(Array.isArray(p.source_spans) && p.source_spans.length===12 && p.source_spans.every((row,index)=>
+    sameJson(row,{first_frame:first[index],last_frame:last[index],scene:[1,2,3,4][index%4]})), 'source topology differs');
+  for(const [name,seed] of [['entry','ba5dac05'],['setup','4b25c79b']]) {
+    const row=p[name];exactKeys(row,['sequence','source_tick','draw_ordinal','match_index','boundary','pc','lr','gprs','seed'],`Later B ${name}`);
+    const {seed:scalar,...coordinate}=row;laterBCoordinate(coordinate,{boundary:name});
+    laterBRequire(scalar===seed,'Entry and completed Setup phase seed differs');
+  }
+  laterBRequire(p.entry.sequence<p.setup.sequence,'Entry/Setup order differs');
+  const ctor=p.constructor_shared_projection;
+  exactKeys(ctor,['scope','entry_count','parameter_roles','min_parameter','max_parameter','random_bound','random_result','seed_before','seed_after'], 'Later B constructor aggregate');
+  laterBRequire(sameJson(ctor,{scope:'original-and-native-shared-aggregate-only',entry_count:1,
+    parameter_roles:{min_parameter:'parameter_x0',max_parameter:'parameter_x4'},min_parameter:3600,max_parameter:3800,
+    random_bound:200,random_result:142,seed_before:p.entry.seed,seed_after:'b6cdeeb4'}),'shared constructor aggregate differs');
+  const witnesses=p.constructor_original_witnesses;
+  exactKeys(witnesses,['scope','coordinates'],'Later B original constructor witnesses');
+  laterBRequire(witnesses.scope==='original-only order; no browser phase-dispatch pairing' &&
+    Array.isArray(witnesses.coordinates) && witnesses.coordinates.length===5,'original witness scope/count differs');
+  let sequence=p.entry.sequence;
+  for(const [index,phase] of ['constructor_entry','constructor_parameters','constructor_up_call','constructor_up_return','constructor_commit'].entries()) {
+    const row=laterBCoordinate(witnesses.coordinates[index],{phase});
+    laterBRequire(row.sequence>sequence && row.sequence<p.setup.sequence,'original constructor phase order differs');sequence=row.sequence;
+  }
+  laterBRequire(Array.isArray(p.actions) && p.actions.length===360,'requires exactly360 actual actions');
+  const bundles=[],schedule=[];
+  sequence=p.setup.sequence;
+  for(let tick=0;tick<180;tick++) {
+    const a=p.actions[tick*2],d=p.actions[tick*2+1];
+    exactKeys(a,['action_index','kind','source_tick','consume','tick','pads'],'Later B tick action');
+    exactKeys(d,['action_index','kind','source_tick','draw_enter','draw_return'],'Later B draw action');
+    laterBRequire(a.action_index===tick*2 && a.kind==='tick' && a.source_tick===tick &&
+      d.action_index===tick*2+1 && d.kind==='draw' && d.source_tick===tick+1 &&
+      Array.isArray(a.pads) && a.pads.length===4 && a.pads.every(pad=>/^[0-9a-f]{22}$/.test(pad)), 'actual action/PAD dimensions differ');
+    const coordinates=[laterBCoordinate(a.consume,{boundary:'pad_consume',tick,draw:tick}),
+      laterBCoordinate(a.tick,{boundary:'source_tick',tick,draw:tick}),
+      laterBCoordinate(d.draw_enter,{boundary:'draw_enter',tick:tick+1,draw:tick}),
+      laterBCoordinate(d.draw_return,{boundary:'draw_return',tick:tick+1,draw:tick})];
+    for(const row of coordinates){laterBRequire(row.sequence>sequence,'consume/tick/draw source order differs');sequence=row.sequence;}
+    bundles.push({bundle:tick,ports:a.pads.map((status_hex,port)=>({port,status_hex}))});
+    schedule.push({action:'tick',action_index:tick*2,bundle:tick},{action:'draw',action_index:tick*2+1,draw:tick});
+  }
+  laterBCoordinate(p.stop_before_consume,{boundary:'pad_consume',tick:180,draw:180});
+  laterBRequire(sequence<p.stop_before_consume.sequence,'final actual draw crosses the pause consume');
+  exactKeys(p.go,['coordinate','state','rng'],'Later B GO');
+  const go=laterBCoordinate(p.go.coordinate,{phase:'go_after'}),goTick=go.source_tick;
+  laterBRequire(Number.isSafeInteger(goTick) && goTick>=0 && goTick+96===180 && go.draw_ordinal===goTick &&
+    p.actions[goTick*2].consume.sequence<go.sequence && go.sequence<p.actions[goTick*2].tick.sequence,
+    'actual GO marker is absent or outside its consume/tick bracket');
+  laterBRequire(p.go.state.label==='GO' && p.go.state.sequence===go.sequence &&
+    p.go.state.source_tick===goTick && p.go.state.draw_ordinal===go.draw_ordinal,'GO state is not its event');
+  typedOriginalValues(p.go.state,goTick);laterBSeed(p.go.rng);
+  laterBRequire(Array.isArray(p.states) && p.states.length===96,'requires exactly96 post-GO typed states');
+  const expectedRows=new Map();
+  for(const [ordinal,row] of p.states.entries()) {
+    exactKeys(row,['tick','state','rng'],'Later B post-tick state');
+    const tick=goTick+ordinal,a=p.actions[tick*2],raw=row.state;
+    laterBRequire(sameJson(row.tick,a.tick) && raw.label==='IDLE' && raw.sequence===a.tick.sequence &&
+      raw.source_tick===tick && raw.draw_ordinal===a.tick.draw_ordinal &&
+      row.rng.value_address===p.go.rng.value_address && row.rng.pointer_hex===p.go.rng.pointer_hex,
+      'post-tick row is not its actual source action/seed owner');
+    expectedRows.set(tick*2,freezeLaterB({action_index:tick*2,boundary_role:'POST_GO_STATE',draw_ordinal:raw.draw_ordinal,
+      raw_identity:{sequence:raw.sequence,source_tick:tick,draw_ordinal:raw.draw_ordinal},seed_ordinal:ordinal,
+      seed_hex:laterBSeed(row.rng),source_tick:tick,values:typedOriginalValues(raw,tick)}));
+  }
+  const runtimePayload=freezeLaterB({schema:'melee-web-stadium-later-b-gate2-actions-v1',version:1,
+    bundles,schedule,checkpoints:{go_action_index:goTick*2,go_source_tick:goTick,terminal_action_index:359,terminal_draw_ordinal:179}});
+  validateRun2RuntimePayload({schema:'melee-web-stadium-pad-action-plan',version:1,bundles,schedule});
+  return {mode:LATER_B_GATE2_MODE,runtimePayload,commonRowsByAction:expectedRows,
+    reference:freezeLaterB(p),goTick,goActionIndex:goTick*2,sourceActions:freezeLaterB(p.actions),
+    runtime_admission:false};
+}
+
+export function compareLaterBGate2Constructor({expected,actualSetup,admittedWorldGeneration}) {
+  const state=actualSetup?.stadium_setup_state;
+  const pairs=[['entry_count','constructor_callback_count'],['min_parameter','parameter_x0'],['max_parameter','parameter_x4'],
+    ['random_bound','constructor_randi_bound'],['random_result','constructor_randi_result'],
+    ['seed_before','source_seed_before_hex'],['seed_after','source_seed_after_hex']]
+    .map(([original,native])=>({path:original,expected:expected?.constructor_shared_projection?.[original],actual:state?.[native]}));
+  const mismatch=pairs.find(row=>!Object.is(row.expected,row.actual)) || null;
+  const owner=Number.isSafeInteger(admittedWorldGeneration) && admittedWorldGeneration>0 &&
+    actualSetup?.handoff_origin==='current_sss_prepared_later_943' && actualSetup.complete===true && actualSetup.captured===true &&
+    actualSetup.source_frames===0 && actualSetup.host_tick_calls===0 && actualSetup.host_draw_calls===0 &&
+    state?.schema==='melee-web-stadium-zero-tick-setup-state-v1' && state.world_generation===admittedWorldGeneration &&
+    state.world_ticks===0 && state.source_frame===0 && state.map_id===2 && state.source_parameter_roots_agree===true &&
+    state.constructor_randi_call_count===1 && state.constructor_randi_scope==='existing_inline_grStadium_randi_call';
+  const setupSeed=actualSetup?.actual?.random_seed_hex;
+  return {schema:'melee-web-later-b-constructor-aggregate-comparison-v1',
+    decision:owner&&!mismatch&&setupSeed===expected?.setup?.seed?'PASS_SEVEN_SHARED_AGGREGATES_AND_SEPARATE_SETUP_SEED':'REFUSE_CONSTRUCTOR_AGGREGATE_OR_SETUP_OWNER',
+    compared_fields:pairs,first_mismatch:mismatch,owner_checks_pass:owner,
+    native_randi_call_count:state?.constructor_randi_call_count??null,
+    setup_seed:{expected:expected?.setup?.seed??null,actual:setupSeed??null},
+    unpaired:['original_five_phase_order','browser_constructor_dispatch_PC','per_owner_rng']};
+}
+export function compareLaterBGate2Go({reference,actualEvent,actualTick,admittedWorldGeneration}) {
+  const go=reference?.go;
+  const pairs=[{path:'map2.gate_mask_80',expected:Number(go?.state?.map2?.gate_mask_80),actual:actualEvent?.map2_gate},
+    {path:'display.mode_s16',expected:go?.state?.display?.mode_s16,actual:actualEvent?.display_mode},
+    {path:'rng.seed_hex',expected:go?.rng?.value_hex,actual:actualEvent?.source_seed_hex}];
+  const mismatch=pairs.find(row=>!Object.is(row.expected,row.actual))||null;
+  const owner=actualTick===go?.coordinate?.source_tick && Number.isSafeInteger(admittedWorldGeneration) && admittedWorldGeneration>0 &&
+    actualEvent?.generation===admittedWorldGeneration && actualEvent?.world_ticks===actualTick &&
+    actualEvent?.source_seed_valid===1 && actualEvent?.sequence===3 && actualEvent?.source_branch===0;
+  return {schema:'melee-web-later-b-go-hook-comparison-v1',phase:'GO',
+    decision:owner&&!mismatch?'PASS_SHARED_GO_EVENT_FIELDS_AND_SEED':'REFUSE_GO_EVENT_OR_MEMBERSHIP',
+    original_sequence:go?.coordinate?.sequence??null,source_tick:actualTick,
+    compared_fields:pairs,first_mismatch:mismatch,owner_checks_pass:owner,
+    unpaired:['native_callback_index','native_callback_identity','native_remap_branch','native_hud_enabled','native_source_frame',
+      'original_vs_native_event_sequence_identity','GO_typed22_full_snapshot']};
+}
+
 export const FRESH132_TYPED22_MODE = 'fresh132-full-pair-typed22-v1';
 export const TYPED22_RELATION_KEYS = Object.freeze(["map2_gate_mask_40", "map5_root_relation", "sis_font1_present", "title_child_present", "title_wrapper_present", "title_static_present", "title_dynamic_present"]);
 const COMMON_FIELDS_NATIVE_SAMPLE_SCHEMA = 'melee-web-stadium-per-tick-common-fields-native-v2';
@@ -572,19 +759,7 @@ export function deriveFresh132FullAExpectations(projection, {typed22 = false} = 
       throw new TypeError(`Fresh132 full-A typed row ${index} identity differs`);
     const actionIndex = findTickAction(tick);
     if (expectedByAction.has(actionIndex)) throw new TypeError('Fresh132 full-A typed row action is duplicated');
-    const values = commonOriginalValues(row.typed_fields, tick);
-    if (typed22) {
-      const map=row.typed_fields.map2, title=row.typed_fields.title;
-      Object.assign(values, {
-        map2_gate_mask_40: requiredBoolean(map.gate_mask_40, 'map2.gate_mask_40'),
-        map5_root_relation: requiredBoolean(map.map5_root_pointer_equals_fixed_map5_slot_value, 'map2.map5_root_relation'),
-        sis_font1_present: requiredBoolean(title.font1_slot_pointer_present, 'title.font1_slot_pointer_present'),
-        title_child_present: requiredBoolean(title.title_child_present, 'title.title_child_present'),
-        title_wrapper_present: requiredBoolean(title.text_wrapper_present, 'title.text_wrapper_present'),
-        title_static_present: requiredBoolean(title.static_text_pointer_present, 'title.static_text_pointer_present'),
-        title_dynamic_present: requiredBoolean(title.dynamic_text_pointer_present, 'title.dynamic_text_pointer_present'),
-      });
-    }
+    const values = typed22 ? typedOriginalValues(row.typed_fields,tick) : commonOriginalValues(row.typed_fields,tick);
     expectedByAction.set(actionIndex, {action_index: actionIndex, boundary_role: role,
       draw_ordinal: row.draw_ordinal,
       raw_identity: {sequence: row.source_sequence, source_tick: tick, draw_ordinal: row.draw_ordinal},
@@ -854,8 +1029,8 @@ export function deriveRun2CommonSeedExpectations(runtimePayload, hostOnly,
 }
 
 export function compareOriginalCommonTickFields({expected, actual, actionIndex, sourceFramesAfter,
-  admittedWorldGeneration, typed22 = false}) {
-  if (typeof typed22 !== 'boolean') throw new TypeError('Typed22 comparison scope must be explicit');
+  admittedWorldGeneration, typed22 = false, laterB = false, laterBGoTick = null}) {
+  if (typeof typed22 !== 'boolean' || typeof laterB !== 'boolean' || (laterB && !typed22)) throw new TypeError('Typed22 comparison scope must be explicit');
   const fieldCount=typed22?22:15;
   const nativeSchema=typed22?'melee-web-stadium-per-tick-common-fields-native-v3':COMMON_FIELDS_NATIVE_SAMPLE_SCHEMA;
   const comparisonSchema=typed22?'melee-web-stadium-source-tick-common-fields-comparison-v3':COMMON_FIELDS_COMPARISON_SCHEMA;
@@ -878,13 +1053,16 @@ export function compareOriginalCommonTickFields({expected, actual, actionIndex, 
       result.first_mismatch={path,expected:'strict record (raw retained)',actual:'invalid (raw retained)'};
     return result;
   };
+  if(laterB&&(!Number.isSafeInteger(laterBGoTick)||laterBGoTick<0||laterBGoTick+96!==180))
+    return refusal('original.GO_coordinate','actual validated reference GO plus96 states to pause180',laterBGoTick);
+  const firstTick=laterB?laterBGoTick:84;
   if (typed22) {
     const inRange=(value,min,max)=>Number.isSafeInteger(value)&&value>=min&&value<=max;
-    const valid={action_index:inRange(actionIndex,0,7167),source_tick:inRange(expected?.source_tick,84,3584),
+    const valid={action_index:inRange(actionIndex,0,laterB?359:7167),source_tick:inRange(expected?.source_tick,laterB?0:84,laterB?179:3584),
       original_sequence:inRange(expected?.raw_identity?.sequence,0,Number.MAX_SAFE_INTEGER),
-      draw_ordinal:inRange(expected?.draw_ordinal,0,3582)};
+      draw_ordinal:inRange(expected?.draw_ordinal,0,laterB?179:3582)};
     if(Object.values(valid).some(value=>!value)) {
-      const result=refusal('original.coordinates','declared MWC6 coordinate domains','invalid coordinates; full raw retained');
+      const result=refusal('original.coordinates',laterB?'declared MWB2 coordinate domains':'declared MWC6 coordinate domains','invalid coordinates; full raw retained');
       for(const [key,ok] of Object.entries(valid))if(!ok)result[key]=null;
       return result;
     }
@@ -896,13 +1074,13 @@ export function compareOriginalCommonTickFields({expected, actual, actionIndex, 
       'common-field expected raw identity');
     exactKeys(expected.values, [...COMMON_FIELDS_EXPECTED_KEYS,...relationKeys], 'common-field expected values');
     if (!Number.isSafeInteger(actionIndex) || actionIndex !== expected.action_index ||
-        !Number.isSafeInteger(expected.source_tick) || expected.source_tick < 84 ||
-        expected.source_tick > 3584 || expected.raw_identity.source_tick !== expected.source_tick ||
+        !Number.isSafeInteger(expected.source_tick) || expected.source_tick < firstTick ||
+        expected.source_tick > (laterB?179:3584) || expected.raw_identity.source_tick !== expected.source_tick ||
         expected.raw_identity.draw_ordinal !== expected.draw_ordinal ||
         !Number.isSafeInteger(expected.raw_identity.sequence) || expected.raw_identity.sequence < 0 ||
-        expected.seed_ordinal !== expected.source_tick - 84 ||
+        expected.seed_ordinal !== expected.source_tick - firstTick ||
         !/^[0-9a-f]{8}$/.test(expected.seed_hex ?? '') ||
-        expected.boundary_role !== (expected.source_tick === 84 ? 'C' :
+        expected.boundary_role !== (laterB ? 'POST_GO_STATE' : expected.source_tick === 84 ? 'C' :
           expected.source_tick === 85 ? 'F' : 'IDLE'))
       return refusal('original.action_mapping', expected?.action_index, actionIndex);
     if (!Number.isSafeInteger(admittedWorldGeneration) || admittedWorldGeneration <= 0)
@@ -1076,9 +1254,14 @@ function encodeNativeManifestRows(prefix, magic) {
   write32(12, prefix.checkpoints.f_action_index);
   write32(16, prefix.checkpoints.c_source_tick);
   write32(20, prefix.checkpoints.f_source_tick);
+  writeNativeManifestActionRows(prefix,bytes,24,write32);
+  return bytes;
+}
+
+function writeNativeManifestActionRows(prefix,bytes,start,write32) {
   let draws = 0;
   for (let index = 0; index < prefix.schedule.length; ++index) {
-    const action = prefix.schedule[index], offset = 24 + index * 57;
+    const action = prefix.schedule[index], offset = start + index * 57;
     const tick = action.action === 'tick';
     bytes[offset] = tick ? 1 : 2;
     write32(offset + 1, tick ? action.bundle : action.draw);
@@ -1087,7 +1270,29 @@ function encodeNativeManifestRows(prefix, magic) {
     if (tick) bytes.set(bundleBytes(prefix.bundles[action.bundle]), offset + 13);
     else ++draws;
   }
-  return bytes;
+}
+
+export function encodeLaterBGate2NativeManifest(full,token) {
+  exactKeys(full,['schema','version','bundles','schedule','checkpoints'],'Later B manifest');
+  exactKeys(full.checkpoints,['go_action_index','go_source_tick','terminal_action_index','terminal_draw_ordinal'],'Later B checkpoints');
+  const go=full.checkpoints.go_source_tick;
+  laterBRequire(full.schema==='melee-web-stadium-later-b-gate2-actions-v1' && full.version===1 &&
+    full.bundles.length===180 && full.schedule.length===360 && go+96===180 &&
+    full.checkpoints.go_action_index===go*2 && full.checkpoints.terminal_action_index===359 &&
+    full.checkpoints.terminal_draw_ordinal===179 && typeof token==='string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(token),
+    'MWB2 exact dimensions or UUID differs');
+  validateRun2RuntimePayload({schema:'melee-web-stadium-pad-action-plan',version:1,bundles:full.bundles,schedule:full.schedule});
+  laterBRequire(full.schedule.every((row,index)=>row.action===(index%2?'draw':'tick') &&
+    (index%2?row.draw:row.bundle)===Math.floor(index/2)), 'MWB2 action order differs');
+  const bytes=new Uint8Array(60+360*57);bytes.set([0x4d,0x57,0x42,0x32]);
+  const write32=(offset,value)=>{
+    if(!Number.isSafeInteger(value)||value<0||value>0xffffffff)throw new TypeError('MWB2 integer outside uint32');
+    bytes[offset]=value&0xff;bytes[offset+1]=(value>>>8)&0xff;bytes[offset+2]=(value>>>16)&0xff;bytes[offset+3]=(value>>>24)&0xff;
+  };
+  for(const [offset,value] of [[4,360],[8,943],[12,go],[16,180],[20,36]])write32(offset,value);
+  bytes.set(Uint8Array.from(token,char=>char.charCodeAt(0)),24);
+  writeNativeManifestActionRows(full,bytes,60,write32);return bytes;
 }
 
 function requiredHex32(value, label) {
@@ -1538,31 +1743,41 @@ function bundleBytes(bundle) {
 export class StadiumSetupCfActionDriver {
   constructor({runtimePayload, native, commonFields = false, fresh132FullA = false, fresh132Typed22 = false,
     commonRowsByAction = null, admittedWorldGeneration = null,
-    requiredQueueObservation = null, go2QueueExpectation = null, go2ActionIndex = null}) {
+    requiredQueueObservation = null, go2QueueExpectation = null, go2ActionIndex = null, laterBProjection = null, laterBToken = null}) {
+    const laterB=laterBProjection!==null;
+    if(!laterB&&laterBToken!==null)throw new TypeError('Later B UUID requires its explicit serialized projection');
+    const laterBSource=laterB?deriveLaterBGate2Expectations(laterBProjection):null;
+    if(laterB){
+      if(commonFields||fresh132FullA||fresh132Typed22||commonRowsByAction!==null||requiredQueueObservation!==null||go2QueueExpectation!==null||go2ActionIndex!==null||runtimePayload!==undefined)
+        throw new TypeError('Later B Gate2 cannot mix legacy manifests or field scopes');
+      runtimePayload=laterBSource.runtimePayload;commonRowsByAction=laterBSource.commonRowsByAction;
+      laterBDriverSources.set(this,laterBSource);
+    }
     if (typeof fresh132Typed22 !== 'boolean' || (fresh132Typed22 && !fresh132FullA) ||
         typeof commonFields !== 'boolean' || typeof fresh132FullA !== 'boolean' ||
         (commonFields && runtimePayload?.schema !== 'melee-web-stadium-run2-full-schedule-v3') ||
         (fresh132FullA && (commonFields ||
           runtimePayload?.schema !== 'melee-web-stadium-fresh132-full-a-v1')))
       throw new TypeError('Per-tick or Fresh132 full-A observations require their explicit manifest mode');
-    this.typed22=fresh132Typed22;
-    this.mode = fresh132Typed22 ? FRESH132_TYPED22_MODE : fresh132FullA ? 'fresh132-full-a-v1'
+    this.laterB=laterB;
+    this.typed22=fresh132Typed22||laterB;
+    this.mode = laterB?LATER_B_GATE2_MODE:fresh132Typed22 ? FRESH132_TYPED22_MODE : fresh132FullA ? 'fresh132-full-a-v1'
       : commonFields ? 'run2-full-common-fields-seed-v1'
       : runtimePayload?.schema === 'melee-web-stadium-run2-full-schedule-v3'
       ? 'run2-full-schedule-v3' : runtimePayload?.schema === 'melee-web-stadium-run2-proper-prefix-v2'
       ? 'run2-proper-prefix-v2' : 'legacy-v1';
-    this.commonFields = commonFields || fresh132FullA;
-    this.commonRowsByAction = this.commonFields ? commonRowsByAction : null;
+    this.commonFields = commonFields || fresh132FullA || laterB;
+    this.commonRowsByAction = this.commonFields ? (laterB?new Map(commonRowsByAction):commonRowsByAction) : null;
     const generationBound = this.commonFields || requiredQueueObservation !== null || go2QueueExpectation !== null;
     if (generationBound && (!Number.isSafeInteger(admittedWorldGeneration) || admittedWorldGeneration <= 0))
       throw new TypeError('Per-tick common fields or queue observation require the positive safe generation from checked Setup');
     this.admittedWorldGeneration = generationBound ? admittedWorldGeneration : null;
-    if (this.commonFields && (!(commonRowsByAction instanceof Map) || commonRowsByAction.size !== 3501))
-      throw new TypeError('Per-tick common source expectations must contain exactly3501 mapped rows');
+    if (this.commonFields && (!(commonRowsByAction instanceof Map) || commonRowsByAction.size !== (laterB?96:3501)))
+      throw new TypeError(laterB?'Later B requires exactly96 mapped rows':'Per-tick common source expectations must contain exactly3501 mapped rows');
     if (this.commonFields) {
       for (let index = 0; index < runtimePayload.schedule.length; ++index) {
         const action = runtimePayload.schedule[index];
-        const selected = action.action === 'tick' && action.bundle >= 84 && action.bundle <= 3584;
+        const selected = action.action === 'tick' && action.bundle >= (laterB?laterBSource.goTick:84) && action.bundle <= (laterB?179:3584);
         const row = commonRowsByAction.get(index);
         if (selected ? (!row || row.action_index !== index || row.source_tick !== action.bundle)
           : row !== undefined)
@@ -1573,7 +1788,7 @@ export class StadiumSetupCfActionDriver {
     else {
       exactKeys(runtimePayload, ['bundles', 'checkpoints', 'schedule', 'schema', 'version'],
         'run2 proper-prefix manifest');
-      const expectedVersion = ['fresh132-full-a-v1',FRESH132_TYPED22_MODE].includes(this.mode) ? 1
+      const expectedVersion = laterB?1:['fresh132-full-a-v1',FRESH132_TYPED22_MODE].includes(this.mode) ? 1
         : ['run2-full-schedule-v3', 'run2-full-common-fields-seed-v1'].includes(this.mode) ? 3 : 2;
       if (runtimePayload.version !== expectedVersion || !Array.isArray(runtimePayload.bundles) ||
           !Array.isArray(runtimePayload.schedule) || !runtimePayload.schedule.length ||
@@ -1581,12 +1796,17 @@ export class StadiumSetupCfActionDriver {
           runtimePayload.schedule.at(-1)?.action !== 'draw')
         throw new TypeError('run2 proper-prefix manifest is malformed');
       this.payload = runtimePayload;
-      this.nativeManifest = ['fresh132-full-a-v1',FRESH132_TYPED22_MODE].includes(this.mode)
+      this.nativeManifest = laterB ? encodeLaterBGate2NativeManifest(runtimePayload,laterBToken) : ['fresh132-full-a-v1',FRESH132_TYPED22_MODE].includes(this.mode)
         ? encodeFresh132FullANativeManifest(runtimePayload)
         : this.mode === 'run2-full-common-fields-seed-v1'
           ? encodeRun2FullCommonNativeManifest(runtimePayload)
           : this.mode === 'run2-full-schedule-v3'
             ? encodeRun2FullNativeManifest(runtimePayload) : encodeRun2NativeManifest(runtimePayload);
+    }
+    if(laterB){
+      for(const key of ['payload','mode','laterB','typed22','commonFields','admittedWorldGeneration'])
+        Object.defineProperty(this,key,{value:this[key],writable:false});
+      laterBSource.manifestSha256=createHash('sha256').update(this.nativeManifest).digest('hex');
     }
     this.requiredQueueObservation = requiredQueueObservation === null ? null
       : validateRequiredQueueObservation(requiredQueueObservation, this.payload);
@@ -1632,11 +1852,18 @@ export class StadiumSetupCfActionDriver {
     this.sourceFrame = 0; // Completed Setup is admitted at original match clock zero.
   }
 
-  async arm(setupApproved) {
+  async arm(setupApproved,actualSetup=null) {
     if (this.inFlight || this.armed || this.failed || this.complete)
       return this._fail('duplicate or terminal arm');
     if (setupApproved !== true)
       return this._fail('fresh completed Setup owner/approval was refused');
+    if(this.laterB){
+      if(createHash('sha256').update(this.nativeManifest).digest('hex')!==laterBDriverSources.get(this).manifestSha256)
+        return this._fail('Later B immutable native manifest changed before arm');
+      this.constructorComparison=compareLaterBGate2Constructor({expected:laterBDriverSources.get(this).reference,actualSetup,admittedWorldGeneration:this.admittedWorldGeneration});
+      if(this.constructorComparison.decision!=='PASS_SEVEN_SHARED_AGGREGATES_AND_SEPARATE_SETUP_SEED')
+        return this._fail('Later B actual zero-action constructor/Setup comparison refused');
+    }
     this.inFlight = true;
     try {
       const manifest = this.mode === 'legacy-v1' ? null : this.nativeManifest;
@@ -1690,6 +1917,9 @@ export class StadiumSetupCfActionDriver {
          observation?.common_field_count !== (this.typed22?22:15) || observation?.seed_value_count !== 1 ||
          observation?.action_count !== 7167))
       return this._fail('Per-tick common-field native observation scope differs');
+    const laterBSource=this.laterB?laterBDriverSources.get(this):null;
+    if(this.laterB && !this._acceptLaterBEnvelope(observation,action,laterBSource))
+      return this._fail('Later B native action/owner/GO/constructor envelope differs');
     const result = observation?.last_action;
     const ordinal = this.mode === 'legacy-v1' ? action?.ordinal :
       action?.action === 'tick' ? action.bundle : action?.draw;
@@ -1723,7 +1953,7 @@ export class StadiumSetupCfActionDriver {
       return this._fail(observation?.error || 'native completion receipt differs from the pending action');
     const cIndex = this.mode === 'legacy-v1' ? 168 : this.payload.checkpoints.c_action_index;
     const fIndex = this.mode === 'legacy-v1' ? 170 : this.payload.checkpoints.f_action_index;
-    const isBoundary = action.action === 'tick' && (this.cursor === cIndex || this.cursor === fIndex);
+    const isBoundary = !this.laterB && action.action === 'tick' && (this.cursor === cIndex || this.cursor === fIndex);
     const isGo2 = action.action === 'tick' && (['fresh132-full-a-v1',FRESH132_TYPED22_MODE].includes(this.mode)
       ? this.cursor === this.go2ActionIndex
       : this.go2QueueExpectation !== null && this.cursor === this.go2QueueExpectation.action_index);
@@ -1794,16 +2024,22 @@ export class StadiumSetupCfActionDriver {
     } else if (hostComparison !== null) {
       refusal = 'host comparison was supplied outside C/F/GO2';
     }
-    if (this.mode === 'run2-full-common-fields-seed-v1' || ['fresh132-full-a-v1',FRESH132_TYPED22_MODE].includes(this.mode)) {
-      const selectedTick = action.action === 'tick' && action.bundle >= 84 && action.bundle <= 3584;
-      const expectedCommon = this.commonRowsByAction.get(this.cursor);
+    if (this.commonFields) {
+      const selectedTick = action.action === 'tick' && action.bundle >= (this.laterB?laterBSource.goTick:84) && action.bundle <= (this.laterB?179:3584);
+      const expectedCommon = (this.laterB?laterBSource.commonRowsByAction:this.commonRowsByAction).get(this.cursor);
+      const commonSample=this.laterB?result.post_go_typed22_state:result.common_fields_sample;
+      if(this.laterB && selectedTick){
+        const computed=compareOriginalCommonTickFields({expected:expectedCommon,actual:commonSample,actionIndex:this.cursor,sourceFramesAfter:result.source_frames_after,admittedWorldGeneration:this.admittedWorldGeneration,typed22:true,laterB:true,laterBGoTick:laterBSource.goTick});
+        if(commonComparison!==null&&!sameJson(commonComparison,computed))refusal??='Later B supplied comparison differs from actual typed values';
+        commonComparison=computed;this.lastCommonComparison=computed;
+      }
       if (selectedTick) {
         if (!expectedCommon || expectedCommon.source_tick !== action.bundle ||
             expectedCommon.action_index !== this.cursor ||
-            result.common_fields_sample?.schema !== (this.typed22?'melee-web-stadium-per-tick-common-fields-native-v3':COMMON_FIELDS_NATIVE_SAMPLE_SCHEMA) ||
-            result.common_fields_sample?.schedule_index !== this.cursor ||
-            result.common_fields_sample?.source_tick !== action.bundle ||
-            result.common_fields_sample?.world_generation !== this.admittedWorldGeneration ||
+            commonSample?.schema !== (this.typed22?'melee-web-stadium-per-tick-common-fields-native-v3':COMMON_FIELDS_NATIVE_SAMPLE_SCHEMA) ||
+            commonSample?.schedule_index !== this.cursor ||
+            commonSample?.source_tick !== action.bundle ||
+            commonSample?.world_generation !== this.admittedWorldGeneration ||
             commonComparison?.schema !== (this.typed22?'melee-web-stadium-source-tick-common-fields-comparison-v3':COMMON_FIELDS_COMPARISON_SCHEMA) ||
             commonComparison?.action_index !== this.cursor ||
             commonComparison?.source_tick !== action.bundle ||
@@ -1812,7 +2048,7 @@ export class StadiumSetupCfActionDriver {
             commonComparison?.seed_value_count !== 1 || commonComparison?.exact_value_count !== (this.typed22?23:16) ||
             commonComparison?.decision !== (this.typed22?'PASS_EXACT_22_COMMON_FIELDS_AND_SEED':'PASS_EXACT_15_COMMON_FIELDS_AND_SEED'))
           refusal ??= 'per-tick common-field comparison failed or is absent';
-      } else if (expectedCommon || result.common_fields_sample !== null || commonComparison !== null) {
+      } else if (expectedCommon || commonSample !== null || commonComparison !== null) {
         refusal ??= 'per-tick common-field sample/comparison was supplied outside its source-tick scope';
       }
     } else if (commonComparison !== null) {
@@ -1834,6 +2070,37 @@ export class StadiumSetupCfActionDriver {
     } catch (error) {
       return this._fail(`native approval rejected: ${error?.message ?? String(error)}`);
     } finally { this.inFlight = false; }
+  }
+
+  _acceptLaterBEnvelope(observation,action,source) {
+    const r=observation?.last_action,tick=action.action==='tick'?action.bundle:action.draw;
+    const ticksAfter=Math.floor(this.cursor/2)+1;
+    const selected=action.action==='tick'&&tick>=source.goTick;
+    const expectSeen=ticksAfter>source.goTick;
+    const isGo=action.action==='tick'&&this.cursor===source.goActionIndex;
+    const constructor=observation?.constructor_shared_projection;
+    const {scope,parameter_roles,...aggregate}=constructor||{};
+    const want=source.reference.constructor_shared_projection;
+    const expectedAggregate={entry_count:want.entry_count,min_parameter:want.min_parameter,max_parameter:want.max_parameter,
+      random_bound:want.random_bound,random_result:want.random_result,seed_before:want.seed_before,seed_after:want.seed_after,randi_call_count:1};
+    if(observation?.schema!=='melee-web-stadium-later-b-gate2-native-v1'||
+      observation.scope!=='observed-b-first180-actions-go-event-and-post-go-typed22-observation-only'||
+      r?.world_generation!==this.admittedWorldGeneration||observation.action_count!==360||observation.cursor!==this.cursor||observation.prefix_cursor!==943||observation.reference_go_tick!==source.goTick||observation.stop_tick!==180||
+      observation.source_ticks!==ticksAfter||observation.source_draws!==Math.floor((this.cursor+1)/2)||
+      observation.post_go_typed22_state_count!==Math.max(0,ticksAfter-source.goTick)||
+      !sameJson(observation.actual_go,{observed:expectSeen,tick:expectSeen?source.goTick:null})||
+      scope!=='shared-constructor-aggregate-only'||!sameJson(parameter_roles,want.parameter_roles)||!sameJson(aggregate,expectedAggregate)||
+      !sameJson(r?.source_coordinates,{source_tick:action.action==='tick'?tick:tick+1,
+        draw_ordinal:action.action==='tick'?null:tick,recipe_input_index:action.action==='tick'?943+tick:null})||
+      (selected?(r?.post_go_typed22_state===null||r?.post_go_typed22_state===undefined):r?.post_go_typed22_state!==null))return false;
+    if(isGo){
+      const compared=compareLaterBGate2Go({reference:source.reference,actualEvent:r?.actual_go_event,
+        actualTick:observation.actual_go.tick,admittedWorldGeneration:this.admittedWorldGeneration});
+      if(source.actualGoComparison||compared.decision!=='PASS_SHARED_GO_EVENT_FIELDS_AND_SEED')return false;
+      source.actualGoComparison=freezeLaterB(compared);this.goComparison=source.actualGoComparison;
+    } else if(r?.actual_go_event!==null)return false;
+    if(this.cursor===359&&(!source.actualGoComparison||observation.post_go_typed22_state_count!==96))return false;
+    return true;
   }
 
   status() {

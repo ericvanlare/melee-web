@@ -1,10 +1,21 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import test from 'node:test';
+import {randomUUID} from 'node:crypto';
 import * as h from './stadium_matched_setup_cf_consumer.mjs';
 import * as gate from './stadium_matched_setup_cf_runner_gate.mjs';
 import {createStadiumRecreationCanaryContext} from './stadium_recreation_canary_context.mjs';
 import {isStadiumC3ReportCheckpointEligible} from './stadium_c3_report_checkpoint.mjs';
+// Reuse the reviewed stock4 fixture's actual owner extraction. Only idle,
+// snapshot and UUID leaves are modeled here; no native transfer is executed.
+function installActualLaterBTransferOwner(vm, source, context) {
+ const first='  let saveProfileSnapshotsActive = 0;',last='  // END LATER_B_REPLAY_TRANSFER_OWNER';
+ assert.equal(source.split(first).length,2);assert.equal(source.split(last).length,2);
+ const begin=source.indexOf(first),end=source.indexOf(last);assert.ok(end>begin);
+ context.networkSessionClose=null;context.crypto={randomUUID};context.snapshot=()=>({});
+ vm.runInContext(source.slice(begin,end)+'\nconst laterBReplayTransfer = createLaterBReplayTransferOwner();',context);
+ assert.equal(vm.runInContext('laterBReplayTransfer.suspended()',context),false);
+}
 const expected={action_index:168,boundary_role:'C',draw_ordinal:84,raw_identity:{sequence:3007,source_tick:84,draw_ordinal:84},seed_ordinal:0,seed_hex:'bc2cb82f',source_tick:84,values:{map2_countdown:3665,map2_phase:0,map2_form:5,map2_history_e0:-1,map2_history_e2:-1,map2_gate:false,display_mode:11,display_e6:64,display_e8:64,display_previous_mode:10,display_selected_player:99,display_f2:0,display_flags:0}};
 const syntheticNative=(row,typed22)=>({schema:`melee-web-stadium-per-tick-common-fields-native-v${typed22?3:2}`,schedule_index:row.action_index,source_tick:row.source_tick,world_ticks:row.source_tick+1,source_frame:0,world_generation:3,...row.values,seed_hex:row.seed_hex});
 const typedExpected=structuredClone(expected);for(const key of h.TYPED22_RELATION_KEYS)typedExpected.values[key]=key!=='map2_gate_mask_40';
@@ -51,8 +62,21 @@ test('actual private identity binds new arm/full-close/full-B wrappers',async()=
 test('actual runtime close accepts exact new shape/live receipt and preserves legacy admission',async()=>{
  const vm=await import('node:vm'),source=await fs.readFile(new URL('../web/melee-runtime.mjs',import.meta.url),'utf8');const start=source.indexOf('    menuStadiumRecreationClosed(receipt) {'),end=source.indexOf('    menuFrame(',start);assert.ok(start>0&&end>start);const body=source.slice(start,end);
  const base={schema:'melee-web-stadium-recreation-boundary-v2',attempted:true,closed:true,restarted:false,error:null,match_to_host_restored:true,host_to_parent_restored:true,prior_world_generation:3,match_seed:1,host_seed:2,parent_seed:3,matched_setup_cf:{schema:'melee-web-stadium-source-action-native-v7',scope:'fresh132-full-pair-7168-typed22-seed-observation-only',common_field_count:22,seed_value_count:1,action_count:7168,cursor:7168,source_ticks:3585,source_draws:3583,state:'complete',complete:true,failed:false,error:null,queued:false,awaiting_approval:false}};
- function run(receipt,mutate=()=>{}){const ctx={ready:true,fatal:false,destroyed:false,stadiumRecreationCloseSettled:false,terminalMatchedSetupCfRetirementObserved:false,terminalMatchedSetupCfRetirementConsumed:false,busy:false,assetTransfer:false,commands:[],loading:null,preparationLabel:null,diagnosticActive:false,callbacks:{menuPreparationCanceled(){}},publish(){},emit(){},Module:{stadiumMatchedSetupNativeIdle:()=>true,_melee_web_native_menu_stadium_recreation_status:()=>1,_melee_web_native_menu_phase:()=>0,_melee_web_native_menu_running:()=>0,UTF8ToString:()=>JSON.stringify(receipt)}};mutate(ctx);return vm.runInNewContext(`({${body}})`,ctx).menuStadiumRecreationClosed(receipt);}
+ function run(receipt,mutate=()=>{},activeTransfer=false){const ctx={ready:true,fatal:false,destroyed:false,stadiumRecreationCloseSettled:false,terminalMatchedSetupCfRetirementObserved:false,terminalMatchedSetupCfRetirementConsumed:false,busy:false,assetTransfer:false,commands:[],loading:null,preparationLabel:null,diagnosticActive:false,callbacks:{menuPreparationCanceled(){}},publish(){},emit(){},Module:{stadiumMatchedSetupNativeIdle:()=>true,_melee_web_native_menu_stadium_recreation_status:()=>1,_melee_web_native_menu_phase:()=>0,_melee_web_native_menu_running:()=>0,UTF8ToString:()=>JSON.stringify(receipt)}};mutate(ctx);vm.createContext(ctx);installActualLaterBTransferOwner(vm,source,ctx);
+ if(activeTransfer){
+  // Synthetic reservation invokes the actual owner; this proves callback refusal,
+  // not native lifetime success. Traps must remain untouched after reservation.
+  vm.runInContext(`laterBReplayTransfer.reserve({reference_id:'original-b-2013-943-v1',
+   recipe_sha256:'5fb53bdc71b35b800bc3451b1d9117709edef2413a38a8f7311ee352647a6755',
+   cursor:943,notification_order:4330,world_generation:7,setup_seed_hex:'4b25c79b'});`,ctx);
+  const trap=()=>{throw Error('active transfer callback performed ordinary native/host effects');};
+  for(const key of Object.keys(ctx.Module))ctx.Module[key]=trap;
+  ctx.callbacks.menuPreparationCanceled=ctx.publish=ctx.emit=trap;
+ }
+ return vm.runInContext(`({${body}})`,ctx).menuStadiumRecreationClosed(receipt);}
+
  assert.equal(run(base),true);
+ assert.equal(run(base,()=>{},true),false,'actual active transfer refuses before native getters or host effects');
  for(const [key,value] of [['action_count',7167],['source_draws',3582],['common_field_count',15],['queued',true],['awaiting_approval',true]]){const bad=structuredClone(base);bad.matched_setup_cf[key]=value;assert.equal(run(bad),false,key);}
  for(const mutate of [c=>c.busy=true,c=>c.Module.stadiumMatchedSetupNativeIdle=()=>false,c=>c.Module.UTF8ToString=()=>'{}',c=>c.Module._melee_web_native_menu_running=()=>1])assert.equal(run(base,mutate),false);
  const legacy=structuredClone(base);legacy.schema='melee-web-stadium-recreation-boundary-v1';Object.assign(legacy.matched_setup_cf,{schema:'melee-web-stadium-source-action-native-v5',scope:'original-full7167-common-fields-seed-observation-only',common_field_count:15,action_count:7167,cursor:7167,source_draws:3582});assert.equal(run(legacy),true);
@@ -83,6 +107,7 @@ test('actual shell and checked core close renew only one newer finite lifetime',
   const Module={stadiumMatchedSetupNativeIdle:()=>true,_melee_web_native_menu_stadium_recreation_status:()=>2,_melee_web_native_menu_phase:()=>phase,_melee_web_native_menu_running:()=>running,_melee_web_native_menu_stadium_first_css_fresh_finite_v4_arm(){},_melee_web_native_menu_stadium_first_css_draw_observe:()=>1,UTF8ToString:p=>JSON.stringify(p===1?observation:liveReceipt),_melee_web_native_menu_launch:()=>{++launches;phase=1;running=1;Object.assign(state,{state:'css',scene:'css',phase:1,running:true,paused:false});Object.assign(observation,{state:'entered',native_phase:1,running:true,host_entered:true});return 1;},_melee_web_native_menu_stadium_first_css_fresh_finite_v4_first_kick:()=>{++stageCalls;return 1;}};
   const owner={handle:{getState:()=>state}},boundary=async fn=>{if(hold)await hold;return fn();};
   const c=vm.createContext({window:{},Module,owner,boundary,check:x=>x,developmentHooks:{},structuredClone,resetTiming(){},prepareAudio:async()=>{},pauseAudioForPreparation:async()=>{},waitForAudioRender:async()=>{},$:()=>({focus(){}}),inputDirty:false,syncAudio(){},ready:true,fatal:false,destroyed:false,stadiumRecreationCloseSettled:false,terminalMatchedSetupCfRetirementObserved:false,terminalMatchedSetupCfRetirementConsumed:false,busy:false,assetTransfer:false,commands:[],loading:null,preparationLabel:null,diagnosticActive:false,callbacks:{menuPreparationCanceled(){}},publish(){}});
+  installActualLaterBTransferOwner(vm,core,c);
   c.emit=(name,data)=>c.developmentHooks[name]?.(data);vm.runInContext(shell.slice(start,end),c);const callbacks=vm.runInContext(`({${core.slice(cs,ce)}})`,c);
   return {c,Module,state,receipt,callbacks,get launches(){return launches;},get stageCalls(){return stageCalls;},restart(gen=4){generation=gen;phase=0;running=0;liveReceipt={...receipt,restarted:true};Object.assign(state,{state:'prepared',scene:'css',phase:0,running:false,paused:false});Object.assign(observation,{state:'armed',native_phase:0,running:false,host_entered:false,armed_world_generation:gen});},close(){phase=0;running=0;liveReceipt=receipt;closed=callbacks.menuStadiumRecreationClosed(receipt);return closed;},hold(p){hold=p;},get liveReceipt(){return liveReceipt;},set liveReceipt(v){liveReceipt=v;}};
  }

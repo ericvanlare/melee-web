@@ -1,6 +1,7 @@
 #include "gameplay_menu_browser_state.hpp"
 #include <emscripten/em_macros.h>
 extern "C" uint32_t gm_801A4BA8(void);
+extern "C" int melee_web_native_menu_running();
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 // Retain the private postset that captures actual Emscripten instance object
 // identities for the short recreation canary. Ordinary/public profiles omit it.
@@ -617,12 +618,28 @@ struct FirstSssVsSetupState {
  std::string error,actual,history,stadium_setup_state;
 };
 FirstSssVsSetupState first_sss_vs_setup;
-enum class StadiumCfObservationScope { Common15, Fresh132Typed22 };
+enum class StadiumCfObservationScope { Common15, Fresh132Typed22, LaterBTyped22 };
 struct MatchedSetupCfState {
  StadiumCfObservationScope observation_scope=StadiumCfObservationScope::Common15;
  bool opted_in=false,armed=false,queued=false,awaiting_approval=false;
  bool failed=false,complete=false,last_action_complete=false;
  bool explicit_step_mode=false,explicit_step_inflight=false;
+ // Gate2 consumes the exact stopped profile-3 replay parent once.  The
+ // archive is an owner move, not a replay reconstruction or a new authority.
+ bool later_b_gate2_attempted=false,later_b_gate2_parent_archived=false;
+ bool later_b_gate2_mode=false,later_b_gate2_go_observed=false;
+ bool later_b_gate2_abort_consumed=false;
+ bool later_b_action_started=false,later_b_safe_refusal_boundary=false;
+ std::unique_ptr<melee_web::RetailReplayRecipe> later_b_archived_replay;
+ const melee_web::RetailReplayRecipe* later_b_recipe_owner=nullptr;
+ const melee_web::RetailReplayInitialCssContext* later_b_context_owner=nullptr;
+ uint64_t later_b_notification_order=0,later_b_setup_world_generation=0;
+ uint32_t later_b_setup_seed=0;
+ uint32_t later_b_reference_go_tick=0,later_b_actual_go_tick=0;
+ uint32_t later_b_post_go_typed22_count=0;
+ uint32_t later_b_prefix_cursor=0,later_b_stop_tick=0;
+ MeleeWebStadiumGoAlignmentEvent later_b_actual_go_event{};
+ std::string later_b_transfer_token_id;
  bool version2=false,full_schedule=false,common_fields=false,fresh132_full_a=false;
  uint32_t cursor=0,last_schedule_index=0,last_ordinal=0,last_bundle=UINT32_MAX;
  uint32_t action_count=171,c_action_index=168,f_action_index=170,c_source_tick=84,f_source_tick=85;
@@ -654,9 +671,13 @@ struct MatchedSetupCfState {
 MatchedSetupCfState matched_setup_cf;
 struct MatchedSetupCfRetirement {
  bool native_retired=false,terminal=false;
+ bool later_b_parent_close_checked=false;
+ bool later_b_unarmed_abort=false,later_b_attempt_consumed=false,later_b_was_armed=false;
+ unsigned later_b_source_ticks=0,later_b_source_draws=0,later_b_action_cursor=0;
  int phase_after_close=-1,running_after_close=-1;
  int pipeline_cache_before=-1,pipeline_cache_after=-1;
  std::string receipt,error;
+ std::string later_b_transfer_receipt;
 };
 MatchedSetupCfRetirement matched_setup_cf_retirement;
 std::string matched_setup_cf_json();
@@ -3715,6 +3736,47 @@ std::string matched_setup_cf_common_fields_json(
        "Stadium per-tick common-field sample exceeded its reviewed byte bound");
  return sample;
 }
+bool later_b_gate2_uuid_valid(const std::string& value){
+ if(value.size()!=36)return false;
+ for(size_t i=0;i<value.size();++i){
+  if(i==8||i==13||i==18||i==23){if(value[i]!='-')return false;continue;}
+  const char c=value[i];
+  if(!((c>='0'&&c<='9')||(c>='a'&&c<='f')||(c>='A'&&c<='F')))return false;
+ }
+ return true;
+}
+bool later_b_gate2_constructor_snapshot_valid(const MeleeWebStadiumSetupSnapshot& setup){
+ return setup.constructor_callback_count==1&&setup.constructor_randi_call_count==1&&
+        setup.parameter_x0==3600&&setup.parameter_x4==3800&&
+        setup.constructor_random_bound_valid==1&&setup.constructor_random_bound==200&&
+        setup.constructor_random_result_valid==1&&setup.constructor_random_result==142&&
+        setup.source_seed_before==0xba5dac05U&&setup.source_seed_after==0xb6cdeeb4U;
+}
+bool later_b_gate2_first_go_snapshot_valid(
+    const MeleeWebStadiumGoAlignmentSnapshot& observed,unsigned source_tick,
+    uint64_t world_generation){
+ const auto& event=observed.go_after;
+ return observed.armed==1&&observed.failure==0&&observed.expected_branch==0&&
+        observed.generation==world_generation&&event.sequence==3&&
+        event.generation==world_generation&&event.world_ticks==source_tick&&
+        event.source_branch==0&&event.source_seed_valid==1&&
+        observed.next_sequence==3&&observed.stage_before.sequence==1&&
+        observed.stage_after.sequence==2&&observed.hud_after.sequence==0;
+}
+std::string later_b_gate2_constructor_snapshot_json(const MeleeWebStadiumSetupSnapshot& setup){
+ std::ostringstream out;
+ out<<"{\"scope\":\"shared-constructor-aggregate-only\",\"entry_count\":"
+    <<setup.constructor_callback_count
+    <<",\"parameter_roles\":{\"min_parameter\":\"parameter_x0\",\"max_parameter\":\"parameter_x4\"}"
+    <<",\"min_parameter\":"<<setup.parameter_x0
+    <<",\"max_parameter\":"<<setup.parameter_x4
+    <<",\"random_bound\":"<<setup.constructor_random_bound
+    <<",\"random_result\":"<<setup.constructor_random_result
+    <<",\"seed_before\":\""<<melee_web::stadium_first_css_diagnostic::hex32(setup.source_seed_before)
+    <<"\",\"seed_after\":\""<<melee_web::stadium_first_css_diagnostic::hex32(setup.source_seed_after)
+    <<"\",\"randi_call_count\":"<<setup.constructor_randi_call_count<<'}';
+ return out.str();
+}
 void matched_setup_cf_fail(const char* error){
  auto& state=matched_setup_cf;
  state.failed=true;state.complete=false;state.queued=false;state.awaiting_approval=false;
@@ -3729,6 +3791,107 @@ bool matched_setup_cf_clock_transition(bool tick_action,uint64_t before,uint64_t
  return before<=UINT32_MAX&&after<=UINT32_MAX&&after>=before&&
         (tick_action?after-before<=1:after==before);
 }
+// Gate2 keeps the parsed original replay as the same unique owner.  While the
+// arm attempt is pending it may still be global; after the one-way move it is
+// owned by MatchedSetupCfState and the old global-only Gate1 predicate must
+// remain false.  This is an identity/topology check only; it does not authorize
+// source work or replace the ordinary Setup/match owner checks below.
+bool later_b_gate2_parent_identity_valid(const MatchedSetupCfState& state){
+ const auto& reference=melee_web::stadium_later_reference::observed_b;
+ if(!state.later_b_gate2_attempted||later_sss.reference!=&reference||
+    reference.profile!=3||reference.frames!=2013||reference.recipe_bytes!=112230||
+    !later_b_gate2_uuid_valid(state.later_b_transfer_token_id)||!state.later_b_recipe_owner||
+    !state.later_b_context_owner||!state.later_b_setup_world_generation||
+    !state.later_b_setup_seed||state.later_b_notification_order==0)
+  return false;
+ const auto* recipe=state.later_b_gate2_parent_archived?
+      state.later_b_archived_replay.get():replay.get();
+ if(!recipe||state.later_b_recipe_owner!=recipe||
+    recipe->initial_css.get()!=state.later_b_context_owner||
+    (state.later_b_gate2_parent_archived?static_cast<bool>(replay):!replay)||
+    later_sss_reference_seal.owner!=recipe||
+    later_sss_reference_seal.bytes!=reference.recipe_bytes||
+    later_sss_reference_seal.sha256!=reference.recipe_sha256||
+    !melee_web::stadium_later_reference::topology(*recipe,reference))
+  return false;
+ const auto& setup=first_sss_vs_setup;
+ if(!current_sss_exit.armed||current_sss_exit.failed||!current_sss_exit.terminal||
+    current_sss_exit.profile!=CurrentSssExitProfile::Stock4None||
+    !current_sss_exit.prepared_setup_attempted||
+    !current_sss_exit.prepared_setup_approved||
+    !current_sss_exit.prepared_setup_consumed||
+    current_sss_exit.recipe!=recipe||current_sss_exit.context!=state.later_b_context_owner||
+    current_sss_exit.notification_order!=state.later_b_notification_order||
+    !current_sss_exit.notification_received||
+    current_sss_exit.notification_cursor!=reference.first[6]||
+    current_sss_exit.notification_steps!=0||current_sss_exit.notification_draws!=0||
+    current_sss_exit.terminal_cursor!=reference.first[6]||
+    current_sss_exit.terminal_steps!=0||current_sss_exit.terminal_draws!=0||
+    current_sss_exit.notification_order==UINT64_MAX||
+    current_sss_exit.order!=current_sss_exit.notification_order+1||
+    !setup.attempted||!setup.complete||setup.failed||!setup.construction_complete||
+    setup.origin!=FirstSssVsSetupOrigin::CurrentPreparedLater_943||
+    setup.match_world_generation!=state.later_b_setup_world_generation||
+    setup.setup_snapshot.world_generation!=state.later_b_setup_world_generation||
+    state.later_b_setup_seed!=0x4b25c79bU||replay_cursor!=reference.first[6]||
+    replay_source_frames.pending()||replay_source_frames.steps()!=0||
+    replay_source_frames.draws()!=0||!host||host!=current_sss_exit.host_owner||
+    host_entered||world||!match||!archive_cache||!match->construction_complete()||
+    !melee_web_gameplay_world_exists()||
+    melee_web_gameplay_generation()!=state.later_b_setup_world_generation||
+    asset_generation!=setup.committed_generation||!scoped_assets||!scoped_disc_import||
+    !source_session_owned||running||pending||faulted||menu_scene_rebuild_pending||
+    preparation.busy()||preparation.phase()!=melee_web::MenuPreparationState::Phase::Idle||
+    asset_destination!=AssetDestination::None||melee_web_source_file_drive_busy()||
+    !later_b_gate2_constructor_snapshot_valid(setup.setup_snapshot))
+  return false;
+ if(state.owner&&match.get()!=state.owner)return false;
+ if(state.cache_owner&&archive_cache.get()!=state.cache_owner)return false;
+ if(state.host_owner&&host!=state.host_owner)return false;
+ if(state.world_generation&&state.world_generation!=state.later_b_setup_world_generation)
+  return false;
+ if(state.asset_generation&&state.asset_generation!=setup.committed_generation)
+  return false;
+ if(state.source_ticks==0&&match->random_seed()!=state.later_b_setup_seed)return false;
+ return true;
+}
+std::string later_b_gate2_transfer_proof_json(const MatchedSetupCfState& state,bool parent_close_checked){
+ check(later_b_gate2_parent_identity_valid(state),
+       "Later B transfer proof lost its checked native parent identity");
+ std::ostringstream out;
+ out<<"{\"schema\":\"melee-web-stadium-later-b-parent-transfer-v1\""
+    <<",\"token\":"<<first_css_browser_draw_json_quote(state.later_b_transfer_token_id)
+    <<",\"reference_id\":\"original-b-2013-943-v1\""
+    <<",\"recipe_sha256\":\""<<melee_web::stadium_first_css_diagnostic::hex(
+        melee_web::stadium_later_reference::observed_b.recipe_sha256.data(),
+        melee_web::stadium_later_reference::observed_b.recipe_sha256.size())<<'"'
+    <<",\"cursor\":"<<state.later_b_prefix_cursor
+    <<",\"notification_order\":"<<state.later_b_notification_order
+    <<",\"world_generation\":"<<state.later_b_setup_world_generation
+    <<",\"setup_seed_hex\":\""<<melee_web::stadium_first_css_diagnostic::hex32(state.later_b_setup_seed)<<'"'
+    <<",\"parent_identity_checked\":true,\"stage\":\""
+    <<(state.later_b_gate2_parent_archived?"after-parent-move":"before-parent-move")<<'"'
+    <<",\"parent_archived\":"<<(state.later_b_gate2_parent_archived?"true":"false")
+    <<",\"source_ticks\":"<<state.source_ticks
+    <<",\"source_draws\":"<<state.source_draws;
+ if(parent_close_checked)out<<",\"parent_close_checked\":true";
+ out<<'}';
+ return out.str();
+}
+std::string later_b_gate2_mark_parent_close_checked(std::string proof){
+ check(!proof.empty()&&proof.back()=='}',"Later B transfer proof is absent at parent close");
+ proof.pop_back();proof+=",\"parent_close_checked\":true}";
+ return proof;
+}
+void later_b_gate2_notify_parent_transferred(const MatchedSetupCfState& state){
+ const std::string receipt=later_b_gate2_transfer_proof_json(state,false);
+ check(state.later_b_gate2_parent_archived&&state.source_ticks==0&&state.source_draws==0&&
+       state.cursor==0&&
+       EM_ASM_INT({try{return typeof window.menuLaterBReplayParentTransferred==='function'&&
+         window.menuLaterBReplayParentTransferred(JSON.parse(UTF8ToString($0)))===true?1:0;
+       }catch(_){return 0;}},receipt.c_str())==1,
+       "Later B exact parent move was not accepted by its reserved shell owner");
+}
 void matched_setup_cf_check_owner(unsigned expected_ticks,unsigned expected_draws=~0U){
  const auto& state=matched_setup_cf;
  check(state.armed&&!state.failed&&!state.complete&&first_sss_vs_setup.complete&&
@@ -3740,6 +3903,9 @@ void matched_setup_cf_check_owner(unsigned expected_ticks,unsigned expected_draw
        melee_web_gameplay_generation()==state.world_generation&&
        match->construction_complete()&&melee_web_gameplay_stats().ticks==expected_ticks,
        "Matched Setup C/F action lost its bound stopped source owner or tick position");
+ if(state.later_b_gate2_attempted)
+  check(later_b_gate2_parent_identity_valid(state),
+        "Later B Gate2 action lost its archived parsed replay or Setup owner");
  if(state.version2&&expected_draws!=~0U)
   check(state.source_draws==expected_draws,
         "Matched Setup C/F v2 independent source draw counter changed");
@@ -3880,11 +4046,52 @@ bool matched_setup_cf_service(){
   state.audio_calls_after=diagnostic_audio_render_calls;
   state.audio_frames_after=diagnostic_audio_render_frames;
   state.audio_phase_before=phase_before;state.audio_phase_after=audio_phase;
+  std::string later_b_actual_go_event_json="null";
+  std::string later_b_post_go_typed22_state_json="null";
+  if(state.later_b_gate2_mode&&tick_action){
+   MeleeWebStadiumGoAlignmentSnapshot observed{};char owner_error[256]{};
+   check(match->diagnostic_stadium_go_alignment_snapshot(&observed,owner_error,sizeof(owner_error)),
+         owner_error[0]?owner_error:"Later B actual GO snapshot refused");
+   check(observed.armed==1&&observed.failure==0&&observed.expected_branch==0&&
+         observed.generation==state.world_generation,
+         "Later B actual GO snapshot lost its exact armed source owner");
+   const auto& event=observed.go_after;
+   if(!state.later_b_gate2_go_observed&&event.sequence){
+    check(later_b_gate2_first_go_snapshot_valid(
+          observed,ordinal,state.world_generation),
+          "Later B GO was not an actual single source event at its observed tick");
+    state.later_b_gate2_go_observed=true;
+    state.later_b_actual_go_tick=ordinal;
+    state.later_b_actual_go_event=event;
+    check(state.later_b_actual_go_tick==state.later_b_reference_go_tick,
+          "Later B actual GO event differs from its retained reference coordinate");
+    later_b_actual_go_event_json=matched_setup_cf_go_event_json(event);
+   }else if(state.later_b_gate2_go_observed){
+    check(event.sequence==3&&matched_setup_cf_go_event_equal(
+          event,state.later_b_actual_go_event),
+          "Later B actual GO event changed after its observed source tick");
+   }else check(event.sequence==0,
+          "Later B GO event appeared without its native source event latch");
+   state.go=observed;
+   if(state.later_b_gate2_go_observed&&ordinal>=state.later_b_actual_go_tick){
+    check(ordinal<state.later_b_stop_tick&&state.later_b_post_go_typed22_count<96,
+          "Later B post-GO typed22 interval exceeded its bounded 96-state extent");
+    check(match->diagnostic_stadium_idle_snapshot(&state.idle,owner_error,sizeof(owner_error)),
+          owner_error[0]?owner_error:"Later B post-GO typed22 owner snapshot refused");
+    check(state.idle.world_generation==state.world_generation&&
+          state.idle.world_ticks==ordinal+1&&
+          state.idle.source_frame==state.last_source_frame_after,
+          "Later B typed22 value is not its actual completed post-tick source coordinate");
+    later_b_post_go_typed22_state_json=matched_setup_cf_common_fields_json(
+        state.idle,state.seed_after_action,index,ordinal,true);
+    ++state.later_b_post_go_typed22_count;
+   }
+  }
   std::ostringstream actual;
   const unsigned c_tick=state.version2?state.c_source_tick:84U;
   const unsigned f_tick=state.version2?state.f_source_tick:85U;
   std::string go2_state_observation_json="null";
-  if(tick_action&&(ordinal==c_tick||ordinal==f_tick)){
+  if(!state.later_b_gate2_mode&&tick_action&&(ordinal==c_tick||ordinal==f_tick)){
    const char* label=ordinal==c_tick?"C":"F";
    check(state.expected_branch==0,"Matched Setup C/F supports only the approved branch-0 Setup");
    char owner_error[256]{};
@@ -3914,7 +4121,7 @@ bool matched_setup_cf_service(){
          <<",\"idle_snapshot\":"<<matched_setup_cf_idle_json(state.idle)
          <<",\"go_trace\":"<<matched_setup_cf_go_json(state.go)<<'}';
   }else actual<<"null";
-  if(state.version2&&state.source_ticks>c_tick&&
+  if(state.version2&&!state.later_b_gate2_mode&&state.source_ticks>c_tick&&
      !(tick_action&&(ordinal==c_tick||ordinal==f_tick))){
    char owner_error[256]{};
    check(match->diagnostic_stadium_idle_snapshot(&state.idle,owner_error,sizeof(owner_error)),
@@ -3939,7 +4146,7 @@ bool matched_setup_cf_service(){
       ",\"go_trace\":"+matched_setup_cf_go_json(state.go)+"}";
   }
   std::string common_sample_json;
-  if(state.common_fields){
+  if(state.common_fields&&!state.later_b_gate2_mode){
    common_sample_json="null";
    if(tick_action&&ordinal>=84&&ordinal<=3584){
     check(state.idle.world_generation==state.world_generation&&
@@ -3971,8 +4178,17 @@ bool matched_setup_cf_service(){
       (tick_action?std::to_string(state.last_bundle):"null")+
       ",\"complete\":true,\"source_frames\":"+std::to_string(match->source_frames())
       +",\"world_ticks\":"+std::to_string(melee_web_gameplay_stats().ticks)
-      +(tick_action?",\"world_generation\":"+std::to_string(state.world_generation):"")
+      +((tick_action||state.later_b_gate2_mode)?",\"world_generation\":"+std::to_string(state.world_generation):"")
       +v2_counter_json
+      +(state.later_b_gate2_mode?
+         ",\"source_coordinates\":{\"source_tick\":"+
+           std::to_string(tick_action?ordinal:ordinal+1)+
+           ",\"draw_ordinal\":"+(tick_action?"null":std::to_string(ordinal))+
+           ",\"recipe_input_index\":"+(tick_action?
+             std::to_string(state.later_b_prefix_cursor+ordinal):"null")+"}":"")
+      +(state.later_b_gate2_mode?
+         ",\"actual_go_event\":"+later_b_actual_go_event_json+
+         ",\"post_go_typed22_state\":"+later_b_post_go_typed22_state_json:"")
       +",\"audio_render_calls_before\":"+std::to_string(state.audio_calls_before)
       +",\"audio_render_calls_after\":"+std::to_string(state.audio_calls_after)
       +",\"audio_render_frames_before\":"+std::to_string(state.audio_frames_before)
@@ -3984,7 +4200,13 @@ bool matched_setup_cf_service(){
       +",\"observation\":"+actual.str()+
       (go2_state_observation_json!="null"?",\"go2_state_observation\":"+go2_state_observation_json:"")+
       (tick_action?",\"pad_hsd_queue_observation\":"+pad_queue_observation_json:"")+
-      (state.common_fields?",\"common_fields_sample\":"+common_sample_json:"")+"}";
+      (state.common_fields&&!state.later_b_gate2_mode?",\"common_fields_sample\":"+common_sample_json:"")+"}";
+  if(state.later_b_gate2_mode&&index+1==state.action_count)
+   check(state.source_ticks==state.later_b_stop_tick&&state.source_draws==state.later_b_stop_tick&&
+         state.later_b_gate2_go_observed&&
+         state.later_b_actual_go_tick+96==state.later_b_stop_tick&&
+         state.later_b_post_go_typed22_count==96,
+         "Later B did not produce one observed GO plus exactly96 post-tick states before pause");
   state.awaiting_approval=true;
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
   drain_pipeline_provenance();
@@ -4012,7 +4234,19 @@ std::string matched_setup_cf_json(){
      state.awaiting_approval?"awaiting-approval":state.queued?"queued":
      state.armed?"armed":"idle";
  std::ostringstream out;
- if(state.observation_scope==StadiumCfObservationScope::Fresh132Typed22)out<<"{\"schema\":\"melee-web-stadium-source-action-native-v7\",\"scope\":\"fresh132-full-pair-7168-typed22-seed-observation-only\",\"common_field_count\":22,\"seed_value_count\":1,\"action_count\":"
+ if(state.later_b_gate2_mode)out<<"{\"schema\":\"melee-web-stadium-later-b-gate2-native-v1\",\"scope\":\"observed-b-first180-actions-go-event-and-post-go-typed22-observation-only\",\"action_count\":"
+    <<state.action_count<<",\"prefix_cursor\":"<<state.later_b_prefix_cursor
+    <<",\"reference_go_tick\":"<<state.later_b_reference_go_tick
+    <<",\"stop_tick\":"<<state.later_b_stop_tick
+    <<",\"actual_go\":{\"observed\":"<<(state.later_b_gate2_go_observed?"true":"false")
+    <<",\"tick\":"<<(state.later_b_gate2_go_observed?std::to_string(state.later_b_actual_go_tick):"null")<<'}'
+    <<",\"post_go_typed22_state_count\":"<<state.later_b_post_go_typed22_count
+    <<",\"constructor_shared_projection\":"
+    <<later_b_gate2_constructor_snapshot_json(first_sss_vs_setup.setup_snapshot)
+    <<",\"constructor_original_witnesses\":{\"scope\":\"original-only-order-from-retained-reference-projection\",\"native_counterpart\":\"unpaired\"}"
+    <<",\"source_ticks\":"<<state.source_ticks<<",\"source_draws\":"<<state.source_draws
+    <<",\"state\":\"";
+ else if(state.observation_scope==StadiumCfObservationScope::Fresh132Typed22)out<<"{\"schema\":\"melee-web-stadium-source-action-native-v7\",\"scope\":\"fresh132-full-pair-7168-typed22-seed-observation-only\",\"common_field_count\":22,\"seed_value_count\":1,\"action_count\":"
     <<state.action_count<<",\"source_ticks\":"<<state.source_ticks<<",\"source_draws\":"<<state.source_draws<<",\"state\":\"";
  else if(state.fresh132_full_a)out<<"{\"schema\":\"melee-web-stadium-source-action-native-v6\",\"scope\":\"fresh132-full-a-7168-common-fields-seed-observation-only\",\"common_field_count\":15,\"seed_value_count\":1,\"action_count\":"
     <<state.action_count<<",\"source_ticks\":"<<state.source_ticks
@@ -4039,6 +4273,22 @@ std::string matched_setup_cf_json(){
 }
 std::string matched_setup_cf_retirement_json(){
  std::ostringstream out;
+ if(matched_setup_cf_retirement.later_b_unarmed_abort){
+  out<<"{\"schema\":\"melee-web-stadium-later-b-unarmed-abort-v1\""
+     <<",\"native_closed\":"<<(matched_setup_cf_retirement.native_retired?"true":"false")
+     <<",\"attempt_consumed\":"<<(matched_setup_cf_retirement.later_b_attempt_consumed?"true":"false")
+     <<",\"armed\":"<<(matched_setup_cf_retirement.later_b_was_armed?"true":"false")
+     <<",\"source_ticks\":"<<matched_setup_cf_retirement.later_b_source_ticks
+     <<",\"source_draws\":"<<matched_setup_cf_retirement.later_b_source_draws
+     <<",\"action_cursor\":"<<matched_setup_cf_retirement.later_b_action_cursor
+     <<",\"phase_after_close\":"<<matched_setup_cf_retirement.phase_after_close
+     <<",\"running_after_close\":"<<matched_setup_cf_retirement.running_after_close
+     <<",\"error\":"<<(matched_setup_cf_retirement.error.empty()?"null":
+         first_css_browser_draw_json_quote(matched_setup_cf_retirement.error))
+     <<",\"later_b_transfer\":"<<(matched_setup_cf_retirement.later_b_transfer_receipt.empty()?"null":
+         matched_setup_cf_retirement.later_b_transfer_receipt)<<'}';
+  return out.str();
+ }
  out<<"{\"schema\":\"melee-web-stadium-matched-setup-cf-retirement-v1\""
     <<",\"native_retired\":"<<(matched_setup_cf_retirement.native_retired?"true":"false")
     <<",\"terminal\":"<<(matched_setup_cf_retirement.terminal?"true":"false")
@@ -4050,6 +4300,8 @@ std::string matched_setup_cf_retirement_json(){
         first_css_browser_draw_json_quote(matched_setup_cf_retirement.error))
     <<",\"matched_setup_cf\":"<<(matched_setup_cf_retirement.receipt.empty()?"null":
         matched_setup_cf_retirement.receipt);
+ if(!matched_setup_cf_retirement.later_b_transfer_receipt.empty())
+  out<<",\"later_b_transfer\":"<<matched_setup_cf_retirement.later_b_transfer_receipt;
  const auto recreation_b=stadium_recreation_b_json();
  if(!recreation_b.empty())out<<",\"recreation_b_rng\":"<<recreation_b;
  out<<'}';
@@ -6128,9 +6380,86 @@ int melee_web_native_menu_match_draw_discard_retire(){try{
  return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
 #endif
-int melee_web_native_menu_unload(){try{close();message="Native menus unloaded.";return 1;}catch(const std::exception& e){
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
- first_sss_text_tail_unload_refused(e.what());first_css_browser_draw_refresh_observation();
+bool later_b_gate2_unarmed_abort_ready(const MatchedSetupCfState& state){
+ if(!state.later_b_gate2_attempted||!state.later_b_gate2_mode||!state.failed||
+    state.armed||state.complete||state.queued||state.awaiting_approval||
+    state.last_action_complete||state.explicit_step_mode||state.explicit_step_inflight||
+    state.later_b_action_started||state.later_b_safe_refusal_boundary||
+    state.later_b_gate2_abort_consumed||state.source_ticks||state.source_draws||
+    state.cursor||state.last_schedule_index||state.last_source_frame_after||
+    (!state.version2_actions.empty()&&state.version2_actions.size()!=360)||
+    !match||match.get()!=state.owner||!archive_cache||
+    archive_cache.get()!=state.cache_owner||!host||host!=state.host_owner||host_entered||
+    running||pending||faulted||first_use_draw_pending||preparation.busy()||
+    preparation.phase()!=melee_web::MenuPreparationState::Phase::Idle||
+    asset_destination!=AssetDestination::None||menu_scene_rebuild_pending||
+    melee_web_net_active()||melee_web_source_file_drive_busy()||
+    !source_session_owned||!melee_web_gameplay_world_exists()||
+    melee_web_gameplay_generation()!=state.world_generation||
+    melee_web_gameplay_stats().ticks!=0||!match->construction_complete()||
+    match->source_frames()!=0||replay_cursor!=state.later_b_prefix_cursor||
+    replay_source_frames.pending()||replay_source_frames.steps()!=0||
+    replay_source_frames.draws()!=0||!later_b_gate2_parent_identity_valid(state))
+  return false;
+ if(EM_ASM_INT({return !ABORT&&typeof Module.stadiumMatchedSetupNativeIdle==='function'&&
+      Module.stadiumMatchedSetupNativeIdle()===true?1:0;})!=1)return false;
+ const auto submission=aurora_browser_submission_status();
+ const auto* stats=aurora_get_stats();
+ return stats&&stats->queuedPipelines==0&&submission.pendingFramePackets==0&&
+        submission.pendingStagingBuffers==0&&submission.workerBusy==0;
+}
+int later_b_gate2_unarmed_abort(){try{
+ auto& state=matched_setup_cf;
+ check(later_b_gate2_unarmed_abort_ready(state),
+       "Later B abort requires a settled, exact, unarmed zero-action parent");
+ check(EM_ASM_INT({return typeof window.menuLaterBReplayUnarmedAborted==='function'?1:0;}),
+       "Later B checked unarmed-abort callback is unavailable");
+ matched_setup_cf_retirement=MatchedSetupCfRetirement{};
+ auto& retirement=matched_setup_cf_retirement;
+ retirement.later_b_unarmed_abort=true;retirement.later_b_attempt_consumed=true;
+ retirement.later_b_was_armed=false;
+ retirement.later_b_source_ticks=state.source_ticks;
+ retirement.later_b_source_draws=state.source_draws;
+ retirement.later_b_action_cursor=state.cursor;
+ retirement.terminal=true;
+ retirement.later_b_transfer_receipt=later_b_gate2_transfer_proof_json(state,false);
+ emscripten_cancel_main_loop();
+ close();
+ retirement.phase_after_close=melee_web_native_menu_phase();
+ retirement.running_after_close=melee_web_native_menu_running();
+ check(!match&&!world&&!results&&!prize&&!host&&!replay&&!source_session_owned&&
+       retirement.phase_after_close==0&&retirement.running_after_close==0,
+       "Later B known-unarmed abort left a native parent or source owner live");
+ retirement.later_b_parent_close_checked=true;
+ retirement.later_b_transfer_receipt=later_b_gate2_mark_parent_close_checked(
+      retirement.later_b_transfer_receipt);
+ retirement.native_retired=true;retirement.error.clear();
+ const std::string receipt=matched_setup_cf_retirement_json();
+ check(EM_ASM_INT({try{return window.menuLaterBReplayUnarmedAborted(
+      JSON.parse(UTF8ToString($0)))===true?1:0;}catch(_){return 0;}},receipt.c_str())==1,
+       "Later B known-unarmed native close was refused by its reserved shell owner");
+ return 1;
+}catch(const std::exception& error){
+ if(matched_setup_cf_retirement.error.empty())matched_setup_cf_retirement.error=error.what();
+ message=error.what();return 0;
+}}
+#endif
+int melee_web_native_menu_unload(){try{
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(matched_setup_cf.later_b_gate2_attempted){
+  if(matched_setup_cf.armed||matched_setup_cf.explicit_step_inflight||
+     !later_b_gate2_unarmed_abort_ready(matched_setup_cf))
+   check(false,"Later B private owner requires checked retirement; ordinary unload is refused");
+  return later_b_gate2_unarmed_abort();
+ }
+#endif
+ close();message="Native menus unloaded.";return 1;
+}catch(const std::exception& e){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(!matched_setup_cf.later_b_gate2_attempted){
+  first_sss_text_tail_unload_refused(e.what());first_css_browser_draw_refresh_observation();
+ }
 #endif
  message=e.what();return 0;}}
 void melee_web_native_menu_pause(int paused){
@@ -6772,7 +7101,8 @@ int melee_web_native_menu_stadium_first_sss_draw_kick(){try{
 }catch(const std::exception& error){first_sss_sequence_fail(false,error.what());first_css_browser_draw_refresh_observation();return 0;}}
 int melee_web_native_menu_stadium_first_sss_vs_setup_begin(int text_tail_probe){try{
  auto& s=first_sss_vs_setup;
- check(!s.attempted&&!s.failed&&!s.complete,"VS Setup continuation is one-use");
+ check(!matched_setup_cf.later_b_gate2_attempted&&
+       !s.attempted&&!s.failed&&!s.complete,"VS Setup continuation is one-use");
  matched_setup_cf=MatchedSetupCfState{};
  check(text_tail_probe==0||text_tail_probe==1,"VS Setup text probe flag must be 0 or 1");
  first_sss_text_tail_probe=FirstSssTextTailProbeState{};
@@ -6827,18 +7157,19 @@ int matched_setup_cf_arm_internal(bool version2,unsigned action_count,
     unsigned f_source_tick,bool full_schedule=false,bool common_fields=false,
     bool fresh132_full_a=false){try{
  auto& state=matched_setup_cf;auto& setup=first_sss_vs_setup;
- stadium_recreation_b_require_arm(version2,full_schedule,common_fields,action_count,
+ const bool later_b_gate2=state.later_b_gate2_mode;
+ if(!later_b_gate2)stadium_recreation_b_require_arm(version2,full_schedule,common_fields,action_count,
      state.observation_scope==StadiumCfObservationScope::Fresh132Typed22);
  check(!state.opted_in&&!state.armed&&!state.failed&&!state.complete,
        "Matched Setup C/F continuation is one-use");
  state.opted_in=true;
  state.version2=version2;
  state.full_schedule=full_schedule;
- state.common_fields=common_fields;
+ state.common_fields=common_fields||later_b_gate2;
  state.fresh132_full_a=fresh132_full_a;
  check(!fresh132_full_a||(version2&&full_schedule&&common_fields),
        "Fresh132 full-A requires its explicit full-schedule common-field owner");
- check(!common_fields||(version2&&full_schedule),
+ check(later_b_gate2||!common_fields||(version2&&full_schedule),
        "Per-tick common fields require the explicit full-schedule v2 owner");
  state.action_count=version2?action_count:171U;
  state.c_action_index=version2?c_action_index:168U;
@@ -6847,7 +7178,16 @@ int matched_setup_cf_arm_internal(bool version2,unsigned action_count,
  state.f_source_tick=version2?f_source_tick:85U;
  state.source_ticks=state.source_draws=0;
  state.queued_source_frame_before=state.last_source_frame_after=0;
- check(!version2||(action_count==state.version2_actions.size()&&action_count>=5&&
+ if(later_b_gate2){
+  check(version2&&action_count==360&&state.version2_actions.size()==360&&
+        !full_schedule&&common_fields&&!fresh132_full_a&&
+        state.observation_scope==StadiumCfObservationScope::LaterBTyped22&&
+        state.later_b_prefix_cursor==943&&state.later_b_stop_tick==180&&
+        state.later_b_reference_go_tick<state.later_b_stop_tick&&
+        state.version2_actions.front().kind==1&&
+        state.version2_actions.back().kind==2,
+        "Later B Gate2 immutable action dimensions are invalid");
+ }else check(!version2||(action_count==state.version2_actions.size()&&action_count>=5&&
        (fresh132_full_a?action_count==7168:action_count<=7167)&&
        c_action_index<f_action_index&&
        (full_schedule?((fresh132_full_a?action_count==7168:action_count==7167)&&
@@ -6859,7 +7199,8 @@ int matched_setup_cf_arm_internal(bool version2,unsigned action_count,
        setup.source_frames==0&&!running&&!pending&&!faulted&&!host_entered&&
        host&&match&&archive_cache&&match->construction_complete()&&
        match->source_frames()==0&&asset_generation==setup.committed_generation&&
-       !first_use_draw_pending&&!replay&&!melee_web_net_active(),
+       !first_use_draw_pending&&(!later_b_gate2?!replay:(replay&&
+         later_b_gate2_parent_identity_valid(state)))&&!melee_web_net_active(),
        "Matched Setup C/F arm requires the completed stopped same-run Setup owner");
  const auto* const expected_owner=match.get();
  const auto* const expected_cache=archive_cache.get();
@@ -6895,11 +7236,22 @@ int matched_setup_cf_arm_internal(bool version2,unsigned action_count,
  state.expected_branch=match->start_data().rules.x1_3?1U:0U;
  check(state.expected_branch==0,
        "Matched Setup C/F bounded continuation supports only the approved branch-0 profile");
+ if(later_b_gate2){
+  check(later_b_gate2_parent_identity_valid(state)&&replay&&
+        replay.get()==state.later_b_recipe_owner,
+        "Later B Gate2 exact parsed parent changed before its one-use move");
+  state.later_b_archived_replay=std::move(replay);
+  state.later_b_gate2_parent_archived=true;
+  check(later_b_gate2_parent_identity_valid(state),
+        "Later B Gate2 archived parent failed its post-move identity check");
+  later_b_gate2_notify_parent_transferred(state);
+ }
  match->diagnostic_stadium_go_alignment_arm(0,error,sizeof(error));
  state.audio_calls_before=state.audio_calls_after=diagnostic_audio_render_calls;
  state.audio_frames_before=state.audio_frames_after=diagnostic_audio_render_frames;
  state.audio_phase_before=state.audio_phase_after=audio_phase;
  state.armed=true;
+ if(later_b_gate2)state.explicit_step_mode=true;
  matched_setup_cf_check_owner(0,version2?0U:~0U);
  first_css_browser_draw_refresh_observation();return 1;
 }catch(const std::exception& error){
@@ -7036,6 +7388,85 @@ int matched_setup_cf_full_manifest_arm(
  matched_setup_cf_fail(error.what());return 0;
 }}
 
+static int later_b_gate2_manifest_arm(const uint8_t* manifest,size_t manifest_bytes){
+ auto& state=matched_setup_cf;
+ check(!state.later_b_gate2_attempted&&!state.opted_in&&!state.armed&&
+       !state.failed&&!state.complete,
+       "Later B Gate2 parent transfer is one-use");
+ // Consume the attempt before descriptor, PAD, owner, or host approval checks.
+ // A refusal can never reopen this stopped parent for another arm.
+ state.later_b_gate2_attempted=true;state.later_b_gate2_mode=true;
+ check(manifest&&manifest_bytes>=24&&manifest[0]=='M'&&manifest[1]=='W'&&
+       manifest[2]=='B'&&manifest[3]=='2',
+       "Later B Gate2 manifest header or magic is absent");
+ const auto read32=[&](size_t offset){
+  check(offset<=manifest_bytes&&manifest_bytes-offset>=4,
+        "Later B Gate2 manifest integer is truncated");
+  return static_cast<uint32_t>(manifest[offset])|
+      (static_cast<uint32_t>(manifest[offset+1])<<8)|
+      (static_cast<uint32_t>(manifest[offset+2])<<16)|
+      (static_cast<uint32_t>(manifest[offset+3])<<24);
+ };
+ const unsigned action_count=read32(4),prefix_cursor=read32(8),reference_go_tick=read32(12),
+                stop_tick=read32(16),token_bytes=read32(20);
+ constexpr size_t header_bytes=24,token_size=36,action_bytes=57;
+ check(action_count==360&&prefix_cursor==943&&stop_tick==180&&token_bytes==token_size&&
+       reference_go_tick<stop_tick&&
+       manifest_bytes==header_bytes+token_size+static_cast<size_t>(action_count)*action_bytes,
+       "Later B Gate2 manifest has an unexpected fixed extent or reference coordinate");
+ state.later_b_transfer_token_id.assign(reinterpret_cast<const char*>(manifest+header_bytes),token_size);
+ check(later_b_gate2_uuid_valid(state.later_b_transfer_token_id),
+       "Later B Gate2 transfer token is not a UUID");
+ state.later_b_prefix_cursor=prefix_cursor;
+ state.later_b_reference_go_tick=reference_go_tick;
+ state.later_b_stop_tick=stop_tick;
+ state.later_b_recipe_owner=replay.get();
+ state.later_b_context_owner=replay&&replay->initial_css?replay->initial_css.get():nullptr;
+ state.later_b_notification_order=current_sss_exit.notification_order;
+ state.later_b_setup_world_generation=first_sss_vs_setup.match_world_generation;
+ // Constructor RNG and the stopped post-Setup match RNG are distinct observed
+ // boundaries: constructor ends at b6cdeeb4; Setup resumes at 4b25c79b.
+ state.later_b_setup_seed=match?match->random_seed():0;
+ state.owner=match.get();state.cache_owner=archive_cache.get();state.host_owner=host;
+ state.world_generation=first_sss_vs_setup.match_world_generation;
+ state.asset_generation=asset_generation;
+ check(later_b_gate2_parent_identity_valid(state),
+       "Later B Gate2 refused a stale, mixed, or unsealed profile-3 parent");
+ check(replay->frames.size()>=static_cast<size_t>(prefix_cursor)+stop_tick,
+       "Later B Gate2 archived recipe is shorter than the source-action span");
+ std::vector<MatchedSetupCfState::ManifestAction> actions;actions.reserve(action_count);
+ const size_t actions_offset=header_bytes+token_size;
+ for(unsigned index=0;index<action_count;++index){
+  const size_t offset=actions_offset+static_cast<size_t>(index)*action_bytes;
+  MatchedSetupCfState::ManifestAction action{};
+  action.kind=manifest[offset];
+  action.ordinal=read32(offset+1);action.bundle=read32(offset+5);
+  action.draws_before=read32(offset+9);
+  std::copy(manifest+offset+13,manifest+offset+action_bytes,action.pad.begin());
+  const unsigned local=index/2;const bool tick_action=(index%2)==0;
+  if(tick_action){
+   check(action.kind==1&&action.ordinal==local&&action.bundle==local&&
+         action.draws_before==local,
+         "Later B Gate2 tick row is missing, duplicated, or out of order");
+   const auto& raw=replay->frames[static_cast<size_t>(prefix_cursor)+local].bytes;
+   check(std::equal(action.pad.begin(),action.pad.end(),raw.begin()),
+         "Later B Gate2 four-port PAD row differs from its sealed original recipe input");
+  }else{
+   check(action.kind==2&&action.ordinal==local&&action.bundle==UINT32_MAX&&
+         action.draws_before==local&&
+         std::all_of(action.pad.begin(),action.pad.end(),[](uint8_t byte){return byte==0;}),
+         "Later B Gate2 draw-return row is malformed or out of order");
+  }
+  actions.push_back(action);
+ }
+ state.version2_actions=std::move(actions);
+ state.observation_scope=StadiumCfObservationScope::LaterBTyped22;
+ check(matched_setup_cf_arm_internal(true,action_count,0,0,reference_go_tick,
+       reference_go_tick+1,false,true,false)==1,
+       "Later B Gate2 checked source owner arm refused");
+ return 1;
+}
+
 int melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_explicit_arm(
     const uint8_t* manifest,size_t manifest_bytes){try{
  auto& state=matched_setup_cf;
@@ -7068,10 +7499,13 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_cf_full_explicit_arm(
        matched_setup_cf_retirement.receipt.empty(),
        "Matched Setup C/F explicit-step owner is one-use");
  matched_setup_cf_retirement=MatchedSetupCfRetirement{};
- check(matched_setup_cf_full_manifest_arm(
-       manifest,manifest_bytes)==1,
+ const bool later_b_gate2=manifest&&manifest_bytes>=4&&manifest[0]=='M'&&
+       manifest[1]=='W'&&manifest[2]=='B'&&manifest[3]=='2';
+ check((later_b_gate2?later_b_gate2_manifest_arm(manifest,manifest_bytes):
+       matched_setup_cf_full_manifest_arm(manifest,manifest_bytes))==1,
        "Matched Setup C/F v2 arm refused the explicit-step manifest");
- check(state.version2&&state.full_schedule&&state.armed&&!state.failed&&!state.complete&&
+ check(state.version2&&(later_b_gate2?state.later_b_gate2_mode:state.full_schedule)&&
+       state.armed&&!state.failed&&!state.complete&&
        !state.queued&&!state.awaiting_approval,
        "Matched Setup C/F explicit-step arm did not retain a fresh v2 owner");
  state.explicit_step_mode=true;
@@ -7114,6 +7548,7 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_cf_step_once(){try{
  if(owner_action==1){menu_clock.reset();audio_clock.reset();}
  // This is the existing single-row service. It owns the original PAD/tick or
  // Aurora draw path, source checks, and complete receipt; no tick is batched.
+ if(state.later_b_gate2_mode)state.later_b_action_started=true;
  (void)matched_setup_cf_service();
  state.explicit_step_inflight=false;
  check(!state.failed&&!state.queued&&state.awaiting_approval&&
@@ -7141,6 +7576,9 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire_ready(){
     !melee_web_gameplay_world_exists()||melee_web_gameplay_generation()!=state.world_generation||
     asset_generation!=state.asset_generation||!match->construction_complete()||
     match->source_frames()!=state.last_source_frame_after) return -1;
+ if(state.later_b_gate2_mode&&(!later_b_gate2_parent_identity_valid(state)||
+    (state.failed&&state.later_b_action_started&&
+     !state.later_b_safe_refusal_boundary)))return -1;
  const auto submission=aurora_browser_submission_status();
  const auto* stats=aurora_get_stats();
  if(!stats)return -1;
@@ -7148,7 +7586,16 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire_ready(){
         submission.pendingStagingBuffers==0&&submission.workerBusy==0?1:0;
 }
 const char* melee_web_native_menu_stadium_first_sss_vs_setup_cf_retirement_status(){
- static std::string status;status=matched_setup_cf_retirement_json();return status.c_str();
+ static std::string status;
+ // The legacy CSS draw owner is not armed by Gate1 profile 3.  This existing
+ // retained-state getter is the Gate2 observation endpoint; it performs no
+ // CSS refresh and reads no source/current-SSS snapshot.
+ if(matched_setup_cf.later_b_gate2_attempted&&
+    !matched_setup_cf_retirement.native_retired&&
+    !matched_setup_cf_retirement.later_b_unarmed_abort)
+  status=matched_setup_cf_json();
+ else status=matched_setup_cf_retirement_json();
+ return status.c_str();
 }
 int melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire(){try{
  check(!matched_setup_cf_retirement.native_retired&&
@@ -7159,6 +7606,9 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire(){try{
  check(EM_ASM_INT({return typeof window.menuMatchedSetupCfRetired==='function'?1:0;}),
        "Matched Setup C/F runtime retirement callback is unavailable");
  auto& state=matched_setup_cf;
+ if(state.later_b_gate2_mode)
+  matched_setup_cf_retirement.later_b_transfer_receipt=
+      later_b_gate2_transfer_proof_json(state,false);
  matched_setup_cf_retirement.terminal=state.complete||state.failed||
      (state.awaiting_approval&&state.last_action_complete);
  matched_setup_cf_retirement.receipt=matched_setup_cf_json();
@@ -7175,6 +7625,12 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire(){try{
        matched_setup_cf_retirement.phase_after_close==0&&
        matched_setup_cf_retirement.running_after_close==0,
        "Matched Setup C/F native close left a live owner");
+ if(!matched_setup_cf_retirement.later_b_transfer_receipt.empty()){
+  matched_setup_cf_retirement.later_b_parent_close_checked=true;
+  matched_setup_cf_retirement.later_b_transfer_receipt=
+      later_b_gate2_mark_parent_close_checked(
+          matched_setup_cf_retirement.later_b_transfer_receipt);
+ }
  stadium_recreation_b_after_close();
  melee_web_input_shutdown();
  // Aurora shutdown retains its existing opportunistic writer behavior. JS IDBFS
@@ -7479,6 +7935,16 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_queue(
          (action.kind==1?state.source_ticks:state.source_draws),
        "Matched Setup C/F v2 queued action differs from its immutable manifest row");
  matched_setup_cf_check_owner(state.source_ticks,state.source_draws);
+ if(state.later_b_gate2_mode&&action.kind==1){
+  check(state.later_b_gate2_parent_archived&&state.later_b_archived_replay&&
+        state.later_b_prefix_cursor==943&&action.ordinal<state.later_b_stop_tick&&
+        state.later_b_prefix_cursor+action.ordinal<state.later_b_archived_replay->frames.size(),
+        "Later B Gate2 tick no longer has its archived original recipe row");
+  const auto& raw=state.later_b_archived_replay->frames[
+      static_cast<size_t>(state.later_b_prefix_cursor)+action.ordinal].bytes;
+  check(std::equal(action.pad.begin(),action.pad.end(),raw.begin()),
+        "Later B Gate2 queued PAD differs from its still-owned recipe row");
+ }
  state.seed_at_queue=match->random_seed();
  state.last_schedule_index=schedule_index;state.last_action_kind=action.kind;
  state.last_ordinal=action.ordinal;state.last_bundle=action.kind==1?action.bundle:UINT32_MAX;
@@ -7501,7 +7967,17 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_cf_approve(
        "Matched Setup C/F approval is duplicate, stale, or out of order");
  if(state.version2)matched_setup_cf_check_owner(state.last_ticks_after,state.last_draws_after);
  else matched_setup_cf_check_owner(state.last_ordinal+1);
- if(!accepted){matched_setup_cf_fail("Host refused the pending matched Setup C/F boundary");return 1;}
+ if(state.later_b_gate2_mode&&schedule_index+1==state.action_count)
+  check(state.action_count==360&&state.last_action_kind==2&&
+        state.last_ordinal==179&&state.source_ticks==180&&state.source_draws==180&&
+        state.cursor==359&&state.later_b_gate2_go_observed&&
+        state.later_b_actual_go_tick+96==180&&
+        state.later_b_post_go_typed22_count==96,
+        "Later B Gate2 final approval is not the exact post-GO 180-action boundary");
+ if(!accepted){
+  if(state.later_b_gate2_mode)state.later_b_safe_refusal_boundary=true;
+  matched_setup_cf_fail("Host refused the pending matched Setup C/F boundary");return 1;
+ }
  state.awaiting_approval=false;state.last_action_complete=false;++state.cursor;
  if(state.cursor==state.action_count)state.complete=true;
  first_css_browser_draw_refresh_observation();return 1;

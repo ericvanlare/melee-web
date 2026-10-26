@@ -17,6 +17,8 @@ import {validateStock4SssExitExpected, compareStock4SssExitObservation, validate
   validateStock4SssExitTerminal, validateStock4SssExitFinalization} from './stadium_stock4_sss_exit_observation.mjs';
 import {validateLaterSssExitExpected, validateLaterReferenceRecipeInputs, compareLaterSssExitObservation, validateLaterSssExitTrace,
   validateLaterSssExitTerminal, validateLaterSssExitFinalization, compareLaterPreparedStartObservation, compareLaterPreparedSetupObservation} from './stadium_later_sss_exit_observation.mjs';
+import {StadiumSetupCfActionDriver, deriveLaterBGate2Expectations} from '../tests/stadium_matched_setup_cf_consumer.mjs';
+import {createLaterBGate2NativeAdapter, runLaterBGate2ActionContinuation} from '../tests/stadium_matched_setup_cf_runner_gate.mjs';
 import fs from 'node:fs/promises';
 import {closeSync, createReadStream, fsyncSync, openSync, writeSync} from 'node:fs';
 import path from 'node:path';
@@ -75,6 +77,7 @@ const {values, tokens} = parseArgs({tokens: true, options: {
   'stadium-later-sss-prepared-start': {type: 'boolean', default: false},
   'stadium-later-sss-prepared-setup': {type: 'boolean', default: false},
   'stadium-later-sss-reference': {type: 'string'},
+  'stadium-later-b-gate2-projection': {type: 'string'},
   'stadium-later-sss-exit': {type: 'boolean', default: false},
   'artifact-root': {type: 'string'},
 }});
@@ -172,6 +175,10 @@ const currentSssLater = values['stadium-later-sss-exit'];
 const laterSssPreparedStart = values['stadium-later-sss-prepared-start'];
 const laterSssPreparedSetup = values['stadium-later-sss-prepared-setup'];
 const laterSssReference = values['stadium-later-sss-reference'] ?? null;
+const laterBGate2ProjectionPath = values['stadium-later-b-gate2-projection'] ? path.resolve(values['stadium-later-b-gate2-projection']) : null;
+const laterBGate2 = laterBGate2ProjectionPath !== null;
+if (laterBGate2 && (laterSssReference !== OBSERVED_B_REFERENCE.id || !laterSssPreparedSetup))
+  throw Error('Gate2 requires the exact new-reference checked profile3 Setup route');
 if (laterSssReference !== null && (laterSssReference !== OBSERVED_B_REFERENCE.id ||
     !currentSssLater || !laterSssPreparedStart || !laterSssPreparedSetup || currentSssPreparedStart))
   throw Error('New later reference requires its exact explicit descriptor and checked later Setup route');
@@ -195,7 +202,7 @@ if (!firstReplayCallbackProbe && !currentSssExit && (expectedFrame0Path || value
 const runtimeDataUrl = new URL('gameplay_menu_browser.data', url).href;
 const output = path.resolve(values.out);
 const observationTimeoutMs = diagnostic ? diagnosticProtocol.observation_timeout_ms : Math.min(phaseTimeoutMs, 5000);
-const inputPaths = [values.disc, values.recipe, values.manifest, values['runtime-data'], expectedFrame0Path, currentSssExitPath]
+const inputPaths = [values.disc, values.recipe, values.manifest, values['runtime-data'], expectedFrame0Path, currentSssExitPath, laterBGate2ProjectionPath]
   .filter(Boolean).map(value => path.resolve(value));
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const artifactRoot = path.resolve(values['artifact-root'] || path.join(repoRoot, 'build/browser-release'));
@@ -247,6 +254,8 @@ const report = {
   unexpected_requests: [],
 };
 let currentSssExpected, currentSssRecipeBytes, currentSssArm;
+let laterBGate2ProjectionBytes, laterBGate2Reference;
+let laterBGate2Reserved = false, laterBGate2Finalized = false;
 let currentSssStock4 = false;
 let currentSssStopsBeforeAssets = false;
 let currentSssPolicy = {compare: compareCurrentSssExitObservation, terminal: validateCurrentSssExitTerminal,
@@ -383,6 +392,137 @@ function persistBoundaryConsoleEvent(params) {
   }
 }
 
+// Gate2 uses this same artifact writer only after a correlated acknowledged close.
+async function retainReplayArtifacts() {
+  const artifacts = await observePageOperation('final replay artifacts', () => page.locator('#retail-replay-downloads a').evaluateAll(async links => {
+    const retained = [];
+    for (const link of links) {
+      if (!['retail-port.jsonl', 'retail-timer.jsonl', 'retail-browser-report.json'].includes(link.download) || !link.href.startsWith('blob:')) continue;
+      const response = await fetch(link.href);
+      if (!response.ok) throw Error(`Artifact ${link.download} returned HTTP ${response.status}`);
+      retained.push({name: link.download, text: await response.text()});
+    }
+    return retained;
+  }));
+  report.saved_downloads = [];
+  for (const artifact of artifacts) {
+    if (report.saved_downloads.some(row => row.name === artifact.name)) throw Error(`Duplicate exported artifact: ${artifact.name}`);
+    await write(artifact.name, artifact.text);
+    if (currentSssExit && artifact.name === 'retail-port.jsonl') currentSssTrace = artifact.text;
+    report.saved_downloads.push({name: artifact.name, bytes: Buffer.byteLength(artifact.text), sha256: createHash('sha256').update(artifact.text).digest('hex')});
+  }
+}
+
+async function runLaterBGate2FromSetup(deadline, actualObservation) {
+  const setup = actualObservation.prepared_to_setup?.setup;
+  const request = {reference_id: laterSssReference,
+    recipe_sha256: laterBGate2Reference.reference.recipe_sha256, cursor: 943,
+    notification_order: actualObservation.notification_coordinates?.order,
+    world_generation: setup?.stadium_setup_state?.world_generation,
+    setup_seed_hex: setup?.actual?.random_seed_hex};
+  // A lost reservation response must never reopen ordinary snapshots/cleanup.
+  laterBGate2Reserved = true;
+  report.later_b_gate2 = {request, component_pass: false, native_cleanup: 'pending'};
+  const token = await observePageOperation('Gate2 reserve same retailRun', () =>
+    currentSssArm.evaluate((scope, operands) => scope.reserveLaterBTransfer(operands.actual, operands.request),
+      {actual: actualObservation, request}));
+  report.later_b_gate2.token_id = token.id;
+  const adapter = createLaterBGate2NativeAdapter({owner: currentSssArm, deadline,
+    evaluate: (fn, command) => observePageOperation(`Gate2 ${command.kind}`, () => page.evaluate(fn, command))});
+  const actionDriver = new StadiumSetupCfActionDriver({laterBProjection: laterBGate2ProjectionBytes,
+    laterBToken: token.id, native: adapter, admittedWorldGeneration: request.world_generation});
+  await fs.writeFile(path.join(output, 'gate2-native-manifest.bin'), actionDriver.nativeManifest, {flag: 'wx'});
+  const evidencePath = path.join(output, 'gate2-actions.jsonl');
+  await fs.writeFile(evidencePath, '', {flag: 'wx'});
+  try {
+    const result = await runLaterBGate2ActionContinuation({driver: actionDriver, adapter,
+      actualSetup: setup, deadline,
+      persist: row => fs.appendFile(evidencePath, JSON.stringify(row) + '\n'),
+      record: row => observePageOperation('Gate2 retain accepted action', () =>
+        currentSssArm.evaluate((scope, value) => scope.gate2Record(value), row)),
+      finalize: async () => {
+        const final = await observePageOperation('Gate2 JS-only finalization', () => currentSssArm.evaluate(scope => scope.gate2Finalize()));
+        if (final?.finalized !== true) throw Error('Gate2 JS-only finalization did not acknowledge native close');
+        laterBGate2Finalized = true;
+        report.browser_report = final.replay_report;
+        return final;
+      }});
+    report.later_b_gate2 = {...report.later_b_gate2, ...result, transport: adapter.state(),
+      constructor_comparison: actionDriver.constructorComparison, go_comparison: actionDriver.goComparison};
+    if (!result.component_pass) throw Error('Gate2 arm was refused and checked-aborted; component comparison not run');
+  } catch (error) {
+    report.later_b_gate2.failure = String(error?.message || error);
+    report.later_b_gate2.driver = actionDriver.status();
+    report.later_b_gate2.transport = adapter.state();
+    // Partial/pending/unACKed/uncertain paths never attempt retire, abort, ordinary
+    // unload, status, memory, cache or snapshots from this catch or outer finally.
+    throw error;
+  }
+}
+
+async function finalizeLaterBGate2Capture() {
+  try {
+    if (!laterBGate2Finalized || pageObservationTimedOut) {
+      report.later_b_gate2 ||= {};
+      report.later_b_gate2.native_cleanup = 'UNRUN_OWNED_OS_CLEANUP_ONLY';
+      report.result = 'fail';
+      return;
+    }
+    await retainReplayArtifacts();
+    report.current_sss_exit.wrapper_final = await observePageOperation('Gate2 pure callback ownership', () => currentSssArm.evaluate(scope => scope.state()));
+    report.current_sss_exit.wrapper_restored = await observePageOperation('Gate2 restore JS replay callback', () => currentSssArm.evaluate(scope => scope.dispose()));
+    await currentSssArm.dispose();
+    const terminal = report.browser_report?.later_b_transfer?.native_terminal;
+    const receipt = terminal?.receipt;
+    if (terminal?.kind === 'known-unarmed-abort' && receipt?.native_closed === true &&
+        receipt.attempt_consumed === true && receipt.armed === false && receipt.source_ticks === 0 &&
+        receipt.source_draws === 0 && receipt.action_cursor === 0 && receipt.phase_after_close === 0 &&
+        receipt.running_after_close === 0 && receipt.error === null &&
+        receipt.later_b_transfer?.token === report.later_b_gate2.token_id &&
+        receipt.later_b_transfer.parent_close_checked === true) {
+      report.later_b_gate2.native_cleanup = 'ACKNOWLEDGED_KNOWN_UNARMED_ABORT_JS_ONLY_FINALIZATION';
+      throw Error('Gate2 arm refused; checked unarmed abort is cleanup evidence only');
+    }
+    const closedState = receipt?.matched_setup_cf;
+    if (terminal?.kind !== 'retired' || receipt?.native_retired !== true || receipt.terminal !== true ||
+        closedState?.schema !== 'melee-web-stadium-later-b-gate2-native-v1' ||
+        closedState.action_count !== 360 || closedState.cursor !== 360 || closedState.complete !== true ||
+        closedState.source_ticks !== 180 || closedState.source_draws !== 180 ||
+        closedState.actual_go?.observed !== true || closedState.actual_go.tick !== laterBGate2Reference.goTick ||
+        closedState.post_go_typed22_state_count !== 96 ||
+        report.current_sss_exit.comparison?.pass !== true ||
+        report.current_sss_exit.prepared_start_comparison?.pass !== true ||
+        report.current_sss_exit.prepared_setup_comparison?.pass !== true ||
+        receipt.phase_after_close !== 0 || receipt.running_after_close !== 0 || receipt.error !== null ||
+        receipt.later_b_transfer?.token !== report.later_b_gate2.token_id ||
+        receipt.later_b_transfer.parent_close_checked !== true || report.browser_report.complete !== false ||
+        report.browser_report.later_b_transfer.action_evidence?.length !== 360 ||
+        report.later_b_gate2.accepted_actions !== 360 || !report.later_b_gate2.component_pass ||
+        report.current_sss_exit.wrapper_restored !== true || !currentSssTrace)
+      throw Error('Gate2 completed action/retirement evidence is incomplete');
+    report.current_sss_exit.trace_comparison = currentSssPolicy.trace(currentSssTrace, currentSssExpected,
+      report.current_sss_exit.observation);
+    report.artifact_inventory_post = await browserArtifactInventory();
+    if (!report.artifact_inventory_post.equal || JSON.stringify(report.artifact_inventory_post) !== JSON.stringify(report.artifact_inventory_pre))
+      throw Error('Gate2 served/local runtime artifacts changed');
+    if (pageErrors.length || report.unexpected_requests.length || report.failure || report.download_error)
+      throw Error('Gate2 page/host diagnostics failed');
+    report.later_b_gate2.native_cleanup = 'ACKNOWLEDGED_ONE_SHOT_NATIVE_RETIREMENT_JS_ONLY_FINALIZATION';
+    finalizeSessionCapture(report); // Retain ordinary whole-replay incomplete failures.
+    report.original_replay_capture_result = report.result;
+    report.result = 'later_b_gate2_component_pass_replay_incomplete';
+  } catch (error) {
+    firstError('later_b_gate2_finalization', error.message || error);
+    report.result = 'fail';
+  } finally {
+    await closeOwnedCaptureBrowser(); // Existing recorded OS owner only, never native teardown.
+    if (report.cleanup?.browser_close_returned !== true || report.close_error || report.cdp_close_error || pageErrors.length) report.result = 'fail';
+    report.browser_errors = pageErrors.slice(0, 256);
+    await write('report.json', report);
+    if (report.failure) await write('failure.txt', report.failure + '\n');
+  }
+}
+
 async function browserArtifactInventory() {
   return readSharedArtifactInventory({artifactRoot, url});
 }
@@ -446,6 +586,7 @@ async function captureStoppedSceneImage(name, expectedCursor, initialStatus = nu
 }
 
 async function snapshot(reason = 'poll', {captureCss = !diagnostic} = {}) {
+  if (laterBGate2Reserved) return {reason, native_access_suppressed: 'Gate2 reserved/transfer/terminal owner; prefix and action metrics are separate'};
   if (!page || page.isClosed()) return null;
   let value;
   try {
@@ -870,6 +1011,13 @@ try {
     for (const identity of Object.values(currentSssExpected.source_binding.files))
       if (await digest(identity.path) !== identity.sha256) throw Error('Current SSS original source input changed');
     if (laterSssReference !== null) validateLaterReferenceRecipeInputs(recipeBytes,currentSssExpected);
+    if (laterBGate2) {
+      report.inputs.later_b_gate2_projection = await statInput(laterBGate2ProjectionPath);
+      laterBGate2ProjectionBytes = await fs.readFile(laterBGate2ProjectionPath);
+      laterBGate2Reference = deriveLaterBGate2Expectations(laterBGate2ProjectionBytes);
+      if (laterBGate2Reference.reference.recipe_sha256 !== report.inputs.recipe.sha256)
+        throw Error('Gate2 projection and current literal recipe identities differ');
+    }
     currentSssRecipeBytes = Array.from(recipeBytes);
     report.current_sss_exit = {component_pass: false, runtime_replay: 'NOT_RUN',
       original_menu_draw_parity: 'UNKNOWN', Entry: false, C3: false};
@@ -1218,6 +1366,10 @@ try {
                   report.current_sss_exit.prepared_setup_comparison =
                     currentSssPolicy.preparedSetup(observedSetup.value, currentSssExpected);
                   setupFinished = true;
+                  if (laterBGate2) {
+                    await runLaterBGate2FromSetup(deadline, observedSetup.value);
+                    return; // No ordinary snapshot/getter/UI unload after reservation.
+                  }
                   break;
                 }
                 await new Promise(resolve => setTimeout(resolve, replayPollMs));
@@ -1226,6 +1378,7 @@ try {
                 throw Error('Prepared Start to completed Setup exceeded the unchanged bounded replay interval');
             } catch (error) {
               report.current_sss_exit.prepared_setup_failure = String(error.message || error);
+              if (laterBGate2Reserved) throw error;
               if (!report.current_sss_exit.prepared_start_comparison?.pass)
                 report.current_sss_exit.prepared_start_failure = report.current_sss_exit.prepared_setup_failure;
             }
@@ -1380,7 +1533,8 @@ try {
   firstError(currentPhase, error.message || error, report.last_successful_snapshot ?? null);
   report.failure = String(error.stack || error);
 } finally {
-  if (firstReplayCallbackProbe) await finalizeFirstReplayCallbackProbe();
+  if (laterBGate2Reserved) await finalizeLaterBGate2Capture();
+  else if (firstReplayCallbackProbe) await finalizeFirstReplayCallbackProbe();
   else {
   try {
   if (diagnostic) {
@@ -1672,24 +1826,7 @@ try {
       report.page_exports_skipped = 'Renderer observation timed out; last successful snapshot retained and page exports were skipped.';
     } else {
     try {
-      const artifacts = await observePageOperation('final replay artifacts', () => page.locator('#retail-replay-downloads a').evaluateAll(async links => {
-        const retained = [];
-        for (const link of links) {
-          if (!['retail-port.jsonl', 'retail-timer.jsonl', 'retail-browser-report.json'].includes(link.download) || !link.href.startsWith('blob:')) continue;
-          const response = await fetch(link.href);
-          if (!response.ok) throw Error(`Artifact ${link.download} returned HTTP ${response.status}`);
-          retained.push({name: link.download, text: await response.text()});
-        }
-        return retained;
-      }));
-      report.saved_downloads = [];
-      for (const artifact of artifacts) {
-        if (report.saved_downloads.some(row => row.name === artifact.name))
-          throw Error(`Duplicate exported artifact: ${artifact.name}`);
-        await write(artifact.name, artifact.text);
-        if (currentSssExit && artifact.name === 'retail-port.jsonl') currentSssTrace = artifact.text;
-        report.saved_downloads.push({name: artifact.name, bytes: Buffer.byteLength(artifact.text), sha256: createHash('sha256').update(artifact.text).digest('hex')});
-      }
+      await retainReplayArtifacts();
     } catch (error) { report.download_error = String(error?.message || error); }
     try { const rows = await observePageOperation('final CPU prefix rows', () => page.evaluate(() => window.__cpuPrefixRows || [])); if(rows.length) await write('cpu-prefix.jsonl',rows.join('\n')+'\n'); } catch(error) { report.cpu_download_error = String(error); }
     try { const rows = await observePageOperation('final CPU item rows', () => page.evaluate(() => window.__cpuItemEventRows || [])); await write('cpu-item-events.jsonl',rows.length ? rows.join('\n')+'\n' : ''); report.cpu_item_event_count = rows.length; } catch(error) { report.cpu_item_event_error = String(error); }
@@ -1901,14 +2038,17 @@ try {
 if (diagnostic) {
   if (report.result !== 'captured' || process.exitCode) process.exitCode = 1;
   else console.log(`captured: ${report.natural_pause_terminal?.outcome || 'unknown'}; diagnosis only`);
+} else if (laterBGate2) {
+  if (report.result !== 'later_b_gate2_component_pass_replay_incomplete') process.exitCode = 1;
+  else console.log('component pass: same-owner B constructor aggregate, actual GO and96 typed22+seed samples; checked one-shot retirement; whole replay/C3 incomplete');
 } else if (currentSssExit) {
   const expectedResult = currentSssLater ? 'later_sss_component_pass_replay_stopped' : currentSssStock4 ? (currentSssPreparedStart ?
     'prepared_entry_setup_candidate_pass_replay_stopped' : 'component_pass_replay_stopped') : 'component_pass_replay_refused';
   if (report.result !== expectedResult) process.exitCode = 1;
   else console.log(currentSssLater ?
     (laterSssPreparedSetup ?
-      'component pass: retained occurrence1 zero-action Setup common fields/seed and literal940 prefix; replay incomplete; no original constructor/GO or C3' :
-      'component pass: retained occurrence1 SSS OnExit fields and literal 940-input prefix; checked unload, replay incomplete; no B Entry/constructor/GO or C3') : currentSssStock4 ? (currentSssPreparedStart ?
+      `component pass: retained occurrence1 zero-action Setup common fields/seed and literal${currentSssExpected.literal_inputs.length} prefix; replay incomplete; no original constructor/GO or C3` :
+      `component pass: retained occurrence1 SSS OnExit fields and literal ${currentSssExpected.literal_inputs.length}-input prefix; checked unload, replay incomplete; no B Entry/constructor/GO or C3`) : currentSssStock4 ? (currentSssPreparedStart ?
     'candidate pass: prepared Start to completed zero-tick Setup common fields and seed; replay explicitly stopped/incomplete; no original Entry dispatch/C3 claim' :
     'component pass: retained stock4 SSS OnExit fields; replay explicitly stopped/incomplete; no Entry/C3') :
     'component pass: retained SSS OnExit fields; original TIME replay refused/incomplete; no Entry/C3');

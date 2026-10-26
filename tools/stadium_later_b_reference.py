@@ -8,7 +8,9 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
+import stat
 
 import stadium_current_context_packet as context
 import reference_input_stream as si
@@ -21,6 +23,12 @@ VARIANT = 'private-original-b-2013-943-reference-only'
 ROLES = {'primary', 'primary_status', 'si', 'si_status', 'launch', 'report',
          'setup_receipt', 'producer_manifest'}
 RECIPE_SHA256 = '5fb53bdc71b35b800bc3451b1d9117709edef2413a38a8f7311ee352647a6755'
+GATE2_SCHEMA = 'melee-web-stadium-later-b-gate2-reference-projection-v1'
+GATE2_REFERENCE_ID = 'original-b-2013-943-v1'
+GATE2_ACTION_STEPS = 180
+GATE2_GO_STATES = 96
+GATE2_PREFIX_INPUTS = 943
+MAX_BINDING_BYTES = 64 * 1024
 
 
 def require(value, message):
@@ -53,6 +61,14 @@ def _named_seed(row):
     for item in named['payload']['slices']:
         item['name'] = SLICE_NAMES.get(item['tag'], 'unknown')
     return context.seed(named)
+
+
+def _progress_coordinate(row):
+    payload = row['payload']
+    return {'sequence': row['seq'], 'source_tick': row['source_tick'],
+            'draw_ordinal': row['draw_ordinal'],
+            'match_index': payload['match_index'], 'phase': payload['phase'],
+            'pc': payload['pc'], 'lr': payload['lr']}
 
 
 def derive(rows, expected, receipt, report):
@@ -113,6 +129,9 @@ def derive(rows, expected, receipt, report):
     require(observations == report['stadium_b_observation'],
             'retained observation report differs from actual strict raw replay')
     require(len(states[stop-go_tick:]) == 12, 'natural pause tail differs')
+    by_sequence = {row['seq']: row for row in rows}
+    constructor_coordinates = [_progress_coordinate(by_sequence[sequence])
+                              for sequence in construction['source_sequences']]
     # Retain actual consume/tick/draw coordinates. No synthetic wire action or PAD.
     return {'schema': SCHEMA, 'variant': VARIANT, 'runtime_admission': False,
             'same_run_provenance_verified': False,
@@ -121,6 +140,8 @@ def derive(rows, expected, receipt, report):
             'whole_session_context': packet, 'selected_match': 1,
             'setup_global_cursor': packet['spans'][6]['first_frame'],
             'entry': entry, 'setup': setup, 'constructor': construction,
+            'constructor_original_witnesses': constructor_coordinates,
+            'go_source_coordinate': _progress_coordinate(go),
             'go': go_projection, 'go_rng': _named_seed(go),
             'source_steps_before_pause': steps[:stop],
             'pre_pause_states': states[:stop-go_tick],
@@ -130,6 +151,173 @@ def derive(rows, expected, receipt, report):
             'stop_before_consume': steps[stop]['consume'],
             'registration_parity': False, 'per_owner_rng_parity': False,
             'browser_parity': False, 'C3': False}
+
+
+def _binding_stat_identity(info):
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_size,
+            info.st_mtime_ns, info.st_ctime_ns)
+
+
+def _read_binding_snapshot(binding_path):
+    """Read exact bytes from one stable regular non-symlink binding file."""
+    path = Path(binding_path)
+    nofollow = getattr(os, 'O_NOFOLLOW', None)
+    require(nofollow is not None, 'binding no-follow file open is unavailable')
+    try:
+        before = os.lstat(path)
+        require(stat.S_ISREG(before.st_mode) and not stat.S_ISLNK(before.st_mode),
+                'binding must be a regular non-symlink file')
+        require(before.st_size <= MAX_BINDING_BYTES, 'binding exceeds the bounded file size')
+        fd = os.open(path, os.O_RDONLY | nofollow)
+    except (OSError, TypeError, ValueError) as error:
+        raise ValueError(f'cannot open exact binding file: {error}') from error
+    try:
+        opened = os.fstat(fd)
+        require(stat.S_ISREG(opened.st_mode) and
+                _binding_stat_identity(before) == _binding_stat_identity(opened),
+                'binding file identity changed before read')
+        with os.fdopen(fd, 'rb', closefd=False) as stream:
+            raw = stream.read(MAX_BINDING_BYTES + 1)
+        after_fd = os.fstat(fd)
+    finally:
+        os.close(fd)
+    try:
+        after_path = os.lstat(path)
+    except OSError as error:
+        raise ValueError(f'binding file disappeared after read: {error}') from error
+    require(len(raw) <= MAX_BINDING_BYTES and len(raw) == before.st_size and
+            _binding_stat_identity(before) == _binding_stat_identity(after_fd) ==
+            _binding_stat_identity(after_path),
+            'binding file changed during read')
+    return raw, _binding_stat_identity(after_path)
+
+
+def build_gate2_projection(binding_path):
+    """Build source-reference Gate2 rows from one exact retained binding file.
+
+    The exact-byte hash identifies this host input file. It is not a native
+    admission token; consumers must revalidate the complete sealed identity.
+    """
+    raw_binding, file_identity = _read_binding_snapshot(binding_path)
+    try:
+        binding = json.loads(raw_binding.decode('utf-8'))
+    except (json.JSONDecodeError, UnicodeDecodeError) as error:
+        raise ValueError(f'binding is not valid UTF-8 JSON: {error}') from error
+    require(isinstance(binding, dict), 'binding JSON root must be an object')
+    operands = load(binding)
+
+    steps = operands['source_steps_before_pause']
+    states = operands['pre_pause_states']
+    state_rng = operands['pre_pause_state_rng']
+    packet = operands['whole_session_context']
+    stop = operands['stop_before_consume']
+    go_tick = operands['go']['source_tick']
+    require(operands['recipe_sha256'] == RECIPE_SHA256 and
+            operands['setup_global_cursor'] == GATE2_PREFIX_INPUTS and
+            len(packet['inputs']) == 2013 and
+            len(packet['inputs'][:GATE2_PREFIX_INPUTS]) == GATE2_PREFIX_INPUTS,
+            'strict source packet differs from exact Gate2 reference dimensions')
+    require(len(steps) == GATE2_ACTION_STEPS and len(states) == GATE2_GO_STATES and
+            len(state_rng) == GATE2_GO_STATES and stop['source_tick'] == GATE2_ACTION_STEPS,
+            'strict source interval differs from the bounded Gate2 extent')
+    require(go_tick + GATE2_GO_STATES == stop['source_tick'],
+            'actual GO-to-pause state interval differs from 96 rows')
+
+    actions = []
+    for local_tick, step in enumerate(steps):
+        require(step['tick']['source_tick'] == local_tick and
+                step['consume']['source_tick'] == local_tick and
+                step['draw_enter']['source_tick'] == local_tick + 1 and
+                step['draw_return']['source_tick'] == local_tick + 1 and
+                len(step['ports']) == 4 and all(len(port) == 22 for port in step['ports']),
+                'actual source tick/draw/PAD tuple escaped Gate2 coordinates')
+        actions.append({'action_index': 2 * local_tick, 'kind': 'tick',
+                        'source_tick': step['tick']['source_tick'],
+                        'consume': step['consume'], 'tick': step['tick'],
+                        'pads': list(step['ports'])})
+        actions.append({'action_index': 2 * local_tick + 1, 'kind': 'draw',
+                        'source_tick': step['draw_return']['source_tick'],
+                        'draw_enter': step['draw_enter'],
+                        'draw_return': step['draw_return']})
+
+    go_step = steps[go_tick]
+    go_coordinate = operands['go_source_coordinate']
+    require(go_step['consume']['sequence'] < go_coordinate['sequence'] <
+            go_step['tick']['sequence'], 'actual GO marker escaped its consume/tick bracket')
+    projected_states = []
+    for offset, (state, rng) in enumerate(zip(states, state_rng)):
+        step = steps[go_tick + offset]
+        require(state['source_tick'] == go_tick + offset and
+                step['tick']['source_tick'] == state['source_tick'],
+                'post-tick state escaped its actual GO-to-pause source tick')
+        projected_states.append({'tick': step['tick'], 'state': state, 'rng': rng})
+
+    constructor_state = operands['constructor']['state_projection']
+    require(constructor_state['constructor_entry_count'] == 1 and
+            constructor_state['random_call_observed'] is True and
+            constructor_state['random_bound_valid'] is True and
+            constructor_state['random_result_valid'] is True,
+            'checked shared constructor aggregate is incomplete')
+    constructor_projection = {
+        'scope': 'original-and-native-shared-aggregate-only',
+        'entry_count': constructor_state['constructor_entry_count'],
+        'parameter_roles': {'min_parameter': 'parameter_x0',
+                            'max_parameter': 'parameter_x4'},
+        'min_parameter': constructor_state['parameter_x0'],
+        'max_parameter': constructor_state['parameter_x4'],
+        'random_bound': constructor_state['random_bound'],
+        'random_result': constructor_state['random_result'],
+        'seed_before': constructor_state['seed_before_hex'],
+        'seed_after': constructor_state['seed_after_hex'],
+    }
+    witnesses = operands['constructor_original_witnesses']
+    require(len(witnesses) == 5 and
+            [witness['sequence'] for witness in witnesses] ==
+            operands['constructor']['source_sequences'],
+            'original constructor witness order differs from strict accepted source rows')
+
+    entry = operands['entry']
+    setup = operands['setup']
+    projected = {
+        'schema': GATE2_SCHEMA,
+        'reference_id': GATE2_REFERENCE_ID,
+        'binding_sha256': hashlib.sha256(raw_binding).hexdigest(),
+        'recipe_sha256': operands['recipe_sha256'],
+        'selected_match': 1,
+        'setup_global_cursor': GATE2_PREFIX_INPUTS,
+        'menu_prefix': {
+            'scope': 'global literal input prefix; distinct from local B action indices',
+            'input_count': GATE2_PREFIX_INPUTS,
+            'inputs': packet['inputs'][:GATE2_PREFIX_INPUTS],
+        },
+        'source_spans': packet['spans'],
+        'entry': {key: entry[key] for key in
+                  ('sequence', 'source_tick', 'draw_ordinal', 'match_index',
+                   'boundary', 'pc', 'lr', 'gprs')} | {'seed': entry['rng']['value_hex']},
+        'setup': {key: setup[key] for key in
+                  ('sequence', 'source_tick', 'draw_ordinal', 'match_index',
+                   'boundary', 'pc', 'lr', 'gprs')} | {'seed': setup['rng']['value_hex']},
+        'constructor_shared_projection': constructor_projection,
+        'constructor_original_witnesses': {
+            'scope': 'original-only order; no browser phase-dispatch pairing',
+            'coordinates': witnesses,
+        },
+        'actions': actions,
+        'go': {'coordinate': go_coordinate, 'state': operands['go'],
+               'rng': operands['go_rng']},
+        'states': projected_states,
+        'stop_before_consume': stop,
+        'unpaired': ['original_constructor_phase_dispatch', 'per_owner_rng',
+                     'registration', 'all_writers', 'C3'],
+        'runtime_admission': False,
+        'same_run_provenance_verified': False,
+        'browser_parity': False,
+        'C3': False,
+    }
+    final_raw, final_identity = _read_binding_snapshot(binding_path)
+    require(final_identity == file_identity and final_raw == raw_binding,
+            'binding file changed during Gate2 projection')
+    return projected
 
 
 def load(binding):

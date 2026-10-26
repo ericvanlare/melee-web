@@ -24,6 +24,8 @@ struct MeleeWebPadState {std::array<uint8_t,822> bytes{};};
 struct MeleeWebMenuHost;
 struct MeleeWebStadiumIdleSnapshot {};
 struct MeleeWebStadiumGoAlignmentSnapshot {};
+// Unused Gate2 event storage only; these Setup fixtures do not observe GO.
+struct MeleeWebStadiumGoAlignmentEvent {};
 static unsigned continuation_service_calls=0;
 static bool matched_setup_cf_service(){++continuation_service_calls;throw std::runtime_error("default Setup unexpectedly invoked C/F continuation");}
 
@@ -60,6 +62,12 @@ namespace melee_web {struct MenuPreparationState{enum class Phase{Idle,WaitingFo
 struct Preparation {melee_web::MenuPreparationState::Phase p=melee_web::MenuPreparationState::Phase::Idle;bool busy(){return p!=melee_web::MenuPreparationState::Phase::Idle;}bool waiting_for_audio(){return p==melee_web::MenuPreparationState::Phase::WaitingForAudio;}auto phase(){return p;}void reset(){p=melee_web::MenuPreparationState::Phase::Idle;}} preparation;
 struct Start {int value=7;};struct MeleeWebMenuMatchSelection{uint32_t random_seed=0x3bb84c53,hud_layout=0,player_count=2;uint16_t unlocked_characters=2047,unlocked_stages=2047;uint8_t save_profile_present=1,opening_demo=0,sudden_death=0;struct{uint32_t controller=0,stocks=4,costume=0,sub_color=0;}players[4];Start start;};
 struct Recipe{uint32_t seed=0x312151c3;MeleeWebMenuMatchSelection selection;std::unique_ptr<int> initial_css{new int(1)};};
+// Storage aliases only: preserve this fixture's existing Recipe/int context
+// model for the adjacent, unselected Gate2 state. No Gate2 admission is modeled.
+namespace melee_web {
+using RetailReplayRecipe = ::Recipe;
+using RetailReplayInitialCssContext = int;
+}
 static std::unique_ptr<Recipe> replay;
 enum class CurrentSssExitProfile{Time120,Stock4None};
 struct LeaveNote{bool captured=false;uint64_t world_generation=0,session_ticks=0;};
@@ -109,6 +117,8 @@ int current_sss_prepared_setup_begin();
 #endif
 [[maybe_unused]] static bool prepared_reenter=false;
 [[maybe_unused]] static int prepared_mutation=0,prepared_nested_result=99;
+static unsigned gate2_fixture_close_calls=0;
+int melee_web_native_menu_unload();
 static void close();
 static int approve(){++approval_calls;if(reenter){reenter=false;assert(melee_web_native_menu_stadium_first_sss_vs_setup_begin(0)==0);}
 #if defined(TEST_CURRENT_PREPARED)
@@ -123,9 +133,10 @@ static void reset(){match.reset();archive_cache.reset();setup_snapshot_ok=true;s
 static void reset_text_probe(){first_sss_text_tail_probe={};first_sss_text_tail_retained_json.clear();text_probe_value=text_probe_sets=sis_capture_calls=membership_begin_calls=membership_end_calls=0;sis_capture_ok=membership_begin_ok=true;membership_snapshot_live=false;}
 static void commit(){files={{"stage",{1}},{"fighter",{2}}};asset_scope.active=2;asset_scope.pending=0;asset_committed=true;}
 std::string first_sss_vs_setup_current_json(){return "{}";}
-static void close(){FirstSssTextTailCloseGuard guard{first_sss_text_tail_probe.opted_in};throw std::runtime_error("controlled close failure");}
+static void close(){++gate2_fixture_close_calls;FirstSssTextTailCloseGuard guard{first_sss_text_tail_probe.opted_in};throw std::runtime_error("controlled close failure");}
 int main(){
  assert_no_later_route_fixture();
+ assert_gate2_unload_outside_fixture();
  // The legacy124 owner has completed its prefix; current270 has not entered it.
  reset();assert(first_sss_prefix_sequence.complete);
  first_sss_prefix_sequence.complete=false;
@@ -150,6 +161,7 @@ int main(){
  reset();assert(melee_web_native_menu_stadium_first_sss_vs_setup_begin(0)==1);commit();files.erase("stage");assert(first_sss_vs_setup_service()&&first_sss_vs_setup.failed&&!match);
  reset();assert(melee_web_native_menu_stadium_first_sss_vs_setup_begin(0)==1);commit();first_sss_vs_setup_service();match->frames=1;first_sss_vs_setup_service();assert(first_sss_vs_setup.failed&&first_sss_vs_setup.source_frames==1&&!first_sss_vs_setup.captured);
  assert(continuation_service_calls==0);
+ assert(gate2_abort_ready_calls==1&&gate2_abort_calls==0);
  assert(!later_sss.armed&&completed_matches==0&&later_getter_calls==0&&later_context_calls==1);
  puts("PASS extracted legacy Setup source begin/classifier/handoff/service with controlled services; excludes new 270 admission");
 }
@@ -157,6 +169,7 @@ int main(){
 PREPARED_TEST=r"""
 static unsigned native_close_calls=0;
 static void close(){
+ ++gate2_fixture_close_calls;
  ++native_close_calls;
  if(close_should_fail)throw std::runtime_error("controlled native close failure");
  if(world){world->close();world.reset();}
@@ -222,6 +235,7 @@ static void commit_prepared_assets(){
 }
 int main(){
  assert_no_later_route_fixture();
+ assert_gate2_unload_outside_fixture();
  reset_prepared();
  assert(current_sss_prepared_setup_begin()==1);
  assert(approval_calls==1&&current_sss_exit.prepared_setup_approved&&
@@ -303,12 +317,34 @@ int main(){
  host_pad.bytes[81]=1;commit_prepared_assets();assert(first_sss_vs_setup_service());
  assert(first_sss_vs_setup.failed&&!match&&first_sss_vs_setup.error.find("PAD changed")!=std::string::npos);
 
+ assert(gate2_abort_ready_calls==1&&gate2_abort_calls==0);
  assert(!later_sss.armed&&completed_matches==0&&later_getter_calls==0&&later_context_calls==1);
  puts("PASS extracted current 270 prepared Setup source admission, approval rechecks, asset handoff and controlled unload; legacy 124 remains separate");
 }
 """
 def unarmed_later_asset_fixture(source):
   return '#include "'+str(ROOT/'src/stadium_later_reference.hpp')+'"\n'+r"""
+// Gate2 close/abort is outside this Legacy124/Current270 fixture. These are
+// rejecting leaves, not stand-ins for the separately controlled native close.
+static unsigned gate2_abort_ready_calls=0,gate2_abort_calls=0;
+static bool later_b_gate2_unarmed_abort_ready(const MatchedSetupCfState&){
+ ++gate2_abort_ready_calls;
+ throw std::runtime_error("Gate2 abort is outside this legacy/current Setup fixture");
+}
+static int later_b_gate2_unarmed_abort(){
+ ++gate2_abort_calls;
+ throw std::runtime_error("Gate2 close is outside this legacy/current Setup fixture");
+}
+static void assert_gate2_unload_outside_fixture(){
+ assert(!matched_setup_cf.later_b_gate2_attempted&&gate2_abort_ready_calls==0&&gate2_abort_calls==0);
+ const auto closes_before=gate2_fixture_close_calls;
+ matched_setup_cf.later_b_gate2_attempted=true;
+ assert(melee_web_native_menu_unload()==0);
+ assert(message=="Gate2 abort is outside this legacy/current Setup fixture");
+ assert(gate2_abort_ready_calls==1&&gate2_abort_calls==0&&gate2_fixture_close_calls==closes_before);
+ matched_setup_cf=MatchedSetupCfState{};
+ assert(!matched_setup_cf.later_b_gate2_attempted);
+}
 // Legacy/current Setup only: no later route is armed in these fixtures.
 struct {bool armed=false;unsigned stage=0,requested_generation=0;
 const melee_web::stadium_later_reference::Context* reference=&melee_web::stadium_later_reference::legacy;} later_sss;

@@ -1,4 +1,4 @@
-import {createHash} from 'node:crypto';
+import {createHash,randomUUID} from 'node:crypto';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -376,13 +376,29 @@ test('actual unloadAndSave body cancels preparation and waits for observed cache
   const text=fs.readFileSync(root+'/web/melee-runtime.mjs','utf8');
   const start=text.indexOf('  async function unloadAndSave() {'),end=text.indexOf('  function putNow(',start);
   assert.ok(start>=0&&end>start);const events=[];let reads=0;
-  const context={prepared:true,closeNetworkSession:async(reason)=>events.push('network:'+reason),
+  // Actual transfer owner closure, not an unconditional inactive stub.
+  const ownerStart='  let saveProfileSnapshotsActive = 0;',ownerEnd='  // END LATER_B_REPLAY_TRANSFER_OWNER';
+  assert.equal(text.split(ownerStart).length,2);assert.equal(text.split(ownerEnd).length,2);
+  const ownerFrom=text.indexOf(ownerStart),ownerTo=text.indexOf(ownerEnd);
+  assert.ok(ownerTo>ownerFrom);
+  const context={ready:true,fatal:false,destroyed:false,busy:false,assetTransfer:null,
+    networkSessionClose:null,commands:[],loading:null,crypto:{randomUUID},snapshot:()=>({}),
+    prepared:true,closeNetworkSession:async(reason)=>events.push('network:'+reason),
     boundary:async(fn)=>{events.push('command');return fn();},syncAudio:()=>events.push('audio-sync'),
-    Module:{_melee_web_native_menu_unload:()=>{events.push('native-unload');return 1;}},
+    // Modeled idle leaf only for the active-owner guard countercontrol.
+    Module:{stadiumMatchedSetupNativeIdle:()=>true,_melee_web_native_menu_unload:()=>{events.push('native-unload');return 1;}},
     callbacks:{menuPreparationCanceled:()=>events.push('preparation-canceled')},pauseAudioForPreparation:async()=>events.push('audio-ack'),
     performance:{now:()=>0},readNativeCacheIdle:()=>{events.push('cache-observe');return reads++?1:0;},emit:()=>{throw Error('unexpected emit');}};
-  vm.createContext(context);vm.runInContext(text.slice(start,end)+'\nglobalThis.invoke=unloadAndSave;',context);
+  vm.createContext(context);
+  vm.runInContext(text.slice(ownerFrom,ownerTo)+'\nconst laterBReplayTransfer = createLaterBReplayTransferOwner();',context);
+  vm.runInContext(text.slice(start,end)+'\nglobalThis.invoke=unloadAndSave;',context);
   assert.equal(await context.invoke(),true);assert.equal(context.prepared,false);
   assert.deepEqual(events,['network:normal','command','audio-sync','native-unload','preparation-canceled','audio-ack',
     'command','cache-observe','command','cache-observe']);
+  const priorEvents=events.length;
+  vm.runInContext(`laterBReplayTransfer.reserve({reference_id:'original-b-2013-943-v1',
+    recipe_sha256:'5fb53bdc71b35b800bc3451b1d9117709edef2413a38a8f7311ee352647a6755',
+    cursor:943,notification_order:4330,world_generation:7,setup_seed_hex:'4b25c79b'});`,context);
+  await assert.rejects(context.invoke(),/forbids ordinary unload\/cache flush/);
+  assert.equal(events.length,priorEvents,'Active transfer refuses before network/native/cache cleanup');
 });

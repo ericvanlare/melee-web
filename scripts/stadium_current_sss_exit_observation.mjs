@@ -62,6 +62,15 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
     return JSON.stringify(value);
   };
   let preparedSetupAttempted = false;
+  let gate2Attempted = false, gate2Token = null, gate2Finalized = false, gate2ApprovalCalls = 0;
+  let gate2AcceptedJson = null;
+  const ordinaryObservation = () => {
+    if (gate2Attempted) throw Error('Gate2 reservation forbids ordinary current SSS native access');
+  };
+  const gate2Owned = () => {
+    if (!gate2Token || gate2Finalized || state.disposed || !owns())
+      throw Error('Gate2 adapter token is stale, finalized or foreign');
+  };
   function wrapped(...args) {
     if (state.disposed || state.calls || !owns())
       throw Error('Current SSS replay callback ownership/reuse refused');
@@ -90,6 +99,7 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
   return {
     state() { return {...state, owned: owns()}; },
     observe() {
+      ordinaryObservation();
       if (state.disposed || !owns()) throw Error('Current SSS observation lost its retained Module/callback');
       if (idle() !== true) return {busy: true};
       const pointer = Reflect.apply(observe, module, []);
@@ -97,6 +107,7 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
       return {busy: false, value: JSON.parse(module.UTF8ToString(pointer))};
     },
     observePreparedStart() {
+      ordinaryObservation();
       if (!preparedStartProbe || ![1,2,3].includes(observationProfile) || !preparedStartObserve)
         throw Error('Prepared Start observation is available only to an explicit checked prepared-Start profile');
       if (!state.armed || state.disposed || !owns())
@@ -107,6 +118,7 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
       return {busy: false, value: JSON.parse(module.UTF8ToString(pointer))};
     },
     continuePreparedStart(acceptedReceipt) {
+      ordinaryObservation();
       if (!preparedStartProbe || !preparedStartObserve || typeof preparedSetupBegin !== 'function' ||
           preparedSetupAttempted || state.disposed || !state.armed || !owns() || idle() !== true)
         throw Error('Prepared Setup continuation lacks its same-run one-use owner');
@@ -136,7 +148,56 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
         if (globalThis[approvalName] === approved) delete globalThis[approvalName];
       }
     },
+    reserveLaterBTransfer(acceptedObservation, request) {
+      if (observationProfile !== 3 || !laterPreparedSetup || !preparedSetupAttempted ||
+          gate2Attempted || state.disposed || !state.armed || !owns())
+        throw Error('Gate2 reservation requires the one-use profile3 completed Setup owner');
+      gate2Attempted = true; // Even a lost reservation response closes ordinary getters.
+      if (idle() !== true) throw Error('Gate2 reservation requires settled Asyncify');
+      const pointer = Reflect.apply(observe, module, []);
+      const actual = pointer ? JSON.parse(module.UTF8ToString(pointer)) : null;
+      if (!actual || stableJson(actual) !== stableJson(acceptedObservation) ||
+          actual.reference_descriptor !== 'original-b-2013-943-v1' ||
+          actual.prepared_to_setup?.setup?.complete !== true ||
+          actual.prepared_to_setup.setup.captured !== true ||
+          actual.prepared_to_setup.setup.stadium_setup_state?.world_generation !== request?.world_generation ||
+          actual.prepared_to_setup.setup.actual?.random_seed_hex !== request?.setup_seed_hex ||
+          actual.notification_coordinates?.order !== request?.notification_order ||
+          actual.notification_coordinates?.replay_cursor !== 943 || request?.cursor !== 943)
+        throw Error('Gate2 reservation changed the approved actual Setup/context');
+      gate2AcceptedJson = stableJson(actual.prepared_to_setup.setup);
+      if (typeof window.menuReplayReserveLaterBTransfer !== 'function')
+        throw Error('Gate2 shell reservation service is unavailable');
+      gate2Token = window.menuReplayReserveLaterBTransfer(request);
+      if (!gate2Token || typeof gate2Token.id !== 'string')
+        throw Error('Gate2 shell reservation returned no opaque same-page token');
+      return {id: gate2Token.id}; // The opaque object itself never crosses page serialization.
+    },
+    gate2CanSettle() {
+      gate2Owned();
+      const evidence = window.menuReplayReadLaterBTransferEvidence(gate2Token);
+      return evidence.uncertain !== true && evidence.core?.phase === 'pending';
+    },
+    gate2Pending(kind) { gate2Owned(); window.menuReplayLaterBCommandPending(gate2Token, kind); },
+    gate2Settled() { gate2Owned(); window.menuReplayLaterBCommandSettled(gate2Token); },
+    gate2Uncertain(reason) { gate2Owned(); window.menuReplayLaterBCommandUncertain(gate2Token, reason); },
+    gate2ApproveSetup() {
+      gate2Owned();
+      return ++gate2ApprovalCalls === 1 && gate2AcceptedJson !== null &&
+        typeof gate2Token.id === 'string'; // Pure approved-receipt vote; native independently checks current owner.
+    },
+    gate2Evidence() { gate2Owned(); return window.menuReplayReadLaterBTransferEvidence(gate2Token); },
+    gate2Record(evidence) { gate2Owned(); window.menuReplayRecordLaterBAction(gate2Token, evidence); },
+    async gate2Finalize() {
+      gate2Owned();
+      const evidence = window.menuReplayReadLaterBTransferEvidence(gate2Token);
+      await window.menuReplayFinalizeLaterBTransfer(gate2Token);
+      gate2Finalized = true;
+      return {finalized: true, evidence, replay_report: window.lastRetailReplayReport};
+    },
     dispose() {
+      if (gate2Attempted && !gate2Finalized)
+        throw Error('Gate2 callback restoration requires acknowledged finalized native close');
       if (state.disposed || !owns()) throw Error('Current SSS callback disposal refuses foreign replacement');
       Object.defineProperty(module, key, original);
       state.disposed = true;
