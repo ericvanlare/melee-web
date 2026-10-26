@@ -70,6 +70,8 @@ int main(int argc, char** argv) {
     assert(std::string(CpuProbeOwnerCallbackSymbol(0,0x8005c9a4)) == "null");
     assert(std::string(CpuProbeOwnerCallbackSymbol(1,0x8005c9a4)) == "\"efLib_particles_proc_main\"");
     assert(std::string(CpuProbeOwnerCallbackSymbol(1,0x801d1390)) == "\"grStadium_801D1390\"");
+    assert(std::string(CpuProbeOwnerCallbackSymbol(1,0x8006a360)) == "\"Fighter_8006A360\"");
+    assert(std::string(CpuProbeOwnerCallbackSymbol(1,0x8006a364)) == "\"unknown\"");
     assert(std::string(CpuProbeOwnerCallbackSymbol(1,0x8005c9a8)) == "\"unknown\"");
     u32 result = 42;
     for (const auto bad : {"", "-1", "+1", "1 ", " 1", "0x10", "1.0", "4294967296"})
@@ -163,9 +165,11 @@ HSD_GObj* HSD_GObj_804D781C;
 HSD_GObjProc* HSD_GObj_804D7838;
 void grStadium_801D1390(HSD_GObj* o) { (void)o; }
 void efLib_particles_proc_main(HSD_GObj* o) { (void)o; }
+void Fighter_8006A360(HSD_GObj* o) { (void)o; }
 enum { MELEE_WEB_RNG_DRAW_RAND=0, MELEE_WEB_RNG_DRAW_RANDF=1 };
 '''
         native = native.replace("#include <melee/ef/eflib.h>\n", "")
+        native = native.replace("#include <melee/ft/fighter.h>\n", "")
         native = native.replace("#include <melee/gr/grpstadium.h>\n", "")
         native = re.sub(r'^#include "gameplay_cpu_observation.h"\n', '', native)
         native = re.sub(r'^#include <sysdolphin/baselib/(gobj|gobjproc).h>\n', '', native, flags=re.M)
@@ -176,6 +180,7 @@ int main(int argc, char** argv) {
   HSD_GObj gobj = {0}; HSD_GObjProc proc = {0};
   gobj.classifier=13; gobj.p_link=4; proc.s_link=7; proc.gobj=&gobj;
   if(strcmp(argv[1],"particle")==0) {gobj.classifier=8;gobj.p_link=11;proc.s_link=15;proc.on_invoke=efLib_particles_proc_main;}
+  else if(strcmp(argv[1],"fighter")==0) {gobj.classifier=4;gobj.p_link=8;proc.s_link=1;proc.on_invoke=Fighter_8006A360;}
   else if(strcmp(argv[1],"unknown")==0) proc.on_invoke=callback;
   else proc.on_invoke=grStadium_801D1390;
   rng_draw_probe_active=1; rng_draw_probe_cursor=12;
@@ -214,7 +219,7 @@ int main(int argc, char** argv) {
         binary = path.with_suffix("")
         built = subprocess.run([compiler, "-std=c11", "-Wall", "-Wextra", "-Wno-unused-variable", str(path), "-o", str(binary)], capture_output=True, text=True)
         self.assertEqual(built.returncode, 0, built.stderr)
-        for mode in ("legacy", "owners", "particle", "unknown", "capacity"):
+        for mode in ("legacy", "owners", "particle", "fighter", "unknown", "capacity"):
             result = subprocess.run([str(binary), mode], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             row = json.loads(result.stderr.removeprefix("RNG_DRAW_PROBE "))
@@ -230,6 +235,11 @@ int main(int argc, char** argv) {
                     self.assertEqual((row["draws"][1]["owner"]["classifier"],
                                       row["draws"][1]["owner"]["p_link"],
                                       row["draws"][1]["owner"]["s_link"]), (8, 11, 15))
+                elif mode == "fighter":
+                    self.assertEqual(row["draws"][1]["owner"]["callback_symbol"], "Fighter_8006A360")
+                    self.assertEqual((row["draws"][1]["owner"]["classifier"],
+                                      row["draws"][1]["owner"]["p_link"],
+                                      row["draws"][1]["owner"]["s_link"]), (4, 8, 1))
                 elif mode == "unknown":
                     self.assertEqual(row["draws"][1]["owner"]["callback_symbol"], "unknown")
                 else:
@@ -301,6 +311,15 @@ int main() {
         self.assertIn('efLib_particles_proc_main = .text:0x8005C9A4;', symbols)
         self.assertIn('gobj = GObj_Create(8U, 0xBU, 1U);', source)
         self.assertIn('HSD_GObj_SetupProc(gobj, efLib_particles_proc_main, 0xFU);', source)
+
+    def test_fighter_callback_mapping_is_source_backed(self):
+        symbols = (ROOT / '.deps/melee/config/GALE01/symbols.txt').read_text()
+        source = (ROOT / '.deps/melee/src/melee/ft/fighter.c').read_text()
+        header = (ROOT / '.deps/melee/src/melee/ft/fighter.h').read_text()
+        self.assertIn('Fighter_8006A360 = .text:0x8006A360;', symbols)
+        self.assertIn('gobj = GObj_Create(HSD_GOBJ_CLASS_FIGHTER, 8, 0);', source)
+        self.assertIn('HSD_GObj_SetupProc(gobj, &Fighter_8006A360, 1);', source)
+        self.assertIn('void Fighter_8006A360(Fighter_GObj* gobj);', header)
 
     def test_compiled_bounds_and_bit_serialization(self):
         self.run_probe("helpers")

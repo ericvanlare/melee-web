@@ -3823,12 +3823,15 @@ int main(void)
                     else:
                         self.assertEqual(owner["status"], "scheduled_proc")
                         self.assertIn(owner["callback_symbol"],
-                                      ("grStadium_801D1390", "efLib_particles_proc_main"))
+                                      ("grStadium_801D1390", "efLib_particles_proc_main", "Fighter_8006A360"))
                         self.assertNotIn("0000000000000000",
                                          (owner["gobj"], owner["proc"], owner["callback"]))
                         if owner["callback_symbol"] == "efLib_particles_proc_main":
                             self.assertEqual((owner["classifier"], owner["p_link"], owner["s_link"]),
                                              (8, 11, 15))
+                        elif owner["callback_symbol"] == "Fighter_8006A360":
+                            self.assertEqual((owner["classifier"], owner["p_link"], owner["s_link"]),
+                                             (4, 8, 1))
                 sample_seed_before = samples[sample_ordinal - 1][6]
                 sample_seed_after = samples[sample_ordinal - 1][7]
                 self._assert_hsd_rng_seed_chain(

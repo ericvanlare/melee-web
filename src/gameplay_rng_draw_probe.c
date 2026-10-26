@@ -1,6 +1,7 @@
 #include "gameplay_cpu_observation.h"
 
 #include <melee/ef/eflib.h>
+#include <melee/ft/fighter.h>
 #include <melee/gr/grpstadium.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjproc.h>
@@ -178,7 +179,9 @@ static void emit_rng_draw_probe(void)
                 !entry->proc ? "null" : entry->callback == (uintptr_t)grStadium_801D1390 ?
                     "\"grStadium_801D1390\"" :
                 entry->callback == (uintptr_t)efLib_particles_proc_main ?
-                    "\"efLib_particles_proc_main\"" : "\"unknown\"");
+                    "\"efLib_particles_proc_main\"" :
+                entry->callback == (uintptr_t)Fighter_8006A360 ?
+                    "\"Fighter_8006A360\"" : "\"unknown\"");
         put("}");
     }
     put("]}");

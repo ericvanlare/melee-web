@@ -953,6 +953,7 @@ const char* CpuProbeOwnerCallbackSymbol(u32 proc, u32 callback)
   if (!proc) return "null";
   if (callback == 0x801d1390) return "\"grStadium_801D1390\"";
   if (callback == 0x8005c9a4) return "\"efLib_particles_proc_main\"";
+  if (callback == 0x8006a360) return "\"Fighter_8006A360\"";
   return "\"unknown\"";
 }
 

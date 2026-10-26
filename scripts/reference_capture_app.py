@@ -207,7 +207,8 @@ def validate_cpu_rng_probe(path, request, capture_id, sequence_id, dol_sha256, s
                 raise EnvironmentError("CPU RNG owner source fields are invalid")
             outside = all(int(owner[k], 16) == 0 for k in ("gobj", "proc", "callback"))
             symbol = None if outside else {"0x801d1390": "grStadium_801D1390",
-                                           "0x8005c9a4": "efLib_particles_proc_main"}.get(owner["callback"], "unknown")
+                                           "0x8005c9a4": "efLib_particles_proc_main",
+                                           "0x8006a360": "Fighter_8006A360"}.get(owner["callback"], "unknown")
             if "callback_symbol" not in owner or owner["callback_symbol"] != symbol:
                 raise EnvironmentError("CPU RNG callback symbol differs from its pinned original address")
             if owner.get("status") == "outside_proc":

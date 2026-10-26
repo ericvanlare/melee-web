@@ -41,9 +41,14 @@ test('version 2 owners are explicit and inconsistent or mixed owners refuse', ()
   const outside = {status:'outside_proc',gobj:'0000000000000000',proc:'0000000000000000',callback:'0000000000000000',classifier:0,p_link:0,s_link:0,callback_symbol:null};
   const scheduled = {status:'scheduled_proc',gobj:'0000000000010000',proc:'0000000000020000',callback:'0000000000000123',classifier:13,p_link:4,s_link:0,callback_symbol:'unknown'};
   const particle = {...scheduled,callback:'0000000000030123',classifier:8,p_link:11,s_link:15,callback_symbol:'efLib_particles_proc_main'};
+  const fighter = {...scheduled,callback:'0000000000001926',classifier:4,p_link:8,s_link:1,callback_symbol:'Fighter_8006A360'};
   const ownerRow = (cursor, owner) => JSON.stringify({schema:'melee-web-rng-draw-probe',version:2,source_cursor:cursor,overflowed:false,draws:[{kind:'HSD_Rand',seed_after:'01234567',owner}]});
   const validate = rows => validateRngDrawProbeRows(rows, selection, {observedCursor:41});
   assert.equal(validate([ownerRow(40,outside),ownerRow(41,particle)]).complete,true);
+  assert.equal(validate([ownerRow(40,outside),ownerRow(41,fighter)]).complete,true);
+  for (const key of ['classifier','p_link','s_link'])
+    assert.throws(()=>validate([ownerRow(40,outside),ownerRow(41,{...fighter,[key]:fighter[key]+1})]),/fighter callback owner tuple/);
+  assert.throws(()=>validate([ownerRow(40,outside),ownerRow(41,{...fighter,callback_symbol:'Fighter_8006A364'})]),/callback symbol/);
   assert.throws(()=>validate([ownerRow(40,{...outside,callback:scheduled.callback}),ownerRow(41,scheduled)]),/outside-proc/);
   assert.throws(()=>validate([ownerRow(40,outside),ownerRow(41,{...scheduled,proc:outside.proc})]),/scheduled/);
   assert.throws(()=>validate([ownerRow(40,outside),row(41)]),/invalid identity/);
