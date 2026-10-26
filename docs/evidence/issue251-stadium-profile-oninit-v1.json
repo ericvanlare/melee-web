@@ -23795,6 +23795,220 @@
             }
           ]
         }
+      },
+      "new_reference_gate2": {
+        "state": "FAILED_NEXT_DRAW_AFTER_ACTUAL_GO; ONE_TYPED22_STATE_COMPARED; GO96_AND_C3_FALSE",
+        "run_id": "browser-rollback-sprint-20261022-115029-d89e262b",
+        "artifact_paths_relative_to_run": true,
+        "scope": "Two bounded headless attempts from the checked Original-B Setup owner. The retry retains 169 completed receipts and one compared post-GO state. Neither capture passes the requested 96-state interval or checked native retirement.",
+        "sprint_limits": {
+          "initial_capture_plus_changed_hypothesis_retry": 2,
+          "actual_captures": 2,
+          "third_capture": false,
+          "deadline_or_comparator_changes": false
+        },
+        "source": {
+          "clean_capture_source_checkpoint": {
+            "schema": "stadium-go96-clean-source-checkpoint-v1",
+            "head": "d0ef087559e0740b8f3cd1754d277d07dbf5721e",
+            "tree": "472948c81830ef12f6638abf150226f201625f5e",
+            "parent": "232208f6ccef0f0d99d833a6a1a00bfedd1e01db",
+            "source_count": 28,
+            "files_equal_captured_source": true,
+            "capture_runtime_relabelled": false,
+            "commit_message": "Checkpoint checked later Stadium match action continuation"
+          },
+          "actual_harness": "Dirty 232208f6 plus the 28 frozen source/test paths; later committed without changing those bytes as d0ef0875.",
+          "actual_runtime_producer": "Dirty 232208f6 plus the 16 frozen producer paths, built in the 27-path context before the scalar fixture-only repair. This is not relabeled to a later clean commit.",
+          "capture_source_inventory": {
+            "path": "stadium-go96-sprint-20261025-204912/retry/final-inventory.json",
+            "bytes": 28108,
+            "sha256": "93ca745c8b12dd0a18be695759c83e3089949c9a09c6ae41616ded2a3f276345"
+          },
+          "build_source_inventory": {
+            "path": "stadium-go96-sprint-20261025-204912/retry/current-inventory.json",
+            "bytes": 26735,
+            "sha256": "a87057ca8068a421783fdd8490c61f09596c120e39794fd2e972e427a69df3fe"
+          },
+          "runtime_producer_inventory": {
+            "path": "stadium-go96-sprint-20261025-204912/retry/producer-inventory.json",
+            "bytes": 11426,
+            "sha256": "e18d06500fddc9a08e0213270802812300d1d09747bf521fc21cc4cd9c8d21c2"
+          },
+          "runtime_inventory": {
+            "path": "stadium-go96-sprint-20261025-204912/retry/runtime-inventory.json",
+            "bytes": 34178,
+            "sha256": "75f345bb7479c4c91a64cb05661eb664321e8ba02b64755672e9941eb0211ba0"
+          },
+          "original_reference": "The sibling original_b_reference_observation retains producer e87c3156 plus seven files and binary f7b2dbda. No original capture was repeated."
+        },
+        "initial_capture": {
+          "result": "FAIL_ARM_BEFORE_SOURCE_ACTIONS",
+          "completed_gate2_actions": 0,
+          "cause": "The arm predicate required a menu world after checked Setup had retired it.",
+          "repair": "Require the retired menu world to be absent while the match owner is present; preserve stale-owner and other refusal controls.",
+          "report": {
+            "path": "stadium-go96-sprint-20261025-204912/capture/browser-run/report.json",
+            "bytes": 526869,
+            "sha256": "b2f90a3c00cb38c5b72b335cff52ff22fe1c518fb938fa2cb56a269fff5df377"
+          },
+          "root_review": {
+            "path": "stadium-go96-sprint-20261025-204912/first-capture-review.json",
+            "bytes": 2156,
+            "sha256": "2a8ed000485510ce9b41bc5679433fc5767820233e3b44f56df375b94392c15f"
+          },
+          "repair_freeze": {
+            "path": "stadium-go96-sprint-20261025-204912/arm-refusal-owner-boundary-candidate-v1/freeze-v1.json",
+            "bytes": 4702,
+            "sha256": "72b756812229e210b07050c2747e5cf386f10ffc53e101167e135b5daa5402c0"
+          },
+          "actual_source_reduction": {
+            "path": "stadium-go96-sprint-20261025-204912/owner-boundary-reduction/result.json",
+            "bytes": 2680,
+            "sha256": "8727a9395a4e308464506b3bcc3b3bbf39b3623651bd8847b1024a07f1608fba"
+          }
+        },
+        "pre_capture_validation": {
+          "diagnostic_release_seconds": 23.787,
+          "ordinary_release_seconds": 21.214,
+          "full_regression": {
+            "tests": 2788,
+            "skipped": 196,
+            "seconds": 588.933
+          },
+          "failed_regression": "The preceding suite consumed all 331 scalar vector rows before its Node stdin pipe read failed. A same-byte held-open-pipe reduction reproduced the transport class. The Wasm fixture now reads the saved vectors file; arithmetic and comparisons are unchanged.",
+          "retained_builds_and_failed_regression_receipt": {
+            "path": "stadium-go96-sprint-20261025-204912/retry/validation/result.json",
+            "bytes": 6363,
+            "sha256": "8e62748dadaf1f997e05badb7b0be5c9e1eb34c54fa42062e3eea045321028c6"
+          },
+          "stdio_repair": {
+            "path": "stadium-go96-sprint-20261025-204912/stdio-transport-candidate-v1/freeze.json",
+            "bytes": 3158,
+            "sha256": "632b87cea8ea37a7b152ba585422a10f49d2f5fc1a4c20d3714c923a67d5f270"
+          },
+          "open_pipe_reduction": {
+            "path": "stadium-go96-sprint-20261025-204912/stdio-transport-diagnosis-v3/result.json",
+            "bytes": 1138,
+            "sha256": "27b8fe16ac1277b878cfe4f5d9ab9c9968e1b0ccb55a461579fd3ad0e9f98125"
+          },
+          "final_result": {
+            "path": "stadium-go96-sprint-20261025-204912/retry/final-validation/result.json",
+            "bytes": 9383,
+            "sha256": "88d1be24dcfa8c5948f13a198a76978d7020fc9d6201144d55bb132de0a875a8"
+          }
+        },
+        "retry_capture": {
+          "result": "FAIL_GATE2_STEP_REFUSED",
+          "completed_receipts": 169,
+          "completed_tick_receipts": 85,
+          "completed_draw_receipts": 84,
+          "last_completed_action_index": 168,
+          "next_refused_action_index": 169,
+          "next_refused_draw_ordinal": 84,
+          "actual_go_observed_tick": 84,
+          "go_tick_was_not_assumed": true,
+          "typed22_plus_seed_samples_compared": 1,
+          "required_neutral_samples": 96,
+          "exact_native_refusal": "UNKNOWN: old adapter retained only Gate2 gate2-step refused",
+          "refused_call_may_have_executed_source_work": true,
+          "native_retirement": "UNRUN_OWNED_OS_CLEANUP_ONLY",
+          "owner_elapsed_ms": 27191,
+          "cleanup_elapsed_ms": 142,
+          "all_12_recorded_pids_and_3_groups_absent": true,
+          "manifest_pins_exact": 430,
+          "report": {
+            "path": "stadium-go96-sprint-20261025-204912/retry/capture/browser-run/report.json",
+            "bytes": 517295,
+            "sha256": "ffbe71b9241c4ae69a2ea5caf0ef8a4e78599c20ab038c0260a9bac4ac7ec524"
+          },
+          "action_journal": {
+            "path": "stadium-go96-sprint-20261025-204912/retry/capture/browser-run/gate2-actions.jsonl",
+            "bytes": 352469,
+            "sha256": "e83eb35c0fc1876b9c86203b0e1952b4a9692ab62bd5e397f5ae8ea1dbeb8f78"
+          },
+          "owner": {
+            "path": "stadium-go96-sprint-20261025-204912/retry/capture/owner.json",
+            "bytes": 98984,
+            "sha256": "3882d5b8e018cfd435a8955a942ef5ffaba159e406504016f911bce7834f7546"
+          },
+          "root_cleanup": {
+            "path": "stadium-go96-sprint-20261025-204912/retry/root-postflight.json",
+            "bytes": 995,
+            "sha256": "b5f32564c1d4702408c317c929bf29ed7e40e0f241d37a9b0b1ef6749e231a52"
+          },
+          "manifest": {
+            "path": "stadium-go96-sprint-20261025-204912/retry/manifest.json",
+            "bytes": 123462,
+            "sha256": "fc102aee61328f87bab557c416d9c0919982b9dc3db925640e1abed7f87581cb"
+          }
+        },
+        "independent_retained_prefix_comparison": {
+          "scope": "Existing unchanged strict consumer replay of all 169 retained receipts; offline ACKs are modeled. No native/Wasm execution, source action, capture or new runtime result.",
+          "seven_constructor_aggregates_and_separate_setup_seed": true,
+          "declared_actual_go_fields_and_seed": true,
+          "typed22_plus_seed_samples": 1,
+          "full_96_states": false,
+          "checked_native_retirement": false,
+          "constructor_five_phase_dispatch_and_per_owner_rng_paired": false,
+          "review": {
+            "path": "stadium-go96-sprint-20261025-204912/retry/offline-prefix-review/review.json",
+            "bytes": 9270,
+            "sha256": "f76755d76d5d7c1f9eb815ccb7586bd18622883acc28d800fd0a680689aa287b"
+          }
+        },
+        "reporting_checkpoint": {
+          "clean_head": "7ad009a62008a8643d6f656606f84072b3ea6a10",
+          "tree": "bbc26c7d8827766356b5b6541219169f381f2f60",
+          "tested_source": "d0ef0875 plus exactly the three files frozen in the reporting candidate; those bytes are committed as clean_head.",
+          "changed_paths": 3,
+          "native_cpp_unchanged": true,
+          "runtime_rebuild": false,
+          "capture": false,
+          "behavior": "After actual owner/Asyncify settlement, retain the existing native failed-state first error, journal it once, and refuse subsequent commands. No uncertain or pending observation and no cleanup promotion.",
+          "adapter_controls": {
+            "tests": 9,
+            "skipped": 0
+          },
+          "native_controls": {
+            "tests": 5,
+            "skipped": 0
+          },
+          "full_regression": {
+            "tests": 2788,
+            "seconds": 607.853,
+            "skipped": 196
+          },
+          "freeze": {
+            "path": "stadium-go96-sprint-20261025-204912/step-error-diagnostic-candidate-v2/freeze-v2.json",
+            "bytes": 3506,
+            "sha256": "8a9518492953450412feac808c212258199fbaab13969b15ca5cd7250b6f4764"
+          },
+          "initial_recipe_failure": {
+            "path": "stadium-go96-sprint-20261025-204912/reporting-validation/result.json",
+            "bytes": 3654,
+            "sha256": "7485d3dfe0af15b944d7063c6d23c7ea5c5f49fc0e42a8ab3aee4262770606fb"
+          },
+          "validation": {
+            "path": "stadium-go96-sprint-20261025-204912/reporting-final-validation/result.json",
+            "bytes": 6054,
+            "sha256": "2bb831592af3fae747318d1fb5d82af687de1259e441b5408651c83b438a991c"
+          },
+          "independent_review": {
+            "path": "stadium-go96-sprint-20261025-204912/reporting-final-validation/independent-review.json",
+            "bytes": 4855,
+            "sha256": "c0efc9ad7cd6439086fa8c468652ec0e07dedb64e8a9bf19ef21197ca9cdf79c"
+          }
+        },
+        "remaining": [
+          "exact draw-refusal cause",
+          "96-state continuation with checked native retirement",
+          "original constructor dispatch/per-owner and all-writer RNG",
+          "full idle lifetime and transformations",
+          "whole-session C3 acceptance",
+          "public admission, pixels/PCM and timing"
+        ],
+        "publication": "Existing draft PR301; current-head CI is recorded on the PR and does not establish C3."
       }
     }
   }

@@ -52,6 +52,26 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
+### 2026-10-25 — Owner and Codex: bounded completion sprint
+
+**Ask:** Close the prior sprint, review why small prerequisites kept expanding,
+and choose a short sprint that produces a concrete useful outcome before
+broadening work.
+
+**Status:** Accepted. Focus this sprint on the second Stadium match through
+actual GO and its declared 96-state comparison. Use one implementer and one
+reviewer, a three-hour limit, first capture within one hour, and at most an
+initial capture plus one changed-hypothesis retry. Keep rollback work
+checkpointed. Publish one coherent code/docs batch in the existing milestone;
+if the target fails, preserve the first failure and stop the sprint without
+turning component progress into milestone completion. Further experiments need
+a concrete hypothesis and a smaller reproducer; no timeout or comparator
+changes.
+
+**Links:** [Stadium #251](https://github.com/ericvanlare/melee-web/issues/251),
+[draft PR #301](https://github.com/ericvanlare/melee-web/pull/301),
+[current boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md).
+
 ### 2026-10-17 — Owner and Claude: no-draw rollback and isolated profile
 
 **Ask:** Use Slippi's match-only fast-forward model: correction ticks execute
