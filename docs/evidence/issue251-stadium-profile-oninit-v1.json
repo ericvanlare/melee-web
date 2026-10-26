@@ -24009,6 +24009,257 @@
           "public admission, pixels/PCM and timing"
         ],
         "publication": "Existing draft PR301; current-head CI is recorded on the PR and does not establish C3."
+      },
+      "draw84_refresh_2026_10_26": {
+        "schema": "stadium-later-b-go96-checked-retirement-v1",
+        "state": "PASS_DECLARED_GO96_AND_CHECKED_RETIREMENT_C3_OPEN",
+        "run_id": "stadium-draw84-repair-20261026-113815-21326f7a",
+        "artifact_paths_relative_to_run": true,
+        "scope": "Headless original-B-context continuation: 943-input prefix, seven shared constructor aggregates plus separate Setup seed, actual GO shared fields/seed,96 post-GO typed22/seed rows, and checked native/host retirement. Whole replay intentionally incomplete; no C3 or public admission.",
+        "source": {
+          "capture_build_harness_and_full_regression_head": "2d54be3814110647ef9c0209bdb7393b0cd19151",
+          "tree": "2a3b1da10af90e9a9a413e92fe9ed8b2cdaf51e3",
+          "native_draw_refresh_checkpoint": "d623622af1c0fd155261df929a12ae1696e1f0e8",
+          "retirement_reporting_checkpoint": "4196eb085a5fa1c5812be479c3a672460baeeb63",
+          "prior_runtime_not_relabelled": true,
+          "original_reference": "Reuse sibling original_b_reference_observation: original producer e87c3156 plus seven files; binary f7b2dbda. No new original capture."
+        },
+        "outcomes": {
+          "literal_prefix_inputs": 943,
+          "source_ticks": 180,
+          "source_draws": 180,
+          "action_receipts": 360,
+          "literal_four_port_pad_records": 720,
+          "constructor_shared_aggregates": 7,
+          "separate_setup_seed": "4b25c79b",
+          "actual_go_observed_tick": 84,
+          "go_tick_not_assumed": true,
+          "actual_go_shared_fields": [
+            "map2.gate_mask_80",
+            "display.mode_s16",
+            "rng.seed_hex"
+          ],
+          "post_go_typed22_plus_seed_samples": 96,
+          "sample_tick_range": [
+            84,
+            179
+          ],
+          "native_retirement_acknowledged": true,
+          "parent_close_checked": true,
+          "phase_after_close": 0,
+          "running_after_close": 0,
+          "whole_replay_complete": false,
+          "C3": false
+        },
+        "repairs": [
+          {
+            "change": "Refresh stored idle/GO owner observations after completed Gate2 draws, preserving tick snapshots and unchanged equality guards.",
+            "observed_failure": "Matched Setup C/F native owner state changed while awaiting host approval",
+            "exact_differing_idle_or_go_field": "UNOBSERVED",
+            "control": "Actual extracted source branches; modeled post-draw change accepted after refresh, later between-action change refused."
+          },
+          {
+            "change": "Expose retained retirement status/message only after correlated ccall settles with Asyncify idle; make refusal sticky.",
+            "observed_failure": "Native retired and checked parent close succeeded, but runtime notification was refused. A zero return alone did not mean native retirement was unrun."
+          },
+          {
+            "change": "Use current JS-owned loading in the private transfer snapshot, so preparation cancellation is reflected in retirement publication.",
+            "control": "Actual old-source callback refuses; candidate callback accepts. Foreign token, busy owner and unrelated loading still refuse; native getters are trapped."
+          }
+        ],
+        "experiments": {
+          "total_headless_captures": 4,
+          "sequence": [
+            "draw diagnostic: failed",
+            "draw repair:96 action comparisons pass; retirement refused",
+            "retirement diagnostic:native closed; host notification refused",
+            "loading repair:component pass with acknowledged retirement"
+          ],
+          "smaller_reproducer_or_bounded_review_before_followup": true,
+          "deadline_extensions": false,
+          "comparison_changes": false,
+          "game_arithmetic_input_rng_order_changes": false,
+          "failures_retained": true
+        },
+        "validation": {
+          "focused_native_tests": 6,
+          "focused_adapter_tests": 10,
+          "focused_shell_tests": 7,
+          "additional_owner_adapter_tests": 42,
+          "additional_owner_adapter_skips": 1,
+          "skip_reason": "Retained projection unavailable in that focused command; not counted as coverage.",
+          "full_regression": {
+            "tests": 2794,
+            "seconds": 611.733,
+            "skipped": 195,
+            "failures": 1,
+            "failure_scope": "Incomplete explicit consumer fixture environment; no source change needed",
+            "corrected_component_tests": 3,
+            "corrected_component_tests_passed": true
+          },
+          "builds": {
+            "diagnostic_release_seconds": 21.433,
+            "ordinary_release_seconds": 20.507
+          },
+          "cleanup": {
+            "owner_elapsed_ms": 31617,
+            "cleanup_elapsed_ms": 174,
+            "recorded_pids_absent": 13,
+            "recorded_process_groups_absent": 3,
+            "root_signals": false
+          },
+          "admitted_manifest_pins_exact": 34,
+          "runtime_artifacts_exact": 54
+        },
+        "retained_non_capture_failures": [
+          "External focused native fixture compile failures v1-v4 retained; final six controls pass.",
+          "First actions-only offline reviewer used the wrong derived-reference object level. Three field accesses corrected; strict comparisons unchanged; failed result retained.",
+          "The full-suite launcher supplied an incomplete explicit consumer fixture environment. The same-source corrected three-component rerun passes; original full failure retained."
+        ],
+        "remaining": [
+          "Five original constructor phase witnesses/browser dispatch and per-owner RNG pairing",
+          "Original two-lifetime source-event and lifecycle/RNG parity",
+          "Broader C3 idle lifetime and transformation boundaries",
+          "Public Stadium admission, pixels/PCM, foreground timing and physical-input acceptance"
+        ],
+        "artifacts": [
+          {
+            "path": "source-test-review.json",
+            "bytes": 2690,
+            "sha256": "8929d9baca69db8c5718c5dd3a5c6437db866bcbc2babaa35349d9fd2832a58c"
+          },
+          {
+            "path": "diagnostic-root-review.json",
+            "bytes": 804,
+            "sha256": "97a50afc950dbaf21f7af561e2c58597a091c6f74fa5d69c710b0b883bde3ac3"
+          },
+          {
+            "path": "diagnostic-capture/browser-run/report.json",
+            "bytes": 528443,
+            "sha256": "02837bda004625382bfa2c7b034819b33f8cad2f919fc07dc7f565bcf646e8cf"
+          },
+          {
+            "path": "diagnostic-capture/browser-run/gate2-actions.jsonl",
+            "bytes": 354403,
+            "sha256": "56027e278f98605955b92fa45831787c18b442e1c37212d55d7f293c2572b273"
+          },
+          {
+            "path": "fixed-capture/browser-run/report.json",
+            "bytes": 522221,
+            "sha256": "7ed7313274a2d2389ba9876ab3328b1199254d0b24ce57f128c721312cd3a3d0"
+          },
+          {
+            "path": "fixed-root-review.json",
+            "bytes": 721,
+            "sha256": "ee6ccafcfde64091238d0a3d6bcd61fdb5c3aa91abd32ed1f9aa575a3dfa5616"
+          },
+          {
+            "path": "actions-only-review-v2.json",
+            "bytes": 11909,
+            "sha256": "8aada927e72db2058ad6bf8077f7a037c557639d76bfd3d8855c3fd12620a314"
+          },
+          {
+            "path": "retirement-diagnostic-v1/freeze-v1.json",
+            "bytes": 5076,
+            "sha256": "2f644c1ddd632228c8426b1b0c883e6ab955e8d47192782f24e5a2673bd6adc3"
+          },
+          {
+            "path": "retirement-diagnostic-root-result.json",
+            "bytes": 755,
+            "sha256": "a5aaccf8ecdbf26e4c72dab5f01efde2799e75fd92dc86ff96944363be23bfe8"
+          },
+          {
+            "path": "retirement-diagnostic-capture/browser-run/report.json",
+            "bytes": 519854,
+            "sha256": "ebf96612cb2a75fc27f8a3666b95b3d71ec6d4afec8f57184f48d40313caaaea"
+          },
+          {
+            "path": "retirement-ack-field-review.json",
+            "bytes": 3569,
+            "sha256": "f1217f32bed93980fa7e5efac59aaa103885c84d0807e5f08fc210f1f43d2984"
+          },
+          {
+            "path": "retirement-ack-field-fix/focused-result-transcription-v1.json",
+            "bytes": 9196,
+            "sha256": "0569a78188f38069a6d02800523f5804af74e526833e8a59f572ecb9f2552b80"
+          },
+          {
+            "path": "old-loading-control/result.json",
+            "bytes": 1305,
+            "sha256": "fc025c8d790f8530acfddd1ba2d731e6b9b8c2bc8c0419c44e846be5e23ac33b"
+          },
+          {
+            "path": "build-validation/result.json",
+            "bytes": 2228,
+            "sha256": "a44029f2b718dd7a56e98e4267850bcd1c5214cc68e80e2b2c72880da584f794"
+          },
+          {
+            "path": "build-v2-validation/result.json",
+            "bytes": 2240,
+            "sha256": "8bef1324e8c4f06f015f952ccf694cdbbbd0d7af625443ff9683e1ee51569b10"
+          },
+          {
+            "path": "runtime-inventory.json",
+            "bytes": 30400,
+            "sha256": "bcfd16993e3a104c85f66a66d1454bdf98e4bcdbbbfd1f8c8069d52bfe1c114e"
+          },
+          {
+            "path": "runtime-inventory-v2.json",
+            "bytes": 30562,
+            "sha256": "99475141ce85c54d10f097e9a3f4bdf56a73bb202895c7f3ed6c96a43d6bcd14"
+          },
+          {
+            "path": "runtime-rebuild-delta.json",
+            "bytes": 566,
+            "sha256": "8c120d4f70945495f653dd505b1fd12c7319feb59a36213a5fffb22ba9cc8f43"
+          },
+          {
+            "path": "confirmation-capture-manifest-v2.json",
+            "bytes": 13777,
+            "sha256": "dbc13fb2efd26650ffdcdcd5aeffc758a06b0ec9388a34789d98260b018041bd"
+          },
+          {
+            "path": "confirmation-capture/browser-run/report.json",
+            "bytes": 12284212,
+            "sha256": "e4c9caa26e4afbbfc52912ec1e5e706994a53f0365f7d4be1da1ce840bf0e597"
+          },
+          {
+            "path": "confirmation-capture/browser-run/gate2-actions.jsonl",
+            "bytes": 810495,
+            "sha256": "96a8ace7df0a49d8662e7e3c637e64d3a38baccb9a5b7e789a9e4b1f33c12267"
+          },
+          {
+            "path": "confirmation-capture/owner.json",
+            "bytes": 102259,
+            "sha256": "2990ed913a3d2efd36fc1604d3f7bd133ba46b920aac9a3c650842fcbedc3264"
+          },
+          {
+            "path": "confirmation-root-review.json",
+            "bytes": 573,
+            "sha256": "3562e70528d29a65ef2188a8ad6b9f706592c6bcf7c2f49ba6d4c67dcfc95379"
+          },
+          {
+            "path": "confirmation-offline-review.json",
+            "bytes": 12979,
+            "sha256": "3949a68c4e4d52be62d83eefbe1c8ee17799189efc61cd8de02d6fa225a052ac"
+          },
+          {
+            "path": "confirmation-independent-review.json",
+            "bytes": 5367,
+            "sha256": "ac7fff603e171663f3a04057003dcc0d08fec01b2932bf59d45030560b09699e"
+          },
+          {
+            "path": "full-v2-validation/result.json",
+            "bytes": 1214,
+            "sha256": "6d9dd8969a0ae186442e3f9f08ee6447700f61216cc0596466a58a528aaf6671"
+          },
+          {
+            "path": "corrected-consumer-validation/result.json",
+            "bytes": 2100,
+            "sha256": "09b4aaeff16fee87e0a693c253ddf2680f621ff00f4949b54e11cc8bb56e1468"
+          }
+        ],
+        "publication": "Existing draft PR301; exact-head CI belongs to final documentation publication and is not C3 evidence."
       }
     }
   }

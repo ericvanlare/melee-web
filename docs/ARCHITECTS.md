@@ -52,6 +52,14 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
+### 2026-10-26 — Owner and Codex: fix the first failure before broad validation
+
+**Ask:** Proceed autonomously, but step back when stuck or when validation is consuming more effort than the fix.
+
+**Status:** Accepted. Continue the checkpointed Stadium prerequisite with short diagnostic runs and actual-source controls for the first failure. Reuse unchanged build/evidence identities, review each coherent repair, and run the full regression once at the final integration boundary. After two experiments at one boundary, require a smaller reproducer or bounded review before another run. Keep prior failures and acceptance limits explicit; do not turn each diagnostic into another milestone or PR.
+
+**Links:** [Stadium #251](https://github.com/ericvanlare/melee-web/issues/251), [draft PR #301](https://github.com/ericvanlare/melee-web/pull/301), [current boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md).
+
 ### 2026-10-25 — Owner and Codex: bounded completion sprint
 
 **Ask:** Close the prior sprint, review why small prerequisites kept expanding,
