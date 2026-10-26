@@ -402,7 +402,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       state() { return active ? {phase: active.phase, transferred: active.transferred,
         consumed: active.consumed, failures: [...active.failures]} : null; },
       snapshot() {
-        return active && Object.freeze({...active.before, state: 'diagnostic-transfer', running: false,
+        return active && Object.freeze({...active.before, loading, state: 'diagnostic-transfer', running: false,
           message: 'Private replay continuation owns native access.', canImport: false, canStart: false,
           canPause: false, canUnload: false, canSelectDisc: false});
       },

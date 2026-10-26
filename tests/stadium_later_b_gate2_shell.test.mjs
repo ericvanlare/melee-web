@@ -28,6 +28,9 @@ const reload = cut(dev, 'async function reloadApplication(clearRenderCache){', "
 const clicks = cut(dev, "$('pause').onclick=()=>{", 'controllerSettings = mountControllerSettings');
 const events = cut(dev, '    onEvent(name,data){', '\n    },\n  });').trim().replace(/^onEvent\(/, 'function actualOnEvent(') + '\n}';
 const retirement = cut(core, '    menuMatchedSetupCfRetired(receipt) {', '    // Private nonterminal canary boundary.');
+const preparationCanceled = cut(core, '    menuPreparationCanceled() {', '    menuPreparationFailed(error) {');
+const actualSnapshot = cut(core, '  function snapshot() {', '  function publish() {');
+const actualPublish = cut(core, '  function publish() {', '  function recordNetworkCleanupError(');
 const otherRetirements=cut(core,'    menuMatchDrawDiscardRetired() {','    // The explicit-step Stadium path')+
   cut(core,'    menuStadiumRecreationClosed(receipt) {','    menuFrame(wasRunning) {');
 const ordinaryBoundary = cut(core, '  const boundary = run =>', '  async function operation(');
@@ -280,4 +283,93 @@ test('actual cache export owns the entire awaited persistence and FS transaction
   await f.$('export-render-cache').onclick();assert.equal(fsReads,1);
   assert.throws(()=>f.api.core.endCacheExport({}),/foreign or repeated/);
   assert.equal(typeof token.id,'string');
+});
+
+
+
+function terminalPublicationFixture({busyOwner=false, unrelatedLoading=false}={}) {
+  const calls=[];
+  const context=vm.createContext({
+    assert, crypto:webcrypto, JSON, Object, Number, Error,
+    ready:true, fatal:false, destroyed:false, busy:'', assetTransfer:null,
+    networkSessionClose:null, commands:[], saveProfileSnapshotsActive:0,
+    loading:{phase:'native',message:'Preparing game data…',complete:0,total:0},
+    preparationLabel:'Preparing original scene', preparationKeepsAudio:true, message:'',
+    terminalMatchedSetupCfRetirementObserved:false, terminalMatchedSetupCfRetirementConsumed:false,
+    diagnosticActive:true, lastState:'', document:{hidden:false},
+    diagnosticActivity(value){context.diagnosticActive=value;calls.push(['diagnosticActivity',value]);},
+    onState(state){calls.push(['state',state]);},
+    diagnosticLifecycle(name){calls.push(['lifecycle',name]);},
+    emit(name){calls.push(['emit',name]);},
+    Module:{stadiumMatchedSetupNativeIdle:()=>true}, calls,
+  });
+  const init=[
+    factory,
+    "let snapshot=()=>({state:'preparing',running:false,busy:false,loading});",
+    "const laterBReplayTransfer=createLaterBReplayTransferOwner();",
+    "const request="+JSON.stringify(request)+";",
+    "const token=laterBReplayTransfer.reserve(request);",
+    "const before=laterBReplayTransfer.snapshot();",
+    "const actual=(()=>{",
+    actualSnapshot,
+    actualPublish,
+    "return {snapshot,publish};})();",
+    "snapshot=actual.snapshot; const publish=actual.publish;",
+    "const callbacks={",
+    preparationCanceled,
+    retirement,
+    "};",
+    "globalThis.api={laterBReplayTransfer,request,token,before,snapshot,publish,callbacks};",
+  ].join('\n');
+  vm.runInContext(init,context);
+  if(busyOwner) context.busy='asset transfer';
+  if(unrelatedLoading) context.loading={phase:'disc',message:'Controlled unrelated read',complete:1,total:2};
+  const api=context.api, token=api.token;
+  api.laterBReplayTransfer.pending(token,'arm');
+  const parentProof={schema:'melee-web-stadium-later-b-parent-transfer-v1',...api.request,
+    token:token.id,parent_identity_checked:true,stage:'after-parent-move',parent_archived:true,
+    source_ticks:0,source_draws:0};
+  assert.equal(api.laterBReplayTransfer.transferred(parentProof),true);
+  api.laterBReplayTransfer.settled(token);
+  api.laterBReplayTransfer.pending(token,'retire');
+  // After transfer, even the idle predicate is forbidden to the host callback.
+  for(const name of ['stadiumMatchedSetupNativeIdle','_melee_web_native_menu_phase',
+    '_melee_web_native_menu_running','_melee_web_native_menu_message'])
+    context.Module[name]=()=>{throw Error('Forbidden post-transfer native getter '+name);};
+  const receipt={schema:'melee-web-stadium-matched-setup-cf-retirement-v1',native_retired:true,
+    terminal:true,error:null,phase_after_close:0,running_after_close:0,
+    later_b_transfer:{...parentProof,parent_close_checked:true},
+    matched_setup_cf:{state:'complete',complete:true,error:null,queued:false}};
+  return {context,api,receipt,calls};
+}
+
+test('actual settled retirement cancels the reserved native-loading snapshot without weakening refusal guards',()=>{
+  const valid=terminalPublicationFixture();
+  assert.equal(valid.api.before.loading.phase,'native');
+  assert.equal(valid.api.callbacks.menuMatchedSetupCfRetired(valid.receipt),true,
+    'actual snapshot and publish consume current JS-owned loading after native preparation cancellation');
+  assert.equal(valid.context.loading,null);
+  assert.equal(valid.context.preparationLabel,'');
+  assert.equal(valid.context.diagnosticActive,false);
+  assert.equal(valid.api.laterBReplayTransfer.state().phase,'pending',
+    'the callback records terminal proof; shell settlement remains a separate command');
+  assert.ok(valid.calls.some(row=>row[0]==='diagnosticActivity'&&row[1]===false));
+
+  const foreign=terminalPublicationFixture();
+  const bad={...foreign.receipt,later_b_transfer:{...foreign.receipt.later_b_transfer,token:'foreign-token'}};
+  assert.equal(foreign.api.callbacks.menuMatchedSetupCfRetired(bad),false);
+  assert.equal(foreign.context.terminalMatchedSetupCfRetirementObserved,false);
+  assert.equal(foreign.context.loading.phase,'native');
+  assert.equal(foreign.calls.length,0,'foreign token refusal performs no publication or native access');
+
+  const busy=terminalPublicationFixture({busyOwner:true});
+  assert.equal(busy.api.callbacks.menuMatchedSetupCfRetired(busy.receipt),false);
+  assert.equal(busy.context.busy,'asset transfer');
+  assert.equal(busy.context.loading.phase,'native');
+  assert.equal(busy.context.diagnosticActive,true,'active host owner remains visible');
+
+  const unrelated=terminalPublicationFixture({unrelatedLoading:true});
+  assert.equal(unrelated.api.callbacks.menuMatchedSetupCfRetired(unrelated.receipt),false);
+  assert.equal(unrelated.context.loading.phase,'disc');
+  assert.equal(unrelated.context.diagnosticActive,true,'unrelated loading remains visible and unconsumed');
 });
