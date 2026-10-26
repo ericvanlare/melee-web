@@ -306,7 +306,8 @@ export function evaluateMatchedSetupCfNativeCommand({kind, scheduleIndex, action
           return {result: 0, asyncify_idle: false, message: 'Gate2 late settlement belongs to an uncertain/stale token'};
         if (!asyncifyIdle()) return unsafe('Gate2 command settled without actual Asyncify idle');
         gate2Owner.gate2Settled();
-        return {result, asyncify_idle: true, ...extra};
+        const details = typeof extra === 'function' ? extra() : extra;
+        return {result, asyncify_idle: true, ...details};
       };
       const readLive = () => {
         const fn = module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_retirement_status;
@@ -351,7 +352,7 @@ export function evaluateMatchedSetupCfNativeCommand({kind, scheduleIndex, action
           if (typeof fn !== 'function') throw Error('Gate2 approval export is absent');
           return settled(fn(scheduleIndex, accepted ? 1 : 0));
         }
-        if (kind === 'gate2-live') return settled(1, {observation: readLive()});
+        if (kind === 'gate2-live') return settled(1, () => ({observation: readLive()}));
         if (kind === 'gate2-retire-ready') {
           const fn = module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire_ready;
           if (typeof fn !== 'function') throw Error('Gate2 retirement readiness export is absent');
@@ -374,7 +375,16 @@ export function evaluateMatchedSetupCfNativeCommand({kind, scheduleIndex, action
               'melee_web_native_menu_unload';
           const call = module.ccall(name, 'number', [], [], {async: true});
           if (!call || typeof call.then !== 'function') return unsafe('Gate2 ccall did not return its generated promise');
-          return Promise.resolve(call).then(result => settled(result),
+          return Promise.resolve(call).then(result => settled(result,
+            kind === 'gate2-step' && result === 0 ? () => {
+              const observation = readLive();
+              if (observation?.schema !== 'melee-web-stadium-later-b-gate2-native-v1' ||
+                  observation.failed !== true || observation.state !== 'failed' ||
+                  typeof observation.error !== 'string' || observation.error.length === 0)
+                throw Error('Gate2 settled zero step lacks a retained native failed-state message');
+              return {failure: {classification: 'settled-native-step-failure',
+                message: observation.error, observation}};
+            } : undefined),
             error => unsafe(`Gate2 Asyncify command rejected: ${String(error?.message || error)}`));
         }
         throw Error(`Unknown Gate2 native command ${kind}`);
@@ -521,9 +531,10 @@ export function createLaterBGate2NativeAdapter({evaluate, owner, deadline,
     throw Error('Gate2 adapter requires its bounded page owner and deadline');
   let pending = null, unsafe = false, armed = false, armAttempted = false;
   let knownUnarmedRefusal = false, closed = false, actionsStarted = false, unacknowledgedFailure = false;
+  let settledFailure = null;
   const execute = async command => {
-    if (unsafe || unacknowledgedFailure || closed || pending || now() >= deadline)
-      throw Error('Gate2 native command is closed, pending, uncertain or expired');
+    if (unsafe || unacknowledgedFailure || settledFailure || closed || pending || now() >= deadline)
+      throw Error('Gate2 native command is closed, pending, failed, uncertain or expired');
     const request = {...command, gate2Owner: owner, requireAsyncifyIdle: true};
     try {
       const promise = dispatchMatchedSetupCfNativeEvaluation({command: request,
@@ -545,7 +556,16 @@ export function createLaterBGate2NativeAdapter({evaluate, owner, deadline,
   };
   const one = async command => {
     const response = await execute(command);
-    if (response.result !== 1) throw Error(response.message || `Gate2 ${command.kind} refused`);
+    if (response.result !== 1) {
+      if (command.kind === 'gate2-step' &&
+          response.failure?.classification === 'settled-native-step-failure') {
+        settledFailure = response.failure;
+        const error = Error(`Gate2 settled native step refusal: ${response.failure.message}`);
+        error.gate2Failure = response.failure;
+        throw error;
+      }
+      throw Error(response.message || `Gate2 ${command.kind} refused`);
+    }
     return response;
   };
   const api = {
@@ -599,7 +619,7 @@ export function createLaterBGate2NativeAdapter({evaluate, owner, deadline,
     },
     state() { return {unsafe, pending: pending !== null, armed, arm_attempted: armAttempted,
       known_unarmed_refusal: knownUnarmedRefusal, actions_started: actionsStarted,
-      unacknowledged_failure: unacknowledgedFailure, closed}; },
+      unacknowledged_failure: unacknowledgedFailure, settled_failure: settledFailure, closed}; },
   };
   return Object.freeze(api);
 }
@@ -626,7 +646,14 @@ export async function runLaterBGate2ActionContinuation({driver, adapter, actualS
   for (const action of driver.payload.schedule) {
     beforeCommand();
     if (!await driver.submit(action)) throw Error(driver.status().first_error || 'Gate2 submit refused');
-    await adapter.step();
+    try {
+      await adapter.step();
+    } catch (error) {
+      const failure = error?.gate2Failure;
+      if (failure?.classification === 'settled-native-step-failure')
+        await persist({phase: 'settled-native-step-failure', action_index: accepted, failure});
+      throw error;
+    }
     const observation = await adapter.observe();
     // Preserve the real unmodified receipt before comparison/one-use ACK.
     await persist({phase: 'actual-action-receipt', action_index: accepted, observation});

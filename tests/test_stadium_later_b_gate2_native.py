@@ -1,7 +1,7 @@
 """Focused controls for the actual private Later-B MWB2 native boundary.
 
 The C++ fixture extracts production parser, owner-identity, GO-validator,
-status-serializer, and abort-predicate bodies. Its stopped match/host services
+status-serializer, first-error selection, and abort-predicate bodies. Its stopped match/host services
 are deliberately modeled leaves; it never runs a source action, native close,
 or browser callback and cannot establish runtime admission or gameplay success.
 """
@@ -283,6 +283,10 @@ static AuroraSubmission aurora_submission;
 static GameplayStats gameplay_stats;
 static bool arm_leaf_accept = true;
 static unsigned arm_leaf_calls = 0;
+struct FixtureClock { void reset() {} };
+static FixtureClock menu_clock, audio_clock;
+static std::string message;
+static void first_css_browser_draw_refresh_observation() {}
 
 // `world` is the outgoing menu-world owner; `world_live` models the separate
 // gameplay-world service that survives when completed Setup owns `match`.
@@ -592,12 +596,25 @@ static void lifecycle_and_status_controls() {
   std::cout << "LEGACY " << melee_web_native_menu_stadium_first_sss_vs_setup_cf_retirement_status() << '\n';
 }
 
+static void step_error_controls() {
+  reset_fixture();
+  auto& state=matched_setup_cf;
+  state.later_b_gate2_mode=true;
+  state.armed=true;
+  matched_setup_cf_fail("first native service error");
+  matched_setup_cf_fail("generic outer catch");
+  assert(state.error=="first native service error");
+  assert(message=="first native service error");
+  std::cout << "STEP_ERROR " << matched_setup_cf_json() << '\n';
+}
+
 int main(int argc,char** argv) {
   assert(argc==2); const std::string mode=argv[1];
   if(mode=="parser-accept") parser_accept_case();
   else if(mode=="parser-controls") parser_refusal_controls();
   else if(mode=="go") go_snapshot_controls();
   else if(mode=="lifecycle-status") lifecycle_and_status_controls();
+  else if(mode=="step-error") step_error_controls();
   else return 2;
   return 0;
 }
@@ -742,6 +759,7 @@ class LaterBGate2NativeControls(OwnedWorkspaceTests):
             _function(cls.cpp_source, "std::string later_b_gate2_transfer_proof_json(const MatchedSetupCfState& state,bool parent_close_checked){"),
             _function(cls.cpp_source, "static int later_b_gate2_manifest_arm(const uint8_t* manifest,size_t manifest_bytes){"),
             _function(cls.cpp_source, "bool later_b_gate2_unarmed_abort_ready(const MatchedSetupCfState& state){"),
+            _function(cls.cpp_source, "void matched_setup_cf_fail(const char* error){"),
             _function(cls.cpp_source, "std::string matched_setup_cf_json(){"),
             _function(cls.cpp_source, "const char* melee_web_native_menu_stadium_first_sss_vs_setup_cf_retirement_status(){"),
         ]
@@ -844,6 +862,19 @@ static std::string actual_action_json_control(bool tick_action) {
         self.assertIsNone(records["ABORT"]["error"])
         self.assertFalse(records["ABORT_ERROR"]["native_closed"])
         self.assertEqual(records["ABORT_ERROR"]["error"], 'abort "failed"\nretained')
+
+    def test_actual_outer_step_catch_preserves_first_service_error_in_native_status(self):
+        step = _function(self.cpp_source,
+                         "int melee_web_native_menu_stadium_first_sss_vs_setup_cf_step_once(){")
+        self.assertIn("matched_setup_cf_fail(error.what())", step)
+        fail = _function(self.cpp_source, "void matched_setup_cf_fail(const char* error){")
+        self.assertIn("if(state.error.empty())state.error=error?error:", fail)
+        output = self._run_fixture("step-error")
+        label, payload = output.strip().split(" ", 1)
+        self.assertEqual(label, "STEP_ERROR")
+        status = json.loads(payload)
+        self.assertTrue(status["failed"])
+        self.assertEqual(status["error"], "first native service error")
 
 
 if __name__ == "__main__":

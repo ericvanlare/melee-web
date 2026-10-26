@@ -14,7 +14,8 @@ function cut(text,start,end){assert.equal(text.split(start).length,2,start);asse
 function nativeFixture(){
   const calls=[];let idle=true;
   const receipt={schema:'melee-web-stadium-later-b-gate2-native-v1',armed:false,failed:true,complete:false,
-    source_ticks:0,source_draws:0,cursor:0,queued:false,awaiting_approval:false,last_action:null};
+    state:'failed',error:'first native service error',source_ticks:0,source_draws:0,cursor:0,
+    queued:false,awaiting_approval:false,last_action:null};
   const owner={gate2CanSettle:()=>true,gate2Pending:kind=>calls.push(['pending',kind]),gate2Settled:()=>{assert.equal(idle,true);calls.push(['settled']);},
     gate2Uncertain:reason=>calls.push(['uncertain',reason]),gate2ApproveSetup:()=>{calls.push(['setup-vote']);return true;}};
   const module={HEAPU8:new Uint8Array(30000),stadiumMatchedSetupNativeIdle:()=>idle,
@@ -116,6 +117,33 @@ test('actual Gate2 page commands keep full transactions pending and never read n
   });
 });
 
+test('settled zero Gate2 step retains its native failure while pending or uncertain outcomes read nothing',async()=>{
+  const f=nativeFixture();
+  await withModule(f.module,async()=>{
+    f.module.ccall=()=>Promise.resolve(0);
+    const response=await evaluateMatchedSetupCfNativeCommand({kind:'gate2-step',gate2Owner:f.owner});
+    assert.equal(response.result,0);assert.equal(response.asyncify_idle,true);
+    assert.equal(response.failure.classification,'settled-native-step-failure');
+    assert.equal(response.failure.message,'first native service error');
+    assert.equal(response.failure.observation.error,'first native service error');
+    assert.ok(f.calls.findIndex(x=>x[0]==='settled')<f.calls.findIndex(x=>x[0]==='live'));
+
+    for (const mode of ['owner-uncertain','asyncify-pending']) {
+      let resolve;let canSettle=true;f.owner.gate2CanSettle=()=>canSettle;
+      f.module.ccall=()=>new Promise(r=>{resolve=r;});
+      const before=f.calls.filter(x=>x[0]==='live').length;
+      const pending=evaluateMatchedSetupCfNativeCommand({kind:'gate2-step',gate2Owner:f.owner});
+      if(mode==='owner-uncertain')canSettle=false;else f.setIdle(false);
+      resolve(0);
+      const refused=await pending;
+      assert.equal(refused.asyncify_idle,false);
+      assert.equal(f.calls.filter(x=>x[0]==='live').length,before,
+        'pending or uncertain settlement must not read retained native state');
+      if(mode==='asyncify-pending')f.setIdle(true);
+    }
+  });
+});
+
 test('host transport is one-use, serial, sticky on lost responses and refuses negative ACK before native dispatch',async()=>{
   let resolve;const commands=[];
   const adapter=createLaterBGate2NativeAdapter({owner:{},deadline:100,now:()=>0,
@@ -154,6 +182,37 @@ test('actual orchestration uses supplied existing driver,360 ordered actions, an
   assert.deepEqual(f.calls.slice(-2),['retire','finalize']);assert.equal(f.calls.filter(x=>x.startsWith('step')).length,360);
   const bad=fixture(1);await assert.rejects(runLaterBGate2ActionContinuation(bad.options),/comparison refusal/);
   assert.equal(bad.calls.includes('retire'),false);assert.equal(bad.calls.includes('abort'),false);assert.equal(bad.calls.includes('finalize'),false);
+});
+
+test('settled failed step is persisted with its native snapshot and never promoted to cleanup',async()=>{
+  const failure={classification:'settled-native-step-failure',message:'first native service error',
+    observation:{schema:'melee-web-stadium-later-b-gate2-native-v1',state:'failed',failed:true,
+      error:'first native service error',cursor:0,source_ticks:0,source_draws:0}};
+  const calls=[];let submitted=0;
+  const adapter=createLaterBGate2NativeAdapter({owner:{},deadline:100,now:()=>0,
+    evaluate:(_fn,command)=>Promise.resolve(command.kind==='gate2-step'
+      ?{result:0,asyncify_idle:true,failure}:{result:1,asyncify_idle:true})});
+  await adapter.arm(new Uint8Array(20580));
+  const schedule=Array.from({length:360},(_,i)=>i%2
+    ?{action:'draw',action_index:i,draw:Math.floor(i/2)}
+    :{action:'tick',action_index:i,bundle:Math.floor(i/2)});
+  const driver={laterB:true,payload:{schedule},arm:async()=>true,
+    submit:async()=>{submitted++;return true;},accept:async()=>true,
+    status:()=>({complete:false,pending:true,cursor:0,first_error:null})};
+  await assert.rejects(runLaterBGate2ActionContinuation({driver,adapter,actualSetup:{},deadline:100,now:()=>0,
+    persist:async row=>calls.push(row),record:async()=>calls.push({phase:'record'}),
+    finalize:async()=>{calls.push({phase:'finalize'});return{finalized:true};}}),
+    /Gate2 settled native step refusal: first native service error/);
+  assert.equal(submitted,1);
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].phase,'settled-native-step-failure');
+  assert.equal(calls[0].action_index,0);
+  assert.deepEqual(calls[0].failure,failure);
+  assert.equal(adapter.state().settled_failure,failure);
+  assert.equal(adapter.state().armed,true);assert.equal(adapter.state().unsafe,false);
+  await assert.rejects(adapter.retire(),/failed/);
+  await assert.rejects(adapter.abortUnarmed(),/definite/);
+  assert.deepEqual(calls,[calls[0]],'failed step cannot be promoted to retire/abort/finalize');
 });
 
 test('actual harness catch/finally/snapshot branches bypass every ordinary cleanup after reservation or uncertainty',async()=>{
