@@ -9,6 +9,7 @@ import copy
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import stat
 
@@ -318,6 +319,240 @@ def build_gate2_projection(binding_path):
     require(final_identity == file_identity and final_raw == raw_binding,
             'binding file changed during Gate2 projection')
     return projected
+
+
+def build_gate2_constructor_phase_projection(binding_path):
+    """Derive an explicit constructor-phase sidecar from retained original rows.
+
+    This uses the same checked operand binding and StadiumConstructorObservations
+    parser as the aggregate/action projection. It adds no native/runtime authority
+    and leaves the version-1 Gate2 projection bytes and meaning unchanged.
+    """
+    raw_binding, file_identity = _read_binding_snapshot(binding_path)
+    try:
+        binding = json.loads(raw_binding.decode('utf-8'))
+    except (json.JSONDecodeError, UnicodeDecodeError) as error:
+        raise ValueError(f'binding is not valid UTF-8 JSON: {error}') from error
+    require(isinstance(binding, dict), 'binding JSON root must be an object')
+    operands = load(binding)
+    paths = verified_files(binding)
+    rows = list(context.replay.iter_records(paths['primary']))
+    source = StadiumConstructorObservations()
+    entry, setup = operands['entry'], operands['setup']
+    sequences = operands['constructor']['source_sequences']
+    require(len(sequences) in (3, 5), 'strict original constructor phase count is unsupported')
+    for sequence in sequences:
+        require(type(sequence) is int and 0 <= sequence < len(rows) and rows[sequence]['seq'] == sequence,
+                'strict constructor sequence no longer indexes its raw row')
+        row = rows[sequence]
+        require(entry['sequence'] < sequence < setup['sequence'],
+                'constructor phase escaped the selected Entry/Setup interval')
+        source.accept(row, route_ready=True, scope='stadium_whole3_feedback_v1',
+                      expected_receipt=binding['files']['setup_receipt']['sha256'],
+                      match_index=1)
+    observed = source.finish(include_state_projection=True)
+    state = observed['state_projection']
+    by_phase = {row['payload']['phase']: row for row in source.rows}
+    expected_phases = (['constructor_entry', 'constructor_parameters',
+                        f"constructor_{observed['branch']}_call",
+                        f"constructor_{observed['branch']}_return", 'constructor_commit']
+                       if observed['branch'] != 'equal' else
+                       ['constructor_entry', 'constructor_parameters', 'constructor_commit'])
+    require([row['payload']['phase'] for row in source.rows] == expected_phases,
+            'strict original constructor phase order differs')
+    events = []
+    for ordinal, (row, phase) in enumerate(zip(source.rows, expected_phases), 1):
+        payload = row['payload']
+        seed_slices = [item for item in payload['slices'] if item.get('tag') == 20]
+        require(len(seed_slices) == 1 and len(bytes.fromhex(seed_slices[0]['hex'])) == 4,
+                'strict constructor phase lacks its actual dynamic seed value')
+        seed_hex = bytes.fromhex(seed_slices[0]['hex']).hex()
+        event = {
+            'ordinal': ordinal,
+            'phase': phase.removeprefix('constructor_'),
+            'parameter_values_valid': phase != 'constructor_entry',
+            'parameter_x0': state['parameter_x0'] if phase != 'constructor_entry' else 0,
+            'parameter_x4': state['parameter_x4'] if phase != 'constructor_entry' else 0,
+            'scalar_value_valid': phase not in ('constructor_entry', 'constructor_parameters'),
+            'scalar_value': 0,
+            'source_seed_valid': True,
+            'source_seed_hex': seed_hex,
+        }
+        if phase.endswith('_call'):
+            event['scalar_value'] = payload['constructor_gprs'][0]
+            event['scalar_kind'] = 'randi_bound'
+        elif phase.endswith('_return'):
+            event['scalar_value'] = payload['constructor_gprs'][0]
+            event['scalar_kind'] = 'randi_result'
+        elif phase == 'constructor_commit':
+            countdown = [item for item in payload['slices'] if item.get('tag') == 70]
+            require(len(countdown) == 1 and len(bytes.fromhex(countdown[0]['hex'])) == 4,
+                    'strict constructor commit lacks its actual stored countdown')
+            event['scalar_value'] = int.from_bytes(bytes.fromhex(countdown[0]['hex']),
+                                                   'big', signed=True)
+            event['scalar_kind'] = 'stored_countdown'
+        events.append(event)
+    require(observed['branch'] in ('up', 'down', 'equal'), 'unknown original constructor branch')
+    result = {
+        'schema': 'melee-web-stadium-original-b-constructor-phase-projection-v1',
+        'reference_id': GATE2_REFERENCE_ID,
+        'binding_sha256': hashlib.sha256(raw_binding).hexdigest(),
+        'semantic_owner': {
+            'id': 'selected-match-1/map2/constructor-callback-1',
+            'selected_match': 1,
+            'native_role': 'map2/constructor-callback-1',
+            'map_id': 2,
+            'constructor_callback_ordinal': 1,
+        },
+        'branch': observed['branch'],
+        'events': events,
+        'source_coordinates': [_progress_coordinate(row) for row in source.rows],
+        'runtime_admission': False,
+        'browser_parity': False,
+        'C3': False,
+    }
+    final_raw, final_identity = _read_binding_snapshot(binding_path)
+    require(final_identity == file_identity and final_raw == raw_binding,
+            'binding file changed during constructor phase projection')
+    return result
+
+
+def compare_gate2_constructor_phase_trace(expected, actual_setup_state):
+    """Strictly compare the explicit original sidecar to the actual Setup receipt.
+
+    The selected original match is reference provenance; the native receipt only
+    claims its generic map-2 constructor-callback role. This comparator maps
+    that role to the selected original context without claiming native match
+    selection. PPC/native addresses and ticks remain separate provenance.
+    """
+    fields = []
+    try:
+        require(isinstance(expected, dict) and expected.get('schema') ==
+                'melee-web-stadium-original-b-constructor-phase-projection-v1',
+                'original phase projection schema differs')
+        require(set(expected) == {'schema', 'reference_id', 'binding_sha256',
+                'semantic_owner', 'branch', 'events', 'source_coordinates',
+                'runtime_admission', 'browser_parity', 'C3'},
+                'original phase projection fields differ')
+        require(expected['reference_id'] == GATE2_REFERENCE_ID and
+                re.fullmatch(r'[0-9a-f]{64}', expected['binding_sha256']) is not None and
+                expected['runtime_admission'] is False and
+                expected['browser_parity'] is False and expected['C3'] is False,
+                'original phase projection identity/scope differs')
+        semantic = expected['semantic_owner']
+        require(semantic == {'id': 'selected-match-1/map2/constructor-callback-1',
+                'selected_match': 1, 'native_role': 'map2/constructor-callback-1',
+                'map_id': 2, 'constructor_callback_ordinal': 1},
+                'original semantic owner identity/mapping differs')
+        require(expected['branch'] in ('up', 'down', 'equal') and
+                isinstance(expected['events'], list) and
+                len(expected['events']) == (3 if expected['branch'] == 'equal' else 5),
+                'original constructor phase extent/branch differs')
+        phases = (['entry', 'parameters', 'commit'] if expected['branch'] == 'equal' else
+                  ['entry', 'parameters', f"{expected['branch']}_call",
+                   f"{expected['branch']}_return", 'commit'])
+        expected_event_keys = {'ordinal', 'phase', 'parameter_values_valid',
+            'parameter_x0', 'parameter_x4', 'scalar_value_valid', 'scalar_value',
+            'source_seed_valid', 'source_seed_hex'}
+        for index, (event, phase) in enumerate(zip(expected['events'], phases), 1):
+            keys = set(expected_event_keys)
+            if phase in ('up_call', 'down_call', 'up_return', 'down_return', 'commit'):
+                keys.add('scalar_kind')
+            require(set(event) == keys and event['ordinal'] == index and
+                    event['phase'] == phase and event['source_seed_valid'] is True and
+                    re.fullmatch(r'[0-9a-f]{8}', event['source_seed_hex']) is not None,
+                    'original constructor event schema/order/seed differs')
+            if phase == 'entry':
+                require(event['parameter_values_valid'] is False and
+                        event['scalar_value_valid'] is False,
+                        'original entry has unexpected constructor values')
+            else:
+                require(event['parameter_values_valid'] is True and
+                        type(event['parameter_x0']) is int and type(event['parameter_x4']) is int,
+                        'original constructor parameter phase lacks actual values')
+            scalar_kind = ('randi_bound' if phase.endswith('_call') else
+                           'randi_result' if phase.endswith('_return') else
+                           'stored_countdown' if phase == 'commit' else None)
+            if scalar_kind is None:
+                require(event['scalar_value_valid'] is False and event['scalar_value'] == 0,
+                        'original constructor phase has an unexpected scalar')
+            else:
+                require(event['scalar_value_valid'] is True and event['scalar_kind'] == scalar_kind and
+                        type(event['scalar_value']) is int,
+                        'original constructor scalar phase differs')
+        require(isinstance(actual_setup_state, dict) and
+                actual_setup_state.get('schema') == 'melee-web-stadium-zero-tick-setup-state-v1',
+                'actual zero-tick Setup state schema differs')
+        trace = actual_setup_state.get('constructor_phase_trace')
+        require(isinstance(trace, dict) and set(trace) ==
+                {'schema', 'scope', 'owner', 'event_count', 'events'} and
+                trace['schema'] == 'melee-web-stadium-constructor-phase-trace-v1' and
+                trace['scope'] == 'diagnostic-zero-tick-setup-owner-observation-only',
+                'actual constructor phase trace schema/scope differs')
+        owner = trace['owner']
+        require(isinstance(owner, dict) and set(owner) ==
+                {'semantic_id', 'world_generation', 'map_id', 'constructor_callback_ordinal'} and
+                owner['semantic_id'] == semantic['native_role'] == 'map2/constructor-callback-1' and
+                semantic['id'] == 'selected-match-1/map2/constructor-callback-1' and
+                semantic['selected_match'] == 1 and owner['map_id'] == semantic['map_id'] == 2 and
+                owner['constructor_callback_ordinal'] == semantic['constructor_callback_ordinal'] == 1 and
+                type(owner['world_generation']) is int and owner['world_generation'] > 0 and
+                owner['world_generation'] == actual_setup_state.get('world_generation'),
+                'actual semantic Stage owner or generation differs')
+        require(actual_setup_state.get('world_ticks') == 0 and
+                actual_setup_state.get('source_frame') == 0 and
+                actual_setup_state.get('map_id') == 2 and
+                actual_setup_state.get('source_parameter_roots_agree') is True and
+                actual_setup_state.get('constructor_callback_count') == 1,
+                'actual Setup owner is not the checked zero-tick map-2 constructor')
+        actual_events = trace.get('events')
+        require(trace.get('event_count') == len(expected['events']) and
+                isinstance(actual_events, list) and len(actual_events) == len(expected['events']),
+                'actual constructor phase count differs')
+        for index, (want, got) in enumerate(zip(expected['events'], actual_events)):
+            require(isinstance(got, dict) and got.get('ordinal') == want['ordinal'] and
+                    got.get('phase') == want['phase'] and
+                    got.get('parameter_values_valid') is want['parameter_values_valid'] and
+                    got.get('parameter_x0') == want['parameter_x0'] and
+                    got.get('parameter_x4') == want['parameter_x4'] and
+                    got.get('scalar_value_valid') is want['scalar_value_valid'] and
+                    got.get('scalar_value') == want['scalar_value'] and
+                    got.get('source_seed_valid') is True and
+                    got.get('source_seed_hex') == want['source_seed_hex'] and
+                    got.get('scalar_kind') == want.get('scalar_kind'),
+                    f'constructor phase {index + 1} differs')
+        parameter = expected['events'][1]
+        require(actual_setup_state.get('parameter_x0') == parameter['parameter_x0'] and
+                actual_setup_state.get('parameter_x4') == parameter['parameter_x4'] and
+                actual_setup_state.get('source_seed_before_hex') == expected['events'][0]['source_seed_hex'] and
+                actual_setup_state.get('source_seed_after_hex') == expected['events'][-1]['source_seed_hex'] and
+                actual_setup_state.get('initial_countdown') == expected['events'][-1]['scalar_value'] and
+                actual_setup_state.get('current_countdown') == expected['events'][-1]['scalar_value'],
+                'actual Setup aggregate differs from its constructor phase trace')
+        if expected['branch'] == 'equal':
+            require(actual_setup_state.get('constructor_randi_call_count') == 0 and
+                    actual_setup_state.get('constructor_randi_bound') is None and
+                    actual_setup_state.get('constructor_randi_result') is None,
+                    'equal branch unexpectedly reports a Randi call')
+        else:
+            call, returned = expected['events'][2:4]
+            require(actual_setup_state.get('constructor_randi_call_count') == 1 and
+                    actual_setup_state.get('constructor_randi_bound') == call['scalar_value'] and
+                    actual_setup_state.get('constructor_randi_result') == returned['scalar_value'],
+                    'actual Setup Randi aggregate differs from phase scalars')
+        fields = ['semantic_owner.map_id', 'semantic_owner.constructor_callback_ordinal',
+            'event.ordinal', 'event.phase', 'event.parameter_x0', 'event.parameter_x4',
+            'event.randi_bound', 'event.randi_result', 'event.stored_countdown',
+            'event.source_seed_hex', 'actual.world_generation']
+        return {'schema': 'melee-web-stadium-constructor-phase-comparison-v1',
+            'decision': 'PASS_EXACT_ORIGINAL_PHASES_AND_NATIVE_SETUP_SCALARS',
+            'compared_fields': fields, 'first_mismatch': None,
+            'source_coordinates_compared': False, 'runtime_admission': False, 'C3': False}
+    except (KeyError, TypeError, ValueError) as error:
+        return {'schema': 'melee-web-stadium-constructor-phase-comparison-v1',
+            'decision': 'REFUSE_CONSTRUCTOR_PHASE_TRACE',
+            'compared_fields': fields, 'first_mismatch': str(error),
+            'source_coordinates_compared': False, 'runtime_admission': False, 'C3': False}
 
 
 def load(binding):

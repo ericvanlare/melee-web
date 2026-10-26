@@ -83,7 +83,9 @@ static bool retirement_changes_seed=false;static unsigned close_calls=0;[[maybe_
 struct World {void close(){++close_calls;source_world=false;if(retirement_changes_seed)seed_ptr=&foreign_seed;}};
 static std::unique_ptr<World> world;
 static std::map<std::string,std::vector<uint8_t>> files;
-struct MeleeWebStadiumSetupSnapshot {uint32_t version=1;uint64_t world_generation=9,world_ticks=0;uint32_t source_frame=0;int32_t map_id=2,initial_countdown=4,current_countdown=4,parameter_x0=3,parameter_x4=5;uint32_t constructor_randi_call_count=1,constructor_random_bound_valid=1;int32_t constructor_random_bound=2;uint32_t constructor_random_result_valid=1;int32_t constructor_random_result=1;uint32_t source_seed_before=17,source_seed_after=19;int32_t ground_source_heap_handle=3;uint32_t ground_requested_bytes=256;uint64_t ground_allocation_generation=12;int32_t object_source_heap_handle=3;uint32_t object_requested_bytes=128;uint64_t object_allocation_generation=11;uint32_t constructor_callback_count=1,source_parameter_roots_agree=1;};
+enum {MELEE_WEB_STADIUM_SETUP_PHASE_ENTRY=1,MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS=2,MELEE_WEB_STADIUM_SETUP_PHASE_UP_CALL=3,MELEE_WEB_STADIUM_SETUP_PHASE_UP_RETURN=4,MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_CALL=5,MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_RETURN=6,MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT=7};
+struct MeleeWebStadiumSetupConstructorPhaseEvent {uint32_t ordinal=0,phase=0,parameter_values_valid=0;int32_t parameter_x0=0,parameter_x4=0;uint32_t scalar_value_valid=0;int32_t scalar_value=0;uint32_t source_seed_valid=0,source_seed=0;};
+struct MeleeWebStadiumSetupSnapshot {uint32_t version=2;uint64_t world_generation=9,world_ticks=0;uint32_t source_frame=0;int32_t map_id=2,initial_countdown=4,current_countdown=4,parameter_x0=3,parameter_x4=5;uint32_t constructor_randi_call_count=1,constructor_random_bound_valid=1;int32_t constructor_random_bound=2;uint32_t constructor_random_result_valid=1;int32_t constructor_random_result=1;uint32_t source_seed_before=17,source_seed_after=19;int32_t ground_source_heap_handle=3;uint32_t ground_requested_bytes=256;uint64_t ground_allocation_generation=12;int32_t object_source_heap_handle=3;uint32_t object_requested_bytes=128;uint64_t object_allocation_generation=11;uint32_t constructor_callback_count=1,source_parameter_roots_agree=1;uint32_t constructor_phase_count=0;MeleeWebStadiumSetupConstructorPhaseEvent constructor_phases[5]{};};
 static bool setup_snapshot_ok=true;static unsigned setup_snapshot_calls=0;[[maybe_unused]] static uint32_t setup_seed_to_return=0x35a455b9;
 static uint32_t constructed_selection_seed=0;
 namespace melee_web {
@@ -387,6 +389,10 @@ class FirstSssVsSetupEndpointTests(OwnedWorkspaceTests):
   source=(ROOT/'src/gameplay_menu_browser.cpp').read_text();menu=(ROOT/'src/gameplay_menu_browser_menu.cpp').read_text()
   a=source.index('enum class FirstSssVsSetupOrigin : unsigned');b=source.index('std::string first_sss_vs_setup_json(){',a)
   body=PRELUDE+source[a:b]
+  for name in ('const char* later_b_gate2_constructor_phase_name(uint32_t phase)',
+               'const char* later_b_gate2_constructor_phase_scalar_name(uint32_t phase)',
+               'std::string later_b_gate2_constructor_phase_trace_json(const MeleeWebStadiumSetupSnapshot& setup)'):
+   body+=_function(source,name)+'\n'
   body+=unarmed_later_asset_fixture(source)
   body+=_function(source,'std::string current_sss_selection_difference(const MeleeWebMenuMatchSelection& a,')
   body+=_function(source,'bool current_sss_selection_equal(const MeleeWebMenuMatchSelection& a,')
@@ -404,6 +410,10 @@ class FirstSssVsSetupEndpointTests(OwnedWorkspaceTests):
   source=(ROOT/'src/gameplay_menu_browser.cpp').read_text();menu=(ROOT/'src/gameplay_menu_browser_menu.cpp').read_text()
   a=source.index('enum class FirstSssVsSetupOrigin : unsigned');b=source.index('std::string first_sss_vs_setup_json(){',a)
   body='#define TEST_CURRENT_PREPARED 1\n'+PRELUDE+source[a:b]
+  for name in ('const char* later_b_gate2_constructor_phase_name(uint32_t phase)',
+               'const char* later_b_gate2_constructor_phase_scalar_name(uint32_t phase)',
+               'std::string later_b_gate2_constructor_phase_trace_json(const MeleeWebStadiumSetupSnapshot& setup)'):
+   body+=_function(source,name)+'\n'
   body+=unarmed_later_asset_fixture(source)
   body+=_function(source,'std::string current_sss_selection_difference(const MeleeWebMenuMatchSelection& a,')
   body+=_function(source,'bool current_sss_selection_equal(const MeleeWebMenuMatchSelection& a,')

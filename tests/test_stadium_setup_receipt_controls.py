@@ -77,7 +77,24 @@ PRELUDE = r'''
 #define St_Kind_PStadium 3
 #define MELEE_WEB_SOURCE_MEMORY_READ_OK 0
 #define MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT 3
-#define MELEE_WEB_STADIUM_SETUP_SNAPSHOT_VERSION 1U
+#define MELEE_WEB_STADIUM_SETUP_CONSTRUCTOR_PHASE_CAPACITY 5U
+#define MELEE_WEB_STADIUM_SETUP_SNAPSHOT_VERSION 2U
+enum {
+ MELEE_WEB_STADIUM_SETUP_PHASE_ENTRY=1,
+ MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS=2,
+ MELEE_WEB_STADIUM_SETUP_PHASE_UP_CALL=3,
+ MELEE_WEB_STADIUM_SETUP_PHASE_UP_RETURN=4,
+ MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_CALL=5,
+ MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_RETURN=6,
+ MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT=7
+};
+typedef struct {
+ uint32_t ordinal,phase,parameter_values_valid;
+ int32_t parameter_x0,parameter_x4;
+ uint32_t scalar_value_valid;
+ int32_t scalar_value;
+ uint32_t source_seed_valid,source_seed;
+} MeleeWebStadiumSetupConstructorPhaseEvent;
 typedef int32_t s32;
 typedef struct HSD_GObj HSD_GObj;
 typedef HSD_GObj Ground_GObj;
@@ -115,6 +132,9 @@ typedef struct {
  uint64_t ground_allocation_generation; int32_t object_source_heap_handle;
  uint32_t object_requested_bytes; uint64_t object_allocation_generation;
  uint32_t constructor_callback_count, source_parameter_roots_agree;
+ uint32_t constructor_phase_count;
+ MeleeWebStadiumSetupConstructorPhaseEvent constructor_phases[
+     MELEE_WEB_STADIUM_SETUP_CONSTRUCTOR_PHASE_CAPACITY];
 } MeleeWebStadiumSetupSnapshot;
 typedef struct MeleeWebStageLast {
  uint64_t generation; Definition *definition; int source_ordered;
@@ -126,11 +146,13 @@ typedef struct MeleeWebStageLast {
  MeleeWebSourceMemoryAllocation stadium_manager_lease, stadium_manager_proc_lease;
  struct {
   unsigned seen, finished, failure, call_observed, bound_valid, result_valid;
-  unsigned seed_before_valid, seed_after_valid;
+  unsigned seed_before_valid, seed_after_valid, phase_count;
   HSD_GObj *object; Ground *ground;
   MeleeWebSourceMemoryAllocation object_lease, ground_lease;
   int32_t parameter_x0, parameter_x4, initial_countdown;
   int32_t random_bound, random_result; uint32_t seed_before, seed_after;
+  MeleeWebStadiumSetupConstructorPhaseEvent phases[
+      MELEE_WEB_STADIUM_SETUP_CONSTRUCTOR_PHASE_CAPACITY];
  } stadium_setup;
 } MeleeWebStageLast;
 
@@ -241,6 +263,8 @@ static void assert_snapshot_refuses_unchanged(const char *message_part)
  memset(&out,0xA5,sizeof(out)); memcpy(before,&out,sizeof(out));
  assert(!melee_web_stage_last_stadium_setup_snapshot(active,&parameter,&out,error,sizeof(error)));
  assert(memcmp(&out,before,sizeof(out))==0);
+ if(message_part&&!strstr(error,message_part))
+  fprintf(stderr,"expected refusal fragment [%s], actual error [%s]\n",message_part,error);
  if(message_part) assert(strstr(error,message_part)!=NULL);
 }
 static void check_randi_branch(int32_t x0, int32_t x4, int expected_count)
@@ -258,12 +282,43 @@ static void check_randi_branch(int32_t x0, int32_t x4, int expected_count)
   assert(out.constructor_random_bound_valid==1 && out.constructor_random_bound==bound);
   assert(out.constructor_random_result_valid==1 && out.constructor_random_result==2);
   assert(out.source_seed_before==17 && out.source_seed_after==19);
+  assert(out.constructor_phase_count==5);
+  assert(out.constructor_phases[0].phase==MELEE_WEB_STADIUM_SETUP_PHASE_ENTRY);
+  assert(out.constructor_phases[0].ordinal==1 && !out.constructor_phases[0].parameter_values_valid);
+  assert(out.constructor_phases[0].source_seed_valid && out.constructor_phases[0].source_seed==17);
+  assert(out.constructor_phases[1].phase==MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS);
+  assert(out.constructor_phases[1].ordinal==2 && out.constructor_phases[1].parameter_values_valid);
+  assert(out.constructor_phases[1].parameter_x0==x0 && out.constructor_phases[1].parameter_x4==x4);
+  assert(out.constructor_phases[1].source_seed==17 && !out.constructor_phases[1].scalar_value_valid);
+  const uint32_t call_phase=x4>x0?MELEE_WEB_STADIUM_SETUP_PHASE_UP_CALL:MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_CALL;
+  const uint32_t return_phase=x4>x0?MELEE_WEB_STADIUM_SETUP_PHASE_UP_RETURN:MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_RETURN;
+  assert(out.constructor_phases[2].phase==call_phase && out.constructor_phases[2].ordinal==3);
+  assert(out.constructor_phases[2].scalar_value_valid && out.constructor_phases[2].scalar_value==bound);
+  assert(out.constructor_phases[2].source_seed==17);
+  assert(out.constructor_phases[3].phase==return_phase && out.constructor_phases[3].ordinal==4);
+  assert(out.constructor_phases[3].scalar_value_valid && out.constructor_phases[3].scalar_value==2);
+  assert(out.constructor_phases[3].source_seed==19);
+  assert(out.constructor_phases[4].phase==MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT &&
+         out.constructor_phases[4].ordinal==5);
+  assert(out.constructor_phases[4].scalar_value_valid &&
+         out.constructor_phases[4].scalar_value==out.current_countdown);
+  assert(out.constructor_phases[4].source_seed==19);
   assert(out.current_countdown==(x0<x4 ? x0+2 : x4+2));
  } else {
   assert(x0==x4 && rng_calls==0 && out.constructor_randi_call_count==0);
   assert(out.constructor_random_bound_valid==0 && out.constructor_random_bound==0);
   assert(out.constructor_random_result_valid==0 && out.constructor_random_result==0);
   assert(out.source_seed_before==17 && out.source_seed_after==17);
+  assert(out.constructor_phase_count==3);
+  assert(out.constructor_phases[0].phase==MELEE_WEB_STADIUM_SETUP_PHASE_ENTRY &&
+         out.constructor_phases[0].source_seed==17);
+  assert(out.constructor_phases[1].phase==MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS &&
+         out.constructor_phases[1].parameter_x0==x0 &&
+         out.constructor_phases[1].parameter_x4==x4);
+  assert(out.constructor_phases[2].phase==MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT &&
+         out.constructor_phases[2].ordinal==3 &&
+         out.constructor_phases[2].scalar_value==x0 &&
+         out.constructor_phases[2].source_seed==17);
   assert(out.current_countdown==x0);
  }
 }
@@ -287,10 +342,69 @@ int main(void)
  assert_snapshot_refuses_unchanged("completed zero-tick prepared Ready owner");
 
  fixture_setup(3,7); mutate_lease_on_map_init=1; capture_setup();
- assert_snapshot_refuses_unchanged("constructor call/result/owner receipt changed");
+ assert_snapshot_refuses_unchanged(NULL);
  fixture_setup(3,7); mutate_lease_on_map_init=2; capture_setup();
- assert_snapshot_refuses_unchanged("constructor call/result/owner receipt changed");
- puts("PASS component checks only: extracted StageLast receipt functions; Setup zero-tick; refusals preserve output; missing/duplicate constructor; source-owner/grkind; stale GObj/Ground generations; both randi branches and equal-endpoint no-call");
+ assert_snapshot_refuses_unchanged(NULL);
+
+ fixture_setup(3,7); assert(melee_web_stage_last_stadium_setup_constructor_begin(map2_object));
+ melee_web_stage_last_stadium_setup_constructor_phase(map2_object,
+     MELEE_WEB_STADIUM_SETUP_PHASE_UP_CALL,3,7,1,4);
+ complete_setup_phase();
+ assert_snapshot_refuses_unchanged("constructor phase trace order, values, or owner changed");
+
+ fixture_setup(3,7); assert(melee_web_stage_last_stadium_setup_constructor_begin(map2_object));
+ melee_web_stage_last_stadium_setup_constructor_phase(map2_object,
+     MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS,4,7,0,0);
+ complete_setup_phase();
+ assert_snapshot_refuses_unchanged("constructor phase trace order, values, or owner changed");
+
+ /* Missing actual Randi phases cannot be replaced by a synthetic COMMIT. */
+ fixture_setup(3,7); assert(melee_web_stage_last_stadium_setup_constructor_begin(map2_object));
+ melee_web_stage_last_stadium_setup_constructor_phase(map2_object,
+     MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS,3,7,0,0);
+ melee_web_stage_last_stadium_setup_constructor_phase(map2_object,
+     MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT,3,7,1,5);
+ complete_setup_phase(); assert_snapshot_refuses_unchanged("constructor phase trace order, values, or owner changed");
+
+ /* A duplicate marker is refused at its actual owner transition. */
+ fixture_setup(3,7); assert(melee_web_stage_last_stadium_setup_constructor_begin(map2_object));
+ melee_web_stage_last_stadium_setup_constructor_phase(map2_object,
+     MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS,3,7,0,0);
+ melee_web_stage_last_stadium_setup_constructor_phase(map2_object,
+     MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS,3,7,0,0);
+ complete_setup_phase(); assert_snapshot_refuses_unchanged("constructor phase trace order, values, or owner changed");
+
+ /* RETURN cannot precede the real CALL marker. */
+ fixture_setup(3,7); assert(melee_web_stage_last_stadium_setup_constructor_begin(map2_object));
+ melee_web_stage_last_stadium_setup_constructor_phase(map2_object,
+     MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS,3,7,0,0);
+ melee_web_stage_last_stadium_setup_constructor_phase(map2_object,
+     MELEE_WEB_STADIUM_SETUP_PHASE_UP_RETURN,3,7,1,2);
+ complete_setup_phase(); assert_snapshot_refuses_unchanged("constructor phase trace order, values, or owner changed");
+
+ /* A marker tied to another GObj fails before reading its Ground. */
+ fixture_setup(3,7); HSD_GObj foreign_object={0};
+ assert(melee_web_stage_last_stadium_setup_constructor_begin(map2_object));
+ melee_web_stage_last_stadium_setup_constructor_phase(&foreign_object,
+     MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS,3,7,0,0);
+ complete_setup_phase(); assert_snapshot_refuses_unchanged("constructor phase trace order, values, or owner changed");
+
+ /* The CALL scalar is compared with the actual bound handed to finish. */
+ fixture_setup(3,7); assert(melee_web_stage_last_stadium_setup_constructor_begin(map2_object));
+ melee_web_stage_last_stadium_setup_constructor_phase(map2_object,
+     MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS,3,7,0,0);
+ melee_web_stage_last_stadium_setup_constructor_phase(map2_object,
+     MELEE_WEB_STADIUM_SETUP_PHASE_UP_CALL,3,7,1,5);
+ melee_web_stage_last_stadium_setup_constructor_phase(map2_object,
+     MELEE_WEB_STADIUM_SETUP_PHASE_UP_RETURN,3,7,1,2);
+ ((Ground*)map2_object->user_data)->u.stadium.xD8=5;
+ melee_web_stage_last_stadium_setup_constructor_phase(map2_object,
+     MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT,3,7,1,5);
+ melee_web_stage_last_stadium_setup_constructor_finish(
+     map2_object,3,7,5,1,4,2,1,17,1,19,1);
+ complete_setup_phase(); assert_snapshot_refuses_unchanged("constructor phase trace order, values, or owner changed");
+
+ puts("PASS component checks only: extracted StageLast receipt functions and patched constructor; Setup zero-tick; refusals preserve output; missing/duplicate constructor; source-owner/grkind; stale GObj/Ground generations; actual ordered entry/parameters/up/down/equal/call/return/commit phase values and seeds; missing, duplicate, reordered, foreign-owner, parameter, and scalar-value phase controls");
  return 0;
 }
 '''
@@ -309,20 +423,26 @@ class StadiumSetupReceiptControlTests(OwnedWorkspaceTests):
         stage_functions = (
             "static int stadium_go_alignment_has_no_events(",
             "static void stadium_setup_fail(",
+            "static void stadium_setup_phase_append(",
+            "static int stadium_setup_phase_receipt_matches(",
             "static int stadium_setup_owner_phase(",
             "static int stadium_setup_same_lease(",
             "static int stadium_setup_live_map2(",
             "int melee_web_stage_last_stadium_setup_constructor_begin(",
+            "void melee_web_stage_last_stadium_setup_constructor_phase(",
             "void melee_web_stage_last_stadium_setup_constructor_finish(",
             "int melee_web_stage_last_stadium_setup_snapshot(",
         )
         stadium_functions = (
             "static inline int randi(",
+            "enum {\n    MW_STADIUM_SETUP_PHASE_PARAMETERS = 2,",
             "void grStadium_801D13E0(Ground_GObj* gobj)",
         )
         program = PRELUDE
         program += "\n".join(_function(stage, signature) for signature in stage_functions)
-        program += "\n".join(_function(stadium, signature) for signature in stadium_functions)
+        program += "\n".join(
+            _function(stadium, signature) + (";" if signature.startswith("enum {") else "")
+            for signature in stadium_functions)
         program += TEST_MAIN
 
         workspace = self.new_workspace(ROOT, "stadium-setup-receipt-control-")

@@ -488,6 +488,9 @@ struct CpuProbeRecord
   u32 source_tick = 0;
   u32 match = 0;
   u32 lr = 0;
+  u32 owner_gobj = 0, owner_proc = 0, owner_callback = 0;
+  u16 owner_classifier = 0;
+  u8 owner_p_link = 0, owner_s_link = 0;
   std::array<u32, 32> gpr{};
   std::array<u64, 7> fpr{};
   std::array<u8, CPU_PROBE_STACK_SIZE> stack{};
@@ -927,6 +930,12 @@ bool AllocationConfigured()
   return configured;
 }
 
+bool SelectedRngReturn(u32 configured_pc, bool both, u32 pc)
+{
+  return both ? pc == 0x80380524 || pc == 0x8038057c :
+                configured_pc != 0 && pc == configured_pc;
+}
+
 struct CpuProbePoint
 {
   const char* label;
@@ -1020,6 +1029,7 @@ struct CpuProbeSettings
   u32 first_tick = 0;
   u32 last_tick = 0;
   u32 rng_return_pc = 0;
+  bool rng_returns = false;
   std::string rng_return_site;
 };
 
@@ -1044,13 +1054,16 @@ const CpuProbeSettings& CpuProbeEnvironment()
     result.output_path = output;
     if (!rng_return_site.empty())
     {
-      if (rng_return_site != "rand_return" && rng_return_site != "randf_return")
+      if (rng_return_site != "rand_return" && rng_return_site != "randf_return" &&
+          rng_return_site != "rng_returns")
       {
-        result.error = "MWRC_CPU_PROBE_RNG_RETURN_SITE must be rand_return or randf_return";
+        result.error = "MWRC_CPU_PROBE_RNG_RETURN_SITE must be rand_return, randf_return, or rng_returns";
         return result;
       }
       result.rng_return_site = rng_return_site;
-      result.rng_return_pc = rng_return_site == "rand_return" ? 0x80380524 : 0x8038057c;
+      result.rng_returns = rng_return_site == "rng_returns";
+      result.rng_return_pc = result.rng_returns ? 0 :
+          rng_return_site == "rand_return" ? 0x80380524 : 0x8038057c;
     }
     if (!ParseBoundedDecimal(match, WHOLE_SESSION_MAX_MATCHES - 1, &result.match) ||
         !ParseBoundedDecimal(first_tick, std::numeric_limits<u32>::max(),
@@ -1318,6 +1331,7 @@ struct Observer::Impl
       cpu_probe_first_tick = cpu_probe.first_tick;
       cpu_probe_last_tick = cpu_probe.last_tick;
       cpu_probe_rng_return_pc = cpu_probe.rng_return_pc;
+      cpu_probe_rng_returns = cpu_probe.rng_returns;
       cpu_probe_rng_return_site = cpu_probe.rng_return_site;
       cpu_probe_records.reset(new (std::nothrow) CpuProbeRecord[CPU_PROBE_MAX_RECORDS]);
       if (!cpu_probe_records)
@@ -1762,7 +1776,7 @@ struct Observer::Impl
   void RecordSelectedRngCallback(Core::System* system, u32 pc)
   {
     if (!cpu_probe_configured || !cpu_probe_valid || cpu_probe_closed ||
-        cpu_probe_rng_return_pc == 0 || pc != cpu_probe_rng_return_pc)
+        !SelectedRngReturn(cpu_probe_rng_return_pc, cpu_probe_rng_returns, pc))
       return;
     if (cpu_probe_rng_return_callback_count != std::numeric_limits<u64>::max())
       ++cpu_probe_rng_return_callback_count;
@@ -1790,7 +1804,7 @@ struct Observer::Impl
     if (!cpu_probe_configured || !cpu_probe_valid || cpu_probe_closed ||
         source_tick <= cpu_probe_last_tick || match_index != cpu_probe_match)
       return;
-    const bool rng_match_scope = cpu_probe_rng_return_pc != 0 && whole_session_enabled() &&
+    const bool rng_match_scope = (cpu_probe_rng_returns || cpu_probe_rng_return_pc != 0) && whole_session_enabled() &&
         (whole_phase == 4 || (whole_phase == 5 && match_active));
     const bool active_match_scope = match_active && setup_ready;
     if (rng_match_scope || active_match_scope)
@@ -1800,7 +1814,7 @@ struct Observer::Impl
   std::string CpuProbeCloseStatusJson() const
   {
     if (!cpu_probe_published.load(std::memory_order_acquire) ||
-        cpu_probe_rng_return_pc == 0)
+        (!cpu_probe_rng_returns && cpu_probe_rng_return_pc == 0))
       return {};
     std::string rng_return_pc;
     std::string close_pc;
@@ -1817,8 +1831,11 @@ struct Observer::Impl
                  std::to_string(cpu_probe_rng_return_callback_tick) : "null") +
             ",\"match\":" +
             std::to_string(cpu_probe_rng_return_callback_match) + "}";
-    return ",\"cpu_probe_close\":{\"reason\":\"source_tick_after_window\",\"rng_return_pc\":\"0x" +
-           rng_return_pc + "\",\"close_pc\":\"0x" + close_pc +
+    const std::string selected = cpu_probe_rng_returns ?
+        "\"rng_return_site\":\"rng_returns\",\"rng_return_pcs\":[\"0x80380524\",\"0x8038057c\"]" :
+        "\"rng_return_pc\":\"0x" + rng_return_pc + "\"";
+    return ",\"cpu_probe_close\":{\"reason\":\"source_tick_after_window\"," + selected +
+           ",\"close_pc\":\"0x" + close_pc +
            "\",\"configured_match\":" + std::to_string(cpu_probe_match) +
            ",\"first_tick\":" +
            std::to_string(cpu_probe_first_tick) + ",\"last_tick\":" +
@@ -1833,9 +1850,10 @@ struct Observer::Impl
   void RecordCpuProbe(Core::System* system, u32 pc, const CpuProbePoint& point,
                       PowerPC::PowerPCState* state, u32 source_tick)
   {
-    if (cpu_probe_rng_return_pc != 0 && pc != cpu_probe_rng_return_pc)
+    if ((cpu_probe_rng_returns || cpu_probe_rng_return_pc != 0) &&
+        !SelectedRngReturn(cpu_probe_rng_return_pc, cpu_probe_rng_returns, pc))
       return;
-    const bool rng_match_construction_scope = cpu_probe_rng_return_pc != 0 &&
+    const bool rng_match_construction_scope = (cpu_probe_rng_returns || cpu_probe_rng_return_pc != 0) &&
         whole_session_enabled() && match_index == cpu_probe_match &&
         (whole_phase == 4 || (whole_phase == 5 && match_active && !setup_ready));
     const bool samus_effect_bank_probe = pc == 0x80398614;
@@ -1889,6 +1907,36 @@ struct Observer::Impl
     {
       SetInvalid("CPU probe stack or random-seed range is outside MEM1");
       return;
+    }
+    if (cpu_probe_rng_returns)
+    {
+      // GALE01r2 globals are set immediately around proc->on_invoke and cleared
+      // after it. This is scheduled context, not an allocation-lifetime proof.
+      if (!ReadU32(system, 0x804d781c, &record.owner_gobj) ||
+          !ReadU32(system, 0x804d7838, &record.owner_proc))
+        return SetInvalid("RNG owner globals are outside MEM1"), void();
+      if (record.owner_gobj != 0 || record.owner_proc != 0)
+      {
+        std::array<u8, 4> gobj{};
+        std::array<u8, 24> proc{};
+        if (!record.owner_gobj || !record.owner_proc ||
+            (record.owner_gobj & 3) || (record.owner_proc & 3) ||
+            !ReadMem1(system, record.owner_gobj, gobj.size(), gobj.data()) ||
+            !ReadMem1(system, record.owner_proc, proc.size(), proc.data()))
+          return SetInvalid("RNG scheduled owner has an invalid checked span"), void();
+        const auto be32 = [](const u8* b) {
+          return (u32(b[0]) << 24) | (u32(b[1]) << 16) | (u32(b[2]) << 8) | u32(b[3]);
+        };
+        if (be32(proc.data() + 0x10) != record.owner_gobj)
+          return SetInvalid("RNG scheduled proc backpointer differs"), void();
+        record.owner_classifier = (u16(gobj[0]) << 8) | gobj[1];
+        record.owner_p_link = gobj[2];
+        record.owner_s_link = proc[0x0c];
+        record.owner_callback = be32(proc.data() + 0x14);
+        if (!record.owner_callback || (record.owner_callback & 3) ||
+            !IsMem1Range(record.owner_callback, 4))
+          return SetInvalid("RNG scheduled callback is not a MEM1 instruction address"), void();
+      }
     }
     if (samus_effect_bank_load_probe)
     {
@@ -4360,7 +4408,7 @@ struct Observer::Impl
       transform_prefix_sss_ready = true;
       return;
     }
-    if (pc == cpu_probe_rng_return_pc && cpu_probe_rng_return_pc != 0)
+    if (SelectedRngReturn(cpu_probe_rng_return_pc, cpu_probe_rng_returns, pc))
       RecordSelectedRngCallback(system, pc);
     if (const ItemProbePoint* item_probe = FindItemProbePoint(pc))
     {
@@ -5507,7 +5555,9 @@ struct Observer::Impl
     const auto append_number = [&](u64 value) { return append(std::to_string(value)); };
     const auto append_hex32 = [&](u32 value) { return AppendHex(json, value, 8); };
     const auto append_hex64 = [&](u64 value) { return AppendHex(json, value, 16); };
-    if (!append(cpu_probe_rng_return_pc == 0 ?
+    if (!append(cpu_probe_rng_returns ?
+                "{\"schema\":\"melee-web-cpu-register-probe\",\"version\":4," :
+                cpu_probe_rng_return_pc == 0 ?
                 "{\"schema\":\"melee-web-cpu-register-probe\",\"version\":1," :
                 "{\"schema\":\"melee-web-cpu-register-probe\",\"version\":3,") ||
         !append("\"diagnostic_only\":true,\"window_complete\":true,"
@@ -5520,6 +5570,9 @@ struct Observer::Impl
     if (!append_number(cpu_probe_match) || !append(",\"first_tick\":") ||
         !append_number(cpu_probe_first_tick) || !append(",\"last_tick\":") ||
         !append_number(cpu_probe_last_tick))
+      return false;
+    if (cpu_probe_rng_returns &&
+        !append(",\"rng_return_site\":\"rng_returns\",\"rng_return_pcs\":[\"0x80380524\",\"0x8038057c\"]"))
       return false;
     if (cpu_probe_rng_return_pc != 0 &&
         (!append(",\"rng_return_pc\":\"0x") ||
@@ -5564,7 +5617,24 @@ struct Observer::Impl
           !append("\",\"random_seed_and_pointer\":\"0x") ||
           !AppendHexBytes(json, record.random_seed_and_pointer.data(),
                           record.random_seed_and_pointer.size()) ||
-          !append("\",\"fighters\":["))
+          !append("\""))
+        return false;
+      if (cpu_probe_rng_returns)
+      {
+        if (!append(",\"owner\":{\"status\":\"") ||
+            !append(record.owner_proc ? "scheduled_proc" : "outside_proc") ||
+            !append("\",\"gobj\":\"0x") || !append_hex32(record.owner_gobj) ||
+            !append("\",\"proc\":\"0x") || !append_hex32(record.owner_proc) ||
+            !append("\",\"callback\":\"0x") || !append_hex32(record.owner_callback) ||
+            !append("\",\"classifier\":") || !append_number(record.owner_classifier) ||
+            !append(",\"p_link\":") || !append_number(record.owner_p_link) ||
+            !append(",\"s_link\":") || !append_number(record.owner_s_link) ||
+            !append(",\"callback_symbol\":") ||
+            !append(!record.owner_proc ? "null" : record.owner_callback == 0x801d1390 ?
+                "\"grStadium_801D1390\"" : "\"unknown\"") || !append("}"))
+          return false;
+      }
+      if (!append(",\"fighters\":["))
         return false;
       bool first_fighter = true;
       for (size_t slot = 0; slot < record.fighter_present.size(); ++slot)
@@ -6277,6 +6347,7 @@ struct Observer::Impl
   u32 cpu_probe_first_tick = 0;
   u32 cpu_probe_last_tick = 0;
   u32 cpu_probe_rng_return_pc = 0;
+  bool cpu_probe_rng_returns = false;
   std::string cpu_probe_rng_return_site;
   u64 cpu_probe_rng_return_callback_count = 0;
   u32 cpu_probe_rng_return_callback_pc = 0;
@@ -6515,15 +6586,15 @@ static bool IsCaptureBoundary(u32 guest_pc)
            (SdInitRequested() && (guest_pc == 0x8016ebc0 || guest_pc == 0x8016ec24 ||
             ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() || SparsePairRequested()) && guest_pc == 0x8025b84c))) ||
            (CpuProbeEnabled() && FindCpuProbePoint(guest_pc) != nullptr &&
-            (CpuProbeEnvironment().rng_return_pc == 0 ||
-             CpuProbeEnvironment().rng_return_pc == guest_pc)) ||
+            ((!CpuProbeEnvironment().rng_returns && CpuProbeEnvironment().rng_return_pc == 0) ||
+             SelectedRngReturn(CpuProbeEnvironment().rng_return_pc, CpuProbeEnvironment().rng_returns, guest_pc))) ||
            (ItemProbeEnabled() && FindItemProbePoint(guest_pc) != nullptr);
   }
 }
 
 bool Observer::IsRngReturnBoundary(u32 guest_pc)
 {
-  return CpuProbeEnabled() && CpuProbeEnvironment().rng_return_pc == guest_pc &&
+  return CpuProbeEnabled() && SelectedRngReturn(CpuProbeEnvironment().rng_return_pc, CpuProbeEnvironment().rng_returns, guest_pc) &&
          FindCpuProbePoint(guest_pc) != nullptr;
 }
 

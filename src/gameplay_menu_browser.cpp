@@ -3547,9 +3547,18 @@ bool first_sss_fresh_prefix_callback_ready(){
      asset_destination==AssetDestination::None;
 }
 
+bool matched_setup_cf_constructor_phase_equal(
+    const MeleeWebStadiumSetupConstructorPhaseEvent& a,
+    const MeleeWebStadiumSetupConstructorPhaseEvent& b){
+ return a.ordinal==b.ordinal&&a.phase==b.phase&&
+  a.parameter_values_valid==b.parameter_values_valid&&
+  a.parameter_x0==b.parameter_x0&&a.parameter_x4==b.parameter_x4&&
+  a.scalar_value_valid==b.scalar_value_valid&&a.scalar_value==b.scalar_value&&
+  a.source_seed_valid==b.source_seed_valid&&a.source_seed==b.source_seed;
+}
 bool matched_setup_cf_setup_equal(const MeleeWebStadiumSetupSnapshot& a,
                                  const MeleeWebStadiumSetupSnapshot& b){
- return a.version==b.version&&a.world_generation==b.world_generation&&
+ if(!(a.version==b.version&&a.world_generation==b.world_generation&&
   a.world_ticks==b.world_ticks&&a.source_frame==b.source_frame&&a.map_id==b.map_id&&
   a.initial_countdown==b.initial_countdown&&a.current_countdown==b.current_countdown&&
   a.parameter_x0==b.parameter_x0&&a.parameter_x4==b.parameter_x4&&
@@ -3566,7 +3575,13 @@ bool matched_setup_cf_setup_equal(const MeleeWebStadiumSetupSnapshot& a,
   a.object_requested_bytes==b.object_requested_bytes&&
   a.object_allocation_generation==b.object_allocation_generation&&
   a.constructor_callback_count==b.constructor_callback_count&&
-  a.source_parameter_roots_agree==b.source_parameter_roots_agree;
+  a.source_parameter_roots_agree==b.source_parameter_roots_agree&&
+  a.constructor_phase_count==b.constructor_phase_count))return false;
+ if(a.constructor_phase_count>MELEE_WEB_STADIUM_SETUP_CONSTRUCTOR_PHASE_CAPACITY)return false;
+ for(uint32_t i=0;i<a.constructor_phase_count;++i)
+  if(!matched_setup_cf_constructor_phase_equal(a.constructor_phases[i],b.constructor_phases[i]))
+   return false;
+ return true;
 }
 bool matched_setup_cf_go_event_equal(const MeleeWebStadiumGoAlignmentEvent& a,
                                      const MeleeWebStadiumGoAlignmentEvent& b){
@@ -3745,12 +3760,53 @@ bool later_b_gate2_uuid_valid(const std::string& value){
  }
  return true;
 }
+bool later_b_gate2_constructor_phase_trace_valid(const MeleeWebStadiumSetupSnapshot& setup){
+ const bool call=setup.parameter_x0!=setup.parameter_x4;
+ const uint32_t expected_count=call?5U:3U;
+ if(setup.constructor_phase_count!=expected_count||
+    setup.constructor_phase_count>MELEE_WEB_STADIUM_SETUP_CONSTRUCTOR_PHASE_CAPACITY)return false;
+ const auto* p=setup.constructor_phases;
+ if(p[0].ordinal!=1||p[0].phase!=MELEE_WEB_STADIUM_SETUP_PHASE_ENTRY||
+    p[0].parameter_values_valid||p[0].scalar_value_valid||!p[0].source_seed_valid||
+    p[0].source_seed!=setup.source_seed_before||
+    p[1].ordinal!=2||p[1].phase!=MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS||
+    !p[1].parameter_values_valid||p[1].parameter_x0!=setup.parameter_x0||
+    p[1].parameter_x4!=setup.parameter_x4||p[1].scalar_value_valid||
+    !p[1].source_seed_valid||p[1].source_seed!=setup.source_seed_before)return false;
+ unsigned commit_index=2;
+ if(call){
+  const uint32_t call_phase=setup.parameter_x4>setup.parameter_x0?
+      MELEE_WEB_STADIUM_SETUP_PHASE_UP_CALL:MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_CALL;
+  const uint32_t return_phase=setup.parameter_x4>setup.parameter_x0?
+      MELEE_WEB_STADIUM_SETUP_PHASE_UP_RETURN:MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_RETURN;
+  if(setup.constructor_random_bound_valid!=1||setup.constructor_random_result_valid!=1||
+     p[2].ordinal!=3||p[2].phase!=call_phase||!p[2].parameter_values_valid||
+     p[2].parameter_x0!=setup.parameter_x0||p[2].parameter_x4!=setup.parameter_x4||
+     !p[2].scalar_value_valid||p[2].scalar_value!=setup.constructor_random_bound||
+     !p[2].source_seed_valid||p[2].source_seed!=setup.source_seed_before||
+     p[3].ordinal!=4||p[3].phase!=return_phase||!p[3].parameter_values_valid||
+     p[3].parameter_x0!=setup.parameter_x0||p[3].parameter_x4!=setup.parameter_x4||
+     !p[3].scalar_value_valid||p[3].scalar_value!=setup.constructor_random_result||
+     !p[3].source_seed_valid||p[3].source_seed!=setup.source_seed_after)return false;
+  commit_index=4;
+ }else if(setup.constructor_randi_call_count||setup.constructor_random_bound_valid||
+          setup.constructor_random_result_valid||setup.source_seed_before!=setup.source_seed_after)
+  return false;
+ const auto& commit=p[commit_index];
+ return commit.ordinal==commit_index+1&&
+    commit.phase==MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT&&
+    commit.parameter_values_valid&&commit.parameter_x0==setup.parameter_x0&&
+    commit.parameter_x4==setup.parameter_x4&&commit.scalar_value_valid&&
+    commit.scalar_value==setup.initial_countdown&&commit.source_seed_valid&&
+    commit.source_seed==setup.source_seed_after;
+}
 bool later_b_gate2_constructor_snapshot_valid(const MeleeWebStadiumSetupSnapshot& setup){
  return setup.constructor_callback_count==1&&setup.constructor_randi_call_count==1&&
         setup.parameter_x0==3600&&setup.parameter_x4==3800&&
         setup.constructor_random_bound_valid==1&&setup.constructor_random_bound==200&&
         setup.constructor_random_result_valid==1&&setup.constructor_random_result==142&&
-        setup.source_seed_before==0xba5dac05U&&setup.source_seed_after==0xb6cdeeb4U;
+        setup.source_seed_before==0xba5dac05U&&setup.source_seed_after==0xb6cdeeb4U&&
+        later_b_gate2_constructor_phase_trace_valid(setup);
 }
 bool later_b_gate2_first_go_snapshot_valid(
     const MeleeWebStadiumGoAlignmentSnapshot& observed,unsigned source_tick,
@@ -3762,6 +3818,57 @@ bool later_b_gate2_first_go_snapshot_valid(
         event.source_branch==0&&event.source_seed_valid==1&&
         observed.next_sequence==3&&observed.stage_before.sequence==1&&
         observed.stage_after.sequence==2&&observed.hud_after.sequence==0;
+}
+const char* later_b_gate2_constructor_phase_name(uint32_t phase){
+ switch(phase){
+  case MELEE_WEB_STADIUM_SETUP_PHASE_ENTRY:return "entry";
+  case MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS:return "parameters";
+  case MELEE_WEB_STADIUM_SETUP_PHASE_UP_CALL:return "up_call";
+  case MELEE_WEB_STADIUM_SETUP_PHASE_UP_RETURN:return "up_return";
+  case MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_CALL:return "down_call";
+  case MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_RETURN:return "down_return";
+  case MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT:return "commit";
+  default:return "invalid";
+ }
+}
+const char* later_b_gate2_constructor_phase_scalar_name(uint32_t phase){
+ switch(phase){
+  case MELEE_WEB_STADIUM_SETUP_PHASE_UP_CALL:
+  case MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_CALL:return "randi_bound";
+  case MELEE_WEB_STADIUM_SETUP_PHASE_UP_RETURN:
+  case MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_RETURN:return "randi_result";
+  case MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT:return "stored_countdown";
+  default:return nullptr;
+ }
+}
+std::string later_b_gate2_constructor_phase_trace_json(const MeleeWebStadiumSetupSnapshot& setup){
+ std::ostringstream out;
+ out<<"{\"schema\":\"melee-web-stadium-constructor-phase-trace-v1\""
+    <<",\"scope\":\"diagnostic-zero-tick-setup-owner-observation-only\""
+    <<",\"owner\":{\"semantic_id\":\"map2/constructor-callback-1\""
+    <<",\"world_generation\":"<<setup.world_generation
+    <<",\"map_id\":"<<setup.map_id
+    <<",\"constructor_callback_ordinal\":1}"
+    <<",\"event_count\":"<<setup.constructor_phase_count<<",\"events\":[";
+ for(uint32_t i=0;i<setup.constructor_phase_count;++i){
+  if(i)out<<',';
+  const auto& event=setup.constructor_phases[i];
+  out<<"{\"ordinal\":"<<event.ordinal<<",\"phase\":\""
+     <<later_b_gate2_constructor_phase_name(event.phase)<<"\""
+     <<",\"parameter_values_valid\":"<<(event.parameter_values_valid?"true":"false")
+     <<",\"parameter_x0\":"<<event.parameter_x0
+     <<",\"parameter_x4\":"<<event.parameter_x4
+     <<",\"scalar_value_valid\":"<<(event.scalar_value_valid?"true":"false")
+     <<",\"scalar_value\":"<<event.scalar_value
+     <<",\"source_seed_valid\":"<<(event.source_seed_valid?"true":"false")
+     <<",\"source_seed_hex\":\""
+     <<melee_web::stadium_first_css_diagnostic::hex32(event.source_seed)<<"\"";
+  if(const char* scalar_name=later_b_gate2_constructor_phase_scalar_name(event.phase))
+   out<<",\"scalar_kind\":\""<<scalar_name<<"\"";
+  out<<'}';
+ }
+ out<<"]}";
+ return out.str();
 }
 std::string later_b_gate2_constructor_snapshot_json(const MeleeWebStadiumSetupSnapshot& setup){
  std::ostringstream out;
@@ -4364,7 +4471,8 @@ bool first_sss_vs_setup_service(){
         <<melee_web::stadium_first_css_diagnostic::hex32(setup.source_seed_before)
         <<"\",\"source_seed_after_hex\":\""
         <<melee_web::stadium_first_css_diagnostic::hex32(setup.source_seed_after)
-        <<"\",\"ground_source_heap_handle\":"<<setup.ground_source_heap_handle
+        <<"\",\"constructor_phase_trace\":"<<later_b_gate2_constructor_phase_trace_json(setup)
+        <<",\"ground_source_heap_handle\":"<<setup.ground_source_heap_handle
         <<",\"ground_requested_bytes\":"<<setup.ground_requested_bytes
         <<",\"ground_allocation_generation\":"<<setup.ground_allocation_generation
         <<",\"object_source_heap_handle\":"<<setup.object_source_heap_handle

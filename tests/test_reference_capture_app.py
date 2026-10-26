@@ -1,4 +1,5 @@
 import importlib.util
+import os
 import json
 from pathlib import Path
 import stat
@@ -9,12 +10,14 @@ import types
 import unittest
 from unittest import mock
 
-ROOT = Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location("reference_capture_app_under_test", ROOT / "scripts/reference_capture_app.py")
+ROOT = Path(os.environ.get("MELEE_RNG_OWNER_BASE_ROOT", Path(__file__).resolve().parents[1]))
+SPEC = importlib.util.spec_from_file_location("reference_capture_app_under_test", os.environ.get("MELEE_RNG_OWNER_APP_SOURCE", ROOT / "scripts/reference_capture_app.py"))
 APP = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
-sys.path[:0] = [str(ROOT / "tools"), str(ROOT / "scripts")]
+sys.path[:0] = [str(ROOT / "tools"), str(ROOT / "scripts"), str(ROOT / "reference-capture/dolphin")]
 SPEC.loader.exec_module(APP)
+if "MELEE_RNG_OWNER_BASE_ROOT" in os.environ:
+    APP.ROOT = ROOT  # External candidate uses the explicitly selected real support tree.
 
 
 class ReferenceCaptureAppTests(unittest.TestCase):
@@ -24,6 +27,7 @@ class ReferenceCaptureAppTests(unittest.TestCase):
         self.assertEqual(APP.parse_cpu_rng_probe("63:4294967290:4294967295:randf_return"), {
             "match": 63, "first_tick": 4294967290, "last_tick": 4294967295,
             "site": "randf_return"})
+        self.assertEqual(APP.parse_cpu_rng_probe("1:0:63:rng_returns")["site"], "rng_returns")
         for value in ("", "0:0:64:rand_return", "64:0:0:rand_return",
                       "0:-1:0:rand_return", "0:2:1:rand_return",
                       "0:0:0:rand", "0:0:0:rand_return:extra"):
@@ -68,6 +72,29 @@ class ReferenceCaptureAppTests(unittest.TestCase):
             with self.assertRaisesRegex(APP.EnvironmentError, "outside the selected return site"):
                 APP.validate_cpu_rng_probe(path, request, "capture-1", "sequence-1",
                                            "a" * 64, status)
+
+    def test_combined_rng_returns_keeps_order_and_refuses_mixed_identity(self):
+        request = APP.parse_cpu_rng_probe("1:0:63:rng_returns")
+        selection = {"rng_return_site": "rng_returns", "rng_return_pcs": ["0x80380524", "0x8038057c"]}
+        outside = dict(status="outside_proc", gobj="0x00000000", proc="0x00000000", callback="0x00000000", classifier=0, p_link=0, s_link=0, callback_symbol=None)
+        scheduled = dict(status="scheduled_proc", gobj="0x80410000", proc="0x80411000", callback="0x801d1390", classifier=13, p_link=4, s_link=0, callback_symbol="grStadium_801D1390")
+        records = [dict(pc=pc, label=label, match=1, source_tick=0, owner=owner)
+                   for pc, label, owner in [("0x8038057c", "randf_return", outside), ("0x80380524", "rand_return", scheduled), ("0x8038057c", "randf_return", scheduled)]]
+        probe = dict(schema="melee-web-cpu-register-probe", version=4, diagnostic_only=True, window_complete=True, source_revision="GALE01r2", dol_sha256="a"*64, capture_id="c", sequence_id="s", match=1, first_tick=0, last_tick=63, record_count=3, records=records, **selection)
+        status = {"cpu_probe_close": dict(reason="source_tick_after_window", configured_match=1, first_tick=0, last_tick=63, source_tick=64, **selection)}
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary)/"probe.json"
+            def validate():
+                path.write_text(json.dumps(probe))
+                return APP.validate_cpu_rng_probe(path, request, "c", "s", "a"*64, status)
+            self.assertEqual(validate()["record_count"], 3)
+            self.assertEqual([r["pc"] for r in records], ["0x8038057c", "0x80380524", "0x8038057c"])
+            for mutate in (lambda: records[0].update(pc=None,label=None), lambda: records[0].update(pc="0x80380524",label="unknown"), lambda: records[0].pop("label"), lambda: records[0].pop("pc"), lambda: records[0].update(source_tick=1), lambda: probe.update(version=3), lambda: records[0].update(pc="0x80380524"), lambda: records[0].update(owner=scheduled | {"proc":"0x00000000"}), lambda: status["cpu_probe_close"].update(rng_return_pcs=["0x80380524"])):
+                original = json.loads(json.dumps(probe)); old_status = json.loads(json.dumps(status))
+                mutate()
+                with self.assertRaises(APP.EnvironmentError): validate()
+                probe.clear(); probe.update(original); records = probe["records"]
+                status.clear(); status.update(old_status)
 
     def test_cli_root_option_routes_captures_to_explicit_external_storage(self):
         with tempfile.TemporaryDirectory() as temporary:

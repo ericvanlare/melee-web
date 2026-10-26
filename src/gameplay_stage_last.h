@@ -43,6 +43,27 @@ typedef struct MeleeWebStadiumGoAlignmentSnapshot {
     MeleeWebStadiumGoAlignmentEvent hud_after;
 } MeleeWebStadiumGoAlignmentSnapshot;
 typedef void (*MeleeWebStadiumGoAlignmentHudCallback)(int);
+#define MELEE_WEB_STADIUM_SETUP_CONSTRUCTOR_PHASE_CAPACITY 5U
+typedef enum MeleeWebStadiumSetupConstructorPhase {
+    MELEE_WEB_STADIUM_SETUP_PHASE_ENTRY = 1,
+    MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS = 2,
+    MELEE_WEB_STADIUM_SETUP_PHASE_UP_CALL = 3,
+    MELEE_WEB_STADIUM_SETUP_PHASE_UP_RETURN = 4,
+    MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_CALL = 5,
+    MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_RETURN = 6,
+    MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT = 7
+} MeleeWebStadiumSetupConstructorPhase;
+typedef struct MeleeWebStadiumSetupConstructorPhaseEvent {
+    uint32_t ordinal;
+    uint32_t phase;
+    uint32_t parameter_values_valid;
+    int32_t parameter_x0;
+    int32_t parameter_x4;
+    uint32_t scalar_value_valid;
+    int32_t scalar_value;
+    uint32_t source_seed_valid;
+    uint32_t source_seed;
+} MeleeWebStadiumSetupConstructorPhaseEvent;
 typedef struct MeleeWebStadiumSetupSnapshot {
     uint32_t version;
     uint64_t world_generation;
@@ -68,8 +89,11 @@ typedef struct MeleeWebStadiumSetupSnapshot {
     uint64_t object_allocation_generation;
     uint32_t constructor_callback_count;
     uint32_t source_parameter_roots_agree;
+    uint32_t constructor_phase_count;
+    MeleeWebStadiumSetupConstructorPhaseEvent constructor_phases[
+        MELEE_WEB_STADIUM_SETUP_CONSTRUCTOR_PHASE_CAPACITY];
 } MeleeWebStadiumSetupSnapshot;
-#define MELEE_WEB_STADIUM_SETUP_SNAPSHOT_VERSION 1U
+#define MELEE_WEB_STADIUM_SETUP_SNAPSHOT_VERSION 2U
 /* Strict zero-tick snapshot after prepared Ready ownership, before its first
  * source callback. It does not extend GO/idle snapshots or run source work. */
 int melee_web_stage_last_stadium_setup_snapshot(
@@ -77,6 +101,8 @@ int melee_web_stage_last_stadium_setup_snapshot(
 /* Called only by the existing original map-2 OnInit callback around its
  * existing parameter read and optional randi call. */
 int melee_web_stage_last_stadium_setup_constructor_begin(void*);
+void melee_web_stage_last_stadium_setup_constructor_phase(
+    void*,uint32_t,int32_t,int32_t,int,int32_t);
 void melee_web_stage_last_stadium_setup_constructor_finish(
     void*,int32_t,int32_t,int32_t,int,int32_t,int32_t,int,uint32_t,int,uint32_t,int);
 #endif

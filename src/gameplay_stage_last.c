@@ -150,13 +150,15 @@ struct MeleeWebStageLast {
     MeleeWebStadiumGoAlignmentSnapshot stadium_go_alignment;
     struct {
         unsigned seen,finished,failure,call_observed,bound_valid,result_valid;
-        unsigned seed_before_valid,seed_after_valid;
+        unsigned seed_before_valid,seed_after_valid,phase_count;
         HSD_GObj* object;
         Ground* ground;
         MeleeWebSourceMemoryAllocation object_lease,ground_lease;
         int32_t parameter_x0,parameter_x4,initial_countdown;
         int32_t random_bound,random_result;
         uint32_t seed_before,seed_after;
+        MeleeWebStadiumSetupConstructorPhaseEvent phases[
+            MELEE_WEB_STADIUM_SETUP_CONSTRUCTOR_PHASE_CAPACITY];
     } stadium_setup;
 #endif
 };
@@ -514,6 +516,63 @@ static int stadium_setup_same_lease(const MeleeWebSourceMemoryAllocation* a,
     a->source_heap_handle==b->source_heap_handle&&
     a->allocation_generation==b->allocation_generation;
 }
+static void stadium_setup_phase_append(MeleeWebStageLast* h,uint32_t phase,
+        int parameter_values_valid,int32_t parameter_x0,int32_t parameter_x4,
+        int scalar_value_valid,int32_t scalar_value,uint32_t source_seed)
+{
+ if(!h||!h->stadium_setup.seen||h->stadium_setup.failure)return;
+ if(h->stadium_setup.phase_count>=MELEE_WEB_STADIUM_SETUP_CONSTRUCTOR_PHASE_CAPACITY){
+  stadium_setup_fail(h,6);return;
+ }
+ MeleeWebStadiumSetupConstructorPhaseEvent* event=
+     &h->stadium_setup.phases[h->stadium_setup.phase_count];
+ memset(event,0,sizeof(*event));
+ event->ordinal=h->stadium_setup.phase_count+1;
+ event->phase=phase;
+ event->parameter_values_valid=parameter_values_valid?1U:0U;
+ event->parameter_x0=parameter_x0;event->parameter_x4=parameter_x4;
+ event->scalar_value_valid=scalar_value_valid?1U:0U;
+ event->scalar_value=scalar_value;
+ event->source_seed_valid=1;event->source_seed=source_seed;
+ ++h->stadium_setup.phase_count;
+}
+static int stadium_setup_phase_receipt_matches(const MeleeWebStageLast* h,
+        int32_t x0,int32_t x4,int32_t countdown,int call_observed,
+        int32_t bound,int32_t result,uint32_t seed_before,uint32_t seed_after)
+{
+ if(!h)return 0;
+ const unsigned count=call_observed?5U:3U;
+ if(h->stadium_setup.phase_count!=count)return 0;
+ const MeleeWebStadiumSetupConstructorPhaseEvent* p=h->stadium_setup.phases;
+ if(p[0].ordinal!=1||p[0].phase!=MELEE_WEB_STADIUM_SETUP_PHASE_ENTRY||
+    p[0].parameter_values_valid||p[0].scalar_value_valid||!p[0].source_seed_valid||
+    p[0].source_seed!=seed_before||
+    p[1].ordinal!=2||p[1].phase!=MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS||
+    !p[1].parameter_values_valid||p[1].parameter_x0!=x0||p[1].parameter_x4!=x4||
+    p[1].scalar_value_valid||!p[1].source_seed_valid||p[1].source_seed!=seed_before)
+  return 0;
+ unsigned commit_index=2;
+ if(call_observed){
+  const uint32_t call_phase=x4>x0?MELEE_WEB_STADIUM_SETUP_PHASE_UP_CALL:
+                                      MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_CALL;
+  const uint32_t return_phase=x4>x0?MELEE_WEB_STADIUM_SETUP_PHASE_UP_RETURN:
+                                         MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_RETURN;
+  if(p[2].ordinal!=3||p[2].phase!=call_phase||!p[2].parameter_values_valid||
+     p[2].parameter_x0!=x0||p[2].parameter_x4!=x4||!p[2].scalar_value_valid||
+     p[2].scalar_value!=bound||!p[2].source_seed_valid||p[2].source_seed!=seed_before||
+     p[3].ordinal!=4||p[3].phase!=return_phase||!p[3].parameter_values_valid||
+     p[3].parameter_x0!=x0||p[3].parameter_x4!=x4||!p[3].scalar_value_valid||
+     p[3].scalar_value!=result||!p[3].source_seed_valid||p[3].source_seed!=seed_after)
+   return 0;
+  commit_index=4;
+ }else if(x0!=x4)return 0;
+ const MeleeWebStadiumSetupConstructorPhaseEvent* commit=&p[commit_index];
+ return commit->ordinal==commit_index+1&&
+    commit->phase==MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT&&
+    commit->parameter_values_valid&&commit->parameter_x0==x0&&commit->parameter_x4==x4&&
+    commit->scalar_value_valid&&commit->scalar_value==countdown&&
+    commit->source_seed_valid&&commit->source_seed==seed_after;
+}
 static int stadium_setup_live_map2(const MeleeWebStageLast* h,HSD_GObj* object,
         Ground* expected_ground,const MeleeWebSourceMemoryAllocation* saved_object,
         const MeleeWebSourceMemoryAllocation* saved_ground,
@@ -589,7 +648,55 @@ int melee_web_stage_last_stadium_setup_constructor_begin(void* raw_object)
  }
  h->stadium_setup.object=object;h->stadium_setup.ground=ground;
  h->stadium_setup.object_lease=object_lease;h->stadium_setup.ground_lease=ground_lease;
+ stadium_setup_phase_append(h,MELEE_WEB_STADIUM_SETUP_PHASE_ENTRY,0,0,0,0,0,seed_owner_check);
  return 1;
+}
+void melee_web_stage_last_stadium_setup_constructor_phase(
+        void* raw_object,uint32_t phase,int32_t x0,int32_t x4,
+        int scalar_valid,int32_t scalar_value)
+{
+ MeleeWebStageLast* h=active;
+ if(!h||!h->stadium_setup.seen)return;
+ if(h->stadium_setup.failure)return;
+ if(h->stadium_setup.finished||raw_object!=h->stadium_setup.object){
+  stadium_setup_fail(h,6);return;
+ }
+ uint32_t expected=0;
+ const unsigned count=h->stadium_setup.phase_count;
+ if(count==1)expected=MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS;
+ else if(count==2)expected=x4>x0?MELEE_WEB_STADIUM_SETUP_PHASE_UP_CALL:
+       x4<x0?MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_CALL:MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT;
+ else if(count==3&&h->stadium_setup.phases[2].phase==MELEE_WEB_STADIUM_SETUP_PHASE_UP_CALL)
+  expected=MELEE_WEB_STADIUM_SETUP_PHASE_UP_RETURN;
+ else if(count==3&&h->stadium_setup.phases[2].phase==MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_CALL)
+  expected=MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_RETURN;
+ else if(count==4)expected=MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT;
+ if(!expected||phase!=expected||
+    (phase==MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS&&(scalar_valid||scalar_value))||
+    (phase!=MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS&&!scalar_valid)){
+  stadium_setup_fail(h,6);return;
+ }
+ HSD_GObj* object=(HSD_GObj*)raw_object;
+ MeleeWebSourceMemoryAllocation current_object={0},current_ground={0};
+ int map_id=-1,current_countdown=0;
+ int32_t cached_x0=0,cached_x4=0;
+ uint32_t seed=0;
+ if(!stadium_setup_owner_phase(h)||h->stadium_started!=0||h->stadium_ready_route||
+    h->stadium_ready_armed||!melee_web_stage_selection_preflight(St_Kind_PStadium)||
+    !stadium_setup_live_map2(h,object,h->stadium_setup.ground,
+       &h->stadium_setup.object_lease,&h->stadium_setup.ground_lease,
+       &current_object,&current_ground,&map_id,
+       phase==MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT?&current_countdown:NULL)||map_id!=2||
+    !melee_web_grpstadium_cached_yakumono_snapshot(h->source_yakumono,&cached_x0,&cached_x4)||
+    !melee_web_match_rng_seed_owner_read(&seed)||
+    (phase!=MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS&&
+     (x0!=h->stadium_setup.phases[1].parameter_x0||
+      x4!=h->stadium_setup.phases[1].parameter_x4))||
+    (phase!=MELEE_WEB_STADIUM_SETUP_PHASE_ENTRY&&(x0!=cached_x0||x4!=cached_x4))||
+    (phase==MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT&&current_countdown!=scalar_value)){
+  stadium_setup_fail(h,6);return;
+ }
+ stadium_setup_phase_append(h,phase,1,x0,x4,scalar_valid,scalar_value,seed);
 }
 void melee_web_stage_last_stadium_setup_constructor_finish(
         void* raw_object,int32_t observed_x0,int32_t observed_x4,
@@ -616,6 +723,10 @@ void melee_web_stage_last_stadium_setup_constructor_finish(
     !seed_before_valid||!seed_after_valid||
     (!call_observed&&seed_after!=seed_before)){
   stadium_setup_fail(h,5);return;
+ }
+ if(!stadium_setup_phase_receipt_matches(h,observed_x0,observed_x4,
+       observed_countdown,call_observed,bound,result,seed_before,seed_after)){
+  stadium_setup_fail(h,6);return;
  }
  h->stadium_setup.initial_countdown=countdown;
  h->stadium_setup.parameter_x0=observed_x0;
@@ -660,7 +771,8 @@ int melee_web_stage_last_stadium_setup_snapshot(
   static const char* const reasons[]={"none","duplicate map-2 constructor callback",
    "map-2 GObj/root/source lease changed","map-2 Ground allocation lease changed",
    "source-local parameter roots or owned seed unavailable",
-   "constructor call/result/owner receipt changed"};
+   "constructor call/result/owner receipt changed",
+   "constructor phase trace order, values, or owner changed"};
   unsigned reason=h->stadium_setup.failure;
   return fail(e,n,reason<sizeof(reasons)/sizeof(reasons[0])?reasons[reason]:
       "Stadium constructor receipt failed closed");
@@ -700,6 +812,9 @@ int melee_web_stage_last_stadium_setup_snapshot(
  candidate.object_allocation_generation=object_lease.allocation_generation;
  candidate.constructor_callback_count=h->stadium_setup.seen;
  candidate.source_parameter_roots_agree=1;
+ candidate.constructor_phase_count=h->stadium_setup.phase_count;
+ memcpy(candidate.constructor_phases,h->stadium_setup.phases,
+        sizeof(candidate.constructor_phases));
  *out=candidate;
  return ok(e,n);
 }

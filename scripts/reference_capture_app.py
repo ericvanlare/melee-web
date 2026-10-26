@@ -123,8 +123,8 @@ def parse_cpu_rng_probe(spec):
         raise EnvironmentError("CPU RNG probe match/ticks exceed their unsigned bounds")
     if first_tick > last_tick or last_tick - first_tick >= 64:
         raise EnvironmentError("CPU RNG probe window must contain at most 64 source ticks")
-    if site not in ("rand_return", "randf_return"):
-        raise EnvironmentError("CPU RNG probe site must be rand_return or randf_return")
+    if site not in ("rand_return", "randf_return", "rng_returns"):
+        raise EnvironmentError("CPU RNG probe site must be rand_return, randf_return, or rng_returns")
     return {"match": match, "first_tick": first_tick, "last_tick": last_tick,
             "site": site}
 
@@ -145,11 +145,17 @@ def validate_cpu_rng_probe(path, request, capture_id, sequence_id, dol_sha256, s
         probe = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise EnvironmentError("CPU RNG probe sidecar is missing or invalid JSON") from error
-    expected_pc = {"rand_return": "0x80380524", "randf_return": "0x8038057c"}[request["site"]]
+    sites = {"rand_return": "0x80380524", "randf_return": "0x8038057c"}
+    combined = request["site"] == "rng_returns"
+    expected_pc = sites.get(request["site"])
+    def selected(value):
+        return (value.get("rng_return_site") == "rng_returns" and
+                value.get("rng_return_pcs") == list(sites.values()) and
+                "rng_return_pc" not in value) if combined else value.get("rng_return_pc") == expected_pc
     records = probe.get("records") if isinstance(probe, dict) else None
-    if (not isinstance(records, list) or not records or
+    if (not isinstance(records, list) or not records or len(records) > 4096 or
             probe.get("schema") != "melee-web-cpu-register-probe" or
-            probe.get("version") != 3 or probe.get("diagnostic_only") is not True or
+            probe.get("version") != (4 if combined else 3) or probe.get("diagnostic_only") is not True or
             probe.get("window_complete") is not True or
             probe.get("source_revision") != "GALE01r2" or
             probe.get("dol_sha256") != dol_sha256 or
@@ -158,20 +164,42 @@ def validate_cpu_rng_probe(path, request, capture_id, sequence_id, dol_sha256, s
             probe.get("match") != request["match"] or
             probe.get("first_tick") != request["first_tick"] or
             probe.get("last_tick") != request["last_tick"] or
-            probe.get("rng_return_pc") != expected_pc or
+            not selected(probe) or
             probe.get("record_count") != len(records)):
         raise EnvironmentError("CPU RNG probe sidecar identity or bounded window is invalid")
+    previous_tick = request["first_tick"]
     for record in records:
-        if (not isinstance(record, dict) or record.get("pc") != expected_pc or
-                record.get("label") != request["site"] or
+        if (not isinstance(record, dict) or record.get("label") not in sites or
+                record.get("pc") != sites[record["label"]] or
+                (not combined and record.get("label") != request["site"]) or
                 record.get("match") != request["match"] or
                 isinstance(record.get("source_tick"), bool) or
                 not isinstance(record.get("source_tick"), int) or
                 not request["first_tick"] <= record["source_tick"] <= request["last_tick"]):
             raise EnvironmentError("CPU RNG probe contains a record outside the selected return site/window")
+        if combined:
+            if record["source_tick"] < previous_tick:
+                raise EnvironmentError("CPU RNG source ticks decrease in callback order")
+            previous_tick = record["source_tick"]
+            owner = record.get("owner")
+            pointer = lambda v: isinstance(v, str) and re.fullmatch(r"0x[0-9a-f]{8}", v) is not None
+            if not isinstance(owner, dict) or not all(pointer(owner.get(k)) for k in ("gobj", "proc", "callback")):
+                raise EnvironmentError("CPU RNG owner pointer encoding is invalid")
+            if any(isinstance(owner.get(k), bool) or not isinstance(owner.get(k), int) or
+                   not 0 <= owner[k] <= limit for k, limit in (("classifier", 65535), ("p_link", 255), ("s_link", 255))):
+                raise EnvironmentError("CPU RNG owner source fields are invalid")
+            outside = all(int(owner[k], 16) == 0 for k in ("gobj", "proc", "callback"))
+            symbol = None if outside else "grStadium_801D1390" if owner["callback"] == "0x801d1390" else "unknown"
+            if "callback_symbol" not in owner or owner["callback_symbol"] != symbol:
+                raise EnvironmentError("CPU RNG callback symbol differs from its pinned original address")
+            if owner.get("status") == "outside_proc":
+                if not outside or any(owner[k] for k in ("classifier", "p_link", "s_link")):
+                    raise EnvironmentError("CPU RNG outside-proc owner is inconsistent")
+            elif owner.get("status") != "scheduled_proc" or any(int(owner[k], 16) == 0 or int(owner[k], 16) & 3 for k in ("gobj", "proc", "callback")):
+                raise EnvironmentError("CPU RNG scheduled owner is inconsistent")
     close = status.get("cpu_probe_close") if isinstance(status, dict) else None
     if (not isinstance(close, dict) or close.get("reason") != "source_tick_after_window" or
-            close.get("rng_return_pc") != expected_pc or
+            not selected(close) or
             close.get("configured_match") != request["match"] or
             close.get("first_tick") != request["first_tick"] or
             close.get("last_tick") != request["last_tick"] or
@@ -180,12 +208,17 @@ def validate_cpu_rng_probe(path, request, capture_id, sequence_id, dol_sha256, s
             close["source_tick"] <= request["last_tick"]):
         raise EnvironmentError("CPU RNG probe did not publish a matching bounded close record")
     digest = sha256(path)
-    return {"schema": "melee-web-cpu-rng-probe-validation-v1", "valid": True,
+    result = {"schema": "melee-web-cpu-rng-probe-validation-v1", "valid": True,
             "capture_id": capture_id, "sequence_id": sequence_id,
             "dol_sha256": dol_sha256, "output_sha256": digest,
             "rng_return_pc": expected_pc, "record_count": len(records),
             "window": {"match": request["match"], "first_tick": request["first_tick"],
                        "last_tick": request["last_tick"]}}
+    if combined:
+        result["schema"] = "melee-web-cpu-rng-probe-validation-v2"
+        del result["rng_return_pc"]
+        result.update(rng_return_site="rng_returns", rng_return_pcs=list(sites.values()))
+    return result
 
 
 def validate_observer_handshake(records, identity):
@@ -722,7 +755,7 @@ def main():
                         help="Developer validation only: ordinary human port 1 Pipe inputs")
     parser.add_argument("--replay-bundle", type=Path, help="Replay one finalized original input recording, then exit")
     parser.add_argument("--cpu-rng-probe", metavar="MATCH:FIRST_TICK:LAST_TICK:SITE",
-        help="Record one bounded rand_return or randf_return window during --replay-bundle")
+        help="Record one bounded rand_return, randf_return, or combined rng_returns window during --replay-bundle")
     parser.add_argument("--root", type=Path,
         help="Store captures and logs under this explicit directory instead of the support root")
     parser.add_argument("--settings", type=Path,

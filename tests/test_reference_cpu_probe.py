@@ -8,8 +8,8 @@ import subprocess
 import tempfile
 import unittest
 
-ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp"
+ROOT = Path(os.environ.get("MELEE_RNG_OWNER_BASE_ROOT", Path(__file__).resolve().parents[1]))
+SOURCE = Path(os.environ.get("MELEE_RNG_OWNER_OBSERVER_SOURCE", ROOT / "reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp"))
 
 
 class ReferenceCpuProbeTests(unittest.TestCase):
@@ -27,8 +27,8 @@ class ReferenceCpuProbeTests(unittest.TestCase):
         constants = "\n".join(line for line in constants.splitlines()
                               if "CPU_PROBE_TICK_WINDOW_MAX" in line or
                               "CPU_PROBE_MAX_JSON_BYTES" in line)
-        helpers = source[source.index("struct CpuProbePoint"):
-                         source.index("}  // namespace", source.index("struct CpuProbePoint"))]
+        helpers = source[source.index("bool SelectedRngReturn"):
+                         source.index("}  // namespace", source.index("bool SelectedRngReturn"))]
         stream_policy = source[source.index("enum class Event"):
                                source.index("enum class Boundary")]
         harness = r'''
@@ -97,6 +97,13 @@ int main(int argc, char** argv) {
   else if (action == "invalid") assert(settings.present && !settings.valid && !CpuProbeEnabled() && !settings.error.empty());
   else if (action == "disabled") assert(settings.valid && !CpuProbeEnabled());
   else if (action == "enabled") assert(settings.valid && CpuProbeEnabled());
+  else if (action == "rng-returns") {
+    assert(settings.valid && settings.rng_returns && settings.rng_return_pc == 0);
+    assert(SelectedRngReturn(0, true, 0x80380524));
+    assert(SelectedRngReturn(0, true, 0x8038057c));
+    assert(!SelectedRngReturn(0, true, 0x80380528));
+    assert(!SelectedRngReturn(0x80380524, false, 0x8038057c));
+  }
   else if (action == "rand-return") assert(settings.valid && settings.rng_return_site == "rand_return" && settings.rng_return_pc == 0x80380524);
   else if (action == "randf-return") assert(settings.valid && settings.rng_return_site == "randf_return" && settings.rng_return_pc == 0x8038057c);
   else assert(false);
@@ -117,6 +124,145 @@ int main(int argc, char** argv) {
                                 capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_actual_native_emitter_with_source_declared_scheduler_context(self):
+        # Actual declarations/bodies, modeled dispatcher state. This does not
+        # execute HSD dispatch or prove object generation/lifetime.
+        native = Path(os.environ.get("MELEE_RNG_OWNER_NATIVE_SOURCE", ROOT / "src/gameplay_rng_draw_probe.c")).read_text()
+        if not (ROOT / "build/gameplay-source/src/sysdolphin/baselib/gobj.h").is_file():
+            self.skipTest("Prepared actual HSD declarations are required for the native owner boundary control")
+        gobj = (ROOT / "build/gameplay-source/src/sysdolphin/baselib/gobj.h").read_text()
+        proc = (ROOT / "build/gameplay-source/src/sysdolphin/baselib/gobjproc.h").read_text()
+        gobj = gobj[gobj.index("typedef struct HSD_GObj {"):gobj.index("} HSD_GObj;") + len("} HSD_GObj;")]
+        proc = proc[proc.index("struct HSD_GObjProc {"):proc.index("};") + 2]
+        prefix = '''
+#include <stdint.h>
+#include <stddef.h>
+#include <assert.h>
+#include <string.h>
+typedef uint8_t u8; typedef uint16_t u16; typedef uint64_t u64;
+typedef struct HSD_GObj HSD_GObj;
+typedef struct HSD_GObjProc HSD_GObjProc;
+typedef void (*HSD_GObjEvent)(HSD_GObj*);
+typedef void (*GObj_RenderFunc)(HSD_GObj*, int);
+''' + proc + gobj + '''
+HSD_GObj* HSD_GObj_804D781C;
+HSD_GObjProc* HSD_GObj_804D7838;
+void grStadium_801D1390(HSD_GObj* o) { (void)o; }
+enum { MELEE_WEB_RNG_DRAW_RAND=0, MELEE_WEB_RNG_DRAW_RANDF=1 };
+'''
+        native = native.replace("#include <melee/gr/grpstadium.h>\n", "")
+        native = re.sub(r'^#include "gameplay_cpu_observation.h"\n', '', native)
+        native = re.sub(r'^#include <sysdolphin/baselib/(gobj|gobjproc).h>\n', '', native, flags=re.M)
+        harness = prefix + native + '''
+static void callback(HSD_GObj* o) { (void)o; }
+int main(int argc, char** argv) {
+  assert(argc == 2);
+  HSD_GObj gobj = {0}; HSD_GObjProc proc = {0};
+  gobj.classifier=13; gobj.p_link=4; proc.s_link=7;
+  proc.gobj=&gobj; proc.on_invoke=grStadium_801D1390;
+  rng_draw_probe_active=1; rng_draw_probe_cursor=12;
+  rng_draw_probe_owners=strcmp(argv[1],"legacy")!=0;
+  melee_web_cpu_observation_rng_draw(0x12345678,0);
+  if(strcmp(argv[1],"partial")==0) HSD_GObj_804D781C=&gobj;
+  else { HSD_GObj_804D781C=&gobj; HSD_GObj_804D7838=&proc; }
+  if(strcmp(argv[1],"backpointer")==0) proc.gobj=NULL;
+  melee_web_cpu_observation_rng_draw(0x23456789,1);
+  if(rng_draw_probe_owners) {
+    assert(rng_draw_probe_entries[0].proc==0);
+    assert(rng_draw_probe_entries[1].classifier==13);
+    assert(rng_draw_probe_entries[1].p_link==4);
+    assert(rng_draw_probe_entries[1].s_link==7);
+  }
+  if(strcmp(argv[1],"capacity")==0) {
+    while(rng_draw_probe_count<RNG_DRAW_PROBE_MAX_PER_FRAME)
+      melee_web_cpu_observation_rng_draw(0xffffffff,1);
+    assert(rng_draw_probe_count==1024);
+    for(size_t i=1;i<1024;i++) {
+      rng_draw_probe_entries[i].gobj=UINTPTR_MAX;
+      rng_draw_probe_entries[i].proc=UINTPTR_MAX;
+      rng_draw_probe_entries[i].classifier=65535;
+      rng_draw_probe_entries[i].p_link=255;
+      rng_draw_probe_entries[i].s_link=255;
+    }
+  }
+  melee_web_rng_draw_probe_scheduler_return();
+  return 0;
+}
+'''
+        path = self.binary.parent / "native-owner.c"
+        path.write_text(harness)
+        compiler = shutil.which("clang") or shutil.which("gcc")
+        self.assertIsNotNone(compiler)
+        binary = path.with_suffix("")
+        built = subprocess.run([compiler, "-std=c11", "-Wall", "-Wextra", "-Wno-unused-variable", str(path), "-o", str(binary)], capture_output=True, text=True)
+        self.assertEqual(built.returncode, 0, built.stderr)
+        for mode in ("legacy", "owners", "capacity"):
+            result = subprocess.run([str(binary), mode], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            row = json.loads(result.stderr.removeprefix("RNG_DRAW_PROBE "))
+            self.assertEqual(row["version"], 1 if mode == "legacy" else 2)
+            self.assertEqual([x["seed_after"] for x in row["draws"][:2]], ["12345678","23456789"])
+            self.assertEqual([x["kind"] for x in row["draws"][:2]], ["HSD_Rand","HSD_Randf"])
+            if mode == "legacy": self.assertNotIn("owner", row["draws"][0])
+            else:
+                self.assertEqual(row["draws"][0]["owner"]["status"], "outside_proc")
+                self.assertEqual(row["draws"][1]["owner"]["status"], "scheduled_proc")
+                self.assertEqual(row["draws"][1]["owner"]["callback_symbol"], "grStadium_801D1390")
+                if mode == "capacity": self.assertEqual(len(row["draws"]),1024)
+        for mode in ("partial", "backpointer"):
+            result = subprocess.run([str(binary), mode], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn("RNG_DRAW_PROBE", result.stderr)
+
+    def test_actual_guest_owner_block_checks_spans_and_backpointer(self):
+        source = SOURCE.read_text()
+        start = source.index("    if (cpu_probe_rng_returns)\n", source.index("  void RecordCpuProbe("))
+        body = source[start:source.index("    if (samus_effect_bank_load_probe)", start)]
+        harness = r'''
+#include <array>
+#include <cstdint>
+#include <cstring>
+#include <cassert>
+#include <string>
+using u8=uint8_t; using u16=uint16_t; using u32=uint32_t;
+u32 gobj=0,proc=0; bool invalid=false, readable=true; unsigned reads=0;
+std::array<u8,4> gb{}; std::array<u8,24> pb{};
+struct {u32 owner_gobj=0,owner_proc=0,owner_callback=0;u16 owner_classifier=0;u8 owner_p_link=0,owner_s_link=0;} record;
+bool cpu_probe_rng_returns=true;
+void SetInvalid(const char*) {invalid=true;}
+bool IsMem1Range(u32 a, size_t n) {return a>=0x80000000 && uint64_t(a)+n<=0x81800000;}
+bool ReadU32(void*,u32 a,u32* v) {if(a==0x804d781c)*v=gobj;else if(a==0x804d7838)*v=proc;else return false;return true;}
+bool ReadMem1(void*,u32 a,size_t n,u8* out) {
+  ++reads; if(!readable||!IsMem1Range(a,n))return false;
+  if(a==gobj&&n==4)std::memcpy(out,gb.data(),n);
+  else if(a==proc&&n==24)std::memcpy(out,pb.data(),n);else return false;return true;
+}
+void inspect() {
+void* system=nullptr;
+''' + body + r'''
+}
+void reset() {record={};invalid=false;reads=0;readable=true;gb={};pb={};gobj=0;proc=0;}
+void be32(size_t o,u32 value) {for(int i=0;i<4;i++)pb[o+i]=value>>(24-8*i);}
+void scheduled() {gobj=0x80410000;proc=0x80411000;gb={0,13,4,0};pb[12]=7;be32(16,gobj);be32(20,0x801d1390);}
+int main() {
+ reset();inspect();assert(!invalid&&reads==0&&record.owner_proc==0);
+ reset();scheduled();inspect();assert(!invalid&&reads==2&&record.owner_classifier==13&&record.owner_p_link==4&&record.owner_s_link==7&&record.owner_callback==0x801d1390);
+ reset();gobj=0x80410000;inspect();assert(invalid&&reads==0);
+ reset();scheduled();proc++;inspect();assert(invalid&&reads==0);
+ reset();scheduled();be32(16,gobj+4);inspect();assert(invalid&&record.owner_callback==0);
+ reset();scheduled();readable=false;inspect();assert(invalid);
+ reset();scheduled();be32(20,0x1000);inspect();assert(invalid);
+}
+'''
+        path = self.binary.parent / "guest-owner.cpp"
+        path.write_text(harness)
+        compiler = shutil.which("clang++") or shutil.which("g++")
+        binary = path.with_suffix("")
+        result = subprocess.run([compiler,"-std=c++17","-Wall","-Wextra","-Werror",str(path),"-o",str(binary)],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+        result = subprocess.run([str(binary)],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+
     def test_compiled_bounds_and_bit_serialization(self):
         self.run_probe("helpers")
 
@@ -134,6 +280,7 @@ int main(int argc, char** argv) {
                     MWRC_CPU_PROBE_LAST_TICK="163")
         self.run_probe("enabled", **good)
         self.run_probe("disabled", **dict(good, MWRC_ENABLE="0"))
+        self.run_probe("rng-returns", **dict(good, MWRC_CPU_PROBE_RNG_RETURN_SITE="rng_returns"))
         self.run_probe("rand-return", **dict(good, MWRC_ENABLE="1",
                                                MWRC_CPU_PROBE_RNG_RETURN_SITE="rand_return"))
         self.run_probe("randf-return", **dict(good, MWRC_ENABLE="1",

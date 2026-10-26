@@ -95,6 +95,7 @@ PRELUDE = r"""
 #include <string>
 #include <utility>
 #include <vector>
+#define MELEE_WEB_STADIUM_SETUP_CONSTRUCTOR_PHASE_CAPACITY 5U
 
 #include "stadium_later_reference.hpp"
 
@@ -111,14 +112,36 @@ static std::string hex32(uint32_t value) {
 }
 }
 
+enum {
+  MELEE_WEB_STADIUM_SETUP_PHASE_ENTRY=1,
+  MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS=2,
+  MELEE_WEB_STADIUM_SETUP_PHASE_UP_CALL=3,
+  MELEE_WEB_STADIUM_SETUP_PHASE_UP_RETURN=4,
+  MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_CALL=5,
+  MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_RETURN=6,
+  MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT=7,
+};
+struct MeleeWebStadiumSetupConstructorPhaseEvent {
+  uint32_t ordinal=0, phase=0, parameter_values_valid=0;
+  int32_t parameter_x0=0, parameter_x4=0;
+  uint32_t scalar_value_valid=0;
+  int32_t scalar_value=0;
+  uint32_t source_seed_valid=0, source_seed=0;
+};
 struct MeleeWebStadiumSetupSnapshot {
-  uint64_t world_generation = 0;
+  uint64_t world_generation = 0, world_ticks = 0;
+  uint32_t source_frame = 0;
+  int32_t map_id = 2, initial_countdown = 0, current_countdown = 0;
   unsigned constructor_callback_count = 0;
   unsigned constructor_randi_call_count = 0;
   int parameter_x0 = 0, parameter_x4 = 0;
-  unsigned constructor_random_bound_valid = 0, constructor_random_bound = 0;
-  unsigned constructor_random_result_valid = 0, constructor_random_result = 0;
+  unsigned constructor_random_bound_valid = 0;
+  int32_t constructor_random_bound = 0;
+  unsigned constructor_random_result_valid = 0;
+  int32_t constructor_random_result = 0;
   uint32_t source_seed_before = 0, source_seed_after = 0;
+  uint32_t constructor_phase_count = 0;
+  MeleeWebStadiumSetupConstructorPhaseEvent constructor_phases[5]{};
 };
 struct MeleeWebStadiumGoAlignmentEvent {
   uint32_t sequence = 0;
@@ -375,11 +398,19 @@ static void reset_fixture() {
   first_sss_vs_setup.origin=FirstSssVsSetupOrigin::CurrentPreparedLater_943;
   first_sss_vs_setup.match_world_generation=7; first_sss_vs_setup.committed_generation=5;
   auto& snap=first_sss_vs_setup.setup_snapshot;
-  snap.world_generation=7; snap.constructor_callback_count=1;
+  snap.world_generation=7; snap.world_ticks=0; snap.source_frame=0; snap.map_id=2;
+  snap.constructor_callback_count=1; snap.constructor_phase_count=5;
   snap.constructor_randi_call_count=1; snap.parameter_x0=3600; snap.parameter_x4=3800;
+  snap.initial_countdown=3742; snap.current_countdown=3742;
   snap.constructor_random_bound_valid=1; snap.constructor_random_bound=200;
   snap.constructor_random_result_valid=1; snap.constructor_random_result=142;
   snap.source_seed_before=0xba5dac05U; snap.source_seed_after=0xb6cdeeb4U;
+  auto& p=snap.constructor_phases;
+  p[0]={1,MELEE_WEB_STADIUM_SETUP_PHASE_ENTRY,0,0,0,0,0,1,0xba5dac05U};
+  p[1]={2,MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS,1,3600,3800,0,0,1,0xba5dac05U};
+  p[2]={3,MELEE_WEB_STADIUM_SETUP_PHASE_UP_CALL,1,3600,3800,1,200,1,0xba5dac05U};
+  p[3]={4,MELEE_WEB_STADIUM_SETUP_PHASE_UP_RETURN,1,3600,3800,1,142,1,0xb6cdeeb4U};
+  p[4]={5,MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT,1,3600,3800,1,3742,1,0xb6cdeeb4U};
 }
 
 static void put32(std::vector<uint8_t>& out,uint32_t value) {
@@ -504,6 +535,10 @@ static void parser_refusal_controls() {
   reset_fixture(); match->seed=0xb6cdeeb4U;
   assert(parser_refuses(valid)); assert(arm_leaf_calls==0 && replay);
   reset_fixture(); first_sss_vs_setup.setup_snapshot.source_seed_after=0x4b25c79bU;
+  assert(parser_refuses(valid)); assert(arm_leaf_calls==0 && replay);
+  reset_fixture(); first_sss_vs_setup.setup_snapshot.constructor_phases[2].scalar_value=201;
+  assert(parser_refuses(valid)); assert(arm_leaf_calls==0 && replay);
+  reset_fixture(); first_sss_vs_setup.setup_snapshot.constructor_phases[3].phase=MELEE_WEB_STADIUM_SETUP_PHASE_UP_CALL;
   assert(parser_refuses(valid)); assert(arm_leaf_calls==0 && replay);
   reset_fixture(); replay->frames.resize(1122);
   assert(parser_refuses(valid)); assert(arm_leaf_calls==0 && replay);
@@ -751,6 +786,7 @@ class LaterBGate2NativeControls(OwnedWorkspaceTests):
             "\n return retirement.running_after_close;\n}\nextern \"C\" {\n" +
             _function(cls.cpp_source, "int melee_web_native_menu_running(){") + "\n}",
             _function(cls.cpp_source, "bool later_b_gate2_uuid_valid(const std::string& value){"),
+            _function(cls.cpp_source, "bool later_b_gate2_constructor_phase_trace_valid(const MeleeWebStadiumSetupSnapshot& setup){"),
             _function(cls.cpp_source, "bool later_b_gate2_constructor_snapshot_valid(const MeleeWebStadiumSetupSnapshot& setup){"),
             _function(cls.cpp_source, "bool later_b_gate2_first_go_snapshot_valid(\n    const MeleeWebStadiumGoAlignmentSnapshot& observed,unsigned source_tick,\n    uint64_t world_generation){"),
             _function(cls.cpp_source, "bool later_b_gate2_parent_identity_valid(const MatchedSetupCfState& state){"),

@@ -148,6 +148,78 @@ class LaterBGate2ReferenceTests(unittest.TestCase):
                                if key != 'binding_sha256'}
         self.assertEqual(pretty_without_hash, original_without_hash)
 
+    def test_constructor_phase_sidecar_and_modeled_native_receipt_comparator(self):
+        expected = operand.build_gate2_constructor_phase_projection(self.binding_path)
+        self.assertEqual(expected['schema'],
+                         'melee-web-stadium-original-b-constructor-phase-projection-v1')
+        self.assertEqual(expected['branch'], 'up')
+        self.assertEqual(expected['semantic_owner'], {
+            'id': 'selected-match-1/map2/constructor-callback-1',
+            'selected_match': 1, 'native_role': 'map2/constructor-callback-1',
+            'map_id': 2, 'constructor_callback_ordinal': 1})
+        self.assertEqual([event['phase'] for event in expected['events']],
+                         ['entry', 'parameters', 'up_call', 'up_return', 'commit'])
+        self.assertEqual([row['sequence'] for row in expected['source_coordinates']],
+                         [4303, 4304, 4305, 4306, 4307])
+        self.assertEqual((expected['events'][1]['parameter_x0'],
+                          expected['events'][1]['parameter_x4']), (3600, 3800))
+        self.assertEqual((expected['events'][2]['scalar_kind'],
+                          expected['events'][2]['scalar_value']), ('randi_bound', 200))
+        self.assertEqual((expected['events'][3]['scalar_kind'],
+                          expected['events'][3]['scalar_value']), ('randi_result', 142))
+        self.assertEqual((expected['events'][4]['scalar_kind'],
+                          expected['events'][4]['scalar_value']), ('stored_countdown', 3742))
+        self.assertEqual([event['source_seed_hex'] for event in expected['events']],
+                         ['ba5dac05', 'ba5dac05', 'ba5dac05', 'b6cdeeb4', 'b6cdeeb4'])
+        self.assertIs(expected['runtime_admission'], False)
+        self.assertIs(expected['browser_parity'], False)
+        self.assertIs(expected['C3'], False)
+
+        # This fixture exercises the consumer's strict join shape; it models an
+        # actual Setup receipt and is not evidence from a running native game.
+        events = copy.deepcopy(expected['events'])
+        setup = {
+            'schema': 'melee-web-stadium-zero-tick-setup-state-v1',
+            'world_generation': 77, 'world_ticks': 0, 'source_frame': 0,
+            'map_id': 2, 'initial_countdown': 3742, 'current_countdown': 3742,
+            'parameter_x0': 3600, 'parameter_x4': 3800,
+            'constructor_callback_count': 1, 'source_parameter_roots_agree': True,
+            'constructor_randi_call_count': 1, 'constructor_randi_bound': 200,
+            'constructor_randi_result': 142,
+            'source_seed_before_hex': 'ba5dac05', 'source_seed_after_hex': 'b6cdeeb4',
+            'constructor_phase_trace': {
+                'schema': 'melee-web-stadium-constructor-phase-trace-v1',
+                'scope': 'diagnostic-zero-tick-setup-owner-observation-only',
+                'owner': {'semantic_id': expected['semantic_owner']['native_role'],
+                          'world_generation': 77, 'map_id': 2,
+                          'constructor_callback_ordinal': 1},
+                'event_count': len(events), 'events': events,
+            },
+        }
+        compared = operand.compare_gate2_constructor_phase_trace(expected, setup)
+        self.assertEqual(compared['decision'],
+                         'PASS_EXACT_ORIGINAL_PHASES_AND_NATIVE_SETUP_SCALARS')
+        self.assertFalse(compared['source_coordinates_compared'])
+        self.assertFalse(compared['runtime_admission'])
+
+        for change in (
+            lambda state: state['constructor_phase_trace']['events'].reverse(),
+            lambda state: state['constructor_phase_trace']['events'][2].update(scalar_value=201),
+            lambda state: state['constructor_phase_trace']['events'][3].update(source_seed_hex='00000000'),
+            lambda state: state['constructor_phase_trace']['owner'].update(world_generation=78),
+            lambda state: state.update(current_countdown=3743),
+            lambda state: state['constructor_phase_trace']['owner'].update(semantic_id='foreign/map2/callback-1'),
+        ):
+            changed = copy.deepcopy(setup)
+            change(changed)
+            self.assertEqual(operand.compare_gate2_constructor_phase_trace(expected, changed)['decision'],
+                             'REFUSE_CONSTRUCTOR_PHASE_TRACE')
+
+        misbound = copy.deepcopy(expected)
+        misbound['semantic_owner']['native_role'] = 'foreign/map2/constructor-callback-1'
+        self.assertEqual(operand.compare_gate2_constructor_phase_trace(misbound, setup)['decision'],
+                         'REFUSE_CONSTRUCTOR_PHASE_TRACE')
+
     def test_changed_role_pin_and_mixed_setup_owner_refuse(self):
         with tempfile.TemporaryDirectory() as folder:
             changed_pin = copy.deepcopy(self.binding)

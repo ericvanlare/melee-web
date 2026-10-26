@@ -1,3 +1,4 @@
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import {parseRngDrawProbe, validateRngDrawProbeRows} from '../scripts/rng_draw_probe.mjs';
 
@@ -33,3 +34,16 @@ for (const invalidRows of [
 ]) assert.throws(() => validateRngDrawProbeRows(invalidRows, selection, {observedCursor: 9}));
 assert.throws(() => validateRngDrawProbeRows([row(8)], selection, {observedCursor: 9}), /omitted reached/);
 console.log('Bounded RNG draw probe request and artifact contract passed');
+
+
+test('version 2 owners are explicit and inconsistent or mixed owners refuse', () => {
+  const selection = parseRngDrawProbe({cursors:'40,41'});
+  const outside = {status:'outside_proc',gobj:'0000000000000000',proc:'0000000000000000',callback:'0000000000000000',classifier:0,p_link:0,s_link:0,callback_symbol:null};
+  const scheduled = {status:'scheduled_proc',gobj:'0000000000010000',proc:'0000000000020000',callback:'0000000000000123',classifier:13,p_link:4,s_link:0,callback_symbol:'unknown'};
+  const ownerRow = (cursor, owner) => JSON.stringify({schema:'melee-web-rng-draw-probe',version:2,source_cursor:cursor,overflowed:false,draws:[{kind:'HSD_Rand',seed_after:'01234567',owner}]});
+  const validate = rows => validateRngDrawProbeRows(rows, selection, {observedCursor:41});
+  assert.equal(validate([ownerRow(40,outside),ownerRow(41,scheduled)]).complete,true);
+  assert.throws(()=>validate([ownerRow(40,{...outside,callback:scheduled.callback}),ownerRow(41,scheduled)]),/outside-proc/);
+  assert.throws(()=>validate([ownerRow(40,outside),ownerRow(41,{...scheduled,proc:outside.proc})]),/scheduled/);
+  assert.throws(()=>validate([ownerRow(40,outside),row(41)]),/invalid identity/);
+});

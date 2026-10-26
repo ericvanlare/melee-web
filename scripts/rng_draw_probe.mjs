@@ -50,19 +50,45 @@ export function validateRngDrawProbeRows(textRows, selection, {observedCursor, d
   const requested = new Set(selection.selected);
   const seen = new Set();
   const rows = [];
+  let captureVersion = null;
   for (const text of textRows) {
     let row;
     try { row = JSON.parse(text); }
     catch { throw Error('RNG draw probe row is not valid JSON'); }
-    if (!row || row.schema !== 'melee-web-rng-draw-probe' || row.version !== 1 ||
+    if (!row || row.schema !== 'melee-web-rng-draw-probe' || ![1,2].includes(row.version) ||
         !Number.isSafeInteger(row.source_cursor) || !requested.has(row.source_cursor) ||
         seen.has(row.source_cursor) || row.overflowed !== false || !Array.isArray(row.draws) ||
-        row.draws.length > MAX_DRAWS_PER_CURSOR)
+        row.draws.length > MAX_DRAWS_PER_CURSOR ||
+        (captureVersion !== null && captureVersion !== row.version))
       throw Error('RNG draw probe row has an invalid identity, cursor, or bounded payload');
+    captureVersion = row.version;
     for (const draw of row.draws) {
       if (!draw || !['HSD_Rand', 'HSD_Randf'].includes(draw.kind) ||
           typeof draw.seed_after !== 'string' || !SEED.test(draw.seed_after))
         throw Error('RNG draw probe row contains an invalid kind or 32-bit post-update seed');
+      if (row.version === 2) {
+        const owner = draw.owner;
+        const pointer = value => typeof value === 'string' && /^[0-9a-f]{16}$/.test(value);
+        const zero = '0000000000000000';
+        if (!owner || !['gobj','proc','callback'].every(key => pointer(owner[key])) ||
+            ![['classifier',65535],['p_link',255],['s_link',255]].every(([key,max]) =>
+              Number.isInteger(owner[key]) && owner[key] >= 0 && owner[key] <= max))
+          throw Error('RNG draw probe owner encoding is invalid');
+        if (!Object.hasOwn(owner,'callback_symbol') ||
+            (owner.status === 'outside_proc' ? owner.callback_symbol !== null :
+             !['unknown','grStadium_801D1390'].includes(owner.callback_symbol)))
+          throw Error('RNG draw callback symbol is invalid');
+        if (owner.status === 'outside_proc') {
+          if (!['gobj','proc','callback'].every(key => owner[key] === zero) ||
+              owner.classifier !== 0 || owner.p_link !== 0 || owner.s_link !== 0)
+            throw Error('RNG draw outside-proc owner is inconsistent');
+        } else if (owner.status !== 'scheduled_proc' ||
+                   ['gobj','proc','callback'].some(key => owner[key] === zero)) {
+          throw Error('RNG draw scheduled owner is inconsistent');
+        }
+      } else if (Object.hasOwn(draw, 'owner')) {
+        throw Error('Version 1 RNG draw cannot claim owner context');
+      }
     }
     seen.add(row.source_cursor);
     rows.push({text, row});
