@@ -1,5 +1,6 @@
 #include "gameplay_cpu_observation.h"
 
+#include <melee/ef/eflib.h>
 #include <melee/gr/grpstadium.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjproc.h>
@@ -28,7 +29,9 @@ static size_t rng_draw_probe_count;
 static int rng_draw_probe_overflow, rng_draw_probe_active;
 static int rng_draw_probe_configuration_checked, rng_draw_probe_configured;
 static int rng_draw_probe_owners;
+static int rng_draw_probe_native_pair;
 static size_t rng_draw_probe_cursor = (size_t)-1;
+static size_t rng_draw_probe_emitted_count;
 static char rng_draw_probe_line[RNG_DRAW_PROBE_LINE_CAPACITY];
 static size_t rng_draw_probe_used;
 static void emit_rng_draw_probe(void);
@@ -48,6 +51,15 @@ static void put(const char* format, ...)
 
 void melee_web_cpu_observation_set_rng_draw_cursor(size_t index)
 {
+    if (rng_draw_probe_native_pair) {
+        if (rng_draw_probe_active || index != rng_draw_probe_emitted_count + 1)
+            abort();
+        rng_draw_probe_cursor = index;
+        rng_draw_probe_count = 0;
+        rng_draw_probe_overflow = 0;
+        rng_draw_probe_active = 1;
+        return;
+    }
     if (rng_draw_probe_active && rng_draw_probe_cursor == index) return;
     if (rng_draw_probe_active) emit_rng_draw_probe();
     rng_draw_probe_cursor = index;
@@ -79,6 +91,34 @@ void melee_web_cpu_observation_set_rng_draw_cursor(size_t index)
     rng_draw_probe_active = 0;
 #endif
 }
+
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+int melee_web_rng_draw_probe_begin_native_pair(void)
+{
+    if (rng_draw_probe_native_pair || rng_draw_probe_active) return 0;
+    rng_draw_probe_native_pair = 1;
+    rng_draw_probe_owners = 1;
+    rng_draw_probe_cursor = (size_t)-1;
+    rng_draw_probe_emitted_count = 0;
+    rng_draw_probe_count = 0;
+    rng_draw_probe_overflow = 0;
+    return 1;
+}
+
+int melee_web_rng_draw_probe_end_native_pair(size_t expected_cursors)
+{
+    if (!rng_draw_probe_native_pair || rng_draw_probe_active ||
+        expected_cursors == 0 || rng_draw_probe_emitted_count != expected_cursors ||
+        rng_draw_probe_cursor != expected_cursors)
+        return 0;
+    rng_draw_probe_native_pair = 0;
+    rng_draw_probe_owners = 0;
+    rng_draw_probe_cursor = (size_t)-1;
+    rng_draw_probe_count = 0;
+    rng_draw_probe_overflow = 0;
+    return 1;
+}
+#endif
 
 /* The actual HSD dispatcher owns these typed globals only while on_invoke is
  * running. No list walk, dereference of user_data, or callback invocation here.
@@ -136,20 +176,29 @@ static void emit_rng_draw_probe(void)
                 (unsigned long long)entry->callback, entry->classifier,
                 entry->p_link, entry->s_link,
                 !entry->proc ? "null" : entry->callback == (uintptr_t)grStadium_801D1390 ?
-                    "\"grStadium_801D1390\"" : "\"unknown\"");
+                    "\"grStadium_801D1390\"" :
+                entry->callback == (uintptr_t)efLib_particles_proc_main ?
+                    "\"efLib_particles_proc_main\"" : "\"unknown\"");
         put("}");
     }
     put("]}");
 #ifdef __EMSCRIPTEN__
+    if (rng_draw_probe_native_pair) {
+        fprintf(stderr, "RNG_DRAW_PROBE %s\n", rng_draw_probe_line);
+        fflush(stderr);
+    } else {
     EM_ASM({
         const text = UTF8ToString($0);
         if (typeof window !== 'undefined' && window.meleeRngDrawObservation)
             window.meleeRngDrawObservation(text);
         else err('RNG_DRAW_PROBE ' + text);
     }, rng_draw_probe_line);
+    }
 #else
     fprintf(stderr, "RNG_DRAW_PROBE %s\n", rng_draw_probe_line);
+    fflush(stderr);
 #endif
+    if (rng_draw_probe_native_pair) ++rng_draw_probe_emitted_count;
     rng_draw_probe_used = 0;
     rng_draw_probe_active = 0;
 }

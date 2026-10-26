@@ -520,6 +520,31 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
     def setUpClass(cls):
         cls.scratch = cls.new_workspace(ROOT, "stadium-c1a-native-menu-")
 
+    def _assert_hsd_rng_seed_chain(self, draws, seed_before, seed_after, context):
+        seed = int(seed_before, 16)
+        for ordinal, draw in enumerate(draws, 1):
+            seed = (seed * 214013 + 2531011) & 0xffffffff
+            self.assertEqual(int(draw["seed_after"], 16), seed,
+                             f"{context}: event {ordinal} did not advance the pinned HSD LCG exactly once")
+        self.assertEqual(seed, int(seed_after, 16),
+                         f"{context}: sample boundary contains an unreported HSD LCG update")
+
+    def test_hsd_rng_owner_rows_require_one_lcg_transition_per_event(self):
+        # These are source-derived outputs from the pinned random.c recurrence:
+        # seed = seed * 214013 + 2531011 modulo 2^32, for both HSD_Rand kinds.
+        draws = [
+            {"kind": "HSD_Rand", "seed_after": "0029e2c0"},
+            {"kind": "HSD_Randf", "seed_after": "c823f683"},
+        ]
+        self._assert_hsd_rng_seed_chain(draws, "00000001", "c823f683", "fixture")
+        with self.assertRaisesRegex(AssertionError, "event 2"):
+            self._assert_hsd_rng_seed_chain(
+                [draws[0], {**draws[1], "seed_after": "c823f684"}],
+                "00000001", "c823f683", "mutated event")
+        with self.assertRaisesRegex(AssertionError, "unreported HSD LCG update"):
+            self._assert_hsd_rng_seed_chain(
+                draws[:1], "00000001", "c823f683", "omitted event")
+
     def test_stadium_hsd_queue_observation_executes_actual_phased_step(self):
         """Exercise the production queue fill and snapshot lifecycle with named HSD services."""
         import shutil
@@ -3391,7 +3416,7 @@ int main(void)
             self.assertIn("STADIUM_SOURCE_GO phase=checked-close snapshot_unavailable=1", stderr)
         elif functional_idle_pair_probe:
             self.assertIn(
-                "Two same-process Stadium functional-idle lifetimes each reached 3,500 post-GO no-draw PCM ticks and fully retired their owners; no C3 claim",
+                "Two same-process Stadium functional-idle lifetimes each recorded 3,500 GO-relative typed idle snapshots and bounded per-tick RNG-owner rows with PCM processing and fully retired owners; no C3 claim",
                 stdout)
         elif toy_owner_controls:
             self.assertIn("Stadium bounded Toy owner controls passed; one Ready plus no-acquisition and unarmed OnInit lifetimes, no C3 claim", stdout)
@@ -3581,10 +3606,12 @@ int main(void)
         import re
 
         self.assertEqual(stdout.count(
-            "Stadium one-world neutral no-draw interval reached exactly 3,500 ticks after the GO-containing tick, with PCM processing and checked close; timer/transform state unobserved; no C3 claim"), 2)
+            "Stadium one-world neutral 3,500 post-GO no-draw PCM ticks recorded typed idle snapshots and bounded per-tick RNG-owner rows with checked close; no C3 claim"), 2)
         self.assertIn(
-            "Two same-process Stadium functional-idle lifetimes each reached 3,500 post-GO no-draw PCM ticks and fully retired their owners; no C3 claim",
+            "Two same-process Stadium functional-idle lifetimes each recorded 3,500 GO-relative typed idle snapshots and bounded per-tick RNG-owner rows with PCM processing and fully retired owners; no C3 claim",
             stdout)
+        self.assertEqual(stdout.count(
+            "Stadium live typed idle snapshots captured at GO tick exit and around the first full post-GO tick; no extra tick/draw or C3 claim"), 2)
 
         identity = json.loads((owner_dir / "identity.json").read_text())
         self.assertEqual(identity["ownership"], "direct-Popen")
@@ -3644,8 +3671,8 @@ int main(void)
         event_pattern = (r"STADIUM_SOURCE_GO_EVENT event=(\S+) sequence=(\d+) generation=(\d+) world_ticks=(\d+) source_frame=(\d+) object=(\d+) proc=(\d+) callback_index=(-?\d+) source_branch=(-?\d+) map2_gate=(-?\d+) display_mode=(-?\d+) remap_branch=(-?\d+) callback_identity=(-?\d+) hud_enabled=(-?\d+)")
         step_pattern = (r"STADIUM_FUNCTIONAL_IDLE_STEP ordinal=(\d+) world_before=(\d+) world_after=(\d+) session_before=(\d+) session_after=(\d+) source_frame_before=(\d+) source_frame_after=(\d+) generation=(\d+) memory_status_before=(\d+) memory_status_after=(\d+) memory_world_before=(\d+) memory_world_after=(\d+) source_heap_before=(-?\d+) source_heap_after=(-?\d+) ready=(\d+) ending=(\d+) complete=(\d+) draw=0 audio=rendered")
         phase_pattern = (r"STADIUM_READY_SESSION phase=(\S+) world_exists=(\d+) world=(\d+) ticks=(\d+) heap=(-?\d+) objects=(\d+) processes=(\d+)")
-        begin_pattern = (r"STADIUM_FUNCTIONAL_IDLE phase=begin go_world_after=(\d+) ready_world_tick=(\d+) already_post_go_ticks=(\d+) target_world_tick=(\d+) draw=0 timer=unobserved transform=unobserved")
-        complete_pattern = (r"STADIUM_FUNCTIONAL_IDLE phase=complete go_world_after=(\d+) ready_world_tick=(\d+) target_world_tick=(\d+) observed_post_go_ticks=(\d+) final_session_ticks=(\d+) final_source_frame=(\d+) draw=0 timer=unobserved transform=unobserved")
+        begin_pattern = (r"STADIUM_FUNCTIONAL_IDLE phase=begin go_world_after=(\d+) ready_world_tick=(\d+) already_post_go_ticks=(\d+) target_world_tick=(\d+) draw=0 state=typed-idle-snapshot-v2 rng=owner-v2")
+        complete_pattern = (r"STADIUM_FUNCTIONAL_IDLE phase=complete go_world_after=(\d+) ready_world_tick=(\d+) target_world_tick=(\d+) observed_post_go_ticks=(\d+) final_session_ticks=(\d+) final_source_frame=(\d+) draw=0 state=typed-idle-snapshot-v2 rng=owner-v2")
 
         for ordinal, (start_marker, close_marker) in enumerate(zip(begin_markers, close_markers)):
             self.assertEqual(int(start_marker.group(1)), ordinal)
@@ -3712,6 +3739,110 @@ int main(void)
                 self.assertGreaterEqual(row[12], 0)
                 self.assertEqual(row[13], row[12])
                 self.assertEqual((row[15], row[16]), (0, 0))
+
+            sample_pattern = (r"STADIUM_FUNCTIONAL_IDLE_PAIR_SAMPLE ordinal=(\d+) generation=(\d+) world_ticks=(\d+) session_ticks=(\d+) source_frame=(\d+) seed_owner=(\S+) seed_before=([0-9a-f]{8}) seed_after=([0-9a-f]{8}) draw=0")
+            samples = re.findall(sample_pattern, segment)
+            self.assertEqual(len(samples), 3500, segment[-5000:])
+            for sample_ordinal, row in enumerate(samples, 1):
+                ordinal, generation_value, world_ticks, session_ticks, source_frame, owner_name, seed_before, seed_after = row
+                step = steps[sample_ordinal - 1]
+                self.assertEqual(int(ordinal), sample_ordinal)
+                self.assertEqual(owner_name, "active_match_context")
+                self.assertEqual(int(generation_value), world_generation)
+                self.assertEqual((int(world_ticks), int(session_ticks), int(source_frame)),
+                                 (step[2], step[4], step[6]))
+                if sample_ordinal > 1:
+                    self.assertEqual(seed_before, samples[sample_ordinal - 2][7],
+                                     f"seed chain broke at local tick {sample_ordinal}")
+
+            idle_lines = [line for line in segment.splitlines()
+                          if line.startswith("STADIUM_SOURCE_IDLE phase=")]
+            self.assertEqual(sum("phase=go-containing-exit " in line for line in idle_lines), 1)
+            self.assertEqual(sum("phase=first-full-post-go-before " in line for line in idle_lines), 1)
+            self.assertEqual(sum("phase=first-full-post-go-after " in line for line in idle_lines), 1)
+            self.assertEqual(sum("phase=closed-owner-refusal " in line for line in idle_lines), 1)
+            idle_rows = []
+            for line in idle_lines:
+                fields = dict(token.split("=", 1) for token in line.split()[1:])
+                if fields.get("phase") == "functional-idle-pair-step":
+                    idle_rows.append(fields)
+            self.assertEqual(len(idle_rows), 3500, segment[-5000:])
+            for sample_ordinal, row in enumerate(idle_rows, 1):
+                step = steps[sample_ordinal - 1]
+                sample = samples[sample_ordinal - 1]
+                self.assertEqual(int(row["version"]), 2)
+                self.assertEqual(int(row["generation"]), world_generation)
+                self.assertEqual((int(row["world_ticks"]), int(row["session_ticks"]),
+                                  int(row["source_frame"])),
+                                 (step[2], step[4], step[6]))
+                self.assertRegex(row["display_timer_native_hex"], r"^[0-9a-f]{8}$")
+                self.assertEqual(row["display_timer_representation"], "native-object-bytes")
+                self.assertEqual(row["display_timer_initialization_observed"], "0")
+                self.assertNotIn("display_timer", row)
+                self.assertEqual(int(row["sis_world_generation"]), world_generation)
+                self.assertEqual(int(row["map2_world_generation"]), world_generation)
+                self.assertEqual(row["sis_source_heap_handle"], row["map2_source_heap_handle"])
+                self.assertGreater(int(row["sis_allocation_generation"]), 0)
+                self.assertGreater(int(row["map2_allocation_generation"]), 0)
+                self.assertGreater(int(row["sis_source_epoch"]), 0)
+                self.assertGreater(int(row["sis_requested_bytes"]), 0)
+                self.assertGreater(int(row["map2_requested_bytes"]), 0)
+                self.assertEqual((int(row["sis_font_slot"]), int(row["sis_static_text_role"]),
+                                  int(row["sis_dynamic_text_role"]), int(row["sis_context_present"])),
+                                 (1, 0, 1, 1))
+                self.assertEqual(int(row["typed_relations_version"]), 1)
+                for relation in ("map2_gate_mask_40", "map5_root_relation", "sis_font1_present",
+                                 "title_child_present", "title_wrapper_present",
+                                 "title_static_present", "title_dynamic_present"):
+                    self.assertIn(int(row[relation]), (0, 1))
+                self.assertEqual(int(row["title_bytes_captured"]), 0)
+                self.assertEqual(int(row["draw"]), 0)
+                self.assertFalse(any("pointer" in key or "address" in key for key in row))
+
+            rng_lines = [line for line in segment.splitlines()
+                         if line.startswith("RNG_DRAW_PROBE ")]
+            self.assertEqual(len(rng_lines), 3500, segment[-5000:])
+            for sample_ordinal, line in enumerate(rng_lines, 1):
+                row = json.loads(line[len("RNG_DRAW_PROBE "):])
+                self.assertEqual(row["schema"], "melee-web-rng-draw-probe")
+                self.assertEqual(row["version"], 2)
+                self.assertEqual(row["source_cursor"], sample_ordinal)
+                self.assertFalse(row["overflowed"])
+                self.assertLessEqual(len(row["draws"]), 1024)
+                for draw in row["draws"]:
+                    self.assertIn(draw["kind"], ("HSD_Rand", "HSD_Randf"))
+                    self.assertRegex(draw["seed_after"], r"^[0-9a-f]{8}$")
+                    owner = draw["owner"]
+                    for key in ("gobj", "proc", "callback"):
+                        self.assertRegex(owner[key], r"^[0-9a-f]{16}$")
+                    if owner["status"] == "outside_proc":
+                        self.assertEqual(owner["callback_symbol"], None)
+                        self.assertEqual((owner["gobj"], owner["proc"], owner["callback"],
+                                          owner["classifier"], owner["p_link"], owner["s_link"]),
+                                         ("0000000000000000",) * 3 + (0, 0, 0))
+                    else:
+                        self.assertEqual(owner["status"], "scheduled_proc")
+                        self.assertIn(owner["callback_symbol"],
+                                      ("grStadium_801D1390", "efLib_particles_proc_main"))
+                        self.assertNotIn("0000000000000000",
+                                         (owner["gobj"], owner["proc"], owner["callback"]))
+                        if owner["callback_symbol"] == "efLib_particles_proc_main":
+                            self.assertEqual((owner["classifier"], owner["p_link"], owner["s_link"]),
+                                             (8, 11, 15))
+                sample_seed_before = samples[sample_ordinal - 1][6]
+                sample_seed_after = samples[sample_ordinal - 1][7]
+                self._assert_hsd_rng_seed_chain(
+                    row["draws"], sample_seed_before, sample_seed_after,
+                    f"lifetime {ordinal} local tick {sample_ordinal}")
+
+            armed = segment.find("STADIUM_FUNCTIONAL_IDLE_PROBE phase=armed ")
+            disabled = segment.find("STADIUM_FUNCTIONAL_IDLE_PROBE phase=disabled ")
+            self.assertGreaterEqual(armed, 0)
+            self.assertGreater(disabled, armed)
+            self.assertIn("seed_owner=active_match_context draws_only_after_go=1", segment[armed:disabled])
+            self.assertIn("samples=3500 draws_only_after_go=1 before_checked_close=1",
+                          segment[disabled:])
+            self.assertLess(disabled, segment.find("STADIUM_SOURCE_IDLE phase=closed-owner-refusal"))
 
             begin = re.findall(begin_pattern, segment)
             self.assertEqual(len(begin), 1)

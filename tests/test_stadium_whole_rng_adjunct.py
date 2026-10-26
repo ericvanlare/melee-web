@@ -75,6 +75,8 @@ void reset(){env.clear();InputStream::recording=true;InputStream::replaying=fals
 void adjunct(){reset();env["MWRC_STADIUM_WHOLE_B_STATE"]="1";env["MWRC_STADIUM_WHOLE_RNG_RETURNS"]="1";env["MWRC_CPU_PROBE_OUTPUT"]="owned/rng.json";env["MWRC_CPU_PROBE_MATCH"]="1";env["MWRC_CPU_PROBE_FIRST_TICK"]="1";env["MWRC_CPU_PROBE_LAST_TICK"]="3";env["MWRC_CPU_PROBE_RNG_RETURN_SITE"]="rng_returns";}
 int main(){
  reset();assert(Gate().Run());adjunct();assert(Gate().Run());
+ adjunct();env["MWRC_CPU_PROBE_RNG_RETURN_SITE"]="rng_updates";assert(Gate().Run());
+ adjunct();env["MWRC_CPU_PROBE_RNG_RETURN_SITE"]="rng_updates";InputStream::recording=false;InputStream::replaying=true;env["MWRC_STADIUM_WHOLE_REPLAY_BINDING"]=std::string(64,'b');assert(Gate().Run());
  for(const char* site:{"","rand_return","randf_return","unknown"}){adjunct();env["MWRC_CPU_PROBE_RNG_RETURN_SITE"]=site;assert(!Gate().Run());}
  for(const char* key:{"MWRC_STADIUM_WHOLE_B_STATE","MWRC_CPU_PROBE_OUTPUT","MWRC_STADIUM_WHOLE_RNG_RETURNS"}){adjunct();env[key]="";assert(!Gate().Run());}
  adjunct();env["MWRC_CPU_PROBE_MATCH"]="0";assert(!Gate().Run());
@@ -82,6 +84,13 @@ int main(){
  adjunct();env["MWRC_CPU_PROBE_LAST_TICK"]="10";assert(!Gate().Run());
  adjunct();env["MWRC_CPU_PROBE_LAST_TICK"]="1";env["MWRC_CPU_PROBE_FIRST_TICK"]="3";assert(!Gate().Run());
  adjunct();InputStream::replaying=true;assert(!Gate().Run());adjunct();InputStream::recording=false;assert(!Gate().Run());
+ adjunct();InputStream::recording=false;InputStream::replaying=true;env["MWRC_STADIUM_WHOLE_REPLAY_BINDING"]=std::string(64,'b');assert(Gate().Run());
+ for(const char* bad:{"","0","not-a-sha"}){adjunct();InputStream::recording=false;InputStream::replaying=true;env["MWRC_STADIUM_WHOLE_REPLAY_BINDING"]=bad;assert(!Gate().Run());}
+ adjunct();env["MWRC_STADIUM_WHOLE_REPLAY_BINDING"]=std::string(64,'b');assert(!Gate().Run());
+ adjunct();InputStream::recording=false;InputStream::replaying=true;env["MWRC_STADIUM_WHOLE_REPLAY_BINDING"]=std::string(64,'0');assert(!Gate().Run());
+ adjunct();InputStream::recording=false;InputStream::replaying=true;env["MWRC_STADIUM_WHOLE_REPLAY_BINDING"]=std::string(64,'b');env["MWRC_CPU_PROBE_RNG_RETURN_SITE"]="rand_return";assert(!Gate().Run());
+ adjunct();InputStream::recording=false;InputStream::replaying=true;env["MWRC_STADIUM_WHOLE_REPLAY_BINDING"]=std::string(64,'b');env["MWRC_STADIUM_WHOLE_FEEDBACK"]="";assert(!Gate().Run());
+
  for(const char* key:{"MWRC_STADIUM_CONSTRUCTOR_OWNER","MWRC_ITEM_PROBE_OUTPUT","MWRC_ENTITY_PROFILE","MWRC_STADIUM_IDLE_3500"}){adjunct();env[key]="1";assert(!Gate().Run());}
  adjunct();Gate wrong;wrong.whole_session_matches=2;assert(!wrong.Run());
  Window w;w.CloseCpuProbeAtSourceTick(0,999);assert(!w.cpu_probe_closed&&!w.cpu_probe_published);
@@ -134,6 +143,15 @@ int main(){
             path=Path(temporary)/'rng.json'
             def run():path.write_text(json.dumps(probe));return validate(path,(1,3),go,status,'a'*64)
             result=run();self.assertEqual(result['raw_source_tick_bounds'],[52,56]);self.assertTrue(result['guard_band_extras_retained']);self.assertIs(result['C3'],False)
+            old_probe=json.loads(json.dumps(probe));old_status=json.loads(json.dumps(status))
+            probe.update(version=5,rng_return_site='rng_updates',rng_return_pcs=['0x80380524','0x8038057c','0x803805b8'])
+            probe['records'][0].update(label='randi_return',pc='0x803805b8')
+            status['cpu_probe_close'].update(rng_return_site='rng_updates',rng_return_pcs=probe['rng_return_pcs'])
+            path.write_text(json.dumps(probe))
+            self.assertEqual(validate(path,(1,3),go,status,'a'*64,coverage='rng_updates')['record_count'],1)
+            with self.assertRaises(ValueError):validate(path,(1,3),go,status,'a'*64)
+            probe.clear();probe.update(old_probe);record=probe['records'][0]
+            status.clear();status.update(old_status)
             for mutate in (lambda:go.update(sequence=778),lambda:status['cpu_probe_close'].update(requested_last_offset=4),lambda:record.update(seed_owner_pointer='0x00000000')):
                 before=json.loads(json.dumps([probe,status,go]));mutate()
                 with self.assertRaises(ValueError):run()

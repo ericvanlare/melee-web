@@ -26,6 +26,7 @@
 #include "gameplay_stadium_display_owner.h"
 #include "gameplay_heap.h"
 #include "gameplay_match_context.h"
+#include "gameplay_cpu_observation.h"
 #include "hsd_native_joint.h"
 #include "stadium_c1_heap_owner_observer.h"
 #include "dat_archive.hpp"
@@ -8459,8 +8460,8 @@ void emit_stadium_idle_snapshot(const char* phase,
                                 uint64_t session_ticks)
 {
     std::fprintf(stderr,
-        "STADIUM_SOURCE_IDLE phase=%s generation=%llu world_ticks=%llu session_ticks=%llu source_frame=%u map2_gate=%d map2_countdown=%d map2_phase=%d map2_form=%d map2_history_e0=%d map2_history_e2=%d display_mode=%d display_e6=%d display_e8=%d display_timer_native_hex=%02x%02x%02x%02x display_timer_representation=native-object-bytes display_timer_initialization_observed=%u display_previous_mode=%d display_selected_player=%d display_f2=%d display_flags=%u sis_font_slot=%u sis_static_text_role=%u sis_dynamic_text_role=%u sis_context_present=%u sis_title_entry_seen=%u sis_title_entry_index=%d title_bytes_captured=%u sis_source_heap_handle=%d sis_world_generation=%llu sis_allocation_generation=%llu sis_source_epoch=%llu sis_requested_bytes=%u map2_source_heap_handle=%d map2_world_generation=%llu map2_allocation_generation=%llu map2_requested_bytes=%u map2_buffer_origin=%u draw=0\n",
-        phase,static_cast<unsigned long long>(snapshot.world_generation),
+        "STADIUM_SOURCE_IDLE phase=%s version=%u generation=%llu world_ticks=%llu session_ticks=%llu source_frame=%u map2_gate=%d map2_countdown=%d map2_phase=%d map2_form=%d map2_history_e0=%d map2_history_e2=%d display_mode=%d display_e6=%d display_e8=%d display_timer_native_hex=%02x%02x%02x%02x display_timer_representation=native-object-bytes display_timer_initialization_observed=%u display_previous_mode=%d display_selected_player=%d display_f2=%d display_flags=%u sis_font_slot=%u sis_static_text_role=%u sis_dynamic_text_role=%u sis_context_present=%u sis_title_entry_seen=%u sis_title_entry_index=%d title_bytes_captured=%u sis_source_heap_handle=%d sis_world_generation=%llu sis_allocation_generation=%llu sis_source_epoch=%llu sis_requested_bytes=%u map2_source_heap_handle=%d map2_world_generation=%llu map2_allocation_generation=%llu map2_requested_bytes=%u map2_buffer_origin=%u typed_relations_version=%u map2_gate_mask_40=%u map5_root_relation=%u sis_font1_present=%u title_child_present=%u title_wrapper_present=%u title_static_present=%u title_dynamic_present=%u draw=0\n",
+        phase,snapshot.version,static_cast<unsigned long long>(snapshot.world_generation),
         static_cast<unsigned long long>(snapshot.world_ticks),
         static_cast<unsigned long long>(session_ticks),snapshot.source_frame,
         snapshot.map2_gate,snapshot.map2_countdown,snapshot.map2_phase,
@@ -8482,7 +8483,11 @@ void emit_stadium_idle_snapshot(const char* phase,
         snapshot.sis_requested_bytes,snapshot.map2_source_heap_handle,
         static_cast<unsigned long long>(snapshot.map2_world_generation),
         static_cast<unsigned long long>(snapshot.map2_allocation_generation),
-        snapshot.map2_requested_bytes,snapshot.map2_buffer_origin);
+        snapshot.map2_requested_bytes,snapshot.map2_buffer_origin,
+        snapshot.typed_relations_version,snapshot.map2_gate_mask_40,
+        snapshot.map5_root_relation,snapshot.sis_font1_present,
+        snapshot.title_child_present,snapshot.title_wrapper_present,
+        snapshot.title_static_present,snapshot.title_dynamic_present);
     std::fflush(stderr);
 }
 #endif
@@ -8515,8 +8520,9 @@ void run_stadium_c1_context_preflight(
     uint64_t* functional_idle_world_generation = nullptr,
     bool idle_state_snapshot_probe = false)
 {
+    const bool capture_idle_state = idle_state_snapshot_probe || functional_idle_pair_probe;
     const bool go_probe = go_alignment_probe || functional_idle_probe ||
-        idle_state_snapshot_probe;
+        capture_idle_state;
     char error[256]{};
     const int previous_mode = gm_GetCurrentGameMode();
     const int previous_language = lbLang_GetLanguageSetting();
@@ -8893,6 +8899,57 @@ void run_stadium_c1_context_preflight(
                 MeleeWebStadiumIdleSnapshot idle_snapshot_first_post_before{};
                 bool idle_snapshot_containing_seen=false;
                 bool idle_snapshot_first_post_before_seen=false;
+                uint64_t functional_idle_pair_samples=0;
+                const uint32_t* functional_idle_pair_seed_owner=nullptr;
+                auto read_functional_idle_pair_seed=[&](const uint32_t* expected_owner,
+                                                         uint32_t* value){
+                    uint32_t context_seed=0;
+                    const auto current=melee_web_gameplay_stats();
+                    check(value&&match&&seed_ptr&&seed_ptr!=parent_seed_owner&&
+                              (!expected_owner||seed_ptr==expected_owner)&&
+                              melee_web_match_rng_seed_owner_read(&context_seed)&&
+                              *seed_ptr==context_seed&&match->random_seed()==context_seed&&
+                              current.generation!=0,
+                          "Post-GO RNG owner is not the checked active match context in its live world");
+                    if(!functional_idle_pair_seed_owner)
+                        functional_idle_pair_seed_owner=seed_ptr;
+                    check(seed_ptr==functional_idle_pair_seed_owner,
+                          "Post-GO active match-context seed storage owner changed within a lifetime");
+                    *value=context_seed;
+                    return current.generation;
+                };
+                auto record_functional_idle_pair_tick=[&](uint64_t ordinal,
+                    const MeleeWebGameplayStats& world_after,uint64_t session_after,
+                    uint32_t frames_after,const uint32_t* seed_owner_before,
+                    uint32_t seed_before){
+                    check(ordinal==functional_idle_pair_samples+1&&ordinal<=3500&&
+                              seed_owner_before==functional_idle_pair_seed_owner,
+                          "Post-GO native observation rows are not contiguous or lost their seed owner");
+                    uint32_t seed_after=0;
+                    const auto seed_generation=read_functional_idle_pair_seed(
+                        seed_owner_before,&seed_after);
+                    check(seed_generation==world_after.generation,
+                          "Post-GO seed owner and world generation disagree");
+                    MeleeWebStadiumIdleSnapshot snapshot{};
+                    check(match->diagnostic_stadium_idle_snapshot(
+                              &snapshot,error,sizeof(error)),error);
+                    check(snapshot.version==MELEE_WEB_STADIUM_IDLE_SNAPSHOT_VERSION&&
+                              snapshot.world_generation==world_after.generation&&
+                              snapshot.world_ticks==world_after.ticks&&
+                              snapshot.source_frame==frames_after&&
+                              session_after==match->player_stats(0).ticks,
+                          "Post-GO typed idle snapshot does not match its completed source tick");
+                    emit_stadium_idle_snapshot("functional-idle-pair-step",snapshot,session_after);
+                    std::fprintf(stderr,
+                        "STADIUM_FUNCTIONAL_IDLE_PAIR_SAMPLE ordinal=%llu generation=%llu world_ticks=%llu session_ticks=%llu source_frame=%u seed_owner=active_match_context seed_before=%08x seed_after=%08x draw=0\n",
+                        static_cast<unsigned long long>(ordinal),
+                        static_cast<unsigned long long>(world_after.generation),
+                        static_cast<unsigned long long>(world_after.ticks),
+                        static_cast<unsigned long long>(session_after),frames_after,
+                        seed_before,seed_after);
+                    std::fflush(stderr);
+                    ++functional_idle_pair_samples;
+                };
 #endif
                 auto emit_go_event=[&](const char* name,const MeleeWebStadiumGoAlignmentEvent& event){
                     if(!event.sequence||event.sequence<=emitted_go_sequence)return;
@@ -8922,7 +8979,7 @@ void run_stadium_c1_context_preflight(
                     }
                     const bool go_was_seen=go_probe&&go_snapshot.go_after.sequence!=0;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-                    const bool idle_first_post_go_tick=idle_state_snapshot_probe&&
+                    const bool idle_first_post_go_tick=capture_idle_state&&
                         go_was_seen&&go_containing_tick_seen&&!go_post_tick_seen;
 #endif
                     const auto world_before=melee_web_gameplay_stats();
@@ -8961,9 +9018,28 @@ void run_stadium_c1_context_preflight(
                                   idle_memory_before.source_heap_handle>=0 &&
                                   melee_web_source_memory_healthy(),
                               "Post-GO source-memory owner was not healthy before a tick");
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+                    const uint64_t pair_ordinal_before_tick=functional_idle_pair_probe&&go_was_seen
+                        ?world_before.ticks-go_containing_world_after+1:0;
+                    const uint32_t* pair_seed_owner_before_tick=nullptr;
+                    uint32_t pair_seed_before_tick=0;
+                    if(pair_ordinal_before_tick){
+                        check(pair_ordinal_before_tick<=3500,
+                              "Post-GO RNG probe exceeded its exact 3,500-cursor boundary");
+                        pair_seed_owner_before_tick=seed_ptr;
+                        read_functional_idle_pair_seed(pair_seed_owner_before_tick,
+                                                       &pair_seed_before_tick);
+                        melee_web_cpu_observation_set_rng_draw_cursor(
+                            static_cast<size_t>(pair_ordinal_before_tick));
+                    }
+#endif
                     match->tick(pads);
                     audio_phase+=32000;const unsigned samples=audio_phase/60;audio_phase%=60;
                     check(melee_web_audio_render(match->audio(),pcm,samples,error,sizeof(error)),error);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+                    if(pair_ordinal_before_tick)
+                        melee_web_rng_draw_probe_scheduler_return();
+#endif
                     if(go_probe){
                         const auto world_after=melee_web_gameplay_stats();
                         const auto session_after=match->player_stats(0).ticks;
@@ -8998,7 +9074,7 @@ void run_stadium_c1_context_preflight(
                                 int(match->ready()));
                             std::fflush(stderr);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-                            if(idle_state_snapshot_probe){
+                            if(capture_idle_state){
                                 check(!idle_snapshot_containing_seen,
                                       "Stadium idle containing snapshot was captured more than once");
                                 check(match->diagnostic_stadium_idle_snapshot(
@@ -9013,6 +9089,21 @@ void run_stadium_c1_context_preflight(
                                 idle_snapshot_containing_seen=true;
                                 emit_stadium_idle_snapshot("go-containing-exit",
                                     idle_snapshot_containing,session_after);
+                            }
+#endif
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+                            if(functional_idle_pair_probe){
+                                uint32_t go_seed=0;
+                                const auto seed_generation=read_functional_idle_pair_seed(
+                                    nullptr,&go_seed);
+                                check(seed_generation==world_after.generation&&
+                                          melee_web_rng_draw_probe_begin_native_pair(),
+                                      "Native paired RNG probe could not arm at the observed GO boundary");
+                                std::fprintf(stderr,
+                                    "STADIUM_FUNCTIONAL_IDLE_PROBE phase=armed generation=%llu world_ticks=%llu seed_owner=active_match_context draws_only_after_go=1\n",
+                                    static_cast<unsigned long long>(world_after.generation),
+                                    static_cast<unsigned long long>(world_after.ticks));
+                                std::fflush(stderr);
                             }
 #endif
                         }else if(go_was_seen&&!go_post_tick_seen){
@@ -9068,6 +9159,13 @@ void run_stadium_c1_context_preflight(
                         }
 #endif
                         go_snapshot=next;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+                        if(pair_ordinal_before_tick){
+                            record_functional_idle_pair_tick(pair_ordinal_before_tick,
+                                world_after,session_after,frames_after,
+                                pair_seed_owner_before_tick,pair_seed_before_tick);
+                        }
+#endif
                         if(functional_idle_probe && go_was_seen){
                             MeleeWebSourceMemoryContext idle_memory_after{};
                             const auto idle_memory_status_after=
@@ -9146,11 +9244,14 @@ void run_stadium_c1_context_preflight(
                           "Functional idle recipe did not retain its checked Ready/GO boundary");
                     const auto target_world=go_containing_world_after+3500;
                     std::fprintf(stderr,
-                        "STADIUM_FUNCTIONAL_IDLE phase=begin go_world_after=%llu ready_world_tick=%llu already_post_go_ticks=%llu target_world_tick=%llu draw=0 timer=unobserved transform=unobserved\n",
+                        "STADIUM_FUNCTIONAL_IDLE phase=begin go_world_after=%llu ready_world_tick=%llu already_post_go_ticks=%llu target_world_tick=%llu draw=0 %s\n",
                         static_cast<unsigned long long>(go_containing_world_after),
                         static_cast<unsigned long long>(ready_world.ticks),
                         static_cast<unsigned long long>(already_post_go),
-                        static_cast<unsigned long long>(target_world));
+                        static_cast<unsigned long long>(target_world),
+                        functional_idle_pair_probe
+                            ?"state=typed-idle-snapshot-v2 rng=owner-v2"
+                            :"timer=unobserved transform=unobserved");
                     std::fflush(stderr);
                     while(melee_web_gameplay_stats().ticks<target_world){
                         const auto before_tick=melee_web_gameplay_stats();
@@ -9167,9 +9268,28 @@ void run_stadium_c1_context_preflight(
                                   match->fighter_kind(0)==FTKIND_MARIO&&
                                   match->fighter_kind(1)==FTKIND_MARIO,
                               "Post-Ready idle lifetime lost its checked live owner or phase");
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+                        const uint64_t pair_ordinal_before_tick=functional_idle_pair_probe
+                            ?before_tick.ticks-go_containing_world_after+1:0;
+                        const uint32_t* pair_seed_owner_before_tick=nullptr;
+                        uint32_t pair_seed_before_tick=0;
+                        if(pair_ordinal_before_tick){
+                            check(pair_ordinal_before_tick<=3500,
+                                  "Post-Ready RNG probe exceeded its exact 3,500-cursor boundary");
+                            pair_seed_owner_before_tick=seed_ptr;
+                            read_functional_idle_pair_seed(pair_seed_owner_before_tick,
+                                                           &pair_seed_before_tick);
+                            melee_web_cpu_observation_set_rng_draw_cursor(
+                                static_cast<size_t>(pair_ordinal_before_tick));
+                        }
+#endif
                         match->tick(pads);
                         audio_phase+=32000;const unsigned samples=audio_phase/60;audio_phase%=60;
                         check(melee_web_audio_render(match->audio(),pcm,samples,error,sizeof(error)),error);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+                        if(pair_ordinal_before_tick)
+                            melee_web_rng_draw_probe_scheduler_return();
+#endif
                         const auto after_tick=melee_web_gameplay_stats();
                         const auto session_after=match->player_stats(0).ticks;
                         const auto frames_after=match->source_frames();
@@ -9190,6 +9310,13 @@ void run_stadium_c1_context_preflight(
                                   match->fighter_kind(0)==FTKIND_MARIO&&
                                   match->fighter_kind(1)==FTKIND_MARIO,
                               "Post-Ready idle tick changed the owner, tick order, or match phase");
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+                        if(pair_ordinal_before_tick){
+                            record_functional_idle_pair_tick(pair_ordinal_before_tick,
+                                after_tick,session_after,frames_after,
+                                pair_seed_owner_before_tick,pair_seed_before_tick);
+                        }
+#endif
                         std::fprintf(stderr,
                             "STADIUM_FUNCTIONAL_IDLE_STEP ordinal=%llu world_before=%llu world_after=%llu session_before=%llu session_after=%llu source_frame_before=%u source_frame_after=%u generation=%llu memory_status_before=%d memory_status_after=%d memory_world_before=%llu memory_world_after=%llu source_heap_before=%d source_heap_after=%d ready=%d ending=%d complete=%d draw=0 audio=rendered\n",
                             static_cast<unsigned long long>(ordinal),
@@ -9210,14 +9337,27 @@ void run_stadium_c1_context_preflight(
                               final_world.ticks-go_containing_world_after==3500&&
                               match->ready()&&!match->ending()&&!match->complete(),
                           "Functional idle interval did not finish at exactly 3,500 post-GO ticks");
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+                    if(functional_idle_pair_probe){
+                        check(functional_idle_pair_samples==3500&&
+                                  melee_web_rng_draw_probe_end_native_pair(3500),
+                              "Native paired state/RNG observation did not close exactly 3,500 cursors");
+                        std::fprintf(stderr,
+                            "STADIUM_FUNCTIONAL_IDLE_PROBE phase=disabled samples=%llu draws_only_after_go=1 before_checked_close=1\n",
+                            static_cast<unsigned long long>(functional_idle_pair_samples));
+                        std::fflush(stderr);
+                    }
+#endif
                     std::fprintf(stderr,
-                        "STADIUM_FUNCTIONAL_IDLE phase=complete go_world_after=%llu ready_world_tick=%llu target_world_tick=%llu observed_post_go_ticks=%llu final_session_ticks=%llu final_source_frame=%u draw=0 timer=unobserved transform=unobserved\n",
+                        "STADIUM_FUNCTIONAL_IDLE phase=complete go_world_after=%llu ready_world_tick=%llu target_world_tick=%llu observed_post_go_ticks=%llu final_session_ticks=%llu final_source_frame=%u draw=0 %s\n",
                         static_cast<unsigned long long>(go_containing_world_after),
                         static_cast<unsigned long long>(ready_world.ticks),
                         static_cast<unsigned long long>(target_world),
                         static_cast<unsigned long long>(final_world.ticks-go_containing_world_after),
                         static_cast<unsigned long long>(match->player_stats(0).ticks),
-                        match->source_frames());
+                        match->source_frames(),functional_idle_pair_probe
+                            ?"state=typed-idle-snapshot-v2 rng=owner-v2"
+                            :"timer=unobserved transform=unobserved");
                     std::fflush(stderr);
                     if(functional_idle_world_generation)
                         *functional_idle_world_generation=final_world.generation;
@@ -9283,7 +9423,7 @@ void run_stadium_c1_context_preflight(
                     std::fflush(stderr);
                 }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-                if(idle_state_snapshot_probe){
+                if(capture_idle_state){
                     check(idle_snapshot_containing_seen&&
                               idle_snapshot_first_post_before_seen&&go_post_tick_seen,
                           "Stadium idle snapshot interval did not reach its checked post-GO endpoint");
@@ -9399,13 +9539,15 @@ void run_stadium_c1_context_preflight(
                     std::cout<<"Stadium bounded Toy owner controls passed; one Ready plus no-acquisition and unarmed OnInit lifetimes, no C3 claim\n";
                 else if(post_ready_tick_probe)
                     std::cout<<"Stadium original source-session Ready plus one post-Ready source tick and checked owned-world retirement passed; exact GO alignment unobserved; no C3 claim\n";
+                else if(functional_idle_pair_probe)
+                    std::cout<<"Stadium one-world neutral 3,500 post-GO no-draw PCM ticks recorded typed idle snapshots and bounded per-tick RNG-owner rows with checked close; no C3 claim\n";
                 else if(functional_idle_probe)
                     std::cout<<"Stadium one-world neutral no-draw interval reached exactly 3,500 ticks after the GO-containing tick, with PCM processing and checked close; timer/transform state unobserved; no C3 claim\n";
                 else if(go_probe)
                     std::cout<<"Stadium source GO containing tick and immediately following full tick observed through HUD and checked close; source-frame values retained without ordinal inference; no C3 claim\n";
                 else
                     std::cout<<"Stadium original source-session Ready and checked owned-world retirement passed; one lifetime, no draw/post-GO idle/C3 claim\n";
-                if(idle_state_snapshot_probe)
+                if(capture_idle_state)
                     std::cout<<"Stadium live typed idle snapshots captured at GO tick exit and around the first full post-GO tick; no extra tick/draw or C3 claim\n";
                 return;
             }catch(const std::exception& first){
@@ -10454,7 +10596,7 @@ int main(int argc,char** argv){try{
   }
   check(world_generations[1]>world_generations[0],
         "Second functional-idle lifetime did not receive a newer world generation");
-  std::cout<<"Two same-process Stadium functional-idle lifetimes each reached 3,500 post-GO no-draw PCM ticks and fully retired their owners; no C3 claim\n";
+  std::cout<<"Two same-process Stadium functional-idle lifetimes each recorded 3,500 GO-relative typed idle snapshots and bounded per-tick RNG-owner rows with PCM processing and fully retired owners; no C3 claim\n";
   return 0;
  }
 #endif

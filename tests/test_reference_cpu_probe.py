@@ -67,6 +67,10 @@ int main(int argc, char** argv) {
     return 0;
   }
   if (action == "helpers") {
+    assert(std::string(CpuProbeOwnerCallbackSymbol(0,0x8005c9a4)) == "null");
+    assert(std::string(CpuProbeOwnerCallbackSymbol(1,0x8005c9a4)) == "\"efLib_particles_proc_main\"");
+    assert(std::string(CpuProbeOwnerCallbackSymbol(1,0x801d1390)) == "\"grStadium_801D1390\"");
+    assert(std::string(CpuProbeOwnerCallbackSymbol(1,0x8005c9a8)) == "\"unknown\"");
     u32 result = 42;
     for (const auto bad : {"", "-1", "+1", "1 ", " 1", "0x10", "1.0", "4294967296"})
       assert(!ParseBoundedDecimal(bad, UINT32_MAX, &result));
@@ -101,8 +105,18 @@ int main(int argc, char** argv) {
     assert(settings.valid && settings.rng_returns && settings.rng_return_pc == 0);
     assert(SelectedRngReturn(0, true, 0x80380524));
     assert(SelectedRngReturn(0, true, 0x8038057c));
+    assert(!settings.rng_updates);
+    assert(!SelectedRngReturn(0, true, 0x803805b8));
     assert(!SelectedRngReturn(0, true, 0x80380528));
     assert(!SelectedRngReturn(0x80380524, false, 0x8038057c));
+  }
+  else if (action == "rng-updates") {
+    assert(settings.valid && settings.rng_returns && settings.rng_updates && settings.rng_return_pc == 0);
+    for(u32 pc:{0x80380524U,0x8038057cU,0x803805b8U}) assert(SelectedRngReturn(0,true,pc,true));
+    assert(!SelectedRngReturn(0,true,0x803805bc,true));
+    assert(std::string(CombinedRngSelection(true)).find("randi") == std::string::npos);
+    assert(std::string(CombinedRngSelection(true)).find("0x803805b8") != std::string::npos);
+    assert(std::string(CombinedRngSelection(false)).find("0x803805b8") == std::string::npos);
   }
   else if (action == "rand-return") assert(settings.valid && settings.rng_return_site == "rand_return" && settings.rng_return_pc == 0x80380524);
   else if (action == "randf-return") assert(settings.valid && settings.rng_return_site == "randf_return" && settings.rng_return_pc == 0x8038057c);
@@ -148,8 +162,10 @@ typedef void (*GObj_RenderFunc)(HSD_GObj*, int);
 HSD_GObj* HSD_GObj_804D781C;
 HSD_GObjProc* HSD_GObj_804D7838;
 void grStadium_801D1390(HSD_GObj* o) { (void)o; }
+void efLib_particles_proc_main(HSD_GObj* o) { (void)o; }
 enum { MELEE_WEB_RNG_DRAW_RAND=0, MELEE_WEB_RNG_DRAW_RANDF=1 };
 '''
+        native = native.replace("#include <melee/ef/eflib.h>\n", "")
         native = native.replace("#include <melee/gr/grpstadium.h>\n", "")
         native = re.sub(r'^#include "gameplay_cpu_observation.h"\n', '', native)
         native = re.sub(r'^#include <sysdolphin/baselib/(gobj|gobjproc).h>\n', '', native, flags=re.M)
@@ -158,8 +174,10 @@ static void callback(HSD_GObj* o) { (void)o; }
 int main(int argc, char** argv) {
   assert(argc == 2);
   HSD_GObj gobj = {0}; HSD_GObjProc proc = {0};
-  gobj.classifier=13; gobj.p_link=4; proc.s_link=7;
-  proc.gobj=&gobj; proc.on_invoke=grStadium_801D1390;
+  gobj.classifier=13; gobj.p_link=4; proc.s_link=7; proc.gobj=&gobj;
+  if(strcmp(argv[1],"particle")==0) {gobj.classifier=8;gobj.p_link=11;proc.s_link=15;proc.on_invoke=efLib_particles_proc_main;}
+  else if(strcmp(argv[1],"unknown")==0) proc.on_invoke=callback;
+  else proc.on_invoke=grStadium_801D1390;
   rng_draw_probe_active=1; rng_draw_probe_cursor=12;
   rng_draw_probe_owners=strcmp(argv[1],"legacy")!=0;
   melee_web_cpu_observation_rng_draw(0x12345678,0);
@@ -169,9 +187,9 @@ int main(int argc, char** argv) {
   melee_web_cpu_observation_rng_draw(0x23456789,1);
   if(rng_draw_probe_owners) {
     assert(rng_draw_probe_entries[0].proc==0);
-    assert(rng_draw_probe_entries[1].classifier==13);
-    assert(rng_draw_probe_entries[1].p_link==4);
-    assert(rng_draw_probe_entries[1].s_link==7);
+    assert(rng_draw_probe_entries[1].classifier==gobj.classifier);
+    assert(rng_draw_probe_entries[1].p_link==gobj.p_link);
+    assert(rng_draw_probe_entries[1].s_link==proc.s_link);
   }
   if(strcmp(argv[1],"capacity")==0) {
     while(rng_draw_probe_count<RNG_DRAW_PROBE_MAX_PER_FRAME)
@@ -196,7 +214,7 @@ int main(int argc, char** argv) {
         binary = path.with_suffix("")
         built = subprocess.run([compiler, "-std=c11", "-Wall", "-Wextra", "-Wno-unused-variable", str(path), "-o", str(binary)], capture_output=True, text=True)
         self.assertEqual(built.returncode, 0, built.stderr)
-        for mode in ("legacy", "owners", "capacity"):
+        for mode in ("legacy", "owners", "particle", "unknown", "capacity"):
             result = subprocess.run([str(binary), mode], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             row = json.loads(result.stderr.removeprefix("RNG_DRAW_PROBE "))
@@ -207,7 +225,15 @@ int main(int argc, char** argv) {
             else:
                 self.assertEqual(row["draws"][0]["owner"]["status"], "outside_proc")
                 self.assertEqual(row["draws"][1]["owner"]["status"], "scheduled_proc")
-                self.assertEqual(row["draws"][1]["owner"]["callback_symbol"], "grStadium_801D1390")
+                if mode == "particle":
+                    self.assertEqual(row["draws"][1]["owner"]["callback_symbol"], "efLib_particles_proc_main")
+                    self.assertEqual((row["draws"][1]["owner"]["classifier"],
+                                      row["draws"][1]["owner"]["p_link"],
+                                      row["draws"][1]["owner"]["s_link"]), (8, 11, 15))
+                elif mode == "unknown":
+                    self.assertEqual(row["draws"][1]["owner"]["callback_symbol"], "unknown")
+                else:
+                    self.assertEqual(row["draws"][1]["owner"]["callback_symbol"], "grStadium_801D1390")
                 if mode == "capacity": self.assertEqual(len(row["draws"]),1024)
         for mode in ("partial", "backpointer"):
             result = subprocess.run([str(binary), mode], capture_output=True, text=True)
@@ -269,6 +295,13 @@ int main() {
         result = subprocess.run([str(binary)],capture_output=True,text=True)
         self.assertEqual(result.returncode,0,result.stderr)
 
+    def test_particle_callback_mapping_is_source_backed(self):
+        symbols = (ROOT / '.deps/melee/config/GALE01/symbols.txt').read_text()
+        source = (ROOT / '.deps/melee/src/melee/ef/eflib.c').read_text()
+        self.assertIn('efLib_particles_proc_main = .text:0x8005C9A4;', symbols)
+        self.assertIn('gobj = GObj_Create(8U, 0xBU, 1U);', source)
+        self.assertIn('HSD_GObj_SetupProc(gobj, efLib_particles_proc_main, 0xFU);', source)
+
     def test_compiled_bounds_and_bit_serialization(self):
         self.run_probe("helpers")
 
@@ -287,6 +320,7 @@ int main() {
         self.run_probe("enabled", **good)
         self.run_probe("disabled", **dict(good, MWRC_ENABLE="0"))
         self.run_probe("rng-returns", **dict(good, MWRC_CPU_PROBE_RNG_RETURN_SITE="rng_returns"))
+        self.run_probe("rng-updates", **dict(good, MWRC_CPU_PROBE_RNG_RETURN_SITE="rng_updates"))
         self.run_probe("rand-return", **dict(good, MWRC_ENABLE="1",
                                                MWRC_CPU_PROBE_RNG_RETURN_SITE="rand_return"))
         self.run_probe("randf-return", **dict(good, MWRC_ENABLE="1",

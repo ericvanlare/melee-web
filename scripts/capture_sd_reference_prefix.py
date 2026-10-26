@@ -914,7 +914,7 @@ def prepare_rules_profile(profile, user, *, source_slots=(0, 1)):
 
 
 def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_manifest, timeout=180, gci=None,
-        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False, stadium_go_ordinal2=False, stadium_whole_target=None, stadium_whole_setup=None, stadium_whole_gc=None, stadium_whole_dol=None, stadium_whole_provenance=None, stadium_whole_b_state=False, stadium_whole_rng_window=None):
+        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False, stadium_go_ordinal2=False, stadium_whole_target=None, stadium_whole_setup=None, stadium_whole_gc=None, stadium_whole_dol=None, stadium_whole_provenance=None, stadium_whole_b_state=False, stadium_whole_rng_window=None, stadium_whole_replay_binding=None, stadium_whole_rng_coverage="rng_returns"):
     """Own fresh output before preparation so failures cannot vanish before launch."""
     require(type(stadium_whole_b_state) is bool, "Whole Stadium B observation opt-in must be boolean")
     whole_args = (stadium_whole_target, stadium_whole_setup, stadium_whole_gc,
@@ -929,7 +929,9 @@ def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_m
             menu_recipe=menu_recipe, output=output, build_manifest=build_manifest,
             target_path=stadium_whole_target, setup_path=stadium_whole_setup,
             checkpoint_gc=stadium_whole_gc, dol=stadium_whole_dol,
-            provenance=stadium_whole_provenance, gci=gci, timeout=timeout, stadium_whole_b_state=stadium_whole_b_state, stadium_whole_rng_window=stadium_whole_rng_window)
+            provenance=stadium_whole_provenance, gci=gci, timeout=timeout, stadium_whole_b_state=stadium_whole_b_state, stadium_whole_rng_window=stadium_whole_rng_window, stadium_whole_replay_binding=stadium_whole_replay_binding, stadium_whole_rng_coverage=stadium_whole_rng_coverage)
+    require(stadium_whole_rng_coverage == "rng_returns", "Whole Stadium RNG coverage requires the whole3 window")
+    require(stadium_whole_replay_binding is None, "Whole Stadium replay requires the whole3 input tuple")
     require(stadium_whole_rng_window is None, "Whole Stadium RNG window requires the whole3 input tuple")
     require(not stadium_whole_b_state, "Whole Stadium B observation requires the whole3 input tuple")
     require(type(stadium_go_ordinal2) is bool and
@@ -1880,10 +1882,11 @@ def drive_stadium_sss_feedback(receiver, menus, controller, next_row, wait_sourc
 
 class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
     """Strict whole-session rows feeding the existing CSS/SSS input policies."""
-    def __init__(self, menus, receipt, expected, *, stadium_whole_b_state=False):
+    def __init__(self, menus, receipt, expected, *, stadium_whole_b_state=False, replay_binding_sha256=None):
         super().__init__(menus)
         require(type(stadium_whole_b_state) is bool, "Whole Stadium B observation opt-in must be boolean")
         from stadium_go_prefix import StadiumConstructorObservations
+        self.replay_binding_sha256 = replay_binding_sha256
         self.stadium_whole_b_state = stadium_whole_b_state
         self.b_constructor = StadiumConstructorObservations()
         self.b_entry_seen = False
@@ -1918,7 +1921,7 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
         # Carry only its closed counter; all geometry and owner state is fresh.
         last_sss_call = self.sss_positions.last_call
         seq, boundaries, announcements, index = self.seq, self.boundaries, self.announcements, self.match_index
-        fresh = type(self)(self.menus, self.receipt, self.expected, stadium_whole_b_state=self.stadium_whole_b_state)
+        fresh = type(self)(self.menus, self.receipt, self.expected, stadium_whole_b_state=self.stadium_whole_b_state, replay_binding_sha256=self.replay_binding_sha256)
         fresh.b_observation = self.b_observation
         fresh.sss_positions.last_call = last_sss_call
         self.__dict__.update(fresh.__dict__)
@@ -2002,6 +2005,8 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
             require(payload.get('stadium_whole_b_state', False) is self.stadium_whole_b_state and
                     (not self.stadium_whole_b_state or type(payload.get('stadium_observed_match')) is int and payload['stadium_observed_match'] == 1),
                     'Whole Stadium B announcement opt-in differs')
+            require(payload.get('stadium_whole_replay_binding_sha256') == self.replay_binding_sha256,
+                    'Whole Stadium replay source announcement differs')
             self.announcements.append(event)
             return
         require(self.announcements == ['handshake', 'start'], 'Whole Stadium row preceded announcements')
@@ -2352,7 +2357,7 @@ def parse_stadium_whole_rng_window(value):
     return int(value[0]),int(value[2])
 
 
-def validate_stadium_whole_rng_sidecar(path, offsets, go, status, dol_sha256):
+def validate_stadium_whole_rng_sidecar(path, offsets, go, status, dol_sha256, coverage="rng_returns"):
     # This validates bounded same-run raw capture, not original/native parity.
     from reference_capture_app import validate_cpu_rng_probe
     require(isinstance(go,dict) and type(go.get('source_tick')) is int and
@@ -2369,7 +2374,8 @@ def validate_stadium_whole_rng_sidecar(path, offsets, go, status, dol_sha256):
     require(isinstance(probe,dict) and isinstance(close,dict) and
             all(type(row.get(k)) is type(v) and row.get(k)==v for row in (probe,close) for k,v in metadata.items()),
             'Whole Stadium RNG sidecar/header/status differ from actual GO and requested offsets')
-    request=dict(site='rng_returns',match=1,first_tick=raw_first,last_tick=raw_last)
+    require(coverage in ('rng_returns','rng_updates'), 'Unknown whole RNG coverage')
+    request=dict(site=coverage,match=1,first_tick=raw_first,last_tick=raw_last)
     result=validate_cpu_rng_probe(path,request,'stadium-whole3','primary3-allocation2-feedback',dol_sha256,status)
     result.update(scope='same-run raw guard-band capture only; extras retained; no paired owner parity',
         requested_pair_offsets=[first,last],raw_source_tick_bounds=[raw_first,raw_last],
@@ -2378,12 +2384,131 @@ def validate_stadium_whole_rng_sidecar(path, offsets, go, status, dol_sha256):
     return result
 
 
+class StadiumReplayIntentObserver:
+    """Observe existing policy decisions; this object owns no Pipe or input service.
+
+    Each policy wait still validates newly observed consumed PAD bytes. Requests
+    cannot change the prerecorded stream, acknowledge native work, or grant a
+    phase transition. A final exact source recipe/seed comparison is mandatory.
+    """
+    sleep = staticmethod(time.sleep)
+
+    def __init__(self, log):
+        self.log = Path(log)
+        require(not self.log.exists(), 'Replay policy observation log already exists')
+        self.count = 0
+
+    def set_both(self, p1, p2, *, action):
+        require(self.count < STADIUM_CAPTURE_CAPS['intent_records'] and
+                isinstance(action,str) and 0 < len(action) <= 96 and
+                all(32 <= ord(c) <= 126 for c in action), 'Replay policy observation cap')
+        pipe_commands(p1); pipe_commands(p2)  # Validate syntax, never dispatch.
+        record=(json.dumps(dict(index=self.count,action=action,pads=[p1,p2],
+                                input_written=False),sort_keys=True)+'\n').encode()
+        require((self.log.stat().st_size if self.log.exists() else 0)+len(record) <=
+                STADIUM_CAPTURE_CAPS['intent_bytes'], 'Replay policy byte cap')
+        with self.log.open('ab') as stream: stream.write(record)
+        self.count += 1
+
+
+def stadium_whole_replay_preflight(binding_path, *, output, setup_path, expected,
+                                    profile_inventory, disc, dol):
+    """Admit one complete raw source; never manufacture a finalized bundle.
+
+    Reuse the eight-role raw identity binding, but not the fixed2013 exporter:
+    this adapter validates input provenance; browser context admission remains
+    a separate unchanged strict comparison after the new capture.
+    """
+    import stadium_later_b_reference as reference
+    import stadium_current_context_packet as context
+    from capture_retail_replay import _sha256
+    from capture_allocation_history import validate_reference_build_manifest
+    raw, _ = reference._read_binding_snapshot(binding_path)
+    binding=json.loads(raw)
+    require(binding.get('schema')==reference.SCHEMA,
+            'Whole replay source must be an original record binding')
+    paths=reference.verified_files(binding)
+    require(not Path(binding_path).resolve().is_relative_to(Path(output).resolve()),
+            'Whole replay binding must be outside fresh output')
+    for path in paths.values():
+        require(not path.resolve().is_relative_to(Path(output).resolve()),
+                'Whole replay source must be outside fresh output')
+    source_launch=json.loads(paths['launch'].read_text())
+    source_report=json.loads(paths['report'].read_text())
+    require(source_report.get('result')=='pass' and not source_report.get('cleanup_errors') and
+            source_report.get('scope')=='original-stadium-whole3-feedback-allocation2' and
+            source_launch.get('input_mode','record')=='record',
+            'Whole replay requires a completed original raw recording')
+    for role, launch_key in [('setup_receipt','setup'),('producer_manifest','manifest')]:
+        require(source_launch[launch_key]['sha256']==binding['files'][role]['sha256'] and
+                Path(source_launch[launch_key]['path'])==paths[role],
+                'Whole replay source producer/setup role differs')
+    validate_reference_build_manifest(paths['producer_manifest'],Path(source_launch['command'][0]))
+    summary=validate_input_stream(paths['si'])
+    require(summary['bytes']<=STADIUM_CAPTURE_CAPS['input_bytes'] and
+            source_report['input_stream']==summary and
+            source_report['native']['primary_sha256']==binding['files']['primary']['sha256'],
+            'Whole replay source report/raw identity differs')
+    validate_status(paths['si_status'],mode='record',events=summary['events'],require_complete=True)
+    capture=context.replay.capture_from_path(paths['primary'],paths['primary_status'])
+    require(capture['declared_setups']==[expected]*3 and
+            source_launch['expected']==expected and source_launch['profile_inventory']==profile_inventory,
+            'Whole replay source declared Setup/profile differs')
+    prior=json.loads(paths['setup_receipt'].read_text());current=json.loads(Path(setup_path).read_text())
+    # Native observer build changes are explicit; all game/profile/initial-save
+    # identities are identical. Reconciliation prose is retained, not authority.
+    for key in ('schema','version','disc','dol','external_save_hashes','initial_card',
+                'reference_run_configuration','retail_provenance','template_source','source_profile_export'):
+        require(key in prior and prior[key]==current.get(key),
+                'Whole replay current game/setup identity differs: '+key)
+    require(prior['disc']['sha256']==_sha256(Path(disc)) and
+            prior['dol']['sha256']==_sha256(Path(dol)) and
+            source_launch['environment_delta']['MWRC_DOL_SHA256']==prior['dol']['sha256'],
+            'Whole replay actual disc/DOL identity differs')
+    reference.verified_files(binding)
+    require(reference._read_binding_snapshot(binding_path)[0]==raw,
+            'Whole replay binding changed during admission')
+    return dict(binding_path=str(Path(binding_path).resolve()),binding_sha256=hashlib.sha256(raw).hexdigest(),
+                source=str(paths['si']),summary=summary,source_files=binding['files'],
+                source_profile_inventory=profile_inventory,
+                scope='complete raw input replay only; no finalized bundle or browser authority')
+
+
+def stadium_whole_replay_complete(source, native_status, primary, primary_status, expected):
+    """Require actual replay completion and same newly consumed source workload."""
+    import stadium_later_b_reference as reference
+    import stadium_current_context_packet as context
+    raw,_=reference._read_binding_snapshot(source['binding_path'])
+    require(hashlib.sha256(raw).hexdigest()==source['binding_sha256'], 'Whole replay binding changed')
+    binding=json.loads(raw);paths=reference.verified_files(binding)
+    require(binding['files']==source['source_files'] and str(paths['si'])==source['source'],
+            'Whole replay source roles changed')
+    summary=validate_input_stream(paths['si'])
+    require(summary==source['summary'], 'Whole replay input changed')
+    validate_status(native_status,mode='replay',events=summary['events'],require_complete=True)
+    old=context.replay.capture_from_path(paths['primary'],paths['primary_status'])
+    new=context.replay.capture_from_path(primary,primary_status)
+    require(context.replay.encode_v8(old)[0]==context.replay.encode_v8(new)[0],
+            'Whole replay actual consumed recipe differs from recorded source')
+    old_packet=context.packet_from_records(list(context.replay.iter_records(paths['primary'])),expected)
+    new_packet=context.packet_from_records(list(context.replay.iter_records(primary)),expected)
+    for previous,current in zip(old_packet['matches'],new_packet['matches']):
+        for phase in ('entry','setup'):
+            require(previous[phase]['rng']['value_hex']==current[phase]['rng']['value_hex'],
+                    'Whole replay actual Entry/Setup seed differs')
+    reference.verified_files(binding)
+    return summary
+
+
 def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, build_manifest,
-                             target_path, setup_path, checkpoint_gc, dol, provenance, gci, timeout, stadium_whole_b_state=False, stadium_whole_rng_window=None):
+                             target_path, setup_path, checkpoint_gc, dol, provenance, gci, timeout, stadium_whole_b_state=False, stadium_whole_rng_window=None, stadium_whole_replay_binding=None, stadium_whole_rng_coverage="rng_returns"):
     """Explicit private whole3/sidecar2 diagnostic using the existing passive route."""
     import types
     require(type(stadium_whole_b_state) is bool, "Whole Stadium B observation opt-in must be boolean")
     rng_window=parse_stadium_whole_rng_window(stadium_whole_rng_window)
+    require(stadium_whole_rng_coverage in ("rng_returns","rng_updates") and
+            (rng_window is not None or stadium_whole_rng_coverage == "rng_returns"),
+            "Whole Stadium RNG coverage requires its explicit bounded window")
     require(rng_window is None or stadium_whole_b_state,
             'Whole Stadium RNG window requires the selected match1 B-state observer')
     from capture_allocation_history import (validate_setup_receipt, stadium_three_target,
@@ -2444,13 +2569,27 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             env.update(MWRC_STADIUM_WHOLE_RNG_RETURNS='1',
                 MWRC_CPU_PROBE_OUTPUT=str(output/'rng-returns.json'),MWRC_CPU_PROBE_MATCH='1',
                 MWRC_CPU_PROBE_FIRST_TICK=str(rng_window[0]),MWRC_CPU_PROBE_LAST_TICK=str(rng_window[1]),
-                MWRC_CPU_PROBE_RNG_RETURN_SITE='rng_returns')
+                MWRC_CPU_PROBE_RNG_RETURN_SITE=stadium_whole_rng_coverage)
         command=rules_dolphin_command(dolphin,user,disc)+['-C','Dolphin.Core.SlotA=8',
             '-C','Dolphin.Core.GCIFolderAPath='+str(output/'gci-folder')]
         receiver=StadiumWholeFeedbackReceiver(menus,setup['sha256'],expected,stadium_whole_b_state=stadium_whole_b_state)
-        controller=StadiumIntentController(p1,p2,output/'input-intentions.jsonl')
+        replay_source = None
+        if stadium_whole_replay_binding is not None:
+            require(rng_window is not None and stadium_whole_b_state,
+                    'Whole Stadium replay requires B state and combined RNG observation')
+            replay_source = stadium_whole_replay_preflight(stadium_whole_replay_binding,
+                output=output, setup_path=setup_path, expected=expected,
+                profile_inventory=profile_inventory, disc=disc, dol=dol)
+            env.pop('MWRC_INPUT_RECORD')
+            env['MWRC_INPUT_REPLAY']=replay_source['source']
+            env['MWRC_STADIUM_WHOLE_REPLAY_BINDING']=replay_source['binding_sha256']
+            receiver.replay_binding_sha256=replay_source['binding_sha256']
+        controller=(StadiumReplayIntentObserver(output/'replay-policy-intentions.jsonl') if replay_source else
+                    StadiumIntentController(p1,p2,output/'input-intentions.jsonl'))
         launch=dict(command=command,environment_delta={k:v for k,v in env.items() if k.startswith('MWRC_')},manifest=build,setup=setup,expected=expected,
                     profile_inventory=profile_inventory,owned_gci=dict(path=str(owned_gci),bytes=owned_gci.stat().st_size,sha256=hashlib.sha256(owned_gci.read_bytes()).hexdigest()),operation_seconds=180,owner_seconds=210,cleanup_seconds=30)
+        if replay_source is not None:
+            launch.update(input_mode='replay', input_replay=replay_source)
         (output/'launch.json').write_bytes(canonical(launch))
         require(time.monotonic()<deadline,'Whole Stadium operation expired before native launch')
         log=(output/'dolphin.log').open('xb')
@@ -2461,15 +2600,24 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             check_stadium_capture_bounds(raw,native,deadline,receiver.seq)
         with ObserverTail(raw,status,wait_check=wait_check) as tail:
             report['actual_inputs']=drive_stadium_whole_three(receiver,tail,controller,menus,deadline)
-        wait_transform_terminal_statuses(status,native_status,deadline,wait_check=wait_check)
+        wait_transform_terminal_statuses(status,native_status,deadline,wait_check=wait_check,
+            input_mode="replay" if replay_source is not None else "record")
         if stadium_whole_b_state:
             require(receiver.b_observation is not None, 'Whole Stadium B observation incomplete')
             report['stadium_b_observation']=receiver.b_observation
-        report['input_stream']=validate_input_stream(native)
+        if replay_source is None:
+            report['input_stream']=validate_input_stream(native)
+        else:
+            report['input_stream']=stadium_whole_replay_complete(replay_source,native_status,
+                raw,status,expected)
+            report['input_replay']=replay_source
+            report['input_replay_status']=validate_status(native_status,mode='replay',
+                events=replay_source['summary']['events'],require_complete=True)
         report['native']=validate_stadium_three_native(output,allocation_profile,expected)
         if rng_window is not None:
             report['rng_returns']=validate_stadium_whole_rng_sidecar(output/'rng-returns.json',rng_window,
-                receiver.b_observation['go'],read_status(status),env['MWRC_DOL_SHA256'])
+                receiver.b_observation['go'],read_status(status),env['MWRC_DOL_SHA256'],
+                coverage=stadium_whole_rng_coverage)
         require(time.monotonic()<deadline,'Whole Stadium operation expired during final validation')
         report['result']='pass'
         cleanup_process(process,output,scope=report['scope'])
@@ -2525,6 +2673,10 @@ def main(argv=None):
                             help='Explicit whole3/allocation2 passive source-route input identity')
     parser.add_argument("--stadium-whole-b-state", action="store_true",
                         help="Whole3-only selected match1 constructor/actual-GO/state adjunct; terminal unchanged")
+    parser.add_argument('--stadium-whole-replay-binding',type=Path,
+                        help='Bound complete raw whole3 MWRI diagnostic replay; requires B-state+combined RNG')
+    parser.add_argument("--stadium-whole-rng-coverage",choices=("rng_returns","rng_updates"),
+                        default="rng_returns",help="Explicit v4 two-site or v5 three-site LCG update coverage")
     parser.add_argument("--stadium-whole-rng-window",
                         help="Whole3+B-state combined RNG adjunct;1–9 post-GO pair offsets, raw guard-band extras retained")
     args = parser.parse_args(argv)

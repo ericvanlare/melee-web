@@ -186,6 +186,11 @@
       "label": "rand_return",
       "address": "0x80380524",
       "expected_word": "0x4e800020"
+    },
+    {
+      "label": "randi_return",
+      "address": "0x803805b8",
+      "expected_word": "0x4e800020"
     }
   ],
   "extra_memory": [

@@ -76,7 +76,7 @@ export function validateRngDrawProbeRows(textRows, selection, {observedCursor, d
           throw Error('RNG draw probe owner encoding is invalid');
         if (!Object.hasOwn(owner,'callback_symbol') ||
             (owner.status === 'outside_proc' ? owner.callback_symbol !== null :
-             !['unknown','grStadium_801D1390'].includes(owner.callback_symbol)))
+             !['unknown','grStadium_801D1390','efLib_particles_proc_main'].includes(owner.callback_symbol)))
           throw Error('RNG draw callback symbol is invalid');
         if (owner.status === 'outside_proc') {
           if (!['gobj','proc','callback'].every(key => owner[key] === zero) ||

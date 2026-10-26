@@ -20,6 +20,7 @@ from stadium_go_prefix import (CONSTRUCTOR_POINTS, StadiumConstructorObservation
                                _validate_progress, _validate_stadium_idle_state_record)
 
 SCHEMA = 'melee-web-stadium-later-b-reference-operands-v1'
+REPLAY_SCHEMA = 'melee-web-stadium-later-b-reference-replay-operands-v2'
 VARIANT = 'private-original-b-2013-943-reference-only'
 ROLES = {'primary', 'primary_status', 'si', 'si_status', 'launch', 'report',
          'setup_receipt', 'producer_manifest'}
@@ -29,6 +30,7 @@ GATE2_REFERENCE_ID = 'original-b-2013-943-v1'
 GATE2_ACTION_STEPS = 180
 GATE2_GO_STATES = 96
 GATE2_PREFIX_INPUTS = 943
+REPLAY_ROLES = ROLES | {'replay_source_binding', 'replay_status'}
 MAX_BINDING_BYTES = 64 * 1024
 
 
@@ -38,10 +40,11 @@ def require(value, message):
 
 
 def verified_files(binding):
-    require(set(binding) == {'schema', 'files'} and binding['schema'] == SCHEMA,
+    require(set(binding) == {'schema', 'files'} and binding['schema'] in (SCHEMA, REPLAY_SCHEMA),
             'unknown operand binding schema or field')
     files = binding['files']
-    require(set(files) == ROLES, 'unknown or missing consumed operand role')
+    require(set(files) == (ROLES if binding['schema'] == SCHEMA else REPLAY_ROLES),
+            'unknown or missing consumed operand role')
     paths = {}
     for role, pin in files.items():
         require(set(pin) == {'path', 'bytes', 'sha256'}, 'malformed operand pin')
@@ -577,8 +580,59 @@ def load(binding):
             for row in result['whole_session_context']['inputs']], 'strict input extraction differs')
     events = si.validate_stream(paths['si'])
     si.validate_status(paths['si_status'], mode='record', events=events['events'], require_complete=True)
+    mode = launch.get('input_mode', 'record')
+    require(mode in ('record', 'replay') and
+            (mode == 'replay') == (binding['schema'] == REPLAY_SCHEMA),
+            'input mode requires its explicit record or replay binding schema')
+    if mode == 'replay':
+        validate_replay_operand_source(binding, paths, launch, report, strict, events)
     verified_files(binding)
     return result
+
+
+def validate_replay_operand_source(binding, paths, launch, report, strict, events):
+    # Retained record input and status are distinct from CURRENT replay status.
+    raw, _ = _read_binding_snapshot(paths['replay_source_binding'])
+    source_binding = json.loads(raw)
+    require(source_binding.get('schema') == SCHEMA,
+            'replay source must be an original record binding, never recursive replay')
+    source_paths = verified_files(source_binding)
+    source_operands = load(source_binding)  # All unchanged original context guards.
+    for role in ('si', 'si_status'):
+        require(binding['files'][role] == source_binding['files'][role],
+                'replay retained input/status role differs from original binding')
+    receipt = launch.get('input_replay')
+    require(isinstance(receipt, dict) and report.get('input_replay') == receipt and
+            receipt.get('binding_sha256') == hashlib.sha256(raw).hexdigest() and
+            Path(receipt.get('binding_path', '')) == paths['replay_source_binding'] and
+            receipt.get('source_files') == source_binding['files'] and
+            Path(receipt.get('source', '')) == paths['si'] and
+            receipt.get('summary') == events and report['input_stream'] == events,
+            'current replay launch/report and original source binding differ')
+    environment = launch['environment_delta']
+    require(environment.get('MWRC_STADIUM_WHOLE_REPLAY_BINDING') == receipt['binding_sha256'] and
+            environment.get('MWRC_INPUT_REPLAY') == str(paths['si']) and
+            not environment.get('MWRC_INPUT_RECORD') and
+            environment.get('MWRC_INPUT_STATUS') == str(paths['replay_status']),
+            'current replay native input-source environment differs')
+    replay_status = si.validate_status(paths['replay_status'], mode='replay',
+                                      events=events['events'], require_complete=True)
+    require(report.get('input_replay_status') == replay_status,
+            'current replay completion status differs from report')
+    previous = context.replay.capture_from_path(source_paths['primary'], source_paths['primary_status'])
+    require(context.replay.encode_v8(previous)[0] == context.replay.encode_v8(strict)[0],
+            'current replay consumed recipe differs from original source')
+    current_rows = list(context.replay.iter_records(paths['primary']))
+    current_packet = context.packet_from_records(current_rows, launch['expected'])
+    previous_packet = source_operands['whole_session_context']
+    for prior_match, current_match in zip(previous_packet['matches'], current_packet['matches']):
+        for phase in ('entry', 'setup'):
+            require(prior_match[phase]['rng']['value_hex'] == current_match[phase]['rng']['value_hex'],
+                    'current replay actual Entry/Setup seed differs')
+    for row in current_rows[:2]:
+        require(row['payload'].get('stadium_whole_replay_binding_sha256') == receipt['binding_sha256'],
+                'current replay raw announcement lacks bound source identity')
+    verified_files(source_binding)
 
 
 def require_runtime_admission(_operands):
