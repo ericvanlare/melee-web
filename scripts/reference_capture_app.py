@@ -168,7 +168,9 @@ def validate_cpu_rng_probe(path, request, capture_id, sequence_id, dol_sha256, s
             probe.get("record_count") != len(records)):
         raise EnvironmentError("CPU RNG probe sidecar identity or bounded window is invalid")
     previous_tick = request["first_tick"]
-    for record in records:
+    previous_sequence = 0
+    previous_draw = 0
+    for ordinal, record in enumerate(records):
         if (not isinstance(record, dict) or record.get("label") not in sites or
                 record.get("pc") != sites[record["label"]] or
                 (not combined and record.get("label") != request["site"]) or
@@ -178,6 +180,18 @@ def validate_cpu_rng_probe(path, request, capture_id, sequence_id, dol_sha256, s
                 not request["first_tick"] <= record["source_tick"] <= request["last_tick"]):
             raise EnvironmentError("CPU RNG probe contains a record outside the selected return site/window")
         if combined:
+            seed_pointer=record.get("seed_owner_pointer")
+            if (not isinstance(seed_pointer,str) or re.fullmatch(r"0x[0-9a-f]{8}",seed_pointer) is None or
+                    int(seed_pointer,16)==0 or int(seed_pointer,16)&3 or not 0x80000000<=int(seed_pointer,16)<=0x817ffffc or
+                    not isinstance(record.get("seed_after"),str) or re.fullmatch(r"[0-9a-f]{8}",record["seed_after"]) is None):
+                raise EnvironmentError("CPU RNG actual seed owner/value encoding is invalid")
+            if isinstance(record.get("rng_ordinal"), bool) or record.get("rng_ordinal") != ordinal or any(
+                    isinstance(record.get(k), bool) or not isinstance(record.get(k), int) or
+                    not 0 <= record[k] <= maximum for k, maximum in (("observer_next_sequence",9007199254740991),("draw_ordinal",4294967295))):
+                raise EnvironmentError("CPU RNG stream counter identity is invalid")
+            if record["observer_next_sequence"] < previous_sequence or record["draw_ordinal"] < previous_draw:
+                raise EnvironmentError("CPU RNG stream counters decrease in callback order")
+            previous_sequence, previous_draw = record["observer_next_sequence"], record["draw_ordinal"]
             if record["source_tick"] < previous_tick:
                 raise EnvironmentError("CPU RNG source ticks decrease in callback order")
             previous_tick = record["source_tick"]

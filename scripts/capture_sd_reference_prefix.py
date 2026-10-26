@@ -914,7 +914,7 @@ def prepare_rules_profile(profile, user, *, source_slots=(0, 1)):
 
 
 def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_manifest, timeout=180, gci=None,
-        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False, stadium_go_ordinal2=False, stadium_whole_target=None, stadium_whole_setup=None, stadium_whole_gc=None, stadium_whole_dol=None, stadium_whole_provenance=None, stadium_whole_b_state=False):
+        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False, stadium_go_ordinal2=False, stadium_whole_target=None, stadium_whole_setup=None, stadium_whole_gc=None, stadium_whole_dol=None, stadium_whole_provenance=None, stadium_whole_b_state=False, stadium_whole_rng_window=None):
     """Own fresh output before preparation so failures cannot vanish before launch."""
     require(type(stadium_whole_b_state) is bool, "Whole Stadium B observation opt-in must be boolean")
     whole_args = (stadium_whole_target, stadium_whole_setup, stadium_whole_gc,
@@ -929,7 +929,8 @@ def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_m
             menu_recipe=menu_recipe, output=output, build_manifest=build_manifest,
             target_path=stadium_whole_target, setup_path=stadium_whole_setup,
             checkpoint_gc=stadium_whole_gc, dol=stadium_whole_dol,
-            provenance=stadium_whole_provenance, gci=gci, timeout=timeout, stadium_whole_b_state=stadium_whole_b_state)
+            provenance=stadium_whole_provenance, gci=gci, timeout=timeout, stadium_whole_b_state=stadium_whole_b_state, stadium_whole_rng_window=stadium_whole_rng_window)
+    require(stadium_whole_rng_window is None, "Whole Stadium RNG window requires the whole3 input tuple")
     require(not stadium_whole_b_state, "Whole Stadium B observation requires the whole3 input tuple")
     require(type(stadium_go_ordinal2) is bool and
             (not stadium_go_ordinal2 or input_replay is None),
@@ -2342,11 +2343,49 @@ def prepare_stadium_setup_gci_folder(checkpoint_gc, initial_gci, destination, se
     return copied[0]
 
 
+def parse_stadium_whole_rng_window(value):
+    if value is None:
+        return None
+    require(isinstance(value,str) and len(value)==3 and value[1]==':' and
+            '1'<=value[0]<=value[2]<='9',
+            'Whole Stadium RNG window requires FIRST:LAST pair offsets1..9 after actual GO')
+    return int(value[0]),int(value[2])
+
+
+def validate_stadium_whole_rng_sidecar(path, offsets, go, status, dol_sha256):
+    # This validates bounded same-run raw capture, not original/native parity.
+    from reference_capture_app import validate_cpu_rng_probe
+    require(isinstance(go,dict) and type(go.get('source_tick')) is int and
+            type(go.get('sequence')) is int, 'Whole Stadium RNG lacks its actual same-run B GO')
+    first,last=offsets;tick=go['source_tick']
+    raw_first,raw_last=tick+first-1,tick+last+1
+    require(0<=raw_first<=raw_last<=0xffffffff and raw_last-raw_first<64,
+            'Whole Stadium RNG actual GO raw guard band is out of bounds')
+    metadata=dict(window_basis='actual_go_raw_guard_band',requested_first_offset=first,
+        requested_last_offset=last,go_tick=tick,go_observer_sequence=go['sequence'],
+        first_guard_tick_partial=first==1)
+    probe=json.loads(Path(path).read_text())
+    close=status.get('cpu_probe_close') if isinstance(status,dict) else None
+    require(isinstance(probe,dict) and isinstance(close,dict) and
+            all(type(row.get(k)) is type(v) and row.get(k)==v for row in (probe,close) for k,v in metadata.items()),
+            'Whole Stadium RNG sidecar/header/status differ from actual GO and requested offsets')
+    request=dict(site='rng_returns',match=1,first_tick=raw_first,last_tick=raw_last)
+    result=validate_cpu_rng_probe(path,request,'stadium-whole3','primary3-allocation2-feedback',dol_sha256,status)
+    result.update(scope='same-run raw guard-band capture only; extras retained; no paired owner parity',
+        requested_pair_offsets=[first,last],raw_source_tick_bounds=[raw_first,raw_last],
+        actual_go=dict(source_tick=tick,sequence=go['sequence']),
+        requires_exact_sequence_projection=True,guard_band_extras_retained=True,C3=False)
+    return result
+
+
 def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, build_manifest,
-                             target_path, setup_path, checkpoint_gc, dol, provenance, gci, timeout, stadium_whole_b_state=False):
+                             target_path, setup_path, checkpoint_gc, dol, provenance, gci, timeout, stadium_whole_b_state=False, stadium_whole_rng_window=None):
     """Explicit private whole3/sidecar2 diagnostic using the existing passive route."""
     import types
     require(type(stadium_whole_b_state) is bool, "Whole Stadium B observation opt-in must be boolean")
+    rng_window=parse_stadium_whole_rng_window(stadium_whole_rng_window)
+    require(rng_window is None or stadium_whole_b_state,
+            'Whole Stadium RNG window requires the selected match1 B-state observer')
     from capture_allocation_history import (validate_setup_receipt, stadium_three_target,
                                             validate_stadium_three_native)
     from retail_allocation_profile import build_profile
@@ -2401,6 +2440,11 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             MWRC_STADIUM_WHOLE_FEEDBACK='1',MWRC_STADIUM_WHOLE_SETUP_RECEIPT_SHA256=setup['sha256'])
         if stadium_whole_b_state:
             env['MWRC_STADIUM_WHOLE_B_STATE']='1'
+        if rng_window is not None:
+            env.update(MWRC_STADIUM_WHOLE_RNG_RETURNS='1',
+                MWRC_CPU_PROBE_OUTPUT=str(output/'rng-returns.json'),MWRC_CPU_PROBE_MATCH='1',
+                MWRC_CPU_PROBE_FIRST_TICK=str(rng_window[0]),MWRC_CPU_PROBE_LAST_TICK=str(rng_window[1]),
+                MWRC_CPU_PROBE_RNG_RETURN_SITE='rng_returns')
         command=rules_dolphin_command(dolphin,user,disc)+['-C','Dolphin.Core.SlotA=8',
             '-C','Dolphin.Core.GCIFolderAPath='+str(output/'gci-folder')]
         receiver=StadiumWholeFeedbackReceiver(menus,setup['sha256'],expected,stadium_whole_b_state=stadium_whole_b_state)
@@ -2423,6 +2467,9 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             report['stadium_b_observation']=receiver.b_observation
         report['input_stream']=validate_input_stream(native)
         report['native']=validate_stadium_three_native(output,allocation_profile,expected)
+        if rng_window is not None:
+            report['rng_returns']=validate_stadium_whole_rng_sidecar(output/'rng-returns.json',rng_window,
+                receiver.b_observation['go'],read_status(status),env['MWRC_DOL_SHA256'])
         require(time.monotonic()<deadline,'Whole Stadium operation expired during final validation')
         report['result']='pass'
         cleanup_process(process,output,scope=report['scope'])
@@ -2478,6 +2525,8 @@ def main(argv=None):
                             help='Explicit whole3/allocation2 passive source-route input identity')
     parser.add_argument("--stadium-whole-b-state", action="store_true",
                         help="Whole3-only selected match1 constructor/actual-GO/state adjunct; terminal unchanged")
+    parser.add_argument("--stadium-whole-rng-window",
+                        help="Whole3+B-state combined RNG adjunct;1–9 post-GO pair offsets, raw guard-band extras retained")
     args = parser.parse_args(argv)
     try:
         comparator = None

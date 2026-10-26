@@ -224,14 +224,15 @@ int main(int argc, char** argv) {
 #include <cstring>
 #include <cassert>
 #include <string>
-using u8=uint8_t; using u16=uint16_t; using u32=uint32_t;
+using u8=uint8_t; using u16=uint16_t; using u32=uint32_t; using u64=uint64_t;
 u32 gobj=0,proc=0; bool invalid=false, readable=true; unsigned reads=0;
 std::array<u8,4> gb{}; std::array<u8,24> pb{};
-struct {u32 owner_gobj=0,owner_proc=0,owner_callback=0;u16 owner_classifier=0;u8 owner_p_link=0,owner_s_link=0;} record;
+u64 next_sequence=123;u32 draw_ordinal=7;
+struct {std::array<u8,8> random_seed_and_pointer{};u32 seed_owner_pointer=0,seed_after=0;u64 observer_next_sequence=0;u32 rng_draw_ordinal=0;u32 owner_gobj=0,owner_proc=0,owner_callback=0;u16 owner_classifier=0;u8 owner_p_link=0,owner_s_link=0;} record;
 bool cpu_probe_rng_returns=true;
 void SetInvalid(const char*) {invalid=true;}
 bool IsMem1Range(u32 a, size_t n) {return a>=0x80000000 && uint64_t(a)+n<=0x81800000;}
-bool ReadU32(void*,u32 a,u32* v) {if(a==0x804d781c)*v=gobj;else if(a==0x804d7838)*v=proc;else return false;return true;}
+bool ReadU32(void*,u32 a,u32* v) {if(a==0x804d781c)*v=gobj;else if(a==0x804d7838)*v=proc;else if(a==0x80412000)*v=0xabcdef01;else return false;return true;}
 bool ReadMem1(void*,u32 a,size_t n,u8* out) {
   ++reads; if(!readable||!IsMem1Range(a,n))return false;
   if(a==gobj&&n==4)std::memcpy(out,gb.data(),n);
@@ -241,17 +242,22 @@ void inspect() {
 void* system=nullptr;
 ''' + body + r'''
 }
-void reset() {record={};invalid=false;reads=0;readable=true;gb={};pb={};gobj=0;proc=0;}
+void reset() {record={};record.random_seed_and_pointer={0,0,0,0,0x80,0x41,0x20,0};invalid=false;reads=0;readable=true;gb={};pb={};gobj=0;proc=0;}
 void be32(size_t o,u32 value) {for(int i=0;i<4;i++)pb[o+i]=value>>(24-8*i);}
 void scheduled() {gobj=0x80410000;proc=0x80411000;gb={0,13,4,0};pb[12]=7;be32(16,gobj);be32(20,0x801d1390);}
 int main() {
  reset();inspect();assert(!invalid&&reads==0&&record.owner_proc==0);
+ assert(record.observer_next_sequence==123&&record.rng_draw_ordinal==7&&record.seed_after==0xabcdef01&&record.seed_owner_pointer==0x80412000);
  reset();scheduled();inspect();assert(!invalid&&reads==2&&record.owner_classifier==13&&record.owner_p_link==4&&record.owner_s_link==7&&record.owner_callback==0x801d1390);
  reset();gobj=0x80410000;inspect();assert(invalid&&reads==0);
  reset();scheduled();proc++;inspect();assert(invalid&&reads==0);
  reset();scheduled();be32(16,gobj+4);inspect();assert(invalid&&record.owner_callback==0);
  reset();scheduled();readable=false;inspect();assert(invalid);
  reset();scheduled();be32(20,0x1000);inspect();assert(invalid);
+ reset();record.random_seed_and_pointer.fill(0);inspect();assert(invalid);
+ reset();record.random_seed_and_pointer[7]=1;inspect();assert(invalid);
+ reset();record.random_seed_and_pointer[4]=0x10;inspect();assert(invalid);
+ reset();record.random_seed_and_pointer[6]=0x30;inspect();assert(invalid);
 }
 '''
         path = self.binary.parent / "guest-owner.cpp"

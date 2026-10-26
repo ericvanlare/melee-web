@@ -15,6 +15,7 @@ extern "C" int gm_GetPreviousSceneIndex(void);
 #include "private_sha256.hpp"
 #include "stadium_later_reference.hpp"
 #include "gameplay_menu.h"
+#include "gameplay_cpu_observation.h"
 #include "gameplay_audio_bank_transport.h"
 #include "stadium_first_css_diagnostic_input.hpp"
 #include "stadium_first_css_diagnostic_snapshot_json.hpp"
@@ -630,6 +631,9 @@ struct MatchedSetupCfState {
  bool later_b_gate2_mode=false,later_b_gate2_go_observed=false;
  bool later_b_gate2_abort_consumed=false;
  bool later_b_action_started=false,later_b_safe_refusal_boundary=false;
+ bool later_b_rng_owner_checked=false,later_b_rng_owner_enabled=false;
+ bool later_b_rng_owner_open=false;
+ unsigned later_b_rng_owner_first=0,later_b_rng_owner_last=0,later_b_rng_owner_tick=0;
  std::unique_ptr<melee_web::RetailReplayRecipe> later_b_archived_replay;
  const melee_web::RetailReplayRecipe* later_b_recipe_owner=nullptr;
  const melee_web::RetailReplayInitialCssContext* later_b_context_owner=nullptr;
@@ -4060,6 +4064,52 @@ void matched_setup_cf_check_owner(unsigned expected_ticks,unsigned expected_draw
         "Matched Setup C/F native owner state changed while awaiting host approval");
  }
 }
+// Diagnostic-only connector. The existing checked manifest/action owner grants
+// source work; this selector can only observe an already-admitted tick/draw pair.
+void later_b_rng_owner_begin(MatchedSetupCfState& state,unsigned ordinal){
+ if(!state.later_b_gate2_mode)return;
+ if(!state.later_b_rng_owner_checked){
+  const int packed=EM_ASM_INT({
+   const p=window.__meleeLaterBRngOwnerWindow;
+   if(p===undefined||p===null)return -1;
+   const n=v=>Number.isInteger(v)&&v>=0;
+   if(p.schema!=='melee-web-later-b-rng-owner-window-v1'||p.prefix_cursor!==943||
+      p.go_tick!==$0||!n(p.first_tick)||!n(p.last_tick)||p.first_tick<=p.go_tick||
+      p.last_tick<p.first_tick||p.last_tick-p.first_tick>=9||p.last_tick>=180||
+      window.__meleeRngDrawProbeOwners!==true||
+      !Array.isArray(window.__meleeRngDrawProbeCursors)||
+      window.__meleeRngDrawProbeCursors.length!==p.last_tick-p.first_tick+1||
+      !window.__meleeRngDrawProbeCursors.every((v,i)=>v===943+p.first_tick+i))return -2;
+   return p.first_tick*256+p.last_tick;
+  },state.later_b_reference_go_tick);
+  check(packed>=-1,"Later B RNG owner diagnostic has an invalid bounded selector");
+  state.later_b_rng_owner_checked=true;
+  state.later_b_rng_owner_enabled=packed>=0;
+  if(packed>=0){state.later_b_rng_owner_first=static_cast<unsigned>(packed)/256;
+   state.later_b_rng_owner_last=static_cast<unsigned>(packed)%256;}
+ }
+ if(!state.later_b_rng_owner_enabled)return;
+ check(!state.later_b_rng_owner_open,"Later B RNG owner window crossed an unclosed draw");
+ if(ordinal<state.later_b_rng_owner_first||ordinal>state.later_b_rng_owner_last)return;
+ check(state.later_b_gate2_go_observed&&
+       state.later_b_actual_go_tick==state.later_b_reference_go_tick&&
+       ordinal>state.later_b_actual_go_tick&&state.later_b_prefix_cursor==943,
+       "Later B RNG owner window requires the actual admitted post-GO source boundary");
+ melee_web_cpu_observation_set_rng_draw_cursor(
+     static_cast<size_t>(state.later_b_prefix_cursor)+ordinal);
+ state.later_b_rng_owner_open=true;state.later_b_rng_owner_tick=ordinal;
+}
+void later_b_rng_owner_draw_return(MatchedSetupCfState& state,unsigned ordinal){
+ if(!state.later_b_gate2_mode||!state.later_b_rng_owner_enabled)return;
+ if(ordinal<state.later_b_rng_owner_first||ordinal>state.later_b_rng_owner_last)return;
+ check(state.later_b_rng_owner_open&&state.later_b_rng_owner_tick==ordinal,
+       "Later B RNG owner draw lacks its exact preceding selected tick");
+ // Do not flush at scheduler return: selected RNG rows encompass both the
+ // source tick and its subsequent source draw, including an empty pair.
+ melee_web_rng_draw_probe_scheduler_return();
+ state.later_b_rng_owner_open=false;
+}
+
 bool matched_setup_cf_service(){
  auto& state=matched_setup_cf;
  if(!state.armed||state.failed||state.complete)return true;
@@ -4097,6 +4147,7 @@ bool matched_setup_cf_service(){
    input.ports=state.queued_statuses;
    PADStatus raw[4]{};
    melee_web::stadium_first_css_diagnostic::decode_consumed_pad_statuses(input,raw);
+   later_b_rng_owner_begin(state,ordinal);
    match->tick(raw);
    check(melee_web_gameplay_stats().ticks==ordinal+1&&!match->paused()&&!match->ending()&&
          !match->complete(),"Matched Setup C/F source tick left its exact live sequence");
@@ -4146,6 +4197,7 @@ bool matched_setup_cf_service(){
    state.last_ticks_after=state.source_ticks;state.last_draws_after=state.source_draws;
    state.last_source_frame_after=source_frame_after;
    matched_setup_cf_check_owner(state.last_ticks_after,state.last_draws_after);
+   if(!tick_action)later_b_rng_owner_draw_return(state,ordinal);
   }else matched_setup_cf_check_owner(ordinal+1);
   state.seed_after_action=match->random_seed();
   state.last_action_complete=true;

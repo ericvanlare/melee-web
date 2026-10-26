@@ -80,6 +80,8 @@ class ReferenceCaptureAppTests(unittest.TestCase):
         scheduled = dict(status="scheduled_proc", gobj="0x80410000", proc="0x80411000", callback="0x801d1390", classifier=13, p_link=4, s_link=0, callback_symbol="grStadium_801D1390")
         records = [dict(pc=pc, label=label, match=1, source_tick=0, owner=owner)
                    for pc, label, owner in [("0x8038057c", "randf_return", outside), ("0x80380524", "rand_return", scheduled), ("0x8038057c", "randf_return", scheduled)]]
+        for ordinal, record in enumerate(records):
+            record.update(seed_owner_pointer="0x80412000",seed_after="12345678",rng_ordinal=ordinal,observer_next_sequence=100+ordinal,draw_ordinal=0)
         probe = dict(schema="melee-web-cpu-register-probe", version=4, diagnostic_only=True, window_complete=True, source_revision="GALE01r2", dol_sha256="a"*64, capture_id="c", sequence_id="s", match=1, first_tick=0, last_tick=63, record_count=3, records=records, **selection)
         status = {"cpu_probe_close": dict(reason="source_tick_after_window", configured_match=1, first_tick=0, last_tick=63, source_tick=64, **selection)}
         with tempfile.TemporaryDirectory() as temporary:
@@ -89,7 +91,7 @@ class ReferenceCaptureAppTests(unittest.TestCase):
                 return APP.validate_cpu_rng_probe(path, request, "c", "s", "a"*64, status)
             self.assertEqual(validate()["record_count"], 3)
             self.assertEqual([r["pc"] for r in records], ["0x8038057c", "0x80380524", "0x8038057c"])
-            for mutate in (lambda: records[0].update(pc=None,label=None), lambda: records[0].update(pc="0x80380524",label="unknown"), lambda: records[0].pop("label"), lambda: records[0].pop("pc"), lambda: records[0].update(source_tick=1), lambda: probe.update(version=3), lambda: records[0].update(pc="0x80380524"), lambda: records[0].update(owner=scheduled | {"proc":"0x00000000"}), lambda: status["cpu_probe_close"].update(rng_return_pcs=["0x80380524"])):
+            for mutate in (lambda: records[0].update(seed_owner_pointer="0x00000000"), lambda: records[0].update(seed_owner_pointer="0x80412001"), lambda: records[0].update(seed_after="1234ABCD"), lambda: records[1].update(rng_ordinal=True), lambda: records[0].pop("rng_ordinal"), lambda: records[1].update(observer_next_sequence=0), lambda: records[0].update(draw_ordinal=1), lambda: records[0].update(pc=None,label=None), lambda: records[0].update(pc="0x80380524",label="unknown"), lambda: records[0].pop("label"), lambda: records[0].pop("pc"), lambda: records[0].update(source_tick=1), lambda: probe.update(version=3), lambda: records[0].update(pc="0x80380524"), lambda: records[0].update(owner=scheduled | {"proc":"0x00000000"}), lambda: status["cpu_probe_close"].update(rng_return_pcs=["0x80380524"])):
                 original = json.loads(json.dumps(probe)); old_status = json.loads(json.dumps(status))
                 mutate()
                 with self.assertRaises(APP.EnvironmentError): validate()

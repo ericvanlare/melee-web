@@ -31,7 +31,7 @@ import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {finalizeSessionCapture, sessionReplayReportCompleted, readRequestedEntityPrefix, validateRuntimeDataAbort, boundedCaptureOperation,
   retainFirstCaptureError, FIRST_REPLAY_BOUNDARY_MARKER_NAMES, parseFirstReplayBoundaryMarker,
   FIRST_REPLAY_BOUNDARY_MARKER_PREFIX, inspectFirstReplayBoundaryMarkers} from './whole_session_capture_result.mjs';
-import {parseRngDrawProbe, validateRngDrawProbeRows, parseHitTransitionProbe, validateHitTransitionProbeRows} from './rng_draw_probe.mjs';
+import {parseRngDrawProbe, validateRngDrawProbeRows, parseHitTransitionProbe, validateHitTransitionProbeRows, deriveLaterBRngOwnerWindow} from './rng_draw_probe.mjs';
 import {NATURAL_PAUSE_PROTOCOL, STOPPED_SCENE_PAIR_PROTOCOL, resolveCaptureMode,
   validateNaturalPauseManifest, validateStoppedScenePairManifest, naturalPauseRuntimeUrl,
   validateNaturalPauseBrowserIdentity, validateDefaultTwoRingStatus, firstNaturalPauseStop,
@@ -78,6 +78,7 @@ const {values, tokens} = parseArgs({tokens: true, options: {
   'stadium-later-sss-prepared-setup': {type: 'boolean', default: false},
   'stadium-later-sss-reference': {type: 'string'},
   'stadium-later-b-gate2-projection': {type: 'string'},
+  'stadium-later-b-rng-owner-window': {type: 'string'},
   'stadium-later-sss-exit': {type: 'boolean', default: false},
   'artifact-root': {type: 'string'},
 }});
@@ -156,7 +157,7 @@ const captureCpuObservations = diagnostic ? false : values['cpu-observations'];
 const firstReplayCallbackProbe = values['first-replay-callback-probe'];
 const expectedFrame0Path = values['expected-frame0'] ? path.resolve(values['expected-frame0']) : null;
 const probeTimeoutMs = 10000;
-const rngDrawProbe = parseRngDrawProbe({range: values['rng-draw-probe-range'],
+let rngDrawProbe = parseRngDrawProbe({range: values['rng-draw-probe-range'],
   cursors: values['rng-draw-probe-cursors']});
 const hitTransitionProbe = parseHitTransitionProbe(values['hit-transition-probe-cursors']);
 if (hitTransitionProbe && (captureCpuObservations || stopAfter !== 5241 ||
@@ -177,6 +178,11 @@ const laterSssPreparedSetup = values['stadium-later-sss-prepared-setup'];
 const laterSssReference = values['stadium-later-sss-reference'] ?? null;
 const laterBGate2ProjectionPath = values['stadium-later-b-gate2-projection'] ? path.resolve(values['stadium-later-b-gate2-projection']) : null;
 const laterBGate2 = laterBGate2ProjectionPath !== null;
+const laterBRngOwnerWindowSpec = values['stadium-later-b-rng-owner-window'];
+let laterBRngOwnerWindow = null;
+if (laterBRngOwnerWindowSpec !== undefined && (!laterBGate2 || rngDrawProbe || hitTransitionProbe ||
+    captureCpuObservations || stopAfter || resumeTimingPauses || diagnostic))
+  throw Error('Gate2 RNG owners require the exact Gate2 route and no other diagnostic selectors');
 if (laterBGate2 && (laterSssReference !== OBSERVED_B_REFERENCE.id || !laterSssPreparedSetup))
   throw Error('Gate2 requires the exact new-reference checked profile3 Setup route');
 if (laterSssReference !== null && (laterSssReference !== OBSERVED_B_REFERENCE.id ||
@@ -1017,6 +1023,14 @@ try {
       laterBGate2Reference = deriveLaterBGate2Expectations(laterBGate2ProjectionBytes);
       if (laterBGate2Reference.reference.recipe_sha256 !== report.inputs.recipe.sha256)
         throw Error('Gate2 projection and current literal recipe identities differ');
+      laterBRngOwnerWindow = deriveLaterBRngOwnerWindow(laterBRngOwnerWindowSpec,laterBGate2Reference);
+      if(laterBRngOwnerWindow){
+        rngDrawProbe=laterBRngOwnerWindow.selection;
+        report.rng_draw_probe={request:rngDrawProbe.request,selected_cursors:rngDrawProbe.selected,
+          complete:false,scope:'one source tick plus its subsequent source draw; scheduled owner context only',
+          projection_sha256:report.inputs.later_b_gate2_projection.sha256,
+          configuration:laterBRngOwnerWindow.configuration,coordinates:laterBRngOwnerWindow.coordinates};
+      }
     }
     currentSssRecipeBytes = Array.from(recipeBytes);
     report.current_sss_exit = {component_pass: false, runtime_replay: 'NOT_RUN',
@@ -1103,7 +1117,7 @@ try {
     await write('report.json', report);
   }
   await page.addInitScript(({cpuObservationRowLimit, captureCpuObservations,
-    rngDrawProbeSelection, hitTransitionProbeSelection, boundaryProbeEnabled, boundaryMarkerPrefix, boundaryMarkerNames}) => {
+    rngDrawProbeSelection, laterBRngOwnerConfiguration, hitTransitionProbeSelection, boundaryProbeEnabled, boundaryMarkerPrefix, boundaryMarkerNames}) => {
     window.__meleeNativeRuntimeReady = false;
     const module = globalThis.Module || {};
     module.onRuntimeInitialized = () => { window.__meleeNativeRuntimeReady = true; };
@@ -1121,6 +1135,8 @@ try {
         throw Error('Hit transition observation exceeded or duplicated selected cursors');
       window.__hitTransitionProbeRows.push(text);
     };
+    window.__meleeRngDrawProbeOwners = laterBRngOwnerConfiguration !== null;
+    window.__meleeLaterBRngOwnerWindow = laterBRngOwnerConfiguration;
     window.__rngDrawProbeRows = [];
     window.__rngDrawProbeSelection = rngDrawProbeSelection;
     window.__meleeRngDrawProbeCursors = rngDrawProbeSelection?.request.kind === 'cursors'
@@ -1165,6 +1181,7 @@ try {
     };
   }, {cpuObservationRowLimit, captureCpuObservations,
     rngDrawProbeSelection: rngDrawProbe,
+    laterBRngOwnerConfiguration: laterBRngOwnerWindow?.configuration ?? null,
     hitTransitionProbeSelection: hitTransitionProbe,
     boundaryProbeEnabled: firstReplayCallbackProbe,
     boundaryMarkerPrefix: FIRST_REPLAY_BOUNDARY_MARKER_PREFIX,
@@ -1833,6 +1850,13 @@ try {
     if (rngDrawProbe) {
       try {
         const rows = await observePageOperation('final RNG draw rows', () => page.evaluate(() => window.__rngDrawProbeRows || []));
+        if(laterBRngOwnerWindow){
+          const rawText=rows.length?rows.join('\n')+'\n':'';
+          await write('rng-draw-probe.jsonl',rawText);
+          report.rng_draw_probe.raw_artifact={name:'rng-draw-probe.jsonl',bytes:Buffer.byteLength(rawText),
+            sha256:createHash('sha256').update(rawText).digest('hex')};
+          if(rows.some(text=>JSON.parse(text).version!==2))throw Error('Gate2 RNG owner rows require the actual version2 owner producer');
+        }
         const validation = validateRngDrawProbeRows(rows, rngDrawProbe, {
           observedCursor: report.final_snapshot?.source_cursor,
           deliberateStop: report.deliberate_prefix_stop,

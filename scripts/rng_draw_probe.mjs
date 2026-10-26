@@ -325,3 +325,39 @@ export function validateHitTransitionProbeRows(textRows, selection,
     throw Error('Hit transition probe omitted reached selected cursors');
   return {rows: textRows, missing_cursors: missing, complete: missing.length === 0};
 }
+
+
+/** Diagnostic coordinates only; the native manifest independently owns actions. */
+export function deriveLaterBRngOwnerWindow(spec, derived) {
+  if (spec === undefined || spec === null) return null;
+  if (typeof spec !== 'string' || !/^[1-9][0-9]*:[1-9][0-9]*$/.test(spec))
+    throw Error('Gate2 RNG owner window requires positive FIRST:LAST offsets after actual GO');
+  const [firstOffset,lastOffset] = spec.split(':').map(Number);
+  if (!Number.isSafeInteger(firstOffset) || !Number.isSafeInteger(lastOffset) ||
+      lastOffset < firstOffset || lastOffset-firstOffset >= 9)
+    throw Error('Gate2 RNG owner window must select1–9 consecutive post-GO ticks');
+  const p=derived?.reference,go=derived?.goTick;
+  if (!Number.isSafeInteger(go) || p?.go?.coordinate?.source_tick!==go ||
+      p.setup_global_cursor!==943 || !Array.isArray(p.actions) || p.actions.length!==360)
+    throw Error('Gate2 RNG owner window requires the validated actual GO/action projection');
+  const first=go+firstOffset,last=go+lastOffset;
+  if (last>=180) throw Error('Gate2 RNG owner window crosses the unchanged stop-before-pause');
+  const coordinates=[];
+  for(let tick=first;tick<=last;++tick){
+    const a=p.actions[tick*2],d=p.actions[tick*2+1];
+    if(a?.kind!=='tick'||a.action_index!==tick*2||a.source_tick!==tick||
+       d?.kind!=='draw'||d.action_index!==tick*2+1||d.source_tick!==tick+1||
+       ![a.consume?.sequence,a.tick?.sequence,d.draw_enter?.sequence,d.draw_return?.sequence]
+         .every(Number.isSafeInteger)||
+       !(a.consume.sequence<a.tick.sequence&&a.tick.sequence<d.draw_enter.sequence&&
+         d.draw_enter.sequence<d.draw_return.sequence))
+      throw Error('Gate2 RNG owner window lost an actual ordered tick/draw pair');
+    coordinates.push({source_tick:tick,recipe_cursor:p.setup_global_cursor+tick,
+      tick_action_index:a.action_index,draw_action_index:d.action_index,
+      consume_sequence:a.consume.sequence,tick_return_sequence:a.tick.sequence,
+      draw_enter_sequence:d.draw_enter.sequence,draw_return_sequence:d.draw_return.sequence});
+  }
+  const selection=parseRngDrawProbe({cursors:coordinates.map(row=>row.recipe_cursor).join(',')});
+  return {configuration:{schema:'melee-web-later-b-rng-owner-window-v1',prefix_cursor:p.setup_global_cursor,
+    go_tick:go,first_tick:first,last_tick:last},selection,coordinates};
+}

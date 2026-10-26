@@ -488,6 +488,9 @@ struct CpuProbeRecord
   u32 source_tick = 0;
   u32 match = 0;
   u32 lr = 0;
+  u64 observer_next_sequence = 0;
+  u32 rng_draw_ordinal = 0;
+  u32 seed_owner_pointer=0,seed_after=0;
   u32 owner_gobj = 0, owner_proc = 0, owner_callback = 0;
   u16 owner_classifier = 0;
   u8 owner_p_link = 0, owner_s_link = 0;
@@ -1246,6 +1249,18 @@ struct Observer::Impl
     if (!whole_feedback_setting.empty() && whole_feedback_setting != "1")
       return SetInvalid("Stadium whole feedback must be explicitly 1"), false;
     stadium_whole_feedback = whole_feedback_setting == "1";
+    const std::string whole_rng_setting=Env("MWRC_STADIUM_WHOLE_RNG_RETURNS");
+    const bool whole_rng_returns=whole_rng_setting=="1";
+    const std::string rng_first=Env("MWRC_CPU_PROBE_FIRST_TICK"),rng_last=Env("MWRC_CPU_PROBE_LAST_TICK");
+    const bool whole_rng_admitted=whole_rng_returns&&
+        Env("MWRC_STADIUM_WHOLE_B_STATE")=="1"&&
+        !Env("MWRC_CPU_PROBE_OUTPUT").empty()&&Env("MWRC_CPU_PROBE_OUTPUT").size()<=4096&&
+        Env("MWRC_CPU_PROBE_RNG_RETURN_SITE")=="rng_returns"&&Env("MWRC_CPU_PROBE_MATCH")=="1"&&
+        rng_first.size()==1&&rng_last.size()==1&&rng_first[0]>='1'&&rng_first[0]<='9'&&
+        rng_last[0]>=rng_first[0]&&rng_last[0]<='9';
+    if((!whole_rng_setting.empty()&&!whole_rng_returns)||
+       (whole_rng_returns&&(!stadium_whole_feedback||!whole_rng_admitted)))
+      return SetInvalid("Whole Stadium RNG adjunct requires combined-only match1 GO offsets1..9 and B state"),false;
     stadium_whole_setup_receipt = Env("MWRC_STADIUM_WHOLE_SETUP_RECEIPT_SHA256");
     if (stadium_whole_feedback &&
         (whole_session_matches != 3 || stadium_go_prefix_enabled || SdInitRequested() ||
@@ -1256,7 +1271,7 @@ struct Observer::Impl
          !Env("MWRC_ENTITY_PROFILE").empty() ||
          !Env("MWRC_SD_MENU_PROBE").empty() ||
          !Env("MWRC_ORDINARY_POLICY_SHA256").empty() ||
-         !Env("MWRC_CPU_PROBE_OUTPUT").empty() ||
+         (!Env("MWRC_CPU_PROBE_OUTPUT").empty()&&!whole_rng_admitted) ||
          !Env("MWRC_ITEM_PROBE_OUTPUT").empty() || !AllocationConfigured() ||
          Env("MWRC_ALLOCATION_VS_TARGET") != "2" ||
          Env("MWRC_ALLOCATION_STOP_AT") != "exit" ||
@@ -1333,6 +1348,11 @@ struct Observer::Impl
       cpu_probe_rng_return_pc = cpu_probe.rng_return_pc;
       cpu_probe_rng_returns = cpu_probe.rng_returns;
       cpu_probe_rng_return_site = cpu_probe.rng_return_site;
+      cpu_probe_whole_go_relative=stadium_whole_feedback&&whole_rng_returns;
+      if(cpu_probe_whole_go_relative){
+        cpu_probe_first_offset=cpu_probe.first_tick;cpu_probe_last_offset=cpu_probe.last_tick;
+        cpu_probe_first_tick=cpu_probe_last_tick=0;
+      }
       cpu_probe_records.reset(new (std::nothrow) CpuProbeRecord[CPU_PROBE_MAX_RECORDS]);
       if (!cpu_probe_records)
       {
@@ -1801,6 +1821,7 @@ struct Observer::Impl
 
   void CloseCpuProbeAtSourceTick(u32 pc, u32 source_tick)
   {
+    if(cpu_probe_whole_go_relative&&!cpu_probe_go_latched)return;
     if (!cpu_probe_configured || !cpu_probe_valid || cpu_probe_closed ||
         source_tick <= cpu_probe_last_tick || match_index != cpu_probe_match)
       return;
@@ -1809,6 +1830,32 @@ struct Observer::Impl
     const bool active_match_scope = match_active && setup_ready;
     if (rng_match_scope || active_match_scope)
       CloseCpuProbe(pc, source_tick);
+  }
+
+  bool LatchWholeRngGo(u32 tick,u64 sequence)
+  {
+    if(!cpu_probe_whole_go_relative)return true;
+    if(cpu_probe_go_latched||!cpu_probe_rng_returns||cpu_probe_match!=1||
+       cpu_probe_first_offset<1||cpu_probe_last_offset<cpu_probe_first_offset||
+       cpu_probe_last_offset>9||tick>UINT32_MAX-cpu_probe_last_offset-1)
+      return false;
+    cpu_probe_go_tick=tick;cpu_probe_go_sequence=sequence;
+    // Raw source counters differ across tick/draw. Retain guard-band extras;
+    // only an offline exact sequence join may project the requested pairs.
+    cpu_probe_first_tick=tick+cpu_probe_first_offset-1;
+    cpu_probe_last_tick=tick+cpu_probe_last_offset+1;
+    cpu_probe_go_latched=true;
+    return true;
+  }
+
+  std::string CpuProbeWholeWindowJson() const
+  {
+    if(!cpu_probe_whole_go_relative)return {};
+    return ",\"window_basis\":\"actual_go_raw_guard_band\",\"requested_first_offset\":"+
+      std::to_string(cpu_probe_first_offset)+",\"requested_last_offset\":"+
+      std::to_string(cpu_probe_last_offset)+",\"go_tick\":"+std::to_string(cpu_probe_go_tick)+
+      ",\"go_observer_sequence\":"+std::to_string(cpu_probe_go_sequence)+
+      ",\"first_guard_tick_partial\":"+std::string(cpu_probe_first_offset==1?"true":"false");
   }
 
   std::string CpuProbeCloseStatusJson() const
@@ -1834,7 +1881,7 @@ struct Observer::Impl
     const std::string selected = cpu_probe_rng_returns ?
         "\"rng_return_site\":\"rng_returns\",\"rng_return_pcs\":[\"0x80380524\",\"0x8038057c\"]" :
         "\"rng_return_pc\":\"0x" + rng_return_pc + "\"";
-    return ",\"cpu_probe_close\":{\"reason\":\"source_tick_after_window\"," + selected +
+    return ",\"cpu_probe_close\":{\"reason\":\"source_tick_after_window\"," + selected + CpuProbeWholeWindowJson() +
            ",\"close_pc\":\"0x" + close_pc +
            "\",\"configured_match\":" + std::to_string(cpu_probe_match) +
            ",\"first_tick\":" +
@@ -1850,6 +1897,7 @@ struct Observer::Impl
   void RecordCpuProbe(Core::System* system, u32 pc, const CpuProbePoint& point,
                       PowerPC::PowerPCState* state, u32 source_tick)
   {
+    if(cpu_probe_whole_go_relative&&!cpu_probe_go_latched)return;
     if ((cpu_probe_rng_returns || cpu_probe_rng_return_pc != 0) &&
         !SelectedRngReturn(cpu_probe_rng_return_pc, cpu_probe_rng_returns, pc))
       return;
@@ -1910,6 +1958,13 @@ struct Observer::Impl
     }
     if (cpu_probe_rng_returns)
     {
+      const auto* bytes=record.random_seed_and_pointer.data()+4;
+      record.seed_owner_pointer=(u32(bytes[0])<<24)|(u32(bytes[1])<<16)|(u32(bytes[2])<<8)|u32(bytes[3]);
+      if(!record.seed_owner_pointer||(record.seed_owner_pointer&3)||
+         !IsMem1Range(record.seed_owner_pointer,4)||!ReadU32(system,record.seed_owner_pointer,&record.seed_after))
+        return SetInvalid("RNG actual seed owner is not an aligned readable MEM1 cell"),void();
+      record.observer_next_sequence=next_sequence;
+      record.rng_draw_ordinal=draw_ordinal;
       // GALE01r2 globals are set immediately around proc->on_invoke and cleared
       // after it. This is scheduled context, not an allocation-lifetime proof.
       if (!ReadU32(system, 0x804d781c, &record.owner_gobj) ||
@@ -4300,6 +4355,8 @@ struct Observer::Impl
 
     if (later && !stadium_whole_b.Go(match_index, whole_phase, setup_pointer, source_tick))
       return SetInvalid("Stadium B GO changed selected setup owner/order"), void();
+    if(later&&!LatchWholeRngGo(source_tick,next_sequence))
+      return SetInvalid("Whole Stadium RNG actual GO latch refused"),void();
     PublishStadiumProgress("go_after", pc, word, state->gpr[3], state, source_tick);
     if (invalid.load())
       return;
@@ -5571,6 +5628,7 @@ struct Observer::Impl
         !append_number(cpu_probe_first_tick) || !append(",\"last_tick\":") ||
         !append_number(cpu_probe_last_tick))
       return false;
+    if(!append(CpuProbeWholeWindowJson()))return false;
     if (cpu_probe_rng_returns &&
         !append(",\"rng_return_site\":\"rng_returns\",\"rng_return_pcs\":[\"0x80380524\",\"0x8038057c\"]"))
       return false;
@@ -5621,7 +5679,12 @@ struct Observer::Impl
         return false;
       if (cpu_probe_rng_returns)
       {
-        if (!append(",\"owner\":{\"status\":\"") ||
+        if (!append(",\"seed_owner_pointer\":\"0x") || !append_hex32(record.seed_owner_pointer) ||
+            !append("\",\"seed_after\":\"") || !append_hex32(record.seed_after) || !append("\"") ||
+            !append(",\"rng_ordinal\":") || !append_number(record_index) ||
+            !append(",\"observer_next_sequence\":") || !append_number(record.observer_next_sequence) ||
+            !append(",\"draw_ordinal\":") || !append_number(record.rng_draw_ordinal) ||
+            !append(",\"owner\":{\"status\":\"") ||
             !append(record.owner_proc ? "scheduled_proc" : "outside_proc") ||
             !append("\",\"gobj\":\"0x") || !append_hex32(record.owner_gobj) ||
             !append("\",\"proc\":\"0x") || !append_hex32(record.owner_proc) ||
@@ -6348,6 +6411,9 @@ struct Observer::Impl
   u32 cpu_probe_last_tick = 0;
   u32 cpu_probe_rng_return_pc = 0;
   bool cpu_probe_rng_returns = false;
+  bool cpu_probe_whole_go_relative=false,cpu_probe_go_latched=false;
+  u32 cpu_probe_first_offset=0,cpu_probe_last_offset=0,cpu_probe_go_tick=0;
+  u64 cpu_probe_go_sequence=0;
   std::string cpu_probe_rng_return_site;
   u64 cpu_probe_rng_return_callback_count = 0;
   u32 cpu_probe_rng_return_callback_pc = 0;
