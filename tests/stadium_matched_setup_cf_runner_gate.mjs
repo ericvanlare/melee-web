@@ -384,6 +384,20 @@ export function evaluateMatchedSetupCfNativeCommand({kind, scheduleIndex, action
                 throw Error('Gate2 settled zero step lacks a retained native failed-state message');
               return {failure: {classification: 'settled-native-step-failure',
                 message: observation.error, observation}};
+            } : kind === 'gate2-retire' && result === 0 ? () => {
+              // The ccall promise has resolved, the reserved owner is still
+              // correlated, and Asyncify is idle before either retained-state
+              // getter runs. A false result may mean a refusal before close or
+              // a notification refusal after native close; preserve both facts.
+              const nativeStatus = readLive();
+              const nativeMessagePointer = module._melee_web_native_menu_message?.();
+              const nativeMessage = nativeMessagePointer
+                ? module.UTF8ToString(nativeMessagePointer) : null;
+              const message = typeof nativeMessage === 'string' && nativeMessage.length
+                ? nativeMessage : 'Gate2 native retirement returned zero without a retained message';
+              const failure = {classification: 'settled-native-retire-failure', message,
+                native_retired: nativeStatus?.native_retired === true, native_status: nativeStatus};
+              return {message, failure};
             } : undefined),
             error => unsafe(`Gate2 Asyncify command rejected: ${String(error?.message || error)}`));
         }
@@ -531,9 +545,9 @@ export function createLaterBGate2NativeAdapter({evaluate, owner, deadline,
     throw Error('Gate2 adapter requires its bounded page owner and deadline');
   let pending = null, unsafe = false, armed = false, armAttempted = false;
   let knownUnarmedRefusal = false, closed = false, actionsStarted = false, unacknowledgedFailure = false;
-  let settledFailure = null;
+  let settledFailure = null, settledRetirementFailure = null;
   const execute = async command => {
-    if (unsafe || unacknowledgedFailure || settledFailure || closed || pending || now() >= deadline)
+    if (unsafe || unacknowledgedFailure || settledFailure || settledRetirementFailure || closed || pending || now() >= deadline)
       throw Error('Gate2 native command is closed, pending, failed, uncertain or expired');
     const request = {...command, gate2Owner: owner, requireAsyncifyIdle: true};
     try {
@@ -562,6 +576,13 @@ export function createLaterBGate2NativeAdapter({evaluate, owner, deadline,
         settledFailure = response.failure;
         const error = Error(`Gate2 settled native step refusal: ${response.failure.message}`);
         error.gate2Failure = response.failure;
+        throw error;
+      }
+      if (command.kind === 'gate2-retire' &&
+          response.failure?.classification === 'settled-native-retire-failure') {
+        settledRetirementFailure = response.failure;
+        const error = Error(`Gate2 settled native retirement refusal: ${response.failure.message}`);
+        error.gate2Retirement = response.failure;
         throw error;
       }
       throw Error(response.message || `Gate2 ${command.kind} refused`);
@@ -619,7 +640,8 @@ export function createLaterBGate2NativeAdapter({evaluate, owner, deadline,
     },
     state() { return {unsafe, pending: pending !== null, armed, arm_attempted: armAttempted,
       known_unarmed_refusal: knownUnarmedRefusal, actions_started: actionsStarted,
-      unacknowledged_failure: unacknowledgedFailure, settled_failure: settledFailure, closed}; },
+      unacknowledged_failure: unacknowledgedFailure, settled_failure: settledFailure,
+      settled_retirement_failure: settledRetirementFailure, closed}; },
   };
   return Object.freeze(api);
 }

@@ -12,10 +12,13 @@ const scopeSource = await fs.readFile(new URL('scripts/stadium_current_sss_exit_
 const tokenId='123e4567-e89b-42d3-a456-426614174000';
 function cut(text,start,end){assert.equal(text.split(start).length,2,start);assert.equal(text.split(end).length,2,end);return text.slice(text.indexOf(start),text.indexOf(end));}
 function nativeFixture(){
-  const calls=[];let idle=true;
+  const calls=[];let idle=true,statusPointer=1,retireResult=1;
   const receipt={schema:'melee-web-stadium-later-b-gate2-native-v1',armed:false,failed:true,complete:false,
     state:'failed',error:'first native service error',source_ticks:0,source_draws:0,cursor:0,
     queued:false,awaiting_approval:false,last_action:null};
+  let retirementStatus={schema:'melee-web-stadium-matched-setup-cf-retirement-v1',native_retired:false,
+    terminal:true,error:'controlled native close refusal'};
+  const nativeMessage='controlled native retirement message';
   const owner={gate2CanSettle:()=>true,gate2Pending:kind=>calls.push(['pending',kind]),gate2Settled:()=>{assert.equal(idle,true);calls.push(['settled']);},
     gate2Uncertain:reason=>calls.push(['uncertain',reason]),gate2ApproveSetup:()=>{calls.push(['setup-vote']);return true;}};
   const module={HEAPU8:new Uint8Array(30000),stadiumMatchedSetupNativeIdle:()=>idle,
@@ -24,14 +27,22 @@ function nativeFixture(){
       assert.equal(globalThis.__meleeWebStadiumFirstSssVsSetupCfApproved(),true);calls.push(['arm']);return 1;},
     _melee_web_native_menu_stadium_first_sss_vs_setup_cf_v2_queue:(...args)=>{calls.push(['queue',...args]);return 1;},
     _melee_web_native_menu_stadium_first_sss_vs_setup_cf_approve:()=>{calls.push(['approve']);return 1;},
-    _melee_web_native_menu_stadium_first_sss_vs_setup_cf_retirement_status:()=>{calls.push(['live']);return 1;},
+    _melee_web_native_menu_stadium_first_sss_vs_setup_cf_retirement_status:()=>{calls.push(['live']);return statusPointer;},
     _melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire_ready:()=>{calls.push(['ready']);return 1;},
-    UTF8ToString:()=>JSON.stringify(receipt),
-    ccall:(name,_type,_types,_args,options)=>{assert.equal(options.async,true);calls.push(['ccall',name]);return Promise.resolve(1);}};
-  for(const key of ['_melee_web_native_menu_message','_melee_web_native_menu_running','_melee_web_native_menu_phase',
+    _melee_web_native_menu_message:()=>{calls.push(['message']);return 3;},
+    UTF8ToString:pointer=>pointer===2?JSON.stringify(retirementStatus):pointer===3?nativeMessage:JSON.stringify(receipt),
+    ccall:(name,_type,_types,_args,options)=>{assert.equal(options.async,true);calls.push(['ccall',name]);
+      return Promise.resolve(name==='melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire'?retireResult:1)
+        .then(result=>{if(name==='melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire'&&result===0)
+          statusPointer=retirementStatus.native_retired===true?2:1;return result;});}};
+  for(const key of ['_melee_web_native_menu_running','_melee_web_native_menu_phase',
     '_melee_web_native_menu_stadium_current_sss_exit_observe','saveRuntimeCache'])
     module[key]=()=>{throw Error(`Forbidden ordinary native access ${key}`);};
-  return {calls,owner,module,receipt,setIdle:value=>{idle=value;}};
+  return {calls,owner,module,receipt,retirementStatus,setIdle:value=>{idle=value;},
+    setRetirementStatus:value=>{retirementStatus=value;
+      Object.assign(receipt,{state:'complete',armed:true,failed:false,complete:true,error:null,cursor:360,
+        source_ticks:180,source_draws:180,queued:false,awaiting_approval:false,last_action:{complete:true}});},
+    setRetireResult:value=>{retireResult=value;}};
 }
 async function withModule(module,body){const before=globalThis.Module;globalThis.Module=module;try{return await body();}finally{globalThis.Module=before;}}
 
@@ -90,7 +101,8 @@ test('actual Gate2 page commands keep full transactions pending and never read n
     assert.deepEqual(f.calls.find(x=>x[0]==='queue'),['queue',3,2,1,-1]);
     const liveBefore=f.calls.filter(x=>x[0]==='live').length;
     assert.equal((await evaluateMatchedSetupCfNativeCommand({kind:'gate2-retire',gate2Owner:f.owner})).result,1);
-    assert.equal(f.calls.filter(x=>x[0]==='live').length,liveBefore,'retirement has no post-close getter');
+    assert.equal(f.calls.filter(x=>x[0]==='live').length,liveBefore,'successful retirement has no post-close getter');
+    assert.equal(f.calls.filter(x=>x[0]==='message').length,0,'successful retirement needs no failure message read');
     f.receipt.source_ticks=1;
     const ccallBefore=f.calls.filter(x=>x[0]==='ccall').length;
     assert.equal((await evaluateMatchedSetupCfNativeCommand({kind:'gate2-abort',gate2Owner:f.owner})).asyncify_idle,false);
@@ -142,6 +154,69 @@ test('settled zero Gate2 step retains its native failure while pending or uncert
       if(mode==='asyncify-pending')f.setIdle(true);
     }
   });
+});
+
+test('settled zero Gate2 retirement retains native message and status; uncertain outcomes perform no getters',async()=>{
+  for (const nativeRetired of [false,true]) {
+    const f=nativeFixture();
+    f.setRetireResult(0);
+    f.setRetirementStatus({schema:'melee-web-stadium-matched-setup-cf-retirement-v1',
+      native_retired:nativeRetired,terminal:true,error:nativeRetired
+        ?'Matched Setup C/F runtime retirement completed but runtime notification was refused'
+        :'Stadium B terminal retirement lost its admitted owner or RNG boundary'});
+    await withModule(f.module,async()=>{
+      const response=await evaluateMatchedSetupCfNativeCommand({kind:'gate2-retire',gate2Owner:f.owner});
+      assert.equal(response.result,0);assert.equal(response.asyncify_idle,true);
+      assert.equal(response.failure.classification,'settled-native-retire-failure');
+      assert.equal(response.failure.message,'controlled native retirement message');
+      assert.equal(response.failure.native_retired,nativeRetired);
+      if(nativeRetired) {
+        assert.equal(response.failure.native_status.schema,'melee-web-stadium-matched-setup-cf-retirement-v1');
+        assert.equal(response.failure.native_status.error,'Matched Setup C/F runtime retirement completed but runtime notification was refused');
+      } else {
+        assert.equal(response.failure.native_status.schema,'melee-web-stadium-later-b-gate2-native-v1');
+        assert.equal(response.failure.native_status.complete,true);
+        assert.equal(response.failure.native_status.error,null);
+      }
+      const calls=f.calls.map(x=>x[0]);
+      assert.ok(calls.indexOf('ccall')<calls.indexOf('settled'));
+      assert.ok(calls.indexOf('settled')<calls.indexOf('live'));
+      assert.ok(calls.indexOf('live')<calls.indexOf('message'));
+    });
+  }
+
+  const f=nativeFixture();f.setRetireResult(0);
+  const adapter=createLaterBGate2NativeAdapter({owner:f.owner,deadline:100,now:()=>0,
+    evaluate:(_fn,command)=>evaluateMatchedSetupCfNativeCommand(command)});
+  await withModule(f.module,async()=>{
+    await adapter.arm(new Uint8Array(20580));
+    await assert.rejects(adapter.retire(),/Gate2 settled native retirement refusal: controlled native retirement message/);
+    const failure=adapter.state().settled_retirement_failure;
+    assert.equal(failure.classification,'settled-native-retire-failure');
+    assert.equal(failure.native_retired,false);
+    assert.equal(adapter.state().unsafe,false);
+    assert.equal(adapter.state().closed,false,'a zero result is not native-close acknowledgement');
+    const before=f.calls.length;
+    await assert.rejects(adapter.observe(),/failed/);
+    await assert.rejects(adapter.abortUnarmed(),/definite/);
+    assert.equal(f.calls.length,before,'settled retirement failure cannot trigger another native command');
+  });
+
+  for (const mode of ['owner-uncertain','asyncify-pending']) {
+    const f=nativeFixture();f.setRetireResult(0);
+    if (mode==='owner-uncertain') f.owner.gate2CanSettle=()=>false;
+    else f.module.ccall=(name,_type,_types,_args,options)=>{
+      assert.equal(options.async,true);f.calls.push(['ccall',name]);
+      return Promise.resolve(0).then(value=>{f.setIdle(false);return value;});
+    };
+    await withModule(f.module,async()=>{
+      const before=f.calls.filter(x=>['live','message'].includes(x[0])).length;
+      const response=await evaluateMatchedSetupCfNativeCommand({kind:'gate2-retire',gate2Owner:f.owner});
+      assert.equal(response.asyncify_idle,false);
+      assert.equal(f.calls.filter(x=>['live','message'].includes(x[0])).length,before,
+        `${mode} must not read retained native state`);
+    });
+  }
 });
 
 test('host transport is one-use, serial, sticky on lost responses and refuses negative ACK before native dispatch',async()=>{
