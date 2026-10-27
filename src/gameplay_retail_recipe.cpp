@@ -27,6 +27,17 @@ namespace {
 void check(bool value, const char* message) {
     if (!value) throw std::runtime_error(message);
 }
+bool has_setup_table(uint32_t version) {
+    return version == kRetailReplayVersion ||
+           version == kRetailReplayFighterVersion ||
+           version == kRetailReplayDrawClosureVersion;
+}
+unsigned expected_setup_count(uint32_t version) {
+    if (version == kRetailReplayVersion || version == kRetailReplayFighterVersion)
+        return kRetailReplayMaxMatchSetups;
+    if (version == kRetailReplayDrawClosureVersion) return 2;
+    return 0;
+}
 struct Reader {
     std::span<const uint8_t> bytes;
     size_t cursor = 0;
@@ -98,6 +109,7 @@ uint32_t whole_session_match_index = 0;
 bool whole_session_primary_identity_active = false;
 bool whole_session_setup_table_active = false;
 bool whole_session_entity_prefix_active = false;
+unsigned whole_session_expected_match_count = 0;
 
 constexpr std::array<uint8_t, 0x60> kMilestoneRules = {
     0x30,0x00,0x86,0x4c,0xc3,0x00,0x00,0x00,0x00,0x00,0x00,0xff,
@@ -246,6 +258,35 @@ void validate_fighter_v10_setup(std::span<const uint8_t> raw,
         check(selection.start.players[slot].slot_type == Gm_PKind_NA,
               "MWRC v10 setup has an active player outside its four-player roster");
 }
+void validate_stadium_pair_setup(std::span<const uint8_t> raw,
+                                 const MeleeWebMenuMatchSelection& selection,
+                                 size_t match_index) {
+    check(match_index < 2, "MWRC v11 setup index is outside the paired Stadium profile");
+    const auto& rules = selection.start.rules;
+    check(raw.size() == 0x138 && selection.player_count == 2 &&
+          rules.match_kind == 1 && !rules.timer_enabled && !rules.timer_counts_up &&
+          !rules.timer_shows_hours && !rules.friendly_fire && rules.is_stock &&
+          !rules.disable_pausing && !rules.is_teams && rules.is_vs && rules.xB == -1 &&
+          rules.stkind == 3 && rules.time_limit == 0 && rules.x14 == 0 &&
+          rules.x20 == UINT64_MAX &&
+          std::bit_cast<uint32_t>(rules.x2C) == 0x3f800000u &&
+          std::bit_cast<uint32_t>(rules.x30) == 0x3f800000u &&
+          std::bit_cast<uint32_t>(rules.game_speed) == 0x3f800000u,
+          "MWRC v11 setup is not the exact paired Stadium stock4 ItemsNone rules profile");
+    constexpr uint8_t roster[] = {8, 8};
+    constexpr uint8_t costumes[] = {1, 0};
+    for (unsigned slot = 0; slot < 2; ++slot) {
+        const auto& player = selection.start.players[slot];
+        check(player.slot_type == Gm_PKind_Human &&
+              static_cast<uint8_t>(player.ckind) == roster[slot] &&
+              player.stocks == 4 && player.color == costumes[slot] &&
+              player.rumble_enabled,
+              "MWRC v11 setup is not the exact two-human Mario port/costume profile");
+    }
+    for (unsigned slot = 2; slot < GM_MAX_PLAYERS; ++slot)
+        check(selection.start.players[slot].slot_type == Gm_PKind_NA,
+              "MWRC v11 setup has an active player outside its two-port roster");
+}
 void timer_state(const char* record, size_t index = 0) {
     if (!timer_audit_active) return;
     // Separate diagnostic stream: never add fields to an older state schema,
@@ -273,7 +314,7 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
     check(input.u32() == 0x4d575243, "Unsupported reference input format");
     RetailReplayRecipe result;
     result.version = input.u32();
-    check(result.version >= 1 && result.version <= kRetailReplayFighterVersion,
+    check(result.version >= 1 && result.version <= kRetailReplayDrawClosureVersion,
           "Unsupported reference input version");
     const auto max_frames = result.version >= kRetailReplayV8Version
         ? kRetailReplayWholeSessionMaxFrames : kRetailReplayLegacyMaxFrames;
@@ -348,12 +389,11 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
               "Whole-session profile masks disagree with first-CSS SaveData");
     }
     size_t setup_bytes = 0x138;
-    if (result.version == kRetailReplayVersion ||
-        result.version == kRetailReplayFighterVersion) {
+    if (has_setup_table(result.version)) {
         const auto setup_count = input.u16();
-        check(input.u16() == 0 && setup_count == kRetailReplayMaxMatchSetups &&
+        check(input.u16() == 0 && setup_count == expected_setup_count(result.version) &&
               setup_count <= kRetailReplayMaxMatchSetups,
-              "Whole-session setup table requires exactly three setups and zero flags");
+              "Whole-session setup table has an unsupported exact setup count or flags");
         setup_bytes = 4 + size_t(setup_count) * 0x138;
         check(input.cursor + size_t(setup_count) * 0x138 <= bytes.size(),
               "Whole-session setup table is truncated");
@@ -379,8 +419,7 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
     char error[256]{};
     check(melee_web_retail_setup(result.setup.data(), result.seed, &result.selection,
                                 error, sizeof(error)), error);
-    if (result.version == kRetailReplayVersion ||
-        result.version == kRetailReplayFighterVersion) {
+    if (has_setup_table(result.version)) {
         result.match_selections.resize(result.match_setups.size());
         for (size_t index = 0; index < result.match_setups.size(); ++index) {
             auto& decoded = result.match_selections[index];
@@ -388,9 +427,15 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
                                          &decoded, error, sizeof(error)), error);
             if (result.version == kRetailReplayVersion)
                 validate_milestone_setup(result.match_setups[index], decoded, index);
-            else
+            else if (result.version == kRetailReplayFighterVersion)
                 validate_fighter_v10_setup(result.match_setups[index], decoded, index);
+            else if (result.version == kRetailReplayDrawClosureVersion)
+                validate_stadium_pair_setup(result.match_setups[index], decoded, index);
         }
+        if (result.version == kRetailReplayDrawClosureVersion)
+            check(std::equal(result.match_setups[0].begin(), result.match_setups[0].end(),
+                             result.match_setups[1].begin()),
+                  "MWRC v11 paired Stadium setup rows differ in full StartMeleeData bytes");
         result.selection = result.match_selections.front();
     }
     if (result.diagnostic_entity_prefix) {
@@ -450,7 +495,10 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
         const auto span_count = input.u16();
         check(span_count >= 1 && span_count <= kRetailReplayMaxSpans,
               "Whole-session span count is outside its bounds");
-        check(bytes.size() == envelope_bytes + 2 + size_t(span_count) * kRetailReplaySpanBytes,
+        const size_t closure_bytes = result.version == kRetailReplayDrawClosureVersion
+            ? kRetailReplayDrawClosureHeaderBytes + (size_t(count) + 7) / 8 : 0;
+        check(bytes.size() == envelope_bytes + 2 + size_t(span_count) * kRetailReplaySpanBytes +
+              closure_bytes,
               "Whole-session span table disagrees with its transport");
         result.spans.reserve(span_count);
         uint32_t next_frame = 0;
@@ -472,6 +520,20 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
         check(next_frame == count, "Whole-session spans must cover every input frame");
         check(result.spans.front().scene == kRetailReplayCss,
               "Whole-session timeline must start in CSS");
+        if (result.version == kRetailReplayDrawClosureVersion) {
+            constexpr uint8_t expected_scenes[] = {
+                kRetailReplayCss, kRetailReplaySss, kRetailReplayMatch,
+                kRetailReplayResults, kRetailReplayCss, kRetailReplaySss,
+                kRetailReplayMatch, kRetailReplayResults,
+            };
+            check(result.spans.size() == std::size(expected_scenes) &&
+                  std::equal(result.spans.begin(), result.spans.end(),
+                      std::begin(expected_scenes),
+                      [](const RetailReplaySpan& span, uint8_t scene) {
+                          return span.scene == scene;
+                      }),
+                  "MWRC v11 requires the normal CSS/SSS/Match/Results route twice");
+        }
         if (result.diagnostic_entity_prefix) {
             check(result.spans.size() == 3 && result.spans[0].scene == kRetailReplayCss &&
                   result.spans[1].scene == kRetailReplaySss &&
@@ -487,31 +549,54 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
               result.spans.back().scene == kRetailReplayPrize,
               "Whole-session timeline must end in Results or Prize");
         }
-        if (result.version == kRetailReplayVersion ||
-            result.version == kRetailReplayFighterVersion) {
+        if (has_setup_table(result.version)) {
             const auto match_spans = std::count_if(result.spans.begin(), result.spans.end(),
                 [](const RetailReplaySpan& span) { return span.scene == kRetailReplayMatch; });
-            check(match_spans == kRetailReplayMaxMatchSetups &&
+            check(match_spans == expected_setup_count(result.version) &&
                   match_spans == result.match_setups.size(),
                   "Whole-session setup table does not match its match scene spans");
+        }
+        if (result.version == kRetailReplayDrawClosureVersion) {
+            check(input.u32() == count,
+                  "Whole-session draw closure count must equal its frame count");
+            const size_t closure_bytes = (size_t(count) + 7) / 8;
+            check(input.cursor + closure_bytes == bytes.size(),
+                  "Whole-session draw closure bitset length disagrees with its transport");
+            result.draw_boundaries.resize(count);
+            for (uint32_t index = 0; index < count; ++index) {
+                const auto byte = bytes[input.cursor + index / 8];
+                result.draw_boundaries[index] = (byte & (0x80u >> (index % 8))) != 0;
+            }
+            if (count % 8) {
+                const auto unused_bits = static_cast<uint8_t>((1u << (8 - count % 8)) - 1u);
+                check((bytes.back() & unused_bits) == 0,
+                      "Whole-session draw closure bitset has noncanonical unused bits");
+            }
+            for (const auto& span : result.spans) {
+                check(result.draw_boundaries[span.last_frame],
+                      "Whole-session scene span must end at a closed draw boundary");
+                if (span.scene != kRetailReplayMatch) {
+                    for (uint32_t frame = span.first_frame; frame <= span.last_frame; ++frame)
+                        check(result.draw_boundaries[frame],
+                              "Non-Match draw closures must use the declared close-each-step policy");
+                }
+            }
         }
     }
     return result;
 }
 
 void retail_replay_session_initial(const RetailReplayRecipe& recipe) {
-    check(recipe.whole_session(), "Session diagnostics require MWRC v8, v9, or v10");
+    check(recipe.whole_session(), "Session diagnostics require MWRC v8 through v11");
     timer_audit_active = false;
     whole_session_cpu_observation_requested = melee_web_cpu_observation_available() != 0;
     whole_session_cpu_observation_started = false;
     whole_session_cpu_observation_finished = false;
     whole_session_match_index = 0;
+    whole_session_expected_match_count = expected_setup_count(recipe.version);
     whole_session_entity_prefix_active = recipe.diagnostic_entity_prefix;
-    whole_session_primary_identity_active =
-        recipe.version == kRetailReplayVersion ||
-        recipe.version == kRetailReplayFighterVersion;
-    whole_session_setup_table_active = recipe.version == kRetailReplayVersion ||
-                                       recipe.version == kRetailReplayFighterVersion;
+    whole_session_primary_identity_active = has_setup_table(recipe.version);
+    whole_session_setup_table_active = has_setup_table(recipe.version);
     if (whole_session_primary_identity_active) melee_web_retail_entities_reset();
     std::cout << "{\"record\":\"header\",\"schema\":\"melee-web-port-session-diagnostic\","
         "\"version\":" << (recipe.diagnostic_entity_prefix ? 2 : 1);
@@ -532,9 +617,9 @@ void retail_replay_validate_match_setup(const RetailReplayRecipe& recipe,
               "Entity prefix actual source setup differs from its declared setup");
         return;
     }
-    if (recipe.version != kRetailReplayVersion &&
-        recipe.version != kRetailReplayFighterVersion) return;
-    check(match_index < recipe.match_selections.size(),
+    if (!has_setup_table(recipe.version)) return;
+    check(match_index < expected_setup_count(recipe.version) &&
+          match_index < recipe.match_selections.size(),
           "Whole-session replay observed a match setup beyond its declared setup table");
     if (!same_setup(actual_setup, recipe.match_selections[match_index].start))
         report_setup_difference(match_index, actual_setup,
@@ -548,8 +633,8 @@ void retail_replay_validate_match_setup(const RetailReplayRecipe& recipe,
 
 unsigned retail_replay_next_match_index(const RetailReplayRecipe& recipe,
                                         size_t next_frame) {
-    check((recipe.version == kRetailReplayVersion ||
-           recipe.version == kRetailReplayFighterVersion) &&
+    check(has_setup_table(recipe.version) &&
+          recipe.match_setups.size() == expected_setup_count(recipe.version) &&
           next_frame < recipe.frames.size(),
           "Whole-session match index is unavailable outside its recorded input timeline");
     unsigned completed_matches = 0;
@@ -565,8 +650,7 @@ unsigned retail_replay_next_match_index(const RetailReplayRecipe& recipe,
 }
 
 void retail_replay_initial(const RetailReplayRecipe& recipe, bool source_drawing) {
-    check(recipe.version != kRetailReplayVersion &&
-          recipe.version != kRetailReplayFighterVersion,
+    check(!has_setup_table(recipe.version),
           "Whole-session match entry requires the actual constructed setup");
     retail_replay_initial(recipe, source_drawing, recipe.selection.start);
 }
@@ -575,7 +659,8 @@ void retail_replay_initial(const RetailReplayRecipe& recipe, bool source_drawing
                            const StartMeleeData& actual_setup) {
     if (recipe.whole_session()) {
         check(!whole_session_setup_table_active ||
-              whole_session_match_index < recipe.match_setups.size(),
+              (whole_session_match_index < expected_setup_count(recipe.version) &&
+               whole_session_match_index < recipe.match_setups.size()),
               "Whole-session replay observed more entries than its setup table");
         retail_replay_validate_match_setup(recipe, whole_session_match_index, actual_setup);
         std::cout << "{\"record\":\"session_match_enter_complete\",";
@@ -654,10 +739,9 @@ void retail_replay_frame(const RetailReplayRecipe& recipe, size_t index, unsigne
               "Entity prefix tick preceded its single checked setup record");
         melee_web_retail_entities_checked();
     }
-    if ((recipe.version == kRetailReplayVersion ||
-         recipe.version == kRetailReplayFighterVersion) &&
-        scene == kRetailReplayMatch) {
-        check(whole_session_match_index > 0,
+    if (has_setup_table(recipe.version) && scene == kRetailReplayMatch) {
+        check(whole_session_match_index > 0 &&
+              whole_session_match_index <= expected_setup_count(recipe.version),
               "Whole-session match tick preceded its match setup record");
         if (whole_session_primary_identity_active)
             melee_web_retail_entities_index(whole_session_match_index - 1);
@@ -688,14 +772,17 @@ void retail_replay_end(size_t frames, bool whole_session) {
     if (whole_session) {
         check(!whole_session_entity_prefix_active || whole_session_match_index == 1,
               "Entity prefix did not enter its single checked match");
-        check(!whole_session_setup_table_active || whole_session_match_index == 3,
-              "Whole-session replay did not enter exactly three matches");
+        check(!whole_session_setup_table_active ||
+              whole_session_match_index == whole_session_expected_match_count,
+              "Whole-session replay did not enter its exact declared match count");
         if (whole_session_cpu_observation_started)
             melee_web_cpu_observation_end(frames);
         whole_session_cpu_observation_requested = false;
         whole_session_cpu_observation_started = false;
         whole_session_cpu_observation_finished = false;
         whole_session_entity_prefix_active = false;
+        whole_session_setup_table_active = false;
+        whole_session_expected_match_count = 0;
     } else {
         melee_web_cpu_observation_end(frames);
     }

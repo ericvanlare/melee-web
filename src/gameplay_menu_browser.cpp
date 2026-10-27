@@ -2979,7 +2979,8 @@ void advance(){
   }
   MeleeWebMenuMatchSelection selection{};check(melee_web_menu_host_selection(host,&selection,error,sizeof(error)),error);
   if(replay&&(replay->version==melee_web::kRetailReplayVersion||
-              replay->version==melee_web::kRetailReplayFighterVersion))
+              replay->version==melee_web::kRetailReplayFighterVersion||
+              replay->version==melee_web::kRetailReplayDrawClosureVersion))
    melee_web::retail_replay_validate_match_setup(
        *replay,melee_web::retail_replay_next_match_index(*replay,replay_cursor),selection.start);
   match_message=selected_match_message(selection);
