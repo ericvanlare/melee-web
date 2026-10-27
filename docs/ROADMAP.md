@@ -256,10 +256,14 @@ general scheduling rule and missing form samples before runtime transformation
 release; stop at the first changed loading latency under fixed inputs/settings.
 The archive-service milestone [#345](https://github.com/ericvanlare/melee-web/issues/345)
 composes exact disc tails, owned destinations and quiescent teardown; its
-[component receipt](status/2026-10-27-stadium-archive-service.md) records validation
-and remaining direct-file, timing and transformed-graph requirements.
-Reuse the existing route and retained evidence;
-do not repeat accepted functional captures or invent neutral rows/GO coordinates.
+[component receipt](status/2026-10-27-stadium-archive-service.md) records the
+merged service evidence and current source-slot boundary. The [#347 follow-up](https://github.com/ericvanlare/melee-web/issues/347) adds
+owned form catalogs, exact source-slot/header/buffer binding, original file-entry
+metadata and checked retirement. The component receipt owns its review and
+validation results. Browser transformations remain disabled pending World
+integration, actual transformed-graph retirement and a justified completion
+schedule. Reuse the existing route and retained evidence; do not repeat accepted
+functional captures or invent neutral rows/GO coordinates.
 Track A retains priority for shared capture resources.
 
 ### Standing rules and baselines

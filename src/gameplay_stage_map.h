@@ -33,6 +33,16 @@ int melee_web_stage_map_close(MeleeWebStageMap*,char*,size_t);
 int melee_web_stage_map_grdatfiles_begin(void);
 int melee_web_stage_map_grdatfiles_capture(void);
 int melee_web_stage_map_grdatfiles_arm(MeleeWebStageMap*,char*,size_t);
+/* Prerequisite only: retains the four exact registered GrPs1..4 map catalogs.
+ * Caller keeps typed arenas alive; existing open-handle refusal prevents scope
+ * close. This does not load, select, schedule or enable any transformation. */
+int melee_web_stage_map_set_forms(MeleeWebStageMap*,void* const map_heads[4],char*,size_t);
+/* Source hooks take an actual ordinary-table slot pointer, never an inferred
+ * row index. On failure the caller stops before flags/free/slot mutation. */
+int melee_web_stage_map_source_slot_bind(void* slot,const void* buffer,size_t length);
+int melee_web_stage_map_source_slot_release(void* slot);
+int melee_web_stage_map_source_slot_cleared(void* slot);
+
 #endif
 /* Original grDatFiles storage adapters. NULL means no owned native context. */
 void* melee_web_stage_map_archives(void);

@@ -5311,10 +5311,20 @@ index 2014b73b50dd73519850ecf05db8e4b016d76fb6..92daff95d361415c686770b07bc186d5
  struct lbl_8046B6A0_24C_t {
      UNK_T x0;
 diff --git a/src/melee/gr/granime.c b/src/melee/gr/granime.c
-index a0401b6075684cc6fad4ff050d8c0dfd953b63e0..2e9f1d15d86496a3336702051d106e15ae666059 100644
+index a0401b6075684cc6fad4ff050d8c0dfd953b63e0..d2703b76d7d79f20ef0b1db788bfacc7e4630df8 100644
 --- a/src/melee/gr/granime.c
 +++ b/src/melee/gr/granime.c
-@@ -47,12 +47,20 @@
+@@ -1,4 +1,9 @@
+ #include "granime.h"
++#if defined(TARGET_PC) && defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++#include "gameplay_stage_map.h"
++#include <stdio.h>
++#include <stdlib.h>
++#endif
+ 
+ #include <Runtime/platform.h>
+ 
+@@ -47,12 +52,20 @@
                                            u32 type, void* param, int arg5);
  ///* 1C7B24 */ static void grAnime_801C7B24(HSD_GObj* gobj, int arg1, u32 arg2,
  ///                                          f32 arg8);
@@ -5335,7 +5345,33 @@ index a0401b6075684cc6fad4ff050d8c0dfd953b63e0..2e9f1d15d86496a3336702051d106e15
      u8 pad[0x118 - 0xF8];
  };
  
-@@ -508,6 +516,26 @@ typedef void (*Callback3)(HSD_AObj* aobj, HSD_TObj* obj, int param);
+@@ -73,6 +86,12 @@ void grAnime_801C65B0(UnkArchiveStruct* arg0)
+     if (arg0 == NULL) {
+         return;
+     }
++#if defined(TARGET_PC) && defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    if (!melee_web_stage_map_source_slot_release(arg0)) {
++        fputs("Stadium source archive release lost its exact slot or consumers\n", stderr);
++        abort();
++    }
++#endif
+     if ((uintptr_t) arg0->unk0 != -1U) {
+         if (arg0->unk8 == 0) {
+             lbArchive_80016EFC(arg0->unk0);
+@@ -81,6 +100,12 @@ void grAnime_801C65B0(UnkArchiveStruct* arg0)
+         }
+     }
+     memzero(arg0, sizeof(*arg0));
++#if defined(TARGET_PC) && defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    if (!melee_web_stage_map_source_slot_cleared(arg0)) {
++        fputs("Stadium source archive release did not clear its exact slot\n", stderr);
++        abort();
++    }
++#endif
+ }
+ 
+ void grAnime_801C6620(HSD_PObj* arg0, HSD_ShapeAnim* arg1)
+@@ -508,6 +533,26 @@ typedef void (*Callback3)(HSD_AObj* aobj, HSD_TObj* obj, int param);
  void grAnime_801C6F50(HSD_AObj* aobj, void* obj, u32 flags, void* func,
                        u32 type, void* param)
  {
@@ -5362,7 +5398,7 @@ index a0401b6075684cc6fad4ff050d8c0dfd953b63e0..2e9f1d15d86496a3336702051d106e15
      switch (type) {
      case 0:
          ((Event) func)();
-@@ -546,6 +574,7 @@ void grAnime_801C6F50(HSD_AObj* aobj, void* obj, u32 flags, void* func,
+@@ -546,6 +591,7 @@ void grAnime_801C6F50(HSD_AObj* aobj, void* obj, u32 flags, void* func,
          ((Callback4) func)(aobj, obj, flags, *(int*) param);
          break;
      }
@@ -5370,7 +5406,7 @@ index a0401b6075684cc6fad4ff050d8c0dfd953b63e0..2e9f1d15d86496a3336702051d106e15
  }
  
  void grAnime_801C706C(HSD_TObj* tobj, s32 flags, void* func, u32 type,
-@@ -1047,17 +1076,30 @@ void grAnime_801C8138(HSD_GObj* gobj, enum_t arg1, bool arg2)
+@@ -1047,17 +1093,30 @@ void grAnime_801C8138(HSD_GObj* gobj, enum_t arg1, bool arg2)
      HSD_JObjAnimAll(jobj);
  }
  
@@ -5401,7 +5437,7 @@ index a0401b6075684cc6fad4ff050d8c0dfd953b63e0..2e9f1d15d86496a3336702051d106e15
      jobj = Ground_801C3FA4(gobj, arg1);
      if (jobj == NULL) {
          return 0;
-@@ -1071,7 +1113,11 @@ HSD_AObj* grAnime_801C8318(HSD_GObj* gobj, int arg1, u32 arg2)
+@@ -1071,7 +1130,11 @@ HSD_AObj* grAnime_801C8318(HSD_GObj* gobj, int arg1, u32 arg2)
      if (arg2 & 4) {
          var_r30 |= 0x100;
      }
@@ -5511,10 +5547,10 @@ index af393e2b880e946c7fb9f304e563815154196845..409c872346c80206e644b51fe802fc74
  /* 1CD4A0 */ void grCastle_801CD4A0(void);
  /* 1CD4A4 */ void grCastle_801CD4A4(void);
 diff --git a/src/melee/gr/grdatfiles.c b/src/melee/gr/grdatfiles.c
-index ff1989d3967ca50ccadd979e0636f5a9601a22ad..9d5673d9001f107d62a4a9ea1ffeb71103858107 100644
+index ff1989d3967ca50ccadd979e0636f5a9601a22ad..20829b3004691d8a76ed4e7dcab336e2b5b9bb7e 100644
 --- a/src/melee/gr/grdatfiles.c
 +++ b/src/melee/gr/grdatfiles.c
-@@ -1,14 +1,20 @@
+@@ -1,14 +1,22 @@
  #include "grdatfiles.h"
 +#ifdef TARGET_PC
 +#include "gameplay_stage_map.h"
@@ -5532,10 +5568,12 @@ index ff1989d3967ca50ccadd979e0636f5a9601a22ad..9d5673d9001f107d62a4a9ea1ffeb711
  #include <sysdolphin/baselib/particle.h>
  #include <sysdolphin/baselib/psstructs.h>
 +#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
  
  /* 1C6228 */ static void grDatFiles_801C6228(UnkStageDat*);
  /* 1C62B4 */ static UnkArchiveStruct* grDatFiles_801C62B4(void);
-@@ -28,7 +34,14 @@ void grDatFiles_801C5FC0(HSD_Archive* archive, void* data, size_t length)
+@@ -28,7 +36,14 @@ void grDatFiles_801C5FC0(HSD_Archive* archive, void* data, size_t length)
      map_texg = HSD_ArchiveGetPublicAddress(archive, "map_texg");
  
      if (map_ptcl != NULL && map_texg != NULL) {
@@ -5550,7 +5588,7 @@ index ff1989d3967ca50ccadd979e0636f5a9601a22ad..9d5673d9001f107d62a4a9ea1ffeb711
      }
  }
  
-@@ -51,10 +64,22 @@ void grDatFiles_801C6038(void* arg0, s32 arg1, s32 arg2)
+@@ -51,10 +66,22 @@ void grDatFiles_801C6038(void* arg0, s32 arg1, s32 arg2)
          if (arg1 == 0) {
              stage_info.coll_data =
                  HSD_ArchiveGetPublicAddress(sp14, "coll_data");
@@ -5573,7 +5611,7 @@ index ff1989d3967ca50ccadd979e0636f5a9601a22ad..9d5673d9001f107d62a4a9ea1ffeb711
              stage_info.ald_yaku_all =
                  HSD_ArchiveGetPublicAddress(sp14, "ALDYakuAll");
              stage_info.map_ptcl =
-@@ -63,13 +88,23 @@ void grDatFiles_801C6038(void* arg0, s32 arg1, s32 arg2)
+@@ -63,13 +90,23 @@ void grDatFiles_801C6038(void* arg0, s32 arg1, s32 arg2)
                  HSD_ArchiveGetPublicAddress(sp14, "map_texg");
              stage_info.yakumono_param =
                  HSD_ArchiveGetPublicAddress(sp14, "yakumono_param");
@@ -5597,7 +5635,7 @@ index ff1989d3967ca50ccadd979e0636f5a9601a22ad..9d5673d9001f107d62a4a9ea1ffeb711
              if (phi_r28 != 0) {
                  psInitDataBankLoad(0x40, stage_info.map_ptcl,
                                     stage_info.map_texg, 0, 0);
-@@ -77,6 +112,9 @@ void grDatFiles_801C6038(void* arg0, s32 arg1, s32 arg2)
+@@ -77,6 +114,9 @@ void grDatFiles_801C6038(void* arg0, s32 arg1, s32 arg2)
                  psInitDataBank(0x40, stage_info.map_ptcl, stage_info.map_texg,
                                 0, 0);
              }
@@ -5607,7 +5645,7 @@ index ff1989d3967ca50ccadd979e0636f5a9601a22ad..9d5673d9001f107d62a4a9ea1ffeb711
          }
          grDatFiles_801C6228(temp_r3->unk4);
      } else {
-@@ -111,6 +149,68 @@ void grDatFiles_801C6228(UnkStageDat* arg0)
+@@ -111,6 +151,68 @@ void grDatFiles_801C6228(UnkStageDat* arg0)
  
  static UnkArchiveStruct grDatFiles_8049EE10[4];
  
@@ -5676,7 +5714,7 @@ index ff1989d3967ca50ccadd979e0636f5a9601a22ad..9d5673d9001f107d62a4a9ea1ffeb711
  void grDatFiles_801C6288(void)
  {
      memzero(&grDatFiles_8049EE10, sizeof(grDatFiles_8049EE10));
-@@ -129,11 +229,38 @@ UnkArchiveStruct* grDatFiles_801C62B4(void)
+@@ -129,11 +231,38 @@ UnkArchiveStruct* grDatFiles_801C62B4(void)
  
  UnkArchiveStruct* grDatFiles_GetArchive(void)
  {
@@ -5715,6 +5753,19 @@ index ff1989d3967ca50ccadd979e0636f5a9601a22ad..9d5673d9001f107d62a4a9ea1ffeb711
      if (arg0 >= 0) {
          s32 i;
          for (i = 0; i < 4; i++) {
+@@ -161,6 +290,12 @@ UnkArchiveStruct* grDatFiles_801C6478(void* data, s32 length)
+     arc->unk0 = archive;
+     arc->unk4 = HSD_ArchiveGetPublicAddress(archive, "map_head");
+     arc->unk8 = 1;
++#if defined(TARGET_PC) && defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    if (!melee_web_stage_map_source_slot_bind(arc, data, (size_t) length)) {
++        fputs("Stadium source archive slot ownership could not be bound\n", stderr);
++        abort();
++    }
++#endif
+ 
+     grDatFiles_801C6228(arc->unk4);
+ 
 diff --git a/src/melee/gr/grdisplay.c b/src/melee/gr/grdisplay.c
 index 8a06121d4b149b0a55ad836a124d850c37eabdac..64b6694e3941f4366f8bfc0198e25216a96d43de 100644
 --- a/src/melee/gr/grdisplay.c
@@ -13952,7 +14003,7 @@ index f30cb676d6709b87741845e94f926745d6ca0267..20798b8bd0da3fff63ed48d82198db80
      u8 x0;
      u8 pad_01[3];
 diff --git a/src/melee/lb/lbarchive.c b/src/melee/lb/lbarchive.c
-index fb0385b0da7036603c2da1d4b5bdc1ce960a2238..4a018eb08f826ef3ec4861dc86b3cc6c21534227 100644
+index fb0385b0da7036603c2da1d4b5bdc1ce960a2238..b215ee449030185b7b46946ebda908936deb59d7 100644
 --- a/src/melee/lb/lbarchive.c
 +++ b/src/melee/lb/lbarchive.c
 @@ -1,5 +1,13 @@
@@ -13983,7 +14034,7 @@ index fb0385b0da7036603c2da1d4b5bdc1ce960a2238..4a018eb08f826ef3ec4861dc86b3cc6c
 +    archive->flags |= 1;
 +    archive->data = (u8*) data + sizeof(HSD_ArchiveHeader);
 +    archive->top_ptr = data;
-+    if (!melee_web_archive_sections_attach_source(archive, filename)) {
++    if (!melee_web_archive_sections_attach_source_buffer(archive, filename, data, length)) {
 +        OSReport("Source archive has no registered native public symbols: %s\n",
 +                 filename);
 +        HSD_Panic(__FILE__, __LINE__, "Source archive hydration is unavailable.\n");
@@ -15078,7 +15129,7 @@ index d5b38ac5c92ce0e82ca005de8a205cb338790bb4..f2f2784310c8ccd0426e527a0d282f7a
      if (DbLevel != DbLKind_Master && preloadCache.preloaded && archive == NULL)
      {
 diff --git a/src/melee/lb/lbfile.c b/src/melee/lb/lbfile.c
-index b3a812755463919195aeda9772f81e90853e2423..ac666c67a137958a80e45bc92501b0f13630c75a 100644
+index b3a812755463919195aeda9772f81e90853e2423..6d6dd2e0fbefc9caefd58ee6f56e1c04b94bc7f2 100644
 --- a/src/melee/lb/lbfile.c
 +++ b/src/melee/lb/lbfile.c
 @@ -1,5 +1,9 @@
@@ -15091,7 +15142,28 @@ index b3a812755463919195aeda9772f81e90853e2423..ac666c67a137958a80e45bc92501b0f1
  #include <placeholder.h>
  #include <string.h>
  
-@@ -108,12 +112,22 @@ size_t lbFile_8001634C(int fileno)
+@@ -95,6 +99,20 @@ size_t lbFile_8001634C(int fileno)
+     size_t length;
+     bool intr = OSDisableInterrupts();
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++    if (fileno >= MELEE_WEB_SOURCE_FILE_ENTRY_BASE) {
++        const int resolved = melee_web_source_file_entry_size(fileno, &length);
++        OSRestoreInterrupts(intr);
++        if (!resolved) {
++            OSReport("Source RuntimeFiles has no active file entry %d.\n",
++                     fileno);
++            HSD_Panic(__FILE__, __LINE__,
++                      "Source file entry size lookup failed.\n");
++        }
++        return length;
++    }
++#endif
++
+     if (!DVDFastOpen(fileno, &info)) {
+         OSReport("Cannot open file no=%d.", fileno);
+         HSD_ASSERT(0xD8, 0);
+@@ -108,12 +126,22 @@ size_t lbFile_8001634C(int fileno)
  
  size_t lbFileGetSize(const char* basename)
  {
@@ -15114,7 +15186,7 @@ index b3a812755463919195aeda9772f81e90853e2423..ac666c67a137958a80e45bc92501b0f1
  }
  
  #define ROUND_UP_32(x) (((x) + 31) & ~31)
-@@ -143,9 +157,17 @@ void lbFile_80016580(const char* basename, void* dst, size_t* size,
+@@ -143,9 +171,17 @@ void lbFile_80016580(const char* basename, void* dst, size_t* size,
  
  void lbFile_8001668C(const char* basename, void* dst, size_t* size)
  {

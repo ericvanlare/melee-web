@@ -46,6 +46,16 @@ void* melee_web_archive_sections_open(const char* filename);
 void* melee_web_archive_sections_open_preloaded(const char* filename);
 int melee_web_archive_sections_attach_source(void* archive,
                                               const char* filename);
+/* Explicit copied-buffer attachment. The source header owns neither the bytes
+ * nor the typed descriptors; release removes only this registry adjunct. */
+int melee_web_archive_sections_attach_source_buffer(
+    void* archive,const char* filename,const void* buffer,size_t length);
+/* Registry-first exact map relation; candidate pointers are never dereferenced.
+ * Native owner is an existing open handle retained by StageMap. */
+int melee_web_archive_sections_catalog_map_matches(const char* filename,const void* map);
+int melee_web_archive_sections_source_map_matches(uint64_t generation,
+    const void* source,const void* native_owner,const void* map,
+    const void* buffer,size_t length,uint64_t expected,uint64_t* actual);
 int melee_web_archive_sections_is_handle(const void* handle);
 int melee_web_archive_sections_is_source_archive(const void* archive);
 /* Pure identity/generation check; never reads an unregistered candidate scope. */

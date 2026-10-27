@@ -1,10 +1,10 @@
 {
   "schema": "melee-web-stadium-archive-service-v1",
   "issue": 345,
-  "state": "COMPONENT_CONTROLS_PUBLIC_AUDIO_BUILDS_AND_FULL_REGRESSION_V2_PASS",
+  "state": "PR346_MERGED_CI_PASS; C5_SOURCE_HOLD_CLOSED; REPAIRED_SOURCE_FOCUSED_CONTROL_AND_BUILDS_PASS; FULL_REGRESSION_ONE_CANONICAL_REPRESENTATION_FAILURE_RETAINED; CANONICALIZATION_CONTROL_PASS; EXACT_HEAD_CI_PENDING",
   "checkpoint5_complete": false,
   "browser_transformations_enabled": false,
-  "source_head": "3639903a7d664c0816afc421ea3c32eb8721b887",
+  "source_head": "3e0a533c376dbfe613d3084802297c372b40cb01",
   "base": "b041dcefff1f96a73f5b4afc9972e48250d4ba91",
   "prior_build_source": "91bcf57e863f4accd6a4b0fc6aaa2e6170e637d3",
   "parent_only_rebase": {
@@ -89,21 +89,31 @@
       }
     ]
   },
-  "full_regression": "V1_FAILED_RETAINED; V2_PASS",
-  "exact_head_ci": "PENDING",
+  "full_regression": "3639903A_V2_PASS_RETAINED; E487_STOPPED_ON_SHARED_MAP0_DEFECT; 3E0A_FULL_REGRESSION_2975_TESTS_211_SKIPS_ONE_CANONICAL_REPRESENTATION_FAILURE; PATCH_CANONICALIZATION_PRESERVED_APPLIED_TREE; EXACT_HEAD_CI_PENDING",
+  "exact_head_ci": "PR346_MERGED_HEAD_PASSED; C5_CANONICALIZED_SOURCE_EXACT_HEAD_CI_PENDING",
   "retained_failures": [
     "c5-archive-service-full-regression-v1/full-regression.stderr: four full-suite fixture/export failures at 9d9d53b, before the reviewed compatibility repair",
     "c5-composed-focused-v1/test_stadium_pre_ready_cancel.stderr and work/stadium-pre-ready-i6tizcdk",
     "work/stadium-pre-ready-vr868vua",
     "c5-native-service-trace-v1/compile.stderr",
-    "Earlier receipt source attribution correction remains preserved in c5-cancellation-fixture-repair-v1/root-producer-correction-v2.json"
+    "Earlier receipt source attribution correction remains preserved in c5-cancellation-fixture-repair-v1/root-producer-correction-v2.json",
+    "c5-slots-focused-v1/test_gameplay_lbfile_source_entry.result.json: initial metadata fixture failed; the corrected focused control passes in c5-slots-focused-v2",
+    "c5-slots-regression-v2/root-stop-known-defect.json: e487 full regression stopped at 232.290s after review found shared base map0 was misattributed as a form-slot consumer; the owned process group was absent afterward.",
+    "c5-slots-regression-v3: 2,975 tests / 211 skips / one failure in test_gameplay_patch_canonical; canonicalization and its 15-test control passed, but the full suite was not rerun after the representation-only patch change.",
+    "c5-slots-regression-v3: 2,975 tests / 211 skips / one failure in test_gameplay_patch_canonical; canonicalization and its 15-test control passed, but the full suite was not rerun after the representation-only patch change."
   ],
   "scope": [
     "Actual disc/asset/C adapter and native/WebAssembly source-service controls",
     "Exact source-owned writable-region lifetime and pre-mutation teardown checks",
     "No source arithmetic/input/RNG/order change",
     "No browser gameplay capture or transformation run",
-    "No deterministic all-form completion rule, transformed graph retirement, C5 acceptance, or whole-stage acceptance"
+    "No deterministic all-form completion rule, transformed graph retirement, C5 acceptance, or whole-stage acceptance",
+    "Four-form asset probe reports four hydrated map_head records and 123 public names; it executes no source transformation.",
+    "Source-slot and private-entry metadata focused runs were executed on the staged 35b50ab composition; their nine source/test hashes match the corresponding e4879796 files. Ordinary and diagnostic Release builds passed at e4879796.",
+    "The e4879796 full regression was stopped at 232.290s on the independently reviewed shared-map0 consumer defect; it is not a full pass. That historical review was HOLD; the later first-provider repair and its closure are recorded below.",
+    "No World wiring, live transformation, transformed graph retirement, or C5 acceptance.",
+    "At 3e0a533c, the shared-map0 source HOLD is closed by the reviewed first-provider repair. Focused actual-source control and ordinary/diagnostic Release builds passed. The full regression retained one patch canonical-representation failure; canonicalizing patch bytes preserved applied dependency tree 13ef3f889b0e3a6ffd5c52feffefe47bfd5c92ad, and the 15-test canonicalization module passed. Exact-head CI, including its regression job, remains pending.",
+    "At 3e0a533c, the shared-map0 source HOLD is closed by the reviewed first-provider repair. Focused actual-source control and ordinary/diagnostic Release builds passed. The full regression retained one patch canonical-representation failure; canonicalizing patch bytes preserved applied dependency tree 13ef3f889b0e3a6ffd5c52feffefe47bfd5c92ad, and the 15-test canonicalization module passed. Exact-head CI, including its regression job, remains pending."
   ],
   "service_source_head": "9d9d53b6a320caf0fd90fdc37c208951cc5fe8a3",
   "compatibility_repair": {
@@ -121,9 +131,12 @@
     },
     "focused_test_count": 23,
     "focused_passed": true,
-    "full_regression_status": "RERUN_AND_PASS_AT_3639903A",
+    "full_regression_status": "RERUN_AND_PASS_AT_3639903A; E4879796_RUN_STOPPED_ON_KNOWN_DEFECT",
     "focused_run_head": "9d9d53b6a320caf0fd90fdc37c208951cc5fe8a3",
-    "focused_run_note": "23 focused tests passed against the reviewed repair before it was committed as 3639903a; the receipt records the pre-commit base head."
+    "focused_run_note": "23 focused tests passed against the reviewed repair before it was committed as 3639903a; the receipt records the pre-commit base head.",
+    "current_head_ci": "PR346_MERGED_HEAD_PASSED; CANONICALIZED_3E0A_EXACT_HEAD_CI_PENDING",
+    "public_audio_builds_passed": true,
+    "builds_scope_note": "Public/audio builds passed at 3639903a; separate ordinary/diagnostic e4879796 builds also passed, before the shared-map0 repair."
   },
   "full_regression_v1": {
     "state": "FAILED_RETAINED_BEFORE_COMPATIBILITY_REPAIR",
@@ -193,6 +206,324 @@
       "sha256": "88a90bc62f6c7be350f95673d07d85a9ffcade361237a90d9e20d8df7bd292f0"
     },
     "public_audio_builds_passed": true,
+    "current_head_ci": "PR346_MERGED_HEAD_PASSED; EXACT_HEAD_CI_FOR_CANONICALIZED_3E0A_SOURCE_PENDING",
+    "full_regression_v3": {
+      "state": "FAIL_ONE_CANONICAL_REPRESENTATION_TEST; RETAINED",
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-regression-v3/result.json",
+      "sha256": "8269d2e06ea8f6dc42645597413e30e67a21f421941a7e3a9a52b4d25eeb8ee8",
+      "head": "3e0a533c376dbfe613d3084802297c372b40cb01",
+      "tree": "196ddd3e7cf5b48a26d4e2d4e1cd3ccb84f203eb",
+      "tests": 2975,
+      "skipped": 211,
+      "failures": 1,
+      "exit_code": 1,
+      "group_absent": true,
+      "scope_note": "Sole failure was patch canonicalization. Patch normalization preserved applied dependency tree; full suite not rerun after this representation-only change."
+    },
+    "repaired_focused": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-focused-v3/result.json",
+      "sha256": "e65ba18e7cd80395e3e986919ec4ce0a5816ddc5bea4aed34097ff3655feb6d2",
+      "head": "3e0a533c376dbfe613d3084802297c372b40cb01",
+      "passed": true,
+      "group_absent": true,
+      "scope_note": "Actual-source first-provider repair control keeps base Ground0 live and refuses a real form Ground9 consumer."
+    },
+    "canonicalization": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-canonical-v1/result.json",
+      "sha256": "db321829744ba2b8e8fcc43d5e7f536992bd1288ba80bf4847c48860f32eb608",
+      "passed": true,
+      "canonical_test_count": 15,
+      "canonical_test_passed": true,
+      "patch_after_sha256": "db35d73df152b157fec7fc381b2342e6a8d0fa7ac8bc1b97cee088814e78a4b1",
+      "applied_dependency_tree": "13ef3f889b0e3a6ffd5c52feffefe47bfd5c92ad",
+      "full_regression_rerun": false
+    },
+    "repaired_builds": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-build-v3/result.json",
+      "sha256": "c8a247b4b131ad2636cde0e5be6c938c8c41badc5ef8b3ca16dac6c03deb0dc1",
+      "head": "3e0a533c376dbfe613d3084802297c372b40cb01",
+      "passed": true,
+      "ordinary_release": true,
+      "diagnostic_release": true,
+      "source_unchanged": true
+    }
+  },
+  "merged_pr346": {
+    "url": "https://github.com/ericvanlare/melee-web/pull/346",
+    "merge_commit": "3fd2ed878bbb9a149b79e830701762887410a0a2",
+    "reviewed_head": "713b2fba1c156654f546943afeded36cd557f203",
+    "tree": "88ac98b1c482b7062c33bc490eeba11cf8e95481",
+    "reviewed_tree": "88ac98b1c482b7062c33bc490eeba11cf8e95481",
+    "tree_match": true,
+    "ci": {
+      "run": 40540770417,
+      "attempt": 1,
+      "completed": 14,
+      "success": 12,
+      "expected_skips": 2,
+      "conclusion": "success"
+    },
+    "receipts": [
+      {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-merge-gate-v1/merged-tree.json",
+        "sha256": "e201c3889bff959d9b871b4b7e0fa001eee85a0ca7ad1e9f5ec9b234257f7447"
+      },
+      {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-merge-gate-v1/independent-review.json",
+        "sha256": "0320e9b8862ef896320e8b7820e943d6da77ad43573fdc37c3c7d212df99ccb7"
+      },
+      {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-merge-gate-v1/ci-final.json",
+        "sha256": "ed7b6415cb27e2aca2dbd2f9b3109f448b1ffdb6a6392b2b38393b8baadab6fd"
+      }
+    ]
+  },
+  "form_assets_probe": {
+    "state": "PASS_SOURCE_DATA_PROBE_ONLY",
+    "source_head": "c56161ea073cfeff543df6f83c8eee4f23d6ef18",
+    "result": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-form-assets-probe-v1/result.json",
+      "sha256": "2bc58186201b8c7880dcb4d5848b38ff5843e4fac7362ad09fba27f5d85d37ad"
+    },
+    "observed": {
+      "archives": 4,
+      "public_names": 123,
+      "hydrated_map_heads": 4,
+      "wrong_ordinal_refused": true,
+      "live_handle_close_refused": true,
+      "immutable_data": true
+    },
+    "source_transform_executed": false,
+    "C3": false,
+    "scope_note": "Validates imported form archive data and catalog lookup only; no source lifecycle, World wiring, active transformation, or browser behavior.",
+    "source_identity": {
+      "base_head": "c56161ea073cfeff543df6f83c8eee4f23d6ef18",
+      "note": "The probe was not a clean c56161ea checkout. It used the exact five-file overlay pinned below; result.json records the five source_before hashes.",
+      "five_file_freeze": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-form-assets-reduced-v1/freeze-v1.json",
+        "sha256": "b789fad24a8be1a533617984ff124834e340ac593964923accdb049b552d9ad6"
+      }
+    },
+    "composed_followup": {
+      "state": "PASS_SOURCE_DATA_PROBE_ONLY",
+      "source_head": "3e0a533c376dbfe613d3084802297c372b40cb01",
+      "result": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-form-assets-probe-v2/result.json",
+        "sha256": "d839a487d2ef10e230dd1f010eb9407509c54dc552fb66b6272408fa1a9c63b2"
+      },
+      "build_seconds": 16.908317708875984,
+      "probe_seconds": 0.3242075829766691,
+      "artifacts": {
+        "pokemon_stadium_c0_trace.js": "8a8d28a2d3907c93206455750e9a0104a87b9199fd5141e1e0263b00349efcc1",
+        "pokemon_stadium_c0_trace.wasm": "63519b6453b5358efa9c6e5d22359a2aac46a90313146784fdd6cb23c2bdcb5f"
+      },
+      "passed": true,
+      "source_unchanged": true,
+      "observed": {
+        "archives": 4,
+        "public_names": 123,
+        "hydrated_map_heads": 4,
+        "wrong_ordinal_refused": true,
+        "live_handle_close_refused": true
+      },
+      "source_transform_executed": false,
+      "source_identity_note": "Built with canonical patch bytes db35d73d\u2026; source HEAD 3e0a533c, non-patch sources unchanged. This remains a data/ownership probe only."
+    }
+  },
+  "c5_source_slot_and_entry_metadata": {
+    "implementation_head": "3e0a533c376dbfe613d3084802297c372b40cb01",
+    "tree": "196ddd3e7cf5b48a26d4e2d4e1cd3ccb84f203eb",
+    "state": "SOURCE_HOLD_CLOSED; REPAIRED_ACTUAL_SOURCE_CONTROL_PASS; ORDINARY_AND_DIAGNOSTIC_RELEASE_BUILDS_PASS; FULL_REGRESSION_ONE_CANONICAL_REPRESENTATION_FAILURE_RETAINED; CANONICAL_PATCH_CONTROL_15_PASS; EXACT_HEAD_CI_PENDING",
+    "source_slot_candidate": {
+      "production_freeze": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-stadium-source-slot-candidate-v2/freeze-v2.json",
+        "sha256": "7f3536df2e9a5156b130aae7e405e63b4c3ed7d19934c7f8e5fd9d7f1209bf56"
+      },
+      "test_successor": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-stadium-source-slot-candidate-v3/freeze-v3.json",
+        "sha256": "d6c7ed00cded48124e09550f607ef5d2cf96d0d3018760e1e66bae6ffd050f7a"
+      },
+      "focused_result": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-focused-v1/result.json",
+        "sha256": "05274765b1c951aa7f29e5cffab196b6f48df6251a3cec1d8fc91a389c6394f3"
+      },
+      "focused_test": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-focused-v1/test_stadium_source_slot_ownership.result.json",
+        "sha256": "cffe34055e3cdc66363204586a2f047f1d759e99b7e25043584f5ba57220ae52",
+        "passed": true
+      },
+      "scope": "Binds an exact source slot/header/buffer/allocation lease to a selected form and retains the corresponding native archive-section handle. Ordinary source header retirement and raw phase-6 buffer clearing remain distinct. No World transformation wiring."
+    },
+    "source_entry_metadata": {
+      "candidate_freeze": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-source-entry-metadata-candidate-v3/freeze-v3.json",
+        "sha256": "7d45dc05994e69d3cc6b9abe33428f8960bbb82314c57614dee593a821433ee5"
+      },
+      "source_review": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-source-entry-metadata-candidate-v3/independent-review.json",
+        "sha256": "ab59b0e3857be54a2607dff5794d0b5ecc34c6d5815cfda204cfc99b9fe11912"
+      },
+      "focused_first_attempt": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-focused-v1/test_gameplay_lbfile_source_entry.result.json",
+        "sha256": "15f90239ca44b519d7c19cd03292ed030b2c98c0f087cbf7cfd4a50e45ca766a",
+        "passed": false,
+        "retained": true
+      },
+      "focused_repaired": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-focused-v2/test_gameplay_lbfile_source_entry.result.json",
+        "sha256": "f9a86361853fd5b871aa3435476bfc4be34806c3e04fff94801e62b425172500",
+        "passed": true
+      },
+      "focused_run": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-focused-v2/result.json",
+        "sha256": "0043f68c6e3b133871ed89f2514926646c6ba9cc60ede2e81f5a18768918b49d"
+      },
+      "scope": "Private source-entry IDs resolve logical length through the active source registry. The test exercises extracted original lbFile bodies with modeled memory/service leaves; it is not a live disc read or gameplay transformation."
+    },
+    "unvalidated": [
+      "exact-head CI, including its regression job, after patch canonicalization",
+      "live World transformation and complete transformed graph retirement",
+      "C5 and whole-stage acceptance"
+    ],
+    "transformations_enabled": false,
+    "execution_identity": {
+      "focused_execution_head": "35b50ab26073be283f4361024fcece8f545508cc",
+      "focused_execution_note": "Both focused runs were performed on the staged 35b50ab composition before rebasing. The exact nine tracked source/test hashes in the result source inventory match the corresponding committed e4879796 files; this is source-byte equivalence, not a claim the runs executed at the e487 commit.",
+      "slot_focused_result": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-focused-v1/result.json",
+        "sha256": "05274765b1c951aa7f29e5cffab196b6f48df6251a3cec1d8fc91a389c6394f3"
+      },
+      "metadata_focused_result": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-focused-v2/result.json",
+        "sha256": "0043f68c6e3b133871ed89f2514926646c6ba9cc60ede2e81f5a18768918b49d"
+      },
+      "exact_source_hashes": {
+        "patches/melee-gameplay.patch": "d1ceea6f2f8b6f024152502a627a91dfc2d8468c73deab7f859df6ed05a08fa1",
+        "src/gameplay_archive_sections.c": "629f32e5cfb92fdf2df11df0f49839e474de47d23722d05ce0f5dbaa05cfb42c",
+        "src/gameplay_archive_sections.h": "ae0a460985c8827aac11bca19057f6228a84e23418a234223c8de382c84d8824",
+        "src/gameplay_stage_map.c": "5f48f2fd4019d81d914eea4edcc3f190123cb5ba8aa61cb5aa22488c6da95809",
+        "src/gameplay_stage_map.h": "751260496c900fa4cbe33f9fd8ee6c1bd8dba1b8f771f3bdd299b2431e57c691",
+        "tests/test_stadium_source_slot_ownership.py": "eeedf687b6ab8e0014c5d60889f101955b88725b32323a3537a714214374ce4e",
+        "src/gameplay_source_files.c": "0bd453b2de3ed41e5edd6ac3d910a898bf5d9e01e80d88c09763e4fcee944b30",
+        "src/gameplay_source_files.h": "8231cd789c6062725dae48aff0734424789455d0a64ae15ca855115882cc7e58",
+        "tests/test_gameplay_lbfile_source_entry.py": "5b7ce1c2fa9db4c9659145a8dc1e4e9b776e2bbdcf5d2391a3d7b33f04a43010"
+      },
+      "canonicalized_patch_sha256": "db35d73df152b157fec7fc381b2342e6a8d0fa7ac8bc1b97cee088814e78a4b1",
+      "applied_dependency_tree": "13ef3f889b0e3a6ffd5c52feffefe47bfd5c92ad"
+    },
+    "builds": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-build-v3/result.json",
+      "sha256": "c8a247b4b131ad2636cde0e5be6c938c8c41badc5ef8b3ca16dac6c03deb0dc1",
+      "head": "3e0a533c376dbfe613d3084802297c372b40cb01",
+      "ordinary_release_passed": true,
+      "diagnostic_release_passed": true,
+      "source_unchanged": true,
+      "scope_note": "Both builds passed before patch-only canonicalization; non-patch source and applied dependency tree are unchanged."
+    },
+    "source_review": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slot-final-review-v1/final-source-signoff-v1.json",
+      "sha256": "8d5bddc795149bd1ac9416d75adb57bd68bbaa00269ff975d90df2844b782585",
+      "disposition": "GO_REVIEWED_EXECUTABLE_TREE_CANONICAL_REPRESENTATION_ONLY",
+      "closure_path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slot-final-review-v1/closure-v1.json",
+      "closure_sha256": "5bedc52d9871ea81199e4994e1881e22c65cd2007b0b989d48a5393afea24b93",
+      "historical_hold_review": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slot-final-review-v1/final-source-signoff-v1.json",
+        "sha256": "8d5bddc795149bd1ac9416d75adb57bd68bbaa00269ff975d90df2844b782585",
+        "disposition": "GO_REVIEWED_EXECUTABLE_TREE_CANONICAL_REPRESENTATION_ONLY",
+        "closure_path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slot-final-review-v1/closure-v1.json",
+        "closure_sha256": "5bedc52d9871ea81199e4994e1881e22c65cd2007b0b989d48a5393afea24b93",
+        "historical_finding": "The original HOLD identified incorrect attribution of base-provided shared map0 to form-slot consumers. It is closed by the reviewed checked first-provider repair."
+      },
+      "historical_finding": "The original HOLD identified incorrect attribution of base-provided shared map0 to form-slot consumers. The reviewed checked first-provider repair closes it."
+    },
+    "repaired_source_validation": {
+      "focused_result": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-focused-v3/result.json",
+        "sha256": "e65ba18e7cd80395e3e986919ec4ce0a5816ddc5bea4aed34097ff3655feb6d2",
+        "passed": true,
+        "head": "3e0a533c376dbfe613d3084802297c372b40cb01"
+      },
+      "old_source_reproduction": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-shared-provider-old-source-v1/result.json",
+        "sha256": "8ab268aa92c6339844197d5e5e1644d7685bdce93104e58ff3452284d81af44a",
+        "expected_refusal_reproduced": true,
+        "old_source": "e4879796cde679543890f19a99b9108e5425ae99"
+      },
+      "closure": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slot-final-review-v1/closure-v1.json",
+        "sha256": "5bedc52d9871ea81199e4994e1881e22c65cd2007b0b989d48a5393afea24b93",
+        "disposition": "SOURCE_HOLD_CLOSED"
+      }
+    },
+    "latest_full_regression": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-regression-v3/result.json",
+      "sha256": "8269d2e06ea8f6dc42645597413e30e67a21f421941a7e3a9a52b4d25eeb8ee8",
+      "head": "3e0a533c376dbfe613d3084802297c372b40cb01",
+      "tree": "196ddd3e7cf5b48a26d4e2d4e1cd3ccb84f203eb",
+      "tests": 2975,
+      "skipped": 211,
+      "failures": 1,
+      "failed_case": "test_gameplay_patch_canonical",
+      "exit_code": 1,
+      "source_unchanged": true,
+      "disposition": "FAILED_RETAINED_CANONICAL_PATCH_REPRESENTATION_ONLY; FULL_SUITE_NOT_RERUN_AFTER_PATCH_ONLY_NORMALIZATION"
+    },
+    "canonicalization": {
+      "result": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-canonical-v1/result.json",
+        "sha256": "db321829744ba2b8e8fcc43d5e7f536992bd1288ba80bf4847c48860f32eb608",
+        "passed": true
+      },
+      "canonical_test": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-canonical-v1/canonical-test.stderr",
+        "sha256": "4866311a9efee7403021c0a160174e5ae63d18b5d562040629a3f3d125819f92",
+        "tests": 15,
+        "passed": true
+      },
+      "patch_before_sha256": "d1ceea6f2f8b6f024152502a627a91dfc2d8468c73deab7f859df6ed05a08fa1",
+      "patch_after_sha256": "db35d73df152b157fec7fc381b2342e6a8d0fa7ac8bc1b97cee088814e78a4b1",
+      "applied_dependency_tree": "13ef3f889b0e3a6ffd5c52feffefe47bfd5c92ad",
+      "non_patch_source_unchanged": true,
+      "exact_head_ci": "PENDING",
+      "full_regression_rerun": false
+    },
+    "historical_e487_regression": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-regression-v2/result.json",
+      "sha256": "ab2f58a0fc8bd9337265a140673906212711ac4424b9fd7168617b63578d775e",
+      "state": "STOPPED_KNOWN_DEFECT_NOT_A_TEST_FAILURE_SUMMARY",
+      "elapsed_seconds": 232.29042941704392,
+      "exit_code": -15,
+      "root_stop_receipt": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-regression-v2/root-stop-known-defect.json",
+        "sha256": "563f7503271d007824b52ace4340546cb3b3046f0e61572eea0b63d671e52735",
+        "reason": "Stop validation of known source defect: shared base map0 falsely treated as transformed-slot consumer. Repair and reduced control before new full regression.",
+        "owned_pgid": 42819
+      },
+      "stopped_by_root": true,
+      "full_suite_completed": false,
+      "group_absent_after_stop": true
+    }
+  },
+  "source_tree": "196ddd3e7cf5b48a26d4e2d4e1cd3ccb84f203eb",
+  "pr348_linux_fixture": {
+    "failed_head": "e71533c6886d4baced4d291b23a7364530ae18e9",
+    "failed_run": 40552013069,
+    "failed_job": 122358154734,
+    "log": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr348-unit1-failed.log",
+      "sha256": "64bd727f7d9bd09e4eec5c23cc79de675e4a87eb12219662f558a22bce5bb26e"
+    },
+    "cause": "New fixture strict C11 lacks POSIX strnlen declaration on Linux; production runtime builds pass.",
+    "repair": "Fixture compiler feature macro _POSIX_C_SOURCE=200809L; no production or assertion change.",
+    "review": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr348-posix-fixture-repair-v1/review.json",
+      "sha256": "ba74dc776d5f96e127ab35fc8a22f330a3d81994ceb8338d25efdcccd5eba0c7"
+    },
+    "focused": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr348-posix-fixture-repair-v1/result.json",
+      "sha256": "3d8cfaa87380cf3c0980b3b2f1c742af040ba744b37af4955ecc62e7afdf3042",
+      "passed": true
+    },
     "current_head_ci": "PENDING"
   }
 }

@@ -13,6 +13,8 @@ typedef struct ArchiveHandle {
     const void* object;
     MeleeWebArchiveSections* owner;
     uint64_t identity;
+    const void* source_buffer;
+    size_t source_length;
     int source_archive;
     int preloaded;
 } ArchiveHandle;
@@ -105,16 +107,55 @@ void* melee_web_archive_sections_open_preloaded(const char* filename) {
     if(!assign_handle_identity(h)){free(h->filename);free(h);fatal(filename,NULL,"Typed archive identity budget exhausted");}
     h->next=handles;handles=h;++handle_count;return (void*)h->object;
 }
-int melee_web_archive_sections_attach_source(void* archive,const char* filename) {
+int melee_web_archive_sections_attach_source_buffer(void* archive,const char* filename,
+                                                       const void* buffer,size_t length) {
+    if((buffer==NULL)!=(length==0))return 0;
     if(!archive||!has_archive(filename)||handle_count>=256||
        melee_web_archive_sections_is_handle(archive))return 0;
     ArchiveHandle* h=calloc(1,sizeof(*h));
     if(!h)return 0;
     h->filename=strdup(filename);
     if(!h->filename){free(h);return 0;}
+    h->source_buffer=buffer;h->source_length=length;
     h->object=archive;h->owner=NULL;h->source_archive=1;h->preloaded=0;
     if(!assign_handle_identity(h)){free(h->filename);free(h);return 0;}
     h->next=handles;handles=h;++handle_count;
+    return 1;
+}
+int melee_web_archive_sections_attach_source(void* archive,const char* filename) {
+    return melee_web_archive_sections_attach_source_buffer(archive,filename,NULL,0);
+}
+int melee_web_archive_sections_catalog_map_matches(const char* filename,const void* map) {
+    MeleeWebArchiveSections* scope=unique_archive_scope(filename);
+    if(!scope||scope->heap_generation||!map)return 0;
+    size_t found=0;
+    for(size_t i=0;i<scope->count;i++)
+        if(!strcmp(scope->entries[i].filename,filename)&&
+           !strcmp(scope->entries[i].symbol,"map_head")) {
+            if(scope->entries[i].native_data!=map)return 0;
+            found++;
+        }
+    return found==1;
+}
+int melee_web_archive_sections_source_map_matches(uint64_t generation,
+        const void* source,const void* native_owner,const void* map,
+        const void* buffer,size_t length,uint64_t expected,uint64_t* actual) {
+    if(!source||!native_owner||source==native_owner||!map||!buffer||!length||!actual||
+       !generation||!melee_web_gameplay_world_exists()||
+       melee_web_gameplay_stats().generation!=generation)return 0;
+    const ArchiveHandle *src=NULL,*native=NULL;
+    for(const ArchiveHandle* h=handles;h;h=h->next) {
+        if(h->object==source)src=h;
+        if(h->object==native_owner)native=h;
+    }
+    if(!src||!native||!src->source_archive||src->preloaded||src->owner||
+       native->source_archive||native->preloaded||native->owner||
+       !src->identity||!native->identity||
+       strcmp(src->filename,native->filename)||
+       src->source_buffer!=buffer||src->source_length!=length||
+       (expected&&expected!=src->identity)||
+       !melee_web_archive_sections_catalog_map_matches(native->filename,map))return 0;
+    *actual=src->identity;
     return 1;
 }
 int melee_web_archive_sections_is_handle(const void* candidate) {
