@@ -25720,9 +25720,211 @@
           "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-stockout-full-regression-v1/result.json",
           "sha256": "10d746186391e8e57e32e22411504f3230fa82816c7d9d1a1c3e79c2175dbcd0"
         },
-        "exact_documentation_head_CI": "pending"
+        "exact_documentation_head_CI": {
+          "head": "7d1872b0eb86a498c575069ef3048d52ab67ea04",
+          "checks": 14,
+          "success": 12,
+          "expected_skip": 2,
+          "run": 40471282558,
+          "receipt": {
+            "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-stockout-docs-root-v1/ci-head7d1872b0.json",
+            "bytes": 5227,
+            "sha256": "4de006eb716dc15a2273da9615812b39470d9f6a7042ebba8647613c87aff3ba"
+          }
+        }
       }
     },
     "artifact_path_base": "External melee-web evidence root; paths are relative to that root."
+  },
+  "c3_natural_standings_input_v1_2026_10_27": {
+    "scope": "Original same-run route/input/compact validation only; standings attempt inconclusive, no browser comparison or C3/C4 acceptance",
+    "source": {
+      "original_producer": "2e4cbdee9949f3e8bc7506f2cdf54f5bbedc6eeb",
+      "capture_harness": "7d39c71a254aed14db52c2d1ce0b2e9360119736",
+      "reporting_repair": "6852283d0a0c7967e5fe5fe9c2b3d07397fef17f",
+      "input_policy": "selected_b_mode8_horizontal_standings_v1",
+      "observer_layout": "selected_b_3500_v1"
+    },
+    "outcome": {
+      "result": "INCONCLUSIVE_PRETRANSFORM",
+      "reason": "go_plus_3500_cap",
+      "source_tick": 3584,
+      "actual_GO": 84,
+      "display_mode": 1,
+      "selected_mode14_observed": false
+    },
+    "seconds": 117.25399370817468,
+    "original_live_report": "FAIL: post-C live match index relabeled the closed B window",
+    "recovered_offline_postflight": "PASS: use the saved closed B receipt; full raw/status/compact/input/three-lifetime validation unchanged",
+    "raw_report_unchanged": true,
+    "recaptured": false,
+    "mode14_observed": false,
+    "first_transform_observed": false,
+    "stop_bound": "actual GO + 3500; GO84/source3584/mode1",
+    "observed_display_transitions": [
+      {
+        "source_tick": 84,
+        "mode": 11,
+        "focus": 99
+      },
+      {
+        "source_tick": 123,
+        "mode": 1,
+        "focus": 99
+      },
+      {
+        "source_tick": 724,
+        "mode": 8,
+        "focus": 0
+      },
+      {
+        "source_tick": 887,
+        "mode": 7,
+        "focus": 0
+      },
+      {
+        "source_tick": 2074,
+        "mode": 1,
+        "focus": 0
+      },
+      {
+        "source_tick": 2676,
+        "mode": 8,
+        "focus": 1
+      },
+      {
+        "source_tick": 2684,
+        "mode": 7,
+        "focus": 1
+      },
+      {
+        "source_tick": 3294,
+        "mode": 1,
+        "focus": 1
+      }
+    ],
+    "timing_decision": {
+      "observed_mode7_residence_ticks": [
+        1187,
+        610
+      ],
+      "three_authored_mode1_assignments_minimum_ticks": 1800,
+      "lower_bound_excluding_initial_and_mode8_ticks": 3597,
+      "scope": "Trace-specific lower bound with these observed timer draws; not universal pretransformation impossibility",
+      "next": "No unchanged directional retry or seed fishing. Finish owner registration/lifetime observation, then define a separate source-backed standings/first-transformation contract before any new recording."
+    },
+    "validation": {
+      "focused_tests": 15,
+      "skips": 0,
+      "all_recorded_process_groups_absent": true,
+      "retained_inputs_exact": 12,
+      "C3": false,
+      "C4": false,
+      "browser_comparison": false
+    },
+    "artifacts": {
+      "raw_report": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-standings-original-v1/report.json",
+        "bytes": 5736228,
+        "sha256": "fd0795145e276b9d38ff197aa265a6c1f72fd476115810f4f34ffe31aa88905b"
+      },
+      "launch": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-standings-original-v1/launch.json",
+        "bytes": 6224,
+        "sha256": "7454ad7e4acf20d8272fed6280546065285ca4993d855b37d7a79ba3b3164161"
+      },
+      "cleanup": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-standings-original-v1/cleanup.json",
+        "bytes": 162,
+        "sha256": "29526e0ea8e940aff28526bda3d48eb60abcb50f7f42ab4997ea7ecb73884fdf"
+      },
+      "source_review": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-standings-reachability-v1/source-review-v2.json",
+        "bytes": 6993,
+        "sha256": "6f1a76e6ada665e38a191ea3e64a3f26cc8a75ad1d3d36df5c43cb9cdccc04d2"
+      },
+      "policy_review": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-standings-input-candidate-v5/independent-final-review.json",
+        "bytes": 7703,
+        "sha256": "59c1d69778514da7ffca5ae78dc9a86cc5e6c8acdb6f2f19e58db77458e0dd8d"
+      },
+      "repair": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-standings-postflight-repair-v1/freeze.json",
+        "bytes": 4385,
+        "sha256": "042b2c5656a872a6dca69b8c881d3acd2afaa810d02cf8e2866b68aef423ad27"
+      },
+      "offline_validation": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-standings-postflight-repair-v1/offline-validation.json",
+        "bytes": 185005,
+        "sha256": "3916ac78a9afb6fe09add3d370417a26358a66a936281f5a6989f6608cf2088e"
+      },
+      "independent_review": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-standings-postflight-repair-v1/independent-review.json",
+        "bytes": 2965,
+        "sha256": "d8457e332b624fa9725fc4c6aaa0efb48c9510a7f0fc2d5ebc5b9e6ed1a3ada3"
+      }
+    },
+    "raw_inputs": [
+      {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-standings-original-v1/report.json",
+        "bytes": 5736228,
+        "sha256": "fd0795145e276b9d38ff197aa265a6c1f72fd476115810f4f34ffe31aa88905b"
+      },
+      {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-standings-original-v1/launch.json",
+        "bytes": 6224,
+        "sha256": "7454ad7e4acf20d8272fed6280546065285ca4993d855b37d7a79ba3b3164161"
+      },
+      {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-standings-original-v1/native-primary.mwro",
+        "bytes": 38965407,
+        "sha256": "746f5b151aa8db96e01466fd91dcc8ab1e0bc0e25bc7ec7e38300b0f14aba676"
+      },
+      {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-standings-original-v1/native-primary-status.json",
+        "bytes": 699,
+        "sha256": "b0016fe879f448ee15368a353ad2cd2476bb37466e3d5f739ea24b3905d3b8d8"
+      },
+      {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-standings-original-v1/native-inputs.mwri",
+        "bytes": 1097576,
+        "sha256": "1ee2ddb6da854085ba1408a57a6dc0dd9448efa57cc418b272c39276adb1a27d"
+      },
+      {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-standings-original-v1/native-input-status.json",
+        "bytes": 90,
+        "sha256": "b331b1c65c2735b72d19e975364b74a898bb3bf4276e03d1a5398ec3f3a369c8"
+      },
+      {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-standings-original-v1/native-allocations.jsonl",
+        "bytes": 945821942,
+        "sha256": "223078a1bd196851ab8a5ea51e51fe6059a165213d3467f47fdabd7e370ab80d"
+      },
+      {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-standings-original-v1/allocation-profile.json",
+        "bytes": 14448,
+        "sha256": "84f9fe7db756e56166b817d1720a0627b76ed261473a77c7a17d20b855a92b39"
+      },
+      {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-standings-original-v1/standings-input-issues.json",
+        "bytes": 1212,
+        "sha256": "4f0f7231e04f1ac374889704b3a3694b7c7bb54efbf72f5466fd2976ee73f733"
+      },
+      {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-standings-original-v1/input-intentions.jsonl",
+        "bytes": 127902,
+        "sha256": "8aa93509d4827ae1c425b35818c2ba736551a3b2d4a35c676f1cb08708e329aa"
+      },
+      {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-standings-original-v1/stadium-whole-selected-b-compact-rng.mwrl",
+        "bytes": 4679239,
+        "sha256": "a4de1c541a32cd4a06c564172cdd67003b02c2ff9a5d6fb6945e6713b8502577"
+      },
+      {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-standings-original-v1/cleanup.json",
+        "bytes": 162,
+        "sha256": "29526e0ea8e940aff28526bda3d48eb60abcb50f7f42ab4997ea7ecb73884fdf"
+      }
+    ]
   }
 }
