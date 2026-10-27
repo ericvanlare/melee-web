@@ -10,6 +10,7 @@ class StadiumStandingsInputPolicy:
     permission to issue stick input for another/unobserved focus.
     """
     PROFILE = 'selected_b_mode8_horizontal_standings_v1'
+    POST_TRANSFORM_PROFILE = 'selected_b_mode8_post_transform_mode14_v1'
 
     @staticmethod
     def validate_setup(expected):
@@ -21,10 +22,16 @@ class StadiumStandingsInputPolicy:
                     (('player_type', 0), ('character_kind', 8), ('stocks', 4))),
                 'Standings input requires exact contiguous two-human Mario stock4 controllers')
 
-    def __init__(self):
+    def __init__(self, profile=PROFILE):
+        require(profile in (self.PROFILE, self.POST_TRANSFORM_PROFILE),
+                'Unknown exact Stadium standings input profile')
+        self.profile = profile
+        self.post_transform = profile == self.POST_TRANSFORM_PROFILE
         self.last = None
         self.go_tick = None
         self.initial_form = None
+        self.first_transform = None
+        self.mode14_witness = None
         self.stop = None
         self.transitions = []
         self.desired = [NEUTRAL_PAD, NEUTRAL_PAD]
@@ -102,13 +109,32 @@ class StadiumStandingsInputPolicy:
         transformed = (snapshot['map2']['phase_s16'] != 0 or
                        snapshot['map2']['gate_mask_80'] or
                        snapshot['map2']['form_s16'] != self.initial_form)
-        reason = ('first_transform' if transformed else 'observed_mode14' if mode == 14 else
-                  'go_plus_3500_cap' if tick-self.go_tick >= 3500 else None)
+        witness = dict(sequence=row['seq'], source_tick=tick,
+            draw_ordinal=row['draw_ordinal'], mode=mode, focus=focus,
+            display=dict(snapshot['display']), map2=dict(snapshot['map2']),
+            consumed_pad=dict(sequence=sample['sequence'], source_tick=sample['source_tick'],
+                draw_ordinal=sample['draw_ordinal'], ports=list(sample['ports']),
+                errors=list(sample['errors'])))
+        if transformed and self.first_transform is None:
+            self.first_transform = witness
+        if self.post_transform:
+            reason = (('observed_post_transform_mode14' if self.first_transform is not None
+                       else 'mode14_before_transform') if mode == 14 else None)
+            if mode == 14:
+                self.mode14_witness = witness
+        else:
+            reason = ('first_transform' if transformed else 'observed_mode14' if mode == 14 else
+                      'go_plus_3500_cap' if tick-self.go_tick >= 3500 else None)
         self.desired = [NEUTRAL_PAD, NEUTRAL_PAD]
         if reason is not None:
             self.stop = dict(point, reason=reason,
-                result='OBSERVED_PRETRANSFORM_MODE14' if reason == 'observed_mode14' else
-                       'INCONCLUSIVE_PRETRANSFORM', C3=False, per_owner_rng_comparison=False)
+                result=('OBSERVED_POST_TRANSFORM_MODE14' if reason == 'observed_post_transform_mode14' else
+                        'INCONCLUSIVE_MODE14_BEFORE_TRANSFORM' if reason == 'mode14_before_transform' else
+                        'OBSERVED_PRETRANSFORM_MODE14' if reason == 'observed_mode14' else
+                        'INCONCLUSIVE_PRETRANSFORM'), C3=False, per_owner_rng_comparison=False)
+            if self.post_transform:
+                self.stop['first_transform'] = self.first_transform
+                self.stop['mode14_witness'] = self.mode14_witness
         elif mode == 8 and not self.releasing:
             desired = [NEUTRAL_PAD, NEUTRAL_PAD]
             desired[focus] = raw_pad(x=80)
@@ -119,15 +145,25 @@ class StadiumStandingsInputPolicy:
     def summary(self):
         require(self.stop is not None and self.inflight is None and not self.releasing,
                 'Standings evidence stop/release has not settled')
-        return dict(profile=self.PROFILE, stop=dict(self.stop),
+        result = dict(profile=self.profile, stop=dict(self.stop),
                     transitions=list(self.transitions), consumed_ticks=self.consumed_ticks,
                     neutral_release_observed=True, allocation_acceptance=False,
                     per_owner_rng_comparison=False, C3=False)
+        if self.post_transform:
+            require(self.stop.get('reason') in ('observed_post_transform_mode14',
+                                                'mode14_before_transform'),
+                    'Post-transform profile lacks an actual mode14 stop')
+            result.update(first_transform=self.first_transform,
+                          mode14_witness=self.mode14_witness,
+                          post_go_ticks=self.consumed_ticks,
+                          event_stop=self.stop['reason'])
+        return result
 
 
 from pathlib import Path
 import json
-from stadium_whole_long_idle import LongIdleBObservations, PROFILE
+from stadium_whole_long_idle import (DRAW_RETURN_PC, LongIdleBObservations, PROFILE,
+                                     _validate_idle_3500_boundary_minimum)
 from whole_session_replay import _consumed_ports
 
 
@@ -154,12 +190,19 @@ class StandingsBObservations(LongIdleBObservations):
     The default LongIdleBObservations still requires literal neutral and an
     untransformed map. This subclass grants no idle/C4/owner-parity acceptance.
     """
-    def __init__(self, issues, pipe_rows):
+    def __init__(self, issues, pipe_rows, *, profile=StadiumStandingsInputPolicy.PROFILE):
         super().__init__(PROFILE)
         require(isinstance(issues, list) and len(issues) <= 4096 and
                 isinstance(pipe_rows, list) and len(pipe_rows) <= 4096,
                 'Standings issue/Pipe inventory differs')
-        self.policy = StadiumStandingsInputPolicy()
+        self.policy = StadiumStandingsInputPolicy(profile)
+        self.post_transform = self.policy.post_transform
+        self.post_window_tick = None
+        self.post_window_pending = None
+        self.post_window_ticks = 0
+        self.post_window_complete = False
+        self.post_window_expected_draw = None
+        self.post_window_draw_open = None
         self.issues = issues
         self.issue_cursor = 0
         covered = set()
@@ -206,21 +249,109 @@ class StandingsBObservations(LongIdleBObservations):
                 'Standings consumed PAD lacks previously issued source-owned input')
 
     def validate_map_state(self, row, state, roots, consumed):
-        require(roots == self.owner, 'Standings map root owner changed')
         ports = _consumed_ports(consumed, consumed['seq'])
         sample = dict(sequence=consumed['seq'], match_index=consumed['payload']['match_index'],
                       source_tick=consumed['source_tick'], draw_ordinal=consumed['draw_ordinal'],
                       ports=ports, errors=[int.from_bytes(bytes.fromhex(pad)[-1:], 'big', signed=True)
                                            for pad in ports])
+        require(roots == self.owner, 'Standings map root owner changed')
         self.policy.observe(row, state, sample, self.go)
-        # Until the selected stop, retain all old map/countdown checks. A real
-        # transformation is an explicit inconclusive stop; its suffix remains
-        # raw observed material and is not accepted as an idle/C4 comparison.
-        if self.policy.stop is None:
+        # Before the first authored transformation, retain the old exact map
+        # owner/countdown check. After it, keep the typed state and consumed
+        # PAD sequence checks, but do not apply the untransformed-map contract.
+        if self.policy.stop is None and not (self.post_transform and self.policy.first_transform is not None):
             super().validate_map_state(row, state, roots, consumed)
 
+    def _accept_post_window_boundary(self, row):
+        if self.post_window_complete or row.get('event') != 'boundary':
+            return
+        payload = row.get('payload', {})
+        kind = payload.get('boundary')
+        if kind not in ('source_tick', 'pad_poll', 'pad_consume', 'draw_enter', 'draw_return'):
+            return
+        require(payload.get('whole_session') is True and payload.get('match_index') == 1 and
+                payload.get('audio_owner_epoch') is not None,
+                'Post-window source boundary has a foreign whole-session owner')
+        require(type(self.post_window_expected_draw) is int and
+                type(row.get('draw_ordinal')) is int and
+                row['draw_ordinal'] == self.post_window_expected_draw,
+                'Post-window draw ordinal is missing, duplicated or reordered')
+        if self.post_window_draw_open is not None:
+            require(kind in ('pad_poll', 'draw_return') and
+                    row.get('source_tick') == self.post_window_draw_open,
+                    'Post-window source work escaped its open draw')
+        if kind in ('source_tick', 'pad_poll', 'pad_consume'):
+            _validate_idle_3500_boundary_minimum(row)
+        elif kind in ('draw_enter', 'draw_return'):
+            pcs = {'draw_enter': 0x80390fc0, 'draw_return': DRAW_RETURN_PC}
+            require(payload.get('pc') == pcs[kind] and isinstance(payload.get('gprs'), list) and
+                    len(payload['gprs']) == 32 and
+                    all(type(value) is int and 0 <= value <= 0xffffffff
+                        for value in payload['gprs']),
+                    'Post-window draw PC/GPR inventory differs')
+        if kind == 'pad_consume':
+            require(self.post_window_pending is None and self.post_window_draw_open is None,
+                    'Post-transform SourceTick has duplicate consumed PAD')
+            self.validate_consumed_pad(row)
+            self.post_window_pending = row
+            return
+        if kind == 'draw_enter':
+            require(self.post_window_pending is None and self.post_window_draw_open is None and
+                    type(row.get('source_tick')) is int and
+                    row['source_tick'] == self.post_window_tick + 1,
+                    'Post-window DrawEnter is nested or out of order')
+            self.post_window_draw_open = row['source_tick']
+            return
+        if kind == 'draw_return':
+            require(self.post_window_pending is None and
+                    self.post_window_draw_open == row.get('source_tick'),
+                    'Post-window DrawReturn lacks its exact DrawEnter')
+            self.post_window_draw_open = None
+            self.post_window_expected_draw += 1
+            return
+        if kind == 'pad_poll':
+            return
+        if kind != 'source_tick':
+            return
+        from stadium_go_prefix import _validate_stadium_idle_state_record
+        from retail_input_plan import DISCONNECTED_PAD
+        consumed = self.post_window_pending
+        require(consumed is not None and consumed['seq'] < row['seq'] and
+                consumed['source_tick'] == row['source_tick'] and
+                consumed['draw_ordinal'] == row['draw_ordinal'] and
+                type(row.get('source_tick')) is int and
+                row['source_tick'] == self.post_window_tick + 1,
+                'Post-window SourceTick lacks its contiguous consumed PAD')
+        ports = _consumed_ports(consumed, consumed['seq'])
+        require(ports[2:] == [DISCONNECTED_PAD]*2,
+                'Post-window consumed PAD is not an exact four-port record')
+        sample = dict(sequence=consumed['seq'], match_index=1,
+            source_tick=consumed['source_tick'], draw_ordinal=consumed['draw_ordinal'],
+            ports=ports, errors=[int.from_bytes(bytes.fromhex(pad)[-1:], 'big', signed=True)
+                                 for pad in ports])
+        state = _validate_stadium_idle_state_record(row, 'IDLE', row['source_tick'])
+        roots = tuple((item['tag'], item['flags'], item['hex'])
+                      for item in row['payload']['slices'] if item['tag'] in (67, 68))
+        require(roots == self.owner, 'Post-window map root owner changed')
+        self.policy.observe(row, state, sample, self.go)
+        self.post_window_tick = row['source_tick']
+        self.post_window_ticks += 1
+        self.post_window_pending = None
+        if self.policy.stop is not None and self.policy.inflight is None and not self.policy.releasing:
+            self.post_window_complete = True
+
     def accept(self, row):
+        was_closed = self.closed
         super().accept(row)
+        if self.post_transform and self.closed:
+            if not was_closed:
+                self.post_window_tick = self.last_tick
+                self.post_window_expected_draw = self.expected_draw
+                self.post_window_draw_open = None
+                if self.policy.stop is not None and self.policy.inflight is None and not self.policy.releasing:
+                    self.post_window_complete = True
+            else:
+                self._accept_post_window_boundary(row)
         if self.issue_cursor < len(self.issues):
             issue = self.issues[self.issue_cursor]
             require(issue['after_sequence'] >= row['seq'],
@@ -237,8 +368,22 @@ class StandingsBObservations(LongIdleBObservations):
     def finish(self):
         result = super().finish()
         require(self.issue_cursor == len(self.issues), 'Standings source issue events incomplete')
-        self.policy.summary()  # exact selected stop and consumed neutral release
-        result.update(scope='original-whole3-b-standings-input-structural-window-only',
-                      host_input_profile=StadiumStandingsInputPolicy.PROFILE,
-                      idle_acceptance=False, transformation_acceptance=False, C3=False)
+        policy_summary = self.policy.summary()  # exact selected stop and consumed neutral release
+        result['standings_input'] = policy_summary
+        if self.post_transform:
+            require(self.post_window_pending is None and self.post_window_draw_open is None and
+                    self.post_window_complete,
+                    'Post-transform mode14 lacks completed post-window source/PAD/draw join')
+            result.update(scope='original-whole3-b-post-transform-mode14-input-observation-only',
+                host_input_profile=StadiumStandingsInputPolicy.POST_TRANSFORM_PROFILE,
+                post_window_source_ticks=self.post_window_ticks,
+                post_window_first_tick=(self.post_window_tick - self.post_window_ticks + 1
+                    if self.post_window_ticks else None),
+                post_window_last_tick=(self.post_window_tick if self.post_window_ticks else None),
+                event_stop=policy_summary['event_stop'], idle_acceptance=False,
+                transformation_acceptance=False, C3=False)
+        else:
+            result.update(scope='original-whole3-b-standings-input-structural-window-only',
+                          host_input_profile=StadiumStandingsInputPolicy.PROFILE,
+                          idle_acceptance=False, transformation_acceptance=False, C3=False)
         return result

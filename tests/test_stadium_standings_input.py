@@ -26,6 +26,12 @@ validator_module = importlib.util.module_from_spec(validator_spec)
 sys.modules['stadium_whole_long_idle'] = validator_module
 validator_spec.loader.exec_module(validator_module)
 assert Path(validator_module.__file__).resolve() == validator_path.resolve()
+policy_path = TOOLS / 'stadium_standings_input.py'
+policy_spec = importlib.util.spec_from_file_location('stadium_standings_input', policy_path)
+policy_module = importlib.util.module_from_spec(policy_spec)
+sys.modules['stadium_standings_input'] = policy_module
+policy_spec.loader.exec_module(policy_module)
+assert Path(policy_module.__file__).resolve() == policy_path.resolve()
 SOURCE = Path(os.environ.get('MELEE_STANDINGS_SOURCE',
                              ROOT / 'scripts/capture_sd_reference_prefix.py'))
 spec = importlib.util.spec_from_file_location('standings_input_control', SOURCE)
@@ -33,8 +39,8 @@ m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
 from retail_input_plan import DISCONNECTED_PAD
 from reference_versus_sequence_capture import raw_pad
-import stadium_standings_input as policy_module
 from stadium_whole_long_idle import LongIdleBObservations
+import stadium_go_prefix
 
 
 class StandingsInputPolicyTests(unittest.TestCase):
@@ -113,6 +119,207 @@ class StandingsInputPolicyTests(unittest.TestCase):
         p = m.StadiumStandingsInputPolicy()
         self.observe(p, 84, mode=14, phase=1)
         self.assertEqual(p.stop['reason'], 'first_transform')
+
+    def test_post_transform_profile_crosses_old_cap_and_requires_mode14_after_transform(self):
+        profile = policy_module.StadiumStandingsInputPolicy.POST_TRANSFORM_PROFILE
+        p = policy_module.StadiumStandingsInputPolicy(profile)
+        self.observe(p, 84, mode=1)
+        self.observe(p, 85, mode=1, phase=1)
+        self.assertIsNone(p.stop)
+        self.assertEqual(p.first_transform['source_tick'], 85)
+        for tick in range(86, 3585):
+            self.observe(p, tick, mode=1, phase=1)
+        self.assertIsNone(p.stop)  # GO+3500 is only the unchanged native window.
+        self.observe(p, 3585, mode=14, phase=1)
+        self.assertEqual(p.stop['reason'], 'observed_post_transform_mode14')
+        self.assertEqual(p.mode14_witness['source_tick'], 3585)
+        self.assertEqual(p.mode14_witness['consumed_pad']['ports'],
+                         [m.NEUTRAL_PAD, m.NEUTRAL_PAD,
+                          DISCONNECTED_PAD, DISCONNECTED_PAD])
+        result = p.summary()
+        self.assertEqual(result['profile'], profile)
+        self.assertEqual(result['event_stop'], 'observed_post_transform_mode14')
+        self.assertFalse(result['C3'])
+
+    def test_post_transform_profile_does_not_accept_pretransform_mode14(self):
+        p = policy_module.StadiumStandingsInputPolicy(
+            policy_module.StadiumStandingsInputPolicy.POST_TRANSFORM_PROFILE)
+        self.observe(p, 84, mode=14)
+        self.assertEqual(p.stop['reason'], 'mode14_before_transform')
+        self.assertEqual(p.stop['result'], 'INCONCLUSIVE_MODE14_BEFORE_TRANSFORM')
+        self.assertFalse(p.summary()['C3'])
+
+    def test_post_window_raw_pad_must_pair_to_next_contiguous_source_tick(self):
+        profile = policy_module.StadiumStandingsInputPolicy.POST_TRANSFORM_PROFILE
+
+        def receiver():
+            observed = policy_module.StandingsBObservations([], [], profile=profile)
+            observed.closed = True
+            observed.previous = 1000
+            observed.last_tick = 3500
+            observed.post_window_tick = 3500
+            observed.go = dict(source_tick=84)
+            observed.policy.go_tick = 84
+            observed.policy.initial_form = 0
+            observed.policy.last = dict(source_tick=3500, mode=1, focus=99)
+            observed.owner = ((67, 1, '00000001'), (68, 1, '00000002'))
+            observed.post_window_expected_draw = 451
+            return observed
+
+        consumed = dict(seq=1001, event='boundary', source_tick=3501, draw_ordinal=451,
+            payload=dict(boundary='pad_consume', whole_session=True, match_index=1,
+                         audio_owner_epoch=1,
+                         pc=0x80377584, gprs=[0]*32))
+        state_row = dict(seq=1002, event='boundary', source_tick=3501, draw_ordinal=451,
+            payload=dict(boundary='source_tick', whole_session=True, match_index=1,
+                         audio_owner_epoch=1,
+                         pc=stadium_go_prefix.SOURCE_TICK_PC, gprs=[0]*32,
+                         slices=[dict(tag=67, flags=1, hex='00000001'),
+                                 dict(tag=68, flags=1, hex='00000002')]))
+        def add_boundary_slices(row):
+            tick = row['source_tick']
+            rng_pointer, camera, camera_object = 0x80401000, 0x80402000, 0x80403000
+            specs = [(14, 46, 0x8046b6a0, bytes(46)),
+                     (21, 856, 0x804c1f84, bytes(856)),
+                     (30, 4, 0x80479d58, tick.to_bytes(4, 'big')),
+                     (19, 4, 0x804d5f94, rng_pointer.to_bytes(4, 'big')),
+                     (20, 4, rng_pointer, bytes.fromhex('12345678')),
+                     (10, 76, 0x80452c68, camera.to_bytes(4, 'big') + bytes(72)),
+                     (28, 4, camera + 0x28, camera_object.to_bytes(4, 'big')),
+                     (11, 81, camera_object, bytes(81))]
+            row['payload']['slices'].extend(dict(tag=tag, flags=0, size=size,
+                address=address, hex=raw.hex()) for tag, size, address, raw in specs)
+            return row
+        add_boundary_slices(state_row)
+        snapshot = dict(sequence=1002, source_tick=3501, draw_ordinal=451,
+            display=dict(mode_s16=14, focused_player_s16=0),
+            map2=dict(phase_s16=1, gate_mask_80=False, form_s16=0))
+        literal = [m.NEUTRAL_PAD, m.NEUTRAL_PAD, DISCONNECTED_PAD, DISCONNECTED_PAD]
+        accepted = receiver()
+        with patch.object(policy_module, '_consumed_ports', return_value=literal), \
+             patch('stadium_go_prefix._validate_stadium_idle_state_record', return_value=snapshot):
+            accepted.accept(consumed)
+            accepted.accept(state_row)
+        self.assertEqual(accepted.post_window_ticks, 1)
+        self.assertTrue(accepted.post_window_complete)
+        self.assertEqual(accepted.policy.stop['reason'], 'observed_post_transform_mode14')
+
+        rejected = receiver()
+        wrong_tick = dict(state_row, source_tick=3502)
+        wrong_tick['payload'] = copy.deepcopy(state_row['payload'])
+        next(x for x in wrong_tick['payload']['slices'] if x['tag'] == 30)['hex'] = (3502).to_bytes(4, 'big').hex()
+        with patch.object(policy_module, '_consumed_ports', return_value=literal), \
+             patch('stadium_go_prefix._validate_stadium_idle_state_record', return_value=snapshot):
+            rejected.accept(consumed)
+            with self.assertRaises(ValueError):
+                rejected.accept(wrong_tick)
+
+        changed_root = receiver()
+        changed_root_row = copy.deepcopy(state_row)
+        changed_root_row['payload']['slices'][0]['hex'] = '00000003'
+        with patch.object(policy_module, '_consumed_ports', return_value=literal), \
+             patch('stadium_go_prefix._validate_stadium_idle_state_record', return_value=snapshot):
+            changed_root.accept(consumed)
+            with self.assertRaisesRegex(ValueError, 'map root owner changed'):
+                changed_root.accept(changed_root_row)
+
+    def test_post_window_source_draw_order_and_root_owner(self):
+        profile = policy_module.StadiumStandingsInputPolicy.POST_TRANSFORM_PROFILE
+        observed = policy_module.StandingsBObservations([], [], profile=profile)
+        observed.closed = True
+        observed.previous = 1000
+        observed.last_tick = 3500
+        observed.post_window_tick = 3500
+        observed.post_window_expected_draw = 451
+        observed.go = dict(source_tick=84)
+        observed.policy.go_tick = 84
+        observed.policy.initial_form = 0
+        observed.policy.last = dict(source_tick=3500, mode=1, focus=99)
+        observed.owner = ((67, 1, '00000001'), (68, 1, '00000002'))
+
+        def add_source_slices(row):
+            tick = row['source_tick']
+            rng_pointer, camera, camera_object = 0x80401000, 0x80402000, 0x80403000
+            specs = [(14, 46, 0x8046b6a0, bytes(46)),
+                     (21, 856, 0x804c1f84, bytes(856)),
+                     (30, 4, 0x80479d58, tick.to_bytes(4, 'big')),
+                     (19, 4, 0x804d5f94, rng_pointer.to_bytes(4, 'big')),
+                     (20, 4, rng_pointer, bytes.fromhex('12345678')),
+                     (10, 76, 0x80452c68, camera.to_bytes(4, 'big') + bytes(72)),
+                     (28, 4, camera + 0x28, camera_object.to_bytes(4, 'big')),
+                     (11, 81, camera_object, bytes(81))]
+            row['payload']['slices'].extend(dict(tag=tag, flags=0, size=size,
+                address=address, hex=raw.hex()) for tag, size, address, raw in specs)
+            return row
+
+        def tick_row(seq, tick, draw):
+            row = dict(seq=seq, event='boundary', source_tick=tick, draw_ordinal=draw,
+                payload=dict(boundary='source_tick', whole_session=True, match_index=1,
+                    audio_owner_epoch=1,
+                    pc=stadium_go_prefix.SOURCE_TICK_PC, gprs=[0]*32,
+                    slices=[dict(tag=67, flags=1, size=4, address=0x8049e9cc, hex='00000001'),
+                            dict(tag=68, flags=1, size=4, address=0x8049e9cc, hex='00000002')]))
+            # Raw root bytes are compared below; this lower-bound test checks
+            # the existing SourceTick/RNG/camera identity decoder as well.
+            add_source_slices(row)
+            return row
+
+        def consume_row(seq, tick, draw):
+            return dict(seq=seq, event='boundary', source_tick=tick, draw_ordinal=draw,
+                payload=dict(boundary='pad_consume', whole_session=True, match_index=1,
+                             audio_owner_epoch=1,
+                             pc=0x80377584, gprs=[0]*32))
+
+        def draw_row(seq, kind, tick, draw):
+            return dict(seq=seq, event='boundary', source_tick=tick, draw_ordinal=draw,
+                payload=dict(boundary=kind, whole_session=True, match_index=1,
+                    audio_owner_epoch=1,
+                    pc=0x80390fc0 if kind == 'draw_enter' else 0x80391040,
+                    gprs=[0]*32, slices=[dict(tag=1)]))
+
+        snapshots = {
+            3501: dict(sequence=1002, source_tick=3501, draw_ordinal=451,
+                display=dict(mode_s16=1, focused_player_s16=99),
+                map2=dict(phase_s16=1, gate_mask_80=False, form_s16=0)),
+            3502: dict(sequence=1006, source_tick=3502, draw_ordinal=452,
+                display=dict(mode_s16=14, focused_player_s16=0),
+                map2=dict(phase_s16=1, gate_mask_80=False, form_s16=0)),
+        }
+        literal = [m.NEUTRAL_PAD, m.NEUTRAL_PAD, DISCONNECTED_PAD, DISCONNECTED_PAD]
+        with patch.object(policy_module, '_consumed_ports', return_value=literal), \
+             patch('stadium_go_prefix._validate_stadium_idle_state_record',
+                   side_effect=lambda row, label, tick: snapshots[tick]):
+            observed.accept(consume_row(1001, 3501, 451))
+            observed.accept(tick_row(1002, 3501, 451))
+            observed.accept(draw_row(1003, 'draw_enter', 3502, 451))
+            wrong_return = draw_row(1004, 'draw_return', 3502, 452)
+            with self.assertRaisesRegex(ValueError, 'draw ordinal'):
+                observed.accept(wrong_return)
+
+        # A failed draw must leave the stream state untouched; use a fresh
+        # receiver to prove the actual ordered source/draw bracket succeeds.
+        observed = policy_module.StandingsBObservations([], [], profile=profile)
+        observed.closed = True
+        observed.previous = 1000
+        observed.last_tick = 3500
+        observed.post_window_tick = 3500
+        observed.post_window_expected_draw = 451
+        observed.go = dict(source_tick=84)
+        observed.policy.go_tick = 84
+        observed.policy.initial_form = 0
+        observed.policy.last = dict(source_tick=3500, mode=1, focus=99)
+        observed.owner = ((67, 1, '00000001'), (68, 1, '00000002'))
+        with patch.object(policy_module, '_consumed_ports', return_value=literal), \
+             patch('stadium_go_prefix._validate_stadium_idle_state_record',
+                   side_effect=lambda row, label, tick: snapshots[tick]):
+            observed.accept(consume_row(1001, 3501, 451))
+            observed.accept(tick_row(1002, 3501, 451))
+            observed.accept(draw_row(1003, 'draw_enter', 3502, 451))
+            observed.accept(draw_row(1004, 'draw_return', 3502, 451))
+            observed.accept(consume_row(1005, 3502, 452))
+            observed.accept(tick_row(1006, 3502, 452))
+        self.assertTrue(observed.post_window_complete)
+        self.assertEqual(observed.post_window_expected_draw, 452)
 
     def test_exact_declared_human_controller_setup(self):
         setup = dict(players=[dict(port=i+1, player_type=0, character_kind=8, stocks=4)
