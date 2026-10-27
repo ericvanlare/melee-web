@@ -33,6 +33,7 @@ PAIRED_IDLE_PROFILE = {
     "natural_tail_max": 4,
     "raw_omission_kinds": ["draw_enter", "draw_return"],
 }
+PAIRED_REGISTRATION_PROFILE = {**PAIRED_IDLE_PROFILE, "profile": "paired_idle_registration_v1"}
 # Version 1 whole-session records retain the original eight-byte tail.  The
 # extended tail carries the source audio owner epoch while keeping the old
 # decoder shape readable for preserved diagnostic streams.
@@ -357,6 +358,7 @@ def iter_records(path: str | Path, *,
     whole_session_announced = False
     whole_session_count = None
     whole_session_paired_idle = None
+    whole_session_paired_profile = None
     with stream:
         index = 0
         bytes_read = 0
@@ -418,11 +420,14 @@ def iter_records(path: str | Path, *,
                         "stadium_observed_match" not in announcement and
                         isinstance(long_idle, Mapping) and
                         json.dumps(dict(long_idle), sort_keys=True) ==
-                        json.dumps(PAIRED_IDLE_PROFILE, sort_keys=True)
+                        json.dumps(PAIRED_REGISTRATION_PROFILE if long_idle.get("profile") ==
+                                   "paired_idle_registration_v1" else PAIRED_IDLE_PROFILE,
+                                   sort_keys=True)
                     )
                     paired_marker = (
                         isinstance(long_idle, Mapping) and
-                        long_idle.get("profile") == "paired_idle_scene_endpoints_v1"
+                        long_idle.get("profile") in ("paired_idle_scene_endpoints_v1",
+                                                     "paired_idle_registration_v1")
                     )
                     if type(count) is not int or not (
                             (profile is None and 3 <= count <= 64) or paired_valid or
@@ -438,6 +443,12 @@ def iter_records(path: str | Path, *,
                     if whole_session_paired_idle is not None and paired_idle != whole_session_paired_idle:
                         raise ObserverStreamError(
                             f"{context}: paired-idle profile disagrees with prior announcement")
+                    if paired_valid:
+                        if (whole_session_paired_profile is not None and
+                                long_idle != whole_session_paired_profile):
+                            raise ObserverStreamError(
+                                f"{context}: paired-idle profile disagrees with prior announcement")
+                        whole_session_paired_profile = dict(long_idle)
                     whole_session_paired_idle = paired_idle
                     whole_session_count = count
                     whole_session_announced = True

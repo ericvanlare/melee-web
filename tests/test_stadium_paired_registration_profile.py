@@ -8,6 +8,7 @@ import os
 import subprocess
 import tempfile
 import unittest
+import zlib
 from unittest.mock import patch
 import test_stadium_paired_idle_profile as base
 def exact_module(name, relative):
@@ -106,6 +107,47 @@ return 0;
         with self.assertRaises(w.WholeSessionReplayError): w._capture_identity(rows(bad))
         self.assertTrue(LongIdleBObservations(PAIRED_REGISTRATION_PROFILE).paired)
         with self.assertRaises(ValueError): LongIdleBObservations(dict(PAIRED_REGISTRATION_PROFILE,natural_tail_max=5))
+
+    def test_binary_reader_admits_exact_registration_and_rejects_mixed_profiles(self):
+        stream = exact_module('reference_observer_stream',
+                              'reference-capture/dolphin/reference_observer_stream.py')
+        declaration = dict(whole_session=True, match_count=2,
+            stadium_whole_feedback=True, setup_receipt_sha256='a' * 64,
+            stadium_whole_b_state=True, stadium_observed_matches=[0, 1],
+            stadium_whole_long_idle=PAIRED_REGISTRATION_PROFILE)
+
+        def frame(code, sequence, value):
+            payload = json.dumps(value, separators=(',', ':')).encode()
+            return stream.HEADER.pack(stream.MAGIC_U32, stream.SCHEMA_VERSION,
+                code, sequence, sequence + 10, 0, 0, 0, len(payload),
+                zlib.crc32(payload) & 0xffffffff) + payload
+
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'registration.mwro'
+            def read(handshake, start):
+                path.write_bytes(frame(1, 0, handshake) + frame(2, 1, start))
+                return list(stream.iter_records(path))
+
+            self.assertEqual(len(read(declaration, declaration)), 2)
+            legacy = dict(declaration, stadium_whole_long_idle=stream.PAIRED_IDLE_PROFILE)
+            self.assertEqual(len(read(legacy, legacy)), 2)
+            for first, second in ((declaration, legacy), (legacy, declaration)):
+                with self.subTest(mixed=True), self.assertRaisesRegex(
+                        stream.ObserverStreamError, 'disagrees with prior announcement'):
+                    read(first, second)
+            for mutation in ({'profile': 'unknown'}, {'comparison_post_go_ticks': 3501},
+                             {'natural_tail_max': 5}, {'selected_matches': [1, 0]},
+                             {'match_count': True}, {'extra': 1}):
+                bad = dict(declaration, stadium_whole_long_idle={
+                    **PAIRED_REGISTRATION_PROFILE, **mutation})
+                with self.subTest(mutation=mutation), self.assertRaises(stream.ObserverStreamError):
+                    read(bad, bad)
+            for key, value in (('match_count', 3), ('stadium_whole_feedback', False),
+                               ('setup_receipt_sha256', '0' * 64),
+                               ('stadium_observed_matches', [1, 0])):
+                bad = dict(declaration, **{key: value})
+                with self.subTest(key=key), self.assertRaises(stream.ObserverStreamError):
+                    read(bad, bad)
 
     def test_receiver_and_cli_require_explicit_paired_route(self):
         driver=base.driver
