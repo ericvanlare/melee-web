@@ -850,9 +850,6 @@ async function pairedFullPhase(){
   if(status?.schema==='melee-web-stadium-paired-v11-full-pair-v1'&&status.whole_session_complete){
    await drainPairedFull();
    report.paired_v11_full_pair.comparison=pairedFullComparison.finish(status);
-   report.paired_v11_full_pair.rng_comparison=pairedFullExpected.stockout
-    ? {per_owner_rng_comparison:false,scope:'Per-tick and scene seed comparison only; original compact RNG was not captured.'}
-    : runPairedFullRngComparison(true);
    // Actual native action recording is complete. The selected stockout profile
    // has no original per-owner RNG ledger; do not infer that comparison.
    report.rng_draw_probe={...report.rng_draw_probe,complete:true,
@@ -871,6 +868,13 @@ async function pairedFullPhase(){
       await fs.writeFile(path.join(output,'stadium-registration-rows.jsonl'),retained.rows.join('\n')+'\n',{flag:'wx'});
       report.stadium_registration={...report.stadium_registration,...validateStadiumRegistrationSnapshot(retained)};
      }
+     // Retain the completed browser evidence before the independent host-side
+     // comparison, which may fail or exhaust the remaining capture budget.
+     await write('report.json',report);
+     report.paired_v11_full_pair.rng_comparison=pairedFullExpected.stockout
+      ? {per_owner_rng_comparison:false,scope:'Per-tick and scene seed comparison only; original compact RNG was not captured.'}
+      : runPairedFullRngComparison(true);
+     if(Date.now()>=deadline)throw Error('Paired full strict comparison exceeded unchanged replay deadline');
      report.paired_v11_full_pair.component_pass=true;return;
     }
     await new Promise(r=>setTimeout(r,replayPollMs));

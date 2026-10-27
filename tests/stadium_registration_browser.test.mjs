@@ -145,10 +145,11 @@ test('actual full-route phase exports only after ordinary retirement and cannot 
   const source=fs.readFileSync(new URL('../scripts/capture_whole_session_browser.mjs',import.meta.url),'utf8');
   const start=source.indexOf('async function pairedFullPhase(){'),end=source.indexOf('\n}',start);
   assert.ok(start>=0&&end>start);
-  async function run(invalid=false){
+  async function run(invalid=false,rngFails=false,deadlineFails=false){
+    let clock=0;
     const events=[],rows=[row(0),row(1)],native=runtime(status({count:2,worlds:4,invalid}),rows);
     let observations=0;
-    const ctx={Date,Promise,setTimeout,replayTimeoutMs:1000,replayPollMs:1,output:'/owned',pairedRegistration:true,
+    const ctx={Date:{now:()=>clock},Promise,setTimeout,replayTimeoutMs:1000,replayPollMs:1,output:'/owned',pairedRegistration:true,
       fs:{writeFile:async(p,raw)=>events.push(['raw',p,raw])},path:{join:(...p)=>p.join('/')},
       installPairedFullLaunch:()=>{},installPairedFullObserver:()=>{},
       collectStadiumRegistrationInPage,validateStadiumRegistrationSnapshot,
@@ -161,13 +162,20 @@ test('actual full-route phase exports only after ordinary retirement and cannot 
         assert.deepEqual(native.calls,[]);events.push(['retired']);
         return {busy:false,status:{native_retired:true},phase:0,running:0,runtime:{replay_report:{complete:true,pass:true,failures:[]}}};},
       pairedFullExpected:{total:10},pairedFullComparison:{finish:()=>({pass:true})},
-      runPairedFullRngComparison:()=>({status:'PASS_SELECTED_RNG_COMPARISON'})};
+      runPairedFullRngComparison:()=>{events.push(['rng']);if(rngFails)throw Error('retained RNG comparison failure');if(deadlineFails)clock=1000;return {status:'PASS_SELECTED_RNG_COMPARISON'};}};
     vm.createContext(ctx);vm.runInContext(source.slice(start,end+2),ctx);
-    if(invalid){await assert.rejects(ctx.pairedFullPhase(),/incomplete or unhealthy/);assert.notEqual(ctx.report.paired_v11_full_pair.component_pass,true);}
+    if(invalid){await assert.rejects(ctx.pairedFullPhase(),/incomplete or unhealthy/);assert.notEqual(ctx.report.paired_v11_full_pair.component_pass,true);assert.ok(!events.some(e=>e[0]==='rng'));}
+    else if(rngFails){await assert.rejects(ctx.pairedFullPhase(),/retained RNG comparison failure/);assert.notEqual(ctx.report.paired_v11_full_pair.component_pass,true);assert.equal(ctx.report.stadium_registration.complete,true);}
+    else if(deadlineFails){await assert.rejects(ctx.pairedFullPhase(),/exceeded unchanged replay deadline/);assert.notEqual(ctx.report.paired_v11_full_pair.component_pass,true);assert.equal(ctx.report.stadium_registration.complete,true);}
     else{await ctx.pairedFullPhase();assert.equal(ctx.report.paired_v11_full_pair.component_pass,true);assert.equal(ctx.report.stadium_registration.C3,false);}
     assert.deepEqual(native.calls,['seal']);
     const raw=events.find(e=>e[0]==='raw'&&e[1].endsWith('stadium-registration-rows.jsonl'));
     assert.equal(raw[2],rows.join('\n')+'\n');assert.ok(events.indexOf(raw)>events.findIndex(e=>e[0]==='retired'));
+    if(!invalid){
+      const rngIndex=events.findIndex(e=>e[0]==='rng');
+      assert.ok(rngIndex>events.indexOf(raw));
+      assert.ok(events.slice(events.indexOf(raw)+1,rngIndex).some(e=>e[0]==='write'&&e[1]==='report.json'));
+    }
   }
-  await run();await run(true);
+  await run();await run(true);await run(false,true);await run(false,false,true);
 });

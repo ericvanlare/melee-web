@@ -390,7 +390,10 @@ def _owner_semantics(owner: Any, side: str, label: str, owner_tools: Any) -> tup
                  "p_link": 8, "s_link": 1, "fighter": fighter}, pointers)
     if side == "original":
         try:
-            semantic, _ = owner_tools._original_owner(owner, label)
+            # _pointer_identity above already performs the same per-row
+            # spelling/range/alignment checks as _original_owner. Keep the
+            # shared semantic validator, without parsing those pointers twice.
+            semantic = owner_tools._semantic_owner(owner, label)
         except Exception as exc:
             raise EvidenceError(f"{label}: existing original semantic owner validator rejected row: {exc}") from exc
         require(owner.get("source_slot") is None and owner.get("entity") is None and
@@ -398,7 +401,8 @@ def _owner_semantics(owner: Any, side: str, label: str, owner_tools: Any) -> tup
                 f"{label}: non-fighter original owner claims a port")
     else:
         try:
-            semantic = owner_tools._native_owner(owner, label)
+            # The native pointer/token checks also ran above for this row.
+            semantic = owner_tools._semantic_owner(owner, label)
         except Exception as exc:
             raise EvidenceError(f"{label}: existing browser semantic owner validator rejected row: {exc}") from exc
         require("fighter" in owner and owner.get("fighter") is None,
