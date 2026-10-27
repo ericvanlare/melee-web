@@ -78,6 +78,7 @@ const {values, tokens} = parseArgs({tokens: true, options: {
   'stadium-paired-v11-full-pair-projection-sha256': {type: 'string'},
   'stadium-paired-v11-full-pair-endpoints': {type: 'string'},
   'stadium-paired-v11-full-pair-endpoints-sha256': {type: 'string'},
+  'water-collision-probe': {type: 'boolean', default: false},
   'stadium-paired-v11-first-go-projection': {type: 'string'},
   'stadium-paired-v11-first-go-projection-sha256': {type: 'string'},
   'expected-frame0': {type: 'string'},
@@ -178,6 +179,8 @@ const pairedRegistration=values['stadium-paired-v11-full-pair-registration'] ===
 const pairedFullEndpoints=values['stadium-paired-v11-full-pair-endpoints'];
 const pairedFullSha=values['stadium-paired-v11-full-pair-projection-sha256'];
 const pairedFullEndpointsSha=values['stadium-paired-v11-full-pair-endpoints-sha256'];
+const waterCollisionProbe=values['water-collision-probe'];
+if(waterCollisionProbe&&!pairedFull)throw Error('--water-collision-probe requires the paired full Water profile');
 const fullOptions=Object.entries(values).filter(([k,v])=>k.startsWith('stadium-paired-v11-full-pair-')&&v!==undefined);
 if(fullOptions.length){
  const conflict=Object.entries(values).some(([k,v])=>v&&((k.startsWith('stadium-')&&!k.startsWith('stadium-paired-v11-full-pair-'))||['manifest','diagnostic-manifest','stopped-scene-pair','stop-after-source-frames','resume-timing-pauses','cpu-observations','rng-draw-probe-range','rng-draw-probe-cursors','hit-transition-probe-cursors','first-replay-callback-probe','expected-frame0'].includes(k)));
@@ -835,7 +838,7 @@ async function pairedFullPhase(){
  await fs.writeFile(path.join(output,'paired-v11-full-rows.jsonl'),'',{flag:'wx'});
  await fs.writeFile(path.join(output,'paired-v11-full-rng.jsonl'),'',{flag:'wx'});
  await page.evaluate(installPairedFullObserver,{maximumRows:4*pairedFullExpected.total+16000});
- await page.evaluate(installPairedFullLaunch,{stockout:pairedFullExpected.stockout===true,natural14:pairedFullExpected.natural14===true,firstFire:pairedFullExpected.firstFire===true,firstWater:pairedFullExpected.firstWater===true,requestSourceTick:pairedFullExpected.firstWater?pairedFullExpected.projection.first_water.request.source_tick:pairedFullExpected.firstFire?pairedFullExpected.projection.first_fire.request.source_tick:null,callbackSourceTick:pairedFullExpected.firstWater?pairedFullExpected.projection.first_water.callback.source_tick:pairedFullExpected.firstFire?pairedFullExpected.projection.first_fire.callback.source_tick:null,mode14SourceTick:pairedFullExpected.natural14?pairedFullExpected.matches[1].reference.mode14_source_tick:null,lastSelectedSourceTick:pairedFullExpected.firstWater?pairedFullExpected.projection.first_water.settled.source_tick:pairedFullExpected.firstFire?pairedFullExpected.projection.first_fire.settled.source_tick:pairedFullExpected.natural14?pairedFullExpected.matches[1].reference.last_selected_source_tick:null});
+ await page.evaluate(installPairedFullLaunch,{stockout:pairedFullExpected.stockout===true,natural14:pairedFullExpected.natural14===true,firstFire:pairedFullExpected.firstFire===true,firstWater:pairedFullExpected.firstWater===true,waterCollisionProbe:pairedFullExpected.waterCollisionProbe===true,requestSourceTick:pairedFullExpected.firstWater?pairedFullExpected.projection.first_water.request.source_tick:pairedFullExpected.firstFire?pairedFullExpected.projection.first_fire.request.source_tick:null,callbackSourceTick:pairedFullExpected.firstWater?pairedFullExpected.projection.first_water.callback.source_tick:pairedFullExpected.firstFire?pairedFullExpected.projection.first_fire.callback.source_tick:null,mode14SourceTick:pairedFullExpected.natural14?pairedFullExpected.matches[1].reference.mode14_source_tick:null,lastSelectedSourceTick:pairedFullExpected.firstWater?pairedFullExpected.projection.first_water.settled.source_tick:pairedFullExpected.firstFire?pairedFullExpected.projection.first_fire.settled.source_tick:pairedFullExpected.natural14?pairedFullExpected.matches[1].reference.last_selected_source_tick:null});
  await page.locator('#retail-replay-start').click();
  let status;
  while(Date.now()<deadline){
@@ -1269,6 +1272,8 @@ try {
     const pinned=async(file,sha)=>{const stat=await fs.lstat(file);if(!stat.isFile()||stat.isSymbolicLink()||stat.size>64*1024*1024)throw Error('Full reference must be a bounded regular file');const raw=await fs.readFile(file),actual=createHash('sha256').update(raw).digest('hex');if(actual!==sha)throw Error('Full reference SHA differs');return {raw,identity:{path:path.resolve(file),bytes:raw.length,sha256:actual}};};
     const projection=await pinned(pairedFullPath,pairedFullSha),endpoints=await pinned(pairedFullEndpoints,pairedFullEndpointsSha);
     pairedFullExpected=derivePairedFull(JSON.parse(projection.raw),report.inputs.recipe.sha256,report.recipe_header.frames,JSON.parse(endpoints.raw));
+    if(waterCollisionProbe&&!pairedFullExpected.firstWater)throw Error('--water-collision-probe requires the exact first-Water paired full profile');
+    pairedFullExpected.waterCollisionProbe=waterCollisionProbe;
     if(pairedRegistration && (pairedFullExpected.stockout||pairedFullExpected.natural14||pairedFullExpected.firstFire||pairedFullExpected.firstWater)) throw Error('Registration capture requires the paired idle route');
     if(pairedRegistration) report.stadium_registration={requested:true,complete:false};
     pairedFullComparison=new PairedFullComparator(pairedFullExpected);

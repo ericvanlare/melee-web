@@ -20,6 +20,52 @@ export function firstWaterOriginalValues(fields,sourceTick){
  need(same(Object.keys(values),FIRST_WATER_STATE_KEYS),'first-water ordered state field contract');
  return values;
 }
+const waterQueryKeys=['schema','world_generation','source_tick','state_before','state_after','readiness_before','readiness_after','line_index','chain','line','queries'];
+const waterStateKeys=['world_generation','world_ticks','source_frame','random_seed','journal_armed','selected_form','journal_failed','event_count','map2_gate','countdown','phase','form','history_e0','history_e2','pending','display_mode','display_e6','display_e8','display_previous_mode','display_selected_player','display_f2','buffer_uses','display_flags','scalar_sample_valid'];
+const waterReadinessKeys=['vertices','lines','joints','floor_islands','ceiling_islands','empty_lines','storage_owned','original_indices_initialized','stage_joint_bindings_ready','stage_callbacks_ready'];
+const waterLineKeys=['v0','v0_bits','v1','v1_bits','normal','normal_bits','kind','material_flags','runtime_flags','previous','next','joint','pruned_hi_flags','has_normal'];
+const waterFloorKeys=['x','x_bits','y','y_bits','line','displacement_y','displacement_y_bits','normal','normal_bits','material_flags'];
+function exactKeys(value,keys,label){need(value&&typeof value==='object'&&!Array.isArray(value)&&same(Object.keys(value).sort(),[...keys].sort()),label+' fields');}
+function finiteTuple(value,length,label){need(Array.isArray(value)&&value.length===length&&value.every(Number.isFinite),label+' finite float tuple');}
+const waterFloatBitsView=new DataView(new ArrayBuffer(4));
+function checkWaterFloatBits(value,bits,label){
+ need(Number.isFinite(value)&&typeof bits==='string'&&/^0x[0-9a-f]{8}$/.test(bits),label+' float bits');
+ waterFloatBitsView.setUint32(0,Number.parseInt(bits.slice(2),16),true);
+ need(Object.is(value,waterFloatBitsView.getFloat32(0,true)),label+' float value/bits');
+}
+function checkWaterFloatTuple(values,bits,label){finiteTuple(values,3,label);need(Array.isArray(bits)&&bits.length===3,label+' bit fields');
+ for(let i=0;i<3;i++)checkWaterFloatBits(values[i],bits[i],label+'['+i+']');}
+export function validateFirstWaterCollisionQuery(value,generation,sourceTick){
+ exactKeys(value,waterQueryKeys,'Water collision query');
+ need(value.schema==='melee-web-stadium-first-water-collision-query-native-v1'&&Number.isSafeInteger(generation)&&generation>0&&value.world_generation===generation&&Number.isSafeInteger(sourceTick)&&sourceTick>=0&&sourceTick<Number.MAX_SAFE_INTEGER&&value.source_tick===sourceTick,'Water collision query owner/boundary');
+ for(const state of [value.state_before,value.state_after]){
+  exactKeys(state,waterStateKeys,'Water collision bracket state');
+  need(waterStateKeys.every(key=>Number.isSafeInteger(state[key]))&&state.world_generation===generation&&state.world_ticks===sourceTick+1&&state.source_frame>=0&&state.random_seed>=0&&state.random_seed<=0xffffffff&&state.journal_armed===1&&state.selected_form===9&&state.journal_failed===0&&state.event_count===5&&state.map2_gate>=0&&state.map2_gate<=1&&state.phase===0&&state.form===9&&state.pending===0&&state.buffer_uses===2&&state.display_flags<=7&&state.scalar_sample_valid===1,'Water collision completed owner/scalar snapshot');
+ }
+ need(same(value.state_before,value.state_after),'Water collision query changed source ticks, seed, or scalar owner state');
+ exactKeys(value.readiness_before,waterReadinessKeys,'Water collision readiness before');exactKeys(value.readiness_after,waterReadinessKeys,'Water collision readiness after');
+ for(const readiness of [value.readiness_before,value.readiness_after]){
+  need(waterReadinessKeys.every(key=>Number.isSafeInteger(readiness[key])&&readiness[key]>=0)&&readiness.lines>0&&readiness.joints>0&&readiness.storage_owned===1&&readiness.original_indices_initialized===1&&readiness.stage_joint_bindings_ready===1&&readiness.stage_callbacks_ready===1,'Water collision readiness');
+ }
+ need(same(value.readiness_before,value.readiness_after),'Water collision query changed collision readiness/owner');
+ need(Number.isSafeInteger(value.line_index)&&value.line_index>=0&&value.line_index<value.readiness_before.lines,'Water collision selected line');
+ exactKeys(value.chain,['min_x','min_x_bits','max_x','max_x_bits'],'Water collision chain');
+ checkWaterFloatBits(value.chain.min_x,value.chain.min_x_bits,'Water chain min_x');checkWaterFloatBits(value.chain.max_x,value.chain.max_x_bits,'Water chain max_x');
+ need(value.chain.min_x<value.chain.max_x,'Water collision chain bounds');
+ exactKeys(value.line,waterLineKeys,'Water collision line');
+ checkWaterFloatTuple(value.line.v0,value.line.v0_bits,'Water line v0');checkWaterFloatTuple(value.line.v1,value.line.v1_bits,'Water line v1');checkWaterFloatTuple(value.line.normal,value.line.normal_bits,'Water line normal');
+ need(Number.isSafeInteger(value.line.joint)&&Number.isSafeInteger(value.line.kind)&&Number.isSafeInteger(value.line.runtime_flags)&&value.line.runtime_flags>=0&&value.line.runtime_flags<=0xffffffff&&Number.isSafeInteger(value.line.material_flags)&&value.line.material_flags>=0&&value.line.material_flags<=0xffffffff&&Number.isSafeInteger(value.line.previous)&&Number.isSafeInteger(value.line.next)&&Number.isSafeInteger(value.line.pruned_hi_flags)&&value.line.pruned_hi_flags>=0&&value.line.pruned_hi_flags<=0xffff&&value.line.previous>=-1&&value.line.previous<value.readiness_before.lines&&value.line.next>=-1&&value.line.next<value.readiness_before.lines&&value.line.joint===0&&value.line.kind===1&&(value.line.runtime_flags&0x10000)!==0&&(value.line.runtime_flags&0x80)===0&&value.line.has_normal===1&&value.line.v0[0]<value.line.v1[0]&&value.chain.min_x<=value.line.v0[0]&&value.chain.max_x>=value.line.v1[0],'Water joint-zero enabled floor line');
+ exactKeys(value.queries,['hit','left_miss','right_miss'],'Water collision queries');
+ for(const [name,q] of Object.entries(value.queries)){exactKeys(q,waterFloorKeys,'Water '+name);checkWaterFloatBits(q.x,q.x_bits,'Water '+name+' x');checkWaterFloatBits(q.y,q.y_bits,'Water '+name+' y');checkWaterFloatBits(q.displacement_y,q.displacement_y_bits,'Water '+name+' displacement');checkWaterFloatTuple(q.normal,q.normal_bits,'Water '+name+' normal');need(Number.isSafeInteger(q.line)&&Number.isSafeInteger(q.material_flags)&&q.material_flags>=0&&q.material_flags<=0xffffffff,'Water '+name+' result');}
+ const {hit,left_miss:left,right_miss:right}=value.queries;
+ const f32=Math.fround;
+ const midpointX=f32(value.line.v0[0]+f32(f32(value.line.v1[0]-value.line.v0[0])*0.5));
+ const midpointY=f32(value.line.v0[1]+f32(f32(value.line.v1[1]-value.line.v0[1])*0.5));
+ need(hit.x===midpointX&&hit.y===midpointY&&hit.line===value.line_index,'Water collision midpoint hit');
+ need(left.x===f32(value.chain.min_x-1)&&left.y===midpointY&&left.x<value.chain.min_x-0.1&&left.line===-1,'Water collision left miss');
+ need(right.x===f32(value.chain.max_x+1)&&right.y===midpointY&&right.x>value.chain.max_x+0.1&&right.line===-1,'Water collision right miss');
+ return true;
+}
 const registrationOfflineScope='original-paired-registration-offline-postflight-v1';
 const registrationRawRoles=['report.json','launch.json','native-primary.mwro','native-primary-status.json',
  'native-inputs.mwri','native-input-status.json','native-allocations.jsonl','allocation-profile.json',
@@ -276,15 +322,15 @@ function deriveNaturalMode14Pair(p,recipeSha,frames,endpoints){
   need(r.result?.outcome_byte===7,'natural14 original NoContest');const start=total;total+=r.actions.length;return {reference:r,states:statesMap,offset:start,endpoints:ep};
  });need(total<=2*frames,'natural14 bounded schedule');return {projection:p,matches,total,natural14:true,selection:{request:{kind:'range',first:0,last:total-1},selected:Array.from({length:total},(_,i)=>i)}};
 }
-export function installPairedFullLaunch({stockout=false,natural14=false,firstFire=false,firstWater=false,requestSourceTick=null,callbackSourceTick=null,mode14SourceTick=null,lastSelectedSourceTick=null}={}){
- if(typeof stockout!=='boolean'||typeof natural14!=='boolean'||typeof firstFire!=='boolean'||typeof firstWater!=='boolean'||Number(stockout)+Number(natural14)+Number(firstFire)+Number(firstWater)>1)throw Error('Paired full launch profile must be explicit');
+export function installPairedFullLaunch({stockout=false,natural14=false,firstFire=false,firstWater=false,waterCollisionProbe=false,requestSourceTick=null,callbackSourceTick=null,mode14SourceTick=null,lastSelectedSourceTick=null}={}){
+ if(typeof stockout!=='boolean'||typeof natural14!=='boolean'||typeof firstFire!=='boolean'||typeof firstWater!=='boolean'||typeof waterCollisionProbe!=='boolean'||Number(stockout)+Number(natural14)+Number(firstFire)+Number(firstWater)>1||waterCollisionProbe&&!firstWater)throw Error('Paired full launch profile must be explicit');
  if(natural14&&(!Number.isSafeInteger(mode14SourceTick)||!Number.isSafeInteger(lastSelectedSourceTick)||mode14SourceTick<0||mode14SourceTick>0xffffffff||lastSelectedSourceTick>0xffffffff||lastSelectedSourceTick<=mode14SourceTick))throw Error('Natural14 arm coordinates invalid');
  if((firstFire||firstWater)&&(![requestSourceTick,callbackSourceTick,lastSelectedSourceTick].every(x=>Number.isSafeInteger(x)&&x>=0&&x<=0xffffffff)||!(requestSourceTick<callbackSourceTick&&callbackSourceTick<lastSelectedSourceTick)))throw Error('First-fire arm coordinates invalid');
  const m=globalThis.Module;
  const arm=firstWater?'_melee_web_native_menu_stadium_paired_v11_first_water_pair_arm':firstFire?'_melee_web_native_menu_stadium_paired_v11_first_fire_pair_arm':natural14?'_melee_web_native_menu_stadium_paired_v11_natural_mode14_pair_arm':stockout?'_melee_web_native_menu_stadium_paired_v11_stockout_pair_arm':'_melee_web_native_menu_stadium_paired_v11_full_pair_arm';
  if(!m||typeof m._melee_web_native_menu_launch!=='function'||typeof m[arm]!=='function'||m.__pairedFullLaunch)throw Error('Paired full launch interface unavailable/already wrapped');
  const original=m._melee_web_native_menu_launch;let used=false;
- m.__pairedFullLaunch={original,called:false};
+ m.__pairedFullLaunch={original,called:false,waterCollisionProbe};
  m._melee_web_native_menu_launch=function(...args){
   if(used)throw Error('Paired full launch is one-use');used=true;
   if(m.stadiumMatchedSetupNativeIdle?.()!==true)throw Error('Paired full launch owner is not settled');
@@ -294,7 +340,7 @@ export function installPairedFullLaunch({stockout=false,natural14=false,firstFir
  return true;
 }
 export class PairedFullComparator{
- constructor(expected){this.e=expected;this.order=0;this.action=0;this.current=null;this.probes=new Map();this.matches=expected.matches.map(()=>({generation:null,setup:false,go:false,state:0,window:false,terminal:false,retired:false,results:false,css:false,endpoint:0,actions:0,selectedEvents:0,unpairedNativeEvents:0}));this.complete=false;}
+ constructor(expected){this.e=expected;this.order=0;this.action=0;this.current=null;this.probes=new Map();this.matches=expected.matches.map(()=>({generation:null,setup:false,go:false,state:0,window:false,waterQuery:false,terminal:false,retired:false,results:false,css:false,endpoint:0,actions:0,lastActionKind:null,lastActionSourceTick:null,selectedEvents:0,unpairedNativeEvents:0}));this.complete=false;}
  acceptProbe(text){const p=JSON.parse(text);validateRngDrawProbeRows([text],{selected:[p.source_cursor]});need(p.version===3&&!this.probes.has(p.source_cursor),'duplicate/unsupported raw probe');this.probes.set(p.source_cursor,p);}
  accept(row){
   need(row?.record==='stadium_paired_v11'&&row.schema==='melee-web-stadium-paired-v11-row-v1'&&row.order===this.order++,'stream schema/order');
@@ -335,7 +381,7 @@ export class PairedFullComparator{
     need(selected&&all&&selected[0]===all[0]&&selected[1]===all[1],'fully observed action RNG range');
     need(selected[1]-selected[0]===probe.draws.length,'selected action RNG count');m.selectedEvents+=probe.draws.length;
    }else m.unpairedNativeEvents+=probe.draws.length;
-   this.probes.delete(this.action);this.action++;m.actions++;this.current=null;return;
+   this.probes.delete(this.action);this.action++;m.actions++;m.lastActionKind=a.kind;m.lastActionSourceTick=a.source_tick;this.current=null;return;
   }
   need(!this.current,'observation before actual action return');
   if(row.kind==='go'){
@@ -359,11 +405,16 @@ export class PairedFullComparator{
     }
    }m.state++;return;
   }
+  if(row.kind==='water_collision_query'){
+   const selectedTick=this.e.projection.first_water.settled.source_tick;
+   need(this.e.firstWater&&this.e.waterCollisionProbe===true&&i===1&&m.go&&!m.window&&!m.waterQuery&&m.state===r.states.length&&m.actions>0&&row.local_action_index===m.actions&&m.lastActionKind==='tick'&&m.lastActionSourceTick===selectedTick,'Water collision query must be explicitly requested and follow the selected B state tick/action return');
+   validateFirstWaterCollisionQuery(p,m.generation,selectedTick);m.waterQuery=true;return;
+  }
   if(row.kind==='window_closed'){
    need(!m.window&&m.state===r.states.length,'actual window closure order');
    if(this.e.firstWater){
-    if(i===0)need(p.close_policy==='declared_match_actions_complete'&&m.actions===r.actions.length&&p.state_samples===0&&p.natural_tail_ticks===0,'first-water warmup close');
-    else need(p.close_policy==='observed_first_water_settled'&&p.state_samples===r.states.length&&p.natural_tail_ticks===0&&p.last_selected_source_tick===this.e.projection.first_water.settled.source_tick,'first-water actual settled close');
+    if(i===0)need(!m.waterQuery&&p.close_policy==='declared_match_actions_complete'&&m.actions===r.actions.length&&p.state_samples===0&&p.natural_tail_ticks===0,'first-water warmup close');
+    else need((this.e.waterCollisionProbe===true?m.waterQuery:!m.waterQuery)&&p.close_policy==='observed_first_water_settled'&&p.state_samples===r.states.length&&p.natural_tail_ticks===0&&p.last_selected_source_tick===this.e.projection.first_water.settled.source_tick,'first-water actual settled close/query opt-in');
    }else if(this.e.firstFire){
     if(i===0)need(p.close_policy==='declared_match_actions_complete'&&m.actions===r.actions.length&&p.state_samples===0&&p.natural_tail_ticks===0,'first-fire warmup close');
     else need(p.close_policy==='observed_first_fire_settled'&&p.state_samples===r.states.length&&p.natural_tail_ticks===0&&p.last_selected_source_tick===this.e.projection.first_fire.settled.source_tick,'first-fire actual settled close');
@@ -389,7 +440,10 @@ export class PairedFullComparator{
   if(row.kind==='complete'){need(i===1&&this.matches.every(x=>x.css)&&this.action===this.e.total&&p.whole_session_input_complete===true&&p.C3===false,'actual complete lifetime');this.complete=true;return;}
   throw Error('Paired full comparison: unsupported row kind '+row.kind);
  }
- finish(status){need(this.complete&&!this.current&&this.probes.size===0&&status?.schema==='melee-web-stadium-paired-v11-full-pair-v1'&&status.full_pair===true&&status.whole_session_complete===true&&status.failed===false&&status.diagnostic_actions===this.e.total&&status.lifetimes?.length===2,'complete native trace');this.matches.forEach((m,i)=>{
+ finish(status){need(this.complete&&!this.current&&this.probes.size===0&&status?.schema==='melee-web-stadium-paired-v11-full-pair-v1'&&status.full_pair===true&&status.whole_session_complete===true&&status.failed===false&&status.diagnostic_actions===this.e.total&&status.lifetimes?.length===2,'complete native trace');
+ if(this.e.waterCollisionProbe===true)need(status.water_collision_probe_requested===true&&status.water_collision_probe_observed===true,'requested Water collision probe completion');
+ else need(status.water_collision_probe_requested===undefined&&status.water_collision_probe_observed===undefined,'unrequested Water collision probe stayed absent');
+ this.matches.forEach((m,i)=>{
  if(this.e.firstWater)need(status.profile==='selected_b_first_water_recorded_callback_v1'&&status.per_owner_rng_comparison===false,'first-water final profile');
  else if(this.e.firstFire)need(status.profile==='selected_b_first_fire_recorded_callback_v1'&&status.per_owner_rng_comparison===false,'first-fire final profile');
  else if(this.e.natural14)need(status.profile==='selected_b_natural_mode14_v1'&&status.per_owner_rng_comparison===false,'natural14 final profile/outcome');
@@ -398,5 +452,5 @@ export class PairedFullComparator{
  if(this.e.natural14)need(i===0||l.mode14_observed===true&&l.neutral_release_observed===true,'natural14 native final outcome counters');
  if(this.e.stockout)need(l.published_result===true&&(i===0||l.stock_losses===4&&l.mode9_observed===true),'stockout native final outcome counters');
  need(l.match_index===i&&l.world_generation===m.generation&&l.actions===m.actions&&l.ticks===r.actions.filter(a=>a.kind==='tick').length&&l.draws===r.actions.filter(a=>a.kind==='draw').length&&l.state_samples===((this.e.stockout||this.e.natural14||this.e.firstFire||this.e.firstWater)?r.states.length:3501)&&l.natural_tail_ticks===r.window.natural_tail_ticks&&l.window_closed===true&&l.retired===true&&l.results_requested===true&&l.results_entered===true&&l.css_returned===true&&l.scene_rng_count===4,'final native lifetime counters/owners');
- });return {pass:true,actions:this.action,lifetimes:this.matches.map((m,i)=>({match_index:i,...m})),RNG_semantics_requires_separate_python_comparison:!(this.e.stockout||this.e.natural14||this.e.firstFire||this.e.firstWater),...((this.e.stockout||this.e.natural14||this.e.firstFire||this.e.firstWater)?{per_owner_rng_comparison:false}:{}),entry_dispatch_parity:false,raw_pointer_equality:false,C3:false};}
+ });return {pass:true,actions:this.action,lifetimes:this.matches.map((m,i)=>({match_index:i,...m})),RNG_semantics_requires_separate_python_comparison:!(this.e.stockout||this.e.natural14||this.e.firstFire||this.e.firstWater),...((this.e.stockout||this.e.natural14||this.e.firstFire||this.e.firstWater)?{per_owner_rng_comparison:false}:{}),water_collision_probe_requested:this.e.waterCollisionProbe===true,water_collision_probe_observed:this.e.waterCollisionProbe===true,original_collision_query_parity:false,entry_dispatch_parity:false,raw_pointer_equality:false,C3:false};}
 }

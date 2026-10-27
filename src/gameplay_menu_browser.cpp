@@ -25,6 +25,9 @@ extern "C" int gm_GetPreviousSceneIndex(void);
 #include <sstream>
 #include <iostream>
 #include <exception>
+#include <iomanip>
+#include <limits>
+#include <cstring>
 extern "C" int HSD_SynthSFXGetPendingLoadCount(void);
 extern "C" void HSD_SisLib_C1TextProbeSet(int enabled);
 extern "C" void* melee_web_current_scene_info(void);
@@ -876,6 +879,7 @@ struct StadiumPairedV11Lifetime {
 };
 struct StadiumPairedV11State {
  bool full_pair=false,full_arm_consumed=false,stockout_pair=false,natural14_pair=false,first_fire_pair=false,first_water_pair=false;
+ bool water_collision_probe_requested=false,water_collision_probe_observed=false;
  uint32_t mode14_source_tick=0,last_selected_source_tick=0;
  uint32_t first_fire_request_tick=0,first_fire_callback_tick=0;
  uint32_t first_water_request_tick=0,first_water_callback_tick=0;
@@ -4519,6 +4523,72 @@ std::string stadium_paired_v11_first_water_graph_json(const MeleeWebStadiumFirst
    <<",\"map_id\":"<<g.events[n].map_id<<'}';}
  out<<"]}";return out.str();
 }
+std::string stadium_paired_v11_water_collision_query_json(
+    const melee_web::GameplayStadiumWaterCollisionProbe& p){
+ auto float_bits=[](float value){
+  static_assert(sizeof(float)==sizeof(uint32_t)&&std::numeric_limits<float>::is_iec559,
+                "Water query float must be IEEE binary32");
+  uint32_t bits=0;std::memcpy(&bits,&value,sizeof(bits));
+  std::ostringstream encoded;encoded<<"\"0x"<<std::hex<<std::setw(8)<<std::setfill('0')<<bits<<"\"";
+  return encoded.str();
+ };
+ auto bits3=[&](const float value[3]){std::ostringstream encoded;encoded<<'[';
+  for(unsigned i=0;i<3;++i){if(i)encoded<<',';encoded<<float_bits(value[i]);}
+  encoded<<']';return encoded.str();
+ };
+ std::ostringstream out;out<<std::setprecision(std::numeric_limits<double>::max_digits10)
+  <<"{\"schema\":\"melee-web-stadium-first-water-collision-query-native-v1\",\"world_generation\":"<<p.world_generation
+  <<",\"source_tick\":"<<p.source_tick<<",\"state_before\":";
+ auto state=[&](const melee_web::GameplayStadiumWaterCollisionProbe::State& s){
+  out<<"{\"world_generation\":"<<s.world_generation<<",\"world_ticks\":"<<s.world_ticks
+   <<",\"source_frame\":"<<s.source_frame<<",\"random_seed\":"<<s.random_seed
+   <<",\"journal_armed\":"<<s.journal_armed<<",\"selected_form\":"<<s.selected_form
+   <<",\"journal_failed\":"<<s.journal_failed<<",\"event_count\":"<<s.event_count
+   <<",\"map2_gate\":"<<s.map2_gate<<",\"countdown\":"<<s.countdown
+   <<",\"phase\":"<<s.phase<<",\"form\":"<<s.form<<",\"history_e0\":"<<s.history_e0
+   <<",\"history_e2\":"<<s.history_e2<<",\"pending\":"<<s.pending
+   <<",\"display_mode\":"<<s.display_mode<<",\"display_e6\":"<<s.display_e6
+   <<",\"display_e8\":"<<s.display_e8<<",\"display_previous_mode\":"<<s.display_previous_mode
+   <<",\"display_selected_player\":"<<s.display_selected_player<<",\"display_f2\":"<<s.display_f2
+   <<",\"buffer_uses\":"<<s.buffer_uses<<",\"display_flags\":"<<s.display_flags
+   <<",\"scalar_sample_valid\":"<<s.scalar_sample_valid<<'}';
+ };
+ auto readiness=[&](const MeleeWebCollisionReadiness& r){
+  out<<"{\"vertices\":"<<r.vertices<<",\"lines\":"<<r.lines<<",\"joints\":"<<r.joints
+   <<",\"floor_islands\":"<<r.floor_islands<<",\"ceiling_islands\":"<<r.ceiling_islands
+   <<",\"empty_lines\":"<<r.empty_lines<<",\"storage_owned\":"<<r.storage_owned
+   <<",\"original_indices_initialized\":"<<r.original_indices_initialized
+   <<",\"stage_joint_bindings_ready\":"<<r.stage_joint_bindings_ready
+   <<",\"stage_callbacks_ready\":"<<r.stage_callbacks_ready<<'}';
+ };
+ state(p.state_before);out<<",\"state_after\":";state(p.state_after);
+ out<<",\"readiness_before\":";readiness(p.readiness_before);
+ out<<",\"readiness_after\":";readiness(p.readiness_after);
+ out<<",\"line_index\":"<<p.line_index<<",\"chain\":{\"min_x\":"<<static_cast<double>(p.chain_min_x)
+  <<",\"min_x_bits\":"<<float_bits(p.chain_min_x)<<",\"max_x\":"<<static_cast<double>(p.chain_max_x)
+  <<",\"max_x_bits\":"<<float_bits(p.chain_max_x)<<'}';
+ auto vec=[&](const float value[3]){out<<'['<<static_cast<double>(value[0])<<','
+  <<static_cast<double>(value[1])<<','<<static_cast<double>(value[2])<<']';};
+ out<<",\"line\":{\"v0\":";vec(p.line.v0);out<<",\"v0_bits\":"<<bits3(p.line.v0)
+  <<",\"v1\":";vec(p.line.v1);out<<",\"v1_bits\":"<<bits3(p.line.v1)
+  <<",\"normal\":";vec(p.line.normal);out<<",\"normal_bits\":"<<bits3(p.line.normal);
+ out<<",\"kind\":"<<p.line.kind<<",\"material_flags\":"<<p.line.material_flags
+  <<",\"runtime_flags\":"<<p.line.runtime_flags<<",\"previous\":"<<p.line.previous
+  <<",\"next\":"<<p.line.next<<",\"joint\":"<<p.line.joint
+  <<",\"pruned_hi_flags\":"<<p.line.pruned_hi_flags<<",\"has_normal\":"<<p.line.has_normal<<'}'
+  <<",\"queries\":{";
+ auto floor=[&](const char* name,float x,const MeleeWebCollisionFloorResult& q,bool comma){
+  if(comma){out<<',';}
+  out<<'\"'<<name<<"\":{\"x\":"<<static_cast<double>(x)<<",\"x_bits\":"<<float_bits(x)
+   <<",\"y\":"<<static_cast<double>(p.query_y)<<",\"y_bits\":"<<float_bits(p.query_y)
+   <<",\"line\":"<<q.line<<",\"displacement_y\":"<<static_cast<double>(q.displacement_y)
+   <<",\"displacement_y_bits\":"<<float_bits(q.displacement_y)<<",\"normal\":";vec(q.normal);
+  out<<",\"normal_bits\":"<<bits3(q.normal);
+  out<<",\"material_flags\":"<<q.material_flags<<'}';
+ };
+ floor("hit",p.hit_x,p.hit,false);floor("left_miss",p.left_miss_x,p.left_miss,true);
+ floor("right_miss",p.right_miss_x,p.right_miss,true);out<<"}}";return out.str();
+}
 void stadium_paired_v11_capture_first_water_retirement(){
  auto& s=stadium_paired_v11;if(!s.first_water_pair||s.match_index!=1)return;
  MeleeWebStadiumFirstTransformJournal g{};char error[256]{};
@@ -4606,6 +4676,17 @@ void stadium_paired_v11_first_water_after_tick(uint64_t before,uint64_t frame_be
  if(before==s.last_selected_source_tick){
   check(g.phase==0&&g.form==9&&!g.pending&&g.count==5&&g.buffer_uses==2,
         "First-water selected endpoint did not settle its actual source-created graph");
+  if(s.water_collision_probe_requested){
+   check(!s.water_collision_probe_observed&&!s.action_open&&l.state_samples==ordinal+1,
+         "First-water collision probe is not after the completed selected state action");
+   melee_web::GameplayStadiumWaterCollisionProbe probe{};
+   check(match->diagnostic_stadium_water_collision_probe(before,&probe,error,sizeof(error)),
+         error[0]?error:"First-water actual collision query component refused");
+   check(probe.world_generation==l.generation&&probe.source_tick==before,
+         "First-water collision query escaped its selected source owner/boundary");
+   stadium_paired_v11_emit("water_collision_query",stadium_paired_v11_water_collision_query_json(probe));
+   s.water_collision_probe_observed=true;
+  }
   l.window_closed=true;std::ostringstream closed;
   closed<<"{\"close_policy\":\"observed_first_water_settled\",\"state_samples\":"<<l.state_samples
    <<",\"natural_tail_ticks\":0,\"last_selected_source_tick\":"<<before<<'}';
@@ -4952,6 +5033,9 @@ std::string stadium_paired_v11_status_json(){
   if(s.natural14_pair)out<<",\"profile\":\"selected_b_natural_mode14_v1\",\"per_owner_rng_comparison\":false";
   if(s.first_fire_pair)out<<",\"profile\":\"selected_b_first_fire_recorded_callback_v1\",\"per_owner_rng_comparison\":false";
   if(s.first_water_pair)out<<",\"profile\":\"selected_b_first_water_recorded_callback_v1\",\"per_owner_rng_comparison\":false";
+  if(s.first_water_pair&&s.water_collision_probe_requested)
+   out<<",\"water_collision_probe_requested\":true,\"water_collision_probe_observed\":"
+      <<(s.water_collision_probe_observed?"true":"false");
   out<<",\"lifetimes\":[";
   for(unsigned i=0;i<2;++i){const auto& l=s.lifetimes[i];if(i)out<<',';
    out<<"{\"match_index\":"<<i<<",\"world_generation\":"<<l.generation
@@ -8074,8 +8158,11 @@ int melee_web_native_menu_running(){return running;}
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 static int stadium_paired_v11_full_profile_arm(bool stockout,bool natural14=false,
     uint32_t mode14_tick=0,uint32_t last_tick=0,bool first_fire=false,
-    uint32_t request_tick=0,uint32_t callback_tick=0,bool first_water=false){try{
+    uint32_t request_tick=0,uint32_t callback_tick=0,bool first_water=false,
+    bool water_collision_probe=false){try{
  auto& s=stadium_paired_v11;
+ check(!water_collision_probe||first_water,
+       "Water collision probe is limited to the explicit first-Water profile");
  check(stadium_paired_v11_recipe()&&replay_trace&&replay->initial_css&&replay->initial_input&&
        !s.full_arm_consumed&&!s.full_pair&&!s.route_prepared&&!s.enabled&&
        replay_cursor==0&&!replay_started&&host&&world&&!host_entered&&!world_exposed&&
@@ -8126,7 +8213,16 @@ int melee_web_native_menu_stadium_paired_v11_natural_mode14_pair_arm(
 }
 int melee_web_native_menu_stadium_paired_v11_first_water_pair_arm(
     uint32_t request_tick,uint32_t callback_tick,uint32_t last_selected_tick){
- return stadium_paired_v11_full_profile_arm(false,false,0,last_selected_tick,false,request_tick,callback_tick,true);
+ const int requested=EM_ASM_INT({try{
+  const value=Module.__pairedFullLaunch?.waterCollisionProbe;
+  return typeof value==='boolean'?(value?1:0):-1;
+ }catch(_){return -1;}});
+ if(requested<0){message="First-water collision probe selection is not an explicit boolean";return 0;}
+ const int armed=stadium_paired_v11_full_profile_arm(false,false,0,last_selected_tick,false,
+     request_tick,callback_tick,true,requested==1);
+ if(armed==1){stadium_paired_v11.water_collision_probe_requested=requested==1;
+              stadium_paired_v11.water_collision_probe_observed=false;}
+ return armed;
 }
 int melee_web_native_menu_stadium_paired_v11_first_fire_pair_arm(
     uint32_t request_tick,uint32_t callback_tick,uint32_t last_selected_tick){

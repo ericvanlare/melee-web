@@ -7,7 +7,7 @@ import vm from 'node:vm';
 import {parseArgs} from 'node:util';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {derivePairedFull,PairedFullComparator,installPairedFullLaunch,firstFireOriginalValues,FIRST_FIRE_STATE_KEYS,validateFirstFireCompletion,firstWaterOriginalValues,FIRST_WATER_STATE_KEYS,validateFirstWaterCompletion,validateFirstWaterLocalGraph} from '../scripts/stadium_paired_v11_full.mjs';
+import {derivePairedFull,PairedFullComparator,installPairedFullLaunch,firstFireOriginalValues,FIRST_FIRE_STATE_KEYS,validateFirstFireCompletion,firstWaterOriginalValues,FIRST_WATER_STATE_KEYS,validateFirstWaterCompletion,validateFirstWaterLocalGraph,validateFirstWaterCollisionQuery} from '../scripts/stadium_paired_v11_full.mjs';
 import {typedOriginalValues} from './stadium_matched_setup_cf_consumer.mjs';
 const projectionPath=process.env.MELEE_PAIRED_FULL_PROJECTION;
 const endpointsPath=process.env.MELEE_PAIRED_FULL_ENDPOINTS;
@@ -181,8 +181,14 @@ test('first-water launch preserves distinct arm and rejects mixed selectors',()=
  const calls=[],m={stadiumMatchedSetupNativeIdle:()=>true,
  _melee_web_native_menu_stadium_paired_v11_first_water_pair_arm:(...args)=>{calls.push(args);return 1;},_melee_web_native_menu_launch:()=>23};
  vm.runInNewContext('('+installPairedFullLaunch.toString()+')({firstWater:true,requestSourceTick:100,callbackSourceTick:111,lastSelectedSourceTick:200})',{Module:m});
- assert.equal(m._melee_web_native_menu_launch(),23);assert.deepEqual(calls,[[100,111,200]]);
+ assert.equal(m._melee_web_native_menu_launch(),23);assert.deepEqual(calls,[[100,111,200]]);assert.equal(m.__pairedFullLaunch.waterCollisionProbe,false);
+ const queryModule={stadiumMatchedSetupNativeIdle:()=>true,
+  _melee_web_native_menu_stadium_paired_v11_first_water_pair_arm:(...args)=>{calls.push(args);return 1;},_melee_web_native_menu_launch:()=>24};
+ vm.runInNewContext('('+installPairedFullLaunch.toString()+')({firstWater:true,waterCollisionProbe:true,requestSourceTick:100,callbackSourceTick:111,lastSelectedSourceTick:200})',{Module:queryModule});
+ assert.equal(queryModule._melee_web_native_menu_launch(),24);assert.equal(queryModule.__pairedFullLaunch.waterCollisionProbe,true);
  assert.throws(()=>installPairedFullLaunch({firstWater:true,firstFire:true}),/explicit/);
+ assert.throws(()=>installPairedFullLaunch({firstWater:true,waterCollisionProbe:'true'}),/explicit/);
+ assert.throws(()=>installPairedFullLaunch({firstFire:true,waterCollisionProbe:true}),/explicit/);
  for(const args of [{requestSourceTick:100,callbackSourceTick:100,lastSelectedSourceTick:200},{requestSourceTick:100,callbackSourceTick:111,lastSelectedSourceTick:0x100000000}])assert.throws(()=>installPairedFullLaunch({firstWater:true,...args}),/coordinates invalid/);
 });
 test('first-water actual role adapter never relabels Fire or stable owners',()=>{
@@ -202,6 +208,37 @@ test('first-water eleven event graph and separate completion refuse missing reor
  const f={request:{source_tick:100},callback:{source_tick:111},settled:{source_tick:200}},c={schema:'melee-web-stadium-first-water-recorded-completion-v1',armed:1,failed:0,completed:1,request_seen:1,local_request_id:17,actual_request_cursor:100,actual_callback_cursor:111,last_preconsume_cursor:200};
  validateFirstWaterCompletion(c,f);
  for(const mutate of [x=>x.schema='melee-web-stadium-first-fire-recorded-completion-v1',x=>x.failed=1,x=>x.completed=0,x=>x.actual_request_cursor++,x=>x.actual_callback_cursor--,x=>x.last_preconsume_cursor--]){const bad=structuredClone(c);mutate(bad);assert.throws(()=>validateFirstWaterCompletion(bad,f));}
+});
+function waterCollisionQueryFixture(generation=7,sourceTick=20){
+ const bits=value=>{const view=new DataView(new ArrayBuffer(4));view.setFloat32(0,value,true);return '0x'+view.getUint32(0,true).toString(16).padStart(8,'0');};
+ const bits3=values=>values.map(bits);
+ const state={world_generation:generation,world_ticks:sourceTick+1,source_frame:12,random_seed:1234,journal_armed:1,selected_form:9,journal_failed:0,event_count:5,map2_gate:0,countdown:0,phase:0,form:9,history_e0:0,history_e2:0,pending:0,display_mode:0,display_e6:0,display_e8:0,display_previous_mode:0,display_selected_player:0,display_f2:0,buffer_uses:2,display_flags:0,scalar_sample_valid:1};
+ const readiness={vertices:8,lines:4,joints:3,floor_islands:1,ceiling_islands:0,empty_lines:0,storage_owned:1,original_indices_initialized:1,stage_joint_bindings_ready:1,stage_callbacks_ready:1};
+ const floor=(line,x)=>({line,x,x_bits:bits(x),y:0,y_bits:bits(0),displacement_y:0,displacement_y_bits:bits(0),normal:[0,1,0],normal_bits:bits3([0,1,0]),material_flags:0});
+ return {schema:'melee-web-stadium-first-water-collision-query-native-v1',world_generation:generation,source_tick:sourceTick,
+  state_before:{...state},state_after:{...state},readiness_before:{...readiness},readiness_after:{...readiness},
+  line_index:2,chain:{min_x:-2,min_x_bits:bits(-2),max_x:3,max_x_bits:bits(3)},line:{v0:[0,-0,0],v0_bits:bits3([0,-0,0]),v1:[1,0,0],v1_bits:bits3([1,0,0]),normal:[0,1,0],normal_bits:bits3([0,1,0]),kind:1,material_flags:0,runtime_flags:0x10001,previous:1,next:3,joint:0,pruned_hi_flags:0,has_normal:1},
+  queries:{hit:floor(2,0.5),left_miss:floor(-1,-3),right_miss:floor(-1,4)}};
+}
+test('first-water collision query is one scoped post-window component with exact pointer-free hit/miss data',()=>{
+ const q=waterCollisionQueryFixture();assert.equal(validateFirstWaterCollisionQuery(q,7,20),true);
+ assert.ok(Object.is(q.line.v0[1],-0));assert.equal(q.line.v0_bits[1],'0x80000000');
+ for(const mutate of [x=>x.source_tick++,x=>x.world_generation++,x=>x.readiness_before.stage_callbacks_ready=0,
+  x=>x.state_after.random_seed++,x=>x.readiness_after.lines++,x=>x.line.joint=1,x=>x.line.runtime_flags=1,x=>x.queries.hit.line=-1,
+  x=>x.queries.left_miss.line=0,x=>x.queries.right_miss.x=x.chain.max_x,
+  x=>x.chain.min_x+=Number.EPSILON,
+  x=>x.line.v0_bits[1]='0x00000000',
+  x=>x.pointer='0x1234']){const bad=structuredClone(q);mutate(bad);assert.throws(()=>validateFirstWaterCollisionQuery(bad,7,20));}
+ const e={firstWater:true,waterCollisionProbe:true,projection:{first_water:{settled:{source_tick:20}}},total:3,
+  matches:[{reference:{actions:[],states:[]}},{reference:{actions:[{}],states:[{}]}}]};
+ const c=new PairedFullComparator(e);c.matches[0].css=true;c.matches[1].setup=true;c.matches[1].generation=7;c.matches[1].go=true;c.matches[1].state=1;c.matches[1].actions=3;c.matches[1].lastActionKind='tick';c.matches[1].lastActionSourceTick=20;c.action=3;
+ const row={record:'stadium_paired_v11',schema:'melee-web-stadium-paired-v11-row-v1',order:0,kind:'water_collision_query',match_index:1,world_generation:7,input_cursor:44,diagnostic_action_index:3,local_action_index:3,source_tick:21,draw_ordinal:0,payload:q};
+ c.accept(row);assert.equal(c.matches[1].waterQuery,true);
+ const duplicate={...row,order:1};assert.throws(()=>c.accept(duplicate),/Water collision query/);
+ const unrequested=new PairedFullComparator({...e,waterCollisionProbe:false});unrequested.matches[0].css=true;unrequested.matches[1].setup=true;unrequested.matches[1].generation=7;unrequested.matches[1].go=true;unrequested.matches[1].state=1;unrequested.matches[1].actions=3;unrequested.matches[1].lastActionKind='tick';unrequested.matches[1].lastActionSourceTick=20;unrequested.action=3;
+ assert.throws(()=>unrequested.accept(row),/explicitly requested/);
+ const wrongProfile=new PairedFullComparator({...e,firstWater:false});wrongProfile.matches[0].css=true;wrongProfile.matches[1].setup=true;wrongProfile.matches[1].generation=7;wrongProfile.matches[1].go=true;wrongProfile.matches[1].state=1;wrongProfile.matches[1].actions=3;wrongProfile.matches[1].lastActionKind='tick';wrongProfile.matches[1].lastActionSourceTick=20;wrongProfile.action=3;
+ assert.throws(()=>wrongProfile.accept(row),/Water collision query/);
 });
 function modeledWaterProjection(){
  const sha='1'.repeat(64),request={kind:'request_enter',source_tick:3},callback={kind:'callback_enter',source_tick:4},poll={kind:'poll_return',result:1,source_tick:4};
