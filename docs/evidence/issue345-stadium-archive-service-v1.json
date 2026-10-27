@@ -525,5 +525,28 @@
       "passed": true
     },
     "current_head_ci": "PENDING"
+  },
+  "transformed_archive_merge": {
+    "pr": 348,
+    "issue": 347,
+    "merged_commit": "b10ef03bb73595a06c36991d6c354bc7ba4b080b",
+    "reviewed_head": "bd4a025c432a983395cb308efd6d02242521066c",
+    "tree": "816d55adda1b4a1696ff4025f0dfacdbb6148882",
+    "reviewed_tree_matches": true,
+    "ci_run": 40554121745,
+    "checks": 14,
+    "success": 12,
+    "expected_skips": 2,
+    "gate": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr348-merge-gate-v1/gate.json",
+      "bytes": 439,
+      "sha256": "e8e218fc560aaec0f1fe22e4581fbea40d5d0a2da712e0d8bdd088d30bdf90b2"
+    },
+    "tree_verification": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr348-merge-gate-v1/tree-verification.json",
+      "bytes": 270,
+      "sha256": "17a10054703754178865ef5212ee041d2bba33f716c043bad531b3899d2a1ac1"
+    },
+    "scope": "Source metadata and four-form archive/slot ownership; no live transformation or general completion model."
   }
 }
