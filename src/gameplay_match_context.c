@@ -58,6 +58,10 @@ struct MeleeWebMatchContext {
     CmSubject* pool;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     MeleeWebMatchSceneRngSnapshot scene_rng;
+    MeleeWebMatchRecordedPreconsume recorded_preconsume;
+    void* recorded_preconsume_context;
+    uint64_t recorded_preconsume_generation;
+    int recorded_preconsume_active,recorded_preconsume_failed;
     MeleeWebSourceMemoryAllocation camera_lease;
     MeleeWebStadiumPadQueueObservation pad_queue_observation;
     int pad_queue_observation_candidate, pad_queue_observation_complete;
@@ -362,6 +366,19 @@ int melee_web_match_step_raw(MeleeWebMatchContext* h,const PADStatus raw[4],char
 {
     return melee_web_match_step_raw_phased(h,raw,NULL,NULL,NULL,NULL,e,n);
 }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+int melee_web_match_recorded_preconsume_arm(MeleeWebMatchContext* h,
+    MeleeWebMatchRecordedPreconsume callback,void* context,char* e,size_t n) {
+    if(!owned(h,e,n))return 0;
+    if(!callback||!context||h->ticks||h->recorded_preconsume||
+       HSD_GObj_804D781C||HSD_GObj_804D7814||
+       HSD_PadLibData.queue!=&h->input_queue||HSD_PadLibData.qcount)
+        return fail(e,n,"Recorded pre-consume registration requires untouched exact Match");
+    h->recorded_preconsume=callback;h->recorded_preconsume_context=context;
+    h->recorded_preconsume_generation=h->generation;
+    return ok(e,n);
+}
+#endif
 int melee_web_match_step_raw_phased(MeleeWebMatchContext* h,const PADStatus raw[4],
     MeleeWebMatchTickPhase renew,MeleeWebMatchTickPhase before,
     MeleeWebMatchTickPhase after,void* context,char* e,size_t n)
@@ -370,6 +387,11 @@ int melee_web_match_step_raw_phased(MeleeWebMatchContext* h,const PADStatus raw[
     if(h&&h==owner){h->pad_queue_observation_candidate=0;h->pad_queue_observation_complete=0;}
 #endif
     if(!live(h,e,n))return 0;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(h->recorded_preconsume_active||h->recorded_preconsume_failed){
+        h->recorded_preconsume_failed=1;return fail(e,n,"Recorded pre-consume reentry/failed boundary");
+    }
+#endif
     if(!raw)return fail(e,n,"Four raw controller samples are required");
     if(HSD_PadLibData.queue!=&h->input_queue||HSD_PadLibData.qnum!=1||HSD_PadLibData.qcount)
         return fail(e,n,"Owned source PAD queue changed or has an unconsumed sample");
@@ -401,6 +423,25 @@ int melee_web_match_step_raw_phased(MeleeWebMatchContext* h,const PADStatus raw[
         h->pad_queue_observation_candidate=1;
     }
 #endif
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(h->recorded_preconsume){
+        if(h->recorded_preconsume_generation!=h->generation||
+           HSD_GObj_804D781C||HSD_GObj_804D7814){
+            h->recorded_preconsume_failed=1;return fail(e,n,"Recorded pre-consume generation/source callback changed");
+        }
+        h->recorded_preconsume_active=1;
+        int admitted=h->recorded_preconsume(h->recorded_preconsume_context,h->ticks,e,n);
+        if(h!=owner||h->generation!=melee_web_gameplay_generation())
+            return fail(e,n,"Recorded pre-consume replaced Match owner");
+        h->recorded_preconsume_active=0;
+        if(!admitted||h->recorded_preconsume_failed||
+           HSD_PadLibData.queue!=&h->input_queue||HSD_PadLibData.qnum!=1||
+           HSD_PadLibData.qread!=0||HSD_PadLibData.qcount!=1||
+           memcmp(h->pad_queue_observation.queue_slots,h->input_queue.stat,sizeof(h->input_queue.stat))){
+            h->recorded_preconsume_failed=1;return fail(e,n,"Recorded pre-consume callback/queued input refused");
+        }
+    }
+#endif
     HSD_PadRenewMasterStatus();
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     h->pad_queue_observation.qcount_after_hsd=HSD_PadLibData.qcount;
@@ -426,6 +467,10 @@ int melee_web_match_step_raw_phased(MeleeWebMatchContext* h,const PADStatus raw[
 int melee_web_match_step_inputs(MeleeWebMatchContext* h,const MeleeWebControllerSample samples[4],char* e,size_t n)
 {
     if(!live(h,e,n))return 0;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(h->recorded_preconsume)
+        return fail(e,n,"Recorded pre-consume plan requires exact raw PAD stepping");
+#endif
     if(!samples)return fail(e,n,"Four controller samples are required");
     for(unsigned i=0;i<4;i++)if(!sample_valid(&samples[i]))return fail(e,n,"Controller axes/triggers must be finite and within normalized ranges");
     for(uint32_t i=0;i<h->player_count;i++)if(!Player_GetPtrForSlot(h->slots[i])->player_entity[0])
@@ -714,6 +759,10 @@ int melee_web_match_end(MeleeWebMatchContext* h,char* e,size_t n)
     /* A source-ordered startup can fail after camera creation but before
      * Ground attaches collision; still retire the scoped player/camera owner. */
     if(!owned(h,e,n))return 0;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(h->recorded_preconsume_active||h->recorded_preconsume_failed)
+        return fail(e,n,"Recorded pre-consume owner cannot retire during/after failed boundary");
+#endif
     /* Items may retain their fighter owner during source destruction. */
     while(((HSD_GObj**)HSD_GObj_Entities)[9])Item_8026A8EC(((HSD_GObj**)HSD_GObj_Entities)[9]);
     if(h->crowd_started){

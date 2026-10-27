@@ -12,7 +12,7 @@
 namespace melee_web {
 enum class GameplayMatchConstruction { Immediate, Deferred };
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-enum class GameplayMatchDiagnostic { StadiumReady };
+enum class GameplayMatchDiagnostic { StadiumReady, StadiumFirstFireReady };
 #endif
 // Shared source match lifecycle. The confirmed menu payload supplies player
 // identity and source RNG; scene resources close before returning to a menu.
@@ -89,6 +89,11 @@ public:
     void diagnostic_stadium_go_alignment_arm(int expected_branch,char*,size_t);
     bool diagnostic_stadium_go_alignment_snapshot(
         MeleeWebStadiumGoAlignmentSnapshot*,char*,size_t) const;
+    bool diagnostic_stadium_first_transform_snapshot(
+        MeleeWebStadiumFirstTransformJournal*,char*,size_t) const;
+    bool diagnostic_stadium_first_transform_completion_status(
+        MeleeWebSourceFileRecordedCompletionStatus*,char*,size_t) const;
+    bool diagnostic_stadium_first_transform_schedule(uint32_t,uint32_t,uint32_t,char*,size_t);
     bool diagnostic_stadium_idle_snapshot(
         MeleeWebStadiumIdleSnapshot*,char*,size_t) const;
     bool diagnostic_stadium_setup_snapshot(
@@ -102,6 +107,8 @@ private:
     std::unique_ptr<Storage> storage_;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     MeleeWebMatchSceneRngSnapshot scene_rng_retained_{};
+    MeleeWebStadiumFirstTransformJournal first_transform_retained_{};
+    MeleeWebSourceFileRecordedCompletionStatus first_completion_retained_{};
     bool scene_rng_entry_complete_=false;
 #endif
 };

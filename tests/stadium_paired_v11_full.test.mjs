@@ -7,7 +7,7 @@ import vm from 'node:vm';
 import {parseArgs} from 'node:util';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {derivePairedFull,PairedFullComparator,installPairedFullLaunch} from '../scripts/stadium_paired_v11_full.mjs';
+import {derivePairedFull,PairedFullComparator,installPairedFullLaunch,firstFireOriginalValues,FIRST_FIRE_STATE_KEYS,validateFirstFireCompletion} from '../scripts/stadium_paired_v11_full.mjs';
 import {typedOriginalValues} from './stadium_matched_setup_cf_consumer.mjs';
 const projectionPath=process.env.MELEE_PAIRED_FULL_PROJECTION;
 const endpointsPath=process.env.MELEE_PAIRED_FULL_ENDPOINTS;
@@ -132,4 +132,42 @@ test('actual complete CLI prelude admits only the bounded full artifact route',a
  for(const flag of ['--artifact-root','--runtime-data','--stadium-paired-v11-full-pair-endpoints']){const args=[...base],i=args.indexOf(flag);args.splice(i,2);await assert.rejects(run(args),/Paired full requires/);}
  for(const flag of ['--phase-timeout','--replay-timeout']){const args=[...base];args[args.indexOf(flag)+1]='150001';await assert.rejects(run(args),/Paired full requires/);}
  for(const more of [['--expected-frame0','/frame0'],['--stadium-paired-v11-first-go-projection','/first'],['--stadium-later-sss-exit']])await assert.rejects(run([...base,...more]),/Paired full requires/);
+});
+
+test('first-fire launch uses only explicit bounded request callback and settled operands',()=>{
+ const calls=[],m={stadiumMatchedSetupNativeIdle:()=>true,
+  _melee_web_native_menu_stadium_paired_v11_first_fire_pair_arm:(...args)=>{calls.push(args);return 1;},
+  _melee_web_native_menu_launch:()=>19};
+ vm.runInNewContext('('+installPairedFullLaunch.toString()+')({firstFire:true,requestSourceTick:3853,callbackSourceTick:3864,lastSelectedSourceTick:4470})',{Module:m});
+ assert.equal(m._melee_web_native_menu_launch(),19);assert.deepEqual(calls,[[3853,3864,4470]]);
+ for(const args of [{requestSourceTick:3853,callbackSourceTick:3853,lastSelectedSourceTick:4470},
+ {requestSourceTick:3853,callbackSourceTick:3864,lastSelectedSourceTick:0x100000000}])
+  assert.throws(()=>installPairedFullLaunch({firstFire:true,...args}),/coordinates invalid/);
+});
+test('first-fire common field adapter checks actual pending bit without promoting old relations',()=>{
+ // Explicit modeled source leaf, not a captured World or parity result.
+ const fields={display:{flags_s16:0,focused_player_s16:0,mode_s16:1,packed_flags_raw_hex:'00',previous_flags_s16:0,previous_mode_s16:0,selection_counter_s16:0,timer_initialization_observed:false,timer_raw_hex:'00000000',timer_representation:'unpaired',xF0_observed:false},
+ map2:{countdown_s32:0,form_s16:3,gate_mask_40:true,gate_mask_80:false,gate_raw_hex:'40',map5_root_pointer_equals_fixed_map5_slot_value:false,phase_s16:1,previous_form_s16:-1,prior_form_s16:-1},
+ draw_ordinal:0,guest_pointer_policy:'unpaired',label:'modeled',map_root_allocation_lifetime_proved:false,map_root_object_type_observed:false,map_root_roles:[0,1,2,3].map(fixed_slot_map_id=>({fixed_slot_map_id,root_pointer_range_valid:true,ground_pointer_range_valid:true})),sequence:1,source_tick:0,title:{}};
+ const values=firstFireOriginalValues(fields,0);assert.deepEqual(Object.keys(values),FIRST_FIRE_STATE_KEYS);assert.equal(values.map2_pending,true);
+ assert.equal(Object.keys(values).length,14);assert.equal('map5_root_relation' in values,false);
+ const initial=structuredClone(fields);initial.map2.form_s16=5;
+ initial.map2.map5_root_pointer_equals_fixed_map5_slot_value=true;
+ initial.map_root_roles[3].fixed_slot_map_id=5;assert.equal(firstFireOriginalValues(initial,0).map2_form,5);
+ const pending=structuredClone(initial);pending.map2.form_s16=3;
+ assert.equal(firstFireOriginalValues(pending,0).map2_form,3); // Selected form precedes source root replacement.
+ for(const mutate of [x=>x.map_root_roles[3].fixed_slot_map_id=4,
+  x=>x.map_root_roles[0].fixed_slot_map_id=1,
+  x=>x.map_root_roles[3].ground_pointer_range_valid=false,
+  x=>x.map2.map5_root_pointer_equals_fixed_map5_slot_value=true,
+  x=>x.map2.form_s16=5]){const bad=structuredClone(fields);mutate(bad);assert.throws(()=>firstFireOriginalValues(bad,0));}
+
+ for(const change of [x=>x.map2.gate_mask_40=false,x=>delete x.map2.gate_mask_40]){const bad=structuredClone(fields);change(bad);assert.throws(()=>firstFireOriginalValues(bad,0));}
+});
+
+test('first-fire sealed completion validates actual cursor receipt independently of graph',()=>{
+ const f={request:{source_tick:3853},callback:{source_tick:3864},settled:{source_tick:4470}};
+ const c={schema:'melee-web-stadium-first-fire-recorded-completion-v1',armed:1,failed:0,completed:1,request_seen:1,local_request_id:7,actual_request_cursor:3853,actual_callback_cursor:3864,last_preconsume_cursor:4490};
+ assert.equal(validateFirstFireCompletion(c,f),true);
+ for(const change of [x=>x.armed=0,x=>x.failed=1,x=>x.completed=0,x=>x.request_seen=0,x=>x.local_request_id=0,x=>x.actual_request_cursor++,x=>x.actual_callback_cursor--,x=>x.last_preconsume_cursor=4469]){const bad={...c};change(bad);assert.throws(()=>validateFirstFireCompletion(bad,f));}
 });

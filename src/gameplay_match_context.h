@@ -21,6 +21,11 @@ typedef struct MeleeWebMatchSceneRngSnapshot {
     int invalid;
     MeleeWebMatchSceneRngPoint points[4];
 } MeleeWebMatchSceneRngSnapshot;
+/* Registered once before tick0, called every raw tick after queue staging
+ * and before HSD master renewal consumes it. Not an ordinary renew hook. */
+typedef int (*MeleeWebMatchRecordedPreconsume)(void*,uint64_t,char*,size_t);
+int melee_web_match_recorded_preconsume_arm(MeleeWebMatchContext*,
+    MeleeWebMatchRecordedPreconsume,void*,char*,size_t);
 void melee_web_match_scene_rng_note(unsigned phase);
 int melee_web_match_scene_rng_snapshot(MeleeWebMatchContext*,
     MeleeWebMatchSceneRngSnapshot*,char*,size_t);

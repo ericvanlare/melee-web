@@ -4,6 +4,7 @@
 #include "gameplay_render.h"
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include "gameplay_stage_last.h"
+#include "gameplay_source_files.h"
 #endif
 #include "dat_menu_support.hpp"
 #include <array>
@@ -98,6 +99,9 @@ struct GameplayWorldSelection {
     // may be sparse after the authored winner filter.
     bool sudden_death=false;
     std::array<MeleeWebPlayerSettings,4> source_players{};
+    // Opt-in for first-transform form preparation; false keeps the existing
+    // Stadium idle/paired diagnostic asset path unchanged.
+    bool stadium_first_transform_diagnostic=false;
 };
 // Shared by the browser and source regression harness. Owns one original SDK
 // world and its assets. Match/render contexts must close before this owner.
@@ -137,6 +141,15 @@ public:
         MeleeWebStadiumGoAlignmentSnapshot*,char*,size_t) const;
     bool diagnostic_stadium_idle_snapshot(
         MeleeWebStadiumIdleSnapshot*,char*,size_t) const;
+    // Read-only retirement admission; call before any flow/HUD/quakes mutation.
+    bool diagnostic_stadium_first_transform_schedule(uint32_t,uint32_t,uint32_t,char*,size_t);
+    bool diagnostic_stadium_first_transform_completion_status(
+        MeleeWebSourceFileRecordedCompletionStatus*,char*,size_t) const;
+    bool diagnostic_stadium_first_transform_can_end(char*,size_t) const;
+    // Reads the checked live first-form graph, or the sealed terminal receipt
+    // after end_stage and before the World is destroyed.
+    bool diagnostic_stadium_first_transform_snapshot(
+        MeleeWebStadiumFirstTransformJournal*,char*,size_t) const;
     bool diagnostic_stadium_setup_snapshot(
         MeleeWebStadiumSetupSnapshot*,char*,size_t) const;
 #endif

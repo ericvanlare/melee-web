@@ -761,6 +761,23 @@ function signedRange(value, bits, label) {
   return value;
 }
 export function commonOriginalValues(fields, sourceTick) {
+  return commonOriginalValuesForRoles(fields, sourceTick, [0, 1, 2, 5]);
+}
+
+// First-form roles are actual source slot identities, never normalized to map 5.
+export function firstFormCommonOriginalValues(fields, sourceTick) {
+  const roles = fields?.map_root_roles;
+  const active = roles?.[3]?.fixed_slot_map_id;
+  if (![3, 5].includes(active) || !Array.isArray(roles) || roles.length !== 4 ||
+      roles.some((role, i) => role?.fixed_slot_map_id !== [0, 1, 2, active][i] ||
+        role.root_pointer_range_valid !== true || role.ground_pointer_range_valid !== true) ||
+      fields.map2?.map5_root_pointer_equals_fixed_map5_slot_value !== (active === 5) ||
+      (active === 3 && fields.map2?.form_s16 !== 3))
+    throw new TypeError(`original source tick ${sourceTick} first-form root identity differs`);
+  return commonOriginalValuesForRoles(fields, sourceTick, [0, 1, 2, active]);
+}
+
+function commonOriginalValuesForRoles(fields, sourceTick, rootIds) {
   exactKeys(fields, ['display', 'draw_ordinal', 'guest_pointer_policy', 'label', 'map2',
     'map_root_allocation_lifetime_proved', 'map_root_object_type_observed', 'map_root_roles',
     'sequence', 'source_tick', 'title'], `original source tick ${sourceTick} typed fields`);
@@ -792,7 +809,7 @@ export function commonOriginalValues(fields, sourceTick) {
       fields.map_root_allocation_lifetime_proved !== false ||
       fields.map_root_object_type_observed !== false ||
       !Array.isArray(fields.map_root_roles) || fields.map_root_roles.length !== 4 ||
-      fields.map_root_roles.some((role, index) => role?.fixed_slot_map_id !== [0, 1, 2, 5][index]) ||
+      fields.map_root_roles.some((role, index) => role?.fixed_slot_map_id !== rootIds[index]) ||
       !/^[0-9a-fA-F]{2}$/.test(display.packed_flags_raw_hex ?? '') ||
       typeof display.timer_initialization_observed !== 'boolean' ||
       typeof display.xF0_observed !== 'boolean' ||

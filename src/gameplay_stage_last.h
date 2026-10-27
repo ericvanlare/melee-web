@@ -161,6 +161,16 @@ int melee_web_stage_last_stadium_source_journal_snapshot(
 /* A successful map-2 DMA unregister begins irreversible StageLast retirement.
  * World pump/tick/draw must refuse source work while a failed close retains
  * this owner. NULL means no StageLast has yet been constructed. */
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+/* Explicit first FIRE source graph only; arm after form publication and E8
+ * capture, before OnLoad. Initial idle APIs stay exact and unchanged. */
+int melee_web_stage_last_stadium_first_transform_arm(MeleeWebStageLast*,char*,size_t);
+int melee_web_stage_last_stadium_first_transform_can_end(const MeleeWebStageLast*,char*,size_t);
+int melee_web_stage_last_stadium_first_transform_end(MeleeWebStageLast*,
+    MeleeWebStadiumFirstTransformJournal*,char*,size_t);
+int melee_web_stage_last_stadium_first_transform_status(const MeleeWebStageLast*,
+    MeleeWebStadiumFirstTransformJournal*,char*,size_t);
+#endif
 int melee_web_stage_last_source_work_allowed(const MeleeWebStageLast*);
 
 /* Requires full native map/overrides, stage particle bank64, original effect

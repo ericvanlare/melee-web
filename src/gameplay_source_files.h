@@ -103,6 +103,32 @@ int melee_web_source_files_pump_for(MeleeWebSourceFileScope* scope,
  * Registered writable regions remain owned until their source object retires. */
 int melee_web_source_files_quiescent_for(MeleeWebSourceFileScope* scope,
                                          char* error, size_t error_size);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+/* One authenticated recorded request, conditional evidence only. Native cursors
+ * are pre-consume Match ticks, never emulated cycles or a drive timing model.
+ * Resident RuntimeFiles only; no external read scheduling.
+ * Caller owns predicate and RuntimeFiles until the scope is closed. */
+typedef struct MeleeWebSourceFileRecordedCompletionPlan {
+    const char* name;
+    int entry, type, priority;
+    uintptr_t offset, destination;
+    size_t logical_size, transfer_size;
+    void* region_base;
+    size_t region_size;
+    uint64_t request_cursor, callback_cursor, last_selected_cursor;
+    int (*callback_matches)(MeleeWebSourceFileCallback);
+} MeleeWebSourceFileRecordedCompletionPlan;
+typedef struct MeleeWebSourceFileRecordedCompletionStatus {
+    int armed, failed, request_seen, completed, request_id;
+    uint64_t last_preconsume_cursor, actual_request_cursor, actual_callback_cursor;
+} MeleeWebSourceFileRecordedCompletionStatus;
+int melee_web_source_files_recorded_completion_arm(MeleeWebSourceFileScope*,
+    const MeleeWebSourceFileRecordedCompletionPlan*,char*,size_t);
+int melee_web_source_files_recorded_preconsume(MeleeWebSourceFileScope*,uint64_t,char*,size_t);
+int melee_web_source_files_recorded_completion_status(MeleeWebSourceFileScope*,
+    MeleeWebSourceFileRecordedCompletionStatus*,char*,size_t);
+#endif
+
 
 #ifdef __cplusplus
 }
