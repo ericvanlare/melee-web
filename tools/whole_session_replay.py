@@ -218,6 +218,12 @@ def _capture_identity(records: list[Mapping[str, Any]], *, entity_prefix: bool =
             _fail(f"observer handshake {field} is not the pinned reference identity")
     if handshake.get("writes_guest_memory") is not False:
         _fail("observer handshake must declare writes_guest_memory=false")
+    paired_idle_profile = "paired_idle_scene_endpoints_v1"
+    paired_idle_fields = (
+        "stadium_whole_feedback", "setup_receipt_sha256", "stadium_whole_b_state",
+        "stadium_observed_matches", "stadium_observed_match", "stadium_whole_long_idle",
+    )
+    paired_idle_announcements = []
     for announcement, context in ((handshake, "handshake"), (start, "start")):
         if announcement.get("whole_session") is not True:
             _fail(f"{context} does not declare whole_session=true")
@@ -226,7 +232,34 @@ def _capture_identity(records: list[Mapping[str, Any]], *, entity_prefix: bool =
                 _fail(f"{context} does not bind the declared entity profile")
             _integer(announcement.get("match_count"), f"{context} match_count", 1, 1)
         else:
-            _integer(announcement.get("match_count"), f"{context} match_count", 3, 64)
+            match_count = announcement.get("match_count")
+            if type(match_count) is int and match_count == 2:
+                profile = announcement.get("stadium_whole_long_idle")
+                receipt = announcement.get("setup_receipt_sha256")
+                expected_profile = {
+                    "profile": paired_idle_profile,
+                    "selected_matches": [0, 1],
+                    "match_count": 2,
+                    "comparison_post_go_ticks": 3500,
+                    "natural_tail_max": 4,
+                    "raw_omission_kinds": ["draw_enter", "draw_return"],
+                }
+                if (announcement.get("stadium_whole_feedback") is not True or
+                        announcement.get("stadium_whole_b_state") is not True or
+                        announcement.get("stadium_observed_matches") != [0, 1] or
+                        not all(type(value) is int for value in
+                                announcement.get("stadium_observed_matches", [])) or
+                        "stadium_observed_match" in announcement or
+                        not isinstance(profile, Mapping) or
+                        json.dumps(dict(profile), sort_keys=True) !=
+                        json.dumps(expected_profile, sort_keys=True) or
+                        not isinstance(receipt, str) or
+                        re.fullmatch(r"[0-9a-f]{64}", receipt) is None or
+                        receipt == "0" * 64):
+                    _fail(f"{context} paired-idle match_count=2 profile is incomplete or malformed")
+                paired_idle_announcements.append(announcement)
+            else:
+                _integer(match_count, f"{context} match_count", 3, 64)
         capture_id = announcement.get("capture_id")
         sequence_id = announcement.get("sequence_id")
         if not isinstance(capture_id, str) or IDENTITY.fullmatch(capture_id) is None:
@@ -236,6 +269,21 @@ def _capture_identity(records: list[Mapping[str, Any]], *, entity_prefix: bool =
     for field in ("match_count", "capture_id", "sequence_id"):
         if handshake.get(field) != start.get(field):
             _fail(f"observer {field} disagrees between handshake and start")
+    if not entity_prefix:
+        if paired_idle_announcements:
+            if len(paired_idle_announcements) != 2:
+                _fail("paired-idle profile must be declared by both handshake and start")
+            for field in paired_idle_fields:
+                if handshake.get(field) != start.get(field):
+                    _fail(f"observer paired-idle {field} disagrees between handshake and start")
+            if handshake.get("setup_receipt_sha256") != start.get("setup_receipt_sha256"):
+                _fail("observer paired-idle setup receipt differs between handshake and start")
+        elif any(
+            isinstance(announcement.get("stadium_whole_long_idle"), Mapping) and
+            announcement["stadium_whole_long_idle"].get("profile") == paired_idle_profile
+            for announcement in (handshake, start)
+        ):
+            _fail("paired-idle profile cannot use a legacy whole-session match count")
     if entity_prefix and handshake.get("entity_profile") != start.get("entity_profile"):
         _fail("observer entity profile disagrees between handshake and start")
     if start.get("source_revision") != "GALE01r2":

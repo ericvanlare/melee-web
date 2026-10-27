@@ -43,6 +43,7 @@ class StadiumWholeRngAdjunctTests(unittest.TestCase):
         fixture=r'''
 #include <cassert>
 #include <atomic>
+#include <array>
 #include <cstdint>
 #include <cstddef>
 #include <map>
@@ -59,6 +60,8 @@ struct CompactRngSettings{bool present=false,valid=false;std::string selection;}
 const CompactRngSettings& CompactRngEnvironment(){static const CompactRngSettings value{};return value;}
 struct Gate{
  StadiumWholeBObservation stadium_whole_b;StadiumWholeLongIdle stadium_whole_long_idle;unsigned whole_session_matches=3;
+ // This legacy short-RNG control never selects the paired profile.
+ bool stadium_whole_paired_idle=false;
  bool stadium_go_prefix_enabled=false,stadium_whole_feedback=false,whole_rng_returns=false,whole_replay=false;
  std::string stadium_whole_setup_receipt,error;void SetInvalid(const char* e){error=e;}
  bool Run(){

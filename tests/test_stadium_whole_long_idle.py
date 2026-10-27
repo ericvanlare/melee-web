@@ -30,12 +30,13 @@ class LongIdleSourceTests(unittest.TestCase):
         cls.addClassCleanup(lambda: None if cls.preserve_scratch else cls.scratch.cleanup())
         source = (ROOT / "reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp").read_text()
         start = source.index("enum class Boundary :")
-        end = source.index("// Optional whole3 adjunct", start)
+        end = source.index("struct StadiumWholeBObservation\n{", start)
         enum = source[start:end]
         start = source.index("struct StadiumWholeLongIdle\n{")
         end = source.index("enum class StadiumGoPrefixPhase", start)
         leaf = source[start:end]
-        control = r'''#include <cassert>
+        control = r'''#include <array>
+#include <cassert>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -52,6 +53,9 @@ int main(int argc, char**) {
  assert(!L::Admit("selected_b_3500_v1",false,true,true,false,false,true,"1"));
  assert(!L::Admit("selected_b_3500_v1",true,false,true,false,false,true,"1"));
  assert(!L::Admit("selected_b_3500_v1",true,true,true,false,false,false,"1"));
+ assert(L::Admit("paired_idle_scene_endpoints_v1",true,true,true,false,false,true,"0,1",true));
+ assert(!L::Admit("paired_idle_scene_endpoints_v1",true,true,true,false,false,true,"1",true));
+ assert(!L::Admit("paired_idle_scene_endpoints_v1",true,true,true,false,true,true,"0,1",true));
  assert(!L::Admit("unknown",true,true,true,false,false,true,"1"));
  L inactive;assert(inactive.Complete()&&!inactive.Omit(1,Boundary::DrawEnter));
  L x;x.enabled=true;assert(!x.Go(0,0x80400000,84));assert(x.Go(1,0x80400000,84));
@@ -75,6 +79,21 @@ int main(int argc, char**) {
  L excess=tail;assert(!excess.Observe(1,5,0x80400000,Boundary::SourceTick,3589));
  assert(!tail.Complete()); // Missing final DrawReturn refuses, no forced extra tick.
  assert(tail.Observe(1,5,0x80400000,Boundary::DrawReturn,3589));assert(tail.Complete());
+ L pair;pair.enabled=true;pair.paired=true;pair.active_match=0;
+ assert(!pair.Complete()&&!pair.Go(1,0x80400000,100));
+ assert(pair.Go(0,0x80400000,100));
+ for(u32 t=100;t<=3600;++t) assert(pair.Observe(0,5,0x80400000,Boundary::SourceTick,t));
+ assert(pair.Omit(0,Boundary::DrawEnter)&&!pair.Complete());
+ assert(pair.Observe(0,5,0x80400000,Boundary::DrawEnter,3601));
+ assert(pair.Observe(0,5,0x80400000,Boundary::DrawReturn,3601));
+ assert(pair.WindowClosed(0)&&!pair.WindowClosed(1)&&!pair.Complete());
+ assert(pair.paired_go_ticks[0]==100&&pair.paired_samples[0]==3501);
+ assert(pair.Go(1,0x80400000,5000));
+ for(u32 t=5000;t<=8500;++t) assert(pair.Observe(1,5,0x80400000,Boundary::SourceTick,t));
+ assert(pair.Observe(1,5,0x80400000,Boundary::DrawEnter,8501));
+ assert(pair.Observe(1,5,0x80400000,Boundary::DrawReturn,8501));
+ assert(pair.WindowClosed(0)&&pair.WindowClosed(1)&&pair.Complete());
+ assert(pair.paired_go_ticks[1]==5000&&pair.paired_samples[1]==3501);
  L early;early.enabled=true;assert(early.Go(1,0x80400000,84));
  assert(!early.Observe(1,5,0x80400000,Boundary::DrawReturn,85));
  assert(!early.Go(1,0x80400000,UINT32_MAX));
@@ -104,7 +123,7 @@ int main(int argc, char**) {
         self.assertIn("for (u32 value : state->gpr)", source[reserve:reserve+1000])
         self.assertIn("if (stadium_idle_3500 && (next_sequence >= STADIUM_IDLE_RECORD_CAP - 1", source)
         self.assertIn("if (!stadium_whole_long_idle.Complete())", source)
-        self.assertEqual(source.count('StadiumWholeLongIdle::ProfileJson()'),3)
+        self.assertEqual(source.count('stadium_whole_long_idle.ProfileJson()'),3)
 
 
 class LongIdleRetainedCompositionTests(unittest.TestCase):

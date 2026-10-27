@@ -131,6 +131,7 @@ class StadiumWholeFeedbackTests(OwnedWorkspaceTests):
         stop=source.index('    const std::string constructor_setting =',start)
         body=source[start:stop]
         fixture=r'''
+#include <array>
 #include <cassert>
 #include <cstdint>
 #include <cstddef>
@@ -146,13 +147,22 @@ bool AllocationConfigured(){return !Env("MWRC_ALLOCATION_OUTPUT").empty();}
 struct CompactRngSettings{bool present=false,valid=false;std::string selection;};
 const CompactRngSettings& CompactRngEnvironment(){static const CompactRngSettings value{};return value;}
 namespace InputStream { bool recording=true,replaying=false; bool IsRecording(){return recording;} bool IsReplaying(){return replaying;} }
-struct Gate { StadiumWholeBObservation stadium_whole_b;StadiumWholeLongIdle stadium_whole_long_idle;unsigned whole_session_matches=3;bool stadium_go_prefix_enabled=false,stadium_whole_feedback=false,whole_rng_returns=false,whole_replay=false;std::string stadium_whole_setup_receipt,error;void SetInvalid(const char* e){error=e;}
+struct Gate { StadiumWholeBObservation stadium_whole_b;StadiumWholeLongIdle stadium_whole_long_idle;unsigned whole_session_matches=3;bool stadium_go_prefix_enabled=false,stadium_whole_feedback=false,stadium_whole_paired_idle=false,whole_rng_returns=false,whole_replay=false;std::string stadium_whole_setup_receipt,error;void SetInvalid(const char* e){error=e;}
 bool Run(){
 ''' + body + r'''
 return true;
 }};
 void reset(){env.clear();InputStream::recording=true;InputStream::replaying=false;env["MWRC_STADIUM_WHOLE_FEEDBACK"]="1";env["MWRC_STADIUM_WHOLE_SETUP_RECEIPT_SHA256"]=std::string(64,'a');env["MWRC_ALLOCATION_OUTPUT"]="owned";env["MWRC_ALLOCATION_VS_TARGET"]="2";env["MWRC_ALLOCATION_STOP_AT"]="exit";}
 int main(){reset();assert(Gate().Run());
+StadiumWholeBObservation paired;paired.enabled=true;paired.paired=true;paired.selected_match=0;
+assert(paired.SssExit(0,3,1)&&paired.Entry(0,4,0x80400000));
+assert(paired.Setup(0,5,0x80400000,5)&&paired.Go(0,5,0x80400000,100));
+assert(paired.Tick(0,5,0x80400000,100)&&paired.Close(0,5,0x80400000));
+assert(!paired.Complete());
+assert(paired.SssExit(1,3,1)&&paired.Entry(1,4,0x80400004));
+assert(paired.Setup(1,5,0x80400004,5)&&paired.Go(1,5,0x80400004,5000));
+assert(paired.Tick(1,5,0x80400004,5000)&&paired.Close(1,5,0x80400004));
+assert(paired.Complete());
 reset();Gate off;assert(off.Run()&&!off.stadium_whole_b.enabled);
 reset();env["MWRC_STADIUM_WHOLE_B_STATE"]="1";Gate on;assert(on.Run()&&on.stadium_whole_b.enabled);
 reset();env["MWRC_STADIUM_WHOLE_B_STATE"]="2";assert(!Gate().Run());
@@ -209,6 +219,7 @@ struct SliceRef {SliceTag tag;u16 flags;u32 address,size,offset;};
 '''+constants+'\n'+whole_b_declaration(source)+helper
         fields='''StadiumWholeBObservation stadium_whole_b;
 bool stadium_whole_feedback=false;
+bool stadium_whole_paired_idle=false;
 std::string stadium_whole_setup_receipt=std::string(64,'b');
 std::string stadium_go_prefix_setup_receipt_sha256=std::string(64,'a');
 u32 match_index=2,draw_ordinal=7;size_t slice_count=1;
@@ -250,7 +261,7 @@ assert(scoped.emitted.find("stadium_b_state_observation")==std::string::npos);
         def simulate(mode):
             menus=stadium_go_feedback_packet()
             class Receiver:
-                css=None;latest_menu=None;seq=0;menu_polls=0;menu_consumed=0;ended=False
+                match_count=3;css=None;latest_menu=None;seq=0;menu_polls=0;menu_consumed=0;ended=False
                 last_pad=[driver.NEUTRAL_PAD]*2
                 def accept(self,row):
                     self.seq+=1
@@ -668,11 +679,13 @@ print('Actual package finalizer imports; real missing-stream guard retained')
         class Receiver:
             def __init__(self):
                 self.seq=self.match_index=self.menu_polls=self.menu_consumed=self.tick_count=0
+                self.match_count=3
                 self.css=True;self.latest_menu=None;self.setup_seen=True;self.previous_tick=None
                 self.ended=self.returned_css=self.outcome_seen=self.chord_requested=self.start_allowed=False
                 self.chord_consumed=self.chord_released=None;self.last_pad=[driver.NEUTRAL_PAD]*2
                 self.pause_consumed=self.pause_released=self.pause_ready_clock=None
                 self.exit_requested=False;self.results_entered=False
+            def selected_long_idle(self,index):return False
             def accept(self,row):
                 self.seq+=1;kind=row['payload']['boundary'] if row['event']=='boundary' else 'end'
                 if kind=='source_tick':
@@ -953,7 +966,7 @@ env.clear();for(u32 pc:added){primary_calls=0;Observer::OnBoundary(&system,pc,&s
         def simulate(mode):
             menus=stadium_go_feedback_packet();actions={a['label']:a for a in menus['actions']}
             class Receiver:
-                css=None;latest_menu=None;seq=0;menu_polls=0;menu_consumed=0;ended=False
+                match_count=3;css=None;latest_menu=None;seq=0;menu_polls=0;menu_consumed=0;ended=False
                 expected={'is_stock':True};last_pad=[driver.NEUTRAL_PAD]*2
                 def accept(self,row):
                     self.seq+=1

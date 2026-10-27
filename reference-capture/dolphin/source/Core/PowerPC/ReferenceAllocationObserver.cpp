@@ -217,6 +217,8 @@ struct State
   u32 vs_entries = 0;
   u32 vs_exits = 0;
   bool stop_at_exit = false;
+  bool scene_endpoint_profile = false;
+  std::array<u32, 2> scene_endpoint_functions{};
   bool target_complete = false;
   bool active_owner = false;
   bool ownership_complete = false;
@@ -551,8 +553,9 @@ public:
     }
     std::string header =
         "{\"record\":\"header\",\"schema\":\"melee-web-original-allocation-history\","
-        "\"version\":1,\"original_rng_scene_boundaries_v1\":true,\"start\":\"original_dol_entry\",\"scope\":\"vs_ownership\","
-        "\"vs_target\":";
+        "\"version\":1,\"original_rng_scene_boundaries_v1\":true,\"start\":\"original_dol_entry\",\"scope\":\"" +
+        std::string(state_.scene_endpoint_profile ? "scene-rng-endpoints-only" : "vs_ownership") +
+        "\",\"vs_target\":";
     if (!AppendNumber(&header, state_.vs_target) || !Append(&header, ",\"stop_at\":\"") ||
         !Append(&header, state_.stop_at_exit ? "exit" : "entry") ||
         !Append(&header, "\",\"max_events\":") ||
@@ -560,7 +563,18 @@ public:
         !Append(&header, ",\"compression\":\"") ||
         !Append(&header, state_.gzip_output ? "gzip" : "none") ||
         !Append(&header, "\",\"writes_game_state\":false,\"profile_sha256\":\"") ||
-        !Append(&header, state_.profile.profile_sha256) || !Append(&header, "\",\"initial_pc\":"))
+        !Append(&header, state_.profile.profile_sha256) || !Append(&header, "\""))
+    {
+      Fail("allocation observer header exceeded its bound");
+      return false;
+    }
+    if (state_.scene_endpoint_profile &&
+        !Append(&header, ",\"scene_endpoint_profile\":\"paired_idle_scene_endpoints_v1\",\"allocation_history_complete\":false,\"registration_lifetime_complete\":false,\"selected_functions\":[\"gm_Scene_Vs_OnEnter\",\"gm_Scene_Vs_OnExit\"]"))
+    {
+      Fail("allocation observer endpoint header exceeded its bound");
+      return false;
+    }
+    if (!Append(&header, ",\"initial_pc\":"))
     {
       Fail("allocation observer header exceeded its bound");
       return false;
@@ -615,9 +629,19 @@ public:
   {
     if (!state_.armed.load() || state_.invalid.load() || !state_.profile.functions)
       return false;
+    if (pc == state_.profile.entry)
+      return true;
     u32 index = 0;
-    return pc == state_.profile.entry || FindEntry(state_.profile, pc, &index) ||
-           FindReturn(state_.profile, pc, &index);
+    const FunctionIdentity* function = FindEntry(state_.profile, pc, &index);
+    if (!function)
+      function = FindReturn(state_.profile, pc, &index);
+    return function && (!state_.scene_endpoint_profile || IsSceneEndpoint(index));
+  }
+
+  bool IsSceneEndpoint(u32 index) const
+  {
+    return index == state_.scene_endpoint_functions[0] ||
+           index == state_.scene_endpoint_functions[1];
   }
 
   void Observe(Core::System* system, u32 pc, PowerPC::PowerPCState* state)
@@ -644,6 +668,8 @@ public:
     if (!function)
       function = FindReturn(state_.profile, pc, &function_index);
     if (!function)
+      return;
+    if (state_.scene_endpoint_profile && !IsSceneEndpoint(function_index))
       return;
     u32 instruction = 0;
     if (!ReadWord(system, pc, &instruction) ||
@@ -850,6 +876,46 @@ private:
     state_.vs_target = 1;
     state_.stop_at_exit = false;
     state_.max_events = kMaxEvents;
+    const char* endpoint = std::getenv("MWRC_ALLOCATION_SCENE_ENDPOINT_PROFILE");
+    if (endpoint && *endpoint)
+    {
+      if (std::string_view(endpoint) != "paired_idle_scene_endpoints_v1")
+      {
+        Fail("MWRC_ALLOCATION_SCENE_ENDPOINT_PROFILE has an unknown profile");
+        return false;
+      }
+      state_.scene_endpoint_profile = true;
+      state_.max_events = 64;
+      for (u32 wanted = 0; wanted < 2; ++wanted)
+      {
+        const std::string_view name = wanted == 0 ? "gm_Scene_Vs_OnEnter" : "gm_Scene_Vs_OnExit";
+        u32 found = UINT32_MAX;
+        u32 count = 0;
+        for (u32 index = 0; index < state_.profile.function_count; ++index)
+        {
+          const FunctionIdentity& function = state_.profile.functions[index];
+          if (function.name && std::string_view(function.name) == name)
+          {
+            found = index;
+            ++count;
+          }
+        }
+        if (count != 1)
+        {
+          Fail("endpoint profile requires one exact generated scene callback identity");
+          return false;
+        }
+        state_.scene_endpoint_functions[wanted] = found;
+      }
+      const char* configured_target = std::getenv("MWRC_ALLOCATION_VS_TARGET");
+      const char* configured_stop = std::getenv("MWRC_ALLOCATION_STOP_AT");
+      if (!configured_target || std::string_view(configured_target) != "2" ||
+          !configured_stop || std::string_view(configured_stop) != "exit")
+      {
+        Fail("scene endpoint profile requires exactly two VS exits");
+        return false;
+      }
+    }
     const char* target = std::getenv("MWRC_ALLOCATION_VS_TARGET");
     if (target && *target)
     {
@@ -898,6 +964,11 @@ private:
       if (value == 0 || value > kMaxConfiguredEvents)
       {
         Fail("MWRC_ALLOCATION_MAX_EVENTS must be a decimal count from 1 through 100000000");
+        return false;
+      }
+      if (state_.scene_endpoint_profile && value != 64)
+      {
+        Fail("scene endpoint profile fixes MWRC_ALLOCATION_MAX_EVENTS at 64");
         return false;
       }
       state_.max_events = value;
@@ -1730,21 +1801,38 @@ private:
             end += "null";
           else
             end += "\"" + JsonEscape(error) + "\"";
-          end += ",\"original_rng_scene_boundaries_v1\":true,\"scope\":\"vs_ownership\",\"vs_target\":" +
-                 std::to_string(state_.vs_target) + ",\"stop_at\":\"" +
-                 (state_.stop_at_exit ? "exit" : "entry") + "\",\"max_events\":" +
-                 std::to_string(state_.max_events) + ",\"compression\":\"" +
-                 (state_.gzip_output ? "gzip" : "none") + "\",\"target_complete\":" +
-                 (state_.target_complete ? "true" : "false") + ",\"vs_entries\":" +
-                 std::to_string(state_.vs_entries) + ",\"vs_exits\":" +
-                 std::to_string(state_.vs_exits) + ",\"active_owner\":" +
-                 (state_.active_owner ? "true" : "false") + ",\"pending_calls\":" + PendingJson() +
-                 ",\"calls\":" +
-                 std::to_string(state_.call_count) + ",\"repeated_stops\":" +
-                 std::to_string(state_.repeated_stops) + ",\"boundary_complete\":" +
-                 (state_.boundary_complete ? "true" : "false") +
-                 ",\"ownership_complete\":" +
-                 (state_.ownership_complete ? "true" : "false") + "}";
+          if (state_.scene_endpoint_profile)
+          {
+            end += std::string(",\"original_rng_scene_boundaries_v1\":true,\"scene_endpoint_profile\":\"paired_idle_scene_endpoints_v1\",\"scope\":\"scene-rng-endpoints-only\",\"profile_sha256\":\"") +
+                   state_.profile.profile_sha256 + "\",\"allocation_history_complete\":false,\"registration_lifetime_complete\":false,\"vs_target\":" +
+                   std::to_string(state_.vs_target) + ",\"stop_at\":\"exit\",\"max_events\":" +
+                   std::to_string(state_.max_events) + ",\"repeated_stops\":" +
+                   std::to_string(state_.repeated_stops) + ",\"compression\":\"" +
+                   (state_.gzip_output ? "gzip" : "none") + "\",\"target_complete\":" +
+                   (state_.target_complete ? "true" : "false") + ",\"vs_entries\":" +
+                   std::to_string(state_.vs_entries) + ",\"vs_exits\":" +
+                   std::to_string(state_.vs_exits) + ",\"active_owner\":" +
+                   (state_.active_owner ? "true" : "false") + ",\"pending_calls\":" + PendingJson() +
+                   ",\"endpoint_callbacks\":\"gm_Scene_Vs_OnEnter,gm_Scene_Vs_OnExit\"}";
+          }
+          else
+          {
+            end += ",\"original_rng_scene_boundaries_v1\":true,\"scope\":\"vs_ownership\",\"vs_target\":" +
+                   std::to_string(state_.vs_target) + ",\"stop_at\":\"" +
+                   (state_.stop_at_exit ? "exit" : "entry") + "\",\"max_events\":" +
+                   std::to_string(state_.max_events) + ",\"compression\":\"" +
+                   (state_.gzip_output ? "gzip" : "none") + "\",\"target_complete\":" +
+                   (state_.target_complete ? "true" : "false") + ",\"vs_entries\":" +
+                   std::to_string(state_.vs_entries) + ",\"vs_exits\":" +
+                   std::to_string(state_.vs_exits) + ",\"active_owner\":" +
+                   (state_.active_owner ? "true" : "false") + ",\"pending_calls\":" + PendingJson() +
+                   ",\"calls\":" +
+                   std::to_string(state_.call_count) + ",\"repeated_stops\":" +
+                   std::to_string(state_.repeated_stops) + ",\"boundary_complete\":" +
+                   (state_.boundary_complete ? "true" : "false") +
+                   ",\"ownership_complete\":" +
+                   (state_.ownership_complete ? "true" : "false") + "}";
+          }
           if (!EmitWriter(std::move(end), output))
             Fail("allocation observer final record could not be written");
           if (!output.Finish())

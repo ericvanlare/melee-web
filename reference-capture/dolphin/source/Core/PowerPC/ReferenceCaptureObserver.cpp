@@ -186,17 +186,27 @@ enum class Boundary : u16
   StartupPrizeModeExit = 30,
 };
 
-// Optional whole3 adjunct for the already observed second VS lifetime only.
-// Source selectors/writers remain shared; this records no registration generations.
+// Optional whole-session constructor/GO state. Legacy whole3 observes only B;
+// the paired profile advances the same checked state machine through A then B.
 struct StadiumWholeBObservation
 {
   enum class Phase { AwaitSssExit, AwaitEntry, AwaitSetup, AwaitGo, PostGo, Closed };
-  bool enabled = false;
+  bool enabled = false, paired = false;
   Phase phase = Phase::AwaitSssExit;
   u32 setup_owner = 0, go_tick = 0, last_tick = 0, samples = 0;
-  bool Selected(u32 index) const { return enabled && index == 1; }
+  u32 selected_match = 1, completed_matches = 0;
+  bool Selected(u32 index) const { return enabled && index == selected_match; }
+  void ResetForNextMatch(u32 index)
+  {
+    selected_match = index;
+    phase = Phase::AwaitSssExit;
+    setup_owner = go_tick = last_tick = samples = 0;
+  }
   bool SssExit(u32 index, u32 whole, u8 route)
   {
+    if (!enabled) return true;
+    if (paired && phase == Phase::Closed && completed_matches == 1 && index == 1)
+      ResetForNextMatch(index);
     if (!Selected(index)) return true;
     if (phase != Phase::AwaitSssExit || whole != 3 || !route) return false;
     phase = Phase::AwaitEntry; return true;
@@ -236,38 +246,67 @@ struct StadiumWholeBObservation
     if (!Selected(index)) return true;
     if (phase != Phase::PostGo || whole != 5 || owner != setup_owner || samples == 0)
       return false;
-    phase = Phase::Closed; return true;
+    phase = Phase::Closed;
+    if (paired) ++completed_matches;
+    return true;
   }
-  bool Complete() const { return !enabled || phase == Phase::Closed; }
+  bool Complete() const
+  {
+    return !enabled || (paired ? completed_matches == 2 && phase == Phase::Closed :
+                                 phase == Phase::Closed);
+  }
 };
 
-// Explicit B-only long window; records/order remain ordinary MWRO.
-// No gameplay writes, extra source calls, or match-zero admission.
+// Explicit GO+3500 observation. The paired profile reuses this checked
+// per-window state machine sequentially for selected matches0 and1.
 struct StadiumWholeLongIdle
 {
-  bool enabled = false, open = false, target_seen = false, closed = false;
+  bool enabled = false, paired = false, open = false, target_seen = false, closed = false;
   u32 owner = 0, go_tick = 0, last_tick = 0, samples = 0;
+  u32 active_match = 1, completed_windows = 0;
+  std::array<u32, 2> paired_go_ticks{}, paired_samples{};
+  bool Selected(u32 index) const
+  {
+    return enabled && (paired ? index < 2 : index == 1);
+  }
   static bool Admit(std::string_view setting, bool whole, bool b_state, bool recording,
                     bool replaying, bool short_rng, bool compact_valid,
-                    std::string_view compact_selection)
+                    std::string_view compact_selection, bool paired = false)
   {
-    return setting.empty() || (setting == "selected_b_3500_v1" && whole && b_state &&
-        recording && !replaying && !short_rng && compact_valid && compact_selection == "1");
+    if (setting.empty()) return true;
+    if (paired)
+      return setting == "paired_idle_scene_endpoints_v1" && whole && b_state &&
+          recording && !replaying && !short_rng && compact_valid &&
+          compact_selection == "0,1";
+    return setting == "selected_b_3500_v1" && whole && b_state && recording &&
+        !replaying && !short_rng && compact_valid && compact_selection == "1";
   }
-  static std::string ProfileJson()
+  std::string ProfileJson() const
   {
+    if (paired)
+      return R"({"profile":"paired_idle_scene_endpoints_v1","selected_matches":[0,1],"match_count":2,"comparison_post_go_ticks":3500,"natural_tail_max":4,"raw_omission_kinds":["draw_enter","draw_return"]})";
     return R"({"profile":"selected_b_3500_v1","selected_matches":[1],"comparison_post_go_ticks":3500,"natural_tail_max":4,"raw_omission_kinds":["draw_enter","draw_return"]})";
+  }
+  void ResetWindow(u32 index)
+  {
+    active_match = index;
+    owner = go_tick = last_tick = samples = 0;
+    open = target_seen = closed = false;
   }
   bool Go(u32 index, u32 setup, u32 tick)
   {
     if (!enabled) return true;
-    if (index != 1 || !setup || open || closed || tick > UINT32_MAX - 3504) return false;
+    if (paired && completed_windows == 1 && index == 1 && closed)
+      ResetWindow(index);
+    const u32 expected = paired ? completed_windows : 1;
+    if (index != expected || index != active_match || !setup || open || closed ||
+        tick > UINT32_MAX - 3504) return false;
     owner = setup; go_tick = last_tick = tick; open = true; return true;
   }
   bool Observe(u32 index, u32 whole, u32 setup, Boundary boundary, u32 tick)
   {
     if (!enabled || !open) return true;
-    if (index != 1 || whole != 5 || setup != owner || !owner) return false;
+    if (index != active_match || whole != 5 || setup != owner || !owner) return false;
     if (boundary == Boundary::SourceTick)
     {
       if ((samples == 0 ? tick != go_tick : tick != last_tick + 1) ||
@@ -278,7 +317,16 @@ struct StadiumWholeLongIdle
     else if (boundary == Boundary::DrawEnter || boundary == Boundary::DrawReturn)
     {
       if (!samples || last_tick == UINT32_MAX || tick != last_tick + 1) return false;
-      if (boundary == Boundary::DrawReturn && target_seen) { open = false; closed = true; }
+      if (boundary == Boundary::DrawReturn && target_seen)
+      {
+        open = false; closed = true;
+        if (paired && completed_windows < paired_go_ticks.size())
+        {
+          paired_go_ticks[completed_windows] = go_tick;
+          paired_samples[completed_windows] = samples;
+          ++completed_windows;
+        }
+      }
     }
     else if (boundary != Boundary::PadPoll && boundary != Boundary::PadConsume)
       return false;
@@ -286,11 +334,18 @@ struct StadiumWholeLongIdle
   }
   bool Omit(u32 index, Boundary boundary) const
   {
-    return enabled && open && index == 1 &&
+    return enabled && open && index == active_match &&
            (boundary == Boundary::DrawEnter || boundary == Boundary::DrawReturn);
   }
-  bool Complete() const { return !enabled || (closed && !open && target_seen &&
-      samples >= 3501 && samples <= 3505); }
+  bool WindowClosed(u32 index) const
+  {
+    return paired ? completed_windows > index : index == 1 && closed && !open && target_seen;
+  }
+  bool Complete() const
+  {
+    return !enabled || (paired ? completed_windows == 2 && closed && !open :
+        closed && !open && target_seen && samples >= 3501 && samples <= 3505);
+  }
 };
 
 enum class StadiumGoPrefixPhase : u8
@@ -960,9 +1015,26 @@ u32 WholeSessionMatchCount()
     if (result > WHOLE_SESSION_MAX_MATCHES)
       return 0;
   }
+  const bool paired_idle = Env("MWRC_STADIUM_WHOLE_PAIRED_IDLE") ==
+                           "paired_idle_scene_endpoints_v1";
   return result >= WHOLE_SESSION_MIN_MATCHES ||
+         (result == 2 && paired_idle) ||
          (result == 1 && (Env("MWRC_ENTITY_PROFILE") == "jiggly-ice-mario-fox-v1" ||
                          Env("MWRC_ENTITY_PROFILE") == "jiggly-ice-mario-fox-active60-v1")) ? result : 0;
+}
+
+bool PairedIdleStartupProfilesAgree(bool paired_idle, u32 match_count,
+                                    std::string_view allocation_endpoint_profile,
+                                    std::string_view long_idle_profile)
+{
+  if (paired_idle)
+  {
+    return match_count == 2 &&
+           allocation_endpoint_profile == "paired_idle_scene_endpoints_v1" &&
+           long_idle_profile == "paired_idle_scene_endpoints_v1";
+  }
+  return allocation_endpoint_profile.empty() &&
+         long_idle_profile != "paired_idle_scene_endpoints_v1";
 }
 
 bool ValidIdentity(std::string_view value)
@@ -1340,7 +1412,18 @@ struct Observer::Impl
       SetInvalid("MWRC_OUTPUT must name a fresh stream");
       return false;
     }
+    const std::string paired_idle_setting = Env("MWRC_STADIUM_WHOLE_PAIRED_IDLE");
+    if (!paired_idle_setting.empty() &&
+        paired_idle_setting != "paired_idle_scene_endpoints_v1")
+      return SetInvalid("Stadium paired-idle profile identity differs"), false;
+    stadium_whole_paired_idle = paired_idle_setting == "paired_idle_scene_endpoints_v1";
     whole_session_matches = WholeSessionMatchCount();
+    const std::string allocation_endpoint_profile =
+        Env("MWRC_ALLOCATION_SCENE_ENDPOINT_PROFILE");
+    const std::string long_idle_profile = Env("MWRC_STADIUM_WHOLE_LONG_IDLE");
+    if (!PairedIdleStartupProfilesAgree(stadium_whole_paired_idle, whole_session_matches,
+                                        allocation_endpoint_profile, long_idle_profile))
+      return SetInvalid("Stadium paired-idle and allocation endpoint profiles must agree at startup"), false;
     const std::string stadium_go_prefix_setting = Env("MWRC_STADIUM_GO_PREFIX");
     if (!stadium_go_prefix_setting.empty() && stadium_go_prefix_setting != "1")
       return SetInvalid("MWRC_STADIUM_GO_PREFIX must be 1 when set"), false;
@@ -1374,7 +1457,8 @@ struct Observer::Impl
       return SetInvalid("Whole Stadium replay binding requires explicit whole3 observation"), false;
     stadium_whole_setup_receipt = Env("MWRC_STADIUM_WHOLE_SETUP_RECEIPT_SHA256");
     if (stadium_whole_feedback &&
-        (whole_session_matches != 3 || stadium_go_prefix_enabled || SdInitRequested() ||
+        ((stadium_whole_paired_idle ? whole_session_matches != 2 : whole_session_matches != 3) ||
+         stadium_go_prefix_enabled || SdInitRequested() ||
          !Env("MWRC_STADIUM_CONSTRUCTOR_OWNER").empty() ||
          !Env("MWRC_STADIUM_IDLE_3500").empty() ||
          !Env("MWRC_STADIUM_GO_ORDINAL2").empty() ||
@@ -1390,22 +1474,28 @@ struct Observer::Impl
          stadium_whole_setup_receipt.size() != 64 ||
          stadium_whole_setup_receipt.find_first_not_of("0123456789abcdef") != std::string::npos ||
          stadium_whole_setup_receipt == std::string(64, '0')))
-      return SetInvalid("Stadium whole feedback requires exclusive whole3/allocation2 record or bound combined RNG replay"), false;
+      return SetInvalid("Stadium whole feedback requires its exact whole-session/allocation record or bound combined RNG replay"), false;
     if (!stadium_whole_feedback && !stadium_whole_setup_receipt.empty())
       return SetInvalid("Stadium whole feedback receipt lacks explicit scope"), false;
     const std::string whole_b_setting = Env("MWRC_STADIUM_WHOLE_B_STATE");
     if ((!whole_b_setting.empty() && whole_b_setting != "1") ||
-        (!whole_b_setting.empty() && !stadium_whole_feedback))
-      return SetInvalid("Stadium B state requires explicit whole3 feedback recording"), false;
+        (!whole_b_setting.empty() && !stadium_whole_feedback) ||
+        (stadium_whole_paired_idle && whole_b_setting != "1"))
+      return SetInvalid("Stadium selected-match state requires its explicit whole-session feedback recording"), false;
     stadium_whole_b.enabled = whole_b_setting == "1";
+    stadium_whole_b.paired = stadium_whole_paired_idle;
+    stadium_whole_b.selected_match = stadium_whole_paired_idle ? 0 : 1;
     const std::string long_idle_setting = Env("MWRC_STADIUM_WHOLE_LONG_IDLE");
     const auto& long_idle_compact = CompactRngEnvironment();
     if (!StadiumWholeLongIdle::Admit(long_idle_setting, stadium_whole_feedback,
         stadium_whole_b.enabled, InputStream::IsRecording(), InputStream::IsReplaying(),
         whole_rng_returns || whole_replay, long_idle_compact.present && long_idle_compact.valid,
-        long_idle_compact.selection))
-      return SetInvalid("Whole Stadium long idle requires selected B fresh recording/compact ledger and no short RNG/replay"), false;
+        long_idle_compact.selection, stadium_whole_paired_idle) ||
+        (stadium_whole_paired_idle && long_idle_setting != "paired_idle_scene_endpoints_v1"))
+      return SetInvalid("Whole Stadium idle profile requires its exact selected-match recording/compact ledger and no short RNG/replay"), false;
     stadium_whole_long_idle.enabled = !long_idle_setting.empty();
+    stadium_whole_long_idle.paired = stadium_whole_paired_idle;
+    stadium_whole_long_idle.active_match = stadium_whole_paired_idle ? 0 : 1;
     const std::string constructor_setting = Env("MWRC_STADIUM_CONSTRUCTOR_OWNER");
     if ((!constructor_setting.empty() && constructor_setting != "1") ||
         (!constructor_setting.empty() && !stadium_go_prefix_enabled))
@@ -1659,9 +1749,14 @@ struct Observer::Impl
     if (stadium_idle_3500)
       handshake += ",\"original_idle_post_go_ticks\":3500";
     if (stadium_whole_b.enabled)
-      handshake += ",\"stadium_whole_b_state\":true,\"stadium_observed_match\":1";
+    {
+      if (stadium_whole_paired_idle)
+        handshake += ",\"stadium_whole_b_state\":true,\"stadium_observed_matches\":[0,1]";
+      else
+        handshake += ",\"stadium_whole_b_state\":true,\"stadium_observed_match\":1";
+    }
     if (stadium_whole_long_idle.enabled)
-      handshake += ",\"stadium_whole_long_idle\":" + StadiumWholeLongIdle::ProfileJson();
+      handshake += ",\"stadium_whole_long_idle\":" + stadium_whole_long_idle.ProfileJson();
     if (stadium_go_ordinal2)
       handshake += ",\"original_post_go_target_ordinal\":2";
     if (stadium_whole_feedback)
@@ -1696,9 +1791,14 @@ struct Observer::Impl
     if (stadium_idle_3500)
       start += ",\"original_idle_post_go_ticks\":3500";
     if (stadium_whole_b.enabled)
-      start += ",\"stadium_whole_b_state\":true,\"stadium_observed_match\":1";
+    {
+      if (stadium_whole_paired_idle)
+        start += ",\"stadium_whole_b_state\":true,\"stadium_observed_matches\":[0,1]";
+      else
+        start += ",\"stadium_whole_b_state\":true,\"stadium_observed_match\":1";
+    }
     if (stadium_whole_long_idle.enabled)
-      start += ",\"stadium_whole_long_idle\":" + StadiumWholeLongIdle::ProfileJson();
+      start += ",\"stadium_whole_long_idle\":" + stadium_whole_long_idle.ProfileJson();
     if (stadium_go_ordinal2)
       start += ",\"original_post_go_target_ordinal\":2";
     if (stadium_whole_feedback)
@@ -4255,6 +4355,63 @@ struct Observer::Impl
     return SceneResetAction::Invalid;
   }
 
+  bool StadiumConstructorWitnessStepValid(size_t point) const
+  {
+    const bool call = point == 2 || point == 4;
+    const bool returned = point == 3 || point == 5;
+    return !((point == 0 && stadium_constructor_step != 0) ||
+             (point == 1 && stadium_constructor_step != 1) ||
+             (call && stadium_constructor_step != 2) ||
+             (returned && (stadium_constructor_step != 3 ||
+                           point != stadium_constructor_call + 1)) ||
+             (point == 6 && stadium_constructor_step != 2 &&
+              stadium_constructor_step != 4));
+  }
+
+  void AdvanceStadiumConstructorWitness(size_t point)
+  {
+    const bool call = point == 2 || point == 4;
+    const bool returned = point == 3 || point == 5;
+    if (point == 0) stadium_constructor_step = 1;
+    else if (point == 1) stadium_constructor_step = 2;
+    else if (call) { stadium_constructor_step = 3; stadium_constructor_call = point; }
+    else if (returned) stadium_constructor_step = 4;
+    else stadium_constructor_step = 5;
+  }
+
+  bool StadiumConstructorOwnerMatches(u32 gobj, u32 ground) const
+  {
+    return gobj == stadium_constructor_gobj && ground == stadium_constructor_ground;
+  }
+
+  bool ResetPairedConstructorWitnessForSecondMatch(u32 index, u32 whole, u8 route)
+  {
+    if (!stadium_whole_paired_idle || !stadium_whole_b.enabled || !stadium_whole_b.paired ||
+        stadium_whole_b.phase != StadiumWholeBObservation::Phase::Closed ||
+        stadium_whole_b.completed_matches != 1 || stadium_whole_b.selected_match != 0 ||
+        index != 1 || whole != 3 || route == 0 || stadium_constructor_step != 5 ||
+        (stadium_constructor_call != 2 && stadium_constructor_call != 4) ||
+        !stadium_constructor_gobj || !stadium_constructor_ground ||
+        !stadium_constructor_parameter_slot || !stadium_constructor_parameters)
+      return false;
+    stadium_constructor_step = stadium_constructor_call = 0;
+    stadium_constructor_gobj = stadium_constructor_ground = 0;
+    stadium_constructor_parameter_slot = stadium_constructor_parameters = 0;
+    return true;
+  }
+
+  bool AcceptStadiumConstructorSssExit(u32 index, u32 whole, u8 route)
+  {
+    const bool paired_second_match = stadium_whole_paired_idle &&
+        stadium_whole_b.phase == StadiumWholeBObservation::Phase::Closed &&
+        stadium_whole_b.completed_matches == 1 && stadium_whole_b.selected_match == 0 &&
+        index == 1;
+    if (paired_second_match &&
+        !ResetPairedConstructorWitnessForSecondMatch(index, whole, route))
+      return false;
+    return stadium_whole_b.SssExit(index, whole, route);
+  }
+
   // Entry is within gm_Scene_Vs_OnEnter -> fn_8016E730 -> Stage_8022524C
   // -> Ground_801C0800 -> grStadium_OnInit. No registration/generation claim.
   void ObserveStadiumConstructor(Core::System* system, size_t point,
@@ -4275,22 +4432,16 @@ struct Observer::Impl
       return SetInvalid("Stadium constructor escaped its accepted ordinary VS setup interval"), void();
     if (point == 0)
     {
-      if (stadium_constructor_step != 0)
+      if (!StadiumConstructorWitnessStepValid(point))
         return SetInvalid("Stadium constructor entry duplicated"), void();
       stadium_constructor_gobj = state->gpr[3];
       if (!IsMem1Range(stadium_constructor_gobj, 0x38) ||
           !ReadU32(system, stadium_constructor_gobj + 0x2c, &stadium_constructor_ground))
         return SetInvalid("Stadium constructor entry lacks Ground user data"), void();
     }
-    else if (state->gpr[30] != stadium_constructor_gobj ||
-             state->gpr[31] != stadium_constructor_ground)
+    else if (!StadiumConstructorOwnerMatches(state->gpr[30], state->gpr[31]))
       return SetInvalid("Stadium constructor register owner changed"), void();
-    const bool call = point == 2 || point == 4;
-    const bool returned = point == 3 || point == 5;
-    if ((point == 1 && stadium_constructor_step != 1) ||
-        (call && stadium_constructor_step != 2) ||
-        (returned && (stadium_constructor_step != 3 || point != stadium_constructor_call + 1)) ||
-        (point == 6 && stadium_constructor_step != 2 && stadium_constructor_step != 4))
+    if (!StadiumConstructorWitnessStepValid(point))
       return SetInvalid("Stadium constructor witnesses are missing, duplicated or reordered"), void();
     raw_size = 0;
     slice_count = 0;
@@ -4364,18 +4515,16 @@ struct Observer::Impl
         "constructor_commit"};
     PublishStadiumProgress(phases[point], STADIUM_CONSTRUCTOR_PCS[point], word,
                            root, state, tick);
-    if (point == 0) stadium_constructor_step = 1;
-    else if (point == 1) stadium_constructor_step = 2;
-    else if (call) { stadium_constructor_step = 3; stadium_constructor_call = point; }
-    else if (returned) stadium_constructor_step = 4;
-    else stadium_constructor_step = 5;
+    AdvanceStadiumConstructorWitness(point);
   }
 
   void PublishStadiumProgress(const char* phase, u32 pc, u32 word, u32 argument,
                               PowerPC::PowerPCState* state, u32 source_tick)
   {
     const std::string diagnostic = stadium_whole_feedback ?
-        "stadium_whole3_feedback_v1" : "stadium_go_prefix_v3";
+        (stadium_whole_paired_idle ? "stadium_paired_idle_feedback_v1" :
+                                     "stadium_whole3_feedback_v1") :
+        "stadium_go_prefix_v3";
     std::string json =
         "{\"diagnostic\":\"" + diagnostic + "\",\"phase\":\"" +
         std::string(phase) + "\",\"setup_receipt_sha256\":\"" +
@@ -5104,7 +5253,7 @@ struct Observer::Impl
         if (!ReadU32(system, 0x804d6c90, &sss_pointer) || !sss_pointer ||
             sss_pointer > UINT32_MAX - 4 || !ReadBytes(system, sss_pointer + 4, 1, &route))
           return SetInvalid("whole-session SSS exit did not expose its source route"), void();
-        if (!stadium_whole_b.SssExit(match_index, whole_phase, route))
+        if (!AcceptStadiumConstructorSssExit(match_index, whole_phase, route))
           return SetInvalid("Stadium B lacks its one selected nonzero SSS exit"), void();
         whole_phase = route ? 4 : 8;
       }
@@ -5737,8 +5886,10 @@ struct Observer::Impl
     const bool omit_long_idle_raw = stadium_whole_long_idle.Omit(match_index, boundary);
     if (!stadium_whole_long_idle.Observe(match_index, whole_phase, setup_pointer, boundary, source_tick))
       return SetInvalid("Stadium B long idle owner/target/natural-tail refused"), void();
-    if (boundary == Boundary::VsExit && match_index == 1 && !stadium_whole_long_idle.Complete())
-      return SetInvalid("Stadium B VS exit preceded checked long idle window"), void();
+    if (boundary == Boundary::VsExit && stadium_whole_long_idle.enabled &&
+        stadium_whole_long_idle.Selected(match_index) &&
+        !stadium_whole_long_idle.WindowClosed(match_index))
+      return SetInvalid("Stadium selected VS exit preceded its checked GO+3500 window"), void();
     if (omit_long_idle_raw) { slice_count = 0; raw_size = 0; }
     Slot* slot = Reserve(Event::Boundary, pc, source_tick, draw_ordinal);
     if (!slot)
@@ -6694,14 +6845,26 @@ struct Observer::Impl
         (invalid.load() ? "true" : "false") + ",\"error\":" +
         (error_text.empty() ? "null" : "\"" + error_text + "\"");
     if (stadium_whole_b.enabled)
-      json += ",\"stadium_whole_b_state\":true,\"stadium_observed_match\":1,\"stadium_b_observations_complete\":" +
-              std::string(stadium_whole_b.Complete() && !invalid.load() ? "true" : "false") +
-              ",\"stadium_b_go_tick\":" + std::to_string(stadium_whole_b.go_tick) +
-              ",\"stadium_b_state_source_ticks\":" + std::to_string(stadium_whole_b.samples);
+    {
+      if (stadium_whole_paired_idle)
+        json += ",\"stadium_whole_b_state\":true,\"stadium_observed_matches\":[0,1],\"stadium_b_observations_complete\":" +
+                std::string(stadium_whole_b.Complete() && !invalid.load() ? "true" : "false");
+      else
+        json += ",\"stadium_whole_b_state\":true,\"stadium_observed_match\":1,\"stadium_b_observations_complete\":" +
+                std::string(stadium_whole_b.Complete() && !invalid.load() ? "true" : "false") +
+                ",\"stadium_b_go_tick\":" + std::to_string(stadium_whole_b.go_tick) +
+                ",\"stadium_b_state_source_ticks\":" + std::to_string(stadium_whole_b.samples);
+    }
     if (stadium_whole_long_idle.enabled)
-      json += ",\"stadium_whole_long_idle\":" + StadiumWholeLongIdle::ProfileJson() +
+      json += ",\"stadium_whole_long_idle\":" + stadium_whole_long_idle.ProfileJson() +
               ",\"stadium_whole_long_idle_window_complete\":" +
-              std::string(stadium_long_idle_window_complete.load() ? "true" : "false");
+              std::string(stadium_long_idle_window_complete.load() ? "true" : "false") +
+              (stadium_whole_paired_idle ? ",\"paired_go_ticks\":[" +
+                  std::to_string(stadium_whole_long_idle.paired_go_ticks[0]) + "," +
+                  std::to_string(stadium_whole_long_idle.paired_go_ticks[1]) +
+                  "],\"paired_source_ticks\":[" +
+                  std::to_string(stadium_whole_long_idle.paired_samples[0]) + "," +
+                  std::to_string(stadium_whole_long_idle.paired_samples[1]) + "]" : "");
     if (checked_entity_profile && !active_entity_profile && force && state != "starting")
       json += ",\"diagnostic_prefix_complete\":" + std::string(completed ? "true" : "false") +
               ",\"whole_session_equivalent\":false,\"comparison_source_ticks\":60," +
@@ -6924,6 +7087,7 @@ struct Observer::Impl
   u32 stadium_constructor_parameter_slot = 0, stadium_constructor_parameters = 0;
   bool stadium_go_prefix_enabled = false;
   bool stadium_whole_feedback = false;
+  bool stadium_whole_paired_idle = false;
   StadiumWholeBObservation stadium_whole_b;
   StadiumWholeLongIdle stadium_whole_long_idle;
   std::atomic<bool> stadium_long_idle_window_complete{false};

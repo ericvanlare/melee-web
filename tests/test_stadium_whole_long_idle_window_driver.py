@@ -113,7 +113,7 @@ class StadiumWholeLongIdleWindowDriverTests(unittest.TestCase):
         receiver._observe_long_idle_boundary(tick, "source_tick")
         sample = dict(
             sequence=sequence, source_tick=source_tick,
-            draw_ordinal=draw_ordinal,
+            draw_ordinal=draw_ordinal, match_index=receiver.match_index,
             ports=(ports if ports is not None else
                    [driver.NEUTRAL_PAD, driver.NEUTRAL_PAD,
                     "00" * 10 + "ff", "00" * 10 + "ff"]),

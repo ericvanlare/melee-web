@@ -901,7 +901,8 @@ class StadiumBootGateControl(OwnedWorkspaceTests):
         gate = source[begin:end].rsplit("    }", 1)[0]
         # Execute the exact production filter with a finite boundary-PC seam.
         # No guest memory, Observe implementation or match admission is mocked.
-        harness = """#include <cassert>
+        harness = """#include <array>
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <string>

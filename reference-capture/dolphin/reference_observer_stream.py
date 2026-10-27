@@ -25,6 +25,14 @@ BOUNDARY = struct.Struct("<HHIIII")
 SLICE = struct.Struct("<HHIII")
 WHOLE_SESSION_FLAG = 1
 WHOLE_METADATA = struct.Struct("<HHI")
+PAIRED_IDLE_PROFILE = {
+    "profile": "paired_idle_scene_endpoints_v1",
+    "selected_matches": [0, 1],
+    "match_count": 2,
+    "comparison_post_go_ticks": 3500,
+    "natural_tail_max": 4,
+    "raw_omission_kinds": ["draw_enter", "draw_return"],
+}
 # Version 1 whole-session records retain the original eight-byte tail.  The
 # extended tail carries the source audio owner epoch while keeping the old
 # decoder shape readable for preserved diagnostic streams.
@@ -348,6 +356,7 @@ def iter_records(path: str | Path, *,
     previous_sequence = None
     whole_session_announced = False
     whole_session_count = None
+    whole_session_paired_idle = None
     with stream:
         index = 0
         bytes_read = 0
@@ -391,14 +400,45 @@ def iter_records(path: str | Path, *,
                 if announcement.get("whole_session") is True:
                     count = announcement.get("match_count")
                     profile = announcement.get("entity_profile")
+                    long_idle = announcement.get("stadium_whole_long_idle")
+                    paired_idle = count == 2 and profile is None
+                    paired_valid = (
+                        paired_idle and
+                        announcement.get("stadium_whole_feedback") is True and
+                        announcement.get("setup_receipt_sha256") is not None and
+                        isinstance(announcement.get("setup_receipt_sha256"), str) and
+                        len(announcement["setup_receipt_sha256"]) == 64 and
+                        announcement["setup_receipt_sha256"] != "0" * 64 and
+                        all(character in "0123456789abcdef"
+                            for character in announcement["setup_receipt_sha256"]) and
+                        announcement.get("stadium_whole_b_state") is True and
+                        announcement.get("stadium_observed_matches") == [0, 1] and
+                        all(type(value) is int for value in
+                            announcement.get("stadium_observed_matches", [])) and
+                        "stadium_observed_match" not in announcement and
+                        isinstance(long_idle, Mapping) and
+                        json.dumps(dict(long_idle), sort_keys=True) ==
+                        json.dumps(PAIRED_IDLE_PROFILE, sort_keys=True)
+                    )
+                    paired_marker = (
+                        isinstance(long_idle, Mapping) and
+                        long_idle.get("profile") == "paired_idle_scene_endpoints_v1"
+                    )
                     if type(count) is not int or not (
-                            (profile is None and 3 <= count <= 64) or
+                            (profile is None and 3 <= count <= 64) or paired_valid or
                             (profile in ("jiggly-ice-mario-fox-v1", "jiggly-ice-mario-fox-active60-v1") and count == 1)):
                         raise ObserverStreamError(
                             f"{context}: invalid whole-session match_count")
+                    if paired_marker and not paired_valid:
+                        raise ObserverStreamError(
+                            f"{context}: paired-idle profile is invalid for this whole-session match_count")
                     if whole_session_count is not None and count != whole_session_count:
                         raise ObserverStreamError(
                             f"{context}: whole-session match_count disagrees with prior announcement")
+                    if whole_session_paired_idle is not None and paired_idle != whole_session_paired_idle:
+                        raise ObserverStreamError(
+                            f"{context}: paired-idle profile disagrees with prior announcement")
+                    whole_session_paired_idle = paired_idle
                     whole_session_count = count
                     whole_session_announced = True
             elif decoded["event"] == "boundary":

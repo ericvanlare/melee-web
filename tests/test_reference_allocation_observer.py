@@ -25,6 +25,13 @@ from tools.retail_allocation_profile import DOL_SHA1, SOURCE_REVISION
 
 ROOT = Path(__file__).parents[1]
 OBSERVER = ROOT / "reference-capture/dolphin/source/Core/PowerPC/ReferenceAllocationObserver.cpp"
+sys.path.insert(0, str(ROOT / "scripts"))
+from capture_allocation_history import (
+    read_stadium_paired_allocation_rows,
+    validate_stadium_paired_allocation_inventory,
+    validate_stadium_paired_allocation_scope,
+)
+from tools.allocation_lifetime_replay import validate_original_rng_scene_boundaries_stream
 
 
 def synthetic_profile() -> dict:
@@ -175,6 +182,30 @@ int Run(std::string_view mode, const char* output) {
   }
   if (mode == "invalid-config") {
     assert(!Observer::Arm(fixture.profile, output));
+    return 0;
+  }
+  if (mode == "paired-refuse") {
+    assert(!Observer::Arm(fixture.profile, output));
+    assert(Observer::Error().find("scene endpoint profile requires exactly two VS exits") !=
+           std::string::npos);
+    return 0;
+  }
+  if (mode == "paired-cap-refuse") {
+    assert(!Observer::Arm(fixture.profile, output));
+    assert(Observer::Error().find("scene endpoint profile fixes MWRC_ALLOCATION_MAX_EVENTS at 64") !=
+           std::string::npos);
+    return 0;
+  }
+  if (mode == "paired-unknown") {
+    assert(!Observer::Arm(fixture.profile, output));
+    assert(Observer::Error().find("unknown profile") != std::string::npos);
+    return 0;
+  }
+  if (mode == "paired-duplicate") {
+    fixture.functions[45].name = "gm_Scene_Vs_OnEnter";
+    assert(!Observer::Arm(fixture.profile, output));
+    assert(Observer::Error().find("requires one exact generated scene callback identity") !=
+           std::string::npos);
     return 0;
   }
   assert(Observer::Arm(fixture.profile, output));
@@ -454,6 +485,23 @@ int Run(std::string_view mode, const char* output) {
     Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
     assert(Observer::Error().empty());
   };
+  if (mode == "paired-scene") {
+    assert(Observer::IsBoundary(fixture.profile.entry));
+    assert(Observer::IsBoundary(fixture.functions[43].address));
+    assert(Observer::IsBoundary(fixture.returns[43]));
+    assert(Observer::IsBoundary(fixture.functions[44].address));
+    assert(Observer::IsBoundary(fixture.returns[44]));
+    assert(!Observer::IsBoundary(fixture.functions[0].address));
+    assert(!Observer::IsBoundary(fixture.returns[0]));
+    // The endpoint-only profile must ignore unrelated admitted identities before
+    // any frame or machine snapshot is created.
+    fixture.cpu.pc = fixture.functions[0].address;
+    Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
+    assert(Observer::Error().empty());
+    invoke_vs(43); invoke_vs(44); invoke_vs(43); invoke_vs(44);
+    assert(Observer::Finish(true));
+    return 0;
+  }
   if (mode == "vs-reentry") {
     invoke_vs(43);
     invoke_vs(44);
@@ -732,7 +780,8 @@ class ReferenceAllocationObserverTests(unittest.TestCase):
                          **environment: str) -> subprocess.CompletedProcess[str]:
                 env = os.environ.copy()
                 for key in ("MWRC_ALLOCATION_VS_TARGET", "MWRC_ALLOCATION_STOP_AT",
-                            "MWRC_ALLOCATION_MAX_EVENTS"):
+                            "MWRC_ALLOCATION_MAX_EVENTS",
+                            "MWRC_ALLOCATION_SCENE_ENDPOINT_PROFILE"):
                     env.pop(key, None)
                 env.update(environment)
                 output = temp / (output_name or (mode + ".jsonl"))
@@ -898,6 +947,9 @@ class ReferenceAllocationObserverTests(unittest.TestCase):
                                MWRC_ALLOCATION_STOP_AT="exit")
             self.assertEqual(checked.returncode, 0, checked.stderr)
             rows = [json.loads(line) for line in output.read_text().splitlines()]
+            self.assertEqual(rows[0]["scope"], "vs_ownership")
+            self.assertNotIn("scene_endpoint_profile", rows[0])
+            self.assertNotIn("allocation_history_complete", rows[0])
             self.assertIs(rows[0]['original_rng_scene_boundaries_v1'], True)
             self.assertIs(rows[-1]['original_rng_scene_boundaries_v1'], True)
             samples = [row['observed']['original_rng'] for row in rows
@@ -915,6 +967,155 @@ class ReferenceAllocationObserverTests(unittest.TestCase):
                 self.assertEqual(sample['value'], 0x89abcdef)
                 self.assertEqual(sample['pointer_bytes'], [0x81, 0, 6, 0])
                 self.assertEqual(sample['value_bytes'], [0x89, 0xab, 0xcd, 0xef])
+
+            paired_env = {
+                "MWRC_ALLOCATION_SCENE_ENDPOINT_PROFILE": "paired_idle_scene_endpoints_v1",
+                "MWRC_ALLOCATION_VS_TARGET": "2",
+                "MWRC_ALLOCATION_STOP_AT": "exit",
+            }
+            checked = run_mode("paired-scene", **paired_env)
+            self.assertEqual(checked.returncode, 0, f"paired-scene: {checked.stderr}")
+            paired_rows = [json.loads(line) for line in
+                           (temp / "paired-scene.jsonl").read_text().splitlines()]
+            header, end = paired_rows[0], paired_rows[-1]
+            self.assertEqual(header["scope"], "scene-rng-endpoints-only")
+            self.assertEqual(header["scene_endpoint_profile"], "paired_idle_scene_endpoints_v1")
+            self.assertEqual(header["selected_functions"],
+                             ["gm_Scene_Vs_OnEnter", "gm_Scene_Vs_OnExit"])
+            self.assertEqual(header["max_events"], 64)
+            self.assertIs(header["allocation_history_complete"], False)
+            self.assertIs(header["registration_lifetime_complete"], False)
+            self.assertEqual(end["scope"], "scene-rng-endpoints-only")
+            self.assertEqual(end["scene_endpoint_profile"], "paired_idle_scene_endpoints_v1")
+            self.assertIs(end["allocation_history_complete"], False)
+            self.assertIs(end["registration_lifetime_complete"], False)
+            self.assertEqual(end["vs_target"], 2)
+            self.assertEqual(end["stop_at"], "exit")
+            self.assertEqual((end["vs_entries"], end["vs_exits"]), (2, 2))
+            self.assertIs(end["target_complete"], True)
+            self.assertIs(end["active_owner"], False)
+            self.assertEqual(end["pending_calls"], [])
+            endpoint_rows = [row for row in paired_rows if row.get("record") in ("enter", "return")]
+            self.assertEqual(len(endpoint_rows), 8)
+            self.assertEqual({row["function"] for row in endpoint_rows},
+                             {"gm_Scene_Vs_OnEnter", "gm_Scene_Vs_OnExit"})
+            self.assertEqual([row["function"] for row in endpoint_rows],
+                             ["gm_Scene_Vs_OnEnter", "gm_Scene_Vs_OnEnter",
+                              "gm_Scene_Vs_OnExit", "gm_Scene_Vs_OnExit"] * 2)
+            self.assertEqual([row["record"] for row in endpoint_rows],
+                             ["enter", "return"] * 4)
+            paired_samples = [row["observed"]["original_rng"] for row in endpoint_rows]
+            self.assertEqual(len(paired_samples), 8)
+            self.assertEqual([sample["value"] for sample in paired_samples],
+                             [0x89abcdef] * 8)
+            self.assertEqual({sample["pointer_slot_address"] for sample in paired_samples},
+                             {0x81000700})
+            actual_path = temp / "paired-scene.jsonl"
+            actual_rows = read_stadium_paired_allocation_rows(actual_path)
+            decoded, actual_header, actual_footer, actual_selected = \
+                validate_original_rng_scene_boundaries_stream(synthetic_profile(), actual_rows)
+            self.assertEqual(decoded["sample_count"], 8)
+            self.assertEqual(len(actual_selected), 8)
+            self.assertEqual(
+                validate_stadium_paired_allocation_scope(
+                    actual_header, actual_footer, actual_header["profile_sha256"]),
+                actual_header["profile_sha256"],
+            )
+            inventory = validate_stadium_paired_allocation_inventory(
+                actual_rows, actual_header, actual_footer)
+            self.assertEqual(inventory["endpoint_rows"], 8)
+            self.assertEqual(inventory["repeated_stop_rows"], 0)
+
+            with self.assertRaisesRegex(ValueError, "scope/profile"):
+                validate_stadium_paired_allocation_scope(
+                    actual_header, dict(actual_footer, profile_sha256="1" * 64),
+                    actual_header["profile_sha256"],
+                )
+            with self.assertRaisesRegex(ValueError, "scope/profile"):
+                validate_stadium_paired_allocation_scope(
+                    dict(actual_header, max_events=65), actual_footer,
+                    actual_header["profile_sha256"],
+                )
+            injected = [dict(row) for row in actual_rows]
+            injected.insert(1, dict(actual_rows[1], sequence=1, function="HSD_Unknown"))
+            for sequence, row in enumerate(injected[:-1]):
+                row["sequence"] = sequence
+            with self.assertRaisesRegex(ValueError, "non-endpoint callback"):
+                validate_stadium_paired_allocation_inventory(
+                    injected, injected[0], injected[-1],
+                )
+
+            # The real producer positive above covers source->reader->parser. Add
+            # one bounded duplicate marker from an actual emitted endpoint solely
+            # to exercise the consumer's repeated-stop rule; do not synthesize a
+            # second source callback/re-entry in the C++ fixture.
+            repeated_rows = [dict(row) for row in actual_rows]
+            repeated_header = repeated_rows[0]
+            original = next(row for row in repeated_rows if row.get("record") == "enter")
+            repeated_footer = repeated_rows[-1]
+            repeated_footer["repeated_stops"] = 1
+            repeated_row = {
+                "record": "repeated_stop",
+                "sequence": repeated_footer["sequence"],
+                "original_sequence": original["sequence"],
+                "function": original["function"],
+                "phase": original["record"],
+                "machine": original["machine"],
+                "observed": original["observed"],
+            }
+            repeated_rows.insert(-1, repeated_row)
+            repeated_footer["sequence"] += 1
+            repeated_decoded, _, _, repeated_selected = validate_original_rng_scene_boundaries_stream(
+                synthetic_profile(), repeated_rows)
+            self.assertEqual(repeated_decoded["sample_count"], 8)
+            self.assertEqual(len(repeated_selected), 8)
+            repeated_inventory = validate_stadium_paired_allocation_inventory(
+                repeated_rows, repeated_header, repeated_footer)
+            self.assertEqual(repeated_inventory["repeated_stop_rows"], 1)
+            bad_repeat = [dict(row) for row in repeated_rows]
+            repeat_row = next(row for row in bad_repeat if row.get("record") == "repeated_stop")
+            repeat_row["phase"] = "return"
+            with self.assertRaisesRegex(ValueError, "repeated-stop row differs"):
+                validate_stadium_paired_allocation_inventory(
+                    bad_repeat, bad_repeat[0], bad_repeat[-1],
+                )
+            incomplete = run_mode("vs-interrupted", **paired_env)
+            self.assertEqual(incomplete.returncode, 0,
+                             f"paired incomplete-terminal refusal: {incomplete.stderr}")
+            incomplete_rows = [json.loads(line) for line in
+                               (temp / "vs-interrupted.jsonl").read_text().splitlines()]
+            incomplete_end = incomplete_rows[-1]
+            self.assertEqual(incomplete_end["scope"], "scene-rng-endpoints-only")
+            self.assertEqual(incomplete_end["status"], "incomplete")
+            self.assertIs(incomplete_end["target_complete"], False)
+            self.assertEqual((incomplete_end["vs_entries"], incomplete_end["vs_exits"]), (1, 1))
+            self.assertIs(incomplete_end["active_owner"], False)
+            refused = run_mode("paired-refuse",
+                               MWRC_ALLOCATION_SCENE_ENDPOINT_PROFILE="paired_idle_scene_endpoints_v1",
+                               MWRC_ALLOCATION_VS_TARGET="3", MWRC_ALLOCATION_STOP_AT="exit")
+            self.assertEqual(refused.returncode, 0, f"paired target refusal: {refused.stderr}")
+            self.assertFalse((temp / "paired-refuse.jsonl").exists())
+            refused = run_mode("paired-refuse",
+                               MWRC_ALLOCATION_SCENE_ENDPOINT_PROFILE="paired_idle_scene_endpoints_v1",
+                               MWRC_ALLOCATION_VS_TARGET="2", MWRC_ALLOCATION_STOP_AT="entry")
+            self.assertEqual(refused.returncode, 0, f"paired stop refusal: {refused.stderr}")
+            self.assertFalse((temp / "paired-refuse.jsonl").exists())
+            refused = run_mode("paired-cap-refuse",
+                               MWRC_ALLOCATION_SCENE_ENDPOINT_PROFILE="paired_idle_scene_endpoints_v1",
+                               MWRC_ALLOCATION_VS_TARGET="2", MWRC_ALLOCATION_STOP_AT="exit",
+                               MWRC_ALLOCATION_MAX_EVENTS="65")
+            self.assertEqual(refused.returncode, 0, f"paired event-cap refusal: {refused.stderr}")
+            self.assertFalse((temp / "paired-cap-refuse.jsonl").exists())
+            refused = run_mode("paired-unknown",
+                               MWRC_ALLOCATION_SCENE_ENDPOINT_PROFILE="paired_idle_scene_endpoints_v2",
+                               MWRC_ALLOCATION_VS_TARGET="2", MWRC_ALLOCATION_STOP_AT="exit")
+            self.assertEqual(refused.returncode, 0, f"paired unknown-profile refusal: {refused.stderr}")
+            self.assertFalse((temp / "paired-unknown.jsonl").exists())
+            refused = run_mode("paired-duplicate",
+                               MWRC_ALLOCATION_SCENE_ENDPOINT_PROFILE="paired_idle_scene_endpoints_v1",
+                               MWRC_ALLOCATION_VS_TARGET="2", MWRC_ALLOCATION_STOP_AT="exit")
+            self.assertEqual(refused.returncode, 0, f"paired duplicate-identity refusal: {refused.stderr}")
+            self.assertFalse((temp / "paired-duplicate.jsonl").exists())
 
             checked = run_mode("vs-three-exits",output_name="three-route-target-two.jsonl",
                                MWRC_ALLOCATION_VS_TARGET="2",MWRC_ALLOCATION_STOP_AT="exit")

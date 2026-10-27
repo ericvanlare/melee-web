@@ -13,6 +13,7 @@ import datetime
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -1256,6 +1257,132 @@ def iter_stadium_allocation_jsonl(path):
             yield json.loads(line)
 
 
+def _paired_idle_json_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError('Native paired allocation JSON contains a duplicate key')
+        result[key] = value
+    return result
+
+
+def read_stadium_paired_allocation_rows(path):
+    """Read only the bounded endpoint stream admitted by the paired profile."""
+    rows = []
+    with Path(path).open('rb') as source:
+        while True:
+            line = source.readline(64 * 1024 + 2)
+            if not line:
+                break
+            if len(line) > 64 * 1024 + 1 or not line.endswith(b'\n'):
+                raise ValueError('Native paired allocation row exceeds its line bound')
+            if len(rows) >= 65:
+                raise ValueError('Native paired allocation stream exceeds its exact row bound')
+            try:
+                row = json.loads(line.decode('utf-8'), object_pairs_hook=_paired_idle_json_object)
+            except (UnicodeDecodeError, json.JSONDecodeError) as error:
+                raise ValueError('Native paired allocation stream contains invalid JSON') from error
+            if not isinstance(row, dict):
+                raise ValueError('Native paired allocation stream row is not an object')
+            rows.append(row)
+    if not rows:
+        raise ValueError('Native paired allocation stream is empty')
+    return rows
+
+
+def validate_stadium_paired_allocation_inventory(rows, header, footer):
+    """Enforce endpoint-only rows and repeated-stop bounds for the paired profile."""
+    if len(rows) < 10 or len(rows) > 65 or rows[0] is not header or rows[-1] is not footer:
+        raise ValueError('Native paired allocation stream row count or framing differs')
+    if (header.get('record') != 'header' or footer.get('record') != 'end' or
+            header.get('max_events') != 64 or footer.get('max_events') != 64 or
+            header.get('compression') != 'none' or footer.get('compression') != 'none'):
+        raise ValueError('Native paired allocation stream cap, compression, or framing differs')
+    endpoint_by_sequence = {}
+    repeated_by_sequence = {}
+    endpoint_count = 0
+    repeated_count = 0
+    for index, row in enumerate(rows[:-1]):
+        if type(row.get('sequence')) is not int or row.get('sequence') != index:
+            raise ValueError('Native paired allocation event sequence is not contiguous')
+        if index == 0:
+            continue
+        record = row.get('record')
+        if record in ('enter', 'return'):
+            if row.get('function') not in ('gm_Scene_Vs_OnEnter', 'gm_Scene_Vs_OnExit'):
+                raise ValueError('Native paired allocation stream contains a non-endpoint callback')
+            endpoint_by_sequence[index] = row
+            endpoint_count += 1
+        elif record == 'repeated_stop':
+            original_sequence = row.get('original_sequence')
+            original = endpoint_by_sequence.get(original_sequence)
+            if (type(original_sequence) is not int or original is None or
+                    row.get('function') != original.get('function') or
+                    row.get('phase') != original.get('record') or
+                    row.get('machine') != original.get('machine') or
+                    row.get('observed') != original.get('observed')):
+                raise ValueError('Native paired repeated-stop row differs from its endpoint')
+            repeated_by_sequence[original_sequence] = repeated_by_sequence.get(original_sequence, 0) + 1
+            if repeated_by_sequence[original_sequence] > 32:
+                raise ValueError('Native paired endpoint repeated-stop count exceeds its source bound')
+            repeated_count += 1
+        else:
+            raise ValueError('Native paired allocation stream contains a non-endpoint row')
+    if (endpoint_count != 8 or repeated_count > 55 or
+            type(footer.get('repeated_stops')) is not int or
+            footer.get('repeated_stops') != repeated_count):
+        raise ValueError('Native paired allocation endpoint/repeated-stop inventory differs')
+    if type(footer.get('sequence')) is not int or footer.get('sequence') != len(rows) - 1:
+        raise ValueError('Native paired allocation footer sequence is not contiguous')
+    return {'event_rows': len(rows) - 2, 'endpoint_rows': endpoint_count,
+            'repeated_stop_rows': repeated_count, 'row_limit': 65, 'event_limit': 64}
+
+
+def validate_stadium_paired_allocation_environment(environment):
+    """Join paired primary and allocation profiles before starting the producer."""
+    paired = environment.get('MWRC_STADIUM_WHOLE_PAIRED_IDLE')
+    endpoint = environment.get('MWRC_ALLOCATION_SCENE_ENDPOINT_PROFILE')
+    long_idle = environment.get('MWRC_STADIUM_WHOLE_LONG_IDLE')
+    if paired == 'paired_idle_scene_endpoints_v1':
+        if (environment.get('MWRC_WHOLE_SESSION_MATCHES') != '2' or
+                endpoint != paired or long_idle != paired or
+                environment.get('MWRC_STADIUM_WHOLE_FEEDBACK') != '1' or
+                environment.get('MWRC_STADIUM_WHOLE_B_STATE') != '1'):
+            raise ValueError('paired primary, allocation endpoint, and long-idle profiles must agree')
+        if (environment.get('MWRC_ALLOCATION_VS_TARGET') != '2' or
+                environment.get('MWRC_ALLOCATION_STOP_AT') != 'exit'):
+            raise ValueError('paired allocation target must be exactly two exits')
+        if environment.get('MWRC_ALLOCATION_MAX_EVENTS') not in (None, '64'):
+            raise ValueError('paired allocation event cap must remain exactly 64')
+        return {'profile': paired, 'match_count': 2, 'max_events': 64}
+    if paired not in (None, ''):
+        raise ValueError('unknown paired primary profile')
+    if endpoint not in (None, '') or long_idle == 'paired_idle_scene_endpoints_v1':
+        raise ValueError('legacy primary route cannot enable paired allocation endpoints')
+    return None
+
+
+def validate_stadium_paired_allocation_scope(header, footer, expected_profile_sha256):
+    if (not isinstance(expected_profile_sha256, str) or
+            re.fullmatch(r'[0-9a-f]{64}', expected_profile_sha256) is None):
+        raise ValueError('Native paired allocation expected profile identity is malformed')
+    for row in (header, footer):
+        if (not isinstance(row, dict) or row.get('profile_sha256') != expected_profile_sha256 or
+                row.get('scene_endpoint_profile') != 'paired_idle_scene_endpoints_v1' or
+                row.get('scope') != 'scene-rng-endpoints-only' or
+                row.get('allocation_history_complete') is not False or
+                row.get('registration_lifetime_complete') is not False or
+                row.get('vs_target') != 2 or row.get('stop_at') != 'exit' or
+                row.get('max_events') != 64 or row.get('compression') != 'none'):
+            raise ValueError('Native paired scene endpoint scope/profile differs')
+    if (header.get('original_rng_scene_boundaries_v1') is not True or
+            header.get('selected_functions') != ['gm_Scene_Vs_OnEnter', 'gm_Scene_Vs_OnExit'] or
+            footer.get('original_rng_scene_boundaries_v1') is not True or
+            footer.get('endpoint_callbacks') != 'gm_Scene_Vs_OnEnter,gm_Scene_Vs_OnExit'):
+        raise ValueError('Native paired endpoint source-function identities differ')
+    return expected_profile_sha256
+
+
 def validate_stadium_three_native(output, profile_path, expected):
     from whole_session_replay import capture_from_path
     from reference_observer_stream import iter_records
@@ -1279,6 +1406,47 @@ def validate_stadium_three_native(output, profile_path, expected):
         'primary_sha256':retail._sha256(output/'native-primary.mwro'),
         'native_allocations_sha256':retail._sha256(output/'native-allocations.jsonl'),
         'original_rng_scene_boundaries':decoded,'all_rng_writers_observed':False}
+
+
+def validate_stadium_paired_idle_native(output, profile_path, expected):
+    """Validate two natural primary lifetimes plus only their scene RNG endpoints."""
+    from whole_session_replay import capture_from_path
+    from reference_observer_stream import iter_records
+    from tools.allocation_lifetime_replay import validate_original_rng_scene_boundaries_stream
+
+    primary_path = Path(output) / 'native-primary.mwro'
+    primary_status_path = Path(output) / 'native-primary-status.json'
+    primary = capture_from_path(primary_path, primary_status_path)
+    if (primary['identity']['match_count'] != 2 or
+            primary['declared_setups'] != [expected, expected]):
+        raise ValueError('Native primary does not contain exactly two declared paired Stadium lifetimes')
+    profile = json.loads(Path(profile_path).read_text())
+    allocation_rows = read_stadium_paired_allocation_rows(Path(output) / 'native-allocations.jsonl')
+    decoded, header, footer, selected = validate_original_rng_scene_boundaries_stream(
+        profile, allocation_rows)
+    expected_profile_sha256 = '30e6ccc981d5e8eea6d5c88381bfc3df5a3b1103599c2b632ddb48580165bf65'
+    validate_stadium_paired_allocation_scope(header, footer, expected_profile_sha256)
+    if (footer.get('status') != 'captured' or footer.get('target_complete') is not True or
+            footer.get('vs_entries') != 2 or footer.get('vs_exits') != 2 or
+            footer.get('active_owner') is not False or footer.get('pending_calls') != [] or
+            decoded.get('sample_count') != 8 or len(selected) != 8):
+        raise ValueError('Native paired endpoint stream lacks its exact eight natural callback records')
+    allocation_inventory = validate_stadium_paired_allocation_inventory(
+        allocation_rows, header, footer)
+    boundaries = [row for row in iter_records(primary_path) if row.get('event') == 'boundary']
+    join_stadium_allocation_samples(selected, boundaries)
+    return {
+        'scope': 'two natural Stadium lifetimes; scene RNG endpoints only',
+        'primary_identity': primary['identity'], 'primary_lifecycle': primary['lifecycle'],
+        'primary_sha256': retail._sha256(primary_path),
+        'native_allocations_sha256': retail._sha256(Path(output) / 'native-allocations.jsonl'),
+        'original_rng_scene_boundaries': decoded,
+        'allocation_inventory': allocation_inventory,
+        'allocation_history_complete': False,
+        'registration_lifetime_complete': False,
+        'all_rng_writers_observed': False,
+        'C3': False,
+    }
 
 
 def capture(args):

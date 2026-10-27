@@ -25,6 +25,8 @@ from reference_observer_stream import (  # noqa: E402
     read_status,
 )
 DIAGNOSTIC = "stadium_go_prefix_v3"
+WHOLE_FEEDBACK_DIAGNOSTIC = "stadium_whole3_feedback_v1"
+PAIRED_IDLE_DIAGNOSTIC = "stadium_paired_idle_feedback_v1"
 SCHEMA = "melee-web-original-stadium-go-prefix"
 VERSION = 3
 EXPECTED_OBSERVER_SCHEMA = "melee-web-passive-dolphin-observer"
@@ -316,10 +318,12 @@ class StadiumSssPositionObservations:
         phase = p.get("phase")
         _require(route_ready and phase in SSS_POSITION_PHASES,
                  "SSS position is outside its accepted live source route")
-        _require(scope in (DIAGNOSTIC, "stadium_whole3_feedback_v1"),
+        _require(scope in (DIAGNOSTIC, WHOLE_FEEDBACK_DIAGNOSTIC,
+                           PAIRED_IDLE_DIAGNOSTIC),
                  "SSS position diagnostic scope is unsupported")
-        if scope == "stadium_whole3_feedback_v1":
-            _require(type(match_index) is int and 0 <= match_index < 3 and
+        if scope in (WHOLE_FEEDBACK_DIAGNOSTIC, PAIRED_IDLE_DIAGNOSTIC):
+            allowed_matches = (0, 1, 2) if scope == WHOLE_FEEDBACK_DIAGNOSTIC else (0, 1)
+            _require(type(match_index) is int and match_index in allowed_matches and
                      p.get("whole_session") is True and
                      type(p.get("match_index")) is int and p["match_index"] == match_index and
                      isinstance(expected_receipt, str) and len(expected_receipt) == 64 and
@@ -565,10 +569,13 @@ def _validate_progress(row: dict[str, Any], phase: str,
                        match_index: int | None = None) -> dict[str, Any]:
     payload = row["payload"]
     if scope != DIAGNOSTIC:
-        _require(scope == "stadium_whole3_feedback_v1" and phase == "go_after" and
-                 type(match_index) is int and match_index == 1 and
+        allowed_matches = (1,) if scope == WHOLE_FEEDBACK_DIAGNOSTIC else (0, 1)
+        _require(scope in (WHOLE_FEEDBACK_DIAGNOSTIC, PAIRED_IDLE_DIAGNOSTIC) and
+                 phase == "go_after" and type(match_index) is int and
+                 match_index in allowed_matches and
                  payload.get("whole_session") is True and
-                 type(payload.get("match_index")) is int and payload["match_index"] == 1 and
+                 type(payload.get("match_index")) is int and
+                 payload["match_index"] == match_index and
                  payload.get("stadium_b_state_observation") is True,
                  "GO: whole-B source scope differs")
     else:
@@ -2121,9 +2128,10 @@ def _validate_progress_constructor(row: dict[str, Any], *, scope: str = DIAGNOST
                                    expected_receipt: str = EXPECTED_SETUP_RECEIPT_SHA256,
                                    match_index: int | None = None) -> dict[str, Any]:
     p = row['payload']; phase = p.get('phase')
-    later = scope == 'stadium_whole3_feedback_v1'
+    later = scope in (WHOLE_FEEDBACK_DIAGNOSTIC, PAIRED_IDLE_DIAGNOSTIC)
     if later:
-        _require(type(match_index) is int and match_index == 1 and
+        allowed_matches = (1,) if scope == WHOLE_FEEDBACK_DIAGNOSTIC else (0, 1)
+        _require(type(match_index) is int and match_index in allowed_matches and
                  p.get('whole_session') is True and type(p.get('match_index')) is int and
                  p['match_index'] == match_index and p.get('stadium_b_state_observation') is True and
                  isinstance(expected_receipt, str) and re.fullmatch(r'[0-9a-f]{64}', expected_receipt) and
