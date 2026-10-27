@@ -54,6 +54,9 @@ const char* melee_web_source_file_take_name(const void* copied_buffer);
  * active RuntimeFiles scope. Entry numbers occupy a private positive range. */
 int melee_web_source_file_entry(const char* name);
 int melee_web_source_file_entry_owned(int entry);
+/* Resolve the exact private entry through the current active scope and return
+ * its logical source length. Failure leaves *size unchanged. */
+int melee_web_source_file_entry_size(int entry, size_t* size);
 int melee_web_source_files_active(void);
 /* Return the current opaque owner token for exact source-object region binding.
  * The pointer is only valid while that scope remains active. */

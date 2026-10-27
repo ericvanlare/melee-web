@@ -431,6 +431,14 @@ static const SourceFile* file_for_entry(int entry)
     return index < active_scope->count ? &active_scope->files[index] : NULL;
 }
 
+int melee_web_source_file_entry_size(int entry, size_t* size)
+{
+    const SourceFile* file = file_for_entry(entry);
+    if (!file || !size) return 0;
+    *size = file->size;
+    return 1;
+}
+
 int melee_web_source_file_entry(const char* name)
 {
     const SourceFile* file = find_file(name);
