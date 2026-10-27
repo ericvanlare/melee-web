@@ -387,7 +387,8 @@ class GameplayLbFileSourceEntryTests(unittest.TestCase):
             )
             binary = directory / "lbfile_source_entry_trace"
             built = subprocess.run(
-                [compiler, "-std=c11", "-DMELEE_WEB_GAMEPLAY=1", "-O0",
+                [compiler, "-std=c11", "-D_POSIX_C_SOURCE=200809L",
+                 "-DMELEE_WEB_GAMEPLAY=1", "-O0",
                  "-Wall", "-Wextra", "-Werror", "-I", str(ROOT / "src"),
                  str(generated), str(REGISTRY), "-o", str(binary)],
                 cwd=directory, capture_output=True, text=True, timeout=60,

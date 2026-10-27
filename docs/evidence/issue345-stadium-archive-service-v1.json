@@ -504,5 +504,26 @@
       "group_absent_after_stop": true
     }
   },
-  "source_tree": "196ddd3e7cf5b48a26d4e2d4e1cd3ccb84f203eb"
+  "source_tree": "196ddd3e7cf5b48a26d4e2d4e1cd3ccb84f203eb",
+  "pr348_linux_fixture": {
+    "failed_head": "e71533c6886d4baced4d291b23a7364530ae18e9",
+    "failed_run": 40552013069,
+    "failed_job": 122358154734,
+    "log": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr348-unit1-failed.log",
+      "sha256": "64bd727f7d9bd09e4eec5c23cc79de675e4a87eb12219662f558a22bce5bb26e"
+    },
+    "cause": "New fixture strict C11 lacks POSIX strnlen declaration on Linux; production runtime builds pass.",
+    "repair": "Fixture compiler feature macro _POSIX_C_SOURCE=200809L; no production or assertion change.",
+    "review": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr348-posix-fixture-repair-v1/review.json",
+      "sha256": "ba74dc776d5f96e127ab35fc8a22f330a3d81994ceb8338d25efdcccd5eba0c7"
+    },
+    "focused": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr348-posix-fixture-repair-v1/result.json",
+      "sha256": "3d8cfaa87380cf3c0980b3b2f1c742af040ba744b37af4955ecc62e7afdf3042",
+      "passed": true
+    },
+    "current_head_ci": "PENDING"
+  }
 }
