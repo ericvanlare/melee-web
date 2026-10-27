@@ -717,7 +717,6 @@ int melee_web_source_files_pump_for(MeleeWebSourceFileScope* scope,
     scope->pumping = 1;
     while (available && budget-- && scope->requests) {
         SourceFileRequest* request = scope->requests;
-        uint32_t staging = 0;
         if (!request->cancelled && request->file->external &&
             !request->stream_ready) {
 #if defined(__EMSCRIPTEN__)
@@ -750,7 +749,7 @@ int melee_web_source_files_pump_for(MeleeWebSourceFileScope* scope,
                             status < 0 ? "Original disc range read failed" :
                                          "Original disc range read timed out");
             }
-            staging = source_stream_take(request->id);
+            uint32_t staging = source_stream_take(request->id);
             if (!staging) {
                 scope->pumping = 0;
                 return fail(error, error_size,
