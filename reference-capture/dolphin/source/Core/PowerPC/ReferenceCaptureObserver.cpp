@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "Core/PowerPC/ReferenceCaptureObserver.h"
+#include "Core/PowerPC/ReferenceCompactRngLedger.h"
 #include "Core/PowerPC/ReferenceAllocationObserver.h"
 #include "Core/PowerPC/ReferenceAllocationProfile.h"
 #include "Core/PowerPC/ReferenceInputStream.h"
@@ -1056,6 +1057,30 @@ struct CpuProbeSettings
   std::string rng_return_site;
 };
 
+struct CompactRngSettings
+{
+  bool present=false,valid=false;
+  std::string output,selection;
+};
+const CompactRngSettings& CompactRngEnvironment()
+{
+  static const CompactRngSettings settings=[] {
+    CompactRngSettings result;
+    result.output=Env("MWRC_STADIUM_COMPACT_RNG_OUTPUT");
+    result.selection=Env("MWRC_STADIUM_COMPACT_RNG_MATCHES");
+    result.present=!result.output.empty()||!result.selection.empty();
+    result.valid=!result.output.empty()&&result.output.size()<=4096&&
+        (result.selection=="0"||result.selection=="1"||result.selection=="0,1");
+    return result;
+  }();
+  return settings;
+}
+bool CompactRngEnabled()
+{
+  const auto& settings=CompactRngEnvironment();
+  return settings.present&&settings.valid;
+}
+
 const CpuProbeSettings& CpuProbeEnvironment()
 {
   static const CpuProbeSettings settings = [] {
@@ -1236,6 +1261,8 @@ bool AppendHexBytes(std::string* output, const u8* bytes, size_t size)
 }
 
 }  // namespace
+
+static_assert(CompactRng::MAX_NATURAL_TAIL+1 == EntityPrefixBoundaryProgress::queue_capacity);
 
 struct Observer::Impl
 {
@@ -1420,6 +1447,7 @@ struct Observer::Impl
     item_probe_summary_stream = item_probe_summary_stream_setting == "1";
     if (item_probe_summary_stream && !item_probe_configured)
       SetInvalid("MWRC_ITEM_PROBE_SUMMARY_STREAM requires a configured item probe");
+    if (!StartCompact()) return false;
     // Dolphin builds with exceptions disabled.  std::thread reports an
     // unavailable worker by terminating; there is no catchable error path.
     writer = std::thread([this] { WriterMain(); });
@@ -1616,6 +1644,233 @@ struct Observer::Impl
     start += "}";
     PushJson(Event::Start, start);
     return !invalid.load();
+  }
+
+  bool CompactSelected(u32 match) const
+  {
+    return compact_enabled && (compact_matches[0] == match ||
+           (compact_match_count == 2 && compact_matches[1] == match));
+  }
+
+  bool StartCompact()
+  {
+    const auto& settings=CompactRngEnvironment();
+    if (!settings.present) return true;
+    const auto& path=settings.output;
+    const auto& selected=settings.selection;
+    std::error_code path_error;
+    const bool exists=std::filesystem::exists(path,path_error);
+    if (!settings.valid || path_error || exists ||
+        cpu_probe_configured || item_probe_configured ||
+        !(stadium_whole_feedback || (stadium_idle_3500 && selected == "0")) ||
+        !InputStream::IsRecording() || InputStream::IsReplaying() ||
+        capture_id.empty() || capture_id.size() > 128 || sequence_id.empty() || sequence_id.size() > 128)
+      return SetInvalid("compact RNG requires explicit fresh output/selected checked recorded route and no other probes"), false;
+    compact_enabled = true;
+    compact_path = path;
+    compact_matches[0] = selected == "1" ? 1 : 0;
+    compact_match_count = selected == "0,1" ? 2 : 1;
+    compact_matches[1] = 1;
+    compact_header = "{\"schema\":\"melee-web-live-compact-rng-ledger\",\"version\":3,"
+        "\"row_bytes\":64,\"dol_sha256\":\"" + std::string(EXPECTED_DOL_SHA256) +
+        "\",\"capture_id\":\"" + JsonEscape(capture_id) + "\",\"sequence_id\":\"" +
+        JsonEscape(sequence_id) + "\",\"matches\":[" + std::to_string(compact_matches[0]) +
+        (compact_match_count == 2 ? ",1" : "") +
+        "],\"first_offset\":1,\"last_offset\":3500,\"site_pcs\":[\"0x80380524\",\"0x8038057c\",\"0x803805b8\"],"
+        "\"source_schedule_required_separately\":true,\"lifecycle_parity\":false}";
+    if (compact_header.size() > CompactRng::MAX_HEADER_BYTES)
+      return SetInvalid("compact RNG header exceeds fixed byte budget"), false;
+    return true;
+  }
+
+  void CompactGo(Core::System* system, u32 pc, PowerPC::PowerPCState* state)
+  {
+    if (!CompactSelected(match_index) || !match_active || !setup_ready) return;
+    if (compact_next_window >= compact_match_count || compact_matches[compact_next_window] != match_index ||
+        compact_active >= 0)
+      return SetInvalid("compact RNG duplicate/reordered GO owner"), void();
+    u32 call = 0, word = 0, tick = 0, pointer = 0, seed = 0;
+    u8 mode = 0;
+    if (pc != STADIUM_GO_AFTER_PC || state->spr[8] != STADIUM_GO_AFTER_PC ||
+        !ReadU32(system, STADIUM_GO_CALL_PC, &call) || call != STADIUM_GO_CALL_WORD ||
+        !ReadU32(system, pc, &word) || word != STADIUM_GO_AFTER_WORD ||
+        !ReadBytes(system, 0x80479d30, 1, &mode) || mode != 2 ||
+        !ReadU32(system, 0x80479d58, &tick) || tick > UINT32_MAX - CompactRng::LAST_OFFSET - CompactRng::MAX_NATURAL_TAIL - 1 ||
+        active_slot_count != 2 || cpu_slots[0] || cpu_slots[1] || !StadiumGoPrefixRosterValid(system) ||
+        !ReadU32(system, 0x804d5f94, &pointer) || !CompactRng::Mem1(pointer) ||
+        !ReadU32(system, pointer, &seed))
+      return SetInvalid("compact RNG GO lacks pinned call/actual Setup/roster/seed owner"), void();
+    auto& w = compact_windows[compact_next_window];
+    w.match=match_index;w.go_tick=tick;w.go_sequence=next_sequence;
+    w.target=tick+CompactRng::LAST_OFFSET;w.last_source=tick;
+    w.seed_pointer=pointer;w.seed=seed;w.setup=setup_pointer;
+    compact_active=static_cast<int>(compact_next_window++);
+    compact_go_mask.fetch_or(1u<<compact_active,std::memory_order_release);
+  }
+
+  void RecordCompact(Core::System* system, u32 pc, PowerPC::PowerPCState* state)
+  {
+    if (!compact_enabled || compact_active < 0) return;
+    auto& w = compact_windows[compact_active];
+    u32 tick=0,word=0;
+    if (!match_active || !setup_ready || match_index != w.match || setup_pointer != w.setup ||
+        !ReadU32(system, 0x80479d58, &tick) || tick < w.go_tick || tick > w.target+CompactRng::MAX_NATURAL_TAIL+1 ||
+        !ReadU32(system, pc, &word) || word != 0x4e800020)
+      return SetInvalid("compact RNG return escaped actual GO/Setup window"), void();
+    CompactRng::Record r;
+    r.site = pc == 0x80380524 ? 1 : pc == 0x8038057c ? 2 : pc == 0x803805b8 ? 3 : 0;
+    r.tick=tick;r.match=match_index;r.ordinal=compact_budget.total;
+    r.sequence=next_sequence;r.draw=draw_ordinal;r.lr=state->spr[8];
+    if (!ReadU32(system, 0x804d5f94, &r.seed_pointer) || !CompactRng::Mem1(r.seed_pointer) ||
+        r.seed_pointer!=w.seed_pointer || !ReadU32(system, r.seed_pointer, &r.seed) ||
+        !ReadU32(system, 0x804d781c, &r.gobj) || !ReadU32(system, 0x804d7838, &r.proc))
+      return SetInvalid("compact RNG dynamic seed/owner read failed"), void();
+    if (r.gobj || r.proc)
+    {
+      std::array<u8,4> gobj{};
+      std::array<u8,24> proc{};
+      if (!CompactRng::Mem1(r.gobj) || !CompactRng::Mem1(r.proc) ||
+          !ReadMem1(system,r.gobj,gobj.size(),gobj.data()) ||
+          !ReadMem1(system,r.proc,proc.size(),proc.data()) || ReadBE32(proc.data()+0x10)!=r.gobj)
+        return SetInvalid("compact RNG scheduled proc/backpointer invalid"), void();
+      r.status=1;r.callback=ReadBE32(proc.data()+0x14);r.symbol=CompactRng::Symbol(r.callback);
+      r.classifier=static_cast<u16>((u16(gobj[0])<<8)|gobj[1]);r.p_link=gobj[2];r.s_link=proc[0xc];
+      if (r.symbol == 4)
+      {
+        u32 fighter=0,backlink=0,kind=0;
+        u8 slot=0xff;
+        if (!ReadU32(system,r.gobj+0x2c,&fighter) || !IsMem1Range(fighter,0x100) ||
+            !ReadU32(system,fighter,&backlink) || !ReadU32(system,fighter+4,&kind) ||
+            !ReadFighterSourceSlot(system,fighter,&slot) || slot>=fighter_entity_count.size())
+          return SetInvalid("compact RNG fighter source identity unreadable"), void();
+        unsigned matches=0;
+        for (u32 entity=0;entity<fighter_entity_count[slot];++entity)
+          if (CompactRng::FighterIdentity(r.gobj,fighter,backlink,slot,kind,
+              fighter_entity_pointers[slot][entity],fighter_entity_kinds[slot][entity]))
+          {r.slot=slot;r.entity=static_cast<u8>(entity);r.fighter_kind=kind;++matches;}
+        if (matches!=1)
+          return SetInvalid("compact RNG fighter is not one registered source entity"), void();
+        // Read the same pinned StaticPlayer entity table as AddPlayerEntitySlices,
+        // without invoking its slice-publication side effects from an RNG hook.
+        u32 registered_gobj=0;
+        if (!ReadU32(system,0x80453080+u32(slot)*0xe90+0xb0+u32(r.entity)*4,&registered_gobj) ||
+            registered_gobj!=r.gobj)
+          return SetInvalid("compact RNG fighter differs from checked player entity table"), void();
+      }
+    }
+    std::array<u8,CompactRng::ROW_BYTES> row{};
+    const u64 head=compact_head.load(std::memory_order_relaxed);
+    if (!CompactRng::Encode(r,&row) || !compact_budget.Accept(static_cast<unsigned>(compact_active)) ||
+        head-compact_tail.load(std::memory_order_acquire)>=CompactRng::QUEUE_ROWS)
+      return SetInvalid("compact RNG row/finite event byte budget/queue capacity refused"), void();
+    compact_ring[head%CompactRng::QUEUE_ROWS]=row;
+    compact_head.store(head+1,std::memory_order_release);
+  }
+
+  void CompactBoundaryClosed(Boundary boundary,u32 tick,u64 sequence)
+  {
+    if (!compact_enabled || compact_active<0) return;
+    auto& w=compact_windows[compact_active];
+    if (match_index!=w.match || setup_pointer!=w.setup ||
+        boundary==Boundary::VsExit || boundary==Boundary::SceneTeardown)
+      return SetInvalid("compact RNG match ended before completed GO window"),void();
+    if (boundary==Boundary::SourceTick)
+    {
+      if ((!w.containing_seen && tick!=w.go_tick) ||
+          (w.containing_seen && tick!=w.last_source+1) ||
+          (w.target_reached && w.tail>=CompactRng::MAX_NATURAL_TAIL))
+        return SetInvalid("compact RNG missing contiguous source tick or natural tail exceeds four"),void();
+      if (!w.containing_seen)
+      {w.containing_seen=true;w.containing_sequence=sequence;}
+      if (w.target_reached) ++w.tail;
+      w.last_source=tick;
+      if (tick==w.target)
+      {w.target_reached=true;w.target_sequence=sequence;}
+    }
+    if (boundary==Boundary::DrawReturn && w.target_reached)
+    {
+      // gm_801A4D34 increments the scene counter after each actual process
+      // return and before rendering. The last SourceTick can be in a batch;
+      // it is not assumed to be the sole tick since the preceding draw.
+      if (tick!=w.last_source+1)
+        return SetInvalid("compact RNG natural DrawReturn counter differs from last actual tick"),void();
+      w.close_tick=tick;w.close_sequence=sequence;
+      w.count=compact_budget.lifetime[compact_active];w.closed=true;
+      compact_closed_mask.fetch_or(1u<<compact_active,std::memory_order_release);
+      compact_active=-1;
+    }
+  }
+
+  bool CompactWrite(File::DirectIOFile& output,mbedtls_sha256_context& digest,
+                    const u8* bytes,size_t size,size_t* written)
+  {
+    if (!written || *written>CompactRng::MAX_BYTES ||
+        size>CompactRng::MAX_BYTES-*written || !output.IsOpen() ||
+        !output.Write(bytes,size) || mbedtls_sha256_update_ret(&digest,bytes,size)!=0)
+      return SetInvalid("compact RNG bounded file/hash write failed"),false;
+    *written+=size;return true;
+  }
+
+  bool CompactBeginWrite(File::DirectIOFile& output,mbedtls_sha256_context& digest,size_t* written)
+  {
+    std::array<u8,8> prefix{{'M','W','R','L',0,3,0,0}};
+    prefix[6]=static_cast<u8>(compact_header.size()>>8);
+    prefix[7]=static_cast<u8>(compact_header.size());
+    return mbedtls_sha256_starts_ret(&digest,0)==0 &&
+           CompactWrite(output,digest,prefix.data(),prefix.size(),written) &&
+           CompactWrite(output,digest,reinterpret_cast<const u8*>(compact_header.data()),compact_header.size(),written);
+  }
+
+  void CompactDrain(File::DirectIOFile& output,mbedtls_sha256_context& digest,size_t* written)
+  {
+    u64 tail=compact_tail.load(std::memory_order_relaxed);
+    while(tail<compact_head.load(std::memory_order_acquire))
+    {
+      const auto& row=compact_ring[tail%CompactRng::QUEUE_ROWS];
+      if (!invalid.load())
+      {
+        if (*written>CompactRng::MAX_BYTES-CompactRng::FOOTER_BYTES-row.size() ||
+            !CompactWrite(output,digest,row.data(),row.size(),written))
+          SetInvalid("compact RNG total byte budget/write refused");
+        else compact_written_rows.fetch_add(1,std::memory_order_release);
+      }
+      ++tail;compact_tail.store(tail,std::memory_order_release);
+    }
+  }
+
+  bool CompactFinishWrite(File::DirectIOFile& output,mbedtls_sha256_context& digest,size_t* written)
+  {
+    if (!natural_completion.load() || invalid.load() || compact_active>=0 ||
+        compact_next_window!=compact_match_count ||
+        compact_tail.load()!=compact_head.load() || compact_written_rows.load()!=compact_budget.total)
+      return SetInvalid("compact RNG has no accepted natural complete window/primary stream"),false;
+    std::array<u8,CompactRng::FOOTER_BYTES> footer{};
+    u8* p=footer.data();*p++='E';*p++='N';*p++='D';*p++='!';
+    CompactRng::Put(p,compact_budget.total,4);CompactRng::Put(p,compact_match_count,4);
+    CompactRng::Put(p,1,4); // actual primary natural completion, not lifecycle parity
+    for(unsigned i=0;i<2;++i)
+    {
+      const auto& w=compact_windows[i];
+      if(i<compact_match_count && (!w.closed || !w.count || !w.containing_seen || !w.target_reached ||
+         w.target!=w.go_tick+3500 || w.last_source!=w.target+w.tail || w.tail>CompactRng::MAX_NATURAL_TAIL ||
+         w.close_tick!=w.last_source+1 || w.containing_sequence<w.go_sequence ||
+         w.target_sequence<=w.containing_sequence || w.close_sequence<=w.target_sequence))
+        return SetInvalid("compact RNG missing completed source-owned window"),false;
+      CompactRng::Put(p,w.match,4);CompactRng::Put(p,w.go_tick,4);CompactRng::Put(p,w.go_sequence,8);
+      CompactRng::Put(p,w.target,4);CompactRng::Put(p,w.last_source,4);CompactRng::Put(p,w.count,4);
+      CompactRng::Put(p,w.close_tick,4);CompactRng::Put(p,w.close_sequence,8);
+      CompactRng::Put(p,w.seed_pointer,4);CompactRng::Put(p,w.seed,4);
+      CompactRng::Put(p,w.containing_sequence,8);CompactRng::Put(p,w.target_sequence,8);
+    }
+    const size_t metadata_size=footer.size()-32;
+    if(p!=footer.data()+metadata_size ||
+       !CompactWrite(output,digest,footer.data(),metadata_size,written)) return false;
+    std::array<u8,32> checksum{};
+    if(mbedtls_sha256_finish_ret(&digest,checksum.data())!=0 ||
+       *written>CompactRng::MAX_BYTES-checksum.size() ||
+       !output.Write(checksum.data(),checksum.size()) || !output.Flush() || !output.Close())
+      return SetInvalid("compact RNG completion footer/flush/close failed"),false;
+    *written+=checksum.size();return true;
   }
 
   const char* StadiumCompletionBoundary() const
@@ -4415,6 +4670,17 @@ struct Observer::Impl
       if (point != STADIUM_CONSTRUCTOR_PCS.end())
         return ObserveStadiumConstructor(system, static_cast<size_t>(point - STADIUM_CONSTRUCTOR_PCS.begin()), state), void();
     }
+    if (compact_enabled && pc == STADIUM_GO_AFTER_PC)
+    {
+      CompactGo(system,pc,state);
+      if (invalid.load()) return;
+      if (!stadium_whole_b.enabled && !stadium_go_prefix_enabled) return;
+    }
+    if (compact_enabled && SelectedRngReturn(0,true,pc,true))
+    {
+      RecordCompact(system,pc,state);
+      return;
+    }
     if (stadium_whole_b.enabled && pc == STADIUM_GO_AFTER_PC)
       return ObserveStadiumGoAfter(system, pc, state), void();
     if (stadium_go_prefix_enabled)
@@ -5456,6 +5722,8 @@ struct Observer::Impl
     if (transform_prefix_down_b_after_publish)
       transform_prefix_down_b_source_sequence = slot->sequence;
     Publish(slot);
+    CompactBoundaryClosed(boundary,source_tick,slot->sequence);
+    if (invalid.load()) return;
     if (stadium_go_prefix_complete_after_publish)
       RequestComplete();
     else if (transform_items_stop_after_publish)
@@ -6080,6 +6348,17 @@ struct Observer::Impl
 
   void WriterMain()
   {
+    mbedtls_sha256_context compact_digest;
+    mbedtls_sha256_init(&compact_digest);
+    std::unique_ptr<File::DirectIOFile> compact_output;
+    size_t compact_written=0;
+    if(compact_enabled)
+    {
+      compact_output.reset(new(std::nothrow) File::DirectIOFile(compact_path,File::AccessMode::Write,File::OpenMode::Create));
+      if(!compact_output || !compact_output->IsOpen() ||
+         !CompactBeginWrite(*compact_output,compact_digest,&compact_written))
+        SetInvalid("compact RNG output/header could not be opened/written");
+    }
     writer_last_dequeue_ns.store(SteadyNowNs(), std::memory_order_release);
     File::DirectIOFile output(output_path, File::AccessMode::Write, File::OpenMode::Create);
     if (!output.IsOpen())
@@ -6092,6 +6371,7 @@ struct Observer::Impl
     while (true)
     {
       bool drained = false;
+      if(compact_output) CompactDrain(*compact_output,compact_digest,&compact_written);
       while (tail < head_index.load(std::memory_order_acquire))
       {
         Slot& slot = ring[tail % RING_SIZE];
@@ -6277,6 +6557,12 @@ struct Observer::Impl
           if (!output.Flush())
             SetInvalid("observer stream flush failed");
         }
+        if(compact_output)
+        {
+          CompactDrain(*compact_output,compact_digest,&compact_written);
+          CompactFinishWrite(*compact_output,compact_digest,&compact_written);
+        }
+        mbedtls_sha256_free(&compact_digest);
         const bool complete = natural_completion.load() && !invalid.load();
         if (!WriteStatus(complete ? "completed" : (invalid.load() ? "invalid" : "interrupted"),
                          static_cast<s64>(last_seq), last_tick, last_draw, complete, true))
@@ -6363,6 +6649,13 @@ struct Observer::Impl
               std::to_string(stadium_go_prefix_tail_ticks);
     if (stadium_go_ordinal2)
       json += ",\"original_post_go_target_ordinal\":2";
+    if(compact_enabled)
+      json += ",\"compact_rng\":{\"schema\":\"melee-web-live-compact-rng-status-v1\","
+              "\"go_mask\":"+std::to_string(compact_go_mask.load(std::memory_order_acquire))+
+              ",\"closed_window_mask\":"+std::to_string(compact_closed_mask.load(std::memory_order_acquire))+
+              ",\"requested_window_mask\":"+std::to_string((1u<<compact_match_count)-1)+
+              ",\"written_rows\":"+std::to_string(compact_written_rows.load(std::memory_order_acquire))+
+              ",\"lifecycle_parity\":false}";
     json += CpuProbeCloseStatusJson();
     json += "}\n";
     if (!status.Write(reinterpret_cast<const u8*>(json.data()), json.size()) || !status.Flush() ||
@@ -6385,6 +6678,22 @@ struct Observer::Impl
     return error;
   }
 
+  struct CompactWindow
+  {
+    u32 match=0,go_tick=0,target=0,last_source=0,tail=0,count=0,close_tick=0,seed_pointer=0,seed=0,setup=0;
+    u64 go_sequence=0,close_sequence=0,containing_sequence=0,target_sequence=0;
+    bool closed=false,containing_seen=false,target_reached=false;
+  };
+  bool compact_enabled=false;
+  std::string compact_path,compact_header;
+  std::array<u32,2> compact_matches{};
+  unsigned compact_match_count=0,compact_next_window=0;
+  int compact_active=-1;
+  std::array<CompactWindow,2> compact_windows{};
+  CompactRng::Budget compact_budget;
+  std::array<std::array<u8,CompactRng::ROW_BYTES>,CompactRng::QUEUE_ROWS> compact_ring{};
+  std::atomic<u64> compact_head{0},compact_tail{0},compact_written_rows{0};
+  std::atomic<unsigned> compact_go_mask{0},compact_closed_mask{0};
   std::atomic<bool> started{false};
   std::atomic<bool> invalid{false};
   std::atomic<bool> finish_requested{false};
@@ -6690,6 +6999,8 @@ static bool IsCaptureBoundary(u32 guest_pc)
            (Env("MWRC_TRANSFORM_PREFIX") == "1" && guest_pc == SSS_ENTER_RETURN) ||
            (SdInitRequested() && (guest_pc == 0x8016ebc0 || guest_pc == 0x8016ec24 ||
             ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() || SparsePairRequested()) && guest_pc == 0x8025b84c))) ||
+           (CompactRngEnabled() &&
+            (guest_pc==STADIUM_GO_AFTER_PC || SelectedRngReturn(0,true,guest_pc,true))) ||
            (CpuProbeEnabled() && FindCpuProbePoint(guest_pc) != nullptr &&
             ((!CpuProbeEnvironment().rng_returns && CpuProbeEnvironment().rng_return_pc == 0 && guest_pc != 0x803805b8) ||
              SelectedRngReturn(CpuProbeEnvironment().rng_return_pc, CpuProbeEnvironment().rng_returns, guest_pc, CpuProbeEnvironment().rng_updates))) ||
@@ -6699,6 +7010,7 @@ static bool IsCaptureBoundary(u32 guest_pc)
 
 bool Observer::IsRngReturnBoundary(u32 guest_pc)
 {
+  if(CompactRngEnabled() && SelectedRngReturn(0,true,guest_pc,true)) return true;
   return CpuProbeEnabled() && SelectedRngReturn(CpuProbeEnvironment().rng_return_pc, CpuProbeEnvironment().rng_returns, guest_pc, CpuProbeEnvironment().rng_updates) &&
          FindCpuProbePoint(guest_pc) != nullptr;
 }
