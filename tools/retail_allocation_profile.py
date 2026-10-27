@@ -12,11 +12,11 @@ from pathlib import Path
 
 DOL_SHA1 = "08e0bf20134dfcb260699671004527b2d6bb1a45"
 SOURCE_REVISION = "b43912cc78606f96c9569f5d6229bc9d7e265ea5"
-PROFILE_VERSION = 3
+PROFILE_VERSION = 4
 
 # Argument counts follow the pinned original declarations. These are observation
 # boundaries, not replacement implementations of the functions.
-FUNCTIONS = {
+FUNCTIONS_V3 = {
     "ARInit": 2, "ARAlloc": 1, "ARFree": 1, "ARGetSize": 0,
     "OSInitAlloc": 3, "OSCreateHeap": 2, "OSDestroyHeap": 1,
     "OSSetCurrentHeap": 1, "OSAllocFromHeap": 2, "OSFreeToHeap": 2,
@@ -45,8 +45,18 @@ FUNCTIONS = {
     "ftDemo_CreateFighter": 1,
     "ftDemo_ObjAllocInit": 0,
 }
+PREVIOUS_PROFILE_VERSION = 3
+REGISTRATION_PROFILE = "gobjproc-registration-v1"
+FUNCTIONS = {
+    **FUNCTIONS_V3,
+    "HSD_GObj_SetupProc": 3,
+    "HSD_GObjProc_8038FAA8": 1,
+    "HSD_GObjProc_8038FC18": 1,
+    "HSD_GObjProc_8038FCE4": 1,
+    "HSD_GObjProc_8038FE24": 1,
+}
 LEGACY_PROFILE_VERSION = 2
-LEGACY_FUNCTIONS = {name: argc for name, argc in FUNCTIONS.items()
+LEGACY_FUNCTIONS = {name: argc for name, argc in FUNCTIONS_V3.items()
                     if name not in {"ftDemo_CreateFighter", "ftDemo_ObjAllocInit"}}
 GLOBALS = ("HeapArray", "NumHeaps", "ArenaStart", "ArenaEnd",
            "__OSArenaLo", "__OSArenaHi", "seed", "seed_ptr",
@@ -117,6 +127,7 @@ def build_profile(dol_path: Path, symbols_path: Path) -> dict:
                             "iparam_audio_heap_size", "iparam_heap_max_num")}
     entry_word = int.from_bytes(dol.read(dol.entry, 4), "big")
     return {"schema": "melee-web-original-allocation-profile", "version": PROFILE_VERSION,
+            "registration_profile": REGISTRATION_PROFILE,
             "dol_sha1": DOL_SHA1, "source_revision": SOURCE_REVISION,
             "symbols_sha256": hashlib.sha256(symbols_path.read_bytes()).hexdigest(),
             "entry": dol.entry, "entry_word": entry_word,

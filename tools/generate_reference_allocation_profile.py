@@ -18,13 +18,15 @@ import sys
 
 try:
     from .retail_allocation_profile import (
-        DOL_SHA1, FUNCTIONS, GLOBALS, LEGACY_FUNCTIONS, LEGACY_PROFILE_VERSION,
-        PROFILE_VERSION, SOURCE_REVISION,
+        DOL_SHA1, FUNCTIONS, FUNCTIONS_V3, GLOBALS, LEGACY_FUNCTIONS,
+        LEGACY_PROFILE_VERSION, PREVIOUS_PROFILE_VERSION, PROFILE_VERSION,
+        REGISTRATION_PROFILE, SOURCE_REVISION,
     )
 except ImportError:
     from retail_allocation_profile import (
-        DOL_SHA1, FUNCTIONS, GLOBALS, LEGACY_FUNCTIONS, LEGACY_PROFILE_VERSION,
-        PROFILE_VERSION, SOURCE_REVISION,
+        DOL_SHA1, FUNCTIONS, FUNCTIONS_V3, GLOBALS, LEGACY_FUNCTIONS,
+        LEGACY_PROFILE_VERSION, PREVIOUS_PROFILE_VERSION, PROFILE_VERSION,
+        REGISTRATION_PROFILE, SOURCE_REVISION,
     )
 
 
@@ -48,6 +50,8 @@ def _integer(value: object, field: str, *, maximum: int = 0xFFFFFFFF) -> int:
 def _functions_for_version(version: object) -> dict[str, int]:
     if type(version) is int and version == PROFILE_VERSION:
         return FUNCTIONS
+    if type(version) is int and version == PREVIOUS_PROFILE_VERSION:
+        return FUNCTIONS_V3
     if type(version) is int and version == LEGACY_PROFILE_VERSION:
         return LEGACY_FUNCTIONS
     raise ValueError("unsupported allocation profile version")
@@ -57,6 +61,11 @@ def validate_profile(value: object) -> dict:
     if not isinstance(value, dict) or value.get("schema") != PROFILE_SCHEMA:
         raise ValueError("unsupported allocation profile schema")
     functions_table = _functions_for_version(value.get("version"))
+    if value.get("version") == PROFILE_VERSION:
+        if value.get("registration_profile") != REGISTRATION_PROFILE:
+            raise ValueError("profile registration_profile differs from the pinned v4 scope")
+    elif "registration_profile" in value:
+        raise ValueError("legacy allocation profile cannot claim the v4 registration scope")
     if value.get("dol_sha1") != DOL_SHA1:
         raise ValueError("profile DOL identity differs from the pinned GALE01r2 DOL")
     if value.get("source_revision") != SOURCE_REVISION:

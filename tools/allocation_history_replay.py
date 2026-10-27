@@ -440,9 +440,11 @@ def load_profile(path: Path) -> dict[str, Any]:
         raise ReplayProblem("input", f"cannot read allocation profile {path}: {error}") from error
     if not isinstance(value, dict) or value.get("schema") != "melee-web-original-allocation-profile":
         raise ReplayProblem("input", "unsupported allocation profile schema")
-    if (type(value.get("version")) is not int or value["version"] not in (1, 2, 3)
+    if (type(value.get("version")) is not int or value["version"] not in (1, 2, 3, 4)
             or not isinstance(value.get("functions"), list)):
         raise ReplayProblem("input", "unsupported allocation profile version")
+    if value["version"] == 4 and value.get("registration_profile") != "gobjproc-registration-v1":
+        raise ReplayProblem("input", "v4 allocation profile registration scope is missing or unsupported")
     return value
 
 

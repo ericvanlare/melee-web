@@ -3,7 +3,7 @@
 // DOL SHA-1: 08e0bf20134dfcb260699671004527b2d6bb1a45
 // Source revision: b43912cc78606f96c9569f5d6229bc9d7e265ea5
 // Symbols SHA-256: 214477d5b27989a9675c4b881f4db2dad5eeaada39dbac17c57c70d5ba84d579
-// Profile SHA-256: 30e6ccc981d5e8eea6d5c88381bfc3df5a3b1103599c2b632ddb48580165bf65
+// Profile SHA-256: d4dcc28edcf534586b3953d3235e8880173f6dbcd9ecb384e97991137646756e
 #pragma once
 #include <array>
 #include "Core/PowerPC/ReferenceAllocationObserver.h"
@@ -60,7 +60,12 @@ inline constexpr std::array<u32, 1> kReturns48 = {{0x8038ecd8u}};
 inline constexpr std::array<u32, 1> kReturns49 = {{0x8038f950u}};
 inline constexpr std::array<u32, 1> kReturns50 = {{0x800beb24u}};
 inline constexpr std::array<u32, 1> kReturns51 = {{0x800beb5cu}};
-inline constexpr std::array<FunctionIdentity, 52> kFunctions = { {
+inline constexpr std::array<u32, 1> kReturns52 = {{0x8038fe20u}};
+inline constexpr std::array<u32, 1> kReturns53 = {{0x8038fc14u}};
+inline constexpr std::array<u32, 1> kReturns54 = {{0x8038fce0u}};
+inline constexpr std::array<u32, 1> kReturns55 = {{0x8038fd50u}};
+inline constexpr std::array<u32, 1> kReturns56 = {{0x8038fed0u}};
+inline constexpr std::array<FunctionIdentity, 57> kFunctions = { {
   {"ARInit", 0x80350e9cu, 0x000000f4u, 0x7c0802a6u, 2, kReturns0.data(), static_cast<u32>(kReturns0.size()), "7ff72977174513f962039820909640d9d5597ee148341d914808c6f1a51e7098"},
   {"ARAlloc", 0x80350dc0u, 0x00000068u, 0x7c0802a6u, 1, kReturns1.data(), static_cast<u32>(kReturns1.size()), "b146a5c6dc168e35495b1c58171801b991ba8797901c28ffd0aa0729db38e51f"},
   {"ARFree", 0x80350e28u, 0x00000074u, 0x7c0802a6u, 1, kReturns2.data(), static_cast<u32>(kReturns2.size()), "dc307f4b3db9f125c7e75d32d40145c210521b077a3a447282abb62d3eaa4251"},
@@ -113,6 +118,11 @@ inline constexpr std::array<FunctionIdentity, 52> kFunctions = { {
   {"HSD_DevComRequest", 0x8038f6d4u, 0x00000280u, 0x7c0802a6u, 8, kReturns49.data(), static_cast<u32>(kReturns49.size()), "219bba0d0b6aede387879888140d014f207907ac5d77b76dc0be792b0b166d77"},
   {"ftDemo_CreateFighter", 0x800be7e0u, 0x00000348u, 0x7c0802a6u, 1, kReturns50.data(), static_cast<u32>(kReturns50.size()), "530be329d151e5262f62f2cca83294c6d1c40dc7d495afdb0d7fe91679c38573"},
   {"ftDemo_ObjAllocInit", 0x800beb28u, 0x00000038u, 0x7c0802a6u, 0, kReturns51.data(), static_cast<u32>(kReturns51.size()), "4894716d0946d2d46d760f552fb6b8cea3ec63ffef115e4c0dee9dcfbd9c94fa"},
+  {"HSD_GObj_SetupProc", 0x8038fd54u, 0x000000d0u, 0x7c0802a6u, 3, kReturns52.data(), static_cast<u32>(kReturns52.size()), "ed2b1b6efa800ac21e13b834e789a4c699e6e5beeac2897a9f11610d38ca7277"},
+  {"HSD_GObjProc_8038FAA8", 0x8038faa8u, 0x00000170u, 0x3c80804du, 1, kReturns53.data(), static_cast<u32>(kReturns53.size()), "b7642c70114f74d4f76665b7832af9ff47c810b9d05095ff89eb5c49cfe48361"},
+  {"HSD_GObjProc_8038FC18", 0x8038fc18u, 0x000000ccu, 0x3c80804du, 1, kReturns54.data(), static_cast<u32>(kReturns54.size()), "8b758f57bcff9e8378b0263a2f282a6399d87f230497332c3f28b2c3c8a8c24c"},
+  {"HSD_GObjProc_8038FCE4", 0x8038fce4u, 0x00000070u, 0x7c0802a6u, 1, kReturns55.data(), static_cast<u32>(kReturns55.size()), "bc20676415730d14df79bf61f92014a68b09bec0162d0ac5fb8ab697a325cfab"},
+  {"HSD_GObjProc_8038FE24", 0x8038fe24u, 0x000000b0u, 0x7c0802a6u, 1, kReturns56.data(), static_cast<u32>(kReturns56.size()), "ea0d59cb0331712414ba7f9b4a00bd583c47110f60e07b40f73e23a34701d000"},
 }};
 inline constexpr std::array<GlobalIdentity, 23> kGlobals = { {
   {"HeapArray", 0x804d7360u, 0x00000004u},
@@ -142,7 +152,7 @@ inline constexpr std::array<GlobalIdentity, 23> kGlobals = { {
 inline const BoundProfile kProfile{
   "08e0bf20134dfcb260699671004527b2d6bb1a45",
   "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
-  "30e6ccc981d5e8eea6d5c88381bfc3df5a3b1103599c2b632ddb48580165bf65",
+  "d4dcc28edcf534586b3953d3235e8880173f6dbcd9ecb384e97991137646756e",
   0x8000522cu,
   0x48000115u,
   kFunctions.data(), static_cast<u32>(kFunctions.size()),

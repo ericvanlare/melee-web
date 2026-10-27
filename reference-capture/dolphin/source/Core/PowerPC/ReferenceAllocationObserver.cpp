@@ -32,7 +32,7 @@ namespace
 {
 constexpr char kExpectedDolSha1[] = "08e0bf20134dfcb260699671004527b2d6bb1a45";
 constexpr char kExpectedSourceRevision[] = "b43912cc78606f96c9569f5d6229bc9d7e265ea5";
-constexpr size_t kFunctionCount = 52;
+constexpr size_t kFunctionCount = 57;
 constexpr size_t kGlobalCount = 23;
 constexpr size_t kMaxThreads = 16;
 constexpr size_t kMaxDepth = 64;
