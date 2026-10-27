@@ -55,6 +55,8 @@ completion, browser parity, public admission and whole-stage acceptance remain
 open. The incomplete historical water prefix is a different input/context and
 cannot establish variability under fixed input.
 
-Required integration regression and exact-head CI remain pending. The affected
-observer build is verified separately; the source game and browser runtime are
-unchanged by this diagnostic milestone.
+The integration regression at `80f8cd49` passes 2,967 tests with 211 skips in
+604.514 seconds; its owned process group is absent. Independent source/docs
+review passes, and the affected Release observer build is verified separately.
+Publication-head CI remains required before merge. The source game and browser
+runtime are unchanged by this diagnostic milestone.

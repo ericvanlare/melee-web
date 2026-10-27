@@ -372,12 +372,35 @@
     "general_latency_rule_decided": false
   },
   "validation": {
-    "full_regression": "PENDING",
+    "full_regression": {
+      "result": "PASS",
+      "source_head": "80f8cd49133ba1552cdfa77df70f3b45daf4ea5a",
+      "source_tree": "aec67d17213344e7e9e4dd2a4c9915abf31fa087",
+      "tests": 2967,
+      "skips": 211,
+      "unittest_seconds": 604.514,
+      "owned_group_absent": true,
+      "receipt": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-full-regression-v1/result.json",
+        "bytes": 1171,
+        "sha256": "31beaf50e71eecfaf46bf21c57e333bd6d4c0e3a05188400a772d0f604a2db32"
+      },
+      "log": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-full-regression-v1/full-regression.stderr",
+        "bytes": 544753,
+        "sha256": "a54b919df2a1b4168ef8d5a2f9483cb301662722e9ea138b90e910398c4b8204"
+      }
+    },
     "exact_head_ci": "PENDING",
     "affected_observer_build": {
       "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-native-replay-build-v1/result.json",
       "bytes": 4811,
       "sha256": "266b6ac0902824d625ec8ae0594f66b4e06d52ada613667065d953ad7c1f9622"
+    },
+    "final_source_docs_review": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-milestone-review-v1/final-source-docs-review-v1.json",
+      "bytes": 6393,
+      "sha256": "b44da8a63cb03df7f450b933852c593279bd9f4eff53398e774237fe204c6172"
     }
   }
 }
