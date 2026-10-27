@@ -6255,7 +6255,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..c9f21415941be6c2ce510d5034400c55
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..b8ead25c9f7fc129b6fd570db01f22de60f184a0 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d2a9cfb52 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
 @@ -1,5 +1,18 @@
@@ -6576,7 +6576,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..b8ead25c9f7fc129b6fd570db01f22de
  #define GET_WRAPPER(x) ((ImageDescWrapper*) HSD_GObjGetUserData(x))
  
  void grStadium_801D1EF8(Ground_GObj* gobj)
-@@ -788,137 +996,6098 @@ void grStadium_801D1EF8(Ground_GObj* gobj)
+@@ -788,137 +996,6126 @@ void grStadium_801D1EF8(Ground_GObj* gobj)
              }
              break;
          }
@@ -10182,6 +10182,35 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..b8ead25c9f7fc129b6fd570db01f22de
 +    return owner->nested_map5_ground==j->initial_map5;
 +}
 +
++/* Ground_GetStageGObj inserts its two original procs before Stadium adds
++ * the Fire callback. Retain the exact three-node/root proof; no missing,
++ * foreign, extra or unrooted child is admitted. */
++static int stadium_owner_first_fire_proc_chain_matches(
++    const HSD_GObj* map2, const HSD_GObjProc* expected_head)
++{
++    const HSD_GObjProc* middle;
++    const HSD_GObjProc* tail;
++    if (map2 == NULL || expected_head == NULL || map2->proc != expected_head ||
++        !stadium_owner_map2_proc_root_contains_once(expected_head))
++        return 0;
++    middle = expected_head->child;
++    if (middle == NULL || middle == expected_head ||
++        !stadium_owner_map2_proc_root_contains_once(middle))
++        return 0;
++    tail = middle->child;
++    if (tail == NULL || tail == expected_head || tail == middle ||
++        !stadium_owner_go_proc_root_contains_once(tail, 1))
++        return 0;
++    return expected_head->gobj == map2 &&
++           expected_head->on_invoke == grStadium_801D19D8 &&
++           expected_head->s_link == 4 &&
++           middle->gobj == map2 && middle->s_link == 4 &&
++           melee_web_stadium_c1_ground_proc_callback_matches(middle->on_invoke, 4) &&
++           tail->gobj == map2 && tail->s_link == 1 &&
++           melee_web_stadium_c1_ground_proc_callback_matches(tail->on_invoke, 1) &&
++           tail->child == NULL;
++}
++
 +/* Validate actual post-tick roots and source phase; no phase/state writes.
 + * Exactly the first base->fire transition is admitted, no default return. */
 +static int stadium_first_transform_graph_matches(
@@ -10242,8 +10271,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..b8ead25c9f7fc129b6fd570db01f22de
 +    if(j->count){
 +        const Ground* fire=HSD_GObjGetUserData(j->fire_map3);
 +        HSD_GObjProc* proc=j->fire_map3->proc;
-+        if(!fire||!proc||proc->gobj!=j->fire_map3||
-+           proc->on_invoke!=grPs_StageCallbacks[3].gobj_proc||proc->s_link!=4||proc->child||
++        if(!fire||!stadium_owner_first_fire_proc_chain_matches(j->fire_map3,proc)||
 +           fire->x1C_callback!=grPs_StageCallbacks[3].callback3)return 0;
 +    }
 +    char error[128];if(!melee_web_stadium_manager_view_preflight(&owner->manager,error,sizeof(error)))return 0;
@@ -12785,7 +12813,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..b8ead25c9f7fc129b6fd570db01f22de
  
  /// @todo can these inlines be merged?
  static inline int randi_between_2(int a, int b)
-@@ -1185,22 +7354,41 @@ HSD_GObj* grStadium_801D2BEC(void)
+@@ -1185,22 +7382,41 @@ HSD_GObj* grStadium_801D2BEC(void)
      PAD_STACK(4);
  
      gobj = GObj_Create(0x11, 0x13, 0);
@@ -12827,7 +12855,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..b8ead25c9f7fc129b6fd570db01f22de
      text->win_dynamic_p->pos_z = 0.0F;
      hsd_text = text->win_dynamic_p;
      hsd_text->box_size_x = 250.0F;
-@@ -1214,11 +7402,21 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1214,11 +7430,21 @@ HSD_GObj* grStadium_801D2D78(void)
      ImageDescWrapper* wrapper;
  
      temp_r3 = GObj_Create(0x11, 0x12, 0);
@@ -12849,7 +12877,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..b8ead25c9f7fc129b6fd570db01f22de
      wrapper->flag = true;
      return temp_r3;
  }
-@@ -1226,12 +7424,22 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1226,12 +7452,22 @@ HSD_GObj* grStadium_801D2D78(void)
  HSD_GObj* grStadium_801D2E24(void)
  {
      HSD_GObj* gobj = GObj_Create(0x11, 0x12, 0);
@@ -12872,7 +12900,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..b8ead25c9f7fc129b6fd570db01f22de
      wrapper->flag = false;
      return gobj;
  }
-@@ -1896,6 +8104,9 @@ bool grStadium_801D42B8(void)
+@@ -1896,6 +8132,9 @@ bool grStadium_801D42B8(void)
      if (gp->u.stadium.xC4_b1) {
          return false;
      }
@@ -12882,7 +12910,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..b8ead25c9f7fc129b6fd570db01f22de
      gp->u.stadium.xD0 =
          grDatFiles_801C6478(gp->u.stadium.xCC, gp->u.stadium.xC8);
      return true;
-@@ -2093,6 +8304,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2093,6 +8332,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
              gp = GET_GROUND(map_gobj);
              HSD_ASSERT(0x99B, gp);
              gp->u.stadium.xC4_b1 = true;
@@ -12892,7 +12920,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..b8ead25c9f7fc129b6fd570db01f22de
              lbFile_80016580(datfiles[var_r29], gp->u.stadium.xCC,
                              &gp->u.stadium.xC8, fn_801D4220, NULL);
              temp_r31->u.stadium.xDC = 1;
-@@ -2221,6 +8435,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2221,6 +8463,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
          if (temp_r31->u.stadium.xDE == 5) {
              temp_r31->u.stadium.xD8 =
                  randi_between_2(yakumono_param->x0, yakumono_param->x4);
