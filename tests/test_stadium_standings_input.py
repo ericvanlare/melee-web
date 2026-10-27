@@ -61,8 +61,11 @@ class StandingsInputPolicyTests(unittest.TestCase):
             errors=[0, 0, -1, -1])
         return row, snapshot, sample
 
-    def observe(self, policy, tick, **kwargs):
-        policy.observe(*self.operands(tick, **kwargs), dict(source_tick=84))
+    def observe(self, policy, tick, *, first_form=None, **kwargs):
+        row, snapshot, sample = self.operands(tick, **kwargs)
+        if first_form is not None:
+            snapshot['first_form'] = dict(first_form)
+        policy.observe(row, snapshot, sample, dict(source_tick=84))
 
     def test_each_mode8_uses_actual_focus_and_requires_consumed_release(self):
         p = m.StadiumStandingsInputPolicy()
@@ -148,6 +151,198 @@ class StandingsInputPolicyTests(unittest.TestCase):
         self.assertEqual(p.stop['reason'], 'mode14_before_transform')
         self.assertEqual(p.stop['result'], 'INCONCLUSIVE_MODE14_BEFORE_TRANSFORM')
         self.assertFalse(p.summary()['C3'])
+
+    def _first_form_point(self, phase, selected_form, *, active_map_id=None, replaced=None):
+        return dict(profile='first_form_v1', phase=phase,
+            active_map_id=(selected_form if phase >= 6 else 5)
+                if active_map_id is None else active_map_id,
+            selected_form=selected_form,
+            root_replacement_observed=(phase >= 6) if replaced is None else replaced)
+
+    def test_first_form_latency_mode14_first_forces_fresh_neutral_and_waits_for_settlement(self):
+        profile = policy_module.StadiumStandingsInputPolicy.FIRST_FORM_LATENCY_PROFILE
+        p = policy_module.StadiumStandingsInputPolicy(profile)
+        neutral = [m.NEUTRAL_PAD, m.NEUTRAL_PAD]
+        self.observe(p, 84, mode=14, focus=0, phase=0, form=5)
+        self.assertEqual(p.neutralization_trigger['kind'], 'pretransform_mode14')
+        self.assertEqual(p.mode14_witness['source_tick'], 84)
+        self.assertTrue(p.mode14_witness['before_first_transform'])
+        self.assertIsNone(p.stop)  # mode14 is an input trigger, not a host exit.
+        self.assertTrue(p.neutralization_issue_requested)
+        self.assertTrue(p.requires_issue(neutral))  # write even if last desired value was neutral.
+        p.issue(neutral)
+        self.assertFalse(p.neutralization_issue_requested)
+        self.assertEqual(p.neutralization_issue['sequence'], p.neutralization_trigger['sequence'])
+
+        phases = ((85, 0, 5, False), (86, 1, 6, False), (87, 2, 6, False),
+                  (88, 3, 6, False), (89, 4, 6, False), (90, 5, 6, False),
+                  (91, 6, 6, True), (92, 0, 6, True))
+        for tick, phase, form, replaced in phases:
+            self.observe(p, tick, mode=14, focus=0, phase=phase, form=form,
+                ports=neutral, first_form=dict(profile='first_form_v1', phase=phase,
+                    active_map_id=form if replaced else 5, selected_form=form,
+                    root_replacement_observed=replaced))
+            if phase != 0 or not replaced:
+                self.assertIsNone(p.stop)
+        self.assertEqual(p.stop['reason'], 'first_form_phase6_to_settled_phase0')
+        summary = p.summary()
+        self.assertEqual(summary['profile'], profile)
+        self.assertEqual(summary['neutralization_trigger']['kind'], 'pretransform_mode14')
+        self.assertEqual(summary['neutralization_release']['ports'],
+                         [m.NEUTRAL_PAD, m.NEUTRAL_PAD,
+                          DISCONNECTED_PAD, DISCONNECTED_PAD])
+        self.assertEqual(summary['first_form_latency']['phase1_source_tick_dwell'], 1)
+        self.assertFalse(summary['C4'])
+        self.assertFalse(summary['C3'])
+
+    def test_first_form_latency_transform_first_needs_no_mode14_witness(self):
+        p = policy_module.StadiumStandingsInputPolicy(
+            policy_module.StadiumStandingsInputPolicy.FIRST_FORM_LATENCY_PROFILE)
+        focused = [raw_pad(x=80), m.NEUTRAL_PAD]
+        self.observe(p, 84, mode=8, focus=0, phase=0, form=5)
+        p.issue(focused)
+        self.observe(p, 85, mode=1, phase=1, form=5, ports=focused,
+            first_form=self._first_form_point(1, 6, active_map_id=5, replaced=False))
+        self.assertEqual(p.neutralization_trigger['kind'], 'first_transformation')
+        self.assertIsNone(p.mode14_witness)
+        self.assertTrue(p.requires_issue(focused))
+        p.issue([m.NEUTRAL_PAD, m.NEUTRAL_PAD])
+        phases = ((86, 2, 6, 5, False), (87, 3, 6, 5, False),
+                  (88, 4, 6, 5, False), (89, 5, 6, 5, False),
+                  (90, 6, 6, 6, True), (91, 0, 6, 6, True))
+        for tick, phase, selected, active, replaced in phases:
+            self.observe(p, tick, mode=14 if tick == 86 else 1,
+                focus=0 if tick == 86 else 99, phase=1, form=5,
+                first_form=self._first_form_point(phase, selected,
+                    active_map_id=active, replaced=replaced))
+        self.assertEqual(p.stop['reason'], 'first_form_phase6_to_settled_phase0')
+        result = p.summary()
+        self.assertEqual(result['mode14_witness']['source_tick'], 86)
+        self.assertFalse(result['mode14_witness']['before_first_transform'])
+        self.assertEqual(result['neutralization_trigger']['kind'], 'first_transformation')
+        self.assertLessEqual(result['neutralization_trigger']['sequence'],
+                             result['neutralization_issue']['sequence'])
+        self.assertLess(result['neutralization_release']['sequence'],
+                        result['first_form_latency']['settled_phase0']['sequence'])
+
+    def test_first_form_latency_same_row_trigger_does_not_claim_event_order(self):
+        p = policy_module.StadiumStandingsInputPolicy(
+            policy_module.StadiumStandingsInputPolicy.FIRST_FORM_LATENCY_PROFILE)
+        self.observe(p, 84, mode=14, focus=0, phase=1, form=5,
+            first_form=self._first_form_point(1, 6, active_map_id=5, replaced=False))
+        self.assertEqual(p.neutralization_trigger['kind'],
+                         'mode14_and_first_transform_same_source_row')
+        self.assertFalse(p.mode14_witness['before_first_transform'])
+        p.issue([m.NEUTRAL_PAD, m.NEUTRAL_PAD])
+        self.assertIsNone(p.stop)
+
+    def test_first_form_latency_issue_records_latest_source_after_trigger(self):
+        p = policy_module.StadiumStandingsInputPolicy(
+            policy_module.StadiumStandingsInputPolicy.FIRST_FORM_LATENCY_PROFILE)
+        neutral = [m.NEUTRAL_PAD, m.NEUTRAL_PAD]
+        self.observe(p, 84, mode=14, focus=0, phase=0, form=5)
+        trigger_sequence = p.neutralization_trigger['sequence']
+        # Model the source reader returning another complete row before the
+        # Pipe owner handles the latched issue; do not relabel the write at the
+        # older trigger coordinate.
+        self.observe(p, 85, mode=1, focus=99, phase=0, form=5)
+        p.issue(neutral)
+        self.assertGreater(p.neutralization_issue['sequence'], trigger_sequence)
+        self.assertEqual(p.neutralization_issue['source_tick'], 85)
+        self.assertEqual(p.neutralization_issue['trigger_sequence'], trigger_sequence)
+
+    def test_first_form_latency_neutral_release_requires_exact_four_ports(self):
+        p = policy_module.StadiumStandingsInputPolicy(
+            policy_module.StadiumStandingsInputPolicy.FIRST_FORM_LATENCY_PROFILE)
+        neutral = [m.NEUTRAL_PAD, m.NEUTRAL_PAD]
+        self.observe(p, 84, mode=14, focus=0, phase=0, form=5)
+        p.issue(neutral)
+        row, snapshot, sample = self.operands(85, mode=1, focus=0,
+                                               phase=0, form=5)
+        sample['ports'][2] = m.NEUTRAL_PAD
+        with self.assertRaisesRegex(ValueError, 'exact four-port consumed input'):
+            p.observe(row, snapshot, sample, dict(source_tick=84))
+        self.assertIsNone(p.neutralization_release)
+
+    def test_first_form_latency_wrong_form_or_root_cannot_settle(self):
+        p = policy_module.StadiumStandingsInputPolicy(
+            policy_module.StadiumStandingsInputPolicy.FIRST_FORM_LATENCY_PROFILE)
+        self.observe(p, 84, mode=1, phase=1, form=5,
+            first_form=self._first_form_point(1, 6, active_map_id=5, replaced=False))
+        p.issue([m.NEUTRAL_PAD, m.NEUTRAL_PAD])
+        row, snapshot, sample = self.operands(85, mode=1, phase=1, form=5,
+            ports=[m.NEUTRAL_PAD, m.NEUTRAL_PAD])
+        snapshot['first_form'] = self._first_form_point(2, 4, active_map_id=5, replaced=False)
+        with self.assertRaisesRegex(ValueError, 'selected form changed'):
+            p.observe(row, snapshot, sample, dict(source_tick=84))
+
+        q = policy_module.StadiumStandingsInputPolicy(
+            policy_module.StadiumStandingsInputPolicy.FIRST_FORM_LATENCY_PROFILE)
+        self.observe(q, 84, mode=1, phase=1, form=5,
+            first_form=self._first_form_point(1, 6, active_map_id=5, replaced=False))
+        q.issue([m.NEUTRAL_PAD, m.NEUTRAL_PAD])
+        row, snapshot, sample = self.operands(85, mode=1, phase=1, form=5,
+            ports=[m.NEUTRAL_PAD, m.NEUTRAL_PAD])
+        snapshot['first_form'] = self._first_form_point(6, 6, active_map_id=6, replaced=False)
+        with self.assertRaisesRegex(ValueError, 'form/root phase relation'):
+            q.observe(row, snapshot, sample, dict(source_tick=84))
+
+    def test_first_form_latency_missing_or_late_neutral_consume_never_settles(self):
+        p = policy_module.StadiumStandingsInputPolicy(
+            policy_module.StadiumStandingsInputPolicy.FIRST_FORM_LATENCY_PROFILE)
+        focused = [raw_pad(x=80), m.NEUTRAL_PAD]
+        self.observe(p, 84, mode=8, focus=0, phase=0, form=5)
+        p.issue(focused)
+        self.observe(p, 85, mode=1, phase=1, form=5, ports=focused,
+            first_form=self._first_form_point(1, 6, active_map_id=5, replaced=False))
+        p.issue([m.NEUTRAL_PAD, m.NEUTRAL_PAD])
+        phases = ((86, 2, 6, 5, False), (87, 3, 6, 5, False),
+                  (88, 4, 6, 5, False), (89, 5, 6, 5, False),
+                  (90, 6, 6, 6, True), (91, 0, 6, 6, True))
+        for tick, phase, selected, active, replaced in phases:
+            self.observe(p, tick, mode=1, focus=99, phase=1, form=5,
+                ports=focused, first_form=self._first_form_point(phase, selected,
+                    active_map_id=active, replaced=replaced))
+        self.assertIsNone(p.neutralization_release)
+        self.assertIsNone(p.stop)
+        with self.assertRaisesRegex(ValueError, 'evidence stop/release has not settled'):
+            p.summary()
+        # A neutral consumed only after phase6->0 is too late for this record.
+        with self.assertRaisesRegex(ValueError, 'ordered phase1/phase6/root-settlement'):
+            self.observe(p, 92, mode=1, focus=99, phase=1, form=5,
+                ports=[m.NEUTRAL_PAD, m.NEUTRAL_PAD],
+                first_form=self._first_form_point(0, 6, active_map_id=6, replaced=True))
+        self.assertIsNotNone(p.neutralization_release)
+        self.assertIsNone(p.stop)
+        with self.assertRaisesRegex(ValueError, 'evidence stop/release has not settled'):
+            p.summary()
+
+    def test_first_form_latency_timeout_cannot_be_summarized_as_a_sample(self):
+        p = policy_module.StadiumStandingsInputPolicy(
+            policy_module.StadiumStandingsInputPolicy.FIRST_FORM_LATENCY_PROFILE)
+        self.observe(p, 84, mode=14, focus=0, phase=0, form=5)
+        with self.assertRaisesRegex(ValueError, 'evidence stop/release has not settled'):
+            p.summary()
+
+    def test_first_form_latency_requires_phase6_then_settled_phase0(self):
+        p = policy_module.StadiumStandingsInputPolicy(
+            policy_module.StadiumStandingsInputPolicy.FIRST_FORM_LATENCY_PROFILE)
+        neutral = [m.NEUTRAL_PAD, m.NEUTRAL_PAD]
+        self.observe(p, 84, mode=14, focus=0, phase=0, form=5)
+        p.issue(neutral)
+        for tick, phase, form, replaced in ((85, 0, 5, False),
+                                             (86, 1, 6, False),
+                                             (87, 2, 6, False),
+                                             (88, 3, 6, False),
+                                             (89, 4, 6, False),
+                                             (90, 5, 6, False)):
+            self.observe(p, tick, mode=14, focus=0, phase=phase, form=form,
+                ports=neutral, first_form=dict(profile='first_form_v1', phase=phase,
+                    active_map_id=5, selected_form=form,
+                    root_replacement_observed=replaced))
+        self.assertIsNone(p.stop)
+        with self.assertRaisesRegex(ValueError, 'evidence stop/release has not settled'):
+            p.summary()
 
     def test_post_window_raw_pad_must_pair_to_next_contiguous_source_tick(self):
         profile = policy_module.StadiumStandingsInputPolicy.POST_TRANSFORM_PROFILE
