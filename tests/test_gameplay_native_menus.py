@@ -559,7 +559,10 @@ static MeleeWebMatchContext match;
 static StaticPlayer players[4];
 static CmSubject pool[70];
 static int consume_queue=1,gameplay_ok=1,hsd_calls=0,rumble_calls=0;
-static int copy_calls=0,game_calls=0,renew_calls=0,event_count=0,event_order[5];
+static int copy_calls=0,game_calls=0,renew_calls=0,event_count=0,event_order[6];
+static int preconsume_calls=0;
+/* Explicit scheduler-context witnesses; this fixture runs outside any proc. */
+HSD_GObj *HSD_GObj_804D781C,*HSD_GObj_804D7814;
 PadLibData HSD_PadLibData;
 u32* seed_ptr;
 CmSubject *cm_804D6458,*cm_804D645C,*cm_804D6460;
@@ -586,6 +589,14 @@ static int invalidate_owner(void* context,char* error,size_t size)
 {(void)context;(void)error;(void)size;owner=NULL;return 1;}
 static int renew_ok(void* context,char* error,size_t size)
 {(void)error;(void)size;++renew_calls;event_order[event_count++]=6;return *(const int*)context;}
+static int recorded_preconsume(void* context,uint64_t cursor,char* error,size_t size)
+{
+ (void)error;(void)size;++preconsume_calls;event_order[event_count++]=7;
+ if(cursor!=match.ticks||HSD_PadLibData.queue!=&match.input_queue||
+    HSD_PadLibData.qcount!=1||HSD_PadLibData.qread!=0||rumble_calls!=1||hsd_calls)return 0;
+ if(!*(const int*)context)HSD_PadLibData.qcount=0;
+ return 1;
+}
 static void initialize(void)
 {
  memset(&match,0,sizeof(match));memset(players,0,sizeof(players));
@@ -596,7 +607,8 @@ static void initialize(void)
  players[0].player_entity[0]=(HSD_GObj*)1;players[1].player_entity[0]=(HSD_GObj*)1;
  HSD_PadLibData=(PadLibData){.qnum=1,.queue=&match.input_queue};
  consume_queue=1;gameplay_ok=1;hsd_calls=0;rumble_calls=0;
- copy_calls=0;game_calls=0;renew_calls=0;event_count=0;memset(event_order,0,sizeof(event_order));
+ copy_calls=0;game_calls=0;renew_calls=0;event_count=0;preconsume_calls=0;
+ HSD_GObj_804D781C=NULL;HSD_GObj_804D7814=NULL;memset(event_order,0,sizeof(event_order));
 }
 static PADStatus sample(unsigned value)
 {
@@ -674,6 +686,22 @@ int main(void)
  initialize();
  if(!melee_web_match_step_raw_phased(&match,raw,NULL,NULL,invalidate_owner,NULL,error,sizeof(error))||
     !refuses_snapshot())return 17;
+ /* Actual registered hook runs after staged raw queue and rumble, before
+  * master consumption. Existing cases above retain default-off ordering. */
+ initialize();int preserve_queue=1;
+ if(!melee_web_match_recorded_preconsume_arm(&match,recorded_preconsume,
+       &preserve_queue,error,sizeof(error))||
+    !melee_web_match_step_raw_phased(&match,raw,NULL,NULL,NULL,NULL,error,sizeof(error))||
+    preconsume_calls!=1||hsd_calls!=1||match.ticks!=1||event_count!=6||
+    event_order[0]!=1||event_order[1]!=7||event_order[2]!=2||
+    event_order[3]!=3||event_order[4]!=4||event_order[5]!=5||
+    !melee_web_match_stadium_pad_queue_observation(&match,&observed,error,sizeof(error)))return 18;
+ initialize();preserve_queue=0;
+ if(!melee_web_match_recorded_preconsume_arm(&match,recorded_preconsume,
+       &preserve_queue,error,sizeof(error))||
+    melee_web_match_step_raw_phased(&match,raw,NULL,NULL,NULL,NULL,error,sizeof(error))||
+    preconsume_calls!=1||hsd_calls||match.ticks||!match.recorded_preconsume_failed||
+    event_count!=2||event_order[0]!=1||event_order[1]!=7||!refuses_snapshot())return 19;
  puts("Stadium HSD queue observation: production phased fill/order, literal four slots and map pass; unconsumed, failed-phase, failed-tick, stale-owner, failed-retry and post-callback owner invalidation refused");
  return 0;
 }

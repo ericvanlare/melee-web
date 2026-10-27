@@ -19,6 +19,10 @@ class StadiumPreReadyCancelTests(unittest.TestCase):
   memory=(SOURCE_ROOT/'src/gameplay_source_memory_runtime.h').read_text()
   service=(SOURCE_ROOT/'src/gameplay_source_files.c').read_text()
   memory=memory[memory.index('typedef enum MeleeWebSourceMemoryReadStatus'):memory.index('/* Fighter_Create')]
+  display=(SOURCE_ROOT/'src/gameplay_stadium_display_owner.h').read_text()
+  journal=display[display.index('#define MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENTS'):display.index('} MeleeWebStadiumFirstTransformJournal;')+len('} MeleeWebStadiumFirstTransformJournal;')]
+  header=(SOURCE_ROOT/'src/gameplay_source_files.h').read_text()
+  completion=header[header.index('typedef struct MeleeWebSourceFileRecordedCompletionStatus {'):header.index('} MeleeWebSourceFileRecordedCompletionStatus;')+len('} MeleeWebSourceFileRecordedCompletionStatus;')]
   region=stage[stage.index('typedef struct MeleeWebStadiumMap2WritableRegion'):stage.index('static int stadium_map2_region_lease_matches')]
   program=r"""
 #include <assert.h>
@@ -34,13 +38,14 @@ typedef struct HSD_GObj {struct HSD_GObj* next;int classifier;void* user_data;} 
 typedef void (*HSD_GObjEvent)(HSD_GObj*);
 typedef struct {int map_id;union {struct {void* xF4;} display;}u;} Ground;
 
-"""+memory+r"""
+"""+memory+journal+completion+r"""
 /* Unused map-2 fallback storage is explicit in this cancellation-only fixture.
  * Any attempt to activate the new file capability refuses; focused region
  * controls separately exercise registered leases and pending/closing state. */
 typedef struct MeleeWebSourceFileScope {
  size_t count;void* files;void* copies;void* regions;void* requests;
  void* request_tail;size_t request_count;int pumping;
+ struct {MeleeWebSourceFileRecordedCompletionStatus status;} recorded;
 } MeleeWebSourceFileScope;
 enum {MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK=2};
 typedef struct {int captured;HSD_GObj *map0_ground,*display_ground,*map2_ground,*nested_map5_ground;
@@ -56,6 +61,7 @@ typedef struct MeleeWebStageLast {
  MeleeWebStadiumMap2BufferOwner stadium_map2_buffer_owner;
  MeleeWebStadiumMap2WritableRegion stadium_map2_region;
  MeleeWebSourceMemoryContext stadium_start_context;
+ MeleeWebStadiumFirstTransformJournal stadium_first_transform;
  void* stadium_headers[2];MeleeWebSourceMemoryAllocation stadium_header_leases[2];
 } MeleeWebStageLast;
 struct Pending {void* next;HSD_GObj* object;HSD_GObjEvent callback;};
@@ -94,6 +100,9 @@ static void melee_web_stadium_display_owner_abort_cancel_transfer(void* owner,co
 {assert(owner==&display_ok&&stage==&h&&world==h.generation&&token==transfer_token);assert(!generator_cancels&&!frees&&stage_info.x6A4==headers);++transfer_abort_calls;}
 static void melee_web_stadium_display_owner_publish_cancel_transfer(void* owner,uint64_t token)
 {assert(owner==&display_ok&&token==transfer_token);assert(generator_cancels==1&&frees==2&&!stage_info.x6A4&&!h.stadium_started&&!h.stadium_ready_route&&!h.stadium_ready_armed);assert(h.stadium_cancel_transfer_token==token);++transfer_publish_calls;}
+/* The pre-Ready fixture cannot authenticate an entered transformed graph. */
+static int melee_web_stadium_display_owner_first_transform_graph(void* p,int retiring,char* e,size_t n)
+{(void)p;(void)retiring;return fail(e,n,"transformed graph outside pre-Ready fixture");}
 static int melee_web_stadium_generator_cancel_prepared(void* p,char* e,size_t n)
 {if(!generator_ok||p!=&generator_ok)return fail(e,n,"synthetic generator refusal");++generator_cancels;return 1;}
 static void HSD_Free(void* p){assert(p==&headers[frees]);assert(!stage_info.x6A4);assert(generator_cancels==1);++frees;}
@@ -136,6 +145,8 @@ void fixture_refusal_checks(void){char e[256];
  assert(!fixture_cancel(&h,e,sizeof(e)));assert(e[0]&&!frees&&!generator_cancels&&!transfer_prepare_calls&&!file_capability_calls);
  for(int route=0;route<2;route++){fixture_setup();h.stadium_started=2;h.stadium_ready_route=route;h.stadium_ready_armed=0;
  assert(fixture_cancel(&h,e,sizeof(e)));assert(!frees&&!generator_cancels&&stage_info.x6A4==headers);assert(!transfer_prepare_calls&&!transfer_abort_calls&&!transfer_publish_calls);}
+ fixture_setup();h.stadium_first_transform.failed=1;
+ assert(!fixture_cancel(&h,e,sizeof(e)));assert(!frees&&!generator_cancels&&!transfer_prepare_calls);
  fixture_setup();transfer_prepare_ok=0;
  assert(!fixture_cancel(&h,e,sizeof(e)));assert(e[0]&&!frees&&!generator_cancels&&stage_info.x6A4==headers&&h.stadium_generator==&generator_ok);
  assert(transfer_prepare_calls==1&&!transfer_abort_calls&&!transfer_publish_calls);
@@ -158,22 +169,30 @@ for(int i=0;i<16;i++){
 #include <stdexcept>
 #include <cstdio>
 #include <cstddef>
+#include <cstdint>
 #define MELEE_WEB_STADIUM_C1A_DIAGNOSTIC 1
 using DatError=std::runtime_error;
+typedef struct HSD_GObj HSD_GObj;
+"""+journal+completion+r"""
 struct MeleeWebSourceFileScope;
 extern "C" {int melee_web_source_files_quiescent_for(MeleeWebSourceFileScope*,char*,size_t);void fixture_setup();void* fixture_stage();MeleeWebSourceFileScope* fixture_source_scope();void fixture_set_source_busy(int);int fixture_cancel(void*,char*,size_t);void fixture_check(int);void fixture_bad(int);void fixture_refusal_checks();}
 static void check(bool v,const char* e){if(!v)throw std::runtime_error(e);}
 static int melee_web_stage_last_stadium_cancel_prepared_ready(void* p,char* e,size_t n){return fixture_cancel(p,e,n);}
-struct GameplayWorld {struct Storage {bool stadium_diagnostic;void* stage_last;MeleeWebSourceFileScope* source_files;}*storage_;void cancel_prepared_stadium_ready();void ensure_source_files_quiescent()const;void end_stage(){ensure_source_files_quiescent();++stage_ends;}static int stage_ends;};int GameplayWorld::stage_ends;
+struct GameplayWorld {struct Storage {bool stadium_diagnostic;void* stage_last;MeleeWebSourceFileScope* source_files;}*storage_;bool diagnostic_stadium_first_transform_can_end(char* e,size_t n)const{std::snprintf(e,n,"first-Fire outside cancellation fixture");return false;}
+ bool diagnostic_stadium_first_transform_snapshot(MeleeWebStadiumFirstTransformJournal* out,char* e,size_t n)const{(void)out;std::snprintf(e,n,"no first-Fire graph capability");return false;}
+ bool diagnostic_stadium_first_transform_completion_status(MeleeWebSourceFileRecordedCompletionStatus* out,char* e,size_t n)const{(void)out;std::snprintf(e,n,"no recorded completion capability");return false;}
+ void cancel_prepared_stadium_ready();void ensure_source_files_quiescent()const;void end_stage(){ensure_source_files_quiescent();++stage_ends;}static int stage_ends;};int GameplayWorld::stage_ends;
 """+quiescent_method+method+r"""
 static int hud_ends;
 static int melee_web_hud_end(void*,char*,size_t){++hud_ends;return 1;}
 static int melee_web_match_rules_publish_result(){assert(0);return 0;}
-struct Session {GameplayWorld* world;bool stadium_diagnostic=true;void* match=nullptr;void* hud=this;struct {bool opening_demo=false;}selected;int flow_ends=0;void end_flow(){++flow_ends;}
+struct Session {GameplayWorld* world;bool stadium_diagnostic=true,first_fire_diagnostic=false;MeleeWebStadiumFirstTransformJournal first_transform_retired{};MeleeWebSourceFileRecordedCompletionStatus first_completion_retired{};void* match=nullptr;void* hud=this;struct {bool opening_demo=false;}selected;int flow_ends=0;void end_flow(){++flow_ends;}
 """+close+r"""
 };
 int main(){fixture_refusal_checks();for(int run=0;run<2;run++){
  fixture_setup();GameplayWorld::Storage st{true,fixture_stage(),fixture_source_scope()};GameplayWorld w{&st};Session s{};s.world=&w;
+ s.first_fire_diagnostic=true;bool fire_refused=false;try{s.close();}catch(const std::runtime_error&){fire_refused=true;}
+ assert(fire_refused&&!s.flow_ends&&!hud_ends&&!GameplayWorld::stage_ends&&s.hud);fixture_check(0);s.first_fire_diagnostic=false;
  fixture_set_source_busy(1);bool refused=false;try{s.close();}catch(const std::runtime_error&){refused=true;}
  assert(refused&&!s.flow_ends&&!hud_ends&&!GameplayWorld::stage_ends&&s.hud);fixture_check(0);
  fixture_setup();st={true,fixture_stage(),fixture_source_scope()};refused=false;fixture_bad(8);try{s.close();}catch(const std::runtime_error&){refused=true;}

@@ -39,7 +39,7 @@ struct Lifetime {bool mode14_observed=false,mode14_neutral_release=false,window_
  uint64_t generation=7,ticks=0,state_samples=0,tail_ticks=0,span_first=100,span_last=5100,draws=0;
  unsigned stock_losses=0;std::array<int,2> last_stocks{4,4};std::string terminal;};
 struct State {bool full_pair=true,route_prepared=true,native_retired=false,natural14_pair=true,
- stockout_pair=false,failed=false,action_open=false,go_observed=true;
+ stockout_pair=false,first_fire_pair=false,failed=false,action_open=false,go_observed=true;
  unsigned match_index=1;uint64_t go_world_tick=80;
  uint32_t mode14_source_tick=3700,last_selected_source_tick=3702;
  std::array<Lifetime,2> lifetimes{};} stadium_paired_v11;

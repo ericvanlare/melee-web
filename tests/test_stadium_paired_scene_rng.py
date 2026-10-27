@@ -10,7 +10,7 @@ class StadiumPairedSceneRngTests(OwnedWorkspaceTests):
     def test_actual_phase_owner_leaf_and_refusals(self):
         source=(ROOT/'src/gameplay_match_context.c').read_text()
         header=(ROOT/'src/gameplay_match_context.h').read_text()
-        types=header[header.index('typedef struct MeleeWebMatchSceneRngPoint {'):header.index('void melee_web_match_scene_rng_note(unsigned phase);')]
+        types=header[header.index('typedef struct MeleeWebMatchSceneRngPoint {'):header.index('} MeleeWebMatchSceneRngSnapshot;')+len('} MeleeWebMatchSceneRngSnapshot;')]
         code=r'''#include <stdint.h>
 #include <stddef.h>
 #include <assert.h>
