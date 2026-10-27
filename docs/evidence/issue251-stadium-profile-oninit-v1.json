@@ -1,7 +1,7 @@
 {
   "schema": "melee-web-issue251-stadium-profile-oninit-v1",
   "issue": "https://github.com/ericvanlare/melee-web/issues/251",
-  "result": "Fresh132 same-instance full A/checked close-restart/fresh B typed22+seed component PASS; C3 and original per-owner parity remain open",
+  "result": "C3 defined functional/selected-ledger comparisons and final regression PASS; literal cleanup-order FAIL retained; publication-head CI required before merge; whole-stage/public admission open",
   "evidence_labels": [
     "Compiled",
     "Synthetic controls",
@@ -25925,6 +25925,679 @@
         "bytes": 162,
         "sha256": "29526e0ea8e940aff28526bda3d48eb60abcb50f7f42ab4997ea7ecb73884fdf"
       }
-    ]
+    ],
+    "posttransform_v1": {
+      "result": "FAIL_ORIGINAL_TRANSFORM_SNAPSHOT",
+      "source_head": "8a0d416192c64bcbc7cfd8fd40b6e8f0da8fe73f",
+      "native_producer": "fe2e50fcb85c83fc6e8e0ca3e5a2392a6da768a4",
+      "seconds": 109.79205508390442,
+      "error": "CaptureError(\"observer error: {'error': 'Stadium C/F boundary did not expose its checked map/display snapshot'}\")",
+      "source_tick": 4432,
+      "draw_ordinal": 4430,
+      "fixed_native_window_completed": true,
+      "whole_route_complete": false,
+      "mode14_observed": false,
+      "source_pins_exact": true,
+      "owned_absence": [
+        {
+          "kind": "pid",
+          "id": 45434,
+          "absent": true
+        },
+        {
+          "kind": "group",
+          "id": 45434,
+          "absent": true
+        },
+        {
+          "kind": "pid",
+          "id": 45435,
+          "absent": true
+        },
+        {
+          "kind": "group",
+          "id": 45435,
+          "absent": true
+        }
+      ],
+      "repeat_authorized": false,
+      "artifacts": {
+        "owner": {
+          "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-posttransform-standings-packet-v1/launch-result.json",
+          "bytes": 3459,
+          "sha256": "cef152223ecd561410a13ebb5ff74d11788e6399d4a324e97dea08a57de2259a"
+        },
+        "report": {
+          "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-posttransform-standings-original-v1/report.json",
+          "bytes": 766,
+          "sha256": "15379811d1fd13f70f3d4d4aa2b1d47b248ebbd4abd7a59c60fe288c1126b4df"
+        },
+        "status": {
+          "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-posttransform-standings-original-v1/native-primary-status.json",
+          "bytes": 766,
+          "sha256": "2394e69fee3805abdff368bfcbce15a7592ed3389f56821a240b11c0e4027f52"
+        },
+        "primary": {
+          "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-posttransform-standings-original-v1/native-primary.mwro",
+          "bytes": 46506103,
+          "sha256": "ce3874f401f8331e01dcb74ef317fd012ab08eca2d764103d7563a1097051844"
+        },
+        "input": {
+          "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-posttransform-standings-original-v1/native-inputs.mwri",
+          "bytes": 1036536,
+          "sha256": "b8f6530db9b5576c2cb3f8197366f8c376ef5e019440a0b22d1dea1f9abb0975"
+        }
+      }
+    }
+  },
+  "c3_paired_registration_lifetimes_2026_10_27": {
+    "state": "PASS_PAIRED_STATE_INPUT_RNG_AND_SELECTED_SCHEDULED_LIFETIMES; LITERAL_CLEANUP_ORDER_FAIL_RETAINED; C3_FALSE",
+    "source_identity": {
+      "original_producer_and_harness": "fe2e50fcb85c83fc6e8e0ca3e5a2392a6da768a4",
+      "original_binary_sha256": "8978bc5ee2630ffd36ebe912c6647a3af0956e4545862c2bf179b9c3b870d277",
+      "original_offline_validator": "17b448a58a42d51f4b8eb3ab36cfd8889665a97e",
+      "browser_runtime": "1b4f1adbea2c4daf05112cb9b0fbc6d8751b38a6",
+      "browser_harness": "1470a827c2eea76e0453eb051082de120c85e4b7",
+      "integrated_comparator_and_posttransform_harness": "8a0d416192c64bcbc7cfd8fd40b6e8f0da8fe73f"
+    },
+    "original": {
+      "raw_result": "FAIL",
+      "failure": "MWRO postflight reader rejected new exact registration capture profile at record0",
+      "offline_result": "PASS_OFFLINE_POSTFLIGHT_REFERENCE_ONLY",
+      "raw_capture_repeated": false,
+      "allocation_rows": 3250,
+      "selected_rng_events": 153025,
+      "unpaired_original_guard_events": 19
+    },
+    "browser": {
+      "result": "pass",
+      "elapsed_seconds": 148.99562937486917,
+      "fixed_work_deadline_seconds": 150,
+      "actions": 14391,
+      "typed22_plus_seed_and_four_port_rows": 7002,
+      "scene_seed_endpoints": 8,
+      "selected_rng_events": 153025,
+      "unpaired_browser_events": 8913,
+      "registration_rows": 2444,
+      "registration_worlds": 9,
+      "checked_native_retirement": true,
+      "owned_pids_absent": 12,
+      "owned_groups_absent": 3,
+      "cleanup_ms": 150,
+      "H1_incidents": 0
+    },
+    "retained_failures": [
+      "Original v1 conditional return observer gap; repaired by exact reviewed v5 return-site handling",
+      "Original v2 reader postflight failure; raw remains FAIL, exact offline validation retained separately",
+      "Browser v1 owner work deadline before registration export; no registration data claimed from it",
+      "Actual literal selected registration comparison v1 mismatch at edge24; resolved as source bulk root/pool reset versus checked explicit native destruction. Literal comparison still FAIL; separately reviewed semantic lifetime result PASS."
+    ],
+    "reviewed_harness_fixes": {
+      "retention": "Persist actual checked-retired registration before host comparison; later failure cannot erase evidence or mark late result pass",
+      "normalization": "Avoid duplicate raw pointer validation; same strict result bytes and all semantic checks retained",
+      "single_retained_data_profile_seconds": [
+        7.023028832860291,
+        5.650583666283637
+      ],
+      "performance_scope": "Single offline comparator benchmark only, not browser performance acceptance"
+    },
+    "limits": {
+      "C3": false,
+      "registration_lifetime_parity": false,
+      "all_rng_writers_observed": false,
+      "standings_mode14_parity": false,
+      "pixels_PCM_live_timing_or_whole_stage_acceptance": false,
+      "selected_scheduled_lifetime_correspondence": true
+    },
+    "artifacts": {
+      "original_raw_report": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-paired-registration-original-v2/report.json",
+        "bytes": 7405,
+        "sha256": "6a74ec6f748fa7b25009f956902a8e33b13c41d17731e0a11ad83480061fc51b"
+      },
+      "original_primary": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-paired-registration-original-v2/native-primary.mwro",
+        "bytes": 57962058,
+        "sha256": "1edee624cdad639ccb5975cbec215178dd67c1f0d8804a376963d00593459d46"
+      },
+      "original_inputs": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-paired-registration-original-v2/native-inputs.mwri",
+        "bytes": 1494136,
+        "sha256": "a38576ddd3fcfb43c5f4a298827510102bf47e9db5c70f6540214ef80a968813"
+      },
+      "original_allocations": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-paired-registration-original-v2/native-allocations.jsonl",
+        "bytes": 2277235,
+        "sha256": "e2dbd6f2cc06041c935bb4795da92d31e286aa3af3d7d886ba0efddb22ed5eac"
+      },
+      "original_compact": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-paired-registration-original-v2/stadium-whole-paired-compact-rng.mwrl",
+        "bytes": 9795419,
+        "sha256": "0783bbcd81bdea28dc6e3115d96a6edcb926c8eca910e50e35c54ed0efa63563"
+      },
+      "offline_postflight": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-registration-postflight-repair-v1/offline-validation.json",
+        "bytes": 261276,
+        "sha256": "224b71c13e9fc6de41ee75413342e1bcdfb6fb9bba3f966d0ce2412e5a36c943"
+      },
+      "original_review": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-paired-registration-original-v2/independent-review.json",
+        "bytes": 5987,
+        "sha256": "531d3e0e143b8710eb6f305f0a1b46ed5460bb7638aef4e3665916d0165742b1"
+      },
+      "browser_manifest": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-registration-browser-packet-v2/manifest.json",
+        "bytes": 41232,
+        "sha256": "d7c7b91393560b70c7623857a68e10d9dad03cd77058a1797283426d1a15476a"
+      },
+      "browser_report": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-registration-browser-capture-v2/browser-run/report.json",
+        "bytes": 345549,
+        "sha256": "4b6f9da7f810abd4b04342cbf1c0b586353404122974f2afd243b6bff266a77d"
+      },
+      "browser_rows": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-registration-browser-capture-v2/browser-run/paired-v11-full-rows.jsonl",
+        "bytes": 21239786,
+        "sha256": "4e97dd86707d22aa7a3be99531cf066aaf72e884661988b9ee2e12e36ac23a63"
+      },
+      "browser_rng": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-registration-browser-capture-v2/browser-run/paired-v11-full-rng.jsonl",
+        "bytes": 43969236,
+        "sha256": "0d30e9ebb4f62a58b3c1844e4468334491392f69df1929aabfa2e8c9ddf01300"
+      },
+      "browser_registration": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-registration-browser-capture-v2/browser-run/stadium-registration-rows.jsonl",
+        "bytes": 1186514,
+        "sha256": "720110ab28bc48a7681cac077021a9ae7018faf48e6e7f55b55d9e2a8601c5e1"
+      },
+      "browser_registration_status": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-registration-browser-capture-v2/browser-run/stadium-registration-status.json",
+        "bytes": 331,
+        "sha256": "832b47bb67f19a6853f0fcc9ebba1ead861bf87523f912b044559cb6849a3562"
+      },
+      "browser_review": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-registration-browser-capture-v2/root-review.json",
+        "bytes": 2555,
+        "sha256": "c142ddbd35d47b52a981b0e59913b097636201b8ab6b9f1eeaeeb24f288801d2"
+      },
+      "browser_owner": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-registration-browser-capture-v2/owner.json",
+        "bytes": 111997,
+        "sha256": "92d77629e7c0e9ebbe8df3477909e8f27d0f5022ea96ece69cf31376cee069d7"
+      },
+      "browser_v1_failure": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-registration-browser-capture-v1/launcher-result.json",
+        "bytes": 214,
+        "sha256": "c6c98d329ec202795f4ef0047c0637f82d33466a86635ba1f0f2d3b7de4bfe8e"
+      },
+      "retention_review": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-registration-retention-order-v2/independent-review-v2.json",
+        "bytes": 1393,
+        "sha256": "eec12fc0f8e52bcb0c99182cbc9ee77b95c9f82e25ee2b4746db7af84ca922cb"
+      },
+      "normalization_freeze": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-rng-normalization-performance-v1/freeze.json",
+        "bytes": 3657,
+        "sha256": "b80c5f24c599695813f5890bc4bf489000b1f034710fb5d315306af8c4eb0c53"
+      },
+      "normalization_review": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-rng-normalization-performance-v1/root-review.json",
+        "bytes": 671,
+        "sha256": "1b7f565dbd19e0dd7fc2a10018bbe891b3ee9fa293184e675c41c6c1beeb1c08"
+      },
+      "source_writer_inventory": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-owner-completion-contract-v1/source-writer-inventory.json",
+        "bytes": 12017,
+        "sha256": "625cf0a8498a14bd9211e807a49ab6f3360d4e6b503f281100b4d40ffb0c64b0"
+      },
+      "registration_comparison_v1_failure": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-registration-comparison-v1/actual-v1/result.json",
+        "bytes": 3769,
+        "sha256": "22fc643c64cb492f5b7a84072783bd8626821ba2bdcdbe52d2fc7e5fe3981715"
+      },
+      "semantic_freeze": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-registration-scheduled-lifetime-candidate-v1/freeze.json",
+        "bytes": 5382,
+        "sha256": "d1892747f8340d9a447029da6c12ba87b2637d258c2a210bc76d58a3f41ce71d"
+      },
+      "semantic_review": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-registration-scheduled-lifetime-candidate-v1/independent-review.json",
+        "bytes": 4261,
+        "sha256": "91fc391f98e682dacf404d15a6966312fb46f94416f374498071a6821d20b633"
+      },
+      "semantic_actual": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-registration-scheduled-lifetime-candidate-v1/actual-v1/comparison.json",
+        "bytes": 23583,
+        "sha256": "e397670d97e776fde291203803c7810f44ed36c370bb12b1679981f2f23a0490"
+      },
+      "semantic_actual_summary": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-registration-scheduled-lifetime-candidate-v1/actual-v1/actual-summary.json",
+        "bytes": 7658,
+        "sha256": "11c4fcd0040931076942105707e269c86841c136d7b1c6fca1fe925db2d688a0"
+      },
+      "semantic_result": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-registration-scheduled-lifetime-candidate-v1/actual-v1/result.json",
+        "bytes": 4741,
+        "sha256": "93e98c4d04ac59af66a6abcfb78847169656ea6b7b710b0fb331e463a0178fb3"
+      },
+      "retirement_source_review": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-registration-comparison-v1/actual-v1/independent-scheduled-lifetime-source-review.json",
+        "bytes": 5596,
+        "sha256": "4920947e7fba5d7f4575c820dbc70691aecb3065f20cdb891341e5020a5f9bb1"
+      },
+      "posttransform_freeze": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-posttransform-standings-candidate-v1/freeze-v1.json",
+        "bytes": 3386,
+        "sha256": "cb40aab0b51f16631f3f2ffc22da04b46011aa24dbec4a6ea5a5d6d2fa6e6f02"
+      },
+      "posttransform_focused": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-posttransform-standings-root-controls-v1/result.json",
+        "bytes": 2295,
+        "sha256": "c259b5ff1ceb568901a4c3bae8a342d4325218a5730bfec5722e6c6335146c2a"
+      }
+    },
+    "scheduled_lifetimes": {
+      "result": "PASS_SELECTED_SCHEDULED_LIFETIME_CORRESPONDENCE",
+      "owners": 8,
+      "creation_setup_link_edges": 48,
+      "native_local_cleanup_edges": 80,
+      "A_retirement": "Observed exact selected generations in original post-OnExit pool reset residuals",
+      "B_retirement": "Source-proved mandatory active-root replacement no later than actual Results entry39363, bounded by source primary39361..39363",
+      "B_dynamic_reset_or_free_observed": false,
+      "literal_cleanup_order": "FAIL retained separately",
+      "arbitrary_allocations_or_writers": false
+    },
+    "validation": {
+      "focused_semantic_tests": 14,
+      "focused_posttransform_and_route_tests": 18,
+      "skips": 0,
+      "full_regression": "PENDING current batch",
+      "exact_head_CI": "PENDING current batch",
+      "runtime_build_producer": "1b4f1adbea2c4daf05112cb9b0fbc6d8751b38a6",
+      "build_scope": "Both affected Release builds pass. Later registration-retention/comparator/standings commits are harness only. Service candidate remains external/unintegrated."
+    }
+  },
+  "c3_natural_mode14_original_2026_10_27": {
+    "state": "C3_FUNCTIONAL_COMPARISONS_AND_FINAL_REGRESSION_PASS_AT_DECLARED_SCOPES; PUBLICATION_HEAD_CI_REQUIRED_BEFORE_MERGE",
+    "source_identity": {
+      "original_producer_and_native_source_head": "646206616654d8b5d7f6c11fc2ae188022c2fd1c",
+      "capture_profile": "selected_b_mode8_post_transform_mode14_v1",
+      "fixed_window_profile": "selected_b_3500_v1",
+      "packet_inputs_exact": 74
+    },
+    "raw_capture": {
+      "directory": "c3-posttransform-standings-original-v2",
+      "collector_result": "pass",
+      "supervisor_completed": false,
+      "supervisor_primary_error": "AssertionError",
+      "classification": "INCONCLUSIVE_MODE14_BEFORE_TRANSFORM",
+      "independent_review": "c3-posttransform-standings-original-v2/independent-review.json",
+      "independent_review_sha256": "8631c97c0e8cce6ed3f6bf2f288c4cc141e6651fb7266d9d56863dfae2f28e0a",
+      "mode14_witness": {
+        "sequence": 23033,
+        "source_tick": 3725,
+        "draw_ordinal": 3722,
+        "mode": 14,
+        "focus": 0
+      },
+      "preceding_consumed_pad": {
+        "sequence": 23032,
+        "source_tick": 3725,
+        "draw_ordinal": 3722,
+        "ports": [
+          "0000500000000000000000",
+          "0000000000000000000000",
+          "00000000000000000000ff",
+          "00000000000000000000ff"
+        ],
+        "errors": [
+          0,
+          0,
+          -1,
+          -1
+        ]
+      },
+      "map2_countdown": 148,
+      "first_transform": null,
+      "fixed_window": {
+        "profile": "selected_b_3500_v1",
+        "post_go_ticks": 3500,
+        "state_and_input_rows": 3501,
+        "go": {
+          "source_tick": 84,
+          "sequence": 4833,
+          "draw_ordinal": 84
+        },
+        "target": {
+          "source_tick": 3584,
+          "sequence": 22328,
+          "draw_ordinal": 3581
+        },
+        "natural_tail_ticks": 0
+      },
+      "post_window_observation": {
+        "source_ticks": 143,
+        "first_source_tick": 3585,
+        "last_source_tick": 3727,
+        "stop": "mode14_before_transform"
+      },
+      "reviewed_scope": "Original natural mode14 source reference; later browser comparison is a separate actual run under its own producer. Original supervisor FAIL and post-transform classification unchanged."
+    },
+    "artifact_pins": {
+      "report": {
+        "path": "c3-posttransform-standings-original-v2/report.json",
+        "bytes": 6088709,
+        "sha256": "113ca723d4c9278a48aba1136dc9983536226ab72d6937f7df20a16b768ad7eb"
+      },
+      "native_primary": {
+        "path": "c3-posttransform-standings-original-v2/native-primary.mwro",
+        "bytes": 41380328,
+        "sha256": "558dce51463178127ac1331eb888918fd4fa4120865dbbee11e1b742ab149846"
+      },
+      "native_inputs": {
+        "path": "c3-posttransform-standings-original-v2/native-inputs.mwri",
+        "bytes": 1129016,
+        "sha256": "6a1ec0fa3aec43dc59afaf8840cc0fc7a33ba0da5ab5abf96839361fbb11cf7b"
+      },
+      "launch_result": {
+        "path": "c3-posttransform-standings-packet-v2/launch-result.json",
+        "bytes": 3674,
+        "sha256": "c936982189b384e13b0b90725808e3519a8e717d360b8c471d30bda94e4074c9"
+      },
+      "browser_manifest": {
+        "path": "c3-natural14-browser-packet-v1/manifest.json",
+        "bytes": 36624,
+        "sha256": "c2c41da2951247510904dbe39f66e873d8b6bdb7e5914b15ea0d199eca602b80"
+      },
+      "browser_launcher": {
+        "path": "c3-natural14-browser-capture-v1/launcher-result.json",
+        "bytes": 214,
+        "sha256": "69ff1cb2856c4ece038f80ef84838f0330ebd4c6125085139e88275ca3e05d7f"
+      },
+      "browser_report": {
+        "path": "c3-natural14-browser-capture-v1/browser-run/report.json",
+        "bytes": 332575,
+        "sha256": "1def3099c334093370494fd453dd74e574bdc1ae9f2b4f553d9861a0840614c2"
+      },
+      "browser_rows": {
+        "path": "c3-natural14-browser-capture-v1/browser-run/paired-v11-full-rows.jsonl",
+        "bytes": 11320838,
+        "sha256": "3dfadbf6dd0170b919df971f0ed4260eeec76368b282b1ad7cc540f5d1ca3191"
+      },
+      "browser_raw_rng": {
+        "path": "c3-natural14-browser-capture-v1/browser-run/paired-v11-full-rng.jsonl",
+        "bytes": 21969186,
+        "sha256": "7d2fab031f7062e492faa940c7f839dc26d341e795d303dc567260d890f17fd7"
+      },
+      "browser_owner": {
+        "path": "c3-natural14-browser-capture-v1/owner.json",
+        "bytes": 112407,
+        "sha256": "69a6b626664603f5fbfb3ec9d282e8df8f41a2a18c2c72a713fe4c37d1963078"
+      },
+      "runtime_builds": {
+        "path": "c3-natural14-runtime-build-v1/result.json",
+        "bytes": 2405,
+        "sha256": "5e0566c8ee893d9b3ab70d2b58bea73ebf0b90f35f2c429372fc238d75d7cc58"
+      },
+      "focused_controls": {
+        "path": "c3-natural14-focused-v1/result.json",
+        "bytes": 1162,
+        "sha256": "ad7c95273fc848bd7118be353ce201fe29021204587397f0843a2e147c2a93d7"
+      },
+      "derived_projection": {
+        "path": "c3-natural-mode14-browser-candidate-v2/export-v1/projection.json",
+        "bytes": 10087142,
+        "sha256": "567751f62404c6e4cb081ab202a5dd0e7ab62a0a543867b05c866dc8cbf79f89"
+      },
+      "derived_recipe": {
+        "path": "c3-natural-mode14-browser-candidate-v2/export-v1/recipe.mwrc",
+        "bytes": 240628,
+        "sha256": "91b01fef948088a641062c3a53be5580520d85717a4de64f76a2d68563734185"
+      },
+      "browser_independent_review": {
+        "path": "c3-natural14-browser-capture-v1/independent-review.json",
+        "bytes": 8254,
+        "sha256": "fe43cccf70ed9d064ccc52ed4c121641b3c9f0e106dd3607b449e33ebcab1606"
+      }
+    },
+    "next_step": "Final regression passed. Require passing publication-head CI and final integration checks before merge. Next Stadium milestone is C4 original latency measurement, reference first; runtime transformation/service candidates remain parked.",
+    "parked_scope": "C4 transformation candidates remain parked pending source-file-service quiescence resolution; finish_vs/finish_sudden_death can call end_flow and publish Results before that check.",
+    "validation": {
+      "native_policy_controls": 4,
+      "native_services": "modeled controls; actual browser run separate",
+      "retained_js_controls": 6,
+      "retained_js_skips": 0,
+      "diagnostic_Release": "PASS afb141c7",
+      "ordinary_Release": "PASS afb141c7",
+      "independent_browser_raw_review": {
+        "status": "PASS_SCOPED_NATURAL14_BROWSER_COMPONENT",
+        "receipt": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-natural14-browser-capture-v1/independent-review.json",
+          "bytes": 8254,
+          "sha256": "fe43cccf70ed9d064ccc52ed4c121641b3c9f0e106dd3607b449e33ebcab1606"
+        }
+      },
+      "full_regression": {
+        "status": "PASS",
+        "source_head": "90ba7a5138ddfdcaac008231993401d5d6ffdde7",
+        "source_tree": "fa82210ef5b6f63599387ee13514cd60466836b4",
+        "receipt": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-natural14-full-regression-v2/result.json",
+          "bytes": 1168,
+          "sha256": "2ddda6b33b29114ccb07ac75db31df73d7d74113f7460ee64d84232cf269749d"
+        },
+        "stderr": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-natural14-full-regression-v2/full-regression.stderr",
+          "bytes": 541189,
+          "sha256": "098a518cff4b4a03e70aec212992b1a3d1cd399ca1173bd81fb38e7a40c329c6"
+        },
+        "stdout": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-natural14-full-regression-v2/full-regression.stdout",
+          "bytes": 34225,
+          "sha256": "a57003afaa7f0059094ca677219059e43bfab7347cd1521f88cf9fe17e913742"
+        },
+        "actual_tests": 2949,
+        "actual_skips": 211,
+        "unittest_seconds": 608.4,
+        "owner_seconds": 608.951186500024,
+        "footer": "OK (skipped=211)",
+        "passed": true,
+        "source_unchanged": true,
+        "owned_group_absent": true,
+        "runtime_capture_head": "afb141c7dff8e4c94d194bbd7a4a12c0f24a174a"
+      },
+      "exact_head_CI": {
+        "status": "REQUIRED_ON_PUBLICATION_HEAD_BEFORE_MERGE",
+        "run_url": null,
+        "head": null,
+        "policy": "CI must pass on the actual publication head before merge; this document does not assert its own future commit hash."
+      },
+      "retained_regression_v1": {
+        "result": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-natural14-full-regression-v1/result.json",
+          "bytes": 1170,
+          "sha256": "6edd9e867f95cea7f27fed0c5ce09b1b74d5d5eab06cf22abe00d0233bf21b02"
+        },
+        "source_head": "afb141c7dff8e4c94d194bbd7a4a12c0f24a174a",
+        "actual_tests": 2949,
+        "failures": 6,
+        "errors": 3,
+        "skips": 211,
+        "footer": "FAILED (failures=6, errors=3, skipped=211)",
+        "seconds_unittest": 615.27,
+        "stderr": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-natural14-full-regression-v1/full-regression.stderr",
+          "bytes": 561867,
+          "sha256": "c304526fe135c1f4a3034fb0f64c18b5fc4ce995a098c8f3358d95b2fe60f080"
+        },
+        "source_unchanged": true,
+        "owned_group_absent": true
+      },
+      "fixture_repair": {
+        "source_commit": "90ba7a5138ddfdcaac008231993401d5d6ffdde7",
+        "scope": "nine test-only files; production/runtime/capture source unchanged",
+        "independent_review": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-regression-fixture-repair-v1/v3-review.json",
+          "bytes": 4434,
+          "sha256": "916bc8528e8ff83b8969fd2a59297beb853d4b93b9f3076472ef6fc337d05e2a"
+        },
+        "first_focused": {
+          "result": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-regression-fixture-focused-v1/result.json",
+            "bytes": 2295,
+            "sha256": "5800bbf9021855a8d94556c05d0cb5391adc9559f93e72471757c6ac9232b464"
+          },
+          "stderr": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-regression-fixture-focused-v1/nine-actual-regression-failures.stderr",
+            "bytes": 3177,
+            "sha256": "22c41e98b69c82b04069e9edf2328489a28aa3750bfcfa0408b38b9838395677"
+          },
+          "tests": 9,
+          "passed": 8,
+          "failed": 1,
+          "retained_failure": "SSS fixture duplicated actual StadiumFirstFormObservation declaration"
+        },
+        "final_SSS": {
+          "result": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-regression-fixture-focused-v2/result.json",
+            "bytes": 1337,
+            "sha256": "8c1533007f5deaed3b7b68fc7b7d4b1033ef921d64622ab7d20e58a08d140ff7"
+          },
+          "tests": 1,
+          "pass": true,
+          "seconds": 0.6626313328742981,
+          "pgid": 64936,
+          "group_absent": true
+        },
+        "SSS_source_attribution": "Actual retained SliceTag\u2192SliceRef enum span already includes StadiumFirstFormObservation; remove only redundant separate extraction/concatenation. Retain actual ReadBE16/member and original assertions.",
+        "runtime_and_capture_producer_unchanged": "afb141c7dff8e4c94d194bbd7a4a12c0f24a174a"
+      }
+    },
+    "browser_comparison": {
+      "profile": "selected_b_natural_mode14_v1",
+      "result": "pass",
+      "component_pass": true,
+      "runtime_and_harness_head": "afb141c7dff8e4c94d194bbd7a4a12c0f24a174a",
+      "runtime_tree": "329f3ce594aec7feace998bd6067b8ebec8775fd",
+      "runtime_dirty": false,
+      "manifest_sha256": "c2c41da2951247510904dbe39f66e873d8b6bdb7e5914b15ea0d199eca602b80",
+      "launcher_elapsed_seconds": 95.36030529206619,
+      "all_source_runtime_input_pins_exact": true,
+      "original_full3_recording": "retained unchanged; recipe is an explicitly derived complete A+B prefix through B CSS",
+      "recipe_sha256": "91b01fef948088a641062c3a53be5580520d85717a4de64f76a2d68563734185",
+      "recipe_frames": 4911,
+      "actual_source_actions": 7867,
+      "lifetimes": [
+        {
+          "match_index": 0,
+          "role": "A route warmup",
+          "ticks": 192,
+          "draws": 192,
+          "actions": 384,
+          "paired_state_rows": 0,
+          "world_generation": 3,
+          "recorded_outcome": "NoContest",
+          "checked_retirement": true,
+          "Results_CSS": true
+        },
+        {
+          "match_index": 1,
+          "role": "B selected natural mode14",
+          "ticks": 3743,
+          "draws": 3740,
+          "actions": 7483,
+          "paired_state_rows": 3644,
+          "world_generation": 7,
+          "recorded_outcome": "NoContest",
+          "checked_retirement": true,
+          "Results_CSS": true
+        }
+      ],
+      "typed_state_partition": {
+        "fixed_window_rows": 3501,
+        "post_window_rows": 143,
+        "total": 3644,
+        "selected_ticks": [
+          84,
+          3727
+        ],
+        "actual_GO_tick": 84
+      },
+      "mode14": {
+        "source_tick": 3725,
+        "draw_ordinal": 3722,
+        "form": 5,
+        "phase": 0,
+        "countdown": 148,
+        "transform_observed": false
+      },
+      "release": {
+        "source_tick3726": "actual delayed horizontal PAD retained and compared",
+        "source_tick3727": "actual neutral four-port PAD retained and compared"
+      },
+      "scene_rng_endpoints_compared": 8,
+      "per_owner_rng_comparison": false,
+      "native_rng_events_unpaired": 80748,
+      "H1": {
+        "timing_incident_count": 0,
+        "timing_pause_observed": false,
+        "performance_accepted": false,
+        "scope": "H1 observation only; not foreground timing/performance acceptance"
+      },
+      "cleanup": {
+        "native_retired": true,
+        "phase": 0,
+        "running": 0,
+        "owner_cleanup_passed": true,
+        "capture_group_absent": true,
+        "server_group_absent": true,
+        "browser_groups_absent": true
+      },
+      "claims": {
+        "browser_component_comparison": true,
+        "per_owner_rng": false,
+        "transformation": false,
+        "arbitrary_writer_coverage": false,
+        "whole_stage_acceptance": false,
+        "public_admission": false,
+        "C3_complete": false
+      }
+    },
+    "milestone_assessment": {
+      "functional_comparisons": "complete at the defined functional/selected-ledger scopes according to independent C3 gate assessment",
+      "assessment_receipt": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-natural14-docs-batch-v1/c3-gate-review.json",
+        "bytes": 5900,
+        "sha256": "e0696b385d17e29bb3a6d4dbfa123fea1c7af4a565939c0903200d07a82a0c5b"
+      },
+      "final_regression_required": true,
+      "publication_head_CI_required": true,
+      "merge_released": false,
+      "broader_allocator_arbitrary_writer_coverage": "explicit scope limit; full allocator journaling is separate per ARCHITECTS October26 entry",
+      "next_milestone": "C4: obtain one complete first-form original reference, then repeat its exact completed input for original latency measurement; no runtime transformation port release",
+      "independent_recommendation": "HOLD pending final regression/CI and explicit literal cleanup-order disposition",
+      "root_disposition": {
+        "decision": "Accept separately reviewed selected-owner active-lifetime semantic comparison for C3 only; retain literal cleanup-order FAIL",
+        "basis": "Original pool/root retirement and native post-lifetime checked explicit destructor cleanup are distinct mechanisms under the reviewed source proof and semantic comparison.",
+        "safety_cleanup": "retained; no native cleanup removal",
+        "original_B_dynamic_free_reset": "not observed and not promoted to observed",
+        "literal_event_order_equal": false
+      },
+      "functional_checklist": {
+        "two_native_no_draw_lifetimes": true,
+        "original_matched_drawn_pair_and_selected_owner_rng": true,
+        "selected_registration_active_lifetimes_with_scoped_retirement": true,
+        "natural_stockout_mode9": true,
+        "natural_mode14_browser_comparison": true,
+        "final_regression": "PASS",
+        "publication_head_CI": "REQUIRED_BEFORE_MERGE"
+      },
+      "root_disposition_receipt": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-final-docs-batch-v3/root-lifetime-scope-disposition.json",
+        "bytes": 2276,
+        "sha256": "e2c1aa915c79c6a37208b04b57d63f05ec7e7b7e989a0233e34d9e47d744956c"
+      },
+      "final_regression_completed": true
+    }
   }
 }
