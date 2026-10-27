@@ -20,6 +20,8 @@ class FirstFormLatencyReplayAdmissionTests(unittest.TestCase):
         cls.addClassCleanup(cls.tmp.cleanup)
         directory = Path(cls.tmp.name)
         text = SOURCE.read_text()
+        timing_start = text.index('  bool selected_timing_enabled=')
+        timing_state = text[timing_start:text.index(';', timing_start)+1]
         begin = text.index('enum class Boundary : u16')
         boundary = text[begin:text.index('};', begin)+2]
         leaves = text[text.index('struct StadiumWholeBObservation\n'):
@@ -55,6 +57,7 @@ struct CompactRngSettings { bool present=false,valid=false;std::string selection
 const CompactRngSettings& CompactRngEnvironment(){return settings;}
 constexpr const char* EXPECTED_DOL_SHA256="e";
 struct Gate {
+""" + timing_state + r"""
  StadiumWholeBObservation stadium_whole_b; StadiumWholeLongIdle stadium_whole_long_idle;
  bool stadium_whole_paired_idle=false;
  bool stadium_go_prefix_enabled=false,stadium_whole_feedback=false;

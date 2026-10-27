@@ -98,6 +98,8 @@ class ReferenceEntityProfileTests(unittest.TestCase):
         stadium_state_start = source.index('  bool stadium_go_prefix_enabled = false;')
         stadium_state_end = source.index('  bool stadium_go_prefix_css_ready = false;', stadium_state_start)
         stadium_state = source[stadium_state_start:stadium_state_end]
+        timing_start = source.index('  bool selected_timing_enabled=')
+        timing_state = source[timing_start:source.index(';', timing_start)+1]
         start = source.index('    if (checked_entity_profile)\n      handshake +=')
         metadata = source[start:source.index('    handshake += "}";', start)]
         count_function=source[source.index('u32 WholeSessionMatchCount()'):source.index('bool PairedIdleStartupProfilesAgree(')]
@@ -132,7 +134,7 @@ constexpr unsigned WHOLE_SESSION_MIN_MATCHES=3,WHOLE_SESSION_MAX_MATCHES=64;
 bool SdInitRequested(){return !Env("MWRC_SD_INIT").empty();}
 struct Reader {
  unsigned whole_session_matches=0;bool checked_entity_profile=false,active_entity_profile=false;std::string error;
-''' + stadium_owner_fields + '\n' + stadium_state + r'''
+''' + stadium_owner_fields + '\n' + stadium_state + '\n' + timing_state + r'''
  bool SetInvalid(const char* s){error=s;return false;}
  bool configure(){
 ''' + gate + r'''

@@ -385,6 +385,9 @@ class SheikTransformPrefixTests(unittest.TestCase):
             self.skipTest("A native C++ compiler is not installed")
         source = OBSERVER_SOURCE.read_text(encoding="utf-8")
         dispatcher = _extract_braced_definition(source, "static bool IsCaptureBoundary(")
+        timing_points = source[source.index("constexpr std::array<u32,7> SELECTED_TIMING_PCS="):
+                               source.index("constexpr char EXPECTED_DOL_SHA256[]")]
+        timing_requested = _extract_braced_definition(source, "static bool SelectedTimingRequested()")
         stadium_after_pc_start = source.index("constexpr u32 STADIUM_GO_AFTER_PC =")
         stadium_after_pc = source[stadium_after_pc_start:source.index(";", stadium_after_pc_start) + 1]
         constructor_pcs_start = source.index("constexpr std::array<u32, 7> STADIUM_CONSTRUCTOR_PCS =")
@@ -400,7 +403,7 @@ class SheikTransformPrefixTests(unittest.TestCase):
 #include <string>
 using u32 = uint32_t;
 constexpr u32 SSS_ENTER_RETURN = 0x8025B84C;
-''' + stadium_after_pc + constructor_pcs + r'''
+''' + stadium_after_pc + constructor_pcs + timing_points + r'''
 std::map<std::string, std::string> environment;
 std::string Env(const char* name) { return environment[name]; }
 bool CpuProbeEnabled() { return false; }
@@ -411,7 +414,7 @@ struct Settings { u32 rng_return_pc = 0; bool rng_returns = false, rng_updates =
 const Settings& CpuProbeEnvironment() { return settings; }
 bool CompactRngEnabled() { return false; }
 bool SelectedRngReturn(u32, bool, u32, bool = false) { return false; }
-''' + request_helpers + dispatcher + r'''
+''' + request_helpers + timing_requested + dispatcher + r'''
 int main(int argc, char** argv) {
   assert(argc == 2);
   const std::string mode = argv[1];
