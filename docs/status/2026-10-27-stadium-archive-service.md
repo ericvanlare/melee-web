@@ -1,48 +1,25 @@
 # Stadium C5: archive transfer and source teardown
 
-**Compiled / Source identified**
+**Source identified / Focused source controls passed**
 
-Current boundary: service components, public/audio builds, and the repaired full regression pass. C5 and whole-stage acceptance remain open.
+Current boundary: #346 is merged and its exact-head CI passed. The #347 shared-map0 attribution repair is applied at `3e0a533c`; the old `e4879796` source reproduces the refusal and the repaired source passes the actual-source control with base Ground0 live while still refusing a real form Ground9 consumer. The slot controls and ordinary/diagnostic Release builds pass. The full regression completed with one canonical patch-representation failure; canonicalization preserved the applied source tree and its 15-test control passes. Exact-head CI is pending. C5 and whole-stage acceptance remain open, and browser transformations remain disabled.
 
-[Milestone #345](https://github.com/ericvanlare/melee-web/issues/345) composes the
-exact-disc transfer, source-file service, and Stadium map-2 writable-region
-owner. The [evidence record](../evidence/issue345-stadium-archive-service-v1.json)
-keeps the service, compatibility, build, and regression identities separate.
+[Milestone #345](https://github.com/ericvanlare/melee-web/issues/345) composes the exact-disc transfer, source-file service, and Stadium map-2 writable-region owner. The [evidence record](../evidence/issue345-stadium-archive-service-v1.json) keeps service, compatibility, build, and regression identities separate.
 
-The C5 service implementation is at 9d9d53b6; its five-file compatibility
-repair was committed as 3639903a. The composed service controls and ordinary
-and Stadium-diagnostic Release builds passed at the service source. The
-compatibility repair then passed its 23-test focused control, and the public
-runtime and audio-preview Release builds passed at 3639903a.
+PR [#346](https://github.com/ericvanlare/melee-web/pull/346) merged as `3fd2ed878bbb9a149b79e830701762887410a0a2`; its reviewed tree `88ac98b1c482b7062c33bc490eeba11cf8e95481` matches the merged tree. Exact-head CI run `40540770417` completed all 14 checks: 12 passed and two expected skips. The merge gate is recorded in `runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-merge-gate-v1/`.
 
-The first full regression is preserved unchanged: 2,973 tests, 211 skips, four
-failures at 9d9d53b. They expose a public export-list expectation that omitted
-the new asset-transfer export, two extracted end-flow fixtures without the
-production world binding, and a native-menu fixture that extracted region
-helpers without their call sites. The reviewed five-file repair is now applied
-at 3639903a; it updates those compatibility expectations and fixtures only.
-The repaired full regression at 3639903a passed 2,973 tests with 211 skips;
-the process group was absent at completion. Its result and complete captured output are retained at
-`runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-archive-service-full-regression-v2/`. The first four failures remain preserved as historical evidence. Final current-head CI is pending.
+The C5 service implementation is at 9d9d53b6; its five-file compatibility repair was committed as 3639903a. The composed service controls, ordinary and Stadium-diagnostic Release builds, 23 focused compatibility controls, and public/audio-preview Release builds passed at their recorded source revisions. The repaired 3639903a full regression passed 2,973 tests with 211 skips; output is retained at `runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-archive-service-full-regression-v2/`. Those results are separate from the later #347 source-slot work.
 
-The service component now carries authenticated rounded-transfer tail bytes
-without changing logical file bytes or hashes, accepts the source's 0x21 and
-0x23 request classes only for owned files and destinations, and records a
-destination-to-filename receipt only after a complete file copy. Its match
-owner pumps requests at the source tick boundary. The diagnostic Stadium
-StageLast owner binds the exact live map-2 region to its active source scope;
-tick, draw, and teardown check ownership and quiescence before continuing or
-mutating owners. These are service and lifetime components, not a demonstrated
-vanilla map transformation.
+The #347 source-slot and private-entry metadata focused runs were first executed on staged composition `35b50ab`, before rebasing to `e4879796`. Their nine tracked source/test hashes match the corresponding e487 files; the runs were not executed at the e487 commit. The first metadata fixture failure is retained and the corrected v2 control passes. Ordinary and diagnostic Release builds passed at e487. The e487 full regression was deliberately stopped after 232.29 seconds on the shared-map0 defect, with the owned group absent; it is not a completed suite result. These records remain at `c5-slots-focused-v1/`, `c5-slots-focused-v2/`, `c5-slots-build-v2/`, and `c5-slots-regression-v2/`.
 
-No browser gameplay capture or transformation run was performed. DVDFastOpen
-remains an explicit STOP stub; the direct original lbFile async open/read
-path is not yet connected end to end. No deterministic completion rule has
-been justified across forms, and the transformed map archive/graph lifecycle
-remains incomplete. Thus these results do not enable transformations or close
-checkpoint 5. The earlier four failures, the native fixture compile failure, and the initial
-cancellation fixture failure remain retained as historical evidence alongside
-their reviewed repairs.
+Independent review found that each form map contains shared `map0`, but original first-resident lookup supplies `map0` from base slot 0. The old release check attributed a live base Ground0 to each form-local map0 and refused unrelated form release. The exact repair now uses checked first-provider lookup and preserves the lease, header, registry, file-scope, and stale-row guards. A retained source-only reducer reproduces the refusal on e487; the repaired actual-source control passes on `3e0a533c`, keeping base Ground0 live while requiring a real form Ground9 consumer to remain protected. The former HOLD is closed by `c5-slot-final-review-v1/closure-v1.json`; the original HOLD receipt remains preserved. The focused result is in `c5-slots-focused-v3/`.
 
-The next repository check is current-head CI. Even a passing component suite
-does not demonstrate a live archive transform or C5 acceptance.
+Ordinary and diagnostic Release builds also passed at `3e0a533c` (`c5-slots-build-v3/`). The full regression on that source completed 2,975 tests with 211 skips and one failure: `test_gameplay_patch_canonical` rejected patch byte ordering. The canonicalizer then rewrote only `patches/melee-gameplay.patch`; the applied source tree remained `13ef3f889b0e3a6ffd5c52feffefe47bfd5c92ad`. The 15-test canonicalization module passed. The full suite has not been rerun after this representation-only normalization, and exact-head CI is pending. See `c5-slots-regression-v3/` and `c5-slots-canonical-v1/`.
+
+The source-slot code binds the exact ordinary source row, source header, backing-buffer extent, allocation lease, and selected form identity, retaining its matching native archive-section handle as a separate adjunct. The source `map_head` graph remains borrowed. The private `lbFile_8001634C` entry bridge resolves logical length through the active RuntimeFiles registry; invalid or inactive private IDs restore interrupt state and fail instead of falling through to `DVDFastOpen`. These focused controls do not demonstrate a live disc request or an active World transformation route.
+
+The original four-form asset probe used `c56161ea` plus the exact five-file overlay pinned at `c5-form-assets-reduced-v1/freeze-v1.json`, not a clean c561-only checkout. A later composed probe/build at `3e0a533c` plus canonical patch bytes `db35d73d…` again found four hydrated `map_head` records and 123 public names, refused wrong-ordinal lookup and close with a live handle, and reported no source transform. Both probe receipts are linked from the evidence record. Neither probe validates lighting, pipelines, textures, active World wiring, or transformation behavior. The phase-6 raw map2 clear remains distinct from an ordinary source archive row and does not free an archive header or native adjunct; the native ABI fixture does not establish the original Wasm clear extent.
+
+`DVDFastOpen` remains an explicit STOP for ordinary DVD-backed entries. No live `World` transformation path uses the slot binding, and transformed graph retirement and a deterministic completion rule across forms remain unproved. These results do not enable transformations or close checkpoint 5. The earlier four regression failures, initial metadata fixture failure, e487 shared-map0 stop, and canonical representation failure remain retained with their repairs or disposition.
+
+The next gate is exact-head CI, including its regression job. A passing source control, build, or asset probe does not demonstrate a live archive transformation or C5 acceptance.

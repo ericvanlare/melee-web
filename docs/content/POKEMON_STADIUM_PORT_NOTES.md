@@ -327,38 +327,58 @@ bounded service/lifetime coverage, not general transformation activation
 [World end-stage preflight](../../src/gameplay_world.cpp),
 [session source-work guard](../../src/gameplay_match_session.cpp)).
 
-The remaining original entry path still fails explicitly. `DVDFastOpen` remains
-a `STOP` stub ([platform boundary](../../src/gameplay_platform.c)); the
-original `lbFile_8001634C`, `lbFile_80016580`, and `lbFile_800164A4` path is not
-yet connected end to end to this service. The existing `lbFileGetSize` and
-`lbFile_8001668C` adaptations cover their exact-name size/copy helpers, not
-proof that Stadium's direct asynchronous DAT path can load and transform a map.
-The old numeric address threshold may still select type `0x23`; C5 admits that
-type only for a validated owned request, which does not demonstrate the
-complete vanilla call path.
+The source-entry metadata bridge is now present in the #347 candidate. For a
+private RuntimeFiles entry, patched `lbFile_8001634C` resolves logical length
+through `melee_web_source_file_entry_size` inside the existing interrupt-disabled
+section. A missing or inactive private ID restores the previous interrupt
+state and fails explicitly; it never falls through to `DVDFastOpen`. Ordinary
+FST entry IDs retain the source DVD path. The focused extracted-call-chain
+control checks the original logical size, 32-byte request rounding,
+destination-dependent `0x23` type, priority 1, and deferred completion against
+modeled source-service leaves. That does not demonstrate a live disc read or
+transformation. `DVDFastOpen` remains a `STOP` stub for DVD-backed entries.
 
-Transformation support also needs work before the clock starts. Preparation
-must import the required `GrPs1.dat`–`GrPs4.dat` entries while ticks are stopped,
-hydrate each `map_head` graph with the chosen `ResolveNull` policy, register its
-archive sections, and prepare the required stage-light overrides, pipelines,
-and textures. No live archive decode, light-table hydration, pipeline creation,
-or first texture upload should be introduced on the active source-tick path.
-These preparation steps are not supplied by the C5 service component.
+The original actual-data C0 form-asset probe used the `c56161ea` source base
+plus the exact five-file frozen overlay (see the C5 evidence record), and found
+four `GrPs1.dat`–`GrPs4.dat` archives, 123 public names, and four hydrated
+`map_head` records. The composed follow-up probe/build at `3e0a533c` with the
+canonical patch bytes repeated those results and the wrong-ordinal/live-handle
+refusals. Both report `source_transform_executed=false`; neither validates the
+active World path, lighting, pipelines, textures, or a live transformation.
+See `c5-form-assets-probe-v1/result.json` and `c5-form-assets-probe-v2/result.json`
+in the C5 evidence run directory.
 
-The stage-map owner currently has four slots in its struct, but
-[`src/gameplay_stage_map.c`](../../src/gameplay_stage_map.c) populates and
-looks up only `archives[0]`; the patched `grDatFiles_801C6330` and
-`grDatFiles_GetArchive` therefore still resolve only the base archive. A
-transformation needs a separately owned slot for its selected archive. The
-source calls `grAnime_801C65B0` on the previous slot and calls
-`Ground_801C4A08` to destroy the outgoing map (`grpstadium.c:2096-2098, 2209`; `gr/ground.c:2791-2826`). The archive
-backing and descriptors must remain valid while that outgoing map is being
-destroyed; slot retirement must respect both source boundaries. At bind
-time the source writes `0x4000000` into flagged objects, so those objects and
-their native descriptors need correctly owned writable backing.
-The transformed archive/graph lifecycle and the exact completion rule remain
-unresolved; no C5 gameplay capture or transformation acceptance is claimed.
-See the [C5 component boundary](../status/2026-10-27-stadium-archive-service.md)
+The #347 source-slot candidate binds the exact ordinary source-table row,
+source header, backing-buffer extent, allocation leases, and selected form
+identity. It retains the matching native archive-section handle as a distinct
+adjunct; the authored source header and the native handle are not interchangeable,
+and the hydrated `map_head` graph remains borrowed. The source row is retired
+only after its exact adjunct is released, before the source-authored header and
+row are freed. The initial focused controls were run on the staged `35b50ab`
+composition; the tested source/test hashes match the corresponding nine paths
+in `e4879796`. Review found shared `map0` is first-resident in base slot 0, but
+old consumer attribution treated a live base Ground0 as a form-local consumer.
+The corrected first-provider lookup now keeps base Ground0 live and still refuses
+a real form Ground9 consumer; the old source reproduces the refusal. The repair
+closure and focused controls are linked from the [C5 component
+boundary](../status/2026-10-27-stadium-archive-service.md). Ordinary and
+diagnostic Release builds pass at repaired source `3e0a533c`.
+
+The phase-6 default-return path remains separate: the source passes the raw
+map-2 backing buffer to `grAnime_801C65B0`. The slot code recognizes that exact
+buffer as the raw-clear case, not an ordinary archive slot; it preserves the
+source clear without freeing an archive header or releasing the native adjunct.
+The focused fixture models the host `UnkArchiveStruct` ABI and does not yet
+prove the original Wasm clear extent. Neither this raw buffer nor its first
+bytes may be treated as a source slot/header identity.
+
+Before an active transformation, preparation still must provide the authored
+light overrides, pipelines, and textures outside the source-tick path, and the
+runtime must wire the checked form catalog and source-slot hooks into a
+complete World transition. The current candidate has no such World wiring or
+transformation activation. The transformed archive/graph lifecycle and exact
+completion rule therefore remain unresolved; no C5 gameplay transformation or
+acceptance is claimed. See the [C5 component boundary](../status/2026-10-27-stadium-archive-service.md)
 and its [evidence record](../evidence/issue345-stadium-archive-service-v1.json).
 
 Quirk to preserve: on returning to the default form, case 6 passes the raw

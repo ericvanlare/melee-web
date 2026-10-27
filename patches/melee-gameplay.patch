@@ -5311,7 +5311,7 @@ index 2014b73b50dd73519850ecf05db8e4b016d76fb6..92daff95d361415c686770b07bc186d5
  struct lbl_8046B6A0_24C_t {
      UNK_T x0;
 diff --git a/src/melee/gr/granime.c b/src/melee/gr/granime.c
-index a0401b6075684cc6fad4ff050d8c0dfd953b63e0..2e9f1d15d86496a3336702051d106e15ae666059 100644
+index a0401b6075684cc6fad4ff050d8c0dfd953b63e0..d2703b76d7d79f20ef0b1db788bfacc7e4630df8 100644
 --- a/src/melee/gr/granime.c
 +++ b/src/melee/gr/granime.c
 @@ -1,4 +1,9 @@
@@ -5345,7 +5345,7 @@ index a0401b6075684cc6fad4ff050d8c0dfd953b63e0..2e9f1d15d86496a3336702051d106e15
      u8 pad[0x118 - 0xF8];
  };
  
-@@ -73,6 +86,12 @@
+@@ -73,6 +86,12 @@ void grAnime_801C65B0(UnkArchiveStruct* arg0)
      if (arg0 == NULL) {
          return;
      }
@@ -5358,7 +5358,7 @@ index a0401b6075684cc6fad4ff050d8c0dfd953b63e0..2e9f1d15d86496a3336702051d106e15
      if ((uintptr_t) arg0->unk0 != -1U) {
          if (arg0->unk8 == 0) {
              lbArchive_80016EFC(arg0->unk0);
-@@ -81,6 +100,12 @@
+@@ -81,6 +100,12 @@ void grAnime_801C65B0(UnkArchiveStruct* arg0)
          }
      }
      memzero(arg0, sizeof(*arg0));
@@ -5547,7 +5547,7 @@ index af393e2b880e946c7fb9f304e563815154196845..409c872346c80206e644b51fe802fc74
  /* 1CD4A0 */ void grCastle_801CD4A0(void);
  /* 1CD4A4 */ void grCastle_801CD4A4(void);
 diff --git a/src/melee/gr/grdatfiles.c b/src/melee/gr/grdatfiles.c
-index ff1989d3967ca50ccadd979e0636f5a9601a22ad..9d5673d9001f107d62a4a9ea1ffeb71103858107 100644
+index ff1989d3967ca50ccadd979e0636f5a9601a22ad..20829b3004691d8a76ed4e7dcab336e2b5b9bb7e 100644
 --- a/src/melee/gr/grdatfiles.c
 +++ b/src/melee/gr/grdatfiles.c
 @@ -1,14 +1,22 @@
@@ -5753,7 +5753,7 @@ index ff1989d3967ca50ccadd979e0636f5a9601a22ad..9d5673d9001f107d62a4a9ea1ffeb711
      if (arg0 >= 0) {
          s32 i;
          for (i = 0; i < 4; i++) {
-@@ -161,6 +290,12 @@
+@@ -161,6 +290,12 @@ UnkArchiveStruct* grDatFiles_801C6478(void* data, s32 length)
      arc->unk0 = archive;
      arc->unk4 = HSD_ArchiveGetPublicAddress(archive, "map_head");
      arc->unk8 = 1;
@@ -14003,7 +14003,7 @@ index f30cb676d6709b87741845e94f926745d6ca0267..20798b8bd0da3fff63ed48d82198db80
      u8 x0;
      u8 pad_01[3];
 diff --git a/src/melee/lb/lbarchive.c b/src/melee/lb/lbarchive.c
-index fb0385b0da7036603c2da1d4b5bdc1ce960a2238..4a018eb08f826ef3ec4861dc86b3cc6c21534227 100644
+index fb0385b0da7036603c2da1d4b5bdc1ce960a2238..b215ee449030185b7b46946ebda908936deb59d7 100644
 --- a/src/melee/lb/lbarchive.c
 +++ b/src/melee/lb/lbarchive.c
 @@ -1,5 +1,13 @@
@@ -15129,6 +15129,7 @@ index d5b38ac5c92ce0e82ca005de8a205cb338790bb4..f2f2784310c8ccd0426e527a0d282f7a
      if (DbLevel != DbLKind_Master && preloadCache.preloaded && archive == NULL)
      {
 diff --git a/src/melee/lb/lbfile.c b/src/melee/lb/lbfile.c
+index b3a812755463919195aeda9772f81e90853e2423..6d6dd2e0fbefc9caefd58ee6f56e1c04b94bc7f2 100644
 --- a/src/melee/lb/lbfile.c
 +++ b/src/melee/lb/lbfile.c
 @@ -1,5 +1,9 @@
@@ -15141,7 +15142,7 @@ diff --git a/src/melee/lb/lbfile.c b/src/melee/lb/lbfile.c
  #include <placeholder.h>
  #include <string.h>
  
-@@ -95,6 +99,20 @@
+@@ -95,6 +99,20 @@ size_t lbFile_8001634C(int fileno)
      size_t length;
      bool intr = OSDisableInterrupts();
  
@@ -15162,7 +15163,7 @@ diff --git a/src/melee/lb/lbfile.c b/src/melee/lb/lbfile.c
      if (!DVDFastOpen(fileno, &info)) {
          OSReport("Cannot open file no=%d.", fileno);
          HSD_ASSERT(0xD8, 0);
-@@ -108,12 +126,22 @@
+@@ -108,12 +126,22 @@ size_t lbFile_8001634C(int fileno)
  
  size_t lbFileGetSize(const char* basename)
  {
@@ -15185,7 +15186,7 @@ diff --git a/src/melee/lb/lbfile.c b/src/melee/lb/lbfile.c
  }
  
  #define ROUND_UP_32(x) (((x) + 31) & ~31)
-@@ -143,9 +171,17 @@
+@@ -143,9 +171,17 @@ void lbFile_80016580(const char* basename, void* dst, size_t* size,
  
  void lbFile_8001668C(const char* basename, void* dst, size_t* size)
  {
