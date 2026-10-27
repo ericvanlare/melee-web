@@ -597,13 +597,20 @@ void retail_replay_session_initial(const RetailReplayRecipe& recipe) {
     whole_session_match_index = 0;
     whole_session_expected_match_count = expected_setup_count(recipe.version);
     whole_session_entity_prefix_active = recipe.diagnostic_entity_prefix;
-    whole_session_primary_identity_active = has_setup_table(recipe.version);
+    // This inventory validates the v9/v10 four-CPU, three-Match profiles.
+    // The v11 two-human Stadium profile has its own scoped observer and does
+    // not admit that incompatible CPU entity identity inventory.
+    whole_session_primary_identity_active =
+        recipe.version == kRetailReplayVersion ||
+        recipe.version == kRetailReplayFighterVersion;
     whole_session_setup_table_active = has_setup_table(recipe.version);
     if (whole_session_primary_identity_active) melee_web_retail_entities_reset();
     std::cout << "{\"record\":\"header\",\"schema\":\"melee-web-port-session-diagnostic\","
         "\"version\":" << (recipe.diagnostic_entity_prefix ? 2 : 1);
     if (recipe.diagnostic_entity_prefix)
         std::cout << ",\"fighter_entities\":\"all_player_entity_slots\"";
+    if (recipe.version == kRetailReplayDrawClosureVersion)
+        std::cout << ",\"fighter_entities\":\"not_captured\"";
     std::cout << ",\"frames_requested\":" << recipe.frames.size()
         << ",\"comparison\":\"not_run\",\"cpu_observations\":\""
         << (whole_session_cpu_observation_requested &&
