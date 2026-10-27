@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import test from 'node:test';
 import vm from 'node:vm';
+import {createHash} from 'node:crypto';
+import {parseRngDrawProbe,validateRngDrawProbeRows} from '../scripts/rng_draw_probe.mjs';
 import {evaluateMatchedSetupCfNativeCommand, createLaterBGate2NativeAdapter,
   runLaterBGate2ActionContinuation} from './stadium_matched_setup_cf_runner_gate.mjs';
 const root = new URL('../', import.meta.url);
@@ -291,7 +293,7 @@ test('settled failed step is persisted with its native snapshot and never promot
 });
 
 test('actual harness catch/finally/snapshot branches bypass every ordinary cleanup after reservation or uncertainty',async()=>{
-  const calls=[];const ctx={laterBGate2Reserved:true,page:{isClosed:()=>false},console};vm.createContext(ctx);
+  const calls=[];const ctx={laterBGate2Reserved:true,rngDrawProbe:null,page:{isClosed:()=>false},console};vm.createContext(ctx);
   ctx.observePageOperation=()=>{throw Error('ordinary/native snapshot must not run');};
   const snapshot=cut(captureSource,"async function snapshot(reason = 'poll', {captureCss = !diagnostic} = {}) {",'\nasync function phase(');
   const snap=vm.runInContext('('+snapshot+')',ctx);
@@ -330,6 +332,8 @@ test('actual harness catch/finally/snapshot branches bypass every ordinary clean
     artifact_inventory_pre:{equal:true},unexpected_requests:[]};
   ctx.currentSssArm={evaluate:async fn=>fn({state:()=>({owned:true}),dispose:()=>true}),dispose:async()=>calls.push('JS-handle-dispose')};
   ctx.retainReplayArtifacts=async()=>calls.push('pure-blob-evidence');
+  const rngExport=cut(captureSource,'async function retainRngDrawProbe() {','\nasync function runLaterBGate2FromSetup(');
+  ctx.retainRngDrawProbe=vm.runInContext('('+rngExport+')',ctx);
   ctx.browserArtifactInventory=async()=>({equal:true});ctx.finalizeSessionCapture=report=>{report.result='incomplete';report.finalization_failures=['whole replay remains incomplete'];};
   const actualFinalizationErrors=[];
   ctx.firstError=(kind,message)=>actualFinalizationErrors.push({kind,message});
@@ -337,6 +341,38 @@ test('actual harness catch/finally/snapshot branches bypass every ordinary clean
   assert.deepEqual(actualFinalizationErrors,[],`Actual finalizer refused: ${JSON.stringify(actualFinalizationErrors)}`);
   assert.equal(ctx.report.result,'later_b_gate2_component_pass_replay_incomplete');
   assert.deepEqual(ctx.report.finalization_failures,['whole replay remains incomplete']);
+  // Actual Gate2 finalizer and actual shared RNG exporter/validator, with only
+  // page/native retirement leaves modeled. Empty windows must be exported too.
+  ctx.Buffer=Buffer;ctx.createHash=createHash;ctx.validateRngDrawProbeRows=validateRngDrawProbeRows;
+  ctx.rngDrawProbe=parseRngDrawProbe({cursors:'1028,1029,1030'});
+  ctx.laterBRngOwnerWindow={};
+  let rows=ctx.rngDrawProbe.selected.map(source_cursor=>JSON.stringify({
+    schema:'melee-web-rng-draw-probe',version:2,source_cursor,overflowed:false,draws:[]}));
+  const saved=new Map();
+  ctx.write=async(name,text)=>{saved.set(name,text);calls.push(name==='rng-draw-probe.jsonl'?'RNG-write':'host-write');};
+  ctx.page.evaluate=async()=>rows;
+  const acknowledge=ctx.observePageOperation;
+  ctx.observePageOperation=async(label,operation)=>label==='final RNG draw rows'
+    ? (typeof operation==='function'?operation():operation):acknowledge(label,operation);
+  ctx.report.rng_draw_probe={complete:false};
+  calls.length=0;
+  await vm.runInContext('('+finalizer+')()',ctx);
+  assert.equal(ctx.report.result,'later_b_gate2_component_pass_replay_incomplete');
+  assert.equal(ctx.report.rng_draw_probe.complete,true);
+  assert.deepEqual(Array.from(ctx.report.rng_draw_probe.captured_cursors),[1028,1029,1030]);
+  assert.equal(saved.get('rng-draw-probe.jsonl'),rows.join('\n')+'\n');
+  assert.ok(calls.indexOf('RNG-write')<calls.indexOf('OS-close'),'actual Gate2 branch exports before closing page');
+  rows=[];ctx.report.rng_draw_probe={complete:false};actualFinalizationErrors.length=0;
+  await vm.runInContext('('+finalizer+')()',ctx);
+  assert.equal(ctx.report.result,'fail');
+  assert.equal(ctx.report.rng_draw_probe.complete,false);
+  assert.match(actualFinalizationErrors[0].message,/Requested Gate2 RNG owner capture is incomplete/);
+  ctx.page.evaluate=async()=>{throw Error('modeled export failure');};
+  ctx.report.rng_draw_probe={complete:false};actualFinalizationErrors.length=0;
+  await vm.runInContext('('+finalizer+')()',ctx);
+  assert.equal(ctx.report.result,'fail');
+  assert.match(ctx.report.rng_draw_probe_error,/modeled export failure/);
+  assert.match(actualFinalizationErrors[0].message,/Requested Gate2 RNG owner capture is incomplete/);
 });
 
 test('Gate2 capture opt-in requires the exact existing profile3 route, with no deadline or route fallback',()=>{

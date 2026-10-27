@@ -427,6 +427,36 @@ async function retainReplayArtifacts() {
   }
 }
 
+async function retainRngDrawProbe() {
+    if (rngDrawProbe) {
+      try {
+        const rows = await observePageOperation('final RNG draw rows', () => page.evaluate(() => window.__rngDrawProbeRows || []));
+        if(laterBRngOwnerWindow){
+          const rawText=rows.length?rows.join('\n')+'\n':'';
+          await write('rng-draw-probe.jsonl',rawText);
+          report.rng_draw_probe.raw_artifact={name:'rng-draw-probe.jsonl',bytes:Buffer.byteLength(rawText),
+            sha256:createHash('sha256').update(rawText).digest('hex')};
+          if(rows.some(text=>JSON.parse(text).version!==2))throw Error('Gate2 RNG owner rows require the actual version2 owner producer');
+        }
+        const validation = validateRngDrawProbeRows(rows, rngDrawProbe, {
+          observedCursor: report.final_snapshot?.source_cursor,
+          deliberateStop: report.deliberate_prefix_stop,
+        });
+        const text = validation.rows.length ? validation.rows.join('\n') + '\n' : '';
+        await write('rng-draw-probe.jsonl', text);
+        const artifact = {name: 'rng-draw-probe.jsonl', bytes: Buffer.byteLength(text),
+          sha256: createHash('sha256').update(text).digest('hex')};
+        report.saved_downloads ||= [];
+        report.saved_downloads.push(artifact);
+        report.rng_draw_probe = {...report.rng_draw_probe, complete: validation.complete,
+          captured_cursors: validation.rows.length ? validation.rows.map(row => JSON.parse(row).source_cursor) : [],
+          missing_cursors: validation.missing_cursors, artifact};
+      } catch (error) {
+        report.rng_draw_probe_error = String(error?.message || error);
+      }
+    }
+}
+
 async function runLaterBGate2FromSetup(deadline, actualObservation) {
   const setup = actualObservation.prepared_to_setup?.setup;
   const request = {reference_id: laterSssReference,
@@ -517,6 +547,9 @@ async function finalizeLaterBGate2Capture() {
       throw Error('Gate2 completed action/retirement evidence is incomplete');
     report.current_sss_exit.trace_comparison = currentSssPolicy.trace(currentSssTrace, currentSssExpected,
       report.current_sss_exit.observation);
+    await retainRngDrawProbe();
+    if (rngDrawProbe && report.rng_draw_probe?.complete !== true)
+      throw Error('Requested Gate2 RNG owner capture is incomplete: ' + (report.rng_draw_probe_error || 'missing selected cursor rows'));
     report.artifact_inventory_post = await browserArtifactInventory();
     if (!report.artifact_inventory_post.equal || JSON.stringify(report.artifact_inventory_post) !== JSON.stringify(report.artifact_inventory_pre))
       throw Error('Gate2 served/local runtime artifacts changed');
@@ -1871,33 +1904,7 @@ try {
     } catch (error) { report.download_error = String(error?.message || error); }
     try { const rows = await observePageOperation('final CPU prefix rows', () => page.evaluate(() => window.__cpuPrefixRows || [])); if(rows.length) await write('cpu-prefix.jsonl',rows.join('\n')+'\n'); } catch(error) { report.cpu_download_error = String(error); }
     try { const rows = await observePageOperation('final CPU item rows', () => page.evaluate(() => window.__cpuItemEventRows || [])); await write('cpu-item-events.jsonl',rows.length ? rows.join('\n')+'\n' : ''); report.cpu_item_event_count = rows.length; } catch(error) { report.cpu_item_event_error = String(error); }
-    if (rngDrawProbe) {
-      try {
-        const rows = await observePageOperation('final RNG draw rows', () => page.evaluate(() => window.__rngDrawProbeRows || []));
-        if(laterBRngOwnerWindow){
-          const rawText=rows.length?rows.join('\n')+'\n':'';
-          await write('rng-draw-probe.jsonl',rawText);
-          report.rng_draw_probe.raw_artifact={name:'rng-draw-probe.jsonl',bytes:Buffer.byteLength(rawText),
-            sha256:createHash('sha256').update(rawText).digest('hex')};
-          if(rows.some(text=>JSON.parse(text).version!==2))throw Error('Gate2 RNG owner rows require the actual version2 owner producer');
-        }
-        const validation = validateRngDrawProbeRows(rows, rngDrawProbe, {
-          observedCursor: report.final_snapshot?.source_cursor,
-          deliberateStop: report.deliberate_prefix_stop,
-        });
-        const text = validation.rows.length ? validation.rows.join('\n') + '\n' : '';
-        await write('rng-draw-probe.jsonl', text);
-        const artifact = {name: 'rng-draw-probe.jsonl', bytes: Buffer.byteLength(text),
-          sha256: createHash('sha256').update(text).digest('hex')};
-        report.saved_downloads ||= [];
-        report.saved_downloads.push(artifact);
-        report.rng_draw_probe = {...report.rng_draw_probe, complete: validation.complete,
-          captured_cursors: validation.rows.length ? validation.rows.map(row => JSON.parse(row).source_cursor) : [],
-          missing_cursors: validation.missing_cursors, artifact};
-      } catch (error) {
-        report.rng_draw_probe_error = String(error?.message || error);
-      }
-    }
+    await retainRngDrawProbe();
     if (hitTransitionProbe) {
       try {
         const rows = await observePageOperation('final hit transition rows', () => page.evaluate(() => window.__hitTransitionProbeRows || []));
