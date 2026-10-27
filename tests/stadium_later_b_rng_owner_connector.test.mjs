@@ -53,11 +53,11 @@ test('actual native configuration parser is inactive by default and refuses stal
 });
 
 test('actual capture initialization enables owners before runtime startup and installs only derived cursors',async()=>{
- const marker='  await page.addInitScript(({cpuObservationRowLimit, captureCpuObservations,';
+ const marker='  await page.addInitScript(({pairedFull,cpuObservationRowLimit, captureCpuObservations,';
  const start=capture.indexOf(marker),end=capture.indexOf('  page.setDefaultTimeout',start);
  assert.ok(start>=0&&end>start);
  let fn,args;
- const context={window:{},page:{addInitScript:(f,a)=>{fn=f;args=a;}},
+ const context={window:{},pairedFull:false,page:{addInitScript:(f,a)=>{fn=f;args=a;}},
   cpuObservationRowLimit:2013,captureCpuObservations:false,rngDrawProbe:deriveLaterBRngOwnerWindow('1:3',reference()).selection,
   laterBRngOwnerWindow:deriveLaterBRngOwnerWindow('1:3',reference()),hitTransitionProbe:null,firstReplayCallbackProbe:false,
   FIRST_REPLAY_BOUNDARY_MARKER_PREFIX:'unused',FIRST_REPLAY_BOUNDARY_MARKER_NAMES:[]};

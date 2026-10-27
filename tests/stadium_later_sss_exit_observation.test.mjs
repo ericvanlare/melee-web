@@ -223,6 +223,7 @@ async function runnerAdmission(e,args,overrides={}) {
     validateCurrentSssExitExpected,compareCurrentSssExitObservation,validateCurrentSssExitTerminal,
     validateCurrentSssExitTrace,validateCurrentSssExitFinalization,
     diagnostic:false,firstReplayCallbackProbe:false,captureCpuObservations:false,rngDrawProbe:false,
+    pairedFirstGo:false,pairedFull:false, // Existing finite SSS route, paired modes are inactive.
     hitTransitionProbe:false,stopAfter:false,resumeTimingPauses:false,runtimeIncidentRecording:false,
     phaseTimeoutMs:150000,replayTimeoutMs:150000,expectedFrame0Path:null,
     fs:{readFile:async()=>JSON.stringify(e)},statInput:async()=>({sha256:'d'.repeat(64)}),
@@ -282,7 +283,7 @@ test('actual runner loop waits for returned later stop then unloads once and che
     replayTimeoutMs:1000,replayPollMs:0,setTimeout,Date,Promise,
     write:async(name,value)=>writes.push({name,value}),pageErrors:[],report,
     snapshot:async()=>({phase:0,running:0,replay_downloads:unloaded?['retail-browser-report.json']:[],replay_report:browserReport})};
-  const code=runnerSlice('  if (currentSssExit) {\n    currentSssArm =','  } else if (firstReplayCallbackProbe) await firstReplayCallbackPhase();')+'  }';
+  const code=runnerSlice('  if (currentSssExit) {\n    currentSssArm =',"  } else if (pairedFull) await phase('whole-session-replay',pairedFullPhase,replayTimeoutMs,0);")+'  }';
   await vm.runInNewContext('(async()=>{let currentSssArm;'+code+'})()',context);
   assert.equal(starts,1);assert.equal(unloads,1);assert.equal(observations,3);
   assert.equal(report.current_sss_exit.comparison.pass,true);assert.equal(report.current_sss_exit.terminal.pass,true);
@@ -330,7 +331,7 @@ test('actual runner finalizer classifies only later component pass after strict 
     const context={currentSssExit:true,currentSssLater:true,currentSssStock4:false,currentSssPreparedStart:false,laterSssPreparedStart:false,laterSssPreparedSetup:false,
       laterBGate2:admitted.laterBGate2,laterBGate2Reserved:admitted.laterBGate2Reserved,
       currentSssPolicy:admitted.currentSssPolicy,currentSssExpected:e,currentSssTrace:text(trace(e)),report,
-      browserArtifactInventory:async()=>({equal:true}),diagnostic:false,process,console:{log:s=>messages.push(s)}};
+      browserArtifactInventory:async()=>({equal:true}),diagnostic:false,pairedFull:false,pairedFirstGo:false,process,console:{log:s=>messages.push(s)}};
     await vm.runInNewContext('(async()=>{'+finalizer+'})()',context);
     vm.runInNewContext(outcome,context);
     if(!mutate){assert.equal(report.result,'later_sss_component_pass_replay_stopped');assert.equal(process.exitCode,0);
@@ -518,7 +519,7 @@ test('actual runner Setup branch compares prepared receipt before one handoff th
    observePageOperation:async(label,fn)=>fn(),phase:async(label,fn)=>fn(),replayTimeoutMs:1000,replayPollMs:0,setTimeout,Date,Promise,
    write:async(name,value)=>writes.push({name,value}),pageErrors:[],report,
    snapshot:async()=>({phase:0,running:0,replay_downloads:unloaded?['retail-browser-report.json']:[],replay_report:laterReplayReport(e)})};
- const code=runnerSlice('  if (currentSssExit) {\n    currentSssArm =','  } else if (firstReplayCallbackProbe) await firstReplayCallbackPhase();')+'  }';
+ const code=runnerSlice('  if (currentSssExit) {\n    currentSssArm =',"  } else if (pairedFull) await phase('whole-session-replay',pairedFullPhase,replayTimeoutMs,0);")+'  }';
  await vm.runInNewContext('(async()=>{let currentSssArm;'+code+'})()',context);
  assert.equal(starts,1);assert.equal(unloads,1);assert.equal(continuations,1);assert.equal(observations,3);
  assert.equal(report.current_sss_exit.prepared_setup_comparison.pass,true);assert.equal(report.current_sss_exit.terminal.pass,true);

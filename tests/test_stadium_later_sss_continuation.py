@@ -460,6 +460,11 @@ int main(){
         helpers='\n'.join(function(browser,s) for s in ['bool later_sss_pause_pads(','bool later_sss_pause_before(','void later_sss_pause_after('])
         branch=function(browser,'    else if(replay_whole){').replace('else if(replay_whole)','if(replay_whole)',1)
         getter=function(flow,'int melee_web_match_flow_pause_observation(')
+        paired_full=function(browser,'bool stadium_paired_v11_full_active(){')
+        paired_pause=function(browser,'bool stadium_paired_v11_pause_before(const PADStatus* sample){')
+        paired_pause=paired_pause[:paired_pause.index('\n check(')] + '\n (void)sample;throw std::runtime_error("Legacy pause fixture refuses active paired observer");\n}'
+        assert 'if(!stadium_paired_v11_full_active()||!s.enabled)return false;' in paired_pause
+
         result_anchor='  check(later_sss.stage==2&&later_sss_context_owned()&&later_sss.pause_finished&&replay_cursor==later_sss_reference_context().first[3]&&completed_matches==1,'
         assert browser.count(result_anchor)==1
         i=browser.index(result_anchor);j=browser.index('  later_sss.stage=3;',i)+len('  later_sss.stage=3;')
@@ -499,7 +504,8 @@ int main(){
     bool later_sss_context_owned(){return context_ok&&bool(replay);}
     bool later_sss_recipe_valid(const Recipe&){return topology_ok;}
     const auto& later_sss_reference_context(){return melee_web::stadium_later_reference::legacy;}
-    '''+helpers+'\n'+result_gate+'\nvoid actual_browser_pre_tick(const PADStatus* sample){'+branch+'}\n'+r'''
+    struct {bool full_pair=false,route_prepared=false,native_retired=false,enabled=false;} stadium_paired_v11;
+    '''+paired_full+'\n'+paired_pause+'\n'+helpers+'\n'+result_gate+'\nvoid actual_browser_pre_tick(const PADStatus* sample){'+branch+'}\n'+r'''
     PADStatus* sample(){return replay->frames[replay_cursor].pads.data();}
     void reset(){match=std::make_unique<ModelMatch>();replay=std::make_unique<Recipe>();later_sss={};later_sss.armed=true;later_sss.stage=2;later_sss.pause_next_cursor=450;later_sss.pause_match_owner=match.get();context_ok=topology_ok=replay_whole=true;completed_matches=0;replay_cursor=450;
      for(size_t c=450;c<=461;++c){auto& p=replay->frames[c].pads;p[2].err=p[3].err=-1;if(c==450||c==461){p[0].button=0x1160;p[0].triggerLeft=p[0].triggerRight=255;}}
@@ -545,6 +551,10 @@ int main(){
      assert(!melee_web_match_flow_pause_observation(&owned_flow,nullptr));
      source_paused=0;source_frame=57;clock_fields.pause_timer=9;clock_fields.match_result=7;owned_flow.complete=0;
      assert(melee_web_match_flow_pause_observation(&owned_flow,&o));assert(o.generation==1&&o.frame==57&&o.pause_timer==9&&!o.paused&&o.result==7&&!o.complete);
+     assert(!stadium_paired_v11_full_active()&&!stadium_paired_v11.enabled);
+     stadium_paired_v11.full_pair=stadium_paired_v11.route_prepared=stadium_paired_v11.enabled=true;
+     refuses([]{(void)stadium_paired_v11_pause_before(nullptr);});
+     stadium_paired_v11={};
      std::cout<<"PASS extracted private pause guard, ordinary pause refusal, copied-field getter; MODELED_LEAF_COMPONENT_ONLY\n";
     }
     '''

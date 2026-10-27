@@ -8,6 +8,43 @@ from owned_test_workspace import OwnedWorkspaceTests
 from check_gameplay import node_runtime
 from stadium_finite_css_fixture import write_fixture
 
+def paired_v11_inactive_scope(source):
+    """Actual inactive selector/pause guard; active services deliberately throw.
+
+    The CSS fixture never admits a paired match. This closure keeps the actual
+    production early return and refuses accidental expansion into that scope.
+    """
+    def actual(signature):
+        assert source.count(signature) == 1, signature
+        start = source.index(signature)
+        end = source.index('\n}', start) + 2
+        assert end > start
+        return source[start:end]
+    full = actual('bool stadium_paired_v11_full_active(){')
+    pause = actual('bool stadium_paired_v11_pause_before(const PADStatus* sample){')
+    prefix = pause[:pause.index('\n check(')]
+    assert 'if(!stadium_paired_v11_full_active()||!s.enabled)return false;' in prefix
+    return r'''
+// Explicit inactive optional observer state, not a successful paired service.
+struct InactivePairedV11State {
+ bool full_pair=false,route_prepared=false,native_retired=false;
+ bool enabled=false,admitted=false,failed=false,stopped=false,closure_action_seen=false;
+ uint64_t completed_source_draws=0;
+} stadium_paired_v11;
+unsigned paired_optional_calls=0;
+[[noreturn]] void paired_optional_refusal(){
+ ++paired_optional_calls;throw std::runtime_error("CSS fixture cannot execute paired observer services");
+}
+''' + full + '\n' + prefix + '\n paired_optional_refusal();\n}\n' + r'''
+bool stadium_paired_v11_owner_valid(){paired_optional_refusal();}
+void stadium_paired_v11_action_begin(bool,uint64_t){paired_optional_refusal();}
+void stadium_paired_v11_action_end(){paired_optional_refusal();}
+void stadium_paired_v11_after_match_tick(uint64_t,uint64_t,uint64_t,uint64_t,bool){paired_optional_refusal();}
+struct PairedFixtureStats {uint64_t ticks=0;};
+PairedFixtureStats melee_web_gameplay_stats(){paired_optional_refusal();}
+'''
+
+
 class FiniteCssControls(OwnedWorkspaceTests):
     @classmethod
     def setUpClass(cls):
@@ -173,7 +210,7 @@ int main(){
                 'void did_step(bool=true){++count;}template<class F>void before_step(F){}')
             services=services.replace('assert(sample[0].button==first_css_browser_draw.finite_css.rows[first_css_browser_postdraw_stream.current_input_index+1].consumed.ports[1]);',
                 'if(first_css_browser_postdraw_stream.armed)assert(sample[0].button==first_css_browser_draw.finite_css.rows[first_css_browser_postdraw_stream.current_input_index+1].consumed.ports[1]);')
-            services+=WRAPPER_SERVICES
+            services+=WRAPPER_SERVICES+paired_v11_inactive_scope(source)
             reset=reset.replace('match=false;results=false;prize=false;replay=false;',
                 'match=nullptr;results=nullptr;prize=nullptr;replay=nullptr;').replace('preparation.active=false;','preparation.reset();')
             loop=cut('  for(unsigned step=0;step<elapsed.steps;step++){',
@@ -416,6 +453,10 @@ int run(){
  native_result=3;source_callback();assert(pending&&clear_diagnostic_calls==1&&native_ticks==1&&!preparation.busy());
  next_command_callback();assert(!pending&&!running&&preparation.waiting_for_audio()&&source_leave_calls==1&&preparation_profile_calls==1&&!host_entered);
  assert(later_pause_before_calls==0&&later_pause_after_calls==0&&!match&&!replay&&!finite_later_sss_armed);
+ assert(!stadium_paired_v11.enabled&&!stadium_paired_v11_full_active()&&paired_optional_calls==0);
+ stadium_paired_v11.full_pair=stadium_paired_v11.route_prepared=stadium_paired_v11.enabled=true;
+ rejects([]{(void)stadium_paired_v11_pause_before(nullptr);});assert(paired_optional_calls==1);
+ stadium_paired_v11={};
  std::cout<<"PASS whole native source loop: final result3 breaks before shared pending handler; next command fence and final authorization succeed; forced shared-tail mutation detected; ordinary result3 enters real preparation\n";
  return 0;
 }

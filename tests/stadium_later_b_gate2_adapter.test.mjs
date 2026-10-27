@@ -301,6 +301,7 @@ test('settled failed step is persisted with its native snapshot and never promot
 
 test('actual harness catch/finally/snapshot branches bypass every ordinary cleanup after reservation or uncertainty',async()=>{
   const calls=[];const ctx={laterBGate2Reserved:true,laterBLong:false,longBRngRetained:false,
+    pairedFull:false, // Gate2 uses the existing ordinary RNG exporter.
     laterBGate2Reference:{goTick:84},rngDrawProbe:null,page:{isClosed:()=>false},console};vm.createContext(ctx);
   ctx.observePageOperation=()=>{throw Error('ordinary/native snapshot must not run');};
   const snapshot=cut(captureSource,"async function snapshot(reason = 'poll', {captureCss = !diagnostic} = {}) {",'\nasync function phase(');

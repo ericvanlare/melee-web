@@ -70,19 +70,19 @@ assert.throws(()=>validate(rows.slice(1)),/omitted reached/);
 // Execute the actual installed capture consumer with a synthetic window.
 // This exercises callback storage/selection, not a browser or original payload.
 const source=fs.readFileSync(new URL('../scripts/capture_whole_session_browser.mjs',import.meta.url),'utf8');
-const start=source.indexOf('await page.addInitScript(({cpuObservationRowLimit');
-const end=source.indexOf('  }, {cpuObservationRowLimit',start);
+const start=source.indexOf('await page.addInitScript(({pairedFull,cpuObservationRowLimit');
+const end=source.indexOf('  }, {pairedFull,cpuObservationRowLimit',start);
 assert.ok(start>=0&&end>start);
 const callbackText=source.slice(start+'await page.addInitScript('.length,end+3);
 const context={window:{},console};
 const callback=vm.runInNewContext('('+callbackText+')',context);
-callback({cpuObservationRowLimit:1,captureCpuObservations:false,rngDrawProbeSelection:null,
+callback({pairedFull:false,cpuObservationRowLimit:1,captureCpuObservations:false,rngDrawProbeSelection:null,
  hitTransitionProbeSelection:selection,boundaryProbeEnabled:false});
 assert.deepEqual(Array.from(context.window.__meleeHitTransitionProbeCursors),selection.selected);
 context.window.meleeHitTransitionObservation(JSON.stringify(rows[0]));
 assert.throws(()=>context.window.meleeHitTransitionObservation(JSON.stringify(rows[0])),/duplicated/);
 assert.throws(()=>context.window.meleeHitTransitionObservation(JSON.stringify(row(5241))),/selected/);
-callback({cpuObservationRowLimit:1,captureCpuObservations:false,rngDrawProbeSelection:null,
+callback({pairedFull:false,cpuObservationRowLimit:1,captureCpuObservations:false,rngDrawProbeSelection:null,
  hitTransitionProbeSelection:null,boundaryProbeEnabled:false});
 assert.throws(()=>context.window.meleeHitTransitionObservation(JSON.stringify(rows[0])),/Unexpected/);
 console.log('Actual selector, strict artifact validator and installed capture consumer passed');

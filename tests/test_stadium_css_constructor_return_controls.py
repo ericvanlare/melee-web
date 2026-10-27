@@ -174,7 +174,7 @@ int main(){
         failure = source_slice("void first_css_browser_draw_fail(const std::string& error){",
                                "void first_css_browser_draw_check_live(")
         helpers = source_slice("bool stadium_first_css_constructor_return_active(){",
-                               "uint32_t asset_generation=0;")
+                               "\nuint32_t asset_generation=0;\n")
         fixture = r'''
 #include <cassert>
 #include <cstdint>

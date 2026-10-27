@@ -432,7 +432,7 @@ class RetailRecipeDrawClosureTests(unittest.TestCase):
         setup_table = whole.HEADER.size + whole.CONTEXT_HEADER.size + context_bytes
         malformed = bytearray(blob)
         malformed[setup_table:setup_table + 2] = struct.pack(">H", 3)
-        self.assertIn("ERROR Whole-session setup table has an unsupported exact setup count",
+        self.assertIn("ERROR Whole-session setup table requires exactly two setups and zero flags",
                       self.parse(bytes(malformed)))
 
     def test_native_reader_rejects_wrong_profile_opaque_setup_and_route(self):
