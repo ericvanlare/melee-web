@@ -1,11 +1,22 @@
 # Stadium C4: original first-transformation latency
 
-**Current scope: one original first-form recording and two fixed-input replays pass; broader C4 remains open.**
+**Current scope: one original first-form recording and two fixed-input replays pass; #344 is merged, while broader C4 remains open.**
 [Milestone #343](https://github.com/ericvanlare/melee-web/issues/343) follows the
 [C3 idle-lifetime milestone](2026-10-07-pokemon-stadium-profile-oninit.md), merged
 in [#301](https://github.com/ericvanlare/melee-web/pull/301). The
 [evidence record](../evidence/issue343-stadium-first-form-latency-v1.json) keeps
 source, native producer, harness, raw data and review identities separate.
+
+PR #344 merged as b041dcefff1f96a73f5b4afc9972e48250d4ba91. Its tree
+ebac35fcb62841cb37135aefa179f3f0d5043d85 exactly matches the reviewed PR
+tree; the reviewed PR head was d4a7280b3a4ebd9e4633808ea231612628083543.
+The exact-head CI run completed successfully on attempt 2: 14 checks, 12
+successes and two expected skips. The initial unit-1 and menus jobs failed
+before their test partitions started when the pinned FreeType archive transfer
+ended with HTTP/2 receive code 56 after HTTP 200 at 2%. A separate fetch
+matched the existing 4,134,916-byte SHA-256 pin, so only the failed jobs and
+dependent aggregator were retried; no source change was made. The retained
+diagnosis and merge gate are in c4-merge-gate-v1.
 
 One original whole-three recording reaches form 9 and its checked replacement
 root, then completes the existing Results/CSS route and native input footer.
@@ -55,8 +66,4 @@ completion, browser parity, public admission and whole-stage acceptance remain
 open. The incomplete historical water prefix is a different input/context and
 cannot establish variability under fixed input.
 
-The integration regression at `80f8cd49` passes 2,967 tests with 211 skips in
-604.514 seconds; its owned process group is absent. Independent source/docs
-review passes, and the affected Release observer build is verified separately.
-Publication-head CI remains required before merge. The source game and browser
-runtime are unchanged by this diagnostic milestone.
+The pre-merge full regression passed 2,967 tests with 211 skips at the reviewed source tree, and the affected observer build passed separately. The C4 diagnostic did not change the source game or browser runtime. The merged milestone remains scoped to the recorded form and fixed-input replays; other forms, a general completion rule, browser transformation support, public admission and whole-stage acceptance remain open.

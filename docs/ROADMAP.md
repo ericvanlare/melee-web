@@ -254,8 +254,11 @@ step pass at the declared scope. The [C4 receipt](status/2026-10-27-stadium-firs
 tracks observed forms, retained failures and remaining coverage. Resolve the
 general scheduling rule and missing form samples before runtime transformation
 release; stop at the first changed loading latency under fixed inputs/settings.
-Existing source-file/region/transfer candidates remain external. The service
-end-flow/quiescence repair has component support and needs current-main integration. Reuse the existing route and retained evidence;
+The archive-service milestone [#345](https://github.com/ericvanlare/melee-web/issues/345)
+composes exact disc tails, owned destinations and quiescent teardown; its
+[component receipt](status/2026-10-27-stadium-archive-service.md) records validation
+and remaining direct-file, timing and transformed-graph requirements.
+Reuse the existing route and retained evidence;
 do not repeat accepted functional captures or invent neutral rows/GO coordinates.
 Track A retains priority for shared capture resources.
 

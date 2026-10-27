@@ -283,78 +283,83 @@ that have the event only; see
 exposes the case-2 frame but not the trigger tick, which must be inferred from
 the RNG stream.
 
-What the port does today, and why it fails explicitly:
+What the port does today, and what C5 now covers:
 
-- `DVDFastOpen` is a `STOP` stub (`src/gameplay_platform.c:132`), so
-  `lbFile_8001634C` stops. `lbFile_80016580` and `lbFile_800164A4` are **not**
-  patched; only `lbFileGetSize` and `lbFile_8001668C` are
-  (`patches/melee-gameplay.patch`, the `lbfile.c` hunk).
-- `DVDConvertPathToEntrynum` already maps an exact RuntimeFiles name to a
-  private entry (`src/gameplay_audio_stream.c:133-137`), and `HSD_DevComRequest`
-  routes owned entries to `melee_web_source_file_request`
-  (`src/gameplay_audio_stream.c:143-148`). That function accepts only type
-  `0x21`, priority 1, null `args`, 32-byte-aligned offset and size, a range
-  inside the file and a destination inside a registered writable region
-  (`src/gameplay_source_files.c:483-519`).
-- Wasm pointers stay below `0x80000000` (no `MAXIMUM_MEMORY` override exists, so
-  Emscripten's 2 GiB default applies), so the unpatched
-  `type = dst >= 0x80000000 ? 0x21 : 0x23` picks the ARAM relay type, which the
-  service rejects.
-- The existing **external** (streamed) source files are the wrong tool. They
-  read disc ranges through `window.menuStartSourceRead` and the pump blocks with
-  `emscripten_sleep(1)` for up to 30 s per request
-  (`src/gameplay_source_files.c:590-601`; `web/melee-runtime.mjs:464-500`),
-  which would stall source ticks and touch the disc mid-match. They are for
-  authored THP movies.
-- Source requests are pumped only by the menu host before each step
-  (`src/gameplay_menu_host.c:178-185`: pump, `lbAudioAx_80027DF8`, step, clock
-  tick) and by the patched `lb_800195D0` (`lb/lb_0195.c`). The browser reads
-  files only in the preparation transaction while ticks and draws are stopped
-  ([scene asset loading](../SCENE_ASSET_LOADING.md)).
-- `melee_web_source_files_end` refuses to close while a request or writable
-  region is live (`src/gameplay_source_files.c:252-262`), so a request pending
-  at match exit needs a defined drain.
+C5 is an opt-in source-service component for bytes already imported into the
+selected match's `RuntimeFiles`. `HSD_DevComRequest` routes an owned entry to
+[`melee_web_source_file_request`](../../src/gameplay_source_files.c), which
+accepts the original `0x21` and `0x23` request classes only after validating the
+file, callback, alignment, destination extent, and active source owner
+([audio bridge](../../src/gameplay_audio_stream.c),
+[source-file service](../../src/gameplay_source_files.c)). The browser
+imports those Stadium bytes during preparation while gameplay ticks are
+stopped. For this preloaded Stadium path, the in-match request does not read the
+host disc. That statement does not cover the separate external-source THP
+streaming branch: it still reads ranges through `window.menuStartSourceRead`
+and its pump can wait with `emscripten_sleep` ([THP service](../../src/gameplay_source_files.c),
+[browser source reader](../../web/melee-runtime.mjs)).
 
-The service the port needs, which keeps disc reads off the running clock and the
-source's own polling loop unchanged:
+For a transfer rounded past logical EOF, `RuntimeFiles` carries captured tail
+bytes separately. The service copies only the requested logical bytes and the
+authenticated tail; it does not synthesize padding. A destination-to-filename
+receipt is created only after the complete file copy, and logical size and
+archive hashes remain based on the unrounded file length
+([source-file transfer](../../src/gameplay_source_files.c),
+[copy receipt](../../src/gameplay_source_files.c)). In the current match
+path, the source-file scope is pumped before each source tick
+([GameplayMatchSession::tick](../../src/gameplay_match_session.cpp)).
+That host service ordering does not establish the original game's general
+completion rule. A deterministic rule must complete at `request_tick + L_rule`, using the
+recorded per-transformation delay for a declared original comparison. A general
+rule remains for checkpoint 4; completion must never depend on host I/O finish
+time. Checkpoint 4 has one measured first-form context and exact
+fixed-input replays, not a rule proven across forms or online peers
+([C4 evidence](../status/2026-10-27-stadium-first-form-latency.md)).
 
-1. Import GrPs1-4.dat (1,121,132 bytes) as ordinary RuntimeFiles in the
-   selected-match transaction while the clock is stopped, as explicit
-   content-row archives. No browser disc read happens mid-match.
-2. Complete the source request from those bytes through the existing pumped
-   `melee_web_source_file_request` queue, with a **deterministic completion
-   rule**: complete at `request_tick + L_rule`, never at host I/O completion.
-   Today's pump-before-step order gives `L = 1`: the request is made in step N,
-   the pump completes it at the start of tick N+1 outside the source frame, and
-   the first case-1 poll succeeds. The value of `L_rule`, constant or recorded
-   per transformation for original comparison, is decided by checkpoint 4. The
-   rule must be identical for both peers in online lockstep.
-3. Required service changes: answer the size query by entry (a
-   `lbFile_8001634C` patch mirroring the `lbFileGetSize` hunk); classify
-   main-memory destinations as `0x21` by registered region rather than numeric
-   address; register the 0x50000 destination for its owner's lifetime (the
-   allocation is in unpatched source, so this needs a hunk in
-   `grStadium_801D13E0`); accept the source's `ROUND_UP_32` length (the request
-   check rejects reads past the file end today; supply the 6-31 zero tail bytes,
-   which match the disc); and record the destination-to-filename association on
-   completion, because only synchronous copies feed
-   `melee_web_source_file_take_name`, which the patched
-   `lbArchive_InitializeDAT` requires (`lb/lbarchive.c` hunk).
-4. Hydrate all four `map_head` graphs natively at preparation (ResolveNull
-   externs) and register their archive sections, so the in-tick bind does no
-   decoding. Seed the pipelines and textures for the four models at preparation:
-   a live pipeline creation or first texture upload mid-match breaks the stage
-   admission gates.
-5. Give `src/gameplay_stage_map.c` a second slot. `MeleeWebStageMap` already has
-   `archives[4]`, but only `archives[0]` is populated, `melee_web_stage_map_lookup`
-   consults only slot 0 and `melee_web_stage_map_set_public` requires one
-   archive (`src/gameplay_stage_map.c:10-45`). The patched
-   `grDatFiles_801C6330` and `grDatFiles_GetArchive` route to it
-   (`patches/melee-gameplay.patch`, `grdatfiles.c` hunk). Release the slot at the
-   source `grAnime_801C65B0` and keep it alive until the outgoing transformation
-   map has been destroyed (`Ground_801C4A08`, `gr/ground.c:2791-2826`). The
-   flagged objects get `0x4000000` written at bind time, so those native
-   descriptors must be writable.
+The C1A diagnostic StageLast path registers the exact live map-2 allocation as
+a writable destination region under its source scope and generation. Source
+work checks that owner before pumping, ticking, or drawing. Before teardown,
+pending requests or an active callback/pump refuse the quiescence preflight,
+leaving owners intact for retry. An idle registered region is allowed: teardown
+unregisters that exact region before freeing its backing source owner. This is
+bounded service/lifetime coverage, not general transformation activation
+([StageLast region ownership](../../src/gameplay_stage_last.c),
+[World end-stage preflight](../../src/gameplay_world.cpp),
+[session source-work guard](../../src/gameplay_match_session.cpp)).
+
+The remaining original entry path still fails explicitly. `DVDFastOpen` remains
+a `STOP` stub ([platform boundary](../../src/gameplay_platform.c)); the
+original `lbFile_8001634C`, `lbFile_80016580`, and `lbFile_800164A4` path is not
+yet connected end to end to this service. The existing `lbFileGetSize` and
+`lbFile_8001668C` adaptations cover their exact-name size/copy helpers, not
+proof that Stadium's direct asynchronous DAT path can load and transform a map.
+The old numeric address threshold may still select type `0x23`; C5 admits that
+type only for a validated owned request, which does not demonstrate the
+complete vanilla call path.
+
+Transformation support also needs work before the clock starts. Preparation
+must import the required `GrPs1.dat`–`GrPs4.dat` entries while ticks are stopped,
+hydrate each `map_head` graph with the chosen `ResolveNull` policy, register its
+archive sections, and prepare the required stage-light overrides, pipelines,
+and textures. No live archive decode, light-table hydration, pipeline creation,
+or first texture upload should be introduced on the active source-tick path.
+These preparation steps are not supplied by the C5 service component.
+
+The stage-map owner currently has four slots in its struct, but
+[`src/gameplay_stage_map.c`](../../src/gameplay_stage_map.c) populates and
+looks up only `archives[0]`; the patched `grDatFiles_801C6330` and
+`grDatFiles_GetArchive` therefore still resolve only the base archive. A
+transformation needs a separately owned slot for its selected archive. The
+source calls `grAnime_801C65B0` on the previous slot and calls
+`Ground_801C4A08` to destroy the outgoing map (`grpstadium.c:2096-2098, 2209`; `gr/ground.c:2791-2826`). The archive
+backing and descriptors must remain valid while that outgoing map is being
+destroyed; slot retirement must respect both source boundaries. At bind
+time the source writes `0x4000000` into flagged objects, so those objects and
+their native descriptors need correctly owned writable backing.
+The transformed archive/graph lifecycle and the exact completion rule remain
+unresolved; no C5 gameplay capture or transformation acceptance is claimed.
+See the [C5 component boundary](../status/2026-10-27-stadium-archive-service.md)
+and its [evidence record](../evidence/issue345-stadium-archive-service-v1.json).
 
 Quirk to preserve: on returning to the default form, case 6 passes the raw
 buffer to `grAnime_801C65B0` (`grpstadium.c:2224`). Read as `UnkArchiveStruct`,
