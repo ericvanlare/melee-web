@@ -182,13 +182,22 @@ identities, raw failures and coverage limits. C4 original request/callback
 observations remain scoped under [#343](https://github.com/ericvanlare/melee-web/issues/343)
 and its [evidence boundary](status/2026-10-27-stadium-first-form-latency.md).
 The conditional first-Fire runtime component belongs to
-[#349](https://github.com/ericvanlare/melee-web/issues/349). A separate first-Water
-route under [#351](https://github.com/ericvanlare/melee-web/issues/351) now has a
-scoped recorded-callback browser result and independent raw-review and final
-regression passes; publication-head CI remains pending in the
-[C5 boundary](status/2026-10-27-stadium-archive-service.md).
-Neither route establishes per-owner RNG parity or a general completion schedule;
-ordinary/public transformations and general loading remain unadmitted.
+[#349](https://github.com/ericvanlare/melee-web/issues/349). The separate first-Water
+route under [#351](https://github.com/ericvanlare/melee-web/issues/351) has a
+scoped recorded-callback browser result, independent raw review, final regression,
+and merged [PR #353](https://github.com/ericvanlare/melee-web/pull/353)
+with exact-head CI passed; see the
+[C5 boundary](status/2026-10-27-stadium-archive-service.md). Issue
+[#354](https://github.com/ericvanlare/melee-web/issues/354) has one completed
+default-off native Water collision-query component. The existing route comparator
+and native query validator replay, independent raw review and full regression
+passed; see its [scoped evidence boundary](status/2026-10-27-stadium-water-collision.md).
+No original collision-query counterpart is available, so original collision-query
+parity remains unobserved and outside #354. This component does not extend the
+#351 browser comparison. Neither route establishes per-owner RNG parity or a
+general completion schedule; ordinary/public transformations and general loading
+remain unadmitted. Exact-head CI for the publication containing the #354 docs is
+tracked on that PR.
 Ranked/Unranked use unfrozen Stadium, so C4–C8 transformations remain in scope.
 Track A retains first claim on the shared capture lane. Physical controllers,
 foreground timing, audible output and a two-machine human session remain separate

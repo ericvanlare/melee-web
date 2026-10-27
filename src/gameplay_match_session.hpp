@@ -13,6 +13,26 @@ namespace melee_web {
 enum class GameplayMatchConstruction { Immediate, Deferred };
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 enum class GameplayMatchDiagnostic { StadiumReady, StadiumFirstFireReady, StadiumFirstWaterReady };
+// Pointer-free result of one opt-in Water collision-query component at an
+// explicitly selected, completed source tick.
+struct GameplayStadiumWaterCollisionProbe {
+    struct State {
+        uint64_t world_generation=0,world_ticks=0;
+        uint32_t source_frame=0,random_seed=0;
+        uint32_t journal_armed=0,selected_form=0,journal_failed=0,event_count=0;
+        int32_t map2_gate=0,countdown=0,phase=0,form=0,history_e0=0,history_e2=0,pending=0;
+        int32_t display_mode=0,display_e6=0,display_e8=0,display_previous_mode=0;
+        int32_t display_selected_player=0,display_f2=0;
+        uint32_t buffer_uses=0,display_flags=0,scalar_sample_valid=0;
+    };
+    uint64_t world_generation=0,source_tick=0;
+    State state_before{},state_after{};
+    MeleeWebCollisionReadiness readiness_before{},readiness_after{};
+    int32_t line_index=-1;
+    float chain_min_x=0,chain_max_x=0,hit_x=0,query_y=0,left_miss_x=0,right_miss_x=0;
+    MeleeWebCollisionLineResult line{};
+    MeleeWebCollisionFloorResult hit{},left_miss{},right_miss{};
+};
 #endif
 // Shared source match lifecycle. The confirmed menu payload supplies player
 // identity and source RNG; scene resources close before returning to a menu.
@@ -94,6 +114,8 @@ public:
     bool diagnostic_stadium_first_transform_completion_status(
         MeleeWebSourceFileRecordedCompletionStatus*,char*,size_t) const;
     bool diagnostic_stadium_first_transform_schedule(uint32_t,uint32_t,uint32_t,char*,size_t);
+    bool diagnostic_stadium_water_collision_probe(
+        uint64_t,GameplayStadiumWaterCollisionProbe*,char*,size_t) const;
     bool diagnostic_stadium_idle_snapshot(
         MeleeWebStadiumIdleSnapshot*,char*,size_t) const;
     bool diagnostic_stadium_setup_snapshot(

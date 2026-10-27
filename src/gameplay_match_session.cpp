@@ -17,6 +17,9 @@
 #include <cstring>
 #include <stdexcept>
 #include <set>
+#include <algorithm>
+#include <cmath>
+#include <limits>
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
 #include "pipeline_provenance_runtime.h"
 #include "gameplay_bootstrap.h"
@@ -25,6 +28,7 @@
 extern "C" {
 #include <melee/gm/types.h>
 #include <melee/gm/gmvsmelee.h>
+#include <melee/mp/forward.h>
 }
 extern "C" int lbAudioAx_80023F28(int);
 extern "C" int melee_web_vs_mode_begin(void);
@@ -754,6 +758,185 @@ bool GameplayMatchSession::diagnostic_stadium_first_transform_snapshot(
     }
     if(error&&size)std::snprintf(error,size,"First-fire snapshot has no exact live or sealed owner");
     return false;
+}
+bool GameplayMatchSession::diagnostic_stadium_water_collision_probe(
+    uint64_t source_tick,GameplayStadiumWaterCollisionProbe* out,char* error,size_t size)const{
+    auto fail=[&](const char* message){if(error&&size)std::snprintf(error,size,"%s",message);return false;};
+    auto fail_api=[&](const char* message){return error&&size&&*error?false:fail(message);};
+    if(error&&size)*error='\0';
+    if(!out)return fail("Water collision probe output is missing");
+    if(!storage_||!storage_->stadium_diagnostic||!storage_->first_water_diagnostic||
+       storage_->first_fire_diagnostic||!construction_complete()||!storage_->match||
+       !storage_->world||!storage_->flow)
+        return fail("Water collision probe requires its complete live first-Water session");
+    if(paused()||ending()||complete()||source_tick==std::numeric_limits<uint64_t>::max())
+        return fail("Water collision probe requires an active completed source tick");
+
+    MeleeWebStadiumFirstTransformJournal journal{};
+    if(!storage_->world->diagnostic_stadium_first_transform_snapshot(&journal,error,size))
+        return fail_api("Water collision probe has no live graph journal");
+    if(journal.armed!=1||journal.failed||journal.selected_form!=9||journal.phase!=0||
+       journal.form!=9||journal.pending!=0||journal.count!=5||journal.buffer_uses!=2||
+       !journal.scalar_sample_valid||journal.scalar_world_ticks!=source_tick+1||
+       !journal.world_generation)
+        return fail("Water collision probe is outside the settled live Water graph boundary");
+    MeleeWebMatchPauseObservation pause{};
+    if(!melee_web_match_flow_pause_observation(storage_->flow,&pause)||pause.paused||pause.complete||
+       pause.generation!=journal.world_generation||pause.result!=OUTCOME_NONE)
+        return fail_api("Water collision probe lost its active source match owner");
+    const uint32_t seed_before=random_seed();
+    const uint32_t frame_before=melee_web_match_flow_frames(storage_->flow);
+    if(pause.frame!=frame_before)
+        return fail("Water collision probe did not begin at the completed source clock");
+    auto state_from=[&](const MeleeWebStadiumFirstTransformJournal& j,uint32_t frame,uint32_t seed){
+        GameplayStadiumWaterCollisionProbe::State state{};
+        state.world_generation=j.world_generation;state.world_ticks=j.scalar_world_ticks;
+        state.source_frame=frame;state.random_seed=seed;
+        state.journal_armed=j.armed;state.selected_form=j.selected_form;
+        state.journal_failed=j.failed;state.event_count=j.count;
+        state.map2_gate=j.map2_gate;state.countdown=j.countdown;state.phase=j.phase;state.form=j.form;
+        state.history_e0=j.history_e0;state.history_e2=j.history_e2;state.pending=j.pending;
+        state.display_mode=j.display_mode;state.display_e6=j.display_e6;state.display_e8=j.display_e8;
+        state.display_previous_mode=j.display_previous_mode;state.display_selected_player=j.display_selected_player;
+        state.display_f2=j.display_f2;state.buffer_uses=j.buffer_uses;state.display_flags=j.display_flags;
+        state.scalar_sample_valid=j.scalar_sample_valid;return state;
+    };
+
+    MeleeWebCollision* collision=storage_->world->collision();
+    MeleeWebCollisionReadiness readiness{};
+    if(!collision||!melee_web_collision_readiness(collision,&readiness,error,size))
+        return fail_api("Water collision storage is not ready");
+    if(!readiness.storage_owned||!readiness.original_indices_initialized||
+       !readiness.stage_joint_bindings_ready||!readiness.stage_callbacks_ready||
+       !readiness.lines||readiness.lines>static_cast<uint32_t>(std::numeric_limits<int32_t>::max())||
+       !readiness.joints)
+        return fail("Water collision probe requires the bound source collision owner");
+
+    auto read_line=[&](int32_t index,MeleeWebCollisionLineResult& line){
+        return melee_web_collision_line(collision,index,&line,error,size)!=0;
+    };
+    auto valid_line=[](const MeleeWebCollisionLineResult& line){
+        for(float value:line.v0)if(!std::isfinite(value))return false;
+        for(float value:line.v1)if(!std::isfinite(value))return false;
+        for(float value:line.normal)if(!std::isfinite(value))return false;
+        return line.has_normal==1&&line.v0[0]<line.v1[0];
+    };
+    GameplayStadiumWaterCollisionProbe result{};
+    result.world_generation=journal.world_generation;
+    result.source_tick=source_tick;
+    result.state_before=state_from(journal,frame_before,seed_before);
+    result.readiness_before=readiness;
+    for(uint32_t index=0;index<readiness.lines;++index){
+        MeleeWebCollisionLineResult line{};
+        if(!read_line(static_cast<int32_t>(index),line))
+            return fail_api("Water collision line observation failed");
+        if(line.joint!=0||(line.kind&CollLine_Floor)==0||
+           (line.runtime_flags&LINE_FLAG_ENABLED)==0||(line.runtime_flags&LINE_FLAG_EMPTY))continue;
+        if(!valid_line(line))return fail("Water joint-zero floor line has invalid source geometry");
+        result.line_index=static_cast<int32_t>(index);result.line=line;break;
+    }
+    if(result.line_index<0)
+        return fail("Water collision has no enabled authored joint-zero floor line");
+    result.chain_min_x=result.line.v0[0];result.chain_max_x=result.line.v1[0];
+    auto extend_chain=[&](int direction){
+        MeleeWebCollisionLineResult current=result.line;
+        for(uint32_t step=0;step<readiness.lines;++step){
+            const int32_t adjacent=direction<0?current.previous:current.next;
+            if(adjacent==-1)return true;
+            if(adjacent<0||static_cast<uint32_t>(adjacent)>=readiness.lines)
+                return fail("Water floor chain escaped its loaded collision owner");
+            MeleeWebCollisionLineResult next{};
+            if(!read_line(adjacent,next))
+                return fail_api("Water floor-chain observation failed");
+            if((next.kind&CollLine_Floor)==0)return true;
+            if((next.runtime_flags&LINE_FLAG_ENABLED)==0||(next.runtime_flags&LINE_FLAG_EMPTY)||
+               !valid_line(next))
+                return fail("Water connected floor chain contains a disabled or invalid source line");
+            if(direction<0)result.chain_min_x=std::min(result.chain_min_x,next.v0[0]);
+            else result.chain_max_x=std::max(result.chain_max_x,next.v1[0]);
+            current=next;
+        }
+        return fail("Water floor chain is cyclic or exceeds the bounded line count");
+    };
+    if(!extend_chain(-1)||!extend_chain(1))return false;
+    result.hit_x=result.line.v0[0]+(result.line.v1[0]-result.line.v0[0])*0.5F;
+    result.query_y=result.line.v0[1]+(result.line.v1[1]-result.line.v0[1])*0.5F;
+    result.left_miss_x=result.chain_min_x-1.0F;
+    result.right_miss_x=result.chain_max_x+1.0F;
+    if(!std::isfinite(result.hit_x)||!std::isfinite(result.query_y)||
+       !std::isfinite(result.left_miss_x)||!std::isfinite(result.right_miss_x)||
+       !(result.left_miss_x<result.chain_min_x-0.1F)||
+       !(result.right_miss_x>result.chain_max_x+0.1F))
+        return fail("Water source floor bounds cannot represent the declared hit/miss probes");
+    if(!melee_web_collision_floor(collision,result.line_index,result.hit_x,result.query_y,&result.hit,error,size)||
+       result.hit.line!=result.line_index)
+        return fail_api("Water midpoint floor query did not hit its selected source line");
+    if(!melee_web_collision_floor(collision,result.line_index,result.left_miss_x,result.query_y,&result.left_miss,error,size)||
+       result.left_miss.line!=-1)
+        return fail_api("Water left-of-chain floor query did not miss");
+    if(!melee_web_collision_floor(collision,result.line_index,result.right_miss_x,result.query_y,&result.right_miss,error,size)||
+       result.right_miss.line!=-1)
+        return fail_api("Water right-of-chain floor query did not miss");
+    const MeleeWebCollisionFloorResult* queries[]={&result.hit,&result.left_miss,&result.right_miss};
+    for(const MeleeWebCollisionFloorResult* query:queries){
+        if(!std::isfinite(query->displacement_y))return fail("Water floor query returned nonfinite displacement");
+        for(float value:query->normal)if(!std::isfinite(value))return fail("Water floor query returned nonfinite normal");
+    }
+    MeleeWebStadiumFirstTransformJournal after{};
+    if(!storage_->world->diagnostic_stadium_first_transform_snapshot(&after,error,size))
+        return fail_api("Water collision probe lost its live graph journal");
+    MeleeWebMatchPauseObservation pause_after{};
+    if(!melee_web_match_flow_pause_observation(storage_->flow,&pause_after))
+        return fail_api("Water collision probe lost its post-query source clock");
+    MeleeWebCollisionReadiness readiness_after{};
+    if(storage_->world->collision()!=collision||
+       !melee_web_collision_readiness(collision,&readiness_after,error,size))
+        return fail_api("Water collision probe changed or lost its collision owner");
+    const uint32_t frame_after=melee_web_match_flow_frames(storage_->flow);
+    const uint32_t seed_after=random_seed();
+    result.state_after=state_from(after,frame_after,seed_after);
+    result.readiness_after=readiness_after;
+    const auto same_state=[](const GameplayStadiumWaterCollisionProbe::State& a,
+                             const GameplayStadiumWaterCollisionProbe::State& b){
+        return a.world_generation==b.world_generation&&a.world_ticks==b.world_ticks&&
+            a.source_frame==b.source_frame&&a.random_seed==b.random_seed&&
+            a.journal_armed==b.journal_armed&&a.selected_form==b.selected_form&&
+            a.journal_failed==b.journal_failed&&a.event_count==b.event_count&&a.map2_gate==b.map2_gate&&
+            a.countdown==b.countdown&&a.phase==b.phase&&a.form==b.form&&a.history_e0==b.history_e0&&
+            a.history_e2==b.history_e2&&a.pending==b.pending&&a.display_mode==b.display_mode&&
+            a.display_e6==b.display_e6&&a.display_e8==b.display_e8&&
+            a.display_previous_mode==b.display_previous_mode&&
+            a.display_selected_player==b.display_selected_player&&a.display_f2==b.display_f2&&
+            a.buffer_uses==b.buffer_uses&&a.display_flags==b.display_flags&&
+            a.scalar_sample_valid==b.scalar_sample_valid;
+    };
+    bool same_events=journal.count==after.count;
+    for(unsigned i=0;same_events&&i<journal.count;++i)
+        same_events=journal.events[i].kind==after.events[i].kind&&
+            journal.events[i].map_id==after.events[i].map_id&&journal.events[i].object==after.events[i].object;
+    const bool same_graph_owners=journal.initial_map5==after.initial_map5&&journal.fire_map3==after.fire_map3&&
+        journal.water_map9==after.water_map9&&journal.water_child7==after.water_child7&&
+        journal.water_child8==after.water_child8&&journal.water_map9_proc==after.water_map9_proc&&
+        journal.water_child7_proc==after.water_child7_proc&&journal.water_child8_proc==after.water_child8_proc&&
+        journal.source_slot==after.source_slot;
+    const bool same_readiness=readiness.vertices==readiness_after.vertices&&readiness.lines==readiness_after.lines&&
+        readiness.joints==readiness_after.joints&&readiness.floor_islands==readiness_after.floor_islands&&
+        readiness.ceiling_islands==readiness_after.ceiling_islands&&readiness.empty_lines==readiness_after.empty_lines&&
+        readiness.storage_owned==readiness_after.storage_owned&&
+        readiness.original_indices_initialized==readiness_after.original_indices_initialized&&
+        readiness.stage_joint_bindings_ready==readiness_after.stage_joint_bindings_ready&&
+        readiness.stage_callbacks_ready==readiness_after.stage_callbacks_ready;
+    if(!same_state(result.state_before,result.state_after)||!same_events||!same_graph_owners||!same_readiness||
+       pause_after.paused||pause_after.complete||pause_after.result!=OUTCOME_NONE||
+       pause_after.generation!=journal.world_generation||pause_after.frame!=frame_after||
+       frame_after!=frame_before||seed_after!=seed_before||
+       after.armed!=journal.armed||after.failed||after.selected_form!=9||after.phase!=0||after.form!=9||
+       after.pending!=0||after.count!=5||after.buffer_uses!=2||!after.scalar_sample_valid||
+       after.scalar_world_ticks!=source_tick+1||after.world_generation!=journal.world_generation)
+        return fail("Water collision observations changed source owner, scalar state, seed, or clock");
+    *out=result;
+    if(error&&size)*error='\0';
+    return true;
 }
 bool GameplayMatchSession::diagnostic_stadium_idle_snapshot(
     MeleeWebStadiumIdleSnapshot* out,char* error,size_t size)const{
