@@ -17931,6 +17931,126 @@ index a19879e747e28f690db92cb25ba403fc8dbde44d..ae4b7898968ae959e4e82cddbd66951d
              HSD_GObj_804D7818 = saved;
          }
          cur = cur->next_gx;
+diff --git a/src/sysdolphin/baselib/gobjproc.c b/src/sysdolphin/baselib/gobjproc.c
+index 8f2a999387cda30069c9a08422469bafb77910df..686a333049614ef45050eb9e3b7932840195fc0c 100644
+--- a/src/sysdolphin/baselib/gobjproc.c
++++ b/src/sysdolphin/baselib/gobjproc.c
+@@ -3,6 +3,15 @@
+ #include "debug.h"
+ #include "gobj.h"
+ #include "objalloc.h"
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++#include "stadium_registration_observer.h"
++static uint32_t registration_enter(unsigned kind,HSD_GObjProc* p,unsigned deferred)
++{
++    if (!melee_web_stadium_registration_enabled()) return UINT32_MAX;
++    return melee_web_stadium_registration_proc(kind,p,p->gobj,(uintptr_t)p->on_invoke,
++        p->gobj->classifier,p->gobj->p_link,p->s_link,NULL,NULL,NULL,deferred);
++}
++#endif
+ 
+ extern HSD_ObjAllocData gobjproc_alloc_data;
+ 
+@@ -11,6 +20,10 @@ extern HSD_ObjAllocData gobjproc_alloc_data;
+  */
+ void HSD_GObjProc_8038FAA8(HSD_GObjProc* gproc)
+ {
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    const uint32_t registration_token=registration_enter(MW_REG_LINK_ENTER,gproc,0);
++#endif
++
+     HSD_GObj* proc_gobj;
+     HSD_GObjProc* dst_proc;
+     u8 s_link;
+@@ -92,10 +105,18 @@ void HSD_GObjProc_8038FAA8(HSD_GObjProc* gproc)
+     {
+         HSD_GObj_804D7830 = gproc;
+     }
++
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    if (registration_token != UINT32_MAX) melee_web_stadium_registration_proc_return(registration_token,MW_REG_LINK_RETURN,gproc->prev,gproc->next,gproc->child,0);
++#endif
+ }
+ 
+ void HSD_GObjProc_8038FC18(HSD_GObjProc* gproc)
+ {
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    const uint32_t registration_token=registration_enter(MW_REG_SCHED_UNLINK_ENTER,gproc,0);
++#endif
++
+     int p_link = gproc->gobj->p_link;
+     int s_link = gproc->s_link;
+     if (HSD_GObj_804CE3E4.b0 && gproc == HSD_GObj_804D7830) {
+@@ -123,10 +144,18 @@ void HSD_GObjProc_8038FC18(HSD_GObjProc* gproc)
+     if (gproc->next != NULL) {
+         gproc->next->prev = gproc->prev;
+     }
++
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    if (registration_token != UINT32_MAX) melee_web_stadium_registration_proc_return(registration_token,MW_REG_SCHED_UNLINK_RETURN,gproc->prev,gproc->next,gproc->child,0);
++#endif
+ }
+ 
+ void HSD_GObjProc_8038FCE4(HSD_GObjProc* gproc)
+ {
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    const uint32_t registration_token=registration_enter(MW_REG_OWNER_UNLINK_ENTER,gproc,0);
++#endif
++
+     HSD_GObj* gobj = gproc->gobj;
+     HSD_GObjProc_8038FC18(gproc);
+     if (gobj->proc == gproc) {
+@@ -138,6 +167,10 @@ void HSD_GObjProc_8038FCE4(HSD_GObjProc* gproc)
+         }
+         cur->child = gproc->child;
+     }
++
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    if (registration_token != UINT32_MAX) melee_web_stadium_registration_proc_return(registration_token,MW_REG_OWNER_UNLINK_RETURN,gproc->prev,gproc->next,gproc->child,0);
++#endif
+ }
+ 
+ static inline void assertProc(HSD_GObjProc* gproc)
+@@ -152,6 +185,9 @@ HSD_GObjProc* HSD_GObj_SetupProc(HSD_GObj* gobj, void (*func)(HSD_GObj*),
+ 
+     u8 _[8];
+ 
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    if (melee_web_stadium_registration_enabled()) melee_web_stadium_registration_setup_enter(gobj,(uintptr_t)func,pri,gobj->classifier,gobj->p_link);
++#endif
+     gproc = HSD_ObjAlloc(&gobjproc_alloc_data);
+     assertProc(gproc);
+     HSD_ASSERT(216, pri <= HSD_GObjLibInitData.gproc_pri_max);
+@@ -161,17 +197,29 @@ HSD_GObjProc* HSD_GObj_SetupProc(HSD_GObj* gobj, void (*func)(HSD_GObj*),
+     gproc->gobj = gobj;
+     gproc->on_invoke = func;
+     HSD_GObjProc_8038FAA8(gproc);
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    if (melee_web_stadium_registration_enabled()) melee_web_stadium_registration_proc(MW_REG_SETUP_RETURN,gproc,gobj,(uintptr_t)func,
++        gobj->classifier,gobj->p_link,pri,gproc->prev,gproc->next,gproc->child,0);
++#endif
+     return gproc;
+ }
+ 
+ void HSD_GObjProc_8038FE24(HSD_GObjProc* gproc)
+ {
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    const uint32_t registration_token=registration_enter(MW_REG_REMOVE_REQUEST,gproc,!HSD_GObj_804CE3E4.b0 && gproc == HSD_GObj_804D7838);
++#endif
++
+     if (!HSD_GObj_804CE3E4.b0 && gproc == HSD_GObj_804D7838) {
+         HSD_GObj_804CE3E4.b2 = true;
+     } else {
+         HSD_GObjProc_8038FCE4(gproc);
+         HSD_ObjFree(&gobjproc_alloc_data, gproc);
+     }
++
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    if (registration_token != UINT32_MAX) melee_web_stadium_registration_proc_return(registration_token,MW_REG_REMOVE_RETURN,NULL,NULL,NULL,1);
++#endif
+ }
+ 
+ void HSD_GObjProc_8038FED4(HSD_GObj* gobj)
 diff --git a/src/sysdolphin/baselib/hsd_3915.c b/src/sysdolphin/baselib/hsd_3915.c
 index ab058c4c90d083c04f87d4b97936b4be919eeb58..8e1aaa23f47a64be0bba1885f841f3548c6d4418 100644
 --- a/src/sysdolphin/baselib/hsd_3915.c
@@ -18194,20 +18314,21 @@ index 15fa8a880a290516780c5febbc76db6c0cf04105..d6acdf2e32548b6c119cda499038ee38
      m[0][3] = vec3->x;
      m[1][3] = vec3->y;
 diff --git a/src/sysdolphin/baselib/objalloc.c b/src/sysdolphin/baselib/objalloc.c
-index 499fe7804bee57eee4e5bad306235086489dde19..13bdd96a9b58010cd665de64692a3a62fd52d38b 100644
+index 499fe7804bee57eee4e5bad306235086489dde19..379c708650474520f4f30d43b98b6e4216ed9f63 100644
 --- a/src/sysdolphin/baselib/objalloc.c
 +++ b/src/sysdolphin/baselib/objalloc.c
-@@ -1,5 +1,9 @@
+@@ -1,5 +1,10 @@
  #include "objalloc.h"
  
 +#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 +#include "stadium_c1_heap_owner_observer.h"
++#include "stadium_registration_observer.h"
 +#endif
 +
  #include <string.h>
  
  #include "initialize.h"
-@@ -65,6 +69,13 @@ s32 HSD_ObjAllocAddFree(HSD_ObjAllocData* data, u32 num)
+@@ -65,6 +70,13 @@ s32 HSD_ObjAllocAddFree(HSD_ObjAllocData* data, u32 num)
  
      data->freehead = (HSD_ObjAllocLink*) pool_start;
      data->free += num;
@@ -18221,6 +18342,63 @@ index 499fe7804bee57eee4e5bad306235086489dde19..13bdd96a9b58010cd665de64692a3a62
      return num;
  }
  
+@@ -74,7 +86,10 @@ void* HSD_ObjAlloc(HSD_ObjAllocData* data)
+     u32 size;
+ 
+     if (data->num_limit_flag && data->used >= data->num_limit) {
+-        return NULL;
++        #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++            melee_web_stadium_registration_alloc(data, NULL, data->size);
++#endif
++            return NULL;
+     }
+     if (data->heap_limit_flag) {
+         if (data->heap_limit_num == (unsigned) -1) {
+@@ -97,12 +112,18 @@ void* HSD_ObjAlloc(HSD_ObjAllocData* data)
+             }
+         }
+         if (data->used >= data->heap_limit_num) {
++            #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++            melee_web_stadium_registration_alloc(data, NULL, data->size);
++#endif
+             return NULL;
+         }
+     }
+     if (data->free == 0) {
+         HSD_ObjAllocAddFree(data, 1);
+         if (data->free == 0) {
++            #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++            melee_web_stadium_registration_alloc(data, NULL, data->size);
++#endif
+             return NULL;
+         }
+     }
+@@ -113,16 +134,25 @@ void* HSD_ObjAlloc(HSD_ObjAllocData* data)
+     if (data->used > data->peak) {
+         data->peak = data->used;
+     }
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    melee_web_stadium_registration_alloc(data, cur, data->size);
++#endif
+     return cur;
+ }
+ 
+ void HSD_ObjFree(HSD_ObjAllocData* data, void* obj)
+ {
+     HSD_ObjAllocLink* link = obj;
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    melee_web_stadium_registration_free(0, data, obj, data->size);
++#endif
+     link->next = data->freehead;
+     data->freehead = link;
+     data->free += 1;
+     data->used -= 1;
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    melee_web_stadium_registration_free(1, data, obj, data->size);
++#endif
+ }
+ 
+ static inline void removeAll(HSD_ObjAllocData* data)
 diff --git a/src/sysdolphin/baselib/particle.c b/src/sysdolphin/baselib/particle.c
 index 2b9052578d839648c308ee7317e19c5a15d5a224..061d98799d249a0ca49c24a90e5d0771ec4c56af 100644
 --- a/src/sysdolphin/baselib/particle.c

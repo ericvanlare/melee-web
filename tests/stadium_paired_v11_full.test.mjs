@@ -82,7 +82,7 @@ test('actual full harness phase waits for ordinary completion retirement without
  const source=fs.readFileSync(new URL('../scripts/capture_whole_session_browser.mjs',import.meta.url),'utf8');
  const start=source.indexOf('async function pairedFullPhase(){'),end=source.indexOf('\n}',start);assert.ok(start>=0&&end>start);
  const clicks=[],writes=[];let drains=0,observations=0;
- const ctx={Date,Promise,setTimeout,replayTimeoutMs:1000,replayPollMs:1,output:'/owned',
+ const ctx={Date,Promise,setTimeout,replayTimeoutMs:1000,replayPollMs:1,output:'/owned',pairedRegistration:false,
   fs:{writeFile:async p=>writes.push(p)},path:{join:(...p)=>p.join('/')},installPairedFullLaunch:()=>{},installPairedFullObserver:()=>{},write:async()=>{},
   page:{evaluate:async()=>true,locator:label=>({click:async()=>clicks.push(label)})},
   report:{paired_v11_full_pair:{}},pageErrors:[],drainPairedFull:async()=>drains++,
@@ -120,6 +120,8 @@ test('actual complete CLI prelude admits only the bounded full artifact route',a
  assert.equal(full.rngDrawProbe.selected.length,14394);assert.equal(full.report.rng_draw_probe.requested_action_count,14394);assert.equal(full.report.rng_draw_probe.complete,false);assert.equal(full.report.rng_draw_probe.scope,'paired-v11-global-diagnostic-action-index');
  for(const cursor of [8153,8154]){const ordinary={pairedFull:false,rngDrawProbe:{selected:[cursor]},report:{recipe_header:{frames:8154}}};vm.createContext(ordinary);if(cursor===8153)vm.runInContext(headerGuard,ordinary);else assert.throws(()=>vm.runInContext(headerGuard,ordinary),/inside the source recipe frame count/);}
  const admitted=await run(base);assert.equal(admitted.pairedFull,true);assert.equal(admitted.artifactRoot,'/artifacts');assert.ok(admitted.inputPaths.includes('/projection')&&admitted.inputPaths.includes('/endpoints'));
+ await run([...base,'--stadium-paired-v11-full-pair-registration']);
+ await assert.rejects(run([...base.filter((x,i)=>x!=='--stadium-paired-v11-full-pair-projection'&&base[i-1]!=='--stadium-paired-v11-full-pair-projection'),'--stadium-paired-v11-full-pair-registration']),/Paired full requires/);
  for(const flag of ['--artifact-root','--runtime-data','--stadium-paired-v11-full-pair-endpoints']){const args=[...base],i=args.indexOf(flag);args.splice(i,2);await assert.rejects(run(args),/Paired full requires/);}
  for(const flag of ['--phase-timeout','--replay-timeout']){const args=[...base];args[args.indexOf(flag)+1]='150001';await assert.rejects(run(args),/Paired full requires/);}
  for(const more of [['--expected-frame0','/frame0'],['--stadium-paired-v11-first-go-projection','/first'],['--stadium-later-sss-exit']])await assert.rejects(run([...base,...more]),/Paired full requires/);

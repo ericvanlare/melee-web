@@ -1,4 +1,7 @@
 #include "gameplay_source_memory_runtime.h"
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+#include "stadium_registration_observer.h"
+#endif
 
 #include "source_address_context.hpp"
 #include "source_game_heap_context.hpp"
@@ -128,6 +131,9 @@ extern "C" int melee_web_source_memory_begin(uint64_t generation,
     failure.clear();
     allocations.clear();
     fighters.clear();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    melee_web_stadium_registration_world_begin(generation);
+#endif
     return 1;
 }
 
@@ -135,6 +141,9 @@ extern "C" int melee_web_source_memory_end(uint64_t generation)
 {
     if (!active || !generation || generation != world_generation)
         return fail("source address heap world owner changed during teardown");
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    melee_web_stadium_registration_world_end(generation);
+#endif
     active = false;
     source_heap_handle = -1;
     world_generation = 0;

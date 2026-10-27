@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {armStadiumRegistrationInPage, collectStadiumRegistrationInPage, validateStadiumRegistrationSnapshot} from './stadium_registration_browser.mjs';
 import {derivePairedFull,PairedFullComparator,installPairedFullLaunch} from './stadium_paired_v11_full.mjs';
 import {OBSERVED_B_REFERENCE, LONG_B_REFERENCE, OBSERVED_B_SCHEMA} from './stadium_later_reference_contexts.mjs';
 /*
@@ -72,6 +73,7 @@ const {values, tokens} = parseArgs({tokens: true, options: {
   'hit-transition-probe-cursors': {type: 'string'},
   'first-replay-callback-probe': {type: 'boolean', default: false},
   'runtime-incidents': {type: 'boolean', default: false},
+  'stadium-paired-v11-full-pair-registration': {type: 'boolean'},
   'stadium-paired-v11-full-pair-projection': {type: 'string'},
   'stadium-paired-v11-full-pair-projection-sha256': {type: 'string'},
   'stadium-paired-v11-full-pair-endpoints': {type: 'string'},
@@ -172,6 +174,7 @@ let rngDrawProbe = parseRngDrawProbe({range: values['rng-draw-probe-range'],
 const hitTransitionProbe = parseHitTransitionProbe(values['hit-transition-probe-cursors']);
 const pairedFullPath=values['stadium-paired-v11-full-pair-projection'];
 const pairedFull=pairedFullPath!==undefined;
+const pairedRegistration=values['stadium-paired-v11-full-pair-registration'] === true;
 const pairedFullEndpoints=values['stadium-paired-v11-full-pair-endpoints'];
 const pairedFullSha=values['stadium-paired-v11-full-pair-projection-sha256'];
 const pairedFullEndpointsSha=values['stadium-paired-v11-full-pair-endpoints-sha256'];
@@ -859,7 +862,17 @@ async function pairedFullPhase(){
    while(Date.now()<deadline){
     const after=await readPairedFirstGoStatus();
     if(!after.busy&&after.status?.failed)throw Error(after.status.error||'Paired full unload failed');
-    if(!after.busy&&after.status?.native_retired&&after.phase===0&&after.running===0){report.browser_report=after.runtime?.replay_report;report.paired_v11_full_pair.retirement=after;report.paired_v11_full_pair.component_pass=true;return;}
+    if(!after.busy&&after.status?.native_retired&&after.phase===0&&after.running===0){
+     report.browser_report=after.runtime?.replay_report;
+     report.paired_v11_full_pair.retirement=after;
+     if(pairedRegistration){
+      const retained=await observePageOperation('seal and retain source registration after checked unload', () => page.evaluate(collectStadiumRegistrationInPage,{seal:true}));
+      await write('stadium-registration-status.json',retained.status);
+      await fs.writeFile(path.join(output,'stadium-registration-rows.jsonl'),retained.rows.join('\n')+'\n',{flag:'wx'});
+      report.stadium_registration={...report.stadium_registration,...validateStadiumRegistrationSnapshot(retained)};
+     }
+     report.paired_v11_full_pair.component_pass=true;return;
+    }
     await new Promise(r=>setTimeout(r,replayPollMs));
    }
    throw Error('Paired full checked ordinary unload exceeded deadline');
@@ -1252,6 +1265,8 @@ try {
     const pinned=async(file,sha)=>{const stat=await fs.lstat(file);if(!stat.isFile()||stat.isSymbolicLink()||stat.size>64*1024*1024)throw Error('Full reference must be a bounded regular file');const raw=await fs.readFile(file),actual=createHash('sha256').update(raw).digest('hex');if(actual!==sha)throw Error('Full reference SHA differs');return {raw,identity:{path:path.resolve(file),bytes:raw.length,sha256:actual}};};
     const projection=await pinned(pairedFullPath,pairedFullSha),endpoints=await pinned(pairedFullEndpoints,pairedFullEndpointsSha);
     pairedFullExpected=derivePairedFull(JSON.parse(projection.raw),report.inputs.recipe.sha256,report.recipe_header.frames,JSON.parse(endpoints.raw));
+    if(pairedRegistration && pairedFullExpected.stockout) throw Error('Registration capture requires the paired idle route');
+    if(pairedRegistration) report.stadium_registration={requested:true,complete:false};
     pairedFullComparison=new PairedFullComparator(pairedFullExpected);
     report.inputs.paired_full_projection=projection.identity;report.inputs.paired_full_endpoints=endpoints.identity;
     report.paired_v11_full_pair={component_pass:false,scope:pairedFullExpected.stockout
@@ -1606,6 +1621,9 @@ try {
   });
   driver = createBrowserDriver(page, {surface: 'development', timeoutMs: phaseTimeoutMs});
   await phase('runtime-ready', () => driver.waitForImport());
+  if(pairedRegistration){
+    report.stadium_registration.initial=await observePageOperation('arm source registration before disc import', () => page.evaluate(armStadiumRegistrationInPage));
+  }
   if (diagnostic) {
     report.pause_trace_installation = await installPauseTraceCapture(page, null);
     if (!report.pause_trace_installation.timing_hook_present ||
@@ -2243,6 +2261,14 @@ try {
         report.hit_transition_probe_error = String(error?.message || error);
         retainFirstCaptureError(report, 'hit_transition_probe', report.hit_transition_probe_error, 'artifact validation');
       }
+    }
+    if(pairedRegistration && !report.stadium_registration?.complete){
+      try {
+        const retained=await observePageOperation('retain incomplete source registration', () => page.evaluate(collectStadiumRegistrationInPage,{seal:false}));
+        await write('stadium-registration-partial-status.json',retained.status);
+        await fs.writeFile(path.join(output,'stadium-registration-partial-rows.jsonl'),retained.rows.join('\n')+'\n',{flag:'wx'});
+        report.stadium_registration={...report.stadium_registration,complete:false,partial_retained:true};
+      } catch(error) { report.stadium_registration={...report.stadium_registration,complete:false,retention_error:String(error)}; }
     }
     try { await write('source-owner-trace.json', await observePageOperation('final source owner trace', () => page.evaluate(() => window.__meleeSourceOwnerTrace || []))); } catch(error) { report.owner_trace_error = String(error); }
     try { await write('source-main-allocation-trace.json', {total: await observePageOperation('final source allocation total', () => page.evaluate(() => window.__meleeSourceAllocationTraceTotal || 0)), events: await observePageOperation('final source allocation trace', () => page.evaluate(() => window.__meleeSourceAllocationTrace || []))}); } catch(error) { report.source_allocation_trace_error = String(error); }
