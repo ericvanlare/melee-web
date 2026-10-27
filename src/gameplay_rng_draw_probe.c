@@ -1,10 +1,6 @@
 #include "gameplay_cpu_observation.h"
+#include "gameplay_rng_draw_owner.h"
 
-#include <melee/ef/eflib.h>
-#include <melee/ft/fighter.h>
-#include <melee/ft/types.h>
-#include <melee/pl/player.h>
-#include <melee/gr/grpstadium.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjproc.h>
 #include <stdint.h>
@@ -41,6 +37,19 @@ static size_t rng_draw_probe_emitted_count;
 static char rng_draw_probe_line[RNG_DRAW_PROBE_LINE_CAPACITY];
 static size_t rng_draw_probe_used;
 static void emit_rng_draw_probe(void);
+static const MeleeWebRngDrawOwnerBindings* rng_draw_owner_bindings;
+void melee_web_rng_draw_probe_bind_source_owners(const MeleeWebRngDrawOwnerBindings* bindings)
+{
+ if (rng_draw_owner_bindings == bindings && bindings) return;
+ if (rng_draw_probe_active || rng_draw_owner_bindings || !bindings ||
+     !bindings->stadium_callback || !bindings->particle_callback ||
+     !bindings->fighter_callback || !bindings->fighter_membership ||
+     bindings->stadium_callback == bindings->particle_callback ||
+     bindings->stadium_callback == bindings->fighter_callback ||
+     bindings->particle_callback == bindings->fighter_callback) abort();
+ rng_draw_owner_bindings = bindings;
+}
+
 
 static void put(const char* format, ...)
 {
@@ -84,6 +93,7 @@ void melee_web_cpu_observation_set_rng_draw_cursor(size_t index)
             return window.__meleeRngDrawProbeFighterOwners === true;
         }, 0);
         if (rng_draw_probe_fighter_owners && !rng_draw_probe_owners) abort();
+        if (rng_draw_probe_owners && !rng_draw_owner_bindings) abort();
         rng_draw_probe_configuration_checked = 1;
     }
     if (!rng_draw_probe_configured) {
@@ -105,7 +115,7 @@ void melee_web_cpu_observation_set_rng_draw_cursor(size_t index)
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 int melee_web_rng_draw_probe_begin_native_pair(void)
 {
-    if (rng_draw_probe_native_pair || rng_draw_probe_active) return 0;
+    if (rng_draw_probe_native_pair || rng_draw_probe_active || !rng_draw_owner_bindings) return 0;
     rng_draw_probe_native_pair = 1;
     rng_draw_probe_owners = 1;
     rng_draw_probe_fighter_owners = 1;
@@ -138,6 +148,7 @@ int melee_web_rng_draw_probe_end_native_pair(size_t expected_cursors)
  * scheduled membership, not an allocation/registration/lifetime attestation. */
 static void capture_rng_draw_owner(RngDrawProbeEntry* entry)
 {
+    if (!rng_draw_owner_bindings) abort();
     HSD_GObj* gobj = HSD_GObj_804D781C;
     HSD_GObjProc* proc = HSD_GObj_804D7838;
     entry->gobj = entry->proc = entry->callback = 0;
@@ -152,25 +163,12 @@ static void capture_rng_draw_owner(RngDrawProbeEntry* entry)
     entry->classifier = gobj->classifier;
     entry->p_link = gobj->p_link;
     entry->s_link = proc->s_link;
-    if (rng_draw_probe_fighter_owners && proc->on_invoke == Fighter_8006A360) {
+    if (rng_draw_probe_fighter_owners && proc->on_invoke == rng_draw_owner_bindings->fighter_callback) {
         if (gobj->classifier != 4 || gobj->p_link != 8 || proc->s_link != 1)
             abort();
-        const Fighter* fighter = gobj->user_data;
-        if (!fighter || fighter->gobj != gobj || fighter->player_id >= 6)
-            abort();
-        const StaticPlayer* player = Player_GetPtrForSlot(fighter->player_id);
-        if (!player) abort();
-        _Static_assert(sizeof(player->player_entity) / sizeof(player->player_entity[0]) == 2,
-                       "Source player entity extent changed");
-        unsigned matches = 0, ordinal = 0;
-        for (unsigned i = 0; i < sizeof(player->player_entity) / sizeof(player->player_entity[0]); ++i) {
-            if (player->player_entity[i] == gobj) { ++matches; ordinal = i; }
-        }
-        if (matches != 1) abort();
+        if (!rng_draw_owner_bindings->fighter_membership(gobj,
+                &entry->fighter_slot, &entry->fighter_entity, &entry->fighter_kind)) abort();
         entry->fighter_observed = 1;
-        entry->fighter_slot = fighter->player_id;
-        entry->fighter_entity = ordinal;
-        entry->fighter_kind = fighter->kind;
     }
 }
 
@@ -209,11 +207,11 @@ static void emit_rng_draw_probe(void)
                 (unsigned long long)entry->gobj, (unsigned long long)entry->proc,
                 (unsigned long long)entry->callback, entry->classifier,
                 entry->p_link, entry->s_link,
-                !entry->proc ? "null" : entry->callback == (uintptr_t)grStadium_801D1390 ?
+                !entry->proc ? "null" : entry->callback == (uintptr_t)rng_draw_owner_bindings->stadium_callback ?
                     "\"grStadium_801D1390\"" :
-                entry->callback == (uintptr_t)efLib_particles_proc_main ?
+                entry->callback == (uintptr_t)rng_draw_owner_bindings->particle_callback ?
                     "\"efLib_particles_proc_main\"" :
-                entry->callback == (uintptr_t)Fighter_8006A360 ?
+                entry->callback == (uintptr_t)rng_draw_owner_bindings->fighter_callback ?
                     "\"Fighter_8006A360\"" : "\"unknown\"");
             if (rng_draw_probe_fighter_owners) {
                 if (entry->fighter_observed)

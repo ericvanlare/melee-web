@@ -179,6 +179,13 @@ enum { MELEE_WEB_RNG_DRAW_RAND=0, MELEE_WEB_RNG_DRAW_RANDF=1 };
         native = native.replace("#include <melee/pl/player.h>\n", "")
         native = native.replace("#include <melee/gr/grpstadium.h>\n", "")
         native = re.sub(r'^#include "gameplay_cpu_observation.h"\n', '', native)
+        owner_root = Path(os.environ.get("MELEE_RNG_OWNER_NATIVE_SOURCE", ROOT / "src/gameplay_rng_draw_probe.c")).parent
+        owner_header = (owner_root / "gameplay_rng_draw_owner.h").read_text()
+        provider = (owner_root / "gameplay_rng_draw_owner.c").read_text()
+        provider = re.sub(r'^#include .*\n', '', provider, flags=re.M)
+        native = native.replace('#include "gameplay_rng_draw_owner.h"\n', '')
+        native = owner_header + provider + native
+
         native = re.sub(r'^#include <sysdolphin/baselib/(gobj|gobjproc).h>\n', '', native, flags=re.M)
         harness = prefix + native + '''
 static void callback(HSD_GObj* o) { (void)o; }
@@ -192,6 +199,7 @@ int main(int argc, char** argv) {
   else if(strncmp(argv[1],"fighter",7)==0) {gobj.classifier=4;gobj.p_link=8;proc.s_link=1;proc.on_invoke=Fighter_8006A360;}
   else if(strcmp(argv[1],"unknown")==0) proc.on_invoke=callback;
   else proc.on_invoke=grStadium_801D1390;
+  if(strcmp(argv[1],"missing-binding")!=0) melee_web_rng_draw_probe_install_source_owners();
   rng_draw_probe_active=1; rng_draw_probe_cursor=12;
   rng_draw_probe_owners=strcmp(argv[1],"legacy")!=0;
   rng_draw_probe_fighter_owners=strncmp(argv[1],"fighter-v3",10)==0;
@@ -270,7 +278,7 @@ int main(int argc, char** argv) {
                 else:
                     self.assertNotIn("fighter",row["draws"][1]["owner"])
                 if mode == "capacity": self.assertEqual(len(row["draws"]),1024)
-        for mode in ("partial", "backpointer", "fighter-v3-null", "fighter-v3-link", "fighter-v3-slot", "fighter-v3-unregistered", "fighter-v3-duplicate", "fighter-v3-tuple"):
+        for mode in ("missing-binding", "partial", "backpointer", "fighter-v3-null", "fighter-v3-link", "fighter-v3-slot", "fighter-v3-unregistered", "fighter-v3-duplicate", "fighter-v3-tuple"):
             result = subprocess.run([str(binary), mode], capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertNotIn("RNG_DRAW_PROBE", result.stderr)

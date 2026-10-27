@@ -13,11 +13,13 @@ class StadiumLongBRngActivationTests(unittest.TestCase):
     def test_actual_cached_probe_empty_prefix_then_action_selection(self):
         compiler=shutil.which('clang') or shutil.which('cc')
         if not compiler:self.skipTest('C compiler required')
-        source=(ROOT/'src/gameplay_rng_draw_probe.c').read_text()
+        probe_path=Path(os.environ.get('MELEE_LONG_B_RNG_PROBE_SOURCE',ROOT/'src/gameplay_rng_draw_probe.c'))
+        source=probe_path.read_text()
+        bindings_header=(probe_path.parent/'gameplay_rng_draw_owner.h').read_text()
         declarations=source[source.index('typedef struct {'):source.index('#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)')]
         draw=source[source.index('void melee_web_cpu_observation_rng_draw('):source.index('static void emit_rng_draw_probe(void)\n{')]
         emit=source[source.index('static void emit_rng_draw_probe(void)\n{'):]
-        mock=r'''
+        mock=bindings_header+r'''
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -41,14 +43,19 @@ static int modeled_js(const char* code,size_t index){
 static void modeled_callback(const char* line){++rows;puts(line);}
 #define EM_ASM_INT(code,arg) modeled_js(#code,arg)
 #define EM_ASM(code,arg) modeled_callback(arg)
-void grStadium_801D1390(void){}
-void efLib_particles_proc_main(void){}
-void Fighter_8006A360(void){}
+void grStadium_801D1390(struct HSD_GObj* p){(void)p;}
+void efLib_particles_proc_main(struct HSD_GObj* p){(void)p;}
+void Fighter_8006A360(struct HSD_GObj* p){(void)p;}
 '''
-        owner='static void capture_rng_draw_owner(RngDrawProbeEntry* e){e->gobj=e->proc=e->callback=0;e->classifier=e->p_link=e->s_link=0;e->fighter_observed=0;}\n'
+        owner='static int modeled_membership(const struct HSD_GObj* g,unsigned* a,unsigned* b,unsigned* c){(void)g;(void)a;(void)b;(void)c;return 0;}\nstatic void capture_rng_draw_owner(RngDrawProbeEntry* e){e->gobj=e->proc=e->callback=0;e->classifier=e->p_link=e->s_link=0;e->fighter_observed=0;}\n'
         main=r'''
 int main(int argc,char** argv){
  (void)argv;ordinary=argc>1;
+ /* Modeled capability only: this test exercises actual cached cursor/emitter
+  * selection, not Fighter membership. The owner callback remains modeled. */
+ static const MeleeWebRngDrawOwnerBindings bindings={
+  grStadium_801D1390,efLib_particles_proc_main,Fighter_8006A360,modeled_membership};
+ melee_web_rng_draw_probe_bind_source_owners(&bindings);
  if(ordinary){
   melee_web_cpu_observation_set_rng_draw_cursor(11);melee_web_rng_draw_probe_scheduler_return();assert(rows==0);
   melee_web_cpu_observation_set_rng_draw_cursor(12);melee_web_cpu_observation_rng_draw(0x12345678,1);melee_web_rng_draw_probe_scheduler_return();assert(rows==1);

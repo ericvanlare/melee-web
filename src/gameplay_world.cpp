@@ -1,3 +1,4 @@
+#include "gameplay_rng_draw_owner.h"
 #include "gameplay_vs_sis.h"
 #include "gameplay_world.hpp"
 #include "runtime_archive_cache.hpp"
@@ -305,6 +306,7 @@ struct GameplayWorld::Storage {
     }
     void start(const RuntimeFiles& files,const GameplayWorldSelection& selection,
                RuntimeArchiveCache* cache,bool defer=false,bool source_ordered=false){
+        melee_web_rng_draw_probe_install_source_owners();
         if(selection.player_count < MELEE_WEB_MENU_MIN_PLAYERS ||
            selection.player_count > MELEE_WEB_MENU_MAX_PLAYERS)
             throw DatError("Gameplay world requires two through four active fighters");

@@ -102,6 +102,7 @@ class ReferenceEntityProfileTests(unittest.TestCase):
         count_function=source[source.index('u32 WholeSessionMatchCount()'):source.index('bool ValidIdentity(')]
         allocation_configured = _extract_braced_declaration(source, 'bool AllocationConfigured()')
         harness = r'''
+#include <atomic>
 #include <cassert>
 #include <cstdint>
 #include <cstddef>
