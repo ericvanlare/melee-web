@@ -14,6 +14,20 @@ const endpointsPath=process.env.MELEE_PAIRED_FULL_ENDPOINTS;
 if((projectionPath!==undefined)!==(endpointsPath!==undefined)||[projectionPath,endpointsPath].some(x=>x!==undefined&&!x))throw Error('Paired full retained fixtures require both nonempty paths');
 function original(){assert.ok(projectionPath&&endpointsPath,'actual retained projection/endpoints required');const p=JSON.parse(fs.readFileSync(projectionPath)),ep=JSON.parse(fs.readFileSync(endpointsPath));return {p,ep,e:derivePairedFull(p,p.recipe_sha256,p.actual_frame_count,ep)};}
 test('actual synchronous launch wrapper arms exactly once before forwarding',()=>{
+ const harness=fs.readFileSync(new URL('../scripts/capture_whole_session_browser.mjs',import.meta.url),'utf8');
+ const observerStart=harness.indexOf('function installPairedFullObserver('),observerEnd=harness.indexOf('\n}',observerStart);assert.ok(observerStart>=0&&observerEnd>observerStart);
+ const runtime=fs.readFileSync(new URL('../web/runtime-development.mjs',import.meta.url),'utf8');
+ const assignment='window.__meleeWebStadiumTextTailProbe=stadiumTextTailProbe;';
+ const runtimeStart=runtime.indexOf('const STADIUM_TEXT_TAIL_MAX_RECORDS='),runtimeEnd=runtime.indexOf(assignment,runtimeStart)+assignment.length;assert.ok(runtimeStart>=0&&runtimeEnd>runtimeStart);
+ const page={window:{__meleeWebStadiumTextTailProbe:{observe(){throw Error('stale init observer');}}},TextEncoder};
+ vm.createContext(page);vm.runInContext(runtime.slice(runtimeStart,runtimeEnd),page); // Actual page assignment replaces the obsolete init observer.
+ const probe=page.window.__meleeWebStadiumTextTailProbe;probe.enable();probe.observe('C1_SIS_TEXT_EVENT before');
+ vm.runInContext(harness.slice(observerStart,observerEnd+2),page);page.installPairedFullObserver({maximumRows:2});
+ probe.observe('C1_SIS_TEXT_EVENT after');const native='{"record":"stadium_paired_v11","order":0}';
+ probe.observe(native);probe.observe(native.replace(':0',':1'));
+ assert.equal(probe.totalRecords,2);assert.equal(probe.records.length,2);assert.equal(page.window.__pairedFullRows.length,2);assert.equal(page.window.__pairedFullRows[0],native);
+ assert.throws(()=>probe.observe(native),/exceeds recipe bound/);assert.throws(()=>page.installPairedFullObserver({maximumRows:2}),/already owned/);
+ const missing={window:{}};vm.createContext(missing);vm.runInContext(harness.slice(observerStart,observerEnd+2),missing);assert.throws(()=>missing.installPairedFullObserver({maximumRows:2}),/unavailable/);
  const calls=[],m={stadiumMatchedSetupNativeIdle:()=>true,_melee_web_native_menu_stadium_paired_v11_full_pair_arm:()=>{calls.push('arm');return 1;},_melee_web_native_menu_launch:()=>{calls.push('launch');return 17;}};
  const ctx={Module:m};vm.runInNewContext('('+installPairedFullLaunch.toString()+')()',ctx);assert.equal(m._melee_web_native_menu_launch(),17);assert.deepEqual(calls,['arm','launch']);assert.throws(()=>m._melee_web_native_menu_launch(),/one-use/);
  for(const mode of ['busy','refuse']){let launched=0;const bad={stadiumMatchedSetupNativeIdle:()=>mode!=='busy',_melee_web_native_menu_stadium_paired_v11_full_pair_arm:()=>0,_melee_web_native_menu_launch:()=>launched++,_melee_web_native_menu_message:()=>1,UTF8ToString:()=> 'actual refusal'};vm.runInNewContext('('+installPairedFullLaunch.toString()+')()',{Module:bad});assert.throws(()=>bad._melee_web_native_menu_launch(),/settled|actual refusal/);assert.equal(launched,0);}
@@ -69,7 +83,7 @@ test('actual full harness phase waits for ordinary completion retirement without
  const start=source.indexOf('async function pairedFullPhase(){'),end=source.indexOf('\n}',start);assert.ok(start>=0&&end>start);
  const clicks=[],writes=[];let drains=0,observations=0;
  const ctx={Date,Promise,setTimeout,replayTimeoutMs:1000,replayPollMs:1,output:'/owned',
-  fs:{writeFile:async p=>writes.push(p)},path:{join:(...p)=>p.join('/')},installPairedFullLaunch:()=>{},
+  fs:{writeFile:async p=>writes.push(p)},path:{join:(...p)=>p.join('/')},installPairedFullLaunch:()=>{},installPairedFullObserver:()=>{},write:async()=>{},
   page:{evaluate:async()=>true,locator:label=>({click:async()=>clicks.push(label)})},
   report:{paired_v11_full_pair:{}},pageErrors:[],drainPairedFull:async()=>drains++,
   readPairedFirstGoStatus:async()=>++observations===1?{busy:false,status:{schema:'melee-web-stadium-paired-v11-full-pair-v1',whole_session_complete:true,failed:false}}:{busy:false,status:{native_retired:true},phase:0,running:0},

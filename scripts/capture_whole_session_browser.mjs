@@ -792,8 +792,33 @@ function runPairedFullRngComparison(browserInputs){
  if(result.status!==(browserInputs?'PASS_SELECTED_RNG_COMPARISON':'PASS_ORIGINAL_PREFLIGHT_ONLY'))throw Error('Paired full strict RNG comparison did not pass');
  return result;
 }
+// Install only after the development page has assigned its real observer.
+function installPairedFullObserver({maximumRows}){
+ const probe=window.__meleeWebStadiumTextTailProbe;
+ if(!probe||typeof probe.observe!=='function'||window.__pairedFullObserver||
+    !Number.isSafeInteger(maximumRows)||maximumRows<1||maximumRows>1000000)
+  throw Error('Paired full runtime text observer unavailable, already owned, or unbounded');
+ const original=probe.observe;
+ const state={probe,original,maximumRows,total:0};
+ window.__pairedFullRows=[];
+ state.observe=function(text){
+  const result=Reflect.apply(original,this,[text]);
+  if(typeof text==='string'&&text.startsWith('{"record":"stadium_paired_v11"')){
+   if(state.total>=maximumRows)throw Error('Paired source stream exceeds recipe bound');
+   ++state.total;window.__pairedFullRows.push(text);
+  }
+  return result;
+ };
+ probe.observe=state.observe;window.__pairedFullObserver=state;
+ return {installed:true,maximumRows};
+}
 async function drainPairedFull(){
- const batch=await observePageOperation('paired full new diagnostic rows',()=>page.evaluate(()=>({rows:window.__pairedFullRows.splice(0),probes:window.__rngDrawProbeRows.splice(0)})));
+ const batch=await observePageOperation('paired full new diagnostic rows',()=>page.evaluate(()=>{
+  const state=window.__pairedFullObserver;
+  if(!state||window.__meleeWebStadiumTextTailProbe!==state.probe||state.probe.observe!==state.observe)
+   throw Error('Paired full runtime text observer ownership changed');
+  return {rows:window.__pairedFullRows.splice(0),probes:window.__rngDrawProbeRows.splice(0)};
+ }));
  // Persist the exact bytes before comparison so a first refusal never loses its row.
  if(batch.rows.length){await fs.appendFile(path.join(output,'paired-v11-full-rows.jsonl'),batch.rows.join('\n')+'\n');}
  if(batch.probes.length){await fs.appendFile(path.join(output,'paired-v11-full-rng.jsonl'),batch.probes.join('\n')+'\n');}
@@ -806,12 +831,15 @@ async function pairedFullPhase(){
  const deadline=Date.now()+replayTimeoutMs;
  await fs.writeFile(path.join(output,'paired-v11-full-rows.jsonl'),'',{flag:'wx'});
  await fs.writeFile(path.join(output,'paired-v11-full-rng.jsonl'),'',{flag:'wx'});
+ await page.evaluate(installPairedFullObserver,{maximumRows:4*pairedFullExpected.total+16000});
  await page.evaluate(installPairedFullLaunch);
  await page.locator('#retail-replay-start').click();
  let status;
  while(Date.now()<deadline){
   await drainPairedFull();const observed=await readPairedFirstGoStatus();
   report.paired_v11_full_pair.last_observation=observed;
+  report.paired_v11_full_pair.progress={source_rows:pairedFullComparison.order,completed_actions:pairedFullComparison.action,requested_actions:pairedFullExpected.total};
+  await write('report.json',report);
   if(observed.runtime?.terminal_error)throw Error('Paired full runtime failed: '+observed.runtime.terminal_error);
   if(observed.busy){await new Promise(r=>setTimeout(r,replayPollMs));continue;}
   status=observed.status;
@@ -1452,15 +1480,9 @@ try {
     report.boundary_marker_artifact = path.join(output, 'boundary-markers.jsonl');
     await write('report.json', report);
   }
-  await page.addInitScript(({pairedFull,pairedFullMaximumRows,cpuObservationRowLimit, captureCpuObservations,
+  await page.addInitScript(({pairedFull,cpuObservationRowLimit, captureCpuObservations,
     rngDrawProbeSelection, laterBRngOwnerConfiguration, hitTransitionProbeSelection, boundaryProbeEnabled, boundaryMarkerPrefix, boundaryMarkerNames}) => {
     window.__meleeNativeRuntimeReady = false;
-    if(pairedFull){
-      if(window.__meleeWebStadiumTextTailProbe)throw Error('Paired stream observer conflicts with existing text observer');
-      window.__pairedFullRows=[];
-      let seen=0;
-      window.__meleeWebStadiumTextTailProbe={observe(text){if(!text.startsWith('{"record":"stadium_paired_v11"'))return;if(++seen>pairedFullMaximumRows)throw Error('Paired source stream exceeds recipe bound');window.__pairedFullRows.push(text);}};
-    }
     const module = globalThis.Module || {};
     module.onRuntimeInitialized = () => { window.__meleeNativeRuntimeReady = true; };
     globalThis.Module = module;
@@ -1523,7 +1545,7 @@ try {
       seenRngActions.add(row.source_cursor);
       window.__rngDrawProbeRows.push(text);
     };
-  }, {pairedFull,pairedFullMaximumRows:pairedFullExpected?4*pairedFullExpected.total+16000:0,cpuObservationRowLimit, captureCpuObservations,
+  }, {pairedFull,cpuObservationRowLimit, captureCpuObservations,
     rngDrawProbeSelection: rngDrawProbe,
     laterBRngOwnerConfiguration: laterBRngOwnerWindow?.configuration ?? null,
     hitTransitionProbeSelection: hitTransitionProbe,
