@@ -19,6 +19,8 @@ class WholeBObservationControls(OwnedWorkspaceTests):
         boundary_start=source.index("enum class Boundary : u16")
         boundary=source[boundary_start:source.index("};",boundary_start)+2]
         state=boundary+cut(source,'struct StadiumWholeBObservation\n','enum class StadiumGoPrefixPhase : u8')
+        timing_start=source.index('  bool selected_timing_enabled=')
+        timing_state=source[timing_start:source.index(';',timing_start)+1]
         paired_init=source[source.index('    const std::string paired_idle_setting ='):
                             source.index('    whole_session_matches = WholeSessionMatchCount();')]
         mode=paired_init+cut(source,'    const std::string whole_b_setting =','    const std::string constructor_setting =')
@@ -41,7 +43,7 @@ class WholeBObservationControls(OwnedWorkspaceTests):
 #include <string_view>
 #include <iostream>
 using u32=uint32_t;using u16=uint16_t;using u8=uint8_t;
-'''+state+r'''
+'''+state+timing_state+r'''
 std::map<std::string,std::string> env;
 std::string Env(const char* key){return env[key];}
 namespace InputStream{bool IsRecording(){return true;}bool IsReplaying(){return false;}}
@@ -49,6 +51,7 @@ struct CompactRngSettings{bool present=false,valid=false;std::string selection;}
 const CompactRngSettings& CompactRngEnvironment(){static const CompactRngSettings value{};return value;}
 bool whole_rng_returns=false,whole_replay=false;
 // The prior parsed match-count is a modeled input; pair-profile validation and flag derivation below are actual source.
+u32 whole_session_matches=3;
 bool stadium_whole_paired_idle=false;
 bool stadium_whole_feedback=false;std::string error;
 StadiumWholeBObservation stadium_whole_b;StadiumWholeLongIdle stadium_whole_long_idle;
