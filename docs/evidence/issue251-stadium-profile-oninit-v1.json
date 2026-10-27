@@ -24967,7 +24967,92 @@
         "next": "Review the final result of the full regression on clean source 868454a5. The next C3 proposal is a source-only two-natural-lifetime scene-endpoint profile; it is not implemented or captured."
       },
       "latest_evidence_key": "original_b_long_browser_component_v2_2026_10_26",
-      "current_scope": "Selected long-B state, input, checked retirement and selected ordered RNG comparison pass; original paired-lifetime parity and C3 remain open."
+      "current_scope": "Selected long-B state, input, checked retirement and selected ordered RNG comparison pass; original paired-lifetime parity and C3 remain open.",
+      "paired_original_reference_2026_10_26": {
+        "run_id": "stadium-owner-parity-20261026-150215-d5a0bac0",
+        "scope": "original paired idle windows and scene RNG endpoints only",
+        "producer": "2e4cbdee9949f3e8bc7506f2cdf54f5bbedc6eeb",
+        "capture_harness": "232447068f65c94e1aaa410c0a22fe4c7679bdbf",
+        "validator": "b5250ac7bfc28732153883bb7566ed1eb62f7230",
+        "live_report": {
+          "path": "paired-original-capture-v1/report.json",
+          "bytes": 7385,
+          "sha256": "dca6713c5ef6dc7660a99669b843b3f2eb400e722ae51af0f4ab7346fb0113d2"
+        },
+        "live_result": "fail_preserved",
+        "offline_validation": {
+          "path": "paired-original-postflight-repair-v2/offline-validation.json",
+          "bytes": 254270,
+          "sha256": "f2a9f29e958ebbfe6113774671dc5dd5c5c119a0305d978f4d4959e125059eb4"
+        },
+        "independent_review": {
+          "path": "paired-original-postflight-repair-v2/independent-review.json",
+          "bytes": 1641,
+          "sha256": "e902b8ecd6eebf7abe4d0c67e61dfb9c955c294cc0bf0333803030009837011e"
+        },
+        "original_capture_repeated": false,
+        "deadline_reclassified": false,
+        "owned_native_processes_absent": true,
+        "projection_result": {
+          "path": "paired-window-projection-v1/reviewed-export-v2/result.json",
+          "bytes": 10979,
+          "sha256": "634266e382cc6614d5c3a024636bf1dad40a4bc13473243c4b437b77437239b7"
+        },
+        "frames": 8154,
+        "windows": [
+          {
+            "match_index": 0,
+            "states": 3501,
+            "actions": 7198,
+            "selected_rng_events": 118035,
+            "unpaired_guard_rng_events": 8
+          },
+          {
+            "match_index": 1,
+            "states": 3501,
+            "actions": 7196,
+            "selected_rng_events": 94417,
+            "unpaired_guard_rng_events": 29
+          }
+        ],
+        "replay_format_controls": {
+          "path": "paired-draw-closure-candidate-v2a/run-v1/result-v1.json",
+          "bytes": 3246,
+          "sha256": "0a8778a01fbc18a8ad7321322533f3d85548e42264b8a75ce569f4a112ee6ed2"
+        },
+        "replay_format_review": {
+          "path": "paired-draw-closure-candidate-v2a/independent-review.json",
+          "bytes": 1093,
+          "sha256": "05580453596dfd29202be4dd9203a2781036484c0df85d207861fabc21803110"
+        },
+        "retained_failures": [
+          {
+            "path": "paired-original-postflight-repair-v1/offline-validation.json",
+            "bytes": 20719,
+            "sha256": "c7816537b29d793ea8080010b6d6d8b8dcf6f8f5b74e210188b53029bbb7259f"
+          },
+          {
+            "path": "paired-window-projection-v1/export-v1.stderr",
+            "bytes": 780,
+            "sha256": "324f242415a208f20bf659aa7da4867abe45181fe323ad44e060bd1e7f23ad97"
+          },
+          {
+            "path": "paired-draw-closure-candidate-v2/reviewed-run-v1/result.json",
+            "bytes": 1697,
+            "sha256": "140d12ae54b52860dedfff774d08579b3edbfac3be9f9a6bd0c1840487ab0289"
+          },
+          {
+            "path": "paired-integration-full-regression-v1/result.json",
+            "bytes": 1182,
+            "sha256": "69e8650d61967f99aba36d097797e99ec386438b0fa608afbf0787c9e9141820"
+          }
+        ],
+        "browser_parity": false,
+        "allocation_registration_complete": false,
+        "all_rng_writers_observed": false,
+        "C3": false,
+        "integration_validation": "new full suite, affected builds, exact-head CI pending"
+      }
     }
   }
 }
