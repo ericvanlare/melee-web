@@ -355,10 +355,15 @@ struct GameplayMatchSession::Storage {
     }
     void end_flow(){
         char error[256]{};
-        if(flow){check(melee_web_match_flow_end(flow,error,sizeof(error)),error);flow=nullptr;}
+        if(flow){
+            check(world!=nullptr,"Match flow teardown has no source world owner");
+            world->ensure_source_files_quiescent();
+            check(melee_web_match_flow_end(flow,error,sizeof(error)),error);flow=nullptr;
+        }
     }
     void close(){
         char error[256]{};
+        if(world)world->ensure_source_files_quiescent();
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
         /* Refuse unsupported partial starts before flow/HUD retirement. */
         if(world&&stadium_diagnostic)world->cancel_prepared_stadium_ready();
@@ -501,7 +506,6 @@ void GameplayMatchSession::finish_vs(
 }
 void GameplayMatchSession::finish_sudden_death(
     MeleeWebMenuMatchContinuation& results){
-    std::memset(&results,0,sizeof(results));
     check(storage_&&storage_->selected.sudden_death&&
           storage_->sudden_death_host&&storage_->sudden_death_claimed,
           "Sudden Death Results handoff requires its live typed match owner");
@@ -510,6 +514,7 @@ void GameplayMatchSession::finish_sudden_death(
     // Keep canonical close order through publication while the match-owned
     // RNG/PAD are still live. OnExit may change either; capture afterward.
     storage_->end_flow();
+    std::memset(&results,0,sizeof(results));
     check(melee_web_match_rules_publish_result(),
           "Original Sudden Death could not publish its complete terminal data");
     uint32_t final_seed=0;
@@ -531,10 +536,18 @@ void GameplayMatchSession::finish_sudden_death(
 }
 void GameplayMatchSession::tick(const PADStatus raw[4]){
     check(storage_&&storage_->match,"Match session is closed");char error[256]{};
+    check(storage_->world!=nullptr,"Match session has no source world owner");
+    storage_->world->ensure_source_work_allowed();
+    storage_->world->pump_source_files();
+    // A completion callback may have begun a guarded region close while the
+    // transfer pump was running. Refuse to enter the next source tick then.
+    storage_->world->ensure_source_work_allowed();
     check(melee_web_match_step_raw_phased(storage_->match,raw,melee_web_match_flow_renew,melee_web_match_flow_pre,melee_web_match_flow_post,storage_->flow,error,sizeof(error)),error);
 }
 void GameplayMatchSession::draw(){
     check(storage_&&storage_->render,"Match render session is closed");char error[256]{};
+    check(storage_->world!=nullptr,"Match render session has no source world owner");
+    storage_->world->ensure_source_work_allowed();
     check(melee_web_render_draw(storage_->render,error,sizeof(error)),error);
     check(melee_web_match_flow_present(storage_->flow,error,sizeof(error)),error);
 }

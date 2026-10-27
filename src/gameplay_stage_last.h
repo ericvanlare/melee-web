@@ -158,6 +158,11 @@ int melee_web_stage_last_stadium_map2_buffer_snapshot(
 int melee_web_stage_last_stadium_source_journal_snapshot(
     const MeleeWebStageLast*, MeleeWebStadiumSourceJournal* out);
 #endif
+/* A successful map-2 DMA unregister begins irreversible StageLast retirement.
+ * World pump/tick/draw must refuse source work while a failed close retains
+ * this owner. NULL means no StageLast has yet been constructed. */
+int melee_web_stage_last_source_work_allowed(const MeleeWebStageLast*);
+
 /* Requires full native map/overrides, stage particle bank64, original effect
  * runtime, numeric stage/collision and original camera contexts already live.
  * These compatibility wrappers select Final Destination. */

@@ -167,6 +167,12 @@ int melee_web_native_asset_file(unsigned generation,const char* name,const uint8
        "Native asset transfer requires closed source owners");
  asset_scope.put(generation,name,{data,size});return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
+int melee_web_native_asset_file_transfer(unsigned generation,const char* name,
+        const uint8_t* data,unsigned size,const uint8_t* tail,unsigned tail_size){try{
+ check(scoped_assets&&!world&&!match&&!archive_cache&&name&&data&&
+       (tail_size==0||tail),"Native DVD asset transfer requires closed source owners and actual bytes");
+ asset_scope.put(generation,name,{data,size},{tail,tail_size});return 1;
+}catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_asset_commit(unsigned generation){try{
  check(scoped_assets&&!world&&!match&&!results&&!prize&&!archive_cache,
       "Close source owners before asset commit");
@@ -255,7 +261,7 @@ if(scoped_assets)throw std::runtime_error("Scoped disc imports require an asset 
  for(auto key:zelda_sheik_keys)known|=key==name;
  if(!known)throw std::runtime_error("Unknown native menu file: "+std::string(name));
  archive_cache.reset();
- files[name]={data,data+size};scoped_disc_import=false;return 1;
+ files[name]=std::vector<uint8_t>(data,data+size);scoped_disc_import=false;return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_source_file_external_set(const char* name,unsigned size){try{
  if(world||match||results||prize||host_entered)

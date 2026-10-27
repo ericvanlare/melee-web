@@ -860,6 +860,9 @@ struct GameplayWorld::Storage {
         check(melee_web_stage_numeric_source_stage_ready(numeric,error,sizeof(error)),error);
     }
     void end_stage(){
+        if(source_files)
+            check(melee_web_source_files_quiescent_for(
+                source_files,error,sizeof(error)),error);
         if(numeric)check(melee_web_stage_numeric_clear_quakes(numeric,error,sizeof(error)),error);
         if(stage_last){check(melee_web_stage_last_end(stage_last,error,sizeof(error)),error);stage_last=nullptr;}
         if(stage_visual){check(melee_web_stage_visual_end(stage_visual,error,sizeof(error)),error);stage_visual=nullptr;}
@@ -889,6 +892,9 @@ struct GameplayWorld::Storage {
         }
     }
     void close(const std::function<void()>& after_effect_runtime_end = {}){
+        if(source_files)
+            check(melee_web_source_files_quiescent_for(
+                source_files,error,sizeof(error)),error);
         for(const auto& [kind,fighter]:fighters)
             if(fighter->live_fighters())throw DatError("Close all fighter/render contexts before the runtime world");
         end_stage();
@@ -1001,6 +1007,27 @@ GameplayWorld::GameplayWorld(const RuntimeFiles& files,const GameplayWorldSelect
                     construction==GameplayWorldConstruction::SourceOrdered);
 }
 GameplayWorld::~GameplayWorld()=default;
+void GameplayWorld::ensure_source_work_allowed()const{
+    if(!storage_)throw DatError("Gameplay world is closed");
+    if(!storage_->stage_last)return;
+    check(melee_web_stage_last_source_work_allowed(storage_->stage_last),
+          "Gameplay world Stadium source region is closing or no longer owned");
+}
+void GameplayWorld::pump_source_files(){
+    if(!storage_||!storage_->source_files)
+        throw DatError("Gameplay world has no live source RuntimeFiles owner");
+    ensure_source_work_allowed();
+    char error[256]{};
+    check(melee_web_source_files_pump_for(storage_->source_files,
+                                         error,sizeof(error)),error);
+}
+void GameplayWorld::ensure_source_files_quiescent()const{
+    if(!storage_||!storage_->source_files)
+        throw DatError("Gameplay world has no live source RuntimeFiles owner");
+    char error[256]{};
+    check(melee_web_source_files_quiescent_for(storage_->source_files,
+                                              error,sizeof(error)),error);
+}
 void GameplayWorld::enable_stage_visual(){storage_->enable_stage_visual();}
 void GameplayWorld::enable_full_stage(bool defer_start){storage_->enable_full_stage(defer_start);}
 void GameplayWorld::end_stage(){storage_->end_stage();}

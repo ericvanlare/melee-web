@@ -721,7 +721,9 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       const session = discSession;
       const result = {state: 0, bytes: null};
       sourceReadResults.set(request, result);
-      Promise.resolve().then(() => session.readFile(name, offset, size)).then(bytes => {
+      Promise.resolve().then(() => typeof session.readFileTransfer === 'function'
+        ? session.readFileTransfer(name, offset, size)
+        : session.readFile(name, offset, size)).then(bytes => {
         if (sourceReadResults.get(request) !== result) return;
         if (!(bytes instanceof Uint8Array) || bytes.byteLength !== size) {
           result.state = -1;
@@ -1010,16 +1012,31 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     if (Module.runtimeCacheState?.dirty) await Module.saveRuntimeCache();
     return true;
   }
-  function putNow(name, bytes, generation = 0) {
+  function putNow(name, bytes, generation = 0, transfer = null) {
     const encoded = new TextEncoder().encode(name + '\0');
+    if (transfer !== null && (!(transfer.tail instanceof Uint8Array) ||
+        transfer.logicalSize !== bytes.length || transfer.tail.length > 31 ||
+        transfer.transferSize !== Math.ceil(bytes.length / 32) * 32 ||
+        transfer.tail.length !== transfer.transferSize - bytes.length || !generation))
+      throw Error('Invalid actual DVD transfer tail metadata.');
     const np = Module._malloc(encoded.length), bp = Module._malloc(bytes.length);
+    let tp = 0;
     try {
       if (!np || !bp) throw Error('Allocation failed.');
       Module.HEAPU8.set(encoded, np); Module.HEAPU8.set(bytes, bp);
-      check(generation ? Module._melee_web_native_asset_file(generation, np, bp, bytes.length) :
+      if (transfer !== null) {
+        if (typeof Module._melee_web_native_asset_file_transfer !== 'function')
+          throw Error('Native runtime cannot preserve actual DVD transfer tails.');
+        if (transfer.tail.length) {
+          tp = Module._malloc(transfer.tail.length);
+          if (!tp) throw Error('DVD transfer tail allocation failed.');
+          Module.HEAPU8.set(transfer.tail, tp);
+        }
+        check(Module._melee_web_native_asset_file_transfer(generation,np,bp,bytes.length,tp,transfer.tail.length));
+      } else check(generation ? Module._melee_web_native_asset_file(generation, np, bp, bytes.length) :
         Module._melee_web_native_menu_file(np, bp, bytes.length));
       hasLocalData = true;
-    } finally { Module._free(np); Module._free(bp); }
+    } finally { Module._free(np); Module._free(bp); if (tp) Module._free(tp); }
   }
   async function put(name, bytes) {
     await boundary(() => putNow(name, bytes));
@@ -1033,11 +1050,11 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
         const started = performance.now();
         let count = 0, bytes = 0;
         while (offset + count < total) {
-          const [name, data] = entries[offset + count];
+          const [name, data, transfer = null] = entries[offset + count];
           const size = numericProgress(data?.byteLength ?? data?.length);
           if (count && (count >= IMPORT_BATCH_MAX_FILES ||
               bytes + size > IMPORT_BATCH_MAX_BYTES || performance.now() - started >= IMPORT_BATCH_MAX_MS)) break;
-          putNow(name, data, generation);
+          putNow(name, data, generation, transfer);
           ++count; bytes += size;
         }
         return count;
@@ -1077,7 +1094,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
           ? 'The armed Stadium C1a import requires its private disc mapping.'
           : 'The local disc session cannot stream the requested asset scope.');
       let batch = [], batchBytes = 0, files = 0, bytes = 0;
-      for await (const [name, data] of streamScope.call(discSession, names, reportDiscRead)) {
+      for await (const [name, data, transfer = null] of streamScope.call(discSession, names, reportDiscRead)) {
         // The next file may exceed the existing batch budget on its own. Keep
         // at most the bounded pending batch plus this one complete file alive.
         if (batch.length && (batch.length >= IMPORT_BATCH_MAX_FILES ||
@@ -1085,7 +1102,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
           await putBatches(batch, generation, false);
           batch = []; batchBytes = 0;
         }
-        batch.push([name, data]); batchBytes += data.byteLength;
+        batch.push([name, data, transfer]); batchBytes += data.byteLength;
         ++files; bytes += data.byteLength;
       }
       setLoading('handoff', 'Preparing game data…', 0, files); publish();

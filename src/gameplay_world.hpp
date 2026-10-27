@@ -14,10 +14,48 @@
 #include <string_view>
 #include <vector>
 #include <cstdint>
+#include <span>
+#include <stdexcept>
+#include <algorithm>
+#include <utility>
 
 struct StartMeleeData;
 namespace melee_web {
-using RuntimeFiles = std::map<std::string, std::vector<uint8_t>, std::less<>>;
+// Logical archive bytes preserve the existing vector API. The independently
+// read DVD tail is transport metadata, never appended to size()/archive hashes.
+class RuntimeFileBytes : public std::vector<uint8_t> {
+    using Base = std::vector<uint8_t>;
+    std::array<uint8_t,31> transfer_tail_{};
+    std::size_t transfer_tail_size_=0, transfer_logical_size_=0;
+    void clear_transfer_tail() noexcept { transfer_tail_size_=transfer_logical_size_=0; }
+public:
+    using Base::Base;
+    RuntimeFileBytes()=default;
+    RuntimeFileBytes(const Base& bytes):Base(bytes){}
+    RuntimeFileBytes(Base&& bytes):Base(std::move(bytes)){}
+    RuntimeFileBytes(const RuntimeFileBytes&)=default;
+    RuntimeFileBytes(RuntimeFileBytes&&) noexcept=default;
+    RuntimeFileBytes& operator=(const RuntimeFileBytes&)=default;
+    RuntimeFileBytes& operator=(RuntimeFileBytes&&) noexcept=default;
+    RuntimeFileBytes& operator=(const Base& bytes){Base::operator=(bytes);clear_transfer_tail();return *this;}
+    RuntimeFileBytes& operator=(Base&& bytes){Base::operator=(std::move(bytes));clear_transfer_tail();return *this;}
+    RuntimeFileBytes& operator=(std::initializer_list<uint8_t> bytes){Base::operator=(bytes);clear_transfer_tail();return *this;}
+    void set_transfer_tail(std::span<const uint8_t> tail){
+        const auto expected=(32-size()%32)%32;
+        if(!tail.empty()&&tail.size()!=expected)
+            throw std::runtime_error("Runtime file DVD tail does not match its logical extent");
+        if(tail.size()>transfer_tail_.size())
+            throw std::runtime_error("Runtime file DVD tail exceeds its aligned extent");
+        std::copy(tail.begin(),tail.end(),transfer_tail_.begin());
+        transfer_tail_size_=tail.size();transfer_logical_size_=size();
+    }
+    [[nodiscard]] std::span<const uint8_t> transfer_tail()const{
+        if(transfer_tail_size_&&size()!=transfer_logical_size_)
+            throw std::runtime_error("Runtime file logical extent changed after DVD tail admission");
+        return {transfer_tail_.data(),transfer_tail_size_};
+    }
+};
+using RuntimeFiles = std::map<std::string, RuntimeFileBytes, std::less<>>;
 // Source lbFileGetFullName treats a trailing-dot basename as a language
 // selector. This bridge applies its setting/saved-language rules and then
 // requires the selected archive to exist; it never changes source identity
@@ -77,6 +115,14 @@ public:
     GameplayWorld(const GameplayWorld&) = delete;
     GameplayWorld& operator=(const GameplayWorld&) = delete;
     void close(const std::function<void()>& after_effect_runtime_end = {});
+    // Refuses source pump, tick, or draw work once the owned Stadium source
+    // region has begun retirement. A world without a stage owner is allowed.
+    void ensure_source_work_allowed() const;
+    // Completes pending original DVD/DevCom requests for this world's exact
+    // RuntimeFiles owner. Match ticks call this before advancing source state.
+    void pump_source_files();
+    // Refuses teardown while a source callback is still owned by the world.
+    void ensure_source_files_quiescent() const;
     void enable_stage_visual();
     void enable_full_stage(bool defer_start = false);
     void end_stage();
