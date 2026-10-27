@@ -25315,5 +25315,414 @@
         }
       }
     }
+  },
+  "c3_natural_stockout_original_v3_2026_10_27": {
+    "state": "PASS_ORIGINAL_SELECTED_B_NATURAL_STOCKOUT_MODE9_RESULTS_WHOLE3_TERMINAL; SCOPED_BROWSER_COMPARISON_PASS; C3_FALSE",
+    "scope": "Original same-run selected-B natural stockout/mode9/elimination Results and whole3 stream terminal only; no browser parity/C3/all-writer/lifecycle acceptance",
+    "source_identity": {
+      "native_producer_commit": "2e4cbdee9949f3e8bc7506f2cdf54f5bbedc6eeb",
+      "capture_harness_commit": "73f33120cce4f96ea35873b0952ae347f8ce6494",
+      "raw_schema": "melee-web-stadium-natural-zero-stockout-v1",
+      "observed_profile": "selected_b_natural_zero_stockout_v1",
+      "mode": "complete original whole3 stream; selected B is the natural stockout match"
+    },
+    "retained_v2_failure_and_v3_repair": {
+      "v2_raw_error": "Natural stockout source wait/deadline: P1 grounded respawn at 3 stocks",
+      "reduced_cause": "The retained raw state reduction showed the motion-13 neutral wait exhausting the bounded row cap.",
+      "reviewed_v3_driver_change": "After observed RebirthWait (motion 13), ordinary stick-x 80 is consumed until Fall (motion 29), then neutral release and grounded Wait (motion 14). Source state and deadlines remain unchanged.",
+      "focused_controls": {
+        "tests": 10,
+        "passed": true,
+        "source_head": "73f33120cce4f96ea35873b0952ae347f8ce6494"
+      }
+    },
+    "capture": {
+      "elapsed_seconds": 90.75583145814016,
+      "primary_status": {
+        "state": "completed",
+        "completed": true,
+        "invalid": false,
+        "event_count": 16256,
+        "last_seq": 16255
+      },
+      "input_status": {
+        "events": 20260,
+        "complete": true,
+        "invalid": false
+      },
+      "selected_b": {
+        "go_source_tick": 84,
+        "source_ticks": 1537,
+        "initial_stocks": [
+          4,
+          4
+        ],
+        "p1_stock_transitions": [
+          {
+            "sequence": 6206,
+            "source_tick": 372,
+            "from_stocks": [
+              4,
+              4
+            ],
+            "to_stocks": [
+              3,
+              4
+            ]
+          },
+          {
+            "sequence": 8101,
+            "source_tick": 751,
+            "from_stocks": [
+              3,
+              4
+            ],
+            "to_stocks": [
+              2,
+              4
+            ]
+          },
+          {
+            "sequence": 9986,
+            "source_tick": 1128,
+            "from_stocks": [
+              2,
+              4
+            ],
+            "to_stocks": [
+              1,
+              4
+            ]
+          },
+          {
+            "sequence": 11876,
+            "source_tick": 1506,
+            "from_stocks": [
+              1,
+              4
+            ],
+            "to_stocks": [
+              0,
+              4
+            ]
+          }
+        ],
+        "mode9": {
+          "sequence": 11876,
+          "source_tick": 1506,
+          "mode": 9,
+          "stocks": [
+            0,
+            4
+          ]
+        },
+        "result_outcome": 2,
+        "terminal_sequences": {
+          "vs_exit_return": 12453,
+          "vs_mode_exit": 12454,
+          "results_enter": 12455,
+          "results_exit": 13575,
+          "results_mode_exit": 13576,
+          "scene_teardown": 13630,
+          "return_css": 13631
+        }
+      },
+      "owned_process_cleanup": "Recorded absent flags verified; fresh named PID/PGID absence confirmed",
+      "state_injection": "The driver used ordinary consumed input; this raw witness does not prove absence of every uninstrumented write."
+    },
+    "limits": {
+      "source_stock_write_observed": false,
+      "standings_observed": false,
+      "browser_stockout_pair": "PASS declared state/input/seed/action/mode9/Results and retirement scope; raw outer harness report FAIL preserved",
+      "cross_runtime_state_input_rng_parity": "Exact declared typed22+seed, player stock/motion/ground, literal four-port inputs and eight scene RNG endpoints; original per-owner RNG unavailable for this stockout producer",
+      "all_writer_or_allocation_registration_completeness": "not established",
+      "full_a_b_lifecycle_parity": false,
+      "C3": false
+    },
+    "next": {
+      "smallest_step": "Resolve original mode-14 standings reachability against the authored timers and first transformation, then choose one bounded source-faithful continuation. Do not repeat the passing idle or stockout captures.",
+      "remaining_c3": "Natural standings/mode14 plus explicit complete owner allocation/registration and all-writer evidence; existing scoped paired idle result remains valid without broadening it.",
+      "separate_branches": "C4\u2013C8 transformations and whole-stage/public admission remain separate."
+    },
+    "artifacts": {
+      "v2_report": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-natural-stockout-original-v2/report.json",
+        "bytes": 437,
+        "sha256": "34fb0af1857637a7afafb333eebf044f868b18b9f8db415696a8cd256783e16c"
+      },
+      "v2_first_failure_reduction": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-natural-stockout-original-v2/respawn-first-failure-reduction.json",
+        "bytes": 10435,
+        "sha256": "3814b0faaf167e4a505c335bd15bfc67127dd8859b962614396771878cf3eb5b"
+      },
+      "v3_report": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-natural-stockout-original-v3/report.json",
+        "bytes": 2565903,
+        "sha256": "c6fc3ccd2742bc5e45ff77b087aac31e24b38678f7095e60463d6dad04714954"
+      },
+      "v3_primary": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-natural-stockout-original-v3/native-primary.mwro",
+        "bytes": 38050114,
+        "sha256": "75a16ef455d61cb1dbb365c4a9efd60c9536431d402a5373a13379208f808fd9"
+      },
+      "v3_mwri": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-natural-stockout-original-v3/native-inputs.mwri",
+        "bytes": 810456,
+        "sha256": "f3cb5f9895471bfca134b80dc0a8d7e678e93ae12b3301a836cef6103724018c"
+      },
+      "v3_primary_status": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-natural-stockout-original-v3/native-primary-status.json",
+        "bytes": 296,
+        "sha256": "5a027139ef041158b4f287b7cb1ea15bd403207ab05a1b3635a2e739dd707cd1"
+      },
+      "v3_input_status": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-natural-stockout-original-v3/native-input-status.json",
+        "bytes": 90,
+        "sha256": "5e8994393a03d94f0f6fee823e5666577ca1490f6c080ef2d52dd999ef4ae6b3"
+      },
+      "v3_launch_result": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-natural-stockout-original-packet-v3/launch-result.json",
+        "bytes": 4898,
+        "sha256": "c1c0182a9ea78d5a05e5d87889e6d90ba9039839c58837fce7acf925f50a0838"
+      },
+      "v3_independent_review": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-natural-stockout-original-v3/independent-review.json",
+        "bytes": 4577,
+        "sha256": "c7d3799c00630db327ab9a0b78e428ad75889f455f096c13ffbbf31692c51904"
+      },
+      "v3_driver_review": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-natural-stockout-original-packet-v3/driver-review.json",
+        "bytes": 1508,
+        "sha256": "60c6facc771aa55e4a812893b3924326786d97af24f35630898202e20e8f6867"
+      }
+    },
+    "independent_review": {
+      "decision": "GO",
+      "scope": "Original same-run selected-B natural stockout/mode9/elimination Results and whole3 stream terminal only; no browser parity/C3/all-writer/lifecycle acceptance",
+      "sha256": "c7d3799c00630db327ab9a0b78e428ad75889f455f096c13ffbbf31692c51904",
+      "offline_exit_code": 0
+    },
+    "browser_stockout_pair": {
+      "source": {
+        "runtime_commit": "528e015a1d8ff1bb49b6e9e3e88c9812d505698b",
+        "harness_commit": "528e015a1d8ff1bb49b6e9e3e88c9812d505698b",
+        "recipe_sha256": "211a456e16d4fd1e485d5090020ec2eb7450667ccd77f39e12c4ca41bc9503ee",
+        "frames": 2922,
+        "derivation": "Actual A+B prefix through B ReturnCSS from the complete original three-match recording, using unchanged v11 codec; third original match retained but not replayed."
+      },
+      "comparison": {
+        "pass": true,
+        "actions": 3630,
+        "lifetimes": [
+          {
+            "match_index": 0,
+            "generation": 3,
+            "setup": true,
+            "go": false,
+            "state": 0,
+            "window": true,
+            "terminal": true,
+            "retired": true,
+            "results": true,
+            "css": true,
+            "endpoint": 4,
+            "actions": 388,
+            "selectedEvents": 0,
+            "unpairedNativeEvents": 8552,
+            "seedPointer": "0x104b98c",
+            "published": true,
+            "resultsRequested": true
+          },
+          {
+            "match_index": 1,
+            "generation": 7,
+            "setup": true,
+            "go": true,
+            "state": 1537,
+            "window": true,
+            "terminal": true,
+            "retired": true,
+            "results": true,
+            "css": true,
+            "endpoint": 4,
+            "actions": 3242,
+            "selectedEvents": 0,
+            "unpairedNativeEvents": 42256,
+            "seedPointer": "0x10e072c",
+            "published": true,
+            "resultsRequested": true
+          }
+        ],
+        "RNG_semantics_requires_separate_python_comparison": false,
+        "per_owner_rng_comparison": false,
+        "entry_dispatch_parity": false,
+        "raw_pointer_equality": false,
+        "C3": false
+      },
+      "raw_row_count": 8835,
+      "raw_probe_count": 3630,
+      "mode9": {
+        "first": {
+          "source_tick": 1506,
+          "native_row_world_tick": 1507,
+          "ordinal": 1422,
+          "stocks": [
+            0,
+            4
+          ]
+        },
+        "count": 115
+      },
+      "published_results": [
+        {
+          "match_index": 0,
+          "outcome": 7,
+          "winner_count": 2,
+          "winners": [
+            0,
+            1
+          ]
+        },
+        {
+          "match_index": 1,
+          "outcome": 2,
+          "winner_count": 1,
+          "winners": [
+            1
+          ]
+        }
+      ],
+      "raw_outer": {
+        "result": "fail",
+        "launch_exit_code": 1,
+        "finalization_failures": [
+          "Browser replay report is incomplete or failed"
+        ],
+        "browser_report_field_present": false
+      },
+      "saved_replay": {
+        "complete": true,
+        "pass": true,
+        "frames": 2922
+      },
+      "elapsed_seconds": 58.27235362492502,
+      "cleanup": {
+        "passed": true,
+        "elapsed_ms": 148,
+        "cdp_attribution": true,
+        "fresh_owned_groups_absent": [
+          9653,
+          9654,
+          9659
+        ]
+      },
+      "limitations": [
+        "Original A no detailed constructor/GO/state; native A detail unpaired",
+        "Native actual published winner1 agrees with inference from original0/4 stocks; original published winner not observed",
+        "No original compact RNG ledger; all native RNG events unpaired",
+        "No all-writer, registration-lifetime, C3 or whole-game acceptance",
+        "Outer report remains FAIL: paired phase omitted report.browser_report assignment despite saved and final-snapshot replay PASS"
+      ],
+      "H1": {
+        "timing_pauses": 0,
+        "automatic_resumes": 0
+      },
+      "report_forwarding_repair": {
+        "commit": "bec43a92c1dc3652a706df732d0f99f307d65b9d",
+        "change": "Forward the actual runtime replay report after settled checked retirement to the unchanged generic finalizer.",
+        "focused_actual_phase_controls": 7,
+        "runtime_changed": false,
+        "recaptured": false
+      },
+      "artifacts": {
+        "projection": {
+          "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-stockout-pair-projection-v1/export-v2/projection.json",
+          "sha256": "39c5664a3af65f36a2a3b4ae930512199a17882f9583f6bea0eeb63e9ad38afc"
+        },
+        "recipe": {
+          "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-stockout-pair-projection-v1/export-v2/recipe.mwrc",
+          "sha256": "211a456e16d4fd1e485d5090020ec2eb7450667ccd77f39e12c4ca41bc9503ee"
+        },
+        "original_report": {
+          "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-natural-stockout-original-v3/report.json",
+          "sha256": "c6fc3ccd2742bc5e45ff77b087aac31e24b38678f7095e60463d6dad04714954"
+        },
+        "rows": {
+          "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-stockout-browser-capture-v1/browser-run/paired-v11-full-rows.jsonl",
+          "sha256": "5f75906cdfcd004898d5e8eb4597c9c25f3826d989ca74631ed69e4408d04586"
+        },
+        "rng": {
+          "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-stockout-browser-capture-v1/browser-run/paired-v11-full-rng.jsonl",
+          "sha256": "a1c2a20eb9a8f55046cff8e5163c72deef8dcdb2b90c0815bed520703381affe"
+        },
+        "report": {
+          "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-stockout-browser-capture-v1/browser-run/report.json",
+          "sha256": "f05cc24d4486380d8300bf92a475ac0d4b24c06f1aa1eb322e449f214f5440fa"
+        },
+        "saved_replay": {
+          "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-stockout-browser-capture-v1/browser-run/retail-browser-report.json",
+          "sha256": "800230d6cf9cb3e978dfe251fb4c42d110009660f1d3c2dac9cdd637939e0dc4"
+        },
+        "owner": {
+          "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-stockout-browser-capture-v1/owner.json",
+          "sha256": "0a5688646bfa8cb47b0f30cac255fa05e3b54906d87d87ef01ad3fdbd87619da"
+        },
+        "launcher": {
+          "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-stockout-browser-capture-v1/launcher-result.json",
+          "sha256": "509e348438cf3a2e40a524f656c4065fb016fe7c318274a29acaa4845e2bb76b"
+        },
+        "independent_review": {
+          "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-stockout-browser-capture-v1/independent-review.json",
+          "bytes": 6168,
+          "sha256": "288057e389bc9e9259159b4aaac1d09db659a31b7c8933d25e053c76c391ad12"
+        },
+        "manifest": {
+          "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-stockout-browser-packet-v1/manifest.json",
+          "bytes": 36467,
+          "sha256": "615c956e4d4e01d3da927f5fe1f8513ead2d89dc21c43e023c923e583f38a47a"
+        },
+        "projection_export": {
+          "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-stockout-pair-projection-v1/export-v2/result.json",
+          "bytes": 19304,
+          "sha256": "f302165ae4bed19e143604b893daf2ce7a589fb1900b94260f1671f297b5b63e"
+        },
+        "builds": {
+          "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-stockout-runtime-build-v1/result.json",
+          "bytes": 2397,
+          "sha256": "9fbd536bb1a0c644d8586e7c9e163dab0081bc4d9f9ecafc3f4080d8c59f60ed"
+        },
+        "report_forwarding_review": {
+          "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-stockout-browser-report-forward-review-v1.json",
+          "bytes": 1802,
+          "sha256": "d66fe7acff042694858238b8d82e602c13859690a3084e40c62b1671d035d8bc"
+        },
+        "focused_retained": {
+          "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-stockout-retained-focused-v1/result.json",
+          "bytes": 2404,
+          "sha256": "642033a17b791f5e11edaf506dcd36d3449ee61968de7bbc03b466a303563177"
+        },
+        "focused_forwarding": {
+          "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-stockout-report-forwarding-focused-v1/result.json",
+          "bytes": 1210,
+          "sha256": "32ab47c5561d9519c7747a26235a1a93ec9a98dbc3fb4325341f84af65e6643a"
+        }
+      },
+      "integration_validation": {
+        "head": "bec43a92c1dc3652a706df732d0f99f307d65b9d",
+        "tests": 2880,
+        "skips": 211,
+        "failures": 0,
+        "errors": 0,
+        "suite_seconds": 615.395,
+        "source_unchanged": true,
+        "owned_group_absent": true,
+        "receipt": {
+          "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-stockout-full-regression-v1/result.json",
+          "sha256": "10d746186391e8e57e32e22411504f3230fa82816c7d9d1a1c3e79c2175dbcd0"
+        },
+        "exact_documentation_head_CI": "pending"
+      }
+    },
+    "artifact_path_base": "External melee-web evidence root; paths are relative to that root."
   }
 }
