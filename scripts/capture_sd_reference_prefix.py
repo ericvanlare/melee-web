@@ -3535,6 +3535,57 @@ def validate_first_form_replay_status(native_status, primary_status, *, events, 
     return input_status
 
 
+def compare_first_form_replay_captures(previous, current, previous_rows, current_rows, expected):
+    """Strict input/profile and actual draw brackets; no scene RAM fabrication."""
+    import stadium_current_context_packet as context
+    replay = context.replay
+    require(previous['identity']['match_count'] == current['identity']['match_count'] == 3 and
+            previous['declared_setups'] == current['declared_setups'] == [expected]*3,
+            'First-form replay exact three-match Setup profile differs')
+    # This is export_pair's existing consumed-input/profile comparison, without
+    # creating a browser recipe whose full draw RAM was deliberately omitted.
+    require(replay._recipe_key(previous) == replay._recipe_key(current),
+            'Whole replay actual consumed recipe differs from recorded source')
+    old_trace = replay.derive_draw_boundary_trace(previous, previous_rows, expected_match_count=3)
+    new_trace = replay.derive_draw_boundary_trace(current, current_rows, expected_match_count=3)
+    require(old_trace == new_trace,
+            'First-form replay actual source PAD/tick/draw brackets differ')
+
+    def endpoints(capture, rows):
+        result = []
+        for match in range(3):
+            points = {}
+            for phase in ('entry', 'setup'):
+                selected = [row for row in rows if row['event'] == 'boundary' and
+                    row['payload'].get('match_index') == match and
+                    row['payload'].get('boundary') == phase]
+                require(len(selected) == 1, 'First-form replay missing/duplicate '+phase)
+                points[phase] = selected[0]
+            values = {}
+            for phase, row in points.items():
+                item, raw = replay._slice(row, 'match_setup', replay.GAME_INFO_SIZE, phase)
+                require(item['address'] == replay._gpr(points['entry']['payload'], 3, 'entry') and
+                        raw.hex() == capture['setup_hexes'][match] and
+                        context._decode_setup(raw.hex()) == expected,
+                        'First-form replay Entry/Setup raw block/owner differs')
+                values[phase] = context.seed(row)
+            result.append(values)
+        return result
+
+    old_endpoints, new_endpoints = endpoints(previous, previous_rows), endpoints(current, current_rows)
+    for before, after in zip(old_endpoints, new_endpoints):
+        for phase in ('entry', 'setup'):
+            require(before[phase]['value_hex'] == after[phase]['value_hex'],
+                    'Whole replay actual Entry/Setup seed differs')
+    return dict(scope='exact original consumed inputs/profile, actual Match draw brackets and Entry/Setup seeds only',
+        frames=len(current['frames']), match_count=3,
+        source_actions=[dict(match_index=m['match_index'], ticks=len(m['ticks']),
+                             draw_returns=len(m['draws'])) for m in new_trace['matches']],
+        entry_setup_seed_values=[{phase:item[phase]['value_hex'] for phase in ('entry','setup')}
+                                 for item in new_endpoints],
+        synthesized_scene_slices=False, browser_recipe_created=False)
+
+
 def stadium_whole_replay_complete(source, native_status, primary, primary_status, expected):
     """Require actual replay completion and same newly consumed source workload."""
     import stadium_later_b_reference as reference
@@ -3553,14 +3604,19 @@ def stadium_whole_replay_complete(source, native_status, primary, primary_status
         validate_status(native_status,mode='replay',events=summary['events'],require_complete=True)
     old=context.replay.capture_from_path(paths['primary'],paths['primary_status'])
     new=context.replay.capture_from_path(primary,primary_status)
-    require(context.replay.encode_v8(old)[0]==context.replay.encode_v8(new)[0],
-            'Whole replay actual consumed recipe differs from recorded source')
-    old_packet=context.packet_from_records(list(context.replay.iter_records(paths['primary'])),expected)
-    new_packet=context.packet_from_records(list(context.replay.iter_records(primary)),expected)
-    for previous,current in zip(old_packet['matches'],new_packet['matches']):
-        for phase in ('entry','setup'):
-            require(previous[phase]['rng']['value_hex']==current[phase]['rng']['value_hex'],
-                    'Whole replay actual Entry/Setup seed differs')
+    if source.get('first_form_latency_summary') is not None:
+        compare_first_form_replay_captures(old, new,
+            list(context.replay.iter_records(paths['primary'])),
+            list(context.replay.iter_records(primary)), expected)
+    else:
+        require(context.replay.encode_v8(old)[0]==context.replay.encode_v8(new)[0],
+                'Whole replay actual consumed recipe differs from recorded source')
+        old_packet=context.packet_from_records(list(context.replay.iter_records(paths['primary'])),expected)
+        new_packet=context.packet_from_records(list(context.replay.iter_records(primary)),expected)
+        for previous,current in zip(old_packet['matches'],new_packet['matches']):
+            for phase in ('entry','setup'):
+                require(previous[phase]['rng']['value_hex']==current[phase]['rng']['value_hex'],
+                        'Whole replay actual Entry/Setup seed differs')
     reference.verified_files(binding)
     return summary
 
