@@ -16,10 +16,12 @@ def cut(text,a,b):
 class WholeBObservationControls(OwnedWorkspaceTests):
     def test_actual_selected_state_and_mode_gate(self):
         source=(ROOT/'reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp').read_text()
-        state=cut(source,'struct StadiumWholeBObservation\n','enum class StadiumGoPrefixPhase : u8')
+        boundary_start=source.index("enum class Boundary : u16")
+        boundary=source[boundary_start:source.index("};",boundary_start)+2]
+        state=boundary+cut(source,'struct StadiumWholeBObservation\n','enum class StadiumGoPrefixPhase : u8')
         mode=cut(source,'    const std::string whole_b_setting =','    const std::string constructor_setting =')
         # The parent whole3/allocation2/record-only guard stays byte-identical.
-        guard_start='    if (stadium_whole_feedback &&'
+        guard_start='    if (stadium_whole_feedback &&\n        (whole_session_matches'
         guard_end='    const std::string whole_b_setting ='
         candidate=cut(source,guard_start,guard_end)
         original=(BASE/'reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp').read_text()
@@ -33,13 +35,18 @@ class WholeBObservationControls(OwnedWorkspaceTests):
 #include <cstddef>
 #include <map>
 #include <string>
+#include <string_view>
 #include <iostream>
-using u32=uint32_t;using u8=uint8_t;
+using u32=uint32_t;using u16=uint16_t;using u8=uint8_t;
 '''+state+r'''
 std::map<std::string,std::string> env;
 std::string Env(const char* key){return env[key];}
+namespace InputStream{bool IsRecording(){return true;}bool IsReplaying(){return false;}}
+struct CompactRngSettings{bool present=false,valid=false;std::string selection;};
+const CompactRngSettings& CompactRngEnvironment(){static const CompactRngSettings value{};return value;}
+bool whole_rng_returns=false,whole_replay=false;
 bool stadium_whole_feedback=false;std::string error;
-StadiumWholeBObservation stadium_whole_b;
+StadiumWholeBObservation stadium_whole_b;StadiumWholeLongIdle stadium_whole_long_idle;
 void SetInvalid(const char* text){error=text;}
 bool actual_mode(){
 '''+mode+r'''
@@ -99,7 +106,7 @@ int main(){
         def receiver(enabled=True,index=1):
             r=object.__new__(driver.StadiumWholeFeedbackReceiver)
             r.ended=False;r.seq=100;r.announcements=['handshake','start'];r.match_index=index
-            r.receipt=receipt;r.stadium_whole_b_state=enabled;r.b_entry_seen=True
+            r.receipt=receipt;r.stadium_whole_b_state=enabled;r.stadium_whole_long_idle=False;r.b_entry_seen=True
             r.b_constructor=StadiumConstructorObservations();r.setup_seen=False;r.b_go=None
             return r
         def selected(row):

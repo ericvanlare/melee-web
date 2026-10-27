@@ -119,7 +119,9 @@ class StadiumSssPositionTests(OwnedWorkspaceTests):
         publish=source[source.index("  void PublishStadiumProgress"):source.index("  // Pinned fn_8025A310")]
         fields=source[source.index("  struct StadiumSssPositionCall"):source.index("  bool stadium_go_prefix_enabled = false;")]
         assert source.count("struct StadiumWholeBObservation\n")==source.count("enum class StadiumGoPrefixPhase : u8")==1
-        whole_b_state=source[source.index("struct StadiumWholeBObservation\n"):source.index("enum class StadiumGoPrefixPhase : u8")]
+        boundary_start=source.index("enum class Boundary : u16")
+        boundary=source[boundary_start:source.index("};",boundary_start)+2]
+        whole_b_state=boundary+source[source.index("struct StadiumWholeBObservation\n"):source.index("enum class StadiumGoPrefixPhase : u8")]
         whole_fields="\n".join(
             source[source.index(marker):source.index(";",source.index(marker))+1]
             for marker in ("  StadiumWholeBObservation stadium_whole_b;",
@@ -140,6 +142,7 @@ class StadiumSssPositionTests(OwnedWorkspaceTests):
 #include <map>
 #include <vector>
 #include <string>
+#include <string_view>
 #include <sstream>
 #include <iomanip>
 #include <cstdint>

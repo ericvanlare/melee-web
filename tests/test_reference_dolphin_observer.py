@@ -329,7 +329,12 @@ int main() {
         method_start = source.index("bool Observer::IsRngReturnBoundary(")
         selected = source[method_start:source.index("bool Observer::IsBoundary(", method_start)]
         self.assertIn("CpuProbeEnabled()", selected)
-        self.assertIn("CpuProbeEnvironment().rng_return_pc == guest_pc", selected)
+        self.assertIn(
+            "SelectedRngReturn(CpuProbeEnvironment().rng_return_pc, "
+            "CpuProbeEnvironment().rng_returns, guest_pc, "
+            "CpuProbeEnvironment().rng_updates)",
+            selected,
+        )
         self.assertIn("FindCpuProbePoint(guest_pc) != nullptr", selected)
         self.assertIn("ReferenceCapture::Observer::IsRngReturnBoundary(observer_op.address)", patch)
         self.assertIn("ReferenceCapture::Observer::IsRngReturnBoundary(op.address)", patch)

@@ -407,8 +407,10 @@ bool CpuProbeEnabled() { return false; }
 bool ItemProbeEnabled() { return false; }
 const void* FindCpuProbePoint(u32) { return nullptr; }
 const void* FindItemProbePoint(u32) { return nullptr; }
-struct Settings { u32 rng_return_pc = 0; } settings;
+struct Settings { u32 rng_return_pc = 0; bool rng_returns = false, rng_updates = false; } settings;
 const Settings& CpuProbeEnvironment() { return settings; }
+bool CompactRngEnabled() { return false; }
+bool SelectedRngReturn(u32, bool, u32, bool = false) { return false; }
 ''' + request_helpers + dispatcher + r'''
 int main(int argc, char** argv) {
   assert(argc == 2);

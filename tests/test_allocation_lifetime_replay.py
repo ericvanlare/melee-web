@@ -20,6 +20,7 @@ from tools.allocation_history_replay import ReplayProblem
 from tools.allocation_history_replay import ModelDriver
 from tools.allocation_lifetime_replay import (
     replay_lifetimes, validate_layout, validate_metadata_shape, validate_original_rng_scene_boundaries,
+    validate_original_rng_scene_boundaries_stream,
 )
 
 
@@ -1346,6 +1347,40 @@ class OriginalRngSceneBoundaryTests(unittest.TestCase):
         with self.assertRaises(ReplayProblem):validate_original_rng_scene_boundaries(p,h,e,r)
         for row in r:row['observed'].clear()
         self.assertFalse(validate_original_rng_scene_boundaries(p,h,e,r)['observed'])
+
+    def test_streaming_endpoint_reduction_matches_list_result_and_consumes_footer(self):
+        profile,header,end,endpoints=self.fixture()
+        first={'record':'header','observed':{},**header}
+        last={'record':'footer','observed':{},**end}
+        repeated={'record':'repeated_stop','function':'outside-boundary',
+                  'observed':{'original_rng':{'retained_by_existing_rule':True}}}
+        source=[first,*endpoints,repeated,last]
+        visited=[]
+        def rows():
+            for row in source:
+                visited.append(row)
+                yield row
+        legacy=validate_original_rng_scene_boundaries(profile,header,end,endpoints)
+        streamed,stream_header,stream_end,selected=validate_original_rng_scene_boundaries_stream(profile,rows())
+        self.assertEqual(streamed,legacy)
+        self.assertIs(stream_header,first)
+        self.assertIs(stream_end,last)
+        self.assertEqual(len(selected),8)
+        self.assertEqual(selected,endpoints)
+        self.assertEqual(len(visited),len(source))
+
+    def test_streaming_endpoint_reduction_rejects_outside_rows_bad_containers_and_extra_endpoints(self):
+        profile,header,end,endpoints=self.fixture()
+        first={'record':'header','observed':{},**header}
+        last={'record':'footer','observed':{},**end}
+        outside={'record':'ordinary','observed':{'original_rng':{'value':1}}}
+        with self.assertRaisesRegex(ReplayProblem,'outside a declared VS boundary'):
+            validate_original_rng_scene_boundaries_stream(profile,[first,*endpoints,outside,last])
+        malformed={'record':'ordinary','observed':None}
+        with self.assertRaisesRegex(ReplayProblem,'container shape'):
+            validate_original_rng_scene_boundaries_stream(profile,[first,*endpoints,malformed,last])
+        with self.assertRaisesRegex(ReplayProblem,'cardinality'):
+            validate_original_rng_scene_boundaries_stream(profile,[first,*endpoints,endpoints[0],last])
 
 
 if __name__ == "__main__":

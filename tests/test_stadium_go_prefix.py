@@ -904,6 +904,8 @@ class StadiumBootGateControl(OwnedWorkspaceTests):
         harness = """#include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <string>
+#include <string_view>
 using std::size_t;
 using u8 = uint8_t; using u16 = uint16_t; using u32 = uint32_t;
 """ + enums + """

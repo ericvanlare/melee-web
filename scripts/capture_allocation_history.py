@@ -1249,23 +1249,29 @@ def join_stadium_allocation_samples(selected, boundaries):
         if len(joined)!=1:raise ValueError('Native allocation boundary lacks unique intended Stadium primary owner')
 
 
+def iter_stadium_allocation_jsonl(path):
+    """Yield every parsed allocation row without retaining the whole JSONL file."""
+    with Path(path).open('r', encoding='utf-8') as source:
+        for line in source:
+            yield json.loads(line)
+
+
 def validate_stadium_three_native(output, profile_path, expected):
     from whole_session_replay import capture_from_path
     from reference_observer_stream import iter_records
-    from tools.allocation_lifetime_replay import validate_original_rng_scene_boundaries
+    from tools.allocation_lifetime_replay import validate_original_rng_scene_boundaries_stream
     primary=capture_from_path(output/'native-primary.mwro',output/'native-primary-status.json')
     if primary['identity']['match_count']!=3 or primary['declared_setups']!=[expected]*3:
         raise ValueError('Native primary does not contain three declared Stadium matches')
-    rows=[json.loads(line) for line in (output/'native-allocations.jsonl').read_text().splitlines()]
-    if (rows[0].get('profile_sha256')!='30e6ccc981d5e8eea6d5c88381bfc3df5a3b1103599c2b632ddb48580165bf65' or
-            rows[0].get('vs_target')!=2 or rows[0].get('stop_at')!='exit'):
+    profile=json.loads(profile_path.read_text())
+    decoded,header,footer,selected=validate_original_rng_scene_boundaries_stream(
+        profile,iter_stadium_allocation_jsonl(output/'native-allocations.jsonl'))
+    if (header.get('profile_sha256')!='30e6ccc981d5e8eea6d5c88381bfc3df5a3b1103599c2b632ddb48580165bf65' or
+            header.get('vs_target')!=2 or header.get('stop_at')!='exit'):
         raise ValueError('Native allocation scope differs from exact firsttwo exits')
-    decoded=validate_original_rng_scene_boundaries(json.loads(profile_path.read_text()),rows[0],rows[-1],rows)
     if decoded['sample_count']!=8:raise ValueError('Native allocation sample count differs')
     # Join actual callback CPU identity, never assume allocation ordinal equals
     # accepted primary match ordinal (opening attract VS would violate this).
-    selected=[r for r in rows if r.get('record') in ('enter','return') and
-              r.get('function') in ('gm_Scene_Vs_OnEnter','gm_Scene_Vs_OnExit')]
     boundaries=[r for r in iter_records(output/'native-primary.mwro') if r['event']=='boundary']
     join_stadium_allocation_samples(selected,boundaries)
     return {'scope':'primary3 natural matches; native allocation first2 only; third natural tail',

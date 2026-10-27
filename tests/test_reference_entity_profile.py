@@ -84,6 +84,14 @@ class ReferenceEntityProfileTests(unittest.TestCase):
                       source.index('    capture_id = Env("MWRC_CAPTURE_ID");')]
         stadium_receipt_start = source.index('constexpr char STADIUM_SETUP_RECEIPT_SHA256[]')
         stadium_receipt = source[stadium_receipt_start:source.index(';', stadium_receipt_start) + 1]
+        stadium_boundary = _extract_braced_declaration(source, 'enum class Boundary : u16')
+        stadium_long_idle = _extract_braced_declaration(source, 'struct StadiumWholeLongIdle\n')
+        compact_settings = source[source.index('struct CompactRngSettings'):source.index(
+            'const CompactRngSettings& CompactRngEnvironment()')
+        ]
+        compact_environment = _extract_braced_declaration(
+            source, 'const CompactRngSettings& CompactRngEnvironment()'
+        )
         stadium_phase = _extract_braced_declaration(source, 'enum class StadiumGoPrefixPhase')
         whole_b_state = _extract_braced_declaration(source, 'struct StadiumWholeBObservation\n')
         stadium_state_start = source.index('  bool stadium_go_prefix_enabled = false;')
@@ -97,8 +105,10 @@ class ReferenceEntityProfileTests(unittest.TestCase):
 #include <cassert>
 #include <cstdint>
 #include <cstddef>
+#include <new>
 #include <map>
 #include <string>
+#include <string_view>
 namespace ReferenceCapture {
 struct TestInputState { int mode = 0; };
 TestInputState& State() { static TestInputState state; return state; }
@@ -111,9 +121,10 @@ using namespace ReferenceCapture;
 std::map<std::string,std::string> environment;
 std::string Env(const char* name){return environment[name];}
 using u8=std::uint8_t;
+using u16=std::uint16_t;
 using u32=unsigned;
 constexpr unsigned WHOLE_SESSION_MIN_MATCHES=3,WHOLE_SESSION_MAX_MATCHES=64;
-'''+stadium_receipt+"\n"+stadium_phase+"\n"+whole_b_state+"\n"+count_function+"\n"+allocation_configured+r'''
+'''+stadium_boundary+"\n"+stadium_long_idle+"\n"+compact_settings+compact_environment+"\n"+stadium_receipt+"\n"+stadium_phase+"\n"+whole_b_state+"\n"+count_function+"\n"+allocation_configured+r'''
 bool SdInitRequested(){return !Env("MWRC_SD_INIT").empty();}
 struct Reader {
  unsigned whole_session_matches=0;bool checked_entity_profile=false,active_entity_profile=false;std::string error;
@@ -126,27 +137,31 @@ std::string identity(){std::string handshake="base";
 ''' + metadata + r'''
 return handshake;}
 };
+static void ResetReader(Reader& reader) {
+ reader.~Reader();
+ ::new (static_cast<void*>(&reader)) Reader{};
+}
 int main(){
- Reader r;assert(r.configure());assert(!r.stadium_whole_b.enabled);assert(!r.checked_entity_profile);assert(!r.stadium_whole_feedback);assert(r.identity()=="base");
+ Reader r;assert(r.configure());assert(!r.stadium_whole_b.enabled);assert(!r.stadium_whole_long_idle.enabled);assert(!r.checked_entity_profile);assert(!r.stadium_whole_feedback);assert(r.identity()=="base");
  environment["MWRC_WHOLE_SESSION_MATCHES"]="1";
- r=Reader{};assert(!r.configure()||r.whole_session_matches==0);
+ ResetReader(r);assert(!r.configure()||r.whole_session_matches==0);
  environment["MWRC_ENTITY_PROFILE"]="jiggly-ice-mario-fox-v1";
- r=Reader{};assert(r.configure()&&r.checked_entity_profile);
+ ResetReader(r);assert(r.configure()&&r.checked_entity_profile);
  assert(r.identity()=="base,\"entity_profile\":\"jiggly-ice-mario-fox-v1\"");
  environment["MWRC_ENTITY_PROFILE"]="jiggly-ice-mario-fox-active60-v1";
- r=Reader{};assert(r.configure()&&r.checked_entity_profile&&r.active_entity_profile);
+ ResetReader(r);assert(r.configure()&&r.checked_entity_profile&&r.active_entity_profile);
  assert(r.identity()=="base,\"entity_profile\":\"jiggly-ice-mario-fox-active60-v1\"");
  environment["MWRC_ENTITY_PROFILE"]="jiggly-ice-mario-fox-v1";
- environment["MWRC_WHOLE_SESSION_MATCHES"]="3";r=Reader{};assert(!r.configure());
+ environment["MWRC_WHOLE_SESSION_MATCHES"]="3";ResetReader(r);assert(!r.configure());
  environment["MWRC_WHOLE_SESSION_MATCHES"]="1";
  for(const char* other:{"MWRC_SD_INIT","MWRC_CPU_PROBE_OUTPUT","MWRC_ITEM_PROBE_OUTPUT","MWRC_ALLOCATION_OUTPUT"}){
-  environment[other]="1";r=Reader{};assert(!r.configure());assert(!r.error.empty());environment.erase(other);
+  environment[other]="1";ResetReader(r);assert(!r.configure());assert(!r.error.empty());environment.erase(other);
  }
- environment["MWRC_ENTITY_PROFILE"]="unknown";r=Reader{};assert(!r.configure());
- environment.clear();environment["MWRC_STADIUM_GO_PREFIX"]="0";r=Reader{};assert(!r.configure());
- environment.clear();environment["MWRC_STADIUM_GO_PREFIX"]="1";r=Reader{};assert(!r.configure());
+ environment["MWRC_ENTITY_PROFILE"]="unknown";ResetReader(r);assert(!r.configure());
+ environment.clear();environment["MWRC_STADIUM_GO_PREFIX"]="0";ResetReader(r);assert(!r.configure());
+ environment.clear();environment["MWRC_STADIUM_GO_PREFIX"]="1";ResetReader(r);assert(!r.configure());
  environment["MWRC_STADIUM_SETUP_RECEIPT_SHA256"]=STADIUM_SETUP_RECEIPT_SHA256;
- r=Reader{};assert(r.configure()&&r.stadium_go_prefix_enabled);
+ ResetReader(r);assert(r.configure()&&r.stadium_go_prefix_enabled);
  assert(r.stadium_go_prefix_setup_receipt_sha256==STADIUM_SETUP_RECEIPT_SHA256);
  assert(r.stadium_go_prefix_phase==StadiumGoPrefixPhase::AwaitCss);
 }

@@ -84,7 +84,7 @@ test('selected empty windows remain explicit version2 rows and service placement
  const service=native.slice(native.indexOf('bool matched_setup_cf_service(){'),native.indexOf('bool matched_setup_cf_service(){')+22000);
  const begin=service.indexOf('later_b_rng_owner_begin(state,ordinal);'),tick=service.indexOf('match->tick(raw);');
  const draw=service.indexOf('match->draw();'),postOwner=service.indexOf('matched_setup_cf_check_owner(state.last_ticks_after,state.last_draws_after);');
- const flush=service.indexOf('if(!tick_action)later_b_rng_owner_draw_return(state,ordinal);');
+ const flush=service.indexOf('if(!tick_action&&!state.later_b_gate2_long_mode)later_b_rng_owner_draw_return(state,ordinal);');
  assert.ok(begin>=0&&begin<tick&&tick<draw&&draw<postOwner&&postOwner<flush);
  assert.doesNotMatch(service.slice(tick,draw),/melee_web_rng_draw_probe_scheduler_return/);
 });

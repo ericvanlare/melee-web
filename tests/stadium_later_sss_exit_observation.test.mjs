@@ -215,7 +215,7 @@ function runnerSlice(first,last) {
 async function runnerAdmission(e,args,overrides={}) {
   const report={inputs:{recipe:{sha256:e.recipe.sha256}},requested_entity_prefix:false};
   e.source_binding={files:{operand:{path:'modeled-source-input',sha256:'c'.repeat(64)}}};
-  const context={path,JSON,OBSERVED_B_REFERENCE,OBSERVED_B_SCHEMA,validateLaterReferenceRecipeInputs,parseArgs:options=>parseArgs({...options,args}),
+  const context={path,JSON,OBSERVED_B_REFERENCE,LONG_B_REFERENCE,OBSERVED_B_SCHEMA,validateLaterReferenceRecipeInputs,parseArgs:options=>parseArgs({...options,args}),
     validateLaterSssExitExpected,compareLaterSssExitObservation,validateLaterSssExitTrace,
     validateLaterSssExitTerminal,validateLaterSssExitFinalization,compareLaterPreparedStartObservation,compareLaterPreparedSetupObservation,
     validateStock4SssExitExpected,compareStock4SssExitObservation,validateStock4SssExitTerminal,

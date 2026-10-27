@@ -21,20 +21,20 @@ from .allocation_history_replay import (
 )
 
 
-def validate_original_rng_scene_boundaries(profile: dict, header: dict, end: dict,
-                                           rows: list[dict]) -> dict:
-    """Validate source scene endpoint samples, never a port ownership stack."""
+def _validate_original_rng_scene_boundary_endpoints(profile: dict, header: dict, end: dict,
+                                                     selected: list[dict], *,
+                                                     selected_count: int,
+                                                     sample_present: bool,
+                                                     outside_sample: bool) -> dict:
+    """Shared exact endpoint checks for legacy-list and bounded-stream callers."""
     feature = 'original_rng_scene_boundaries_v1'
     if (not isinstance(profile, dict) or not isinstance(header, dict) or
-            not isinstance(end, dict) or not isinstance(rows, list) or
+            not isinstance(end, dict) or not isinstance(selected, list) or
             any(not isinstance(row, dict) or
-                not isinstance(row.get('observed', {}), dict) for row in rows)):
+                not isinstance(row.get('observed', {}), dict) for row in selected)):
         raise ReplayProblem('stream', 'original RNG endpoint container shape differs')
-    selected = [row for row in rows if row.get('record') in {'enter', 'return'} and
-                row.get('function') in {'gm_Scene_Vs_OnEnter', 'gm_Scene_Vs_OnExit'}]
-    present = any('original_rng' in row.get('observed', {}) for row in rows)
     if feature not in header and feature not in end:
-        if present:
+        if sample_present:
             raise ReplayProblem('stream', 'original RNG samples lack their explicit feature marker')
         return {'observed': False, 'scope': 'historical/non-feature producer'}
     if header.get(feature) is not True or end.get(feature) is not True:
@@ -61,7 +61,7 @@ def validate_original_rng_scene_boundaries(profile: dict, header: dict, end: dic
         if ordinal < exits:
             expected += [(ordinal + 1, 'gm_Scene_Vs_OnExit', 'enter'),
                          (ordinal + 1, 'gm_Scene_Vs_OnExit', 'return')]
-    if len(selected) != len(expected):
+    if selected_count != len(expected) or len(selected) != selected_count:
         raise ReplayProblem('stream', 'original RNG scene endpoint cardinality differs')
     fields = {'pointer_slot_address', 'pointer_value', 'value_address', 'value',
               'pointer_bytes', 'value_bytes'}
@@ -96,12 +96,67 @@ def validate_original_rng_scene_boundaries(profile: dict, header: dict, end: dic
                        'sequence': row['sequence'], 'call': row['call'], 'thread': row['thread'],
                        'sp': machine['r1'], 'lr': machine['lr'], **sample})
         previous_sequence = row['sequence']
-    if any('original_rng' in row.get('observed', {}) and
-           row.get('record') != 'repeated_stop' and row not in selected for row in rows):
+    if outside_sample:
         raise ReplayProblem('stream', 'original RNG sample occurs outside a declared VS boundary')
     return {'observed': True, 'scope': 'original VS seed-slot/value endpoints only',
             'samples': result, 'sample_count': len(result), 'all_writers_observed': False,
             'port_wrapper_correspondence': 'not claimed'}
+
+
+def validate_original_rng_scene_boundaries(profile: dict, header: dict, end: dict,
+                                           rows: list[dict]) -> dict:
+    """Legacy list API: validate source endpoints, never a port ownership stack."""
+    if (not isinstance(profile, dict) or not isinstance(header, dict) or
+            not isinstance(end, dict) or not isinstance(rows, list) or
+            any(not isinstance(row, dict) or
+                not isinstance(row.get('observed', {}), dict) for row in rows)):
+        raise ReplayProblem('stream', 'original RNG endpoint container shape differs')
+    selected = [row for row in rows if row.get('record') in {'enter', 'return'} and
+                row.get('function') in {'gm_Scene_Vs_OnEnter', 'gm_Scene_Vs_OnExit'}]
+    present = any('original_rng' in row.get('observed', {}) for row in rows)
+    outside = any('original_rng' in row.get('observed', {}) and
+                  row.get('record') != 'repeated_stop' and row not in selected for row in rows)
+    return _validate_original_rng_scene_boundary_endpoints(
+        profile, header, end, selected, selected_count=len(selected),
+        sample_present=present, outside_sample=outside)
+
+
+def validate_original_rng_scene_boundaries_stream(profile: dict, rows) -> tuple[dict, dict, dict, list]:
+    """Validate a JSONL stream while retaining only its endpoints and 8 scene rows.
+
+    The input iterator must yield every parsed allocation record in file order.
+    This bounded variant is for the exact Stadium two-exit capture (8 endpoint
+    records); the public list API above remains unchanged for existing callers.
+    """
+    first = last = None
+    selected = []
+    selected_count = 0
+    present = False
+    outside = False
+    for row in rows:
+        if (not isinstance(row, dict) or
+                not isinstance(row.get('observed', {}), dict)):
+            raise ReplayProblem('stream', 'original RNG endpoint container shape differs')
+        if first is None:
+            first = row
+        last = row
+        observed = row.get('observed', {})
+        is_endpoint = (row.get('record') in {'enter', 'return'} and
+                       row.get('function') in {'gm_Scene_Vs_OnEnter', 'gm_Scene_Vs_OnExit'})
+        if is_endpoint:
+            selected_count += 1
+            if len(selected) < 8:
+                selected.append(row)
+        if 'original_rng' in observed:
+            present = True
+            if row.get('record') != 'repeated_stop' and not is_endpoint:
+                outside = True
+    if first is None:
+        raise ReplayProblem('stream', 'original RNG endpoint container shape differs')
+    decoded = _validate_original_rng_scene_boundary_endpoints(
+        profile, first, last, selected, selected_count=selected_count,
+        sample_present=present, outside_sample=outside)
+    return decoded, first, last, selected
 
 
 class StreamModel:

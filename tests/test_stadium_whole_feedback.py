@@ -17,17 +17,21 @@ def load_exact(name,path):
     assert hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest()==digest
     return module
 def whole_b_declaration(source):
+    boundary_start='enum class Boundary : u16'
     start='struct StadiumWholeBObservation\n'
     end='enum class StadiumGoPrefixPhase : u8'
+    assert source.count(boundary_start)==1
     assert source.count(start)==source.count(end)==1
-    return source[source.index(start):source.index(end)]
+    boundary_end=source.index("};",source.index(boundary_start))+2
+    return (source[source.index(boundary_start):boundary_end]+"\n"+
+            source[source.index(start):source.index(end)])
 
 class StadiumWholeFeedbackTests(OwnedWorkspaceTests):
     @classmethod
     def setUpClass(cls):
         global decoder, driver
         cls.workspace=cls.new_workspace(REPO_ROOT,'stadium-whole-feedback-')
-        prior={name:sys.modules.get(name) for name in ('stadium_go_prefix','capture_sd_reference_prefix')}
+        prior={name:sys.modules.get(name) for name in ('stadium_go_prefix','capture_sd_reference_prefix','capture_allocation_history')}
         def restore():
             for name,value in prior.items():
                 if value is None:sys.modules.pop(name,None)
@@ -35,6 +39,14 @@ class StadiumWholeFeedbackTests(OwnedWorkspaceTests):
         cls.addClassCleanup(restore)
         decoder=load_exact('stadium_go_prefix',SOURCE_ROOT/'tools/stadium_go_prefix.py')
         driver=load_exact('capture_sd_reference_prefix',SOURCE_ROOT/'scripts/capture_sd_reference_prefix.py')
+
+    def test_stadium_allocation_jsonl_reader_parses_late_rows_lazily(self):
+        capture=load_exact('capture_allocation_history',SOURCE_ROOT/'scripts/capture_allocation_history.py')
+        path=self.workspace/'allocation-reader.jsonl'
+        path.write_text('{\"record\":\"header\"}\nnot-json\n')
+        rows=capture.iter_stadium_allocation_jsonl(path)
+        self.assertEqual(next(rows),{'record':'header'})
+        with self.assertRaises(json.JSONDecodeError):next(rows)
 
     def test_actual_strict_admitted_gci_copy_and_profile_separation(self):
         packet_setting=os.environ.get('MELEE_STADIUM_WHOLE_CAPTURE_PACKET')
@@ -124,14 +136,17 @@ class StadiumWholeFeedbackTests(OwnedWorkspaceTests):
 #include <cstddef>
 #include <map>
 #include <string>
-using u32=uint32_t;using u8=uint8_t;
+#include <string_view>
+using u32=uint32_t;using u8=uint8_t;using u16=uint16_t;
 '''+whole_b_declaration(source)+r'''
 std::map<std::string,std::string> env;
 std::string Env(const char* key){return env[key];}
 bool SdInitRequested(){return !Env("MWRC_SD_INIT").empty();}
 bool AllocationConfigured(){return !Env("MWRC_ALLOCATION_OUTPUT").empty();}
+struct CompactRngSettings{bool present=false,valid=false;std::string selection;};
+const CompactRngSettings& CompactRngEnvironment(){static const CompactRngSettings value{};return value;}
 namespace InputStream { bool recording=true,replaying=false; bool IsRecording(){return recording;} bool IsReplaying(){return replaying;} }
-struct Gate { StadiumWholeBObservation stadium_whole_b;unsigned whole_session_matches=3;bool stadium_go_prefix_enabled=false,stadium_whole_feedback=false;std::string stadium_whole_setup_receipt,error;void SetInvalid(const char* e){error=e;}
+struct Gate { StadiumWholeBObservation stadium_whole_b;StadiumWholeLongIdle stadium_whole_long_idle;unsigned whole_session_matches=3;bool stadium_go_prefix_enabled=false,stadium_whole_feedback=false,whole_rng_returns=false,whole_replay=false;std::string stadium_whole_setup_receipt,error;void SetInvalid(const char* e){error=e;}
 bool Run(){
 ''' + body + r'''
 return true;
@@ -174,7 +189,9 @@ reset();env["MWRC_STADIUM_WHOLE_FEEDBACK"]="";env["MWRC_STADIUM_WHOLE_SETUP_RECE
         start=source.index('  void PublishStadiumProgress(')
         stop=source.index('  // Pinned fn_8025A310',start)
         current=source[start:stop]
-        helper=source[source.index('bool AppendBounded('):source.index('\n}  // namespace\n\nstruct Observer::Impl')]
+        helper_start=source.index('bool AppendBounded(')
+        helper_end=source.index('\n}  // namespace\n\nstatic_assert(',helper_start)
+        helper=source[helper_start:helper_end]
         import re
         constants='\n'.join(re.findall(r'^constexpr size_t (?:RING_PAYLOAD|CPU_PROBE_MAX_JSON_BYTES) = .*?;',source,re.M))
         self.assertEqual(len(constants.splitlines()),2)
@@ -831,8 +848,10 @@ std::string Env(const char* key){return env[key];}
 bool SdInitRequested(){return !Env("MWRC_SD_INIT").empty();}
 bool OrdinaryTimeoutRequested(){return false;} bool SparsePairRequested(){return false;}
 bool CpuProbeEnabled(){return false;} bool ItemProbeEnabled(){return false;}
-struct ProbeEnvironment{u32 rng_return_pc=0;};
+struct ProbeEnvironment{u32 rng_return_pc=0;bool rng_returns=false,rng_updates=false;};
 ProbeEnvironment CpuProbeEnvironment(){return {};}
+bool CompactRngEnabled(){return false;}
+bool SelectedRngReturn(u32,bool,u32,bool=false){return false;}
 const void* FindCpuProbePoint(u32){return nullptr;}
 const void* FindItemProbePoint(u32){return nullptr;}
 bool IsEnabled(){return true;} bool AllocationConfigured(){return !Env("MWRC_ALLOCATION_OUTPUT").empty();}
