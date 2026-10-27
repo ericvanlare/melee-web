@@ -166,6 +166,13 @@ SLICE_NAMES = {
     87: "stadium_title_text_wrapper",
     88: "stadium_title_static_text_pointer",
     89: "stadium_title_dynamic_text_pointer",
+    99: "stadium_first_form_incoming",
+    100: "stadium_first_form_current_id",
+    101: "stadium_first_form_incoming_id",
+    102: "stadium_first_form_legacy_root",
+    103: "stadium_first_form_root",
+    104: "stadium_first_form_ground",
+    105: "stadium_first_form_ground_id",
 }
 
 
@@ -357,6 +364,8 @@ def iter_records(path: str | Path, *,
     previous_sequence = None
     whole_session_announced = False
     whole_session_count = None
+    first_form_marker = None
+    first_form_seen = False
     whole_session_paired_idle = None
     whole_session_paired_profile = None
     with stream:
@@ -399,6 +408,19 @@ def iter_records(path: str | Path, *,
             decoded = _decode_record(header, payload, context, names)
             if decoded["event"] in {"handshake", "start"}:
                 announcement = decoded["payload"]
+                marker = announcement.get('stadium_posttransform_state')
+                if marker is not None and not (marker == 'first_form_v1' and
+                        announcement.get('whole_session') is True and
+                        announcement.get('match_count') == 3 and
+                        announcement.get('stadium_whole_feedback') is True and
+                        announcement.get('stadium_whole_b_state') is True and
+                        announcement.get('stadium_observed_match') == 1 and
+                        isinstance(announcement.get('stadium_whole_long_idle'), Mapping) and
+                        announcement['stadium_whole_long_idle'].get('profile') == 'selected_b_3500_v1'):
+                    raise ObserverStreamError(f"{context}: first-form profile lacks exact selected-B owner")
+                if first_form_seen and marker != first_form_marker:
+                    raise ObserverStreamError(f"{context}: first-form announcements disagree")
+                first_form_marker=marker; first_form_seen=True
                 if announcement.get("whole_session") is True:
                     count = announcement.get("match_count")
                     profile = announcement.get("entity_profile")
@@ -454,6 +476,8 @@ def iter_records(path: str | Path, *,
                     whole_session_announced = True
             elif decoded["event"] == "boundary":
                 boundary_payload = decoded["payload"]
+                if any(x.get('tag') in range(99,106) for x in boundary_payload.get('slices',[])) and first_form_marker != 'first_form_v1':
+                    raise ObserverStreamError(f"{context}: first-form slices lack explicit profile")
                 if boundary_payload.get("whole_session") and not whole_session_announced:
                     raise ObserverStreamError(
                         f"{context}: whole-session boundary precedes opt-in announcement")

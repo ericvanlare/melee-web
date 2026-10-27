@@ -197,7 +197,7 @@ class StandingsInputPolicyTests(unittest.TestCase):
         literal = [m.NEUTRAL_PAD, m.NEUTRAL_PAD, DISCONNECTED_PAD, DISCONNECTED_PAD]
         accepted = receiver()
         with patch.object(policy_module, '_consumed_ports', return_value=literal), \
-             patch('stadium_go_prefix._validate_stadium_idle_state_record', return_value=snapshot):
+             patch('stadium_go_prefix.StadiumFirstFormObservations.accept', return_value=snapshot):
             accepted.accept(consumed)
             accepted.accept(state_row)
         self.assertEqual(accepted.post_window_ticks, 1)
@@ -209,7 +209,7 @@ class StandingsInputPolicyTests(unittest.TestCase):
         wrong_tick['payload'] = copy.deepcopy(state_row['payload'])
         next(x for x in wrong_tick['payload']['slices'] if x['tag'] == 30)['hex'] = (3502).to_bytes(4, 'big').hex()
         with patch.object(policy_module, '_consumed_ports', return_value=literal), \
-             patch('stadium_go_prefix._validate_stadium_idle_state_record', return_value=snapshot):
+             patch('stadium_go_prefix.StadiumFirstFormObservations.accept', return_value=snapshot):
             rejected.accept(consumed)
             with self.assertRaises(ValueError):
                 rejected.accept(wrong_tick)
@@ -218,7 +218,7 @@ class StandingsInputPolicyTests(unittest.TestCase):
         changed_root_row = copy.deepcopy(state_row)
         changed_root_row['payload']['slices'][0]['hex'] = '00000003'
         with patch.object(policy_module, '_consumed_ports', return_value=literal), \
-             patch('stadium_go_prefix._validate_stadium_idle_state_record', return_value=snapshot):
+             patch('stadium_go_prefix.StadiumFirstFormObservations.accept', return_value=snapshot):
             changed_root.accept(consumed)
             with self.assertRaisesRegex(ValueError, 'map root owner changed'):
                 changed_root.accept(changed_root_row)
@@ -287,8 +287,8 @@ class StandingsInputPolicyTests(unittest.TestCase):
         }
         literal = [m.NEUTRAL_PAD, m.NEUTRAL_PAD, DISCONNECTED_PAD, DISCONNECTED_PAD]
         with patch.object(policy_module, '_consumed_ports', return_value=literal), \
-             patch('stadium_go_prefix._validate_stadium_idle_state_record',
-                   side_effect=lambda row, label, tick: snapshots[tick]):
+             patch('stadium_go_prefix.StadiumFirstFormObservations.accept',
+                   side_effect=lambda row, owner=None: snapshots[row['source_tick']]):
             observed.accept(consume_row(1001, 3501, 451))
             observed.accept(tick_row(1002, 3501, 451))
             observed.accept(draw_row(1003, 'draw_enter', 3502, 451))
@@ -310,8 +310,8 @@ class StandingsInputPolicyTests(unittest.TestCase):
         observed.policy.last = dict(source_tick=3500, mode=1, focus=99)
         observed.owner = ((67, 1, '00000001'), (68, 1, '00000002'))
         with patch.object(policy_module, '_consumed_ports', return_value=literal), \
-             patch('stadium_go_prefix._validate_stadium_idle_state_record',
-                   side_effect=lambda row, label, tick: snapshots[tick]):
+             patch('stadium_go_prefix.StadiumFirstFormObservations.accept',
+                   side_effect=lambda row, owner=None: snapshots[row['source_tick']]):
             observed.accept(consume_row(1001, 3501, 451))
             observed.accept(tick_row(1002, 3501, 451))
             observed.accept(draw_row(1003, 'draw_enter', 3502, 451))

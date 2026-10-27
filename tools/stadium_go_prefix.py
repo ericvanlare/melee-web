@@ -4059,7 +4059,10 @@ def _state_pointer(raw: bytes, context: str, size: int = 1) -> int:
 
 
 def _validate_stadium_idle_state_record(row: dict[str, Any], label: str,
-                                        expected_tick: int) -> dict[str, Any]:
+                                        expected_tick: int, *, _active_map_id: int = 5) -> dict[str, Any]:
+    _require(_active_map_id in (3,4,5,6,9), "Unsupported first-form map ID")
+    root_ids = (0,1,2,_active_map_id)
+    always_keys = (STADIUM_IDLE_STATE_ALWAYS_KEYS - {(67,5),(68,5)}) | {(67,_active_map_id),(68,_active_map_id)}
     _require(label in ("GO", "C", "F", "IDLE", "GO2"), "state snapshot label is unknown")
     _require(type(expected_tick) is int and expected_tick >= 0,
              f"{label}: expected source tick is malformed")
@@ -4090,8 +4093,8 @@ def _validate_stadium_idle_state_record(row: dict[str, Any], label: str,
              f"{label}: typed Stadium state tags or flags are malformed")
     state_keys = [(item["tag"], item["flags"]) for item in state_slices]
     _require(len(state_keys) == len(set(state_keys)) and
-             STADIUM_IDLE_STATE_ALWAYS_KEYS.issubset(set(state_keys)) and
-             set(state_keys).issubset(STADIUM_IDLE_STATE_ALWAYS_KEYS |
+             always_keys.issubset(set(state_keys)) and
+             set(state_keys).issubset(always_keys |
                                       STADIUM_IDLE_STATE_POINTER_KEYS),
              f"{label}: typed Stadium state inventory is incomplete or contains extras")
     if label == "GO":
@@ -4109,7 +4112,7 @@ def _validate_stadium_idle_state_record(row: dict[str, Any], label: str,
 
     roots: dict[int, int] = {}
     grounds: dict[int, int] = {}
-    for map_id in STADIUM_IDLE_STATE_ROOT_IDS:
+    for map_id in root_ids:
         root_slot = 0x8049E6C8 + 0x180 + map_id * 4
         root_raw = read(STADIUM_IDLE_STATE_ROOT_TAG, 4, root_slot,
                         f"map_root_{map_id}", map_id)
@@ -4122,8 +4125,8 @@ def _validate_stadium_idle_state_record(row: dict[str, Any], label: str,
         _require(ground != 0, f"{label}.ground_{map_id}: authored member is null")
         roots[map_id] = root
         grounds[map_id] = ground
-    _require(len(set(roots.values())) == len(STADIUM_IDLE_STATE_ROOT_IDS) and
-             len(set(grounds.values())) == len(STADIUM_IDLE_STATE_ROOT_IDS),
+    _require(len(set(roots.values())) == len(root_ids) and
+             len(set(grounds.values())) == len(root_ids),
              f"{label}: authored map roots or Ground owners alias")
 
     map2 = grounds[2]
@@ -4140,7 +4143,7 @@ def _validate_stadium_idle_state_record(row: dict[str, Any], label: str,
                               f"map2.{name}")
     map5_ref = read(75, 4, _state_add(map2, 0xE4, 4, f"{label}.map2.map5_root"),
                     "map2.map5_root")
-    _require(_state_pointer(map5_ref, f"{label}.map2.map5_root", 0x30) == roots[5],
+    _require(_state_pointer(map5_ref, f"{label}.map2.map5_root", 0x30) == roots[_active_map_id],
              f"{label}: map2 map5 link does not bind authored map root 5")
 
     display_fields = {
@@ -4178,7 +4181,7 @@ def _validate_stadium_idle_state_record(row: dict[str, Any], label: str,
                                "title_dynamic_text")
             static_text = _state_pointer(static_raw, f"{label}.title_static_text")
             dynamic_text = _state_pointer(dynamic_raw, f"{label}.title_dynamic_text")
-    _require(set(state_keys) == STADIUM_IDLE_STATE_ALWAYS_KEYS | expected_optional,
+    _require(set(state_keys) == always_keys | expected_optional,
              f"{label}: title role slices do not match their observed parent pointers")
 
     s16 = lambda raw: int.from_bytes(raw, "big", signed=True)
@@ -4191,7 +4194,7 @@ def _validate_stadium_idle_state_record(row: dict[str, Any], label: str,
         "map_root_roles": [
             {"fixed_slot_map_id": map_id, "root_pointer_range_valid": True,
              "ground_pointer_range_valid": True}
-            for map_id in STADIUM_IDLE_STATE_ROOT_IDS
+            for map_id in root_ids
         ],
         "map_root_object_type_observed": False,
         "map_root_allocation_lifetime_proved": False,
@@ -4204,7 +4207,7 @@ def _validate_stadium_idle_state_record(row: dict[str, Any], label: str,
             "form_s16": s16(map2_raw["form"]),
             "previous_form_s16": s16(map2_raw["previous_form"]),
             "prior_form_s16": s16(map2_raw["prior_form"]),
-            "map5_root_pointer_equals_fixed_map5_slot_value": True,
+            "map5_root_pointer_equals_fixed_map5_slot_value": _active_map_id == 5,
         },
         "display": {
             # No current-object source write receipt exists at GO/C/F.
@@ -4548,3 +4551,110 @@ def validate_stadium_idle_3500_reference(stream_path, *, status_path=None,
         result['literal_input_bundles'] = observations.bundles
         result['source_action_schedule'] = observations.actions
     return result
+
+
+class StadiumFirstFormObservations:
+    """One source-authored default-to-first-form root replacement, after the fixed window."""
+    def __init__(self):
+        self.last_phase = 0
+        self.selected_form = None
+        self.initial_root = None
+        self.incoming_root = None
+        self.swapped = False
+        self.stable = None
+
+    def accept(self, row, expected_owner=None):
+        payload = row.get('payload', {})
+        slices = payload.get('slices', [])
+        def field(tag, size, address=None, flags=0):
+            item = _state_slice(payload, tag, 'first_form', size, flags)
+            _require(address is None or item['address'] == address,
+                     'First-form source member address differs')
+            return int.from_bytes(item['raw'], 'big'), item['address']
+        roots = {i:field(67,4,0x8049e848+i*4,i)[0] for i in (0,1,2)}
+        grounds = {i:field(68,4,roots[i]+0x2c,i)[0] for i in (0,1,2)}
+        stable = tuple((x['tag'],x['flags'],x['hex']) for x in slices
+                       if x.get('tag') in (67,68) and x.get('flags') in (0,1,2))
+        if expected_owner is not None:
+            _require(stable == tuple(x for x in expected_owner if x[1] in (0,1,2)),
+                     'First-form stable map owner changed')
+        _require(self.stable is None or self.stable == stable,
+                 'First-form stable map owner changed')
+        map2=grounds[2]
+        phase,_=field(71,2,map2+0xdc); form,_=field(72,2,map2+0xde)
+        previous,_=field(73,2,map2+0xe0); prior,_=field(74,2,map2+0xe2)
+        current,_=field(75,4,map2+0xe4); incoming,_=field(99,4,map2+0xe8)
+        current_id,current_addr=field(100,4)
+        root5,_=field(102,4,0x8049e85c)
+        _require(form in (3,4,5,6,9) and phase <= 6 and prior == 0xffff,
+                 'First-form authored phase/form history differs')
+        form_root,_=field(103,4,0x8049e848+form*4,form)
+        _require(_state_mem1_range(current,0x30) and current_id in (5,form),
+                 'First-form current root/map ID differs')
+        # The shared decoder validates the actual current root/ground, all stable
+        # fields and every original title relation; no virtual slice is inserted.
+        state=_validate_stadium_idle_state_record(row,'IDLE',row['source_tick'],
+                                                  _active_map_id=current_id)
+        current_ground=field(68,4,current+0x2c,current_id)[0]
+        _require(current_addr == current_ground+0x14,
+                 'First-form current Ground ID address differs')
+        expected={(99,0),(100,0),(102,0),(103,form)}
+        incoming_id=0
+        form_ground=0
+        if form_root:
+            _require(_state_mem1_range(form_root,0x30), 'First-form root escaped MEM1')
+            form_ground,_=field(104,4,form_root+0x2c,form)
+            _require(_state_mem1_range(form_ground,0x18), 'First-form Ground escaped MEM1')
+            form_id,_=field(105,4,form_ground+0x14,form)
+            _require(form_id==form and form_root not in roots.values() and
+                     form_ground not in grounds.values(), 'First-form owner aliases stable roles')
+            expected |= {(104,form),(105,form)}
+        if incoming:
+            _require(incoming==form_root and incoming!=current and
+                     form_ground!=current_ground, 'First-form incoming root differs/aliases')
+            incoming_id,_=field(101,4,form_ground+0x14)
+            expected.add((101,0))
+        keys=[(x.get('tag'),x.get('flags')) for x in slices if x.get('tag') in range(99,106)]
+        _require(len(keys)==len(set(keys)) and set(keys)==expected,
+                 'First-form source slice inventory differs')
+        if self.initial_root is None:
+            _require(phase==0 and form==5 and previous==0xffff and root5!=0,
+                     'First-form observation lacks initial fixed owner')
+        initial = self.initial_root if self.initial_root is not None else root5
+        if self.swapped:
+            _require(phase==0 and form==self.selected_form and previous==5 and root5==0 and
+                     current==self.incoming_root and form_root==current and
+                     current_id==form and incoming==0,
+                     'First-form retired owner resurrected or second transformation began')
+        else:
+            _require(phase in (self.last_phase,self.last_phase+1),
+                     'First-form source phase was skipped/reordered')
+            if phase==0:
+                _require(form==5 and previous==0xffff and root5==initial and
+                         current==root5==form_root and incoming==0 and current_id==5,
+                         'First-form initial owner differs')
+            else:
+                _require(form in (3,4,6,9) and previous==5 and
+                         self.selected_form in (None,form), 'First-form selection changed')
+                if phase<5:
+                    _require(root5==initial and current==root5 and current_id==5 and
+                             incoming==0 and form_root==0, 'First-form pre-construction owner differs')
+                elif phase==5:
+                    _require(root5==initial and current==root5 and current_id==5 and
+                             incoming!=0 and incoming==form_root and incoming_id==form and
+                             self.incoming_root in (None,incoming),
+                             'First-form incoming construction owner differs')
+                else:
+                    _require(self.last_phase==5 and self.incoming_root is not None and
+                             root5==0 and incoming==0 and current==self.incoming_root and
+                             form_root==current and current_id==form,
+                             'First-form replacement lacks observed phase5 owner')
+        self.initial_root=initial; self.stable=stable
+        if phase: self.selected_form=form
+        if phase==5: self.incoming_root=incoming
+        if phase==6: self.swapped=True
+        self.last_phase=phase
+        state['first_form']={'profile':'first_form_v1','phase':phase,
+            'active_map_id':current_id,'selected_form':form,'root_replacement_observed':self.swapped,
+            'allocation_lifetime_proved':False}
+        return state

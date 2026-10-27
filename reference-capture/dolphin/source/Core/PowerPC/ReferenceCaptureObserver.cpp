@@ -546,7 +546,66 @@ enum class SliceTag : u16
   StadiumConstructorChainNode = 96,
   StadiumConstructorStoreWord = 97,
   StadiumConstructorEntities = 98,
+  StadiumFirstFormIncoming = 99,
+  StadiumFirstFormCurrentId = 100,
+  StadiumFirstFormIncomingId = 101,
+  StadiumFirstFormLegacyRoot = 102,
+  StadiumFirstFormRoot = 103,
+  StadiumFirstFormGround = 104,
+  StadiumFirstFormGroundId = 105,
 };
+
+
+// One authored default-to-first-form transition. This observes pointers only;
+// it never invokes a callback, replaces a root, or advances source work.
+struct StadiumFirstFormObservation
+{
+  bool initialized=false, swapped=false;
+  u16 last_phase=0, selected_form=5;
+  u32 initial_root=0, incoming_root=0;
+  bool Observe(u16 phase,u16 form,u16 previous,u16 prior,u32 root5,
+               u32 current,u32 incoming,u32 form_root,u32 current_id,u32 incoming_id)
+  {
+    if (phase>6 || prior!=0xffff || !current) return false;
+    if (!initialized) {
+      if (phase!=0 || form!=5 || previous!=0xffff || !root5) return false;
+      initialized=true;initial_root=root5;
+    }
+    if (swapped) {
+      return phase==0 && form==selected_form && previous==5 && root5==0 &&
+             current==incoming_root && form_root==current && current_id==form && !incoming;
+    }
+    if (!(phase==last_phase || phase==last_phase+1)) return false;
+    if (phase==0) {
+      if(form!=5 || previous!=0xffff || root5!=initial_root || current!=root5 ||
+         form_root!=root5 || incoming || current_id!=5) return false;
+    } else {
+      if ((form!=3&&form!=4&&form!=6&&form!=9)||previous!=5) return false;
+      if(selected_form!=5&&selected_form!=form)return false;
+      selected_form=form;
+      if(phase<5) {
+        if(root5!=initial_root||current!=root5||current_id!=5||incoming||form_root)return false;
+      } else if(phase==5) {
+        if(root5!=initial_root||current!=root5||current_id!=5||!incoming||
+           incoming==current||incoming!=form_root||incoming_id!=form)return false;
+        if(incoming_root&&incoming_root!=incoming)return false;
+        incoming_root=incoming;
+      } else {
+        if(last_phase!=5||!incoming_root||root5||incoming||current!=incoming_root||
+           form_root!=current||current_id!=form)return false;
+        swapped=true;
+      }
+    }
+    last_phase=phase;return true;
+  }
+};
+
+bool StadiumPostTransformAdmit(const std::string& value,bool feedback,bool b_state,
+                              bool paired,const std::string& idle)
+{
+  return value.empty() || (value=="first_form_v1"&&feedback&&b_state&&!paired&&
+                           idle=="selected_b_3500_v1");
+}
 
 struct SliceRef
 {
@@ -1613,6 +1672,10 @@ struct Observer::Impl
     item_probe_summary_stream = item_probe_summary_stream_setting == "1";
     if (item_probe_summary_stream && !item_probe_configured)
       SetInvalid("MWRC_ITEM_PROBE_SUMMARY_STREAM requires a configured item probe");
+    stadium_posttransform_state = Env("MWRC_STADIUM_POSTTRANSFORM_STATE");
+    if (!StadiumPostTransformAdmit(stadium_posttransform_state,stadium_whole_feedback,
+          stadium_whole_b.enabled,stadium_whole_paired_idle,long_idle_setting))
+      return SetInvalid("Stadium post-transform state profile requires exact selected-B long feedback"), false;
     if (!StartCompact()) return false;
     // Dolphin builds with exceptions disabled.  std::thread reports an
     // unavailable worker by terminating; there is no catchable error path.
@@ -1779,6 +1842,8 @@ struct Observer::Impl
       handshake += ",\"stadium_whole_feedback\":true,\"setup_receipt_sha256\":\"" + stadium_whole_setup_receipt + "\"";
     if (stadium_whole_feedback && !Env("MWRC_STADIUM_WHOLE_REPLAY_BINDING").empty())
       handshake += ",\"stadium_whole_replay_binding_sha256\":\"" + Env("MWRC_STADIUM_WHOLE_REPLAY_BINDING") + "\"";
+    if (!stadium_posttransform_state.empty())
+      handshake += ",\"stadium_posttransform_state\":\"" + stadium_posttransform_state + "\"";
     handshake += "}";
     PushJson(Event::Handshake, handshake);
     std::string start =
@@ -1821,6 +1886,8 @@ struct Observer::Impl
       start += ",\"stadium_whole_feedback\":true,\"setup_receipt_sha256\":\"" + stadium_whole_setup_receipt + "\"";
     if (stadium_whole_feedback && !Env("MWRC_STADIUM_WHOLE_REPLAY_BINDING").empty())
       start += ",\"stadium_whole_replay_binding_sha256\":\"" + Env("MWRC_STADIUM_WHOLE_REPLAY_BINDING") + "\"";
+    if (!stadium_posttransform_state.empty())
+      start += ",\"stadium_posttransform_state\":\"" + stadium_posttransform_state + "\"";
     start += "}";
     PushJson(Event::Start, start);
     return !invalid.load();
@@ -3101,12 +3168,12 @@ struct Observer::Impl
     return IsMem1Range(address, size) && AddSlice(system, tag, address, size, flags);
   }
 
-  bool AddStadiumStateSlices(Core::System* system)
+  bool AddStadiumStateSlices(Core::System* system, u16 active_map_id = 5)
   {
     // Ground_GetMapGObj uses the authored fixed StageInfo map-root table.
     // These slots establish map-ID roles and pointer equality only, not a live
     // GObj type or allocation-lifetime proof. Do not infer a table length.
-    constexpr std::array<u16, 4> map_ids = {0, 1, 2, 5};
+    const std::array<u16, 4> map_ids = {0, 1, 2, active_map_id};
     std::array<u32, map_ids.size()> roots{};
     std::array<u32, map_ids.size()> grounds{};
     for (size_t index = 0; index < map_ids.size(); ++index)
@@ -3186,6 +3253,53 @@ struct Observer::Impl
         (static_text && !IsMem1Range(static_text, 1)) ||
         (dynamic_text && !IsMem1Range(dynamic_text, 1)))
       return false;
+    return true;
+  }
+
+
+  bool AddStadiumFirstFormSlices(Core::System* system)
+  {
+    u32 map2_root=0,map2=0,root5=0,current=0,incoming=0,form_root=0;
+    u32 current_ground=0,incoming_ground=0,form_ground=0,current_id=0,incoming_id=0,form_id=0;
+    std::array<u8,8> phases{};
+    u16 phase=0,form=0,previous=0,prior=0;
+    if(!ReadU32(system,0x8049e850,&map2_root)||!IsMem1Range(map2_root,0x30)||
+       !ReadU32(system,map2_root+0x2c,&map2)||!IsMem1Range(map2,0xec)||
+       !ReadBytes(system,map2+0xdc,8,phases.data()))return false;
+    phase=ReadBE16(phases.data());form=ReadBE16(phases.data()+2);
+    previous=ReadBE16(phases.data()+4);prior=ReadBE16(phases.data()+6);
+    if(
+       (form!=5&&form!=3&&form!=4&&form!=6&&form!=9)||
+       !ReadU32(system,0x8049e85c,&root5)||!ReadU32(system,map2+0xe4,&current)||
+       !ReadU32(system,map2+0xe8,&incoming)||!IsMem1Range(current,0x30)||
+       !ReadU32(system,current+0x2c,&current_ground)||!IsMem1Range(current_ground,0x18)||
+       !ReadU32(system,current_ground+0x14,&current_id)||
+       !ReadU32(system,0x8049e848+form*4,&form_root)) return false;
+    if(incoming&&(!IsMem1Range(incoming,0x30)||
+       !ReadU32(system,incoming+0x2c,&incoming_ground)||!IsMem1Range(incoming_ground,0x18)||
+       !ReadU32(system,incoming_ground+0x14,&incoming_id)))return false;
+    if(form_root&&(!IsMem1Range(form_root,0x30)||
+       !ReadU32(system,form_root+0x2c,&form_ground)||!IsMem1Range(form_ground,0x18)||
+       !ReadU32(system,form_ground+0x14,&form_id)||form_id!=form))return false;
+    if(form_root) {
+      for(u32 id : {0u,1u,2u}) {
+        u32 stable=0,ground=0;
+        if(!ReadU32(system,0x8049e848+id*4,&stable)||!IsMem1Range(stable,0x30)||
+           !ReadU32(system,stable+0x2c,&ground)||stable==form_root||ground==form_ground)return false;
+      }
+      if(incoming&&(incoming_ground==current_ground))return false;
+    }
+    if(!stadium_first_form.Observe(phase,form,previous,prior,root5,current,incoming,
+                                  form_root,current_id,incoming_id))return false;
+    if(current_id!=5&&current_id!=form)return false;
+    if(!AddStadiumStateSlices(system,static_cast<u16>(current_id))||
+       !AddMem1Slice(system,SliceTag::StadiumFirstFormIncoming,map2+0xe8,4)||
+       !AddMem1Slice(system,SliceTag::StadiumFirstFormCurrentId,current_ground+0x14,4)||
+       !AddMem1Slice(system,SliceTag::StadiumFirstFormLegacyRoot,0x8049e85c,4)||
+       !AddMem1Slice(system,SliceTag::StadiumFirstFormRoot,0x8049e848+form*4,4,form))return false;
+    if(incoming&&!AddMem1Slice(system,SliceTag::StadiumFirstFormIncomingId,incoming_ground+0x14,4))return false;
+    if(form_root&&(!AddMem1Slice(system,SliceTag::StadiumFirstFormGround,form_root+0x2c,4,form)||
+       !AddMem1Slice(system,SliceTag::StadiumFirstFormGroundId,form_ground+0x14,4,form)))return false;
     return true;
   }
 
@@ -5673,7 +5787,8 @@ struct Observer::Impl
         return SetInvalid("Stadium GO prefix queue snapshot escaped its checked source range"), void();
       if ((stadium_state_snapshot_this_tick ||
            (later_state && boundary == Boundary::SourceTick)) &&
-          !AddStadiumStateSlices(system))
+          !(stadium_posttransform_state.empty() || !stadium_whole_long_idle.closed ?
+            AddStadiumStateSlices(system) : AddStadiumFirstFormSlices(system)))
         return SetInvalid("Stadium C/F boundary did not expose its checked map/display snapshot"),
                void();
       if (checked_entity_profile)
@@ -6918,6 +7033,8 @@ struct Observer::Impl
               ",\"requested_window_mask\":"+std::to_string((1u<<compact_match_count)-1)+
               ",\"written_rows\":"+std::to_string(compact_written_rows.load(std::memory_order_acquire))+
               ",\"lifecycle_parity\":false}";
+    if (!stadium_posttransform_state.empty())
+      json += ",\"stadium_posttransform_state\":\"" + stadium_posttransform_state + "\"";
     json += CpuProbeCloseStatusJson();
     json += "}\n";
     if (!status.Write(reinterpret_cast<const u8*>(json.data()), json.size()) || !status.Flush() ||
@@ -6969,6 +7086,8 @@ struct Observer::Impl
   std::atomic<u64> max_write_frame_ns{0};
   u64 next_sequence = 0;
   std::thread writer;
+  std::string stadium_posttransform_state;
+  StadiumFirstFormObservation stadium_first_form;
   std::string output_path;
   std::string status_path;
   mutable std::mutex error_mutex;

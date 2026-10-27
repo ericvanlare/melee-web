@@ -144,6 +144,9 @@ def validate_stadium_whole_long_idle_outputs(raw, status_path, output_root,
             primary_status.get("stadium_whole_long_idle") == PROFILE and
             primary_status.get("stadium_whole_long_idle_window_complete") is True,
             "Whole Stadium long-idle final status lacks exact natural completion/profile")
+    require(primary_status.get('stadium_posttransform_state') ==
+            ('first_form_v1' if post_transform_standings is not None else None),
+            'Whole Stadium post-transform final observer profile differs')
     if standings is None and post_transform_standings is None:
         observations = LongIdleBObservations()
     else:
@@ -2424,6 +2427,8 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
             StadiumStandingsInputPolicy.validate_setup(expected)
         self.stadium_whole_standings = stadium_whole_standings
         self.stadium_whole_post_transform_standings = stadium_whole_post_transform_standings
+        from stadium_go_prefix import StadiumFirstFormObservations
+        self.first_form = StadiumFirstFormObservations() if stadium_whole_post_transform_standings else None
         self.standings_policy = (StadiumStandingsInputPolicy(
             StadiumStandingsInputPolicy.POST_TRANSFORM_PROFILE
             if stadium_whole_post_transform_standings else StadiumStandingsInputPolicy.PROFILE)
@@ -2908,7 +2913,9 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                 from stadium_go_prefix import _validate_stadium_idle_state_record
                 require(self.b_state_samples or row['source_tick'] == self.b_go['source_tick'],
                         'Whole Stadium B first state is not actual GO containing tick')
-                snapshot = _validate_stadium_idle_state_record(row, 'IDLE',row['source_tick'])
+                snapshot = (self.first_form.accept(row) if getattr(self, 'stadium_whole_post_transform_standings', False) and
+                    self.long_idle_window_complete else
+                    _validate_stadium_idle_state_record(row, 'IDLE',row['source_tick']))
                 self.b_state_samples.append(snapshot)
             if self.selected_standings(self.match_index) and snapshot is not None and not self.chord_requested:
                 self.standings_policy.observe(row, snapshot, sample, self.b_go)
@@ -3567,6 +3574,8 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             env['MWRC_STADIUM_WHOLE_LONG_IDLE']=STADIUM_WHOLE_LONG_IDLE_PROFILE['profile']
             compact_env, long_idle_compact_launch = build_stadium_whole_long_idle_compact_launch(output)
             env.update(compact_env)
+        if stadium_whole_post_transform_standings:
+            env['MWRC_STADIUM_POSTTRANSFORM_STATE']='first_form_v1'
         if rng_window is not None:
             env.update(MWRC_STADIUM_WHOLE_RNG_RETURNS='1',
                 MWRC_CPU_PROBE_OUTPUT=str(output/'rng-returns.json'),MWRC_CPU_PROBE_MATCH='1',
@@ -3612,6 +3621,7 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
                 caps=dict(STADIUM_CAPTURE_CAPS, observer_records=STADIUM_WHOLE_LONG_IDLE_RECORD_CAP),
                 per_owner_rng_comparison=False)
         if stadium_whole_post_transform_standings:
+            launch['stadium_posttransform_state']='first_form_v1'
             launch['stadium_whole_post_transform_standings'] = dict(
                 profile=StadiumStandingsInputPolicy.POST_TRANSFORM_PROFILE,
                 selected_match=1,

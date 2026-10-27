@@ -197,6 +197,9 @@ class StandingsBObservations(LongIdleBObservations):
                 'Standings issue/Pipe inventory differs')
         self.policy = StadiumStandingsInputPolicy(profile)
         self.post_transform = self.policy.post_transform
+        from stadium_go_prefix import StadiumFirstFormObservations
+        self.first_form = StadiumFirstFormObservations() if self.post_transform else None
+        self.first_form_announcements = set()
         self.post_window_tick = None
         self.post_window_pending = None
         self.post_window_ticks = 0
@@ -329,10 +332,11 @@ class StandingsBObservations(LongIdleBObservations):
             source_tick=consumed['source_tick'], draw_ordinal=consumed['draw_ordinal'],
             ports=ports, errors=[int.from_bytes(bytes.fromhex(pad)[-1:], 'big', signed=True)
                                  for pad in ports])
-        state = _validate_stadium_idle_state_record(row, 'IDLE', row['source_tick'])
         roots = tuple((item['tag'], item['flags'], item['hex'])
-                      for item in row['payload']['slices'] if item['tag'] in (67, 68))
-        require(roots == self.owner, 'Post-window map root owner changed')
+                      for item in row['payload']['slices'] if item['tag'] in (67, 68) and item['flags'] in (0,1,2))
+        require(roots == tuple(x for x in self.owner if x[1] in (0,1,2)),
+                'Post-window stable map root owner changed')
+        state = self.first_form.accept(row, self.owner)
         self.policy.observe(row, state, sample, self.go)
         self.post_window_tick = row['source_tick']
         self.post_window_ticks += 1
@@ -341,6 +345,11 @@ class StandingsBObservations(LongIdleBObservations):
             self.post_window_complete = True
 
     def accept(self, row):
+        if row.get('event') in ('handshake','start'):
+            marker = row.get('payload',{}).get('stadium_posttransform_state')
+            require(marker == ('first_form_v1' if self.post_transform else None),
+                    'Standings post-transform observer profile differs')
+            if self.post_transform: self.first_form_announcements.add(row['event'])
         was_closed = self.closed
         super().accept(row)
         if self.post_transform and self.closed:
@@ -371,6 +380,8 @@ class StandingsBObservations(LongIdleBObservations):
         policy_summary = self.policy.summary()  # exact selected stop and consumed neutral release
         result['standings_input'] = policy_summary
         if self.post_transform:
+            require(self.first_form_announcements == {'handshake','start'},
+                    'First-form profile lacks matching announcements')
             require(self.post_window_pending is None and self.post_window_draw_open is None and
                     self.post_window_complete,
                     'Post-transform mode14 lacks completed post-window source/PAD/draw join')
