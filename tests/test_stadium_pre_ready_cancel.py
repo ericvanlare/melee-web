@@ -21,6 +21,9 @@ class StadiumPreReadyCancelTests(unittest.TestCase):
   memory=memory[memory.index('typedef enum MeleeWebSourceMemoryReadStatus'):memory.index('/* Fighter_Create')]
   display=(SOURCE_ROOT/'src/gameplay_stadium_display_owner.h').read_text()
   journal=display[display.index('#define MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENTS'):display.index('} MeleeWebStadiumFirstTransformJournal;')+len('} MeleeWebStadiumFirstTransformJournal;')]
+  journal_helper=''
+  if 'static inline unsigned melee_web_stadium_first_transform_event_count(' in display:
+   journal_helper=whole_function(display,'static inline unsigned melee_web_stadium_first_transform_event_count(')+'\n'
   header=(SOURCE_ROOT/'src/gameplay_source_files.h').read_text()
   completion=header[header.index('typedef struct MeleeWebSourceFileRecordedCompletionStatus {'):header.index('} MeleeWebSourceFileRecordedCompletionStatus;')+len('} MeleeWebSourceFileRecordedCompletionStatus;')]
   region=stage[stage.index('typedef struct MeleeWebStadiumMap2WritableRegion'):stage.index('static int stadium_map2_region_lease_matches')]
@@ -35,6 +38,7 @@ class StadiumPreReadyCancelTests(unittest.TestCase):
 #define St_Kind_PStadium 3
 #define HSD_GOBJ_CLASS_STAGE 3
 typedef struct HSD_GObj {struct HSD_GObj* next;int classifier;void* user_data;} HSD_GObj;
+typedef struct HSD_GObjProc HSD_GObjProc;
 typedef void (*HSD_GObjEvent)(HSD_GObj*);
 typedef struct {int map_id;union {struct {void* xF4;} display;}u;} Ground;
 
@@ -173,7 +177,8 @@ for(int i=0;i<16;i++){
 #define MELEE_WEB_STADIUM_C1A_DIAGNOSTIC 1
 using DatError=std::runtime_error;
 typedef struct HSD_GObj HSD_GObj;
-"""+journal+completion+r"""
+typedef struct HSD_GObjProc HSD_GObjProc;
+"""+journal+journal_helper+completion+r"""
 struct MeleeWebSourceFileScope;
 extern "C" {int melee_web_source_files_quiescent_for(MeleeWebSourceFileScope*,char*,size_t);void fixture_setup();void* fixture_stage();MeleeWebSourceFileScope* fixture_source_scope();void fixture_set_source_busy(int);int fixture_cancel(void*,char*,size_t);void fixture_check(int);void fixture_bad(int);void fixture_refusal_checks();}
 static void check(bool v,const char* e){if(!v)throw std::runtime_error(e);}
@@ -186,7 +191,7 @@ struct GameplayWorld {struct Storage {bool stadium_diagnostic;void* stage_last;M
 static int hud_ends;
 static int melee_web_hud_end(void*,char*,size_t){++hud_ends;return 1;}
 static int melee_web_match_rules_publish_result(){assert(0);return 0;}
-struct Session {GameplayWorld* world;bool stadium_diagnostic=true,first_fire_diagnostic=false;MeleeWebStadiumFirstTransformJournal first_transform_retired{};MeleeWebSourceFileRecordedCompletionStatus first_completion_retired{};void* match=nullptr;void* hud=this;struct {bool opening_demo=false;}selected;int flow_ends=0;void end_flow(){++flow_ends;}
+struct Session {GameplayWorld* world;bool stadium_diagnostic=true,first_fire_diagnostic=false,first_water_diagnostic=false;MeleeWebStadiumFirstTransformJournal first_transform_retired{};MeleeWebSourceFileRecordedCompletionStatus first_completion_retired{};void* match=nullptr;void* hud=this;struct {bool opening_demo=false;}selected;int flow_ends=0;void end_flow(){++flow_ends;}
 """+close+r"""
 };
 int main(){fixture_refusal_checks();for(int run=0;run<2;run++){

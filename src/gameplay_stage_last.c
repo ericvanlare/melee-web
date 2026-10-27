@@ -438,21 +438,42 @@ static int stadium_maps_live(MeleeWebStageLast* h,char* e,size_t n)
  }
  return 1;
 }
-int melee_web_stage_last_stadium_first_transform_arm(MeleeWebStageLast* h,char* e,size_t n)
+static int stadium_first_transform_arm_form(MeleeWebStageLast* h,uint32_t form,
+        char* e,size_t n)
 {
+ if(form!=MELEE_WEB_STADIUM_FIRST_TRANSFORM_FIRE_FORM&&
+    form!=MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM)
+  return fail(e,n,"First-transform arm requires exact supported authored form");
  if(!h||h!=active||h->generation!=melee_web_gameplay_stats().generation||
     !h->definition||!h->definition->diagnostic_only||h->stadium_loaded||h->stadium_started||
     !melee_web_stage_last_source_work_allowed(h)||!stadium_maps_live(h,e,n)||
     !stadium_map2_region_preflight(&h->stadium_map2_region,&h->stadium_map2_buffer_owner,h->generation,e,n))
-  return fail(e,n,"First-fire policy requires untouched checked OnInit owner before OnLoad");
- return melee_web_stadium_display_owner_first_transform_arm(h->stadium_display_owner,
-          &h->stadium_first_transform,e,n);
+  return fail(e,n,"First-transform policy requires untouched checked OnInit owner before OnLoad");
+ return melee_web_stadium_display_owner_first_transform_arm_form(
+          h->stadium_display_owner,&h->stadium_first_transform,form,e,n);
 }
+int melee_web_stage_last_stadium_first_transform_arm(MeleeWebStageLast* h,char* e,size_t n)
+{ return stadium_first_transform_arm_form(h,MELEE_WEB_STADIUM_FIRST_TRANSFORM_FIRE_FORM,e,n); }
+int melee_web_stage_last_stadium_water_graph_arm(MeleeWebStageLast* h,char* e,size_t n)
+{ return stadium_first_transform_arm_form(h,MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM,e,n); }
 int melee_web_stage_last_stadium_first_transform_status(const MeleeWebStageLast* h,
         MeleeWebStadiumFirstTransformJournal* out,char* e,size_t n)
 {
  if(!h||h!=active||!out||h->generation!=melee_web_gameplay_stats().generation||
-    !melee_web_stage_last_source_work_allowed(h))return fail(e,n,"First-fire status lost source owner");
+    !melee_web_stage_last_source_work_allowed(h)||
+    h->stadium_first_transform.selected_form!=MELEE_WEB_STADIUM_FIRST_TRANSFORM_FIRE_FORM)
+  return fail(e,n,"First-fire status lost exact selected source owner");
+ if(h->stadium_started==2&&!melee_web_stadium_display_owner_first_transform_graph(
+      h->stadium_display_owner,0,e,n))return 0;
+ return melee_web_stadium_display_owner_first_transform_status(&h->stadium_first_transform,out,e,n);
+}
+int melee_web_stage_last_stadium_water_graph_status(const MeleeWebStageLast* h,
+        MeleeWebStadiumFirstTransformJournal* out,char* e,size_t n)
+{
+ if(!h||h!=active||!out||h->generation!=melee_web_gameplay_stats().generation||
+    !melee_web_stage_last_source_work_allowed(h)||
+    h->stadium_first_transform.selected_form!=MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM)
+  return fail(e,n,"Water graph status lost exact selected source owner");
  if(h->stadium_started==2&&!melee_web_stadium_display_owner_first_transform_graph(
       h->stadium_display_owner,0,e,n))return 0;
  return melee_web_stadium_display_owner_first_transform_status(&h->stadium_first_transform,out,e,n);
@@ -1348,24 +1369,25 @@ MeleeWebStageLast* melee_web_stage_last_begin_intro(void* yaku,MeleeWebEffectBan
  return begin_stage(melee_web_stage_profile(St_Kind_Last),yaku,bank,1,0,0,NULL,e,n);
 }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-/* Same read-only owner preflight used by the actual first-fire end. The World
+/* Same read-only owner preflight used by the selected-form end. The World
  * must call this before clearing numeric quakes or any other source borrower.
  * Diagnostic last-live scalar caching is allowed; no source object is changed. */
-int melee_web_stage_last_stadium_first_transform_can_end(
-        const MeleeWebStageLast* h,char* e,size_t n)
+static int stadium_first_transform_can_end_form(
+        const MeleeWebStageLast* h,uint32_t form,char* e,size_t n)
 {
  if(!h||h!=active||h->generation!=melee_web_gameplay_stats().generation||
     !h->definition||!h->definition->diagnostic_only||
     h->definition->stage_kind!=St_Kind_PStadium||!h->source_ordered||
     h->stadium_first_transform.armed!=1||h->stadium_first_transform.failed||
+    h->stadium_first_transform.selected_form!=form||
     h->stadium_started!=2||HSD_GObj_804D781C||HSD_GObj_804D7814)
-  return fail(e,n,"First-fire close requires its settled idle source owner");
+  return fail(e,n,"First-transform close requires its settled idle source owner");
  if(!stadium_map2_region_preflight(&h->stadium_map2_region,
       &h->stadium_map2_buffer_owner,h->generation,e,n)||
     !melee_web_stage_selection_preflight(h->definition->stage_kind)||
     stage_info.grkind!=h->definition->ground_kind||
     !melee_web_stadium_display_owner_first_transform_graph(h->stadium_display_owner,1,e,n))
-  return fail(e,n,"First-fire close lost its exact quiescent settled graph");
+  return fail(e,n,"First-transform close lost its exact quiescent settled graph");
  if(((Ground*)h->stadium_map2_buffer_owner.display_ground->user_data)->u.display.xF4!=h->stadium_subject)
   return fail(e,n,"First-fire display camera borrower changed before retirement");
  if(!stadium_manager_storage_preflight((MeleeWebStageLast*)h,e,n)||
@@ -1374,6 +1396,20 @@ int melee_web_stage_last_stadium_first_transform_can_end(
     !melee_web_match_camera_subject_preflight(h->stadium_camera_owner,h->stadium_subject,e,n))return 0;
  return ok(e,n);
 }
+static int stadium_first_transform_can_end_selected(
+        const MeleeWebStageLast* h,char* e,size_t n)
+{
+ if(!h)return fail(e,n,"First-transform close lost its stage owner");
+ return stadium_first_transform_can_end_form(h,h->stadium_first_transform.selected_form,e,n);
+}
+int melee_web_stage_last_stadium_first_transform_can_end(
+        const MeleeWebStageLast* h,char* e,size_t n)
+{ return stadium_first_transform_can_end_form(
+      h,MELEE_WEB_STADIUM_FIRST_TRANSFORM_FIRE_FORM,e,n); }
+int melee_web_stage_last_stadium_water_graph_can_end(
+        const MeleeWebStageLast* h,char* e,size_t n)
+{ return stadium_first_transform_can_end_form(
+      h,MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM,e,n); }
 #endif
 int melee_web_stage_last_end(MeleeWebStageLast* h,char* e,size_t n){
  if(!h)return ok(e,n);
@@ -1381,9 +1417,9 @@ int melee_web_stage_last_end(MeleeWebStageLast* h,char* e,size_t n){
  if(HSD_GObj_804D781C||HSD_GObj_804D7814)return fail(e,n,"Stage teardown must run outside source object callbacks");
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  if(h->stadium_first_transform.armed==1&&!h->stadium_first_transform_terminal_out)
-  return fail(e,n,"First-fire close requires its checked terminal receipt destination");
+  return fail(e,n,"First-transform close requires its checked terminal receipt destination");
  if(h->stadium_first_transform.armed==1&&
-    !melee_web_stage_last_stadium_first_transform_can_end(h,e,n))return 0;
+    !stadium_first_transform_can_end_selected(h,e,n))return 0;
  if(!stadium_map2_region_preflight(&h->stadium_map2_region,
       &h->stadium_map2_buffer_owner,h->generation,e,n))return 0;
  /* Validate every new owner and map borrower before any destructive release.
@@ -1509,8 +1545,9 @@ int melee_web_stage_last_end(MeleeWebStageLast* h,char* e,size_t n){
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  if(h->stadium_first_transform_terminal_out){
   if(h->stadium_first_transform.armed!=2||h->stadium_first_transform.failed||
-     h->stadium_first_transform.count!=MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENTS)
-   return fail(e,n,"First-fire successful teardown lacks its exact completed source journal");
+     h->stadium_first_transform.count!=
+       melee_web_stadium_first_transform_event_count(&h->stadium_first_transform))
+   return fail(e,n,"First-transform successful teardown lacks its exact completed source journal");
   *h->stadium_first_transform_terminal_out=h->stadium_first_transform;
  }
 #endif
@@ -1525,6 +1562,20 @@ int melee_web_stage_last_stadium_first_transform_end(MeleeWebStageLast* h,
     h->stadium_first_transform_terminal_out)
   return fail(e,n,"First-fire close requires its exact live StageLast and output owner");
  if(!melee_web_stage_last_stadium_first_transform_can_end(h,e,n))return 0;
+ h->stadium_first_transform_terminal_out=out;
+ if(!melee_web_stage_last_end(h,e,n)){
+  h->stadium_first_transform_terminal_out=NULL;return 0;
+ }
+ return 1; /* h is freed; only the copied terminal receipt remains valid. */
+}
+int melee_web_stage_last_stadium_water_graph_end(MeleeWebStageLast* h,
+        MeleeWebStadiumFirstTransformJournal* out,char* e,size_t n)
+{
+ if(!h||h!=active||!out||h->stadium_first_transform.armed!=1||
+    h->stadium_first_transform.selected_form!=MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM||
+    h->stadium_first_transform_terminal_out)
+  return fail(e,n,"Water graph close requires its exact live StageLast and output owner");
+ if(!melee_web_stage_last_stadium_water_graph_can_end(h,e,n))return 0;
  h->stadium_first_transform_terminal_out=out;
  if(!melee_web_stage_last_end(h,e,n)){
   h->stadium_first_transform_terminal_out=NULL;return 0;

@@ -170,6 +170,14 @@ int melee_web_stage_last_stadium_first_transform_end(MeleeWebStageLast*,
     MeleeWebStadiumFirstTransformJournal*,char*,size_t);
 int melee_web_stage_last_stadium_first_transform_status(const MeleeWebStageLast*,
     MeleeWebStadiumFirstTransformJournal*,char*,size_t);
+/* Separate opt-in first-Water source graph. It shares the immutable journal
+ * type but accepts only selected form 9 and its exact eleven source events. */
+int melee_web_stage_last_stadium_water_graph_arm(MeleeWebStageLast*,char*,size_t);
+int melee_web_stage_last_stadium_water_graph_status(const MeleeWebStageLast*,
+    MeleeWebStadiumFirstTransformJournal*,char*,size_t);
+int melee_web_stage_last_stadium_water_graph_can_end(const MeleeWebStageLast*,char*,size_t);
+int melee_web_stage_last_stadium_water_graph_end(MeleeWebStageLast*,
+    MeleeWebStadiumFirstTransformJournal*,char*,size_t);
 #endif
 int melee_web_stage_last_source_work_allowed(const MeleeWebStageLast*);
 
