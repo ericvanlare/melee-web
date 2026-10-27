@@ -122,9 +122,12 @@ class StadiumSssPositionTests(OwnedWorkspaceTests):
         boundary_start=source.index("enum class Boundary : u16")
         boundary=source[boundary_start:source.index("};",boundary_start)+2]
         whole_b_state=boundary+source[source.index("struct StadiumWholeBObservation\n"):source.index("enum class StadiumGoPrefixPhase : u8")]
+        read_be16_start=source.index("constexpr u16 ReadBE16(const u8* bytes)")
+        read_be16=source[read_be16_start:source.index("\n}",read_be16_start)+2]
         whole_fields="\n".join(
             source[source.index(marker):source.index(";",source.index(marker))+1]
             for marker in ("  StadiumWholeBObservation stadium_whole_b;",
+                           "  StadiumFirstFormObservation stadium_first_form;",
                            "  bool stadium_whole_feedback = false;",
                            "  bool stadium_whole_paired_idle = false;",
                            "  bool stadium_whole_sss_ready = false;",
@@ -198,7 +201,7 @@ int main(){Core::System sys;
 }
 """
         work=self.new_workspace(ROOT,"sss-position-control-");cpp=work/"control.cpp";exe=work/"control"
-        cpp.write_text(prefix+whole_b_state+enum+middle+whole_fields+fields+add_slice+publish+methods+setup+main)
+        cpp.write_text(prefix+read_be16+whole_b_state+enum+middle+whole_fields+fields+add_slice+publish+methods+setup+main)
         build=subprocess.run([compiler,"-std=c++17","-Wall","-Wextra","-Werror",str(cpp),"-o",str(exe)],capture_output=True,text=True,timeout=30)
         (work/"compile.stdout").write_text(build.stdout);(work/"compile.stderr").write_text(build.stderr)
         self.assertEqual(build.returncode,0,build.stderr)

@@ -474,7 +474,7 @@ int main(int argc, char** argv) {
                       source.index("struct SliceRef")]
         entries = re.findall(r"^\s+(\w+) = (\d+),", enum, re.MULTILINE)
         tags = {name: int(value) for name, value in entries}
-        # Preserve the shipped namespace and the exact appended Stadium-state inventory.
+        # Preserve the shipped namespace and exact appended Stadium/first-form inventory.
         # The fixed contiguous range rejects both duplicate values and gaps.
         old_names = """
             PadStatusAll4 PadQueue PadSlot MatchSetup FighterHead FighterInputAnim FighterDamageShield FighterStocks
@@ -502,10 +502,14 @@ int main(int argc, char** argv) {
             "StadiumConstructorParameters": 94, "StadiumConstructorPLinkLimit": 95,
             "StadiumConstructorChainNode": 96, "StadiumConstructorStoreWord": 97,
             "StadiumConstructorEntities": 98,
+            "StadiumFirstFormIncoming": 99, "StadiumFirstFormCurrentId": 100,
+            "StadiumFirstFormIncomingId": 101, "StadiumFirstFormLegacyRoot": 102,
+            "StadiumFirstFormRoot": 103, "StadiumFirstFormGround": 104,
+            "StadiumFirstFormGroundId": 105,
         }
         self.assertEqual({name: tags[name] for name in appended}, appended)
         self.assertEqual(set(tags), set(old_names) | set(appended))
-        self.assertEqual(sorted(tags.values()), list(range(1, 99)))
+        self.assertEqual(sorted(tags.values()), list(range(1, 106)))
         self.assertEqual({name: tags[name] for name in (
             "StadiumMapRoot", "StadiumGroundPointer", "StadiumMap2Gate",
             "StadiumMap2Countdown", "StadiumMap2Phase", "StadiumMap2Form",

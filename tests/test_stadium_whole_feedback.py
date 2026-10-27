@@ -127,9 +127,13 @@ class StadiumWholeFeedbackTests(OwnedWorkspaceTests):
         with self.assertRaises(ValueError):decoder.StadiumSssPositionObservations().accept(projected[0],route_ready=True)
     def test_native_admission_actual_slice(self):
         source=(SOURCE_ROOT/'reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp').read_text()
-        start=source.index('    const std::string whole_feedback_setting =')
-        stop=source.index('    const std::string constructor_setting =',start)
-        body=source[start:stop]
+        start=source.index('    const std::string paired_idle_setting =')
+        stop=source.index('    whole_session_matches = WholeSessionMatchCount();',start)
+        paired_init=source[start:stop]
+        feedback_start=source.index('    const std::string whole_feedback_setting =',stop)
+        feedback_stop=source.index('    const std::string constructor_setting =',feedback_start)
+        # The previously validated whole-session count is modeled; pair profile/flag logic is actual source.
+        body=paired_init+source[feedback_start:feedback_stop]
         fixture=r'''
 #include <array>
 #include <cassert>

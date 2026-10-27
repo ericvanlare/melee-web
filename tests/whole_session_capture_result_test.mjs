@@ -220,7 +220,7 @@ async function actualCollection(failure, runtimeIncidentRecording = false) {
     screenshot: () => {calls.push('screenshot'); return Promise.resolve();},
   };
   const scope = vm.createContext({report, page, diagnostic: false, pageObservationTimedOut: false,
-    pairedFull: false, pairedFirstGo: false, // Existing ordinary capture path.
+    pairedFull: false, pairedFirstGo: false, pairedRegistration: false, // Existing ordinary capture path.
     currentSssExit: false, currentSssArm: undefined, // Actual default-OFF optional observation scope.
     observationTimeoutMs: 5, currentPhase: 'finally', boundedCaptureOperation,
     runtimeIncidentRecording, summarizeRuntimeIncidents,

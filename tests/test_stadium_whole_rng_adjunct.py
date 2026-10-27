@@ -32,7 +32,13 @@ def functions(path,names,namespace):
 class StadiumWholeRngAdjunctTests(unittest.TestCase):
     def test_actual_original_admission_is_combined_only_and_close_never_finishes_whole3(self):
         source=SOURCE.read_text()
-        body=section(source,'    const std::string whole_feedback_setting =','    const std::string constructor_setting =')
+        paired_start=source.index('    const std::string paired_idle_setting =')
+        paired_stop=source.index('    whole_session_matches = WholeSessionMatchCount();',paired_start)
+        paired_init=source[paired_start:paired_stop]
+        feedback_start=source.index('    const std::string whole_feedback_setting =',paired_stop)
+        feedback_stop=source.index('    const std::string constructor_setting =',feedback_start)
+        # The previously validated whole-session count is modeled; pair profile/flag logic is actual source.
+        body=paired_init+source[feedback_start:feedback_stop]
         boundary_start=source.index("enum class Boundary : u16")
         boundary=source[boundary_start:source.index("};",boundary_start)+2]
         declaration=boundary+section(source,'struct StadiumWholeBObservation\n','enum class StadiumGoPrefixPhase : u8')

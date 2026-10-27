@@ -395,6 +395,11 @@ return 0;
             # Ordinary CI models profile contents; retained-data focused execution supplies both exact files.
             from test_reference_allocation_observer import synthetic_profile
             current = synthetic_profile()
+            # Supply the strict identity envelope to exercise reducer semantics;
+            # these function/global rows remain synthetic, not retained-source evidence.
+            current['dol_sha1'] = reducer.EXPECTED_DOL_SHA1
+            current['source_revision'] = reducer.EXPECTED_SOURCE_REVISION
+            current['symbols_sha256'] = reducer.EXPECTED_SYMBOLS_SHA256
             old = copy.deepcopy(current)
             old['version'] = 4
             old.pop('registration_return_policy')

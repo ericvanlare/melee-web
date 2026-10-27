@@ -19,7 +19,9 @@ class WholeBObservationControls(OwnedWorkspaceTests):
         boundary_start=source.index("enum class Boundary : u16")
         boundary=source[boundary_start:source.index("};",boundary_start)+2]
         state=boundary+cut(source,'struct StadiumWholeBObservation\n','enum class StadiumGoPrefixPhase : u8')
-        mode=cut(source,'    const std::string whole_b_setting =','    const std::string constructor_setting =')
+        paired_init=source[source.index('    const std::string paired_idle_setting ='):
+                            source.index('    whole_session_matches = WholeSessionMatchCount();')]
+        mode=paired_init+cut(source,'    const std::string whole_b_setting =','    const std::string constructor_setting =')
         # Compare the exact current parent guard; applied-tree BASE self-reads.
         guard_start='    if (stadium_whole_feedback &&\n'
         guard_end='    const std::string whole_b_setting ='
@@ -46,7 +48,7 @@ namespace InputStream{bool IsRecording(){return true;}bool IsReplaying(){return 
 struct CompactRngSettings{bool present=false,valid=false;std::string selection;};
 const CompactRngSettings& CompactRngEnvironment(){static const CompactRngSettings value{};return value;}
 bool whole_rng_returns=false,whole_replay=false;
-// This control exercises the unchanged legacy single-B mode.
+// The prior parsed match-count is a modeled input; pair-profile validation and flag derivation below are actual source.
 bool stadium_whole_paired_idle=false;
 bool stadium_whole_feedback=false;std::string error;
 StadiumWholeBObservation stadium_whole_b;StadiumWholeLongIdle stadium_whole_long_idle;
@@ -63,6 +65,8 @@ int main(){
   env.clear();env["MWRC_STADIUM_WHOLE_B_STATE"]=value;stadium_whole_feedback=parent;stadium_whole_b={};error.clear();
   const bool pass=value.empty()||(value=="1"&&parent);assert(actual_mode()==pass);
   assert(pass==error.empty());assert(stadium_whole_b.enabled==(pass&&value=="1"));}
+ env.clear();env["MWRC_STADIUM_WHOLE_PAIRED_IDLE"]="unknown";error.clear();
+ assert(!actual_mode()&&error=="Stadium paired-idle profile identity differs");
  StadiumWholeBObservation off;
  assert(off.Complete()&&!off.Selected(1)&&off.SssExit(1,0,0)&&off.Entry(1,0,0)&&off.Setup(1,0,0,0)&&off.Close(1,0,0));
  assert(!off.Constructor(1,5,1)&&!off.Go(1,5,1,123)&&!off.Tick(1,5,1,123));

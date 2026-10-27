@@ -79,8 +79,9 @@ class ReferenceEntityProfileTests(unittest.TestCase):
             source[source.index(marker):source.index(';', source.index(marker)) + 1]
             for marker in ('  bool stadium_idle_3500 = false;',
                            '  bool stadium_constructor_enabled = false;',
-                           '  bool stadium_go_ordinal2 = false;'))
-        gate = source[source.index('    whole_session_matches = WholeSessionMatchCount();'):
+                           '  bool stadium_go_ordinal2 = false;',
+                           '  std::string stadium_posttransform_state;'))
+        gate = source[source.index('    const std::string paired_idle_setting = Env("MWRC_STADIUM_WHOLE_PAIRED_IDLE");'):
                       source.index('    capture_id = Env("MWRC_CAPTURE_ID");')]
         stadium_receipt_start = source.index('constexpr char STADIUM_SETUP_RECEIPT_SHA256[]')
         stadium_receipt = source[stadium_receipt_start:source.index(';', stadium_receipt_start) + 1]
@@ -99,7 +100,8 @@ class ReferenceEntityProfileTests(unittest.TestCase):
         stadium_state = source[stadium_state_start:stadium_state_end]
         start = source.index('    if (checked_entity_profile)\n      handshake +=')
         metadata = source[start:source.index('    handshake += "}";', start)]
-        count_function=source[source.index('u32 WholeSessionMatchCount()'):source.index('bool ValidIdentity(')]
+        count_function=source[source.index('u32 WholeSessionMatchCount()'):source.index('bool PairedIdleStartupProfilesAgree(')]
+        paired_startup=source[source.index('bool PairedIdleStartupProfilesAgree('):source.index('bool ValidIdentity(')]
         allocation_configured = _extract_braced_declaration(source, 'bool AllocationConfigured()')
         harness = r'''
 #include <array>
@@ -126,7 +128,7 @@ using u8=std::uint8_t;
 using u16=std::uint16_t;
 using u32=unsigned;
 constexpr unsigned WHOLE_SESSION_MIN_MATCHES=3,WHOLE_SESSION_MAX_MATCHES=64;
-'''+stadium_boundary+"\n"+stadium_long_idle+"\n"+compact_settings+compact_environment+"\n"+stadium_receipt+"\n"+stadium_phase+"\n"+whole_b_state+"\n"+count_function+"\n"+allocation_configured+r'''
+'''+stadium_boundary+"\n"+stadium_long_idle+"\n"+compact_settings+compact_environment+"\n"+stadium_receipt+"\n"+stadium_phase+"\n"+whole_b_state+"\n"+count_function+"\n"+paired_startup+"\n"+allocation_configured+r'''
 bool SdInitRequested(){return !Env("MWRC_SD_INIT").empty();}
 struct Reader {
  unsigned whole_session_matches=0;bool checked_entity_profile=false,active_entity_profile=false;std::string error;
