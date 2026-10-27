@@ -687,6 +687,7 @@ print('Actual package finalizer imports; real missing-stream guard retained')
                 self.exit_requested=False;self.results_entered=False
             def selected_long_idle(self,index):return False
             def selected_stockout(self,index):return False
+            def selected_standings(self,index):return False
             def accept(self,row):
                 self.seq+=1;kind=row['payload']['boundary'] if row['event']=='boundary' else 'end'
                 if kind=='source_tick':

@@ -73,6 +73,19 @@ class LongIdleBObservations:
             result["target_source_tick"] = self.target_source_tick
         return result
 
+    def validate_consumed_pad(self, row):
+        require(_consumed_ports(row, row['seq']) ==
+                ["00"*11, "00"*11, "00"*10+"ff", "00"*10+"ff"],
+                "idle consumed PAD differs from literal neutral")
+
+    def validate_map_state(self, row, state, roots, consumed):
+        require(roots == self.owner and
+                {k:v for k,v in state["map2"].items() if k != "countdown_s32"} == self.map2_history and
+                state["map2"]["phase_s16"] == 0 and
+                not state["map2"]["gate_mask_80"] and
+                state["map2"]["countdown_s32"] == self.countdown - self.samples and
+                state["map2"]["countdown_s32"] > 0, "stage owner/countdown differs")
+
     def accept(self, row):
         seq = row.get("seq")
         require(type(seq) is int and (self.previous is None and seq == 0 or
@@ -160,13 +173,12 @@ class LongIdleBObservations:
                     for v in p["gprs"]), "draw PC/GPR inventory differs")
         if kind == "pad_consume":
             require(self.pending is None and self.draw_open is None, "unpaired consume")
-            require(_consumed_ports(row, seq) ==
-                    ["00"*11, "00"*11, "00"*10+"ff", "00"*10+"ff"],
-                    "idle consumed PAD differs from literal neutral")
+            self.validate_consumed_pad(row)
             self.pending = row
         elif kind == "source_tick":
             require(self.pending is not None and self.pending["source_tick"] == row["source_tick"] and
                     self.pending["draw_ordinal"] == row["draw_ordinal"], "tick lacks exact consumed PAD")
+            consumed = self.pending
             self.pending = None
             tick = row["source_tick"]
             require(tick == (self.go["source_tick"] if self.last_tick is None else self.last_tick + 1) and
@@ -178,12 +190,7 @@ class LongIdleBObservations:
                 self.owner = roots
                 self.countdown = state["map2"]["countdown_s32"]
                 self.map2_history = {k:v for k,v in state["map2"].items() if k != "countdown_s32"}
-            require(roots == self.owner and
-                    {k:v for k,v in state["map2"].items() if k != "countdown_s32"} == self.map2_history and
-                    state["map2"]["phase_s16"] == 0 and
-                    not state["map2"]["gate_mask_80"] and
-                    state["map2"]["countdown_s32"] == self.countdown - self.samples and
-                    state["map2"]["countdown_s32"] > 0, "stage owner/countdown differs")
+            self.validate_map_state(row, state, roots, consumed)
             self.samples += 1
             self.last_tick = tick
             if tick - self.go["source_tick"] == 3500:

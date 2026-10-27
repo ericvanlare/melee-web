@@ -98,7 +98,7 @@ def build_stadium_whole_long_idle_compact_launch(output, *, paired_idle=False):
 
 
 def validate_stadium_whole_long_idle_outputs(raw, status_path, output_root,
-                                             compact_launch, driver_window, dol_sha256):
+                                             compact_launch, driver_window, dol_sha256, *, standings=None):
     """Join the full raw stream, final observer status, and selected-B compact ledger."""
     from reference_observer_stream import iter_records
     from stadium_whole_long_idle import LongIdleBObservations, PROFILE
@@ -114,11 +114,19 @@ def validate_stadium_whole_long_idle_outputs(raw, status_path, output_root,
             primary_status.get("stadium_whole_long_idle") == PROFILE and
             primary_status.get("stadium_whole_long_idle_window_complete") is True,
             "Whole Stadium long-idle final status lacks exact natural completion/profile")
-    observations = LongIdleBObservations()
+    if standings is None:
+        observations = LongIdleBObservations()
+    else:
+        from stadium_standings_input import StandingsBObservations, read_standings_intents
+        issues, pipe_rows = read_standings_intents(output_root)
+        observations = StandingsBObservations(issues, pipe_rows)
     for row in iter_records(raw, max_bytes=STADIUM_CAPTURE_CAPS["observer_bytes"],
                             max_records=STADIUM_WHOLE_LONG_IDLE_RECORD_CAP):
         observations.accept(row)
     source_window = observations.finish()
+    if standings is not None:
+        require(observations.policy.summary() == standings,
+                'Standings live/offline source/input policy stop differs')
 
     require(isinstance(driver_window, dict) and driver_window.get("profile") == PROFILE["profile"] and
             driver_window.get("match_index") == 1 and
@@ -189,6 +197,10 @@ def validate_stadium_whole_long_idle_outputs(raw, status_path, output_root,
         "lifecycle_parity": False,
         "C3": False,
     }
+    if standings is not None:
+        compact_summary.update(owner_comparison_ready=False,
+                               per_owner_rng_comparison=False,
+                               host_input_profile=StadiumStandingsInputPolicy.PROFILE)
     return source_window, compact_summary
 
 
@@ -1189,7 +1201,7 @@ def prepare_rules_profile(profile, user, *, source_slots=(0, 1)):
 
 
 def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_manifest, timeout=180, gci=None,
-        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False, stadium_go_ordinal2=False, stadium_whole_target=None, stadium_whole_setup=None, stadium_whole_gc=None, stadium_whole_dol=None, stadium_whole_provenance=None, stadium_whole_b_state=False, stadium_whole_long_idle=False, stadium_whole_paired_idle=False, stadium_whole_stockout=False, stadium_whole_rng_window=None, stadium_whole_replay_binding=None, stadium_whole_rng_coverage="rng_returns"):
+        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False, stadium_go_ordinal2=False, stadium_whole_target=None, stadium_whole_setup=None, stadium_whole_gc=None, stadium_whole_dol=None, stadium_whole_provenance=None, stadium_whole_b_state=False, stadium_whole_long_idle=False, stadium_whole_paired_idle=False, stadium_whole_stockout=False, stadium_whole_standings=False, stadium_whole_rng_window=None, stadium_whole_replay_binding=None, stadium_whole_rng_coverage="rng_returns"):
     """Own fresh output before preparation so failures cannot vanish before launch."""
     require(type(stadium_whole_b_state) is bool, "Whole Stadium B observation opt-in must be boolean")
     require(type(stadium_whole_long_idle) is bool and
@@ -1197,6 +1209,12 @@ def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_m
             'Whole Stadium long-idle profile requires the B-state option')
     require(type(stadium_whole_paired_idle) is bool,
             'Whole Stadium paired-idle profile option must be boolean')
+    require(type(stadium_whole_standings) is bool and
+            (not stadium_whole_standings or stadium_whole_b_state and
+             not stadium_whole_stockout and stadium_whole_long_idle and
+             not stadium_whole_paired_idle and stadium_whole_rng_window is None and
+             stadium_whole_replay_binding is None),
+            'Whole Stadium standings input requires exclusive recorded B-state scope')
     require(type(stadium_whole_stockout) is bool and
             (not stadium_whole_stockout or stadium_whole_b_state and
              not stadium_whole_long_idle and not stadium_whole_paired_idle and
@@ -1222,6 +1240,7 @@ def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_m
             stadium_whole_long_idle=stadium_whole_long_idle,
             stadium_whole_paired_idle=stadium_whole_paired_idle,
             stadium_whole_stockout=stadium_whole_stockout,
+            stadium_whole_standings=stadium_whole_standings,
             stadium_whole_rng_window=stadium_whole_rng_window,
             stadium_whole_replay_binding=stadium_whole_replay_binding,
             stadium_whole_rng_coverage=stadium_whole_rng_coverage)
@@ -1231,6 +1250,7 @@ def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_m
     require(not stadium_whole_b_state, "Whole Stadium B observation requires the whole3 input tuple")
     require(not stadium_whole_long_idle,
             "Whole Stadium long-idle profile requires the whole3 input tuple")
+    require(not stadium_whole_standings, 'Standings input requires the whole-session input tuple')
     require(not stadium_whole_stockout,
             "Whole Stadium natural stockout requires the whole-session input tuple")
     require(not stadium_whole_paired_idle,
@@ -2269,11 +2289,50 @@ def _stockout_source_fighter_state(row):
     return _source_fighter_state(projected_row)
 
 
+from stadium_standings_input import StadiumStandingsInputPolicy
+
+
+def drive_stadium_standings_input(receiver, next_row, controller, deadline):
+    """Stop the input workload, not the producer's GO+3500 observation layout."""
+    require(receiver.selected_standings(receiver.match_index),
+            'Standings input driver is outside selected B')
+    policy = receiver.standings_policy
+    sent = [NEUTRAL_PAD, NEUTRAL_PAD]
+    transport = controller.controller  # Existing StadiumDeadlineController -> Pipe owner.
+    try:
+        while policy.stop is None or policy.inflight is not None or policy.releasing:
+            require(not receiver.ended and time.monotonic() < deadline,
+                    'Standings input source wait/deadline')
+            if policy.desired != sent:
+                source = dict(policy.last)
+                before = transport.intent_records
+                policy.issue(policy.desired)
+                sent = list(policy.desired)
+                action = ('standings-mode8-focused-horizontal' if sent != [NEUTRAL_PAD]*2
+                          else 'standings-mode8:release')
+                controller.set_both(*sent, action=action)
+                require(transport.intent_records == before + 2,
+                        'Standings input lacks both completed ordinary Pipe writes')
+                issue = dict(schema='melee-web-stadium-standings-input-issue-v1',
+                    index=len(receiver.standings_issues), source=source,
+                    after_sequence=receiver.seq-1, ports=list(sent), action=action,
+                    pipe_row_indices=[before, before+1])
+                require(issue['after_sequence'] == source['sequence'] and
+                        len(receiver.standings_issues) < 4096,
+                        'Standings issue source point/count differs')
+                receiver.standings_issues.append(issue)
+                receiver.standings_issue_path.write_bytes(canonical(receiver.standings_issues))
+            next_row()
+    finally:
+        controller.set_both(NEUTRAL_PAD, NEUTRAL_PAD, action='standings-evidence-stop:neutral')
+    return policy.summary()
+
+
 class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
     """Strict whole-session rows feeding the existing CSS/SSS input policies."""
     def __init__(self, menus, receipt, expected, *, stadium_whole_b_state=False,
                  stadium_whole_long_idle=False, stadium_whole_paired_idle=False,
-                 stadium_whole_stockout=False, replay_binding_sha256=None):
+                 stadium_whole_stockout=False, stadium_whole_standings=False, replay_binding_sha256=None):
         super().__init__(menus)
         require(type(stadium_whole_b_state) is bool, "Whole Stadium B observation opt-in must be boolean")
         require(type(stadium_whole_long_idle) is bool and
@@ -2291,6 +2350,16 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                 (not stadium_whole_stockout or stadium_whole_b_state and
                  not stadium_whole_long_idle and not stadium_whole_paired_idle),
                 'Whole Stadium natural stockout requires B-state and excludes idle profiles')
+        require(type(stadium_whole_standings) is bool and
+                (not stadium_whole_standings or stadium_whole_b_state and
+                 not stadium_whole_stockout and stadium_whole_long_idle and
+                 not stadium_whole_paired_idle and replay_binding_sha256 is None),
+                'Standings input receiver requires exclusive B-state scope')
+        if stadium_whole_standings:
+            StadiumStandingsInputPolicy.validate_setup(expected)
+        self.stadium_whole_standings = stadium_whole_standings
+        self.standings_policy = StadiumStandingsInputPolicy() if stadium_whole_standings else None
+        self.standings_summary = None
         self.stadium_whole_stockout = stadium_whole_stockout
         self.stockout_witness = StadiumNaturalStockoutWitness() if stadium_whole_stockout else None
         self.stockout_summary = None
@@ -2333,6 +2402,9 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
     def selected_long_idle(self, index):
         return self.stadium_whole_long_idle and index in self.b_state_matches
 
+    def selected_standings(self, index):
+        return getattr(self, 'stadium_whole_standings', False) is True and index == 1
+
     def selected_stockout(self, index):
         return self.stadium_whole_stockout and index == STADIUM_WHOLE_STOCKOUT_PROFILE['selected_match']
 
@@ -2352,10 +2424,15 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
             stadium_whole_long_idle=self.stadium_whole_long_idle,
             stadium_whole_paired_idle=self.stadium_whole_paired_idle,
             stadium_whole_stockout=self.stadium_whole_stockout,
+            stadium_whole_standings=self.stadium_whole_standings,
             replay_binding_sha256=self.replay_binding_sha256)
         fresh.b_observations = self.b_observations
         fresh.long_idle_windows = self.long_idle_windows
         fresh.stockout_summary = self.stockout_summary
+        fresh.standings_summary = self.standings_summary
+        if self.stadium_whole_standings:
+            fresh.standings_issues = self.standings_issues
+            fresh.standings_issue_path = self.standings_issue_path
         if not self.stadium_whole_paired_idle:
             fresh.b_observation = self.b_observation
             fresh.long_idle_window = self.long_idle_window
@@ -2435,8 +2512,10 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                 consumed_sample.get('match_index') == self.match_index and
                 consumed_sample['source_tick'] == row['source_tick'] and
                 consumed_sample.get('draw_ordinal') == row['draw_ordinal'] and
-                consumed_sample['ports'] == [NEUTRAL_PAD, NEUTRAL_PAD,
-                                              DISCONNECTED_PAD, DISCONNECTED_PAD] and
+                consumed_sample['ports'][2:] == [DISCONNECTED_PAD]*2 and
+                (self.selected_standings(self.match_index) and
+                 self.standings_policy.allowed(consumed_sample['ports'][:2]) or
+                 consumed_sample['ports'][:2] == [NEUTRAL_PAD]*2) and
                 consumed_sample['errors'] == [0, 0, -1, -1],
                 'Whole Stadium long-idle SourceTick lacks its exact four-port consumed PAD')
         require(snapshot.get('sequence') == row['seq'] and
@@ -2670,6 +2749,8 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                 chord = raw_pad(buttons=['L','R','A','START'])
                 start = raw_pad(buttons=['START'])
                 allowed = [[NEUTRAL_PAD, NEUTRAL_PAD]]
+                if self.selected_standings(self.match_index) and self.standings_policy.inflight is not None:
+                    allowed.append(list(self.standings_policy.inflight))
                 if self.stockout_gameplay_active():
                     edge = raw_pad(x=80)
                     jump = raw_pad(buttons=['X'], x=80)
@@ -2684,7 +2765,7 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                 sample = dict(sequence=row['seq'], source_tick=row['source_tick'],
                               phase='whole-post-setup', match_index=self.match_index, ports=ports, errors=errors,
                               pc=payload['pc'], lr=payload['lr'], gprs=list(payload['gprs']), **queue)
-                if self.selected_long_idle(self.match_index):
+                if self.selected_long_idle(self.match_index) or self.selected_standings(self.match_index):
                     sample['draw_ordinal'] = row['draw_ordinal']
                 if not self.chord_requested and not (self.selected_stockout(self.match_index) and self.outcome_seen):
                     require(self.pending_neutral_sample is None,
@@ -2737,6 +2818,8 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                 require(sample is not None and sample['sequence'] < row['seq'] and
                         sample['source_tick'] == row['source_tick'] and
                         (sample['ports'][:2] == [NEUTRAL_PAD]*2 or
+                         self.selected_standings(self.match_index) and
+                         self.standings_policy.allowed(sample['ports'][:2]) or
                          self.selected_stockout(self.match_index) and
                          sample['ports'][1] == NEUTRAL_PAD and sample['ports'][0] in
                          [NEUTRAL_PAD, raw_pad(x=80), raw_pad(buttons=['X'], x=80)]),
@@ -2750,6 +2833,8 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                         'Whole Stadium B first state is not actual GO containing tick')
                 snapshot = _validate_stadium_idle_state_record(row, 'IDLE',row['source_tick'])
                 self.b_state_samples.append(snapshot)
+            if self.selected_standings(self.match_index) and snapshot is not None and not self.chord_requested:
+                self.standings_policy.observe(row, snapshot, sample, self.b_go)
             if self.selected_long_idle(self.match_index) and self.b_go is not None:
                 self._observe_long_idle_tick(row, snapshot, sample)
             if self.selected_stockout(self.match_index) and snapshot is not None:
@@ -2970,6 +3055,10 @@ def drive_stadium_whole_three(receiver, tail, controller, menus, deadline):
         wait_source(lambda: receiver.setup_seen,'Setup',600)
         while receiver.tick_count < 180:
             next_row()
+        standings_result = None
+        if receiver.selected_standings(index):
+            standings_result = drive_stadium_standings_input(receiver, next_row, controller, deadline)
+            receiver.standings_summary = standings_result
         stockout_result = None
         if receiver.selected_stockout(index):
             stockout_result = drive_stadium_natural_stockout(receiver, next_row, controller, deadline)
@@ -3024,6 +3113,8 @@ def drive_stadium_whole_three(receiver, tail, controller, menus, deadline):
             actual_pause_chord=receiver.pause_consumed, actual_pause_release=receiver.pause_released,
             pause_ready=receiver.pause_ready_clock,
             actual_chord=receiver.chord_consumed, actual_release=receiver.chord_released))
+        if standings_result is not None:
+            measurement['standings_input'] = standings_result
         if idle_window is not None:
             measurement['long_idle_window'] = idle_window
         measurements.append(measurement)
@@ -3247,7 +3338,7 @@ def stadium_whole_replay_complete(source, native_status, primary, primary_status
 def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, build_manifest,
                              target_path, setup_path, checkpoint_gc, dol, provenance, gci, timeout,
                              stadium_whole_b_state=False, stadium_whole_long_idle=False,
-                             stadium_whole_paired_idle=False, stadium_whole_stockout=False, stadium_whole_rng_window=None,
+                             stadium_whole_paired_idle=False, stadium_whole_stockout=False, stadium_whole_standings=False, stadium_whole_rng_window=None,
                              stadium_whole_replay_binding=None,
                              stadium_whole_rng_coverage="rng_returns"):
     """Explicit private whole3/sidecar2 diagnostic using the existing passive route."""
@@ -3258,6 +3349,12 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             'Whole Stadium long-idle profile requires the B-state observation')
     require(type(stadium_whole_paired_idle) is bool,
             'Whole Stadium paired-idle profile option must be boolean')
+    require(type(stadium_whole_standings) is bool and
+            (not stadium_whole_standings or stadium_whole_b_state and
+             not stadium_whole_stockout and stadium_whole_long_idle and
+             not stadium_whole_paired_idle and stadium_whole_rng_window is None and
+             stadium_whole_replay_binding is None),
+            'Whole Stadium standings input requires exclusive recorded B-state scope')
     require(type(stadium_whole_stockout) is bool and
             (not stadium_whole_stockout or stadium_whole_b_state and
              not stadium_whole_long_idle and not stadium_whole_paired_idle and
@@ -3300,10 +3397,15 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
                                 'firsttwo short natural lifetimes only; no C3/per-owner ledger'),
                 input_contract=('exact stock4_none two-human setup; ordinary P1 edge/jump and P2 neutral consumed rows; no stock writes' if stadium_whole_stockout else
                                 'minimum180 observed neutral ticks before ordinary chord request; actual consume ticks retained'))
+    if stadium_whole_standings:
+        report.update(scope='original-stadium-whole3-standings-input-v1',
+            endpoint_scope='actual pretransform mode14 or inconclusive transform/GO+3500 stop; no C3/per-owner claim',
+            input_contract='each source mode8 valid focus0/1 gets ordinary horizontal input; exact four-port consumes; neutral release before existing exit',
+            standings_resource_limits=dict(STADIUM_CAPTURE_CAPS, observer_records=STADIUM_WHOLE_LONG_IDLE_RECORD_CAP))
     if stadium_whole_paired_idle:
         report.update(endpoint_scope='two natural lifetimes; GO+3500 typed/four-port windows for matches0/1; only exact scene RNG endpoints; no full allocation/registration claim',
                       input_contract='actual four-port neutral consumes retained for both actual GO-derived windows; natural pause/exit/Results/CSS order preserved')
-    elif stadium_whole_long_idle:
+    elif stadium_whole_long_idle and not stadium_whole_standings:
         report.update(endpoint_scope='three natural lifetimes; selected B GO+3500 and first later natural DrawReturn; no C3/per-owner ledger',
                       input_contract='actual four-port neutral consumes retained; existing pause/exit route follows the selected B natural batch close')
     try:
@@ -3317,7 +3419,7 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             provenance=Path(provenance))
         setup=validate_setup_receipt(Path(setup_path),inputs,build)
         expected=stadium_three_target(Path(target_path))['source_expected_setup']
-        if stadium_whole_stockout:
+        if stadium_whole_stockout or stadium_whole_standings:
             from capture_allocation_history import stadium_three_rule_profile
             require(stadium_three_rule_profile(expected) == 'stock4_none' and
                     len(expected.get('players', [])) == 2,
@@ -3373,7 +3475,13 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             stadium_whole_b_state=stadium_whole_b_state,
             stadium_whole_long_idle=stadium_whole_long_idle,
             stadium_whole_paired_idle=stadium_whole_paired_idle,
-            stadium_whole_stockout=stadium_whole_stockout)
+            stadium_whole_stockout=stadium_whole_stockout,
+            stadium_whole_standings=stadium_whole_standings)
+        if stadium_whole_standings:
+            receiver.standings_issues = []
+            receiver.standings_issue_path = output/'standings-input-issues.json'
+            with receiver.standings_issue_path.open('xb') as stream:
+                stream.write(canonical([]))
         replay_source = None
         if stadium_whole_replay_binding is not None:
             require(rng_window is not None and stadium_whole_b_state and not stadium_whole_long_idle,
@@ -3390,6 +3498,13 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
         launch=dict(command=command,environment_delta={k:v for k,v in env.items() if k.startswith('MWRC_')},manifest=build,setup=setup,expected=expected,
                     profile_inventory=profile_inventory,owned_gci=dict(path=str(owned_gci),bytes=owned_gci.stat().st_size,sha256=hashlib.sha256(owned_gci.read_bytes()).hexdigest()),operation_seconds=180,owner_seconds=210,cleanup_seconds=30,
                     stadium_whole_stockout=dict(STADIUM_WHOLE_STOCKOUT_PROFILE) if stadium_whole_stockout else None)
+        if stadium_whole_standings:
+            launch['stadium_whole_standings'] = dict(profile=StadiumStandingsInputPolicy.PROFILE,
+                selected_match=1, stop_at=['actual_mode14', 'first_transform', 'actual_GO_plus_3500'],
+                observer_profile='selected_b_3500_v1',
+                recording_suffix='neutral through actualGO+3500/first natural DrawReturn then unchanged whole3 exit',
+                caps=dict(STADIUM_CAPTURE_CAPS, observer_records=STADIUM_WHOLE_LONG_IDLE_RECORD_CAP),
+                per_owner_rng_comparison=False)
         if stadium_whole_paired_idle:
             launch['stadium_whole_paired_idle'] = dict(STADIUM_WHOLE_PAIRED_IDLE_PROFILE)
             launch['stadium_whole_long_idle_compact_launch'] = dict(long_idle_compact_launch)
@@ -3420,6 +3535,9 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
         if stadium_whole_b_state and not stadium_whole_paired_idle:
             require(receiver.b_observation is not None, 'Whole Stadium B observation incomplete')
             report['stadium_b_observation']=receiver.b_observation
+        if stadium_whole_standings:
+            require(receiver.standings_summary is not None, 'Standings evidence stop/release missing')
+            report['stadium_whole_standings'] = receiver.standings_summary
         if stadium_whole_stockout:
             require(receiver.stockout_summary is not None,
                     'Whole Stadium natural stockout profile lacks the source-authored zero-stock/mode9 boundary')
@@ -3437,7 +3555,8 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             driver_window = receiver.long_idle_window_summary()
             source_window, compact_summary = validate_stadium_whole_long_idle_outputs(
                 raw, status, output, long_idle_compact_launch, driver_window,
-                env['MWRC_DOL_SHA256'])
+                env['MWRC_DOL_SHA256'],
+                standings=receiver.standings_summary if stadium_whole_standings else None)
             report['stadium_whole_long_idle_window'] = driver_window
             report['stadium_whole_long_idle_source_validation'] = source_window
             report['stadium_whole_long_idle_compact_rng'] = compact_summary
@@ -3516,6 +3635,8 @@ def main(argv=None):
                         help="Whole3 selected B: gate its existing pause on actual GO+3500 ticks and first later natural DrawReturn")
     parser.add_argument("--stadium-whole-paired-idle", action="store_true",
                         help="Two natural Stadium lifetimes with actual GO+3500 windows for both and scene RNG endpoints only")
+    parser.add_argument("--stadium-whole-standings", action="store_true",
+                        help="B-state+long-layout only: stop workload at14/transform/GO+3500, then neutral through unchanged producer terminal")
     parser.add_argument("--stadium-whole-stockout", action="store_true",
                         help="Strict selected-B natural P1 zero-stock/mode9 witness on the exact two-human stock4_none route")
     parser.add_argument('--stadium-whole-replay-binding',type=Path,
