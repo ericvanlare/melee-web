@@ -3965,7 +3965,7 @@ void stadium_paired_v11_admit_match(){
  s.enabled=true;s.admitted=true;s.whole_session_complete=false;
  stadium_paired_v11_capture_setup();
  check(!s.failed&&s.setup_captured&&s.go_armed,
-       s.error.empty()?"Paired v11 failed to capture its checked Setup":s.error);
+       s.error.empty()?"Paired v11 failed to capture its checked Setup":s.error.c_str());
 }
 void stadium_paired_v11_capture_setup(){
  auto& s=stadium_paired_v11;
