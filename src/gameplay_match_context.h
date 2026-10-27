@@ -9,6 +9,22 @@
 extern "C" {
 #endif
 typedef struct MeleeWebMatchContext MeleeWebMatchContext;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+/* Read-only source-owner receipts. Entry is partitioned, not a literal OnEnter. */
+typedef struct MeleeWebMatchSceneRngPoint {
+    uint64_t world_generation;
+    uintptr_t seed_pointer;
+    uint32_t seed;
+} MeleeWebMatchSceneRngPoint;
+typedef struct MeleeWebMatchSceneRngSnapshot {
+    unsigned count;
+    int invalid;
+    MeleeWebMatchSceneRngPoint points[4];
+} MeleeWebMatchSceneRngSnapshot;
+void melee_web_match_scene_rng_note(unsigned phase);
+int melee_web_match_scene_rng_snapshot(MeleeWebMatchContext*,
+    MeleeWebMatchSceneRngSnapshot*,char*,size_t);
+#endif
 int melee_web_match_restore_input(MeleeWebMatchContext*,const MeleeWebPadState*,char*,size_t);
 /* Source scene phases run after PAD renewal and around the original scheduler. */
 typedef int (*MeleeWebMatchTickPhase)(void*, char*, size_t);

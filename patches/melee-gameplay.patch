@@ -3679,7 +3679,6 @@ index fea468cc6c89d7d4c6c8a1a81e31f99eec07bc63..6d0819f60ef4c12cdf80b1ea29bbd805
  
  void gm_80168C5C(u32 arg0)
 diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
-index cd7e31a0636e4e1a48d6a870e09319e887345ed1..954ae20a44e3948d46e733e9d3c0da8362a20e52 100644
 --- a/src/melee/gm/gm_16AE.c
 +++ b/src/melee/gm/gm_16AE.c
 @@ -1,12 +1,18 @@
@@ -3701,7 +3700,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..954ae20a44e3948d46e733e9d3c0da83
  #include "gmmain_lib.h"
  #include "gmmultiman.h"
  #include "gmpause.h"
-@@ -355,6 +361,13 @@ static float get_unk_float(void)
+@@ -355,6 +361,13 @@
      }
  }
  
@@ -3715,7 +3714,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..954ae20a44e3948d46e733e9d3c0da83
  bool gm_IsCurrently1PMode(void)
  {
      return gm_Is1PMode(gm_GetCurrentGameMode());
-@@ -473,6 +486,26 @@ void fn_8016B784(void)
+@@ -473,6 +486,26 @@
      grStadium_801D4150();
  }
  
@@ -3742,7 +3741,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..954ae20a44e3948d46e733e9d3c0da83
  void fn_8016B7B4(int arg0)
  {
      Ground_801C1154();
-@@ -492,10 +525,13 @@ void fn_8016B7F8(void)
+@@ -492,10 +525,13 @@
      ftLib_800868A4();
      Stage_802252E4(tmp->x24C8.stkind, NULL);
      grStadium_801D4040();
@@ -3751,14 +3750,15 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..954ae20a44e3948d46e733e9d3c0da83
 +#endif
      if (!tmp->x24C8.x1_3) {
 -        ifStatus_802F6EA4(4, -1, -1, 0, NULL, fn_8016B784);
-+        ifStatus_802F6EA4(4, -1, -1, 0, NULL, (Event) melee_web_hud_enable);
-     } else {
+-    } else {
 -        ifStatus_802F6EA4(8, -1, -1, 0, NULL, fn_8016B784);
++        ifStatus_802F6EA4(4, -1, -1, 0, NULL, (Event) melee_web_hud_enable);
++    } else {
 +        ifStatus_802F6EA4(8, -1, -1, 0, NULL, (Event) melee_web_hud_enable);
      }
      un_802FD428();
  }
-@@ -996,6 +1032,9 @@ int gm_8016C75C(HSD_GObj* arg0)
+@@ -996,6 +1032,9 @@
      if (tmp->x0 != (UNK_T) gm_801A4BA8()) {
          tmp->x0 = (UNK_T) gm_801A4BA8();
          gm_80166378(tmp);
@@ -3768,7 +3768,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..954ae20a44e3948d46e733e9d3c0da83
      }
      return tmp->x58[ftLib_80086BE0(arg0)].x20;
  }
-@@ -1325,6 +1364,17 @@ static inline void fn_8016CFE0_inline(void)
+@@ -1325,6 +1364,17 @@
      }
  }
  
@@ -3786,7 +3786,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..954ae20a44e3948d46e733e9d3c0da83
  void fn_8016CFE0(void)
  {
      lbl_8046B6A0_t* tmp = &lbl_8046B6A0;
-@@ -1387,11 +1437,7 @@ void fn_8016CFE0(void)
+@@ -1387,11 +1437,7 @@
      }
      if (tmp->match_result != OUTCOME_NONE) {
      block_51:
@@ -3799,7 +3799,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..954ae20a44e3948d46e733e9d3c0da83
      } else {
          fn_8016CD98(tmp);
      }
-@@ -1661,7 +1707,11 @@ void fn_8016DCC0(StartMeleeData* arg0)
+@@ -1661,7 +1707,11 @@
      lbl_8046B6A0_t* tmp = &lbl_8046B6A0;
      int i;
  
@@ -3811,7 +3811,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..954ae20a44e3948d46e733e9d3c0da83
      lbl_8046B6A0.unk_D = 6;
      lbl_8046B6A0.unk_1C = (void*) &lbl_803D5630;
      lbl_8046B6A0.unk_20 = (void*) &lbl_803D5620;
-@@ -1871,6 +1921,33 @@ void fn_8016E124(void)
+@@ -1871,6 +1921,33 @@
      }
  }
  
@@ -3845,7 +3845,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..954ae20a44e3948d46e733e9d3c0da83
  /// @todo The loop's SFX flag load uses a different equivalent address form.
  void fn_8016E2BC(void)
  {
-@@ -1915,26 +1992,8 @@ void fn_8016E2BC(void)
+@@ -1915,26 +1992,8 @@
          fn_8016DEEC();
          for (i = 0; i < 6; i++) {
              if (Player_GetPlayerSlotType(i) != Gm_PKind_NA) {
@@ -3873,19 +3873,41 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..954ae20a44e3948d46e733e9d3c0da83
                  Player_80031AD0(i);
                  if (tmp->FighterMatchInfo[i].x4_b4) {
                      lbAudioAx_800237A8(0x41F4E, 0x7F, 0x40);
-@@ -2036,9 +2095,9 @@ void gm_Scene_Vs_OnEnter(void* arg0)
+@@ -2036,9 +2095,9 @@
      StartMeleeData* tmp = arg0;
      fn_8016E730(tmp);
      if (tmp->rules.x1_2) {
 -        ifStatus_802F6EA4(8, -1, -1, 0, (void*) fn_8016B7B4, fn_8016B7F8);
-+        ifStatus_802F6EA4(8, -1, -1, 0, (void*) fn_8016B7B4, (Event) melee_web_hud_intro_finished);
-     } else {
+-    } else {
 -        ifStatus_802F6EA4(3, -1, -1, 0, (void*) fn_8016B7B4, fn_8016B7F8);
++        ifStatus_802F6EA4(8, -1, -1, 0, (void*) fn_8016B7B4, (Event) melee_web_hud_intro_finished);
++    } else {
 +        ifStatus_802F6EA4(3, -1, -1, 0, (void*) fn_8016B7B4, (Event) melee_web_hud_intro_finished);
      }
      ifTime_CreateTimers();
      ifStatus_802F665C(tmp->rules.x0_3);
-@@ -2119,7 +2178,7 @@ void gm_Scene_SuddenDeath_OnEnter(void* user_data)
+@@ -2074,6 +2133,10 @@
+     struct EndMeleeData* data = user_data;
+     lbl_8046B6A0_t* tmp = &lbl_8046B6A0;
+     int i;
++#if defined(MELEE_WEB_GAMEPLAY) && defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    extern void melee_web_match_scene_rng_note(unsigned);
++    melee_web_match_scene_rng_note(2);
++#endif
+ 
+     if (lbl_8046B6A0.match_over == 0) {
+         data->xC = lbl_8046B6A0.x24C;
+@@ -2112,6 +2175,9 @@
+             }
+         }
+     }
++#if defined(MELEE_WEB_GAMEPLAY) && defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    melee_web_match_scene_rng_note(3);
++#endif
+ }
+ 
+ void gm_Scene_SuddenDeath_OnEnter(void* user_data)
+@@ -2119,7 +2185,7 @@
      StartMeleeData* data = user_data;
      data->rules.x6 = true;
      fn_8016E730(data);
@@ -3894,19 +3916,20 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..954ae20a44e3948d46e733e9d3c0da83
      ifTime_CreateTimers();
      ifStatus_802F665C(data->rules.x0_3);
  }
-@@ -2138,9 +2197,9 @@ void gm_Scene_Training_OnEnter(void* user_data)
+@@ -2138,9 +2204,9 @@
      Stage_802252E4(tmp2->x24C8.stkind, NULL);
      grStadium_801D4040();
      if (!lbl_8046B6A0.x24C8.x1_3) {
 -        ifStatus_802F6EA4(4, -1, -1, 0, 0, fn_8016B784);
-+        ifStatus_802F6EA4(4, -1, -1, 0, 0, (Event) melee_web_hud_enable);
-     } else {
+-    } else {
 -        ifStatus_802F6EA4(8, -1, -1, 0, 0, fn_8016B784);
++        ifStatus_802F6EA4(4, -1, -1, 0, 0, (Event) melee_web_hud_enable);
++    } else {
 +        ifStatus_802F6EA4(8, -1, -1, 0, 0, (Event) melee_web_hud_enable);
      }
      un_802FD428();
      ifStatus_802F665C(data->rules.x0_3);
-@@ -2277,3 +2336,258 @@ int fn_8016F160(int arg0, int arg1)
+@@ -2277,3 +2343,258 @@
  {
      return pl_80039418(arg0, arg1);
  }

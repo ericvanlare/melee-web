@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {derivePairedFull,PairedFullComparator,installPairedFullLaunch} from './stadium_paired_v11_full.mjs';
 import {OBSERVED_B_REFERENCE, LONG_B_REFERENCE, OBSERVED_B_SCHEMA} from './stadium_later_reference_contexts.mjs';
 /*
  * Headless whole-session MWRC diagnostic.
@@ -21,7 +22,7 @@ import {StadiumSetupCfActionDriver, deriveLaterBGate2Expectations, deriveLaterBL
 import {createLaterBGate2NativeAdapter, runLaterBGate2ActionContinuation} from '../tests/stadium_matched_setup_cf_runner_gate.mjs';
 import {deriveLongBActionRngWindow, bindLongBActionRngRows, activateLongBActionRngSelection} from './stadium_later_b_long_rng.mjs';
 import fs from 'node:fs/promises';
-import {closeSync, createReadStream, fsyncSync, openSync, writeSync} from 'node:fs';
+import {closeSync, createReadStream, readFileSync, fsyncSync, openSync, writeSync} from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
@@ -71,6 +72,10 @@ const {values, tokens} = parseArgs({tokens: true, options: {
   'hit-transition-probe-cursors': {type: 'string'},
   'first-replay-callback-probe': {type: 'boolean', default: false},
   'runtime-incidents': {type: 'boolean', default: false},
+  'stadium-paired-v11-full-pair-projection': {type: 'string'},
+  'stadium-paired-v11-full-pair-projection-sha256': {type: 'string'},
+  'stadium-paired-v11-full-pair-endpoints': {type: 'string'},
+  'stadium-paired-v11-full-pair-endpoints-sha256': {type: 'string'},
   'stadium-paired-v11-first-go-projection': {type: 'string'},
   'stadium-paired-v11-first-go-projection-sha256': {type: 'string'},
   'expected-frame0': {type: 'string'},
@@ -165,6 +170,19 @@ const probeTimeoutMs = 10000;
 let rngDrawProbe = parseRngDrawProbe({range: values['rng-draw-probe-range'],
   cursors: values['rng-draw-probe-cursors']});
 const hitTransitionProbe = parseHitTransitionProbe(values['hit-transition-probe-cursors']);
+const pairedFullPath=values['stadium-paired-v11-full-pair-projection'];
+const pairedFull=pairedFullPath!==undefined;
+const pairedFullEndpoints=values['stadium-paired-v11-full-pair-endpoints'];
+const pairedFullSha=values['stadium-paired-v11-full-pair-projection-sha256'];
+const pairedFullEndpointsSha=values['stadium-paired-v11-full-pair-endpoints-sha256'];
+const fullOptions=Object.entries(values).filter(([k,v])=>k.startsWith('stadium-paired-v11-full-pair-')&&v!==undefined);
+if(fullOptions.length){
+ const conflict=Object.entries(values).some(([k,v])=>v&&((k.startsWith('stadium-')&&!k.startsWith('stadium-paired-v11-full-pair-'))||['manifest','diagnostic-manifest','stopped-scene-pair','stop-after-source-frames','resume-timing-pauses','cpu-observations','rng-draw-probe-range','rng-draw-probe-cursors','hit-transition-probe-cursors','first-replay-callback-probe','expected-frame0'].includes(k)));
+ if(!pairedFull||!pairedFullEndpoints||![pairedFullSha,pairedFullEndpointsSha].every(x=>/^[0-9a-f]{64}$/.test(x||''))||conflict||diagnostic||captureMode.mode!=='state'||!runtimeIncidentRecording||!values['artifact-root']||!values['runtime-data']||phaseTimeoutMs>150000||replayTimeoutMs>150000)
+  throw Error('Paired full requires exact projection/endpoints, state/incidents/artifacts/data, <=150s bounds and no other diagnostic route');
+}
+let pairedFullExpected=null,pairedFullComparison=null;
+let pairedFullOriginalPreflight=null;
 const pairedFirstGoPath=values['stadium-paired-v11-first-go-projection'];
 const pairedFirstGoSha=values['stadium-paired-v11-first-go-projection-sha256'];
 const pairedFirstGo=pairedFirstGoPath!==undefined;
@@ -233,12 +251,12 @@ if (currentSssExit !== !!values['stadium-current-sss-exit-expected-sha256'] ||
       values.mode !== 'state' || !values['artifact-root'] || !values['runtime-data'] ||
       phaseTimeoutMs > 150000 || replayTimeoutMs > 150000)))
   throw Error('Current SSS observation requires explicit state/expectation/hash/artifacts/data and unchanged150s bounds only');
-if (!firstReplayCallbackProbe && !currentSssExit && (expectedFrame0Path || (!pairedFirstGo && values['artifact-root'])))
+if (!firstReplayCallbackProbe && !currentSssExit && (expectedFrame0Path || (!pairedFirstGo && !pairedFull && values['artifact-root'])))
   throw Error('--expected-frame0 and --artifact-root require --first-replay-callback-probe');
 const runtimeDataUrl = new URL('gameplay_menu_browser.data', url).href;
 const output = path.resolve(values.out);
 const observationTimeoutMs = diagnostic ? diagnosticProtocol.observation_timeout_ms : Math.min(phaseTimeoutMs, 5000);
-const inputPaths = [values.disc, values.recipe, values.manifest, values['runtime-data'], expectedFrame0Path, currentSssExitPath, laterBGate2ProjectionPath, laterBGate2BindingPath, pairedFirstGoPath]
+const inputPaths = [values.disc, values.recipe, values.manifest, values['runtime-data'], expectedFrame0Path, currentSssExitPath, laterBGate2ProjectionPath, laterBGate2BindingPath, pairedFirstGoPath, pairedFullPath, pairedFullEndpoints]
   .filter(Boolean).map(value => path.resolve(value));
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const artifactRoot = path.resolve(values['artifact-root'] || path.join(repoRoot, 'build/browser-release'));
@@ -313,7 +331,7 @@ async function closeOwnedCaptureBrowser() {
     }
     else if (browser) {
       await boundedCaptureOperation(browser.close(), observationTimeoutMs, 'owned browser close');
-      if (currentSssExit) { report.cleanup ||= {}; report.cleanup.browser_close_returned = true; }
+      if (currentSssExit || pairedFirstGo || pairedFull) { report.cleanup ||= {}; report.cleanup.browser_close_returned = true; }
     }
   } catch (error) { report.close_error = String(error); }
   try {
@@ -450,6 +468,7 @@ async function retainReplayArtifacts() {
 }
 
 async function retainRngDrawProbe() {
+    if (pairedFull) return; // Full mode drains and retains its raw rows incrementally.
     if (rngDrawProbe) {
       try {
         const rows = await observePageOperation('final RNG draw rows', () => page.evaluate(() => window.__rngDrawProbeRows || []));
@@ -763,6 +782,59 @@ async function readPairedFirstGoStatus(){
   return {busy:false,runtime,status:JSON.parse(m.UTF8ToString(pointer)),phase:m._melee_web_native_menu_phase(),running:m._melee_web_native_menu_running()};
  }));
 }
+function runPairedFullRngComparison(browserInputs){
+ const python=process.env.MELEE_PAIRED_FULL_PYTHON||'python3';
+ const outFile=path.join(output,browserInputs?'paired-full-rng-comparison.json':'paired-full-rng-original-preflight.json');
+ const args=[path.join(repoRoot,'tools/compare_stadium_paired_v11_rng.py'),'--projection',path.resolve(pairedFullPath),'--projection-sha256',pairedFullSha,'--out',outFile];
+ if(browserInputs)args.push('--browser-rows',path.join(output,'paired-v11-full-rows.jsonl'),'--browser-rng',path.join(output,'paired-v11-full-rng.jsonl'));
+ execFileSync(python,args,{stdio:['ignore','pipe','pipe'],timeout:30000,maxBuffer:1024*1024});
+ const result=JSON.parse(readFileSync(outFile,'utf8'));
+ if(result.status!==(browserInputs?'PASS_SELECTED_RNG_COMPARISON':'PASS_ORIGINAL_PREFLIGHT_ONLY'))throw Error('Paired full strict RNG comparison did not pass');
+ return result;
+}
+async function drainPairedFull(){
+ const batch=await observePageOperation('paired full new diagnostic rows',()=>page.evaluate(()=>({rows:window.__pairedFullRows.splice(0),probes:window.__rngDrawProbeRows.splice(0)})));
+ // Persist the exact bytes before comparison so a first refusal never loses its row.
+ if(batch.rows.length){await fs.appendFile(path.join(output,'paired-v11-full-rows.jsonl'),batch.rows.join('\n')+'\n');}
+ if(batch.probes.length){await fs.appendFile(path.join(output,'paired-v11-full-rng.jsonl'),batch.probes.join('\n')+'\n');}
+ for(const [kind,rows]of [['probe',batch.probes],['source',batch.rows]])for(const text of rows){
+  try{if(kind==='probe')pairedFullComparison.acceptProbe(text);else pairedFullComparison.accept(JSON.parse(text));}
+  catch(error){report.first_mismatch ||= {kind:'paired_full_'+kind,message:String(error.message||error),actual:JSON.parse(text)};throw error;}
+ }
+}
+async function pairedFullPhase(){
+ const deadline=Date.now()+replayTimeoutMs;
+ await fs.writeFile(path.join(output,'paired-v11-full-rows.jsonl'),'',{flag:'wx'});
+ await fs.writeFile(path.join(output,'paired-v11-full-rng.jsonl'),'',{flag:'wx'});
+ await page.evaluate(installPairedFullLaunch);
+ await page.locator('#retail-replay-start').click();
+ let status;
+ while(Date.now()<deadline){
+  await drainPairedFull();const observed=await readPairedFirstGoStatus();
+  report.paired_v11_full_pair.last_observation=observed;
+  if(observed.runtime?.terminal_error)throw Error('Paired full runtime failed: '+observed.runtime.terminal_error);
+  if(observed.busy){await new Promise(r=>setTimeout(r,replayPollMs));continue;}
+  status=observed.status;
+  if(status?.failed)throw Error(status.error||'Paired full native failed');
+  if(status?.schema==='melee-web-stadium-paired-v11-full-pair-v1'&&status.whole_session_complete){
+   await drainPairedFull();
+   report.paired_v11_full_pair.comparison=pairedFullComparison.finish(status);
+   report.paired_v11_full_pair.rng_comparison=runPairedFullRngComparison(true);
+   // Ordinary completion performs its existing checked unload and evidence write.
+   // If the callback has not completed yet, wait; do not issue a second unload.
+   while(Date.now()<deadline){
+    const after=await readPairedFirstGoStatus();
+    if(!after.busy&&after.status?.failed)throw Error(after.status.error||'Paired full unload failed');
+    if(!after.busy&&after.status?.native_retired&&after.phase===0&&after.running===0){report.paired_v11_full_pair.retirement=after;report.paired_v11_full_pair.component_pass=true;return;}
+    await new Promise(r=>setTimeout(r,replayPollMs));
+   }
+   throw Error('Paired full checked ordinary unload exceeded deadline');
+  }
+  if(pageErrors.length)throw Error('Paired full browser diagnostic failure');
+  await new Promise(r=>setTimeout(r,replayPollMs));
+ }
+ throw Error('Paired full exceeded unchanged replay deadline');
+}
 async function pairedFirstGoPhase(){
  const deadline=Date.now()+replayTimeoutMs;
  await page.locator('#retail-replay-start').click();
@@ -860,7 +932,7 @@ async function snapshot(reason = 'poll', {captureCss = !diagnostic} = {}) {
         replay_report: replayReport,
         replay_downloads: [...document.querySelectorAll('#retail-replay-downloads a')].map(link => link.download),
       };
-    }, {reason, captureCss, currentSssExit, pairedFirstGo}));
+    }, {reason, captureCss, currentSssExit, pairedFirstGo:pairedFirstGo||pairedFull}));
   } catch (error) {
     firstError('snapshot', error.message || error);
     return {reason, snapshot_error: String(error.message || error)};
@@ -1130,7 +1202,7 @@ try {
     version: recipeBytes.readUInt32BE(4), seed: recipeBytes.readUInt32BE(8),
     frames: recipeBytes.readUInt32BE(12), bytes: recipeBytes.length,
   };
-  if (!(pairedFirstGo?report.recipe_header.version===11:[8, 9, 10].includes(report.recipe_header.version)) ||
+  if (!((pairedFirstGo||pairedFull)?report.recipe_header.version===11:[8, 9, 10].includes(report.recipe_header.version)) ||
       report.recipe_header.frames < 1 || report.recipe_header.frames > 108000)
     throw Error('Whole-session replay requires a valid MWRC v8/v9/v10 frame count');
   if(pairedFirstGo){
@@ -1141,6 +1213,17 @@ try {
     pairedFirstGoExpected=derivePairedFirstGo(JSON.parse(raw),report.inputs.recipe.sha256,report.recipe_header.frames);
     report.inputs.paired_first_go_projection={path:file,bytes:raw.length,sha256:hash};
     report.paired_v11_first_go={scope:'Setup aggregates, actual GO, first strict post-GO typed22+seed+PAD and checked unload only',whole_session_complete:false};
+  }
+  if(pairedFull){
+    const pinned=async(file,sha)=>{const stat=await fs.lstat(file);if(!stat.isFile()||stat.isSymbolicLink()||stat.size>64*1024*1024)throw Error('Full reference must be a bounded regular file');const raw=await fs.readFile(file),actual=createHash('sha256').update(raw).digest('hex');if(actual!==sha)throw Error('Full reference SHA differs');return {raw,identity:{path:path.resolve(file),bytes:raw.length,sha256:actual}};};
+    const projection=await pinned(pairedFullPath,pairedFullSha),endpoints=await pinned(pairedFullEndpoints,pairedFullEndpointsSha);
+    pairedFullExpected=derivePairedFull(JSON.parse(projection.raw),report.inputs.recipe.sha256,report.recipe_header.frames,JSON.parse(endpoints.raw));
+    pairedFullComparison=new PairedFullComparator(pairedFullExpected);
+    report.inputs.paired_full_projection=projection.identity;report.inputs.paired_full_endpoints=endpoints.identity;
+    rngDrawProbe=pairedFullExpected.selection;
+    report.paired_v11_full_pair={component_pass:false,scope:'actual two-window source lifecycle; C3/all-writer/registration false'};
+    pairedFullOriginalPreflight=runPairedFullRngComparison(false);
+    report.paired_v11_full_pair.original_rng_preflight=pairedFullOriginalPreflight;
   }
   report.requested_entity_prefix = readRequestedEntityPrefix(recipeBytes, report.inputs.recipe.sha256);
   if (report.requested_entity_prefix) {
@@ -1275,7 +1358,7 @@ try {
     report.artifact_inventory_pre = await browserArtifactInventory();
     if (!report.artifact_inventory_pre.equal) throw Error('Current SSS served/local artifact inventory differs');
   }
-  if (pairedFirstGo) {
+  if (pairedFirstGo || pairedFull) {
     report.artifact_inventory_pre = await browserArtifactInventory();
     if (!report.artifact_inventory_pre.equal) throw Error('Paired first-GO served/local artifact inventory differs');
   }
@@ -1290,7 +1373,7 @@ try {
       viewport: {width: diagnosticProtocol.viewport_width,
       height: diagnosticProtocol.viewport_height},
       deviceScaleFactor: diagnosticProtocol.device_scale_factor} : {})};
-  if (firstReplayCallbackProbe || currentSssExit || pairedFirstGo) browserOptions.args = [...(browserOptions.args || []), '--enable-automation'];
+  if (firstReplayCallbackProbe || currentSssExit || pairedFirstGo || pairedFull) browserOptions.args = [...(browserOptions.args || []), '--enable-automation'];
   if (diagnostic) {
     const chromeVersionOutput = execFileSync(browserPath, ['--version'], {encoding: 'utf8'}).trim();
     const chromeVersion = chromeVersionOutput.match(/\d+(?:\.\d+){2,3}/)?.[0] ?? null;
@@ -1335,7 +1418,7 @@ try {
     if (!Array.isArray(report.browser_process_info) || !report.browser_process_info.length)
       throw Error('Owned Chrome CDP process inventory is unavailable');
     await write('report.json', report);
-    if (firstReplayCallbackProbe || currentSssExit || pairedFirstGo) {
+    if (firstReplayCallbackProbe || currentSssExit || pairedFirstGo || pairedFull) {
       report.browser.command_line = (await browserCdp.send('Browser.getBrowserCommandLine')).arguments || [];
       report.browser_system_info = await browserCdp.send('SystemInfo.getInfo');
       await write('report.json', report);
@@ -1357,9 +1440,15 @@ try {
     report.boundary_marker_artifact = path.join(output, 'boundary-markers.jsonl');
     await write('report.json', report);
   }
-  await page.addInitScript(({cpuObservationRowLimit, captureCpuObservations,
+  await page.addInitScript(({pairedFull,pairedFullMaximumRows,cpuObservationRowLimit, captureCpuObservations,
     rngDrawProbeSelection, laterBRngOwnerConfiguration, hitTransitionProbeSelection, boundaryProbeEnabled, boundaryMarkerPrefix, boundaryMarkerNames}) => {
     window.__meleeNativeRuntimeReady = false;
+    if(pairedFull){
+      if(window.__meleeWebStadiumTextTailProbe)throw Error('Paired stream observer conflicts with existing text observer');
+      window.__pairedFullRows=[];
+      let seen=0;
+      window.__meleeWebStadiumTextTailProbe={observe(text){if(!text.startsWith('{"record":"stadium_paired_v11"'))return;if(++seen>pairedFullMaximumRows)throw Error('Paired source stream exceeds recipe bound');window.__pairedFullRows.push(text);}};
+    }
     const module = globalThis.Module || {};
     module.onRuntimeInitialized = () => { window.__meleeNativeRuntimeReady = true; };
     globalThis.Module = module;
@@ -1376,8 +1465,8 @@ try {
         throw Error('Hit transition observation exceeded or duplicated selected cursors');
       window.__hitTransitionProbeRows.push(text);
     };
-    window.__meleeRngDrawProbeOwners = laterBRngOwnerConfiguration !== null;
-    window.__meleeRngDrawProbeFighterOwners = laterBRngOwnerConfiguration?.schema==='melee-web-later-b-long-action-rng-v1';
+    window.__meleeRngDrawProbeOwners = pairedFull || laterBRngOwnerConfiguration !== null;
+    window.__meleeRngDrawProbeFighterOwners = pairedFull || laterBRngOwnerConfiguration?.schema==='melee-web-later-b-long-action-rng-v1';
     window.__meleeLaterBRngOwnerWindow = laterBRngOwnerConfiguration;
     window.__rngDrawProbeRows = [];
     const seenRngActions=new Set(),selectedRngActions=new Set(rngDrawProbeSelection?.selected||[]);
@@ -1422,7 +1511,7 @@ try {
       seenRngActions.add(row.source_cursor);
       window.__rngDrawProbeRows.push(text);
     };
-  }, {cpuObservationRowLimit, captureCpuObservations,
+  }, {pairedFull,pairedFullMaximumRows:pairedFullExpected?4*pairedFullExpected.total+16000:0,cpuObservationRowLimit, captureCpuObservations,
     rngDrawProbeSelection: rngDrawProbe,
     laterBRngOwnerConfiguration: laterBRngOwnerWindow?.configuration ?? null,
     hitTransitionProbeSelection: hitTransitionProbe,
@@ -1679,7 +1768,8 @@ try {
       }
       throw Error('Current SSS observation exceeded unchanged bounded replay interval');
     }, replayTimeoutMs, 0);
-  } else if (pairedFirstGo) await phase('paired-v11-first-go-component',pairedFirstGoPhase,replayTimeoutMs,0);
+  } else if (pairedFull) await phase('whole-session-replay',pairedFullPhase,replayTimeoutMs,0);
+  else if (pairedFirstGo) await phase('paired-v11-first-go-component',pairedFirstGoPhase,replayTimeoutMs,0);
   else if (firstReplayCallbackProbe) await firstReplayCallbackPhase();
   else await phase('whole-session-replay', async () => {
     const replayStartedAt = Date.now();
@@ -2237,6 +2327,13 @@ try {
     report.result = captureValid ? 'captured' : 'incomplete';
   } else {
     finalizeSessionCapture(report); // Keep original incomplete-replay classification truthful.
+    if(pairedFull){
+      try{
+       report.artifact_inventory_post=await browserArtifactInventory();
+       if(!report.artifact_inventory_post.equal||JSON.stringify(report.artifact_inventory_post)!==JSON.stringify(report.artifact_inventory_pre))throw Error('Paired full served/local inventory changed');
+       if(!report.paired_v11_full_pair.component_pass||report.cleanup?.browser_close_returned!==true)throw Error('Paired full completion/owned close incomplete');
+      }catch(error){firstError('paired_full_finalization',error.message||error);report.result='fail';}
+    }
     if(pairedFirstGo){
       report.original_replay_capture_result=report.result;
       let pairedInventoryValid = false;
@@ -2298,6 +2395,9 @@ try {
 if (diagnostic) {
   if (report.result !== 'captured' || process.exitCode) process.exitCode = 1;
   else console.log(`captured: ${report.natural_pause_terminal?.outcome || 'unknown'}; diagnosis only`);
+} else if (pairedFull) {
+  if(report.result!=='pass'||report.paired_v11_full_pair?.component_pass!==true)process.exitCode=1;
+  else console.log('component pass: actual paired v11 source lifecycle, state/PAD and selected RNG; C3 remains unproved');
 } else if (pairedFirstGo) {
   if(report.result!=='paired_v11_first_go_component_pass_replay_incomplete')process.exitCode=1;
   else console.log('component pass: paired v11 first Setup/GO/post-GO; whole replay and C3 incomplete');

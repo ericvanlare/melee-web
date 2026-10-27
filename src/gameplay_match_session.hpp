@@ -79,6 +79,8 @@ public:
     bool construction_complete() const;
     void close();
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    bool diagnostic_stadium_scene_rng_snapshot(
+        MeleeWebMatchSceneRngSnapshot*,char*,size_t) const;
     bool diagnostic_stadium_pad_queue_observation(
         MeleeWebStadiumPadQueueObservation*,char*,size_t) const;
     // Test-only access to the world's pure Toy owner/scope preflight. It does
@@ -98,5 +100,9 @@ public:
 private:
     struct Storage;
     std::unique_ptr<Storage> storage_;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    MeleeWebMatchSceneRngSnapshot scene_rng_retained_{};
+    bool scene_rng_entry_complete_=false;
+#endif
 };
 }

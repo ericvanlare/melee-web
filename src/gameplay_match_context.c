@@ -57,6 +57,7 @@ struct MeleeWebMatchContext {
     HSD_PadRumbleListData rumble_lists[12];
     CmSubject* pool;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    MeleeWebMatchSceneRngSnapshot scene_rng;
     MeleeWebSourceMemoryAllocation camera_lease;
     MeleeWebStadiumPadQueueObservation pad_queue_observation;
     int pad_queue_observation_candidate, pad_queue_observation_complete;
@@ -252,6 +253,13 @@ MeleeWebMatchContext* melee_web_match_begin_players(const MeleeWebPlayerSettings
         HSD_PadGameStatus[i]=default_status_data;
     }
     seed_ptr=&h->seed;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    /* First installed match seed, before any source startup operation. owner
+     * is committed after camera setup; this local allocation is already exact. */
+    h->scene_rng.points[0]=(MeleeWebMatchSceneRngPoint){
+        h->generation,(uintptr_t)seed_ptr,*seed_ptr};
+    h->scene_rng.count=1;
+#endif
     plStale_InitAttackInstance();plAttack_80037590();
     /* Source match reset; these are per-query collision callbacks and an unused
      * event field. No prior fighters may survive into this exclusive context. */
@@ -737,3 +745,29 @@ int melee_web_match_end(MeleeWebMatchContext* h,char* e,size_t n)
     memcpy(HSD_Rumble_804C22E0,h->saved_rumble,sizeof(h->saved_rumble));
     owner=NULL;free(h);return ok(e,n);
 }
+
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+void melee_web_match_scene_rng_note(unsigned phase)
+{
+    MeleeWebMatchContext* h=owner;
+    if(!h)return;
+    /* Observation failure is retained; it never changes source RNG or flow. */
+    if(h->scene_rng.invalid || phase>=4 || h->scene_rng.count!=phase ||
+       !live(h,NULL,0) || !seed_ptr){h->scene_rng.invalid=1;return;}
+    h->scene_rng.points[phase]=(MeleeWebMatchSceneRngPoint){
+        h->generation,(uintptr_t)seed_ptr,*seed_ptr};
+    h->scene_rng.count++;
+}
+int melee_web_match_scene_rng_snapshot(MeleeWebMatchContext* h,
+    MeleeWebMatchSceneRngSnapshot* out,char* e,size_t n)
+{
+    if(!out||!live(h,e,n))return 0;
+    if(h->scene_rng.invalid||h->scene_rng.count<2||h->scene_rng.count>4)
+        return fail(e,n,"Match scene RNG observation lost exact phase order");
+    for(unsigned i=0;i<h->scene_rng.count;i++)
+        if(h->scene_rng.points[i].world_generation!=h->generation||
+           h->scene_rng.points[i].seed_pointer!=(uintptr_t)seed_ptr)
+            return fail(e,n,"Match scene RNG observation changed its seed owner");
+    *out=h->scene_rng;return ok(e,n);
+}
+#endif

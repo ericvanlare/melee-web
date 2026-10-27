@@ -491,6 +491,12 @@ void GameplayMatchSession::finish_vs(
     check(melee_web_match_stats(storage_->match,&stats,error,sizeof(error)),error);
     seed=stats.random_seed;
     melee_web_pad_state_capture(input);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(storage_->stadium_diagnostic&&scene_rng_entry_complete_)
+        check(melee_web_match_scene_rng_snapshot(storage_->match,
+            &scene_rng_retained_,error,sizeof(error))&&scene_rng_retained_.count==4,
+            error[0]?error:"VS scene RNG receipt is incomplete before close");
+#endif
     storage_->close();storage_.reset();
 }
 void GameplayMatchSession::finish_sudden_death(
@@ -631,7 +637,16 @@ MeleeWebMatchStats GameplayMatchSession::player_stats(unsigned index)const{
     check(melee_web_match_player_stats(storage_->match,index,&stats,error,sizeof(error)),error);return stats;
 }
 MeleeWebAudio* GameplayMatchSession::audio()const{return storage_&&storage_->bank?storage_->bank->get():nullptr;}
-bool GameplayMatchSession::advance_construction(){return storage_&&storage_->advance_construction();}
+bool GameplayMatchSession::advance_construction(){
+    const bool complete=storage_&&storage_->advance_construction();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(complete&&storage_->stadium_diagnostic&&!scene_rng_entry_complete_){
+        melee_web_match_scene_rng_note(1);
+        scene_rng_entry_complete_=true;
+    }
+#endif
+    return complete;
+}
 bool GameplayMatchSession::construction_complete()const{return storage_&&storage_->construction_phase==5;}
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 bool GameplayMatchSession::diagnostic_stadium_pad_queue_observation(
@@ -665,3 +680,20 @@ bool GameplayMatchSession::diagnostic_stadium_setup_snapshot(
 }
 #endif
 }
+
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+namespace melee_web {
+bool GameplayMatchSession::diagnostic_stadium_scene_rng_snapshot(
+    MeleeWebMatchSceneRngSnapshot* out,char* error,size_t size) const
+{
+    if(!out)return false;
+    if(storage_&&storage_->stadium_diagnostic&&storage_->match)
+        return melee_web_match_scene_rng_snapshot(storage_->match,out,error,size)!=0;
+    if(!storage_&&scene_rng_retained_.count==4&&!scene_rng_retained_.invalid){
+        *out=scene_rng_retained_;return true;
+    }
+    if(error&&size)std::snprintf(error,size,"Stadium scene RNG receipt has no checked owner");
+    return false;
+}
+}
+#endif

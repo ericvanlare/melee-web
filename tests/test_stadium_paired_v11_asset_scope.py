@@ -24,7 +24,7 @@ namespace melee_web {constexpr unsigned kRetailReplayDrawClosureVersion=11;
 static unsigned setup_checks=0,next_index=0;
 // Modeled strict setup service: exact declared payload, not unconditional success.
 static unsigned retail_replay_next_match_index(const Recipe&,unsigned){return next_index;}
-static void retail_replay_validate_match_setup(const Recipe&,unsigned i,const Start& s){++setup_checks;if(i!=0||s.value!=7)throw std::runtime_error("declared setup mismatch");}
+static void retail_replay_validate_match_setup(const Recipe&,unsigned i,const Start& s){++setup_checks;if(i>1||i!=next_index||s.value!=7)throw std::runtime_error("declared setup mismatch");}
 static std::vector<std::string> stadium_c1a_asset_names(const MeleeWebMenuMatchSelection& s){if(s.start.value!=7)throw std::runtime_error("manifest profile mismatch");return {"stage","fighter"};}}
 static std::unique_ptr<Recipe> replay;
 static void* host=(void*)1;
@@ -40,12 +40,15 @@ static MeleeWebPadState pad,foreign_pad;
 static MeleeWebMenuMatchSelection live_selection;
 static bool getter_ok=true;
 static int melee_web_menu_host_stadium_c1a_selection(void*,MeleeWebMenuMatchSelection* out,char*,size_t){if(!getter_ok)return 0;*out=live_selection;return 1;}
+static unsigned later_getter_calls=0;
+static int melee_web_menu_host_later_sss_prepared_selection(void* h,MeleeWebMenuMatchSelection* out,char* e,size_t n){++later_getter_calls;if(completed_matches!=1||melee_web::next_index!=1)return 0;return melee_web_menu_host_stadium_c1a_selection(h,out,e,n);}
 static const MeleeWebPadState* pad_owner=&pad;
 static const MeleeWebPadState* melee_web_menu_host_input(void*){return pad_owner;}
 static int melee_web_pad_state_encode(const MeleeWebPadState* p,uint8_t* out,size_t n){if(!p||n!=822)return 0;memcpy(out,p->bytes.data(),n);return 1;}
 static bool current_sss_selection_equal(const MeleeWebMenuMatchSelection& a,const MeleeWebMenuMatchSelection& b){return a.start.value==b.start.value&&a.seed==b.seed;}
 static void check(bool ok,const char* error){if(!ok)throw std::runtime_error(error);}
-struct State {bool route_prepared=false,native_retired=false,failed=false,import_pending=false,import_consumed=false,enabled=false;Recipe* recipe_owner=nullptr;const int* context_owner=nullptr;void* route_host_owner=nullptr;uint32_t* parent_seed_owner=nullptr;uint32_t parent_seed=0,requested_generation=0;MeleeWebMenuMatchSelection selected;const MeleeWebPadState* ready_input=nullptr;std::array<uint8_t,822> ready_input_bytes{};} stadium_paired_v11;
+struct Lifetime {bool retired=false,results_entered=false,css_returned=false;uint64_t generation=0;};
+struct State {bool full_pair=false,full_arm_consumed=false,later_exit_observed=false;Recipe* full_recipe_owner=nullptr;const int* full_context_owner=nullptr;std::array<Lifetime,2> lifetimes{};bool route_prepared=false,native_retired=false,failed=false,import_pending=false,import_consumed=false,enabled=false;Recipe* recipe_owner=nullptr;const int* context_owner=nullptr;void* route_host_owner=nullptr;uint32_t* parent_seed_owner=nullptr;uint32_t parent_seed=0,requested_generation=0;MeleeWebMenuMatchSelection selected;const MeleeWebPadState* ready_input=nullptr;std::array<uint8_t,822> ready_input_bytes{};} stadium_paired_v11;
 enum class AssetDestination{None,StadiumC1a};static AssetDestination asset_destination=AssetDestination::StadiumC1a;
 static bool scoped_assets=true,scoped_disc_import=true,asset_committed=false,asset_selection_valid=true;
 static unsigned asset_generation=7;
@@ -71,6 +74,25 @@ int main(){
  reject([]{stadium_paired_v11.import_consumed=true;});reject([]{stadium_paired_v11.import_pending=false;});reject([]{stadium_paired_v11.enabled=true;});reject([]{stadium_paired_v11.failed=true;});reject([]{stadium_paired_v11.native_retired=true;});
  reject([]{asset_generation=8;});reject([]{asset_scope.pending=8;});reject([]{stadium_paired_v11.requested_generation=8;});reject([]{asset_destination=AssetDestination::None;});reject([]{asset_committed=true;});reject([]{asset_selection_valid=false;});reject([]{scoped_disc_import=false;});
  reject([]{seed_ptr=&foreign_seed;});reject([]{seed=18;});reject([]{host_entered=true;});reject([]{world=(void*)1;});reject([]{match=(void*)1;});reject([]{melee_web::next_index=1;});
+ // Full B import is closed unless the actual preceding A lifecycle is complete.
+ auto full_b=[](){reset();auto& s=stadium_paired_v11;s.full_pair=s.full_arm_consumed=true;
+  s.full_recipe_owner=replay.get();s.full_context_owner=replay->initial_css.get();
+  s.lifetimes[0]={true,true,true,9};s.later_exit_observed=true;
+  completed_matches=1;melee_web::next_index=1;};
+ auto b_refuses=[&](auto mutate){full_b();mutate();assert(!stadium_paired_v11_asset_pending(7));};
+ full_b();assert(stadium_paired_v11_asset_pending(7));assert(later_getter_calls>0);
+ b_refuses([]{getter_ok=false;});
+ b_refuses([]{stadium_paired_v11.full_pair=false;});
+ b_refuses([]{stadium_paired_v11.full_arm_consumed=false;});
+ b_refuses([]{stadium_paired_v11.full_recipe_owner=nullptr;});
+ b_refuses([]{stadium_paired_v11.full_context_owner=nullptr;});
+ b_refuses([]{stadium_paired_v11.lifetimes[0].retired=false;});
+ b_refuses([]{stadium_paired_v11.lifetimes[0].results_entered=false;});
+ b_refuses([]{stadium_paired_v11.lifetimes[0].css_returned=false;});
+ b_refuses([]{stadium_paired_v11.later_exit_observed=false;});
+ b_refuses([]{stadium_paired_v11.lifetimes[1].retired=true;});
+ b_refuses([]{stadium_paired_v11.import_consumed=true;});
+ b_refuses([]{stadium_paired_v11.import_pending=false;});
  reject([]{getter_ok=false;});reject([]{live_selection.start.value=8;});reject([]{asset_selection.seed=18;});reject([]{pad_owner=&foreign_pad;});reject([]{stadium_paired_v11.ready_input_bytes[0]=1;});reject([]{requested_assets.pop_back();});
  reset();stadium_paired_v11.route_prepared=false;assert(melee_web_native_menu_stadium_c1a_asset_scope(7)==0);
  // Existing branches retain their own admission; paired state does not replace them.
@@ -84,12 +106,46 @@ class StadiumPairedV11AssetScopeTests(OwnedWorkspaceTests):
         body=PRELUDE
         for signature in ('bool stadium_paired_v11_recipe(){',
                           'bool stadium_paired_v11_route_owned(){',
+                          'unsigned stadium_paired_v11_import_index(){',
                           'void stadium_paired_v11_validate_import_selection(){',
                           'bool stadium_paired_v11_asset_pending(unsigned generation)'):
             self.assertEqual(source.count(signature),1,signature)
             body+=_function(source,signature)+'\n'
         body+=_function(menu,'int melee_web_native_menu_stadium_c1a_asset_scope(unsigned generation)')+TEST
         work=self.new_workspace(ROOT,'paired-v11-private-import-')
+        cpp=work/'control.cpp';exe=work/'control';cpp.write_text(body)
+        command=shlex.split(os.environ.get('CXX','c++'))+['-std=c++20','-Wall','-Wextra','-Werror',str(cpp),'-o',str(exe)]
+        result=subprocess.run(command,capture_output=True,text=True)
+        (work/'compile.stdout').write_text(result.stdout);(work/'compile.stderr').write_text(result.stderr)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        result=subprocess.run([str(exe)],capture_output=True,text=True)
+        (work/'control.stdout').write_text(result.stdout);(work/'control.stderr').write_text(result.stderr)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+
+    def test_actual_full_tail_pad_predicate_preserves_all_four_ports(self):
+        source=(ROOT/'src/gameplay_menu_browser.cpp').read_text()
+        signature='bool stadium_paired_v11_pause_pad(const PADStatus* pads){'
+        self.assertEqual(source.count(signature),1)
+        body=r'''
+#include <cassert>
+#include <cstdint>
+struct PADStatus {uint16_t button=0;int8_t stickX=0,stickY=0,substickX=0,substickY=0;
+ uint8_t triggerLeft=0,triggerRight=0,analogA=0,analogB=0;int8_t err=0;};
+'''+_function(source,signature)+r'''
+int main(){
+ PADStatus pads[4]{};pads[2].err=pads[3].err=-1;
+ assert(stadium_paired_v11_pause_pad(pads));assert(!stadium_paired_v11_pause_pad(nullptr));
+ pads[0].button=0x1160;pads[0].triggerLeft=pads[0].triggerRight=255;
+ assert(stadium_paired_v11_pause_pad(pads));
+ pads[1].button=0x1160;assert(!stadium_paired_v11_pause_pad(pads));pads[1].button=0;
+ pads[0].triggerLeft=254;assert(!stadium_paired_v11_pause_pad(pads));pads[0].triggerLeft=255;
+ pads[3].err=0;assert(!stadium_paired_v11_pause_pad(pads));pads[3].err=-1;
+ pads[2].stickX=1;assert(!stadium_paired_v11_pause_pad(pads));pads[2].stickX=0;
+ pads[0].analogA=1;assert(!stadium_paired_v11_pause_pad(pads));pads[0].analogA=0;
+ pads[0].button=0x1000;assert(!stadium_paired_v11_pause_pad(pads));
+}
+'''
+        work=self.new_workspace(ROOT,'paired-v11-tail-pad-')
         cpp=work/'control.cpp';exe=work/'control';cpp.write_text(body)
         command=shlex.split(os.environ.get('CXX','c++'))+['-std=c++20','-Wall','-Wextra','-Werror',str(cpp),'-o',str(exe)]
         result=subprocess.run(command,capture_output=True,text=True)
