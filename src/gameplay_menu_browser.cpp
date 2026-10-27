@@ -3993,15 +3993,13 @@ void stadium_paired_v11_capture_setup(){
   check(s.match_index==0&&replay->match_setups.size()==2&&
         replay->match_selections.size()==2,
         "Paired v11 first match is not the exact two-Setup producer profile");
-  MeleeWebStadiumSetupSnapshot setup{};MeleeWebStadiumIdleSnapshot idle{};char error[256]{};
+  MeleeWebStadiumSetupSnapshot setup{};char error[256]{};
   check(match->diagnostic_stadium_setup_snapshot(&setup,error,sizeof(error)),
         error[0]?error:"Paired v11 actual Setup snapshot refused");
-  check(match->diagnostic_stadium_idle_snapshot(&idle,error,sizeof(error)),
-        error[0]?error:"Paired v11 zero-tick typed22 snapshot refused");
   const auto world=melee_web_gameplay_stats();
   check(setup.world_generation!=0&&setup.world_generation==world.generation&&
-        idle.world_generation==setup.world_generation&&idle.world_ticks==0&&
-        idle.source_frame==0&&world.ticks==0&&world.generation!=0,
+        setup.world_ticks==0&&setup.source_frame==0&&
+        world.ticks==0&&world.generation!=0,
         "Paired v11 Setup snapshot is not the live zero-tick world");
   const uint32_t seed=match->random_seed();
   s.setup_input_cursor=replay_cursor;s.world_generation=setup.world_generation;
@@ -4011,9 +4009,9 @@ void stadium_paired_v11_capture_setup(){
   out<<"{\"schema\":\"melee-web-stadium-paired-v11-setup-v1\",\"match_index\":"
      <<s.match_index<<",\"input_cursor\":"<<s.setup_input_cursor
      <<",\"seed_hex\":\""<<melee_web::stadium_first_css_diagnostic::hex32(seed)
-     <<"\",\"typed22\":"<<matched_setup_cf_common_fields_json(
-          idle,seed,static_cast<unsigned>(s.setup_input_cursor),
-          static_cast<unsigned>(idle.world_ticks),true)
+     <<"\",\"world_generation\":"<<setup.world_generation
+     <<",\"world_ticks\":"<<setup.world_ticks
+     <<",\"source_frame\":"<<setup.source_frame
      <<",\"constructor\":"<<later_b_gate2_constructor_snapshot_json(setup)<<'}';
   s.setup=out.str();
   match->diagnostic_stadium_go_alignment_arm(

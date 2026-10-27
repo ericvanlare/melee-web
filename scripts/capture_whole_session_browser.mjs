@@ -706,10 +706,10 @@ function comparePairedFirstGo(s,e){
   s.enabled && s.admitted && s.setup_captured && s.go_armed && s.go_observed &&
   s.first_post_go_tick_captured && s.stop_requested && s.stopped && !s.failed &&
   s.error===null && s.native_retired===false && s.whole_session_complete===false && s.match_index===0,'native terminal/owner differs');
- const setup=s.setup,typed=s.first_post_go_typed22,gen=setup?.typed22?.world_generation;
+ const setup=s.setup,typed=s.first_post_go_typed22,gen=setup?.world_generation;
  need(setup?.schema==='melee-web-stadium-paired-v11-setup-v1' && setup.match_index===0 &&
   setup.input_cursor===e.setupCursor && setup.seed_hex===e.match.setup.rng.value_hex &&
-  Number.isSafeInteger(gen)&&gen>0 && setup.typed22.world_ticks===0 && setup.typed22.source_frame===0,'zero-tick Setup owner/seed differs');
+  Number.isSafeInteger(gen)&&gen>0 && setup.world_ticks===0 && setup.source_frame===0,'zero-tick Setup owner/seed differs');
  const c=e.match.constructor.state_projection,w={scope:'shared-constructor-aggregate-only',entry_count:c.constructor_entry_count,
   parameter_roles:{min_parameter:'parameter_x0',max_parameter:'parameter_x4'},min_parameter:c.parameter_x0,
   max_parameter:c.parameter_x4,random_bound:c.random_bound,random_result:c.random_result,
