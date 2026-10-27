@@ -2,7 +2,7 @@
 
 **Source identified / Focused source controls passed**
 
-Current boundary: PR #346, #348, and #350 are merged with exact-head CI passed; historical local regression failures and their repairs remain scoped below. On runtime producer `38ecb6b1`, the reviewed three-process guard, ordinary/diagnostic builds, integrated source control, and conditional first-Fire A+B Results/CSS route pass; independent raw review gives scoped GO. The final test-only head `57714af2` passes the full regression (2,990 tests, 211 skips). Per-owner RNG, general timing, other forms, exact-head CI for the current test head, C5 acceptance, and whole-stage acceptance remain open; ordinary/public transformations stay disabled.
+Current boundary: PRs #346, #348, #350, and #352 are merged; #352 exact-head CI passed 14 checks (12 successes, two expected skips). The conditional first-Fire route has scoped raw-review and regression passes. The separate first-Water A+B route passed its recorded comparison, independent raw review, and final regression (3,000 tests, 211 skips) at runtime producer `26f0a0d2`; the checkout was unchanged and its owned process group is absent. The forthcoming docs/EOF-cleanup PR head and exact-head CI remain pending. Per-owner RNG, general completion/timing, other forms, C5 and whole-stage acceptance remain open; ordinary/public transformations stay disabled.
 
 [Milestone #345](https://github.com/ericvanlare/melee-web/issues/345) composes the exact-disc transfer, source-file service, and Stadium map-2 writable-region owner. The [evidence record](../evidence/issue345-stadium-archive-service-v1.json) keeps service, compatibility, build, and regression identities separate.
 
@@ -84,14 +84,12 @@ single case passed separately.
 The integrated final regression on test-only head `57714af2` passed all 2,990
 tests with 211 skips in 623.445 seconds (624.114 seconds including ownership).
 The checkout was unchanged and the owned process group was absent with no cleanup
-signals. Runtime/build/browser producer `38ecb6b1` remains distinct. Exact-head CI
-for the eventual PR head is pending. See the evidence record for hashes and
+signals. Runtime/build/browser producer `38ecb6b1` remains distinct. At that point,
+exact-head CI for the eventual PR was pending; PR #352 has since merged and passed
+all 14 exact-head checks (12 successes, two expected skips). That CI run does not
+rerun this local suite. See the evidence record for hashes and
 `runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-full-regression-v1/`,
 `c5-first-fire-full-regression-v2/`, `c5-first-fire-regression-fixture-batch-v1/`,
 and `c5-first-fire-full-regression-v3/`.
 
-The next bounded graph is [Water #351](https://github.com/ericvanlare/melee-web/issues/351):
-first observe its actual original callback timing, then admit its source-created
-parent and children with checked deferred joint binding and nested teardown.
-Fire's passing route will not be repeated without a new hypothesis. Ordinary
-transformations remain disabled and C5 remains open.
+The separate default-off first-Water route for [#351](https://github.com/ericvanlare/melee-web/issues/351) now has a conditional browser result on runtime producer `26f0a0d2`, using the reviewed original Water callback/source projection from `b1dc7687`. Independent raw review returned `GO_SCOPED_CONDITIONAL_FIRST_WATER_COMPONENT` after verifying 219 pins: 22,318 native diagnostic rows, 9,024 actions, 4,223 B state samples, eight scene endpoints and an 11-event graph lifecycle journal. The separate original primary contains 29,344 rows. Both lifetimes reached Results/CSS, checked retirement and owned cleanup passed, and H1 pauses were absent. The final full regression passed 3,000 tests with 211 skips at runtime producer `26f0a0d2`; its receipt records an unchanged source checkout, absent owned process group and no cleanup signals. Runtime evidence remains bound to that producer, separate from the forthcoming docs/EOF-cleanup PR head and its pending exact-head CI. This selected recorded-callback evidence does not establish per-owner RNG parity, a general DVD completion rule, other-form behavior or C5 acceptance. Retained pre-capture preparation records include the unreleased projector draft (`c5-first-water-projection-candidate-v1/draft-freeze-v1.json`), its interrupted focused-v1 control and corrected focused-v2 control (`c5-first-water-projection-candidate-v2/focused-v1.log` and `focused-v2.log`), and the packet-v1 corrections documented by `c5-first-water-browser-packet-v1/root-preparer-review-v2.json`; these are preparation history, not failed browser captures. The first actual Water browser capture passed. Ordinary/public transformations remain disabled.

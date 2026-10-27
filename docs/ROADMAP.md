@@ -182,12 +182,13 @@ identities, raw failures and coverage limits. C4 original request/callback
 observations remain scoped under [#343](https://github.com/ericvanlare/melee-web/issues/343)
 and its [evidence boundary](status/2026-10-27-stadium-first-form-latency.md).
 The conditional first-Fire runtime component belongs to
-[#349](https://github.com/ericvanlare/melee-web/issues/349); next is the original
-Water graph and nested teardown under
-[#351](https://github.com/ericvanlare/melee-web/issues/351), reusing the
-[C5 boundary](status/2026-10-27-stadium-archive-service.md). Recorded completion
-schedules remain diagnostic only; ordinary/public transformations and the
-general loading model are not admitted.
+[#349](https://github.com/ericvanlare/melee-web/issues/349). A separate first-Water
+route under [#351](https://github.com/ericvanlare/melee-web/issues/351) now has a
+scoped recorded-callback browser result and independent raw-review and final
+regression passes; publication-head CI remains pending in the
+[C5 boundary](status/2026-10-27-stadium-archive-service.md).
+Neither route establishes per-owner RNG parity or a general completion schedule;
+ordinary/public transformations and general loading remain unadmitted.
 Ranked/Unranked use unfrozen Stadium, so C4–C8 transformations remain in scope.
 Track A retains first claim on the shared capture lane. Physical controllers,
 foreground timing, audible output and a two-machine human session remain separate
@@ -266,10 +267,12 @@ composes exact disc tails, owned destinations and quiescent teardown; its
 merged service evidence and current source-slot boundary. The [#347 follow-up](https://github.com/ericvanlare/melee-web/issues/347) adds
 owned form catalogs, exact source-slot/header/buffer binding, original file-entry
 metadata and checked retirement. The component receipt owns its review and
-validation results. Browser transformations remain disabled pending World
-integration, actual transformed-graph retirement and a justified completion
-schedule. Reuse the existing route and retained evidence; do not repeat accepted
-functional captures or invent neutral rows/GO coordinates.
+validation results. The selected first-Fire and first-Water diagnostic routes
+exercise World integration and checked graph retirement only for their declared
+profiles. Ordinary/public transformations remain disabled pending a justified
+general completion schedule and remaining-form coverage. Reuse the existing
+route and retained evidence; do not repeat accepted functional captures or
+invent neutral rows/GO coordinates.
 Track A retains priority for shared capture resources.
 
 ### Standing rules and baselines
