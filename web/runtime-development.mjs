@@ -809,19 +809,19 @@ $('retail-replay-start').onclick=async()=>{
  replayLoading=true;$('retail-replay-start').disabled=$('disc').disabled=$('launch').disabled=true;
  try{
   if(window.meleeHitchCaptureLoading)await window.meleeHitchCaptureLoading;if(window.meleeHitchCaptureLoadError&&hitchCaptureFromUrl)throw Error(`Hitch capture unavailable: ${window.meleeHitchCaptureLoadError}`);
-  // Native parsing applies the legacy 36,000-frame limit and the v8/v9/v10
+  // Native parsing applies the legacy 36,000-frame limit and the v8-v11
   // whole-session 108,000-frame limit after reading the version. This upload
   // bound admits the largest checked v8 envelope without widening legacy
   // formats or allowing an unbounded allocation.
   const file=$('retail-replay-file').files[0];if(!file||file.size<328||file.size>RETAIL_REPLAY_MAX_BYTES)throw Error('Invalid bounded MWRC input recipe');
   const bytes=new Uint8Array(await file.arrayBuffer()),hash=await replayHash(bytes),observe=$('retail-replay-mode').value==='state';
-  // The v8 route enters the canonical, freshly prepared CSS owner. Unloading
+  // Whole-session routes enter the canonical, freshly prepared CSS owner. Unloading
   // here would discard its scoped assets before native launch. This header
   // probe selects ownership only; the native decoder validates the recipe and
   // rejects an already used source heap before accepting it.
   const header=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
   const wholeVersion=bytes.length>=8&&header.getUint32(0,false)===0x4d575243?header.getUint32(4,false):0;
-  const wholeSession=wholeVersion===8||wholeVersion===9||wholeVersion===10;
+  const wholeSession=wholeVersion===8||wholeVersion===9||wholeVersion===10||wholeVersion===11;
   // Requested scope survives native preparation failure/time-out. This probe
   // is not admission: the native decoder still validates the complete recipe.
   const diagnosticEntityPrefixMode=wholeVersion===8&&bytes.length>=24&&[1,2].includes(header.getUint16(22,false))?header.getUint16(22,false):0;

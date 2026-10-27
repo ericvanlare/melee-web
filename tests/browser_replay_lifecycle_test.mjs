@@ -421,10 +421,10 @@ function harness(unload=true,wholeSession=false){
  assert.equal(h.$('retail-replay-report').textContent,'teardown failed');
  assert.equal(h.scope.replayLoading,false);assert.equal(h.$('disc').disabled,false);
 }
-{
+for(const version of [8,9,10,11]){
  const h=harness(true,true);const playing=h.play();
  const bytes=new ArrayBuffer(1194),header=new DataView(bytes);
- header.setUint32(0,0x4d575243,false);header.setUint32(4,8,false);
+ header.setUint32(0,0x4d575243,false);header.setUint32(4,version,false);
  h.resolveBytes(bytes);await playing;
  assert.equal(h.calls.unload,0,'Whole-session replay retains the canonical prepared CSS assets');
  assert.equal(h.calls.native,1);

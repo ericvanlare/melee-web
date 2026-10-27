@@ -48,3 +48,31 @@ test('actual CLI prelude admits bounded paired artifacts and refuses incomplete 
  const ordinary=without('--stadium-paired-v11-first-go-projection');ordinary.splice(ordinary.indexOf('--stadium-paired-v11-first-go-projection-sha256'),2);
  await assert.rejects(run(ordinary),/--artifact-root require/);
 });
+
+// Actual getter and phase functions; only DOM/native leaves and clock are modeled.
+test('actual paired poll retains terminal replay failure without mistaking initial idle or preparation for failure',async()=>{
+ let text='Preparing reference replay…',idle=true,reads=0;
+ const elements={'#status':{textContent:'Preparing',dataset:{}},'#retail-replay-report':{get textContent(){return text;}},'#retail-replay-start':{disabled:true}};
+ const globals={document:{querySelector:id=>elements[id]},Module:{stadiumMatchedSetupNativeIdle:()=>idle,
+  _melee_web_native_menu_stadium_paired_v11_status:()=>{reads++;return 1;},UTF8ToString:()=>JSON.stringify({enabled:false}),
+  _melee_web_native_menu_phase:()=>0,_melee_web_native_menu_running:()=>0}};
+ const ctx={page:{evaluate:fn=>vm.runInNewContext('('+fn.toString()+')()',globals)},observePageOperation:(_,fn)=>fn()};
+ vm.createContext(ctx);vm.runInContext('async '+body('readPairedFirstGoStatus'),ctx);
+ assert.equal((await ctx.readPairedFirstGoStatus()).runtime.terminal_error,null);
+ text='';elements['#retail-replay-start'].disabled=false;
+ assert.equal((await ctx.readPairedFirstGoStatus()).runtime.terminal_error,null);
+ text=JSON.stringify({schema:'melee-web-browser-retail-replay',pass:false,complete:false,failures:['Native replay preparation refused']});
+ const terminal=await ctx.readPairedFirstGoStatus();assert.match(terminal.runtime.terminal_error,/Native replay preparation refused/);
+ idle=false;const readCount=reads;assert.equal((await ctx.readPairedFirstGoStatus()).busy,true);assert.equal(reads,readCount);
+ const writes=[],clicks=[];const phase={Date,Promise,setTimeout,replayTimeoutMs:1000,replayPollMs:1,
+  report:{paired_v11_first_go:{}},pageErrors:[],write:async name=>writes.push(name),
+  page:{locator:label=>({click:async()=>clicks.push(label)})},readPairedFirstGoStatus:async()=>({...terminal,busy:true})};
+ vm.createContext(phase);vm.runInContext('async '+body('pairedFirstGoPhase'),phase);
+ await assert.rejects(phase.pairedFirstGoPhase(),/terminal replay failure: Native replay preparation refused/);
+ assert.deepEqual(clicks,['#retail-replay-start']);assert.deepEqual(writes,['paired-v11-first-go-status.json']);
+ assert.equal(phase.report.paired_v11_first_go.terminal_replay_failure.replay_report.complete,false);
+ text='Native recipe rejected';idle=true;
+ assert.equal((await ctx.readPairedFirstGoStatus()).runtime.terminal_error,'Native recipe rejected');
+ elements['#retail-replay-start'].disabled=true;
+ assert.equal((await ctx.readPairedFirstGoStatus()).runtime.terminal_error,null);
+});

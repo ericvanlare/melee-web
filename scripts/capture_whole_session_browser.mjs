@@ -739,12 +739,28 @@ function comparePairedFirstGo(s,e){
 async function readPairedFirstGoStatus(){
  return observePageOperation('paired first-GO native idle observation',()=>page.evaluate(()=>{
   const m=globalThis.Module;
+  const text=id=>globalThis.document?.querySelector(id)?.textContent || '';
+  const replayText=text('#retail-replay-report');
+  let replayReport=null;
+  try{if(replayText.trim().startsWith('{'))replayReport=JSON.parse(replayText);}catch{}
+  const runtimeError=globalThis.document?.querySelector('#status')?.dataset?.runtimeError || null;
+  // The runtime writes this schema only when replay finalization has completed.
+  const terminalReport=replayReport?.schema==='melee-web-browser-retail-replay' &&
+    replayReport.pass===false && Array.isArray(replayReport.failures) && replayReport.failures.length>0;
+  // Preparation may fail before retailRun exists; its catch writes plain error
+  // text, and finally re-enables Start. Preparing text/initial phase 0 are not errors.
+  const terminalPreparationError=!replayReport && replayText.trim()!=='' &&
+    replayText.trim()!=='Preparing reference replay…' &&
+    globalThis.document?.querySelector('#retail-replay-start')?.disabled===false;
+  const runtime={message:text('#status'),runtime_error:runtimeError,replay_report:replayReport,
+    replay_report_text:replayText,terminal_error:runtimeError ||
+      (terminalReport?replayReport.failures.join('; '):terminalPreparationError?replayText:null)};
   if(typeof m?.stadiumMatchedSetupNativeIdle!=='function')throw Error('Native idle ownership service unavailable');
-  if(m.stadiumMatchedSetupNativeIdle()!==true)return {busy:true};
+  if(m.stadiumMatchedSetupNativeIdle()!==true)return {busy:true,runtime};
   const getter=m._melee_web_native_menu_stadium_paired_v11_status;
   if(typeof getter!=='function')throw Error('Paired v11 status export unavailable');
   const pointer=getter();if(!pointer)throw Error('Paired v11 status pointer absent');
-  return {busy:false,status:JSON.parse(m.UTF8ToString(pointer)),phase:m._melee_web_native_menu_phase(),running:m._melee_web_native_menu_running()};
+  return {busy:false,runtime,status:JSON.parse(m.UTF8ToString(pointer)),phase:m._melee_web_native_menu_phase(),running:m._melee_web_native_menu_running()};
  }));
 }
 async function pairedFirstGoPhase(){
@@ -752,8 +768,13 @@ async function pairedFirstGoPhase(){
  await page.locator('#retail-replay-start').click();
  while(Date.now()<deadline){
   const observed=await readPairedFirstGoStatus();
-  if(observed.busy){await new Promise(r=>setTimeout(r,replayPollMs));continue;}
   report.paired_v11_first_go={...report.paired_v11_first_go,observation:observed};
+  if(observed.runtime?.terminal_error){
+   report.paired_v11_first_go.terminal_replay_failure=observed.runtime;
+   await write('paired-v11-first-go-status.json',observed);
+   throw Error('Paired first-GO terminal replay failure: '+observed.runtime.terminal_error);
+  }
+  if(observed.busy){await new Promise(r=>setTimeout(r,replayPollMs));continue;}
   await write('paired-v11-first-go-status.json',observed);
   if(observed.status.failed)throw Error(observed.status.error||'Paired native observer failed');
   if(observed.status.stopped){
