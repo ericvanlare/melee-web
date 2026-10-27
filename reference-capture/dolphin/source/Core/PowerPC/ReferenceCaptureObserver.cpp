@@ -241,6 +241,58 @@ struct StadiumWholeBObservation
   bool Complete() const { return !enabled || phase == Phase::Closed; }
 };
 
+// Explicit B-only long window; records/order remain ordinary MWRO.
+// No gameplay writes, extra source calls, or match-zero admission.
+struct StadiumWholeLongIdle
+{
+  bool enabled = false, open = false, target_seen = false, closed = false;
+  u32 owner = 0, go_tick = 0, last_tick = 0, samples = 0;
+  static bool Admit(std::string_view setting, bool whole, bool b_state, bool recording,
+                    bool replaying, bool short_rng, bool compact_valid,
+                    std::string_view compact_selection)
+  {
+    return setting.empty() || (setting == "selected_b_3500_v1" && whole && b_state &&
+        recording && !replaying && !short_rng && compact_valid && compact_selection == "1");
+  }
+  static std::string ProfileJson()
+  {
+    return R"({"profile":"selected_b_3500_v1","selected_matches":[1],"comparison_post_go_ticks":3500,"natural_tail_max":4,"raw_omission_kinds":["draw_enter","draw_return"]})";
+  }
+  bool Go(u32 index, u32 setup, u32 tick)
+  {
+    if (!enabled) return true;
+    if (index != 1 || !setup || open || closed || tick > UINT32_MAX - 3504) return false;
+    owner = setup; go_tick = last_tick = tick; open = true; return true;
+  }
+  bool Observe(u32 index, u32 whole, u32 setup, Boundary boundary, u32 tick)
+  {
+    if (!enabled || !open) return true;
+    if (index != 1 || whole != 5 || setup != owner || !owner) return false;
+    if (boundary == Boundary::SourceTick)
+    {
+      if ((samples == 0 ? tick != go_tick : tick != last_tick + 1) ||
+          tick < go_tick || tick - go_tick > 3504) return false;
+      last_tick = tick; ++samples;
+      if (tick - go_tick == 3500) target_seen = true;
+    }
+    else if (boundary == Boundary::DrawEnter || boundary == Boundary::DrawReturn)
+    {
+      if (!samples || last_tick == UINT32_MAX || tick != last_tick + 1) return false;
+      if (boundary == Boundary::DrawReturn && target_seen) { open = false; closed = true; }
+    }
+    else if (boundary != Boundary::PadPoll && boundary != Boundary::PadConsume)
+      return false;
+    return true;
+  }
+  bool Omit(u32 index, Boundary boundary) const
+  {
+    return enabled && open && index == 1 &&
+           (boundary == Boundary::DrawEnter || boundary == Boundary::DrawReturn);
+  }
+  bool Complete() const { return !enabled || (closed && !open && target_seen &&
+      samples >= 3501 && samples <= 3505); }
+};
+
 enum class StadiumGoPrefixPhase : u8
 {
   Disabled,
@@ -1346,6 +1398,14 @@ struct Observer::Impl
         (!whole_b_setting.empty() && !stadium_whole_feedback))
       return SetInvalid("Stadium B state requires explicit whole3 feedback recording"), false;
     stadium_whole_b.enabled = whole_b_setting == "1";
+    const std::string long_idle_setting = Env("MWRC_STADIUM_WHOLE_LONG_IDLE");
+    const auto& long_idle_compact = CompactRngEnvironment();
+    if (!StadiumWholeLongIdle::Admit(long_idle_setting, stadium_whole_feedback,
+        stadium_whole_b.enabled, InputStream::IsRecording(), InputStream::IsReplaying(),
+        whole_rng_returns || whole_replay, long_idle_compact.present && long_idle_compact.valid,
+        long_idle_compact.selection))
+      return SetInvalid("Whole Stadium long idle requires selected B fresh recording/compact ledger and no short RNG/replay"), false;
+    stadium_whole_long_idle.enabled = !long_idle_setting.empty();
     const std::string constructor_setting = Env("MWRC_STADIUM_CONSTRUCTOR_OWNER");
     if ((!constructor_setting.empty() && constructor_setting != "1") ||
         (!constructor_setting.empty() && !stadium_go_prefix_enabled))
@@ -1600,6 +1660,8 @@ struct Observer::Impl
       handshake += ",\"original_idle_post_go_ticks\":3500";
     if (stadium_whole_b.enabled)
       handshake += ",\"stadium_whole_b_state\":true,\"stadium_observed_match\":1";
+    if (stadium_whole_long_idle.enabled)
+      handshake += ",\"stadium_whole_long_idle\":" + StadiumWholeLongIdle::ProfileJson();
     if (stadium_go_ordinal2)
       handshake += ",\"original_post_go_target_ordinal\":2";
     if (stadium_whole_feedback)
@@ -1635,6 +1697,8 @@ struct Observer::Impl
       start += ",\"original_idle_post_go_ticks\":3500";
     if (stadium_whole_b.enabled)
       start += ",\"stadium_whole_b_state\":true,\"stadium_observed_match\":1";
+    if (stadium_whole_long_idle.enabled)
+      start += ",\"stadium_whole_long_idle\":" + StadiumWholeLongIdle::ProfileJson();
     if (stadium_go_ordinal2)
       start += ",\"original_post_go_target_ordinal\":2";
     if (stadium_whole_feedback)
@@ -1894,6 +1958,8 @@ struct Observer::Impl
   {
     if (!stadium_whole_b.Complete())
       return SetInvalid("Stadium B observations incomplete at unchanged whole-route terminal"), void();
+    if (!stadium_whole_long_idle.Complete())
+      return SetInvalid("Stadium B long idle incomplete at unchanged whole-route terminal"), void();
     InputStream::RequestFinish(true);
     natural_completion.store(true);
     finish_requested.store(true);
@@ -4647,6 +4713,8 @@ struct Observer::Impl
 
     if (later && !stadium_whole_b.Go(match_index, whole_phase, setup_pointer, source_tick))
       return SetInvalid("Stadium B GO changed selected setup owner/order"), void();
+    if (later && !stadium_whole_long_idle.Go(match_index, setup_pointer, source_tick))
+      return SetInvalid("Stadium B long idle actual GO owner/counter refused"), void();
     if(later&&!LatchWholeRngGo(source_tick,next_sequence))
       return SetInvalid("Whole Stadium RNG actual GO latch refused"),void();
     PublishStadiumProgress("go_after", pc, word, state->gpr[3], state, source_tick);
@@ -5665,6 +5733,13 @@ struct Observer::Impl
         return SetInvalid("scene exit request is invalid"), void();
     }
 
+    // Validate all source reads above before omitting only redundant serialization.
+    const bool omit_long_idle_raw = stadium_whole_long_idle.Omit(match_index, boundary);
+    if (!stadium_whole_long_idle.Observe(match_index, whole_phase, setup_pointer, boundary, source_tick))
+      return SetInvalid("Stadium B long idle owner/target/natural-tail refused"), void();
+    if (boundary == Boundary::VsExit && match_index == 1 && !stadium_whole_long_idle.Complete())
+      return SetInvalid("Stadium B VS exit preceded checked long idle window"), void();
+    if (omit_long_idle_raw) { slice_count = 0; raw_size = 0; }
     Slot* slot = Reserve(Event::Boundary, pc, source_tick, draw_ordinal);
     if (!slot)
       return;
@@ -5723,6 +5798,8 @@ struct Observer::Impl
       transform_prefix_down_b_source_sequence = slot->sequence;
     Publish(slot);
     CompactBoundaryClosed(boundary,source_tick,slot->sequence);
+    if (stadium_whole_long_idle.Complete() && stadium_whole_long_idle.enabled)
+      stadium_long_idle_window_complete.store(true);
     if (invalid.load()) return;
     if (stadium_go_prefix_complete_after_publish)
       RequestComplete();
@@ -5819,6 +5896,8 @@ struct Observer::Impl
   {
     if (invalid.load() || finish_requested.load())
       return nullptr;
+    if (stadium_whole_long_idle.enabled && next_sequence >= 77602 - 1)
+      return SetInvalid("Stadium whole long idle record cap"), nullptr;
     if (stadium_idle_3500 && (next_sequence >= STADIUM_IDLE_RECORD_CAP - 1 ||
         (!stadium_idle_c_seen && next_sequence >= 16384)))
       return SetInvalid("Stadium idle3500 checked record inventory cap"), nullptr;
@@ -6619,6 +6698,10 @@ struct Observer::Impl
               std::string(stadium_whole_b.Complete() && !invalid.load() ? "true" : "false") +
               ",\"stadium_b_go_tick\":" + std::to_string(stadium_whole_b.go_tick) +
               ",\"stadium_b_state_source_ticks\":" + std::to_string(stadium_whole_b.samples);
+    if (stadium_whole_long_idle.enabled)
+      json += ",\"stadium_whole_long_idle\":" + StadiumWholeLongIdle::ProfileJson() +
+              ",\"stadium_whole_long_idle_window_complete\":" +
+              std::string(stadium_long_idle_window_complete.load() ? "true" : "false");
     if (checked_entity_profile && !active_entity_profile && force && state != "starting")
       json += ",\"diagnostic_prefix_complete\":" + std::string(completed ? "true" : "false") +
               ",\"whole_session_equivalent\":false,\"comparison_source_ticks\":60," +
@@ -6842,6 +6925,8 @@ struct Observer::Impl
   bool stadium_go_prefix_enabled = false;
   bool stadium_whole_feedback = false;
   StadiumWholeBObservation stadium_whole_b;
+  StadiumWholeLongIdle stadium_whole_long_idle;
+  std::atomic<bool> stadium_long_idle_window_complete{false};
   bool stadium_whole_sss_ready = false;
   std::string stadium_whole_setup_receipt;
   std::string stadium_go_prefix_setup_receipt_sha256;
