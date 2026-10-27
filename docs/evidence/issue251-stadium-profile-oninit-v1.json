@@ -25136,6 +25136,182 @@
           "full_pair": false,
           "per_owner_rng_compared": false,
           "C3": false
+        },
+        "full_browser_pair": {
+          "result": "PASS_SCOPED_OFFLINE_PAIRED_COMPARISON_WITH_RAW_HARNESS_FAILURE_RETAINED",
+          "runtime": "f838c3f83cd946461c52e8a01dae9dac0f712ab5",
+          "capture_harness": "f548a87e6be73b5211e1c64ae4f4e44410c532d7",
+          "observer_repair_source": "2221c72b4479831d1c2e528fd282559d08a365b1",
+          "whole_route_frames": 8154,
+          "source_actions": 14394,
+          "typed_states_and_four_port_inputs": 7002,
+          "scene_rng_endpoints": 8,
+          "selected_rng_events": 212452,
+          "original_guard_events_unpaired": 37,
+          "native_outside_events_unpaired": 9235,
+          "world_generations": [
+            3,
+            7
+          ],
+          "raw_outer_capture_result": "fail",
+          "ordinary_browser_replay_complete_pass": true,
+          "native_retired": true,
+          "owned_cleanup_passed": true,
+          "H1_incidents": 0,
+          "automatic_resumes": 0,
+          "C3": false,
+          "all_rng_writers_observed": false,
+          "allocation_registration_parity": false,
+          "original_entry_dispatch_parity": false,
+          "observed_entry_scope": "partitioned source construction before/return",
+          "observed_exit_scope": "actual original VS OnExit before/return",
+          "recovery": "byte-exact discriminator selection from ordinary retail-port export, independently verified; failed live report unchanged",
+          "no_recapture": true,
+          "evidence": {
+            "manifest": {
+              "path": "paired-full-browser-packet-v2/manifest.json",
+              "bytes": 42894,
+              "sha256": "5531acd851773607dc3f193724d40dec04d02abb9c175d1d472e3f87358b5869"
+            },
+            "launch": {
+              "path": "paired-full-browser-capture-v2/launcher-result.json",
+              "bytes": 215,
+              "sha256": "0529dc572f35d5154e897405a2c8de7804c77062cf6b1501166f058bbdd9599a"
+            },
+            "owner": {
+              "path": "paired-full-browser-capture-v2/owner.json",
+              "bytes": 107642,
+              "sha256": "a229a3412bf27578437ace92e7083aa671f3c723d57e9c3ceb6a68fb678f6d84"
+            },
+            "raw_harness": {
+              "path": "paired-full-browser-capture-v2/browser-run/report.json",
+              "bytes": 276580,
+              "sha256": "bedc8c654099c76a011368edf1075764ad04ab0d10434fbb43df6b2bb7d50ee2"
+            },
+            "raw_replay": {
+              "path": "paired-full-browser-capture-v2/browser-run/retail-port.jsonl",
+              "bytes": 45198430,
+              "sha256": "53e105717d383789648322a2d70acebe37a2bcdd05fc1fbcabb1294a6a240dfd"
+            },
+            "ordinary_replay_report": {
+              "path": "paired-full-browser-capture-v2/browser-run/retail-browser-report.json",
+              "bytes": 18502,
+              "sha256": "c95d495008e2929ca5f82b20961a5d06a9511ab729924ff188f3b451b0e9c0f5"
+            },
+            "raw_rng": {
+              "path": "paired-full-browser-capture-v2/browser-run/paired-v11-full-rng.jsonl",
+              "bytes": 59683263,
+              "sha256": "3a413278f2575d773bcaf566b9862b2ffebb9cb66276fcb5f87531a2ae4b39fd"
+            },
+            "H1": {
+              "path": "paired-full-browser-capture-v2/browser-run/rawruntime-incidents.json",
+              "bytes": 4978,
+              "sha256": "f08630278c3be3b1465f7d0b1705e1833f69a4286125f2f6eaa157cb3501f2b2"
+            },
+            "extraction": {
+              "path": "paired-full-browser-offline-v1/extraction.json",
+              "bytes": 1855,
+              "sha256": "de44b4a732d4748148413cb9c3aa1c6ff26461d85ca3f3cd9be2a37767285ff8"
+            },
+            "state_comparison": {
+              "path": "paired-full-browser-offline-v1/state-comparison.json",
+              "bytes": 1018,
+              "sha256": "8e266ed33852fe840b5dd63707412fff7bd4277e91119c2f4c9aa30806d2988a"
+            },
+            "rng_comparison": {
+              "path": "paired-full-browser-offline-v1/rng-comparison.json",
+              "bytes": 6243,
+              "sha256": "644cd5b71cecde18d36bc1aec6346c1979f87cfda6f3aacd99a24fd134ed5b7d"
+            },
+            "independent_review": {
+              "path": "paired-full-browser-offline-v1/independent-review.json",
+              "bytes": 5820,
+              "sha256": "d98bde155dcf422c2011a97e3a0f4852fcad4a63ad166314e7d219b22849b5eb"
+            },
+            "builds": {
+              "path": "paired-full-runtime-build-v1/result.json",
+              "bytes": 2402,
+              "sha256": "448a4a101414c02984d51a3ec8b8f94ce60f254a074b8e4f5ff951c9c05cae50"
+            },
+            "observer_fix": {
+              "path": "paired-full-observer-hook-repair-v1/root-focused/review-and-result.json",
+              "bytes": 1843,
+              "sha256": "ddd2c004f02d63bdb15eb9a1c2a42d214aa84bdf90b73e5ced2f14ac23f75bb2"
+            },
+            "action_scope_fix": {
+              "path": "paired-full-action-probe-scope-repair-v1/root-focused/review-and-result.json",
+              "bytes": 1743,
+              "sha256": "5bdccfb7ba4e106d7b0237865ce46b7992649736829328f5befcf59cbb7c1272"
+            }
+          },
+          "integration": {
+            "full_regression": {
+              "source": "2221c72b4479831d1c2e528fd282559d08a365b1",
+              "result": "FAIL_RETAINED",
+              "tests": 2867,
+              "failures": 10,
+              "errors": 2,
+              "skips": 211,
+              "seconds": 608.772
+            },
+            "focused_python_groups": [
+              {
+                "tests": 65,
+                "skips": 3,
+                "seconds": 9.67,
+                "pass": true
+              },
+              {
+                "tests": 27,
+                "skips": 2,
+                "seconds": 11.448,
+                "pass": true
+              }
+            ],
+            "focused_js": {
+              "tests": 22,
+              "passes": 21,
+              "skips": 1,
+              "failures": 0
+            },
+            "canonical_patch_applied_tree": "e8f50d908b2e962d3fb34507cdc62b09173e1a25",
+            "canonical_patch_source_unchanged": true,
+            "new_full_local_suite_pass_claimed": false,
+            "exact_head_CI": "pending"
+          },
+          "fixture_repair_source": "59f45d985dd63d67b9916e1ab83adc9ab6b46277",
+          "integration_evidence": [
+            {
+              "path": "/Volumes/AgentStorage/melee-web/runs/stadium-owner-parity-20261026-150215-d5a0bac0/paired-full-integration-regression-v1/result.json",
+              "bytes": 1182,
+              "sha256": "5ecaac117c367dd690c6310e5476a4012d9bf04c47598f1a8b7f119c796c2d4d"
+            },
+            {
+              "path": "/Volumes/AgentStorage/melee-web/runs/stadium-owner-parity-20261026-150215-d5a0bac0/paired-full-fixture-format-repair-v1/root-focused-v1/result.json",
+              "bytes": 1454,
+              "sha256": "f94e43eb888bf1bfac194d12cc67df8aace3fd3a2df427ab85e38a2d8f9d1d9a"
+            },
+            {
+              "path": "/Volumes/AgentStorage/melee-web/runs/stadium-owner-parity-20261026-150215-d5a0bac0/paired-full-native-fixture-repair-v1/root-focused-v1/result.json",
+              "bytes": 1439,
+              "sha256": "18a2f1bffed49f474e6dc0e13ec38ae4fd16363cbbd6592372829ff5805423b2"
+            },
+            {
+              "path": "/Volumes/AgentStorage/melee-web/runs/stadium-owner-parity-20261026-150215-d5a0bac0/paired-full-fixture-format-repair-v1/root-later-sss-js-v2.log",
+              "bytes": 5359,
+              "sha256": "bf8997e2e249e1b4e361b662416372dba62ea58750111a5ba41335e63b47fbe2"
+            },
+            {
+              "path": "/Volumes/AgentStorage/melee-web/runs/stadium-owner-parity-20261026-150215-d5a0bac0/paired-full-fixture-format-repair-v1/review-addendum-v4.json",
+              "bytes": 1913,
+              "sha256": "1d8659883f55b681cdf3d11629b51ffc30294779b9b3b76ed91bc16b7dd91c9f"
+            },
+            {
+              "path": "/Volumes/AgentStorage/melee-web/runs/stadium-owner-parity-20261026-150215-d5a0bac0/paired-full-native-fixture-repair-v1/independent-review.json",
+              "bytes": 5127,
+              "sha256": "be9e81e4a1c281e2eebfabb03dbc0a29a178968afc6eb4cce63f0a66fe547698"
+            }
+          ]
         }
       }
     }
