@@ -1,5 +1,5 @@
 import test from 'node:test';
-import {LATER_REFERENCE_CONTEXTS, OBSERVED_B_REFERENCE, OBSERVED_B_SCHEMA} from '../scripts/stadium_later_reference_contexts.mjs';
+import {LATER_REFERENCE_CONTEXTS, OBSERVED_B_REFERENCE, LONG_B_REFERENCE, OBSERVED_B_SCHEMA} from '../scripts/stadium_later_reference_contexts.mjs';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
@@ -527,8 +527,8 @@ test('actual runner Setup branch compares prepared receipt before one handoff th
 });
 
 // Synthetic new-context mechanism fixtures keep original/native parity unclaimed.
-function observedExpected(){
-  const e=expected(),d=OBSERVED_B_REFERENCE;
+function observedExpected(d=OBSERVED_B_REFERENCE){
+  const e=expected();
   Object.assign(e,{schema:OBSERVED_B_SCHEMA,observation_profile:d.profile,
     notification_cursor:d.first[6],menu_session_ticks:d.menu_ticks,
     original_B_constructor_GO:d.original_B_constructor_GO,
@@ -547,11 +547,11 @@ function observedExpected(){
   Object.assign(e.preceding_profile.setup,{sequence:d.a_setup_sequence,source_tick:d.a_tick});
   return e;
 }
-function observedTrace(e){
+function observedTrace(e,d=OBSERVED_B_REFERENCE){
   const rows=[{record:'header',schema:'melee-web-port-session-diagnostic',version:1,
     frames_requested:e.recipe.frames,draw_state:'not_captured',comparison:'not_run'}];let order=0;
   for(const row of e.literal_inputs){
-    if(row.index===OBSERVED_B_REFERENCE.first[2])rows.push({record:'session_match_enter_complete',rng:0x083a62a9,pad_state_hex:'00'.repeat(822)});
+    if(row.index===d.first[2])rows.push({record:'session_match_enter_complete',rng:parseInt(d.a_setup_seed||LATER_REFERENCE_CONTEXTS.a_setup_seed,16),pad_state_hex:'00'.repeat(822)});
     rows.push({record:'session_frame',index:row.index,scene:row.scene,supplied_inputs:row.pads,rng:0,pad_state_hex:'00'.repeat(822)});
     rows.push({record:'current_sss_exit_order',order:order++,kind:'tick_return',replay_cursor:row.index,
       source_steps:1,source_draws:0,menu_draw_reference:'UNKNOWN'});
@@ -559,7 +559,7 @@ function observedTrace(e){
     if(row.index===7)rows.push({record:'current_sss_exit_order',order:order++,kind:'draw_aurora_return',
       replay_cursor:row.index+1,source_steps:0,source_draws:0,menu_draw_reference:'UNKNOWN'});
   }
-  return {rows,actual:{reference_descriptor:OBSERVED_B_REFERENCE.id,notification_coordinates:{order},notification_order_count:order+1}};
+  return {rows,actual:{reference_descriptor:d.id,notification_coordinates:{order},notification_order_count:order+1}};
 }
 test('new reference identity refuses mixed or mutated contexts and preserves old admission',()=>{
   const e=observedExpected();assert.equal(validateLaterSssExitExpected(e),e);
@@ -568,6 +568,20 @@ test('new reference identity refuses mixed or mutated contexts and preserves old
     v=>v.observation_profile=2,v=>v.recipe.sha256='0'.repeat(64),v=>v.recipe.bytes--,
     v=>v.prepared_profile.setup.rng.value_hex='25d557a7',v=>v.source.sequence=4234,
     v=>v.preceding_profile.entry.source_tick=125,v=>v.literal_inputs[43].pads.pop()]){
+    const bad=structuredClone(e);mutate(bad);assert.throws(()=>validateLaterSssExitExpected(bad));
+  }
+});
+test('profile4 accepts only the exact retained long-B descriptor and preserves profile3',()=>{
+  const e=observedExpected(LONG_B_REFERENCE);
+  assert.equal(validateLaterSssExitExpected(e),e);
+  assert.equal(e.observation_profile,4);
+  assert.equal(e.notification_cursor,951);
+  assert.equal(e.recipe.frames,5422);
+  assert.equal(validateLaterSssExitExpected(observedExpected()).observation_profile,3);
+  for(const mutate of [v=>v.reference_context.id='foreign',v=>v.reference_context.first[6]=943,
+    v=>v.reference_context.pause_timer_zero_cursor=467,v=>v.reference_context.handoff_origin='current_sss_prepared_later_943',
+    v=>v.recipe.sha256=OBSERVED_B_REFERENCE.recipe_sha256,v=>v.observation_profile=3,
+    v=>v.prepared_profile.setup.rng.value_hex='4b25c79b']){
     const bad=structuredClone(e);mutate(bad);assert.throws(()=>validateLaterSssExitExpected(bad));
   }
 });
@@ -583,6 +597,19 @@ test('new emitted trace brackets every frame and accepts actual zero-step draw s
     const bad=structuredClone(rows);mutate(bad);assert.throws(()=>validateLaterSssExitTrace(text(bad),e,actual));
   }
   for(const mutate of [a=>a.notification_order_count++,a=>a.reference_descriptor='foreign',a=>a.notification_coordinates.order--]){
+    const bad=structuredClone(actual);mutate(bad);assert.throws(()=>validateLaterSssExitTrace(text(rows),e,bad));
+  }
+});
+test('profile4 trace derives the exact 951-row input boundary and dynamic notification owner',()=>{
+  const e=observedExpected(LONG_B_REFERENCE),{rows,actual}=observedTrace(e,LONG_B_REFERENCE);
+  assert.equal(validateLaterSssExitTrace(text(rows),e,actual).literal_supplied_inputs,951);
+  for(const mutate of [r=>r.splice(r.findIndex(x=>x.record==='session_frame'&&x.index===950),1),
+    r=>r.find(x=>x.record==='current_sss_exit_order'&&x.replay_cursor===950).replay_cursor=943,
+    r=>r.find(x=>x.record==='session_frame'&&x.index===4).supplied_inputs[2]='ff'.repeat(11)]){
+    const bad=structuredClone(rows);mutate(bad);assert.throws(()=>validateLaterSssExitTrace(text(bad),e,actual));
+  }
+  for(const mutate of [a=>a.reference_descriptor=OBSERVED_B_REFERENCE.id,
+    a=>a.notification_order_count++,a=>a.notification_coordinates.order--]){
     const bad=structuredClone(actual);mutate(bad);assert.throws(()=>validateLaterSssExitTrace(text(rows),e,bad));
   }
 });
@@ -648,5 +675,29 @@ test('new prepared receipts bind captured parent order and distinct zero-action 
    v=>v.prepared_to_setup.setup.source_frames=1,v=>v.notification_order_count++,
    v=>v.prepared_to_setup.setup.parent_seed_owner_value_restored=false]){
   const bad=structuredClone(setup);mutate(bad);assert.throws(()=>compareLaterPreparedSetupObservation(bad,e));
+ }
+});
+test('profile4 prepared receipts require the exact951 owner and new Setup origin',()=>{
+ const e=observedExpected(LONG_B_REFERENCE),d=LONG_B_REFERENCE;
+ const prepared=preparedLaterReceipt(e),parent=laterEndpoint(e),{actual}=observedTrace(e,d);
+ Object.assign(parent,{observation_profile:d.profile,reference_descriptor:d.id,
+   notification_order_count:actual.notification_order_count,original_B_constructor_GO:d.original_B_constructor_GO});
+ Object.assign(parent.notification_coordinates,{replay_cursor:d.first[6],order:actual.notification_coordinates.order});
+ parent.terminal.cursor=d.first[6];parent.note.session_ticks=d.menu_ticks;
+ Object.assign(prepared,{observation_profile:d.profile,replay_cursor:d.first[6],
+   local_order_rows:parent.notification_coordinates.order,random_seed_hex:d.entry_seed});
+ assert.equal(compareLaterPreparedStartObservation(prepared,e,parent).pass,true);
+
+ const setup=laterSetupReceipt(e);
+ Object.assign(setup,{observation_profile:d.profile,reference_descriptor:d.id,
+   notification_order_count:actual.notification_order_count,original_B_constructor_GO:d.original_B_constructor_GO});
+ Object.assign(setup.notification_coordinates,{replay_cursor:d.first[6],order:parent.notification_coordinates.order});
+ setup.terminal.cursor=d.first[6];setup.note.session_ticks=d.menu_ticks;
+ setup.prepared_to_setup.setup.handoff_origin=d.handoff_origin;
+ assert.equal(compareLaterPreparedSetupObservation(setup,e).pass,true);
+ for(const mutate of [v=>v.prepared_to_setup.setup.handoff_origin=OBSERVED_B_REFERENCE.handoff_origin,
+   v=>v.prepared_to_setup.setup.actual.random_seed_hex=d.entry_seed,
+   v=>v.notification_coordinates.replay_cursor=943,v=>v.reference_descriptor=OBSERVED_B_REFERENCE.id]){
+   const bad=structuredClone(setup);mutate(bad);assert.throws(()=>compareLaterPreparedSetupObservation(bad,e));
  }
 });

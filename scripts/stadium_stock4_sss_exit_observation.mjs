@@ -1,4 +1,4 @@
-import {OBSERVED_B_REFERENCE, OBSERVED_B_SCHEMA} from './stadium_later_reference_contexts.mjs';
+import {OBSERVED_B_REFERENCE, LONG_B_REFERENCE, OBSERVED_B_SCHEMA} from './stadium_later_reference_contexts.mjs';
 import {createHash} from 'node:crypto';
 import {validateSssExitExpectedFields, compareSssExitObservationFields,
   validateSssExitTraceFields} from './stadium_current_sss_exit_observation.mjs';
@@ -18,6 +18,9 @@ export function validateLaterStock4SssExitExpectedFields(v) {
 }
 export function validateObservedLaterReferenceFields(v) {
   return validateStock4SssExitExpectedMode(v,true,OBSERVED_B_REFERENCE);
+}
+export function validateLongLaterReferenceFields(v) {
+  return validateStock4SssExitExpectedMode(v,true,LONG_B_REFERENCE);
 }
 function validateStock4SssExitExpectedMode(v, later, reference = null) {
   requireValue(v?.schema === (reference ? OBSERVED_B_SCHEMA : later ? 'melee-web-stock4-none-later-sss-exit-host-expectation-v1' :
@@ -117,6 +120,8 @@ export function comparePreparedStartReceiptFields(actual, expectedRng, declaredS
     ((boundary.profile === 1 && boundary.cursor === 270 && boundary.order === 543) ||
      (boundary.profile === 2 && boundary.cursor === 940 && boundary.order === 1887) ||
      (boundary.profile === OBSERVED_B_REFERENCE.profile && boundary.cursor === OBSERVED_B_REFERENCE.first[6] &&
+      Number.isSafeInteger(boundary.order) && boundary.order >= 0) ||
+     (boundary.profile === LONG_B_REFERENCE.profile && boundary.cursor === LONG_B_REFERENCE.first[6] &&
       Number.isSafeInteger(boundary.order) && boundary.order >= 0)),
   'Prepared Start receipt boundary must be one of the two explicit private routes');
   requireValue(actual && Object.keys(actual).sort().join('|') === [
@@ -180,7 +185,8 @@ export function compareStock4PreparedSetupObservation(actual, expected) {
 }
 // Callers validate the exact first/later source profile before sharing structural checks.
 export function comparePreparedSetupObservationFields(actual, expected, origin) {
-  requireValue(['current_sss_prepared_stock4_270','current_sss_prepared_later_940',OBSERVED_B_REFERENCE.handoff_origin].includes(origin),
+  requireValue(['current_sss_prepared_stock4_270','current_sss_prepared_later_940',
+    OBSERVED_B_REFERENCE.handoff_origin,LONG_B_REFERENCE.handoff_origin].includes(origin),
     'Prepared Setup origin is unknown');
   const route = actual?.prepared_to_setup, setup = route?.setup;
   const terminal = actual?.terminal;

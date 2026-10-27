@@ -1,14 +1,15 @@
-import {LATER_REFERENCE_CONTEXTS, OBSERVED_B_REFERENCE, laterReferenceContext} from './stadium_later_reference_contexts.mjs';
+import {LATER_REFERENCE_CONTEXTS, OBSERVED_B_REFERENCE, LONG_B_REFERENCE, laterReferenceContext} from './stadium_later_reference_contexts.mjs';
 // Node-side finite occurrence1 admission. The page arm remains the shared closure-free helper.
 import {createHash} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
-import {STOCK4_SSS_STOP, validateLaterStock4SssExitExpectedFields, validateObservedLaterReferenceFields, comparePreparedStartReceiptFields,
+import {STOCK4_SSS_STOP, validateLaterStock4SssExitExpectedFields, validateObservedLaterReferenceFields, validateLongLaterReferenceFields, comparePreparedStartReceiptFields,
   comparePreparedSetupObservationFields, validateStock4PreparedSetupUnload} from './stadium_stock4_sss_exit_observation.mjs';
 import {compareSssExitObservationFields, validateSssExitTraceFields} from './stadium_current_sss_exit_observation.mjs';
 const requireValue = (value, message) => { if (!value) throw Error(message); };
 export function validateLaterSssExitExpected(v) {
-  const d=laterReferenceContext(v), observed=d===OBSERVED_B_REFERENCE;
-  if(observed)validateObservedLaterReferenceFields(v);else validateLaterStock4SssExitExpectedFields(v);
+  const d=laterReferenceContext(v), observed=d===OBSERVED_B_REFERENCE, long=d===LONG_B_REFERENCE;
+  if(observed)validateObservedLaterReferenceFields(v);else if(long)validateLongLaterReferenceFields(v);
+  else validateLaterStock4SssExitExpectedFields(v);
   const spans=d.first.slice(0,6).map((first,i)=>[LATER_REFERENCE_CONTEXTS.scenes[i],first,d.last[i]]);
   requireValue(v.selected_occurrence === 1 && v.notification_cursor === d.first[6] &&
     v.source.sequence === d.sss_sequence && v.source.source_tick === d.sss_tick && v.source.draw_ordinal === d.sss_draw &&
@@ -35,7 +36,7 @@ export function validateLaterSssExitExpected(v) {
     a.entry.start_melee_sha256 === LATER_REFERENCE_CONTEXTS.start_sha256 &&
     a.entry.start_melee_sha256 === v.prepared_profile.entry.start_melee_sha256,
   'Later SSS preceding A source identity differs');
-  if(observed)requireValue(v.recipe.sha256===d.recipe_sha256 && v.recipe.bytes===d.recipe_bytes &&
+  if(observed||long)requireValue(v.recipe.sha256===d.recipe_sha256 && v.recipe.bytes===d.recipe_bytes &&
     a.setup.sequence===d.a_setup_sequence && a.entry.source_tick===d.a_tick && a.setup.source_tick===d.a_tick &&
     v.prepared_profile.setup.source_tick===d.sss_tick && v.prepared_profile.setup.draw_ordinal===0 &&
     v.prepared_profile.setup.rng.value_hex===d.setup_seed &&
@@ -48,7 +49,7 @@ export function validateLaterSssExitExpected(v) {
 export function validateLaterReferenceRecipeInputs(bytes,expected){
   validateLaterSssExitExpected(expected);
   const d=laterReferenceContext(expected);
-  requireValue(d===OBSERVED_B_REFERENCE && Buffer.isBuffer(bytes) && bytes.length===d.recipe_bytes,
+  requireValue((d===OBSERVED_B_REFERENCE||d===LONG_B_REFERENCE) && Buffer.isBuffer(bytes) && bytes.length===d.recipe_bytes,
     'New later reference raw recipe transport size differs');
   const headerBytes=20, contextHeaderBytes=8;
   const contextBytes=0x18+0x55e8+0x148+6, setupBytes=0x138, initialPadBytes=822;
@@ -82,7 +83,7 @@ export function validateLaterReferenceRecipeInputs(bytes,expected){
 }
 function checkedLaterOrder(actual,expected){
   const d=laterReferenceContext(expected), order=actual?.notification_coordinates?.order;
-  if(d===OBSERVED_B_REFERENCE)requireValue(actual?.reference_descriptor===d.id &&
+  if(d===OBSERVED_B_REFERENCE||d===LONG_B_REFERENCE)requireValue(actual?.reference_descriptor===d.id &&
     Number.isSafeInteger(order)&&order>=0&&actual.notification_order_count===order+1,
     'New later reference notification owner/order receipt differs');
   else return d.notification_order; // Existing legacy consumers retain their own fixed-order checks.
@@ -114,7 +115,7 @@ export function validateLaterSssExitTrace(text, expected, actual) {
   const result = validateSssExitTraceFields(text, expected, actual);
   const rows = text.trim().split('\n').map(line => JSON.parse(line));
   const d=laterReferenceContext(expected);
-  if(d===OBSERVED_B_REFERENCE){
+  if(d===OBSERVED_B_REFERENCE||d===LONG_B_REFERENCE){
     checkedLaterOrder(actual,expected);
     const order=rows.filter(row=>row.record==='current_sss_exit_order');
     requireValue(order.every((row,i)=>i===0||row.replay_cursor>=order[i-1].replay_cursor),
@@ -204,8 +205,9 @@ export function compareLaterPreparedStartObservation(actual, expected, stoppedOb
   validateLaterSssExitExpected(expected);
   const d=laterReferenceContext(expected);
   const entry=expected.prepared_profile.entry;
-  const order=d===OBSERVED_B_REFERENCE ? checkedLaterOrder(stoppedObservation,expected) : d.notification_order;
-  if(d===OBSERVED_B_REFERENCE)compareLaterSssExitObservation(stoppedObservation,expected,false);
+  const observed=d===OBSERVED_B_REFERENCE||d===LONG_B_REFERENCE;
+  const order=observed ? checkedLaterOrder(stoppedObservation,expected) : d.notification_order;
+  if(observed)compareLaterSssExitObservation(stoppedObservation,expected,false);
   const receipt=comparePreparedStartReceiptFields(actual,entry.rng,entry.declared_setup,
     entry.start_melee_hex,{profile:d.profile,cursor:d.first[6],order});
   return {...receipt,scope:'later_sss_prepared_start_common_fields_only',

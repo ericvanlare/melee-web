@@ -361,6 +361,10 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     const cacheExports = new Set();
     const copy = value => JSON.parse(JSON.stringify(value));
     const freeze = value => { if (value && typeof value === 'object') { for (const item of Object.values(value)) freeze(item); Object.freeze(value); } return value; };
+    const profiles = Object.freeze({
+      'original-b-2013-943-v1': Object.freeze({recipe_sha256:'5fb53bdc71b35b800bc3451b1d9117709edef2413a38a8f7311ee352647a6755',cursor:943,setup_seed_hex:'4b25c79b'}),
+      'original-b-5422-951-long-v1': Object.freeze({recipe_sha256:'e669f831538b90e39241a569b6c38884300bfe246b252cacda994cbc45c10bbf',cursor:951,setup_seed_hex:'25d557a7'}),
+    });
     const keys = ['reference_id', 'recipe_sha256', 'cursor', 'notification_order', 'world_generation', 'setup_seed_hex'];
     const owned = token => {
       if (!active || active.token !== token || active.consumed) throw Error('Later B replay transfer token is stale, repeated or foreign');
@@ -380,13 +384,13 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
         if (!cacheExports.delete(token)) throw Error('Cache export transaction token is foreign or repeated');
       },
       checkReservation(request) {
+        const profile = request && Object.hasOwn(profiles, request.reference_id) ? profiles[request.reference_id] : null;
         if (cacheExports.size || saveProfileSnapshotsActive || active || !ready || fatal || destroyed || busy || assetTransfer || networkSessionClose || commands.length ||
             (loading && loading.phase !== 'native') ||
             Module.stadiumMatchedSetupNativeIdle?.() !== true ||
             !request || Object.keys(request).sort().join(',') !== [...keys].sort().join(',') ||
-            request.reference_id !== 'original-b-2013-943-v1' ||
-            request.recipe_sha256 !== '5fb53bdc71b35b800bc3451b1d9117709edef2413a38a8f7311ee352647a6755' ||
-            request.cursor !== 943 || request.setup_seed_hex !== '4b25c79b' ||
+            !profile || request.recipe_sha256 !== profile.recipe_sha256 ||
+            request.cursor !== profile.cursor || request.setup_seed_hex !== profile.setup_seed_hex ||
             !Number.isSafeInteger(request.notification_order) || request.notification_order < 1 ||
             !Number.isSafeInteger(request.world_generation) || request.world_generation < 1)
           throw Error('Later B replay transfer requires an idle exact new-reference Setup reservation');

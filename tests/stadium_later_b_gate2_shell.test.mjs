@@ -50,7 +50,16 @@ const request = {
   recipe_sha256: '5fb53bdc71b35b800bc3451b1d9117709edef2413a38a8f7311ee352647a6755',
   cursor: 943, notification_order: 1897, world_generation: 7, setup_seed_hex: '4b25c79b',
 }; // Order is arbitrary synthetic owner bookkeeping, never an original-order claim.
-function fixture() {
+const longRequest = {
+  reference_id: 'original-b-5422-951-long-v1',
+  recipe_sha256: 'e669f831538b90e39241a569b6c38884300bfe246b252cacda994cbc45c10bbf',
+  cursor: 951, notification_order: 1903, world_generation: 9, setup_seed_hex: '25d557a7',
+}; // Synthetic request only; the source-bound descriptor is independently reviewed.
+const inputProfile = value => value.reference_id === request.reference_id ? {frames:2013,scope:'frozen-menu-prefix943-not-action-metrics'} :
+  value.reference_id === longRequest.reference_id ? {frames:5422,scope:'literal-global-prefix951-not-action-metrics'} : null;
+function fixture(inputRequest = request) {
+  const profile=inputProfile(inputRequest);
+  assert.ok(profile,'test fixture only supports the two explicit checked profiles');
   const nodes = new Map(), downloads = [], calls = [], deferred = [];
   const $ = name => {
     if (!nodes.has(name)) nodes.set(name, {disabled: false, files: [{}], dataset: {}, textContent: '',querySelectorAll:()=>[],replaceChildren(){},append(){}});
@@ -71,12 +80,12 @@ function fixture() {
     emit: (name, value) => calls.push(['emit', name, value]),
     snapshot: () => ({state: 'preparing', running: false, phase: 7}),
     Module: {HEAPU8: new Uint8Array(32), stadiumMatchedSetupNativeIdle: () => true,
-      _melee_web_native_menu_replay_cursor: () => {calls.push('cursor'); return 943;},
+      _melee_web_native_menu_replay_cursor: () => {calls.push('cursor'); return inputRequest.cursor;},
       _melee_web_native_menu_memory: () => {calls.push('memory'); return 1;},
       UTF8ToString: () => '{"scope":"synthetic-pre-move-memory"}'},
-    $, calls, downloads, deferred, laterRequest: request,
+    $, calls, downloads, deferred, laterRequest: inputRequest,
     bundle: true, importing: false, replayLoading: false, preparationSince: 0,
-    nativeSourceSteps: 943, nativeSourceDraws: 943, worstBrowserCallback: null,
+    nativeSourceSteps: inputRequest.cursor, nativeSourceDraws: inputRequest.cursor, worstBrowserCallback: null,
     activeFrames: 4, worstFrame: 0, longFrames: 0, browserLongTasks: 0, browserLongTaskWorst: 0,
     nativeTimingFrames: 4, nativeTimingWorst: 0, nativeLongFrames: 0, nativeOverBudgetFrames: 0,
     nativeWorstTiming: null, livePipelineQueued: 0, livePipelineCreated: 0, liveTextureUploads: 0,
@@ -95,8 +104,8 @@ function fixture() {
     const owner={laterBReplayTransfer};
     let cacheEvidence=[];
     let retailRun={observe:true,wholeSession:true,baseline:{preparations:2,heap:32,underruns:0,overflows:0},
-      hash:laterRequest.recipe_sha256,frames:2013,expectedDraws:2013,rows:Array.from({length:943},(_,index)=>JSON.stringify({record:'session_frame',index,supplied_inputs:Array(4).fill('00'.repeat(11))})),timerRows:[],
-      memory:{},preparation:{},cache:{},started:0,lastProgress:17,lastCursor:943,scheduling:2};
+      hash:laterRequest.recipe_sha256,frames:${profile.frames},expectedDraws:${profile.frames},rows:Array.from({length:laterRequest.cursor},(_,index)=>JSON.stringify({record:'session_frame',index,supplied_inputs:Array(4).fill('00'.repeat(11))})),timerRows:[],
+      memory:{},preparation:{},cache:{},started:0,lastProgress:17,lastCursor:laterRequest.cursor,scheduling:2};
     ${suspended}\n${observers}\n${transfer}\n${writers}\n${polling}\n${timing}\n${frame}\n${reload}\n${clicks}\n${cacheExport}\n${events}
     const actualCallbacks={${retirement}};
     const actualOtherRetirements={${otherRetirements}};
@@ -116,11 +125,11 @@ ${checkpoint}
       run:()=>retailRun,setRun:r=>{retailRun=r;},owner,
       finish:finishRetailReplay,reload:reloadApplication,events:actualOnEvent,
       coreSnapshot:()=>{${snapshot};return snapshot();},coreSync:()=>{${sync};return syncAudio();}};`, context);
-  return {context, api: context.api, calls, downloads, $, run: () => context.api.run()};
+  return {context, api: context.api, calls, downloads, $, request:inputRequest, run: () => context.api.run()};
 }
-function reserve(f) {const token = f.api.reserve(request); f.calls.length = 0; return token;}
-function proof(token, extra = {}) {
-  return {schema: 'melee-web-stadium-later-b-parent-transfer-v1', ...request, token: token.id,
+function reserve(f) {const token = f.api.reserve(f.request); f.calls.length = 0; return token;}
+function proof(token, extra = {}, inputRequest=request) {
+  return {schema: 'melee-web-stadium-later-b-parent-transfer-v1', ...inputRequest, token: token.id,
     parent_identity_checked: true, stage: 'after-parent-move', parent_archived: true,
     source_ticks: 0, source_draws: 0, ...extra};
 }
@@ -134,14 +143,43 @@ function noNative(f) {
 }
 function pendingTransfer(f, token) {
   f.context.window.menuReplayLaterBCommandPending(token,'arm');
-  assert.equal(f.api.callbacks.menuLaterBReplayParentTransferred(proof(token)), true);
+  assert.equal(f.api.callbacks.menuLaterBReplayParentTransferred(proof(token, {}, f.request)), true);
   f.context.window.menuReplayLaterBCommandSettled(token);
 }
-function retirementReceipt(token) {
+function retirementReceipt(token, inputRequest=request) {
   return {schema:'melee-web-stadium-matched-setup-cf-retirement-v1',native_retired:true,terminal:true,error:null,
-    phase_after_close:0,running_after_close:0,later_b_transfer:proof(token,{parent_close_checked:true}),
+    phase_after_close:0,running_after_close:0,later_b_transfer:proof(token,{parent_close_checked:true},inputRequest),
     matched_setup_cf:{state:'complete',complete:true,error:null,queued:false}};
 }
+test('explicit long B profile4 reserves only its exact 951-row literal prefix and retires once', async () => {
+  const wrongRecipe=fixture(longRequest);
+  assert.throws(()=>wrongRecipe.api.reserve({...longRequest,recipe_sha256:request.recipe_sha256}),/exact stopped state replay951 owner/);
+  const wrongSeed=fixture(longRequest);
+  assert.throws(()=>wrongSeed.api.reserve({...longRequest,setup_seed_hex:'4b25c79b'}),/exact stopped state replay951 owner/);
+  const unknownProfile=fixture(longRequest);
+  assert.throws(()=>unknownProfile.api.reserve({...longRequest,reference_id:'__proto__'}),/exact stopped state/);
+  const wrongPrefix=fixture(longRequest);
+  wrongPrefix.run().rows[950]=JSON.stringify({record:'session_frame',index:950,supplied_inputs:['00'.repeat(11)]});
+  assert.throws(()=>wrongPrefix.api.reserve(longRequest),/literal951/);
+
+  const f=fixture(longRequest),token=reserve(f),prefix=f.run().laterBTransfer.prefix;
+  assert.equal(prefix.recipe_sha256,longRequest.recipe_sha256);
+  assert.equal(prefix.rows.length,951);
+  assert.equal(prefix.metrics.sourceFrames,951);
+  assert.equal(prefix.scope,'literal-global-prefix951-not-action-metrics');
+  assert.equal(f.api.core.state().transferred,false);
+  pendingTransfer(f,token);
+  f.api.core.pending(token,'retire');
+  assert.equal(f.api.callbacks.menuMatchedSetupCfRetired(retirementReceipt(token,longRequest)),true);
+  f.api.core.settled(token);
+  await f.context.window.menuReplayFinalizeLaterBTransfer(token);
+  const report=JSON.parse(f.downloads.find(([name])=>name==='retail-browser-report.json')[1]);
+  assert.equal(report.complete,false);
+  assert.equal(report.later_b_transfer.reference_id,'original-b-5422-951-long-v1');
+  assert.equal(report.later_b_transfer.prefix.rows.length,951);
+  assert.equal(report.later_b_transfer.native_terminal.kind,'retired');
+  assert.equal(f.downloads.filter(([name])=>name==='retail-browser-report.json').length,1);
+});
 test('actual reservation binds exact run/token/context; no native transfer inferred', () => {
   const f = fixture();
   assert.throws(() => f.api.reserve({...request, cursor:940}), /exact stopped/);

@@ -361,6 +361,10 @@ let retailRun=null,replayLoading=false;
 // BEGIN LATER_B_REPLAY_SHELL_TRANSFER
 let laterBReplayTransferConsumed=false;
 const laterBReplayTransferRuns=new WeakMap();
+const laterBReplayInputProfiles=Object.freeze({
+ 'original-b-2013-943-v1':Object.freeze({recipe_sha256:'5fb53bdc71b35b800bc3451b1d9117709edef2413a38a8f7311ee352647a6755',cursor:943,frames:2013,setup_seed_hex:'4b25c79b',scope:'frozen-menu-prefix943-not-action-metrics'}),
+ 'original-b-5422-951-long-v1':Object.freeze({recipe_sha256:'e669f831538b90e39241a569b6c38884300bfe246b252cacda994cbc45c10bbf',cursor:951,frames:5422,setup_seed_hex:'25d557a7',scope:'literal-global-prefix951-not-action-metrics'}),
+});
 const laterBReplayCopy=value=>JSON.parse(JSON.stringify(value));
 function laterBReplayFreeze(value){if(value&&typeof value==='object'){for(const item of Object.values(value))laterBReplayFreeze(item);Object.freeze(value);}return value;}
 function laterBReplayOwned(token){
@@ -370,28 +374,29 @@ function laterBReplayOwned(token){
 }
 window.menuReplayReserveLaterBTransfer=request=>{
  const run=retailRun;
+ const profile=request&&Object.hasOwn(laterBReplayInputProfiles,request.reference_id)?laterBReplayInputProfiles[request.reference_id]:null;
  if(laterBReplayTransferConsumed||!run||!run.observe||!run.wholeSession||!run.baseline||run.finishing||
     run.completed||run.failure||fatal||run.stoppedEvidence||run.laterBTransfer||
-    run.hash!=='5fb53bdc71b35b800bc3451b1d9117709edef2413a38a8f7311ee352647a6755'||
-    request?.recipe_sha256!==run.hash||request?.cursor!==943)
-  throw Error('Later B shell reservation requires the exact stopped state replay943 owner');
+    !profile||run.hash!==profile.recipe_sha256||run.frames!==profile.frames||run.expectedDraws!==profile.frames||
+    request?.recipe_sha256!==run.hash||request?.cursor!==profile.cursor||request?.setup_seed_hex!==profile.setup_seed_hex)
+  throw Error(`Later B shell reservation requires the exact stopped state replay${profile?.cursor||'unknown'} owner`);
  owner.laterBReplayTransfer.checkReservation(request);
- if(Module._melee_web_native_menu_replay_cursor()!==943)throw Error('Later B shell reservation cursor changed');
+ if(Module._melee_web_native_menu_replay_cursor()!==profile.cursor)throw Error('Later B shell reservation cursor changed');
  // Freeze the actual supplied-input prefix; this structural check does not
  // replace the existing host comparison or the native sealed-parent predicate.
  const supplied=run.rows.map(row=>JSON.parse(row)).filter(row=>row.record==='session_frame');
- if(supplied.length!==943||supplied.some((row,index)=>row.index!==index||
+ if(supplied.length!==profile.cursor||supplied.some((row,index)=>row.index!==index||
     !Array.isArray(row.supplied_inputs)||row.supplied_inputs.length!==4||
     row.supplied_inputs.some(pad=>typeof pad!=='string'||!/^[0-9a-f]{22}$/.test(pad))))
-  throw Error('Later B shell reservation requires the complete literal943 four-port prefix');
+  throw Error(`Later B shell reservation requires the complete literal${profile.cursor} four-port prefix`);
  // Capture while the original parent is still live and native access is settled.
  const metrics=replayMetrics(run);
  metrics.audioUnderrunFrames=Number(latestAudio.underruns||0)-(run.baseline?.underruns??0);
  metrics.audioOverflowFrames=Number(latestAudio.overflows||0)-(run.baseline?.overflows??0);
+ if(metrics.sourceFrames!==profile.cursor)throw Error('Later B shell prefix cursor differs');
  const prefix=laterBReplayFreeze(laterBReplayCopy({metrics,rows:run.rows,
    timer_rows:run.timerRows,memory:replayMemorySnapshot(),failure:run.failure||null,
-   recipe_sha256:run.hash,scope:'frozen-menu-prefix943-not-action-metrics'}));
- if(prefix.metrics.sourceFrames!==943)throw Error('Later B shell prefix cursor differs');
+   recipe_sha256:run.hash,scope:profile.scope,...(request.reference_id==='original-b-5422-951-long-v1'?{reference_id:request.reference_id}:{})}));
  const token=owner.laterBReplayTransfer.reserve(request);
  laterBReplayTransferConsumed=true;
  laterBReplayTransferRuns.set(token,run);
@@ -425,7 +430,7 @@ window.menuReplayFinalizeLaterBTransfer=async token=>{
  const reason=terminal.kind==='retired'?'Private later B continuation retired; whole replay incomplete':
   'Private later B unarmed attempt closed; whole replay incomplete';
  const scoped={schema:'melee-web-later-b-shell-transfer-evidence-v1',
-  reference_id:'original-b-2013-943-v1',prefix:transfer.prefix,
+  reference_id:transfer.prefix.reference_id||'original-b-2013-943-v1',prefix:transfer.prefix,
   action_evidence:laterBReplayCopy(transfer.actionEvidence),action_timing:laterBReplayCopy(transfer.timing),
   finish_requests:[...transfer.finishRequests],native_terminal:terminal,
   whole_replay_complete:false,ordinary_unload_parity:false,idbfs_persistence:'not_run'};

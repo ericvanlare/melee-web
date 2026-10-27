@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import vm from 'node:vm';
 import {finalizeSessionCapture} from '../scripts/whole_session_capture_result.mjs';
 import {installCurrentSssExitReplayArm, compareCurrentSssExitObservation,
   validateCurrentSssExitTrace, validateCurrentSssExitTerminal, validateCurrentSssExitFinalization,
   CURRENT_SSS_EXIT_REFUSAL} from '../scripts/stadium_current_sss_exit_observation.mjs';
+import {LONG_B_REFERENCE} from '../scripts/stadium_later_reference_contexts.mjs';
 
 // Endpoint doubles establish only wrapper order/descriptor/refusal behavior.
 function fixture({result = 1, armResult = 1, thrown = null, replace = false} = {}) {
@@ -73,6 +75,60 @@ test('synthetic changed recipe and busy owner refuse arm; busy observation makes
   const scope = installCurrentSssExitReplayArm({recipeBytes: bytes});idle = false;
   assert.deepEqual(scope.observe(), {busy: true}); assert.deepEqual(g.events, []);
   assert.throws(g.invoke, /idle owner/); assert.deepEqual(g.events, ['parse']);scope.dispose();
+});
+
+test('profile4 current SSS owner reserves only the exact prepared long-B Setup and cursor', async () => {
+  const recipe = Array.from({length: 328}, (_, i) => i & 255);
+  const page = {window: {}}; vm.createContext(page);
+  const heap = vm.runInContext('new Uint8Array(400)', page);
+  heap.set(recipe, 16);
+  const receipt = {accepted: true, profile: LONG_B_REFERENCE.profile};
+  const actual = {reference_descriptor: LONG_B_REFERENCE.id,
+    prepared_to_setup: {setup: {complete: true, captured: true,
+      stadium_setup_state: {world_generation: 9}, actual: {random_seed_hex: LONG_B_REFERENCE.setup_seed}}},
+    notification_coordinates: {order: 1903, replay_cursor: LONG_B_REFERENCE.first[6]}};
+  const values = new Map([[101, JSON.stringify(receipt)], [102, JSON.stringify(actual)]]);
+  let reserved = null, finalized = false, scope;
+  const module = {HEAPU8: heap, UTF8ToString: pointer => values.get(pointer),
+    stadiumMatchedSetupNativeIdle: () => true,
+    _melee_web_native_menu_replay: () => 1,
+    _melee_web_native_menu_stadium_current_sss_exit_arm_profile: profile => profile === 4 ? 1 : 0,
+    _melee_web_native_menu_stadium_current_sss_exit_observe: () => 102,
+    _melee_web_native_menu_stadium_current_sss_prepared_start_observe: () => 101,
+    _melee_web_native_menu_stadium_current_sss_prepared_setup_begin: () => 1};
+  const request = {reference_id: LONG_B_REFERENCE.id, recipe_sha256: LONG_B_REFERENCE.recipe_sha256,
+    cursor: LONG_B_REFERENCE.first[6], setup_seed_hex: LONG_B_REFERENCE.setup_seed,
+    notification_order: actual.notification_coordinates.order,
+    world_generation: actual.prepared_to_setup.setup.stadium_setup_state.world_generation};
+  page.Module = module;
+  Object.assign(page.window, {
+    menuReplayReserveLaterBTransfer(value) { reserved = structuredClone(value); return {id: 'opaque-profile4'}; },
+    menuReplayReadLaterBTransferEvidence: () => ({uncertain: false, core: {phase: 'pending'}}),
+    menuReplayFinalizeLaterBTransfer: async () => { finalized = true; },
+  });
+  assert.equal(page.OBSERVED_B_REFERENCE, undefined);
+  assert.equal(page.LONG_B_REFERENCE, undefined);
+  const pageInstaller = vm.runInContext(`(${installCurrentSssExitReplayArm.toString()})`, page);
+  try {
+    assert.throws(() => pageInstaller({recipeBytes: recipe,
+      observationProfile: 4, preparedStartProbe: true}), /checked Setup stop/);
+    scope = pageInstaller({recipeBytes: recipe, observationProfile: 4,
+      preparedStartProbe: true, laterPreparedSetup: true});
+    assert.equal(module._melee_web_native_menu_replay(16, recipe.length, 1), 1);
+    assert.equal(scope.state().armed, true);
+    const continued = scope.continuePreparedStart(receipt);
+    assert.equal(continued.result, 1);
+    assert.equal(continued.accepted_receipt_rechecked, true);
+    const transfer = scope.reserveLaterBTransfer(actual, request);
+    assert.equal(transfer.id, 'opaque-profile4');
+    assert.deepEqual(reserved, request);
+    const completion = await scope.gate2Finalize();
+    assert.equal(completion.finalized, true);
+    assert.equal(finalized, true);
+    assert.equal(scope.dispose(), true);
+  } finally {
+    delete page.Module;
+  }
 });
 
 const expectedPath = process.env.MELEE_STADIUM_CURRENT_SSS_EXPECTED;

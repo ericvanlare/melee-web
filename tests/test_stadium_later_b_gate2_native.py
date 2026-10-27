@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import struct
 import sys
 import unittest
 
@@ -27,6 +28,7 @@ from owned_test_workspace import OwnedWorkspaceTests
 
 CPP_PATH_ENV = "MELEE_LATER_B_GATE2_NATIVE_CPP"
 PROJECTION_ENV = "MELEE_LATER_B_GATE2_PROJECTION"
+LONG_PROJECTION_ENV = "MELEE_LATER_B_LONG_PROJECTION"
 RUN_ROOT_ENV = "MELEE_LATER_B_GATE2_RUN_ROOT"
 CLANGXX_ENV = "MELEE_LATER_B_GATE2_CLANGXX"
 
@@ -177,7 +179,7 @@ struct MenuPreparationState {
 };
 }
 
-enum class FirstSssVsSetupOrigin { LegacyEntry124, CurrentPreparedLater_943 };
+enum class FirstSssVsSetupOrigin { LegacyEntry124, CurrentPreparedLater_943, CurrentPreparedLater_951 };
 enum class CurrentSssExitProfile { Other, Stock4None };
 enum class StadiumCfObservationScope { Common15, Fresh132Typed22, LaterBTyped22 };
 enum class AssetDestination { None, Other };
@@ -237,7 +239,9 @@ struct MatchedSetupCfState {
   bool failed = false, complete = false, last_action_complete = false;
   bool explicit_step_mode = false, explicit_step_inflight = false;
   bool later_b_gate2_attempted = false, later_b_gate2_parent_archived = false;
-  bool later_b_gate2_mode = false, later_b_gate2_go_observed = false;
+  bool later_b_gate2_mode = false, later_b_gate2_long_mode = false, later_b_gate2_go_observed = false;
+  bool later_b_rng_action_enabled = false;
+  unsigned later_b_rng_action_first = 0, later_b_rng_action_last = 0;
   bool later_b_gate2_abort_consumed = false;
   bool later_b_action_started = false, later_b_safe_refusal_boundary = false;
   std::unique_ptr<melee_web::RetailReplayRecipe> later_b_archived_replay;
@@ -252,6 +256,7 @@ struct MatchedSetupCfState {
   bool fresh132_full_a = false;
   uint32_t action_count = 171, cursor = 0, last_schedule_index = 0;
   uint32_t source_ticks = 0, source_draws = 0, last_source_frame_after = 0;
+  unsigned queued_draws_before = 0;
   const MockMatch* owner = nullptr;
   const MockCache* cache_owner = nullptr;
   const MeleeWebMenuHost* host_owner = nullptr;
@@ -344,6 +349,9 @@ static std::array<uint8_t, 11> hex_pad(const char* hex) {
 }
 static const char* const actual_tick_pads[180][4] = {
 __PADS__
+};
+static const char* const actual_long_tick_pads[3585][4] = {
+__LONG_PADS__
 };
 
 static void reset_fixture() {
@@ -445,8 +453,9 @@ int matched_setup_cf_arm_internal(bool version2,unsigned action_count,
     unsigned c_action_index,unsigned f_action_index,unsigned c_source_tick,
     unsigned f_source_tick,bool full_schedule,bool common_fields,
     bool fresh132_full_a) {
-  assert(version2 && action_count==360 && c_action_index==0 && f_action_index==0);
-  assert(c_source_tick==84 && f_source_tick==85 && !full_schedule && common_fields && !fresh132_full_a);
+  assert(version2 && c_action_index==0 && f_action_index==0);
+  assert((action_count==360 || action_count==7168) && c_source_tick==84 &&
+         f_source_tick==85 && !full_schedule && common_fields && !fresh132_full_a);
   ++arm_leaf_calls;
   auto& state=matched_setup_cf;
   // Exact assignment from actual matched_setup_cf_arm_internal; this remains a modeled leaf.
@@ -608,8 +617,14 @@ static void lifecycle_and_status_controls() {
   state.action_count=360; state.later_b_prefix_cursor=943;
   state.later_b_reference_go_tick=84; state.later_b_stop_tick=180;
   state.later_b_gate2_go_observed=false; state.later_b_post_go_typed22_count=0;
+  state.last_bundle=1;
   std::cout << "ACTION_TICK " << actual_action_json_control(true) << '\n';
   std::cout << "ACTION_DRAW " << actual_action_json_control(false) << '\n';
+  state.later_b_gate2_long_mode=true; state.later_b_prefix_cursor=951;
+  state.queued_draws_before=84; state.last_bundle=85;
+  std::cout << "LONG_ACTION_TICK " << actual_action_json_control(true,168,84) << '\n';
+  std::cout << "LONG_ACTION_DRAW " << actual_action_json_control(false,169,84) << '\n';
+  state.later_b_gate2_long_mode=false;
   state.later_b_gate2_mode=false;
   std::cout << "LEGACY_TICK " << actual_action_json_control(true) << '\n';
   std::cout << "LEGACY_DRAW " << actual_action_json_control(false) << '\n';
@@ -643,6 +658,8 @@ static void step_error_controls() {
   std::cout << "STEP_ERROR " << matched_setup_cf_json() << '\n';
 }
 
+__LONG_TESTS__
+
 int main(int argc,char** argv) {
   assert(argc==2); const std::string mode=argv[1];
   if(mode=="parser-accept") parser_accept_case();
@@ -650,8 +667,139 @@ int main(int argc,char** argv) {
   else if(mode=="go") go_snapshot_controls();
   else if(mode=="lifecycle-status") lifecycle_and_status_controls();
   else if(mode=="step-error") step_error_controls();
+  else if(mode=="long-parser-accept") long_parser_accept_case();
+  else if(mode=="long-parser-controls") long_parser_refusal_controls();
   else return 2;
   return 0;
+}
+"""
+
+
+LONG_TESTS = r"""
+static void reset_long_fixture() {
+  reset_fixture();
+  const auto& reference=melee_web::stadium_later_reference::observed_b_long;
+  later_sss.reference=&reference;
+  replay->frames.resize(reference.frames);
+  static const unsigned scenes[12]={1,2,3,4,1,2,3,4,1,2,3,4};
+  for(size_t i=0;i<12;++i)
+    replay->spans[i]={scenes[i],reference.first[i],reference.last[i]};
+  for(unsigned tick=0;tick<3585;++tick) {
+    std::array<uint8_t,44> row{};
+    for(unsigned port=0;port<4;++port) {
+      const auto bytes=hex_pad(actual_long_tick_pads[tick][port]);
+      assert(bytes.size()==11);
+      std::copy(bytes.begin(),bytes.end(),row.begin()+port*11);
+    }
+    replay->frames[951+tick].bytes=row;
+  }
+  match->seed=0x25d557a7U;
+  replay_cursor=951;
+  later_sss_reference_seal.owner=replay.get();
+  later_sss_reference_seal.bytes=262226;
+  later_sss_reference_seal.sha256=reference.recipe_sha256;
+  current_sss_exit.recipe=replay.get(); current_sss_exit.context=replay->initial_css.get();
+  current_sss_exit.notification_cursor=951; current_sss_exit.terminal_cursor=951;
+  // The actual trace order is dynamic and is not fixed by the reference descriptor.
+  // This integer is a deliberately modeled nonzero order for the extracted-owner leaf.
+  current_sss_exit.notification_order=9000; current_sss_exit.order=9001;
+  first_sss_vs_setup.origin=FirstSssVsSetupOrigin::CurrentPreparedLater_951;
+  auto& snap=first_sss_vs_setup.setup_snapshot;
+  snap.constructor_callback_count=1; snap.constructor_phase_count=5;
+  snap.constructor_randi_call_count=1; snap.parameter_x0=3600; snap.parameter_x4=3800;
+  snap.initial_countdown=3672; snap.current_countdown=3672;
+  snap.constructor_random_bound_valid=1; snap.constructor_random_bound=200;
+  snap.constructor_random_result_valid=1; snap.constructor_random_result=72;
+  snap.source_seed_before=0x7fc17cf1U; snap.source_seed_after=0x5ce52bf0U;
+  auto& phases=snap.constructor_phases;
+  phases[0]={1,MELEE_WEB_STADIUM_SETUP_PHASE_ENTRY,0,0,0,0,0,1,0x7fc17cf1U};
+  phases[1]={2,MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS,1,3600,3800,0,0,1,0x7fc17cf1U};
+  phases[2]={3,MELEE_WEB_STADIUM_SETUP_PHASE_UP_CALL,1,3600,3800,1,200,1,0x7fc17cf1U};
+  phases[3]={4,MELEE_WEB_STADIUM_SETUP_PHASE_UP_RETURN,1,3600,3800,1,72,1,0x5ce52bf0U};
+  phases[4]={5,MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT,1,3600,3800,1,3672,1,0x5ce52bf0U};
+}
+static const char* const actual_long_manifest_hex="__LONG_MANIFEST_HEX__";
+static std::vector<uint8_t> make_long_manifest() {
+  const std::string hex=actual_long_manifest_hex;
+  assert(hex.size()==2*(24+36+7168*57));
+  auto digit=[](char c)->unsigned {
+    assert((c>='0'&&c<='9')||(c>='a'&&c<='f'));
+    return c<='9'?unsigned(c-'0'):unsigned(c-'a'+10);
+  };
+  std::vector<uint8_t> out; out.reserve(hex.size()/2);
+  for(size_t i=0;i<hex.size();i+=2)
+    out.push_back(static_cast<uint8_t>((digit(hex[i])<<4)|digit(hex[i+1])));
+  return out;
+}
+static bool long_parser_refuses(std::vector<uint8_t> bytes) {
+  bool refused=false;
+  try { (void)later_b_gate2_long_manifest_arm(bytes.data(),bytes.size()); }
+  catch(const std::exception&) { refused=true; }
+  return refused;
+}
+static void long_parser_accept_case() {
+  reset_long_fixture(); auto manifest=make_long_manifest();
+  assert(world==nullptr && world_live && match && archive_cache && host);
+  assert(replay->frames.size()==5422 && replay_cursor==951);
+  assert(later_b_gate2_long_manifest_arm(manifest.data(),manifest.size())==1);
+  assert(matched_setup_cf.later_b_gate2_attempted && matched_setup_cf.later_b_gate2_mode &&
+         matched_setup_cf.later_b_gate2_long_mode && matched_setup_cf.later_b_gate2_parent_archived);
+  assert(matched_setup_cf.action_count==7168 && matched_setup_cf.version2_actions.size()==7168);
+  assert(matched_setup_cf.later_b_prefix_cursor==951 && matched_setup_cf.later_b_stop_tick==3585);
+  assert(matched_setup_cf.later_b_setup_seed==0x25d557a7U);
+  assert(first_sss_vs_setup.setup_snapshot.source_seed_after==0x5ce52bf0U);
+  assert(matched_setup_cf.later_b_reference_go_tick==84 && !matched_setup_cf.later_b_gate2_go_observed);
+  assert(matched_setup_cf.version2_actions[168].kind==1 &&
+         matched_setup_cf.version2_actions[168].ordinal==84 &&
+         matched_setup_cf.version2_actions[169].kind==2 &&
+         matched_setup_cf.version2_actions[169].ordinal==84 &&
+         matched_setup_cf.version2_actions[169].bundle==85 &&
+         matched_setup_cf.version2_actions[170].kind==1 &&
+         matched_setup_cf.version2_actions[170].ordinal==85);
+  assert(matched_setup_cf.version2_actions.back().kind==2 &&
+         matched_setup_cf.version2_actions.back().ordinal==3582 &&
+         matched_setup_cf.version2_actions.back().bundle==3585);
+  assert(matched_setup_cf.source_ticks==0 && matched_setup_cf.source_draws==0 &&
+         matched_setup_cf.cursor==0);
+  assert(matched_setup_cf.later_b_archived_replay.get()==matched_setup_cf.later_b_recipe_owner);
+  assert(later_b_gate2_parent_identity_valid(matched_setup_cf));
+  const uint32_t setup_seed=match->seed;
+  match->seed=0x5ce52bf0U; // Constructor endpoint differs from completed Setup RNG state.
+  assert(!later_b_gate2_parent_identity_valid(matched_setup_cf));
+  match->seed=setup_seed; assert(later_b_gate2_parent_identity_valid(matched_setup_cf));
+  std::cout << "MWB3_ACCEPT actions=7168 ticks=3585 draws=3583 prefix=951 GO=84 actual_go_observed=false\n";
+}
+static void long_parser_refusal_controls() {
+  const auto valid=make_long_manifest();
+  auto reject=[&](std::vector<uint8_t> bytes) {
+    reset_long_fixture();
+    assert(long_parser_refuses(std::move(bytes)));
+    assert(matched_setup_cf.later_b_gate2_attempted && arm_leaf_calls==0 && replay);
+  };
+  auto bytes=valid; bytes.pop_back(); reject(bytes);
+  bytes=valid; bytes[8]=0xB8; reject(bytes); // Refuse prefix 952 before any move.
+  bytes=valid; bytes[24]='x'; reject(bytes); // UUID is validated before ownership transfer.
+  bytes=valid; bytes[60+13]^=1; reject(bytes); // First literal PAD no longer matches retained recipe.
+  bytes=valid; bytes[60+169*57+5]=84; reject(bytes); // Draw bundle must be ticks_before=85.
+  bytes=valid; bytes[60+170*57]=2; reject(bytes); // Action 170 must be source tick 85.
+  reset_long_fixture(); replay->frames[951+84].bytes[0]^=1;
+  assert(long_parser_refuses(valid)); assert(arm_leaf_calls==0 && replay);
+  reset_long_fixture(); later_sss.reference=&melee_web::stadium_later_reference::observed_b;
+  assert(long_parser_refuses(valid)); assert(arm_leaf_calls==0 && replay);
+  reset_long_fixture(); match->seed=0x5ce52bf0U; // Constructor endpoint is not completed Setup seed.
+  assert(long_parser_refuses(valid)); assert(arm_leaf_calls==0 && replay);
+  reset_long_fixture(); first_sss_vs_setup.origin=FirstSssVsSetupOrigin::CurrentPreparedLater_943;
+  assert(long_parser_refuses(valid)); assert(arm_leaf_calls==0 && replay);
+  reset_long_fixture(); current_sss_exit.order=current_sss_exit.notification_order;
+  assert(long_parser_refuses(valid)); assert(arm_leaf_calls==0 && replay);
+  reset_long_fixture(); arm_leaf_accept=false;
+  assert(long_parser_refuses(valid));
+  assert(matched_setup_cf.failed && matched_setup_cf.later_b_gate2_parent_archived && !replay);
+  assert(matched_setup_cf.later_b_archived_replay.get()==matched_setup_cf.later_b_recipe_owner);
+  assert(later_b_gate2_parent_identity_valid(matched_setup_cf));
+  assert(long_parser_refuses(valid)); // Failed one-use parent is not rebound.
+  assert(arm_leaf_calls==1 && matched_setup_cf.later_b_gate2_parent_archived);
+  std::cout << "MWB3_CONTROLS passed=geometry,token,pad,order,context,seed,setup-order,one-use\n";
 }
 """
 
@@ -687,6 +835,21 @@ class LaterBGate2NativeControls(OwnedWorkspaceTests):
             raise ValueError("retained Gate2 projection bytes differ from the reviewed export")
         cls.projection = json.loads(cls.projection_bytes)
         cls._validate_projection(cls.projection)
+        cls.long_projection = None
+        cls.long_projection_path = None
+        if os.environ.get(LONG_PROJECTION_ENV):
+            long_supplied = Path(os.environ[LONG_PROJECTION_ENV]).absolute()
+            if (long_supplied.is_symlink() or long_supplied.resolve(strict=True) != long_supplied or
+                    not long_supplied.is_file()):
+                raise ValueError("retained long-B projection must be a regular non-symlink file")
+            cls.long_projection_path = long_supplied
+            cls.long_projection_bytes = long_supplied.read_bytes()
+            if hashlib.sha256(cls.long_projection_bytes).hexdigest() != (
+                    "dead7b678716df87432febba4c8dfedf43acdb47f8d1254bec7b6970f00d3ba1"):
+                raise ValueError("retained long-B projection bytes differ from the reviewed export")
+            cls.long_projection = json.loads(cls.long_projection_bytes)
+            cls._validate_long_projection(cls.long_projection)
+            cls.long_manifest = cls._encode_long_manifest(cls.long_projection)
 
         run_root = Path(os.environ.get(RUN_ROOT_ENV, cls.cpp_path.parents[1] / "run-v1")).absolute()
         if run_root.is_symlink() or run_root.resolve() != run_root:
@@ -702,7 +865,8 @@ class LaterBGate2NativeControls(OwnedWorkspaceTests):
         if not compiler:
             raise RuntimeError("clang++ is required by the pinned focused native recipe")
         command = [compiler, "-std=c++20", "-Wall", "-Wextra", "-Werror",
-                   "-I", str(SOURCE_ROOT / "src"), str(fixture), "-o", str(cls.binary)]
+                   "-I", str(cls.cpp_path.parent), "-I", str(SOURCE_ROOT / "src"),
+                   str(fixture), "-o", str(cls.binary)]
         # Redirect before execution so even compiler errors/timeouts retain raw diagnostics.
         compile_stdout = cls.workspace / "compile.stdout"
         compile_stderr = cls.workspace / "compile.stderr"
@@ -767,6 +931,113 @@ class LaterBGate2NativeControls(OwnedWorkspaceTests):
                 except ValueError as error:
                     raise ValueError(f"retained tick {tick} PAD record is not literal hex") from error
 
+    @staticmethod
+    def _encode_long_manifest(value):
+        out = bytearray(b"MWB3" + struct.pack("<5I", 7168, 951, 84, 3585, 36))
+        out.extend(b"123e4567-e89b-12d3-a456-426614174000")
+        for row in value["actions"]:
+            if row["kind"] == "tick":
+                encoded = (struct.pack("<BIII", 1, row["bundle"], row["bundle"],
+                                       row["draws_before"]) +
+                           b"".join(bytes.fromhex(pad) for pad in row["pads"]))
+            else:
+                encoded = (struct.pack("<BIII", 2, row["draw"], row["ticks_before"],
+                                       row["draw"]) + bytes(44))
+            if len(encoded) != 57:
+                raise ValueError("long MWB3 action does not have the fixed 57-byte wire extent")
+            out.extend(encoded)
+        if len(out) != 24 + 36 + 7168 * 57:
+            raise ValueError("long MWB3 fixture extent differs")
+        return bytes(out)
+
+    @staticmethod
+    def _validate_long_projection(value):
+        if value.get("schema") != "melee-web-stadium-later-b-long-reference-projection-v1":
+            raise ValueError("retained long-B projection schema differs")
+        if value.get("reference_id") != "original-b-5422-951-long-v1":
+            raise ValueError("retained long-B reference identity differs")
+        if (value.get("setup_global_cursor") != 951 or value.get("recipe_frames") != 5422 or
+                value.get("recipe_bytes") != 262226 or value.get("selected_match") != 1):
+            raise ValueError("retained long-B projection dimensions differ")
+        recipe = bytes.fromhex(value["recipe_hex"])
+        if (len(recipe) != 262226 or hashlib.sha256(recipe).hexdigest() !=
+                "e669f831538b90e39241a569b6c38884300bfe246b252cacda994cbc45c10bbf"):
+            raise ValueError("retained long-B exact recipe bytes differ")
+        descriptor = value["reference_descriptor"]
+        if (descriptor.get("id") != value["reference_id"] or descriptor.get("profile") != 4 or
+                descriptor.get("recipe_sha256") != hashlib.sha256(recipe).hexdigest() or
+                descriptor.get("recipe_bytes") != 262226 or descriptor.get("frames") != 5422 or
+                descriptor.get("pause_timer_zero_cursor") != 468 or
+                descriptor.get("notification_order") is not None):
+            raise ValueError("retained long-B descriptor or dynamic-order scope differs")
+        if (value["entry"].get("rng", {}).get("value_hex") != "7fc17cf1" or
+                value["setup"].get("rng", {}).get("value_hex") != "25d557a7" or
+                value["go"]["coordinate"].get("source_tick") != 84):
+            raise ValueError("retained Entry/Setup/actual-GO seed or coordinate differs")
+        shared = value["constructor_shared_projection"]
+        if (shared.get("entry_count") != 1 or shared.get("min_parameter") != 3600 or
+                shared.get("max_parameter") != 3800 or shared.get("random_bound") != 200 or
+                shared.get("random_result") != 72 or shared.get("seed_before") != "7fc17cf1" or
+                shared.get("seed_after") != "5ce52bf0" or
+                shared.get("parameter_roles") != {
+                    "min_parameter": "parameter_x0", "max_parameter": "parameter_x4"}):
+            raise ValueError("retained long-B shared constructor aggregate differs")
+        actions = value.get("actions", [])
+        if len(actions) != 7168 or len(value.get("states", [])) != 3501:
+            raise ValueError("retained long-B action or typed-state count differs")
+        ticks = draws = 0
+        tick_pads = []
+        for index, action in enumerate(actions):
+            if action.get("action_index") != index:
+                raise ValueError("retained long-B action indices are not contiguous")
+            source = action.get("source", {})
+            if action.get("kind") == "tick":
+                pads = action.get("pads")
+                if (action.get("bundle") != ticks or action.get("draws_before") != draws or
+                        source.get("source_tick") != ticks or source.get("draw_ordinal") != draws or
+                        action.get("consume", {}).get("source_tick") != ticks or
+                        action.get("consume", {}).get("draw_ordinal") != draws or
+                        not isinstance(pads, list) or len(pads) != 4):
+                    raise ValueError(f"retained long-B tick action {index} lost source/PAD coordinates")
+                for pad in pads:
+                    if not isinstance(pad, str) or len(pad) != 22:
+                        raise ValueError(f"retained long-B tick action {index} lacks literal four-port PAD")
+                    bytes.fromhex(pad)
+                tick_pads.append(pads)
+                ticks += 1
+            elif action.get("kind") == "draw":
+                draw_enter = action.get("draw_enter", {})
+                if (action.get("draw") != draws or action.get("ticks_before") != ticks or
+                        source.get("source_tick") != ticks or source.get("draw_ordinal") != draws or
+                        draw_enter.get("source_tick") != ticks or
+                        draw_enter.get("draw_ordinal") != draws):
+                    raise ValueError(f"retained long-B draw action {index} lost distinct source/draw coordinates")
+                draws += 1
+            else:
+                raise ValueError(f"retained long-B action {index} has an unknown kind")
+        if (ticks != 3585 or draws != 3583 or len(tick_pads) != 3585 or
+                actions[168]["kind"] != "tick" or actions[168]["bundle"] != 84 or
+                actions[169]["kind"] != "draw" or actions[169]["draw"] != 84 or
+                actions[169]["ticks_before"] != 85 or
+                actions[170]["kind"] != "tick" or actions[170]["bundle"] != 85 or
+                actions[-1]["kind"] != "draw" or actions[-1]["draw"] != 3582 or
+                actions[-1]["ticks_before"] != 3585):
+            raise ValueError("retained long-B independent action schedule boundary differs")
+        terminal = value["natural_terminal"]
+        if (terminal.get("target_source_tick") != 3584 or
+                terminal.get("first_later_natural_draw_return", {}).get("source_tick") != 3585 or
+                terminal.get("first_later_natural_draw_return", {}).get("draw_ordinal") != 3582):
+            raise ValueError("retained long-B natural terminal coordinates differ")
+        selector = value["action_rng"]["selector"]
+        if (selector != {"schema": "melee-web-later-b-long-action-rng-v1",
+                         "reference_id": "original-b-5422-951-long-v1", "prefix_cursor": 951,
+                         "reference_go_tick": 84, "first_action": 168, "last_action": 7167} or
+                len(value["action_rng"].get("rows", [])) != 7000):
+            raise ValueError("retained long-B diagnostic action-index selector differs")
+        if any(value.get(flag) is not False for flag in
+               ("runtime_admission", "browser_parity", "per_owner_rng_parity", "C3")):
+            raise ValueError("reference-only long-B projection claims native/runtime acceptance")
+
     @classmethod
     def _build_fixture(cls):
         running_declaration = 'extern "C" int melee_web_native_menu_running();'
@@ -787,13 +1058,14 @@ class LaterBGate2NativeControls(OwnedWorkspaceTests):
             _function(cls.cpp_source, "int melee_web_native_menu_running(){") + "\n}",
             _function(cls.cpp_source, "bool later_b_gate2_uuid_valid(const std::string& value){"),
             _function(cls.cpp_source, "bool later_b_gate2_constructor_phase_trace_valid(const MeleeWebStadiumSetupSnapshot& setup){"),
-            _function(cls.cpp_source, "bool later_b_gate2_constructor_snapshot_valid(const MeleeWebStadiumSetupSnapshot& setup){"),
+            _function(cls.cpp_source, "bool later_b_gate2_constructor_snapshot_valid(const MeleeWebStadiumSetupSnapshot& setup,\n                                               bool long_reference=false){"),
             _function(cls.cpp_source, "bool later_b_gate2_first_go_snapshot_valid(\n    const MeleeWebStadiumGoAlignmentSnapshot& observed,unsigned source_tick,\n    uint64_t world_generation){"),
             _function(cls.cpp_source, "bool later_b_gate2_parent_identity_valid(const MatchedSetupCfState& state){"),
             _function(cls.cpp_source, "std::string later_b_gate2_constructor_snapshot_json(const MeleeWebStadiumSetupSnapshot& setup){"),
             _function(cls.cpp_source, "std::string first_css_browser_draw_json_quote(const std::string& value){"),
             _function(cls.cpp_source, "std::string later_b_gate2_transfer_proof_json(const MatchedSetupCfState& state,bool parent_close_checked){"),
             _function(cls.cpp_source, "static int later_b_gate2_manifest_arm(const uint8_t* manifest,size_t manifest_bytes){"),
+            _function(cls.cpp_source, "static int later_b_gate2_long_manifest_arm(const uint8_t* manifest,size_t manifest_bytes){"),
             _function(cls.cpp_source, "bool later_b_gate2_unarmed_abort_ready(const MatchedSetupCfState& state){"),
             _function(cls.cpp_source, "void matched_setup_cf_fail(const char* error){"),
             _function(cls.cpp_source, "std::string matched_setup_cf_json(){"),
@@ -806,9 +1078,8 @@ class LaterBGate2NativeControls(OwnedWorkspaceTests):
             raise AssertionError("actual last_action assignment endpoints must be unique")
         assignment = cls.cpp_source[cls.cpp_source.index(action_start):cls.cpp_source.index(action_end)]
         extracted.append("""
-static std::string actual_action_json_control(bool tick_action) {
+static std::string actual_action_json_control(bool tick_action,unsigned index=0,unsigned ordinal=0) {
   auto& state=matched_setup_cf;
-  const unsigned index=tick_action?0:1, ordinal=0;
   const std::string v2_counter_json, go2_state_observation_json="null",
       pad_queue_observation_json="null", common_sample_json="null",
       later_b_actual_go_event_json="null", later_b_post_go_typed22_state_json="null";
@@ -982,12 +1253,40 @@ static void draw84_refresh_and_owner_controls() {
         if len(pad_rows) != 180:
             raise ValueError("actual projection did not yield 180 PAD rows")
         pads = ",\n".join(pad_rows)
+        long_pad_rows = []
+        if cls.long_projection is not None:
+            for action in cls.long_projection["actions"]:
+                if action["kind"] == "tick":
+                    long_pad_rows.append("{" + ",".join(json.dumps(pad) for pad in action["pads"]) + "}")
+            if len(long_pad_rows) != 3585:
+                raise ValueError("long projection did not yield 3585 actual PAD rows")
+        else:
+            long_pad_rows = ['{"' + '0000000000000000000000' + '","' +
+                             '0000000000000000000000' + '","' +
+                             '0000000000000000000000' + '","' +
+                             '0000000000000000000000' + '"}']
+        long_pads = ",\n".join(long_pad_rows)
         fixture_body = FIXTURE_BODY.replace(
             'else if(mode=="step-error") step_error_controls();',
             'else if(mode=="step-error") step_error_controls();\n  else if(mode=="draw84") draw84_source_probe::draw84_refresh_and_owner_controls();')
         return (PRELUDE + fixture_body
                 .replace("__PADS__", pads)
+                .replace("__LONG_PADS__", long_pads)
+                .replace("__LONG_TESTS__", LONG_TESTS)
+                .replace("__LONG_MANIFEST_HEX__", cls.long_manifest.hex() if cls.long_projection is not None else "")
                 .replace("__EXTRACTED_FUNCTIONS__", "\n\n".join(extracted)))
+
+    def test_actual_mwb3_parser_accepts_exact_retained_long_rows_and_keeps_go_unobserved(self):
+        if self.long_projection is None:
+            self.skipTest("optional retained long-B projection fixture is absent")
+        output = self._run_fixture("long-parser-accept")
+        self.assertIn("MWB3_ACCEPT actions=7168 ticks=3585 draws=3583 prefix=951 GO=84 actual_go_observed=false", output)
+
+    def test_actual_mwb3_parser_refuses_geometry_literal_pad_and_owner_controls(self):
+        if self.long_projection is None:
+            self.skipTest("optional retained long-B projection fixture is absent")
+        output = self._run_fixture("long-parser-controls")
+        self.assertIn("MWB3_CONTROLS passed=geometry,token,pad,order,context,seed,setup-order,one-use", output)
 
     def _run_fixture(self, mode):
         result = subprocess.run([str(self.binary), mode], check=False, timeout=20,
@@ -1043,6 +1342,35 @@ static void draw84_refresh_and_owner_controls() {
         })
         self.assertEqual(records["OBSERVED"]["actual_go"], {"observed": True, "tick": 84})
         self.assertEqual(records["OBSERVED"]["post_go_typed22_state_count"], 96)
+        expected_coordinates = {
+            "ACTION_TICK": {"source_tick": 0, "draw_ordinal": None, "recipe_input_index": 943},
+            "ACTION_DRAW": {"source_tick": 1, "draw_ordinal": 0, "recipe_input_index": None},
+            "LONG_ACTION_TICK": {"source_tick": 84, "draw_ordinal": None,
+                                 "recipe_input_index": 1035},
+            "LONG_ACTION_DRAW": {"source_tick": 85, "draw_ordinal": 84,
+                                 "recipe_input_index": None},
+        }
+        coordinate_keys = {"source_tick", "draw_ordinal", "recipe_input_index"}
+        def accept_action_receipt(label, receipt):
+            coordinates = receipt.get("source_coordinates")
+            if (not isinstance(coordinates, dict) or set(coordinates) != coordinate_keys or
+                    coordinates != expected_coordinates[label] or
+                    "global_recipe_input_index" in receipt):
+                raise ValueError("native action source_coordinates contract differs")
+            return coordinates
+        for label, expected in expected_coordinates.items():
+            self.assertEqual(accept_action_receipt(label, records[label]), expected)
+        bad_receipt = dict(records["LONG_ACTION_TICK"])
+        bad_receipt["source_coordinates"] = dict(bad_receipt["source_coordinates"])
+        bad_receipt["global_recipe_input_index"] = bad_receipt[
+            "source_coordinates"].pop("recipe_input_index")
+        with self.assertRaisesRegex(ValueError, "source_coordinates contract"):
+            accept_action_receipt("LONG_ACTION_TICK", bad_receipt)
+        bad_receipt = dict(records["LONG_ACTION_DRAW"])
+        bad_receipt["source_coordinates"] = dict(bad_receipt["source_coordinates"])
+        bad_receipt["source_coordinates"]["recipe_input_index"] = 1035
+        with self.assertRaisesRegex(ValueError, "source_coordinates contract"):
+            accept_action_receipt("LONG_ACTION_DRAW", bad_receipt)
         self.assertEqual(records["LIVE"]["state"], "armed")
         self.assertEqual(records["LIVE"]["cursor"], 0)
         for label in ("ACTION_TICK", "ACTION_DRAW", "LEGACY_TICK"):

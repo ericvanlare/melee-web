@@ -123,6 +123,36 @@
       "handoff_origin": "current_sss_prepared_later_943",
       "original_B_constructor_GO": "REFERENCE_OBSERVED_BROWSER_UNPAIRED",
       "notification_order_contract": "captured_native_complete_trace_not_original_draw_ordinal"
+    },
+    {
+      "id": "original-b-5422-951-long-v1",
+      "profile": 4,
+      "recipe_sha256": "e669f831538b90e39241a569b6c38884300bfe246b252cacda994cbc45c10bbf",
+      "recipe_bytes": 262226,
+      "frames": 5422,
+      "first": [0,151,278,471,685,817,951,4550,4762,4893,5017,5210],
+      "last": [150,277,470,684,816,950,4549,4761,4892,5016,5209,5421],
+      "pause_first": 458,
+      "pause_last": 470,
+      "pause_frame": 56,
+      "pause_timer_zero_cursor": 468,
+      "menu_ticks": 544,
+      "notification_order": null,
+      "sss_sequence": 4266,
+      "sss_tick": 134,
+      "sss_draw": 193,
+      "entry_sequence": 4267,
+      "setup_sequence": 4353,
+      "entry_seed": "7fc17cf1",
+      "setup_seed": "25d557a7",
+      "a_entry_sequence": 1661,
+      "a_setup_sequence": 1697,
+      "a_tick": 127,
+      "a_entry_seed": "e2624ac3",
+      "a_setup_seed": "083a62a9",
+      "handoff_origin": "current_sss_prepared_later_951",
+      "original_B_constructor_GO": "REFERENCE_OBSERVED_BROWSER_UNPAIRED",
+      "notification_order_contract": "captured_native_complete_trace_not_original_draw_ordinal"
     }
   ]
 }

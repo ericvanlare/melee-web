@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import {OBSERVED_B_REFERENCE, OBSERVED_B_SCHEMA} from './stadium_later_reference_contexts.mjs';
+import {OBSERVED_B_REFERENCE, LONG_B_REFERENCE, OBSERVED_B_SCHEMA} from './stadium_later_reference_contexts.mjs';
 /*
  * Headless whole-session MWRC diagnostic.
  *
@@ -17,8 +17,9 @@ import {validateStock4SssExitExpected, compareStock4SssExitObservation, validate
   validateStock4SssExitTerminal, validateStock4SssExitFinalization} from './stadium_stock4_sss_exit_observation.mjs';
 import {validateLaterSssExitExpected, validateLaterReferenceRecipeInputs, compareLaterSssExitObservation, validateLaterSssExitTrace,
   validateLaterSssExitTerminal, validateLaterSssExitFinalization, compareLaterPreparedStartObservation, compareLaterPreparedSetupObservation} from './stadium_later_sss_exit_observation.mjs';
-import {StadiumSetupCfActionDriver, deriveLaterBGate2Expectations} from '../tests/stadium_matched_setup_cf_consumer.mjs';
+import {StadiumSetupCfActionDriver, deriveLaterBGate2Expectations, deriveLaterBLongExpectations} from '../tests/stadium_matched_setup_cf_consumer.mjs';
 import {createLaterBGate2NativeAdapter, runLaterBGate2ActionContinuation} from '../tests/stadium_matched_setup_cf_runner_gate.mjs';
+import {deriveLongBActionRngWindow, bindLongBActionRngRows, activateLongBActionRngSelection} from './stadium_later_b_long_rng.mjs';
 import fs from 'node:fs/promises';
 import {closeSync, createReadStream, fsyncSync, openSync, writeSync} from 'node:fs';
 import path from 'node:path';
@@ -180,6 +181,9 @@ const laterSssPreparedSetup = values['stadium-later-sss-prepared-setup'];
 const laterSssReference = values['stadium-later-sss-reference'] ?? null;
 const laterBGate2ProjectionPath = values['stadium-later-b-gate2-projection'] ? path.resolve(values['stadium-later-b-gate2-projection']) : null;
 const laterBGate2 = laterBGate2ProjectionPath !== null;
+const laterBLong = laterSssReference === LONG_B_REFERENCE.id;
+const laterBActionReceipts = new Map();
+let longBRngRetained = false;
 const laterBGate2BindingPath = values['stadium-later-b-gate2-binding'] ? path.resolve(values['stadium-later-b-gate2-binding']) : null;
 const laterBGate2BindingPython = values['stadium-later-b-gate2-binding-python'] ?? null;
 if ((laterBGate2BindingPath !== null) !== (laterBGate2BindingPython !== null) ||
@@ -191,9 +195,9 @@ let laterBRngOwnerWindow = null;
 if (laterBRngOwnerWindowSpec !== undefined && (!laterBGate2 || rngDrawProbe || hitTransitionProbe ||
     captureCpuObservations || stopAfter || resumeTimingPauses || diagnostic))
   throw Error('Gate2 RNG owners require the exact Gate2 route and no other diagnostic selectors');
-if (laterBGate2 && (laterSssReference !== OBSERVED_B_REFERENCE.id || !laterSssPreparedSetup))
+if (laterBGate2 && (![OBSERVED_B_REFERENCE.id,LONG_B_REFERENCE.id].includes(laterSssReference) || !laterSssPreparedSetup))
   throw Error('Gate2 requires the exact new-reference checked profile3 Setup route');
-if (laterSssReference !== null && (laterSssReference !== OBSERVED_B_REFERENCE.id ||
+if (laterSssReference !== null && (![OBSERVED_B_REFERENCE.id,LONG_B_REFERENCE.id].includes(laterSssReference) ||
     !currentSssLater || !laterSssPreparedStart || !laterSssPreparedSetup || currentSssPreparedStart))
   throw Error('New later reference requires its exact explicit descriptor and checked later Setup route');
 if (laterSssPreparedSetup && (!currentSssLater || !laterSssPreparedStart || currentSssPreparedStart))
@@ -436,7 +440,17 @@ async function retainRngDrawProbe() {
           await write('rng-draw-probe.jsonl',rawText);
           report.rng_draw_probe.raw_artifact={name:'rng-draw-probe.jsonl',bytes:Buffer.byteLength(rawText),
             sha256:createHash('sha256').update(rawText).digest('hex')};
-          if(rows.some(text=>JSON.parse(text).version!==2))throw Error('Gate2 RNG owner rows require the actual version2 owner producer');
+          if(rows.some(text=>JSON.parse(text).version!==(laterBLong?3:2)))throw Error('Gate2 RNG owner rows require the actual version2 owner producer');
+        }
+        if(laterBLong) {
+          const result=bindLongBActionRngRows(rows,laterBRngOwnerWindow,laterBActionReceipts,
+            {complete:report.later_b_gate2?.component_pass===true});
+          const text=result.rows.map(row=>JSON.stringify(row)).join('\n')+(result.rows.length?'\n':'');
+          await write('long-b-action-rng.jsonl',text);
+          report.rng_draw_probe={...report.rng_draw_probe,complete:result.complete,
+            captured_action_count:result.rows.length,missing_action_count:result.missing_cursors.length,
+            action_artifact:{name:'long-b-action-rng.jsonl',bytes:Buffer.byteLength(text),sha256:createHash('sha256').update(text).digest('hex')}};
+          longBRngRetained=true;return;
         }
         const validation = validateRngDrawProbeRows(rows, rngDrawProbe, {
           observedCursor: report.final_snapshot?.source_cursor,
@@ -460,7 +474,7 @@ async function retainRngDrawProbe() {
 async function runLaterBGate2FromSetup(deadline, actualObservation) {
   const setup = actualObservation.prepared_to_setup?.setup;
   const request = {reference_id: laterSssReference,
-    recipe_sha256: laterBGate2Reference.reference.recipe_sha256, cursor: 943,
+    recipe_sha256: laterBGate2Reference.reference.recipe_sha256, cursor: laterBLong?951:943,
     notification_order: actualObservation.notification_coordinates?.order,
     world_generation: setup?.stadium_setup_state?.world_generation,
     setup_seed_hex: setup?.actual?.random_seed_hex};
@@ -471,10 +485,12 @@ async function runLaterBGate2FromSetup(deadline, actualObservation) {
     currentSssArm.evaluate((scope, operands) => scope.reserveLaterBTransfer(operands.actual, operands.request),
       {actual: actualObservation, request}));
   report.later_b_gate2.token_id = token.id;
+  if(laterBLong)report.later_b_gate2.rng_activation=await observePageOperation('Gate2 activate action RNG after reservation',()=>
+    page.evaluate(activateLongBActionRngSelection,{configuration:laterBRngOwnerWindow.configuration,selected:laterBRngOwnerWindow.selection.selected}));
   const adapter = createLaterBGate2NativeAdapter({owner: currentSssArm, deadline,
     evaluate: (fn, command) => observePageOperation(`Gate2 ${command.kind}`, () => page.evaluate(fn, command))});
   const actionDriver = new StadiumSetupCfActionDriver({laterBProjection: laterBGate2ProjectionBytes,
-    laterBProjectionBinding: laterBGate2BindingBytes,
+    laterBProjectionBinding: laterBGate2BindingBytes, laterBLong,
     laterBToken: token.id, native: adapter, admittedWorldGeneration: request.world_generation});
   await fs.writeFile(path.join(output, 'gate2-native-manifest.bin'), actionDriver.nativeManifest, {flag: 'wx'});
   const evidencePath = path.join(output, 'gate2-actions.jsonl');
@@ -482,7 +498,10 @@ async function runLaterBGate2FromSetup(deadline, actualObservation) {
   try {
     const result = await runLaterBGate2ActionContinuation({driver: actionDriver, adapter,
       actualSetup: setup, deadline,
-      persist: row => fs.appendFile(evidencePath, JSON.stringify(row) + '\n'),
+      persist: async row => {
+        await fs.appendFile(evidencePath, JSON.stringify(row) + '\n');
+        if(laterBLong && row.phase==='actual-action-receipt')laterBActionReceipts.set(row.action_index,row.observation);
+      },
       record: row => observePageOperation('Gate2 retain accepted action', () =>
         currentSssArm.evaluate((scope, value) => scope.gate2Record(value), row)),
       finalize: async () => {
@@ -530,19 +549,19 @@ async function finalizeLaterBGate2Capture() {
     }
     const closedState = receipt?.matched_setup_cf;
     if (terminal?.kind !== 'retired' || receipt?.native_retired !== true || receipt.terminal !== true ||
-        closedState?.schema !== 'melee-web-stadium-later-b-gate2-native-v1' ||
-        closedState.action_count !== 360 || closedState.cursor !== 360 || closedState.complete !== true ||
-        closedState.source_ticks !== 180 || closedState.source_draws !== 180 ||
+        closedState?.schema !== (laterBLong?'melee-web-stadium-later-b-long-native-v1':'melee-web-stadium-later-b-gate2-native-v1') ||
+        closedState.action_count !== (laterBLong?7168:360) || closedState.cursor !== (laterBLong?7168:360) || closedState.complete !== true ||
+        closedState.source_ticks !== (laterBLong?3585:180) || closedState.source_draws !== (laterBLong?3583:180) ||
         closedState.actual_go?.observed !== true || closedState.actual_go.tick !== laterBGate2Reference.goTick ||
-        closedState.post_go_typed22_state_count !== 96 ||
+        closedState.post_go_typed22_state_count !== (laterBLong?3501:96) ||
         report.current_sss_exit.comparison?.pass !== true ||
         report.current_sss_exit.prepared_start_comparison?.pass !== true ||
         report.current_sss_exit.prepared_setup_comparison?.pass !== true ||
         receipt.phase_after_close !== 0 || receipt.running_after_close !== 0 || receipt.error !== null ||
         receipt.later_b_transfer?.token !== report.later_b_gate2.token_id ||
         receipt.later_b_transfer.parent_close_checked !== true || report.browser_report.complete !== false ||
-        report.browser_report.later_b_transfer.action_evidence?.length !== 360 ||
-        report.later_b_gate2.accepted_actions !== 360 || !report.later_b_gate2.component_pass ||
+        report.browser_report.later_b_transfer.action_evidence?.length !== (laterBLong?7168:360) ||
+        report.later_b_gate2.accepted_actions !== (laterBLong?7168:360) || !report.later_b_gate2.component_pass ||
         report.current_sss_exit.wrapper_restored !== true || !currentSssTrace)
       throw Error('Gate2 completed action/retirement evidence is incomplete');
     report.current_sss_exit.trace_comparison = currentSssPolicy.trace(currentSssTrace, currentSssExpected,
@@ -563,6 +582,7 @@ async function finalizeLaterBGate2Capture() {
     firstError('later_b_gate2_finalization', error.message || error);
     report.result = 'fail';
   } finally {
+    if(laterBLong && !longBRngRetained && !pageObservationTimedOut)await retainRngDrawProbe(); // Pure JS retained callbacks, no native access.
     await closeOwnedCaptureBrowser(); // Existing recorded OS owner only, never native teardown.
     if (report.cleanup?.browser_close_returned !== true || report.close_error || report.cdp_close_error || pageErrors.length) report.result = 'fail';
     report.browser_errors = pageErrors.slice(0, 256);
@@ -1038,7 +1058,7 @@ try {
         currentSssPolicy.preparedSetup = compareLaterPreparedSetupObservation;
       }
       report.scope = newLaterSchema ?
-        'New-reference occurrence1 zero-action Setup common fields/seed after diagnostic A/Results/CSS; literal inputs0..942, UNKNOWN original menu draw parity and unpaired original constructor/GO; replay incomplete, no C3' : laterSssPreparedSetup ?
+        `New-reference occurrence1 Setup after diagnostic A/Results/CSS; literal inputs0..${laterBLong?950:942}, UNKNOWN original menu draw parity; subsequent declared action comparison separate, replay incomplete, no C3` : laterSssPreparedSetup ?
         'Retained occurrence1 zero-source-action Setup common fields/seed after diagnostic A/Results/CSS; literal global inputs0..939, UNKNOWN original menu draws/constructor/GO; replay incomplete, no C3' :
         'Retained occurrence1 SSS OnExit common-field component after diagnostic A/Results/CSS; literal global inputs 0..939, pre-B-assets stop; replay incomplete, UNKNOWN menu draw parity, no B Entry/constructor/GO or C3';
     }
@@ -1066,7 +1086,7 @@ try {
         report.inputs.later_b_gate2_binding = await statInput(laterBGate2BindingPath);
         laterBGate2BindingBytes = await fs.readFile(laterBGate2BindingPath);
         const admission = JSON.parse(execFileSync(laterBGate2BindingPython,
-          [path.join(repoRoot,'tools/stadium_later_b_reference.py'),'--admit-serialized-projection',
+          [path.join(repoRoot,laterBLong?'tools/stadium_later_b_long_reference.py':'tools/stadium_later_b_reference.py'),'--admit-serialized-projection',
             laterBGate2BindingPath,laterBGate2ProjectionPath],
           {encoding:'utf8',timeout:10000,maxBuffer:65536}));
         if (admission.schema!=='melee-web-later-b-serialized-projection-admission-v1'||admission.runtime_admission!==false||
@@ -1077,14 +1097,14 @@ try {
           throw Error('Gate2 strict raw binding/projection admission differs from actual bytes');
         report.later_b_serialized_projection_admission=admission;
       }
-      laterBGate2Reference = deriveLaterBGate2Expectations(laterBGate2ProjectionBytes,laterBGate2BindingBytes);
+      laterBGate2Reference = (laterBLong?deriveLaterBLongExpectations:deriveLaterBGate2Expectations)(laterBGate2ProjectionBytes,laterBGate2BindingBytes);
       if (laterBGate2Reference.reference.recipe_sha256 !== report.inputs.recipe.sha256)
         throw Error('Gate2 projection and current literal recipe identities differ');
-      laterBRngOwnerWindow = deriveLaterBRngOwnerWindow(laterBRngOwnerWindowSpec,laterBGate2Reference);
+      laterBRngOwnerWindow = (laterBLong?deriveLongBActionRngWindow:deriveLaterBRngOwnerWindow)(laterBRngOwnerWindowSpec,laterBGate2Reference);
       if(laterBRngOwnerWindow){
         rngDrawProbe=laterBRngOwnerWindow.selection;
         report.rng_draw_probe={request:rngDrawProbe.request,selected_cursors:rngDrawProbe.selected,
-          complete:false,scope:'one source tick plus its subsequent source draw; scheduled owner context only',
+          complete:false,scope:laterBLong?'one completed actual action per diagnostic action index; original guard intervals retained separately':'one source tick plus its subsequent source draw; scheduled owner context only',
           projection_sha256:report.inputs.later_b_gate2_projection.sha256,
           configuration:laterBRngOwnerWindow.configuration,coordinates:laterBRngOwnerWindow.coordinates};
       }
@@ -1193,11 +1213,13 @@ try {
       window.__hitTransitionProbeRows.push(text);
     };
     window.__meleeRngDrawProbeOwners = laterBRngOwnerConfiguration !== null;
+    window.__meleeRngDrawProbeFighterOwners = laterBRngOwnerConfiguration?.schema==='melee-web-later-b-long-action-rng-v1';
     window.__meleeLaterBRngOwnerWindow = laterBRngOwnerConfiguration;
     window.__rngDrawProbeRows = [];
+    const seenRngActions=new Set(),selectedRngActions=new Set(rngDrawProbeSelection?.selected||[]);
     window.__rngDrawProbeSelection = rngDrawProbeSelection;
     window.__meleeRngDrawProbeCursors = rngDrawProbeSelection?.request.kind === 'cursors'
-      ? rngDrawProbeSelection.selected : null;
+      ? (laterBRngOwnerConfiguration?.schema==='melee-web-later-b-long-action-rng-v1'?[]:rngDrawProbeSelection.selected) : null;
     window.__meleeRngDrawProbeRange = rngDrawProbeSelection?.request.kind === 'range'
       ? [rngDrawProbeSelection.request.first, rngDrawProbeSelection.request.last] : null;
     window.__meleeCaptureWholeSessionCpuObservation = captureCpuObservations;
@@ -1229,11 +1251,11 @@ try {
       if (window.__rngDrawProbeRows.length >= selection.selected.length)
         throw Error('RNG draw probe exceeded its selected-cursor bound');
       const row = JSON.parse(text);
-      if (!selection.selected.includes(row.source_cursor))
+      if (!selectedRngActions.has(row.source_cursor))
         throw Error('RNG draw probe emitted an unselected source cursor');
-      if (window.__rngDrawProbeRows.some(existing =>
-          JSON.parse(existing).source_cursor === row.source_cursor))
+      if (seenRngActions.has(row.source_cursor))
         throw Error('RNG draw probe emitted a duplicate source cursor');
+      seenRngActions.add(row.source_cursor);
       window.__rngDrawProbeRows.push(text);
     };
   }, {cpuObservationRowLimit, captureCpuObservations,

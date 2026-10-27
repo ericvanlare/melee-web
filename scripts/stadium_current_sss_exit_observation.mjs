@@ -13,18 +13,27 @@ export function continuePreparedStartInPage(scope, acceptedReceipt) {
 // Passed as the actual page function; deliberately has no module-scope closure.
 // Controls use a synthetic Module solely for call ordering/ownership semantics.
 export function installCurrentSssExitReplayArm({recipeBytes, observationProfile = 0, preparedStartProbe = false, laterPreparedSetup = false}) {
-  if (laterPreparedSetup && (![2,3].includes(observationProfile) || !preparedStartProbe))
+  if (laterPreparedSetup && (![2,3,4].includes(observationProfile) || !preparedStartProbe))
     throw Error('Later prepared Setup requires its explicit profile2 prepared-Start probe');
   if (observationProfile === 3 && (!laterPreparedSetup || !preparedStartProbe))
     throw Error('Private profile3 new later reference requires the checked Setup stop');
+  if (observationProfile === 4 && (!laterPreparedSetup || !preparedStartProbe))
+    throw Error('Private profile4 long later reference requires the checked Setup stop');
+  // This function is serialized into the page realm. Keep exact identity and
+  // cursor values local so its Gate2 callback does not depend on Node imports.
+  const laterReference = observationProfile === 3
+    ? {id: 'original-b-2013-943-v1', cursor: 943}
+    : observationProfile === 4
+      ? {id: 'original-b-5422-951-long-v1', cursor: 951}
+      : null;
   const module = globalThis.Module;
   const key = '_melee_web_native_menu_replay';
   const original = Object.getOwnPropertyDescriptor(module || {}, key);
-  if (observationProfile !== 0 && observationProfile !== 1 && observationProfile !== 2 && observationProfile !== 3) throw Error('Unknown private SSS observation profile');
+  if (observationProfile !== 0 && observationProfile !== 1 && observationProfile !== 2 && observationProfile !== 3 && observationProfile !== 4) throw Error('Unknown private SSS observation profile');
   const armKey = observationProfile !== 0 ? '_melee_web_native_menu_stadium_current_sss_exit_arm_profile' : '_melee_web_native_menu_stadium_current_sss_exit_arm';
   const arm = module?.[armKey];
   const observe = module?._melee_web_native_menu_stadium_current_sss_exit_observe;
-  const preparedStartObserve = ([1,2,3].includes(observationProfile)) && preparedStartProbe
+  const preparedStartObserve = ([1,2,3,4].includes(observationProfile)) && preparedStartProbe
     ? module?._melee_web_native_menu_stadium_current_sss_prepared_start_observe : null;
   const preparedSetupBegin = (observationProfile === 1 || laterPreparedSetup) && preparedStartProbe
     ? module?._melee_web_native_menu_stadium_current_sss_prepared_setup_begin : null;
@@ -32,7 +41,7 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
   if (!original || !Object.hasOwn(original, 'value') ||
       typeof original.value !== 'function' || !original.writable ||
       typeof arm !== 'function' || typeof observe !== 'function' ||
-      (preparedStartProbe && (![1,2,3].includes(observationProfile) || typeof preparedStartObserve !== 'function')) ||
+      (preparedStartProbe && (![1,2,3,4].includes(observationProfile) || typeof preparedStartObserve !== 'function')) ||
       (laterPreparedSetup && typeof preparedSetupBegin !== 'function') ||
       typeof idle !== 'function' || typeof module.UTF8ToString !== 'function' ||
       !Array.isArray(recipeBytes) || recipeBytes.length < 328 ||
@@ -108,7 +117,7 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
     },
     observePreparedStart() {
       ordinaryObservation();
-      if (!preparedStartProbe || ![1,2,3].includes(observationProfile) || !preparedStartObserve)
+      if (!preparedStartProbe || ![1,2,3,4].includes(observationProfile) || !preparedStartObserve)
         throw Error('Prepared Start observation is available only to an explicit checked prepared-Start profile');
       if (!state.armed || state.disposed || !owns())
         throw Error('Prepared Start observation lost its armed retained Module/callback');
@@ -149,21 +158,23 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
       }
     },
     reserveLaterBTransfer(acceptedObservation, request) {
-      if (observationProfile !== 3 || !laterPreparedSetup || !preparedSetupAttempted ||
+      const reference = laterReference;
+      if (!reference || !laterPreparedSetup || !preparedSetupAttempted ||
           gate2Attempted || state.disposed || !state.armed || !owns())
-        throw Error('Gate2 reservation requires the one-use profile3 completed Setup owner');
+        throw Error(observationProfile===3?'Gate2 reservation requires the one-use profile3 completed Setup owner':
+          'Gate2 reservation requires a one-use checked long-reference completed Setup owner');
       gate2Attempted = true; // Even a lost reservation response closes ordinary getters.
       if (idle() !== true) throw Error('Gate2 reservation requires settled Asyncify');
       const pointer = Reflect.apply(observe, module, []);
       const actual = pointer ? JSON.parse(module.UTF8ToString(pointer)) : null;
       if (!actual || stableJson(actual) !== stableJson(acceptedObservation) ||
-          actual.reference_descriptor !== 'original-b-2013-943-v1' ||
+          actual.reference_descriptor !== reference.id ||
           actual.prepared_to_setup?.setup?.complete !== true ||
           actual.prepared_to_setup.setup.captured !== true ||
           actual.prepared_to_setup.setup.stadium_setup_state?.world_generation !== request?.world_generation ||
           actual.prepared_to_setup.setup.actual?.random_seed_hex !== request?.setup_seed_hex ||
           actual.notification_coordinates?.order !== request?.notification_order ||
-          actual.notification_coordinates?.replay_cursor !== 943 || request?.cursor !== 943)
+          actual.notification_coordinates?.replay_cursor !== reference.cursor || request?.cursor !== reference.cursor)
         throw Error('Gate2 reservation changed the approved actual Setup/context');
       gate2AcceptedJson = stableJson(actual.prepared_to_setup.setup);
       if (typeof window.menuReplayReserveLaterBTransfer !== 'function')
@@ -246,7 +257,8 @@ export function compareCurrentSssExitObservation(actual, expected) {
 
 export function compareSssExitObservationFields(actual, expected) {
   const later = (expected.schema === 'melee-web-stock4-none-later-sss-exit-host-expectation-v1' &&
-    expected.observation_profile === 2) || (expected.schema === 'melee-web-stock4-none-later-sss-reference-expectation-v1' && expected.observation_profile === 3);
+    expected.observation_profile === 2) || (expected.schema === 'melee-web-stock4-none-later-sss-reference-expectation-v1' &&
+      [3,4].includes(expected.observation_profile));
   requireValue(actual?.scope === 'passive_sss_onexit_return_only' &&
     actual.armed === true && actual.notified === true && actual.failed === false &&
     actual.error === null && actual.notification_received === true && actual.observation_state === 2 &&
@@ -291,7 +303,8 @@ export function validateCurrentSssExitTrace(text, expected, actual) {
 
 export function validateSssExitTraceFields(text, expected, actual) {
   const later = (expected.schema === 'melee-web-stock4-none-later-sss-exit-host-expectation-v1' &&
-    expected.observation_profile === 2) || (expected.schema === 'melee-web-stock4-none-later-sss-reference-expectation-v1' && expected.observation_profile === 3);
+    expected.observation_profile === 2) || (expected.schema === 'melee-web-stock4-none-later-sss-reference-expectation-v1' &&
+      [3,4].includes(expected.observation_profile));
   const rows = text.trim().split('\n').map(line => JSON.parse(line));
   requireValue(rows.every(r => ['header', 'session_frame', 'current_sss_exit_order',
     ...(later ? ['session_match_enter_complete'] : [])].includes(r.record)),

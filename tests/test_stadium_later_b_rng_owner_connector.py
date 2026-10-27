@@ -13,7 +13,10 @@ class StadiumLaterBRngOwnerConnectorTests(unittest.TestCase):
     def test_actual_native_connector_has_no_source_action_or_close_authority(self):
         source=(ROOT/"src/gameplay_menu_browser.cpp").read_text()
         start=source.index("void later_b_rng_owner_begin(")
-        helpers=source[start:source.index("bool matched_setup_cf_service(){",start)]
+        end=source.find("void later_b_rng_action_begin(",start)
+        if end<0:
+            end=source.index("bool matched_setup_cf_service(){",start)
+        helpers=source[start:end]
         compiler=shutil.which("clang++") or shutil.which("g++")
         if not compiler: self.skipTest("A C++ compiler is required")
         harness=r'''

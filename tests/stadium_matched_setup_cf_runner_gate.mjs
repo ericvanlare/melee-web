@@ -650,7 +650,7 @@ export function createLaterBGate2NativeAdapter({evaluate, owner, deadline,
 // delegated to the existing StadiumSetupCfActionDriver supplied by the caller.
 export async function runLaterBGate2ActionContinuation({driver, adapter, actualSetup,
   persist, record, finalize, deadline, now = Date.now}) {
-  if (!driver?.laterB || driver.payload?.schedule?.length !== 360 ||
+  if (!driver?.laterB || driver.payload?.schedule?.length !== (driver.laterBLong?7168:360) ||
       typeof persist !== 'function' || typeof record !== 'function' || typeof finalize !== 'function')
     throw Error('Gate2 continuation requires the admitted existing driver and evidence sinks');
   const beforeCommand = () => {
@@ -684,8 +684,8 @@ export async function runLaterBGate2ActionContinuation({driver, adapter, actualS
     await record({action_index: accepted, observation, approved: true});
     ++accepted;
   }
-  if (accepted !== 360 || driver.status().complete !== true || driver.status().pending)
-    throw Error('Gate2 continuation did not approve all actual360 actions');
+  if (accepted !== (driver.laterBLong?7168:360) || driver.status().complete !== true || driver.status().pending)
+    throw Error('Gate2 continuation did not approve all declared actual actions');
   beforeCommand(); await adapter.retire();
   const finalization = await finalize(); // Only correlated acknowledged native close; JS-only.
   return {outcome: 'retired', component_pass: true, accepted_actions: accepted,

@@ -12,12 +12,13 @@ const freeze = value => {
 export const LATER_REFERENCE_CONTEXTS = freeze(table);
 export const LEGACY_LATER_REFERENCE = table.contexts[0];
 export const OBSERVED_B_REFERENCE = table.contexts[1];
+export const LONG_B_REFERENCE = table.contexts[2];
 export const OBSERVED_B_SCHEMA = 'melee-web-stock4-none-later-sss-reference-expectation-v1';
 export function laterReferenceContext(expected) {
   if (expected?.schema === OBSERVED_B_SCHEMA) {
-    if (!isDeepStrictEqual(expected.reference_context, OBSERVED_B_REFERENCE))
-      throw Error('Later reference descriptor is stale, foreign or mixed');
-    return OBSERVED_B_REFERENCE;
+    if (isDeepStrictEqual(expected.reference_context, OBSERVED_B_REFERENCE)) return OBSERVED_B_REFERENCE;
+    if (isDeepStrictEqual(expected.reference_context, LONG_B_REFERENCE)) return LONG_B_REFERENCE;
+    throw Error('Later reference descriptor is stale, foreign or mixed');
   }
   if (expected?.schema !== 'melee-web-stock4-none-later-sss-exit-host-expectation-v1')
     throw Error('Later reference schema is unknown');
