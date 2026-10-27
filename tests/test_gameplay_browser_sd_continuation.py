@@ -33,9 +33,15 @@ class BrowserSuddenDeathContinuationTests(OwnedWorkspaceTests):
         source = (ROOT / "src/gameplay_match_session.cpp").read_text()
         finish = function(source, "void GameplayMatchSession::finish_vs(")
         end_flow = function(source, "    void end_flow()")
+        world = (ROOT / "src/gameplay_world.cpp").read_text()
+        service = (ROOT / "src/gameplay_source_files.c").read_text()
+        quiescent = function(service, "int melee_web_source_files_quiescent_for(")
+        ensure = function(world, "void GameplayWorld::ensure_source_files_quiescent()const{")
         harness = r'''
 #include <cassert>
 #include <cstdint>
+#include <cstdio>
+#include <cstddef>
 #include <cstring>
 #include <memory>
 #include <stdexcept>
@@ -46,6 +52,15 @@ static std::vector<std::string> events;
 static uint32_t host_seed=777,*seed_ptr=&host_seed;
 static uint8_t live_pad=0;static bool published=false,publication_ok=true;
 static void check(bool v,const char* e){if(!v)throw std::runtime_error(e);}
+// Only ownership fields are modeled; predicate and World wrapper below are actual source.
+using DatError=std::runtime_error;
+struct MeleeWebSourceFileScope {int pumping=0;void* requests=nullptr;size_t request_count=0;};
+static MeleeWebSourceFileScope* active_scope=nullptr;
+static int fail(char* e,size_t n,const char* message){if(e&&n)std::snprintf(e,n,"%s",message);return 0;}
+''' + quiescent + r'''
+struct WorldStorage {MeleeWebSourceFileScope* source_files=nullptr;};
+struct GameplayWorld {WorldStorage* storage_=nullptr;void ensure_source_files_quiescent()const;};
+''' + ensure + r'''
 static int melee_web_match_flow_end(int*,char*,size_t){events.push_back("end");*seed_ptr+=2;return 1;}
 static int melee_web_match_rules_publish_result(){
  if(!publication_ok){events.push_back("publish_failed");return 0;}
@@ -58,9 +73,10 @@ static int melee_web_match_stats(int*,MeleeWebMatchStats* s,char*,size_t){
 }
 static void melee_web_pad_state_capture(uint8_t* p){events.push_back("capture_pad");std::memset(p,live_pad,822);}
 struct Storage{
+ MeleeWebSourceFileScope scope;WorldStorage world_storage{&scope};GameplayWorld owned_world{&world_storage};GameplayWorld* world=&owned_world;
  struct{bool opening_demo=false,sudden_death=false;}selected;
  bool sudden_death_claimed=false;int value=1,*match=&value,*flow=&value;uint32_t seed=17;
- Storage(){seed_ptr=&seed;live_pad=1;}
+ Storage(){seed_ptr=&seed;live_pad=1;active_scope=&scope;}
 ''' + end_flow + r'''
  void close(){end_flow();melee_web_match_rules_publish_result();events.push_back("close");seed_ptr=&host_seed;}
  ~Storage(){seed_ptr=&host_seed;}
@@ -83,6 +99,13 @@ int main(){
  uint32_t seed=999;uint8_t pad[822];std::memset(pad,7,822);bool rejected=false;
  try{s.finish_vs(seed,bad==5?nullptr:pad);}catch(const std::exception&){rejected=true;}
  assert(rejected&&events.empty()&&seed==999&&pad[0]==7&&s.storage_->flow);}
+ // Actual quiescence must reject before flow/publication/caller-output mutation.
+ for(unsigned busy=0;busy<4;++busy){events.clear();published=false;GameplayMatchSession s;
+ if(busy==0)s.storage_->scope.requests=&s;if(busy==1)s.storage_->scope.pumping=1;
+ if(busy==2)active_scope=nullptr;if(busy==3)s.storage_->world=nullptr;
+ uint32_t seed=999;uint8_t pad[822];std::memset(pad,7,822);bool rejected=false;
+ try{s.finish_vs(seed,pad);}catch(const std::exception&){rejected=true;}
+ assert(rejected&&events.empty()&&seed==999&&pad[0]==7&&pad[821]==7&&s.storage_&&s.storage_->flow);}
  events.clear();published=false;publication_ok=false;
  {GameplayMatchSession s;uint32_t seed=999;uint8_t pad[822]{};bool rejected=false;
  try{s.finish_vs(seed,pad);}catch(const std::exception&){rejected=true;}
