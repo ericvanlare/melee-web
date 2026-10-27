@@ -58,6 +58,8 @@ ships with a migration path, and is measured against those PRs before merge.
 
 **Status:** Accepted. Continue the checkpointed Stadium prerequisite with short diagnostic runs and actual-source controls for the first failure. Reuse unchanged build/evidence identities, review each coherent repair, and run the full regression once at the final integration boundary. After two experiments at one boundary, require a smaller reproducer or bounded review before another run. Keep prior failures and acceptance limits explicit; do not turn each diagnostic into another milestone or PR.
 
+**Follow-up:** The long second-lifetime state/input and selected per-owner RNG comparisons now pass with checked retirement. The integrated regression passes after targeted fixture repairs. Original and browser producers remain separately pinned in the existing boundary; partial-GO guard events and detailed constructor phases remain explicitly unpaired. Continue with an explicit two-natural-lifetime reference profile using the existing route and scene seed endpoints. Full allocator journaling remains a separate scope. C3 remains open; C4–C8 transformations remain later gates.
+
 **Links:** [Stadium #251](https://github.com/ericvanlare/melee-web/issues/251), [draft PR #301](https://github.com/ericvanlare/melee-web/pull/301), [current boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md).
 
 ### 2026-10-25 — Owner and Codex: bounded completion sprint

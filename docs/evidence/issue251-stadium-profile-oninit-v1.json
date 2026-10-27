@@ -319,7 +319,7 @@
   },
   "subsequent_c3_component_2026_10_09": {
     "claim_boundary": "The latest native checkpoint is the bounded first-full-post-GO C/F state trace on exact runtime source 59f843fd (tree bbe284bf). It records one native tick with no draw and preserves the display timer only as raw object bytes because initialization was not observed; this is not original-state parity. The 59f suite retained one stale Sheik tag-range assertion failure. Test-only descendant 7fb9ceb8 corrected only the authored tag inventory; its full suite passed 2,471 tests with 167 skips and no failures, while runtime and observer producers remain 59f. Exact-head CI is pending after push. The original observer capture passed its bounded route checks but failed the frozen sequence reproduction criterion; the first consumed-PAD content difference is at sequence 260/index 5. The earlier typed-timer diagnostic on 16bc is superseded as a representation, not erased. Original PAD856/profile, persistent VsModeData, title bytes, per-owner RNG, Ready/GO, an original-matched 3,500-tick sequence and C3 acceptance remain open. The two historical functional 3,500-tick lifetimes and ordinary Results regression remain separate completed evidence; public Stadium admission stays closed.",
-    "current_result": "On runtime source 59f843fd/tree bbe284bf, the native-menu trace build and diagnostic/ordinary Release runtime builds passed. The root-reviewed trace captured GO-containing C exit, pre-F85 and post-F86 in generation 3, all at source_frame 0: map-2 countdown 3646→3645 with phase/gate/form 0/0/5; display mode/previous mode 11/10; title entry 19; and no draw. The display timer is raw bytes fffffffe with initialization unobserved, not a typed value. The 59f full suite ran 2,471 tests with 167 skips and one failure in the stale Sheik tag-range test. Test-only descendant 7fb9ceb8 fixed only that expected namespace; its full suite passed 2,471 tests with 167 skips and zero failures. The 7fb9 validation does not change the 59f runtime/observer producers; exact-head CI remains pending. The original observer capture passed C84/F85/zero-tail route validation and shut Dolphin down cleanly, but frozen reproduction failed: 3,050 records versus 2,935 in v6, with DrawReturn sequence IDs 3048 versus 2933. First consumed-PAD content differed at sequence 260/index 5 (port 0), and the cause remains unresolved. The original state companion is valid under its own schema but unpaired to native because inputs/context and draw/no-draw paths differ. No matched original counterpart is claimed.",
+    "current_result": "On runtime source 59f843fd/tree bbe284bf, the native-menu trace build and diagnostic/ordinary Release runtime builds passed. The root-reviewed trace captured GO-containing C exit, pre-F85 and post-F86 in generation 3, all at source_frame 0: map-2 countdown 3646\u21923645 with phase/gate/form 0/0/5; display mode/previous mode 11/10; title entry 19; and no draw. The display timer is raw bytes fffffffe with initialization unobserved, not a typed value. The 59f full suite ran 2,471 tests with 167 skips and one failure in the stale Sheik tag-range test. Test-only descendant 7fb9ceb8 fixed only that expected namespace; its full suite passed 2,471 tests with 167 skips and zero failures. The 7fb9 validation does not change the 59f runtime/observer producers; exact-head CI remains pending. The original observer capture passed C84/F85/zero-tail route validation and shut Dolphin down cleanly, but frozen reproduction failed: 3,050 records versus 2,935 in v6, with DrawReturn sequence IDs 3048 versus 2933. First consumed-PAD content differed at sequence 260/index 5 (port 0), and the cause remains unresolved. The original state companion is valid under its own schema but unpaired to native because inputs/context and draw/no-draw paths differ. No matched original counterpart is claimed.",
     "first_css_browser_draw_4d6c0b37_d949a0b8_v1": {
       "status": "FAIL_BEFORE_ARM; NO_BROWSER_CSS_COMPARISON; NO_TICK; NO_DRAW",
       "scope": "One headless browser attempt with the existing captured first-CSS context and one consumed sample. The diagnostic did not arm; this is not a source draw or Stadium/C3 acceptance result.",
@@ -842,7 +842,7 @@
         "bytes": 5827,
         "sha256": "00aed8ec430c9eee43d7a61315a61d195487a2cf3900516a6c517620cb9e0f72",
         "decision": "PROPOSE_EXISTING_POST_TICK_READ_WITH_DECLARED_PHASE_OFFSET",
-        "interval": "Original CSS return 833 → consumed PAD sample 834 → scheduler-end SourceTick 835; stop before DrawEnter 836.",
+        "interval": "Original CSS return 833 \u2192 consumed PAD sample 834 \u2192 scheduler-end SourceTick 835; stop before DrawEnter 836.",
         "compare": "PAD822, seed, scene kind and four authored routing getters. Original scheduler-return frame0 vs native public post-tick frame1 is explicit; intervening clock/transition code does not write the compared fields. Raw pending-mode and next-state bytes remain unpaired.",
         "stopping_rule": "One tick only; stop on first preparation, owner, input or state mismatch. No draw or retry."
       },
@@ -1547,7 +1547,7 @@
       },
       "remaining": "The scoped browser diagnostic now matches the captured original CSS-return state, one consumed input/tick and one actual first CSS draw. The next proposed experiment is a separately reviewed bounded CSS stream using only the retained raw timeline as preparation; it must stop at the first mismatch or native transition result 3 before any no-op draw, pending-input advancement or rebuild. A later CSS comparison, SSS/history, full setup/per-owner RNG, VS Setup/GO, full match, stock-out/standings and C3 gates remain outstanding. The earlier 6e/8f and 7d evidence retain their scoped identities.",
       "c3_original_ledger_requirement": "Reuse existing RNG draw observer; C3 notes604-608 require per-tick/per-owner original comparison, separately from broader C8 transformation comparison.",
-      "claim_boundary": "The separate 8f785fe5 producer retains two sequential 3,500-post-GO functional lifetimes and the ordinary Results regression within their recorded scopes. The original v6 capture on 7d406f63 passes the bounded CSS→SSS→selected Stadium→VS Setup→GO prefix, with C=84, F=85 and natural DrawReturn; its independent raw review extracted original-only phase-tagged setup/RNG observations. The first-CSS typed return, one consumed input/tick and one browser source draw now match their admitted original fields on the reviewed 8cc72c16 producer. This establishes only the first-CSS browser boundary; no later CSS stream, SSS/history, VS Setup/GO setup, per-owner RNG ledger, full match, gameplay or C3 acceptance is established. Physical-input, audible-output, live-timing and foreground gates remain open; ordinary public Stadium admission remains closed.",
+      "claim_boundary": "The separate 8f785fe5 producer retains two sequential 3,500-post-GO functional lifetimes and the ordinary Results regression within their recorded scopes. The original v6 capture on 7d406f63 passes the bounded CSS\u2192SSS\u2192selected Stadium\u2192VS Setup\u2192GO prefix, with C=84, F=85 and natural DrawReturn; its independent raw review extracted original-only phase-tagged setup/RNG observations. The first-CSS typed return, one consumed input/tick and one browser source draw now match their admitted original fields on the reviewed 8cc72c16 producer. This establishes only the first-CSS browser boundary; no later CSS stream, SSS/history, VS Setup/GO setup, per-owner RNG ledger, full match, gameplay or C3 acceptance is established. Physical-input, audible-output, live-timing and foreground gates remain open; ordinary public Stadium admission remains closed.",
       "pad_input_reducer": {
         "caller_source": "8e087161fcc5a62f6f82cb333a812d0f4eff448f",
         "phase_correction_source": "e2ff861b3f290714d4c6aaa1a19158d4e7f8e59a",
@@ -2679,10 +2679,10 @@
             "draw": false,
             "pcm_processing": true
           },
-          "scope": "One native no-draw neutral-input port-side canary that traversed the original CSS→SSS route. It did not emit the full typed setup receipt or bind the first-CSS seed context to match construction; it is not paired with the separate setup observation, not an original comparison, and not a per-owner RNG result.",
+          "scope": "One native no-draw neutral-input port-side canary that traversed the original CSS\u2192SSS route. It did not emit the full typed setup receipt or bind the first-CSS seed context to match construction; it is not paired with the separate setup observation, not an original comparison, and not a per-owner RNG result.",
           "limitations": [
             "source frame stayed0 across GO-containing and next full tick; no increment inferred",
-            "CSS→SSS navigation occurred, but no same-run typed setup receipt/first-CSS-context binding",
+            "CSS\u2192SSS navigation occurred, but no same-run typed setup receipt/first-CSS-context binding",
             "no long two-world3500tick C3, original draw/RNG equivalence, browser, physical input, foreground timing, audible output or whole-session acceptance"
           ]
         }
@@ -2757,7 +2757,7 @@
           },
           "normalized_equals_post_vs": false
         },
-        "scope": "Original source CSS→SSS Stadium selection and checked menu/world/session retirement only. No OnInit, MatchSession, Ready/GO, draw or gameplay ticks; this is setup provenance, not complete replay context or matched original comparison.",
+        "scope": "Original source CSS\u2192SSS Stadium selection and checked menu/world/session retirement only. No OnInit, MatchSession, Ready/GO, draw or gameplay ticks; this is setup provenance, not complete replay context or matched original comparison.",
         "unobserved": [
           "full 0x55E8 transient SaveData bytes",
           "private PAD queue slots and qcount snapshot",
@@ -3204,7 +3204,7 @@
             "bytes": 4706,
             "sha256": "b51baa7d3d3169d9ab98ac7de043ca88bbc0198b938e78c2b15ec0d447bc94bb",
             "status": "EXTERNAL_CANDIDATE_PREPARATION_ONLY; INTEGRATION_AND_FOCUSED_REVIEW_PENDING; NO_NEW_CAPTURE",
-            "summary": "Use a fresh completed same-call tuple correlated with consumed PAD; invalidate stale/absent target data. Permit at most four already-chosen same-direction callbacks only after a validated earlier-row hit omits the target tuple. Preserve current ownership, movement, input and stream caps, consumed neutral stability, exact index 18/kind 3 success, and CSS→SSS→VS→GO guards. No native observer or binary change is proposed."
+            "summary": "Use a fresh completed same-call tuple correlated with consumed PAD; invalidate stale/absent target data. Permit at most four already-chosen same-direction callbacks only after a validated earlier-row hit omits the target tuple. Preserve current ownership, movement, input and stream caps, consumed neutral stability, exact index 18/kind 3 success, and CSS\u2192SSS\u2192VS\u2192GO guards. No native observer or binary change is proposed."
           },
           "preparation_corrections": [
             {
@@ -3223,7 +3223,7 @@
         },
         "current_feedback_capture": {
           "status": "PASS_ORIGINAL_RAW_STADIUM_GO_PREFIX_ONLY",
-          "scope": "One bounded original source CSS→SSS→Stadium→VS Setup→GO prefix. Driver source is 7d406f63; native observer producer is unchanged 91fc1fb9.",
+          "scope": "One bounded original source CSS\u2192SSS\u2192Stadium\u2192VS Setup\u2192GO prefix. Driver source is 7d406f63; native observer producer is unchanged 91fc1fb9.",
           "source": {
             "driver_head": "7d406f63a0ae9fde60174ff9db2174d482c522fe",
             "driver_tree": "d929b37efdc7362fdd6ddcfb0d85a5a9df4ad710",
@@ -3482,15 +3482,15 @@
         "observed": {
           "world_generation": 3,
           "source_heap": 0,
-          "go_containing_world_tick": "84→85",
-          "first_full_post_go_tick": "85→86",
+          "go_containing_world_tick": "84\u219285",
+          "first_full_post_go_tick": "85\u219286",
           "post_go_ticks": 3500,
           "ready_world_tick": 124,
           "ready_post_go_ordinal": 39,
           "ticks_after_ready": 3461,
-          "last_world_and_session_tick": "3584→3585",
-          "source_frames_through_ready": "0→0",
-          "post_ready_source_frames": "0→3461",
+          "last_world_and_session_tick": "3584\u21923585",
+          "source_frames_through_ready": "0\u21920",
+          "post_ready_source_frames": "0\u21923461",
           "world_and_session_advance_each_step": true,
           "source_frame_advances_each_post_ready_step": true,
           "source_memory_owner_healthy_same_world_heap": true,
@@ -3582,7 +3582,7 @@
             "artifact": "root-ordinary-results-frozen-failure-v1.json",
             "sha256": "0c1e0ca8dddd128959e44f474c419940306e1bb42ef1caf58ad0353edfc84040",
             "first_failure": "Missing source match fixture: LbRf.dat",
-            "boundary": "CSS→SSS and selected Final Destination route; no Match construction, Results or elimination",
+            "boundary": "CSS\u2192SSS and selected Final Destination route; no Match construction, Results or elimination",
             "immutable_bindings_unchanged": 171
           },
           "source_only_fixture_audit": {
@@ -3692,7 +3692,7 @@
                 "sha256": "ed61b1d9f55cf89901bc0d7cd49245d103ab9233f1bd65d0d6cae79c28b882f1"
               }
             ],
-            "scope": "Functional native source route using scripted source PAD and fixture seed: No Contest Match→Results→CSS/SSS, followed by a recreated four-stock Mario/Final Destination Match→source GAME ending→Results→CSS and checked final Session end. No Prize traversal.",
+            "scope": "Functional native source route using scripted source PAD and fixture seed: No Contest Match\u2192Results\u2192CSS/SSS, followed by a recreated four-stock Mario/Final Destination Match\u2192source GAME ending\u2192Results\u2192CSS and checked final Session end. No Prize traversal.",
             "limitations": [
               "No numeric post-close arena snapshot; checked session_end and natural process exit are the retirement evidence emitted by this recipe.",
               "No original-game comparison, browser, rendered-pixel, physical-input, uninterrupted-audio, PCM-equivalence or timing acceptance.",
@@ -4176,7 +4176,7 @@
           "bytes": 4764,
           "sha256": "5a72a8a5ecfa2deed6853ec8974a735e5af72dd29adf431928d387c985a95d06"
         },
-        "interval": "DrawEnter 836 → DrawReturn 837 using existing real browser renderer and same input-only prefix, no second tick or warm-up source draw.",
+        "interval": "DrawEnter 836 \u2192 DrawReturn 837 using existing real browser renderer and same input-only prefix, no second tick or warm-up source draw.",
         "pass_criteria": "Available original PAD/RNG/scene/routing fields agree, one actual source draw with GPU diagnostics and checked cleanup retained.",
         "stopping_rule": "Stop at first preparation/resource/owner/extra callback/state mismatch; retain evidence, no draw skip/reseed or unchanged retry."
       },
@@ -4254,8 +4254,8 @@
         },
         "verified": {
           "first_css_return": "Full typed CSS/VS/rules/six-player state, KO counts, live PAD, seed and scene fields match the captured original CSS-return state at original return sequence 833. The actual nine null pointer strings were checked; only explicit ABI padding pad_x5C was excluded.",
-          "consumed_tick": "One consumed PAD sample and SourceTick match the admitted original fields at sequences 834→835; original frame 0 versus native post-host-tick frame 1 remains explicit. Only the four admitted routing getters are compared.",
-          "draw": "Exactly one actual browser source draw matches the admitted original DrawEnter/DrawReturn 836→837 fields, including source tick 1, draw ordinal 0, PAD, seed, scene frame 1, scene kind 8 and the four routing getters.",
+          "consumed_tick": "One consumed PAD sample and SourceTick match the admitted original fields at sequences 834\u2192835; original frame 0 versus native post-host-tick frame 1 remains explicit. Only the four admitted routing getters are compared.",
+          "draw": "Exactly one actual browser source draw matches the admitted original DrawEnter/DrawReturn 836\u2192837 fields, including source tick 1, draw ordinal 0, PAD, seed, scene frame 1, scene kind 8 and the four routing getters.",
           "counts": "One source tick, one source draw, one host tick and one host draw; no source tick or draw during preparation. Forty local/HTTP artifacts matched before/after/current. All eleven recorded owned PIDs were absent at review.",
           "cleanup": "Unload cleared the observation and returned to phase 0/running 0; browser and server ownership cleanup passed with no reported failure.",
           "visual_scope": "The retained screenshot displays the original CSS view and was visually inspected; no pixel comparison was performed."
@@ -4280,7 +4280,7 @@
         "independent_review": "sol-first-css-postdraw-timeline-review-v2.json",
         "independent_review_sha256": "dc4c8c165c806723f60210b579426d20e96b86aed6a206bd3ce4633adcb0c0ce",
         "decision": "PASS_RAW_TIMELINE_WITH_TRANSITION_LIMIT; this is original-only sequencing and not a port comparison or authorization.",
-        "first_following_chain": "PadConsume 839 → SourceTick 840 → DrawEnter/DrawReturn 841–842.",
+        "first_following_chain": "PadConsume 839 \u2192 SourceTick 840 \u2192 DrawEnter/DrawReturn 841\u2013842.",
         "cap": "At most 148 additional consumed-tick/draw batches before first SSS entry; a stopping limit, not a required completion.",
         "stop_rule": "Stop on first mismatch or native transition result 3 before draw, advance_pending or rebuild. A host_draw success with transition nonzero may be a no-op and is not a source draw.",
         "preservation": "Keep raw DrawReturn 1577 unpaired if the boundary is reached; do not assign a cause to the source-tick reset."
@@ -6393,14 +6393,14 @@
         "original_row": 2468,
         "expected_bytes": 7500,
         "expected_sha256": "281f4dea8491c9a2848e087c43453ef987b397f4590d2a764fb2b69d86853bd1",
-        "compared": "Declared match Start rules and source semantic fields for players 0–3, preserving raw-float fields, plus host seed; this is not a whole-Start comparison.",
+        "compared": "Declared match Start rules and source semantic fields for players 0\u20133, preserving raw-float fields, plus host seed; this is not a whole-Start comparison.",
         "getter_calls": 1,
         "actual_seed": "3bb84c53",
         "first_mismatch": null,
         "persistent_prepared_vs_mode": "Retained as a separate actual object; unpaired.",
         "exclusions": [
           "native xB",
-          "players 4–5",
+          "players 4\u20135",
           "padding",
           "pointer/callback slots"
         ]
@@ -6715,7 +6715,7 @@
         "original_row": 2503,
         "approved": true,
         "first_mismatch": null,
-        "compared": "Declared match Start rules and source-semantic fields for players 0–3, preserving raw-float fields, plus host seed; not a whole-Start comparison.",
+        "compared": "Declared match Start rules and source-semantic fields for players 0\u20133, preserving raw-float fields, plus host seed; not a whole-Start comparison.",
         "actual_seed": "35a455b9",
         "expected_seed": "35a455b9",
         "getter_calls": 1,
@@ -6727,7 +6727,7 @@
         "exclusions": [
           "whole Start blob",
           "native xB",
-          "players 4–5",
+          "players 4\u20135",
           "padding",
           "pointer/callback slots"
         ]
@@ -6762,7 +6762,7 @@
         "decision": "SOURCE_REDUCTION_EXACT_REJECTED_PREDICATE_UNOBSERVED",
         "known": "The observed browser error was the generic display-owner mismatch; source review infers that refusal occurred at the Session/display-owner teardown preflight after flow/HUD end and before destructive display services.",
         "unobserved": "The exact e12 runtime failed predicate/clause/index, pointers and text/context topology were not retained; no post-failure full Session graph was captured, and the reducer does not reproduce the exact browser owner state.",
-        "next_experiment": "One stopped Setup diagnosis retaining the driver’s already-collected error.diagnostics before cleanup, with all owner/preflight predicates unchanged. Inspect the actual rejected clause; if diagnostics still do not expose it, leave it unobserved. Do not relax ownership or proceed to Ready/GO.",
+        "next_experiment": "One stopped Setup diagnosis retaining the driver\u2019s already-collected error.diagnostics before cleanup, with all owner/preflight predicates unchanged. Inspect the actual rejected clause; if diagnostics still do not expose it, leave it unobserved. Do not relax ownership or proceed to Ready/GO.",
         "actual_source_composition_control": {
           "freeze_artifact": "sol-stadium-display-close-reducer-v1/freeze.json",
           "freeze_sha256": "7417c744f6647ee05bea60fefc8d5317c30a04c0a7931bf76fbd1eec9d2883b3",
@@ -6912,7 +6912,7 @@
         "original_row": 2503,
         "approved": true,
         "first_mismatch": null,
-        "compared": "Declared match Start rules and source-semantic fields for players 0–3, preserving raw-float fields, plus host seed; not a whole-Start comparison.",
+        "compared": "Declared match Start rules and source-semantic fields for players 0\u20133, preserving raw-float fields, plus host seed; not a whole-Start comparison.",
         "actual_seed": "35a455b9",
         "expected_seed": "35a455b9",
         "construction_complete": true,
@@ -6923,7 +6923,7 @@
         "exclusions": [
           "whole Start blob",
           "native xB",
-          "players 4–5",
+          "players 4\u20135",
           "padding",
           "pointer/callback slots"
         ]
@@ -7047,7 +7047,7 @@
         "original_row": 2503,
         "approved": true,
         "first_mismatch": null,
-        "compared": "Declared match Start rules and source-semantic fields for players 0–3, preserving raw-float fields, plus host seed; not a whole-Start comparison.",
+        "compared": "Declared match Start rules and source-semantic fields for players 0\u20133, preserving raw-float fields, plus host seed; not a whole-Start comparison.",
         "actual_seed": "35a455b9",
         "expected_seed": "35a455b9",
         "construction_complete": true,
@@ -7058,7 +7058,7 @@
         "exclusions": [
           "whole Start blob",
           "native xB",
-          "players 4–5",
+          "players 4\u20135",
           "padding",
           "pointer/callback slots"
         ]
@@ -7133,7 +7133,7 @@
           "dropped_bytes": 0,
           "overflow": false
         },
-        "chronology": "Ordered source event stream places font2 append/nametag creation before HUD end and membership rejection. log_before_unload was overwritten by runner failure-handler lines3015–3020 after attempted unload; it is not exclusively a pre-unload snapshot.",
+        "chronology": "Ordered source event stream places font2 append/nametag creation before HUD end and membership rejection. log_before_unload was overwritten by runner failure-handler lines3015\u20133020 after attempted unload; it is not exclusively a pre-unload snapshot.",
         "proven": "Observed un_802FD4C8 creation and current allocated160-byte payload membership in captured SIS backing lease world3/allocation2763/epoch5.",
         "not_proven": "Numeric GObj/text addresses and allocation membership do not establish subsystem ownership, lifetime authority, safe deletion or correct teardown ordering."
       },
@@ -7900,7 +7900,7 @@
           "failures": 1,
           "exit_code": 1,
           "failed_test": "test_sheik_transform_prefix.TestSheikTransformPrefixTests.test_entity_identity_and_transform_tags_remain_distinct_in_actual_namespace",
-          "failure_scope": "Stale expected tag namespace ends at 66 while current source explicitly includes 67–89; no production behavior change is implicated."
+          "failure_scope": "Stale expected tag namespace ends at 66 while current source explicitly includes 67\u201389; no production behavior change is implicated."
         },
         "exact_head_ci": {
           "status": "pending_after_push; no current-head CI result is yet bound"
@@ -8667,7 +8667,7 @@
           "bytes": 31920,
           "sha256": "ef038d48eab48db248ddb9a0c790d8d890b9af735a8b1c4151090f77ae560fd5"
         },
-        "hash_note": "Final Sol review frozen at the bound ffafe836…f48f6b hash (15037 bytes); root final review separately binds the scoped result.",
+        "hash_note": "Final Sol review frozen at the bound ffafe836\u2026f48f6b hash (15037 bytes); root final review separately binds the scoped result.",
         "root_recorded_result": {
           "artifact": "root-recorded-replay-result-review-c7a14fd6-v1/review.json",
           "bytes": 1141,
@@ -9650,7 +9650,7 @@
       "profile_setup_equivalence": false,
       "whole_session_equivalent": false
     },
-    "next": "Extract this fresh recording’s Setup-to-GO input/draw schedule and bounded comparison fields; compare browser lifetime A, then checked retirement/recreation and lifetime B with per-owner RNG. Keep historical C/F and no-draw results separate."
+    "next": "Extract this fresh recording\u2019s Setup-to-GO input/draw schedule and bounded comparison fields; compare browser lifetime A, then checked retirement/recreation and lifetime B with per-owner RNG. Keep historical C/F and no-draw results separate."
   },
   "browser_prefix_source056_2026_10_13": {
     "result": "PASS_SCOPED_174_ACTION_SOURCE_PREFIX_ONLY",
@@ -9781,7 +9781,7 @@
         "per_action_runtime_errors": 0
       },
       "hud_clock": {
-        "diagnostic_text": "Completed matches: 0 · stock check: 0 · ticks: 0 · stocks: 4 · respawns: 0 · raw PAD: none · menu audio blocks: 0 · revisits: 0",
+        "diagnostic_text": "Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 0 \u00b7 revisits: 0",
         "source_traversal_ticks": 87,
         "interpretation": "The menu HUD clock and source traversal counter are distinct."
       },
@@ -11964,7 +11964,7 @@
         "startup_elapsed_ms": 2250.0049996376038,
         "terminal": true
       },
-      "interpretation": "The import spans are 44.6–45.1 s, but the one observed scene-prepare constructor callback is 0.25–0.27 s. The arithmetic remainder is outside that callback measurement and is not attributed to disc IO, archive decode, audio decode, or any specific subsystem.",
+      "interpretation": "The import spans are 44.6\u201345.1 s, but the one observed scene-prepare constructor callback is 0.25\u20130.27 s. The arithmetic remainder is outside that callback measurement and is not attributed to disc IO, archive decode, audio decode, or any specific subsystem.",
       "schema": "melee-web-stadium-import-preparation-attribution-v1",
       "scope": "Existing construction publication plus JS-only startup fields/UserTiming; no new native read or IO attribution."
     },
@@ -12741,7 +12741,7 @@
   "stadium_full_A_full_B_v15_2026_10_15": {
     "schema": "stadium-full-A-full-B-common-fields-seed-component-evidence-v1",
     "state": "PASS_COMPONENT_ROOT_AND_INDEPENDENT_FULL_PAIR_REPLAY",
-    "scope": "One unchanged-budget A7167 → checked native close/host settlement/restart → B7167 on the same Module/Wasm instance, with the retained original common-field/seed comparison. Component evidence only.",
+    "scope": "One unchanged-budget A7167 \u2192 checked native close/host settlement/restart \u2192 B7167 on the same Module/Wasm instance, with the retained original common-field/seed comparison. Component evidence only.",
     "source_and_harness": {
       "head": "53eb560d545911235cf937fbacde1b16bd4093e0",
       "tree": "560d70650c21a594c1bc0634600d354c60896eab",
@@ -14237,7 +14237,7 @@
           62902
         ],
         "all37_inputs_unchanged": true,
-        "limits": "Actual first natural no-contest Results→CSS lifetime, not full idle-duration parity or C3. Native7fa unchanged. Historical71a rawcleanupFAIL remains retained separately."
+        "limits": "Actual first natural no-contest Results\u2192CSS lifetime, not full idle-duration parity or C3. Native7fa unchanged. Historical71a rawcleanupFAIL remains retained separately."
       },
       "SSS_global_call_continuity_repair": {
         "state": "COMMITTED_FOCUSED_AND_REQUIRED_REGRESSION_PASS",
@@ -14273,7 +14273,7 @@
           "bytes": 855,
           "sha256": "1f53e92669d8006339a2b9fbcbb67c9e8f6faf8a276490bd9a3a6bc13b4f0e6a"
         },
-        "scope": "Preserve only closed native session-global SSS last_call through checked natural ReturnCSS reset; fresh geometry/active tuple/live owner/token and strict contiguous identity/default decoder unchanged. Actual retained firstleg→secondSSSthrough147 and duplicate/gap/foreign/targetfirst/partialcallback/earlyReturnCSS/default0→1 negatives passed; driver ordering/deadline control also passed. No native rebuild. Its subsequent failed capture is recorded separately below.",
+        "scope": "Preserve only closed native session-global SSS last_call through checked natural ReturnCSS reset; fresh geometry/active tuple/live owner/token and strict contiguous identity/default decoder unchanged. Actual retained firstleg\u2192secondSSSthrough147 and duplicate/gap/foreign/targetfirst/partialcallback/earlyReturnCSS/default0\u21921 negatives passed; driver ordering/deadline control also passed. No native rebuild. Its subsequent failed capture is recorded separately below.",
         "required_regression": {
           "tests": 2660,
           "skips": 182,
@@ -15030,7 +15030,7 @@
       "next_competitive_original_reference": {
         "decision": "Prefer source-observed original stock-four/Items None via existing Rules driver; do not add TIME/items gameplay to match incidental endpoint context.",
         "recipe_reuse": "Existing Main/VS/Rules/Items choreography plus checked same-call Stadium SSS selection; legal costumes[1,0]. New menu inputs require fresh actual context/PAD/seed, not splicing old TIME reference.",
-        "first_experiment": "Prove actual original Rules commit and SSS OnExit→VS Entry→completed Setup competitive profile; exact collector terminal remains planned pending bounded reuse review. Reuse of existing original GO/C/F terminal is being considered instead of a new stop-at-Setup mode; no capture release.",
+        "first_experiment": "Prove actual original Rules commit and SSS OnExit\u2192VS Entry\u2192completed Setup competitive profile; exact collector terminal remains planned pending bounded reuse review. Reuse of existing original GO/C/F terminal is being considered instead of a new stop-at-Setup mode; no capture release.",
         "items_none": "Frequency disabled; item mask need not be zero.",
         "stop": "First unknown owner/lock, profile mismatch, input/seed/context join gap, unsupported observer field, deadline, incomplete stream or cleanup failure. No memory/seed writes, normalization, cap extension or automatic retry.",
         "decision_receipt": {
@@ -16434,7 +16434,7 @@
               "setup_observation": null,
               "runtime_replay": "NOT_RUN"
             },
-            "first_boundary": "The native prepared Setup continuation refused with “Prepared Setup selection differs from the accepted receipt or replay owner”; no Setup constructor or Setup observation was reached. The failed report also records a finalizer error because it applied the Setup-unload state check while validating the SSS stop.",
+            "first_boundary": "The native prepared Setup continuation refused with \u201cPrepared Setup selection differs from the accepted receipt or replay owner\u201d; no Setup constructor or Setup observation was reached. The failed report also records a finalizer error because it applied the Setup-unload state check while validating the SSS stop.",
             "captured_source_pins": {
               "src/gameplay_menu_browser.cpp": "6eaf5ca120b32737925ee443f5bfdc3543a5769df8aac12963801ef7d399d9d7",
               "scripts/stadium_stock4_sss_exit_observation.mjs": "439a93bfdc2d11342a486297f791c89b79fd33126d00fed5599bbc298d18fa64",
@@ -16685,7 +16685,7 @@
         "retained_v6_posthoc_declared_setup_audit_v1": {
           "schema": "melee-web-stadium-v6-posthoc-declared-setup-audit-v1",
           "status": "PASS_POSTHOC_DECLARED_SETUP_FIELDS_ONLY",
-          "scope": "A separate offline audit of the original v6 producer’s own retained Setup tag-4 record against an independently sourced expected object. It is not a browser capture result and does not change either failed prepared-Setup capture.",
+          "scope": "A separate offline audit of the original v6 producer\u2019s own retained Setup tag-4 record against an independently sourced expected object. It is not a browser capture result and does not change either failed prepared-Setup capture.",
           "audit_receipt": {
             "run_directory": "stadium-setup-go-review-repair-20261018-050651-5cfb537c",
             "file": "retained-v6-audit-after-root-review.json",
@@ -19504,7 +19504,7 @@
               "all_11_recorded_pids_independently_absent": true,
               "owned_capture_and_server_groups_absent": true,
               "screenshots_hash_verified": true,
-              "screenshot_description_correction": "Two Mario selections were visible; the “4-man survival” text is not evidence of four-stock settings.",
+              "screenshot_description_correction": "Two Mario selections were visible; the \u201c4-man survival\u201d text is not evidence of four-stock settings.",
               "root_correction": {
                 "prior_sha256": "1feb2f5f719412fec7b61aca1bf5c9cace5650ea5d1aa6eba80ccaf59b4ceed7",
                 "operative_result_check": {
@@ -22363,7 +22363,7 @@
       "No ordinary unload/cache/IDBFS parity.",
       "No C3 or public admission acceptance."
     ],
-    "next": "source-only design for one coherent original-B constructor → actual GO → bounded idle comparison. Reuse the retained literal B inputs and existing constructor/map2/title/GO observers, but first supply their missing match1 observations and an explicit checked bridge from retained replay Setup to the existing source-action driver. Do not infer GO from tick84, reuse the original-A schedule, force seeds or repeat successful menu/Setup captures. Original owner registration/retirement and per-owner RNG correspondence remain separate gaps; full replay, transformations, public admission, pixels/PCM, timing and C3 remain open.",
+    "next": "source-only design for one coherent original-B constructor \u2192 actual GO \u2192 bounded idle comparison. Reuse the retained literal B inputs and existing constructor/map2/title/GO observers, but first supply their missing match1 observations and an explicit checked bridge from retained replay Setup to the existing source-action driver. Do not infer GO from tick84, reuse the original-A schedule, force seeds or repeat successful menu/Setup captures. Original owner registration/retirement and per-owner RNG correspondence remain separate gaps; full replay, transformations, public admission, pixels/PCM, timing and C3 remain open.",
     "original_B_continuation": {
       "state": "PASS_ORIGINAL_B_CONSTRUCTOR_GO_AND_SHORT_STATE_REFERENCE; BROWSER_REFERENCE_ALIGNMENT_AND_C3_OPEN",
       "run_id": "browser-rollback-sprint-20261022-115029-d89e262b",
@@ -23321,7 +23321,7 @@
         "state": "PASS_GATE1_FOCUSED_COMPONENTS_BUILDS_FULL_REGRESSION_AND_SCOPED_BROWSER_CAPTURE; WHOLE_REPLAY_INCOMPLETE; GATE2_HELD_C3_FALSE",
         "run_id": "browser-rollback-sprint-20261022-115029-d89e262b",
         "artifact_paths_relative_to_run": true,
-        "scope": "A distinct 2,013-row Original-B reference at later-SSS cursor 943 is bound by profile 3 for the existing A → Results → returned CSS → later SSS → Entry → zero-source-action Setup route, with checked unload. Cumulative focused component controls, independent review, both Release builds and full regression pass. One bounded headless browser capture passes only the declared literal-input, Entry/Setup common-field and seed, zero-action Setup, and checked-retirement component. Whole replay remains FAIL_INCOMPLETE_EXPLICIT_SSS_STOP; original menu-draw parity, B constructor/Randi/GO parity, GO+96-state continuity, Gate2 and C3 are not established.",
+        "scope": "A distinct 2,013-row Original-B reference at later-SSS cursor 943 is bound by profile 3 for the existing A \u2192 Results \u2192 returned CSS \u2192 later SSS \u2192 Entry \u2192 zero-source-action Setup route, with checked unload. Cumulative focused component controls, independent review, both Release builds and full regression pass. One bounded headless browser capture passes only the declared literal-input, Entry/Setup common-field and seed, zero-action Setup, and checked-retirement component. Whole replay remains FAIL_INCOMPLETE_EXPLICIT_SSS_STOP; original menu-draw parity, B constructor/Randi/GO parity, GO+96-state continuity, Gate2 and C3 are not established.",
         "source": {
           "base_head": "638cf8a4e1df31cff56e95db07c3b6f84e483480",
           "candidate_freeze_status_at_freeze": "FROZEN_COHERENT_GATE1_CANDIDATE_UNEXECUTED_REVIEW_REQUIRED",
@@ -23419,7 +23419,7 @@
           "clean_capture_harness": "769886c7e51587302da13d97ed7c3b96431c8f44; tree 190a2fb1ed81ff2d17ee988bd982008a9b495a1a",
           "original_native_producer": "Dirty e87c3156 plus exactly seven reviewed observer/host/test files; binary f7b2dbdab8dd829cd510d30cc0adf364c55b5587fd326169c408286ed24a1885; manifest 33b05150497517d6359983ec097900aae8694a6ad4ec5d701a6b4406bddc9f56.",
           "historical_browser_runtime": "4258918a plus seven reviewed runtime-source files; separate from the original native capture producer and the later Gate1 candidate.",
-          "observed_original_B": "Constructor Randi(200)=142; actual GO at source tick 84; 108 state observations over ticks 84–191, including 96 neutral post-GO samples and 12 pause/exit-tail samples; 8,629 primary records and 13,824 input events.",
+          "observed_original_B": "Constructor Randi(200)=142; actual GO at source tick 84; 108 state observations over ticks 84\u2013191, including 96 neutral post-GO samples and 12 pause/exit-tail samples; 8,629 primary records and 13,824 input events.",
           "capture_result_scope": "Raw independent review accepts the selected constructor, actual GO, typed-state observations and three-match terminal only. The lifecycle transition join is incomplete; this is not an accepted whole-session reference bundle, browser parity, or C3.",
           "pins": {
             "capture_report": {
@@ -24260,7 +24260,714 @@
           }
         ],
         "publication": "Existing draft PR301; exact-head CI belongs to final documentation publication and is not C3 evidence."
-      }
+      },
+      "rng_native_idle_v5_2026_10_26": {
+        "schema": "melee-web-stadium-original-b-continuation-rng-native-idle-addition-v1",
+        "state": "PASS_ORIGINAL_REPLAY_V5_AND_NATIVE_TWO_LIFETIME_NO_DRAW_COMPONENT; BROWSER_RNG_COMPARISON_AND_FULL_REGRESSION_PENDING; C3_FALSE",
+        "run_id": "stadium-owner-parity-20261026-150215-d5a0bac0",
+        "artifact_paths_relative_to_run": true,
+        "source_identities": {
+          "current_native_idle_source": {
+            "head": "ec8d694717a6d417dd64566ecefa08948601565b",
+            "tree": "9f4da5a4f0406031d9f9f68b7539e60fc2621b75",
+            "clean": true,
+            "runtime_artifact_identity": {
+              "path": "native-idle-integration/ec8d6947-runtime/identity.json",
+              "bytes": 933,
+              "sha256": "f562566cdb9256c008857326bf5bb4b200b8f19dece9f1558967826f556ebcb4"
+            },
+            "prior_c291_incremental_wasm_retained": false,
+            "prior_c291_raw_source_and_table_proof_retained": true
+          },
+          "original_replay": {
+            "capture_harness_head": "c291cc03d3e9e4407ab0c88022f411a4c22e32d3",
+            "capture_harness_tree": "4e67c52233f338a0d5dc4b5c4bfbb353fab9baed",
+            "native_producer_head": "a6988b75c841f040c010ad26fd85ea713847fe60",
+            "native_producer_tree": "84020328084188e2694322f42850192a4a37ef3b",
+            "binary_sha256": "ff823c36f0331b13bfc66dea58e976ce9036e0eb5830e6ebf42a21eb66e7163a",
+            "manifest_sha256": "ac70fe1b6f7266776ec944db54fc90b2fc217ee353c6eb3cd42a360388a26d24",
+            "roles_are_distinct_from_current_ec8_native_idle_producer": true,
+            "capture_harness_role": "c291cc03 contains the CMake observer-macro capture-harness change; it is separate from a6988b75 native observer/game-producer source.",
+            "native_producer_role": "a6988b75 introduced the replay/v5 RNG and native-idle observation path; ec8d6947 is the later source-table fighter callback mapping and native idle runtime producer."
+          }
+        },
+        "original_replay_v5": {
+          "scope": "One diagnostic original whole3/allocation2 replay of the exact retained 2013-input/943-cursor context with a bounded actual-GO raw guard-band RNG observation; no browser execution or authorization.",
+          "elapsed_seconds": 65.96560741681606,
+          "input_mode": "replay",
+          "input_events": 13824,
+          "input_complete": true,
+          "primary_events": 8629,
+          "primary_complete": true,
+          "actual_go": {
+            "source_tick": 84,
+            "observer_sequence": 4753,
+            "phase": "go_after"
+          },
+          "actual_entry": {
+            "observer_sequence": 4242,
+            "source_tick": 125,
+            "seed": "ba5dac05"
+          },
+          "actual_setup": {
+            "observer_sequence": 4331,
+            "source_tick": 125,
+            "seed": "4b25c79b"
+          },
+          "rng_window": {
+            "validator_schema": "melee-web-cpu-rng-probe-validation-v3",
+            "valid": true,
+            "record_count": 20,
+            "return_site": "rng_updates",
+            "return_pcs": [
+              "0x80380524",
+              "0x8038057c",
+              "0x803805b8"
+            ],
+            "source_tick_bounds": [
+              84,
+              88
+            ],
+            "requested_pair_offsets": [
+              1,
+              3
+            ],
+            "guard_band_extras_retained": true,
+            "same_run_context_state": "PASS_CURRENT_FIXED_CONTEXT_CORE",
+            "browser_authorized": false,
+            "registration_or_lifetime_ledger_accepted": false,
+            "C3": false
+          },
+          "cleanup": {
+            "native_returncode": 0,
+            "collector_reaped": true,
+            "native_pid_absent": true,
+            "native_group_absent": true,
+            "collector_group_absent": true
+          },
+          "artifacts": [
+            {
+              "path": "rng-replay-capture-packet/launch-result.json",
+              "bytes": 9095,
+              "sha256": "9652332c246b61597e4ad045e271e604e21bcc2cfeb47698d7a8d35a958aacff"
+            },
+            {
+              "path": "rng-replay-original-capture-v1/report.json",
+              "bytes": 222226,
+              "sha256": "e2b84ea90ca524d8bff55443793714d4fe7031848b22bebf8fb067def53aa94c"
+            },
+            {
+              "path": "rng-replay-original-capture-v1/rng-returns.json",
+              "bytes": 169459,
+              "sha256": "f3d3ff299cc651647cd3a6af4ba18f62ebe36d260b88e788fd2622b0cb1e03cb"
+            },
+            {
+              "path": "rng-replay-original-capture-v1/native-primary-status.json",
+              "bytes": 852,
+              "sha256": "c79fe00acb99d1deb4c5b5f6fa4d88a3bf18138d1a6110cbd703f07d3a084450"
+            },
+            {
+              "path": "rng-replay-original-capture-v1/native-input-status.json",
+              "bytes": 90,
+              "sha256": "d43346a1ac98efe790060c79978d8eb22c1e06f0d9d50565ff8cb836e0913745"
+            },
+            {
+              "path": "rng-replay-original-capture-v1/same-run-reference-binding.json",
+              "bytes": 2944,
+              "sha256": "9eaea572d1da1f3da43816241cc3869b73159177c745623fe034695991f16057"
+            },
+            {
+              "path": "rng-replay-original-capture-v1/same-run-reference-projection.json",
+              "bytes": 2198167,
+              "sha256": "bfdcfaecb70919fdd628fc03456c466fcee5fa5a2bf30a5d99fb1b3883fc0f3b"
+            }
+          ]
+        },
+        "native_idle_two_lifetimes": {
+          "scope": "Native no-draw source component only; same-node sequential lifetimes with existing checked retirement. Not original/browser parity or C3.",
+          "lifetimes": 2,
+          "typed_rows": 7000,
+          "typed_rows_per_lifetime": 3500,
+          "ordered_rng_events": 136752,
+          "observed_callback_classes": 3,
+          "checked_close_boundaries": 2,
+          "unknown_nested_callback_events_in_retained_raw_pair": 200,
+          "fighter_callback_table_mapping": "0x1926 maps by source table to Fighter_8006A360; the retained rows do not individually establish the nested wait-animation path for each event.",
+          "source_proof_scope": "Source-supported owner/callback identity only; no complete per-owner ledger claim.",
+          "validation_artifacts": [
+            {
+              "path": "paired-idle-integrated/native-validation-v5/result.json",
+              "bytes": 2437,
+              "sha256": "9dc1d4c005473fe81857631d56e0aebd84d8fe69a3f297645ef4deb829827509"
+            },
+            {
+              "path": "native-idle-integration/first-actual-pair.json",
+              "bytes": 1971,
+              "sha256": "7c4d2f0c3974fafbf7be94863056f81db484a38601235f46323e4d9de319c48f"
+            },
+            {
+              "path": "native-idle-integration/raw-seed-chain-check.json",
+              "bytes": 186,
+              "sha256": "12e8e79e2a651a3c2946669880c2f264af18bffc60a9b1b1a0836b9da4c29aef"
+            },
+            {
+              "path": "native-idle-integration/fighter-owner-table-source-proof-v1.json",
+              "bytes": 4700,
+              "sha256": "db6ac645423b16f151c74f165b4e97c3def6c4c6353eabc69e49226a75ed10fe"
+            },
+            {
+              "path": "native-idle-integration/ec8d6947-runtime/native_menu_host_trace.wasm",
+              "bytes": 15040646,
+              "sha256": "b84832596f0c10eb3db3c9bfbbc8957757afa37cd6a33f42ff5827c25e5ff3f9"
+            }
+          ]
+        },
+        "builds": {
+          "source_head": "ec8d694717a6d417dd64566ecefa08948601565b",
+          "source_tree": "9f4da5a4f0406031d9f9f68b7539e60fc2621b75",
+          "diagnostic_release_seconds": 23.191170250065625,
+          "ordinary_release_seconds": 21.26887841615826,
+          "both_passed": true,
+          "full_regression": "PENDING",
+          "artifact": {
+            "path": "paired-idle-integrated/build-validation-v5/result.json",
+            "bytes": 2327,
+            "sha256": "f3128fabb499bcee3ab520ea2f5b25d7a101bf74e0e2e7c2ae1aad253bcff5d4"
+          }
+        },
+        "retained_failures_and_unknowns": [
+          {
+            "path": "rng-original-local-chain-failure.json",
+            "bytes": 1847,
+            "sha256": "cf3c22e580daddec8a78c75614d3622570c212c54e5f0766b061150caf2c943f",
+            "scope": "Earlier 15-record rng_returns chain; four two-step gaps remain historical and are not rewritten by the separate v5 rng_updates replay."
+          },
+          {
+            "path": "rng-original-capture-packet/launch-result.json",
+            "bytes": 6321,
+            "sha256": "3b1ff1768390c36b33598e5a0c391ea8bf31c7c98aa5c012e6e6298225d099de",
+            "scope": "Separate fresh-feedback attempt refused exact current fixed context: 2,023 inputs/cursor 950 did not match retained 2,013-input/cursor 943 reference."
+          },
+          {
+            "path": "paired-idle-integrated/native-validation-v2/native-idle-target.stdout",
+            "bytes": 190386,
+            "sha256": "918db24bb3e33c1a74046961c047fe5cee27de7423913c55cad8ae94b667c8d6",
+            "scope": "Retained native link failure: undefined symbols melee_web_rng_draw_probe_begin_native_pair and melee_web_rng_draw_probe_end_native_pair."
+          },
+          {
+            "path": "paired-idle-integrated/native-validation-v3/native-idle-two-lifetimes.stderr",
+            "bytes": 1457,
+            "sha256": "cf920171f9143d3b166fe60a546f820b237ed577c7e071828cfdc4239afb3b5e",
+            "scope": "Retained fixture failure: required retained Stadium fixture root was absent."
+          },
+          {
+            "path": "paired-idle-integrated/native-validation-v4/native-idle-two-lifetimes.stderr",
+            "bytes": 1680,
+            "sha256": "60980c7c00c9bd8389d548e481bc2d67ca51865c3c8f7af9de7485202be8e785",
+            "scope": "Retained source-symbol fixture failure on callback_symbol=unknown; later source-table proof maps 0x1926 to Fighter_8006A360 but does not prove every nested child path."
+          },
+          {
+            "path": "native-idle-integration/focused.stderr",
+            "bytes": 1473,
+            "sha256": "d1f6526717aa9a83010ee0c36a23d0a24d00c5e87e572c5efe25f396c963fa83",
+            "scope": "Retained native-emitter fixture abort; the scoped emitter repair result is separate."
+          }
+        ],
+        "limits": [
+          "No browser RNG comparison has run; browser_authorized is false in the original replay result.",
+          "No per-owner original/browser RNG parity, complete original two-lifetime event/lifecycle parity, or C3 acceptance is established.",
+          "The full regression on integrated ec8d6947 source is pending; do not copy in an older green suite result.",
+          "C3 is pre-transformation; C4-C8 transformations remain distinct later gates."
+        ],
+        "publication": "Existing draft PR #301; no publication or acceptance claim.",
+        "browser_rng_attempt_v1": {
+          "state": "FAILED_HOST_STARTUP_BEFORE_GAMEPLAY; NO_RNG_COMPARISON; AGGREGATE_CLEANUP_FALSE",
+          "first_error": {
+            "kind": "startup",
+            "message": "Later B Gate2 serialized projection identity differs",
+            "first_mismatch": null,
+            "phases": [],
+            "rng_draw_probe": "not_captured"
+          },
+          "cause": "The existing host consumer contains a historical serialized-projection identity check that rejects the new valid same-run projection (2198167 bytes, SHA-256 bfdcfaecb70919fdd628fc03456c466fcee5fa5a2bf30a5d99fb1b3883fc0f3b). This is a harness preparation failure, not a gameplay/RNG divergence.",
+          "browser_attributed": false,
+          "cdp_attributed": false,
+          "capture_process_group_absent": true,
+          "server_process_group_absent": true,
+          "aggregate_cleanup_passed": false,
+          "artifact_paths_relative_to_run": true,
+          "artifacts": [
+            {
+              "path": "rng-browser-capture-v1/browser-run/report.json",
+              "bytes": 18533,
+              "sha256": "eecee08e2c92667e8447c4eb40c23b3c86af9c218e5994361b1328b32a7f6489"
+            },
+            {
+              "path": "rng-browser-capture-v1/owner.json",
+              "bytes": 5656,
+              "sha256": "08772c3331bd786d60eb9376c11ff681c302dcba9cc1d3f5ad6e81b9677ce6d8"
+            },
+            {
+              "path": "rng-browser-capture-v1/launcher-result.json",
+              "bytes": 353,
+              "sha256": "39aa10d3204a08516fb616a399fa6364a0eab65b7da4a58e1b7f74c9dc1c506f"
+            },
+            {
+              "path": "rng-browser-capture-v1/command.json",
+              "bytes": 5991,
+              "sha256": "c571a961ba401b336e4f2ad222988bdcf711242121777a6020299d597eb0f1b1"
+            },
+            {
+              "path": "rng-browser-capture-v1/server-spec.json",
+              "bytes": 621,
+              "sha256": "912e37587ae6d5efefb76bbe0fc2b835e5dc4ac17e15d878de68f3b55e6cefba"
+            },
+            {
+              "path": "rng-browser-capture-v1/server.log",
+              "bytes": 3816,
+              "sha256": "9a979d54925c0f09bc844fc5dec96adcc1e484202f1baf8e1e8b28c27ab28338"
+            },
+            {
+              "path": "rng-browser-capture-v1/capture.log",
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        }
+      },
+      "rng_browser_owner_window_v7_2026_10_26": {
+        "schema": "melee-web-stadium-original-browser-rng-owner-window-addition-v1",
+        "state": "PASS_DECLARED_THREE_PAIR_COMPONENT; WHOLE_REPLAY_INCOMPLETE; FULL_REGRESSION_PENDING; C3_FALSE",
+        "run_id": "stadium-owner-parity-20261026-150215-d5a0bac0",
+        "extends_child_without_replacing": "rng_native_idle_v5_2026_10_26",
+        "scope": {
+          "actual_go": {
+            "source_tick": 84,
+            "observer_sequence": 4753
+          },
+          "matched_go_offsets": [
+            1,
+            2,
+            3
+          ],
+          "original_source_ticks": [
+            85,
+            86,
+            87
+          ],
+          "native_rng_cursors": [
+            1028,
+            1029,
+            1030
+          ],
+          "events_per_tick": 3,
+          "matched_events": 9,
+          "semantic_owners": {
+            "grStadium_801D1390": 3,
+            "efLib_particles_proc_main": 6
+          },
+          "compared": [
+            "ordered event count",
+            "HSD_Rand/HSD_Randf kind",
+            "exact post-seed",
+            "source-backed callback symbol/classifier/p_link/s_link"
+          ],
+          "not_established": [
+            "all RNG writers",
+            "fighter/outside-proc parity",
+            "owner allocation-generation/lifetime equality",
+            "full two-lifetime event/lifecycle parity",
+            "whole-replay acceptance",
+            "C3"
+          ]
+        },
+        "projection_provenance": {
+          "original_insertion_order": {
+            "path": "rng-replay-original-capture-v1/same-run-reference-projection.json",
+            "bytes": 2198167,
+            "sha256": "bfdcfaecb70919fdd628fc03456c466fcee5fa5a2bf30a5d99fb1b3883fc0f3b",
+            "unchanged": true
+          },
+          "strict_export_canonical_derivative": {
+            "path": "projection-binding-admission-candidate/same-run-reference-projection-canonical.json",
+            "bytes": 2198167,
+            "sha256": "d90296a2d18bdeee8ce77926f935f8086c42f87798e8f289367c291b6bef52ea",
+            "used_by_accepted_browser_run": true
+          },
+          "correction": "Earlier object-only reasoning did not prove byte equivalence. Serialized key order differs; original bytes are unchanged and the canonical derivative is a distinct strict-export product.",
+          "equivalence_receipt": {
+            "path": "projection-binding-admission-candidate/projection-equivalence.json",
+            "sha256": "66dd369714bb9769c9895e6f450485dd40e6b7f86b6d95c3e2fe0d3756a8b12d"
+          }
+        },
+        "producer_identities": {
+          "original_native": {
+            "head": "a6988b75c841f040c010ad26fd85ea713847fe60",
+            "capture_harness": "c291cc03d3e9e4407ab0c88022f411a4c22e32d3",
+            "binary_sha256": "ff823c36f0331b13bfc66dea58e976ce9036e0eb5830e6ebf42a21eb66e7163a",
+            "archived_identity": "reference-artifact/a6988b75-retained/identity.json"
+          },
+          "browser_runtime": {
+            "head": "ec8d694717a6d417dd64566ecefa08948601565b",
+            "tree": "9f4da5a4f0406031d9f9f68b7539e60fc2621b75"
+          },
+          "browser_capture_manifest": "rng-browser-capture-packet-v3/manifest.json",
+          "browser_capture": {
+            "head": "ffe238da07a45171a0200a4cd29f3d68d28aea73",
+            "tree": "0517e19e4de68abb371b5359faac398a8fb72bd1",
+            "runtime_producer_head": "ec8d694717a6d417dd64566ecefa08948601565b"
+          }
+        },
+        "artifacts": {
+          "comparison": {
+            "path": "rng-browser-comparison-v7/comparison.json",
+            "sha256": "9121844515b3241a6560368032e59048343cf47d2da644c0c7cbabcad7764231"
+          },
+          "independent_review": {
+            "path": "rng-browser-comparison-v7/independent-review.json",
+            "sha256": "e1f4d929aeb6abff5c389d554534f318d6041e7e003f38cc79f746266c85bb26"
+          },
+          "browser_report": {
+            "path": "rng-browser-capture-v3/browser-run/report.json",
+            "sha256": "6154b370162a3835540f444bc6acd5766081dac73b087340d6e999116ee6fa30"
+          },
+          "browser_owner": {
+            "path": "rng-browser-capture-v3/owner.json",
+            "sha256": "b755298eae0d512a2eea33367510dd5ef0ada98f99cac7d0aca8ebb3c72f33cf",
+            "cleanup_passed": true,
+            "cdp_attribution_complete": true
+          },
+          "browser_packet_manifest": {
+            "path": "rng-browser-capture-packet-v3/manifest.json",
+            "sha256": "253af3e6f020b40c4d2295233789a69f4091224959a520e4a1413406bf514858"
+          },
+          "comparison_input_manifest": {
+            "path": "rng-browser-comparison-v7/manifest.json",
+            "sha256": "38d92e6f89eb775b373be3684565d36fd59558978e88ecc15ea033a965938839"
+          },
+          "archived_original_binary_identity": {
+            "path": "reference-artifact/a6988b75-retained/identity.json",
+            "identity_receipt_sha256": "722e7ce86420c5bc50998a65d497b61f2008f55eac4f54cc1c4ea41878ab7997",
+            "binary_sha256": "ff823c36f0331b13bfc66dea58e976ce9036e0eb5830e6ebf42a21eb66e7163a"
+          }
+        },
+        "whole_replay": "Incomplete after the Gate2 component; final CSS/session completion was not observed.",
+        "integrated_full_regression": "PENDING",
+        "next": "The longer idle-source candidate is still being designed; no capture is planned or released."
+      },
+      "original_b_long_idle_source_v1_2026_10_26": {
+        "schema": "melee-web-stadium-original-b-long-idle-source-addition-v1",
+        "state": "PASS_ORIGINAL_SELECTED_B_SOURCE_REFERENCE_ONLY; NATIVE_COMPONENT_SEPARATE; BROWSER_PROFILE_NOT_YET_DERIVED; C3_FALSE",
+        "run_id": "stadium-owner-parity-20261026-150215-d5a0bac0",
+        "extends_child_without_replacing": "original_B_continuation and all earlier children",
+        "scope": {
+          "recording": "whole-three-match source recording; only selected match B has the declared long-idle window",
+          "selected_B_match_index": 1,
+          "actual_go": {
+            "source_tick": 84,
+            "observer_sequence": 4775
+          },
+          "post_go_ticks": 3500,
+          "typed_state_rows": 3501,
+          "four_port_consumed_input_rows": 3501,
+          "window_close": {
+            "source_tick": 3585,
+            "observer_sequence": 22274
+          },
+          "natural_tail_ticks": 0,
+          "compact_rng": {
+            "records": 91383,
+            "bytes": 5849095,
+            "sha256": "7b736093706e8357cb04deecac7c892cacd435dc1b74f1a60fa2f51e1ca10fec",
+            "unresolved_owner_events": 0,
+            "source_schedule_verified": false,
+            "all_rng_writers_observed": false
+          },
+          "recipe": {
+            "frames": 5422,
+            "bytes": 262226,
+            "sha256": "e669f831538b90e39241a569b6c38884300bfe246b252cacda994cbc45c10bbf",
+            "selected_b_prefix": 951,
+            "historical_browser_prefix": 943,
+            "compatible_with_historical_profile": false
+          },
+          "comparison_not_established": [
+            "native parity",
+            "browser parity",
+            "source-schedule verification",
+            "all-writer RNG coverage",
+            "whole three-lifetime acceptance",
+            "full two-lifetime original/browser parity",
+            "C3"
+          ],
+          "original_reference_review": {
+            "decision": "GO_ORIGINAL_B_LONG_WINDOW_REFERENCE_ONLY",
+            "whole3_natural_terminal_observed": true,
+            "whole3_lifecycle_acceptance": false,
+            "allocation_scope": "First two lifetimes only, 8 samples; third natural terminal separate"
+          }
+        },
+        "producer_identities": {
+          "original_native_source_head": "878088b42424d988d980b2bb0ebcc75c77196ca0",
+          "capture_harness_head": "3c351dca59646bbe85e44d7f4ef185033804ec1b",
+          "build_manifest_sha256": "3816ac1825cd26570cdadb25f94ea8ed2ad8c3772316cefd3baaef45d54d8ee7",
+          "binary_sha256": "b52eba6ba2c2cd687cfecc2f163b3795b1ee802b07d46d2c49ba66dfcb2e600c",
+          "native_membership_component_source_head": "9576c1be9757a6a6f32f02db0ea086a49a0ded3b",
+          "native_membership_component_tree": "a6bc37106129185fcdf3e717b9c489c46a065378"
+        },
+        "artifacts": {
+          "capture_launch_result": {
+            "path": "long-b-original-capture-packet-v2/launch-result.json",
+            "sha256": "9c97ef4e93cc8db9e2060c17791e1300d7bfd09cff01f3bd356a130354e30bd0"
+          },
+          "raw_report": {
+            "path": "long-b-original-capture-v1/report.json",
+            "bytes": 5818016,
+            "sha256": "b53d85cfa60e4678e6c36f8ff3baf38ef18187709f2aa6c6a9a74483c03c4bba"
+          },
+          "cleanup": {
+            "path": "long-b-original-capture-v1/cleanup.json",
+            "sha256": "7cd7950c7e166731c00354d34202b6f6eaac9258bf793cf8784ba6608b7c7be4"
+          },
+          "native_primary_status": {
+            "path": "long-b-original-capture-v1/native-primary-status.json",
+            "sha256": "8e84da0d71799157867f22f8724a0a70c74b1198e868dca4cc7f3c230e49dc64"
+          },
+          "native_input_status": {
+            "path": "long-b-original-capture-v1/native-input-status.json",
+            "sha256": "0bf7d5cd188556b9a6a58e74b334e4523cbf40754b57e80e842f0fbf4ea167f0"
+          },
+          "capture_log_sha256": "cfc4273c21c0c33e2f4ef75bc3c77648605ecf41efd735553d867a52090c4109",
+          "native_validation": {
+            "path": "native-fighter-owner-integrated/native-validation-v6/result.json",
+            "sha256": "cc9b038465e9cf8f2d77be21e9d38ad013f83dca9c7320577acec4582dda2ef3",
+            "passed": true,
+            "scope": "separate native same-process two idle lifetimes; 7000 typed rows, 136752 RNG events and 200 fighter-membership events; no source draw or original parity"
+          },
+          "native_retained_runtime_identity": {
+            "path": "native-fighter-owner-v3/retained-runtime/identity.json",
+            "sha256": "5290335745b58a6c76fb8806889cc1bf31fe0a2fc48ae0a7eae38e0b87dc139d"
+          },
+          "prior_short_original_browser_component": "issue251-original-b-continuation-addition-v2.json (V7 comparison and independent review identities unchanged)",
+          "independent_raw_replay_review": {
+            "path": "long-b-independent-review/result.json",
+            "bytes": 8523,
+            "sha256": "708f6d10025bb5a4596f000c6942607f2782b5311d8da3b25e4fa58316a625af",
+            "decision": "GO_ORIGINAL_B_LONG_WINDOW_REFERENCE_ONLY"
+          }
+        },
+        "independent_raw_replay_review": "PASS_REFERENCE_ONLY",
+        "next": "Derive and review a same-producer 7,168-action browser context using this recording\u2019s actual recipe and selected-B 951-prefix before any browser execution. Keep the native component and historical 2013/943 browser profile separate."
+      },
+      "original_b_long_browser_component_v2_2026_10_26": {
+        "schema": "melee-web-stadium-original-b-long-browser-component-v2",
+        "state": "PASS_SCOPED_LONG_B_STATE_INPUT_RETIREMENT_AND_SELECTED_RNG_COMPONENT; WHOLE_REPLAY_INCOMPLETE; C3_FALSE; FULL_REGRESSION_PASS",
+        "run_id": "stadium-owner-parity-20261026-150215-d5a0bac0",
+        "artifact_paths_relative_to_run": true,
+        "scope": {
+          "reference_addition_key": "original_b_long_idle_source_v1_2026_10_26",
+          "reference_id": "original-b-5422-951-long-v1",
+          "recipe_sha256": "e669f831538b90e39241a569b6c38884300bfe246b252cacda994cbc45c10bbf",
+          "recipe_frames": 5422,
+          "selected_b_prefix": 951,
+          "selected_match_index": 1,
+          "accepted_actions": 7168,
+          "source_ticks": 3585,
+          "source_draws": 3583,
+          "literal_four_port_input_rows": 3501,
+          "actual_go_observed_tick": 84,
+          "go_tick_not_assumed": true,
+          "constructor_shared_aggregates": 7,
+          "entry_seed_hex": "7fc17cf1",
+          "setup_seed_hex": "25d557a7",
+          "actual_go_seed_hex": "7fc9b4d0",
+          "post_go_typed22_plus_seed_rows": 3501,
+          "sample_tick_range": [
+            84,
+            3584
+          ],
+          "checked_native_parent_retirement": true,
+          "browser_and_owned_processes_absent": true,
+          "outer_elapsed_seconds": 75.7123507,
+          "whole_replay_result": "later_b_gate2_component_pass_replay_incomplete",
+          "whole_replay_complete": false,
+          "C3": false,
+          "cleanup": {
+            "owner_cleanup_passed": true,
+            "owned_browser_pids_absent": 10,
+            "browser_capture_server_process_groups_absent": 3,
+            "cleanup_seconds": 0.424,
+            "empty_owned_temporary_directory_removed_by_rmdir": true
+          },
+          "detailed_constructor_phase_witnesses_browser_paired": false,
+          "long_window_rng_comparison": {
+            "status": "PASS_COMPONENT",
+            "selected_matched_events": 91318,
+            "browser_events_accounted_across_7000_action_rows": 91383,
+            "original_events_accounted_once": 91383,
+            "partial_actual_go_action_guard_events_unpaired_per_side": 65,
+            "final_close_draw_guard_events_per_side": 0,
+            "raw_pointer_equality_compared": false
+          }
+        },
+        "producer_identities": {
+          "original_source_head": "878088b42424d988d980b2bb0ebcc75c77196ca0",
+          "original_capture_harness_head": "3c351dca59646bbe85e44d7f4ef185033804ec1b",
+          "browser_source_head": "9693d2404e32bf0b2c789b993ba1cd25f36cf3bf",
+          "browser_source_tree": "862c16c4aa44622b13816f7b801c0654a9884659",
+          "browser_runtime_clean": true
+        },
+        "validation": {
+          "diagnostic_release_seconds": 21.158,
+          "ordinary_release_seconds": 19.98,
+          "focused_settlement_controls": 19,
+          "focused_settlement_skips": 0,
+          "full_regression_state": "PASS_FINAL_INTEGRATED_SOURCE",
+          "long_window_offline_rng_comparison": "PASS_COMPONENT; 91318 selected ordered events matched; 65 partial-GO guard events per side remain unpaired",
+          "all_writer_or_per_owner_rng_parity": false,
+          "full_two_lifetime_original_browser_acceptance": false,
+          "previous_full_regression": {
+            "source_head": "9693d2404e32bf0b2c789b993ba1cd25f36cf3bf",
+            "state": "FAILED_RETAINED",
+            "tests": 2833,
+            "skipped": 208,
+            "failures": 8,
+            "errors": 6,
+            "seconds": 615.805
+          },
+          "current_full_regression": {
+            "source_head": "868454a5f5edc2081ca5d7367d8dae55e073c097",
+            "state": "PASS",
+            "tests": 2837,
+            "skipped": 208,
+            "failures": 0,
+            "errors": 0,
+            "seconds": 620.647,
+            "owner_seconds": 621.1322973747738,
+            "source_unchanged": true,
+            "owned_group_absent": true,
+            "tree": "7b5935c39358d92feac883cc8bf4e8581e0c793e"
+          },
+          "fixture_batch_focused": "151 tests PASS, 10 expected skips; six reference controls PASS, zero skips",
+          "current_fixture_source_checkpoint": "868454a5f5edc2081ca5d7367d8dae55e073c097",
+          "fixture_batch_source_changes": "Fourteen reviewed source/test files; streaming allocation endpoint validation and extracted fixture repairs. Runtime source/build/capture remains9693d240; no rebuild on868454a5 is claimed."
+        },
+        "retained_attempt_history": [
+          "V1 retained pause pre-tick refusal before cursor 468; original raw boundary and reduced off-by-one control motivated the guarded timer comparison repair.",
+          "V2 retained receipt-serialization failure after Setup and before action 0; the long status path lacked the state prefix.",
+          "V3 retained fixed 150-second deadline stop after 2,841 actions; the deadline was unchanged.",
+          "V4 completed the bounded long-B action/state component and checked retirement."
+        ],
+        "artifacts": {
+          "browser_capture_manifest": {
+            "path": "long-b-browser-capture-packet-v4/manifest.json",
+            "bytes": 37235,
+            "sha256": "f1fc9ba8091ad20c69a6d47738bbe36990816a7e90fc82d75c62635d75a98f5c"
+          },
+          "browser_report": {
+            "path": "long-b-browser-capture-v4/browser-run/report.json",
+            "bytes": 114772039,
+            "sha256": "dd15c08e289296ea7430d8a134ce5101c02ceae31f789746444e0c6642596d9b"
+          },
+          "browser_owner_cleanup": {
+            "path": "long-b-browser-capture-v4/owner.json",
+            "bytes": 97243,
+            "sha256": "7e278640f0d57bb50e545ab255d84acd643e6a6791db455d749f8bd25672c90a"
+          },
+          "launcher_result": {
+            "path": "long-b-browser-capture-v4/launcher-result.json",
+            "bytes": 214,
+            "sha256": "fd952d39a67dc4e886fb8f3ba43fc136020c8fac0bb395de59db78651161936d"
+          },
+          "retail_browser_report": {
+            "path": "long-b-browser-capture-v4/browser-run/retail-browser-report.json",
+            "bytes": 33436511,
+            "sha256": "103ad51c6c67c5bce6a8c221873d1155ad1de2d8bdffe3f63eae6f810377d556"
+          },
+          "artifact_identities": {
+            "path": "long-b-browser-capture-v4/artifact-identities.json",
+            "bytes": 1101,
+            "sha256": "9fd2973e62f4688b01b6468e20afdb45ef6ada35f1722df9f5345a25f849b4c9"
+          },
+          "long_b_action_rng_sidecar": {
+            "path": "long-b-browser-capture-v4/browser-run/long-b-action-rng.jsonl",
+            "bytes": 26125736,
+            "sha256": "1579def5d05ef24a83314138bd52d0a284fa71c9899aa4c74ee3456bd6188c70",
+            "comparison_state": "PASS_COMPONENT; selected 91318 events matched; 65 per-side GO guard events unpaired"
+          },
+          "long_b_rng_comparison": {
+            "manifest": {
+              "path": "long-b-browser-comparison-v1/manifest.json",
+              "bytes": 8687,
+              "sha256": "ac6c5a8ae6e61f83cae7833404f9bd6b89f4d0fa5f2cddba1240af4e030aa5dd"
+            },
+            "comparison": {
+              "path": "long-b-browser-comparison-v1/comparison.json",
+              "bytes": 4182,
+              "sha256": "12de687893b05c9b15b7657ed78f0b2ddeb16572ff77f8c6767c12b1c0647e26"
+            },
+            "independent_review": {
+              "path": "long-b-browser-comparison-v1/independent-review.json",
+              "bytes": 4102,
+              "sha256": "b0f64fdb9747346d1bc0128ecdcacfc4ce5f599e5e8af33f3566fd3de19c4ced"
+            },
+            "review_decision": "GO_SCOPED_COMPONENT_EVIDENCE"
+          },
+          "retained_failed_full_regression": {
+            "result": {
+              "path": "long-b-full-regression-v1/result.json",
+              "bytes": 1158,
+              "sha256": "93b0b432a2005ddf94cd6504bc8878e72583bc2a8a54e6a065d0084b1508fca5"
+            },
+            "stderr": {
+              "path": "long-b-full-regression-v1/full-regression.stderr",
+              "bytes": 562359,
+              "sha256": "e52b7e0fc7cdbb74ccb3fd5bcea476e3e40529f0e6eb57e88f55ef056877ae60"
+            }
+          },
+          "reviewed_fixture_batch": {
+            "path": "long-b-fixture-stream-integration-review-v1.json",
+            "bytes": 2646,
+            "sha256": "9e2b2b0c25782d6693e277f990d52fcee0065b953fe1492c90b2c4804ec9a0d9",
+            "focused": "151 PASS/10 expected skips plus six reference controls PASS/0 skips",
+            "review_decision": "GO"
+          },
+          "focused_cpu_entity_repair": {
+            "path": "long-b-regression-fixture-repair-v2/focused-v2.log",
+            "bytes": 1103,
+            "sha256": "4ab3bc566bc94d8cd843ca32563926bef49388de77a00afceecede6426df087b",
+            "result": "6 PASS/0 skips"
+          },
+          "final_integrated_full_regression": {
+            "result": {
+              "path": "long-b-full-regression-v2/result.json",
+              "bytes": 1157,
+              "sha256": "8f7a6400bd5da0bcac6c1130b435433c257761072c7fbaf99beed5b984c408c7"
+            },
+            "stderr": {
+              "path": "long-b-full-regression-v2/full-regression.stderr",
+              "bytes": 519570,
+              "sha256": "29eb2f5e1f139f1615a48c369cec466f1b7deec42e6975482e0c69a23ba33781"
+            }
+          },
+          "final_focused_regression": {
+            "path": "long-b-focused-regression-v2c/result.json",
+            "bytes": 1308,
+            "sha256": "b47518772091457a3617f5d51d74ff1994fad2a5dc9732c3affed416f02a9baa"
+          }
+        },
+        "limits": [
+          "The RNG result is a selected-window component: 65 partial-action actual-GO guard events per side remain unpaired; this is not all-writer coverage.",
+          "The browser report marks the whole replay incomplete and does not accept the full original A+B lifecycle.",
+          "The five detailed original constructor phase witnesses remain unpaired to browser observations; browser comparison covers seven shared aggregates plus Setup seed.",
+          "Separate native fighter-membership evidence does not establish long-window owner or allocation-generation/lifetime parity.",
+          "The current full regression on clean 868454a5 is pending; the prior 9693d240 failure remains retained.",
+          "C3, authored stock-out/standings obligations, C4-C8 transformations, visual/audio, live timing, physical input and public admission remain open."
+        ],
+        "next": "Review the final result of the full regression on clean source 868454a5. The next C3 proposal is a source-only two-natural-lifetime scene-endpoint profile; it is not implemented or captured."
+      },
+      "latest_evidence_key": "original_b_long_browser_component_v2_2026_10_26",
+      "current_scope": "Selected long-B state, input, checked retirement and selected ordered RNG comparison pass; original paired-lifetime parity and C3 remain open."
     }
   }
 }
