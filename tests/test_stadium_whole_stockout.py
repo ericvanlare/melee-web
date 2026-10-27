@@ -24,6 +24,69 @@ spec.loader.exec_module(module)
 
 
 class NaturalStockoutWitnessTests(unittest.TestCase):
+    def test_driver_leaves_observed_platform_then_requires_consumed_fall_and_landing(self):
+        # Exercise the real driver against a modeled transport. The retained
+        # original failure supplies the 0 -> 12 -> 13 respawn sequence; this
+        # control is input-policy evidence, not a successful original run.
+        for missing_consumed_stick in (False, True):
+            with self.subTest(missing_consumed_stick=missing_consumed_stick):
+                neutral = module.NEUTRAL_PAD
+                witness = SimpleNamespace(last_stocks=(4, 4), last_tick=179,
+                    last_fighters=self.fighters(4), transitions=[], mode9=None)
+                receiver = SimpleNamespace(stockout_witness=witness, seq=100,
+                    selected_stockout=lambda index: index == 1, ended=False,
+                    last_pad=[neutral, neutral], outcome_seen=False, stockout_summary=None)
+                pending, calls = [], []
+
+                def next_row():
+                    self.assertTrue(pending, 'driver waited without a source/input transition')
+                    state = pending.pop(0)
+                    receiver.seq += 5
+                    witness.last_tick += 1
+                    if state == 'exit':
+                        witness.mode9 = {'mode': 9}
+                        receiver.outcome_seen = True
+                        receiver.stockout_summary = {'result_outcome': 2}
+                        return
+                    stock, motion, air, pad = state
+                    if stock != witness.last_stocks[0]:
+                        witness.transitions.append({'from_stocks': witness.last_stocks,
+                                                    'to_stocks': (stock, 4)})
+                    witness.last_stocks = (stock, 4)
+                    witness.last_fighters = dict(stocks=(stock, 4), motions=(motion, 14),
+                                                 ground_air=(air, 0))
+                    receiver.last_pad = [pad, neutral]
+
+                class Controller:
+                    def hold(self, p1, p2, seconds, *, action):
+                        calls.append(action)
+                        if action.endswith('-jump'):
+                            stock = witness.last_stocks[0] - 1
+                            pending.append((stock, 0, 1, neutral))
+                            pending.extend([(stock, 12, 1, neutral), (stock, 13, 1, neutral)]
+                                           if stock else ['exit'])
+
+                    def set_both(self, p1, p2, *, action):
+                        calls.append(action)
+                        if action.endswith('-leave-platform'):
+                            pending.append((witness.last_stocks[0], 29, 1,
+                                            neutral if missing_consumed_stick else p1))
+                        elif action.endswith('-leave-platform:release'):
+                            pending.append((witness.last_stocks[0], 14, 0, neutral))
+
+                if missing_consumed_stick:
+                    with self.assertRaisesRegex(module.SdDiagnosticError, 'consumed stick and source Fall'):
+                        module.drive_stadium_natural_stockout(receiver, next_row, Controller(),
+                                                              module.time.monotonic() + 1)
+                    self.assertTrue(calls[-1].endswith('-leave-platform:release'))
+                else:
+                    result = module.drive_stadium_natural_stockout(receiver, next_row, Controller(),
+                                                                  module.time.monotonic() + 1)
+                    self.assertEqual(result, {'result_outcome': 2})
+                    self.assertEqual(sum(x.endswith('-leave-platform') for x in calls), 3)
+                    self.assertEqual(sum(x.endswith('-leave-platform:release') for x in calls), 3)
+                    self.assertEqual([x['to_stocks'][0] for x in witness.transitions], [3, 2, 1, 0])
+
     @staticmethod
     def row(sequence, tick):
         return {'event': 'boundary', 'seq': sequence, 'source_tick': tick,

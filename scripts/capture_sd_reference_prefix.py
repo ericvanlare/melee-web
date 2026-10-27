@@ -2902,6 +2902,32 @@ def drive_stadium_natural_stockout(receiver, next_row, controller, deadline):
                 witness.transitions[-1]['to_stocks'] == (expected_stock - 1, 4),
                 'Natural stockout action skipped or combined actual stock transitions')
         if expected_stock > 1:
+            # RebirthWait intentionally holds a neutral player on the platform.
+            # Leave it with ordinary input, then observe the original landing;
+            # do not spend the bounded source wait on its inactivity timer.
+            pump_until(lambda: witness.last_stocks == (expected_stock - 1, 4) and
+                       witness.last_fighters['motions'][1] == 14 and
+                       (witness.last_fighters['motions'][0] == 13 or
+                        witness.last_fighters['motions'] == (14, 14) and
+                        witness.last_fighters['ground_air'] == (0, 0)),
+                       f'P1 respawn platform at {expected_stock - 1} stocks')
+            if witness.last_fighters['motions'][0] == 13:
+                requested_after = receiver.seq
+                controller.set_both(edge, NEUTRAL_PAD,
+                    action=f'natural-stockout-stock-{expected_stock - 1}-leave-platform')
+                try:
+                    pump_until(lambda: witness.last_tick is not None and
+                               witness.last_fighters['motions'][0] != 13,
+                               'P1 leave respawn platform', max_rows=150)
+                    require(receiver.seq > requested_after and
+                            receiver.last_pad[:2] == [edge, NEUTRAL_PAD] and
+                            witness.last_stocks == (expected_stock - 1, 4) and
+                            witness.last_fighters['motions'] == (29, 14) and
+                            witness.last_fighters['ground_air'] == (1, 0),
+                            'Natural stockout platform exit lacks consumed stick and source Fall')
+                finally:
+                    controller.set_both(NEUTRAL_PAD, NEUTRAL_PAD,
+                        action=f'natural-stockout-stock-{expected_stock - 1}-leave-platform:release')
             pump_until(lambda: witness.last_stocks == (expected_stock - 1, 4) and
                        witness.last_fighters['motions'] == (14, 14) and
                        witness.last_fighters['ground_air'] == (0, 0),
