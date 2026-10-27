@@ -893,6 +893,7 @@ bool stadium_paired_v11_recipe(){
  return replay&&replay->whole_session()&&
         replay->version==melee_web::kRetailReplayDrawClosureVersion;
 }
+bool matched_setup_cf_clock_transition(bool tick_action,uint64_t before,uint64_t after);
 void stadium_paired_v11_fail(const std::string& error);
 bool stadium_paired_v11_route_owned();
 void stadium_paired_v11_prepare_route();
@@ -4053,9 +4054,14 @@ void stadium_paired_v11_after_match_tick(uint64_t source_tick_before,
     const uint64_t source_frame_after=match->source_frames();
     check(idle.world_generation==s.world_generation&&
           idle.world_ticks==source_tick_before+1&&
-          idle.source_frame==source_frame_before+1&&
-          source_frame_after==source_frame_before+1,
-          "Paired v11 post-GO typed22 is not the completed actual source tick");
+          idle.source_frame==source_frame_after&&
+          matched_setup_cf_clock_transition(true,source_frame_before,source_frame_after),
+          ("Paired v11 post-GO typed22 coordinate mismatch: tick_before="+
+           std::to_string(source_tick_before)+" observed_ticks="+
+           std::to_string(idle.world_ticks)+" clock_before="+
+           std::to_string(source_frame_before)+" clock_after="+
+           std::to_string(source_frame_after)+" snapshot_clock="+
+           std::to_string(idle.source_frame)).c_str());
     check(match->diagnostic_stadium_pad_queue_observation(&queue,error,sizeof(error)),
           error[0]?error:"Paired v11 literal HSD queue snapshot refused");
     check(queue.source_generation==s.world_generation&&
