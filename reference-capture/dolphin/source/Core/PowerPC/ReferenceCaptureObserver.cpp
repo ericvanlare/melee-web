@@ -265,6 +265,14 @@ struct StadiumWholeBObservation
 // per-window state machine sequentially for selected matches0 and1.
 struct StadiumWholeLongIdle
 {
+  // Passive selected timing is available only for fresh recording or the
+  // independently authenticated first-form whole3 replay admission below.
+  static bool SelectedTimingInputAdmit(bool recording, bool replaying, bool first_form_replay)
+  {
+    return (recording && !replaying && !first_form_replay) ||
+           (!recording && replaying && first_form_replay);
+  }
+
   bool enabled = false, paired = false, registration = false, open = false, target_seen = false, closed = false;
   bool first_form_replay = false;
   u32 owner = 0, go_tick = 0, last_tick = 0, samples = 0;
@@ -1620,9 +1628,10 @@ struct Observer::Impl
     if (selected_timing_enabled && (timing_setting!="first_selected_stage_request_v1" ||
         !stadium_whole_feedback || whole_session_matches!=3 || !stadium_whole_b.enabled ||
         long_idle_setting!="selected_b_3500_v1" || Env("MWRC_STADIUM_POSTTRANSFORM_STATE")!="first_form_v1" ||
-        !InputStream::IsRecording() || InputStream::IsReplaying() || whole_rng_returns ||
+        !StadiumWholeLongIdle::SelectedTimingInputAdmit(InputStream::IsRecording(),
+            InputStream::IsReplaying(), stadium_whole_long_idle.first_form_replay) || whole_rng_returns ||
         stadium_whole_paired_idle || !Env("MWRC_CPU_PROBE_OUTPUT").empty()))
-      return SetInvalid("Selected source timing requires exact fresh whole3 first-form observation"),false;
+      return SetInvalid("Selected source timing requires exact fresh or bound first-form whole3 replay observation"),false;
     stadium_whole_long_idle.enabled = !long_idle_setting.empty();
     stadium_whole_long_idle.paired = stadium_whole_paired_idle;
     stadium_whole_long_idle.registration = paired_idle_setting == "paired_idle_registration_v1";

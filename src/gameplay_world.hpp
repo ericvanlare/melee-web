@@ -101,7 +101,8 @@ struct GameplayWorldSelection {
     std::array<MeleeWebPlayerSettings,4> source_players{};
     // Opt-in for first-transform form preparation; false keeps the existing
     // Stadium idle/paired diagnostic asset path unchanged.
-    bool stadium_first_transform_diagnostic=false;
+    bool stadium_first_transform_diagnostic=false; // existing first-Fire policy
+    bool stadium_first_water_diagnostic=false; // separate first Water9, never a Fire->Water cycle
 };
 // Shared by the browser and source regression harness. Owns one original SDK
 // world and its assets. Match/render contexts must close before this owner.

@@ -6255,7 +6255,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..c9f21415941be6c2ce510d5034400c55
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d2a9cfb52 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..207761d18f33a6ceb120dea5ff1bf184c81b45b0 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
 @@ -1,5 +1,18 @@
@@ -6303,7 +6303,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
  #include <sysdolphin/baselib/jobj.h>
  #include <sysdolphin/baselib/memory.h>
  #include <sysdolphin/baselib/mobj.h>
-@@ -38,6 +59,15 @@
+@@ -38,6 +59,16 @@
  #include <sysdolphin/baselib/sislib.h>
  #include <sysdolphin/baselib/wobj.h>
  
@@ -6313,13 +6313,14 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
 +    HSD_GObj* gobj, const void* lookup_result, const void* stored_result);
 +static void stadium_owner_note_map2_proc_dispatch(void);
 +static void stadium_owner_note_map2_proc(HSD_GObj* gobj, HSD_GObjProc* proc);
++static void stadium_owner_note_first_transform_proc(int,HSD_GObj*,HSD_GObjProc*);
 +static void stadium_owner_note_map2_buffer_use(const void* buffer);
 +#endif
 +
  static struct grPStadium_YakumonoParam {
      int x0;
      int x4;
-@@ -64,6 +94,47 @@ static struct grPStadium_YakumonoParam {
+@@ -64,6 +95,47 @@ static struct grPStadium_YakumonoParam {
      s16 x50;
  }* yakumono_param;
  
@@ -6367,7 +6368,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
  GrJoint grPs_803E1248[] = {
      { 1, 3, 0 }, { 2, 3, 0 }, { 3, 4, 0 },
      { 4, 5, 0 }, { 5, 6, 0 }, { 7, 9, 0 },
-@@ -162,6 +233,10 @@ void grStadium_OnDemoInit(int unused) {}
+@@ -162,6 +234,10 @@ void grStadium_OnDemoInit(int unused) {}
  
  void grStadium_OnInit(void)
  {
@@ -6378,7 +6379,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
      yakumono_param = Ground_GetYakumonoParam();
  
      stage_info.unk8C.b4 = false;
-@@ -206,6 +281,10 @@ Ground_GObj* grStadium_801D10F8(StadiumGrType id)
+@@ -206,6 +282,10 @@ Ground_GObj* grStadium_801D10F8(StadiumGrType id)
  
      cb = &grPs_StageCallbacks[id];
      gobj = Ground_GetStageGObj(id);
@@ -6389,20 +6390,21 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
  
      if (gobj != NULL) {
          Ground* gp = GET_GROUND(gobj);
-@@ -219,7 +298,12 @@ Ground_GObj* grStadium_801D10F8(StadiumGrType id)
+@@ -219,7 +299,13 @@ Ground_GObj* grStadium_801D10F8(StadiumGrType id)
              cb->on_init(gobj);
          }
          if (cb->gobj_proc != NULL) {
 +#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 +            HSD_GObjProc* proc = HSD_GObj_SetupProc(gobj, cb->gobj_proc, 4);
 +            if ((int) id == 2) stadium_owner_note_map2_proc(gobj, proc);
++            stadium_owner_note_first_transform_proc((int) id, gobj, proc);
 +#else
              HSD_GObj_SetupProc(gobj, cb->gobj_proc, 4);
 +#endif
          }
      } else {
          OSReport("%s:%d: couldn t get gobj(id=%d)\n", __FILE__, 288, id);
-@@ -304,7 +388,16 @@ void grStadium_801D13E0(Ground_GObj* gobj)
+@@ -304,7 +390,16 @@ void grStadium_801D13E0(Ground_GObj* gobj)
      HSD_MObj* mobj;
      s32 temp_r28;
      s32 var_r27;
@@ -6420,7 +6422,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
      Ground* gr = GET_GROUND(gobj);
      HSD_JObj* jobj = GET_JOBJ(gobj);
  
-@@ -315,6 +408,9 @@ void grStadium_801D13E0(Ground_GObj* gobj)
+@@ -315,6 +410,9 @@ void grStadium_801D13E0(Ground_GObj* gobj)
      if (mobj == NULL) {
          gr->u.stadium.xCC = HSD_MemAlloc(0x50000);
      }
@@ -6430,7 +6432,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
      gr->u.stadium.xC4_b1 = false;
      gr->u.stadium.xD0 = NULL;
      gr->u.stadium.xD4 = 0.0F;
-@@ -326,17 +422,94 @@ void grStadium_801D13E0(Ground_GObj* gobj)
+@@ -326,17 +424,94 @@ void grStadium_801D13E0(Ground_GObj* gobj)
      gr->u.stadium.xE8 = NULL;
      var_r27 = yakumono_param->x4;
      temp_r28 = yakumono_param->x0;
@@ -6527,7 +6529,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
  }
  
  bool grStadium_801D1518(Ground_GObj* gobj)
-@@ -346,6 +519,9 @@ bool grStadium_801D1518(Ground_GObj* gobj)
+@@ -346,6 +521,9 @@ bool grStadium_801D1518(Ground_GObj* gobj)
  
  void grStadium_801D1520(Ground_GObj* gobj)
  {
@@ -6537,7 +6539,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
      Ground* gp = GET_GROUND(gobj);
      if (!gp->u.stadium.xC4_b0) {
          grStadium_801D4548(gobj);
-@@ -652,6 +828,38 @@ typedef struct ImageDescWrapper {
+@@ -652,6 +830,38 @@ typedef struct ImageDescWrapper {
      u16 x1A, x1C;
  } ImageDescWrapper;
  
@@ -6576,7 +6578,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
  #define GET_WRAPPER(x) ((ImageDescWrapper*) HSD_GObjGetUserData(x))
  
  void grStadium_801D1EF8(Ground_GObj* gobj)
-@@ -788,137 +996,6126 @@ void grStadium_801D1EF8(Ground_GObj* gobj)
+@@ -788,137 +998,6343 @@ void grStadium_801D1EF8(Ground_GObj* gobj)
              }
              break;
          }
@@ -6961,10 +6963,13 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
 +static MeleeWebStadiumMap2BufferOwner* stadium_first_transform_retired_buffer_owner;
 +static uint64_t stadium_first_transform_retired_generation;
 +
-+int melee_web_stadium_display_owner_first_transform_arm(
++int melee_web_stadium_display_owner_first_transform_arm_form(
 +    MeleeWebStadiumDisplayOwner* owner,MeleeWebStadiumFirstTransformJournal* j,
-+    char* error,size_t size)
++    uint32_t form,char* error,size_t size)
 +{
++    if(form!=MELEE_WEB_STADIUM_FIRST_TRANSFORM_FIRE_FORM&&
++       form!=MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM)
++        return stadium_owner_error(error,size,"First-transform arm requires exact authored form 3 or 9");
 +    if(!owner||owner!=stadium_display_owner_current||!j||
 +       stadium_first_transform_current||stadium_first_transform_retired_buffer_owner||
 +       j->armed||j->count||j->failed||
@@ -6972,12 +6977,35 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
 +       !owner->map2_buffer_output||!owner->nested_map5_ground||
 +       !stadium_owner_source_journal_matches(owner,stage_info.map_gobjs,
 +                                            ARRAY_SIZE(stage_info.map_gobjs)))
-+        return stadium_owner_error(error,size,"First-fire journal requires exact untouched source OnInit owner");
++        return stadium_owner_error(error,size,"First-transform journal requires exact untouched source OnInit owner");
 +    j->world_generation=melee_web_gameplay_stats().generation;
-+    if(!j->world_generation)return stadium_owner_error(error,size,"First-fire journal has no live world");
-+    j->initial_map5=owner->nested_map5_ground;j->armed=1;
++    if(!j->world_generation)return stadium_owner_error(error,size,"First-transform journal has no live world");
++    j->selected_form=form;j->initial_map5=owner->nested_map5_ground;j->armed=1;
 +    stadium_first_transform_current=j;
 +    if(error&&size)error[0]='\0';return 1;
++}
++int melee_web_stadium_display_owner_first_transform_arm(
++    MeleeWebStadiumDisplayOwner* owner,MeleeWebStadiumFirstTransformJournal* j,
++    char* error,size_t size)
++{
++    return melee_web_stadium_display_owner_first_transform_arm_form(
++        owner,j,MELEE_WEB_STADIUM_FIRST_TRANSFORM_FIRE_FORM,error,size);
++}
++
++static void stadium_owner_note_first_transform_proc(
++    int map_id,HSD_GObj* object,HSD_GObjProc* proc)
++{
++    MeleeWebStadiumFirstTransformJournal* j=stadium_first_transform_current;
++    if(!j||j->selected_form!=MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM||
++       j->armed!=1||j->failed)return;
++    HSD_GObjProc** out=NULL;
++    HSD_GObj* expected=NULL;
++    if(map_id==9){out=&j->water_map9_proc;expected=j->water_map9;}
++    else if(map_id==7){out=&j->water_child7_proc;expected=j->water_child7;}
++    else if(map_id==8){out=&j->water_child8_proc;expected=j->water_child8;}
++    else return;
++    if(!object||object!=expected||!proc||*out){j->failed=1;return;}
++    *out=proc;
 +}
 +
 +void melee_web_stadium_display_owner_note_ground_retire(HSD_GObj* object,int entering)
@@ -6985,7 +7013,13 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
 +    MeleeWebStadiumFirstTransformJournal* j=stadium_first_transform_current;
 +    if(!j||!object)return;
 +    /* Pointer comparisons only: return is after original GObj destruction. */
-+    const int id=object==j->initial_map5?5:(object==j->fire_map3?3:-1);
++    int id=-1;
++    if(j->selected_form==MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM){
++        if(object==j->initial_map5)id=5;
++        else if(object==j->water_map9)id=9;
++        else if(object==j->water_child7)id=7;
++        else if(object==j->water_child8)id=8;
++    }else id=object==j->initial_map5?5:(object==j->fire_map3?3:-1);
 +    if(id<0)return;
 +    if(j->world_generation!=melee_web_gameplay_stats().generation){j->failed=1;return;}
 +    (void)melee_web_stadium_first_transform_record(j,entering?2U:3U,id,object);
@@ -6997,7 +7031,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
 +{
 +    if(!j||j!=stadium_first_transform_current||!out||j->armed!=1||j->failed||
 +       j->world_generation!=melee_web_gameplay_stats().generation)
-+        return stadium_owner_error(error,size,"First-fire source lifetime journal is unavailable or failed");
++        return stadium_owner_error(error,size,"First-transform source lifetime journal is unavailable or failed");
 +    const MeleeWebStadiumDisplayOwner* owner=stadium_display_owner_current;
 +    if(!owner||!owner->map2_ground||Ground_GetMapGObj(2)!=owner->map2_ground)
 +        return stadium_owner_error(error,size,"First-fire status lacks its active source map2");
@@ -10211,13 +10245,164 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
 +           tail->child == NULL;
 +}
 +
++/* Water9 and its source-created7/8 each retain the exact three-node source
++ * process chain. The callback identity comes from the authored callback table;
++ * local process/GObj addresses are compared only within this live world. */
++static int stadium_owner_water_proc_chain_matches(
++    const HSD_GObj* gobj,HSD_GObjProc* expected_head,int map_id)
++{
++    const HSD_GObjProc* middle;
++    const HSD_GObjProc* tail;
++    if(map_id!=7&&map_id!=8&&map_id!=9)return 0;
++    if(!gobj||!expected_head||gobj->proc!=expected_head||
++       !stadium_owner_map2_proc_root_contains_once(expected_head))return 0;
++    middle=expected_head->child;
++    if(!middle||middle==expected_head||
++       !stadium_owner_map2_proc_root_contains_once(middle))return 0;
++    tail=middle->child;
++    if(!tail||tail==expected_head||tail==middle||
++       !stadium_owner_go_proc_root_contains_once(tail,1))return 0;
++    return expected_head->gobj==gobj&&
++       expected_head->on_invoke==grPs_StageCallbacks[map_id].gobj_proc&&
++       expected_head->s_link==4&&middle->gobj==gobj&&middle->s_link==4&&
++       melee_web_stadium_c1_ground_proc_callback_matches(middle->on_invoke,4)&&
++       tail->gobj==gobj&&tail->s_link==1&&
++       melee_web_stadium_c1_ground_proc_callback_matches(tail->on_invoke,1)&&
++       tail->child==NULL;
++}
++
++static int stadium_first_water_graph_matches(
++    const MeleeWebStadiumDisplayOwner* owner,int retiring)
++{
++    MeleeWebStadiumFirstTransformJournal* j=stadium_first_transform_current;
++    if(!owner||owner!=stadium_display_owner_current||!j||
++       j->selected_form!=MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM||
++       !stadium_first_transform_source_prefix(owner)||
++       (j->count!=0&&j->count!=3&&j->count!=5)||
++       !owner->map2_buffer_output||owner->map2_buffer_output->map0_ground!=Ground_GetMapGObj(0)||
++       !stadium_owner_ground_map_matches(owner->map2_ground,2)||
++       !stadium_owner_ground_map_matches(owner->display_ground,1)||
++       !stadium_owner_ground_map_matches(Ground_GetMapGObj(0),0)||
++       !owner->manager_bound||!owner->source_started||
++       owner->map2_buffer_origin!=MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK||
++       !owner->map2_buffer_allocation_lease_captured||
++       !stadium_owner_map2_buffer_allocation_matches(owner->map2_buffer,&owner->map2_buffer_allocation_lease))return 0;
++    const Ground* map2=HSD_GObjGetUserData(owner->map2_ground);
++    if(!map2||map2->map_id!=2||map2->u.stadium.xCC!=owner->map2_buffer||
++       owner->map2_proc!=owner->map2_ground->proc||
++       !stadium_owner_map2_proc_root_contains_once(owner->map2_proc)||
++       owner->map2_proc->gobj!=owner->map2_ground||
++       owner->map2_proc->on_invoke!=grStadium_801D1520||owner->map2_proc->s_link!=4)return 0;
++    const int phase=map2->u.stadium.xDC;
++    const int form=map2->u.stadium.xDE;
++    const int initial=phase==0&&form==5&&j->count==0;
++    if(initial){
++        if(retiring||owner->map2_buffer_use_count||map2->u.stadium.xD0||map2->u.stadium.xE8||
++           map2->u.stadium.xE4!=j->initial_map5||map2->u.stadium.xE0!=-1||
++           map2->u.stadium.xE2!=-1)return 0;
++    }else if(phase==0&&form==MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM){
++        if(j->count!=5||owner->map2_buffer_use_count!=2||map2->u.stadium.xC4_b1||
++           !map2->u.stadium.xD0||
++           map2->u.stadium.xD0!=j->source_slot||
++           melee_web_stage_map_lookup(MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM)!=j->source_slot||
++           map2->u.stadium.xE0!=5||map2->u.stadium.xE2!=-1||map2->u.stadium.xE8||
++           map2->u.stadium.xE4!=j->water_map9)return 0;
++        /* `can_end` runs before StageLast's reverse-map destruction. It must
++         * see the settled Water graph still alive; the 11-event receipt is
++         * checked only after source removal callbacks have actually run. */
++        if(retiring&&(phase!=0||j->count!=5))return 0;
++    }else{
++        if(form!=MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM||
++           phase<1||phase>6||map2->u.stadium.xE0!=5||map2->u.stadium.xE2!=-1)
++            return 0;
++        if(phase==1){
++            if(j->count||owner->map2_buffer_use_count!=1||map2->u.stadium.xD0||
++               map2->u.stadium.xE8||map2->u.stadium.xE4!=j->initial_map5)return 0;
++        }else{
++            if(owner->map2_buffer_use_count!=2||!map2->u.stadium.xD0||
++               melee_web_stage_map_lookup(MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM)!=
++                   map2->u.stadium.xD0||map2->u.stadium.xC4_b1)
++                return 0;
++            if(j->source_slot&&j->source_slot!=map2->u.stadium.xD0)return 0;
++            j->source_slot=map2->u.stadium.xD0; /* exact source-returned archive slot */
++            if(phase>=2&&phase<=4){
++                if(j->count||map2->u.stadium.xE8||map2->u.stadium.xE4!=j->initial_map5)
++                    return 0;
++            }else if(phase==5){
++                if(j->count!=3||map2->u.stadium.xE8!=j->water_map9||
++                   map2->u.stadium.xE4!=j->initial_map5)return 0;
++            }else if(phase==6){
++                if(j->count!=5||map2->u.stadium.xE8||
++                   map2->u.stadium.xE4!=j->water_map9)return 0;
++            }
++        }
++    }
++    const int live_water=j->count==3||j->count==5;
++    const int live_base=j->count<5;
++    HSD_GObj* maps[7]={Ground_GetMapGObj(0),owner->display_ground,owner->map2_ground,
++        live_base?j->initial_map5:NULL,live_water?j->water_map9:NULL,
++        live_water?j->water_child7:NULL,live_water?j->water_child8:NULL};
++    const unsigned ids[7]={0,1,2,5,9,7,8};
++    for(size_t i=0;i<ARRAY_SIZE(stage_info.map_gobjs);i++){
++        HSD_GObj* expected=NULL;
++        for(unsigned k=0;k<7;k++)if(i==ids[k])expected=maps[k];
++        if(stage_info.map_gobjs[i]!=expected)return 0;
++    }
++    unsigned expected_count=1; /* exact checked source manager */
++    for(unsigned k=0;k<7;k++)if(maps[k]){
++        if(!stadium_owner_ground_map_matches(maps[k],(int)ids[k]))return 0;
++        ++expected_count;
++    }
++    if(live_water){
++        const Ground* water=HSD_GObjGetUserData(j->water_map9);
++        const Ground* child7=HSD_GObjGetUserData(j->water_child7);
++        const Ground* child8=HSD_GObjGetUserData(j->water_child8);
++        if(!water||water->map_id!=9||!child7||child7->map_id!=7||!child8||child8->map_id!=8||
++           water->u.stadium9.xCC_gobj!=j->water_child7||
++           water->u.stadium9.xD0_gobj!=j->water_child8||
++           !j->water_map9_proc||!j->water_child7_proc||!j->water_child8_proc||
++           !stadium_owner_water_proc_chain_matches(j->water_map9,j->water_map9_proc,9)||
++           !stadium_owner_water_proc_chain_matches(j->water_child7,j->water_child7_proc,7)||
++           !stadium_owner_water_proc_chain_matches(j->water_child8,j->water_child8_proc,8)||
++           water->x1C_callback!=grPs_StageCallbacks[9].callback3||
++           child7->x1C_callback!=grPs_StageCallbacks[7].callback3||
++           child8->x1C_callback!=grPs_StageCallbacks[8].callback3)return 0;
++    }
++    if(retiring&&(Ground_GetMapGObj(2)!=owner->map2_ground||j->count!=5))return 0;
++    char error[128];if(!melee_web_stadium_manager_view_preflight(&owner->manager,error,sizeof(error)))return 0;
++    unsigned found=0;
++    for(HSD_GObj* g=((HSD_GObj**)HSD_GObj_Entities)[5];g;g=g->next){
++        if(g->classifier!=HSD_GOBJ_CLASS_STAGE)continue;
++        int known=g==owner->manager.object;
++        for(unsigned k=0;k<7;k++)if(maps[k]&&g==maps[k])known=1;
++        if(!known)return 0;
++        ++found;
++    }
++    if(found!=expected_count)return 0;
++    const Ground* display=HSD_GObjGetUserData(owner->display_ground);
++    j->phase=map2->u.stadium.xDC;j->form=map2->u.stadium.xDE;
++    j->history_e0=map2->u.stadium.xE0;j->history_e2=map2->u.stadium.xE2;
++    j->countdown=map2->u.stadium.xD8;j->pending=map2->u.stadium.xC4_b1;
++    j->buffer_uses=owner->map2_buffer_use_count;j->map2_gate=map2->u.stadium.xC4_b0;
++    j->display_mode=display->u.display.xE4;j->display_e6=display->u.display.xE6;
++    j->display_e8=display->u.display.xE8;j->display_previous_mode=display->u.display.xEA;
++    j->display_selected_player=display->u.display.xEE;j->display_f2=display->u.display.xF2;
++    j->display_flags=(display->u.display.xF8_0?1U:0U)|
++       (display->u.display.xF8_1?2U:0U)|(display->u.display.xF8_2?4U:0U);
++    j->scalar_world_ticks=melee_web_gameplay_stats().ticks;j->scalar_sample_valid=1;
++    return 1;
++}
++
 +/* Validate actual post-tick roots and source phase; no phase/state writes.
 + * Exactly the first base->fire transition is admitted, no default return. */
 +static int stadium_first_transform_graph_matches(
 +    const MeleeWebStadiumDisplayOwner* owner,int retiring)
 +{
 +    MeleeWebStadiumFirstTransformJournal* j=stadium_first_transform_current;
++    if(j&&j->selected_form==MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM)
++        return stadium_first_water_graph_matches(owner,retiring);
 +    if(!owner||owner!=stadium_display_owner_current||!j||
++       j->selected_form!=MELEE_WEB_STADIUM_FIRST_TRANSFORM_FIRE_FORM||
 +       !stadium_first_transform_source_prefix(owner)||j->count==2||j->count>3||
 +       !owner->map2_buffer_output||owner->map2_buffer_output->map0_ground!=Ground_GetMapGObj(0)||
 +       !stadium_owner_ground_map_matches(owner->map2_ground,2)||
@@ -10305,14 +10490,16 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
 +    const MeleeWebStadiumDisplayOwner* owner,int retiring,char* error,size_t size)
 +{
 +    if(!stadium_first_transform_graph_matches(owner,retiring))
-+        return stadium_owner_error(error,size,"First-fire phase/slot/source graph proof failed");
++        return stadium_owner_error(error,size,"Selected first-transform phase/slot/source graph proof failed");
 +    if(error&&size)error[0]='\0';return 1;
 +}
 +int melee_web_stadium_first_transform_callback_matches(MeleeWebSourceFileCallback callback)
 +{
 +    const MeleeWebStadiumFirstTransformJournal* j=stadium_first_transform_current;
 +    const MeleeWebStadiumDisplayOwner* owner=stadium_display_owner_current;
-+    return callback==fn_801D4220&&j&&j->armed==1&&!j->failed&&j->count==0&&
++    return callback==fn_801D4220&&j&&
++        j->selected_form==MELEE_WEB_STADIUM_FIRST_TRANSFORM_FIRE_FORM&&
++        j->armed==1&&!j->failed&&j->count==0&&
 +        j->world_generation==melee_web_gameplay_stats().generation&&
 +        owner&&owner->state==STADIUM_DISPLAY_OWNER_CAPTURED&&owner->source_started&&
 +        owner->manager_bound&&owner->map2_buffer_use_count==1&&
@@ -10322,18 +10509,50 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
 +        stadium_owner_map2_buffer_allocation_matches(owner->map2_buffer,
 +                                                     &owner->map2_buffer_allocation_lease);
 +}
++int melee_web_stadium_water_graph_callback_matches(MeleeWebSourceFileCallback callback)
++{
++    const MeleeWebStadiumFirstTransformJournal* j=stadium_first_transform_current;
++    const MeleeWebStadiumDisplayOwner* owner=stadium_display_owner_current;
++    return callback==fn_801D4220&&j&&
++        j->selected_form==MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM&&
++        j->armed==1&&!j->failed&&j->count==0&&
++        j->world_generation==melee_web_gameplay_stats().generation&&
++        owner&&owner->state==STADIUM_DISPLAY_OWNER_CAPTURED&&owner->source_started&&
++        owner->manager_bound&&owner->map2_buffer_use_count==1&&
++        owner->map2_buffer_output&&owner->map2_ground==Ground_GetMapGObj(2)&&
++        owner->map2_buffer_origin==MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK&&
++        owner->map2_buffer_allocation_lease_captured&&
++        stadium_owner_map2_buffer_allocation_matches(owner->map2_buffer,
++                                                     &owner->map2_buffer_allocation_lease);
++}
++
 +int melee_web_stadium_display_owner_first_transform_end(
 +    MeleeWebStadiumFirstTransformJournal* j,MeleeWebStadiumMap2BufferOwner* maps,
 +    char* error,size_t size)
 +{
-+    if(!j||j!=stadium_first_transform_current||j->armed!=1||j->failed||j->count!=5||
-+       j->world_generation!=melee_web_gameplay_stats().generation||!j->source_slot||
-+       Ground_GetMapGObj(2)||Ground_GetMapGObj(3)||Ground_GetMapGObj(5)||
++    const unsigned expected=j?melee_web_stadium_first_transform_event_count(j):0;
++    if(!j||j!=stadium_first_transform_current||j->armed!=1||j->failed||
++       !expected||j->count!=expected||
++       j->world_generation!=melee_web_gameplay_stats().generation||
++       Ground_GetMapGObj(2)||Ground_GetMapGObj(5)||
 +       !maps||maps->captured!=1||maps->nested_map5_ground!=j->initial_map5||
-+       maps->initial_map5_source_retired||
-+       stadium_owner_gobj_address_present(j->fire_map3))
-+        return stadium_owner_error(error,size,"First-fire journal has not observed exact source Ground retirement");
-+    grAnime_801C65B0(j->source_slot); /* original checked header-free/slot-clear */
++       maps->initial_map5_source_retired)
++        return stadium_owner_error(error,size,"First-transform journal has not observed exact source Ground retirement");
++    if(j->selected_form==MELEE_WEB_STADIUM_FIRST_TRANSFORM_FIRE_FORM){
++        if(!j->source_slot||Ground_GetMapGObj(3)||
++           stadium_owner_gobj_address_present(j->fire_map3))
++            return stadium_owner_error(error,size,"First-fire journal still has a live source object or header slot");
++        grAnime_801C65B0(j->source_slot); /* original checked header-free/slot-clear */
++    }else if(j->selected_form==MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM){
++        if(!j->source_slot||melee_web_stage_map_lookup(
++               MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM)!=j->source_slot||
++           Ground_GetMapGObj(9)||Ground_GetMapGObj(7)||Ground_GetMapGObj(8)||
++           stadium_owner_gobj_address_present(j->water_map9)||
++           stadium_owner_gobj_address_present(j->water_child7)||
++           stadium_owner_gobj_address_present(j->water_child8))
++            return stadium_owner_error(error,size,"Water graph journal still has a live source Ground or archive slot");
++        grAnime_801C65B0(j->source_slot); /* exact source-returned Water slot after all borrowers are gone */
++    }else return stadium_owner_error(error,size,"First-transform journal has an unsupported selected form");
 +    /* A later unrelated pool object may reuse old map5's address. The two
 +     * real removal call receipts prove that logical lifetime ended; never
 +     * reinterpret mere pointer membership as its resurrection. */
@@ -12813,7 +13032,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
  
  /// @todo can these inlines be merged?
  static inline int randi_between_2(int a, int b)
-@@ -1185,22 +7382,41 @@ HSD_GObj* grStadium_801D2BEC(void)
+@@ -1185,22 +7601,41 @@ HSD_GObj* grStadium_801D2BEC(void)
      PAD_STACK(4);
  
      gobj = GObj_Create(0x11, 0x13, 0);
@@ -12855,7 +13074,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
      text->win_dynamic_p->pos_z = 0.0F;
      hsd_text = text->win_dynamic_p;
      hsd_text->box_size_x = 250.0F;
-@@ -1214,11 +7430,21 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1214,11 +7649,21 @@ HSD_GObj* grStadium_801D2D78(void)
      ImageDescWrapper* wrapper;
  
      temp_r3 = GObj_Create(0x11, 0x12, 0);
@@ -12877,7 +13096,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
      wrapper->flag = true;
      return temp_r3;
  }
-@@ -1226,12 +7452,22 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1226,12 +7671,22 @@ HSD_GObj* grStadium_801D2D78(void)
  HSD_GObj* grStadium_801D2E24(void)
  {
      HSD_GObj* gobj = GObj_Create(0x11, 0x12, 0);
@@ -12900,7 +13119,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
      wrapper->flag = false;
      return gobj;
  }
-@@ -1896,6 +8132,9 @@ bool grStadium_801D42B8(void)
+@@ -1896,6 +8351,9 @@ bool grStadium_801D42B8(void)
      if (gp->u.stadium.xC4_b1) {
          return false;
      }
@@ -12910,7 +13129,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
      gp->u.stadium.xD0 =
          grDatFiles_801C6478(gp->u.stadium.xCC, gp->u.stadium.xC8);
      return true;
-@@ -2093,6 +8332,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2093,6 +8551,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
              gp = GET_GROUND(map_gobj);
              HSD_ASSERT(0x99B, gp);
              gp->u.stadium.xC4_b1 = true;
@@ -12920,7 +13139,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..380e5b6a11dd35c015cca9f67511ac5d
              lbFile_80016580(datfiles[var_r29], gp->u.stadium.xCC,
                              &gp->u.stadium.xC8, fn_801D4220, NULL);
              temp_r31->u.stadium.xDC = 1;
-@@ -2221,6 +8463,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2221,6 +8682,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
          if (temp_r31->u.stadium.xDE == 5) {
              temp_r31->u.stadium.xD8 =
                  randi_between_2(yakumono_param->x0, yakumono_param->x4);

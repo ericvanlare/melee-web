@@ -260,14 +260,20 @@ struct GameplayWorld::Storage {
     MeleeWebStageLast* stage_last=nullptr;
     bool stadium_diagnostic=false;
     bool stadium_first_transform_diagnostic=false;
+    bool stadium_first_water_diagnostic=false;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     MeleeWebStadiumFirstTransformJournal stadium_first_transform_terminal{};
+    unsigned first_transform_selected_form()const{
+        if(stadium_first_transform_diagnostic&&stadium_first_water_diagnostic)return 0;
+        return stadium_first_water_diagnostic?9U:(stadium_first_transform_diagnostic?3U:0U);
+    }
+
     bool first_fire_hook_installed=false,first_fire_schedule_declared=false,first_fire_gate_armed=false;
     uint32_t first_fire_request_tick=0,first_fire_callback_tick=0,first_fire_last_tick=0;
     MeleeWebSourceFileRecordedCompletionStatus first_fire_completion_retained{};
     static int first_fire_preconsume(void* context,uint64_t cursor,char* error,size_t size){
         auto* self=static_cast<Storage*>(context);
-        if(!self||!self->stadium_first_transform_diagnostic||!self->first_fire_gate_armed||
+        if(!self||!self->first_transform_selected_form()||!self->first_fire_gate_armed||
            !self->source_files||!self->stage_last||
            !melee_web_stage_last_source_work_allowed(self->stage_last)){
             if(error&&size)std::snprintf(error,size,"First-fire preconsume owner/plan unavailable");
@@ -277,7 +283,7 @@ struct GameplayWorld::Storage {
     }
     bool first_fire_completion_status(MeleeWebSourceFileRecordedCompletionStatus* out,
                                      char* error,size_t size)const{
-        if(!out||!stadium_first_transform_diagnostic||!first_fire_gate_armed)return false;
+        if(!out||!first_transform_selected_form()||!first_fire_gate_armed)return false;
         if(source_files)return melee_web_source_files_recorded_completion_status(source_files,out,error,size);
         if(!first_fire_completion_retained.armed||first_fire_completion_retained.failed||
            !first_fire_completion_retained.completed)return false;
@@ -297,7 +303,7 @@ struct GameplayWorld::Storage {
         return ready;
     }
     void first_fire_arm_resident_plan(){
-        check(stadium_first_transform_diagnostic&&first_fire_schedule_declared&&
+        check(first_transform_selected_form()&&first_fire_schedule_declared&&
               first_fire_hook_installed&&!first_fire_gate_armed&&stage_last&&source_files&&runtime_files&&
               source_files==melee_web_source_files_current_scope(),
               "First-fire resident plan requires its declared live owner before tick0");
@@ -314,7 +320,7 @@ struct GameplayWorld::Storage {
               lease.world_generation==maps.buffer_allocation_lease.world_generation&&
               lease.allocation_generation==maps.buffer_allocation_lease.allocation_generation,
               "First-fire recorded plan map2 allocation lease changed");
-        const auto name=melee_web_runtime_file_name(*runtime_files,"GrPs1.dat");
+        const auto name=melee_web_runtime_file_name(*runtime_files,stadium_first_water_diagnostic?"GrPs3.dat":"GrPs1.dat");
         const auto it=runtime_files->find(name);
         check(!name.empty()&&it!=runtime_files->end()&&!it->second.empty(),
               "First-fire recorded plan requires resident GrPs1 archive");
@@ -329,7 +335,9 @@ struct GameplayWorld::Storage {
         plan.region_base=maps.buffer;plan.region_size=lease.requested_bytes;
         plan.request_cursor=first_fire_request_tick;plan.callback_cursor=first_fire_callback_tick;
         plan.last_selected_cursor=first_fire_last_tick;
-        plan.callback_matches=melee_web_stadium_first_transform_callback_matches;
+        plan.callback_matches=stadium_first_water_diagnostic?
+            melee_web_stadium_water_graph_callback_matches:
+            melee_web_stadium_first_transform_callback_matches;
         check(melee_web_source_files_recorded_completion_arm(source_files,&plan,error,sizeof(error)),error);
         first_fire_gate_armed=true;
     }
@@ -397,11 +405,14 @@ struct GameplayWorld::Storage {
         }
         stadium_diagnostic=selection.stadium_diagnostic;
         stadium_first_transform_diagnostic=selection.stadium_first_transform_diagnostic;
+        stadium_first_water_diagnostic=selection.stadium_first_water_diagnostic;
 #if !defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-        check(!stadium_diagnostic&&!stadium_first_transform_diagnostic,
+        check(!stadium_diagnostic&&!stadium_first_transform_diagnostic&&!stadium_first_water_diagnostic,
               "Diagnostic Stadium source session is unavailable in this build");
 #else
-        check(!stadium_first_transform_diagnostic||stadium_diagnostic,
+        check(!(stadium_first_transform_diagnostic&&stadium_first_water_diagnostic),
+              "First-transform Fire and Water policies are mutually exclusive");
+        check(!(stadium_first_transform_diagnostic||stadium_first_water_diagnostic)||stadium_diagnostic,
               "First-transform form preparation requires the explicit diagnostic Stadium source session");
         if(stadium_diagnostic){
             check(source_ordered && selection.begin_source_match &&
@@ -455,7 +466,7 @@ struct GameplayWorld::Storage {
             load("LbRf.dat",DatExternalPolicy::ResolveNull);
         if(stage)load(stage->archive);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-        if(stadium_first_transform_diagnostic)
+        if(first_transform_selected_form())
             for(const char* name:{"GrPs1.dat","GrPs2.dat","GrPs3.dat","GrPs4.dat"})
                 load(name,DatExternalPolicy::ResolveNull);
 #endif
@@ -894,7 +905,7 @@ struct GameplayWorld::Storage {
         if(!quake_model)throw DatError("Source stage quake descriptor owner is missing");
         full_stage->set_quake_model(quake_model->single_model());
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-        if(stadium_first_transform_diagnostic&&!stadium_forms){
+        if(first_transform_selected_form()&&!stadium_forms){
             StadiumFormAssets::Archives forms={archive("GrPs1.dat"),archive("GrPs2.dat"),
                 archive("GrPs3.dat"),archive("GrPs4.dat")};
             stadium_forms=std::make_unique<StadiumFormAssets>(std::move(forms),
@@ -944,11 +955,12 @@ struct GameplayWorld::Storage {
                     stadium_forms->map(4).map_head()};
                 check(melee_web_stage_map_set_forms(
                     stage_map,form_maps,error,sizeof(error)),error);
-                check(melee_web_stage_last_stadium_first_transform_arm(
-                    stage_last,error,sizeof(error)),error);
+                check(stadium_first_water_diagnostic?
+                    melee_web_stage_last_stadium_water_graph_arm(stage_last,error,sizeof(error)):
+                    melee_web_stage_last_stadium_first_transform_arm(stage_last,error,sizeof(error)),error);
             }
             check(melee_web_stage_last_stadium_on_load(stage_last,error,sizeof(error)),error);
-            if(stadium_first_transform_diagnostic)first_fire_arm_resident_plan();
+            if(first_transform_selected_form())first_fire_arm_resident_plan();
         }else
 #endif
         stage_last=melee_web_stage_begin_kind(stage->stage_kind,full_stage->yakumono(),
@@ -971,18 +983,20 @@ struct GameplayWorld::Storage {
             check(melee_web_source_files_quiescent_for(
                 source_files,error,sizeof(error)),error);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-        if(stage_last&&stadium_first_transform_diagnostic){
+        if(stage_last&&first_transform_selected_form()){
             check(first_fire_completion_can_end(error,sizeof(error)),error);
-            check(melee_web_stage_last_stadium_first_transform_can_end(
-                stage_last,error,sizeof(error)),error);
+            check(stadium_first_water_diagnostic?
+                melee_web_stage_last_stadium_water_graph_can_end(stage_last,error,sizeof(error)):
+                melee_web_stage_last_stadium_first_transform_can_end(stage_last,error,sizeof(error)),error);
         }
 #endif
         if(numeric)check(melee_web_stage_numeric_clear_quakes(numeric,error,sizeof(error)),error);
         if(stage_last){
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-            if(stadium_first_transform_diagnostic){
-                check(melee_web_stage_last_stadium_first_transform_end(
-                    stage_last,&stadium_first_transform_terminal,error,sizeof(error)),error);
+            if(first_transform_selected_form()){
+                check(stadium_first_water_diagnostic?
+                    melee_web_stage_last_stadium_water_graph_end(stage_last,&stadium_first_transform_terminal,error,sizeof(error)):
+                    melee_web_stage_last_stadium_first_transform_end(stage_last,&stadium_first_transform_terminal,error,sizeof(error)),error);
             }else
 #endif
             check(melee_web_stage_last_end(stage_last,error,sizeof(error)),error);
@@ -1102,7 +1116,7 @@ struct GameplayWorld::Storage {
         if(font){check(melee_web_font_atlas_close(font,error,sizeof(error)),error);font=nullptr;}
         if(source_files){
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-            if(stadium_first_transform_diagnostic){
+            if(first_transform_selected_form()){
                 check(first_fire_completion_can_end(error,sizeof(error)),error);
                 check(first_fire_completion_status(&first_fire_completion_retained,error,sizeof(error)),error);
             }
@@ -1187,7 +1201,7 @@ bool GameplayWorld::diagnostic_stadium_idle_snapshot(
 }
 bool GameplayWorld::diagnostic_stadium_first_transform_schedule(
     uint32_t request,uint32_t callback,uint32_t last,char* error,size_t size){
-    if(!storage_||!storage_->stadium_first_transform_diagnostic||
+    if(!storage_||!storage_->first_transform_selected_form()||
        !storage_->first_fire_hook_installed||storage_->first_fire_schedule_declared||
        storage_->stage_last||request>=callback||callback>=last){
         if(error&&size)std::snprintf(error,size,"First-fire schedule must be declared once before stage construction");
@@ -1203,26 +1217,32 @@ bool GameplayWorld::diagnostic_stadium_first_transform_completion_status(
     return storage_&&storage_->first_fire_completion_status(out,error,size);
 }
 bool GameplayWorld::diagnostic_stadium_first_transform_can_end(char* error,size_t size)const{
-    if(!storage_||!storage_->stadium_first_transform_diagnostic)return false;
+    if(!storage_||!storage_->first_transform_selected_form())return false;
     if(!storage_->first_fire_completion_can_end(error,size))return false;
     if(storage_->stage_last)
-        return melee_web_stage_last_stadium_first_transform_can_end(
-            storage_->stage_last,error,size);
+        return storage_->stadium_first_water_diagnostic?
+            melee_web_stage_last_stadium_water_graph_can_end(storage_->stage_last,error,size):
+            melee_web_stage_last_stadium_first_transform_can_end(storage_->stage_last,error,size);
     const auto& terminal=storage_->stadium_first_transform_terminal;
     const bool retired=terminal.armed==2&&!terminal.failed&&
-        terminal.count==MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENTS&&terminal.world_generation;
+        terminal.selected_form==storage_->first_transform_selected_form()&&
+        terminal.count==melee_web_stadium_first_transform_event_count(&terminal)&&terminal.world_generation;
     if(retired&&error&&size)*error='\0';
     return retired;
 }
 bool GameplayWorld::diagnostic_stadium_first_transform_snapshot(
     MeleeWebStadiumFirstTransformJournal* out,char* error,size_t size)const{
-    if(!out||!storage_||!storage_->stadium_first_transform_diagnostic)return false;
-    if(storage_->stage_last)
-        return melee_web_stage_last_stadium_first_transform_status(
-            storage_->stage_last,out,error,size);
+    if(!out||!storage_||!storage_->first_transform_selected_form())return false;
+    if(storage_->stage_last){
+        const bool observed=storage_->stadium_first_water_diagnostic?
+            melee_web_stage_last_stadium_water_graph_status(storage_->stage_last,out,error,size):
+            melee_web_stage_last_stadium_first_transform_status(storage_->stage_last,out,error,size);
+        return observed&&out->selected_form==storage_->first_transform_selected_form();
+    }
     const auto& terminal=storage_->stadium_first_transform_terminal;
     if(terminal.armed!=2||terminal.failed||
-       terminal.count!=MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENTS||
+       terminal.selected_form!=storage_->first_transform_selected_form()||
+       terminal.count!=melee_web_stadium_first_transform_event_count(&terminal)||
        !terminal.world_generation)return false;
     // StageLast has retired. Only its copied sealed receipt remains readable;
     // the pointer-shaped tokens are identities and are never dereferenced here.
@@ -1243,7 +1263,7 @@ MeleeWebMatchContext* GameplayWorld::take_match_context(){
         throw DatError("Gameplay world has no unclaimed source match context");
     auto* match=storage_->match_context;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-    if(storage_->stadium_first_transform_diagnostic){
+    if(storage_->first_transform_selected_form()){
         check(!storage_->first_fire_hook_installed&&
               melee_web_match_recorded_preconsume_arm(match,Storage::first_fire_preconsume,
                   storage_.get(),storage_->error,sizeof(storage_->error)),storage_->error);

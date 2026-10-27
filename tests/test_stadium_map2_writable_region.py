@@ -45,6 +45,7 @@ class StadiumMap2WritableRegionTests(unittest.TestCase):
 #include <string.h>
 #define MELEE_WEB_STADIUM_C1A_DIAGNOSTIC 1
 typedef struct HSD_GObj HSD_GObj;
+typedef struct HSD_GObjProc HSD_GObjProc;
 typedef struct MeleeWebSourceFileScope { int identity; } MeleeWebSourceFileScope;
 '''+memory+origin+owner+'\n'+journal+r'''
 /* Explicit service models: these are refusal-capable capabilities, not native

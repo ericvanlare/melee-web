@@ -156,9 +156,16 @@ typedef struct MeleeWebStadiumSourceJournal {
     int overflowed;
 } MeleeWebStadiumSourceJournal;
 
-/* Exact first FIRE lifetime only. These are actual source call receipts,
- * not allocator generations, current membership, or original equivalence. */
+/* Exact first selected-transform lifetime. The legacy Fire contract remains
+ * five events; Water has a separate source-derived eleven-event contract.
+ * These are actual source call receipts, not allocator generations, current
+ * membership, or original equivalence. */
 #define MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENTS 5U
+#define MELEE_WEB_STADIUM_FIRST_TRANSFORM_FIRE_FORM 3U
+#define MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM 9U
+#define MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_EVENTS 11U
+#define MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENT_CAPACITY \
+    MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_EVENTS
 typedef struct MeleeWebStadiumFirstTransformEvent {
     unsigned kind; /* 1 original creation return, 2 removal entry, 3 removal return */
     int map_id;
@@ -167,8 +174,15 @@ typedef struct MeleeWebStadiumFirstTransformEvent {
 typedef struct MeleeWebStadiumFirstTransformJournal {
     uint64_t world_generation;
     unsigned armed, count, failed;
+    uint32_t selected_form; /* exact authored Stadium form: Fire=3, Water=9 */
     HSD_GObj* initial_map5;
     HSD_GObj* fire_map3;
+    HSD_GObj* water_map9;
+    HSD_GObj* water_child7;
+    HSD_GObj* water_child8;
+    HSD_GObjProc* water_map9_proc;
+    HSD_GObjProc* water_child7_proc;
+    HSD_GObjProc* water_child8_proc;
     void* source_slot;
     /* Read-only status fields, copied from the current checked source owner. */
     int phase,form,history_e0,history_e2,countdown,pending;
@@ -179,29 +193,70 @@ typedef struct MeleeWebStadiumFirstTransformJournal {
     int display_previous_mode,display_selected_player,display_f2;
     unsigned display_flags,scalar_sample_valid;
     uint64_t scalar_world_ticks;
-    MeleeWebStadiumFirstTransformEvent events[MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENTS];
+    MeleeWebStadiumFirstTransformEvent events[MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENT_CAPACITY];
 } MeleeWebStadiumFirstTransformJournal;
+static inline unsigned melee_web_stadium_first_transform_event_count(
+    const MeleeWebStadiumFirstTransformJournal* j)
+{
+    if (j == NULL) return 0;
+    if (j->selected_form == MELEE_WEB_STADIUM_FIRST_TRANSFORM_FIRE_FORM)
+        return MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENTS;
+    if (j->selected_form == MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM)
+        return MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_EVENTS;
+    return 0;
+}
 /* Pure fixed call-order reducer used by the passive source hooks. Object
  * tokens are compared locally only; callers establish the live source owner. */
 static inline int melee_web_stadium_first_transform_record(
     MeleeWebStadiumFirstTransformJournal* j,unsigned kind,int id,HSD_GObj* object)
 {
-    static const unsigned kinds[5]={1,2,3,2,3};
-    static const int ids[5]={3,5,5,3,3};
+    static const unsigned fire_kinds[5]={1,2,3,2,3};
+    static const int fire_ids[5]={3,5,5,3,3};
+    static const unsigned water_kinds[MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_EVENTS]={
+        1,1,1,2,3,2,2,3,2,3,3};
+    static const int water_ids[MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_EVENTS]={
+        9,7,8,5,5,9,7,7,8,8,9};
+    const unsigned expected = j != NULL &&
+        j->selected_form == MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM
+        ? MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_EVENTS
+        : MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENTS;
     if(!j||j->armed!=1||j->failed||!j->world_generation||!j->initial_map5||
-       !object||j->count>=MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENTS)
+       !object||j->count>=expected||
+       (j->selected_form!=0&&
+        j->selected_form!=MELEE_WEB_STADIUM_FIRST_TRANSFORM_FIRE_FORM&&
+        j->selected_form!=MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM))
         {if(j)j->failed=1;return 0;}
     const unsigned n=j->count;
-    if(kind!=kinds[n]||id!=ids[n]||
-       (n==0&&(j->fire_map3||object==j->initial_map5))||
-       (n!=0&&object!=(id==5?j->initial_map5:j->fire_map3)))
-        {j->failed=1;return 0;}
-    if(n==0)j->fire_map3=object;
+    if(j->selected_form==MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM){
+        HSD_GObj* expected_object = NULL;
+        if(kind!=water_kinds[n]||id!=water_ids[n]){j->failed=1;return 0;}
+        switch(n){
+        case 0: if(j->water_map9||object==j->initial_map5){j->failed=1;return 0;}j->water_map9=object;break;
+        case 1: if(j->water_child7||object==j->initial_map5||object==j->water_map9){j->failed=1;return 0;}j->water_child7=object;break;
+        case 2: if(j->water_child8||object==j->initial_map5||object==j->water_map9||object==j->water_child7){j->failed=1;return 0;}j->water_child8=object;break;
+        case 3: case 4: expected_object=j->initial_map5;break;
+        case 5: case 10: expected_object=j->water_map9;break;
+        case 6: case 7: expected_object=j->water_child7;break;
+        case 8: case 9: expected_object=j->water_child8;break;
+        default: j->failed=1;return 0;
+        }
+        if(expected_object&&object!=expected_object){j->failed=1;return 0;}
+        if(expected_object==NULL&&((n==0&&object!=j->water_map9)||
+           (n==1&&object!=j->water_child7)||(n==2&&object!=j->water_child8))){j->failed=1;return 0;}
+    }else{
+        if(kind!=fire_kinds[n]||id!=fire_ids[n]||
+           (n==0&&(j->fire_map3||object==j->initial_map5))||
+           (n!=0&&object!=(id==5?j->initial_map5:j->fire_map3)))
+            {j->failed=1;return 0;}
+        if(n==0)j->fire_map3=object;
+    }
     j->events[n].kind=kind;j->events[n].map_id=id;j->events[n].object=object;
     ++j->count;return 1;
 }
 int melee_web_stadium_display_owner_first_transform_arm(
     MeleeWebStadiumDisplayOwner*,MeleeWebStadiumFirstTransformJournal*,char*,size_t);
+int melee_web_stadium_display_owner_first_transform_arm_form(
+    MeleeWebStadiumDisplayOwner*,MeleeWebStadiumFirstTransformJournal*,uint32_t,char*,size_t);
 int melee_web_stadium_display_owner_first_transform_graph(
     const MeleeWebStadiumDisplayOwner*,int retiring,char*,size_t);
 struct MeleeWebStadiumMap2BufferOwner;
@@ -210,7 +265,10 @@ int melee_web_stadium_display_owner_first_transform_end(
 /* Typed static source callback identity, only in the actual live first-fire
  * owner. This predicate never invokes a callback or selects an arrival. */
 int melee_web_stadium_first_transform_callback_matches(MeleeWebSourceFileCallback);
+int melee_web_stadium_water_graph_callback_matches(MeleeWebSourceFileCallback);
 void melee_web_stadium_display_owner_note_ground_retire(HSD_GObj*,int entering);
+void melee_web_stadium_display_owner_note_first_transform_proc(
+    int,HSD_GObj*,HSD_GObjProc*);
 int melee_web_stadium_display_owner_first_transform_status(
     const MeleeWebStadiumFirstTransformJournal*,MeleeWebStadiumFirstTransformJournal*,char*,size_t);
 
@@ -231,7 +289,7 @@ typedef struct MeleeWebStadiumMap2BufferOwner {
     MeleeWebSourceMemoryAllocation buffer_allocation_lease;
     int buffer_allocation_lease_captured;
     int started_allocation_lease_required;
-    int initial_map5_source_retired; /* only fixed first-fire source journal may transfer this receipt */
+    int initial_map5_source_retired; /* selected first-transform journal transfers this receipt */
 } MeleeWebStadiumMap2BufferOwner;
 
 /* The owner is opaque so the private grpstadium TextWrapper ABI stays in its

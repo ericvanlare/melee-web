@@ -28,6 +28,103 @@ from reference_observer_stream import read_status
 from reference_input_stream import validate_status, validate_stream as validate_input_stream
 
 
+
+class FirstFormTimingSequenceJoin:
+    """Join added passive timing rows without changing any raw row/sequence.
+
+    Only metadata sequence leaves are translated. Every other stream row must
+    correspond one-for-one to the authenticated prior observation point.
+    Strict raw decoders and the full timing reducer still validate actual rows.
+    """
+    TIMING_SCHEMA = 'melee-web-stadium-selected-request-source-timing-v1'
+    SEQUENCE_KEYS = frozenset(('sequence', 'trigger_sequence', 'after_sequence',
+        'entry_seq', 'results_enter_seq', 'pad_consume_seq', 'source_tick_seq',
+        'draw_enter_seq', 'draw_return_seq'))
+
+    def __init__(self, original_rows):
+        self.original_rows = iter(original_rows)
+        self.original_to_actual = {}
+        self.actual_to_original = {}
+        self.timing_sequences = []
+        self.last_actual = -1
+        self.last_original = -1
+        self.complete = False
+
+    @staticmethod
+    def signature(row):
+        p = row.get('payload', {})
+        return (row.get('event'), row.get('source_tick'), row.get('draw_ordinal'),
+                row.get('pc'), row.get('lr'), p.get('boundary'), p.get('phase'),
+                p.get('match_index'), p.get('schema'))
+
+    def accept(self, row):
+        require(not self.complete and type(row.get('seq')) is int and
+                row['seq'] == self.last_actual + 1 and row['seq'] < STADIUM_WHOLE_LONG_IDLE_RECORD_CAP,
+                'Timing replay actual sequence cap/order')
+        self.last_actual = row['seq']
+        p = row.get('payload', {})
+        if p.get('schema') == self.TIMING_SCHEMA:
+            from stadium_selected_request_timing import PROFILE, FIELDS, PCS
+            require(row.get('event') == 'progress' and set(p) == FIELDS and
+                    p.get('profile') == PROFILE and p.get('whole_session') is True and
+                    p.get('match_index') == 1 and p.get('kind') in PCS and
+                    p.get('pc') == PCS[p['kind']] and p.get('drive_model_observed') is False and
+                    len(self.timing_sequences) < 8192,
+                    'Timing replay excluded row is not declared timing observation')
+            self.timing_sequences.append(row['seq'])
+            return None  # Full clock/owner/decision reducer is mandatory at postflight.
+        original = next(self.original_rows, None)
+        require(original is not None and type(original.get('seq')) is int and
+                original['seq'] == self.last_original + 1 and
+                original.get('payload', {}).get('schema') != self.TIMING_SCHEMA and
+                self.signature(original) == self.signature(row),
+                'Timing replay original/actual source point differs')
+        self.last_original = original['seq']
+        self.original_to_actual[original['seq']] = row['seq']
+        self.actual_to_original[row['seq']] = original['seq']
+        if row.get('event') == 'end':
+            require(next(self.original_rows, None) is None,
+                    'Timing replay ended before original source stream')
+            self.complete = True
+        return original['seq']
+
+    def metadata(self, value, *, to_actual, key=None):
+        table = self.original_to_actual if to_actual else self.actual_to_original
+        if key in self.SEQUENCE_KEYS:
+            require(type(value) is int and value in table,
+                    'Timing replay metadata sequence lacks exact correspondence')
+            return table[value]
+        if key == 'source_tick_seqs':
+            require(isinstance(value, list), 'Timing replay sequence-list shape')
+            return [self.metadata(x, to_actual=to_actual, key='source_tick_seq') for x in value]
+        if isinstance(value, dict):
+            return {k:self.metadata(v, to_actual=to_actual, key=k) for k,v in value.items()}
+        if isinstance(value, list):
+            return [self.metadata(x, to_actual=to_actual) for x in value]
+        return value
+
+    def apply_issue(self, policy, issues, cursor, row, original_sequence):
+        if original_sequence is None or cursor == len(issues):
+            return cursor
+        require(issues[cursor]['after_sequence'] >= original_sequence,
+                'Timing replay historical issue was missed')
+        if issues[cursor]['after_sequence'] != original_sequence:
+            return cursor
+        from stadium_standings_input import apply_standings_source_issue
+        mapped = self.metadata(issues[cursor], to_actual=True)
+        require(apply_standings_source_issue(policy, [mapped], 0, row) == 1,
+                'Timing replay historical issue did not bind actual source row')
+        return cursor + 1
+
+    def receipt(self):
+        require(self.complete and self.timing_sequences,
+                'Timing replay correspondence is incomplete')
+        return dict(scope='original observation points joined around additional passive timing rows',
+                    original_rows=len(self.original_to_actual), actual_rows=self.last_actual+1,
+                    timing_rows=len(self.timing_sequences),
+                    original_to_actual=list(self.original_to_actual.items()),
+                    timing_actual_sequences=list(self.timing_sequences), raw_rows_modified=False)
+
 class BoundedIntentController(DualPipeController):
     """Scope-local pre-write limits; historical controllers remain unchanged."""
     def __init__(self,*args,**kwargs):
@@ -129,7 +226,7 @@ def validate_stadium_whole_long_idle_outputs(raw, status_path, output_root,
                                              compact_launch, driver_window, dol_sha256, *,
                                              standings=None, post_transform_standings=None,
                                              first_form_latency_standings=None,
-                                             standings_intent_root=None):
+                                             standings_intent_root=None, standings_sequence_join=None):
     """Join the full raw stream, final observer status, and selected-B compact ledger."""
     from reference_observer_stream import iter_records
     from stadium_whole_long_idle import LongIdleBObservations, PROFILE
@@ -140,6 +237,9 @@ def validate_stadium_whole_long_idle_outputs(raw, status_path, output_root,
     require(sum(x is not None for x in
                 (standings, post_transform_standings, first_form_latency_standings)) <= 1,
             "Standings input profile validators are exclusive")
+    require(standings_sequence_join is None or
+            (first_form_latency_standings is not None and standings_sequence_join.complete),
+            'Timing replay offline join is outside complete first-form scope')
     primary_status = read_status(status_path)
     require(primary_status.get("state") == "completed" and
             primary_status.get("completed") is True and
@@ -159,6 +259,10 @@ def validate_stadium_whole_long_idle_outputs(raw, status_path, output_root,
             StadiumStandingsInputPolicy, read_standings_intents)
         issues, pipe_rows = read_standings_intents(
             standings_intent_root if standings_intent_root is not None else output_root)
+        if standings_sequence_join is not None:
+            require(first_form_latency_standings is not None and standings_sequence_join.complete,
+                    'Timing replay issue join is not complete first-form scope')
+            issues = standings_sequence_join.metadata(issues, to_actual=True)
         selected_profile = (StadiumStandingsInputPolicy.POST_TRANSFORM_PROFILE
                             if post_transform_standings is not None else
                             StadiumStandingsInputPolicy.FIRST_FORM_LATENCY_PROFILE
@@ -1272,8 +1376,9 @@ def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_m
     """Own fresh output before preparation so failures cannot vanish before launch."""
     require(type(stadium_selected_request_timing) is bool and
             (not stadium_selected_request_timing or stadium_whole_first_form_latency and
-             stadium_whole_replay_binding is None and stadium_whole_first_form_replay_journals is None),
-            "Selected request timing requires fresh first-form latency recording")
+             ((stadium_whole_replay_binding is None and stadium_whole_first_form_replay_journals is None) or
+              (stadium_whole_replay_binding is not None and stadium_whole_first_form_replay_journals is not None))),
+            "Selected request timing requires fresh or exactly bound first-form replay")
     require(type(stadium_first_form_menu_wait_72) is bool and
             (not stadium_first_form_menu_wait_72 or
              stadium_whole_first_form_latency and stadium_whole_replay_binding is None and
@@ -2598,6 +2703,7 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                 self, 'stadium_whole_first_form_latency_replay', False),
             replay_binding_sha256=self.replay_binding_sha256)
         fresh.selected_request_timing = getattr(self,'selected_request_timing',False)
+        fresh.first_form_timing_sequence_join = getattr(self,'first_form_timing_sequence_join',None)
         fresh.b_observations = self.b_observations
         fresh.long_idle_windows = self.long_idle_windows
         fresh.stockout_summary = self.stockout_summary
@@ -2817,12 +2923,19 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                 self.pause_ready_clock = clock
 
     def accept(self, row):
+        sequence_join = getattr(self, 'first_form_timing_sequence_join', None)
+        original_sequence = sequence_join.accept(row) if sequence_join is not None else None
         self._accept_source(row)
         if getattr(self, 'standings_replay_issues', None) is not None:
-            from stadium_standings_input import apply_standings_source_issue
-            self.standings_replay_issue_cursor = apply_standings_source_issue(
-                self.standings_policy, self.standings_replay_issues,
-                self.standings_replay_issue_cursor, row)
+            if sequence_join is not None:
+                self.standings_replay_issue_cursor = sequence_join.apply_issue(
+                    self.standings_policy, self.standings_replay_issues,
+                    self.standings_replay_issue_cursor, row, original_sequence)
+            else:
+                from stadium_standings_input import apply_standings_source_issue
+                self.standings_replay_issue_cursor = apply_standings_source_issue(
+                    self.standings_policy, self.standings_replay_issues,
+                    self.standings_replay_issue_cursor, row)
 
     def _accept_source(self, row):
         from stadium_go_prefix import SSS_POSITION_PHASES
@@ -3557,7 +3670,8 @@ def validate_first_form_replay_status(native_status, primary_status, *, events, 
     return input_status
 
 
-def compare_first_form_replay_captures(previous, current, previous_rows, current_rows, expected):
+def compare_first_form_replay_captures(previous, current, previous_rows, current_rows, expected,
+                                      sequence_join=None):
     """Strict input/profile and actual draw brackets; no scene RAM fabrication."""
     import stadium_current_context_packet as context
     replay = context.replay
@@ -3570,7 +3684,10 @@ def compare_first_form_replay_captures(previous, current, previous_rows, current
             'Whole replay actual consumed recipe differs from recorded source')
     old_trace = replay.derive_draw_boundary_trace(previous, previous_rows, expected_match_count=3)
     new_trace = replay.derive_draw_boundary_trace(current, current_rows, expected_match_count=3)
-    require(old_trace == new_trace,
+    require(sequence_join is None or sequence_join.complete,
+            'Timing replay trace correspondence is incomplete')
+    compared_trace = new_trace if sequence_join is None else sequence_join.metadata(new_trace, to_actual=False)
+    require(old_trace == compared_trace,
             'First-form replay actual source PAD/tick/draw brackets differ')
 
     def endpoints(capture, rows):
@@ -3608,10 +3725,14 @@ def compare_first_form_replay_captures(previous, current, previous_rows, current
         synthesized_scene_slices=False, browser_recipe_created=False)
 
 
-def stadium_whole_replay_complete(source, native_status, primary, primary_status, expected):
+def stadium_whole_replay_complete(source, native_status, primary, primary_status, expected,
+                                  sequence_join=None):
     """Require actual replay completion and same newly consumed source workload."""
     import stadium_later_b_reference as reference
     import stadium_current_context_packet as context
+    require(sequence_join is None or (sequence_join.complete and
+            source.get('first_form_latency_summary') is not None),
+            'Timing replay terminal join is outside complete first-form scope')
     raw,_=reference._read_binding_snapshot(source['binding_path'])
     require(hashlib.sha256(raw).hexdigest()==source['binding_sha256'], 'Whole replay binding changed')
     binding=json.loads(raw);paths=reference.verified_files(binding)
@@ -3629,7 +3750,7 @@ def stadium_whole_replay_complete(source, native_status, primary, primary_status
     if source.get('first_form_latency_summary') is not None:
         compare_first_form_replay_captures(old, new,
             list(context.replay.iter_records(paths['primary'])),
-            list(context.replay.iter_records(primary)), expected)
+            list(context.replay.iter_records(primary)), expected, sequence_join=sequence_join)
     else:
         require(context.replay.encode_v8(old)[0]==context.replay.encode_v8(new)[0],
                 'Whole replay actual consumed recipe differs from recorded source')
@@ -3654,8 +3775,9 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
     import types
     require(type(stadium_selected_request_timing) is bool and
             (not stadium_selected_request_timing or stadium_whole_first_form_latency and
-             stadium_whole_replay_binding is None and stadium_whole_first_form_replay_journals is None),
-            "Selected request timing requires fresh first-form latency recording")
+             ((stadium_whole_replay_binding is None and stadium_whole_first_form_replay_journals is None) or
+              (stadium_whole_replay_binding is not None and stadium_whole_first_form_replay_journals is not None))),
+            "Selected request timing requires fresh or exactly bound first-form replay")
     require(type(stadium_first_form_menu_wait_72) is bool and
             (not stadium_first_form_menu_wait_72 or
              stadium_whole_first_form_latency and stadium_whole_replay_binding is None and
@@ -3914,6 +4036,18 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
                     source_binding_sha256=replay_source['binding_sha256'],
                     source_directory=journals['source_directory']) == journals,
                     'First-form replay historical issues changed before admission')
+        if first_form_replay and stadium_selected_request_timing:
+            require(replay_source['first_form_latency_summary']['first_form_latency']
+                        ['settled_phase0']['selected_form'] == 9,
+                    'Timing replay requires the retained first-Water source')
+            import stadium_later_b_reference as reference
+            original_binding = json.loads(Path(replay_source['binding_path']).read_text())
+            original_paths = reference.verified_files(original_binding)
+            require(json.loads(original_paths['report'].read_text()).get('stadium_selected_request_timing') is None,
+                    'Timing replay source already contains selected timing rows')
+            receiver.first_form_timing_sequence_join = FirstFormTimingSequenceJoin(
+                iter_records(original_paths['primary'], max_bytes=STADIUM_CAPTURE_CAPS['observer_bytes'],
+                             max_records=STADIUM_WHOLE_LONG_IDLE_RECORD_CAP))
         receiver.selected_request_timing = stadium_selected_request_timing
         if stadium_selected_request_timing:
             env['MWRC_STADIUM_SELECTED_REQUEST_TIMING']='first_selected_stage_request_v1'
@@ -4024,19 +4158,24 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             report['stadium_whole_first_form_latency'] = receiver.standings_summary
             if replay_source is not None:
                 source_summary = replay_source['first_form_latency_summary']
+                sequence_join = getattr(receiver, 'first_form_timing_sequence_join', None)
+                compared_summary = (receiver.standings_summary if sequence_join is None else
+                    sequence_join.metadata(receiver.standings_summary, to_actual=False))
                 report['stadium_whole_first_form_latency_replay'] = dict(
                     schema='melee-web-stadium-first-form-latency-replay-comparison-v1',
                     source_binding_sha256=replay_source['binding_sha256'],
                     journal_binding=replay_source['first_form_replay_journals'],
                     source_summary=source_summary,
                     actual_summary=receiver.standings_summary,
-                    summary_equal=(receiver.standings_summary == source_summary),
+                    summary_equal=(compared_summary == source_summary),
                     consumed_input_scope='recorded MWRI selected; exact recipe, input footer and native terminal checks pending',
                     input_terminal_checks='PENDING', comparison_result='SUMMARY_ONLY_PENDING_TERMINAL',
                     historical_issue_observation=dict(
                         label='historical source issues applied at exact actual rows',
                         count=receiver.standings_replay_issue_cursor, input_written=False))
-                require(receiver.standings_summary == source_summary,
+                if sequence_join is not None:
+                    report['stadium_whole_first_form_latency_replay']['sequence_correspondence'] = sequence_join.receipt()
+                require(compared_summary == source_summary,
                         'First-form replay actual phase/owner timeline differs from recorded source')
                 from stadium_standings_input import validate_first_form_replay_journals
                 journals = replay_source['first_form_replay_journals']
@@ -4069,7 +4208,8 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
                 first_form_latency_standings=(receiver.standings_summary
                     if stadium_whole_first_form_latency else None),
                 standings_intent_root=(replay_source.get('standings_intent_root')
-                    if replay_source is not None and stadium_whole_first_form_latency else None))
+                    if replay_source is not None and stadium_whole_first_form_latency else None),
+                standings_sequence_join=getattr(receiver, 'first_form_timing_sequence_join', None))
             report['stadium_whole_long_idle_window'] = driver_window
             report['stadium_whole_long_idle_source_validation'] = source_window
             report['stadium_whole_long_idle_compact_rng'] = compact_summary
@@ -4077,7 +4217,8 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             report['input_stream']=validate_input_stream(native)
         else:
             report['input_stream']=stadium_whole_replay_complete(replay_source,native_status,
-                raw,status,expected)
+                raw,status,expected,
+                sequence_join=getattr(receiver, 'first_form_timing_sequence_join', None))
             report['input_replay']=replay_source
             report['input_replay_status']=validate_status(native_status,mode='replay',
                 events=replay_source['summary']['events'],require_complete=True)

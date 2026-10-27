@@ -777,6 +777,18 @@ export function firstFormCommonOriginalValues(fields, sourceTick) {
   return commonOriginalValuesForRoles(fields, sourceTick, [0, 1, 2, active]);
 }
 
+export function firstWaterCommonOriginalValues(fields, sourceTick) {
+  const roles = fields?.map_root_roles;
+  const active = roles?.[3]?.fixed_slot_map_id;
+  if (![9, 5].includes(active) || !Array.isArray(roles) || roles.length !== 4 ||
+      roles.some((role, i) => role?.fixed_slot_map_id !== [0, 1, 2, active][i] ||
+        role.root_pointer_range_valid !== true || role.ground_pointer_range_valid !== true) ||
+      fields.map2?.map5_root_pointer_equals_fixed_map5_slot_value !== (active === 5) ||
+      (active === 9 && fields.map2?.form_s16 !== 9))
+    throw new TypeError(`original source tick ${sourceTick} first-Water root identity differs`);
+  return commonOriginalValuesForRoles(fields, sourceTick, [0, 1, 2, active]);
+}
+
 function commonOriginalValuesForRoles(fields, sourceTick, rootIds) {
   exactKeys(fields, ['display', 'draw_ordinal', 'guest_pointer_policy', 'label', 'map2',
     'map_root_allocation_lifetime_proved', 'map_root_object_type_observed', 'map_root_roles',

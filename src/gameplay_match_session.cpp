@@ -57,7 +57,7 @@ struct GameplayMatchSession::Storage {
     MeleeWebMatchFlow* flow=nullptr;
     bool stadium_diagnostic=false;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-    bool first_fire_diagnostic=false;
+    bool first_fire_diagnostic=false,first_water_diagnostic=false;
     MeleeWebStadiumFirstTransformJournal first_transform_retired{};
     MeleeWebSourceFileRecordedCompletionStatus first_completion_retired{};
 #endif
@@ -192,6 +192,7 @@ struct GameplayMatchSession::Storage {
         content.stadium_diagnostic=stadium_diagnostic;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
         content.stadium_first_transform_diagnostic=first_fire_diagnostic;
+        content.stadium_first_water_diagnostic=first_water_diagnostic;
 #endif
         content.sudden_death=sudden_death;
         content.source_camera_subjects=70;
@@ -366,7 +367,7 @@ struct GameplayMatchSession::Storage {
         if(flow){
             check(world!=nullptr,"Match flow teardown has no source world owner");
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-            if(first_fire_diagnostic)
+            if(first_fire_diagnostic||first_water_diagnostic)
                 check(world->diagnostic_stadium_first_transform_can_end(error,sizeof(error)),error);
 #endif
             world->ensure_source_files_quiescent();
@@ -377,7 +378,7 @@ struct GameplayMatchSession::Storage {
         char error[256]{};
         if(world)world->ensure_source_files_quiescent();
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-        if(world&&first_fire_diagnostic)
+        if(world&&(first_fire_diagnostic||first_water_diagnostic))
             check(world->diagnostic_stadium_first_transform_can_end(error,sizeof(error)),error);
         /* Refuse unsupported partial starts before flow/HUD retirement. */
         if(world&&stadium_diagnostic)world->cancel_prepared_stadium_ready();
@@ -392,11 +393,12 @@ struct GameplayMatchSession::Storage {
         if(hud){check(melee_web_hud_end(hud,error,sizeof(error)),error);hud=nullptr;}
         if(world)world->end_stage();
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-        if(world&&first_fire_diagnostic){
+        if(world&&(first_fire_diagnostic||first_water_diagnostic)){
             check(world->diagnostic_stadium_first_transform_snapshot(
                 &first_transform_retired,error,sizeof(error))&&
                 first_transform_retired.armed==2&&!first_transform_retired.failed&&
-                first_transform_retired.count==MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENTS,
+                first_transform_retired.selected_form==(first_water_diagnostic?9U:3U)&&
+                first_transform_retired.count==melee_web_stadium_first_transform_event_count(&first_transform_retired),
                 error[0]?error:"First-fire StageLast retirement receipt is incomplete");
             check(world->diagnostic_stadium_first_transform_completion_status(
                 &first_completion_retired,error,sizeof(error))&&
@@ -472,9 +474,11 @@ GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,
     GameplayMatchConstruction construction,const MeleeWebPadState& input,
     GameplayMatchDiagnostic diagnostic):storage_(std::make_unique<Storage>())
 {
-    check(diagnostic==GameplayMatchDiagnostic::StadiumReady||diagnostic==GameplayMatchDiagnostic::StadiumFirstFireReady,"Unknown diagnostic match boundary");
+    check(diagnostic==GameplayMatchDiagnostic::StadiumReady||diagnostic==GameplayMatchDiagnostic::StadiumFirstFireReady||diagnostic==GameplayMatchDiagnostic::StadiumFirstWaterReady,"Unknown diagnostic match boundary");
     storage_->stadium_diagnostic=true;
     storage_->first_fire_diagnostic=diagnostic==GameplayMatchDiagnostic::StadiumFirstFireReady;
+    storage_->first_water_diagnostic=diagnostic==GameplayMatchDiagnostic::StadiumFirstWaterReady;
+    first_transform_selected_form_=storage_->first_water_diagnostic?9U:(storage_->first_fire_diagnostic?3U:0U);
     try{
         if(construction==GameplayMatchConstruction::Deferred)
             storage_->begin(files,selection,&cache,&input);
@@ -513,7 +517,7 @@ GameplayMatchSession::GameplayMatchSession(
 }
 void GameplayMatchSession::close(){if(storage_){storage_->close();
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-    if(storage_->first_fire_diagnostic){first_transform_retained_=storage_->first_transform_retired;
+    if(storage_->first_fire_diagnostic||storage_->first_water_diagnostic){first_transform_retained_=storage_->first_transform_retired;
         first_completion_retained_=storage_->first_completion_retired;}
 #endif
     storage_.reset();}}
@@ -539,7 +543,7 @@ void GameplayMatchSession::finish_vs(
 #endif
     storage_->close();
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-    if(storage_->first_fire_diagnostic){first_transform_retained_=storage_->first_transform_retired;
+    if(storage_->first_fire_diagnostic||storage_->first_water_diagnostic){first_transform_retained_=storage_->first_transform_retired;
         first_completion_retained_=storage_->first_completion_retired;}
 #endif
     storage_.reset();
@@ -724,7 +728,7 @@ bool GameplayMatchSession::diagnostic_stadium_go_alignment_snapshot(
 bool GameplayMatchSession::diagnostic_stadium_first_transform_completion_status(
     MeleeWebSourceFileRecordedCompletionStatus* out,char* error,size_t size)const{
     if(!out)return false;
-    if(storage_&&storage_->first_fire_diagnostic&&storage_->world)
+    if(storage_&&(storage_->first_fire_diagnostic||storage_->first_water_diagnostic)&&storage_->world)
         return storage_->world->diagnostic_stadium_first_transform_completion_status(out,error,size);
     if(!storage_&&first_completion_retained_.armed==1&&!first_completion_retained_.failed&&
        first_completion_retained_.completed&&first_completion_retained_.request_seen&&
@@ -734,16 +738,18 @@ bool GameplayMatchSession::diagnostic_stadium_first_transform_completion_status(
 }
 bool GameplayMatchSession::diagnostic_stadium_first_transform_schedule(
     uint32_t request_tick,uint32_t callback_tick,uint32_t last_tick,char* error,size_t size){
-    return storage_&&storage_->first_fire_diagnostic&&storage_->world&&
+    return storage_&&(storage_->first_fire_diagnostic||storage_->first_water_diagnostic)&&storage_->world&&
         storage_->world->diagnostic_stadium_first_transform_schedule(request_tick,callback_tick,last_tick,error,size);
 }
 bool GameplayMatchSession::diagnostic_stadium_first_transform_snapshot(
     MeleeWebStadiumFirstTransformJournal* out,char* error,size_t size)const{
     if(!out)return false;
-    if(storage_&&storage_->first_fire_diagnostic&&storage_->world)
+    if(storage_&&(storage_->first_fire_diagnostic||storage_->first_water_diagnostic)&&storage_->world)
         return storage_->world->diagnostic_stadium_first_transform_snapshot(out,error,size);
     if(!storage_&&first_transform_retained_.armed==2&&!first_transform_retained_.failed&&
-       first_transform_retained_.count==MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENTS){
+       (first_transform_selected_form_==3||first_transform_selected_form_==9)&&
+       first_transform_retained_.selected_form==first_transform_selected_form_&&
+       first_transform_retained_.count==melee_web_stadium_first_transform_event_count(&first_transform_retained_)){
         *out=first_transform_retained_;return true;
     }
     if(error&&size)std::snprintf(error,size,"First-fire snapshot has no exact live or sealed owner");

@@ -25,7 +25,7 @@ class StadiumStockoutPairPolicyTests(OwnedWorkspaceTests):
 constexpr int OUTCOME_NONE=0,OUTCOME_ELIMINATION=2,OUTCOME_NO_CONTEST=7;
 struct MeleeWebMatchStats {uint32_t player_slot=0;int32_t stocks=4,motion_id=14,ground_or_air=0,fighter_kind=8;};
 struct Lifetime {bool mode14_observed=false,mode14_neutral_release=false;bool stock_initialized=true,mode9_observed=false,published_result=false,terminal_observed=false,window_closed=false,pause_seen=false,pause_release_seen=false;std::array<int32_t,2> stock_slots{0,1},last_stocks{4,4};unsigned stock_losses=0;uint64_t state_samples=0,tail_ticks=0,ticks=0,draws=0,span_first=0,span_last=0;std::string terminal;};
-struct State {bool full_pair=true,route_prepared=true,native_retired=false,stockout_pair=true,natural14_pair=false,first_fire_pair=false,failed=false,action_open=false,go_observed=false;unsigned match_index=1;uint64_t go_world_tick=0;uint32_t mode14_source_tick=0,last_selected_source_tick=0;std::array<Lifetime,2> lifetimes{};} stadium_paired_v11;
+struct State {bool full_pair=true,route_prepared=true,native_retired=false,stockout_pair=true,natural14_pair=false,first_fire_pair=false,first_water_pair=false,failed=false,action_open=false,go_observed=false;unsigned match_index=1;uint64_t go_world_tick=0;uint32_t mode14_source_tick=0,last_selected_source_tick=0;std::array<Lifetime,2> lifetimes{};} stadium_paired_v11;
 static void check(bool v,const char* e){if(!v)throw std::runtime_error(e);}
 // Explicit modeled settled-world and source MatchEnd leaves; invalid services refuse.
 static bool owner_valid=true;static bool stadium_paired_v11_owner_valid(){return owner_valid;}

@@ -7,7 +7,7 @@ import vm from 'node:vm';
 import {parseArgs} from 'node:util';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {derivePairedFull,PairedFullComparator,installPairedFullLaunch,firstFireOriginalValues,FIRST_FIRE_STATE_KEYS,validateFirstFireCompletion} from '../scripts/stadium_paired_v11_full.mjs';
+import {derivePairedFull,PairedFullComparator,installPairedFullLaunch,firstFireOriginalValues,FIRST_FIRE_STATE_KEYS,validateFirstFireCompletion,firstWaterOriginalValues,FIRST_WATER_STATE_KEYS,validateFirstWaterCompletion,validateFirstWaterLocalGraph} from '../scripts/stadium_paired_v11_full.mjs';
 import {typedOriginalValues} from './stadium_matched_setup_cf_consumer.mjs';
 const projectionPath=process.env.MELEE_PAIRED_FULL_PROJECTION;
 const endpointsPath=process.env.MELEE_PAIRED_FULL_ENDPOINTS;
@@ -170,4 +170,50 @@ test('first-fire sealed completion validates actual cursor receipt independently
  const c={schema:'melee-web-stadium-first-fire-recorded-completion-v1',armed:1,failed:0,completed:1,request_seen:1,local_request_id:7,actual_request_cursor:3853,actual_callback_cursor:3864,last_preconsume_cursor:4490};
  assert.equal(validateFirstFireCompletion(c,f),true);
  for(const change of [x=>x.armed=0,x=>x.failed=1,x=>x.completed=0,x=>x.request_seen=0,x=>x.local_request_id=0,x=>x.actual_request_cursor++,x=>x.actual_callback_cursor--,x=>x.last_preconsume_cursor=4469]){const bad={...c};change(bad);assert.throws(()=>validateFirstFireCompletion(bad,f));}
+});
+
+// Explicit modeled source leaves. No original Water recording is manufactured.
+function modeledWaterFields(form=9,active=form){return {
+ display:{flags_s16:0,focused_player_s16:0,mode_s16:1,packed_flags_raw_hex:'00',previous_flags_s16:0,previous_mode_s16:0,selection_counter_s16:0,timer_initialization_observed:false,timer_raw_hex:'00000000',timer_representation:'unpaired',xF0_observed:false},
+ map2:{countdown_s32:0,form_s16:form,gate_mask_40:false,gate_mask_80:false,gate_raw_hex:'00',map5_root_pointer_equals_fixed_map5_slot_value:active===5,phase_s16:0,previous_form_s16:5,prior_form_s16:-1},
+ draw_ordinal:0,guest_pointer_policy:'unpaired',label:'modeled-only',map_root_allocation_lifetime_proved:false,map_root_object_type_observed:false,map_root_roles:[0,1,2,active].map(fixed_slot_map_id=>({fixed_slot_map_id,root_pointer_range_valid:true,ground_pointer_range_valid:true})),sequence:1,source_tick:0,title:{}};}
+test('first-water launch preserves distinct arm and rejects mixed selectors',()=>{
+ const calls=[],m={stadiumMatchedSetupNativeIdle:()=>true,
+ _melee_web_native_menu_stadium_paired_v11_first_water_pair_arm:(...args)=>{calls.push(args);return 1;},_melee_web_native_menu_launch:()=>23};
+ vm.runInNewContext('('+installPairedFullLaunch.toString()+')({firstWater:true,requestSourceTick:100,callbackSourceTick:111,lastSelectedSourceTick:200})',{Module:m});
+ assert.equal(m._melee_web_native_menu_launch(),23);assert.deepEqual(calls,[[100,111,200]]);
+ assert.throws(()=>installPairedFullLaunch({firstWater:true,firstFire:true}),/explicit/);
+ for(const args of [{requestSourceTick:100,callbackSourceTick:100,lastSelectedSourceTick:200},{requestSourceTick:100,callbackSourceTick:111,lastSelectedSourceTick:0x100000000}])assert.throws(()=>installPairedFullLaunch({firstWater:true,...args}),/coordinates invalid/);
+});
+test('first-water actual role adapter never relabels Fire or stable owners',()=>{
+ const fields=modeledWaterFields();assert.deepEqual(Object.keys(firstWaterOriginalValues(fields,0)),FIRST_WATER_STATE_KEYS);
+ assert.equal(firstWaterOriginalValues(modeledWaterFields(5,5),0).map2_form,5);
+ assert.equal(firstWaterOriginalValues(modeledWaterFields(9,5),0).map2_form,9);
+ assert.throws(()=>firstFireOriginalValues(fields,0));
+ assert.throws(()=>firstWaterOriginalValues(modeledWaterFields(3),0));
+ for(const mutate of [x=>x.map_root_roles[0].fixed_slot_map_id=1,x=>x.map_root_roles[3].fixed_slot_map_id=7,x=>x.map2.map5_root_pointer_equals_fixed_map5_slot_value=true,x=>x.map2.gate_mask_40=true]){const bad=structuredClone(fields);mutate(bad);assert.throws(()=>firstWaterOriginalValues(bad,0));}
+});
+test('first-water eleven event graph and separate completion refuse missing reordered or Fire receipts',()=>{
+ const events=[[1,9],[1,7],[1,8],[2,5],[3,5],[2,9],[2,7],[3,7],[2,8],[3,8],[3,9]].map(([kind,map_id])=>({kind,map_id}));
+ const g={schema:'melee-web-stadium-first-water-native-graph-v1',selected_form:9,world_generation:7,armed:2,failed:false,scalar_scope:'last_live_validated_sample',scalar_sample_valid:true,scalar_world_ticks:200,event_count:11,events,phase:0,form:9,buffer_uses:2};
+ validateFirstWaterLocalGraph(g,7,true);
+ const live={...g,armed:1,event_count:5,events:events.slice(0,5)};validateFirstWaterLocalGraph(live,7);
+ for(const mutate of [x=>x.selected_form=3,x=>x.form=3,x=>x.event_count=5,x=>x.events[6].map_id=8,x=>x.buffer_uses=0,x=>x.world_generation=8]){const bad=structuredClone(g);mutate(bad);assert.throws(()=>validateFirstWaterLocalGraph(bad,7,true));}
+ const f={request:{source_tick:100},callback:{source_tick:111},settled:{source_tick:200}},c={schema:'melee-web-stadium-first-water-recorded-completion-v1',armed:1,failed:0,completed:1,request_seen:1,local_request_id:17,actual_request_cursor:100,actual_callback_cursor:111,last_preconsume_cursor:200};
+ validateFirstWaterCompletion(c,f);
+ for(const mutate of [x=>x.schema='melee-web-stadium-first-fire-recorded-completion-v1',x=>x.failed=1,x=>x.completed=0,x=>x.actual_request_cursor++,x=>x.actual_callback_cursor--,x=>x.last_preconsume_cursor--]){const bad=structuredClone(c);mutate(bad);assert.throws(()=>validateFirstWaterCompletion(bad,f));}
+});
+function modeledWaterProjection(){
+ const sha='1'.repeat(64),request={kind:'request_enter',source_tick:3},callback={kind:'callback_enter',source_tick:4},poll={kind:'poll_return',result:1,source_tick:4};
+ const settled={selected_form:9,phase:0,active_map_id:9,root_replacement_observed:true,source_tick:5};
+ const points={observed:true,sample_count:8,samples:Array.from({length:8},(_,i)=>({lifetime:Math.floor(i/4)+1,function:i%4<2?'gm_Scene_Vs_OnEnter':'gm_Scene_Vs_OnExit',phase:i%2?'return':'enter',value:17}))};
+ const setup={declared_setup:{stage:3,players:[0,1].map(()=>({character_kind:8,player_type:0,stocks:4}))}};
+ const actions=Array.from({length:4},(_,i)=>({action_index:i,kind:'tick',source_tick:i+2,draw_ordinal:0,frame_index:i,after_sequence:2*i+1,through_sequence:2*i+2}));
+ const p={schema:'melee-web-stadium-first-water-pair-projection-v1',profile:'selected_b_first_water_recorded_callback_v1',source_schedule_verified:true,recipe_sha256:sha,actual_frame_count:6,claims:{per_owner_rng_comparison:false,C4_complete:false},original_route:'whole3',runtime_view:'first_two_complete_lifetimes',source_files:{'native-primary.mwro':{sha256:sha}},first_water:{selected_form:9,request,callback,successful_poll:poll,settled},matches:[{match_index:0,actions:actions.slice(0,1),states:[],window:{state_samples:0,natural_tail_ticks:0},setup,go:null,constructor:null},{match_index:1,actions,states:actions.map(a=>({selected:true,tick:{source_tick:a.source_tick},state:modeledWaterFields()})),window:{state_samples:4,natural_tail_ticks:0,go_tick:2,last_selected_source_tick:5},setup,go:{},constructor:{}}]};
+ const report={result:'pass',scope:'original-stadium-whole3-first-form-latency-replay-v1',cleanup_errors:[],native:{primary_sha256:sha,original_rng_scene_boundaries:points},stadium_selected_request_timing:{schema:'melee-web-stadium-selected-request-source-timing-summary-v1',profile:'first_selected_stage_request_v1',identity:{selected_form:9},drive_model_observed:false,C4_complete:false,rows:[request,callback,poll]},stadium_whole_first_form_latency_replay:{schema:'melee-web-stadium-first-form-latency-replay-comparison-v1',comparison_result:'PASS_EXACT_INPUT_AND_FIRST_FORM_SAMPLE',input_terminal_checks:'PASS',summary_equal:true,actual_summary:{first_form_latency:{settled_phase0:settled}},sequence_correspondence:{original_rows:2,actual_rows:3,timing_rows:1,original_to_actual:[[0,0],[1,2]],timing_actual_sequences:[1],raw_rows_modified:false}}};
+ return {p,report,sha};
+}
+test('first-water exact replay metadata admission rejects pending terminal and rewritten source coordinates',()=>{
+ const {p,report,sha}=modeledWaterProjection();assert.equal(derivePairedFull(p,sha,6,report).firstWater,true);
+ for(const mutate of [x=>x.stadium_whole_first_form_latency_replay.summary_equal=false,x=>x.stadium_whole_first_form_latency_replay.input_terminal_checks='PENDING',x=>x.stadium_whole_first_form_latency_replay.sequence_correspondence.raw_rows_modified=true,x=>x.stadium_selected_request_timing.identity.selected_form=3,x=>x.scope='original-stadium-whole3-first-form-latency-record-v2']){const bad=structuredClone(report);mutate(bad);assert.throws(()=>derivePairedFull(p,sha,6,bad));}
 });

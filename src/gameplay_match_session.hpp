@@ -12,7 +12,7 @@
 namespace melee_web {
 enum class GameplayMatchConstruction { Immediate, Deferred };
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-enum class GameplayMatchDiagnostic { StadiumReady, StadiumFirstFireReady };
+enum class GameplayMatchDiagnostic { StadiumReady, StadiumFirstFireReady, StadiumFirstWaterReady };
 #endif
 // Shared source match lifecycle. The confirmed menu payload supplies player
 // identity and source RNG; scene resources close before returning to a menu.
@@ -108,6 +108,7 @@ private:
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     MeleeWebMatchSceneRngSnapshot scene_rng_retained_{};
     MeleeWebStadiumFirstTransformJournal first_transform_retained_{};
+    unsigned first_transform_selected_form_=0;
     MeleeWebSourceFileRecordedCompletionStatus first_completion_retained_{};
     bool scene_rng_entry_complete_=false;
 #endif
