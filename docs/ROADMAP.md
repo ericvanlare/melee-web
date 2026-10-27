@@ -120,8 +120,9 @@ need explicit ownership. The owner has authorized profile implementation in the
 isolated GPL scope; complete semantics and reference coverage remain open under
 #9. Keep component measurements separate from browser acceptance.
 
-After this bounded measurement checkpoint, investigate first-use respawn-platform
-and common-effect pipeline preparation under H1/#116. Preparation must not consume
+The first-use respawn preparation component merged in [#322](https://github.com/ericvanlare/melee-web/pull/322).
+Continue broader common-effect and sustained-play work under H1/#116, using the
+[existing H1 boundary](status/2026-10-13-h1-first-use-respawn.md). Preparation must not consume
 hidden gameplay ticks/RNG, change draw order or relax timing guards. Keep H1
 incident recording on for combat and simulated-network runs; a forced pause is
 retained H1 evidence. The owner identifies the #316 respawn preparation stall as
@@ -174,12 +175,16 @@ Only a reviewed pass opens a longer correction-budget measurement. The existing
 historical measurements and the current scope; no whole-session claim follows.
 
 Pokémon Stadium C3 [#251](https://github.com/ericvanlare/melee-web/issues/251) /
-[draft #301](https://github.com/ericvanlare/melee-web/pull/301) remains the next
-Track B milestone. Ranked/Unranked use unfrozen Stadium, so transformations
-remain in scope. Reuse the retained PadPoll/draw-order reduction and original
-owner evidence; no duplicate capture. Track A has first claim on the shared
-capture lane. Physical controllers, foreground timing, audible output and a
-two-machine human session remain separate unrun gates.
+[draft #301](https://github.com/ericvanlare/melee-web/pull/301) has completed its
+defined functional and selected-ledger comparisons, with independent raw/gate
+support. Final regression v2 passes. Passing publication-head CI is required before
+merge. The [single Stadium boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md)
+retains exact identities, raw failures and coverage limits. Next is C4 original
+latency measurement, reference first; no runtime transformation port is released.
+Ranked/Unranked use unfrozen Stadium, so C4–C8 transformations remain in scope.
+Track A retains first claim on the shared capture lane. Physical controllers,
+foreground timing, audible output and a two-machine human session remain separate
+unrun gates.
 
 ### Track B: competitive-rules Melee before the whole game
 
@@ -233,20 +238,23 @@ FMA diagnostic above also leaves the target unresolved and has reached its
 stopping rule. The failed reconstruction and both bounded investigations remain
 retained; further fighter work follows the breadth-first queue.
 
-**Current #304 boundary.** The bounded original Zelda-to-Sheik owner-prefix milestone is complete for [issue #304](https://github.com/ericvanlare/melee-web/issues/304), with evidence in the [scoped lineup status](status/2026-10-09-weaker-fighter-comparison-lineup.md); strict two-human browser comparison remains separate. Stadium C3 under [#251](https://github.com/ericvanlare/melee-web/issues/251) remains checkpointed while #318 rollback feasibility has first claim on the capture lane. Its existing [CSS/SSS preparation status](status/2026-10-06-pokemon-stadium-c1a-css-sss-preparation.md) records the route boundary; current C3 receipts remain in #251. Public #288 now uses the owner-cleared isolated staging relay.
+**Current #304 boundary.** The bounded original Zelda-to-Sheik owner-prefix milestone is complete for [issue #304](https://github.com/ericvanlare/melee-web/issues/304), with evidence in the [scoped lineup status](status/2026-10-09-weaker-fighter-comparison-lineup.md); strict two-human browser comparison remains separate. Public #288 uses the owner-cleared isolated staging relay.
 
-The next Stadium milestone is [C3 idle in-match lifetime #251](https://github.com/ericvanlare/melee-web/issues/251),
-with its remaining prerequisites counted and tracked inside that issue and PR.
-First reduce the retained PadPoll-inside-draw mismatch against original source
-ordering. Complete the actual original input/draw/state/RNG reference through
-3,500 post-GO ticks, counted from the observed GO event, then compare runtime
-lifetime A, checked retirement/recreation and lifetime B with per-owner RNG.
-Historical no-draw lifetimes remain separate; do not invent neutral rows or
-hardcode the historical GO tick. Prerequisite fixes are commits within C3,
-not isolated ownership PRs. Transformations, broader rendering, browser
-admission and whole-stage acceptance remain separate. Source-only
-and documentation work may overlap when ownership permits; Track A retains
-priority for shared capture resources.
+**Stadium C3 → C4.** The defined C3 idle, selected owner/RNG lifetime, natural
+stockout/mode9 and natural mode14 functional comparisons are complete at their
+declared scopes, including checked Results/CSS and retirement. Independent raw
+and scoped gate review support those outcomes. Final regression v2 passes; passing CI
+on the publication head is required before merge; this text does not claim a
+future commit's CI result. Broader allocator/arbitrary-writer coverage is a limit,
+not a newly waived gate; full allocator journaling remains separate. Whole-stage
+accuracy, public Stadium admission and C4–C8 are not accepted by C3.
+
+Next **C4** obtains one complete first-form original reference, then repeats its
+exact completed input for original latency measurement using actual source boundaries and bounded first-divergence controls before any runtime transformation
+port release. Existing source-file/region/transfer candidates remain checkpointed
+at the end-flow/quiescence HOLD. Reuse the existing route and retained evidence;
+do not repeat accepted functional captures or invent neutral rows/GO coordinates.
+Track A retains priority for shared capture resources.
 
 ### Standing rules and baselines
 

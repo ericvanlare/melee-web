@@ -183,6 +183,7 @@ function extractBetween(start, end) {
   assert(a >= 0 && b > a, `${start} production boundary missing`);
   return captureSource.slice(a, b);
 }
+const retainArtifactsSource = extractBetween('async function retainReplayArtifacts() {', 'async function runLaterBGate2FromSetup(');
 const closeSource = extractBetween('async function closeOwnedCaptureBrowser() {', 'const boundaryMarkers = [];');
 const observeSource = extractBetween('async function observePageOperation(label, operation) {', 'async function pauseTraceStatus');
 const collectSource = extractBetween('  try {\n  if (diagnostic) {\n    if (pageObservationTimedOut)', '  for (const candidate of runtimeDataAbortCandidates)');
@@ -219,6 +220,8 @@ async function actualCollection(failure, runtimeIncidentRecording = false) {
     screenshot: () => {calls.push('screenshot'); return Promise.resolve();},
   };
   const scope = vm.createContext({report, page, diagnostic: false, pageObservationTimedOut: false,
+    pairedFull: false, pairedFirstGo: false, pairedRegistration: false, // Existing ordinary capture path.
+    currentSssExit: false, currentSssArm: undefined, // Actual default-OFF optional observation scope.
     observationTimeoutMs: 5, currentPhase: 'finally', boundedCaptureOperation,
     runtimeIncidentRecording, summarizeRuntimeIncidents,
     firstError: (kind, message) => {report.first_error ||= {kind, message};},
@@ -230,12 +233,13 @@ async function actualCollection(failure, runtimeIncidentRecording = false) {
     browser: {close: async () => {calls.push('close'); if (failure === 'close failure') throw Error('owned close failed');}},
     browserContext: null, diagnosticCdp: null,
   });
-  vm.runInContext(observeSource + closeSource, scope);
+  vm.runInContext(observeSource + closeSource + retainArtifactsSource, scope);
   await vm.runInContext(`(async () => {${collectSource}})()`, scope);
   if (primary) assert.equal(report.first_error, primary, 'later failures must preserve primary');
   else if (failure === 'runtime incidents success')
     assert.equal(report.first_error, null, 'successful runtime incident retention must not create an error');
   assert.equal(calls.at(-1), 'close', 'actual final collection must close its browser last');
+  assert.equal(report.current_sss_exit, undefined, 'default-OFF final collection cannot claim an SSS component');
   if (failure === 'artifacts stall') {
     assert.deepEqual(calls, ['artifacts', 'dispose', 'close']);
     assert.equal(scope.pageObservationTimedOut, true);

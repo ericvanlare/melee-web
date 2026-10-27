@@ -3,11 +3,17 @@
 #include "gameplay_menu_host.h"
 #include "gameplay_match_context.h"
 #include <memory>
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+#include "gameplay_match_flow.h"
+#endif
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
 #include "pipeline_provenance.h"
 #endif
 namespace melee_web {
 enum class GameplayMatchConstruction { Immediate, Deferred };
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+enum class GameplayMatchDiagnostic { StadiumReady };
+#endif
 // Shared source match lifecycle. The confirmed menu payload supplies player
 // identity and source RNG; scene resources close before returning to a menu.
 class GameplayMatchSession {
@@ -29,6 +35,11 @@ public:
                          const MeleeWebMenuMatchContinuation&,
                          RuntimeArchiveCache&,GameplayMatchConstruction,
                          const MeleeWebPadState&);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    GameplayMatchSession(const RuntimeFiles&,const MeleeWebMenuMatchSelection&,
+                         RuntimeArchiveCache&,GameplayMatchConstruction,
+                         const MeleeWebPadState&,GameplayMatchDiagnostic);
+#endif
     ~GameplayMatchSession();
     GameplayMatchSession(const GameplayMatchSession&)=delete;
     GameplayMatchSession& operator=(const GameplayMatchSession&)=delete;
@@ -47,6 +58,9 @@ public:
     bool opening_demo() const;
     bool sudden_death() const;
     bool paused() const;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    bool diagnostic_pause_observation(MeleeWebMatchPauseObservation&) const;
+#endif
     uint32_t source_frames() const;
     int hud_damage(unsigned player) const;
     uint32_t random_seed() const;
@@ -64,11 +78,31 @@ public:
     bool advance_construction();
     bool construction_complete() const;
     void close();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    bool diagnostic_stadium_scene_rng_snapshot(
+        MeleeWebMatchSceneRngSnapshot*,char*,size_t) const;
+    bool diagnostic_stadium_pad_queue_observation(
+        MeleeWebStadiumPadQueueObservation*,char*,size_t) const;
+    // Test-only access to the world's pure Toy owner/scope preflight. It does
+    // not mutate state or execute original cleanup.
+    bool diagnostic_toy_owner_preflight() const;
+    void diagnostic_stadium_go_alignment_arm(int expected_branch,char*,size_t);
+    bool diagnostic_stadium_go_alignment_snapshot(
+        MeleeWebStadiumGoAlignmentSnapshot*,char*,size_t) const;
+    bool diagnostic_stadium_idle_snapshot(
+        MeleeWebStadiumIdleSnapshot*,char*,size_t) const;
+    bool diagnostic_stadium_setup_snapshot(
+        MeleeWebStadiumSetupSnapshot*,char*,size_t) const;
+#endif
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
     MeleeWebPipelineSourceContext provenance_context() const;
 #endif
 private:
     struct Storage;
     std::unique_ptr<Storage> storage_;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    MeleeWebMatchSceneRngSnapshot scene_rng_retained_{};
+    bool scene_rng_entry_complete_=false;
+#endif
 };
 }

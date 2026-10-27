@@ -12,11 +12,11 @@ from pathlib import Path
 
 DOL_SHA1 = "08e0bf20134dfcb260699671004527b2d6bb1a45"
 SOURCE_REVISION = "b43912cc78606f96c9569f5d6229bc9d7e265ea5"
-PROFILE_VERSION = 3
+PROFILE_VERSION = 5
 
 # Argument counts follow the pinned original declarations. These are observation
 # boundaries, not replacement implementations of the functions.
-FUNCTIONS = {
+FUNCTIONS_V3 = {
     "ARInit": 2, "ARAlloc": 1, "ARFree": 1, "ARGetSize": 0,
     "OSInitAlloc": 3, "OSCreateHeap": 2, "OSDestroyHeap": 1,
     "OSSetCurrentHeap": 1, "OSAllocFromHeap": 2, "OSFreeToHeap": 2,
@@ -45,9 +45,28 @@ FUNCTIONS = {
     "ftDemo_CreateFighter": 1,
     "ftDemo_ObjAllocInit": 0,
 }
+REGISTRATION_PROFILE_VERSION = 4
+REGISTRATION_RETURN_POLICY = "declared-cr0-eq-lr-returns-v1"
+CONDITIONAL_RETURN_FUNCTIONS = frozenset({"HSD_GObjProc_8038FAA8", "HSD_GObjProc_8038FC18"})
+SUPPORTED_RETURN_WORDS = frozenset({0x4e800020, 0x4d820020, 0x4c820020})
+PREVIOUS_PROFILE_VERSION = 3
+REGISTRATION_PROFILE = "gobjproc-registration-v1"
+FUNCTIONS = {
+    **FUNCTIONS_V3,
+    "HSD_GObj_SetupProc": 3,
+    "HSD_GObjProc_8038FAA8": 1,
+    "HSD_GObjProc_8038FC18": 1,
+    "HSD_GObjProc_8038FCE4": 1,
+    "HSD_GObjProc_8038FE24": 1,
+}
 LEGACY_PROFILE_VERSION = 2
-LEGACY_FUNCTIONS = {name: argc for name, argc in FUNCTIONS.items()
+LEGACY_FUNCTIONS = {name: argc for name, argc in FUNCTIONS_V3.items()
                     if name not in {"ftDemo_CreateFighter", "ftDemo_ObjAllocInit"}}
+REGISTRATION_OBSERVED_FUNCTIONS = frozenset({
+    "gm_Scene_Vs_OnEnter", "gm_Scene_Vs_OnExit", "HSD_ObjAlloc", "HSD_ObjFree", "HSD_ObjAllocInit",
+    "_HSD_ObjAllocForgetMemory", "HSD_GObj_SetupProc", "HSD_GObjProc_8038FAA8",
+    "HSD_GObjProc_8038FC18", "HSD_GObjProc_8038FCE4", "HSD_GObjProc_8038FE24"})
+
 GLOBALS = ("HeapArray", "NumHeaps", "ArenaStart", "ArenaEnd",
            "__OSArenaLo", "__OSArenaHi", "seed", "seed_ptr",
            "fighter_alloc_data", "obj_heap", "current_heap", "__OSCurrHeap",
@@ -102,12 +121,20 @@ def build_profile(dol_path: Path, symbols_path: Path) -> dict:
         symbol = symbols[name]
         body = dol.read(symbol["address"], symbol["size"])
         words = struct.unpack(">" + "I" * (len(body) // 4), body)
+        if name in REGISTRATION_OBSERVED_FUNCTIONS:
+            for word in words:
+                is_bclr = word >> 26 == 19 and (word >> 1) & 1023 == 16
+                if is_bclr and (word not in SUPPORTED_RETURN_WORDS or
+                                word != 0x4e800020 and name not in CONDITIONAL_RETURN_FUNCTIONS):
+                    raise ValueError("unsupported LR-return form in selected registration function: " + name)
         returns = [symbol["address"] + i * 4 for i, word in enumerate(words)
-                   if word == 0x4E800020]
+                   if word == 0x4E800020 or
+                   name in CONDITIONAL_RETURN_FUNCTIONS and word in SUPPORTED_RETURN_WORDS]
         if not returns:
             raise ValueError("no unconditional original return for " + name)
         functions.append({"name": name, "argc": argc, **symbol,
                           "entry_word": words[0], "returns": returns,
+                          "return_words": [words[(address-symbol["address"])//4] for address in returns],
                           "body_sha256": hashlib.sha256(body).hexdigest()})
     globals_ = {name: symbols[name] for name in GLOBALS}
     # Initial global pointer data comes from the executable's linker layout,
@@ -117,6 +144,8 @@ def build_profile(dol_path: Path, symbols_path: Path) -> dict:
                             "iparam_audio_heap_size", "iparam_heap_max_num")}
     entry_word = int.from_bytes(dol.read(dol.entry, 4), "big")
     return {"schema": "melee-web-original-allocation-profile", "version": PROFILE_VERSION,
+            "registration_profile": REGISTRATION_PROFILE,
+            "registration_return_policy": REGISTRATION_RETURN_POLICY,
             "dol_sha1": DOL_SHA1, "source_revision": SOURCE_REVISION,
             "symbols_sha256": hashlib.sha256(symbols_path.read_bytes()).hexdigest(),
             "entry": dol.entry, "entry_word": entry_word,

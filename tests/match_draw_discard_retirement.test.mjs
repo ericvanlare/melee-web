@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import {randomUUID} from 'node:crypto';
 
 const source = fs.readFileSync(new URL('../web/melee-runtime.mjs', import.meta.url), 'utf8');
 
@@ -42,18 +43,22 @@ function actualFunction(signature, name) {
   assert.fail(`could not find the end of ${signature}`);
 }
 
+// Actual owner closure; only readiness/snapshot leaves below are modeled.
+const transferOwner = actualFunction('function createLaterBReplayTransferOwner()', 'createLaterBReplayTransferOwner');
 const publish = actualFunction('function publish()', 'publish');
 const completion = actualFunction('menuMatchDrawDiscardRetired()', 'completion');
 const exportDiagnostics = actualFunction('async exportDiagnostics()', 'exportDiagnostics')
   .replace(/^function /, 'async function ');
 
 function harness({retired = false, privateExport = true, phase = 0, running = 0,
-  busy = false, fatal = false, destroyed = false, malformed = false} = {}) {
+  busy = false, fatal = false, destroyed = false, malformed = false, transferActive = false} = {}) {
   const counts = {status: 0, phase: 0, running: 0, snapshots: 0,
     published: 0, sceneExit: 0, persist: 0};
   const context = {
     counts,
     ready: true,
+    busy, assetTransfer: null, networkSessionClose: null, commands: [], loading: null,
+    crypto: {randomUUID},
     fatal,
     destroyed,
     terminalDrawDiscardRetirementConsumed: false,
@@ -62,6 +67,8 @@ function harness({retired = false, privateExport = true, phase = 0, running = 0,
     preparationLabel: '',
     document: {hidden: false},
     Module: {
+      // Modeled idle leaf for the active-owner refusal countercontrol only.
+      stadiumMatchedSetupNativeIdle: () => true,
       UTF8ToString: value => value,
       _melee_web_native_menu_phase: () => { counts.phase++; return phase; },
       _melee_web_native_menu_running: () => { counts.running++; return running; },
@@ -86,12 +93,26 @@ function harness({retired = false, privateExport = true, phase = 0, running = 0,
     };
   }
   vm.createContext(context);
+  vm.runInContext('let saveProfileSnapshotsActive = 0;\n'+transferOwner+
+    '\nconst laterBReplayTransfer = createLaterBReplayTransferOwner();\n'+
+    'globalThis.fixtureTransferOwner = laterBReplayTransfer;', context);
+  if (transferActive) context.fixtureTransferOwner.reserve({
+    reference_id: 'original-b-2013-943-v1',
+    recipe_sha256: '5fb53bdc71b35b800bc3451b1d9117709edef2413a38a8f7311ee352647a6755',
+    cursor: 943, notification_order: 4330, world_generation: 7, setup_seed_hex: '4b25c79b',
+  });
   vm.runInContext(`${publish}\n${completion}\n${exportDiagnostics}\n` +
     'globalThis.complete = completion; globalThis.exported = exportDiagnostics;', context);
   return {context, counts};
 }
 
 test('a retired private owner publishes inactivity once and permits the existing export', async () => {
+  // Actual active owner refuses before native status/phase/running reads.
+  const blocked = harness({retired: true, transferActive: true});
+  assert.equal(blocked.context.complete(), false);
+  assert.equal(await blocked.context.exported(), null);
+  assert.deepEqual([blocked.counts.status, blocked.counts.phase, blocked.counts.running,
+    blocked.counts.published, blocked.counts.sceneExit, blocked.counts.persist], [0, 0, 0, 0, 0, 0]);
   const {context, counts} = harness({retired: true});
   assert.equal(context.complete(), true);
   assert.equal(context.terminalDrawDiscardRetirementConsumed, true);

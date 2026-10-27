@@ -55,6 +55,7 @@ struct GameplayMatchSession::Storage {
     std::unique_ptr<GameplayKirbyCopyAssets> kirby_copy_assets;
     MeleeWebHud* hud=nullptr;
     MeleeWebMatchFlow* flow=nullptr;
+    bool stadium_diagnostic=false;
     bool mode_owned=false;
     bool profile_owned=false;
     bool sudden_death_claimed=false;
@@ -129,6 +130,19 @@ struct GameplayMatchSession::Storage {
         runtime_files=&files;runtime_cache=archive_cache;selected=selected_input;
         if(selection_uses_kirby(selected_input))
             kirby_copy_assets=std::make_unique<GameplayKirbyCopyAssets>(files,selected_input);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        if(stadium_diagnostic){
+            check(!opening_demo && !sudden_death && !selected_input.sudden_death &&
+                  player_count==2 && !selected_input.start.rules.is_teams &&
+                  selected_input.start.rules.stkind==St_Kind_PStadium,
+                  "Diagnostic session requires the exact two-Human-Mario Stadium profile");
+            for(unsigned i=0;i<2;++i)
+                check(selected_input.start.players[i].slot_type==Gm_PKind_Human &&
+                      selected_input.start.players[i].ckind==CKIND_MARIO,
+                      "Diagnostic Stadium session requires two Human Mario players");
+            stage=melee_web_stage_content_for_profile(St_Kind_PStadium);
+        }else
+#endif
         stage=melee_web_stage_content(selected_input.start.rules.stkind);
         check(stage!=nullptr,"Match stage has no source runtime owner");
         content.ground_kind=stage->ground_kind;
@@ -170,6 +184,7 @@ struct GameplayMatchSession::Storage {
               "Match source-slot compaction changed its active player count");
         content.begin_source_match=true;
         content.opening_demo=opening_demo;
+        content.stadium_diagnostic=stadium_diagnostic;
         content.sudden_death=sudden_death;
         content.source_camera_subjects=70;
         content.source_random_seed=selected_input.random_seed;
@@ -303,6 +318,9 @@ struct GameplayMatchSession::Storage {
             MeleeWebRenderSettings settings{640,480,{0,25,180},{0,15,0},30,1,1000,(uint64_t(1)<<5)|(uint64_t(1)<<3)};
             check(melee_web_render_finish_match_camera(render,&settings,error,sizeof(error)),error);
             check(melee_web_render_use_match_passes(render,error,sizeof(error)),error);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+            if(stadium_diagnostic)world->prepare_stadium_ready(match);
+#endif
             auto prepare_music=[](void* context,char* message,size_t size)->int{
                 try{static_cast<Storage*>(context)->prepare_music();return 1;}
                 catch(const std::exception& e){if(message&&size)std::snprintf(message,size,"%s",e.what());return 0;}
@@ -341,6 +359,10 @@ struct GameplayMatchSession::Storage {
     }
     void close(){
         char error[256]{};
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        /* Refuse unsupported partial starts before flow/HUD retirement. */
+        if(world&&stadium_diagnostic)world->cancel_prepared_stadium_ready();
+#endif
         end_flow();
         /* The browser's final source draw has completed before close(). Keep
          * the original fighter state resident while publishing MatchEnd, then
@@ -410,6 +432,26 @@ GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,
     else
         storage_->start(files,selection,&archive_cache);
 }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,
+    const MeleeWebMenuMatchSelection& selection,RuntimeArchiveCache& cache,
+    GameplayMatchConstruction construction,const MeleeWebPadState& input,
+    GameplayMatchDiagnostic diagnostic):storage_(std::make_unique<Storage>())
+{
+    check(diagnostic==GameplayMatchDiagnostic::StadiumReady,"Unknown diagnostic match boundary");
+    storage_->stadium_diagnostic=true;
+    try{
+        if(construction==GameplayMatchConstruction::Deferred)
+            storage_->begin(files,selection,&cache,&input);
+        else storage_->start(files,selection,&cache,&input);
+    }catch(const std::exception& first){
+        // Preserve the first preparation refusal before the existing checked
+        // Storage destructor attempts retirement of any partial source owners.
+        std::fprintf(stderr,"STADIUM_READY_CONSTRUCTION_FIRST_FAILURE %s\n",first.what());
+        std::fflush(stderr);throw;
+    }
+}
+#endif
 GameplayMatchSession::~GameplayMatchSession()=default;
 GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,
                                            const MeleeWebMenuMatchSelection& selection,
@@ -449,6 +491,12 @@ void GameplayMatchSession::finish_vs(
     check(melee_web_match_stats(storage_->match,&stats,error,sizeof(error)),error);
     seed=stats.random_seed;
     melee_web_pad_state_capture(input);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(storage_->stadium_diagnostic&&scene_rng_entry_complete_)
+        check(melee_web_match_scene_rng_snapshot(storage_->match,
+            &scene_rng_retained_,error,sizeof(error))&&scene_rng_retained_.count==4,
+            error[0]?error:"VS scene RNG receipt is incomplete before close");
+#endif
     storage_->close();storage_.reset();
 }
 void GameplayMatchSession::finish_sudden_death(
@@ -540,6 +588,11 @@ bool GameplayMatchSession::complete()const{return storage_&&melee_web_match_flow
 bool GameplayMatchSession::opening_demo()const{return storage_&&storage_->selected.opening_demo!=0;}
 bool GameplayMatchSession::sudden_death()const{return storage_&&storage_->selected.sudden_death!=0;}
 bool GameplayMatchSession::paused()const{return storage_&&melee_web_match_flow_paused(storage_->flow);}
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+bool GameplayMatchSession::diagnostic_pause_observation(MeleeWebMatchPauseObservation& out)const{
+    return storage_&&melee_web_match_flow_pause_observation(storage_->flow,&out);
+}
+#endif
 uint32_t GameplayMatchSession::source_frames()const{return storage_?melee_web_match_flow_frames(storage_->flow):0;}
 int GameplayMatchSession::hud_damage(unsigned player)const{
     if(!storage_||player>=storage_->content.player_count)return -1;
@@ -584,6 +637,63 @@ MeleeWebMatchStats GameplayMatchSession::player_stats(unsigned index)const{
     check(melee_web_match_player_stats(storage_->match,index,&stats,error,sizeof(error)),error);return stats;
 }
 MeleeWebAudio* GameplayMatchSession::audio()const{return storage_&&storage_->bank?storage_->bank->get():nullptr;}
-bool GameplayMatchSession::advance_construction(){return storage_&&storage_->advance_construction();}
-bool GameplayMatchSession::construction_complete()const{return storage_&&storage_->construction_phase==5;}
+bool GameplayMatchSession::advance_construction(){
+    const bool complete=storage_&&storage_->advance_construction();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(complete&&storage_->stadium_diagnostic&&!scene_rng_entry_complete_){
+        melee_web_match_scene_rng_note(1);
+        scene_rng_entry_complete_=true;
+    }
+#endif
+    return complete;
 }
+bool GameplayMatchSession::construction_complete()const{return storage_&&storage_->construction_phase==5;}
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+bool GameplayMatchSession::diagnostic_stadium_pad_queue_observation(
+    MeleeWebStadiumPadQueueObservation* out,char* error,size_t size)const{
+    return storage_&&construction_complete()&&storage_->match&&
+        melee_web_match_stadium_pad_queue_observation(storage_->match,out,error,size);
+}
+bool GameplayMatchSession::diagnostic_toy_owner_preflight()const{
+    return storage_&&storage_->world&&storage_->world->diagnostic_toy_owner_preflight();
+}
+void GameplayMatchSession::diagnostic_stadium_go_alignment_arm(
+    int expected_branch,char* error,size_t size){
+    check(storage_&&construction_complete()&&storage_->world,
+          "Stadium GO trace requires a complete live source match owner");
+    storage_->world->diagnostic_stadium_go_alignment_arm(expected_branch,error,size);
+}
+bool GameplayMatchSession::diagnostic_stadium_go_alignment_snapshot(
+    MeleeWebStadiumGoAlignmentSnapshot* out,char* error,size_t size)const{
+    return storage_&&construction_complete()&&storage_->world&&
+        storage_->world->diagnostic_stadium_go_alignment_snapshot(out,error,size);
+}
+bool GameplayMatchSession::diagnostic_stadium_idle_snapshot(
+    MeleeWebStadiumIdleSnapshot* out,char* error,size_t size)const{
+    return storage_&&construction_complete()&&storage_->world&&
+        storage_->world->diagnostic_stadium_idle_snapshot(out,error,size);
+}
+bool GameplayMatchSession::diagnostic_stadium_setup_snapshot(
+    MeleeWebStadiumSetupSnapshot* out,char* error,size_t size)const{
+    return storage_&&construction_complete()&&storage_->world&&
+        storage_->world->diagnostic_stadium_setup_snapshot(out,error,size);
+}
+#endif
+}
+
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+namespace melee_web {
+bool GameplayMatchSession::diagnostic_stadium_scene_rng_snapshot(
+    MeleeWebMatchSceneRngSnapshot* out,char* error,size_t size) const
+{
+    if(!out)return false;
+    if(storage_&&storage_->stadium_diagnostic&&storage_->match)
+        return melee_web_match_scene_rng_snapshot(storage_->match,out,error,size)!=0;
+    if(!storage_&&scene_rng_retained_.count==4&&!scene_rng_retained_.invalid){
+        *out=scene_rng_retained_;return true;
+    }
+    if(error&&size)std::snprintf(error,size,"Stadium scene RNG receipt has no checked owner");
+    return false;
+}
+}
+#endif

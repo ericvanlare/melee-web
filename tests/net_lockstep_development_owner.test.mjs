@@ -158,7 +158,10 @@ test('development runtime APIs use the guarded owner and only frame callbacks ad
   const owner = {
     stop(error) { events.push(['stop', error]); },
     attachNetworkSession(close) { events.push(['attach']); this.networkClose = close; },
-    handle: {getState: () => ({state: 'prepared'})},
+    // Modeled handle mirrors the actual core snapshot's active-transfer state;
+    // it does not manufacture a prepared owner while native access is reserved.
+    handle: {getState: () => ({state: owner.laterBReplayTransfer?.suspended() === true
+      ? 'diagnostic-transfer' : 'prepared'})},
   };
   let session = null, identityCalls = 0, ownerFactories = 0;
   const window = {meleeNetPeerIdentity: async () => {
@@ -203,7 +206,11 @@ test('development runtime APIs use the guarded owner and only frame callbacks ad
     syncAudio: () => { events.push(['sync-audio']); },
     $: () => ({focus: () => events.push(['focus'])}),
   };
+  const transferGuards = source.split('\n').filter(line =>
+    /^(?:const laterBReplayNativeSuspended=|function assertLaterBReplayNativeAccess\()/.test(line)).join('\n');
+  assert.equal(transferGuards.split('\n').length, 2, 'both actual native access guards are extracted');
   vm.createContext(scope);
+  vm.runInContext(transferGuards, scope, {filename: 'runtime-development-native-access-guards.mjs'});
   vm.runInContext(`let runtimeLockstepEntry=null;\n${source.slice(apiStart, apiEnd)}`, scope,
     {filename: 'runtime-development.mjs'});
   vm.runInContext(`${source.slice(frameStart, frameEnd)}\n};`, scope,
@@ -213,6 +220,23 @@ test('development runtime APIs use the guarded owner and only frame callbacks ad
     transport: 'webrtc'};
   assert.throws(() => window.meleeNetConfigureRuntimeLockstep(config), /configuration is unavailable/);
   assert.equal(ownerFactories, 0, 'unready runtime context allocates no lockstep owner');
+  assert.equal(vm.runInContext('laterBReplayNativeSuspended()', scope), false);
+  owner.laterBReplayTransfer = {suspended: () => true};
+  assert.throws(() => window.meleeNetConfigureRuntimeLockstep(config), /Private replay continuation forbids ordinary native diagnostics/);
+  await assert.rejects(window.meleeNetBeginLockstep(11, 8), /Lockstep session is unavailable/,
+    'the actual API checks unready availability before the prepared-owner gate');
+  scope.ready = true;
+  assert.equal(owner.handle.getState().state, 'diagnostic-transfer');
+  await assert.rejects(window.meleeNetBeginLockstep(11, 8), /requires a freshly imported disc/,
+    'a ready transferred owner fails the actual prepared-owner gate before native start');
+  scope.ready = false;
+  const beforeSuspendedFrame = events.length;
+  scope.developmentHooks.frame(false);
+  assert.equal(events.length, beforeSuspendedFrame, 'suspended frame does not advance the lockstep owner');
+  assert.equal(identityCalls, 0); assert.equal(ownerFactories, 0); assert.equal(nativeCalls.length, 0);
+  delete owner.laterBReplayTransfer;
+  assert.equal(vm.runInContext('laterBReplayNativeSuspended()', scope), false);
+
   scope.ready = true;
   assert.equal(window.meleeNetConfigureRuntimeLockstep(config), true);
 

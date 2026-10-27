@@ -74,6 +74,8 @@ class GameplayMenuContractTests(OwnedWorkspaceTests):
         self.assertIn("sparse-port admission: dense count=2 CSS=1 SSS=1; "
                       "P1+P3 count=2 CSS=1 SSS=1; source ports 0/2 retained", run.stdout)
         self.assertIn("native menu lifecycle contract trace: passed", run.stdout)
+        if stadium:
+            self.assertIn("current-context SSS note: after OnExit/before mode-exit/prepare; TIME refused; abort/destroy retained note; legacy Stock4 unchanged", run.stdout)
 
 
 if __name__ == "__main__":

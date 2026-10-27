@@ -3,6 +3,8 @@
 using namespace melee_web_menu_browser;
 extern "C" {
 int melee_web_native_menu_replay(const uint8_t* data,unsigned size,int observe){try{
+ check(!stadium_first_css_prepared_diagnostic_active(),
+       "CSS constructor-return diagnostic refuses replay ownership");
  replay_source_frames=melee_web::SourceFrameSequence{};
  check(data&&size<=melee_web::kRetailReplayMaxBytes,"Invalid reference replay bytes");
  check(observe==0||observe==1,"Invalid replay observation mode");
@@ -25,7 +27,11 @@ int melee_web_native_menu_replay(const uint8_t* data,unsigned size,int observe){
   scoped_assets=scoped_disc_import;
  }
  if(!archive_cache)archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
- replay=std::move(candidate);replay_trace=observe;replay_pending=!replay->whole_session();
+ replay=std::move(candidate);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ later_sss_bind_parsed_reference(data,size);
+#endif
+ replay_trace=observe;replay_pending=!replay->whole_session();
  replay_completion={};replay_completion.whole_session=replay->whole_session();
  match_message="Reference replay: "+selected_match_message(replay->selection);
  if(replay->whole_session()){
@@ -45,6 +51,8 @@ int melee_web_native_menu_replay(const uint8_t* data,unsigned size,int observe){
 }catch(const std::exception& e){message=e.what();running=false;return 0;}}
 #if defined(MELEE_WEB_NET_SESSION)
 int melee_web_native_menu_net_begin(unsigned seed,unsigned max_frames){try{
+ check(!stadium_first_css_prepared_diagnostic_active(),
+       "CSS constructor-return diagnostic refuses network ownership");
  check(!replay&&!reference_heap_used&&world&&host&&!host_entered&&!world_exposed&&!match&&
        !results&&!prize&&melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CREATED,
        "Networked session requires the fresh prepared character-select owner");
@@ -52,6 +60,8 @@ int melee_web_native_menu_net_begin(unsigned seed,unsigned max_frames){try{
  reference_heap_used=true;message="Networked session ready; launch to enter character select.";return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_menu_net_begin_lockstep(unsigned seed,unsigned max_frames){try{
+ check(!stadium_first_css_prepared_diagnostic_active(),
+       "CSS constructor-return diagnostic refuses lockstep ownership");
  check(!replay&&!reference_heap_used&&world&&host&&!host_entered&&!world_exposed&&!match&&
        !results&&!prize&&melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CREATED,
        "Lockstep session requires the fresh prepared character-select owner");

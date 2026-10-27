@@ -202,6 +202,37 @@ class ObserverStreamTests(unittest.TestCase):
 
         self.assertEqual(decoded["payload"]["slices"][0]["name"], "pad_queue")
 
+    def test_live_stage_cooldown_tag_preserves_unknown_and_range_refusals(self) -> None:
+        # Exact existing native tag/address/type; synthetic transport bytes.
+        # Source-specific stage_state retains its separate4byte/cooldown checks.
+        def record(tag=55, size=4):
+            raw = bytes.fromhex("00000013")
+            prefix = stream.BOUNDARY.pack(1, stream.WHOLE_SESSION_FLAG,
+                                           0x8034DD8C, 32, 1, 0)
+            gprs = struct.pack("<32I", *range(32))
+            offset = len(prefix) + len(gprs) + stream.SLICE.size
+            descriptor = stream.SLICE.pack(tag, 0, 0x804D6CA4, size, offset)
+            metadata = stream.WHOLE_AUDIO_METADATA.pack(0, 1, 0, 0)
+            return frame(3, 1022, prefix+gprs+descriptor+raw+metadata,
+                         pc=0x8034DD8C, source_tick=1)
+        def decode(raw):
+            return stream._decode_record(stream.HEADER.unpack(raw[:stream.HEADER.size]),
+                                         raw[stream.HEADER.size:], "stage cooldown")
+        row = decode(record())
+        self.assertEqual(row["payload"]["slices"], [{
+            "name": "sd_stage_cooldown", "tag": 55, "flags": 0,
+            "address": 0x804D6CA4, "size": 4, "hex": "00000013"}])
+        self.assertTrue(row["payload"]["whole_session"])
+        self.assertEqual(row["payload"]["match_index"], 0)
+        for tag in (54, 65535):
+            with self.subTest(tag=tag):
+                with self.assertRaisesRegex(stream.ObserverStreamError, "unknown slice tag"):
+                    decode(record(tag=tag))
+        for size in (0, 0x100000):
+            with self.subTest(size=size):
+                with self.assertRaisesRegex(stream.ObserverStreamError, "invalid slice range"):
+                    decode(record(size=size))
+
     def test_iter_records_accepts_an_explicit_legacy_slice_schema(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "legacy-tags.mwro"

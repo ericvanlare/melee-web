@@ -6,8 +6,26 @@ import subprocess
 import tempfile
 import unittest
 
-ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / 'reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp'
+ROOT = Path(os.environ.get('MELEE_STADIUM_OBSERVER_REPO_ROOT', Path(__file__).resolve().parents[1]))
+SOURCE = Path(os.environ.get('MELEE_STADIUM_OBSERVER_SOURCE', ROOT / 'reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp'))
+
+
+def _extract_braced_declaration(source, marker):
+    start = source.index(marker)
+    opening = source.index("{", start)
+    depth = 0
+    for index in range(opening, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                end = index + 1
+                if source[end:].lstrip().startswith(";"):
+                    end = source.index(";", end) + 1
+                return source[start:end]
+    raise AssertionError(f"unterminated C++ block after {marker!r}")
+
 
 class ReferenceEntityProfileTests(unittest.TestCase):
     def test_typed_identity_and_secondary_relationship_decode(self):
@@ -54,23 +72,67 @@ class ReferenceEntityProfileTests(unittest.TestCase):
         if compiler is None:
             self.skipTest('Native C++ compiler unavailable')
         source = SOURCE.read_text()
-        gate = source[source.index('    whole_session_matches = WholeSessionMatchCount();'):
+        input_source = (ROOT / 'reference-capture/dolphin/source/Core/PowerPC/ReferenceInputStream.cpp').read_text()
+        input_start = input_source.index('bool InputStream::IsReplaying()')
+        input_methods = input_source[input_start:input_source.index('void InputStream::Record', input_start)]
+        stadium_owner_fields = '\n'.join(
+            source[source.index(marker):source.index(';', source.index(marker)) + 1]
+            for marker in ('  bool stadium_idle_3500 = false;',
+                           '  bool stadium_constructor_enabled = false;',
+                           '  bool stadium_go_ordinal2 = false;',
+                           '  std::string stadium_posttransform_state;'))
+        gate = source[source.index('    const std::string paired_idle_setting = Env("MWRC_STADIUM_WHOLE_PAIRED_IDLE");'):
                       source.index('    capture_id = Env("MWRC_CAPTURE_ID");')]
+        stadium_receipt_start = source.index('constexpr char STADIUM_SETUP_RECEIPT_SHA256[]')
+        stadium_receipt = source[stadium_receipt_start:source.index(';', stadium_receipt_start) + 1]
+        stadium_boundary = _extract_braced_declaration(source, 'enum class Boundary : u16')
+        stadium_long_idle = _extract_braced_declaration(source, 'struct StadiumWholeLongIdle\n')
+        compact_settings = source[source.index('struct CompactRngSettings'):source.index(
+            'const CompactRngSettings& CompactRngEnvironment()')
+        ]
+        compact_environment = _extract_braced_declaration(
+            source, 'const CompactRngSettings& CompactRngEnvironment()'
+        )
+        stadium_phase = _extract_braced_declaration(source, 'enum class StadiumGoPrefixPhase')
+        whole_b_state = _extract_braced_declaration(source, 'struct StadiumWholeBObservation\n')
+        stadium_state_start = source.index('  bool stadium_go_prefix_enabled = false;')
+        stadium_state_end = source.index('  bool stadium_go_prefix_css_ready = false;', stadium_state_start)
+        stadium_state = source[stadium_state_start:stadium_state_end]
         start = source.index('    if (checked_entity_profile)\n      handshake +=')
         metadata = source[start:source.index('    handshake += "}";', start)]
-        count_function=source[source.index('u32 WholeSessionMatchCount()'):source.index('bool ValidIdentity(')]
+        count_function=source[source.index('u32 WholeSessionMatchCount()'):source.index('bool PairedIdleStartupProfilesAgree(')]
+        paired_startup=source[source.index('bool PairedIdleStartupProfilesAgree('):source.index('bool ValidIdentity(')]
+        allocation_configured = _extract_braced_declaration(source, 'bool AllocationConfigured()')
         harness = r'''
+#include <array>
+#include <atomic>
 #include <cassert>
+#include <cstdint>
+#include <cstddef>
+#include <new>
 #include <map>
 #include <string>
+#include <string_view>
+namespace ReferenceCapture {
+struct TestInputState { int mode = 0; };
+TestInputState& State() { static TestInputState state; return state; }
+class Observer { public: static bool enabled; static bool IsEnabled() { return enabled; } };
+bool Observer::enabled = false;
+class InputStream { public: static bool IsReplaying(); static bool IsRecording(); };
+'''+input_methods+r'''
+}
+using namespace ReferenceCapture;
 std::map<std::string,std::string> environment;
 std::string Env(const char* name){return environment[name];}
+using u8=std::uint8_t;
+using u16=std::uint16_t;
 using u32=unsigned;
 constexpr unsigned WHOLE_SESSION_MIN_MATCHES=3,WHOLE_SESSION_MAX_MATCHES=64;
-'''+count_function+r'''
+'''+stadium_boundary+"\n"+stadium_long_idle+"\n"+compact_settings+compact_environment+"\n"+stadium_receipt+"\n"+stadium_phase+"\n"+whole_b_state+"\n"+count_function+"\n"+paired_startup+"\n"+allocation_configured+r'''
 bool SdInitRequested(){return !Env("MWRC_SD_INIT").empty();}
 struct Reader {
  unsigned whole_session_matches=0;bool checked_entity_profile=false,active_entity_profile=false;std::string error;
+''' + stadium_owner_fields + '\n' + stadium_state + r'''
  bool SetInvalid(const char* s){error=s;return false;}
  bool configure(){
 ''' + gate + r'''
@@ -79,23 +141,33 @@ std::string identity(){std::string handshake="base";
 ''' + metadata + r'''
 return handshake;}
 };
+static void ResetReader(Reader& reader) {
+ reader.~Reader();
+ ::new (static_cast<void*>(&reader)) Reader{};
+}
 int main(){
- Reader r;assert(r.configure());assert(!r.checked_entity_profile);assert(r.identity()=="base");
+ Reader r;assert(r.configure());assert(!r.stadium_whole_b.enabled);assert(!r.stadium_whole_long_idle.enabled);assert(!r.checked_entity_profile);assert(!r.stadium_whole_feedback);assert(r.identity()=="base");
  environment["MWRC_WHOLE_SESSION_MATCHES"]="1";
- r=Reader{};assert(!r.configure()||r.whole_session_matches==0);
+ ResetReader(r);assert(!r.configure()||r.whole_session_matches==0);
  environment["MWRC_ENTITY_PROFILE"]="jiggly-ice-mario-fox-v1";
- r=Reader{};assert(r.configure()&&r.checked_entity_profile);
+ ResetReader(r);assert(r.configure()&&r.checked_entity_profile);
  assert(r.identity()=="base,\"entity_profile\":\"jiggly-ice-mario-fox-v1\"");
  environment["MWRC_ENTITY_PROFILE"]="jiggly-ice-mario-fox-active60-v1";
- r=Reader{};assert(r.configure()&&r.checked_entity_profile&&r.active_entity_profile);
+ ResetReader(r);assert(r.configure()&&r.checked_entity_profile&&r.active_entity_profile);
  assert(r.identity()=="base,\"entity_profile\":\"jiggly-ice-mario-fox-active60-v1\"");
  environment["MWRC_ENTITY_PROFILE"]="jiggly-ice-mario-fox-v1";
- environment["MWRC_WHOLE_SESSION_MATCHES"]="3";r=Reader{};assert(!r.configure());
+ environment["MWRC_WHOLE_SESSION_MATCHES"]="3";ResetReader(r);assert(!r.configure());
  environment["MWRC_WHOLE_SESSION_MATCHES"]="1";
  for(const char* other:{"MWRC_SD_INIT","MWRC_CPU_PROBE_OUTPUT","MWRC_ITEM_PROBE_OUTPUT","MWRC_ALLOCATION_OUTPUT"}){
-  environment[other]="1";r=Reader{};assert(!r.configure());assert(!r.error.empty());environment.erase(other);
+  environment[other]="1";ResetReader(r);assert(!r.configure());assert(!r.error.empty());environment.erase(other);
  }
- environment["MWRC_ENTITY_PROFILE"]="unknown";r=Reader{};assert(!r.configure());
+ environment["MWRC_ENTITY_PROFILE"]="unknown";ResetReader(r);assert(!r.configure());
+ environment.clear();environment["MWRC_STADIUM_GO_PREFIX"]="0";ResetReader(r);assert(!r.configure());
+ environment.clear();environment["MWRC_STADIUM_GO_PREFIX"]="1";ResetReader(r);assert(!r.configure());
+ environment["MWRC_STADIUM_SETUP_RECEIPT_SHA256"]=STADIUM_SETUP_RECEIPT_SHA256;
+ ResetReader(r);assert(r.configure()&&r.stadium_go_prefix_enabled);
+ assert(r.stadium_go_prefix_setup_receipt_sha256==STADIUM_SETUP_RECEIPT_SHA256);
+ assert(r.stadium_go_prefix_phase==StadiumGoPrefixPhase::AwaitCss);
 }
 '''
         scratch_parent = Path(os.environ.get('MELEE_ENTITY_TEST_OUTPUT', ROOT / 'work'))

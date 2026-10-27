@@ -1,3 +1,4 @@
+#include "gameplay_rng_draw_owner.h"
 #include "gameplay_compat.h"
 #include "gameplay_menu_world.hpp"
 #include "runtime_archive_cache.hpp"
@@ -179,6 +180,7 @@ struct GameplayMenuWorld::Storage {
 
     void start_scene(GameplayMenuScene scene)
     {
+        melee_web_rng_draw_probe_install_source_owners();
         if (!runtime_files) fail("Native menu RuntimeFiles owner is missing");
         source_files = begin_source_files(*runtime_files, error, sizeof(error));
         check(source_files != nullptr, error,

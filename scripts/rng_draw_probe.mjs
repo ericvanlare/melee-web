@@ -50,19 +50,61 @@ export function validateRngDrawProbeRows(textRows, selection, {observedCursor, d
   const requested = new Set(selection.selected);
   const seen = new Set();
   const rows = [];
+  let captureVersion = null;
   for (const text of textRows) {
     let row;
     try { row = JSON.parse(text); }
     catch { throw Error('RNG draw probe row is not valid JSON'); }
-    if (!row || row.schema !== 'melee-web-rng-draw-probe' || row.version !== 1 ||
+    if (!row || row.schema !== 'melee-web-rng-draw-probe' || ![1,2,3].includes(row.version) ||
         !Number.isSafeInteger(row.source_cursor) || !requested.has(row.source_cursor) ||
         seen.has(row.source_cursor) || row.overflowed !== false || !Array.isArray(row.draws) ||
-        row.draws.length > MAX_DRAWS_PER_CURSOR)
+        row.draws.length > MAX_DRAWS_PER_CURSOR ||
+        (captureVersion !== null && captureVersion !== row.version))
       throw Error('RNG draw probe row has an invalid identity, cursor, or bounded payload');
+    captureVersion = row.version;
     for (const draw of row.draws) {
       if (!draw || !['HSD_Rand', 'HSD_Randf'].includes(draw.kind) ||
           typeof draw.seed_after !== 'string' || !SEED.test(draw.seed_after))
         throw Error('RNG draw probe row contains an invalid kind or 32-bit post-update seed');
+      if (row.version >= 2) {
+        const owner = draw.owner;
+        const pointer = value => typeof value === 'string' && /^[0-9a-f]{16}$/.test(value);
+        const zero = '0000000000000000';
+        if (!owner || !['gobj','proc','callback'].every(key => pointer(owner[key])) ||
+            ![['classifier',65535],['p_link',255],['s_link',255]].every(([key,max]) =>
+              Number.isInteger(owner[key]) && owner[key] >= 0 && owner[key] <= max))
+          throw Error('RNG draw probe owner encoding is invalid');
+        if (!Object.hasOwn(owner,'callback_symbol') ||
+            (owner.status === 'outside_proc' ? owner.callback_symbol !== null :
+             !['unknown','grStadium_801D1390','efLib_particles_proc_main','Fighter_8006A360'].includes(owner.callback_symbol)))
+          throw Error('RNG draw callback symbol is invalid');
+        if (owner.callback_symbol === 'Fighter_8006A360' &&
+            (owner.classifier !== 4 || owner.p_link !== 8 || owner.s_link !== 1))
+          throw Error('RNG draw fighter callback owner tuple differs');
+        if (row.version === 3) {
+          const fighter = owner.fighter;
+          if (owner.callback_symbol === 'Fighter_8006A360') {
+            if (!fighter || !Number.isInteger(fighter.slot) || fighter.slot < 0 || fighter.slot >= 6 ||
+                !Number.isInteger(fighter.entity) || fighter.entity < 0 || fighter.entity >= 2 ||
+                !Number.isInteger(fighter.kind) || fighter.kind < 0 || fighter.kind > 0xffffffff)
+              throw Error('RNG draw fighter slot/entity identity is invalid');
+          } else if (fighter !== null) {
+            throw Error('RNG draw non-fighter owner cannot claim a fighter identity');
+          }
+        } else if (Object.hasOwn(owner, 'fighter')) {
+          throw Error('Version 2 RNG draw cannot claim a fighter identity');
+        }
+        if (owner.status === 'outside_proc') {
+          if (!['gobj','proc','callback'].every(key => owner[key] === zero) ||
+              owner.classifier !== 0 || owner.p_link !== 0 || owner.s_link !== 0)
+            throw Error('RNG draw outside-proc owner is inconsistent');
+        } else if (owner.status !== 'scheduled_proc' ||
+                   ['gobj','proc','callback'].some(key => owner[key] === zero)) {
+          throw Error('RNG draw scheduled owner is inconsistent');
+        }
+      } else if (Object.hasOwn(draw, 'owner')) {
+        throw Error('Version 1 RNG draw cannot claim owner context');
+      }
     }
     seen.add(row.source_cursor);
     rows.push({text, row});
@@ -298,4 +340,40 @@ export function validateHitTransitionProbeRows(textRows, selection,
       !deliberateStop || cursor <= deliberateStop.requested_cursor))
     throw Error('Hit transition probe omitted reached selected cursors');
   return {rows: textRows, missing_cursors: missing, complete: missing.length === 0};
+}
+
+
+/** Diagnostic coordinates only; the native manifest independently owns actions. */
+export function deriveLaterBRngOwnerWindow(spec, derived) {
+  if (spec === undefined || spec === null) return null;
+  if (typeof spec !== 'string' || !/^[1-9][0-9]*:[1-9][0-9]*$/.test(spec))
+    throw Error('Gate2 RNG owner window requires positive FIRST:LAST offsets after actual GO');
+  const [firstOffset,lastOffset] = spec.split(':').map(Number);
+  if (!Number.isSafeInteger(firstOffset) || !Number.isSafeInteger(lastOffset) ||
+      lastOffset < firstOffset || lastOffset-firstOffset >= 9)
+    throw Error('Gate2 RNG owner window must select1–9 consecutive post-GO ticks');
+  const p=derived?.reference,go=derived?.goTick;
+  if (!Number.isSafeInteger(go) || p?.go?.coordinate?.source_tick!==go ||
+      p.setup_global_cursor!==943 || !Array.isArray(p.actions) || p.actions.length!==360)
+    throw Error('Gate2 RNG owner window requires the validated actual GO/action projection');
+  const first=go+firstOffset,last=go+lastOffset;
+  if (last>=180) throw Error('Gate2 RNG owner window crosses the unchanged stop-before-pause');
+  const coordinates=[];
+  for(let tick=first;tick<=last;++tick){
+    const a=p.actions[tick*2],d=p.actions[tick*2+1];
+    if(a?.kind!=='tick'||a.action_index!==tick*2||a.source_tick!==tick||
+       d?.kind!=='draw'||d.action_index!==tick*2+1||d.source_tick!==tick+1||
+       ![a.consume?.sequence,a.tick?.sequence,d.draw_enter?.sequence,d.draw_return?.sequence]
+         .every(Number.isSafeInteger)||
+       !(a.consume.sequence<a.tick.sequence&&a.tick.sequence<d.draw_enter.sequence&&
+         d.draw_enter.sequence<d.draw_return.sequence))
+      throw Error('Gate2 RNG owner window lost an actual ordered tick/draw pair');
+    coordinates.push({source_tick:tick,recipe_cursor:p.setup_global_cursor+tick,
+      tick_action_index:a.action_index,draw_action_index:d.action_index,
+      consume_sequence:a.consume.sequence,tick_return_sequence:a.tick.sequence,
+      draw_enter_sequence:d.draw_enter.sequence,draw_return_sequence:d.draw_return.sequence});
+  }
+  const selection=parseRngDrawProbe({cursors:coordinates.map(row=>row.recipe_cursor).join(',')});
+  return {configuration:{schema:'melee-web-later-b-rng-owner-window-v1',prefix_cursor:p.setup_global_cursor,
+    go_tick:go,first_tick:first,last_tick:last},selection,coordinates};
 }

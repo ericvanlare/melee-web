@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import {armStadiumRegistrationInPage, collectStadiumRegistrationInPage, validateStadiumRegistrationSnapshot} from './stadium_registration_browser.mjs';
+import {derivePairedFull,PairedFullComparator,installPairedFullLaunch} from './stadium_paired_v11_full.mjs';
+import {OBSERVED_B_REFERENCE, LONG_B_REFERENCE, OBSERVED_B_SCHEMA} from './stadium_later_reference_contexts.mjs';
 /*
  * Headless whole-session MWRC diagnostic.
  *
@@ -7,8 +10,20 @@
  * supplied. Native source phase/cursor snapshots are retained at bounded
  * changes, and every failure writes the report before the browser closes.
  */
+import {installCurrentSssExitReplayArm, continuePreparedStartInPage,
+  validateCurrentSssExitExpected, compareCurrentSssExitObservation,
+  validateCurrentSssExitTrace, validateCurrentSssExitTerminal, validateCurrentSssExitFinalization} from './stadium_current_sss_exit_observation.mjs';
+import {validateStock4SssExitExpected, compareStock4SssExitObservation, validateStock4SssExitTrace,
+  compareStock4PreparedStartObservation, compareStock4PreparedSetupObservation,
+  validateStock4PreparedStartFinalization, validateStock4PreparedSetupFinalization,
+  validateStock4SssExitTerminal, validateStock4SssExitFinalization} from './stadium_stock4_sss_exit_observation.mjs';
+import {validateLaterSssExitExpected, validateLaterReferenceRecipeInputs, compareLaterSssExitObservation, validateLaterSssExitTrace,
+  validateLaterSssExitTerminal, validateLaterSssExitFinalization, compareLaterPreparedStartObservation, compareLaterPreparedSetupObservation} from './stadium_later_sss_exit_observation.mjs';
+import {StadiumSetupCfActionDriver, deriveLaterBGate2Expectations, deriveLaterBLongExpectations, typedOriginalValues, compareLaterBGate2Go} from '../tests/stadium_matched_setup_cf_consumer.mjs';
+import {createLaterBGate2NativeAdapter, runLaterBGate2ActionContinuation} from '../tests/stadium_matched_setup_cf_runner_gate.mjs';
+import {deriveLongBActionRngWindow, bindLongBActionRngRows, activateLongBActionRngSelection} from './stadium_later_b_long_rng.mjs';
 import fs from 'node:fs/promises';
-import {closeSync, createReadStream, fsyncSync, openSync, writeSync} from 'node:fs';
+import {closeSync, createReadStream, readFileSync, fsyncSync, openSync, writeSync} from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
@@ -19,7 +34,7 @@ import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {finalizeSessionCapture, sessionReplayReportCompleted, readRequestedEntityPrefix, validateRuntimeDataAbort, boundedCaptureOperation,
   retainFirstCaptureError, FIRST_REPLAY_BOUNDARY_MARKER_NAMES, parseFirstReplayBoundaryMarker,
   FIRST_REPLAY_BOUNDARY_MARKER_PREFIX, inspectFirstReplayBoundaryMarkers} from './whole_session_capture_result.mjs';
-import {parseRngDrawProbe, validateRngDrawProbeRows, parseHitTransitionProbe, validateHitTransitionProbeRows} from './rng_draw_probe.mjs';
+import {parseRngDrawProbe, validateRngDrawProbeRows, parseHitTransitionProbe, validateHitTransitionProbeRows, deriveLaterBRngOwnerWindow} from './rng_draw_probe.mjs';
 import {NATURAL_PAUSE_PROTOCOL, STOPPED_SCENE_PAIR_PROTOCOL, resolveCaptureMode,
   validateNaturalPauseManifest, validateStoppedScenePairManifest, naturalPauseRuntimeUrl,
   validateNaturalPauseBrowserIdentity, validateDefaultTwoRingStatus, firstNaturalPauseStop,
@@ -58,7 +73,25 @@ const {values, tokens} = parseArgs({tokens: true, options: {
   'hit-transition-probe-cursors': {type: 'string'},
   'first-replay-callback-probe': {type: 'boolean', default: false},
   'runtime-incidents': {type: 'boolean', default: false},
+  'stadium-paired-v11-full-pair-registration': {type: 'boolean'},
+  'stadium-paired-v11-full-pair-projection': {type: 'string'},
+  'stadium-paired-v11-full-pair-projection-sha256': {type: 'string'},
+  'stadium-paired-v11-full-pair-endpoints': {type: 'string'},
+  'stadium-paired-v11-full-pair-endpoints-sha256': {type: 'string'},
+  'stadium-paired-v11-first-go-projection': {type: 'string'},
+  'stadium-paired-v11-first-go-projection-sha256': {type: 'string'},
   'expected-frame0': {type: 'string'},
+  'stadium-current-sss-exit-expected': {type: 'string'},
+  'stadium-current-sss-exit-expected-sha256': {type: 'string'},
+  'stadium-current-sss-prepared-start': {type: 'boolean', default: false},
+  'stadium-later-sss-prepared-start': {type: 'boolean', default: false},
+  'stadium-later-sss-prepared-setup': {type: 'boolean', default: false},
+  'stadium-later-sss-reference': {type: 'string'},
+  'stadium-later-b-gate2-projection': {type: 'string'},
+  'stadium-later-b-gate2-binding': {type: 'string'},
+  'stadium-later-b-gate2-binding-python': {type: 'string'},
+  'stadium-later-b-rng-owner-window': {type: 'string'},
+  'stadium-later-sss-exit': {type: 'boolean', default: false},
   'artifact-root': {type: 'string'},
 }});
 
@@ -136,9 +169,39 @@ const captureCpuObservations = diagnostic ? false : values['cpu-observations'];
 const firstReplayCallbackProbe = values['first-replay-callback-probe'];
 const expectedFrame0Path = values['expected-frame0'] ? path.resolve(values['expected-frame0']) : null;
 const probeTimeoutMs = 10000;
-const rngDrawProbe = parseRngDrawProbe({range: values['rng-draw-probe-range'],
+let rngDrawProbe = parseRngDrawProbe({range: values['rng-draw-probe-range'],
   cursors: values['rng-draw-probe-cursors']});
 const hitTransitionProbe = parseHitTransitionProbe(values['hit-transition-probe-cursors']);
+const pairedFullPath=values['stadium-paired-v11-full-pair-projection'];
+const pairedFull=pairedFullPath!==undefined;
+const pairedRegistration=values['stadium-paired-v11-full-pair-registration'] === true;
+const pairedFullEndpoints=values['stadium-paired-v11-full-pair-endpoints'];
+const pairedFullSha=values['stadium-paired-v11-full-pair-projection-sha256'];
+const pairedFullEndpointsSha=values['stadium-paired-v11-full-pair-endpoints-sha256'];
+const fullOptions=Object.entries(values).filter(([k,v])=>k.startsWith('stadium-paired-v11-full-pair-')&&v!==undefined);
+if(fullOptions.length){
+ const conflict=Object.entries(values).some(([k,v])=>v&&((k.startsWith('stadium-')&&!k.startsWith('stadium-paired-v11-full-pair-'))||['manifest','diagnostic-manifest','stopped-scene-pair','stop-after-source-frames','resume-timing-pauses','cpu-observations','rng-draw-probe-range','rng-draw-probe-cursors','hit-transition-probe-cursors','first-replay-callback-probe','expected-frame0'].includes(k)));
+ if(!pairedFull||!pairedFullEndpoints||![pairedFullSha,pairedFullEndpointsSha].every(x=>/^[0-9a-f]{64}$/.test(x||''))||conflict||diagnostic||captureMode.mode!=='state'||!runtimeIncidentRecording||!values['artifact-root']||!values['runtime-data']||phaseTimeoutMs>150000||replayTimeoutMs>150000)
+  throw Error('Paired full requires exact projection/endpoints, state/incidents/artifacts/data, <=150s bounds and no other diagnostic route');
+}
+let pairedFullExpected=null,pairedFullComparison=null;
+let pairedFullOriginalPreflight=null;
+const pairedFirstGoPath=values['stadium-paired-v11-first-go-projection'];
+const pairedFirstGoSha=values['stadium-paired-v11-first-go-projection-sha256'];
+const pairedFirstGo=pairedFirstGoPath!==undefined;
+if(pairedFirstGo || pairedFirstGoSha!==undefined){
+ const incompatible=Object.entries(values).filter(([key,value])=>value &&
+   ((key.startsWith('stadium-')&&!key.startsWith('stadium-paired-v11-first-go-projection')) ||
+    ['manifest','diagnostic-manifest','stopped-scene-pair','stop-after-source-frames','resume-timing-pauses',
+     'cpu-observations','rng-draw-probe-range','rng-draw-probe-cursors','hit-transition-probe-cursors',
+     'first-replay-callback-probe','expected-frame0'].includes(key)));
+ if(!pairedFirstGo || !/^[0-9a-f]{64}$/.test(pairedFirstGoSha||'') || diagnostic ||
+    captureMode.mode!=='state' || !runtimeIncidentRecording || incompatible.length ||
+    !values['artifact-root'] || !values['runtime-data'] || phaseTimeoutMs>150000 || replayTimeoutMs>150000)
+  throw Error('Paired v11 first-GO requires state/runtime-incidents, artifacts/data, at most 150s bounds, explicit projection hash, and no legacy/prefix/resume/probe route');
+}
+let pairedFirstGoExpected=null;
+
 if (hitTransitionProbe && (captureCpuObservations || stopAfter !== 5241 ||
     rngDrawProbe?.selected.join(',') !== hitTransitionProbe.selected.join(',')))
   throw Error('Hit transition diagnosis requires its matching RNG selection, stop cursor 5241, and no historical CPU observer');
@@ -147,12 +210,56 @@ if (diagnostic && (values['cpu-observations'] || rngDrawProbe || hitTransitionPr
 if (firstReplayCallbackProbe && (diagnostic || !expectedFrame0Path || stopAfter || resumeTimingPauses ||
     captureCpuObservations || rngDrawProbe || hitTransitionProbe))
   throw Error('--first-replay-callback-probe requires --expected-frame0 and cannot be combined with prefix, resume, CPU, or RNG probes');
-if (!firstReplayCallbackProbe && (expectedFrame0Path || values['artifact-root']))
+const currentSssExitPath = values['stadium-current-sss-exit-expected']
+  ? path.resolve(values['stadium-current-sss-exit-expected']) : null;
+const currentSssExit = currentSssExitPath !== null;
+const currentSssPreparedStart = values['stadium-current-sss-prepared-start'];
+const currentSssLater = values['stadium-later-sss-exit'];
+const laterSssPreparedStart = values['stadium-later-sss-prepared-start'];
+const laterSssPreparedSetup = values['stadium-later-sss-prepared-setup'];
+const laterSssReference = values['stadium-later-sss-reference'] ?? null;
+const laterBGate2ProjectionPath = values['stadium-later-b-gate2-projection'] ? path.resolve(values['stadium-later-b-gate2-projection']) : null;
+const laterBGate2 = laterBGate2ProjectionPath !== null;
+const laterBLong = laterSssReference === LONG_B_REFERENCE.id;
+const laterBActionReceipts = new Map();
+let longBRngRetained = false;
+const laterBGate2BindingPath = values['stadium-later-b-gate2-binding'] ? path.resolve(values['stadium-later-b-gate2-binding']) : null;
+const laterBGate2BindingPython = values['stadium-later-b-gate2-binding-python'] ?? null;
+if ((laterBGate2BindingPath !== null) !== (laterBGate2BindingPython !== null) ||
+    (laterBGate2BindingPath !== null && (!laterBGate2 || !path.isAbsolute(laterBGate2BindingPython))))
+  throw Error('Gate2 source binding requires its explicit projection and absolute Python executable');
+
+const laterBRngOwnerWindowSpec = values['stadium-later-b-rng-owner-window'];
+let laterBRngOwnerWindow = null;
+if (laterBRngOwnerWindowSpec !== undefined && (!laterBGate2 || rngDrawProbe || hitTransitionProbe ||
+    captureCpuObservations || stopAfter || resumeTimingPauses || diagnostic))
+  throw Error('Gate2 RNG owners require the exact Gate2 route and no other diagnostic selectors');
+if (laterBGate2 && (![OBSERVED_B_REFERENCE.id,LONG_B_REFERENCE.id].includes(laterSssReference) || !laterSssPreparedSetup))
+  throw Error('Gate2 requires the exact new-reference checked profile3 Setup route');
+if (laterSssReference !== null && (![OBSERVED_B_REFERENCE.id,LONG_B_REFERENCE.id].includes(laterSssReference) ||
+    !currentSssLater || !laterSssPreparedStart || !laterSssPreparedSetup || currentSssPreparedStart))
+  throw Error('New later reference requires its exact explicit descriptor and checked later Setup route');
+if (laterSssPreparedSetup && (!currentSssLater || !laterSssPreparedStart || currentSssPreparedStart))
+  throw Error('--stadium-later-sss-prepared-setup requires explicit later prepared Start and forbids the profile1 route');
+const preparedSetupRequested = currentSssPreparedStart || laterSssPreparedSetup;
+if (laterSssPreparedStart && (!currentSssLater || currentSssPreparedStart))
+  throw Error('--stadium-later-sss-prepared-start requires later SSS and forbids Setup continuation');
+if (currentSssLater && (!currentSssExit || currentSssPreparedStart))
+  throw Error('--stadium-later-sss-exit requires its expected packet and forbids prepared Start');
+if (currentSssPreparedStart && !currentSssExit)
+  throw Error('--stadium-current-sss-prepared-start requires the stock4 SSS expected packet');
+if (currentSssExit !== !!values['stadium-current-sss-exit-expected-sha256'] ||
+    (currentSssExit && (diagnostic || firstReplayCallbackProbe || captureCpuObservations ||
+      rngDrawProbe || hitTransitionProbe || stopAfter || resumeTimingPauses || runtimeIncidentRecording ||
+      values.mode !== 'state' || !values['artifact-root'] || !values['runtime-data'] ||
+      phaseTimeoutMs > 150000 || replayTimeoutMs > 150000)))
+  throw Error('Current SSS observation requires explicit state/expectation/hash/artifacts/data and unchanged150s bounds only');
+if (!firstReplayCallbackProbe && !currentSssExit && (expectedFrame0Path || (!pairedFirstGo && !pairedFull && values['artifact-root'])))
   throw Error('--expected-frame0 and --artifact-root require --first-replay-callback-probe');
 const runtimeDataUrl = new URL('gameplay_menu_browser.data', url).href;
 const output = path.resolve(values.out);
 const observationTimeoutMs = diagnostic ? diagnosticProtocol.observation_timeout_ms : Math.min(phaseTimeoutMs, 5000);
-const inputPaths = [values.disc, values.recipe, values.manifest, values['runtime-data'], expectedFrame0Path]
+const inputPaths = [values.disc, values.recipe, values.manifest, values['runtime-data'], expectedFrame0Path, currentSssExitPath, laterBGate2ProjectionPath, laterBGate2BindingPath, pairedFirstGoPath, pairedFullPath, pairedFullEndpoints]
   .filter(Boolean).map(value => path.resolve(value));
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const artifactRoot = path.resolve(values['artifact-root'] || path.join(repoRoot, 'build/browser-release'));
@@ -165,7 +272,7 @@ if (firstReplayCallbackProbe) {
 }
 const report = {
   schema: 'melee-web-headless-whole-session-replay-v1',
-  scope: firstReplayCallbackProbe ? 'Single headless first-replay-callback boundary observation; not a complete replay or GPU-cause finding' :
+  scope: currentSssExit ? 'Retained first SSS OnExit common-field component; expected TIME replay refusal, UNKNOWN menu draw parity, no Entry/C3' : firstReplayCallbackProbe ? 'Single headless first-replay-callback boundary observation; not a complete replay or GPU-cause finding' :
     stoppedScenePair ? 'One bounded paired stopped-scene screenshot timing check; image presence does not establish visible gameplay' :
     diagnostic ? 'One bounded headless natural-pause performance diagnosis; no admission, pixel, PCM, foreground, or physical-input claim' :
     'Single headless browser MWRC v8/v9/v10 diagnostic; no pixel, PCM, performance, or admission claim',
@@ -203,6 +310,14 @@ const report = {
   browser_errors: [],
   unexpected_requests: [],
 };
+let currentSssExpected, currentSssRecipeBytes, currentSssArm;
+let laterBGate2ProjectionBytes, laterBGate2Reference, laterBGate2BindingBytes = null;
+let laterBGate2Reserved = false, laterBGate2Finalized = false;
+let currentSssStock4 = false;
+let currentSssStopsBeforeAssets = false;
+let currentSssPolicy = {compare: compareCurrentSssExitObservation, terminal: validateCurrentSssExitTerminal,
+  trace: validateCurrentSssExitTrace, finalization: validateCurrentSssExitFinalization};
+let currentSssTrace = null;
 let browser;
 let page;
 let driver;
@@ -217,7 +332,10 @@ async function closeOwnedCaptureBrowser() {
       report.cleanup ||= {};
       report.cleanup.browser_context_closed = true;
     }
-    else if (browser) await boundedCaptureOperation(browser.close(), observationTimeoutMs, 'owned browser close');
+    else if (browser) {
+      await boundedCaptureOperation(browser.close(), observationTimeoutMs, 'owned browser close');
+      if (currentSssExit || pairedFirstGo || pairedFull) { report.cleanup ||= {}; report.cleanup.browser_close_returned = true; }
+    }
   } catch (error) { report.close_error = String(error); }
   try {
     if (diagnosticCdp)
@@ -331,6 +449,188 @@ function persistBoundaryConsoleEvent(params) {
   }
 }
 
+// Gate2 uses this same artifact writer only after a correlated acknowledged close.
+async function retainReplayArtifacts() {
+  const artifacts = await observePageOperation('final replay artifacts', () => page.locator('#retail-replay-downloads a').evaluateAll(async links => {
+    const retained = [];
+    for (const link of links) {
+      if (!['retail-port.jsonl', 'retail-timer.jsonl', 'retail-browser-report.json'].includes(link.download) || !link.href.startsWith('blob:')) continue;
+      const response = await fetch(link.href);
+      if (!response.ok) throw Error(`Artifact ${link.download} returned HTTP ${response.status}`);
+      retained.push({name: link.download, text: await response.text()});
+    }
+    return retained;
+  }));
+  report.saved_downloads = [];
+  for (const artifact of artifacts) {
+    if (report.saved_downloads.some(row => row.name === artifact.name)) throw Error(`Duplicate exported artifact: ${artifact.name}`);
+    await write(artifact.name, artifact.text);
+    if (currentSssExit && artifact.name === 'retail-port.jsonl') currentSssTrace = artifact.text;
+    report.saved_downloads.push({name: artifact.name, bytes: Buffer.byteLength(artifact.text), sha256: createHash('sha256').update(artifact.text).digest('hex')});
+  }
+}
+
+async function retainRngDrawProbe() {
+    if (pairedFull) return; // Full mode drains and retains its raw rows incrementally.
+    if (rngDrawProbe) {
+      try {
+        const rows = await observePageOperation('final RNG draw rows', () => page.evaluate(() => window.__rngDrawProbeRows || []));
+        if(laterBRngOwnerWindow){
+          const rawText=rows.length?rows.join('\n')+'\n':'';
+          await write('rng-draw-probe.jsonl',rawText);
+          report.rng_draw_probe.raw_artifact={name:'rng-draw-probe.jsonl',bytes:Buffer.byteLength(rawText),
+            sha256:createHash('sha256').update(rawText).digest('hex')};
+          if(rows.some(text=>JSON.parse(text).version!==(laterBLong?3:2)))throw Error('Gate2 RNG owner rows require the actual version2 owner producer');
+        }
+        if(laterBLong) {
+          const result=bindLongBActionRngRows(rows,laterBRngOwnerWindow,laterBActionReceipts,
+            {complete:report.later_b_gate2?.component_pass===true});
+          const text=result.rows.map(row=>JSON.stringify(row)).join('\n')+(result.rows.length?'\n':'');
+          await write('long-b-action-rng.jsonl',text);
+          report.rng_draw_probe={...report.rng_draw_probe,complete:result.complete,
+            captured_action_count:result.rows.length,missing_action_count:result.missing_cursors.length,
+            action_artifact:{name:'long-b-action-rng.jsonl',bytes:Buffer.byteLength(text),sha256:createHash('sha256').update(text).digest('hex')}};
+          longBRngRetained=true;return;
+        }
+        const validation = validateRngDrawProbeRows(rows, rngDrawProbe, {
+          observedCursor: report.final_snapshot?.source_cursor,
+          deliberateStop: report.deliberate_prefix_stop,
+        });
+        const text = validation.rows.length ? validation.rows.join('\n') + '\n' : '';
+        await write('rng-draw-probe.jsonl', text);
+        const artifact = {name: 'rng-draw-probe.jsonl', bytes: Buffer.byteLength(text),
+          sha256: createHash('sha256').update(text).digest('hex')};
+        report.saved_downloads ||= [];
+        report.saved_downloads.push(artifact);
+        report.rng_draw_probe = {...report.rng_draw_probe, complete: validation.complete,
+          captured_cursors: validation.rows.length ? validation.rows.map(row => JSON.parse(row).source_cursor) : [],
+          missing_cursors: validation.missing_cursors, artifact};
+      } catch (error) {
+        report.rng_draw_probe_error = String(error?.message || error);
+      }
+    }
+}
+
+async function runLaterBGate2FromSetup(deadline, actualObservation) {
+  const setup = actualObservation.prepared_to_setup?.setup;
+  const request = {reference_id: laterSssReference,
+    recipe_sha256: laterBGate2Reference.reference.recipe_sha256, cursor: laterBLong?951:943,
+    notification_order: actualObservation.notification_coordinates?.order,
+    world_generation: setup?.stadium_setup_state?.world_generation,
+    setup_seed_hex: setup?.actual?.random_seed_hex};
+  // A lost reservation response must never reopen ordinary snapshots/cleanup.
+  laterBGate2Reserved = true;
+  report.later_b_gate2 = {request, component_pass: false, native_cleanup: 'pending'};
+  const token = await observePageOperation('Gate2 reserve same retailRun', () =>
+    currentSssArm.evaluate((scope, operands) => scope.reserveLaterBTransfer(operands.actual, operands.request),
+      {actual: actualObservation, request}));
+  report.later_b_gate2.token_id = token.id;
+  if(laterBLong)report.later_b_gate2.rng_activation=await observePageOperation('Gate2 activate action RNG after reservation',()=>
+    page.evaluate(activateLongBActionRngSelection,{configuration:laterBRngOwnerWindow.configuration,selected:laterBRngOwnerWindow.selection.selected}));
+  const adapter = createLaterBGate2NativeAdapter({owner: currentSssArm, deadline,
+    evaluate: (fn, command) => observePageOperation(`Gate2 ${command.kind}`, () => page.evaluate(fn, command))});
+  const actionDriver = new StadiumSetupCfActionDriver({laterBProjection: laterBGate2ProjectionBytes,
+    laterBProjectionBinding: laterBGate2BindingBytes, laterBLong,
+    laterBToken: token.id, native: adapter, admittedWorldGeneration: request.world_generation});
+  await fs.writeFile(path.join(output, 'gate2-native-manifest.bin'), actionDriver.nativeManifest, {flag: 'wx'});
+  const evidencePath = path.join(output, 'gate2-actions.jsonl');
+  await fs.writeFile(evidencePath, '', {flag: 'wx'});
+  try {
+    const result = await runLaterBGate2ActionContinuation({driver: actionDriver, adapter,
+      actualSetup: setup, deadline,
+      persist: async row => {
+        await fs.appendFile(evidencePath, JSON.stringify(row) + '\n');
+        if(laterBLong && row.phase==='actual-action-receipt')laterBActionReceipts.set(row.action_index,row.observation);
+      },
+      record: row => observePageOperation('Gate2 retain accepted action', () =>
+        currentSssArm.evaluate((scope, value) => scope.gate2Record(value), row)),
+      finalize: async () => {
+        const final = await observePageOperation('Gate2 JS-only finalization', () => currentSssArm.evaluate(scope => scope.gate2Finalize()));
+        if (final?.finalized !== true) throw Error('Gate2 JS-only finalization did not acknowledge native close');
+        laterBGate2Finalized = true;
+        report.browser_report = final.replay_report;
+        return final;
+      }});
+    report.later_b_gate2 = {...report.later_b_gate2, ...result, transport: adapter.state(),
+      constructor_comparison: actionDriver.constructorComparison, go_comparison: actionDriver.goComparison};
+    if (!result.component_pass) throw Error('Gate2 arm was refused and checked-aborted; component comparison not run');
+  } catch (error) {
+    report.later_b_gate2.failure = String(error?.message || error);
+    report.later_b_gate2.driver = actionDriver.status();
+    report.later_b_gate2.transport = adapter.state();
+    // Partial/pending/unACKed/uncertain paths never attempt retire, abort, ordinary
+    // unload, status, memory, cache or snapshots from this catch or outer finally.
+    throw error;
+  }
+}
+
+async function finalizeLaterBGate2Capture() {
+  try {
+    if (!laterBGate2Finalized || pageObservationTimedOut) {
+      report.later_b_gate2 ||= {};
+      report.later_b_gate2.native_cleanup = 'UNRUN_OWNED_OS_CLEANUP_ONLY';
+      report.result = 'fail';
+      return;
+    }
+    await retainReplayArtifacts();
+    report.current_sss_exit.wrapper_final = await observePageOperation('Gate2 pure callback ownership', () => currentSssArm.evaluate(scope => scope.state()));
+    report.current_sss_exit.wrapper_restored = await observePageOperation('Gate2 restore JS replay callback', () => currentSssArm.evaluate(scope => scope.dispose()));
+    await currentSssArm.dispose();
+    const terminal = report.browser_report?.later_b_transfer?.native_terminal;
+    const receipt = terminal?.receipt;
+    if (terminal?.kind === 'known-unarmed-abort' && receipt?.native_closed === true &&
+        receipt.attempt_consumed === true && receipt.armed === false && receipt.source_ticks === 0 &&
+        receipt.source_draws === 0 && receipt.action_cursor === 0 && receipt.phase_after_close === 0 &&
+        receipt.running_after_close === 0 && receipt.error === null &&
+        receipt.later_b_transfer?.token === report.later_b_gate2.token_id &&
+        receipt.later_b_transfer.parent_close_checked === true) {
+      report.later_b_gate2.native_cleanup = 'ACKNOWLEDGED_KNOWN_UNARMED_ABORT_JS_ONLY_FINALIZATION';
+      throw Error('Gate2 arm refused; checked unarmed abort is cleanup evidence only');
+    }
+    const closedState = receipt?.matched_setup_cf;
+    if (terminal?.kind !== 'retired' || receipt?.native_retired !== true || receipt.terminal !== true ||
+        closedState?.schema !== (laterBLong?'melee-web-stadium-later-b-long-native-v1':'melee-web-stadium-later-b-gate2-native-v1') ||
+        closedState.action_count !== (laterBLong?7168:360) || closedState.cursor !== (laterBLong?7168:360) || closedState.complete !== true ||
+        closedState.source_ticks !== (laterBLong?3585:180) || closedState.source_draws !== (laterBLong?3583:180) ||
+        closedState.actual_go?.observed !== true || closedState.actual_go.tick !== laterBGate2Reference.goTick ||
+        closedState.post_go_typed22_state_count !== (laterBLong?3501:96) ||
+        report.current_sss_exit.comparison?.pass !== true ||
+        report.current_sss_exit.prepared_start_comparison?.pass !== true ||
+        report.current_sss_exit.prepared_setup_comparison?.pass !== true ||
+        receipt.phase_after_close !== 0 || receipt.running_after_close !== 0 || receipt.error !== null ||
+        receipt.later_b_transfer?.token !== report.later_b_gate2.token_id ||
+        receipt.later_b_transfer.parent_close_checked !== true || report.browser_report.complete !== false ||
+        report.browser_report.later_b_transfer.action_evidence?.length !== (laterBLong?7168:360) ||
+        report.later_b_gate2.accepted_actions !== (laterBLong?7168:360) || !report.later_b_gate2.component_pass ||
+        report.current_sss_exit.wrapper_restored !== true || !currentSssTrace)
+      throw Error('Gate2 completed action/retirement evidence is incomplete');
+    report.current_sss_exit.trace_comparison = currentSssPolicy.trace(currentSssTrace, currentSssExpected,
+      report.current_sss_exit.observation);
+    await retainRngDrawProbe();
+    if (rngDrawProbe && report.rng_draw_probe?.complete !== true)
+      throw Error('Requested Gate2 RNG owner capture is incomplete: ' + (report.rng_draw_probe_error || 'missing selected cursor rows'));
+    report.artifact_inventory_post = await browserArtifactInventory();
+    if (!report.artifact_inventory_post.equal || JSON.stringify(report.artifact_inventory_post) !== JSON.stringify(report.artifact_inventory_pre))
+      throw Error('Gate2 served/local runtime artifacts changed');
+    if (pageErrors.length || report.unexpected_requests.length || report.failure || report.download_error)
+      throw Error('Gate2 page/host diagnostics failed');
+    report.later_b_gate2.native_cleanup = 'ACKNOWLEDGED_ONE_SHOT_NATIVE_RETIREMENT_JS_ONLY_FINALIZATION';
+    finalizeSessionCapture(report); // Retain ordinary whole-replay incomplete failures.
+    report.original_replay_capture_result = report.result;
+    report.result = 'later_b_gate2_component_pass_replay_incomplete';
+  } catch (error) {
+    firstError('later_b_gate2_finalization', error.message || error);
+    report.result = 'fail';
+  } finally {
+    if(laterBLong && !longBRngRetained && !pageObservationTimedOut)await retainRngDrawProbe(); // Pure JS retained callbacks, no native access.
+    await closeOwnedCaptureBrowser(); // Existing recorded OS owner only, never native teardown.
+    if (report.cleanup?.browser_close_returned !== true || report.close_error || report.cdp_close_error || pageErrors.length) report.result = 'fail';
+    report.browser_errors = pageErrors.slice(0, 256);
+    await write('report.json', report);
+    if (report.failure) await write('failure.txt', report.failure + '\n');
+  }
+}
+
 async function browserArtifactInventory() {
   return readSharedArtifactInventory({artifactRoot, url});
 }
@@ -393,13 +693,250 @@ async function captureStoppedSceneImage(name, expectedCursor, initialStatus = nu
     cursor_unchanged_during_capture: true}};
 }
 
+
+// First-GO is a read-only stopped-prefix comparison using the existing replay
+// owner. Projection hashes bind host evidence; native v11 independently admits
+// the recipe and source owner. No host values feed source state.
+function derivePairedFirstGo(projection,recipeSha,frames){
+ const need=(ok,why)=>{if(!ok)throw Error('Paired first-GO projection: '+why);};
+ need(projection.schema==='melee-web-stadium-paired-window-projection-v1' &&
+  projection.recipe_sha256===recipeSha && projection.actual_frame_count===frames &&
+  projection.browser_parity===false && projection.C3===false &&
+  projection.matches?.length===2 && projection.matches.every((m,i)=>m.match_index===i),'identity/recipe differs');
+ const m=projection.matches[0],go=m.states?.[0],post=m.states?.[1];
+ need(go?.tick.source_tick===m.go.coordinate.source_tick && post?.tick.source_tick===go.tick.source_tick+1 &&
+  go.selected===true && post.selected===true && post.pads?.length===4 &&
+  post.pads.every(x=>/^[0-9a-f]{22}$/.test(x)),'GO/post-GO source rows differ');
+ const first=m.actions.find(a=>a.kind==='tick'),g=m.actions[go.action_index],a=m.actions[post.action_index];
+ const close=m.actions.slice(post.action_index+1).find(a=>a.kind==='draw');
+ need(first && g?.kind==='tick' && a?.kind==='tick' && close &&
+  g.frame_index===go.frame_index && a.frame_index===post.frame_index &&
+  g.source_tick===go.tick.source_tick && a.source_tick===post.tick.source_tick &&
+  close.after_sequence>=a.through_sequence,'actual action brackets differ');
+ const tail=m.actions.slice(post.action_index+1,close.action_index).filter(a=>a.kind==='tick');
+ need(tail.length<=4 && close.source_tick===post.tick.source_tick+1+tail.length,'natural batch tail differs');
+ return {match:m,go,post,typed:typedOriginalValues(post.state,post.tick.source_tick),
+  setupCursor:first.frame_index,goCursor:go.frame_index,postCursor:post.frame_index,
+  closureActionCursor:tail.length?tail.at(-1).frame_index:post.frame_index,
+  closureCursor:(tail.length?tail.at(-1).frame_index:post.frame_index)+1,
+  drawsBefore:a.draw_ordinal,drawsAfter:close.draw_ordinal+1,tail:tail.length};
+}
+function comparePairedFirstGo(s,e){
+ const need=(ok,why)=>{if(!ok)throw Error('Paired first-GO comparison: '+why);};
+ need(s.schema==='melee-web-stadium-paired-v11-first-go-v1' && s.version===1 &&
+  s.scope==='first_match_setup_actual_go_first_post_go_tick_and_closed_draw_batch' &&
+  s.enabled && s.admitted && s.setup_captured && s.go_armed && s.go_observed &&
+  s.first_post_go_tick_captured && s.stop_requested && s.stopped && !s.failed &&
+  s.error===null && s.native_retired===false && s.whole_session_complete===false && s.match_index===0,'native terminal/owner differs');
+ const setup=s.setup,typed=s.first_post_go_typed22,gen=setup?.world_generation;
+ need(setup?.schema==='melee-web-stadium-paired-v11-setup-v1' && setup.match_index===0 &&
+  setup.input_cursor===e.setupCursor && setup.seed_hex===e.match.setup.rng.value_hex &&
+  Number.isSafeInteger(gen)&&gen>0 && setup.world_ticks===0 && setup.source_frame===0,'zero-tick Setup owner/seed differs');
+ const c=e.match.constructor.state_projection,w={scope:'shared-constructor-aggregate-only',entry_count:c.constructor_entry_count,
+  parameter_roles:{min_parameter:'parameter_x0',max_parameter:'parameter_x4'},min_parameter:c.parameter_x0,
+  max_parameter:c.parameter_x4,random_bound:c.random_bound,random_result:c.random_result,
+  seed_before:c.seed_before_hex,seed_after:c.seed_after_hex,randi_call_count:1};
+ need(JSON.stringify(setup.constructor)===JSON.stringify(w),'constructor seven aggregates/parameter roles differ');
+ const go=compareLaterBGate2Go({reference:e.match,actualEvent:s.go_event,actualTick:s.go_world_tick,admittedWorldGeneration:gen});
+ need(go.decision==='PASS_SHARED_GO_EVENT_FIELDS_AND_SEED','actual GO fields/seed differ');
+ for(const [key,value] of Object.entries(e.typed))need(Object.is(typed?.[key],value),'typed22 '+key+' differs');
+ need(typed?.schema==='melee-web-stadium-per-tick-common-fields-native-v3' && typed.world_generation===gen &&
+  typed.source_tick===e.post.tick.source_tick && typed.world_ticks===e.post.tick.source_tick+1 &&
+  typed.seed_hex===e.post.rng.value_hex,'post-GO typed owner/seed differs');
+ const q=s.first_post_go_pad_queue;
+ need(q?.schema==='melee-web-stadium-hsd-pad-queue-observation' && q.version===2 &&
+  q.source_generation===gen && q.source_tick_before===e.post.tick.source_tick &&
+  q.source_tick_after===e.post.tick.source_tick+1 && q.qnum_before===1 && q.qread_before===0 &&
+  q.qcount_before===1 && q.qcount_after_hsd===0 && q.tick_complete===true &&
+  JSON.stringify(q.queue_slot_status_hex)===JSON.stringify(e.post.pads),'literal four-port source PAD queue differs');
+ const coordinates={setup_input_cursor:e.setupCursor,go_input_cursor:e.goCursor,post_go_input_cursor:e.postCursor,
+  closure_action_input_cursor:e.closureActionCursor,closure_input_cursor:e.closureCursor,
+  post_go_source_tick_before:e.post.tick.source_tick,post_go_source_tick_after:e.post.tick.source_tick+1,
+  natural_batch_tail_ticks:e.tail,draws_before:e.drawsBefore,draws_after:e.drawsAfter};
+ for(const [key,value] of Object.entries(coordinates))need(s[key]===value,key+' differs');
+ return {pass:true,setup_seed:setup.seed_hex,constructor_aggregates:7,go,typed_values_compared:Object.keys(e.typed),
+  post_go_seed:typed.seed_hex,coordinates,whole_session_complete:false,
+  unpaired:['original five constructor phase order','source callback dispatch identity','per-owner RNG','whole lifecycle','C3']};
+}
+async function readPairedFirstGoStatus(){
+ return observePageOperation('paired first-GO native idle observation',()=>page.evaluate(()=>{
+  const m=globalThis.Module;
+  const text=id=>globalThis.document?.querySelector(id)?.textContent || '';
+  const replayText=text('#retail-replay-report');
+  let replayReport=null;
+  try{if(replayText.trim().startsWith('{'))replayReport=JSON.parse(replayText);}catch{}
+  const runtimeError=globalThis.document?.querySelector('#status')?.dataset?.runtimeError || null;
+  // The runtime writes this schema only when replay finalization has completed.
+  const terminalReport=replayReport?.schema==='melee-web-browser-retail-replay' &&
+    replayReport.pass===false && Array.isArray(replayReport.failures) && replayReport.failures.length>0;
+  // Preparation may fail before retailRun exists; its catch writes plain error
+  // text, and finally re-enables Start. Preparing text/initial phase 0 are not errors.
+  const terminalPreparationError=!replayReport && replayText.trim()!=='' &&
+    replayText.trim()!=='Preparing reference replay…' &&
+    globalThis.document?.querySelector('#retail-replay-start')?.disabled===false;
+  const runtime={message:text('#status'),runtime_error:runtimeError,replay_report:replayReport,
+    replay_report_text:replayText,terminal_error:runtimeError ||
+      (terminalReport?replayReport.failures.join('; '):terminalPreparationError?replayText:null)};
+  if(typeof m?.stadiumMatchedSetupNativeIdle!=='function')throw Error('Native idle ownership service unavailable');
+  if(m.stadiumMatchedSetupNativeIdle()!==true)return {busy:true,runtime};
+  const getter=m._melee_web_native_menu_stadium_paired_v11_status;
+  if(typeof getter!=='function')throw Error('Paired v11 status export unavailable');
+  const pointer=getter();if(!pointer)throw Error('Paired v11 status pointer absent');
+  return {busy:false,runtime,status:JSON.parse(m.UTF8ToString(pointer)),phase:m._melee_web_native_menu_phase(),running:m._melee_web_native_menu_running()};
+ }));
+}
+function runPairedFullRngComparison(browserInputs){
+ const python=process.env.MELEE_PAIRED_FULL_PYTHON||'python3';
+ const outFile=path.join(output,browserInputs?'paired-full-rng-comparison.json':'paired-full-rng-original-preflight.json');
+ const args=[path.join(repoRoot,'tools/compare_stadium_paired_v11_rng.py'),'--projection',path.resolve(pairedFullPath),'--projection-sha256',pairedFullSha,'--out',outFile];
+ if(browserInputs)args.push('--browser-rows',path.join(output,'paired-v11-full-rows.jsonl'),'--browser-rng',path.join(output,'paired-v11-full-rng.jsonl'));
+ execFileSync(python,args,{stdio:['ignore','pipe','pipe'],timeout:30000,maxBuffer:1024*1024});
+ const result=JSON.parse(readFileSync(outFile,'utf8'));
+ if(result.status!==(browserInputs?'PASS_SELECTED_RNG_COMPARISON':'PASS_ORIGINAL_PREFLIGHT_ONLY'))throw Error('Paired full strict RNG comparison did not pass');
+ return result;
+}
+// Install only after the development page has assigned its real observer.
+function installPairedFullObserver({maximumRows}){
+ const probe=window.__meleeWebStadiumTextTailProbe;
+ if(!probe||typeof probe.observe!=='function'||window.__pairedFullObserver||
+    !Number.isSafeInteger(maximumRows)||maximumRows<1||maximumRows>1000000)
+  throw Error('Paired full runtime text observer unavailable, already owned, or unbounded');
+ const original=probe.observe;
+ const state={probe,original,maximumRows,total:0};
+ window.__pairedFullRows=[];
+ state.observe=function(text){
+  const result=Reflect.apply(original,this,[text]);
+  if(typeof text==='string'&&text.startsWith('{"record":"stadium_paired_v11"')){
+   if(state.total>=maximumRows)throw Error('Paired source stream exceeds recipe bound');
+   ++state.total;window.__pairedFullRows.push(text);
+  }
+  return result;
+ };
+ probe.observe=state.observe;window.__pairedFullObserver=state;
+ return {installed:true,maximumRows};
+}
+async function drainPairedFull(){
+ const batch=await observePageOperation('paired full new diagnostic rows',()=>page.evaluate(()=>{
+  const state=window.__pairedFullObserver;
+  if(!state||window.__meleeWebStadiumTextTailProbe!==state.probe||state.probe.observe!==state.observe)
+   throw Error('Paired full runtime text observer ownership changed');
+  return {rows:window.__pairedFullRows.splice(0),probes:window.__rngDrawProbeRows.splice(0)};
+ }));
+ // Persist the exact bytes before comparison so a first refusal never loses its row.
+ if(batch.rows.length){await fs.appendFile(path.join(output,'paired-v11-full-rows.jsonl'),batch.rows.join('\n')+'\n');}
+ if(batch.probes.length){await fs.appendFile(path.join(output,'paired-v11-full-rng.jsonl'),batch.probes.join('\n')+'\n');}
+ for(const [kind,rows]of [['probe',batch.probes],['source',batch.rows]])for(const text of rows){
+  try{if(kind==='probe')pairedFullComparison.acceptProbe(text);else pairedFullComparison.accept(JSON.parse(text));}
+  catch(error){report.first_mismatch ||= {kind:'paired_full_'+kind,message:String(error.message||error),actual:JSON.parse(text)};throw error;}
+ }
+}
+async function pairedFullPhase(){
+ const deadline=Date.now()+replayTimeoutMs;
+ await fs.writeFile(path.join(output,'paired-v11-full-rows.jsonl'),'',{flag:'wx'});
+ await fs.writeFile(path.join(output,'paired-v11-full-rng.jsonl'),'',{flag:'wx'});
+ await page.evaluate(installPairedFullObserver,{maximumRows:4*pairedFullExpected.total+16000});
+ await page.evaluate(installPairedFullLaunch,{stockout:pairedFullExpected.stockout===true,natural14:pairedFullExpected.natural14===true,mode14SourceTick:pairedFullExpected.natural14?pairedFullExpected.matches[1].reference.mode14_source_tick:null,lastSelectedSourceTick:pairedFullExpected.natural14?pairedFullExpected.matches[1].reference.last_selected_source_tick:null});
+ await page.locator('#retail-replay-start').click();
+ let status;
+ while(Date.now()<deadline){
+  await drainPairedFull();const observed=await readPairedFirstGoStatus();
+  report.paired_v11_full_pair.last_observation=observed;
+  report.paired_v11_full_pair.progress={source_rows:pairedFullComparison.order,completed_actions:pairedFullComparison.action,requested_actions:pairedFullExpected.total};
+  await write('report.json',report);
+  if(observed.runtime?.terminal_error)throw Error('Paired full runtime failed: '+observed.runtime.terminal_error);
+  if(observed.busy){await new Promise(r=>setTimeout(r,replayPollMs));continue;}
+  status=observed.status;
+  if(status?.failed)throw Error(status.error||'Paired full native failed');
+  if(status?.schema==='melee-web-stadium-paired-v11-full-pair-v1'&&status.whole_session_complete){
+   await drainPairedFull();
+   report.paired_v11_full_pair.comparison=pairedFullComparison.finish(status);
+   // Actual native action recording is complete. The selected stockout profile
+   // has no original per-owner RNG ledger; do not infer that comparison.
+   report.rng_draw_probe={...report.rng_draw_probe,complete:true,
+     captured_action_count:pairedFullExpected.total};
+   // Ordinary completion performs its existing checked unload and evidence write.
+   // If the callback has not completed yet, wait; do not issue a second unload.
+   while(Date.now()<deadline){
+    const after=await readPairedFirstGoStatus();
+    if(!after.busy&&after.status?.failed)throw Error(after.status.error||'Paired full unload failed');
+    if(!after.busy&&after.status?.native_retired&&after.phase===0&&after.running===0){
+     report.browser_report=after.runtime?.replay_report;
+     report.paired_v11_full_pair.retirement=after;
+     if(pairedRegistration){
+      const retained=await observePageOperation('seal and retain source registration after checked unload', () => page.evaluate(collectStadiumRegistrationInPage,{seal:true}));
+      await write('stadium-registration-status.json',retained.status);
+      await fs.writeFile(path.join(output,'stadium-registration-rows.jsonl'),retained.rows.join('\n')+'\n',{flag:'wx'});
+      report.stadium_registration={...report.stadium_registration,...validateStadiumRegistrationSnapshot(retained)};
+     }
+     // Retain the completed browser evidence before the independent host-side
+     // comparison, which may fail or exhaust the remaining capture budget.
+     await write('report.json',report);
+     report.paired_v11_full_pair.rng_comparison=(pairedFullExpected.stockout||pairedFullExpected.natural14)
+      ? {per_owner_rng_comparison:false,scope:'Per-tick and scene seed comparison only; no per-owner comparison for the declared profile.'}
+      : runPairedFullRngComparison(true);
+     if(Date.now()>=deadline)throw Error('Paired full strict comparison exceeded unchanged replay deadline');
+     report.paired_v11_full_pair.component_pass=true;return;
+    }
+    await new Promise(r=>setTimeout(r,replayPollMs));
+   }
+   throw Error('Paired full checked ordinary unload exceeded deadline');
+  }
+  if(pageErrors.length)throw Error('Paired full browser diagnostic failure');
+  await new Promise(r=>setTimeout(r,replayPollMs));
+ }
+ throw Error('Paired full exceeded unchanged replay deadline');
+}
+async function pairedFirstGoPhase(){
+ const deadline=Date.now()+replayTimeoutMs;
+ await page.locator('#retail-replay-start').click();
+ while(Date.now()<deadline){
+  const observed=await readPairedFirstGoStatus();
+  report.paired_v11_first_go={...report.paired_v11_first_go,observation:observed};
+  if(observed.runtime?.terminal_error){
+   report.paired_v11_first_go.terminal_replay_failure=observed.runtime;
+   await write('paired-v11-first-go-status.json',observed);
+   throw Error('Paired first-GO terminal replay failure: '+observed.runtime.terminal_error);
+  }
+  if(observed.busy){await new Promise(r=>setTimeout(r,replayPollMs));continue;}
+  await write('paired-v11-first-go-status.json',observed);
+  if(observed.status.failed)throw Error(observed.status.error||'Paired native observer failed');
+  if(observed.status.stopped){
+   if(observed.running!==0)throw Error('Paired observer stopped without stopping source running');
+   report.paired_v11_first_go.comparison=comparePairedFirstGo(observed.status,pairedFirstGoExpected);
+   report.paired_v11_first_go.unload_requested=true;
+   await page.locator('#unload').click(); // Existing checked unload, exactly once.
+   while(Date.now()<deadline){
+    const after=await readPairedFirstGoStatus();
+    if(!after.busy){
+     report.paired_v11_first_go.retirement=after;
+     await write('paired-v11-first-go-retirement.json',after);
+     if(after.status.failed)throw Error(after.status.error||'Paired unload failed');
+     if(after.status.native_retired){
+      if(after.phase!==0||after.running!==0||after.status.whole_session_complete!==false)
+       throw Error('Paired unload did not verify idle native retirement');
+      report.paired_v11_first_go.component_pass=true;return;
+     }
+    }
+    await new Promise(r=>setTimeout(r,replayPollMs));
+   }
+   throw Error('Paired first-GO retirement exceeded unchanged deadline');
+  }
+  if(pageErrors.length)throw Error('Paired first-GO browser diagnostics failed');
+  await new Promise(r=>setTimeout(r,replayPollMs));
+ }
+ throw Error('Paired first-GO exceeded unchanged replay deadline');
+}
+
 async function snapshot(reason = 'poll', {captureCss = !diagnostic} = {}) {
+  if (laterBGate2Reserved) return {reason, native_access_suppressed: 'Gate2 reserved/transfer/terminal owner; prefix and action metrics are separate'};
   if (!page || page.isClosed()) return null;
   let value;
   try {
     if (pageObservationTimedOut) return {reason, snapshot_error: 'Page observation already timed out'};
-    value = await observePageOperation(`snapshot ${reason}`, page.evaluate(({reason, captureCss}) => {
+    value = await observePageOperation(`snapshot ${reason}`, page.evaluate(({reason, captureCss, currentSssExit, pairedFirstGo}) => {
       const module = globalThis.Module;
+      if ((currentSssExit || pairedFirstGo) && module?.stadiumMatchedSetupNativeIdle?.() !== true)
+        return {reason, busy: true}; // Suppress every native snapshot call during Asyncify.
       const ready = globalThis.__meleeNativeRuntimeReady === true;
       const call = name => {
         if (!ready) return null;
@@ -446,7 +983,7 @@ async function snapshot(reason = 'poll', {captureCss = !diagnostic} = {}) {
         replay_report: replayReport,
         replay_downloads: [...document.querySelectorAll('#retail-replay-downloads a')].map(link => link.download),
       };
-    }, {reason, captureCss}));
+    }, {reason, captureCss, currentSssExit, pairedFirstGo:pairedFirstGo||pairedFull}));
   } catch (error) {
     firstError('snapshot', error.message || error);
     return {reason, snapshot_error: String(error.message || error)};
@@ -716,9 +1253,36 @@ try {
     version: recipeBytes.readUInt32BE(4), seed: recipeBytes.readUInt32BE(8),
     frames: recipeBytes.readUInt32BE(12), bytes: recipeBytes.length,
   };
-  if (![8, 9, 10].includes(report.recipe_header.version) ||
+  if (!((pairedFirstGo||pairedFull)?report.recipe_header.version===11:[8, 9, 10].includes(report.recipe_header.version)) ||
       report.recipe_header.frames < 1 || report.recipe_header.frames > 108000)
     throw Error('Whole-session replay requires a valid MWRC v8/v9/v10 frame count');
+  if(pairedFirstGo){
+    const file=path.resolve(pairedFirstGoPath),stat=await fs.lstat(file);
+    if(!stat.isFile()||stat.isSymbolicLink()||stat.size>64*1024*1024)throw Error('Paired projection must be a bounded regular file');
+    const raw=await fs.readFile(file),hash=createHash('sha256').update(raw).digest('hex');
+    if(hash!==pairedFirstGoSha)throw Error('Paired projection hash differs');
+    pairedFirstGoExpected=derivePairedFirstGo(JSON.parse(raw),report.inputs.recipe.sha256,report.recipe_header.frames);
+    report.inputs.paired_first_go_projection={path:file,bytes:raw.length,sha256:hash};
+    report.paired_v11_first_go={scope:'Setup aggregates, actual GO, first strict post-GO typed22+seed+PAD and checked unload only',whole_session_complete:false};
+  }
+  if(pairedFull){
+    const pinned=async(file,sha)=>{const stat=await fs.lstat(file);if(!stat.isFile()||stat.isSymbolicLink()||stat.size>64*1024*1024)throw Error('Full reference must be a bounded regular file');const raw=await fs.readFile(file),actual=createHash('sha256').update(raw).digest('hex');if(actual!==sha)throw Error('Full reference SHA differs');return {raw,identity:{path:path.resolve(file),bytes:raw.length,sha256:actual}};};
+    const projection=await pinned(pairedFullPath,pairedFullSha),endpoints=await pinned(pairedFullEndpoints,pairedFullEndpointsSha);
+    pairedFullExpected=derivePairedFull(JSON.parse(projection.raw),report.inputs.recipe.sha256,report.recipe_header.frames,JSON.parse(endpoints.raw));
+    if(pairedRegistration && (pairedFullExpected.stockout||pairedFullExpected.natural14)) throw Error('Registration capture requires the paired idle route');
+    if(pairedRegistration) report.stadium_registration={requested:true,complete:false};
+    pairedFullComparison=new PairedFullComparator(pairedFullExpected);
+    report.inputs.paired_full_projection=projection.identity;report.inputs.paired_full_endpoints=endpoints.identity;
+    report.paired_v11_full_pair={component_pass:false,scope:pairedFullExpected.natural14
+      ?'A route warmup; B natural mode14 before transformation with literal input/typed state/seed and Results; C3/per-owner/registration false'
+      :pairedFullExpected.stockout
+      ?'A route warmup; B natural stock-out typed state/input/seed/display and Results; C3/all-writer/registration false'
+      :'actual two-window source lifecycle; C3/all-writer/registration false'};
+    pairedFullOriginalPreflight=(pairedFullExpected.stockout||pairedFullExpected.natural14)
+      ?{per_owner_rng_comparison:false,scope:'Admitted declared profile original report and exact projection; per-owner RNG outside this comparison.'}
+      :runPairedFullRngComparison(false);
+    report.paired_v11_full_pair.original_rng_preflight=pairedFullOriginalPreflight;
+  }
   report.requested_entity_prefix = readRequestedEntityPrefix(recipeBytes, report.inputs.recipe.sha256);
   if (report.requested_entity_prefix) {
     if (diagnostic || stopAfter || resumeTimingPauses || firstReplayCallbackProbe ||
@@ -734,6 +1298,15 @@ try {
     throw Error('MWRC header differs from the frozen diagnostic recipe identity');
   if (rngDrawProbe && rngDrawProbe.selected.some(cursor => cursor >= report.recipe_header.frames))
     throw Error('RNG draw probe cursor must be inside the source recipe frame count');
+  // Full mode selects actual source actions, not replay input-frame cursors.
+  // Keep generic cursor validation intact, then install the admitted action range.
+  if(pairedFull){
+    rngDrawProbe=pairedFullExpected.selection;
+    report.rng_draw_probe={scope:'paired-v11-global-diagnostic-action-index',
+      source_coordinate_scope:'actual source tick/draw actions across two worlds',
+      request:rngDrawProbe.request,requested_action_count:pairedFullExpected.total,
+      complete:false,artifact:'paired-v11-full-rng.jsonl'};
+  }
   if (captureCpuObservations && report.recipe_header.version !== 9)
     throw Error('--cpu-observations is restricted to MWRC v9 second-match diagnostics');
   if (hitTransitionProbe && (report.recipe_header.version !== 10 ||
@@ -769,6 +1342,93 @@ try {
     if (!report.artifact_inventory_pre.equal)
       throw Error(`Local and served browser artifact inventory differs before capture: ${report.artifact_inventory_pre.mismatches.join(', ')}`);
   }
+  if (currentSssExit) {
+    report.inputs.current_sss_expected = await statInput(currentSssExitPath);
+    if (report.inputs.current_sss_expected.sha256 !== values['stadium-current-sss-exit-expected-sha256'])
+      throw Error('Current SSS expectation hash differs');
+    const expected = JSON.parse(await fs.readFile(currentSssExitPath, 'utf8'));
+    currentSssStock4 = expected?.schema === 'melee-web-stock4-none-sss-exit-host-expectation-v1';
+    const newLaterSchema = expected?.schema === OBSERVED_B_SCHEMA;
+    const laterSchema = expected?.schema === 'melee-web-stock4-none-later-sss-exit-host-expectation-v1' || newLaterSchema;
+    if ((laterSssReference !== null) !== newLaterSchema)
+      throw Error('Later reference descriptor/expected schema needs the explicit matching opt-in');
+    if (currentSssLater !== laterSchema)
+      throw Error('Later SSS expectation requires the explicit matching later-SSS opt-in');
+    currentSssExpected = currentSssLater ? validateLaterSssExitExpected(expected) :
+      currentSssStock4 ? validateStock4SssExitExpected(expected) : validateCurrentSssExitExpected(expected);
+    currentSssStopsBeforeAssets = currentSssStock4 || currentSssLater;
+    if (currentSssLater) {
+      currentSssPolicy = {compare: compareLaterSssExitObservation, terminal: validateLaterSssExitTerminal,
+        trace: validateLaterSssExitTrace, finalization: validateLaterSssExitFinalization,
+        preparedStart:newLaterSchema ? (value,expected)=>compareLaterPreparedStartObservation(value,expected,report.current_sss_exit.observation) : compareLaterPreparedStartObservation};
+      if (laterSssReference !== null) report.later_sss_reference = laterSssReference;
+      if (laterSssPreparedStart) report.later_sss_prepared_start = true;
+      if (laterSssPreparedSetup) {
+        report.later_sss_prepared_setup = true;
+        currentSssPolicy.preparedSetup = compareLaterPreparedSetupObservation;
+      }
+      report.scope = newLaterSchema ?
+        `New-reference occurrence1 Setup after diagnostic A/Results/CSS; literal inputs0..${laterBLong?950:942}, UNKNOWN original menu draw parity; subsequent declared action comparison separate, replay incomplete, no C3` : laterSssPreparedSetup ?
+        'Retained occurrence1 zero-source-action Setup common fields/seed after diagnostic A/Results/CSS; literal global inputs0..939, UNKNOWN original menu draws/constructor/GO; replay incomplete, no C3' :
+        'Retained occurrence1 SSS OnExit common-field component after diagnostic A/Results/CSS; literal global inputs 0..939, pre-B-assets stop; replay incomplete, UNKNOWN menu draw parity, no B Entry/constructor/GO or C3';
+    }
+    if (currentSssStock4) {
+      currentSssPolicy = {compare: compareStock4SssExitObservation, terminal: validateStock4SssExitTerminal,
+        trace: validateStock4SssExitTrace, finalization: validateStock4SssExitFinalization};
+      if (currentSssPreparedStart) {
+        currentSssPolicy.preparedStart = compareStock4PreparedStartObservation;
+        currentSssPolicy.preparedSetup = compareStock4PreparedSetupObservation;
+        report.scope = 'Retained stock4/None SSS stop, same-run prepared Start comparison, and bounded completed zero-tick Setup common-field/seed comparison; explicit stopped/incomplete replay, UNKNOWN menu draws, no Entry/C3';
+      } else report.scope = 'Retained stock4/None first SSS OnExit common-field component; explicit stopped/incomplete replay, UNKNOWN menu draws, no Entry/C3';
+    }
+    if (currentSssPreparedStart && !currentSssStock4)
+      throw Error('--stadium-current-sss-prepared-start requires the stock4/None original Entry profile');
+    if (currentSssExpected.recipe.sha256 !== report.inputs.recipe.sha256 ||
+        currentSssExpected.recipe.bytes !== recipeBytes.length || report.requested_entity_prefix)
+      throw Error('Current SSS literal recipe/profile differs');
+    for (const identity of Object.values(currentSssExpected.source_binding.files))
+      if (await digest(identity.path) !== identity.sha256) throw Error('Current SSS original source input changed');
+    if (laterSssReference !== null) validateLaterReferenceRecipeInputs(recipeBytes,currentSssExpected);
+    if (laterBGate2) {
+      report.inputs.later_b_gate2_projection = await statInput(laterBGate2ProjectionPath);
+      laterBGate2ProjectionBytes = await fs.readFile(laterBGate2ProjectionPath);
+      if (laterBGate2BindingPath !== null) {
+        report.inputs.later_b_gate2_binding = await statInput(laterBGate2BindingPath);
+        laterBGate2BindingBytes = await fs.readFile(laterBGate2BindingPath);
+        const admission = JSON.parse(execFileSync(laterBGate2BindingPython,
+          [path.join(repoRoot,laterBLong?'tools/stadium_later_b_long_reference.py':'tools/stadium_later_b_reference.py'),'--admit-serialized-projection',
+            laterBGate2BindingPath,laterBGate2ProjectionPath],
+          {encoding:'utf8',timeout:10000,maxBuffer:65536}));
+        if (admission.schema!=='melee-web-later-b-serialized-projection-admission-v1'||admission.runtime_admission!==false||
+            admission.source_binding.bytes!==laterBGate2BindingBytes.length||
+            admission.source_binding.sha256!==createHash('sha256').update(laterBGate2BindingBytes).digest('hex')||
+            admission.projection.bytes!==laterBGate2ProjectionBytes.length||
+            admission.projection.sha256!==createHash('sha256').update(laterBGate2ProjectionBytes).digest('hex'))
+          throw Error('Gate2 strict raw binding/projection admission differs from actual bytes');
+        report.later_b_serialized_projection_admission=admission;
+      }
+      laterBGate2Reference = (laterBLong?deriveLaterBLongExpectations:deriveLaterBGate2Expectations)(laterBGate2ProjectionBytes,laterBGate2BindingBytes);
+      if (laterBGate2Reference.reference.recipe_sha256 !== report.inputs.recipe.sha256)
+        throw Error('Gate2 projection and current literal recipe identities differ');
+      laterBRngOwnerWindow = (laterBLong?deriveLongBActionRngWindow:deriveLaterBRngOwnerWindow)(laterBRngOwnerWindowSpec,laterBGate2Reference);
+      if(laterBRngOwnerWindow){
+        rngDrawProbe=laterBRngOwnerWindow.selection;
+        report.rng_draw_probe={request:rngDrawProbe.request,selected_cursors:rngDrawProbe.selected,
+          complete:false,scope:laterBLong?'one completed actual action per diagnostic action index; original guard intervals retained separately':'one source tick plus its subsequent source draw; scheduled owner context only',
+          projection_sha256:report.inputs.later_b_gate2_projection.sha256,
+          configuration:laterBRngOwnerWindow.configuration,coordinates:laterBRngOwnerWindow.coordinates};
+      }
+    }
+    currentSssRecipeBytes = Array.from(recipeBytes);
+    report.current_sss_exit = {component_pass: false, runtime_replay: 'NOT_RUN',
+      original_menu_draw_parity: 'UNKNOWN', Entry: false, C3: false};
+    report.artifact_inventory_pre = await browserArtifactInventory();
+    if (!report.artifact_inventory_pre.equal) throw Error('Current SSS served/local artifact inventory differs');
+  }
+  if (pairedFirstGo || pairedFull) {
+    report.artifact_inventory_pre = await browserArtifactInventory();
+    if (!report.artifact_inventory_pre.equal) throw Error('Paired first-GO served/local artifact inventory differs');
+  }
   const cpuObservationRowLimit = report.recipe_header.frames;
   report.cpu_observation_row_limit = cpuObservationRowLimit;
   browserTools ||= await loadBrowserTools(values.playwright);
@@ -780,7 +1440,7 @@ try {
       viewport: {width: diagnosticProtocol.viewport_width,
       height: diagnosticProtocol.viewport_height},
       deviceScaleFactor: diagnosticProtocol.device_scale_factor} : {})};
-  if (firstReplayCallbackProbe) browserOptions.args = [...(browserOptions.args || []), '--enable-automation'];
+  if (firstReplayCallbackProbe || currentSssExit || pairedFirstGo || pairedFull) browserOptions.args = [...(browserOptions.args || []), '--enable-automation'];
   if (diagnostic) {
     const chromeVersionOutput = execFileSync(browserPath, ['--version'], {encoding: 'utf8'}).trim();
     const chromeVersion = chromeVersionOutput.match(/\d+(?:\.\d+){2,3}/)?.[0] ?? null;
@@ -825,7 +1485,7 @@ try {
     if (!Array.isArray(report.browser_process_info) || !report.browser_process_info.length)
       throw Error('Owned Chrome CDP process inventory is unavailable');
     await write('report.json', report);
-    if (firstReplayCallbackProbe) {
+    if (firstReplayCallbackProbe || currentSssExit || pairedFirstGo || pairedFull) {
       report.browser.command_line = (await browserCdp.send('Browser.getBrowserCommandLine')).arguments || [];
       report.browser_system_info = await browserCdp.send('SystemInfo.getInfo');
       await write('report.json', report);
@@ -847,8 +1507,8 @@ try {
     report.boundary_marker_artifact = path.join(output, 'boundary-markers.jsonl');
     await write('report.json', report);
   }
-  await page.addInitScript(({cpuObservationRowLimit, captureCpuObservations,
-    rngDrawProbeSelection, hitTransitionProbeSelection, boundaryProbeEnabled, boundaryMarkerPrefix, boundaryMarkerNames}) => {
+  await page.addInitScript(({pairedFull,cpuObservationRowLimit, captureCpuObservations,
+    rngDrawProbeSelection, laterBRngOwnerConfiguration, hitTransitionProbeSelection, boundaryProbeEnabled, boundaryMarkerPrefix, boundaryMarkerNames}) => {
     window.__meleeNativeRuntimeReady = false;
     const module = globalThis.Module || {};
     module.onRuntimeInitialized = () => { window.__meleeNativeRuntimeReady = true; };
@@ -866,10 +1526,14 @@ try {
         throw Error('Hit transition observation exceeded or duplicated selected cursors');
       window.__hitTransitionProbeRows.push(text);
     };
+    window.__meleeRngDrawProbeOwners = pairedFull || laterBRngOwnerConfiguration !== null;
+    window.__meleeRngDrawProbeFighterOwners = pairedFull || laterBRngOwnerConfiguration?.schema==='melee-web-later-b-long-action-rng-v1';
+    window.__meleeLaterBRngOwnerWindow = laterBRngOwnerConfiguration;
     window.__rngDrawProbeRows = [];
+    const seenRngActions=new Set(),selectedRngActions=new Set(rngDrawProbeSelection?.selected||[]);
     window.__rngDrawProbeSelection = rngDrawProbeSelection;
     window.__meleeRngDrawProbeCursors = rngDrawProbeSelection?.request.kind === 'cursors'
-      ? rngDrawProbeSelection.selected : null;
+      ? (laterBRngOwnerConfiguration?.schema==='melee-web-later-b-long-action-rng-v1'?[]:rngDrawProbeSelection.selected) : null;
     window.__meleeRngDrawProbeRange = rngDrawProbeSelection?.request.kind === 'range'
       ? [rngDrawProbeSelection.request.first, rngDrawProbeSelection.request.last] : null;
     window.__meleeCaptureWholeSessionCpuObservation = captureCpuObservations;
@@ -901,15 +1565,16 @@ try {
       if (window.__rngDrawProbeRows.length >= selection.selected.length)
         throw Error('RNG draw probe exceeded its selected-cursor bound');
       const row = JSON.parse(text);
-      if (!selection.selected.includes(row.source_cursor))
+      if (!selectedRngActions.has(row.source_cursor))
         throw Error('RNG draw probe emitted an unselected source cursor');
-      if (window.__rngDrawProbeRows.some(existing =>
-          JSON.parse(existing).source_cursor === row.source_cursor))
+      if (seenRngActions.has(row.source_cursor))
         throw Error('RNG draw probe emitted a duplicate source cursor');
+      seenRngActions.add(row.source_cursor);
       window.__rngDrawProbeRows.push(text);
     };
-  }, {cpuObservationRowLimit, captureCpuObservations,
+  }, {pairedFull,cpuObservationRowLimit, captureCpuObservations,
     rngDrawProbeSelection: rngDrawProbe,
+    laterBRngOwnerConfiguration: laterBRngOwnerWindow?.configuration ?? null,
     hitTransitionProbeSelection: hitTransitionProbe,
     boundaryProbeEnabled: firstReplayCallbackProbe,
     boundaryMarkerPrefix: FIRST_REPLAY_BOUNDARY_MARKER_PREFIX,
@@ -962,6 +1627,9 @@ try {
   });
   driver = createBrowserDriver(page, {surface: 'development', timeoutMs: phaseTimeoutMs});
   await phase('runtime-ready', () => driver.waitForImport());
+  if(pairedRegistration){
+    report.stadium_registration.initial=await observePageOperation('arm source registration before disc import', () => page.evaluate(armStadiumRegistrationInPage));
+  }
   if (diagnostic) {
     report.pause_trace_installation = await installPauseTraceCapture(page, null);
     if (!report.pause_trace_installation.timing_hook_present ||
@@ -1037,7 +1705,136 @@ try {
     report.trace_configuration = naturalPauseTraceSettings.trace;
     report.trace_started_at_utc = new Date().toISOString();
   }
-  if (firstReplayCallbackProbe) await firstReplayCallbackPhase();
+  if (currentSssExit) {
+    currentSssArm = await observePageOperation('install current SSS returned-parser arm', () =>
+      page.evaluateHandle(installCurrentSssExitReplayArm, {recipeBytes: currentSssRecipeBytes,
+        observationProfile: currentSssLater ? currentSssExpected.observation_profile : currentSssStock4 ? 1 : 0, preparedStartProbe: currentSssPreparedStart || laterSssPreparedStart, laterPreparedSetup: laterSssPreparedSetup}));
+    await phase('current-sss-exit-component', async () => {
+      const deadline = Date.now() + replayTimeoutMs;
+      await page.locator('#retail-replay-start').click();
+      while (Date.now() < deadline) {
+        const wrapper = await observePageOperation('current SSS wrapper state', () =>
+          currentSssArm.evaluate(scope => scope.state()));
+        report.current_sss_exit.wrapper = wrapper;
+        if (!wrapper.owned || wrapper.failure) throw Error(wrapper.failure || 'Current SSS replay wrapper replaced');
+        const observed = await observePageOperation('current SSS copied observation', () =>
+          currentSssArm.evaluate(scope => scope.observe()));
+        if (observed.busy) { await new Promise(resolve => setTimeout(resolve, replayPollMs)); continue; }
+        const value = observed.value;
+        if (value.notification_received && !report.current_sss_exit.observation) {
+          report.current_sss_exit.observation = value;
+          await write('current-sss-exit-observation.json', value); // retain before assertions
+        }
+        if (value.failed) throw Error(value.error || 'Current SSS native observation failed');
+        if (value.notification_received && !report.current_sss_exit.comparison &&
+            (!currentSssStopsBeforeAssets || value.terminal?.complete === true)) {
+          report.current_sss_exit.observation = value;
+          await write('current-sss-exit-observation.json', value);
+          report.current_sss_exit.comparison = currentSssPolicy.compare(value, currentSssExpected);
+        }
+        if (currentSssStopsBeforeAssets && report.current_sss_exit.comparison?.pass &&
+            !report.current_sss_exit.unload_requested) {
+          if (laterSssPreparedStart && !laterSssPreparedSetup) {
+            try {
+              const prepared=await observePageOperation('later prepared Start before-assets receipt',()=>
+                currentSssArm.evaluate(scope=>scope.observePreparedStart()));
+              report.current_sss_exit.prepared_start_observation=prepared.value??null;
+              await write('current-sss-prepared-start-observation.json',prepared);
+              if(prepared.busy||!prepared.value)throw Error('Later prepared Start was busy or absent');
+              report.current_sss_exit.prepared_start_comparison=
+                currentSssPolicy.preparedStart(prepared.value,currentSssExpected);
+            }catch(error){report.current_sss_exit.prepared_start_failure=String(error.message||error);}
+          }
+          if (preparedSetupRequested) {
+            try {
+              const prepared = await observePageOperation('prepared Start before-assets receipt', () =>
+                currentSssArm.evaluate(scope => scope.observePreparedStart()));
+              report.current_sss_exit.prepared_start_observation = prepared.value ?? null;
+              await write('current-sss-prepared-start-observation.json', prepared);
+              if (prepared.busy || !prepared.value)
+                throw Error('Prepared Start observation was busy or absent at the stopped SSS boundary');
+              report.current_sss_exit.prepared_start_comparison =
+                currentSssPolicy.preparedStart(prepared.value, currentSssExpected);
+              const continuation = await observePageOperation('prepared Start to Setup handoff', () =>
+                currentSssArm.evaluate(continuePreparedStartInPage, prepared.value));
+              report.current_sss_exit.prepared_setup_begin = continuation;
+              if (continuation.result !== 1 || !continuation.accepted_receipt_rechecked)
+                throw Error('Prepared Start to Setup continuation did not retain its approved receipt');
+              let setupFinished = false;
+              while (Date.now() < deadline) {
+                const observedSetup = await observePageOperation('completed prepared Setup receipt', () =>
+                  currentSssArm.evaluate(scope => scope.observe()));
+                if (observedSetup.busy) {
+                  await new Promise(resolve => setTimeout(resolve, replayPollMs));
+                  continue;
+                }
+                const setupRoute = observedSetup.value?.prepared_to_setup;
+                report.current_sss_exit.prepared_setup_observation = observedSetup.value ?? null;
+                if (setupRoute?.failed) {
+                  await write('current-sss-prepared-to-setup-observation.json', observedSetup.value);
+                  throw Error(setupRoute.error || 'Prepared Start to Setup native continuation failed');
+                }
+                if (setupRoute?.setup?.complete === true && setupRoute.setup.captured === true) {
+                  await write('current-sss-prepared-to-setup-observation.json', observedSetup.value);
+                  report.current_sss_exit.prepared_setup_comparison =
+                    currentSssPolicy.preparedSetup(observedSetup.value, currentSssExpected);
+                  setupFinished = true;
+                  if (laterBGate2) {
+                    await runLaterBGate2FromSetup(deadline, observedSetup.value);
+                    return; // No ordinary snapshot/getter/UI unload after reservation.
+                  }
+                  break;
+                }
+                await new Promise(resolve => setTimeout(resolve, replayPollMs));
+              }
+              if (!setupFinished)
+                throw Error('Prepared Start to completed Setup exceeded the unchanged bounded replay interval');
+            } catch (error) {
+              report.current_sss_exit.prepared_setup_failure = String(error.message || error);
+              if (laterBGate2Reserved) throw error;
+              if (!report.current_sss_exit.prepared_start_comparison?.pass)
+                report.current_sss_exit.prepared_start_failure = report.current_sss_exit.prepared_setup_failure;
+            }
+          }
+          // Invoke the existing UI stop once. Its retained reason and normal
+          // finishRetailReplay/unloadAndSave path keep full replay incomplete.
+          report.current_sss_exit.unload_requested = true;
+          await page.locator('#unload').click();
+        }
+        const last = await snapshot('current-sss-exit-poll', {captureCss: false});
+        if (!last || last.snapshot_error) throw Error(last?.snapshot_error || 'Current SSS page unavailable');
+        if (last.busy) { await new Promise(resolve => setTimeout(resolve, replayPollMs)); continue; }
+        if ((last.replay_downloads || []).includes('retail-browser-report.json')) {
+          report.browser_report = last.replay_report;
+          if (!report.current_sss_exit.observation)
+            throw Error(wrapper.failure || 'Replay ended before current SSS note');
+          if (currentSssStopsBeforeAssets) {
+            const unloaded = await observePageOperation('current SSS normal unload receipt', () =>
+              currentSssArm.evaluate(scope => scope.observe()));
+            report.current_sss_exit.unloaded_observation = unloaded.value;
+            await write('current-sss-exit-unloaded-observation.json', unloaded);
+            if (unloaded.busy || !unloaded.value) throw Error('Current SSS unload is still busy');
+          }
+          report.current_sss_exit.terminal = preparedSetupRequested ?
+            currentSssPolicy.terminal(last.replay_report, last, currentSssExpected,
+              report.current_sss_exit.observation, report.current_sss_exit.unloaded_observation) :
+            currentSssPolicy.terminal(last.replay_report, last,
+              currentSssExpected, report.current_sss_exit.unloaded_observation);
+          report.current_sss_exit.runtime_replay = currentSssStopsBeforeAssets ?
+            'FAIL_INCOMPLETE_EXPLICIT_SSS_STOP' : 'FAIL_INCOMPLETE_EXPECTED_TIME_REFUSAL';
+          return;
+        }
+        if (last.runtime_error && (currentSssStopsBeforeAssets ||
+            !String(last.runtime_error).includes(currentSssExpected.expected_runtime_refusal)))
+          throw Error(last.runtime_error);
+        if (pageErrors.length) throw Error('Current SSS browser diagnostics failed');
+        await new Promise(resolve => setTimeout(resolve, replayPollMs));
+      }
+      throw Error('Current SSS observation exceeded unchanged bounded replay interval');
+    }, replayTimeoutMs, 0);
+  } else if (pairedFull) await phase('whole-session-replay',pairedFullPhase,replayTimeoutMs,0);
+  else if (pairedFirstGo) await phase('paired-v11-first-go-component',pairedFirstGoPhase,replayTimeoutMs,0);
+  else if (firstReplayCallbackProbe) await firstReplayCallbackPhase();
   else await phase('whole-session-replay', async () => {
     const replayStartedAt = Date.now();
     let lastProgressWriteAt = 0;
@@ -1151,7 +1948,8 @@ try {
   firstError(currentPhase, error.message || error, report.last_successful_snapshot ?? null);
   report.failure = String(error.stack || error);
 } finally {
-  if (firstReplayCallbackProbe) await finalizeFirstReplayCallbackProbe();
+  if (laterBGate2Reserved) await finalizeLaterBGate2Capture();
+  else if (firstReplayCallbackProbe) await finalizeFirstReplayCallbackProbe();
   else {
   try {
   if (diagnostic) {
@@ -1443,46 +2241,11 @@ try {
       report.page_exports_skipped = 'Renderer observation timed out; last successful snapshot retained and page exports were skipped.';
     } else {
     try {
-      const artifacts = await observePageOperation('final replay artifacts', () => page.locator('#retail-replay-downloads a').evaluateAll(async links => {
-        const retained = [];
-        for (const link of links) {
-          if (!['retail-port.jsonl', 'retail-timer.jsonl', 'retail-browser-report.json'].includes(link.download) || !link.href.startsWith('blob:')) continue;
-          const response = await fetch(link.href);
-          if (!response.ok) throw Error(`Artifact ${link.download} returned HTTP ${response.status}`);
-          retained.push({name: link.download, text: await response.text()});
-        }
-        return retained;
-      }));
-      report.saved_downloads = [];
-      for (const artifact of artifacts) {
-        if (report.saved_downloads.some(row => row.name === artifact.name))
-          throw Error(`Duplicate exported artifact: ${artifact.name}`);
-        await write(artifact.name, artifact.text);
-        report.saved_downloads.push({name: artifact.name, bytes: Buffer.byteLength(artifact.text), sha256: createHash('sha256').update(artifact.text).digest('hex')});
-      }
+      await retainReplayArtifacts();
     } catch (error) { report.download_error = String(error?.message || error); }
     try { const rows = await observePageOperation('final CPU prefix rows', () => page.evaluate(() => window.__cpuPrefixRows || [])); if(rows.length) await write('cpu-prefix.jsonl',rows.join('\n')+'\n'); } catch(error) { report.cpu_download_error = String(error); }
     try { const rows = await observePageOperation('final CPU item rows', () => page.evaluate(() => window.__cpuItemEventRows || [])); await write('cpu-item-events.jsonl',rows.length ? rows.join('\n')+'\n' : ''); report.cpu_item_event_count = rows.length; } catch(error) { report.cpu_item_event_error = String(error); }
-    if (rngDrawProbe) {
-      try {
-        const rows = await observePageOperation('final RNG draw rows', () => page.evaluate(() => window.__rngDrawProbeRows || []));
-        const validation = validateRngDrawProbeRows(rows, rngDrawProbe, {
-          observedCursor: report.final_snapshot?.source_cursor,
-          deliberateStop: report.deliberate_prefix_stop,
-        });
-        const text = validation.rows.length ? validation.rows.join('\n') + '\n' : '';
-        await write('rng-draw-probe.jsonl', text);
-        const artifact = {name: 'rng-draw-probe.jsonl', bytes: Buffer.byteLength(text),
-          sha256: createHash('sha256').update(text).digest('hex')};
-        report.saved_downloads ||= [];
-        report.saved_downloads.push(artifact);
-        report.rng_draw_probe = {...report.rng_draw_probe, complete: validation.complete,
-          captured_cursors: validation.rows.length ? validation.rows.map(row => JSON.parse(row).source_cursor) : [],
-          missing_cursors: validation.missing_cursors, artifact};
-      } catch (error) {
-        report.rng_draw_probe_error = String(error?.message || error);
-      }
-    }
+    await retainRngDrawProbe();
     if (hitTransitionProbe) {
       try {
         const rows = await observePageOperation('final hit transition rows', () => page.evaluate(() => window.__hitTransitionProbeRows || []));
@@ -1505,6 +2268,14 @@ try {
         retainFirstCaptureError(report, 'hit_transition_probe', report.hit_transition_probe_error, 'artifact validation');
       }
     }
+    if(pairedRegistration && !report.stadium_registration?.complete){
+      try {
+        const retained=await observePageOperation('retain incomplete source registration', () => page.evaluate(collectStadiumRegistrationInPage,{seal:false}));
+        await write('stadium-registration-partial-status.json',retained.status);
+        await fs.writeFile(path.join(output,'stadium-registration-partial-rows.jsonl'),retained.rows.join('\n')+'\n',{flag:'wx'});
+        report.stadium_registration={...report.stadium_registration,complete:false,partial_retained:true};
+      } catch(error) { report.stadium_registration={...report.stadium_registration,complete:false,retention_error:String(error)}; }
+    }
     try { await write('source-owner-trace.json', await observePageOperation('final source owner trace', () => page.evaluate(() => window.__meleeSourceOwnerTrace || []))); } catch(error) { report.owner_trace_error = String(error); }
     try { await write('source-main-allocation-trace.json', {total: await observePageOperation('final source allocation total', () => page.evaluate(() => window.__meleeSourceAllocationTraceTotal || 0)), events: await observePageOperation('final source allocation trace', () => page.evaluate(() => window.__meleeSourceAllocationTrace || []))}); } catch(error) { report.source_allocation_trace_error = String(error); }
     try { await write('page.txt', await observePageOperation('final page text', () => page.locator('body').innerText())); } catch (error) { report.page_dump_error = String(error); }
@@ -1518,6 +2289,15 @@ try {
     firstError('runtime_incident_recording', reason, report.last_successful_snapshot ?? null);
   }
   } finally {
+    if (currentSssArm && !pageObservationTimedOut && page && !page.isClosed()) {
+      try {
+        report.current_sss_exit.wrapper_final = await observePageOperation('current SSS callback ownership', () =>
+          currentSssArm.evaluate(scope => scope.state()));
+        report.current_sss_exit.wrapper_restored = await observePageOperation('restore current SSS replay callback', () =>
+          currentSssArm.evaluate(scope => scope.dispose()));
+        await currentSssArm.dispose();
+      } catch (error) { firstError('current_sss_callback_cleanup', error.message || error); }
+    }
     await closeOwnedCaptureBrowser();
   }
   for (const candidate of runtimeDataAbortCandidates) {
@@ -1617,7 +2397,68 @@ try {
       clean_prefix: captureValid && ['cursor_limit', 'replay_timeout', 'paired_screenshot_target'].includes(terminal?.outcome),
       terminal_failure: terminal?.outcome === 'runtime_error'};
     report.result = captureValid ? 'captured' : 'incomplete';
-  } else finalizeSessionCapture(report);
+  } else {
+    finalizeSessionCapture(report); // Keep original incomplete-replay classification truthful.
+    if(pairedFull){
+      try{
+       report.artifact_inventory_post=await browserArtifactInventory();
+       if(!report.artifact_inventory_post.equal||JSON.stringify(report.artifact_inventory_post)!==JSON.stringify(report.artifact_inventory_pre))throw Error('Paired full served/local inventory changed');
+       if(!report.paired_v11_full_pair.component_pass||report.rng_draw_probe?.complete!==true||report.cleanup?.browser_close_returned!==true)throw Error('Paired full completion/owned close incomplete');
+      }catch(error){firstError('paired_full_finalization',error.message||error);report.result='fail';}
+    }
+    if(pairedFirstGo){
+      report.original_replay_capture_result=report.result;
+      let pairedInventoryValid = false;
+      try {
+        report.artifact_inventory_post = await browserArtifactInventory();
+        if (!report.artifact_inventory_post.equal ||
+            JSON.stringify(report.artifact_inventory_post) !== JSON.stringify(report.artifact_inventory_pre))
+          throw Error('Paired first-GO artifact inventory changed');
+        pairedInventoryValid = true;
+      } catch (error) {
+        firstError('artifact_inventory', error.message || String(error));
+      }
+      const valid=pairedInventoryValid && report.paired_v11_first_go?.component_pass===true && !report.first_error && !report.first_mismatch &&
+        !report.close_error && !report.cdp_close_error && !report.download_error && !report.screenshot_error &&
+        !report.browser_errors.length && !report.unexpected_requests.length && report.cleanup?.browser_close_returned===true;
+      report.result=valid?'paired_v11_first_go_component_pass_replay_incomplete':'fail';
+    }
+
+    if (currentSssExit) {
+      report.original_replay_capture_result = report.result;
+      try {
+        report.artifact_inventory_post = await browserArtifactInventory();
+        if (!report.artifact_inventory_post.equal ||
+            JSON.stringify(report.artifact_inventory_post) !== JSON.stringify(report.artifact_inventory_pre))
+          throw Error('Current SSS artifact inventory changed');
+        report.current_sss_exit.finalization = currentSssPolicy.finalization(report, currentSssExpected);
+        if (currentSssPreparedStart)
+          report.current_sss_exit.prepared_start_finalization =
+            validateStock4PreparedStartFinalization(report, currentSssExpected);
+        if (currentSssPreparedStart)
+          report.current_sss_exit.prepared_setup_finalization =
+            validateStock4PreparedSetupFinalization(report, currentSssExpected);
+        if (!report.current_sss_exit?.comparison?.pass || !report.current_sss_exit?.terminal?.pass ||
+            (currentSssPreparedStart && !report.current_sss_exit?.prepared_start_finalization?.pass) ||
+            (currentSssPreparedStart && !report.current_sss_exit?.prepared_setup_finalization?.pass) ||
+            !currentSssTrace || report.browser_errors.length || report.unexpected_requests.length ||
+            report.close_error || report.cdp_close_error || report.download_error || report.screenshot_error ||
+            report.current_sss_exit.wrapper_restored !== true || report.cleanup?.browser_close_returned !== true)
+          throw Error('Current SSS component evidence/diagnostics/cleanup incomplete');
+        report.current_sss_exit.trace_comparison = currentSssPolicy.trace(currentSssTrace,
+          currentSssExpected, report.current_sss_exit.observation);
+        report.current_sss_exit.component_pass = true;
+        report.result = currentSssLater ? 'later_sss_component_pass_replay_stopped' : currentSssStock4 ? (currentSssPreparedStart ?
+          'prepared_entry_setup_candidate_pass_replay_stopped' : 'component_pass_replay_stopped') :
+          'component_pass_replay_refused';
+      } catch (error) {
+        report.current_sss_exit ||= {};
+        report.current_sss_exit.component_pass = false;
+        report.current_sss_exit.failure = String(error.message || error);
+        report.result = 'fail';
+      }
+    }
+  }
   await write('report.json', report);
   if (report.failure) await write('failure.txt', report.failure + '\n');
   }
@@ -1626,6 +2467,26 @@ try {
 if (diagnostic) {
   if (report.result !== 'captured' || process.exitCode) process.exitCode = 1;
   else console.log(`captured: ${report.natural_pause_terminal?.outcome || 'unknown'}; diagnosis only`);
+} else if (pairedFull) {
+  if(report.result!=='pass'||report.paired_v11_full_pair?.component_pass!==true)process.exitCode=1;
+  else console.log('component pass: actual paired v11 source lifecycle, state/PAD and selected RNG; C3 remains unproved');
+} else if (pairedFirstGo) {
+  if(report.result!=='paired_v11_first_go_component_pass_replay_incomplete')process.exitCode=1;
+  else console.log('component pass: paired v11 first Setup/GO/post-GO; whole replay and C3 incomplete');
+} else if (laterBGate2) {
+  if (report.result !== 'later_b_gate2_component_pass_replay_incomplete') process.exitCode = 1;
+  else console.log('component pass: same-owner B constructor aggregate, actual GO and96 typed22+seed samples; checked one-shot retirement; whole replay/C3 incomplete');
+} else if (currentSssExit) {
+  const expectedResult = currentSssLater ? 'later_sss_component_pass_replay_stopped' : currentSssStock4 ? (currentSssPreparedStart ?
+    'prepared_entry_setup_candidate_pass_replay_stopped' : 'component_pass_replay_stopped') : 'component_pass_replay_refused';
+  if (report.result !== expectedResult) process.exitCode = 1;
+  else console.log(currentSssLater ?
+    (laterSssPreparedSetup ?
+      `component pass: retained occurrence1 zero-action Setup common fields/seed and literal${currentSssExpected.literal_inputs.length} prefix; replay incomplete; no original constructor/GO or C3` :
+      `component pass: retained occurrence1 SSS OnExit fields and literal ${currentSssExpected.literal_inputs.length}-input prefix; checked unload, replay incomplete; no B Entry/constructor/GO or C3`) : currentSssStock4 ? (currentSssPreparedStart ?
+    'candidate pass: prepared Start to completed zero-tick Setup common fields and seed; replay explicitly stopped/incomplete; no original Entry dispatch/C3 claim' :
+    'component pass: retained stock4 SSS OnExit fields; replay explicitly stopped/incomplete; no Entry/C3') :
+    'component pass: retained SSS OnExit fields; original TIME replay refused/incomplete; no Entry/C3');
 } else if (report.result !== 'pass') process.exitCode = 1;
 else if (firstReplayCallbackProbe)
   console.log(`pass: first replay callback returned at cursor ${report.post_callback_native_state?.source_cursor}; ${report.boundary_markers_received} durable markers; no full-session or GPU-cause claim`);

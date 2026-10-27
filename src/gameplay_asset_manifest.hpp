@@ -26,6 +26,9 @@ match_asset_names(const MeleeWebMenuMatchSelection& selection);
 // Stadium to the ordinary match registry or construct a match owner.
 [[nodiscard]] std::vector<std::string>
 stadium_c1a_asset_names(const MeleeWebMenuMatchSelection& selection);
+// Caller must retain the private preceding-match provenance; ordinary policy is unchanged.
+[[nodiscard]] std::vector<std::string>
+stadium_later_sss_results_asset_names(const MeleeWebMenuMatchSelection& selection);
 #endif
 
 // Resolves only an exact live host continuation. Active source slots remain

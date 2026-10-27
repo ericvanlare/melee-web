@@ -429,7 +429,15 @@ class ResultsEntryPacketTests(OwnedWorkspaceTests):
         self.assertLess(trace_reset, scoped_return)
         self.assertLess(camera_reset, scoped_return)
         handoff = function(source, 'void enter_typed_results_world()')
-        self.assertIn('if(destination==AssetDestination::Results){enter_typed_results_world();return true;}', source)
+        dispatch = function(source, 'if(destination==AssetDestination::Results){')
+        self.assertEqual(dispatch, """if(destination==AssetDestination::Results){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(later_sss.armed)
+   check(later_sss.stage==3&&later_sss_context_owned()&&replay_cursor==later_sss_reference_context().first[3]&&completed_matches==1,
+         "Later SSS Results import lost its captured replay/context/provenance");
+#endif
+  enter_typed_results_world();return true;
+ }""")
         constructor = handoff.index('results=std::make_unique<melee_web::GameplayResultsSession>')
         snapshot = handoff.index('results_camera_entry_snapshot=results->camera_entry_snapshot();')
         release_input = handoff.index('results_input.reset();', constructor)

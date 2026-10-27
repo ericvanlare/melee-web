@@ -35,8 +35,23 @@ PAD_SLOT = 0x804C3000
 PAD_POLL_PC = 0x8034DD8C
 
 
+def _extract_braced_definition(source: str, marker: str) -> str:
+    start = source.index(marker)
+    opening = source.index("{", start)
+    depth = 0
+    for index in range(opening, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[start:index + 1]
+    raise AssertionError(f"unterminated C++ block after {marker!r}")
+
+
 def _retain_cpp_failure(directory: Path, command: list[str], result: subprocess.CompletedProcess) -> None:
-    retained = os.environ.get("MWRC_SHEIK_FAILURE_DIR")
+    retained = (os.environ.get("MWRC_SHEIK_CPP_FAILURE_DIR")
+                or os.environ.get("MWRC_SHEIK_FAILURE_DIR"))
     if not retained:
         return
     target = Path(retained)
@@ -369,32 +384,49 @@ class SheikTransformPrefixTests(unittest.TestCase):
         if compiler is None:
             self.skipTest("A native C++ compiler is not installed")
         source = OBSERVER_SOURCE.read_text(encoding="utf-8")
-        dispatcher = source[source.index("static bool IsCaptureBoundary("):
-                            source.index("bool Observer::IsRngReturnBoundary(")]
+        dispatcher = _extract_braced_definition(source, "static bool IsCaptureBoundary(")
+        stadium_after_pc_start = source.index("constexpr u32 STADIUM_GO_AFTER_PC =")
+        stadium_after_pc = source[stadium_after_pc_start:source.index(";", stadium_after_pc_start) + 1]
+        constructor_pcs_start = source.index("constexpr std::array<u32, 7> STADIUM_CONSTRUCTOR_PCS =")
+        constructor_pcs = source[constructor_pcs_start:source.index(";", constructor_pcs_start) + 1]
         request_helpers = source[source.index("bool SdInitRequested()"):
                                  source.index("bool SparsePadErrorsValid(")]
         harness = r'''
 #include <cassert>
 #include <cstdint>
+#include <algorithm>
+#include <array>
 #include <map>
 #include <string>
 using u32 = uint32_t;
 constexpr u32 SSS_ENTER_RETURN = 0x8025B84C;
+''' + stadium_after_pc + constructor_pcs + r'''
 std::map<std::string, std::string> environment;
 std::string Env(const char* name) { return environment[name]; }
 bool CpuProbeEnabled() { return false; }
 bool ItemProbeEnabled() { return false; }
 const void* FindCpuProbePoint(u32) { return nullptr; }
 const void* FindItemProbePoint(u32) { return nullptr; }
-struct Settings { u32 rng_return_pc = 0; } settings;
+struct Settings { u32 rng_return_pc = 0; bool rng_returns = false, rng_updates = false; } settings;
 const Settings& CpuProbeEnvironment() { return settings; }
+bool CompactRngEnabled() { return false; }
+bool SelectedRngReturn(u32, bool, u32, bool = false) { return false; }
 ''' + request_helpers + dispatcher + r'''
 int main(int argc, char** argv) {
   assert(argc == 2);
   const std::string mode = argv[1];
-  bool sss = false, sd = false;
+  bool sss = false, sd = false, stadium = false, constructor = false;
   if (mode == "transform") { environment["MWRC_TRANSFORM_PREFIX"] = "1"; sss = true; }
   else if (mode == "invalid-transform") environment["MWRC_TRANSFORM_PREFIX"] = "0";
+  else if (mode == "stadium-go") {
+    environment["MWRC_STADIUM_GO_PREFIX"] = "1"; stadium = true; sss = true;
+  }
+  else if (mode == "stadium-constructor") {
+    environment["MWRC_STADIUM_GO_PREFIX"] = "1";
+    environment["MWRC_STADIUM_CONSTRUCTOR_OWNER"] = "1";
+    stadium = true; sss = true; constructor = true;
+  }
+  else if (mode == "constructor-without-stadium") environment["MWRC_STADIUM_CONSTRUCTOR_OWNER"] = "1";
   else if (mode == "ordinary-without-sd") environment["MWRC_SD_MENU_PROBE"] = "ordinary_timeout";
   else if (mode != "default") {
     environment["MWRC_SD_INIT"] = "1"; sd = true;
@@ -407,7 +439,9 @@ int main(int argc, char** argv) {
                  0x80377584u, 0x800693A8u, 0x8016E934u, 0x8016E9C4u,
                  0x80390EB4u, 0x80390FC0u, 0x80391040u, 0x8039157Cu})
     assert(IsCaptureBoundary(pc));
+  for (u32 pc : STADIUM_CONSTRUCTOR_PCS) assert(IsCaptureBoundary(pc) == constructor);
   assert(IsCaptureBoundary(SSS_ENTER_RETURN) == sss);
+  assert(IsCaptureBoundary(STADIUM_GO_AFTER_PC) == stadium);
   assert(IsCaptureBoundary(0x8016EBC0) == sd);
   assert(IsCaptureBoundary(0x8016EC24) == sd);
   assert(!IsCaptureBoundary(0x8025B850));
@@ -423,9 +457,10 @@ int main(int argc, char** argv) {
             if built.returncode:
                 _retain_cpp_failure(path, command, built)
             self.assertEqual(built.returncode, 0, built.stderr)
-            for mode in ("default", "transform", "invalid-transform", "ordinary-without-sd",
-                         "ordinary_timeout", "sd_prefix", "competitive_entry", "sparse_pair",
-                         "rules_ready"):
+            for mode in ("default", "transform", "invalid-transform", "stadium-go",
+                         "stadium-constructor", "constructor-without-stadium",
+                         "ordinary-without-sd", "ordinary_timeout", "sd_prefix",
+                         "competitive_entry", "sparse_pair", "rules_ready"):
                 with self.subTest(mode=mode):
                     command = [str(path / "owner"), mode]
                     checked = subprocess.run(command, capture_output=True, text=True)
@@ -439,7 +474,72 @@ int main(int argc, char** argv) {
                       source.index("struct SliceRef")]
         entries = re.findall(r"^\s+(\w+) = (\d+),", enum, re.MULTILINE)
         tags = {name: int(value) for name, value in entries}
-        self.assertEqual(sorted(tags.values()), list(range(1, 59)))
+        # Preserve the shipped namespace and exact appended Stadium/first-form inventory.
+        # The fixed contiguous range rejects both duplicate values and gaps.
+        old_names = """
+            PadStatusAll4 PadQueue PadSlot MatchSetup FighterHead FighterInputAnim FighterDamageShield FighterStocks
+            CpuState Camera CameraProjection Hud Magnifier MatchClock Result SceneEntityHeads SceneRouting
+            FighterSubject RngPointer RngValue PadSnapshot RetraceCount SourceVICount FighterCreateContext
+            SceneEntityCount SceneEntityHeadsPointer PadPollCaller CameraObjectPointer SceneRequest SceneFrame
+            MenuCssState MenuSssState MenuAudio MenuAudioVoice MenuSssRoute ProfileCharacters ProfileStages
+            ProfileGameRules ProfileSaveData SceneKind StageSelectIndex StageSelectKind MenuCssCursor MenuCssDoors
+            MenuMainFlow MenuMainInput MenuCssModel MenuCssLiveState MenuCssSlider MenuCssContext MenuCssKoCounts
+            PlayerEntities PlayerEntityUserData SdRumblePorts SdStageCooldown SdItemsLock PlayerIdentity
+            PlayerTransformed SssPositionCursorWorld SssPositionTargetWorld SssPositionGObj SssPositionProc
+            SssPositionTargetRow SssPositionScheduler SssPositionAxes SssPositionCursorLocal StadiumMapRoot
+            StadiumGroundPointer StadiumMap2Gate StadiumMap2Countdown StadiumMap2Phase StadiumMap2Form
+            StadiumMap2PreviousForm StadiumMap2PriorForm StadiumMap2Map5Root StadiumDisplayTimer StadiumDisplayMode
+            StadiumDisplayFlags StadiumDisplayPreviousFlags StadiumDisplayPreviousMode StadiumDisplayFocusedPlayer
+            StadiumDisplaySelectionCounter StadiumDisplayPackedFlags StadiumTitleScratch StadiumFont1SlotPointer
+            StadiumTitleChildGObj StadiumTitleTextWrapper StadiumTitleStaticTextPointer
+            StadiumTitleDynamicTextPointer
+        """.split()
+        self.assertEqual({name: tags[name] for name in old_names},
+                         {name: value for value, name in enumerate(old_names, 1)})
+        appended = {
+            "StadiumConstructorGObj": 90, "StadiumConstructorGround": 91,
+            "StadiumConstructorListHead": 92, "StadiumConstructorParameterSlot": 93,
+            "StadiumConstructorParameters": 94, "StadiumConstructorPLinkLimit": 95,
+            "StadiumConstructorChainNode": 96, "StadiumConstructorStoreWord": 97,
+            "StadiumConstructorEntities": 98,
+            "StadiumFirstFormIncoming": 99, "StadiumFirstFormCurrentId": 100,
+            "StadiumFirstFormIncomingId": 101, "StadiumFirstFormLegacyRoot": 102,
+            "StadiumFirstFormRoot": 103, "StadiumFirstFormGround": 104,
+            "StadiumFirstFormGroundId": 105,
+        }
+        self.assertEqual({name: tags[name] for name in appended}, appended)
+        self.assertEqual(set(tags), set(old_names) | set(appended))
+        self.assertEqual(sorted(tags.values()), list(range(1, 106)))
+        self.assertEqual({name: tags[name] for name in (
+            "StadiumMapRoot", "StadiumGroundPointer", "StadiumMap2Gate",
+            "StadiumMap2Countdown", "StadiumMap2Phase", "StadiumMap2Form",
+            "StadiumMap2PreviousForm", "StadiumMap2PriorForm", "StadiumMap2Map5Root",
+            "StadiumDisplayTimer", "StadiumDisplayMode", "StadiumDisplayFlags",
+            "StadiumDisplayPreviousFlags", "StadiumDisplayPreviousMode",
+            "StadiumDisplayFocusedPlayer", "StadiumDisplaySelectionCounter",
+            "StadiumDisplayPackedFlags", "StadiumTitleScratch",
+            "StadiumFont1SlotPointer", "StadiumTitleChildGObj",
+            "StadiumTitleTextWrapper", "StadiumTitleStaticTextPointer",
+            "StadiumTitleDynamicTextPointer")}, {
+                "StadiumMapRoot": 67, "StadiumGroundPointer": 68, "StadiumMap2Gate": 69,
+                "StadiumMap2Countdown": 70, "StadiumMap2Phase": 71, "StadiumMap2Form": 72,
+                "StadiumMap2PreviousForm": 73, "StadiumMap2PriorForm": 74,
+                "StadiumMap2Map5Root": 75, "StadiumDisplayTimer": 76,
+                "StadiumDisplayMode": 77, "StadiumDisplayFlags": 78,
+                "StadiumDisplayPreviousFlags": 79, "StadiumDisplayPreviousMode": 80,
+                "StadiumDisplayFocusedPlayer": 81, "StadiumDisplaySelectionCounter": 82,
+                "StadiumDisplayPackedFlags": 83, "StadiumTitleScratch": 84,
+                "StadiumFont1SlotPointer": 85, "StadiumTitleChildGObj": 86,
+                "StadiumTitleTextWrapper": 87, "StadiumTitleStaticTextPointer": 88,
+                "StadiumTitleDynamicTextPointer": 89})
+        self.assertEqual({name: tags[name] for name in (
+            "SssPositionCursorWorld", "SssPositionTargetWorld", "SssPositionGObj",
+            "SssPositionProc", "SssPositionTargetRow", "SssPositionScheduler",
+            "SssPositionAxes", "SssPositionCursorLocal")}, {
+                "SssPositionCursorWorld": 59, "SssPositionTargetWorld": 60,
+                "SssPositionGObj": 61, "SssPositionProc": 62,
+                "SssPositionTargetRow": 63, "SssPositionScheduler": 64,
+                "SssPositionAxes": 65, "SssPositionCursorLocal": 66})
         self.assertEqual(tags["PlayerIdentity"], 57)
         self.assertEqual(tags["PlayerTransformed"], 58)
         identity = struct.pack(">III", 2, 18, 0) + bytes((0, 0, 0, 0))
@@ -663,6 +763,7 @@ int main(int argc, char** argv) {
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <string>
 #include <unordered_map>
 #include <vector>
 using u8 = uint8_t;

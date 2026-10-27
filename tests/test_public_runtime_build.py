@@ -177,12 +177,16 @@ class PublicRuntimeBuildTests(unittest.TestCase):
         self.assertIn("target_compile_definitions(gameplay_menu_browser PRIVATE", browser)
         self.assertIn("_melee_web_native_menu_stadium_c1a_arm", browser)
         self.assertIn("_melee_web_native_menu_stadium_c1a_asset_scope", browser)
+        self.assertIn("stadium_recreation_identity_library.js", browser)
+        self.assertIn("--js-library=${MELEE_WEB_STADIUM_RECREATION_IDENTITY_JS_LIBRARY}", browser)
         public_player = cmake.split("# The public player", 1)[1].split(
             "# Shared typed scene/model tables", 1)[0]
         self.assertNotIn("MELEE_WEB_STADIUM_C1A_DIAGNOSTIC", public_player)
         self.assertNotIn("_melee_web_native_menu_stadium_c1a_arm", public_player)
         self.assertNotIn("_melee_web_native_menu_stadium_c1a_asset_scope", public_player)
         self.assertNotIn("_melee_web_native_menu_stadium_c1a_observe", public_player)
+        self.assertNotIn("stadium_recreation_identity_library.js", public_player)
+        self.assertNotIn("_melee_web_native_menu_stadium_recreation_close", public_player)
 
     def test_development_target_keeps_instrumentation(self):
         cmake = (ROOT / "cmake/FighterRuntime.cmake").read_text(encoding="utf-8")

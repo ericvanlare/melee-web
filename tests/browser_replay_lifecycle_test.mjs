@@ -2,11 +2,61 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import {randomUUID} from 'node:crypto';
 const page=fs.readFileSync(new URL('../web/runtime-development.mjs',import.meta.url),'utf8');
 const start=page.slice(page.indexOf("$('retail-replay-start').onclick="),page.indexOf("\n$('disc').onchange="));
 const pause=page.slice(page.indexOf("$('pause').onclick="),page.indexOf("\n$('unload').onclick="));
 const completion=page.slice(page.indexOf('window.menuReplayCompleted='),page.indexOf('\nwindow.menuReplayPoll='));
 assert(start&&pause&&completion);
+
+// Source-extraction closure for the inactive legacy route. Every VM receives
+// the actual transfer owner, not a constant-false native-access success stub.
+const sharedRuntime=fs.readFileSync(new URL('../web/melee-runtime.mjs',import.meta.url),'utf8');
+function exactSourceSlice(text,start,end){
+ assert.equal(text.split(start).length,2,`Expected one source start: ${start}`);
+ assert.equal(text.split(end).length,2,`Expected one source end: ${end}`);
+ const from=text.indexOf(start),to=text.indexOf(end);
+ assert.ok(to>from,`Source extraction order: ${start}`);
+ return text.slice(from,to);
+}
+const transferOwnerSource=exactSourceSlice(sharedRuntime,
+ '  let saveProfileSnapshotsActive = 0;', '  // END LATER_B_REPLAY_TRANSFER_OWNER');
+const suspendedSource=page.split('\n').find(line=>line.startsWith('const laterBReplayNativeSuspended='));
+const nativeAccessSource=page.split('\n').find(line=>line.startsWith('function assertLaterBReplayNativeAccess()'));
+assert.ok(suspendedSource&&nativeAccessSource);
+const deferFinishSource=exactSourceSlice(page,'function laterBReplayDeferFinish(run,reason){',
+ '// END LATER_B_REPLAY_SHELL_TRANSFER');
+const writeEvidenceSource=exactSourceSlice(page,'async function writeRetailReplayEvidence(',
+ 'function finishRetailReplay(reason){');
+function createLifecycleContext(scope){
+ // Explicit modeled fixture state only: no transfer was reserved in these
+ // preexisting legacy cases. The production owner itself decides suspension.
+ scope.owner??={};scope.retailRun??=null;scope.crypto??={randomUUID};
+ vm.createContext(scope);
+ vm.runInContext(transferOwnerSource+'\nconst laterBReplayTransfer = createLaterBReplayTransferOwner();',scope);
+ scope.owner.laterBReplayTransfer=vm.runInContext('laterBReplayTransfer',scope);
+ vm.runInContext(suspendedSource+'\n'+nativeAccessSource+'\n'+deferFinishSource+'\n'+writeEvidenceSource,scope);
+ return scope;
+}
+{
+ // Fail-closed countercontrol: an actual reserved owner blocks ordinary native
+ // access/cache export and defers finish. Only idle/snapshot leaves are modeled.
+ const scope={owner:{},ready:true,fatal:false,destroyed:false,busy:false,
+  assetTransfer:null,networkSessionClose:null,commands:[],loading:null,
+  Module:{stadiumMatchedSetupNativeIdle:()=>true},snapshot:()=>({})};
+ createLifecycleContext(scope);
+ const transfer=scope.owner.laterBReplayTransfer;
+ assert.equal(transfer.suspended(),false);
+ transfer.reserve({reference_id:'original-b-2013-943-v1',
+  recipe_sha256:'5fb53bdc71b35b800bc3451b1d9117709edef2413a38a8f7311ee352647a6755',
+  cursor:943,notification_order:4330,world_generation:7,setup_seed_hex:'4b25c79b'});
+ assert.equal(vm.runInContext('laterBReplayNativeSuspended()',scope),true);
+ assert.throws(()=>vm.runInContext('assertLaterBReplayNativeAccess()',scope),/forbids ordinary native diagnostics/);
+ assert.throws(()=>transfer.beginCacheExport(),/forbids cache export/);
+ scope.activeRun={laterBTransfer:{finishRequests:[]}};
+ assert.equal(vm.runInContext("laterBReplayDeferFinish(activeRun,'blocked finish')",scope),true);
+ assert.deepEqual(scope.activeRun.laterBTransfer.finishRequests,['blocked finish']);
+}
 {
  const unload=page.slice(page.indexOf("$('unload').onclick="),page.indexOf('\ncontrollerSettings ='));
  for(const replayActive of [true,false]){
@@ -17,7 +67,7 @@ assert(start&&pause&&completion);
    owner:{handle:{unload:async()=>{events.push('ordinary-unload');}}},
    finishRetailReplay:async reason=>{events.push(reason);await exported;events.push('exported');},
    log:error=>{throw Error(error);}};
-  vm.createContext(scope);vm.runInContext(unload,scope);
+  createLifecycleContext(scope);vm.runInContext(unload,scope);
   const stopped=elements.unload.onclick();
   if(replayActive){
    assert.deepEqual(events,['Manual unload stopped the replay']);
@@ -45,7 +95,7 @@ assert(start&&pause&&completion);
    Module:{_melee_web_native_menu_replay_cursor:()=>cursor,_melee_web_native_menu_running:()=>running},
    finishRetailReplay:async reason=>{ended.push(reason);run.finishing=true;},
    retailReplayWallTimeMs:()=>900000};
-  vm.createContext(scope);vm.runInContext(leases+'\n'+poll,scope);
+  createLifecycleContext(scope);vm.runInContext(leases+'\n'+poll,scope);
   const acquire=()=>scope.window.menuReplayAcquireStoppedEvidence(cursor,()=>{
    nativeCalls.push('pause');running=0;return{acknowledged:true};});
   return{scope,run,ended,nativeCalls,acquire,setNow:v=>now=v,setCursor:v=>cursor=v,
@@ -111,7 +161,7 @@ assert(start&&pause&&completion);
   latestAudio:{},diagnosticCaptureInvalid:false,navigator:{userAgent:'test'},devicePixelRatio:1,
   replayDownload:(name,text)=>downloads.push([name,JSON.parse(text)]),$:()=>({}),
   syncAudio(){},fatal:false,bundle:true,importing:false};
- vm.createContext(scope);vm.runInContext(finish,scope);
+ createLifecycleContext(scope);vm.runInContext(finish,scope);
  const first=scope.finishRetailReplay('Diagnostic stopped-prefix evidence complete');
  const joined=scope.finishRetailReplay('second request');
  assert.equal(first,joined,'All requests await one owner finish promise');
@@ -135,7 +185,7 @@ assert(start&&pause&&completion);
  const ended=[],display={files:[{}],dataset:{}};
  const scope={developmentHooks:{},window:{},retailRun:{},ready:true,fatal:false,bundle:true,
   replayLoading:false,$:()=>display,finishRetailReplay:reason=>ended.push(reason)};
- vm.createContext(scope);vm.runInContext(failed+'\n'+poll,scope);
+ createLifecycleContext(scope);vm.runInContext(failed+'\n'+poll,scope);
  scope.developmentHooks.preparationFailed('PlLk.dat: invalid descriptor');
  assert.equal(ended.length,0,'Teardown is deferred until the next poll');
  assert.equal(scope.preparationSince,0);
@@ -170,7 +220,7 @@ assert(start&&pause&&completion);
     _melee_web_native_menu_cache_idle:()=>{events.push('idle-check');return idleCalls++?finalState:0;},
     markRuntimeCacheDirty(){this.runtimeCacheState.dirty=true;events.push('dirty');},
     saveRuntimeCache:async()=>{events.push('save');return true;}}};
-  vm.createContext(scope);vm.runInContext(cacheReader+'\n'+unload+'\n'+flush,scope);
+  createLifecycleContext(scope);vm.runInContext(cacheReader+'\n'+unload+'\n'+flush,scope);
   if(finalState===2){
    await assert.rejects(scope.unloadAndSave(),/Invalid native cache idle state: 2/);
    assertNormalCloseBeforeUnload(events);
@@ -192,7 +242,7 @@ assert(start&&pause&&completion);
    _melee_web_native_menu_cache_idle:()=>cacheState,
    saveRuntimeCache:async()=>{saves++;return false;},
    FS:{readdir:()=>{reads++;return [];}}}};
-  vm.createContext(scope);vm.runInContext(exportHandler,scope);await button.onclick();
+  createLifecycleContext(scope);vm.runInContext(exportHandler,scope);await button.onclick();
   assert.equal(reads,0,'Export must not publish stale files before native flush and persistence both succeed');
   assert.equal(saves,cacheState===1?1:0);assert.equal(errors.length,1);
  }
@@ -201,7 +251,7 @@ assert(start&&pause&&completion);
  const handler=page.split('\n').find(line=>line.startsWith('window.menuRuntimeTimingError='));
  const failed=[];
  const scope={window:{},diagnosticCaptureInvalid:false,stop:error=>failed.push(error)};
- vm.createContext(scope);vm.runInContext(handler,scope);
+ createLifecycleContext(scope);vm.runInContext(handler,scope);
  scope.window.menuRuntimeTimingError('Native menu timing JSON exceeded 4096 bytes');
  assert.equal(scope.diagnosticCaptureInvalid,true);
  assert.deepEqual(failed,['Native menu timing JSON exceeded 4096 bytes'],
@@ -213,7 +263,7 @@ assert(start&&pause&&completion);
  const scope={fatal:true,retailRun:null,$:()=>display,
   Module:{_melee_web_native_menu_running(){nativeCalls++;return 1;}},
   fetch:async(path,options)=>{posted.push([path,options.body]);return{ok:true,json:async()=>({path})};}};
- vm.createContext(scope);vm.runInContext(save,scope);
+ createLifecycleContext(scope);vm.runInContext(save,scope);
  await scope.saveEvidence([['retail-browser-report.json','retained failure']]);
  assert.equal(nativeCalls,0,'Saving retained crash evidence must not call the aborted module');
  assert.deepEqual(posted,[['/__melee_evidence/retail-browser-report.json','retained failure']]);
@@ -232,7 +282,7 @@ assert(start&&pause&&completion);
   settlingEntryProfile:null,pendingEntryProfile:null,
   Module:{HEAPU8:new Uint8Array(2048),_melee_web_native_menu_replay_cursor:()=>42,
    _melee_web_native_menu_diagnostics(){diagnostics++;return 'source tick 42';},UTF8ToString:x=>x}};
- vm.createContext(scope);vm.runInContext(reset+'\n'+timing+'\n'+metrics,scope);
+ createLifecycleContext(scope);vm.runInContext(reset+'\n'+timing+'\n'+metrics,scope);
  scope.resetTiming();
  const sample=(frame,total,preparation=0)=>scope.window.menuRuntimeTiming({
   valid:1,frame,total_ms:total,preparation_ms:preparation,draw_ms:4,end_ms:3,
@@ -269,9 +319,9 @@ assert(start&&pause&&completion);
  const replayLimits=page.match(/const RETAIL_REPLAY_(?:LEGACY_MAX_FRAMES|WHOLE_SESSION_MAX_FRAMES|STATE_RECORD_OVERHEAD|SESSION_RECORD_OVERHEAD|TIMER_RECORD_OVERHEAD|MAX_BYTES)[^;]*;/g).join('\n');
  const moduleLine=replayLimits+'\nconst hooks={'+logHook+'}; var Module={print:text=>hooks.onLog(text,false),printErr:text=>hooks.onLog(text,true)};';
  const logged=[];
- const scope={$:()=>({}),retailRun:{observe:true,rows:[],timerRows:[]},
+ const scope={window:{},$:()=>({}),retailRun:{observe:true,rows:[],timerRows:[]},
   log:text=>logged.push(text),stop(){}};
- vm.createContext(scope);vm.runInContext(moduleLine,scope);
+ createLifecycleContext(scope);vm.runInContext(moduleLine,scope);
  const state='{"record":"frame","index":0}';
  const timer='{"record":"frame","index":0,"seconds":480}';
  scope.Module.print(state);
@@ -303,7 +353,7 @@ assert(start&&pause&&completion);
  const memory=page.slice(page.indexOf('const replayMemorySnapshot='),page.indexOf('\nfunction replayMetrics('));
  let nativeCalls=0;
  const scope={fatal:true,Module:{_melee_web_native_menu_memory(){nativeCalls++;throw Error('unavailable');}}};
- vm.createContext(scope);vm.runInContext(memory,scope);
+ createLifecycleContext(scope);vm.runInContext(memory,scope);
  assert.equal(vm.runInContext('replayMemorySnapshot().available',scope),false);
  assert.equal(nativeCalls,0,'A native abort must not trigger an allocator walk');
  scope.fatal=false;
@@ -336,7 +386,7 @@ function harness(unload=true,wholeSession=false){
    _melee_web_native_menu_running:()=>1,
    _melee_web_native_menu_pause:()=>{calls.paused++;}}};
  const replayLimits=page.match(/const RETAIL_REPLAY_(?:LEGACY_MAX_FRAMES|WHOLE_SESSION_MAX_FRAMES|STATE_RECORD_OVERHEAD|SESSION_RECORD_OVERHEAD|TIMER_RECORD_OVERHEAD|MAX_BYTES)[^;]*;/g).join('\n');
- vm.createContext(scope);vm.runInContext(replayLimits+'\n'+start+'\n'+pause,scope);
+ createLifecycleContext(scope);vm.runInContext(replayLimits+'\n'+start+'\n'+pause,scope);
  return {$,scope,calls,resolveBytes,play:()=>$('retail-replay-start').onclick()};
 }
 {
@@ -371,10 +421,10 @@ function harness(unload=true,wholeSession=false){
  assert.equal(h.$('retail-replay-report').textContent,'teardown failed');
  assert.equal(h.scope.replayLoading,false);assert.equal(h.$('disc').disabled,false);
 }
-{
+for(const version of [8,9,10,11]){
  const h=harness(true,true);const playing=h.play();
  const bytes=new ArrayBuffer(1194),header=new DataView(bytes);
- header.setUint32(0,0x4d575243,false);header.setUint32(4,8,false);
+ header.setUint32(0,0x4d575243,false);header.setUint32(4,version,false);
  h.resolveBytes(bytes);await playing;
  assert.equal(h.calls.unload,0,'Whole-session replay retains the canonical prepared CSS assets');
  assert.equal(h.calls.native,1);
@@ -494,7 +544,7 @@ function harness(unload=true,wholeSession=false){
   Module:{HEAPU8:new Uint8Array(2048),_melee_web_native_menu_phase:()=>7,_melee_web_native_menu_stock_check_ready:()=>1,
    _melee_web_native_menu_running:()=>1,_melee_web_native_menu_message:()=>0,_melee_web_native_menu_diagnostics:()=>0,
    _melee_web_input_message:()=>0,_melee_web_native_menu_replay_cursor:()=>42,UTF8ToString:value=>value}};
- vm.createContext(scope);vm.runInContext(reset+'\n'+frame+'\n'+metrics,scope);
+ createLifecycleContext(scope);vm.runInContext(reset+'\n'+frame+'\n'+metrics,scope);
  scope.resetTiming();scope.frameLast=1000;scope.perfLastReport=2000;
  scope.nativePreviousTiming={frame:3,total_ms:7,end_phases:{staging_writes_ms:0.4}};
  scope.nativeLastTiming={frame:4,total_ms:18,end_phases:{staging_writes_ms:13}};clock=1034.72;
@@ -524,7 +574,7 @@ function harness(unload=true,wholeSession=false){
   Module:{HEAPU8:new Uint8Array(2048),_melee_web_native_menu_phase:()=>7,_melee_web_native_menu_stock_check_ready:()=>1,
    _melee_web_native_menu_running:()=>1,_melee_web_native_menu_message:()=>0,_melee_web_native_menu_diagnostics:()=>0,
    _melee_web_input_message:()=>0,UTF8ToString:value=>value}};
- vm.createContext(scope);vm.runInContext(reset+'\n'+frame.replace('developmentHooks.frame=', 'window.menuFrame='),scope);scope.resetTiming();scope.frameLast=1000;scope.perfLastReport=1000;
+ createLifecycleContext(scope);vm.runInContext(reset+'\n'+frame.replace('developmentHooks.frame=', 'window.menuFrame='),scope);scope.resetTiming();scope.frameLast=1000;scope.perfLastReport=1000;
  scope.window.menuFrame(true);assert.equal(sceneReads,0);assert.equal(inputReads,0);assert.equal(polls,1);
  clock=1260;scope.window.menuFrame(true);assert.equal(sceneReads,1);assert.equal(inputReads,1);
  assert.equal(polls,2,'Replay polling remains per callback while diagnostics refresh is throttled');assert.equal(scope.activeFrames,2);

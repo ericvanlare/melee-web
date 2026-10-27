@@ -2,7 +2,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 const page=fs.readFileSync(new URL('../web/runtime-development.mjs',import.meta.url),'utf8');
-const finish=page.slice(page.indexOf('function finishRetailReplay('),page.indexOf('window.menuReplayStarted='));
+function actualSlice(start,end){
+ assert.equal(page.split(start).length,2,`Expected one source start: ${start}`);
+ assert.equal(page.split(end).length,2,`Expected one source end: ${end}`);
+ assert.ok(page.indexOf(end)>page.indexOf(start));
+ return page.slice(page.indexOf(start),page.indexOf(end));
+}
+// Shared writer/defer definitions moved outside finishRetailReplay in source.
+const defer=actualSlice('function laterBReplayDeferFinish(run,reason){','// END LATER_B_REPLAY_SHELL_TRANSFER');
+const finish=actualSlice('async function writeRetailReplayEvidence(','window.menuReplayStarted=');
 for(const [prefix,teardown,observations,bound,mode] of [[true,true,60,60],[true,false,60,60],[true,true,59,60],[true,true,61,61],[true,true,60,61],[true,true,65,65],[false,true,0,0],[true,true,120,120,2],[true,false,120,120,2],[true,true,60,60,2],[true,true,605,605,2]]){
  let release,unloads=0;
  const pending=new Promise(resolve=>{release=resolve;});
@@ -17,7 +25,13 @@ for(const [prefix,teardown,observations,bound,mode] of [[true,true,60,60],[true,
   navigator:{userAgent:'synthetic'},devicePixelRatio:1,TextEncoder,
   replayHash:async()=> 'synthetic',replayDownload:(name,text)=>downloads.push([name,text]),
   $:()=>({}),syncAudio(){},fatal:false,bundle:true,importing:false};
- vm.createContext(scope);vm.runInContext(finish,scope);
+ vm.createContext(scope);vm.runInContext(defer+'\n'+finish,scope);
+ // Actual defer path cannot unload/export while a transfer owns the run.
+ run.laterBTransfer={finishRequests:[]};
+ assert.equal(await scope.finishRetailReplay('held by transfer'),false);
+ assert.equal(unloads,0);assert.equal(downloads.length,0);
+ assert.deepEqual(run.laterBTransfer.finishRequests,['held by transfer']);
+ delete run.laterBTransfer;
  const done=scope.finishRetailReplay(null);
  assert.equal(unloads,1);assert.equal(downloads.length,0,'Evidence waits for actual owned teardown');
  release(teardown);await done;
@@ -53,7 +67,7 @@ for(const [mode,completed] of [[1,null],[1,false],[0,true],[2,null],[2,1]]){
   navigator:{userAgent:'synthetic'},devicePixelRatio:1,TextEncoder,replayHash:async()=> 'synthetic',
   replayDownload(){},syncAudio(){},fatal:false,bundle:true,importing:false,
   setTimeout:fn=>callbacks.push(fn)};
- vm.createContext(scope);vm.runInContext(finish,scope);
+ vm.createContext(scope);vm.runInContext(defer+'\n'+finish,scope);
  await vm.runInContext('(async()=>{'+requestedBlock+'})()',scope);
  assert.equal(scope.retailRun.diagnosticEntityPrefix,requested);
  if(completed!==null){vm.runInContext(completionBlock,scope);scope.window.menuReplayCompleted(0,false,0,-1,3,completed,60,0,59,60);

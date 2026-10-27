@@ -129,10 +129,12 @@ def _extract_function(source, signature, *, following_signature=None):
     return source[start:_matching_brace(source, opening)] + "\n"
 
 
-def _run(command, *, cwd=ROOT, env=None, input_text=None, timeout=120):
+def _run(command, *, cwd=ROOT, env=None, input_text=None, stdin=None, timeout=120):
+    if input_text is not None and stdin is not None:
+        raise ValueError("choose text input or an explicit stdin stream")
     result = subprocess.run(
-        command, cwd=cwd, env=env, input=input_text, capture_output=True,
-        text=True, timeout=timeout,
+        command, cwd=cwd, env=env, input=input_text, stdin=stdin,
+        capture_output=True, text=True, timeout=timeout,
     )
     return result
 
@@ -275,7 +277,7 @@ class DboocScalarHelperTests(unittest.TestCase):
             node = node_runtime()
             wasm_run = self._capture_command(
                 scratch, "wasm-run", [str(node), str(wasm)], env=env,
-                input_text=vector_input,
+                stdin_path=scratch / "vectors.txt",
             )
             self.assertEqual(wasm_run.returncode, 0, wasm_run.stdout + wasm_run.stderr)
 
@@ -334,8 +336,16 @@ class DboocScalarHelperTests(unittest.TestCase):
                 self.assertFalse(scratch.exists())
 
     @staticmethod
-    def _capture_command(scratch, label, command, *, env=None, input_text=None):
-        result = _run(command, env=env, input_text=input_text)
+    def _capture_command(
+        scratch, label, command, *, env=None, input_text=None, stdin_path=None,
+    ):
+        if stdin_path is None:
+            result = _run(command, env=env, input_text=input_text)
+        else:
+            if input_text is not None:
+                raise ValueError("stdin_path and input_text are mutually exclusive")
+            with Path(stdin_path).open("rb") as input_stream:
+                result = _run(command, env=env, stdin=input_stream)
         (scratch / f"{label}.log").write_text(
             json.dumps({
                 "command": [str(argument) for argument in command],

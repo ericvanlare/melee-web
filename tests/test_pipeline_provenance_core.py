@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 HEADER = ROOT / "src" / "pipeline_provenance.h"
 SOURCE = ROOT / "src" / "pipeline_provenance.cpp"
 FIXTURE = ROOT / "tests" / "pipeline_provenance_test.cpp"
+HASH = ROOT / "src" / "private_sha256.hpp"
 
 
 class PipelineProvenanceCoreStaticTests(unittest.TestCase):
@@ -22,6 +23,7 @@ class PipelineProvenanceCoreStaticTests(unittest.TestCase):
         cls.header = HEADER.read_text(encoding="utf-8")
         cls.source = SOURCE.read_text(encoding="utf-8")
         cls.fixture = FIXTURE.read_text(encoding="utf-8")
+        cls.hash_leaf = HASH.read_text(encoding="utf-8")
 
     def test_private_build_guards_are_present(self):
         self.assertIn("#error", self.header)
@@ -88,8 +90,9 @@ class PipelineProvenanceCoreStaticTests(unittest.TestCase):
         self.assertIn("execution_depth", self.source)
 
     def test_descriptor_bytes_are_hashed_and_not_serialized(self):
-        self.assertIn("class Sha256", self.source)
-        self.assertIn("std::array<uint8_t, 32> digest", self.source)
+        self.assertIn("class Sha256", self.hash_leaf)
+        self.assertIn("using melee_web::private_sha256::digest;", self.source)
+        self.assertIn("std::array<uint8_t, 32> digest", self.hash_leaf)
         self.assertIn("const auto descriptor_sha256 = digest(blob, blob_length)", self.source)
         self.assertIn("descriptor_sha256", self.source)
         self.assertNotIn("output += blob", self.source)

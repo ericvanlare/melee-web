@@ -130,6 +130,9 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   let keyboard = [true, true], layout = 'two';
   const commands = [], listeners = [];
   let terminalDrawDiscardRetirementConsumed = false;
+  let terminalMatchedSetupCfRetirementObserved = false;
+  let terminalMatchedSetupCfRetirementConsumed = false;
+  let stadiumRecreationCloseSettled = false;
   let diagnostics = null, diagnosticActive = true, longtaskObserver = null, diagnosticPreparationAt = null;
   let diagnosticDelivery = null, diagnosticDeliveryTimer = null, diagnosticRetainedLoaded = false;
   let diagnosticMatureDeliveryPromise = null;
@@ -159,6 +162,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     diagnosticDeliveryTimer = null;
   }
   function requestDiagnosticCheckpoint() {
+    if (laterBReplayTransfer.suspended()) return Promise.resolve({persisted: false, reason: 'private-replay-transfer'});
     diagnosticCheckpointRequested = true;
     if (!diagnostics) {
       diagnosticCheckpointRequested = false;
@@ -348,10 +352,124 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       ready = true; publish(); resolveStartup();
     },
   };
-  const status = () => ready ? Module.UTF8ToString(Module._melee_web_native_menu_message()) : 'Starting WebGPU…';
+  // Private Gate2 shell ownership. Native transfer/abort producers are separate
+  // prerequisites: reserving a token is NOT evidence that native moved a parent.
+  // BEGIN LATER_B_REPLAY_TRANSFER_OWNER
+  let saveProfileSnapshotsActive = 0;
+  function createLaterBReplayTransferOwner() {
+    let active = null;
+    const cacheExports = new Set();
+    const copy = value => JSON.parse(JSON.stringify(value));
+    const freeze = value => { if (value && typeof value === 'object') { for (const item of Object.values(value)) freeze(item); Object.freeze(value); } return value; };
+    const profiles = Object.freeze({
+      'original-b-2013-943-v1': Object.freeze({recipe_sha256:'5fb53bdc71b35b800bc3451b1d9117709edef2413a38a8f7311ee352647a6755',cursor:943,setup_seed_hex:'4b25c79b'}),
+      'original-b-5422-951-long-v1': Object.freeze({recipe_sha256:'e669f831538b90e39241a569b6c38884300bfe246b252cacda994cbc45c10bbf',cursor:951,setup_seed_hex:'25d557a7'}),
+    });
+    const keys = ['reference_id', 'recipe_sha256', 'cursor', 'notification_order', 'world_generation', 'setup_seed_hex'];
+    const owned = token => {
+      if (!active || active.token !== token || active.consumed) throw Error('Later B replay transfer token is stale, repeated or foreign');
+      return active;
+    };
+    const same = (value, expected) => value && keys.every(key => value[key] === expected[key]);
+    const proof = value => active && value?.schema === 'melee-web-stadium-later-b-parent-transfer-v1' &&
+      value.token === active.token.id && same(value, active.request) &&
+      value.parent_identity_checked === true;
+    const api = {
+      suspended: () => active !== null,
+      beginCacheExport() {
+        if (active) throw Error('Private replay continuation forbids cache export');
+        const token = Object.freeze({}); cacheExports.add(token); return token;
+      },
+      endCacheExport(token) {
+        if (!cacheExports.delete(token)) throw Error('Cache export transaction token is foreign or repeated');
+      },
+      checkReservation(request) {
+        const profile = request && Object.hasOwn(profiles, request.reference_id) ? profiles[request.reference_id] : null;
+        if (cacheExports.size || saveProfileSnapshotsActive || active || !ready || fatal || destroyed || busy || assetTransfer || networkSessionClose || commands.length ||
+            (loading && loading.phase !== 'native') ||
+            Module.stadiumMatchedSetupNativeIdle?.() !== true ||
+            !request || Object.keys(request).sort().join(',') !== [...keys].sort().join(',') ||
+            !profile || request.recipe_sha256 !== profile.recipe_sha256 ||
+            request.cursor !== profile.cursor || request.setup_seed_hex !== profile.setup_seed_hex ||
+            !Number.isSafeInteger(request.notification_order) || request.notification_order < 1 ||
+            !Number.isSafeInteger(request.world_generation) || request.world_generation < 1)
+          throw Error('Later B replay transfer requires an idle exact new-reference Setup reservation');
+      },
+      reserve(request) {
+        api.checkReservation(request);
+        const before = snapshot();
+        active = {token: Object.freeze({id: crypto.randomUUID()}), request: freeze(copy(request)),
+          before, phase: 'reserved', transferred: false, terminal: null, consumed: false, failures: []};
+        return active.token;
+      },
+      request(token) { return owned(token).request; },
+      state() { return active ? {phase: active.phase, transferred: active.transferred,
+        consumed: active.consumed, failures: [...active.failures]} : null; },
+      snapshot() {
+        return active && Object.freeze({...active.before, loading, state: 'diagnostic-transfer', running: false,
+          message: 'Private replay continuation owns native access.', canImport: false, canStart: false,
+          canPause: false, canUnload: false, canSelectDisc: false});
+      },
+      pending(token, kind) {
+        const item = owned(token);
+        const permitted = item.phase === 'reserved' ? ['arm'] : item.phase === 'rejected' ? ['abort'] :
+          item.phase === 'transferred' ? ['action', 'retire', 'abort'] : [];
+        if (!permitted.includes(kind)) throw Error('Later B replay transfer command is repeated, pending or unsafe');
+        item.command = kind; item.phase = 'pending';
+      },
+      settled(token) {
+        const item = owned(token);
+        if (item.phase !== 'pending' || Module.stadiumMatchedSetupNativeIdle?.() !== true)
+          throw Error('Later B replay transfer requires actual settled Asyncify');
+        item.phase = item.terminal ? 'terminal' : item.transferred ? 'transferred' : 'rejected';
+      },
+      fail(reason) {
+        if (!active || active.consumed) return;
+        active.phase = 'uncertain'; active.failures.push(String(reason || 'Player stopped during transfer'));
+      },
+      uncertain(token, reason) {
+        const item = owned(token); item.phase = 'uncertain';
+        item.failures.push(String(reason || 'Native command settlement is unknown'));
+      },
+      transferred(receipt) {
+        if (!active || active.phase !== 'pending' || active.command !== 'arm' || active.transferred || !proof(receipt) ||
+            receipt.stage !== 'after-parent-move' || receipt.parent_archived !== true ||
+            receipt.source_ticks !== 0 || receipt.source_draws !== 0) return false;
+        active.transferred = true; return true;
+      },
+      acceptsTerminal(kind, receipt) {
+        if (!active || active.phase !== 'pending' || active.terminal || !proof(receipt?.later_b_transfer) ||
+            receipt.phase_after_close !== 0 || receipt.running_after_close !== 0 ||
+            receipt.later_b_transfer.parent_close_checked !== true || receipt.error !== null) return false;
+        if (kind === 'retired') {
+          if (active.command !== 'retire' || !active.transferred || receipt.native_retired !== true || receipt.terminal !== true) return false;
+        } else if (kind === 'known-unarmed-abort') {
+          if (active.command !== 'abort' || receipt.schema !== 'melee-web-stadium-later-b-unarmed-abort-v1' ||
+              receipt.native_closed !== true || receipt.attempt_consumed !== true || receipt.armed !== false ||
+              receipt.source_ticks !== 0 || receipt.source_draws !== 0 || receipt.action_cursor !== 0) return false;
+        } else return false;
+        return true;
+      },
+      terminal(kind, receipt) {
+        if (!api.acceptsTerminal(kind, receipt)) return false;
+        active.terminal = freeze({kind, receipt: copy(receipt)}); return true;
+      },
+      consume(token) {
+        const item = owned(token);
+        if (item.phase !== 'terminal' || !item.terminal || Module.stadiumMatchedSetupNativeIdle?.() !== true)
+          throw Error('Later B replay transfer has no acknowledged settled native close');
+        item.consumed = true; return item.terminal;
+      },
+    };
+    return Object.freeze(api);
+  }
+  // END LATER_B_REPLAY_TRANSFER_OWNER
+  const laterBReplayTransfer = createLaterBReplayTransferOwner();
+  const status = () => laterBReplayTransfer.suspended() ? 'Private replay continuation owns native access.' : terminalMatchedSetupCfRetirementObserved ? 'Native diagnostic owner retired.' : ready ? Module.UTF8ToString(Module._melee_web_native_menu_message()) : 'Starting WebGPU…';
   const check = result => { if (!result) throw Error(status()); return result; };
   const numericProgress = (value, fallback = 0) => Number.isFinite(Number(value)) ? Math.max(0, Math.floor(Number(value))) : fallback;
   function readNativeCacheIdle() {
+    if (laterBReplayTransfer.suspended()) throw Error('Private replay continuation forbids ordinary cache reads');
     const idle = Module._melee_web_native_menu_cache_idle;
     if (typeof idle !== 'function') throw Error('The native renderer-cache readiness service is unavailable. Reload to recover.');
     const state = idle();
@@ -423,9 +541,12 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     setLoading('catalog', 'Preparing graphics…', complete, total);
   }
   function snapshot() {
+    if (laterBReplayTransfer.suspended()) return laterBReplayTransfer.snapshot();
     refreshCatalogLoading();
-    const phase = ready && !fatal && !destroyed ? Module._melee_web_native_menu_phase() : 0;
-    const running = ready && !fatal && !destroyed && !!Module._melee_web_native_menu_running();
+    const phase = ready && !fatal && !destroyed && !terminalMatchedSetupCfRetirementObserved
+      ? Module._melee_web_native_menu_phase() : 0;
+    const running = ready && !fatal && !destroyed && !terminalMatchedSetupCfRetirementObserved &&
+      !!Module._melee_web_native_menu_running();
     const scene = SCENES[phase] || 'idle';
     const active = ['css', 'sss', 'title', 'main', 'opening', 'opening-vs',
       'match', 'results', 'prize'].includes(scene);
@@ -515,12 +636,13 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   function stop(error, startupFailureKind = 'runtime_failure') {
     if (fatal || destroyed) return;
     failProfile(startupFailureKind);
-    try { diagnosticIncident(4, null, null, null, null, 0); } catch {}
+    laterBReplayTransfer.fail(error?.message || String(error));
+    if (!laterBReplayTransfer.suspended()) { try { diagnosticIncident(4, null, null, null, null, 0); } catch {} }
     diagnosticActivity(false);
     fatal = true; message = String(error?.message || error || 'Player stopped. Reload to recover.');
     clearStartupTimeout();
     const networkClosing = closeNetworkSession('fatal');
-    retireDiscAfterNetwork(networkClosing);
+    if (!laterBReplayTransfer.suspended()) retireDiscAfterNetwork(networkClosing);
     preparationLabel = ''; preparationKeepsAudio = false; loading = null;
     syncAudio();
     for (const c of commands.splice(0)) c.reject(Error(message));
@@ -528,9 +650,10 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     rejectStartup(Error(message)); publish(); onError(Error(message)); emit('fatal', message);
   }
   failStartup = stop;
-  const boundary = run => fatal || destroyed ? Promise.reject(Error('Reload after the player stopped.')) :
+  const boundary = run => laterBReplayTransfer.suspended() ? Promise.reject(Error('Private replay continuation owns native access.')) : fatal || destroyed ? Promise.reject(Error('Reload after the player stopped.')) :
     new Promise((resolve, reject) => commands.push({run, resolve, reject}));
   async function operation(name, run, requireStartupCache = false) {
+    if (laterBReplayTransfer.suspended()) throw Error('Private replay continuation owns native access.');
     if (!ready || fatal || destroyed) throw Error('The player is unavailable. Reload to recover.');
     if (requireStartupCache && !startupCacheReady) throw Error('Graphics are still preparing. Wait for startup preparation to finish.');
     if (busy) throw Error('Wait for the current player operation to finish.');
@@ -555,12 +678,14 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   };
   const pauseAudioForPreparation = async () => { await audio?.pause(); };
   function syncAudio() {
+    if (laterBReplayTransfer.suspended()) return;
     const running = ready && !fatal && !destroyed && !!Module._melee_web_native_menu_running();
     const enabled = ready && !fatal && !destroyed && (running || preparationKeepsAudio) && !document.hidden;
     if (running) preparationKeepsAudio = false;
     audio?.setEnabled(enabled);
   }
   function diagnosticIncident(...args) {
+    if (laterBReplayTransfer.suspended()) return false;
     const result = diagnostics?.trigger(...args);
     // An earlier idle read cannot cover an incident created afterward. Its
     // persisted snapshot may outlive its slot in the bounded current ring.
@@ -632,7 +757,8 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     menuServiceCommands() {
       // Native consumes this terminal signal before input, clocks, preparation
       // or source work. Never re-enter native teardown from an audio/error event.
-      if (fatal || destroyed) return -1;
+      if (fatal || destroyed || laterBReplayTransfer.state()?.phase === 'uncertain') return -1;
+      if (laterBReplayTransfer.suspended()) return 0;
       for (const c of commands.splice(0)) {
         if (fatal || destroyed) { c.reject(Error(message || 'Player stopped.')); continue; }
         try {
@@ -675,6 +801,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     menuRenderCacheSettled() { Module.markRuntimeCacheDirty?.(); emit('cacheSettled'); },
     // This is a private native retirement event, never a synthetic frame.
     menuMatchDrawDiscardRetired() {
+      if (laterBReplayTransfer.suspended()) return false;
       if (!ready || fatal || destroyed || terminalDrawDiscardRetirementConsumed ||
           typeof Module._melee_web_native_menu_match_draw_discard_status !== 'function') return false;
       let terminal;
@@ -687,7 +814,96 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       publish(); // Derive diagnostic activity from the actual inactive owner.
       return diagnosticActive === false;
     },
+    // The explicit-step Stadium path supplies its immutable C/F receipt from
+    // native retirement. This callback deliberately reads no native exports:
+    // the awaited ccall owns teardown and the host checks Asyncify idle after it settles.
+    menuMatchedSetupCfRetired(receipt) {
+      if (laterBReplayTransfer.suspended() && !laterBReplayTransfer.acceptsTerminal('retired', receipt)) return false;
+      if (!ready || fatal || destroyed || terminalMatchedSetupCfRetirementConsumed ||
+          receipt?.schema !== 'melee-web-stadium-matched-setup-cf-retirement-v1' ||
+          receipt.native_retired !== true || receipt.terminal !== true || receipt.error !== null ||
+          receipt.phase_after_close !== 0 || receipt.running_after_close !== 0) return false;
+      const state = receipt.matched_setup_cf;
+      if (!state || state.queued === true ||
+          (state.complete === true && state.error !== null) ||
+          (state.failed === true && typeof state.error !== 'string') ||
+          !(state.complete === true || state.failed === true ||
+            (state.awaiting_approval === true && state.last_action?.complete === true)) ||
+          !['complete', 'failed', 'awaiting-approval'].includes(state.state)) return false;
+      const firstRetirementObservation = !terminalMatchedSetupCfRetirementObserved;
+      terminalMatchedSetupCfRetirementObserved = true;
+      if (firstRetirementObservation) diagnosticLifecycle('scene_exit');
+      // Native retirement closes the source owner, but it does not run the
+      // ordinary unload callback that cancels a preparation label. Do not
+      // consume host retirement while a host operation or unrelated loading
+      // phase still owns the player; a later retry can settle it after unwind.
+      const hasActiveOwner = !!busy || !!assetTransfer || commands.length !== 0;
+      if (hasActiveOwner || (loading && loading.phase !== 'native')) {
+        publish();
+        return false;
+      }
+      const canCancelStaleNativePreparation = !!preparationLabel || loading?.phase === 'native';
+      if (canCancelStaleNativePreparation) callbacks.menuPreparationCanceled();
+      else publish();
+      if (diagnosticActive !== false) return false;
+      if (laterBReplayTransfer.suspended() && !laterBReplayTransfer.terminal('retired', receipt)) return false;
+      terminalMatchedSetupCfRetirementConsumed = true;
+      return true;
+    },
+    // These callbacks require a separately reviewed native producer. No public
+    // caller receipt is accepted by the shell finalizer as native-close proof.
+    menuLaterBReplayParentTransferred(receipt) { return laterBReplayTransfer.transferred(receipt); },
+    menuLaterBReplayUnarmedAborted(receipt) { return laterBReplayTransfer.terminal('known-unarmed-abort', receipt); },
+    // Private nonterminal canary boundary. Read native state only after the
+    // generated Asyncify idle predicate; never consume terminal retirement or
+    // hide B's native state. Ordinary unload/terminal paths stay unchanged.
+    menuStadiumRecreationClosed(receipt) {
+      if (laterBReplayTransfer.suspended()) return false;
+      if (!ready || fatal || destroyed || stadiumRecreationCloseSettled ||
+          terminalMatchedSetupCfRetirementObserved || terminalMatchedSetupCfRetirementConsumed ||
+          busy || assetTransfer || commands.length || (loading && loading.phase !== 'native')) return false;
+      try {
+        if (Module.stadiumMatchedSetupNativeIdle?.() !== true ||
+            typeof Module._melee_web_native_menu_stadium_recreation_status !== 'function' ||
+            typeof Module._melee_web_native_menu_phase !== 'function' ||
+            typeof Module._melee_web_native_menu_running !== 'function' ||
+            typeof Module.UTF8ToString !== 'function') return false;
+        const state = receipt?.matched_setup_cf;
+        const prefixComplete = state?.schema === 'melee-web-stadium-source-action-native-v2' &&
+          state.scope === 'proper-prefix-next-draw-tick-draw' && state.action_count === 174 && state.cursor === 174;
+        const fullPairComplete = state?.schema === 'melee-web-stadium-source-action-native-v5' &&
+          state.scope === 'original-full7167-common-fields-seed-observation-only' &&
+          state.action_count === 7167 && state.cursor === 7167 &&
+          state.common_field_count === 15 && state.seed_value_count === 1 &&
+          state.source_ticks === 3585 && state.source_draws === 3582;
+        const typed22Complete = receipt?.schema === 'melee-web-stadium-recreation-boundary-v2' &&
+          state?.schema === 'melee-web-stadium-source-action-native-v7' &&
+          state.scope === 'fresh132-full-pair-7168-typed22-seed-observation-only' &&
+          state.common_field_count === 22 && state.seed_value_count === 1 &&
+          state.action_count === 7168 && state.cursor === 7168 &&
+          state.source_ticks === 3585 && state.source_draws === 3583;
+        if ((!typed22Complete && receipt?.schema !== 'melee-web-stadium-recreation-boundary-v1') ||
+            receipt.attempted !== true || receipt.closed !== true || receipt.restarted !== false || receipt.error !== null ||
+            receipt.match_to_host_restored !== true || receipt.host_to_parent_restored !== true ||
+            !Number.isSafeInteger(receipt.prior_world_generation) || receipt.prior_world_generation <= 0 ||
+            ['match_seed', 'host_seed', 'parent_seed'].some(key => !Number.isInteger(receipt[key]) || receipt[key] < 0 || receipt[key] > 0xffffffff) ||
+            (!prefixComplete && !fullPairComplete && !typed22Complete) ||
+            (receipt.schema === 'melee-web-stadium-recreation-boundary-v2' && !typed22Complete) ||
+            state.state !== 'complete' || state.complete !== true || state.failed !== false || state.error !== null ||
+            state.queued !== false || state.awaiting_approval !== false) return false;
+        const pointer = Module._melee_web_native_menu_stadium_recreation_status();
+        if (!pointer || JSON.stringify(JSON.parse(Module.UTF8ToString(pointer))) !== JSON.stringify(receipt) ||
+            Module._melee_web_native_menu_phase() !== 0 || Module._melee_web_native_menu_running() !== 0) return false;
+      } catch { return false; }
+      if (preparationLabel || loading?.phase === 'native') callbacks.menuPreparationCanceled();
+      else publish();
+      if (diagnosticActive !== false) return false;
+      stadiumRecreationCloseSettled = true;
+      emit('stadiumRecreationClosed', receipt);
+      return true;
+    },
     menuFrame(wasRunning) {
+      if (laterBReplayTransfer.suspended()) { emit('frame', false); return; }
       if (!ready || fatal || destroyed) return;
       if (startupProfilingPending) profileCall('nativeFrame');
       // Emscripten's onRuntimeInitialized precedes main/Aurora initialization.
@@ -741,6 +957,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     return cardData;
   }
   async function configureSaveProfile(mode, cardData = null) {
+    if (laterBReplayTransfer.suspended()) throw Error('Private replay continuation forbids ordinary save/unload access');
     if (!['everything', 'personal'].includes(mode)) throw Error('Unknown save mode.');
     const bytes = saveProfileBytes(cardData);
     if (mode === 'everything' && bytes.byteLength) throw Error('Everything unlocked does not use a personal save.');
@@ -759,8 +976,11 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     });
   }
   async function snapshotSaveProfile({baseline = false} = {}) {
+    if (laterBReplayTransfer.suspended()) throw Error('Private replay continuation forbids ordinary save/unload access');
     if (baseline && !prepared && snapshot().phase === 0) throw Error('Select a disc before exporting Everything unlocked.');
     if (!ready || fatal || destroyed) throw Error('The player is unavailable. Reload to recover.');
+    saveProfileSnapshotsActive++;
+    try {
     const length = 0x1790 + 7 * 0x1F2C;
     const ptr = Module._malloc(length);
     if (!ptr) throw Error('Unable to allocate save snapshot memory.');
@@ -770,8 +990,10 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
         Module._melee_web_native_menu_snapshot_save_profile(ptr, length, 0)));
       return new Uint8Array(Module.HEAPU8.slice(ptr, ptr + length));
     } finally { Module._free(ptr); }
+    } finally { saveProfileSnapshotsActive--; }
   }
   async function unloadAndSave() {
+    if (laterBReplayTransfer.suspended()) throw Error('Private replay continuation forbids ordinary unload/cache flush');
     await closeNetworkSession('normal');
     const unloaded = await boundary(() => { syncAudio(); return Module._melee_web_native_menu_unload(); });
     if (!unloaded) return false;
@@ -1029,12 +1251,14 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       return boundary(() => { check(Module._melee_web_input_set_keyboard_layout(value === 'boxx' ? 1 : 0)); layout = value; inputDirty = true; });
     },
     unload() {
+    if (laterBReplayTransfer.suspended()) throw Error('Private replay continuation forbids ordinary save/unload access');
       if (unloadOperation) return unloadOperation;
       unloadOperation = operation('unloading', async () => { check(await unloadAndSave()); })
         .finally(() => { unloadOperation = null; });
       return unloadOperation;
     },
     destroy() {
+      if (laterBReplayTransfer.suspended()) return Promise.reject(Error('Private replay continuation requires owned OS cleanup'));
       if (destroyOperation) return destroyOperation;
       profileCall('destroy');
       startupProfilingPending = false;
@@ -1087,7 +1311,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   // The development entry may attach tools before loading; these are never part of the public handle.
   try {
     onOwner?.({Module, boundary, handle, status, check, put, prepareAudio, pauseAudioForPreparation,
-      syncAudio, unloadAndSave, prepareNativeResources, waitForAudioAck, waitForAudioRender, stop, callbacks,
+      laterBReplayTransfer, syncAudio, unloadAndSave, prepareNativeResources, waitForAudioAck, waitForAudioRender, stop, callbacks,
       attachNetworkSession, getNetworkCleanupErrors: () => Object.freeze(networkCleanupErrors.slice()), diagnostics});
     configureModule?.(Module);
   } catch (error) { failProfile('module_setup_failure'); throw error; }

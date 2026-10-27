@@ -8,6 +8,7 @@ CPU observer represents the match-only diagnostic stream.
 
 from pathlib import Path
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -16,7 +17,8 @@ import textwrap
 import unittest
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(os.environ.get("MELEE_RETAIL_RECIPE_TEST_ROOT", Path(__file__).resolve().parents[1]))
+RECIPE_SOURCE = Path(os.environ.get("MELEE_RETAIL_RECIPE_TEST_SOURCE", ROOT / "src" / "gameplay_retail_recipe.cpp"))
 
 
 _HARNESS = r'''
@@ -341,6 +343,38 @@ static void identity_observation_case(uint32_t version) {
     print_entity_counts(version == 9 ? "v9" : "v10");
 }
 
+// Modeled already-admitted two-human setup; this is an actual diagnostic
+// function/serializer control, not a second parser admission or gameplay run.
+static void paired_v11_identity_scope_case() {
+    fake::reset();
+    RetailReplayRecipe recipe;
+    recipe.version = kRetailReplayDrawClosureVersion;
+    recipe.frames.resize(2);
+    recipe.match_setups.resize(2);
+    recipe.match_selections.resize(2);
+    for (auto& selection : recipe.match_selections) {
+        selection.player_count = 2;
+        selection.start.rules.stkind = 3;
+        selection.start.rules.is_stock = true;
+        for (unsigned slot = 0; slot < GM_MAX_PLAYERS; ++slot) {
+            auto& player = selection.start.players[slot];
+            player.slot_type = slot < 2 ? Gm_PKind_Human : Gm_PKind_NA;
+            player.ckind = 8;
+            player.stocks = 4;
+        }
+    }
+    retail_replay_session_initial(recipe);
+    fake::state_allowed = true;
+    for (unsigned match = 0; match < 2; ++match) {
+        retail_replay_initial(recipe, true, recipe.match_selections[match].start);
+        retail_replay_frame(recipe, match, kRetailReplayMatch);
+    }
+    if (fake::entity_resets || !fake::entity_indices.empty() ||
+        fake::checked_entities || fake::cpu_begin)
+        throw std::runtime_error("paired v11 invoked incompatible CPU/entity inventory");
+    print_entity_counts("v11");
+}
+
 static void checked_prefix_case() {
     fake::reset();
     RetailReplayRecipe recipe;
@@ -433,6 +467,8 @@ int main() {
     identity_observation_case(9);
     std::cout << "IDENTITY_CASE_BEGIN v10\n";
     identity_observation_case(10);
+    std::cout << "IDENTITY_CASE_BEGIN v11\n";
+    paired_v11_identity_scope_case();
     std::cout << "IDENTITY_CASE_BEGIN prefix\n";
     checked_prefix_case();
 }
@@ -468,7 +504,7 @@ class RetailRecipeSceneTraceTests(unittest.TestCase):
                 *(f"-I{path}" for path in include_dirs),
             ]
             for source, output in (
-                (ROOT / "src" / "gameplay_retail_recipe.cpp", recipe_object),
+                (RECIPE_SOURCE, recipe_object),
                 (harness, harness_object),
             ):
                 subprocess.run(
@@ -545,6 +581,26 @@ class RetailRecipeSceneTraceTests(unittest.TestCase):
         self.assertEqual(identity_counts["v8"], (0, 0))
         self.assertEqual(identity_counts["v9"], (1, 2, 0, 0))
         self.assertEqual(identity_counts["v10"], (1, 2, 0, 0))
+        self.assertEqual(identity_counts["v11"], (0, 0))
+        paired = identity_records["v11"]
+        self.assertEqual(paired[0], {
+            "record": "header", "schema": "melee-web-port-session-diagnostic",
+            "version": 1, "fighter_entities": "not_captured",
+            "frames_requested": 2, "comparison": "not_run",
+            "cpu_observations": "not_captured", "draw_state": "not_captured",
+        })
+        self.assertEqual([r["record"] for r in paired[1:]], [
+            "session_match_enter_complete", "session_frame",
+            "session_match_enter_complete", "session_frame",
+        ])
+        for row in paired[1:]:
+            self.assertNotIn("fighter_entities", row)
+            self.assertIn("rng", row)
+            self.assertIn("pad_state_hex", row)
+        for row in (paired[1], paired[3]):
+            self.assertEqual(row["declared_setup"]["stage"], 3)
+            self.assertEqual([p["player_type"] for p in row["declared_setup"]["players"]], [0, 0])
+            self.assertEqual([p["character_kind"] for p in row["declared_setup"]["players"]], [8, 8])
         prefix = identity_records["prefix"]
         self.assertEqual(prefix[0], {
             "record": "header", "schema": "melee-web-port-session-diagnostic",

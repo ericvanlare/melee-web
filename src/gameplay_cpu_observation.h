@@ -27,6 +27,13 @@ void melee_web_cpu_observation_set_rng_draw_cursor(size_t index);
 void melee_web_cpu_observation_scheduler_return(void);
 void melee_web_rng_draw_probe_scheduler_return(void);
 void melee_web_cpu_observation_rng_draw(uint32_t updated_seed, unsigned kind);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+/* Private direct opt-in for the existing same-process Stadium idle pair test.
+ * It does not consult browser globals and accepts only a contiguous cursor
+ * sequence that is explicitly closed before the source owner is retired. */
+int melee_web_rng_draw_probe_begin_native_pair(void);
+int melee_web_rng_draw_probe_end_native_pair(size_t expected_cursors);
+#endif
 
 /* Read-only, one-cursor trace of the Arrow shield-collision arithmetic. */
 enum {

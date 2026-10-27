@@ -25,6 +25,15 @@ BOUNDARY = struct.Struct("<HHIIII")
 SLICE = struct.Struct("<HHIII")
 WHOLE_SESSION_FLAG = 1
 WHOLE_METADATA = struct.Struct("<HHI")
+PAIRED_IDLE_PROFILE = {
+    "profile": "paired_idle_scene_endpoints_v1",
+    "selected_matches": [0, 1],
+    "match_count": 2,
+    "comparison_post_go_ticks": 3500,
+    "natural_tail_max": 4,
+    "raw_omission_kinds": ["draw_enter", "draw_return"],
+}
+PAIRED_REGISTRATION_PROFILE = {**PAIRED_IDLE_PROFILE, "profile": "paired_idle_registration_v1"}
 # Version 1 whole-session records retain the original eight-byte tail.  The
 # extended tail carries the source audio owner epoch while keeping the old
 # decoder shape readable for preserved diagnostic streams.
@@ -130,9 +139,40 @@ SLICE_NAMES = {
     51: "menu_css_ko_counts",
     52: "player_entities",
     53: "player_entity_user_data",
+    55: "sd_stage_cooldown",
     56: "sd_items_lock",
     57: "player_identity",
     58: "player_transformed",
+    67: "stadium_map_root",
+    68: "stadium_ground_pointer",
+    69: "stadium_map2_gate",
+    70: "stadium_map2_countdown",
+    71: "stadium_map2_phase",
+    72: "stadium_map2_form",
+    73: "stadium_map2_previous_form",
+    74: "stadium_map2_prior_form",
+    75: "stadium_map2_map5_root",
+    76: "stadium_display_timer",
+    77: "stadium_display_mode",
+    78: "stadium_display_flags",
+    79: "stadium_display_previous_flags",
+    80: "stadium_display_previous_mode",
+    81: "stadium_display_focused_player",
+    82: "stadium_display_selection_counter",
+    83: "stadium_display_packed_flags",
+    84: "stadium_title_scratch",
+    85: "stadium_font1_slot_pointer",
+    86: "stadium_title_child_gobj",
+    87: "stadium_title_text_wrapper",
+    88: "stadium_title_static_text_pointer",
+    89: "stadium_title_dynamic_text_pointer",
+    99: "stadium_first_form_incoming",
+    100: "stadium_first_form_current_id",
+    101: "stadium_first_form_incoming_id",
+    102: "stadium_first_form_legacy_root",
+    103: "stadium_first_form_root",
+    104: "stadium_first_form_ground",
+    105: "stadium_first_form_ground_id",
 }
 
 
@@ -324,6 +364,10 @@ def iter_records(path: str | Path, *,
     previous_sequence = None
     whole_session_announced = False
     whole_session_count = None
+    first_form_marker = None
+    first_form_seen = False
+    whole_session_paired_idle = None
+    whole_session_paired_profile = None
     with stream:
         index = 0
         bytes_read = 0
@@ -364,21 +408,76 @@ def iter_records(path: str | Path, *,
             decoded = _decode_record(header, payload, context, names)
             if decoded["event"] in {"handshake", "start"}:
                 announcement = decoded["payload"]
+                marker = announcement.get('stadium_posttransform_state')
+                if marker is not None and not (marker == 'first_form_v1' and
+                        announcement.get('whole_session') is True and
+                        announcement.get('match_count') == 3 and
+                        announcement.get('stadium_whole_feedback') is True and
+                        announcement.get('stadium_whole_b_state') is True and
+                        announcement.get('stadium_observed_match') == 1 and
+                        isinstance(announcement.get('stadium_whole_long_idle'), Mapping) and
+                        announcement['stadium_whole_long_idle'].get('profile') == 'selected_b_3500_v1'):
+                    raise ObserverStreamError(f"{context}: first-form profile lacks exact selected-B owner")
+                if first_form_seen and marker != first_form_marker:
+                    raise ObserverStreamError(f"{context}: first-form announcements disagree")
+                first_form_marker=marker; first_form_seen=True
                 if announcement.get("whole_session") is True:
                     count = announcement.get("match_count")
                     profile = announcement.get("entity_profile")
+                    long_idle = announcement.get("stadium_whole_long_idle")
+                    paired_idle = count == 2 and profile is None
+                    paired_valid = (
+                        paired_idle and
+                        announcement.get("stadium_whole_feedback") is True and
+                        announcement.get("setup_receipt_sha256") is not None and
+                        isinstance(announcement.get("setup_receipt_sha256"), str) and
+                        len(announcement["setup_receipt_sha256"]) == 64 and
+                        announcement["setup_receipt_sha256"] != "0" * 64 and
+                        all(character in "0123456789abcdef"
+                            for character in announcement["setup_receipt_sha256"]) and
+                        announcement.get("stadium_whole_b_state") is True and
+                        announcement.get("stadium_observed_matches") == [0, 1] and
+                        all(type(value) is int for value in
+                            announcement.get("stadium_observed_matches", [])) and
+                        "stadium_observed_match" not in announcement and
+                        isinstance(long_idle, Mapping) and
+                        json.dumps(dict(long_idle), sort_keys=True) ==
+                        json.dumps(PAIRED_REGISTRATION_PROFILE if long_idle.get("profile") ==
+                                   "paired_idle_registration_v1" else PAIRED_IDLE_PROFILE,
+                                   sort_keys=True)
+                    )
+                    paired_marker = (
+                        isinstance(long_idle, Mapping) and
+                        long_idle.get("profile") in ("paired_idle_scene_endpoints_v1",
+                                                     "paired_idle_registration_v1")
+                    )
                     if type(count) is not int or not (
-                            (profile is None and 3 <= count <= 64) or
+                            (profile is None and 3 <= count <= 64) or paired_valid or
                             (profile in ("jiggly-ice-mario-fox-v1", "jiggly-ice-mario-fox-active60-v1") and count == 1)):
                         raise ObserverStreamError(
                             f"{context}: invalid whole-session match_count")
+                    if paired_marker and not paired_valid:
+                        raise ObserverStreamError(
+                            f"{context}: paired-idle profile is invalid for this whole-session match_count")
                     if whole_session_count is not None and count != whole_session_count:
                         raise ObserverStreamError(
                             f"{context}: whole-session match_count disagrees with prior announcement")
+                    if whole_session_paired_idle is not None and paired_idle != whole_session_paired_idle:
+                        raise ObserverStreamError(
+                            f"{context}: paired-idle profile disagrees with prior announcement")
+                    if paired_valid:
+                        if (whole_session_paired_profile is not None and
+                                long_idle != whole_session_paired_profile):
+                            raise ObserverStreamError(
+                                f"{context}: paired-idle profile disagrees with prior announcement")
+                        whole_session_paired_profile = dict(long_idle)
+                    whole_session_paired_idle = paired_idle
                     whole_session_count = count
                     whole_session_announced = True
             elif decoded["event"] == "boundary":
                 boundary_payload = decoded["payload"]
+                if any(x.get('tag') in range(99,106) for x in boundary_payload.get('slices',[])) and first_form_marker != 'first_form_v1':
+                    raise ObserverStreamError(f"{context}: first-form slices lack explicit profile")
                 if boundary_payload.get("whole_session") and not whole_session_announced:
                     raise ObserverStreamError(
                         f"{context}: whole-session boundary precedes opt-in announcement")

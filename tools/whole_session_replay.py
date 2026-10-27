@@ -38,6 +38,7 @@ from retail_setup_validation import _decode_setup  # noqa: E402
 MAGIC = b"MWRC"
 MWRC_V8_VERSION = 8
 MWRC_VERSION = 9
+MWRC_DRAW_CLOSURE_VERSION = 11
 V9_MILESTONE_ROSTER = (
     (8, 2, 20, 9),       # Mario, Fox, Falco, Marth
     (22, 23, 6, 21),     # Dr. Mario, Roy, Link, Young Link
@@ -59,6 +60,30 @@ V9_MILESTONE_RULES = {
     "item_mask_hex": "ffffffffffffffff",
     "damage_ratio_bits": "3f800000",
     "game_speed_bits": "3f800000",
+}
+V11_PAIRED_STADIUM_SETUP = {
+    "players": [
+        {"port": 1, "character_kind": 8, "costume": 1, "stocks": 4,
+         "player_type": 0, "rumble_enabled": True},
+        {"port": 2, "character_kind": 8, "costume": 0, "stocks": 4,
+         "player_type": 0, "rumble_enabled": True},
+    ],
+    "stage": 3,
+    "match_kind": 1,
+    "timer_enabled": False,
+    "timer_counts_up": False,
+    "time_limit_seconds": 0,
+    "is_stock": True,
+    "disable_pausing": False,
+    "is_teams": False,
+    "item_frequency": -1,
+    "item_mask_hex": "ffffffffffffffff",
+    "damage_ratio_bits": "3f800000",
+    "game_speed_bits": "3f800000",
+}
+V11_PRIZE_BOUNDARIES = {
+    "prize_mode_enter", "prize_scene_enter", "prize_scene_exit",
+    "prize_mode_exit", "startup_prize_mode_exit",
 }
 LEGACY_WHOLE_SESSION_VERSION = 7
 GAME_INFO_SIZE = 0x138
@@ -101,6 +126,10 @@ RUNTIME_CONTEXT_STATUS = (
 )
 
 SCENES = {"css": 1, "sss": 2, "match": 3, "results": 4, "prize": 5}
+V11_PAIRED_STADIUM_SCENES = (
+    SCENES["css"], SCENES["sss"], SCENES["match"], SCENES["results"],
+    SCENES["css"], SCENES["sss"], SCENES["match"], SCENES["results"],
+)
 LIFECYCLE_NAMES = set(semantics.WHOLE_OBSERVER_PCS)
 IDENTITY = re.compile(r"[A-Za-z0-9_.-]{1,128}\Z")
 
@@ -218,6 +247,12 @@ def _capture_identity(records: list[Mapping[str, Any]], *, entity_prefix: bool =
             _fail(f"observer handshake {field} is not the pinned reference identity")
     if handshake.get("writes_guest_memory") is not False:
         _fail("observer handshake must declare writes_guest_memory=false")
+    paired_idle_profile = "paired_idle_scene_endpoints_v1"
+    paired_idle_fields = (
+        "stadium_whole_feedback", "setup_receipt_sha256", "stadium_whole_b_state",
+        "stadium_observed_matches", "stadium_observed_match", "stadium_whole_long_idle",
+    )
+    paired_idle_announcements = []
     for announcement, context in ((handshake, "handshake"), (start, "start")):
         if announcement.get("whole_session") is not True:
             _fail(f"{context} does not declare whole_session=true")
@@ -226,7 +261,36 @@ def _capture_identity(records: list[Mapping[str, Any]], *, entity_prefix: bool =
                 _fail(f"{context} does not bind the declared entity profile")
             _integer(announcement.get("match_count"), f"{context} match_count", 1, 1)
         else:
-            _integer(announcement.get("match_count"), f"{context} match_count", 3, 64)
+            match_count = announcement.get("match_count")
+            if type(match_count) is int and match_count == 2:
+                profile = announcement.get("stadium_whole_long_idle")
+                receipt = announcement.get("setup_receipt_sha256")
+                expected_profile = {
+                    "profile": ("paired_idle_registration_v1" if isinstance(profile, Mapping) and
+                                profile.get("profile") == "paired_idle_registration_v1"
+                                else paired_idle_profile),
+                    "selected_matches": [0, 1],
+                    "match_count": 2,
+                    "comparison_post_go_ticks": 3500,
+                    "natural_tail_max": 4,
+                    "raw_omission_kinds": ["draw_enter", "draw_return"],
+                }
+                if (announcement.get("stadium_whole_feedback") is not True or
+                        announcement.get("stadium_whole_b_state") is not True or
+                        announcement.get("stadium_observed_matches") != [0, 1] or
+                        not all(type(value) is int for value in
+                                announcement.get("stadium_observed_matches", [])) or
+                        "stadium_observed_match" in announcement or
+                        not isinstance(profile, Mapping) or
+                        json.dumps(dict(profile), sort_keys=True) !=
+                        json.dumps(expected_profile, sort_keys=True) or
+                        not isinstance(receipt, str) or
+                        re.fullmatch(r"[0-9a-f]{64}", receipt) is None or
+                        receipt == "0" * 64):
+                    _fail(f"{context} paired-idle match_count=2 profile is incomplete or malformed")
+                paired_idle_announcements.append(announcement)
+            else:
+                _integer(match_count, f"{context} match_count", 3, 64)
         capture_id = announcement.get("capture_id")
         sequence_id = announcement.get("sequence_id")
         if not isinstance(capture_id, str) or IDENTITY.fullmatch(capture_id) is None:
@@ -236,6 +300,21 @@ def _capture_identity(records: list[Mapping[str, Any]], *, entity_prefix: bool =
     for field in ("match_count", "capture_id", "sequence_id"):
         if handshake.get(field) != start.get(field):
             _fail(f"observer {field} disagrees between handshake and start")
+    if not entity_prefix:
+        if paired_idle_announcements:
+            if len(paired_idle_announcements) != 2:
+                _fail("paired-idle profile must be declared by both handshake and start")
+            for field in paired_idle_fields:
+                if handshake.get(field) != start.get(field):
+                    _fail(f"observer paired-idle {field} disagrees between handshake and start")
+            if handshake.get("setup_receipt_sha256") != start.get("setup_receipt_sha256"):
+                _fail("observer paired-idle setup receipt differs between handshake and start")
+        elif any(
+            isinstance(announcement.get("stadium_whole_long_idle"), Mapping) and
+            announcement["stadium_whole_long_idle"].get("profile") in (paired_idle_profile, "paired_idle_registration_v1")
+            for announcement in (handshake, start)
+        ):
+            _fail("paired-idle profile cannot use a legacy whole-session match count")
     if entity_prefix and handshake.get("entity_profile") != start.get("entity_profile"):
         _fail("observer entity profile disagrees between handshake and start")
     if start.get("source_revision") != "GALE01r2":
@@ -433,6 +512,57 @@ def validate_milestone_setups(setup_hexes: list[str]) -> list[dict[str, Any]]:
     return declared
 
 
+def validate_stadium_pair_setups(setup_hexes: list[str]) -> list[dict[str, Any]]:
+    """Require the exact two-human Stadium stock4/ItemsNone Mario profile."""
+    if len(setup_hexes) != 2:
+        _fail("MWRC v11 paired Stadium profile requires exactly two setup rows")
+    try:
+        raw_setups = [_hex_bytes(value, GAME_INFO_SIZE, f"Stadium pair setup {index}")
+                      for index, value in enumerate(setup_hexes)]
+    except WholeSessionReplayError:
+        raise
+    if raw_setups[0] != raw_setups[1]:
+        _fail("MWRC v11 paired Stadium setup rows differ in their full StartMeleeData bytes")
+    declared = []
+    for match_index, raw in enumerate(raw_setups):
+        try:
+            setup = _decode_setup(raw.hex())
+        except (KeyError, TypeError, ValueError) as error:
+            raise WholeSessionReplayError(
+                f"Stadium pair setup {match_index} is unsupported: {error}") from error
+        if setup != V11_PAIRED_STADIUM_SETUP:
+            _fail(f"MWRC v11 match {match_index} setup is not the exact paired Stadium stock4 Mario profile")
+        declared.append(setup)
+    return declared
+
+
+def validate_v11_stadium_capture(capture: Mapping[str, Any],
+                                 records: Iterable[Mapping[str, Any]]) -> None:
+    """Bind v11 to the actual paired source profile and normal two-lifetime route."""
+    identity = capture.get("identity")
+    if not isinstance(identity, Mapping) or identity.get("match_count") != 2:
+        _fail("MWRC v11 requires the paired Stadium two-match source identity")
+    setups = capture.get("setup_hexes")
+    if not isinstance(setups, list):
+        _fail("MWRC v11 paired Stadium source setup table is missing")
+    validate_stadium_pair_setups(setups)
+    spans = capture.get("spans")
+    if not isinstance(spans, list) or tuple(
+            span.get("scene") if isinstance(span, Mapping) else None for span in spans
+    ) != V11_PAIRED_STADIUM_SCENES:
+        _fail("MWRC v11 requires the normal CSS/SSS/Match/Results route twice")
+    for index, row in enumerate(records):
+        if not isinstance(row, Mapping):
+            _fail(f"MWRC v11 source record {index} is not an object")
+        payload = row.get("payload")
+        if not isinstance(payload, Mapping):
+            continue
+        if row.get("event") in {"handshake", "start"} and "entity_profile" in payload:
+            _fail("MWRC v11 does not accept an entity-prefix observer variant")
+        if row.get("event") == "boundary" and payload.get("boundary") in V11_PRIZE_BOUNDARIES:
+            _fail("MWRC v11 does not accept a Prize scene or entity-prefix lifecycle")
+
+
 def _consumed_ports(row: Mapping[str, Any], index: int) -> list[str]:
     payload = row.get("payload")
     if not isinstance(payload, Mapping) or payload.get("boundary") != "pad_consume":
@@ -591,6 +721,183 @@ def _timeline(
     return frames, spans
 
 
+def derive_draw_boundary_trace(capture: Mapping[str, Any],
+                               records: Iterable[Mapping[str, Any]],
+                               *, expected_match_count: int | None = None) -> dict[str, Any]:
+    """Join actual Match draws to PAD frames and retain their source brackets.
+
+    The caller must supply records from the strict MWRO iterator. Match draw
+    closures are derived from those records; menu spans use the explicit
+    close-each-step recipe policy because their draw boundaries are not
+    observed by this stream. The returned tick/draw sequence brackets preserve
+    every observed Match action coordinate for later typed-state joins.
+    """
+    frames = capture.get("frames")
+    spans = capture.get("spans")
+    setups = capture.get("setup_hexes")
+    if not isinstance(frames, list) or not frames or not isinstance(spans, list):
+        _fail("draw-closure source requires a normalized whole-session timeline")
+    match_spans = [span for span in spans if span.get("scene") == SCENES["match"]]
+    if (not isinstance(setups, list) or len(setups) != len(match_spans) or
+            not match_spans or (expected_match_count is not None and
+                                len(match_spans) != expected_match_count)):
+        _fail("draw-closure Match spans do not match their ordered setup table")
+
+    rows = list(records)
+    last_seq = -1
+    entries: dict[int, list[int]] = {index: [] for index in range(len(match_spans))}
+    results: dict[int, list[int]] = {index: [] for index in range(len(match_spans))}
+    for index, row in enumerate(rows):
+        seq = _integer(row.get("seq"), f"draw-closure record {index} sequence")
+        if seq <= last_seq:
+            _fail("draw-closure observer records are out of sequence")
+        last_seq = seq
+        payload = row.get("payload")
+        if row.get("event") != "boundary" or not isinstance(payload, Mapping):
+            continue
+        boundary = payload.get("boundary")
+        if boundary not in {"entry", "results_enter"}:
+            continue
+        match = _integer(payload.get("match_index"),
+                         f"draw-closure {boundary} match_index", 0,
+                         len(match_spans) - 1)
+        (entries if boundary == "entry" else results)[match].append(seq)
+
+    closures = [True] * len(frames)
+    match_traces = []
+    for match_index, span in enumerate(match_spans):
+        if len(entries[match_index]) != 1 or len(results[match_index]) != 1 or \
+                entries[match_index][0] >= results[match_index][0]:
+            _fail(f"Match {match_index} lacks one ordered entry/results boundary pair")
+        first = _integer(span.get("first_frame"), "Match span first_frame", 0,
+                         len(frames) - 1)
+        last = _integer(span.get("last_frame"), "Match span last_frame", first,
+                        len(frames) - 1)
+        match_frames = frames[first:last + 1]
+        if span.get("last_frame") != last or span.get("first_frame") != first:
+            _fail("Match span is outside the normalized input timeline")
+        entry_seq, results_seq = entries[match_index][0], results[match_index][0]
+        match_rows = []
+        for row in rows:
+            if not entry_seq < row["seq"] < results_seq:
+                continue
+            payload = row.get("payload")
+            if row.get("event") == "boundary" and isinstance(payload, Mapping):
+                if payload.get("boundary") in {"pad_consume", "source_tick",
+                                                "draw_enter", "draw_return"}:
+                    match = _integer(payload.get("match_index"),
+                                     "Match schedule match_index", 0,
+                                     len(match_spans) - 1)
+                    if match == match_index:
+                        match_rows.append(row)
+
+        pads = [row for row in match_rows
+                if row["payload"].get("boundary") == "pad_consume"]
+        ticks = [row for row in match_rows
+                 if row["payload"].get("boundary") == "source_tick"]
+        schedule = [row for row in match_rows if row["payload"].get("boundary") in
+                    {"source_tick", "draw_enter", "draw_return"}]
+        if len(pads) != len(match_frames) or len(ticks) != len(match_frames):
+            _fail(f"Match {match_index} PAD and SourceTick counts disagree with its span")
+        for local_tick, (frame, pad, tick) in enumerate(zip(match_frames, pads, ticks)):
+            pad_seq = _integer(pad.get("seq"), "Match PAD sequence")
+            tick_seq = _integer(tick.get("seq"), "Match SourceTick sequence")
+            pad_draw = _integer(pad.get("draw_ordinal"), "Match PAD draw ordinal")
+            tick_draw = _integer(tick.get("draw_ordinal"), "Match SourceTick draw ordinal")
+            if (frame.get("source_seq") != pad_seq or frame.get("source_tick") != local_tick or
+                    pad.get("source_tick") != local_tick or tick.get("source_tick") != local_tick or
+                    pad_draw != tick_draw or
+                    not pad_seq < tick_seq < results_seq or
+                    frame.get("pads") != _consumed_ports(pad, pad_seq)):
+                _fail(f"Match {match_index} PAD does not join its exact SourceTick")
+
+        tick_brackets = [
+            {"source_tick": local_tick, "frame_index": first + local_tick,
+             "draws_before": _integer(pad.get("draw_ordinal"), "Match PAD draw ordinal"),
+             "pad_consume_seq": pad["seq"], "source_tick_seq": tick["seq"]}
+            for local_tick, (pad, tick) in enumerate(zip(pads, ticks))
+        ]
+
+        tick_count = draw_count = last_closed_tick = 0
+        draw_open: int | None = None
+        draw_open_source_tick = draw_open_draw_ordinal = None
+        draw_brackets = []
+        for row in schedule:
+            kind = row["payload"]["boundary"]
+            source_tick = _integer(row.get("source_tick"),
+                                   f"Match {match_index} {kind} source_tick")
+            draw_ordinal = _integer(row.get("draw_ordinal"),
+                                    f"Match {match_index} {kind} draw_ordinal")
+            if kind == "source_tick":
+                if draw_open is not None or source_tick != tick_count or draw_ordinal != draw_count:
+                    _fail(f"Match {match_index} SourceTick coordinates are not contiguous")
+                tick_count += 1
+            elif kind == "draw_enter":
+                if (draw_open is not None or tick_count <= last_closed_tick or
+                        source_tick != tick_count or draw_ordinal != draw_count):
+                    _fail(f"Match {match_index} DrawEnter has no new checked tick batch")
+                draw_open = _integer(row.get("seq"), "Match DrawEnter sequence")
+                draw_open_source_tick = source_tick
+                draw_open_draw_ordinal = draw_ordinal
+            else:
+                if (draw_open is None or source_tick != tick_count or
+                        draw_ordinal != draw_count or tick_count <= last_closed_tick):
+                    _fail(f"Match {match_index} DrawReturn lacks its actual open batch")
+                draw_seq = _integer(row.get("seq"), "Match DrawReturn sequence")
+                if draw_open >= draw_seq:
+                    _fail(f"Match {match_index} DrawReturn precedes its DrawEnter")
+                for local_tick in range(last_closed_tick, tick_count):
+                    closures[first + local_tick] = local_tick == tick_count - 1
+                draw_brackets.append({
+                    "draw_ordinal": draw_count,
+                    "source_tick_after": tick_count,
+                    "draw_enter_source_tick": draw_open_source_tick,
+                    "draw_enter_ordinal": draw_open_draw_ordinal,
+                    "draw_return_source_tick": source_tick,
+                    "draw_return_ordinal": draw_ordinal,
+                    "draw_enter_seq": draw_open,
+                    "draw_return_seq": draw_seq,
+                    "first_frame": first + last_closed_tick,
+                    "last_frame": first + tick_count - 1,
+                    "source_tick_seqs": [
+                        tick_brackets[index]["source_tick_seq"]
+                        for index in range(last_closed_tick, tick_count)
+                    ],
+                })
+                last_closed_tick = tick_count
+                draw_count += 1
+                draw_open = None
+        if draw_open is not None or tick_count != len(match_frames) or last_closed_tick != tick_count:
+            _fail(f"Match {match_index} has an unfinished PAD/tick/draw batch")
+        match_traces.append({
+            "match_index": match_index,
+            "entry_seq": entry_seq,
+            "results_enter_seq": results_seq,
+            "ticks": tick_brackets,
+            "draws": draw_brackets,
+        })
+
+    # Non-Match source draws are not present in MWRO. The new format declares
+    # one close per consumed frame there as policy, never as observed source data.
+    for span in spans:
+        first = span["first_frame"]
+        last = span["last_frame"]
+        if span["scene"] != SCENES["match"]:
+            if any(not value for value in closures[first:last + 1]):
+                _fail("non-Match close-each-step policy was modified")
+    return {"schema": "melee-web-mwro-draw-boundary-trace-v1",
+            "matches": match_traces, "closures": closures,
+            "non_match_draw_policy": "close_each_step_unobserved"}
+
+
+def derive_draw_boundaries(capture: Mapping[str, Any],
+                           records: Iterable[Mapping[str, Any]],
+                           *, expected_match_count: int | None = None) -> list[bool]:
+    """Compatibility wrapper returning only the per-frame closure vector."""
+    return derive_draw_boundary_trace(capture, records,
+                                      expected_match_count=expected_match_count)["closures"]
+
+
 def capture_from_records(records: Iterable[Mapping[str, Any]], source: str = "<records>") -> dict[str, Any]:
     """Validate and normalize one decoded raw MWRO stream."""
     rows = list(records)
@@ -700,7 +1007,8 @@ def _recipe_key(capture: Mapping[str, Any]) -> tuple[Any, ...]:
 
 
 def _encode_whole_session(capture: Mapping[str, Any], version: int, *, entity_prefix: bool = False,
-                          entity_prefix_flag: int = 1) -> tuple[bytes, dict[str, Any]]:
+                          entity_prefix_flag: int = 1,
+                          draw_boundaries: list[bool] | None = None) -> tuple[bytes, dict[str, Any]]:
     frames = capture["frames"]
     spans = capture["spans"]
     if not 1 <= len(frames) <= V8_MAX_FRAMES:
@@ -714,10 +1022,14 @@ def _encode_whole_session(capture: Mapping[str, Any], version: int, *, entity_pr
         _fail("MWRC v8 requires identical StartMeleeData for every match")
     if version == MWRC_VERSION and len(setup_hexes) != 3:
         _fail("MWRC v9 milestone requires exactly three match setups")
+    if version == MWRC_DRAW_CLOSURE_VERSION and len(setup_hexes) != 2:
+        _fail("MWRC v11 draw-closure profile requires exactly two match setups")
     setups = [_hex_bytes(value, GAME_INFO_SIZE, f"source setup {index}")
               for index, value in enumerate(setup_hexes)]
     if version == MWRC_VERSION:
         validate_milestone_setups([value.hex() for value in setups])
+    if version == MWRC_DRAW_CLOSURE_VERSION:
+        validate_stadium_pair_setups([value.hex() for value in setups])
     setup = setups[0]
     initial_pad = _hex_bytes(capture["first_css"]["pad_state_hex"], PAD_STATE_BYTES,
                               "first CSS semantic PAD state")
@@ -755,6 +1067,29 @@ def _encode_whole_session(capture: Mapping[str, Any], version: int, *, entity_pr
         _fail("whole-session spans do not cover every frame at encoding")
     if spans[0]["scene"] != SCENES["css"]:
         _fail("whole-session timeline must start in CSS")
+    closure_bytes = b""
+    if version == MWRC_DRAW_CLOSURE_VERSION:
+        if entity_prefix or draw_boundaries is None or len(draw_boundaries) != len(frames):
+            _fail("MWRC v11 requires one closure bit for every whole-session input frame")
+        if any(type(value) is not bool for value in draw_boundaries):
+            _fail("MWRC v11 draw closures must be boolean source observations or declared policy")
+        if tuple(span["scene"] for span in spans) != V11_PAIRED_STADIUM_SCENES:
+            _fail("MWRC v11 requires the normal CSS/SSS/Match/Results route twice")
+        match_spans = [span for span in spans if span["scene"] == SCENES["match"]]
+        if len(match_spans) != 2:
+            _fail("MWRC v11 draw-closure profile requires exactly two Match spans")
+        for span in spans:
+            first = span["first_frame"]
+            last = span["last_frame"]
+            if not draw_boundaries[last]:
+                _fail("MWRC v11 every scene span must end at a closed draw boundary")
+            if span["scene"] != SCENES["match"] and not all(draw_boundaries[first:last + 1]):
+                _fail("MWRC v11 non-Match spans require the declared close-each-step policy")
+        packed = bytearray((len(frames) + 7) // 8)
+        for index, closes in enumerate(draw_boundaries):
+            if closes:
+                packed[index // 8] |= 0x80 >> (index % 8)
+        closure_bytes = struct.pack(">I", len(frames)) + bytes(packed)
     if entity_prefix:
         if version != MWRC_V8_VERSION or [s["scene"] for s in spans] != [1, 2, 3]:
             _fail("entity prefix requires v8 and one CSS/SSS/Match route")
@@ -770,10 +1105,10 @@ def _encode_whole_session(capture: Mapping[str, Any], version: int, *, entity_pr
         payload += setup
     else:
         payload += struct.pack(">HH", len(setups), 0) + b"".join(setups)
-    payload += initial_pad + input_bytes + span_bytes
+    payload += initial_pad + input_bytes + span_bytes + closure_bytes
     setup_bytes = GAME_INFO_SIZE if version == MWRC_V8_VERSION else 4 + len(setups) * GAME_INFO_SIZE
     expected = (HEADER.size + CONTEXT_HEADER.size + CONTEXT_BYTES + setup_bytes +
-                PAD_STATE_BYTES + len(input_bytes) + len(span_bytes))
+                PAD_STATE_BYTES + len(input_bytes) + len(span_bytes) + len(closure_bytes))
     if len(payload) != expected:
         _fail(f"generated MWRC v{version} size does not match its source timeline")
     return bytes(payload), {
@@ -782,6 +1117,12 @@ def _encode_whole_session(capture: Mapping[str, Any], version: int, *, entity_pr
         "frame_count": len(frames),
         "input_bytes_sha256": hashlib.sha256(input_bytes).hexdigest(),
         "output_sha256": hashlib.sha256(payload).hexdigest(),
+        **({"draw_closure_count": len(draw_boundaries),
+            "draw_closure_sha256": hashlib.sha256(closure_bytes).hexdigest(),
+            "draw_closure_false_count": draw_boundaries.count(False),
+            "draw_closure_source": "strict_raw_mwro_match_drawreturn_pad_join",
+            "non_match_draw_policy": "close_each_step_unobserved"}
+           if version == MWRC_DRAW_CLOSURE_VERSION else {}),
     }
 
 
@@ -975,6 +1316,25 @@ def encode_v9(capture: Mapping[str, Any]) -> tuple[bytes, dict[str, Any]]:
     return _encode_whole_session(capture, MWRC_VERSION)
 
 
+def encode_v11(capture: Mapping[str, Any], records: Iterable[Mapping[str, Any]]) -> tuple[bytes, dict[str, Any]]:
+    """Encode exact-two whole-session v11 from a strict raw observer stream.
+
+    Match closures come only from joined actual DrawReturn/PAD boundaries.
+    Non-Match spans use the format's declared close-each-step policy because
+    source draw boundaries for those scenes are not captured by MWRO.
+    """
+    identity = capture.get("identity")
+    if not isinstance(identity, Mapping) or identity.get("match_count") != 2:
+        _fail("MWRC v11 requires a validated exact-two whole-session identity")
+    strict_records = list(records)
+    validate_v11_stadium_capture(capture, strict_records)
+    trace = derive_draw_boundary_trace(capture, strict_records, expected_match_count=2)
+    payload, metadata = _encode_whole_session(
+        capture, MWRC_DRAW_CLOSURE_VERSION, draw_boundaries=trace["closures"])
+    metadata["draw_boundary_trace"] = trace
+    return payload, metadata
+
+
 def encode_v7(capture: Mapping[str, Any]) -> tuple[bytes, dict[str, Any]]:
     """Reject the provisional whole-session format explicitly.
 
@@ -1050,15 +1410,20 @@ def _capture_report(capture: Mapping[str, Any],
 
 def export_single(capture_path: str | Path, output_path: str | Path,
                   sidecar_path: str | Path | None = None,
-                  status_path: str | Path | None = None) -> dict[str, Any]:
-    """Write a valid v8/v9 workload from one complete source capture.
+                  status_path: str | Path | None = None,
+                  *, draw_closure_v11: bool = False) -> dict[str, Any]:
+    """Write a valid v8/v9 workload or explicitly requested v11 workload.
 
     This mode proves transport completeness and source ownership only. It
     intentionally does not claim independent execution or repeatability.
     """
     capture = capture_from_path(capture_path, status_path)
-    payload, transport = _encode_current(capture)
     source = Path(capture_path).expanduser().resolve()
+    if draw_closure_v11:
+        strict_records = list(iter_records(source))
+        payload, transport = encode_v11(capture, strict_records)
+    else:
+        payload, transport = _encode_current(capture)
     output, sidecar = _output_paths(output_path, sidecar_path, (source,))
     result = {
         "schema": SCHEMA,
@@ -1136,6 +1501,8 @@ def _main(argv: list[str]) -> int:
     parser.add_argument("capture_b", nargs="?", type=Path, help="second raw MWRO stream")
     parser.add_argument("--single", action="store_true",
                         help="export one complete stream without a repeatability claim")
+    parser.add_argument("--draw-closure-v11", action="store_true",
+                        help="explicitly export exact-two MWRC v11 from strict raw Match draw/PAD boundaries")
     parser.add_argument("--output", required=True, type=Path,
                         help="new checked MWRC output (v8 for repeated setups; v9 for the 12-character milestone)")
     parser.add_argument("--sidecar", type=Path, help="new JSON provenance sidecar path")
@@ -1146,8 +1513,11 @@ def _main(argv: list[str]) -> int:
         if args.single:
             if args.capture_b is not None:
                 parser.error("--single accepts exactly one capture path")
-            result = export_single(args.capture_a, args.output, args.sidecar, args.status_a)
+            result = export_single(args.capture_a, args.output, args.sidecar, args.status_a,
+                                   draw_closure_v11=args.draw_closure_v11)
         else:
+            if args.draw_closure_v11:
+                parser.error("--draw-closure-v11 is available only with --single")
             if args.capture_b is None:
                 parser.error("pair mode requires capture A and capture B; use --single for one")
             result = export_pair(args.capture_a, args.capture_b, args.output, args.sidecar,
