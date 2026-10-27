@@ -73,7 +73,9 @@ test('actual currentSSS wrapper reserves once and closes all ordinary getters th
   const token=Object.freeze({id:tokenId});
   ctx.menuReplayReserveLaterBTransfer=()=>{calls.push('reserve');moved=true;return token;};
   for(const name of ['Pending','Settled','Uncertain'])ctx[`menuReplayLaterBCommand${name}`]=(t)=>{assert.equal(t,token);calls.push(name);};
-  ctx.menuReplayReadLaterBTransferEvidence=t=>{assert.equal(t,token);return {scope:'synthetic shell leaf',core:{phase:'pending'},uncertain:false};};
+  let evidenceReads=0,settleAllowed=true,settleProbeCalls=0;
+  ctx.menuReplayReadLaterBTransferEvidence=t=>{assert.equal(t,token);evidenceReads++;return {scope:'synthetic shell leaf',core:{phase:'pending'},uncertain:false};};
+  ctx.menuReplayLaterBCommandCanSettle=t=>{assert.equal(t,token);settleProbeCalls++;return settleAllowed;};
   ctx.menuReplayRecordLaterBAction=t=>assert.equal(t,token);
   ctx.menuReplayFinalizeLaterBTransfer=async t=>{assert.equal(t,token);calls.push('finalize');ctx.lastRetailReplayReport={complete:false};};
   const source=cut(scopeSource,'export function installCurrentSssExitReplayArm(', '\n\nexport function validateCurrentSssExitExpected');
@@ -86,9 +88,14 @@ test('actual currentSSS wrapper reserves once and closes all ordinary getters th
   assert.equal(scope.reserveLaterBTransfer(actual,request).id,tokenId);
   for(const call of [()=>scope.observe(),()=>scope.observePreparedStart(),()=>scope.continuePreparedStart(prepared),
     ()=>scope.reserveLaterBTransfer(actual,request),()=>scope.dispose()])assert.throws(call,/Gate2|one-use/);
-  scope.gate2Pending('arm');assert.equal(scope.gate2ApproveSetup(),true);assert.equal(scope.gate2ApproveSetup(),false);scope.gate2Settled();
-  const original=ctx.Module;ctx.Module={};assert.throws(()=>scope.gate2Pending('action'),/foreign/);ctx.Module=original;
+  scope.gate2Pending('arm');assert.equal(scope.gate2CanSettle(),true);settleAllowed=false;
+  assert.equal(scope.gate2CanSettle(),false);assert.equal(settleProbeCalls,2);
+  assert.equal(evidenceReads,0,'the boolean settle path must not clone the complete retained evidence');
+  settleAllowed=true;assert.equal(scope.gate2ApproveSetup(),true);assert.equal(scope.gate2ApproveSetup(),false);scope.gate2Settled();
+  const original=ctx.Module;ctx.Module={};assert.throws(()=>scope.gate2Pending('action'),/foreign/);
+  assert.throws(()=>scope.gate2CanSettle(),/foreign/);assert.equal(settleProbeCalls,2,'foreign owner refusal happens before the shell query');ctx.Module=original;
   assert.equal((await scope.gate2Finalize()).finalized,true);
+  assert.equal(evidenceReads,1,'full evidence remains available for the explicit final export');
   assert.throws(()=>scope.gate2Pending('action'),/finalized/);
   assert.equal(scope.dispose(),true);assert.equal(calls.filter(x=>x==='reserve').length,1);
 });
@@ -293,7 +300,8 @@ test('settled failed step is persisted with its native snapshot and never promot
 });
 
 test('actual harness catch/finally/snapshot branches bypass every ordinary cleanup after reservation or uncertainty',async()=>{
-  const calls=[];const ctx={laterBGate2Reserved:true,rngDrawProbe:null,page:{isClosed:()=>false},console};vm.createContext(ctx);
+  const calls=[];const ctx={laterBGate2Reserved:true,laterBLong:false,longBRngRetained:false,
+    laterBGate2Reference:{goTick:84},rngDrawProbe:null,page:{isClosed:()=>false},console};vm.createContext(ctx);
   ctx.observePageOperation=()=>{throw Error('ordinary/native snapshot must not run');};
   const snapshot=cut(captureSource,"async function snapshot(reason = 'poll', {captureCss = !diagnostic} = {}) {",'\nasync function phase(');
   const snap=vm.runInContext('('+snapshot+')',ctx);
@@ -378,7 +386,8 @@ test('actual harness catch/finally/snapshot branches bypass every ordinary clean
 test('Gate2 capture opt-in requires the exact existing profile3 route, with no deadline or route fallback',()=>{
   const declaration=cut(captureSource,"const laterBGate2ProjectionPath = values['stadium-later-b-gate2-projection']",'\nif (laterSssReference !== null');
   const run=values=>vm.runInNewContext(declaration,{values,path:{resolve:x=>x},laterSssReference:values.reference,
-    laterSssPreparedSetup:values.setup,OBSERVED_B_REFERENCE:{id:'original-b-2013-943-v1'}});
+    laterSssPreparedSetup:values.setup,OBSERVED_B_REFERENCE:{id:'original-b-2013-943-v1'},
+    LONG_B_REFERENCE:{id:'original-b-5422-951-long-v1'}});
   assert.doesNotThrow(()=>run({}));
   assert.throws(()=>run({'stadium-later-b-gate2-projection':'projection.json'}),/exact new-reference/);
   assert.doesNotThrow(()=>run({'stadium-later-b-gate2-projection':'projection.json',reference:'original-b-2013-943-v1',setup:true}));

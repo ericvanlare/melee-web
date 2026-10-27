@@ -151,6 +151,36 @@ function retirementReceipt(token, inputRequest=request) {
     phase_after_close:0,running_after_close:0,later_b_transfer:proof(token,{parent_close_checked:true},inputRequest),
     matched_setup_cf:{state:'complete',complete:true,error:null,queued:false}};
 }
+test('constant-size settlement checks avoid cloning the growing evidence journal and retain explicit export',()=>{
+  const f=fixture(),token=reserve(f);
+  f.context.window.menuReplayLaterBCommandPending(token,'arm');
+  for(let i=0;i<12;i++)f.context.window.menuReplayRecordLaterBAction(token,
+    {action_index:i,kind:'tick',source_tick:i});
+  const readEvidence=f.context.window.menuReplayReadLaterBTransferEvidence;
+  const before=readEvidence(token),prefix=JSON.stringify(before.prefix),actions=JSON.stringify(before.action_evidence);
+  f.context.window.menuReplayReadLaterBTransferEvidence=()=>{throw Error('full evidence copy forbidden during settle check');};
+  for(let i=0;i<1000;i++)assert.equal(f.context.window.menuReplayLaterBCommandCanSettle(token),true);
+  f.context.window.menuReplayLaterBCommandSettled(token);
+  assert.equal(f.context.window.menuReplayLaterBCommandCanSettle(token),false);
+  f.context.window.menuReplayReadLaterBTransferEvidence=readEvidence;
+  const after=readEvidence(token);
+  assert.equal(JSON.stringify(after.prefix),prefix);
+  assert.equal(JSON.stringify(after.action_evidence),actions);
+  assert.equal(after.action_evidence.length,12);
+
+  const uncertain=fixture(),uncertainToken=reserve(uncertain);
+  uncertain.context.window.menuReplayLaterBCommandPending(uncertainToken,'arm');
+  uncertain.context.window.menuReplayLaterBCommandUncertain(uncertainToken,'lost settlement');
+  assert.equal(uncertain.context.window.menuReplayLaterBCommandCanSettle(uncertainToken),false);
+
+  const stale=fixture(),staleToken=reserve(stale);
+  stale.context.window.menuReplayLaterBCommandPending(staleToken,'arm');
+  stale.api.setRun({...stale.run()});
+  assert.throws(()=>stale.context.window.menuReplayLaterBCommandCanSettle(staleToken),/stale, repeated or foreign/);
+
+  const foreign=fixture(),foreignToken=reserve(foreign);
+  assert.throws(()=>f.context.window.menuReplayLaterBCommandCanSettle(foreignToken),/stale, repeated or foreign/);
+});
 test('explicit long B profile4 reserves only its exact 951-row literal prefix and retires once', async () => {
   const wrongRecipe=fixture(longRequest);
   assert.throws(()=>wrongRecipe.api.reserve({...longRequest,recipe_sha256:request.recipe_sha256}),/exact stopped state replay951 owner/);

@@ -409,6 +409,12 @@ window.menuReplayLaterBCommandUncertain=(token,reason)=>{
  const{transfer}=laterBReplayOwned(token);transfer.uncertain=true;
  owner.laterBReplayTransfer.uncertain(token,reason);transfer.finishRequests.push(String(reason||'Unknown native settlement'));
 };
+// Settlement queries stay constant-size as the retained action journal grows.
+// The full evidence copy remains available through the explicit export below.
+window.menuReplayLaterBCommandCanSettle=token=>{
+ const{transfer}=laterBReplayOwned(token);
+ return !transfer.uncertain&&owner.laterBReplayTransfer.state()?.phase==='pending';
+};
 window.menuReplayReadLaterBTransferEvidence=token=>{
  const{transfer}=laterBReplayOwned(token);
  return laterBReplayCopy({prefix:transfer.prefix,action_evidence:transfer.actionEvidence,action_timing:transfer.timing,

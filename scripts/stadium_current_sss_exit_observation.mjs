@@ -186,8 +186,7 @@ export function installCurrentSssExitReplayArm({recipeBytes, observationProfile 
     },
     gate2CanSettle() {
       gate2Owned();
-      const evidence = window.menuReplayReadLaterBTransferEvidence(gate2Token);
-      return evidence.uncertain !== true && evidence.core?.phase === 'pending';
+      return window.menuReplayLaterBCommandCanSettle(gate2Token);
     },
     gate2Pending(kind) { gate2Owned(); window.menuReplayLaterBCommandPending(gate2Token, kind); },
     gate2Settled() { gate2Owned(); window.menuReplayLaterBCommandSettled(gate2Token); },
