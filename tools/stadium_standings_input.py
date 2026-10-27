@@ -1,6 +1,7 @@
 """Explicit host standings input; same native structural long-window layout. No parity claim."""
 from retail_input_plan import NEUTRAL_PAD, DISCONNECTED_PAD
 from sd_reference_diagnostic import require
+import hashlib
 
 class StadiumStandingsInputPolicy:
     """Host ordinary-input policy; source snapshots are read-only operands.
@@ -11,6 +12,7 @@ class StadiumStandingsInputPolicy:
     """
     PROFILE = 'selected_b_mode8_horizontal_standings_v1'
     POST_TRANSFORM_PROFILE = 'selected_b_mode8_post_transform_mode14_v1'
+    FIRST_FORM_LATENCY_PROFILE = 'first_form_latency_v2'
 
     @staticmethod
     def validate_setup(expected):
@@ -23,15 +25,30 @@ class StadiumStandingsInputPolicy:
                 'Standings input requires exact contiguous two-human Mario stock4 controllers')
 
     def __init__(self, profile=PROFILE):
-        require(profile in (self.PROFILE, self.POST_TRANSFORM_PROFILE),
+        require(profile in (self.PROFILE, self.POST_TRANSFORM_PROFILE,
+                            self.FIRST_FORM_LATENCY_PROFILE),
                 'Unknown exact Stadium standings input profile')
         self.profile = profile
-        self.post_transform = profile == self.POST_TRANSFORM_PROFILE
+        self.first_form_latency = profile == self.FIRST_FORM_LATENCY_PROFILE
+        # The two first-form routes reuse the existing first_form_v1 source
+        # observer after the unchanged GO+3500 window; their host stop rules differ.
+        self.post_transform = profile in (self.POST_TRANSFORM_PROFILE,
+                                           self.FIRST_FORM_LATENCY_PROFILE)
         self.last = None
         self.go_tick = None
         self.initial_form = None
         self.first_transform = None
         self.mode14_witness = None
+        self.neutralization_trigger = None
+        self.neutralization_issue_requested = False
+        self.neutralization_issue = None
+        self.neutralization_release = None
+        self.first_form_phase = None
+        self.first_form_selected_form = None
+        self.first_form_phase1_entry = None
+        self.first_form_phase1_exit = None
+        self.first_form_phase6_entry = None
+        self.first_form_settlement = None
         self.stop = None
         self.transitions = []
         self.desired = [NEUTRAL_PAD, NEUTRAL_PAD]
@@ -43,13 +60,28 @@ class StadiumStandingsInputPolicy:
         return (ports == [NEUTRAL_PAD, NEUTRAL_PAD] or
                 self.inflight is not None and ports == self.inflight)
 
+    def requires_issue(self, sent):
+        return list(sent) != self.desired or self.neutralization_issue_requested
+
     def issue(self, ports):
         from reference_versus_sequence_capture import raw_pad
         neutral = [NEUTRAL_PAD, NEUTRAL_PAD]
         require(ports == self.desired, 'Standings input differs from actual observed policy')
         if ports == neutral:
             self.releasing = self.inflight is not None
+            if self.first_form_latency and self.neutralization_issue_requested:
+                require(self.neutralization_trigger is not None and self.last is not None and
+                        self.last['sequence'] >= self.neutralization_trigger['sequence'],
+                        'First-form neutral issue lacks its actual trigger/source order')
+                self.neutralization_issue = dict(
+                    sequence=self.last['sequence'], source_tick=self.last['source_tick'],
+                    draw_ordinal=self.last['draw_ordinal'], trigger_sequence=(
+                        self.neutralization_trigger['sequence']))
+                self.neutralization_issue_requested = False
+                self.releasing = True
             return
+        require(not self.first_form_latency or self.neutralization_trigger is None,
+                'First-form latency forbids stick input after its neutralization trigger')
         require(self.stop is None and self.last is not None and
                 self.last['mode'] == 8 and self.last['focus'] in (0, 1) and
                 self.inflight is None and not self.releasing,
@@ -71,6 +103,14 @@ class StadiumStandingsInputPolicy:
                 'Standings tick lacks exact four-port consumed input owner')
         if self.releasing and sample['ports'][:2] == [NEUTRAL_PAD]*2:
             self.inflight, self.releasing = None, False
+        if (self.first_form_latency and self.neutralization_issue is not None and
+                self.neutralization_release is None and
+                sample['sequence'] > self.neutralization_issue['sequence'] and
+                sample['ports'] == [NEUTRAL_PAD, NEUTRAL_PAD,
+                                    DISCONNECTED_PAD, DISCONNECTED_PAD]):
+            self.neutralization_release = dict(sequence=sample['sequence'],
+                source_tick=sample['source_tick'], draw_ordinal=sample['draw_ordinal'],
+                ports=list(sample['ports']), errors=list(sample['errors']))
         if self.stop is not None:
             return
         tick = row['source_tick']
@@ -109,15 +149,78 @@ class StadiumStandingsInputPolicy:
         transformed = (snapshot['map2']['phase_s16'] != 0 or
                        snapshot['map2']['gate_mask_80'] or
                        snapshot['map2']['form_s16'] != self.initial_form)
+        first_transform_event = transformed and self.first_transform is None
         witness = dict(sequence=row['seq'], source_tick=tick,
             draw_ordinal=row['draw_ordinal'], mode=mode, focus=focus,
             display=dict(snapshot['display']), map2=dict(snapshot['map2']),
             consumed_pad=dict(sequence=sample['sequence'], source_tick=sample['source_tick'],
                 draw_ordinal=sample['draw_ordinal'], ports=list(sample['ports']),
                 errors=list(sample['errors'])))
-        if transformed and self.first_transform is None:
+        if first_transform_event:
             self.first_transform = witness
-        if self.post_transform:
+        first_form = snapshot.get('first_form') if self.first_form_latency else None
+        if first_form is not None:
+            require(isinstance(first_form, dict) and
+                    first_form.get('profile') == 'first_form_v1',
+                    'First-form latency received a foreign first-form observation')
+            phase = first_form.get('phase')
+            require(type(phase) is int and 0 <= phase <= 6,
+                    'First-form latency lacks an actual authored phase')
+            selected_form = first_form.get('selected_form')
+            active_map_id = first_form.get('active_map_id')
+            root_replaced = first_form.get('root_replacement_observed')
+            require(type(selected_form) is int and selected_form in (3, 4, 5, 6, 9) and
+                    type(active_map_id) is int and type(root_replaced) is bool,
+                    'First-form latency lacks exact selected form/root fields')
+            # The authoritative decoder persists its swap at phase6: settled
+            # phase0 still owns the incoming form, not the original map5 root.
+            replacement_seen = phase == 6 or self.first_form_phase6_entry is not None
+            require(active_map_id == (selected_form if replacement_seen else 5) and
+                    root_replaced is replacement_seen,
+                    'First-form latency form/root phase relation differs')
+            if phase > 0:
+                require(selected_form in (3, 4, 6, 9) and
+                        (self.first_form_selected_form is None or
+                         selected_form == self.first_form_selected_form),
+                        'First-form latency selected form changed during transformation')
+                if self.first_form_selected_form is None:
+                    self.first_form_selected_form = selected_form
+            elif self.first_form_selected_form is not None:
+                require(selected_form == self.first_form_selected_form,
+                        'First-form latency settled into a different selected form')
+            point = dict(sequence=row['seq'], source_tick=tick,
+                draw_ordinal=row['draw_ordinal'], phase=phase,
+                active_map_id=active_map_id, selected_form=selected_form,
+                root_replacement_observed=root_replaced)
+            previous_phase = self.first_form_phase
+            if phase == 1 and previous_phase != 1 and self.first_form_phase1_entry is None:
+                self.first_form_phase1_entry = point
+            if previous_phase == 1 and phase != 1 and self.first_form_phase1_exit is None:
+                self.first_form_phase1_exit = point
+            if phase == 6 and previous_phase != 6:
+                self.first_form_phase6_entry = point
+            if (phase == 0 and previous_phase == 6 and
+                    first_form.get('root_replacement_observed') is True):
+                self.first_form_settlement = point
+            self.first_form_phase = phase
+        if self.first_form_latency:
+            reason = None
+            if mode == 14 and self.mode14_witness is None:
+                self.mode14_witness = dict(witness,
+                    before_first_transform=not transformed and self.first_transform is None)
+            if self.neutralization_trigger is None:
+                if mode == 14 and not transformed and not first_transform_event:
+                    kind = 'pretransform_mode14'
+                elif first_transform_event and mode == 14:
+                    kind = 'mode14_and_first_transform_same_source_row'
+                elif first_transform_event:
+                    kind = 'first_transformation'
+                else:
+                    kind = None
+                if kind is not None:
+                    self.neutralization_trigger = dict(kind=kind, **witness)
+                    self.neutralization_issue_requested = True
+        elif self.post_transform:
             reason = (('observed_post_transform_mode14' if self.first_transform is not None
                        else 'mode14_before_transform') if mode == 14 else None)
             if mode == 14:
@@ -126,6 +229,29 @@ class StadiumStandingsInputPolicy:
             reason = ('first_transform' if transformed else 'observed_mode14' if mode == 14 else
                       'go_plus_3500_cap' if tick-self.go_tick >= 3500 else None)
         self.desired = [NEUTRAL_PAD, NEUTRAL_PAD]
+        if (self.first_form_latency and self.neutralization_trigger is not None and
+                self.first_form_settlement is not None and
+                self.neutralization_release is not None and self.stop is None):
+            require(self.first_transform is not None and
+                    self.first_form_phase1_entry is not None and
+                    self.first_form_phase1_exit is not None and
+                    self.first_form_phase6_entry is not None and
+                    self.first_form_phase1_entry['sequence'] >=
+                        self.neutralization_trigger['sequence'] and
+                    self.first_form_phase1_entry['sequence'] >=
+                        self.first_transform['sequence'] and
+                    self.first_form_phase1_entry['sequence'] <
+                        self.first_form_phase1_exit['sequence'] <
+                        self.first_form_phase6_entry['sequence'] and
+                    self.neutralization_release['sequence'] <
+                        self.first_form_settlement['sequence'] and
+                    self.first_form_settlement['sequence'] >
+                        self.first_form_phase6_entry['sequence'],
+                    'First-form latency lacks ordered phase1/phase6/root-settlement points')
+            point = self.first_form_settlement
+            self.stop = dict(point, reason='first_form_phase6_to_settled_phase0',
+                result='OBSERVED_FIRST_FORM_ROOT_SETTLED', C3=False, C4=False,
+                per_owner_rng_comparison=False)
         if reason is not None:
             self.stop = dict(point, reason=reason,
                 result=('OBSERVED_POST_TRANSFORM_MODE14' if reason == 'observed_post_transform_mode14' else
@@ -135,7 +261,8 @@ class StadiumStandingsInputPolicy:
             if self.post_transform:
                 self.stop['first_transform'] = self.first_transform
                 self.stop['mode14_witness'] = self.mode14_witness
-        elif mode == 8 and not self.releasing:
+        elif mode == 8 and not self.releasing and not (
+                self.first_form_latency and self.neutralization_trigger is not None):
             desired = [NEUTRAL_PAD, NEUTRAL_PAD]
             desired[focus] = raw_pad(x=80)
             # A focus change first releases the previous source-owned command.
@@ -149,7 +276,61 @@ class StadiumStandingsInputPolicy:
                     transitions=list(self.transitions), consumed_ticks=self.consumed_ticks,
                     neutral_release_observed=True, allocation_acceptance=False,
                     per_owner_rng_comparison=False, C3=False)
-        if self.post_transform:
+        if self.first_form_latency:
+            trigger_kind = (self.neutralization_trigger or {}).get('kind')
+            trigger_sequence = (self.neutralization_trigger or {}).get('sequence')
+            transform_sequence = (self.first_transform or {}).get('sequence')
+            trigger_relation_valid = (
+                trigger_kind == 'pretransform_mode14' and
+                    self.mode14_witness is not None and
+                    self.mode14_witness.get('before_first_transform') is True and
+                    self.mode14_witness['sequence'] == trigger_sequence < transform_sequence or
+                trigger_kind == 'first_transformation' and
+                    trigger_sequence == transform_sequence and
+                    (self.mode14_witness is None or
+                     self.mode14_witness['sequence'] >= trigger_sequence) or
+                trigger_kind == 'mode14_and_first_transform_same_source_row' and
+                    self.mode14_witness is not None and
+                    self.mode14_witness.get('before_first_transform') is False and
+                    self.mode14_witness['sequence'] == trigger_sequence == transform_sequence)
+            require(self.stop.get('reason') == 'first_form_phase6_to_settled_phase0' and
+                    self.neutralization_trigger is not None and
+                    self.neutralization_issue is not None and
+                    self.neutralization_release is not None and
+                    self.first_transform is not None and
+                    trigger_relation_valid and
+                    self.neutralization_trigger['sequence'] <=
+                        self.neutralization_issue['sequence'] <
+                        self.neutralization_release['sequence'] and
+                    self.neutralization_release['sequence'] <
+                        self.first_form_settlement['sequence'] and
+                    self.first_form_phase1_entry is not None and
+                    self.first_form_phase1_exit is not None and
+                    self.first_form_phase6_entry is not None and
+                    self.first_form_phase1_entry['sequence'] >= trigger_sequence and
+                    self.first_form_phase1_entry['sequence'] >= transform_sequence and
+                    self.first_form_settlement is not None,
+                    'First-form latency lacks trigger/neutral/phase6-settlement chain')
+            result.update(mode14_witness=self.mode14_witness,
+                neutralization_trigger=self.neutralization_trigger,
+                neutralization_issue=self.neutralization_issue,
+                neutralization_release=self.neutralization_release,
+                first_transform=self.first_transform,
+                first_form_latency=dict(profile=self.FIRST_FORM_LATENCY_PROFILE,
+                    phase1_entry=self.first_form_phase1_entry,
+                    phase1_exit=self.first_form_phase1_exit,
+                    phase1_source_tick_dwell=(self.first_form_phase1_exit['source_tick'] -
+                                              self.first_form_phase1_entry['source_tick']),
+                    phase6_entry=self.first_form_phase6_entry,
+                    settled_phase0=self.first_form_settlement,
+                    trigger_to_transform_source_ticks=(
+                        self.first_transform['source_tick'] -
+                        self.neutralization_trigger['source_tick']),
+                    trigger_to_settlement_source_ticks=(
+                        self.first_form_settlement['source_tick'] -
+                        self.neutralization_trigger['source_tick'])),
+                event_stop=self.stop['reason'], C4=False)
+        elif self.post_transform:
             require(self.stop.get('reason') in ('observed_post_transform_mode14',
                                                 'mode14_before_transform'),
                     'Post-transform profile lacks an actual mode14 stop')
@@ -184,6 +365,82 @@ def read_standings_intents(output):
     return tuple(values)
 
 
+FIRST_FORM_REPLAY_JOURNAL_SCHEMA = 'melee-web-stadium-first-form-replay-journals-v1'
+
+
+def validate_first_form_replay_journals(binding_path, *, source_binding_sha256,
+                                         source_directory):
+    """Bind the recorded first-form issue and completed Pipe journals separately.
+
+    The existing eight-role raw-source binding remains unchanged. These two
+    journals are additional host evidence tied to that exact binding and to
+    their fixed filenames beside its primary observer stream.
+    """
+    path = Path(binding_path)
+    require(not path.is_symlink() and path.is_file() and path.stat().st_size <= 64*1024,
+            'First-form replay journal binding is missing/nonregular/over cap')
+    raw = path.read_bytes()
+    envelope = json.loads(raw)
+    require(isinstance(envelope, dict) and set(envelope) ==
+            {'schema', 'source_binding_sha256', 'files'} and
+            envelope['schema'] == FIRST_FORM_REPLAY_JOURNAL_SCHEMA and
+            envelope['source_binding_sha256'] == source_binding_sha256,
+            'First-form replay journals do not bind the exact eight-role source binding')
+    root = Path(source_directory).resolve()
+    files = envelope['files']
+    expected_names = {'issues': 'standings-input-issues.json',
+                      'pipe_journal': 'input-intentions.jsonl'}
+    require(isinstance(files, dict) and set(files) == set(expected_names),
+            'First-form replay journal roles differ')
+    retained = {}
+    for role, name in expected_names.items():
+        pin = files[role]
+        expected_path = root/name
+        require(isinstance(pin, dict) and set(pin) == {'path', 'bytes', 'sha256'} and
+                Path(pin['path']).resolve() == expected_path and
+                not expected_path.is_symlink() and expected_path.is_file(),
+                'First-form replay journal path is not the bound source sidecar: '+role)
+        digest = hashlib.sha256(expected_path.read_bytes()).hexdigest()
+        require(type(pin['bytes']) is int and pin['bytes'] == expected_path.stat().st_size and
+                pin['sha256'] == digest,
+                'First-form replay journal bytes/hash differ: '+role)
+        retained[role] = dict(path=str(expected_path), bytes=pin['bytes'], sha256=digest)
+    issues, pipe_rows = read_standings_intents(root)
+    require(issues and pipe_rows,
+            'First-form replay source lacks its actual issue/Pipe journal')
+    # Validate the complete historical issue-to-successful-write relation
+    # before starting Dolphin. The same journals are later replayed against
+    # actual raw source coordinates by validate_stadium_whole_long_idle_outputs.
+    StandingsBObservations(issues, pipe_rows,
+        profile=StadiumStandingsInputPolicy.FIRST_FORM_LATENCY_PROFILE)
+    return dict(schema=FIRST_FORM_REPLAY_JOURNAL_SCHEMA,
+                binding_path=str(path.resolve()),
+                binding_sha256=hashlib.sha256(raw).hexdigest(),
+                source_binding_sha256=source_binding_sha256,
+                source_directory=str(root), files=retained)
+
+
+def apply_standings_source_issue(policy, issues, cursor, row):
+    """Apply only an authenticated historical issue at its exact actual source row.
+
+    Shared by the strict offline validator and live read-only replay receiver.
+    The caller validates journal schema/Pipe provenance before admitting rows.
+    """
+    if cursor < len(issues):
+        issue = issues[cursor]
+        require(issue['after_sequence'] >= row['seq'],
+                'Standings source issue event was missed/reordered')
+        if issue['after_sequence'] == row['seq']:
+            require(row['event'] == 'boundary' and
+                    row['payload'].get('boundary') == 'source_tick' and
+                    row['payload'].get('match_index') == 1 and
+                    policy.last == issue['source'],
+                    'Standings issue does not match actual focused source snapshot')
+            policy.issue(issue['ports'])  # Existing desired-PAD/refusal checks.
+            return cursor + 1
+    return cursor
+
+
 class StandingsBObservations(LongIdleBObservations):
     """Explicit host input policy over the unchanged native structural layout.
 
@@ -197,6 +454,7 @@ class StandingsBObservations(LongIdleBObservations):
                 'Standings issue/Pipe inventory differs')
         self.policy = StadiumStandingsInputPolicy(profile)
         self.post_transform = self.policy.post_transform
+        self.first_form_latency = self.policy.first_form_latency
         from stadium_go_prefix import StadiumFirstFormObservations
         self.first_form = StadiumFirstFormObservations() if self.post_transform else None
         self.first_form_announcements = set()
@@ -361,18 +619,8 @@ class StandingsBObservations(LongIdleBObservations):
                     self.post_window_complete = True
             else:
                 self._accept_post_window_boundary(row)
-        if self.issue_cursor < len(self.issues):
-            issue = self.issues[self.issue_cursor]
-            require(issue['after_sequence'] >= row['seq'],
-                    'Standings source issue event was missed/reordered')
-            if issue['after_sequence'] == row['seq']:
-                require(row['event'] == 'boundary' and
-                        row['payload'].get('boundary') == 'source_tick' and
-                        row['payload'].get('match_index') == 1 and
-                        self.policy.last == issue['source'],
-                        'Standings issue does not match actual focused source snapshot')
-                self.policy.issue(issue['ports'])
-                self.issue_cursor += 1
+        self.issue_cursor = apply_standings_source_issue(
+            self.policy, self.issues, self.issue_cursor, row)
 
     def finish(self):
         result = super().finish()
@@ -384,15 +632,23 @@ class StandingsBObservations(LongIdleBObservations):
                     'First-form profile lacks matching announcements')
             require(self.post_window_pending is None and self.post_window_draw_open is None and
                     self.post_window_complete,
-                    'Post-transform mode14 lacks completed post-window source/PAD/draw join')
-            result.update(scope='original-whole3-b-post-transform-mode14-input-observation-only',
-                host_input_profile=StadiumStandingsInputPolicy.POST_TRANSFORM_PROFILE,
+                    ('First-form v2 lacks completed post-window source/PAD/draw join'
+                     if self.first_form_latency else
+                     'Post-transform mode14 lacks completed post-window source/PAD/draw join'))
+            result.update(scope=('original-whole3-b-first-form-latency-v2-record-only' if
+                                 self.first_form_latency else
+                                 'original-whole3-b-post-transform-mode14-input-observation-only'),
+                host_input_profile=(StadiumStandingsInputPolicy.FIRST_FORM_LATENCY_PROFILE if
+                                    self.first_form_latency else
+                                    StadiumStandingsInputPolicy.POST_TRANSFORM_PROFILE),
                 post_window_source_ticks=self.post_window_ticks,
                 post_window_first_tick=(self.post_window_tick - self.post_window_ticks + 1
                     if self.post_window_ticks else None),
                 post_window_last_tick=(self.post_window_tick if self.post_window_ticks else None),
                 event_stop=policy_summary['event_stop'], idle_acceptance=False,
                 transformation_acceptance=False, C3=False)
+            if self.first_form_latency:
+                result['C4'] = False
         else:
             result.update(scope='original-whole3-b-standings-input-structural-window-only',
                           host_input_profile=StadiumStandingsInputPolicy.PROFILE,

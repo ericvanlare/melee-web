@@ -273,8 +273,9 @@ before queue 1, so the priority-1 read waits for the in-flight operation and is
 then passed over by each newly queued music block. Changing `L` shifts the
 whole later schedule and changes how the five-per-tick `HSD_Randf` draws of
 cases 4-5 interleave with fighter, item and particle draws on the shared RNG.
-`L` has not been measured. It is expected to exceed one tick on a real drive,
-but that is **unmeasured**. Slippi records the phase boundary as stage event
+The [C4 evidence boundary](../status/2026-10-27-stadium-first-form-latency.md)
+records the original measurements, fixed-input repeatability and remaining
+form coverage. Hardware-drive timing remains unmeasured. Slippi records the phase boundary as stage event
 `0x41` (frame, phase, type), where phase values 2-6 are exactly `xDC` after
 entering that case and the type is `xDE` (`types.ts:307-330`; replay versions
 that have the event only; see
@@ -666,8 +667,9 @@ checkpoint 8.
 
 ## Top risks
 
-1. **Load latency.** `L` decides the RNG interleaving of every later tick, and
-   it is unmeasured. A host-timed completion would also break online lockstep.
+1. **Load latency.** `L` decides the RNG interleaving of every later tick. C4
+   records measured samples; a general timing rule remains unresolved.
+   Host-timed completion would also diverge between online peers.
    Recommend a rule-defined completion tick, with `L` recorded per
    transformation when comparing against a capture.
 2. **Particle RNG.** The stage's effects draw from the shared seed through the

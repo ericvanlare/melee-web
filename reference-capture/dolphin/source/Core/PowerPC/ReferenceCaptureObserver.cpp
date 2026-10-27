@@ -262,6 +262,7 @@ struct StadiumWholeBObservation
 struct StadiumWholeLongIdle
 {
   bool enabled = false, paired = false, registration = false, open = false, target_seen = false, closed = false;
+  bool first_form_replay = false;
   u32 owner = 0, go_tick = 0, last_tick = 0, samples = 0;
   u32 active_match = 1, completed_windows = 0;
   std::array<u32, 2> paired_go_ticks{}, paired_samples{};
@@ -271,8 +272,12 @@ struct StadiumWholeLongIdle
   }
   static bool Admit(std::string_view setting, bool whole, bool b_state, bool recording,
                     bool replaying, bool short_rng, bool compact_valid,
-                    std::string_view compact_selection, bool paired = false)
+                    std::string_view compact_selection, bool paired = false,
+                    bool first_form_replay = false)
   {
+    if (first_form_replay)
+      return !paired && setting == "selected_b_3500_v1" && whole && b_state &&
+          !recording && replaying && !short_rng && compact_valid && compact_selection == "1";
     if (setting.empty()) return true;
     if (paired)
       return (setting == "paired_idle_scene_endpoints_v1" || setting == "paired_idle_registration_v1") && whole && b_state &&
@@ -347,6 +352,32 @@ struct StadiumWholeLongIdle
   {
     return !enabled || (paired ? completed_windows == 2 && closed && !open :
         closed && !open && target_seen && samples >= 3501 && samples <= 3505);
+  }
+
+  // Separate diagnostic admission; this does not alter the long-window state machine.
+  static bool StadiumFirstFormLatencyReplayAdmit(std::string_view token, bool whole, u32 matches,
+      bool b_state, std::string_view idle, std::string_view posttransform,
+      std::string_view binding, bool recording, bool replaying, bool short_rng,
+      bool cpu_probe, bool paired, bool compact_valid, std::string_view compact_selection)
+  {
+    return token == "first_form_latency_replay_v1" && whole && matches == 3 && b_state &&
+        idle == "selected_b_3500_v1" && posttransform == "first_form_v1" &&
+        binding.size() == 64 && binding.find_first_not_of("0123456789abcdef") ==
+            std::string_view::npos && binding != std::string(64, '0') &&
+        !recording && replaying && !short_rng && !cpu_probe && !paired &&
+        compact_valid && compact_selection == "1";
+  }
+
+  static bool StadiumCompactInputAdmit(bool recording, bool replaying, bool first_form_replay)
+  {
+    return first_form_replay ? !recording && replaying : recording && !replaying;
+  }
+
+  static std::string StadiumFirstFormLatencyReplayJson(bool admitted, std::string_view binding)
+  {
+    if (!admitted) return "";
+    return ",\"stadium_first_form_latency_replay\":\"first_form_latency_replay_v1\","
+        "\"stadium_first_form_latency_replay_binding_sha256\":\"" + std::string(binding) + "\"";
   }
 };
 
@@ -1521,10 +1552,22 @@ struct Observer::Impl
       return SetInvalid("Whole Stadium RNG adjunct requires combined-only match1 GO offsets1..9 and B state"),false;
     const std::string whole_replay_binding = Env("MWRC_STADIUM_WHOLE_REPLAY_BINDING");
     const bool whole_replay = !whole_replay_binding.empty();
+    const std::string first_form_replay_setting = Env("MWRC_STADIUM_FIRST_FORM_LATENCY_REPLAY");
+    const auto& first_form_replay_compact = CompactRngEnvironment();
+    stadium_whole_long_idle.first_form_replay = StadiumWholeLongIdle::StadiumFirstFormLatencyReplayAdmit(
+        first_form_replay_setting, stadium_whole_feedback, whole_session_matches,
+        Env("MWRC_STADIUM_WHOLE_B_STATE") == "1", Env("MWRC_STADIUM_WHOLE_LONG_IDLE"),
+        Env("MWRC_STADIUM_POSTTRANSFORM_STATE"), whole_replay_binding,
+        InputStream::IsRecording(), InputStream::IsReplaying(), whole_rng_returns,
+        !Env("MWRC_CPU_PROBE_OUTPUT").empty(), stadium_whole_paired_idle,
+        first_form_replay_compact.present && first_form_replay_compact.valid, first_form_replay_compact.selection);
+    if (!first_form_replay_setting.empty() && !stadium_whole_long_idle.first_form_replay)
+      return SetInvalid("First-form latency replay requires its exact whole3/B/long/posttransform/bound-input/compact profile"), false;
     const bool whole_input_admitted = whole_replay ?
         whole_replay_binding.size() == 64 &&
         whole_replay_binding.find_first_not_of("0123456789abcdef") == std::string::npos &&
-        whole_replay_binding != std::string(64, '0') && whole_rng_admitted &&
+        whole_replay_binding != std::string(64, '0') &&
+        (whole_rng_admitted || stadium_whole_long_idle.first_form_replay) &&
         !InputStream::IsRecording() && InputStream::IsReplaying() :
         InputStream::IsRecording() && !InputStream::IsReplaying();
     if (whole_replay && !stadium_whole_feedback)
@@ -1563,8 +1606,9 @@ struct Observer::Impl
     const auto& long_idle_compact = CompactRngEnvironment();
     if (!StadiumWholeLongIdle::Admit(long_idle_setting, stadium_whole_feedback,
         stadium_whole_b.enabled, InputStream::IsRecording(), InputStream::IsReplaying(),
-        whole_rng_returns || whole_replay, long_idle_compact.present && long_idle_compact.valid,
-        long_idle_compact.selection, stadium_whole_paired_idle) ||
+        whole_rng_returns || (whole_replay && !stadium_whole_long_idle.first_form_replay),
+        long_idle_compact.present && long_idle_compact.valid,
+        long_idle_compact.selection, stadium_whole_paired_idle, stadium_whole_long_idle.first_form_replay) ||
         (stadium_whole_paired_idle && long_idle_setting != paired_idle_setting))
       return SetInvalid("Whole Stadium idle profile requires its exact selected-match recording/compact ledger and no short RNG/replay"), false;
     stadium_whole_long_idle.enabled = !long_idle_setting.empty();
@@ -1844,6 +1888,8 @@ struct Observer::Impl
       handshake += ",\"stadium_whole_replay_binding_sha256\":\"" + Env("MWRC_STADIUM_WHOLE_REPLAY_BINDING") + "\"";
     if (!stadium_posttransform_state.empty())
       handshake += ",\"stadium_posttransform_state\":\"" + stadium_posttransform_state + "\"";
+    handshake += StadiumWholeLongIdle::StadiumFirstFormLatencyReplayJson(stadium_whole_long_idle.first_form_replay,
+        Env("MWRC_STADIUM_WHOLE_REPLAY_BINDING"));
     handshake += "}";
     PushJson(Event::Handshake, handshake);
     std::string start =
@@ -1888,6 +1934,8 @@ struct Observer::Impl
       start += ",\"stadium_whole_replay_binding_sha256\":\"" + Env("MWRC_STADIUM_WHOLE_REPLAY_BINDING") + "\"";
     if (!stadium_posttransform_state.empty())
       start += ",\"stadium_posttransform_state\":\"" + stadium_posttransform_state + "\"";
+    start += StadiumWholeLongIdle::StadiumFirstFormLatencyReplayJson(stadium_whole_long_idle.first_form_replay,
+        Env("MWRC_STADIUM_WHOLE_REPLAY_BINDING"));
     start += "}";
     PushJson(Event::Start, start);
     return !invalid.load();
@@ -1910,7 +1958,8 @@ struct Observer::Impl
     if (!settings.valid || path_error || exists ||
         cpu_probe_configured || item_probe_configured ||
         !(stadium_whole_feedback || (stadium_idle_3500 && selected == "0")) ||
-        !InputStream::IsRecording() || InputStream::IsReplaying() ||
+        !StadiumWholeLongIdle::StadiumCompactInputAdmit(InputStream::IsRecording(), InputStream::IsReplaying(),
+                                 stadium_whole_long_idle.first_form_replay) ||
         capture_id.empty() || capture_id.size() > 128 || sequence_id.empty() || sequence_id.size() > 128)
       return SetInvalid("compact RNG requires explicit fresh output/selected checked recorded route and no other probes"), false;
     compact_enabled = true;
@@ -7035,6 +7084,8 @@ struct Observer::Impl
               ",\"lifecycle_parity\":false}";
     if (!stadium_posttransform_state.empty())
       json += ",\"stadium_posttransform_state\":\"" + stadium_posttransform_state + "\"";
+    json += StadiumWholeLongIdle::StadiumFirstFormLatencyReplayJson(stadium_whole_long_idle.first_form_replay,
+        Env("MWRC_STADIUM_WHOLE_REPLAY_BINDING"));
     json += CpuProbeCloseStatusJson();
     json += "}\n";
     if (!status.Write(reinterpret_cast<const u8*>(json.data()), json.size()) || !status.Flush() ||

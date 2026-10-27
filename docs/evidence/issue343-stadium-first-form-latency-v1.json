@@ -1,0 +1,406 @@
+{
+  "schema": "melee-web-stadium-c4-first-form-latency-evidence-v1",
+  "issue": 343,
+  "state": "ORIGINAL_FIRST_FORM_RECORD_AND_TWO_FIXED_INPUT_REPLAYS_PASS",
+  "C4_complete": false,
+  "source_head": "5103583b7279ffcfb8d5797e204516161f639553",
+  "native_producer_head": "646206616654d8b5d7f6c11fc2ae188022c2fd1c",
+  "native_binary_sha256": "90b3374141bed9a3ddc7449be371f59adf5a4f8ee46aeacbd46ad124ab96eeaa",
+  "original_record": {
+    "owner_seconds": 139.44237183313817,
+    "first_form_latency": {
+      "phase1_entry": {
+        "active_map_id": 5,
+        "draw_ordinal": 3687,
+        "phase": 1,
+        "root_replacement_observed": false,
+        "selected_form": 9,
+        "sequence": 22803,
+        "source_tick": 3689
+      },
+      "phase1_exit": {
+        "active_map_id": 5,
+        "draw_ordinal": 3698,
+        "phase": 2,
+        "root_replacement_observed": false,
+        "selected_form": 9,
+        "sequence": 22858,
+        "source_tick": 3700
+      },
+      "phase1_source_tick_dwell": 11,
+      "phase6_entry": {
+        "active_map_id": 9,
+        "draw_ordinal": 4303,
+        "phase": 6,
+        "root_replacement_observed": true,
+        "selected_form": 9,
+        "sequence": 25883,
+        "source_tick": 4305
+      },
+      "profile": "first_form_latency_v2",
+      "settled_phase0": {
+        "active_map_id": 9,
+        "draw_ordinal": 4304,
+        "phase": 0,
+        "root_replacement_observed": true,
+        "selected_form": 9,
+        "sequence": 25888,
+        "source_tick": 4306
+      },
+      "trigger_to_settlement_source_ticks": 617,
+      "trigger_to_transform_source_ticks": 0
+    },
+    "trigger_kind": "first_transformation",
+    "neutralization_issue": {
+      "draw_ordinal": 3687,
+      "sequence": 22803,
+      "source_tick": 3689,
+      "trigger_sequence": 22803
+    },
+    "neutralization_consumed": {
+      "draw_ordinal": 3688,
+      "errors": [
+        0,
+        0,
+        -1,
+        -1
+      ],
+      "ports": [
+        "0000000000000000000000",
+        "0000000000000000000000",
+        "00000000000000000000ff",
+        "00000000000000000000ff"
+      ],
+      "sequence": 22807,
+      "source_tick": 3690
+    },
+    "event_stop": "first_form_phase6_to_settled_phase0",
+    "actual_inputs_complete": true,
+    "whole3_terminal": true,
+    "owned_processes_absent": true,
+    "artifacts": {
+      "native-primary.mwro": {
+        "bytes": 50331838,
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-latency-original-v1/native-primary.mwro",
+        "sha256": "e31cb3f67eb403772bd02be58eaa8f0e2d3db7cc3626e19eb31f8c2cb46404e9"
+      },
+      "native-inputs.mwri": {
+        "bytes": 1221176,
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-latency-original-v1/native-inputs.mwri",
+        "sha256": "92be0494806928315bae49c8dcddadef687d1acb7987a49fb722e2e4392ea289"
+      },
+      "native-allocations.jsonl": {
+        "bytes": 1109621551,
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-latency-original-v1/native-allocations.jsonl",
+        "sha256": "201810da81cb5f7bca56bc525cf314417abd426034c78962c0c2f3460f8c7274"
+      },
+      "stadium-whole-selected-b-compact-rng.mwrl": {
+        "bytes": 4494983,
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-latency-original-v1/stadium-whole-selected-b-compact-rng.mwrl",
+        "sha256": "7f47d37968d6aaa8da00fcb56cb86cad7187129fff20c861c04986ee47d79239"
+      },
+      "report.json": {
+        "bytes": 7134050,
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-latency-original-v1/report.json",
+        "sha256": "b4f60a49076f54dda9535b7ee81c42956e2a14f67d764a247e7c924395307a8f"
+      }
+    },
+    "independent_review": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-latency-original-v1/independent-review-v1.json",
+      "bytes": 13003,
+      "sha256": "eb04c975b4e24d44bea30f1b2cc18ad036059ce7a4f073a82faa58f5f147d647"
+    },
+    "packet_release": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-latency-packet-v1/root-one-launch-release-v2.json",
+      "bytes": 1090,
+      "sha256": "0fe4e69a4ebe055c32f13c69656ba394306caaf7642114f58336cbb925ad3388"
+    },
+    "candidate_review": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-latency-candidate-v3/root-review-v3.json",
+      "bytes": 1220,
+      "sha256": "9abf509ccb71033042e6f6a8c76c2f70865bd9e5b7137d18387f539108072bd7"
+    },
+    "applied_focused": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-latency-candidate-v3/applied-source-receipt.json",
+      "bytes": 453,
+      "sha256": "cb0d6ce8922950a213630b0217d6368b7e62ae60ab02293c25bc48e31b4cd440"
+    },
+    "phase_durations": [
+      {
+        "phase": 1,
+        "source_ticks": 11
+      },
+      {
+        "phase": 2,
+        "source_ticks": 1
+      },
+      {
+        "phase": 3,
+        "source_ticks": 302
+      },
+      {
+        "phase": 4,
+        "source_ticks": 181
+      },
+      {
+        "phase": 5,
+        "source_ticks": 121
+      },
+      {
+        "phase": 6,
+        "source_ticks": 1
+      }
+    ],
+    "phase_duration_receipt": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-phase-durations-v1/result.json",
+      "bytes": 3566,
+      "sha256": "bc74ff7c1bc8a0c52db68d7d1c759422b8cbb86b58e1dcd52af67c003d8dca46"
+    }
+  },
+  "fixed_input_replays": [
+    {
+      "state": "SAVED_REPLAY_POSTFLIGHT_PASS_LIVE_FAIL_PRESERVED",
+      "native_producer_head": "841305f3ee681856b30cb8fe5e4602dac795f122",
+      "harness_source_head": "2fa481a276ee5378b27e421b0e7280cfdc503230",
+      "elapsed_seconds": 133.2138026249595,
+      "first_form_latency": {
+        "phase1_entry": {
+          "active_map_id": 5,
+          "draw_ordinal": 3687,
+          "phase": 1,
+          "root_replacement_observed": false,
+          "selected_form": 9,
+          "sequence": 22803,
+          "source_tick": 3689
+        },
+        "phase1_exit": {
+          "active_map_id": 5,
+          "draw_ordinal": 3698,
+          "phase": 2,
+          "root_replacement_observed": false,
+          "selected_form": 9,
+          "sequence": 22858,
+          "source_tick": 3700
+        },
+        "phase1_source_tick_dwell": 11,
+        "phase6_entry": {
+          "active_map_id": 9,
+          "draw_ordinal": 4303,
+          "phase": 6,
+          "root_replacement_observed": true,
+          "selected_form": 9,
+          "sequence": 25883,
+          "source_tick": 4305
+        },
+        "profile": "first_form_latency_v2",
+        "settled_phase0": {
+          "active_map_id": 9,
+          "draw_ordinal": 4304,
+          "phase": 0,
+          "root_replacement_observed": true,
+          "selected_form": 9,
+          "sequence": 25888,
+          "source_tick": 4306
+        },
+        "trigger_to_settlement_source_ticks": 617,
+        "trigger_to_transform_source_ticks": 0
+      },
+      "summary_equal": true,
+      "input_events": 30528,
+      "input_complete": true,
+      "final_comparison_pending": false,
+      "error": "WholeSessionReplayError('draw return must contain exactly one scene_frame slice')",
+      "report": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-replay-v1/report.json",
+        "bytes": 7055641,
+        "sha256": "ffd4f95731f3de84340fe80b260d30075e042d26e9f09a141cbe56d43df62b98"
+      },
+      "supervisor": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-replay-packet-v1/launch-result.json",
+        "bytes": 27830,
+        "sha256": "feaca05f9ef87c992532d7af68550d5dca8b61c9ff529653f94a18f6ed8b2814"
+      },
+      "source_inputs_unchanged": true,
+      "owned_processes_absent": true,
+      "validation_source_head": "cba847f0c97115b88012784f76b89be44b266307",
+      "supplemental_postflight": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-replay-terminal-repair-v1/supplemental-summary.json",
+        "bytes": 3716,
+        "sha256": "f4e68ed1c71d04b0302b8f971b6841c9a3648df6e9efd3718a213e407e55e269"
+      },
+      "independent_review": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-replay-terminal-repair-v1/independent-review-v1.json",
+        "bytes": 3877,
+        "sha256": "95ea7de9c9e091c42b07d1f69b0130101bef472779769d2d35ad41d8c9c8adef"
+      }
+    },
+    {
+      "state": "LIVE_REPLAY_PASS_INDEPENDENTLY_REVIEWED",
+      "native_producer_head": "841305f3ee681856b30cb8fe5e4602dac795f122",
+      "harness_source_head": "cba847f0c97115b88012784f76b89be44b266307",
+      "elapsed_seconds": 140.92540241638198,
+      "first_form_latency": {
+        "phase1_entry": {
+          "active_map_id": 5,
+          "draw_ordinal": 3687,
+          "phase": 1,
+          "root_replacement_observed": false,
+          "selected_form": 9,
+          "sequence": 22803,
+          "source_tick": 3689
+        },
+        "phase1_exit": {
+          "active_map_id": 5,
+          "draw_ordinal": 3698,
+          "phase": 2,
+          "root_replacement_observed": false,
+          "selected_form": 9,
+          "sequence": 22858,
+          "source_tick": 3700
+        },
+        "phase1_source_tick_dwell": 11,
+        "phase6_entry": {
+          "active_map_id": 9,
+          "draw_ordinal": 4303,
+          "phase": 6,
+          "root_replacement_observed": true,
+          "selected_form": 9,
+          "sequence": 25883,
+          "source_tick": 4305
+        },
+        "profile": "first_form_latency_v2",
+        "settled_phase0": {
+          "active_map_id": 9,
+          "draw_ordinal": 4304,
+          "phase": 0,
+          "root_replacement_observed": true,
+          "selected_form": 9,
+          "sequence": 25888,
+          "source_tick": 4306
+        },
+        "trigger_to_settlement_source_ticks": 617,
+        "trigger_to_transform_source_ticks": 0
+      },
+      "summary_equal": true,
+      "input_events": 30528,
+      "input_complete": true,
+      "final_comparison_pending": false,
+      "report": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-replay-v2/report.json",
+        "bytes": 7154840,
+        "sha256": "89eb7ed4d15ce7420fc98d68209ff38c9e5fae88d39a80dcfca03b379e4d11e7"
+      },
+      "supervisor": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-replay-packet-v2/launch-result.json",
+        "bytes": 27739,
+        "sha256": "ea7034ef170412e5ba49be4678df6399952fa7cb1887f22041f49ab070b27eef"
+      },
+      "independent_review": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-replay-v2/independent-review-v2.json",
+        "bytes": 5529,
+        "sha256": "4144421dde3a26cf449a8919d4e8468878d6cb7f6f96cc68eebcf8592710697d"
+      },
+      "source_inputs_unchanged": true,
+      "owned_processes_absent": true,
+      "primary": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-replay-v2/native-primary.mwro",
+        "bytes": 50332418,
+        "sha256": "c7b76b0af5e17ad214fea5ca6d2976b83a43d81620630e1c8f85c5be9b22082a"
+      }
+    }
+  ],
+  "stopping_rule": "Stop at first changed latency under fixed input/settings, source/owner/decoder failure or existing limit. Do not substitute another fresh feedback recording, extend caps or alter arithmetic/input/RNG/source order.",
+  "limits": [
+    "One naturally observed form9 recording is not a distribution across all forms.",
+    "No browser transformation implementation or original/browser/per-owner RNG parity claim.",
+    "No pixels, PCM, live timing, physical-input, public-stage or whole-stage acceptance.",
+    "Native allocation journal retained; not audited as universal allocator coverage."
+  ],
+  "retained_preparation_failures": [
+    "Candidate v1/v2 holds and composed focused fixture failures.",
+    "Packet ancestry assumption after squash, receipt-summary preparation errors, and preflight supervisor schema errors.",
+    "Reviewer postexit INI byte-equality failure: exact prelaunch reconstruction matches; postexit serialization differs while all section/key/values are equal.",
+    "Host replay V1 independent review HOLD: Observer-only metadata checked on INPUT footer, and policy issue timing incorrectly reconstructed at host drain. Corrected by V2 exact actual-source-row hook and separate status checks.",
+    "Native admission global helper placement failed extracted source fixtures; moved helpers into actual long-idle class and retained failed fixture log.",
+    "First replay live terminal export required scene_frame slices that the long-idle diagnostic intentionally omits. Failed live report retained; supplemental postflight uses existing literal-input/context and raw draw-boundary checks, with Entry/Setup owner/seed checks unchanged.",
+    "Initial supplemental adapter import error retained; continuation binds earlier passing stages and runs remaining native/cleanup checks."
+  ],
+  "replay_producer": {
+    "native_source_head": "841305f3ee681856b30cb8fe5e4602dac795f122",
+    "harness_source_head": "2fa481a276ee5378b27e421b0e7280cfdc503230",
+    "binary_sha256": "509f1732bf794e1715ae6453a483eee8f19136df1f5cc2f4bf72e94ebb00490d",
+    "build": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-native-replay-build-v1/result.json",
+      "bytes": 4811,
+      "sha256": "266b6ac0902824d625ec8ae0594f66b4e06d52ada613667065d953ad7c1f9622"
+    },
+    "host_review": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-replay-candidate-v2/independent-review-v2.json",
+      "bytes": 7472,
+      "sha256": "4fdc01a36fb9aaeb8063c59b8ae19698393e5e4fc427c25fa98c88e717368046"
+    },
+    "focused": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-host-applied-focused-v2/tests.log",
+      "bytes": 5223,
+      "sha256": "74bda94fa940031c8bcc4042eba7e044ed8aecc089d14ecacf14951ca3253bc7"
+    },
+    "historical_native_binary_unchanged": true
+  },
+  "timing_scope": {
+    "source_note": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-dvd-completion-determinism-v1/decision.md",
+      "bytes": 3920,
+      "sha256": "a986a5753a654af1db3551dfd181af5443c5b9e195f19098541b1a504ff16538"
+    },
+    "rule": "No universal constant is justified. DVD range, DevCom/music queue, emulated drive state and callback/poll order remain material.",
+    "census_recommendation": "NOT RELEASED: assess remaining source tick budget before any longer capture."
+  },
+  "latest_source_head": "cba847f0c97115b88012784f76b89be44b266307",
+  "repeatability": {
+    "selected_form": 9,
+    "loading_source_ticks": [
+      11,
+      11,
+      11
+    ],
+    "input_contexts": 1,
+    "source_records": 1,
+    "fixed_input_replays": 2,
+    "all_phase_owner_summaries_equal": true,
+    "first_replay_live_failure_retained": true,
+    "other_forms_unmeasured": true,
+    "general_latency_rule_decided": false
+  },
+  "validation": {
+    "full_regression": {
+      "result": "PASS",
+      "source_head": "80f8cd49133ba1552cdfa77df70f3b45daf4ea5a",
+      "source_tree": "aec67d17213344e7e9e4dd2a4c9915abf31fa087",
+      "tests": 2967,
+      "skips": 211,
+      "unittest_seconds": 604.514,
+      "owned_group_absent": true,
+      "receipt": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-full-regression-v1/result.json",
+        "bytes": 1171,
+        "sha256": "31beaf50e71eecfaf46bf21c57e333bd6d4c0e3a05188400a772d0f604a2db32"
+      },
+      "log": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-full-regression-v1/full-regression.stderr",
+        "bytes": 544753,
+        "sha256": "a54b919df2a1b4168ef8d5a2f9483cb301662722e9ea138b90e910398c4b8204"
+      }
+    },
+    "exact_head_ci": "PENDING",
+    "affected_observer_build": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-native-replay-build-v1/result.json",
+      "bytes": 4811,
+      "sha256": "266b6ac0902824d625ec8ae0594f66b4e06d52ada613667065d953ad7c1f9622"
+    },
+    "final_source_docs_review": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-milestone-review-v1/final-source-docs-review-v1.json",
+      "bytes": 6393,
+      "sha256": "b44da8a63cb03df7f450b933852c593279bd9f4eff53398e774237fe204c6172"
+    }
+  }
+}
