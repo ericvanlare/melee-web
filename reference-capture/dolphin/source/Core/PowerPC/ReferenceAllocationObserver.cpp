@@ -299,6 +299,28 @@ const FunctionIdentity* FindEntry(const BoundProfile& profile, u32 pc, u32* inde
   return nullptr;
 }
 
+bool SupportedAllocationReturnWord(u32 word)
+{
+  return word == 0x4e800020 || word == 0x4d820020 || word == 0x4c820020;
+}
+
+bool AllocationReturnTaken(u32 word, u32 cr)
+{
+  // Only the declared original blr / CR0-EQ beqlr / bnelr forms (LK=0).
+  if (word == 0x4e800020) return true;
+  if (word == 0x4d820020) return (cr & 0x20000000u) != 0;
+  if (word == 0x4c820020) return (cr & 0x20000000u) == 0;
+  return false;
+}
+
+u32 DeclaredAllocationReturnWord(const FunctionIdentity& function, u32 pc)
+{
+  for (u32 index = 0; index < function.return_count; ++index)
+    if (function.returns[index] == pc)
+      return function.return_words ? function.return_words[index] : kBlr;
+  return 0;
+}
+
 const FunctionIdentity* FindReturn(const BoundProfile& profile, u32 pc, u32* index)
 {
   for (u32 candidate = 0; candidate < profile.function_count; ++candidate)
@@ -528,7 +550,7 @@ bool PairedRegistrationCaptureScopeAgree(std::string_view registration, std::str
           !exact("MWRC_STADIUM_WHOLE_FEEDBACK", "1") || !exact("MWRC_STADIUM_WHOLE_B_STATE", "1") ||
           !exact("MWRC_ALLOCATION_VS_TARGET", "2") || !exact("MWRC_ALLOCATION_STOP_AT", "exit") ||
           !exact("MWRC_ALLOCATION_MAX_EVENTS", "2000000") ||
-          profile_sha256 != "d4dcc28edcf534586b3953d3235e8880173f6dbcd9ecb384e97991137646756e");
+          profile_sha256 != "b1f4b68f72ba9e0af754c4100845860321cac6b537f3803d6fe41e3d68626e09");
 }
 
 class Backend
@@ -632,7 +654,7 @@ public:
       return false;
     }
     if (state_.paired_registration_profile &&
-        !Append(&header, ",\"paired_registration_profile\":\"paired_idle_registration_v1\",\"registration_profile\":\"gobjproc-registration-v1\",\"profile_version\":4,\"allocation_history_complete\":false,\"registration_lifetime_complete\":false"))
+        !Append(&header, ",\"paired_registration_profile\":\"paired_idle_registration_v1\",\"registration_profile\":\"gobjproc-registration-v1\",\"profile_version\":5,\"registration_return_policy\":\"declared-cr0-eq-lr-returns-v1\",\"allocation_history_complete\":false,\"registration_lifetime_complete\":false"))
     {
       Fail("allocation observer registration header exceeded its bound");
       return false;
@@ -744,8 +766,11 @@ public:
       return;
     u32 instruction = 0;
     if (!ReadWord(system, pc, &instruction) ||
-        instruction != (entering ? function->entry_word : kBlr))
+        instruction != (entering ? function->entry_word : DeclaredAllocationReturnWord(*function, pc)) ||
+        (!entering && !SupportedAllocationReturnWord(instruction)))
       return Fail("allocation observer boundary word differs from the generated profile");
+    if (!entering && !AllocationReturnTaken(instruction, state->cr.Get()))
+      return;
 
     const u32 thread = ReadWordOrFail(system, kThreadGlobal);
     if (state_.invalid.load())
@@ -793,7 +818,10 @@ public:
         return Fail("allocation observer return has no source frame");
       const CallFrame& frame = stack->frames[stack->depth - 1];
       if (frame.function_index != function_index || frame.sp != sp || frame.lr != lr)
-        return Fail("allocation observer return does not match function, sp, and lr");
+        return Fail("allocation observer return does not match function, sp, and lr: pc=" +
+            std::to_string(pc) + " actual_function=" + function->name + " sp=" + std::to_string(sp) +
+            " lr=" + std::to_string(lr) + " expected_function_index=" + std::to_string(frame.function_index) +
+            " expected_sp=" + std::to_string(frame.sp) + " expected_lr=" + std::to_string(frame.lr));
       argc = frame.argc;
       args = frame.args;
       call = frame.call;
@@ -1093,10 +1121,13 @@ private:
           function.return_count == 0 || function.return_count > 256 || !function.returns ||
           function.argc > 8)
         return false;
+      if (state_.paired_registration_profile && !function.return_words)
+        return false;
       for (u32 return_index = 0; return_index < function.return_count; ++return_index)
       {
         const u32 address = function.returns[return_index];
-        if (!address || address % 4 || address < function.address ||
+        if ((function.return_words && !SupportedAllocationReturnWord(function.return_words[return_index])) ||
+            !address || address % 4 || address < function.address ||
             static_cast<u64>(address) + 4 > static_cast<u64>(function.address) + function.size)
           return false;
       }
@@ -1153,6 +1184,13 @@ private:
       cleanup();
       if (!finished || std::string_view(function.body_sha256) != HexDigest(digest))
         return false;
+      for (u32 return_index = 0; return_index < function.return_count; ++return_index)
+      {
+        u32 word = 0;
+        if (!ReadWord(system, function.returns[return_index], &word) ||
+            word != (function.return_words ? function.return_words[return_index] : kBlr))
+          return false;
+      }
     }
     return true;
   }
@@ -1900,7 +1938,7 @@ private:
           else
             end += "\"" + JsonEscape(error) + "\"";
           if (state_.paired_registration_profile)
-            end += std::string(",\"paired_registration_profile\":\"paired_idle_registration_v1\",\"registration_profile\":\"gobjproc-registration-v1\",\"profile_version\":4,\"allocation_history_complete\":false,\"registration_lifetime_complete\":false,\"profile_sha256\":\"") + state_.profile.profile_sha256 + "\"";
+            end += std::string(",\"paired_registration_profile\":\"paired_idle_registration_v1\",\"registration_profile\":\"gobjproc-registration-v1\",\"profile_version\":5,\"registration_return_policy\":\"declared-cr0-eq-lr-returns-v1\",\"allocation_history_complete\":false,\"registration_lifetime_complete\":false,\"profile_sha256\":\"") + state_.profile.profile_sha256 + "\"";
           if (state_.scene_endpoint_profile)
           {
             end += std::string(",\"original_rng_scene_boundaries_v1\":true,\"scene_endpoint_profile\":\"paired_idle_scene_endpoints_v1\",\"scope\":\"scene-rng-endpoints-only\",\"profile_sha256\":\"") +

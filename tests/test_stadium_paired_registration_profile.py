@@ -31,7 +31,7 @@ base.whole_session_replay = exact_module('whole_session_replay', 'tools/whole_se
 
 NEW = 'paired_idle_registration_v1'
 OLD = 'paired_idle_scene_endpoints_v1'
-HASH = 'd4dcc28edcf534586b3953d3235e8880173f6dbcd9ecb384e97991137646756e'
+HASH = 'b1f4b68f72ba9e0af754c4100845860321cac6b537f3803d6fe41e3d68626e09'
 ENV = {'MWRC_STADIUM_WHOLE_PAIRED_IDLE': NEW, 'MWRC_STADIUM_WHOLE_LONG_IDLE': NEW,
        'MWRC_ALLOCATION_PAIRED_REGISTRATION_PROFILE': NEW,
        'MWRC_WHOLE_SESSION_MATCHES': '2', 'MWRC_STADIUM_WHOLE_FEEDBACK': '1',
@@ -142,7 +142,7 @@ return 0;
             base.SUPPORT_ROOT/'tests/test_reference_allocation_observer.py')
         component='#include <cstdlib>\n'+fixture_module.COMPONENT
         component=component.replace('  assert(Observer::Arm(fixture.profile, output));',
-            '  fixture.profile.profile_sha256 = "'+HASH+'";\n  assert(Observer::Arm(fixture.profile, output));',1)
+            '  fixture.profile.profile_sha256 = "'+HASH+'";\n  static std::array<u32,57> model_words; model_words.fill(0x4e800020);\n  for (size_t i=0;i<fixture.functions.size();++i) fixture.functions[i].return_words=&model_words[i];\n  assert(Observer::Arm(fixture.profile, output));',1)
         block=r'''  if (mode == "registration-selected" || mode == "registration-filtered-child") {
     auto index = [&](std::string_view name) {
       for (size_t i=0;i<fixture.functions.size();++i)
@@ -225,16 +225,112 @@ return 0;
             self.assertNotEqual(failed_rows[-1]['status'],'captured')
             self.assertIn('filtered pool parent',failed_rows[-1]['error'])
 
+    def test_actual_observer_conditional_returns_taken_untaken_and_guard_refusals(self):
+        leaves=base.load_exact('_conditional_return_observer_fixture',
+            base.SUPPORT_ROOT/'tests/test_reference_allocation_observer.py')
+        component='#include <cstdlib>\n'+leaves.COMPONENT
+        setup=r'''
+  static std::array<u32,57> words;words.fill(0x4e800020u);
+  for (size_t i=0;i<fixture.functions.size();++i) fixture.functions[i].return_words=&words[i];
+  const bool baseline=mode=="conditional-baseline";
+  fixture.profile.profile_sha256=baseline ? "d4dcc28edcf534586b3953d3235e8880173f6dbcd9ecb384e97991137646756e" : "'+HASH+'";
+  const size_t faa=53,setup_index=52;
+  static std::array<u32,3> pcs;static std::array<u32,3> branch_words{{0x4d820020u,0x4c820020u,0x4e800020u}};
+  for (u32 i=0;i<3;++i) {pcs[i]=fixture.functions[faa].address+4+4*i;fixture.system.memory.Write(pcs[i],branch_words[i]);}
+  fixture.functions[faa].size=16;fixture.returns[faa]=pcs[2];
+  fixture.functions[faa].returns=baseline ? &pcs[2] : pcs.data();
+  fixture.functions[faa].return_words=baseline ? &branch_words[2] : branch_words.data();
+  fixture.functions[faa].return_count=baseline ? 1 : 3;
+'''
+        setup=setup.replace("'+HASH+'",HASH)
+        component=component.replace('  assert(Observer::Arm(fixture.profile, output));',setup+'  assert(Observer::Arm(fixture.profile, output));',1)
+        run=r'''
+  if (mode.substr(0,12)=="conditional-") {
+    fixture.cpu.gpr[3]=0x80030000u;
+    fixture.cpu.pc=fixture.functions[setup_index].address;
+    Observer::Observe(&fixture.system,fixture.cpu.pc,&fixture.cpu);
+    fixture.cpu.gpr[1]-=56;fixture.cpu.spr[8]=0x8000def0u;
+    fixture.cpu.pc=fixture.functions[faa].address;
+    Observer::Observe(&fixture.system,fixture.cpu.pc,&fixture.cpu);
+    auto branch=[&](u32 pc,u32 cr) {fixture.cpu.pc=pc;fixture.cpu.cr.value=cr;
+      if (Observer::IsBoundary(pc)) Observer::Observe(&fixture.system,pc,&fixture.cpu);};
+    branch(pcs[0],0); // beqlr not taken: no row/pop.
+    branch(pcs[1],0x20000000u); // bnelr not taken: no row/pop.
+    if (mode=="conditional-word") {
+      fixture.system.memory.Write(pcs[0],0x4c820020u);branch(pcs[0],0x20000000u);
+      assert(Observer::Error().find("boundary word differs")!=std::string::npos);
+    } else if (mode=="conditional-sp") {
+      fixture.cpu.gpr[1]+=4;branch(pcs[0],0x20000000u);
+      assert(Observer::Error().find("function, sp, and lr")!=std::string::npos);
+    } else {
+      branch(mode=="conditional-bne" ? pcs[1] : pcs[0],mode=="conditional-bne" ? 0 : 0x20000000u);
+      fixture.cpu.gpr[1]+=56;fixture.cpu.spr[8]=0x8000abcdu;
+      fixture.cpu.pc=fixture.returns[setup_index];Observer::Observe(&fixture.system,fixture.cpu.pc,&fixture.cpu);
+      if (baseline) assert(Observer::Error().find("function, sp, and lr")!=std::string::npos);
+      else assert(Observer::Error().empty());
+    }
+    const bool expected_error=baseline || mode=="conditional-word" || mode=="conditional-sp";
+    assert(Observer::Finish(false)==!expected_error);return 0;
+  }
+'''
+        component=component.replace('  if (mode == "gobjproc-registration") {',run+'  if (mode == "gobjproc-registration") {',1)
+        from tools.allocation_history_replay import load_trace
+        with tempfile.TemporaryDirectory() as temporary:
+            temp=Path(temporary)
+            for name,content in leaves.STUBS.items():
+                target=temp/name;target.parent.mkdir(parents=True,exist_ok=True);target.write_text(content)
+            source=temp/'component.cpp';source.write_text(component)
+            header_root=base.SOURCE_ROOT/'reference-capture/dolphin/source'
+            support=base.SUPPORT_ROOT/'reference-capture/dolphin/source'
+            env={k:v for k,v in os.environ.items() if not k.startswith('MWRC_')};env.update(ENV)
+            baseline_cpp=Path(os.environ.get('MELEE_STADIUM_CONDITIONAL_BASELINE',base.SOURCE_ROOT/'reference-capture/dolphin/source/Core/PowerPC/ReferenceAllocationObserver.cpp'))
+            for kind,cpp,modes in [('candidate',header_root/'Core/PowerPC/ReferenceAllocationObserver.cpp',
+                    ('conditional-eq','conditional-bne','conditional-sp','conditional-word')),
+                    ('baseline',baseline_cpp,('conditional-baseline',))]:
+                if kind=='baseline' and not os.environ.get('MELEE_STADIUM_CONDITIONAL_BASELINE'):continue
+                binary=temp/kind
+                built=subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-fno-exceptions','-Wall','-Wextra','-Werror',
+                    '-I',str(temp),'-I',str(header_root),'-I',str(support),str(cpp),str(source),'-lz','-o',str(binary)],capture_output=True,text=True,timeout=120)
+                self.assertEqual(built.returncode,0,built.stderr)
+                for mode in modes:
+                    path=temp/(mode+'.jsonl')
+                    result=subprocess.run([str(binary),mode,str(path)],env=env,text=True,capture_output=True,timeout=10)
+                    self.assertEqual(result.returncode,0,mode+': '+result.stderr)
+                    _,rows,enters,returns=load_trace(path,disk_backed=False)
+                    self.assertEqual(rows[-1]['status'],'incomplete')
+                    if mode in ('conditional-eq','conditional-bne'):
+                        self.assertEqual(len(enters),2);self.assertEqual(len(returns),2)
+                        self.assertEqual(rows[-1]['pending_calls'],[])
+                        faa_return=[r for r in returns.values() if r['function']=='HSD_GObjProc_8038FAA8']
+                        self.assertEqual(len(faa_return),1)
+                        self.assertEqual(faa_return[0]['machine']['pc'],0x80013504 if mode=='conditional-eq' else 0x80013508)
+                    else:
+                        self.assertNotEqual(rows[-1]['status'],'captured')
+                        self.assertEqual(len(rows[-1]['pending_calls']),2)
+
     def test_broad_scope_requires_exact_profile_and_complete_exits(self):
         # Optional real generated profile; ordinary CI uses an explicitly modeled profile/hash.
         actual=os.environ.get('MELEE_STADIUM_PAIRED_REGISTRATION_PROFILE')
-        profile=json.loads(Path(actual).read_text()) if actual else {'version':4,'registration_profile':'gobjproc-registration-v1'}
+        profile=json.loads(Path(actual).read_text()) if actual else {'version':5,'registration_return_policy':'declared-cr0-eq-lr-returns-v1','registration_profile':'gobjproc-registration-v1'}
         digest=hashlib.sha256((json.dumps(profile,sort_keys=True,indent=2)+'\n').encode()).hexdigest()
         if actual:
             self.assertEqual(digest,HASH)
+            exact_module('retail_allocation_profile','tools/retail_allocation_profile.py')
+            generator=exact_module('generate_reference_allocation_profile','tools/generate_reference_allocation_profile.py')
+            self.assertIs(generator.validate_profile(profile),profile)
+            reader=exact_module('allocation_history_replay','tools/allocation_history_replay.py')
+            self.assertEqual(reader.load_profile(Path(actual))['version'],5)
+            extractor=exact_module('extract_original_gobjproc_registration','tools/extract_original_gobjproc_registration.py')
+            self.assertIn('HSD_GObjProc_8038FAA8',extractor._function_table(profile))
+            historical=os.environ.get('MELEE_STADIUM_REGISTRATION_HISTORICAL_V4')
+            if historical:
+                old=json.loads(Path(historical).read_text())
+                self.assertIs(generator.validate_profile(old),old)
+                self.assertEqual(reader.load_profile(Path(historical))['version'],4)
+                self.assertIn('HSD_GObjProc_8038FAA8',extractor._function_table(old))
             self.assertEqual(base.driver.stadium_whole_allocation_profile_bytes(profile,registration=True),Path(actual).read_bytes())
         self.assertEqual(base.driver.stadium_whole_allocation_profile_bytes(profile),base.driver.canonical(profile))
-        header=dict(scope='selected-gobjproc-registration',recording_filter=allocation.PAIRED_REGISTRATION_FILTER,paired_registration_profile=NEW,profile_version=4,registration_profile='gobjproc-registration-v1',
+        header=dict(scope='selected-gobjproc-registration',recording_filter=allocation.PAIRED_REGISTRATION_FILTER,paired_registration_profile=NEW,profile_version=5,registration_return_policy='declared-cr0-eq-lr-returns-v1',registration_profile='gobjproc-registration-v1',
             profile_sha256=digest,allocation_history_complete=False,registration_lifetime_complete=False,
             vs_target=2,stop_at='exit',max_events=2000000,compression='none')
         footer=dict(header,status='captured',target_complete=True,vs_entries=2,vs_exits=2,active_owner=False,pending_calls=[],
@@ -245,5 +341,64 @@ return 0;
             for key,value in [('max_events',64),('scope','scene-rng-endpoints-only'),('profile_version',3),('vs_exits',1),('registration_lifetime_complete',True),('profile_sha256','0'*64),('emitted_calls',23),('filtered_pool_calls',-1)]:
                 with self.subTest(key=key),self.assertRaises(ValueError):validate_stadium_registration_scope(header,dict(footer,**{key:value}),profile)
             with self.assertRaises(ValueError):validate_stadium_registration_scope(header,footer,dict(profile,version=3))
+
+    def test_actual_reducer_selects_exact_v4_v5_trace_header_identity(self):
+        reducer = exact_module('extract_original_gobjproc_registration',
+                               'tools/extract_original_gobjproc_registration.py')
+        actual = os.environ.get('MELEE_STADIUM_PAIRED_REGISTRATION_PROFILE')
+        historical = os.environ.get('MELEE_STADIUM_REGISTRATION_HISTORICAL_V4')
+        if actual and historical:
+            profiles = [json.loads(Path(actual).read_text()), json.loads(Path(historical).read_text())]
+        else:
+            # Ordinary CI models profile contents; retained-data focused execution supplies both exact files.
+            from test_reference_allocation_observer import synthetic_profile
+            current = synthetic_profile()
+            old = copy.deepcopy(current)
+            old['version'] = 4
+            old.pop('registration_return_policy')
+            for function in old['functions']: function.pop('return_words')
+            profiles = [current, old]
+        for profile in profiles:
+            expected = (reducer.EXPECTED_PROFILE_SHA256_V5 if profile['version'] == 5
+                        else reducer.EXPECTED_PROFILE_SHA256)
+            symbols = {'gobj_alloc_data': {'address': 0x804ce38c, 'size': 0x2c},
+                       'gobjproc_alloc_data': {'address': 0x804ce3b8, 'size': 0x2c}}
+            self.assertNotIn('gobj_alloc_data', profile['globals'])
+            self.assertNotIn('gobjproc_alloc_data', profile['globals'])
+            symbols.update({'grStadium_801D1390': {'address': 0x801d1390},
+                            'efLib_particles_proc_main': {'address': 0x8005c9a4},
+                            'Fighter_8006A360': {'address': 0x8006a360}})
+            header = dict(record='header', sequence=0, schema=reducer.TRACE_SCHEMA, version=1,
+                          profile_sha256=expected, scope='selected-gobjproc-registration',
+                          start='original_dol_entry', writes_game_state=False)
+            enter = dict(record='enter', sequence=1, call=0, function='HSD_ObjAlloc',
+                         args=[symbols['gobj_alloc_data']['address']], parent=None,
+                         thread=0, sp=0x80010000, lr=0x80020000)
+            returned = dict(record='return', sequence=2, call=0, function='HSD_ObjAlloc',
+                            thread=0, result=0x804d1000, observed={})
+            terminal = dict(record='end', sequence=3, status='captured', calls=1, pending_calls=[])
+            rows = [header, enter, returned, terminal]
+            result = reducer.reduce_registration_trace(header, rows, {0: enter}, {0: returned},
+                                                       profile, symbols)
+            self.assertEqual(result['trace']['profile_sha256'], expected)
+            self.assertEqual(result['summary']['allocations']['gobj'], 1)
+            for key, value in [('address', 0x804ce390), ('size', 0x30), ('address', 0x804ce38d)]:
+                bad_symbols = copy.deepcopy(symbols)
+                bad_symbols['gobj_alloc_data'][key] = value
+                with self.subTest(version=profile['version'], key=key, value=value):
+                    with self.assertRaisesRegex(reducer.RegistrationProblem, 'source pool identity'):
+                        reducer.reduce_registration_trace(header, rows, {0: enter}, {0: returned},
+                                                          profile, bad_symbols)
+            contradictory = copy.deepcopy(profile)
+            contradictory['globals']['gobj_alloc_data'] = {'address': 0x804ce390, 'size': 0x2c}
+            with self.assertRaisesRegex(reducer.RegistrationProblem, 'profile pool identity'):
+                reducer.reduce_registration_trace(header, rows, {0: enter}, {0: returned},
+                                                  contradictory, symbols)
+            for wrong in ('f'*64, reducer.EXPECTED_PROFILE_SHA256 if profile['version'] == 5
+                          else reducer.EXPECTED_PROFILE_SHA256_V5):
+                with self.subTest(version=profile['version'], wrong=wrong):
+                    with self.assertRaisesRegex(reducer.RegistrationProblem, 'pinned observer profile identity'):
+                        reducer.reduce_registration_trace(dict(header, profile_sha256=wrong), rows,
+                                                          {0: enter}, {0: returned}, profile, symbols)
 
 if __name__=='__main__':unittest.main()

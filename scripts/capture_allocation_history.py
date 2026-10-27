@@ -1340,7 +1340,8 @@ def validate_stadium_paired_allocation_inventory(rows, header, footer):
 
 
 PAIRED_REGISTRATION_PROFILE = 'paired_idle_registration_v1'
-PAIRED_REGISTRATION_PROFILE_SHA256 = 'd4dcc28edcf534586b3953d3235e8880173f6dbcd9ecb384e97991137646756e'
+PAIRED_REGISTRATION_PROFILE_V4_SHA256 = 'd4dcc28edcf534586b3953d3235e8880173f6dbcd9ecb384e97991137646756e'
+PAIRED_REGISTRATION_PROFILE_SHA256 = 'b1f4b68f72ba9e0af754c4100845860321cac6b537f3803d6fe41e3d68626e09'
 
 
 PAIRED_REGISTRATION_FILTER = {'profile': 'selected-gobjproc-registration-v1', 'functions': ['gm_Scene_Vs_OnEnter', 'gm_Scene_Vs_OnExit', 'HSD_ObjAlloc', 'HSD_ObjFree', 'HSD_ObjAllocInit', '_HSD_ObjAllocForgetMemory', 'HSD_GObj_SetupProc', 'HSD_GObjProc_8038FAA8', 'HSD_GObjProc_8038FC18', 'HSD_GObjProc_8038FCE4', 'HSD_GObjProc_8038FE24'], 'pools': [{'symbol': 'gobj_alloc_data', 'address': 2152522636, 'size': 44}, {'symbol': 'gobjproc_alloc_data', 'address': 2152522680, 'size': 44}], 'parent_policy': 'selected-parent-or-refuse'}
@@ -1349,10 +1350,13 @@ def exact_stadium_allocation_profile_hash(profile):
     """Two generated source profiles; no caller-selected hash authority."""
     expected = ('30e6ccc981d5e8eea6d5c88381bfc3df5a3b1103599c2b632ddb48580165bf65'
                 if profile.get('version') == 3 else PAIRED_REGISTRATION_PROFILE_SHA256
-                if profile.get('version') == 4 and profile.get('registration_profile') == 'gobjproc-registration-v1' else None)
+                if profile.get('version') == 5 and profile.get('registration_profile') == 'gobjproc-registration-v1' and
+                   profile.get('registration_return_policy') == 'declared-cr0-eq-lr-returns-v1' else
+                   PAIRED_REGISTRATION_PROFILE_V4_SHA256 if profile.get('version') == 4 and
+                   profile.get('registration_profile') == 'gobjproc-registration-v1' else None)
     actual = hashlib.sha256((json.dumps(profile, sort_keys=True, indent=2, allow_nan=False) + '\n').encode()).hexdigest()
     if expected is None or actual != expected:
-        raise ValueError('Native Stadium allocation profile is not an exact generated v3/v4 identity')
+        raise ValueError('Native Stadium allocation profile is not an exact generated v3/v4/v5 identity')
     return expected
 
 
@@ -1360,12 +1364,13 @@ def validate_stadium_registration_scope(header, footer, profile):
     """Broad stream identity only; never claims complete registration semantics."""
     expected = PAIRED_REGISTRATION_PROFILE_SHA256
     canonical = hashlib.sha256((json.dumps(profile, sort_keys=True, indent=2, allow_nan=False) + '\n').encode()).hexdigest()
-    if (profile.get('version') != 4 or profile.get('registration_profile') != 'gobjproc-registration-v1' or canonical != expected):
-        raise ValueError('Paired registration requires the exact generated v4 profile')
+    if (profile.get('version') != 5 or profile.get('registration_profile') != 'gobjproc-registration-v1' or canonical != expected):
+        raise ValueError('Paired registration requires the exact generated v5 profile')
     for row in (header, footer):
         if (row.get('scope') != 'selected-gobjproc-registration' or
                 row.get('recording_filter') != PAIRED_REGISTRATION_FILTER or row.get('paired_registration_profile') != PAIRED_REGISTRATION_PROFILE or
-                row.get('profile_version') != 4 or row.get('registration_profile') != 'gobjproc-registration-v1' or
+                row.get('profile_version') != 5 or
+                row.get('registration_return_policy') != 'declared-cr0-eq-lr-returns-v1' or row.get('registration_profile') != 'gobjproc-registration-v1' or
                 row.get('profile_sha256') != expected or row.get('scene_endpoint_profile') is not None or
                 row.get('allocation_history_complete') is not False or row.get('registration_lifetime_complete') is not False or
                 row.get('vs_target') != 2 or row.get('stop_at') != 'exit' or

@@ -20,13 +20,15 @@ try:
     from .retail_allocation_profile import (
         DOL_SHA1, FUNCTIONS, FUNCTIONS_V3, GLOBALS, LEGACY_FUNCTIONS,
         LEGACY_PROFILE_VERSION, PREVIOUS_PROFILE_VERSION, PROFILE_VERSION,
-        REGISTRATION_PROFILE, SOURCE_REVISION,
+        REGISTRATION_PROFILE, REGISTRATION_PROFILE_VERSION, REGISTRATION_RETURN_POLICY,
+        CONDITIONAL_RETURN_FUNCTIONS, SUPPORTED_RETURN_WORDS, SOURCE_REVISION,
     )
 except ImportError:
     from retail_allocation_profile import (
         DOL_SHA1, FUNCTIONS, FUNCTIONS_V3, GLOBALS, LEGACY_FUNCTIONS,
         LEGACY_PROFILE_VERSION, PREVIOUS_PROFILE_VERSION, PROFILE_VERSION,
-        REGISTRATION_PROFILE, SOURCE_REVISION,
+        REGISTRATION_PROFILE, REGISTRATION_PROFILE_VERSION, REGISTRATION_RETURN_POLICY,
+        CONDITIONAL_RETURN_FUNCTIONS, SUPPORTED_RETURN_WORDS, SOURCE_REVISION,
     )
 
 
@@ -48,7 +50,7 @@ def _integer(value: object, field: str, *, maximum: int = 0xFFFFFFFF) -> int:
 
 
 def _functions_for_version(version: object) -> dict[str, int]:
-    if type(version) is int and version == PROFILE_VERSION:
+    if type(version) is int and version in (PROFILE_VERSION, REGISTRATION_PROFILE_VERSION):
         return FUNCTIONS
     if type(version) is int and version == PREVIOUS_PROFILE_VERSION:
         return FUNCTIONS_V3
@@ -61,11 +63,16 @@ def validate_profile(value: object) -> dict:
     if not isinstance(value, dict) or value.get("schema") != PROFILE_SCHEMA:
         raise ValueError("unsupported allocation profile schema")
     functions_table = _functions_for_version(value.get("version"))
-    if value.get("version") == PROFILE_VERSION:
+    if value.get("version") in (PROFILE_VERSION, REGISTRATION_PROFILE_VERSION):
         if value.get("registration_profile") != REGISTRATION_PROFILE:
-            raise ValueError("profile registration_profile differs from the pinned v4 scope")
+            raise ValueError("profile registration_profile differs from the pinned registration scope")
     elif "registration_profile" in value:
-        raise ValueError("legacy allocation profile cannot claim the v4 registration scope")
+        raise ValueError("legacy allocation profile cannot claim the registration scope")
+    if value.get("version") == PROFILE_VERSION:
+        if value.get("registration_return_policy") != REGISTRATION_RETURN_POLICY:
+            raise ValueError("profile registration_return_policy differs from v5")
+    elif "registration_return_policy" in value:
+        raise ValueError("historical profile cannot claim v5 return coverage")
     if value.get("dol_sha1") != DOL_SHA1:
         raise ValueError("profile DOL identity differs from the pinned GALE01r2 DOL")
     if value.get("source_revision") != SOURCE_REVISION:
@@ -109,6 +116,15 @@ def validate_profile(value: object) -> dict:
             raise ValueError(f"functions[{index}].returns must be sorted and unique")
         if any(item < address or item + 4 > address + size or item % 4 for item in parsed_returns):
             raise ValueError(f"functions[{index}].returns escapes its body")
+        return_words = function.get("return_words")
+        if value.get("version") == PROFILE_VERSION:
+            if not isinstance(return_words, list) or len(return_words) != len(parsed_returns):
+                raise ValueError(f"functions[{index}].return_words must bind every declared return")
+            if any(type(word) is not int or word not in SUPPORTED_RETURN_WORDS or
+                   word != 0x4e800020 and name not in CONDITIONAL_RETURN_FUNCTIONS for word in return_words):
+                raise ValueError(f"functions[{index}].return_words has unsupported source branch semantics")
+        elif return_words is not None:
+            raise ValueError("historical profile cannot claim v5 conditional return words")
         body_hash = function.get("body_sha256")
         if not isinstance(body_hash, str) or not HEX256.fullmatch(body_hash):
             raise ValueError(f"functions[{index}].body_sha256 is not a SHA-256 identity")
@@ -164,11 +180,16 @@ def render_header(profile: dict, profile_sha256: str) -> str:
         "namespace ReferenceAllocation::Generated {",
     ]
     return_names: list[str] = []
+    return_word_names: list[str] = []
     for index, function in enumerate(functions):
         name = f"kReturns{index}"
         return_names.append(name)
         values = ", ".join(f"0x{_integer(item, 'return'):08x}u" for item in function["returns"])
         lines.append(f"inline constexpr std::array<u32, {len(function['returns'])}> {name} = {{{{{values}}}}};")
+        word_name = f"kReturnWords{index}"
+        return_word_names.append(word_name)
+        words = ", ".join(f"0x{_integer(word, 'return_word'):08x}u" for word in function["return_words"])
+        lines.append(f"inline constexpr std::array<u32, {len(function['return_words'])}> {word_name} = {{{{{words}}}}};")
     lines.append(f"inline constexpr std::array<FunctionIdentity, {len(functions)}> kFunctions = {{ {{")
     for index, function in enumerate(functions):
         lines.append(
@@ -181,6 +202,7 @@ def render_header(profile: dict, profile_sha256: str) -> str:
                 f"{return_names[index]}.data()",
                 f"static_cast<u32>({return_names[index]}.size())",
                 _c_string(function["body_sha256"].lower()),
+                f"{return_word_names[index]}.data()",
             )) + "},"
         )
     lines.append("}};")

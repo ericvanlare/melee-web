@@ -28,11 +28,12 @@ EXPECTED_DOL_SHA1 = "08e0bf20134dfcb260699671004527b2d6bb1a45"
 EXPECTED_SOURCE_REVISION = "b43912cc78606f96c9569f5d6229bc9d7e265ea5"
 EXPECTED_SYMBOLS_SHA256 = "214477d5b27989a9675c4b881f4db2dad5eeaada39dbac17c57c70d5ba84d579"
 EXPECTED_PROFILE_SHA256 = "d4dcc28edcf534586b3953d3235e8880173f6dbcd9ecb384e97991137646756e"
+EXPECTED_PROFILE_SHA256_V5 = "b1f4b68f72ba9e0af754c4100845860321cac6b537f3803d6fe41e3d68626e09"
 SOURCE_HELPER_SHA256 = {
-    "allocation_history_replay.py": "16de421ac59cc7641e3f54dda5735a8778461896447af3f295c2e1b90774c81f",
+    "allocation_history_replay.py": "eb7cc59c5361668d50850da0e0d716c1e44ae15758f9be4517462a2b38779085",
     "allocation_trace_store.py": "1f9f860006396f4477e063dcb0b620c8dfa66da360b28ed398cf6e59d587136a",
-    "retail_allocation_profile.py": "3a96ba9ea6c56525fd55328708fa4c0bb326bef03524bfccd316ac6af850a384",
-    "generate_reference_allocation_profile.py": "8bfde4aea2a05677057dd7e2181be1d8d77b8b345a4d9cb65b38f151a9673d16",
+    "retail_allocation_profile.py": "eeb9b7fc22d40c5c7689f6cfc5c8e7a6c8e2ee8047c5ddce603d73bdc2a6a8f3",
+    "generate_reference_allocation_profile.py": "3b41793466612696c407ee390f7d2fd23710e8d32cfc8d78c67f825877cd06a3",
 }
 
 FUNCTION_ARITIES = {
@@ -48,6 +49,8 @@ FUNCTION_ARITIES = {
 }
 POOL_NAMES = {1: "gobj", 2: "gobjproc"}
 POOL_SYMBOLS = {1: "gobj_alloc_data", 2: "gobjproc_alloc_data"}
+# Exact GALE01 symbols.txt identities (objects, size 0x2c), authenticated by load_and_validate.
+POOL_IDENTITIES = {1: (0x804CE38C, 0x2C), 2: (0x804CE3B8, 0x2C)}
 CALLBACK_ROLES = {
     "grStadium_801D1390": "stadium",
     "efLib_particles_proc_main": "particle",
@@ -79,9 +82,9 @@ def _hex(value: int) -> str:
 
 def _function_table(profile: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
     if (profile.get("schema") != PROFILE_SCHEMA or type(profile.get("version")) is not int
-            or profile.get("version") != 4
+            or profile.get("version") not in (4, 5)
             or profile.get("registration_profile") != REGISTRATION_PROFILE):
-        raise RegistrationProblem("only the pinned v4 GObjProc registration profile is supported")
+        raise RegistrationProblem("only the pinned v4/v5 GObjProc registration profile is supported")
     if profile.get("dol_sha1") != EXPECTED_DOL_SHA1:
         raise RegistrationProblem("profile DOL differs from the owned GALE01r2 identity")
     if profile.get("source_revision") != EXPECTED_SOURCE_REVISION:
@@ -118,11 +121,18 @@ def _pools(profile: Mapping[str, Any], symbols: Mapping[str, Mapping[str, Any]])
     for pool_kind, name in POOL_SYMBOLS.items():
         profile_global = globals_value.get(name)
         source_symbol = symbols.get(name)
-        if not isinstance(profile_global, dict) or not isinstance(source_symbol, Mapping):
-            raise RegistrationProblem(f"profile or source symbol map omits {name}")
-        address = _u32(profile_global.get("address"), f"globals.{name}.address")
-        if address != _u32(source_symbol.get("address"), f"symbols.{name}.address"):
-            raise RegistrationProblem(f"profile pool address differs from source symbol {name}")
+        if not isinstance(source_symbol, Mapping):
+            raise RegistrationProblem(f"source symbol map omits {name}")
+        address = _u32(source_symbol.get("address"), f"symbols.{name}.address")
+        size = _u32(source_symbol.get("size"), f"symbols.{name}.size")
+        if (address, size) != POOL_IDENTITIES[pool_kind]:
+            raise RegistrationProblem(f"source pool identity differs from pinned symbol {name}")
+        # These pools are not part of the generated allocator-state global set.
+        # Retain contradiction checks for profiles that explicitly carry them.
+        if name in globals_value and (not isinstance(profile_global, dict) or
+                _u32(profile_global.get("address"), f"globals.{name}.address") != address or
+                _u32(profile_global.get("size"), f"globals.{name}.size") != size):
+            raise RegistrationProblem(f"profile pool identity differs from source symbol {name}")
         if address % 4 or not MEM1_START <= address < MEM1_END:
             raise RegistrationProblem(f"pool symbol {name} is outside aligned MEM1")
         result[pool_kind] = address
@@ -179,7 +189,8 @@ def reduce_registration_trace(
     if (header.get("schema") != TRACE_SCHEMA or type(header.get("version")) is not int
             or header.get("version") != 1):
         raise RegistrationProblem("unsupported original allocation trace schema/version")
-    if header.get("profile_sha256") != EXPECTED_PROFILE_SHA256:
+    expected_profile = EXPECTED_PROFILE_SHA256_V5 if profile["version"] == 5 else EXPECTED_PROFILE_SHA256
+    if header.get("profile_sha256") != expected_profile:
         raise RegistrationProblem("trace header differs from the pinned observer profile identity")
     if header.get("start") != "original_dol_entry":
         raise RegistrationProblem("registration extraction requires the original DOL entry boundary")
@@ -678,12 +689,13 @@ def load_and_validate(profile_path: Path, dol_path: Path, symbols_path: Path,
         raise RegistrationProblem(f"cannot load pinned allocation-history helpers: {error}") from error
     profile = replay.load_profile(profile_path)
     profile_generator.validate_profile(profile)
-    if profile.get("version") != 4 or profile.get("registration_profile") != REGISTRATION_PROFILE:
-        raise RegistrationProblem("the supplied profile is not the v4 registration profile")
+    if profile.get("version") not in (4, 5) or profile.get("registration_profile") != REGISTRATION_PROFILE:
+        raise RegistrationProblem("the supplied profile is not an explicit v4/v5 registration profile")
     if profile.get("profile_sha256") is not None:
         raise RegistrationProblem("profile file must not self-assert its own digest")
-    if hashlib.sha256(profile_path.read_bytes()).hexdigest() != EXPECTED_PROFILE_SHA256:
-        raise RegistrationProblem("v4 profile differs from the original observer build identity")
+    expected_profile = EXPECTED_PROFILE_SHA256_V5 if profile["version"] == 5 else EXPECTED_PROFILE_SHA256
+    if hashlib.sha256(profile_path.read_bytes()).hexdigest() != expected_profile:
+        raise RegistrationProblem("registration profile differs from the original observer build identity")
     symbols = retail.read_symbols(symbols_path)
     replay.validate_provenance(
         {"profile_sha256": hashlib.sha256(profile_path.read_bytes()).hexdigest()},

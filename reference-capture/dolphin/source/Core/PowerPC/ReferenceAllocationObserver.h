@@ -33,6 +33,8 @@ struct FunctionIdentity
   const u32* returns = nullptr;
   u32 return_count = 0;
   const char* body_sha256 = nullptr;
+  // v5 binds each declared LR-return word; historical profiles imply plain blr.
+  const u32* return_words = nullptr;
 };
 
 struct GlobalIdentity

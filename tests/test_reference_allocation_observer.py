@@ -47,6 +47,7 @@ def synthetic_profile() -> dict:
             "entry_word": 0x12340000,
             "argc": argc,
             "returns": [address + 4],
+            "return_words": [0x4e800020],
             "body_sha256": "0" * 64,
         })
     globals_value = {
@@ -57,6 +58,7 @@ def synthetic_profile() -> dict:
         "schema": PROFILE_SCHEMA,
         "version": PROFILE_VERSION,
         "registration_profile": REGISTRATION_PROFILE,
+        "registration_return_policy": "declared-cr0-eq-lr-returns-v1",
         "dol_sha1": DOL_SHA1,
         "source_revision": SOURCE_REVISION,
         "symbols_sha256": "0" * 64,
@@ -732,7 +734,7 @@ class ReferenceAllocationObserverTests(unittest.TestCase):
 
     def test_registration_profile_is_versioned_and_has_pinned_arities(self) -> None:
         profile = synthetic_profile()
-        self.assertEqual(profile["version"], 4)
+        self.assertEqual(profile["version"], 5)
         self.assertEqual(profile["registration_profile"], REGISTRATION_PROFILE)
         tail = {item["name"]: item["argc"] for item in profile["functions"][-5:]}
         self.assertEqual(tail, {
@@ -751,9 +753,16 @@ class ReferenceAllocationObserverTests(unittest.TestCase):
             mutate(bad)
             with self.assertRaisesRegex(ValueError, "registration_profile"):
                 validate_profile(bad)
+        v4 = synthetic_profile()
+        v4["version"] = 4
+        v4.pop("registration_return_policy")
+        for function in v4["functions"]: function.pop("return_words")
+        self.assertIs(validate_profile(v4), v4)
         prior = synthetic_profile()
         prior["version"] = PREVIOUS_PROFILE_VERSION
         prior.pop("registration_profile")
+        prior.pop("registration_return_policy")
+        for function in prior["functions"]: function.pop("return_words")
         prior["functions"] = prior["functions"][:-5]
         self.assertIs(validate_profile(prior), prior)
 
@@ -761,6 +770,8 @@ class ReferenceAllocationObserverTests(unittest.TestCase):
         profile = synthetic_profile()
         profile["version"] = LEGACY_PROFILE_VERSION
         profile.pop("registration_profile")
+        profile.pop("registration_return_policy")
+        for function in profile["functions"]: function.pop("return_words")
         profile["functions"] = [function for function in profile["functions"]
                                 if function["name"] in LEGACY_FUNCTIONS]
         self.assertEqual(len(profile["functions"]), 50)
