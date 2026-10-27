@@ -454,14 +454,38 @@ function typedOriginalValues(fields,tick) {
   });
   return values;
 }
-export function deriveLaterBGate2Expectations(input) {
+const LATER_B_LEGACY_BINDING_SHA = 'af0aff6dc9a4b0e3cd1e2ff179fbc9a098aaa11871c828578e2f85e9beee4e63';
+export function deriveLaterBGate2Expectations(input, sourceBindingBytes = null) {
   // This validates/copies host reference data. It grants no native authority;
   // the actual archived recipe/parent remains independently checked by MWB2.
   laterBRequire(typeof input==='string'||input instanceof Uint8Array,'requires exact serialized projection bytes, not a mutable operand object');
   const raw=Buffer.from(input);
-  laterBRequire(raw.length===LATER_B_GATE2_PROJECTION_IDENTITY.bytes &&
-    createHash('sha256').update(raw).digest('hex')===LATER_B_GATE2_PROJECTION_IDENTITY.sha256,'serialized projection identity differs');
-  return inspectLaterBGate2ReferenceFields(JSON.parse(raw.toString('utf8')));
+  laterBRequire(raw.length===LATER_B_GATE2_PROJECTION_IDENTITY.bytes,'serialized projection identity differs');
+  if (sourceBindingBytes === null) {
+    laterBRequire(createHash('sha256').update(raw).digest('hex')===LATER_B_GATE2_PROJECTION_IDENTITY.sha256,
+      'serialized projection identity differs');
+    return inspectLaterBGate2ReferenceFields(JSON.parse(raw.toString('utf8')));
+  }
+  // The capture caller first regenerates these exact bytes through the strict
+  // Python raw exporter. This pure reader grants no provenance/native authority.
+  // Only the provenance binding hash may differ; all other serialized bytes
+  // must remain identical to the historically admitted immutable reference.
+  laterBRequire(typeof sourceBindingBytes==='string'||sourceBindingBytes instanceof Uint8Array,
+    'requires exact serialized source binding bytes');
+  const binding=Buffer.from(sourceBindingBytes);
+  laterBRequire(binding.length>0&&binding.length<=65536,'source binding size differs');
+  const p=JSON.parse(raw.toString('utf8'));
+  laterBRequire(validSha(p.binding_sha256)&&createHash('sha256').update(binding).digest('hex')===p.binding_sha256,
+    'serialized source binding identity differs');
+  const marker=Buffer.from('"binding_sha256": "');
+  const index=raw.indexOf(marker),start=index+marker.length;
+  laterBRequire(index>=0&&raw.lastIndexOf(marker)===index&&raw[start+64]===34&&
+    raw.subarray(start,start+64).toString('ascii')===p.binding_sha256,'serialized binding field differs');
+  const normalized=Buffer.from(raw);
+  normalized.set(Buffer.from(LATER_B_LEGACY_BINDING_SHA,'ascii'),start);
+  laterBRequire(createHash('sha256').update(normalized).digest('hex')===LATER_B_GATE2_PROJECTION_IDENTITY.sha256,
+    'serialized projection identity differs outside provenance binding');
+  return inspectLaterBGate2ReferenceFields(p);
 }
 // Reference-only field validation is exposed for falsification controls, never
 // accepted as a prevalidated driver/native admission object.
@@ -1743,10 +1767,10 @@ function bundleBytes(bundle) {
 export class StadiumSetupCfActionDriver {
   constructor({runtimePayload, native, commonFields = false, fresh132FullA = false, fresh132Typed22 = false,
     commonRowsByAction = null, admittedWorldGeneration = null,
-    requiredQueueObservation = null, go2QueueExpectation = null, go2ActionIndex = null, laterBProjection = null, laterBToken = null}) {
+    requiredQueueObservation = null, go2QueueExpectation = null, go2ActionIndex = null, laterBProjection = null, laterBToken = null, laterBProjectionBinding = null}) {
     const laterB=laterBProjection!==null;
-    if(!laterB&&laterBToken!==null)throw new TypeError('Later B UUID requires its explicit serialized projection');
-    const laterBSource=laterB?deriveLaterBGate2Expectations(laterBProjection):null;
+    if(!laterB&&(laterBToken!==null||laterBProjectionBinding!==null))throw new TypeError('Later B UUID/binding requires its explicit serialized projection');
+    const laterBSource=laterB?deriveLaterBGate2Expectations(laterBProjection,laterBProjectionBinding):null;
     if(laterB){
       if(commonFields||fresh132FullA||fresh132Typed22||commonRowsByAction!==null||requiredQueueObservation!==null||go2QueueExpectation!==null||go2ActionIndex!==null||runtimePayload!==undefined)
         throw new TypeError('Later B Gate2 cannot mix legacy manifests or field scopes');

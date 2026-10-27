@@ -78,6 +78,8 @@ const {values, tokens} = parseArgs({tokens: true, options: {
   'stadium-later-sss-prepared-setup': {type: 'boolean', default: false},
   'stadium-later-sss-reference': {type: 'string'},
   'stadium-later-b-gate2-projection': {type: 'string'},
+  'stadium-later-b-gate2-binding': {type: 'string'},
+  'stadium-later-b-gate2-binding-python': {type: 'string'},
   'stadium-later-b-rng-owner-window': {type: 'string'},
   'stadium-later-sss-exit': {type: 'boolean', default: false},
   'artifact-root': {type: 'string'},
@@ -178,6 +180,12 @@ const laterSssPreparedSetup = values['stadium-later-sss-prepared-setup'];
 const laterSssReference = values['stadium-later-sss-reference'] ?? null;
 const laterBGate2ProjectionPath = values['stadium-later-b-gate2-projection'] ? path.resolve(values['stadium-later-b-gate2-projection']) : null;
 const laterBGate2 = laterBGate2ProjectionPath !== null;
+const laterBGate2BindingPath = values['stadium-later-b-gate2-binding'] ? path.resolve(values['stadium-later-b-gate2-binding']) : null;
+const laterBGate2BindingPython = values['stadium-later-b-gate2-binding-python'] ?? null;
+if ((laterBGate2BindingPath !== null) !== (laterBGate2BindingPython !== null) ||
+    (laterBGate2BindingPath !== null && (!laterBGate2 || !path.isAbsolute(laterBGate2BindingPython))))
+  throw Error('Gate2 source binding requires its explicit projection and absolute Python executable');
+
 const laterBRngOwnerWindowSpec = values['stadium-later-b-rng-owner-window'];
 let laterBRngOwnerWindow = null;
 if (laterBRngOwnerWindowSpec !== undefined && (!laterBGate2 || rngDrawProbe || hitTransitionProbe ||
@@ -208,7 +216,7 @@ if (!firstReplayCallbackProbe && !currentSssExit && (expectedFrame0Path || value
 const runtimeDataUrl = new URL('gameplay_menu_browser.data', url).href;
 const output = path.resolve(values.out);
 const observationTimeoutMs = diagnostic ? diagnosticProtocol.observation_timeout_ms : Math.min(phaseTimeoutMs, 5000);
-const inputPaths = [values.disc, values.recipe, values.manifest, values['runtime-data'], expectedFrame0Path, currentSssExitPath, laterBGate2ProjectionPath]
+const inputPaths = [values.disc, values.recipe, values.manifest, values['runtime-data'], expectedFrame0Path, currentSssExitPath, laterBGate2ProjectionPath, laterBGate2BindingPath]
   .filter(Boolean).map(value => path.resolve(value));
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const artifactRoot = path.resolve(values['artifact-root'] || path.join(repoRoot, 'build/browser-release'));
@@ -260,7 +268,7 @@ const report = {
   unexpected_requests: [],
 };
 let currentSssExpected, currentSssRecipeBytes, currentSssArm;
-let laterBGate2ProjectionBytes, laterBGate2Reference;
+let laterBGate2ProjectionBytes, laterBGate2Reference, laterBGate2BindingBytes = null;
 let laterBGate2Reserved = false, laterBGate2Finalized = false;
 let currentSssStock4 = false;
 let currentSssStopsBeforeAssets = false;
@@ -436,6 +444,7 @@ async function runLaterBGate2FromSetup(deadline, actualObservation) {
   const adapter = createLaterBGate2NativeAdapter({owner: currentSssArm, deadline,
     evaluate: (fn, command) => observePageOperation(`Gate2 ${command.kind}`, () => page.evaluate(fn, command))});
   const actionDriver = new StadiumSetupCfActionDriver({laterBProjection: laterBGate2ProjectionBytes,
+    laterBProjectionBinding: laterBGate2BindingBytes,
     laterBToken: token.id, native: adapter, admittedWorldGeneration: request.world_generation});
   await fs.writeFile(path.join(output, 'gate2-native-manifest.bin'), actionDriver.nativeManifest, {flag: 'wx'});
   const evidencePath = path.join(output, 'gate2-actions.jsonl');
@@ -1020,7 +1029,22 @@ try {
     if (laterBGate2) {
       report.inputs.later_b_gate2_projection = await statInput(laterBGate2ProjectionPath);
       laterBGate2ProjectionBytes = await fs.readFile(laterBGate2ProjectionPath);
-      laterBGate2Reference = deriveLaterBGate2Expectations(laterBGate2ProjectionBytes);
+      if (laterBGate2BindingPath !== null) {
+        report.inputs.later_b_gate2_binding = await statInput(laterBGate2BindingPath);
+        laterBGate2BindingBytes = await fs.readFile(laterBGate2BindingPath);
+        const admission = JSON.parse(execFileSync(laterBGate2BindingPython,
+          [path.join(repoRoot,'tools/stadium_later_b_reference.py'),'--admit-serialized-projection',
+            laterBGate2BindingPath,laterBGate2ProjectionPath],
+          {encoding:'utf8',timeout:10000,maxBuffer:65536}));
+        if (admission.schema!=='melee-web-later-b-serialized-projection-admission-v1'||admission.runtime_admission!==false||
+            admission.source_binding.bytes!==laterBGate2BindingBytes.length||
+            admission.source_binding.sha256!==createHash('sha256').update(laterBGate2BindingBytes).digest('hex')||
+            admission.projection.bytes!==laterBGate2ProjectionBytes.length||
+            admission.projection.sha256!==createHash('sha256').update(laterBGate2ProjectionBytes).digest('hex'))
+          throw Error('Gate2 strict raw binding/projection admission differs from actual bytes');
+        report.later_b_serialized_projection_admission=admission;
+      }
+      laterBGate2Reference = deriveLaterBGate2Expectations(laterBGate2ProjectionBytes,laterBGate2BindingBytes);
       if (laterBGate2Reference.reference.recipe_sha256 !== report.inputs.recipe.sha256)
         throw Error('Gate2 projection and current literal recipe identities differ');
       laterBRngOwnerWindow = deriveLaterBRngOwnerWindow(laterBRngOwnerWindowSpec,laterBGate2Reference);

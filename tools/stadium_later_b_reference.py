@@ -13,6 +13,11 @@ import re
 from pathlib import Path
 import stat
 
+if __name__ == '__main__':
+    import sys
+    root = Path(__file__).resolve().parents[1]
+    sys.path[:0] = [str(root / 'scripts'), str(root / 'reference-capture/dolphin')]
+
 import stadium_current_context_packet as context
 import reference_input_stream as si
 from reference_observer_stream import SLICE_NAMES
@@ -162,7 +167,7 @@ def _binding_stat_identity(info):
             info.st_mtime_ns, info.st_ctime_ns)
 
 
-def _read_binding_snapshot(binding_path):
+def _read_binding_snapshot(binding_path, *, max_bytes=MAX_BINDING_BYTES):
     """Read exact bytes from one stable regular non-symlink binding file."""
     path = Path(binding_path)
     nofollow = getattr(os, 'O_NOFOLLOW', None)
@@ -171,7 +176,7 @@ def _read_binding_snapshot(binding_path):
         before = os.lstat(path)
         require(stat.S_ISREG(before.st_mode) and not stat.S_ISLNK(before.st_mode),
                 'binding must be a regular non-symlink file')
-        require(before.st_size <= MAX_BINDING_BYTES, 'binding exceeds the bounded file size')
+        require(before.st_size <= max_bytes, 'binding exceeds the bounded file size')
         fd = os.open(path, os.O_RDONLY | nofollow)
     except (OSError, TypeError, ValueError) as error:
         raise ValueError(f'cannot open exact binding file: {error}') from error
@@ -181,7 +186,7 @@ def _read_binding_snapshot(binding_path):
                 _binding_stat_identity(before) == _binding_stat_identity(opened),
                 'binding file identity changed before read')
         with os.fdopen(fd, 'rb', closefd=False) as stream:
-            raw = stream.read(MAX_BINDING_BYTES + 1)
+            raw = stream.read(max_bytes + 1)
         after_fd = os.fstat(fd)
     finally:
         os.close(fd)
@@ -189,7 +194,7 @@ def _read_binding_snapshot(binding_path):
         after_path = os.lstat(path)
     except OSError as error:
         raise ValueError(f'binding file disappeared after read: {error}') from error
-    require(len(raw) <= MAX_BINDING_BYTES and len(raw) == before.st_size and
+    require(len(raw) <= max_bytes and len(raw) == before.st_size and
             _binding_stat_identity(before) == _binding_stat_identity(after_fd) ==
             _binding_stat_identity(after_path),
             'binding file changed during read')
@@ -678,3 +683,31 @@ def build_gate1_expected(binding):
                  runtime_admission=False)
     verified_files(binding)
     return value
+
+
+def admit_serialized_projection(binding_path, projection_path):
+    """Pure preflight through the existing strict raw exporter, not native authority."""
+    binding_raw, binding_identity = _read_binding_snapshot(binding_path)
+    projection_raw, projection_identity = _read_binding_snapshot(projection_path, max_bytes=4 * 1024 * 1024)
+    projected = build_gate2_projection(binding_path)
+    regenerated = (json.dumps(projected, sort_keys=True, indent=2) + '\n').encode('utf-8')
+    require(projection_raw == regenerated,
+            'serialized projection differs from strict raw binding regeneration')
+    require(_read_binding_snapshot(binding_path) == (binding_raw, binding_identity) and
+            _read_binding_snapshot(projection_path, max_bytes=4 * 1024 * 1024) ==
+            (projection_raw, projection_identity), 'projection or binding changed during strict admission')
+    return {'schema': 'melee-web-later-b-serialized-projection-admission-v1',
+            'source_binding': {'bytes': len(binding_raw), 'sha256': hashlib.sha256(binding_raw).hexdigest()},
+            'projection': {'bytes': len(projection_raw), 'sha256': hashlib.sha256(projection_raw).hexdigest()},
+            'recipe_sha256': projected['recipe_sha256'], 'reference_id': projected['reference_id'],
+            'scope': 'Strict original raw binding and exact serialization only; independent native MWB2 ownership required',
+            'runtime_admission': False}
+
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description='Pure exact serialized Gate2 projection admission')
+    parser.add_argument('--admit-serialized-projection', nargs=2, required=True,
+                        metavar=('BINDING', 'PROJECTION'))
+    arguments = parser.parse_args()
+    print(json.dumps(admit_serialized_projection(*arguments.admit_serialized_projection), sort_keys=True))
