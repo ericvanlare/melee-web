@@ -94,6 +94,7 @@ typedef struct HSD_GObj {struct HSD_GObj* next;int classifier;void* user_data;} 
 typedef struct Ground {int map_id;} Ground;
 enum {HSD_GOBJ_CLASS_STAGE=1};
 static HSD_GObj* HSD_GObj_Entities[6];
+static Ground base_ground={0},form_ground={9}; /* modeled exact live Ground leases */
 typedef struct Entry { void* unk0; } Entry;
 typedef struct UnkStageDat { int unkC;Entry* unk8; } UnkStageDat;
 typedef struct UnkArchiveStruct {HSD_Archive* unk0;UnkStageDat* unk4;unsigned unk8;} UnkArchiveStruct;
@@ -117,6 +118,10 @@ MeleeWebSourceMemoryReadStatus melee_web_source_memory_context_read(MeleeWebSour
  *out=(MeleeWebSourceMemoryContext){.source_heap_handle=3,.world_generation=generation};return MELEE_WEB_SOURCE_MEMORY_READ_OK;
 }
 MeleeWebSourceMemoryReadStatus melee_web_source_memory_allocation_read(const void* p,MeleeWebSourceMemoryAllocation* out){
+ if(p==&base_ground||p==&form_ground){
+ *out=(MeleeWebSourceMemoryAllocation){.source_heap_handle=3,.world_generation=generation,
+ .allocation_generation=p==&base_ground?23:24,.requested_bytes=sizeof(Ground),.live=1};
+ return MELEE_WEB_SOURCE_MEMORY_READ_OK;}
  if(p!=&source_header&&p!=source_buffer)return MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT;
  *out=(MeleeWebSourceMemoryAllocation){.source_heap_handle=3,.world_generation=generation,
  .allocation_generation=p==&source_header?header_generation:buffer_generation,
@@ -164,7 +169,8 @@ int main(void){
  assert(melee_web_archive_sections_preloaded_stage_map_matches(h.sections,generation,rows[0].unk0,
  h.archives[0].unk0,&base,0,&h.grdatfiles_identities[0],0,&h.grdatfiles_native_identity));
  MeleeWebArchiveSymbol symbols[4];for(unsigned i=0;i<4;i++){
- maps[i]=(UnkStageDat){10,entries[i]};heads[i]=&maps[i];entries[i][ids[i]].unk0=&joints[i+1];symbols[i]=(MeleeWebArchiveSymbol){form_files[i],"map_head",heads[i]};}
+ maps[i]=(UnkStageDat){10,entries[i]};heads[i]=&maps[i];entries[i][0].unk0=&joints[0]; /* actual shared map0 geometry */
+ entries[i][ids[i]].unk0=&joints[i+1];symbols[i]=(MeleeWebArchiveSymbol){form_files[i],"map_head",heads[i]};}
  MeleeWebArchiveSections* forms=melee_web_archive_sections_register(symbols,4,error,sizeof(error));assert(forms);
  void* wrong[4]={heads[0],heads[1],heads[2],heads[2]};assert(!melee_web_stage_map_set_forms(&h,wrong,error,sizeof(error)));
  assert(melee_web_stage_map_set_forms(&h,heads,error,sizeof(error)));
@@ -191,6 +197,10 @@ int main(void){
  }
  Ground foreign_ground={9};HSD_GObj linked={NULL,HSD_GOBJ_CLASS_STAGE,&foreign_ground};
  HSD_GObj_Entities[5]=&linked;assert(!melee_web_stage_map_source_slot_release(&rows[1]));HSD_GObj_Entities[5]=NULL;
+ HSD_GObj form_linked={NULL,HSD_GOBJ_CLASS_STAGE,&form_ground};
+ HSD_GObj_Entities[5]=&form_linked;
+ assert(!melee_web_stage_map_source_slot_release(&rows[1])); /* actual selected provider still live */
+ HSD_GObj_Entities[5]=NULL;
  source_header.top_ptr=NULL;assert(!melee_web_stage_map_source_slot_release(&rows[1]));source_header.top_ptr=source_buffer;
  UnkArchiveStruct captured=rows[1];rows[1].unk4=&base;assert(!melee_web_stage_map_source_slot_release(&rows[1]));rows[1]=captured;
  assert(!melee_web_stage_map_source_slot_cleared(&rows[1]));
@@ -203,7 +213,12 @@ int main(void){
  for(size_t i=0;i<sizeof(UnkArchiveStruct);i++)assert(source_buffer[i]==0);
  assert(source_buffer[sizeof(UnkArchiveStruct)]==0x5a&&!h.source_slots[1].raw_clear_pending);
  assert(!melee_web_stage_map_source_slot_release(source_buffer)); /* thirdword now0 */
+ /* The base remains live and supplies shared map0 before the form slot.
+  * Neither its stage-array entry nor its checked linked Ground consumes slot1. */
+ HSD_GObj base_linked={NULL,HSD_GOBJ_CLASS_STAGE,&base_ground};
+ stage_info.map_gobjs[0]=&base_linked;HSD_GObj_Entities[5]=&base_linked;
  source_buffer[0]=0x5a;grAnime_801C65B0(&rows[1]);
+ stage_info.map_gobjs[0]=NULL;HSD_GObj_Entities[5]=NULL;
  assert(header_frees==1&&row_clears==1&&source_buffer[0]==0x5a&&h.source_slots[1].state==0);
  assert(!melee_web_archive_sections_is_handle(&source_header)&&melee_web_archive_sections_is_handle(h.form_handles[2]));
  assert(!melee_web_archive_sections_close(forms,error,sizeof(error)));

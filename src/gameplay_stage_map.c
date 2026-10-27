@@ -265,7 +265,12 @@ int melee_web_stage_map_source_slot_release(void* candidate){
     const UnkStageDat* map=h->form_maps[saved->form];
     if(map->unkC<0||map->unkC>(int)(sizeof(stage_info.map_gobjs)/sizeof(stage_info.map_gobjs[0]))||
        !map->unk8)return 0;
-    for(int id=0;id<map->unkC;id++)if(map->unk8[id].unk0&&stage_info.map_gobjs[id])return 0;
+    /* A form-local joint is not necessarily supplied by this slot: shared
+     * map0 is resolved from the earlier base slot by original grDatFiles.
+     * The checked lookup validates every resident row before selecting the
+     * first provider; never retire a slot with an actual live consumer. */
+    for(int id=0;id<map->unkC;id++)if(map->unk8[id].unk0&&stage_info.map_gobjs[id]&&
+        melee_web_stage_map_lookup(id)==candidate)return 0;
     /* The stage array is not permission to ignore a still-linked source GObj.
      * Check allocation ownership before reading any Ground userdata. */
     for(HSD_GObj* obj=((HSD_GObj**)HSD_GObj_Entities)[5];obj;obj=obj->next){
@@ -274,7 +279,8 @@ int melee_web_stage_map_source_slot_release(void* candidate){
         if(melee_web_source_memory_allocation_read(obj->user_data,&lease)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
            !lease.live||lease.world_generation!=h->generation||lease.requested_bytes!=sizeof(Ground))return 0;
         const Ground* ground=obj->user_data;
-        if((unsigned)ground->map_id<(unsigned)map->unkC&&map->unk8[ground->map_id].unk0)return 0;
+        if((unsigned)ground->map_id<(unsigned)map->unkC&&map->unk8[ground->map_id].unk0&&
+           melee_web_stage_map_lookup(ground->map_id)==candidate)return 0;
     }
     /* This is an adjunct detach, never lbArchive_80016EFC/top_ptr release.
      * Typed descriptor arenas/catalog handles remain retained by StageMap. */
