@@ -4,6 +4,8 @@ from retail_input_plan import NEUTRAL_PAD, pipe_commands
 from reference_versus_sequence_capture import raw_pad
 
 SCHEMA = "melee-web-sd-original-menu-inputs"
+STADIUM_FIRST_FORM_MENU_WAIT_PROFILE = "first_form_menu_wait_72_v1"
+STADIUM_FIRST_FORM_MENU_WAIT_POLLS = 72
 
 
 def guard(kind, row, value=None):
@@ -37,6 +39,8 @@ def validate_packet(value):
     if canonical(value) == canonical(gci_competitive_entry_packet()):
         return value
     if canonical(value) == canonical(gci_sparse_pair_packet()):
+        return value
+    if canonical(value) == canonical(stadium_first_form_menu_wait_72_packet()):
         return value
     if canonical(value) == canonical(stadium_go_feedback_packet()):
         return value
@@ -421,3 +425,41 @@ def stadium_go_feedback_packet():
                         near_center_distance=5, max_reacquire_callbacks=4,
                         max_movement_callbacks=56)
     return value
+
+
+def stadium_first_form_menu_wait_72_packet():
+    """Exact fresh-record context variant; all other Stadium v11 inputs stay fixed."""
+    value = stadium_go_feedback_packet()
+    value["css"]["idle_polls_before_start"] = STADIUM_FIRST_FORM_MENU_WAIT_POLLS
+    value["first_form_menu_wait_variant"] = STADIUM_FIRST_FORM_MENU_WAIT_PROFILE
+    return value
+
+
+def validate_stadium_first_form_menu_wait_variant(value, *, selected):
+    """Bind the one named packet to its explicit whole3 recording selector."""
+    from authored_sd_reference_plan import canonical
+    if type(selected) is not bool:
+        raise ValueError("First-form menu-wait selector must be boolean")
+    has_variant = isinstance(value, dict) and "first_form_menu_wait_variant" in value
+    if selected:
+        if not has_variant or canonical(value) != canonical(stadium_first_form_menu_wait_72_packet()):
+            raise ValueError("Selected first-form menu-wait profile requires its exact canonical packet")
+        return {"profile": STADIUM_FIRST_FORM_MENU_WAIT_PROFILE,
+                "selector": "--stadium-first-form-menu-wait-72",
+                "base_idle_polls": 12,
+                "css_idle_polls_before_start": STADIUM_FIRST_FORM_MENU_WAIT_POLLS,
+                "declared_css_visits": 3}
+    if has_variant:
+        raise ValueError("First-form menu-wait packet requires its explicit selector")
+    return None
+
+
+def stadium_first_form_menu_wait_receipt(value, *, selected, menu_recipe_sha256):
+    """Return the exact launch/report binding for the named packet, if selected."""
+    variant = validate_stadium_first_form_menu_wait_variant(value, selected=selected)
+    if variant is None:
+        return None
+    if (not isinstance(menu_recipe_sha256, str) or len(menu_recipe_sha256) != 64 or
+            any(char not in "0123456789abcdef" for char in menu_recipe_sha256)):
+        raise ValueError("First-form menu-wait packet hash is malformed")
+    return dict(variant, menu_recipe_sha256=menu_recipe_sha256)

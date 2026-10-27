@@ -1268,8 +1268,13 @@ def prepare_rules_profile(profile, user, *, source_slots=(0, 1), fast_disc_speed
 
 
 def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_manifest, timeout=180, gci=None,
-        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False, stadium_go_ordinal2=False, stadium_whole_target=None, stadium_whole_setup=None, stadium_whole_gc=None, stadium_whole_dol=None, stadium_whole_provenance=None, stadium_whole_b_state=False, stadium_whole_long_idle=False, stadium_whole_paired_idle=False, stadium_whole_paired_registration=False, stadium_whole_stockout=False, stadium_whole_standings=False, stadium_whole_post_transform_standings=False, stadium_whole_first_form_latency=False, stadium_whole_rng_window=None, stadium_whole_replay_binding=None, stadium_whole_first_form_replay_journals=None, stadium_whole_rng_coverage="rng_returns"):
+        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False, stadium_go_ordinal2=False, stadium_whole_target=None, stadium_whole_setup=None, stadium_whole_gc=None, stadium_whole_dol=None, stadium_whole_provenance=None, stadium_whole_b_state=False, stadium_whole_long_idle=False, stadium_whole_paired_idle=False, stadium_whole_paired_registration=False, stadium_whole_stockout=False, stadium_whole_standings=False, stadium_whole_post_transform_standings=False, stadium_whole_first_form_latency=False, stadium_first_form_menu_wait_72=False, stadium_whole_rng_window=None, stadium_whole_replay_binding=None, stadium_whole_first_form_replay_journals=None, stadium_whole_rng_coverage="rng_returns"):
     """Own fresh output before preparation so failures cannot vanish before launch."""
+    require(type(stadium_first_form_menu_wait_72) is bool and
+            (not stadium_first_form_menu_wait_72 or
+             stadium_whole_first_form_latency and stadium_whole_replay_binding is None and
+             stadium_whole_first_form_replay_journals is None),
+            "First-form menu-wait variant requires a fresh first-form latency recording")
     require(type(stadium_whole_b_state) is bool, "Whole Stadium B observation opt-in must be boolean")
     require(type(stadium_whole_long_idle) is bool and
             (not stadium_whole_long_idle or stadium_whole_b_state),
@@ -1333,6 +1338,7 @@ def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_m
             stadium_whole_standings=stadium_whole_standings,
             stadium_whole_post_transform_standings=stadium_whole_post_transform_standings,
             stadium_whole_first_form_latency=stadium_whole_first_form_latency,
+            stadium_first_form_menu_wait_72=stadium_first_form_menu_wait_72,
             stadium_whole_rng_window=stadium_whole_rng_window,
             stadium_whole_replay_binding=stadium_whole_replay_binding,
             stadium_whole_first_form_replay_journals=stadium_whole_first_form_replay_journals,
@@ -1383,6 +1389,8 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
          ordinary_policy=None, replay_receipt=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False, stadium_go_ordinal2=False):
     build = validate_reference_build_manifest(Path(build_manifest), Path(dolphin))
     menus, menu_hash = menu_actions(menu_recipe)
+    require("first_form_menu_wait_variant" not in menus,
+            "First-form menu-wait packet requires the whole3 latency selector")
     stadium_prefix = menus["scope"] == "stadium_go_prefix"
     require(type(stadium_idle_3500) is bool and
             (not stadium_idle_3500 or (stadium_prefix and replay_receipt is None)),
@@ -3624,12 +3632,17 @@ def stadium_whole_replay_complete(source, native_status, primary, primary_status
 def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, build_manifest,
                              target_path, setup_path, checkpoint_gc, dol, provenance, gci, timeout,
                              stadium_whole_b_state=False, stadium_whole_long_idle=False,
-                             stadium_whole_paired_idle=False, stadium_whole_paired_registration=False, stadium_whole_stockout=False, stadium_whole_standings=False, stadium_whole_post_transform_standings=False, stadium_whole_first_form_latency=False, stadium_whole_rng_window=None,
+                             stadium_whole_paired_idle=False, stadium_whole_paired_registration=False, stadium_whole_stockout=False, stadium_whole_standings=False, stadium_whole_post_transform_standings=False, stadium_whole_first_form_latency=False, stadium_first_form_menu_wait_72=False, stadium_whole_rng_window=None,
                              stadium_whole_replay_binding=None,
                              stadium_whole_first_form_replay_journals=None,
                              stadium_whole_rng_coverage="rng_returns"):
     """Explicit private whole3/sidecar2 diagnostic using the existing passive route."""
     import types
+    require(type(stadium_first_form_menu_wait_72) is bool and
+            (not stadium_first_form_menu_wait_72 or
+             stadium_whole_first_form_latency and stadium_whole_replay_binding is None and
+             stadium_whole_first_form_replay_journals is None),
+            "First-form menu-wait variant requires a fresh first-form latency recording")
     require(type(stadium_whole_b_state) is bool, "Whole Stadium B observation opt-in must be boolean")
     require(type(stadium_whole_long_idle) is bool and
             (not stadium_whole_long_idle or stadium_whole_b_state),
@@ -3766,7 +3779,11 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             require(stadium_three_rule_profile(expected) == 'stock4_none' and
                     len(expected.get('players', [])) == 2,
                     'Natural stockout requires the exact admitted two-human stock4_none setup')
-        menus,_=menu_actions(menu_recipe)
+        menus,menu_recipe_sha256=menu_actions(menu_recipe)
+        from sd_original_menu_plan import stadium_first_form_menu_wait_receipt
+        menu_wait_receipt = stadium_first_form_menu_wait_receipt(
+            menus, selected=stadium_first_form_menu_wait_72,
+            menu_recipe_sha256=menu_recipe_sha256)
         require(menus['scope']=='stadium_go_prefix' and menus['version']==11 and
                 menus['sss'].get('policy')=='same_call_feedback_v1',
                 'Whole Stadium must reuse the existing reviewed same-call input policy')
@@ -3774,6 +3791,8 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
         # Actual source Setup/receipt are admitted separately, never relabeled GO-prefix.
         menus=json.loads(json.dumps(menus))
         menus['css']['costumes']=[p['costume'] for p in expected['players']]
+        if menu_wait_receipt is not None:
+            report['stadium_first_form_menu_wait_variant'] = menu_wait_receipt
         user=output/'user'
         p1,p2,profile_inventory=prepare_rules_profile(profile,user,
             fast_disc_speed=False if stadium_whole_first_form_latency else None)
@@ -3882,6 +3901,8 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
         launch=dict(command=command,environment_delta={k:v for k,v in env.items() if k.startswith('MWRC_')},manifest=build,setup=setup,expected=expected,
                     profile_inventory=profile_inventory,owned_gci=dict(path=str(owned_gci),bytes=owned_gci.stat().st_size,sha256=hashlib.sha256(owned_gci.read_bytes()).hexdigest()),operation_seconds=180,owner_seconds=210,cleanup_seconds=30,
                     stadium_whole_stockout=dict(STADIUM_WHOLE_STOCKOUT_PROFILE) if stadium_whole_stockout else None)
+        if menu_wait_receipt is not None:
+            launch['stadium_first_form_menu_wait_variant'] = dict(menu_wait_receipt)
         if stadium_whole_standings:
             launch['stadium_whole_standings'] = dict(profile=StadiumStandingsInputPolicy.PROFILE,
                 selected_match=1, stop_at=['actual_mode14', 'first_transform', 'actual_GO_plus_3500'],
@@ -4118,6 +4139,8 @@ def main(argv=None):
                         help="New exclusive B-state profile: retain selected-B GO+3500 window and continue unchanged focus-bound input through actual transform and mode14")
     parser.add_argument("--stadium-whole-first-form-latency", action="store_true",
                         help="Fresh-record first-form v2: neutralize at first pre-transform mode14 or first transformation, then retain checked phase6-to-settled-phase0 and unchanged whole3 terminal")
+    parser.add_argument("--stadium-first-form-menu-wait-72", action="store_true",
+                        help="Fresh-record-only exact CSS menu wait variant: 72 polls at each of all three CSS visits")
     parser.add_argument("--stadium-whole-stockout", action="store_true",
                         help="Strict selected-B natural P1 zero-stock/mode9 witness on the exact two-human stock4_none route")
     parser.add_argument('--stadium-whole-replay-binding',type=Path,
