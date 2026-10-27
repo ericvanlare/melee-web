@@ -266,7 +266,9 @@ def _capture_identity(records: list[Mapping[str, Any]], *, entity_prefix: bool =
                 profile = announcement.get("stadium_whole_long_idle")
                 receipt = announcement.get("setup_receipt_sha256")
                 expected_profile = {
-                    "profile": paired_idle_profile,
+                    "profile": ("paired_idle_registration_v1" if isinstance(profile, Mapping) and
+                                profile.get("profile") == "paired_idle_registration_v1"
+                                else paired_idle_profile),
                     "selected_matches": [0, 1],
                     "match_count": 2,
                     "comparison_post_go_ticks": 3500,
@@ -309,7 +311,7 @@ def _capture_identity(records: list[Mapping[str, Any]], *, entity_prefix: bool =
                 _fail("observer paired-idle setup receipt differs between handshake and start")
         elif any(
             isinstance(announcement.get("stadium_whole_long_idle"), Mapping) and
-            announcement["stadium_whole_long_idle"].get("profile") == paired_idle_profile
+            announcement["stadium_whole_long_idle"].get("profile") in (paired_idle_profile, "paired_idle_registration_v1")
             for announcement in (handshake, start)
         ):
             _fail("paired-idle profile cannot use a legacy whole-session match count")

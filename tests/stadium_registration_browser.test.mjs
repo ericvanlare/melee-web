@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import {armStadiumRegistrationInPage, collectStadiumRegistrationInPage, validateStadiumRegistrationSnapshot} from '../scripts/stadium_registration_browser.mjs';
+import {derivePairedFull} from '../scripts/stadium_paired_v11_full.mjs';
 
 function status(overrides={}) {
   return {schema:'melee-web-source-registration-status-v1',armed:true,sealed:false,invalid:false,
@@ -19,6 +20,30 @@ function runtime(s,rows=[]) {
     _melee_web_stadium_registration_read_json:i=>rows[i]}};
 }
 const invoke=(fn,context,arg)=>vm.runInNewContext('('+fn.toString()+')(arg)',{...context,arg});
+
+test('new registration projection requires its actual passing source report and exact input/allocation producers',()=>{
+  const primary='a'.repeat(64),allocation='b'.repeat(64),input='c'.repeat(64),recipe='d'.repeat(64);
+  const p={schema:'melee-web-stadium-paired-window-projection-v1',capture_profile:'paired_idle_registration_v1',
+    source_schedule_verified:true,recipe_sha256:recipe,actual_frame_count:2,
+    source_files:{'native-primary.mwro':{sha256:primary},'native-allocations.jsonl':{sha256:allocation},'native-inputs.mwri':{sha256:input}},
+    matches:[0,1].map(i=>({match_index:i,window:{state_samples:3501},
+      setup:{declared_setup:{stage:3,players:[0,1].map(()=>({character_kind:8,player_type:0,stocks:4}))}},
+      actions:[{action_index:0,kind:'tick',source_tick:0,draw_ordinal:0}],
+      states:Array.from({length:3501},(_,t)=>({selected:true,tick:{source_tick:t}}))}))};
+  const e={result:'pass',scope:'original-stadium-paired-registration-v1',cleanup_errors:[],
+    input_stream:{complete:true,sha256:input},native:{primary_sha256:primary,native_allocations_sha256:allocation,
+      original_rng_scene_boundaries:{observed:true,sample_count:8,samples:Array.from({length:8},(_,i)=>({
+        lifetime:Math.floor(i/4)+1,function:i%4<2?'gm_Scene_Vs_OnEnter':'gm_Scene_Vs_OnExit',phase:i%2?'return':'enter',value:1}))}}};
+  assert.equal(derivePairedFull(p,recipe,2,e).matches.length,2);
+  for(const alter of [x=>x.result='fail',x=>x.scope='original-stadium-paired-idle-scene-endpoints-v1',
+    x=>x.cleanup_errors=['owned process remained'],x=>x.input_stream.complete=false,
+    x=>x.input_stream.sha256='e'.repeat(64),x=>x.native.native_allocations_sha256='e'.repeat(64)]){
+    const bad=structuredClone(e);alter(bad);assert.throws(()=>derivePairedFull(p,recipe,2,bad));
+  }
+  assert.throws(()=>derivePairedFull({...p,capture_profile:'unknown'},recipe,2,e),/unknown original capture profile/);
+  const legacy=structuredClone(p);delete legacy.capture_profile;
+  assert.throws(()=>derivePairedFull(legacy,recipe,2,e),/original endpoint postflight/);
+});
 
 test('arm executes the actual page adapter and refuses missing, active or dirty observers',()=>{
   const r=runtime(status());assert.equal(invoke(armStadiumRegistrationInPage,r).count,0);

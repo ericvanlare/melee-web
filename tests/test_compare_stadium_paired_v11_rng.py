@@ -1,14 +1,19 @@
 """Synthetic ownership negatives; retained original data has a separate opt-in check."""
 import copy
+import hashlib
 import importlib.util
+import json
 import os
 from pathlib import Path
+import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("paired_rng", ROOT / "tools/compare_stadium_paired_v11_rng.py")
 compare = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(compare)
+_MISSING = object()
 
 
 def fixture():
@@ -32,6 +37,91 @@ def fixture():
 
 
 class PairedRngTests(unittest.TestCase):
+    def _load_reference_profile(self, capture_profile, launch, *, include_launch=True):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            compact_path = root / "compact.mwrl"
+            compact_bytes = b"compact fixture bytes"
+            compact_path.write_bytes(compact_bytes)
+            status_path = root / "native-primary-status.json"
+            status_path.write_text(json.dumps({"state": "completed", "completed": True,
+                                               "invalid": False, "error": None}))
+            source_files = {
+                "stadium-whole-paired-compact-rng.mwrl": self._pin(compact_path),
+                "native-primary-status.json": self._pin(status_path),
+            }
+            if include_launch:
+                launch_path = root / "launch.json"
+                launch_path.write_text(json.dumps(launch))
+                source_files["launch.json"] = self._pin(launch_path)
+            projection = {
+                "compact_sha256": hashlib.sha256(compact_bytes).hexdigest(),
+                "source_files": source_files,
+            }
+            if capture_profile is not _MISSING:
+                projection["capture_profile"] = capture_profile
+            projection_path = root / "projection.json"
+            projection_path.write_text(json.dumps(projection))
+            captured = {}
+
+            def decode(raw, **kwargs):
+                captured.update(kwargs)
+                return {"records": [], "windows": [], "owner_comparison_ready": True,
+                        "unresolved_owner_events": 0}
+
+            with patch.object(compare.compact, "decode_live_compact", side_effect=decode), \
+                 patch.object(compare, "derive_windows", return_value=([], {})):
+                compare.load_reference(projection_path, compare.identity(projection_path)["sha256"])
+            return captured
+
+    @staticmethod
+    def _pin(path):
+        data = path.read_bytes()
+        return {"path": str(path.resolve()), "bytes": len(data),
+                "sha256": hashlib.sha256(data).hexdigest()}
+
+    def test_legacy_missing_profile_keeps_historical_compact_identity(self):
+        launch = {"stadium_whole_paired_idle": {
+            "profile": "paired_idle_scene_endpoints_v1", "selected_matches": [0, 1],
+            "match_count": 2, "comparison_post_go_ticks": 3500, "natural_tail_max": 4,
+            "raw_omission_kinds": ["draw_enter", "draw_return"]}}
+        decoded = self._load_reference_profile(_MISSING, launch)
+        self.assertEqual(decoded["capture_id"], "stadium-whole-paired-idle")
+        self.assertEqual(decoded["sequence_id"], "primary2-paired-idle-scene-endpoints")
+
+    def test_registration_profile_uses_only_exact_pinned_launch_and_compact_identity(self):
+        launch = {"stadium_whole_paired_idle": compare.REGISTRATION_LAUNCH_PROFILE,
+                  "stadium_whole_paired_registration": True}
+        decoded = self._load_reference_profile(compare.REGISTRATION_CAPTURE_PROFILE, launch)
+        self.assertEqual(decoded["capture_id"], "stadium-whole-paired-registration")
+        self.assertEqual(decoded["sequence_id"], "primary2-paired-registration")
+
+    def test_registration_and_mixed_profile_downgrades_refuse(self):
+        exact_launch = {"stadium_whole_paired_idle": compare.REGISTRATION_LAUNCH_PROFILE,
+                        "stadium_whole_paired_registration": True}
+        invalid = [
+            ("unknown-profile", exact_launch, True),
+            (compare.REGISTRATION_CAPTURE_PROFILE,
+             {"stadium_whole_paired_idle": dict(compare.REGISTRATION_LAUNCH_PROFILE,
+                                                natural_tail_max=5),
+              "stadium_whole_paired_registration": True}, True),
+            (compare.REGISTRATION_CAPTURE_PROFILE,
+             {"stadium_whole_paired_idle": compare.REGISTRATION_LAUNCH_PROFILE,
+              "stadium_whole_paired_registration": False}, True),
+            (compare.REGISTRATION_CAPTURE_PROFILE, {}, False),
+            (_MISSING, exact_launch, True),
+        ]
+        messages = (
+            "capture_profile is unsupported",
+            "exact registration profile",
+            "explicit paired-registration opt-in",
+            "pinned launch.json",
+            "missing its projection capture_profile marker",
+        )
+        for (capture_profile, launch, include_launch), message in zip(invalid, messages):
+            with self.subTest(message=message), self.assertRaisesRegex(compare.semantics.EvidenceError, message):
+                self._load_reference_profile(capture_profile, launch, include_launch=include_launch)
+
     def test_declared_empty_actions_require_actual_probe_rows(self):
         matches, rows, probes = fixture()
         self.assertEqual([r["compared_actions"] for r in compare.compare_browser(matches, rows, probes)], [1, 1])

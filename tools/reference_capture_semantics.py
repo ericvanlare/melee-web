@@ -1108,7 +1108,8 @@ def validate_whole_session_observer_records(records, *, transition_trace=None):
             announcement.get("stadium_whole_feedback") is True and
             announcement.get("stadium_whole_b_state") is True and
             announcement.get("stadium_observed_matches") == [0, 1] and
-            isinstance(profile, dict) and profile == paired_idle_profile and
+            isinstance(profile, dict) and profile in (paired_idle_profile,
+                {**paired_idle_profile, "profile": "paired_idle_registration_v1"}) and
             isinstance(receipt, str) and len(receipt) == 64 and
             all(character in "0123456789abcdef" for character in receipt) and
             receipt != "0" * 64 and

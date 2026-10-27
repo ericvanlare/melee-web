@@ -17,6 +17,9 @@ def require(condition, reason):
         raise StadiumGoPrefixError("whole long idle: " + reason)
 
 
+PAIRED_REGISTRATION_PROFILE = {**PAIRED_IDLE_PROFILE, 'profile': 'paired_idle_registration_v1'}
+
+
 class LongIdleBObservations:
     """Strictly consumes selected GO+3500 windows from one complete MWRO stream.
 
@@ -25,9 +28,9 @@ class LongIdleBObservations:
     either GO from a fixed tick or from the compact sidecar.
     """
     def __init__(self, profile=PROFILE):
-        require(profile in (PROFILE, PAIRED_IDLE_PROFILE), "unknown exact profile")
+        require(profile in (PROFILE, PAIRED_IDLE_PROFILE, PAIRED_REGISTRATION_PROFILE), "unknown exact profile")
         self.profile = profile
-        self.paired = profile == PAIRED_IDLE_PROFILE
+        self.paired = profile in (PAIRED_IDLE_PROFILE, PAIRED_REGISTRATION_PROFILE)
         self.previous = None
         self.markers = []
         self.go = None
@@ -225,7 +228,8 @@ class LongIdleBObservations:
             require(len(windows) == 2 and windows[0]["match_index"] == 0 and
                     windows[1] == final and windows[1]["match_index"] == 1,
                     "paired profile lacks exactly two ordered natural windows")
-            return {"scope": "original-paired-idle-scene-endpoints-source-observation-only",
+            return {"scope": ("original-paired-registration-source-observation-only" if self.profile == PAIRED_REGISTRATION_PROFILE else
+                              "original-paired-idle-scene-endpoints-source-observation-only"),
                     "profile": self.profile, "windows": windows,
                     "whole_session_lifecycle_required_separately": True,
                     "allocation_history_complete": False,

@@ -70,6 +70,15 @@ STADIUM_WHOLE_STOCKOUT_PROFILE = {
 STADIUM_WHOLE_LONG_IDLE_COMPACT_BASENAME = "stadium-whole-selected-b-compact-rng.mwrl"
 STADIUM_WHOLE_PAIRED_IDLE_COMPACT_BASENAME = "stadium-whole-paired-compact-rng.mwrl"
 
+STADIUM_WHOLE_PAIRED_REGISTRATION_PROFILE = {**STADIUM_WHOLE_PAIRED_IDLE_PROFILE, 'profile': 'paired_idle_registration_v1'}
+
+
+def stadium_whole_allocation_profile_bytes(profile, *, registration=False):
+    """The new profile uses the exact generated-header bytes; legacy bytes stay unchanged."""
+    if registration:
+        return (json.dumps(profile, sort_keys=True, indent=2, allow_nan=False) + "\n").encode("utf-8")
+    return canonical(profile)
+
 
 def build_stadium_whole_long_idle_compact_launch(output, *, paired_idle=False):
     """Build a fresh selected-B or explicitly paired compact sidecar config."""
@@ -242,13 +251,15 @@ def validate_stadium_paired_idle_window_coordinates(driver, source):
 
 
 def validate_stadium_paired_idle_outputs(raw, status_path, output_root,
-                                         compact_launch, driver_windows, dol_sha256):
+                                         compact_launch, driver_windows, dol_sha256, *, registration=False):
     """Join two actual GO windows across the full raw stream and compact ledger."""
     from reference_observer_stream import iter_records
-    from stadium_whole_long_idle import LongIdleBObservations, PAIRED_IDLE_PROFILE
+    from stadium_whole_long_idle import LongIdleBObservations, PAIRED_IDLE_PROFILE, PAIRED_REGISTRATION_PROFILE
+    PAIRED_IDLE_PROFILE = PAIRED_REGISTRATION_PROFILE if registration else PAIRED_IDLE_PROFILE
+    driver_profile = STADIUM_WHOLE_PAIRED_REGISTRATION_PROFILE if registration else STADIUM_WHOLE_PAIRED_IDLE_PROFILE
     from stadium_rng_compact_live import decode_live_compact
 
-    require(PAIRED_IDLE_PROFILE == STADIUM_WHOLE_PAIRED_IDLE_PROFILE,
+    require(PAIRED_IDLE_PROFILE == driver_profile,
             "paired idle driver and strict source validator profiles differ")
     primary_status = read_status(status_path)
     require(primary_status.get("state") == "completed" and
@@ -319,8 +330,8 @@ def validate_stadium_paired_idle_outputs(raw, status_path, output_root,
             all(ch in "0123456789abcdef" for ch in dol_sha256),
             "paired compact DOL identity is malformed")
     ledger = decode_live_compact(compact_path.read_bytes(),
-        capture_id="stadium-whole-paired-idle",
-        sequence_id="primary2-paired-idle-scene-endpoints",
+        capture_id="stadium-whole-paired-registration" if registration else "stadium-whole-paired-idle",
+        sequence_id="primary2-paired-registration" if registration else "primary2-paired-idle-scene-endpoints",
         dol_sha256=dol_sha256, primary_status=primary_status)
     windows = ledger.get("windows")
     require(ledger["header"].get("matches") == [0, 1] and
@@ -1219,12 +1230,15 @@ def prepare_rules_profile(profile, user, *, source_slots=(0, 1)):
 
 
 def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_manifest, timeout=180, gci=None,
-        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False, stadium_go_ordinal2=False, stadium_whole_target=None, stadium_whole_setup=None, stadium_whole_gc=None, stadium_whole_dol=None, stadium_whole_provenance=None, stadium_whole_b_state=False, stadium_whole_long_idle=False, stadium_whole_paired_idle=False, stadium_whole_stockout=False, stadium_whole_standings=False, stadium_whole_rng_window=None, stadium_whole_replay_binding=None, stadium_whole_rng_coverage="rng_returns"):
+        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False, stadium_go_ordinal2=False, stadium_whole_target=None, stadium_whole_setup=None, stadium_whole_gc=None, stadium_whole_dol=None, stadium_whole_provenance=None, stadium_whole_b_state=False, stadium_whole_long_idle=False, stadium_whole_paired_idle=False, stadium_whole_paired_registration=False, stadium_whole_stockout=False, stadium_whole_standings=False, stadium_whole_rng_window=None, stadium_whole_replay_binding=None, stadium_whole_rng_coverage="rng_returns"):
     """Own fresh output before preparation so failures cannot vanish before launch."""
     require(type(stadium_whole_b_state) is bool, "Whole Stadium B observation opt-in must be boolean")
     require(type(stadium_whole_long_idle) is bool and
             (not stadium_whole_long_idle or stadium_whole_b_state),
             'Whole Stadium long-idle profile requires the B-state option')
+    require(type(stadium_whole_paired_registration) is bool and
+            (not stadium_whole_paired_registration or stadium_whole_paired_idle),
+            'Paired registration requires explicit paired-idle route')
     require(type(stadium_whole_paired_idle) is bool,
             'Whole Stadium paired-idle profile option must be boolean')
     require(type(stadium_whole_standings) is bool and
@@ -1257,6 +1271,7 @@ def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_m
             stadium_whole_b_state=stadium_whole_b_state,
             stadium_whole_long_idle=stadium_whole_long_idle,
             stadium_whole_paired_idle=stadium_whole_paired_idle,
+            stadium_whole_paired_registration=stadium_whole_paired_registration,
             stadium_whole_stockout=stadium_whole_stockout,
             stadium_whole_standings=stadium_whole_standings,
             stadium_whole_rng_window=stadium_whole_rng_window,
@@ -2349,7 +2364,7 @@ def drive_stadium_standings_input(receiver, next_row, controller, deadline):
 class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
     """Strict whole-session rows feeding the existing CSS/SSS input policies."""
     def __init__(self, menus, receipt, expected, *, stadium_whole_b_state=False,
-                 stadium_whole_long_idle=False, stadium_whole_paired_idle=False,
+                 stadium_whole_long_idle=False, stadium_whole_paired_idle=False, stadium_whole_paired_registration=False,
                  stadium_whole_stockout=False, stadium_whole_standings=False, replay_binding_sha256=None):
         super().__init__(menus)
         require(type(stadium_whole_b_state) is bool, "Whole Stadium B observation opt-in must be boolean")
@@ -2363,6 +2378,10 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
         self.replay_binding_sha256 = replay_binding_sha256
         self.stadium_whole_b_state = stadium_whole_b_state
         self.stadium_whole_long_idle = stadium_whole_long_idle
+        require(type(stadium_whole_paired_registration) is bool and
+                (not stadium_whole_paired_registration or stadium_whole_paired_idle),
+                'Paired registration requires explicit paired-idle receiver')
+        self.stadium_whole_paired_registration = stadium_whole_paired_registration
         self.stadium_whole_paired_idle = stadium_whole_paired_idle
         require(type(stadium_whole_stockout) is bool and
                 (not stadium_whole_stockout or stadium_whole_b_state and
@@ -2417,6 +2436,10 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
     def selected_b_state(self, index):
         return self.stadium_whole_b_state and index in self.b_state_matches
 
+    def paired_observation_profile(self):
+        return (STADIUM_WHOLE_PAIRED_REGISTRATION_PROFILE if
+                getattr(self, 'stadium_whole_paired_registration', False) else STADIUM_WHOLE_PAIRED_IDLE_PROFILE)
+
     def selected_long_idle(self, index):
         return self.stadium_whole_long_idle and index in self.b_state_matches
 
@@ -2441,6 +2464,7 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
             stadium_whole_b_state=self.stadium_whole_b_state,
             stadium_whole_long_idle=self.stadium_whole_long_idle,
             stadium_whole_paired_idle=self.stadium_whole_paired_idle,
+            stadium_whole_paired_registration=self.stadium_whole_paired_registration,
             stadium_whole_stockout=self.stadium_whole_stockout,
             stadium_whole_standings=self.stadium_whole_standings,
             replay_binding_sha256=self.replay_binding_sha256)
@@ -2482,7 +2506,7 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
             if self.selected_stockout(self.match_index):
                 self.stockout_witness.begin(self.b_go['source_tick'])
             if self.selected_long_idle(self.match_index):
-                profile = (STADIUM_WHOLE_PAIRED_IDLE_PROFILE if self.stadium_whole_paired_idle else
+                profile = (self.paired_observation_profile() if self.stadium_whole_paired_idle else
                            STADIUM_WHOLE_LONG_IDLE_PROFILE)
                 self.long_idle_window = {
                     'schema': 'melee-web-stadium-whole-paired-idle-window-v1' if self.stadium_whole_paired_idle else
@@ -2592,7 +2616,7 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
         target = window['target_source_tick']
         if target is not None and row['seq'] > target['sequence']:
             require(len(window['natural_tail_source_ticks']) <=
-                    (STADIUM_WHOLE_PAIRED_IDLE_PROFILE if self.stadium_whole_paired_idle else
+                    (self.paired_observation_profile() if self.stadium_whole_paired_idle else
                      STADIUM_WHOLE_LONG_IDLE_PROFILE)['natural_tail_max'],
                     'Whole Stadium long-idle first DrawReturn exceeds its natural tail bound')
             window['first_later_draw_return'] = self._idle_row_identity(row)
@@ -2603,7 +2627,7 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                 window['state_count'] == window['consumed_pad_count'] ==
                     3501 + len(window['natural_tail_source_ticks']) and
                 len(window['natural_tail_source_ticks']) <=
-                    (STADIUM_WHOLE_PAIRED_IDLE_PROFILE if self.stadium_whole_paired_idle else
+                    (self.paired_observation_profile() if self.stadium_whole_paired_idle else
                      STADIUM_WHOLE_LONG_IDLE_PROFILE)['natural_tail_max'],
                 'Whole Stadium long-idle profile lacks its actual GO+3500/natural DrawReturn window')
         return {
@@ -2687,7 +2711,7 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
             require(payload.get('stadium_whole_replay_binding_sha256') == self.replay_binding_sha256,
                     'Whole Stadium replay source announcement differs')
             if self.stadium_whole_long_idle:
-                expected_idle = (STADIUM_WHOLE_PAIRED_IDLE_PROFILE if self.stadium_whole_paired_idle else
+                expected_idle = (self.paired_observation_profile() if self.stadium_whole_paired_idle else
                                  STADIUM_WHOLE_LONG_IDLE_PROFILE)
                 require(payload.get('stadium_whole_long_idle') == expected_idle,
                         'Whole Stadium long-idle source profile announcement differs')
@@ -3356,7 +3380,7 @@ def stadium_whole_replay_complete(source, native_status, primary, primary_status
 def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, build_manifest,
                              target_path, setup_path, checkpoint_gc, dol, provenance, gci, timeout,
                              stadium_whole_b_state=False, stadium_whole_long_idle=False,
-                             stadium_whole_paired_idle=False, stadium_whole_stockout=False, stadium_whole_standings=False, stadium_whole_rng_window=None,
+                             stadium_whole_paired_idle=False, stadium_whole_paired_registration=False, stadium_whole_stockout=False, stadium_whole_standings=False, stadium_whole_rng_window=None,
                              stadium_whole_replay_binding=None,
                              stadium_whole_rng_coverage="rng_returns"):
     """Explicit private whole3/sidecar2 diagnostic using the existing passive route."""
@@ -3365,6 +3389,9 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
     require(type(stadium_whole_long_idle) is bool and
             (not stadium_whole_long_idle or stadium_whole_b_state),
             'Whole Stadium long-idle profile requires the B-state observation')
+    require(type(stadium_whole_paired_registration) is bool and
+            (not stadium_whole_paired_registration or stadium_whole_paired_idle),
+            'Paired registration requires explicit paired-idle route')
     require(type(stadium_whole_paired_idle) is bool,
             'Whole Stadium paired-idle profile option must be boolean')
     require(type(stadium_whole_standings) is bool and
@@ -3409,6 +3436,7 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
     output.mkdir()
     process=bounded_log=log=None
     report=dict(scope=('original-stadium-whole3-natural-stockout-v1' if stadium_whole_stockout else
+                       'original-stadium-paired-registration-v1' if stadium_whole_paired_registration else
                        'original-stadium-paired-idle-scene-endpoints-v1' if stadium_whole_paired_idle else
                        'original-stadium-whole3-feedback-allocation2'),result='fail',
                 endpoint_scope=('selected B: actual P1 four-stock losses, mode9 before elimination exit; no standings/lifecycle parity' if stadium_whole_stockout else
@@ -3421,7 +3449,8 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             input_contract='each source mode8 valid focus0/1 gets ordinary horizontal input; exact four-port consumes; neutral release before existing exit',
             standings_resource_limits=dict(STADIUM_CAPTURE_CAPS, observer_records=STADIUM_WHOLE_LONG_IDLE_RECORD_CAP))
     if stadium_whole_paired_idle:
-        report.update(endpoint_scope='two natural lifetimes; GO+3500 typed/four-port windows for matches0/1; only exact scene RNG endpoints; no full allocation/registration claim',
+        report.update(endpoint_scope=('two natural lifetimes; GO+3500 typed/four-port windows for matches0/1; selected GObj/GObjProc allocation/registration stream with eight joined scene RNG endpoints; registration semantics not yet validated' if stadium_whole_paired_registration else
+                       'two natural lifetimes; GO+3500 typed/four-port windows for matches0/1; only exact scene RNG endpoints; no full allocation/registration claim'),
                       input_contract='actual four-port neutral consumes retained for both actual GO-derived windows; natural pause/exit/Results/CSS order preserved')
     elif stadium_whole_long_idle and not stadium_whole_standings:
         report.update(endpoint_scope='three natural lifetimes; selected B GO+3500 and first later natural DrawReturn; no C3/per-owner ledger',
@@ -3454,7 +3483,9 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
         p1,p2,profile_inventory=prepare_rules_profile(profile,user)
         owned_gci=prepare_stadium_setup_gci_folder(checkpoint_gc,gci,output/'gci-folder',setup)
         allocation_profile=output/'allocation-profile.json'
-        allocation_profile.write_bytes(canonical(build_profile(Path(dol),ROOT/'.deps/melee/config/GALE01/symbols.txt')))
+        allocation_profile.write_bytes(stadium_whole_allocation_profile_bytes(
+            build_profile(Path(dol),ROOT/'.deps/melee/config/GALE01/symbols.txt'),
+            registration=stadium_whole_paired_registration))
         raw,status=output/'native-primary.mwro',output/'native-primary-status.json'
         native,native_status=output/'native-inputs.mwri',output/'native-input-status.json'
         env={k:v for k,v in os.environ.items() if not k.startswith(('MWRC_','DOLPHIN_','SDL_'))}
@@ -3463,8 +3494,8 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             MWRC_OUTPUT=str(raw),MWRC_STATUS=str(status),MWRC_INPUT_RECORD=str(native),
             MWRC_INPUT_STATUS=str(native_status),
             MWRC_WHOLE_SESSION_MATCHES='2' if stadium_whole_paired_idle else '3',
-            MWRC_CAPTURE_ID='stadium-whole-paired-idle' if stadium_whole_paired_idle else 'stadium-whole3',
-            MWRC_SEQUENCE_ID='primary2-paired-idle-scene-endpoints' if stadium_whole_paired_idle else 'primary3-allocation2-feedback',
+            MWRC_CAPTURE_ID='stadium-whole-paired-registration' if stadium_whole_paired_registration else 'stadium-whole-paired-idle' if stadium_whole_paired_idle else 'stadium-whole3',
+            MWRC_SEQUENCE_ID='primary2-paired-registration' if stadium_whole_paired_registration else 'primary2-paired-idle-scene-endpoints' if stadium_whole_paired_idle else 'primary3-allocation2-feedback',
             MWRC_ALLOCATION_OUTPUT=str(output/'native-allocations.jsonl'),
             MWRC_ALLOCATION_VS_TARGET='2',MWRC_ALLOCATION_STOP_AT='exit',
             MWRC_STADIUM_WHOLE_FEEDBACK='1',MWRC_STADIUM_WHOLE_SETUP_RECEIPT_SHA256=setup['sha256'])
@@ -3472,9 +3503,14 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             env['MWRC_STADIUM_WHOLE_B_STATE']='1'
         long_idle_compact_launch = None
         if stadium_whole_paired_idle:
-            env['MWRC_STADIUM_WHOLE_PAIRED_IDLE']=STADIUM_WHOLE_PAIRED_IDLE_PROFILE['profile']
-            env['MWRC_STADIUM_WHOLE_LONG_IDLE']=STADIUM_WHOLE_PAIRED_IDLE_PROFILE['profile']
-            env['MWRC_ALLOCATION_SCENE_ENDPOINT_PROFILE']=STADIUM_WHOLE_PAIRED_IDLE_PROFILE['profile']
+            paired_profile = (STADIUM_WHOLE_PAIRED_REGISTRATION_PROFILE if stadium_whole_paired_registration else STADIUM_WHOLE_PAIRED_IDLE_PROFILE)
+            env['MWRC_STADIUM_WHOLE_PAIRED_IDLE']=paired_profile['profile']
+            env['MWRC_STADIUM_WHOLE_LONG_IDLE']=paired_profile['profile']
+            if stadium_whole_paired_registration:
+                env['MWRC_ALLOCATION_PAIRED_REGISTRATION_PROFILE']=paired_profile['profile']
+                env['MWRC_ALLOCATION_MAX_EVENTS']='2000000'
+            else:
+                env['MWRC_ALLOCATION_SCENE_ENDPOINT_PROFILE']=paired_profile['profile']
             compact_env, long_idle_compact_launch = build_stadium_whole_long_idle_compact_launch(output, paired_idle=True)
             env.update(compact_env)
         elif stadium_whole_long_idle:
@@ -3493,6 +3529,7 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             stadium_whole_b_state=stadium_whole_b_state,
             stadium_whole_long_idle=stadium_whole_long_idle,
             stadium_whole_paired_idle=stadium_whole_paired_idle,
+            stadium_whole_paired_registration=stadium_whole_paired_registration,
             stadium_whole_stockout=stadium_whole_stockout,
             stadium_whole_standings=stadium_whole_standings)
         if stadium_whole_standings:
@@ -3524,7 +3561,9 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
                 caps=dict(STADIUM_CAPTURE_CAPS, observer_records=STADIUM_WHOLE_LONG_IDLE_RECORD_CAP),
                 per_owner_rng_comparison=False)
         if stadium_whole_paired_idle:
-            launch['stadium_whole_paired_idle'] = dict(STADIUM_WHOLE_PAIRED_IDLE_PROFILE)
+            launch['stadium_whole_paired_idle'] = dict(paired_profile)
+            if stadium_whole_paired_registration:
+                launch['stadium_whole_paired_registration'] = True
             launch['stadium_whole_long_idle_compact_launch'] = dict(long_idle_compact_launch)
             launch['caps'] = dict(observer_bytes=STADIUM_CAPTURE_CAPS['observer_bytes'],
                                   observer_records=STADIUM_WHOLE_LONG_IDLE_RECORD_CAP,
@@ -3564,7 +3603,7 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             driver_windows = list(receiver.long_idle_windows)
             source_windows, compact_summary = validate_stadium_paired_idle_outputs(
                 raw, status, output, long_idle_compact_launch, driver_windows,
-                env['MWRC_DOL_SHA256'])
+                env['MWRC_DOL_SHA256'], registration=stadium_whole_paired_registration)
             report['stadium_whole_paired_idle_windows'] = driver_windows
             report['stadium_whole_paired_idle_source_validation'] = source_windows
             report['stadium_paired_idle_compact_rng'] = compact_summary
@@ -3587,7 +3626,7 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             report['input_replay_status']=validate_status(native_status,mode='replay',
                 events=replay_source['summary']['events'],require_complete=True)
         if stadium_whole_paired_idle:
-            report['native']=validate_stadium_paired_idle_native(output,allocation_profile,expected)
+            report['native']=validate_stadium_paired_idle_native(output,allocation_profile,expected, registration=stadium_whole_paired_registration)
         else:
             report['native']=validate_stadium_three_native(output,allocation_profile,expected)
         if rng_window is not None:
@@ -3651,6 +3690,8 @@ def main(argv=None):
                         help="Whole3-only selected match1 constructor/actual-GO/state adjunct; terminal unchanged")
     parser.add_argument("--stadium-whole-long-idle", action="store_true",
                         help="Whole3 selected B: gate its existing pause on actual GO+3500 ticks and first later natural DrawReturn")
+    parser.add_argument("--stadium-whole-paired-registration", action="store_true",
+                        help="Paired-idle route only: explicit selected-pool v4 allocation/registration observation through two exits")
     parser.add_argument("--stadium-whole-paired-idle", action="store_true",
                         help="Two natural Stadium lifetimes with actual GO+3500 windows for both and scene RNG endpoints only")
     parser.add_argument("--stadium-whole-standings", action="store_true",

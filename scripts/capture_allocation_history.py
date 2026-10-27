@@ -11,6 +11,7 @@ import argparse
 import base64
 import datetime
 import json
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -1338,11 +1339,90 @@ def validate_stadium_paired_allocation_inventory(rows, header, footer):
             'repeated_stop_rows': repeated_count, 'row_limit': 65, 'event_limit': 64}
 
 
+PAIRED_REGISTRATION_PROFILE = 'paired_idle_registration_v1'
+PAIRED_REGISTRATION_PROFILE_SHA256 = 'd4dcc28edcf534586b3953d3235e8880173f6dbcd9ecb384e97991137646756e'
+
+
+PAIRED_REGISTRATION_FILTER = {'profile': 'selected-gobjproc-registration-v1', 'functions': ['gm_Scene_Vs_OnEnter', 'gm_Scene_Vs_OnExit', 'HSD_ObjAlloc', 'HSD_ObjFree', 'HSD_ObjAllocInit', '_HSD_ObjAllocForgetMemory', 'HSD_GObj_SetupProc', 'HSD_GObjProc_8038FAA8', 'HSD_GObjProc_8038FC18', 'HSD_GObjProc_8038FCE4', 'HSD_GObjProc_8038FE24'], 'pools': [{'symbol': 'gobj_alloc_data', 'address': 2152522636, 'size': 44}, {'symbol': 'gobjproc_alloc_data', 'address': 2152522680, 'size': 44}], 'parent_policy': 'selected-parent-or-refuse'}
+
+def exact_stadium_allocation_profile_hash(profile):
+    """Two generated source profiles; no caller-selected hash authority."""
+    expected = ('30e6ccc981d5e8eea6d5c88381bfc3df5a3b1103599c2b632ddb48580165bf65'
+                if profile.get('version') == 3 else PAIRED_REGISTRATION_PROFILE_SHA256
+                if profile.get('version') == 4 and profile.get('registration_profile') == 'gobjproc-registration-v1' else None)
+    actual = hashlib.sha256((json.dumps(profile, sort_keys=True, indent=2, allow_nan=False) + '\n').encode()).hexdigest()
+    if expected is None or actual != expected:
+        raise ValueError('Native Stadium allocation profile is not an exact generated v3/v4 identity')
+    return expected
+
+
+def validate_stadium_registration_scope(header, footer, profile):
+    """Broad stream identity only; never claims complete registration semantics."""
+    expected = PAIRED_REGISTRATION_PROFILE_SHA256
+    canonical = hashlib.sha256((json.dumps(profile, sort_keys=True, indent=2, allow_nan=False) + '\n').encode()).hexdigest()
+    if (profile.get('version') != 4 or profile.get('registration_profile') != 'gobjproc-registration-v1' or canonical != expected):
+        raise ValueError('Paired registration requires the exact generated v4 profile')
+    for row in (header, footer):
+        if (row.get('scope') != 'selected-gobjproc-registration' or
+                row.get('recording_filter') != PAIRED_REGISTRATION_FILTER or row.get('paired_registration_profile') != PAIRED_REGISTRATION_PROFILE or
+                row.get('profile_version') != 4 or row.get('registration_profile') != 'gobjproc-registration-v1' or
+                row.get('profile_sha256') != expected or row.get('scene_endpoint_profile') is not None or
+                row.get('allocation_history_complete') is not False or row.get('registration_lifetime_complete') is not False or
+                row.get('vs_target') != 2 or row.get('stop_at') != 'exit' or
+                row.get('max_events') != 2000000 or row.get('compression') != 'none'):
+            raise ValueError('Paired registration broad scope/profile/target/cap differs')
+    if (footer.get('status') != 'captured' or footer.get('target_complete') is not True or
+            footer.get('vs_entries') != 2 or footer.get('vs_exits') != 2 or
+            footer.get('active_owner') is not False or footer.get('pending_calls') != [] or
+            footer.get('error') is not None):
+        raise ValueError('Paired registration stream lacks its exact complete two exits')
+    if (type(footer.get('calls')) is not int or footer['calls'] < 0 or
+            footer.get('emitted_calls') != footer['calls'] or
+            type(footer.get('filtered_pool_calls')) is not int or footer['filtered_pool_calls'] < 0 or
+            type(footer.get('filtered_pool_repeated_stops')) is not int or footer['filtered_pool_repeated_stops'] < 0):
+        raise ValueError('Paired registration emitted/suppressed call accounting differs')
+    return expected
+
+
+def iter_stadium_registration_rows(path, inventory):
+    """Bounded streaming framing; callback registration semantics are a later reader."""
+    previous = -1; ended = False; counts = {}
+    with Path(path).open('rb') as source:
+        while True:
+            line = source.readline(65538)
+            if not line: break
+            if len(line) > 65537 or not line.endswith(b'\n') or ended:
+                raise ValueError('Paired registration row bound/framing differs')
+            row = json.loads(line.decode('utf-8'), object_pairs_hook=_paired_idle_json_object)
+            if (not isinstance(row, dict) or type(row.get('sequence')) is not int or
+                    row['sequence'] != previous + 1 or row['sequence'] > 2000000):
+                raise ValueError('Paired registration event sequence/cap differs')
+            kind = row.get('record')
+            if kind not in ('header', 'enter', 'return', 'repeated_stop', 'end') or (previous < 0) != (kind == 'header'):
+                raise ValueError('Paired registration record kind/framing differs')
+            previous = row['sequence']; ended = kind == 'end'
+            counts[kind] = counts.get(kind, 0) + 1
+            yield row
+    if not ended: raise ValueError('Paired registration final record missing')
+    inventory.update(row_count=previous + 1, record_counts=counts,
+                     registration_semantics_validated=False, allocation_history_complete=False,
+                     recording_scope='selected-gobjproc-registration')
+
+
 def validate_stadium_paired_allocation_environment(environment):
     """Join paired primary and allocation profiles before starting the producer."""
     paired = environment.get('MWRC_STADIUM_WHOLE_PAIRED_IDLE')
     endpoint = environment.get('MWRC_ALLOCATION_SCENE_ENDPOINT_PROFILE')
     long_idle = environment.get('MWRC_STADIUM_WHOLE_LONG_IDLE')
+    registration = environment.get('MWRC_ALLOCATION_PAIRED_REGISTRATION_PROFILE')
+    if registration not in (None, '') or paired == PAIRED_REGISTRATION_PROFILE or long_idle == PAIRED_REGISTRATION_PROFILE:
+        if not (registration == paired == long_idle == PAIRED_REGISTRATION_PROFILE and
+                endpoint in (None, '') and environment.get('MWRC_WHOLE_SESSION_MATCHES') == '2' and
+                environment.get('MWRC_STADIUM_WHOLE_FEEDBACK') == '1' and environment.get('MWRC_STADIUM_WHOLE_B_STATE') == '1' and
+                environment.get('MWRC_ALLOCATION_VS_TARGET') == '2' and environment.get('MWRC_ALLOCATION_STOP_AT') == 'exit' and
+                environment.get('MWRC_ALLOCATION_MAX_EVENTS') == '2000000'):
+            raise ValueError('Paired registration requires exact same-profile two-exit broad 2M scope')
+        return {'profile': PAIRED_REGISTRATION_PROFILE, 'match_count': 2, 'max_events': 2000000}
     if paired == 'paired_idle_scene_endpoints_v1':
         if (environment.get('MWRC_WHOLE_SESSION_MATCHES') != '2' or
                 endpoint != paired or long_idle != paired or
@@ -1393,7 +1473,8 @@ def validate_stadium_three_native(output, profile_path, expected):
     profile=json.loads(profile_path.read_text())
     decoded,header,footer,selected=validate_original_rng_scene_boundaries_stream(
         profile,iter_stadium_allocation_jsonl(output/'native-allocations.jsonl'))
-    if (header.get('profile_sha256')!='30e6ccc981d5e8eea6d5c88381bfc3df5a3b1103599c2b632ddb48580165bf65' or
+    expected_profile = exact_stadium_allocation_profile_hash(profile)
+    if (expected_profile is None or header.get('profile_sha256') != expected_profile or
             header.get('vs_target')!=2 or header.get('stop_at')!='exit'):
         raise ValueError('Native allocation scope differs from exact firsttwo exits')
     if decoded['sample_count']!=8:raise ValueError('Native allocation sample count differs')
@@ -1408,8 +1489,8 @@ def validate_stadium_three_native(output, profile_path, expected):
         'original_rng_scene_boundaries':decoded,'all_rng_writers_observed':False}
 
 
-def validate_stadium_paired_idle_native(output, profile_path, expected):
-    """Validate two natural primary lifetimes plus only their scene RNG endpoints."""
+def validate_stadium_paired_idle_native(output, profile_path, expected, *, registration=False):
+    """Validate natural lifetimes and endpoints; optional broad stream stays observational."""
     from whole_session_replay import capture_from_path
     from reference_observer_stream import iter_records
     from tools.allocation_lifetime_replay import validate_original_rng_scene_boundaries_stream
@@ -1421,22 +1502,28 @@ def validate_stadium_paired_idle_native(output, profile_path, expected):
             primary['declared_setups'] != [expected, expected]):
         raise ValueError('Native primary does not contain exactly two declared paired Stadium lifetimes')
     profile = json.loads(Path(profile_path).read_text())
-    allocation_rows = read_stadium_paired_allocation_rows(Path(output) / 'native-allocations.jsonl')
+    registration_inventory = {}
+    allocation_rows = (iter_stadium_registration_rows(Path(output) / 'native-allocations.jsonl', registration_inventory)
+                       if registration else read_stadium_paired_allocation_rows(Path(output) / 'native-allocations.jsonl'))
     decoded, header, footer, selected = validate_original_rng_scene_boundaries_stream(
         profile, allocation_rows)
-    expected_profile_sha256 = '30e6ccc981d5e8eea6d5c88381bfc3df5a3b1103599c2b632ddb48580165bf65'
-    validate_stadium_paired_allocation_scope(header, footer, expected_profile_sha256)
+    expected_profile_sha256 = exact_stadium_allocation_profile_hash(profile)
+    if registration:
+        validate_stadium_registration_scope(header, footer, profile)
+    else:
+        validate_stadium_paired_allocation_scope(header, footer, expected_profile_sha256)
     if (footer.get('status') != 'captured' or footer.get('target_complete') is not True or
             footer.get('vs_entries') != 2 or footer.get('vs_exits') != 2 or
             footer.get('active_owner') is not False or footer.get('pending_calls') != [] or
             decoded.get('sample_count') != 8 or len(selected) != 8):
         raise ValueError('Native paired endpoint stream lacks its exact eight natural callback records')
-    allocation_inventory = validate_stadium_paired_allocation_inventory(
-        allocation_rows, header, footer)
+    allocation_inventory = (registration_inventory if registration else
+        validate_stadium_paired_allocation_inventory(allocation_rows, header, footer))
     boundaries = [row for row in iter_records(primary_path) if row.get('event') == 'boundary']
     join_stadium_allocation_samples(selected, boundaries)
     return {
-        'scope': 'two natural Stadium lifetimes; scene RNG endpoints only',
+        'scope': ('two natural Stadium lifetimes; selected GObj/GObjProc allocation/registration observation only' if registration else
+                  'two natural Stadium lifetimes; scene RNG endpoints only'),
         'primary_identity': primary['identity'], 'primary_lifecycle': primary['lifecycle'],
         'primary_sha256': retail._sha256(primary_path),
         'native_allocations_sha256': retail._sha256(Path(output) / 'native-allocations.jsonl'),

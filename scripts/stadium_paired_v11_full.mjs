@@ -7,7 +7,14 @@ const seed=value=>typeof value==='string'&&/^[0-9a-f]{8}$/.test(value);
 export function derivePairedFull(p,recipeSha,frames,endpoints){
  if(p?.schema==='melee-web-stadium-stockout-pair-projection-v1')return deriveStockoutPair(p,recipeSha,frames,endpoints);
  need(p?.schema==='melee-web-stadium-paired-window-projection-v1'&&p.source_schedule_verified===true&&p.recipe_sha256===recipeSha&&p.actual_frame_count===frames&&p.matches?.length===2,'projection/recipe identity');
- need(endpoints?.result==='PASS_OFFLINE_POSTFLIGHT_REFERENCE_ONLY'&&endpoints.inputs_unchanged===true,'original endpoint postflight');
+ const registration=p.capture_profile==='paired_idle_registration_v1';
+ need(p.capture_profile===undefined||registration,'unknown original capture profile');
+ if(registration){
+  need(endpoints?.result==='pass'&&endpoints.scope==='original-stadium-paired-registration-v1'&&Array.isArray(endpoints.cleanup_errors)&&endpoints.cleanup_errors.length===0,'registration original live result');
+  need(['native-primary.mwro','native-allocations.jsonl','native-inputs.mwri'].every(name=>/^[0-9a-f]{64}$/.test(p.source_files?.[name]?.sha256||'')),'registration source hashes missing');
+  need(endpoints.input_stream?.complete===true&&endpoints.input_stream.sha256===p.source_files?.['native-inputs.mwri']?.sha256,'registration literal input producer differs');
+  need(typeof endpoints.native?.native_allocations_sha256==='string'&&endpoints.native.native_allocations_sha256===p.source_files?.['native-allocations.jsonl']?.sha256,'registration allocation producer differs');
+ }else need(endpoints?.result==='PASS_OFFLINE_POSTFLIGHT_REFERENCE_ONLY'&&endpoints.inputs_unchanged===true,'original endpoint postflight');
  need(endpoints.native?.primary_sha256===p.source_files?.['native-primary.mwro']?.sha256,'endpoint primary producer differs');
  for(const [name,identity]of Object.entries(p.source_files||{})){const other=endpoints.inputs?.[name];if(other)need(other.sha256===identity.sha256&&other.bytes===identity.bytes,'endpoint source role '+name);}
  const points=endpoints.native?.original_rng_scene_boundaries;

@@ -21,6 +21,19 @@ from tools import stadium_rng_compact_live as compact
 SCHEMA = "melee-web-stadium-paired-v11-rng-comparison-v1"
 ROW_SCHEMA = "melee-web-stadium-paired-v11-row-v1"
 require = semantics.require
+LEGACY_CAPTURE_ID = "stadium-whole-paired-idle"
+LEGACY_SEQUENCE_ID = "primary2-paired-idle-scene-endpoints"
+REGISTRATION_CAPTURE_PROFILE = "paired_idle_registration_v1"
+REGISTRATION_CAPTURE_ID = "stadium-whole-paired-registration"
+REGISTRATION_SEQUENCE_ID = "primary2-paired-registration"
+REGISTRATION_LAUNCH_PROFILE = {
+    "profile": REGISTRATION_CAPTURE_PROFILE,
+    "selected_matches": [0, 1],
+    "match_count": 2,
+    "comparison_post_go_ticks": 3500,
+    "natural_tail_max": 4,
+    "raw_omission_kinds": ["draw_enter", "draw_return"],
+}
 
 
 def read_json(path):
@@ -128,16 +141,51 @@ def load_reference(path, expected_sha):
     require(p["sha256"] == expected_sha, "projection SHA-256 differs")
     projection = read_json(path)
     pins = {}
+    pinned_source_bytes = {}
     for name, pin in projection["source_files"].items():
         source, data, sha = semantics._pin(pin, name)
         pins[name] = {"path": str(source), "bytes": len(data), "sha256": sha}
+        if name == "launch.json":
+            pinned_source_bytes[name] = data
     raw = Path(pins["stadium-whole-paired-compact-rng.mwrl"]["path"]).read_bytes()
     require(hashlib.sha256(raw).hexdigest() == projection["compact_sha256"],
             "projection compact identity differs")
-    decoded = compact.decode_live_compact(raw, capture_id="stadium-whole-paired-idle",
-        sequence_id="primary2-paired-idle-scene-endpoints", dol_sha256=compact.DOL,
+    compact_capture_id, compact_sequence_id = _compact_profile_identity(
+        projection, pins, pinned_source_bytes)
+    decoded = compact.decode_live_compact(raw, capture_id=compact_capture_id,
+        sequence_id=compact_sequence_id, dol_sha256=compact.DOL,
         primary_status=read_json(pins["native-primary-status.json"]["path"]))
     return derive_windows(projection, decoded), {"projection": p, "original_sources": pins}
+
+
+def _compact_profile_identity(projection, pins, pinned_source_bytes):
+    """Select one fixed compact identity from the authenticated launch profile.
+
+    Historical projections omitted ``capture_profile`` and keep their old
+    compact tuple. The registration profile is a separate explicit opt-in;
+    its marker, pinned launch object, and compact tuple must all agree.
+    """
+    if "capture_profile" not in projection:
+        launch_pin = pins.get("launch.json")
+        if launch_pin is not None:
+            launch = semantics.parse_json(pinned_source_bytes["launch.json"], "pinned launch.json")
+            launch_profile = launch.get("stadium_whole_paired_idle")
+            require(launch.get("stadium_whole_paired_registration") is not True and
+                    not (isinstance(launch_profile, dict) and
+                         launch_profile.get("profile") == REGISTRATION_CAPTURE_PROFILE),
+                    "registration launch is missing its projection capture_profile marker")
+        return LEGACY_CAPTURE_ID, LEGACY_SEQUENCE_ID
+
+    require(projection.get("capture_profile") == REGISTRATION_CAPTURE_PROFILE,
+            "projection capture_profile is unsupported")
+    launch_pin = pins.get("launch.json")
+    require(launch_pin is not None, "registration projection lacks its pinned launch.json")
+    launch = semantics.parse_json(pinned_source_bytes["launch.json"], "pinned launch.json")
+    require(launch.get("stadium_whole_paired_idle") == REGISTRATION_LAUNCH_PROFILE,
+            "pinned launch paired-idle profile differs from exact registration profile")
+    require(launch.get("stadium_whole_paired_registration") is True,
+            "pinned launch lacks explicit paired-registration opt-in")
+    return REGISTRATION_CAPTURE_ID, REGISTRATION_SEQUENCE_ID
 
 
 def completed_actions(rows, matches):

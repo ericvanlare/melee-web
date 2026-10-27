@@ -161,6 +161,7 @@ struct CallFrame
   u32 argc = 0;
   bool has_parent = false;
   u32 parent = 0;
+  bool record_selected = true;
 };
 
 struct ThreadStack
@@ -218,6 +219,9 @@ struct State
   u32 vs_exits = 0;
   bool stop_at_exit = false;
   bool scene_endpoint_profile = false;
+  bool paired_registration_profile = false;
+  u64 filtered_pool_calls = 0;
+  u64 filtered_pool_repeated_stops = 0;
   std::array<u32, 2> scene_endpoint_functions{};
   bool target_complete = false;
   bool active_owner = false;
@@ -475,6 +479,58 @@ private:
   std::array<Bytef, 64 * 1024> compressed_{};
 };
 
+bool PairedRegistrationFunctionSelected(std::string_view function)
+{
+  return function == "gm_Scene_Vs_OnEnter" ||
+         function == "gm_Scene_Vs_OnExit" ||
+         function == "HSD_ObjAlloc" ||
+         function == "HSD_ObjFree" ||
+         function == "HSD_ObjAllocInit" ||
+         function == "_HSD_ObjAllocForgetMemory" ||
+         function == "HSD_GObj_SetupProc" ||
+         function == "HSD_GObjProc_8038FAA8" ||
+         function == "HSD_GObjProc_8038FC18" ||
+         function == "HSD_GObjProc_8038FCE4" ||
+         function == "HSD_GObjProc_8038FE24";
+}
+
+bool PairedRegistrationRecordSelected(std::string_view function, u32 pool)
+{
+  if (!PairedRegistrationFunctionSelected(function))
+    return false;
+  if (function == "HSD_ObjAlloc" || function == "HSD_ObjFree" || function == "HSD_ObjAllocInit")
+    return pool == 0x804ce38c || pool == 0x804ce3b8;
+  return true;
+}
+
+bool PairedRegistrationParentAllowed(bool selected, bool has_parent, bool parent_selected)
+{
+  return !selected || !has_parent || parent_selected;
+}
+
+std::string_view PairedRegistrationFilterJson()
+{
+  return R"(,"recording_filter":{"profile":"selected-gobjproc-registration-v1","functions":["gm_Scene_Vs_OnEnter","gm_Scene_Vs_OnExit","HSD_ObjAlloc","HSD_ObjFree","HSD_ObjAllocInit","_HSD_ObjAllocForgetMemory","HSD_GObj_SetupProc","HSD_GObjProc_8038FAA8","HSD_GObjProc_8038FC18","HSD_GObjProc_8038FCE4","HSD_GObjProc_8038FE24"],"pools":[{"symbol":"gobj_alloc_data","address":2152522636,"size":44},{"symbol":"gobjproc_alloc_data","address":2152522680,"size":44}],"parent_policy":"selected-parent-or-refuse"})";
+}
+
+bool PairedRegistrationCaptureScopeAgree(std::string_view registration, std::string_view profile_sha256)
+{
+  const auto exact = [](const char* key, std::string_view expected) {
+    const char* value = std::getenv(key);
+    return value && std::string_view(value) == expected;
+  };
+  const char* endpoint_value = std::getenv("MWRC_ALLOCATION_SCENE_ENDPOINT_PROFILE");
+  return !(registration != "paired_idle_registration_v1" ||
+          (endpoint_value && *endpoint_value) ||
+          !exact("MWRC_STADIUM_WHOLE_PAIRED_IDLE", "paired_idle_registration_v1") ||
+          !exact("MWRC_STADIUM_WHOLE_LONG_IDLE", "paired_idle_registration_v1") ||
+          !exact("MWRC_WHOLE_SESSION_MATCHES", "2") ||
+          !exact("MWRC_STADIUM_WHOLE_FEEDBACK", "1") || !exact("MWRC_STADIUM_WHOLE_B_STATE", "1") ||
+          !exact("MWRC_ALLOCATION_VS_TARGET", "2") || !exact("MWRC_ALLOCATION_STOP_AT", "exit") ||
+          !exact("MWRC_ALLOCATION_MAX_EVENTS", "2000000") ||
+          profile_sha256 != "d4dcc28edcf534586b3953d3235e8880173f6dbcd9ecb384e97991137646756e");
+}
+
 class Backend
 {
 public:
@@ -554,7 +610,8 @@ public:
     std::string header =
         "{\"record\":\"header\",\"schema\":\"melee-web-original-allocation-history\","
         "\"version\":1,\"original_rng_scene_boundaries_v1\":true,\"start\":\"original_dol_entry\",\"scope\":\"" +
-        std::string(state_.scene_endpoint_profile ? "scene-rng-endpoints-only" : "vs_ownership") +
+        std::string(state_.scene_endpoint_profile ? "scene-rng-endpoints-only" :
+                    state_.paired_registration_profile ? "selected-gobjproc-registration" : "vs_ownership") +
         "\",\"vs_target\":";
     if (!AppendNumber(&header, state_.vs_target) || !Append(&header, ",\"stop_at\":\"") ||
         !Append(&header, state_.stop_at_exit ? "exit" : "entry") ||
@@ -572,6 +629,17 @@ public:
         !Append(&header, ",\"scene_endpoint_profile\":\"paired_idle_scene_endpoints_v1\",\"allocation_history_complete\":false,\"registration_lifetime_complete\":false,\"selected_functions\":[\"gm_Scene_Vs_OnEnter\",\"gm_Scene_Vs_OnExit\"]"))
     {
       Fail("allocation observer endpoint header exceeded its bound");
+      return false;
+    }
+    if (state_.paired_registration_profile &&
+        !Append(&header, ",\"paired_registration_profile\":\"paired_idle_registration_v1\",\"registration_profile\":\"gobjproc-registration-v1\",\"profile_version\":4,\"allocation_history_complete\":false,\"registration_lifetime_complete\":false"))
+    {
+      Fail("allocation observer registration header exceeded its bound");
+      return false;
+    }
+    if (state_.paired_registration_profile && !Append(&header, PairedRegistrationFilterJson()))
+    {
+      Fail("allocation observer registration filter header exceeded its bound");
       return false;
     }
     if (!Append(&header, ",\"initial_pc\":"))
@@ -635,7 +703,8 @@ public:
     const FunctionIdentity* function = FindEntry(state_.profile, pc, &index);
     if (!function)
       function = FindReturn(state_.profile, pc, &index);
-    return function && (!state_.scene_endpoint_profile || IsSceneEndpoint(index));
+    return function && (!state_.scene_endpoint_profile || IsSceneEndpoint(index)) &&
+           (!state_.paired_registration_profile || PairedRegistrationFunctionSelected(function->name));
   }
 
   bool IsSceneEndpoint(u32 index) const
@@ -670,6 +739,8 @@ public:
     if (!function)
       return;
     if (state_.scene_endpoint_profile && !IsSceneEndpoint(function_index))
+      return;
+    if (state_.paired_registration_profile && !PairedRegistrationFunctionSelected(function->name))
       return;
     u32 instruction = 0;
     if (!ReadWord(system, pc, &instruction) ||
@@ -728,6 +799,13 @@ public:
       call = frame.call;
     }
 
+    const bool record_selected = !state_.paired_registration_profile ||
+        PairedRegistrationRecordSelected(function->name, argc ? args[0] : 0);
+    if (entering && state_.paired_registration_profile &&
+        !PairedRegistrationParentAllowed(record_selected, stack->depth != 0,
+            !stack->depth || stack->frames[stack->depth - 1].record_selected))
+      return Fail("selected registration call has a filtered pool parent");
+
     std::string observed;
     if (!BuildObserved(system, function->name, args, argc, entering ? nullptr : &state->gpr[3], state,
                         &observed))
@@ -744,7 +822,10 @@ public:
     {
       if (++state_.last_stop.repeats > 32)
         return Fail("allocation observer repeated boundary did not make progress");
-      ++state_.repeated_stops;
+      if (record_selected)
+        ++state_.repeated_stops;
+      else
+        ++state_.filtered_pool_repeated_stops;
       std::string repeated = "{\"record\":\"repeated_stop\",\"original_sequence\":";
       if (!AppendNumber(&repeated, state_.last_stop.sequence) || Append(&repeated, ",\"function\":\"") == false ||
           !Append(&repeated, JsonEscape(function->name)) || Append(&repeated, "\",\"phase\":\"") == false ||
@@ -752,7 +833,8 @@ public:
           !Append(&repeated, machine_json) || Append(&repeated, ",\"observed\":") == false ||
           !Append(&repeated, observed) || !Append(&repeated, "}"))
         return Fail("allocation observer repeated-stop record exceeded its bound");
-      Emit(std::move(repeated));
+      if (record_selected)
+        Emit(std::move(repeated));
       return;
     }
 
@@ -789,7 +871,7 @@ public:
     if (!Append(&row, "}"))
       return Fail("allocation observer event exceeded its bound");
     const u64 sequence = state_.next_sequence.load(std::memory_order_relaxed);
-    if (!Emit(std::move(row)))
+    if (record_selected && !Emit(std::move(row)))
       return;
     state_.last_stop = {true, sequence, function_index, key, stop_state, 0};
     if (entering)
@@ -797,8 +879,11 @@ public:
       if (stack->depth == kMaxDepth)
         return Fail("allocation observer call depth exceeded");
       stack->frames[stack->depth++] = {function_index, call, thread, sp, lr, args, argc,
-                                       has_parent, parent};
-      ++state_.call_count;
+                                       has_parent, parent, record_selected};
+      if (record_selected)
+        ++state_.call_count;
+      else
+        ++state_.filtered_pool_calls;
     }
     else
     {
@@ -876,6 +961,17 @@ private:
     state_.vs_target = 1;
     state_.stop_at_exit = false;
     state_.max_events = kMaxEvents;
+    const char* registration = std::getenv("MWRC_ALLOCATION_PAIRED_REGISTRATION_PROFILE");
+    if (registration && *registration)
+    {
+      if (!PairedRegistrationCaptureScopeAgree(registration,
+              state_.profile.profile_sha256 ? state_.profile.profile_sha256 : ""))
+      {
+        Fail("paired registration requires its exact broad v4/two-exit/2M capture profile");
+        return false;
+      }
+      state_.paired_registration_profile = true;
+    }
     const char* endpoint = std::getenv("MWRC_ALLOCATION_SCENE_ENDPOINT_PROFILE");
     if (endpoint && *endpoint)
     {
@@ -1646,10 +1742,12 @@ private:
     {
       for (size_t index = 0; index < stack.depth; ++index)
       {
+        const CallFrame& frame = stack.frames[index];
+        if (!frame.record_selected)
+          continue;
         if (!first)
           result += ",";
         first = false;
-        const CallFrame& frame = stack.frames[index];
         result += "{\"call\":" + std::to_string(frame.call) + ",\"function\":\"" +
                   JsonEscape(FunctionAt(state_.profile, frame.function_index)->name) +
                   "\",\"thread\":" + std::to_string(frame.thread) + ",\"sp\":" +
@@ -1801,6 +1899,8 @@ private:
             end += "null";
           else
             end += "\"" + JsonEscape(error) + "\"";
+          if (state_.paired_registration_profile)
+            end += std::string(",\"paired_registration_profile\":\"paired_idle_registration_v1\",\"registration_profile\":\"gobjproc-registration-v1\",\"profile_version\":4,\"allocation_history_complete\":false,\"registration_lifetime_complete\":false,\"profile_sha256\":\"") + state_.profile.profile_sha256 + "\"";
           if (state_.scene_endpoint_profile)
           {
             end += std::string(",\"original_rng_scene_boundaries_v1\":true,\"scene_endpoint_profile\":\"paired_idle_scene_endpoints_v1\",\"scope\":\"scene-rng-endpoints-only\",\"profile_sha256\":\"") +
@@ -1817,7 +1917,14 @@ private:
           }
           else
           {
-            end += ",\"original_rng_scene_boundaries_v1\":true,\"scope\":\"vs_ownership\",\"vs_target\":" +
+            if (state_.paired_registration_profile)
+              end += std::string(PairedRegistrationFilterJson()) + ",\"filtered_pool_calls\":" +
+                     std::to_string(state_.filtered_pool_calls) + ",\"emitted_calls\":" +
+                     std::to_string(state_.call_count) + ",\"filtered_pool_repeated_stops\":" +
+                     std::to_string(state_.filtered_pool_repeated_stops);
+            end += ",\"original_rng_scene_boundaries_v1\":true,\"scope\":\"" +
+                   std::string(state_.paired_registration_profile ? "selected-gobjproc-registration" : "vs_ownership") +
+                   "\",\"vs_target\":" +
                    std::to_string(state_.vs_target) + ",\"stop_at\":\"" +
                    (state_.stop_at_exit ? "exit" : "entry") + "\",\"max_events\":" +
                    std::to_string(state_.max_events) + ",\"compression\":\"" +

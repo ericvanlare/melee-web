@@ -12,5 +12,5 @@ class StadiumRegistrationBrowserTests(unittest.TestCase):
         script = Path(__file__).with_name('stadium_registration_browser.test.mjs')
         result = subprocess.run([node, '--test', str(script)], capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('# pass 4', result.stdout)
+        self.assertIn('# pass 5', result.stdout)
         self.assertIn('# fail 0', result.stdout)

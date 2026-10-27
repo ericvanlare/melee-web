@@ -261,7 +261,7 @@ struct StadiumWholeBObservation
 // per-window state machine sequentially for selected matches0 and1.
 struct StadiumWholeLongIdle
 {
-  bool enabled = false, paired = false, open = false, target_seen = false, closed = false;
+  bool enabled = false, paired = false, registration = false, open = false, target_seen = false, closed = false;
   u32 owner = 0, go_tick = 0, last_tick = 0, samples = 0;
   u32 active_match = 1, completed_windows = 0;
   std::array<u32, 2> paired_go_ticks{}, paired_samples{};
@@ -275,7 +275,7 @@ struct StadiumWholeLongIdle
   {
     if (setting.empty()) return true;
     if (paired)
-      return setting == "paired_idle_scene_endpoints_v1" && whole && b_state &&
+      return (setting == "paired_idle_scene_endpoints_v1" || setting == "paired_idle_registration_v1") && whole && b_state &&
           recording && !replaying && !short_rng && compact_valid &&
           compact_selection == "0,1";
     return setting == "selected_b_3500_v1" && whole && b_state && recording &&
@@ -283,6 +283,8 @@ struct StadiumWholeLongIdle
   }
   std::string ProfileJson() const
   {
+    if (paired && registration)
+      return R"({"profile":"paired_idle_registration_v1","selected_matches":[0,1],"match_count":2,"comparison_post_go_ticks":3500,"natural_tail_max":4,"raw_omission_kinds":["draw_enter","draw_return"]})";
     if (paired)
       return R"({"profile":"paired_idle_scene_endpoints_v1","selected_matches":[0,1],"match_count":2,"comparison_post_go_ticks":3500,"natural_tail_max":4,"raw_omission_kinds":["draw_enter","draw_return"]})";
     return R"({"profile":"selected_b_3500_v1","selected_matches":[1],"comparison_post_go_ticks":3500,"natural_tail_max":4,"raw_omission_kinds":["draw_enter","draw_return"]})";
@@ -1015,8 +1017,8 @@ u32 WholeSessionMatchCount()
     if (result > WHOLE_SESSION_MAX_MATCHES)
       return 0;
   }
-  const bool paired_idle = Env("MWRC_STADIUM_WHOLE_PAIRED_IDLE") ==
-                           "paired_idle_scene_endpoints_v1";
+  const bool paired_idle = (Env("MWRC_STADIUM_WHOLE_PAIRED_IDLE") == "paired_idle_scene_endpoints_v1" ||
+                            Env("MWRC_STADIUM_WHOLE_PAIRED_IDLE") == "paired_idle_registration_v1");
   return result >= WHOLE_SESSION_MIN_MATCHES ||
          (result == 2 && paired_idle) ||
          (result == 1 && (Env("MWRC_ENTITY_PROFILE") == "jiggly-ice-mario-fox-v1" ||
@@ -1025,16 +1027,24 @@ u32 WholeSessionMatchCount()
 
 bool PairedIdleStartupProfilesAgree(bool paired_idle, u32 match_count,
                                     std::string_view allocation_endpoint_profile,
-                                    std::string_view long_idle_profile)
+                                    std::string_view long_idle_profile,
+                                    std::string_view registration_profile = std::string_view(),
+                                    std::string_view event_cap = std::string_view(),
+                                    std::string_view vs_target = std::string_view(),
+                                    std::string_view stop_at = std::string_view())
 {
+  if (!registration_profile.empty())
+    return paired_idle && match_count == 2 && allocation_endpoint_profile.empty() &&
+           registration_profile == "paired_idle_registration_v1" &&
+           long_idle_profile == registration_profile && event_cap == "2000000" &&
+           vs_target == "2" && stop_at == "exit";
   if (paired_idle)
-  {
     return match_count == 2 &&
            allocation_endpoint_profile == "paired_idle_scene_endpoints_v1" &&
            long_idle_profile == "paired_idle_scene_endpoints_v1";
-  }
   return allocation_endpoint_profile.empty() &&
-         long_idle_profile != "paired_idle_scene_endpoints_v1";
+         long_idle_profile != "paired_idle_scene_endpoints_v1" &&
+         long_idle_profile != "paired_idle_registration_v1";
 }
 
 bool ValidIdentity(std::string_view value)
@@ -1414,15 +1424,20 @@ struct Observer::Impl
     }
     const std::string paired_idle_setting = Env("MWRC_STADIUM_WHOLE_PAIRED_IDLE");
     if (!paired_idle_setting.empty() &&
-        paired_idle_setting != "paired_idle_scene_endpoints_v1")
+        paired_idle_setting != "paired_idle_scene_endpoints_v1" &&
+        paired_idle_setting != "paired_idle_registration_v1")
       return SetInvalid("Stadium paired-idle profile identity differs"), false;
-    stadium_whole_paired_idle = paired_idle_setting == "paired_idle_scene_endpoints_v1";
+    stadium_whole_paired_idle = !paired_idle_setting.empty();
     whole_session_matches = WholeSessionMatchCount();
     const std::string allocation_endpoint_profile =
         Env("MWRC_ALLOCATION_SCENE_ENDPOINT_PROFILE");
     const std::string long_idle_profile = Env("MWRC_STADIUM_WHOLE_LONG_IDLE");
     if (!PairedIdleStartupProfilesAgree(stadium_whole_paired_idle, whole_session_matches,
-                                        allocation_endpoint_profile, long_idle_profile))
+                                        allocation_endpoint_profile, long_idle_profile,
+                                        Env("MWRC_ALLOCATION_PAIRED_REGISTRATION_PROFILE"),
+                                        Env("MWRC_ALLOCATION_MAX_EVENTS"),
+                                        Env("MWRC_ALLOCATION_VS_TARGET"), Env("MWRC_ALLOCATION_STOP_AT")) ||
+        (stadium_whole_paired_idle && paired_idle_setting != long_idle_profile))
       return SetInvalid("Stadium paired-idle and allocation endpoint profiles must agree at startup"), false;
     const std::string stadium_go_prefix_setting = Env("MWRC_STADIUM_GO_PREFIX");
     if (!stadium_go_prefix_setting.empty() && stadium_go_prefix_setting != "1")
@@ -1491,10 +1506,11 @@ struct Observer::Impl
         stadium_whole_b.enabled, InputStream::IsRecording(), InputStream::IsReplaying(),
         whole_rng_returns || whole_replay, long_idle_compact.present && long_idle_compact.valid,
         long_idle_compact.selection, stadium_whole_paired_idle) ||
-        (stadium_whole_paired_idle && long_idle_setting != "paired_idle_scene_endpoints_v1"))
+        (stadium_whole_paired_idle && long_idle_setting != paired_idle_setting))
       return SetInvalid("Whole Stadium idle profile requires its exact selected-match recording/compact ledger and no short RNG/replay"), false;
     stadium_whole_long_idle.enabled = !long_idle_setting.empty();
     stadium_whole_long_idle.paired = stadium_whole_paired_idle;
+    stadium_whole_long_idle.registration = paired_idle_setting == "paired_idle_registration_v1";
     stadium_whole_long_idle.active_match = stadium_whole_paired_idle ? 0 : 1;
     const std::string constructor_setting = Env("MWRC_STADIUM_CONSTRUCTOR_OWNER");
     if ((!constructor_setting.empty() && constructor_setting != "1") ||
