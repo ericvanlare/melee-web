@@ -820,6 +820,10 @@ async function pairedFullPhase(){
    await drainPairedFull();
    report.paired_v11_full_pair.comparison=pairedFullComparison.finish(status);
    report.paired_v11_full_pair.rng_comparison=runPairedFullRngComparison(true);
+   // Both the actual stream comparator and strict semantic RNG tool passed.
+   // This is selected-action coverage, never replay-frame cursor coverage.
+   report.rng_draw_probe={...report.rng_draw_probe,complete:true,
+     captured_action_count:pairedFullExpected.total};
    // Ordinary completion performs its existing checked unload and evidence write.
    // If the callback has not completed yet, wait; do not issue a second unload.
    while(Date.now()<deadline){
@@ -1220,7 +1224,6 @@ try {
     pairedFullExpected=derivePairedFull(JSON.parse(projection.raw),report.inputs.recipe.sha256,report.recipe_header.frames,JSON.parse(endpoints.raw));
     pairedFullComparison=new PairedFullComparator(pairedFullExpected);
     report.inputs.paired_full_projection=projection.identity;report.inputs.paired_full_endpoints=endpoints.identity;
-    rngDrawProbe=pairedFullExpected.selection;
     report.paired_v11_full_pair={component_pass:false,scope:'actual two-window source lifecycle; C3/all-writer/registration false'};
     pairedFullOriginalPreflight=runPairedFullRngComparison(false);
     report.paired_v11_full_pair.original_rng_preflight=pairedFullOriginalPreflight;
@@ -1240,6 +1243,15 @@ try {
     throw Error('MWRC header differs from the frozen diagnostic recipe identity');
   if (rngDrawProbe && rngDrawProbe.selected.some(cursor => cursor >= report.recipe_header.frames))
     throw Error('RNG draw probe cursor must be inside the source recipe frame count');
+  // Full mode selects actual source actions, not replay input-frame cursors.
+  // Keep generic cursor validation intact, then install the admitted action range.
+  if(pairedFull){
+    rngDrawProbe=pairedFullExpected.selection;
+    report.rng_draw_probe={scope:'paired-v11-global-diagnostic-action-index',
+      source_coordinate_scope:'actual source tick/draw actions across two worlds',
+      request:rngDrawProbe.request,requested_action_count:pairedFullExpected.total,
+      complete:false,artifact:'paired-v11-full-rng.jsonl'};
+  }
   if (captureCpuObservations && report.recipe_header.version !== 9)
     throw Error('--cpu-observations is restricted to MWRC v9 second-match diagnostics');
   if (hitTransitionProbe && (report.recipe_header.version !== 10 ||
@@ -2331,7 +2343,7 @@ try {
       try{
        report.artifact_inventory_post=await browserArtifactInventory();
        if(!report.artifact_inventory_post.equal||JSON.stringify(report.artifact_inventory_post)!==JSON.stringify(report.artifact_inventory_pre))throw Error('Paired full served/local inventory changed');
-       if(!report.paired_v11_full_pair.component_pass||report.cleanup?.browser_close_returned!==true)throw Error('Paired full completion/owned close incomplete');
+       if(!report.paired_v11_full_pair.component_pass||report.rng_draw_probe?.complete!==true||report.cleanup?.browser_close_returned!==true)throw Error('Paired full completion/owned close incomplete');
       }catch(error){firstError('paired_full_finalization',error.message||error);report.result='fail';}
     }
     if(pairedFirstGo){

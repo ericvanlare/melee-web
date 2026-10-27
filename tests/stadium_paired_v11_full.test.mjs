@@ -73,10 +73,14 @@ test('actual full harness phase waits for ordinary completion retirement without
   page:{evaluate:async()=>true,locator:label=>({click:async()=>clicks.push(label)})},
   report:{paired_v11_full_pair:{}},pageErrors:[],drainPairedFull:async()=>drains++,
   readPairedFirstGoStatus:async()=>++observations===1?{busy:false,status:{schema:'melee-web-stadium-paired-v11-full-pair-v1',whole_session_complete:true,failed:false}}:{busy:false,status:{native_retired:true},phase:0,running:0},
+  pairedFullExpected:{total:14394},
   pairedFullComparison:{finish:()=>({pass:true})},runPairedFullRngComparison:()=>({status:'PASS_SELECTED_RNG_COMPARISON'})};
  vm.createContext(ctx);vm.runInContext(source.slice(start,end+2),ctx);await ctx.pairedFullPhase();
- assert.deepEqual(clicks,['#retail-replay-start']);assert.equal(drains,2);assert.equal(writes.length,2);assert.equal(ctx.report.paired_v11_full_pair.component_pass,true);
+ assert.deepEqual(clicks,['#retail-replay-start']);assert.equal(drains,2);assert.equal(writes.length,2);assert.equal(ctx.report.paired_v11_full_pair.component_pass,true);assert.equal(ctx.report.rng_draw_probe.complete,true);assert.equal(ctx.report.rng_draw_probe.captured_action_count,14394);
  const bad={...ctx,report:{paired_v11_full_pair:{}},readPairedFirstGoStatus:async()=>({busy:true,runtime:{terminal_error:'actual native refusal'}})};vm.createContext(bad);vm.runInContext(source.slice(start,end+2),bad);await assert.rejects(bad.pairedFullPhase(),/actual native refusal/);assert.notEqual(bad.report.paired_v11_full_pair.component_pass,true);
+ const semanticFailure={...ctx,report:{paired_v11_full_pair:{},rng_draw_probe:{complete:false}},runPairedFullRngComparison:()=>{throw Error('actual semantic RNG mismatch');},readPairedFirstGoStatus:async()=>({busy:false,status:{schema:'melee-web-stadium-paired-v11-full-pair-v1',whole_session_complete:true,failed:false}})};
+ vm.createContext(semanticFailure);vm.runInContext(source.slice(start,end+2),semanticFailure);await assert.rejects(semanticFailure.pairedFullPhase(),/actual semantic RNG mismatch/);assert.equal(semanticFailure.report.rng_draw_probe.complete,false);
+
 });
 
 test('actual complete CLI prelude admits only the bounded full artifact route',async()=>{
@@ -91,6 +95,15 @@ test('actual complete CLI prelude admits only the bounded full artifact route',a
  parseArgs:o=>parseArgs({...o,args}),resolveCaptureMode:mode=>({mode,diagnostic:false}),incidentRecordingUrl:s=>new URL(s),
  parseRngDrawProbe:()=>null,parseHitTransitionProbe:()=>null,NATURAL_PAUSE_PROTOCOL:{},STOPPED_SCENE_PAIR_PROTOCOL:{},OBSERVED_B_REFERENCE:{id:'observed'},LONG_B_REFERENCE:{id:'long'}};
  vm.createContext(ctx);return vm.runInContext('(async()=>{'+prelude+';return {pairedFull,inputPaths,artifactRoot};})()',ctx);}
+ // Execute the actual generic guard and following full-mode action admission.
+ const guardStart=source.indexOf('  if (rngDrawProbe && rngDrawProbe.selected.some(cursor => cursor >= report.recipe_header.frames))');
+ const guardEnd=source.indexOf('  if (captureCpuObservations',guardStart);
+ assert.ok(guardStart>=0&&guardEnd>guardStart);
+ const headerGuard=source.slice(guardStart,guardEnd);
+ const actionSelection={request:{kind:'range',first:0,last:14393},selected:Array.from({length:14394},(_,i)=>i)};
+ const full={pairedFull:true,pairedFullExpected:{total:14394,selection:actionSelection},rngDrawProbe:null,report:{recipe_header:{frames:8154}}};vm.createContext(full);vm.runInContext(headerGuard,full);
+ assert.equal(full.rngDrawProbe.selected.length,14394);assert.equal(full.report.rng_draw_probe.requested_action_count,14394);assert.equal(full.report.rng_draw_probe.complete,false);assert.equal(full.report.rng_draw_probe.scope,'paired-v11-global-diagnostic-action-index');
+ for(const cursor of [8153,8154]){const ordinary={pairedFull:false,rngDrawProbe:{selected:[cursor]},report:{recipe_header:{frames:8154}}};vm.createContext(ordinary);if(cursor===8153)vm.runInContext(headerGuard,ordinary);else assert.throws(()=>vm.runInContext(headerGuard,ordinary),/inside the source recipe frame count/);}
  const admitted=await run(base);assert.equal(admitted.pairedFull,true);assert.equal(admitted.artifactRoot,'/artifacts');assert.ok(admitted.inputPaths.includes('/projection')&&admitted.inputPaths.includes('/endpoints'));
  for(const flag of ['--artifact-root','--runtime-data','--stadium-paired-v11-full-pair-endpoints']){const args=[...base],i=args.indexOf(flag);args.splice(i,2);await assert.rejects(run(args),/Paired full requires/);}
  for(const flag of ['--phase-timeout','--replay-timeout']){const args=[...base];args[args.indexOf(flag)+1]='150001';await assert.rejects(run(args),/Paired full requires/);}
