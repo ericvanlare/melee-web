@@ -441,7 +441,7 @@ function laterBSeed(row) {
     Number.parseInt(row.pointer_hex,16)===row.value_address, 'original seed owner is malformed');
   return row.value_hex;
 }
-function typedOriginalValues(fields,tick) {
+export function typedOriginalValues(fields,tick) {
   const values=commonOriginalValues(fields,tick),map=fields.map2,title=fields.title;
   Object.assign(values, {
     map2_gate_mask_40: requiredBoolean(map.gate_mask_40, 'map2.gate_mask_40'),

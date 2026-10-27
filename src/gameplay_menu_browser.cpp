@@ -678,6 +678,34 @@ struct MatchedSetupCfState {
  std::string error,last_action_json;
 };
 MatchedSetupCfState matched_setup_cf;
+struct StadiumPairedV11State {
+ bool route_prepared=false,import_pending=false,import_consumed=false,later_exit_observed=false;
+ const melee_web::RetailReplayRecipe* recipe_owner=nullptr;
+ const melee_web::RetailReplayInitialCssContext* context_owner=nullptr;
+ const MeleeWebMenuHost* route_host_owner=nullptr;
+ const MeleeWebPadState* ready_input=nullptr;
+ std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> ready_input_bytes{};
+ uint32_t* parent_seed_owner=nullptr;
+ uint32_t parent_seed=0,requested_generation=0;
+ MeleeWebMenuMatchSelection selected{};
+ bool enabled=false,admitted=false,setup_captured=false,go_armed=false,go_observed=false;
+ bool first_post_go_tick_captured=false,waiting_for_draw_close=false,closure_action_seen=false;
+ bool stop_requested=false;
+ bool stopped=false,failed=false,native_retired=false,whole_session_complete=false;
+ unsigned match_index=0,natural_batch_tail_ticks=0;
+ uint64_t setup_input_cursor=0,go_input_cursor=0,post_go_input_cursor=0,closure_input_cursor=0;
+ uint64_t closure_action_cursor=0;
+ uint64_t source_tick_before=0,source_tick_after=0,draws_before=0,draws_after=0;
+ uint64_t completed_source_draws=0;
+ uint64_t go_world_tick=0,world_generation=0;
+ uint32_t asset_generation=0;
+ const melee_web::GameplayMatchSession* match_owner=nullptr;
+ const MeleeWebMenuHost* host_owner=nullptr;
+ const melee_web::RuntimeArchiveCache* cache_owner=nullptr;
+ std::string setup,go_event,first_post_go_typed22,first_post_go_pad_queue,error;
+ MeleeWebStadiumGoAlignmentEvent actual_go{};
+};
+StadiumPairedV11State stadium_paired_v11;
 struct MatchedSetupCfRetirement {
  bool native_retired=false,terminal=false;
  bool later_b_parent_close_checked=false;
@@ -690,6 +718,22 @@ struct MatchedSetupCfRetirement {
 };
 MatchedSetupCfRetirement matched_setup_cf_retirement;
 std::string matched_setup_cf_json();
+bool stadium_paired_v11_recipe(){
+ return replay&&replay->whole_session()&&
+        replay->version==melee_web::kRetailReplayDrawClosureVersion;
+}
+void stadium_paired_v11_fail(const std::string& error);
+bool stadium_paired_v11_route_owned();
+void stadium_paired_v11_prepare_route();
+void stadium_paired_v11_validate_import_selection();
+void stadium_paired_v11_admit_match();
+void stadium_paired_v11_capture_setup();
+void stadium_paired_v11_after_match_tick(uint64_t source_tick_before,uint64_t source_frame_before,
+                                         uint64_t input_cursor,uint64_t draws_before,
+                                         bool closes_batch);
+void stadium_paired_v11_after_source_finish(const melee_web::SourceFrameSequence&,unsigned);
+std::string stadium_paired_v11_status_json();
+std::string later_b_gate2_constructor_snapshot_json(const MeleeWebStadiumSetupSnapshot&);
 std::string stadium_recreation_b_json();
 void stadium_recreation_b_before_retire();
 void stadium_recreation_b_require_arm(bool version2,bool full_schedule,bool common_fields,unsigned action_count,bool typed22);
@@ -2307,6 +2351,20 @@ if(scoped_assets){
   report_construction("lifecycle-close",started,finished,finished,before,
                       aurora_stats_snapshot());
  }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(stadium_paired_v11.enabled&&!stadium_paired_v11.native_retired){
+  auto& s=stadium_paired_v11;
+  const bool retired=!world&&!match&&!results&&!prize&&!host&&!host_entered&&
+      !source_session_owned&&!replay&&!pending&&!running&&
+      asset_destination==AssetDestination::None;
+  if(retired){
+   s.native_retired=true;s.match_owner=nullptr;s.host_owner=nullptr;s.cache_owner=nullptr;
+  }else if(s.error.empty()){
+   s.error="Paired v11 unload returned before checked source-owner retirement";
+   s.failed=true;
+  }
+ }
+#endif
 }
 void request_assets(AssetDestination destination,
                     const MeleeWebMenuMatchSelection* selection,
@@ -2329,8 +2387,15 @@ void request_assets(AssetDestination destination,
         "VS Setup asset scope requires its one-use checked selection");
   names=melee_web::stadium_c1a_asset_names(*selection);break;
  case AssetDestination::StadiumC1a:
-  check((stadium_c1a_armed||(later_sss.armed&&later_sss.stage==1&&later_sss_context_owned()))&&selection!=nullptr,
+  check((stadium_c1a_armed||(later_sss.armed&&later_sss.stage==1&&later_sss_context_owned())||
+         (stadium_paired_v11_recipe()&&stadium_paired_v11_route_owned()&&
+          stadium_paired_v11.import_pending&&!stadium_paired_v11.import_consumed))&&selection!=nullptr,
         "Stadium C1a preparation requires its armed source selection");
+  if(stadium_paired_v11_recipe()){
+   stadium_paired_v11_validate_import_selection();
+   check(current_sss_selection_equal(*selection,stadium_paired_v11.selected),
+         "Paired v11 asset request changed its selected source payload");
+  }
   names=melee_web::stadium_c1a_asset_names(*selection);break;
 #endif
  case AssetDestination::SuddenDeath:
@@ -2372,6 +2437,8 @@ void request_assets(AssetDestination destination,
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  if(destination==AssetDestination::StadiumC1a&&later_sss.armed&&later_sss.stage==1)
   later_sss.requested_generation=asset_generation;
+ if(destination==AssetDestination::StadiumC1a&&stadium_paired_v11_recipe())
+  stadium_paired_v11.requested_generation=asset_generation;
  if(destination==AssetDestination::FirstSssVsSetup){
   first_sss_vs_setup.requested_generation=asset_generation;first_sss_vs_setup.requested=true;
  }
@@ -2441,6 +2508,7 @@ void enter_world(){
       replay->initial_css->game_rules.data(),replay->initial_css->save_data.data(),
       error,sizeof(error)),error);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(stadium_paired_v11_recipe())stadium_paired_v11_prepare_route();
   if(current_sss_exit.armed){
    check(replay.get()==current_sss_exit.recipe&&host==current_sss_exit.host_owner&&
          replay->initial_css.get()==current_sss_exit.context,
@@ -2939,6 +3007,23 @@ void advance(){
  report_owner_lifetime("menu-after-teardown");
  if(phase==5){
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(stadium_paired_v11_recipe()){
+   auto& s=stadium_paired_v11;
+   check(stadium_paired_v11_route_owned()&&!s.import_pending&&!s.import_consumed&&
+         !s.enabled&&completed_matches==0&&
+         melee_web::retail_replay_next_match_index(*replay,replay_cursor)==0&&
+         scoped_assets&&scoped_disc_import,
+         "Paired v11 initial SSS lost its private source route");
+   check(melee_web_menu_host_stadium_c1a_selection(host,&s.selected,error,sizeof(error)),error);
+   melee_web::retail_replay_validate_match_setup(*replay,0,s.selected.start);
+   s.ready_input=melee_web_menu_host_input(host);
+   check(s.ready_input&&melee_web_pad_state_encode(s.ready_input,
+       s.ready_input_bytes.data(),s.ready_input_bytes.size())&&seed_ptr,
+       "Paired v11 initial SSS lost its returned PAD/RNG owner");
+   s.parent_seed_owner=seed_ptr;s.parent_seed=*seed_ptr;s.import_pending=true;
+   match_message="Private paired v11 first Stadium continuation";
+   request_assets(AssetDestination::StadiumC1a,&s.selected);return;
+  }
   if(later_sss.armed){
     check(later_sss.stage==0&&later_sss_context_owned()&&!current_sss_exit.notified&&
           replay_cursor==later_sss_reference_context().first[2]&&completed_matches==0&&later_sss_recipe_valid(*replay),
@@ -3108,6 +3193,26 @@ bool finish_asset_handoff(){
  asset_destination=AssetDestination::None;asset_committed=false;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  if(destination==AssetDestination::FirstSssVsSetup)return first_sss_vs_setup_finish_handoff();
+ if(destination==AssetDestination::StadiumC1a&&stadium_paired_v11_recipe()){
+  auto& s=stadium_paired_v11;
+  stadium_paired_v11_validate_import_selection();
+  check(asset_selection_valid&&asset_generation==s.requested_generation&&
+        current_sss_selection_equal(asset_selection,s.selected),
+        "Paired v11 asset handoff changed its generation/selection");
+  const auto names=melee_web::stadium_c1a_asset_names(asset_selection);
+  check(names==requested_assets&&files.size()==names.size()&&
+        asset_scope.active_file_count()==names.size(),
+        "Paired v11 exact Stadium manifest differs");
+  for(const auto& name:names){const auto it=files.find(name);
+   check(it!=files.end()&&!it->second.empty(),"Paired v11 Stadium manifest file is missing");}
+  // Consume before construction; a failed constructor cannot retry this handoff.
+  s.import_consumed=true;s.import_pending=false;
+  archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
+  match=std::make_unique<melee_web::GameplayMatchSession>(files,asset_selection,*archive_cache,
+      melee_web::GameplayMatchConstruction::Deferred,*s.ready_input,
+      melee_web::GameplayMatchDiagnostic::StadiumReady);
+  running=false;pending=false;first_use_draw_pending=false;return false;
+ }
  if(destination==AssetDestination::StadiumC1a&&later_sss.armed){
   check(later_sss.stage==1&&asset_selection_valid&&host&&!host_entered&&
         later_sss_context_owned()&&!current_sss_exit.notified&&replay_cursor==later_sss_reference_context().first[2]&&
@@ -3243,6 +3348,9 @@ bool advance_match_construction(){
   if(match->sudden_death()){sudden_death_input.reset();pending_match_continuation={};}
   if(replay&&replay_trace)melee_web::retail_replay_initial(*replay,true,match->start_data());
   first_use_draw_pending=true;running=true;message=match_message;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  stadium_paired_v11_admit_match();
+#endif
  }
  return complete;
 }
@@ -3766,6 +3874,266 @@ std::string matched_setup_cf_common_fields_json(
  check(sample.size()<=MATCHED_SETUP_CF_COMMON_SAMPLE_MAX_BYTES,
        "Stadium per-tick common-field sample exceeded its reviewed byte bound");
  return sample;
+}
+bool stadium_paired_v11_route_owned(){
+ const auto& s=stadium_paired_v11;
+ return s.route_prepared&&!s.native_retired&&!s.failed&&!faulted&&
+        stadium_paired_v11_recipe()&&replay.get()==s.recipe_owner&&
+        replay->initial_css&&replay->initial_css.get()==s.context_owner&&
+        host&&host==s.route_host_owner&&source_session_owned&&
+        !later_sss.armed&&!current_sss_exit.armed&&!stadium_c1a_armed&&
+        !matched_setup_cf.opted_in&&!matched_setup_cf.armed&&!melee_web_net_active();
+}
+void stadium_paired_v11_later_exit_note(void* data,
+    const MeleeWebMenuCurrentSssExitObservation* observation){
+ auto& s=stadium_paired_v11;
+ if(data!=&s||!stadium_paired_v11_route_owned()||s.later_exit_observed||
+    !observation||observation->state!=2||!observation->note.captured){
+  stadium_paired_v11_fail("Paired v11 passive later-SSS note lost its exact source owner");return;
+ }
+ // Passive cache capability only; never arms the old SSS terminal or Gate2.
+ s.later_exit_observed=true;
+}
+void stadium_paired_v11_prepare_route(){
+ auto& s=stadium_paired_v11;char error[256]{};
+ check(stadium_paired_v11_recipe()&&!s.route_prepared&&!s.enabled&&
+       replay_trace&&replay->initial_css&&replay->initial_input&&
+       replay->match_setups.size()==2&&replay->match_selections.size()==2&&
+       !replay->diagnostic_entity_prefix&&!replay->diagnostic_active_entity_prefix&&
+       host&&!host_entered&&source_session_owned&&scoped_assets&&scoped_disc_import&&
+       !faulted&&!match&&!results&&!prize&&!later_sss.armed&&!current_sss_exit.armed&&
+       !stadium_c1a_armed&&!matched_setup_cf.opted_in&&!matched_setup_cf.armed&&
+       !melee_web_net_active()&&!diagnostic_start_ticks&&!diagnostic_pad_remaining&&stock_check!=-1,
+       "Paired v11 requires its fresh private whole-session CSS owner");
+ check(melee_web_menu_host_enable_stadium_c1a(host,error,sizeof(error)),error);
+ s.recipe_owner=replay.get();s.context_owner=replay->initial_css.get();
+ s.route_host_owner=host;s.route_prepared=true;
+ check(melee_web_menu_host_arm_later_sss_exit(host,s.context_owner,
+       stadium_paired_v11_later_exit_note,&s,1,error,sizeof(error)),error);
+}
+void stadium_paired_v11_validate_import_selection(){
+ auto& s=stadium_paired_v11;char error[256]{};
+ check(stadium_paired_v11_route_owned()&&s.import_pending&&!s.import_consumed&&
+       !s.enabled&&!world&&!match&&!results&&!prize&&!host_entered&&
+       completed_matches==0&&melee_web::retail_replay_next_match_index(*replay,replay_cursor)==0&&
+       seed_ptr&&seed_ptr==s.parent_seed_owner&&*seed_ptr==s.parent_seed,
+       "Paired v11 import lost its pending first SSS/parent RNG owner");
+ MeleeWebMenuMatchSelection live{};
+ check(melee_web_menu_host_stadium_c1a_selection(host,&live,error,sizeof(error)),error);
+ check(current_sss_selection_equal(live,s.selected),
+       "Paired v11 selected payload changed during import");
+ melee_web::retail_replay_validate_match_setup(*replay,0,live.start);
+ std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> input_now{};
+ check(s.ready_input&&s.ready_input==melee_web_menu_host_input(host)&&
+       melee_web_pad_state_encode(s.ready_input,input_now.data(),input_now.size())&&
+       input_now==s.ready_input_bytes,
+       "Paired v11 retained SSS PAD changed during import");
+}
+bool stadium_paired_v11_owner_valid(){
+ const auto& s=stadium_paired_v11;
+ return s.enabled&&s.admitted&&!s.native_retired&&stadium_paired_v11_recipe()&&
+        replay_trace&&match&&match.get()==s.match_owner&&archive_cache&&
+        archive_cache.get()==s.cache_owner&&host&&host==s.host_owner&&!host_entered&&
+        melee_web_menu_host_phase(host)==MELEE_WEB_MENU_READY&&
+        !results&&!prize&&!faulted&&!melee_web_net_active()&&
+        melee_web_gameplay_world_exists()&&
+        melee_web_gameplay_generation()==s.world_generation&&
+        asset_generation==s.asset_generation&&match->construction_complete()&&
+        !match->paused()&&!match->ending()&&!match->complete();
+}
+void stadium_paired_v11_fail(const std::string& error){
+ auto& s=stadium_paired_v11;
+ if(s.error.empty())s.error=error;
+ s.failed=true;s.stop_requested=true;s.whole_session_complete=false;faulted=true;
+ running=false;pending=false;first_use_draw_pending=false;
+ menu_clock.reset();audio_clock.reset();message=s.error;
+}
+void stadium_paired_v11_admit_match(){
+ auto& s=stadium_paired_v11;
+ if(!stadium_paired_v11_recipe())return;
+ check(stadium_paired_v11_route_owned()&&s.import_consumed&&!s.import_pending&&
+       !s.enabled&&!s.admitted&&!s.failed&&!s.native_retired,
+       "Paired v11 first-match diagnostic is one-use");
+ check(replay_trace&&!replay->diagnostic_entity_prefix&&match&&host&&archive_cache&&
+       !host_entered&&melee_web_menu_host_phase(host)==MELEE_WEB_MENU_READY&&
+       !faulted&&!pending&&!results&&!prize&&!melee_web_net_active()&&
+       !matched_setup_cf.opted_in&&!matched_setup_cf.armed&&
+       replay->match_setups.size()==2&&replay->match_selections.size()==2&&
+       melee_web::retail_replay_next_match_index(*replay,replay_cursor)==0&&
+       !diagnostic_start_ticks&&!diagnostic_pad_remaining&&stock_check!=-1,
+       "Paired v11 profile is outside its exact first whole-session match owner");
+ s.enabled=true;s.admitted=true;s.whole_session_complete=false;
+ stadium_paired_v11_capture_setup();
+ check(!s.failed&&s.setup_captured&&s.go_armed,
+       s.error.empty()?"Paired v11 failed to capture its checked Setup":s.error);
+}
+void stadium_paired_v11_capture_setup(){
+ auto& s=stadium_paired_v11;
+ if(!s.enabled||s.setup_captured||s.failed)return;
+ try{
+  check(stadium_paired_v11_recipe()&&replay_trace&&match&&host&&archive_cache&&
+        stadium_paired_v11_route_owned()&&s.import_consumed&&!s.import_pending&&
+        !host_entered&&melee_web_menu_host_phase(host)==MELEE_WEB_MENU_READY&&
+        !faulted&&!pending&&!results&&!prize&&!melee_web_net_active()&&
+        match->construction_complete()&&match->source_frames()==0,
+        "Paired v11 Setup capture lost its actual whole-session match owner");
+  s.match_index=melee_web::retail_replay_next_match_index(*replay,replay_cursor);
+  check(s.match_index==0&&replay->match_setups.size()==2&&
+        replay->match_selections.size()==2,
+        "Paired v11 first match is not the exact two-Setup producer profile");
+  MeleeWebStadiumSetupSnapshot setup{};MeleeWebStadiumIdleSnapshot idle{};char error[256]{};
+  check(match->diagnostic_stadium_setup_snapshot(&setup,error,sizeof(error)),
+        error[0]?error:"Paired v11 actual Setup snapshot refused");
+  check(match->diagnostic_stadium_idle_snapshot(&idle,error,sizeof(error)),
+        error[0]?error:"Paired v11 zero-tick typed22 snapshot refused");
+  const auto world=melee_web_gameplay_stats();
+  check(setup.world_generation!=0&&setup.world_generation==world.generation&&
+        idle.world_generation==setup.world_generation&&idle.world_ticks==0&&
+        idle.source_frame==0&&world.ticks==0&&world.generation!=0,
+        "Paired v11 Setup snapshot is not the live zero-tick world");
+  const uint32_t seed=match->random_seed();
+  s.setup_input_cursor=replay_cursor;s.world_generation=setup.world_generation;
+  s.asset_generation=asset_generation;s.match_owner=match.get();
+  s.host_owner=host;s.cache_owner=archive_cache.get();
+  std::ostringstream out;
+  out<<"{\"schema\":\"melee-web-stadium-paired-v11-setup-v1\",\"match_index\":"
+     <<s.match_index<<",\"input_cursor\":"<<s.setup_input_cursor
+     <<",\"seed_hex\":\""<<melee_web::stadium_first_css_diagnostic::hex32(seed)
+     <<"\",\"typed22\":"<<matched_setup_cf_common_fields_json(
+          idle,seed,static_cast<unsigned>(s.setup_input_cursor),
+          static_cast<unsigned>(idle.world_ticks),true)
+     <<",\"constructor\":"<<later_b_gate2_constructor_snapshot_json(setup)<<'}';
+  s.setup=out.str();
+  match->diagnostic_stadium_go_alignment_arm(
+      match->start_data().rules.x1_3?1:0,error,sizeof(error));
+  s.go_armed=true;s.setup_captured=true;
+ }catch(const std::exception& error){stadium_paired_v11_fail(error.what());}
+}
+void stadium_paired_v11_after_match_tick(uint64_t source_tick_before,
+    uint64_t source_frame_before,uint64_t input_cursor,uint64_t draws_before,
+    bool closes_batch){
+ auto& s=stadium_paired_v11;
+ if(!s.enabled||!s.setup_captured||s.failed||s.stopped)return;
+ try{
+  check(stadium_paired_v11_owner_valid(),
+        "Paired v11 source tick lost its admitted owner/generation");
+  MeleeWebStadiumGoAlignmentSnapshot go{};char error[256]{};
+  check(match->diagnostic_stadium_go_alignment_snapshot(&go,error,sizeof(error)),
+        error[0]?error:"Paired v11 actual GO snapshot refused");
+  check(go.armed==1&&go.failure==0&&go.generation==s.world_generation,
+        "Paired v11 GO trace lost its admitted generation");
+  const auto& event=go.go_after;
+  if(!s.go_observed){
+   if(event.sequence){
+    check(event.sequence==3&&event.generation==s.world_generation&&
+          event.world_ticks==source_tick_before,
+          "Paired v11 latched GO is not the actual event in this source tick");
+    s.go_observed=true;s.go_input_cursor=input_cursor;s.go_world_tick=event.world_ticks;
+    s.actual_go=event;s.go_event=matched_setup_cf_go_event_json(event);
+   }
+  }else{
+   check(matched_setup_cf_go_event_equal(event,s.actual_go),
+         "Paired v11 actual GO event changed after its one source latch");
+   if(!s.first_post_go_tick_captured){
+    check(source_tick_before==s.go_world_tick+1&&input_cursor>s.go_input_cursor,
+          "Paired v11 did not reach the first strictly post-GO source tick");
+    MeleeWebStadiumIdleSnapshot idle{};MeleeWebStadiumPadQueueObservation queue{};
+    check(match->diagnostic_stadium_idle_snapshot(&idle,error,sizeof(error)),
+          error[0]?error:"Paired v11 post-GO typed22 snapshot refused");
+    const uint64_t source_frame_after=match->source_frames();
+    check(idle.world_generation==s.world_generation&&
+          idle.world_ticks==source_tick_before+1&&
+          idle.source_frame==source_frame_before+1&&
+          source_frame_after==source_frame_before+1,
+          "Paired v11 post-GO typed22 is not the completed actual source tick");
+    check(match->diagnostic_stadium_pad_queue_observation(&queue,error,sizeof(error)),
+          error[0]?error:"Paired v11 literal HSD queue snapshot refused");
+    check(queue.source_generation==s.world_generation&&
+          queue.source_tick_before==source_tick_before&&
+          queue.source_tick_after==source_tick_before+1&&
+          queue.qnum_before==1&&queue.qread_before==0&&
+          queue.qcount_before==1&&queue.qcount_after_hsd==0,
+          "Paired v11 post-GO queue is not the actual consumed four-port row");
+    const uint32_t seed=match->random_seed();
+    s.post_go_input_cursor=input_cursor;s.source_tick_before=source_tick_before;
+    s.draws_before=draws_before;
+    s.source_tick_after=idle.world_ticks;s.first_post_go_tick_captured=true;
+    s.first_post_go_typed22=matched_setup_cf_common_fields_json(
+        idle,seed,static_cast<unsigned>(input_cursor),
+        static_cast<unsigned>(source_tick_before),true);
+    s.first_post_go_pad_queue=matched_setup_cf_pad_queue_observation_json(
+        queue,match->start_data());
+    s.stop_requested=true;
+    if(closes_batch){
+     s.closure_action_seen=true;s.closure_action_cursor=input_cursor;
+     s.closure_input_cursor=input_cursor+1;
+    }
+    else s.waiting_for_draw_close=true;
+   }else if(s.waiting_for_draw_close){
+    check(input_cursor>s.post_go_input_cursor,
+          "Paired v11 natural draw-batch tail did not advance source input");
+    ++s.natural_batch_tail_ticks;
+    if(closes_batch){
+     s.closure_action_seen=true;s.closure_action_cursor=input_cursor;
+     s.closure_input_cursor=input_cursor+1;
+    }
+   }
+  }
+ }catch(const std::exception& error){stadium_paired_v11_fail(error.what());}
+}
+void stadium_paired_v11_after_source_finish(
+    const melee_web::SourceFrameSequence& frames,unsigned cursor){
+ auto& s=stadium_paired_v11;
+ if(!s.enabled||!s.admitted||s.stopped||s.failed)return;
+ const uint64_t actual_draws_after=s.completed_source_draws+frames.draws();
+ if(!s.stop_requested||!s.closure_action_seen){
+  s.completed_source_draws=actual_draws_after;return;
+ }
+ try{
+  check(!s.failed&&s.first_post_go_tick_captured&&s.closure_action_seen&&
+        s.closure_input_cursor==cursor&&
+        replay&&replay->closes_draw_batch(s.closure_action_cursor)&&
+        !frames.pending()&&actual_draws_after>s.draws_before&&
+        stadium_paired_v11_owner_valid(),
+        "Paired v11 natural draw-batch closure failed its checked source boundary");
+  s.draws_after=actual_draws_after;s.completed_source_draws=actual_draws_after;
+  s.stopped=true;s.whole_session_complete=false;
+  running=false;pending=false;menu_clock.reset();audio_clock.reset();
+ }catch(const std::exception& error){stadium_paired_v11_fail(error.what());}
+}
+std::string stadium_paired_v11_status_json(){
+ const auto& s=stadium_paired_v11;std::ostringstream out;
+ out<<"{\"schema\":\"melee-web-stadium-paired-v11-first-go-v1\",\"version\":1"
+    <<",\"scope\":\"first_match_setup_actual_go_first_post_go_tick_and_closed_draw_batch\""
+    <<",\"enabled\":"<<(s.enabled?"true":"false")
+    <<",\"admitted\":"<<(s.admitted?"true":"false")
+    <<",\"setup_captured\":"<<(s.setup_captured?"true":"false")
+    <<",\"go_armed\":"<<(s.go_armed?"true":"false")
+    <<",\"go_observed\":"<<(s.go_observed?"true":"false")
+    <<",\"first_post_go_tick_captured\":"<<(s.first_post_go_tick_captured?"true":"false")
+    <<",\"stop_requested\":"<<(s.stop_requested?"true":"false")
+    <<",\"stopped\":"<<(s.stopped?"true":"false")
+    <<",\"failed\":"<<(s.failed?"true":"false")
+    <<",\"native_retired\":"<<(s.native_retired?"true":"false")
+    <<",\"whole_session_complete\":false"
+    <<",\"match_index\":"<<s.match_index
+    <<",\"setup_input_cursor\":"<<s.setup_input_cursor
+    <<",\"go_input_cursor\":"<<s.go_input_cursor
+    <<",\"post_go_input_cursor\":"<<s.post_go_input_cursor
+    <<",\"closure_action_input_cursor\":"<<s.closure_action_cursor
+    <<",\"closure_input_cursor\":"<<s.closure_input_cursor
+    <<",\"go_world_tick\":"<<s.go_world_tick
+    <<",\"post_go_source_tick_before\":"<<s.source_tick_before
+    <<",\"post_go_source_tick_after\":"<<s.source_tick_after
+    <<",\"natural_batch_tail_ticks\":"<<s.natural_batch_tail_ticks
+    <<",\"draws_before\":"<<s.draws_before
+    <<",\"draws_after\":"<<s.draws_after
+    <<",\"setup\":"<<(s.setup.empty()?"null":s.setup)
+    <<",\"go_event\":"<<(s.go_event.empty()?"null":s.go_event)
+    <<",\"first_post_go_typed22\":"<<(s.first_post_go_typed22.empty()?"null":s.first_post_go_typed22)
+    <<",\"first_post_go_pad_queue\":"<<(s.first_post_go_pad_queue.empty()?"null":s.first_post_go_pad_queue)
+    <<",\"error\":"<<(s.error.empty()?"null":first_css_browser_draw_json_quote(s.error))<<'}';
+ return out.str();
 }
 bool later_b_gate2_uuid_valid(const std::string& value){
  if(value.size()!=36)return false;
@@ -5253,6 +5621,14 @@ void tick(){
 #endif
  service_render_cache_writes();
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(stadium_paired_v11.enabled&&!stadium_paired_v11.native_retired&&
+    (stadium_paired_v11.stopped||stadium_paired_v11.failed)){
+  // Keep menu service/unload commands live, but do not re-enter clocks,
+  // gameplay, or replay completion after this explicitly incomplete boundary.
+  running=false;pending=false;first_use_draw_pending=false;audio_phase=0;
+  menu_clock.reset();audio_clock.reset();
+  EM_ASM({window.menuFrame?.(false);});return;
+ }
  if(current_sss_exit.profile==CurrentSssExitProfile::Stock4None&&current_sss_exit.terminal){
   // Owner/unload commands above still run. UI-only polling drives the existing
   // stopped-replay finalizer. Normal cache flush above remains reachable
@@ -5995,6 +6371,22 @@ void tick(){
     // gm_801A4BA8 is the original scene traversal cursor (MWRO80479d58),
     // not the gameplay timer returned by source_frames()/gm_GetFrameCount.
     const auto prefix_tick_before=replay&&replay->diagnostic_entity_prefix?gm_801A4BA8():0;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    const bool paired_v11_tick=stadium_paired_v11.enabled&&
+        stadium_paired_v11.admitted&&!stadium_paired_v11.failed&&
+        !stadium_paired_v11.stopped&&replay_whole;
+    uint64_t paired_world_ticks_before=0,paired_source_frame_before=0;
+    uint64_t paired_input_cursor=0,paired_draws_before=0;
+    if(paired_v11_tick){
+     check(stadium_paired_v11_owner_valid(),
+           "Paired v11 attempted a tick outside its admitted source owner");
+     paired_world_ticks_before=melee_web_gameplay_stats().ticks;
+     paired_source_frame_before=match->source_frames();
+     paired_input_cursor=replay_cursor;
+     paired_draws_before=stadium_paired_v11.completed_source_draws+
+                         source_frames.draws();
+    }
+#endif
     match->tick(sample);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     if(replay_whole)later_sss_pause_after();
@@ -6004,7 +6396,14 @@ void tick(){
            !match->paused()&&!match->complete()&&!match->ending(),
            "Diagnostic entity prefix lost its original live source boundary");
     if(replay_whole)melee_web_cpu_observation_scheduler_return();
-    source_frames.did_step(!replay||replay->closes_draw_batch(replay_cursor));
+    const bool closes_current_batch=!replay||replay->closes_draw_batch(replay_cursor);
+    source_frames.did_step(closes_current_batch);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(paired_v11_tick)
+     stadium_paired_v11_after_match_tick(paired_world_ticks_before,
+         paired_source_frame_before,paired_input_cursor,paired_draws_before,
+         closes_current_batch);
+#endif
     int winner=-1;const int outcome=match->outcome(winner);
     if(replay){
      replay_match_complete=match->complete();replay_outcome=outcome;replay_winner=winner;
@@ -6231,6 +6630,10 @@ void tick(){
     ++replay_cursor;
     ++replay_steps;
     replay_draw_boundaries+=replay->closes_draw_batch(replay_cursor-1)?1U:0U;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(stadium_paired_v11.enabled&&
+       (stadium_paired_v11.closure_action_seen||stadium_paired_v11.failed))break;
+#endif
    }
    if(result==3){
     if(results){
@@ -6363,6 +6766,10 @@ void tick(){
   }
 #else
   source_frames.finish(present_source);
+#endif
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  stadium_paired_v11_after_source_finish(source_frames,
+                                          static_cast<unsigned>(replay_cursor));
 #endif
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
   replay_boundary_mark("source_frames_finish_returned",static_cast<int>(source_frames.steps()),
@@ -6767,6 +7174,13 @@ void melee_web_native_menu_pause(int paused){
 }
 const char* melee_web_native_menu_message(){return message.c_str();}
 int melee_web_native_menu_running(){return running;}
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+const char* melee_web_native_menu_stadium_paired_v11_status(){
+ static std::string status;
+ status=stadium_paired_v11_status_json();
+ return status.c_str();
+}
+#endif
 int melee_web_native_menu_cache_idle(){
  if(!render_cache_can_flush()){publish_graphics_startup(0,true);return 0;}
  const auto state=aurora_pipeline_cache_status();

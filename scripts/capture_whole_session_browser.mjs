@@ -17,7 +17,7 @@ import {validateStock4SssExitExpected, compareStock4SssExitObservation, validate
   validateStock4SssExitTerminal, validateStock4SssExitFinalization} from './stadium_stock4_sss_exit_observation.mjs';
 import {validateLaterSssExitExpected, validateLaterReferenceRecipeInputs, compareLaterSssExitObservation, validateLaterSssExitTrace,
   validateLaterSssExitTerminal, validateLaterSssExitFinalization, compareLaterPreparedStartObservation, compareLaterPreparedSetupObservation} from './stadium_later_sss_exit_observation.mjs';
-import {StadiumSetupCfActionDriver, deriveLaterBGate2Expectations, deriveLaterBLongExpectations} from '../tests/stadium_matched_setup_cf_consumer.mjs';
+import {StadiumSetupCfActionDriver, deriveLaterBGate2Expectations, deriveLaterBLongExpectations, typedOriginalValues, compareLaterBGate2Go} from '../tests/stadium_matched_setup_cf_consumer.mjs';
 import {createLaterBGate2NativeAdapter, runLaterBGate2ActionContinuation} from '../tests/stadium_matched_setup_cf_runner_gate.mjs';
 import {deriveLongBActionRngWindow, bindLongBActionRngRows, activateLongBActionRngSelection} from './stadium_later_b_long_rng.mjs';
 import fs from 'node:fs/promises';
@@ -71,6 +71,8 @@ const {values, tokens} = parseArgs({tokens: true, options: {
   'hit-transition-probe-cursors': {type: 'string'},
   'first-replay-callback-probe': {type: 'boolean', default: false},
   'runtime-incidents': {type: 'boolean', default: false},
+  'stadium-paired-v11-first-go-projection': {type: 'string'},
+  'stadium-paired-v11-first-go-projection-sha256': {type: 'string'},
   'expected-frame0': {type: 'string'},
   'stadium-current-sss-exit-expected': {type: 'string'},
   'stadium-current-sss-exit-expected-sha256': {type: 'string'},
@@ -163,6 +165,21 @@ const probeTimeoutMs = 10000;
 let rngDrawProbe = parseRngDrawProbe({range: values['rng-draw-probe-range'],
   cursors: values['rng-draw-probe-cursors']});
 const hitTransitionProbe = parseHitTransitionProbe(values['hit-transition-probe-cursors']);
+const pairedFirstGoPath=values['stadium-paired-v11-first-go-projection'];
+const pairedFirstGoSha=values['stadium-paired-v11-first-go-projection-sha256'];
+const pairedFirstGo=pairedFirstGoPath!==undefined;
+if(pairedFirstGo || pairedFirstGoSha!==undefined){
+ const incompatible=Object.entries(values).filter(([key,value])=>value &&
+   ((key.startsWith('stadium-')&&!key.startsWith('stadium-paired-v11-first-go-projection')) ||
+    ['manifest','diagnostic-manifest','stopped-scene-pair','stop-after-source-frames','resume-timing-pauses',
+     'cpu-observations','rng-draw-probe-range','rng-draw-probe-cursors','hit-transition-probe-cursors',
+     'first-replay-callback-probe','expected-frame0'].includes(key)));
+ if(!pairedFirstGo || !/^[0-9a-f]{64}$/.test(pairedFirstGoSha||'') || diagnostic ||
+    captureMode.mode!=='state' || !runtimeIncidentRecording || incompatible.length)
+  throw Error('Paired v11 first-GO requires state/runtime-incidents, explicit projection hash, and no legacy/prefix/resume/probe route');
+}
+let pairedFirstGoExpected=null;
+
 if (hitTransitionProbe && (captureCpuObservations || stopAfter !== 5241 ||
     rngDrawProbe?.selected.join(',') !== hitTransitionProbe.selected.join(',')))
   throw Error('Hit transition diagnosis requires its matching RNG selection, stop cursor 5241, and no historical CPU observer');
@@ -653,15 +670,127 @@ async function captureStoppedSceneImage(name, expectedCursor, initialStatus = nu
     cursor_unchanged_during_capture: true}};
 }
 
+
+// First-GO is a read-only stopped-prefix comparison using the existing replay
+// owner. Projection hashes bind host evidence; native v11 independently admits
+// the recipe and source owner. No host values feed source state.
+function derivePairedFirstGo(projection,recipeSha,frames){
+ const need=(ok,why)=>{if(!ok)throw Error('Paired first-GO projection: '+why);};
+ need(projection.schema==='melee-web-stadium-paired-window-projection-v1' &&
+  projection.recipe_sha256===recipeSha && projection.actual_frame_count===frames &&
+  projection.browser_parity===false && projection.C3===false &&
+  projection.matches?.length===2 && projection.matches.every((m,i)=>m.match_index===i),'identity/recipe differs');
+ const m=projection.matches[0],go=m.states?.[0],post=m.states?.[1];
+ need(go?.tick.source_tick===m.go.coordinate.source_tick && post?.tick.source_tick===go.tick.source_tick+1 &&
+  go.selected===true && post.selected===true && post.pads?.length===4 &&
+  post.pads.every(x=>/^[0-9a-f]{22}$/.test(x)),'GO/post-GO source rows differ');
+ const first=m.actions.find(a=>a.kind==='tick'),g=m.actions[go.action_index],a=m.actions[post.action_index];
+ const close=m.actions.slice(post.action_index+1).find(a=>a.kind==='draw');
+ need(first && g?.kind==='tick' && a?.kind==='tick' && close &&
+  g.frame_index===go.frame_index && a.frame_index===post.frame_index &&
+  g.source_tick===go.tick.source_tick && a.source_tick===post.tick.source_tick &&
+  close.after_sequence>=a.through_sequence,'actual action brackets differ');
+ const tail=m.actions.slice(post.action_index+1,close.action_index).filter(a=>a.kind==='tick');
+ need(tail.length<=4 && close.source_tick===post.tick.source_tick+1+tail.length,'natural batch tail differs');
+ return {match:m,go,post,typed:typedOriginalValues(post.state,post.tick.source_tick),
+  setupCursor:first.frame_index,goCursor:go.frame_index,postCursor:post.frame_index,
+  closureActionCursor:tail.length?tail.at(-1).frame_index:post.frame_index,
+  closureCursor:(tail.length?tail.at(-1).frame_index:post.frame_index)+1,
+  drawsBefore:a.draw_ordinal,drawsAfter:close.draw_ordinal+1,tail:tail.length};
+}
+function comparePairedFirstGo(s,e){
+ const need=(ok,why)=>{if(!ok)throw Error('Paired first-GO comparison: '+why);};
+ need(s.schema==='melee-web-stadium-paired-v11-first-go-v1' && s.version===1 &&
+  s.scope==='first_match_setup_actual_go_first_post_go_tick_and_closed_draw_batch' &&
+  s.enabled && s.admitted && s.setup_captured && s.go_armed && s.go_observed &&
+  s.first_post_go_tick_captured && s.stop_requested && s.stopped && !s.failed &&
+  s.error===null && s.native_retired===false && s.whole_session_complete===false && s.match_index===0,'native terminal/owner differs');
+ const setup=s.setup,typed=s.first_post_go_typed22,gen=setup?.typed22?.world_generation;
+ need(setup?.schema==='melee-web-stadium-paired-v11-setup-v1' && setup.match_index===0 &&
+  setup.input_cursor===e.setupCursor && setup.seed_hex===e.match.setup.rng.value_hex &&
+  Number.isSafeInteger(gen)&&gen>0 && setup.typed22.world_ticks===0 && setup.typed22.source_frame===0,'zero-tick Setup owner/seed differs');
+ const c=e.match.constructor.state_projection,w={scope:'shared-constructor-aggregate-only',entry_count:c.constructor_entry_count,
+  parameter_roles:{min_parameter:'parameter_x0',max_parameter:'parameter_x4'},min_parameter:c.parameter_x0,
+  max_parameter:c.parameter_x4,random_bound:c.random_bound,random_result:c.random_result,
+  seed_before:c.seed_before_hex,seed_after:c.seed_after_hex,randi_call_count:1};
+ need(JSON.stringify(setup.constructor)===JSON.stringify(w),'constructor seven aggregates/parameter roles differ');
+ const go=compareLaterBGate2Go({reference:e.match,actualEvent:s.go_event,actualTick:s.go_world_tick,admittedWorldGeneration:gen});
+ need(go.decision==='PASS_SHARED_GO_EVENT_FIELDS_AND_SEED','actual GO fields/seed differ');
+ for(const [key,value] of Object.entries(e.typed))need(Object.is(typed?.[key],value),'typed22 '+key+' differs');
+ need(typed?.schema==='melee-web-stadium-per-tick-common-fields-native-v3' && typed.world_generation===gen &&
+  typed.source_tick===e.post.tick.source_tick && typed.world_ticks===e.post.tick.source_tick+1 &&
+  typed.seed_hex===e.post.rng.value_hex,'post-GO typed owner/seed differs');
+ const q=s.first_post_go_pad_queue;
+ need(q?.schema==='melee-web-stadium-hsd-pad-queue-observation' && q.version===2 &&
+  q.source_generation===gen && q.source_tick_before===e.post.tick.source_tick &&
+  q.source_tick_after===e.post.tick.source_tick+1 && q.qnum_before===1 && q.qread_before===0 &&
+  q.qcount_before===1 && q.qcount_after_hsd===0 && q.tick_complete===true &&
+  JSON.stringify(q.queue_slot_status_hex)===JSON.stringify(e.post.pads),'literal four-port source PAD queue differs');
+ const coordinates={setup_input_cursor:e.setupCursor,go_input_cursor:e.goCursor,post_go_input_cursor:e.postCursor,
+  closure_action_input_cursor:e.closureActionCursor,closure_input_cursor:e.closureCursor,
+  post_go_source_tick_before:e.post.tick.source_tick,post_go_source_tick_after:e.post.tick.source_tick+1,
+  natural_batch_tail_ticks:e.tail,draws_before:e.drawsBefore,draws_after:e.drawsAfter};
+ for(const [key,value] of Object.entries(coordinates))need(s[key]===value,key+' differs');
+ return {pass:true,setup_seed:setup.seed_hex,constructor_aggregates:7,go,typed_values_compared:Object.keys(e.typed),
+  post_go_seed:typed.seed_hex,coordinates,whole_session_complete:false,
+  unpaired:['original five constructor phase order','source callback dispatch identity','per-owner RNG','whole lifecycle','C3']};
+}
+async function readPairedFirstGoStatus(){
+ return observePageOperation('paired first-GO native idle observation',()=>page.evaluate(()=>{
+  const m=globalThis.Module;
+  if(typeof m?.stadiumMatchedSetupNativeIdle!=='function')throw Error('Native idle ownership service unavailable');
+  if(m.stadiumMatchedSetupNativeIdle()!==true)return {busy:true};
+  const getter=m._melee_web_native_menu_stadium_paired_v11_status;
+  if(typeof getter!=='function')throw Error('Paired v11 status export unavailable');
+  const pointer=getter();if(!pointer)throw Error('Paired v11 status pointer absent');
+  return {busy:false,status:JSON.parse(m.UTF8ToString(pointer)),phase:m._melee_web_native_menu_phase(),running:m._melee_web_native_menu_running()};
+ }));
+}
+async function pairedFirstGoPhase(){
+ const deadline=Date.now()+replayTimeoutMs;
+ await page.locator('#retail-replay-start').click();
+ while(Date.now()<deadline){
+  const observed=await readPairedFirstGoStatus();
+  if(observed.busy){await new Promise(r=>setTimeout(r,replayPollMs));continue;}
+  report.paired_v11_first_go={...report.paired_v11_first_go,observation:observed};
+  await write('paired-v11-first-go-status.json',observed);
+  if(observed.status.failed)throw Error(observed.status.error||'Paired native observer failed');
+  if(observed.status.stopped){
+   if(observed.running!==0)throw Error('Paired observer stopped without stopping source running');
+   report.paired_v11_first_go.comparison=comparePairedFirstGo(observed.status,pairedFirstGoExpected);
+   report.paired_v11_first_go.unload_requested=true;
+   await page.locator('#unload').click(); // Existing checked unload, exactly once.
+   while(Date.now()<deadline){
+    const after=await readPairedFirstGoStatus();
+    if(!after.busy){
+     report.paired_v11_first_go.retirement=after;
+     await write('paired-v11-first-go-retirement.json',after);
+     if(after.status.failed)throw Error(after.status.error||'Paired unload failed');
+     if(after.status.native_retired){
+      if(after.phase!==0||after.running!==0||after.status.whole_session_complete!==false)
+       throw Error('Paired unload did not verify idle native retirement');
+      report.paired_v11_first_go.component_pass=true;return;
+     }
+    }
+    await new Promise(r=>setTimeout(r,replayPollMs));
+   }
+   throw Error('Paired first-GO retirement exceeded unchanged deadline');
+  }
+  if(pageErrors.length)throw Error('Paired first-GO browser diagnostics failed');
+  await new Promise(r=>setTimeout(r,replayPollMs));
+ }
+ throw Error('Paired first-GO exceeded unchanged replay deadline');
+}
+
 async function snapshot(reason = 'poll', {captureCss = !diagnostic} = {}) {
   if (laterBGate2Reserved) return {reason, native_access_suppressed: 'Gate2 reserved/transfer/terminal owner; prefix and action metrics are separate'};
   if (!page || page.isClosed()) return null;
   let value;
   try {
     if (pageObservationTimedOut) return {reason, snapshot_error: 'Page observation already timed out'};
-    value = await observePageOperation(`snapshot ${reason}`, page.evaluate(({reason, captureCss, currentSssExit}) => {
+    value = await observePageOperation(`snapshot ${reason}`, page.evaluate(({reason, captureCss, currentSssExit, pairedFirstGo}) => {
       const module = globalThis.Module;
-      if (currentSssExit && module?.stadiumMatchedSetupNativeIdle?.() !== true)
+      if ((currentSssExit || pairedFirstGo) && module?.stadiumMatchedSetupNativeIdle?.() !== true)
         return {reason, busy: true}; // Suppress every native snapshot call during Asyncify.
       const ready = globalThis.__meleeNativeRuntimeReady === true;
       const call = name => {
@@ -709,7 +838,7 @@ async function snapshot(reason = 'poll', {captureCss = !diagnostic} = {}) {
         replay_report: replayReport,
         replay_downloads: [...document.querySelectorAll('#retail-replay-downloads a')].map(link => link.download),
       };
-    }, {reason, captureCss, currentSssExit}));
+    }, {reason, captureCss, currentSssExit, pairedFirstGo}));
   } catch (error) {
     firstError('snapshot', error.message || error);
     return {reason, snapshot_error: String(error.message || error)};
@@ -979,9 +1108,18 @@ try {
     version: recipeBytes.readUInt32BE(4), seed: recipeBytes.readUInt32BE(8),
     frames: recipeBytes.readUInt32BE(12), bytes: recipeBytes.length,
   };
-  if (![8, 9, 10].includes(report.recipe_header.version) ||
+  if (!(pairedFirstGo?report.recipe_header.version===11:[8, 9, 10].includes(report.recipe_header.version)) ||
       report.recipe_header.frames < 1 || report.recipe_header.frames > 108000)
     throw Error('Whole-session replay requires a valid MWRC v8/v9/v10 frame count');
+  if(pairedFirstGo){
+    const file=path.resolve(pairedFirstGoPath),stat=await fs.lstat(file);
+    if(!stat.isFile()||stat.isSymbolicLink()||stat.size>64*1024*1024)throw Error('Paired projection must be a bounded regular file');
+    const raw=await fs.readFile(file),hash=createHash('sha256').update(raw).digest('hex');
+    if(hash!==pairedFirstGoSha)throw Error('Paired projection hash differs');
+    pairedFirstGoExpected=derivePairedFirstGo(JSON.parse(raw),report.inputs.recipe.sha256,report.recipe_header.frames);
+    report.inputs.paired_first_go_projection={path:file,bytes:raw.length,sha256:hash};
+    report.paired_v11_first_go={scope:'Setup aggregates, actual GO, first strict post-GO typed22+seed+PAD and checked unload only',whole_session_complete:false};
+  }
   report.requested_entity_prefix = readRequestedEntityPrefix(recipeBytes, report.inputs.recipe.sha256);
   if (report.requested_entity_prefix) {
     if (diagnostic || stopAfter || resumeTimingPauses || firstReplayCallbackProbe ||
@@ -1515,7 +1653,8 @@ try {
       }
       throw Error('Current SSS observation exceeded unchanged bounded replay interval');
     }, replayTimeoutMs, 0);
-  } else if (firstReplayCallbackProbe) await firstReplayCallbackPhase();
+  } else if (pairedFirstGo) await phase('paired-v11-first-go-component',pairedFirstGoPhase,replayTimeoutMs,0);
+  else if (firstReplayCallbackProbe) await firstReplayCallbackPhase();
   else await phase('whole-session-replay', async () => {
     const replayStartedAt = Date.now();
     let lastProgressWriteAt = 0;
@@ -2072,6 +2211,14 @@ try {
     report.result = captureValid ? 'captured' : 'incomplete';
   } else {
     finalizeSessionCapture(report); // Keep original incomplete-replay classification truthful.
+    if(pairedFirstGo){
+      report.original_replay_capture_result=report.result;
+      const valid=report.paired_v11_first_go?.component_pass===true && !report.first_error && !report.first_mismatch &&
+        !report.close_error && !report.cdp_close_error && !report.download_error && !report.screenshot_error &&
+        !report.browser_errors.length && !report.unexpected_requests.length && report.cleanup?.browser_close_returned===true;
+      report.result=valid?'paired_v11_first_go_component_pass_replay_incomplete':'fail';
+    }
+
     if (currentSssExit) {
       report.original_replay_capture_result = report.result;
       try {
@@ -2115,6 +2262,9 @@ try {
 if (diagnostic) {
   if (report.result !== 'captured' || process.exitCode) process.exitCode = 1;
   else console.log(`captured: ${report.natural_pause_terminal?.outcome || 'unknown'}; diagnosis only`);
+} else if (pairedFirstGo) {
+  if(report.result!=='paired_v11_first_go_component_pass_replay_incomplete')process.exitCode=1;
+  else console.log('component pass: paired v11 first Setup/GO/post-GO; whole replay and C3 incomplete');
 } else if (laterBGate2) {
   if (report.result !== 'later_b_gate2_component_pass_replay_incomplete') process.exitCode = 1;
   else console.log('component pass: same-owner B constructor aggregate, actual GO and96 typed22+seed samples; checked one-shot retirement; whole replay/C3 incomplete');
