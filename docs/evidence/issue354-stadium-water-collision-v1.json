@@ -1,0 +1,188 @@
+{
+  "schema": "melee-web-stadium-water-collision-v1",
+  "issue": 354,
+  "state": "PASS_NATIVE_CONDITIONAL_QUERY_COMPONENT; STRICT_ROUTE_COMPARATOR_AND_NATIVE_QUERY_VALIDATOR_REPLAY_PASS; INDEPENDENT_RAW_REVIEW_PASS; FULL_REGRESSION_PASS; ORIGINAL_COLLISION_QUERY_UNOBSERVED",
+  "capture_path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-browser-capture-v1/",
+  "runtime": {
+    "head": "3d533ec3944b3b95d842c15fbfe2c98fef93d1d2",
+    "tree": "8f5026c9fb791c076eb55089b664270e4e544c08"
+  },
+  "original_reference": {
+    "producer": "b1dc76874537a17282c4023d9438047f00f89624",
+    "callback_report_sha256": "d75418f6410c0b45c7d32242a68464548e6f85fe64509cb9f5041bae44b04ddf",
+    "projection_sha256": "c3c64749a0eaa3b05813244bb5f374b43980dbcdfd246f695b38aae705fca7ab",
+    "recipe_sha256": "4fab2fe9916bd58baf1e031c746b7e236b893f620dbce7dd6d456679f2c04000",
+    "limitation": "The existing route comparator and native query validator replay passed. The retained original callback trace contains no collision-query counterpart; original collision-query parity is unobserved and outside #354."
+  },
+  "capture": {
+    "elapsed_seconds": 103.37609529076144,
+    "manifest_sha256": "de2f7e41bae31421502f7cf99b64e18da831a67f26d2d298d5dc9ec7556d3c37",
+    "pin_count": 235,
+    "all_pins_exact": true,
+    "report_sha256": "50f9614068deee794fa8ff8eb5e9db451890edad23395b44d9cb4d86c6dd7f1d",
+    "owner_sha256": "036cd5c999b4053edd9b7bafa32ad1f492dc26d34386f3d914e0fb60f60eb36f",
+    "launcher_sha256": "c428106a0b2c70562d12b2fe7fa98f5fd0598dd9e87373881ad6d0fa08fea9e1",
+    "root_summary_sha256": "24490a20dc8ff3622cd759d86355487de0c59730a0a52ce5aaef79a5533dea0d",
+    "owned_cleanup_passed": true,
+    "owned_process_groups_absent": true,
+    "H1_pauses": 0,
+    "lifetimes": 2,
+    "actions": 9024,
+    "native_diagnostic_rows": 22319,
+    "B_state_samples": 4223,
+    "scene_endpoints": 8,
+    "results_css_both_lifetimes": true,
+    "native_retired": true
+  },
+  "query": {
+    "schema": "melee-web-stadium-first-water-collision-query-native-v1",
+    "wrapper_source_tick": 4307,
+    "payload_source_tick": 4306,
+    "match_index": 1,
+    "world_generation": 7,
+    "line_index": 113,
+    "joint": 0,
+    "kind": "floor",
+    "chain_x_bounds": {
+      "min": -64.96515655517578,
+      "min_bits": "0xc281ee29",
+      "max": -63.20751953125,
+      "max_bits": "0xc27cd480"
+    },
+    "midpoint_hit": {
+      "x": -64.08633422851562,
+      "x_bits": "0xc2802c34",
+      "y": 86.15269470214844,
+      "y_bits": "0x42ac4e2e",
+      "line": 113,
+      "displacement_y": 9.999999747378752e-05,
+      "displacement_y_bits": "0x38d1b717",
+      "normal_bits": [
+        "0xbef44df4",
+        "0x3f60fa35",
+        "0x00000000"
+      ]
+    },
+    "outside_chain_misses": {
+      "left": {
+        "x_bits": "0xc283ee29",
+        "line": -1
+      },
+      "right": {
+        "x_bits": "0xc278d480",
+        "line": -1
+      }
+    },
+    "sampled_world_state_unchanged": true,
+    "readiness_unchanged": true,
+    "raw_input_order_and_rng_comparison": "The declared route/input/action comparator replay passed. Query parity itself remains unobserved because no original collision-query counterpart is retained."
+  },
+  "raw_inspection": {
+    "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-browser-capture-v1/pure-raw-inspection.json",
+    "sha256": "d0e2c0a5d474af211a0c4789576dafa021ee8c095dab510bf286885bda189941",
+    "decision": "PASS_RAW_INSPECTION; STRICT_ROUTE_REPLAY_COMPLETED_IN_SEPARATE_INDEPENDENT_REVIEW",
+    "note": "This retained raw-inspection receipt predates the strict offline route/query replay; the later independent-review receipt records that replay."
+  },
+  "validation": {
+    "focused_controls_path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-integration-v1/focused-final.json",
+    "focused_controls_sha256": "98d788d815fafc90cfd825c0bb5af8bb3e423714b22ef8df607a67b77c6e6ed8",
+    "builds_path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-integration-v1/build-summary.json",
+    "builds_sha256": "2b8840a656bb0e7c938fc8ca33cf0f94977e41a6260e4e25e4e3a87381552ebe",
+    "source_review_path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-integration-v1/independent-final-source-review.json",
+    "source_review_sha256": "b4324e3eab2c61ca421e38fc8b57eac943bbbb516dbc97c93841bdb4bf6844d5",
+    "source_review_decision": "GO_COMMIT_AND_AFFECTED_BUILD",
+    "full_regression": {
+      "state": "PASS",
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-integration-v1/regression-summary.json",
+      "sha256": "ae0ac6047937b6f9420e3cade8add365dcf01f889d140da14e3dc2a3767cd80a",
+      "result_path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-integration-v1/regression.result.json",
+      "result_sha256": "59c9616558217538456476cac73ffb2f64574eddc5bab9ad3411d2c0c169ca20",
+      "tests": 3001,
+      "skipped": 211,
+      "failures": 0,
+      "runtime_head": "3d533ec3944b3b95d842c15fbfe2c98fef93d1d2",
+      "source_unchanged": true,
+      "owned_process_group_absent": true,
+      "cleanup_signals": [],
+      "elapsed_seconds_unittest": 629.643,
+      "elapsed_seconds_owned": 630.401973125
+    },
+    "existing_route_comparator_and_native_query_validator_replay": {
+      "state": "PASS",
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-browser-capture-v1/independent-review.json",
+      "sha256": "5425dbaa29f44e1ce9887acb6d2c623313d11d7df6e235efaa17ef49f6e0e15f",
+      "decision": "GO_SCOPED_NATIVE_WATER_QUERY_COMPONENT",
+      "elapsed_seconds": 1.768,
+      "actions": 9024,
+      "states": 4223,
+      "scene_endpoints": 8,
+      "probe_rows": 9024,
+      "native_rows": 22319,
+      "collision_query_rows": 1,
+      "generations": [
+        3,
+        7
+      ],
+      "water_graph_lifecycle_events": 11,
+      "current_immutable_pins_verified": 234,
+      "prior_capture_time_pins_verified": 235,
+      "source_unchanged": true,
+      "owned_process_group_absent": true
+    },
+    "original_collision_query_parity": "UNOBSERVED_AND_OUTSIDE_ISSUE_354"
+  },
+  "retained_nonruntime_failures": [
+    {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-browser-capture-v1/pure-review-preparation-error-v1.json",
+      "sha256": "37a4240e5d351c892a38881ccb900ad6113bd3b9231295dfa25efe8d94aa1302",
+      "type": "reviewer-preparation assertion; no runtime mismatch"
+    },
+    {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-browser-capture-v1/independent-review-run-v1/actual-water-query-raw-review.result.json",
+      "sha256": "a96c8aaba67b7011efb331cc3d6718153f289d0ee0376ac818c343dfe6bc3720",
+      "stderr_sha256": "7dc27a345a7bd0eb3235a03cdd8d94c48046ea896c68f916e91eb477f267312f",
+      "type": "reviewer invocation/preparation failure; later pure raw inspection passed"
+    },
+    {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-component-v1/independent-review-v3.json",
+      "sha256": "33cf353272cc51133f9ed69b270dc6bfc05fdd62b8443be4664481dac1cabc75",
+      "type": "source-fixture namespace finding; corrected actual-method focused control passes"
+    },
+    {
+      "kind": "actual-source-test-fixture-compile",
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-component-v1/focused-v5/result.json",
+      "sha256": "1ee5f8daaf913ecf934a4d39f1cf8572c4d5bed67f939f7b6098ff769a3dc357",
+      "stderr_path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-component-v1/focused-v5/actual-session-water-query.stderr",
+      "stderr_sha256": "95d1f6ac0598a0ad636921165471f31330ba35084b26d4823247f332db308d18",
+      "disposition": "The extracted actual-session fixture lacked the Dolphin include path; fixture setup failure, not a runtime result."
+    },
+    {
+      "kind": "actual-source-test-fixture-compile",
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-component-v1/focused-v6/result.json",
+      "sha256": "9a91349e53efca38430078933cf8b32ab5261cd598b8bd0660a4080bc5316631",
+      "stderr_path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-component-v1/focused-v6/actual-session-water-query.stderr",
+      "stderr_sha256": "88cf049e998bb72ec8a835f9a697f6e3f5fb9cbd1d8e626636565bfd675b4689",
+      "disposition": "The extracted fixture omitted OUTCOME_NONE declarations; fixture setup failure, not a runtime result."
+    },
+    {
+      "kind": "route-comparator-runner-fixture",
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-integration-v1/runner.result.json",
+      "sha256": "c92b38011f4e82409c4f28e5b660dd1966f32c5e240a5f38e024a082605963d2",
+      "stderr_sha256": "d0b8bf96788ef15066b78b6f5edc6434041439559792a3208a9f9086b5a6978a",
+      "corrected_result_path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-integration-v1/runner-v2/runner.result.json",
+      "corrected_result_sha256": "add1b3c8a3b9cf6bd96067db72501283a99316b2c2365c4b6a2f25842c8d2ab3",
+      "disposition": "The first reducer fixture supplied an action before Setup; the corrected runner control passed. This was test-fixture ordering, not a browser mismatch."
+    }
+  ],
+  "scope_exclusions": [
+    "No original rotated Water vertices or original source-side query/normal counterpart; collision-query parity remains unobserved and outside #354.",
+    "No per-owner RNG parity, general timing/completion rule, Grass/Rock, repeated-transform coverage, C5/C6 acceptance, or public transformation admission.",
+    "The query component does not retroactively extend the prior #351 first-Water comparison."
+  ],
+  "reviewer_environment_drift": {
+    "review_sha256": "5425dbaa29f44e1ce9887acb6d2c623313d11d7df6e235efaa17ef49f6e0e15f",
+    "captured_chrome_sha256": "4f71e9dbe725fec1110977b6a6dd0708fb32fbde9c905b4b461cef880ac08288",
+    "current_chrome_sha256_at_review": "0d8e033c06b6dfecb6595e41ff98db9555fb48de6abda0052aac9b48bf688d9c",
+    "scope": "The browser installation changed after the successful capture and its prior 235-pin verification. The offline comparator did not launch a browser; this reviewer-environment drift does not invalidate the capture."
+  }
+}
