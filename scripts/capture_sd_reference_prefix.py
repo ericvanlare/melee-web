@@ -97,6 +97,24 @@ def build_stadium_whole_long_idle_compact_launch(output, *, paired_idle=False):
     return environment, receipt
 
 
+def saved_stadium_b_long_idle_window(receiver):
+    """B's closed receipt survives C; never derive its label from the live index."""
+    window = receiver.long_idle_window_result
+    require(isinstance(window, dict) and
+            window.get('schema') == 'melee-web-stadium-whole-long-idle-window-v1' and
+            window.get('profile') == STADIUM_WHOLE_LONG_IDLE_PROFILE['profile'] and
+            type(window.get('match_index')) is int and window['match_index'] == 1 and
+            window.get('comparison_post_go_ticks') == 3500 and
+            window.get('comparison_typed_state_count') == 3501 and
+            type(window.get('typed_state_count_including_natural_tail')) is int and
+            3501 <= window['typed_state_count_including_natural_tail'] <= 3505 and
+            window.get('four_port_consumed_pad_count') == window['typed_state_count_including_natural_tail'] and
+            all(isinstance(window.get(k), dict) for k in
+                ('go', 'target_source_tick', 'first_later_natural_draw_return')),
+            'Whole Stadium saved B window is missing or mislabeled')
+    return window
+
+
 def validate_stadium_whole_long_idle_outputs(raw, status_path, output_root,
                                              compact_launch, driver_window, dol_sha256, *, standings=None):
     """Join the full raw stream, final observer status, and selected-B compact ledger."""
@@ -3552,7 +3570,7 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             report['stadium_paired_idle_compact_rng'] = compact_summary
             report['stadium_b_observations'] = receiver.b_observations
         elif stadium_whole_long_idle:
-            driver_window = receiver.long_idle_window_summary()
+            driver_window = saved_stadium_b_long_idle_window(receiver)
             source_window, compact_summary = validate_stadium_whole_long_idle_outputs(
                 raw, status, output, long_idle_compact_launch, driver_window,
                 env['MWRC_DOL_SHA256'],

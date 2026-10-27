@@ -238,5 +238,25 @@ class StandingsInputPolicyTests(unittest.TestCase):
             with self.assertRaises(ValueError): observed.validate_map_state(row, state, (), consumed)
             self.assertEqual(checked.call_args.args[2]['errors'], [-2, 0, -1, -1])
 
+    def test_final_c_uses_saved_closed_b_window_without_relabeling(self):
+        window = dict(schema='melee-web-stadium-whole-long-idle-window-v1',
+            profile='selected_b_3500_v1', match_index=1, comparison_post_go_ticks=3500,
+            comparison_typed_state_count=3501, typed_state_count_including_natural_tail=3501,
+            four_port_consumed_pad_count=3501, go=dict(sequence=10),
+            target_source_tick=dict(sequence=100), first_later_natural_draw_return=dict(sequence=101))
+        class FinalC:
+            match_index = 2
+            long_idle_window_result = window
+            def long_idle_window_summary(self):
+                raise AssertionError('post-C live summary must not relabel B')
+        receiver = FinalC()
+        self.assertIs(m.saved_stadium_b_long_idle_window(receiver), window)
+        self.assertEqual(window['match_index'], 1)
+        for change in ({'match_index': 2}, {'profile': 'wrong'},
+                       {'typed_state_count_including_natural_tail': 3500},
+                       {'four_port_consumed_pad_count': 3500}, {'go': None}):
+            receiver.long_idle_window_result = dict(window, **change)
+            with self.assertRaises(ValueError): m.saved_stadium_b_long_idle_window(receiver)
+
 
 if __name__ == '__main__': unittest.main()
