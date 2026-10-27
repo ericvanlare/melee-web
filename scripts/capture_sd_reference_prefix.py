@@ -61,6 +61,12 @@ STADIUM_WHOLE_PAIRED_IDLE_PROFILE = {
     "raw_omission_kinds": ["draw_enter", "draw_return"],
 }
 STADIUM_WHOLE_LONG_IDLE_RECORD_CAP = 77602
+STADIUM_WHOLE_STOCKOUT_PROFILE = {
+    "profile": "selected_b_natural_zero_stockout_v1", "match_count": 3,
+    "selected_match": 1, "initial_stock_pair": [4, 4],
+    "p1_transitions": [3, 2, 1, 0], "p2_stocks": 4,
+    "required_mode_before_exit": 9, "required_outcome": 2,
+}
 STADIUM_WHOLE_LONG_IDLE_COMPACT_BASENAME = "stadium-whole-selected-b-compact-rng.mwrl"
 STADIUM_WHOLE_PAIRED_IDLE_COMPACT_BASENAME = "stadium-whole-paired-compact-rng.mwrl"
 
@@ -1183,7 +1189,7 @@ def prepare_rules_profile(profile, user, *, source_slots=(0, 1)):
 
 
 def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_manifest, timeout=180, gci=None,
-        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False, stadium_go_ordinal2=False, stadium_whole_target=None, stadium_whole_setup=None, stadium_whole_gc=None, stadium_whole_dol=None, stadium_whole_provenance=None, stadium_whole_b_state=False, stadium_whole_long_idle=False, stadium_whole_paired_idle=False, stadium_whole_rng_window=None, stadium_whole_replay_binding=None, stadium_whole_rng_coverage="rng_returns"):
+        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False, stadium_go_ordinal2=False, stadium_whole_target=None, stadium_whole_setup=None, stadium_whole_gc=None, stadium_whole_dol=None, stadium_whole_provenance=None, stadium_whole_b_state=False, stadium_whole_long_idle=False, stadium_whole_paired_idle=False, stadium_whole_stockout=False, stadium_whole_rng_window=None, stadium_whole_replay_binding=None, stadium_whole_rng_coverage="rng_returns"):
     """Own fresh output before preparation so failures cannot vanish before launch."""
     require(type(stadium_whole_b_state) is bool, "Whole Stadium B observation opt-in must be boolean")
     require(type(stadium_whole_long_idle) is bool and
@@ -1191,6 +1197,11 @@ def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_m
             'Whole Stadium long-idle profile requires the B-state option')
     require(type(stadium_whole_paired_idle) is bool,
             'Whole Stadium paired-idle profile option must be boolean')
+    require(type(stadium_whole_stockout) is bool and
+            (not stadium_whole_stockout or stadium_whole_b_state and
+             not stadium_whole_long_idle and not stadium_whole_paired_idle and
+             stadium_whole_rng_window is None and stadium_whole_replay_binding is None),
+            'Whole Stadium natural stockout requires B-state and excludes other adjunct profiles')
     whole_args = (stadium_whole_target, stadium_whole_setup, stadium_whole_gc,
                   stadium_whole_dol, stadium_whole_provenance)
     if any(x is not None for x in whole_args):
@@ -1210,6 +1221,7 @@ def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_m
             stadium_whole_b_state=stadium_whole_b_state,
             stadium_whole_long_idle=stadium_whole_long_idle,
             stadium_whole_paired_idle=stadium_whole_paired_idle,
+            stadium_whole_stockout=stadium_whole_stockout,
             stadium_whole_rng_window=stadium_whole_rng_window,
             stadium_whole_replay_binding=stadium_whole_replay_binding,
             stadium_whole_rng_coverage=stadium_whole_rng_coverage)
@@ -1219,6 +1231,8 @@ def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_m
     require(not stadium_whole_b_state, "Whole Stadium B observation requires the whole3 input tuple")
     require(not stadium_whole_long_idle,
             "Whole Stadium long-idle profile requires the whole3 input tuple")
+    require(not stadium_whole_stockout,
+            "Whole Stadium natural stockout requires the whole-session input tuple")
     require(not stadium_whole_paired_idle,
             "Whole Stadium paired-idle profile requires the whole-session input tuple")
     require(type(stadium_go_ordinal2) is bool and
@@ -2167,11 +2181,99 @@ def drive_stadium_sss_feedback(receiver, menus, controller, next_row, wait_sourc
             "SSS Stadium confirm/release did not retain exact consumed PAD rows")
 
 
+class StadiumNaturalStockoutWitness:
+    """Validate actual two-fighter stock rows and mode-9 ordering."""
+    def __init__(self):
+        self.expected_start_tick = None
+        self.last_tick = None
+        self.last_stocks = None
+        self.last_fighters = None
+        self.transitions = []
+        self.mode9 = None
+        self.source_ticks = 0
+
+    def begin(self, go_source_tick):
+        require(self.expected_start_tick is None and self.last_tick is None and
+                type(go_source_tick) is int and go_source_tick >= 0,
+                'Natural stockout witness lacks one actual B GO source-tick binding')
+        self.expected_start_tick = go_source_tick
+
+    def observe(self, row, fighters, mode):
+        require(row.get('event') == 'boundary' and row['payload'].get('boundary') == 'source_tick' and
+                type(row.get('source_tick')) is int and type(row.get('seq')) is int and
+                isinstance(fighters, dict) and isinstance(fighters.get('stocks'), tuple) and
+                len(fighters['stocks']) == 2 and all(type(x) is int and 0 <= x <= 4 for x in fighters['stocks']) and
+                type(mode) is int,
+                'Natural stockout witness lacks actual source-tick fighters/display')
+        tick, stocks = row['source_tick'], fighters['stocks']
+        require((self.last_tick is None and tick == self.expected_start_tick and stocks == (4, 4)) or
+                (self.last_tick is not None and tick == self.last_tick + 1 and stocks[1] == 4 and
+                 stocks[0] <= self.last_stocks[0] and self.last_stocks[0] - stocks[0] <= 1),
+                'Natural stockout source rows skipped/reordered a stock or changed neutral P2 stocks')
+        if self.last_tick is None:
+            require(mode != 9, 'Natural stockout began in mode9 before any observed stock loss')
+        elif stocks[0] != self.last_stocks[0]:
+            require(stocks[0] == self.last_stocks[0] - 1,
+                    'Natural stockout P1 stock transition is not exactly one source-observed life')
+            self.transitions.append(dict(sequence=row['seq'], source_tick=tick,
+                                         from_stocks=self.last_stocks, to_stocks=stocks))
+        if mode == 9:
+            require(stocks == (0, 4) and [item['to_stocks'][0] for item in self.transitions] == [3, 2, 1, 0],
+                    'Natural stockout mode9 appeared before P1 zero with exact four observed losses')
+            if self.mode9 is None:
+                self.mode9 = dict(sequence=row['seq'], source_tick=tick, mode=mode,
+                                  stocks=list(stocks))
+        self.last_tick, self.last_stocks, self.last_fighters = tick, stocks, fighters
+        self.source_ticks += 1
+
+    def finish(self, exit_row, result_outcome):
+        require(type(result_outcome) is int and result_outcome == 2 and self.mode9 is not None and
+                type(exit_row.get('seq')) is int and exit_row['seq'] > self.mode9['sequence'] and
+                self.last_stocks == (0, 4) and
+                [item['to_stocks'][0] for item in self.transitions] == [3, 2, 1, 0],
+                'Natural stockout lacks ordered four actual losses, mode9-before-exit, or elimination outcome')
+        return {'schema': 'melee-web-stadium-natural-zero-stockout-v1',
+                'profile': STADIUM_WHOLE_STOCKOUT_PROFILE['profile'],
+                'go_source_tick': self.expected_start_tick,
+                'source_tick_count': self.source_ticks,
+                'initial_stocks': [4, 4], 'p1_stock_transitions': list(self.transitions),
+                'mode9_source_tick': self.mode9,
+                'vs_exit_return_sequence': exit_row['seq'], 'result_outcome': result_outcome,
+                'source_stock_write_observed': False, 'standings_observed': False,
+                'lifecycle_parity': False, 'C3': False}
+
+
+def _stockout_source_fighter_state(row):
+    """Project the two fighter slices for the existing strict fighter decoder.
+
+    Whole Stadium source ticks also carry map/display slices with flags 2 and
+    5. The full Stadium snapshot validator checks those; this projection keeps
+    them out of `_source_fighter_state`, whose flags are fighter-only.
+    """
+    payload = row.get('payload') if isinstance(row, dict) else None
+    slices = payload.get('slices') if isinstance(payload, dict) else None
+    require(isinstance(slices, list) and all(isinstance(item, dict) for item in slices),
+            'Natural stockout source row lacks a complete slice descriptor list')
+    fighter_slices = [item for item in slices
+                      if item.get('name') in ('fighter_head', 'fighter_stocks')]
+    require(len(fighter_slices) == 4 and
+            all(sum(item.get('name') == name and item.get('flags') == slot
+                    for item in fighter_slices) == 1
+                for name in ('fighter_head', 'fighter_stocks') for slot in (0, 1)),
+            'Natural stockout source row lacks exactly two FighterHead and FighterStocks slices')
+    projected_payload = dict(payload)
+    projected_payload['slices'] = fighter_slices
+    projected_row = dict(row)
+    projected_row['payload'] = projected_payload
+    from reference_versus_sequence_capture import _source_fighter_state
+    return _source_fighter_state(projected_row)
+
+
 class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
     """Strict whole-session rows feeding the existing CSS/SSS input policies."""
     def __init__(self, menus, receipt, expected, *, stadium_whole_b_state=False,
                  stadium_whole_long_idle=False, stadium_whole_paired_idle=False,
-                 replay_binding_sha256=None):
+                 stadium_whole_stockout=False, replay_binding_sha256=None):
         super().__init__(menus)
         require(type(stadium_whole_b_state) is bool, "Whole Stadium B observation opt-in must be boolean")
         require(type(stadium_whole_long_idle) is bool and
@@ -2185,6 +2287,13 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
         self.stadium_whole_b_state = stadium_whole_b_state
         self.stadium_whole_long_idle = stadium_whole_long_idle
         self.stadium_whole_paired_idle = stadium_whole_paired_idle
+        require(type(stadium_whole_stockout) is bool and
+                (not stadium_whole_stockout or stadium_whole_b_state and
+                 not stadium_whole_long_idle and not stadium_whole_paired_idle),
+                'Whole Stadium natural stockout requires B-state and excludes idle profiles')
+        self.stadium_whole_stockout = stadium_whole_stockout
+        self.stockout_witness = StadiumNaturalStockoutWitness() if stadium_whole_stockout else None
+        self.stockout_summary = None
         self.progress_scope = ('stadium_paired_idle_feedback_v1' if stadium_whole_paired_idle else
                                'stadium_whole3_feedback_v1')
         self.match_count = 2 if stadium_whole_paired_idle else 3
@@ -2224,6 +2333,12 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
     def selected_long_idle(self, index):
         return self.stadium_whole_long_idle and index in self.b_state_matches
 
+    def selected_stockout(self, index):
+        return self.stadium_whole_stockout and index == STADIUM_WHOLE_STOCKOUT_PROFILE['selected_match']
+
+    def stockout_gameplay_active(self):
+        return self.selected_stockout(self.match_index) and not self.outcome_seen
+
     def next_lifetime(self):
         require(self.returned_css and self.match_index < self.match_count - 1 and not self.ended,
                 'Whole Stadium lifetime reset preceded natural ReturnCss')
@@ -2236,9 +2351,11 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
             stadium_whole_b_state=self.stadium_whole_b_state,
             stadium_whole_long_idle=self.stadium_whole_long_idle,
             stadium_whole_paired_idle=self.stadium_whole_paired_idle,
+            stadium_whole_stockout=self.stadium_whole_stockout,
             replay_binding_sha256=self.replay_binding_sha256)
         fresh.b_observations = self.b_observations
         fresh.long_idle_windows = self.long_idle_windows
+        fresh.stockout_summary = self.stockout_summary
         if not self.stadium_whole_paired_idle:
             fresh.b_observation = self.b_observation
             fresh.long_idle_window = self.long_idle_window
@@ -2267,6 +2384,8 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
             self.b_constructor.finish()
             _validate_progress(row, phase, self.receipt, scope=self.progress_scope,match_index=self.match_index)
             self.b_go = _validate_stadium_idle_state_record(row, 'GO', row['source_tick'])
+            if self.selected_stockout(self.match_index):
+                self.stockout_witness.begin(self.b_go['source_tick'])
             if self.selected_long_idle(self.match_index):
                 profile = (STADIUM_WHOLE_PAIRED_IDLE_PROFILE if self.stadium_whole_paired_idle else
                            STADIUM_WHOLE_LONG_IDLE_PROFILE)
@@ -2492,6 +2611,8 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                         [item['match_index'] for item in self.long_idle_windows] == [0, 1],
                         'Whole Stadium paired terminal lacks both selected observation windows')
             else:
+                require(not self.stadium_whole_stockout or self.stockout_summary is not None,
+                        'Whole Stadium terminal lacks completed natural stockout mode9/result witness')
                 require(not self.stadium_whole_b_state or self.b_observation is not None,
                         'Whole Stadium terminal lacks completed B observation span')
                 require(not self.stadium_whole_long_idle or self.long_idle_window_complete,
@@ -2549,6 +2670,10 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                 chord = raw_pad(buttons=['L','R','A','START'])
                 start = raw_pad(buttons=['START'])
                 allowed = [[NEUTRAL_PAD, NEUTRAL_PAD]]
+                if self.stockout_gameplay_active():
+                    edge = raw_pad(x=80)
+                    jump = raw_pad(buttons=['X'], x=80)
+                    allowed.extend([[edge, NEUTRAL_PAD], [jump, NEUTRAL_PAD]])
                 if self.chord_requested and ((not self.exit_requested and self.pause_released is None) or
                                              (self.exit_requested and self.chord_released is None)):
                     allowed.append([chord, NEUTRAL_PAD])
@@ -2561,7 +2686,7 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                               pc=payload['pc'], lr=payload['lr'], gprs=list(payload['gprs']), **queue)
                 if self.selected_long_idle(self.match_index):
                     sample['draw_ordinal'] = row['draw_ordinal']
-                if not self.chord_requested:
+                if not self.chord_requested and not (self.selected_stockout(self.match_index) and self.outcome_seen):
                     require(self.pending_neutral_sample is None,
                             'Whole Stadium repeated unpaired neutral consumed sample')
                     self.pending_neutral_sample = sample
@@ -2601,6 +2726,8 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                         'Whole Stadium Setup preceded consumed menu confirmation/release')
                 self.setup_seen = True
         elif name == 'source_tick':
+            require(not (self.selected_stockout(self.match_index) and self.outcome_seen),
+                    'Whole Stadium natural stockout source tick followed its validated exit')
             require(self.setup_seen and self.last_pad is not None and
                     (row['source_tick'] == 0 if self.previous_tick is None else row['source_tick'] == self.previous_tick+1),
                     'Whole Stadium source tick lacks ordered Setup/PAD')
@@ -2609,7 +2736,10 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                 sample = self.pending_neutral_sample
                 require(sample is not None and sample['sequence'] < row['seq'] and
                         sample['source_tick'] == row['source_tick'] and
-                        sample['ports'][:2] == [NEUTRAL_PAD]*2,
+                        (sample['ports'][:2] == [NEUTRAL_PAD]*2 or
+                         self.selected_stockout(self.match_index) and
+                         sample['ports'][1] == NEUTRAL_PAD and sample['ports'][0] in
+                         [NEUTRAL_PAD, raw_pad(x=80), raw_pad(buttons=['X'], x=80)]),
                         'Whole Stadium counted tick lacks its fresh neutral consumed owner')
                 self.pending_neutral_sample = None
                 self.tick_count += 1
@@ -2622,24 +2752,33 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                 self.b_state_samples.append(snapshot)
             if self.selected_long_idle(self.match_index) and self.b_go is not None:
                 self._observe_long_idle_tick(row, snapshot, sample)
+            if self.selected_stockout(self.match_index) and snapshot is not None:
+                self.stockout_witness.observe(row, _stockout_source_fighter_state(row),
+                    snapshot['display']['mode_s16'])
             self.previous_tick = row['source_tick']
             self.observe_pause_clock(row)
         elif name == 'vs_exit_return':
             items = [x for x in payload.get('slices', []) if x.get('name') == 'result']
-            require(self.pause_released is not None and self.pause_ready_clock is not None and
-                    self.chord_consumed is not None and self.exit_requested and
-                    self.chord_consumed['sequence'] < row['seq'] and
-                    len(items) == 1,
-                    'Whole Stadium exit lacks fresh ready chord or result header')
+            stockout = self.selected_stockout(self.match_index)
+            require((self.stockout_witness is not None if stockout else
+                     self.pause_released is not None and self.pause_ready_clock is not None and
+                     self.chord_consumed is not None and self.exit_requested and
+                     self.chord_consumed['sequence'] < row['seq']) and len(items) == 1,
+                    'Whole Stadium exit lacks the exact selected natural-route witness or result header')
             # Native Result is the first0x28 bytes of original MatchEnd at
             # MatchExitInfo0x80479d98 +0xc, not the whole0x227c-byte object.
             # gm/types.h declares timer+0 and outcome+4 in this header prefix.
             result = items[0]
             raw = bytes.fromhex(result['hex'])
+            outcome = 2 if stockout else 7
             require(result.get('tag') == 15 and result.get('flags') == 0 and
                     result.get('address') == 0x80479da4 and
-                    result.get('size') == len(raw) == 0x28 and raw[4] == 7,
-                    'Whole Stadium completed MatchEnd header lacks source outcome7')
+                    result.get('size') == len(raw) == 0x28 and raw[4] == outcome,
+                    'Whole Stadium MatchEnd header outcome differs from selected route')
+            if stockout:
+                require(self.pending_neutral_sample is None,
+                        'Whole Stadium natural stockout exit has an unpaired consumed sample')
+                self.stockout_summary = self.stockout_witness.finish(row, raw[4])
             if self.selected_b_state(self.match_index):
                 require(self.b_go is not None and self.b_state_samples,
                         'Whole Stadium selected match exit lacks actual GO/state span')
@@ -2655,8 +2794,9 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
                     self.b_observations.append(self.b_observation)
             self.outcome_seen = True
         elif name == 'return_css':
-            require(self.outcome_seen and self.chord_released is not None,
-                    'Whole Stadium CSS return preceded outcome7 or consumed exit release')
+            require(self.outcome_seen and
+                    (self.chord_released is not None or self.selected_stockout(self.match_index)),
+                    'Whole Stadium CSS return preceded its outcome or consumed exit release')
             require(not self.selected_long_idle(self.match_index) or self.long_idle_window_complete,
                     'Whole Stadium Results began before the selected long-idle window')
             self.returned_css = True
@@ -2722,6 +2862,59 @@ def drive_stadium_cold_css(receiver, menus, next_row, wait_source, tap, *, stock
     wait_source(lambda: receiver.css is not None, 'whole-first-CSS', 600)
 
 
+def drive_stadium_natural_stockout(receiver, next_row, controller, deadline):
+    """Reuse the existing ordinary edge/jump sequence, gated by actual source stocks."""
+    from reference_versus_sequence_capture import raw_pad
+    witness = receiver.stockout_witness
+    require(receiver.selected_stockout(1) and witness is not None and
+            witness.last_stocks == (4, 4) and witness.last_fighters is not None and
+            witness.last_fighters['motions'] == (14, 14) and
+            witness.last_fighters['ground_air'] == (0, 0),
+            'Natural stockout did not start from the actual grounded four-stock state')
+    edge = raw_pad(x=80)
+    jump = raw_pad(buttons=['X'], x=80)
+
+    def pump_until(predicate, label, max_rows=1800):
+        start = receiver.seq
+        while not predicate():
+            require(not receiver.ended and receiver.seq - start < max_rows and
+                    time.monotonic() < deadline,
+                    'Natural stockout source wait/deadline: ' + label)
+            next_row()
+
+    for expected_stock in (4, 3, 2, 1):
+        require(witness.last_stocks == (expected_stock, 4) and
+                witness.last_fighters['motions'] == (14, 14) and
+                witness.last_fighters['ground_air'] == (0, 0),
+                'Natural stockout life did not begin from a source-observed grounded respawn')
+        prior = len(witness.transitions)
+        # This is the existing ordinary SequenceRunner recipe, not injected
+        # stock state. Every actual source tick and consumed four-port row is
+        # still processed by the receiver while the input stream is retained.
+        controller.hold(edge, NEUTRAL_PAD, 1.2,
+                        action=f'natural-stockout-stock-{expected_stock}-edge')
+        controller.hold(jump, NEUTRAL_PAD, 0.65,
+                        action=f'natural-stockout-stock-{expected_stock}-jump')
+        pump_until(lambda: len(witness.transitions) > prior,
+                   f'P1 stock {expected_stock}->{expected_stock - 1}')
+        require(len(witness.transitions) == prior + 1 and
+                witness.transitions[-1]['from_stocks'] == (expected_stock, 4) and
+                witness.transitions[-1]['to_stocks'] == (expected_stock - 1, 4),
+                'Natural stockout action skipped or combined actual stock transitions')
+        if expected_stock > 1:
+            pump_until(lambda: witness.last_stocks == (expected_stock - 1, 4) and
+                       witness.last_fighters['motions'] == (14, 14) and
+                       witness.last_fighters['ground_air'] == (0, 0),
+                       f'P1 grounded respawn at {expected_stock - 1} stocks')
+
+    controller.set_both(NEUTRAL_PAD, NEUTRAL_PAD, action='natural-stockout-zero:neutral')
+    pump_until(lambda: receiver.outcome_seen,
+               'source-observed zero-stock mode9 and natural elimination Results exit')
+    require(witness.mode9 is not None and receiver.stockout_summary is not None,
+            'Natural stockout result arrived before a source-observed mode9 row')
+    return dict(receiver.stockout_summary)
+
+
 def drive_stadium_whole_three(receiver, tail, controller, menus, deadline):
     """Existing input policies, three natural completions; no source writes."""
     controller = StadiumDeadlineController(controller, deadline)
@@ -2751,6 +2944,9 @@ def drive_stadium_whole_three(receiver, tail, controller, menus, deadline):
         wait_source(lambda: receiver.setup_seen,'Setup',600)
         while receiver.tick_count < 180:
             next_row()
+        stockout_result = None
+        if receiver.selected_stockout(index):
+            stockout_result = drive_stadium_natural_stockout(receiver, next_row, controller, deadline)
         if receiver.selected_long_idle(index):
             # Continue consuming the same complete MWRO stream. The receiver
             # gates only on its actual GO, contiguous SourceTicks, and first
@@ -2759,20 +2955,18 @@ def drive_stadium_whole_three(receiver, tail, controller, menus, deadline):
             idle_window = wait_for_stadium_b_long_idle_window(receiver, next_row, deadline)
         else:
             idle_window = None
-        receiver.chord_requested = True
         requested_after = dict(sequence=receiver.seq-1, source_tick=receiver.previous_tick,
                                minimum_neutral_ticks=receiver.tick_count)
-        chord = raw_pad(buttons=['L','R','A','START'])
-        tap({'p1':chord,'p2':NEUTRAL_PAD},'whole-pause-request',600)
-        wait_source(lambda: receiver.pause_ready_clock is not None,'source-pause-ready',600)
-        receiver.exit_requested = True
-        controller.set_both(chord, NEUTRAL_PAD, action='whole-no-contest')
-        wait_source(lambda: receiver.chord_consumed is not None,'fresh-exit-chord-consumed',600)
-        # Release immediately; source may exit before its next PAD consume.
-        # Preserve exit/mode/Results ordering rather than draining those rows
-        # inside a tap waiting for the release to become source-visible.
-        controller.set_both(NEUTRAL_PAD, NEUTRAL_PAD, action='whole-no-contest:release')
-        wait_source(lambda: receiver.outcome_seen,'natural-exit-outcome7',600)
+        if stockout_result is None:
+            receiver.chord_requested = True
+            chord = raw_pad(buttons=['L','R','A','START'])
+            tap({'p1':chord,'p2':NEUTRAL_PAD},'whole-pause-request',600)
+            wait_source(lambda: receiver.pause_ready_clock is not None,'source-pause-ready',600)
+            receiver.exit_requested = True
+            controller.set_both(chord, NEUTRAL_PAD, action='whole-no-contest')
+            wait_source(lambda: receiver.chord_consumed is not None,'fresh-exit-chord-consumed',600)
+            controller.set_both(NEUTRAL_PAD, NEUTRAL_PAD, action='whole-no-contest:release')
+            wait_source(lambda: receiver.outcome_seen,'natural-exit-outcome7',600)
         # Use the existing checked exit/Results/Prize protocol intact.
         from reference_versus_sequence_capture import SequenceRunner
         class ObservedResultsTail:
@@ -2789,16 +2983,21 @@ def drive_stadium_whole_three(receiver, tail, controller, menus, deadline):
         def input_ready():
             require(receiver.menu_polls-release_wait_start < 600,
                     'Whole Stadium exit release consume polling cap')
+            if stockout_result is not None:
+                receiver.start_allowed = True
+                return True
             if receiver.chord_released is None:
                 return False
             receiver.start_allowed = True
             return True
         result_policy._confirm_results(index, deadline, input_ready=input_ready)
         require(receiver.returned_css,'Whole Stadium Results lacks checked natural CSS return')
-        measurement = dict(match_index=index, request=requested_after,
+        measurement = (dict(match_index=index, request=requested_after,
+            natural_stockout=stockout_result) if stockout_result is not None else
+            dict(match_index=index, request=requested_after,
             actual_pause_chord=receiver.pause_consumed, actual_pause_release=receiver.pause_released,
             pause_ready=receiver.pause_ready_clock,
-            actual_chord=receiver.chord_consumed, actual_release=receiver.chord_released)
+            actual_chord=receiver.chord_consumed, actual_release=receiver.chord_released))
         if idle_window is not None:
             measurement['long_idle_window'] = idle_window
         measurements.append(measurement)
@@ -3022,7 +3221,7 @@ def stadium_whole_replay_complete(source, native_status, primary, primary_status
 def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, build_manifest,
                              target_path, setup_path, checkpoint_gc, dol, provenance, gci, timeout,
                              stadium_whole_b_state=False, stadium_whole_long_idle=False,
-                             stadium_whole_paired_idle=False, stadium_whole_rng_window=None,
+                             stadium_whole_paired_idle=False, stadium_whole_stockout=False, stadium_whole_rng_window=None,
                              stadium_whole_replay_binding=None,
                              stadium_whole_rng_coverage="rng_returns"):
     """Explicit private whole3/sidecar2 diagnostic using the existing passive route."""
@@ -3033,6 +3232,11 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             'Whole Stadium long-idle profile requires the B-state observation')
     require(type(stadium_whole_paired_idle) is bool,
             'Whole Stadium paired-idle profile option must be boolean')
+    require(type(stadium_whole_stockout) is bool and
+            (not stadium_whole_stockout or stadium_whole_b_state and
+             not stadium_whole_long_idle and not stadium_whole_paired_idle and
+             stadium_whole_rng_window is None and stadium_whole_replay_binding is None),
+            'Whole Stadium natural stockout profile is exclusive and requires B-state')
     if stadium_whole_paired_idle:
         require(stadium_whole_rng_window is None and stadium_whole_replay_binding is None,
                 'Whole Stadium paired-idle profile excludes RNG sidecar/replay modes')
@@ -3063,10 +3267,13 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
     _require_stadium_output_disjoint(output,checkpoint_gc,profile)
     output.mkdir()
     process=bounded_log=log=None
-    report=dict(scope=('original-stadium-paired-idle-scene-endpoints-v1' if stadium_whole_paired_idle else
+    report=dict(scope=('original-stadium-whole3-natural-stockout-v1' if stadium_whole_stockout else
+                       'original-stadium-paired-idle-scene-endpoints-v1' if stadium_whole_paired_idle else
                        'original-stadium-whole3-feedback-allocation2'),result='fail',
-                endpoint_scope='firsttwo short natural lifetimes only; no C3/per-owner ledger',
-                input_contract='minimum180 observed neutral ticks before ordinary chord request; actual consume ticks retained')
+                endpoint_scope=('selected B: actual P1 four-stock losses, mode9 before elimination exit; no standings/lifecycle parity' if stadium_whole_stockout else
+                                'firsttwo short natural lifetimes only; no C3/per-owner ledger'),
+                input_contract=('exact stock4_none two-human setup; ordinary P1 edge/jump and P2 neutral consumed rows; no stock writes' if stadium_whole_stockout else
+                                'minimum180 observed neutral ticks before ordinary chord request; actual consume ticks retained'))
     if stadium_whole_paired_idle:
         report.update(endpoint_scope='two natural lifetimes; GO+3500 typed/four-port windows for matches0/1; only exact scene RNG endpoints; no full allocation/registration claim',
                       input_contract='actual four-port neutral consumes retained for both actual GO-derived windows; natural pause/exit/Results/CSS order preserved')
@@ -3084,6 +3291,11 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             provenance=Path(provenance))
         setup=validate_setup_receipt(Path(setup_path),inputs,build)
         expected=stadium_three_target(Path(target_path))['source_expected_setup']
+        if stadium_whole_stockout:
+            from capture_allocation_history import stadium_three_rule_profile
+            require(stadium_three_rule_profile(expected) == 'stock4_none' and
+                    len(expected.get('players', [])) == 2,
+                    'Natural stockout requires the exact admitted two-human stock4_none setup')
         menus,_=menu_actions(menu_recipe)
         require(menus['scope']=='stadium_go_prefix' and menus['version']==11 and
                 menus['sss'].get('policy')=='same_call_feedback_v1',
@@ -3134,7 +3346,8 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
         receiver=StadiumWholeFeedbackReceiver(menus,setup['sha256'],expected,
             stadium_whole_b_state=stadium_whole_b_state,
             stadium_whole_long_idle=stadium_whole_long_idle,
-            stadium_whole_paired_idle=stadium_whole_paired_idle)
+            stadium_whole_paired_idle=stadium_whole_paired_idle,
+            stadium_whole_stockout=stadium_whole_stockout)
         replay_source = None
         if stadium_whole_replay_binding is not None:
             require(rng_window is not None and stadium_whole_b_state and not stadium_whole_long_idle,
@@ -3149,7 +3362,8 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
         controller=(StadiumReplayIntentObserver(output/'replay-policy-intentions.jsonl') if replay_source else
                     StadiumIntentController(p1,p2,output/'input-intentions.jsonl'))
         launch=dict(command=command,environment_delta={k:v for k,v in env.items() if k.startswith('MWRC_')},manifest=build,setup=setup,expected=expected,
-                    profile_inventory=profile_inventory,owned_gci=dict(path=str(owned_gci),bytes=owned_gci.stat().st_size,sha256=hashlib.sha256(owned_gci.read_bytes()).hexdigest()),operation_seconds=180,owner_seconds=210,cleanup_seconds=30)
+                    profile_inventory=profile_inventory,owned_gci=dict(path=str(owned_gci),bytes=owned_gci.stat().st_size,sha256=hashlib.sha256(owned_gci.read_bytes()).hexdigest()),operation_seconds=180,owner_seconds=210,cleanup_seconds=30,
+                    stadium_whole_stockout=dict(STADIUM_WHOLE_STOCKOUT_PROFILE) if stadium_whole_stockout else None)
         if stadium_whole_paired_idle:
             launch['stadium_whole_paired_idle'] = dict(STADIUM_WHOLE_PAIRED_IDLE_PROFILE)
             launch['stadium_whole_long_idle_compact_launch'] = dict(long_idle_compact_launch)
@@ -3180,6 +3394,10 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
         if stadium_whole_b_state and not stadium_whole_paired_idle:
             require(receiver.b_observation is not None, 'Whole Stadium B observation incomplete')
             report['stadium_b_observation']=receiver.b_observation
+        if stadium_whole_stockout:
+            require(receiver.stockout_summary is not None,
+                    'Whole Stadium natural stockout profile lacks the source-authored zero-stock/mode9 boundary')
+            report['stadium_whole_stockout'] = receiver.stockout_summary
         if stadium_whole_paired_idle:
             driver_windows = list(receiver.long_idle_windows)
             source_windows, compact_summary = validate_stadium_paired_idle_outputs(
@@ -3272,6 +3490,8 @@ def main(argv=None):
                         help="Whole3 selected B: gate its existing pause on actual GO+3500 ticks and first later natural DrawReturn")
     parser.add_argument("--stadium-whole-paired-idle", action="store_true",
                         help="Two natural Stadium lifetimes with actual GO+3500 windows for both and scene RNG endpoints only")
+    parser.add_argument("--stadium-whole-stockout", action="store_true",
+                        help="Strict selected-B natural P1 zero-stock/mode9 witness on the exact two-human stock4_none route")
     parser.add_argument('--stadium-whole-replay-binding',type=Path,
                         help='Bound complete raw whole3 MWRI diagnostic replay; requires B-state+combined RNG')
     parser.add_argument("--stadium-whole-rng-coverage",choices=("rng_returns","rng_updates"),

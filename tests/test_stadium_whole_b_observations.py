@@ -110,6 +110,7 @@ int main(){
             r=object.__new__(driver.StadiumWholeFeedbackReceiver)
             r.ended=False;r.seq=100;r.announcements=['handshake','start'];r.match_index=index
             r.receipt=receipt;r.stadium_whole_b_state=enabled;r.stadium_whole_long_idle=False;r.b_entry_seen=True
+            r.stadium_whole_stockout=False
             # Modeled already-admitted legacy profile; actual dispatch/validators remain live.
             r.progress_scope='stadium_whole3_feedback_v1';r.stadium_whole_paired_idle=False;r.b_state_matches=(1,)
             r.b_constructor=StadiumConstructorObservations();r.setup_seen=False;r.b_go=None
