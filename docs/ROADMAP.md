@@ -175,12 +175,13 @@ Only a reviewed pass opens a longer correction-budget measurement. The existing
 historical measurements and the current scope; no whole-session claim follows.
 
 Pokémon Stadium C3 [#251](https://github.com/ericvanlare/melee-web/issues/251) /
-[draft #301](https://github.com/ericvanlare/melee-web/pull/301) has completed its
-defined functional and selected-ledger comparisons, with independent raw/gate
-support. Final regression v2 passes. Passing publication-head CI is required before
-merge. The [single Stadium boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md)
-retains exact identities, raw failures and coverage limits. Next is C4 original
-latency measurement, reference first; no runtime transformation port is released.
+[#301](https://github.com/ericvanlare/melee-web/pull/301) merged after independent
+review, full regression, affected builds and complete publication-head CI. The
+[C3 boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md) retains exact
+identities, raw failures and coverage limits. Next is C4 original latency
+measurement under [#343](https://github.com/ericvanlare/melee-web/issues/343), with
+its [own evidence boundary](status/2026-10-27-stadium-first-form-latency.md);
+no runtime transformation port is released.
 Ranked/Unranked use unfrozen Stadium, so C4–C8 transformations remain in scope.
 Track A retains first claim on the shared capture lane. Physical controllers,
 foreground timing, audible output and a two-machine human session remain separate
@@ -243,16 +244,18 @@ retained; further fighter work follows the breadth-first queue.
 **Stadium C3 → C4.** The defined C3 idle, selected owner/RNG lifetime, natural
 stockout/mode9 and natural mode14 functional comparisons are complete at their
 declared scopes, including checked Results/CSS and retirement. Independent raw
-and scoped gate review support those outcomes. Final regression v2 passes; passing CI
-on the publication head is required before merge; this text does not claim a
-future commit's CI result. Broader allocator/arbitrary-writer coverage is a limit,
+and scoped gate review support those outcomes; #301 is merged. The scoped receipt
+records the integration validation. Broader allocator/arbitrary-writer coverage is a limit,
 not a newly waived gate; full allocator journaling remains separate. Whole-stage
 accuracy, public Stadium admission and C4–C8 are not accepted by C3.
 
-Next **C4** obtains one complete first-form original reference, then repeats its
-exact completed input for original latency measurement using actual source boundaries and bounded first-divergence controls before any runtime transformation
-port release. Existing source-file/region/transfer candidates remain checkpointed
-at the end-flow/quiescence HOLD. Reuse the existing route and retained evidence;
+The first **C4 (#343)** original recording and its fixed-input repeatability
+step pass at the declared scope. The [C4 receipt](status/2026-10-27-stadium-first-form-latency.md)
+tracks observed forms, retained failures and remaining coverage. Resolve the
+general scheduling rule and missing form samples before runtime transformation
+release; stop at the first changed loading latency under fixed inputs/settings.
+Existing source-file/region/transfer candidates remain external. The service
+end-flow/quiescence repair has component support and needs current-main integration. Reuse the existing route and retained evidence;
 do not repeat accepted functional captures or invent neutral rows/GO coordinates.
 Track A retains priority for shared capture resources.
 
