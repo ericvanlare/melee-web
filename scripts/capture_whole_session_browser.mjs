@@ -832,7 +832,7 @@ async function pairedFullPhase(){
  await fs.writeFile(path.join(output,'paired-v11-full-rows.jsonl'),'',{flag:'wx'});
  await fs.writeFile(path.join(output,'paired-v11-full-rng.jsonl'),'',{flag:'wx'});
  await page.evaluate(installPairedFullObserver,{maximumRows:4*pairedFullExpected.total+16000});
- await page.evaluate(installPairedFullLaunch);
+ await page.evaluate(installPairedFullLaunch,{stockout:pairedFullExpected.stockout===true});
  await page.locator('#retail-replay-start').click();
  let status;
  while(Date.now()<deadline){
@@ -847,9 +847,11 @@ async function pairedFullPhase(){
   if(status?.schema==='melee-web-stadium-paired-v11-full-pair-v1'&&status.whole_session_complete){
    await drainPairedFull();
    report.paired_v11_full_pair.comparison=pairedFullComparison.finish(status);
-   report.paired_v11_full_pair.rng_comparison=runPairedFullRngComparison(true);
-   // Both the actual stream comparator and strict semantic RNG tool passed.
-   // This is selected-action coverage, never replay-frame cursor coverage.
+   report.paired_v11_full_pair.rng_comparison=pairedFullExpected.stockout
+    ? {per_owner_rng_comparison:false,scope:'Per-tick and scene seed comparison only; original compact RNG was not captured.'}
+    : runPairedFullRngComparison(true);
+   // Actual native action recording is complete. The selected stockout profile
+   // has no original per-owner RNG ledger; do not infer that comparison.
    report.rng_draw_probe={...report.rng_draw_probe,complete:true,
      captured_action_count:pairedFullExpected.total};
    // Ordinary completion performs its existing checked unload and evidence write.
@@ -1252,8 +1254,12 @@ try {
     pairedFullExpected=derivePairedFull(JSON.parse(projection.raw),report.inputs.recipe.sha256,report.recipe_header.frames,JSON.parse(endpoints.raw));
     pairedFullComparison=new PairedFullComparator(pairedFullExpected);
     report.inputs.paired_full_projection=projection.identity;report.inputs.paired_full_endpoints=endpoints.identity;
-    report.paired_v11_full_pair={component_pass:false,scope:'actual two-window source lifecycle; C3/all-writer/registration false'};
-    pairedFullOriginalPreflight=runPairedFullRngComparison(false);
+    report.paired_v11_full_pair={component_pass:false,scope:pairedFullExpected.stockout
+      ?'A route warmup; B natural stock-out typed state/input/seed/display and Results; C3/all-writer/registration false'
+      :'actual two-window source lifecycle; C3/all-writer/registration false'};
+    pairedFullOriginalPreflight=pairedFullExpected.stockout
+      ?{per_owner_rng_comparison:false,scope:'No compact original ledger; admitted successful original stockout report and exact projection.'}
+      :runPairedFullRngComparison(false);
     report.paired_v11_full_pair.original_rng_preflight=pairedFullOriginalPreflight;
   }
   report.requested_entity_prefix = readRequestedEntityPrefix(recipeBytes, report.inputs.recipe.sha256);
