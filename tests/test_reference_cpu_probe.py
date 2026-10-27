@@ -161,6 +161,11 @@ typedef struct HSD_GObjProc HSD_GObjProc;
 typedef void (*HSD_GObjEvent)(HSD_GObj*);
 typedef void (*GObj_RenderFunc)(HSD_GObj*, int);
 ''' + proc + gobj + '''
+/* Modeled field owners; the affected target build checks real Fighter/Player declarations. */
+typedef struct { HSD_GObj* gobj; unsigned kind; u8 player_id; } Fighter;
+typedef struct { HSD_GObj* player_entity[2]; } StaticPlayer;
+static StaticPlayer players[6];
+StaticPlayer* Player_GetPtrForSlot(int slot) { assert(slot>=0 && slot<6); return &players[slot]; }
 HSD_GObj* HSD_GObj_804D781C;
 HSD_GObjProc* HSD_GObj_804D7838;
 void grStadium_801D1390(HSD_GObj* o) { (void)o; }
@@ -170,6 +175,8 @@ enum { MELEE_WEB_RNG_DRAW_RAND=0, MELEE_WEB_RNG_DRAW_RANDF=1 };
 '''
         native = native.replace("#include <melee/ef/eflib.h>\n", "")
         native = native.replace("#include <melee/ft/fighter.h>\n", "")
+        native = native.replace("#include <melee/ft/types.h>\n", "")
+        native = native.replace("#include <melee/pl/player.h>\n", "")
         native = native.replace("#include <melee/gr/grpstadium.h>\n", "")
         native = re.sub(r'^#include "gameplay_cpu_observation.h"\n', '', native)
         native = re.sub(r'^#include <sysdolphin/baselib/(gobj|gobjproc).h>\n', '', native, flags=re.M)
@@ -178,13 +185,25 @@ static void callback(HSD_GObj* o) { (void)o; }
 int main(int argc, char** argv) {
   assert(argc == 2);
   HSD_GObj gobj = {0}; HSD_GObjProc proc = {0};
+  Fighter fighter = {&gobj, 0, 1};
+  gobj.user_data = &fighter; players[1].player_entity[0] = &gobj;
   gobj.classifier=13; gobj.p_link=4; proc.s_link=7; proc.gobj=&gobj;
   if(strcmp(argv[1],"particle")==0) {gobj.classifier=8;gobj.p_link=11;proc.s_link=15;proc.on_invoke=efLib_particles_proc_main;}
-  else if(strcmp(argv[1],"fighter")==0) {gobj.classifier=4;gobj.p_link=8;proc.s_link=1;proc.on_invoke=Fighter_8006A360;}
+  else if(strncmp(argv[1],"fighter",7)==0) {gobj.classifier=4;gobj.p_link=8;proc.s_link=1;proc.on_invoke=Fighter_8006A360;}
   else if(strcmp(argv[1],"unknown")==0) proc.on_invoke=callback;
   else proc.on_invoke=grStadium_801D1390;
   rng_draw_probe_active=1; rng_draw_probe_cursor=12;
   rng_draw_probe_owners=strcmp(argv[1],"legacy")!=0;
+  rng_draw_probe_fighter_owners=strncmp(argv[1],"fighter-v3",10)==0;
+  if(strcmp(argv[1],"fighter-v3-entity1")==0) {
+    players[1].player_entity[0]=NULL; players[1].player_entity[1]=&gobj;
+  }
+  if(strcmp(argv[1],"fighter-v3-null")==0) gobj.user_data=NULL;
+  if(strcmp(argv[1],"fighter-v3-link")==0) fighter.gobj=NULL;
+  if(strcmp(argv[1],"fighter-v3-slot")==0) fighter.player_id=6;
+  if(strcmp(argv[1],"fighter-v3-unregistered")==0) players[1].player_entity[0]=NULL;
+  if(strcmp(argv[1],"fighter-v3-duplicate")==0) players[1].player_entity[1]=&gobj;
+  if(strcmp(argv[1],"fighter-v3-tuple")==0) proc.s_link=2;
   melee_web_cpu_observation_rng_draw(0x12345678,0);
   if(strcmp(argv[1],"partial")==0) HSD_GObj_804D781C=&gobj;
   else { HSD_GObj_804D781C=&gobj; HSD_GObj_804D7838=&proc; }
@@ -219,11 +238,11 @@ int main(int argc, char** argv) {
         binary = path.with_suffix("")
         built = subprocess.run([compiler, "-std=c11", "-Wall", "-Wextra", "-Wno-unused-variable", str(path), "-o", str(binary)], capture_output=True, text=True)
         self.assertEqual(built.returncode, 0, built.stderr)
-        for mode in ("legacy", "owners", "particle", "fighter", "unknown", "capacity"):
+        for mode in ("legacy", "owners", "particle", "fighter", "unknown", "capacity", "fighter-v3", "fighter-v3-entity1"):
             result = subprocess.run([str(binary), mode], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             row = json.loads(result.stderr.removeprefix("RNG_DRAW_PROBE "))
-            self.assertEqual(row["version"], 1 if mode == "legacy" else 2)
+            self.assertEqual(row["version"], 1 if mode == "legacy" else 3 if mode.startswith("fighter-v3") else 2)
             self.assertEqual([x["seed_after"] for x in row["draws"][:2]], ["12345678","23456789"])
             self.assertEqual([x["kind"] for x in row["draws"][:2]], ["HSD_Rand","HSD_Randf"])
             if mode == "legacy": self.assertNotIn("owner", row["draws"][0])
@@ -235,7 +254,7 @@ int main(int argc, char** argv) {
                     self.assertEqual((row["draws"][1]["owner"]["classifier"],
                                       row["draws"][1]["owner"]["p_link"],
                                       row["draws"][1]["owner"]["s_link"]), (8, 11, 15))
-                elif mode == "fighter":
+                elif mode.startswith("fighter"):
                     self.assertEqual(row["draws"][1]["owner"]["callback_symbol"], "Fighter_8006A360")
                     self.assertEqual((row["draws"][1]["owner"]["classifier"],
                                       row["draws"][1]["owner"]["p_link"],
@@ -244,8 +263,14 @@ int main(int argc, char** argv) {
                     self.assertEqual(row["draws"][1]["owner"]["callback_symbol"], "unknown")
                 else:
                     self.assertEqual(row["draws"][1]["owner"]["callback_symbol"], "grStadium_801D1390")
+                if mode.startswith("fighter-v3"):
+                    self.assertIsNone(row["draws"][0]["owner"]["fighter"])
+                    self.assertEqual(row["draws"][1]["owner"]["fighter"],
+                        {"slot":1,"entity":int(mode.endswith("entity1")),"kind":0})
+                else:
+                    self.assertNotIn("fighter",row["draws"][1]["owner"])
                 if mode == "capacity": self.assertEqual(len(row["draws"]),1024)
-        for mode in ("partial", "backpointer"):
+        for mode in ("partial", "backpointer", "fighter-v3-null", "fighter-v3-link", "fighter-v3-slot", "fighter-v3-unregistered", "fighter-v3-duplicate", "fighter-v3-tuple"):
             result = subprocess.run([str(binary), mode], capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertNotIn("RNG_DRAW_PROBE", result.stderr)

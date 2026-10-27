@@ -3805,7 +3805,7 @@ int main(void)
             for sample_ordinal, line in enumerate(rng_lines, 1):
                 row = json.loads(line[len("RNG_DRAW_PROBE "):])
                 self.assertEqual(row["schema"], "melee-web-rng-draw-probe")
-                self.assertEqual(row["version"], 2)
+                self.assertEqual(row["version"], 3)
                 self.assertEqual(row["source_cursor"], sample_ordinal)
                 self.assertFalse(row["overflowed"])
                 self.assertLessEqual(len(row["draws"]), 1024)
@@ -3815,6 +3815,11 @@ int main(void)
                     owner = draw["owner"]
                     for key in ("gobj", "proc", "callback"):
                         self.assertRegex(owner[key], r"^[0-9a-f]{16}$")
+                    if owner["callback_symbol"] == "Fighter_8006A360":
+                        self.assertIn(owner["fighter"],
+                                      ({"slot":0,"entity":0,"kind":0}, {"slot":1,"entity":0,"kind":0}))
+                    else:
+                        self.assertIsNone(owner["fighter"])
                     if owner["status"] == "outside_proc":
                         self.assertEqual(owner["callback_symbol"], None)
                         self.assertEqual((owner["gobj"], owner["proc"], owner["callback"],

@@ -55,7 +55,7 @@ export function validateRngDrawProbeRows(textRows, selection, {observedCursor, d
     let row;
     try { row = JSON.parse(text); }
     catch { throw Error('RNG draw probe row is not valid JSON'); }
-    if (!row || row.schema !== 'melee-web-rng-draw-probe' || ![1,2].includes(row.version) ||
+    if (!row || row.schema !== 'melee-web-rng-draw-probe' || ![1,2,3].includes(row.version) ||
         !Number.isSafeInteger(row.source_cursor) || !requested.has(row.source_cursor) ||
         seen.has(row.source_cursor) || row.overflowed !== false || !Array.isArray(row.draws) ||
         row.draws.length > MAX_DRAWS_PER_CURSOR ||
@@ -66,7 +66,7 @@ export function validateRngDrawProbeRows(textRows, selection, {observedCursor, d
       if (!draw || !['HSD_Rand', 'HSD_Randf'].includes(draw.kind) ||
           typeof draw.seed_after !== 'string' || !SEED.test(draw.seed_after))
         throw Error('RNG draw probe row contains an invalid kind or 32-bit post-update seed');
-      if (row.version === 2) {
+      if (row.version >= 2) {
         const owner = draw.owner;
         const pointer = value => typeof value === 'string' && /^[0-9a-f]{16}$/.test(value);
         const zero = '0000000000000000';
@@ -81,6 +81,19 @@ export function validateRngDrawProbeRows(textRows, selection, {observedCursor, d
         if (owner.callback_symbol === 'Fighter_8006A360' &&
             (owner.classifier !== 4 || owner.p_link !== 8 || owner.s_link !== 1))
           throw Error('RNG draw fighter callback owner tuple differs');
+        if (row.version === 3) {
+          const fighter = owner.fighter;
+          if (owner.callback_symbol === 'Fighter_8006A360') {
+            if (!fighter || !Number.isInteger(fighter.slot) || fighter.slot < 0 || fighter.slot >= 6 ||
+                !Number.isInteger(fighter.entity) || fighter.entity < 0 || fighter.entity >= 2 ||
+                !Number.isInteger(fighter.kind) || fighter.kind < 0 || fighter.kind > 0xffffffff)
+              throw Error('RNG draw fighter slot/entity identity is invalid');
+          } else if (fighter !== null) {
+            throw Error('RNG draw non-fighter owner cannot claim a fighter identity');
+          }
+        } else if (Object.hasOwn(owner, 'fighter')) {
+          throw Error('Version 2 RNG draw cannot claim a fighter identity');
+        }
         if (owner.status === 'outside_proc') {
           if (!['gobj','proc','callback'].every(key => owner[key] === zero) ||
               owner.classifier !== 0 || owner.p_link !== 0 || owner.s_link !== 0)

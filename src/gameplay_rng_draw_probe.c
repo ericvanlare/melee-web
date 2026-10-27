@@ -2,6 +2,8 @@
 
 #include <melee/ef/eflib.h>
 #include <melee/ft/fighter.h>
+#include <melee/ft/types.h>
+#include <melee/pl/player.h>
 #include <melee/gr/grpstadium.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjproc.h>
@@ -14,15 +16,17 @@
 #endif
 
 #define RNG_DRAW_PROBE_MAX_PER_FRAME 1024
-/* Each bounded v2 row is < 320 bytes even with 64-bit pointer tokens and
- * maximum decimal fields. Header/trailer < 512 bytes. Never truncate. */
-#define RNG_DRAW_PROBE_LINE_CAPACITY (512 + RNG_DRAW_PROBE_MAX_PER_FRAME * 320)
+/* Each bounded v3 event is < 448 bytes including the checked fighter slot
+ * and entity ordinal. Header/trailer < 512 bytes. Never truncate. */
+#define RNG_DRAW_PROBE_LINE_CAPACITY (512 + RNG_DRAW_PROBE_MAX_PER_FRAME * 448)
 
 typedef struct {
     uint32_t seed;
     unsigned kind;
     uintptr_t gobj, proc, callback;
     unsigned classifier, p_link, s_link;
+    int fighter_observed;
+    unsigned fighter_slot, fighter_entity, fighter_kind;
 } RngDrawProbeEntry;
 
 static RngDrawProbeEntry rng_draw_probe_entries[RNG_DRAW_PROBE_MAX_PER_FRAME];
@@ -30,6 +34,7 @@ static size_t rng_draw_probe_count;
 static int rng_draw_probe_overflow, rng_draw_probe_active;
 static int rng_draw_probe_configuration_checked, rng_draw_probe_configured;
 static int rng_draw_probe_owners;
+static int rng_draw_probe_fighter_owners;
 static int rng_draw_probe_native_pair;
 static size_t rng_draw_probe_cursor = (size_t)-1;
 static size_t rng_draw_probe_emitted_count;
@@ -75,6 +80,10 @@ void melee_web_cpu_observation_set_rng_draw_cursor(size_t index)
         rng_draw_probe_owners = EM_ASM_INT({
             return window.__meleeRngDrawProbeOwners === true;
         }, 0);
+        rng_draw_probe_fighter_owners = EM_ASM_INT({
+            return window.__meleeRngDrawProbeFighterOwners === true;
+        }, 0);
+        if (rng_draw_probe_fighter_owners && !rng_draw_probe_owners) abort();
         rng_draw_probe_configuration_checked = 1;
     }
     if (!rng_draw_probe_configured) {
@@ -99,6 +108,7 @@ int melee_web_rng_draw_probe_begin_native_pair(void)
     if (rng_draw_probe_native_pair || rng_draw_probe_active) return 0;
     rng_draw_probe_native_pair = 1;
     rng_draw_probe_owners = 1;
+    rng_draw_probe_fighter_owners = 1;
     rng_draw_probe_cursor = (size_t)-1;
     rng_draw_probe_emitted_count = 0;
     rng_draw_probe_count = 0;
@@ -114,6 +124,7 @@ int melee_web_rng_draw_probe_end_native_pair(size_t expected_cursors)
         return 0;
     rng_draw_probe_native_pair = 0;
     rng_draw_probe_owners = 0;
+    rng_draw_probe_fighter_owners = 0;
     rng_draw_probe_cursor = (size_t)-1;
     rng_draw_probe_count = 0;
     rng_draw_probe_overflow = 0;
@@ -121,16 +132,18 @@ int melee_web_rng_draw_probe_end_native_pair(size_t expected_cursors)
 }
 #endif
 
-/* The actual HSD dispatcher owns these typed globals only while on_invoke is
- * running. No list walk, dereference of user_data, or callback invocation here.
- * Their backpointer agreement is scheduled context, not a lifetime attestation.
- */
+/* The actual HSD dispatcher owns these typed globals while on_invoke runs.
+ * The v3 fighter adjunct checks the source Fighter and authored player slots
+ * only for the known fighter callback. No callback is invoked. This is current
+ * scheduled membership, not an allocation/registration/lifetime attestation. */
 static void capture_rng_draw_owner(RngDrawProbeEntry* entry)
 {
     HSD_GObj* gobj = HSD_GObj_804D781C;
     HSD_GObjProc* proc = HSD_GObj_804D7838;
     entry->gobj = entry->proc = entry->callback = 0;
     entry->classifier = entry->p_link = entry->s_link = 0;
+    entry->fighter_observed = 0;
+    entry->fighter_slot = entry->fighter_entity = entry->fighter_kind = 0;
     if (!gobj && !proc) return; /* Explicit outside_proc; never guess an owner. */
     if (!gobj || !proc || proc->gobj != gobj || !proc->on_invoke) abort();
     entry->gobj = (uintptr_t)gobj;
@@ -139,6 +152,26 @@ static void capture_rng_draw_owner(RngDrawProbeEntry* entry)
     entry->classifier = gobj->classifier;
     entry->p_link = gobj->p_link;
     entry->s_link = proc->s_link;
+    if (rng_draw_probe_fighter_owners && proc->on_invoke == Fighter_8006A360) {
+        if (gobj->classifier != 4 || gobj->p_link != 8 || proc->s_link != 1)
+            abort();
+        const Fighter* fighter = gobj->user_data;
+        if (!fighter || fighter->gobj != gobj || fighter->player_id >= 6)
+            abort();
+        const StaticPlayer* player = Player_GetPtrForSlot(fighter->player_id);
+        if (!player) abort();
+        _Static_assert(sizeof(player->player_entity) / sizeof(player->player_entity[0]) == 2,
+                       "Source player entity extent changed");
+        unsigned matches = 0, ordinal = 0;
+        for (unsigned i = 0; i < sizeof(player->player_entity) / sizeof(player->player_entity[0]); ++i) {
+            if (player->player_entity[i] == gobj) { ++matches; ordinal = i; }
+        }
+        if (matches != 1) abort();
+        entry->fighter_observed = 1;
+        entry->fighter_slot = fighter->player_id;
+        entry->fighter_entity = ordinal;
+        entry->fighter_kind = fighter->kind;
+    }
 }
 
 void melee_web_cpu_observation_rng_draw(uint32_t updated_seed, unsigned kind)
@@ -161,17 +194,17 @@ static void emit_rng_draw_probe(void)
     rng_draw_probe_used = 0;
     put("{\"schema\":\"melee-web-rng-draw-probe\",\"version\":%u,"
         "\"source_cursor\":%zu,\"overflowed\":%s,\"draws\":[",
-        rng_draw_probe_owners ? 2u : 1u, rng_draw_probe_cursor, rng_draw_probe_overflow ? "true" : "false");
+        rng_draw_probe_fighter_owners ? 3u : rng_draw_probe_owners ? 2u : 1u, rng_draw_probe_cursor, rng_draw_probe_overflow ? "true" : "false");
     for (size_t index = 0; index < rng_draw_probe_count; ++index) {
         const RngDrawProbeEntry* entry = &rng_draw_probe_entries[index];
         put("%s{\"kind\":\"%s\",\"seed_after\":\"%08x\"",
             index ? "," : "",
             entry->kind == MELEE_WEB_RNG_DRAW_RAND ? "HSD_Rand" : "HSD_Randf",
             entry->seed);
-        if (rng_draw_probe_owners)
+        if (rng_draw_probe_owners) {
             put(",\"owner\":{\"status\":\"%s\",\"gobj\":\"%016llx\","
                 "\"proc\":\"%016llx\",\"callback\":\"%016llx\","
-                "\"classifier\":%u,\"p_link\":%u,\"s_link\":%u,\"callback_symbol\":%s}",
+                "\"classifier\":%u,\"p_link\":%u,\"s_link\":%u,\"callback_symbol\":%s",
                 entry->proc ? "scheduled_proc" : "outside_proc",
                 (unsigned long long)entry->gobj, (unsigned long long)entry->proc,
                 (unsigned long long)entry->callback, entry->classifier,
@@ -182,6 +215,14 @@ static void emit_rng_draw_probe(void)
                     "\"efLib_particles_proc_main\"" :
                 entry->callback == (uintptr_t)Fighter_8006A360 ?
                     "\"Fighter_8006A360\"" : "\"unknown\"");
+            if (rng_draw_probe_fighter_owners) {
+                if (entry->fighter_observed)
+                    put(",\"fighter\":{\"slot\":%u,\"entity\":%u,\"kind\":%u}",
+                        entry->fighter_slot, entry->fighter_entity, entry->fighter_kind);
+                else put(",\"fighter\":null");
+            }
+            put("}");
+        }
         put("}");
     }
     put("]}");
