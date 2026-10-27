@@ -95,9 +95,12 @@ int main(){
  assert(stadium_paired_v11.lifetimes[1].mode14_neutral_release);
  for(unsigned which=0;which<10;which++){
   reset();auto y=idle(14);auto p=queue();
-  if(which==0)y.map2_phase=1;if(which==1)y.map2_form=9;
-  if(which==2)y.map2_gate=1;if(which==3)y.map2_history_e0=5;
-  if(which==4)y.map5_root_relation=0;if(which==5)y.display_selected_player=2;
+  if(which==0)y.map2_phase=1;
+  if(which==1)y.map2_form=9;
+  if(which==2)y.map2_gate=1;
+  if(which==3)y.map2_history_e0=5;
+  if(which==4)y.map5_root_relation=0;
+  if(which==5)y.display_selected_player=2;
   if(which==6)stadium_paired_v11.stockout_pair=true;
   if(which==7)stadium_paired_v11.match_index=0;
   if(which==8)stadium_paired_v11.lifetimes[1].window_closed=true;
@@ -108,9 +111,12 @@ int main(){
  reset();rejects([&]{stadium_paired_v11_natural14_observe(idle(),q,3700);});
  for(unsigned which=0;which<6;which++){
   reset();stadium_paired_v11.lifetimes[1].mode14_observed=true;auto p=queue();
-  if(which==0)p.queue_slots[0].stickX=80;if(which==1)p.queue_slots[1].button=1;
-  if(which==2)p.queue_slots[2].err=0;if(which==3)p.slots[1]=0;
-  if(which==4)p.controllers[1]=0;if(which==5)p.player_count=1;
+  if(which==0)p.queue_slots[0].stickX=80;
+  if(which==1)p.queue_slots[1].button=1;
+  if(which==2)p.queue_slots[2].err=0;
+  if(which==3)p.slots[1]=0;
+  if(which==4)p.controllers[1]=0;
+  if(which==5)p.player_count=1;
   rejects([&]{stadium_paired_v11_natural14_observe(idle(14),p,3702);});
  }
  std::cout<<"PASS actual selector/mode14/source-owner/neutral-release leaves MODELED_WORLD_ONLY\n";
@@ -127,10 +133,15 @@ int main(){
  assert(emitted.size()==1&&emitted[0]=="terminal");
  for(unsigned which=0;which<9;which++){
   reset();ready();auto& l=stadium_paired_v11.lifetimes[1];
-  if(which==0)l.mode14_observed=false;if(which==1)l.mode14_neutral_release=false;
-  if(which==2)l.state_samples--;if(which==3)l.pause_release_seen=false;
-  if(which==4)model_match.result=OUTCOME_ELIMINATION;if(which==5)model_match.completed=false;
-  if(which==6)replay_cursor--;if(which==7)owned=false;if(which==8)l.ticks--;
+  if(which==0)l.mode14_observed=false;
+  if(which==1)l.mode14_neutral_release=false;
+  if(which==2)l.state_samples--;
+  if(which==3)l.pause_release_seen=false;
+  if(which==4)model_match.result=OUTCOME_ELIMINATION;
+  if(which==5)model_match.completed=false;
+  if(which==6)replay_cursor--;
+  if(which==7)owned=false;
+  if(which==8)l.ticks--;
   rejects([]{stadium_paired_v11_before_retire();});assert(!l.terminal_observed);
  }
  reset();stadium_paired_v11.match_index=0;auto& a=stadium_paired_v11.lifetimes[0];

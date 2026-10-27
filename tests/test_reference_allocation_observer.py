@@ -716,7 +716,8 @@ inline void mbedtls_sha256_free(mbedtls_sha256_context*) {}
 inline int mbedtls_sha256_starts_ret(mbedtls_sha256_context*, int) { return 0; }
 inline int mbedtls_sha256_update_ret(mbedtls_sha256_context*, const unsigned char*, size_t) { return 0; }
 inline int mbedtls_sha256_finish_ret(mbedtls_sha256_context*, unsigned char* out) {
-  for (size_t i = 0; i < 32; ++i) out[i] = 0; return 0;
+  for (size_t i = 0; i < 32; ++i) { out[i] = 0; }
+  return 0;
 }
 """,
 }

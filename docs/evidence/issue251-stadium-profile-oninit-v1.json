@@ -26471,6 +26471,42 @@
         },
         "SSS_source_attribution": "Actual retained SliceTag\u2192SliceRef enum span already includes StadiumFirstFormObservation; remove only redundant separate extraction/concatenation. Retain actual ReadBE16/member and original assertions.",
         "runtime_and_capture_producer_unchanged": "afb141c7dff8e4c94d194bbd7a4a12c0f24a174a"
+      },
+      "retained_publication_CI_a967d821": {
+        "head": "a967d8216a757c926748a2d35a90efd4b3e07fae",
+        "run_url": "https://github.com/ericvanlare/melee-web/actions/runs/40509333027",
+        "result": "FAIL",
+        "unit_0_tests": 1626,
+        "unit_0_failures": 5,
+        "unit_0_skips": 160,
+        "browser_build": "downstream refusal after unit-0 failure",
+        "raw_run": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-ci-a967d821-failure-v1/run.json",
+          "bytes": 28704,
+          "sha256": "45df05a6c1528b577ee0c918a9f8b58372261e40632f54b58c580ee7a4355202"
+        },
+        "raw_failed_jobs": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-ci-a967d821-failure-v1/failed-jobs.log",
+          "bytes": 842004,
+          "sha256": "1ccc34e02f5b989c6394b12ad29ebc6739ccf57ddfc318403c5c43666335567b"
+        }
+      },
+      "compiler_portability_fixture_repair": {
+        "scope": "Three test-only fixture files: explicit std::string include, separate independent if statements, braces/separate return in modeled SHA loop. Runtime, assertions and warning flags unchanged.",
+        "independent_review": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-ci-a967d821-failure-v1/fixture-review.json",
+          "bytes": 2689,
+          "sha256": "7bbf99553ef40399cf36c7dca4af0bcfdd2233238c8f038ec159c2d912825845"
+        },
+        "focused_result": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/stadium-owner-parity-20261026-150215-d5a0bac0/c3-ci-portability-focused-v1/result.json",
+          "bytes": 1899,
+          "sha256": "da3bf8434cf3f1b888b7c170353af392c27b7f417c4070edd95fa390459a3ce2"
+        },
+        "focused_tests": 5,
+        "focused_pass": true,
+        "new_exact_head_CI_required": true,
+        "earlier_local_full_regression_not_relabelled": true
       }
     },
     "browser_comparison": {
