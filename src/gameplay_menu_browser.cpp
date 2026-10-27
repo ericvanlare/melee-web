@@ -4694,7 +4694,7 @@ bool later_sss_pause_before(const PADStatus* sample){
  const auto& reference=later_sss_reference_context();
  const unsigned expected_before_timer=reference.pause_timer_zero_first?
      (replay_cursor==reference.pause_first?0U:
-      replay_cursor<reference.pause_timer_zero_first?
+      replay_cursor<=reference.pause_timer_zero_first?
        reference.pause_timer_zero_first+1U-static_cast<unsigned>(replay_cursor):0U):
      (replay_cursor==reference.pause_first?0U:reference.pause_last-static_cast<unsigned>(replay_cursor));
  check(match->diagnostic_pause_observation(o)&&o.generation&&o.frame==reference.pause_frame&&
