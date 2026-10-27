@@ -25051,7 +25051,92 @@
         "allocation_registration_complete": false,
         "all_rng_writers_observed": false,
         "C3": false,
-        "integration_validation": "new full suite, affected builds, exact-head CI pending"
+        "integration_validation": "Affected diagnostic/ordinary Release builds pass on6cca5ce5; final full suite and exact-head CI still pending.",
+        "first_go_browser_prefix": {
+          "state": "GO_OBSERVED_FIRST_GO_PREFIX_ONLY",
+          "runtime_harness": "6cca5ce5a20fc699e4f3d2842602268864e22350",
+          "scope": "Normal first CSS/SSS/Setup, shared constructor aggregates, actual GO, first strictly post-GO state/seed/four-port PAD, natural draw closure and checked native unload. Full replay incomplete.",
+          "raw_generic_result": "fail preserved: whole-session incomplete; component finalizer additionally required an unrecorded cleanup field",
+          "component_pass": true,
+          "report": {
+            "path": "paired-first-go-browser-capture-v8/browser-run/report.json",
+            "bytes": 275197,
+            "sha256": "0731901c60c32fb54c9e71bff1b4deca813697280c59693e8ba8e33ee185bd9d"
+          },
+          "manifest": {
+            "path": "paired-first-go-browser-packet-v8/manifest.json",
+            "bytes": 40002,
+            "sha256": "d55f8fb5e65e88643023765ec53bc4fd51d0feb8dc7e81ce6dbaaa5b697ded01"
+          },
+          "launcher": {
+            "path": "paired-first-go-browser-capture-v8/launcher-result.json",
+            "bytes": 215,
+            "sha256": "ad43be32d8e6f9e923f0a98972f3b07291d145f9211110151bcf3b420c19d736"
+          },
+          "owner": {
+            "path": "paired-first-go-browser-capture-v8/owner.json",
+            "bytes": 104361,
+            "sha256": "735f031a4296e45cc7e61771f148635c28afe7b6bfbd197be57cc642fe724723"
+          },
+          "independent_review": {
+            "path": "paired-first-go-browser-capture-v8/independent-review.json",
+            "bytes": 8460,
+            "sha256": "34e3b8a325bc6b34dc2ca255d5b1f9f4d466ff184fb37fa8c4a10ceac78ce3ea"
+          },
+          "runtime_build": {
+            "path": "paired-first-go-runtime-build-v7/result.json",
+            "bytes": 2418,
+            "sha256": "128748182d5043a77a7ac73fbad6e696c46bc9544cff7b997c6e33eb6bf4cefb"
+          },
+          "runtime_inventory": {
+            "path": "paired-first-go-runtime-build-v7/runtime-inventory.json",
+            "bytes": 32128,
+            "sha256": "c9ba7643d99188b37675f65136f039aa52aac329a9cf47ad274eef0716428230"
+          },
+          "retained_prior_attempts": [
+            {
+              "path": "paired-first-go-browser-capture-v1/launcher-result.json",
+              "bytes": 215,
+              "sha256": "833bf14d6b93c252553d7220ff0a6e66f9781df21d3967dfdc8c7ea2e78ab2b7"
+            },
+            {
+              "path": "paired-first-go-browser-capture-v2/launcher-result.json",
+              "bytes": 215,
+              "sha256": "5ce38cc9faaa2c52d7d1aadd763c8152ca504c8b742361580e6c8937025030f8"
+            },
+            {
+              "path": "paired-first-go-browser-capture-v3/launcher-result.json",
+              "bytes": 214,
+              "sha256": "91ad39acfd3a2c829b3d37d2bac9e2a347e314b3537fcc5f86d7f678e34f6e31"
+            },
+            {
+              "path": "paired-first-go-browser-capture-v4/launcher-result.json",
+              "bytes": 215,
+              "sha256": "340a4265a665a578fa44005952989d3c58e44422920b73097c8136a15b2f7d08"
+            },
+            {
+              "path": "paired-first-go-browser-capture-v5/launcher-result.json",
+              "bytes": 215,
+              "sha256": "0d9c61167e18a2659d300b19422ab944f4e4e98cb29140cbbed66283e3c04c81"
+            },
+            {
+              "path": "paired-first-go-browser-capture-v6/launcher-result.json",
+              "bytes": 215,
+              "sha256": "73be91598dd708126b03f45bcc9cfe7acba77d204320fda9225df15aac1be5ed"
+            },
+            {
+              "path": "paired-first-go-browser-capture-v7/launcher-result.json",
+              "bytes": 214,
+              "sha256": "518c10541a2ac53d7be42e7854cef43de41932b227dcb9de4e821826e45c3ee7"
+            }
+          ],
+          "H1_incidents": 0,
+          "checked_native_unload": true,
+          "owned_processes_absent": true,
+          "full_pair": false,
+          "per_owner_rng_compared": false,
+          "C3": false
+        }
       }
     }
   }
