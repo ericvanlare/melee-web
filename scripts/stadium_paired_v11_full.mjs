@@ -9,6 +9,7 @@ const registrationRawRoles=['report.json','launch.json','native-primary.mwro','n
  'native-inputs.mwri','native-input-status.json','native-allocations.jsonl','allocation-profile.json',
  'stadium-whole-paired-compact-rng.mwrl','cleanup.json','input-intentions.jsonl'];
 export function derivePairedFull(p,recipeSha,frames,endpoints){
+ if(p?.schema==='melee-web-stadium-natural-mode14-pair-projection-v1')return deriveNaturalMode14Pair(p,recipeSha,frames,endpoints);
  if(p?.schema==='melee-web-stadium-stockout-pair-projection-v1')return deriveStockoutPair(p,recipeSha,frames,endpoints);
  need(p?.schema==='melee-web-stadium-paired-window-projection-v1'&&p.source_schedule_verified===true&&p.recipe_sha256===recipeSha&&p.actual_frame_count===frames&&p.matches?.length===2,'projection/recipe identity');
  const registration=p.capture_profile==='paired_idle_registration_v1';
@@ -76,17 +77,46 @@ function deriveStockoutPair(p,recipeSha,frames,endpoints){
  need(total>0&&total<=2*frames,'stockout actual action extent');
  return {projection:p,matches,total,stockout:true,selection:{request:{kind:'range',first:0,last:total-1},selected:Array.from({length:total},(_,i)=>i)}};
 }
-export function installPairedFullLaunch({stockout=false}={}){
- if(typeof stockout!=='boolean')throw Error('Paired full launch profile must be explicit');
+function sameNatural14WitnessFields(a,b){
+ if(!a||!b||Array.isArray(a)||Array.isArray(b))return false;
+ const keys=Reflect.ownKeys(a);return keys.length===Reflect.ownKeys(b).length&&keys.every(k=>Object.hasOwn(b,k)&&(a[k]===null||typeof a[k]!=='object')&&Object.is(a[k],b[k]));
+}
+function deriveNaturalMode14Pair(p,recipeSha,frames,endpoints){
+ need(p?.profile==='selected_b_natural_mode14_v1'&&p.source_schedule_verified===true&&p.recipe_sha256===recipeSha&&p.actual_frame_count===frames&&p.matches?.length===2,'natural14 recipe/profile');
+ need(endpoints?.result==='pass'&&endpoints.scope==='original-stadium-whole3-post-transform-mode14-input-v1'&&endpoints.native?.primary_sha256===p.source_files?.['native-primary.mwro']?.sha256,'natural14 actual collector provenance');
+ need(p.source_posttransform_outcome==='INCONCLUSIVE_MODE14_BEFORE_TRANSFORM'&&p.claims?.per_owner_rng_comparison===false&&p.claims?.C3===false,'natural14 scoped outcome');
+ need(p.scene_rng_endpoints?.observed===true&&p.scene_rng_endpoints.sample_count===8&&same(p.scene_rng_endpoints,endpoints.native.original_rng_scene_boundaries),'natural14 eight scene endpoints');
+ let total=0;
+ const matches=p.matches.map((r,i)=>{
+  need(r.match_index===i&&r.actions?.length>0&&Array.isArray(r.states)&&r.window?.state_samples===r.states.length,'natural14 match/state inventory');
+  need(r.setup?.declared_setup?.stage===3&&r.setup.declared_setup.players?.length===2&&r.setup.declared_setup.players.every(x=>x.character_kind===8&&x.player_type===0&&x.stocks===4),'natural14 exact setup');
+  r.actions.forEach((a,j)=>need(a.action_index===j&&['tick','draw'].includes(a.kind)&&Number.isInteger(a.source_tick)&&Number.isInteger(a.draw_ordinal)&&Number.isInteger(a.frame_index)&&a.after_sequence<a.through_sequence,'natural14 source action coordinate'));
+  const statesMap=new Map(r.states.map(x=>[x.tick.source_tick,x]));need(statesMap.size===r.states.length,'natural14 duplicate state');
+  if(i===0)need(r.states.length===0&&r.go===null&&r.constructor===null,'natural14 unpaired warmup state');
+  else{
+   need(r.go?.coordinate?.source_tick===r.window.go_tick&&r.states.length===3644&&r.mode14_source_tick===3725&&r.last_selected_source_tick===3727,'natural14 selected extent');
+   r.states.forEach((x,j)=>need(x.state.map2.phase_s16===0&&x.state.map2.form_s16===5&&x.state.map2.previous_form_s16===-1&&x.state.map2.prior_form_s16===-1&&x.selected===true&&x.tick.source_tick===r.window.go_tick+j&&same(x.pads,r.actions[x.action_index]?.pads)&&r.actions[x.action_index]?.through_sequence===x.tick.sequence,'natural14 state action/PAD join'));
+   const w=r.standings_witness;need(w?.event_stop==='mode14_before_transform'&&w.first_transform===null&&w.neutral_release_observed===true&&same(w,endpoints.stadium_whole_post_transform_standings),'natural14 actual witness');
+   const m=statesMap.get(r.mode14_source_tick);need(m.state.display.mode_s16===14&&m.state.map2.phase_s16===0&&m.state.map2.form_s16===5&&m.state.map2.countdown_s32===148&&sameNatural14WitnessFields(m.state.display,w.mode14_witness.display)&&sameNatural14WitnessFields(m.state.map2,w.mode14_witness.map2),'natural14 typed witness');
+   need(same(r.states.at(-1).pads,['0000000000000000000000','0000000000000000000000','00000000000000000000ff','00000000000000000000ff']),'natural14 actual neutral release');
+   need(r.fixed_native_observation_window?.comparison_typed_state_count===3501&&same(r.fixed_native_observation_window,endpoints.stadium_whole_long_idle_window),'natural14 separate fixed window');
+  }
+  const ep=p.scene_rng_endpoints.samples.filter(x=>x.lifetime===i+1);need(ep.length===4&&same(ep.map(x=>[x.function,x.phase]),[['gm_Scene_Vs_OnEnter','enter'],['gm_Scene_Vs_OnEnter','return'],['gm_Scene_Vs_OnExit','enter'],['gm_Scene_Vs_OnExit','return']]),'natural14 endpoint order');
+  need(r.result?.outcome_byte===7,'natural14 original NoContest');const start=total;total+=r.actions.length;return {reference:r,states:statesMap,offset:start,endpoints:ep};
+ });need(total<=2*frames,'natural14 bounded schedule');return {projection:p,matches,total,natural14:true,selection:{request:{kind:'range',first:0,last:total-1},selected:Array.from({length:total},(_,i)=>i)}};
+}
+export function installPairedFullLaunch({stockout=false,natural14=false,mode14SourceTick=null,lastSelectedSourceTick=null}={}){
+ if(typeof stockout!=='boolean'||typeof natural14!=='boolean'||stockout&&natural14)throw Error('Paired full launch profile must be explicit');
+ if(natural14&&(!Number.isSafeInteger(mode14SourceTick)||!Number.isSafeInteger(lastSelectedSourceTick)||mode14SourceTick<0||mode14SourceTick>0xffffffff||lastSelectedSourceTick>0xffffffff||lastSelectedSourceTick<=mode14SourceTick))throw Error('Natural14 arm coordinates invalid');
  const m=globalThis.Module;
- const arm=stockout?'_melee_web_native_menu_stadium_paired_v11_stockout_pair_arm':'_melee_web_native_menu_stadium_paired_v11_full_pair_arm';
+ const arm=natural14?'_melee_web_native_menu_stadium_paired_v11_natural_mode14_pair_arm':stockout?'_melee_web_native_menu_stadium_paired_v11_stockout_pair_arm':'_melee_web_native_menu_stadium_paired_v11_full_pair_arm';
  if(!m||typeof m._melee_web_native_menu_launch!=='function'||typeof m[arm]!=='function'||m.__pairedFullLaunch)throw Error('Paired full launch interface unavailable/already wrapped');
  const original=m._melee_web_native_menu_launch;let used=false;
  m.__pairedFullLaunch={original,called:false};
  m._melee_web_native_menu_launch=function(...args){
   if(used)throw Error('Paired full launch is one-use');used=true;
   if(m.stadiumMatchedSetupNativeIdle?.()!==true)throw Error('Paired full launch owner is not settled');
-  if(m[arm]()!==1)throw Error('Paired full native arm refused: '+m.UTF8ToString(m._melee_web_native_menu_message()));
+  if((natural14?m[arm](mode14SourceTick,lastSelectedSourceTick):m[arm]())!==1)throw Error('Paired full native arm refused: '+m.UTF8ToString(m._melee_web_native_menu_message()));
   m.__pairedFullLaunch.called=true;return original.apply(this,args);
  };
  return true;
@@ -103,7 +133,7 @@ export class PairedFullComparator{
   need(row.world_generation===m.generation&&row.diagnostic_action_index===this.action,'owner/action generation changed');
   if(row.kind==='setup'){
    need(!m.setup&&p.schema==='melee-web-stadium-paired-v11-setup-v1'&&p.match_index===i&&p.world_generation===m.generation&&p.world_ticks===0&&p.source_frame===0&&p.input_cursor===r.actions[0].frame_index&&p.seed_hex===r.setup.rng.value_hex,'zero-tick Setup seed/owner');
-   if(!this.e.stockout||i===1){
+   if(!(this.e.stockout||this.e.natural14)||i===1){
     const c=r.constructor.state_projection,w={scope:'shared-constructor-aggregate-only',entry_count:c.constructor_entry_count,parameter_roles:{min_parameter:'parameter_x0',max_parameter:'parameter_x4'},min_parameter:c.parameter_x0,max_parameter:c.parameter_x4,random_bound:c.random_bound,random_result:c.random_result,seed_before:c.seed_before_hex,seed_after:c.seed_after_hex,randi_call_count:1};
     need(same(p.constructor,w),'constructor seven aggregates');
    }m.setup=true;return;
@@ -128,7 +158,7 @@ export class PairedFullComparator{
    need(Number.isInteger(begin.source_frame_before)&&Number.isInteger(p.source_frame_after)&&p.source_frame_after>=begin.source_frame_before&&(a.kind==='tick'?p.source_frame_after-begin.source_frame_before<=1:p.source_frame_after===begin.source_frame_before),'source match clock transition');
    const probe=this.probes.get(this.action);need(probe,'missing actual RNG action row');
    const selected=a.selected_rng_event_ordinals,all=a.rng_event_ordinals;
-   const full=!this.e.stockout&&a.after_sequence>=r.states[0].tick.sequence&&a.through_sequence<=r.window.target_source_tick.sequence;
+   const full=!(this.e.stockout||this.e.natural14)&&a.after_sequence>=r.states[0].tick.sequence&&a.through_sequence<=r.window.target_source_tick.sequence;
    if(full){
     need(selected&&all&&selected[0]===all[0]&&selected[1]===all[1],'fully observed action RNG range');
     need(selected[1]-selected[0]===probe.draws.length,'selected action RNG count');m.selectedEvents+=probe.draws.length;
@@ -137,11 +167,11 @@ export class PairedFullComparator{
   }
   need(!this.current,'observation before actual action return');
   if(row.kind==='go'){
-   need(!this.e.stockout||i===1,'stockout unobserved A GO');
+   need(!(this.e.stockout||this.e.natural14)||i===1,'stockout unobserved A GO');
    need(!m.go&&compareLaterBGate2Go({reference:r,actualEvent:p,actualTick:p.world_ticks,admittedWorldGeneration:m.generation}).decision==='PASS_SHARED_GO_EVENT_FIELDS_AND_SEED','actual GO');m.go=true;return;
   }
   if(row.kind==='state'){
-   need(!this.e.stockout||i===1,'stockout unobserved A state');
+   need(!(this.e.stockout||this.e.natural14)||i===1,'stockout unobserved A state');
    need(m.go&&!m.window&&p.ordinal===m.state,'typed state ordinal');const s=r.states[m.state];need(s&&p.selected===s.selected,'selected/tail state scope');
    const typed=typedOriginalValues(s.state,s.tick.source_tick),t=p.typed22,q=p.pad_queue;
    for(const[k,v]of Object.entries(typed))need(Object.is(t?.[k],v),'typed22 '+k);
@@ -157,11 +187,14 @@ export class PairedFullComparator{
   }
   if(row.kind==='window_closed'){
    need(!m.window&&m.state===r.states.length,'actual window closure order');
-   if(this.e.stockout)need(p.close_policy==='declared_match_actions_complete'&&m.actions===r.actions.length&&p.state_samples===r.states.length&&p.natural_tail_ticks===0&&p.source_ticks===r.actions.filter(a=>a.kind==='tick').length&&p.source_draws===r.actions.filter(a=>a.kind==='draw').length,'stockout declared action completion');
+   if(this.e.natural14){
+    if(i===0)need(p.close_policy==='declared_match_actions_complete'&&m.actions===r.actions.length&&p.state_samples===0&&p.natural_tail_ticks===0,'natural14 warmup closure');
+    else need(p.close_policy==='observed_mode14_and_neutral_release'&&p.state_samples===r.states.length&&p.natural_tail_ticks===0&&p.mode14_source_tick===r.mode14_source_tick&&p.last_selected_source_tick===r.last_selected_source_tick&&p.mode14_observed===true&&p.neutral_release_observed===true,'natural14 actual mode/release closure');
+   }else if(this.e.stockout)need(p.close_policy==='declared_match_actions_complete'&&m.actions===r.actions.length&&p.state_samples===r.states.length&&p.natural_tail_ticks===0&&p.source_ticks===r.actions.filter(a=>a.kind==='tick').length&&p.source_draws===r.actions.filter(a=>a.kind==='draw').length,'stockout declared action completion');
    else need(p.state_samples===3501&&p.natural_tail_ticks===r.window.natural_tail_ticks&&p.close_source_tick===r.window.close.source_tick&&p.draw_ordinal===r.window.close.draw_ordinal,'actual natural window closure');
    m.window=true;return;
   }
-  if(row.kind==='tail_before'){need((this.e.stockout?i===0:m.window)&&!m.retired&&Number.isInteger(p.pause_timer),'actual pause tail');return;}
+  if(row.kind==='tail_before'){need((this.e.stockout?i===0:this.e.natural14?i===0||m.window:m.window)&&!m.retired&&Number.isInteger(p.pause_timer),'actual pause tail');return;}
   if(row.kind==='terminal'){need(m.window&&!m.terminal&&m.actions===r.actions.length,'natural Match terminal action extent');m.terminal=true;return;}
   if(row.kind==='published_result'){
    need(this.e.stockout&&m.terminal&&m.endpoint===4&&!m.published&&!m.retired,'stockout published result order');
@@ -177,9 +210,11 @@ export class PairedFullComparator{
   throw Error('Paired full comparison: unsupported row kind '+row.kind);
  }
  finish(status){need(this.complete&&!this.current&&this.probes.size===0&&status?.schema==='melee-web-stadium-paired-v11-full-pair-v1'&&status.full_pair===true&&status.whole_session_complete===true&&status.failed===false&&status.diagnostic_actions===this.e.total&&status.lifetimes?.length===2,'complete native trace');this.matches.forEach((m,i)=>{
- if(this.e.stockout)need(status.profile==='selected_b_natural_stockout_v1'&&status.per_owner_rng_comparison===false&&m.published,'stockout final profile/published outcome');
+ if(this.e.natural14)need(status.profile==='selected_b_natural_mode14_v1'&&status.per_owner_rng_comparison===false,'natural14 final profile/outcome');
+ else if(this.e.stockout)need(status.profile==='selected_b_natural_stockout_v1'&&status.per_owner_rng_comparison===false&&m.published,'stockout final profile/published outcome');
  else need(m.selectedEvents===this.e.matches[i].reference.selected_rng_events,'selected RNG coverage');const l=status.lifetimes[i],r=this.e.matches[i].reference;
+ if(this.e.natural14)need(i===0||l.mode14_observed===true&&l.neutral_release_observed===true,'natural14 native final outcome counters');
  if(this.e.stockout)need(l.published_result===true&&(i===0||l.stock_losses===4&&l.mode9_observed===true),'stockout native final outcome counters');
- need(l.match_index===i&&l.world_generation===m.generation&&l.actions===m.actions&&l.ticks===r.actions.filter(a=>a.kind==='tick').length&&l.draws===r.actions.filter(a=>a.kind==='draw').length&&l.state_samples===(this.e.stockout?r.states.length:3501)&&l.natural_tail_ticks===r.window.natural_tail_ticks&&l.window_closed===true&&l.retired===true&&l.results_requested===true&&l.results_entered===true&&l.css_returned===true&&l.scene_rng_count===4,'final native lifetime counters/owners');
- });return {pass:true,actions:this.action,lifetimes:this.matches.map((m,i)=>({match_index:i,...m})),RNG_semantics_requires_separate_python_comparison:!this.e.stockout,...(this.e.stockout?{per_owner_rng_comparison:false}:{}),entry_dispatch_parity:false,raw_pointer_equality:false,C3:false};}
+ need(l.match_index===i&&l.world_generation===m.generation&&l.actions===m.actions&&l.ticks===r.actions.filter(a=>a.kind==='tick').length&&l.draws===r.actions.filter(a=>a.kind==='draw').length&&l.state_samples===((this.e.stockout||this.e.natural14)?r.states.length:3501)&&l.natural_tail_ticks===r.window.natural_tail_ticks&&l.window_closed===true&&l.retired===true&&l.results_requested===true&&l.results_entered===true&&l.css_returned===true&&l.scene_rng_count===4,'final native lifetime counters/owners');
+ });return {pass:true,actions:this.action,lifetimes:this.matches.map((m,i)=>({match_index:i,...m})),RNG_semantics_requires_separate_python_comparison:!(this.e.stockout||this.e.natural14),...((this.e.stockout||this.e.natural14)?{per_owner_rng_comparison:false}:{}),entry_dispatch_parity:false,raw_pointer_equality:false,C3:false};}
 }

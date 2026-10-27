@@ -865,6 +865,7 @@ struct StadiumPairedV11Lifetime {
  bool import_attempted=false,window_target=false,window_closed=false;
  bool terminal_observed=false,retired=false,results_requested=false,results_entered=false,css_returned=false;
  bool pause_seen=false,pause_release_seen=false;
+ bool mode14_observed=false,mode14_neutral_release=false;
  unsigned scene_rng_count=0;
  bool stock_initialized=false,mode9_observed=false,published_result=false;
  std::array<int32_t,2> stock_slots{},last_stocks{};
@@ -874,7 +875,8 @@ struct StadiumPairedV11Lifetime {
  std::string setup,go,terminal,retirement;
 };
 struct StadiumPairedV11State {
- bool full_pair=false,full_arm_consumed=false,stockout_pair=false;
+ bool full_pair=false,full_arm_consumed=false,stockout_pair=false,natural14_pair=false;
+ uint32_t mode14_source_tick=0,last_selected_source_tick=0;
  const melee_web::RetailReplayRecipe* full_recipe_owner=nullptr;
  const melee_web::RetailReplayInitialCssContext* full_context_owner=nullptr;
  std::array<StadiumPairedV11Lifetime,2> lifetimes{};
@@ -4036,7 +4038,7 @@ bool stadium_paired_v11_owner_valid(){
         melee_web_gameplay_world_exists()&&
         melee_web_gameplay_generation()==s.world_generation&&
         asset_generation==s.asset_generation&&match->construction_complete()&&
-        ((!s.full_pair||(!s.stockout_pair&&!s.lifetimes[s.match_index].window_closed))?
+        ((!s.full_pair||(!s.stockout_pair&&!s.natural14_pair&&!s.lifetimes[s.match_index].window_closed))?
           (!match->paused()&&!match->ending()&&!match->complete()):true);
 }
 void stadium_paired_v11_fail(const std::string& error){
@@ -4293,7 +4295,7 @@ void stadium_paired_v11_action_end(){
  stadium_paired_v11_emit("action_end",out.str());
  if(s.action_tick)++l.ticks;else ++l.draws;
  ++l.actions;++s.diagnostic_action_index;s.action_open=false;
- if(!s.stockout_pair&&!s.action_tick&&l.window_target&&!l.window_closed){
+ if(!s.stockout_pair&&!s.natural14_pair&&!s.action_tick&&l.window_target&&!l.window_closed){
   check(l.state_samples==3501&&l.tail_ticks<=4,"Paired v11 natural window close lacks its exact typed samples");
   l.window_closed=true;
   std::ostringstream closed;closed<<"{\"target_source_tick\":"<<s.go_world_tick+3500
@@ -4312,12 +4314,47 @@ bool stadium_paired_v11_pause_pad(const PADStatus* pads){
  }
  return true;
 }
+
+bool stadium_paired_v11_natural14_selector_valid(uint32_t mode14_tick,uint32_t last_tick,
+                                               uint64_t match_ticks){
+ return mode14_tick>3500&&last_tick>mode14_tick&&last_tick<match_ticks;
+}
+void stadium_paired_v11_natural14_observe(const MeleeWebStadiumIdleSnapshot& idle,
+    const MeleeWebStadiumPadQueueObservation& queue,uint64_t before){
+ auto& s=stadium_paired_v11;
+ check(s.match_index<2,"Natural14 source observation has a foreign match index");
+ auto& l=s.lifetimes[s.match_index];
+ check(s.natural14_pair&&!s.stockout_pair&&s.match_index==1&&!l.window_closed&&
+       before<=s.last_selected_source_tick&&s.go_observed&&
+       s.mode14_source_tick>s.go_world_tick+3500,
+       "Natural14 selected state escaped its actual GO/declared source window");
+ check(idle.map2_phase==0&&idle.map2_form==5&&!idle.map2_gate&&
+       idle.map2_history_e0==-1&&idle.map2_history_e2==-1&&idle.map5_root_relation==1,
+       "Natural14 only admits the actual pre-first-transformation map owner");
+ if(idle.display_mode==14&&!l.mode14_observed){
+  check(before==s.mode14_source_tick&&idle.display_selected_player>=0&&
+        idle.display_selected_player<2,"Natural14 first actual mode14 differs from declared source coordinate");
+  l.mode14_observed=true;
+ }
+ check(before<s.mode14_source_tick||l.mode14_observed,
+       "Natural14 expected source mode14 was not observed");
+ if(before==s.last_selected_source_tick){
+  check(l.mode14_observed&&before>s.mode14_source_tick&&queue.player_count==2&&
+        queue.slots[0]==0&&queue.slots[1]==1&&queue.controllers[0]==0&&queue.controllers[1]==1&&
+        stadium_paired_v11_pause_pad(queue.queue_slots)&&queue.queue_slots[0].button==0,
+        "Natural14 selected stop lacks its actual neutral four-port source release");
+  l.mode14_neutral_release=true;
+ }
+}
 bool stadium_paired_v11_pause_before(const PADStatus* sample){
  auto& s=stadium_paired_v11;
  if(!stadium_paired_v11_full_active()||!s.enabled)return false;
  check(s.match_index<2&&stadium_paired_v11_owner_valid(),"Paired v11 pause guard lost its source owner");
  auto& l=s.lifetimes[s.match_index];
- if(s.stockout_pair){
+ if(s.natural14_pair){
+  if(s.match_index==1&&!l.window_closed)return false;
+  if(!match->paused()&&!l.pause_seen)return false;
+ }else if(s.stockout_pair){
   // Only the captured warm-up A may use its literal pause/NoContest tail.
   // B is natural stock elimination; ordinary pause refusal remains active.
   if(s.match_index!=0)return false;
@@ -4358,10 +4395,27 @@ void stadium_paired_v11_full_after_tick(uint64_t before,uint64_t frame_before,ui
   check(match->diagnostic_pause_observation(o)&&o.generation==l.generation,
         "Paired v11 tail lost its actual post-tick pause state");
   if(l.pause_seen)check(o.frame==l.pause_frame,"Paired v11 paused source clock advanced");
+  if(s.natural14_pair&&s.match_index==1&&!o.paused&&!o.complete&&o.result==OUTCOME_NONE){
+   MeleeWebStadiumIdleSnapshot tail{};char error[256]{};
+   check(match->diagnostic_stadium_idle_snapshot(&tail,error,sizeof(error))&&
+         tail.world_generation==l.generation&&tail.map2_phase==0&&tail.map2_form==5&&
+         !tail.map2_gate&&tail.map2_history_e0==-1&&tail.map2_history_e2==-1&&tail.map5_root_relation==1,
+         error[0]?error:"Natural14 tail left its checked pre-first-transformation owner");
+  }
   if(o.complete||o.result!=OUTCOME_NONE)
    check(o.complete&&o.result==OUTCOME_NO_CONTEST&&cursor==l.span_last&&l.pause_seen&&
          l.pause_release_seen,"Paired v11 terminal did not match its literal final Match input");
   return;
+ }
+ if(s.natural14_pair&&s.match_index==0){
+  MeleeWebMatchPauseObservation o{};
+  check(match->diagnostic_pause_observation(o)&&o.generation==l.generation,
+        "Natural14 A lost its actual warm-up source owner");
+  if(l.pause_seen)check(o.frame==l.pause_frame,"Natural14 A paused clock advanced");
+  if(o.complete||o.result!=OUTCOME_NONE)
+   check(o.complete&&o.result==OUTCOME_NO_CONTEST&&cursor==l.span_last&&
+         l.pause_seen&&l.pause_release_seen,"Natural14 A terminal differs from its literal NoContest route");
+  return; // No original A GO/typed state observations are paired by this profile.
  }
  if(s.stockout_pair){
   MeleeWebMatchPauseObservation o{};
@@ -4399,7 +4453,7 @@ void stadium_paired_v11_full_after_tick(uint64_t before,uint64_t frame_before,ui
        "Paired v11 GO event changed after actual latch");
  const uint64_t ordinal=before-s.go_world_tick;
  check(ordinal==l.state_samples+l.tail_ticks&&
-       (s.stockout_pair?before<l.span_last-l.span_first+1:ordinal<=3504),
+       ((s.stockout_pair||s.natural14_pair)?before<l.span_last-l.span_first+1:ordinal<=3504),
        "Paired v11 window has a missing, repeated or overlong source tick");
  MeleeWebStadiumIdleSnapshot idle{};MeleeWebStadiumPadQueueObservation queue{};
  check(match->diagnostic_stadium_idle_snapshot(&idle,error,sizeof(error)),
@@ -4414,19 +4468,30 @@ void stadium_paired_v11_full_after_tick(uint64_t before,uint64_t frame_before,ui
        queue.source_tick_after==before+1&&queue.qnum_before==1&&queue.qread_before==0&&
        queue.qcount_before==1&&queue.qcount_after_hsd==0,
        "Paired v11 window lost its actual consumed four-port queue");
+ if(s.natural14_pair)stadium_paired_v11_natural14_observe(idle,queue,before);
  std::string players;
  if(s.stockout_pair)players=stadium_paired_v11_stockout_players(
      {match->player_stats(0),match->player_stats(1)},idle.display_mode,before);
  std::ostringstream sample;sample<<"{\"ordinal\":"<<ordinal
-  <<",\"selected\":"<<((s.stockout_pair||ordinal<=3500)?"true":"false")
+  <<",\"selected\":"<<((s.stockout_pair||s.natural14_pair||ordinal<=3500)?"true":"false")
   <<",\"typed22\":"<<matched_setup_cf_common_fields_json(idle,match->random_seed(),
       static_cast<unsigned>(cursor),static_cast<unsigned>(before),true)
   <<",\"pad_queue\":"<<matched_setup_cf_pad_queue_observation_json(queue,match->start_data());
  if(s.stockout_pair)sample<<",\"players_scope\":\"source-player-stock-motion-ground-only\",\"players\":"<<players;
  sample<<'}';
  stadium_paired_v11_emit("state",sample.str());
- if(s.stockout_pair||ordinal<=3500)++l.state_samples;else ++l.tail_ticks;
- if(!s.stockout_pair&&ordinal==3500)l.window_target=true;
+ if(s.stockout_pair||s.natural14_pair||ordinal<=3500)++l.state_samples;else ++l.tail_ticks;
+ if(s.natural14_pair&&before==s.last_selected_source_tick){
+  check(l.mode14_observed&&l.mode14_neutral_release&&
+        l.state_samples==before-s.go_world_tick+1,"Natural14 selected span has missing typed states");
+  l.window_closed=true;
+  std::ostringstream closed;closed<<"{\"close_policy\":\"observed_mode14_and_neutral_release\",\"state_samples\":"
+   <<l.state_samples<<",\"natural_tail_ticks\":0,\"last_selected_source_tick\":"<<before
+   <<",\"mode14_source_tick\":"<<s.mode14_source_tick
+   <<",\"mode14_observed\":true,\"neutral_release_observed\":true}";
+  stadium_paired_v11_emit("window_closed",closed.str());
+ }
+ if(!s.stockout_pair&&!s.natural14_pair&&ordinal==3500)l.window_target=true;
 }
 void stadium_paired_v11_scene_rng(unsigned first,unsigned end){
  if(!stadium_paired_v11_full_active())return;
@@ -4508,7 +4573,20 @@ void stadium_paired_v11_before_retire(){
  auto& s=stadium_paired_v11;
  if(!stadium_paired_v11_full_active())return;
  auto& l=s.lifetimes[s.match_index];int winner=-1;
- if(s.stockout_pair){
+ if(s.natural14_pair){
+  check(!s.failed&&!s.action_open&&stadium_paired_v11_owner_valid()&&!l.terminal_observed&&
+        match->complete()&&match->outcome(winner)==OUTCOME_NO_CONTEST&&
+        l.ticks==l.span_last-l.span_first+1&&replay_cursor==l.span_last+1&&
+        l.pause_seen&&l.pause_release_seen,
+        "Natural14 retirement preceded its actual literal NoContest terminal");
+  if(s.match_index==0){
+   check(l.state_samples==0&&!l.window_closed,"Natural14 A gained unpaired typed state authority");
+   l.window_closed=true;
+   stadium_paired_v11_emit("window_closed","{\"close_policy\":\"declared_match_actions_complete\",\"state_samples\":0,\"natural_tail_ticks\":0}");
+  }else check(s.go_observed&&l.window_closed&&l.mode14_observed&&l.mode14_neutral_release&&
+       l.state_samples==s.last_selected_source_tick-s.go_world_tick+1,
+       "Natural14 B retirement lacks the actual mode14/release selected window");
+ }else if(s.stockout_pair){
   check(!s.failed&&!s.action_open&&stadium_paired_v11_owner_valid()&&!l.terminal_observed&&
         match->complete()&&l.ticks==l.span_last-l.span_first+1&&replay_cursor==l.span_last+1,
         "StockoutPair retirement preceded its exact declared Match terminal");
@@ -4612,6 +4690,7 @@ std::string stadium_paired_v11_status_json(){
      <<",\"observation_order\":"<<s.observation_order
      <<",\"diagnostic_actions\":"<<s.diagnostic_action_index;
   if(s.stockout_pair)out<<",\"profile\":\"selected_b_natural_stockout_v1\",\"per_owner_rng_comparison\":false";
+  if(s.natural14_pair)out<<",\"profile\":\"selected_b_natural_mode14_v1\",\"per_owner_rng_comparison\":false";
   out<<",\"lifetimes\":[";
   for(unsigned i=0;i<2;++i){const auto& l=s.lifetimes[i];if(i)out<<',';
    out<<"{\"match_index\":"<<i<<",\"world_generation\":"<<l.generation
@@ -4625,6 +4704,10 @@ std::string stadium_paired_v11_status_json(){
       <<",\"css_returned\":"<<(l.css_returned?"true":"false");
    if(s.stockout_pair)out<<",\"published_result\":"<<(l.published_result?"true":"false")
       <<",\"stock_losses\":"<<l.stock_losses<<",\"mode9_observed\":"<<(l.mode9_observed?"true":"false");
+   if(s.natural14_pair)out<<",\"mode14_observed\":"<<(l.mode14_observed?"true":"false")
+      <<",\"neutral_release_observed\":"<<(l.mode14_neutral_release?"true":"false")
+      <<",\"fixed_window_state_samples\":"<<std::min<uint64_t>(3501,l.state_samples)
+      <<",\"post_window_state_samples\":"<<(l.state_samples>3501?l.state_samples-3501:0);
    out<<'}';}
   out<<"],\"error\":"<<(s.error.empty()?"null":first_css_browser_draw_json_quote(s.error))<<'}';return out.str();
  }
@@ -7728,7 +7811,8 @@ void melee_web_native_menu_pause(int paused){
 const char* melee_web_native_menu_message(){return message.c_str();}
 int melee_web_native_menu_running(){return running;}
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-static int stadium_paired_v11_full_profile_arm(bool stockout){try{
+static int stadium_paired_v11_full_profile_arm(bool stockout,bool natural14=false,
+    uint32_t mode14_tick=0,uint32_t last_tick=0){try{
  auto& s=stadium_paired_v11;
  check(stadium_paired_v11_recipe()&&replay_trace&&replay->initial_css&&replay->initial_input&&
        !s.full_arm_consumed&&!s.full_pair&&!s.route_prepared&&!s.enabled&&
@@ -7741,14 +7825,17 @@ static int stadium_paired_v11_full_profile_arm(bool stockout){try{
        "Paired v11 full choice requires one decoded unentered whole-session owner");
  // One shot even if collector admission refuses: no silent firstGO fallback.
  s.full_arm_consumed=true;
- uint64_t actions=0;unsigned matches=0;
+ uint64_t actions=0,b_match_ticks=0;unsigned matches=0;
  for(const auto& span:replay->spans)if(span.scene==melee_web::kRetailReplayMatch){
   ++matches;
+  if(matches==2)b_match_ticks=span.last_frame-span.first_frame+1;
   for(size_t i=span.first_frame;i<=span.last_frame;++i)
    actions+=1U+(replay->closes_draw_batch(i)?1U:0U);
  }
  check(matches==2&&actions>0&&actions<=2*replay->frames.size(),
        "Paired v11 full action count differs from its checked recipe");
+ check(!natural14||(!stockout&&stadium_paired_v11_natural14_selector_valid(mode14_tick,last_tick,b_match_ticks)),
+       "Natural14 selector is outside its exact B Match recipe");
  check(EM_ASM_INT({
    const r=window.__meleeRngDrawProbeRange;
    return window.__meleeRngDrawProbeOwners===true&&
@@ -7757,13 +7844,18 @@ static int stadium_paired_v11_full_profile_arm(bool stockout){try{
      r[0]===0&&r[1]===$0-1&&typeof window.meleeRngDrawObservation==='function'?1:0;
   },static_cast<unsigned>(actions)),"Paired v11 full source action/RNG collector is unavailable");
  s.declared_actions=actions;s.full_recipe_owner=replay.get();
- s.full_context_owner=replay->initial_css.get();s.full_pair=true;s.stockout_pair=stockout;return 1;
+ s.full_context_owner=replay->initial_css.get();s.full_pair=true;s.stockout_pair=stockout;
+ s.natural14_pair=natural14;s.mode14_source_tick=mode14_tick;s.last_selected_source_tick=last_tick;return 1;
 }catch(const std::exception& error){message=error.what();return 0;}}
 int melee_web_native_menu_stadium_paired_v11_full_pair_arm(){
  return stadium_paired_v11_full_profile_arm(false);
 }
 int melee_web_native_menu_stadium_paired_v11_stockout_pair_arm(){
  return stadium_paired_v11_full_profile_arm(true);
+}
+int melee_web_native_menu_stadium_paired_v11_natural_mode14_pair_arm(
+    uint32_t mode14_source_tick,uint32_t last_selected_source_tick){
+ return stadium_paired_v11_full_profile_arm(false,true,mode14_source_tick,last_selected_source_tick);
 }
 const char* melee_web_native_menu_stadium_paired_v11_status(){
  static std::string status;

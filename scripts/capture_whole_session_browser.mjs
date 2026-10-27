@@ -835,7 +835,7 @@ async function pairedFullPhase(){
  await fs.writeFile(path.join(output,'paired-v11-full-rows.jsonl'),'',{flag:'wx'});
  await fs.writeFile(path.join(output,'paired-v11-full-rng.jsonl'),'',{flag:'wx'});
  await page.evaluate(installPairedFullObserver,{maximumRows:4*pairedFullExpected.total+16000});
- await page.evaluate(installPairedFullLaunch,{stockout:pairedFullExpected.stockout===true});
+ await page.evaluate(installPairedFullLaunch,{stockout:pairedFullExpected.stockout===true,natural14:pairedFullExpected.natural14===true,mode14SourceTick:pairedFullExpected.natural14?pairedFullExpected.matches[1].reference.mode14_source_tick:null,lastSelectedSourceTick:pairedFullExpected.natural14?pairedFullExpected.matches[1].reference.last_selected_source_tick:null});
  await page.locator('#retail-replay-start').click();
  let status;
  while(Date.now()<deadline){
@@ -871,8 +871,8 @@ async function pairedFullPhase(){
      // Retain the completed browser evidence before the independent host-side
      // comparison, which may fail or exhaust the remaining capture budget.
      await write('report.json',report);
-     report.paired_v11_full_pair.rng_comparison=pairedFullExpected.stockout
-      ? {per_owner_rng_comparison:false,scope:'Per-tick and scene seed comparison only; original compact RNG was not captured.'}
+     report.paired_v11_full_pair.rng_comparison=(pairedFullExpected.stockout||pairedFullExpected.natural14)
+      ? {per_owner_rng_comparison:false,scope:'Per-tick and scene seed comparison only; no per-owner comparison for the declared profile.'}
       : runPairedFullRngComparison(true);
      if(Date.now()>=deadline)throw Error('Paired full strict comparison exceeded unchanged replay deadline');
      report.paired_v11_full_pair.component_pass=true;return;
@@ -1269,15 +1269,17 @@ try {
     const pinned=async(file,sha)=>{const stat=await fs.lstat(file);if(!stat.isFile()||stat.isSymbolicLink()||stat.size>64*1024*1024)throw Error('Full reference must be a bounded regular file');const raw=await fs.readFile(file),actual=createHash('sha256').update(raw).digest('hex');if(actual!==sha)throw Error('Full reference SHA differs');return {raw,identity:{path:path.resolve(file),bytes:raw.length,sha256:actual}};};
     const projection=await pinned(pairedFullPath,pairedFullSha),endpoints=await pinned(pairedFullEndpoints,pairedFullEndpointsSha);
     pairedFullExpected=derivePairedFull(JSON.parse(projection.raw),report.inputs.recipe.sha256,report.recipe_header.frames,JSON.parse(endpoints.raw));
-    if(pairedRegistration && pairedFullExpected.stockout) throw Error('Registration capture requires the paired idle route');
+    if(pairedRegistration && (pairedFullExpected.stockout||pairedFullExpected.natural14)) throw Error('Registration capture requires the paired idle route');
     if(pairedRegistration) report.stadium_registration={requested:true,complete:false};
     pairedFullComparison=new PairedFullComparator(pairedFullExpected);
     report.inputs.paired_full_projection=projection.identity;report.inputs.paired_full_endpoints=endpoints.identity;
-    report.paired_v11_full_pair={component_pass:false,scope:pairedFullExpected.stockout
+    report.paired_v11_full_pair={component_pass:false,scope:pairedFullExpected.natural14
+      ?'A route warmup; B natural mode14 before transformation with literal input/typed state/seed and Results; C3/per-owner/registration false'
+      :pairedFullExpected.stockout
       ?'A route warmup; B natural stock-out typed state/input/seed/display and Results; C3/all-writer/registration false'
       :'actual two-window source lifecycle; C3/all-writer/registration false'};
-    pairedFullOriginalPreflight=pairedFullExpected.stockout
-      ?{per_owner_rng_comparison:false,scope:'No compact original ledger; admitted successful original stockout report and exact projection.'}
+    pairedFullOriginalPreflight=(pairedFullExpected.stockout||pairedFullExpected.natural14)
+      ?{per_owner_rng_comparison:false,scope:'Admitted declared profile original report and exact projection; per-owner RNG outside this comparison.'}
       :runPairedFullRngComparison(false);
     report.paired_v11_full_pair.original_rng_preflight=pairedFullOriginalPreflight;
   }
