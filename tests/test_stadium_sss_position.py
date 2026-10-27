@@ -126,6 +126,7 @@ class StadiumSssPositionTests(OwnedWorkspaceTests):
             source[source.index(marker):source.index(";",source.index(marker))+1]
             for marker in ("  StadiumWholeBObservation stadium_whole_b;",
                            "  bool stadium_whole_feedback = false;",
+                           "  bool stadium_whole_paired_idle = false;",
                            "  bool stadium_whole_sss_ready = false;",
                            "  std::string stadium_whole_setup_receipt;",
                            "  u32 match_index = 0;", "  u32 whole_phase = 0;"))
