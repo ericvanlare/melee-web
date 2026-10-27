@@ -5,6 +5,7 @@
 #include <stdint.h>
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include "gameplay_source_memory_runtime.h"
+#include "gameplay_source_files.h"
 #endif
 
 #ifdef __cplusplus
@@ -155,6 +156,64 @@ typedef struct MeleeWebStadiumSourceJournal {
     int overflowed;
 } MeleeWebStadiumSourceJournal;
 
+/* Exact first FIRE lifetime only. These are actual source call receipts,
+ * not allocator generations, current membership, or original equivalence. */
+#define MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENTS 5U
+typedef struct MeleeWebStadiumFirstTransformEvent {
+    unsigned kind; /* 1 original creation return, 2 removal entry, 3 removal return */
+    int map_id;
+    HSD_GObj* object;
+} MeleeWebStadiumFirstTransformEvent;
+typedef struct MeleeWebStadiumFirstTransformJournal {
+    uint64_t world_generation;
+    unsigned armed, count, failed;
+    HSD_GObj* initial_map5;
+    HSD_GObj* fire_map3;
+    void* source_slot;
+    /* Read-only status fields, copied from the current checked source owner. */
+    int phase,form,history_e0,history_e2,countdown,pending;
+    unsigned buffer_uses;
+    /* Scalar values are the last successfully validated LIVE graph sample.
+     * Sealed terminal events do not reread any destroyed display/Ground. */
+    int map2_gate,display_mode,display_e6,display_e8;
+    int display_previous_mode,display_selected_player,display_f2;
+    unsigned display_flags,scalar_sample_valid;
+    uint64_t scalar_world_ticks;
+    MeleeWebStadiumFirstTransformEvent events[MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENTS];
+} MeleeWebStadiumFirstTransformJournal;
+/* Pure fixed call-order reducer used by the passive source hooks. Object
+ * tokens are compared locally only; callers establish the live source owner. */
+static inline int melee_web_stadium_first_transform_record(
+    MeleeWebStadiumFirstTransformJournal* j,unsigned kind,int id,HSD_GObj* object)
+{
+    static const unsigned kinds[5]={1,2,3,2,3};
+    static const int ids[5]={3,5,5,3,3};
+    if(!j||j->armed!=1||j->failed||!j->world_generation||!j->initial_map5||
+       !object||j->count>=MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENTS)
+        {if(j)j->failed=1;return 0;}
+    const unsigned n=j->count;
+    if(kind!=kinds[n]||id!=ids[n]||
+       (n==0&&(j->fire_map3||object==j->initial_map5))||
+       (n!=0&&object!=(id==5?j->initial_map5:j->fire_map3)))
+        {j->failed=1;return 0;}
+    if(n==0)j->fire_map3=object;
+    j->events[n].kind=kind;j->events[n].map_id=id;j->events[n].object=object;
+    ++j->count;return 1;
+}
+int melee_web_stadium_display_owner_first_transform_arm(
+    MeleeWebStadiumDisplayOwner*,MeleeWebStadiumFirstTransformJournal*,char*,size_t);
+int melee_web_stadium_display_owner_first_transform_graph(
+    const MeleeWebStadiumDisplayOwner*,int retiring,char*,size_t);
+struct MeleeWebStadiumMap2BufferOwner;
+int melee_web_stadium_display_owner_first_transform_end(
+    MeleeWebStadiumFirstTransformJournal*,struct MeleeWebStadiumMap2BufferOwner*,char*,size_t);
+/* Typed static source callback identity, only in the actual live first-fire
+ * owner. This predicate never invokes a callback or selects an arrival. */
+int melee_web_stadium_first_transform_callback_matches(MeleeWebSourceFileCallback);
+void melee_web_stadium_display_owner_note_ground_retire(HSD_GObj*,int entering);
+int melee_web_stadium_display_owner_first_transform_status(
+    const MeleeWebStadiumFirstTransformJournal*,MeleeWebStadiumFirstTransformJournal*,char*,size_t);
+
 /* This source-derived record crosses the private Stadium TU boundary. It
  * keeps the exact branch provenance alive after display/SIS retirement and
  * until the original Ground owner objects have been removed. */
@@ -172,6 +231,7 @@ typedef struct MeleeWebStadiumMap2BufferOwner {
     MeleeWebSourceMemoryAllocation buffer_allocation_lease;
     int buffer_allocation_lease_captured;
     int started_allocation_lease_required;
+    int initial_map5_source_retired; /* only fixed first-fire source journal may transfer this receipt */
 } MeleeWebStadiumMap2BufferOwner;
 
 /* The owner is opaque so the private grpstadium TextWrapper ABI stays in its

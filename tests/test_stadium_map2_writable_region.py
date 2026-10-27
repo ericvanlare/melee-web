@@ -35,6 +35,7 @@ class StadiumMap2WritableRegionTests(unittest.TestCase):
         memory = memory[memory.index('typedef enum MeleeWebSourceMemoryReadStatus'):memory.index('/* Fighter_Create')]
         origin = display[display.index('typedef enum MeleeWebStadiumMap2BufferOrigin'):display.index('} MeleeWebStadiumMap2BufferOrigin;')+len('} MeleeWebStadiumMap2BufferOrigin;')]
         owner = display[display.index('typedef struct MeleeWebStadiumMap2BufferOwner'):display.index('} MeleeWebStadiumMap2BufferOwner;')+len('} MeleeWebStadiumMap2BufferOwner;')]
+        journal = display[display.index('#define MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENTS'):display.index('} MeleeWebStadiumFirstTransformJournal;')+len('} MeleeWebStadiumFirstTransformJournal;')]
         helpers = stage[stage.index('typedef struct MeleeWebStadiumMap2WritableRegion'):stage.index('\n#endif\nstruct MeleeWebStageLast')]
         program = r'''
 #include <assert.h>
@@ -45,7 +46,7 @@ class StadiumMap2WritableRegionTests(unittest.TestCase):
 #define MELEE_WEB_STADIUM_C1A_DIAGNOSTIC 1
 typedef struct HSD_GObj HSD_GObj;
 typedef struct MeleeWebSourceFileScope { int identity; } MeleeWebSourceFileScope;
-'''+memory+origin+owner+r'''
+'''+memory+origin+owner+'\n'+journal+r'''
 /* Explicit service models: these are refusal-capable capabilities, not native
  * transport evidence. Pending remains true throughout a modeled async wait. */
 static MeleeWebSourceFileScope first={1},second={2};
@@ -77,7 +78,7 @@ MeleeWebSourceMemoryReadStatus melee_web_source_memory_allocation_read(const voi
  *out=actual;return memory_status;
 }
 '''+helpers+r'''
-typedef struct MeleeWebStageLast { uint64_t generation;MeleeWebStadiumMap2WritableRegion stadium_map2_region;} MeleeWebStageLast;
+typedef struct MeleeWebStageLast { uint64_t generation;MeleeWebStadiumMap2WritableRegion stadium_map2_region;MeleeWebStadiumFirstTransformJournal stadium_first_transform;} MeleeWebStageLast;
 static MeleeWebStageLast* active;
 static struct {uint64_t generation;} stats={7};
 #define melee_web_gameplay_stats() stats
@@ -142,6 +143,8 @@ int main(void){
  assert(!melee_web_stage_last_source_work_allowed(&foreign));
  assert(melee_web_stage_last_source_work_allowed(NULL));
  h.stadium_map2_region.closing=0;assert(melee_web_stage_last_source_work_allowed(&h));
+ h.stadium_first_transform.failed=1;assert(!melee_web_stage_last_source_work_allowed(&h));
+ h.stadium_first_transform.failed=0;
  h.generation=8;assert(!melee_web_stage_last_source_work_allowed(&h));
  reset();assert(stadium_map2_region_preflight(&region,&maps,7,error,sizeof(error)));
  region.scope=&first;assert(!stadium_map2_region_preflight(&region,&maps,7,error,sizeof(error)));

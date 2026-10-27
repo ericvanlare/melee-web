@@ -1,17 +1,12 @@
 {
   "schema": "melee-web-stadium-archive-service-v1",
   "issue": 345,
-  "state": "PR346_MERGED_CI_PASS; C5_SOURCE_HOLD_CLOSED; REPAIRED_SOURCE_FOCUSED_CONTROL_AND_BUILDS_PASS; FULL_REGRESSION_ONE_CANONICAL_REPRESENTATION_FAILURE_RETAINED; CANONICALIZATION_CONTROL_PASS; EXACT_HEAD_CI_PENDING",
+  "state": "PR346_348_350_MERGED; FIRST_FIRE_CONDITIONAL_BROWSER_ROUTE_PASS_INDEPENDENT_REVIEW_GO; FINAL_REGRESSION_57714AF_PASS; EXACT_HEAD_CI_PENDING; C5_AND_WHOLE_STAGE_ACCEPTANCE_OPEN",
   "checkpoint5_complete": false,
   "browser_transformations_enabled": false,
-  "source_head": "3e0a533c376dbfe613d3084802297c372b40cb01",
-  "base": "b041dcefff1f96a73f5b4afc9972e48250d4ba91",
+  "source_head": "38ecb6b1c1344d6a6900c70dce92bbff7944b4da",
+  "base": "3ddc98b759b225faec080b2b15419e555f31667c",
   "prior_build_source": "91bcf57e863f4accd6a4b0fc6aaa2e6170e637d3",
-  "parent_only_rebase": {
-    "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-current-main-rebase.json",
-    "bytes": 388,
-    "sha256": "1f08c5014a10b3e097ef0ec6e43f12bd66c41ae1cb2ebe59510d81a64391eb28"
-  },
   "source_reviews": [
     {
       "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-source-file-service-composed-v1/independent-review-v1.json",
@@ -89,8 +84,8 @@
       }
     ]
   },
-  "full_regression": "3639903A_V2_PASS_RETAINED; E487_STOPPED_ON_SHARED_MAP0_DEFECT; 3E0A_FULL_REGRESSION_2975_TESTS_211_SKIPS_ONE_CANONICAL_REPRESENTATION_FAILURE; PATCH_CANONICALIZATION_PRESERVED_APPLIED_TREE; EXACT_HEAD_CI_PENDING",
-  "exact_head_ci": "PR346_MERGED_HEAD_PASSED; C5_CANONICALIZED_SOURCE_EXACT_HEAD_CI_PENDING",
+  "full_regression": "FIRST_FIRE_V3_PASS_AT_57714AF; PRIOR_FAILED_AND_STOPPED_RUNS_RETAINED_BELOW",
+  "exact_head_ci": "PR346_PR348_PR350_MERGED_EXACT_HEAD_CI_PASSED; FIRST_FIRE_FINAL_PR_HEAD_PENDING",
   "retained_failures": [
     "c5-archive-service-full-regression-v1/full-regression.stderr: four full-suite fixture/export failures at 9d9d53b, before the reviewed compatibility repair",
     "c5-composed-focused-v1/test_stadium_pre_ready_cancel.stderr and work/stadium-pre-ready-i6tizcdk",
@@ -100,20 +95,22 @@
     "c5-slots-focused-v1/test_gameplay_lbfile_source_entry.result.json: initial metadata fixture failed; the corrected focused control passes in c5-slots-focused-v2",
     "c5-slots-regression-v2/root-stop-known-defect.json: e487 full regression stopped at 232.290s after review found shared base map0 was misattributed as a form-slot consumer; the owned process group was absent afterward.",
     "c5-slots-regression-v3: 2,975 tests / 211 skips / one failure in test_gameplay_patch_canonical; canonicalization and its 15-test control passed, but the full suite was not rerun after the representation-only patch change.",
-    "c5-slots-regression-v3: 2,975 tests / 211 skips / one failure in test_gameplay_patch_canonical; canonicalization and its 15-test control passed, but the full suite was not rerun after the representation-only patch change."
+    "c5-first-fire-browser-capture-v1/root-first-failure.json: default-off Fire graph run failed at B world tick 4349; strict retained prefix had no mismatch but B did not retire or reach Results/CSS; owned cleanup passed.",
+    "c5-first-fire-browser-capture-v1 remains a retained failed runtime result. The v2 route completed conditionally on 38ecb6b1 and passed independent raw review; see first_fire_browser_capture_v2.",
+    "c5-first-fire-full-regression-v1/root-early-stop.json: prior 38ec full-suite run stopped at 106.60s on the known stale textual callback assertion; no runtime failure inferred. The reviewed two-case fixture repair passes, and the later test-only 57714af full regression passed.",
+    "c5-first-fire-full-regression-v2: 2,990 tests / 211 skips / eight stale fixture failures. The seven-file fixture batch and final v3 full-suite pass are recorded separately; all failed evidence remains retained."
   ],
   "scope": [
     "Actual disc/asset/C adapter and native/WebAssembly source-service controls",
     "Exact source-owned writable-region lifetime and pre-mutation teardown checks",
     "No source arithmetic/input/RNG/order change",
-    "No browser gameplay capture or transformation run",
-    "No deterministic all-form completion rule, transformed graph retirement, C5 acceptance, or whole-stage acceptance",
+    "The first default-off Fire browser attempt stopped before completing the route; no accepted transformed gameplay run.",
+    "No general all-form completion or retirement rule; the selected first-Fire graph retired in the conditional v2 route. C5 acceptance and whole-stage acceptance remain open.",
     "Four-form asset probe reports four hydrated map_head records and 123 public names; it executes no source transformation.",
     "Source-slot and private-entry metadata focused runs were executed on the staged 35b50ab composition; their nine source/test hashes match the corresponding e4879796 files. Ordinary and diagnostic Release builds passed at e4879796.",
     "The e4879796 full regression was stopped at 232.290s on the independently reviewed shared-map0 consumer defect; it is not a full pass. That historical review was HOLD; the later first-provider repair and its closure are recorded below.",
-    "No World wiring, live transformation, transformed graph retirement, or C5 acceptance.",
-    "At 3e0a533c, the shared-map0 source HOLD is closed by the reviewed first-provider repair. Focused actual-source control and ordinary/diagnostic Release builds passed. The full regression retained one patch canonical-representation failure; canonicalizing patch bytes preserved applied dependency tree 13ef3f889b0e3a6ffd5c52feffefe47bfd5c92ad, and the 15-test canonicalization module passed. Exact-head CI, including its regression job, remains pending.",
-    "At 3e0a533c, the shared-map0 source HOLD is closed by the reviewed first-provider repair. Focused actual-source control and ordinary/diagnostic Release builds passed. The full regression retained one patch canonical-representation failure; canonicalizing patch bytes preserved applied dependency tree 13ef3f889b0e3a6ffd5c52feffefe47bfd5c92ad, and the 15-test canonicalization module passed. Exact-head CI, including its regression job, remains pending."
+    "At the 3e0a source checkpoint, World wiring had not yet been added. The later default-off first-Fire path at cffe173a failed its graph guard; after the reviewed three-process repair, the v2 route completed conditionally on 38ecb6b1 and passed independent raw review. This does not establish C5 acceptance.",
+    "At 3e0a533c, the shared-map0 source HOLD closed with the reviewed first-provider repair. Its local full regression retained one patch-representation failure and was not rerun after canonicalization. Later PR #348 and PR #350 exact-head CI passed on their own merge heads; those CI runs do not claim a rerun of the local 3e0a suite."
   ],
   "service_source_head": "9d9d53b6a320caf0fd90fdc37c208951cc5fe8a3",
   "compatibility_repair": {
@@ -134,7 +131,7 @@
     "full_regression_status": "RERUN_AND_PASS_AT_3639903A; E4879796_RUN_STOPPED_ON_KNOWN_DEFECT",
     "focused_run_head": "9d9d53b6a320caf0fd90fdc37c208951cc5fe8a3",
     "focused_run_note": "23 focused tests passed against the reviewed repair before it was committed as 3639903a; the receipt records the pre-commit base head.",
-    "current_head_ci": "PR346_MERGED_HEAD_PASSED; CANONICALIZED_3E0A_EXACT_HEAD_CI_PENDING",
+    "current_head_ci": "HISTORICAL_AT_3E0A_CANONICALIZATION_STAGE: EXACT_HEAD_CI_PENDING; LATER_PR348_AND_PR350_MERGED_EXACT_HEAD_CI_PASSED_ON_THEIR_OWN_HEADS",
     "public_audio_builds_passed": true,
     "builds_scope_note": "Public/audio builds passed at 3639903a; separate ordinary/diagnostic e4879796 builds also passed, before the shared-map0 repair."
   },
@@ -162,91 +159,6 @@
       "test_gameplay_native_menus.NativeMenuSourceTests.test_stadium_ready_rules_and_callback_owner_controls",
       "test_gameplay_sd_handoff_order.SuddenDeathHandoffOrderTests.test_actual_public_finish_captures_after_publication_before_teardown"
     ]
-  },
-  "current_validation": {
-    "full_regression_v2": {
-      "state": "PASS",
-      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-archive-service-full-regression-v2/result.json",
-      "bytes": 1181,
-      "sha256": "7a3c36c80d83bfb969de82735b24bab42af0c2481ffac084c148d4217234ae60",
-      "stderr": {
-        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-archive-service-full-regression-v2/full-regression.stderr",
-        "bytes": 545978,
-        "sha256": "86e7d27cc50684c9ab9fb0414d1a927277b57d7f00c60c004e272b2947aabf3e"
-      },
-      "stdout": {
-        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-archive-service-full-regression-v2/full-regression.stdout",
-        "bytes": 35292,
-        "sha256": "86f606a216be9c5d37d8151b9b8a6757d544a6dc808be7d3e74999a3c1c205c8"
-      },
-      "head": "3639903a7d664c0816afc421ea3c32eb8721b887",
-      "tree": "9ed490cba1819aea4b0e169e0fd96ee3c6fac5b6",
-      "tests": 2973,
-      "skipped": 211,
-      "elapsed_seconds": 620.6380092906766,
-      "raw_unittest_seconds": 619.938,
-      "exit_code": 0,
-      "group_absent": true,
-      "source_unchanged": true,
-      "scope_note": "The four v1 fixture/export failures are retained; the reviewed compatibility repair passed the v2 regression. No browser gameplay or transformation run was performed."
-    },
-    "public_runtime_release": {
-      "path": "c5-compatibility-build-v1/result.json",
-      "bytes": 5471,
-      "sha256": "26a1692771ec11974f8a53d6cbb76c2b7c9188f096d342109d612db603302ca0"
-    },
-    "audio_preview_release": {
-      "path": "c5-compatibility-build-v1/result.json",
-      "bytes": 5471,
-      "sha256": "26a1692771ec11974f8a53d6cbb76c2b7c9188f096d342109d612db603302ca0"
-    },
-    "build_artifacts": {
-      "path": "c5-compatibility-build-v1/artifacts.json",
-      "bytes": 1202,
-      "sha256": "88a90bc62f6c7be350f95673d07d85a9ffcade361237a90d9e20d8df7bd292f0"
-    },
-    "public_audio_builds_passed": true,
-    "current_head_ci": "PR346_MERGED_HEAD_PASSED; EXACT_HEAD_CI_FOR_CANONICALIZED_3E0A_SOURCE_PENDING",
-    "full_regression_v3": {
-      "state": "FAIL_ONE_CANONICAL_REPRESENTATION_TEST; RETAINED",
-      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-regression-v3/result.json",
-      "sha256": "8269d2e06ea8f6dc42645597413e30e67a21f421941a7e3a9a52b4d25eeb8ee8",
-      "head": "3e0a533c376dbfe613d3084802297c372b40cb01",
-      "tree": "196ddd3e7cf5b48a26d4e2d4e1cd3ccb84f203eb",
-      "tests": 2975,
-      "skipped": 211,
-      "failures": 1,
-      "exit_code": 1,
-      "group_absent": true,
-      "scope_note": "Sole failure was patch canonicalization. Patch normalization preserved applied dependency tree; full suite not rerun after this representation-only change."
-    },
-    "repaired_focused": {
-      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-focused-v3/result.json",
-      "sha256": "e65ba18e7cd80395e3e986919ec4ce0a5816ddc5bea4aed34097ff3655feb6d2",
-      "head": "3e0a533c376dbfe613d3084802297c372b40cb01",
-      "passed": true,
-      "group_absent": true,
-      "scope_note": "Actual-source first-provider repair control keeps base Ground0 live and refuses a real form Ground9 consumer."
-    },
-    "canonicalization": {
-      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-canonical-v1/result.json",
-      "sha256": "db321829744ba2b8e8fcc43d5e7f536992bd1288ba80bf4847c48860f32eb608",
-      "passed": true,
-      "canonical_test_count": 15,
-      "canonical_test_passed": true,
-      "patch_after_sha256": "db35d73df152b157fec7fc381b2342e6a8d0fa7ac8bc1b97cee088814e78a4b1",
-      "applied_dependency_tree": "13ef3f889b0e3a6ffd5c52feffefe47bfd5c92ad",
-      "full_regression_rerun": false
-    },
-    "repaired_builds": {
-      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-build-v3/result.json",
-      "sha256": "c8a247b4b131ad2636cde0e5be6c938c8c41badc5ef8b3ca16dac6c03deb0dc1",
-      "head": "3e0a533c376dbfe613d3084802297c372b40cb01",
-      "passed": true,
-      "ordinary_release": true,
-      "diagnostic_release": true,
-      "source_unchanged": true
-    }
   },
   "merged_pr346": {
     "url": "https://github.com/ericvanlare/melee-web/pull/346",
@@ -333,7 +245,7 @@
   "c5_source_slot_and_entry_metadata": {
     "implementation_head": "3e0a533c376dbfe613d3084802297c372b40cb01",
     "tree": "196ddd3e7cf5b48a26d4e2d4e1cd3ccb84f203eb",
-    "state": "SOURCE_HOLD_CLOSED; REPAIRED_ACTUAL_SOURCE_CONTROL_PASS; ORDINARY_AND_DIAGNOSTIC_RELEASE_BUILDS_PASS; FULL_REGRESSION_ONE_CANONICAL_REPRESENTATION_FAILURE_RETAINED; CANONICAL_PATCH_CONTROL_15_PASS; EXACT_HEAD_CI_PENDING",
+    "state": "HISTORICAL_3E0A_SOURCE_HOLD_CLOSED; REPAIRED_ACTUAL_SOURCE_CONTROL_PASS; ORDINARY_AND_DIAGNOSTIC_RELEASE_BUILDS_PASS; FULL_REGRESSION_ONE_CANONICAL_REPRESENTATION_FAILURE_RETAINED; CANONICAL_PATCH_CONTROL_15_PASS; LATER_PR348_AND_PR350_EXACT_HEAD_CI_PASS",
     "source_slot_candidate": {
       "production_freeze": {
         "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-stadium-source-slot-candidate-v2/freeze-v2.json",
@@ -352,7 +264,7 @@
         "sha256": "cffe34055e3cdc66363204586a2f047f1d759e99b7e25043584f5ba57220ae52",
         "passed": true
       },
-      "scope": "Binds an exact source slot/header/buffer/allocation lease to a selected form and retains the corresponding native archive-section handle. Ordinary source header retirement and raw phase-6 buffer clearing remain distinct. No World transformation wiring."
+      "scope": "Binds an exact source slot/header/buffer/allocation lease to a selected form and retains the corresponding native archive-section handle. These source-slot controls are component evidence; the conditional World route is recorded separately. Ordinary source header retirement and raw phase-6 buffer clearing remain distinct."
     },
     "source_entry_metadata": {
       "candidate_freeze": {
@@ -382,7 +294,7 @@
     },
     "unvalidated": [
       "exact-head CI, including its regression job, after patch canonicalization",
-      "live World transformation and complete transformed graph retirement",
+      "general multi-form live World transformation and transformed graph retirement",
       "C5 and whole-stage acceptance"
     ],
     "transformations_enabled": false,
@@ -484,7 +396,7 @@
       "patch_after_sha256": "db35d73df152b157fec7fc381b2342e6a8d0fa7ac8bc1b97cee088814e78a4b1",
       "applied_dependency_tree": "13ef3f889b0e3a6ffd5c52feffefe47bfd5c92ad",
       "non_patch_source_unchanged": true,
-      "exact_head_ci": "PENDING",
+      "exact_head_ci": "PENDING_AT_HISTORICAL_3E0A_STAGE; LATER_PR348_AND_PR350_MERGED_EXACT_HEAD_CI_PASSED",
       "full_regression_rerun": false
     },
     "historical_e487_regression": {
@@ -504,7 +416,7 @@
       "group_absent_after_stop": true
     }
   },
-  "source_tree": "196ddd3e7cf5b48a26d4e2d4e1cd3ccb84f203eb",
+  "source_tree": "2077bb4c08112a1624820d7dbbc4a5c10effa7f5",
   "pr348_linux_fixture": {
     "failed_head": "e71533c6886d4baced4d291b23a7364530ae18e9",
     "failed_run": 40552013069,
@@ -524,7 +436,7 @@
       "sha256": "3d8cfaa87380cf3c0980b3b2f1c742af040ba744b37af4955ecc62e7afdf3042",
       "passed": true
     },
-    "current_head_ci": "PENDING"
+    "current_head_ci": "PR348_MERGED_EXACT_HEAD_CI_PASSED: 12_SUCCESS_2_EXPECTED_SKIP"
   },
   "transformed_archive_merge": {
     "pr": 348,
@@ -547,6 +459,446 @@
       "bytes": 270,
       "sha256": "17a10054703754178865ef5212ee041d2bba33f716c043bad531b3899d2a1ac1"
     },
-    "scope": "Source metadata and four-form archive/slot ownership; no live transformation or general completion model."
+    "scope": "Source metadata and four-form archive/slot ownership. The later selected first-Fire route is conditional; a general completion model and other-form retirement remain unproved."
+  },
+  "merged_pr350": {
+    "url": "https://github.com/ericvanlare/melee-web/pull/350",
+    "issue": 349,
+    "merge_commit": "3ddc98b759b225faec080b2b15419e555f31667c",
+    "reviewed_head": "a1aebaa22ed2c5bd7857bfda1887d469bf3312d1",
+    "tree": "6ba7897a6338c44c899dc53aeabec660ca4cea31",
+    "reviewed_tree_matches": true,
+    "ci": {
+      "run": 40559928170,
+      "checks": 14,
+      "success": 12,
+      "expected_skips": 2,
+      "conclusion": "success",
+      "gate": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr350-merge-gate-v1/gate.json",
+        "bytes": 969,
+        "sha256": "1a1f15732f89753c27bfab4843bede221ccfb88c0642ceb359523eaab46a7c23"
+      },
+      "merged_commit_receipt": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr350-merge-gate-v1/merged-commit.json",
+        "bytes": 3559,
+        "sha256": "0d2a2bb82e14740fc4d1b777e6b44ab7c51e56281cfe46719a854db0f07f85da"
+      }
+    },
+    "scope": "Passive original request/callback/loaded-pending-poll clock observation; no general completion rule or C4 acceptance."
+  },
+  "first_fire_browser_attempt": {
+    "state": "FAILED_FIRST_GRAPH_GUARD; COMPLETE_ROUTE_FAILED; RETAINED",
+    "profile": "selected_b_first_fire_recorded_callback_v1",
+    "original_recording": {
+      "source_head": "c389eded70f3f09efafb8cc7f2a7a8f35f49ef94",
+      "report": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-request-clocks-original-v1/report.json",
+        "bytes": 7442885,
+        "sha256": "964eab483b087180f8c87f60c075f0e9e9e17527c7c46282b66cf2a1bf9049ef"
+      },
+      "independent_raw_review": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-request-clocks-original-v1/independent-review-v1/review.json",
+        "bytes": 8938,
+        "sha256": "ac67a8e27fcf68bffa918447d6b851d5307098be187bdc333a4ffe52d68f2b21"
+      }
+    },
+    "browser_source_head": "cffe173adf484ee937f19fa93e2dcfe845fdd977",
+    "elapsed_seconds": 103.86104200035334,
+    "first_failure": "First-fire phase/slot/source graph proof failed at B world tick 4349.",
+    "exact_pins_and_cleanup": {
+      "source_runtime_input_pins_exact": true,
+      "cleanup_passed": true,
+      "capture_process_group_absent": true,
+      "server_process_group_absent": true,
+      "owner_receipt": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v1/owner.json",
+        "bytes": 112253,
+        "sha256": "46e0d95d625284f5816b8272a1df9e6bd8d8f35f14b6634612d00b7c4fee708e"
+      }
+    },
+    "strict_retained_prefix": {
+      "rows_compared": 22446,
+      "actions": 9078,
+      "first_mismatch": null,
+      "whole_route": false,
+      "receipt": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v1/retained-prefix-comparison.json",
+        "bytes": 1064,
+        "sha256": "52b1ec954c4d4c262f3c05d3a8444b05a9ba89359fe70fb3807016ee8fa18d4a"
+      }
+    },
+    "last_b_status": {
+      "world_generation": 7,
+      "ticks": 4349,
+      "draws": 4345,
+      "actions": 8694,
+      "state_samples": 4264,
+      "window_closed": false,
+      "native_retired": false,
+      "results_entered": false,
+      "css_returned": false,
+      "whole_session_complete": false,
+      "per_owner_rng_comparison": false
+    },
+    "first_failure_receipt": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v1/root-first-failure.json",
+      "bytes": 3518,
+      "sha256": "f68972e5a2823ec5de3a1ca2aeaddebb9afd1a4969793387295d651862155ffc"
+    },
+    "browser_report": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v1/browser-run/report.json",
+      "bytes": 271725,
+      "sha256": "6a8413b694079f9fb3bcf2bea883b786b2508097946109cee43ee4152956124d"
+    },
+    "source_reviews": [
+      {
+        "decision": "GO_SOURCE_COMPOSITION_ONLY",
+        "scope": "runner composition, not runtime proof",
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-runner-candidate-v3/root-independent-review-v1.json",
+        "sha256": "ef308d152d8aa08ed0a505aebbd2828876731933f9528849d9cb732a215aba04"
+      },
+      {
+        "decision": "GO_SOURCE_INTEGRATION_ONLY",
+        "scope": "first-Fire owner lifecycle source review, not runtime proof",
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-transform-owner-candidate-v1/independent-review-v1.json",
+        "sha256": "e71d572338989b0d1034b7eef7c04ba40cd3e2ae80abcdf6f4e589a3d3363780"
+      },
+      {
+        "decision": "GO_SOURCE_COMPOSITION_ONLY",
+        "scope": "World composition source review, not runtime proof",
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-world-first-fire-composition-v3/root-independent-review-v1.json",
+        "sha256": "a9fad922c5521f8512577ee07d91bb3dc7aa88bf6727263defaaf84b26ed15c7"
+      }
+    ],
+    "limitations": [
+      "A completed its CSS terminal; B did not complete its window, retirement, Results or CSS return.",
+      "The 22,446-row comparison is only the retained incomplete prefix and does not pass the full route.",
+      "No per-owner RNG parity, C5 acceptance, transformation acceptance or whole-stage acceptance is established."
+    ],
+    "followup_source_repair": {
+      "state": "APPLIED_AFTER_INDEPENDENT_SOURCE_REVIEW; ORDINARY_AND_DIAGNOSTIC_RELEASE_BUILDS_PASS; INTEGRATED_ACTUAL_SOURCE_CONTROL_PASS; CONDITIONAL_FIRST_FIRE_ROUTE_PASS_INDEPENDENT_RAW_REVIEW_GO",
+      "source_head": "38ecb6b1c1344d6a6900c70dce92bbff7944b4da",
+      "tree": "2077bb4c08112a1624820d7dbbc4a5c10effa7f5",
+      "base": "3ddc98b759b225faec080b2b15419e555f31667c",
+      "pre_parent_rebase_source": "133eeb2f066d17ab53efd4f565c5749605af4035",
+      "tree_unchanged_by_parent_rebase": true,
+      "finding": "Ground_GetStageGObj installs two authored Ground processes and Stadium Fire adds a third. The previous guard incorrectly required one node; the repair validates the exact three-node chain including callback, priority, GObj ownership and terminating tail.",
+      "patch_sha256": "c9ab98e7bf38fce371b5ec9f3f841378d14f19a837dad08f87a04efb5df760de",
+      "applied_receipt": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-proc-chain-repair-v1/applied-current-main.json",
+        "bytes": 512,
+        "sha256": "c9db6a6be41cdcd4644a7c1f2ebb7a3ede19b2ec73e3700aece149a5c1ebc5c8"
+      },
+      "independent_review": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-proc-chain-repair-v1/root-independent-review-v1.json",
+        "bytes": 1078,
+        "sha256": "c74c5fd3523e301715ebfcfc2e078284abb4ed101939604fc980b29e9946c75e",
+        "decision": "GO",
+        "capture_released": false
+      },
+      "candidate_control": "Integrated actual-source three-process chain control PASS (1 test, 0 skips); ordinary and diagnostic Release builds PASS. Guard validation only; route outcome is recorded separately under first_fire_browser_capture_v2.",
+      "builds": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-proc-chain-build-v1/build-summary.json",
+        "bytes": 3623,
+        "sha256": "c1a81b9837a4133c2bcf636be230a7413244a128b39ab469323a28312bc91826",
+        "ordinary_release_passed": true,
+        "diagnostic_release_passed": true
+      },
+      "integrated_actual_source_control": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-proc-chain-repair-v1/focused-v1/actual-first-fire-three-proc-chain.result.json",
+        "bytes": 1302,
+        "sha256": "e7de14b59b9361efc09483febbf23e6c1b0fa4a064fa319c7ba06f46448674b8",
+        "passed": true,
+        "tests": 1,
+        "skips": 0
+      }
+    }
+  },
+  "first_fire_browser_capture_v2": {
+    "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v2/",
+    "state": "PASS_CONDITIONAL_FIRST_FIRE_ROUTE_INDEPENDENT_RAW_REVIEW_GO",
+    "decision": "GO_SCOPED_CONDITIONAL_FIRST_FIRE_COMPONENT",
+    "source_head": "38ecb6b1c1344d6a6900c70dce92bbff7944b4da",
+    "elapsed_seconds": 106.842971208971,
+    "source_rows": 23129,
+    "actions": 9348,
+    "state_samples": 4387,
+    "scene_endpoints": 8,
+    "results_and_css_returned": true,
+    "native_retired": true,
+    "pins_exact": true,
+    "owned_cleanup_passed": true,
+    "h1_timing_pause_observed": false,
+    "profile": "selected_b_first_fire_recorded_callback_v1",
+    "comparison_scope": "Declared 14 source fields plus seed, four-port PAD, action order, and native-local checked graph lifetime; conditional recorded callback phase.",
+    "exclusions": [
+      "No per-owner RNG comparison.",
+      "No general timing or remaining-form claim.",
+      "No C5 or whole-stage acceptance."
+    ],
+    "root_result_summary": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v2/root-result-summary.json",
+      "bytes": 972,
+      "sha256": "51dfd37781486d948ea447b88366300f4b1dcd6a20e3816af443b368a1ec3fb0"
+    },
+    "browser_report": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v2/browser-run/report.json",
+      "bytes": 333085,
+      "sha256": "8a48c1516bea7f02afb11aa427d70212b1b1a9aedc7961c250831889b09b0071"
+    },
+    "owner_receipt": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v2/owner.json",
+      "bytes": 83355,
+      "sha256": "ecf5cd34326b8b15e6aba6229717bcdf2ab377e849eb00447f23982996c7f534",
+      "cleanup_passed": true
+    },
+    "independent_raw_review": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v2/independent-review.json",
+      "bytes": 36188,
+      "sha256": "7c484b2f5d841f5c8a9890535836f7b3c436433d2ad584cf6f0f5253e5098606",
+      "decision": "GO_SCOPED_CONDITIONAL_FIRST_FIRE_COMPONENT",
+      "all_manifest_pins_verified": 106,
+      "source": "38ecb6b1c1344d6a6900c70dce92bbff7944b4da",
+      "tree": "2077bb4c08112a1624820d7dbbc4a5c10effa7f5"
+    },
+    "capture_command": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v2/command.json",
+      "bytes": 5923,
+      "sha256": "f01b27597af42a5e5a694933be89812a774febe76174e6c73abdc951497fd520"
+    },
+    "retained_rows": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v2/browser-run/paired-v11-full-rows.jsonl",
+      "bytes": 14056698,
+      "sha256": "f3515cabba48cde85e3b3eb9dec827b199c00273aa86899163cbcc7b1ad64c09"
+    },
+    "retained_rng_trace": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v2/browser-run/paired-v11-full-rng.jsonl",
+      "bytes": 36004940,
+      "sha256": "0164e84c7425b5bf3f41a07718384f261edc05c2f6018d2e8cfa44257d1f98bc",
+      "comparison": "retained only; no per-owner RNG parity claim"
+    },
+    "component_comparison": {
+      "pass": true,
+      "actions": 9348,
+      "source_rows": 23129,
+      "source_state_samples": 4387,
+      "scene_endpoints": 8,
+      "native_phase": 0,
+      "native_running": 0,
+      "native_retired": true,
+      "whole_session_complete": true,
+      "per_owner_rng_comparison": false
+    }
+  },
+  "current_test_head": "57714af2c35e3485b16b5c7865691302636ae356",
+  "source_fixture_repair": {
+    "state": "TEST_ONLY_REPAIR_REVIEWED_AND_APPLIED; TWO_FOCUSED_CASES_PASS; FULL_V2_FINISHED_WITH_EIGHT_OTHER_FIXTURE_FAILURES",
+    "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-source-fixture-repair-v1/",
+    "test_head": "58d705a10fa131022e855e69cdbb226e9c63f496",
+    "runtime_producer": "38ecb6b1c1344d6a6900c70dce92bbff7944b4da",
+    "test_only": true,
+    "production_unchanged": true,
+    "old_assertion_reproduced": true,
+    "candidate_two_focused_cases_pass": true,
+    "focused_result": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-source-fixture-repair-v1/focused-result.json",
+      "bytes": 2603,
+      "sha256": "4e7bf69c0c30c014088706364d74f9607d403b91651b6923faf61812a86637f8"
+    },
+    "independent_review": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-source-fixture-repair-v1/independent-review.json",
+      "bytes": 495,
+      "sha256": "0507cac9a687c251003a3e73e5670eac8c26391a52adf35c8cb322c704a041bb",
+      "decision": "GO"
+    },
+    "applied_receipt": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-source-fixture-repair-v1/applied.json",
+      "bytes": 154,
+      "sha256": "f225970218c053bd0d8567353a99956cce39e0a0d6c07e002ad78bae309b5ac4"
+    },
+    "prior_full_regression_stop": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-full-regression-v1/root-early-stop.json",
+      "bytes": 1352,
+      "sha256": "88116565793229ff3588cbf2a36af9b9f95d526dce907a8fb2b22ee5685f2ecf",
+      "elapsed_seconds": 106.6,
+      "reason": "Known stale textual fixture assertion; no runtime failure inferred."
+    },
+    "current_full_regression": "COMPLETED_WITH_EIGHT_OTHER_FIXTURE_FAILURES",
+    "current_exact_head_ci": "HISTORICAL_58D_HEAD_NOT_SUBMITTED; FINAL_PR_HEAD_CI_PENDING"
+  },
+  "historical_source_slot_context": {
+    "head": "3e0a533c376dbfe613d3084802297c372b40cb01",
+    "tree": "196ddd3e7cf5b48a26d4e2d4e1cd3ccb84f203eb",
+    "base": "b041dcefff1f96a73f5b4afc9972e48250d4ba91",
+    "parent_only_rebase": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-current-main-rebase.json",
+      "bytes": 388,
+      "sha256": "1f08c5014a10b3e097ef0ec6e43f12bd66c41ae1cb2ebe59510d81a64391eb28"
+    },
+    "note": "Historical source-slot milestone only, not the current Fire runtime producer."
+  },
+  "archive_and_slot_validation": {
+    "full_regression_v2": {
+      "state": "PASS",
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-archive-service-full-regression-v2/result.json",
+      "bytes": 1181,
+      "sha256": "7a3c36c80d83bfb969de82735b24bab42af0c2481ffac084c148d4217234ae60",
+      "stderr": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-archive-service-full-regression-v2/full-regression.stderr",
+        "bytes": 545978,
+        "sha256": "86e7d27cc50684c9ab9fb0414d1a927277b57d7f00c60c004e272b2947aabf3e"
+      },
+      "stdout": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-archive-service-full-regression-v2/full-regression.stdout",
+        "bytes": 35292,
+        "sha256": "86f606a216be9c5d37d8151b9b8a6757d544a6dc808be7d3e74999a3c1c205c8"
+      },
+      "head": "3639903a7d664c0816afc421ea3c32eb8721b887",
+      "tree": "9ed490cba1819aea4b0e169e0fd96ee3c6fac5b6",
+      "tests": 2973,
+      "skipped": 211,
+      "elapsed_seconds": 620.6380092906766,
+      "raw_unittest_seconds": 619.938,
+      "exit_code": 0,
+      "group_absent": true,
+      "source_unchanged": true,
+      "scope_note": "The four v1 fixture/export failures are retained; the reviewed compatibility repair passed the v2 regression. No browser gameplay or transformation run was performed."
+    },
+    "public_runtime_release": {
+      "path": "c5-compatibility-build-v1/result.json",
+      "bytes": 5471,
+      "sha256": "26a1692771ec11974f8a53d6cbb76c2b7c9188f096d342109d612db603302ca0"
+    },
+    "audio_preview_release": {
+      "path": "c5-compatibility-build-v1/result.json",
+      "bytes": 5471,
+      "sha256": "26a1692771ec11974f8a53d6cbb76c2b7c9188f096d342109d612db603302ca0"
+    },
+    "build_artifacts": {
+      "path": "c5-compatibility-build-v1/artifacts.json",
+      "bytes": 1202,
+      "sha256": "88a90bc62f6c7be350f95673d07d85a9ffcade361237a90d9e20d8df7bd292f0"
+    },
+    "public_audio_builds_passed": true,
+    "full_regression_v3": {
+      "state": "FAIL_ONE_CANONICAL_REPRESENTATION_TEST; RETAINED",
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-regression-v3/result.json",
+      "sha256": "8269d2e06ea8f6dc42645597413e30e67a21f421941a7e3a9a52b4d25eeb8ee8",
+      "head": "3e0a533c376dbfe613d3084802297c372b40cb01",
+      "tree": "196ddd3e7cf5b48a26d4e2d4e1cd3ccb84f203eb",
+      "tests": 2975,
+      "skipped": 211,
+      "failures": 1,
+      "exit_code": 1,
+      "group_absent": true,
+      "scope_note": "Sole failure was patch canonicalization. Patch normalization preserved applied dependency tree; full suite not rerun after this representation-only change."
+    },
+    "repaired_focused": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-focused-v3/result.json",
+      "sha256": "e65ba18e7cd80395e3e986919ec4ce0a5816ddc5bea4aed34097ff3655feb6d2",
+      "head": "3e0a533c376dbfe613d3084802297c372b40cb01",
+      "passed": true,
+      "group_absent": true,
+      "scope_note": "Actual-source first-provider repair control keeps base Ground0 live and refuses a real form Ground9 consumer."
+    },
+    "canonicalization": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-canonical-v1/result.json",
+      "sha256": "db321829744ba2b8e8fcc43d5e7f536992bd1288ba80bf4847c48860f32eb608",
+      "passed": true,
+      "canonical_test_count": 15,
+      "canonical_test_passed": true,
+      "patch_after_sha256": "db35d73df152b157fec7fc381b2342e6a8d0fa7ac8bc1b97cee088814e78a4b1",
+      "applied_dependency_tree": "13ef3f889b0e3a6ffd5c52feffefe47bfd5c92ad",
+      "full_regression_rerun": false
+    },
+    "repaired_builds": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-build-v3/result.json",
+      "sha256": "c8a247b4b131ad2636cde0e5be6c938c8c41badc5ef8b3ca16dac6c03deb0dc1",
+      "head": "3e0a533c376dbfe613d3084802297c372b40cb01",
+      "passed": true,
+      "ordinary_release": true,
+      "diagnostic_release": true,
+      "source_unchanged": true
+    },
+    "scope": "Historical archive/slot validations at their explicit heads; current Fire validation is recorded separately."
+  },
+  "first_fire_full_regression_v2": {
+    "head": "58d705a10fa131022e855e69cdbb226e9c63f496",
+    "tests": 2990,
+    "skipped": 211,
+    "failures": 8,
+    "elapsed_seconds": 626.0194787499495,
+    "state": "FAIL_RETAINED",
+    "source_unchanged": true,
+    "group_absent": true,
+    "note": "Missing modeled fields/scheduler declarations in extracted native fixtures and stale exact Node pass-count expectation. Runtime bytes unchanged.",
+    "result_receipt": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-full-regression-v2/result.json",
+      "bytes": 3769,
+      "sha256": "833b6efb1275e3884d9221970eb1089d1cbeae1bbf5050252b51ceb3b5d4fe20"
+    },
+    "failures_receipt": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-full-regression-v2/failures-only.txt",
+      "bytes": 13220,
+      "sha256": "5aa3d699f41d8b07597e513963fd7846ab4528a7293b125526f1659f615cb57a"
+    }
+  },
+  "runtime_tree": "2077bb4c08112a1624820d7dbbc4a5c10effa7f5",
+  "current_test_tree": "c4828bc64194e2dd5ae3a0c2480bc521ea20972a",
+  "first_fire_regression_fixture_batch": {
+    "state": "TEST_ONLY_REVIEWED_APPLIED; FULL_V3_PASS",
+    "head": "57714af2c35e3485b16b5c7865691302636ae356",
+    "runtime_producer": "38ecb6b1c1344d6a6900c70dce92bbff7944b4da",
+    "production_unchanged": true,
+    "review": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-regression-fixture-batch-v1/root-review-v1.json",
+      "bytes": 661,
+      "sha256": "c3a1636a95680135ca982e9b2e464bc519d7e0273e786266ea9c075e37b2472e"
+    },
+    "freeze": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-regression-fixture-batch-v1/freeze-v1.json",
+      "bytes": 10358,
+      "sha256": "dde47b19beb71d682878ef72fe2021ff1748a03c029859bd5b48c36ef44025e3"
+    },
+    "applied": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-regression-fixture-batch-v1/applied.json",
+      "bytes": 3640,
+      "sha256": "a3e1233a5ab1a101d50baa0865a732b475c2b5914630b420a93ed0dae2b7da25"
+    },
+    "focused_v1": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-regression-fixture-batch-v1/focused-result-v1.json",
+      "bytes": 2149,
+      "sha256": "2875433d6b46356d8b44368b8dc841beb6abe3548935c25b65fedccfa99b1465"
+    },
+    "focused_v2": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-regression-fixture-batch-v1/focused-result-v2.json",
+      "bytes": 675,
+      "sha256": "4557036eacade962154e9fee7cca5701dd7b155301050e7ee9f4fcb53865d3fc"
+    },
+    "focused_scope": "Initial eight-case batch: seven passed, one failed on a fixture newline. After that fix the single failed case passed. These are separate runs; final integrated suite follows. Exact Node counts and original runtime assertions remain enforced."
+  },
+  "first_fire_full_regression_v3": {
+    "state": "PASS",
+    "head": "57714af2c35e3485b16b5c7865691302636ae356",
+    "tests": 2990,
+    "skipped": 211,
+    "failures": 0,
+    "raw_unittest_seconds": 623.445,
+    "elapsed_seconds": 624.1135070407763,
+    "source_unchanged": true,
+    "group_absent": true,
+    "cleanup_signals": [],
+    "result": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-full-regression-v3/result.json",
+      "bytes": 4572,
+      "sha256": "14dc4edad4faee77625395dbb493e1ce1da715f0c06f146e305fd91394289d70"
+    },
+    "stderr": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-full-regression-v3/regression.stderr",
+      "bytes": 548919,
+      "sha256": "8575370a9a800d91cae9f2e2aefd1f27ffa506915767ee1eb26258687e075d1b"
+    },
+    "scope": "Full regression at the final test-only source; production matches runtime/capture producer38ecb6b1. Later docs-only changes do not imply another runtime capture."
   }
 }

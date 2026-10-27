@@ -54,6 +54,9 @@ typedef struct SourceFileRegion {
     struct SourceFileRegion* next;
     uintptr_t begin;
     size_t size;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    uint64_t identity;
+#endif
 } SourceFileRegion;
 
 typedef struct SourceFileRequest {
@@ -78,6 +81,16 @@ struct MeleeWebSourceFileScope {
     SourceFileRequest** request_tail;
     size_t request_count;
     int pumping;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    struct {
+        MeleeWebSourceFileRecordedCompletionPlan plan;
+        MeleeWebSourceFileRecordedCompletionStatus status;
+        const SourceFile* file;
+        SourceFileRegion* region;
+        uint64_t region_identity;
+        int cursor_seen, committing;
+    } recorded;
+#endif
 };
 
 static MeleeWebSourceFileScope* active_scope;
@@ -87,6 +100,9 @@ static size_t external_file_count;
  * above that range so HSD_DevComCancelEx can dispatch them to the right
  * owner without relying on which owner happens to be checked first. */
 static int next_source_request = 0x50000000;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+static uint64_t next_region_identity=1;
+#endif
 
 static int fail(char* error, size_t error_size, const char* message)
 {
@@ -538,6 +554,10 @@ int melee_web_source_file_region_register(void* base, size_t size,
         return fail(error, error_size,
                     "Unable to allocate source RuntimeFiles region owner");
     }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (!next_region_identity) { free(region); return fail(error,error_size,"Source region identity exhausted"); }
+    region->identity=next_region_identity++;
+#endif
     region->begin = begin;
     region->size = size;
     region->next = active_scope->regions;
@@ -555,6 +575,10 @@ int melee_web_source_file_region_unregister(void* base, size_t size,
                     "Invalid source RuntimeFiles region release");
     }
     const uintptr_t begin = (uintptr_t)base;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(active_scope->recorded.status.armed&&(!active_scope->recorded.status.completed||active_scope->recorded.status.failed))
+        return fail(error,error_size,"Recorded source region remains owned by incomplete gate");
+#endif
     SourceFileRegion** link = &active_scope->regions;
     while (*link && ((*link)->begin != begin || (*link)->size != size))
         link = &(*link)->next;
@@ -626,6 +650,88 @@ static int source_file_copy_transfer(const SourceFile* file,
     return 1;
 }
 
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+static int recorded_fail(MeleeWebSourceFileScope* scope,char* e,size_t n,const char* message) {
+    scope->recorded.status.failed=1; return fail(e,n,message);
+}
+static int recorded_region_live(MeleeWebSourceFileScope* scope) {
+    for(SourceFileRegion* r=scope->regions;r;r=r->next)
+        if(r==scope->recorded.region)
+            return r->identity==scope->recorded.region_identity &&
+                r->begin==(uintptr_t)scope->recorded.plan.region_base &&
+                r->size==scope->recorded.plan.region_size;
+    return 0; /* Do not dereference a released region token. */
+}
+int melee_web_source_files_recorded_completion_arm(MeleeWebSourceFileScope* scope,
+    const MeleeWebSourceFileRecordedCompletionPlan* p,char* e,size_t n) {
+    if(!scope||scope!=active_scope||!p||scope->pumping||scope->requests||
+       scope->recorded.status.armed||!p->name||!p->callback_matches||
+       p->request_cursor>=p->callback_cursor||p->callback_cursor>p->last_selected_cursor||
+       p->last_selected_cursor>UINT32_MAX||p->offset!=0||
+       (p->type!=0x21&&p->type!=0x23)||p->priority!=1)
+        return fail(e,n,"Recorded source completion plan/owner refused");
+    const SourceFile* file=file_for_entry(p->entry);
+    if(!file||file->external||!file->bytes||strcmp(file->name,p->name)||file->size!=p->logical_size||
+       !p->logical_size||source_file_transfer_size(file)!=p->transfer_size||
+       !p->transfer_size||p->transfer_size%32||
+       !destination_owned(p->destination,p->transfer_size))
+        return fail(e,n,"Recorded source completion file/extent refused");
+    SourceFileRegion* region=NULL;
+    for(SourceFileRegion* r=scope->regions;r;r=r->next)
+        if(r->begin==(uintptr_t)p->region_base&&r->size==p->region_size)region=r;
+    if(!region||p->destination<region->begin||p->destination-region->begin>region->size||
+       p->transfer_size>region->size-(p->destination-region->begin))
+        return fail(e,n,"Recorded source completion region refused");
+    scope->recorded.plan=*p; scope->recorded.file=file;
+    scope->recorded.region=region;scope->recorded.region_identity=region->identity;
+    scope->recorded.status.armed=1;
+    if(e&&n)*e=0;return 1;
+}
+/* Resident RuntimeFiles own the already authenticated logical bytes/tail.
+ * Readiness needs no I/O: defer the unchanged copy/receipt/callback path. */
+static int recorded_pending_matches(MeleeWebSourceFileScope* scope,char* e,size_t n) {
+    if(scope->recorded.status.failed)return fail(e,n,"Recorded source completion already failed");
+    if(!recorded_region_live(scope))return recorded_fail(scope,e,n,"Recorded source region lease changed");
+    if(!scope->recorded.status.request_seen)return 1;
+    SourceFileRequest* r=scope->requests;
+    if(!r||r->next||scope->request_count!=1||r->id!=scope->recorded.status.request_id||
+       r->cancelled||r->file!=scope->recorded.file||r->file->external||!r->file->bytes)
+        return recorded_fail(scope,e,n,"Recorded resident FIFO/request changed");
+    return 1;
+}
+int melee_web_source_files_recorded_completion_status(MeleeWebSourceFileScope* scope,
+    MeleeWebSourceFileRecordedCompletionStatus* out,char* e,size_t n) {
+    if(!scope||scope!=active_scope||!out||!scope->recorded.status.armed)
+        return fail(e,n,"Recorded completion status owner refused");
+    *out=scope->recorded.status;if(e&&n)*e=0;return 1;
+}
+int melee_web_source_files_recorded_preconsume(MeleeWebSourceFileScope* scope,
+    uint64_t cursor,char* e,size_t n) {
+    if(!scope||scope!=active_scope||!scope->recorded.status.armed||scope->pumping)
+        return fail(e,n,"Recorded pre-consume owner refused");
+    MeleeWebSourceFileRecordedCompletionStatus* st=&scope->recorded.status;
+    const MeleeWebSourceFileRecordedCompletionPlan* p=&scope->recorded.plan;
+    if(st->failed||(!scope->recorded.cursor_seen&&cursor!=0)||
+       (scope->recorded.cursor_seen&&(st->last_preconsume_cursor==UINT64_MAX||cursor!=st->last_preconsume_cursor+1)))
+        return recorded_fail(scope,e,n,"Recorded pre-consume cursor skipped/repeated");
+    scope->recorded.cursor_seen=1;st->last_preconsume_cursor=cursor;
+    if(st->completed){if(e&&n)*e=0;return 1;}
+    if(cursor>p->request_cursor&&!st->request_seen)
+        return recorded_fail(scope,e,n,"Recorded request cursor missed");
+    if(!recorded_pending_matches(scope,e,n))return 0;
+    if(cursor<p->callback_cursor){if(e&&n)*e=0;return 1;}
+    if(cursor!=p->callback_cursor||!st->request_seen)
+        return recorded_fail(scope,e,n,"Recorded callback cursor missed");
+    scope->recorded.committing=1;
+    int completed=melee_web_source_files_pump_for(scope,e,n);
+    scope->recorded.committing=0;
+    if(!completed||scope->requests||scope->request_count)
+        return recorded_fail(scope,e,n,"Recorded completion did not settle exact FIFO");
+    st->completed=1;st->actual_callback_cursor=cursor;
+    return 1;
+}
+#endif
+
 int melee_web_source_file_request(int entry, uintptr_t offset,
                                   uintptr_t destination, size_t size,
                                   int type, int priority,
@@ -642,9 +748,25 @@ int melee_web_source_file_request(int entry, uintptr_t offset,
         size > transfer_extent - (size_t)offset ||
         (file->external && size > MELEE_WEB_SOURCE_FILE_STREAM_MAX) ||
         !destination_owned(destination, size)) {
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        if(active_scope&&active_scope->recorded.status.armed)active_scope->recorded.status.failed=1;
+#endif
         return fail(error, error_size,
                     "Unsupported or unowned source DVD/DevCom request");
     }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(active_scope->recorded.status.armed){
+        const MeleeWebSourceFileRecordedCompletionPlan* p=&active_scope->recorded.plan;
+        if(active_scope->recorded.status.failed||active_scope->recorded.status.request_seen||
+           !active_scope->recorded.cursor_seen||active_scope->pumping||active_scope->requests||
+           active_scope->request_count||!recorded_region_live(active_scope)||
+           active_scope->recorded.status.last_preconsume_cursor!=p->request_cursor||
+           entry!=p->entry||file!=active_scope->recorded.file||offset!=p->offset||
+           destination!=p->destination||size!=p->transfer_size||type!=p->type||priority!=p->priority||
+           !p->callback_matches(callback))
+            return recorded_fail(active_scope,error,error_size,"Recorded request identity/cursor refused");
+    }
+#endif
     if (next_source_request < 0x50000000 ||
         next_source_request > INT_MAX - 4) {
         return fail(error, error_size,
@@ -666,6 +788,13 @@ int melee_web_source_file_request(int entry, uintptr_t offset,
     active_scope->request_tail = &pending->next;
     ++active_scope->request_count;
     *request_id = pending->id;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(active_scope->recorded.status.armed){
+        active_scope->recorded.status.request_seen=1;
+        active_scope->recorded.status.request_id=pending->id;
+        active_scope->recorded.status.actual_request_cursor=active_scope->recorded.status.last_preconsume_cursor;
+    }
+#endif
     if (error && error_size) error[0] = '\0';
     return 1;
 }
@@ -675,6 +804,9 @@ int melee_web_source_file_cancel(int request_id, uint32_t flags,
                                  void* args)
 {
     if (!active_scope || (flags & ~3u) || args != NULL) return 0;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(active_scope->recorded.status.armed){active_scope->recorded.status.failed=1;return 0;}
+#endif
     for (SourceFileRequest* request = active_scope->requests; request;
          request = request->next) {
         if (request->id != request_id) continue;
@@ -694,6 +826,10 @@ int melee_web_source_file_supply(int request_id, const void* bytes, size_t size,
     if (!active_scope || (!bytes && size))
         return fail(error, error_size,
                     "Invalid external source file transfer result");
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(active_scope->recorded.status.armed&&!active_scope->recorded.committing)
+        return recorded_fail(active_scope,error,error_size,"Recorded transfer supplied before eligible boundary");
+#endif
     SourceFileRequest* request = active_scope->requests;
     while (request && request->id != request_id) request = request->next;
     if (!request || !request->file->external || request->cancelled ||
@@ -720,6 +856,13 @@ int melee_web_source_files_pump_for(MeleeWebSourceFileScope* scope,
         return fail(error, error_size,
                     "Reentrant source RuntimeFiles transfer pump");
     }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(scope->recorded.status.armed&&!scope->recorded.committing){
+        if(scope->recorded.status.failed)return fail(error,error_size,"Recorded source completion already failed");
+        if(scope->recorded.status.completed)return scope->request_count==0?1:recorded_fail(scope,error,error_size,"Recorded completion has trailing request");
+        return recorded_pending_matches(scope,error,error_size);
+    }
+#endif
     size_t available = scope->request_count;
     size_t budget = 64;
     scope->pumping = 1;
@@ -843,6 +986,10 @@ int melee_web_source_files_quiescent_for(MeleeWebSourceFileScope* scope,
     if (!scope || active_scope != scope)
         return fail(error, error_size,
                     "Source RuntimeFiles teardown lost its exact owner");
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(scope->recorded.status.armed&&(!scope->recorded.status.completed||scope->recorded.status.failed))
+        return fail(error,error_size,"Recorded source completion has not completed its exact boundary");
+#endif
     if (scope->pumping || scope->requests || scope->request_count)
         return fail(error, error_size,
                     "Source RuntimeFiles teardown has pending requests");

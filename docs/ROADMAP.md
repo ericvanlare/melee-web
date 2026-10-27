@@ -178,10 +178,16 @@ Pokémon Stadium C3 [#251](https://github.com/ericvanlare/melee-web/issues/251) 
 [#301](https://github.com/ericvanlare/melee-web/pull/301) merged after independent
 review, full regression, affected builds and complete publication-head CI. The
 [C3 boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md) retains exact
-identities, raw failures and coverage limits. Next is C4 original latency
-measurement under [#343](https://github.com/ericvanlare/melee-web/issues/343), with
-its [own evidence boundary](status/2026-10-27-stadium-first-form-latency.md);
-no runtime transformation port is released.
+identities, raw failures and coverage limits. C4 original request/callback
+observations remain scoped under [#343](https://github.com/ericvanlare/melee-web/issues/343)
+and its [evidence boundary](status/2026-10-27-stadium-first-form-latency.md).
+The conditional first-Fire runtime component belongs to
+[#349](https://github.com/ericvanlare/melee-web/issues/349); next is the original
+Water graph and nested teardown under
+[#351](https://github.com/ericvanlare/melee-web/issues/351), reusing the
+[C5 boundary](status/2026-10-27-stadium-archive-service.md). Recorded completion
+schedules remain diagnostic only; ordinary/public transformations and the
+general loading model are not admitted.
 Ranked/Unranked use unfrozen Stadium, so C4–C8 transformations remain in scope.
 Track A retains first claim on the shared capture lane. Physical controllers,
 foreground timing, audible output and a two-machine human session remain separate
