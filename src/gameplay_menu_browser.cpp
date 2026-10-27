@@ -678,34 +678,6 @@ struct MatchedSetupCfState {
  std::string error,last_action_json;
 };
 MatchedSetupCfState matched_setup_cf;
-struct StadiumPairedV11State {
- bool route_prepared=false,import_pending=false,import_consumed=false,later_exit_observed=false;
- const melee_web::RetailReplayRecipe* recipe_owner=nullptr;
- const melee_web::RetailReplayInitialCssContext* context_owner=nullptr;
- const MeleeWebMenuHost* route_host_owner=nullptr;
- const MeleeWebPadState* ready_input=nullptr;
- std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> ready_input_bytes{};
- uint32_t* parent_seed_owner=nullptr;
- uint32_t parent_seed=0,requested_generation=0;
- MeleeWebMenuMatchSelection selected{};
- bool enabled=false,admitted=false,setup_captured=false,go_armed=false,go_observed=false;
- bool first_post_go_tick_captured=false,waiting_for_draw_close=false,closure_action_seen=false;
- bool stop_requested=false;
- bool stopped=false,failed=false,native_retired=false,whole_session_complete=false;
- unsigned match_index=0,natural_batch_tail_ticks=0;
- uint64_t setup_input_cursor=0,go_input_cursor=0,post_go_input_cursor=0,closure_input_cursor=0;
- uint64_t closure_action_cursor=0;
- uint64_t source_tick_before=0,source_tick_after=0,draws_before=0,draws_after=0;
- uint64_t completed_source_draws=0;
- uint64_t go_world_tick=0,world_generation=0;
- uint32_t asset_generation=0;
- const melee_web::GameplayMatchSession* match_owner=nullptr;
- const MeleeWebMenuHost* host_owner=nullptr;
- const melee_web::RuntimeArchiveCache* cache_owner=nullptr;
- std::string setup,go_event,first_post_go_typed22,first_post_go_pad_queue,error;
- MeleeWebStadiumGoAlignmentEvent actual_go{};
-};
-StadiumPairedV11State stadium_paired_v11;
 struct MatchedSetupCfRetirement {
  bool native_retired=false,terminal=false;
  bool later_b_parent_close_checked=false;
@@ -718,22 +690,6 @@ struct MatchedSetupCfRetirement {
 };
 MatchedSetupCfRetirement matched_setup_cf_retirement;
 std::string matched_setup_cf_json();
-bool stadium_paired_v11_recipe(){
- return replay&&replay->whole_session()&&
-        replay->version==melee_web::kRetailReplayDrawClosureVersion;
-}
-void stadium_paired_v11_fail(const std::string& error);
-bool stadium_paired_v11_route_owned();
-void stadium_paired_v11_prepare_route();
-void stadium_paired_v11_validate_import_selection();
-void stadium_paired_v11_admit_match();
-void stadium_paired_v11_capture_setup();
-void stadium_paired_v11_after_match_tick(uint64_t source_tick_before,uint64_t source_frame_before,
-                                         uint64_t input_cursor,uint64_t draws_before,
-                                         bool closes_batch);
-void stadium_paired_v11_after_source_finish(const melee_web::SourceFrameSequence&,unsigned);
-std::string stadium_paired_v11_status_json();
-std::string later_b_gate2_constructor_snapshot_json(const MeleeWebStadiumSetupSnapshot&);
 std::string stadium_recreation_b_json();
 void stadium_recreation_b_before_retire();
 void stadium_recreation_b_require_arm(bool version2,bool full_schedule,bool common_fields,unsigned action_count,bool typed22);
@@ -905,6 +861,50 @@ std::string first_sss_vs_setup_json(){
  out<<'}';
  return out.str();
 }
+struct StadiumPairedV11State {
+ bool route_prepared=false,import_pending=false,import_consumed=false,later_exit_observed=false;
+ const melee_web::RetailReplayRecipe* recipe_owner=nullptr;
+ const melee_web::RetailReplayInitialCssContext* context_owner=nullptr;
+ const MeleeWebMenuHost* route_host_owner=nullptr;
+ const MeleeWebPadState* ready_input=nullptr;
+ std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> ready_input_bytes{};
+ uint32_t* parent_seed_owner=nullptr;
+ uint32_t parent_seed=0,requested_generation=0;
+ MeleeWebMenuMatchSelection selected{};
+ bool enabled=false,admitted=false,setup_captured=false,go_armed=false,go_observed=false;
+ bool first_post_go_tick_captured=false,waiting_for_draw_close=false,closure_action_seen=false;
+ bool stop_requested=false;
+ bool stopped=false,failed=false,native_retired=false,whole_session_complete=false;
+ unsigned match_index=0,natural_batch_tail_ticks=0;
+ uint64_t setup_input_cursor=0,go_input_cursor=0,post_go_input_cursor=0,closure_input_cursor=0;
+ uint64_t closure_action_cursor=0;
+ uint64_t source_tick_before=0,source_tick_after=0,draws_before=0,draws_after=0;
+ uint64_t completed_source_draws=0;
+ uint64_t go_world_tick=0,world_generation=0;
+ uint32_t asset_generation=0;
+ const melee_web::GameplayMatchSession* match_owner=nullptr;
+ const MeleeWebMenuHost* host_owner=nullptr;
+ const melee_web::RuntimeArchiveCache* cache_owner=nullptr;
+ std::string setup,go_event,first_post_go_typed22,first_post_go_pad_queue,error;
+ MeleeWebStadiumGoAlignmentEvent actual_go{};
+};
+StadiumPairedV11State stadium_paired_v11;
+bool stadium_paired_v11_recipe(){
+ return replay&&replay->whole_session()&&
+        replay->version==melee_web::kRetailReplayDrawClosureVersion;
+}
+void stadium_paired_v11_fail(const std::string& error);
+bool stadium_paired_v11_route_owned();
+void stadium_paired_v11_prepare_route();
+void stadium_paired_v11_validate_import_selection();
+void stadium_paired_v11_admit_match();
+void stadium_paired_v11_capture_setup();
+void stadium_paired_v11_after_match_tick(uint64_t source_tick_before,uint64_t source_frame_before,
+                                         uint64_t input_cursor,uint64_t draws_before,
+                                         bool closes_batch);
+void stadium_paired_v11_after_source_finish(const melee_web::SourceFrameSequence&,unsigned);
+std::string stadium_paired_v11_status_json();
+std::string later_b_gate2_constructor_snapshot_json(const MeleeWebStadiumSetupSnapshot&);
 void first_sss_sequence_sync(bool prefix){
  auto& s=prefix?first_sss_prefix_sequence:first_sss_draw_sequence;
  if(!s.armed||!host)return;
@@ -3928,6 +3928,18 @@ void stadium_paired_v11_validate_import_selection(){
        melee_web_pad_state_encode(s.ready_input,input_now.data(),input_now.size())&&
        input_now==s.ready_input_bytes,
        "Paired v11 retained SSS PAD changed during import");
+}
+bool stadium_paired_v11_asset_pending(unsigned generation){
+ const auto& s=stadium_paired_v11;
+ if(!generation||generation!=s.requested_generation||generation!=asset_generation||
+    generation!=asset_scope.pending_generation()||
+    asset_destination!=AssetDestination::StadiumC1a||!scoped_assets||
+    !scoped_disc_import||asset_committed||!asset_selection_valid)return false;
+ try{
+  stadium_paired_v11_validate_import_selection();
+  return current_sss_selection_equal(asset_selection,s.selected)&&
+         requested_assets==melee_web::stadium_c1a_asset_names(asset_selection);
+ }catch(...){return false;}
 }
 bool stadium_paired_v11_owner_valid(){
  const auto& s=stadium_paired_v11;

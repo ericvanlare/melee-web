@@ -370,7 +370,8 @@ int melee_web_native_menu_stadium_c1a_asset_scope(unsigned generation){
     generation!=asset_scope.pending_generation()||
     !scoped_assets||asset_committed||
     !((stadium_c1a_armed&&asset_destination==AssetDestination::StadiumC1a)||
-      first_sss_vs_setup_asset_pending(generation)||later_sss_asset_pending(generation))||
+      first_sss_vs_setup_asset_pending(generation)||later_sss_asset_pending(generation)||
+      stadium_paired_v11_asset_pending(generation))||
     !asset_selection_valid||world||match||results||prize||host_entered)
   return 0;
  try{

@@ -74,6 +74,9 @@ struct LeaveNote{bool captured=false;uint64_t world_generation=0,session_ticks=0
 struct LeaveObservation{unsigned state=0;LeaveNote note;};
 struct CurrentSssExitState{bool armed=false,terminal=false,failed=false,prepared_start_attempted=false,prepared_start_captured=false,prepared_start_selection_captured=false,prepared_setup_attempted=false,prepared_setup_approved=false,prepared_setup_failed=false,prepared_setup_consumed=false,notified=false,last_host_tick_returned=false,host_tick_in_flight=false;CurrentSssExitProfile profile=CurrentSssExitProfile::Time120;Recipe* recipe=nullptr;const int* context=nullptr;void* host_owner=nullptr;void* leave_world=nullptr;void* leave_cache=nullptr;uint64_t leave_world_generation=0,terminal_cursor=0,notification_cursor=0,notification_order=0,leave_asset_requests=0;unsigned leave_asset_generation=0,terminal_steps=0,terminal_draws=0,notification_steps=0,notification_draws=0,terminal_asset_requests=0;LeaveObservation observation;MeleeWebMenuMatchSelection prepared_start_selection;const MeleeWebPadState* prepared_start_input_owner=nullptr;std::array<uint8_t,822> prepared_start_input_bytes{};std::string prepared_start_json,prepared_setup_error;};
 static CurrentSssExitState current_sss_exit;
+// Legacy/current endpoint fixtures never arm the v11 route. Explicit rejecting
+// leaf for the newly composed shared importer gate; actual v11 controls live separately.
+static bool stadium_paired_v11_asset_pending(unsigned){return false;}
 static bool getter_ok=true;static unsigned getter_calls=0;static int selected_value=7;static MeleeWebMenuMatchSelection host_selection;
 static int melee_web_menu_host_stadium_c1a_selection(void*,MeleeWebMenuMatchSelection* s,char* e,unsigned n){++getter_calls;if(!getter_ok){snprintf(e,n,"get refused");return 0;}*s=host_selection;s->start.value=selected_value;return 1;}
 namespace melee_web::stadium_first_css_diagnostic {
@@ -137,6 +140,7 @@ static void commit(){files={{"stage",{1}},{"fighter",{2}}};asset_scope.active=2;
 std::string first_sss_vs_setup_current_json(){return "{}";}
 static void close(){++gate2_fixture_close_calls;FirstSssTextTailCloseGuard guard{first_sss_text_tail_probe.opted_in};throw std::runtime_error("controlled close failure");}
 int main(){
+ assert(!stadium_paired_v11_asset_pending(1));
  assert_no_later_route_fixture();
  assert_gate2_unload_outside_fixture();
  // The legacy124 owner has completed its prefix; current270 has not entered it.
@@ -236,6 +240,7 @@ static void commit_prepared_assets(){
  asset_scope.pending=0;asset_committed=true;
 }
 int main(){
+ assert(!stadium_paired_v11_asset_pending(1));
  assert_no_later_route_fixture();
  assert_gate2_unload_outside_fixture();
  reset_prepared();
