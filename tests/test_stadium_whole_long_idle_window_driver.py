@@ -4,6 +4,7 @@ These controls exercise the actual driver methods with explicitly modeled rows.
 They do not represent an original-game capture or establish source parity.
 """
 from pathlib import Path
+import copy
 import hashlib
 import importlib.util
 import importlib
@@ -159,6 +160,29 @@ class StadiumWholeLongIdleWindowDriverTests(unittest.TestCase):
         self.assertEqual(summary["natural_tail_source_ticks"], [])
         self.assertFalse(summary["source_schedule_verified"])
         self.assertFalse(summary["lifecycle_parity"])
+        # The live receiver carries a GO-relative ordinal on its target;
+        # the independent raw reader carries the three source coordinates.
+        source = {
+            "go_sequence": receiver.long_idle_window["go"]["sequence"],
+            "go_tick": go_tick,
+            "target_source_tick": {"sequence": sequence - 3,
+                "source_tick": go_tick + 3500, "draw_ordinal": first_draw + 3500},
+            "close": {"sequence": sequence - 1,
+                "source_tick": go_tick + 3501, "draw_ordinal": first_draw + 3500},
+            "natural_tail_ticks": 0,
+        }
+        driver.validate_stadium_paired_idle_window_coordinates(summary, source)
+        for key, value in (("ordinal", 3499), ("sequence", sequence),
+                           ("source_tick", go_tick + 3499),
+                           ("draw_ordinal", first_draw + 3499), ("unexpected", 1)):
+            changed = copy.deepcopy(summary)
+            changed["target_source_tick"][key] = value
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "coordinates differ"):
+                driver.validate_stadium_paired_idle_window_coordinates(changed, source)
+        changed = copy.deepcopy(summary)
+        del changed["target_source_tick"]["ordinal"]
+        with self.assertRaisesRegex(ValueError, "coordinates differ"):
+            driver.validate_stadium_paired_idle_window_coordinates(changed, source)
 
     def test_missing_tick_bad_pad_and_bad_draw_coordinates_refuse(self):
         receiver = self.new_receiver()

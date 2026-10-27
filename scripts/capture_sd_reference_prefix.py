@@ -186,6 +186,25 @@ def validate_stadium_whole_long_idle_outputs(raw, status_path, output_root,
     return source_window, compact_summary
 
 
+def validate_stadium_paired_idle_window_coordinates(driver, source):
+    """Join the live ordinal-bearing window to strict raw source coordinates."""
+    go = driver.get("go")
+    target = driver.get("target_source_tick")
+    close = driver.get("first_later_natural_draw_return")
+    source_target = source.get("target_source_tick")
+    source_close = source.get("close")
+    require(isinstance(go, dict) and
+            (go.get("sequence"), go.get("source_tick")) ==
+                (source.get("go_sequence"), source.get("go_tick")) and
+            isinstance(target, dict) and isinstance(source_target, dict) and
+            target == dict(source_target, ordinal=3500) and
+            target.get("source_tick") == go.get("source_tick") + 3500 and
+            isinstance(close, dict) and close == source_close and
+            driver.get("typed_state_count_including_natural_tail") ==
+                3501 + source.get("natural_tail_ticks"),
+            "paired GO/target/natural DrawReturn coordinates differ from the full stream")
+
+
 def validate_stadium_paired_idle_outputs(raw, status_path, output_root,
                                          compact_launch, driver_windows, dol_sha256):
     """Join two actual GO windows across the full raw stream and compact ledger."""
@@ -236,20 +255,7 @@ def validate_stadium_paired_idle_outputs(raw, status_path, output_root,
                 driver.get("four_port_consumed_pad_count") == source.get("state_samples") and
                 len(driver.get("natural_tail_source_ticks", [])) == source.get("natural_tail_ticks"),
                 "paired driver window differs from full-stream count/profile validation")
-        go = driver.get("go")
-        target = driver.get("target_source_tick")
-        close = driver.get("first_later_natural_draw_return")
-        source_target = source.get("target_source_tick")
-        source_close = source.get("close")
-        require(isinstance(go, dict) and
-                (go.get("sequence"), go.get("source_tick")) ==
-                    (source.get("go_sequence"), source.get("go_tick")) and
-                isinstance(target, dict) and target == source_target and
-                target.get("source_tick") == go.get("source_tick") + 3500 and
-                isinstance(close, dict) and close == source_close and
-                driver.get("typed_state_count_including_natural_tail") ==
-                    3501 + source.get("natural_tail_ticks"),
-                "paired GO/target/natural DrawReturn coordinates differ from the full stream")
+        validate_stadium_paired_idle_window_coordinates(driver, source)
         require(primary_status["paired_go_ticks"][index] == source["go_tick"] and
                 primary_status["paired_source_ticks"][index] == source["state_samples"],
                 "paired terminal status counters differ from the validated source window")
