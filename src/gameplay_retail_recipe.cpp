@@ -393,7 +393,9 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
         const auto setup_count = input.u16();
         check(input.u16() == 0 && setup_count == expected_setup_count(result.version) &&
               setup_count <= kRetailReplayMaxMatchSetups,
-              "Whole-session setup table has an unsupported exact setup count or flags");
+              result.version == kRetailReplayDrawClosureVersion
+                  ? "Whole-session setup table requires exactly two setups and zero flags"
+                  : "Whole-session setup table requires exactly three setups and zero flags");
         setup_bytes = 4 + size_t(setup_count) * 0x138;
         check(input.cursor + size_t(setup_count) * 0x138 <= bytes.size(),
               "Whole-session setup table is truncated");
