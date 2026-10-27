@@ -767,6 +767,7 @@ static void long_parser_accept_case() {
   match->seed=0x5ce52bf0U; // Constructor endpoint differs from completed Setup RNG state.
   assert(!later_b_gate2_parent_identity_valid(matched_setup_cf));
   match->seed=setup_seed; assert(later_b_gate2_parent_identity_valid(matched_setup_cf));
+  std::cout << "MWB3_STATUS " << matched_setup_cf_json() << '\n';
   std::cout << "MWB3_ACCEPT actions=7168 ticks=3585 draws=3583 prefix=951 GO=84 actual_go_observed=false\n";
 }
 static void long_parser_refusal_controls() {
@@ -1281,6 +1282,16 @@ static void draw84_refresh_and_owner_controls() {
             self.skipTest("optional retained long-B projection fixture is absent")
         output = self._run_fixture("long-parser-accept")
         self.assertIn("MWB3_ACCEPT actions=7168 ticks=3585 draws=3583 prefix=951 GO=84 actual_go_observed=false", output)
+        statuses = [line.removeprefix("MWB3_STATUS ") for line in output.splitlines()
+                    if line.startswith("MWB3_STATUS ")]
+        self.assertEqual(len(statuses), 1)
+        status = json.loads(statuses[0])
+        self.assertEqual(status["schema"], "melee-web-stadium-later-b-long-native-v1")
+        # The modeled arm leaf does not set the runtime's armed state.
+        self.assertEqual(status["state"], "idle")
+        self.assertEqual(status["cursor"], 0)
+        self.assertEqual(status["action_count"], 7168)
+        self.assertEqual(status["actual_go"], {"observed": False, "tick": None})
 
     def test_actual_mwb3_parser_refuses_geometry_literal_pad_and_owner_controls(self):
         if self.long_projection is None:

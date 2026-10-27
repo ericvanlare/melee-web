@@ -4504,7 +4504,8 @@ std::string matched_setup_cf_json(){
     <<",\"constructor_shared_projection\":"
     <<later_b_gate2_constructor_snapshot_json(first_sss_vs_setup.setup_snapshot)
     <<",\"constructor_original_witnesses\":{\"scope\":\"original-only-order-from-retained-reference-projection\",\"native_counterpart\":\"unpaired\"}"
-    <<",\"source_ticks\":"<<state.source_ticks<<",\"source_draws\":"<<state.source_draws;
+    <<",\"source_ticks\":"<<state.source_ticks<<",\"source_draws\":"<<state.source_draws
+    <<",\"state\":\"";
  else if(state.later_b_gate2_mode)out<<"{\"schema\":\"melee-web-stadium-later-b-gate2-native-v1\",\"scope\":\"observed-b-first180-actions-go-event-and-post-go-typed22-observation-only\",\"action_count\":"
     <<state.action_count<<",\"prefix_cursor\":"<<state.later_b_prefix_cursor
     <<",\"reference_go_tick\":"<<state.later_b_reference_go_tick
