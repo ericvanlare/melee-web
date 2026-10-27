@@ -85,7 +85,9 @@ int main(void){
    graph=body(gr,'static int stadium_first_transform_graph_matches(')
    self.assertIn('form!=3',graph);self.assertIn('owner->map2_buffer_use_count!=2',graph)
    self.assertIn('melee_web_stage_map_lookup(3)!=gp->u.stadium.xD0',graph)
-   self.assertIn('grPs_StageCallbacks[3].gobj_proc',graph)
+   self.assertIn('stadium_owner_first_fire_proc_chain_matches(j->fire_map3,proc)',graph)
+   fire_chain=body(gr,'static int stadium_owner_first_fire_proc_chain_matches(')
+   self.assertIn('expected_head->on_invoke == grStadium_801D19D8',fire_chain)
    self.assertIn('retiring&&(phase!=0||j->count!=3)',graph)
    passed=True
   finally:
