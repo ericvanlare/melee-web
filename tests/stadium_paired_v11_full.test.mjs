@@ -86,11 +86,12 @@ test('actual full harness phase waits for ordinary completion retirement without
   fs:{writeFile:async p=>writes.push(p)},path:{join:(...p)=>p.join('/')},installPairedFullLaunch:()=>{},installPairedFullObserver:()=>{},write:async()=>{},
   page:{evaluate:async()=>true,locator:label=>({click:async()=>clicks.push(label)})},
   report:{paired_v11_full_pair:{}},pageErrors:[],drainPairedFull:async()=>drains++,
-  readPairedFirstGoStatus:async()=>++observations===1?{busy:false,status:{schema:'melee-web-stadium-paired-v11-full-pair-v1',whole_session_complete:true,failed:false}}:{busy:false,status:{native_retired:true},phase:0,running:0},
+  readPairedFirstGoStatus:async()=>++observations===1?{busy:false,status:{schema:'melee-web-stadium-paired-v11-full-pair-v1',whole_session_complete:true,failed:false}}:{busy:false,status:{native_retired:true},phase:0,running:0,runtime:{replay_report:{complete:true,pass:true,failures:[]}}},
   pairedFullExpected:{total:14394},
   pairedFullComparison:{finish:()=>({pass:true})},runPairedFullRngComparison:()=>({status:'PASS_SELECTED_RNG_COMPARISON'})};
  vm.createContext(ctx);vm.runInContext(source.slice(start,end+2),ctx);await ctx.pairedFullPhase();
  assert.deepEqual(clicks,['#retail-replay-start']);assert.equal(drains,2);assert.equal(writes.length,2);assert.equal(ctx.report.paired_v11_full_pair.component_pass,true);assert.equal(ctx.report.rng_draw_probe.complete,true);assert.equal(ctx.report.rng_draw_probe.captured_action_count,14394);
+ assert.deepEqual(ctx.report.browser_report,{complete:true,pass:true,failures:[]});
  const bad={...ctx,report:{paired_v11_full_pair:{}},readPairedFirstGoStatus:async()=>({busy:true,runtime:{terminal_error:'actual native refusal'}})};vm.createContext(bad);vm.runInContext(source.slice(start,end+2),bad);await assert.rejects(bad.pairedFullPhase(),/actual native refusal/);assert.notEqual(bad.report.paired_v11_full_pair.component_pass,true);
  const semanticFailure={...ctx,report:{paired_v11_full_pair:{},rng_draw_probe:{complete:false}},runPairedFullRngComparison:()=>{throw Error('actual semantic RNG mismatch');},readPairedFirstGoStatus:async()=>({busy:false,status:{schema:'melee-web-stadium-paired-v11-full-pair-v1',whole_session_complete:true,failed:false}})};
  vm.createContext(semanticFailure);vm.runInContext(source.slice(start,end+2),semanticFailure);await assert.rejects(semanticFailure.pairedFullPhase(),/actual semantic RNG mismatch/);assert.equal(semanticFailure.report.rng_draw_probe.complete,false);

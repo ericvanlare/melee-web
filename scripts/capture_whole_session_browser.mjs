@@ -859,7 +859,7 @@ async function pairedFullPhase(){
    while(Date.now()<deadline){
     const after=await readPairedFirstGoStatus();
     if(!after.busy&&after.status?.failed)throw Error(after.status.error||'Paired full unload failed');
-    if(!after.busy&&after.status?.native_retired&&after.phase===0&&after.running===0){report.paired_v11_full_pair.retirement=after;report.paired_v11_full_pair.component_pass=true;return;}
+    if(!after.busy&&after.status?.native_retired&&after.phase===0&&after.running===0){report.browser_report=after.runtime?.replay_report;report.paired_v11_full_pair.retirement=after;report.paired_v11_full_pair.component_pass=true;return;}
     await new Promise(r=>setTimeout(r,replayPollMs));
    }
    throw Error('Paired full checked ordinary unload exceeded deadline');
