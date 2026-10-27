@@ -4,13 +4,31 @@ import {validateRngDrawProbeRows} from './rng_draw_probe.mjs';
 const need=(ok,why)=>{if(!ok)throw Error('Paired full comparison: '+why);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const seed=value=>typeof value==='string'&&/^[0-9a-f]{8}$/.test(value);
+const registrationOfflineScope='original-paired-registration-offline-postflight-v1';
+const registrationRawRoles=['report.json','launch.json','native-primary.mwro','native-primary-status.json',
+ 'native-inputs.mwri','native-input-status.json','native-allocations.jsonl','allocation-profile.json',
+ 'stadium-whole-paired-compact-rng.mwrl','cleanup.json','input-intentions.jsonl'];
 export function derivePairedFull(p,recipeSha,frames,endpoints){
  if(p?.schema==='melee-web-stadium-stockout-pair-projection-v1')return deriveStockoutPair(p,recipeSha,frames,endpoints);
  need(p?.schema==='melee-web-stadium-paired-window-projection-v1'&&p.source_schedule_verified===true&&p.recipe_sha256===recipeSha&&p.actual_frame_count===frames&&p.matches?.length===2,'projection/recipe identity');
  const registration=p.capture_profile==='paired_idle_registration_v1';
  need(p.capture_profile===undefined||registration,'unknown original capture profile');
  if(registration){
-  need(endpoints?.result==='pass'&&endpoints.scope==='original-stadium-paired-registration-v1'&&Array.isArray(endpoints.cleanup_errors)&&endpoints.cleanup_errors.length===0,'registration original live result');
+  if(endpoints?.scope===registrationOfflineScope){
+   need(endpoints.result==='PASS_OFFLINE_POSTFLIGHT_REFERENCE_ONLY'&&endpoints.original_live_result==='fail'&&
+    endpoints.inputs_unchanged===true&&endpoints.native_capture_repeated===false&&
+    endpoints.original_operation_deadline_reclassified===false&&endpoints.browser_parity===false&&
+    endpoints.C3===false&&endpoints.native_pid_absent===true&&endpoints.native_group_absent===true,
+    'registration original offline postflight scope');
+   need(p.postflight_scope===registrationOfflineScope&&p.original_live_result==='fail',
+    'registration projection offline provenance differs');
+   for(const name of registrationRawRoles){
+    const identity=p.source_files?.[name],observed=endpoints.inputs?.[name];
+    need(identity&&Number.isSafeInteger(identity.bytes)&&identity.bytes>0&&
+     /^[0-9a-f]{64}$/.test(identity.sha256||'')&&observed?.bytes===identity.bytes&&
+     observed.sha256===identity.sha256,'registration offline raw role '+name);
+   }
+  }else need(endpoints?.result==='pass'&&endpoints.scope==='original-stadium-paired-registration-v1'&&Array.isArray(endpoints.cleanup_errors)&&endpoints.cleanup_errors.length===0,'registration original live result');
   need(['native-primary.mwro','native-allocations.jsonl','native-inputs.mwri'].every(name=>/^[0-9a-f]{64}$/.test(p.source_files?.[name]?.sha256||'')),'registration source hashes missing');
   need(endpoints.input_stream?.complete===true&&endpoints.input_stream.sha256===p.source_files?.['native-inputs.mwri']?.sha256,'registration literal input producer differs');
   need(typeof endpoints.native?.native_allocations_sha256==='string'&&endpoints.native.native_allocations_sha256===p.source_files?.['native-allocations.jsonl']?.sha256,'registration allocation producer differs');

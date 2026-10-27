@@ -21,7 +21,7 @@ function runtime(s,rows=[]) {
 }
 const invoke=(fn,context,arg)=>vm.runInNewContext('('+fn.toString()+')(arg)',{...context,arg});
 
-test('new registration projection requires its actual passing source report and exact input/allocation producers',()=>{
+test('registration projection admits exact live or offline provenance and joins every raw producer',()=>{
   const primary='a'.repeat(64),allocation='b'.repeat(64),input='c'.repeat(64),recipe='d'.repeat(64);
   const p={schema:'melee-web-stadium-paired-window-projection-v1',capture_profile:'paired_idle_registration_v1',
     source_schedule_verified:true,recipe_sha256:recipe,actual_frame_count:2,
@@ -43,6 +43,61 @@ test('new registration projection requires its actual passing source report and 
   assert.throws(()=>derivePairedFull({...p,capture_profile:'unknown'},recipe,2,e),/unknown original capture profile/);
   const legacy=structuredClone(p);delete legacy.capture_profile;
   assert.throws(()=>derivePairedFull(legacy,recipe,2,e),/original endpoint postflight/);
+  {
+  // Modeled native leaves/reference dimensions; actual derivePairedFull performs admission.
+  const recipe='d'.repeat(64),scope='original-paired-registration-offline-postflight-v1';
+  const names=['report.json','launch.json','native-primary.mwro','native-primary-status.json',
+    'native-inputs.mwri','native-input-status.json','native-allocations.jsonl','allocation-profile.json',
+    'stadium-whole-paired-compact-rng.mwrl','cleanup.json','input-intentions.jsonl'];
+  const source=Object.fromEntries(names.map((name,i)=>[name,{bytes:i+1,sha256:(i+1).toString(16).repeat(64)}]));
+  const p={schema:'melee-web-stadium-paired-window-projection-v1',capture_profile:'paired_idle_registration_v1',
+    source_schedule_verified:true,recipe_sha256:recipe,actual_frame_count:2,postflight_scope:scope,original_live_result:'fail',
+    source_files:source,matches:[0,1].map(i=>({match_index:i,window:{state_samples:3501},
+      setup:{declared_setup:{stage:3,players:[0,1].map(()=>({character_kind:8,player_type:0,stocks:4}))}},
+      actions:[{action_index:0,kind:'tick',source_tick:0,draw_ordinal:0}],
+      states:Array.from({length:3501},(_,t)=>({selected:true,tick:{source_tick:t}}))}))};
+  const e={scope,result:'PASS_OFFLINE_POSTFLIGHT_REFERENCE_ONLY',original_live_result:'fail',inputs_unchanged:true,
+    native_capture_repeated:false,original_operation_deadline_reclassified:false,browser_parity:false,C3:false,
+    native_pid_absent:true,native_group_absent:true,inputs:structuredClone(source),
+    input_stream:{complete:true,sha256:source['native-inputs.mwri'].sha256},
+    native:{primary_sha256:source['native-primary.mwro'].sha256,native_allocations_sha256:source['native-allocations.jsonl'].sha256,
+      original_rng_scene_boundaries:{observed:true,sample_count:8,samples:Array.from({length:8},(_,i)=>({
+        lifetime:Math.floor(i/4)+1,function:i%4<2?'gm_Scene_Vs_OnEnter':'gm_Scene_Vs_OnExit',phase:i%2?'return':'enter',value:1}))}}};
+  assert.equal(derivePairedFull(p,recipe,2,e).matches.length,2);
+  for(const [key,value]of [['scope','original-paired-idle-offline-postflight-v1'],['result','pass'],
+    ['original_live_result','pass'],['inputs_unchanged',false],['native_capture_repeated',true],
+    ['original_operation_deadline_reclassified',true],['browser_parity',true],['C3',true],
+    ['native_pid_absent',false],['native_group_absent',false]]){
+    const bad=structuredClone(e);bad[key]=value;assert.throws(()=>derivePairedFull(p,recipe,2,bad),key);
+    delete bad[key];assert.throws(()=>derivePairedFull(p,recipe,2,bad),'missing '+key);
+  }
+  for(const name of names){
+    for(const mutate of [x=>delete x.inputs[name],x=>x.inputs[name].sha256='f'.repeat(64),x=>++x.inputs[name].bytes]){
+      const bad=structuredClone(e);mutate(bad);assert.throws(()=>derivePairedFull(p,recipe,2,bad),name);
+    }
+    const bad=structuredClone(p);delete bad.source_files[name];assert.throws(()=>derivePairedFull(bad,recipe,2,e),name);
+  }
+  for(const [key,value]of [['capture_profile','unknown'],['postflight_scope','original-stadium-paired-registration-v1'],['original_live_result','pass']]){
+    const bad=structuredClone(p);bad[key]=value;assert.throws(()=>derivePairedFull(bad,recipe,2,e),key);
+  }
+  const incomplete=structuredClone(e);incomplete.input_stream.complete=false;
+  assert.throws(()=>derivePairedFull(p,recipe,2,incomplete),/literal input/);
+  const foreign=structuredClone(e);foreign.native.primary_sha256='f'.repeat(64);
+  assert.throws(()=>derivePairedFull(p,recipe,2,foreign),/primary producer/);
+  const legacy=structuredClone(p);delete legacy.capture_profile;
+  const oldReceipt=structuredClone(e);oldReceipt.scope='original-paired-idle-offline-postflight-v1';
+  assert.equal(derivePairedFull(legacy,recipe,2,oldReceipt).matches.length,2); // Historical admission is unchanged.
+  }
+  const projectionPath=process.env.MELEE_PAIRED_REGISTRATION_PROJECTION;
+  const receiptPath=process.env.MELEE_PAIRED_REGISTRATION_POSTFLIGHT;
+  if(projectionPath||receiptPath){
+    assert.ok(projectionPath&&receiptPath,'Both retained registration operands must be configured');
+    const actual=JSON.parse(fs.readFileSync(projectionPath,'utf8'));
+    const receipt=JSON.parse(fs.readFileSync(receiptPath,'utf8'));
+    assert.equal(derivePairedFull(actual,actual.recipe_sha256,actual.actual_frame_count,receipt).matches.length,2);
+    const mixed=structuredClone(receipt);mixed.inputs['native-inputs.mwri'].sha256='0'.repeat(64);
+    assert.throws(()=>derivePairedFull(actual,actual.recipe_sha256,actual.actual_frame_count,mixed),/raw role/);
+  }
 });
 
 test('arm executes the actual page adapter and refuses missing, active or dirty observers',()=>{
