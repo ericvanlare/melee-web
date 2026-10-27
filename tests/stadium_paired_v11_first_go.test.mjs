@@ -3,6 +3,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
+import {parseArgs} from 'node:util';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {typedOriginalValues,compareLaterBGate2Go} from './stadium_matched_setup_cf_consumer.mjs';
 const source=readFileSync(new URL('../scripts/capture_whole_session_browser.mjs',import.meta.url),'utf8');
 const projectionPath=process.env.MELEE_PAIRED_FIRST_GO_PROJECTION;
@@ -18,3 +21,30 @@ function fixture(){assert.ok(projectionPath,'explicit actual projection required
 test('actual projection derives first strict postGO and unchanged pure typed comparison',{skip:!projectionPath},()=>{const {ctx,e,s}=fixture();assert.equal(ctx.comparePairedFirstGo(s,e).pass,true);for(const mutate of [s=>s.setup.seed_hex='00000000',s=>s.first_post_go_typed22.seed_hex='00000000',s=>s.first_post_go_pad_queue.queue_slot_status_hex=['00'.repeat(11),...s.first_post_go_pad_queue.queue_slot_status_hex.slice(1)].map((x,i)=>i?x:'ff'.repeat(11)),s=>s.closure_input_cursor++,s=>s.first_post_go_typed22.world_generation++,s=>s.go_event.source_seed_hex='00000000']){const wrong=structuredClone(s);mutate(wrong);assert.throws(()=>ctx.comparePairedFirstGo(wrong,e));}});
 test('actual getter path suppresses all native reads while owner/Asyncify busy',async()=>{let reads=0,idle=false;const status={enabled:false};const Module={stadiumMatchedSetupNativeIdle:()=>idle,_melee_web_native_menu_stadium_paired_v11_status:()=>{reads++;return 1;},UTF8ToString:()=>JSON.stringify(status),_melee_web_native_menu_phase:()=>3,_melee_web_native_menu_running:()=>1};const ctx={page:{evaluate:fn=>vm.runInNewContext('('+fn.toString()+')()',{Module})},observePageOperation:(_,fn)=>fn()};vm.createContext(ctx);vm.runInContext('async '+body('readPairedFirstGoStatus'),ctx);assert.equal((await ctx.readPairedFirstGoStatus()).busy,true);assert.equal(reads,0);idle=true;assert.equal((await ctx.readPairedFirstGoStatus()).busy,false);assert.equal(reads,1);});
 test('actual firstGO phase compares stopped status and uses exactly one existing unload',{skip:!projectionPath},async()=>{const {e,s}=fixture();const clicks=[],writes=[];let retired=false;const ctx=functions({Date,Promise,setTimeout,report:{paired_v11_first_go:{}},pairedFirstGoExpected:e,replayTimeoutMs:1000,replayPollMs:1,pageErrors:[],write:async(name)=>writes.push(name),page:{locator:label=>({click:async()=>{clicks.push(label);if(label==='#unload')retired=true;}})},readPairedFirstGoStatus:async()=>({busy:false,status:retired?{...s,native_retired:true}:s,phase:retired?0:3,running:0})});vm.runInContext('async '+body('pairedFirstGoPhase'),ctx);await ctx.pairedFirstGoPhase();assert.deepEqual(clicks,['#retail-replay-start','#unload']);assert.equal(ctx.report.paired_v11_first_go.component_pass,true);assert.equal(writes.length,2);});
+
+// Actual parseArgs table and complete pre-resource option prelude; mode/probe URL
+// helpers are modeled leaves. No filesystem write, browser import or launch occurs.
+test('actual CLI prelude admits bounded paired artifacts and refuses incomplete or conflicting routes',async()=>{
+ const start=source.indexOf('const {values, tokens} = parseArgs(');
+ const end=source.indexOf('await fs.mkdir(output, {recursive: false});',start);
+ assert.ok(start>=0 && end>start);
+ const prelude=source.slice(start,end).replaceAll('import.meta.url','sourceUrl');
+ const base=['--url','http://127.0.0.1:8787/runtime.html','--disc','/inputs/disc.iso','--recipe','/inputs/recipe.mwrc',
+  '--out','/output/new','--mode','state','--runtime-incidents','--artifact-root','/artifacts','--runtime-data','/artifacts/gameplay_menu_browser.data',
+  '--phase-timeout','150000','--replay-timeout','150000','--stadium-paired-v11-first-go-projection','/inputs/projection.json',
+  '--stadium-paired-v11-first-go-projection-sha256','a'.repeat(64)];
+ async function run(args){const context={URL,path,fileURLToPath,sourceUrl:new URL('../scripts/capture_whole_session_browser.mjs',import.meta.url).href,
+  parseArgs:options=>parseArgs({...options,args}),resolveCaptureMode:mode=>({mode,diagnostic:false}),
+  incidentRecordingUrl:value=>new URL(value),parseRngDrawProbe:()=>null,parseHitTransitionProbe:()=>null,
+  NATURAL_PAUSE_PROTOCOL:{},STOPPED_SCENE_PAIR_PROTOCOL:{},OBSERVED_B_REFERENCE:{id:'observed'},LONG_B_REFERENCE:{id:'long'}};
+  vm.createContext(context);return vm.runInContext('(async()=>{'+prelude+';return {pairedFirstGo,inputPaths,artifactRoot,phaseTimeoutMs,replayTimeoutMs};})()',context);}
+ const admitted=await run(base);assert.equal(admitted.pairedFirstGo,true);assert.equal(admitted.artifactRoot,'/artifacts');
+ assert.ok(admitted.inputPaths.includes('/inputs/projection.json'));assert.equal(admitted.phaseTimeoutMs,150000);assert.equal(admitted.replayTimeoutMs,150000);
+ function without(flag){const args=[...base],i=args.indexOf(flag);args.splice(i,2);return args;}
+ for(const flag of ['--artifact-root','--runtime-data'])await assert.rejects(run(without(flag)),/Paired v11 first-GO requires/);
+ for(const flag of ['--phase-timeout','--replay-timeout']){const args=[...base];args[args.indexOf(flag)+1]='150001';await assert.rejects(run(args),/Paired v11 first-GO requires/);}
+ await assert.rejects(run([...base,'--expected-frame0','/inputs/frame0.json']),/Paired v11 first-GO requires/);
+ await assert.rejects(run([...base,'--stadium-later-sss-exit']),/Paired v11 first-GO requires/);
+ const ordinary=without('--stadium-paired-v11-first-go-projection');ordinary.splice(ordinary.indexOf('--stadium-paired-v11-first-go-projection-sha256'),2);
+ await assert.rejects(run(ordinary),/--artifact-root require/);
+});

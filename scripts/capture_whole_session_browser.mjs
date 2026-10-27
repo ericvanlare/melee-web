@@ -175,8 +175,9 @@ if(pairedFirstGo || pairedFirstGoSha!==undefined){
      'cpu-observations','rng-draw-probe-range','rng-draw-probe-cursors','hit-transition-probe-cursors',
      'first-replay-callback-probe','expected-frame0'].includes(key)));
  if(!pairedFirstGo || !/^[0-9a-f]{64}$/.test(pairedFirstGoSha||'') || diagnostic ||
-    captureMode.mode!=='state' || !runtimeIncidentRecording || incompatible.length)
-  throw Error('Paired v11 first-GO requires state/runtime-incidents, explicit projection hash, and no legacy/prefix/resume/probe route');
+    captureMode.mode!=='state' || !runtimeIncidentRecording || incompatible.length ||
+    !values['artifact-root'] || !values['runtime-data'] || phaseTimeoutMs>150000 || replayTimeoutMs>150000)
+  throw Error('Paired v11 first-GO requires state/runtime-incidents, artifacts/data, at most 150s bounds, explicit projection hash, and no legacy/prefix/resume/probe route');
 }
 let pairedFirstGoExpected=null;
 
@@ -232,12 +233,12 @@ if (currentSssExit !== !!values['stadium-current-sss-exit-expected-sha256'] ||
       values.mode !== 'state' || !values['artifact-root'] || !values['runtime-data'] ||
       phaseTimeoutMs > 150000 || replayTimeoutMs > 150000)))
   throw Error('Current SSS observation requires explicit state/expectation/hash/artifacts/data and unchanged150s bounds only');
-if (!firstReplayCallbackProbe && !currentSssExit && (expectedFrame0Path || values['artifact-root']))
+if (!firstReplayCallbackProbe && !currentSssExit && (expectedFrame0Path || (!pairedFirstGo && values['artifact-root'])))
   throw Error('--expected-frame0 and --artifact-root require --first-replay-callback-probe');
 const runtimeDataUrl = new URL('gameplay_menu_browser.data', url).href;
 const output = path.resolve(values.out);
 const observationTimeoutMs = diagnostic ? diagnosticProtocol.observation_timeout_ms : Math.min(phaseTimeoutMs, 5000);
-const inputPaths = [values.disc, values.recipe, values.manifest, values['runtime-data'], expectedFrame0Path, currentSssExitPath, laterBGate2ProjectionPath, laterBGate2BindingPath]
+const inputPaths = [values.disc, values.recipe, values.manifest, values['runtime-data'], expectedFrame0Path, currentSssExitPath, laterBGate2ProjectionPath, laterBGate2BindingPath, pairedFirstGoPath]
   .filter(Boolean).map(value => path.resolve(value));
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const artifactRoot = path.resolve(values['artifact-root'] || path.join(repoRoot, 'build/browser-release'));
@@ -1253,6 +1254,10 @@ try {
     report.artifact_inventory_pre = await browserArtifactInventory();
     if (!report.artifact_inventory_pre.equal) throw Error('Current SSS served/local artifact inventory differs');
   }
+  if (pairedFirstGo) {
+    report.artifact_inventory_pre = await browserArtifactInventory();
+    if (!report.artifact_inventory_pre.equal) throw Error('Paired first-GO served/local artifact inventory differs');
+  }
   const cpuObservationRowLimit = report.recipe_header.frames;
   report.cpu_observation_row_limit = cpuObservationRowLimit;
   browserTools ||= await loadBrowserTools(values.playwright);
@@ -1264,7 +1269,7 @@ try {
       viewport: {width: diagnosticProtocol.viewport_width,
       height: diagnosticProtocol.viewport_height},
       deviceScaleFactor: diagnosticProtocol.device_scale_factor} : {})};
-  if (firstReplayCallbackProbe || currentSssExit) browserOptions.args = [...(browserOptions.args || []), '--enable-automation'];
+  if (firstReplayCallbackProbe || currentSssExit || pairedFirstGo) browserOptions.args = [...(browserOptions.args || []), '--enable-automation'];
   if (diagnostic) {
     const chromeVersionOutput = execFileSync(browserPath, ['--version'], {encoding: 'utf8'}).trim();
     const chromeVersion = chromeVersionOutput.match(/\d+(?:\.\d+){2,3}/)?.[0] ?? null;
@@ -1309,7 +1314,7 @@ try {
     if (!Array.isArray(report.browser_process_info) || !report.browser_process_info.length)
       throw Error('Owned Chrome CDP process inventory is unavailable');
     await write('report.json', report);
-    if (firstReplayCallbackProbe || currentSssExit) {
+    if (firstReplayCallbackProbe || currentSssExit || pairedFirstGo) {
       report.browser.command_line = (await browserCdp.send('Browser.getBrowserCommandLine')).arguments || [];
       report.browser_system_info = await browserCdp.send('SystemInfo.getInfo');
       await write('report.json', report);
@@ -2213,7 +2218,17 @@ try {
     finalizeSessionCapture(report); // Keep original incomplete-replay classification truthful.
     if(pairedFirstGo){
       report.original_replay_capture_result=report.result;
-      const valid=report.paired_v11_first_go?.component_pass===true && !report.first_error && !report.first_mismatch &&
+      let pairedInventoryValid = false;
+      try {
+        report.artifact_inventory_post = await browserArtifactInventory();
+        if (!report.artifact_inventory_post.equal ||
+            JSON.stringify(report.artifact_inventory_post) !== JSON.stringify(report.artifact_inventory_pre))
+          throw Error('Paired first-GO artifact inventory changed');
+        pairedInventoryValid = true;
+      } catch (error) {
+        firstError('artifact_inventory', error.message || String(error));
+      }
+      const valid=pairedInventoryValid && report.paired_v11_first_go?.component_pass===true && !report.first_error && !report.first_mismatch &&
         !report.close_error && !report.cdp_close_error && !report.download_error && !report.screenshot_error &&
         !report.browser_errors.length && !report.unexpected_requests.length && report.cleanup?.browser_close_returned===true;
       report.result=valid?'paired_v11_first_go_component_pass_replay_incomplete':'fail';
