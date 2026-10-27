@@ -1268,8 +1268,12 @@ def prepare_rules_profile(profile, user, *, source_slots=(0, 1), fast_disc_speed
 
 
 def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_manifest, timeout=180, gci=None,
-        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False, stadium_go_ordinal2=False, stadium_whole_target=None, stadium_whole_setup=None, stadium_whole_gc=None, stadium_whole_dol=None, stadium_whole_provenance=None, stadium_whole_b_state=False, stadium_whole_long_idle=False, stadium_whole_paired_idle=False, stadium_whole_paired_registration=False, stadium_whole_stockout=False, stadium_whole_standings=False, stadium_whole_post_transform_standings=False, stadium_whole_first_form_latency=False, stadium_first_form_menu_wait_72=False, stadium_whole_rng_window=None, stadium_whole_replay_binding=None, stadium_whole_first_form_replay_journals=None, stadium_whole_rng_coverage="rng_returns"):
+        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False, stadium_go_ordinal2=False, stadium_whole_target=None, stadium_whole_setup=None, stadium_whole_gc=None, stadium_whole_dol=None, stadium_whole_provenance=None, stadium_whole_b_state=False, stadium_whole_long_idle=False, stadium_whole_paired_idle=False, stadium_whole_paired_registration=False, stadium_whole_stockout=False, stadium_whole_standings=False, stadium_whole_post_transform_standings=False, stadium_whole_first_form_latency=False, stadium_selected_request_timing=False, stadium_first_form_menu_wait_72=False, stadium_whole_rng_window=None, stadium_whole_replay_binding=None, stadium_whole_first_form_replay_journals=None, stadium_whole_rng_coverage="rng_returns"):
     """Own fresh output before preparation so failures cannot vanish before launch."""
+    require(type(stadium_selected_request_timing) is bool and
+            (not stadium_selected_request_timing or stadium_whole_first_form_latency and
+             stadium_whole_replay_binding is None and stadium_whole_first_form_replay_journals is None),
+            "Selected request timing requires fresh first-form latency recording")
     require(type(stadium_first_form_menu_wait_72) is bool and
             (not stadium_first_form_menu_wait_72 or
              stadium_whole_first_form_latency and stadium_whole_replay_binding is None and
@@ -1339,6 +1343,7 @@ def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_m
             stadium_whole_post_transform_standings=stadium_whole_post_transform_standings,
             stadium_whole_first_form_latency=stadium_whole_first_form_latency,
             stadium_first_form_menu_wait_72=stadium_first_form_menu_wait_72,
+            stadium_selected_request_timing=stadium_selected_request_timing,
             stadium_whole_rng_window=stadium_whole_rng_window,
             stadium_whole_replay_binding=stadium_whole_replay_binding,
             stadium_whole_first_form_replay_journals=stadium_whole_first_form_replay_journals,
@@ -2592,6 +2597,7 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
             stadium_whole_first_form_latency_replay=getattr(
                 self, 'stadium_whole_first_form_latency_replay', False),
             replay_binding_sha256=self.replay_binding_sha256)
+        fresh.selected_request_timing = getattr(self,'selected_request_timing',False)
         fresh.b_observations = self.b_observations
         fresh.long_idle_windows = self.long_idle_windows
         fresh.stockout_summary = self.stockout_summary
@@ -2860,6 +2866,9 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
             else:
                 require(payload.get('stadium_whole_long_idle') is None,
                         'Whole Stadium default route received an undeclared long-idle profile')
+            require(payload.get('stadium_selected_request_timing') ==
+                    ('first_selected_stage_request_v1' if getattr(self,'selected_request_timing',False) else None),
+                    'Selected timing announcement differs')
             self.announcements.append(event)
             return
         require(self.announcements == ['handshake', 'start'], 'Whole Stadium row preceded announcements')
@@ -2885,6 +2894,11 @@ class StadiumWholeFeedbackReceiver(StadiumGoPrefixReceiver):
         require(event in ('progress', 'boundary') and payload.get('whole_session') is True and
                 type(payload.get('match_index')) is int and payload['match_index'] == self.match_index,
                 'Whole Stadium scope or match index differs')
+        if event == 'progress' and payload.get('schema') == 'melee-web-stadium-selected-request-source-timing-v1':
+            require(getattr(self,'selected_request_timing',False) and self.stadium_whole_first_form_latency and
+                    payload.get('profile')=='first_selected_stage_request_v1',
+                    'Unselected source timing event')
+            return  # Strict full source-timing reducer runs before report PASS.
         if event == 'progress':
             require(payload.get('diagnostic') == self.progress_scope and
                     payload.get('setup_receipt_sha256') == self.receipt,
@@ -3632,12 +3646,16 @@ def stadium_whole_replay_complete(source, native_status, primary, primary_status
 def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, build_manifest,
                              target_path, setup_path, checkpoint_gc, dol, provenance, gci, timeout,
                              stadium_whole_b_state=False, stadium_whole_long_idle=False,
-                             stadium_whole_paired_idle=False, stadium_whole_paired_registration=False, stadium_whole_stockout=False, stadium_whole_standings=False, stadium_whole_post_transform_standings=False, stadium_whole_first_form_latency=False, stadium_first_form_menu_wait_72=False, stadium_whole_rng_window=None,
+                             stadium_whole_paired_idle=False, stadium_whole_paired_registration=False, stadium_whole_stockout=False, stadium_whole_standings=False, stadium_whole_post_transform_standings=False, stadium_whole_first_form_latency=False, stadium_selected_request_timing=False, stadium_first_form_menu_wait_72=False, stadium_whole_rng_window=None,
                              stadium_whole_replay_binding=None,
                              stadium_whole_first_form_replay_journals=None,
                              stadium_whole_rng_coverage="rng_returns"):
     """Explicit private whole3/sidecar2 diagnostic using the existing passive route."""
     import types
+    require(type(stadium_selected_request_timing) is bool and
+            (not stadium_selected_request_timing or stadium_whole_first_form_latency and
+             stadium_whole_replay_binding is None and stadium_whole_first_form_replay_journals is None),
+            "Selected request timing requires fresh first-form latency recording")
     require(type(stadium_first_form_menu_wait_72) is bool and
             (not stadium_first_form_menu_wait_72 or
              stadium_whole_first_form_latency and stadium_whole_replay_binding is None and
@@ -3896,6 +3914,9 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
                     source_binding_sha256=replay_source['binding_sha256'],
                     source_directory=journals['source_directory']) == journals,
                     'First-form replay historical issues changed before admission')
+        receiver.selected_request_timing = stadium_selected_request_timing
+        if stadium_selected_request_timing:
+            env['MWRC_STADIUM_SELECTED_REQUEST_TIMING']='first_selected_stage_request_v1'
         controller=(StadiumReplayIntentObserver(output/'replay-policy-intentions.jsonl') if replay_source else
                     StadiumIntentController(p1,p2,output/'input-intentions.jsonl'))
         launch=dict(command=command,environment_delta={k:v for k,v in env.items() if k.startswith('MWRC_')},manifest=build,setup=setup,expected=expected,
@@ -4073,6 +4094,9 @@ def run_stadium_whole_three(*, dolphin, disc, profile, menu_recipe, output, buil
             report['stadium_whole_first_form_latency_replay'].update(
                 input_terminal_checks='PASS', comparison_result='PASS_EXACT_INPUT_AND_FIRST_FORM_SAMPLE',
                 consumed_input_scope='exact complete replay MWRI/footer, consumed recipe and native whole3 terminal verified')
+        if stadium_selected_request_timing:
+            from stadium_selected_request_timing import validate_selected_request_timing
+            report['stadium_selected_request_timing']=validate_selected_request_timing(iter_records(raw),read_status(status))
         report['result']='pass'
         cleanup_process(process,output,scope=report['scope'])
         process=None
@@ -4139,6 +4163,8 @@ def main(argv=None):
                         help="New exclusive B-state profile: retain selected-B GO+3500 window and continue unchanged focus-bound input through actual transform and mode14")
     parser.add_argument("--stadium-whole-first-form-latency", action="store_true",
                         help="Fresh-record first-form v2: neutralize at first pre-transform mode14 or first transformation, then retain checked phase6-to-settled-phase0 and unchanged whole3 terminal")
+    parser.add_argument("--stadium-selected-request-timing",action="store_true",
+                        help="Fresh first-form only: passive selected source request/callback/poll clocks; no drive-model coverage")
     parser.add_argument("--stadium-first-form-menu-wait-72", action="store_true",
                         help="Fresh-record-only exact CSS menu wait variant: 72 polls at each of all three CSS visits")
     parser.add_argument("--stadium-whole-stockout", action="store_true",

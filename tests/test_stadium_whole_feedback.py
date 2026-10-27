@@ -134,6 +134,8 @@ class StadiumWholeFeedbackTests(OwnedWorkspaceTests):
         feedback_stop=source.index('    const std::string constructor_setting =',feedback_start)
         # The previously validated whole-session count is modeled; pair profile/flag logic is actual source.
         body=paired_init+source[feedback_start:feedback_stop]
+        timing_start = source.index('  bool selected_timing_enabled=')
+        timing_state = source[timing_start:source.index(';', timing_start)+1]
         fixture=r'''
 #include <array>
 #include <cassert>
@@ -151,7 +153,9 @@ bool AllocationConfigured(){return !Env("MWRC_ALLOCATION_OUTPUT").empty();}
 struct CompactRngSettings{bool present=false,valid=false;std::string selection;};
 const CompactRngSettings& CompactRngEnvironment(){static const CompactRngSettings value{};return value;}
 namespace InputStream { bool recording=true,replaying=false; bool IsRecording(){return recording;} bool IsReplaying(){return replaying;} }
-struct Gate { StadiumWholeBObservation stadium_whole_b;StadiumWholeLongIdle stadium_whole_long_idle;unsigned whole_session_matches=3;bool stadium_go_prefix_enabled=false,stadium_whole_feedback=false,stadium_whole_paired_idle=false,whole_rng_returns=false,whole_replay=false;std::string stadium_whole_setup_receipt,error;void SetInvalid(const char* e){error=e;}
+struct Gate {
+'''+timing_state+r'''
+ StadiumWholeBObservation stadium_whole_b;StadiumWholeLongIdle stadium_whole_long_idle;unsigned whole_session_matches=3;bool stadium_go_prefix_enabled=false,stadium_whole_feedback=false,stadium_whole_paired_idle=false,whole_rng_returns=false,whole_replay=false;std::string stadium_whole_setup_receipt,error;void SetInvalid(const char* e){error=e;}
 bool Run(){
 ''' + body + r'''
 return true;
@@ -849,6 +853,8 @@ print('Actual package finalizer imports; real missing-stream guard retained')
         start=source.index('static bool IsCaptureBoundary(')
         stop=source.index('\nbool Observer::IsRngReturnBoundary',start)
         predicate=source[start:stop]
+        timing_points=source[source.index('constexpr std::array<u32,7> SELECTED_TIMING_PCS='):source.index('constexpr char EXPECTED_DOL_SHA256[]')]
+        timing_requested=source[source.index('static bool SelectedTimingRequested()'):source.index('static bool IsCaptureBoundary(')]
         start=source.index('void Observer::OnBoundary(')
         stop=source.index('\nvoid Observer::Observe(',start)
         dispatch=source[start:stop]
@@ -880,7 +886,7 @@ namespace ReferenceAllocation{struct Observer{static void Observe(Core::System*,
 struct Impl{void SetInvalid(const std::string&) {assert(false);}};
 struct Observer{Impl* m_impl;void Observe(Core::System*,u32,PowerPC::PowerPCState*){++primary_calls;}static void OnBoundary(Core::System*,u32,PowerPC::PowerPCState*);};
 Impl impl;Observer instance{&impl};Observer& Instance(){return instance;}
-'''+constants+'\n'+array+'\n'+LEGACY_CAPTURE_BOUNDARY.replace('IsCaptureBoundary','BeforeCaptureBoundary',1)+predicate+dispatch
+'''+constants+'\n'+array+'\n'+timing_points+timing_requested+LEGACY_CAPTURE_BOUNDARY.replace('IsCaptureBoundary','BeforeCaptureBoundary',1)+predicate+dispatch
         fixture+=r'''
 int main(){Core::System system;PowerPC::PowerPCState state;
 const std::array<u32,5> added{SSS_ENTER_RETURN,0x8025a310,0x8025a4c0,0x8025a4e8,0x8025a548};

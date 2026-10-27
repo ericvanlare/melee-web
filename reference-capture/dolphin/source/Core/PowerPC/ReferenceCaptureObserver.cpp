@@ -31,6 +31,7 @@
 #include "Core/HW/Memmap.h"
 #include "Core/PowerPC/PowerPC.h"
 #include "Core/System.h"
+#include "Core/CoreTiming.h"
 #include "DiscIO/DiscUtils.h"
 #include "DiscIO/VolumeDisc.h"
 
@@ -40,6 +41,9 @@ namespace ReferenceCapture
 {
 namespace
 {
+// Cached opt-in: no environment allocation on the instruction hot path.
+constexpr std::array<u32,7> SELECTED_TIMING_PCS={0x8038f6d4,0x8038f950,0x801d4220,0x801d42b4,0x801d42b8,0x801d4318,0x801d4350};
+bool SelectedTimingPC(u32 pc){return std::find(SELECTED_TIMING_PCS.begin(),SELECTED_TIMING_PCS.end(),pc)!=SELECTED_TIMING_PCS.end();}
 constexpr char EXPECTED_DOL_SHA256[] =
     "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646";
 constexpr char EXPECTED_DOL[] =
@@ -1611,6 +1615,14 @@ struct Observer::Impl
         long_idle_compact.selection, stadium_whole_paired_idle, stadium_whole_long_idle.first_form_replay) ||
         (stadium_whole_paired_idle && long_idle_setting != paired_idle_setting))
       return SetInvalid("Whole Stadium idle profile requires its exact selected-match recording/compact ledger and no short RNG/replay"), false;
+    const std::string timing_setting=Env("MWRC_STADIUM_SELECTED_REQUEST_TIMING");
+    selected_timing_enabled=!timing_setting.empty();
+    if (selected_timing_enabled && (timing_setting!="first_selected_stage_request_v1" ||
+        !stadium_whole_feedback || whole_session_matches!=3 || !stadium_whole_b.enabled ||
+        long_idle_setting!="selected_b_3500_v1" || Env("MWRC_STADIUM_POSTTRANSFORM_STATE")!="first_form_v1" ||
+        !InputStream::IsRecording() || InputStream::IsReplaying() || whole_rng_returns ||
+        stadium_whole_paired_idle || !Env("MWRC_CPU_PROBE_OUTPUT").empty()))
+      return SetInvalid("Selected source timing requires exact fresh whole3 first-form observation"),false;
     stadium_whole_long_idle.enabled = !long_idle_setting.empty();
     stadium_whole_long_idle.paired = stadium_whole_paired_idle;
     stadium_whole_long_idle.registration = paired_idle_setting == "paired_idle_registration_v1";
@@ -1890,6 +1902,7 @@ struct Observer::Impl
       handshake += ",\"stadium_posttransform_state\":\"" + stadium_posttransform_state + "\"";
     handshake += StadiumWholeLongIdle::StadiumFirstFormLatencyReplayJson(stadium_whole_long_idle.first_form_replay,
         Env("MWRC_STADIUM_WHOLE_REPLAY_BINDING"));
+    if(selected_timing_enabled)handshake+=",\"stadium_selected_request_timing\":\"first_selected_stage_request_v1\"";
     handshake += "}";
     PushJson(Event::Handshake, handshake);
     std::string start =
@@ -1936,6 +1949,7 @@ struct Observer::Impl
       start += ",\"stadium_posttransform_state\":\"" + stadium_posttransform_state + "\"";
     start += StadiumWholeLongIdle::StadiumFirstFormLatencyReplayJson(stadium_whole_long_idle.first_form_replay,
         Env("MWRC_STADIUM_WHOLE_REPLAY_BINDING"));
+    if(selected_timing_enabled)start+=",\"stadium_selected_request_timing\":\"first_selected_stage_request_v1\"";
     start += "}";
     PushJson(Event::Start, start);
     return !invalid.load();
@@ -5056,10 +5070,118 @@ struct Observer::Impl
     stadium_go_prefix_phase = StadiumGoPrefixPhase::AwaitContainingTick;
   }
 
+  // Selected first source request only. No game memory or clock writes.
+  bool ObserveSelectedRequestTiming(Core::System* system, u32 pc, PowerPC::PowerPCState* state)
+  {
+    if (!SelectedTimingPC(pc)) return false;
+    if (!selected_timing_enabled) return true;
+    if (selected_timing_done) return true;
+    if (whole_phase != 5 || match_index != 1 || !match_active) {
+      if (selected_timing_open) SetInvalid("Selected timing owner left active B");
+      return true;
+    }
+    if (!selected_timing_open && (pc != 0x8038f6d4 || state->gpr[9] != 0x801d4220))
+      return true;
+    u32 root=0, ground=0, buffer=0, logical=0, tick=0, word=0;
+    u8 gate=0; std::array<u8,2> form_bytes{};
+    if (!ReadU32(system,0x8049e850,&root) || !IsMem1Range(root,0x30) ||
+        !ReadU32(system,root+0x2c,&ground) || !IsMem1Range(ground,0xec) ||
+        !ReadU32(system,ground+0xcc,&buffer) || !ReadU32(system,ground+0xc8,&logical) ||
+        !ReadBytes(system,ground+0xc4,1,&gate) || !ReadBytes(system,ground+0xde,2,form_bytes.data()) || !ReadU32(system,0x80479d58,&tick) ||
+        !ReadU32(system,pc,&word) || word != (pc==0x801d4318 ? 0x5400d7ff : ((pc==0x8038f6d4 || pc==0x801d4220 || pc==0x801d42b8) ? 0x7c0802a6 : 0x4e800020))) {
+      SetInvalid("Selected timing source owner/instruction unavailable"); return true;
+    }
+    const u32 selected_form=(u32(form_bytes[0])<<8)|form_bytes[1];
+    const bool pending=(gate&0x40)!=0;
+    const u64 clock=system->GetCoreTiming().GetTicks();
+    const auto emit=[&](const char* kind,u32 result) {
+      if (++selected_timing_rows>8192) { SetInvalid("Selected timing fixed row bound"); return; }
+      std::string json="{\"schema\":\"melee-web-stadium-selected-request-source-timing-v1\",\"profile\":\"first_selected_stage_request_v1\",\"kind\":\""+std::string(kind)+
+          "\",\"whole_session\":true,\"match_index\":1,\"clock_ticks\":"+std::to_string(clock)+
+          ",\"selected_form\":"+std::to_string(selected_form)+",\"request_id\":"+std::to_string(selected_timing_id)+",\"file_entry\":"+std::to_string(selected_timing_file)+
+          ",\"map2_gobj\":"+std::to_string(root)+",\"map2_ground\":"+std::to_string(ground)+
+          ",\"buffer\":"+std::to_string(buffer)+",\"logical_size\":"+std::to_string(logical)+
+          ",\"transfer_size\":"+std::to_string(selected_timing_size)+",\"pending_flag\":"+(pending?"true":"false")+
+          ",\"result\":"+std::to_string(result)+",\"pc\":"+std::to_string(pc)+",\"sp\":"+std::to_string(state->gpr[1])+
+          ",\"lr\":"+std::to_string(state->spr[8])+",\"source_tick\":"+std::to_string(tick)+
+          ",\"draw_ordinal\":"+std::to_string(draw_ordinal)+",\"drive_model_observed\":false}";
+      PushJson(Event::Progress,json,pc,tick,draw_ordinal);
+    };
+    if (selected_timing_open && (root!=selected_timing_root || ground!=selected_timing_ground || buffer!=selected_timing_buffer || logical!=selected_timing_logical || selected_form!=selected_timing_form)) {
+      SetInvalid("Selected timing source allocation owner changed"); return true;
+    }
+    if (pc==0x8038f6d4) {
+      if (state->gpr[9]!=0x801d4220) return true; // Other requests are not this selected request.
+      if (selected_timing_open || !pending || !logical || logical>UINT32_MAX-31 ||
+          (selected_form!=3 && selected_form!=4 && selected_form!=6 && selected_form!=9) ||
+          state->gpr[4]!=0 || state->gpr[5]!=buffer || state->gpr[6]!=((logical+31)&~31U) ||
+          state->gpr[7]!=0x21 || state->gpr[8]!=1 || state->gpr[10]!=0) {
+        SetInvalid("Selected timing request operands differ"); return true;
+      }
+      selected_timing_open=true;selected_timing_root=root;selected_timing_ground=ground;
+      selected_timing_buffer=buffer;selected_timing_logical=logical;selected_timing_size=state->gpr[6];
+      selected_timing_form=selected_form;selected_timing_file=state->gpr[3];selected_timing_request_sp=state->gpr[1];selected_timing_request_lr=state->spr[8];
+      emit("request_enter",0);return true;
+    }
+    if (!selected_timing_open) return true;
+    if (pc==0x8038f950) {
+      if (state->gpr[1]!=selected_timing_request_sp || state->spr[8]!=selected_timing_request_lr) return true;
+      if (selected_timing_returned || !pending) { SetInvalid("Selected timing duplicate/late request return");return true; }
+      selected_timing_id=state->gpr[3];selected_timing_returned=true;emit("request_return",selected_timing_id);return true;
+    }
+    if (pc==0x801d4220) {
+      if (!selected_timing_returned || selected_timing_callback || !pending ||
+          state->gpr[3]!=selected_timing_id || state->gpr[4]!=0 || state->gpr[5]!=0 || state->gpr[6]!=0) {
+        SetInvalid("Selected timing callback lacks settled request identity");return true;
+      }
+      selected_timing_callback=true;selected_timing_callback_sp=state->gpr[1];selected_timing_callback_lr=state->spr[8];
+      emit("callback_enter",0);return true;
+    }
+    if (pc==0x801d42b4) {
+      if (!selected_timing_callback || selected_timing_callback_done || pending ||
+          state->gpr[1]!=selected_timing_callback_sp || state->spr[8]!=selected_timing_callback_lr) {
+        SetInvalid("Selected timing callback return owner/flag differs");return true;
+      }
+      selected_timing_callback_done=true;emit("callback_return",0);return true;
+    }
+    if (pc==0x801d42b8) {
+      if (!selected_timing_returned || selected_timing_poll) { SetInvalid("Selected timing poll reentrancy");return true; }
+      selected_timing_poll=true;selected_timing_poll_read=false;selected_timing_poll_sp=state->gpr[1];selected_timing_poll_lr=state->spr[8];
+      emit("poll_enter",0);return true;
+    }
+    if (pc==0x801d4318) {
+      // The preceding lbz loaded Ground+C4. Capture that byte before rlwinm.
+      // An interrupt may clear live C4 before this hook or before the return;
+      // the interrupted function still branches on the saved register value.
+      u32 load_word=0;
+      if (!selected_timing_poll || selected_timing_poll_read ||
+          selected_timing_poll_sp<0x10 || state->gpr[1]!=selected_timing_poll_sp-0x10 ||
+          state->gpr[31]!=ground || state->spr[8]!=0x801d42fc || state->gpr[0]>0xff ||
+          !ReadU32(system,0x801d4314,&load_word) || load_word!=0x881f00c4) {
+        SetInvalid("Selected timing poll pending read owner/instruction differs");return true;
+      }
+      selected_timing_poll_read=true;
+      selected_timing_poll_pending=(state->gpr[0]&0x40)!=0;
+      emit("poll_pending_read",state->gpr[0]);return true;
+    }
+    if (pc==0x801d4350) {
+      if (!selected_timing_poll || !selected_timing_poll_read || state->gpr[1]!=selected_timing_poll_sp || state->spr[8]!=selected_timing_poll_lr ||
+          state->gpr[3]>1 || (state->gpr[3]!=0)!=(!selected_timing_poll_pending) ||
+          (state->gpr[3]!=0 && !selected_timing_callback_done)) {
+        SetInvalid("Selected timing poll return owner/decision differs");return true;
+      }
+      selected_timing_poll=false;emit("poll_return",state->gpr[3]);
+      if (state->gpr[3]) selected_timing_done=true;
+      return true;
+    }
+    return true;
+  }
+
   void Observe(Core::System* system, u32 pc, PowerPC::PowerPCState* state)
   {
     if (!Start() || invalid.load() || finish_requested.load())
       return;
+    if (ObserveSelectedRequestTiming(system,pc,state)) return;
     if (stadium_constructor_enabled || stadium_whole_b.enabled)
     {
       const auto point = std::find(STADIUM_CONSTRUCTOR_PCS.begin(), STADIUM_CONSTRUCTOR_PCS.end(), pc);
@@ -6183,6 +6305,8 @@ struct Observer::Impl
     {
       if (awaiting_final_css)
       {
+        if(selected_timing_enabled&&!selected_timing_done)
+          return SetInvalid("Selected source timing did not complete before natural terminal"),void();
         awaiting_final_css = false;
         RequestComplete();
       }
@@ -7086,6 +7210,7 @@ struct Observer::Impl
       json += ",\"stadium_posttransform_state\":\"" + stadium_posttransform_state + "\"";
     json += StadiumWholeLongIdle::StadiumFirstFormLatencyReplayJson(stadium_whole_long_idle.first_form_replay,
         Env("MWRC_STADIUM_WHOLE_REPLAY_BINDING"));
+    if(selected_timing_enabled)json+=",\"stadium_selected_request_timing\":\"first_selected_stage_request_v1\",\"stadium_selected_request_timing_complete\":"+std::string(selected_timing_done?"true":"false");
     json += CpuProbeCloseStatusJson();
     json += "}\n";
     if (!status.Write(reinterpret_cast<const u8*>(json.data()), json.size()) || !status.Flush() ||
@@ -7231,6 +7356,13 @@ struct Observer::Impl
   bool entity_prefix_final_draw = false;
   u32 whole_session_matches = 0;
   u32 audio_owner_epoch = 0;
+  bool selected_timing_enabled=false,selected_timing_open=false,selected_timing_returned=false;
+  bool selected_timing_callback=false,selected_timing_callback_done=false,selected_timing_poll=false,selected_timing_done=false;
+  u32 selected_timing_root=0,selected_timing_ground=0,selected_timing_buffer=0,selected_timing_logical=0;
+  u32 selected_timing_form=0,selected_timing_size=0,selected_timing_file=0,selected_timing_id=0,selected_timing_rows=0;
+  u32 selected_timing_request_sp=0,selected_timing_request_lr=0,selected_timing_callback_sp=0,selected_timing_callback_lr=0;
+  bool selected_timing_poll_read=false,selected_timing_poll_pending=false;
+  u32 selected_timing_poll_sp=0,selected_timing_poll_lr=0;
   u32 match_index = 0;
   bool css_steering_ready = false;
   u32 whole_phase = 0;  // CSS, SSS, VS, completed match, or return CSS.
@@ -7380,8 +7512,14 @@ bool Observer::IsEnabled()
   return enabled;
 }
 
+static bool SelectedTimingRequested(){
+  static const bool requested=Env("MWRC_STADIUM_SELECTED_REQUEST_TIMING")=="first_selected_stage_request_v1";
+  return requested;
+}
+
 static bool IsCaptureBoundary(u32 guest_pc)
 {
+  if (SelectedTimingRequested() && SelectedTimingPC(guest_pc)) return true;
   switch (guest_pc)
   {
   case 0x8034DD8C:

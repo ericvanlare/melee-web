@@ -39,6 +39,8 @@ class StadiumWholeRngAdjunctTests(unittest.TestCase):
         feedback_stop=source.index('    const std::string constructor_setting =',feedback_start)
         # The previously validated whole-session count is modeled; pair profile/flag logic is actual source.
         body=paired_init+source[feedback_start:feedback_stop]
+        timing_start = source.index('  bool selected_timing_enabled=')
+        timing_state = source[timing_start:source.index(';', timing_start)+1]
         boundary_start=source.index("enum class Boundary : u16")
         boundary=source[boundary_start:source.index("};",boundary_start)+2]
         declaration=boundary+section(source,'struct StadiumWholeBObservation\n','enum class StadiumGoPrefixPhase : u8')
@@ -65,6 +67,7 @@ namespace InputStream{bool recording=true,replaying=false,finished=false;bool Is
 struct CompactRngSettings{bool present=false,valid=false;std::string selection;};
 const CompactRngSettings& CompactRngEnvironment(){static const CompactRngSettings value{};return value;}
 struct Gate{
+'''+timing_state+r'''
  StadiumWholeBObservation stadium_whole_b;StadiumWholeLongIdle stadium_whole_long_idle;unsigned whole_session_matches=3;
  // This legacy short-RNG control never selects the paired profile.
  bool stadium_whole_paired_idle=false;
