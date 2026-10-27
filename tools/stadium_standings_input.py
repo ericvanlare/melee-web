@@ -1,6 +1,7 @@
 """Explicit host standings input; same native structural long-window layout. No parity claim."""
 from retail_input_plan import NEUTRAL_PAD, DISCONNECTED_PAD
 from sd_reference_diagnostic import require
+import hashlib
 
 class StadiumStandingsInputPolicy:
     """Host ordinary-input policy; source snapshots are read-only operands.
@@ -364,6 +365,82 @@ def read_standings_intents(output):
     return tuple(values)
 
 
+FIRST_FORM_REPLAY_JOURNAL_SCHEMA = 'melee-web-stadium-first-form-replay-journals-v1'
+
+
+def validate_first_form_replay_journals(binding_path, *, source_binding_sha256,
+                                         source_directory):
+    """Bind the recorded first-form issue and completed Pipe journals separately.
+
+    The existing eight-role raw-source binding remains unchanged. These two
+    journals are additional host evidence tied to that exact binding and to
+    their fixed filenames beside its primary observer stream.
+    """
+    path = Path(binding_path)
+    require(not path.is_symlink() and path.is_file() and path.stat().st_size <= 64*1024,
+            'First-form replay journal binding is missing/nonregular/over cap')
+    raw = path.read_bytes()
+    envelope = json.loads(raw)
+    require(isinstance(envelope, dict) and set(envelope) ==
+            {'schema', 'source_binding_sha256', 'files'} and
+            envelope['schema'] == FIRST_FORM_REPLAY_JOURNAL_SCHEMA and
+            envelope['source_binding_sha256'] == source_binding_sha256,
+            'First-form replay journals do not bind the exact eight-role source binding')
+    root = Path(source_directory).resolve()
+    files = envelope['files']
+    expected_names = {'issues': 'standings-input-issues.json',
+                      'pipe_journal': 'input-intentions.jsonl'}
+    require(isinstance(files, dict) and set(files) == set(expected_names),
+            'First-form replay journal roles differ')
+    retained = {}
+    for role, name in expected_names.items():
+        pin = files[role]
+        expected_path = root/name
+        require(isinstance(pin, dict) and set(pin) == {'path', 'bytes', 'sha256'} and
+                Path(pin['path']).resolve() == expected_path and
+                not expected_path.is_symlink() and expected_path.is_file(),
+                'First-form replay journal path is not the bound source sidecar: '+role)
+        digest = hashlib.sha256(expected_path.read_bytes()).hexdigest()
+        require(type(pin['bytes']) is int and pin['bytes'] == expected_path.stat().st_size and
+                pin['sha256'] == digest,
+                'First-form replay journal bytes/hash differ: '+role)
+        retained[role] = dict(path=str(expected_path), bytes=pin['bytes'], sha256=digest)
+    issues, pipe_rows = read_standings_intents(root)
+    require(issues and pipe_rows,
+            'First-form replay source lacks its actual issue/Pipe journal')
+    # Validate the complete historical issue-to-successful-write relation
+    # before starting Dolphin. The same journals are later replayed against
+    # actual raw source coordinates by validate_stadium_whole_long_idle_outputs.
+    StandingsBObservations(issues, pipe_rows,
+        profile=StadiumStandingsInputPolicy.FIRST_FORM_LATENCY_PROFILE)
+    return dict(schema=FIRST_FORM_REPLAY_JOURNAL_SCHEMA,
+                binding_path=str(path.resolve()),
+                binding_sha256=hashlib.sha256(raw).hexdigest(),
+                source_binding_sha256=source_binding_sha256,
+                source_directory=str(root), files=retained)
+
+
+def apply_standings_source_issue(policy, issues, cursor, row):
+    """Apply only an authenticated historical issue at its exact actual source row.
+
+    Shared by the strict offline validator and live read-only replay receiver.
+    The caller validates journal schema/Pipe provenance before admitting rows.
+    """
+    if cursor < len(issues):
+        issue = issues[cursor]
+        require(issue['after_sequence'] >= row['seq'],
+                'Standings source issue event was missed/reordered')
+        if issue['after_sequence'] == row['seq']:
+            require(row['event'] == 'boundary' and
+                    row['payload'].get('boundary') == 'source_tick' and
+                    row['payload'].get('match_index') == 1 and
+                    policy.last == issue['source'],
+                    'Standings issue does not match actual focused source snapshot')
+            policy.issue(issue['ports'])  # Existing desired-PAD/refusal checks.
+            return cursor + 1
+    return cursor
+
+
 class StandingsBObservations(LongIdleBObservations):
     """Explicit host input policy over the unchanged native structural layout.
 
@@ -542,18 +619,8 @@ class StandingsBObservations(LongIdleBObservations):
                     self.post_window_complete = True
             else:
                 self._accept_post_window_boundary(row)
-        if self.issue_cursor < len(self.issues):
-            issue = self.issues[self.issue_cursor]
-            require(issue['after_sequence'] >= row['seq'],
-                    'Standings source issue event was missed/reordered')
-            if issue['after_sequence'] == row['seq']:
-                require(row['event'] == 'boundary' and
-                        row['payload'].get('boundary') == 'source_tick' and
-                        row['payload'].get('match_index') == 1 and
-                        self.policy.last == issue['source'],
-                        'Standings issue does not match actual focused source snapshot')
-                self.policy.issue(issue['ports'])
-                self.issue_cursor += 1
+        self.issue_cursor = apply_standings_source_issue(
+            self.policy, self.issues, self.issue_cursor, row)
 
     def finish(self):
         result = super().finish()

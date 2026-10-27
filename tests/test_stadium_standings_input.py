@@ -3,7 +3,9 @@
 These controls establish no original standings outcome or native parity.
 """
 import copy
+import hashlib
 import importlib.util
+import json
 import os
 from pathlib import Path
 import sys
@@ -659,6 +661,140 @@ class StandingsInputPolicyTests(unittest.TestCase):
                        {'four_port_consumed_pad_count': 3500}, {'go': None}):
             receiver.long_idle_window_result = dict(window, **change)
             with self.assertRaises(ValueError): m.saved_stadium_b_long_idle_window(receiver)
+
+    def test_first_form_replay_journal_binding_checks_exact_source_and_sidecars(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            issue = dict(schema='melee-web-stadium-standings-input-issue-v1',
+                index=0, source=dict(sequence=10, source_tick=1, draw_ordinal=1,
+                    mode=8, focus=0), after_sequence=10,
+                ports=[m.NEUTRAL_PAD, m.NEUTRAL_PAD],
+                action='standings-mode8:release', pipe_row_indices=[0, 1])
+            (root/'standings-input-issues.json').write_text(
+                json.dumps([issue], separators=(',', ':')))
+            pipes = [dict(host_monotonic_ns=1, port=1,
+                          action='standings-mode8:release', intended_pad=m.NEUTRAL_PAD),
+                     dict(host_monotonic_ns=2, port=2,
+                          action='standings-mode8:release', intended_pad=m.NEUTRAL_PAD)]
+            (root/'input-intentions.jsonl').write_text(
+                ''.join(json.dumps(row, sort_keys=True)+'\n' for row in pipes))
+            source_sha = 'a'*64
+            pins = {}
+            for role, name in (('issues', 'standings-input-issues.json'),
+                               ('pipe_journal', 'input-intentions.jsonl')):
+                raw = (root/name).read_bytes()
+                pins[role] = dict(path=str(root/name), bytes=len(raw),
+                                  sha256=hashlib.sha256(raw).hexdigest())
+            envelope = dict(schema=policy_module.FIRST_FORM_REPLAY_JOURNAL_SCHEMA,
+                            source_binding_sha256=source_sha, files=pins)
+            binding_path = root/'journals.json'
+            binding_path.write_text(json.dumps(envelope, sort_keys=True))
+            admitted = policy_module.validate_first_form_replay_journals(
+                binding_path, source_binding_sha256=source_sha, source_directory=root)
+            self.assertEqual(admitted['source_binding_sha256'], source_sha)
+            self.assertEqual(set(admitted['files']), {'issues', 'pipe_journal'})
+
+            with self.assertRaisesRegex(ValueError, 'exact eight-role source binding'):
+                policy_module.validate_first_form_replay_journals(
+                    binding_path, source_binding_sha256='b'*64, source_directory=root)
+            with (root/'input-intentions.jsonl').open('ab') as stream:
+                stream.write(b'{}\n')
+            with self.assertRaisesRegex(ValueError, 'bytes/hash differ: pipe_journal'):
+                policy_module.validate_first_form_replay_journals(
+                    binding_path, source_binding_sha256=source_sha, source_directory=root)
+
+    def replay_receiver(self, *, issue_mutation=None):
+        policy = policy_module.StadiumStandingsInputPolicy(
+            policy_module.StadiumStandingsInputPolicy.FIRST_FORM_LATENCY_PROFILE)
+        issue, pipes = self.issue_operands()
+        release = dict(schema=issue['schema'], index=1,
+            source=dict(sequence=530, source_tick=86, draw_ordinal=86, mode=1, focus=99),
+            after_sequence=530, ports=[m.NEUTRAL_PAD]*2,
+            action='standings-mode8:release', pipe_row_indices=[2,3])
+        issues = [issue, release]
+        pipes += [dict(host_monotonic_ns=i+3,port=i+1,action=release['action'],
+                       intended_pad=m.NEUTRAL_PAD) for i in range(2)]
+        # Real shared constructor validates historical issue/Pipe provenance.
+        policy_module.StandingsBObservations(issues,pipes,
+            profile=policy_module.StadiumStandingsInputPolicy.FIRST_FORM_LATENCY_PROFILE)
+        if issue_mutation is not None: issue_mutation(issues)
+        receiver = object.__new__(m.StadiumWholeFeedbackReceiver)
+        receiver.standings_policy = policy
+        receiver.standings_replay_issues = issues
+        receiver.standings_replay_issue_cursor = 0
+        receiver.match_index = 1
+        receiver.ended = False
+        receiver.selected_standings = lambda index: index == 1
+        # Explicitly modeled already-validated snapshot leaves. The actual
+        # receiver wrapper, shared issue hook and observation policy execute.
+        def observed(row):
+            tick = row['source_tick']
+            phase = max(0,tick-85) if tick<92 else 0
+            form = 5 if tick<86 else 6
+            row_,snapshot,sample = self.operands(tick,
+                mode=8 if tick<86 else 1,focus=0 if tick<86 else 99,
+                phase=phase,form=form,
+                ports=[raw_pad(x=80),m.NEUTRAL_PAD] if tick in (85,86) else [m.NEUTRAL_PAD]*2)
+            if tick>=86:
+                snapshot['first_form']=self._first_form_point(phase,6,
+                    active_map_id=6 if tick>=91 else 5,replaced=tick>=91)
+            policy.observe(row_,snapshot,sample,dict(source_tick=84))
+        receiver._accept_source = observed
+        return receiver
+
+    def test_replay_source_issues_are_exact_even_with_multiple_rows_per_drain(self):
+        receiver = self.replay_receiver()
+        rows = [dict(seq=100+t*5,event='boundary',source_tick=t,
+                     payload=dict(boundary='source_tick',match_index=1)) for t in range(84,93)]
+        with tempfile.TemporaryDirectory() as tmp:
+            log=Path(tmp)/'read-only-intentions.jsonl'
+            observer=m.StadiumReplayIntentObserver(log)
+            drains=[]
+            def drain():
+                drains.append(1)
+                for _ in range(min(3,len(rows))): receiver.accept(rows.pop(0))
+            result=m.drive_stadium_standings_input(receiver,drain,
+                m.StadiumDeadlineController(observer,m.time.monotonic()+5),m.time.monotonic()+5)
+            self.assertEqual(len(drains),3)
+            self.assertEqual(receiver.standings_replay_issue_cursor,2)
+            self.assertEqual(result['neutralization_issue']['sequence'],530)
+            self.assertEqual(result['neutralization_trigger']['sequence'],530)
+            self.assertEqual(result['neutralization_release']['source_tick'],87)
+            self.assertEqual(observer.count,0)
+            self.assertFalse(log.exists())
+            self.assertFalse((Path(tmp)/'input-intentions.jsonl').exists())
+
+    def test_replay_wrong_missing_or_changed_historical_source_issue_refuses(self):
+        for mutation in ('missing','coordinate','source','desire'):
+            with self.subTest(mutation=mutation):
+                def alter(issues):
+                    if mutation=='missing': issues.pop(0)
+                    elif mutation=='coordinate': issues[0]['after_sequence']+=1
+                    elif mutation=='source': issues[0]['source']['focus']=1
+                    elif mutation=='desire': issues[0]['ports']=[m.NEUTRAL_PAD]*2
+                receiver=self.replay_receiver(issue_mutation=alter)
+                with self.assertRaises(ValueError):
+                    for tick in (84,85):
+                        receiver.accept(dict(seq=100+tick*5,event='boundary',source_tick=tick,
+                            payload=dict(boundary='source_tick',match_index=1)))
+
+    def test_replay_input_status_has_only_input_fields_observer_owns_profile(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);input_path=root/'input-status.json';primary_path=root/'primary-status.json'
+            input_status=dict(version=1,mode='replay',events=5,complete=True,invalid=False,error=None)
+            primary=dict(state='completed',event_count=10,last_seq=9,source_tick=10,
+                draw_ordinal=10,completed=True,invalid=False,error=None,
+                stadium_first_form_latency_replay=m.STADIUM_FIRST_FORM_LATENCY_REPLAY,
+                stadium_first_form_latency_replay_binding_sha256='a'*64)
+            input_path.write_text(json.dumps(input_status));primary_path.write_text(json.dumps(primary))
+            self.assertEqual(m.validate_first_form_replay_status(input_path,primary_path,
+                events=5,binding_sha256='a'*64),input_status)
+            primary['stadium_first_form_latency_replay_binding_sha256']='b'*64
+            primary_path.write_text(json.dumps(primary))
+            with self.assertRaisesRegex(ValueError,'Observer footer'):
+                m.validate_first_form_replay_status(input_path,primary_path,events=5,binding_sha256='a'*64)
+            with self.assertRaises(ValueError):
+                m.validate_first_form_replay_status(input_path,primary_path,events=6,binding_sha256='b'*64)
 
 
 if __name__ == '__main__': unittest.main()
