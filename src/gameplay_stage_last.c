@@ -17,6 +17,7 @@
 #include "gameplay_stadium_start.h"
 #include "gameplay_hud.h"
 #include "gameplay_source_memory_runtime.h"
+#include "gameplay_source_files.h"
 #include <melee/gr/grpstadium.h>
 #include <melee/gm/gm_1879.h>
 #include <melee/if/if_2F6E.h>
@@ -113,6 +114,90 @@ int melee_web_stadium_c1_grdatfiles_trace_snapshot(
     return 1;
 }
 #endif
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+/* Exact source fallback storage, not a generic writable preload allowance. */
+typedef struct MeleeWebStadiumMap2WritableRegion {
+    MeleeWebSourceFileScope* scope;
+    void* buffer;
+    MeleeWebSourceMemoryAllocation lease;
+    int registered;
+    int closing;
+} MeleeWebStadiumMap2WritableRegion;
+
+static int stadium_map2_region_lease_matches(
+        const MeleeWebStadiumMap2BufferOwner* maps,uint64_t generation)
+{
+ MeleeWebSourceMemoryAllocation current={0};
+ MeleeWebSourceMemoryContext context={0};
+ const MeleeWebSourceMemoryAllocation* saved=&maps->buffer_allocation_lease;
+ return maps->captured==1&&maps->buffer&&
+     maps->origin==MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK&&
+     maps->buffer_allocation_lease_captured==1&&saved->live==1&&
+     saved->requested_bytes==0x50000&&saved->allocation_generation!=0&&
+     saved->world_generation==generation&&
+     melee_web_source_memory_context_read(&context)==MELEE_WEB_SOURCE_MEMORY_READ_OK&&
+     context.world_generation==generation&&context.source_heap_handle==saved->source_heap_handle&&
+     melee_web_source_memory_allocation_read(maps->buffer,&current)==MELEE_WEB_SOURCE_MEMORY_READ_OK&&
+     current.live==1&&current.requested_bytes==saved->requested_bytes&&
+     current.world_generation==saved->world_generation&&
+     current.source_heap_handle==saved->source_heap_handle&&
+     current.allocation_generation==saved->allocation_generation;
+}
+static int stadium_map2_region_bind(MeleeWebStadiumMap2WritableRegion* region,
+        const MeleeWebStadiumMap2BufferOwner* maps,uint64_t generation,char* e,size_t n)
+{
+ if(region->registered||region->closing||region->scope||region->buffer||
+    !stadium_map2_region_lease_matches(maps,generation)){
+  if(e&&n)snprintf(e,n,"Stadium writable map-2 region lacks its exact live fallback lease");
+  return 0;
+ }
+ MeleeWebSourceFileScope* scope=melee_web_source_files_current_scope();
+ if(!scope||!melee_web_source_files_quiescent_for(scope,e,n))return 0;
+ if(!melee_web_source_file_region_register(maps->buffer,0x50000,e,n))return 0;
+ region->scope=scope;region->buffer=maps->buffer;
+ region->lease=maps->buffer_allocation_lease;region->registered=1;
+ return 1;
+}
+static int stadium_map2_region_preflight(const MeleeWebStadiumMap2WritableRegion* region,
+        const MeleeWebStadiumMap2BufferOwner* maps,uint64_t generation,char* e,size_t n)
+{
+ if(region->closing){
+  if(e&&n)snprintf(e,n,"Stadium map-2 partial retirement cannot resume source work");
+  return 0;
+ }
+ if(!region->registered){
+  if(region->scope||region->buffer){
+   if(e&&n)snprintf(e,n,"Stadium writable map-2 region lost its registration state");
+   return 0;
+  }
+  return 1; /* Earlier preparation refused before this new owner existed. */
+ }
+ if(region->registered!=1||!region->scope||region->buffer!=maps->buffer||
+    !stadium_map2_region_lease_matches(maps,generation)||
+    region->lease.source_heap_handle!=maps->buffer_allocation_lease.source_heap_handle||
+    region->lease.world_generation!=maps->buffer_allocation_lease.world_generation||
+    region->lease.allocation_generation!=maps->buffer_allocation_lease.allocation_generation||
+    region->lease.requested_bytes!=0x50000||region->lease.live!=1||
+    melee_web_source_files_current_scope()!=region->scope){
+  if(e&&n)snprintf(e,n,"Stadium writable map-2 region changed owner before retirement");
+  return 0;
+ }
+ /* Pending requests remain owned across Asyncify; pumping includes callback
+  * execution. Both must be idle before any display/Ground destruction. */
+ return melee_web_source_files_quiescent_for(region->scope,e,n);
+}
+static int stadium_map2_region_unregister(MeleeWebStadiumMap2WritableRegion* region,
+        const MeleeWebStadiumMap2BufferOwner* maps,uint64_t generation,char* e,size_t n)
+{
+ if(!region->registered)return 1;
+ if(!stadium_map2_region_preflight(region,maps,generation,e,n))return 0;
+ if(!melee_web_source_file_region_unregister(region->buffer,0x50000,e,n))return 0;
+ /* No operation after this point may resume source work, even if an existing
+  * destructor subsequently refuses. Keep identities for retained diagnosis. */
+ region->registered=0;region->closing=1;
+ return 1;
+}
+#endif
 struct MeleeWebStageLast {
     StageInfo saved;
     struct ftDeviceUnk3 device1[1],device3[1];
@@ -147,6 +232,7 @@ struct MeleeWebStageLast {
     MeleeWebSourceMemoryAllocation stadium_manager_lease;
     MeleeWebSourceMemoryAllocation stadium_manager_proc_lease;
     MeleeWebStadiumMap2BufferOwner stadium_map2_buffer_owner;
+    MeleeWebStadiumMap2WritableRegion stadium_map2_region;
     MeleeWebStadiumGoAlignmentSnapshot stadium_go_alignment;
     struct {
         unsigned seen,finished,failure,call_observed,bound_valid,result_valid;
@@ -163,6 +249,15 @@ struct MeleeWebStageLast {
 #endif
 };
 static MeleeWebStageLast* active;
+int melee_web_stage_last_source_work_allowed(const MeleeWebStageLast* h){
+ if(!h)return 1;
+ if(h!=active||h->generation!=melee_web_gameplay_stats().generation)return 0;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ return !h->stadium_map2_region.closing;
+#else
+ return 1;
+#endif
+}
 static int fail(char* e,size_t n,const char* m){if(e&&n)snprintf(e,n,"%s",m);return 0;}
 static int ok(char* e,size_t n){if(e&&n)*e=0;return 1;}
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
@@ -279,6 +374,11 @@ static MeleeWebStageLast* begin_stage(const MeleeWebStageProfile* definition,voi
   if(on_init_diagnostic&&!melee_web_stadium_display_owner_capture(
        h->stadium_display_owner,Ground_GetMapGObj(1),
        &h->stadium_map2_buffer_owner,e,n)){
+   if(retained_owner)*retained_owner=h;
+   return NULL;
+  }
+  if(on_init_diagnostic&&!stadium_map2_region_bind(&h->stadium_map2_region,
+       &h->stadium_map2_buffer_owner,h->generation,e,n)){
    if(retained_owner)*retained_owner=h;
    return NULL;
   }
@@ -974,7 +1074,7 @@ static int stadium_prepare_start(MeleeWebStageLast* h,
  if(!melee_web_stage_selection_preflight(h->definition->stage_kind)||
     stage_info.grkind!=h->definition->ground_kind)
   return fail(e,n,"Stadium selected source dispatch pair changed");
- if(!stadium_maps_live(h,e,n)||
+ if(!melee_web_stage_last_source_work_allowed(h)||!stadium_maps_live(h,e,n)||
     !melee_web_match_camera_available(camera_owner,e,n))return 0;
  Ground* display=h->stadium_map2_buffer_owner.display_ground->user_data;
  if(display->u.display.xF4)return fail(e,n,"Stadium display already borrows a camera subject");
@@ -1048,6 +1148,7 @@ int melee_web_stage_last_stadium_on_load(MeleeWebStageLast* h,char* e,size_t n)
 {
  if(!h || h!=active || h->generation!=melee_web_gameplay_generation() ||
     !h->definition || !h->definition->diagnostic_only || !h->source_ordered ||
+    !melee_web_stage_last_source_work_allowed(h) ||
     h->stadium_loaded || h->stadium_started || HSD_GObj_804D781C || HSD_GObj_804D7814 ||
     !melee_web_stage_selection_preflight(St_Kind_PStadium))
   return fail(e,n,"Diagnostic Stadium OnLoad requires its exact unstarted owner");
@@ -1068,6 +1169,8 @@ int melee_web_stage_last_stadium_cancel_prepared_ready(MeleeWebStageLast* h,char
     h->definition->stage_kind!=St_Kind_PStadium||HSD_GObj_804D781C||
     HSD_GObj_804D7814||HSD_GObj_804D7818||HSD_GObj_804D7830||HSD_GObj_804D7838)
   return fail(e,n,"Prepared Stadium cancellation lost its idle source owner");
+ if(!stadium_map2_region_preflight(&h->stadium_map2_region,
+      &h->stadium_map2_buffer_owner,h->generation,e,n))return 0;
  /* Completed starts retain their existing teardown. Unprepared scopes have
   * no continuation lease to cancel; a partial immediate start is not one. */
  if(!h->stadium_started&&!h->stadium_ready_route&&!h->stadium_generator)
@@ -1083,7 +1186,7 @@ int melee_web_stage_last_stadium_cancel_prepared_ready(MeleeWebStageLast* h,char
  if(!melee_web_stage_selection_preflight(St_Kind_PStadium)||
     stage_info.grkind!=h->definition->ground_kind)
   return fail(e,n,"Prepared Stadium selection/dispatch changed");
- if(!stadium_maps_live(h,e,n)||
+ if(!melee_web_stage_last_source_work_allowed(h)||!stadium_maps_live(h,e,n)||
     !melee_web_match_camera_available(h->stadium_camera_owner,e,n))return 0;
  int map2_gate,display_mode;
  if(!melee_web_stadium_display_owner_go_alignment_view(h->stadium_display_owner,
@@ -1149,7 +1252,7 @@ static int stadium_ready_phase(MeleeWebStageLast* h,int stage_kind,int armed)
  return h && h==active && h->generation==melee_web_gameplay_generation() &&
         h->stadium_ready_route && h->definition && h->definition->diagnostic_only &&
         h->definition->stage_kind==St_Kind_PStadium && h->source_ordered &&
-        stage_kind==St_Kind_PStadium && h->stadium_started==1 && h->stadium_ready_armed==armed;
+        stage_kind==St_Kind_PStadium && melee_web_stage_last_source_work_allowed(h) && h->stadium_started==1 && h->stadium_ready_armed==armed;
 }
 int melee_web_stage_last_stadium_ready_before(int stage_kind,char* e,size_t n)
 {
@@ -1160,7 +1263,7 @@ int melee_web_stage_last_stadium_ready_before(int stage_kind,char* e,size_t n)
     stage_info.grkind!=h->definition->ground_kind ||
     !melee_web_hud_stadium_ready_snapshot(&h->stadium_ready_object,&h->stadium_ready_proc))
   return fail(e,n,"Diagnostic Stadium OnStart requires its exact original HUD Ready callback");
- if(!stadium_maps_live(h,e,n)||
+ if(!melee_web_stage_last_source_work_allowed(h)||!stadium_maps_live(h,e,n)||
     !melee_web_match_camera_available_ready(h->stadium_camera_owner,e,n))return 0;
  /* Other original setup allocations can occur between OnLoad and Ready. The
   * exact original header leases remain owned; address reuse must be newer than
@@ -1225,6 +1328,8 @@ int melee_web_stage_last_end(MeleeWebStageLast* h,char* e,size_t n){
  if(h!=active||h->generation!=melee_web_gameplay_stats().generation)return fail(e,n,"Stage scope lost its original world ownership");
  if(HSD_GObj_804D781C||HSD_GObj_804D7814)return fail(e,n,"Stage teardown must run outside source object callbacks");
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(!stadium_map2_region_preflight(&h->stadium_map2_region,
+      &h->stadium_map2_buffer_owner,h->generation,e,n))return 0;
  /* Validate every new owner and map borrower before any destructive release.
   * A partial original start retains its graph for reduction, never cancellation. */
  if(h->stadium_started){
@@ -1239,6 +1344,8 @@ int melee_web_stage_last_end(MeleeWebStageLast* h,char* e,size_t n){
      !melee_web_stadium_display_owner_preflight(h->stadium_display_owner,e,n))return 0;
   if(!melee_web_stadium_generator_preflight(h->stadium_generator,e,n)||
      !melee_web_match_camera_subject_preflight(h->stadium_camera_owner,h->stadium_subject,e,n))return 0;
+  if(!stadium_map2_region_unregister(&h->stadium_map2_region,
+       &h->stadium_map2_buffer_owner,h->generation,e,n))return 0;
   if(!melee_web_stadium_generator_end(h->stadium_generator,e,n))return 0;
   h->stadium_generator=NULL;
   if(!melee_web_match_camera_subject_return(h->stadium_camera_owner,h->stadium_subject,e,n))return 0;
@@ -1252,9 +1359,15 @@ int melee_web_stage_last_end(MeleeWebStageLast* h,char* e,size_t n){
      !melee_web_stadium_display_owner_consume_cancel_transfer(
          h->stadium_display_owner,h,h->generation,
          h->stadium_cancel_transfer_token,e,n))return 0;
+  if(h->stadium_map2_region.registered&&
+     !melee_web_stadium_display_owner_preflight(h->stadium_display_owner,e,n))return 0;
+  if(!stadium_map2_region_unregister(&h->stadium_map2_region,
+       &h->stadium_map2_buffer_owner,h->generation,e,n))return 0;
   if(!melee_web_stadium_display_owner_end(h->stadium_display_owner,e,n))return 0;
   h->stadium_display_owner=NULL;h->stadium_cancel_transfer_token=0;
  }
+ if(h->stadium_map2_region.registered)
+  return fail(e,n,"Stadium map-2 writable region lost its display retirement owner");
 #endif
  /* Ready completion owns creation of this source scheduler. Early unload
   * before Ready is allowed to have none; multiple schedulers are an error. */

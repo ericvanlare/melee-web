@@ -31,6 +31,8 @@ typedef struct SourceFile {
     char* name;
     const uint8_t* bytes;
     size_t size;
+    const uint8_t* transfer_tail;
+    size_t transfer_tail_size;
     int external;
 } SourceFile;
 
@@ -44,6 +46,8 @@ typedef struct SourceFileCopy {
     struct SourceFileCopy* next;
     const void* destination;
     const char* name;
+    size_t extent;
+    int ready;
 } SourceFileCopy;
 
 typedef struct SourceFileRegion {
@@ -88,6 +92,90 @@ static int fail(char* error, size_t error_size, const char* message)
 {
     if (error && error_size) snprintf(error, error_size, "%s", message);
     return 0;
+}
+
+static int source_file_ranges_overlap(uintptr_t first, size_t first_size,
+                                      uintptr_t second, size_t second_size)
+{
+    if (!first_size || !second_size) return 0;
+    if (first > UINTPTR_MAX - first_size ||
+        second > UINTPTR_MAX - second_size) return 1;
+    return first < second + second_size && second < first + first_size;
+}
+
+static void source_file_copy_forget_overlaps(MeleeWebSourceFileScope* scope,
+                                             uintptr_t destination,
+                                             size_t extent)
+{
+    SourceFileCopy** link = &scope->copies;
+    while (*link) {
+        SourceFileCopy* copy = *link;
+        if ((uintptr_t)copy->destination == destination ||
+            source_file_ranges_overlap((uintptr_t)copy->destination,
+                                       copy->extent, destination, extent)) {
+            *link = copy->next;
+            free(copy);
+        } else {
+            link = &copy->next;
+        }
+    }
+}
+
+static SourceFileCopy* source_file_copy_prepare(
+    MeleeWebSourceFileScope* scope, uintptr_t destination)
+{
+    SourceFileCopy* copy = malloc(sizeof(*copy));
+    if (!copy) return NULL;
+    copy->next = scope->copies;
+    copy->destination = (const void*)destination;
+    copy->name = NULL;
+    copy->extent = 0;
+    copy->ready = 0;
+    scope->copies = copy;
+    return copy;
+}
+
+static void source_file_copy_commit(SourceFileCopy* copy,
+                                    const SourceFile* file, size_t extent)
+{
+    copy->name = file->name;
+    copy->extent = extent;
+    copy->ready = 1;
+}
+
+static int source_file_transfer_extent(size_t logical_size,
+                                       size_t tail_size, size_t* extent)
+{
+    if (!extent) return 0;
+    if (!tail_size) {
+        *extent = logical_size;
+        return 1;
+    }
+    if (logical_size > SIZE_MAX - 31u || tail_size > 31u) return 0;
+    const size_t rounded = (logical_size + 31u) & ~(size_t)31u;
+    if (rounded < logical_size || tail_size != rounded - logical_size ||
+        logical_size > SIZE_MAX - tail_size) {
+        return 0;
+    }
+    *extent = logical_size + tail_size;
+    return *extent == rounded;
+}
+
+static int source_file_input_tail_valid(const uint8_t* tail,
+                                        size_t tail_size,
+                                        size_t logical_size)
+{
+    size_t extent = 0;
+    if (!source_file_transfer_extent(logical_size, tail_size, &extent))
+        return 0;
+    if (!tail_size) return 1;
+    if (!tail || (uintptr_t)tail > UINTPTR_MAX - tail_size) return 0;
+    return 1;
+}
+
+static size_t source_file_transfer_size(const SourceFile* file)
+{
+    return file->size + file->transfer_tail_size;
 }
 
 static int valid_external_name(const char* name, size_t* length)
@@ -190,6 +278,8 @@ MeleeWebSourceFileScope* melee_web_source_files_begin(
         const char* name;
         const uint8_t* bytes;
         size_t size;
+        const uint8_t* transfer_tail;
+        size_t transfer_tail_size;
         int is_external = i >= count;
         if (is_external) {
             size_t external_index = i - count;
@@ -204,15 +294,23 @@ MeleeWebSourceFileScope* melee_web_source_files_begin(
             name = external->name;
             bytes = NULL;
             size = external->size;
+            transfer_tail = NULL;
+            transfer_tail_size = 0;
         } else {
             name = input[i].name;
             bytes = input[i].bytes;
             size = input[i].size;
+            transfer_tail = input[i].transfer_tail;
+            transfer_tail_size = input[i].transfer_tail_size;
         }
-        if (!name || !name[0] || (!bytes && size && !is_external)) {
+        if (!name || !name[0] || (!bytes && size && !is_external) ||
+            (bytes && (uintptr_t)bytes > UINTPTR_MAX - size) ||
+            !source_file_input_tail_valid(transfer_tail,
+                                          transfer_tail_size, size)) {
             scope->count = i;
             destroy_scope(scope);
-            fail(error, error_size, "Invalid source RuntimeFiles entry");
+            fail(error, error_size,
+                 "Invalid source RuntimeFiles entry or transfer tail");
             return NULL;
         }
         const size_t name_size = strnlen(name, 4097);
@@ -240,6 +338,8 @@ MeleeWebSourceFileScope* melee_web_source_files_begin(
         memcpy(scope->files[i].name, name, name_size + 1);
         scope->files[i].bytes = bytes;
         scope->files[i].size = size;
+        scope->files[i].transfer_tail = transfer_tail;
+        scope->files[i].transfer_tail_size = transfer_tail_size;
         scope->files[i].external = is_external;
         scope->count = i + 1;
     }
@@ -297,17 +397,16 @@ int melee_web_source_file_copy(const char* name, void* destination,
 {
     const SourceFile* file = find_file(name);
     if (!file || file->external || !size || (file->size && !destination)) return 0;
-    SourceFileCopy* copy = active_scope->copies;
-    while (copy && copy->destination != destination) copy = copy->next;
-    if (!copy) {
-        copy = malloc(sizeof(*copy));
-        if (!copy) return 0;
-        copy->next = active_scope->copies;
-        active_scope->copies = copy;
-        copy->destination = destination;
-    }
-    copy->name = file->name;
+    const uintptr_t destination_address = (uintptr_t)destination;
+    if (file->size && destination_address > UINTPTR_MAX - file->size)
+        return 0;
+    source_file_copy_forget_overlaps(active_scope, destination_address,
+                                     file->size);
+    SourceFileCopy* copy = source_file_copy_prepare(active_scope,
+                                                    destination_address);
+    if (!copy) return 0;
     if (file->size) memcpy(destination, file->bytes, file->size);
+    source_file_copy_commit(copy, file, file->size);
     *size = file->size;
     return 1;
 }
@@ -317,7 +416,7 @@ const char* melee_web_source_file_take_name(const void* copied_buffer)
     if (!active_scope || !copied_buffer) return NULL;
     SourceFileCopy** link = &active_scope->copies;
     while (*link && (*link)->destination != copied_buffer) link = &(*link)->next;
-    if (!*link) return NULL;
+    if (!*link || !(*link)->ready) return NULL;
     SourceFileCopy* copy = *link;
     *link = copy->next;
     const char* name = copy->name;
@@ -348,6 +447,11 @@ int melee_web_source_file_entry_owned(int entry)
 int melee_web_source_files_active(void)
 {
     return active_scope != NULL;
+}
+
+MeleeWebSourceFileScope* melee_web_source_files_current_scope(void)
+{
+    return active_scope;
 }
 
 int melee_web_source_file_drive_busy(void)
@@ -480,6 +584,40 @@ static int destination_owned(uintptr_t destination, size_t size)
     return 0;
 }
 
+static int source_file_copy_transfer(const SourceFile* file,
+                                    uintptr_t offset, void* destination,
+                                    size_t size)
+{
+    const size_t extent = source_file_transfer_size(file);
+    if (offset > extent || size > extent - (size_t)offset ||
+        (size && !destination)) {
+        return 0;
+    }
+    const size_t start = (size_t)offset;
+    size_t logical_bytes = 0;
+    if (start < file->size) {
+        logical_bytes = file->size - start;
+        if (logical_bytes > size) logical_bytes = size;
+    }
+    const size_t tail_bytes = size - logical_bytes;
+    size_t tail_offset = 0;
+    if (tail_bytes) {
+        tail_offset = start + logical_bytes - file->size;
+        if (tail_offset > file->transfer_tail_size ||
+            tail_bytes > file->transfer_tail_size - tail_offset) {
+            return 0;
+        }
+    }
+    if (logical_bytes) {
+        memcpy(destination, file->bytes + start, logical_bytes);
+    }
+    if (tail_bytes) {
+        memcpy((uint8_t*)destination + logical_bytes,
+               file->transfer_tail + tail_offset, tail_bytes);
+    }
+    return 1;
+}
+
 int melee_web_source_file_request(int entry, uintptr_t offset,
                                   uintptr_t destination, size_t size,
                                   int type, int priority,
@@ -488,9 +626,12 @@ int melee_web_source_file_request(int entry, uintptr_t offset,
                                   char* error, size_t error_size)
 {
     const SourceFile* file = file_for_entry(entry);
-    if (!file || !callback || !request_id || args != NULL || type != 0x21 ||
+    const size_t transfer_extent = file ? source_file_transfer_size(file) : 0;
+    if (!file || !callback || !request_id || args != NULL ||
+        (type != 0x21 && type != 0x23) ||
         priority != 1 || offset % 32 != 0 || size == 0 || size % 32 != 0 ||
-        offset > file->size || size > file->size - offset ||
+        offset > transfer_extent ||
+        size > transfer_extent - (size_t)offset ||
         (file->external && size > MELEE_WEB_SOURCE_FILE_STREAM_MAX) ||
         !destination_owned(destination, size)) {
         return fail(error, error_size,
@@ -512,6 +653,7 @@ int melee_web_source_file_request(int entry, uintptr_t offset,
     pending->size = size;
     pending->callback = callback;
     pending->id = next_source_request++;
+    source_file_copy_forget_overlaps(active_scope, destination, size);
     *active_scope->request_tail = pending;
     active_scope->request_tail = &pending->next;
     ++active_scope->request_count;
@@ -552,29 +694,29 @@ int melee_web_source_file_supply(int request_id, const void* bytes, size_t size,
         return fail(error, error_size,
                     "External source file transfer has no matching owner");
     }
+    source_file_copy_forget_overlaps(active_scope, request->destination,
+                                     request->size);
     memcpy((void*)request->destination, bytes, size);
     request->stream_ready = 1;
     if (error && error_size) error[0] = '\0';
     return 1;
 }
 
-int melee_web_source_files_pump(char* error, size_t error_size)
+int melee_web_source_files_pump_for(MeleeWebSourceFileScope* scope,
+                                    char* error, size_t error_size)
 {
-    if (!active_scope) {
-        if (error && error_size) error[0] = '\0';
-        return 1;
-    }
-    if (active_scope->pumping) {
+    if (!scope || active_scope != scope)
+        return fail(error, error_size,
+                    "Source RuntimeFiles pump lost its exact owner");
+    if (scope->pumping) {
         return fail(error, error_size,
                     "Reentrant source RuntimeFiles transfer pump");
     }
-    MeleeWebSourceFileScope* scope = active_scope;
     size_t available = scope->request_count;
     size_t budget = 64;
     scope->pumping = 1;
     while (available && budget-- && scope->requests) {
         SourceFileRequest* request = scope->requests;
-        uint32_t staging = 0;
         if (!request->cancelled && request->file->external &&
             !request->stream_ready) {
 #if defined(__EMSCRIPTEN__)
@@ -607,7 +749,7 @@ int melee_web_source_files_pump(char* error, size_t error_size)
                             status < 0 ? "Original disc range read failed" :
                                          "Original disc range read timed out");
             }
-            staging = source_stream_take(request->id);
+            uint32_t staging = source_stream_take(request->id);
             if (!staging) {
                 scope->pumping = 0;
                 return fail(error, error_size,
@@ -630,16 +772,39 @@ int melee_web_source_files_pump(char* error, size_t error_size)
                         "External source file streaming requires the browser runtime");
 #endif
         }
+        if (!request->cancelled) {
+            /* A later synchronous copy may have been recorded after this
+             * request was admitted or supplied. Invalidate its overlapping
+             * receipt before this request's final bytes become authoritative. */
+            source_file_copy_forget_overlaps(scope, request->destination,
+                                             request->size);
+            if (!request->file->external) {
+                if (!source_file_copy_transfer(
+                        request->file, request->offset,
+                        (void*)request->destination, request->size)) {
+                    scope->pumping = 0;
+                    return fail(error, error_size,
+                                "Authenticated source transfer extent changed before copy");
+                }
+            }
+            if (request->offset == 0 &&
+                request->size == source_file_transfer_size(request->file) &&
+                request->size >= request->file->size) {
+                SourceFileCopy* copy = source_file_copy_prepare(
+                    scope, request->destination);
+                if (!copy) {
+                    scope->pumping = 0;
+                    return fail(error, error_size,
+                                "Unable to retain completed source file copy identity");
+                }
+                source_file_copy_commit(copy, request->file,
+                                        request->size);
+            }
+        }
         scope->requests = request->next;
         if (!scope->requests) scope->request_tail = &scope->requests;
         --scope->request_count;
         --available;
-        if (!request->cancelled) {
-            if (!request->file->external) {
-                memcpy((void*)request->destination,
-                       request->file->bytes + request->offset, request->size);
-            }
-        }
         MeleeWebSourceFileCallback callback = request->callback;
         const int id = request->id;
         const int cancelled = request->cancelled;
@@ -651,6 +816,28 @@ int melee_web_source_files_pump(char* error, size_t error_size)
         }
     }
     scope->pumping = 0;
+    if (error && error_size) error[0] = '\0';
+    return 1;
+}
+
+int melee_web_source_files_pump(char* error, size_t error_size)
+{
+    if (!active_scope) {
+        if (error && error_size) error[0] = '\0';
+        return 1;
+    }
+    return melee_web_source_files_pump_for(active_scope, error, error_size);
+}
+
+int melee_web_source_files_quiescent_for(MeleeWebSourceFileScope* scope,
+                                         char* error, size_t error_size)
+{
+    if (!scope || active_scope != scope)
+        return fail(error, error_size,
+                    "Source RuntimeFiles teardown lost its exact owner");
+    if (scope->pumping || scope->requests || scope->request_count)
+        return fail(error, error_size,
+                    "Source RuntimeFiles teardown has pending requests");
     if (error && error_size) error[0] = '\0';
     return 1;
 }

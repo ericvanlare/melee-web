@@ -1,7 +1,7 @@
 {
   "schema": "melee-web-stadium-c4-first-form-latency-evidence-v1",
   "issue": 343,
-  "state": "ORIGINAL_FIRST_FORM_RECORD_AND_TWO_FIXED_INPUT_REPLAYS_PASS",
+  "state": "MERGED_ORIGINAL_FIRST_FORM_RECORD_AND_TWO_FIXED_INPUT_REPLAYS_PASS",
   "C4_complete": false,
   "source_head": "5103583b7279ffcfb8d5797e204516161f639553",
   "native_producer_head": "646206616654d8b5d7f6c11fc2ae188022c2fd1c",
@@ -373,34 +373,108 @@
   },
   "validation": {
     "full_regression": {
-      "result": "PASS",
-      "source_head": "80f8cd49133ba1552cdfa77df70f3b45daf4ea5a",
-      "source_tree": "aec67d17213344e7e9e4dd2a4c9915abf31fa087",
+      "state": "PASS_BEFORE_MERGE_ON_REVIEWED_SOURCE_TREE",
       "tests": 2967,
-      "skips": 211,
-      "unittest_seconds": 604.514,
-      "owned_group_absent": true,
+      "skipped": 211,
+      "failures": 0,
+      "head": "80f8cd49133ba1552cdfa77df70f3b45daf4ea5a",
+      "tree": "aec67d17213344e7e9e4dd2a4c9915abf31fa087",
       "receipt": {
-        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-full-regression-v1/result.json",
-        "bytes": 1171,
-        "sha256": "31beaf50e71eecfaf46bf21c57e333bd6d4c0e3a05188400a772d0f604a2db32"
+        "path": "c4-merge-gate-v1/gate.json",
+        "bytes": 1973,
+        "sha256": "fa443aafe0b249a4e6ee543c94191239f5da8d681462ad50290bfd19e4ca2614"
       },
-      "log": {
-        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-first-form-full-regression-v1/full-regression.stderr",
+      "stdout": {
+        "path": "c4-first-form-full-regression-v1/full-regression.stdout",
+        "bytes": 34240,
+        "sha256": "2ec308ec847352752535761fe761154e8a2cfbd90e9ebdf1bef82a8a91827788"
+      },
+      "stderr": {
+        "path": "c4-first-form-full-regression-v1/full-regression.stderr",
         "bytes": 544753,
         "sha256": "a54b919df2a1b4168ef8d5a2f9483cb301662722e9ea138b90e910398c4b8204"
       }
     },
-    "exact_head_ci": "PENDING",
+    "exact_head_ci": {
+      "state": "PASS",
+      "run_id": 40530413564,
+      "head": "d4a7280b3a4ebd9e4633808ea231612628083543",
+      "attempt": 2,
+      "expected_checks": 14,
+      "successes": 12,
+      "expected_skips": 2,
+      "conclusion": "success",
+      "receipt": {
+        "path": "c4-merge-gate-v1/ci-final.json",
+        "bytes": 28715,
+        "sha256": "1f86dd0750c50d52bf647e8547c1f94b7fb2587a15c41fac9cf98ef8f1b6289c"
+      }
+    },
     "affected_observer_build": {
       "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-native-replay-build-v1/result.json",
       "bytes": 4811,
       "sha256": "266b6ac0902824d625ec8ae0594f66b4e06d52ada613667065d953ad7c1f9622"
     },
-    "final_source_docs_review": {
-      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-milestone-review-v1/final-source-docs-review-v1.json",
-      "bytes": 6393,
-      "sha256": "b44da8a63cb03df7f450b933852c593279bd9f4eff53398e774237fe204c6172"
+    "merge_tree_verification": {
+      "path": "c4-merge-gate-v1/tree-verification.json",
+      "bytes": 166,
+      "sha256": "0a3914a5007d5d6f8cea14162f1bb50bd53962db7691f129055bb22d5b4e4f3a"
     }
+  },
+  "merge": {
+    "pull_request": 344,
+    "merged_commit": "b041dcefff1f96a73f5b4afc9972e48250d4ba91",
+    "merged_tree": "ebac35fcb62841cb37135aefa179f3f0d5043d85",
+    "reviewed_pr_head": "d4a7280b3a4ebd9e4633808ea231612628083543",
+    "reviewed_tree": "ebac35fcb62841cb37135aefa179f3f0d5043d85",
+    "tree_matches_reviewed": true,
+    "merge_gate": {
+      "path": "c4-merge-gate-v1/gate.json",
+      "bytes": 1973,
+      "sha256": "fa443aafe0b249a4e6ee543c94191239f5da8d681462ad50290bfd19e4ca2614"
+    },
+    "merge_response": {
+      "path": "c4-merge-gate-v1/merge-response.json",
+      "bytes": 109,
+      "sha256": "52b6c61f3f2a703932392f539545888aae99927be1d25334dce9c85af451e86d"
+    },
+    "merged_commit_receipt": {
+      "path": "c4-merge-gate-v1/merged-commit.json",
+      "bytes": 3678,
+      "sha256": "8cdaef5f16ceef4a001c31060894503c04880440864f0a8c863a5d4b2ba2c4ed"
+    }
+  },
+  "retained_ci_dependency_failure": {
+    "failure": "Freetype FetchContent download failed with HTTP/2 receiving failure code 56 after HTTP 200 at 2%; unit-1 and menus test partitions did not start.",
+    "failed_job_ids": [
+      122281504481,
+      122281616478
+    ],
+    "source_change_required": false,
+    "pinned_archive_probe": {
+      "url": "https://files.twilitrealm.dev/freetype-2.14.3.tar.gz",
+      "http_status": 200,
+      "bytes": 4134916,
+      "sha256": "e61b31ab26358b946e767ed7eb7f4bb2e507da1cfefeb7a8861ace7fd5c899a1",
+      "matches_existing_pin": true
+    },
+    "retry": "Only failed jobs and dependent aggregator reran once on the same reviewed d4a7280 head; attempt 2 passed.",
+    "diagnosis_receipt": {
+      "path": "c4-ci-failure-v1/diagnosis.json",
+      "bytes": 1110,
+      "sha256": "67cbdfa36b39b7d6f129114d8bed509176d867c8361645cbfb66794a26e98fd2"
+    },
+    "failed_job_logs": [
+      {
+        "path": "c4-ci-failure-v1/unit-1.log",
+        "bytes": 89319,
+        "sha256": "2836167081193518f2f47f6eff2e91fba912cd605c998948d58d0afd9d4abfb8"
+      },
+      {
+        "path": "c4-ci-failure-v1/menus.log",
+        "bytes": 89242,
+        "sha256": "36c5ee2567ff86d19d63d7ad911bccec33ebbff44189aa23e5e4990224bd11f1"
+      }
+    ]
   }
 }

@@ -1,0 +1,198 @@
+{
+  "schema": "melee-web-stadium-archive-service-v1",
+  "issue": 345,
+  "state": "COMPONENT_CONTROLS_PUBLIC_AUDIO_BUILDS_AND_FULL_REGRESSION_V2_PASS",
+  "checkpoint5_complete": false,
+  "browser_transformations_enabled": false,
+  "source_head": "3639903a7d664c0816afc421ea3c32eb8721b887",
+  "base": "b041dcefff1f96a73f5b4afc9972e48250d4ba91",
+  "prior_build_source": "91bcf57e863f4accd6a4b0fc6aaa2e6170e637d3",
+  "parent_only_rebase": {
+    "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-current-main-rebase.json",
+    "bytes": 388,
+    "sha256": "1f08c5014a10b3e097ef0ec6e43f12bd66c41ae1cb2ebe59510d81a64391eb28"
+  },
+  "source_reviews": [
+    {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-source-file-service-composed-v1/independent-review-v1.json",
+      "bytes": 2964,
+      "sha256": "7806d93f697430793ee223d72b77f208e6ec6e2dd55e881a6f7a129e56bf7840"
+    },
+    {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-integration-review-v1/source-review.json",
+      "bytes": 2353,
+      "sha256": "661d7ae227e35792d0ddae8b5973b96f2f745f666b8cc2767de0bcd25d686e1e"
+    }
+  ],
+  "candidate_freezes": [
+    {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-source-file-service-composed-v1/freeze-v1.json",
+      "bytes": 12466,
+      "sha256": "e86de2138573b0b3215f6b6838987632851c7db84e6c3711d4706be48faf03ee"
+    },
+    {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-source-file-service-composed-v2/freeze-v2.json",
+      "bytes": 9904,
+      "sha256": "4b3d8ace7c7bc7bbb1eecdd349b1299bf0152d9bb0926518c5eb72b6a997c8d0"
+    }
+  ],
+  "focused": {
+    "initial_applied": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-composed-focused-v1/result.json",
+      "bytes": 7473,
+      "sha256": "8f3be677c1de3747eaada47cef01712261e03df112b62b86e375297e3cc4ae91"
+    },
+    "initial_scope": "end-flow, transaction/adapter and map2 controls pass; cancellation fixture fails and stops batch",
+    "cancellation_repair": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-cancellation-fixture-repair-v1/root-producer-correction-v2.json",
+      "bytes": 3561,
+      "sha256": "9eecb68560e024eb10c7484435b5ab1c5a0ca70c6ca112357c62c5106312c6c1"
+    },
+    "remaining_disc_controls": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-composed-remaining-v2/result.json",
+      "bytes": 5802,
+      "sha256": "e6159eadbdf3f818bf51d4f619e7294db394e159e718e5ac5b10346ec488ab89"
+    },
+    "native_trace": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-native-service-trace-v2/result.json",
+      "bytes": 2591,
+      "sha256": "c9cdb077da26cf8bbca41aa86e0ce8fd035dc5b0c6905a7b4a3c2535c50207f0"
+    }
+  },
+  "builds": {
+    "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-composed-build-v3/result.json",
+    "bytes": 7234,
+    "sha256": "abcc450156a5c40cfb996df1d12d82fc165dfcff08cb1201106af6b452d1c863"
+  },
+  "artifacts": {
+    "source": "9d9d53b6a320caf0fd90fdc37c208951cc5fe8a3",
+    "files": [
+      {
+        "path": "build/browser-release/gameplay_menu_browser.js",
+        "bytes": 301443,
+        "sha256": "0827d88cb9bda97f51efb4b69b54ff69ff68f08ed7fd91d24b7378a902cc6f4d"
+      },
+      {
+        "path": "build/browser-release/gameplay_menu_browser.wasm",
+        "bytes": 15944851,
+        "sha256": "d6a22b452a1f4e34c3767a9b721807ab850f82a2cc91c6c3d1ec723dc339ab57"
+      },
+      {
+        "path": "build/browser-stadium-c1a-release/gameplay_menu_browser.js",
+        "bytes": 324922,
+        "sha256": "73a9743dce7f3daf57cbf727cd77800da36f6174e9ac969b0a0c4d9276247c6c"
+      },
+      {
+        "path": "build/browser-stadium-c1a-release/gameplay_menu_browser.wasm",
+        "bytes": 16957431,
+        "sha256": "38426fd638586d4eabe0c57dc69ddeb1fccdf7e4ea1ddcbc37dc695fa7bf9a0d"
+      }
+    ]
+  },
+  "full_regression": "V1_FAILED_RETAINED; V2_PASS",
+  "exact_head_ci": "PENDING",
+  "retained_failures": [
+    "c5-archive-service-full-regression-v1/full-regression.stderr: four full-suite fixture/export failures at 9d9d53b, before the reviewed compatibility repair",
+    "c5-composed-focused-v1/test_stadium_pre_ready_cancel.stderr and work/stadium-pre-ready-i6tizcdk",
+    "work/stadium-pre-ready-vr868vua",
+    "c5-native-service-trace-v1/compile.stderr",
+    "Earlier receipt source attribution correction remains preserved in c5-cancellation-fixture-repair-v1/root-producer-correction-v2.json"
+  ],
+  "scope": [
+    "Actual disc/asset/C adapter and native/WebAssembly source-service controls",
+    "Exact source-owned writable-region lifetime and pre-mutation teardown checks",
+    "No source arithmetic/input/RNG/order change",
+    "No browser gameplay capture or transformation run",
+    "No deterministic all-form completion rule, transformed graph retirement, C5 acceptance, or whole-stage acceptance"
+  ],
+  "service_source_head": "9d9d53b6a320caf0fd90fdc37c208951cc5fe8a3",
+  "compatibility_repair": {
+    "commit": "3639903a7d664c0816afc421ea3c32eb8721b887",
+    "patch_sha256": "b0266505e32e28e1936d454c68ca38b5849ed41be374761e301cee244140f157",
+    "review_and_apply": {
+      "path": "c5-compatibility-repair-v1/root-review-and-apply-v1.json",
+      "bytes": 642,
+      "sha256": "26805a72e6c271c251a56f7c3ff35f0a50364ab8b7eb37f1e005dc54b52fdbc2"
+    },
+    "focused_controls": {
+      "path": "c5-compatibility-focused-v1/compatibility-controls.result.json",
+      "bytes": 1264,
+      "sha256": "d00f2689346704fae4d48719b4edbef02be9c0d7b9c9209dcc0c9aa74747caf0"
+    },
+    "focused_test_count": 23,
+    "focused_passed": true,
+    "full_regression_status": "RERUN_AND_PASS_AT_3639903A",
+    "focused_run_head": "9d9d53b6a320caf0fd90fdc37c208951cc5fe8a3",
+    "focused_run_note": "23 focused tests passed against the reviewed repair before it was committed as 3639903a; the receipt records the pre-commit base head."
+  },
+  "full_regression_v1": {
+    "state": "FAILED_RETAINED_BEFORE_COMPATIBILITY_REPAIR",
+    "head": "9d9d53b6a320caf0fd90fdc37c208951cc5fe8a3",
+    "tree": "ead8af96dd6756e3a078befea4edbbc1f4e4e2c9",
+    "tests": 2973,
+    "skipped": 211,
+    "failures": 4,
+    "elapsed_seconds": 616.3367588329129,
+    "result": {
+      "path": "c5-archive-service-full-regression-v1/result.json",
+      "bytes": 1180,
+      "sha256": "413f5ac1ba480e6722e4a68f289e719e0e18e53a32a73be42fe42f96b547eae7"
+    },
+    "stderr": {
+      "path": "c5-archive-service-full-regression-v1/full-regression.stderr",
+      "bytes": 551839,
+      "sha256": "6e244c216c311632367f5cf92d4d85804d3e0712b2f9e2ab1afea86a71933203"
+    },
+    "failed_cases": [
+      "test_audio_preview_build.AudioPreviewBuildTests.test_release_preview_exports_the_scoped_public_asset_api",
+      "test_gameplay_browser_sd_continuation.BrowserSuddenDeathContinuationTests.test_actual_finish_vs_publishes_before_capture_and_rejects_other_owners",
+      "test_gameplay_native_menus.NativeMenuSourceTests.test_stadium_ready_rules_and_callback_owner_controls",
+      "test_gameplay_sd_handoff_order.SuddenDeathHandoffOrderTests.test_actual_public_finish_captures_after_publication_before_teardown"
+    ]
+  },
+  "current_validation": {
+    "full_regression_v2": {
+      "state": "PASS",
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-archive-service-full-regression-v2/result.json",
+      "bytes": 1181,
+      "sha256": "7a3c36c80d83bfb969de82735b24bab42af0c2481ffac084c148d4217234ae60",
+      "stderr": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-archive-service-full-regression-v2/full-regression.stderr",
+        "bytes": 545978,
+        "sha256": "86e7d27cc50684c9ab9fb0414d1a927277b57d7f00c60c004e272b2947aabf3e"
+      },
+      "stdout": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-archive-service-full-regression-v2/full-regression.stdout",
+        "bytes": 35292,
+        "sha256": "86f606a216be9c5d37d8151b9b8a6757d544a6dc808be7d3e74999a3c1c205c8"
+      },
+      "head": "3639903a7d664c0816afc421ea3c32eb8721b887",
+      "tree": "9ed490cba1819aea4b0e169e0fd96ee3c6fac5b6",
+      "tests": 2973,
+      "skipped": 211,
+      "elapsed_seconds": 620.6380092906766,
+      "raw_unittest_seconds": 619.938,
+      "exit_code": 0,
+      "group_absent": true,
+      "source_unchanged": true,
+      "scope_note": "The four v1 fixture/export failures are retained; the reviewed compatibility repair passed the v2 regression. No browser gameplay or transformation run was performed."
+    },
+    "public_runtime_release": {
+      "path": "c5-compatibility-build-v1/result.json",
+      "bytes": 5471,
+      "sha256": "26a1692771ec11974f8a53d6cbb76c2b7c9188f096d342109d612db603302ca0"
+    },
+    "audio_preview_release": {
+      "path": "c5-compatibility-build-v1/result.json",
+      "bytes": 5471,
+      "sha256": "26a1692771ec11974f8a53d6cbb76c2b7c9188f096d342109d612db603302ca0"
+    },
+    "build_artifacts": {
+      "path": "c5-compatibility-build-v1/artifacts.json",
+      "bytes": 1202,
+      "sha256": "88a90bc62f6c7be350f95673d07d85a9ffcade361237a90d9e20d8df7bd292f0"
+    },
+    "public_audio_builds_passed": true,
+    "current_head_ci": "PENDING"
+  }
+}

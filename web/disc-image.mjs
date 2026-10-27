@@ -44,6 +44,24 @@ export class DiscFile {
   }
 }
 
+/** Actual FST-backed extent used by source DVD transfers. Logical file size
+ * remains unchanged; the at-most31 trailing bytes must be read from the disc.
+ * This does not assert that padding is zero or belongs to the archive. */
+export function discFileTransferInfo(entry, logicalDiscSize) {
+  if (!entry || !Number.isSafeInteger(entry.offset) || entry.offset < 0 ||
+      !Number.isSafeInteger(entry.size) || entry.size < 0 ||
+      !Number.isSafeInteger(logicalDiscSize) || logicalDiscSize < 0) {
+    throw new DiscFormatError("invalid source DVD file extent");
+  }
+  relativeDiscPath(entry.path);
+  const transferSize = Math.ceil(entry.size / 32) * 32;
+  if (!Number.isSafeInteger(transferSize) || entry.offset > logicalDiscSize ||
+      transferSize > logicalDiscSize - entry.offset) {
+    throw new DiscFormatError("source DVD transfer tail is outside the disc");
+  }
+  return Object.freeze({name: entry.path, size: entry.size, transferSize});
+}
+
 /** Reject ambiguous paths rather than normalizing them. */
 export function relativeDiscPath(value) {
   if (typeof value !== "string") {
@@ -272,6 +290,21 @@ export class DiscImage {
     const length = size === undefined ? entry.size - offset : size;
     if (!Number.isSafeInteger(length) || length < 0 || length > entry.size - offset) {
       throw new DiscFormatError("selected byte range is outside the disc file");
+    }
+    return this.read(entry.offset + offset, length);
+  }
+
+  /** Read actual DVD transfer bytes, including a bounded FST tail. This is
+   * separate from readFile(), whose logical-file bounds remain exact. */
+  async readFileTransfer(path, offset = 0, size = undefined) {
+    relativeDiscPath(path);
+    const entry = (await this.files()).get(path);
+    if (!entry) throw new DiscFormatError(`disc file was not found: ${path}`);
+    const info = discFileTransferInfo(entry, this.logicalSize);
+    const length = size === undefined ? info.transferSize - offset : size;
+    if (!Number.isSafeInteger(offset) || offset < 0 || offset > info.transferSize ||
+        !Number.isSafeInteger(length) || length < 0 || length > info.transferSize - offset) {
+      throw new DiscFormatError("selected byte range is outside the DVD transfer extent");
     }
     return this.read(entry.offset + offset, length);
   }

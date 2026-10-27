@@ -1168,6 +1168,7 @@ int main(void)
 /* ACTUAL_STAGE_PHASE_SOURCE */
 static uint64_t fixture_generation=1;
 uint64_t melee_web_gameplay_generation(void){return fixture_generation;}
+MeleeWebGameplayStats melee_web_gameplay_stats(void){return (MeleeWebGameplayStats){.generation=fixture_generation};}
 int main(void)
 {
  const MeleeWebStageProfile profile={.diagnostic_only=1,.stage_kind=St_Kind_PStadium};
@@ -1184,7 +1185,9 @@ int main(void)
     memcmp(&h,&copy,sizeof(h)))return 3;
  h.stadium_started=1;h.stadium_ready_armed=1;fixture_generation=2;
  if(stadium_ready_phase(&h,St_Kind_PStadium,1))return 4;
- fixture_generation=1;active=NULL;
+ fixture_generation=1;h.stadium_map2_region.closing=1;
+ if(stadium_ready_phase(&h,St_Kind_PStadium,1))return 6;
+ h.stadium_map2_region.closing=0;active=NULL;
  if(stadium_ready_phase(&h,St_Kind_PStadium,1))return 5;
  puts("Stadium Ready actual phase predicate: before/after once; duplicate/foreign-kind/world/owner refused without mutation");return 0;
 }
@@ -1202,8 +1205,17 @@ int main(void)
             return text[start:cursor]
         stage_source = (ROOT / "src/gameplay_stage_last.c").read_text()
         owner_struct = balanced_body(stage_source, stage_source.index("struct MeleeWebStageLast {")) + ";"
-        helper = balanced_body(stage_source, stage_source.index("static int stadium_ready_phase("))
+        helper = balanced_body(stage_source, stage_source.index("int melee_web_stage_last_source_work_allowed("))
+        helper += "\n" + balanced_body(stage_source, stage_source.index("static int stadium_ready_phase("))
         prefix = stage_source[:stage_source.index("struct MeleeWebStageLast {")]
+        # Keep the actual region owner type used by StageLast, but this pure
+        # phase reducer does not compile unrelated file/lease mutation bodies.
+        for signature in ("static int stadium_map2_region_lease_matches(",
+                          "static int stadium_map2_region_bind(",
+                          "static int stadium_map2_region_preflight(",
+                          "static int stadium_map2_region_unregister("):
+            body = balanced_body(prefix, prefix.index(signature))
+            prefix = prefix.replace(body, "", 1)
         # The owner type needs only the authored array bound. Preserve its
         # initializer in sizeof without emitting an unused callback table.
         table_start = prefix.index("static const HSD_GObjEvent stadium_pending_callbacks[]=")

@@ -56,6 +56,7 @@ async function* streamNativeScope(session, names, report, stadiumC1a = false) {
   const total = names.length;
   report({phase: 'validate', complete: 0, total});
   yield* session.streamScope(paths, {
+    dvdTransfer: true,
     beforeRead: ({name, index}) => report({phase: 'read', file: name, complete: index, total}),
   });
   if (seen.has('sislib_font.bin')) yield ['sislib_font.bin', session.fontBytes()];
@@ -100,6 +101,8 @@ export async function openNativeGameSession(file) {
       return entry ? Object.freeze({name: entry.path, size: entry.size}) : null;
     },
     readFile: (path, offset, size) => session.readFile(path, offset, size),
+    fileTransferInfo: path => session.fileTransferInfo(path),
+    readFileTransfer: (path, offset, size) => session.readFileTransfer(path, offset, size),
     streamScope: (names, report = () => {}) => streamNativeScope(session, names, report),
     streamStadiumC1aScope: (names, report = () => {}) =>
       streamNativeScope(session, names, report, true),
