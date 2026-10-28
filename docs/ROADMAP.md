@@ -43,6 +43,16 @@ retained failures are recorded in the [scoped H1 status entry](status/2026-10-13
 
 ### Track A: match-only rollback online
 
+**October 28 priority:** The owner has directed autonomous work toward working
+rollback and parked the next Stadium experiment. The browser restore boundary
+in #341 remains open; previously rejected renderer-owner and UCF reference
+follow-ups remain frozen. [#356](https://github.com/ericvanlare/melee-web/issues/356)
+advances the independent bounded match input timeline, reusing the existing PAD
+format and synchronous source-only fixture. Its
+[scoped correction evidence](status/2026-10-28-match-input-timeline.md) does not
+admit a live restore adapter or satisfy A3/A4. Keep integration and full
+validation at the milestone boundary.
+
 **Target.** Two people on different machines play the **Slippi rules** profile
 in the browser with rollback confined to the match. **Vanilla is offline-only**
 and remains the accuracy reference. Both profiles use the player's unmodified

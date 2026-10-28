@@ -1,0 +1,245 @@
+{
+  "schema": "melee-web-match-input-timeline-v1",
+  "issue": 356,
+  "state": "validated_source_only_component",
+  "scope": "Bounded input scheduling plus seven same-instance source-only no-draw correction ticks. No browser restoration, drawn comparison, complete profile or network play admission.",
+  "source_identity": {
+    "base": "833dda8646106e4e3a82750794c8be1ce1a2128c",
+    "implementation": "c92da4adcb77c1e150eb966576cfe969b8e65deb",
+    "native_producer": "833dda8646106e4e3a82750794c8be1ce1a2128c plus native-loader-repair.patch",
+    "native_patch_sha256": "ff2de9093d2fcb54a5119f87659a3537b2ee2f55787fbdf244c8b486048c3776",
+    "fixture_sha256": "81acbbe9aedd3f708f3b747cfc9ff7066f7ab0b1afbc1513bec319de2f4f50b1",
+    "scheduler_sha256": "b16e559ca5c5a45da4d2ceb3e4d382fb5d6ab5f568e9dc0cb9b49913b9a40edb",
+    "driver_sha256": "b9a152a02e9ea828fbcb1365a865a28e6709b244d11ad18dc57e36541ec7e76a",
+    "driver_controls_sha256": "7435acada915f30431b2569e506098fe88233e976365b0160f05f4d92097f44a",
+    "profile": "slippi-render-dependencies-dbooc-shield-drop-v5",
+    "node": "v24.19.0",
+    "machine": {
+      "cpu": "Apple M4",
+      "arch": "arm64",
+      "os": "Darwin",
+      "release": "25.6.0"
+    },
+    "runtime_files": {
+      "build/slippi-synctest-release/gameplay_slippi_synctest_node.js": {
+        "size": 229397,
+        "sha256": "5a0943188112fe57f2608bcc01e5d2ab9aebf7f4ba69fe2957b2d38657139cc0"
+      },
+      "build/slippi-synctest-release/gameplay_slippi_synctest_node.wasm": {
+        "size": 7816744,
+        "sha256": "f2740ec0904e698caef51ccb62f583d557a454ece05b6a91ba528512c0f2f328"
+      }
+    }
+  },
+  "scheduler_contract": {
+    "prediction_limit": 7,
+    "history_default": 128,
+    "inbound_lookahead_default": 32,
+    "hard_storage_limits": 4096,
+    "pad_bytes": 11,
+    "frame_bytes": 44,
+    "copied_local_input": true,
+    "replay": "earliest changed executed input through simulated suffix; original local bytes retained",
+    "confirmation": "contiguous authoritative prefix, only after execution/replay acknowledgement",
+    "adapter_obligation": "Own snapshots; restore or terminate after failed/stale execution. Scheduler commits input history only."
+  },
+  "focused_validation": {
+    "scheduler_node_cases": 11,
+    "driver_mock_node_cases": 9,
+    "result": "passed",
+    "controls": [
+      "delayed/out-of-order paired input convergence against toy-state oracle",
+      "immutable bounded history and stale plans",
+      "exact 329 source-call mock cardinality",
+      "startup clock stalls and post-admission skipped/repeated clock rejection",
+      "transient startup transfer permitted; all eight busy capture/restore/endpoint admissions refused",
+      "wrong PAD/state, stack, full heap, ineffective prediction and cleanup rejected"
+    ]
+  },
+  "source_witness": {
+    "result": "passed",
+    "raw_artifact": "source-only-run-v3/evidence.json",
+    "sha256": "9f51c0df8fc63375148d9dc4ae1c9f83cb7ed1c68570f63f7b1a1fe4e8b9805f",
+    "prefix_input_samples": [
+      0,
+      299
+    ],
+    "checkpoint_match_frame": 176,
+    "matched_input_samples": [
+      300,
+      306
+    ],
+    "matched_match_frames": [
+      177,
+      178,
+      179,
+      180,
+      181,
+      182,
+      183
+    ],
+    "step_calls": {
+      "prefix": 300,
+      "input_generation": 7,
+      "authoritative": 7,
+      "guard_only": 1,
+      "predicted": 7,
+      "corrected": 7,
+      "total": 329
+    },
+    "lane_bytes_per_tick": {
+      "observation": 1280,
+      "pcm_capacity": 4272,
+      "literal_pad": 44
+    },
+    "original_local_input_preserved": true,
+    "remote_motion_negative_control": [
+      {
+        "tick": 300,
+        "authoritativeMotion": 60,
+        "predictedMotion": 14,
+        "differs": true
+      },
+      {
+        "tick": 301,
+        "authoritativeMotion": 60,
+        "predictedMotion": 14,
+        "differs": true
+      },
+      {
+        "tick": 302,
+        "authoritativeMotion": 60,
+        "predictedMotion": 14,
+        "differs": true
+      },
+      {
+        "tick": 303,
+        "authoritativeMotion": 60,
+        "predictedMotion": 14,
+        "differs": true
+      },
+      {
+        "tick": 304,
+        "authoritativeMotion": 60,
+        "predictedMotion": 14,
+        "differs": true
+      },
+      {
+        "tick": 305,
+        "authoritativeMotion": 60,
+        "predictedMotion": 14,
+        "differs": true
+      },
+      {
+        "tick": 306,
+        "authoritativeMotion": 60,
+        "predictedMotion": 14,
+        "differs": true
+      }
+    ],
+    "prediction_cap": {
+      "sample": 307,
+      "status": "blocked",
+      "reason": "prediction_limit",
+      "remoteContiguousThrough": 299
+    },
+    "guard_sample": 307,
+    "guard_scope": "Excluded from seven-tick byte comparison and performance claims; restored away before prediction.",
+    "heap_bytes": 134217728,
+    "checkpoint_heap_sha256": "98eef5641f52b125596a9b58243befd1e43f69291e4a6ecc3f4d9d4742aaacab",
+    "authoritative_endpoint_heap_sha256": "c676be1a012a89d0072af169d45fd384c62d930d747d7e2c5878ad8dc984af61",
+    "corrected_endpoint_heap_sha256": "c676be1a012a89d0072af169d45fd384c62d930d747d7e2c5878ad8dc984af61",
+    "all_eight_quiescence_admissions": true,
+    "observation_clock": {
+      "field": "Observation.frame at byte offset 0",
+      "semantics": "Observation byte offset 0 is the source VS match frame count (lbl_8046B6A0.frame_count), not the caller input sample or scheduler tick; it may stall before HUD activation.",
+      "schedulerGetterAvailable": false,
+      "schedulerGetterScope": "The synchronous Node fixture exports source match-frame observations, not gm_801A4BA8()/gm_80479D58.unk_0; successful source-step calls remain the exact tick-call boundary."
+    },
+    "startup_transfer_107": {
+      "preTickMatchFrame": 0,
+      "beforeTick": {
+        "drive": 0,
+        "source": 0,
+        "bank": 0
+      },
+      "afterTick": {
+        "drive": 0,
+        "source": 0,
+        "bank": 0
+      },
+      "afterAudio": {
+        "drive": 1,
+        "source": 0,
+        "bank": 0
+      }
+    },
+    "cleanup": {
+      "fixtureClosed": true,
+      "snapshotOwnerClosed": true,
+      "failures": []
+    },
+    "owned_process_group_absent": true
+  },
+  "retained_failures": [
+    {
+      "artifact": "build.stderr",
+      "sha256": "627568f0510a261e3d3744c6ef4573f8b22fcafd1672dfaf5696812f3c2c3b21",
+      "failure": "Ambiguous RuntimeFileBytes brace assignment; typed iterator constructor repaired without byte changes."
+    },
+    {
+      "artifact": "first-focused-failure.log",
+      "sha256": "cb2cf08ea4757e5c49d258e129e32f1719c88e3a0009b997799c455371892ff1",
+      "failure": "Initial scheduler test expected confirmation across an absent authoritative prefix; corrected test expectation, implementation unchanged."
+    },
+    {
+      "artifact": "input-timeline-contract-evidence/mock-contract-first-failure.txt",
+      "sha256": "5a5a32d7504e1f893bd6974bcba828de71d4c32ec9de9258707e821c7d039487",
+      "failure": "Initial mock cleanup failure asserted a different message shape; exact output retained."
+    },
+    {
+      "artifact": "source-only-run-v1/evidence.json",
+      "sha256": "ea6aeecf6ebfdd39467bdfd1dbffe1387c77a8038036a1505ebed0bcfd927aa8",
+      "failure": "Harness equated caller input index with VS match frame during introduction."
+    },
+    {
+      "artifact": "source-only-run-v2/evidence.json",
+      "sha256": "c7bdbda0d99be94821bd84c268efbbf59cca20a028d18f4892a587bc4b531841",
+      "failure": "Harness demanded quiescence at ordinary startup sample107, before any checkpoint. Two-attempt stopping rule triggered bounded review."
+    }
+  ],
+  "validation": {
+    "affected_release_build": "gameplay_slippi_synctest Node and browser diagnostic artifacts built; browser not launched",
+    "build_result_sha256": "f8e2f2a9edd5c501c0e476489ee5aff4dec9137ebd94b49312120f0835548c89",
+    "full_regression": {
+      "result": "passed",
+      "tests": 3003,
+      "skipped": 211,
+      "test_seconds": 612.206,
+      "executable_source": "c92da4adcb77c1e150eb966576cfe969b8e65deb",
+      "stdout_sha256": "d1a84d429fde95e59b151abf168f37df59a69f33f1dd5bed12a72bc8fde1a116",
+      "stderr_sha256": "58c4948b6f5e632eda69239f234fd166293e0c07084cdfd457a295aa27273116",
+      "owned_result_sha256": "777e82c0142ddf4414c7a67f012eac5949943f758e803a4c59c27cd706f1716b",
+      "owned_process_group_absent": true
+    },
+    "ci": "Publication-head CI and merge state are tracked on issue #356 and its PR; this receipt is prepared before publication.",
+    "regression_source_scope": "Executable tree c92da4adcb77c1e150eb966576cfe969b8e65deb; documentation-only receipt/roadmap edits prepared during the suite and reviewed separately. Native producer remains base833dda86 plus the typed iterator repair."
+  },
+  "reviews": {
+    "scheduler": "9575907e687c0f558f1c65ebf23f8510e5ea74651e3ec7e401a53eb662dc2bbb",
+    "source_contract": "89ad1ea28b2787985f86e4cc26280ac4cff9669da738d354a065cfa4ff8f9e5f",
+    "source_driver_final": "1fa2eb8d621598bf056d18effa7d3fe4998528ed0c280100ff61fc435433f964",
+    "raw_source_result": "78e57f98e6a178e974be07387c7f9380b207a142ccad3075e67919bee879ef01",
+    "integration_documents": "81129d2baec77052053b9954a9fbe55e909f2644ae0fc79329684b6b889b7834"
+  },
+  "exclusions": [
+    "No browser JS/GPU/audio-sink/asynchronous-host state restoration",
+    "No drawn-versus-no-draw comparison in this witness",
+    "No relay/peer connection, complete match or public mode activation",
+    "No original-game or patched-Slippi reference comparison; incomplete private v5 profile only",
+    "No KO/respawn or general state coverage from this seven-tick interval",
+    "No combined restore/correction/present frame budget",
+    "No physical input, foreground timing, audible output or two-machine acceptance"
+  ],
+  "evidence_locator": "Retained rollback-input-timeline-20261028-105455-e2af2aae run on verified external storage; coordination checkpoint records private paths. The first scheduler review is retained under rollback-input-timeline-2026-10-28-105455-e2af2aae/review-v1."
+}
