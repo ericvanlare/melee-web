@@ -359,7 +359,8 @@ EMSCRIPTEN_KEEPALIVE int melee_web_snapshot_init(const char* root){
         require(entry.file_size()<=64*1024*1024,"Snapshot fixture asset exceeds 64 MiB");
         std::ifstream stream(entry.path(),std::ios::binary);
         require(stream.good(),"Cannot read snapshot fixture asset");
-        files[entry.path().filename().string()]={std::istreambuf_iterator<char>(stream),{}};
+        files[entry.path().filename().string()]=melee_web::RuntimeFileBytes(
+            std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>{});
     }
     lbLang_SetLanguageSetting(LANG_US);lbLang_SetSavedLanguage(LANG_US);
     // Reuse the source menu default payload without entering a menu scene.
