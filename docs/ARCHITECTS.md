@@ -52,6 +52,26 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
+### 2026-10-28 — Owner and Codex: prioritize working rollback
+
+**Ask:** Continue autonomously until working rollback or an owner stop, and
+reassess when a roadblock or validation overhead stops useful progress.
+
+**Status:** Accepted. Park the next Stadium geometry experiment. Preserve the
+one-tick browser proof, the unresolved longer restore boundary and both
+previous automatic-review blocks; do not retry or transfer the rejected
+renderer-owner diagnostic or UCF reference experiment. Advance the independent
+match input timeline in one bounded milestone: saved local input, remote
+prediction, earliest correction, confirmation and bounded history. Reuse the
+existing PAD format and exercise it against the existing synchronous source-only
+fixture after independent review. Keep the component separate from live runtime
+admission. Neither a scheduler test nor a source-only correction establishes
+browser restoration or working online rollback.
+
+**Links:** [input timeline #356](https://github.com/ericvanlare/melee-web/issues/356),
+[browser restore #341](https://github.com/ericvanlare/melee-web/issues/341),
+[priorities #158](https://github.com/ericvanlare/melee-web/issues/158).
+
 ### 2026-10-26 — Owner and Codex: fix the first failure before broad validation
 
 **Ask:** Proceed autonomously, but step back when stuck or when validation is consuming more effort than the fix.

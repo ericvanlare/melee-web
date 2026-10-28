@@ -21,6 +21,42 @@ issue, a short replay or a successful build.
 
 ## Start with the task you are doing
 
+For the standalone match input scheduler, run the focused contract:
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_net_rollback_input_timeline.py -v
+```
+
+`scripts/net_rollback_input_timeline.mjs` reuses the existing four-port PAD
+format. It retains literal local samples, predicts from the latest known remote
+sample, and stops after seven speculative ticks. A changed remote sample
+requires a replay plan for the dirty simulated suffix before forward progress
+can resume. Only acknowledged execution advances the simulated/confirmed
+boundary. An eventual runtime adapter must own its snapshots and restore or
+terminate after a failed or stale execution plan; this scheduler cannot do that
+for it. Its paired toy-state test is input-scheduling evidence, not game-state
+restoration, browser rollback or profile admission. See
+[#356](https://github.com/ericvanlare/melee-web/issues/356) for the milestone.
+
+The source-only delayed-input witness uses the existing diagnostic fixture and
+its quiescent full-memory snapshot owner. Build it through the normal entry
+point, then run the driver under workspace ownership with an external output
+directory:
+
+```sh
+python3 scripts/build.py --trace-target gameplay_slippi_synctest --configuration Release --slippi-synctest-assets /path/to/owned/snapshot-assets
+python3 scripts/agent_workspace.py run -- node src/slippi_profile/tests/run_input_timeline.mjs --node-runtime build/slippi-synctest-release/gameplay_slippi_synctest_node.js --assets /path/to/owned/snapshot-assets --out /path/to/new/external-output
+```
+
+Use the pinned Node runtime selected by `scripts/check_gameplay.py` when the
+ambient runtime differs. The driver retains literal PAD, observation and PCM
+bytes for seven authoritative, predicted and corrected samples. This fixture
+has no browser renderer, audio sink or asynchronous host-state restoration;
+its result cannot admit a live browser restore adapter. Mock driver controls
+are exposed through `tests/test_input_timeline_contract.py`. See the
+[scoped input timeline receipt](status/2026-10-28-match-input-timeline.md) for
+the actual-source result and retained failures.
+
 Use the [build, play and inspect guide](BUILD_AND_PLAY.md) for setup and player
 commands, then choose the smallest relevant boundary check below.
 `scripts/build.py` checks pinned source and toolchain prerequisites before
