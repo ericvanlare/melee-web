@@ -1,0 +1,828 @@
+{
+  "schema": "melee-web-ucf-history-ownership-v1",
+  "issue": 339,
+  "state": "selected_capture_load_zero_saved_bytes_observed_peer_fault_failed_nonzero_restoration_open",
+  "source_base": "130438fd2b86d00cfec98cd2ba0a5f66084ae15c",
+  "scope": "Source-bound reference build, retained prerequisite failures, isolated storage controls and one actual own-local two-peer Capture/Load. Saved/post 48 bytes are zero while pre-load differs; nonzero saved-history restoration and match lifetime remain unproved. No complete profile or browser rollback claim. Independent raw review found P2 signal6 at the diagnostic eight-packet hold-queue bound; the driver first-Load status did not classify that final client failure, so this is not a clean passing run.",
+  "history_contract": {
+    "source_audit_sha256": "07fcbf61535816c488be1e1e341ee839139f4e98efac9046d7d26b0deed987b4",
+    "snapshot_followup_sha256": "2d112f6e1fa8be776a1ddf514a058e51419a1337b21c76c92eb9ac90c25e65f3",
+    "controller_rows": 4,
+    "row_stride": 12,
+    "meaningful_bytes_total": 40,
+    "index_owner": "processed PAD slot at Fighter offset 0x618; not raw port offset 0x61a",
+    "unobserved": [
+      "actual producer callback/processed-slot ordering behind observed changing table bytes",
+      "actual match reset and lifetime",
+      "five remaining consumer paths and their runtime behavior",
+      "nonzero saved-history restoration and dependent behavior agreement"
+    ],
+    "source_projection": {
+      "packet_sha256": "527fb6390edeeb4e8efdb3aeb5fe92bd58b81847916b9637558b5d4024fae6b4",
+      "projection_sha256": "e15c80a5eed188f0bbd533c66e27f0c3a14af9edd24db8228fe170f7e3feaa10",
+      "implementation_contract_sha256": "5ea1d1602a560dcf8e8081342ae6a3a3cb45005c41c930eac2e2e63ee16229a1",
+      "observed_table": [
+        "0x8065d4dc",
+        "0x8065d50c"
+      ],
+      "fixed_backup_region": [
+        "0x8065c000",
+        "0x8071b000"
+      ],
+      "authored_bytes": 48,
+      "meaningful_bytes": 40,
+      "reserved_bytes": 8,
+      "active_exclusion_count": 30,
+      "exclusion_overlaps": [],
+      "observed_main_heap": [
+        "0x806ed800",
+        "0x817f8ac0"
+      ],
+      "main_heap_owns_table": false,
+      "scope": "Static source membership for the selected endpoint span. Capture/Load execution, guest preserve-block overwrite and restore ordering remain unobserved.",
+      "independent_review_sha256": "60b112403c3b0cf5af0929467de8146ff8144873918b3903e7cd9bc733f83b3f",
+      "projection_clarity_supplement_sha256": "ffb2a353cebc61773f956ada46db37b49b2169ec45db448e1bf4c1f9269cf09e",
+      "projection_schema_clarification": "Frozen sample_pairs values denote exclusive8byte interval endpoints, not two sample start addresses; supplement preserves frozen bytes."
+    }
+  },
+  "source_gate": {
+    "client_commit": "41a7a3a110ed52999486ae1901c8fbb9a63d4f13",
+    "semver": "4.0.0-mainline-beta.19",
+    "recursive_submodules": 30,
+    "ordered_patches": 6,
+    "source_transfer_receipt_sha256": "3eca837307221acd44d408c2852ba4e5e09cd382de2f20c85519c28961e44ff5",
+    "receipt_sha256": "b2634ca730b65c1b781ad82518a979a9ffcbe28e68094e443c7840d558949e43",
+    "independent_review_sha256": "a3de40e79ef23b02d57c5496500bc3e156b4353b5e9c8b81c5689665c5cec203",
+    "dolphin_patch_tree": "58e9930fbc31dce00a044df849876210154cc69f",
+    "rust_patch_tree": "3762ffaca98d8f8b50d77256ff783d5296314b5f",
+    "seed_indices_unchanged": 31
+  },
+  "source_copy_failure": {
+    "retained": true,
+    "first_failure_sha256": "54df02f525a8d1d961fe51b822e4f8bae88bbc7298eb35d1015e3e52604911fa",
+    "reduction_sha256": "b993a6f058ee6d07dcd1ddc5406dd630df1223f7cedbd3bf4d6040191d731f4c",
+    "finding": "Local copy/repack stopped on incomplete Git ancestry. Reviewed exact-commit file-only shallow transfer preserved true commit and independently owned object stores; no fabricated history."
+  },
+  "resource_hash_correction": {
+    "source_staged_and_lock_sha256": "525d3333b4eed701982ada34942b83cecd9accc6e96b18a27a1b6d863e499946",
+    "files": 750,
+    "file_differences": 0,
+    "correction_sha256": "3e28ec9d03e627f72005cf33186eb2b93c9c5bc60e24d3f20d4c0e4ce9cd17a7",
+    "finding": "Earlier a8a978 resource hash used a different method. The actual pinned helper agrees across source, staged resources and lock. Historical inventory remains retained, but resource mismatch is withdrawn."
+  },
+  "new_build": {
+    "run_id": "nogui-build-execution-v1",
+    "receipt_sha256": "e63fabc93b88f54b2f0cc2cf68cad1b939fe29110b246316501e8133c1f2c5ee",
+    "root_review_sha256": "c9c81f3bac42cfbfccb5e674b6e0c6d5fc6da6bd69af046acb07a65262d0ee24",
+    "seconds": 162.768,
+    "binary_sha256": "4ba9bd13e102e7ce87444bde080506e00c3623f056cd7aae355fde5e271ffb75",
+    "rust_library_sha256": "097cb30fddb82eff8da29e3b6f156e7eb9ed818f1511cdf53927ea1a30a79efa",
+    "architecture": "arm64",
+    "CMakeCache_sha256": "dff1954462b39970ba5b744a2c63746d05536191df4b6e4db2e7baacb52dab55",
+    "cmake": "3.31.6",
+    "ninja": "1.13.0.git.kitware.jobserver-pipe-1",
+    "clang": "21.0.0 (clang-2100.1.1.101)",
+    "rust_cargo": "1.88.0",
+    "configuration": "Release; 14 locked CMake options; deployment target 11.0.0; FMT_CONSTEVAL empty",
+    "commands_passed": 16,
+    "owned_process_groups_absent": 16,
+    "pre_post_source_verification_equal": true,
+    "old_lock_unchanged": true,
+    "policy": "Process-local builder network denial plus offline Cargo; owned external cache/output. No client executable launch or application staging."
+  },
+  "isolated_storage_component": {
+    "component_identity": "slippi-profile/ucf_input_history; storage format version 1",
+    "source_commit": "11c24f87a266c237b1a4c53edceae6f2962fdd5f",
+    "reviewed_candidate_source_head": "a42a853fdb6884b3e92467775ae5e50aa0a2272b",
+    "active_profile_identity_unchanged": "slippi-render-dependencies-dbooc-shield-drop-v5",
+    "layout": {
+      "rows": 4,
+      "row_bytes": 12,
+      "payload_bytes": 48,
+      "meaningful_bytes": 40,
+      "reserved_bytes_preserved": 8,
+      "owner": "caller-provided unique nonzero token; fresh object precondition; no registry"
+    },
+    "component_files": [
+      {
+        "path": "src/slippi_profile/ucf_input_history.h",
+        "sha256": "3394d3050ff8a8086964b830bfc0218864ca8d2ee1742e5424577d5d2f7427d2"
+      },
+      {
+        "path": "src/slippi_profile/ucf_input_history.c",
+        "sha256": "e3179d8647f5804eac0ce53a21ab3070d71699564af7bcb6ba5d7ef0a06fa4d9"
+      },
+      {
+        "path": "src/slippi_profile/tests/ucf_input_history_fixture.c",
+        "sha256": "0449f82145a2602a219adb3303106fd67566338109e037bf3414fd4fc20910ab"
+      },
+      {
+        "path": "src/slippi_profile/tests/test_ucf_input_history.py",
+        "sha256": "eca321d402db7a925d039e17d927b81df5dbee7a28610f72bbe39bb1907ab705"
+      },
+      {
+        "path": "tests/test_slippi_profile_controls_discovery.py",
+        "sha256": "3bb3cd9df6b8237f83f4bca51cfd57a26fadfeeb9ee3519234d665e027587c12"
+      },
+      {
+        "path": "src/slippi_profile/tests/test_ci_discovery.py",
+        "sha256": "992da4829079129df6da4f77ca4f02e21c764509e02a85c7703f283ba6ae8b0a"
+      },
+      {
+        "path": "src/slippi_profile/README.md",
+        "sha256": "304c5490886d039815cdd7b697bfcc37c0a07e6dedf70740150f84ba8c6608e7"
+      }
+    ],
+    "independent_code_review": {
+      "receipt_sha256": "c9f3bdf6df54ce3a8e65279db4b5b97a4d862bd3c9efddce82f733bc98d813b8",
+      "candidate_receipt": "implementation-candidate-v2.json",
+      "candidate_receipt_sha256": "9d84c0a613fee9c0822ef1d662f5e1d02e9f208cefc14e82a76f678e08ca11c2",
+      "verdict": "PASS_ISOLATED_STORAGE_COMPONENT_ONLY",
+      "live_producer": false,
+      "live_consumer": false,
+      "per_match_reset_api": false,
+      "production_overlay_or_runtime_snapshot_integration": false
+    },
+    "focused_native_wasm": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest src.slippi_profile.tests.test_ucf_input_history -v",
+      "status": "PASS",
+      "tests": 1,
+      "native_wasm_stdout_equal": true,
+      "captured_payload_hex": "007f80ff010203040001a1a211223344556677880102a3a4908172635445362702fea5a6f0e1d2c3b4a5968703ffa7a8",
+      "stdout_sha256": "eee4ce2377e2b770cada1f3e5c45365f4fb8815df0d8a4053f9c27dd98c768d7",
+      "candidate_receipt_sha256": "9d84c0a613fee9c0822ef1d662f5e1d02e9f208cefc14e82a76f678e08ca11c2"
+    },
+    "transaction_negative_control": {
+      "receipt": "transaction-negative-control-v1/receipt.json",
+      "receipt_sha256": "1695881474d0bd194a1f09f1f18e147c25f2e83484a005178e2a297d7b657db9",
+      "mutant_source_sha256": "b77a28ee1649e8ef9c3e2f1d9cebc3ce13c8f316097ed92b6d63b1660332bff1",
+      "status": "EXPECTED_GUARD_FAILURE_DETECTED",
+      "mutation": "Disposable copy-before-refusal of 47 bytes before rejecting payload_size 47",
+      "expected_unchanged_state_assertion": "memcmp(payload, expected, sizeof(payload)) == 0",
+      "run_returncode": -6,
+      "stderr_sha256": "da81e85c6b8cbcbdf2730efa04b07afb7e45c483fef572ea1525aba60ab1314f",
+      "production_source_unchanged": true,
+      "mutant_binary_removed": true
+    },
+    "full_regression": {
+      "source_commit": "11c24f87a266c237b1a4c53edceae6f2962fdd5f",
+      "status": "PASS",
+      "tests_reported": 2427,
+      "skipped": 166,
+      "unittest_seconds": 530.218,
+      "runner_elapsed_seconds": 530.7594342501834,
+      "log_sha256": "4fdc71e3381da162dcd551ce8a63bf528031c051b75fb2cf3a9cb2bcacf17bfb",
+      "result_sha256": "eeaa88e0ae908eca191c9f0923d9f58c219d512a04b10db8d28f65940fb68c4b",
+      "returncode": 0,
+      "timeout": false,
+      "tracked_source_changes": [],
+      "owned_groups_remaining": []
+    },
+    "scope": "Isolated C storage and synthetic byte-snapshot controls only. This does not establish an actual UCF producer/update, any of the five consumer paths, match/reset lifetime, or actual Slippi Capture/Load behavior.",
+    "exact_head_ci": {
+      "pr": 340,
+      "head": "78abf9f0e4b46c8fcf38569e864eb8f82ba58cb7",
+      "run": 39139045794,
+      "status": "COMPLETE",
+      "successful_checks": 12,
+      "expected_skips": [
+        "compiler-cache-audit",
+        "compiler seed (${{ matrix.shard }})"
+      ],
+      "receipt_sha256": "7d1ed832a5df32a9af6de637f1a3f9a268273e14557e6b93d531490fbc423d63",
+      "draft": true,
+      "scope": "This is the named prior documentation/code head, not a future updated head; live history and lifecycle gates remain open."
+    }
+  },
+  "historical_binary": {
+    "actual_sha256": "b5697c69fbe6b18359f173c85c5c2cad4fa34cfa307558234af07937211b0c7a",
+    "locked_sha256": "e4c8a5fb914baf10f25ccbf1077b9a6880a7abb84619db5a1cf294d866ff673b",
+    "matching_build_receipt_found": false,
+    "new_build_relabels_historical_artifact": false
+  },
+  "next": "Nonzero-history experiment preparation is halted by automatic review; preserve partial candidate and do not retry or reroute it. Required nonzero restore, match/reset and consumer gates remain open. Continue independent Stadium work.",
+  "route_admission": {
+    "status": "SCOPED_MENU_READINESS_COMPLETE_ACTUAL_ZERO_SAVED_LOAD_OBSERVED_NONZERO_ACCEPTANCE_PENDING",
+    "reviewed_source_plan": "minimal-menu-input-bridge-packet-v1.json",
+    "reviewed_source_plan_sha256": "e5302bdb22192ca934a13f436a5196b40dd24374e7fe55712a82fc9517f99e1c",
+    "scope": "The historical v8 chooser-to-parent result remains menu-only. The separate own-local v6 observation reaches actual P1 Capture/Load with zero saved bytes; nonzero restoration remains open and the P2 diagnostic hold fault failed."
+  },
+  "exclusions": [
+    "official Slippi services/contact",
+    "complete UCF profile",
+    "live profile activation",
+    "browser rollback",
+    "Stadium acceptance",
+    "human physical/audio/timing/two-machine gates"
+  ],
+  "independent_checkpoint_review_sha256": "fead67df8846178827715ea2606dd227b3fba6a703c80ae87ca3f5a7991b7055",
+  "offline_initialization": {
+    "build_binary_sha256": "4ba9bd13e102e7ce87444bde080506e00c3623f056cd7aae355fde5e271ffb75",
+    "network_scope": "Process-local default deny; exact private Unix observer endpoint only. No IP, official service, account, replay upload or helper launch authority.",
+    "caps_seconds": {
+      "whole": 90,
+      "observation": 45,
+      "cleanup": 6
+    },
+    "attempt1": {
+      "result_sha256": "b31234b938b956d3b1e113c759f12d527bce25ea86ea4450bfaa3d49583a88d2",
+      "retention_sha256": "68a01bcde5e3f5c42bce879e65d8fd550ebbb0a54059f7200a00d3be346bc3af",
+      "elapsed_seconds": 4.439226333,
+      "failure": "Initial original DOL extab word2a080000 rejected as invalid GCT pointer; no metadata admitted.",
+      "owned_group": 39719,
+      "cleanup_verified_absent": true
+    },
+    "preinstall_reduction": {
+      "packet_sha256": "cfb2b62323d55ff50e00bdae844fced16827b99fa7e273ecb804b61632b12379",
+      "independent_review_sha256": "45ebb4abcdee6d7886dfe000578907fd5c836168880521390f481e5254d1d30c",
+      "finding": "Exact first marked snapshot contains original extab data at80005600;23 pointer chains stop after invalid intermediate. It is not table payload.",
+      "pure_tests": 8,
+      "unchanged_decoder_tests": 12
+    },
+    "v5_integration": {
+      "packet_sha256": "5fed09587e2a76491a55887605ec8c303325971acab366fe1f775e6eb9754293",
+      "root_review_sha256": "c5f4135ebeaf0824abcf0279b0c22ff9bc49cd0c9f612e4ed1745c055f3f42b7",
+      "independent_review_sha256": "e269f7c9022820f929fe23631cdac1df2523bd8d5d7089e13febb8218333ff54",
+      "pure_tests": 17,
+      "strict_decoder_and_caps_unchanged": true,
+      "fresh_profile": true,
+      "policy_change": "Only exact new private profile prefix."
+    },
+    "attempt2": {
+      "result_sha256": "e1b77a1abb00d8bc7c59312157f8847e24f83d64ad9b1d50a28cb09f6f0c5cae",
+      "retention_sha256": "d0faae6ac9af0bdfba19ecf6378e2e0158d1822d50a17e23f119465924d8ce50",
+      "elapsed_seconds": 46.807184166274965,
+      "failure": "45-second observation deadline; no installed pointer or hook was emitted.",
+      "initial_slot_raw_hex": "2a080000",
+      "initial_hook_raw_hex": "887f0678",
+      "valid_pointer_epoch": 0,
+      "metadata_complete": false,
+      "last_observed_main_heap_hex": [
+        "806dd440",
+        "817f8ac0"
+      ],
+      "heap_scope": "Actual fixed-address endpoint word observations; no table membership, atomic snapshot or complete source progress proof.",
+      "owned_group": 60462,
+      "cleanup_verified_absent": true,
+      "socket_absent": true,
+      "diagnostic_80479d58_used_for_success": false,
+      "same_uid_sender_authenticated": false,
+      "independent_result_review_sha256": "45e1a839aa75de50213fe91a2c50b0a766c24e40d0a9057acadb86f66414d26d",
+      "fresh_cleanup_review_addendum_sha256": "a355d576e7c3f8ae116aa171ca743c3496d5ee14453e8cd6bd6ffa4e7e5be6f6"
+    },
+    "stop_rule": "After two failures, source reduction and a tiny paired conversion fixture preceded independent review of a changed six-file-read hypothesis. One third attempt observed selected metadata under unchanged deadlines/decoder; no same-hypothesis retry follows.",
+    "second_attempt_reduction": {
+      "packet_sha256": "97341e508ca85f412774ead7237918eb4129d39ea13a26d769e555f0b9802c01",
+      "independent_review_sha256": "6ee9de42df306eae0ee1e8442ce76ff002b9cb247e69e7e146c82c55bcfc4431",
+      "pins_verified": 45,
+      "finding": "An empty Running-state game-ID statistics key supports an identity lead; normal teardown resets to 00000000 after joining the writer. Actual boot ID/patch vector/raw disc read remain unobserved.",
+      "conditional": "Empty ID during LoadPatches would select no game INIs, leaving no active codes and returning before installation. Not proof of actual boot cause.",
+      "converter": {
+        "source_sha256": "d2eb7c78aaec4c07f3a416b856443ea72432df684832333c3506edade0b3fa26",
+        "policy_sha256": "af7c4caebaac8489be0591cf0e23fcac21aab12452bcd1e3495a00db934f8171",
+        "execution_receipt_sha256": "879f70810b1ec4fb6c247e9a4bc223a371a20879ae3804f3283c2294d8609177",
+        "compile_passed": true,
+        "probe_stage": "open_failed",
+        "errno": 22,
+        "input_bytes_remaining": 6,
+        "output_bytes": 0,
+        "owned_groups": [
+          62126,
+          62133
+        ],
+        "owned_groups_absent": true,
+        "no_client_or_disc": true,
+        "network_denied": true,
+        "scope": "Standard API fixture conversion fails under current resource policy; exact missing dependency and client cause are not established.",
+        "result_packet_sha256": "3ec99c60860548023b99e8de2c6fa5cbb7c52c55311dc399e541ed938910efbe",
+        "paired": {
+          "proposal_sha256": "223ad9d1d4cd853e689a844660cb811e092891dd7bddef22f7634de4c0014ea9",
+          "receipt_sha256": "e53bc098e3861b8627a4fe42de3f4231df34f9b553b04c3d249782dcd76d0eec",
+          "policy_sha256": "f1fd6ee02dbe294e30c69f7e96a9bb37a0c752e026cfd796e35578f2581e6140",
+          "binary_unchanged": true,
+          "literal_system_data_files": 6,
+          "result": "exact_match",
+          "output_hex": "47414c453031",
+          "owned_group": 63191,
+          "owned_group_absent": true,
+          "network_denied": true,
+          "scope": "The six-file read-grant set allowed the same converter to succeed; aggregate fixture evidence only, with no per-file necessity/minimality or client-cause proof.",
+          "independent_review_sha256": "ccbd01318c719a8cdb827a539242c451caed155ace95f49ce2dff4971e10716a"
+        }
+      }
+    },
+    "v6_integration": {
+      "packet_sha256": "06cfaa5e50a1a289a87defb9d64cfbae6b2b3b60b66dd460932f6a198b786277",
+      "independent_review_sha256": "abb8744266de7271fcd5ae9f7653849f51466f5e74e4a07cdeaae8840544404a",
+      "root_release_sha256": "7550e477e015684714c12a5e2a342d56dc189204f083e9086c5459b91fa8f4ca",
+      "strict_decoder_and_caps_unchanged": true,
+      "fresh_profile": true,
+      "policy_change": "Six fixture-supported exact conversion-file read grants, with related path metadata; unchanged network denial. Aggregate fixture enablement does not prove individual necessity or client cause.",
+      "frozen_contract_wording_correction": "The frozen contract says SIX_PROVEN_CONVERSION_DATA_READS. Review/release narrows this to SIX_FIXTURE_SUPPORTED_CONVERSION_FILE_READ_GRANTS without rewriting frozen bytes."
+    },
+    "attempt3": {
+      "run_id": "offline-init-candidate-v6",
+      "result_sha256": "9546ec2dcf16cd4fc36d6f2975dde3a3049bb06bc590e4e200faee4c3900ffb9",
+      "retention_sha256": "418b15f3dd75f1afc2d445c3699d3ea49433c84f22d2952a58e4a78fdd8dbb1f",
+      "independent_result_review_sha256": "b1389c9049da3090cf42d08f4200e2642708059a642dcbbdb496cd706e39abb5",
+      "status": "selected_metadata_stop",
+      "elapsed_seconds": 3.6403747922740877,
+      "selected_metadata": {
+        "status": "selected_metadata_stop",
+        "pointer": "0x8065cc80",
+        "payload": "0x8065d4d8",
+        "authored_table_span_exclusive": [
+          "0x8065d4dc",
+          "0x8065d50c"
+        ],
+        "branch_site": "0x8006b460",
+        "branch_word": "0x485f2078",
+        "decoded_branch_target": "0x8065d4d8",
+        "expected_branch_target": "0x8065d4d8",
+        "header_words": {
+          "GCT+0x850": "0xc206b460",
+          "GCT+0x854": "0x00000054",
+          "GCT+0x858": "0x480000b1"
+        },
+        "fingerprints": {
+          "GCT+0x88c": "0xbf1c0000",
+          "GCT+0x890": "0x38d1b717",
+          "GCT+0x894": "0x42a00000"
+        },
+        "sampled_table_words": {
+          "offsets": "0x85c through 0x888 inclusive, step 4",
+          "count": 12,
+          "all_values": "0x00000000",
+          "interpretation": "One observed selected-word snapshot only. It does not prove an installed table is absent, nor establish table history or reset/initialization behavior."
+        },
+        "main_heap_bounds": [
+          "0x806ed800",
+          "0x817f8ac0"
+        ],
+        "diagnostic_0x80479d58_used_for_classification_or_completion": false,
+        "decoder_metadata_complete": true
+      },
+      "raw_datagrams": 3,
+      "strict_replay_matches_saved_report": true,
+      "selected_metadata_observed_while_launcher_alive": true,
+      "client_exec_confirmed": false,
+      "same_uid_sender_authenticated": false,
+      "owned_group": 63980,
+      "cleanup_verified_absent": true,
+      "socket_absent": true,
+      "retained_files": 17,
+      "scope": "Selected endpoint observations only, not an atomic/loss-free full state or authenticated installation, history/reset/restore witness."
+    }
+  },
+  "local_menu_input_bridge": {
+    "status": "PASS_SCOPED_MENU_READINESS_V8_PRIOR_FAILURES_RETAINED",
+    "candidate_packet_sha256": "2a1f3da0c8c9fa61ab37aa00050a0d7bf4823f82f773e3d9c6286f3b0e00c1f9",
+    "root_review_sha256": "ae3d87dda1c49385f1acd6248501e7f17096bb5591048eaa284cdb554a8be7f6",
+    "release_sha256": "17831487a2a2edb9c1c192185f16fe7bb8d382636549ad0ac90734e77291c2af",
+    "result_sha256": "7e58060883e4ad8a9c84eff55c210c81df6d02fbef3e54dfde33a435587d27aa",
+    "root_retention_sha256": "e69ba01537d21432b42d0648fd128be82cc889cb6ebea76690214683ba181208",
+    "reference_binary_sha256": "4ba9bd13e102e7ce87444bde080506e00c3623f056cd7aae355fde5e271ffb75",
+    "focused_controls": 16,
+    "prelaunch_reviews": {
+      "v1_blocked_review_sha256": "415a763f50254e0917a77df108238512d40e08fa6fffd94cd1f58f0a379be7e6",
+      "v1_findings": [
+        "missing SI observer environment",
+        "missing actual disc hash check",
+        "silent pre-output failure",
+        "SI/MW owner-receipt ordering false refusal"
+      ],
+      "v2_blocked_review_sha256": "8a24e38eeb3f60a5b0708aaf78ef014ce8cefee6b0ee0dc05788fefafc7239b1",
+      "v2_finding": "launch -u referred to prior profile while policy and observations referred to fresh profile; corrected in v3 with prelaunch path guard",
+      "v1_v2_client_runs": 0
+    },
+    "actual_attempt": {
+      "seconds": 3.8938582921400666,
+      "datagrams": 18,
+      "si_bytes": 248,
+      "controller_intents_bytes": 0,
+      "controller_actions_created": false,
+      "first_failure": "AdmissionError('wrong baseline: expected scene_kind=1 and online_scene_code=0001')",
+      "phase_snapshot": {
+        "atomic_snapshot_claim": false,
+        "menu": {
+          "host_monotonic_ns": 2489978643846291,
+          "previous_submenu": 0,
+          "raw_word": 0,
+          "receive_sequence": 1,
+          "selected_option": 0,
+          "submenu": 0
+        },
+        "online_scene_code": 40,
+        "online_scene_host_monotonic_ns": 2489978762356125,
+        "online_scene_receive_sequence": 18,
+        "online_scene_word": 671100160,
+        "scene_kind": 42,
+        "scene_pointer": 2154746636,
+        "scene_pointer_host_monotonic_ns": 2489978762356125,
+        "scene_pointer_receive_sequence": 18,
+        "scene_pointer_valid": true,
+        "scene_word_host_monotonic_ns": 2489978762356125,
+        "scene_word_receive_sequence": 18
+      },
+      "startup_metadata_completed": true
+    },
+    "cleanup": {
+      "owned_processes_verified_absent": 2,
+      "observer_socket_absent": true,
+      "retained_files": 23
+    },
+    "caps_seconds": {
+      "whole_attempt": 90,
+      "observation": 45,
+      "cleanup_reserve": 6
+    },
+    "next": "Menu readiness is complete. The reviewed reference observer was built and actual own-local Capture/Load reached separately; first reduce the retained P2 fault/final-outcome failure before the nonzero restoration observation. No further offline menu expansion.",
+    "limits": [
+      "Local B-only menu observation; no history evolution/reset, Capture/Load or gameplay result.",
+      "Default-deny IP and official-service prohibition remain unchanged.",
+      "Owner receipt order is not source-frame causality or authenticated sender identity."
+    ],
+    "second_attempt_v4": {
+      "hypothesis": "Wait for exact source chooser readiness before unchanged strict baseline admission; no input before admission.",
+      "candidate_packet_sha256": "5c7e8cc34230946aac9a40667f2531ab8c04be99b910af990ec29d54aa797adb",
+      "root_review_sha256": "dfe10f7575bc728956cbef4a8fe8cf008dc6a081f2b72b0808d938bbad414a53",
+      "release_sha256": "4fe540cbd32af891658c6edd382db5fc1f40cef3d7a5cfa380af1243c2c3cf00",
+      "result_sha256": "8a020fa898ff7ab0b84a9599df7ce2e45177bc42bfb0467b59d9e3989028ecc4",
+      "root_retention_sha256": "8483315b5a80d6ba221c639ce098408341e00d0b232f8db51d83637108d003c1",
+      "source_reduction_sha256": "4cab769ff271cabc5627224ecc05b547dd5dcdf1a02e99d286306ebb5a1514cf",
+      "focused_controls": 24,
+      "seconds": 3.8411408341489732,
+      "datagrams": 22,
+      "si_bytes": 248,
+      "controller_intents_bytes": 0,
+      "controller_actions_created": false,
+      "first_failure": "AdmissionError('wrong baseline: expected submenu=8 and selected_option=1')",
+      "phase_snapshot": {
+        "atomic_snapshot_claim": false,
+        "menu": {
+          "host_monotonic_ns": 2490603500795208,
+          "previous_submenu": 8,
+          "raw_word": 134742021,
+          "receive_sequence": 22,
+          "selected_option": 5,
+          "submenu": 8
+        },
+        "online_scene_code": 1,
+        "online_scene_host_monotonic_ns": 2490603494031333,
+        "online_scene_receive_sequence": 20,
+        "online_scene_word": 16852992,
+        "scene_kind": 1,
+        "scene_pointer": 2154746540,
+        "scene_pointer_host_monotonic_ns": 2490603500795208,
+        "scene_pointer_receive_sequence": 22,
+        "scene_pointer_valid": true,
+        "scene_word_host_monotonic_ns": 2490603500795208,
+        "scene_word_receive_sequence": 22
+      },
+      "cleanup_owned_pid_and_group_absent": 96771,
+      "observer_socket_absent": true,
+      "retained_files": 23,
+      "decoder_and_caps_unchanged": true
+    },
+    "first_attempt_source_finding": "Pinned GM_BOOT/state0 owns GS_MEMCARD; raw major 0x28/previous GM_COUNT 0x2d and kind0x2a are source-defined boot. Existing run_local waits chooser readiness. Decoder formulas agree.",
+    "second_attempt_source_finding": {
+      "source_reduction_sha256": "c4d0f579d528d3817f66d04a669cdba0e5780ab286d1378f5fe4634be326ad5a",
+      "compiled_handlers_binding_sha256": "3f2b9b0d210987e12b88609032279c8089cdba0562e93126914137623cfcea4f",
+      "finding": "Logged-out chooser locks all options except5 Log-in. Direction navigation cannot change selection. Original B handler sets exact parent-menu word01080002 without confirming any online mode. Four relevant selected C2 payloads match the retained annotated source, current pinned INI and staged INI; not a whole-GCT/source identity claim."
+    },
+    "third_attempt_v5": {
+      "candidate_packet_sha256": "b778462d6120386a8136853aaa894b6fde51add1ebe6e6acbcd130037f21fe99",
+      "root_review_sha256": "c36af746b05278da2d8d65c4b39d0f90f87509b81b2adfdf79709220bd252bfc",
+      "release_sha256": "924196432dbdf1562a5998175a21e1d0eb70df98d39799fba1342c7c8de8e695",
+      "result_sha256": "03f993029a60ae91ef692732122df3f18b6233e3918129e3c98537715cb21453",
+      "root_retention_sha256": "334d362dcbee0150c862c0f38c62ad975f8768f06fb4f17573d5d3eef4e8e67f",
+      "focused_controls": 35,
+      "initial_focused_import_failure_retained": true,
+      "seconds": 46.880065500270575,
+      "datagrams": 2686,
+      "si_bytes": 500,
+      "controller_intents": [
+        "neutral_after_exact_logged_out_chooser",
+        "one_original_B_back"
+      ],
+      "strict_first_B_status": {
+        "analog_ab": [
+          0,
+          255
+        ],
+        "buttons": 512,
+        "buttons_hex": "0200",
+        "connected": true,
+        "cstick": [
+          128,
+          128
+        ],
+        "stick": [
+          128,
+          128
+        ],
+        "triggers": [
+          0,
+          0
+        ]
+      },
+      "menu_target_observed": false,
+      "first_failure": "TimeoutError('bounded 45-second local chooser observation expired')",
+      "phase_snapshot": {
+        "atomic_snapshot_claim": false,
+        "menu": {
+          "host_monotonic_ns": 2491223048386583,
+          "previous_submenu": 8,
+          "raw_word": 134742021,
+          "receive_sequence": 22,
+          "selected_option": 5,
+          "submenu": 8
+        },
+        "online_scene_code": 1,
+        "online_scene_host_monotonic_ns": 2491223041706750,
+        "online_scene_receive_sequence": 20,
+        "online_scene_word": 16852992,
+        "scene_kind": 1,
+        "scene_pointer": 2154746540,
+        "scene_pointer_host_monotonic_ns": 2491223048386583,
+        "scene_pointer_receive_sequence": 22,
+        "scene_pointer_valid": true,
+        "scene_word_host_monotonic_ns": 2491223048386583,
+        "scene_word_receive_sequence": 22
+      },
+      "cleanup_owned_pid_and_group_absent": 99180,
+      "observer_socket_absent": true,
+      "retained_files": 25,
+      "caps_unchanged": true
+    },
+    "fourth_attempt_v7": {
+      "candidate_packet_sha256": "a725cb7f7efde933fa99c4a4f45031eedaaef145d6639d958436e483b961264c",
+      "preflight_sha256": "641f95a92246a717052d126f235d6646254a667d52ae7ae8a860bb09a27532a1",
+      "root_review_sha256": "1b38cee27bc3ffa1348358e49d4b1a02a90e23f8ca5b02376d3893236b2abfca",
+      "release_sha256": "69cd75c7ca9d8e60fd62347397106f55d0e5de71a522c0e0d5d531f4aacb352b",
+      "result_sha256": "0fa2f917589ec39f30102879806a95cdb588da6e1f53d39f9ee556325de5ae74",
+      "root_retention_sha256": "89a9dd7d43d155845234f200454b4aea79874231e95868774a42951469a75138",
+      "seconds": 46.71981720812619,
+      "datagrams": 2685,
+      "si_bytes": 248,
+      "controller_intents": 0,
+      "baseline_admitted": false,
+      "retained_files": 24,
+      "owned_pid_and_group_absent": 3977,
+      "socket_absent": true,
+      "caps_unchanged": true,
+      "first_failure": "Unchanged45seconddeadline: no menu/scene keys in actualLocations config.",
+      "direct_reduction": {
+        "actual_v5_locations_bytes": 380,
+        "actual_v7_locations_bytes": 360,
+        "omitted_existing_keys": [
+          "80479d30",
+          "804a04f0",
+          "804d6720",
+          "804d6720 0"
+        ],
+        "finding": "Readiness addition replaced four existing phase keys instead of retaining them. The cooldown hypothesis was not exercised.",
+        "next": "Escalated smaller actualserializedconfig/decoder keycoverage reproducer before nextcapture."
+      },
+      "prelaunch_v6_refusal": {
+        "packet_sha256": "c89e100be42ba6a5767a058f34deda55d8acb464fa54fd81c45597566ce3af8f",
+        "root_review_sha256": "beea2d788c08d6e5346005f3305f8ce401ad4e7c54e945f8910d4ca13b9b9999",
+        "finding": "missingcanonicalpins requiredbyactualpreflight/loader",
+        "runtime": false
+      }
+    },
+    "fifth_attempt_v8": {
+      "status": "PASS_SCOPED_MENU_READINESS",
+      "candidate_packet_sha256": "10c9db0f10224ec2181b9483699df430bbcbf0b848dbc53d49ccc138eff1126b",
+      "root_review_sha256": "b411f323aee90e725e49bbfe7548b615cce08657682afc6cfb86b96ed2d39b6c",
+      "release_sha256": "db417c769fd93a0d30009777c5482d17a6603142a27dada95ee00bf4c9305cd2",
+      "result_sha256": "38967acbcedd31f63da9054dec99d3d429304db71d5c43ed9a5511d7fb03a619",
+      "retention_sha256": "21130fa443f8eecfb910da49b4e43f4b17cd188cf97ca9b5b3cd4ccbd4976a4c",
+      "independent_review_sha256": "6df657100cd8ab1eec6b504b4bb1287b2db9df748d2f158ab8dffae160f60f1d",
+      "seconds": 3.6771600423380733,
+      "datagrams": 48,
+      "serial_input_bytes": 500,
+      "baseline_sequence": 22,
+      "fresh_direct_zero_cooldown_sequence": 46,
+      "target_menu_sequence": 48,
+      "target_menu_word": "0x01080002",
+      "processed_menu_mask": "0x20",
+      "focused_controls": 15,
+      "serialized_keys": 34,
+      "owned_pid_and_group_absent": 5039,
+      "socket_absent": true,
+      "retained_files": 24,
+      "reporting_gap": "Terminal latest-cooldown=5 clears the summary zero marker; raw event history and independent replay preserve the zero at sequence46. Retained result is not rewritten.",
+      "release_scope": "Neutral FIFO action recorded after target; no post-release neutral SI echo.",
+      "limits": [
+        "Endpoint sender unauthenticated; no source-frame atomicity/causality claim.",
+        "No mode confirmation, login or network service; default-deny IP unchanged.",
+        "No history/reset/restore result."
+      ]
+    }
+  },
+  "reference_history_snapshot_candidate": {
+    "state": "ACTUAL_ZERO_SAVED_FIRST_LOAD_OBSERVED_PEER_FAULT_FAILED",
+    "candidate_v2_packet_sha256": "8a32add1d3419ebfd6df13c440e3b29ef25fb793cc143e2659f2efee410dddf7",
+    "production_source_review_sha256": "dd57109b431f58e8d7489b152cc3804eefce5d814ca65dc262d0b78ca292f294",
+    "focused_cpp_result_sha256": "4ae01e8e3d41dd43e3a23fe20e169ff9649659109227801ac3949caca8823762",
+    "focused_cpp_tests": 8,
+    "range_and_opcode_mutants": "Both deliberately weakened guard variants fail the intended controls; fixture-only first compile failure retained.",
+    "actual_TU_receipt_sha256": "9df7d98f600ba9c88b15b67ac40c4a1a3c3f29e27123996a0198edbb64424303",
+    "actual_TUs": [
+      "EXI_DeviceSlippi.cpp",
+      "SlippiRollbackDiagnostic.cpp"
+    ],
+    "compile_seconds": 3.5207201251760125,
+    "owned_groups_absent": true,
+    "original_source_build_outputs_unchanged": true,
+    "composition": "gale01r2-required-general-codes-pad-buffer-c206b460-gctrel-085c-48-v1",
+    "config_authoring": {
+      "packet_sha256": "33cbc6f8b2769f3c605a4ccc793a780c32b87f931cba48ad68eb88636f19ec36",
+      "independent_review_sha256": "b3b68c71f50c989187424e54ef2f49edc4bafb7e6024ab8f44ba3b86d8dc7439",
+      "tests": 16,
+      "stdout_retention": "Parent tool output only; no separate raw stdout file.",
+      "default_inert": true,
+      "native_parser_execution": {
+        "status": "PASS",
+        "receipt_sha256": "efc2ece0396550449d57638b9610973b51bd4128f9f41d305fb1bf7eb8a65510",
+        "result_sha256": "e17d4b1b9aacea6df7807109ae694a359a90fd87a37d08b11c7a28fef3d61656",
+        "cases": 26,
+        "valid_cases": 9,
+        "expected_native_SIGABRT_cases": 17,
+        "elapsed_seconds": 1.8559227921068668,
+        "canonical_bytes_preserved": true,
+        "parser_or_Fatal_stubs": false,
+        "owned_groups_absent": true
+      }
+    },
+    "limits": [
+      "Actual native Capture/Load observed with zero saved/post history and differing pre-load bytes; nonzero saved-history acceptance remains open.",
+      "Selected composition metadata is not whole-GCT source equivalence.",
+      "No live profile history producer/consumer/reset integration."
+    ],
+    "packaging": {
+      "patch_sha256": "21e4ead1ca3ae6bc95559c4fc420412cb3ad239c2adcfd0abde0a541332b382a",
+      "source_application_receipt_sha256": "70ecb156d34ba3849333057ef3a3bec23b3f300efef3e10c84b370bc10716e11",
+      "seven_patch_tree": "10a018c4b44aaacd8e41630ba4baafc7cefd43eb",
+      "31_real_indices_unchanged": true,
+      "focused_repository_tests": 61,
+      "skips": 1,
+      "focused_receipt_sha256": "5cdd4a6efbf1b23407c6feea7df7a92757763d792d87e0cc78b018197ec8b5c7",
+      "new_client_build": true,
+      "old_staged_binary_unchanged": true,
+      "implementation_commit": "0273b905c02b9272e915c0083544c74d27e92782",
+      "independent_review_sha256": "0e9def73ffb27966ede4daddfbdc8b9496343ccbb7e027316e8c8f90aa85b97d"
+    },
+    "new_build": {
+      "result_sha256": "d00c8cfd4c871b27b62e257bcf6a2076c43609fe63edf2e89a0bd315070e03be",
+      "artifact_manifest_sha256": "d533893503c5fc79d590e1f17cf3614049cf88725261ab9cf7499f76fb377ed1",
+      "root_retention_sha256": "86c46f35cf3e17bf763431bf4a0bb9eea898a11671c96fbfc9847882ee1a2071",
+      "seconds": 14.110390916001052,
+      "commands_passed": 15,
+      "owned_groups_absent": 15,
+      "binary_sha256": "d692719f3f4e5c21400625ad1f5e1e81c4bcaba3947219cd429564c01833029f",
+      "Rust_sha256": "097cb30fddb82eff8da29e3b6f156e7eb9ed818f1511cdf53927ea1a30a79efa",
+      "Sys_tree_sha256": "525d3333b4eed701982ada34942b83cecd9accc6e96b18a27a1b6d863e499946",
+      "old_app_unchanged": true,
+      "source_pre_post_verified": true,
+      "architecture": "arm64",
+      "runtime_launched": false
+    },
+    "full_regression": {
+      "schema": "ucf339-seven-patch-regression-root-retention-v1",
+      "source": "0273b905c02b9272e915c0083544c74d27e92782",
+      "result_sha256": "72fe119eb8c10dca40c79ac3cf3aaeed14ae88b5ba5609824ba9fcf43921c5c2",
+      "log_sha256": "7d5479f69c2d6d75ce65eb136b515d4df352e73c30fd25e320d40a18e1bd495f",
+      "tests": 2432,
+      "skips": 166,
+      "suite_seconds": 524.954,
+      "owned_group_absent": true,
+      "scratch_removed": [
+        "tmp",
+        "test-output"
+      ],
+      "retention_sha256": "019e4f4c1ee7c335c080f6196b5c2cbe6c504fd72f34f7be2264ce166610edc4",
+      "runner_seconds": 525.331864291802
+    },
+    "exact_head_ci": {
+      "head": "5b044db7d106148624ed739d3bcaba99dd0f7ff9",
+      "run": 39150276785,
+      "successes": 12,
+      "expected_skips": 2,
+      "receipt_sha256": "dcc0e8d4926499388da7002c3aa6674facb921bad66c6139b889fbf305cfdd4b"
+    },
+    "first_load_prerequisite": {
+      "capture_load_observed": true,
+      "official_services_contacted": false,
+      "all_owned_groups_absent": true,
+      "failures": [
+        {
+          "attempt": 1,
+          "boundary": "nested sandbox application before native startup",
+          "retention_sha256": "8156c89b7f10e447f845b7c35de49c86f4265eb9ba1f990a2748e1919ecab5c8"
+        },
+        {
+          "attempt": 2,
+          "boundary": "local service listen after explicit loopback bind",
+          "retention_sha256": "2e48e7537eef9edc190ca6f382b31409d0a62da8442127380af4555d186dd603"
+        },
+        {
+          "attempt": 3,
+          "boundary": "empty SJIS conversion before local ticket",
+          "retention_sha256": "5ee9e1751a66c0d441021fe2610cbf92e6781daea68ec7baa0ea7b83562c3a31"
+        },
+        {
+          "attempt": 4,
+          "boundary": "native ENet matchmaking after successful conversion and confirmation",
+          "driver_seconds": 20.523190333973616,
+          "packet_sha256": "3dd0445c69c1caed100f617bf96a54b6b5304715b23fd76e60b3ea11b477e408",
+          "review_sha256": "3c988e8cf03c0a1f93147caabf785e706bdcd88618615840c0a248a2c2ca0fe2",
+          "retention_sha256": "388e5f9d6a026bef2c07a617d9b4a65bb73c927251d445de8e07b0f2ad3d9d5e"
+        },
+        {
+          "attempt": 5,
+          "boundary": "Actual own-local pairing/match start succeeded; parser rejected native pregame sequence-1 before Capture/Load",
+          "driver_seconds": 15.604591915849596,
+          "packet_sha256": "a392038c606ff9a2375f7f20233f55580dc6e5a42d35ffab1a7a83bd4a7597a2",
+          "review_sha256": "e8c3abeb0d4f20856bb9cbba9fb25d67326b0080ec5810c1418354642f4b95ad",
+          "retention_sha256": "9811adbfdaa3535b693ae0410496968d2954eb0915cd220d7b7ded4369a150b3"
+        }
+      ],
+      "next": "Nonzero-history experiment preparation is halted by automatic review; preserve partial candidate and do not retry or reroute it. Required nonzero restore, match/reset and consumer gates remain open. Continue independent Stadium work.",
+      "receive_reduction": {
+        "packet_sha256": "6fbc1134e674914a91ade705b433c81bc490ecba59628c42590f338c2d93a14f",
+        "review_sha256": "8797b1475f424903c4c4d2fddbe8dfff284ea11c4472bc872a0e65d8858f7182",
+        "controls": 9,
+        "native_v4_syscall_errno_observed": false,
+        "scope": "Exact-role empty receive fixtures: baseline/wrong-port deny, fixed-local-port grant permits nonblocking empty receive. Native v5 subsequently paired. No peer-authentication claim."
+      },
+      "attempt6": {
+        "state": "P1_ZERO_SAVED_LOAD_OBSERVED_P2_DIAGNOSTIC_HOLD_FAULT_FAILED",
+        "packet_sha256": "ec50254f91297bfa7cb491f8c3e2cf14eda689b044b8643196de3504b702eb52",
+        "candidate_review_sha256": "ba5c4f8bad53df19480df765aa121531794c2e51354160918d2a53676db72d22",
+        "retention_sha256": "1316cf897c1f6b499c976830da53d9ade0776325aa94b0ee8c0f0ab16985d0ec",
+        "focused_controls": 32,
+        "driver_seconds": 16.957772166933864,
+        "retained_regular_files": 83,
+        "owned_pids_and_groups_absent": 3,
+        "selected_peer": "p1",
+        "game_sequence": 0,
+        "signed_frame": 92,
+        "capture_complete_sequence": 242,
+        "load_entry_sequence": 279,
+        "load_complete_sequence": 280,
+        "saved_nonzero": false,
+        "pre_load_differs": true,
+        "post_load_equals_saved": true,
+        "authored_bytes": 48,
+        "reserved_bytes": 8,
+        "preserve_history_overlaps": 0,
+        "restoration_acceptance": false,
+        "selection": "first complete owner-observed record; p1 then p2 polling, no global cross-peer ordering claim",
+        "full_retained_log_scope": "Earliest nonzero CaptureComplete in each peer is frame77/sequence163 and never loaded; only P1 has a Load. Independent P2 stream includes hold_begin98 and repeatedhold99, no release104; relative timing to P1 Load is unknown. Selected Load is not attributed to that fault.",
+        "original_driver_state": "FIRST_OWNER_OBSERVED_LOAD_REACHABILITY_CHECKPOINT",
+        "independent_result_review_sha256": "1a2f658c7eea7fe9fd123e448c1c3344e625eb57667a57cdaaafc7ace8023aec",
+        "final_process_outcomes": {
+          "matchmaker": 0,
+          "p1": 0,
+          "p2": -6,
+          "p2_diagnostic": "diagnostic hold packet queue exceeded its eight-packet bound",
+          "driver_failed_to_classify_final_client_failure": true,
+          "clean_run_pass": false,
+          "private_profiles_retained": true
+        }
+      },
+      "offline_final_outcome_classifier": {
+        "state": "EXTERNAL_CANDIDATE_PREPARED_REVIEWED_NOT_APPLIED_OR_RUNTIME_RELEASED",
+        "packet_sha256": "2bc80d3058643eb07e93aab77d11db8721f4e719e4cc73a1f8ae5ea6e2ddafa2",
+        "review_sha256": "776a77d0aef64157ce8f32bc029493be79f4e11694d6c4ea8c8d6ec11870d1c0",
+        "focused_adapter_controls": 7,
+        "scope": "Required strict peer streams and first cleanup receipt; nonzero client result/fatal diagnostic fails; earlier errors preserved. Retained v6 classifies as failed while preserving selected P1 observation. No new capture.",
+        "v1_rejected_review_sha256": "a8f061a9f9f0a0c8b3cc5b437227fadf93e96018c2553cdd84ffa7ed5bd3887a"
+      },
+      "nonzero_candidate_automatic_review_block": {
+        "state": "PREPARATION_HALTED_NOT_RELEASED_NOT_RUN",
+        "reason": "Automatic review flagged possible cybersecurity risk; no more specific reason supplied.",
+        "partial_candidate_files_retained": 10,
+        "retention_sha256": "07877e38eb8ef109e4875c3f0bd4e9ca5c458d39006dea80ae3665368b713a42",
+        "retry_or_reroute": false,
+        "game_failure_claim": false
+      }
+    },
+    "exact_head_ci_100da5c1": {
+      "head": "100da5c10ac76564571b1a686b18433fdb0e05bd",
+      "run": 39153753306,
+      "successes": 12,
+      "expected_skips": 2,
+      "receipt_sha256": "35f4e0252a048e092f57795cfa8b039ca6c7217bf4eb8969eadf879969860a37"
+    },
+    "exact_head_ci_9ae5cb9e": {
+      "head": "9ae5cb9e96d2441695da318bb3a861512de727c1",
+      "run": 39155747772,
+      "successes": 12,
+      "expected_skips": 2,
+      "receipt_sha256": "abcb1413739bfdfb5cb10c08cbd752353b17073588c854a22f75a4855d7cb2a3"
+    }
+  }
+}

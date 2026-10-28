@@ -189,6 +189,9 @@ python3 scripts/agent_workspace.py run -- git apply \
 python3 scripts/agent_workspace.py run -- git apply \
   --directory=.deps/slippi-dolphin-local \
   reference-capture/slippi/patches/0006-jitter-reorder-native.patch
+python3 scripts/agent_workspace.py run -- git apply \
+  --directory=.deps/slippi-dolphin-local \
+  reference-capture/slippi/patches/0007-ucf-history-snapshot.native.patch
 python3 scripts/agent_workspace.py run -- git clone --no-checkout \
   https://github.com/project-slippi/slippi-ssbm-asm .deps/slippi-ssbm-asm
 python3 scripts/agent_workspace.py run -- git -C .deps/slippi-ssbm-asm checkout --detach \
@@ -199,11 +202,14 @@ The generated `Output/Netplay/GALE01r2.ini` must match the lock hash. Install
 Rust 1.88.0 and use the locked CMake, Ninja and Apple Clang versions. The
 runner rejects mismatched revisions, patch trees, compiler/build settings, or
 generated game modification. Keep the clean Dolphin checkout unchanged.
-The third through sixth patches are opt-in diagnostic controls. They are
+The third through seventh patches are opt-in diagnostic controls. They are
 disabled unless an explicit diagnostic config is supplied; the ordinary
 match/rematch command retains its controller script. The sixth patch adds the
 bounded jitter/reorder sender actions, while the fourth and fifth add duplicate
-and receiver-arrival observations.
+and receiver-arrival observations. The seventh adds optional synchronous UCF
+history observations around the real capture/load calls. Rebuild the client
+after applying it and retain a new executable/source receipt; the historical
+build lineage in the lock does not identify that new build.
 See [the bounded rollback diagnostic](ROLLBACK_DIAGNOSTIC.md) for the separate
 frame-indexed fixture and its comparison boundary.
 

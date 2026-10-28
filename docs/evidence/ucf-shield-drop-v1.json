@@ -1,7 +1,7 @@
 {
   "schema": "melee-web-ucf-shield-drop-v1",
   "issue": 337,
-  "state": "reviewed_private_v5_component_local_validation_passed_pending_ci_integration",
+  "state": "reviewed_private_v5_component_merged",
   "source_base": "220e8ad969e45edc9d39b747f99411a8f00c7880",
   "implementation_commit": "9ae4d79427532bff91f0c7ca62070c55bc025d2f",
   "profile_identity": "slippi-render-dependencies-dbooc-shield-drop-v5",
@@ -217,5 +217,16 @@
     "retained_runtime_manifest_sha256": "93fea7adb548c09f6f5fd7e2f20080200298d1782a0fbf91ac68e37843b0cba5",
     "retained_runtime_artifacts": 18,
     "scope": "Affected builds and regression only; no new browser, client, capture or online result."
+  },
+  "integration": {
+    "pr": 338,
+    "head": "266e3b2111b260d2659208cf7eed0571dc39f9db",
+    "merge": "130438fd2b86d00cfec98cd2ba0a5f66084ae15c",
+    "reviewed_tree_equals_merged_tree": true,
+    "tree": "767cee5d6178da7f9b1e2afd08df8ac0c1ca6cd8",
+    "ci_run": 39127826537,
+    "checks_completed": 14,
+    "checks_successful": 12,
+    "checks_expected_skipped": 2
   }
 }

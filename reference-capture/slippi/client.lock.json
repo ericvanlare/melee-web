@@ -177,11 +177,13 @@
     "patches/0003-desktop-rollback-diagnostic.patch",
     "patches/0004-desktop-rollback-duplicate-role2.native.patch",
     "patches/0005-duplicate-receive-join.native.patch",
-    "patches/0006-jitter-reorder-native.patch"
+    "patches/0006-jitter-reorder-native.patch",
+    "patches/0007-ucf-history-snapshot.native.patch"
   ],
   "patch_targets": [
     "dolphin",
     "rust",
+    "dolphin",
     "dolphin",
     "dolphin",
     "dolphin",
