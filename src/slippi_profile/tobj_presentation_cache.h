@@ -20,8 +20,11 @@ void slippi_tobj_retiring(void* object);
 void slippi_tobj_rebound(void* object, void* previous, void* next);
 void slippi_tobj_amnesia(void* info);
 void slippi_tobj_unsupported_write(void* object);
-/* Returns 1 for admitted managed UV/TOON, 0 ONLY for named original Shadow.
- * Unknown/pending/custom/poisoned is an explicit panic, never fallback. */
+/* Returns 1 for admitted managed UV/Reflection/TOON, 0 ONLY for a named
+ * original-path Shadow owner. Shadow may be named by makeShadowTObj or by a
+ * canonical descriptor Load while pending, and retained on canonical reload;
+ * it never gains private matrix/dirty-cache authority. Unknown/pending/custom/
+ * poisoned is an explicit panic, never fallback. */
 int slippi_tobj_managed_require(void* object);
 #ifndef __cplusplus
 MtxPtr slippi_tobj_matrix_require(void* object);

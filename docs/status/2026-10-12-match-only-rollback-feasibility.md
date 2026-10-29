@@ -988,7 +988,7 @@ makes the source control use the actual bool-before-profile composition APIs;
 the reduced composition check proves the final TObj source byte-exact. Source
 math, inputs, comparison policy and strict failure were not relaxed.
 
-### V8 presentation cache: component validation passes; browser initialization fails
+### V8 presentation cache: Node initialization repaired; browser restore remains open
 
 Source checkpoint `019fa3171bbff8dff645a5586d8fb03d2f278940` adds the
 default-off private UV/TOON matrix and derived-dirty presentation cache. Its
@@ -1021,12 +1021,50 @@ not applicable to V8's relocated cache; this is not a zero-event success.
 
 The structured receipt records this boundary under
 `tobj_v8_presentation_cache_initialization_v1`, including the exact producer,
-validation, configuration, packet and raw-result review. Further initialization diagnosis is
-checkpointed after an automated tool security block; the blocked investigation
-will not be retried or routed through another executor. No repair or browser
-retry has been released. V7's earlier strict mismatch remains
-unresolved by actual V8 browser evidence. Full owner coverage, seven corrective
-ticks, relay rollback, original parity and acceptance remain open.
+validation, configuration, packet and raw-result review. A historical subagent
+turn received an automated security notice; the subsequent permanent no-retry
+wording was a lead-authored checkpoint, not evidence of a repository or account
+restriction. The owner requested a fresh bounded attempt. No safeguard settings
+changed, and that attempt completed without a new rejection. The original notice
+and failed evidence remain retained.
+
+The October 28 diagnosis retained two short browser failures, then reduced
+initialization to a Node test with no GPU, requested simulation ticks or source
+draws. First-failure diagnostics identified canonical Shadow coordinate 3 and,
+after its repair, canonical Reflection coordinate 1. Canonical-loaded Shadow now
+keeps its original path without acquiring private matrix or restore authority.
+Reflection uses the existing managed matrix calculation with unchanged original
+arithmetic. Highlight, Gradation, Backlight, unknown and custom modes remain
+fail-closed; Highlight's light-vector provider can mutate source state and needs
+a separate ownership proof.
+
+Independent architecture and candidate review preceded the runtime retry. The
+focused actual-source control passes strict original/active output comparisons,
+including five Reflection histories, all seven transform callbacks, reload and
+BUMP. Each active draw preserves all 172 source-object bytes. Cross-binary source
+projections normalize the verified canonical class pointer and compare matrix
+and effective flags separately; this is not raw cross-binary object equality.
+The failure-log harness passes 47 controls. Earlier fixture failures are retained.
+
+The reviewed cache C hash is `81e4062255c4020e47e2de6987c937eacd54270a581b3ce6e39255f8797dc3cb`.
+The affected private Node target rebuild passes. Its Wasm hash is
+`c3ca0be6247e5e9124446626edfefdd20a94ebe4799cd10710753527c7492f75`;
+its unchanged JS glue hash is
+`61941ee6d517133abbc2c841ebc89b6d361ad3348a185431aba9e6793c3d8971`.
+One guarded initialization with seed `0x13579bdf` returns 1, snapshot close
+returns 1, native logs and stderr are empty, and the recorded process group is
+absent. This is zero-tick Node initialization evidence only. The source getter,
+local cache source, build inputs and actual binary hashes are separately pinned
+in `initialization_repair_20261028` in the structured receipt. Previous binaries
+and producer inputs were archived and verified before overwrite.
+
+The browser binary remains the earlier failed producer. There is no repaired
+browser run, two-tick comparison, corrective interval or final-present result.
+The historical five builds and full regression above do not validate this new
+repair; full regression, current-main integration and exact-head CI remain
+pending. V7's earlier strict mismatch remains unresolved by actual V8 browser
+evidence. Full owner coverage, seven corrective ticks, relay rollback, original
+parity and acceptance remain open.
 
 ## Stage decision dependencies, issue #333
 

@@ -70,6 +70,56 @@ export function recordFailedCensusExecution(report, error) {
   return report;
 }
 
+export async function recordCensusFailurePageState(report, page) {
+  if (!page) return;
+  try {
+    // Read the existing JS log buffer even when native initialization aborted.
+    // Do not call the failed Wasm instance or advance the source to diagnose it.
+    report.browserPageState = await page.evaluate(() => ({
+      title: document.title,
+      logs: window.__slippiSynctest?.logs ?? null,
+    }));
+  } catch (error) {
+    report.browserPageStateError = String(error);
+  }
+}
+
+export function selectTobjFailureStatics(manifest) {
+  return [['first_failure', 4], ['owner_world', 8], ['owners', 4],
+    ['active_token', 8], ['owner_count', 4]].map(([name, size]) => {
+    const rows = manifest.mutable_input_sections.filter(row =>
+      row.source === 'src/slippi_profile/tobj_presentation_cache.c' &&
+      row.input_object === 'libhsd_native_runtime.a(tobj_presentation_cache.c.o)' &&
+      row.input_section === `.bss.${name}`);
+    if (rows.length !== 1 || rows[0].size !== size ||
+        !Number.isSafeInteger(rows[0].address) || rows[0].address <= 0 ||
+        rows[0].address + size > 0x100000000) {
+      throw new Error(`TObj failure diagnostic manifest row refused: ${name}`);
+    }
+    return {name, address: rows[0].address, size};
+  });
+}
+
+export async function recordTobjFailureStatics(report, page, rows) {
+  if (!page || !rows) return;
+  try {
+    // The caller has matched this manifest/map to the exact linked Wasm.
+    // Copy only named static bytes; do not follow owners or call native code.
+    report.tobjFailureStatics = await page.evaluate(selected => {
+      const heap = window.__slippiSynctest?.module?.HEAPU8;
+      if (!(heap instanceof Uint8Array)) throw new Error('Wasm memory unavailable after failure');
+      return selected.map(row => {
+        if (row.address + row.size > heap.byteLength) {
+          throw new Error(`TObj diagnostic outside current Wasm memory: ${row.name}`);
+        }
+        return {...row, bytes: Array.from(heap.slice(row.address, row.address + row.size))};
+      });
+    }, rows);
+  } catch (error) {
+    report.tobjFailureStaticsError = String(error);
+  }
+}
+
 export function validateCpuRestoreRouteSelection(values) {
   const oneTick = values['--aggregate-cpu-drawn-reference'] === true;
   const twoTick = values['--aggregate-cpu-drawn-reference-two-tick'] === true;
@@ -438,6 +488,7 @@ async function main() {
   }
   const manifest = JSON.parse(fs.readFileSync(options['--manifest'], 'utf8'));
   const manifestInventory = validateSourceStateManifest(manifest);
+  const tobjFailureStatics = tobjPresentationCache ? selectTobjFailureStatics(manifest) : null;
   const runtimeHashes = Object.fromEntries([runtime, wasm, data].map(file => [path.basename(file), fileSha(file)]));
   if (manifestInventory.wasmSha256 !== runtimeHashes[path.basename(wasm)]) {
     throw new Error('Source-state manifest does not describe the supplied final browser Wasm');
@@ -817,6 +868,12 @@ async function main() {
     recordFailedCensusExecution(report, error);
     if(cpuWire){
       recordCpuRestoreFailure(report,error);
+    }
+    await recordCensusFailurePageState(report, page);
+    await recordTobjFailureStatics(report, page, tobjFailureStatics);
+    if (page) {
+      try { report.failureScreenshot = await screenshotRecord(page, options['--out'], 'failure.png'); }
+      catch (screenshotError) { report.failureScreenshotError = String(screenshotError); }
     }
     writeReport();
     throw error;

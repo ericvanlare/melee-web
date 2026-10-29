@@ -8315,7 +8315,127 @@
         "Original parity, complete owner coverage, seven-tick budget, relay rollback and acceptance remain open.",
         "Default-off private incomplete profile; no comparison weakening or renderer rewind."
       ],
-      "followup_status": "CHECKPOINTED_AUTOMATED_SECURITY_BLOCK_NO_RETRY_OR_REROUTE"
+      "followup_status": "NODE_INITIALIZATION_REPAIR_PASS_BROWSER_RESTORE_PENDING",
+      "initialization_repair_20261028": {
+        "status": "REVIEWED_COMPONENT_AND_PRIVATE_NODE_INIT_PASS",
+        "evidence_root": "rollback-renderer-resume-20261028-155740-eef0524c",
+        "source_head": "9d4b3c69d81c26720e3bce5c223b4e038352c920",
+        "identities": {
+          "gitHead": "9d4b3c69d81c26720e3bce5c223b4e038352c920",
+          "profile": "slippi-render-dependencies-logical-frame-lobj-tobj-v8",
+          "source": "af952c7c386af85630136e63cad8d3322f3bb58fa550c6899e10e3f5814f963f",
+          "rngHelper": "2b9f7398e09cb8ca8c2d53474739b313ce565bae77411cd29b4d2f4087a4812e",
+          "stageBridge": "a81e21f9629e711b3975ca93b821bedd2c13cf06fde6381585bc3918a8aef3db",
+          "nodeJsSha256": "61941ee6d517133abbc2c841ebc89b6d361ad3348a185431aba9e6793c3d8971",
+          "nodeWasmSha256": "c3ca0be6247e5e9124446626edfefdd20a94ebe4799cd10710753527c7492f75",
+          "cacheSourceSha256": "81e4062255c4020e47e2de6987c937eacd54270a581b3ce6e39255f8797dc3cb",
+          "cacheHeaderSha256": "1596a7855615c85930cc2e25de3e1949900dc6299e5f4d6cbfbc2d3670864144",
+          "compileCommandsSha256": "28365dcb1cb2e735696a9e41dd4cb08762da5af641037b9f271404c6658251ce",
+          "sourceProducerInventorySha256": "0d28dbcbc9f14d82f269dfc761427eac8841100bcd4dc022014a5502c8455f65",
+          "cmakeCacheSha256": "44b8f9e0de471e57298942341bc5f2941e6776dd262836b99ed2dcbc0ca809af"
+        },
+        "result": {
+          "configureExitCode": 0,
+          "buildExitCode": 0,
+          "buildObservedProducerCompile": "CMakeFiles/hsd_native_runtime.dir/src/slippi_profile/tobj_presentation_cache.c.o",
+          "buildObservedArchiveLink": "libhsd_native_runtime.a",
+          "nodeInitStatus": "initialized",
+          "nodeInitResult": 1,
+          "firstFailureContext": null,
+          "nativeLogs": [],
+          "externalStderrEmpty": true,
+          "snapshotTicks": 0,
+          "sourceDraws": 0,
+          "closeResult": 1,
+          "ownedProcessTimeoutSeconds": 30,
+          "ownedProcessCleanup": true,
+          "elapsedSeconds": 1.0182159170508385
+        },
+        "first_failures": [
+          {
+            "run": "node-init-reproducer-v3.json",
+            "code": 9,
+            "detail": 3,
+            "meaning": "Canonical Shadow load refusal; repaired as original-path-only."
+          },
+          {
+            "run": "node-init-reproducer-v4.json",
+            "code": 9,
+            "detail": 1,
+            "meaning": "Canonical Reflection load refusal; repaired using existing managed matrix arithmetic."
+          }
+        ],
+        "scope": "Private default-off texture presentation cache. No game arithmetic, input, RNG, source order or comparison policy changed.",
+        "controls": {
+          "harness_node_tests": 47,
+          "actual_source_control": "Strict original/active stdout equivalence, five added Reflection histories; active whole-object 172-byte draw invariance. Cross-binary source projection normalizes verified canonical class pointer and compares matrix/effective flags separately.",
+          "unsupported": "Highlight, Gradation, Backlight, unknown and custom remain fail-closed."
+        },
+        "historical_notice": "A prior subagent turn received an automated security notice. The permanent no-retry language was lead-authored, not evidence of a permanent repository/account restriction. Owner-requested bounded attempt completed without a fresh rejection or safeguard change.",
+        "references": {
+          "node-init-reproducer-v5-result-receipt.json": {
+            "path": "node-init-reproducer-v5-result-receipt.json",
+            "bytes": 6330,
+            "sha256": "a41cec58b817ddaacef172d9d5f006387bfdb8fc2561078f5b3eea438838fe1f"
+          },
+          "node-init-reproducer-v5.json": {
+            "path": "node-init-reproducer-v5.json",
+            "bytes": 8457,
+            "sha256": "971696c667f39fc0cdaa61e3999fbff35d7700299dd077186c2d5fbe25a36287"
+          },
+          "node-init-reproducer-v5.result.json": {
+            "path": "node-init-reproducer-v5.result.json",
+            "bytes": 2384,
+            "sha256": "cb70993f937ab523966262e845b2baf4c6db6d5fc07ab1b484e33570e0102aa6"
+          },
+          "texture-coordinate-architecture-review-v1.json": {
+            "path": "texture-coordinate-architecture-review-v1.json",
+            "bytes": 8947,
+            "sha256": "0e122e748385f37866b70a53c1d93c69264434e9a6537dec73d638a65817a73d"
+          },
+          "root-reflection-candidate-review-v1.json": {
+            "path": "root-reflection-candidate-review-v1.json",
+            "bytes": 2310,
+            "sha256": "ff69699bec889ccad9206487826f36be45e7a1ba8c2c5bfb7e3c2533726ffd81"
+          },
+          "reflection-control-v4.result.json": {
+            "path": "reflection-control-v4.result.json",
+            "bytes": 1181,
+            "sha256": "f303fbb16b55896e54cc388f0913832e2f9fbcc3a05a8a00d7109fda430136b9"
+          },
+          "first-site-diagnostic-review.json": {
+            "path": "first-site-diagnostic-review.json",
+            "bytes": 2709,
+            "sha256": "05da233606dbd9dc04d3c51b0bca2b2a321623fe9a61fb05b035a38c9a6d7b99"
+          },
+          "shadow-role-repair-review-v1.json": {
+            "path": "shadow-role-repair-review-v1.json",
+            "bytes": 3287,
+            "sha256": "456b76088bbdd422cdf204a63191de480a8269134d82db154e78c39fbb8bdac3"
+          },
+          "harness-review-v2.json": {
+            "path": "harness-review-v2.json",
+            "bytes": 6589,
+            "sha256": "133541f0d468a8d39a7f552c8250a2f541a7da3f1240255006171bc5ee397f48"
+          },
+          "node-init-reproducer-v4-result-receipt.json": {
+            "path": "node-init-reproducer-v4-result-receipt.json",
+            "bytes": 9075,
+            "sha256": "e167179015e5e1033344f22c7a02c4fcf89ee920fad1672b4a29dec22f1d7ffd"
+          },
+          "pre-v5-v4-runtime-archive/inventory.json": {
+            "path": "pre-v5-v4-runtime-archive/inventory.json",
+            "bytes": 8035,
+            "sha256": "43d9f8db8727e6f7fedf8e857ef0eaacef3ed5c9fbf66f786cfd3983263d87e1"
+          }
+        },
+        "limits": [
+          "Zero requested simulation ticks or source draws; no browser or GPU result from the repaired runtime.",
+          "Historical browser artifact remains unchanged; regenerate exact linked configuration after a repaired browser build.",
+          "Historical full suite/five builds do not validate this repair. Current-main integration, full regression and exact-head CI remain pending.",
+          "No complete rollback, original parity or acceptance claim."
+        ]
+      }
     }
   }
 }

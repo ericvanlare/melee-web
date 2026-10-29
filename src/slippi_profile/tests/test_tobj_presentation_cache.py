@@ -86,7 +86,8 @@ class TObjPresentationCacheTests(OwnedWorkspaceTests):
         # extracted, with original source providers. Full Shadow Setup/GPU unrun.
         tobj=tree/rels[2]
         tobj.write_text(tobj.read_text()+'''
-void fixture_tobj_update(HSD_TObj* p,float v){HSD_ObjData d;memset(&d,0,sizeof(d));d.fv=v;TObjUpdateFunc(p,HSD_A_T_TRAV,&d);}
+void fixture_tobj_update_type(HSD_TObj* p,u32 type,float v){HSD_ObjData d;memset(&d,0,sizeof(d));d.fv=v;TObjUpdateFunc(p,(enum_t)type,&d);}
+void fixture_tobj_update(HSD_TObj* p,float v){fixture_tobj_update_type(p,HSD_A_T_TRAV,v);}
 void fixture_tobj_setup(HSD_TObj* p){TObjSetupMtx(p);}
 void fixture_actual_make(HSD_TObj* p){MakeTextureMtx(p);}
 void fixture_tobj_amnesia(void){TObjAmnesia((HSD_ClassInfo*)&hsdTObj);}
@@ -120,16 +121,63 @@ return p->mtx;
             args += ['-I'+str(overlay/'src'),'-I'+str(prepared),'-I'+str(prepared/'sysdolphin/baselib'),'-UNDEBUG','-DPROPOSED_LANE='+str(int(active)),'-DMELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE='+str(int(active)),'-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE='+str(int(active)),'-c',str(source),'-o',str(out)]
             self.run_command(mode+'-compile-'+name,args,env=env);return out
         source_map=[('class',tree/rels[0],'/src/sysdolphin/baselib/class.c'),('object',tree/rels[1],'/src/sysdolphin/baselib/class.c'),('tobj',tobj,'/src/sysdolphin/baselib/tobj.c'),('shadow',shadow,'/src/sysdolphin/baselib/tobj.c'),('rotation',mathsrc,'/src/sysdolphin/baselib/tobj.c'),('psmath',ROOT/'src/gameplay_ps_math.c','/src/gameplay_ps_math.c'),('sdkmtx',ROOT/'.deps/aurora/lib/dolphin/mtx/mtx.c','/lib/dolphin/mtx/mtx.c'),('bounds',ROOT/'src/hsd_texture_bounds.c','/src/hsd_texture_bounds.c'),('control',control,'/src/sysdolphin/baselib/tobj.c')]
-        common_cases=['changed','unchanged','same-value','toon','toon-uv','reuse','rebind','amnesia','admission','missing-load','bounds-release'];outputs={}
+        common_cases=['changed','unchanged','same-value','toon','toon-uv','shadow-loaded','reuse','rebind','amnesia','admission','missing-load','bounds-release'];outputs={}
         for mode in ['original','active']:
             objects=[compile_one(n,p,mode,s) for n,p,s in source_map]
             binary=self.work/(mode+'.js');self.run_command(mode+'-link',[em/'emcc',*objects,'-fexceptions','-sDISABLE_EXCEPTION_CATCHING=0','-sENVIRONMENT=node','-sEXIT_RUNTIME=1','-Wl,--wrap=malloc','-Wl,--wrap=calloc','-o',binary],env=env)
-            for case in common_cases+(['oom-observe-malloc-only','oom','pending-anchor','shadow','all-managed','lifecycle-drift','unknown-selection','custom-default','unsupported-coordinate','world-recreation'] if mode=='active' else []):
+            for case in common_cases+(['oom-observe-malloc-only','oom','pending-anchor','active-interval-load','shadow','all-managed','lifecycle-drift','unknown-selection','custom-default','unsupported-coordinate','world-recreation'] if mode=='active' else []):
                 outputs[(mode,case)]=self.run_command(mode+'-'+case,[node_runtime(),binary,case],env=env)
-        for case in ['shadow-cache','unknown-cache']:
+        # These are two distinct HSD_Panic edges inside the same actual
+        # animation callback: the original TIMG table assertion and the
+        # private cache's transform-owner refusal. Keep both messages visible
+        # so a browser startup abort can be attributed before changing policy.
+        for mode in ['original','active']:
+            name=mode+'-timg-null-table'
+            self.run_command(name,[node_runtime(),self.work/(mode+'.js'),'timg-null-table'],env=env,expected=93)
+            record=json.loads((self.work/(name+'.json')).read_text())
+            self.assertIn('tobj->imagetbl',record['stderr']+record['stdout'])
+            self.assertNotIn('Unsupported Slippi TObj presentation owner',record['stderr']+record['stdout'])
+        name='active-pending-update'
+        self.run_command(name,[node_runtime(),self.work/'active.js','pending-update'],env=env,expected=94)
+        record=json.loads((self.work/(name+'.json')).read_text())
+        self.assertIn('Unsupported Slippi TObj presentation owner',record['stderr']+record['stdout'])
+        name='active-unsupported-coordinate-update'
+        self.run_command(name,[node_runtime(),self.work/'active.js',name.removeprefix('active-')],env=env,expected=94)
+        record=json.loads((self.work/(name+'.json')).read_text())
+        diagnostic=record['stderr']+record['stdout']
+        context=re.search(r'FIRST_FAILURE_CONTEXT=\{"code":9,"line":(\d+),"detail":3\}',diagnostic)
+        self.assertIsNotNone(context,'poisoned animated TObj panic must report the earlier OWNER_ROLE line and SHADOW coord')
+        self.assertGreater(int(context.group(1)),0)
+        self.assertIn('Unsupported Slippi TObj presentation owner',diagnostic)
+        self.assertLess(diagnostic.index('FIRST_FAILURE_CONTEXT='),diagnostic.index('Unsupported Slippi TObj presentation owner'))
+        name='active-unsupported-highlight-update'
+        self.run_command(name,[node_runtime(),self.work/'active.js','unsupported-highlight-update'],env=env,expected=94)
+        record=json.loads((self.work/(name+'.json')).read_text());diagnostic=record['stderr']+record['stdout']
+        self.assertRegex(diagnostic,r'FIRST_FAILURE_CONTEXT=\{"code":9,"line":\d+,"detail":2\}')
+        self.assertIn('Unsupported Slippi TObj presentation owner',diagnostic)
+        for case in ['shadow-cache','shadow-flags-cache','shadow-consumed-cache',
+                     'shadow-loaded-matrix-cache','shadow-loaded-flags-cache',
+                     'shadow-loaded-consumed-cache','unknown-cache']:
             self.run_command('active-'+case,[node_runtime(),self.work/'active.js',case],env=env,expected=94)
+        reflection_cases=['reflection-unchanged','reflection-same-value','reflection-changed','reflection-reload','reflection-bump']
+        reflection_outputs={}
+        for case in reflection_cases:
+            for mode in ['original','active']:
+                name=mode+'-'+case
+                reflection_outputs[(mode,case)]=self.run_command(name,[node_runtime(),self.work/(mode+'.js'),case],env=env)
+            original=reflection_outputs[('original',case)]
+            active=reflection_outputs[('active',case)]
+            self.assertEqual(original,active,case)
+            self.assertIn('ACTUAL:canonical Reflection matrix/GX histories',active,case)
+            self.assertIn('GX:reflection-',active,case)
+            self.assertIn('OBS:reflection-',active,case)
+            for mode in ['original','active']:
+                record=json.loads((self.work/(mode+'-'+case+'.json')).read_text())
+                self.assertRegex(record['stderr'],r'SOURCE_CLASS_IDENTITY:[^\n]+:0x[0-9a-fA-F]+:HSD_TObj',case)
+            active_record=json.loads((self.work/('active-'+case+'.json')).read_text())
+            self.assertEqual(active_record['stderr'].count('SOURCE172_ACTIVE_DRAW:UNCHANGED'),active.count('GX:'),case)
         for case in common_cases:self.assertEqual(outputs[('original',case)],outputs[('active',case)],case)
-        (self.work/'input-pins.json').write_text(json.dumps({'compile_graph':str(db),'sha256':hashlib.sha256(db.read_bytes()).hexdigest(),'composed_patch_sha256':hashlib.sha256(composed.read_bytes()).hexdigest(),'texture_bounds_source':str(ROOT/'src/hsd_texture_bounds.c'),'texture_bounds_sha256':hashlib.sha256((ROOT/'src/hsd_texture_bounds.c').read_bytes()).hexdigest(),'source':{r:hashlib.sha256((tree/r).read_bytes()).hexdigest() for r in rels},'scope':'actual module/static test inspectors; modeled memory/null-AObj/abort-only custom/GX arguments; Shadow full Setup and aggregate owner chain not covered'},indent=2)+'\n')
+        (self.work/'input-pins.json').write_text(json.dumps({'compile_graph':str(db),'sha256':hashlib.sha256(db.read_bytes()).hexdigest(),'composed_patch_sha256':hashlib.sha256(composed.read_bytes()).hexdigest(),'texture_bounds_source':str(ROOT/'src/hsd_texture_bounds.c'),'texture_bounds_sha256':hashlib.sha256((ROOT/'src/hsd_texture_bounds.c').read_bytes()).hexdigest(),'source':{r:hashlib.sha256((tree/r).read_bytes()).hexdigest() for r in rels},'scope':'actual TObj module/static source control; each lane asserts canonical HSD_TObj class identity and retains raw relocated class pointer separately; normalized SOURCE172 projection compared (not raw 172-byte binary equality); active lane checks complete 172-byte source preservation during presentation; Reflection matrix and GX 3x4 arguments captured; modeled memory/null-AObj/abort-only custom/GX sink; no full TObj resource assignment, texgen, PObj or aggregate renderer claim'},indent=2)+'\n')
         print('PASS actual typed TObj module/component scope only',self.work)
 
 if __name__=='__main__':unittest.main()

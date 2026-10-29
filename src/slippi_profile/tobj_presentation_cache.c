@@ -57,10 +57,16 @@ static TObjOwner* owners;
 static DescriptorProof proof;
 static uint64_t owner_world, owner_serial, owner_generation, interval_serial, active_token;
 static uint32_t owner_count, first_failure;
+/* Read only from a source/map-pinned post-abort diagnostic. Volatile keeps
+ * these failure-path breadcrumbs in the frozen native image without exports. */
+static volatile uint32_t first_failure_line, first_failure_detail;
 enum { OWNER_MISSING=1, OWNER_DESCRIPTOR=2, OWNER_OOM=3, OWNER_WRAP=4,
        OWNER_LIFETIME=5, OWNER_REBIND=6, OWNER_AMNESIA=7, OWNER_INTERVAL=8,
        OWNER_ROLE=9, OWNER_WORLD=10, OWNER_LOAD=11, OWNER_CUSTOM=12 };
-static void fail(uint32_t why){if(!first_failure)first_failure=why;}
+static void fail_at(uint32_t why,uint32_t line,uint32_t detail){
+    if(!first_failure){first_failure=why;first_failure_line=line;first_failure_detail=detail;}
+}
+#define fail(why) fail_at((why),(uint32_t)__LINE__,0)
 static void event(void){if(owner_serial==UINT64_MAX)fail(OWNER_WRAP);else ++owner_serial;}
 static int descriptor_valid(void){
     HSD_ClassInfo* c=proof.identity;
@@ -85,12 +91,15 @@ static TObjOwner* find(void* pointer){
     return NULL;
 }
 static void panic_owner(uint32_t why){
-    fail(why);HSD_Panic(__FILE__,__LINE__,"Unsupported Slippi TObj presentation owner");
+    fail(why);
+    OSReport("FIRST_FAILURE_CONTEXT={\"code\":%u,\"line\":%u,\"detail\":%u}\n",
+        (unsigned)first_failure,(unsigned)first_failure_line,(unsigned)first_failure_detail);
+    HSD_Panic(__FILE__,__LINE__,"Unsupported Slippi TObj presentation owner");
     abort(); /* A provider returning from panic cannot become silent success. */
 }
 int slippi_tobj_world_begin(uint64_t world){
     if(!world||owner_world||owners||active_token){fail(OWNER_WORLD);return 0;}
-    owner_world=world;first_failure=0;event();return first_failure==0;
+    owner_world=world;first_failure=first_failure_line=first_failure_detail=0;event();return first_failure==0;
 }
 void slippi_tobj_world_end(uint64_t world){
     if(!world||world!=owner_world){fail(OWNER_WORLD);return;}
@@ -158,7 +167,7 @@ static int admissible(TObjOwner* e){
     if(e->role==ROLE_SHADOW)return 1; /* No managed matrix/flags access. */
     if(e->role!=ROLE_MANAGED)return 0;
     const uint32_t c=e->object->flags&TEX_COORD_MASK;
-    return c==TEX_COORD_UV||c==TEX_COORD_TOON;
+    return c==TEX_COORD_UV||c==TEX_COORD_REFLECTION||c==TEX_COORD_TOON;
 }
 static TObjOwner* require_owner(void* object){
     TObjOwner* e=find(object);if(!e||first_failure)panic_owner(OWNER_MISSING);return e;
@@ -172,11 +181,23 @@ void slippi_tobj_loaded(void* object){
     TObjOwner* e=find(object);
     if(!e||first_failure||active_token){fail(OWNER_LOAD);return;}
     const uint32_t coord=e->object->flags&TEX_COORD_MASK;
-    if(e->role==ROLE_SHADOW||(coord!=TEX_COORD_UV&&coord!=TEX_COORD_TOON)){
-        e->poisoned=OWNER_ROLE;fail(OWNER_ROLE);event();return;
+    if(coord==TEX_COORD_SHADOW){
+        /* Descriptor loads copy authored flags before this callback. Only a
+         * newly constructed owner may acquire the named Shadow role here;
+         * an already named Shadow may retain it across a canonical reload.
+         * Neither case enters the private matrix/dirty cache. */
+        if(e->role==ROLE_PENDING){e->role=ROLE_SHADOW;event();return;}
+        if(e->role==ROLE_SHADOW){event();return;}
+        e->poisoned=OWNER_ROLE;fail_at(OWNER_ROLE,(uint32_t)__LINE__,coord);event();return;
     }
-    if(e->role==ROLE_PENDING)memcpy(e->cache.matrix,e->object->mtx,sizeof(Mtx));
-    e->role=ROLE_MANAGED;e->cache.dirty=TEX_MTX_DIRTY;event();
+    if(coord==TEX_COORD_UV||coord==TEX_COORD_REFLECTION||coord==TEX_COORD_TOON){
+        if(e->role==ROLE_PENDING)memcpy(e->cache.matrix,e->object->mtx,sizeof(Mtx));
+        else if(e->role!=ROLE_MANAGED){
+            e->poisoned=OWNER_ROLE;fail_at(OWNER_ROLE,(uint32_t)__LINE__,coord);event();return;
+        }
+        e->role=ROLE_MANAGED;e->cache.dirty=TEX_MTX_DIRTY;event();return;
+    }
+    e->poisoned=OWNER_ROLE;fail_at(OWNER_ROLE,(uint32_t)__LINE__,coord);event();
 }
 void slippi_tobj_shadow(void* object){
     TObjOwner* e=find(object);

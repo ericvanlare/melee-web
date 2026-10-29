@@ -6,6 +6,8 @@ import vm from 'node:vm';
 import {webcrypto} from 'node:crypto';
 import {decodeDrawDiagnostics} from './runner_contract.mjs';
 import {assembleCompletedCensusExecution, recordFailedCensusExecution,
+  recordCensusFailurePageState,
+  selectTobjFailureStatics, recordTobjFailureStatics,
   validateCensusDrawSample, validateCpuRestoreRouteSelection, validateBrowserProfileForRoute} from './run_write_census.mjs';
 import {
   classifyHeapRanges, decodeAudioOwnerInventory, decodeMatchContextRangeInventory,
@@ -17,6 +19,103 @@ import {
   requireStableStageArenaOwnerInventory,
   validateCensusInventory, validateSourceStateManifest, runBrowserSample, closeBrowser,
 } from './run_synctest.mjs';
+
+test('failed census retains native panic logs without calling the aborted module', async () => {
+  const error = new Error('native initialization aborted');
+  const report = {execution: {status: 'starting'}};
+  recordFailedCensusExecution(report, error);
+  const context = vm.createContext({
+    document: {title: 'private diagnostic'},
+    window: {__slippiSynctest: {
+      logs: [{stream: 'stderr', line: 'HSD panic at tobj.c:276: tobj->imagetbl'}],
+      get module() { throw new Error('must not call aborted Wasm'); },
+    }},
+  });
+  await recordCensusFailurePageState(report, {
+    evaluate: async callback => JSON.parse(JSON.stringify(
+      vm.runInContext(`(${callback.toString()})()`, context))),
+  });
+  assert.deepEqual(report.browserPageState.logs, [
+    {stream: 'stderr', line: 'HSD panic at tobj.c:276: tobj->imagetbl'},
+  ]);
+  assert.equal(report.result, 'failed');
+  assert.equal(report.failure.message, String(error));
+});
+
+test('unavailable failure logs remain explicit and do not replace the original error', async () => {
+  const report = {execution: {status: 'starting'}};
+  recordFailedCensusExecution(report, new Error('original initialization failure'));
+  const original = report.failure;
+  await recordCensusFailurePageState(report, null);
+  assert.equal(report.browserPageState, undefined);
+  await recordCensusFailurePageState(report, {
+    evaluate: async () => { throw new Error('page closed'); },
+  });
+  assert.match(report.browserPageStateError, /page closed/);
+  assert.equal(report.failure, original);
+  const context = vm.createContext({document: {title: 'before factory'}, window: {}});
+  await recordCensusFailurePageState(report, {
+    evaluate: async callback => JSON.parse(JSON.stringify(
+      vm.runInContext(`(${callback.toString()})()`, context))),
+  });
+  assert.equal(report.browserPageState.logs, null);
+  assert.equal(report.failure, original);
+});
+
+function tobjFailureManifest() {
+  return {mutable_input_sections: [['first_failure', 4], ['owner_world', 8],
+    ['owners', 4], ['active_token', 8], ['owner_count', 4]].map(([name, size], index) => ({
+      source: 'src/slippi_profile/tobj_presentation_cache.c',
+      input_object: 'libhsd_native_runtime.a(tobj_presentation_cache.c.o)',
+      input_section: `.bss.${name}`, address: 32 + index * 8, size,
+    }))};
+}
+
+test('TObj failure statics require unique exact producer, section, width and address', () => {
+  const data = tobjFailureManifest();
+  assert.equal(selectTobjFailureStatics(data).length, 5);
+  for (const mutate of [
+    m => m.mutable_input_sections.pop(),
+    m => m.mutable_input_sections.push({...m.mutable_input_sections[0]}),
+    m => { m.mutable_input_sections[0].source = 'some-other-source.c'; },
+    m => { m.mutable_input_sections[0].input_object = 'other.a(tobj_presentation_cache.c.o)'; },
+    m => { m.mutable_input_sections[0].size = 8; },
+    m => { m.mutable_input_sections[0].address = -4; },
+    m => { m.mutable_input_sections[0].address = 3.5; },
+    m => { m.mutable_input_sections[0].address = 0xffffffff; },
+  ]) {
+    const broken = structuredClone(data); mutate(broken);
+    assert.throws(() => selectTobjFailureStatics(broken), /diagnostic manifest row refused/);
+  }
+});
+
+test('TObj failure read copies only declared static bytes and preserves the original failure', async () => {
+  const rows = selectTobjFailureStatics(tobjFailureManifest());
+  const heap = new Uint8Array(128); heap[32] = 9; heap[48] = 0xff;
+  const before = heap.slice();
+  const report = {execution: {status: 'starting'}};
+  recordFailedCensusExecution(report, new Error('native panic'));
+  const failure = report.failure;
+  const context = vm.createContext({Uint8Array, window: {__slippiSynctest: {
+    module: {HEAPU8: heap},
+  }}});
+  const page = {evaluate: async (callback, selected) => {
+    context.selected = selected;
+    return JSON.parse(JSON.stringify(vm.runInContext(`(${callback.toString()})(selected)`, context)));
+  }};
+  await recordTobjFailureStatics(report, page, rows);
+  assert.deepEqual(report.tobjFailureStatics[0], {name: 'first_failure', address: 32, size: 4, bytes: [9, 0, 0, 0]});
+  assert.equal(report.tobjFailureStatics.length, 5);
+  assert.deepEqual(heap, before);
+  assert.equal(report.failure, failure);
+  await recordTobjFailureStatics(report, page, [{name: 'outside', address: 126, size: 4}]);
+  assert.match(report.tobjFailureStaticsError, /outside current Wasm memory/);
+  assert.equal(report.failure, failure);
+  delete context.window.__slippiSynctest.module;
+  await recordTobjFailureStatics(report, page, rows);
+  assert.match(report.tobjFailureStaticsError, /memory unavailable/);
+  assert.equal(report.failure, failure);
+});
 
 function manifest(rows) {
   return {
